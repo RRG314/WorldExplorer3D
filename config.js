@@ -15,6 +15,61 @@ export const LOCATIONS = {
 
 export const SCALE = 100000;
 
+// Land use styles for massive visual realism - ground truth rendering
+export const LANDUSE_STYLES = {
+    residential: { color: 0xd4d4d4, name: 'Residential' },
+    industrial: { color: 0x8c8c8c, name: 'Industrial' },
+    commercial: { color: 0xb8b8b8, name: 'Commercial' },
+    retail: { color: 0xc9c9c9, name: 'Retail' },
+    forest: { color: 0x2d5016, name: 'Forest' },
+    farmland: { color: 0x8b7355, name: 'Farmland' },
+    grass: { color: 0x7cb342, name: 'Grass' },
+    meadow: { color: 0x8bc34a, name: 'Meadow' },
+    orchard: { color: 0x689f38, name: 'Orchard' },
+    vineyard: { color: 0x7cb342, name: 'Vineyard' },
+    water: { color: 0x4a90e2, name: 'Water' },
+    wood: { color: 0x1b4d0d, name: 'Woods' },
+    park: { color: 0x66bb6a, name: 'Park' },
+    garden: { color: 0x81c784, name: 'Garden' },
+    cemetery: { color: 0x558b2f, name: 'Cemetery' },
+    allotments: { color: 0x8bc34a, name: 'Allotments' },
+    recreation_ground: { color: 0x66bb6a, name: 'Recreation' },
+    village_green: { color: 0x7cb342, name: 'Village Green' },
+    quarry: { color: 0x9e9e9e, name: 'Quarry' },
+    landfill: { color: 0x757575, name: 'Landfill' },
+    construction: { color: 0xbdbdbd, name: 'Construction' },
+    brownfield: { color: 0xa1887f, name: 'Brownfield' },
+    greenfield: { color: 0x9ccc65, name: 'Greenfield' }
+};
+
+// POI types with icons and colors
+export const POI_TYPES = {
+    'amenity=school': { icon: '🏫', category: 'Education', color: 0x2196f3 },
+    'amenity=hospital': { icon: '🏥', category: 'Healthcare', color: 0xf44336 },
+    'amenity=clinic': { icon: '🏥', category: 'Healthcare', color: 0xe91e63 },
+    'amenity=police': { icon: '👮', category: 'Safety', color: 0x1976d2 },
+    'amenity=fire_station': { icon: '🚒', category: 'Safety', color: 0xff5722 },
+    'amenity=parking': { icon: '🅿️', category: 'Transport', color: 0x607d8b },
+    'amenity=fuel': { icon: '⛽', category: 'Services', color: 0xff9800 },
+    'amenity=restaurant': { icon: '🍽️', category: 'Food', color: 0xef5350 },
+    'amenity=cafe': { icon: '☕', category: 'Food', color: 0x8d6e63 },
+    'amenity=bank': { icon: '🏦', category: 'Finance', color: 0x43a047 },
+    'amenity=pharmacy': { icon: '💊', category: 'Healthcare', color: 0x66bb6a },
+    'amenity=post_office': { icon: '📮', category: 'Services', color: 0x1e88e5 },
+    'shop=supermarket': { icon: '🏪', category: 'Shopping', color: 0x4caf50 },
+    'shop=mall': { icon: '🏬', category: 'Shopping', color: 0x9c27b0 },
+    'shop=convenience': { icon: '🏪', category: 'Shopping', color: 0x66bb6a },
+    'tourism=museum': { icon: '🏛️', category: 'Culture', color: 0x795548 },
+    'tourism=hotel': { icon: '🏨', category: 'Hospitality', color: 0x00bcd4 },
+    'tourism=attraction': { icon: '⭐', category: 'Tourism', color: 0xffc107 },
+    'tourism=viewpoint': { icon: '👁️', category: 'Tourism', color: 0xff9800 },
+    'historic=monument': { icon: '🗿', category: 'Historic', color: 0x8d6e63 },
+    'historic=memorial': { icon: '🗿', category: 'Historic', color: 0x6d4c41 },
+    'leisure=park': { icon: '🌳', category: 'Recreation', color: 0x66bb6a },
+    'leisure=stadium': { icon: '🏟️', category: 'Sports', color: 0xffc107 },
+    'leisure=sports_centre': { icon: '⚽', category: 'Sports', color: 0xff9800 }
+};
+
 export const PHYSICS_CONFIG = {
     maxSpd: 120,
     offMax: 60,
