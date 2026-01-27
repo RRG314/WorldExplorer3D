@@ -26,24 +26,24 @@ export const PHYSICS_CONFIG = {
     boostMax: 140,
     boostDur: 2.5,
     brakeForce: 2.5,
-    
-    // Grip settings
+
+    // Grip settings - realistic car physics
     gripRoad: 0.88,
     gripOff: 0.70,
     gripBrake: 0.60,
     gripDrift: 0.45,
     driftRec: 6,
-    
-    // Turn settings
+
+    // Turn settings - realistic steering
     turnLow: 1.8,
     turnHigh: 0.8,
     turnMin: 30,
-    
-    // Road boundary
+
+    // Road boundary settings
     roadForce: 0.93,
     roadPushback: 0.3,
     maxOffDist: 15,
-    
+
     // Game modes
     cpRadius: 25,
     trialTime: 120,

@@ -6,7 +6,7 @@ export const state = {
     LOC: { lat: 39.2904, lon: -76.6122 },
     customLoc: null,
     selectedLocation: 'baltimore',
-    
+
     // Car state
     car: {
         x: 0,
@@ -23,14 +23,14 @@ export const state = {
         boostReady: true,
         driftAngle: 0
     },
-    
+
     // Input
     keys: {},
-    
+
     // World data
     roads: [],
     buildings: [],
-    
+
     // Three.js objects
     scene: null,
     camera: null,
@@ -39,22 +39,22 @@ export const state = {
     wheelMeshes: [],
     roadMeshes: [],
     buildingMeshes: [],
-    
+
     // Game state
     gameStarted: false,
     paused: false,
     gameMode: 'free',
     gameTimer: 0,
-    
+
     // Camera
     camMode: 0,
-    
+
     // Police
     policeOn: false,
     police: [],
     policeMeshes: [],
     policeHits: 0,
-    
+
     // Objectives
     checkpoints: [],
     cpMeshes: [],
@@ -62,12 +62,12 @@ export const state = {
     destination: null,
     destMesh: null,
     trialDone: false,
-    
+
     // Track recording
     customTrack: [],
     trackMesh: null,
     isRecording: false,
-    
+
     // Drone mode
     droneMode: false,
     drone: {
@@ -79,14 +79,20 @@ export const state = {
         roll: 0,
         speed: 30
     },
-    
+
     // Minimap
     tileCache: new Map(),
     showLargeMap: false,
     largeMapZoom: 14,
-    
+
     // Timing
-    lastTime: 0
+    lastTime: 0,
+
+    // Textures
+    asphaltTex: null,
+    asphaltNormal: null,
+    asphaltRoughness: null,
+    windowTextures: {}
 };
 
 // Helper function for coordinate conversion
