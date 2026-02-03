@@ -1,6 +1,47 @@
-MIT License
+PROPRIETARY SOFTWARE LICENSE
 
-Copyright (c) 2026 World Explorer 3D
+Copyright © 2026 World Explorer 3D. All Rights Reserved.
+
+---
+
+## LICENSE TERMS
+
+This software and associated documentation files (the "Software") are the proprietary 
+and confidential property of World Explorer 3D. All rights are reserved.
+
+### Restrictions
+
+NO PART of this Software may be:
+- Reproduced, copied, or duplicated
+- Modified, adapted, or translated
+- Reverse engineered, decompiled, or disassembled
+- Distributed, sublicensed, or transferred
+- Used to create derivative works
+- Publicly displayed or performed
+- Sold, rented, or leased
+
+WITHOUT EXPRESS WRITTEN PERMISSION from the copyright holder.
+
+### Permitted Use
+
+This Software is provided for:
+- Demonstration purposes
+- Evaluation by authorized parties
+- Use by licensed individuals or organizations
+- Personal viewing and testing only
+
+Any commercial use, redistribution, or modification requires a separate written 
+license agreement.
+
+---
+
+## THIRD-PARTY COMPONENTS AND ACKNOWLEDGEMENTS
+
+This Software incorporates the following third-party components, each subject to 
+their respective licenses:
+
+### Three.js (MIT License)
+**Copyright © 2010-2023 three.js authors**
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -20,57 +61,244 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
+**Source**: https://github.com/mrdoob/three.js/
+**Version**: r128
+
+### OpenStreetMap
+**Copyright © OpenStreetMap contributors**
+
+This Software uses map data from OpenStreetMap:
+- Base map tiles and imagery
+- Geographic data
+- Points of interest
+- Road and street information
+
+**License**: Open Database License (ODbL) 1.0
+**Terms**: https://www.openstreetmap.org/copyright
+**Attribution Required**: "© OpenStreetMap contributors"
+
+OpenStreetMap® is open data, licensed under the Open Data Commons Open Database 
+License (ODbL) by the OpenStreetMap Foundation (OSMF). You are free to copy, 
+distribute, transmit and adapt our data, as long as you credit OpenStreetMap 
+and its contributors.
+
+**Required Attribution**: 
+- Map display: "© OpenStreetMap contributors"
+- Data usage: Must include ODbL license notice
+- Any derived data: Must be made available under ODbL
+
+**Important**: If you modify OpenStreetMap data, you must share those modifications 
+under the same ODbL license. However, using the data in a proprietary application 
+(as done here) is permitted with proper attribution.
+
+**Source**: https://www.openstreetmap.org/
+
+### Google Fonts (Open Font License)
+**Fonts Used**:
+- Inter (Copyright 2020 The Inter Project Authors)
+- Poppins (Copyright 2020 Indian Type Foundry)
+- Orbitron (Copyright 2018 The Orbitron Project Authors)
+- Righteous (Copyright 2011 The Righteous Project Authors)
+
+**License**: SIL Open Font License, Version 1.1
+**Source**: https://fonts.google.com/
+
+These fonts are used under the SIL Open Font License, which permits use in both
+commercial and non-commercial software.
+
+### Real Estate Data APIs
+
+**Rentcast API**
+- Copyright © Rentcast
+- Terms of Service: https://www.rentcast.io/terms
+- API Key required for access
+- Subject to Rentcast's terms and pricing
+
+**Attom Data Solutions API**
+- Copyright © Attom Data Solutions
+- Terms of Service: https://www.attomdata.com/terms-of-use/
+- API Key required for access
+- Subject to Attom's terms and pricing
+
+**Estated API**
+- Copyright © Estated
+- Terms of Service: https://estated.com/terms
+- API Key required for access
+- Subject to Estated's terms and pricing
+
+**Important**: Users must obtain their own API keys and comply with each provider's
+terms of service. Real estate data is provided by third parties and accuracy is not
+guaranteed.
+
 ---
 
-## Third-Party Licenses
+## REQUIRED ATTRIBUTIONS
 
-This software uses the following third-party libraries and services:
+When displaying or demonstrating this Software, the following attributions MUST
+be visible:
 
-### Three.js
-- License: MIT License
-- Copyright: Copyright © 2010-2023 three.js authors
-- Source: https://github.com/mrdoob/three.js/
+### In-Application Credits
+```
+World Explorer 3D © 2026. All Rights Reserved.
+Powered by Three.js (MIT License)
+Map data © OpenStreetMap contributors
+```
 
-### Google Maps Platform
-- Terms of Service: https://cloud.google.com/maps-platform/terms
-- Attribution required for satellite imagery
-- Usage subject to Google Maps Platform Terms
+### For Presentations/Marketing
+```
+World Explorer 3D - Proprietary Software
+© 2026 All Rights Reserved
 
-### Google Fonts
-- License: Open Font License (OFL)
-- Fonts used: Inter, Poppins, Orbitron, Righteous
-- Source: https://fonts.google.com/
+Built with:
+- Three.js (MIT License)
+- OpenStreetMap (ODbL)
+- Real Estate Data APIs
+```
 
-### Real Estate APIs
-- **Rentcast**: Subject to Rentcast API Terms of Service
-- **Attom**: Subject to Attom Data Solutions Terms
-- **Estated**: Subject to Estated API Terms
+### For Documentation
+```
+This Software uses Three.js, an open-source 3D graphics library licensed under
+the MIT License. © 2010-2023 three.js authors.
+
+Map data © OpenStreetMap contributors. Licensed under ODbL.
+```
 
 ---
 
-## Attribution Requirements
+## DATA SOURCES AND ACCURACY
 
-When using World Explorer 3D, please maintain:
+### Geographic Data
+- Map data: OpenStreetMap contributors (ODbL)
+- Tile imagery: OpenStreetMap tile servers
+- Geographic features: OpenStreetMap database
+- Points of interest: OpenStreetMap contributors
 
-1. **This license notice** in all copies
-2. **Google Maps attribution** for satellite imagery
-3. **Three.js attribution** if redistributing
-4. **API provider attribution** when using real estate data
+### Real Estate Data
+- Property information provided by Rentcast, Attom, and Estated APIs
+- Data accuracy not guaranteed
+- For informational purposes only
+- Not intended for financial or legal decisions
 
-## Commercial Use
+### Astronomical Data
+- Star positions: Based on astronomical databases
+- Constellation information: Public domain astronomical data
+- Apollo 11 information: NASA public domain materials
 
-This software is free for commercial use under the MIT License. However:
+---
 
-- Google Maps usage may require a paid account for commercial projects
-- Real Estate API access may require paid subscriptions
-- Ensure you comply with all third-party service terms
+## DISCLAIMER OF WARRANTIES
 
-## Warranty Disclaimer
+THIS SOFTWARE IS PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND, EITHER EXPRESS
+OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. USE AT YOUR OWN RISK.
+THE COPYRIGHT HOLDER DOES NOT WARRANT THAT:
+- The Software will meet your requirements
+- Operation will be uninterrupted or error-free
+- Defects will be corrected
+- The Software is free of viruses or harmful components
 
-The authors are not responsible for:
-- Accuracy of real estate data
-- Availability of third-party services
-- Performance on specific hardware
-- Any damages resulting from use
+### Limitation of Liability
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY DAMAGES, INCLUDING:
+- Direct, indirect, incidental, or consequential damages
+- Loss of profits, data, or business opportunities
+- Personal injury or property damage
+- Any damages whatsoever arising from use or inability to use the Software
+
+Even if advised of the possibility of such damages.
+
+---
+
+## DATA PRIVACY
+
+### User Data
+This Software does not collect or transmit personal user data to the copyright
+holder. However:
+
+- API keys are stored locally in browser storage
+- Third-party services (OpenStreetMap, Real Estate APIs) have their own privacy policies
+- Users should review privacy policies of all integrated services
+
+### Third-Party Data Collection
+- **OpenStreetMap**: Does not track individual users
+- **Real Estate APIs**: Subject to respective provider privacy policies
+
+---
+
+## INTELLECTUAL PROPERTY
+
+### Copyright Notice
+© 2026 World Explorer 3D. All Rights Reserved.
+
+### Trademarks
+World Explorer 3D and associated logos are trademarks of the copyright holder.
+Unauthorized use is prohibited.
+
+### Patents
+Certain features may be subject to pending patent applications.
+
+---
+
+## TERMINATION
+
+This license is effective until terminated. Your rights under this license will
+terminate automatically without notice if you fail to comply with any term herein.
+
+Upon termination, you must:
+1. Cease all use of the Software
+2. Destroy all copies in your possession
+3. Remove any installations from your systems
+
+---
+
+## EXPORT COMPLIANCE
+
+This Software may be subject to export control laws. Users are responsible for
+compliance with all applicable export regulations.
+
+---
+
+## GOVERNING LAW
+
+This license shall be governed by and construed in accordance with the laws of
+the jurisdiction in which the copyright holder resides, without regard to conflict
+of law principles.
+
+---
+
+## CONTACT INFORMATION
+
+For licensing inquiries, permissions, or questions:
+- Email: sreid1118@gmail.com
+- Website: [Your Website]
+
+For technical support:
+- Documentation: See included documentation files
+- Issues: [Your Support Channel]
+
+---
+
+## ACKNOWLEDGEMENTS
+
+This Software was made possible by the following open-source projects and services:
+
+**Special Thanks To**:
+- Three.js community and contributors
+- OpenStreetMap community and contributors
+- Open-source JavaScript community
+- Beta testers and early users
+
+**Inspired By**:
+- Google Earth
+- Flight simulation software
+- Open-world exploration games
+
+---
+
+WORLD EXPLORER 3D
+Proprietary Software - All Rights Reserved
+© 2026
+
+Last Updated: February 2, 2026
+Version: 1.0.0
