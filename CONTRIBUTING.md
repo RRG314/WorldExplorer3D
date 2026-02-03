@@ -1,16 +1,37 @@
 # Contributing to World Explorer 3D 🤝
 
-Thank you for your interest in contributing! This document provides guidelines for contributing to the project.
+Thank you for your interest in contributing! This document provides guidelines for contributing to this **proprietary software project**.
+
+## ⚠️ Important Notice
+
+World Explorer 3D is **proprietary software**. All rights are reserved. By contributing to this project, you agree that:
+
+1. **All contributions become the property of World Explorer 3D**
+2. **You assign all rights, title, and interest** in your contributions to the copyright holder
+3. **No compensation is guaranteed** unless explicitly agreed upon in writing
+4. **Contributions may be used** in any way the copyright holder deems appropriate
+5. **You will not redistribute** the software or any portion thereof
+
+If you cannot agree to these terms, please do not contribute.
+
+## Contributor Agreement
+
+Before contributing, you must sign a **Contributor License Agreement (CLA)** that:
+- Assigns all intellectual property rights to World Explorer 3D
+- Confirms you have the right to contribute the work
+- Grants perpetual, irrevocable rights to use your contributions
+
+Contact sreid1118@gmail.com to receive the CLA.
 
 ## Table of Contents
 - [Code of Conduct](#code-of-conduct)
-- [Getting Started](#getting-started)
+- [Getting Access](#getting-access)
 - [Development Process](#development-process)
-- [Pull Request Process](#pull-request-process)
+- [Contribution Types](#contribution-types)
 - [Coding Standards](#coding-standards)
 - [Testing](#testing)
 - [Documentation](#documentation)
-- [Community](#community)
+- [Legal Requirements](#legal-requirements)
 
 ## Code of Conduct
 
@@ -38,11 +59,20 @@ We are committed to providing a welcoming and inclusive environment for all cont
 - Publishing others' private information
 - Other conduct which could reasonably be considered inappropriate
 
-## Getting Started
+## Getting Access
+
+### Access Requirements
+
+Access to the source code is restricted. To gain access:
+
+1. **Contact the project maintainer** at sreid1118@gmail.com
+2. **Sign the Non-Disclosure Agreement (NDA)**
+3. **Sign the Contributor License Agreement (CLA)**
+4. **Receive authorized access** to the development repository
 
 ### Prerequisites
 
-Before contributing, ensure you have:
+Before requesting access, ensure you have:
 - Modern web browser (Chrome, Firefox, Safari, or Edge)
 - Text editor (VS Code, Sublime, Atom, etc.)
 - Basic knowledge of:
@@ -539,10 +569,76 @@ If you have questions about contributing:
 3. Open a new discussion with your question
 4. Tag it appropriately
 
+## Legal Requirements
+
+### Intellectual Property Assignment
+
+By contributing to this project, you agree that:
+
+1. **Full Ownership Transfer**: All contributions become the exclusive property of World Explorer 3D
+2. **No Retained Rights**: You retain no rights to the contributed code or content
+3. **Perpetual License**: The copyright holder may use contributions in perpetuity
+4. **No Attribution Required**: The copyright holder is not required to provide attribution
+5. **Commercial Use**: Contributions may be used in commercial products
+
+### Required Documents
+
+Before any contribution is accepted, you must sign:
+
+1. **Contributor License Agreement (CLA)**
+   - Assigns all IP rights
+   - Confirms right to contribute
+   - Indemnifies copyright holder
+
+2. **Non-Disclosure Agreement (NDA)** (if accessing source)
+   - Protects confidential information
+   - Restricts disclosure
+   - Defines confidentiality obligations
+
+### Confidentiality
+
+Contributors must:
+- Treat all source code as confidential
+- Not disclose any proprietary information
+- Not share access credentials
+- Not create unauthorized copies
+- Not reverse engineer any components
+
+### Warranties
+
+Contributors warrant that:
+- They own the contributed work
+- Work does not infringe on third-party rights
+- They have authority to assign rights
+- Work is original and not copied
+- No other agreements conflict with this contribution
+
+## Contact for Contributions
+
+To begin the contribution process:
+
+**Email**: sreid1118@gmail.com  
+**GitHub**: RRG314  
+**Subject**: "Contribution Request - World Explorer 3D"
+
+Include:
+- Your name and contact information
+- Brief description of proposed contribution
+- Your experience and qualifications
+- Why you want to contribute
+
+You will receive:
+- NDA for review and signature
+- CLA for review and signature
+- Access instructions (after agreements signed)
+- Contribution guidelines specific to your role
+
 ## Thank You! 🙏
 
-Every contribution, no matter how small, makes this project better. Thank you for being part of the World Explorer 3D community!
+While this is proprietary software, we appreciate interest in improving World Explorer 3D. Contributors who sign agreements and provide valuable contributions may be acknowledged in release notes (at the discretion of the copyright holder).
 
 ---
 
 **Last Updated**: February 2026 | [Back to README](README.md)
+
+**IMPORTANT LEGAL NOTICE**: This is proprietary software. Unauthorized access, use, modification, or distribution is prohibited and may result in legal action.
