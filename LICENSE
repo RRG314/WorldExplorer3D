@@ -1,0 +1,76 @@
+MIT License
+
+Copyright (c) 2026 World Explorer 3D
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---
+
+## Third-Party Licenses
+
+This software uses the following third-party libraries and services:
+
+### Three.js
+- License: MIT License
+- Copyright: Copyright © 2010-2023 three.js authors
+- Source: https://github.com/mrdoob/three.js/
+
+### Google Maps Platform
+- Terms of Service: https://cloud.google.com/maps-platform/terms
+- Attribution required for satellite imagery
+- Usage subject to Google Maps Platform Terms
+
+### Google Fonts
+- License: Open Font License (OFL)
+- Fonts used: Inter, Poppins, Orbitron, Righteous
+- Source: https://fonts.google.com/
+
+### Real Estate APIs
+- **Rentcast**: Subject to Rentcast API Terms of Service
+- **Attom**: Subject to Attom Data Solutions Terms
+- **Estated**: Subject to Estated API Terms
+
+---
+
+## Attribution Requirements
+
+When using World Explorer 3D, please maintain:
+
+1. **This license notice** in all copies
+2. **Google Maps attribution** for satellite imagery
+3. **Three.js attribution** if redistributing
+4. **API provider attribution** when using real estate data
+
+## Commercial Use
+
+This software is free for commercial use under the MIT License. However:
+
+- Google Maps usage may require a paid account for commercial projects
+- Real Estate API access may require paid subscriptions
+- Ensure you comply with all third-party service terms
+
+## Warranty Disclaimer
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. USE AT YOUR OWN RISK.
+
+The authors are not responsible for:
+- Accuracy of real estate data
+- Availability of third-party services
+- Performance on specific hardware
+- Any damages resulting from use
