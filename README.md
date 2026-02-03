@@ -1,9 +1,9 @@
 # World Explorer 3D 🌍
 
-A real-time 3D world exploration platform that combines satellite imagery, interactive gameplay, and immersive experiences. Drive, walk, or fly through realistic recreations of major cities worldwide, travel to the moon, and explore real estate data—all from your browser.
+A real-time 3D world exploration platform that combines open map data, interactive gameplay, and immersive experiences. Drive, walk, or fly through realistic recreations of major cities worldwide, travel to the moon, and explore real estate data—all from your browser.
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+![License](https://img.shields.io/badge/license-Proprietary-red.svg)
 ![Three.js](https://img.shields.io/badge/three.js-r128-orange.svg)
 
 ## ✨ Features
@@ -16,7 +16,7 @@ A real-time 3D world exploration platform that combines satellite imagery, inter
 - **Drone Mode** - Aerial photography and exploration
 
 ### 🗺️ Real-World Integration
-- **Live Satellite Imagery** - Google Maps integration for photorealistic terrain
+- **OpenStreetMap Data** - Community-contributed map data for realistic terrain
 - **11+ Major Cities** - Baltimore, New York, Tokyo, Paris, Monaco, and more
 - **Custom Location Support** - Search any address or enter GPS coordinates
 - **Dynamic Map System** - Interactive map with multiple layers and filters
@@ -139,7 +139,7 @@ A real-time 3D world exploration platform that combines satellite imagery, inter
 - **Browser**: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
 - **RAM**: 4 GB
 - **GPU**: Integrated graphics
-- **Internet**: 5 Mbps
+- **Internet**: 5 Mbps for map data
 
 ### Recommended
 - **Browser**: Latest Chrome or Firefox
@@ -175,7 +175,7 @@ See [API_SETUP.md](API_SETUP.md) for detailed configuration instructions.
 ### Custom Locations
 
 Add your own locations by:
-1. Finding GPS coordinates on Google Maps
+1. Finding GPS coordinates online (from any mapping service)
 2. Entering them in the Settings tab
 3. Clicking "Search Location"
 
@@ -220,7 +220,7 @@ Collect all checkpoints scattered across the map. Find the optimal route to maxi
 ### Map System
 - Press `M` to open the large map
 - Zoom in/out with `+`/`-` buttons
-- Toggle satellite/roads/land-use layers
+- Toggle roads/land-use/property layers
 - Right-click to teleport anywhere
 - View legend for marker meanings
 
@@ -246,7 +246,7 @@ Access quick actions:
 ## 🐛 Known Issues
 
 1. **Performance on Older Devices**: May experience lag on devices >5 years old
-2. **Satellite Imagery Loading**: Can take 10-20 seconds on slow connections
+2. **Map Tile Loading**: Can take 5-15 seconds on slow connections
 3. **Real Estate Data**: Requires valid API keys and may have coverage gaps
 4. **Mobile Graphics**: Some visual effects disabled for performance
 
@@ -266,7 +266,7 @@ Access quick actions:
 ## 🛠️ Technical Stack
 
 - **Three.js** (r128) - 3D graphics engine
-- **Google Maps API** - Satellite imagery and geocoding
+- **OpenStreetMap** - Map data and tiles
 - **Real Estate APIs** - Rentcast, Attom, Estated
 - **Vanilla JavaScript** - No frameworks
 - **HTML5 Canvas** - 2D map rendering
@@ -278,25 +278,44 @@ Access quick actions:
 - [User Guide](USER_GUIDE.md) - Complete feature walkthrough
 - [Technical Documentation](TECHNICAL_DOCS.md) - Architecture and code structure
 - [Changelog](CHANGELOG.md) - Version history
+- [Acknowledgements](ACKNOWLEDGEMENTS.md) - Third-party credits and licenses
 
 ## 🤝 Contributing
 
-This is currently a prototype/demo project. If you'd like to contribute:
+This is proprietary software. Contributions are only accepted under specific legal agreements.
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+Interested in contributing? See [CONTRIBUTING.md](CONTRIBUTING.md) for:
+- Contributor License Agreement (CLA) requirements
+- Non-Disclosure Agreement (NDA) requirements
+- Development process
+- Coding standards
 
-## 📄 License
+**Important**: All contributions become the exclusive property of World Explorer 3D. Contact sreid1118@gmail.com to begin the contribution process.
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+**GitHub**: RRG314
+
+## 📄 License & Copyright
+
+**Copyright © 2026 World Explorer 3D. All Rights Reserved.**
+
+This is proprietary software. No part of this software may be reproduced, modified, distributed, or used without explicit written permission from the copyright holder.
+
+See the [LICENSE](LICENSE) file for complete terms and conditions.
+
+### Third-Party Acknowledgements
+
+This software incorporates the following third-party components:
+- **Three.js** - MIT License © 2010-2023 three.js authors
+- **OpenStreetMap** - Open Database License (ODbL) © OpenStreetMap contributors
+- **Google Fonts** - Open Font License (Inter, Poppins, Orbitron, Righteous)
+- **Real Estate APIs** - Rentcast, Attom, Estated (subject to their respective terms)
+
+All third-party components are used in accordance with their respective licenses. The use of these components does not grant any rights to the proprietary portions of this software.
 
 ## 🙏 Credits
 
 ### APIs & Services
-- Google Maps Platform
+- OpenStreetMap
 - Rentcast API
 - Attom Data Solutions
 - Estated API
@@ -311,17 +330,59 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 - Grand Theft Auto series
 - Minecraft
 
+## 🙏 Acknowledgements
+
+This software would not be possible without the following third-party components and services. See [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md) for complete details and license information.
+
+### Core Technologies
+- **Three.js** (MIT License) - © 2010-2023 three.js authors
+- **OpenStreetMap** (ODbL) - © OpenStreetMap contributors
+
+### Fonts
+- **Inter** - © 2020 The Inter Project Authors (OFL)
+- **Poppins** - © 2020 Indian Type Foundry (OFL)
+- **Orbitron** - © 2018 The Orbitron Project Authors (OFL)
+- **Righteous** - © 2011 The Righteous Project Authors (OFL)
+
+### Data Providers
+- **Rentcast API** - Real estate data
+- **Attom Data Solutions** - Property information
+- **Estated API** - Market data
+- **NASA** - Apollo 11 public domain materials
+
+**Required Attribution**: "Powered by Three.js (MIT License) | Map data © OpenStreetMap contributors"
+
+See [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md) for full third-party license texts and attribution requirements.
+
 ## 📞 Support
 
-For issues, questions, or feedback:
+For issues, questions, or licensing inquiries:
 - Open an issue on GitHub
 - Check the [User Guide](USER_GUIDE.md)
 - Review [Known Issues](#-known-issues)
 
 ## ⚠️ Disclaimer
 
-This project is for educational and demonstration purposes. Satellite imagery is provided by Google Maps and is subject to their terms of service. Real estate data is provided by third-party APIs and may not be current or accurate. Always verify information independently for real decisions.
+**PROPRIETARY SOFTWARE - ALL RIGHTS RESERVED**
+
+This software is provided "as is" without warranty of any kind. The copyright holder is not responsible for:
+- Accuracy of real estate data (provided by third-party APIs)
+- Availability of third-party services (OpenStreetMap, Real Estate APIs)
+- Performance on specific hardware configurations
+- Any damages or losses resulting from use
+
+Map data is provided by OpenStreetMap contributors and is subject to the Open Database License (ODbL). Real estate data is provided by third-party APIs and may not be current or accurate. Always verify information independently for important decisions.
+
+**Usage Restrictions**: This software may not be copied, modified, distributed, or used for commercial purposes without explicit written permission from the copyright holder.
+
+**Third-Party Services**: Users must comply with all applicable third-party terms of service, including OpenStreetMap ODbL and Real Estate API Terms.
+
+**Contact**: sreid1118@gmail.com | **GitHub**: RRG314
 
 ---
 
-**Made with ❤️ and Three.js** | Version 1.0.0 | Last Updated: February 2026
+**Made with Three.js** | Version 1.0.0 | Last Updated: February 2026
+
+**Copyright © 2026 World Explorer 3D. All Rights Reserved.**
+
+Powered by Three.js (MIT License) | Map data © OpenStreetMap contributors
