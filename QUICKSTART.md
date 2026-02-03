@@ -4,7 +4,7 @@ Get World Explorer 3D running in under 2 minutes!
 
 ## 30-Second Setup
 
-1. **Download** `world-explorer-complete.html`
+1. **Download** `index.html` or visit 
 2. **Double-click** the file (or drag to your browser)
 3. **Click "EXPLORE"** button
 4. **Start driving!** Use WASD or arrow keys
@@ -16,10 +16,10 @@ That's it! 🎉
 ### Step 1: Choose Your Location (15 seconds)
 - Baltimore is selected by default ✅
 - Or click another city card
-- Or search for any address
+- Or search for any city
 - Or enter GPS coordinates
 
-### Step 2: Pick a Game Mode (10 seconds)
+### Step 2: Pick a Game Mode if desired (10 seconds)
 - **Free Roam** - Explore freely (recommended first!)
 - **Time Trial** - Race against time
 - **Checkpoints** - Collect all markers
@@ -42,7 +42,7 @@ That's it! 🎉
 - Press `6` - Fly like a drone
 - Press `M` - Open the map
 - Press `C` - Change camera view
-- **Click the Moon** - Travel to space! 🌙
+- **Click the Moon** - Travel to space! Walk and drive on the moon! 🌙
 
 ## Essential Controls
 
