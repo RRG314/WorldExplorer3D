@@ -1,127 +1,152 @@
-# Quick Start Guide ⚡
+# 🚀 Quick Start Guide
 
 Get World Explorer 3D running in under 2 minutes!
 
-## 30-Second Setup
+## Option 1: Double-Click (Easiest)
 
-1. **Download** `index.html` or visit 
-2. **Double-click** the file (or drag to your browser)
-3. **Click "EXPLORE"** button
-4. **Start driving!** Use WASD or arrow keys
+1. Download or clone the repository
+2. Open `index.html` in your web browser
+3. Select a city and click "START GAME"
+4. Drive with **WASD** or **Arrow Keys**
 
 That's it! 🎉
 
-## 2-Minute Tutorial
+## Option 2: Local Server (Recommended)
 
-### Step 1: Choose Your Location (15 seconds)
-- Baltimore is selected by default ✅
-- Or click another city card
-- Or search for any city
-- Or enter GPS coordinates
+For better performance, run a local server:
 
-### Step 2: Pick a Game Mode if desired (10 seconds)
-- **Free Roam** - Explore freely (recommended first!)
-- **Time Trial** - Race against time
-- **Checkpoints** - Collect all markers
+### Using Python (Built into Mac/Linux)
+```bash
+cd world-explorer-3d
+python -m http.server 8000
+```
+Then open: http://localhost:8000
 
-### Step 3: Start Exploring! (5 seconds)
-- Click the big **"EXPLORE"** button
-- Wait 5-15 seconds for loading
-- World appears!
+### Using Node.js
+```bash
+cd world-explorer-3d
+npx http-server -p 8000
+```
+Then open: http://localhost:8000
 
-### Step 4: Drive Around (30 seconds)
-- `W` or `↑` - Go forward
-- `S` or `↓` - Brake/reverse
-- `A` or `←` - Turn left
-- `D` or `→` - Turn right
-- `Space` - Handbrake
-- `Ctrl` - Boost (when charged)
+### Using VS Code
+1. Install "Live Server" extension
+2. Right-click `index.html`
+3. Select "Open with Live Server"
 
-### Step 5: Try Other Features (60 seconds)
-- Press `F` - Walk around on foot
-- Press `6` - Fly like a drone
-- Press `M` - Open the map
-- Press `C` - Change camera view
-- **Click the Moon** - Travel to space! Walk and drive on the moon! 🌙
+## 🎮 First Steps
 
-## Essential Controls
+### 1. Choose Your Location
+- Select from 11 pre-loaded cities
+- OR click "🌍 Custom" to enter any location
 
-### Driving 🚗
+### 2. Pick a Game Mode
+- **Free Roam** - Just explore (recommended for first time)
+- **Time Trial** - Race against the clock
+- **Checkpoints** - Collect markers around the city
+
+### 3. Learn the Controls
+Click the "Controls" tab to see all keys, but here are the basics:
+- **W** - Gas
+- **S** - Brake
+- **A/D** - Steer
+- **Space** - Handbrake (for drifting!)
+
+### 4. Try These Fun Features
+- Press **Ctrl** for boost 🚀
+- Press **6** for drone camera 🚁
+- Press **C** to cycle camera views 📷
+- Click the floating menu (☰) in bottom-right for more options
+
+## 🚔 Police Mode
+
+1. Start the game
+2. Click the floating menu (☰) bottom-right
+3. Click "🚔 Police"
+4. Speed over the limit to trigger a chase!
+5. They won't stop chasing even if you slow down - you must escape!
+
+## 🌍 Exploring Custom Locations
+
+1. Select "🌍 Custom" in location menu
+2. Type a city name (e.g., "Tokyo, Japan")
+3. Click search 🔍
+4. Hit "START GAME"
+
+Or use GPS coordinates from Google Maps!
+
+## ⌨️ Essential Keyboard Shortcuts
+
 | Key | Action |
 |-----|--------|
-| WASD or Arrows | Drive |
-| Space | Handbrake |
-| Ctrl | Boost |
+| **W/↑** | Accelerate |
+| **S/↓** | Brake/Reverse |
+| **A/←** | Turn Left |
+| **D/→** | Turn Right |
+| **Space** | Handbrake |
+| **Ctrl** | Boost |
+| **C** | Change Camera |
+| **F** | Toggle Walking Mode |
+| **6** | Toggle Drone Mode |
+| **M** | Show Map |
+| **N** | Next City |
+| **R** | Record Track |
+| **Esc** | Pause |
 
-### Camera 📷
-| Key | Action |
-|-----|--------|
-| C | Change view |
-| V | Look back |
+## 🚀 Space Travel
 
-### Modes 🎮
-| Key | Action |
-|-----|--------|
-| F | Walk/Drive toggle |
-| 6 | Drone mode |
-| M | Map |
-| Esc | Pause |
+1. Open the Travel menu from the floating menu (bottom-right)
+2. Choose "Direct to Moon" for instant travel or "Rocket to Moon" for the full launch experience
+3. In rocket mode, fly freely through the solar system with planets at real orbital positions
+4. Land on the Moon and explore the lunar surface
+5. Return to Earth when you're ready
 
-## Pro Tips 💡
+## 🌅 Time of Day
 
-1. **Check the map** (M key) to see where you are
-2. **Walk around** (F key) to explore up close
-3. **Visit the moon** by clicking on it at night
-4. **Teleport anywhere** by right-clicking the map
-5. **Try drone mode** (6 key) for aerial views
+Click the time-of-day button in the Explore menu to cycle through: Day, Sunset, Night, and Sunrise. At night you can see the full star field with real constellations!
 
-## Common Questions
+## 🎯 Pro Tips
 
-**Q: Why is it loading slowly?**
-A: Downloading satellite images. Depends on your internet speed.
+1. **Drifting**: Hold **Space** while turning at high speed
+2. **Boost Management**: Boost refills over time, use it wisely
+3. **Off-Road**: Hold **Shift** to drive off-road with less penalty
+4. **Map Navigation**: Click minimap to see full map; right-click to teleport
+5. **Track Recording**: Press **R** to record your route
+6. **Walking Mode**: Press **F** to get out and walk around on foot
+7. **Drone Mode**: Press **6** for a free-flying aerial camera
+8. **Consistent Cities**: Procedural building/window/road texture variation is now deterministic per location, so reloading the same city preserves its look
+   
+## ⚠️ Troubleshooting
 
-**Q: How do I get off the moon?**
-A: Press `N` key or click "Return to Earth" button.
+### Black Screen?
+- Make sure WebGL is enabled in your browser
+- Try Chrome or Firefox
+- Update your graphics drivers
 
-**Q: Can I fly?**
-A: Yes! Press `6` for drone mode.
+### Laggy Performance?
+- Close other browser tabs
+- Lower graphics quality in browser settings
+- Try a different browser
 
-**Q: Where are the real estate features?**
-A: Enable in Settings tab + add API keys ([API Setup Guide](API_SETUP.md))
+### Roads Not Loading?
+- Check your internet connection
+- Try a different city
+- Wait 5-10 seconds for data to load
+- Dense urban areas may use adaptive query tuning and can take a bit longer
 
-**Q: It's laggy, help!**
-A: Close other browser tabs, or try a different city.
+### Map Not Showing?
+- The game loads real map data from the internet
+- It may take a few seconds
+- Look for the loading spinner
 
-## What's Next?
+## 🎊 You're Ready!
 
-### Learn More
-- [Complete User Guide](USER_GUIDE.md) - Every feature explained
-- [Controls Reference](README.md#-controls) - Full control list
-- [API Setup](API_SETUP.md) - Enable real estate features
+Start with **Baltimore** in **Free Roam** mode to get a feel for the controls.
 
-### Explore
-- Try all 11 cities
-- Visit the Apollo 11 landing site on the moon
-- Click on stars to learn constellations
-- Find hidden points of interest
-- Take screenshots from drone mode
+Then try enabling **Police Mode** and see if you can outrun them!
 
-### Customize
-- [Technical Docs](TECHNICAL_DOCS.md) - Modify the code
-- Add your own cities
-- Change car colors
-- Adjust physics
-
-## Need Help?
-
-1. Check [User Guide](USER_GUIDE.md)
-2. Read [FAQ](USER_GUIDE.md#faq)
-3. Open an issue on GitHub
-
-## Ready? Let's Go! 🚀
-
-Open `world-explorer-complete.html` and start your adventure!
+Have fun exploring the world! 🌍🚗💨
 
 ---
 
-**Having fun?** Share with friends! | **Found a bug?** Report it! | **Want to help?** See [Contributing Guide](CONTRIBUTING.md)
+Need more help? Check the full [README.md](README.md) or [open an issue](https://github.com/yourusername/world-explorer-3d/issues).
