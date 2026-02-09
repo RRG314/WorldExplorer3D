@@ -387,15 +387,31 @@ function rebuildRoadsWithTerrain() {
   });
   roadMeshes = [];
 
-  // Rebuild each road with terrain elevation using terrain mesh raycasting
+  // Rebuild each road with terrain elevation using terrain mesh sampling
   roads.forEach(road => {
     const { width } = road;
     const hw = width / 2;
 
-    // Subdivide road points so segments are at most 10 world units long
-    const pts = subdivideRoadPoints(road.pts, 10);
+    // Subdivide road points so segments are at most 5 world units long
+    // Denser subdivision = smoother roads on steep terrain (Monaco, SF hills)
+    const pts = subdivideRoadPoints(road.pts, 5);
 
     const verts = [], indices = [];
+
+    // First pass: sample terrain heights at center of each road point
+    const centerHeights = new Float64Array(pts.length);
+    for (let i = 0; i < pts.length; i++) {
+      centerHeights[i] = terrainMeshHeightAt(pts[i].x, pts[i].z);
+    }
+
+    // Smooth center heights to eliminate stair-stepping on steep terrain
+    // This is critical for hilly cities like Monaco, San Francisco
+    for (let pass = 0; pass < 3; pass++) {
+      for (let i = 1; i < pts.length - 1; i++) {
+        centerHeights[i] = centerHeights[i] * 0.6 +
+          (centerHeights[i - 1] + centerHeights[i + 1]) * 0.2;
+      }
+    }
 
     for (let i = 0; i < pts.length; i++) {
       const p = pts[i];
@@ -407,10 +423,22 @@ function rebuildRoadsWithTerrain() {
       const len = Math.sqrt(dx*dx + dz*dz) || 1;
       const nx = -dz / len, nz = dx / len;
 
-      // Sample terrain mesh directly at each edge vertex - no blending
-      // Roads follow the actual terrain surface including cross-slope tilt on hills
-      const y1 = terrainMeshHeightAt(p.x + nx * hw, p.z + nz * hw) + 0.2;
-      const y2 = terrainMeshHeightAt(p.x - nx * hw, p.z - nz * hw) + 0.2;
+      // Use smoothed center height + cross-slope tilt from terrain
+      const baseY = centerHeights[i] + 0.2;
+
+      // Sample cross-slope at edges for natural tilt on banked roads
+      const edgeY1 = terrainMeshHeightAt(p.x + nx * hw, p.z + nz * hw);
+      const edgeY2 = terrainMeshHeightAt(p.x - nx * hw, p.z - nz * hw);
+      const crossTilt1 = edgeY1 - terrainMeshHeightAt(p.x, p.z);
+      const crossTilt2 = edgeY2 - terrainMeshHeightAt(p.x, p.z);
+
+      // Clamp cross-slope tilt to prevent extreme values
+      const maxTilt = 2.0;
+      const tilt1 = Math.max(-maxTilt, Math.min(maxTilt, crossTilt1));
+      const tilt2 = Math.max(-maxTilt, Math.min(maxTilt, crossTilt2));
+
+      const y1 = baseY + tilt1;
+      const y2 = baseY + tilt2;
 
       verts.push(p.x + nx * hw, y1, p.z + nz * hw);
       verts.push(p.x - nx * hw, y2, p.z - nz * hw);
