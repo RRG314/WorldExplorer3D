@@ -245,35 +245,50 @@ async function searchLocation() {
         status.style.color = '#6b7280';
 
         async function runGeocodeSearch(searchQuery) {
-            const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(searchQuery)}`;
-            const urls = [
-                nominatimUrl,
-                `https://api.allorigins.win/get?url=${encodeURIComponent(nominatimUrl)}`
+                       const endpoints = [
+                {
+                    name: 'Nominatim',
+                    url: `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&q=${encodeURIComponent(searchQuery)}`,
+                    parse: payload => Array.isArray(payload) ? payload : []
+                },
+                {
+                    name: 'Maps.co',
+                    url: `https://geocode.maps.co/search?q=${encodeURIComponent(searchQuery)}&limit=5`,
+                    parse: payload => Array.isArray(payload) ? payload : []
+                },
+                {
+                    name: 'Open-Meteo',
+                    url: `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery)}&count=5&language=en&format=json`,
+                    parse: payload => (payload?.results || []).map(result => ({
+                        lat: result.latitude,
+                        lon: result.longitude,
+                        display_name: [result.name, result.admin1, result.country].filter(Boolean).join(', '),
+                        type: result.feature_code === 'PPLC' || result.feature_code === 'PPLA' ? 'city' : 'place',
+                        class: 'place'
+                    }))
+                }
             ];
 
             let lastError = null;
 
-            for (const url of urls) {
+            for (const endpoint of endpoints) {
                 try {
-                    const res = await fetchWithRetry(url);
-
+                    
+                    const res = await fetchWithRetry(endpoint.url);
                     if (!res || !res.ok) {
-                        throw new Error(`HTTP ${res?.status || 'unknown'}: ${res?.statusText || 'Request failed'}`);
-                    }
+                        throw new Error(`${endpoint.name} HTTP ${res?.status || 'unknown'}: ${res?.statusText || 'Request failed'}`);
 
                     const payload = await res.json();
+                    const parsed = endpoint.parse(payload);
 
-                    // Direct Nominatim returns an array.
-                    if (Array.isArray(payload)) {
-                        return payload;
+                    if (Array.isArray(parsed)) {
+                        if (parsed.length > 0) {
+                            return parsed;
+                        }
+                        continue;
                     }
 
-                    // allorigins wraps the real response in "contents".
-                    if (payload && typeof payload.contents === 'string') {
-                        return JSON.parse(payload.contents);
-                    }
-
-                    throw new Error('Unexpected geocoder response format');
+                   throw new Error(`${endpoint.name} returned an unexpected response format`);
                 } catch (err) {
                     lastError = err;
                 }
