@@ -12,6 +12,8 @@ async function loadRoads() {
     historicMarkers.forEach(m => scene.remove(m)); historicMarkers = []; historicSites = [];
     streetFurnitureMeshes.forEach(m => scene.remove(m)); streetFurnitureMeshes = [];
     _signTextureCache.clear(); _geoSignText = null;
+    windowTextures = {}; // Clear RDT-keyed window texture cache for new location
+    if (typeof invalidateRoadCache === 'function') invalidateRoadCache(); // Clear cached road result
 
     // Flag that roads will need rebuilding after terrain loads
     roadsNeedRebuild = true;
@@ -26,7 +28,19 @@ async function loadRoads() {
         LOC = { lat: LOCS[selLoc].lat, lon: LOCS[selLoc].lon };
     }
 
-    const radii = [0.02, 0.025, 0.03];
+    // RDT complexity index: derive adaptive query strategy from location
+    rdtSeed = hashGeoToInt(LOC.lat, LOC.lon, gameMode === 'trial' ? 1 : gameMode === 'checkpoint' ? 2 : 0);
+    rdtComplexity = rdtDepth(rdtSeed, 1.5);
+
+    // Map RDT depth -> query radii (denser areas get fewer/smaller queries)
+    const radii =
+        rdtComplexity <= 3 ? [0.02] :
+        rdtComplexity <= 5 ? [0.02, 0.025] :
+                             [0.02, 0.025, 0.03];
+
+    // Adapt Overpass timeout based on expected complexity
+    const overpassTimeoutSec = rdtComplexity <= 4 ? 20 : 30;
+
     let loaded = false;
 
     for (const r of radii) {
@@ -34,7 +48,7 @@ async function loadRoads() {
         try {
             showLoad('Loading map data...');
             // Load roads, buildings, landuse, and POIs in one comprehensive query
-            const q = `[out:json][timeout:30];(
+            const q = `[out:json][timeout:${overpassTimeoutSec}];(
                 way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential)$"](${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r});
                 way["building"](${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r});
                 way["landuse"](${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r});
@@ -64,23 +78,43 @@ async function loadRoads() {
                 const name = way.tags?.name || type.charAt(0).toUpperCase() + type.slice(1);
                 roads.push({ pts, width, limit, name, type });
                 const hw = width / 2;
+
+                // Subdivide road points for smoother terrain following
+                const subdPts = typeof subdivideRoadPoints === 'function' ? subdivideRoadPoints(pts, 5) : pts;
+
+                // Sample center heights and smooth them
+                const _tmh = typeof terrainMeshHeightAt === 'function' ? terrainMeshHeightAt : elevationWorldYAtWorldXZ;
+                const cHeights = new Float64Array(subdPts.length);
+                for (let ci = 0; ci < subdPts.length; ci++) {
+                    cHeights[ci] = _tmh(subdPts[ci].x, subdPts[ci].z);
+                }
+                for (let sp = 0; sp < 3; sp++) {
+                    for (let si = 1; si < subdPts.length - 1; si++) {
+                        cHeights[si] = cHeights[si] * 0.6 + (cHeights[si - 1] + cHeights[si + 1]) * 0.2;
+                    }
+                }
+
                 const verts = [], indices = [];
-                for (let i = 0; i < pts.length; i++) {
-                    const p = pts[i];
+                for (let i = 0; i < subdPts.length; i++) {
+                    const p = subdPts[i];
                     let dx, dz;
-                    if (i === 0) { dx = pts[1].x - p.x; dz = pts[1].z - p.z; }
-                    else if (i === pts.length - 1) { dx = p.x - pts[i-1].x; dz = p.z - pts[i-1].z; }
-                    else { dx = pts[i+1].x - pts[i-1].x; dz = pts[i+1].z - pts[i-1].z; }
+                    if (i === 0) { dx = subdPts[1].x - p.x; dz = subdPts[1].z - p.z; }
+                    else if (i === subdPts.length - 1) { dx = p.x - subdPts[i-1].x; dz = p.z - subdPts[i-1].z; }
+                    else { dx = subdPts[i+1].x - subdPts[i-1].x; dz = subdPts[i+1].z - subdPts[i-1].z; }
                     const len = Math.sqrt(dx*dx + dz*dz) || 1;
                     const nx = -dz / len, nz = dx / len;
 
-                    // Get terrain elevation at each road edge vertex directly
-                    const _tmh = typeof terrainMeshHeightAt === 'function' ? terrainMeshHeightAt : elevationWorldYAtWorldXZ;
-                    const y1 = _tmh(p.x + nx * hw, p.z + nz * hw) + 0.2;
-                    const y2 = _tmh(p.x - nx * hw, p.z - nz * hw) + 0.2;
-                    verts.push(p.x + nx * hw, y1, p.z + nz * hw);
-                    verts.push(p.x - nx * hw, y2, p.z - nz * hw);
-                    if (i < pts.length - 1) { const vi = i * 2; indices.push(vi, vi+1, vi+2, vi+1, vi+3, vi+2); }
+                    // Use smoothed center height + clamped cross-slope tilt
+                    const baseY = cHeights[i] + 0.2;
+                    const rawCenter = _tmh(p.x, p.z);
+                    const edgeY1 = _tmh(p.x + nx * hw, p.z + nz * hw);
+                    const edgeY2 = _tmh(p.x - nx * hw, p.z - nz * hw);
+                    const maxTilt = 2.0;
+                    const tilt1 = Math.max(-maxTilt, Math.min(maxTilt, edgeY1 - rawCenter));
+                    const tilt2 = Math.max(-maxTilt, Math.min(maxTilt, edgeY2 - rawCenter));
+                    verts.push(p.x + nx * hw, baseY + tilt1, p.z + nz * hw);
+                    verts.push(p.x - nx * hw, baseY + tilt2, p.z - nz * hw);
+                    if (i < subdPts.length - 1) { const vi = i * 2; indices.push(vi, vi+1, vi+2, vi+1, vi+3, vi+2); }
                 }
                 const geo = new THREE.BufferGeometry();
                 geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
@@ -92,16 +126,16 @@ async function loadRoads() {
                     metalness: 0.05,
                     side: THREE.DoubleSide,
                     polygonOffset: true,
-                    polygonOffsetFactor: -2,
-                    polygonOffsetUnits: -2
+                    polygonOffsetFactor: -4,
+                    polygonOffsetUnits: -4
                 }) : new THREE.MeshStandardMaterial({
                     color: 0x333333,
                     roughness: 0.95,
                     metalness: 0.05,
                     side: THREE.DoubleSide,
                     polygonOffset: true,
-                    polygonOffsetFactor: -2,
-                    polygonOffsetUnits: -2
+                    polygonOffsetFactor: -4,
+                    polygonOffsetUnits: -4
                 });
                 const mesh = new THREE.Mesh(geo, roadMat);
                 mesh.renderOrder = 2;
@@ -148,8 +182,8 @@ async function loadRoads() {
                             emissiveIntensity: 0.3,
                             roughness: 0.8,
                             polygonOffset: true,
-                            polygonOffsetFactor: -3,
-                            polygonOffsetUnits: -3
+                            polygonOffsetFactor: -6,
+                            polygonOffsetUnits: -6
                         }));
                         markMesh.renderOrder = 3; // Layer 3 - renders on top of roads
                         scene.add(markMesh); roadMeshes.push(markMesh);
@@ -164,6 +198,11 @@ async function loadRoads() {
                 const pts = way.nodes.map(id => nodes[id]).filter(n => n).map(n => geoToWorld(n.lat, n.lon));
                 if (pts.length < 3) return;
 
+                // RDT-seeded deterministic random for this building
+                const bSeed = (rdtSeed ^ (way.id >>> 0)) >>> 0;
+                const br1 = rand01FromInt(bSeed);
+                const br2 = rand01FromInt(bSeed ^ 0x9e3779b9);
+
                 // Get building height from tags or estimate
                 let height = 10; // default
                 if (way.tags['building:levels']) {
@@ -171,14 +210,14 @@ async function loadRoads() {
                 } else if (way.tags.height) {
                     height = parseFloat(way.tags.height) || 10;
                 } else {
-                    // Random height based on building type
+                    // Deterministic height based on building type (seeded by location + building id)
                     const bt = way.tags.building;
-                    if (bt === 'house' || bt === 'residential' || bt === 'detached') height = 6 + Math.random() * 4;
-                    else if (bt === 'apartments' || bt === 'commercial') height = 12 + Math.random() * 20;
-                    else if (bt === 'industrial' || bt === 'warehouse') height = 8 + Math.random() * 6;
-                    else if (bt === 'church' || bt === 'cathedral') height = 15 + Math.random() * 15;
-                    else if (bt === 'skyscraper' || bt === 'office') height = 30 + Math.random() * 50;
-                    else height = 8 + Math.random() * 12;
+                    if (bt === 'house' || bt === 'residential' || bt === 'detached') height = 6 + br1 * 4;
+                    else if (bt === 'apartments' || bt === 'commercial') height = 12 + br1 * 20;
+                    else if (bt === 'industrial' || bt === 'warehouse') height = 8 + br1 * 6;
+                    else if (bt === 'church' || bt === 'cathedral') height = 15 + br1 * 15;
+                    else if (bt === 'skyscraper' || bt === 'office') height = 30 + br1 * 50;
+                    else height = 8 + br1 * 12;
                 }
 
                 // Store building collision data (2D polygon with pre-computed bounding box)
@@ -203,9 +242,10 @@ async function loadRoads() {
                 const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
                 geo.rotateX(-Math.PI / 2);
 
+                // Deterministic color selection using RDT seed
                 const colors = ['#888888', '#7788aa', '#998877', '#667788'];
-                const baseColor = colors[Math.floor(Math.random() * colors.length)];
-                const windowTex = createWindowTexture(baseColor);
+                const baseColor = colors[Math.floor(br2 * colors.length)];
+                const windowTex = createWindowTexture(baseColor, bSeed);
 
                 const mesh = new THREE.Mesh(geo, new THREE.MeshLambertMaterial({
                     map: windowTex,
@@ -987,4 +1027,3 @@ function generateStreetFurniture() {
         createTrashCan(poi.x + Math.cos(angle) * offset, poi.z + Math.sin(angle) * offset);
     });
 }
-
