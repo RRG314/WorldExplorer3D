@@ -12,10 +12,11 @@ function createAsphaltTexture() {
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#2a2a2a'; ctx.fillRect(0, 0, 256, 256);
-    // Reduced particle count for performance
+    // RDT-seeded deterministic asphalt speckle
+    const rng = typeof seededRandom === 'function' ? seededRandom(rdtSeed ^ 0xA5FA17) : Math.random.bind(Math);
     for (let i = 0; i < 2000; i++) {
-        const x = Math.random() * 256, y = Math.random() * 256;
-        const brightness = 20 + Math.random() * 40;
+        const x = rng() * 256, y = rng() * 256;
+        const brightness = 20 + rng() * 40;
         ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
         ctx.fillRect(x, y, 1.5, 1.5);
     }
@@ -31,10 +32,10 @@ function createAsphaltNormal() {
     canvas.height = 128;
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = '#8080ff'; ctx.fillRect(0, 0, 128, 128);
-    // Reduced particle count for performance
+    const rng = typeof seededRandom === 'function' ? seededRandom(rdtSeed ^ 0xB0B041) : Math.random.bind(Math);
     for (let i = 0; i < 500; i++) {
-        const x = Math.random() * 128, y = Math.random() * 128;
-        ctx.fillStyle = `rgb(${120 + Math.random() * 20}, ${120 + Math.random() * 20}, ${230 + Math.random() * 25})`;
+        const x = rng() * 128, y = rng() * 128;
+        ctx.fillStyle = `rgb(${120 + rng() * 20}, ${120 + rng() * 20}, ${230 + rng() * 25})`;
         ctx.fillRect(x, y, 2, 2);
     }
     const texture = new THREE.CanvasTexture(canvas);
@@ -51,11 +52,12 @@ function createRoughnessMap() {
     // Asphalt is rough - base level
     ctx.fillStyle = '#e0e0e0'; // High roughness
     ctx.fillRect(0, 0, 128, 128);
-    // Add variation
+    // RDT-seeded deterministic roughness variation
+    const rng = typeof seededRandom === 'function' ? seededRandom(rdtSeed ^ 0xC0FFEE) : Math.random.bind(Math);
     for (let i = 0; i < 800; i++) {
-        const x = Math.random() * 128;
-        const y = Math.random() * 128;
-        const brightness = 200 + Math.random() * 55;
+        const x = rng() * 128;
+        const y = rng() * 128;
+        const brightness = 200 + rng() * 55;
         ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
         ctx.fillRect(x, y, 2, 2);
     }
@@ -65,9 +67,10 @@ function createRoughnessMap() {
     return texture;
 }
 
-function createWindowTexture(baseColor) {
-    // Cache textures to avoid recreating them
-    if (windowTextures[baseColor]) return windowTextures[baseColor];
+function createWindowTexture(baseColor, seed) {
+    // Cache key includes location seed so textures are deterministic per city
+    const cacheKey = baseColor + '_' + (rdtSeed || 0);
+    if (windowTextures[cacheKey]) return windowTextures[cacheKey];
 
     const canvas = document.createElement('canvas');
     canvas.width = 64; // Reduced from 128
@@ -75,17 +78,24 @@ function createWindowTexture(baseColor) {
     const ctx = canvas.getContext('2d');
     ctx.fillStyle = baseColor; ctx.fillRect(0, 0, 64, 256);
     const ww = 10, wh = 12, spacing = 3; // Smaller windows
+
+    // Use RDT-seeded random for deterministic window lights per location
+    const rng = typeof seededRandom === 'function'
+        ? seededRandom((seed || rdtSeed || 42) ^ cacheKey.length)
+        : Math.random.bind(Math);
+
     for (let floor = 0; floor < 18; floor++) {
         for (let col = 0; col < 4; col++) {
             const x = col * (ww + spacing) + spacing;
             const y = floor * (wh + spacing) + spacing;
-            ctx.fillStyle = Math.random() > 0.3 ? `rgba(255, 220, 150, ${0.6 + Math.random() * 0.4})` : 'rgba(20, 30, 40, 0.8)';
+            const r1 = rng(), r2 = rng();
+            ctx.fillStyle = r1 > 0.3 ? `rgba(255, 220, 150, ${0.6 + r2 * 0.4})` : 'rgba(20, 30, 40, 0.8)';
             ctx.fillRect(x, y, ww, wh);
         }
     }
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-    windowTextures[baseColor] = texture;
+    windowTextures[cacheKey] = texture;
     return texture;
 }
 
@@ -585,6 +595,17 @@ function init() {
     let lastMouseX = 0;
     let lastMouseY = 0;
     let mouseActive = false;
+    window.walkMouseLookActive = false; // Toggled by double-click in walking mode
+
+    // Double-click to toggle mouse look in walking mode
+    addEventListener('dblclick', (e) => {
+        if (!gameStarted) return;
+        if (Walk && Walk.state.mode === 'walk') {
+            window.walkMouseLookActive = !window.walkMouseLookActive;
+            lastMouseX = e.clientX;
+            lastMouseY = e.clientY;
+        }
+    });
 
     addEventListener('mousedown', (e) => {
         if (!gameStarted) return;
@@ -623,14 +644,18 @@ function init() {
     });
 
     addEventListener('mousemove', (e) => {
-        if (!gameStarted || !mouseActive) return;
+        if (!gameStarted) return;
+
+        // Walking mode: respond to double-click toggle OR right-click hold
+        const walkLookActive = Walk && Walk.state.mode === 'walk' && window.walkMouseLookActive;
+        if (!mouseActive && !walkLookActive) return;
 
         const deltaX = e.clientX - lastMouseX;
         const deltaY = e.clientY - lastMouseY;
         lastMouseX = e.clientX;
         lastMouseY = e.clientY;
 
-        const sensitivity = 0.005; // Increased from 0.003 for more responsive control
+        const sensitivity = 0.005;
 
         // Drone mode camera control
         if (droneMode) {
@@ -640,7 +665,6 @@ function init() {
         }
         // Walking mode camera control
         else if (Walk && Walk.state.mode === 'walk') {
-            // Update walker's view angles
             Walk.state.walker.yaw -= deltaX * sensitivity;
             Walk.state.walker.pitch += deltaY * sensitivity;
             Walk.state.walker.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, Walk.state.walker.pitch));
