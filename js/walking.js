@@ -188,6 +188,7 @@ function createWalkingModule(opts) {
     car.z = state.walker.z;
     car.angle = state.walker.angle;
     car.speed = 0;
+    if (typeof invalidateRoadCache === 'function') invalidateRoadCache();
   }
 
   function setModeWalk() {
@@ -217,7 +218,9 @@ function createWalkingModule(opts) {
 
     if (state.characterMesh) {
       // Get terrain height at walker position
-      const terrainY = elevationWorldYAtWorldXZ(state.walker.x, state.walker.z);
+      const terrainY = typeof terrainMeshHeightAt === 'function'
+          ? terrainMeshHeightAt(state.walker.x, state.walker.z)
+          : elevationWorldYAtWorldXZ(state.walker.x, state.walker.z);
       // Character should be visible in third person (default view)
       state.characterMesh.visible = (state.view !== "first");
       state.characterMesh.position.set(state.walker.x, terrainY, state.walker.z);
@@ -245,7 +248,8 @@ function createWalkingModule(opts) {
       carMesh.rotation.y = car.angle;
     }
     if (state.characterMesh) state.characterMesh.visible = false;
-    // Debug log removed
+    // Deactivate mouse look when leaving walking mode
+    window.walkMouseLookActive = false;
   }
 
   function toggleWalk() {
@@ -348,7 +352,9 @@ function createWalkingModule(opts) {
         const hits = raycaster.intersectObject(moonSurface, false);
         groundY = hits.length > 0 ? hits[0].point.y : -100;
     } else {
-        groundY = elevationWorldYAtWorldXZ(state.walker.x, state.walker.z);
+        groundY = typeof terrainMeshHeightAt === 'function'
+            ? terrainMeshHeightAt(state.walker.x, state.walker.z)
+            : elevationWorldYAtWorldXZ(state.walker.x, state.walker.z);
     }
 
     // Initialize walker.y if not set
@@ -435,7 +441,9 @@ function createWalkingModule(opts) {
 
     if (state.view === "overhead") {
       // Overhead view like car mode - high up, looking down
-      const terrainY = elevationWorldYAtWorldXZ(state.walker.x, state.walker.z);
+      const terrainY = typeof terrainMeshHeightAt === 'function'
+          ? terrainMeshHeightAt(state.walker.x, state.walker.z)
+          : elevationWorldYAtWorldXZ(state.walker.x, state.walker.z);
       const height = 45;
       const offsetBack = 8;
 
@@ -503,5 +511,4 @@ function createWalkingModule(opts) {
     getMapRefPosition
   };
 }
-
 
