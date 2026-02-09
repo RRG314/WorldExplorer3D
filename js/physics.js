@@ -2,6 +2,18 @@
 // physics.js - Car physics, building collision, drone movement
 // ============================================================================
 
+// RDT-based adaptive throttling state
+// At high complexity, skip findNearestRoad on some frames (reuse cached result)
+let _rdtPhysFrame = 0;
+let _rdtRoadSkipInterval = 1; // 1 = check every frame, 2 = every other, etc.
+let _cachedNearRoad = null;
+
+// Invalidate road cache - must be called on road reload, mode change, teleport
+function invalidateRoadCache() {
+    _cachedNearRoad = null;
+    _rdtPhysFrame = 0;
+}
+
 // Reusable raycaster and vectors (avoid GC pressure from per-frame allocations)
 let _physRaycaster = null;
 const _physRayStart = typeof THREE !== 'undefined' ? new THREE.Vector3() : null;
@@ -275,8 +287,24 @@ function update(dt) {
         friction = moonFriction;
         accel = car.boost ? CFG.boostAccel : moonAccel;
     } else {
-        // Earth physics - detect roads normally
-        const nr = findNearestRoad(car.x, car.z);
+        // Earth physics - detect roads with RDT adaptive throttling
+        // At high complexity (many roads/buildings), skip road search on some frames
+        _rdtPhysFrame++;
+        _rdtRoadSkipInterval = rdtComplexity >= 6 ? 3 : rdtComplexity >= 4 ? 2 : 1;
+
+        // Pitfall #6: Force immediate re-check when safety-critical
+        const isSteering = keys.KeyA || keys.ArrowLeft || keys.KeyD || keys.ArrowRight;
+        const isHighSpeed = Math.abs(car.speed) > 40;
+        const wasOffRoad = !car.onRoad;
+        const forceCheck = isHighSpeed || isSteering || wasOffRoad;
+
+        let nr;
+        if (forceCheck || _rdtRoadSkipInterval <= 1 || _rdtPhysFrame % _rdtRoadSkipInterval === 0 || !_cachedNearRoad) {
+            nr = findNearestRoad(car.x, car.z);
+            _cachedNearRoad = { road: nr.road, dist: nr.dist, pt: { x: nr.pt.x, z: nr.pt.z } };
+        } else {
+            nr = _cachedNearRoad;
+        }
         const edge = nr.road ? nr.road.width / 2 + 10 : 20;
         car.onRoad = nr.dist < edge;
         car.road = nr.road;
@@ -594,8 +622,25 @@ function update(dt) {
             ? terrainMeshHeightAt(car.x, car.z)
             : elevationWorldYAtWorldXZ(car.x, car.z);
 
-        // Add road offset when on road (roads are 0.2 above terrain)
-        carY = groundH + (car.onRoad ? 0.2 : 0) + 1.2;
+        // Road offset matches what rebuildRoadsWithTerrain uses (0.2)
+        const roadOffset = car.onRoad ? 0.2 : 0;
+        const targetY = groundH + roadOffset + 1.2;
+
+        // Smooth vertical transitions to prevent popping on terrain tile seams
+        // and stair-stepping on steep hills
+        if (car.y === undefined || car.y === 0) {
+            carY = targetY;
+        } else {
+            const diff = targetY - car.y;
+            // Fast snap if very far (teleport/spawn), smooth otherwise
+            if (Math.abs(diff) > 20 || Math.abs(diff) < 0.01) {
+                carY = targetY;
+            } else {
+                // Lerp: fast enough to not float, smooth enough to not jitter
+                const lerpRate = Math.min(1.0, dt * 15);
+                carY = car.y + diff * lerpRate;
+            }
+        }
 
         car.y = carY;
         car.vy = 0;
