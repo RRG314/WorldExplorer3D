@@ -912,6 +912,7 @@ function positionCarOnMoon() {
     // Eagle Crater location from real Apollo 11 data
     car.x = 200;   // Apollo 11 Eagle Crater X coordinate
     car.z = -500;  // Apollo 11 Eagle Crater Z coordinate
+    if (typeof invalidateRoadCache === 'function') invalidateRoadCache();
 
     // Find the ACTUAL ground height at spawn position using raycasting
     const spawnRaycaster = new THREE.Raycaster();
@@ -1317,6 +1318,7 @@ function arriveAtEarth() {
     car.vz = 0;
     car.vy = 0;  // Reset vertical velocity
     car.y = 0;   // Reset vertical position
+    if (typeof invalidateRoadCache === 'function') invalidateRoadCache();
 
     // Show Earth terrain and objects - RE-ADD to scene
     if (terrainGroup) {
