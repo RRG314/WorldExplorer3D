@@ -106,4 +106,76 @@ function _updateEnvDebug() {
         }
     }
     _envDebugEl.textContent = 'ENV:' + (_activeEnv || 'INIT');
+}}
+
+function switchEnv(newEnv) {
+    // Guard: no re-entrant transitions
+    if (_transitioning) {
+        console.warn('[ENV] Blocked switchEnv to', newEnv, '- transition in progress');
+        return false;
+    }
+
+    // Guard: already there
+    if (_activeEnv === newEnv) {
+        console.warn('[ENV] Already in', newEnv);
+        return false;
+    }
+
+    // Guard: valid transition
+    const allowed = _validTransitions[_activeEnv];
+    if (allowed && !allowed.includes(newEnv)) {
+        console.warn('[ENV] Invalid transition:', _activeEnv, '->', newEnv);
+        return false;
+    }
+
+    _transitioning = true;
+    const oldEnv = _activeEnv;
+    console.log('[ENV]', (oldEnv || 'INIT'), '->', newEnv);
+
+    _activeEnv = newEnv;
+
+    // Sync legacy state flags for backward compatibility
+    _syncLegacyFlags(newEnv);
+
+    _transitioning = false;
+
+    // Update debug HUD
+    _updateEnvDebug();
+
+    return true;
+}
+
+// Keep the legacy boolean flags in sync so existing code keeps working
+function _syncLegacyFlags(env) {
+    switch (env) {
+        case ENV.EARTH:
+            onMoon = false;
+            travelingToMoon = false;
+            break;
+        case ENV.SPACE_FLIGHT:
+            // travelingToMoon is set by the caller before switchEnv
+            // onMoon stays whatever it was (could be leaving Earth or Moon)
+            break;
+        case ENV.MOON:
+            onMoon = true;
+            travelingToMoon = false;
+            break;
+    }
+}
+
+// Lightweight debug overlay (top-left, unobtrusive)
+function _updateEnvDebug() {
+    if (!_envDebugEl) {
+        _envDebugEl = document.getElementById('envDebug');
+        if (!_envDebugEl) {
+            _envDebugEl = document.createElement('div');
+            _envDebugEl.id = 'envDebug';
+            _envDebugEl.style.cssText =
+                'position:fixed;top:4px;left:4px;z-index:9999;' +
+                'font:10px monospace;color:rgba(255,255,255,0.5);' +
+                'pointer-events:none;text-shadow:0 0 2px #000';
+            document.body.appendChild(_envDebugEl);
+        }
+    }
+    _envDebugEl.textContent = 'ENV:' + (_activeEnv || 'INIT');
 }
