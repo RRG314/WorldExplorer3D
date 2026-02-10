@@ -303,4 +303,273 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #historicBtn{display:none}
 #historicBtn.show{display:block}
 #historicBtn:hover{transform:scale(1.1);box-shadow:0 12px 32px rgba(245,158,11,0.5)}
+#historicPanel.show{display:flex}/* Custom Location Panel */
+#customPanel{display:none;margin-top:16px;padding:20px;background:rgba(255,251,235,0.9);border:2px solid rgba(252,211,77,0.8);border-radius:12px;max-height:60vh;overflow-y:auto;backdrop-filter:blur(10px)}
+#customPanel.show{display:block}
+.custom-title{font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;color:#92400e;margin-bottom:16px;text-align:center}
+.custom-row{margin-bottom:14px}
+.custom-row label{display:block;font-size:12px;font-weight:500;color:#78716c;margin-bottom:8px}
+.search-row{display:flex;gap:10px}
+.search-row input{flex:1;background:#ffffff;border:2px solid #e5e7eb;border-radius:8px;padding:12px;color:#1f2937;font-size:14px;font-family:'Inter',sans-serif}
+.search-row input:focus{outline:none;border-color:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,0.1)}
+.search-btn{background:#f59e0b;border:none;border-radius:8px;padding:12px 18px;color:#ffffff;font-weight:600;cursor:pointer;transition:all 0.2s}
+.search-btn:hover{background:#d97706;transform:translateY(-1px);box-shadow:0 4px 12px rgba(245,158,11,0.3)}
+#searchStatus{font-size:11px;margin-top:8px;min-height:16px;color:#6b7280}
+#searchStatus.success{color:#059669}
+#searchStatus.error{color:#dc2626}
+.divider{text-align:center;margin:16px 0;position:relative}
+.divider::before{content:'';position:absolute;left:0;right:0;top:50%;height:1px;background:#e5e7eb}
+.divider span{background:#fffbeb;padding:0 12px;position:relative;color:#9ca3af;font-size:12px}
+.coords-row{display:flex;gap:12px}
+.coords-row input{flex:1;background:#ffffff;border:2px solid #e5e7eb;border-radius:8px;padding:12px;color:#1f2937;font-size:14px;font-family:'Inter',sans-serif}
+.coords-row input:focus{outline:none;border-color:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,0.1)}
+
+/* Game Mode */
+.mode-grid{display:flex;flex-direction:column;gap:12px}
+.mode{display:flex;align-items:center;gap:16px;background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:16px;cursor:pointer;transition:all 0.2s}
+.mode:hover{border-color:#cbd5e1;background:#f1f5f9;transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.08)}
+.mode.sel{border-color:#667eea;background:#f0f4ff;box-shadow:0 4px 12px rgba(102,126,234,0.2)}
+.mode-icon{font-size:28px;width:44px;text-align:center}
+.mode-name{color:#1e293b;font-family:'Poppins',sans-serif;font-size:14px;font-weight:600}
+.mode-desc{color:#64748b;font-size:12px;margin-top:4px}
+.mode-check{width:20px;height:20px;border:2px solid #cbd5e1;border-radius:50%;margin-left:auto;display:flex;align-items:center;justify-content:center;font-size:12px;color:transparent;transition:all 0.2s}
+.mode.sel .mode-check{border-color:#667eea;background:#667eea;color:#ffffff}
+
+/* Controls Tab */
+.ctrl-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 20px}
+.ctrl-section{grid-column:1/-1;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;color:#667eea;text-transform:uppercase;letter-spacing:0.5px;margin-top:12px;padding-bottom:6px;border-bottom:2px solid #e8eef5}
+.ctrl-section:first-child{margin-top:0}
+.ctrl-row{display:flex;align-items:center;gap:10px;padding:6px 0}
+.ctrl-key{background:#f0f4ff;border:2px solid #c7d2fe;border-radius:6px;padding:4px 10px;font-family:'Inter',sans-serif;font-size:11px;font-weight:600;color:#667eea}
+.ctrl-action{font-size:12px;color:#475569}
+
+/* Start Button */
+.start-section{padding:20px 24px;border-top:2px solid #e8eef5;flex-shrink:0;background:rgba(248,250,252,0.8);backdrop-filter:blur(10px)}
+.startBtn{width:100%;background:linear-gradient(135deg,#0f3460 0%,#533483 100%);border:2px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;color:#ffffff;cursor:pointer;letter-spacing:2px;transition:all 0.3s;text-transform:uppercase;box-shadow:0 4px 20px rgba(83,52,131,0.4)}
+.startBtn:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(83,52,131,0.6),0 0 30px rgba(15,52,96,0.5);border-color:rgba(255,255,255,0.4)}
+
+/* HUD */
+#hud{position:fixed;top:20px;left:20px;z-index:100;display:none}
+#hud.show{display:block}
+.hud-box{background:rgba(255,255,255,0.95);border:none;border-radius:16px;padding:20px;min-width:160px;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
+#speed{font-family:'Poppins',sans-serif;font-size:42px;font-weight:700;color:#1e293b}
+#speed.fast{color:#dc2626}
+.hud-label{font-size:11px;color:#64748b;font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
+#street{font-family:'Inter',sans-serif;font-size:11px;color:#475569;margin-top:12px;border-top:2px solid #f1f5f9;padding-top:12px}
+#boostBar{width:100%;height:6px;background:#f1f5f9;border-radius:3px;margin-top:10px;overflow:hidden}
+#boostFill{height:100%;width:100%;background:linear-gradient(90deg,#667eea,#764ba2);transition:width 0.1s;border-radius:3px}
+#boostFill.active{background:linear-gradient(90deg,#f59e0b,#d97706)}
+.indicators{display:flex;gap:10px;margin-top:10px;font-size:10px}
+.ind{color:#cbd5e1;font-weight:500}
+.ind.on{color:#667eea}
+.ind.warn{color:#dc2626}
+#offRoadWarn{position:fixed;inset:0;pointer-events:none;border:4px solid transparent;z-index:50;transition:border-color 0.2s}
+#offRoadWarn.active{border-color:rgba(239,68,68,0.6);animation:pulse 0.5s infinite}
+@keyframes pulse{0%,100%{border-color:rgba(239,68,68,0.6)}50%{border-color:rgba(239,68,68,0.2)}}
+#minimap{position:fixed;bottom:20px;left:20px;width:160px;height:160px;background:rgba(255,255,255,0.95);border:none;border-radius:16px;z-index:100;display:none;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
+#minimap.show{display:block}
+#minimap:hover{box-shadow:0 12px 32px rgba(0,0,0,0.15)}
+#largeMap{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:150;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+#largeMap.show{display:flex}
+#largeMapCanvas{border:none;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+#mapClose{position:absolute;top:30px;right:30px;background:#ffffff;border:none;color:#1e293b;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;padding:12px 24px;cursor:pointer;border-radius:10px;transition:all 0.2s;z-index:200}
+#mapClose:hover{background:#f1f5f9;transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+#mapSatelliteToggle.active,#mapRoadsToggle.active{background:#0fc !important;color:#000 !important}
+#modeHud{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:8px 16px;z-index:100;text-align:center;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+#modeHud.show{display:block}
+#modeTitle{font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;color:#667eea;text-transform:uppercase;letter-spacing:0.5px}
+#modeTimer{font-family:'Poppins',sans-serif;font-size:16px;font-weight:700;color:#1e293b;margin-top:2px;display:none}
+#modeTimer.show{display:block}
+#modeInfo{font-size:10px;color:#64748b;margin-top:2px;display:none}
+#modeInfo.show{display:block}
+#police{position:fixed;top:20px;right:20px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;padding:10px 16px;color:#dc2626;font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;z-index:100;display:none;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
+#police.show{display:block}
+/* Float Menus - Three separate menus in triangle formation */
+.floatMenuContainer{position:fixed;bottom:20px;right:20px;z-index:100;display:none;flex-direction:column;align-items:center;gap:12px}
+.floatMenuContainer.show{display:flex}
+.floatMenu{display:flex;flex-direction:column;align-items:center;position:relative}
+.floatMenuRow{display:flex;gap:12px;justify-content:center}
+.floatBtn{width:auto;min-width:120px;height:50px;padding:0 16px;border-radius:25px;background:#ffffff;border:none;font-size:14px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.15);transition:all 0.2s;position:relative;z-index:101;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600}
+.floatBtn:active{transform:scale(0.95)}
+.floatBtn:hover{transform:scale(1.05);box-shadow:0 12px 32px rgba(0,0,0,0.2)}
+.floatBtn.travel{color:#10b981}
+.floatBtn.realEstate{color:#3b82f6}
+.floatBtn.explore{color:#f59e0b}
+.floatBtn.game{color:#a855f7}
+.btnIcon{font-size:20px;line-height:1}
+.btnText{font-size:14px;font-weight:600;white-space:nowrap}
+.floatItems{position:fixed;bottom:140px;right:20px;display:none;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto;min-width:160px;max-width:200px;z-index:102}
+.floatMenu.open .floatItems{display:flex}
+.floatItem{background:#ffffff;border:none;border-radius:10px;padding:10px 16px;color:#475569;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.1);transition:all 0.2s;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.floatItem:hover{background:#f8fafc;transform:translateX(-4px);box-shadow:0 6px 16px rgba(0,0,0,0.15)}
+.floatItem.on{background:#667eea;color:#ffffff}
+.floatItem.recording{background:#dc2626;color:#ffffff}
+
+/* Main Menu Button */
+.mainMenuBtn{position:fixed;top:20px;right:20px;z-index:150;background:rgba(255,255,255,0.95);backdrop-filter:blur(10px);border:2px solid rgba(102,126,234,0.3);border-radius:12px;padding:12px 24px;color:#667eea;font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,0.1);transition:all 0.2s;display:none}
+.mainMenuBtn.show{display:block}
+.mainMenuBtn:hover{background:rgba(255,255,255,1);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.15);border-color:#667eea}
+
+/* Responsive adjustments for float menus */
+@media (max-width: 768px) {
+  .floatMenuContainer{bottom:10px;right:10px}
+  .floatBtn{min-width:100px;height:45px;padding:0 12px;font-size:13px}
+  .btnIcon{font-size:18px}
+  .btnText{font-size:13px}
+  .floatItems{min-width:140px;max-width:160px;font-size:11px}
+  .floatItem{padding:8px 12px}
+
+  /* Title screen mobile adjustments */
+  .sub{font-size:16px;letter-spacing:4px}
+  .menu-container{width:95vw;max-height:85vh}
+  .loc-grid{grid-template-columns:1fr;gap:10px}
+  .tab-btn{font-size:12px;padding:12px 8px}
+
+  /* HUD elements */
+  #hud{top:10px;left:10px;font-size:11px}
+  #minimap{width:120px;height:120px}
+  #modeHud{top:10px;font-size:10px;padding:6px 12px}
+  #coords{bottom:180px;left:10px;font-size:10px;padding:8px 12px}
+  #controlsTab{left:140px;max-width:180px;font-size:11px}
+
+  /* Property panel */
+  #propertyPanel{width:90vw;right:5vw;top:10px;max-height:70vh}
+
+  /* Map controls */
+  #largeMapCanvas{width:95vw;height:95vw;max-width:600px;max-height:600px}
+
+  /* Modal adjustments */
+  .modal-content{width:95vw;max-height:90vh}
+  .modal-title{font-size:18px}
+}
+
+@media (max-width: 480px) {
+  .floatMenuContainer{bottom:5px;right:5px}
+  .floatBtn{min-width:90px;height:40px;padding:0 10px;font-size:12px}
+  .btnIcon{font-size:16px}
+  .btnText{font-size:12px}
+  .floatItems{min-width:120px;max-width:140px;bottom:50px}
+  .floatItem{padding:6px 10px;font-size:10px}
+  .floatMenuRow{gap:6px}
+
+  /* Title screen for small phones */
+  .logo{font-size:clamp(28px, 10vw, 48px);letter-spacing:2px}
+  .sub{font-size:14px;letter-spacing:3px;margin-bottom:30px}
+  .menu-container{width:98vw;max-height:90vh}
+  .tab-btn{font-size:11px;padding:10px 6px}
+  .tab-content{padding:16px}
+  .custom-title{font-size:13px}
+  .custom-row label{font-size:11px}
+  .search-row input, .coords-row input{font-size:13px;padding:10px}
+  .search-btn{padding:10px 14px}
+  .startBtn{font-size:14px;padding:14px;letter-spacing:1px}
+
+  /* HUD elements for phones */
+  #hud{top:5px;left:5px;font-size:10px}
+  #minimap{width:100px;height:100px}
+  #modeHud{top:5px;font-size:9px;padding:5px 10px}
+  #modeTimer{font-size:14px}
+  #coords{bottom:160px;left:5px;font-size:9px;padding:6px 10px}
+  #controlsTab{left:115px;max-width:150px;font-size:10px;bottom:15px}
+
+  /* Property panel for phones */
+  #propertyPanel{width:95vw;right:2.5vw;top:5px;max-height:75vh}
+  .panel-title{font-size:16px}
+  .property-card{padding:10px;margin-bottom:10px}
+  .prop-price{font-size:18px}
+
+  /* Map for phones */
+  #largeMapCanvas{width:98vw;height:98vw;max-width:400px;max-height:400px}
+  #mapClose{top:15px;right:15px;font-size:12px;padding:10px 18px}
+  #mapZoomIn, #mapZoomOut, #mapSatelliteToggle, #mapRoadsToggle{width:40px;font-size:16px;padding:8px}
+  #zoomLevel{font-size:10px;padding:4px 8px}
+
+  /* Modal for phones */
+  .modal-content{width:98vw}
+  .modal-title{font-size:16px}
+  .modal-close{width:32px;height:32px;font-size:24px}
+
+  /* Pause/result screens */
+  .pauseTitle{font-size:32px}
+  .pauseBtn{min-width:140px;padding:12px 30px;font-size:13px}
+  .resultBox, .caughtBox{padding:30px 40px}
+  #resultTitle, .caughtTitle{font-size:24px}
+}
+
+/* Landscape orientation adjustments */
+@media (max-height: 500px) and (orientation: landscape) {
+  .menu-container{max-height:95vh;width:80vw}
+  .tab-content{max-height:60vh}
+  #propertyPanel{max-height:85vh}
+  .logo{font-size:clamp(24px, 6vw, 48px);margin-bottom:4px}
+  .sub{font-size:12px;margin-bottom:20px}
+}
+
+#controlsTab{position:fixed;bottom:20px;left:200px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;z-index:100;display:none;font-size:12px;color:#475569;max-width:220px;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
+#controlsTab.show{display:block}
+#ctrlHeader{padding:12px 16px;cursor:pointer;color:#667eea;font-family:'Poppins',sans-serif;font-weight:600}
+#ctrlContent{padding:12px 16px;border-top:2px solid #f1f5f9;line-height:1.8}
+#ctrlContent.hidden{display:none}
+#coords{position:fixed;bottom:200px;left:20px;background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:10px 14px;font-size:11px;color:#475569;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+#coords.show{display:block}
+#loading{position:fixed;inset:0;background:url('images/loading-bg.jpg') center/cover no-repeat, #000;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:300;cursor:pointer}
+#loading.show{display:flex}
+.spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,0.3);border-top-color:#ffffff;border-radius:50%;animation:spin 1s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+#loadText{color:#ffffff;font-family:'Poppins',sans-serif;margin-top:20px;font-size:15px;font-weight:500}
+#pauseScreen{position:fixed;inset:0;background:rgba(0,0,0,0.8);display:none;align-items:center;justify-content:center;flex-direction:column;z-index:250;backdrop-filter:blur(8px)}
+#pauseScreen.show{display:flex}
+.pauseTitle{font-family:'Poppins',sans-serif;font-size:42px;font-weight:700;color:#ffffff;margin-bottom:32px}
+.pauseBtn{background:#ffffff;border:none;border-radius:12px;padding:14px 40px;color:#1e293b;font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;cursor:pointer;margin:8px;min-width:180px;transition:all 0.2s}
+.pauseBtn:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,255,255,0.2)}
+#resultScreen{position:fixed;inset:0;background:rgba(0,0,0,0.8);display:none;align-items:center;justify-content:center;z-index:260;backdrop-filter:blur(8px)}
+#resultScreen.show{display:flex}
+.resultBox{background:#ffffff;border:none;border-radius:20px;padding:40px 60px;text-align:center;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+#resultTitle{font-family:'Poppins',sans-serif;font-size:32px;font-weight:700;color:#667eea;margin-bottom:16px}
+#resultStats{color:#475569;margin-bottom:24px;line-height:1.8;font-size:15px}
+#caughtScreen{position:fixed;inset:0;background:rgba(220,38,38,0.15);display:none;align-items:center;justify-content:center;z-index:270;backdrop-filter:blur(8px)}
+#caughtScreen.show{display:flex}
+.caughtBox{background:#ffffff;border:none;border-radius:20px;padding:40px;text-align:center;box-shadow:0 20px 60px rgba(220,38,38,0.3)}
+.caughtTitle{font-family:'Poppins',sans-serif;font-size:36px;font-weight:700;color:#dc2626;margin-bottom:16px}
+.caughtText{color:#475569;margin-bottom:24px;font-size:15px}
+.caughtBtn{background:#dc2626;border:none;border-radius:12px;padding:14px 32px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;transition:all 0.2s}
+.caughtBtn:hover{background:#b91c1c;transform:translateY(-2px);box-shadow:0 8px 24px rgba(220,38,38,0.3)}
+
+/* Real Estate System Styles */
+#propertyPanel{position:fixed;top:20px;right:20px;width:380px;max-height:80vh;background:rgba(255,255,255,0.98);border:none;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:110;display:none;overflow:hidden;backdrop-filter:blur(10px)}
+#propertyPanel.show{display:flex;flex-direction:column}
+.panel-header{background:linear-gradient(135deg,#667eea,#764ba2);padding:20px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.panel-title{font-family:'Poppins',sans-serif;font-size:18px;font-weight:700;color:#ffffff;letter-spacing:0.5px}
+.panel-close{background:rgba(255,255,255,0.2);border:none;color:#ffffff;font-size:24px;width:32px;height:32px;border-radius:50%;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center}
+.panel-close:hover{background:rgba(255,255,255,0.3);transform:scale(1.1)}
+.panel-content{padding:16px;overflow-y:auto;flex:1}
+.property-card{background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:12px;margin-bottom:12px;cursor:pointer;transition:all 0.2s}
+.property-card:hover{border-color:#667eea;transform:translateY(-2px);box-shadow:0 4px 12px rgba(102,126,234,0.2)}
+.prop-photo{width:100%;height:180px;background:#e2e8f0;border-radius:8px;overflow:hidden;margin-bottom:10px;display:flex;align-items:center;justify-content:center}
+.prop-photo img{width:100%;height:100%;object-fit:cover}
+.prop-photo-placeholder{font-size:48px;color:#cbd5e1}
+.prop-price{font-family:'Poppins',sans-serif;font-size:20px;font-weight:700;color:#667eea;margin-bottom:4px}
+.prop-address{font-size:13px;color:#1e293b;font-weight:500;margin-bottom:6px}
+.prop-details{font-size:12px;color:#64748b;display:flex;gap:12px}
+#propertyModal{position:fixed;inset:0;background:rgba(0,0,0,0.85);display:none;align-items:center;justify-content:center;z-index:200;backdrop-filter:blur(8px)}
+#propertyModal.show{display:flex}
+.modal-content{background:#ffffff;border-radius:20px;width:90%;max-width:700px;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
+.modal-header{background:linear-gradient(135deg,#667eea,#764ba2);padding:24px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0}
+.modal-title{font-family:'Poppins',sans-serif;font-size:20px;font-weight:700;color:#ffffff;flex:1;padding-right:20px}
+.modal-close{background:rgba(255,255,255,0.2);border:none;color:#ffffff;font-size:28px;width:40px;height:40px;border-radius:50%;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;justify-content:center;line-height:1}
+.modal-close:hover{background:rgba(255,255,255,0.3);transform:scale(1.1)}
+.modal-body{padding:24px;overflow-y:auto;flex:1}
+.modal-body img{width:100%;border-radius:12px;margin-bottom:16px}
+.modal-body p{color:#475569;line-height:1.6;margin-bottom:12px}
+.modal-body button{background:#667eea;border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;transition:all 0.2s;margin-top:12px}
+.modal-body button:hover{background:#5568d3;transform:translateY(-2px);box-shadow:0 4px 12px rgba(102,126,234,0.3)}
+.prop-stat{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid #e2e8f0}
+.prop-stat-label{color:#64748b;font-size:13px}
+.prop-stat-value{color:#1e293b;font-weight:600;font-size:13px}
+#realEstateBtn{position:fixed;bottom:90px;right:20px;width:56px;height:56px;background:linear-gradient(135deg,#10b981,#059669);border:none;border-radius:50%;color:#ffffff;font-size:24px;cursor:pointer;box-shadow:0 8px 24px rgba(16,185,129,0.4);transition:all 0.2s;z-index:100;display:none}
+#realEstateBtn.show{display:block}
+#realEstateBtn:hover{transform:scale(1.1);box-shadow:0 12px 32px rgba(16,185,129,0.5)}
+#historicBtn{display:none}
+#historicBtn.show{display:block}
+#historicBtn:hover{transform:scale(1.1);box-shadow:0 12px 32px rgba(245,158,11,0.5)}
 #historicPanel.show{display:flex}
