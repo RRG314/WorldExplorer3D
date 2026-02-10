@@ -10,21 +10,35 @@ Entries reflect changes made relative to the most recent public release.
 ## [Unreleased]
 
 ### Added
-- Recursive Division Tree (RDT) utility module (`js/rdt.js`) for deterministic, location-keyed procedural behavior
-- Stable geo-hash and seeded pseudo-random helpers to keep location visuals consistent across reloads
-- RDT self-test vectors that run on load and warn if `rdtDepth` calculations regress
+- _No entries yet._
+
+---
+
+## [1.1.0] - 2026-02-10
+
+### Highlights vs v1.0.0
+- Introduced **RDT (Recursive Division Tree)** complexity analysis and deterministic seed utilities to make each location's procedural look repeatable while preserving neighborhood variation.
+- Upgraded procedural visual consistency (building/window/road variation now seeded by location), delivering more stable and polished graphics between sessions.
+- Improved world/physics performance behavior with RDT-aware adaptive road-query throttling plus safety overrides in high-speed/off-road edge cases.
+- Continued refinement of **space/solar-system flow** and environment transitions (Earth ↔ Space Flight ↔ Moon) for smoother mode switching and cleanup behavior.
+
+### Added
+- Recursive Division Tree (RDT) utility module (`js/rdt.js`) for deterministic, location-keyed procedural behavior.
+- Stable geo-hash and seeded pseudo-random helpers to keep location visuals consistent across reloads.
+- RDT self-test vectors that run on load and warn if `rdtDepth` calculations regress.
 
 ### Changed
-- World loading now computes and uses an RDT complexity index to adapt query strategy in dense vs. sparse locations
-- Procedural generation now uses deterministic seeds for building/window/road texture variation instead of purely non-deterministic randomness
-- Physics road proximity checks now use adaptive RDT-aware throttling to reduce per-frame cost in high-complexity areas
-- Ongoing performance tuning during city and environment switches
-- Incremental improvements to road and terrain alignment
-- Refinements to environment transitions and cleanup logic
+- World loading now computes and uses an RDT complexity index to adapt query strategy in dense vs. sparse locations.
+- Procedural generation now uses deterministic seeds for building/window/road texture variation instead of purely non-deterministic randomness.
+- Physics road proximity checks now use adaptive RDT-aware throttling to reduce per-frame cost in high-complexity areas.
+- Ongoing performance tuning during city and environment switches.
+- Incremental improvements to road and terrain alignment.
+- Refinements to environment transitions and cleanup logic.
+
 
 ### Fixed
-- Added road-cache invalidation hooks during location reloads and major mode transitions to prevent stale proximity data
-- Added safety overrides so road proximity checks re-run immediately when steering, moving at high speed, or recovering from off-road states
+- Added road-cache invalidation hooks during location reloads and major mode transitions to prevent stale proximity data.
+- Added safety overrides so road proximity checks re-run immediately when steering, moving at high speed, or recovering from off-road states.
 
 ---
 
@@ -57,4 +71,4 @@ Entries reflect changes made relative to the most recent public release.
 - Road elevation issues causing clipping or z-fighting in some areas
 - Inconsistent grounding behavior when switching cities
 ---
-Most recently updated on 02/09/26
+Most recently updated on 02/10/26
