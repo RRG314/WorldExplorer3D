@@ -294,10 +294,31 @@ function init() {
     }
 
     renderer.setSize(innerWidth, innerHeight);
-    // Adaptive pixel ratio: cap at 1.5 for good quality without killing performance
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 
-    // Try advanced features with fallbacks
+    // === GPU TIER DETECTION ===
+    // Detect GPU capability to adapt quality settings across the board
+    let gpuTier = 'high'; // high, mid, low
+    try {
+        const debugExt = renderer.getContext().getExtension('WEBGL_debug_renderer_info');
+        if (debugExt) {
+            const gpuRenderer = renderer.getContext().getParameter(debugExt.UNMASKED_RENDERER_WEBGL).toLowerCase();
+            const isMobile = /mobile|mali|adreno|powervr|apple gpu|sgx|tegra/.test(gpuRenderer);
+            const isIntegrated = /intel|uhd|iris|hd graphics|mesa|swiftshader|llvmpipe/.test(gpuRenderer);
+            if (isMobile || /swiftshader|llvmpipe/.test(gpuRenderer)) {
+                gpuTier = 'low';
+            } else if (isIntegrated) {
+                gpuTier = 'mid';
+            }
+        }
+        // Small screens are likely weak devices
+        if (innerWidth * innerHeight < 500000) gpuTier = 'low';
+    } catch(e) { /* keep default high */ }
+    console.log('GPU tier:', gpuTier);
+
+    // Adaptive pixel ratio: high=1.5, mid=1.25, low=1
+    const pixelRatioCap = gpuTier === 'high' ? 1.5 : gpuTier === 'mid' ? 1.25 : 1;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
+
     // Physically correct lighting for realistic PBR
     try {
         renderer.physicallyCorrectLights = true;
@@ -320,9 +341,10 @@ function init() {
 
     try {
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        // PCFSoft on high/mid, Basic on low
+        renderer.shadowMap.type = gpuTier === 'low' ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
     } catch(e) {
-        console.warn('Soft shadows not supported, trying basic');
+        console.warn('Shadows not supported, trying basic');
         try {
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.BasicShadowMap;
@@ -333,47 +355,46 @@ function init() {
 
     document.body.prepend(renderer.domElement);
 
-    // === POST-PROCESSING SETUP ===
-    try {
-        composer = new THREE.EffectComposer(renderer);
-        const renderPass = new THREE.RenderPass(scene, camera);
-        composer.addPass(renderPass);
-
-        // SSAO - subtle ambient occlusion for depth
+    // Low-tier: no post-processing (Chromebooks, old phones)
+    // Mid/High-tier: bloom + SMAA only (SSAO removed — too expensive, caused Mac glitchiness)
+    if (gpuTier !== 'low' && typeof THREE.EffectComposer !== 'undefined') {
         try {
-            ssaoPass = new THREE.SSAOPass(scene, camera, innerWidth, innerHeight);
-            ssaoPass.kernelRadius = 8;
-            ssaoPass.minDistance = 0.005;
-            ssaoPass.maxDistance = 0.1;
-            ssaoPass.output = THREE.SSAOPass.OUTPUT.Default;
-            composer.addPass(ssaoPass);
-        } catch(e) {
-            console.warn('SSAO not available:', e);
-        }
+            composer = new THREE.EffectComposer(renderer);
+            const renderPass = new THREE.RenderPass(scene, camera);
+            composer.addPass(renderPass);
 
-        // Bloom - very subtle, mainly for night lights and emissive materials
-        try {
-            bloomPass = new THREE.UnrealBloomPass(
-                new THREE.Vector2(innerWidth, innerHeight),
-                0.15,  // strength - very subtle
-                0.4,   // radius
-                0.85   // threshold - only bright things bloom
-            );
-            composer.addPass(bloomPass);
-        } catch(e) {
-            console.warn('Bloom not available:', e);
-        }
+            // Bloom — half-resolution for performance, subtle strength
+            if (typeof THREE.UnrealBloomPass !== 'undefined') {
+                try {
+                    const bloomW = Math.floor(innerWidth / 2);
+                    const bloomH = Math.floor(innerHeight / 2);
+                    bloomPass = new THREE.UnrealBloomPass(
+                        new THREE.Vector2(bloomW, bloomH),
+                        0.15,  // strength - very subtle
+                        0.4,   // radius
+                        0.85   // threshold - only bright things bloom
+                    );
+                    composer.addPass(bloomPass);
+                } catch(e) {
+                    console.warn('Bloom not available:', e);
+                }
+            }
 
-        // SMAA anti-aliasing (since we don't use hardware AA)
-        try {
-            smaaPass = new THREE.SMAAPass(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio());
-            composer.addPass(smaaPass);
+            // SMAA anti-aliasing
+            if (typeof THREE.SMAAPass !== 'undefined') {
+                try {
+                    smaaPass = new THREE.SMAAPass(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio());
+                    composer.addPass(smaaPass);
+                } catch(e) {
+                    console.warn('SMAA not available:', e);
+                }
+            }
         } catch(e) {
-            console.warn('SMAA not available:', e);
+            console.warn('Post-processing not available:', e);
+            composer = null;
         }
-    } catch(e) {
-        console.warn('Post-processing not available:', e);
-        composer = null;
+    } else {
+        console.log('Post-processing skipped (GPU tier: ' + gpuTier + ')');
     }
 
     // Create textures after Three.js is loaded
@@ -457,8 +478,9 @@ function init() {
     sun = new THREE.DirectionalLight(0xfff5e1, 1.2);
     sun.position.set(100, 150, 50);
     sun.castShadow = true;
-    sun.shadow.mapSize.width = 1024;
-    sun.shadow.mapSize.height = 1024;
+    const shadowRes = gpuTier === 'high' ? 1024 : gpuTier === 'mid' ? 512 : 256;
+    sun.shadow.mapSize.width = shadowRes;
+    sun.shadow.mapSize.height = shadowRes;
     sun.shadow.camera.left = -120;
     sun.shadow.camera.right = 120;
     sun.shadow.camera.top = 120;
@@ -541,14 +563,15 @@ function init() {
         opacity: 0.82
     });
 
-    // Create clouds - reduced count for performance
-    for (let i = 0; i < 20; i++) {
+    // Clouds — fewer draw calls: use lower-poly spheres and fewer puffs
+    const cloudCount = gpuTier === 'low' ? 8 : 15;
+    for (let i = 0; i < cloudCount; i++) {
         const cloud = new THREE.Group();
         const numPuffs = 2 + Math.floor(Math.random() * 2);
         for (let j = 0; j < numPuffs; j++) {
             const size = 15 + Math.random() * 12;
             const sphere = new THREE.Mesh(
-                new THREE.SphereGeometry(size, 5, 4),
+                new THREE.SphereGeometry(size, 4, 3),
                 cloudMat
             );
             sphere.position.set(
@@ -566,14 +589,15 @@ function init() {
         cloudGroup.add(cloud);
     }
 
-    // Add a few large clouds
-    for (let i = 0; i < 3; i++) {
+    // A few large clouds
+    const largeClouds = gpuTier === 'low' ? 1 : 3;
+    for (let i = 0; i < largeClouds; i++) {
         const largeCloud = new THREE.Group();
-        const numPuffs = 4 + Math.floor(Math.random() * 3);
+        const numPuffs = 3 + Math.floor(Math.random() * 2);
         for (let j = 0; j < numPuffs; j++) {
             const size = 30 + Math.random() * 30;
             const sphere = new THREE.Mesh(
-                new THREE.SphereGeometry(size, 6, 5),
+                new THREE.SphereGeometry(size, 4, 3),
                 cloudMat
             );
             sphere.position.set(
@@ -700,7 +724,8 @@ function init() {
             isPointInPolygon: pointInPolygon
         });
         window.Walk = Walk;
-        // Debug log removed
+        // Start in walking mode by default (character visible, car hidden)
+        Walk.setModeWalk();
     } catch(e) {
         console.error('Walking module initialization failed:', e);
         console.error('Stack:', e.stack);
