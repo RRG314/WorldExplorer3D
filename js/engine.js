@@ -4,6 +4,7 @@
 
 // Textures will be created in init()
 let asphaltTex, asphaltNormal, asphaltRoughness, windowTextures = {};
+let buildingNormalMap = null, buildingRoughnessMap = null;
 
 // ===== PROCEDURAL TEXTURES =====
 function createAsphaltTexture() {
@@ -64,6 +65,68 @@ function createRoughnessMap() {
     const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
     texture.repeat.set(8, 8);
+    return texture;
+}
+
+function createBuildingNormalMap() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 128;
+    canvas.height = 256;
+    const ctx = canvas.getContext('2d');
+    // Flat neutral normal base
+    ctx.fillStyle = '#8080ff';
+    ctx.fillRect(0, 0, 128, 256);
+    // Horizontal lines for floor separations
+    for (let y = 0; y < 256; y += 14) {
+        ctx.fillStyle = '#7878ff';
+        ctx.fillRect(0, y, 128, 1);
+        ctx.fillStyle = '#8888ff';
+        ctx.fillRect(0, y + 1, 128, 1);
+    }
+    // Vertical lines for window frames
+    for (let x = 0; x < 128; x += 16) {
+        ctx.fillStyle = '#7878ff';
+        ctx.fillRect(x, 0, 1, 256);
+    }
+    // Subtle brick-like variation
+    const rng = typeof seededRandom === 'function' ? seededRandom(0xB21C4) : Math.random.bind(Math);
+    for (let i = 0; i < 400; i++) {
+        const x = rng() * 128, y = rng() * 256;
+        ctx.fillStyle = `rgb(${124 + rng() * 12}, ${124 + rng() * 12}, ${240 + rng() * 15})`;
+        ctx.fillRect(x, y, 3, 2);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(1, 1);
+    return texture;
+}
+
+function createBuildingRoughnessMap() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    // Moderate roughness base (plaster/concrete)
+    ctx.fillStyle = '#c8c8c8';
+    ctx.fillRect(0, 0, 64, 128);
+    // Window areas are smoother (glass)
+    for (let floor = 0; floor < 9; floor++) {
+        for (let col = 0; col < 4; col++) {
+            ctx.fillStyle = '#404040'; // Low roughness = smooth glass
+            ctx.fillRect(col * 14 + 3, floor * 14 + 3, 10, 10);
+        }
+    }
+    // Add variation
+    const rng = typeof seededRandom === 'function' ? seededRandom(0xA0060) : Math.random.bind(Math);
+    for (let i = 0; i < 200; i++) {
+        const x = rng() * 64, y = rng() * 128;
+        const b = 180 + rng() * 55;
+        ctx.fillStyle = `rgb(${b}, ${b}, ${b})`;
+        ctx.fillRect(x, y, 2, 2);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(1, 1);
     return texture;
 }
 
@@ -166,7 +229,7 @@ function init() {
 
     scene = new THREE.Scene();
     scene.background = new THREE.Color(0x87ceeb);
-    scene.fog = new THREE.Fog(0xb8d4e8, 200, 2500);
+    scene.fog = new THREE.FogExp2(0xb8d4e8, 0.00035);
 
     // Camera - tighter near/far ratio improves depth precision.
     // Stars are at r=5000 so far must cover that. logarithmicDepthBuffer (below)
@@ -231,13 +294,19 @@ function init() {
     }
 
     renderer.setSize(innerWidth, innerHeight);
-    // Keep pixel ratio at 1 for Chromebook performance
-    renderer.setPixelRatio(1);
+    // Adaptive pixel ratio: cap at 1.5 for good quality without killing performance
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
 
     // Try advanced features with fallbacks
+    // Physically correct lighting for realistic PBR
+    try {
+        renderer.physicallyCorrectLights = true;
+    } catch(e) {
+        console.warn('Physically correct lights not supported');
+    }
+
     try {
         renderer.outputEncoding = THREE.sRGBEncoding;
-        // Debug log removed
     } catch(e) {
         console.warn('sRGB encoding not supported');
     }
@@ -245,15 +314,13 @@ function init() {
     try {
         renderer.toneMapping = THREE.ACESFilmicToneMapping;
         renderer.toneMappingExposure = 0.9;
-        // Debug log removed
     } catch(e) {
         console.warn('Tone mapping not supported');
     }
 
     try {
         renderer.shadowMap.enabled = true;
-        renderer.shadowMap.type = THREE.BasicShadowMap; // Basic shadows for performance
-        // Debug log removed
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     } catch(e) {
         console.warn('Soft shadows not supported, trying basic');
         try {
@@ -266,12 +333,65 @@ function init() {
 
     document.body.prepend(renderer.domElement);
 
+    // === POST-PROCESSING SETUP ===
+    try {
+        composer = new THREE.EffectComposer(renderer);
+        const renderPass = new THREE.RenderPass(scene, camera);
+        composer.addPass(renderPass);
+
+        // SSAO - subtle ambient occlusion for depth
+        try {
+            ssaoPass = new THREE.SSAOPass(scene, camera, innerWidth, innerHeight);
+            ssaoPass.kernelRadius = 8;
+            ssaoPass.minDistance = 0.005;
+            ssaoPass.maxDistance = 0.1;
+            ssaoPass.output = THREE.SSAOPass.OUTPUT.Default;
+            composer.addPass(ssaoPass);
+        } catch(e) {
+            console.warn('SSAO not available:', e);
+        }
+
+        // Bloom - very subtle, mainly for night lights and emissive materials
+        try {
+            bloomPass = new THREE.UnrealBloomPass(
+                new THREE.Vector2(innerWidth, innerHeight),
+                0.15,  // strength - very subtle
+                0.4,   // radius
+                0.85   // threshold - only bright things bloom
+            );
+            composer.addPass(bloomPass);
+        } catch(e) {
+            console.warn('Bloom not available:', e);
+        }
+
+        // SMAA anti-aliasing (since we don't use hardware AA)
+        try {
+            smaaPass = new THREE.SMAAPass(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio());
+            composer.addPass(smaaPass);
+        } catch(e) {
+            console.warn('SMAA not available:', e);
+        }
+    } catch(e) {
+        console.warn('Post-processing not available:', e);
+        composer = null;
+    }
+
     // Create textures after Three.js is loaded
     try {
         asphaltTex = createAsphaltTexture();
         asphaltNormal = createAsphaltNormal();
         asphaltRoughness = createRoughnessMap();
-        // Debug log removed
+
+        // Create building textures
+        buildingNormalMap = createBuildingNormalMap();
+        buildingRoughnessMap = createBuildingRoughnessMap();
+
+        // Apply anisotropic filtering to ground textures for sharper distant roads
+        const maxAniso = renderer.capabilities.getMaxAnisotropy();
+        const aniso = Math.min(maxAniso, 8);
+        if (asphaltTex) asphaltTex.anisotropy = aniso;
+        if (asphaltNormal) asphaltNormal.anisotropy = aniso;
+        if (asphaltRoughness) asphaltRoughness.anisotropy = aniso;
     } catch(e) {
         console.error('Texture creation failed:', e);
         // Textures will be null, code will use fallback solid colors
@@ -337,14 +457,17 @@ function init() {
     sun = new THREE.DirectionalLight(0xfff5e1, 1.2);
     sun.position.set(100, 150, 50);
     sun.castShadow = true;
-    sun.shadow.mapSize.width = 512;
-    sun.shadow.mapSize.height = 512;
-    sun.shadow.camera.left = -80;
-    sun.shadow.camera.right = 80;
-    sun.shadow.camera.top = 80;
-    sun.shadow.camera.bottom = -80;
+    sun.shadow.mapSize.width = 1024;
+    sun.shadow.mapSize.height = 1024;
+    sun.shadow.camera.left = -120;
+    sun.shadow.camera.right = 120;
+    sun.shadow.camera.top = 120;
+    sun.shadow.camera.bottom = -120;
+    sun.shadow.camera.near = 0.5;
+    sun.shadow.camera.far = 500;
     sun.shadow.bias = -0.0001;
     sun.shadow.normalBias = 0.02;
+    sun.shadow.radius = 3; // Soft shadow edges (PCFSoftShadowMap)
     scene.add(sun);
 
     fillLight = new THREE.DirectionalLight(0x9db4ff, 0.3);
@@ -587,7 +710,13 @@ function init() {
     skyRaycaster = new THREE.Raycaster();
     skyRaycaster.far = 10000; // Reach stars on enlarged celestial sphere (5000m radius)
 
-    addEventListener('resize', () => { camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+    addEventListener('resize', () => {
+        camera.aspect = innerWidth/innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(innerWidth, innerHeight);
+        if (composer) composer.setSize(innerWidth, innerHeight);
+        if (smaaPass) smaaPass.setSize(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio());
+    });
     addEventListener('keydown', e => { keys[e.code] = true; onKey(e.code); });
     addEventListener('keyup', e => keys[e.code] = false);
 
