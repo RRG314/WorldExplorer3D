@@ -18,9 +18,9 @@ function setTimeOfDay(time) {
             ambientColor: 0xffffff,
             ambientIntensity: 0.35,
             fogColor: 0xb8d4e8,
-            fogNear: 200,
-            fogFar: 2500,
+            fogDensity: 0.00035,
             exposure: 0.95,
+            bloomStrength: 0.1,
             icon: '☀️'
         },
         sunset: {
@@ -35,9 +35,9 @@ function setTimeOfDay(time) {
             ambientColor: 0xffa07a,
             ambientIntensity: 0.28,
             fogColor: 0xff9a76,
-            fogNear: 150,
-            fogFar: 1800,
+            fogDensity: 0.00045,
             exposure: 1.1,
+            bloomStrength: 0.2,
             icon: '🌅'
         },
         night: {
@@ -52,9 +52,9 @@ function setTimeOfDay(time) {
             ambientColor: 0x404060,
             ambientIntensity: 0.2,
             fogColor: 0x0d1128,
-            fogNear: 500,
-            fogFar: 15000,
+            fogDensity: 0.00008,
             exposure: 0.5,
+            bloomStrength: 0.35,
             icon: '🌙'
         },
         sunrise: {
@@ -69,9 +69,9 @@ function setTimeOfDay(time) {
             ambientColor: 0xffd4a3,
             ambientIntensity: 0.3,
             fogColor: 0xffd4b8,
-            fogNear: 150,
-            fogFar: 2000,
+            fogDensity: 0.0004,
             exposure: 1.0,
+            bloomStrength: 0.2,
             icon: '🌄'
         }
     };
@@ -144,12 +144,17 @@ function setTimeOfDay(time) {
         }
     }
 
-    // Update fog
-    scene.fog = new THREE.Fog(config.fogColor, config.fogNear, config.fogFar);
+    // Update fog (exponential for natural atmospheric perspective)
+    scene.fog = new THREE.FogExp2(config.fogColor, config.fogDensity);
 
     // Update tone mapping exposure
     if (renderer) {
         renderer.toneMappingExposure = config.exposure;
+    }
+
+    // Adjust bloom per time of day (stronger at night for lights)
+    if (bloomPass && config.bloomStrength !== undefined) {
+        bloomPass.strength = config.bloomStrength;
     }
 
     // Update button icon
@@ -715,9 +720,9 @@ function arriveAtMoon() {
         Walk.toggleWalk(); // Switch back to driving
     }
 
-    // Set night sky for moon
+    // Set night sky for moon (no atmosphere = very low fog)
     scene.background = new THREE.Color(0x000000);
-    scene.fog = new THREE.Fog(0x000000, 1000, 10000);
+    scene.fog = new THREE.FogExp2(0x000000, 0.00005);
 
     // Adjust lighting for moon - stronger sun for better shading and shadows
     if (sun) {
