@@ -75,7 +75,11 @@ function renderLoop(t = 0) {
         }
     }
 
-    renderer.render(scene, camera);
+    if (composer) {
+        composer.render();
+    } else {
+        renderer.render(scene, camera);
+    }
 }
 
 function showLoad(txt) { document.getElementById('loadText').textContent = txt; document.getElementById('loading').classList.add('show'); }
