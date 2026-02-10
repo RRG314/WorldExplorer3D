@@ -86,4 +86,56 @@ let rdtComplexity = 0;  // rdtDepth result for current location
             console.error('[RDT] Self-test FAILED: rdtDepth(' + t.n + ') = ' + got + ', expected ' + t.expected);
         }
     }
+})();    // Murmur-style mix
+    h ^= h >>> 16; h = Math.imul(h, 2246822507) >>> 0;
+    h ^= h >>> 13; h = Math.imul(h, 3266489909) >>> 0;
+    h ^= h >>> 16;
+    return h >>> 0;
+}
+
+// ===== Seeded pseudo-random [0,1) from integer =====
+// xorshift32-based, fast and deterministic. Same input always yields same output.
+function rand01FromInt(x) {
+    x = (x | 0) >>> 0;
+    x ^= x << 13; x >>>= 0;
+    x ^= x >>> 17; x >>>= 0;
+    x ^= x << 5;  x >>>= 0;
+    return (x >>> 0) / 4294967296;
+}
+
+// ===== Seeded random sequence generator =====
+// Creates a function that returns successive pseudo-random [0,1) values
+// from a given seed. Each call advances the internal state.
+function seededRandom(seed) {
+    let s = (seed | 0) >>> 0;
+    if (s === 0) s = 1;
+    return function() {
+        s ^= s << 13; s >>>= 0;
+        s ^= s >>> 17; s >>>= 0;
+        s ^= s << 5;  s >>>= 0;
+        return (s >>> 0) / 4294967296;
+    };
+}
+
+// ===== Global RDT state =====
+// Updated each time loadRoads() runs; available to all modules.
+let rdtSeed = 0;       // hashGeoToInt result for current location
+let rdtComplexity = 0;  // rdtDepth result for current location
+
+// ===== Self-test: canonical test vectors from the RDT paper =====
+// These run once on load and log a warning if the math is wrong.
+(function rdtSelfTest() {
+    const tests = [
+        { n: 1260, expected: 5 },  // chain: 1260→66→8→4→2→1, divisors: [19,8,2,2,2]
+        { n: 2,    expected: 1 },  // 2→1
+        { n: 4,    expected: 2 },  // 4→2→1
+        { n: 1,    expected: 0 },  // below threshold
+        { n: 0,    expected: 0 },  // below threshold
+    ];
+    for (const t of tests) {
+        const got = rdtDepth(t.n, 1.5);
+        if (got !== t.expected) {
+            console.error('[RDT] Self-test FAILED: rdtDepth(' + t.n + ') = ' + got + ', expected ' + t.expected);
+        }
+    }
 })();
