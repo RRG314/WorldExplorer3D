@@ -1,8 +1,120 @@
 // ============================================================================
-// rdt.js - Recursive Division Tree (RDT) algorithm and seeded random utilities
+// rdt.js - Recursive Division Tree (RDT) algorithm and RGE256ctr PRNG
 // Provides deterministic, location-based complexity indexing and pseudo-random
 // number generation for consistent procedural content across sessions.
+//
+// PRNG: RGE256ctr — 256-bit ARX-based counter PRNG (non-cryptographic).
+// Ported from the C reference implementation (rge256ctr.c / rge256ctr.h).
 // ============================================================================
+
+// ===== RGE256ctr PRNG (JavaScript port) =====
+// 256-bit key, 64-bit counter, 64-bit nonce, 16-word (64-byte) output block.
+// Uses 12 ARX rounds (6 double-rounds) with ChaCha-style quarter-round.
+
+const RGE256ctr = (function() {
+    // 32-bit left rotate
+    function rotl32(x, r) {
+        return ((x << r) | (x >>> (32 - r))) >>> 0;
+    }
+
+    // ChaCha-style quarter-round on a 16-word state array
+    function qr(x, a, b, c, d) {
+        x[a] = (x[a] + x[b]) >>> 0;  x[d] ^= x[a];  x[d] = rotl32(x[d], 16);
+        x[c] = (x[c] + x[d]) >>> 0;  x[b] ^= x[c];  x[b] = rotl32(x[b], 12);
+        x[a] = (x[a] + x[b]) >>> 0;  x[d] ^= x[a];  x[d] = rotl32(x[d],  8);
+        x[c] = (x[c] + x[d]) >>> 0;  x[b] ^= x[c];  x[b] = rotl32(x[b],  7);
+    }
+
+    // "expand 32-byte k" constants
+    const CONSTANTS = [0x61707865, 0x3320646E, 0x79622D32, 0x6B206574];
+
+    function createState(seed, nonce) {
+        seed  = (seed  | 0) >>> 0;
+        nonce = (nonce | 0) >>> 0;  // JS port: nonce is 32-bit (low word)
+
+        return {
+            key: new Uint32Array([
+                seed,
+                0x9E3779B9,
+                0x243F6A88,
+                0xB7E15162,
+                0xC6EF3720,
+                0xDEADBEEF,
+                0xA5A5A5A5,
+                0x01234567
+            ]),
+            counterLo: 0,
+            counterHi: 0,
+            nonceLo: nonce,
+            nonceHi: 0,
+            buf: new Uint32Array(16),
+            bufUsed: 16   // force refill on first use
+        };
+    }
+
+    function refill(s) {
+        const st = new Uint32Array(16);
+        const w  = new Uint32Array(16);
+
+        // Set constants
+        st[0] = CONSTANTS[0];
+        st[1] = CONSTANTS[1];
+        st[2] = CONSTANTS[2];
+        st[3] = CONSTANTS[3];
+
+        // Set key
+        for (let i = 0; i < 8; i++) st[4 + i] = s.key[i];
+
+        // Set counter (64-bit)
+        st[12] = s.counterLo;
+        st[13] = s.counterHi;
+
+        // Increment counter
+        s.counterLo = (s.counterLo + 1) >>> 0;
+        if (s.counterLo === 0) s.counterHi = (s.counterHi + 1) >>> 0;
+
+        // Set nonce (64-bit)
+        st[14] = s.nonceLo;
+        st[15] = s.nonceHi;
+
+        // Copy initial state
+        for (let i = 0; i < 16; i++) w[i] = st[i];
+
+        // 12 ARX rounds (6 double-rounds)
+        for (let i = 0; i < 6; i++) {
+            // Column rounds
+            qr(w, 0, 4,  8, 12);
+            qr(w, 1, 5,  9, 13);
+            qr(w, 2, 6, 10, 14);
+            qr(w, 3, 7, 11, 15);
+            // Diagonal rounds
+            qr(w, 0, 5, 10, 15);
+            qr(w, 1, 6, 11, 12);
+            qr(w, 2, 7,  8, 13);
+            qr(w, 3, 4,  9, 14);
+        }
+
+        // Final addition
+        for (let i = 0; i < 16; i++) {
+            s.buf[i] = (w[i] + st[i]) >>> 0;
+        }
+
+        s.bufUsed = 0;
+    }
+
+    function nextU32(s) {
+        if (s.bufUsed >= 16) refill(s);
+        return s.buf[s.bufUsed++];
+    }
+
+    // Return [0, 1)
+    function nextFloat(s) {
+        return (nextU32(s) >>> 0) / 4294967296;
+    }
+
+    return { createState, nextU32, nextFloat };
+})();
+
 
 // ===== RDT (Recursive Division Tree) depth =====
 // Iterative log-based division depth measure of an integer magnitude.
@@ -41,27 +153,21 @@ function hashGeoToInt(lat, lon, extra = 0) {
     return h >>> 0;
 }
 
-// ===== Seeded pseudo-random [0,1) from integer =====
-// xorshift32-based, fast and deterministic. Same input always yields same output.
+// ===== RGE256ctr-backed single-value hash [0,1) from integer =====
+// Drop-in replacement for the old xorshift32 rand01FromInt.
+// Runs one full ARX block to produce a high-quality output from any input.
 function rand01FromInt(x) {
-    x = (x | 0) >>> 0;
-    x ^= x << 13; x >>>= 0;
-    x ^= x >>> 17; x >>>= 0;
-    x ^= x << 5;  x >>>= 0;
-    return (x >>> 0) / 4294967296;
+    const s = RGE256ctr.createState((x | 0) >>> 0, 0);
+    return RGE256ctr.nextFloat(s);
 }
 
-// ===== Seeded random sequence generator =====
-// Creates a function that returns successive pseudo-random [0,1) values
-// from a given seed. Each call advances the internal state.
+// ===== RGE256ctr-backed seeded random sequence generator =====
+// Drop-in replacement for the old xorshift32 seededRandom.
+// Creates a function that returns successive pseudo-random [0,1) values.
 function seededRandom(seed) {
-    let s = (seed | 0) >>> 0;
-    if (s === 0) s = 1;
+    const s = RGE256ctr.createState((seed | 0) >>> 0, 0);
     return function() {
-        s ^= s << 13; s >>>= 0;
-        s ^= s >>> 17; s >>>= 0;
-        s ^= s << 5;  s >>>= 0;
-        return (s >>> 0) / 4294967296;
+        return RGE256ctr.nextFloat(s);
     };
 }
 
@@ -85,5 +191,35 @@ let rdtComplexity = 0;  // rdtDepth result for current location
         if (got !== t.expected) {
             console.error('[RDT] Self-test FAILED: rdtDepth(' + t.n + ') = ' + got + ', expected ' + t.expected);
         }
+    }
+})();
+
+// ===== RGE256ctr self-test =====
+// Verify the JS port produces deterministic output for a known seed.
+(function rge256ctrSelfTest() {
+    const s1 = RGE256ctr.createState(123456789, 0);
+    const v1 = RGE256ctr.nextU32(s1);
+    const v2 = RGE256ctr.nextU32(s1);
+
+    // Same seed must give same sequence
+    const s2 = RGE256ctr.createState(123456789, 0);
+    const w1 = RGE256ctr.nextU32(s2);
+    const w2 = RGE256ctr.nextU32(s2);
+
+    if (v1 !== w1 || v2 !== w2) {
+        console.error('[RGE256ctr] Self-test FAILED: non-deterministic output');
+    }
+    // Different seeds must differ
+    const s3 = RGE256ctr.createState(987654321, 0);
+    const x1 = RGE256ctr.nextU32(s3);
+    if (x1 === v1) {
+        console.error('[RGE256ctr] Self-test WARNING: different seeds produced same first output');
+    }
+
+    // seededRandom wrapper must work
+    const rng = seededRandom(42);
+    const a = rng(), b = rng();
+    if (a === b || a < 0 || a >= 1 || b < 0 || b >= 1) {
+        console.error('[RGE256ctr] Self-test FAILED: seededRandom out of range or stuck');
     }
 })();
