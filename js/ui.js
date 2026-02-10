@@ -312,13 +312,14 @@ function setupUI() {
             }, 5000);
         }
 
-        // Always start in driving mode
-        if (carMesh) carMesh.visible = true;
-        if (Walk && Walk.state.characterMesh) Walk.state.characterMesh.visible = false;
+        // Start in walking mode (character visible, car hidden)
+        if (Walk) {
+            Walk.setModeWalk();
+        }
 
         // Set initial mode button state
-        document.getElementById('fDriving').classList.add('on');
-        document.getElementById('fWalk').classList.remove('on');
+        document.getElementById('fDriving').classList.remove('on');
+        document.getElementById('fWalk').classList.add('on');
         document.getElementById('fDrone').classList.remove('on');
 
         // Set initial map view button states
