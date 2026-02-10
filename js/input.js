@@ -241,72 +241,64 @@ async function searchLocation() {
     }
 
     try {
+        // Make search case-insensitive by not modifying the query
+        // Nominatim handles case-insensitivity automatically
+        let searchQuery = query;
+
+        // Use allorigins.win as CORS proxy - reliable and works from file://
+        // Debug log removed
+        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(searchQuery)}`;
+        let url = `https://api.allorigins.win/get?url=${encodeURIComponent(nominatimUrl)}`;
+
+        // Debug log removed
         status.textContent = 'Searching...';
         status.style.color = '#6b7280';
 
-        async function runGeocodeSearch(searchQuery) {
-                       const endpoints = [
-                {
-                    name: 'Nominatim',
-                    url: `https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&q=${encodeURIComponent(searchQuery)}`,
-                    parse: payload => Array.isArray(payload) ? payload : []
-                },
-                {
-                    name: 'Maps.co',
-                    url: `https://geocode.maps.co/search?q=${encodeURIComponent(searchQuery)}&limit=5`,
-                    parse: payload => Array.isArray(payload) ? payload : []
-                },
-                {
-                    name: 'Open-Meteo',
-                    url: `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(searchQuery)}&count=5&language=en&format=json`,
-                    parse: payload => (payload?.results || []).map(result => ({
-                        lat: result.latitude,
-                        lon: result.longitude,
-                        display_name: [result.name, result.admin1, result.country].filter(Boolean).join(', '),
-                        type: result.feature_code === 'PPLC' || result.feature_code === 'PPLA' ? 'city' : 'place',
-                        class: 'place'
-                    }))
-                }
-            ];
+        let res = await fetchWithRetry(url);
 
-            let lastError = null;
-
-            for (const endpoint of endpoints) {
-                try {
-                    
-                    const res = await fetchWithRetry(endpoint.url);
-                    if (!res || !res.ok) {
-                        throw new Error(`${endpoint.name} HTTP ${res?.status || 'unknown'}: ${res?.statusText || 'Request failed'}`);
-
-                    const payload = await res.json();
-                    const parsed = endpoint.parse(payload);
-
-                    if (Array.isArray(parsed)) {
-                        if (parsed.length > 0) {
-                            return parsed;
-                        }
-                        continue;
-                    }
-
-                   throw new Error(`${endpoint.name} returned an unexpected response format`);
-                } catch (err) {
-                    lastError = err;
-                }
-            }
-
-            throw lastError || new Error('All geocoder endpoints failed');
+        if (!res || !res.ok) {
+            throw new Error(`HTTP ${res?.status || 'unknown'}: ${res?.statusText || 'Request failed'}`);
         }
 
-        let data = await runGeocodeSearch(query);
+        let response = await res.json();
+        let data = JSON.parse(response.contents); // allorigins wraps the response
+        // Debug log removed
+        // Debug log removed
 
         // If no results and it's just a city name, try adding USA
         if (data.length === 0 && !query.includes(',')) {
-            data = await runGeocodeSearch(query + ', USA');
+            // Debug log removed
+            searchQuery = query + ', USA';
+            const retryNominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(searchQuery)}`;
+            url = `https://api.allorigins.win/get?url=${encodeURIComponent(retryNominatimUrl)}`;
+            // Debug log removed
+            res = await fetchWithRetry(url);
+
+            if (!res || !res.ok) {
+                throw new Error(`HTTP ${res?.status || 'unknown'}: ${res?.statusText || 'Request failed'}`);
+            }
+
+            response = await res.json();
+            data = JSON.parse(response.contents);
+            // Debug log removed
         }
 
         // If still no results, try one more time with lowercase
         if (data.length === 0) {
-            data = await runGeocodeSearch(query.toLowerCase());
+            // Debug log removed
+            searchQuery = query.toLowerCase();
+            const retryLowerUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(searchQuery)}`;
+            url = `https://api.allorigins.win/get?url=${encodeURIComponent(retryLowerUrl)}`;
+            // Debug log removed
+            res = await fetchWithRetry(url);
+
+            if (!res || !res.ok) {
+                throw new Error(`HTTP ${res?.status || 'unknown'}: ${res?.statusText || 'Request failed'}`);
+            }
+
+            response = await res.json();
+            data = JSON.parse(response.contents);
+            // Debug log removed
         }
 
         if (!data || data.length === 0) {
