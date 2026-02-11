@@ -64,6 +64,7 @@ const PropertyUI = {
 
 const car = { x:0, z:0, y:0, angle:0, speed:0, vx:0, vz:0, vy:0, grip:1, onRoad:true, road:null, boost:false, boostTime:0, boostReady:true, boostDecayTime:0, driftAngle:0 };
 const keys = {};
+function clearKeys() { Object.keys(keys).forEach(k => keys[k] = false); }
 let roads = [], roadMeshes = [], buildingMeshes = [], buildings = [], landuses = [], landuseMeshes = [], pois = [], poiMeshes = [], scene, camera, renderer, carMesh, wheelMeshes = [];
 let streetFurnitureMeshes = [];
 let nearestPOI = null;
@@ -107,7 +108,7 @@ let composer = null, ssaoPass = null, bloomPass = null, smaaPass = null;
 let showLargeMap = false;
 let largeMapZoom = 14;
 let satelliteView = false;
-let landUseVisible = true;
+let landUseVisible = false;
 let showRoads = true;
 // RA (Right Ascension) in hours (0-24), Dec (Declination) in degrees (-90 to 90)
 // Mag (Apparent magnitude) - lower is brighter. Naked eye limit ~6.0
