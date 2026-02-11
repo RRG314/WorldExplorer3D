@@ -248,21 +248,13 @@ async function loadRoads() {
                 // Deterministic color selection using RDT seed
                 const colors = ['#888888', '#7788aa', '#998877', '#667788'];
                 const baseColor = colors[Math.floor(br2 * colors.length)];
-                const windowTex = createWindowTexture(baseColor, bSeed);
+                const bt = way.tags.building || 'yes';
 
-                const bldgMat = new THREE.MeshStandardMaterial({
-                    map: windowTex,
-                    color: baseColor,
-                    roughness: 0.85,
-                    metalness: 0.05
-                });
-                if (buildingNormalMap) {
-                    bldgMat.normalMap = buildingNormalMap;
-                    bldgMat.normalScale = new THREE.Vector2(0.4, 0.4);
-                }
-                if (buildingRoughnessMap) {
-                    bldgMat.roughnessMap = buildingRoughnessMap;
-                }
+                // Use PBR building material system (concrete/brick/windows based on type)
+                const bldgMat = (typeof getBuildingMaterial === 'function')
+                    ? getBuildingMaterial(bt, bSeed, baseColor)
+                    : new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.85, metalness: 0.05 });
+
                 const mesh = new THREE.Mesh(geo, bldgMat);
 
                 // Calculate average terrain elevation for building footprint
@@ -278,6 +270,15 @@ async function loadRoads() {
                 mesh.receiveShadow = true;
                 scene.add(mesh);
                 buildingMeshes.push(mesh);
+
+                // Create concrete ground patch around this building
+                if (typeof createBuildingGroundPatch === 'function') {
+                    const groundPatch = createBuildingGroundPatch(pts, avgElevation);
+                    if (groundPatch) {
+                        scene.add(groundPatch);
+                        buildingMeshes.push(groundPatch);
+                    }
+                }
             });
 
             // Process landuse for ground truth visual realism
@@ -353,6 +354,7 @@ async function loadRoads() {
                     mesh.userData.avgElevation = avgElevation;
 
                     mesh.receiveShadow = false;
+                    mesh.visible = landUseVisible;
                     scene.add(mesh);
                     landuseMeshes.push(mesh);
                     landuses.push({ type: landuseType, pts });
@@ -451,6 +453,14 @@ async function loadRoads() {
 
                 loaded = true;
                 spawnOnRoad();
+                // Load terrain around spawn point immediately
+                if (typeof updateTerrainAround === 'function') {
+                    updateTerrainAround(car.x, car.z);
+                }
+                // Enter walk mode now that car is positioned on a road
+                if (Walk) {
+                    Walk.setModeWalk();
+                }
                 hideLoad();
                 // Align star field to current location
                 alignStarFieldToLocation(LOC.lat, LOC.lon);
@@ -557,6 +567,12 @@ async function loadRoads() {
 
                 loaded = true;
                 spawnOnRoad();
+                if (typeof updateTerrainAround === 'function') {
+                    updateTerrainAround(car.x, car.z);
+                }
+                if (Walk) {
+                    Walk.setModeWalk();
+                }
                 hideLoad();
                 if (gameStarted) startMode();
                 // Debug log removed
