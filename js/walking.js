@@ -25,7 +25,7 @@ function createWalkingModule(opts) {
     enabled: true,
     mode: "drive",
     view: "third",
-    walker: { x: 0, z: 0, y: 0, angle: 0, yaw: 0, pitch: 0, speedMph: 0, vy: 0, onGround: true, lastGroundY: 0 },
+    walker: { x: 0, z: 0, y: 0, angle: 0, yaw: 0, pitch: 0, speedMph: 0, vy: 0, onGround: true },
     characterMesh: null
   };
 
@@ -35,9 +35,9 @@ function createWalkingModule(opts) {
     turnSpeed: 2.6,
     strafeFactor: 0.85,
     eyeHeight: 1.7,
-    thirdPersonDist: 8.0,
-    thirdPersonHeight: 3.5,
-    thirdPersonLookAhead: 8.0,
+    thirdPersonDist: 4.5,
+    thirdPersonHeight: 2.2,
+    thirdPersonLookAhead: 6.0,
     collisionPushBack: 2.0
   };
 
@@ -181,10 +181,6 @@ function createWalkingModule(opts) {
     state.walker.yaw = car.angle;
     state.walker.pitch = 0;
     state.walker.speedMph = 0;
-    state.walker.vy = 0;
-    state.walker.onGround = true;
-    state.walker.y = 0; // will be re-initialized on first physics tick
-    state.walker.lastGroundY = 0;
   }
 
   function syncCarFromWalker() {
@@ -197,9 +193,13 @@ function createWalkingModule(opts) {
 
   function setModeWalk() {
     state.mode = "walk";
-    state.view = "third";  // Always start behind the character
-
+    if (typeof clearKeys === 'function') clearKeys();
+    window.walkMouseLookActive = false;
     syncWalkerFromCar();
+
+    // Reset walker Y so updateWalkPhysics will snap to current terrain height
+    state.walker.y = 0;
+    state.walker.vy = 0;
 
     if (carMesh) {
       carMesh.visible = false;
@@ -213,20 +213,23 @@ function createWalkingModule(opts) {
       const terrainY = typeof terrainMeshHeightAt === 'function'
           ? terrainMeshHeightAt(state.walker.x, state.walker.z)
           : elevationWorldYAtWorldXZ(state.walker.x, state.walker.z);
-      state.characterMesh.visible = true;  // Third person = character visible
+      state.characterMesh.visible = (state.view !== "first");
       state.characterMesh.position.set(state.walker.x, terrainY, state.walker.z);
       state.characterMesh.rotation.y = state.walker.angle;
-    } else {
-      console.error('ERROR: Character mesh is still null after creation!');
     }
   }
 
   function setModeDrive() {
     state.mode = "drive";
+    if (typeof clearKeys === 'function') clearKeys();
+    window.walkMouseLookActive = false;
     syncCarFromWalker();
     if (carMesh) {
       carMesh.visible = true;
-      carMesh.position.set(car.x, 0, car.z);
+      // Use terrain height instead of hardcoded y=0
+      const driveY = typeof terrainMeshHeightAt === 'function'
+          ? terrainMeshHeightAt(car.x, car.z) : elevationWorldYAtWorldXZ(car.x, car.z);
+      carMesh.position.set(car.x, driveY + 1.2, car.z);
       carMesh.rotation.y = car.angle;
     }
     if (state.characterMesh) state.characterMesh.visible = false;
@@ -339,51 +342,33 @@ function createWalkingModule(opts) {
             : elevationWorldYAtWorldXZ(state.walker.x, state.walker.z);
     }
 
-    const feetY = groundY + 1.7; // ground + eye height
-
     // Initialize walker.y if not set
     if (state.walker.y === undefined || state.walker.y === 0) {
-        state.walker.y = feetY;
-        state.walker.lastGroundY = groundY;
+        state.walker.y = groundY + 1.7; // Start at ground + eye height
     }
 
-    // --- Edge detection: launch off ledges ---
-    // If we were on the ground last frame and the ground has dropped away
-    // beneath us while we have horizontal speed, become airborne instead
-    // of snapping down.
-    const groundDrop = state.walker.lastGroundY - groundY;
-    if (state.walker.onGround && groundDrop > 0.3) {
-        // Ground fell away — we ran off an edge.  Keep current Y, let
-        // gravity pull us down naturally (vy stays 0 = horizontal launch).
-        state.walker.onGround = false;
-    }
-
-    // Check if on ground (with small tolerance) — only when not already airborne
-    if (state.walker.onGround) {
-        state.walker.onGround = Math.abs(state.walker.y - feetY) < 0.15;
-    }
+    // Check if on ground (with small tolerance)
+    state.walker.onGround = Math.abs(state.walker.y - (groundY + 1.7)) < 0.1;
 
     // JUMP with SPACE BAR - Astronaut style!
     if (keys.Space && state.walker.onGround) {
         state.walker.vy = JUMP_VELOCITY;
         state.walker.onGround = false;
+        // Debug log removed
     }
 
-    // Apply gravity (always, even on ground — landing clamp below handles it)
+    // Apply gravity
     state.walker.vy += MOON_GRAVITY * dt;
 
     // Update vertical position
     state.walker.y += state.walker.vy * dt;
 
     // Land on ground
-    if (state.walker.y <= feetY) {
-        state.walker.y = feetY;
+    if (state.walker.y <= groundY + 1.7) {
+        state.walker.y = groundY + 1.7;
         state.walker.vy = 0;
         state.walker.onGround = true;
     }
-
-    // Remember this frame's ground height for next-frame edge detection
-    state.walker.lastGroundY = groundY;
 
     // Adjust speeds for moon (slower, floatier movement)
     const speedMultiplier = onMoon ? 0.6 : 1.0; // 60% speed on moon
@@ -409,8 +394,9 @@ function createWalkingModule(opts) {
     }
 
     // Update character mesh position and rotation
+    // walker.y = groundY + eyeHeight, so subtract eyeHeight so feet are on ground
     if (state.characterMesh && state.characterMesh.visible) {
-      state.characterMesh.position.set(state.walker.x, state.walker.y, state.walker.z);
+      state.characterMesh.position.set(state.walker.x, state.walker.y - CFG.eyeHeight, state.walker.z);
       state.characterMesh.rotation.y = state.walker.angle;
       
       // Animate walking when moving
