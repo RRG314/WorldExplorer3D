@@ -265,8 +265,11 @@ function buildTerrainTileMesh(z, tx, ty) {
   const geo = new THREE.PlaneGeometry(width, depth, TERRAIN_SEGMENTS, TERRAIN_SEGMENTS);
   geo.rotateX(-Math.PI / 2);
 
+  // Tile grass every ~25 world units (~28 meters) for visible detail from car/walking
+  const repeats = Math.max(10, Math.round(width / 25));
+
   const mat = new THREE.MeshStandardMaterial({
-    color: 0x6b8e4a, // Natural grass/earth green
+    color: (typeof grassDiffuse !== 'undefined' && grassDiffuse) ? 0xffffff : 0x6b8e4a,
     roughness: 0.95,
     metalness: 0.0,
     side: THREE.DoubleSide,
@@ -275,6 +278,24 @@ function buildTerrainTileMesh(z, tx, ty) {
     polygonOffsetUnits: 1,
     wireframe: false
   });
+
+  // Apply grass PBR textures if loaded
+  if (typeof grassDiffuse !== 'undefined' && grassDiffuse) {
+    mat.map = grassDiffuse.clone();
+    mat.map.wrapS = mat.map.wrapT = THREE.RepeatWrapping;
+    mat.map.repeat.set(repeats, repeats);
+  }
+  if (typeof grassNormal !== 'undefined' && grassNormal) {
+    mat.normalMap = grassNormal.clone();
+    mat.normalMap.wrapS = mat.normalMap.wrapT = THREE.RepeatWrapping;
+    mat.normalMap.repeat.set(repeats, repeats);
+    mat.normalScale = new THREE.Vector2(0.6, 0.6);
+  }
+  if (typeof grassRoughness !== 'undefined' && grassRoughness) {
+    mat.roughnessMap = grassRoughness.clone();
+    mat.roughnessMap.wrapS = mat.roughnessMap.wrapT = THREE.RepeatWrapping;
+    mat.roughnessMap.repeat.set(repeats, repeats);
+  }
 
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = 0;
@@ -294,6 +315,7 @@ function applyHeightsToTerrainMesh(mesh) {
   if (!info) return;
 
   const { z, tx, ty, bounds } = info;
+
   const tile = getOrLoadTerrainTile(z, tx, ty);
   if (!tile.loaded) return;
 
@@ -454,7 +476,19 @@ function rebuildRoadsWithTerrain() {
     geo.setIndex(indices);
     geo.computeVertexNormals();
 
-    const roadMat = new THREE.MeshStandardMaterial({
+    // Use asphalt PBR textures if available (same as initial road load in world.js)
+    const roadMat = (typeof asphaltTex !== 'undefined' && asphaltTex) ? new THREE.MeshStandardMaterial({
+      map: asphaltTex,
+      normalMap: asphaltNormal || undefined,
+      normalScale: new THREE.Vector2(0.8, 0.8),
+      roughnessMap: asphaltRoughness || undefined,
+      roughness: 0.95,
+      metalness: 0.05,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -4,
+      polygonOffsetUnits: -4
+    }) : new THREE.MeshStandardMaterial({
       color: 0x333333,
       roughness: 0.95,
       metalness: 0.05,
