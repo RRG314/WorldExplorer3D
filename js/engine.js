@@ -6,6 +6,16 @@
 let asphaltTex, asphaltNormal, asphaltRoughness, windowTextures = {};
 let buildingNormalMap = null, buildingRoughnessMap = null;
 
+// PBR ground textures (grass for terrain)
+let grassDiffuse = null, grassNormal = null, grassRoughness = null;
+// PBR pavement textures (concrete ground around buildings)
+let pavementDiffuse = null, pavementNormal = null, pavementRoughness = null;
+// PBR building textures (concrete, brick)
+let concreteDiffuse = null, concreteNormal = null, concreteRoughness = null;
+let brickDiffuse = null, brickNormal = null, brickRoughness = null;
+// Track texture loading state
+let pbrTexturesLoaded = { grass: false, pavement: false, concrete: false, brick: false };
+
 // ===== PROCEDURAL TEXTURES =====
 function createAsphaltTexture() {
     const canvas = document.createElement('canvas');
@@ -160,6 +170,791 @@ function createWindowTexture(baseColor, seed) {
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
     windowTextures[cacheKey] = texture;
     return texture;
+}
+
+// ===== HIGH-QUALITY PROCEDURAL GRASS TEXTURES (fallback for CDN) =====
+function createProceduralGrassTexture() {
+    // Draw on 2x canvas, crop center for seamless tiling (no expensive drawWrapped)
+    const size = 256;
+    const big = size * 2;
+    const tmp = document.createElement('canvas');
+    tmp.width = big; tmp.height = big;
+    const ctx = tmp.getContext('2d');
+
+    // Green base
+    ctx.fillStyle = '#3a7a28';
+    ctx.fillRect(0, 0, big, big);
+
+    // Color variation patches
+    for (let i = 0; i < 120; i++) {
+        const x = Math.random() * big, y = Math.random() * big;
+        const g = 90 + Math.random() * 50;
+        ctx.fillStyle = `rgba(${30 + Math.random() * 20}, ${g}, ${10 + Math.random() * 15}, ${0.06 + Math.random() * 0.08})`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, 4 + Math.random() * 14, 3 + Math.random() * 10, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Dark grass clumps
+    for (let i = 0; i < 1500; i++) {
+        const x = Math.random() * big, y = Math.random() * big;
+        const g = 55 + Math.random() * 40;
+        ctx.fillStyle = `rgba(${15 + Math.random() * 15}, ${g}, ${5 + Math.random() * 10}, 0.25)`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, 1 + Math.random() * 2.5, 0.5 + Math.random(), Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    // Grass blades
+    ctx.lineCap = 'round';
+    for (let i = 0; i < 3000; i++) {
+        const x = Math.random() * big, y = Math.random() * big;
+        const g = 100 + Math.random() * 80;
+        const r = 30 + Math.random() * 35;
+        const b = 5 + Math.random() * 15;
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.35 + Math.random() * 0.45})`;
+        ctx.lineWidth = 0.5 + Math.random() * 1;
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.5;
+        const len = 2 + Math.random() * 6;
+        ctx.beginPath();
+        ctx.moveTo(x, y);
+        ctx.quadraticCurveTo(
+            x + Math.cos(angle) * len * 0.5 + (Math.random() - 0.5) * 1.5,
+            y + Math.sin(angle) * len * 0.5,
+            x + Math.cos(angle) * len,
+            y + Math.sin(angle) * len
+        );
+        ctx.stroke();
+    }
+
+    // Bright tip highlights
+    for (let i = 0; i < 800; i++) {
+        const x = Math.random() * big, y = Math.random() * big;
+        ctx.fillStyle = `rgba(${70 + Math.random() * 45}, ${140 + Math.random() * 70}, ${20 + Math.random() * 25}, ${0.15 + Math.random() * 0.2})`;
+        ctx.fillRect(x, y, 1, 1 + Math.random());
+    }
+
+    // Crop center region - avoids edges, gives seamless-enough tiling
+    const half = size / 2;
+    const out = document.createElement('canvas');
+    out.width = size; out.height = size;
+    out.getContext('2d').drawImage(tmp, half, half, size, size, 0, 0, size, size);
+
+    const texture = new THREE.CanvasTexture(out);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.encoding = THREE.sRGBEncoding;
+    return texture;
+}
+
+function createProceduralGrassNormal() {
+    const size = 256;
+    const big = size * 2;
+    const tmp = document.createElement('canvas');
+    tmp.width = big; tmp.height = big;
+    const ctx = tmp.getContext('2d');
+
+    ctx.fillStyle = '#8080ff';
+    ctx.fillRect(0, 0, big, big);
+
+    const rng = typeof seededRandom === 'function' ? seededRandom(rdtSeed ^ 0xB14DE5) : Math.random.bind(Math);
+
+    for (let i = 0; i < 3000; i++) {
+        const x = rng() * big, y = rng() * big;
+        ctx.fillStyle = `rgb(${120 + rng() * 16}, ${120 + rng() * 16}, ${220 + rng() * 35})`;
+        const angle = rng() * Math.PI;
+        const len = 2 + rng() * 5;
+        ctx.save();
+        ctx.translate(x, y);
+        ctx.rotate(angle);
+        ctx.fillRect(-len/2, -0.5, len, 1);
+        ctx.restore();
+    }
+
+    for (let i = 0; i < 400; i++) {
+        const x = rng() * big, y = rng() * big;
+        ctx.fillStyle = `rgb(${118 + rng() * 20}, ${118 + rng() * 20}, ${230 + rng() * 25})`;
+        ctx.beginPath();
+        ctx.arc(x, y, 2 + rng() * 4, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    const half = size / 2;
+    const out = document.createElement('canvas');
+    out.width = size; out.height = size;
+    out.getContext('2d').drawImage(tmp, half, half, size, size, 0, 0, size, size);
+
+    const texture = new THREE.CanvasTexture(out);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+}
+
+function createProceduralGrassRoughness() {
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Grass is generally rough
+    ctx.fillStyle = '#d8d8d8';
+    ctx.fillRect(0, 0, size, size);
+
+    const rng = typeof seededRandom === 'function' ? seededRandom(rdtSeed ^ 0xD1B7) : Math.random.bind(Math);
+
+    // Variation - some spots slightly smoother (dewy grass) or rougher (dry patches)
+    for (let i = 0; i < 2000; i++) {
+        const x = rng() * size, y = rng() * size;
+        const brightness = 170 + rng() * 85;
+        ctx.fillStyle = `rgb(${brightness}, ${brightness}, ${brightness})`;
+        ctx.fillRect(x, y, 1 + rng() * 3, 1 + rng() * 3);
+    }
+
+    // Dirt patches are slightly smoother
+    for (let i = 0; i < 100; i++) {
+        const x = rng() * size, y = rng() * size;
+        const brightness = 140 + rng() * 40;
+        ctx.fillStyle = `rgba(${brightness}, ${brightness}, ${brightness}, 0.3)`;
+        ctx.beginPath();
+        ctx.arc(x, y, 3 + rng() * 6, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+}
+
+// ===== IMPROVED BUILDING FACADE TEXTURES =====
+function createConcreteFacadeTexture() {
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Concrete base color
+    ctx.fillStyle = '#9a9590';
+    ctx.fillRect(0, 0, size, size);
+
+    const rng = typeof seededRandom === 'function' ? seededRandom(rdtSeed ^ 0xC0C0) : Math.random.bind(Math);
+
+    // Concrete grain noise
+    for (let i = 0; i < 8000; i++) {
+        const x = rng() * size, y = rng() * size;
+        const brightness = 130 + rng() * 50;
+        ctx.fillStyle = `rgba(${brightness}, ${brightness - 5}, ${brightness - 8}, 0.15)`;
+        ctx.fillRect(x, y, 1 + rng() * 2, 1 + rng() * 2);
+    }
+
+    // Concrete panel lines (horizontal)
+    for (let y = 0; y < size; y += 64) {
+        ctx.fillStyle = 'rgba(80, 75, 70, 0.25)';
+        ctx.fillRect(0, y, size, 1);
+        ctx.fillStyle = 'rgba(170, 165, 160, 0.2)';
+        ctx.fillRect(0, y + 1, size, 1);
+    }
+
+    // Stain/weathering patches
+    for (let i = 0; i < 30; i++) {
+        const x = rng() * size, y = rng() * size;
+        const w = 10 + rng() * 40, h = 5 + rng() * 20;
+        ctx.fillStyle = `rgba(${70 + rng() * 30}, ${65 + rng() * 30}, ${60 + rng() * 30}, ${0.05 + rng() * 0.1})`;
+        ctx.fillRect(x, y, w, h);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.encoding = THREE.sRGBEncoding;
+    return texture;
+}
+
+function createConcreteNormalMap() {
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#8080ff';
+    ctx.fillRect(0, 0, size, size);
+
+    const rng = typeof seededRandom === 'function' ? seededRandom(rdtSeed ^ 0xC1C1) : Math.random.bind(Math);
+
+    // Panel joint normals
+    for (let y = 0; y < size; y += 64) {
+        ctx.fillStyle = '#7070f0';
+        ctx.fillRect(0, y, size, 2);
+        ctx.fillStyle = '#9090ff';
+        ctx.fillRect(0, y + 2, size, 1);
+    }
+
+    // Surface texture bumps
+    for (let i = 0; i < 3000; i++) {
+        const x = rng() * size, y = rng() * size;
+        ctx.fillStyle = `rgb(${122 + rng() * 16}, ${122 + rng() * 16}, ${235 + rng() * 20})`;
+        ctx.fillRect(x, y, 1 + rng() * 3, 1 + rng() * 3);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+}
+
+function createConcreteRoughnessMap() {
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#cccccc';
+    ctx.fillRect(0, 0, size, size);
+
+    const rng = typeof seededRandom === 'function' ? seededRandom(rdtSeed ^ 0xC2C2) : Math.random.bind(Math);
+
+    for (let i = 0; i < 2000; i++) {
+        const x = rng() * size, y = rng() * size;
+        const b = 170 + rng() * 70;
+        ctx.fillStyle = `rgb(${b}, ${b}, ${b})`;
+        ctx.fillRect(x, y, 1 + rng() * 2, 1 + rng() * 2);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+}
+
+function createBrickFacadeTexture() {
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    const rng = typeof seededRandom === 'function' ? seededRandom(rdtSeed ^ 0xB41C) : Math.random.bind(Math);
+
+    // Mortar base color
+    ctx.fillStyle = '#b0a89a';
+    ctx.fillRect(0, 0, size, size);
+
+    // Draw bricks
+    const brickH = 16, brickW = 36, mortarW = 3;
+    const colors = ['#8b4c39', '#934e3a', '#7d4535', '#a05a42', '#8a4937', '#7e4233'];
+
+    for (let row = 0; row < size / (brickH + mortarW); row++) {
+        const offsetX = (row % 2) * (brickW / 2); // Stagger every other row
+        for (let col = -1; col < size / (brickW + mortarW) + 1; col++) {
+            const x = col * (brickW + mortarW) + offsetX;
+            const y = row * (brickH + mortarW);
+
+            // Base brick color with variation
+            const baseColor = colors[Math.floor(rng() * colors.length)];
+            ctx.fillStyle = baseColor;
+            ctx.fillRect(x, y, brickW, brickH);
+
+            // Brick surface noise
+            for (let n = 0; n < 15; n++) {
+                const nx = x + rng() * brickW;
+                const ny = y + rng() * brickH;
+                const brightness = rng() > 0.5 ? 20 : -20;
+                ctx.fillStyle = `rgba(${128 + brightness}, ${60 + brightness}, ${40 + brightness}, 0.15)`;
+                ctx.fillRect(nx, ny, 1 + rng() * 3, 1 + rng() * 2);
+            }
+        }
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.encoding = THREE.sRGBEncoding;
+    return texture;
+}
+
+function createBrickNormalMap() {
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Neutral normal
+    ctx.fillStyle = '#8080ff';
+    ctx.fillRect(0, 0, size, size);
+
+    const brickH = 16, brickW = 36, mortarW = 3;
+    const rng = typeof seededRandom === 'function' ? seededRandom(rdtSeed ^ 0xB41D) : Math.random.bind(Math);
+
+    // Mortar groove normals (recessed)
+    for (let row = 0; row < size / (brickH + mortarW); row++) {
+        const y = row * (brickH + mortarW);
+        // Horizontal mortar lines
+        ctx.fillStyle = '#7070e0';
+        ctx.fillRect(0, y + brickH, size, mortarW);
+    }
+
+    for (let row = 0; row < size / (brickH + mortarW); row++) {
+        const offsetX = (row % 2) * (brickW / 2);
+        for (let col = -1; col < size / (brickW + mortarW) + 1; col++) {
+            const x = col * (brickW + mortarW) + offsetX;
+            const y = row * (brickH + mortarW);
+            // Vertical mortar lines
+            ctx.fillStyle = '#7070e0';
+            ctx.fillRect(x + brickW, y, mortarW, brickH);
+
+            // Brick surface variation
+            for (let n = 0; n < 8; n++) {
+                const nx = x + rng() * brickW;
+                const ny = y + rng() * brickH;
+                ctx.fillStyle = `rgb(${124 + rng() * 12}, ${124 + rng() * 12}, ${240 + rng() * 15})`;
+                ctx.fillRect(nx, ny, 2 + rng() * 3, 1 + rng() * 2);
+            }
+        }
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+}
+
+function createBrickRoughnessMap() {
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Brick is moderately rough
+    ctx.fillStyle = '#c0c0c0';
+    ctx.fillRect(0, 0, size, size);
+
+    const brickH = 8, brickW = 18, mortarW = 2;
+    const rng = typeof seededRandom === 'function' ? seededRandom(rdtSeed ^ 0xB41E) : Math.random.bind(Math);
+
+    // Mortar is rougher than brick
+    for (let row = 0; row < size / (brickH + mortarW); row++) {
+        const y = row * (brickH + mortarW);
+        ctx.fillStyle = '#e0e0e0';
+        ctx.fillRect(0, y + brickH, size, mortarW);
+    }
+
+    // Brick surface roughness variation
+    for (let i = 0; i < 1500; i++) {
+        const x = rng() * size, y = rng() * size;
+        const b = 160 + rng() * 70;
+        ctx.fillStyle = `rgb(${b}, ${b}, ${b})`;
+        ctx.fillRect(x, y, 1 + rng() * 2, 1 + rng() * 2);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+}
+
+// ===== PROCEDURAL PAVEMENT/SIDEWALK TEXTURES (fallback for CDN) =====
+function createPavementTexture() {
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Concrete/sidewalk base color - light gray
+    ctx.fillStyle = '#b0aba5';
+    ctx.fillRect(0, 0, size, size);
+
+    const rng = typeof seededRandom === 'function' ? seededRandom(rdtSeed ^ 0xDA7E) : Math.random.bind(Math);
+
+    // Concrete grain
+    for (let i = 0; i < 10000; i++) {
+        const x = Math.random() * size, y = Math.random() * size;
+        const b = 140 + Math.random() * 60;
+        ctx.fillStyle = `rgba(${b+5}, ${b}, ${b-5}, 0.12)`;
+        ctx.fillRect(x, y, 1, 1);
+    }
+
+    // Sidewalk panel lines (grid pattern)
+    ctx.strokeStyle = 'rgba(80, 75, 70, 0.35)';
+    ctx.lineWidth = 2;
+    for (let x = 0; x < size; x += 128) {
+        ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, size); ctx.stroke();
+    }
+    for (let y = 0; y < size; y += 128) {
+        ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(size, y); ctx.stroke();
+    }
+
+    // Subtle stains/weathering
+    for (let i = 0; i < 40; i++) {
+        const x = Math.random() * size, y = Math.random() * size;
+        ctx.fillStyle = `rgba(${80 + Math.random() * 40}, ${75 + Math.random() * 40}, ${70 + Math.random() * 40}, ${0.04 + Math.random() * 0.06})`;
+        ctx.beginPath();
+        ctx.ellipse(x, y, 5 + Math.random() * 20, 3 + Math.random() * 10, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.encoding = THREE.sRGBEncoding;
+    return texture;
+}
+
+function createPavementNormalMap() {
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = '#8080ff';
+    ctx.fillRect(0, 0, size, size);
+
+    // Panel joint grooves
+    for (let x = 0; x < size; x += 128) {
+        ctx.fillStyle = '#6060e0';
+        ctx.fillRect(x - 1, 0, 3, size);
+        ctx.fillStyle = '#a0a0ff';
+        ctx.fillRect(x + 2, 0, 1, size);
+    }
+    for (let y = 0; y < size; y += 128) {
+        ctx.fillStyle = '#6060e0';
+        ctx.fillRect(0, y - 1, size, 3);
+        ctx.fillStyle = '#a0a0ff';
+        ctx.fillRect(0, y + 2, size, 1);
+    }
+
+    // Surface micro-bumps
+    for (let i = 0; i < 3000; i++) {
+        const x = Math.random() * size, y = Math.random() * size;
+        ctx.fillStyle = `rgb(${123 + Math.random() * 14}, ${123 + Math.random() * 14}, ${240 + Math.random() * 15})`;
+        ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+}
+
+function createPavementRoughnessMap() {
+    const size = 256;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
+
+    // Concrete is moderately rough
+    ctx.fillStyle = '#c8c8c8';
+    ctx.fillRect(0, 0, size, size);
+
+    for (let i = 0; i < 2000; i++) {
+        const x = Math.random() * size, y = Math.random() * size;
+        const b = 170 + Math.random() * 60;
+        ctx.fillStyle = `rgb(${b}, ${b}, ${b})`;
+        ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+    }
+
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    return texture;
+}
+
+// Create concrete ground patch around a building footprint
+function createBuildingGroundPatch(pts, avgElevation) {
+    if (!pts || pts.length < 3) return null;
+
+    // Expand the building footprint outward to create a sidewalk/pad
+    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const cz = pts.reduce((s, p) => s + p.z, 0) / pts.length;
+    const expandFactor = 1.35; // 35% larger than building footprint
+
+    const expandedPts = pts.map(p => ({
+        x: cx + (p.x - cx) * expandFactor,
+        z: cz + (p.z - cz) * expandFactor
+    }));
+
+    const shape = new THREE.Shape();
+    expandedPts.forEach(function(p, i) {
+        if (i === 0) shape.moveTo(p.x, -p.z);
+        else shape.lineTo(p.x, -p.z);
+    });
+    shape.closePath();
+
+    const geometry = new THREE.ShapeGeometry(shape, 1);
+    geometry.rotateX(-Math.PI / 2);
+
+    // Deform vertices to follow terrain
+    const positions = geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) {
+        const x = positions.getX(i);
+        const z = positions.getZ(i);
+        const terrainY = typeof terrainMeshHeightAt === 'function'
+            ? terrainMeshHeightAt(x, z)
+            : elevationWorldYAtWorldXZ(x, z);
+        const useY = (terrainY === 0 && Math.abs(avgElevation) > 2) ? avgElevation : terrainY;
+        positions.setY(i, (useY - avgElevation) + 0.05);
+    }
+    positions.needsUpdate = true;
+    geometry.computeVertexNormals();
+
+    // Compute UV-based tiling: tile every ~8 world units for concrete detail
+    const uvs = geometry.attributes.uv;
+    if (uvs) {
+        for (let i = 0; i < uvs.count; i++) {
+            const x = positions.getX(i);
+            const z = positions.getZ(i);
+            uvs.setXY(i, x / 8, z / 8);
+        }
+        uvs.needsUpdate = true;
+    }
+
+    // Create material
+    let mat;
+    if (pbrTexturesLoaded.pavement && pavementDiffuse) {
+        mat = new THREE.MeshStandardMaterial({
+            map: pavementDiffuse,
+            normalMap: pavementNormal || undefined,
+            normalScale: new THREE.Vector2(0.5, 0.5),
+            roughnessMap: pavementRoughness || undefined,
+            roughness: 0.9,
+            metalness: 0.0,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1
+        });
+    } else {
+        mat = new THREE.MeshStandardMaterial({
+            color: 0xa8a29e,
+            roughness: 0.9,
+            metalness: 0.0,
+            polygonOffset: true,
+            polygonOffsetFactor: -1,
+            polygonOffsetUnits: -1
+        });
+    }
+
+    const mesh = new THREE.Mesh(geometry, mat);
+    mesh.position.y = avgElevation;
+    mesh.renderOrder = 1;
+    mesh.receiveShadow = true;
+    mesh.userData.buildingGround = true;
+    return mesh;
+}
+
+// ===== PBR TEXTURE LOADER (Poly Haven CDN with procedural fallback) =====
+function loadPBRTextureSet(name, urls, onLoaded, fallbackFns) {
+    const loader = new THREE.TextureLoader();
+    let loadedCount = 0;
+    const textures = { diff: null, nor: null, rough: null };
+    const total = 3;
+
+    function checkDone() {
+        loadedCount++;
+        if (loadedCount >= total) {
+            // If all three loaded from CDN, use them
+            if (textures.diff && textures.nor && textures.rough) {
+                onLoaded(textures.diff, textures.nor, textures.rough, true);
+            } else {
+                // Use procedural fallback for any that failed
+                const fb = fallbackFns();
+                onLoaded(
+                    textures.diff || fb.diff,
+                    textures.nor || fb.nor,
+                    textures.rough || fb.rough,
+                    false
+                );
+            }
+        }
+    }
+
+    function loadTex(key, url, encoding) {
+        loader.load(url,
+            function(tex) {
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                if (encoding) tex.encoding = encoding;
+                textures[key] = tex;
+                checkDone();
+            },
+            undefined,
+            function() {
+                console.warn('PBR texture load failed (' + name + ' ' + key + '), using fallback');
+                checkDone();
+            }
+        );
+    }
+
+    loadTex('diff', urls.diff, THREE.sRGBEncoding);
+    loadTex('nor', urls.nor, null);
+    loadTex('rough', urls.rough, null);
+}
+
+function initPBRTextures(maxAniso) {
+    const aniso = Math.min(maxAniso, 8);
+
+    // --- Grass/Ground textures (simple procedural grass - no CDN dependency) ---
+    {
+        grassDiffuse = createProceduralGrassTexture();
+        grassNormal = createProceduralGrassNormal();
+        grassRoughness = createProceduralGrassRoughness();
+        [grassDiffuse, grassNormal, grassRoughness].forEach(t => {
+            if (t) { t.anisotropy = aniso; t.wrapS = t.wrapT = THREE.RepeatWrapping; }
+        });
+        pbrTexturesLoaded.grass = true;
+        applyGrassToTerrain();
+    }
+
+    // --- Pavement/sidewalk textures (brushed concrete for ground around buildings) ---
+    loadPBRTextureSet('pavement', {
+        diff: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brushed_concrete/brushed_concrete_diff_1k.jpg',
+        nor: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brushed_concrete/brushed_concrete_nor_gl_1k.jpg',
+        rough: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brushed_concrete/brushed_concrete_rough_1k.jpg'
+    }, function(diff, nor, rough, fromCDN) {
+        pavementDiffuse = diff;
+        pavementNormal = nor;
+        pavementRoughness = rough;
+        [pavementDiffuse, pavementNormal, pavementRoughness].forEach(t => {
+            if (t) { t.anisotropy = aniso; t.wrapS = t.wrapT = THREE.RepeatWrapping; }
+        });
+        pbrTexturesLoaded.pavement = true;
+        console.log('Pavement textures ready (' + (fromCDN ? 'Poly Haven CDN' : 'procedural fallback') + ')');
+    }, function() {
+        return {
+            diff: createPavementTexture(),
+            nor: createPavementNormalMap(),
+            rough: createPavementRoughnessMap()
+        };
+    });
+
+    // --- Concrete building textures ---
+    loadPBRTextureSet('concrete', {
+        diff: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete/concrete_diff_1k.jpg',
+        nor: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete/concrete_nor_gl_1k.jpg',
+        rough: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete/concrete_rough_1k.jpg'
+    }, function(diff, nor, rough, fromCDN) {
+        concreteDiffuse = diff;
+        concreteNormal = nor;
+        concreteRoughness = rough;
+        [concreteDiffuse, concreteNormal, concreteRoughness].forEach(t => {
+            if (t) { t.anisotropy = aniso; t.wrapS = t.wrapT = THREE.RepeatWrapping; }
+        });
+        pbrTexturesLoaded.concrete = true;
+        console.log('Concrete textures ready (' + (fromCDN ? 'Poly Haven CDN' : 'procedural fallback') + ')');
+    }, function() {
+        return {
+            diff: createConcreteFacadeTexture(),
+            nor: createConcreteNormalMap(),
+            rough: createConcreteRoughnessMap()
+        };
+    });
+
+    // --- Brick building textures ---
+    loadPBRTextureSet('brick', {
+        diff: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brick_wall_001/brick_wall_001_diffuse_1k.jpg',
+        nor: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brick_wall_001/brick_wall_001_nor_gl_1k.jpg',
+        rough: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brick_wall_001/brick_wall_001_rough_1k.jpg'
+    }, function(diff, nor, rough, fromCDN) {
+        brickDiffuse = diff;
+        brickNormal = nor;
+        brickRoughness = rough;
+        [brickDiffuse, brickNormal, brickRoughness].forEach(t => {
+            if (t) { t.anisotropy = aniso; t.wrapS = t.wrapT = THREE.RepeatWrapping; }
+        });
+        pbrTexturesLoaded.brick = true;
+        console.log('Brick textures ready (' + (fromCDN ? 'Poly Haven CDN' : 'procedural fallback') + ')');
+    }, function() {
+        return {
+            diff: createBrickFacadeTexture(),
+            nor: createBrickNormalMap(),
+            rough: createBrickRoughnessMap()
+        };
+    });
+}
+
+// Apply grass textures to existing terrain meshes (called after textures load)
+function applyGrassToTerrain() {
+    if (!grassDiffuse || !terrainGroup) return;
+    terrainGroup.children.forEach(function(mesh) {
+        if (!mesh.userData || !mesh.userData.terrainTile) return;
+        const mat = mesh.material;
+        if (!mat) return;
+
+        // Calculate tile world size for proper texture tiling
+        const info = mesh.userData.terrainTile;
+        const bounds = info.bounds;
+        const pNW = geoToWorld(bounds.latN, bounds.lonW);
+        const pNE = geoToWorld(bounds.latN, bounds.lonE);
+        const tileWidth = Math.abs(pNE.x - pNW.x);
+        // Tile grass every ~25 world units (~28 meters) for visible detail
+        const repeats = Math.max(10, Math.round(tileWidth / 25));
+
+        mat.map = grassDiffuse.clone();
+        mat.map.wrapS = mat.map.wrapT = THREE.RepeatWrapping;
+        mat.map.repeat.set(repeats, repeats);
+
+        if (grassNormal) {
+            mat.normalMap = grassNormal.clone();
+            mat.normalMap.wrapS = mat.normalMap.wrapT = THREE.RepeatWrapping;
+            mat.normalMap.repeat.set(repeats, repeats);
+            mat.normalScale = new THREE.Vector2(0.6, 0.6);
+        }
+        if (grassRoughness) {
+            mat.roughnessMap = grassRoughness.clone();
+            mat.roughnessMap.wrapS = mat.roughnessMap.wrapT = THREE.RepeatWrapping;
+            mat.roughnessMap.repeat.set(repeats, repeats);
+        }
+        mat.color.set(0xffffff); // Let the texture drive the color
+        mat.needsUpdate = true;
+    });
+}
+
+// Get building material based on building type (deterministic per building)
+function getBuildingMaterial(buildingType, bSeed, baseColorHex) {
+    const br1 = rand01FromInt(bSeed);
+    const br2 = rand01FromInt(bSeed ^ 0x12345);
+
+    // Decide facade type based on building type and seed
+    let facadeType = 'window'; // default: procedural windows
+
+    if (buildingType === 'industrial' || buildingType === 'warehouse') {
+        facadeType = 'concrete';
+    } else if (buildingType === 'house' || buildingType === 'residential' || buildingType === 'detached') {
+        facadeType = br1 > 0.4 ? 'brick' : 'window';
+    } else if (buildingType === 'apartments') {
+        facadeType = br1 > 0.6 ? 'concrete' : 'window';
+    } else if (buildingType === 'church' || buildingType === 'cathedral') {
+        facadeType = 'brick';
+    } else {
+        // Mixed: ~30% concrete, ~25% brick, ~45% windowed
+        if (br2 < 0.30) facadeType = 'concrete';
+        else if (br2 < 0.55) facadeType = 'brick';
+    }
+
+    if (facadeType === 'concrete' && pbrTexturesLoaded.concrete && concreteDiffuse) {
+        const mat = new THREE.MeshStandardMaterial({
+            map: concreteDiffuse,
+            normalMap: concreteNormal,
+            normalScale: new THREE.Vector2(0.5, 0.5),
+            roughnessMap: concreteRoughness,
+            roughness: 0.9,
+            metalness: 0.02
+        });
+        return mat;
+    }
+
+    if (facadeType === 'brick' && pbrTexturesLoaded.brick && brickDiffuse) {
+        const mat = new THREE.MeshStandardMaterial({
+            map: brickDiffuse,
+            normalMap: brickNormal,
+            normalScale: new THREE.Vector2(0.6, 0.6),
+            roughnessMap: brickRoughness,
+            roughness: 0.88,
+            metalness: 0.02
+        });
+        return mat;
+    }
+
+    // Default: procedural windows (existing system)
+    const windowTex = createWindowTexture(baseColorHex, bSeed);
+    const mat = new THREE.MeshStandardMaterial({
+        map: windowTex,
+        color: baseColorHex,
+        roughness: 0.85,
+        metalness: 0.05
+    });
+    if (buildingNormalMap) {
+        mat.normalMap = buildingNormalMap;
+        mat.normalScale = new THREE.Vector2(0.4, 0.4);
+    }
+    if (buildingRoughnessMap) {
+        mat.roughnessMap = buildingRoughnessMap;
+    }
+    return mat;
 }
 
 const CFG = {
@@ -413,6 +1208,9 @@ function init() {
         if (asphaltTex) asphaltTex.anisotropy = aniso;
         if (asphaltNormal) asphaltNormal.anisotropy = aniso;
         if (asphaltRoughness) asphaltRoughness.anisotropy = aniso;
+
+        // Load PBR textures for ground and buildings (from Poly Haven CDN with procedural fallback)
+        initPBRTextures(maxAniso);
     } catch(e) {
         console.error('Texture creation failed:', e);
         // Textures will be null, code will use fallback solid colors
@@ -620,15 +1418,44 @@ function init() {
     // Create star field (hidden during day, visible at night)
     starField = createStarField();
 
-    // Ground plane - fallback beneath terrain
-    const ground = new THREE.Mesh(
-        new THREE.PlaneGeometry(10000, 10000),
-        new THREE.MeshStandardMaterial({ color: 0x3a5a3f, roughness: 0.95, metalness: 0 })
-    );
+    // Ground plane - fallback beneath terrain (with grass texture when available)
+    const groundMat = new THREE.MeshStandardMaterial({ color: 0x4a7a2e, roughness: 0.95, metalness: 0 });
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(10000, 10000), groundMat);
     ground.rotation.x = -Math.PI / 2;
     ground.position.y = -0.1; // Slightly below terrain tiles (acts as fallback)
     ground.receiveShadow = true;
+    ground.userData.isGroundPlane = true;
     scene.add(ground);
+
+    // Apply grass texture to ground plane when loaded
+    function updateGroundPlaneTexture() {
+        if (grassDiffuse && ground.userData.isGroundPlane) {
+            const gm = ground.material;
+            gm.map = grassDiffuse.clone();
+            gm.map.wrapS = gm.map.wrapT = THREE.RepeatWrapping;
+            gm.map.repeat.set(400, 400);
+            if (grassNormal) {
+                gm.normalMap = grassNormal.clone();
+                gm.normalMap.wrapS = gm.normalMap.wrapT = THREE.RepeatWrapping;
+                gm.normalMap.repeat.set(400, 400);
+                gm.normalScale = new THREE.Vector2(0.4, 0.4);
+            }
+            if (grassRoughness) {
+                gm.roughnessMap = grassRoughness.clone();
+                gm.roughnessMap.wrapS = gm.roughnessMap.wrapT = THREE.RepeatWrapping;
+                gm.roughnessMap.repeat.set(400, 400);
+            }
+            gm.color.set(0xffffff);
+            gm.needsUpdate = true;
+        }
+    }
+    // Check periodically until grass textures are loaded
+    const groundTexInterval = setInterval(function() {
+        if (pbrTexturesLoaded.grass) {
+            updateGroundPlaneTexture();
+            clearInterval(groundTexInterval);
+        }
+    }, 500);
 
     // Car with REALISTIC PBR materials (with error handling)
     try {
@@ -724,8 +1551,7 @@ function init() {
             isPointInPolygon: pointInPolygon
         });
         window.Walk = Walk;
-        // Start in walking mode by default (character visible, car hidden)
-        Walk.setModeWalk();
+        // Walk mode will be entered after spawnOnRoad() in loadRoads()
     } catch(e) {
         console.error('Walking module initialization failed:', e);
         console.error('Stack:', e.stack);
@@ -744,6 +1570,8 @@ function init() {
     });
     addEventListener('keydown', e => { keys[e.code] = true; onKey(e.code); });
     addEventListener('keyup', e => keys[e.code] = false);
+    // Clear all keys when window loses focus to prevent stuck keys
+    addEventListener('blur', () => { clearKeys(); window.walkMouseLookActive = false; });
 
     // Mouse movement for camera control
     let lastMouseX = 0;
