@@ -235,6 +235,19 @@ function update(dt) {
                 }
             });
 
+            // Load terrain around walker (must happen in walk mode too!)
+            if (!onMoon) {
+                updateTerrainAround(Walk.state.walker.x, Walk.state.walker.z);
+
+                const now = performance.now();
+                const rebuildInterval = lastRoadRebuildCheck === 0 ? 500 : 2000;
+                if (roadsNeedRebuild && now - lastRoadRebuildCheck > rebuildInterval) {
+                    lastRoadRebuildCheck = now;
+                    rebuildRoadsWithTerrain();
+                    repositionBuildingsWithTerrain();
+                }
+            }
+
             return;
         }
     }
