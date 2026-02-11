@@ -312,20 +312,17 @@ function setupUI() {
             }, 5000);
         }
 
-        // Start in walking mode (character visible, car hidden)
-        if (Walk) {
-            Walk.setModeWalk();
-        }
-
-        // Set initial mode button state
+        // Start in walking mode - Walk.setModeWalk() will be called after spawnOnRoad
+        // positions the car (which syncWalkerFromCar uses for walker position)
         document.getElementById('fDriving').classList.remove('on');
         document.getElementById('fWalk').classList.add('on');
         document.getElementById('fDrone').classList.remove('on');
 
         // Set initial map view button states
         document.getElementById('mapRoadsToggle').classList.add('active'); // Roads on by default
-        document.getElementById('fLandUse').classList.add('on'); // Land use on by default
-        document.getElementById('fLandUseRE').classList.add('on'); // Land use on by default
+        // Land use off by default - user can toggle on
+        document.getElementById('fLandUse').classList.remove('on');
+        document.getElementById('fLandUseRE').classList.remove('on');
 
         await loadRoads();
     });
