@@ -155,3 +155,8 @@ See `KNOWN_ISSUES.md` for prioritized problem areas and contribution targets.
 
 `All Rights Reserved` (source-available, proprietary).
 See `LICENSE` for terms.
+
+## Development Notes
+
+This project was developed with the assistance of modern AI development tools (e.g., code suggestion and refactoring assistants).
+All architectural design, system integration, and implementation decisions were directed and validated by the author.
