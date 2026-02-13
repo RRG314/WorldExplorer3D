@@ -16,7 +16,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 
 /* Title Screen */
 #titleScreen{position:fixed;inset:0;background:#000 url('title-bg.jpg') center center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:max(24px,calc(env(safe-area-inset-top) + 10px));padding-right:12px;padding-bottom:max(24px,calc(env(safe-area-inset-bottom) + 12px));padding-left:12px;gap:clamp(10px,1.5vh,16px);z-index:200;overflow-y:auto;overflow-x:hidden}
-#titleScreen::before{content:'';position:absolute;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(1px)}
+#titleScreen::before{content:'';position:absolute;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(1px);pointer-events:none}
 #titleScreen.hidden{display:none}
 .logo{font-family:'Orbitron',sans-serif;font-size:clamp(36px, 8vw, 72px);font-weight:900;line-height:1.05;color:#ffffff;letter-spacing:clamp(3px, 1vw, 8px);text-transform:uppercase;text-shadow:0 0 30px rgba(83,52,131,0.8),0 0 60px rgba(15,52,96,0.6),0 4px 20px rgba(0,0,0,0.4);position:relative;z-index:1;margin:0;animation:titleGlow 3s ease-in-out infinite;text-align:center;padding:0 20px;flex-shrink:0}
 @keyframes titleGlow{0%,100%{text-shadow:0 0 30px rgba(83,52,131,0.8),0 0 60px rgba(15,52,96,0.6),0 4px 20px rgba(0,0,0,0.4)}50%{text-shadow:0 0 40px rgba(83,52,131,1),0 0 80px rgba(15,52,96,0.8),0 4px 30px rgba(0,0,0,0.5)}}
@@ -350,19 +350,19 @@ input,textarea{-webkit-user-select:text;user-select:text}
 </div>
 <div class="tab-content active" id="tab-location">
 <div class="location-switch-row">
-<button class="location-switch-btn active" id="suggestedToggle" data-mode="suggested" type="button">
+<button class="location-switch-btn active" id="suggestedToggle" data-mode="suggested" type="button" onclick="if(window.setTitleLocationMode) window.setTitleLocationMode('suggested')">
 <span class="switch-title">📍 Suggested</span>
 <span class="switch-sub">Popular city list</span>
 </button>
-<button class="location-switch-btn" id="customToggle" data-mode="custom" type="button">
+<button class="location-switch-btn" id="customToggle" data-mode="custom" type="button" onclick="if(window.setTitleLocationMode) window.setTitleLocationMode('custom')">
 <span class="switch-title">🌍 Custom</span>
 <span class="switch-sub">Any place search</span>
 </button>
-<button class="location-switch-btn" id="moonToggle" data-mode="moon" type="button">
+<button class="location-switch-btn" id="moonToggle" data-mode="moon" type="button" onclick="if(window.setTitleLocationMode) window.setTitleLocationMode('moon')">
 <span class="switch-title">🌙 Moon</span>
 <span class="switch-sub">Direct moon start</span>
 </button>
-<button class="location-switch-btn" id="spaceToggle" data-mode="space" type="button">
+<button class="location-switch-btn" id="spaceToggle" data-mode="space" type="button" onclick="if(window.setTitleLocationMode) window.setTitleLocationMode('space')">
 <span class="switch-title">🚀 Space</span>
 <span class="switch-sub">Start in space flight</span>
 </button>
@@ -372,21 +372,21 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <div class="suggested-note">Choose from existing city suggestions.</div>
 <div class="suggested-list">
 <div class="loc-grid suggested-grid">
-<div class="loc sel" data-loc="baltimore"><div class="loc-name">Baltimore</div><div class="loc-region">Maryland, USA</div></div>
-<div class="loc" data-loc="hollywood"><div class="loc-name">Hollywood</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="newyork"><div class="loc-name">New York</div><div class="loc-region">New York, USA</div></div>
-<div class="loc" data-loc="miami"><div class="loc-name">Miami</div><div class="loc-region">Florida, USA</div></div>
-<div class="loc" data-loc="tokyo"><div class="loc-name">Tokyo</div><div class="loc-region">Japan</div></div>
-<div class="loc" data-loc="monaco"><div class="loc-name">Monaco</div><div class="loc-region">Monte Carlo</div></div>
-<div class="loc" data-loc="nurburgring"><div class="loc-name">Nürburgring</div><div class="loc-region">Germany</div></div>
-<div class="loc" data-loc="lasvegas"><div class="loc-name">Las Vegas</div><div class="loc-region">Nevada, USA</div></div>
-<div class="loc" data-loc="london"><div class="loc-name">London</div><div class="loc-region">United Kingdom</div></div>
-<div class="loc" data-loc="paris"><div class="loc-name">Paris</div><div class="loc-region">France</div></div>
-<div class="loc" data-loc="dubai"><div class="loc-name">Dubai</div><div class="loc-region">UAE</div></div>
-<div class="loc" data-loc="sanfrancisco"><div class="loc-name">San Francisco</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="losangeles"><div class="loc-name">Los Angeles</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="chicago"><div class="loc-name">Chicago</div><div class="loc-region">Illinois, USA</div></div>
-<div class="loc" data-loc="seattle"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
+<div class="loc sel" data-loc="baltimore" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Baltimore</div><div class="loc-region">Maryland, USA</div></div>
+<div class="loc" data-loc="hollywood" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Hollywood</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="newyork" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">New York</div><div class="loc-region">New York, USA</div></div>
+<div class="loc" data-loc="miami" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Miami</div><div class="loc-region">Florida, USA</div></div>
+<div class="loc" data-loc="tokyo" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Tokyo</div><div class="loc-region">Japan</div></div>
+<div class="loc" data-loc="monaco" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Monaco</div><div class="loc-region">Monte Carlo</div></div>
+<div class="loc" data-loc="nurburgring" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Nürburgring</div><div class="loc-region">Germany</div></div>
+<div class="loc" data-loc="lasvegas" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Las Vegas</div><div class="loc-region">Nevada, USA</div></div>
+<div class="loc" data-loc="london" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">London</div><div class="loc-region">United Kingdom</div></div>
+<div class="loc" data-loc="paris" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Paris</div><div class="loc-region">France</div></div>
+<div class="loc" data-loc="dubai" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Dubai</div><div class="loc-region">UAE</div></div>
+<div class="loc" data-loc="sanfrancisco" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">San Francisco</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="losangeles" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Los Angeles</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="chicago" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Chicago</div><div class="loc-region">Illinois, USA</div></div>
+<div class="loc" data-loc="seattle" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
 </div>
 </div>
 </div>
@@ -939,5 +939,5 @@ Explore the area
 <div id="pauseScreen"><div class="pauseTitle">PAUSED</div><button class="pauseBtn" id="resumeBtn">Resume</button><button class="pauseBtn" id="restartBtn">Restart</button><button class="pauseBtn" id="menuBtn">Main Menu</button></div>
 <div id="resultScreen"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
 <div id="caughtScreen"><div class="caughtBox"><div class="caughtTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
-<script type="module" src="js/bootstrap.js?v=12"></script>
+<script type="module" src="js/bootstrap.js?v=13"></script>
 </body></html>

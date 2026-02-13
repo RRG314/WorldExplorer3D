@@ -305,16 +305,21 @@ function setupUI() {
         }
     };
 
+    const selectSuggestedLocationCard = (targetEl) => {
+        if (!suggestedPanel || !targetEl) return;
+        const selectedLoc = targetEl.closest('.loc[data-loc]');
+        if (!selectedLoc) return;
+        suggestedPanel.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
+        selectedLoc.classList.add('sel');
+        selLoc = selectedLoc.dataset.loc;
+        setTitleLocationMode('suggested');
+    };
+
     if (suggestedPanel) {
         suggestedPanel.addEventListener('click', (event) => {
             const clickTarget = event.target;
             if (!(clickTarget instanceof Element)) return;
-            const selectedLoc = clickTarget.closest('.loc[data-loc]');
-            if (!selectedLoc) return;
-            suggestedPanel.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
-            selectedLoc.classList.add('sel');
-            selLoc = selectedLoc.dataset.loc;
-            setTitleLocationMode('suggested');
+            selectSuggestedLocationCard(clickTarget);
         });
     }
 
@@ -327,6 +332,7 @@ function setupUI() {
 
     // Exposed so searchLocation() can force the custom selector active.
     globalThis.setTitleLocationMode = setTitleLocationMode;
+    globalThis.selectSuggestedLocationCard = selectSuggestedLocationCard;
 
     // Initial panel state (default to suggested list unless custom location is already selected).
     setTitleLocationMode(selLoc === 'custom' ? 'custom' : 'suggested');

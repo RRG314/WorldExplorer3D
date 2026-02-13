@@ -4,6 +4,11 @@
 
 let _hudTimer = 0;
 let _mapTimer = 0;
+const DEFAULT_LOADING_BG = 'loading-bg.jpg';
+const TRANSITION_LOADING = {
+    space: { background: 'space-transition.png', text: 'Preparing Space Flight...' },
+    moon: { background: 'moon-transition.png', text: 'Approaching The Moon...' }
+};
 
 function renderLoop(t = 0) {
     requestAnimationFrame(renderLoop);
@@ -82,9 +87,56 @@ function renderLoop(t = 0) {
     }
 }
 
-function showLoad(txt) { document.getElementById('loadText').textContent = txt; document.getElementById('loading').classList.add('show'); }
-function hideLoad() { document.getElementById('loading').classList.remove('show'); }
+function showLoad(txt, options = {}) {
+    const loading = document.getElementById('loading');
+    const loadText = document.getElementById('loadText');
+    if (!loading || !loadText) return;
 
-Object.assign(globalThis, { hideLoad, renderLoop, showLoad });
+    const spinner = loading.querySelector('.spinner');
+    const background = options.background || DEFAULT_LOADING_BG;
+    const overlay = Number.isFinite(options.overlay) ? options.overlay : 0.32;
 
-export { hideLoad, renderLoop, showLoad };
+    loading.style.background = `linear-gradient(rgba(0,0,0,${overlay}),rgba(0,0,0,${overlay})), url('${background}') center center / cover no-repeat`;
+    loadText.textContent = txt || 'Loading...';
+    loadText.style.fontWeight = options.bold ? '700' : '500';
+    loadText.style.letterSpacing = options.letterSpacing || '';
+    loadText.style.textShadow = options.transition ? '0 4px 18px rgba(0,0,0,0.9)' : '';
+    if (spinner) spinner.style.display = options.hideSpinner ? 'none' : '';
+
+    loading.classList.add('show');
+}
+
+function hideLoad() {
+    const loading = document.getElementById('loading');
+    const loadText = document.getElementById('loadText');
+    if (!loading || !loadText) return;
+
+    const spinner = loading.querySelector('.spinner');
+    if (spinner) spinner.style.display = '';
+    loadText.style.fontWeight = '';
+    loadText.style.letterSpacing = '';
+    loadText.style.textShadow = '';
+    loading.style.background = '';
+    loading.classList.remove('show');
+}
+
+async function showTransitionLoad(mode, durationMs = 1400) {
+    const cfg = TRANSITION_LOADING[mode];
+    if (!cfg) return;
+
+    showLoad(cfg.text, {
+        background: cfg.background,
+        hideSpinner: true,
+        transition: true,
+        bold: true,
+        letterSpacing: '1px',
+        overlay: 0.22
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, durationMs));
+    hideLoad();
+}
+
+Object.assign(globalThis, { hideLoad, renderLoop, showLoad, showTransitionLoad });
+
+export { hideLoad, renderLoop, showLoad, showTransitionLoad };

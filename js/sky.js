@@ -517,8 +517,13 @@ function checkMoonClick(clientX, clientY) {
 }
 
 // Direct travel to moon (bypasses space flight module)
-function directTravelToMoon() {
+async function directTravelToMoon() {
     if (travelingToMoon || onMoon) return;
+
+    if (typeof showTransitionLoad === 'function') {
+        await showTransitionLoad('moon');
+        if (travelingToMoon || onMoon) return;
+    }
 
     travelingToMoon = true;
 
@@ -594,8 +599,13 @@ function returnToEarthDirect() {
 }
 
 // Travel to the moon with smooth animation
-function travelToMoon() {
+async function travelToMoon() {
     if (travelingToMoon || onMoon) return;
+
+    if (typeof showTransitionLoad === 'function') {
+        await showTransitionLoad('space');
+        if (travelingToMoon || onMoon) return;
+    }
 
     // Use the new space flight system if available
     if (typeof startSpaceFlightToMoon === 'function') {
