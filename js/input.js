@@ -398,15 +398,9 @@ async function searchLocation() {
         // Debug log removed
 
         // Update UI to show custom location panel as active
-        const customPanel = document.getElementById('customPanel');
-        const suggestedPanel = document.getElementById('suggestedPanel');
-        const customToggle = document.getElementById('customToggle');
-        const suggestedToggle = document.getElementById('suggestedToggle');
-
-        if (customPanel) customPanel.classList.add('show');
-        if (suggestedPanel) suggestedPanel.classList.remove('show');
-        if (customToggle) customToggle.classList.add('active');
-        if (suggestedToggle) suggestedToggle.classList.remove('active');
+        if (typeof globalThis.setTitleLocationMode === 'function') {
+            globalThis.setTitleLocationMode('custom');
+        }
 
         // Debug log removed
 

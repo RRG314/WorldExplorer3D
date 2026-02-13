@@ -13,7 +13,11 @@ const LOCS = {
     lasvegas: { name: 'Las Vegas', lat: 36.1699, lon: -115.1398 },
     london: { name: 'London', lat: 51.5074, lon: -0.1278 },
     paris: { name: 'Paris', lat: 48.8566, lon: 2.3522 },
-    dubai: { name: 'Dubai', lat: 25.2048, lon: 55.2708 }
+    dubai: { name: 'Dubai', lat: 25.2048, lon: 55.2708 },
+    sanfrancisco: { name: 'San Francisco', lat: 37.7749, lon: -122.4194 },
+    losangeles: { name: 'Los Angeles', lat: 34.0522, lon: -118.2437 },
+    chicago: { name: 'Chicago', lat: 41.8781, lon: -87.6298 },
+    seattle: { name: 'Seattle', lat: 47.6062, lon: -122.3321 }
 };
 const locKeys = Object.keys(LOCS);
 const SCALE = 100000;

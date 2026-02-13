@@ -23,7 +23,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .sub{font-family:'Righteous',cursive;font-size:clamp(13px,1.7vw,20px);line-height:1.25;color:rgba(255,255,255,0.9);letter-spacing:clamp(1px,0.45vw,4px);margin:0;font-weight:400;text-shadow:0 2px 10px rgba(0,0,0,0.35);position:relative;z-index:1;text-align:center;max-width:min(94vw,1100px);padding:0 8px;flex-shrink:0}
 
 /* Menu Container with Tabs */
-.menu-container{background:rgba(255,255,255,0.85);backdrop-filter:blur(20px);border:2px solid rgba(255,255,255,0.3);border-radius:20px;width:min(520px,95vw);max-height:calc(100dvh - 220px);display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,0.4),0 0 40px rgba(83,52,131,0.3);position:relative;z-index:1;flex:0 1 auto}
+.menu-container{background:rgba(255,255,255,0.85);backdrop-filter:blur(20px);border:2px solid rgba(255,255,255,0.3);border-radius:20px;width:min(760px,97vw);max-height:calc(100dvh - 170px);display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,0.4),0 0 40px rgba(83,52,131,0.3);position:relative;z-index:1;flex:0 1 auto}
 .tab-nav{display:flex;border-bottom:2px solid rgba(232,238,245,0.5);flex-shrink:0;background:rgba(248,250,252,0.6);backdrop-filter:blur(10px);border-radius:18px 18px 0 0}
 .tab-btn{flex:1;background:transparent;border:none;padding:16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:#64748b;cursor:pointer;transition:all 0.3s;position:relative}
 .tab-btn:hover{color:#475569;background:rgba(241,245,249,0.6)}
@@ -31,19 +31,23 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .tab-btn.active::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px;background:#667eea}
 .tab-content{display:none;padding:24px;overflow-y:auto;flex:1;background:rgba(255,255,255,0.3)}
 .tab-content.active{display:block}
+#tab-location{overflow:hidden;padding:18px;display:none;flex-direction:column}
+#tab-location.active{display:flex}
 
 /* Location Grid */
-.loc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.loc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .loc-grid.custom-centered{grid-template-columns:1fr;max-width:300px;margin:0 auto}
 .suggested-grid{grid-template-columns:1fr}
-.location-switch-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
-.location-switch-btn{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.9);border-radius:10px;padding:10px 12px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.2s}
+.location-switch-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px}
+.location-switch-btn{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.9);border-radius:10px;padding:10px 12px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.2s;text-align:left;display:flex;flex-direction:column;gap:4px;min-height:70px;justify-content:center}
 .location-switch-btn:hover{border-color:#cbd5e1;background:#f1f5f9}
 .location-switch-btn.active{border-color:#667eea;background:#f0f4ff;color:#3b5bdb;box-shadow:0 4px 12px rgba(102,126,234,0.15)}
+.switch-title{font-size:13px;font-weight:600;line-height:1.2}
+.switch-sub{font-size:11px;font-weight:500;line-height:1.2;color:#64748b}
 .location-panel{display:none}
 .location-panel.show{display:block}
 .suggested-note{font-size:11px;color:#64748b;margin:0 0 10px 2px}
-.suggested-list{max-height:34vh;overflow-y:auto;padding-right:4px}
+.suggested-list{max-height:min(50vh,420px);overflow-y:auto;padding-right:4px;border:1px solid rgba(226,232,240,0.9);border-radius:12px;padding:6px;background:rgba(255,255,255,0.6)}
 .loc{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.8);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s}
 .loc:hover{border-color:rgba(203,213,225,0.9);background:rgba(241,245,249,0.95);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.08)}
 .loc.sel{border-color:rgba(102,126,234,0.8);background:rgba(240,244,255,0.9);box-shadow:0 4px 12px rgba(102,126,234,0.2)}
@@ -57,6 +61,10 @@ input,textarea{-webkit-user-select:text;user-select:text}
 /* Custom Location Panel */
 #customPanel{display:none;margin-top:0;padding:20px;background:rgba(255,251,235,0.9);border:2px solid rgba(252,211,77,0.8);border-radius:12px;backdrop-filter:blur(10px)}
 #customPanel.show{display:block}
+.launch-panel{padding:18px;border-radius:12px;border:2px solid rgba(165,180,252,0.75);background:rgba(238,242,255,0.88)}
+.launch-panel.space{border-color:rgba(125,211,252,0.75);background:rgba(15,23,42,0.78);color:#e2e8f0}
+.launch-title{font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;margin-bottom:8px}
+.launch-copy{font-size:12px;line-height:1.6}
 .custom-title{font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;color:#92400e;margin-bottom:16px;text-align:center}
 .custom-row{margin-bottom:14px}
 .custom-row label{display:block;font-size:12px;font-weight:500;color:#78716c;margin-bottom:8px}
@@ -172,10 +180,10 @@ input,textarea{-webkit-user-select:text;user-select:text}
 
   /* Title screen mobile adjustments */
   .sub{font-size:15px;letter-spacing:2px}
-  .menu-container{width:95vw;max-height:calc(100dvh - 200px)}
+  .menu-container{width:min(96vw,740px);max-height:calc(100dvh - 145px)}
   .loc-grid{grid-template-columns:1fr;gap:10px}
-  .location-switch-row{grid-template-columns:1fr}
-  .suggested-list{max-height:30vh}
+  .location-switch-row{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .suggested-list{max-height:38vh}
   .tab-btn{font-size:12px;padding:12px 8px}
 
   /* HUD elements */
@@ -208,8 +216,9 @@ input,textarea{-webkit-user-select:text;user-select:text}
   /* Title screen for small phones */
   .logo{font-size:clamp(28px, 10vw, 48px);letter-spacing:2px}
   .sub{font-size:13px;letter-spacing:2px;margin:0}
-  .menu-container{width:98vw;max-height:calc(100dvh - 180px)}
-  .suggested-list{max-height:26vh}
+  .menu-container{width:99vw;max-height:calc(100dvh - 126px)}
+  .location-switch-row{grid-template-columns:1fr}
+  .suggested-list{max-height:32vh}
   .tab-btn{font-size:11px;padding:10px 6px}
   .tab-content{padding:16px}
   .custom-title{font-size:13px}
@@ -252,7 +261,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 
 /* Landscape orientation adjustments */
 @media (max-height: 500px) and (orientation: landscape) {
-  .menu-container{max-height:calc(100dvh - 110px);width:min(88vw,760px)}
+  .menu-container{max-height:calc(100dvh - 88px);width:min(95vw,980px)}
   .tab-content{max-height:60vh}
   .suggested-list{max-height:40vh}
   #propertyPanel{max-height:85vh}
@@ -332,7 +341,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <body>
 <div id="titleScreen">
 <div class="logo">WORLD EXPLORER</div>
-<div class="sub">World Explorer Explore Any Place on Earth and Beyond</div>
+<div class="sub">Explore Any Place on Earth and Beyond</div>
 <div class="menu-container">
 <div class="tab-nav">
 <button class="tab-btn active" data-tab="location">Location</button>
@@ -341,8 +350,22 @@ input,textarea{-webkit-user-select:text;user-select:text}
 </div>
 <div class="tab-content active" id="tab-location">
 <div class="location-switch-row">
-<button class="location-switch-btn active" id="suggestedToggle" type="button">📍 Suggested Locations</button>
-<button class="location-switch-btn" id="customToggle" type="button">🌍 Custom Location</button>
+<button class="location-switch-btn active" id="suggestedToggle" data-mode="suggested" type="button">
+<span class="switch-title">📍 Suggested</span>
+<span class="switch-sub">Popular city list</span>
+</button>
+<button class="location-switch-btn" id="customToggle" data-mode="custom" type="button">
+<span class="switch-title">🌍 Custom</span>
+<span class="switch-sub">Any place search</span>
+</button>
+<button class="location-switch-btn" id="moonToggle" data-mode="moon" type="button">
+<span class="switch-title">🌙 Moon</span>
+<span class="switch-sub">Direct moon start</span>
+</button>
+<button class="location-switch-btn" id="spaceToggle" data-mode="space" type="button">
+<span class="switch-title">🚀 Space</span>
+<span class="switch-sub">Start in space flight</span>
+</button>
 </div>
 
 <div id="suggestedPanel" class="location-panel show">
@@ -360,6 +383,10 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <div class="loc" data-loc="london"><div class="loc-name">London</div><div class="loc-region">United Kingdom</div></div>
 <div class="loc" data-loc="paris"><div class="loc-name">Paris</div><div class="loc-region">France</div></div>
 <div class="loc" data-loc="dubai"><div class="loc-name">Dubai</div><div class="loc-region">UAE</div></div>
+<div class="loc" data-loc="sanfrancisco"><div class="loc-name">San Francisco</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="losangeles"><div class="loc-name">Los Angeles</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="chicago"><div class="loc-name">Chicago</div><div class="loc-region">Illinois, USA</div></div>
+<div class="loc" data-loc="seattle"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
 </div>
 </div>
 </div>
@@ -387,6 +414,20 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <input type="number" id="customLon" placeholder="Longitude (e.g. -76.6122)" step="0.0001">
 </div>
 <div style="font-size:11px;margin-top:6px;color:#6b7280">Right-click on Google Maps and copy coordinates</div>
+</div>
+</div>
+
+<div id="moonPanel" class="location-panel">
+<div class="launch-panel">
+<div class="launch-title">🌙 Direct Moon Start</div>
+<div class="launch-copy">Launch into exploration and land directly on the Moon surface after loading.</div>
+</div>
+</div>
+
+<div id="spacePanel" class="location-panel">
+<div class="launch-panel space">
+<div class="launch-title">🚀 Start In Space Flight</div>
+<div class="launch-copy">Begin in orbital flight mode so you can fly immediately and choose when to land.</div>
 </div>
 </div>
 </div>
