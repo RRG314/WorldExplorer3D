@@ -64,8 +64,13 @@ function checkBuildingCollision(x, z, carRadius = 2) {
     // Early exit if no buildings loaded
     if (buildings.length === 0) return { collision: false };
 
-    for (let i = 0; i < buildings.length; i++) {
-        const building = buildings[i];
+    const candidateBuildings = (typeof getNearbyBuildings === 'function')
+        ? getNearbyBuildings(x, z, carRadius + 8)
+        : buildings;
+    if (!candidateBuildings || candidateBuildings.length === 0) return { collision: false };
+
+    for (let i = 0; i < candidateBuildings.length; i++) {
+        const building = candidateBuildings[i];
 
         // Use pre-computed bounding box for fast rejection
         if (x < building.minX - carRadius || x > building.maxX + carRadius ||
@@ -207,7 +212,7 @@ function update(dt) {
 
     if (droneMode) {
         updateDrone(dt);
-        if (!onMoon) updateTerrainAround(drone.x, drone.z);
+        if (!onMoon && !worldLoading) updateTerrainAround(drone.x, drone.z);
         return;
     }
 
@@ -234,19 +239,6 @@ function update(dt) {
                     }
                 }
             });
-
-            // Load terrain around walker (must happen in walk mode too!)
-            if (!onMoon) {
-                updateTerrainAround(Walk.state.walker.x, Walk.state.walker.z);
-
-                const now = performance.now();
-                const rebuildInterval = lastRoadRebuildCheck === 0 ? 500 : 2000;
-                if (roadsNeedRebuild && now - lastRoadRebuildCheck > rebuildInterval) {
-                    lastRoadRebuildCheck = now;
-                    rebuildRoadsWithTerrain();
-                    repositionBuildingsWithTerrain();
-                }
-            }
 
             return;
         }
@@ -385,8 +377,9 @@ function update(dt) {
     }
     const maxSteer = maxSteerLow + (maxSteerHigh - maxSteerLow) * steerAlpha;
 
-    const reverseDir = car.speed >= 0 ? 1 : -1;
-    const steerAngle = car.steerSm * maxSteer * reverseDir;
+    // FIXED: Remove reverseDir inversion for more intuitive reverse steering
+    // In reverse, steering works the same direction (arcade-style, more realistic feel)
+    const steerAngle = car.steerSm * maxSteer;
 
     // Surface grip baseline
     let gripBase = car.onRoad ? 1.0 : 0.65;
@@ -395,8 +388,8 @@ function update(dt) {
     // Moon: full grip — driving should feel the same as Earth
     if (onMoon) gripBase = 1.0;
 
-    // Drift behavior when braking + turning
-    if (brakeInput > 0 && Math.abs(car.steerSm) > 0.2 && spdAbs > 18) gripBase *= 0.65;
+    // Drift mechanic removed — spacebar is pure brake only
+    let isDrifting = false;
 
     const latDamp = (car.onRoad ? 10.5 : 6.5) * gripBase;
     const yawDamp = (car.onRoad ? 7.5 : 5.0) * gripBase;
@@ -510,8 +503,9 @@ function update(dt) {
             car.isAirborne = isAirborne;
 
             if (isAirborne) {
-                const REAL_MOON_GRAVITY = -1.62;
-                car.vy += REAL_MOON_GRAVITY * dt;
+                // Use realistic gravity based on location
+                const GRAVITY = onMoon ? -1.62 : -9.8; // Moon: 1.62 m/s², Earth: 9.8 m/s²
+                car.vy += GRAVITY * dt;
                 car.y += car.vy * dt;
 
                 if (car.y <= groundY) {
@@ -521,17 +515,19 @@ function update(dt) {
                 carY = car.y;
             } else {
                 const slopeAngle = Math.acos(groundNormal.y);
-                const isRamp = slopeAngle > 0.15;
+                // Moon: much easier to launch off edges/hills (low gravity)
+                const isRamp = slopeAngle > 0.05;
 
                 const carDirX = Math.sin(car.angle);
                 const carDirZ = Math.cos(car.angle);
 
-                const movingUp = (groundNormal.x * carDirX + groundNormal.z * carDirZ) < -0.15;
-                const fastEnough = Math.abs(car.speed) > 15;
+                const movingUp = (groundNormal.x * carDirX + groundNormal.z * carDirZ) < -0.05;
+                const fastEnough = Math.abs(car.speed) > 5;
 
                 if (isRamp && movingUp && fastEnough) {
-                    const launchSpeed = Math.abs(car.speed) * 0.2;
-                    car.vy = launchSpeed * (1 + slopeAngle * 3);
+                    // Stronger launch on moon due to low gravity
+                    const launchSpeed = Math.abs(car.speed) * 0.35;
+                    car.vy = launchSpeed * (1 + slopeAngle * 4);
                     car.y = groundY + 0.2;
                 } else {
                     car.y = groundY;
@@ -542,12 +538,13 @@ function update(dt) {
             }
         }
     } else if (terrainEnabled) {
-        const groundH = typeof terrainMeshHeightAt === 'function'
-            ? terrainMeshHeightAt(car.x, car.z)
-            : elevationWorldYAtWorldXZ(car.x, car.z);
+        const surfaceY = (typeof GroundHeight !== 'undefined' && GroundHeight && typeof GroundHeight.driveSurfaceY === 'function')
+            ? GroundHeight.driveSurfaceY(car.x, car.z, !!car.onRoad)
+            : ((typeof terrainMeshHeightAt === 'function'
+                ? terrainMeshHeightAt(car.x, car.z)
+                : elevationWorldYAtWorldXZ(car.x, car.z)) + (car.onRoad ? 0.2 : 0));
 
-        const roadOffset = car.onRoad ? 0.2 : 0;
-        const targetY = groundH + roadOffset + 1.2;
+        const targetY = surfaceY + 1.2;
 
         if (car.y === undefined || car.y === 0) {
             carY = targetY;
@@ -578,7 +575,7 @@ function update(dt) {
     updateNearbyPOI();
     updateNavigationRoute();
 
-    if (!onMoon) {
+    if (!onMoon && !worldLoading) {
         updateTerrainAround(car.x, car.z);
 
         const now = performance.now();
@@ -592,3 +589,25 @@ function update(dt) {
 }
 
 // Check for nearby POIs and display info
+
+Object.assign(globalThis, {
+    _getPhysRaycaster,
+    _physRayDir,
+    _physRayStart,
+    checkBuildingCollision,
+    getNearestRoadThrottled,
+    invalidateRoadCache,
+    update,
+    updateDrone
+});
+
+export {
+    _getPhysRaycaster,
+    _physRayDir,
+    _physRayStart,
+    checkBuildingCollision,
+    getNearestRoadThrottled,
+    invalidateRoadCache,
+    update,
+    updateDrone
+};

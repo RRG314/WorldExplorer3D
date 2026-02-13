@@ -5,6 +5,33 @@
 // Textures will be created in init()
 let asphaltTex, asphaltNormal, asphaltRoughness, windowTextures = {};
 let buildingNormalMap = null, buildingRoughnessMap = null;
+let currentGpuTier = 'high';
+
+function syncTextureGlobals() {
+    globalThis.asphaltTex = asphaltTex;
+    globalThis.asphaltNormal = asphaltNormal;
+    globalThis.asphaltRoughness = asphaltRoughness;
+    globalThis.grassDiffuse = grassDiffuse;
+    globalThis.grassNormal = grassNormal;
+    globalThis.grassRoughness = grassRoughness;
+    globalThis.pavementDiffuse = pavementDiffuse;
+    globalThis.pavementNormal = pavementNormal;
+    globalThis.pavementRoughness = pavementRoughness;
+    globalThis.concreteDiffuse = concreteDiffuse;
+    globalThis.concreteNormal = concreteNormal;
+    globalThis.concreteRoughness = concreteRoughness;
+    globalThis.brickDiffuse = brickDiffuse;
+    globalThis.brickNormal = brickNormal;
+    globalThis.brickRoughness = brickRoughness;
+    globalThis.buildingNormalMap = buildingNormalMap;
+    globalThis.buildingRoughnessMap = buildingRoughnessMap;
+    globalThis.windowTextures = windowTextures;
+}
+
+function clearWindowTextureCache() {
+    windowTextures = {};
+    globalThis.windowTextures = windowTextures;
+}
 
 // PBR ground textures (grass for terrain)
 let grassDiffuse = null, grassNormal = null, grassRoughness = null;
@@ -15,6 +42,8 @@ let concreteDiffuse = null, concreteNormal = null, concreteRoughness = null;
 let brickDiffuse = null, brickNormal = null, brickRoughness = null;
 // Track texture loading state
 let pbrTexturesLoaded = { grass: false, pavement: false, concrete: false, brick: false };
+
+syncTextureGlobals();
 
 // ===== PROCEDURAL TEXTURES =====
 function createAsphaltTexture() {
@@ -174,52 +203,51 @@ function createWindowTexture(baseColor, seed) {
 
 // ===== HIGH-QUALITY PROCEDURAL GRASS TEXTURES (fallback for CDN) =====
 function createProceduralGrassTexture() {
-    // Draw on 2x canvas, crop center for seamless tiling (no expensive drawWrapped)
-    const size = 256;
-    const big = size * 2;
-    const tmp = document.createElement('canvas');
-    tmp.width = big; tmp.height = big;
-    const ctx = tmp.getContext('2d');
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
 
-    // Green base
-    ctx.fillStyle = '#3a7a28';
-    ctx.fillRect(0, 0, big, big);
+    // Strong green base - unmistakably grass
+    ctx.fillStyle = '#3a6b22';
+    ctx.fillRect(0, 0, size, size);
 
-    // Color variation patches
-    for (let i = 0; i < 120; i++) {
-        const x = Math.random() * big, y = Math.random() * big;
-        const g = 90 + Math.random() * 50;
-        ctx.fillStyle = `rgba(${30 + Math.random() * 20}, ${g}, ${10 + Math.random() * 15}, ${0.06 + Math.random() * 0.08})`;
+    // Layer 1: Earthy undertone patches (dirt showing through)
+    for (let i = 0; i < 150; i++) {
+        const x = Math.random() * size, y = Math.random() * size;
+        const b = 55 + Math.random() * 40;
+        ctx.fillStyle = `rgba(${b + 25}, ${b + 15}, ${b - 5}, ${0.08 + Math.random() * 0.1})`;
         ctx.beginPath();
-        ctx.ellipse(x, y, 4 + Math.random() * 14, 3 + Math.random() * 10, Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.ellipse(x, y, 4 + Math.random() * 12, 3 + Math.random() * 8, Math.random() * Math.PI, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // Dark grass clumps
-    for (let i = 0; i < 1500; i++) {
-        const x = Math.random() * big, y = Math.random() * big;
-        const g = 55 + Math.random() * 40;
-        ctx.fillStyle = `rgba(${15 + Math.random() * 15}, ${g}, ${5 + Math.random() * 10}, 0.25)`;
+    // Layer 2: Dark green grass clumps (shadow areas)
+    for (let i = 0; i < 2000; i++) {
+        const x = Math.random() * size, y = Math.random() * size;
+        const g = 60 + Math.random() * 40;
+        ctx.fillStyle = `rgba(${20 + Math.random() * 20}, ${g}, ${5 + Math.random() * 15}, 0.3)`;
         ctx.beginPath();
-        ctx.ellipse(x, y, 1 + Math.random() * 2.5, 0.5 + Math.random(), Math.random() * Math.PI, 0, Math.PI * 2);
+        ctx.ellipse(x, y, 1 + Math.random() * 3, 0.5 + Math.random() * 1.5, Math.random() * Math.PI, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    // Grass blades
+    // Layer 3: Grass blades - clearly visible green strokes
     ctx.lineCap = 'round';
-    for (let i = 0; i < 3000; i++) {
-        const x = Math.random() * big, y = Math.random() * big;
-        const g = 100 + Math.random() * 80;
-        const r = 30 + Math.random() * 35;
-        const b = 5 + Math.random() * 15;
-        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${0.35 + Math.random() * 0.45})`;
-        ctx.lineWidth = 0.5 + Math.random() * 1;
-        const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.5;
-        const len = 2 + Math.random() * 6;
+    for (let i = 0; i < 6000; i++) {
+        const x = Math.random() * size, y = Math.random() * size;
+        const g = 100 + Math.random() * 90;
+        const r = 25 + Math.random() * 45;
+        const b = 5 + Math.random() * 20;
+        const alpha = 0.3 + Math.random() * 0.5;
+        ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        ctx.lineWidth = 0.5 + Math.random() * 1.2;
+        const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.6;
+        const len = 3 + Math.random() * 8;
         ctx.beginPath();
         ctx.moveTo(x, y);
         ctx.quadraticCurveTo(
-            x + Math.cos(angle) * len * 0.5 + (Math.random() - 0.5) * 1.5,
+            x + Math.cos(angle) * len * 0.5 + (Math.random() - 0.5) * 2,
             y + Math.sin(angle) * len * 0.5,
             x + Math.cos(angle) * len,
             y + Math.sin(angle) * len
@@ -227,63 +255,59 @@ function createProceduralGrassTexture() {
         ctx.stroke();
     }
 
-    // Bright tip highlights
-    for (let i = 0; i < 800; i++) {
-        const x = Math.random() * big, y = Math.random() * big;
-        ctx.fillStyle = `rgba(${70 + Math.random() * 45}, ${140 + Math.random() * 70}, ${20 + Math.random() * 25}, ${0.15 + Math.random() * 0.2})`;
+    // Layer 4: Bright highlights on grass tips
+    for (let i = 0; i < 2000; i++) {
+        const x = Math.random() * size, y = Math.random() * size;
+        ctx.fillStyle = `rgba(${70 + Math.random() * 50}, ${150 + Math.random() * 80}, ${20 + Math.random() * 30}, ${0.15 + Math.random() * 0.25})`;
         ctx.fillRect(x, y, 1, 1 + Math.random());
     }
 
-    // Crop center region - avoids edges, gives seamless-enough tiling
-    const half = size / 2;
-    const out = document.createElement('canvas');
-    out.width = size; out.height = size;
-    out.getContext('2d').drawImage(tmp, half, half, size, size, 0, 0, size, size);
-
-    const texture = new THREE.CanvasTexture(out);
+    const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
     texture.encoding = THREE.sRGBEncoding;
     return texture;
 }
 
 function createProceduralGrassNormal() {
-    const size = 256;
-    const big = size * 2;
-    const tmp = document.createElement('canvas');
-    tmp.width = big; tmp.height = big;
-    const ctx = tmp.getContext('2d');
+    const size = 512;
+    const canvas = document.createElement('canvas');
+    canvas.width = size; canvas.height = size;
+    const ctx = canvas.getContext('2d');
 
+    // Neutral normal base
     ctx.fillStyle = '#8080ff';
-    ctx.fillRect(0, 0, big, big);
+    ctx.fillRect(0, 0, size, size);
 
     const rng = typeof seededRandom === 'function' ? seededRandom(rdtSeed ^ 0xB14DE5) : Math.random.bind(Math);
 
-    for (let i = 0; i < 3000; i++) {
-        const x = rng() * big, y = rng() * big;
-        ctx.fillStyle = `rgb(${120 + rng() * 16}, ${120 + rng() * 16}, ${220 + rng() * 35})`;
+    // Grass blade normals (directional perturbations)
+    for (let i = 0; i < 5000; i++) {
+        const x = rng() * size, y = rng() * size;
+        const nx = 120 + rng() * 16;
+        const ny = 120 + rng() * 16;
+        const nz = 220 + rng() * 35;
+        ctx.fillStyle = `rgb(${nx}, ${ny}, ${nz})`;
         const angle = rng() * Math.PI;
         const len = 2 + rng() * 5;
         ctx.save();
-        ctx.translate(x, y);
+        ctx.translate(x % size, y % size);
         ctx.rotate(angle);
         ctx.fillRect(-len/2, -0.5, len, 1);
         ctx.restore();
     }
 
-    for (let i = 0; i < 400; i++) {
-        const x = rng() * big, y = rng() * big;
-        ctx.fillStyle = `rgb(${118 + rng() * 20}, ${118 + rng() * 20}, ${230 + rng() * 25})`;
+    // Larger bumps for ground undulation
+    for (let i = 0; i < 600; i++) {
+        const x = rng() * size, y = rng() * size;
+        const perturbX = 118 + rng() * 20;
+        const perturbY = 118 + rng() * 20;
+        ctx.fillStyle = `rgb(${perturbX}, ${perturbY}, ${230 + rng() * 25})`;
         ctx.beginPath();
-        ctx.arc(x, y, 2 + rng() * 4, 0, Math.PI * 2);
+        ctx.arc(x % size, y % size, 2 + rng() * 5, 0, Math.PI * 2);
         ctx.fill();
     }
 
-    const half = size / 2;
-    const out = document.createElement('canvas');
-    out.width = size; out.height = size;
-    out.getContext('2d').drawImage(tmp, half, half, size, size, 0, 0, size, size);
-
-    const texture = new THREE.CanvasTexture(out);
+    const texture = new THREE.CanvasTexture(canvas);
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
     return texture;
 }
@@ -652,7 +676,7 @@ function createBuildingGroundPatch(pts, avgElevation) {
     // Expand the building footprint outward to create a sidewalk/pad
     const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
     const cz = pts.reduce((s, p) => s + p.z, 0) / pts.length;
-    const expandFactor = 1.35; // 35% larger than building footprint
+    const expandFactor = 1.45; // wider apron to hide steep-slope foundation exposure
 
     const expandedPts = pts.map(p => ({
         x: cx + (p.x - cx) * expandFactor,
@@ -724,6 +748,8 @@ function createBuildingGroundPatch(pts, avgElevation) {
     mesh.renderOrder = 1;
     mesh.receiveShadow = true;
     mesh.userData.buildingGround = true;
+    mesh.userData.alwaysVisible = true;
+    mesh.visible = true;
     return mesh;
 }
 
@@ -731,27 +757,41 @@ function createBuildingGroundPatch(pts, avgElevation) {
 function loadPBRTextureSet(name, urls, onLoaded, fallbackFns) {
     const loader = new THREE.TextureLoader();
     let loadedCount = 0;
+    let resolved = false;
     const textures = { diff: null, nor: null, rough: null };
     const total = 3;
+
+    function resolve(fromCDN) {
+        if (resolved) return;
+        resolved = true;
+        if (fromCDN && textures.diff && textures.nor && textures.rough) {
+            onLoaded(textures.diff, textures.nor, textures.rough, true);
+        } else {
+            // Use procedural fallback for any that failed
+            const fb = fallbackFns();
+            onLoaded(
+                textures.diff || fb.diff,
+                textures.nor || fb.nor,
+                textures.rough || fb.rough,
+                false
+            );
+        }
+    }
 
     function checkDone() {
         loadedCount++;
         if (loadedCount >= total) {
-            // If all three loaded from CDN, use them
-            if (textures.diff && textures.nor && textures.rough) {
-                onLoaded(textures.diff, textures.nor, textures.rough, true);
-            } else {
-                // Use procedural fallback for any that failed
-                const fb = fallbackFns();
-                onLoaded(
-                    textures.diff || fb.diff,
-                    textures.nor || fb.nor,
-                    textures.rough || fb.rough,
-                    false
-                );
-            }
+            resolve(!!(textures.diff && textures.nor && textures.rough));
         }
     }
+
+    // Timeout: if CDN loads don't complete in 4 seconds, use procedural fallback
+    setTimeout(function() {
+        if (!resolved) {
+            console.warn('PBR texture CDN timeout (' + name + '), using procedural fallback');
+            resolve(false);
+        }
+    }, 4000);
 
     function loadTex(key, url, encoding) {
         loader.load(url,
@@ -777,17 +817,30 @@ function loadPBRTextureSet(name, urls, onLoaded, fallbackFns) {
 function initPBRTextures(maxAniso) {
     const aniso = Math.min(maxAniso, 8);
 
-    // --- Grass/Ground textures (simple procedural grass - no CDN dependency) ---
-    {
-        grassDiffuse = createProceduralGrassTexture();
-        grassNormal = createProceduralGrassNormal();
-        grassRoughness = createProceduralGrassRoughness();
+    // --- Grass/Ground textures (forrest_ground_01 - actual ground-level grass) ---
+    loadPBRTextureSet('grass', {
+        diff: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forrest_ground_01/forrest_ground_01_diff_1k.jpg',
+        nor: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forrest_ground_01/forrest_ground_01_nor_gl_1k.jpg',
+        rough: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forrest_ground_01/forrest_ground_01_rough_1k.jpg'
+    }, function(diff, nor, rough, fromCDN) {
+        grassDiffuse = diff;
+        grassNormal = nor;
+        grassRoughness = rough;
+        syncTextureGlobals();
         [grassDiffuse, grassNormal, grassRoughness].forEach(t => {
             if (t) { t.anisotropy = aniso; t.wrapS = t.wrapT = THREE.RepeatWrapping; }
         });
         pbrTexturesLoaded.grass = true;
+        console.log('Grass textures ready (' + (fromCDN ? 'Poly Haven CDN' : 'procedural fallback') + ')');
+        // Apply to existing terrain meshes
         applyGrassToTerrain();
-    }
+    }, function() {
+        return {
+            diff: createProceduralGrassTexture(),
+            nor: createProceduralGrassNormal(),
+            rough: createProceduralGrassRoughness()
+        };
+    });
 
     // --- Pavement/sidewalk textures (brushed concrete for ground around buildings) ---
     loadPBRTextureSet('pavement', {
@@ -798,6 +851,7 @@ function initPBRTextures(maxAniso) {
         pavementDiffuse = diff;
         pavementNormal = nor;
         pavementRoughness = rough;
+        syncTextureGlobals();
         [pavementDiffuse, pavementNormal, pavementRoughness].forEach(t => {
             if (t) { t.anisotropy = aniso; t.wrapS = t.wrapT = THREE.RepeatWrapping; }
         });
@@ -820,6 +874,7 @@ function initPBRTextures(maxAniso) {
         concreteDiffuse = diff;
         concreteNormal = nor;
         concreteRoughness = rough;
+        syncTextureGlobals();
         [concreteDiffuse, concreteNormal, concreteRoughness].forEach(t => {
             if (t) { t.anisotropy = aniso; t.wrapS = t.wrapT = THREE.RepeatWrapping; }
         });
@@ -842,6 +897,7 @@ function initPBRTextures(maxAniso) {
         brickDiffuse = diff;
         brickNormal = nor;
         brickRoughness = rough;
+        syncTextureGlobals();
         [brickDiffuse, brickNormal, brickRoughness].forEach(t => {
             if (t) { t.anisotropy = aniso; t.wrapS = t.wrapT = THREE.RepeatWrapping; }
         });
@@ -958,9 +1014,9 @@ function getBuildingMaterial(buildingType, bSeed, baseColorHex) {
 }
 
 const CFG = {
-    maxSpd: 120, offMax: 60, accel: 25, boostAccel: 45, brake: 150, friction: 25, offFriction: 120,
+    maxSpd: 120, offMax: 60, accel: 12, boostAccel: 25, brake: 150, friction: 25, offFriction: 120,
     boostMax: 140, boostDur: 2.5,
-    brakeForce: 2.5,     // Realistic braking
+    brakeForce: 4.0,     // Strong braking
     // Grip settings - realistic car physics
     gripRoad: 0.88,      // Normal road grip - realistic
     gripOff: 0.70,       // Off-road grip
@@ -977,6 +1033,71 @@ const CFG = {
     maxOffDist: 15,      // Max distance off road before strong pushback
     cpRadius: 25, trialTime: 120, policeSpd: 140, policeAccel: 60, policeDist: 800
 };
+
+// ESM compatibility bridge:
+// physics/game/hud reference CFG as a global symbol.
+Object.assign(globalThis, { CFG });
+
+function setupPostProcessingPipeline() {
+    if (!renderer || !scene || !camera) return false;
+    if (currentGpuTier === 'low') return false;
+    if (typeof THREE.EffectComposer === 'undefined' || typeof THREE.RenderPass === 'undefined') return false;
+
+    try {
+        composer = new THREE.EffectComposer(renderer);
+        composer.setSize(innerWidth, innerHeight);
+
+        const renderPass = new THREE.RenderPass(scene, camera);
+        composer.addPass(renderPass);
+
+        bloomPass = null;
+        if (typeof THREE.UnrealBloomPass !== 'undefined') {
+            try {
+                const bloomW = Math.floor(innerWidth / 2);
+                const bloomH = Math.floor(innerHeight / 2);
+                bloomPass = new THREE.UnrealBloomPass(
+                    new THREE.Vector2(bloomW, bloomH),
+                    0.15,  // strength - very subtle
+                    0.4,   // radius
+                    0.85   // threshold - only bright things bloom
+                );
+                composer.addPass(bloomPass);
+            } catch (e) {
+                console.warn('Bloom not available:', e);
+            }
+        }
+
+        smaaPass = null;
+        if (typeof THREE.SMAAPass !== 'undefined') {
+            try {
+                smaaPass = new THREE.SMAAPass(
+                    innerWidth * renderer.getPixelRatio(),
+                    innerHeight * renderer.getPixelRatio()
+                );
+                composer.addPass(smaaPass);
+            } catch (e) {
+                console.warn('SMAA not available:', e);
+            }
+        }
+
+        return true;
+    } catch (e) {
+        console.warn('Post-processing not available:', e);
+        composer = null;
+        bloomPass = null;
+        smaaPass = null;
+        return false;
+    }
+}
+
+function tryEnablePostProcessing() {
+    if (composer) return true;
+    const enabled = setupPostProcessingPipeline();
+    if (enabled) {
+        console.log('[engine] Post-processing enabled after deferred script load.');
+    }
+    return enabled;
+}
 
 function init() {
     // === WEBGL COMPATIBILITY CHECK ===
@@ -1150,45 +1271,8 @@ function init() {
 
     document.body.prepend(renderer.domElement);
 
-    // Low-tier: no post-processing (Chromebooks, old phones)
-    // Mid/High-tier: bloom + SMAA only (SSAO removed — too expensive, caused Mac glitchiness)
-    if (gpuTier !== 'low' && typeof THREE.EffectComposer !== 'undefined') {
-        try {
-            composer = new THREE.EffectComposer(renderer);
-            const renderPass = new THREE.RenderPass(scene, camera);
-            composer.addPass(renderPass);
-
-            // Bloom — half-resolution for performance, subtle strength
-            if (typeof THREE.UnrealBloomPass !== 'undefined') {
-                try {
-                    const bloomW = Math.floor(innerWidth / 2);
-                    const bloomH = Math.floor(innerHeight / 2);
-                    bloomPass = new THREE.UnrealBloomPass(
-                        new THREE.Vector2(bloomW, bloomH),
-                        0.15,  // strength - very subtle
-                        0.4,   // radius
-                        0.85   // threshold - only bright things bloom
-                    );
-                    composer.addPass(bloomPass);
-                } catch(e) {
-                    console.warn('Bloom not available:', e);
-                }
-            }
-
-            // SMAA anti-aliasing
-            if (typeof THREE.SMAAPass !== 'undefined') {
-                try {
-                    smaaPass = new THREE.SMAAPass(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio());
-                    composer.addPass(smaaPass);
-                } catch(e) {
-                    console.warn('SMAA not available:', e);
-                }
-            }
-        } catch(e) {
-            console.warn('Post-processing not available:', e);
-            composer = null;
-        }
-    } else {
+    currentGpuTier = gpuTier;
+    if (!setupPostProcessingPipeline()) {
         console.log('Post-processing skipped (GPU tier: ' + gpuTier + ')');
     }
 
@@ -1211,8 +1295,10 @@ function init() {
 
         // Load PBR textures for ground and buildings (from Poly Haven CDN with procedural fallback)
         initPBRTextures(maxAniso);
+        syncTextureGlobals();
     } catch(e) {
         console.error('Texture creation failed:', e);
+        syncTextureGlobals();
         // Textures will be null, code will use fallback solid colors
     }
 
@@ -1418,7 +1504,7 @@ function init() {
     // Create star field (hidden during day, visible at night)
     starField = createStarField();
 
-    // Ground plane - fallback beneath terrain (with grass texture when available)
+    // Ground plane - solid green fallback beneath terrain (no texture to avoid sky-like artifacts)
     const groundMat = new THREE.MeshStandardMaterial({ color: 0x4a7a2e, roughness: 0.95, metalness: 0 });
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(10000, 10000), groundMat);
     ground.rotation.x = -Math.PI / 2;
@@ -1426,36 +1512,6 @@ function init() {
     ground.receiveShadow = true;
     ground.userData.isGroundPlane = true;
     scene.add(ground);
-
-    // Apply grass texture to ground plane when loaded
-    function updateGroundPlaneTexture() {
-        if (grassDiffuse && ground.userData.isGroundPlane) {
-            const gm = ground.material;
-            gm.map = grassDiffuse.clone();
-            gm.map.wrapS = gm.map.wrapT = THREE.RepeatWrapping;
-            gm.map.repeat.set(400, 400);
-            if (grassNormal) {
-                gm.normalMap = grassNormal.clone();
-                gm.normalMap.wrapS = gm.normalMap.wrapT = THREE.RepeatWrapping;
-                gm.normalMap.repeat.set(400, 400);
-                gm.normalScale = new THREE.Vector2(0.4, 0.4);
-            }
-            if (grassRoughness) {
-                gm.roughnessMap = grassRoughness.clone();
-                gm.roughnessMap.wrapS = gm.roughnessMap.wrapT = THREE.RepeatWrapping;
-                gm.roughnessMap.repeat.set(400, 400);
-            }
-            gm.color.set(0xffffff);
-            gm.needsUpdate = true;
-        }
-    }
-    // Check periodically until grass textures are loaded
-    const groundTexInterval = setInterval(function() {
-        if (pbrTexturesLoaded.grass) {
-            updateGroundPlaneTexture();
-            clearInterval(groundTexInterval);
-        }
-    }, 500);
 
     // Car with REALISTIC PBR materials (with error handling)
     try {
@@ -1520,6 +1576,12 @@ function init() {
         tl2.position.set(0.55, 0.45, -1.76);
         carMesh.add(tl2);
 
+        // Keep car.y physics semantics unchanged; only lower rendered geometry to ground tires.
+        const CAR_VISUAL_Y_OFFSET = -1.1;
+        carMesh.children.forEach(child => {
+            if (child && child.position) child.position.y += CAR_VISUAL_Y_OFFSET;
+        });
+
         scene.add(carMesh);
 
         // Car casts shadow but doesn't need to receive
@@ -1548,10 +1610,16 @@ function init() {
             car,
             carMesh,
             getBuildingsArray: () => buildings,  // Pass function for dynamic buildings access
+            getNearbyBuildings: (x, z, radius) => (
+                typeof globalThis.getNearbyBuildings === 'function'
+                    ? globalThis.getNearbyBuildings(x, z, radius)
+                    : buildings
+            ),
             isPointInPolygon: pointInPolygon
         });
         window.Walk = Walk;
-        // Walk mode will be entered after spawnOnRoad() in loadRoads()
+        // Start in walking mode by default (character visible, car hidden)
+        Walk.setModeWalk();
     } catch(e) {
         console.error('Walking module initialization failed:', e);
         console.error('Stack:', e.stack);
@@ -1568,10 +1636,8 @@ function init() {
         if (composer) composer.setSize(innerWidth, innerHeight);
         if (smaaPass) smaaPass.setSize(innerWidth * renderer.getPixelRatio(), innerHeight * renderer.getPixelRatio());
     });
-    addEventListener('keydown', e => { keys[e.code] = true; onKey(e.code); });
+    addEventListener('keydown', e => { keys[e.code] = true; onKey(e.code, e); });
     addEventListener('keyup', e => keys[e.code] = false);
-    // Clear all keys when window loses focus to prevent stuck keys
-    addEventListener('blur', () => { clearKeys(); window.walkMouseLookActive = false; });
 
     // Mouse movement for camera control
     let lastMouseX = 0;
@@ -1675,3 +1741,19 @@ function init() {
     setupUI();
     renderLoop();
 }
+
+Object.assign(globalThis, {
+    clearWindowTextureCache,
+    createBuildingGroundPatch,
+    getBuildingMaterial,
+    init,
+    tryEnablePostProcessing
+});
+
+export {
+    clearWindowTextureCache,
+    createBuildingGroundPatch,
+    getBuildingMaterial,
+    init,
+    tryEnablePostProcessing
+};

@@ -111,17 +111,54 @@ function updateCamera() {
     // Get car's actual Y position (follows terrain)
     const carGroundY = carMesh.position.y - 1.2; // Car body is 1.2 above ground
 
+    // Show car mesh for non-first-person modes
+    if (camMode !== 1 && carMesh && !carMesh.visible) {
+        carMesh.visible = true;
+    }
+
     if (camMode === 0) {
         // Chase camera - follow behind car at terrain height
         const ox = -Math.sin(car.angle) * (lb ? -d : d);
         const oz = -Math.cos(car.angle) * (lb ? -d : d);
-        camera.position.set(car.x + ox, carGroundY + h, car.z + oz);
-        camera.lookAt(car.x, carGroundY + 0.5, car.z);
+        const targetX = car.x + ox;
+        const targetY = carGroundY + h;
+        const targetZ = car.z + oz;
+        const lookX = car.x;
+        const lookY = carGroundY + 0.5;
+        const lookZ = car.z;
+
+        // Smooth both camera position and lookAt target together
+        // Higher factor = camera stays more rigidly fixed to car
+        const smoothFactor = 0.7;
+        camera.position.x += (targetX - camera.position.x) * smoothFactor;
+        camera.position.y += (targetY - camera.position.y) * smoothFactor;
+        camera.position.z += (targetZ - camera.position.z) * smoothFactor;
+
+        // Initialize lookAt target if needed
+        if (!camera.userData.lookTarget) {
+            camera.userData.lookTarget = { x: lookX, y: lookY, z: lookZ };
+        }
+
+        // Smooth the lookAt target
+        camera.userData.lookTarget.x += (lookX - camera.userData.lookTarget.x) * smoothFactor;
+        camera.userData.lookTarget.y += (lookY - camera.userData.lookTarget.y) * smoothFactor;
+        camera.userData.lookTarget.z += (lookZ - camera.userData.lookTarget.z) * smoothFactor;
+
+        camera.lookAt(camera.userData.lookTarget.x, camera.userData.lookTarget.y, camera.userData.lookTarget.z);
     } else if (camMode === 1) {
-        // Hood/bumper camera - at car position
-        camera.position.set(car.x, carGroundY + 1.5, car.z);
+        // Hood camera - positioned at front of car looking forward over the hood
+        // Move camera forward to the hood area (1.2 units ahead of car center)
+        const fwdX = Math.sin(car.angle) * 1.2;
+        const fwdZ = Math.cos(car.angle) * 1.2;
+        camera.position.set(car.x + fwdX, carGroundY + 1.8, car.z + fwdZ);
         const dir = lb ? -1 : 1;
-        camera.lookAt(car.x + Math.sin(car.angle) * 10 * dir, carGroundY + 1, car.z + Math.cos(car.angle) * 10 * dir);
+        camera.lookAt(
+            car.x + Math.sin(car.angle) * 10 * dir,
+            carGroundY + 1.6,
+            car.z + Math.cos(car.angle) * 10 * dir
+        );
+        // Hide car mesh in first-person so you don't see tires/body
+        if (carMesh) carMesh.visible = false;
     } else {
         // Overhead camera - high above car
         camera.position.set(car.x, carGroundY + 50, car.z + 15);
@@ -295,3 +332,9 @@ function updateHUD() {
         if (droneControls) droneControls.style.display = 'none';
     }
 }
+
+// OSM Tile functions
+
+Object.assign(globalThis, { updateCamera, updateHUD, updateSkyPositions });
+
+export { updateCamera, updateHUD, updateSkyPositions };

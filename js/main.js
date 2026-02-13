@@ -84,3 +84,7 @@ function renderLoop(t = 0) {
 
 function showLoad(txt) { document.getElementById('loadText').textContent = txt; document.getElementById('loading').classList.add('show'); }
 function hideLoad() { document.getElementById('loading').classList.remove('show'); }
+
+Object.assign(globalThis, { hideLoad, renderLoop, showLoad });
+
+export { hideLoad, renderLoop, showLoad };

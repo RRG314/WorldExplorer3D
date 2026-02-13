@@ -21,23 +21,42 @@ window.spaceFlight = {
   animationId: null,
   destination: 'moon', // 'moon' or 'earth' (legacy, now dynamic)
   _nearestBody: null,   // closest body for HUD
-  _landingTarget: null   // body name being landed on
+  _landingTarget: null,  // body name being landed on
+  _manualLandingTarget: null, // explicit Earth/Moon target selected by UI action
+  _autopilotTarget: null, // active autopilot destination label
+  _gravityVec: null,
+  gravityVelocity: null,
+  launchStartMs: 0,
+  _launchSource: null,
+  _isThrusting: false
 };
 
-// Constants
+// Constants - scaled for real proportional AU distances
 const SPACE_CONSTANTS = {
   EARTH_SIZE: 50,
   MOON_SIZE: 13.5,
   MOON_DISTANCE: 1500,
   MIN_SPEED: 0,
-  CRUISE_SPEED: 3.0,
-  MAX_SPEED: 30,       // Increased for solar system exploration
-  BOOST: 0.25,
-  BRAKE: 0.15,
-  DRIFT_RATE: 0.04,
+  CRUISE_SPEED: 6.0,     // Doubled for proportional AU distances
+  MAX_SPEED: 80,          // Increased for outer solar system exploration
+  BOOST: 0.4,
+  BRAKE: 0.25,
+  DRIFT_RATE: 0.06,
   TURN_SPEED: 0.035,
   PITCH_SPEED: 0.03,
-  LANDING_DISTANCE: 120  // Increased for larger bodies
+  LANDING_DISTANCE: 260,
+  GRAVITY_DAMPING: 0.992,
+  MAX_GRAVITY_SPEED: 18,
+  MAX_GRAVITY_ACCEL: 0.18,
+  MAX_TOTAL_GRAVITY_ACCEL: 0.24,
+  GRAVITY_SOFTENING: 240,
+  LAUNCH_ASSIST_WINDOW_MS: 14000,
+  LAUNCH_ASSIST_ALTITUDE: 2200,
+  LAUNCH_ASSIST_ACCEL: 0.16,
+  LAUNCH_SOURCE_MIN_GRAVITY_SCALE: 0.28,
+  LAUNCH_SUN_GRAVITY_SCALE: 0.06,
+  LAUNCH_BOOST_MULTIPLIER: 1.5,
+  LAUNCH_MIN_SPEED: 8.5
 };
 
 // Initialize space flight UI elements (called once on load)
@@ -46,6 +65,8 @@ function initSpaceFlightUI() {
 
   // Initialize velocity vector
   spaceFlight.velocity = new THREE.Vector3();
+  spaceFlight._gravityVec = new THREE.Vector3();
+  spaceFlight.gravityVelocity = new THREE.Vector3();
 
   // Space Canvas (fullscreen overlay)
   const canvas = document.createElement('canvas');
@@ -143,6 +164,9 @@ function startSpaceFlightToMoon() {
   spaceFlight.destination = 'moon';
   spaceFlight.mode = 'launching';
   spaceFlight.active = true;
+  spaceFlight._launchSource = 'Earth';
+  spaceFlight.launchStartMs = Date.now();
+  spaceFlight._isThrusting = false;
   switchEnv(ENV.SPACE_FLIGHT);
 
   // Show canvas and HUD
@@ -193,6 +217,9 @@ function startSpaceFlightToEarth() {
   spaceFlight.destination = 'earth';
   spaceFlight.mode = 'launching';
   spaceFlight.active = true;
+  spaceFlight._launchSource = 'Moon';
+  spaceFlight.launchStartMs = Date.now();
+  spaceFlight._isThrusting = false;
   switchEnv(ENV.SPACE_FLIGHT);
 
   // Show canvas and HUD
@@ -254,8 +281,8 @@ function createSpaceFlightScene() {
   spaceFlight.scene = new THREE.Scene();
   spaceFlight.scene.background = new THREE.Color(0x000008);
 
-  // Camera - extended far plane for solar system exploration
-  spaceFlight.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 25000);
+  // Camera - extended far plane for real proportional AU-scale solar system + deep starfield
+  spaceFlight.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100000);
 
   // Renderer (capped pixel ratio for Chromebook performance)
   spaceFlight.renderer = new THREE.WebGLRenderer({
@@ -302,21 +329,36 @@ function createSpaceStarfield() {
   const starVerts = [];
   const starColors = [];
 
-  for (let i = 0; i < 4000; i++) {
+  // Massive starfield sphere surrounding entire proportional solar system
+  for (let i = 0; i < 8000; i++) {
+    // Place stars in a hollow shell between 30000 and 90000 units
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos(2 * Math.random() - 1);
+    const r = 30000 + Math.random() * 60000;
     starVerts.push(
-      (Math.random() - 0.5) * 12000,
-      (Math.random() - 0.5) * 12000,
-      (Math.random() - 0.5) * 12000
+      r * Math.sin(phi) * Math.cos(theta),
+      r * Math.sin(phi) * Math.sin(theta),
+      r * Math.cos(phi)
     );
-    const brightness = 0.7 + Math.random() * 0.3;
-    starColors.push(brightness, brightness, brightness + Math.random() * 0.1);
+    const brightness = 0.6 + Math.random() * 0.4;
+    const temp = Math.random();
+    // Star color temperature variation (blue-white-yellow-orange)
+    if (temp < 0.15) {
+      starColors.push(brightness * 0.8, brightness * 0.85, brightness); // blue
+    } else if (temp < 0.7) {
+      starColors.push(brightness, brightness, brightness); // white
+    } else if (temp < 0.9) {
+      starColors.push(brightness, brightness * 0.95, brightness * 0.8); // yellow
+    } else {
+      starColors.push(brightness, brightness * 0.8, brightness * 0.6); // orange
+    }
   }
 
   starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starVerts, 3));
   starGeo.setAttribute('color', new THREE.Float32BufferAttribute(starColors, 3));
 
   const starMat = new THREE.PointsMaterial({
-    size: 2,
+    size: 3.5,
     vertexColors: true,
     transparent: true,
     opacity: 0.9
@@ -555,7 +597,14 @@ function resetSpaceFlightForMoon() {
 
   // Reset velocity and speed
   spaceFlight.velocity.set(0, 0, 0);
+  if (spaceFlight.gravityVelocity) spaceFlight.gravityVelocity.set(0, 0, 0);
+  if (spaceFlight._gravityVec) spaceFlight._gravityVec.set(0, 0, 0);
   spaceFlight.speed = 0;
+  spaceFlight._launchSource = 'Earth';
+  spaceFlight.launchStartMs = Date.now();
+  spaceFlight._isThrusting = false;
+  spaceFlight._manualLandingTarget = 'Moon';
+  spaceFlight._autopilotTarget = null;
 
   // Solar system group stays at origin (Sun at center)
   if (typeof setSolarSystemCenter === 'function') {
@@ -596,7 +645,14 @@ function resetSpaceFlightForEarth() {
 
   // Reset velocity and speed
   spaceFlight.velocity.set(0, 0, 0);
+  if (spaceFlight.gravityVelocity) spaceFlight.gravityVelocity.set(0, 0, 0);
+  if (spaceFlight._gravityVec) spaceFlight._gravityVec.set(0, 0, 0);
   spaceFlight.speed = 0;
+  spaceFlight._launchSource = 'Moon';
+  spaceFlight.launchStartMs = Date.now();
+  spaceFlight._isThrusting = false;
+  spaceFlight._manualLandingTarget = 'Earth';
+  spaceFlight._autopilotTarget = null;
 
   // Solar system group stays at origin
   if (typeof setSolarSystemCenter === 'function') {
@@ -617,12 +673,311 @@ const _sfForward = new THREE.Vector3();
 const _sfTargetPos = new THREE.Vector3();
 const _sfTempVec = new THREE.Vector3();
 const _sfTempQuat = new THREE.Quaternion();
+const _sfGravityTmp = new THREE.Vector3();
+const _sfGravitySum = new THREE.Vector3();
+
+function normalizeLandingTargetName(target) {
+  const t = String(target || '').trim().toLowerCase();
+  if (t === 'earth') return 'Earth';
+  if (t === 'moon') return 'Moon';
+  return null;
+}
+
+function findLandableBodyByName(target) {
+  const normalized = normalizeLandingTargetName(target);
+  if (!normalized) return null;
+
+  if (typeof getAllSpaceBodies === 'function') {
+    const body = getAllSpaceBodies().find(b => b.landable && String(b.name).toLowerCase() === normalized.toLowerCase());
+    if (body) return body;
+  }
+
+  if (normalized === 'Earth' && spaceFlight.earth) {
+    return {
+      name: 'Earth',
+      mesh: spaceFlight.earth,
+      position: spaceFlight.earth.position,
+      radius: SPACE_CONSTANTS.EARTH_SIZE,
+      landable: true
+    };
+  }
+  if (normalized === 'Moon' && spaceFlight.moon) {
+    return {
+      name: 'Moon',
+      mesh: spaceFlight.moon,
+      position: spaceFlight.moon.position,
+      radius: SPACE_CONSTANTS.MOON_SIZE,
+      landable: true
+    };
+  }
+  return null;
+}
+
+function startLandingSequence(targetMesh, targetRadius, targetName, landingDuration = 2000) {
+  if (!targetMesh || !spaceFlight.rocket) return false;
+
+  spaceFlight.mode = 'landing';
+  spaceFlight._landingTarget = targetName;
+  spaceFlight._autopilotTarget = null;
+  showFlightMessage('LANDING SEQUENCE INITIATED', '#10b981');
+
+  const startTime = Date.now();
+  const startPos = spaceFlight.rocket.position.clone();
+  const landPos = targetMesh.position.clone();
+  landPos.y += targetRadius + 10;
+  const frozenTargetPos = targetMesh.position.clone();
+  const duration = Math.max(1200, landingDuration);
+  const landingAxis = new THREE.Vector3(0, -1, 0);
+  const toTarget = new THREE.Vector3();
+
+  function landingAnimation() {
+    const elapsed = Date.now() - startTime;
+    const progress = Math.min(elapsed / duration, 1);
+    const eased = 1 - Math.pow(1 - progress, 3);
+
+    spaceFlight.rocket.position.lerpVectors(startPos, landPos, eased);
+    spaceFlight.velocity.multiplyScalar(0.9);
+    if (spaceFlight.gravityVelocity) spaceFlight.gravityVelocity.multiplyScalar(0.85);
+
+    toTarget.copy(frozenTargetPos).sub(spaceFlight.rocket.position).normalize();
+    spaceFlight.rocket.quaternion.setFromUnitVectors(landingAxis, toTarget);
+
+    if (progress < 1) {
+      requestAnimationFrame(landingAnimation);
+    } else {
+      completeLanding();
+    }
+  }
+
+  landingAnimation();
+  return true;
+}
+
+function setSpaceFlightLandingTarget(target, options = {}) {
+  if (!spaceFlight.active || !spaceFlight.rocket) return false;
+
+  const normalized = normalizeLandingTargetName(target);
+  if (!normalized) return false;
+
+  const body = findLandableBodyByName(normalized);
+  if (!body) return false;
+
+  spaceFlight.destination = normalized.toLowerCase();
+  spaceFlight._manualLandingTarget = normalized;
+  spaceFlight._autopilotTarget = null;
+
+  const dist = spaceFlight.rocket.position.distanceTo(body.position);
+  const canLandNow = dist < SPACE_CONSTANTS.LANDING_DISTANCE + body.radius;
+
+  if ((options.autoLand || options.force) && spaceFlight.mode !== 'landing' && (canLandNow || options.force)) {
+    const dynamicDuration = options.force
+      ? Math.min(6500, Math.max(1800, Math.floor(dist * 4)))
+      : 2000;
+    startLandingSequence(body.mesh, body.radius, body.name, dynamicDuration);
+    return true;
+  }
+
+  showFlightMessage(`TARGET SET: ${normalized.toUpperCase()}`, '#10b981');
+  return true;
+}
+
+function forceSpaceFlightLanding(target) {
+  if (!spaceFlight.active || !spaceFlight.rocket || spaceFlight.mode === 'landing') return false;
+  const normalized = normalizeLandingTargetName(target);
+  if (!normalized) return false;
+
+  const body = findLandableBodyByName(normalized);
+  if (!body || !body.mesh || !body.position) return false;
+
+  spaceFlight.destination = normalized.toLowerCase();
+  spaceFlight._manualLandingTarget = normalized;
+  spaceFlight._autopilotTarget = null;
+
+  const dist = spaceFlight.rocket.position.distanceTo(body.position);
+  const duration = Math.min(7000, Math.max(1800, Math.floor(dist * 4.2)));
+  return startLandingSequence(body.mesh, body.radius, body.name, duration);
+}
+
+function nearestLandableDistance(rocket, bodies) {
+  let minDist = Infinity;
+  for (let i = 0; i < bodies.length; i++) {
+    const b = bodies[i];
+    if (!b.landable || !b.position) continue;
+    const d = rocket.position.distanceTo(b.position);
+    if (d < minDist) minDist = d;
+  }
+  return minDist;
+}
+
+function sunGravityWeightByLocalBodies(nearestLandableDist) {
+  if (!Number.isFinite(nearestLandableDist)) return 1.0;
+  if (nearestLandableDist <= 2200) return 0;
+  if (nearestLandableDist >= 7000) return 1.0;
+  return (nearestLandableDist - 2200) / (7000 - 2200);
+}
+
+function sunGravityRangeByLocalBodies(nearestLandableDist) {
+  if (!Number.isFinite(nearestLandableDist)) return 35000;
+  if (nearestLandableDist <= 2200) return 0;
+  if (nearestLandableDist >= 7000) return 35000;
+  const t = sunGravityWeightByLocalBodies(nearestLandableDist);
+  return 9000 + t * (35000 - 9000);
+}
+
+function bodyGravityRange(body, nearestLandableDist) {
+  if (!body || !body.name) return 0;
+  if (body.name === 'Sun') return sunGravityRangeByLocalBodies(nearestLandableDist);
+  return Math.max((body.radius || 20) * 95, 900);
+}
+
+function bodyGravityScale(body, nearestLandableDist) {
+  if (!body || !body.name) return 1;
+  if (body.name === 'Sun') return sunGravityWeightByLocalBodies(nearestLandableDist);
+  return 1;
+}
+
+function computeBodyGravityAccel(body, distSq, nearestLandableDist) {
+  const mu = getBodyGravityMu(body);
+  if (mu <= 0) return 0;
+
+  const scale = bodyGravityScale(body, nearestLandableDist);
+  if (scale <= 0) return 0;
+
+  const accel = mu / (distSq + SPACE_CONSTANTS.GRAVITY_SOFTENING);
+  return Math.min(SPACE_CONSTANTS.MAX_GRAVITY_ACCEL, accel * scale);
+}
+
+function clampTotalGravity(sumVec) {
+  if (!sumVec) return;
+  if (sumVec.length() > SPACE_CONSTANTS.MAX_TOTAL_GRAVITY_ACCEL) {
+    sumVec.setLength(SPACE_CONSTANTS.MAX_TOTAL_GRAVITY_ACCEL);
+  }
+}
+
+function integrateGravityVelocity() {
+  if (!spaceFlight.gravityVelocity) return;
+
+  spaceFlight.gravityVelocity.add(_sfGravitySum);
+  spaceFlight.gravityVelocity.multiplyScalar(SPACE_CONSTANTS.GRAVITY_DAMPING);
+  if (spaceFlight.gravityVelocity.length() > SPACE_CONSTANTS.MAX_GRAVITY_SPEED) {
+    spaceFlight.gravityVelocity.setLength(SPACE_CONSTANTS.MAX_GRAVITY_SPEED);
+  }
+
+  if (spaceFlight._gravityVec) spaceFlight._gravityVec.copy(_sfGravitySum);
+  return true;
+}
+
+function getBodyGravityMu(body) {
+  const name = String(body?.name || '').toLowerCase();
+  if (name === 'sun') return 3200;
+  if (name === 'jupiter') return 5600;
+  if (name === 'saturn') return 3900;
+  if (name === 'neptune') return 2500;
+  if (name === 'uranus') return 2300;
+  if (name === 'earth') return 1800;
+  if (name === 'venus') return 1400;
+  if (name === 'mars') return 900;
+  if (name === 'mercury') return 700;
+  if (name === 'moon') return 300;
+  if (body?.landable) return 600;
+  return 0;
+}
+
+function shouldApplyGravityFromBody(body) {
+  if (!body || !body.position) return false;
+  const name = String(body.name || '').toLowerCase();
+  if (name === 'sun') return true;
+  if (body.landable) return true;
+  return (
+    name === 'mercury' ||
+    name === 'venus' ||
+    name === 'mars' ||
+    name === 'jupiter' ||
+    name === 'saturn' ||
+    name === 'uranus' ||
+    name === 'neptune'
+  );
+}
+
+function getLaunchAssistState(rocket) {
+  if (!rocket || !spaceFlight._launchSource) return null;
+  const source = findLandableBodyByName(spaceFlight._launchSource);
+  if (!source || !source.position || !Number.isFinite(source.radius)) return null;
+
+  const elapsedMs = Math.max(0, Date.now() - (spaceFlight.launchStartMs || Date.now()));
+  const dist = rocket.position.distanceTo(source.position);
+  const altitude = Math.max(0, dist - source.radius);
+  const altitudeFactor = Math.max(0, 1 - (altitude / SPACE_CONSTANTS.LAUNCH_ASSIST_ALTITUDE));
+  const timeFactor = Math.max(0, 1 - (elapsedMs / SPACE_CONSTANTS.LAUNCH_ASSIST_WINDOW_MS));
+  const strength = Math.max(altitudeFactor, timeFactor);
+  if (strength <= 0) return null;
+
+  return {
+    source,
+    sourceNameLower: String(source.name || '').toLowerCase(),
+    altitude,
+    elapsedMs,
+    strength
+  };
+}
+
+function applyPlanetaryGravity(rocket, launchAssist, isThrusting) {
+  if (!spaceFlight.gravityVelocity || typeof getAllSpaceBodies !== 'function') return;
+
+  const bodies = getAllSpaceBodies();
+  const nearLandableDist = nearestLandableDistance(rocket, bodies);
+  _sfGravitySum.set(0, 0, 0);
+
+  for (let i = 0; i < bodies.length; i++) {
+    const body = bodies[i];
+    if (!shouldApplyGravityFromBody(body)) continue;
+
+    _sfGravityTmp.copy(body.position).sub(rocket.position);
+    const distSq = _sfGravityTmp.lengthSq();
+    if (distSq < 1) continue;
+
+    const dist = Math.sqrt(distSq);
+    const range = bodyGravityRange(body, nearLandableDist);
+    if (dist > range) continue;
+
+    let accel = computeBodyGravityAccel(body, distSq, nearLandableDist);
+    if (launchAssist && accel > 0) {
+      const bodyName = String(body.name || '').toLowerCase();
+      if (bodyName === 'sun') {
+        accel *= SPACE_CONSTANTS.LAUNCH_SUN_GRAVITY_SCALE;
+      } else if (
+        isThrusting &&
+        launchAssist.sourceNameLower &&
+        bodyName === launchAssist.sourceNameLower
+      ) {
+        const attenuatedScale = 1 - launchAssist.strength * (1 - SPACE_CONSTANTS.LAUNCH_SOURCE_MIN_GRAVITY_SCALE);
+        accel *= Math.max(SPACE_CONSTANTS.LAUNCH_SOURCE_MIN_GRAVITY_SCALE, attenuatedScale);
+      }
+    }
+    if (accel <= 0) continue;
+    _sfGravityTmp.multiplyScalar(1 / dist); // normalize in-place
+    _sfGravitySum.addScaledVector(_sfGravityTmp, accel);
+  }
+
+  if (launchAssist && isThrusting && launchAssist.source?.position) {
+    _sfGravityTmp.copy(rocket.position).sub(launchAssist.source.position);
+    const outLen = _sfGravityTmp.length();
+    if (outLen > 1e-3) {
+      _sfGravityTmp.multiplyScalar(1 / outLen);
+      _sfGravitySum.addScaledVector(_sfGravityTmp, SPACE_CONSTANTS.LAUNCH_ASSIST_ACCEL * launchAssist.strength);
+    }
+  }
+
+  clampTotalGravity(_sfGravitySum);
+  integrateGravityVelocity();
+}
 
 function updateSpaceFlightPhysics() {
   if (spaceFlight.mode !== 'flying') return;
 
   const rocket = spaceFlight.rocket;
   const keys = spaceFlight.keys;
+  const launchAssist = getLaunchAssistState(rocket);
 
   // --- STEERING: Camera-relative ---
   const cam = spaceFlight.camera;
@@ -656,7 +1011,11 @@ function updateSpaceFlightPhysics() {
   // --- THROTTLE ---
   let isThrusting = false;
   if (keys[' ']) {
-    spaceFlight.speed = Math.min(spaceFlight.speed + SPACE_CONSTANTS.BOOST, SPACE_CONSTANTS.MAX_SPEED);
+    const launchBoostMult = launchAssist ? SPACE_CONSTANTS.LAUNCH_BOOST_MULTIPLIER : 1;
+    spaceFlight.speed = Math.min(spaceFlight.speed + (SPACE_CONSTANTS.BOOST * launchBoostMult), SPACE_CONSTANTS.MAX_SPEED);
+    if (launchAssist) {
+      spaceFlight.speed = Math.max(spaceFlight.speed, SPACE_CONSTANTS.LAUNCH_MIN_SPEED);
+    }
     isThrusting = true;
   } else if (keys['shift']) {
     spaceFlight.speed = Math.max(spaceFlight.speed - SPACE_CONSTANTS.BRAKE, 0);
@@ -669,9 +1028,28 @@ function updateSpaceFlightPhysics() {
     }
   }
 
+  // Auto-slow near landable bodies so landing windows are practical at normal cruise speed.
+  const nearBody = spaceFlight._nearestBody;
+  if (nearBody && nearBody.landable && nearBody.position) {
+    const distToBody = rocket.position.distanceTo(nearBody.position);
+    const inSlowZone = distToBody < (SPACE_CONSTANTS.LANDING_DISTANCE + nearBody.radius + 180);
+    if (inSlowZone) {
+      const inLandingZone = distToBody < (SPACE_CONSTANTS.LANDING_DISTANCE + nearBody.radius);
+      const targetSpeed = inLandingZone ? 0.8 : 2.0;
+      if (spaceFlight.speed > targetSpeed) {
+        spaceFlight.speed = Math.max(targetSpeed, spaceFlight.speed - SPACE_CONSTANTS.BRAKE * 1.2);
+      }
+    }
+  }
+
   // --- MOVEMENT ---
+  spaceFlight._isThrusting = isThrusting;
+  applyPlanetaryGravity(rocket, launchAssist, isThrusting);
   _sfForward.set(0, 1, 0).applyQuaternion(rocket.quaternion);
   spaceFlight.velocity.copy(_sfForward).multiplyScalar(spaceFlight.speed);
+  if (spaceFlight.gravityVelocity) {
+    spaceFlight.velocity.add(spaceFlight.gravityVelocity);
+  }
   rocket.position.add(spaceFlight.velocity);
 
   // --- ENGINE EFFECTS ---
@@ -703,6 +1081,7 @@ function updateSpaceFlightPhysics() {
         _sfTempVec.copy(rocket.position).sub(body.position).normalize().multiplyScalar(minDist);
         rocket.position.copy(body.position).add(_sfTempVec);
         spaceFlight.speed = Math.max(spaceFlight.speed * 0.5, SPACE_CONSTANTS.MIN_SPEED);
+        if (spaceFlight.gravityVelocity) spaceFlight.gravityVelocity.multiplyScalar(0.35);
       }
     }
   } else {
@@ -714,6 +1093,7 @@ function updateSpaceFlightPhysics() {
       _sfTempVec.copy(rocket.position).sub(source.position).normalize().multiplyScalar(sourceRadius + 5);
       rocket.position.copy(source.position).add(_sfTempVec);
       spaceFlight.speed = Math.max(spaceFlight.speed * 0.5, SPACE_CONSTANTS.MIN_SPEED);
+      if (spaceFlight.gravityVelocity) spaceFlight.gravityVelocity.multiplyScalar(0.35);
     }
   }
 
@@ -723,6 +1103,7 @@ function updateSpaceFlightPhysics() {
 
 function updateSpaceFlightHUD() {
   const rocket = spaceFlight.rocket;
+  const manualTargetBody = findLandableBodyByName(spaceFlight._manualLandingTarget);
 
   // Find nearest body dynamically
   let nearestBody = null;
@@ -743,65 +1124,74 @@ function updateSpaceFlightHUD() {
   if (!nearestBody) {
     const target = spaceFlight.destination === 'moon' ? spaceFlight.moon : spaceFlight.earth;
     const source = spaceFlight.destination === 'moon' ? spaceFlight.earth : spaceFlight.moon;
-    const altFromSource = rocket.position.distanceTo(source.position);
     const distToTarget = rocket.position.distanceTo(target.position);
     const targetRadius = spaceFlight.destination === 'moon' ? SPACE_CONSTANTS.MOON_SIZE : SPACE_CONSTANTS.EARTH_SIZE;
-
-    document.getElementById('sfDestination').textContent = spaceFlight.destination === 'moon' ? 'Moon' : 'Earth';
-    document.getElementById('sfAltitude').textContent = Math.floor(altFromSource);
-    document.getElementById('sfSpeed').textContent = spaceFlight.speed.toFixed(1);
-    document.getElementById('sfDistance').textContent = Math.floor(distToTarget);
-    return;
+    nearestDist = distToTarget;
+    nearestBody = {
+      name: spaceFlight.destination === 'moon' ? 'Moon' : 'Earth',
+      position: target.position,
+      radius: targetRadius,
+      mesh: target,
+      landable: true
+    };
   }
 
   // Store nearest body for landing system
   spaceFlight._nearestBody = nearestBody;
 
+  let activeHudBody = nearestBody;
+  let activeDist = nearestDist;
+  if (manualTargetBody && manualTargetBody.position) {
+    activeHudBody = manualTargetBody;
+    activeDist = rocket.position.distanceTo(manualTargetBody.position);
+  }
+
   // Update displays
-  document.getElementById('sfDestination').textContent = nearestBody.name;
-  const altitude = Math.max(0, nearestDist - nearestBody.radius);
+  document.getElementById('sfDestination').textContent = activeHudBody.name;
+  const altitude = Math.max(0, activeDist - activeHudBody.radius);
   document.getElementById('sfAltitude').textContent = Math.floor(altitude);
-  document.getElementById('sfSpeed').textContent = spaceFlight.speed.toFixed(1);
-  document.getElementById('sfDistance').textContent = Math.floor(nearestDist);
+  const displaySpeed = spaceFlight.velocity ? spaceFlight.velocity.length() : spaceFlight.speed;
+  document.getElementById('sfSpeed').textContent = displaySpeed.toFixed(1);
+  document.getElementById('sfDistance').textContent = Math.floor(activeDist);
 
   // Landing zone progress
-  const landingProgress = Math.max(0, 1 - (nearestDist - nearestBody.radius) / SPACE_CONSTANTS.LANDING_DISTANCE);
+  const landingProgress = Math.max(0, 1 - (activeDist - activeHudBody.radius) / SPACE_CONSTANTS.LANDING_DISTANCE);
   const landingBar = document.getElementById('sfLandingBar');
   const landingText = document.getElementById('sfLandingText');
   const landBtn = document.getElementById('sfLandBtn');
 
   if (landingBar) landingBar.style.width = (landingProgress * 100) + '%';
 
-  const canLand = nearestDist < SPACE_CONSTANTS.LANDING_DISTANCE + nearestBody.radius;
+  const canLand = activeDist < SPACE_CONSTANTS.LANDING_DISTANCE + activeHudBody.radius;
 
-  if (canLand && nearestBody.landable) {
+  if (canLand && activeHudBody.landable) {
     // Can land on Earth or Moon
     if (landingText) landingText.textContent = 'IN RANGE - Ready to land!';
     if (landBtn) {
       landBtn.disabled = false;
       landBtn.style.opacity = '1';
       landBtn.style.background = '#10b981';
-      landBtn.textContent = 'LAND ON ' + nearestBody.name.toUpperCase();
+      landBtn.textContent = 'LAND ON ' + activeHudBody.name.toUpperCase();
     }
-  } else if (canLand && !nearestBody.landable) {
+  } else if (canLand && !activeHudBody.landable) {
     // Close to a non-landable body (planet flyby)
-    if (landingText) landingText.textContent = 'Orbiting ' + nearestBody.name + ' (flyby)';
+    if (landingText) landingText.textContent = 'Orbiting ' + activeHudBody.name + ' (flyby)';
     if (landingBar) landingBar.style.background = 'linear-gradient(90deg,#fbbf24,#f59e0b)';
     if (landBtn) {
       landBtn.disabled = true;
       landBtn.style.opacity = '0.7';
       landBtn.style.background = '#b45309';
-      landBtn.textContent = 'ORBITING ' + nearestBody.name.toUpperCase();
+      landBtn.textContent = 'ORBITING ' + activeHudBody.name.toUpperCase();
     }
   } else {
     // Far from any body
     if (landingBar) landingBar.style.background = 'linear-gradient(90deg,#10b981,#34d399)';
-    if (landingText) landingText.textContent = 'Nearest: ' + nearestBody.name + ' (' + Math.floor(altitude) + ' km)';
+    if (landingText) landingText.textContent = 'Nearest: ' + activeHudBody.name + ' (' + Math.floor(altitude) + ' km)';
     if (landBtn) {
       landBtn.disabled = true;
       landBtn.style.opacity = '0.5';
       landBtn.style.background = '#667eea';
-      landBtn.textContent = 'FLY TO ' + nearestBody.name.toUpperCase();
+      landBtn.textContent = 'FLY TO ' + activeHudBody.name.toUpperCase();
     }
   }
 }
@@ -878,64 +1268,47 @@ function attemptLanding() {
   let target = null;
   let targetRadius = 0;
   let targetName = '';
+  const forcedTarget = normalizeLandingTargetName(spaceFlight._manualLandingTarget);
 
-  if (typeof getAllSpaceBodies === 'function') {
-    const bodies = getAllSpaceBodies();
-    let nearestDist = Infinity;
-    bodies.forEach(body => {
-      if (!body.landable) return;
-      const dist = spaceFlight.rocket.position.distanceTo(body.position);
-      if (dist < nearestDist) {
-        nearestDist = dist;
-        target = body.mesh;
-        targetRadius = body.radius;
-        targetName = body.name;
-      }
-    });
-
-    if (nearestDist >= SPACE_CONSTANTS.LANDING_DISTANCE + targetRadius) return;
-  } else {
-    // Fallback
-    target = spaceFlight.destination === 'moon' ? spaceFlight.moon : spaceFlight.earth;
-    targetRadius = spaceFlight.destination === 'moon' ? SPACE_CONSTANTS.MOON_SIZE : SPACE_CONSTANTS.EARTH_SIZE;
-    targetName = spaceFlight.destination === 'moon' ? 'Moon' : 'Earth';
-    const dist = spaceFlight.rocket.position.distanceTo(target.position);
-    if (dist >= SPACE_CONSTANTS.LANDING_DISTANCE + targetRadius) return;
-  }
-
-  // Perform landing
-  spaceFlight.mode = 'landing';
-  spaceFlight._landingTarget = targetName;
-  showFlightMessage('LANDING SEQUENCE INITIATED', '#10b981');
-
-  const landingDuration = 2000;
-  const startTime = Date.now();
-  const startPos = spaceFlight.rocket.position.clone();
-  const landPos = target.position.clone();
-  landPos.y += targetRadius + 10;
-
-  // Snapshot target position at start of landing (target is frozen during landing mode)
-  const frozenTargetPos = target.position.clone();
-
-  function landingAnimation() {
-    const elapsed = Date.now() - startTime;
-    const progress = Math.min(elapsed / landingDuration, 1);
-    const eased = 1 - Math.pow(1 - progress, 3);
-
-    spaceFlight.rocket.position.lerpVectors(startPos, landPos, eased);
-    spaceFlight.velocity.multiplyScalar(0.9);
-
-    const toTarget = frozenTargetPos.clone().sub(spaceFlight.rocket.position).normalize();
-    spaceFlight.rocket.quaternion.setFromUnitVectors(new THREE.Vector3(0, -1, 0), toTarget);
-
-    if (progress < 1) {
-      requestAnimationFrame(landingAnimation);
-    } else {
-      completeLanding();
+  if (forcedTarget) {
+    const forcedBody = findLandableBodyByName(forcedTarget);
+    if (forcedBody && forcedBody.mesh && forcedBody.position) {
+      target = forcedBody.mesh;
+      targetRadius = forcedBody.radius;
+      targetName = forcedBody.name;
+      const forcedDist = spaceFlight.rocket.position.distanceTo(forcedBody.position);
+      if (forcedDist >= SPACE_CONSTANTS.LANDING_DISTANCE + targetRadius) return;
     }
   }
 
-  landingAnimation();
+  if (!target) {
+    if (typeof getAllSpaceBodies === 'function') {
+      const bodies = getAllSpaceBodies();
+      let nearestDist = Infinity;
+      bodies.forEach(body => {
+        if (!body.landable) return;
+        const dist = spaceFlight.rocket.position.distanceTo(body.position);
+        if (dist < nearestDist) {
+          nearestDist = dist;
+          target = body.mesh;
+          targetRadius = body.radius;
+          targetName = body.name;
+        }
+      });
+
+      if (!target || nearestDist >= SPACE_CONSTANTS.LANDING_DISTANCE + targetRadius) return;
+    } else {
+      // Fallback
+      target = spaceFlight.destination === 'moon' ? spaceFlight.moon : spaceFlight.earth;
+      targetRadius = spaceFlight.destination === 'moon' ? SPACE_CONSTANTS.MOON_SIZE : SPACE_CONSTANTS.EARTH_SIZE;
+      targetName = spaceFlight.destination === 'moon' ? 'Moon' : 'Earth';
+      const dist = spaceFlight.rocket.position.distanceTo(target.position);
+      if (dist >= SPACE_CONSTANTS.LANDING_DISTANCE + targetRadius) return;
+    }
+  }
+
+  // Perform landing
+  return startLandingSequence(target, targetRadius, targetName, 2000);
 }
 
 function completeLanding() {
@@ -982,6 +1355,13 @@ function exitSpaceFlight() {
 
   showGameUI();
   spaceFlight.keys = {};
+  spaceFlight._manualLandingTarget = null;
+  spaceFlight._autopilotTarget = null;
+  spaceFlight._launchSource = null;
+  spaceFlight.launchStartMs = 0;
+  spaceFlight._isThrusting = false;
+  if (spaceFlight.gravityVelocity) spaceFlight.gravityVelocity.set(0, 0, 0);
+  if (spaceFlight._gravityVec) spaceFlight._gravityVec.set(0, 0, 0);
 }
 
 function showFlightMessage(text, color) {
@@ -1010,6 +1390,22 @@ function initSpaceFlightWhenReady() {
     setTimeout(initSpaceFlightWhenReady, 100);
   }
 }
+
+Object.assign(globalThis, {
+  animateSpaceFlight,
+  forceSpaceFlightLanding,
+  setSpaceFlightLandingTarget,
+  startSpaceFlightToEarth,
+  startSpaceFlightToMoon
+});
+
+export {
+  animateSpaceFlight,
+  forceSpaceFlightLanding,
+  setSpaceFlightLandingTarget,
+  startSpaceFlightToEarth,
+  startSpaceFlightToMoon
+};
 
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initSpaceFlightWhenReady);

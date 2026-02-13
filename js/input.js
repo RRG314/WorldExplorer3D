@@ -2,7 +2,7 @@
 // input.js - Keyboard handling, track recording, city switching
 // ============================================================================
 
-function onKey(code) {
+function onKey(code, event) {
     if (!gameStarted) return;
 
     // Walking mode toggle (F key)
@@ -26,6 +26,11 @@ function onKey(code) {
                 document.getElementById('fWalk').classList.toggle('on', isWalking);
                 document.getElementById('fDriving').classList.toggle('on', !isWalking);
                 document.getElementById('fDrone').classList.remove('on');
+                if (!isWalking) {
+                    droneMode = false;
+                    if (typeof camMode !== 'undefined') camMode = 0;
+                    if (carMesh) carMesh.visible = true;
+                }
             }
         } else {
             console.error('Walk module does not exist!');
@@ -57,11 +62,22 @@ function onKey(code) {
             // Initialize drone position above current position
             const ref = Walk ? Walk.getMapRefPosition(false, null) : { x: car.x, z: car.z };
             drone.x = ref.x;
-            drone.y = 50;
             drone.z = ref.z;
-            drone.pitch = -0.3;
             drone.yaw = car.angle;
             drone.roll = 0;
+
+            // On the moon, raycast to find actual ground height so drone spawns near surface
+            if (onMoon && moonSurface) {
+                const rc = _getPhysRaycaster();
+                _physRayStart.set(ref.x, 2000, ref.z);
+                rc.set(_physRayStart, _physRayDir);
+                const hits = rc.intersectObject(moonSurface, false);
+                drone.y = (hits.length > 0 ? hits[0].point.y : -100) + 10;
+                drone.pitch = -0.2;
+            } else {
+                drone.y = 50;
+                drone.pitch = -0.3;
+            }
         }
 
         // Update all travel mode button states
@@ -89,7 +105,15 @@ function onKey(code) {
         }
     }
 
-    if (code === 'KeyR') toggleTrackRecording();
+    if (code === 'KeyR') {
+        // Shift+R: Toggle Road Debug Mode (terrain conformance visualization)
+        // R: Toggle track recording (default)
+        if (event && event.shiftKey && typeof toggleRoadDebugMode === 'function') {
+            toggleRoadDebugMode();
+        } else {
+            toggleTrackRecording();
+        }
+    }
     if (code === 'KeyN') nextCity();
     if (code === 'KeyM') {
         showLargeMap = !showLargeMap;
@@ -245,60 +269,80 @@ async function searchLocation() {
         // Nominatim handles case-insensitivity automatically
         let searchQuery = query;
 
-        // Use allorigins.win as CORS proxy - reliable and works from file://
-        // Debug log removed
-        const nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(searchQuery)}`;
-        let url = `https://api.allorigins.win/get?url=${encodeURIComponent(nominatimUrl)}`;
-
-        // Debug log removed
         status.textContent = 'Searching...';
         status.style.color = '#6b7280';
 
-        let res = await fetchWithRetry(url);
+        // Try direct Nominatim first (supports CORS)
+        let nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(searchQuery)}`;
 
-        if (!res || !res.ok) {
-            throw new Error(`HTTP ${res?.status || 'unknown'}: ${res?.statusText || 'Request failed'}`);
+        let res;
+        let data;
+
+        try {
+            // Attempt direct fetch (works when served from http/https)
+            res = await fetchWithRetry(nominatimUrl);
+
+            if (!res || !res.ok) {
+                throw new Error(`Direct fetch failed: ${res?.status}`);
+            }
+
+            data = await res.json();
+        } catch (directError) {
+            // If direct fetch fails (likely CORS from file://), use CORS proxy
+            console.log('Direct fetch failed, trying CORS proxy:', directError.message);
+
+            // Use cors.sh proxy as fallback (more reliable than allorigins)
+            const proxyUrl = `https://cors.sh/${nominatimUrl}`;
+
+            res = await fetchWithRetry(proxyUrl);
+
+            if (!res || !res.ok) {
+                throw new Error(`HTTP ${res?.status || 'unknown'}: ${res?.statusText || 'Request failed'}`);
+            }
+
+            data = await res.json();
         }
-
-        let response = await res.json();
-        let data = JSON.parse(response.contents); // allorigins wraps the response
         // Debug log removed
         // Debug log removed
 
         // If no results and it's just a city name, try adding USA
         if (data.length === 0 && !query.includes(',')) {
-            // Debug log removed
             searchQuery = query + ', USA';
-            const retryNominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(searchQuery)}`;
-            url = `https://api.allorigins.win/get?url=${encodeURIComponent(retryNominatimUrl)}`;
-            // Debug log removed
-            res = await fetchWithRetry(url);
+            nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(searchQuery)}`;
 
-            if (!res || !res.ok) {
-                throw new Error(`HTTP ${res?.status || 'unknown'}: ${res?.statusText || 'Request failed'}`);
+            try {
+                res = await fetchWithRetry(nominatimUrl);
+                if (res && res.ok) {
+                    data = await res.json();
+                }
+            } catch (err) {
+                // Try proxy fallback
+                const proxyUrl = `https://cors.sh/${nominatimUrl}`;
+                res = await fetchWithRetry(proxyUrl);
+                if (res && res.ok) {
+                    data = await res.json();
+                }
             }
-
-            response = await res.json();
-            data = JSON.parse(response.contents);
-            // Debug log removed
         }
 
         // If still no results, try one more time with lowercase
         if (data.length === 0) {
-            // Debug log removed
             searchQuery = query.toLowerCase();
-            const retryLowerUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(searchQuery)}`;
-            url = `https://api.allorigins.win/get?url=${encodeURIComponent(retryLowerUrl)}`;
-            // Debug log removed
-            res = await fetchWithRetry(url);
+            nominatimUrl = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(searchQuery)}`;
 
-            if (!res || !res.ok) {
-                throw new Error(`HTTP ${res?.status || 'unknown'}: ${res?.statusText || 'Request failed'}`);
+            try {
+                res = await fetchWithRetry(nominatimUrl);
+                if (res && res.ok) {
+                    data = await res.json();
+                }
+            } catch (err) {
+                // Try proxy fallback
+                const proxyUrl = `https://cors.sh/${nominatimUrl}`;
+                res = await fetchWithRetry(proxyUrl);
+                if (res && res.ok) {
+                    data = await res.json();
+                }
             }
-
-            response = await res.json();
-            data = JSON.parse(response.contents);
-            // Debug log removed
         }
 
         if (!data || data.length === 0) {
@@ -380,15 +424,8 @@ async function searchLocation() {
             await loadRoads();
             // Debug log removed
 
-            // Reset vehicle position
-            car.x = car.z = 0;
-            car.angle = 0;
-            car.speed = car.vx = car.vz = 0;
-
-            if (carMesh) {
-                carMesh.position.set(0, 0, 0);
-                carMesh.rotation.y = 0;
-            }
+            // Keep the vehicle on a valid road spawn after reloading location data.
+            if (typeof spawnOnRoad === 'function') spawnOnRoad();
 
             // Debug log removed
         } else {
@@ -405,3 +442,23 @@ async function searchLocation() {
         status.style.color = '#dc2626';
     }
 }
+
+Object.assign(globalThis, {
+    eraseTrack,
+    nextCity,
+    onKey,
+    rebuildTrackMesh,
+    searchLocation,
+    toggleTrackRecording,
+    updateTrack
+});
+
+export {
+    eraseTrack,
+    nextCity,
+    onKey,
+    rebuildTrackMesh,
+    searchLocation,
+    toggleTrackRecording,
+    updateTrack
+};

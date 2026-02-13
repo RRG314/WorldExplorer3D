@@ -627,7 +627,17 @@ function renderPropertyMarkers() {
 }
 
 function clearPropertyMarkers() {
-  propMarkers.forEach(m => scene.remove(m));
+  propMarkers.forEach(m => {
+    scene.remove(m);
+    if (m.geometry) m.geometry.dispose();
+    if (m.material) {
+      if (Array.isArray(m.material)) {
+        m.material.forEach(mat => mat.dispose());
+      } else {
+        m.material.dispose();
+      }
+    }
+  });
   propMarkers = [];
 }
 
@@ -1103,14 +1113,53 @@ function spawnPolice() {
     }
 }
 
-function clearPolice() { policeMeshes.forEach(m => scene.remove(m)); policeMeshes = []; police = []; }
+function clearPolice() {
+    policeMeshes.forEach(m => {
+        scene.remove(m);
+        if (m.geometry) m.geometry.dispose();
+        if (m.material) {
+            if (Array.isArray(m.material)) {
+                m.material.forEach(mat => mat.dispose());
+            } else {
+                m.material.dispose();
+            }
+        }
+    });
+    policeMeshes = [];
+    police = [];
+}
 
 function pickRoadPt() { if (roads.length === 0) return null; const rd = roads[Math.floor(Math.random() * roads.length)]; return rd.pts[Math.floor(Math.random() * rd.pts.length)]; }
 
 function clearObjectives() {
-    cpMeshes.forEach(m => scene.remove(m)); cpMeshes = []; checkpoints = []; cpCollected = 0;
-    if (destMesh) { scene.remove(destMesh); destMesh = null; }
-    destination = null; trialDone = false;
+    cpMeshes.forEach(m => {
+        scene.remove(m);
+        if (m.geometry) m.geometry.dispose();
+        if (m.material) {
+            if (Array.isArray(m.material)) {
+                m.material.forEach(mat => mat.dispose());
+            } else {
+                m.material.dispose();
+            }
+        }
+    });
+    cpMeshes = [];
+    checkpoints = [];
+    cpCollected = 0;
+    if (destMesh) {
+        scene.remove(destMesh);
+        if (destMesh.geometry) destMesh.geometry.dispose();
+        if (destMesh.material) {
+            if (Array.isArray(destMesh.material)) {
+                destMesh.material.forEach(mat => mat.dispose());
+            } else {
+                destMesh.material.dispose();
+            }
+        }
+        destMesh = null;
+    }
+    destination = null;
+    trialDone = false;
 }
 
 function spawnDest() {
@@ -1180,3 +1229,93 @@ function updateMode(dt) {
 function fmtTime(s) { s = Math.max(0, Math.floor(s)); return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0'); }
 function showResult(title, stats) { document.getElementById('resultTitle').textContent = title; document.getElementById('resultStats').innerHTML = stats; document.getElementById('resultScreen').classList.add('show'); paused = true; }
 function hideResult() { document.getElementById('resultScreen').classList.remove('show'); }
+
+Object.assign(globalThis, {
+  clearNavigation,
+  clearObjectives,
+  clearPolice,
+  clearPropertyMarkers,
+  closeHistoricPanel,
+  closeLegend,
+  closeMapInfo,
+  closeModal,
+  closePropertyPanel,
+  createHistoricCard,
+  createNavigationRoute,
+  createPropertyCard,
+  fmtTime,
+  formatPrice,
+  hideResult,
+  isPOIVisible,
+  navigateToHistoric,
+  navigateToPOI,
+  navigateToProperty,
+  openModalById,
+  pickRoadPt,
+  renderPropertyMarkers,
+  showMapInfo,
+  showResult,
+  spawnCheckpoints,
+  spawnDest,
+  spawnPolice,
+  startMode,
+  toggleAllGameElements,
+  toggleAllLayers,
+  toggleAllPOIs,
+  toggleHistoric,
+  togglePropertyFilters,
+  toggleRealEstate,
+  toggleRoads,
+  updateHistoricPanel,
+  updateMapLayers,
+  updateMode,
+  updateNavigationRoute,
+  updateNearbyPOI,
+  updatePolice,
+  updatePropertyPanel
+});
+
+export {
+  clearNavigation,
+  clearObjectives,
+  clearPolice,
+  clearPropertyMarkers,
+  closeHistoricPanel,
+  closeLegend,
+  closeMapInfo,
+  closeModal,
+  closePropertyPanel,
+  createHistoricCard,
+  createNavigationRoute,
+  createPropertyCard,
+  fmtTime,
+  formatPrice,
+  hideResult,
+  isPOIVisible,
+  navigateToHistoric,
+  navigateToPOI,
+  navigateToProperty,
+  openModalById,
+  pickRoadPt,
+  renderPropertyMarkers,
+  showMapInfo,
+  showResult,
+  spawnCheckpoints,
+  spawnDest,
+  spawnPolice,
+  startMode,
+  toggleAllGameElements,
+  toggleAllLayers,
+  toggleAllPOIs,
+  toggleHistoric,
+  togglePropertyFilters,
+  toggleRealEstate,
+  toggleRoads,
+  updateHistoricPanel,
+  updateMapLayers,
+  updateMode,
+  updateNavigationRoute,
+  updateNearbyPOI,
+  updatePolice,
+  updatePropertyPanel
+};

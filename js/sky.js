@@ -629,6 +629,13 @@ function travelToMoon() {
         scene.remove(cloudGroup);
     }
 
+    // Hide Earth ground plane (grass texture fallback)
+    scene.traverse(obj => {
+        if (obj.userData && obj.userData.isGroundPlane) {
+            obj.visible = false;
+        }
+    });
+
     // Remove all city meshes from scene
     roadMeshes.forEach(m => {
         m.visible = false;
@@ -685,6 +692,26 @@ function arriveAtMoon() {
 
     switchEnv(ENV.MOON); // sets onMoon=true, travelingToMoon=false
 
+    // IMMEDIATELY set black background and hide car to prevent earth ground flash
+    scene.background = new THREE.Color(0x000000);
+    scene.fog = new THREE.FogExp2(0x000000, 0.00005);
+    if (carMesh) carMesh.visible = false;
+    paused = true; // Pause rendering updates until moon is ready
+
+    // Reset to driving mode so everything starts clean at the landing site
+    if (droneMode) {
+        droneMode = false;
+        const droneBtn = document.getElementById('fDrone');
+        if (droneBtn) droneBtn.classList.remove('on');
+    }
+    if (Walk && Walk.state.mode === 'walk') {
+        Walk.setModeDrive();
+    }
+    const drivingBtn = document.getElementById('fDriving');
+    if (drivingBtn) drivingBtn.classList.add('on');
+    const walkBtn = document.getElementById('fWalk');
+    if (walkBtn) walkBtn.classList.remove('on');
+
     // Update space menu button labels
     const directBtn = document.getElementById('fSpaceDirect');
     const rocketBtn = document.getElementById('fSpaceRocket');
@@ -692,6 +719,21 @@ function arriveAtMoon() {
     if (rocketBtn) rocketBtn.textContent = '🌍 Return to Earth';
 
     // Earth terrain already hidden during travel animation
+
+    // Hide ALL earth objects to prevent any flash of earth ground
+    if (terrainGroup) {
+        terrainGroup.visible = false;
+        scene.remove(terrainGroup);
+    }
+    if (cloudGroup) {
+        cloudGroup.visible = false;
+        scene.remove(cloudGroup);
+    }
+    scene.traverse(obj => {
+        if (obj.userData && obj.userData.isGroundPlane) {
+            obj.visible = false;
+        }
+    });
 
     // Hide moon sphere (we're on it now!)
     moonSphere.visible = false;
@@ -701,6 +743,7 @@ function arriveAtMoon() {
     if (!moonSurface) {
         createMoonSurface();
         // Car positioning will happen after moonSurface is fully created
+        // (positionCarOnMoon is called in createMoonSurface's setTimeout)
     } else {
         // Re-add and show all moon objects (safe even if already in scene)
         moonSurface.visible = true;
@@ -713,16 +756,10 @@ function arriveAtMoon() {
         }
         // Position car immediately if moonSurface already exists
         positionCarOnMoon();
+        // Show car and unpause now that moon is ready
+        if (carMesh) carMesh.visible = true;
+        paused = false;
     }
-
-    // Ensure DRIVING MODE (not walking!) on moon
-    if (Walk && Walk.state.mode === 'walk') {
-        Walk.toggleWalk(); // Switch back to driving
-    }
-
-    // Set night sky for moon (no atmosphere = very low fog)
-    scene.background = new THREE.Color(0x000000);
-    scene.fog = new THREE.FogExp2(0x000000, 0.00005);
 
     // Adjust lighting for moon - stronger sun for better shading and shadows
     if (sun) {
@@ -747,9 +784,6 @@ function arriveAtMoon() {
         });
         // Debug log removed
     }
-
-    // Re-enable controls
-    paused = false;
 
     // Show return button
     showReturnToEarthButton();
@@ -904,6 +938,23 @@ function createMoonSurface() {
         createApollo11LandingSite();
         // Position car after both moonSurface and landing site are ready
         positionCarOnMoon();
+        // Now that moon surface and car are positioned, reveal the car and unpause
+        if (carMesh) carMesh.visible = true;
+        // Snap camera to car position immediately to avoid seeing earth ground
+        if (camera) {
+            const camD = 10, camH = 5;
+            camera.position.set(
+                car.x - Math.sin(car.angle) * camD,
+                car.y + camH,
+                car.z - Math.cos(car.angle) * camD
+            );
+            camera.lookAt(car.x, car.y + 0.5, car.z);
+            // Reset the smoothed lookAt target so chase cam doesn't lerp from old position
+            if (camera.userData) {
+                camera.userData.lookTarget = { x: car.x, y: car.y + 0.5, z: car.z };
+            }
+        }
+        paused = false;
     }, 150);
 
     // Debug log removed
@@ -919,6 +970,9 @@ function positionCarOnMoon() {
     car.z = -500;  // Apollo 11 Eagle Crater Z coordinate
     if (typeof invalidateRoadCache === 'function') invalidateRoadCache();
 
+    // Ensure moonSurface world matrix is up-to-date for raycasting
+    moonSurface.updateMatrixWorld(true);
+
     // Find the ACTUAL ground height at spawn position using raycasting
     const spawnRaycaster = new THREE.Raycaster();
     const spawnRayStart = new THREE.Vector3(car.x, 1000, car.z);
@@ -926,13 +980,14 @@ function positionCarOnMoon() {
     spawnRaycaster.set(spawnRayStart, spawnRayDir);
 
     const spawnHits = spawnRaycaster.intersectObject(moonSurface, false);
+    let groundHeight;
     if (spawnHits.length > 0) {
-        const groundHeight = spawnHits[0].point.y;
+        groundHeight = spawnHits[0].point.y;
         car.y = groundHeight + 1.2; // Car height above ground
-        // Debug log removed
     } else {
-        // Fallback if raycast fails
-        car.y = -100 + 2;
+        // Fallback if raycast fails - use moonSurface base position
+        groundHeight = moonSurface.position.y;
+        car.y = groundHeight + 2;
         console.warn('⚠️ Spawn raycast failed, using fallback Y=' + car.y);
     }
 
@@ -941,8 +996,23 @@ function positionCarOnMoon() {
     car.vy = 0; // No initial vertical velocity
     car.angle = 0;
 
-    // Debug log removed
-    // Debug log removed
+    // Also position drone at the landing site with correct height
+    drone.x = car.x;
+    drone.z = car.z;
+    drone.y = groundHeight + 10; // 10m above surface
+    drone.pitch = -0.2;
+    drone.yaw = 0;
+    drone.roll = 0;
+
+    // Reset walker position so it doesn't carry over Earth coordinates
+    if (Walk && Walk.state && Walk.state.walker) {
+        Walk.state.walker.x = car.x;
+        Walk.state.walker.z = car.z;
+        Walk.state.walker.y = groundHeight + 1.7;
+        Walk.state.walker.vy = 0;
+        Walk.state.walker.angle = 0;
+        Walk.state.walker.yaw = 0;
+    }
 }
 
 // Global variable for Apollo 11 landing site flag
@@ -1335,6 +1405,13 @@ function arriveAtEarth() {
         scene.add(cloudGroup);
     }
 
+    // Show Earth ground plane (grass texture fallback)
+    scene.traverse(obj => {
+        if (obj.userData && obj.userData.isGroundPlane) {
+            obj.visible = true;
+        }
+    });
+
     // Re-add all city meshes to scene
     roadMeshes.forEach(m => {
         m.visible = true;
@@ -1345,11 +1422,11 @@ function arriveAtEarth() {
         scene.add(m);
     });
     landuseMeshes.forEach(m => {
-        m.visible = true;
+        m.visible = landUseVisible || !!m.userData?.alwaysVisible;
         scene.add(m);
     });
     poiMeshes.forEach(m => {
-        m.visible = true;
+        m.visible = !!poiMode;
         scene.add(m);
     });
     streetFurnitureMeshes.forEach(m => {
@@ -1419,3 +1496,49 @@ function hideReturnToEarthButton() {
 
 
 // Check if car collides with any building and return collision info
+
+Object.assign(globalThis, {
+    alignStarFieldToLocation,
+    arriveAtEarth,
+    arriveAtMoon,
+    checkMoonClick,
+    checkStarClick,
+    clearStarSelection,
+    createMoonSurface,
+    createStarField,
+    cycleTimeOfDay,
+    directTravelToMoon,
+    hideReturnToEarthButton,
+    highlightConstellation,
+    positionCarOnMoon,
+    returnToEarth,
+    returnToEarthDirect,
+    setTimeOfDay,
+    showApollo11Info,
+    showReturnToEarthButton,
+    showStarInfo,
+    travelToMoon
+});
+
+export {
+    alignStarFieldToLocation,
+    arriveAtEarth,
+    arriveAtMoon,
+    checkMoonClick,
+    checkStarClick,
+    clearStarSelection,
+    createMoonSurface,
+    createStarField,
+    cycleTimeOfDay,
+    directTravelToMoon,
+    hideReturnToEarthButton,
+    highlightConstellation,
+    positionCarOnMoon,
+    returnToEarth,
+    returnToEarthDirect,
+    setTimeOfDay,
+    showApollo11Info,
+    showReturnToEarthButton,
+    showStarInfo,
+    travelToMoon
+};

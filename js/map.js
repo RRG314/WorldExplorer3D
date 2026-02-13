@@ -360,6 +360,71 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
         return { x: mx + px, y: my + py };
     };
 
+    // Draw explicit OSM-derived water overlays (harbors/lakes/rivers/canals)
+    // so water stays readable even where custom vector layers dominate the view.
+    if (waterAreas.length > 0 || waterways.length > 0) {
+        const viewPad = isLarge ? 100 : 45;
+
+        if (waterAreas.length > 0) {
+            ctx.save();
+            ctx.fillStyle = isLarge ? 'rgba(66, 142, 224, 0.30)' : 'rgba(66, 142, 224, 0.24)';
+            ctx.strokeStyle = isLarge ? 'rgba(160, 220, 255, 0.55)' : 'rgba(160, 220, 255, 0.45)';
+            ctx.lineWidth = isLarge ? 1.8 : 1.0;
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+
+            waterAreas.forEach(area => {
+                if (!area?.pts || area.pts.length < 3) return;
+
+                let inView = false;
+                ctx.beginPath();
+                area.pts.forEach((pt, idx) => {
+                    const pos = worldToScreen(pt.x, pt.z);
+                    if (Math.abs(pos.x - mx) < (w / 2 + viewPad) && Math.abs(pos.y - my) < (h / 2 + viewPad)) {
+                        inView = true;
+                    }
+                    if (idx === 0) ctx.moveTo(pos.x, pos.y);
+                    else ctx.lineTo(pos.x, pos.y);
+                });
+                ctx.closePath();
+                if (!inView) return;
+                ctx.fill();
+                ctx.stroke();
+            });
+            ctx.restore();
+        }
+
+        if (waterways.length > 0) {
+            ctx.save();
+            ctx.strokeStyle = isLarge ? 'rgba(70, 160, 240, 0.90)' : 'rgba(70, 160, 240, 0.82)';
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            waterways.forEach(way => {
+                if (!way?.pts || way.pts.length < 2) return;
+
+                let inView = false;
+                const lineWidth = Math.max(
+                    isLarge ? 1.0 : 0.8,
+                    Math.min(isLarge ? 4.8 : 2.8, (way.width || 6) * (isLarge ? 0.20 : 0.12))
+                );
+                ctx.lineWidth = lineWidth;
+                ctx.beginPath();
+                way.pts.forEach((pt, idx) => {
+                    const pos = worldToScreen(pt.x, pt.z);
+                    if (Math.abs(pos.x - mx) < (w / 2 + viewPad) && Math.abs(pos.y - my) < (h / 2 + viewPad)) {
+                        inView = true;
+                    }
+                    if (idx === 0) ctx.moveTo(pos.x, pos.y);
+                    else ctx.lineTo(pos.x, pos.y);
+                });
+                if (!inView) return;
+                ctx.stroke();
+            });
+            ctx.restore();
+        }
+    }
+
     // Draw road overlay (if enabled)
     if (showRoads && roads.length > 0) {
         roads.forEach(road => {
@@ -457,7 +522,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     }
 
     // Draw POIs on minimap
-    if (pois.length > 0) {
+    if (poiMode && pois.length > 0) {
         pois.forEach(poi => {
             // Check if this POI category is visible
             if (!isPOIVisible(poi.type)) return;
@@ -720,3 +785,22 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
 
     ctx.restore();
 }
+
+
+Object.assign(globalThis, {
+    drawLargeMap,
+    drawMapOnCanvas,
+    drawMinimap,
+    latLonToTile,
+    loadTile,
+    worldToScreenLarge
+});
+
+export {
+    drawLargeMap,
+    drawMapOnCanvas,
+    drawMinimap,
+    latLonToTile,
+    loadTile,
+    worldToScreenLarge
+};

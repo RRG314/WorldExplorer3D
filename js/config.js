@@ -31,7 +31,7 @@ const TERRAIN_TILE_URL = (z, x, y) =>
 
 // Terrain settings
 const TERRAIN_ZOOM = 13;           // 12–14 is typical for driving
-const TERRAIN_RING = 1;            // 1 => 3x3 tiles around player
+const TERRAIN_RING = 2;            // 2 => 5x5 tiles around player (reduces visible terrain edge cliffs)
 const TERRAIN_SEGMENTS = 128;       // mesh resolution per tile (128 for accurate road-terrain alignment)
 const TERRAIN_Y_EXAGGERATION = 1.0; // 1.0 = real elevation
 
@@ -100,4 +100,60 @@ const POI_TYPES = {
     'leisure=stadium': { icon: '🏟️', category: 'Sports', color: 0xffc107 },
     'leisure=sports_centre': { icon: '⚽', category: 'Sports', color: 0xff9800 },
     'leisure=playground': { icon: '🎪', category: 'Recreation', color: 0xe91e63 }
+};
+
+function exposeMutableGlobal(name, getter, setter) {
+    Object.defineProperty(globalThis, name, {
+        configurable: true,
+        enumerable: true,
+        get: getter,
+        set: setter
+    });
+}
+
+exposeMutableGlobal('LOC', () => LOC, (v) => { LOC = v; });
+exposeMutableGlobal('customLoc', () => customLoc, (v) => { customLoc = v; });
+exposeMutableGlobal('terrainGroup', () => terrainGroup, (v) => { terrainGroup = v; });
+exposeMutableGlobal('terrainEnabled', () => terrainEnabled, (v) => { terrainEnabled = v; });
+exposeMutableGlobal('roadsNeedRebuild', () => roadsNeedRebuild, (v) => { roadsNeedRebuild = v; });
+exposeMutableGlobal('lastRoadRebuildCheck', () => lastRoadRebuildCheck, (v) => { lastRoadRebuildCheck = v; });
+
+Object.assign(globalThis, {
+    LANDUSE_STYLES,
+    LOCS,
+    METERS_PER_WORLD_UNIT,
+    POI_TYPES,
+    SCALE,
+    TERRAIN_RING,
+    TERRAIN_SEGMENTS,
+    TERRAIN_TILE_URL,
+    TERRAIN_Y_EXAGGERATION,
+    TERRAIN_ZOOM,
+    WORLD_UNITS_PER_METER,
+    geoToWorld,
+    locKeys,
+    terrainTileCache
+});
+
+export {
+    LANDUSE_STYLES,
+    LOC,
+    LOCS,
+    METERS_PER_WORLD_UNIT,
+    POI_TYPES,
+    SCALE,
+    TERRAIN_RING,
+    TERRAIN_SEGMENTS,
+    TERRAIN_TILE_URL,
+    TERRAIN_Y_EXAGGERATION,
+    TERRAIN_ZOOM,
+    WORLD_UNITS_PER_METER,
+    customLoc,
+    geoToWorld,
+    lastRoadRebuildCheck,
+    locKeys,
+    roadsNeedRebuild,
+    terrainEnabled,
+    terrainGroup,
+    terrainTileCache
 };

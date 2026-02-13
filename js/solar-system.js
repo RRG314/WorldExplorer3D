@@ -12,7 +12,7 @@ const SOLAR_SYSTEM_PLANETS = [
   {
     name: 'Mercury', type: 'Terrestrial', color: 0xb0a090, emissive: 0x584c40,
     glowColor: 0xb0a090,
-    radiusScaled: 12, meanDistanceAU: 0.387, meanDistanceKM: 57910000,
+    radiusScaled: 22, meanDistanceAU: 0.387, meanDistanceKM: 57910000,
     description: 'Smallest planet, closest to the Sun. Extreme temperature swings.',
     a0: 0.38710, aRate: 0.00000,
     e0: 0.20563, eRate: 0.00002,
@@ -24,7 +24,7 @@ const SOLAR_SYSTEM_PLANETS = [
   {
     name: 'Venus', type: 'Terrestrial', color: 0xe8c080, emissive: 0x745830,
     glowColor: 0xe8c080,
-    radiusScaled: 20, meanDistanceAU: 0.723, meanDistanceKM: 108200000,
+    radiusScaled: 35, meanDistanceAU: 0.723, meanDistanceKM: 108200000,
     description: 'Hottest planet due to runaway greenhouse effect. Thick toxic atmosphere.',
     a0: 0.72333, aRate: 0.00001,
     e0: 0.00677, eRate: -0.00005,
@@ -36,7 +36,7 @@ const SOLAR_SYSTEM_PLANETS = [
   {
     name: 'Earth', type: 'Terrestrial', color: 0x2255bb, emissive: 0x142a5e,
     glowColor: 0x88ccff,
-    radiusScaled: 20, meanDistanceAU: 1.000, meanDistanceKM: 149600000,
+    radiusScaled: 36, meanDistanceAU: 1.000, meanDistanceKM: 149600000,
     description: 'Our home planet. The only known world with liquid surface water and life.',
     a0: 1.00000, aRate: -0.00001,
     e0: 0.01671, eRate: -0.00004,
@@ -48,7 +48,7 @@ const SOLAR_SYSTEM_PLANETS = [
   {
     name: 'Mars', type: 'Terrestrial', color: 0xcc4422, emissive: 0x662210,
     glowColor: 0xcc4422,
-    radiusScaled: 16, meanDistanceAU: 1.524, meanDistanceKM: 227900000,
+    radiusScaled: 28, meanDistanceAU: 1.524, meanDistanceKM: 227900000,
     description: 'The Red Planet. Has the tallest volcano and deepest canyon in the solar system.',
     a0: 1.52368, aRate: 0.00001,
     e0: 0.09340, eRate: 0.00008,
@@ -60,7 +60,7 @@ const SOLAR_SYSTEM_PLANETS = [
   {
     name: 'Jupiter', type: 'Gas Giant', color: 0xd4a060, emissive: 0x6a5030,
     glowColor: 0xd4a060,
-    radiusScaled: 55, meanDistanceAU: 5.203, meanDistanceKM: 778500000,
+    radiusScaled: 90, meanDistanceAU: 5.203, meanDistanceKM: 778500000,
     description: 'Largest planet. Its Great Red Spot is a storm larger than Earth.',
     a0: 5.20260, aRate: -0.00036,
     e0: 0.04849, eRate: 0.00018,
@@ -72,7 +72,7 @@ const SOLAR_SYSTEM_PLANETS = [
   {
     name: 'Saturn', type: 'Gas Giant', color: 0xe8d090, emissive: 0x746840,
     glowColor: 0xe8d090,
-    radiusScaled: 46, meanDistanceAU: 9.537, meanDistanceKM: 1427000000,
+    radiusScaled: 78, meanDistanceAU: 9.537, meanDistanceKM: 1427000000,
     description: 'Famous for its spectacular ring system. Least dense planet.',
     a0: 9.55491, aRate: -0.00121,
     e0: 0.05551, eRate: -0.00035,
@@ -84,7 +84,7 @@ const SOLAR_SYSTEM_PLANETS = [
   {
     name: 'Uranus', type: 'Ice Giant', color: 0x88ccdd, emissive: 0x446670,
     glowColor: 0x88ccdd,
-    radiusScaled: 32, meanDistanceAU: 19.189, meanDistanceKM: 2871000000,
+    radiusScaled: 55, meanDistanceAU: 19.189, meanDistanceKM: 2871000000,
     description: 'Tilted on its side. Has faint rings and 27 known moons.',
     a0: 19.21845, aRate: -0.00152,
     e0: 0.04630, eRate: -0.00003,
@@ -96,7 +96,7 @@ const SOLAR_SYSTEM_PLANETS = [
   {
     name: 'Neptune', type: 'Ice Giant', color: 0x4466dd, emissive: 0x223370,
     glowColor: 0x4466dd,
-    radiusScaled: 30, meanDistanceAU: 30.070, meanDistanceKM: 4498000000,
+    radiusScaled: 52, meanDistanceAU: 30.070, meanDistanceKM: 4498000000,
     description: 'Farthest planet. Has the strongest winds in the solar system.',
     a0: 30.11039, aRate: 0.00030,
     e0: 0.00899, eRate: 0.00001,
@@ -108,18 +108,20 @@ const SOLAR_SYSTEM_PLANETS = [
 ];
 
 // ---------------------------------------------------------------------------
-// HELIOCENTRIC VISUAL DISTANCES (compressed for gameplay)
-// All distances from the Sun in scene units
+// HELIOCENTRIC VISUAL DISTANCES - Real proportional (AU-based)
+// 1 AU = AU_TO_SCENE scene units. Distances are proportional to real semi-major axes.
 // ---------------------------------------------------------------------------
+const AU_TO_SCENE = 800; // 1 AU = 800 scene units
+
 const HELIO_VISUAL_DIST = {
-  Mercury: 300,
-  Venus: 500,
-  Earth: 800,
-  Mars: 1100,
-  Jupiter: 1700,
-  Saturn: 2300,
-  Uranus: 2900,
-  Neptune: 3500
+  Mercury: SOLAR_SYSTEM_PLANETS[0].a0 * AU_TO_SCENE,  // 0.387 AU = ~310
+  Venus:   SOLAR_SYSTEM_PLANETS[1].a0 * AU_TO_SCENE,  // 0.723 AU = ~579
+  Earth:   SOLAR_SYSTEM_PLANETS[2].a0 * AU_TO_SCENE,  // 1.000 AU = 800
+  Mars:    SOLAR_SYSTEM_PLANETS[3].a0 * AU_TO_SCENE,  // 1.524 AU = ~1219
+  Jupiter: SOLAR_SYSTEM_PLANETS[4].a0 * AU_TO_SCENE,  // 5.203 AU = ~4162
+  Saturn:  SOLAR_SYSTEM_PLANETS[5].a0 * AU_TO_SCENE,  // 9.537 AU = ~7630
+  Uranus:  SOLAR_SYSTEM_PLANETS[6].a0 * AU_TO_SCENE,  // 19.189 AU = ~15351
+  Neptune: SOLAR_SYSTEM_PLANETS[7].a0 * AU_TO_SCENE   // 30.070 AU = ~24056
 };
 
 const MOON_ORBIT_RADIUS = 120; // Moon's visual orbit radius around Earth
@@ -155,6 +157,106 @@ const PLANET_MOONS = {
 };
 
 // ---------------------------------------------------------------------------
+// ASTEROID BELT DATA
+// Main belt between Mars and Jupiter (2.2 - 3.2 AU)
+// Kirkwood gaps at Jupiter orbital resonances
+// ---------------------------------------------------------------------------
+const ASTEROID_BELT = {
+  innerAU: 2.06,    // inner edge
+  outerAU: 3.27,    // outer edge
+  centerAU: 2.7,    // belt center
+  count: 3000,       // number of particle asteroids
+  maxInclination: 20, // degrees - most belt asteroids
+  maxEccentricity: 0.3,
+  // Kirkwood gaps (orbital resonances with Jupiter)
+  kirkwoodGaps: [
+    { au: 2.502, width: 0.04 }, // 3:1 resonance
+    { au: 2.825, width: 0.03 }, // 5:2 resonance
+    { au: 2.958, width: 0.02 }, // 7:3 resonance
+    { au: 3.279, width: 0.03 }  // 2:1 resonance
+  ]
+};
+
+// Named large asteroids with real orbital elements
+const NAMED_ASTEROIDS = [
+  {
+    name: 'Ceres', type: 'Dwarf Planet', radiusScaled: 10,
+    color: 0xc4b8a8, emissive: 0x625c54, glowColor: 0xc4b8a8,
+    description: 'Largest object in the asteroid belt. Classified as a dwarf planet with a thin water-ice mantle.',
+    a0: 2.7675, e0: 0.0758, I0: 10.59, L0: 60.0, LP0: 73.6, LN0: 80.3,
+    meanDistanceAU: 2.768, meanDistanceKM: 413900000
+  },
+  {
+    name: 'Vesta', type: 'Asteroid', radiusScaled: 7,
+    color: 0xd4c8b0, emissive: 0x6a6458, glowColor: 0xd4c8b0,
+    description: 'Second-largest asteroid. Has a giant impact crater at its south pole.',
+    a0: 2.3615, e0: 0.0887, I0: 7.14, L0: 150.0, LP0: 149.8, LN0: 103.8,
+    meanDistanceAU: 2.362, meanDistanceKM: 353200000
+  },
+  {
+    name: 'Pallas', type: 'Asteroid', radiusScaled: 6,
+    color: 0xb8b0a0, emissive: 0x5c5850, glowColor: 0xb8b0a0,
+    description: 'Third-largest asteroid. Highly tilted orbit makes it difficult to visit.',
+    a0: 2.7724, e0: 0.2313, I0: 34.84, L0: 310.0, LP0: 310.1, LN0: 173.1,
+    meanDistanceAU: 2.773, meanDistanceKM: 414700000
+  },
+  {
+    name: 'Hygiea', type: 'Asteroid', radiusScaled: 5,
+    color: 0xa09888, emissive: 0x504c44, glowColor: 0xa09888,
+    description: 'Fourth-largest asteroid. Nearly spherical, potentially a dwarf planet.',
+    a0: 3.1421, e0: 0.1146, I0: 3.84, L0: 225.0, LP0: 312.3, LN0: 283.2,
+    meanDistanceAU: 3.142, meanDistanceKM: 470000000
+  }
+];
+
+// ---------------------------------------------------------------------------
+// SPACECRAFT DATA - Real human-made objects in space
+// ---------------------------------------------------------------------------
+const SPACECRAFT = [
+  {
+    name: 'ISS', type: 'Space Station',
+    orbit: 'Earth', orbitRadius: 75, orbitPeriodDays: 0.063, orbitInclination: 51.6,
+    color: 0xffffff, emissive: 0x333333, size: 5,
+    description: 'International Space Station. Continuously crewed since 2000, orbiting at ~408 km altitude at 7.66 km/s.',
+    realDistanceKM: 408, phaseOffset: 0
+  },
+  {
+    name: 'Hubble', type: 'Space Telescope',
+    orbit: 'Earth', orbitRadius: 82, orbitPeriodDays: 0.066, orbitInclination: 28.5,
+    color: 0xccccdd, emissive: 0x333344, size: 4,
+    description: 'Hubble Space Telescope. Launched 1990, orbits at 547 km. Has observed galaxies 13.4 billion light-years away.',
+    realDistanceKM: 547, phaseOffset: Math.PI * 0.7
+  },
+  {
+    name: 'JWST', type: 'Space Telescope',
+    orbit: 'L2', orbitOffset: 120,
+    color: 0xddaa44, emissive: 0x665520, size: 5,
+    description: 'James Webb Space Telescope. At Sun-Earth L2 point, 1.5 million km from Earth. Observes in infrared with a 6.5m gold mirror.',
+    realDistanceKM: 1500000, phaseOffset: 0
+  },
+  {
+    name: 'Voyager 1', type: 'Deep Space Probe',
+    orbit: 'heliocentric',
+    directionRA: 257.5, directionDec: 12.0,
+    realDistanceAU: 163,
+    visualDistanceAU: 48,
+    color: 0xddddcc, emissive: 0x444433, size: 4,
+    description: 'Voyager 1. Launched 1977, now ~163 AU from Sun in interstellar space. Carries the Golden Record.',
+    realDistanceKM: 24400000000, phaseOffset: 0
+  },
+  {
+    name: 'Voyager 2', type: 'Deep Space Probe',
+    orbit: 'heliocentric',
+    directionRA: 296.0, directionDec: -57.0,
+    realDistanceAU: 137,
+    visualDistanceAU: 42,
+    color: 0xddddcc, emissive: 0x444433, size: 4,
+    description: 'Voyager 2. Launched 1977, now ~137 AU from Sun. Only spacecraft to visit Uranus and Neptune.',
+    realDistanceKM: 20500000000, phaseOffset: 0
+  }
+];
+
+// ---------------------------------------------------------------------------
 // SOLAR SYSTEM STATE
 // ---------------------------------------------------------------------------
 const solarSystem = {
@@ -164,12 +266,17 @@ const solarSystem = {
   planetMeshes: [],     // { mesh, hitbox, label, planet, realPosition }
   moonMeshes: [],       // { mesh, planetMesh, orbitRadius, orbitDays, phaseOffset }
   orbitLines: [],
+  asteroidBelt: null,   // THREE.Points particle system for belt
+  asteroidMeshes: [],   // named large asteroids { mesh, hitbox, asteroid, realPosition }
+  spacecraftMeshes: [], // spacecraft { mesh, hitbox, spacecraft, orbitData }
+  orbitMarkers: [],     // glowing markers showing current planet position on orbit
+  orbitsVisible: true,  // toggle for active orbit display
   infoPanel: null,
   selectedPlanet: null,
   raycaster: null,
   mouse: null,
   MOON_TIME_SCALE: 8,   // Speed up moon orbits for visual effect
-  SUN_SIZE: 80,
+  SUN_SIZE: 100,        // Scaled up for visibility at proportional distances
   PROXIMITY_DIST: 200,  // distance to trigger proximity HUD
   _earthVisualPos: null, // cached Earth visual position for space.js
   initialized: false
@@ -348,8 +455,8 @@ function initSolarSystem(spaceScene) {
   });
   solarSystem.sunMesh.add(new THREE.Mesh(glow2Geo, glow2Mat));
 
-  // Sun point light
-  const sunLight = new THREE.PointLight(0xfff8e0, 0.6, 8000);
+  // Sun point light - range covers full proportional solar system + deep space
+  const sunLight = new THREE.PointLight(0xfff8e0, 0.8, 50000);
   solarSystem.sunMesh.add(sunLight);
 
   // Sun label
@@ -427,6 +534,7 @@ function initSolarSystem(spaceScene) {
   // ORBIT PATH LINES - Real elliptical paths computed from Keplerian elements
   // ---------------------------------------------------------------------------
   solarSystem.orbitLines = [];
+  solarSystem.orbitMarkers = [];
   SOLAR_SYSTEM_PLANETS.forEach(planet => {
     const visualDist = HELIO_VISUAL_DIST[planet.name];
     if (!visualDist) return;
@@ -441,13 +549,39 @@ function initSolarSystem(spaceScene) {
     const orbitMat = new THREE.LineBasicMaterial({
       color: planet.color,
       transparent: true,
-      opacity: 0.25,
+      opacity: 0.4,
       linewidth: 1
     });
     const orbitLine = new THREE.LineLoop(orbitGeo, orbitMat);
     orbitLine.name = planet.name + '_orbit';
     solarSystem.group.add(orbitLine);
     solarSystem.orbitLines.push(orbitLine);
+
+    // Active orbit marker - glowing sphere that shows current position on orbit
+    const markerSize = Math.max(planet.radiusScaled * 0.25, 5);
+    const markerGeo = new THREE.SphereGeometry(markerSize, 12, 12);
+    const markerMat = new THREE.MeshBasicMaterial({
+      color: planet.color,
+      transparent: true,
+      opacity: 0.9
+    });
+    const marker = new THREE.Mesh(markerGeo, markerMat);
+    marker.name = planet.name + '_orbitMarker';
+
+    // Outer pulse glow ring
+    const pulseGeo = new THREE.SphereGeometry(markerSize * 3, 10, 10);
+    const pulseMat = new THREE.MeshBasicMaterial({
+      color: planet.color,
+      transparent: true,
+      opacity: 0.2,
+      side: THREE.BackSide
+    });
+    const pulse = new THREE.Mesh(pulseGeo, pulseMat);
+    pulse.name = 'pulse';
+    marker.add(pulse);
+
+    solarSystem.group.add(marker);
+    solarSystem.orbitMarkers.push({ mesh: marker, planet });
   });
 
   // ---------------------------------------------------------------------------
@@ -455,10 +589,28 @@ function initSolarSystem(spaceScene) {
   // ---------------------------------------------------------------------------
   createMoonSystems();
 
+  // ---------------------------------------------------------------------------
+  // ASTEROID BELT - Particle system between Mars and Jupiter
+  // ---------------------------------------------------------------------------
+  createAsteroidBelt();
+
+  // ---------------------------------------------------------------------------
+  // SPACECRAFT - ISS, Hubble, JWST, Voyager 1 & 2
+  // ---------------------------------------------------------------------------
+  createSpacecraft();
+
   // Position all objects based on current date
   updateSolarSystemPositions(now);
 
   spaceScene.add(solarSystem.group);
+
+  // Add Earth-orbiting and L2 spacecraft to the scene (not the group)
+  // These need to track Earth's position, which is a direct scene child
+  solarSystem.spacecraftMeshes.forEach(entry => {
+    if (entry.orbitData.type === 'earthOrbit' || entry.orbitData.type === 'L2') {
+      spaceScene.add(entry.mesh);
+    }
+  });
 
   // Create info panel
   createInfoPanel();
@@ -474,7 +626,10 @@ function initSolarSystem(spaceScene) {
   solarSystem.initialized = true;
   console.log('[SolarSystem] Heliocentric model initialized with',
     solarSystem.planetMeshes.length, 'planets +',
-    solarSystem.moonMeshes.length, 'moons + Sun');
+    solarSystem.moonMeshes.length, 'moons +',
+    solarSystem.asteroidMeshes.length, 'named asteroids +',
+    ASTEROID_BELT.count, 'belt particles +',
+    solarSystem.spacecraftMeshes.length, 'spacecraft + Sun');
 }
 
 // ---------------------------------------------------------------------------
@@ -521,6 +676,502 @@ function createMoonSystems() {
         phaseOffset: index * (Math.PI * 0.8)
       });
     });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// ASTEROID BELT - Particle system + named large asteroids
+// ---------------------------------------------------------------------------
+function createAsteroidBelt() {
+  const belt = ASTEROID_BELT;
+  const positions = [];
+  const colors = [];
+  const sizes = [];
+
+  // Seeded random for reproducible belt
+  let seed = 42;
+  function seededRandom() {
+    seed = (seed * 16807 + 0) % 2147483647;
+    return (seed - 1) / 2147483646;
+  }
+
+  // Check if a semi-major axis falls in a Kirkwood gap
+  function isInKirkwoodGap(a) {
+    for (let i = 0; i < belt.kirkwoodGaps.length; i++) {
+      const gap = belt.kirkwoodGaps[i];
+      if (Math.abs(a - gap.au) < gap.width) return true;
+    }
+    return false;
+  }
+
+  for (let i = 0; i < belt.count; i++) {
+    // Random semi-major axis, rejecting Kirkwood gaps
+    let a;
+    do {
+      a = belt.innerAU + seededRandom() * (belt.outerAU - belt.innerAU);
+    } while (isInKirkwoodGap(a));
+
+    // Orbital elements with realistic distributions
+    const e = seededRandom() * belt.maxEccentricity * seededRandom(); // bias toward lower e
+    const I = (seededRandom() - 0.5) * 2 * belt.maxInclination * seededRandom();
+    const LN = seededRandom() * 360;
+    const w = seededRandom() * 360;
+    const M = seededRandom() * 360;
+
+    // Compute position using real orbital mechanics
+    const pos = computeOrbitalPosition(a, e, I, w, LN, M);
+
+    // Convert to scene coordinates (same as helioToScene with AU_TO_SCENE)
+    const x = pos.x * AU_TO_SCENE;
+    const y = pos.z * AU_TO_SCENE * 0.3; // flatten vertical
+    const z = pos.y * AU_TO_SCENE;       // swap y/z for Three.js
+
+    positions.push(x, y, z);
+
+    // Color variation (grays and browns)
+    const brightness = 0.4 + seededRandom() * 0.5;
+    const warmth = seededRandom() * 0.15;
+    colors.push(brightness + warmth, brightness, brightness - warmth * 0.5);
+
+    // Size variation (most are small, a few larger)
+    const sizeRoll = seededRandom();
+    sizes.push(sizeRoll < 0.9 ? 2.5 + seededRandom() * 3 : 5 + seededRandom() * 5);
+  }
+
+  const beltGeo = new THREE.BufferGeometry();
+  beltGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  beltGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  beltGeo.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+
+  const beltMat = new THREE.PointsMaterial({
+    size: 4.5,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.75,
+    sizeAttenuation: true
+  });
+
+  solarSystem.asteroidBelt = new THREE.Points(beltGeo, beltMat);
+  solarSystem.asteroidBelt.name = 'asteroidBelt';
+  solarSystem.group.add(solarSystem.asteroidBelt);
+
+  // --- Asteroid belt boundary rings (inner and outer edge) ---
+  createBeltBoundaryRing(belt.innerAU, 0x665544, 'beltInnerEdge');
+  createBeltBoundaryRing(belt.outerAU, 0x665544, 'beltOuterEdge');
+
+  // --- Named large asteroids as meshes ---
+  createNamedAsteroids();
+}
+
+function createBeltBoundaryRing(radiusAU, color, name) {
+  const radius = radiusAU * AU_TO_SCENE;
+  const points = [];
+  const segments = 128;
+  for (let i = 0; i <= segments; i++) {
+    const angle = (i / segments) * Math.PI * 2;
+    points.push(new THREE.Vector3(
+      Math.cos(angle) * radius,
+      0,
+      Math.sin(angle) * radius
+    ));
+  }
+  const geo = new THREE.BufferGeometry().setFromPoints(points);
+  const mat = new THREE.LineBasicMaterial({
+    color: color,
+    transparent: true,
+    opacity: 0.12,
+    linewidth: 1
+  });
+  const ring = new THREE.LineLoop(geo, mat);
+  ring.name = name;
+  solarSystem.group.add(ring);
+}
+
+function createNamedAsteroids() {
+  solarSystem.asteroidMeshes = [];
+  const now = new Date();
+  const earthPos = getEarthHelioPos(now);
+
+  NAMED_ASTEROIDS.forEach((asteroid, i) => {
+    // Irregular shape: slightly deformed sphere
+    const geo = new THREE.SphereGeometry(asteroid.radiusScaled, 10, 8);
+    // Deform vertices for rocky appearance
+    const posArr = geo.attributes.position.array;
+    for (let v = 0; v < posArr.length; v += 3) {
+      const deform = 0.8 + Math.sin(v * 3.7) * 0.15 + Math.cos(v * 2.3) * 0.1;
+      posArr[v] *= deform;
+      posArr[v + 1] *= deform;
+      posArr[v + 2] *= deform;
+    }
+    geo.computeVertexNormals();
+
+    const mat = new THREE.MeshPhongMaterial({
+      color: asteroid.color,
+      emissive: asteroid.emissive,
+      shininess: 10,
+      flatShading: true
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.name = asteroid.name;
+    mesh.userData = { isAsteroid: true, asteroidIndex: i };
+
+    // Glow halo
+    const glowGeo = new THREE.SphereGeometry(asteroid.radiusScaled * 1.3, 12, 12);
+    const glowMat = new THREE.MeshBasicMaterial({
+      color: asteroid.glowColor,
+      transparent: true,
+      opacity: 0.1,
+      side: THREE.BackSide
+    });
+    mesh.add(new THREE.Mesh(glowGeo, glowMat));
+
+    // Hitbox for clicking
+    const hitRadius = Math.max(asteroid.radiusScaled * 4, 40);
+    const hitGeo = new THREE.SphereGeometry(hitRadius, 6, 6);
+    const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+    const hitbox = new THREE.Mesh(hitGeo, hitMat);
+    hitbox.userData = { isAsteroid: true, asteroidIndex: i };
+    mesh.add(hitbox);
+
+    // Label
+    createLabel(asteroid.name, mesh, asteroid.radiusScaled);
+
+    // Compute position from orbital elements
+    const T = dateToJulianCenturies(now);
+    const a = asteroid.a0;
+    const e = asteroid.e0;
+    const I_val = asteroid.I0;
+    const LP = asteroid.LP0;
+    const LN = asteroid.LN0;
+    const w = LP - LN;
+    const L = asteroid.L0;
+    const M = normalizeAngle(L - LP);
+    const realPos = computeOrbitalPosition(a, e, I_val, w, LN, M);
+
+    const visualDist = a * AU_TO_SCENE;
+    const scenePos = helioToScene(realPos, visualDist, a);
+    mesh.position.set(scenePos.x, scenePos.y, scenePos.z);
+
+    solarSystem.group.add(mesh);
+
+    const distFromEarth = distanceAU(realPos, earthPos);
+    solarSystem.asteroidMeshes.push({
+      mesh,
+      hitbox,
+      asteroid,
+      realPosition: realPos,
+      distFromEarthAU: distFromEarth
+    });
+  });
+}
+
+// ---------------------------------------------------------------------------
+// SPACECRAFT - Real human-made objects in space
+// ---------------------------------------------------------------------------
+function createSpacecraft() {
+  solarSystem.spacecraftMeshes = [];
+
+  SPACECRAFT.forEach((craft, i) => {
+    let meshGroup;
+
+    // Build distinctive mesh for each spacecraft type
+    if (craft.name === 'ISS') {
+      meshGroup = buildISSMesh(craft);
+    } else if (craft.name === 'Hubble') {
+      meshGroup = buildHubbleMesh(craft);
+    } else if (craft.name === 'JWST') {
+      meshGroup = buildJWSTMesh(craft);
+    } else {
+      meshGroup = buildVoyagerMesh(craft);
+    }
+
+    meshGroup.name = craft.name;
+    meshGroup.userData = { isSpacecraft: true, spacecraftIndex: i };
+
+    // Hitbox for clicking
+    const hitRadius = Math.max(craft.size * 6, 30);
+    const hitGeo = new THREE.SphereGeometry(hitRadius, 6, 6);
+    const hitMat = new THREE.MeshBasicMaterial({ visible: false });
+    const hitbox = new THREE.Mesh(hitGeo, hitMat);
+    hitbox.userData = { isSpacecraft: true, spacecraftIndex: i };
+    meshGroup.add(hitbox);
+
+    // Label
+    createLabel(craft.name, meshGroup, craft.size * 2);
+
+    // Position based on orbit type
+    const orbitData = {};
+    if (craft.orbit === 'Earth') {
+      // Earth-orbiting: add to scene (not group), will track Earth position
+      orbitData.type = 'earthOrbit';
+      orbitData.radius = craft.orbitRadius;
+      orbitData.periodDays = craft.orbitPeriodDays;
+      orbitData.inclination = craft.orbitInclination * _SS_DEG2RAD;
+      orbitData.phase = craft.phaseOffset;
+      // Start at Earth's position (will be updated per frame)
+      meshGroup.position.set(0, 0, 0);
+    } else if (craft.orbit === 'L2') {
+      // L2 point: positioned relative to Earth, away from Sun
+      orbitData.type = 'L2';
+      orbitData.offset = craft.orbitOffset;
+      meshGroup.position.set(0, 0, 0);
+    } else if (craft.orbit === 'heliocentric') {
+      // Deep space: fixed position based on RA/Dec direction
+      orbitData.type = 'deepSpace';
+      const ra = craft.directionRA * _SS_DEG2RAD;
+      const dec = craft.directionDec * _SS_DEG2RAD;
+      const dist = craft.visualDistanceAU * AU_TO_SCENE;
+      const x = dist * Math.cos(dec) * Math.cos(ra);
+      const z = dist * Math.cos(dec) * Math.sin(ra);
+      const y = dist * Math.sin(dec) * 0.3; // flatten vertical like planets
+      meshGroup.position.set(x, y, z);
+      solarSystem.group.add(meshGroup);
+    }
+
+    solarSystem.spacecraftMeshes.push({
+      mesh: meshGroup,
+      hitbox,
+      spacecraft: craft,
+      orbitData
+    });
+  });
+}
+
+// --- ISS: Cross-shaped station with solar arrays ---
+function buildISSMesh(craft) {
+  const group = new THREE.Group();
+  const bodyMat = new THREE.MeshPhongMaterial({
+    color: craft.color, emissive: craft.emissive, shininess: 60
+  });
+  const panelMat = new THREE.MeshPhongMaterial({
+    color: 0x223388, emissive: 0x111844, shininess: 40, side: THREE.DoubleSide
+  });
+
+  // Central module (pressurized modules)
+  const body = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1, 6), bodyMat);
+  group.add(body);
+
+  // Truss (horizontal beam)
+  const truss = new THREE.Mesh(new THREE.BoxGeometry(12, 0.3, 0.3), bodyMat);
+  group.add(truss);
+
+  // 4 solar panel arrays
+  for (let side = -1; side <= 1; side += 2) {
+    for (let pair = -1; pair <= 1; pair += 2) {
+      const panel = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.05, 4), panelMat);
+      panel.position.set(side * 4.5, 0, pair * 1.2);
+      group.add(panel);
+    }
+  }
+
+  // Glow for visibility at distance
+  const glowGeo = new THREE.SphereGeometry(craft.size * 2, 10, 10);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: 0xffffee, transparent: true, opacity: 0.12, side: THREE.BackSide
+  });
+  group.add(new THREE.Mesh(glowGeo, glowMat));
+
+  group.scale.setScalar(craft.size / 3);
+  return group;
+}
+
+// --- Hubble: Cylinder body with solar wing panels ---
+function buildHubbleMesh(craft) {
+  const group = new THREE.Group();
+  const bodyMat = new THREE.MeshPhongMaterial({
+    color: craft.color, emissive: craft.emissive, shininess: 50
+  });
+  const panelMat = new THREE.MeshPhongMaterial({
+    color: 0x223366, emissive: 0x111833, shininess: 30, side: THREE.DoubleSide
+  });
+
+  // Cylindrical body
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 5, 12), bodyMat);
+  body.rotation.z = Math.PI / 2;
+  group.add(body);
+
+  // Aperture door
+  const door = new THREE.Mesh(new THREE.CircleGeometry(0.8, 12), bodyMat);
+  door.position.x = 2.5;
+  door.rotation.y = Math.PI / 2;
+  group.add(door);
+
+  // Two solar panels
+  for (let side = -1; side <= 1; side += 2) {
+    const panel = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 5), panelMat);
+    panel.position.set(0, side * 1.8, 0);
+    group.add(panel);
+  }
+
+  // Glow
+  const glowGeo = new THREE.SphereGeometry(craft.size * 2, 10, 10);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: 0xccccff, transparent: true, opacity: 0.12, side: THREE.BackSide
+  });
+  group.add(new THREE.Mesh(glowGeo, glowMat));
+
+  group.scale.setScalar(craft.size / 2.5);
+  return group;
+}
+
+// --- JWST: Gold hexagonal sunshield + telescope ---
+function buildJWSTMesh(craft) {
+  const group = new THREE.Group();
+
+  // Sunshield - hexagonal shape (gold)
+  const shieldShape = new THREE.Shape();
+  const hexR = 3;
+  for (let i = 0; i < 6; i++) {
+    const angle = (i / 6) * Math.PI * 2 - Math.PI / 6;
+    const x = Math.cos(angle) * hexR;
+    const y = Math.sin(angle) * hexR;
+    if (i === 0) shieldShape.moveTo(x, y);
+    else shieldShape.lineTo(x, y);
+  }
+  shieldShape.closePath();
+
+  const shieldGeo = new THREE.ShapeGeometry(shieldShape);
+  const shieldMat = new THREE.MeshPhongMaterial({
+    color: 0xddaa22, emissive: 0x665510, shininess: 80, side: THREE.DoubleSide
+  });
+  const shield = new THREE.Mesh(shieldGeo, shieldMat);
+  shield.rotation.x = -Math.PI / 2;
+  group.add(shield);
+
+  // Telescope mirror (smaller hexagon on top)
+  const mirrorGeo = new THREE.CircleGeometry(1.2, 6);
+  const mirrorMat = new THREE.MeshPhongMaterial({
+    color: 0xeecc44, emissive: 0x776622, shininess: 100, side: THREE.DoubleSide
+  });
+  const mirror = new THREE.Mesh(mirrorGeo, mirrorMat);
+  mirror.position.y = 1.5;
+  mirror.rotation.x = -Math.PI / 2;
+  group.add(mirror);
+
+  // Support struts
+  const strutMat = new THREE.MeshBasicMaterial({ color: 0x888888 });
+  for (let i = 0; i < 3; i++) {
+    const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 4), strutMat);
+    const angle = (i / 3) * Math.PI * 2;
+    strut.position.set(Math.cos(angle) * 0.8, 0.75, Math.sin(angle) * 0.8);
+    group.add(strut);
+  }
+
+  // Glow (gold)
+  const glowGeo = new THREE.SphereGeometry(craft.size * 2.5, 10, 10);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: 0xddaa44, transparent: true, opacity: 0.15, side: THREE.BackSide
+  });
+  group.add(new THREE.Mesh(glowGeo, glowMat));
+
+  group.scale.setScalar(craft.size / 3);
+  return group;
+}
+
+// --- Voyager: High-gain antenna dish + instrument boom ---
+function buildVoyagerMesh(craft) {
+  const group = new THREE.Group();
+  const bodyMat = new THREE.MeshPhongMaterial({
+    color: craft.color, emissive: craft.emissive, shininess: 30
+  });
+
+  // High-gain antenna dish
+  const dishGeo = new THREE.ConeGeometry(2, 0.8, 16, 1, true);
+  const dish = new THREE.Mesh(dishGeo, bodyMat);
+  dish.rotation.x = Math.PI;
+  group.add(dish);
+
+  // Antenna feed (small cylinder at dish center)
+  const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.2, 6), bodyMat);
+  feed.position.y = 0.6;
+  group.add(feed);
+
+  // Bus body (small box beneath dish)
+  const bus = new THREE.Mesh(new THREE.BoxGeometry(1, 0.8, 1), bodyMat);
+  bus.position.y = -0.8;
+  group.add(bus);
+
+  // Instrument boom (long arm)
+  const boomMat = new THREE.MeshBasicMaterial({ color: 0xaaaaaa });
+  const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 5, 4), boomMat);
+  boom.position.set(2.5, -0.5, 0);
+  boom.rotation.z = Math.PI / 2;
+  group.add(boom);
+
+  // RTG power source (cylinder at end of boom)
+  const rtg = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1, 6), bodyMat);
+  rtg.position.set(5, -0.5, 0);
+  rtg.rotation.z = Math.PI / 2;
+  group.add(rtg);
+
+  // Glow for distant visibility
+  const glowGeo = new THREE.SphereGeometry(craft.size * 3, 10, 10);
+  const glowMat = new THREE.MeshBasicMaterial({
+    color: 0xffffcc, transparent: true, opacity: 0.15, side: THREE.BackSide
+  });
+  group.add(new THREE.Mesh(glowGeo, glowMat));
+
+  group.scale.setScalar(craft.size / 2);
+  return group;
+}
+
+// --- Update spacecraft positions each frame ---
+function updateSpacecraftPositions() {
+  if (!solarSystem.spacecraftMeshes.length) return;
+
+  const elapsedDays = Date.now() / 86400000;
+
+  // Get Earth's scene position (Earth is a direct scene child, not in the group)
+  let earthPos = null;
+  if (window.spaceFlight && spaceFlight.earth) {
+    earthPos = spaceFlight.earth.position;
+  }
+
+  // Get Sun's position for L2 calculation (anti-Sun direction from Earth)
+  const sunWorldPos = solarSystem.group ? solarSystem.group.position : new THREE.Vector3(0, 0, 0);
+
+  solarSystem.spacecraftMeshes.forEach(entry => {
+    const od = entry.orbitData;
+
+    if (od.type === 'earthOrbit' && earthPos) {
+      // Orbit around Earth
+      const angularSpeed = (Math.PI * 2) / od.periodDays;
+      const theta = od.phase + elapsedDays * angularSpeed * solarSystem.MOON_TIME_SCALE;
+      const cosInc = Math.cos(od.inclination);
+      const sinInc = Math.sin(od.inclination);
+
+      const localX = Math.cos(theta) * od.radius;
+      const localZ = Math.sin(theta) * od.radius;
+      const localY = Math.sin(theta) * od.radius * sinInc * 0.15;
+
+      entry.mesh.position.set(
+        earthPos.x + localX,
+        earthPos.y + localY,
+        earthPos.z + localZ
+      );
+
+      // Slow tumble
+      entry.mesh.rotation.y += 0.01;
+    } else if (od.type === 'L2' && earthPos) {
+      // L2 point: opposite direction from Sun relative to Earth
+      const toSun = new THREE.Vector3().subVectors(sunWorldPos, earthPos);
+      if (toSun.length() > 0) {
+        toSun.normalize();
+      } else {
+        toSun.set(-1, 0, 0);
+      }
+      // L2 is in the anti-Sun direction from Earth
+      entry.mesh.position.set(
+        earthPos.x - toSun.x * od.offset,
+        earthPos.y - toSun.y * od.offset + 5,
+        earthPos.z - toSun.z * od.offset
+      );
+      // Slow rotation to show sunshield
+      entry.mesh.rotation.y += 0.003;
+    } else if (od.type === 'deepSpace') {
+      // Static position in the solar system group - just tumble slowly
+      entry.mesh.rotation.y += 0.002;
+    }
   });
 }
 
@@ -604,6 +1255,15 @@ function updateSolarSystemPositions(date) {
     entry.mesh.position.set(scenePos.x, scenePos.y, scenePos.z);
   });
 
+  // Update orbit markers to match planet positions
+  solarSystem.orbitMarkers.forEach(entry => {
+    const planet = entry.planet;
+    const realPos = computePlanetPosition(planet, date);
+    const visualDist = HELIO_VISUAL_DIST[planet.name] || 1000;
+    const scenePos = helioToScene(realPos, visualDist, planet.a0);
+    entry.mesh.position.set(scenePos.x, scenePos.y, scenePos.z);
+  });
+
   // Store Earth's visual position for space.js to use
   const earthScenePos = helioToScene(earthPos, HELIO_VISUAL_DIST.Earth, SOLAR_SYSTEM_PLANETS[2].a0);
   solarSystem._earthVisualPos = earthScenePos;
@@ -679,7 +1339,32 @@ function getAllSpaceBodies() {
         landable: false
       });
     });
+
+    // Named asteroids
+    solarSystem.asteroidMeshes.forEach(entry => {
+      bodies.push({
+        name: entry.asteroid.name,
+        position: entry.mesh.position.clone().add(solarSystem.group.position),
+        radius: entry.asteroid.radiusScaled,
+        mesh: entry.mesh,
+        landable: false
+      });
+    });
   }
+
+  // Spacecraft (positioned in scene or group depending on orbit type)
+  solarSystem.spacecraftMeshes.forEach(entry => {
+    const pos = entry.orbitData.type === 'deepSpace'
+      ? entry.mesh.position.clone().add(solarSystem.group.position)
+      : entry.mesh.position.clone();
+    bodies.push({
+      name: entry.spacecraft.name,
+      position: pos,
+      radius: entry.spacecraft.size,
+      mesh: entry.mesh,
+      landable: false
+    });
+  });
 
   // Earth (direct scene child, not in group)
   if (window.spaceFlight && spaceFlight.earth) {
@@ -732,6 +1417,16 @@ function onSolarSystemClick(event) {
     clickables.push(entry.mesh);
     clickables.push(entry.hitbox);
   });
+  // Named asteroids
+  solarSystem.asteroidMeshes.forEach(entry => {
+    clickables.push(entry.mesh);
+    clickables.push(entry.hitbox);
+  });
+  // Spacecraft
+  solarSystem.spacecraftMeshes.forEach(entry => {
+    clickables.push(entry.mesh);
+    clickables.push(entry.hitbox);
+  });
   // Also test Sun
   clickables.push(solarSystem.sunMesh);
 
@@ -739,9 +1434,9 @@ function onSolarSystemClick(event) {
 
   if (intersects.length > 0) {
     const hit = intersects[0].object;
-    // Walk up to find planet data
+    // Walk up to find planet, asteroid, or spacecraft data
     let target = hit;
-    while (target && !target.userData.isPlanet && target.parent) {
+    while (target && !target.userData.isPlanet && !target.userData.isAsteroid && !target.userData.isSpacecraft && target.parent) {
       target = target.parent;
     }
 
@@ -749,6 +1444,14 @@ function onSolarSystemClick(event) {
       const idx = target.userData.planetIndex;
       const entry = solarSystem.planetMeshes.find(e => e.planet === SOLAR_SYSTEM_PLANETS[idx]);
       if (entry) showPlanetInfo(entry);
+    } else if (target && target.userData.isAsteroid) {
+      const idx = target.userData.asteroidIndex;
+      const entry = solarSystem.asteroidMeshes.find(e => e.asteroid === NAMED_ASTEROIDS[idx]);
+      if (entry) showAsteroidInfo(entry);
+    } else if (target && target.userData.isSpacecraft) {
+      const idx = target.userData.spacecraftIndex;
+      const entry = solarSystem.spacecraftMeshes.find(e => e.spacecraft === SPACECRAFT[idx]);
+      if (entry) showSpacecraftInfo(entry);
     } else if (hit === solarSystem.sunMesh || hit.parent === solarSystem.sunMesh) {
       showSunInfo();
     }
@@ -851,6 +1554,53 @@ function showSunInfo() {
   solarSystem.selectedPlanet = null;
 }
 
+function showAsteroidInfo(entry) {
+  const asteroid = entry.asteroid;
+  const now = new Date();
+  const earthPos = getEarthHelioPos(now);
+  const distEarth = distanceAU(entry.realPosition, earthPos);
+  const distEarthKM = distEarth * 149597870.7;
+
+  document.getElementById('ssInfoTitle').textContent = asteroid.name;
+  document.getElementById('ssInfoType').textContent = asteroid.type + ' (Asteroid Belt)';
+  document.getElementById('ssInfoDesc').textContent = asteroid.description;
+  document.getElementById('ssInfoDistAU').textContent = asteroid.meanDistanceAU.toFixed(3) + ' AU';
+  document.getElementById('ssInfoDistKM').textContent = formatKM(asteroid.meanDistanceKM) + ' km';
+  document.getElementById('ssInfoDistEarth').textContent =
+    distEarth.toFixed(3) + ' AU (' + formatKM(distEarthKM) + ' km)';
+
+  solarSystem.infoPanel.style.display = 'block';
+  solarSystem.selectedPlanet = entry; // reuse for distance updates
+}
+
+function showSpacecraftInfo(entry) {
+  const craft = entry.spacecraft;
+  document.getElementById('ssInfoTitle').textContent = craft.name;
+  document.getElementById('ssInfoType').textContent = craft.type;
+  document.getElementById('ssInfoDesc').textContent = craft.description;
+
+  if (craft.orbit === 'heliocentric') {
+    document.getElementById('ssInfoDistAU').textContent = craft.realDistanceAU + ' AU (actual)';
+  } else if (craft.orbit === 'L2') {
+    document.getElementById('ssInfoDistAU').textContent = 'Sun-Earth L2 Point';
+  } else {
+    document.getElementById('ssInfoDistAU').textContent = craft.realDistanceKM + ' km altitude';
+  }
+
+  document.getElementById('ssInfoDistKM').textContent = formatKM(craft.realDistanceKM) + ' km from Earth';
+
+  // Compute visual scene distance from rocket
+  if (spaceFlight.rocket) {
+    const dist = Math.floor(spaceFlight.rocket.position.distanceTo(entry.mesh.position));
+    document.getElementById('ssInfoDistEarth').textContent = dist + ' (scene distance)';
+  } else {
+    document.getElementById('ssInfoDistEarth').textContent = '---';
+  }
+
+  solarSystem.infoPanel.style.display = 'block';
+  solarSystem.selectedPlanet = null; // no AU distance updates for spacecraft
+}
+
 function hidePlanetInfo() {
   if (solarSystem.infoPanel) {
     solarSystem.infoPanel.style.display = 'none';
@@ -865,61 +1615,149 @@ function formatKM(km) {
   return Math.round(km).toString();
 }
 
+function setSpaceLandingButtonText(text) {
+  const landBtn = document.getElementById('sfLandBtn');
+  if (!landBtn) return;
+  landBtn.textContent = text;
+}
+
+function triggerSpaceLanding(text) {
+  const landBtn = document.getElementById('sfLandBtn');
+  if (!landBtn) return;
+  landBtn.textContent = text;
+  landBtn.disabled = false;
+  landBtn.style.opacity = '1';
+  landBtn.click();
+}
+
+function handleSpaceReturnAction() {
+  // If already on the moon, use the existing direct return flow.
+  if (typeof onMoon !== 'undefined' && onMoon) {
+    if (typeof returnToEarth === 'function') returnToEarth();
+    return;
+  }
+
+  // In space flight, run direct transfer/landing back to Earth.
+  if (window.spaceFlight && window.spaceFlight.active) {
+    if (typeof forceSpaceFlightLanding === 'function') {
+      const forced = forceSpaceFlightLanding('Earth');
+      if (forced) return;
+    }
+    if (typeof setSpaceFlightLandingTarget === 'function') {
+      const handled = setSpaceFlightLandingTarget('Earth', { force: true, autoLand: true });
+      if (handled) return;
+    }
+    window.spaceFlight.destination = 'earth';
+    triggerSpaceLanding('LAND ON EARTH');
+    return;
+  }
+
+  if (typeof returnToEarth === 'function') returnToEarth();
+}
+
+function handleMoonLandingAction() {
+  if (window.spaceFlight && window.spaceFlight.active) {
+    if (typeof forceSpaceFlightLanding === 'function') {
+      const forced = forceSpaceFlightLanding('Moon');
+      if (forced) return;
+    }
+    if (typeof setSpaceFlightLandingTarget === 'function') {
+      const handled = setSpaceFlightLandingTarget('Moon', { force: true, autoLand: true });
+      if (handled) return;
+    }
+    window.spaceFlight.destination = 'moon';
+    triggerSpaceLanding('LAND ON MOON');
+    return;
+  }
+
+  if (typeof directTravelToMoon === 'function' && !(typeof travelingToMoon !== 'undefined' && travelingToMoon)) {
+    directTravelToMoon();
+  }
+}
+
 // ---------------------------------------------------------------------------
 // TOGGLE BUTTON
 // ---------------------------------------------------------------------------
 function createToggleButton() {
-  const btn = document.createElement('button');
-  btn.id = 'solarSystemToggle';
-  btn.style.cssText = `
+  // Container for toggle buttons
+  const container = document.createElement('div');
+  container.id = 'ssToggleContainer';
+  container.style.cssText = `
     position: fixed;
     top: 20px;
     left: 20px;
+    display: none;
+    flex-direction: column;
+    gap: 6px;
+    z-index: 10001;
+  `;
+
+  // Primary action: return to Earth
+  const btn = document.createElement('button');
+  btn.id = 'solarSystemToggle';
+  btn.className = 'ssToggleBtn';
+  btn.style.cssText = `
     background: rgba(10, 10, 30, 0.9);
-    border: 2px solid #667eea;
+    border: 2px solid #3b82f6;
     border-radius: 8px;
     padding: 8px 14px;
     color: #fff;
     font-family: Orbitron, sans-serif;
     font-size: 11px;
     font-weight: 600;
-    z-index: 10001;
-    display: none;
     cursor: pointer;
     transition: all 0.2s;
   `;
-  btn.textContent = 'SOLAR SYSTEM: ON';
-  btn.addEventListener('click', toggleSolarSystem);
-  document.body.appendChild(btn);
+  btn.textContent = 'RETURN TO EARTH';
+  btn.addEventListener('click', handleSpaceReturnAction);
+  container.appendChild(btn);
+
+  // Secondary action: land on Moon
+  const orbitBtn = document.createElement('button');
+  orbitBtn.id = 'orbitsToggle';
+  orbitBtn.className = 'ssToggleBtn';
+  orbitBtn.style.cssText = `
+    background: rgba(10, 10, 30, 0.9);
+    border: 2px solid #10b981;
+    border-radius: 8px;
+    padding: 8px 14px;
+    color: #fff;
+    font-family: Orbitron, sans-serif;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  `;
+  orbitBtn.textContent = 'LAND ON MOON';
+  orbitBtn.addEventListener('click', handleMoonLandingAction);
+  container.appendChild(orbitBtn);
+
+  document.body.appendChild(container);
 }
 
 function toggleSolarSystem() {
-  solarSystem.visible = !solarSystem.visible;
-  if (solarSystem.group) {
-    solarSystem.group.visible = solarSystem.visible;
-  }
-  const btn = document.getElementById('solarSystemToggle');
-  if (btn) {
-    btn.textContent = 'SOLAR SYSTEM: ' + (solarSystem.visible ? 'ON' : 'OFF');
-    btn.style.borderColor = solarSystem.visible ? '#667eea' : '#475569';
-    btn.style.color = solarSystem.visible ? '#fff' : '#64748b';
-  }
-  if (!solarSystem.visible) {
-    hidePlanetInfo();
-  }
+  handleSpaceReturnAction();
+}
+
+function toggleOrbits() {
+  handleMoonLandingAction();
 }
 
 // ---------------------------------------------------------------------------
 // SHOW/HIDE (called when entering/exiting space flight)
 // ---------------------------------------------------------------------------
 function showSolarSystemUI() {
-  const btn = document.getElementById('solarSystemToggle');
-  if (btn) btn.style.display = 'block';
+  const container = document.getElementById('ssToggleContainer');
+  if (container) container.style.display = 'flex';
+  const returnBtn = document.getElementById('solarSystemToggle');
+  const landMoonBtn = document.getElementById('orbitsToggle');
+  if (returnBtn) returnBtn.textContent = 'RETURN TO EARTH';
+  if (landMoonBtn) landMoonBtn.textContent = 'LAND ON MOON';
 }
 
 function hideSolarSystemUI() {
-  const btn = document.getElementById('solarSystemToggle');
-  if (btn) btn.style.display = 'none';
+  const container = document.getElementById('ssToggleContainer');
+  if (container) container.style.display = 'none';
   hidePlanetInfo();
 }
 
@@ -945,12 +1783,32 @@ function updateSolarSystem() {
   // Update moon orbital positions
   updateMoonPositions(new Date());
 
+  // Update spacecraft positions (Earth-orbiting + L2)
+  updateSpacecraftPositions();
+
   // Slow rotation for visual interest
   solarSystem.planetMeshes.forEach(entry => {
     entry.mesh.rotation.y += 0.002;
   });
+  solarSystem.asteroidMeshes.forEach(entry => {
+    entry.mesh.rotation.y += 0.005;
+    entry.mesh.rotation.x += 0.003;
+  });
   if (solarSystem.sunMesh) {
     solarSystem.sunMesh.rotation.y += 0.001;
+  }
+
+  // Animate orbit markers (pulsing glow)
+  if (solarSystem.orbitsVisible) {
+    const pulseT = Date.now() * 0.003;
+    solarSystem.orbitMarkers.forEach(entry => {
+      const pulse = entry.mesh.getObjectByName('pulse');
+      if (pulse) {
+        const scale = 1.0 + Math.sin(pulseT) * 0.4;
+        pulse.scale.setScalar(scale);
+        pulse.material.opacity = 0.15 + Math.sin(pulseT) * 0.1;
+      }
+    });
   }
 
   // Proximity detection - show planet name when rocket is nearby
@@ -1004,6 +1862,39 @@ function updateProximityHUD() {
       closestName = entry.name;
     }
   });
+
+  // Check named asteroids
+  solarSystem.asteroidMeshes.forEach(entry => {
+    const worldX = solarSystem.group.position.x + entry.mesh.position.x;
+    const worldY = solarSystem.group.position.y + entry.mesh.position.y;
+    const worldZ = solarSystem.group.position.z + entry.mesh.position.z;
+    const dx = rocketWorldPos.x - worldX;
+    const dy = rocketWorldPos.y - worldY;
+    const dz = rocketWorldPos.z - worldZ;
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    if (dist < closestDist) {
+      closestDist = dist;
+      closestName = entry.asteroid.name;
+    }
+  });
+
+  // Check spacecraft
+  solarSystem.spacecraftMeshes.forEach(entry => {
+    const dist = rocketWorldPos.distanceTo(entry.mesh.position);
+    if (dist < closestDist) {
+      closestDist = dist;
+      closestName = entry.spacecraft.name;
+    }
+  });
+
+  // Check if rocket is within the asteroid belt region
+  const rocketDistFromSun = Math.sqrt(
+    (rocketWorldPos.x - solarSystem.group.position.x) ** 2 +
+    (rocketWorldPos.z - solarSystem.group.position.z) ** 2
+  );
+  const beltInnerScene = ASTEROID_BELT.innerAU * AU_TO_SCENE;
+  const beltOuterScene = ASTEROID_BELT.outerAU * AU_TO_SCENE;
+  const inBelt = rocketDistFromSun > beltInnerScene * 0.9 && rocketDistFromSun < beltOuterScene * 1.1;
 
   // Also check Sun
   if (solarSystem.sunMesh) {
@@ -1059,8 +1950,43 @@ function updateProximityHUD() {
       indicator.innerHTML = '<span style="color:#fbbf24;">' + closestName +
         '</span> <span style="font-size:10px;opacity:0.7;">' + distText + ' km</span>';
     }
+    // Show asteroid belt context when in the belt
+    if (inBelt) {
+      indicator.innerHTML += '<br><span style="font-size:9px;color:#a08060;opacity:0.8;">ASTEROID BELT REGION</span>';
+    }
+    indicator.style.display = 'block';
+  } else if (inBelt) {
+    indicator.innerHTML = '<span style="color:#a08060;font-weight:600;">ASTEROID BELT</span>' +
+      '<br><span style="font-size:10px;opacity:0.7;">' + ASTEROID_BELT.innerAU.toFixed(1) +
+      ' - ' + ASTEROID_BELT.outerAU.toFixed(1) + ' AU from Sun</span>';
     indicator.style.display = 'block';
   } else {
     indicator.style.display = 'none';
   }
 }
+
+Object.assign(globalThis, {
+  getAllSpaceBodies,
+  getEarthHelioScenePosition,
+  getMoonScenePosition,
+  hideSolarSystemUI,
+  initSolarSystem,
+  setSolarSystemCenter,
+  showSolarSystemUI,
+  toggleOrbits,
+  toggleSolarSystem,
+  updateSolarSystem
+});
+
+export {
+  getAllSpaceBodies,
+  getEarthHelioScenePosition,
+  getMoonScenePosition,
+  hideSolarSystemUI,
+  initSolarSystem,
+  setSolarSystemCenter,
+  showSolarSystemUI,
+  toggleOrbits,
+  toggleSolarSystem,
+  updateSolarSystem
+};
