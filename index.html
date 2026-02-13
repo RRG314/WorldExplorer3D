@@ -35,6 +35,15 @@ input,textarea{-webkit-user-select:text;user-select:text}
 /* Location Grid */
 .loc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
 .loc-grid.custom-centered{grid-template-columns:1fr;max-width:300px;margin:0 auto}
+.suggested-grid{grid-template-columns:1fr}
+.location-switch-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.location-switch-btn{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.9);border-radius:10px;padding:10px 12px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.2s}
+.location-switch-btn:hover{border-color:#cbd5e1;background:#f1f5f9}
+.location-switch-btn.active{border-color:#667eea;background:#f0f4ff;color:#3b5bdb;box-shadow:0 4px 12px rgba(102,126,234,0.15)}
+.location-panel{display:none}
+.location-panel.show{display:block}
+.suggested-note{font-size:11px;color:#64748b;margin:0 0 10px 2px}
+.suggested-list{max-height:34vh;overflow-y:auto;padding-right:4px}
 .loc{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.8);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s}
 .loc:hover{border-color:rgba(203,213,225,0.9);background:rgba(241,245,249,0.95);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.08)}
 .loc.sel{border-color:rgba(102,126,234,0.8);background:rgba(240,244,255,0.9);box-shadow:0 4px 12px rgba(102,126,234,0.2)}
@@ -46,7 +55,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .loc.custom .loc-name{color:#92400e}
 
 /* Custom Location Panel */
-#customPanel{display:none;margin-top:16px;padding:20px;background:rgba(255,251,235,0.9);border:2px solid rgba(252,211,77,0.8);border-radius:12px;max-height:60vh;overflow-y:auto;backdrop-filter:blur(10px)}
+#customPanel{display:none;margin-top:0;padding:20px;background:rgba(255,251,235,0.9);border:2px solid rgba(252,211,77,0.8);border-radius:12px;backdrop-filter:blur(10px)}
 #customPanel.show{display:block}
 .custom-title{font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;color:#92400e;margin-bottom:16px;text-align:center}
 .custom-row{margin-bottom:14px}
@@ -165,6 +174,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .sub{font-size:15px;letter-spacing:2px}
   .menu-container{width:95vw;max-height:calc(100dvh - 160px)}
   .loc-grid{grid-template-columns:1fr;gap:10px}
+  .location-switch-row{grid-template-columns:1fr}
+  .suggested-list{max-height:30vh}
   .tab-btn{font-size:12px;padding:12px 8px}
 
   /* HUD elements */
@@ -198,6 +209,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .logo{font-size:clamp(28px, 10vw, 48px);letter-spacing:2px}
   .sub{font-size:13px;letter-spacing:2px;margin:0}
   .menu-container{width:98vw;max-height:calc(100dvh - 140px)}
+  .suggested-list{max-height:26vh}
   .tab-btn{font-size:11px;padding:10px 6px}
   .tab-content{padding:16px}
   .custom-title{font-size:13px}
@@ -242,6 +254,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 @media (max-height: 500px) and (orientation: landscape) {
   .menu-container{max-height:calc(100dvh - 110px);width:min(88vw,760px)}
   .tab-content{max-height:60vh}
+  .suggested-list{max-height:40vh}
   #propertyPanel{max-height:85vh}
   .logo{font-size:clamp(24px, 6vw, 48px);margin:0}
   .sub{font-size:11px;letter-spacing:2px;margin:0}
@@ -327,10 +340,31 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <button class="tab-btn" data-tab="controls">Controls</button>
 </div>
 <div class="tab-content active" id="tab-location">
-<div class="loc-grid custom-centered">
-<div class="loc custom" data-loc="custom"><div class="loc-name">🌍 Custom</div><div class="loc-region">Any Location</div></div>
+<div class="location-switch-row">
+<button class="location-switch-btn active" id="suggestedToggle" type="button">📍 Suggested Locations</button>
+<button class="location-switch-btn" id="customToggle" type="button">🌍 Custom Location</button>
 </div>
-<div id="customPanel">
+
+<div id="suggestedPanel" class="location-panel show">
+<div class="suggested-note">Choose from existing city suggestions.</div>
+<div class="suggested-list">
+<div class="loc-grid suggested-grid">
+<div class="loc sel" data-loc="baltimore"><div class="loc-name">Baltimore</div><div class="loc-region">Maryland, USA</div></div>
+<div class="loc" data-loc="hollywood"><div class="loc-name">Hollywood</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="newyork"><div class="loc-name">New York</div><div class="loc-region">New York, USA</div></div>
+<div class="loc" data-loc="miami"><div class="loc-name">Miami</div><div class="loc-region">Florida, USA</div></div>
+<div class="loc" data-loc="tokyo"><div class="loc-name">Tokyo</div><div class="loc-region">Japan</div></div>
+<div class="loc" data-loc="monaco"><div class="loc-name">Monaco</div><div class="loc-region">Monte Carlo</div></div>
+<div class="loc" data-loc="nurburgring"><div class="loc-name">Nürburgring</div><div class="loc-region">Germany</div></div>
+<div class="loc" data-loc="lasvegas"><div class="loc-name">Las Vegas</div><div class="loc-region">Nevada, USA</div></div>
+<div class="loc" data-loc="london"><div class="loc-name">London</div><div class="loc-region">United Kingdom</div></div>
+<div class="loc" data-loc="paris"><div class="loc-name">Paris</div><div class="loc-region">France</div></div>
+<div class="loc" data-loc="dubai"><div class="loc-name">Dubai</div><div class="loc-region">UAE</div></div>
+</div>
+</div>
+</div>
+
+<div id="customPanel" class="location-panel">
 <div class="custom-title">🌍 Enter Any Location Worldwide</div>
 
 <div class="custom-row">
@@ -354,19 +388,6 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 </div>
 <div style="font-size:11px;margin-top:6px;color:#6b7280">Right-click on Google Maps and copy coordinates</div>
 </div>
-</div>
-<div class="loc-grid">
-<div class="loc sel" data-loc="baltimore"><div class="loc-name">Baltimore</div><div class="loc-region">Maryland, USA</div></div>
-<div class="loc" data-loc="hollywood"><div class="loc-name">Hollywood</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="newyork"><div class="loc-name">New York</div><div class="loc-region">New York, USA</div></div>
-<div class="loc" data-loc="miami"><div class="loc-name">Miami</div><div class="loc-region">Florida, USA</div></div>
-<div class="loc" data-loc="tokyo"><div class="loc-name">Tokyo</div><div class="loc-region">Japan</div></div>
-<div class="loc" data-loc="monaco"><div class="loc-name">Monaco</div><div class="loc-region">Monte Carlo</div></div>
-<div class="loc" data-loc="nurburgring"><div class="loc-name">Nürburgring</div><div class="loc-region">Germany</div></div>
-<div class="loc" data-loc="lasvegas"><div class="loc-name">Las Vegas</div><div class="loc-region">Nevada, USA</div></div>
-<div class="loc" data-loc="london"><div class="loc-name">London</div><div class="loc-region">United Kingdom</div></div>
-<div class="loc" data-loc="paris"><div class="loc-name">Paris</div><div class="loc-region">France</div></div>
-<div class="loc" data-loc="dubai"><div class="loc-name">Dubai</div><div class="loc-region">UAE</div></div>
 </div>
 </div>
 <div class="tab-content" id="tab-settings">

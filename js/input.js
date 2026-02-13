@@ -397,18 +397,16 @@ async function searchLocation() {
         // Debug log removed
         // Debug log removed
 
-        // Update UI to show custom location as selected
-        const customCard = document.querySelector('.loc[data-loc="custom"]');
-        // Debug log removed
+        // Update UI to show custom location panel as active
+        const customPanel = document.getElementById('customPanel');
+        const suggestedPanel = document.getElementById('suggestedPanel');
+        const customToggle = document.getElementById('customToggle');
+        const suggestedToggle = document.getElementById('suggestedToggle');
 
-        if (customCard) {
-            document.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
-            customCard.classList.add('sel');
-            document.getElementById('customPanel').classList.add('show');
-            // Debug log removed
-        } else {
-            console.warn('Custom location card not found in DOM');
-        }
+        if (customPanel) customPanel.classList.add('show');
+        if (suggestedPanel) suggestedPanel.classList.remove('show');
+        if (customToggle) customToggle.classList.add('active');
+        if (suggestedToggle) suggestedToggle.classList.remove('active');
 
         // Debug log removed
 

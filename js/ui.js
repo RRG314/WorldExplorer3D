@@ -249,12 +249,55 @@ function setupUI() {
         document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     }));
     // Locations
-    document.querySelectorAll('.loc').forEach(el => el.addEventListener('click', () => {
-        document.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
+    const suggestedPanel = document.getElementById('suggestedPanel');
+    const customPanel = document.getElementById('customPanel');
+    const suggestedToggle = document.getElementById('suggestedToggle');
+    const customToggle = document.getElementById('customToggle');
+
+    const syncLocationPanels = (mode) => {
+        const customMode = mode === 'custom';
+        if (customPanel) customPanel.classList.toggle('show', customMode);
+        if (suggestedPanel) suggestedPanel.classList.toggle('show', !customMode);
+        if (suggestedToggle) suggestedToggle.classList.toggle('active', !customMode);
+        if (customToggle) customToggle.classList.toggle('active', customMode);
+    };
+
+    const getSelectedSuggestedLoc = () => {
+        const selected = document.querySelector('#suggestedPanel .loc.sel');
+        if (selected) return selected.dataset.loc;
+        const fallback = document.querySelector('#suggestedPanel .loc[data-loc=\"baltimore\"]');
+        if (fallback) {
+            fallback.classList.add('sel');
+            return fallback.dataset.loc;
+        }
+        return null;
+    };
+
+    document.querySelectorAll('#suggestedPanel .loc').forEach(el => el.addEventListener('click', () => {
+        document.querySelectorAll('#suggestedPanel .loc').forEach(e => e.classList.remove('sel'));
         el.classList.add('sel');
         selLoc = el.dataset.loc;
-        document.getElementById('customPanel').classList.toggle('show', selLoc === 'custom');
+        syncLocationPanels('suggested');
     }));
+
+    if (customToggle) {
+        customToggle.addEventListener('click', () => {
+            selLoc = 'custom';
+            syncLocationPanels('custom');
+        });
+    }
+
+    if (suggestedToggle) {
+        suggestedToggle.addEventListener('click', () => {
+            const suggestedLoc = getSelectedSuggestedLoc();
+            if (suggestedLoc) selLoc = suggestedLoc;
+            syncLocationPanels('suggested');
+        });
+    }
+
+    // Initial panel state (default to suggestions unless a custom location is already selected)
+    syncLocationPanels(selLoc === 'custom' ? 'custom' : 'suggested');
+
     // Custom location search - universal search for any location
     document.getElementById('locationSearchBtn').addEventListener('click', searchLocation);
     document.getElementById('locationSearch').addEventListener('keypress', e => { if (e.key === 'Enter') searchLocation(); });
