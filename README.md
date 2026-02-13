@@ -148,6 +148,20 @@ The engine now includes an RDT (Recursive Division Tree) utility layer that make
 - Seeded pseudo-random utilities are used so each location keeps consistent procedural textures/variation across reloads.
 - Physics road proximity checks are adaptively throttled in dense areas, with safety overrides and cache invalidation hooks during major mode/location transitions.
 
+### RDT + RGE-256 Provenance
+
+The deterministic layer is based on first-party research by Steven Reid and is implemented directly in `js/rdt.js`.
+
+- Reid, S. (2025). *Recursive Division Tree: A Log-Log Algorithm for Integer Depth*. Zenodo. DOI: https://doi.org/10.5281/zenodo.18012166
+- Reid, S. (2025). *RGE-256: A New ARX-Based Pseudorandom Number Generator With Structured Entropy and Empirical Validation*. Zenodo. DOI: https://doi.org/10.5281/zenodo.17982804
+- RGE-256 core repository: https://github.com/RRG314/rge256
+- RGE-256 demo application: https://github.com/RRG314/RGE-256-app
+
+Current runtime behavior:
+- `rdt.js` provides RDT complexity depth plus an RGE256ctr-based deterministic PRNG path.
+- Key procedural systems already use deterministic seeded generation.
+- Additional migration work continues to replace remaining `Math.random` paths with deterministic subsystem streams.
+
 ---
 
 ## Controls (Default)

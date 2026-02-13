@@ -10,7 +10,11 @@ Entries reflect changes made relative to the most recent public release.
 ## [Unreleased]
 
 ### Added
-- _No entries yet._
+- Documentation updates for RDT/RGE-256 research provenance, DOI references, and implementation mapping.
+- Explicit deterministic PRNG direction notes documenting ongoing migration away from `Math.random` where reproducibility is required.
+
+### Changed
+- Technical documentation examples now show deterministic RNG usage patterns aligned with the `rdt.js` seeded runtime helpers.
 
 ---
 

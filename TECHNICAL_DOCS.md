@@ -7,6 +7,7 @@ Developer guide for World Explorer 3D. Architecture, code structure, and customi
 - [Technology Stack](#technology-stack)
 - [File Structure](#file-structure)
 - [Core Systems](#core-systems)
+- [Deterministic RDT & RGE-256 Layer](#deterministic-rdt--rge-256-layer)
 - [API Integration](#api-integration)
 - [Rendering Pipeline](#rendering-pipeline)
 - [Performance Optimization](#performance-optimization)
@@ -320,6 +321,30 @@ function updateCamera() {
 - Target tracking
 - Collision avoidance
 - Mode-specific offset
+
+## Deterministic RDT & RGE-256 Layer
+
+World Explorer 3D includes a deterministic utility layer in `js/rdt.js` that combines:
+- **RDT complexity indexing** (`rdtDepth`) for adaptive world/physics behavior
+- **Stable geographic seeding** (`hashGeoToInt`) keyed to location and mode
+- **RGE256ctr deterministic PRNG wrappers** (`rand01FromInt`, `seededRandom`) for reproducible procedural generation
+
+### Research Provenance (First-Party)
+
+- Reid, S. (2025). *Recursive Division Tree: A Log-Log Algorithm for Integer Depth*. Zenodo. DOI: https://doi.org/10.5281/zenodo.18012166
+- Reid, S. (2025). *RGE-256: A New ARX-Based Pseudorandom Number Generator With Structured Entropy and Empirical Validation*. Zenodo. DOI: https://doi.org/10.5281/zenodo.17982804
+- RGE-256 core repository: https://github.com/RRG314/rge256
+- RGE-256 demo app: https://github.com/RRG314/RGE-256-app
+
+### Current Runtime Integration
+
+- `world.js` computes `rdtSeed` + `rdtComplexity` during load and adapts query strategy.
+- `engine.js` and `world.js` use seeded deterministic paths for procedural road/building/window variation.
+- `physics.js` uses RDT complexity to throttle expensive nearest-road checks with safety overrides.
+
+### Deterministic PRNG Direction
+
+The engine already uses deterministic PRNG paths in key procedural systems. Some subsystems still use `Math.random` for non-critical effects and compatibility. Ongoing work is to continue replacing those paths with deterministic stream-based RNG to maximize reproducibility.
 
 ## API Integration
 
@@ -705,7 +730,10 @@ function randomBuildingColor() {
         0xe8d5b7,  // Beige
         // Add your colors here (hex format)
     ];
-    return colors[Math.floor(Math.random() * colors.length)];
+    const rng = typeof seededRandom === 'function'
+        ? seededRandom((rdtSeed || 0) ^ 0xB11D)
+        : Math.random.bind(Math);
+    return colors[Math.floor(rng() * colors.length)];
 }
 ```
 

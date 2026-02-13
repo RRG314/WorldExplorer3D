@@ -52,6 +52,7 @@ This package includes 8 essential documentation files covering every aspect of t
 - Technology stack
 - Code structure
 - Core systems explained
+- Deterministic RDT/RGE-256 implementation notes and PRNG migration direction
 - API integration details
 - Rendering pipeline
 - Performance optimization
@@ -183,6 +184,9 @@ See USER_GUIDE.md → FAQ section
 
 ### Customization
 See TECHNICAL_DOCS.md → Customization Guide
+
+### Deterministic Systems (RDT/RGE-256)
+See TECHNICAL_DOCS.md → Deterministic RDT & RGE-256 Layer
 
 ### Contributing
 See CONTRIBUTING.md

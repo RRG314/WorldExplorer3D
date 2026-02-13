@@ -188,7 +188,15 @@ The RDT (Recursive Division Tree) utility layer is loaded early and provides det
 Current integrations:
 - **Adaptive OSM query strategy** in `world.js` tunes search radius/timeouts from `rdtComplexity`
 - **Deterministic procedural content** in `engine.js`/`world.js` keeps per-location visuals stable across reloads
-- **Adaptive physics throttling** in `physics.js` reduces dense-area CPU pressure while forcing immediate checks during steering, high-speed driving, or off-road recovery## Known Hard Problems / Constraints
+- **Adaptive physics throttling** in `physics.js` reduces dense-area CPU pressure while forcing immediate checks during steering, high-speed driving, or off-road recovery
+
+RDT/RGE research provenance and implementation notes:
+- `js/rdt.js` includes RDT depth utilities and an RGE256ctr-based deterministic PRNG path.
+- RDT citation: Reid, S. (2025). *Recursive Division Tree: A Log-Log Algorithm for Integer Depth*. DOI: https://doi.org/10.5281/zenodo.18012166
+- RGE-256 citation: Reid, S. (2025). *RGE-256: A New ARX-Based Pseudorandom Number Generator With Structured Entropy and Empirical Validation*. DOI: https://doi.org/10.5281/zenodo.17982804
+- Current deterministic migration direction is to continue replacing remaining `Math.random` paths with deterministic subsystem streams.
+
+## Known Hard Problems / Constraints
 
 - **OSM geometry inconsistencies** -- OpenStreetMap data varies widely in quality; buildings may lack height tags, roads may have missing or conflicting metadata, and some geometries contain self-intersecting polygons
 - **Terrain tile resolution limits** -- Terrarium tiles at zoom 13 provide ~19m/pixel resolution; this creates visible stairstepping on steep terrain and blending seams at tile boundaries
