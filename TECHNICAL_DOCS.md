@@ -18,11 +18,12 @@ Developer guide for World Explorer 3D. Architecture, code structure, and customi
 
 ### Design Philosophy
 
-World Explorer 3D is built as a **single-file application**:
-- No build process required
-- No dependencies to install
-- Easy to deploy and share
-- Self-contained HTML file with embedded CSS and JavaScript
+World Explorer 3D is built as a **no-build static-site runtime**:
+- No bundler required
+- Browser-native execution
+- Easy GitHub Pages deployment
+- Runtime split across `index.html`, `styles.css`, and `js/*`
+- ES module boot with compatibility for shared global-state subsystems
 
 ### High-Level Architecture
 
@@ -49,7 +50,7 @@ World Explorer 3D is built as a **single-file application**:
 │  └─ Material System                     │
 ├─────────────────────────────────────────┤
 │  Data Layer                             │
-│  ├─ Google Maps API                     │
+│  ├─ OpenStreetMap / Overpass Data       │
 │  ├─ Real Estate APIs                    │
 │  ├─ LocalStorage                        │
 │  └─ Configuration                       │
@@ -86,11 +87,14 @@ World Explorer 3D is built as a **single-file application**:
 
 ### External APIs
 
-**Google Maps**
-- Satellite imagery tiles
-- Geocoding
-- Elevation data
-- Roads data
+**OpenStreetMap / Overpass**
+- Road network and building footprints
+- Land use and POI data
+- Historic and amenity metadata
+
+**Terrain Tiles (Terrarium)**
+- Elevation decode source
+- Terrain mesh grounding and sampling
 
 **Real Estate APIs**
 - Rentcast: Property valuations
@@ -99,52 +103,38 @@ World Explorer 3D is built as a **single-file application**:
 
 ## File Structure
 
-### Single File Organization
-
-The HTML file is organized into logical sections:
+### Static-Site Organization
 
 ```
-world-explorer-complete.html
-├─ <!DOCTYPE html>
-├─ <head>
-│  ├─ Meta tags
-│  ├─ Title
-│  ├─ Google Fonts
-│  └─ <style> CSS Block
-│     ├─ Reset & Base Styles
-│     ├─ Title Screen
-│     ├─ Main Menu
-│     ├─ HUD Components
-│     ├─ Float Menu
-│     ├─ Property Panel
-│     ├─ Map System
-│     ├─ Modals
-│     └─ Responsive Media Queries
-├─ <body>
-│  ├─ Title Screen
-│  ├─ Main Menu Container
-│  │  ├─ Location Tab
-│  │  ├─ Settings Tab
-│  │  └─ Controls Tab
-│  ├─ HUD Elements
-│  ├─ Float Menu
-│  ├─ Property Panel
-│  ├─ Map Canvas
-│  ├─ Modals & Overlays
-│  └─ <script> JavaScript Block
-│     ├─ Constants & Configuration
-│     ├─ State Variables
-│     ├─ Three.js Setup
-│     ├─ Terrain Generation
-│     ├─ Physics System
-│     ├─ Input Handling
-│     ├─ Game Modes
-│     ├─ API Integration
-│     ├─ UI Controllers
-│     ├─ Map System
-│     ├─ Moon/Space System
-│     └─ Main Game Loop
-└─ </body>
+WorldExplorer3D/
+├─ index.html
+├─ styles.css
+├─ .nojekyll
+└─ js/
+   ├─ bootstrap.js
+   ├─ app-entry.js
+   ├─ modules/
+   │  ├─ manifest.js
+   │  └─ script-loader.js
+   ├─ config.js
+   ├─ state.js
+   ├─ env.js
+   ├─ rdt.js
+   ├─ world.js
+   ├─ terrain.js
+   ├─ ground.js
+   ├─ engine.js
+   ├─ physics.js
+   ├─ walking.js
+   ├─ sky.js
+   ├─ solar-system.js
+   ├─ space.js
+   ├─ game.js
+   ├─ input.js
+   ├─ hud.js
+   ├─ map.js
+   ├─ ui.js
+   └─ main.js
 ```
 
 ### Code Organization Principles
@@ -348,13 +338,13 @@ The engine already uses deterministic PRNG paths in key procedural systems. Some
 
 ## API Integration
 
-### Google Maps Integration
+### OSM / Tile Integration
 
 **Tile Loading System**:
 ```javascript
-function loadGoogleMapTile(lat, lon, zoom) {
+function loadMapTile(lat, lon, zoom) {
     const tileCoords = latLonToTile(lat, lon, zoom);
-    const url = `https://mt1.google.com/vt/lyrs=s&x=${tileCoords.x}&y=${tileCoords.y}&z=${zoom}`;
+    const url = `https://tile.openstreetmap.org/${zoom}/${tileCoords.x}/${tileCoords.y}.png`;
     
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -771,7 +761,7 @@ document.getElementById('myElement').addEventListener('click', () => {
 - **Fix**: Check browser console, update graphics drivers
 
 **Issue: Terrain Not Loading**
-- **Cause**: Google Maps API rate limit or network error
+- **Cause**: Terrain tile provider or network error
 - **Fix**: Check console, wait a moment, try again
 
 **Issue: Poor Performance**

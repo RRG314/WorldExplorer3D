@@ -19,8 +19,8 @@ Complete guide to using World Explorer 3D. Learn every feature, control, and sec
 ### First Launch
 
 1. **Open the Application**
-   - Double-click `world-explorer-complete.html`
-   - Or drag it into your browser
+   - Start a local server in the repo root (`python -m http.server 8000`)
+   - Open `http://localhost:8000` in your browser
 
 2. **Main Menu Appears**
    - You'll see tabs: Location, Settings, Controls

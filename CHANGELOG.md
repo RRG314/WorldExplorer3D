@@ -12,9 +12,13 @@ Entries reflect changes made relative to the most recent public release.
 ### Added
 - Documentation updates for RDT/RGE-256 research provenance, DOI references, and implementation mapping.
 - Explicit deterministic PRNG direction notes documenting ongoing migration away from `Math.random` where reproducibility is required.
+- `KNOWN_ISSUES.md` with contributor-focused engineering targets.
+- Repository baseline files for consistency: `.editorconfig`, `.eslintrc.cjs`, `.prettierrc.json`, `.prettierignore`.
+- Updated GitHub issue templates for structured bug and feature intake.
 
 ### Changed
 - Technical documentation examples now show deterministic RNG usage patterns aligned with the `rdt.js` seeded runtime helpers.
+- README, QUICKSTART, CONTRIBUTING, and DOCUMENTATION_INDEX are now aligned with the current branch architecture and source-available all-rights-reserved license model.
 
 ---
 
