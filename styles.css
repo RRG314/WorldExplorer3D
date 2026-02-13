@@ -4,15 +4,15 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 input,textarea{-webkit-user-select:text;user-select:text}
 
 /* Title Screen */
-#titleScreen{position:fixed;inset:0;background:#000 url('images/title-bg.jpg') center center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;overflow:hidden}
+#titleScreen{position:fixed;inset:0;background:#000 url('images/title-bg.jpg') center center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:max(14px,env(safe-area-inset-top));padding-right:12px;padding-bottom:max(14px,env(safe-area-inset-bottom));padding-left:12px;gap:clamp(8px,1.8vh,18px);z-index:200;overflow-y:auto;overflow-x:hidden}
 #titleScreen::before{content:'';position:absolute;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(1px)}
 #titleScreen.hidden{display:none}
-.logo{font-family:'Orbitron',sans-serif;font-size:clamp(36px, 8vw, 72px);font-weight:900;color:#ffffff;letter-spacing:clamp(3px, 1vw, 8px);text-transform:uppercase;text-shadow:0 0 30px rgba(83,52,131,0.8),0 0 60px rgba(15,52,96,0.6),0 4px 20px rgba(0,0,0,0.4);position:relative;z-index:1;margin-bottom:8px;animation:titleGlow 3s ease-in-out infinite;text-align:center;padding:0 20px}
+.logo{font-family:'Orbitron',sans-serif;font-size:clamp(36px, 8vw, 72px);font-weight:900;line-height:1.05;color:#ffffff;letter-spacing:clamp(3px, 1vw, 8px);text-transform:uppercase;text-shadow:0 0 30px rgba(83,52,131,0.8),0 0 60px rgba(15,52,96,0.6),0 4px 20px rgba(0,0,0,0.4);position:relative;z-index:1;margin:0;animation:titleGlow 3s ease-in-out infinite;text-align:center;padding:0 20px;flex-shrink:0}
 @keyframes titleGlow{0%,100%{text-shadow:0 0 30px rgba(83,52,131,0.8),0 0 60px rgba(15,52,96,0.6),0 4px 20px rgba(0,0,0,0.4)}50%{text-shadow:0 0 40px rgba(83,52,131,1),0 0 80px rgba(15,52,96,0.8),0 4px 30px rgba(0,0,0,0.5)}}
-.sub{font-family:'Righteous',cursive;font-size:20px;color:rgba(255,255,255,0.85);letter-spacing:6px;margin:0 0 50px;font-weight:400;text-shadow:0 2px 10px rgba(0,0,0,0.3);position:relative;z-index:1}
+.sub{font-family:'Righteous',cursive;font-size:clamp(13px,1.7vw,20px);line-height:1.25;color:rgba(255,255,255,0.9);letter-spacing:clamp(1px,0.45vw,4px);margin:0;font-weight:400;text-shadow:0 2px 10px rgba(0,0,0,0.35);position:relative;z-index:1;text-align:center;max-width:min(94vw,1100px);padding:0 8px;flex-shrink:0}
 
 /* Menu Container with Tabs */
-.menu-container{background:rgba(255,255,255,0.85);backdrop-filter:blur(20px);border:2px solid rgba(255,255,255,0.3);border-radius:20px;width:520px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,0.4),0 0 40px rgba(83,52,131,0.3);position:relative;z-index:1}
+.menu-container{background:rgba(255,255,255,0.85);backdrop-filter:blur(20px);border:2px solid rgba(255,255,255,0.3);border-radius:20px;width:min(520px,95vw);max-height:calc(100dvh - 180px);display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,0.4),0 0 40px rgba(83,52,131,0.3);position:relative;z-index:1;flex:0 1 auto}
 .tab-nav{display:flex;border-bottom:2px solid rgba(232,238,245,0.5);flex-shrink:0;background:rgba(248,250,252,0.6);backdrop-filter:blur(10px);border-radius:18px 18px 0 0}
 .tab-btn{flex:1;background:transparent;border:none;padding:16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:#64748b;cursor:pointer;transition:all 0.3s;position:relative}
 .tab-btn:hover{color:#475569;background:rgba(241,245,249,0.6)}
@@ -151,8 +151,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .floatItem{padding:8px 12px}
 
   /* Title screen mobile adjustments */
-  .sub{font-size:16px;letter-spacing:4px}
-  .menu-container{width:95vw;max-height:85vh}
+  .sub{font-size:15px;letter-spacing:2px}
+  .menu-container{width:95vw;max-height:calc(100dvh - 160px)}
   .loc-grid{grid-template-columns:1fr;gap:10px}
   .tab-btn{font-size:12px;padding:12px 8px}
 
@@ -185,8 +185,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
 
   /* Title screen for small phones */
   .logo{font-size:clamp(28px, 10vw, 48px);letter-spacing:2px}
-  .sub{font-size:14px;letter-spacing:3px;margin-bottom:30px}
-  .menu-container{width:98vw;max-height:90vh}
+  .sub{font-size:13px;letter-spacing:2px;margin:0}
+  .menu-container{width:98vw;max-height:calc(100dvh - 140px)}
   .tab-btn{font-size:11px;padding:10px 6px}
   .tab-content{padding:16px}
   .custom-title{font-size:13px}
@@ -229,11 +229,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
 
 /* Landscape orientation adjustments */
 @media (max-height: 500px) and (orientation: landscape) {
-  .menu-container{max-height:95vh;width:80vw}
+  .menu-container{max-height:calc(100dvh - 110px);width:min(88vw,760px)}
   .tab-content{max-height:60vh}
   #propertyPanel{max-height:85vh}
-  .logo{font-size:clamp(24px, 6vw, 48px);margin-bottom:4px}
-  .sub{font-size:12px;margin-bottom:20px}
+  .logo{font-size:clamp(24px, 6vw, 48px);margin:0}
+  .sub{font-size:11px;letter-spacing:2px;margin:0}
 }
 
 #controlsTab{position:fixed;bottom:20px;left:200px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;z-index:100;display:none;font-size:12px;color:#475569;max-width:220px;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
