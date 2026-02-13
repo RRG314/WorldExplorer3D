@@ -38,16 +38,12 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .loc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .loc-grid.custom-centered{grid-template-columns:1fr;max-width:300px;margin:0 auto}
 .suggested-grid{grid-template-columns:1fr}
-.location-switch-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px}
-.location-switch-btn{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.9);border-radius:10px;padding:10px 12px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.2s;text-align:left;display:flex;flex-direction:column;gap:4px;min-height:70px;justify-content:center}
-.location-switch-btn:hover{border-color:#cbd5e1;background:#f1f5f9}
-.location-switch-btn.active{border-color:#667eea;background:#f0f4ff;color:#3b5bdb;box-shadow:0 4px 12px rgba(102,126,234,0.15)}
-.switch-title{font-size:13px;font-weight:600;line-height:1.2}
-.switch-sub{font-size:11px;font-weight:500;line-height:1.2;color:#64748b}
-.location-panel{display:none}
-.location-panel.show{display:block}
+.location-split{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:14px;align-items:start}
+.location-pane{min-width:0}
+.location-title{font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;color:#334155;margin-bottom:8px}
+.location-panel{display:block}
 .suggested-note{font-size:11px;color:#64748b;margin:0 0 10px 2px}
-.suggested-list{max-height:min(50vh,420px);overflow-y:auto;padding-right:4px;border:1px solid rgba(226,232,240,0.9);border-radius:12px;padding:6px;background:rgba(255,255,255,0.6)}
+.suggested-list{max-height:min(46vh,420px);overflow-y:auto;padding-right:4px;border:1px solid rgba(226,232,240,0.9);border-radius:12px;padding:6px;background:rgba(255,255,255,0.6)}
 .loc{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.8);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s}
 .loc:hover{border-color:rgba(203,213,225,0.9);background:rgba(241,245,249,0.95);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.08)}
 .loc.sel{border-color:rgba(102,126,234,0.8);background:rgba(240,244,255,0.9);box-shadow:0 4px 12px rgba(102,126,234,0.2)}
@@ -59,7 +55,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .loc.custom .loc-name{color:#92400e}
 
 /* Custom Location Panel */
-#customPanel{display:none;margin-top:0;padding:20px;background:rgba(255,251,235,0.9);border:2px solid rgba(252,211,77,0.8);border-radius:12px;backdrop-filter:blur(10px)}
+#customPanel{display:block;margin-top:0;padding:20px;background:rgba(255,251,235,0.9);border:2px solid rgba(252,211,77,0.8);border-radius:12px;backdrop-filter:blur(10px)}
 #customPanel.show{display:block}
 .launch-panel{padding:18px;border-radius:12px;border:2px solid rgba(165,180,252,0.75);background:rgba(238,242,255,0.88)}
 .launch-panel.space{border-color:rgba(125,211,252,0.75);background:rgba(15,23,42,0.78);color:#e2e8f0}
@@ -182,8 +178,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .sub{font-size:15px;letter-spacing:2px}
   .menu-container{width:min(96vw,740px);max-height:calc(100dvh - 145px)}
   .loc-grid{grid-template-columns:1fr;gap:10px}
-  .location-switch-row{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .suggested-list{max-height:38vh}
+  .location-split{grid-template-columns:1fr}
+  .suggested-list{max-height:34vh}
   .tab-btn{font-size:12px;padding:12px 8px}
 
   /* HUD elements */
@@ -217,8 +213,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .logo{font-size:clamp(28px, 10vw, 48px);letter-spacing:2px}
   .sub{font-size:13px;letter-spacing:2px;margin:0}
   .menu-container{width:99vw;max-height:calc(100dvh - 126px)}
-  .location-switch-row{grid-template-columns:1fr}
-  .suggested-list{max-height:32vh}
+  .suggested-list{max-height:30vh}
   .tab-btn{font-size:11px;padding:10px 6px}
   .tab-content{padding:16px}
   .custom-title{font-size:13px}
@@ -263,7 +258,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
 @media (max-height: 500px) and (orientation: landscape) {
   .menu-container{max-height:calc(100dvh - 88px);width:min(95vw,980px)}
   .tab-content{max-height:60vh}
-  .suggested-list{max-height:40vh}
+  .location-split{grid-template-columns:1fr 1fr}
+  .suggested-list{max-height:36vh}
   #propertyPanel{max-height:85vh}
   .logo{font-size:clamp(24px, 6vw, 48px);margin:0}
   .sub{font-size:11px;letter-spacing:2px;margin:0}
@@ -349,51 +345,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <button class="tab-btn" data-tab="controls">Controls</button>
 </div>
 <div class="tab-content active" id="tab-location">
-<div class="location-switch-row">
-<button class="location-switch-btn active" id="suggestedToggle" data-mode="suggested" type="button" onclick="if(window.setTitleLocationMode) window.setTitleLocationMode('suggested')">
-<span class="switch-title">📍 Suggested</span>
-<span class="switch-sub">Popular city list</span>
-</button>
-<button class="location-switch-btn" id="customToggle" data-mode="custom" type="button" onclick="if(window.setTitleLocationMode) window.setTitleLocationMode('custom')">
-<span class="switch-title">🌍 Custom</span>
-<span class="switch-sub">Any place search</span>
-</button>
-<button class="location-switch-btn" id="moonToggle" data-mode="moon" type="button" onclick="if(window.setTitleLocationMode) window.setTitleLocationMode('moon')">
-<span class="switch-title">🌙 Moon</span>
-<span class="switch-sub">Direct moon start</span>
-</button>
-<button class="location-switch-btn" id="spaceToggle" data-mode="space" type="button" onclick="if(window.setTitleLocationMode) window.setTitleLocationMode('space')">
-<span class="switch-title">🚀 Space</span>
-<span class="switch-sub">Start in space flight</span>
-</button>
-</div>
-
-<div id="suggestedPanel" class="location-panel show">
-<div class="suggested-note">Choose from existing city suggestions.</div>
-<div class="suggested-list">
-<div class="loc-grid suggested-grid">
-<div class="loc sel" data-loc="baltimore" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Baltimore</div><div class="loc-region">Maryland, USA</div></div>
-<div class="loc" data-loc="hollywood" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Hollywood</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="newyork" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">New York</div><div class="loc-region">New York, USA</div></div>
-<div class="loc" data-loc="miami" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Miami</div><div class="loc-region">Florida, USA</div></div>
-<div class="loc" data-loc="tokyo" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Tokyo</div><div class="loc-region">Japan</div></div>
-<div class="loc" data-loc="monaco" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Monaco</div><div class="loc-region">Monte Carlo</div></div>
-<div class="loc" data-loc="nurburgring" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Nürburgring</div><div class="loc-region">Germany</div></div>
-<div class="loc" data-loc="lasvegas" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Las Vegas</div><div class="loc-region">Nevada, USA</div></div>
-<div class="loc" data-loc="london" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">London</div><div class="loc-region">United Kingdom</div></div>
-<div class="loc" data-loc="paris" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Paris</div><div class="loc-region">France</div></div>
-<div class="loc" data-loc="dubai" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Dubai</div><div class="loc-region">UAE</div></div>
-<div class="loc" data-loc="sanfrancisco" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">San Francisco</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="losangeles" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Los Angeles</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="chicago" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Chicago</div><div class="loc-region">Illinois, USA</div></div>
-<div class="loc" data-loc="seattle" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
-</div>
-</div>
-</div>
-
-<div id="customPanel" class="location-panel">
-<div class="custom-title">🌍 Enter Any Location Worldwide</div>
-
+<div class="location-split">
+<div class="location-pane">
+<div class="location-title">🌍 Custom Search</div>
+<div id="customPanel" class="location-panel show">
+<div class="custom-title">Enter Any Location Worldwide</div>
 <div class="custom-row">
 <label>🔍 Search by Location Name</label>
 <div class="search-row">
@@ -404,9 +360,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, TX"
 </div>
 </div>
-
 <div class="divider"><span>OR</span></div>
-
 <div class="custom-row">
 <label>📍 Enter Exact Coordinates</label>
 <div class="coords-row">
@@ -415,19 +369,36 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 </div>
 <div style="font-size:11px;margin-top:6px;color:#6b7280">Right-click on Google Maps and copy coordinates</div>
 </div>
+<div style="font-size:11px;color:#475569;margin-top:10px;padding-top:10px;border-top:1px solid rgba(120,113,108,0.2)">
+Space and Moon travel remain available in Exploration mode after you start.
 </div>
-
-<div id="moonPanel" class="location-panel">
-<div class="launch-panel">
-<div class="launch-title">🌙 Direct Moon Start</div>
-<div class="launch-copy">Launch into exploration and land directly on the Moon surface after loading.</div>
 </div>
 </div>
 
-<div id="spacePanel" class="location-panel">
-<div class="launch-panel space">
-<div class="launch-title">🚀 Start In Space Flight</div>
-<div class="launch-copy">Begin in orbital flight mode so you can fly immediately and choose when to land.</div>
+<div class="location-pane">
+<div class="location-title">📍 Suggested Cities</div>
+<div id="suggestedPanel" class="location-panel show">
+<div class="suggested-note">Select a city from the list:</div>
+<div class="suggested-list">
+<div class="loc-grid suggested-grid">
+<div class="loc sel" data-loc="baltimore"><div class="loc-name">Baltimore</div><div class="loc-region">Maryland, USA</div></div>
+<div class="loc" data-loc="hollywood"><div class="loc-name">Hollywood</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="newyork"><div class="loc-name">New York</div><div class="loc-region">New York, USA</div></div>
+<div class="loc" data-loc="miami"><div class="loc-name">Miami</div><div class="loc-region">Florida, USA</div></div>
+<div class="loc" data-loc="tokyo"><div class="loc-name">Tokyo</div><div class="loc-region">Japan</div></div>
+<div class="loc" data-loc="monaco"><div class="loc-name">Monaco</div><div class="loc-region">Monte Carlo</div></div>
+<div class="loc" data-loc="nurburgring"><div class="loc-name">Nürburgring</div><div class="loc-region">Germany</div></div>
+<div class="loc" data-loc="lasvegas"><div class="loc-name">Las Vegas</div><div class="loc-region">Nevada, USA</div></div>
+<div class="loc" data-loc="london"><div class="loc-name">London</div><div class="loc-region">United Kingdom</div></div>
+<div class="loc" data-loc="paris"><div class="loc-name">Paris</div><div class="loc-region">France</div></div>
+<div class="loc" data-loc="dubai"><div class="loc-name">Dubai</div><div class="loc-region">UAE</div></div>
+<div class="loc" data-loc="sanfrancisco"><div class="loc-name">San Francisco</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="losangeles"><div class="loc-name">Los Angeles</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="chicago"><div class="loc-name">Chicago</div><div class="loc-region">Illinois, USA</div></div>
+<div class="loc" data-loc="seattle"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
+</div>
+</div>
+</div>
 </div>
 </div>
 </div>
@@ -939,5 +910,5 @@ Explore the area
 <div id="pauseScreen"><div class="pauseTitle">PAUSED</div><button class="pauseBtn" id="resumeBtn">Resume</button><button class="pauseBtn" id="restartBtn">Restart</button><button class="pauseBtn" id="menuBtn">Main Menu</button></div>
 <div id="resultScreen"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
 <div id="caughtScreen"><div class="caughtBox"><div class="caughtTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
-<script type="module" src="js/bootstrap.js?v=13"></script>
+<script type="module" src="js/bootstrap.js?v=14"></script>
 </body></html>

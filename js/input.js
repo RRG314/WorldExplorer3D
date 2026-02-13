@@ -397,9 +397,10 @@ async function searchLocation() {
         // Debug log removed
         // Debug log removed
 
-        // Update UI to show custom location panel as active
-        if (typeof globalThis.setTitleLocationMode === 'function') {
-            globalThis.setTitleLocationMode('custom');
+        // Update UI so suggested city highlight clears when custom is selected
+        const suggestedPanel = document.getElementById('suggestedPanel');
+        if (suggestedPanel) {
+            suggestedPanel.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
         }
 
         // Debug log removed

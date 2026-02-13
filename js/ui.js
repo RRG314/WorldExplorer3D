@@ -251,15 +251,6 @@ function setupUI() {
     // Locations
     const suggestedPanel = document.getElementById('suggestedPanel');
     const customPanel = document.getElementById('customPanel');
-    const moonPanel = document.getElementById('moonPanel');
-    const spacePanel = document.getElementById('spacePanel');
-    const locationPanels = { suggested: suggestedPanel, custom: customPanel, moon: moonPanel, space: spacePanel };
-    const suggestedToggle = document.getElementById('suggestedToggle');
-    const customToggle = document.getElementById('customToggle');
-    const moonToggle = document.getElementById('moonToggle');
-    const spaceToggle = document.getElementById('spaceToggle');
-    const locationModeButtons = { suggested: suggestedToggle, custom: customToggle, moon: moonToggle, space: spaceToggle };
-    let titleLaunchMode = 'earth'; // earth | moon | space
 
     const getSelectedSuggestedLoc = () => {
         const selected = document.querySelector('#suggestedPanel .loc.sel');
@@ -272,39 +263,6 @@ function setupUI() {
         return 'baltimore';
     };
 
-    const setTitleLocationMode = (mode) => {
-        const nextMode = ['suggested', 'custom', 'moon', 'space'].includes(mode) ? mode : 'suggested';
-        const activePanel = locationPanels[nextMode] || locationPanels.suggested;
-
-        Object.entries(locationModeButtons).forEach(([btnMode, btn]) => {
-            if (!btn) return;
-            btn.classList.toggle('active', btnMode === nextMode);
-        });
-        Object.values(locationPanels).forEach(panel => {
-            if (!panel) return;
-            panel.classList.toggle('show', panel === activePanel);
-        });
-
-        if (nextMode === 'suggested') {
-            selLoc = getSelectedSuggestedLoc();
-            titleLaunchMode = 'earth';
-        } else if (nextMode === 'custom') {
-            selLoc = 'custom';
-            titleLaunchMode = 'earth';
-        } else {
-            titleLaunchMode = nextMode;
-            if (selLoc === 'custom') {
-                const customLatEl = document.getElementById('customLat');
-                const customLonEl = document.getElementById('customLon');
-                const latInput = customLatEl ? parseFloat(customLatEl.value) : NaN;
-                const lonInput = customLonEl ? parseFloat(customLonEl.value) : NaN;
-                if (Number.isNaN(latInput) || Number.isNaN(lonInput)) {
-                    selLoc = getSelectedSuggestedLoc();
-                }
-            }
-        }
-    };
-
     const selectSuggestedLocationCard = (targetEl) => {
         if (!suggestedPanel || !targetEl) return;
         const selectedLoc = targetEl.closest('.loc[data-loc]');
@@ -312,7 +270,7 @@ function setupUI() {
         suggestedPanel.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
         selectedLoc.classList.add('sel');
         selLoc = selectedLoc.dataset.loc;
-        setTitleLocationMode('suggested');
+        if (customPanel) customPanel.classList.add('show');
     };
 
     if (suggestedPanel) {
@@ -323,19 +281,14 @@ function setupUI() {
         });
     }
 
-    Object.entries(locationModeButtons).forEach(([mode, btn]) => {
-        if (!btn) return;
-        btn.addEventListener('click', () => {
-            setTitleLocationMode(mode);
-        });
-    });
-
-    // Exposed so searchLocation() can force the custom selector active.
-    globalThis.setTitleLocationMode = setTitleLocationMode;
+    // Exposed so inline handlers and searchLocation can force suggested selection.
     globalThis.selectSuggestedLocationCard = selectSuggestedLocationCard;
 
-    // Initial panel state (default to suggested list unless custom location is already selected).
-    setTitleLocationMode(selLoc === 'custom' ? 'custom' : 'suggested');
+    if (customPanel) customPanel.classList.add('show');
+    if (suggestedPanel) suggestedPanel.classList.add('show');
+    if (selLoc !== 'custom') {
+        selLoc = getSelectedSuggestedLoc();
+    }
 
     // Custom location search - universal search for any location
     document.getElementById('locationSearchBtn').addEventListener('click', searchLocation);
@@ -348,7 +301,6 @@ function setupUI() {
     }));
     // Start
     document.getElementById('startBtn').addEventListener('click', async () => {
-        const launchMode = titleLaunchMode;
         document.getElementById('titleScreen').classList.add('hidden');
         document.getElementById('hud').classList.add('show');
         document.getElementById('minimap').classList.add('show');
@@ -452,13 +404,6 @@ function setupUI() {
         // Land use OFF by default (user can toggle on if needed)
         document.getElementById('fLandUse').classList.remove('on');
         document.getElementById('fLandUseRE').classList.remove('on');
-
-        // Optional launch-mode shortcuts from title selector.
-        if (launchMode === 'moon' && !onMoon && !travelingToMoon) {
-            directTravelToMoon();
-        } else if (launchMode === 'space' && !onMoon && !travelingToMoon) {
-            travelToMoon();
-        }
     });
 
     // Helper function to close all float menus
