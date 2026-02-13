@@ -249,8 +249,16 @@ function setupUI() {
         document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     }));
     // Locations
-    const locationPanels = document.querySelectorAll('#tab-location .location-panel');
-    const locationModeButtons = document.querySelectorAll('#tab-location .location-switch-btn[data-mode]');
+    const suggestedPanel = document.getElementById('suggestedPanel');
+    const customPanel = document.getElementById('customPanel');
+    const moonPanel = document.getElementById('moonPanel');
+    const spacePanel = document.getElementById('spacePanel');
+    const locationPanels = { suggested: suggestedPanel, custom: customPanel, moon: moonPanel, space: spacePanel };
+    const suggestedToggle = document.getElementById('suggestedToggle');
+    const customToggle = document.getElementById('customToggle');
+    const moonToggle = document.getElementById('moonToggle');
+    const spaceToggle = document.getElementById('spaceToggle');
+    const locationModeButtons = { suggested: suggestedToggle, custom: customToggle, moon: moonToggle, space: spaceToggle };
     let titleLaunchMode = 'earth'; // earth | moon | space
 
     const getSelectedSuggestedLoc = () => {
@@ -266,10 +274,16 @@ function setupUI() {
 
     const setTitleLocationMode = (mode) => {
         const nextMode = ['suggested', 'custom', 'moon', 'space'].includes(mode) ? mode : 'suggested';
-        const panelId = `${nextMode}Panel`;
+        const activePanel = locationPanels[nextMode] || locationPanels.suggested;
 
-        locationModeButtons.forEach(btn => btn.classList.toggle('active', btn.dataset.mode === nextMode));
-        locationPanels.forEach(panel => panel.classList.toggle('show', panel.id === panelId));
+        Object.entries(locationModeButtons).forEach(([btnMode, btn]) => {
+            if (!btn) return;
+            btn.classList.toggle('active', btnMode === nextMode);
+        });
+        Object.values(locationPanels).forEach(panel => {
+            if (!panel) return;
+            panel.classList.toggle('show', panel === activePanel);
+        });
 
         if (nextMode === 'suggested') {
             selLoc = getSelectedSuggestedLoc();
@@ -280,8 +294,10 @@ function setupUI() {
         } else {
             titleLaunchMode = nextMode;
             if (selLoc === 'custom') {
-                const latInput = parseFloat(document.getElementById('customLat')?.value);
-                const lonInput = parseFloat(document.getElementById('customLon')?.value);
+                const customLatEl = document.getElementById('customLat');
+                const customLonEl = document.getElementById('customLon');
+                const latInput = customLatEl ? parseFloat(customLatEl.value) : NaN;
+                const lonInput = customLonEl ? parseFloat(customLonEl.value) : NaN;
                 if (Number.isNaN(latInput) || Number.isNaN(lonInput)) {
                     selLoc = getSelectedSuggestedLoc();
                 }
@@ -289,16 +305,23 @@ function setupUI() {
         }
     };
 
-    document.querySelectorAll('#suggestedPanel .loc').forEach(el => el.addEventListener('click', () => {
-        document.querySelectorAll('#suggestedPanel .loc').forEach(e => e.classList.remove('sel'));
-        el.classList.add('sel');
-        selLoc = el.dataset.loc;
-        setTitleLocationMode('suggested');
-    }));
+    if (suggestedPanel) {
+        suggestedPanel.addEventListener('click', (event) => {
+            const clickTarget = event.target;
+            if (!(clickTarget instanceof Element)) return;
+            const selectedLoc = clickTarget.closest('.loc[data-loc]');
+            if (!selectedLoc) return;
+            suggestedPanel.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
+            selectedLoc.classList.add('sel');
+            selLoc = selectedLoc.dataset.loc;
+            setTitleLocationMode('suggested');
+        });
+    }
 
-    locationModeButtons.forEach(btn => {
+    Object.entries(locationModeButtons).forEach(([mode, btn]) => {
+        if (!btn) return;
         btn.addEventListener('click', () => {
-            setTitleLocationMode(btn.dataset.mode);
+            setTitleLocationMode(mode);
         });
     });
 
