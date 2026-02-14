@@ -449,6 +449,19 @@ function removeMemoryById(id) {
     return true;
 }
 
+function removeAllMemories() {
+    if (memoryEntries.length === 0) return true;
+    const previous = memoryEntries;
+    memoryEntries = [];
+    if (memoryPersistenceEnabled && !saveMemoryEntriesToStorage()) {
+        memoryEntries = previous;
+        return false;
+    }
+    hideMemoryInfo();
+    refreshMemoryMarkersForCurrentLocation();
+    return true;
+}
+
 function placeMemoryFromComposer() {
     if (!gameStarted) return;
     if (!memoryPersistenceEnabled) {
@@ -571,6 +584,7 @@ function setupMemoryUI() {
     const flowerBtn = document.getElementById('memoryTypeFlower');
     const placeBtn = document.getElementById('memoryPlaceBtn');
     const cancelBtn = document.getElementById('memoryCancelBtn');
+    const deleteAllBtn = document.getElementById('memoryDeleteAllBtn');
     const closeInfoBtn = document.getElementById('memoryInfoCloseBtn');
     const deleteInfoBtn = document.getElementById('memoryDeleteBtn');
     const homeBtn = document.getElementById('fHome');
@@ -592,6 +606,21 @@ function setupMemoryUI() {
     if (flowerBtn) flowerBtn.addEventListener('click', () => setComposerType('flower'));
     if (placeBtn) placeBtn.addEventListener('click', placeMemoryFromComposer);
     if (cancelBtn) cancelBtn.addEventListener('click', closeMemoryComposer);
+    if (deleteAllBtn) {
+        deleteAllBtn.addEventListener('click', () => {
+            if (memoryEntries.length === 0) {
+                setComposerStatus('No memories to delete.', false);
+                return;
+            }
+            const confirmed = globalThis.confirm(`Delete all ${memoryEntries.length} memories in this browser? This cannot be undone.`);
+            if (!confirmed) return;
+            if (removeAllMemories()) {
+                setComposerStatus('All memories deleted.', false);
+            } else {
+                setComposerStatus('Failed to delete all memories.', true);
+            }
+        });
+    }
     if (closeInfoBtn) closeInfoBtn.addEventListener('click', hideMemoryInfo);
 
     if (deleteInfoBtn) {
