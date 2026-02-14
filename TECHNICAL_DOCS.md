@@ -394,8 +394,8 @@ The engine includes a user-facing benchmark switch so performance can be compare
 ### Overlay anchoring and placement
 
 - `js/main.js` exposes `positionTopOverlays()` and computes placement from live element bounds.
-- Debug overlay (`#debugOverlay`) is centered between `#hud` and `#modeHud`.
-- Benchmark panel (`#perfPanel`) is centered between `#modeHud` and `#mainMenuBtn`.
+- Debug overlay (`#debugOverlay`) is centered between `#hud` and the virtual top-center anchor.
+- Benchmark panel (`#perfPanel`) is centered between the virtual top-center anchor and `#mainMenuBtn`.
 - Repositioning runs during HUD-throttled updates, perf panel refreshes, debug toggle, and `resize`.
 
 ### Snapshot schema highlights
