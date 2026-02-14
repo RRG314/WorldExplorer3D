@@ -52,14 +52,16 @@ Open `http://localhost:8000`.
 3. Optional: check `Show live benchmark overlay in-game` (default is OFF).
 4. Click `Apply + Reload World`.
 5. Click `Copy Snapshot` and paste the JSON into your notes.
-6. Overlay placement: debug sits between speed/mode HUD; benchmark sits between mode HUD/Main Menu.
-7. Compare:
+6. Auto quality manager is enabled by default and adjusts runtime budget tier from live FPS/frame-time pressure.
+7. Overlay placement: debug sits between speed/mode HUD; benchmark sits between mode HUD/Main Menu.
+8. Compare:
    - `lastLoad.loadMs`
    - `lastLoad.phases.fetchOverpass`
    - `renderer.calls`
    - `renderer.triangles`
    - `fps` / `frameMs`
    - `lastLoad.overpassSource` (`network` vs `memory-cache`)
+   - `dynamicBudget.*` and `lastLoad.dynamicBudget.*`
 
 Reference test (Baltimore, 2026-02-14):
 
@@ -67,7 +69,14 @@ Reference test (Baltimore, 2026-02-14):
 - RDT network load: `4669 ms`
 - RDT repeat load with memory cache: `2202-2246 ms` (`fetchOverpass: 0 ms`)
 
-## 5. Essential Controls
+## 5. Share an Experience Link
+
+1. Open `Settings`.
+2. Click `Copy Experience Link`.
+3. Share the copied URL.
+4. Recipient opens the URL and presses `Explore` to apply linked mode/camera/pose state.
+
+## 6. Essential Controls
 
 | Key | Action |
 | --- | --- |
@@ -107,7 +116,7 @@ Block builder action:
 | `🎮 Game Mode` -> `🧹 Clear Blocks` | Remove all build blocks for current location (including saved blocks) |
 | Block cap | Up to `100` total blocks can be stored for now |
 
-## 6. Troubleshooting
+## 7. Troubleshooting
 
 ### Black or blank view
 
@@ -125,7 +134,7 @@ Block builder action:
 
 - Clear browser cache.
 - Verify cache-bust values are aligned across `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
-- Current freeze snapshot cache-bust target is `v=50`.
+- Current freeze snapshot cache-bust target is `v=54`.
 
 ### Memory markers not persisting
 
@@ -133,7 +142,7 @@ Block builder action:
 - Avoid strict private/incognito settings that block storage.
 - Confirm marker placement is not showing a storage warning in the composer.
 
-## 7. Where to Go Next
+## 8. Where to Go Next
 
 - Usage details: `USER_GUIDE.md`
 - Engineering details: `TECHNICAL_DOCS.md`

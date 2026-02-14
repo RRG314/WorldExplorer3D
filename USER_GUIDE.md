@@ -5,6 +5,7 @@ Complete guide to using World Explorer 3D. Learn every feature, control, and sec
 ## Table of Contents
 - [Getting Started](#getting-started)
 - [Performance Benchmark Mode (RDT vs Baseline)](#performance-benchmark-mode-rdt-vs-baseline)
+- [Shareable Experience Links](#shareable-experience-links)
 - [Game Modes](#game-modes)
 - [Movement Systems](#movement-systems)
 - [Camera Controls](#camera-controls)
@@ -93,6 +94,7 @@ Use the title screen `Settings` tab to compare the two world-loading modes.
    - `Baseline (No RDT Budgeting)` for full-budget loading.
 4. Click `Apply + Reload World`.
 5. Click `Copy Snapshot` to export the current JSON metrics.
+6. Auto quality manager runs by default and continuously tunes runtime budget tier from live FPS/frame timing.
 
 ### Overlay behavior
 
@@ -110,6 +112,8 @@ Use the title screen `Settings` tab to compare the two world-loading modes.
 - `renderer.triangles`
 - `fps` and `frameMs`
 - `lastLoad.overpassSource` (`network` or `memory-cache`)
+- `dynamicBudget.tier` / `dynamicBudget.budgetScale` / `dynamicBudget.lodScale`
+- `lastLoad.dynamicBudget.*` to confirm which budget tier was used for that load
 
 ### Supporting test stats (Baltimore, 2026-02-14)
 
@@ -124,6 +128,20 @@ Interpretation:
 - RDT is currently faster at startup in the captured network run.
 - RDT repeat loads are significantly faster when Overpass data is reused from memory cache.
 - Draw calls still vary and can remain higher in RDT than baseline in some scenes.
+
+## Shareable Experience Links
+
+Use `Settings -> Copy Experience Link` to generate a URL that captures:
+
+- location (`loc`, or custom `lat/lon` + `lname`)
+- game mode (`gm`)
+- performance mode (`pm`)
+- seed (`seed`)
+- movement mode (`mode`)
+- camera mode (`camMode`)
+- runtime pose (`rx`, `ry`, `rz`, `yaw`, optional `pitch`)
+
+Open that URL and the app will preload the title-screen state, then apply mode/camera/pose after you press `Explore`.
 
 ## Game Modes
 
@@ -907,6 +925,9 @@ A: Main Menu -> `Settings` -> `⚡ Performance Benchmark` -> choose mode -> `App
 
 **Q: How do I export benchmark data?**
 A: In the same benchmark panel, click `Copy Snapshot` to copy JSON to clipboard.
+
+**Q: How do I share the exact experience setup with someone else?**
+A: In `Settings`, click `Copy Experience Link` and share the generated URL.
 
 **Q: Why is loading slow?**
 A: First loads are network-bound (Overpass + tiles). Repeat loads can be much faster when `lastLoad.overpassSource` shows `memory-cache`.

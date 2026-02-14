@@ -17,6 +17,9 @@ Entries reflect changes made relative to the most recent public release.
 - Updated GitHub issue templates for structured bug and feature intake.
 - Title-screen benchmark mode controls for `RDT` vs `Baseline` switching.
 - Benchmark snapshot export and optional in-game live perf overlay controls.
+- Auto quality manager in `perf.js` with FPS/frame-time spike-aware tiering (`performance` / `balanced` / `quality`).
+- Dynamic load-profile and LOD scaling path in `world.js` driven by runtime quality budget state.
+- Shareable experience links in `ui.js` (`Copy Experience Link`) with URL import for seed/location/mode/camera context.
 - Overpass fetch telemetry fields in snapshots (`overpassSource`, `overpassEndpoint`, `overpassCacheAgeMs`).
 - In-memory Overpass response cache with endpoint preference reuse for faster repeat loads.
 - Title launch mode row (`Earth`, `Moon`, `Space`) in the start menu.
@@ -42,7 +45,7 @@ Entries reflect changes made relative to the most recent public release.
 - POI map rendering now follows legend category filters on both minimap and large map.
 - Dynamic map/property/historic UI templates now escape untrusted string fields before insertion.
 - Top benchmark/debug overlays now auto-anchor between top HUD widgets to avoid overlap with controls.
-- Module loader cache-bust chain incremented through `v=50` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Module loader cache-bust chain incremented through `v=54` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 - Core docs now include benchmark workflow instructions and supporting measured stats for RDT vs baseline and cache-backed repeat loads.
 
 ### Fixed
@@ -60,6 +63,8 @@ Entries reflect changes made relative to the most recent public release.
 - Load regressions caused by partial retry accumulation after runtime errors in world-load passes.
 - World-load failure path where batching errors could abort load completion instead of recovering.
 - Intermittent stale-client behavior after hotfix pushes due to cache-bust drift (resolved with aligned loader version updates).
+- Share-link parsing bug where missing `lat/lon` could coerce to `0` and incorrectly force custom location payloads.
+- Pre-start share-link copy path now preserves pending mode/camera/seed state loaded from URL parameters.
 
 ---
 

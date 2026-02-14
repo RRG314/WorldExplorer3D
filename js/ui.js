@@ -339,7 +339,9 @@ function setupUI() {
     if (!hasKnown) return null;
 
     const toNum = (key) => {
-      const value = Number(params.get(key));
+      const raw = params.get(key);
+      if (raw === null || raw === '') return null;
+      const value = Number(raw);
       return Number.isFinite(value) ? value : null;
     };
     const normalizeLaunch = (value) => {
@@ -486,7 +488,8 @@ function setupUI() {
   function buildShareableExperienceLink() {
     const url = new URL(window.location.href);
     const params = new URLSearchParams();
-    const mode = getCurrentTravelMode();
+    const pending = appCtx.pendingExperienceState && typeof appCtx.pendingExperienceState === 'object' ? appCtx.pendingExperienceState : null;
+    const mode = !appCtx.gameStarted && pending && pending.travelMode ? pending.travelMode : getCurrentTravelMode();
     const launchMode =
     typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT) ? 'space' :
     appCtx.onMoon ? 'moon' :
@@ -508,27 +511,35 @@ function setupUI() {
     if (launchMode) params.set('launch', launchMode);
     if (appCtx.gameMode) params.set('gm', appCtx.gameMode);
     if (typeof appCtx.getPerfMode === 'function') params.set('pm', appCtx.getPerfMode());
-    if (Number.isFinite(appCtx.rdtSeed)) params.set('seed', String(appCtx.rdtSeed >>> 0));
-    if (Number.isFinite(appCtx.camMode)) params.set('camMode', String(Math.max(0, Math.min(2, appCtx.camMode | 0))));
+    const seedValue = Number.isFinite(Number(appCtx.sharedSeedOverride)) ? Number(appCtx.sharedSeedOverride) : Number(appCtx.rdtSeed);
+    if (Number.isFinite(seedValue)) params.set('seed', String((Math.floor(seedValue) | 0) >>> 0));
+    const cameraMode = !appCtx.gameStarted && pending && Number.isFinite(pending.camMode) ? pending.camMode : appCtx.camMode;
+    if (Number.isFinite(cameraMode)) params.set('camMode', String(Math.max(0, Math.min(2, cameraMode | 0))));
     params.set('mode', mode);
 
+    const pendingX = pending && Number.isFinite(pending.refX) ? pending.refX : null;
+    const pendingY = pending && Number.isFinite(pending.refY) ? pending.refY : null;
+    const pendingZ = pending && Number.isFinite(pending.refZ) ? pending.refZ : null;
+    const pendingYaw = pending && Number.isFinite(pending.yaw) ? pending.yaw : null;
+    const pendingPitch = pending && Number.isFinite(pending.pitch) ? pending.pitch : null;
+
     if (mode === 'drone') {
-      params.set('rx', fmt(appCtx.drone?.x || 0));
-      params.set('ry', fmt(appCtx.drone?.y || 0));
-      params.set('rz', fmt(appCtx.drone?.z || 0));
-      params.set('yaw', fmt(appCtx.drone?.yaw || 0, 4));
-      params.set('pitch', fmt(appCtx.drone?.pitch || 0, 4));
-    } else if (mode === 'walking' && appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker) {
-      const walker = appCtx.Walk.state.walker;
-      params.set('rx', fmt(walker.x || 0));
-      params.set('ry', fmt(walker.y || 0));
-      params.set('rz', fmt(walker.z || 0));
-      params.set('yaw', fmt(walker.yaw || walker.angle || 0, 4));
+      params.set('rx', fmt(pendingX ?? appCtx.drone?.x ?? 0));
+      params.set('ry', fmt(pendingY ?? appCtx.drone?.y ?? 0));
+      params.set('rz', fmt(pendingZ ?? appCtx.drone?.z ?? 0));
+      params.set('yaw', fmt(pendingYaw ?? appCtx.drone?.yaw ?? 0, 4));
+      params.set('pitch', fmt(pendingPitch ?? appCtx.drone?.pitch ?? 0, 4));
+    } else if (mode === 'walking') {
+      const walker = appCtx.Walk && appCtx.Walk.state ? appCtx.Walk.state.walker : null;
+      params.set('rx', fmt(pendingX ?? walker?.x ?? 0));
+      params.set('ry', fmt(pendingY ?? walker?.y ?? 1.7));
+      params.set('rz', fmt(pendingZ ?? walker?.z ?? 0));
+      params.set('yaw', fmt(pendingYaw ?? walker?.yaw ?? walker?.angle ?? 0, 4));
     } else {
-      params.set('rx', fmt(appCtx.car?.x || 0));
-      params.set('ry', fmt(appCtx.car?.y || 0));
-      params.set('rz', fmt(appCtx.car?.z || 0));
-      params.set('yaw', fmt(appCtx.car?.angle || 0, 4));
+      params.set('rx', fmt(pendingX ?? appCtx.car?.x ?? 0));
+      params.set('ry', fmt(pendingY ?? appCtx.car?.y ?? 0));
+      params.set('rz', fmt(pendingZ ?? appCtx.car?.z ?? 0));
+      params.set('yaw', fmt(pendingYaw ?? appCtx.car?.angle ?? 0, 4));
     }
 
     url.search = params.toString();
@@ -675,20 +686,22 @@ function setupUI() {
     appCtx.LOCS &&
     appCtx.LOCS[sharedExperienceParams.loc]);
 
-    if (hasCustomCoords || sharedExperienceParams.loc === 'custom') {
-      const lat = hasCustomCoords ? sharedExperienceParams.lat : Number(appCtx.customLoc?.lat || 0);
-      const lon = hasCustomCoords ? sharedExperienceParams.lon : Number(appCtx.customLoc?.lon || 0);
+    if (hasCustomCoords) {
+      const lat = sharedExperienceParams.lat;
+      const lon = sharedExperienceParams.lon;
       const customLatInput = document.getElementById('customLat');
       const customLonInput = document.getElementById('customLon');
       if (customLatInput && Number.isFinite(lat)) customLatInput.value = lat.toFixed(6);
       if (customLonInput && Number.isFinite(lon)) customLonInput.value = lon.toFixed(6);
       appCtx.customLoc = {
-        lat: Number.isFinite(lat) ? lat : appCtx.customLoc?.lat || 0,
-        lon: Number.isFinite(lon) ? lon : appCtx.customLoc?.lon || 0,
+        lat,
+        lon,
         name: sharedExperienceParams.name || appCtx.customLoc?.name || 'Shared Location'
       };
       appCtx.selLoc = 'custom';
       setTitleLocationMode('custom');
+    } else if (sharedExperienceParams.loc === 'custom' && !hasCustomCoords && perfSettingsStatus) {
+      perfSettingsStatus.textContent = 'Share link missing custom coordinates (lat/lon). Using current location selection.';
     } else if (hasPresetLoc) {
       const selectedLocKey = sharedExperienceParams.loc;
       const selectedLocCard = document.querySelector(`.loc[data-loc="${selectedLocKey}"]`);

@@ -10,6 +10,7 @@ Developer guide for World Explorer 3D. Architecture, code structure, and customi
 - [Core Systems](#core-systems)
 - [Deterministic RDT & RGE-256 Layer](#deterministic-rdt--rge-256-layer)
 - [Benchmark Mode (RDT vs Baseline)](#benchmark-mode-rdt-vs-baseline)
+- [Shareable Experience Link Payload](#shareable-experience-link-payload)
 - [API Integration](#api-integration)
 - [Rendering Pipeline](#rendering-pipeline)
 - [Persistent Memory Markers](#persistent-memory-markers)
@@ -45,8 +46,11 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - Voxel-style brick builder subsystem added (`js/blocks.js`) with click place/stack and shift-click removal.
 - Runtime benchmark settings panel added in title-screen `Settings` for `RDT` vs `Baseline` mode switching.
 - Perf snapshot export path added (`Copy Snapshot`) and optional in-game benchmark overlay.
+- Auto quality manager added in `js/perf.js` with FPS/frame-time driven budget tiers.
+- World-load profile scaling now consumes dynamic budget/LOD state in `js/world.js`.
+- Shareable experience link export/import added in `js/ui.js` (`Copy Experience Link` + URL param parsing).
 - Overpass endpoint preference + in-memory response cache added for faster repeat loads.
-- Loader cache-bust chain is aligned through `v=50` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Loader cache-bust chain is aligned through `v=54` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### High-Level Architecture
 
@@ -372,16 +376,19 @@ The engine includes a user-facing benchmark switch so performance can be compare
 - Overlay toggle: `#perfOverlayToggle`
 - Apply/reload action: `#perfApplyReload`
 - Snapshot export action: `#perfCopySnapshot`
+- Experience link action: `#shareExperienceBtn`
 
 ### Mode semantics
 
 - `rdt`: uses adaptive feature budgets, RDT depth-driven limits, and mixed collider detail.
 - `baseline`: disables RDT budgeting and uses full baseline budgets.
+- Auto quality (default ON): adjusts dynamic budget tier (`performance`, `balanced`, `quality`) from live FPS/frame-time and frame-spike pressure.
 
 ### Persistence and defaults
 
 - Mode storage key: `worldExplorerPerfMode`
 - Overlay storage key: `worldExplorerPerfOverlay`
+- Auto-quality storage key: `worldExplorerPerfAutoQuality`
 - Overlay default: forced OFF each session (`setPerfOverlayEnabled(false, { persist: false })` in `js/perf.js`) so diagnostics remain opt-in.
 
 ### Overlay anchoring and placement
@@ -397,6 +404,7 @@ The engine includes a user-facing benchmark switch so performance can be compare
 
 - top-level render stats (`fps`, `frameMs`, `renderer.*`)
 - live counts (`live.worldCounts`, `live.lodVisible`)
+- dynamic quality budget state (`dynamicBudget.*`, `live.quality.*`)
 - last world-load summary (`lastLoad.*`)
 
 `world.js` appends load diagnostics:
@@ -404,6 +412,7 @@ The engine includes a user-facing benchmark switch so performance can be compare
 - `lastLoad.overpassSource` (`network` or `memory-cache`)
 - `lastLoad.overpassEndpoint`
 - `lastLoad.overpassCacheAgeMs`
+- `lastLoad.dynamicBudget` (budget tier and scales used for that load)
 - per-phase timings in `lastLoad.phases`
 
 ### Supporting test stats (Baltimore, 2026-02-14)
@@ -419,6 +428,27 @@ Current takeaway from these runs:
 - RDT startup is faster than baseline for this dataset.
 - Repeat RDT loads are much faster when Overpass fetch is served from memory cache.
 - Draw-call variance is still a tuning target in RDT mode.
+
+## Shareable Experience Link Payload
+
+`ui.js` supports copying and parsing URL payloads for reproducible runs:
+
+- `loc` (`baltimore`, `seattle`, etc.) or `custom` with:
+- `lat`, `lon`, `lname` (custom location coordinates/name)
+- `launch` (`earth`, `moon`, `space`)
+- `gm` (`free`, `trial`, `checkpoint`)
+- `pm` (`rdt`, `baseline`)
+- `seed` (deterministic seed override routed to `world.js` as `sharedSeedOverride`)
+- `mode` (`driving`, `walking`, `drone`, `rocket`)
+- `camMode` (`0`, `1`, `2`)
+- `rx`, `ry`, `rz`, `yaw`, optional `pitch` (runtime pose)
+
+Flow:
+
+1. On boot, `ui.js` parses query params and preloads title-screen selections.
+2. Parsed runtime state is cached in `appCtx.pendingExperienceState`.
+3. After world start, runtime mode/camera/pose is applied.
+4. `Copy Experience Link` regenerates a URL from active state or pending shared state.
 
 ## API Integration
 
@@ -947,7 +977,7 @@ document.getElementById('myElement').addEventListener('click', () => {
   - `js/bootstrap.js` (`manifest.js?...`, `script-loader.js?...`)
   - `js/modules/manifest.js` (`CACHE_BUST`)
   - `js/app-entry.js` (module import query suffixes)
-  - Current expected value: `v=50`
+  - Current expected value: `v=54`
 
 ### Debugging Tools
 

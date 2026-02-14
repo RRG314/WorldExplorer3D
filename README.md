@@ -40,6 +40,7 @@ Open `http://localhost:8000`.
 - Persistent memory markers (pin/flower + short note) with in-world remove and bulk delete actions.
 - Minecraft-style brick block builder (place, stack, and remove blocks in-world).
 - Deterministic runtime seeding and complexity logic through RDT + RGE256-based paths.
+- Shareable experience links (seed/location/mode/camera context) from the Settings panel.
 
 ## Core Features
 
@@ -111,6 +112,7 @@ Use the built-in benchmark controls from the title screen:
 3. Optional: enable `Show live benchmark overlay in-game` (default is OFF each session).
 4. Click `Apply + Reload World`.
 5. Click `Copy Snapshot` to copy a JSON benchmark payload.
+6. Auto quality manager runs by default and adjusts runtime budget tier (`performance`, `balanced`, `quality`) from live FPS/frame-time pressure.
 
 In-game overlay placement:
 
@@ -126,6 +128,31 @@ Snapshot fields to compare:
 - `renderer.triangles`
 - `fps` and `frameMs`
 - `lastLoad.overpassSource` (`network` or `memory-cache`)
+- `dynamicBudget.*` (top-level snapshot quality/budget state)
+- `lastLoad.dynamicBudget.*` (quality/budget state used during that load)
+
+## Shareable Experience Links
+
+Use the title-screen `Settings` tab:
+
+1. Click `Copy Experience Link`.
+2. Share the copied URL.
+
+The URL payload supports:
+
+- location (`loc`, or custom `lat/lon` + `lname`)
+- game mode (`gm`)
+- performance mode (`pm`)
+- deterministic seed (`seed`)
+- movement mode (`mode`)
+- camera mode (`camMode`)
+- runtime pose (`rx`, `ry`, `rz`, `yaw`, optional `pitch`)
+
+When a shared URL is opened:
+
+- title-screen state is prefilled from params
+- a status note confirms payload load
+- mode/camera/pose state is applied after `Explore` starts
 
 ## Supporting Benchmark Stats (Baltimore, 2026-02-14)
 
@@ -182,7 +209,7 @@ Interpretation:
 - Runtime is split into multiple JS files (`js/*.js`) with no build step.
 - Shared/global runtime state is still used across core systems.
 - ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
-- Cache-bust version alignment across loader chain is currently `v=50`.
+- Cache-bust version alignment across loader chain is currently `v=54`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
 ## Freeze Snapshot (2026-02-14)
@@ -200,6 +227,8 @@ Interpretation:
 - Added Minecraft-style brick block builder with stacking/removal controls.
 - Added persistent per-location block storage and walk-mode climbing support on placed blocks.
 - Added runtime performance benchmark mode switch (`RDT` vs `Baseline`) with in-game snapshot export.
+- Added FPS/frame-time auto quality manager (`perf.js`) with dynamic budget/LOD scaling consumed by `world.js`.
+- Added shareable experience link export/import for seed/location/mode/camera runtime context.
 - Added Overpass endpoint preference plus memory-cache reuse for faster repeat city loads.
 
 ## Repository Structure

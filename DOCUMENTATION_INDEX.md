@@ -16,6 +16,7 @@ This index lists the documentation that exists in this branch today.
 | `CONTRIBUTING.md` | Contribution process and PR rules |
 | `CHANGELOG.md` | Version and release changes |
 | `SECURITY_STORAGE_NOTICE.md` | Memory-storage behavior, security baseline, and disclaimer boilerplate |
+| `SYSTEMS_INVENTORY_REPORT_2026-02-14.md` | Full systems, subsystems, and feature inventory snapshot |
 | `ACKNOWLEDGEMENTS.md` | Third-party and first-party research attributions |
 | `LICENSE` | Proprietary, all-rights-reserved source-available license |
 
@@ -43,12 +44,14 @@ The current branch documentation set includes updates for:
 - Legend checkboxes for independent memory pin/flower visibility on maps
 - Brick block builder controls (`B`, click place, shift-click remove, clear current location, 100-block cap)
 - Title-screen performance benchmark controls (`RDT` vs `Baseline`, overlay toggle, snapshot copy)
+- Auto quality manager with FPS/frame-time dynamic budgets (`perf.js` -> `world.js`)
+- Shareable experience link export/import (`Copy Experience Link`, URL payload parsing/apply)
 - Top-bar overlay anchoring for debug and benchmark panels between their target HUD widgets
 - Overpass endpoint preference and in-memory cache behavior for repeat-load acceleration
 - Supporting benchmark stats documentation from captured Baltimore test runs (network + memory-cache)
 - Security/storage boilerplate notice for persistent memory data
 - Dynamic UI text escaping in map/property/historic panels
-- Cache-bust loader chain alignment through `v=50`
+- Cache-bust loader chain alignment through `v=54`
 
 ## Maintainer Notes
 
