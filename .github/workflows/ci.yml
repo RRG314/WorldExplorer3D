@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - rdt-engine
+  pull_request:
+    branches:
+      - main
+      - rdt-engine
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: JavaScript Syntax Check
+        run: |
+          set -euo pipefail
+          for file in js/*.js js/modules/*.js; do
+            node --check "$file"
+          done
+
+      - name: Static Pages Readiness Check
+        run: node .github/scripts/check-pages-readiness.mjs

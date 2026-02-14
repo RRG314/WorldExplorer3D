@@ -32,6 +32,9 @@ Entries reflect changes made relative to the most recent public release.
 - Brick block builder module (`js/blocks.js`) with in-world place/stack/remove controls.
 - Persistent per-location build-block storage (`worldExplorer3D.buildBlocks.v1`) with runtime status hook (`getBuildPersistenceStatus()`).
 - Security/storage notice document for persistent memory behavior and disclaimer boilerplate.
+- GitHub Actions workflows for CI (`.github/workflows/ci.yml`) and Pages deployment (`.github/workflows/pages.yml`).
+- PR template for structured contributor submissions (`.github/pull_request_template.md`).
+- Repository Pages readiness validator script (`.github/scripts/check-pages-readiness.mjs`).
 
 ### Changed
 - Technical documentation examples now show deterministic RNG usage patterns aligned with the `rdt.js` seeded runtime helpers.

@@ -26,6 +26,15 @@ Open `http://localhost:8000`.
 
 ## 2. Deploy to GitHub Pages
 
+Recommended (automated):
+
+1. In GitHub: `Settings > Pages`.
+2. Set source to `GitHub Actions`.
+3. Push to `rdt-engine` (or `main`).
+4. Wait for `Deploy Pages` workflow to complete.
+
+Fallback (manual branch deploy):
+
 1. Push your branch.
 2. In GitHub: `Settings > Pages`.
 3. Set source to `Deploy from a branch`.

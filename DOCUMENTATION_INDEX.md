@@ -49,6 +49,7 @@ The current branch documentation set includes updates for:
 - Security/storage boilerplate notice for persistent memory data
 - Dynamic UI text escaping in map/property/historic panels
 - Cache-bust loader chain alignment through `v=50`
+- GitHub Actions workflows for CI validation and Pages deployment automation
 
 ## Maintainer Notes
 
