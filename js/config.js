@@ -1,5 +1,8 @@
-// Game configuration and constants
-export const LOCATIONS = {
+// ============================================================================
+// config.js - Game configuration, locations, and constants
+// ============================================================================
+
+const LOCS = {
     baltimore: { name: 'Baltimore', lat: 39.2904, lon: -76.6122 },
     hollywood: { name: 'Hollywood', lat: 34.0928, lon: -118.3287 },
     newyork: { name: 'New York', lat: 40.7580, lon: -73.9855 },
@@ -10,13 +13,45 @@ export const LOCATIONS = {
     lasvegas: { name: 'Las Vegas', lat: 36.1699, lon: -115.1398 },
     london: { name: 'London', lat: 51.5074, lon: -0.1278 },
     paris: { name: 'Paris', lat: 48.8566, lon: 2.3522 },
-    dubai: { name: 'Dubai', lat: 25.2048, lon: 55.2708 }
+    dubai: { name: 'Dubai', lat: 25.2048, lon: 55.2708 },
+    sanfrancisco: { name: 'San Francisco', lat: 37.7749, lon: -122.4194 },
+    losangeles: { name: 'Los Angeles', lat: 34.0522, lon: -118.2437 },
+    chicago: { name: 'Chicago', lat: 41.8781, lon: -87.6298 },
+    seattle: { name: 'Seattle', lat: 47.6062, lon: -122.3321 }
 };
+const locKeys = Object.keys(LOCS);
+const SCALE = 100000;
+let LOC = { lat: 39.2904, lon: -76.6122 };
+let customLoc = null;
+const geoToWorld = (lat, lon) => ({ x: (lon - LOC.lon) * SCALE * Math.cos(LOC.lat * Math.PI / 180), z: -(lat - LOC.lat) * SCALE });
 
-export const SCALE = 100000;
+// =====================
+// TERRAIN (Terrarium tiles)
+// =====================
+
+// AWS Terrarium tiles for elevation data
+const TERRAIN_TILE_URL = (z, x, y) =>
+  `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
+
+// Terrain settings
+const TERRAIN_ZOOM = 13;           // 12–14 is typical for driving
+const TERRAIN_RING = 2;            // 2 => 5x5 tiles around player (reduces visible terrain edge cliffs)
+const TERRAIN_SEGMENTS = 128;       // mesh resolution per tile (128 for accurate road-terrain alignment)
+const TERRAIN_Y_EXAGGERATION = 1.0; // 1.0 = real elevation
+
+// Conversion factors
+const METERS_PER_WORLD_UNIT = 111000 / SCALE;      // ~1.11
+const WORLD_UNITS_PER_METER = 1 / METERS_PER_WORLD_UNIT; // ~0.90
+
+// Tile caches
+const terrainTileCache = new Map(); // key: `${z}/${x}/${y}` => {loaded, elev, w, h}
+let terrainGroup = null;            // THREE.Group holding terrain meshes
+let terrainEnabled = true;          // toggle for terrain system
+let roadsNeedRebuild = true;        // rebuild roads after terrain loads
+let lastRoadRebuildCheck = 0;       // throttle rebuild checks
 
 // Land use styles for massive visual realism - ground truth rendering
-export const LANDUSE_STYLES = {
+const LANDUSE_STYLES = {
     residential: { color: 0xd4d4d4, name: 'Residential' },
     industrial: { color: 0x8c8c8c, name: 'Industrial' },
     commercial: { color: 0xb8b8b8, name: 'Commercial' },
@@ -42,8 +77,8 @@ export const LANDUSE_STYLES = {
     greenfield: { color: 0x9ccc65, name: 'Greenfield' }
 };
 
-// POI types with icons and colors
-export const POI_TYPES = {
+// POI types with icons and colors for meaning in the world
+const POI_TYPES = {
     'amenity=school': { icon: '🏫', category: 'Education', color: 0x2196f3 },
     'amenity=hospital': { icon: '🏥', category: 'Healthcare', color: 0xf44336 },
     'amenity=clinic': { icon: '🏥', category: 'Healthcare', color: 0xe91e63 },
@@ -67,49 +102,62 @@ export const POI_TYPES = {
     'historic=memorial': { icon: '🗿', category: 'Historic', color: 0x6d4c41 },
     'leisure=park': { icon: '🌳', category: 'Recreation', color: 0x66bb6a },
     'leisure=stadium': { icon: '🏟️', category: 'Sports', color: 0xffc107 },
-    'leisure=sports_centre': { icon: '⚽', category: 'Sports', color: 0xff9800 }
+    'leisure=sports_centre': { icon: '⚽', category: 'Sports', color: 0xff9800 },
+    'leisure=playground': { icon: '🎪', category: 'Recreation', color: 0xe91e63 }
 };
 
-export const PHYSICS_CONFIG = {
-    maxSpd: 120,
-    offMax: 60,
-    accel: 25,
-    boostAccel: 45,
-    brake: 150,
-    friction: 25,
-    offFriction: 120,
-    boostMax: 140,
-    boostDur: 2.5,
-    brakeForce: 2.5,
+function exposeMutableGlobal(name, getter, setter) {
+    Object.defineProperty(globalThis, name, {
+        configurable: true,
+        enumerable: true,
+        get: getter,
+        set: setter
+    });
+}
 
-    // Grip settings - realistic car physics
-    gripRoad: 0.88,
-    gripOff: 0.70,
-    gripBrake: 0.60,
-    gripDrift: 0.45,
-    driftRec: 6,
+exposeMutableGlobal('LOC', () => LOC, (v) => { LOC = v; });
+exposeMutableGlobal('customLoc', () => customLoc, (v) => { customLoc = v; });
+exposeMutableGlobal('terrainGroup', () => terrainGroup, (v) => { terrainGroup = v; });
+exposeMutableGlobal('terrainEnabled', () => terrainEnabled, (v) => { terrainEnabled = v; });
+exposeMutableGlobal('roadsNeedRebuild', () => roadsNeedRebuild, (v) => { roadsNeedRebuild = v; });
+exposeMutableGlobal('lastRoadRebuildCheck', () => lastRoadRebuildCheck, (v) => { lastRoadRebuildCheck = v; });
 
-    // Turn settings - realistic steering
-    turnLow: 1.8,
-    turnHigh: 0.8,
-    turnMin: 30,
+Object.assign(globalThis, {
+    LANDUSE_STYLES,
+    LOCS,
+    METERS_PER_WORLD_UNIT,
+    POI_TYPES,
+    SCALE,
+    TERRAIN_RING,
+    TERRAIN_SEGMENTS,
+    TERRAIN_TILE_URL,
+    TERRAIN_Y_EXAGGERATION,
+    TERRAIN_ZOOM,
+    WORLD_UNITS_PER_METER,
+    geoToWorld,
+    locKeys,
+    terrainTileCache
+});
 
-    // Road boundary settings
-    roadForce: 0.93,
-    roadPushback: 0.3,
-    maxOffDist: 15,
-
-    // Game modes
-    cpRadius: 25,
-    trialTime: 120,
-    policeSpd: 140,
-    policeAccel: 60,
-    policeDist: 800
-};
-
-export const CAMERA_MODES = {
-    FOLLOW: 0,
-    CHASE: 1,
-    TOP: 2,
-    HOOD: 3
+export {
+    LANDUSE_STYLES,
+    LOC,
+    LOCS,
+    METERS_PER_WORLD_UNIT,
+    POI_TYPES,
+    SCALE,
+    TERRAIN_RING,
+    TERRAIN_SEGMENTS,
+    TERRAIN_TILE_URL,
+    TERRAIN_Y_EXAGGERATION,
+    TERRAIN_ZOOM,
+    WORLD_UNITS_PER_METER,
+    customLoc,
+    geoToWorld,
+    lastRoadRebuildCheck,
+    locKeys,
+    roadsNeedRebuild,
+    terrainEnabled,
+    terrainGroup,
+    terrainTileCache
 };

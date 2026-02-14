@@ -1,0 +1,56 @@
+WORLD EXPLORER 3D SOURCE-AVAILABLE LICENSE
+
+Copyright (c) 2026 Steven Reid / World Explorer 3D
+All Rights Reserved.
+
+1. License Model
+
+This repository is publicly viewable source code, but it is not open-source software.
+No permission is granted to use, copy, modify, distribute, sublicense, sell, or create derivative works from this codebase except as explicitly stated below.
+
+2. Limited Permission
+
+You may:
+
+- view and read the source code in the public repository
+- clone/fork for private evaluation, testing, and review
+- submit pull requests to this repository
+
+You may not, without prior written permission from the copyright holder:
+
+- redistribute this software or modified versions
+- publish derivative works
+- use this software in commercial or production systems
+- relicense this software
+- package or mirror this repository as a reusable code library
+
+3. Contributions
+
+By submitting code, docs, or other material to this repository, you grant the project maintainer a perpetual, worldwide, royalty-free right to use, modify, and incorporate that contribution into World Explorer 3D.
+
+4. Third-Party Components
+
+This project uses third-party libraries and datasets under their own terms, including:
+
+- Three.js (MIT License)
+- OpenStreetMap data (ODbL)
+- Other provider APIs and assets as documented in `ACKNOWLEDGEMENTS.md`
+
+Third-party components remain under their original licenses.
+
+5. Attribution Requirements
+
+Any permitted demonstration or reference to this project should retain:
+
+- "World Explorer 3D (c) 2026 Steven Reid / World Explorer 3D. All Rights Reserved."
+- "Map data (c) OpenStreetMap contributors"
+
+6. Disclaimer
+
+THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+IN NO EVENT SHALL THE COPYRIGHT HOLDER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN CONTRACT, TORT, OR OTHERWISE, ARISING FROM OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+7. Contact
+
+For licensing questions or commercial inquiries, contact the project maintainer.
