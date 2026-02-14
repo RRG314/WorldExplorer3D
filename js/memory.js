@@ -3,6 +3,7 @@
 // ============================================================================
 
 const MEMORY_STORAGE_KEY = 'worldExplorer3D.memories.v1';
+const MEMORY_STORAGE_TEST_KEY = 'worldExplorer3D.memories.test';
 const MEMORY_MAX_MESSAGE_LENGTH = 200;
 const MEMORY_MAX_PER_LOCATION = 300;
 const MEMORY_LOCATION_PRECISION = 5;
@@ -14,6 +15,8 @@ let memoryUIBound = false;
 let memoryClickBound = false;
 let selectedMemoryType = 'pin';
 let selectedMemoryEntryId = null;
+let memoryPersistenceEnabled = false;
+let memoryPersistenceDetail = 'Not initialized.';
 
 const memoryRaycaster = new THREE.Raycaster();
 const memoryMouse = new THREE.Vector2();
@@ -30,6 +33,31 @@ function parseDateSafe(iso) {
     const dt = new Date(iso);
     if (!Number.isFinite(dt.getTime())) return new Date().toISOString();
     return dt.toISOString();
+}
+
+function detectPersistentStorage() {
+    try {
+        if (!globalThis.localStorage) {
+            return { enabled: false, detail: 'localStorage is unavailable in this environment.' };
+        }
+        localStorage.setItem(MEMORY_STORAGE_TEST_KEY, 'ok');
+        const probe = localStorage.getItem(MEMORY_STORAGE_TEST_KEY);
+        localStorage.removeItem(MEMORY_STORAGE_TEST_KEY);
+        if (probe !== 'ok') {
+            return { enabled: false, detail: 'Storage round-trip check failed.' };
+        }
+        return { enabled: true, detail: 'Storage round-trip check passed.' };
+    } catch (err) {
+        return { enabled: false, detail: `Storage access blocked: ${err && err.message ? err.message : String(err)}` };
+    }
+}
+
+function getMemoryPersistenceStatus() {
+    return {
+        enabled: memoryPersistenceEnabled,
+        detail: memoryPersistenceDetail,
+        storageKey: MEMORY_STORAGE_KEY
+    };
 }
 
 function getCurrentLocationKey() {
@@ -86,6 +114,7 @@ function normalizeMemoryEntry(raw) {
 }
 
 function loadMemoryEntriesFromStorage() {
+    if (!memoryPersistenceEnabled) return [];
     try {
         const raw = localStorage.getItem(MEMORY_STORAGE_KEY);
         if (!raw) return [];
@@ -99,10 +128,28 @@ function loadMemoryEntriesFromStorage() {
 }
 
 function saveMemoryEntriesToStorage() {
+    if (!memoryPersistenceEnabled) return false;
     try {
         localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(memoryEntries));
+        return true;
     } catch (err) {
+        memoryPersistenceEnabled = false;
+        memoryPersistenceDetail = `Storage write failed: ${err && err.message ? err.message : String(err)}`;
         console.warn('[memory] Failed to save storage:', err);
+        updatePersistenceHint();
+        return false;
+    }
+}
+
+function updatePersistenceHint() {
+    const hint = document.getElementById('memoryPersistenceHint');
+    if (!hint) return;
+    if (memoryPersistenceEnabled) {
+        hint.textContent = 'Saved persistently in this browser (local storage).';
+        hint.classList.remove('warn');
+    } else {
+        hint.textContent = 'Persistent browser storage is unavailable. Marker placement is disabled.';
+        hint.classList.add('warn');
     }
 }
 
@@ -318,7 +365,12 @@ function openMemoryComposer(defaultType = 'pin') {
     if (!panel || !input) return;
     panel.classList.add('show');
     setComposerType(defaultType);
-    setComposerStatus('Drop point: your current ground position.', false);
+    updatePersistenceHint();
+    if (!memoryPersistenceEnabled) {
+        setComposerStatus('Persistent storage unavailable. Enable local storage for this site.', true);
+    } else {
+        setComposerStatus('Drop point: your current ground position.', false);
+    }
     updateComposerCharCount();
     input.focus();
 }
@@ -357,16 +409,25 @@ function hideMemoryInfo() {
 }
 
 function removeMemoryById(id) {
+    if (!memoryPersistenceEnabled) return false;
     const next = memoryEntries.filter((entry) => entry.id !== id);
     if (next.length === memoryEntries.length) return false;
+    const previous = memoryEntries;
     memoryEntries = next;
-    saveMemoryEntriesToStorage();
+    if (!saveMemoryEntriesToStorage()) {
+        memoryEntries = previous;
+        return false;
+    }
     refreshMemoryMarkersForCurrentLocation();
     return true;
 }
 
 function placeMemoryFromComposer() {
     if (!gameStarted) return;
+    if (!memoryPersistenceEnabled) {
+        setComposerStatus('Persistent storage unavailable. Marker placement is disabled.', true);
+        return;
+    }
     if (!isEnv || !ENV || !isEnv(ENV.EARTH)) {
         setComposerStatus('Memories can only be placed while in Earth mode.', true);
         return;
@@ -418,7 +479,11 @@ function placeMemoryFromComposer() {
     };
 
     memoryEntries.push(entry);
-    saveMemoryEntriesToStorage();
+    if (!saveMemoryEntriesToStorage()) {
+        memoryEntries.pop();
+        setComposerStatus('Failed to persist marker. Check browser storage permissions.', true);
+        return;
+    }
     refreshMemoryMarkersForCurrentLocation();
     closeMemoryComposer();
 }
@@ -514,14 +579,21 @@ function setupMemoryUI() {
     }
 
     updateComposerCharCount();
+    updatePersistenceHint();
 }
 
+{
+    const storageState = detectPersistentStorage();
+    memoryPersistenceEnabled = storageState.enabled;
+    memoryPersistenceDetail = storageState.detail;
+}
 memoryEntries = loadMemoryEntriesFromStorage();
 bindMemorySceneClick();
 
 Object.assign(globalThis, {
     clearMemoryMarkersForWorldReload,
     closeMemoryComposer,
+    getMemoryPersistenceStatus,
     openMemoryComposer,
     refreshMemoryMarkersForCurrentLocation,
     setupMemoryUI
@@ -530,6 +602,7 @@ Object.assign(globalThis, {
 export {
     clearMemoryMarkersForWorldReload,
     closeMemoryComposer,
+    getMemoryPersistenceStatus,
     openMemoryComposer,
     refreshMemoryMarkersForCurrentLocation,
     setupMemoryUI

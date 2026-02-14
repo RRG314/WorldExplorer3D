@@ -11,6 +11,7 @@ Developer guide for World Explorer 3D. Architecture, code structure, and customi
 - [Deterministic RDT & RGE-256 Layer](#deterministic-rdt--rge-256-layer)
 - [API Integration](#api-integration)
 - [Rendering Pipeline](#rendering-pipeline)
+- [Persistent Memory Markers](#persistent-memory-markers)
 - [Performance Optimization](#performance-optimization)
 - [Customization Guide](#customization-guide)
 - [Troubleshooting](#troubleshooting)
@@ -35,7 +36,8 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - Solar-system layer now renders both the main asteroid belt and the Kuiper belt.
 - Deep-sky galaxy catalog added in `solar-system.js` with RA/Dec placement and click inspection.
 - Deep-space renderer envelope expanded (`space.js` camera far clip and star shell range) to support farther galaxy distances.
-- Loader cache-bust chain is aligned through `v=21` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Persistent memory marker subsystem added (`js/memory.js`) with place/remove flow.
+- Loader cache-bust chain is aligned through `v=23` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### High-Level Architecture
 
@@ -64,7 +66,7 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 │  Data Layer                             │
 │  ├─ OpenStreetMap / Overpass Data       │
 │  ├─ Real Estate APIs                    │
-│  ├─ LocalStorage                        │
+│  ├─ LocalStorage (memory markers)       │
 │  └─ Configuration                       │
 └─────────────────────────────────────────┘
 ```
@@ -145,6 +147,7 @@ WorldExplorer3D/
    ├─ input.js
    ├─ hud.js
    ├─ map.js
+   ├─ memory.js
    ├─ ui.js
    └─ main.js
 ```
@@ -559,6 +562,25 @@ Key implementation files:
 
 - `js/solar-system.js`: belts, galaxies, click raycast integration, info panel content
 - `js/space.js`: deep-space camera clipping and star shell depth envelope
+
+## Persistent Memory Markers
+
+`js/memory.js` adds a persistent marker subsystem for Earth-mode locations:
+
+- Marker types: `pin` and `flower`
+- Message length cap: `200` characters
+- Storage key: `worldExplorer3D.memories.v1`
+- Placement guard: storage round-trip verification must pass before placement is enabled
+- Removal: click marker hitbox in world, then use `Remove Marker`
+- Rebuild timing: markers clear during world reload and rehydrate after location load completes
+
+Core public hooks:
+
+- `setupMemoryUI()`
+- `openMemoryComposer()`
+- `refreshMemoryMarkersForCurrentLocation()`
+- `clearMemoryMarkersForWorldReload()`
+- `getMemoryPersistenceStatus()`
 
 ## Performance Optimization
 

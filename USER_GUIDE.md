@@ -10,6 +10,7 @@ Complete guide to using World Explorer 3D. Learn every feature, control, and sec
 - [Map System](#map-system)
 - [Real Estate Features](#real-estate-features)
 - [Space Exploration](#space-exploration)
+- [Persistent Memories](#persistent-memories)
 - [Advanced Features](#advanced-features)
 - [Tips & Tricks](#tips--tricks)
 - [FAQ](#faq)
@@ -50,6 +51,7 @@ Complete guide to using World Explorer 3D. Learn every feature, control, and sec
 7. **Start Exploring!**
    - You spawn in a car
    - Drive around and discover the city
+   - Use `Exploration > Place Memory` to drop persistent pin/flower notes
 
 ### Interface Overview
 
@@ -576,6 +578,40 @@ You can click objects in space to inspect details:
 - Take screenshots of Earth from the moon
 - Experiment with drone mode on the moon
 
+## Persistent Memories
+
+Use memory markers to leave notes directly in the world.
+
+### What You Can Place
+
+- `📍 Pin`
+- `🌸 Flower`
+- Message up to `200` characters
+
+### How to Place
+
+1. Open `Exploration` float menu.
+2. Click `Place Memory`.
+3. Choose marker type (`Pin` or `Flower`).
+4. Enter your message.
+5. Click `Place Marker`.
+
+Placement uses your current Earth-mode position (car, walk, or drone reference point).
+
+### How to Remove (Erase / Pull Up)
+
+1. Click a placed marker in the world.
+2. Memory info panel opens.
+3. Click `Remove Marker`.
+
+### Persistence Behavior
+
+- Memory markers are persisted in browser local storage on this device/browser profile.
+- They reload automatically when you revisit that location.
+- If browser storage is blocked/disabled, placement is disabled and a warning is shown.
+- Markers are not automatically synced between different browsers/devices.
+- Optional check: run `getMemoryPersistenceStatus()` in browser console.
+
 ## Advanced Features
 
 ### Track Recording
@@ -655,6 +691,7 @@ Located on right side of screen:
    - POI browser
    - Navigation tools
    - Location search
+   - Place persistent memory markers
 
 2. **🏘️ Real Estate**:
    - Property browser
@@ -756,7 +793,7 @@ A: Yes, for satellite imagery and real estate data.
 A: Yes, optimized for tablets and phones with touch controls.
 
 **Q: Can I save my progress?**
-A: Game state is not saved between sessions currently.
+A: Full gameplay state is not saved, but memory markers (pin/flower notes) are persisted locally in your browser.
 
 **Q: Is it multiplayer?**
 A: Not yet, but planned for future updates.
@@ -797,6 +834,9 @@ A: Press N or click "Return to Earth" button.
 
 **Q: Why can I click galaxies in space?**
 A: Galaxies are selectable deep-sky objects with info panels for visual guidance and educational context.
+
+**Q: Are memory markers really persistent?**
+A: Yes. Marker placement is only enabled after a browser storage round-trip check passes, and markers are saved to local storage on this browser profile.
 
 **Q: Why can't I jump in driving mode?**
 A: Cars can't jump. Switch to walking mode (F key).
@@ -852,6 +892,9 @@ A: Right-click map to teleport out, or press N for next city.
 **Q: Car disappeared**
 A: Press F twice (walk mode then back to drive).
 
+**Q: Memory markers are not saving**
+A: Ensure browser local storage is enabled for the site and that private/incognito settings are not blocking storage.
+
 ## Keyboard Reference Card
 
 Quick reference for all controls:
@@ -880,6 +923,7 @@ Quick reference for all controls:
 |-----|--------|
 | M | Toggle Map |
 | N | Next City |
+| Exploration menu > Place Memory | Create persistent pin/flower note |
 | R | Record Track |
 | Esc | Pause |
 
@@ -898,6 +942,7 @@ Quick reference for all controls:
 | Click Moon | Travel to Moon |
 | Click Star | View Constellation |
 | Click Planet/Asteroid/Spacecraft/Galaxy | Open space inspector info |
+| Click Memory Marker | Open/remove memory note |
 | Right Click Map | Teleport |
 | Left Click Map | View Info |
 

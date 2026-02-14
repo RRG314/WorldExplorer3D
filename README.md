@@ -37,6 +37,7 @@ Open `http://localhost:8000`.
 - Space layer with Earth, Moon, and solar-system transitions in the same runtime.
 - Title menu launch-mode selector (Earth / Moon / Space) with one-click starts.
 - Click-to-inspect deep-space objects (planets, asteroids, spacecraft, galaxies).
+- Persistent memory markers (pin/flower + short note) with in-world remove action.
 - Deterministic runtime seeding and complexity logic through RDT + RGE256-based paths.
 
 ## Core Features
@@ -46,6 +47,7 @@ Open `http://localhost:8000`.
 - Preset cities plus custom location search.
 - Real-time road network, buildings, land use, POI overlays.
 - Real estate overlays (Estated, ATTOM, RentCast, and fallback data).
+- Persistent location memories: place/remove pins or flowers with 200-char messages.
 - Minimap + full map with teleport and layer toggles.
 - Time-of-day lighting and sky/constellation systems.
 
@@ -81,12 +83,27 @@ Open `http://localhost:8000`.
 | Utility | `` ` `` | Debug overlay |
 | Utility | `Esc` | Pause |
 
+Memory marker actions:
+
+- `Exploration` menu -> `Place Memory`
+- Click marker in-world -> `Remove Marker`
+
+## Persistent Memory Markers
+
+- Marker types: `Pin` and `Flower`
+- Message length: up to `200` characters
+- Storage: browser `localStorage` (`worldExplorer3D.memories.v1`)
+- Scope: per location center key (`LOC` rounded to 5 decimals)
+- Persistence guard: placement is disabled if browser storage round-trip check fails
+- Removal: click marker and choose `Remove Marker`
+- Verification: run `getMemoryPersistenceStatus()` in browser console
+
 ## Architecture Status (Current)
 
 - Runtime is split into multiple JS files (`js/*.js`) with no build step.
 - Shared/global runtime state is still used across core systems.
 - ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
-- Cache-bust version alignment across loader chain is currently `v=21`.
+- Cache-bust version alignment across loader chain is currently `v=23`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
 ## Freeze Snapshot (2026-02-14)
@@ -96,6 +113,7 @@ Open `http://localhost:8000`.
 - Added Kuiper belt and improved belt visibility (particle + band layers).
 - Added clickable galaxy background objects with distance/sky-position metadata in the inspector.
 - Updated start-menu Controls tab to include space-flight controls.
+- Added persistent memory markers (pin/flower), 200-char notes, and marker removal flow.
 
 ## Repository Structure
 
@@ -126,6 +144,7 @@ js/
   input.js
   hud.js
   map.js
+  memory.js
   ui.js
   main.js
 ```
