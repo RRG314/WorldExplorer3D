@@ -1749,8 +1749,6 @@ function init() {
         checkStarClick(e.clientX, e.clientY);
     });
 
-    setupUI();
-    renderLoop();
 }
 
 Object.assign(globalThis, {

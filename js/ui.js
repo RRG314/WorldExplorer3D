@@ -965,5 +965,3 @@ function setupUI() {
 Object.assign(globalThis, { setupUI });
 
 export { setupUI };
-
-init();
