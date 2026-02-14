@@ -36,7 +36,8 @@ The current branch documentation set includes updates for:
 - Space-flight controls listed in start-menu Controls tab
 - Asteroid belt + Kuiper belt visual layers
 - Clickable deep-sky galaxies with inspector info
-- Cache-bust loader chain alignment through `v=21`
+- Persistent memory markers (pin/flower + 200-char notes + remove flow)
+- Cache-bust loader chain alignment through `v=23`
 
 ## Maintainer Notes
 

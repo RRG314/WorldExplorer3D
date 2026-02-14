@@ -69,6 +69,9 @@ function switchEnv(newEnv) {
 
     // Update debug HUD
     _updateEnvDebug();
+    if (typeof globalThis.updateControlsModeUI === 'function') {
+        globalThis.updateControlsModeUI();
+    }
 
     return true;
 }

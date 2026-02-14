@@ -21,6 +21,9 @@ function setupUI() {
     if (historicBtn) {
         historicBtn.addEventListener('click', toggleHistoric);
     }
+    if (typeof setupMemoryUI === 'function') {
+        setupMemoryUI();
+    }
 
     // Property Controls
     const radiusSlider = document.getElementById('radiusSlider');
@@ -359,6 +362,8 @@ function setupUI() {
         document.getElementById('controlsTab').classList.add('show');
         document.getElementById('coords').classList.add('show');
         document.getElementById('historicBtn').classList.add('show');
+        const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
+        if (memoryFlowerFloatBtn) memoryFlowerFloatBtn.classList.add('show');
         gameStarted = true;
         switchEnv(ENV.EARTH);
 
@@ -447,6 +452,7 @@ function setupUI() {
             document.getElementById('fWalk').classList.remove('on');
             document.getElementById('fDrone').classList.remove('on');
         }
+        updateControlsModeUI();
 
         // Set initial map view button states
         document.getElementById('mapRoadsToggle').classList.add('active'); // Roads on by default
@@ -467,6 +473,48 @@ function setupUI() {
     // Helper function to close all float menus
     function closeAllFloatMenus() {
         document.querySelectorAll('.floatMenu').forEach(m => m.classList.remove('open'));
+    }
+    const ctrlHeader = document.getElementById('ctrlHeader');
+    const ctrlContent = document.getElementById('ctrlContent');
+    const drivingControls = document.getElementById('drivingControls');
+    const walkingControls = document.getElementById('walkingControls');
+    const droneControls = document.getElementById('droneControls');
+    const rocketControls = document.getElementById('rocketControls');
+
+    function detectControlsMode() {
+        if (typeof isEnv === 'function' && typeof ENV !== 'undefined' && isEnv(ENV.SPACE_FLIGHT)) return 'rocket';
+        if (droneMode) return 'drone';
+        if (Walk && Walk.state && Walk.state.mode === 'walk') return 'walking';
+        return 'driving';
+    }
+
+    function updateControlsModeUI() {
+        const mode = detectControlsMode();
+        if (drivingControls) drivingControls.style.display = mode === 'driving' ? 'block' : 'none';
+        if (walkingControls) walkingControls.style.display = mode === 'walking' ? 'block' : 'none';
+        if (droneControls) droneControls.style.display = mode === 'drone' ? 'block' : 'none';
+        if (rocketControls) rocketControls.style.display = mode === 'rocket' ? 'block' : 'none';
+        if (ctrlHeader) {
+            const modeLabel = mode === 'walking' ? 'Walking' : mode === 'drone' ? 'Drone' : mode === 'rocket' ? 'Rocket' : 'Driving';
+            const arrow = ctrlContent && ctrlContent.classList.contains('hidden') ? '▼' : '▲';
+            ctrlHeader.textContent = `🛞 ${modeLabel} ${arrow}`;
+        }
+    }
+
+    globalThis.updateControlsModeUI = updateControlsModeUI;
+    function goToMainMenu() {
+        gameStarted = false; paused = false; clearObjectives(); clearPolice(); policeOn = false; eraseTrack(); closePropertyPanel(); closeHistoricPanel(); clearPropertyMarkers(); realEstateMode = false; historicMode = false;
+        document.querySelectorAll('.floatMenu').forEach(m => m.classList.remove('open'));
+        document.getElementById('titleScreen').classList.remove('hidden');
+        ['hud','minimap','modeHud','police','floatMenuContainer','mainMenuBtn','pauseScreen','resultScreen','caughtScreen','controlsTab','coords','realEstateBtn','historicBtn','memoryFlowerFloatBtn'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('show');
+        });
+        if (ctrlContent) ctrlContent.classList.add('hidden');
+        if (typeof closeMemoryComposer === 'function') closeMemoryComposer();
+        const memoryInfoPanel = document.getElementById('memoryInfoPanel');
+        if (memoryInfoPanel) memoryInfoPanel.classList.remove('show');
+        updateControlsModeUI();
     }
 
     // Float menu
@@ -498,13 +546,16 @@ function setupUI() {
         if (!isOpen) menu.classList.add('open');
     });
 
-    document.getElementById('fHome').addEventListener('click', () => {
-        gameStarted = false; paused = false; clearObjectives(); clearPolice(); policeOn = false; eraseTrack(); closePropertyPanel(); closeHistoricPanel(); clearPropertyMarkers(); realEstateMode = false; historicMode = false;
-        document.querySelectorAll('.floatMenu').forEach(m => m.classList.remove('open'));
-        document.getElementById('titleScreen').classList.remove('hidden');
-        ['hud','minimap','modeHud','police','floatMenuContainer','mainMenuBtn','pauseScreen','resultScreen','caughtScreen','controlsTab','coords','realEstateBtn','historicBtn'].forEach(id => document.getElementById(id).classList.remove('show'));
-    });
+    const homeMenuItem = document.getElementById('fHome');
+    if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);
     document.getElementById('fNextCity').addEventListener('click', () => { nextCity(); closeAllFloatMenus(); });
+    const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
+    if (memoryFlowerFloatBtn) {
+        memoryFlowerFloatBtn.addEventListener('click', () => {
+            if (typeof openMemoryComposer === 'function') openMemoryComposer('flower');
+            closeAllFloatMenus();
+        });
+    }
     document.getElementById('fSatellite').addEventListener('click', () => {
         satelliteView = !satelliteView;
         document.getElementById('fSatellite').classList.toggle('on', satelliteView);
@@ -564,6 +615,7 @@ function setupUI() {
         document.getElementById('fDriving').classList.add('on');
         document.getElementById('fWalk').classList.remove('on');
         document.getElementById('fDrone').classList.remove('on');
+        updateControlsModeUI();
         closeAllFloatMenus();
     });
 
@@ -583,6 +635,7 @@ function setupUI() {
             document.getElementById('fWalk').classList.add('on');
             document.getElementById('fDrone').classList.remove('on');
         }
+        updateControlsModeUI();
         closeAllFloatMenus();
     });
 
@@ -624,6 +677,7 @@ function setupUI() {
         document.getElementById('fDriving').classList.remove('on');
         document.getElementById('fWalk').classList.remove('on');
         document.getElementById('fDrone').classList.add('on');
+        updateControlsModeUI();
         closeAllFloatMenus();
     });
 
@@ -709,11 +763,17 @@ function setupUI() {
         document.getElementById('fConstellations').classList.toggle('on', constellationsVisible);
         closeAllFloatMenus();
     });
-    document.getElementById('ctrlHeader').addEventListener('click', () => document.getElementById('ctrlContent').classList.toggle('hidden'));
+    if (ctrlHeader && ctrlContent) {
+        ctrlHeader.addEventListener('click', (e) => {
+            e.stopPropagation();
+            ctrlContent.classList.toggle('hidden');
+            updateControlsModeUI();
+        });
+    }
 
     // Main Menu Button
     document.getElementById('mainMenuBtn').addEventListener('click', () => {
-        document.getElementById('fHome').click();
+        goToMainMenu();
     });
 
     // Close float menus when clicking outside
@@ -723,19 +783,24 @@ function setupUI() {
         // Check if click is outside float menu container
         const floatContainer = document.getElementById('floatMenuContainer');
         const mainMenuBtn = document.getElementById('mainMenuBtn');
+        const controlsTab = document.getElementById('controlsTab');
 
         if (!floatContainer.contains(e.target) && e.target !== mainMenuBtn) {
             closeAllFloatMenus();
+        }
+        if (controlsTab && !controlsTab.contains(e.target) && ctrlContent) {
+            ctrlContent.classList.add('hidden');
+            updateControlsModeUI();
         }
     });
 
     document.getElementById('resumeBtn').addEventListener('click', () => { paused = false; document.getElementById('pauseScreen').classList.remove('show'); });
     document.getElementById('restartBtn').addEventListener('click', () => { paused = false; document.getElementById('pauseScreen').classList.remove('show'); startMode(); });
-    document.getElementById('menuBtn').addEventListener('click', () => document.getElementById('fHome').click());
+    document.getElementById('menuBtn').addEventListener('click', () => goToMainMenu());
     document.getElementById('caughtBtn').addEventListener('click', () => { document.getElementById('caughtScreen').classList.remove('show'); policeHits = 0; paused = false; document.getElementById('police').textContent = '💔 0/3'; spawnOnRoad(); });
     document.getElementById('againBtn').addEventListener('click', () => { hideResult(); paused = false; startMode(); });
     document.getElementById('freeBtn').addEventListener('click', () => { hideResult(); paused = false; gameMode = 'free'; clearObjectives(); });
-    document.getElementById('resMenuBtn').addEventListener('click', () => { hideResult(); document.getElementById('fHome').click(); });
+    document.getElementById('resMenuBtn').addEventListener('click', () => { hideResult(); goToMainMenu(); });
 
     // Map controls
     document.getElementById('minimap').addEventListener('click', () => {

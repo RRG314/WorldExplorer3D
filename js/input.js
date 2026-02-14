@@ -35,6 +35,7 @@ function onKey(code, event) {
         } else {
             console.error('Walk module does not exist!');
         }
+        if (typeof updateControlsModeUI === 'function') updateControlsModeUI();
         return;
     }
 
@@ -84,6 +85,7 @@ function onKey(code, event) {
         document.getElementById('fDrone').classList.toggle('on', droneMode);
         document.getElementById('fDriving').classList.toggle('on', !droneMode);
         document.getElementById('fWalk').classList.remove('on');
+        if (typeof updateControlsModeUI === 'function') updateControlsModeUI();
     }
     // Debug overlay toggle (Backtick ` key)
     if (code === 'Backquote') {

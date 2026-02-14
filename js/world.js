@@ -378,6 +378,9 @@ async function loadRoads() {
     const locName = selLoc === 'custom' ? (customLoc?.name || 'Custom') : LOCS[selLoc].name;
     showLoad('Loading ' + locName + '...');
     worldLoading = true;
+    if (typeof clearMemoryMarkersForWorldReload === 'function') {
+        clearMemoryMarkersForWorldReload();
+    }
     // Properly dispose of all meshes to prevent memory leaks
     roadMeshes.forEach(m => {
         scene.remove(m);
@@ -1371,6 +1374,9 @@ async function loadRoads() {
                 if (terrainEnabled && !onMoon && typeof updateTerrainAround === 'function') {
                     updateTerrainAround(car.x, car.z);
                 }
+                if (typeof refreshMemoryMarkersForCurrentLocation === 'function') {
+                    refreshMemoryMarkersForCurrentLocation();
+                }
                 hideLoad();
                 // Align star field to current location
                 alignStarFieldToLocation(LOC.lat, LOC.lon);
@@ -1508,6 +1514,9 @@ async function loadRoads() {
                 spawnOnRoad();
                 if (terrainEnabled && !onMoon && typeof updateTerrainAround === 'function') {
                     updateTerrainAround(car.x, car.z);
+                }
+                if (typeof refreshMemoryMarkersForCurrentLocation === 'function') {
+                    refreshMemoryMarkersForCurrentLocation();
                 }
                 hideLoad();
                 if (gameStarted) startMode();

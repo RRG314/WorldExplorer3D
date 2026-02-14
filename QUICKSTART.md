@@ -41,6 +41,7 @@ Open `http://localhost:8000`.
 5. Press `F` for walk mode.
 6. Press `6` for drone mode.
 7. Press `M` for large map.
+8. Open `Exploration` menu and try `Place Memory` (pin/flower + note).
 
 ## 4. Essential Controls
 
@@ -63,6 +64,13 @@ Space-flight specific:
 | `Space` | Thrust / boost |
 | `Shift` | Brake / decelerate |
 
+Memory marker action:
+
+| Action | Result |
+| --- | --- |
+| `Exploration` menu -> `Place Memory` | Open persistent memory composer |
+| Click memory marker -> `Remove Marker` | Erase pin / pull flower |
+
 ## 5. Troubleshooting
 
 ### Black or blank view
@@ -81,7 +89,13 @@ Space-flight specific:
 
 - Clear browser cache.
 - Verify cache-bust values are aligned across `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
-- Current freeze snapshot cache-bust target is `v=21`.
+- Current freeze snapshot cache-bust target is `v=23`.
+
+### Memory markers not persisting
+
+- Ensure browser local storage is enabled for this site.
+- Avoid strict private/incognito settings that block storage.
+- Confirm marker placement is not showing a storage warning in the composer.
 
 ## 6. Where to Go Next
 

@@ -68,6 +68,7 @@ This ensures:
 - Navigation routing and waypoint display
 - Real estate property overlays
 - Historic site discovery
+- Persistent memory marker notes (pin/flower placement + removal)
 
 **Files:** `game.js`, `real-estate.js`
 
@@ -96,6 +97,7 @@ This ensures:
 - Zoomable large map with layer toggles (satellite, roads, landuse, POIs)
 - Pause, results, and alert overlays
 - Start-menu controls tab (driving/walking/drone/space-flight mappings)
+- Memory composer/info overlays for persistent marker placement and removal
 - Property panels, historic site cards, modal system
 
 **Files:** `hud.js`, `map.js`, `ui.js`
@@ -116,9 +118,10 @@ The world initialization follows this sequence:
 8. **Build terrain mesh** -- elevation data decoded (R*256 + G + B/256 - 32768) and applied to a subdivided plane
 9. **Align roads and buildings to terrain** -- road vertices and building bases repositioned to match elevation
 10. **Spawn car on nearest road** -- vehicle placed at a valid road point with correct orientation
-11. **Start main loop** -- `renderLoop()` begins the update/render cycle
+11. **Hydrate persistent markers** -- memory markers for current location are rebuilt from browser storage
+12. **Start main loop** -- `renderLoop()` begins the update/render cycle
 
-Location switching (`nextCity()`, `searchLocation()`) re-runs steps 1--11, clearing all existing meshes first. Custom location search uses the Nominatim geocoding API (via a CORS proxy) to resolve place names to coordinates.
+Location switching (`nextCity()`, `searchLocation()`) re-runs steps 1--12, clearing all existing meshes first. Custom location search uses the Nominatim geocoding API (via a CORS proxy) to resolve place names to coordinates.
 
 ---
 
@@ -137,6 +140,7 @@ Key state groups:
 - **Drone state** -- `drone` object (position, pitch, yaw, speed)
 - **Environment state** -- `ENV` (EARTH, SPACE_FLIGHT, MOON), managed by `env.js` state machine
 - **Terrain state** -- `terrainTileCache`, `terrainGroup`, elevation flags
+- **Persistent memory state** -- marker entries, localStorage capability status, marker hitboxes
 - **Space flight state** -- `spaceFlight` object (rocket, velocity, mode, scene/camera/renderer)
 - **Astronomical data** -- `BRIGHT_STARS`, `CONSTELLATION_LINES`, `SOLAR_SYSTEM_PLANETS`, asteroid/Kuiper belt config, deep-sky `GALAXIES` catalog
 
@@ -177,6 +181,7 @@ Runtime boot uses ES modules (`index.html` → `js/bootstrap.js` → `js/modules
 | `input.js` | ~408 | Keyboard handling, track recording, city/location search |
 | `hud.js` | ~299 | HUD updates, camera system, sky positioning |
 | `map.js` | ~723 | Minimap and large map rendering |
+| `memory.js` | ~535 | Persistent marker subsystem (pin/flower + note + remove flow) |
 | `main.js` | ~82 | Main render loop and environment dispatch |
 | `ui.js` | ~618 | UI setup, event binding, entry point (`init()` call) |
 
@@ -209,6 +214,7 @@ RDT/RGE research provenance and implementation notes:
 - **Scene rebuild cost** -- switching locations requires clearing and regenerating all meshes (roads, buildings, terrain, land use, POIs); there is no incremental chunk loading, so location switches are blocking operations
 - **Browser performance constraints** -- garbage collection pauses, draw call limits, and texture memory budgets are all hard constraints; the engine uses reduced texture sizes, simplified geometry, and throttled updates to stay within budget
 - **Elevation alignment timing** -- terrain tiles load asynchronously; roads and buildings may briefly float or clip until tile data arrives and `rebuildRoadsWithTerrain()` / `repositionBuildingsWithTerrain()` complete
+- **Persistence scope constraints** -- memory markers persist per browser profile via localStorage and are not automatically synced across devices/browsers
 
 ---
 
