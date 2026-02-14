@@ -10,6 +10,16 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --debug-overlay-top:20px;
+  --debug-overlay-left:clamp(190px,24vw,470px);
+  --debug-overlay-z:145;
+  --perf-panel-top:20px;
+  --perf-panel-right:180px;
+  --perf-panel-min-width:260px;
+  --perf-panel-max-width:320px;
+  --perf-panel-z:145;
+}
 body{background:#f5f7fa;overflow:hidden;font-family:'Inter',sans-serif;-webkit-user-select:none;user-select:none;touch-action:pan-x pan-y;-webkit-tap-highlight-color:transparent}
 button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 input,textarea{-webkit-user-select:text;user-select:text}
@@ -190,6 +200,15 @@ input,textarea{-webkit-user-select:text;user-select:text}
   /* Modal adjustments */
   .modal-content{width:95vw;max-height:90vh}
   .modal-title{font-size:18px}
+
+  :root{
+    --debug-overlay-top:10px;
+    --debug-overlay-left:clamp(130px,33vw,250px);
+    --perf-panel-top:10px;
+    --perf-panel-right:130px;
+    --perf-panel-min-width:210px;
+    --perf-panel-max-width:270px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -246,6 +265,15 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .pauseBtn{min-width:140px;padding:12px 30px;font-size:13px}
   .resultBox, .caughtBox{padding:30px 40px}
   #resultTitle, .caughtTitle{font-size:24px}
+
+  :root{
+    --debug-overlay-top:6px;
+    --debug-overlay-left:108px;
+    --perf-panel-top:6px;
+    --perf-panel-right:88px;
+    --perf-panel-min-width:175px;
+    --perf-panel-max-width:228px;
+  }
 }
 
 /* Landscape orientation adjustments */
@@ -255,6 +283,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #propertyPanel{max-height:85vh}
   .logo{font-size:clamp(24px, 6vw, 48px);margin:0}
   .sub{font-size:11px;letter-spacing:2px;margin:0}
+
+  :root{
+    --debug-overlay-top:8px;
+    --perf-panel-top:8px;
+  }
 }
 
 #controlsTab{position:fixed;bottom:20px;left:200px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;z-index:100;display:none;font-size:12px;color:#475569;max-width:220px;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
@@ -1025,8 +1058,8 @@ Explore the area
   </div>
 </div>
 
-<div id="debugOverlay" style="position:fixed;top:20px;left:clamp(190px,24vw,470px);background:rgba(0,0,0,0.8);color:#0f0;font-family:monospace;font-size:11px;padding:10px 14px;border-radius:8px;z-index:145;display:none;line-height:1.6;pointer-events:none;white-space:pre"></div>
-<div id="perfPanel" style="position:fixed;top:20px;right:180px;background:rgba(2,6,23,0.85);color:#38bdf8;font-family:monospace;font-size:11px;padding:10px 12px;border-radius:8px;z-index:145;display:none;line-height:1.45;white-space:pre;pointer-events:none;border:1px solid rgba(56,189,248,0.4);min-width:260px;max-width:320px"></div>
+<div id="debugOverlay" style="position:fixed;top:var(--debug-overlay-top,20px);left:var(--debug-overlay-left,clamp(190px,24vw,470px));background:rgba(0,0,0,0.8);color:#0f0;font-family:monospace;font-size:11px;padding:10px 14px;border-radius:8px;z-index:var(--debug-overlay-z,145);display:none;line-height:1.6;pointer-events:none;white-space:pre"></div>
+<div id="perfPanel" style="position:fixed;top:var(--perf-panel-top,20px);right:var(--perf-panel-right,180px);background:rgba(2,6,23,0.85);color:#38bdf8;font-family:monospace;font-size:11px;padding:10px 12px;border-radius:8px;z-index:var(--perf-panel-z,145);display:none;line-height:1.45;white-space:pre;pointer-events:none;border:1px solid rgba(56,189,248,0.4);min-width:var(--perf-panel-min-width,260px);max-width:var(--perf-panel-max-width,320px)"></div>
 <div id="loading"><div class="spinner"></div><div id="loadText">Loading...</div></div>
 <div id="pauseScreen"><div class="pauseTitle">PAUSED</div><button class="pauseBtn" id="resumeBtn">Resume</button><button class="pauseBtn" id="restartBtn">Restart</button><button class="pauseBtn" id="menuBtn">Main Menu</button></div>
 <div id="resultScreen"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
