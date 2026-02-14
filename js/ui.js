@@ -153,6 +153,13 @@ function setupUI() {
     const perfApplyReload = document.getElementById('perfApplyReload');
     const perfCopySnapshot = document.getElementById('perfCopySnapshot');
     const perfSettingsStatus = document.getElementById('perfSettingsStatus');
+    const gameShareFloatBtn = document.getElementById('gameShareFloatBtn');
+    const gameShareMenu = document.getElementById('gameShareMenu');
+    const gameShareStatus = document.getElementById('gameShareStatus');
+    const gameShareFacebook = document.getElementById('gameShareFacebook');
+    const gameShareTwitter = document.getElementById('gameShareTwitter');
+    const gameShareInstagram = document.getElementById('gameShareInstagram');
+    const gameShareText = document.getElementById('gameShareText');
 
     // Load saved API keys from localStorage
     const savedRentcast = localStorage.getItem('rentcastApiKey');
@@ -324,6 +331,150 @@ function setupUI() {
         });
     }
 
+    function getCurrentTravelMode() {
+        if (typeof globalThis.isEnv === 'function' && typeof globalThis.ENV !== 'undefined' && globalThis.isEnv(globalThis.ENV.SPACE_FLIGHT)) return 'rocket';
+        if (globalThis.droneMode) return 'drone';
+        if (globalThis.Walk && globalThis.Walk.state && globalThis.Walk.state.mode === 'walk') return 'walking';
+        return 'driving';
+    }
+
+    function buildShareableExperienceLink() {
+        const url = new URL(window.location.href);
+        const params = new URLSearchParams();
+        const mode = getCurrentTravelMode();
+        const launchMode =
+            (typeof globalThis.isEnv === 'function' && typeof globalThis.ENV !== 'undefined' && globalThis.isEnv(globalThis.ENV.SPACE_FLIGHT)) ? 'space' :
+            globalThis.onMoon ? 'moon' :
+            (globalThis.loadingScreenMode === 'moon' || globalThis.loadingScreenMode === 'space' ? globalThis.loadingScreenMode : 'earth');
+        const fmt = (value, digits = 3) => Number(value).toFixed(digits);
+
+        if (globalThis.selLoc === 'custom') {
+            params.set('loc', 'custom');
+            const cLat = Number(globalThis.customLoc?.lat);
+            const cLon = Number(globalThis.customLoc?.lon);
+            if (Number.isFinite(cLat)) params.set('lat', cLat.toFixed(6));
+            if (Number.isFinite(cLon)) params.set('lon', cLon.toFixed(6));
+            const cName = (globalThis.customLoc?.name || 'Custom Location').trim();
+            if (cName) params.set('lname', cName.slice(0, 80));
+        } else if (globalThis.selLoc && globalThis.LOCS && globalThis.LOCS[globalThis.selLoc]) {
+            params.set('loc', globalThis.selLoc);
+        }
+
+        if (launchMode) params.set('launch', launchMode);
+        if (globalThis.gameMode) params.set('gm', globalThis.gameMode);
+        if (typeof globalThis.getPerfMode === 'function') params.set('pm', globalThis.getPerfMode());
+        const seedValue = Number.isFinite(Number(globalThis.sharedSeedOverride)) ? Number(globalThis.sharedSeedOverride) : Number(globalThis.rdtSeed);
+        if (Number.isFinite(seedValue)) params.set('seed', String((Math.floor(seedValue) | 0) >>> 0));
+        if (Number.isFinite(Number(globalThis.camMode))) params.set('camMode', String(Math.max(0, Math.min(2, Number(globalThis.camMode) | 0))));
+        params.set('mode', mode);
+
+        if (mode === 'drone') {
+            const d = globalThis.drone || {};
+            params.set('rx', fmt(d.x || 0));
+            params.set('ry', fmt(d.y || 0));
+            params.set('rz', fmt(d.z || 0));
+            params.set('yaw', fmt(d.yaw || 0, 4));
+            params.set('pitch', fmt(d.pitch || 0, 4));
+        } else if (mode === 'walking') {
+            const walker = globalThis.Walk && globalThis.Walk.state ? globalThis.Walk.state.walker : null;
+            params.set('rx', fmt(walker?.x || 0));
+            params.set('ry', fmt(walker?.y || 1.7));
+            params.set('rz', fmt(walker?.z || 0));
+            params.set('yaw', fmt(walker?.yaw || walker?.angle || 0, 4));
+        } else {
+            const c = globalThis.car || {};
+            params.set('rx', fmt(c.x || 0));
+            params.set('ry', fmt(c.y || 0));
+            params.set('rz', fmt(c.z || 0));
+            params.set('yaw', fmt(c.angle || 0, 4));
+        }
+
+        url.search = params.toString();
+        url.hash = '';
+        return url.toString();
+    }
+
+    function setGameShareStatus(message = '') {
+        if (!gameShareStatus) return;
+        gameShareStatus.textContent = message;
+    }
+
+    function closeGameShareMenu() {
+        if (gameShareMenu) gameShareMenu.classList.remove('show');
+        setGameShareStatus('');
+    }
+
+    async function copyShareLinkWithFallback(experienceLink) {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(experienceLink);
+            return true;
+        }
+        window.prompt('Copy experience link:', experienceLink);
+        return false;
+    }
+
+    function openShareWindow(targetUrl) {
+        const popup = window.open(targetUrl, '_blank', 'noopener,noreferrer,width=760,height=760');
+        if (!popup) window.location.href = targetUrl;
+    }
+
+    if (gameShareFloatBtn && gameShareMenu) {
+        gameShareFloatBtn.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const shouldOpen = !gameShareMenu.classList.contains('show');
+            closeAllFloatMenus();
+            if (shouldOpen) gameShareMenu.classList.add('show');
+        });
+        gameShareMenu.addEventListener('click', (event) => {
+            event.stopPropagation();
+        });
+    }
+
+    if (gameShareFacebook) {
+        gameShareFacebook.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const link = buildShareableExperienceLink();
+            openShareWindow(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`);
+            closeGameShareMenu();
+        });
+    }
+
+    if (gameShareTwitter) {
+        gameShareTwitter.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const link = buildShareableExperienceLink();
+            const text = 'Check out my World Explorer 3D experience.';
+            openShareWindow(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`);
+            closeGameShareMenu();
+        });
+    }
+
+    if (gameShareText) {
+        gameShareText.addEventListener('click', (event) => {
+            event.stopPropagation();
+            const link = buildShareableExperienceLink();
+            const body = encodeURIComponent(`Check out my World Explorer 3D experience: ${link}`);
+            const smsUrl = /iPhone|iPad|iPod/i.test(navigator.userAgent) ? `sms:&body=${body}` : `sms:?body=${body}`;
+            window.location.href = smsUrl;
+            closeGameShareMenu();
+        });
+    }
+
+    if (gameShareInstagram) {
+        gameShareInstagram.addEventListener('click', async (event) => {
+            event.stopPropagation();
+            try {
+                const link = buildShareableExperienceLink();
+                await copyShareLinkWithFallback(link);
+                setGameShareStatus('Link copied. Paste into Instagram DM, Story, or bio.');
+            } catch (err) {
+                setGameShareStatus('Could not copy link automatically. Use browser copy.');
+            }
+            openShareWindow('https://www.instagram.com/');
+            setTimeout(() => closeGameShareMenu(), 2600);
+        });
+    }
+
     // Tabs
     document.querySelectorAll('.tab-btn').forEach(btn => btn.addEventListener('click', () => {
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
@@ -444,6 +595,8 @@ function setupUI() {
         document.getElementById('historicBtn').classList.add('show');
         const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
         if (memoryFlowerFloatBtn) memoryFlowerFloatBtn.classList.add('show');
+        if (gameShareFloatBtn) gameShareFloatBtn.classList.add('show');
+        closeGameShareMenu();
         gameStarted = true;
         if (typeof updatePerfPanel === 'function') updatePerfPanel(true);
         switchEnv(ENV.EARTH);
@@ -557,6 +710,7 @@ function setupUI() {
     // Helper function to close all float menus
     function closeAllFloatMenus() {
         document.querySelectorAll('.floatMenu').forEach(m => m.classList.remove('open'));
+        closeGameShareMenu();
     }
     const ctrlHeader = document.getElementById('ctrlHeader');
     const ctrlContent = document.getElementById('ctrlContent');
@@ -591,7 +745,7 @@ function setupUI() {
         if (typeof setBuildModeEnabled === 'function') setBuildModeEnabled(false);
         document.querySelectorAll('.floatMenu').forEach(m => m.classList.remove('open'));
         document.getElementById('titleScreen').classList.remove('hidden');
-        ['hud','minimap','modeHud','police','floatMenuContainer','mainMenuBtn','pauseScreen','resultScreen','caughtScreen','controlsTab','coords','realEstateBtn','historicBtn','memoryFlowerFloatBtn'].forEach(id => {
+        ['hud','minimap','modeHud','police','floatMenuContainer','mainMenuBtn','pauseScreen','resultScreen','caughtScreen','controlsTab','coords','realEstateBtn','historicBtn','memoryFlowerFloatBtn','gameShareFloatBtn','gameShareMenu'].forEach(id => {
             const el = document.getElementById(id);
             if (el) el.classList.remove('show');
         });

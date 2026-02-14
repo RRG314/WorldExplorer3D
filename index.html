@@ -189,6 +189,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #coords{bottom:180px;left:10px;font-size:10px;padding:8px 12px}
   #controlsTab{left:140px;max-width:180px;font-size:11px}
   #memoryFlowerFloatBtn{left:140px;bottom:72px}
+  #gameShareFloatBtn{left:140px;bottom:124px}
+  #gameShareMenu{left:85px;bottom:176px}
   #buildModeIndicator{left:10px;bottom:66px;font-size:10px;padding:8px 10px;max-width:220px}
 
   /* Property panel */
@@ -241,6 +243,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #coords{bottom:160px;left:5px;font-size:9px;padding:6px 10px}
   #controlsTab{left:115px;max-width:150px;font-size:10px;bottom:15px}
   #memoryFlowerFloatBtn{left:115px;bottom:66px}
+  #gameShareFloatBtn{left:115px;bottom:118px}
+  #gameShareMenu{left:60px;bottom:170px}
   #buildModeIndicator{left:5px;bottom:60px;font-size:9px;padding:7px 9px;max-width:190px}
 
   /* Property panel for phones */
@@ -298,6 +302,14 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #memoryFlowerFloatBtn{position:fixed;bottom:78px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#ec4899,#db2777);border:none;border-radius:50%;color:#ffffff;font-size:23px;cursor:pointer;box-shadow:0 10px 26px rgba(236,72,153,0.38);z-index:101;display:none;transition:all 0.2s}
 #memoryFlowerFloatBtn.show{display:flex;align-items:center;justify-content:center}
 #memoryFlowerFloatBtn:hover{transform:scale(1.08);box-shadow:0 14px 34px rgba(236,72,153,0.45)}
+#gameShareFloatBtn{position:fixed;bottom:130px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;border-radius:50%;color:#ffffff;font-size:22px;cursor:pointer;box-shadow:0 10px 24px rgba(37,99,235,0.35);z-index:102;display:none;transition:all 0.2s}
+#gameShareFloatBtn.show{display:flex;align-items:center;justify-content:center}
+#gameShareFloatBtn:hover{transform:scale(1.08);box-shadow:0 14px 34px rgba(37,99,235,0.42)}
+#gameShareMenu{position:fixed;left:145px;bottom:182px;width:158px;background:rgba(255,255,255,0.96);border:1px solid rgba(148,163,184,0.35);border-radius:12px;box-shadow:0 12px 26px rgba(15,23,42,0.2);padding:8px;display:none;z-index:103;backdrop-filter:blur(8px)}
+#gameShareMenu.show{display:block}
+.gameShareOption{width:100%;border:none;background:#f8fafc;color:#334155;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;border-radius:8px;padding:7px 8px;cursor:pointer;text-align:left;margin:2px 0}
+.gameShareOption:hover{background:#e2e8f0}
+#gameShareStatus{font-size:10px;line-height:1.25;color:#475569;min-height:12px;margin-top:6px}
 #buildModeIndicator{position:fixed;left:20px;bottom:78px;background:rgba(17,24,39,0.88);border:1px solid rgba(251,146,60,0.7);border-radius:10px;padding:9px 12px;font-size:11px;color:#fdba74;z-index:101;display:none;max-width:280px;line-height:1.45;box-shadow:0 8px 20px rgba(0,0,0,0.25)}
 #buildModeIndicator.show{display:block}
 #coords{position:fixed;bottom:200px;left:20px;background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:10px 14px;font-size:11px;color:#475569;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
@@ -923,6 +935,14 @@ Explore the area
 
 <button class="mainMenuBtn" id="mainMenuBtn">🏠 Main Menu</button>
 <button id="memoryFlowerFloatBtn" title="Place Flower Memory">🌸</button>
+<button id="gameShareFloatBtn" title="Share This Experience">↗</button>
+<div id="gameShareMenu" aria-label="Share Experience Menu">
+<button id="gameShareFacebook" class="gameShareOption" type="button">📘 Facebook</button>
+<button id="gameShareTwitter" class="gameShareOption" type="button">𝕏 Twitter</button>
+<button id="gameShareInstagram" class="gameShareOption" type="button">📷 Instagram</button>
+<button id="gameShareText" class="gameShareOption" type="button">💬 Text</button>
+<div id="gameShareStatus"></div>
+</div>
 <div id="buildModeIndicator">🧱 Build Mode ON<br>Click to place blocks, Shift+Click to remove.<br>Press B to toggle.</div>
 <div id="controlsTab"><div id="ctrlHeader">🛞 Controls ▼</div><div id="ctrlContent" class="hidden">
 <div id="drivingControls">
