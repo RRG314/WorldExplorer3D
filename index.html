@@ -15,8 +15,8 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 input,textarea{-webkit-user-select:text;user-select:text}
 
 /* Title Screen */
-#titleScreen{position:fixed;inset:0;background:#000 url('title-bg.jpg') center center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:max(24px,calc(env(safe-area-inset-top) + 10px));padding-right:12px;padding-bottom:max(24px,calc(env(safe-area-inset-bottom) + 12px));padding-left:12px;gap:clamp(10px,1.5vh,16px);z-index:200;overflow-y:auto;overflow-x:hidden}
-#titleScreen::before{content:'';position:absolute;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(1px);pointer-events:none}
+#titleScreen{position:fixed;inset:0;background:#000 url('title-bg.jpg') center center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:max(24px,calc(env(safe-area-inset-top) + 10px));padding-right:12px;padding-bottom:max(24px,calc(env(safe-area-inset-bottom) + 12px));padding-left:12px;gap:clamp(10px,1.5vh,16px);z-index:200;overflow-y:auto;overflow-x:hidden;isolation:isolate}
+#titleScreen::before{content:'';position:absolute;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(1px);pointer-events:none;z-index:0}
 #titleScreen.hidden{display:none}
 .logo{font-family:'Orbitron',sans-serif;font-size:clamp(36px, 8vw, 72px);font-weight:900;line-height:1.05;color:#ffffff;letter-spacing:clamp(3px, 1vw, 8px);text-transform:uppercase;text-shadow:0 0 30px rgba(83,52,131,0.8),0 0 60px rgba(15,52,96,0.6),0 4px 20px rgba(0,0,0,0.4);position:relative;z-index:1;margin:0;animation:titleGlow 3s ease-in-out infinite;text-align:center;padding:0 20px;flex-shrink:0}
 @keyframes titleGlow{0%,100%{text-shadow:0 0 30px rgba(83,52,131,0.8),0 0 60px rgba(15,52,96,0.6),0 4px 20px rgba(0,0,0,0.4)}50%{text-shadow:0 0 40px rgba(83,52,131,1),0 0 80px rgba(15,52,96,0.8),0 4px 30px rgba(0,0,0,0.5)}}
@@ -42,6 +42,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .location-switch-btn{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.9);border-radius:10px;padding:10px 12px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.2s;text-align:left;display:flex;flex-direction:column;gap:4px;min-height:70px;justify-content:center}
 .location-switch-btn:hover{border-color:#cbd5e1;background:#f1f5f9}
 .location-switch-btn.active{border-color:#667eea;background:#f0f4ff;color:#3b5bdb;box-shadow:0 4px 12px rgba(102,126,234,0.15)}
+.menu-container,
+#tab-location .location-switch-row,
+#tab-location .location-switch-btn,
+#tab-location .location-panel,
+#tab-location .loc{position:relative;z-index:2;pointer-events:auto}
 .switch-title{font-size:13px;font-weight:600;line-height:1.2}
 .switch-sub{font-size:11px;font-weight:500;line-height:1.2;color:#64748b}
 .location-panel{display:none}
@@ -1061,10 +1066,22 @@ Explore the area
     if (didBindListeners) return;
     didBindListeners = true;
 
+    const handleModeActivation = (mode, event) => {
+      if (event) {
+        if (event.cancelable) event.preventDefault();
+        event.stopPropagation();
+      }
+      globalThis.handleTitleModeClick(mode);
+    };
+
     Object.entries(buttonIds).forEach(([mode, id]) => {
       const button = document.getElementById(id);
       if (!button) return;
-      button.addEventListener('click', () => globalThis.handleTitleModeClick(mode));
+      button.onclick = (event) => handleModeActivation(mode, event);
+      button.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return;
+        handleModeActivation(mode, event);
+      });
     });
 
     const suggestedPanel = document.getElementById('suggestedPanel');
@@ -1080,7 +1097,11 @@ Explore the area
 
     const searchBtn = document.getElementById('locationSearchBtn');
     if (searchBtn) {
-      searchBtn.addEventListener('click', () => { void globalThis.handleTitleSearchClick(); });
+      searchBtn.addEventListener('click', (event) => {
+        if (event.cancelable) event.preventDefault();
+        event.stopPropagation();
+        void globalThis.handleTitleSearchClick();
+      });
     }
 
     const searchInput = document.getElementById('locationSearch');
