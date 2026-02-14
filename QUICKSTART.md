@@ -43,7 +43,30 @@ Open `http://localhost:8000`.
 7. Press `M` for large map.
 8. Click the `🌸` memory button and place a pin/flower memory note.
 
-## 4. Essential Controls
+## 4. RDT vs Baseline Benchmark (2-Minute Workflow)
+
+1. In the title screen, open `Settings`.
+2. In `⚡ Performance Benchmark`, choose a mode:
+   - `RDT Optimized`
+   - `Baseline (No RDT Budgeting)`
+3. Optional: check `Show live benchmark overlay in-game` (default is OFF).
+4. Click `Apply + Reload World`.
+5. Click `Copy Snapshot` and paste the JSON into your notes.
+6. Compare:
+   - `lastLoad.loadMs`
+   - `lastLoad.phases.fetchOverpass`
+   - `renderer.calls`
+   - `renderer.triangles`
+   - `fps` / `frameMs`
+   - `lastLoad.overpassSource` (`network` vs `memory-cache`)
+
+Reference test (Baltimore, 2026-02-14):
+
+- Baseline network load: `5551 ms`
+- RDT network load: `4669 ms`
+- RDT repeat load with memory cache: `2202-2246 ms` (`fetchOverpass: 0 ms`)
+
+## 5. Essential Controls
 
 | Key | Action |
 | --- | --- |
@@ -83,7 +106,7 @@ Block builder action:
 | `🎮 Game Mode` -> `🧹 Clear Blocks` | Remove all build blocks for current location (including saved blocks) |
 | Block cap | Up to `100` total blocks can be stored for now |
 
-## 5. Troubleshooting
+## 6. Troubleshooting
 
 ### Black or blank view
 
@@ -101,7 +124,7 @@ Block builder action:
 
 - Clear browser cache.
 - Verify cache-bust values are aligned across `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
-- Current freeze snapshot cache-bust target is `v=34`.
+- Current freeze snapshot cache-bust target is `v=48`.
 
 ### Memory markers not persisting
 
@@ -109,7 +132,7 @@ Block builder action:
 - Avoid strict private/incognito settings that block storage.
 - Confirm marker placement is not showing a storage warning in the composer.
 
-## 6. Where to Go Next
+## 7. Where to Go Next
 
 - Usage details: `USER_GUIDE.md`
 - Engineering details: `TECHNICAL_DOCS.md`

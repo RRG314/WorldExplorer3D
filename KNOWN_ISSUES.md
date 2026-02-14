@@ -103,6 +103,17 @@ How to help:
 - Add clear UX copy around device/browser storage scope.
 - Keep storage-capability checks aligned with `js/memory.js`.
 
+### 10. RDT Draw-Call Variance vs Baseline
+
+- RDT mode can still produce higher draw-call counts than baseline in some city views even when total content is reduced.
+- Visual smoothness is stable at 60 FPS in recent Baltimore captures, but draw-call spread remains wider than desired.
+
+How to help:
+
+- Capture paired snapshots using benchmark controls (`RDT` + `Baseline`) from the same location and camera state.
+- Profile render batch fragmentation paths in `js/world.js` (roads, street furniture, and material-group splits).
+- Propose optimizations that preserve current visual richness and collision behavior.
+
 ## Reporting Format
 
 When reporting issues, include:

@@ -92,6 +92,7 @@ This ensures:
 ### 6. UI & Map Layer
 - HUD (speedometer, compass, mode indicators, boost bar)
 - Title menu launch-mode selectors (Earth / Moon / Space)
+- Title `Settings` benchmark controls (RDT/Baseline selector, overlay toggle, snapshot copy)
 - Floating menu for global actions
 - Minimap and full-screen interactive map via canvas
 - Zoomable large map with layer toggles (satellite, roads, landuse, POIs)
@@ -110,7 +111,7 @@ The world initialization follows this sequence:
 
 1. **Choose location + launch mode** -- user selects preset/custom Earth location or chooses Moon/Space launch mode
 2. **Set origin** -- `LOC` is set to the geographic center; `geoToWorld()` maps all coordinates relative to this point
-3. **Fetch OSM data** -- Overpass API query retrieves roads, buildings, land use, and POIs within a bounding box
+3. **Fetch OSM data** -- Overpass API query retrieves roads, buildings, land use, and POIs within a bounding box using multi-endpoint racing, preferred-endpoint reuse, and short-lived in-memory cache reuse for repeat loads
 4. **Generate road meshes** -- road segments are created with width based on highway type and speed limits from tags
 5. **Generate building meshes** -- extruded polygons with procedural heights, window textures, and rooftops
 6. **Generate land use ground planes** -- colored ground patches for parks, water, residential, etc.
@@ -140,6 +141,7 @@ Key state groups:
 - **Drone state** -- `drone` object (position, pitch, yaw, speed)
 - **Environment state** -- `ENV` (EARTH, SPACE_FLIGHT, MOON), managed by `env.js` state machine
 - **Terrain state** -- `terrainTileCache`, `terrainGroup`, elevation flags
+- **Performance benchmark state** -- `perfMode`, `perfOverlayEnabled`, `perfStats`, and `lastLoad` snapshot metrics
 - **Persistent memory state** -- marker entries, localStorage capability status, marker hitboxes
 - **Space flight state** -- `spaceFlight` object (rocket, velocity, mode, scene/camera/renderer)
 - **Astronomical data** -- `BRIGHT_STARS`, `CONSTELLATION_LINES`, `SOLAR_SYSTEM_PLANETS`, asteroid/Kuiper belt config, deep-sky `GALAXIES` catalog
@@ -205,6 +207,26 @@ RDT/RGE research provenance and implementation notes:
 - RDT citation: Reid, S. (2025). *Recursive Division Tree: A Log-Log Algorithm for Integer Depth*. DOI: https://doi.org/10.5281/zenodo.18012166
 - RGE-256 citation: Reid, S. (2025). *RGE-256: A New ARX-Based Pseudorandom Number Generator With Structured Entropy and Empirical Validation*. DOI: https://doi.org/10.5281/zenodo.17982804
 - Current deterministic migration direction is to continue replacing remaining `Math.random` paths with deterministic subsystem streams.
+
+## Benchmark Architecture (RDT vs Baseline)
+
+Benchmark switching is a first-class runtime path, not a separate build.
+
+- `js/perf.js` owns mode state (`rdt`/`baseline`), overlay state, and snapshot capture/export.
+- `js/ui.js` binds title-screen controls (`#perfModeSelect`, `#perfOverlayToggle`, `#perfApplyReload`, `#perfCopySnapshot`).
+- `js/world.js` consumes mode selection to apply adaptive (RDT) or baseline budgets and records per-load diagnostics.
+
+Snapshot payloads include:
+
+- renderer stats (`calls`, `triangles`, `geometries`, `textures`, `programs`)
+- load summary (`loadMs`, per-phase timings, selected/requested feature counts)
+- Overpass source metadata (`network` vs `memory-cache`)
+
+Reference measured runs (Baltimore, 2026-02-14):
+
+- Baseline network: `loadMs 5551`, `calls 453`
+- RDT network: `loadMs 4669`, `calls 1149`
+- RDT memory-cache repeat: `loadMs 2202-2246`, `fetchOverpass 0`
 
 ## Known Hard Problems / Constraints
 

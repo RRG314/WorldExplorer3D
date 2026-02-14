@@ -102,6 +102,41 @@ Block builder actions:
 - `Shift+Click` (build mode on) -> remove targeted block
 - `🎮 Game Mode` menu -> `🧱 Build Mode` and `🧹 Clear Blocks`
 
+## Performance Mode Switch (RDT vs Baseline)
+
+Use the built-in benchmark controls from the title screen:
+
+1. Open `Settings` tab.
+2. In `⚡ Performance Benchmark`, pick `RDT Optimized` or `Baseline (No RDT Budgeting)`.
+3. Optional: enable `Show live benchmark overlay in-game` (default is OFF each session).
+4. Click `Apply + Reload World`.
+5. Click `Copy Snapshot` to copy a JSON benchmark payload.
+
+Snapshot fields to compare:
+
+- `lastLoad.loadMs`
+- `lastLoad.phases.fetchOverpass`
+- `renderer.calls`
+- `renderer.triangles`
+- `fps` and `frameMs`
+- `lastLoad.overpassSource` (`network` or `memory-cache`)
+
+## Supporting Benchmark Stats (Baltimore, 2026-02-14)
+
+Measured from in-app snapshot exports:
+
+| Scenario | overpassSource | loadMs | fetchOverpass | fps | frameMs | draw calls | triangles |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline (network) | `network` | `5551` | `4267` | `60.00` | `16.71` | `453` | `2,888,718` |
+| RDT (network) | `network` | `4669` | `3519` | `60.00` | `16.67` | `1149` | `2,174,223` |
+| RDT (repeat load) | `memory-cache` | `2202-2246` | `0` | `59.99-60.00` | `16.59-16.66` | `957-1131` | `2,250,431-2,259,359` |
+
+Interpretation:
+
+- RDT startup is faster than baseline in the captured run.
+- Repeat RDT loads are substantially faster due to memory-cached Overpass responses.
+- Draw calls in RDT are still higher than baseline and remain an active tuning area.
+
 ## Persistent Memory Markers
 
 - Marker types: `Pin` and `Flower`
@@ -141,7 +176,7 @@ Block builder actions:
 - Runtime is split into multiple JS files (`js/*.js`) with no build step.
 - Shared/global runtime state is still used across core systems.
 - ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
-- Cache-bust version alignment across loader chain is currently `v=34`.
+- Cache-bust version alignment across loader chain is currently `v=48`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
 ## Freeze Snapshot (2026-02-14)
@@ -158,6 +193,8 @@ Block builder actions:
 - Restored POI marker rendering on minimap and large map by legend category filters.
 - Added Minecraft-style brick block builder with stacking/removal controls.
 - Added persistent per-location block storage and walk-mode climbing support on placed blocks.
+- Added runtime performance benchmark mode switch (`RDT` vs `Baseline`) with in-game snapshot export.
+- Added Overpass endpoint preference plus memory-cache reuse for faster repeat city loads.
 
 ## Repository Structure
 
