@@ -42,7 +42,7 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - Memory composer now includes `Delete All` with confirmation.
 - POI and memory markers now render on both minimap and large map overlays.
 - Voxel-style brick builder subsystem added (`js/blocks.js`) with click place/stack and shift-click removal.
-- Loader cache-bust chain is aligned through `v=34` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Loader cache-bust chain is aligned through `v=35` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### High-Level Architecture
 
@@ -603,6 +603,7 @@ Core public hooks:
 - Remove: `Shift + Click` an existing placed block
 - Stacking: clicks on existing block faces place adjacent blocks by face normal
 - Persistence: blocks are saved in Earth mode per location in localStorage (`worldExplorer3D.buildBlocks.v1`)
+- Multiplayer sync (optional): block edits can also mirror to Supabase by nearby chunk polling
 - Limit: currently capped to `100` blocks maximum
 - Clear control: `🎮 Game Mode` -> `🧹 Clear Blocks` removes current-location rendered + saved blocks
 - Reload behavior: rendered blocks are cleared during `loadRoads()`, then current-location saved blocks are rehydrated
@@ -619,15 +620,17 @@ Core public hooks:
 - `getBuildCollisionAtWorldXZ(x, z, feetY, stepHeight)`
 - `getBuildLimits()`
 - `getBuildPersistenceStatus()`
+- `mergeRemoteBuildSyncRows(rows)`
 - `refreshBlockBuilderForCurrentLocation()`
 
 ## Security and Storage Notes
 
-Current memory persistence model is client-side only.
+Current persistence model is local-first with optional Supabase multiplayer sync.
 
 - Storage medium: browser `localStorage`, same-origin readable, no encryption at rest.
-- Data scope: per browser profile on one device; no automatic server sync.
+- Data scope: per browser profile on one device by default; optional Supabase sync shares by location/chunk.
 - Reliability: blocked storage (privacy mode/extensions/policies) disables placement.
+- Sync note: Supabase writes are throttled client-side and use tombstone deletes (`deleted_at`) to avoid reappearance races.
 - User controls: per-marker remove and global `Delete All` are available in UI.
 - Deployment guidance: add response headers (`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy`) at host/CDN level.
 - Content guidance: memory notes and external data are untrusted; keep text paths on `textContent` where practical and escape dynamic values before `innerHTML` templates.

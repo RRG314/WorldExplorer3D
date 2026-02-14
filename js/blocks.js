@@ -83,6 +83,26 @@ function latLonToWorldSafe(lat, lon) {
     return { x, z };
 }
 
+function getBuildEnvKey() {
+    if (typeof isEnv === 'function' && typeof ENV !== 'undefined') {
+        if (isEnv(ENV.SPACE_FLIGHT)) return 'space';
+        if (isEnv(ENV.MOON)) return 'moon';
+        return 'earth';
+    }
+    if (onMoon) return 'moon';
+    return 'earth';
+}
+
+function queueBuildSyncAction(action) {
+    if (typeof enqueueWorldPlaceableSync !== 'function') return false;
+    try {
+        return enqueueWorldPlaceableSync(action);
+    } catch (err) {
+        console.warn('[blocks] Failed to queue sync action:', err);
+        return false;
+    }
+}
+
 function detectBuildStorage() {
     try {
         if (!globalThis.localStorage) {
@@ -214,6 +234,29 @@ function getBuildEntriesForCurrentLocation() {
     const locationKey = getCurrentLocationKey();
     if (!locationKey) return [];
     return buildEntries.filter((entry) => entry.locationKey === locationKey);
+}
+
+function findBuildEntryByGrid(locationKey, gx, gy, gz) {
+    if (!locationKey) return null;
+    return buildEntries.find((entry) =>
+        entry.locationKey === locationKey &&
+        entry.gx === gx &&
+        entry.gy === gy &&
+        entry.gz === gz
+    ) || null;
+}
+
+function buildEntriesMatch(a, b) {
+    if (!a || !b) return false;
+    return a.id === b.id &&
+        a.locationKey === b.locationKey &&
+        a.lat === b.lat &&
+        a.lon === b.lon &&
+        a.gx === b.gx &&
+        a.gy === b.gy &&
+        a.gz === b.gz &&
+        a.materialIndex === b.materialIndex &&
+        a.createdAt === b.createdAt;
 }
 
 function addBuildColumnEntry(gx, gy, gz) {
@@ -462,10 +505,52 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
             return false;
         }
     }
+
+    if (options.sync !== false && canPersistBuildBlocks()) {
+        const locationKey = getCurrentLocationKey();
+        const worldX = toWorldCoord(gx);
+        const worldY = toWorldCoord(gy);
+        const worldZ = toWorldCoord(gz);
+        const latLon = worldToLatLonSafe(worldX, worldZ);
+        const persistedEntry = findBuildEntryByGrid(locationKey, gx, gy, gz);
+        const entryId = persistedEntry && persistedEntry.id
+            ? persistedEntry.id
+            : `blk_${locationKey || 'loc'}_${gx}_${gy}_${gz}`;
+        if (locationKey && latLon && isFiniteNumber(latLon.lat) && isFiniteNumber(latLon.lon)) {
+            queueBuildSyncAction({
+                op: 'upsert',
+                id: entryId,
+                type: 'block',
+                env: getBuildEnvKey(),
+                locationKey,
+                x: worldX,
+                y: worldY,
+                z: worldZ,
+                lat: Number(latLon.lat.toFixed(7)),
+                lon: Number(latLon.lon.toFixed(7)),
+                createdAt: persistedEntry && persistedEntry.createdAt
+                    ? persistedEntry.createdAt
+                    : new Date().toISOString(),
+                meta: {
+                    gx,
+                    gy,
+                    gz,
+                    materialIndex: idx
+                }
+            });
+        }
+    }
     return true;
 }
 
 function removeBuildBlock(gx, gy, gz, options = {}) {
+    const locationKey = getCurrentLocationKey();
+    const existingEntry = findBuildEntryByGrid(locationKey, gx, gy, gz);
+    const worldX = toWorldCoord(gx);
+    const worldY = toWorldCoord(gy);
+    const worldZ = toWorldCoord(gz);
+    const latLon = worldToLatLonSafe(worldX, worldZ);
+
     const key = blockKey(gx, gy, gz);
     const mesh = buildBlocks.get(key);
     if (!mesh) return false;
@@ -475,6 +560,32 @@ function removeBuildBlock(gx, gy, gz, options = {}) {
 
     if (options.persist !== false) {
         persistRemovedBuildBlock(gx, gy, gz);
+    }
+
+    if (options.sync !== false && canPersistBuildBlocks() && locationKey && latLon && isFiniteNumber(latLon.lat) && isFiniteNumber(latLon.lon)) {
+        queueBuildSyncAction({
+            op: 'delete',
+            id: existingEntry && existingEntry.id
+                ? existingEntry.id
+                : `blk_${locationKey}_${gx}_${gy}_${gz}`,
+            type: 'block',
+            env: getBuildEnvKey(),
+            locationKey,
+            x: worldX,
+            y: worldY,
+            z: worldZ,
+            lat: Number(latLon.lat.toFixed(7)),
+            lon: Number(latLon.lon.toFixed(7)),
+            createdAt: existingEntry && existingEntry.createdAt
+                ? existingEntry.createdAt
+                : new Date().toISOString(),
+            meta: {
+                gx,
+                gy,
+                gz,
+                materialIndex: mesh && mesh.userData ? mesh.userData.materialIndex : 0
+            }
+        });
     }
     return true;
 }
@@ -490,7 +601,20 @@ function clearRenderedBuildBlocks() {
 }
 
 function clearAllBuildBlocks(options = {}) {
-    if (options.persist !== false) {
+    if (options.persist === false) {
+        clearRenderedBuildBlocks();
+        return;
+    }
+
+    const currentEntries = getBuildEntriesForCurrentLocation();
+    if (currentEntries.length > 0) {
+        currentEntries.forEach((entry) => {
+            removeBuildBlock(entry.gx, entry.gy, entry.gz, {
+                persist: true,
+                sync: options.sync !== false
+            });
+        });
+    } else {
         clearPersistedBuildBlocksForCurrentLocation();
     }
     clearRenderedBuildBlocks();
@@ -709,8 +833,159 @@ function refreshBlockBuilderForCurrentLocation() {
         if (!isFiniteNumber(worldPos.x) || !isFiniteNumber(worldPos.z)) return;
         const gx = toGridCoord(worldPos.x);
         const gz = toGridCoord(worldPos.z);
-        placeBuildBlock(gx, Math.round(entry.gy), gz, entry.materialIndex, { persist: false, enforceLimit: false });
+        placeBuildBlock(gx, Math.round(entry.gy), gz, entry.materialIndex, { persist: false, enforceLimit: false, sync: false });
     });
+}
+
+function normalizeRemoteBuildSyncRow(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+
+    const id = String(raw.id || '').trim();
+    if (!id) return null;
+
+    const type = String(raw.type || '').toLowerCase();
+    if (type !== 'block') return null;
+
+    const locationKey = String(raw.locationKey || raw.location_key || '').trim();
+    if (!locationKey) return null;
+
+    const lat = Number(raw.lat);
+    const lon = Number(raw.lon);
+    if (!isFiniteNumber(lat) || !isFiniteNumber(lon)) return null;
+
+    const meta = raw.meta && typeof raw.meta === 'object' ? raw.meta : {};
+    const gxMeta = Number(meta.gx);
+    const gyMeta = Number(meta.gy);
+    const gzMeta = Number(meta.gz);
+    const materialIndexMeta = Number(meta.materialIndex);
+
+    let gx = Number(raw.gx);
+    let gy = Number(raw.gy);
+    let gz = Number(raw.gz);
+    let materialIndex = Number(raw.materialIndex);
+
+    if (!isFiniteNumber(gx)) gx = gxMeta;
+    if (!isFiniteNumber(gy)) gy = gyMeta;
+    if (!isFiniteNumber(gz)) gz = gzMeta;
+    if (!isFiniteNumber(materialIndex)) materialIndex = materialIndexMeta;
+
+    if (!isFiniteNumber(gx) || !isFiniteNumber(gz)) {
+        const worldPos = latLonToWorldSafe(lat, lon);
+        if (isFiniteNumber(worldPos.x) && isFiniteNumber(worldPos.z)) {
+            gx = toGridCoord(worldPos.x);
+            gz = toGridCoord(worldPos.z);
+        }
+    }
+
+    const deletedAt = raw.deletedAt || raw.deleted_at || null;
+    const createdAt = String(raw.createdAt || raw.created_at || new Date().toISOString());
+
+    return {
+        id,
+        locationKey,
+        lat: Number(lat.toFixed(7)),
+        lon: Number(lon.toFixed(7)),
+        gx: isFiniteNumber(gx) ? Math.round(gx) : null,
+        gy: isFiniteNumber(gy) ? Math.round(gy) : null,
+        gz: isFiniteNumber(gz) ? Math.round(gz) : null,
+        materialIndex: Number.isInteger(Math.round(materialIndex))
+            ? Math.max(0, Math.min(buildMaterials.length > 0 ? buildMaterials.length - 1 : 3, Math.round(materialIndex)))
+            : 0,
+        createdAt,
+        deletedAt: deletedAt ? String(deletedAt) : null
+    };
+}
+
+function mergeRemoteBuildSyncRows(rows) {
+    if (!Array.isArray(rows) || rows.length === 0) return false;
+
+    let changed = false;
+    let needsRefresh = false;
+    const currentLocationKey = getCurrentLocationKey();
+
+    rows.forEach((raw) => {
+        const row = normalizeRemoteBuildSyncRow(raw);
+        if (!row) return;
+
+        if (row.deletedAt) {
+            let removed = false;
+            const idx = buildEntries.findIndex((entry) => entry.id === row.id);
+            if (idx >= 0) {
+                const removedEntry = buildEntries[idx];
+                buildEntries.splice(idx, 1);
+                removed = true;
+                if (removedEntry && removedEntry.locationKey === currentLocationKey) {
+                    needsRefresh = true;
+                }
+            } else if (
+                Number.isFinite(row.gx) &&
+                Number.isFinite(row.gy) &&
+                Number.isFinite(row.gz)
+            ) {
+                const coordIdx = buildEntries.findIndex((entry) =>
+                    entry.locationKey === row.locationKey &&
+                    entry.gx === row.gx &&
+                    entry.gy === row.gy &&
+                    entry.gz === row.gz
+                );
+                if (coordIdx >= 0) {
+                    const removedEntry = buildEntries[coordIdx];
+                    buildEntries.splice(coordIdx, 1);
+                    removed = true;
+                    if (removedEntry && removedEntry.locationKey === currentLocationKey) {
+                        needsRefresh = true;
+                    }
+                }
+            }
+            if (removed) changed = true;
+            return;
+        }
+
+        if (!Number.isFinite(row.gx) || !Number.isFinite(row.gy) || !Number.isFinite(row.gz)) return;
+
+        const nextEntry = normalizeBuildEntry({
+            id: row.id,
+            locationKey: row.locationKey,
+            lat: row.lat,
+            lon: row.lon,
+            gx: row.gx,
+            gy: row.gy,
+            gz: row.gz,
+            materialIndex: row.materialIndex,
+            createdAt: row.createdAt
+        });
+        if (!nextEntry) return;
+
+        const existingIdx = buildEntries.findIndex((entry) => entry.id === nextEntry.id);
+        if (existingIdx >= 0) {
+            const prevEntry = buildEntries[existingIdx];
+            if (!buildEntriesMatch(prevEntry, nextEntry)) {
+                buildEntries[existingIdx] = nextEntry;
+                changed = true;
+                if (nextEntry.locationKey === currentLocationKey || (prevEntry && prevEntry.locationKey === currentLocationKey)) {
+                    needsRefresh = true;
+                }
+            }
+        } else {
+            buildEntries.push(nextEntry);
+            changed = true;
+            if (nextEntry.locationKey === currentLocationKey) needsRefresh = true;
+        }
+    });
+
+    if (buildEntries.length > BUILD_MAX_TOTAL) {
+        buildEntries = buildEntries.slice(buildEntries.length - BUILD_MAX_TOTAL);
+        changed = true;
+        needsRefresh = true;
+    }
+
+    if (changed && buildPersistenceEnabled) {
+        saveBuildEntriesToStorage();
+    }
+    if (needsRefresh && typeof refreshBlockBuilderForCurrentLocation === 'function') {
+        refreshBlockBuilderForCurrentLocation();
+    }
+    return changed;
 }
 
 {
@@ -728,6 +1003,7 @@ Object.assign(globalThis, {
     getBuildPersistenceStatus,
     getBuildTopSurfaceAtWorldXZ,
     handleBlockBuilderClick,
+    mergeRemoteBuildSyncRows,
     placeBuildBlock,
     refreshBlockBuilderForCurrentLocation,
     setBuildModeEnabled,
@@ -742,6 +1018,7 @@ export {
     getBuildPersistenceStatus,
     getBuildTopSurfaceAtWorldXZ,
     handleBlockBuilderClick,
+    mergeRemoteBuildSyncRows,
     placeBuildBlock,
     refreshBlockBuilderForCurrentLocation,
     setBuildModeEnabled,

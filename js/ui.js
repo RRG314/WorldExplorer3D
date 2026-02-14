@@ -146,13 +146,21 @@ function setupUI() {
     const attomKeyInput = document.getElementById('attomKeyInput');
     const estatedKeyInput = document.getElementById('estatedKeyInput');
     const saveApiKeyBtn = document.getElementById('saveApiKey');
+    const supabaseUrlInput = document.getElementById('supabaseUrlInput');
+    const supabaseAnonKeyInput = document.getElementById('supabaseAnonKeyInput');
+    const saveSupabaseConfigBtn = document.getElementById('saveSupabaseConfig');
+    const supabaseSyncStatusEl = document.getElementById('supabaseSyncStatus');
     const realEstateToggle = document.getElementById('realEstateToggle');
     const toggleLabel = document.getElementById('realEstateToggleLabel');
+    const SUPABASE_URL_STORAGE_KEY = 'worldExplorer3D.supabase.url';
+    const SUPABASE_ANON_STORAGE_KEY = 'worldExplorer3D.supabase.anonKey';
 
     // Load saved API keys from localStorage
     const savedRentcast = localStorage.getItem('rentcastApiKey');
     const savedAttom = localStorage.getItem('attomApiKey');
     const savedEstated = localStorage.getItem('estatedApiKey');
+    const savedSupabaseUrl = localStorage.getItem(SUPABASE_URL_STORAGE_KEY);
+    const savedSupabaseAnon = localStorage.getItem(SUPABASE_ANON_STORAGE_KEY);
 
     if (savedRentcast) {
         apiConfig.rentcast = savedRentcast;
@@ -165,6 +173,12 @@ function setupUI() {
     if (savedEstated) {
         apiConfig.estated = savedEstated;
         if (estatedKeyInput) estatedKeyInput.value = savedEstated;
+    }
+    if (savedSupabaseUrl && supabaseUrlInput) {
+        supabaseUrlInput.value = savedSupabaseUrl;
+    }
+    if (savedSupabaseAnon && supabaseAnonKeyInput) {
+        supabaseAnonKeyInput.value = savedSupabaseAnon;
     }
 
     // Load real estate mode preference
@@ -233,6 +247,48 @@ function setupUI() {
             }, 2000);
         });
     }
+
+    function renderSupabaseSyncStatus() {
+        if (!supabaseSyncStatusEl) return;
+        let status = null;
+        if (typeof getWorldSyncStatus === 'function') {
+            status = getWorldSyncStatus();
+        }
+        if (!status) {
+            supabaseSyncStatusEl.textContent = 'Sync status unavailable.';
+            supabaseSyncStatusEl.style.color = '#6b7280';
+            return;
+        }
+        supabaseSyncStatusEl.textContent = status.detail || 'No sync status.';
+        supabaseSyncStatusEl.style.color = status.error ? '#dc2626' : '#047857';
+    }
+
+    if (saveSupabaseConfigBtn) {
+        saveSupabaseConfigBtn.addEventListener('click', async () => {
+            const url = supabaseUrlInput ? supabaseUrlInput.value.trim() : '';
+            const anonKey = supabaseAnonKeyInput ? supabaseAnonKeyInput.value.trim() : '';
+
+            if (!url || !anonKey) {
+                localStorage.removeItem(SUPABASE_URL_STORAGE_KEY);
+                localStorage.removeItem(SUPABASE_ANON_STORAGE_KEY);
+                if (typeof saveSupabaseSyncConfig === 'function') {
+                    await saveSupabaseSyncConfig('', '');
+                }
+                renderSupabaseSyncStatus();
+                return;
+            }
+
+            if (typeof saveSupabaseSyncConfig === 'function') {
+                await saveSupabaseSyncConfig(url, anonKey);
+            } else {
+                localStorage.setItem(SUPABASE_URL_STORAGE_KEY, url);
+                localStorage.setItem(SUPABASE_ANON_STORAGE_KEY, anonKey);
+            }
+            renderSupabaseSyncStatus();
+        });
+    }
+    renderSupabaseSyncStatus();
+    setInterval(renderSupabaseSyncStatus, 2500);
 
     // Real estate toggle
     if (realEstateToggle && toggleLabel) {

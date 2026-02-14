@@ -632,7 +632,7 @@ Placement uses your current Earth-mode position (car, walk, or drone reference p
 - Pin/flower visibility can be toggled independently in the legend.
 - Limits: 200 chars per message, 300 markers per location, 1500 markers total.
 - If browser storage is blocked/disabled, placement is disabled and a warning is shown.
-- Markers are not automatically synced between different browsers/devices.
+- Markers are local-only by default, but can sync across clients when Supabase multiplayer is configured.
 - Notes are not encrypted; do not store passwords, keys, or sensitive personal data.
 - UI paths that render dynamic memory/property/POI text now escape content before HTML insertion.
 - Optional check: run `getMemoryPersistenceStatus()` in browser console.
@@ -843,13 +843,13 @@ A: Yes, optimized for tablets and phones with touch controls.
 A: Full gameplay state is not saved, but memory markers (pin/flower notes) are persisted locally in your browser.
 
 **Q: Where are memory notes stored?**
-A: In browser local storage (`worldExplorer3D.memories.v1`) on this device/profile only.
+A: Always in browser local storage (`worldExplorer3D.memories.v1`), and optionally in Supabase (`public.world_placeables`) if multiplayer sync is configured.
 
 **Q: Are memory notes secure/private?**
-A: They are local-only but not encrypted. Anyone with access to this browser profile can read them.
+A: Notes are not encrypted. If Supabase sync is enabled, notes are shared with clients in the same area.
 
 **Q: Is it multiplayer?**
-A: Not yet, but planned for future updates.
+A: Yes, optional Supabase sync shares nearby blocks, pins, and flowers (including notes) across clients in Earth mode.
 
 **Q: Can I add custom cities?**
 A: Yes, enter any GPS coordinates in Settings.

@@ -28,6 +28,9 @@ Entries reflect changes made relative to the most recent public release.
 - Brick block builder module (`js/blocks.js`) with in-world place/stack/remove controls.
 - Persistent per-location build-block storage (`worldExplorer3D.buildBlocks.v1`) with runtime status hook (`getBuildPersistenceStatus()`).
 - Security/storage notice document for persistent memory behavior and disclaimer boilerplate.
+- Supabase multiplayer sync layer (`js/sync.js`) for shared nearby-chunk blocks, pins, and flowers.
+- Supabase SQL schema + RLS baseline (`supabase/world_placeables.sql`) and setup guide (`SUPABASE_SETUP.md`).
+- Settings UI inputs for Supabase URL/anon key and live sync status feedback.
 
 ### Changed
 - Technical documentation examples now show deterministic RNG usage patterns aligned with the `rdt.js` seeded runtime helpers.
@@ -37,7 +40,7 @@ Entries reflect changes made relative to the most recent public release.
 - Space info panel metric rows are now reusable for planets, asteroids, spacecraft, and galaxies.
 - POI map rendering now follows legend category filters on both minimap and large map.
 - Dynamic map/property/historic UI templates now escape untrusted string fields before insertion.
-- Module loader cache-bust chain incremented through `v=34` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Module loader cache-bust chain incremented through `v=35` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### Fixed
 - Non-responsive title menu interactions for suggested/custom selection after UI rework.
@@ -51,6 +54,7 @@ Entries reflect changes made relative to the most recent public release.
 - Walking-mode HUD street label not showing the active/nearest road name.
 - Redundant global delete-all blocks menu option (kept existing clear-current-location flow only).
 - Memory markers rendering at terrain ground instead of top surface when placed on roofs/blocks.
+- Memory notes now strip HTML-like text before local/remote persistence.
 
 ---
 

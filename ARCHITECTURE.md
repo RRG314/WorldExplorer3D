@@ -214,7 +214,7 @@ RDT/RGE research provenance and implementation notes:
 - **Scene rebuild cost** -- switching locations requires clearing and regenerating all meshes (roads, buildings, terrain, land use, POIs); there is no incremental chunk loading, so location switches are blocking operations
 - **Browser performance constraints** -- garbage collection pauses, draw call limits, and texture memory budgets are all hard constraints; the engine uses reduced texture sizes, simplified geometry, and throttled updates to stay within budget
 - **Elevation alignment timing** -- terrain tiles load asynchronously; roads and buildings may briefly float or clip until tile data arrives and `rebuildRoadsWithTerrain()` / `repositionBuildingsWithTerrain()` complete
-- **Persistence scope constraints** -- memory markers persist per browser profile via localStorage and are not automatically synced across devices/browsers
+- **Persistence scope constraints** -- localStorage is still used as immediate cache; optional Supabase sync adds shared-state complexity (poll cadence, chunk merge, anonymous write abuse controls)
 
 ---
 

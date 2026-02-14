@@ -484,6 +484,19 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 ℹ️ 100 free requests/month. Get key at <a href="https://rentcast.io" target="_blank" style="color:#667eea">RentCast.io</a>
 </div>
 </div>
+<div style="margin-bottom:14px;padding-top:12px;border-top:1px solid #e2e8f0">
+<div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:8px">🌐 Multiplayer Sync (Supabase)</div>
+<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">Supabase Project URL</label>
+<input type="text" id="supabaseUrlInput" placeholder="https://your-project.supabase.co" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:10px">
+<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">Supabase Anon Key</label>
+<input type="text" id="supabaseAnonKeyInput" placeholder="Paste Supabase anon public key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:8px">
+<button id="saveSupabaseConfig" style="background:#0f766e;border:none;border-radius:8px;padding:10px 20px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.2s;width:100%;margin-bottom:8px">
+🌐 Save Supabase Sync Config
+</button>
+<div id="supabaseSyncStatus" style="font-size:10px;color:#64748b;line-height:1.4">
+Supabase sync is disabled until URL and anon key are saved.
+</div>
+</div>
 <button id="saveApiKey" style="background:#667eea;border:none;border-radius:8px;padding:10px 20px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.2s;width:100%">
 💾 Save All API Keys
 </button>
@@ -1007,5 +1020,5 @@ Explore the area
 <div id="pauseScreen"><div class="pauseTitle">PAUSED</div><button class="pauseBtn" id="resumeBtn">Resume</button><button class="pauseBtn" id="restartBtn">Restart</button><button class="pauseBtn" id="menuBtn">Main Menu</button></div>
 <div id="resultScreen"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
 <div id="caughtScreen"><div class="caughtBox"><div class="caughtTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
-<script type="module" src="js/bootstrap.js?v=34"></script>
+<script type="module" src="js/bootstrap.js?v=35"></script>
 </body></html>

@@ -92,16 +92,16 @@ How to help:
 - Verify cache-bust alignment in `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
 - Consider adding a lightweight CI check that fails on version mismatch.
 
-### 9. Memory Marker Portability
+### 9. Supabase Multiplayer Hardening
 
-- Persistent memory markers are intentionally stored in browser localStorage and do not auto-sync across devices/browsers.
-- Users may perceive this as data loss when switching devices or using strict private-mode settings.
+- Multiplayer sync is available, but currently uses client-side polling and anonymous writes.
+- Strong abuse protection (server-side rate limits, moderation, and audit workflows) still needs hardening.
 
 How to help:
 
-- Evaluate optional import/export tooling for memory entries.
-- Add clear UX copy around device/browser storage scope.
-- Keep storage-capability checks aligned with `js/memory.js`.
+- Add Supabase Edge Function rate limiting and write quotas.
+- Expand RLS checks for stricter per-type payload validation.
+- Add operational monitoring for write spikes and chunk hotspots.
 
 ## Reporting Format
 

@@ -39,6 +39,7 @@ Open `http://localhost:8000`.
 - Click-to-inspect deep-space objects (planets, asteroids, spacecraft, galaxies).
 - Persistent memory markers (pin/flower + short note) with in-world remove and bulk delete actions.
 - Minecraft-style brick block builder (place, stack, and remove blocks in-world).
+- Optional Supabase multiplayer sync layer for shared blocks + pins/flowers by nearby chunks.
 - Deterministic runtime seeding and complexity logic through RDT + RGE256-based paths.
 
 ## Core Features
@@ -49,6 +50,7 @@ Open `http://localhost:8000`.
 - Real-time road network, buildings, land use, POI overlays.
 - Real estate overlays (Estated, ATTOM, RentCast, and fallback data).
 - Persistent location memories: place/remove pins or flowers with 200-char messages.
+- Optional Supabase sync for shared memory markers and block edits across clients in the same area.
 - Minimap + full map with teleport and layer toggles.
 - POIs render on minimap/large map according to legend category filters.
 - Memory pins/flowers render on minimap/large map for location recall.
@@ -107,6 +109,7 @@ Block builder actions:
 - Marker types: `Pin` and `Flower`
 - Message length: up to `200` characters
 - Storage: browser `localStorage` (`worldExplorer3D.memories.v1`)
+- Optional multiplayer backend: Supabase (`public.world_placeables`) for shared markers
 - Scope: Earth-mode, per location center key (`LOC` rounded to 5 decimals)
 - Limits: `300` per location, `1500` total, ~`1500KB` max payload
 - Persistence guard: placement is disabled if browser storage round-trip check fails
@@ -120,6 +123,7 @@ Block builder actions:
 ## Persistent Build Blocks
 
 - Storage: browser `localStorage` (`worldExplorer3D.buildBlocks.v1`)
+- Optional multiplayer backend: Supabase (`public.world_placeables`) for shared block edits
 - Scope: per location center key (`LOC` rounded to 5 decimals)
 - In-world behavior: place/stack/remove blocks and stand or climb on them in walking mode
 - Build limit: `100` max blocks for now
@@ -128,7 +132,8 @@ Block builder actions:
 
 ## Security and Storage Notice
 
-- Memory notes are stored locally in this browser profile, not encrypted, and not auto-synced to other devices.
+- Memory notes are stored locally in this browser profile, not encrypted.
+- Optional Supabase sync shares memory text and block edits with other clients in the same area.
 - Anyone with access to this browser profile can read local memory notes.
 - Clearing site data or browser storage will remove saved memories.
 - Do not store secrets, credentials, or sensitive personal information in memory notes.
@@ -141,7 +146,7 @@ Block builder actions:
 - Runtime is split into multiple JS files (`js/*.js`) with no build step.
 - Shared/global runtime state is still used across core systems.
 - ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
-- Cache-bust version alignment across loader chain is currently `v=34`.
+- Cache-bust version alignment across loader chain is currently `v=35`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
 ## Freeze Snapshot (2026-02-14)
@@ -190,6 +195,7 @@ js/
   map.js
   memory.js
   blocks.js
+  sync.js
   ui.js
   main.js
 ```
@@ -219,6 +225,7 @@ Current direction:
 - `CONTRIBUTING.md` - contribution workflow
 - `CHANGELOG.md` - release history
 - `SECURITY_STORAGE_NOTICE.md` - persistent-memory storage and security disclaimer boilerplate
+- `SUPABASE_SETUP.md` - multiplayer sync setup + SQL schema notes
 
 ## Known Issues / Help Wanted
 
