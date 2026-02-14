@@ -525,7 +525,10 @@ function setupUI() {
         document.getElementById('fLandUse').classList.toggle('on', landUseVisible);
         document.getElementById('fLandUseRE').classList.toggle('on', landUseVisible);
         // Keep water features visible even when general land-use overlay is off.
-        landuseMeshes.forEach(m => { m.visible = landUseVisible || !!m.userData?.alwaysVisible; });
+        landuseMeshes.forEach(m => {
+            const alwaysVisible = !!(m && m.userData && m.userData.alwaysVisible);
+            m.visible = landUseVisible || alwaysVisible;
+        });
         closeAllFloatMenus();
     });
     document.getElementById('fLandUseRE').addEventListener('click', () => {
@@ -533,7 +536,10 @@ function setupUI() {
         document.getElementById('fLandUse').classList.toggle('on', landUseVisible);
         document.getElementById('fLandUseRE').classList.toggle('on', landUseVisible);
         // Keep water features visible even when general land-use overlay is off.
-        landuseMeshes.forEach(m => { m.visible = landUseVisible || !!m.userData?.alwaysVisible; });
+        landuseMeshes.forEach(m => {
+            const alwaysVisible = !!(m && m.userData && m.userData.alwaysVisible);
+            m.visible = landUseVisible || alwaysVisible;
+        });
         closeAllFloatMenus();
     });
     document.getElementById('fTimeOfDay').addEventListener('click', () => { cycleTimeOfDay(); });

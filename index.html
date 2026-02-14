@@ -355,11 +355,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
 </div>
 <div class="tab-content active" id="tab-location">
 <div class="location-switch-row">
-<button class="location-switch-btn active" id="suggestedToggle" data-mode="suggested" type="button" onclick="if(window.handleTitleModeClick) window.handleTitleModeClick('suggested')">
+<button class="location-switch-btn active" id="suggestedToggle" data-mode="suggested" type="button" onclick="if(window.handleTitleModeClick){window.handleTitleModeClick('suggested');}else{var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');var selected=document.querySelector('#suggestedPanel .loc.sel')||document.querySelector('#suggestedPanel .loc[data-loc=&quot;baltimore&quot;]');if(selected)window.selLoc=selected.getAttribute('data-loc')||window.selLoc||'baltimore';}">
 <span class="switch-title">📍 Suggested</span>
 <span class="switch-sub">Popular city list</span>
 </button>
-<button class="location-switch-btn" id="customToggle" data-mode="custom" type="button" onclick="if(window.handleTitleModeClick) window.handleTitleModeClick('custom')">
+<button class="location-switch-btn" id="customToggle" data-mode="custom" type="button" onclick="if(window.handleTitleModeClick){window.handleTitleModeClick('custom');}else{var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.remove('show');if(cp)cp.classList.add('show');if(sb)sb.classList.remove('active');if(cb)cb.classList.add('active');window.selLoc='custom';}">
 <span class="switch-title">🌍 Custom</span>
 <span class="switch-sub">Any place search</span>
 </button>
@@ -377,21 +377,21 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <div class="suggested-note">Choose from existing city suggestions.</div>
 <div class="suggested-list">
 <div class="loc-grid suggested-grid">
-<div class="loc sel" data-loc="baltimore" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Baltimore</div><div class="loc-region">Maryland, USA</div></div>
-<div class="loc" data-loc="hollywood" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Hollywood</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="newyork" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">New York</div><div class="loc-region">New York, USA</div></div>
-<div class="loc" data-loc="miami" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Miami</div><div class="loc-region">Florida, USA</div></div>
-<div class="loc" data-loc="tokyo" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Tokyo</div><div class="loc-region">Japan</div></div>
-<div class="loc" data-loc="monaco" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Monaco</div><div class="loc-region">Monte Carlo</div></div>
-<div class="loc" data-loc="nurburgring" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Nürburgring</div><div class="loc-region">Germany</div></div>
-<div class="loc" data-loc="lasvegas" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Las Vegas</div><div class="loc-region">Nevada, USA</div></div>
-<div class="loc" data-loc="london" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">London</div><div class="loc-region">United Kingdom</div></div>
-<div class="loc" data-loc="paris" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Paris</div><div class="loc-region">France</div></div>
-<div class="loc" data-loc="dubai" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Dubai</div><div class="loc-region">UAE</div></div>
-<div class="loc" data-loc="sanfrancisco" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">San Francisco</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="losangeles" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Los Angeles</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="chicago" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Chicago</div><div class="loc-region">Illinois, USA</div></div>
-<div class="loc" data-loc="seattle" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
+<div class="loc sel" data-loc="baltimore" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">Baltimore</div><div class="loc-region">Maryland, USA</div></div>
+<div class="loc" data-loc="hollywood" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">Hollywood</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="newyork" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">New York</div><div class="loc-region">New York, USA</div></div>
+<div class="loc" data-loc="miami" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">Miami</div><div class="loc-region">Florida, USA</div></div>
+<div class="loc" data-loc="tokyo" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">Tokyo</div><div class="loc-region">Japan</div></div>
+<div class="loc" data-loc="monaco" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">Monaco</div><div class="loc-region">Monte Carlo</div></div>
+<div class="loc" data-loc="nurburgring" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">Nürburgring</div><div class="loc-region">Germany</div></div>
+<div class="loc" data-loc="lasvegas" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">Las Vegas</div><div class="loc-region">Nevada, USA</div></div>
+<div class="loc" data-loc="london" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">London</div><div class="loc-region">United Kingdom</div></div>
+<div class="loc" data-loc="paris" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">Paris</div><div class="loc-region">France</div></div>
+<div class="loc" data-loc="dubai" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">Dubai</div><div class="loc-region">UAE</div></div>
+<div class="loc" data-loc="sanfrancisco" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">San Francisco</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="losangeles" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">Los Angeles</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="chicago" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">Chicago</div><div class="loc-region">Illinois, USA</div></div>
+<div class="loc" data-loc="seattle" onclick="if(window.handleSuggestedCardClick){window.handleSuggestedCardClick(this);}else{var cards=document.querySelectorAll('#suggestedPanel .loc');for(var i=0;i<cards.length;i++){cards[i].classList.remove('sel');}this.classList.add('sel');window.selLoc=this.getAttribute('data-loc')||window.selLoc||'baltimore';var sp=document.getElementById('suggestedPanel');var cp=document.getElementById('customPanel');var sb=document.getElementById('suggestedToggle');var cb=document.getElementById('customToggle');if(sp)sp.classList.add('show');if(cp)cp.classList.remove('show');if(sb)sb.classList.add('active');if(cb)cb.classList.remove('active');}"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
 </div>
 </div>
 </div>
@@ -966,7 +966,9 @@ Explore the area
 
     if (nextMode === 'suggested') {
       const selected = document.querySelector('#suggestedPanel .loc.sel');
-      if (selected?.dataset?.loc) globalThis.selLoc = selected.dataset.loc;
+      if (selected && selected.dataset && selected.dataset.loc) {
+        globalThis.selLoc = selected.dataset.loc;
+      }
       globalThis.loadingScreenMode = 'earth';
     } else if (nextMode === 'custom') {
       globalThis.selLoc = 'custom';
@@ -977,7 +979,9 @@ Explore the area
   };
 
   const fallbackSelectSuggestedCard = (targetEl) => {
-    const selectedLoc = targetEl?.closest?.('.loc[data-loc]');
+    const selectedLoc = targetEl && typeof targetEl.closest === 'function'
+      ? targetEl.closest('.loc[data-loc]')
+      : null;
     if (!selectedLoc) return;
     document.querySelectorAll('#suggestedPanel .loc').forEach((el) => el.classList.remove('sel'));
     selectedLoc.classList.add('sel');
@@ -1029,7 +1033,8 @@ Explore the area
       status.textContent = `✓ Found: ${name}`;
       status.style.color = '#059669';
     } catch (err) {
-      status.textContent = `✗ Search failed: ${err?.message || 'Unknown error'}`;
+      const errorMessage = (err && err.message) ? err.message : 'Unknown error';
+      status.textContent = `✗ Search failed: ${errorMessage}`;
       status.style.color = '#dc2626';
     } finally {
       clearTimeout(timeoutId);
@@ -1071,13 +1076,44 @@ Explore the area
         if (event.cancelable) event.preventDefault();
         event.stopPropagation();
       }
-      globalThis.handleTitleModeClick(mode);
+      if (typeof globalThis.setTitleLocationMode === 'function') {
+        try {
+          globalThis.setTitleLocationMode(mode);
+        } catch (e) {
+          console.warn('[title-ui] setTitleLocationMode failed:', e);
+        }
+      }
+      fallbackSetTitleMode(mode);
+    };
+
+    const handleSuggestedActivation = (card) => {
+      if (!card) return;
+      if (typeof globalThis.selectSuggestedLocationCard === 'function') {
+        try {
+          globalThis.selectSuggestedLocationCard(card);
+        } catch (e) {
+          console.warn('[title-ui] selectSuggestedLocationCard failed:', e);
+        }
+      }
+      fallbackSelectSuggestedCard(card);
+    };
+
+    const handleSearchActivation = async () => {
+      if (typeof globalThis.searchLocation === 'function') {
+        try {
+          await globalThis.searchLocation();
+          return;
+        } catch (e) {
+          console.warn('[title-ui] searchLocation failed, using fallback search:', e);
+        }
+      }
+      await fallbackSearchLocation();
     };
 
     Object.entries(buttonIds).forEach(([mode, id]) => {
       const button = document.getElementById(id);
       if (!button) return;
-      button.onclick = (event) => handleModeActivation(mode, event);
+      button.addEventListener('click', (event) => handleModeActivation(mode, event));
       button.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter' && event.key !== ' ') return;
         handleModeActivation(mode, event);
@@ -1089,9 +1125,19 @@ Explore the area
       suggestedPanel.addEventListener('click', (event) => {
         const target = event.target;
         if (!(target instanceof Element)) return;
-        const card = target.closest('.loc[data-loc]');
+        let card = target.closest ? target.closest('.loc[data-loc]') : null;
+        if (!card) {
+          let node = target;
+          while (node && node !== suggestedPanel) {
+            if (node.classList && node.classList.contains('loc') && node.getAttribute('data-loc')) {
+              card = node;
+              break;
+            }
+            node = node.parentElement;
+          }
+        }
         if (!card) return;
-        globalThis.handleSuggestedCardClick(card);
+        handleSuggestedActivation(card);
       });
     }
 
@@ -1100,7 +1146,7 @@ Explore the area
       searchBtn.addEventListener('click', (event) => {
         if (event.cancelable) event.preventDefault();
         event.stopPropagation();
-        void globalThis.handleTitleSearchClick();
+        void handleSearchActivation();
       });
     }
 
@@ -1109,7 +1155,7 @@ Explore the area
       searchInput.addEventListener('keydown', (event) => {
         if (event.key !== 'Enter') return;
         event.preventDefault();
-        void globalThis.handleTitleSearchClick();
+        void handleSearchActivation();
       });
     }
   };
