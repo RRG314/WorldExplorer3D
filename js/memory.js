@@ -5,7 +5,10 @@
 const MEMORY_STORAGE_KEY = 'worldExplorer3D.memories.v1';
 const MEMORY_STORAGE_TEST_KEY = 'worldExplorer3D.memories.test';
 const MEMORY_MAX_MESSAGE_LENGTH = 200;
+const MEMORY_MAX_LOCATION_LABEL_LENGTH = 120;
 const MEMORY_MAX_PER_LOCATION = 300;
+const MEMORY_MAX_TOTAL = 1500;
+const MEMORY_MAX_STORAGE_BYTES = 1500000;
 const MEMORY_LOCATION_PRECISION = 5;
 
 let memoryEntries = [];
@@ -25,8 +28,24 @@ function isFiniteNumber(v) {
     return Number.isFinite(v);
 }
 
+function isValidLatLon(lat, lon) {
+    return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+}
+
 function clampMessage(raw) {
-    return String(raw || '').trim().slice(0, MEMORY_MAX_MESSAGE_LENGTH);
+    return String(raw || '')
+        .replace(/\r\n?/g, '\n')
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+        .trim()
+        .slice(0, MEMORY_MAX_MESSAGE_LENGTH);
+}
+
+function clampLocationLabel(raw) {
+    const cleaned = String(raw || '')
+        .replace(/[\u0000-\u001F\u007F]/g, ' ')
+        .trim()
+        .slice(0, MEMORY_MAX_LOCATION_LABEL_LENGTH);
+    return cleaned || 'Unknown';
 }
 
 function parseDateSafe(iso) {
@@ -100,7 +119,7 @@ function normalizeMemoryEntry(raw) {
     const message = clampMessage(raw.message);
     const lat = Number(raw.lat);
     const lon = Number(raw.lon);
-    if (!message || !isFiniteNumber(lat) || !isFiniteNumber(lon)) return null;
+    if (!message || !isFiniteNumber(lat) || !isFiniteNumber(lon) || !isValidLatLon(lat, lon)) return null;
     return {
         id: String(raw.id || `mem_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
         type: raw.type === 'flower' ? 'flower' : 'pin',
@@ -108,7 +127,7 @@ function normalizeMemoryEntry(raw) {
         lat,
         lon,
         locationKey: String(raw.locationKey || ''),
-        locationLabel: String(raw.locationLabel || 'Unknown'),
+        locationLabel: clampLocationLabel(raw.locationLabel),
         createdAt: parseDateSafe(raw.createdAt)
     };
 }
@@ -120,7 +139,9 @@ function loadMemoryEntriesFromStorage() {
         if (!raw) return [];
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) return [];
-        return parsed.map(normalizeMemoryEntry).filter(Boolean);
+        const normalized = parsed.map(normalizeMemoryEntry).filter(Boolean);
+        if (normalized.length <= MEMORY_MAX_TOTAL) return normalized;
+        return normalized.slice(normalized.length - MEMORY_MAX_TOTAL);
     } catch (err) {
         console.warn('[memory] Failed to read storage:', err);
         return [];
@@ -130,7 +151,13 @@ function loadMemoryEntriesFromStorage() {
 function saveMemoryEntriesToStorage() {
     if (!memoryPersistenceEnabled) return false;
     try {
-        localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(memoryEntries));
+        const payload = JSON.stringify(memoryEntries);
+        if (payload.length > MEMORY_MAX_STORAGE_BYTES) {
+            memoryPersistenceDetail = `Storage limit reached (${Math.round(MEMORY_MAX_STORAGE_BYTES / 1024)}KB). Remove some memories and try again.`;
+            updatePersistenceHint();
+            return false;
+        }
+        localStorage.setItem(MEMORY_STORAGE_KEY, payload);
         return true;
     } catch (err) {
         memoryPersistenceEnabled = false;
@@ -148,7 +175,7 @@ function updatePersistenceHint() {
         hint.textContent = 'Saved persistently in this browser (local storage).';
         hint.classList.remove('warn');
     } else {
-        hint.textContent = 'Persistent browser storage is unavailable. Marker placement is disabled.';
+        hint.textContent = memoryPersistenceDetail || 'Persistent browser storage is unavailable. Marker placement is disabled.';
         hint.classList.add('warn');
     }
 }
@@ -448,6 +475,11 @@ function placeMemoryFromComposer() {
         return;
     }
 
+    if (memoryEntries.length >= MEMORY_MAX_TOTAL) {
+        setComposerStatus(`Total memory limit reached (${MEMORY_MAX_TOTAL}). Remove some memories first.`, true);
+        return;
+    }
+
     const currentCount = memoryEntries.reduce((count, entry) => count + (entry.locationKey === locationKey ? 1 : 0), 0);
     if (currentCount >= MEMORY_MAX_PER_LOCATION) {
         setComposerStatus(`Limit reached (${MEMORY_MAX_PER_LOCATION}) for this location. Remove one first.`, true);
@@ -471,10 +503,10 @@ function placeMemoryFromComposer() {
         id: `mem_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
         type: selectedMemoryType === 'flower' ? 'flower' : 'pin',
         message,
-        lat: latLon.lat,
-        lon: latLon.lon,
+        lat: Number(latLon.lat.toFixed(7)),
+        lon: Number(latLon.lon.toFixed(7)),
         locationKey,
-        locationLabel: getCurrentLocationLabel(),
+        locationLabel: clampLocationLabel(getCurrentLocationLabel()),
         createdAt: nowIso
     };
 
