@@ -141,7 +141,7 @@ Block builder actions:
 - Runtime is split into multiple JS files (`js/*.js`) with no build step.
 - Shared/global runtime state is still used across core systems.
 - ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
-- Cache-bust version alignment across loader chain is currently `v=31`.
+- Cache-bust version alignment across loader chain is currently `v=32`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
 ## Freeze Snapshot (2026-02-14)

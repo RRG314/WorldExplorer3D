@@ -42,7 +42,7 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - Memory composer now includes `Delete All` with confirmation.
 - POI and memory markers now render on both minimap and large map overlays.
 - Voxel-style brick builder subsystem added (`js/blocks.js`) with click place/stack and shift-click removal.
-- Loader cache-bust chain is aligned through `v=31` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Loader cache-bust chain is aligned through `v=32` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### High-Level Architecture
 

@@ -241,10 +241,25 @@ function updateHUD() {
         const viewMode = Walk.state.view === 'third' ? ' [3rd Person]' :
                          Walk.state.view === 'first' ? ' [1st Person]' :
                          ' [Overhead]';
+
+        let walkRoad = null;
+        if (!onMoon && roads && roads.length > 0) {
+            let nearest = null;
+            if (typeof getNearestRoadThrottled === 'function') {
+                nearest = getNearestRoadThrottled(Walk.state.walker.x, Walk.state.walker.z, false);
+            } else if (typeof findNearestRoad === 'function') {
+                nearest = findNearestRoad(Walk.state.walker.x, Walk.state.walker.z);
+            }
+            if (nearest && nearest.road) {
+                const edge = Math.max(6, (nearest.road.w || 10) * 0.75);
+                if (nearest.dist < edge) walkRoad = nearest.road;
+            }
+        }
+
         document.getElementById('speed').textContent = mph;
         document.getElementById('speed').classList.remove('fast');
-        document.getElementById('limit').textContent = '';
-        document.getElementById('street').textContent = (running ? '🏃 RUNNING' : '🚶 WALKING') + viewMode + ' • ' + locName;
+        document.getElementById('limit').textContent = walkRoad ? (walkRoad.limit || 25) : '';
+        document.getElementById('street').textContent = (walkRoad?.name || 'Off Road') + ' • ' + locName;
         const bf = document.getElementById('boostFill');
         bf.style.width = '0%';
         bf.classList.remove('active');
@@ -262,7 +277,7 @@ function updateHUD() {
         document.getElementById('coords').textContent = geo.lat.toFixed(4) + ', ' + geo.lon.toFixed(4) + ' | ' + dirs[Math.round(hdg/45)%8] + ' ' + Math.round(hdg) + '°';
 
         // Mode HUD - just show mode name
-        document.getElementById('modeTitle').textContent = '🚶 Walking Mode';
+        document.getElementById('modeTitle').textContent = '🚶 Walking Mode' + viewMode;
         document.getElementById('modeTimer').classList.remove('show');
         document.getElementById('modeInfo').classList.remove('show');
         return;
