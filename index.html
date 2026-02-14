@@ -178,6 +178,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #modeHud{top:10px;font-size:10px;padding:6px 12px}
   #coords{bottom:180px;left:10px;font-size:10px;padding:8px 12px}
   #controlsTab{left:140px;max-width:180px;font-size:11px}
+  #memoryFlowerFloatBtn{left:140px;bottom:72px}
 
   /* Property panel */
   #propertyPanel{width:90vw;right:5vw;top:10px;max-height:70vh}
@@ -219,6 +220,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #modeTimer{font-size:14px}
   #coords{bottom:160px;left:5px;font-size:9px;padding:6px 10px}
   #controlsTab{left:115px;max-width:150px;font-size:10px;bottom:15px}
+  #memoryFlowerFloatBtn{left:115px;bottom:66px}
 
   /* Property panel for phones */
   #propertyPanel{width:95vw;right:2.5vw;top:5px;max-height:75vh}
@@ -258,6 +260,9 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #ctrlHeader{padding:12px 16px;cursor:pointer;color:#667eea;font-family:'Poppins',sans-serif;font-weight:600}
 #ctrlContent{padding:12px 16px;border-top:2px solid #f1f5f9;line-height:1.8}
 #ctrlContent.hidden{display:none}
+#memoryFlowerFloatBtn{position:fixed;bottom:78px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#ec4899,#db2777);border:none;border-radius:50%;color:#ffffff;font-size:23px;cursor:pointer;box-shadow:0 10px 26px rgba(236,72,153,0.38);z-index:101;display:none;transition:all 0.2s}
+#memoryFlowerFloatBtn.show{display:flex;align-items:center;justify-content:center}
+#memoryFlowerFloatBtn:hover{transform:scale(1.08);box-shadow:0 14px 34px rgba(236,72,153,0.45)}
 #coords{position:fixed;bottom:200px;left:20px;background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:10px 14px;font-size:11px;color:#475569;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
 #coords.show{display:block}
 #loading{position:fixed;inset:0;background:#000 url('loading-bg.jpg') center center/cover no-repeat;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:300;cursor:pointer}
@@ -759,9 +764,7 @@ Explore the area
 <div class="floatItem" id="fSpaceDirect">🌙 Direct to Moon</div>
 <div class="floatItem" id="fSpaceRocket">🚀 Rocket to Moon</div>
 <div style="border-top:1px solid #e2e8f0;margin:6px 0"></div>
-<div class="floatItem" id="fHome">🏠 Menu</div>
 <div class="floatItem" id="fNextCity">📍 New Location</div>
-<div class="floatItem" id="fMemory">🌸 Place Memory</div>
 </div>
 </div>
 
@@ -802,6 +805,7 @@ Explore the area
 </div>
 </div>
 </div>
+<div class="floatItem" id="fHome" style="display:none">🏠 Menu</div>
 
 <div id="memoryComposer">
 <div class="memoryComposerTitle">Memory Marker</div>
@@ -832,7 +836,8 @@ Explore the area
 </div>
 
 <button class="mainMenuBtn" id="mainMenuBtn">🏠 Main Menu</button>
-<div id="controlsTab"><div id="ctrlHeader">🎮 Controls ▼</div><div id="ctrlContent" class="hidden">
+<button id="memoryFlowerFloatBtn" title="Place Flower Memory">🌸</button>
+<div id="controlsTab"><div id="ctrlHeader">🛞 Controls ▼</div><div id="ctrlContent" class="hidden">
 <div id="drivingControls">
 <b>🚗 Driving Mode:</b><br>
 • WASD/Arrows - Drive<br>
@@ -873,7 +878,7 @@ Explore the area
 <b>🌙 Space & Map:</b><br>
 • Click Moon - Travel to moon<br>
 • Click Stars - View constellation<br>
-• Exploration menu > Place Memory - Drop/remove pin or flower notes<br>
+• Flower button above controls - Drop/remove pin or flower notes<br>
 • Right Click Map - Teleport<br>
 • Left Click Map - View info
 </div></div>

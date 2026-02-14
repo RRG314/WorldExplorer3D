@@ -362,6 +362,8 @@ function setupUI() {
         document.getElementById('controlsTab').classList.add('show');
         document.getElementById('coords').classList.add('show');
         document.getElementById('historicBtn').classList.add('show');
+        const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
+        if (memoryFlowerFloatBtn) memoryFlowerFloatBtn.classList.add('show');
         gameStarted = true;
         switchEnv(ENV.EARTH);
 
@@ -471,6 +473,18 @@ function setupUI() {
     function closeAllFloatMenus() {
         document.querySelectorAll('.floatMenu').forEach(m => m.classList.remove('open'));
     }
+    function goToMainMenu() {
+        gameStarted = false; paused = false; clearObjectives(); clearPolice(); policeOn = false; eraseTrack(); closePropertyPanel(); closeHistoricPanel(); clearPropertyMarkers(); realEstateMode = false; historicMode = false;
+        document.querySelectorAll('.floatMenu').forEach(m => m.classList.remove('open'));
+        document.getElementById('titleScreen').classList.remove('hidden');
+        ['hud','minimap','modeHud','police','floatMenuContainer','mainMenuBtn','pauseScreen','resultScreen','caughtScreen','controlsTab','coords','realEstateBtn','historicBtn','memoryFlowerFloatBtn'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.classList.remove('show');
+        });
+        if (typeof closeMemoryComposer === 'function') closeMemoryComposer();
+        const memoryInfoPanel = document.getElementById('memoryInfoPanel');
+        if (memoryInfoPanel) memoryInfoPanel.classList.remove('show');
+    }
 
     // Float menu
     // Three separate float menu buttons
@@ -501,17 +515,13 @@ function setupUI() {
         if (!isOpen) menu.classList.add('open');
     });
 
-    document.getElementById('fHome').addEventListener('click', () => {
-        gameStarted = false; paused = false; clearObjectives(); clearPolice(); policeOn = false; eraseTrack(); closePropertyPanel(); closeHistoricPanel(); clearPropertyMarkers(); realEstateMode = false; historicMode = false;
-        document.querySelectorAll('.floatMenu').forEach(m => m.classList.remove('open'));
-        document.getElementById('titleScreen').classList.remove('hidden');
-        ['hud','minimap','modeHud','police','floatMenuContainer','mainMenuBtn','pauseScreen','resultScreen','caughtScreen','controlsTab','coords','realEstateBtn','historicBtn'].forEach(id => document.getElementById(id).classList.remove('show'));
-    });
+    const homeMenuItem = document.getElementById('fHome');
+    if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);
     document.getElementById('fNextCity').addEventListener('click', () => { nextCity(); closeAllFloatMenus(); });
-    const memoryBtn = document.getElementById('fMemory');
-    if (memoryBtn) {
-        memoryBtn.addEventListener('click', () => {
-            if (typeof openMemoryComposer === 'function') openMemoryComposer();
+    const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
+    if (memoryFlowerFloatBtn) {
+        memoryFlowerFloatBtn.addEventListener('click', () => {
+            if (typeof openMemoryComposer === 'function') openMemoryComposer('flower');
             closeAllFloatMenus();
         });
     }
@@ -723,7 +733,7 @@ function setupUI() {
 
     // Main Menu Button
     document.getElementById('mainMenuBtn').addEventListener('click', () => {
-        document.getElementById('fHome').click();
+        goToMainMenu();
     });
 
     // Close float menus when clicking outside
@@ -741,11 +751,11 @@ function setupUI() {
 
     document.getElementById('resumeBtn').addEventListener('click', () => { paused = false; document.getElementById('pauseScreen').classList.remove('show'); });
     document.getElementById('restartBtn').addEventListener('click', () => { paused = false; document.getElementById('pauseScreen').classList.remove('show'); startMode(); });
-    document.getElementById('menuBtn').addEventListener('click', () => document.getElementById('fHome').click());
+    document.getElementById('menuBtn').addEventListener('click', () => goToMainMenu());
     document.getElementById('caughtBtn').addEventListener('click', () => { document.getElementById('caughtScreen').classList.remove('show'); policeHits = 0; paused = false; document.getElementById('police').textContent = '💔 0/3'; spawnOnRoad(); });
     document.getElementById('againBtn').addEventListener('click', () => { hideResult(); paused = false; startMode(); });
     document.getElementById('freeBtn').addEventListener('click', () => { hideResult(); paused = false; gameMode = 'free'; clearObjectives(); });
-    document.getElementById('resMenuBtn').addEventListener('click', () => { hideResult(); document.getElementById('fHome').click(); });
+    document.getElementById('resMenuBtn').addEventListener('click', () => { hideResult(); goToMainMenu(); });
 
     // Map controls
     document.getElementById('minimap').addEventListener('click', () => {
