@@ -288,11 +288,14 @@ function setupUI() {
         if (nextMode === 'suggested') {
             selLoc = getSelectedSuggestedLoc();
             titleLaunchMode = 'earth';
+            globalThis.loadingScreenMode = 'earth';
         } else if (nextMode === 'custom') {
             selLoc = 'custom';
             titleLaunchMode = 'earth';
+            globalThis.loadingScreenMode = 'earth';
         } else {
             titleLaunchMode = nextMode;
+            globalThis.loadingScreenMode = nextMode;
             if (selLoc === 'custom') {
                 const customLatEl = document.getElementById('customLat');
                 const customLonEl = document.getElementById('customLon');
@@ -349,6 +352,7 @@ function setupUI() {
     // Start
     document.getElementById('startBtn').addEventListener('click', async () => {
         const launchMode = titleLaunchMode;
+        globalThis.loadingScreenMode = launchMode === 'moon' ? 'moon' : launchMode === 'space' ? 'space' : 'earth';
         document.getElementById('titleScreen').classList.add('hidden');
         document.getElementById('hud').classList.add('show');
         document.getElementById('minimap').classList.add('show');
@@ -452,6 +456,8 @@ function setupUI() {
         // Land use OFF by default (user can toggle on if needed)
         document.getElementById('fLandUse').classList.remove('on');
         document.getElementById('fLandUseRE').classList.remove('on');
+        // Reset default loading theme for normal in-game loading after start.
+        globalThis.loadingScreenMode = 'earth';
 
         // Optional launch-mode shortcuts from title selector.
         if (launchMode === 'moon' && !onMoon && !travelingToMoon) {

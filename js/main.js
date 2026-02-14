@@ -9,6 +9,11 @@ const TRANSITION_LOADING = {
     space: { background: 'space-transition.png', text: 'Preparing Space Flight...' },
     moon: { background: 'moon-transition.png', text: 'Approaching The Moon...' }
 };
+const LOADING_BG_BY_MODE = {
+    earth: DEFAULT_LOADING_BG,
+    moon: 'moon-transition.png',
+    space: 'space-transition.png'
+};
 
 function renderLoop(t = 0) {
     requestAnimationFrame(renderLoop);
@@ -93,7 +98,9 @@ function showLoad(txt, options = {}) {
     if (!loading || !loadText) return;
 
     const spinner = loading.querySelector('.spinner');
-    const background = options.background || DEFAULT_LOADING_BG;
+    const selectedMode = options.mode || globalThis.loadingScreenMode || 'earth';
+    const themedBg = LOADING_BG_BY_MODE[selectedMode] || DEFAULT_LOADING_BG;
+    const background = options.background || themedBg;
     const overlay = Number.isFinite(options.overlay) ? options.overlay : 0.32;
 
     loading.style.background = `linear-gradient(rgba(0,0,0,${overlay}),rgba(0,0,0,${overlay})), url('${background}') center center / cover no-repeat`;
