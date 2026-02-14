@@ -107,6 +107,7 @@ function onKey(code, event) {
         window._debugMode = !window._debugMode;
         const overlay = document.getElementById('debugOverlay');
         if (overlay) overlay.style.display = window._debugMode ? 'block' : 'none';
+        if (typeof positionTopOverlays === 'function') positionTopOverlays();
 
         // Create/destroy debug marker under car
         if (window._debugMode && !window._debugMarker) {

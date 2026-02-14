@@ -432,6 +432,7 @@ function updatePerfPanel(force = false) {
     if (force || panel.textContent !== lines.join('\n')) {
         panel.textContent = lines.join('\n');
     }
+    if (typeof positionTopOverlays === 'function') positionTopOverlays();
 }
 
 setPerfMode(readStorage(PERF_STORAGE_MODE_KEY), { persist: false });

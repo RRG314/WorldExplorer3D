@@ -6,6 +6,8 @@ let _hudTimer = 0;
 let _mapTimer = 0;
 let _lodTimer = 0;
 let _perfPanelTimer = 0;
+const OVERLAY_EDGE_MARGIN = 6;
+const OVERLAY_ANCHOR_GAP = 10;
 const DEFAULT_LOADING_BG = 'loading-bg.jpg';
 const TRANSITION_LOADING = {
     space: { background: 'space-transition.png', text: 'Preparing Space Flight...' },
@@ -16,6 +18,51 @@ const LOADING_BG_BY_MODE = {
     moon: 'moon-transition.png',
     space: 'space-transition.png'
 };
+
+function _isVisibleRect(el) {
+    if (!el || typeof el.getBoundingClientRect !== 'function') return null;
+    const style = window.getComputedStyle(el);
+    if (style.display === 'none' || style.visibility === 'hidden') return null;
+    const rect = el.getBoundingClientRect();
+    if (!(rect.width > 0 && rect.height > 0)) return null;
+    return rect;
+}
+
+function _positionOverlayBetween(overlay, leftRect, rightRect) {
+    if (!overlay || !leftRect || !rightRect) return;
+    const overlayRect = overlay.getBoundingClientRect();
+    if (!(overlayRect.width > 0)) return;
+
+    const minLeft = Math.max(OVERLAY_EDGE_MARGIN, leftRect.right + OVERLAY_ANCHOR_GAP);
+    const maxLeft = Math.min(
+        window.innerWidth - OVERLAY_EDGE_MARGIN - overlayRect.width,
+        rightRect.left - OVERLAY_ANCHOR_GAP - overlayRect.width
+    );
+    if (maxLeft < minLeft) return;
+
+    const desiredLeft = ((leftRect.right + rightRect.left) * 0.5) - (overlayRect.width * 0.5);
+    const clampedLeft = Math.max(minLeft, Math.min(maxLeft, desiredLeft));
+    overlay.style.left = `${Math.round(clampedLeft)}px`;
+    overlay.style.right = 'auto';
+}
+
+function positionTopOverlays() {
+    if (!gameStarted) return;
+    const modeHudRect = _isVisibleRect(document.getElementById('modeHud'));
+    if (!modeHudRect) return;
+
+    const debugOverlay = document.getElementById('debugOverlay');
+    if (debugOverlay && debugOverlay.style.display !== 'none') {
+        const hudRect = _isVisibleRect(document.getElementById('hud'));
+        if (hudRect) _positionOverlayBetween(debugOverlay, hudRect, modeHudRect);
+    }
+
+    const perfPanel = document.getElementById('perfPanel');
+    if (perfPanel && perfPanel.style.display !== 'none') {
+        const menuRect = _isVisibleRect(document.getElementById('mainMenuBtn'));
+        if (menuRect) _positionOverlayBetween(perfPanel, modeHudRect, menuRect);
+    }
+}
 
 function renderLoop(t = 0) {
     requestAnimationFrame(renderLoop);
@@ -42,6 +89,7 @@ function renderLoop(t = 0) {
         if (_hudTimer > 0.066) {
             _hudTimer = 0;
             updateHUD();
+            positionTopOverlays();
         }
 
         // Throttle minimap to ~10fps (every ~100ms)
@@ -162,6 +210,7 @@ function renderLoop(t = 0) {
     if (_perfPanelTimer > 0.2) {
         _perfPanelTimer = 0;
         if (typeof updatePerfPanel === 'function') updatePerfPanel(false);
+        positionTopOverlays();
     }
 }
 
@@ -217,6 +266,10 @@ async function showTransitionLoad(mode, durationMs = 1400) {
     hideLoad();
 }
 
-Object.assign(globalThis, { hideLoad, renderLoop, showLoad, showTransitionLoad });
+window.addEventListener('resize', () => {
+    requestAnimationFrame(() => positionTopOverlays());
+}, { passive: true });
 
-export { hideLoad, renderLoop, showLoad, showTransitionLoad };
+Object.assign(globalThis, { hideLoad, positionTopOverlays, renderLoop, showLoad, showTransitionLoad });
+
+export { hideLoad, positionTopOverlays, renderLoop, showLoad, showTransitionLoad };
