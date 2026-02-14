@@ -29,6 +29,9 @@ function renderLoop(t = 0) {
     const dt = Math.min((t - lastTime) / 1000, 0.1);
     lastTime = t;
     if (typeof recordPerfFrame === 'function') recordPerfFrame(dt);
+    if (renderer?.info?.autoReset === false && typeof renderer.info.reset === 'function') {
+        renderer.info.reset();
+    }
 
     if (gameStarted) {
         update(dt);

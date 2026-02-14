@@ -342,6 +342,193 @@ function getWorldLodThresholds(loadDepth, mode = getPerfModeValue()) {
     return { near, mid, farVisible: mid + 260 };
 }
 
+function getAdaptiveLoadProfile(loadDepth, mode = getPerfModeValue()) {
+    const depth = Math.max(0, loadDepth | 0);
+
+    if (mode === 'baseline') {
+        return {
+            radii: [0.02, 0.025, 0.03],
+            featureRadiusScale: 1.0,
+            poiRadiusScale: 1.0,
+            maxRoadWays: 20000,
+            maxBuildingWays: 50000,
+            maxLanduseWays: 15000,
+            maxPoiNodes: 8000,
+            tileBudgetCfg: {
+                tileDegrees: FEATURE_TILE_DEGREES,
+                roadsPerTile: 520,
+                roadsMinPerTile: 240,
+                buildingsPerTile: 1200,
+                buildingsMinPerTile: 600,
+                landusePerTile: 320,
+                landuseMinPerTile: 150,
+                poiPerTile: 200,
+                poiMinPerTile: 90
+            },
+            overpassTimeoutMs: 30000,
+            maxTotalLoadMs: 62000
+        };
+    }
+
+    // Depth-aware RDT budgets: high depth = much tighter caps.
+    const profileByDepth =
+        depth >= 6 ? {
+            radii: [0.017, 0.021, 0.024],
+            featureRadiusScale: 0.82,
+            poiRadiusScale: 0.78,
+            maxRoadWays: 2600,
+            maxBuildingWays: 8200,
+            maxLanduseWays: 3500,
+            maxPoiNodes: 1300,
+            roadsPerTile: 110,
+            roadsMinPerTile: 26,
+            buildingsPerTile: 220,
+            buildingsMinPerTile: 56,
+            landusePerTile: 84,
+            landuseMinPerTile: 18,
+            poiPerTile: 45,
+            poiMinPerTile: 12,
+            overpassTimeoutMs: 16000,
+            maxTotalLoadMs: 38000
+        } :
+        depth === 5 ? {
+            radii: [0.018, 0.022, 0.026],
+            featureRadiusScale: 0.86,
+            poiRadiusScale: 0.82,
+            maxRoadWays: 3400,
+            maxBuildingWays: 10500,
+            maxLanduseWays: 4800,
+            maxPoiNodes: 1700,
+            roadsPerTile: 140,
+            roadsMinPerTile: 34,
+            buildingsPerTile: 280,
+            buildingsMinPerTile: 72,
+            landusePerTile: 110,
+            landuseMinPerTile: 24,
+            poiPerTile: 60,
+            poiMinPerTile: 16,
+            overpassTimeoutMs: 19000,
+            maxTotalLoadMs: 44000
+        } :
+        depth === 4 ? {
+            radii: [0.019, 0.023, 0.027],
+            featureRadiusScale: 0.90,
+            poiRadiusScale: 0.86,
+            maxRoadWays: 4300,
+            maxBuildingWays: 13500,
+            maxLanduseWays: 6200,
+            maxPoiNodes: 2200,
+            roadsPerTile: 170,
+            roadsMinPerTile: 44,
+            buildingsPerTile: 360,
+            buildingsMinPerTile: 90,
+            landusePerTile: 138,
+            landuseMinPerTile: 30,
+            poiPerTile: 80,
+            poiMinPerTile: 20,
+            overpassTimeoutMs: 22000,
+            maxTotalLoadMs: 50000
+        } : {
+            radii: [0.02, 0.025, 0.03],
+            featureRadiusScale: 0.95,
+            poiRadiusScale: 0.90,
+            maxRoadWays: 5600,
+            maxBuildingWays: 17000,
+            maxLanduseWays: 8500,
+            maxPoiNodes: 2800,
+            roadsPerTile: 220,
+            roadsMinPerTile: 60,
+            buildingsPerTile: 500,
+            buildingsMinPerTile: 140,
+            landusePerTile: 165,
+            landuseMinPerTile: 44,
+            poiPerTile: 100,
+            poiMinPerTile: 28,
+            overpassTimeoutMs: 26000,
+            maxTotalLoadMs: 56000
+        };
+
+    return {
+        radii: profileByDepth.radii,
+        featureRadiusScale: profileByDepth.featureRadiusScale,
+        poiRadiusScale: profileByDepth.poiRadiusScale,
+        maxRoadWays: profileByDepth.maxRoadWays,
+        maxBuildingWays: profileByDepth.maxBuildingWays,
+        maxLanduseWays: profileByDepth.maxLanduseWays,
+        maxPoiNodes: profileByDepth.maxPoiNodes,
+        tileBudgetCfg: {
+            tileDegrees: FEATURE_TILE_DEGREES,
+            roadsPerTile: profileByDepth.roadsPerTile,
+            roadsMinPerTile: profileByDepth.roadsMinPerTile,
+            buildingsPerTile: profileByDepth.buildingsPerTile,
+            buildingsMinPerTile: profileByDepth.buildingsMinPerTile,
+            landusePerTile: profileByDepth.landusePerTile,
+            landuseMinPerTile: profileByDepth.landuseMinPerTile,
+            poiPerTile: profileByDepth.poiPerTile,
+            poiMinPerTile: profileByDepth.poiMinPerTile
+        },
+        overpassTimeoutMs: profileByDepth.overpassTimeoutMs,
+        maxTotalLoadMs: profileByDepth.maxTotalLoadMs
+    };
+}
+
+function decimateRoadCenterlineByDepth(pts, roadType, tileDepth, mode = getPerfModeValue()) {
+    if (!Array.isArray(pts) || pts.length < 3) return pts;
+    if (mode === 'baseline') return pts;
+
+    const depth = Math.max(0, tileDepth | 0);
+    if (depth < 4) return pts;
+
+    let minSpacing =
+        depth >= 6 ? 16 :
+        depth === 5 ? 12 :
+                      8;
+    if (roadType?.includes('motorway') || roadType?.includes('trunk')) {
+        minSpacing *= 0.75;
+    } else if (roadType?.includes('service') || roadType?.includes('residential')) {
+        minSpacing *= 1.15;
+    }
+
+    const maxStraightTurn =
+        depth >= 6 ? 0.20 :
+        depth === 5 ? 0.24 :
+                      0.28;
+
+    const out = [pts[0]];
+    let lastKept = pts[0];
+
+    for (let i = 1; i < pts.length - 1; i++) {
+        const prev = pts[i - 1];
+        const curr = pts[i];
+        const next = pts[i + 1];
+
+        const dLast = Math.hypot(curr.x - lastKept.x, curr.z - lastKept.z);
+
+        const ax = curr.x - prev.x;
+        const az = curr.z - prev.z;
+        const bx = next.x - curr.x;
+        const bz = next.z - curr.z;
+        const al = Math.hypot(ax, az);
+        const bl = Math.hypot(bx, bz);
+
+        let turn = 0;
+        if (al > 1e-6 && bl > 1e-6) {
+            const dot = (ax * bx + az * bz) / (al * bl);
+            turn = Math.acos(Math.max(-1, Math.min(1, dot)));
+        }
+
+        const isTurn = turn > maxStraightTurn;
+        if (!isTurn && dLast < minSpacing) continue;
+
+        out.push(curr);
+        lastKept = curr;
+    }
+
+    const last = pts[pts.length - 1];
+    if (out[out.length - 1] !== last) out.push(last);
+    return out;
+}
+
 function createMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8ca0') {
     if (!pts || pts.length < 3) return null;
 
@@ -611,8 +798,8 @@ async function loadRoads() {
         mode: perfModeNow,
         location: locName,
         success: false,
-        lod: { near: 0, mid: 0, farSkipped: 0 },
-        roads: { requested: 0, selected: 0, sourcePoints: 0, subdividedPoints: 0, vertices: 0 },
+        lod: { near: 0, mid: 0, midSkipped: 0, farSkipped: 0 },
+        roads: { requested: 0, selected: 0, sourcePoints: 0, decimatedPoints: 0, subdividedPoints: 0, vertices: 0 },
         buildings: { requested: 0, selected: 0 },
         landuse: { requested: 0, selected: 0 },
         pois: { requested: 0, selected: 0, near: 0, mid: 0, far: 0 }
@@ -773,48 +960,35 @@ async function loadRoads() {
     const rdtLoadComplexity = rdtDepth((rdtSeed % 1000000) + 2, 1.5);
     rdtComplexity = useRdtBudgeting ? rawRdtComplexity : 0;
 
-    // RDT mode narrows load envelopes by depth, baseline mode uses fixed envelopes.
-    const radii = useRdtBudgeting
-        ? (rdtLoadComplexity <= 4 ? [0.02] :
-           rdtLoadComplexity <= 5 ? [0.02, 0.025] :
-                                    [0.02, 0.025, 0.03])
-        : [0.02, 0.025, 0.03];
-
-    const featureRadiusScale = useRdtBudgeting ? 0.95 : 1.0;
-    const poiRadiusScale = useRdtBudgeting ? 0.90 : 1.0;
-
-    // Global caps are safety rails; per-tile budgets below do most of the work.
-    const maxRoadWays = useRdtBudgeting ? 14000 : 20000;
-    const maxBuildingWays = useRdtBudgeting ? 28000 : 50000;
-    const maxLanduseWays = useRdtBudgeting ? 9000 : 15000;
-    const maxPoiNodes = useRdtBudgeting ? 4500 : 8000;
-
-    const tileBudgetCfg = {
-        tileDegrees: FEATURE_TILE_DEGREES,
-        roadsPerTile: useRdtBudgeting ? 320 : 520,
-        roadsMinPerTile: useRdtBudgeting ? 96 : 240,
-        buildingsPerTile: useRdtBudgeting ? 700 : 1200,
-        buildingsMinPerTile: useRdtBudgeting ? 180 : 600,
-        landusePerTile: useRdtBudgeting ? 190 : 320,
-        landuseMinPerTile: useRdtBudgeting ? 56 : 150,
-        poiPerTile: useRdtBudgeting ? 110 : 200,
-        poiMinPerTile: useRdtBudgeting ? 36 : 90
-    };
+    const loadProfile = getAdaptiveLoadProfile(rdtLoadComplexity, perfModeNow);
+    const radii = loadProfile.radii.slice();
+    const featureRadiusScale = loadProfile.featureRadiusScale;
+    const poiRadiusScale = loadProfile.poiRadiusScale;
+    const maxRoadWays = loadProfile.maxRoadWays;
+    const maxBuildingWays = loadProfile.maxBuildingWays;
+    const maxLanduseWays = loadProfile.maxLanduseWays;
+    const maxPoiNodes = loadProfile.maxPoiNodes;
+    const tileBudgetCfg = loadProfile.tileBudgetCfg;
 
     const lodThresholds = getWorldLodThresholds(rdtLoadComplexity, perfModeNow);
 
-    const overpassTimeoutMs = useRdtBudgeting
-        ? (rdtLoadComplexity <= 4 ? 18000 : 25000)
-        : 30000;
-    const maxTotalLoadMs = useRdtBudgeting
-        ? (rdtLoadComplexity <= 4 ? 47000 : 56000)
-        : 62000;
+    const overpassTimeoutMs = loadProfile.overpassTimeoutMs;
+    const maxTotalLoadMs = loadProfile.maxTotalLoadMs;
     const loadStartedAt = performance.now();
 
     loadMetrics.rdtLoadComplexity = rdtLoadComplexity;
     loadMetrics.rdtComplexity = rawRdtComplexity;
     loadMetrics.radii = radii.slice();
     loadMetrics.lodThresholds = lodThresholds;
+    loadMetrics.loadProfile = {
+        maxRoadWays,
+        maxBuildingWays,
+        maxLanduseWays,
+        maxPoiNodes,
+        tileBudgetCfg,
+        overpassTimeoutMs,
+        maxTotalLoadMs
+    };
 
     let loaded = false;
 
@@ -954,9 +1128,10 @@ async function loadRoads() {
                     ? rdtDepthForFeatureTile(roadTileKey, tileBudgetCfg.tileDegrees)
                     : 0;
                 const roadSubdivideStep = getRoadSubdivisionStep(type, roadTileDepth, perfModeNow);
+                const decimatedRoadPts = decimateRoadCenterlineByDepth(pts, type, roadTileDepth, perfModeNow);
 
                 roads.push({
-                    pts,
+                    pts: decimatedRoadPts,
                     width,
                     limit,
                     name,
@@ -968,9 +1143,10 @@ async function loadRoads() {
 
                 // Curvature-aware subdivision: straight = 2-5m, curves = 0.5-2m
                 const subdPts = typeof subdivideRoadPoints === 'function'
-                    ? subdivideRoadPoints(pts, roadSubdivideStep)
-                    : pts;
+                    ? subdivideRoadPoints(decimatedRoadPts, roadSubdivideStep)
+                    : decimatedRoadPts;
                 loadMetrics.roads.sourcePoints += pts.length;
+                loadMetrics.roads.decimatedPoints += decimatedRoadPts.length;
                 loadMetrics.roads.subdividedPoints += subdPts.length;
 
                 // Use cached height function if available
@@ -1118,8 +1294,8 @@ async function loadRoads() {
                     const markVerts = [], markIdx = [];
                     const mw = 0.15, dashLen = 6, gapLen = 6; // Increased gap for performance
                     let dist = 0;
-                    for (let i = 0; i < pts.length - 1; i++) {
-                        const p1 = pts[i], p2 = pts[i + 1];
+                    for (let i = 0; i < decimatedRoadPts.length - 1; i++) {
+                        const p1 = decimatedRoadPts[i], p2 = decimatedRoadPts[i + 1];
                         const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
                         const dx = (p2.x - p1.x) / segLen, dz = (p2.z - p1.z) / segLen;
                         const nx = -dz, nz = dx;
@@ -1224,6 +1400,18 @@ async function loadRoads() {
                 const bSeed = (rdtSeed ^ (way.id >>> 0)) >>> 0;
                 const br1 = rand01FromInt(bSeed);
                 const br2 = rand01FromInt(bSeed ^ 0x9e3779b9);
+
+                if (lodTier === 'mid' && useRdtBudgeting) {
+                    const midKeepRatio =
+                        rdtLoadComplexity >= 6 ? 0.32 :
+                        rdtLoadComplexity === 5 ? 0.45 :
+                        rdtLoadComplexity === 4 ? 0.58 :
+                                                  0.72;
+                    if (br1 > midKeepRatio) {
+                        loadMetrics.lod.midSkipped += 1;
+                        return;
+                    }
+                }
 
                 // Get building height from tags or estimate
                 let height = 10; // default

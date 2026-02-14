@@ -1210,6 +1210,13 @@ function init() {
     }
 
     renderer.setSize(innerWidth, innerHeight);
+    try {
+        // When using post-processing we need manual resets so renderer.info
+        // accumulates all passes in a frame instead of only the final pass.
+        renderer.info.autoReset = false;
+    } catch {
+        // Ignore unsupported renderer.info configurations.
+    }
 
     // === GPU TIER DETECTION ===
     // Detect GPU capability to adapt quality settings across the board
