@@ -177,6 +177,16 @@ const ASTEROID_BELT = {
   ]
 };
 
+// Kuiper belt beyond Neptune (roughly 30 - 50 AU)
+const KUIPER_BELT = {
+  innerAU: 30.0,
+  outerAU: 50.0,
+  centerAU: 40.0,
+  count: 1800,
+  maxInclination: 35,
+  maxEccentricity: 0.35
+};
+
 // Named large asteroids with real orbital elements
 const NAMED_ASTEROIDS = [
   {
@@ -267,6 +277,7 @@ const solarSystem = {
   moonMeshes: [],       // { mesh, planetMesh, orbitRadius, orbitDays, phaseOffset }
   orbitLines: [],
   asteroidBelt: null,   // THREE.Points particle system for belt
+  kuiperBelt: null,     // THREE.Points particle system for Kuiper belt
   asteroidMeshes: [],   // named large asteroids { mesh, hitbox, asteroid, realPosition }
   spacecraftMeshes: [], // spacecraft { mesh, hitbox, spacecraft, orbitData }
   orbitMarkers: [],     // glowing markers showing current planet position on orbit
@@ -595,6 +606,11 @@ function initSolarSystem(spaceScene) {
   createAsteroidBelt();
 
   // ---------------------------------------------------------------------------
+  // KUIPER BELT - Particle system beyond Neptune (30 - 50 AU)
+  // ---------------------------------------------------------------------------
+  createKuiperBelt();
+
+  // ---------------------------------------------------------------------------
   // SPACECRAFT - ISS, Hubble, JWST, Voyager 1 & 2
   // ---------------------------------------------------------------------------
   createSpacecraft();
@@ -629,6 +645,7 @@ function initSolarSystem(spaceScene) {
     solarSystem.moonMeshes.length, 'moons +',
     solarSystem.asteroidMeshes.length, 'named asteroids +',
     ASTEROID_BELT.count, 'belt particles +',
+    KUIPER_BELT.count, 'kuiper particles +',
     solarSystem.spacecraftMeshes.length, 'spacecraft + Sun');
 }
 
@@ -761,6 +778,67 @@ function createAsteroidBelt() {
 
   // --- Named large asteroids as meshes ---
   createNamedAsteroids();
+}
+
+function createKuiperBelt() {
+  const belt = KUIPER_BELT;
+  const positions = [];
+  const colors = [];
+  const sizes = [];
+
+  // Separate seed so Kuiper distribution is stable and distinct from asteroid belt
+  let seed = 314159;
+  function seededRandom() {
+    seed = (seed * 16807 + 0) % 2147483647;
+    return (seed - 1) / 2147483646;
+  }
+
+  for (let i = 0; i < belt.count; i++) {
+    const a = belt.innerAU + seededRandom() * (belt.outerAU - belt.innerAU);
+    const e = seededRandom() * belt.maxEccentricity * seededRandom();
+    const I = (seededRandom() - 0.5) * 2 * belt.maxInclination * seededRandom();
+    const LN = seededRandom() * 360;
+    const w = seededRandom() * 360;
+    const M = seededRandom() * 360;
+
+    const pos = computeOrbitalPosition(a, e, I, w, LN, M);
+
+    // Keep the same scene transform used elsewhere in the heliocentric model.
+    const x = pos.x * AU_TO_SCENE;
+    const y = pos.z * AU_TO_SCENE * 0.3;
+    const z = pos.y * AU_TO_SCENE;
+
+    positions.push(x, y, z);
+
+    // Cooler color palette to visually separate Kuiper objects from rocky asteroids.
+    const brightness = 0.45 + seededRandom() * 0.4;
+    const iceTint = 0.12 + seededRandom() * 0.18;
+    colors.push(brightness - iceTint * 0.2, brightness, brightness + iceTint);
+
+    const sizeRoll = seededRandom();
+    sizes.push(sizeRoll < 0.93 ? 1.6 + seededRandom() * 2.2 : 3.2 + seededRandom() * 3.0);
+  }
+
+  const beltGeo = new THREE.BufferGeometry();
+  beltGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  beltGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+  beltGeo.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
+
+  const beltMat = new THREE.PointsMaterial({
+    size: 3.2,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.58,
+    sizeAttenuation: true
+  });
+
+  solarSystem.kuiperBelt = new THREE.Points(beltGeo, beltMat);
+  solarSystem.kuiperBelt.name = 'kuiperBelt';
+  solarSystem.group.add(solarSystem.kuiperBelt);
+
+  // Boundary guide rings for context.
+  createBeltBoundaryRing(belt.innerAU, 0x4c5e7a, 'kuiperInnerEdge');
+  createBeltBoundaryRing(belt.outerAU, 0x4c5e7a, 'kuiperOuterEdge');
 }
 
 function createBeltBoundaryRing(radiusAU, color, name) {
@@ -1896,6 +1974,11 @@ function updateProximityHUD() {
   const beltOuterScene = ASTEROID_BELT.outerAU * AU_TO_SCENE;
   const inBelt = rocketDistFromSun > beltInnerScene * 0.9 && rocketDistFromSun < beltOuterScene * 1.1;
 
+  // Check if rocket is within the Kuiper belt region
+  const kuiperInnerScene = KUIPER_BELT.innerAU * AU_TO_SCENE;
+  const kuiperOuterScene = KUIPER_BELT.outerAU * AU_TO_SCENE;
+  const inKuiperBelt = rocketDistFromSun > kuiperInnerScene * 0.95 && rocketDistFromSun < kuiperOuterScene * 1.05;
+
   // Also check Sun
   if (solarSystem.sunMesh) {
     const worldX = solarSystem.group.position.x + solarSystem.sunMesh.position.x;
@@ -1954,11 +2037,19 @@ function updateProximityHUD() {
     if (inBelt) {
       indicator.innerHTML += '<br><span style="font-size:9px;color:#a08060;opacity:0.8;">ASTEROID BELT REGION</span>';
     }
+    if (inKuiperBelt) {
+      indicator.innerHTML += '<br><span style="font-size:9px;color:#7aa6d8;opacity:0.85;">KUIPER BELT REGION</span>';
+    }
     indicator.style.display = 'block';
   } else if (inBelt) {
     indicator.innerHTML = '<span style="color:#a08060;font-weight:600;">ASTEROID BELT</span>' +
       '<br><span style="font-size:10px;opacity:0.7;">' + ASTEROID_BELT.innerAU.toFixed(1) +
       ' - ' + ASTEROID_BELT.outerAU.toFixed(1) + ' AU from Sun</span>';
+    indicator.style.display = 'block';
+  } else if (inKuiperBelt) {
+    indicator.innerHTML = '<span style="color:#7aa6d8;font-weight:600;">KUIPER BELT</span>' +
+      '<br><span style="font-size:10px;opacity:0.7;">' + KUIPER_BELT.innerAU.toFixed(1) +
+      ' - ' + KUIPER_BELT.outerAU.toFixed(1) + ' AU from Sun</span>';
     indicator.style.display = 'block';
   } else {
     indicator.style.display = 'none';
