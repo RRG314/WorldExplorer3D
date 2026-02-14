@@ -302,9 +302,10 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #memoryFlowerFloatBtn{position:fixed;bottom:78px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#ec4899,#db2777);border:none;border-radius:50%;color:#ffffff;font-size:23px;cursor:pointer;box-shadow:0 10px 26px rgba(236,72,153,0.38);z-index:101;display:none;transition:all 0.2s}
 #memoryFlowerFloatBtn.show{display:flex;align-items:center;justify-content:center}
 #memoryFlowerFloatBtn:hover{transform:scale(1.08);box-shadow:0 14px 34px rgba(236,72,153,0.45)}
-#gameShareFloatBtn{position:fixed;bottom:130px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;border-radius:50%;color:#ffffff;font-size:22px;cursor:pointer;box-shadow:0 10px 24px rgba(37,99,235,0.35);z-index:102;display:none;transition:all 0.2s}
+#gameShareFloatBtn{position:fixed;bottom:130px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;border-radius:50%;color:#ffffff;cursor:pointer;box-shadow:0 10px 24px rgba(37,99,235,0.35);z-index:102;display:none;transition:all 0.2s;padding:0}
 #gameShareFloatBtn.show{display:flex;align-items:center;justify-content:center}
 #gameShareFloatBtn:hover{transform:scale(1.08);box-shadow:0 14px 34px rgba(37,99,235,0.42)}
+#gameShareFloatBtn .shareIcon{width:22px;height:22px;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none}
 #gameShareMenu{position:fixed;left:145px;bottom:182px;width:158px;background:rgba(255,255,255,0.96);border:1px solid rgba(148,163,184,0.35);border-radius:12px;box-shadow:0 12px 26px rgba(15,23,42,0.2);padding:8px;display:none;z-index:103;backdrop-filter:blur(8px)}
 #gameShareMenu.show{display:block}
 .gameShareOption{width:100%;border:none;background:#f8fafc;color:#334155;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;border-radius:8px;padding:7px 8px;cursor:pointer;text-align:left;margin:2px 0}
@@ -941,7 +942,13 @@ Explore the area
 
 <button class="mainMenuBtn" id="mainMenuBtn">🏠 Main Menu</button>
 <button id="memoryFlowerFloatBtn" title="Place Flower Memory">🌸</button>
-<button id="gameShareFloatBtn" title="Share This Experience">↗</button>
+<button id="gameShareFloatBtn" title="Share This Experience" aria-label="Share This Experience">
+<svg class="shareIcon" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M12 16V4"></path>
+<path d="M8 8l4-4 4 4"></path>
+<path d="M4 13v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"></path>
+</svg>
+</button>
 <div id="gameShareMenu" aria-label="Share Experience Menu">
 <button id="gameShareFacebook" class="gameShareOption" type="button">📘 Facebook</button>
 <button id="gameShareTwitter" class="gameShareOption" type="button">𝕏 Twitter</button>

@@ -575,7 +575,12 @@ function setupUI() {
 
   function openShareWindow(targetUrl) {
     const popup = window.open(targetUrl, '_blank', 'noopener,noreferrer,width=760,height=760');
-    if (!popup) window.location.href = targetUrl;
+    if (popup && typeof popup.focus === 'function') popup.focus();
+    if (!popup) {
+      setGameShareStatus('Popup blocked. Allow popups to open share links.');
+      return false;
+    }
+    return true;
   }
 
   if (shareExperienceBtn) {
@@ -605,31 +610,46 @@ function setupUI() {
   }
 
   if (gameShareFacebook) {
-    gameShareFacebook.addEventListener('click', (event) => {
+    gameShareFacebook.addEventListener('click', async (event) => {
       event.stopPropagation();
       const link = buildShareableExperienceLink();
-      openShareWindow(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`);
+      const opened = openShareWindow(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`);
+      if (!opened) {
+        await copyShareLinkWithFallback(link);
+        setGameShareStatus('Link copied. Paste manually if popup is blocked.');
+        return;
+      }
       closeGameShareMenu();
     });
   }
 
   if (gameShareTwitter) {
-    gameShareTwitter.addEventListener('click', (event) => {
+    gameShareTwitter.addEventListener('click', async (event) => {
       event.stopPropagation();
       const link = buildShareableExperienceLink();
       const text = 'Check out my World Explorer 3D experience.';
-      openShareWindow(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`);
+      const opened = openShareWindow(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`);
+      if (!opened) {
+        await copyShareLinkWithFallback(link);
+        setGameShareStatus('Link copied. Paste manually if popup is blocked.');
+        return;
+      }
       closeGameShareMenu();
     });
   }
 
   if (gameShareText) {
-    gameShareText.addEventListener('click', (event) => {
+    gameShareText.addEventListener('click', async (event) => {
       event.stopPropagation();
       const link = buildShareableExperienceLink();
       const body = encodeURIComponent(`Check out my World Explorer 3D experience: ${link}`);
       const smsUrl = /iPhone|iPad|iPod/i.test(navigator.userAgent) ? `sms:&body=${body}` : `sms:?body=${body}`;
-      window.location.href = smsUrl;
+      const opened = openShareWindow(smsUrl);
+      if (!opened) {
+        await copyShareLinkWithFallback(link);
+        setGameShareStatus('Text app link blocked. Link copied for manual share.');
+        return;
+      }
       closeGameShareMenu();
     });
   }
