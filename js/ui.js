@@ -158,6 +158,8 @@ function setupUI() {
   const gameShareFloatBtn = document.getElementById('gameShareFloatBtn');
   const gameShareMenu = document.getElementById('gameShareMenu');
   const gameShareStatus = document.getElementById('gameShareStatus');
+  const gameShareCopy = document.getElementById('gameShareCopy');
+  const gameShareNative = document.getElementById('gameShareNative');
   const gameShareFacebook = document.getElementById('gameShareFacebook');
   const gameShareTwitter = document.getElementById('gameShareTwitter');
   const gameShareInstagram = document.getElementById('gameShareInstagram');
@@ -607,6 +609,53 @@ function setupUI() {
     });
     gameShareMenu.addEventListener('click', (event) => {
       event.stopPropagation();
+    });
+  }
+
+  if (gameShareNative && !(navigator.share && typeof navigator.share === 'function')) {
+    gameShareNative.style.display = 'none';
+  }
+
+  if (gameShareCopy) {
+    gameShareCopy.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      try {
+        const link = buildShareableExperienceLink();
+        await copyShareLinkWithFallback(link);
+        setGameShareStatus('Link copied to clipboard.');
+        setTimeout(() => closeGameShareMenu(), 900);
+      } catch (err) {
+        setGameShareStatus(`Could not copy link: ${err?.message || err}`);
+      }
+    });
+  }
+
+  if (gameShareNative) {
+    gameShareNative.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      const link = buildShareableExperienceLink();
+      const payload = {
+        title: 'World Explorer 3D',
+        text: 'Check out my World Explorer 3D experience.',
+        url: link
+      };
+      try {
+        if (navigator.share && typeof navigator.share === 'function') {
+          await navigator.share(payload);
+          closeGameShareMenu();
+        } else {
+          await copyShareLinkWithFallback(link);
+          setGameShareStatus('Link copied to clipboard.');
+        }
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+        try {
+          await copyShareLinkWithFallback(link);
+          setGameShareStatus('Share cancelled. Link copied to clipboard.');
+        } catch (copyErr) {
+          setGameShareStatus(`Unable to share link: ${copyErr?.message || copyErr}`);
+        }
+      }
     });
   }
 
