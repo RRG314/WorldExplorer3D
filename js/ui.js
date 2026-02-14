@@ -856,7 +856,8 @@ function setupUI() {
     document.getElementById('titleScreen').classList.add('hidden');
     document.getElementById('hud').classList.add('show');
     document.getElementById('minimap').classList.add('show');
-    document.getElementById('modeHud').classList.add('show');
+    const modeHud = document.getElementById('modeHud');
+    if (modeHud) modeHud.classList.remove('show');
     document.getElementById('floatMenuContainer').classList.add('show');
     document.getElementById('mainMenuBtn').classList.add('show');
     document.getElementById('controlsTab').classList.add('show');
@@ -1003,7 +1004,7 @@ function setupUI() {
     if (droneControls) droneControls.style.display = mode === 'drone' ? 'block' : 'none';
     if (rocketControls) rocketControls.style.display = mode === 'rocket' ? 'block' : 'none';
     if (ctrlHeader) {
-      const modeLabel = mode === 'walking' ? 'Walking' : mode === 'drone' ? 'Drone' : mode === 'rocket' ? 'Rocket' : 'Driving';
+      const modeLabel = mode === 'walking' ? 'Walking Mode' : mode === 'drone' ? 'Drone Mode' : mode === 'rocket' ? 'Rocket Mode' : 'Driving Mode';
       const arrow = ctrlContent && ctrlContent.classList.contains('hidden') ? '▼' : '▲';
       ctrlHeader.textContent = `🛞 ${modeLabel} ${arrow}`;
     }
