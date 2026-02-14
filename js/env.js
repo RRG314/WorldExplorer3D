@@ -107,3 +107,7 @@ function _updateEnvDebug() {
     }
     _envDebugEl.textContent = 'ENV:' + (_activeEnv || 'INIT');
 }
+
+Object.assign(globalThis, { ENV, getEnv, isEnv, switchEnv });
+
+export { ENV, getEnv, isEnv, switchEnv };

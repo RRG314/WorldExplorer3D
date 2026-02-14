@@ -2,17 +2,467 @@
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
+const OVERPASS_ENDPOINTS = [
+    'https://overpass-api.de/api/interpreter',
+    'https://lz4.overpass-api.de/api/interpreter',
+    'https://overpass.kumi.systems/api/interpreter'
+];
+
+const OVERPASS_STAGGER_MS = 450;
+const OVERPASS_MIN_TIMEOUT_MS = 5000;
+const WATER_VECTOR_TILE_ZOOM = 13;
+const WATER_VECTOR_TILE_FETCH_TIMEOUT_MS = 8000;
+const WATER_VECTOR_TILE_ENDPOINT = (z, x, y) =>
+    `https://vector.openstreetmap.org/shortbread_v1/${z}/${x}/${y}.mvt`;
+let _vectorTileLibPromise = null;
+const BUILDING_INDEX_CELL_SIZE = 120;
+let buildingSpatialIndex = new Map();
+
+async function getVectorTileLib() {
+    if (_vectorTileLibPromise) return _vectorTileLibPromise;
+    _vectorTileLibPromise = Promise.all([
+        import('https://cdn.jsdelivr.net/npm/pbf@3.2.1/+esm'),
+        import('https://cdn.jsdelivr.net/npm/@mapbox/vector-tile@1.3.1/+esm')
+    ]).then(([pbfMod, vtMod]) => ({
+        Pbf: pbfMod.default || pbfMod.Pbf,
+        VectorTile: vtMod.VectorTile
+    })).catch(err => {
+        _vectorTileLibPromise = null;
+        throw err;
+    });
+    return _vectorTileLibPromise;
+}
+
+function delayMs(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function firstSuccessful(promises) {
+    return new Promise((resolve, reject) => {
+        const errors = new Array(promises.length);
+        let pending = promises.length;
+        promises.forEach((promise, idx) => {
+            Promise.resolve(promise).then(resolve).catch(err => {
+                errors[idx] = err;
+                pending -= 1;
+                if (pending === 0) reject(errors);
+            });
+        });
+    });
+}
+
+function roadTypePriority(type) {
+    if (!type) return 0;
+    if (type.includes('motorway')) return 6;
+    if (type.includes('trunk')) return 5;
+    if (type.includes('primary')) return 4;
+    if (type.includes('secondary')) return 3;
+    if (type.includes('tertiary')) return 2;
+    if (type.includes('residential') || type.includes('unclassified') || type.includes('living_street')) return 2;
+    if (type.includes('service')) return 1;
+    return 1;
+}
+
+function wayCenterDistanceSq(way, nodeMap) {
+    if (!way?.nodes?.length) return Infinity;
+
+    let latSum = 0;
+    let lonSum = 0;
+    let count = 0;
+    const sampleCount = Math.min(way.nodes.length, 8);
+
+    for (let i = 0; i < sampleCount; i++) {
+        const n = nodeMap[way.nodes[i]];
+        if (!n) continue;
+        latSum += n.lat;
+        lonSum += n.lon;
+        count += 1;
+    }
+
+    if (count === 0) return Infinity;
+
+    const lat = latSum / count;
+    const lon = lonSum / count;
+    const dLat = lat - LOC.lat;
+    const dLon = (lon - LOC.lon) * Math.cos(LOC.lat * Math.PI / 180);
+    return dLat * dLat + dLon * dLon;
+}
+
+function nodeDistanceSq(node) {
+    if (!node) return Infinity;
+    const dLat = node.lat - LOC.lat;
+    const dLon = (node.lon - LOC.lon) * Math.cos(LOC.lat * Math.PI / 180);
+    return dLat * dLat + dLon * dLon;
+}
+
+function limitWaysByDistance(ways, nodeMap, limit, compareFn, options = {}) {
+    if (ways.length <= limit) return ways;
+
+    const sorted = ways
+        .slice()
+        .sort((a, b) => {
+            const cmp = compareFn ? compareFn(a, b) : 0;
+            if (cmp !== 0) return cmp;
+            return wayCenterDistanceSq(a, nodeMap) - wayCenterDistanceSq(b, nodeMap);
+        });
+
+    // Optional spatial spread mode: keep a dense city-core slice, then sample
+    // evenly across the remaining distance-sorted tail so outskirts are represented.
+    if (options?.spreadAcrossArea) {
+        const coreRatio = Math.max(0.1, Math.min(0.9, options.coreRatio ?? 0.5));
+        const coreKeep = Math.max(1, Math.min(limit, Math.floor(limit * coreRatio)));
+        const selected = sorted.slice(0, coreKeep);
+        const tail = sorted.slice(coreKeep);
+        let remaining = limit - selected.length;
+
+        if (remaining > 0 && tail.length > 0) {
+            if (tail.length <= remaining) {
+                selected.push(...tail);
+            } else {
+                const picked = new Set();
+                for (let i = 0; i < remaining; i++) {
+                    let idx = Math.floor((i * tail.length) / remaining);
+                    while (idx < tail.length - 1 && picked.has(idx)) idx++;
+                    if (picked.has(idx)) {
+                        while (idx > 0 && picked.has(idx)) idx--;
+                    }
+                    if (!picked.has(idx)) {
+                        picked.add(idx);
+                        selected.push(tail[idx]);
+                    }
+                }
+            }
+        }
+
+        return selected.slice(0, limit);
+    }
+
+    return sorted.slice(0, limit);
+}
+
+function limitNodesByDistance(nodes, limit) {
+    if (nodes.length <= limit) return nodes;
+    return nodes.slice().sort((a, b) => nodeDistanceSq(a) - nodeDistanceSq(b)).slice(0, limit);
+}
+
+function latLonToTileFloat(lat, lon, zoom) {
+    const n = Math.pow(2, zoom);
+    const x = (lon + 180) / 360 * n;
+    const y = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
+    return { x, y };
+}
+
+function vectorTileRangeForBounds(latMin, lonMin, latMax, lonMax, zoom) {
+    const nw = latLonToTileFloat(latMax, lonMin, zoom);
+    const se = latLonToTileFloat(latMin, lonMax, zoom);
+    const n = Math.pow(2, zoom) - 1;
+
+    return {
+        xMin: Math.max(0, Math.min(n, Math.floor(Math.min(nw.x, se.x)))),
+        xMax: Math.max(0, Math.min(n, Math.floor(Math.max(nw.x, se.x)))),
+        yMin: Math.max(0, Math.min(n, Math.floor(Math.min(nw.y, se.y)))),
+        yMax: Math.max(0, Math.min(n, Math.floor(Math.max(nw.y, se.y))))
+    };
+}
+
+async function fetchVectorTileWater(z, x, y) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), WATER_VECTOR_TILE_FETCH_TIMEOUT_MS);
+    try {
+        const { Pbf, VectorTile } = await getVectorTileLib();
+        const res = await fetch(WATER_VECTOR_TILE_ENDPOINT(z, x, y), { signal: controller.signal });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const buf = await res.arrayBuffer();
+        const tile = new VectorTile(new Pbf(new Uint8Array(buf)));
+        return { tile, z, x, y };
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+function normalizeWorldRingFromLonLat(coords, maxPoints = 900) {
+    if (!Array.isArray(coords) || coords.length < 3) return null;
+    const pts = [];
+    for (let i = 0; i < coords.length; i++) {
+        const c = coords[i];
+        if (!Array.isArray(c) || c.length < 2) continue;
+        const p = geoToWorld(c[1], c[0]); // GeoJSON: [lon, lat]
+        pts.push(p);
+    }
+    if (pts.length < 3) return null;
+
+    let ring = pts;
+    const first = ring[0];
+    const last = ring[ring.length - 1];
+    if (first && last && first.x === last.x && first.z === last.z) {
+        ring = ring.slice(0, -1);
+    }
+    if (ring.length < 3) return null;
+    if (Math.abs(signedPolygonAreaXZ(ring)) < 10) return null;
+    return decimatePoints(ring, maxPoints, false);
+}
+
+function worldLinePointsFromLonLat(coords, maxPoints = 1000) {
+    if (!Array.isArray(coords) || coords.length < 2) return null;
+    const pts = [];
+    for (let i = 0; i < coords.length; i++) {
+        const c = coords[i];
+        if (!Array.isArray(c) || c.length < 2) continue;
+        pts.push(geoToWorld(c[1], c[0]));
+    }
+    if (pts.length < 2) return null;
+    return decimatePoints(pts, maxPoints, false);
+}
+
+function classifyLanduseType(tags) {
+    if (!tags) return null;
+    if (tags.landuse && LANDUSE_STYLES[tags.landuse]) return tags.landuse;
+    if (tags.natural === 'wood') return 'wood';
+    if (tags.leisure === 'park') return 'park';
+    return null;
+}
+
+function signedPolygonAreaXZ(pts) {
+    if (!pts || pts.length < 3) return 0;
+    let area = 0;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        area += (pts[j].x * pts[i].z) - (pts[i].x * pts[j].z);
+    }
+    return area * 0.5;
+}
+
+function decimatePoints(pts, maxPoints, preserveClosedRing = false) {
+    if (!pts || pts.length <= maxPoints) return pts;
+    if (maxPoints < 3) return pts.slice(0, Math.max(2, maxPoints));
+
+    const out = [];
+    const end = preserveClosedRing ? pts.length - 1 : pts.length;
+    const step = Math.max(1, Math.ceil((end - 1) / (maxPoints - 1)));
+    for (let i = 0; i < end; i += step) out.push(pts[i]);
+    if (out[out.length - 1] !== pts[end - 1]) out.push(pts[end - 1]);
+    if (preserveClosedRing && pts.length > 2) {
+        const first = out[0];
+        const last = out[out.length - 1];
+        if (first !== last) out.push(first);
+    }
+    return out;
+}
+
+function clearBuildingSpatialIndex() {
+    buildingSpatialIndex = new Map();
+}
+
+function addBuildingToSpatialIndex(building) {
+    if (!building) return;
+    const minCellX = Math.floor(building.minX / BUILDING_INDEX_CELL_SIZE);
+    const maxCellX = Math.floor(building.maxX / BUILDING_INDEX_CELL_SIZE);
+    const minCellZ = Math.floor(building.minZ / BUILDING_INDEX_CELL_SIZE);
+    const maxCellZ = Math.floor(building.maxZ / BUILDING_INDEX_CELL_SIZE);
+
+    for (let cx = minCellX; cx <= maxCellX; cx++) {
+        for (let cz = minCellZ; cz <= maxCellZ; cz++) {
+            const key = `${cx},${cz}`;
+            let bucket = buildingSpatialIndex.get(key);
+            if (!bucket) {
+                bucket = [];
+                buildingSpatialIndex.set(key, bucket);
+            }
+            bucket.push(building);
+        }
+    }
+}
+
+function getNearbyBuildings(x, z, radius = 80) {
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return buildings;
+    if (!buildingSpatialIndex || buildingSpatialIndex.size === 0) return buildings;
+
+    const queryRadius = Math.max(20, radius);
+    const minCellX = Math.floor((x - queryRadius) / BUILDING_INDEX_CELL_SIZE);
+    const maxCellX = Math.floor((x + queryRadius) / BUILDING_INDEX_CELL_SIZE);
+    const minCellZ = Math.floor((z - queryRadius) / BUILDING_INDEX_CELL_SIZE);
+    const maxCellZ = Math.floor((z + queryRadius) / BUILDING_INDEX_CELL_SIZE);
+
+    const out = [];
+    const seen = new Set();
+
+    for (let cx = minCellX; cx <= maxCellX; cx++) {
+        for (let cz = minCellZ; cz <= maxCellZ; cz++) {
+            const bucket = buildingSpatialIndex.get(`${cx},${cz}`);
+            if (!bucket) continue;
+            for (let i = 0; i < bucket.length; i++) {
+                const b = bucket[i];
+                if (seen.has(b)) continue;
+                seen.add(b);
+                out.push(b);
+            }
+        }
+    }
+
+    return out;
+}
+
+async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity) {
+    const controllers = [];
+    const errors = [];
+
+    const attempts = OVERPASS_ENDPOINTS.map((endpoint, idx) => (async () => {
+        const staggerMs = idx * OVERPASS_STAGGER_MS;
+        if (staggerMs > 0) await delayMs(staggerMs);
+
+        const now = performance.now();
+        if (now >= deadlineMs - 300) {
+            throw new Error(`[${endpoint}] skipped: load budget exhausted`);
+        }
+
+        const timeLeftMs = deadlineMs - now;
+        const timeoutForEndpointMs = Math.max(
+            3500,
+            Math.min(
+                Math.max(OVERPASS_MIN_TIMEOUT_MS, timeoutMs - idx * 1200),
+                timeLeftMs - 250
+            )
+        );
+
+        const controller = new AbortController();
+        controllers.push(controller);
+        const timeoutId = setTimeout(() => controller.abort(), timeoutForEndpointMs);
+
+        try {
+            const res = await fetch(endpoint, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+                body: 'data=' + encodeURIComponent(query),
+                signal: controller.signal
+            });
+
+            if (!res.ok) {
+                throw new Error(`HTTP ${res.status}`);
+            }
+
+            const text = await res.text();
+            let data = null;
+            try {
+                data = JSON.parse(text);
+            } catch {
+                throw new Error('non-JSON response');
+            }
+
+            if (!data || !Array.isArray(data.elements)) {
+                throw new Error('invalid payload');
+            }
+
+            data._overpassEndpoint = endpoint;
+            return data;
+        } catch (err) {
+            const reason = err?.name === 'AbortError'
+                ? `timeout after ${Math.floor(timeoutForEndpointMs)}ms`
+                : (err?.message || String(err));
+            const wrapped = new Error(`[${endpoint}] ${reason}`);
+            errors.push(wrapped.message);
+            throw wrapped;
+        } finally {
+            clearTimeout(timeoutId);
+        }
+    })());
+
+    try {
+        const data = await firstSuccessful(attempts);
+        controllers.forEach(c => c.abort());
+        return data;
+    } catch {
+        throw new Error(`All Overpass endpoints failed: ${errors.join(' | ')}`);
+    }
+}
+
 async function loadRoads() {
     const locName = selLoc === 'custom' ? (customLoc?.name || 'Custom') : LOCS[selLoc].name;
     showLoad('Loading ' + locName + '...');
-    roadMeshes.forEach(m => scene.remove(m)); roadMeshes = []; roads = [];
-    buildingMeshes.forEach(m => scene.remove(m)); buildingMeshes = []; buildings = [];
-    landuseMeshes.forEach(m => scene.remove(m)); landuseMeshes = []; landuses = [];
-    poiMeshes.forEach(m => scene.remove(m)); poiMeshes = []; pois = [];
-    historicMarkers.forEach(m => scene.remove(m)); historicMarkers = []; historicSites = [];
-    streetFurnitureMeshes.forEach(m => scene.remove(m)); streetFurnitureMeshes = [];
+    worldLoading = true;
+    // Properly dispose of all meshes to prevent memory leaks
+    roadMeshes.forEach(m => {
+        scene.remove(m);
+        if (m.geometry) m.geometry.dispose();
+        if (m.material) {
+            if (Array.isArray(m.material)) {
+                m.material.forEach(mat => mat.dispose());
+            } else {
+                m.material.dispose();
+            }
+        }
+    });
+    roadMeshes = []; roads = [];
+
+    buildingMeshes.forEach(m => {
+        scene.remove(m);
+        if (m.geometry) m.geometry.dispose();
+        if (m.material) {
+            if (Array.isArray(m.material)) {
+                m.material.forEach(mat => mat.dispose());
+            } else {
+                m.material.dispose();
+            }
+        }
+    });
+    buildingMeshes = []; buildings = [];
+    clearBuildingSpatialIndex();
+
+    landuseMeshes.forEach(m => {
+        scene.remove(m);
+        if (m.geometry) m.geometry.dispose();
+        if (m.material) {
+            if (Array.isArray(m.material)) {
+                m.material.forEach(mat => mat.dispose());
+            } else {
+                m.material.dispose();
+            }
+        }
+    });
+    landuseMeshes = []; landuses = []; waterAreas = []; waterways = [];
+
+    poiMeshes.forEach(m => {
+        scene.remove(m);
+        if (m.geometry) m.geometry.dispose();
+        if (m.material) {
+            if (Array.isArray(m.material)) {
+                m.material.forEach(mat => mat.dispose());
+            } else {
+                m.material.dispose();
+            }
+        }
+    });
+    poiMeshes = []; pois = [];
+
+    historicMarkers.forEach(m => {
+        scene.remove(m);
+        if (m.geometry) m.geometry.dispose();
+        if (m.material) {
+            if (Array.isArray(m.material)) {
+                m.material.forEach(mat => mat.dispose());
+            } else {
+                m.material.dispose();
+            }
+        }
+    });
+    historicMarkers = []; historicSites = [];
+
+    streetFurnitureMeshes.forEach(m => {
+        scene.remove(m);
+        if (m.geometry) m.geometry.dispose();
+        if (m.material) {
+            if (Array.isArray(m.material)) {
+                m.material.forEach(mat => mat.dispose());
+            } else {
+                m.material.dispose();
+            }
+        }
+    });
+    streetFurnitureMeshes = [];
     _signTextureCache.clear(); _geoSignText = null;
-    windowTextures = {}; // Clear RDT-keyed window texture cache for new location
+    if (typeof clearWindowTextureCache === 'function') {
+        clearWindowTextureCache(); // Clear RDT-keyed window texture cache for new location
+    } else {
+        globalThis.windowTextures = {};
+    }
     if (typeof invalidateRoadCache === 'function') invalidateRoadCache(); // Clear cached road result
 
     // Flag that roads will need rebuilding after terrain loads
@@ -21,55 +471,165 @@ async function loadRoads() {
     if (selLoc === 'custom') {
         const lat = parseFloat(document.getElementById('customLat').value);
         const lon = parseFloat(document.getElementById('customLon').value);
-        if (isNaN(lat) || isNaN(lon)) { showLoad('Enter valid coordinates'); return; }
+        if (isNaN(lat) || isNaN(lon)) {
+            showLoad('Enter valid coordinates');
+            worldLoading = false;
+            return;
+        }
         LOC = { lat, lon };
         customLoc = { lat, lon, name: customLoc?.name || 'Custom' };
     } else {
         LOC = { lat: LOCS[selLoc].lat, lon: LOCS[selLoc].lon };
     }
 
+    // Prevent old-city coordinates from driving terrain stream while loading.
+    car.x = 0;
+    car.z = 0;
+    car.vx = 0;
+    car.vz = 0;
+    car.vy = 0;
+    if (drone) {
+        drone.x = 0;
+        drone.z = 0;
+    }
+    if (Walk && Walk.state && Walk.state.walker) {
+        Walk.state.walker.x = 0;
+        Walk.state.walker.z = 0;
+        Walk.state.walker.vy = 0;
+    }
+
+    // Reset terrain streaming state when location origin changes so stale tiles
+    // from the previous city cannot remain at mismatched world coordinates.
+    if (terrainEnabled && !onMoon) {
+        if (typeof resetTerrainStreamingState === 'function') resetTerrainStreamingState();
+        if (typeof clearTerrainMeshes === 'function') clearTerrainMeshes();
+        if (typeof updateTerrainAround === 'function') updateTerrainAround(0, 0);
+    }
+
     // RDT complexity index: derive adaptive query strategy from location
     rdtSeed = hashGeoToInt(LOC.lat, LOC.lon, gameMode === 'trial' ? 1 : gameMode === 'checkpoint' ? 2 : 0);
     rdtComplexity = rdtDepth(rdtSeed, 1.5);
+    // Use a lower-bit slice for load profile because full 32-bit hash depth
+    // tends to saturate at high values across many cities.
+    const rdtLoadComplexity = rdtDepth((rdtSeed % 1000000) + 2, 1.5);
 
-    // Map RDT depth -> query radii (denser areas get fewer/smaller queries)
+    // Match WorldExplorer3D-style coverage: larger concentric query windows
+    // that keep roads/buildings/landuse aligned across the same loaded area.
     const radii =
-        rdtComplexity <= 3 ? [0.02] :
-        rdtComplexity <= 5 ? [0.02, 0.025] :
+        rdtLoadComplexity <= 4 ? [0.02] :
+        rdtLoadComplexity <= 5 ? [0.02, 0.025] :
                              [0.02, 0.025, 0.03];
 
-    // Adapt Overpass timeout based on expected complexity
-    const overpassTimeoutSec = rdtComplexity <= 4 ? 20 : 30;
+    const featureRadiusScale = 1.0;
+    const poiRadiusScale = 1.0;
+
+    // High caps preserve completeness for dense cities; limits only guard extremes.
+    const maxRoadWays = 20000;
+    const maxBuildingWays = 50000;
+    const maxLanduseWays = 15000;
+    const maxPoiNodes = 8000;
+
+    // Higher request budget for larger full-coverage payloads.
+    const overpassTimeoutMs = rdtLoadComplexity <= 4 ? 20000 : 30000;
+    const maxTotalLoadMs = rdtLoadComplexity <= 4 ? 52000 : 62000;
+    const loadStartedAt = performance.now();
 
     let loaded = false;
+
+    function registerBuildingCollision(pts, height) {
+        let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        pts.forEach(p => {
+            minX = Math.min(minX, p.x);
+            maxX = Math.max(maxX, p.x);
+            minZ = Math.min(minZ, p.z);
+            maxZ = Math.max(maxZ, p.z);
+        });
+        const building = { pts, minX, maxX, minZ, maxZ, height };
+        buildings.push(building);
+        addBuildingToSpatialIndex(building);
+        return building;
+    }
 
     for (const r of radii) {
         if (loaded) break;
         try {
+            if (performance.now() - loadStartedAt > maxTotalLoadMs) {
+                console.warn('[Overpass] Max load budget reached, switching to fallback world.');
+                break;
+            }
+
             showLoad('Loading map data...');
-            // Load roads, buildings, landuse, and POIs in one comprehensive query
-            const q = `[out:json][timeout:${overpassTimeoutSec}];(
-                way["highway"~"^(motorway|trunk|primary|secondary|tertiary|residential)$"](${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r});
-                way["building"](${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r});
-                way["landuse"](${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r});
-                way["natural"~"water|wood"](${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r});
-                way["leisure"="park"](${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r});
-                node["amenity"~"school|hospital|police|fire_station|parking|fuel|restaurant|cafe|bank|pharmacy|post_office"](${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r});
-                node["shop"](${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r});
-                node["tourism"](${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r});
-                node["historic"](${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r});
-                node["leisure"~"park|stadium|sports_centre|playground"](${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r});
+            const featureRadius = r * featureRadiusScale;
+            const poiRadius = r * poiRadiusScale;
+
+            const roadsBounds = `(${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r})`;
+            const featureBounds = `(${LOC.lat-featureRadius},${LOC.lon-featureRadius},${LOC.lat+featureRadius},${LOC.lon+featureRadius})`;
+            const poiBounds = `(${LOC.lat-poiRadius},${LOC.lon-poiRadius},${LOC.lat+poiRadius},${LOC.lon+poiRadius})`;
+
+            // Load roads, buildings, landuse, and POIs in one comprehensive query.
+            const q = `[out:json][timeout:${Math.max(8, Math.floor(overpassTimeoutMs / 1000))}];(
+                way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street|service)$"]${roadsBounds};
+                way["building"]${featureBounds};
+                way["landuse"]${featureBounds};
+                way["natural"="wood"]${featureBounds};
+                way["leisure"="park"]${featureBounds};
+                node["amenity"~"school|hospital|police|fire_station|parking|fuel|restaurant|cafe|bank|pharmacy|post_office"]${poiBounds};
+                node["shop"]${poiBounds};
+                node["tourism"]${poiBounds};
+                node["historic"]${poiBounds};
+                node["leisure"~"park|stadium|sports_centre|playground"]${poiBounds};
             );out body;>;out skel qt;`;
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 25000);
-            const res = await fetch('https://overpass-api.de/api/interpreter', { method: 'POST', body: 'data=' + encodeURIComponent(q), signal: controller.signal });
-            clearTimeout(timeoutId);
-            const data = await res.json();
+            const loadDeadline = loadStartedAt + maxTotalLoadMs;
+            const data = await fetchOverpassJSON(q, overpassTimeoutMs, loadDeadline);
             const nodes = {};
             data.elements.filter(e => e.type === 'node').forEach(n => nodes[n.id] = n);
 
+            const allRoadWays = data.elements.filter(e => e.type === 'way' && e.tags?.highway);
+            const roadWays = allRoadWays.length > maxRoadWays
+                ? limitWaysByDistance(
+                    allRoadWays,
+                    nodes,
+                    maxRoadWays,
+                    (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
+                )
+                : allRoadWays;
+
+            const allBuildingWays = data.elements.filter(e => e.type === 'way' && e.tags?.building);
+            const buildingWays = allBuildingWays.length > maxBuildingWays
+                ? limitWaysByDistance(
+                    allBuildingWays,
+                    nodes,
+                    maxBuildingWays,
+                    null,
+                    { spreadAcrossArea: true, coreRatio: 0.45 }
+                )
+                : allBuildingWays;
+
+            const allLanduseWays = data.elements.filter(e =>
+                e.type === 'way' &&
+                e.tags &&
+                (
+                    !!e.tags.landuse ||
+                    e.tags.natural === 'wood' ||
+                    e.tags.leisure === 'park'
+                )
+            );
+            const landuseWays = allLanduseWays.length > maxLanduseWays
+                ? limitWaysByDistance(allLanduseWays, nodes, maxLanduseWays)
+                : allLanduseWays;
+
+            const allPoiNodes = data.elements.filter(e => e.type === 'node' && e.tags);
+            const poiNodes = limitNodesByDistance(allPoiNodes, maxPoiNodes);
+
+            if (roadWays.length < allRoadWays.length || buildingWays.length < allBuildingWays.length) {
+                console.warn(
+                    `[WorldLoad] Applied adaptive limits (roads ${roadWays.length}/${allRoadWays.length}, buildings ${buildingWays.length}/${allBuildingWays.length}).`
+                );
+            }
+
             // Process roads
-            data.elements.filter(e => e.type === 'way' && e.tags?.highway).forEach(way => {
+            showLoad(`Loading roads... (${roadWays.length})`);
+            roadWays.forEach(way => {
                 const pts = way.nodes.map(id => nodes[id]).filter(n => n).map(n => geoToWorld(n.lat, n.lon));
                 if (pts.length < 2) return;
                 const type = way.tags?.highway || 'residential';
@@ -79,11 +639,14 @@ async function loadRoads() {
                 roads.push({ pts, width, limit, name, type });
                 const hw = width / 2;
 
-                // Subdivide road points for smoother terrain following
-                const subdPts = typeof subdivideRoadPoints === 'function' ? subdivideRoadPoints(pts, 5) : pts;
+                // Curvature-aware subdivision: straight = 2-5m, curves = 0.5-2m
+                const subdPts = typeof subdivideRoadPoints === 'function' ? subdivideRoadPoints(pts, 3.5) : pts;
+
+                // Use cached height function if available
+                const _tmh = typeof cachedTerrainHeight === 'function' ? cachedTerrainHeight :
+                             (typeof terrainMeshHeightAt === 'function' ? terrainMeshHeightAt : elevationWorldYAtWorldXZ);
 
                 // Sample center heights and smooth them
-                const _tmh = typeof terrainMeshHeightAt === 'function' ? terrainMeshHeightAt : elevationWorldYAtWorldXZ;
                 const cHeights = new Float64Array(subdPts.length);
                 for (let ci = 0; ci < subdPts.length; ci++) {
                     cHeights[ci] = _tmh(subdPts[ci].x, subdPts[ci].z);
@@ -95,31 +658,66 @@ async function loadRoads() {
                 }
 
                 const verts = [], indices = [];
+                const leftEdge = [], rightEdge = [];
+
+                // Build road strip with DIRECT edge snapping
                 for (let i = 0; i < subdPts.length; i++) {
                     const p = subdPts[i];
-                    let dx, dz;
-                    if (i === 0) { dx = subdPts[1].x - p.x; dz = subdPts[1].z - p.z; }
-                    else if (i === subdPts.length - 1) { dx = p.x - subdPts[i-1].x; dz = p.z - subdPts[i-1].z; }
-                    else { dx = subdPts[i+1].x - subdPts[i-1].x; dz = subdPts[i+1].z - subdPts[i-1].z; }
-                    const len = Math.sqrt(dx*dx + dz*dz) || 1;
-                    const nx = -dz / len, nz = dx / len;
 
-                    // Use smoothed center height + clamped cross-slope tilt
-                    const baseY = cHeights[i] + 0.2;
-                    const rawCenter = _tmh(p.x, p.z);
-                    const edgeY1 = _tmh(p.x + nx * hw, p.z + nz * hw);
-                    const edgeY2 = _tmh(p.x - nx * hw, p.z - nz * hw);
-                    const maxTilt = 2.0;
-                    const tilt1 = Math.max(-maxTilt, Math.min(maxTilt, edgeY1 - rawCenter));
-                    const tilt2 = Math.max(-maxTilt, Math.min(maxTilt, edgeY2 - rawCenter));
-                    verts.push(p.x + nx * hw, baseY + tilt1, p.z + nz * hw);
-                    verts.push(p.x - nx * hw, baseY + tilt2, p.z - nz * hw);
-                    if (i < subdPts.length - 1) { const vi = i * 2; indices.push(vi, vi+1, vi+2, vi+1, vi+3, vi+2); }
+                    // Calculate tangent direction
+                    let dx, dz;
+                    if (i === 0) {
+                        dx = subdPts[1].x - p.x;
+                        dz = subdPts[1].z - p.z;
+                    } else if (i === subdPts.length - 1) {
+                        dx = p.x - subdPts[i-1].x;
+                        dz = p.z - subdPts[i-1].z;
+                    } else {
+                        dx = subdPts[i+1].x - subdPts[i-1].x;
+                        dz = subdPts[i+1].z - subdPts[i-1].z;
+                    }
+
+                    const len = Math.sqrt(dx*dx + dz*dz) || 1;
+                    const nx = -dz / len, nz = dx / len; // Perpendicular (left direction)
+
+                    // Calculate left and right edge positions
+                    const leftX = p.x + nx * hw;
+                    const leftZ = p.z + nz * hw;
+                    const rightX = p.x - nx * hw;
+                    const rightZ = p.z - nz * hw;
+
+                    // DIRECTLY snap BOTH edges to terrain
+                    let leftY = _tmh(leftX, leftZ);
+                    let rightY = _tmh(rightX, rightZ);
+
+                    // Add vertical bias to prevent z-fighting and terrain peeking
+                    // Increased from 0.10 to 0.25 to handle steep slopes
+                    const verticalBias = 0.25; // 25cm above terrain
+                    leftY += verticalBias;
+                    rightY += verticalBias;
+
+                    // Store edge vertices for skirt generation
+                    leftEdge.push({ x: leftX, y: leftY, z: leftZ });
+                    rightEdge.push({ x: rightX, y: rightY, z: rightZ });
+
+                    // Push vertices
+                    verts.push(leftX, leftY, leftZ);
+                    verts.push(rightX, rightY, rightZ);
+
+                    // Create quad indices
+                    if (i < subdPts.length - 1) {
+                        const vi = i * 2;
+                        indices.push(vi, vi+1, vi+2, vi+1, vi+3, vi+2);
+                    }
                 }
+
+                // Build main road mesh
                 const geo = new THREE.BufferGeometry();
                 geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
                 geo.setIndex(indices);
                 geo.computeVertexNormals();
+
+                // Road material with improved polygon offset
                 const roadMat = asphaltTex ? new THREE.MeshStandardMaterial({
                     map: asphaltTex,
                     normalMap: asphaltNormal,
@@ -129,22 +727,58 @@ async function loadRoads() {
                     metalness: 0.05,
                     side: THREE.DoubleSide,
                     polygonOffset: true,
-                    polygonOffsetFactor: -4,
-                    polygonOffsetUnits: -4
+                    polygonOffsetFactor: -2,
+                    polygonOffsetUnits: -2,
+                    depthWrite: true,
+                    depthTest: true
                 }) : new THREE.MeshStandardMaterial({
                     color: 0x333333,
                     roughness: 0.95,
                     metalness: 0.05,
                     side: THREE.DoubleSide,
                     polygonOffset: true,
-                    polygonOffsetFactor: -4,
-                    polygonOffsetUnits: -4
+                    polygonOffsetFactor: -2,
+                    polygonOffsetUnits: -2,
+                    depthWrite: true,
+                    depthTest: true
                 });
+
                 const mesh = new THREE.Mesh(geo, roadMat);
                 mesh.renderOrder = 2;
                 mesh.receiveShadow = true;
                 mesh.frustumCulled = false;
-                scene.add(mesh); roadMeshes.push(mesh);
+                scene.add(mesh);
+                roadMeshes.push(mesh);
+
+                // Build road skirts (edge curtains) to hide terrain peeking
+                // Increased depth from 1.5 to 3.0 for better coverage on steep slopes
+                if (typeof buildRoadSkirts === 'function') {
+                    const skirtData = buildRoadSkirts(leftEdge, rightEdge, 3.0);
+                    if (skirtData.verts.length > 0) {
+                        const skirtGeo = new THREE.BufferGeometry();
+                        skirtGeo.setAttribute('position', new THREE.Float32BufferAttribute(skirtData.verts, 3));
+                        skirtGeo.setIndex(skirtData.indices);
+                        skirtGeo.computeVertexNormals();
+
+                        const skirtMat = new THREE.MeshStandardMaterial({
+                            color: 0x222222,
+                            roughness: 0.95,
+                            metalness: 0.05,
+                            side: THREE.DoubleSide,
+                            polygonOffset: true,
+                            polygonOffsetFactor: -1,
+                            polygonOffsetUnits: -1
+                        });
+
+                        const skirtMesh = new THREE.Mesh(skirtGeo, skirtMat);
+                        skirtMesh.renderOrder = 1;
+                        skirtMesh.receiveShadow = true;
+                        skirtMesh.frustumCulled = false;
+                        skirtMesh.userData.isRoadSkirt = true;
+                        scene.add(skirtMesh);
+                        roadMeshes.push(skirtMesh);
+                    }
+                }
 
                 // Add lane markings only for major roads (performance optimization)
                 if (width >= 12 && (type.includes('motorway') || type.includes('trunk') || type.includes('primary'))) {
@@ -195,11 +829,42 @@ async function loadRoads() {
             });
 
             // Process buildings
-            showLoad('Loading buildings...');
-            const buildingColors = [0x8899aa, 0x998877, 0x7788aa, 0x887799, 0x778899, 0x667788, 0x998877];
-            data.elements.filter(e => e.type === 'way' && e.tags?.building).forEach(way => {
+            showLoad(`Loading buildings... (${buildingWays.length})`);
+            const roadBuildingCellSize = 120;
+            const buildingRoadRadiusCells = 3; // ~360m coverage around loaded roads
+            const roadCoverageCells = new Set();
+
+            roads.forEach(rd => {
+                if (!rd || !rd.pts) return;
+                for (let i = 0; i < rd.pts.length; i += 2) {
+                    const p = rd.pts[i];
+                    const cx = Math.floor(p.x / roadBuildingCellSize);
+                    const cz = Math.floor(p.z / roadBuildingCellSize);
+                    roadCoverageCells.add(`${cx},${cz}`);
+                }
+            });
+
+            function isBuildingNearLoadedRoad(pts) {
+                if (!pts || pts.length === 0 || roadCoverageCells.size === 0) return true;
+                let sumX = 0, sumZ = 0;
+                for (let i = 0; i < pts.length; i++) {
+                    sumX += pts[i].x;
+                    sumZ += pts[i].z;
+                }
+                const cx = Math.floor((sumX / pts.length) / roadBuildingCellSize);
+                const cz = Math.floor((sumZ / pts.length) / roadBuildingCellSize);
+                for (let dx = -buildingRoadRadiusCells; dx <= buildingRoadRadiusCells; dx++) {
+                    for (let dz = -buildingRoadRadiusCells; dz <= buildingRoadRadiusCells; dz++) {
+                        if (roadCoverageCells.has(`${cx + dx},${cz + dz}`)) return true;
+                    }
+                }
+                return false;
+            }
+
+            buildingWays.forEach(way => {
                 const pts = way.nodes.map(id => nodes[id]).filter(n => n).map(n => geoToWorld(n.lat, n.lon));
                 if (pts.length < 3) return;
+                if (!isBuildingNearLoadedRoad(pts)) return;
 
                 // RDT-seeded deterministic random for this building
                 const bSeed = (rdtSeed ^ (way.id >>> 0)) >>> 0;
@@ -223,15 +888,22 @@ async function loadRoads() {
                     else height = 8 + br1 * 12;
                 }
 
-                // Store building collision data (2D polygon with pre-computed bounding box)
-                let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+                registerBuildingCollision(pts, height);
+
+                // Calculate terrain stats for building footprint
+                let avgElevation = 0;
+                let minElevation = Infinity;
+                let maxElevation = -Infinity;
                 pts.forEach(p => {
-                    minX = Math.min(minX, p.x);
-                    maxX = Math.max(maxX, p.x);
-                    minZ = Math.min(minZ, p.z);
-                    maxZ = Math.max(maxZ, p.z);
+                    const h = elevationWorldYAtWorldXZ(p.x, p.z);
+                    avgElevation += h;
+                    if (h < minElevation) minElevation = h;
+                    if (h > maxElevation) maxElevation = h;
                 });
-                buildings.push({ pts: pts, minX, maxX, minZ, maxZ, height });
+                avgElevation /= pts.length;
+                const slopeRange = (Number.isFinite(minElevation) && Number.isFinite(maxElevation))
+                    ? (maxElevation - minElevation)
+                    : 0;
 
                 // Create extruded building shape
                 const shape = new THREE.Shape();
@@ -245,123 +917,364 @@ async function loadRoads() {
                 const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
                 geo.rotateX(-Math.PI / 2);
 
-                // Deterministic color selection using RDT seed
+                // Deterministic facade selection (matches original texture style)
                 const colors = ['#888888', '#7788aa', '#998877', '#667788'];
                 const baseColor = colors[Math.floor(br2 * colors.length)];
-                const windowTex = createWindowTexture(baseColor, bSeed);
+                const bt = way.tags.building || 'yes';
+                const bldgMat = (typeof getBuildingMaterial === 'function')
+                    ? getBuildingMaterial(bt, bSeed, baseColor)
+                    : new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.85, metalness: 0.05 });
 
-                const bldgMat = new THREE.MeshStandardMaterial({
-                    map: windowTex,
-                    color: baseColor,
-                    roughness: 0.85,
-                    metalness: 0.05
-                });
-                if (buildingNormalMap) {
-                    bldgMat.normalMap = buildingNormalMap;
-                    bldgMat.normalScale = new THREE.Vector2(0.4, 0.4);
-                }
-                if (buildingRoughnessMap) {
-                    bldgMat.roughnessMap = buildingRoughnessMap;
-                }
                 const mesh = new THREE.Mesh(geo, bldgMat);
-
-                // Calculate average terrain elevation for building footprint
-                let avgElevation = 0;
-                pts.forEach(p => {
-                    avgElevation += elevationWorldYAtWorldXZ(p.x, p.z);
-                });
-                avgElevation /= pts.length;
-
                 mesh.position.y = avgElevation;
                 mesh.userData.buildingFootprint = pts;
+                mesh.userData.avgElevation = avgElevation;
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
                 scene.add(mesh);
                 buildingMeshes.push(mesh);
-            });
 
-            // Process landuse for ground truth visual realism
-            showLoad('Loading land use...');
-            data.elements.filter(e => e.type === 'way' && e.tags).forEach(way => {
-                const tags = way.tags;
-                let landuseType = null;
-
-                // Check for landuse tags
-                if (tags.landuse && LANDUSE_STYLES[tags.landuse]) {
-                    landuseType = tags.landuse;
-                } else if (tags.natural === 'water') {
-                    landuseType = 'water';
-                } else if (tags.natural === 'wood') {
-                    landuseType = 'wood';
-                } else if (tags.leisure === 'park') {
-                    landuseType = 'park';
-                }
-
-                if (landuseType) {
-                    const pts = way.nodes.map(id => nodes[id]).filter(n => n).map(n => geoToWorld(n.lat, n.lon));
-                    if (pts.length < 3) return;
-
-                    // Calculate average terrain elevation for this land use area
-                    let avgElevation = 0;
-                    pts.forEach(p => {
-                        avgElevation += elevationWorldYAtWorldXZ(p.x, p.z);
-                    });
-                    avgElevation /= pts.length;
-
-                    // Create landuse polygon that CONFORMS to terrain (not flat!)
-                    const shape = new THREE.Shape();
-                    pts.forEach((p, i) => {
-                        if (i === 0) shape.moveTo(p.x, -p.z);
-                        else shape.lineTo(p.x, -p.z);
-                    });
-                    shape.closePath();
-
-                    // Create subdivided geometry so it can bend to terrain
-                    const geometry = new THREE.ShapeGeometry(shape, 20); // 20 segments for detail
-                    geometry.rotateX(-Math.PI / 2);
-
-                    // Deform each vertex to follow actual terrain elevation (RELATIVE to mesh position)
-                    // If terrain tile not loaded yet (returns 0), use avgElevation as fallback
-                    const positions = geometry.attributes.position;
-                    for (let i = 0; i < positions.count; i++) {
-                        const x = positions.getX(i);
-                        const z = positions.getZ(i);
-                        const terrainY = elevationWorldYAtWorldXZ(x, z);
-                        // Guard against unloaded tiles: if terrain returns 0 but avg is clearly above 0
-                        const useY = (terrainY === 0 && Math.abs(avgElevation) > 2) ? avgElevation : terrainY;
-                        positions.setY(i, (useY - avgElevation) + 0.02);
+                // On steep terrain, add a terrain-conforming apron to hide
+                // exposed flat foundation planes around the footprint.
+                if (typeof createBuildingGroundPatch === 'function' && slopeRange >= 0.7) {
+                    const groundPatch = createBuildingGroundPatch(pts, avgElevation);
+                    if (groundPatch) {
+                        groundPatch.userData.landuseFootprint = pts;
+                        groundPatch.userData.landuseType = 'buildingGround';
+                        groundPatch.userData.avgElevation = avgElevation;
+                        groundPatch.userData.alwaysVisible = true;
+                        groundPatch.visible = true;
+                        scene.add(groundPatch);
+                        landuseMeshes.push(groundPatch);
                     }
-                    positions.needsUpdate = true;
-                    geometry.computeVertexNormals();
-
-                    const material = new THREE.MeshStandardMaterial({
-                        color: LANDUSE_STYLES[landuseType].color,
-                        roughness: 0.95,
-                        metalness: 0.0,
-                        transparent: true,
-                        opacity: 0.85,
-                        depthWrite: true,
-                        polygonOffset: true,
-                        polygonOffsetFactor: -2,
-                        polygonOffsetUnits: -2
-                    });
-
-                    const mesh = new THREE.Mesh(geometry, material);
-                    mesh.renderOrder = 1;
-                    mesh.position.y = avgElevation;
-                    mesh.userData.landuseFootprint = pts;
-                    mesh.userData.avgElevation = avgElevation;
-
-                    mesh.receiveShadow = false;
-                    scene.add(mesh);
-                    landuseMeshes.push(mesh);
-                    landuses.push({ type: landuseType, pts });
                 }
             });
+
+            function addLandusePolygon(pts, landuseType, holeRings = []) {
+                if (!pts || pts.length < 3) return;
+
+                let ring = pts;
+                const first = pts[0];
+                const last = pts[pts.length - 1];
+                if (first.x === last.x && first.z === last.z) {
+                    ring = pts.slice(0, -1);
+                }
+                if (ring.length < 3) return;
+                if (Math.abs(signedPolygonAreaXZ(ring)) < 10) return;
+
+                ring = decimatePoints(ring, 900, false);
+
+                let avgElevation = 0;
+                ring.forEach(p => {
+                    avgElevation += elevationWorldYAtWorldXZ(p.x, p.z);
+                });
+                avgElevation /= ring.length;
+
+                const shape = new THREE.Shape();
+                ring.forEach((p, i) => {
+                    if (i === 0) shape.moveTo(p.x, -p.z);
+                    else shape.lineTo(p.x, -p.z);
+                });
+                shape.closePath();
+
+                if (holeRings && holeRings.length > 0) {
+                    holeRings.forEach(holeRing => {
+                        if (!holeRing || holeRing.length < 3) return;
+                        const path = new THREE.Path();
+                        holeRing.forEach((p, i) => {
+                            if (i === 0) path.moveTo(p.x, -p.z);
+                            else path.lineTo(p.x, -p.z);
+                        });
+                        path.closePath();
+                        shape.holes.push(path);
+                    });
+                }
+
+                const geometry = new THREE.ShapeGeometry(shape, 20);
+                geometry.rotateX(-Math.PI / 2);
+
+                const isWater = landuseType === 'water';
+                const waterFlattenFactor = isWater ? 0.12 : 1.0;
+                const positions = geometry.attributes.position;
+                for (let i = 0; i < positions.count; i++) {
+                    const x = positions.getX(i);
+                    const z = positions.getZ(i);
+                    const terrainY = elevationWorldYAtWorldXZ(x, z);
+                    const useY = (terrainY === 0 && Math.abs(avgElevation) > 2) ? avgElevation : terrainY;
+                    positions.setY(i, ((useY - avgElevation) * waterFlattenFactor) + (isWater ? 0.08 : 0.02));
+                }
+                positions.needsUpdate = true;
+                geometry.computeVertexNormals();
+
+                const material = new THREE.MeshStandardMaterial(isWater ? {
+                    color: LANDUSE_STYLES.water.color,
+                    emissive: 0x0f355a,
+                    emissiveIntensity: 0.30,
+                    roughness: 0.14,
+                    metalness: 0.06,
+                    transparent: true,
+                    opacity: 0.92,
+                    side: THREE.DoubleSide,
+                    depthWrite: false,
+                    polygonOffset: true,
+                    polygonOffsetFactor: -6,
+                    polygonOffsetUnits: -6
+                } : {
+                    color: LANDUSE_STYLES[landuseType].color,
+                    roughness: 0.95,
+                    metalness: 0.0,
+                    transparent: true,
+                    opacity: 0.85,
+                    depthWrite: true,
+                    polygonOffset: true,
+                    polygonOffsetFactor: -2,
+                    polygonOffsetUnits: -2
+                });
+
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.renderOrder = 1;
+                mesh.position.y = avgElevation;
+                mesh.userData.landuseFootprint = ring;
+                mesh.userData.avgElevation = avgElevation;
+                mesh.userData.alwaysVisible = isWater;
+                mesh.userData.landuseType = landuseType;
+                mesh.userData.waterFlattenFactor = waterFlattenFactor;
+                mesh.receiveShadow = false;
+                mesh.visible = landUseVisible || mesh.userData.alwaysVisible;
+                scene.add(mesh);
+                landuseMeshes.push(mesh);
+                landuses.push({ type: landuseType, pts: ring });
+
+                if (isWater) {
+                    waterAreas.push({ type: 'water', pts: ring });
+                }
+            }
+
+            function waterwayWidthFromTags(tags) {
+                const kind = (tags?.kind || tags?.waterway || '').toString();
+                if (kind.includes('ocean') || kind.includes('coast')) return 220;
+                if (kind.includes('river')) return 18;
+                if (kind.includes('canal')) return 12;
+                if (kind.includes('drain')) return 4;
+                if (kind.includes('ditch')) return 3;
+                if (kind.includes('stream')) return 6;
+                return 8;
+            }
+
+            function addWaterwayRibbon(pts, tags) {
+                if (!pts || pts.length < 2) return;
+                const centerline = decimatePoints(pts, 1000, false);
+                if (centerline.length < 2) return;
+
+                const width = waterwayWidthFromTags(tags);
+                const halfWidth = width * 0.5;
+                const verticalBias = 0.14;
+                const _h = typeof terrainMeshHeightAt === 'function' ? terrainMeshHeightAt : elevationWorldYAtWorldXZ;
+                const verts = [];
+                const indices = [];
+
+                for (let i = 0; i < centerline.length; i++) {
+                    const p = centerline[i];
+
+                    let dx, dz;
+                    if (i === 0) {
+                        dx = centerline[1].x - p.x;
+                        dz = centerline[1].z - p.z;
+                    } else if (i === centerline.length - 1) {
+                        dx = p.x - centerline[i - 1].x;
+                        dz = p.z - centerline[i - 1].z;
+                    } else {
+                        dx = centerline[i + 1].x - centerline[i - 1].x;
+                        dz = centerline[i + 1].z - centerline[i - 1].z;
+                    }
+
+                    const len = Math.hypot(dx, dz) || 1;
+                    const nx = -dz / len;
+                    const nz = dx / len;
+                    const leftX = p.x + nx * halfWidth;
+                    const leftZ = p.z + nz * halfWidth;
+                    const rightX = p.x - nx * halfWidth;
+                    const rightZ = p.z - nz * halfWidth;
+                    const leftY = _h(leftX, leftZ) + verticalBias;
+                    const rightY = _h(rightX, rightZ) + verticalBias;
+
+                    verts.push(leftX, leftY, leftZ);
+                    verts.push(rightX, rightY, rightZ);
+
+                    if (i < centerline.length - 1) {
+                        const vi = i * 2;
+                        indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
+                    }
+                }
+
+                if (verts.length < 12 || indices.length < 6) return;
+
+                const geometry = new THREE.BufferGeometry();
+                geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+                geometry.setIndex(indices);
+                geometry.computeVertexNormals();
+
+                const material = new THREE.MeshStandardMaterial({
+                    color: 0x3f87d6,
+                    emissive: 0x0d2b4f,
+                    emissiveIntensity: 0.22,
+                    roughness: 0.2,
+                    metalness: 0.04,
+                    transparent: true,
+                    opacity: 0.82,
+                    side: THREE.DoubleSide,
+                    depthWrite: false,
+                    polygonOffset: true,
+                    polygonOffsetFactor: -4,
+                    polygonOffsetUnits: -4
+                });
+
+                const mesh = new THREE.Mesh(geometry, material);
+                mesh.renderOrder = 1;
+                mesh.receiveShadow = false;
+                mesh.userData.isWaterwayLine = true;
+                mesh.userData.alwaysVisible = true;
+                mesh.userData.waterwayCenterline = centerline;
+                mesh.userData.waterwayWidth = width;
+                mesh.userData.waterwayBias = verticalBias;
+                mesh.visible = true;
+                scene.add(mesh);
+                landuseMeshes.push(mesh);
+                waterways.push({
+                    type: (tags?.kind || tags?.waterway || 'waterway'),
+                    width,
+                    pts: centerline
+                });
+            }
+
+            function addWaterPolygonFromVectorCoords(polygonCoords, properties = {}) {
+                if (!Array.isArray(polygonCoords) || polygonCoords.length === 0) return false;
+                const outer = normalizeWorldRingFromLonLat(polygonCoords[0], 1000);
+                if (!outer) return false;
+
+                const holes = [];
+                for (let i = 1; i < polygonCoords.length; i++) {
+                    const hole = normalizeWorldRingFromLonLat(polygonCoords[i], 700);
+                    if (hole && Math.abs(signedPolygonAreaXZ(hole)) > 12) holes.push(hole);
+                }
+
+                addLandusePolygon(outer, 'water', holes);
+                return true;
+            }
+
+            function addVectorWaterGeoJSON(geojson) {
+                if (!geojson || !geojson.geometry) return { polygons: 0, lines: 0 };
+                let polygons = 0;
+                let lines = 0;
+                const geom = geojson.geometry;
+                const props = geojson.properties || {};
+
+                if (geom.type === 'Polygon') {
+                    if (addWaterPolygonFromVectorCoords(geom.coordinates, props)) polygons++;
+                    return { polygons, lines };
+                }
+                if (geom.type === 'MultiPolygon') {
+                    geom.coordinates.forEach(polyCoords => {
+                        if (addWaterPolygonFromVectorCoords(polyCoords, props)) polygons++;
+                    });
+                    return { polygons, lines };
+                }
+                if (geom.type === 'LineString') {
+                    const pts = worldLinePointsFromLonLat(geom.coordinates, 1000);
+                    if (pts && pts.length >= 2) {
+                        addWaterwayRibbon(pts, props);
+                        lines++;
+                    }
+                    return { polygons, lines };
+                }
+                if (geom.type === 'MultiLineString') {
+                    geom.coordinates.forEach(lineCoords => {
+                        const pts = worldLinePointsFromLonLat(lineCoords, 1000);
+                        if (pts && pts.length >= 2) {
+                            addWaterwayRibbon(pts, props);
+                            lines++;
+                        }
+                    });
+                }
+                return { polygons, lines };
+            }
+
+            async function loadVectorTileWaterCoverage(latMin, lonMin, latMax, lonMax) {
+                const tr = vectorTileRangeForBounds(latMin, lonMin, latMax, lonMax, WATER_VECTOR_TILE_ZOOM);
+                const tileJobs = [];
+                for (let tx = tr.xMin; tx <= tr.xMax; tx++) {
+                    for (let ty = tr.yMin; ty <= tr.yMax; ty++) {
+                        tileJobs.push(fetchVectorTileWater(WATER_VECTOR_TILE_ZOOM, tx, ty));
+                    }
+                }
+                if (tileJobs.length === 0) return { polygons: 0, lines: 0, tiles: 0, okTiles: 0 };
+
+                const settled = await Promise.allSettled(tileJobs);
+                let polygons = 0;
+                let lines = 0;
+                let okTiles = 0;
+
+                settled.forEach(result => {
+                    if (result.status !== 'fulfilled') return;
+                    okTiles++;
+                    const { tile, x, y, z } = result.value;
+                    const polygonLayers = ['ocean', 'water_polygons'];
+                    const lineLayers = ['water_lines'];
+
+                    polygonLayers.forEach(layerName => {
+                        const layer = tile.layers[layerName];
+                        if (!layer || !Number.isFinite(layer.length)) return;
+                        for (let i = 0; i < layer.length; i++) {
+                            const feature = layer.feature(i);
+                            if (!feature || typeof feature.toGeoJSON !== 'function') continue;
+                            const out = addVectorWaterGeoJSON(feature.toGeoJSON(x, y, z));
+                            polygons += out.polygons;
+                            lines += out.lines;
+                        }
+                    });
+
+                    lineLayers.forEach(layerName => {
+                        const layer = tile.layers[layerName];
+                        if (!layer || !Number.isFinite(layer.length)) return;
+                        for (let i = 0; i < layer.length; i++) {
+                            const feature = layer.feature(i);
+                            if (!feature || typeof feature.toGeoJSON !== 'function') continue;
+                            const out = addVectorWaterGeoJSON(feature.toGeoJSON(x, y, z));
+                            polygons += out.polygons;
+                            lines += out.lines;
+                        }
+                    });
+                });
+
+                return { polygons, lines, tiles: tileJobs.length, okTiles };
+            }
+
+            showLoad(`Loading land use... (${landuseWays.length})`);
+            landuseWays.forEach(way => {
+                const landuseType = classifyLanduseType(way.tags);
+                if (!landuseType) return;
+                const pts = way.nodes.map(id => nodes[id]).filter(n => n).map(n => geoToWorld(n.lat, n.lon));
+                addLandusePolygon(pts, landuseType);
+            });
+
+            showLoad('Loading water...');
+            try {
+                const waterSummary = await loadVectorTileWaterCoverage(
+                    LOC.lat - featureRadius,
+                    LOC.lon - featureRadius,
+                    LOC.lat + featureRadius,
+                    LOC.lon + featureRadius
+                );
+                if (waterSummary.polygons === 0 && waterSummary.lines === 0) {
+                    console.warn(`[Water] Vector tiles loaded but no water features in bounds (tiles ok ${waterSummary.okTiles}/${waterSummary.tiles}).`);
+                }
+            } catch (waterErr) {
+                console.warn('[Water] Vector water load failed, continuing without vector water layer.', waterErr);
+            }
 
             // Process POIs for meaning in the world
-            showLoad('Loading POIs...');
-            data.elements.filter(e => e.type === 'node' && e.tags).forEach(node => {
+            showLoad(`Loading POIs... (${poiNodes.length})`);
+            poiNodes.forEach(node => {
                 const tags = node.tags;
                 let poiKey = null;
 
@@ -399,7 +1312,9 @@ async function loadRoads() {
                     const mesh = new THREE.Mesh(geometry, material);
                     mesh.position.set(pos.x, terrainY + 2, pos.z);
                     mesh.userData.poiPosition = { x: pos.x, z: pos.z };
+                    mesh.userData.isPOIMarker = true;
                     mesh.castShadow = false;
+                    mesh.visible = !!poiMode;
                     scene.add(mesh);
                     poiMeshes.push(mesh);
 
@@ -414,6 +1329,8 @@ async function loadRoads() {
                     cap.position.set(pos.x, terrainY + 4, pos.z);
                     cap.userData.poiPosition = { x: pos.x, z: pos.z }; // Store for repositioning
                     cap.userData.isCapMesh = true; // Mark as cap (2 units higher)
+                    cap.userData.isPOIMarker = true;
+                    cap.visible = !!poiMode;
                     scene.add(cap);
                     poiMeshes.push(cap);
 
@@ -451,6 +1368,9 @@ async function loadRoads() {
 
                 loaded = true;
                 spawnOnRoad();
+                if (terrainEnabled && !onMoon && typeof updateTerrainAround === 'function') {
+                    updateTerrainAround(car.x, car.z);
+                }
                 hideLoad();
                 // Align star field to current location
                 alignStarFieldToLocation(LOC.lat, LOC.lon);
@@ -462,9 +1382,16 @@ async function loadRoads() {
                 showLoad('No roads found, trying larger area...');
             }
         } catch (e) {
-            console.error('Road loading error:', e);
+            const isLastAttempt = r === radii[radii.length - 1];
+            if (!isLastAttempt) {
+                console.warn('Road loading attempt failed, retrying with larger area...', e);
+                showLoad('Retrying map data...');
+                continue;
+            }
+
+            console.error('Road loading failed after all attempts:', e);
             // If this is the last attempt and we still have no roads, create a default environment
-            if (r === radii[radii.length - 1] && roads.length === 0) {
+            if (roads.length === 0) {
                 // Debug log removed
                 showLoad('Creating default environment...');
 
@@ -519,7 +1446,7 @@ async function loadRoads() {
                         {x: x + w/2, z: z + d/2},
                         {x: x - w/2, z: z + d/2}
                     ];
-                    buildings.push({ pts, height: h, minX: x - w/2, maxX: x + w/2, minZ: z - d/2, maxZ: z + d/2 });
+                    registerBuildingCollision(pts, h);
 
                     const shape = new THREE.Shape();
                     shape.moveTo(pts[0].x, pts[0].z);
@@ -532,19 +1459,41 @@ async function loadRoads() {
                     const mat = new THREE.MeshLambertMaterial({ color });
                     const mesh = new THREE.Mesh(geo, mat);
 
-                    // Calculate average terrain elevation for building
+                    // Calculate terrain stats for building
                     let avgElevation = 0;
+                    let minElevation = Infinity;
+                    let maxElevation = -Infinity;
                     pts.forEach(p => {
-                        avgElevation += elevationWorldYAtWorldXZ(p.x, p.z);
+                        const hTerrain = elevationWorldYAtWorldXZ(p.x, p.z);
+                        avgElevation += hTerrain;
+                        if (hTerrain < minElevation) minElevation = hTerrain;
+                        if (hTerrain > maxElevation) maxElevation = hTerrain;
                     });
                     avgElevation /= pts.length;
+                    const slopeRange = (Number.isFinite(minElevation) && Number.isFinite(maxElevation))
+                        ? (maxElevation - minElevation)
+                        : 0;
                     mesh.position.y = avgElevation;
                     mesh.userData.buildingFootprint = pts; // Store for repositioning
+                    mesh.userData.avgElevation = avgElevation;
 
                     mesh.castShadow = true;
                     mesh.receiveShadow = true;
                     scene.add(mesh);
                     buildingMeshes.push(mesh);
+
+                    if (typeof createBuildingGroundPatch === 'function' && slopeRange >= 0.7) {
+                        const groundPatch = createBuildingGroundPatch(pts, avgElevation);
+                        if (groundPatch) {
+                            groundPatch.userData.landuseFootprint = pts;
+                            groundPatch.userData.landuseType = 'buildingGround';
+                            groundPatch.userData.avgElevation = avgElevation;
+                            groundPatch.userData.alwaysVisible = true;
+                            groundPatch.visible = true;
+                            scene.add(groundPatch);
+                            landuseMeshes.push(groundPatch);
+                        }
+                    }
                 };
 
                 // Add buildings around the crossroad
@@ -557,29 +1506,83 @@ async function loadRoads() {
 
                 loaded = true;
                 spawnOnRoad();
+                if (terrainEnabled && !onMoon && typeof updateTerrainAround === 'function') {
+                    updateTerrainAround(car.x, car.z);
+                }
                 hideLoad();
                 if (gameStarted) startMode();
                 // Debug log removed
-            } else {
-                showLoad('Retrying...');
             }
         }
     }
     if (!loaded) { showLoad('Failed to load. Click to retry.'); document.getElementById('loading').onclick = () => { document.getElementById('loading').onclick = null; loadRoads(); }; }
+    worldLoading = false;
 }
 
 function spawnOnRoad() {
-    const rd = roads.find(r => r.type.includes('primary') || r.type.includes('secondary')) || roads[0];
-    if (!rd) return;
-    const mid = Math.floor(rd.pts.length / 2);
-    car.x = rd.pts[mid].x; car.z = rd.pts[mid].z;
-    if (mid < rd.pts.length - 1) car.angle = Math.atan2(rd.pts[mid+1].x - rd.pts[mid].x, rd.pts[mid+1].z - rd.pts[mid].z);
+    if (!roads || roads.length === 0) return;
+
+    function spawnRoadPenalty(type) {
+        if (!type) return 0;
+        if (type.includes('motorway') || type.includes('trunk')) return 120;
+        if (type.includes('primary')) return 40;
+        if (type.includes('secondary')) return 20;
+        if (type.includes('service')) return 12;
+        return 0;
+    }
+
+    // Pick the road point closest to the location center, with light penalties for
+    // highway-like roads so initial spawn stays in the city core.
+    let best = null;
+    roads.forEach(rd => {
+        if (!rd || !rd.pts || rd.pts.length < 2) return;
+        const penalty = spawnRoadPenalty(rd.type);
+        for (let i = 0; i < rd.pts.length; i++) {
+            const p = rd.pts[i];
+            const score = Math.hypot(p.x, p.z) + penalty;
+            if (!best || score < best.score) {
+                best = { road: rd, idx: i, score };
+            }
+        }
+    });
+    if (!best) return;
+
+    const rd = best.road;
+    const idx = best.idx;
+    car.x = rd.pts[idx].x;
+    car.z = rd.pts[idx].z;
+
+    if (idx < rd.pts.length - 1) {
+        car.angle = Math.atan2(rd.pts[idx + 1].x - rd.pts[idx].x, rd.pts[idx + 1].z - rd.pts[idx].z);
+    } else if (idx > 0) {
+        car.angle = Math.atan2(rd.pts[idx].x - rd.pts[idx - 1].x, rd.pts[idx].z - rd.pts[idx - 1].z);
+    }
     car.speed = 0; car.vx = 0; car.vz = 0;
     const _spawnH = typeof terrainMeshHeightAt === 'function' ? terrainMeshHeightAt : elevationWorldYAtWorldXZ;
-    const spawnY = _spawnH(car.x, car.z) + 1.2;
+    const spawnY = (typeof GroundHeight !== 'undefined' && GroundHeight && typeof GroundHeight.carCenterY === 'function')
+        ? GroundHeight.carCenterY(car.x, car.z, true, 1.2)
+        : _spawnH(car.x, car.z) + 1.2;
     car.y = spawnY;
-    carMesh.position.set(car.x, spawnY, car.z);
-    carMesh.rotation.y = car.angle;
+    if (carMesh) {
+        carMesh.position.set(car.x, spawnY, car.z);
+        carMesh.rotation.y = car.angle;
+    }
+
+    // Keep walker state aligned with current car spawn so switching back to
+    // driving mode cannot snap to stale coordinates from the previous city.
+    if (Walk && Walk.state && Walk.state.walker) {
+        const groundY = spawnY - 1.2;
+        Walk.state.walker.x = car.x;
+        Walk.state.walker.z = car.z;
+        Walk.state.walker.y = groundY + 1.7;
+        Walk.state.walker.vy = 0;
+        Walk.state.walker.angle = car.angle;
+        Walk.state.walker.yaw = car.angle;
+        if (Walk.state.characterMesh && Walk.state.mode === 'walk') {
+            Walk.state.characterMesh.position.set(car.x, groundY, car.z);
+            Walk.state.characterMesh.rotation.y = car.angle;
+        }
+    }
 }
 
 function teleportToLocation(worldX, worldZ) {
@@ -622,19 +1625,25 @@ function teleportToLocation(worldX, worldZ) {
     car.vx = 0;
     car.vz = 0;
     const _teleH = typeof terrainMeshHeightAt === 'function' ? terrainMeshHeightAt : elevationWorldYAtWorldXZ;
-    const teleportY = _teleH(car.x, car.z) + 1.2;
+    const teleportY = (typeof GroundHeight !== 'undefined' && GroundHeight && typeof GroundHeight.carCenterY === 'function')
+        ? GroundHeight.carCenterY(car.x, car.z, true, 1.2)
+        : _teleH(car.x, car.z) + 1.2;
     car.y = teleportY;
     carMesh.position.set(car.x, teleportY, car.z);
     carMesh.rotation.y = car.angle;
 
-    // Update walker position if in walk mode
-    if (Walk && Walk.state.mode === 'walk') {
+    // Keep walker position aligned with teleports so mode switching stays stable.
+    if (Walk && Walk.state && Walk.state.walker) {
+        const groundY = teleportY - 1.2;
         Walk.state.walker.x = targetX;
         Walk.state.walker.z = targetZ;
+        Walk.state.walker.y = groundY + 1.7;
+        Walk.state.walker.vy = 0;
         Walk.state.walker.angle = targetAngle;
+        Walk.state.walker.yaw = targetAngle;
         Walk.state.walker.speed = 0;
-        if (Walk.state.characterMesh) {
-            Walk.state.characterMesh.position.set(targetX, 0, targetZ);
+        if (Walk.state.characterMesh && Walk.state.mode === 'walk') {
+            Walk.state.characterMesh.position.set(targetX, groundY, targetZ);
             Walk.state.characterMesh.rotation.y = targetAngle;
         }
     }
@@ -1043,3 +2052,25 @@ function generateStreetFurniture() {
         createTrashCan(poi.x + Math.cos(angle) * offset, poi.z + Math.sin(angle) * offset);
     });
 }
+
+Object.assign(globalThis, {
+    findNearestRoad,
+    getNearbyBuildings,
+    largeMapScreenToWorld,
+    loadRoads,
+    minimapScreenToWorld,
+    pointInPolygon,
+    spawnOnRoad,
+    teleportToLocation
+});
+
+export {
+    findNearestRoad,
+    getNearbyBuildings,
+    largeMapScreenToWorld,
+    loadRoads,
+    minimapScreenToWorld,
+    pointInPolygon,
+    spawnOnRoad,
+    teleportToLocation
+};

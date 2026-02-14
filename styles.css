@@ -4,15 +4,15 @@ button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 input,textarea{-webkit-user-select:text;user-select:text}
 
 /* Title Screen */
-#titleScreen{position:fixed;inset:0;background:url('images/title-bg.jpg') center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:200;overflow:hidden}
+#titleScreen{position:fixed;inset:0;background:#000 url('images/title-bg.jpg') center center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:max(14px,env(safe-area-inset-top));padding-right:12px;padding-bottom:max(14px,env(safe-area-inset-bottom));padding-left:12px;gap:clamp(8px,1.8vh,18px);z-index:200;overflow-y:auto;overflow-x:hidden}
 #titleScreen::before{content:'';position:absolute;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(1px)}
 #titleScreen.hidden{display:none}
-.logo{font-family:'Orbitron',sans-serif;font-size:clamp(36px, 8vw, 72px);font-weight:900;color:#ffffff;letter-spacing:clamp(3px, 1vw, 8px);text-transform:uppercase;text-shadow:0 0 30px rgba(83,52,131,0.8),0 0 60px rgba(15,52,96,0.6),0 4px 20px rgba(0,0,0,0.4);position:relative;z-index:1;margin-bottom:8px;animation:titleGlow 3s ease-in-out infinite;text-align:center;padding:0 20px}
+.logo{font-family:'Orbitron',sans-serif;font-size:clamp(36px, 8vw, 72px);font-weight:900;line-height:1.05;color:#ffffff;letter-spacing:clamp(3px, 1vw, 8px);text-transform:uppercase;text-shadow:0 0 30px rgba(83,52,131,0.8),0 0 60px rgba(15,52,96,0.6),0 4px 20px rgba(0,0,0,0.4);position:relative;z-index:1;margin:0;animation:titleGlow 3s ease-in-out infinite;text-align:center;padding:0 20px;flex-shrink:0}
 @keyframes titleGlow{0%,100%{text-shadow:0 0 30px rgba(83,52,131,0.8),0 0 60px rgba(15,52,96,0.6),0 4px 20px rgba(0,0,0,0.4)}50%{text-shadow:0 0 40px rgba(83,52,131,1),0 0 80px rgba(15,52,96,0.8),0 4px 30px rgba(0,0,0,0.5)}}
-.sub{font-family:'Righteous',cursive;font-size:20px;color:rgba(255,255,255,0.85);letter-spacing:6px;margin:0 0 50px;font-weight:400;text-shadow:0 2px 10px rgba(0,0,0,0.3);position:relative;z-index:1}
+.sub{font-family:'Righteous',cursive;font-size:clamp(13px,1.7vw,20px);line-height:1.25;color:rgba(255,255,255,0.9);letter-spacing:clamp(1px,0.45vw,4px);margin:0;font-weight:400;text-shadow:0 2px 10px rgba(0,0,0,0.35);position:relative;z-index:1;text-align:center;max-width:min(94vw,1100px);padding:0 8px;flex-shrink:0}
 
 /* Menu Container with Tabs */
-.menu-container{background:rgba(255,255,255,0.85);backdrop-filter:blur(20px);border:2px solid rgba(255,255,255,0.3);border-radius:20px;width:520px;max-width:95vw;max-height:80vh;display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,0.4),0 0 40px rgba(83,52,131,0.3);position:relative;z-index:1}
+.menu-container{background:rgba(255,255,255,0.85);backdrop-filter:blur(20px);border:2px solid rgba(255,255,255,0.3);border-radius:20px;width:min(520px,95vw);max-height:calc(100dvh - 180px);display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,0.4),0 0 40px rgba(83,52,131,0.3);position:relative;z-index:1;flex:0 1 auto}
 .tab-nav{display:flex;border-bottom:2px solid rgba(232,238,245,0.5);flex-shrink:0;background:rgba(248,250,252,0.6);backdrop-filter:blur(10px);border-radius:18px 18px 0 0}
 .tab-btn{flex:1;background:transparent;border:none;padding:16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:#64748b;cursor:pointer;transition:all 0.3s;position:relative}
 .tab-btn:hover{color:#475569;background:rgba(241,245,249,0.6)}
@@ -24,6 +24,15 @@ input,textarea{-webkit-user-select:text;user-select:text}
 /* Location Grid */
 .loc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
 .loc-grid.custom-centered{grid-template-columns:1fr;max-width:300px;margin:0 auto}
+.suggested-grid{grid-template-columns:1fr}
+.location-switch-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px}
+.location-switch-btn{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.9);border-radius:10px;padding:10px 12px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.2s}
+.location-switch-btn:hover{border-color:#cbd5e1;background:#f1f5f9}
+.location-switch-btn.active{border-color:#667eea;background:#f0f4ff;color:#3b5bdb;box-shadow:0 4px 12px rgba(102,126,234,0.15)}
+.location-panel{display:none}
+.location-panel.show{display:block}
+.suggested-note{font-size:11px;color:#64748b;margin:0 0 10px 2px}
+.suggested-list{max-height:34vh;overflow-y:auto;padding-right:4px}
 .loc{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.8);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s}
 .loc:hover{border-color:rgba(203,213,225,0.9);background:rgba(241,245,249,0.95);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.08)}
 .loc.sel{border-color:rgba(102,126,234,0.8);background:rgba(240,244,255,0.9);box-shadow:0 4px 12px rgba(102,126,234,0.2)}
@@ -35,7 +44,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .loc.custom .loc-name{color:#92400e}
 
 /* Custom Location Panel */
-#customPanel{display:none;margin-top:16px;padding:20px;background:rgba(255,251,235,0.9);border:2px solid rgba(252,211,77,0.8);border-radius:12px;max-height:60vh;overflow-y:auto;backdrop-filter:blur(10px)}
+#customPanel{display:none;margin-top:0;padding:20px;background:rgba(255,251,235,0.9);border:2px solid rgba(252,211,77,0.8);border-radius:12px;backdrop-filter:blur(10px)}
 #customPanel.show{display:block}
 .custom-title{font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;color:#92400e;margin-bottom:16px;text-align:center}
 .custom-row{margin-bottom:14px}
@@ -151,9 +160,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .floatItem{padding:8px 12px}
 
   /* Title screen mobile adjustments */
-  .sub{font-size:16px;letter-spacing:4px}
-  .menu-container{width:95vw;max-height:85vh}
+  .sub{font-size:15px;letter-spacing:2px}
+  .menu-container{width:95vw;max-height:calc(100dvh - 160px)}
   .loc-grid{grid-template-columns:1fr;gap:10px}
+  .location-switch-row{grid-template-columns:1fr}
+  .suggested-list{max-height:30vh}
   .tab-btn{font-size:12px;padding:12px 8px}
 
   /* HUD elements */
@@ -185,8 +196,9 @@ input,textarea{-webkit-user-select:text;user-select:text}
 
   /* Title screen for small phones */
   .logo{font-size:clamp(28px, 10vw, 48px);letter-spacing:2px}
-  .sub{font-size:14px;letter-spacing:3px;margin-bottom:30px}
-  .menu-container{width:98vw;max-height:90vh}
+  .sub{font-size:13px;letter-spacing:2px;margin:0}
+  .menu-container{width:98vw;max-height:calc(100dvh - 140px)}
+  .suggested-list{max-height:26vh}
   .tab-btn{font-size:11px;padding:10px 6px}
   .tab-content{padding:16px}
   .custom-title{font-size:13px}
@@ -229,11 +241,12 @@ input,textarea{-webkit-user-select:text;user-select:text}
 
 /* Landscape orientation adjustments */
 @media (max-height: 500px) and (orientation: landscape) {
-  .menu-container{max-height:95vh;width:80vw}
+  .menu-container{max-height:calc(100dvh - 110px);width:min(88vw,760px)}
   .tab-content{max-height:60vh}
+  .suggested-list{max-height:40vh}
   #propertyPanel{max-height:85vh}
-  .logo{font-size:clamp(24px, 6vw, 48px);margin-bottom:4px}
-  .sub{font-size:12px;margin-bottom:20px}
+  .logo{font-size:clamp(24px, 6vw, 48px);margin:0}
+  .sub{font-size:11px;letter-spacing:2px;margin:0}
 }
 
 #controlsTab{position:fixed;bottom:20px;left:200px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;z-index:100;display:none;font-size:12px;color:#475569;max-width:220px;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
@@ -243,7 +256,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #ctrlContent.hidden{display:none}
 #coords{position:fixed;bottom:200px;left:20px;background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:10px 14px;font-size:11px;color:#475569;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
 #coords.show{display:block}
-#loading{position:fixed;inset:0;background:url('images/loading-bg.jpg') center/cover no-repeat, #000;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:300;cursor:pointer}
+#loading{position:fixed;inset:0;background:#000 url('images/loading-bg.jpg') center center/cover no-repeat;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:300;cursor:pointer}
 #loading.show{display:flex}
 .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,0.3);border-top-color:#ffffff;border-radius:50%;animation:spin 1s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}

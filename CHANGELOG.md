@@ -10,7 +10,29 @@ Entries reflect changes made relative to the most recent public release.
 ## [Unreleased]
 
 ### Added
-- _No entries yet._
+- Documentation updates for RDT/RGE-256 research provenance, DOI references, and implementation mapping.
+- Explicit deterministic PRNG direction notes documenting ongoing migration away from `Math.random` where reproducibility is required.
+- `KNOWN_ISSUES.md` with contributor-focused engineering targets.
+- Repository baseline files for consistency: `.editorconfig`, `.eslintrc.cjs`, `.prettierrc.json`, `.prettierignore`.
+- Updated GitHub issue templates for structured bug and feature intake.
+- Title launch mode row (`Earth`, `Moon`, `Space`) in the start menu.
+- Kuiper belt simulation layer in `solar-system.js` with region HUD context.
+- Explicit visual belt bands for both asteroid and Kuiper belts for reliable visibility.
+- Clickable galaxy catalog (RA/Dec-positioned) with deep-sky info panel support.
+- Start-menu Controls tab coverage for space-flight keys and interactions.
+
+### Changed
+- Technical documentation examples now show deterministic RNG usage patterns aligned with the `rdt.js` seeded runtime helpers.
+- README, QUICKSTART, CONTRIBUTING, and DOCUMENTATION_INDEX are now aligned with the current branch architecture and source-available all-rights-reserved license model.
+- Restored main-style location selection behavior (`Custom` card + suggested city cards) and integrated launch-mode toggles at top of Location tab.
+- Expanded deep-space render envelope: farther star shell, farther galaxy placement, larger visual galaxy scale.
+- Space info panel metric rows are now reusable for planets, asteroids, spacecraft, and galaxies.
+- Module loader cache-bust chain incremented through `v=21` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+
+### Fixed
+- Non-responsive title menu interactions for suggested/custom selection after UI rework.
+- Belt rendering visibility issues caused by distance attenuation and low-contrast boundary rings.
+- Stale client asset issues caused by outdated cache-bust query strings after pushes.
 
 ---
 

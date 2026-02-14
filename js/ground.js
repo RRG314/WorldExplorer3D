@@ -16,10 +16,18 @@ const GroundHeight = {
 
     // --- reusable scratch vectors (allocated once) ---
     _normal: null,
+    _roadRaycaster: null,
+    _roadRayStart: null,
+    _roadRayDir: null,
 
     _ensureVectors() {
         if (!this._normal && typeof THREE !== 'undefined') {
             this._normal = new THREE.Vector3(0, 1, 0);
+        }
+        if (!this._roadRaycaster && typeof THREE !== 'undefined') {
+            this._roadRaycaster = new THREE.Raycaster();
+            this._roadRayStart = new THREE.Vector3();
+            this._roadRayDir = new THREE.Vector3(0, -1, 0);
         }
     },
 
@@ -45,6 +53,37 @@ const GroundHeight = {
      */
     roadSurfaceY(x, z) {
         return this.terrainY(x, z) + this.ROAD_OFFSET;
+    },
+
+    // Exact road mesh sample from rendered road geometry. Falls back to null if unavailable.
+    roadMeshY(x, z) {
+        if (typeof THREE === 'undefined') return null;
+        if (!Array.isArray(roadMeshes) || roadMeshes.length === 0) return null;
+
+        this._ensureVectors();
+        if (!this._roadRaycaster || !this._roadRayStart || !this._roadRayDir) return null;
+
+        this._roadRayStart.set(x, 1500, z);
+        this._roadRaycaster.set(this._roadRayStart, this._roadRayDir);
+        const hits = this._roadRaycaster.intersectObjects(roadMeshes, false);
+        if (!hits || hits.length === 0) return null;
+        const y = hits[0]?.point?.y;
+        return Number.isFinite(y) ? y : null;
+    },
+
+    // Ground used for driving. Prefer exact road mesh height when available.
+    driveSurfaceY(x, z, preferRoad = true) {
+        if (preferRoad) {
+            const roadY = this.roadMeshY(x, z);
+            if (Number.isFinite(roadY)) return roadY;
+        }
+        return this.terrainY(x, z);
+    },
+
+    // Standard car center Y (car origin), derived from surface height.
+    carCenterY(x, z, preferRoad = true, centerHeight = 1.2) {
+        const surfaceY = this.driveSurfaceY(x, z, preferRoad);
+        return surfaceY + centerHeight;
     },
 
     /**
@@ -134,3 +173,7 @@ const GroundHeight = {
         // Currently stateless per-call; placeholder for future caching.
     }
 };
+
+Object.assign(globalThis, { GroundHeight });
+
+export { GroundHeight };

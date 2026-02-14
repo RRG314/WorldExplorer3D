@@ -1,265 +1,176 @@
 # World Explorer 3D
 
-World Explorer 3D is a browser-based real-world exploration engine that enables interactive navigation of city-scale environments using real geographic and astronomical data.
+World Explorer 3D is a real-time geospatial sandbox engine that turns any location on Earth into an interactive 3D world directly in the browser.
 
-The platform supports driving, walking, and aerial (drone-style) traversal through real cities, combining 3D visualization, live map data, and multi-layer spatial context in a self-contained static site that requires no build step or bundler.
+It integrates terrain, OpenStreetMap data, multi-mode navigation (drive, walk, drone), and orbital space travel into one seamless, scalable platform.
 
-This project is intentionally positioned as a **foundation engine** rather than a finished consumer product.
+## License Status
 
----
+This repository is public for code visibility and evaluation.
 
-## Core Capabilities
+`World Explorer 3D` is source-available and proprietary.
+All rights are reserved by the author. Reuse, redistribution, and derivative works are not permitted without written permission. See `LICENSE`.
 
-### Terrestrial Exploration
-- 11 preset city locations plus custom location search (any place worldwide via Nominatim geocoding)
-- Road-aware driving with off-road detection
-- Walking and aerial (drone) traversal modes
-- Vehicle physics including acceleration, braking, drift, and boost
-- Procedural buildings and road geometry derived from live OpenStreetMap data
-- Deterministic procedural visuals per location (RDT-seeded windows, building variance, and road textures)
-- Adaptive world loading/query strategy based on location complexity (RDT complexity index)
-- Terrain elevation from AWS Terrarium tiles with road/building alignment
-- Time-of-day system (day, sunset, night, sunrise) with dynamic lighting
-- Cloud layer with visibility toggle
+## Quick Start
 
-### Map & Navigation
-- Integrated minimap and full-screen interactive map
-- Zoomable large-map view with clickable POI, property, and historic site markers
-- Map layer toggles:
-  - Road network
-  - Satellite imagery (map layer)
-  - Land use overlay
-- Teleportation and respawn tools
-- Right-click teleportation on minimap and large map
+### Run locally (recommended)
 
-### Game & Interaction Modes
-- Free roam exploration
-- Time trial challenges
-- Checkpoint-based navigation
-- Police chase mode with pursuit AI
-- Floating control menu for global actions
-
-### Real Estate & Points of Interest
-- Real estate property overlays with multi-API support (Estated, ATTOM, RentCast) and demo fallback
-- Historic site discovery via OpenStreetMap data
-- POI visualization across categories (schools, hospitals, restaurants, parks, etc.)
-- Property filtering, sorting, and navigation routing
-
----
-
-## Celestial & Space Exploration Layer
-
-World Explorer 3D includes a **celestial visualization and space travel layer** that extends exploration from Earth's surface into the solar system.
-
-### Sky & Stars
-- Star field rendered using real bright-star catalog data (Yale BSC5 / Hipparcos)
-- Constellation line patterns for all 12 zodiac and major constellations
-- Clickable stars with metadata (name, magnitude, distance, constellation)
-- Constellation visibility toggle
-- Independent rendering layer that does not interfere with ground navigation
-
-### Space Travel
-- Rocket launch sequence from Earth's surface
-- Heliocentric solar system with planets at JPL-accurate orbital positions
-- Free-flight rocket controls (pitch, yaw, thrust) through the solar system
-- Planet approach and landing sequences
-- Moon surface exploration with lunar terrain generation
-- Direct and rocket-based travel modes to the Moon
-- Environment state machine managing Earth / Space Flight / Moon transitions
-
-### Astronomical Data Sources
-- **Yale Bright Star Catalog (BSC5)** -- bright-star reference data
-- **Hipparcos** -- distance and astrometric reference values
-- **JPL "Approximate Positions of the Planets"** -- Keplerian orbital elements (J2000 epoch)
-
-Celestial objects are rendered for **visualization and exploratory purposes**.
-They are **not intended to represent real-time ephemeris calculations or precise observational accuracy** in the current version.
-
----
-
-## Intended Use and Scope
-
-While currently presented as an exploratory driving experience, the underlying engine is designed to support broader applications, including:
-
-- Urban visualization and digital twin experiments
-- Educational geography and astronomy tools
-- Simulation and navigation research
-- Real estate and neighborhood exploration
-- Drone path planning and aerial inspection
-- Interactive data overlays for city-scale datasets
-
-The platform prioritizes **spatial consistency**, **interactivity**, and **extensibility** over photorealism or production completeness.
-
----
-
-## Architecture Overview
-
-World Explorer 3D is a self-contained static site (HTML/CSS/JS) using Three.js, deployable directly to GitHub Pages with no build step.
-
-### Design Principles
-- A unified geographic-to-world coordinate system shared across all layers
-- Clear separation between:
-  - Movement and controls
-  - Physics and constraints
-  - World geometry
-  - Gameplay rules
-  - Rendering pipeline
-  - UI and map interfaces
-- Layered architecture allowing new datasets and features to be added without rewriting the core engine
-
-### Project Structure
-
-```
-WorldExplorer/
-  index.html            HTML markup (~900 lines)
-  styles.css            All CSS styles (~300 lines)
-  .nojekyll             GitHub Pages config
-  js/
-    config.js           Locations, constants, terrain/landuse/POI settings
-    rdt.js              Recursive Division Tree complexity metric + seeded random utilities
-    state.js            All global state variables, star catalog, constellation data
-    env.js              Environment state machine (Earth/Space Flight/Moon)
-    real-estate.js      Property API layer (Estated, ATTOM, RentCast) and demo data
-    ground.js           Unified ground height service (terrain, roads, normals)
-    terrain.js          Terrain elevation system (Terrarium tiles, mesh generation)
-    engine.js           Three.js init, renderer, scene, lighting, car mesh
-    physics.js          Car physics, collision detection, drone movement, adaptive road-query throttling
-    walking.js          First-person walking module
-    world.js            OSM data loading (roads, buildings, landuse, POIs)
-    sky.js              Time of day, starfield, constellations, cloud layer
-    solar-system.js     Solar system planet rendering (JPL orbital mechanics)
-    space.js            Space flight transition (rocket, heliocentric flight, landing)
-    game.js             Game modes, police, navigation, real estate UI, historic sites
-    input.js            Keyboard handling, track recording, city/location search
-    hud.js              HUD updates, camera system
-    map.js              Minimap and large map rendering
-    main.js             Main render loop and environment dispatch
-    ui.js               UI setup, event binding, app entry point
+```bash
+python -m http.server 8000
 ```
 
-Detailed architectural notes, the loading pipeline, state management approach, and known constraints are documented in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+Open `http://localhost:8000`.
 
-### Deterministic Generation & Adaptive Performance (RDT)
+### GitHub Pages deployment
 
-The engine now includes an RDT (Recursive Division Tree) utility layer that makes content generation and some runtime behavior deterministic per geographic location while still preserving natural neighborhood-to-neighborhood variation.
+1. Push this branch to your repository.
+2. In GitHub, go to `Settings > Pages`.
+3. Set source to `Deploy from a branch`.
+4. Select `rdt-engine` (or your merge target branch) and `/ (root)`.
+5. Save and wait for the Pages deployment to complete.
 
-- `hashGeoToInt(lat, lon)` generates a stable location seed.
-- `rdtDepth(seed)` computes a location complexity index.
-- Seeded pseudo-random utilities are used so each location keeps consistent procedural textures/variation across reloads.
-- Physics road proximity checks are adaptively throttled in dense areas, with safety overrides and cache invalidation hooks during major mode/location transitions.
+## What Makes It Different
 
----
+- Real-world city generation from live OSM roads/buildings/POIs.
+- Terrain-aware road and building conformance using Terrarium elevation data.
+- Three movement modes sharing one world state: driving, walking, drone.
+- Space layer with Earth, Moon, and solar-system transitions in the same runtime.
+- Title menu launch-mode selector (Earth / Moon / Space) with one-click starts.
+- Click-to-inspect deep-space objects (planets, asteroids, spacecraft, galaxies).
+- Deterministic runtime seeding and complexity logic through RDT + RGE256-based paths.
+
+## Core Features
+
+### Earth Exploration
+
+- Preset cities plus custom location search.
+- Real-time road network, buildings, land use, POI overlays.
+- Real estate overlays (Estated, ATTOM, RentCast, and fallback data).
+- Minimap + full map with teleport and layer toggles.
+- Time-of-day lighting and sky/constellation systems.
+
+### Gameplay
+
+- Free roam, time trial, checkpoints.
+- Police pursuit mode.
+- Track recording.
+
+### Space Layer
+
+- Earth to space flight transitions.
+- Start directly in Earth, Moon, or Space from the title menu.
+- Solar-system visualization and navigation.
+- Main asteroid belt and Kuiper belt visual layers.
+- Clickable deep-sky galaxy catalog (RA/Dec-positioned) with info panel.
+- Moon landing / return flows.
 
 ## Controls (Default)
 
-### Movement
-- **WASD / Arrow Keys** -- accelerate and steer
-- **Space** -- handbrake / drift
-- **Ctrl** -- boost
-- **Shift** -- sprint (walking mode)
+| Area | Key | Action |
+| --- | --- | --- |
+| Movement | `WASD` / `Arrow Keys` | Drive / steer |
+| Movement | `Space` | Handbrake / drift |
+| Movement | `Ctrl` | Boost |
+| Movement | `Shift` | Sprint in walking mode |
+| Modes | `F` | Toggle walking mode |
+| Modes | `6` | Toggle drone mode |
+| Camera | `C` | Cycle camera views |
+| Map | `M` | Toggle large map |
+| Utility | `N` | Next city |
+| Utility | `R` | Track recording |
+| Utility | `` ` `` | Debug overlay |
+| Utility | `Esc` | Pause |
 
-### Camera & Modes
-- **C** -- cycle camera views (driving: chase/hood/bumper; walking: first/third person)
-- **F** -- toggle walking mode
-- **6** -- toggle drone mode
-- **R** -- record track
-- **N** -- next city
-- **M** -- toggle large map
-- **Esc** -- pause
-- **Backtick (`)** -- toggle debug overlay
+## Architecture Status (Current)
 
-### Map
-- Click minimap -- open large map
-- Right-click minimap or large map -- teleport to location
-- **+/-** -- zoom in/out (when large map is open)
-- Toggle satellite imagery, road, and land use layers in map UI
+- Runtime is split into multiple JS files (`js/*.js`) with no build step.
+- Shared/global runtime state is still used across core systems.
+- ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
+- Cache-bust version alignment across loader chain is currently `v=21`.
+- Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
----
+## Freeze Snapshot (2026-02-14)
 
-## Running the Project
+- Restored main-branch title menu behavior for location selection with working custom/suggested interactions.
+- Added title launch selectors: `Earth`, `Moon`, `Space`.
+- Added Kuiper belt and improved belt visibility (particle + band layers).
+- Added clickable galaxy background objects with distance/sky-position metadata in the inspector.
+- Updated start-menu Controls tab to include space-flight controls.
 
-### GitHub Pages (Recommended)
-Push to a GitHub repository with Pages enabled. The `.nojekyll` file ensures proper static file serving.
+## Repository Structure
 
-### Local Server
-Some browsers restrict network requests when opening files directly.
-
-```bash
-python -m http.server
+```text
+index.html
+styles.css
+.nojekyll
+js/
+  bootstrap.js
+  app-entry.js
+  modules/
+    manifest.js
+    script-loader.js
+  config.js
+  state.js
+  env.js
+  rdt.js
+  world.js
+  terrain.js
+  ground.js
+  engine.js
+  physics.js
+  walking.js
+  sky.js
+  solar-system.js
+  space.js
+  game.js
+  input.js
+  hud.js
+  map.js
+  ui.js
+  main.js
 ```
 
-Then open: `http://localhost:8000`
+## Deterministic Systems (RDT + RGE)
 
-### Direct File Open
-The HTML file can be opened directly in a modern browser (Chrome recommended), though some features (OSM data loading) may be limited due to CORS restrictions.
+The deterministic layer is based on first-party research by Steven Reid and implemented in `js/rdt.js`.
 
----
+- Reid, S. (2025). *Recursive Division Tree: A Log-Log Algorithm for Integer Depth*. DOI: https://doi.org/10.5281/zenodo.18012166
+- Reid, S. (2025). *RGE-256: A New ARX-Based Pseudorandom Number Generator With Structured Entropy and Empirical Validation*. DOI: https://doi.org/10.5281/zenodo.17982804
+- RGE-256 core repository: https://github.com/RRG314/rge256
+- RGE-256 demo application: https://github.com/RRG314/RGE-256-app
 
-## Project Status
+Current direction:
 
-The spatial model, traversal systems, terrestrial and celestial layers, and map integration are considered stable. After core alignment and controls are stable, changes prioritize additive features; corrective work is limited to regressions and stability issues.
+- Keep deterministic behavior stable across reloads/cities.
+- Continue replacing remaining `Math.random` paths with deterministic subsystem streams where reproducibility matters.
 
-## Future Directions (Exploratory)
+## Documentation
 
-Potential extensions include:
+- `DOCUMENTATION_INDEX.md` - full docs map
+- `QUICKSTART.md` - run + first 60 seconds
+- `USER_GUIDE.md` - feature usage guide
+- `TECHNICAL_DOCS.md` - engineering details
+- `ARCHITECTURE.md` - system architecture
+- `KNOWN_ISSUES.md` - active gaps and contributor targets
+- `CONTRIBUTING.md` - contribution workflow
+- `CHANGELOG.md` - release history
 
-- Traffic and multi-agent simulation
-- Weather and atmospheric effects
-- Data overlays (zoning, demographics, infrastructure)
-- VR and immersive display support
-- Multi-user synchronized exploration
-- Additional planetary surfaces and celestial bodies
-- ES module migration once subsystem boundaries are stable
+## Known Issues / Help Wanted
 
-These directions are exploratory and subject to change.
+See `KNOWN_ISSUES.md` for prioritized problem areas and contribution targets.
 
----
+## Legal and Attribution
 
-## Legal & Attribution
-
-### OpenStreetMap
-Map data (c) OpenStreetMap contributors
-Licensed under the Open Database License (ODbL) v1.0
-https://www.openstreetmap.org/copyright
-
-This project uses OpenStreetMap data via live API queries.
-No ownership of OpenStreetMap data is claimed.
-
-### Third-Party Services & Libraries
-- Nominatim geocoding -- https://nominatim.org/
-- Overpass API -- https://overpass-api.de/
-- Three.js (r128) -- https://threejs.org/
-- allorigins.win CORS proxy -- used for Nominatim requests
-- AWS Terrarium elevation tiles -- terrain height data
-
-### Astronomical & Planetary Data
-- Yale Bright Star Catalog (BSC5)
-- Hipparcos (ESA astrometric reference)
-- JPL "Approximate Positions of the Planets" -- Keplerian orbital elements
-
-Astronomical and planetary datasets are used for visualization and reference purposes only.
-
-### Other Assets
-- Fonts: Google Fonts (Inter, Poppins) -- SIL Open Font License
-- HDR Environment Maps: Poly Haven -- CC0 (Public Domain)
-
-All third-party trademarks and datasets remain the property of their respective owners.
-
----
+- OSM data is used under ODbL (`© OpenStreetMap contributors`).
+- Three.js is used under MIT.
+- Other APIs/datasets remain under their respective licenses.
 
 ## License
 
-All Rights Reserved
+`All Rights Reserved` (source-available, proprietary).
+See `LICENSE` for terms.
 
-Copyright (c) 2026
+## Development Notes
 
-This repository, including its source code, engine architecture, and original assets, is proprietary.
-No permission is granted to use, copy, modify, or distribute this software without explicit authorization from the author.
-
-OpenStreetMap data and other third-party datasets are used under their respective licenses and are not covered by this restriction.
-
----
-
-## Contact
-
-For questions, feedback, or licensing inquiries, please open an issue on GitHub or email at sreid1118@gmail.com
+This project was developed with the assistance of modern AI development tools (e.g., code suggestion and refactoring assistants).
+All architectural design, system integration, and implementation decisions were directed and validated by the author.

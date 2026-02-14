@@ -4,9 +4,11 @@ Developer guide for World Explorer 3D. Architecture, code structure, and customi
 
 ## Table of Contents
 - [Architecture Overview](#architecture-overview)
+- [Branch Freeze Updates (2026-02)](#branch-freeze-updates-2026-02)
 - [Technology Stack](#technology-stack)
 - [File Structure](#file-structure)
 - [Core Systems](#core-systems)
+- [Deterministic RDT & RGE-256 Layer](#deterministic-rdt--rge-256-layer)
 - [API Integration](#api-integration)
 - [Rendering Pipeline](#rendering-pipeline)
 - [Performance Optimization](#performance-optimization)
@@ -17,11 +19,23 @@ Developer guide for World Explorer 3D. Architecture, code structure, and customi
 
 ### Design Philosophy
 
-World Explorer 3D is built as a **single-file application**:
-- No build process required
-- No dependencies to install
-- Easy to deploy and share
-- Self-contained HTML file with embedded CSS and JavaScript
+World Explorer 3D is built as a **no-build static-site runtime**:
+- No bundler required
+- Browser-native execution
+- Easy GitHub Pages deployment
+- Runtime split across `index.html`, `styles.css`, and `js/*`
+- ES module boot with compatibility for shared global-state subsystems
+
+## Branch Freeze Updates (2026-02)
+
+This branch snapshot includes these runtime additions beyond the previous doc baseline:
+
+- Start-menu Location tab now includes launch selectors: `Earth`, `Moon`, `Space`.
+- Start-menu Controls tab now includes dedicated space-flight controls.
+- Solar-system layer now renders both the main asteroid belt and the Kuiper belt.
+- Deep-sky galaxy catalog added in `solar-system.js` with RA/Dec placement and click inspection.
+- Deep-space renderer envelope expanded (`space.js` camera far clip and star shell range) to support farther galaxy distances.
+- Loader cache-bust chain is aligned through `v=21` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### High-Level Architecture
 
@@ -48,7 +62,7 @@ World Explorer 3D is built as a **single-file application**:
 │  └─ Material System                     │
 ├─────────────────────────────────────────┤
 │  Data Layer                             │
-│  ├─ Google Maps API                     │
+│  ├─ OpenStreetMap / Overpass Data       │
 │  ├─ Real Estate APIs                    │
 │  ├─ LocalStorage                        │
 │  └─ Configuration                       │
@@ -85,11 +99,14 @@ World Explorer 3D is built as a **single-file application**:
 
 ### External APIs
 
-**Google Maps**
-- Satellite imagery tiles
-- Geocoding
-- Elevation data
-- Roads data
+**OpenStreetMap / Overpass**
+- Road network and building footprints
+- Land use and POI data
+- Historic and amenity metadata
+
+**Terrain Tiles (Terrarium)**
+- Elevation decode source
+- Terrain mesh grounding and sampling
 
 **Real Estate APIs**
 - Rentcast: Property valuations
@@ -98,52 +115,38 @@ World Explorer 3D is built as a **single-file application**:
 
 ## File Structure
 
-### Single File Organization
-
-The HTML file is organized into logical sections:
+### Static-Site Organization
 
 ```
-world-explorer-complete.html
-├─ <!DOCTYPE html>
-├─ <head>
-│  ├─ Meta tags
-│  ├─ Title
-│  ├─ Google Fonts
-│  └─ <style> CSS Block
-│     ├─ Reset & Base Styles
-│     ├─ Title Screen
-│     ├─ Main Menu
-│     ├─ HUD Components
-│     ├─ Float Menu
-│     ├─ Property Panel
-│     ├─ Map System
-│     ├─ Modals
-│     └─ Responsive Media Queries
-├─ <body>
-│  ├─ Title Screen
-│  ├─ Main Menu Container
-│  │  ├─ Location Tab
-│  │  ├─ Settings Tab
-│  │  └─ Controls Tab
-│  ├─ HUD Elements
-│  ├─ Float Menu
-│  ├─ Property Panel
-│  ├─ Map Canvas
-│  ├─ Modals & Overlays
-│  └─ <script> JavaScript Block
-│     ├─ Constants & Configuration
-│     ├─ State Variables
-│     ├─ Three.js Setup
-│     ├─ Terrain Generation
-│     ├─ Physics System
-│     ├─ Input Handling
-│     ├─ Game Modes
-│     ├─ API Integration
-│     ├─ UI Controllers
-│     ├─ Map System
-│     ├─ Moon/Space System
-│     └─ Main Game Loop
-└─ </body>
+WorldExplorer3D/
+├─ index.html
+├─ styles.css
+├─ .nojekyll
+└─ js/
+   ├─ bootstrap.js
+   ├─ app-entry.js
+   ├─ modules/
+   │  ├─ manifest.js
+   │  └─ script-loader.js
+   ├─ config.js
+   ├─ state.js
+   ├─ env.js
+   ├─ rdt.js
+   ├─ world.js
+   ├─ terrain.js
+   ├─ ground.js
+   ├─ engine.js
+   ├─ physics.js
+   ├─ walking.js
+   ├─ sky.js
+   ├─ solar-system.js
+   ├─ space.js
+   ├─ game.js
+   ├─ input.js
+   ├─ hud.js
+   ├─ map.js
+   ├─ ui.js
+   └─ main.js
 ```
 
 ### Code Organization Principles
@@ -321,15 +324,39 @@ function updateCamera() {
 - Collision avoidance
 - Mode-specific offset
 
+## Deterministic RDT & RGE-256 Layer
+
+World Explorer 3D includes a deterministic utility layer in `js/rdt.js` that combines:
+- **RDT complexity indexing** (`rdtDepth`) for adaptive world/physics behavior
+- **Stable geographic seeding** (`hashGeoToInt`) keyed to location and mode
+- **RGE256ctr deterministic PRNG wrappers** (`rand01FromInt`, `seededRandom`) for reproducible procedural generation
+
+### Research Provenance (First-Party)
+
+- Reid, S. (2025). *Recursive Division Tree: A Log-Log Algorithm for Integer Depth*. Zenodo. DOI: https://doi.org/10.5281/zenodo.18012166
+- Reid, S. (2025). *RGE-256: A New ARX-Based Pseudorandom Number Generator With Structured Entropy and Empirical Validation*. Zenodo. DOI: https://doi.org/10.5281/zenodo.17982804
+- RGE-256 core repository: https://github.com/RRG314/rge256
+- RGE-256 demo app: https://github.com/RRG314/RGE-256-app
+
+### Current Runtime Integration
+
+- `world.js` computes `rdtSeed` + `rdtComplexity` during load and adapts query strategy.
+- `engine.js` and `world.js` use seeded deterministic paths for procedural road/building/window variation.
+- `physics.js` uses RDT complexity to throttle expensive nearest-road checks with safety overrides.
+
+### Deterministic PRNG Direction
+
+The engine already uses deterministic PRNG paths in key procedural systems. Some subsystems still use `Math.random` for non-critical effects and compatibility. Ongoing work is to continue replacing those paths with deterministic stream-based RNG to maximize reproducibility.
+
 ## API Integration
 
-### Google Maps Integration
+### OSM / Tile Integration
 
 **Tile Loading System**:
 ```javascript
-function loadGoogleMapTile(lat, lon, zoom) {
+function loadMapTile(lat, lon, zoom) {
     const tileCoords = latLonToTile(lat, lon, zoom);
-    const url = `https://mt1.google.com/vt/lyrs=s&x=${tileCoords.x}&y=${tileCoords.y}&z=${zoom}`;
+    const url = `https://tile.openstreetmap.org/${zoom}/${tileCoords.x}/${tileCoords.y}.png`;
     
     return new Promise((resolve, reject) => {
         const img = new Image();
@@ -520,6 +547,19 @@ function createSky() {
 }
 ```
 
+### Deep-Space Objects (Belts + Galaxies)
+
+Current space rendering layers include:
+
+- Main asteroid belt + Kuiper belt (particle layers and volume bands)
+- Clickable solar-system objects (planets, asteroids, spacecraft)
+- Clickable RA/Dec-positioned galaxy sprites with inspector data
+
+Key implementation files:
+
+- `js/solar-system.js`: belts, galaxies, click raycast integration, info panel content
+- `js/space.js`: deep-space camera clipping and star shell depth envelope
+
 ## Performance Optimization
 
 ### Rendering Optimizations
@@ -705,7 +745,10 @@ function randomBuildingColor() {
         0xe8d5b7,  // Beige
         // Add your colors here (hex format)
     ];
-    return colors[Math.floor(Math.random() * colors.length)];
+    const rng = typeof seededRandom === 'function'
+        ? seededRandom((rdtSeed || 0) ^ 0xB11D)
+        : Math.random.bind(Math);
+    return colors[Math.floor(rng() * colors.length)];
 }
 ```
 
@@ -743,7 +786,7 @@ document.getElementById('myElement').addEventListener('click', () => {
 - **Fix**: Check browser console, update graphics drivers
 
 **Issue: Terrain Not Loading**
-- **Cause**: Google Maps API rate limit or network error
+- **Cause**: Terrain tile provider or network error
 - **Fix**: Check console, wait a moment, try again
 
 **Issue: Poor Performance**
@@ -753,6 +796,14 @@ document.getElementById('myElement').addEventListener('click', () => {
 **Issue**: Properties Not Showing**
 - **Cause**: API keys missing or invalid
 - **Fix**: Check configuration, verify keys in dashboards
+
+**Issue: Latest pushed UI/features not appearing**
+- **Cause**: stale module assets from mismatched cache-bust query values
+- **Fix**: hard refresh and verify the same cache-bust value is present in:
+  - `index.html` (`bootstrap.js?...`)
+  - `js/bootstrap.js` (`manifest.js?...`, `script-loader.js?...`)
+  - `js/modules/manifest.js` (`CACHE_BUST`)
+  - `js/app-entry.js` (module import query suffixes)
 
 ### Debugging Tools
 

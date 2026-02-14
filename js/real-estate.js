@@ -313,3 +313,7 @@ const PropertyAPI = {
     });
   }
 };
+
+Object.assign(globalThis, { apiConfig, PropertyAPI, generateDemoProperties });
+
+export { apiConfig, generateDemoProperties, PropertyAPI };

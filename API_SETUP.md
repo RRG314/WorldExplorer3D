@@ -167,7 +167,7 @@ After saving, the app will:
 
 If you prefer to edit the code directly:
 
-1. Open `world-explorer-complete.html` in a text editor
+1. Open `index.html` (or the relevant `js/*.js` file) in a text editor
 2. Find the initialization section (search for `apiConfig`)
 3. Add your keys:
 
@@ -398,7 +398,7 @@ Use **All Three**:
 
 For integration issues with World Explorer:
 - Check the [User Guide](USER_GUIDE.md)
-- Review [Known Issues](README.md#known-issues)
+- Review [Known Issues](KNOWN_ISSUES.md)
 - Open a GitHub issue
 
 ## Additional Resources
@@ -406,7 +406,8 @@ For integration issues with World Explorer:
 - [Rentcast Documentation](https://developers.rentcast.io/docs)
 - [Attom API Reference](https://api.gateway.attomdata.com/propertyapi/v1.0.0/)
 - [Estated Developer Docs](https://estated.com/developers/docs)
-- [Google Maps API](https://developers.google.com/maps/documentation)
+- [Overpass API](https://overpass-api.de/)
+- [OpenStreetMap Copyright and Attribution](https://www.openstreetmap.org/copyright)
 
 ---
 

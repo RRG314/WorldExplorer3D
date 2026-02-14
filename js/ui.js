@@ -101,13 +101,15 @@ function setupUI() {
             }
 
             // Check if click is on a POI marker
-            for (const poi of pois) {
-                if (!isPOIVisible(poi.type)) continue;
-                const screenPos = worldToScreenLarge(poi.x, poi.z);
-                const dist = Math.sqrt((clickX - screenPos.x)**2 + (clickY - screenPos.y)**2);
-                if (dist < 8) {
-                    showMapInfo('poi', poi);
-                    return;
+            if (poiMode && pois.length > 0) {
+                for (const poi of pois) {
+                    if (!isPOIVisible(poi.type)) continue;
+                    const screenPos = worldToScreenLarge(poi.x, poi.z);
+                    const dist = Math.sqrt((clickX - screenPos.x)**2 + (clickY - screenPos.y)**2);
+                    if (dist < 8) {
+                        showMapInfo('poi', poi);
+                        return;
+                    }
                 }
             }
 
@@ -246,13 +248,95 @@ function setupUI() {
         btn.classList.add('active');
         document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     }));
-    // Locations
+    // Locations (main-branch behavior with Moon/Space launch buttons)
+    const customPanel = document.getElementById('customPanel');
+    const earthLaunchToggle = document.getElementById('earthLaunchToggle');
+    const moonLaunchToggle = document.getElementById('moonLaunchToggle');
+    const spaceLaunchToggle = document.getElementById('spaceLaunchToggle');
+    const launchModeButtons = {
+        earth: earthLaunchToggle,
+        moon: moonLaunchToggle,
+        space: spaceLaunchToggle
+    };
+    let titleLaunchMode = 'earth'; // earth | moon | space
+
+    const setLaunchMode = (mode) => {
+        const nextMode = mode === 'moon' || mode === 'space' ? mode : 'earth';
+        titleLaunchMode = nextMode;
+        Object.entries(launchModeButtons).forEach(([btnMode, btn]) => {
+            if (!btn) return;
+            btn.classList.toggle('active', btnMode === nextMode);
+        });
+        globalThis.loadingScreenMode = nextMode;
+    };
+
+    const setTitleLocationMode = (mode) => {
+        if (mode === 'moon' || mode === 'space') {
+            setLaunchMode(mode);
+            return;
+        }
+
+        setLaunchMode('earth');
+
+        if (mode === 'custom') {
+            const customCard = document.querySelector('.loc[data-loc="custom"]');
+            if (customCard) {
+                document.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
+                customCard.classList.add('sel');
+            }
+            selLoc = 'custom';
+            if (customPanel) customPanel.classList.add('show');
+            return;
+        }
+
+        const selectedSuggested = document.querySelector('.loc.sel:not([data-loc="custom"])')
+            || document.querySelector('.loc[data-loc="baltimore"]');
+        if (selectedSuggested) {
+            document.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
+            selectedSuggested.classList.add('sel');
+            selLoc = selectedSuggested.dataset.loc;
+        }
+        if (customPanel) customPanel.classList.remove('show');
+    };
+
     document.querySelectorAll('.loc').forEach(el => el.addEventListener('click', () => {
         document.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
         el.classList.add('sel');
         selLoc = el.dataset.loc;
-        document.getElementById('customPanel').classList.toggle('show', selLoc === 'custom');
+        if (customPanel) customPanel.classList.toggle('show', selLoc === 'custom');
+        if (selLoc === 'custom') {
+            setTitleLocationMode('custom');
+        } else {
+            setLaunchMode('earth');
+        }
     }));
+
+    if (earthLaunchToggle) {
+        earthLaunchToggle.addEventListener('click', () => setLaunchMode('earth'));
+    }
+    if (moonLaunchToggle) {
+        moonLaunchToggle.addEventListener('click', () => setLaunchMode('moon'));
+    }
+    if (spaceLaunchToggle) {
+        spaceLaunchToggle.addEventListener('click', () => setLaunchMode('space'));
+    }
+
+    // Exposed so searchLocation() can force the custom selector active.
+    globalThis.setTitleLocationMode = setTitleLocationMode;
+    globalThis.selectSuggestedLocationCard = (targetEl) => {
+        if (!targetEl) return;
+        const selectedLoc = targetEl.closest('.loc[data-loc]');
+        if (!selectedLoc || selectedLoc.dataset.loc === 'custom') return;
+        document.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
+        selectedLoc.classList.add('sel');
+        selLoc = selectedLoc.dataset.loc;
+        if (customPanel) customPanel.classList.remove('show');
+        setLaunchMode('earth');
+    };
+
+    // Initial panel state.
+    setTitleLocationMode(selLoc === 'custom' ? 'custom' : 'suggested');
+
     // Custom location search - universal search for any location
     document.getElementById('locationSearchBtn').addEventListener('click', searchLocation);
     document.getElementById('locationSearch').addEventListener('keypress', e => { if (e.key === 'Enter') searchLocation(); });
@@ -264,6 +348,8 @@ function setupUI() {
     }));
     // Start
     document.getElementById('startBtn').addEventListener('click', async () => {
+        const launchMode = titleLaunchMode;
+        globalThis.loadingScreenMode = launchMode === 'moon' ? 'moon' : launchMode === 'space' ? 'space' : 'earth';
         document.getElementById('titleScreen').classList.add('hidden');
         document.getElementById('hud').classList.add('show');
         document.getElementById('minimap').classList.add('show');
@@ -312,21 +398,70 @@ function setupUI() {
             }, 5000);
         }
 
-        // Always start in driving mode
-        if (carMesh) carMesh.visible = true;
-        if (Walk && Walk.state.characterMesh) Walk.state.characterMesh.visible = false;
+        // Load visible terrain immediately so grass appears even while road APIs are pending.
+        if (typeof updateTerrainAround === 'function' && terrainEnabled && !onMoon) {
+            const startRef = (Walk && Walk.state && Walk.state.walker)
+                ? Walk.state.walker
+                : car;
+            updateTerrainAround(startRef.x || 0, startRef.z || 0);
+        }
 
-        // Set initial mode button state
-        document.getElementById('fDriving').classList.add('on');
-        document.getElementById('fWalk').classList.remove('on');
-        document.getElementById('fDrone').classList.remove('on');
+        // Load roads and world data (may take longer if Overpass endpoints are slow).
+        await loadRoads();
+
+        // Refresh terrain around final spawn/reference position after roads finish.
+        if (typeof updateTerrainAround === 'function' && terrainEnabled && !onMoon) {
+            const postLoadRef = (Walk && Walk.state && Walk.state.mode === 'walk' && Walk.state.walker)
+                ? Walk.state.walker
+                : car;
+            updateTerrainAround(postLoadRef.x || 0, postLoadRef.z || 0);
+        }
+
+        // Start in WALKING mode with third-person camera
+        if (Walk) {
+            Walk.setModeWalk();
+            Walk.state.view = 'third'; // Ensure third-person view
+            if (carMesh) carMesh.visible = false;
+            if (Walk.state.characterMesh) Walk.state.characterMesh.visible = true;
+
+            // Force initial camera to third-person position behind character
+            // Without this, camera starts at origin and looks like first person
+            const w = Walk.state.walker;
+            const back = Walk.CFG.thirdPersonDist;
+            const up = Walk.CFG.thirdPersonHeight;
+            camera.position.set(
+                w.x - Math.sin(w.yaw) * back,
+                w.y + up,
+                w.z - Math.cos(w.yaw) * back
+            );
+            camera.lookAt(w.x, w.y, w.z);
+
+            // Update UI button states to reflect walking mode
+            document.getElementById('fDriving').classList.remove('on');
+            document.getElementById('fWalk').classList.add('on');
+            document.getElementById('fDrone').classList.remove('on');
+        } else {
+            // Fallback to driving if Walk module not available
+            if (carMesh) carMesh.visible = true;
+            document.getElementById('fDriving').classList.add('on');
+            document.getElementById('fWalk').classList.remove('on');
+            document.getElementById('fDrone').classList.remove('on');
+        }
 
         // Set initial map view button states
         document.getElementById('mapRoadsToggle').classList.add('active'); // Roads on by default
-        document.getElementById('fLandUse').classList.add('on'); // Land use on by default
-        document.getElementById('fLandUseRE').classList.add('on'); // Land use on by default
+        // Land use OFF by default (user can toggle on if needed)
+        document.getElementById('fLandUse').classList.remove('on');
+        document.getElementById('fLandUseRE').classList.remove('on');
+        // Reset default loading theme for normal in-game loading after start.
+        globalThis.loadingScreenMode = 'earth';
 
-        await loadRoads();
+        // Optional launch-mode shortcuts from title selector.
+        if (launchMode === 'moon' && !onMoon && !travelingToMoon) {
+            directTravelToMoon();
+        } else if (launchMode === 'space' && !onMoon && !travelingToMoon) {
+            travelToMoon();
+        }
     });
 
     // Helper function to close all float menus
@@ -386,16 +521,22 @@ function setupUI() {
         landUseVisible = !landUseVisible;
         document.getElementById('fLandUse').classList.toggle('on', landUseVisible);
         document.getElementById('fLandUseRE').classList.toggle('on', landUseVisible);
-        // Update visibility of land use meshes
-        landuseMeshes.forEach(m => { m.visible = landUseVisible; });
+        // Keep water features visible even when general land-use overlay is off.
+        landuseMeshes.forEach(m => {
+            const alwaysVisible = !!(m && m.userData && m.userData.alwaysVisible);
+            m.visible = landUseVisible || alwaysVisible;
+        });
         closeAllFloatMenus();
     });
     document.getElementById('fLandUseRE').addEventListener('click', () => {
         landUseVisible = !landUseVisible;
         document.getElementById('fLandUse').classList.toggle('on', landUseVisible);
         document.getElementById('fLandUseRE').classList.toggle('on', landUseVisible);
-        // Update visibility of land use meshes
-        landuseMeshes.forEach(m => { m.visible = landUseVisible; });
+        // Keep water features visible even when general land-use overlay is off.
+        landuseMeshes.forEach(m => {
+            const alwaysVisible = !!(m && m.userData && m.userData.alwaysVisible);
+            m.visible = landUseVisible || alwaysVisible;
+        });
         closeAllFloatMenus();
     });
     document.getElementById('fTimeOfDay').addEventListener('click', () => { cycleTimeOfDay(); });
@@ -410,9 +551,11 @@ function setupUI() {
     document.getElementById('fDriving').addEventListener('click', () => {
         // Switch to driving mode
         droneMode = false;
-        if (Walk && Walk.state.mode === 'walk') {
+        if (Walk) {
             Walk.setModeDrive();
         }
+        if (typeof camMode !== 'undefined') camMode = 0;
+        if (carMesh) carMesh.visible = true;
 
         // Clear star selection
         clearStarSelection();
@@ -456,11 +599,22 @@ function setupUI() {
             // Initialize drone position above current position
             const ref = Walk ? Walk.getMapRefPosition(false, null) : { x: car.x, z: car.z };
             drone.x = ref.x;
-            drone.y = 50;
             drone.z = ref.z;
-            drone.pitch = -0.3;
             drone.yaw = car.angle;
             drone.roll = 0;
+
+            // On the moon, raycast to find actual ground height so drone spawns near surface
+            if (onMoon && moonSurface) {
+                const rc = _getPhysRaycaster();
+                _physRayStart.set(ref.x, 2000, ref.z);
+                rc.set(_physRayStart, _physRayDir);
+                const hits = rc.intersectObject(moonSurface, false);
+                drone.y = (hits.length > 0 ? hits[0].point.y : -100) + 10;
+                drone.pitch = -0.2;
+            } else {
+                drone.y = 50;
+                drone.pitch = -0.3;
+            }
         }
 
         // Clear star selection
@@ -502,6 +656,13 @@ function setupUI() {
     document.getElementById('fPOI').addEventListener('click', () => {
         poiMode = !poiMode;
         document.getElementById('fPOI').classList.toggle('on', poiMode);
+        poiMeshes.forEach(m => {
+            if (m) m.visible = !!poiMode;
+        });
+        if (!poiMode) {
+            const poiInfo = document.getElementById('poiInfo');
+            if (poiInfo) poiInfo.style.display = 'none';
+        }
         closeAllFloatMenus();
     });
     document.getElementById('fRespawn').addEventListener('click', () => { spawnOnRoad(); closeAllFloatMenus(); });
@@ -512,7 +673,25 @@ function setupUI() {
             car.x = rd.pts[idx].x; car.z = rd.pts[idx].z;
             if (idx < rd.pts.length - 1) car.angle = Math.atan2(rd.pts[idx+1].x - rd.pts[idx].x, rd.pts[idx+1].z - rd.pts[idx].z);
             car.speed = 0; car.vx = 0; car.vz = 0;
-            carMesh.position.set(car.x, 0, car.z); carMesh.rotation.y = car.angle;
+            const _respawnH = typeof terrainMeshHeightAt === 'function' ? terrainMeshHeightAt : elevationWorldYAtWorldXZ;
+            const spawnY = (typeof GroundHeight !== 'undefined' && GroundHeight && typeof GroundHeight.carCenterY === 'function')
+                ? GroundHeight.carCenterY(car.x, car.z, true, 1.2)
+                : _respawnH(car.x, car.z) + 1.2;
+            car.y = spawnY;
+            carMesh.position.set(car.x, spawnY, car.z); carMesh.rotation.y = car.angle;
+            if (Walk && Walk.state && Walk.state.walker) {
+                const groundY = spawnY - 1.2;
+                Walk.state.walker.x = car.x;
+                Walk.state.walker.z = car.z;
+                Walk.state.walker.y = groundY + 1.7;
+                Walk.state.walker.vy = 0;
+                Walk.state.walker.angle = car.angle;
+                Walk.state.walker.yaw = car.angle;
+                if (Walk.state.characterMesh && Walk.state.mode === 'walk') {
+                    Walk.state.characterMesh.position.set(car.x, groundY, car.z);
+                    Walk.state.characterMesh.rotation.y = car.angle;
+                }
+            }
         }
         closeAllFloatMenus();
     });
@@ -615,4 +794,8 @@ function setupUI() {
 }
 
 // Entry point - initialize the application
+Object.assign(globalThis, { setupUI });
+
+export { setupUI };
+
 init();

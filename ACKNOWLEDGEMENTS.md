@@ -252,6 +252,27 @@ All fonts used under the SIL Open Font License (OFL), Version 1.1
 
 ---
 
+## First-Party Research Algorithms
+
+World Explorer 3D also includes original deterministic algorithm work by Steven Reid.
+These are first-party research components used in the engine (not external third-party dependencies).
+
+### Recursive Division Tree (RDT)
+
+- Reid, S. (2025). *Recursive Division Tree: A Log-Log Algorithm for Integer Depth*. Zenodo.
+- DOI: https://doi.org/10.5281/zenodo.18012166
+- Used for: deterministic complexity indexing and adaptive runtime behavior
+
+### RGE-256 / RGE256ctr PRNG
+
+- Reid, S. (2025). *RGE-256: A New ARX-Based Pseudorandom Number Generator With Structured Entropy and Empirical Validation*. Zenodo.
+- DOI: https://doi.org/10.5281/zenodo.17982804
+- Core repository: https://github.com/RRG314/rge256
+- Demo application: https://github.com/RRG314/RGE-256-app
+- Used for: deterministic seeded pseudo-random generation in procedural systems
+
+---
+
 ## Development Tools & Standards
 
 ### Web Standards

@@ -19,8 +19,8 @@ Complete guide to using World Explorer 3D. Learn every feature, control, and sec
 ### First Launch
 
 1. **Open the Application**
-   - Double-click `world-explorer-complete.html`
-   - Or drag it into your browser
+   - Start a local server in the repo root (`python -m http.server 8000`)
+   - Open `http://localhost:8000` in your browser
 
 2. **Main Menu Appears**
    - You'll see tabs: Location, Settings, Controls
@@ -31,18 +31,23 @@ Complete guide to using World Explorer 3D. Learn every feature, control, and sec
    - **Search Address**: Enter an address in the search box
    - **Custom Coordinates**: Enter latitude and longitude
 
-4. **Select Game Mode**
+4. **Choose Launch Mode (Top of Location Tab)**
+   - **Earth**: Standard city/world start
+   - **Moon**: Start directly in lunar environment
+   - **Space**: Start in space-flight mode
+
+5. **Select Game Mode**
    - Free Roam (recommended for first time)
    - Time Trial
    - Checkpoints
 
-5. **Click "EXPLORE"**
+6. **Click "EXPLORE"**
    - The world begins loading
    - Satellite imagery downloads
    - Buildings and terrain generate
    - Wait 5-15 seconds depending on connection
 
-6. **Start Exploring!**
+7. **Start Exploring!**
    - You spawn in a car
    - Drive around and discover the city
 
@@ -68,7 +73,7 @@ Located in bottom-left corner:
 Shows your current GPS position (lat/lon)
 
 #### Controls Tab
-Click header to expand/collapse in-game controls reference
+Click header to expand/collapse in-game controls reference (includes driving, walking, drone, and space-flight controls)
 
 ## Game Modes
 
@@ -450,6 +455,14 @@ Use the Float Menu → Real Estate:
 
 ## Space Exploration
 
+### Launch Options
+
+You can enter space systems in three ways:
+
+1. **Earth launch**: Start on Earth and travel naturally.
+2. **Moon launch**: Start directly on the moon.
+3. **Space launch**: Start directly in space flight.
+
 ### Traveling to the Moon
 
 #### How to Travel
@@ -515,6 +528,30 @@ Use the Float Menu → Real Estate:
 - Ursa Minor (Little Dipper)
 - Cassiopeia
 - And many more!
+
+### Space Flight Controls
+
+When in space-flight mode:
+
+- `Arrow Keys` - Steer rocket (yaw/pitch)
+- `Space` - Thrust / boost
+- `Shift` - Brake / decelerate
+- `LAND ON ...` button - Land when near a valid body
+
+### Solar System Objects
+
+You can click objects in space to inspect details:
+
+- Planets
+- Named asteroids
+- Spacecraft
+- Galaxies (deep-sky catalog)
+
+### Belts and Deep-Sky Layers
+
+- **Main Asteroid Belt** between Mars and Jupiter
+- **Kuiper Belt** beyond Neptune
+- **Galaxies** are shown as distant background targets in real sky directions (RA/Dec placement)
 
 ### Returning to Earth
 
@@ -742,7 +779,7 @@ A: No, requires internet for map data.
 A: Chrome, Firefox, Safari, Edge (latest versions recommended).
 
 **Q: Can I modify the code?**
-A: Yes, it's a single HTML file. See [Technical Documentation](TECHNICAL_DOCS.md).
+A: Yes. It is a no-build static site with `index.html`, `styles.css`, and modular files in `js/`. See [Technical Documentation](TECHNICAL_DOCS.md).
 
 ### Gameplay Questions
 
@@ -757,6 +794,9 @@ A: On the moon, near the center of the landing area.
 
 **Q: How do I get off the moon?**
 A: Press N or click "Return to Earth" button.
+
+**Q: Why can I click galaxies in space?**
+A: Galaxies are selectable deep-sky objects with info panels for visual guidance and educational context.
 
 **Q: Why can't I jump in driving mode?**
 A: Cars can't jump. Switch to walking mode (F key).
@@ -843,12 +883,21 @@ Quick reference for all controls:
 | R | Record Track |
 | Esc | Pause |
 
+### Space Flight
+| Key | Action |
+|-----|--------|
+| Arrow Keys | Rocket steering (yaw/pitch) |
+| Space | Thrust / Boost |
+| Shift | Brake / Decelerate |
+| LAND ON button | Attempt landing when in range |
+
 ### Mouse
 | Action | Function |
 |--------|----------|
 | Right Click + Drag | Camera Look |
 | Click Moon | Travel to Moon |
 | Click Star | View Constellation |
+| Click Planet/Asteroid/Spacecraft/Galaxy | Open space inspector info |
 | Right Click Map | Teleport |
 | Left Click Map | View Info |
 

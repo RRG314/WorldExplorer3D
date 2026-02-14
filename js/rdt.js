@@ -2,6 +2,18 @@
 // rdt.js - Recursive Division Tree (RDT) algorithm and seeded random utilities
 // Provides deterministic, location-based complexity indexing and pseudo-random
 // number generation for consistent procedural content across sessions.
+//
+// Research provenance:
+// - Reid, S. (2025). Recursive Division Tree: A Log-Log Algorithm for Integer Depth.
+//   https://doi.org/10.5281/zenodo.18012166
+// - Reid, S. (2025). RGE-256: A New ARX-Based Pseudorandom Number Generator With
+//   Structured Entropy and Empirical Validation.
+//   https://doi.org/10.5281/zenodo.17982804
+//
+// Current runtime uses deterministic xorshift32 helpers for seeded randomness and
+// keeps Math.random fallbacks in some modules for compatibility. The documented
+// roadmap is to migrate those fallback paths to an optimized deterministic custom
+// PRNG pipeline derived from RGE-256-oriented work.
 // ============================================================================
 
 // ===== RDT (Recursive Division Tree) depth =====
@@ -87,3 +99,25 @@ let rdtComplexity = 0;  // rdtDepth result for current location
         }
     }
 })();
+
+function exposeMutableGlobal(name, getter, setter) {
+    Object.defineProperty(globalThis, name, {
+        configurable: true,
+        enumerable: true,
+        get: getter,
+        set: setter
+    });
+}
+
+exposeMutableGlobal('rdtSeed', () => rdtSeed, (v) => { rdtSeed = v; });
+exposeMutableGlobal('rdtComplexity', () => rdtComplexity, (v) => { rdtComplexity = v; });
+Object.assign(globalThis, { rdtDepth, hashGeoToInt, rand01FromInt, seededRandom });
+
+export {
+    hashGeoToInt,
+    rand01FromInt,
+    rdtComplexity,
+    rdtDepth,
+    rdtSeed,
+    seededRandom
+};
