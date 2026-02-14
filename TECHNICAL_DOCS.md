@@ -46,7 +46,7 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - Runtime benchmark settings panel added in title-screen `Settings` for `RDT` vs `Baseline` mode switching.
 - Perf snapshot export path added (`Copy Snapshot`) and optional in-game benchmark overlay.
 - Overpass endpoint preference + in-memory response cache added for faster repeat loads.
-- Loader cache-bust chain is aligned through `v=48` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Loader cache-bust chain is aligned through `v=49` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### High-Level Architecture
 
@@ -940,7 +940,7 @@ document.getElementById('myElement').addEventListener('click', () => {
   - `js/bootstrap.js` (`manifest.js?...`, `script-loader.js?...`)
   - `js/modules/manifest.js` (`CACHE_BUST`)
   - `js/app-entry.js` (module import query suffixes)
-  - Current expected value: `v=48`
+  - Current expected value: `v=49`
 
 ### Debugging Tools
 

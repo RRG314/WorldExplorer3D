@@ -41,7 +41,7 @@ Entries reflect changes made relative to the most recent public release.
 - Space info panel metric rows are now reusable for planets, asteroids, spacecraft, and galaxies.
 - POI map rendering now follows legend category filters on both minimap and large map.
 - Dynamic map/property/historic UI templates now escape untrusted string fields before insertion.
-- Module loader cache-bust chain incremented through `v=48` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Module loader cache-bust chain incremented through `v=49` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 - Core docs now include benchmark workflow instructions and supporting measured stats for RDT vs baseline and cache-backed repeat loads.
 
 ### Fixed

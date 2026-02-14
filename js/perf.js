@@ -6,6 +6,11 @@ const PERF_MODE_RDT = 'rdt';
 const PERF_MODE_BASELINE = 'baseline';
 const PERF_STORAGE_MODE_KEY = 'worldExplorerPerfMode';
 const PERF_STORAGE_OVERLAY_KEY = 'worldExplorerPerfOverlay';
+const PERF_SPIKE_WINDOW_SIZE = 1800;
+const PERF_SPIKE_16_7_MS = 16.7;
+const PERF_SPIKE_33_3_MS = 33.3;
+const PERF_SPIKE_50_MS = 50;
+const PERF_SPIKE_100_MS = 100;
 
 let perfMode = PERF_MODE_RDT;
 let perfOverlayEnabled = false;
@@ -15,6 +20,22 @@ let _perfFrameMs = 0;
 let _perfFrameAccum = 0;
 let _perfFrameCount = 0;
 let _perfLoadStart = null;
+let _perfLoadSpikeState = null;
+let _perfSessionMaxFrameMs = 0;
+let _perfSessionSpikeOver16_7 = 0;
+let _perfSessionSpikeOver33_3 = 0;
+let _perfSessionSpikeOver50 = 0;
+let _perfSessionSpikeOver100 = 0;
+let _perfSessionSpikeSamples = 0;
+
+const _perfFrameSpikeWindow = new Float32Array(PERF_SPIKE_WINDOW_SIZE);
+let _perfFrameSpikeWriteIdx = 0;
+let _perfFrameSpikeCount = 0;
+let _perfWindowSpikeOver16_7 = 0;
+let _perfWindowSpikeOver33_3 = 0;
+let _perfWindowSpikeOver50 = 0;
+let _perfWindowSpikeOver100 = 0;
+let _perfWindowMaxFrameMs = 0;
 
 const perfStats = {
     mode: PERF_MODE_RDT,
@@ -32,10 +53,132 @@ const perfStats = {
         speedMph: 0,
         terrainRing: (typeof TERRAIN_RING === 'number') ? TERRAIN_RING : 0,
         lodVisible: { near: 0, mid: 0 },
-        worldCounts: { roads: 0, buildings: 0, poiMeshes: 0, landuseMeshes: 0 }
+        worldCounts: { roads: 0, buildings: 0, poiMeshes: 0, landuseMeshes: 0 },
+        spikes: {
+            windowFrames: 0,
+            over16_7: 0,
+            over33_3: 0,
+            over50: 0,
+            over100: 0,
+            maxFrameMs: 0
+        }
     },
     updatedAt: Date.now()
 };
+
+function _isFrameOverThreshold(frameMs, thresholdMs) {
+    return Number.isFinite(frameMs) && frameMs >= thresholdMs;
+}
+
+function _recomputeWindowMaxFrameMs() {
+    if (_perfFrameSpikeCount <= 0) {
+        _perfWindowMaxFrameMs = 0;
+        return;
+    }
+    let max = 0;
+    for (let i = 0; i < _perfFrameSpikeCount; i++) {
+        const value = _perfFrameSpikeWindow[i];
+        if (value > max) max = value;
+    }
+    _perfWindowMaxFrameMs = max;
+}
+
+function _recordPerfSpikeFrame(frameMs) {
+    if (!Number.isFinite(frameMs) || frameMs <= 0) return;
+
+    _perfSessionSpikeSamples += 1;
+    if (_isFrameOverThreshold(frameMs, PERF_SPIKE_16_7_MS)) _perfSessionSpikeOver16_7 += 1;
+    if (_isFrameOverThreshold(frameMs, PERF_SPIKE_33_3_MS)) _perfSessionSpikeOver33_3 += 1;
+    if (_isFrameOverThreshold(frameMs, PERF_SPIKE_50_MS)) _perfSessionSpikeOver50 += 1;
+    if (_isFrameOverThreshold(frameMs, PERF_SPIKE_100_MS)) _perfSessionSpikeOver100 += 1;
+    if (frameMs > _perfSessionMaxFrameMs) _perfSessionMaxFrameMs = frameMs;
+
+    if (_perfLoadSpikeState) {
+        _perfLoadSpikeState.samples += 1;
+        if (_isFrameOverThreshold(frameMs, PERF_SPIKE_16_7_MS)) _perfLoadSpikeState.over16_7 += 1;
+        if (_isFrameOverThreshold(frameMs, PERF_SPIKE_33_3_MS)) _perfLoadSpikeState.over33_3 += 1;
+        if (_isFrameOverThreshold(frameMs, PERF_SPIKE_50_MS)) _perfLoadSpikeState.over50 += 1;
+        if (_isFrameOverThreshold(frameMs, PERF_SPIKE_100_MS)) _perfLoadSpikeState.over100 += 1;
+        if (frameMs > _perfLoadSpikeState.maxFrameMs) _perfLoadSpikeState.maxFrameMs = frameMs;
+    }
+
+    const replacing = _perfFrameSpikeCount >= PERF_SPIKE_WINDOW_SIZE;
+    let replacedValue = 0;
+    if (replacing) replacedValue = _perfFrameSpikeWindow[_perfFrameSpikeWriteIdx];
+
+    if (replacing) {
+        if (_isFrameOverThreshold(replacedValue, PERF_SPIKE_16_7_MS)) _perfWindowSpikeOver16_7 -= 1;
+        if (_isFrameOverThreshold(replacedValue, PERF_SPIKE_33_3_MS)) _perfWindowSpikeOver33_3 -= 1;
+        if (_isFrameOverThreshold(replacedValue, PERF_SPIKE_50_MS)) _perfWindowSpikeOver50 -= 1;
+        if (_isFrameOverThreshold(replacedValue, PERF_SPIKE_100_MS)) _perfWindowSpikeOver100 -= 1;
+    }
+
+    _perfFrameSpikeWindow[_perfFrameSpikeWriteIdx] = frameMs;
+    _perfFrameSpikeWriteIdx = (_perfFrameSpikeWriteIdx + 1) % PERF_SPIKE_WINDOW_SIZE;
+    if (!replacing) _perfFrameSpikeCount += 1;
+
+    if (_isFrameOverThreshold(frameMs, PERF_SPIKE_16_7_MS)) _perfWindowSpikeOver16_7 += 1;
+    if (_isFrameOverThreshold(frameMs, PERF_SPIKE_33_3_MS)) _perfWindowSpikeOver33_3 += 1;
+    if (_isFrameOverThreshold(frameMs, PERF_SPIKE_50_MS)) _perfWindowSpikeOver50 += 1;
+    if (_isFrameOverThreshold(frameMs, PERF_SPIKE_100_MS)) _perfWindowSpikeOver100 += 1;
+
+    if (frameMs >= _perfWindowMaxFrameMs) {
+        _perfWindowMaxFrameMs = frameMs;
+    } else if (replacing && Math.abs(replacedValue - _perfWindowMaxFrameMs) < 0.0001) {
+        _recomputeWindowMaxFrameMs();
+    }
+}
+
+function _windowFramesArray() {
+    if (_perfFrameSpikeCount <= 0) return [];
+    const out = new Array(_perfFrameSpikeCount);
+    const firstIdx = _perfFrameSpikeCount < PERF_SPIKE_WINDOW_SIZE ? 0 : _perfFrameSpikeWriteIdx;
+    for (let i = 0; i < _perfFrameSpikeCount; i++) {
+        const idx = (firstIdx + i) % PERF_SPIKE_WINDOW_SIZE;
+        out[i] = _perfFrameSpikeWindow[idx];
+    }
+    return out;
+}
+
+function _percentileSorted(sortedValues, p) {
+    if (!Array.isArray(sortedValues) || sortedValues.length === 0) return 0;
+    const clamped = Math.max(0, Math.min(1, p));
+    const pos = clamped * (sortedValues.length - 1);
+    const lo = Math.floor(pos);
+    const hi = Math.ceil(pos);
+    if (lo === hi) return sortedValues[lo];
+    const t = pos - lo;
+    return sortedValues[lo] * (1 - t) + sortedValues[hi] * t;
+}
+
+function getPerfSpikeMetrics(includePercentiles = false) {
+    const metrics = {
+        windowFrames: _perfFrameSpikeCount,
+        over16_7: _perfWindowSpikeOver16_7,
+        over33_3: _perfWindowSpikeOver33_3,
+        over50: _perfWindowSpikeOver50,
+        over100: _perfWindowSpikeOver100,
+        maxFrameMs: Number((_perfWindowMaxFrameMs || 0).toFixed(2)),
+        session: {
+            frames: _perfSessionSpikeSamples,
+            over16_7: _perfSessionSpikeOver16_7,
+            over33_3: _perfSessionSpikeOver33_3,
+            over50: _perfSessionSpikeOver50,
+            over100: _perfSessionSpikeOver100,
+            maxFrameMs: Number((_perfSessionMaxFrameMs || 0).toFixed(2))
+        }
+    };
+    if (!includePercentiles || _perfFrameSpikeCount <= 0) {
+        metrics.p95Ms = 0;
+        metrics.p99Ms = 0;
+        return metrics;
+    }
+
+    const sorted = _windowFramesArray().sort((a, b) => a - b);
+    metrics.p95Ms = Number(_percentileSorted(sorted, 0.95).toFixed(2));
+    metrics.p99Ms = Number(_percentileSorted(sorted, 0.99).toFixed(2));
+    return metrics;
+}
 
 function exposeMutableGlobal(name, getter, setter) {
     Object.defineProperty(globalThis, name, {
@@ -110,6 +253,14 @@ function startPerfLoad(label, meta = {}) {
         startedAt: performance.now(),
         meta
     };
+    _perfLoadSpikeState = {
+        samples: 0,
+        over16_7: 0,
+        over33_3: 0,
+        over50: 0,
+        over100: 0,
+        maxFrameMs: 0
+    };
 }
 
 function finishPerfLoad(summary = {}) {
@@ -119,15 +270,28 @@ function finishPerfLoad(summary = {}) {
         ? (now - startedAt)
         : (Number.isFinite(summary.loadMs) ? summary.loadMs : 0);
 
+    const loadSpikes = _perfLoadSpikeState
+        ? {
+            sampleFrames: _perfLoadSpikeState.samples,
+            over16_7: _perfLoadSpikeState.over16_7,
+            over33_3: _perfLoadSpikeState.over33_3,
+            over50: _perfLoadSpikeState.over50,
+            over100: _perfLoadSpikeState.over100,
+            maxFrameMs: Number((_perfLoadSpikeState.maxFrameMs || 0).toFixed(2))
+        }
+        : null;
+
     perfStats.lastLoad = {
         label: _perfLoadStart?.label || summary.label || 'world-load',
         mode: _perfLoadStart?.mode || perfMode,
         loadMs: Math.max(0, Math.round(loadMs)),
         timestamp: new Date().toISOString(),
         ...(typeof _perfLoadStart?.meta === 'object' ? _perfLoadStart.meta : {}),
+        ...(loadSpikes ? { spikes: loadSpikes } : {}),
         ...(typeof summary === 'object' ? summary : {})
     };
     _perfLoadStart = null;
+    _perfLoadSpikeState = null;
     perfStats.updatedAt = Date.now();
 }
 
@@ -135,6 +299,7 @@ function recordPerfFrame(dt) {
     if (!Number.isFinite(dt) || dt <= 0) return;
 
     const frameMs = dt * 1000;
+    _recordPerfSpikeFrame(frameMs);
     _perfFrameMs = _perfFrameMs <= 0 ? frameMs : (_perfFrameMs * 0.9 + frameMs * 0.1);
 
     _perfFrameAccum += dt;
@@ -147,6 +312,7 @@ function recordPerfFrame(dt) {
 
     perfStats.live.fps = Number.isFinite(_perfFps) ? _perfFps : 0;
     perfStats.live.frameMs = Number.isFinite(_perfFrameMs) ? _perfFrameMs : 0;
+    perfStats.live.spikes = getPerfSpikeMetrics(false);
 
     const currentSpeedMph = (() => {
         if (typeof droneMode !== 'undefined' && droneMode && typeof drone !== 'undefined') {
@@ -207,6 +373,7 @@ function capturePerfSnapshot(extra = {}) {
         return String(selLoc);
     })();
 
+    const spikeMetrics = getPerfSpikeMetrics(true);
     return {
         generatedAt: new Date().toISOString(),
         location: locName,
@@ -215,6 +382,7 @@ function capturePerfSnapshot(extra = {}) {
         frameMs: Number((perfStats.live.frameMs || 0).toFixed(2)),
         renderer: { ...perfStats.renderer },
         live: { ...perfStats.live },
+        spikes: spikeMetrics,
         lastLoad: perfStats.lastLoad ? { ...perfStats.lastLoad } : null,
         ...extra
     };
@@ -247,6 +415,7 @@ function updatePerfPanel(force = false) {
     const live = perfStats.live || {};
     const lod = live.lodVisible || {};
     const counts = live.worldCounts || {};
+    const spikes = live.spikes || getPerfSpikeMetrics(false);
 
     const lines = [
         `MODE: ${String(perfMode).toUpperCase()}`,
@@ -256,6 +425,7 @@ function updatePerfPanel(force = false) {
         `LOAD: ${Number.isFinite(lastLoad.loadMs) ? `${lastLoad.loadMs} ms` : '--'}`,
         `FEATURES: R${counts.roads || 0} B${counts.buildings || 0} P${counts.poiMeshes || 0} L${counts.landuseMeshes || 0}`,
         `LOD: NEAR ${lod.near || 0} | MID ${lod.mid || 0}`,
+        `SPIKES: >33 ${spikes.over33_3 || 0} | >50 ${spikes.over50 || 0} | MAX ${(spikes.maxFrameMs || 0).toFixed(1)} ms`,
         `TERRAIN RING: ${Number.isFinite(live.terrainRing) ? live.terrainRing : '--'} | SPEED ${Math.round(live.speedMph || 0)} mph`
     ];
 
@@ -283,6 +453,7 @@ Object.assign(globalThis, {
     copyPerfSnapshotToClipboard,
     finishPerfLoad,
     getPerfMode,
+    getPerfSpikeMetrics,
     getPerfOverlayEnabled,
     mergePerfLiveStats,
     perfStats,
@@ -302,6 +473,7 @@ export {
     copyPerfSnapshotToClipboard,
     finishPerfLoad,
     getPerfMode,
+    getPerfSpikeMetrics,
     getPerfOverlayEnabled,
     mergePerfLiveStats,
     perfMode,
