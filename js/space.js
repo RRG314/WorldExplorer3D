@@ -255,7 +255,7 @@ function startSpaceFlightToEarth() {
 }
 
 function hideGameUI() {
-  const elementsToHide = ['hud', 'minimap', 'coords', 'floatMenuContainer', 'controlsTab', 'modeHud', 'police', 'navigationHud'];
+  const elementsToHide = ['hud', 'minimap', 'coords', 'floatMenuContainer', 'controlsTab', 'police', 'navigationHud'];
   elementsToHide.forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
@@ -263,7 +263,7 @@ function hideGameUI() {
 }
 
 function showGameUI() {
-  const elementsToShow = ['hud', 'minimap', 'coords', 'floatMenuContainer', 'controlsTab', 'modeHud'];
+  const elementsToShow = ['hud', 'minimap', 'coords', 'floatMenuContainer', 'controlsTab'];
   elementsToShow.forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.style.display = '';

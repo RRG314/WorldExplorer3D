@@ -224,12 +224,6 @@ function updateHUD() {
     const pitch = Math.round(appCtx.drone.pitch * 180 / Math.PI);
     document.getElementById('coords').textContent = geo.lat.toFixed(4) + ', ' + geo.lon.toFixed(4) + ' | ' + dirs[Math.round(hdg / 45) % 8] + ' ' + Math.round(hdg) + '° | P:' + pitch + '°';
 
-    // Mode HUD - show mode and altitude (both AGL and MSL)
-    document.getElementById('modeTitle').textContent = '🚁 Drone Mode';
-    const modeTimer = document.getElementById('modeTimer');
-    modeTimer.textContent = 'Alt: ' + altitudeAGL + 'm AGL (' + altitudeMSL + 'm MSL)';
-    modeTimer.classList.add('show');
-    document.getElementById('modeInfo').classList.remove('show');
     return;
   }
 
@@ -238,9 +232,6 @@ function updateHUD() {
     const mph = Math.abs(Math.round(appCtx.Walk.state.walker.speedMph));
     const locName = appCtx.selLoc === 'custom' ? appCtx.customLoc?.name || 'Custom' : appCtx.LOCS[appCtx.selLoc].name;
     const running = appCtx.keys.ShiftLeft || appCtx.keys.ShiftRight;
-    const viewMode = appCtx.Walk.state.view === 'third' ? ' [3rd Person]' :
-    appCtx.Walk.state.view === 'first' ? ' [1st Person]' :
-    ' [Overhead]';
 
     let walkRoad = null;
     if (!appCtx.onMoon && appCtx.roads && appCtx.roads.length > 0) {
@@ -276,10 +267,6 @@ function updateHUD() {
     const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
     document.getElementById('coords').textContent = geo.lat.toFixed(4) + ', ' + geo.lon.toFixed(4) + ' | ' + dirs[Math.round(hdg / 45) % 8] + ' ' + Math.round(hdg) + '°';
 
-    // Mode HUD - just show mode name
-    document.getElementById('modeTitle').textContent = '🚶 Walking Mode' + viewMode;
-    document.getElementById('modeTimer').classList.remove('show');
-    document.getElementById('modeInfo').classList.remove('show');
     return;
   }
 
@@ -307,29 +294,6 @@ function updateHUD() {
   let hdg = (-appCtx.car.angle * 180 / Math.PI + 90) % 360;if (hdg < 0) hdg += 360;
   const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
   document.getElementById('coords').textContent = geo.lat.toFixed(4) + ', ' + geo.lon.toFixed(4) + ' | ' + dirs[Math.round(hdg / 45) % 8] + ' ' + Math.round(hdg) + '°';
-
-  const modeTimer = document.getElementById('modeTimer');
-  const modeInfo = document.getElementById('modeInfo');
-
-  if (appCtx.gameMode === 'free') {
-    document.getElementById('modeTitle').textContent = '🚗 Driving';
-    modeTimer.classList.remove('show');
-    modeInfo.classList.remove('show');
-  } else
-  if (appCtx.gameMode === 'trial') {
-    document.getElementById('modeTitle').textContent = '⏱️ Time Trial';
-    modeTimer.textContent = appCtx.fmtTime(Math.max(0, appCtx.CFG.trialTime - appCtx.gameTimer));
-    modeTimer.classList.add('show');
-    modeInfo.textContent = appCtx.destination ? Math.round(Math.hypot(appCtx.destination.x - appCtx.car.x, appCtx.destination.z - appCtx.car.z)) + 'm' : '';
-    modeInfo.classList.add('show');
-  } else
-  {
-    document.getElementById('modeTitle').textContent = '🏁 Checkpoint';
-    modeTimer.textContent = appCtx.fmtTime(appCtx.gameTimer);
-    modeTimer.classList.add('show');
-    modeInfo.textContent = appCtx.cpCollected + '/' + appCtx.checkpoints.length;
-    modeInfo.classList.add('show');
-  }
 
 }
 

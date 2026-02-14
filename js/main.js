@@ -50,30 +50,27 @@ function positionTopOverlays() {
   if (!appCtx.gameStarted) return;
   const hudRect = _isVisibleRect(document.getElementById('hud'));
   const menuRect = _isVisibleRect(document.getElementById('mainMenuBtn'));
-  let modeHudRect = _isVisibleRect(document.getElementById('modeHud'));
+  if (!hudRect || !menuRect) return;
 
-  // If mode HUD is hidden, keep top overlay centering by using a virtual center anchor.
-  if (!modeHudRect && hudRect && menuRect) {
-    const centerX = Math.round((hudRect.right + menuRect.left) * 0.5);
-    modeHudRect = {
-      left: centerX,
-      right: centerX,
-      top: Math.max(hudRect.top, OVERLAY_EDGE_MARGIN),
-      bottom: Math.max(hudRect.top, OVERLAY_EDGE_MARGIN) + 1,
-      width: 1,
-      height: 1
-    };
-  }
-  if (!modeHudRect) return;
+  // Mode HUD was removed; use a virtual center anchor between HUD and menu.
+  const centerX = Math.round((hudRect.right + menuRect.left) * 0.5);
+  const centerRect = {
+    left: centerX,
+    right: centerX,
+    top: Math.max(hudRect.top, OVERLAY_EDGE_MARGIN),
+    bottom: Math.max(hudRect.top, OVERLAY_EDGE_MARGIN) + 1,
+    width: 1,
+    height: 1
+  };
 
   const debugOverlay = document.getElementById('debugOverlay');
   if (debugOverlay && debugOverlay.style.display !== 'none') {
-    if (hudRect) _positionOverlayBetween(debugOverlay, hudRect, modeHudRect);
+    _positionOverlayBetween(debugOverlay, hudRect, centerRect);
   }
 
   const perfPanel = document.getElementById('perfPanel');
   if (perfPanel && perfPanel.style.display !== 'none') {
-    if (menuRect) _positionOverlayBetween(perfPanel, modeHudRect, menuRect);
+    _positionOverlayBetween(perfPanel, centerRect, menuRect);
   }
 }
 

@@ -857,8 +857,6 @@ function setupUI() {
     document.getElementById('titleScreen').classList.add('hidden');
     document.getElementById('hud').classList.add('show');
     document.getElementById('minimap').classList.add('show');
-    const modeHud = document.getElementById('modeHud');
-    if (modeHud) modeHud.classList.remove('show');
     document.getElementById('floatMenuContainer').classList.add('show');
     document.getElementById('mainMenuBtn').classList.add('show');
     document.getElementById('controlsTab').classList.add('show');
@@ -1007,7 +1005,7 @@ function setupUI() {
     if (ctrlHeader) {
       const modeLabel = mode === 'walking' ? 'Walking Mode' : mode === 'drone' ? 'Drone Mode' : mode === 'rocket' ? 'Rocket Mode' : 'Driving Mode';
       const arrow = ctrlContent && ctrlContent.classList.contains('hidden') ? '▼' : '▲';
-      ctrlHeader.textContent = `🛞 ${modeLabel} ${arrow}`;
+      ctrlHeader.textContent = `⚙️ ${modeLabel} ${arrow}`;
     }
   }
 
@@ -1017,7 +1015,7 @@ function setupUI() {
     if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
     document.getElementById('titleScreen').classList.remove('hidden');
-    ['hud', 'minimap', 'modeHud', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu'].forEach((id) => {
+    ['hud', 'minimap', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('show');
     });
