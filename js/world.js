@@ -8,8 +8,11 @@ const OVERPASS_ENDPOINTS = [
     'https://overpass.kumi.systems/api/interpreter'
 ];
 
-const OVERPASS_STAGGER_MS = 450;
+const OVERPASS_STAGGER_MS = 220;
 const OVERPASS_MIN_TIMEOUT_MS = 5000;
+const OVERPASS_MEMORY_CACHE_TTL_MS = 6 * 60 * 1000;
+const OVERPASS_MEMORY_CACHE_MAX = 6;
+const OVERPASS_LOC_EPSILON = 1e-7;
 const WATER_VECTOR_TILE_ZOOM = 13;
 const WATER_VECTOR_TILE_FETCH_TIMEOUT_MS = 8000;
 const WATER_VECTOR_TILE_ENDPOINT = (z, x, y) =>
@@ -19,6 +22,85 @@ const BUILDING_INDEX_CELL_SIZE = 120;
 let buildingSpatialIndex = new Map();
 const FEATURE_TILE_DEGREES = 0.002;
 const _rdtTileDepthCache = new Map();
+const _overpassMemoryCache = [];
+let _lastOverpassEndpoint = null;
+
+function sameLocation(a, b) {
+    return Math.abs((a?.lat || 0) - (b?.lat || 0)) <= OVERPASS_LOC_EPSILON
+        && Math.abs((a?.lon || 0) - (b?.lon || 0)) <= OVERPASS_LOC_EPSILON;
+}
+
+function pruneOverpassMemoryCache(nowMs = Date.now()) {
+    for (let i = _overpassMemoryCache.length - 1; i >= 0; i--) {
+        if (nowMs - _overpassMemoryCache[i].savedAt > OVERPASS_MEMORY_CACHE_TTL_MS) {
+            _overpassMemoryCache.splice(i, 1);
+        }
+    }
+}
+
+function findOverpassMemoryCache(meta) {
+    if (!meta) return null;
+    const nowMs = Date.now();
+    pruneOverpassMemoryCache(nowMs);
+
+    let best = null;
+    for (let i = 0; i < _overpassMemoryCache.length; i++) {
+        const entry = _overpassMemoryCache[i];
+        if (!sameLocation(entry.meta, meta)) continue;
+        if (entry.meta.roadsRadius + 1e-9 < meta.roadsRadius) continue;
+        if (entry.meta.featureRadius + 1e-9 < meta.featureRadius) continue;
+        if (entry.meta.poiRadius + 1e-9 < meta.poiRadius) continue;
+
+        if (!best || entry.savedAt > best.savedAt) best = entry;
+    }
+    if (!best) return null;
+
+    best.lastHitAt = nowMs;
+    return best;
+}
+
+function storeOverpassMemoryCache(meta, data, endpoint) {
+    if (!meta || !data || !Array.isArray(data.elements)) return;
+
+    const nowMs = Date.now();
+    pruneOverpassMemoryCache(nowMs);
+
+    const existingIdx = _overpassMemoryCache.findIndex(entry =>
+        sameLocation(entry.meta, meta)
+        && Math.abs(entry.meta.roadsRadius - meta.roadsRadius) < 1e-9
+        && Math.abs(entry.meta.featureRadius - meta.featureRadius) < 1e-9
+        && Math.abs(entry.meta.poiRadius - meta.poiRadius) < 1e-9
+    );
+
+    const record = {
+        meta: {
+            lat: meta.lat,
+            lon: meta.lon,
+            roadsRadius: meta.roadsRadius,
+            featureRadius: meta.featureRadius,
+            poiRadius: meta.poiRadius
+        },
+        data,
+        endpoint: endpoint || null,
+        savedAt: nowMs,
+        lastHitAt: nowMs
+    };
+
+    if (existingIdx >= 0) _overpassMemoryCache.splice(existingIdx, 1);
+    _overpassMemoryCache.unshift(record);
+
+    while (_overpassMemoryCache.length > OVERPASS_MEMORY_CACHE_MAX) {
+        _overpassMemoryCache.pop();
+    }
+}
+
+function orderedOverpassEndpoints() {
+    if (!_lastOverpassEndpoint || !OVERPASS_ENDPOINTS.includes(_lastOverpassEndpoint)) {
+        return OVERPASS_ENDPOINTS.slice();
+    }
+    const rest = OVERPASS_ENDPOINTS.filter(ep => ep !== _lastOverpassEndpoint);
+    return [_lastOverpassEndpoint, ...rest];
+}
 
 async function getVectorTileLib() {
     if (_vectorTileLibPromise) return _vectorTileLibPromise;
@@ -1233,11 +1315,19 @@ function getNearbyBuildings(x, z, radius = 80) {
     return out;
 }
 
-async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity) {
+async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheMeta = null) {
+    const cached = findOverpassMemoryCache(cacheMeta);
+    if (cached?.data?.elements) {
+        cached.data._overpassEndpoint = cached.endpoint ? `${cached.endpoint} (memory-cache)` : 'memory-cache';
+        cached.data._overpassSource = 'memory-cache';
+        cached.data._overpassCacheAgeMs = Math.max(0, Date.now() - cached.savedAt);
+        return cached.data;
+    }
+
     const controllers = [];
     const errors = [];
-
-    const attempts = OVERPASS_ENDPOINTS.map((endpoint, idx) => (async () => {
+    const endpoints = orderedOverpassEndpoints();
+    const attempts = endpoints.map((endpoint, idx) => (async () => {
         const staggerMs = idx * OVERPASS_STAGGER_MS;
         if (staggerMs > 0) await delayMs(staggerMs);
 
@@ -1284,6 +1374,10 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity) {
             }
 
             data._overpassEndpoint = endpoint;
+            data._overpassSource = 'network';
+            data._overpassCacheAgeMs = 0;
+            _lastOverpassEndpoint = endpoint;
+            storeOverpassMemoryCache(cacheMeta, data, endpoint);
             return data;
         } catch (err) {
             const reason = err?.name === 'AbortError'
@@ -1612,6 +1706,13 @@ async function loadRoads(retryPass = 0) {
             showLoad('Loading map data...');
             const featureRadius = r * featureRadiusScale;
             const poiRadius = r * poiRadiusScale;
+            const overpassCacheMeta = {
+                lat: LOC.lat,
+                lon: LOC.lon,
+                roadsRadius: r,
+                featureRadius,
+                poiRadius
+            };
 
             const roadsBounds = `(${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r})`;
             const featureBounds = `(${LOC.lat-featureRadius},${LOC.lon-featureRadius},${LOC.lat+featureRadius},${LOC.lon+featureRadius})`;
@@ -1634,9 +1735,14 @@ async function loadRoads(retryPass = 0) {
             startLoadPhase('fetchOverpass');
             let data;
             try {
-                data = await fetchOverpassJSON(q, overpassTimeoutMs, loadDeadline);
+                data = await fetchOverpassJSON(q, overpassTimeoutMs, loadDeadline, overpassCacheMeta);
             } finally {
                 endLoadPhase('fetchOverpass');
+            }
+            if (data?._overpassSource) loadMetrics.overpassSource = data._overpassSource;
+            if (data?._overpassEndpoint) loadMetrics.overpassEndpoint = data._overpassEndpoint;
+            if (Number.isFinite(data?._overpassCacheAgeMs)) {
+                loadMetrics.overpassCacheAgeMs = Math.floor(data._overpassCacheAgeMs);
             }
             const nodes = {};
             data.elements.filter(e => e.type === 'node').forEach(n => nodes[n.id] = n);
