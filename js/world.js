@@ -1536,6 +1536,49 @@ async function loadRoads(retryPass = 0) {
         return building;
     }
 
+    function recordLoadWarning(label, err) {
+        const message = `${label}: ${err?.message || err}`;
+        if (!Array.isArray(loadMetrics.warnings)) loadMetrics.warnings = [];
+        if (loadMetrics.warnings.length < 10) loadMetrics.warnings.push(message);
+        console.warn(`[WorldLoad] ${label} failed:`, err);
+    }
+
+    function safeLoadCall(label, fn) {
+        try {
+            return fn();
+        } catch (err) {
+            recordLoadWarning(label, err);
+            return null;
+        }
+    }
+
+    function finalizeLoadedWorld(reason = 'primary') {
+        loaded = true;
+        if (reason && reason !== 'primary') {
+            loadMetrics.recoveryReason = reason;
+            loadMetrics.partialRecovery = true;
+        }
+
+        safeLoadCall('spawnOnRoad', () => spawnOnRoad());
+        if (terrainEnabled && !onMoon && typeof updateTerrainAround === 'function') {
+            safeLoadCall('updateTerrainAround', () => updateTerrainAround(car.x, car.z));
+        }
+        if (typeof refreshMemoryMarkersForCurrentLocation === 'function') {
+            safeLoadCall('refreshMemoryMarkersForCurrentLocation', () => refreshMemoryMarkersForCurrentLocation());
+        }
+        if (typeof refreshBlockBuilderForCurrentLocation === 'function') {
+            safeLoadCall('refreshBlockBuilderForCurrentLocation', () => refreshBlockBuilderForCurrentLocation());
+        }
+        if (typeof updateWorldLod === 'function') {
+            safeLoadCall('updateWorldLod', () => updateWorldLod(true));
+        }
+        hideLoad();
+        if (typeof alignStarFieldToLocation === 'function') {
+            safeLoadCall('alignStarFieldToLocation', () => alignStarFieldToLocation(LOC.lat, LOC.lon));
+        }
+        if (gameStarted) safeLoadCall('startMode', () => startMode());
+    }
+
     for (const r of radii) {
         if (loaded) break;
         try {
@@ -2496,28 +2539,16 @@ async function loadRoads(retryPass = 0) {
                 // Generate street furniture (signs, trees, lights, trash cans)
                 showLoad('Adding details...');
                 startLoadPhase('buildStreetFurniture');
-                generateStreetFurniture();
-                endLoadPhase('buildStreetFurniture');
+                try {
+                    generateStreetFurniture();
+                } catch (err) {
+                    loadMetrics.streetFurnitureError = err?.message || String(err);
+                    recordLoadWarning('generateStreetFurniture', err);
+                } finally {
+                    endLoadPhase('buildStreetFurniture');
+                }
 
-                loaded = true;
-                spawnOnRoad();
-                if (terrainEnabled && !onMoon && typeof updateTerrainAround === 'function') {
-                    updateTerrainAround(car.x, car.z);
-                }
-                if (typeof refreshMemoryMarkersForCurrentLocation === 'function') {
-                    refreshMemoryMarkersForCurrentLocation();
-                }
-                if (typeof refreshBlockBuilderForCurrentLocation === 'function') {
-                    refreshBlockBuilderForCurrentLocation();
-                }
-                if (typeof updateWorldLod === 'function') {
-                    updateWorldLod(true);
-                }
-                hideLoad();
-                // Align star field to current location
-                alignStarFieldToLocation(LOC.lat, LOC.lon);
-                if (gameStarted) startMode();
-                // Debug log removed
+                finalizeLoadedWorld('primary');
             }
             else {
                 console.warn('No roads found in data, trying larger area...');
@@ -2532,6 +2563,12 @@ async function loadRoads(retryPass = 0) {
             }
 
             console.error('Road loading failed after all attempts:', e);
+            if (roads.length > 0) {
+                console.warn('[WorldLoad] Recovering with partially loaded world data.');
+                loadMetrics.error = e?.message || String(e);
+                finalizeLoadedWorld('partial_after_error');
+                break;
+            }
             // If this is the last attempt and we still have no roads, create a default environment
             if (roads.length === 0) {
                 // Debug log removed
@@ -2654,25 +2691,13 @@ async function loadRoads(retryPass = 0) {
                 makeBuilding(-50, 50, 25, 20, 10);
                 makeBuilding(50, -50, 30, 25, 14);
 
-                loaded = true;
-                spawnOnRoad();
-                if (terrainEnabled && !onMoon && typeof updateTerrainAround === 'function') {
-                    updateTerrainAround(car.x, car.z);
-                }
-                if (typeof refreshMemoryMarkersForCurrentLocation === 'function') {
-                    refreshMemoryMarkersForCurrentLocation();
-                }
-                if (typeof refreshBlockBuilderForCurrentLocation === 'function') {
-                    refreshBlockBuilderForCurrentLocation();
-                }
-                if (typeof updateWorldLod === 'function') {
-                    updateWorldLod(true);
-                }
-                hideLoad();
-                if (gameStarted) startMode();
-                // Debug log removed
+                finalizeLoadedWorld('synthetic_fallback');
             }
         }
+    }
+    if (!loaded && roads.length > 0) {
+        console.warn('[WorldLoad] Completing with partially loaded roads.');
+        finalizeLoadedWorld('post_loop_partial');
     }
     if (!loaded && retryPass < 1) {
         console.warn('[WorldLoad] Initial pass failed. Retrying once automatically...');
