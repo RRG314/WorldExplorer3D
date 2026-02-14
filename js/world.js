@@ -948,7 +948,7 @@ function batchNearLodBuildingMeshes() {
         mergedMesh.renderOrder = group.renderOrder;
         mergedMesh.castShadow = true;
         mergedMesh.receiveShadow = true;
-        mergedMesh.frustumCulled = false;
+        mergedMesh.frustumCulled = true;
 
         let centerX = 0;
         let centerZ = 0;
@@ -1089,7 +1089,7 @@ function batchLanduseMeshes() {
         mergedMesh.renderOrder = group.renderOrder;
         mergedMesh.receiveShadow = false;
         mergedMesh.castShadow = false;
-        mergedMesh.frustumCulled = false;
+        mergedMesh.frustumCulled = true;
 
         let centerX = 0;
         let centerZ = 0;
