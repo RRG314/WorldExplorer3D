@@ -114,6 +114,58 @@ function getGroundYAt(x, z) {
     return 0;
 }
 
+function isInsideFootprintSafe(x, z, pts) {
+    if (!Array.isArray(pts) || pts.length < 3) return false;
+    if (typeof pointInPolygon === 'function') {
+        return !!pointInPolygon(x, z, pts);
+    }
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const xi = pts[i].x, zi = pts[i].z;
+        const xj = pts[j].x, zj = pts[j].z;
+        const intersect = ((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+function getBuildingRoofYAt(x, z, groundY) {
+    if (!Array.isArray(buildings) || buildings.length === 0) return null;
+    const candidates = (typeof getNearbyBuildings === 'function')
+        ? (getNearbyBuildings(x, z, 28) || [])
+        : buildings;
+    if (!Array.isArray(candidates) || candidates.length === 0) return null;
+
+    let bestRoofY = -Infinity;
+    for (let i = 0; i < candidates.length; i++) {
+        const b = candidates[i];
+        if (!b) continue;
+        if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) continue;
+        if (!isInsideFootprintSafe(x, z, b.pts)) continue;
+        const height = Number(b.height);
+        if (!isFiniteNumber(height) || height <= 0) continue;
+        const roofY = groundY + height;
+        if (roofY > bestRoofY) bestRoofY = roofY;
+    }
+
+    return Number.isFinite(bestRoofY) ? bestRoofY : null;
+}
+
+function getTopSurfaceYAt(x, z) {
+    const groundY = getGroundYAt(x, z);
+    let topY = groundY;
+
+    const roofY = getBuildingRoofYAt(x, z, groundY);
+    if (isFiniteNumber(roofY) && roofY > topY) topY = roofY;
+
+    if (typeof getBuildTopSurfaceAtWorldXZ === 'function') {
+        const blockY = getBuildTopSurfaceAtWorldXZ(x, z, Infinity);
+        if (isFiniteNumber(blockY) && blockY > topY) topY = blockY;
+    }
+
+    return topY;
+}
+
 function normalizeMemoryEntry(raw) {
     if (!raw || typeof raw !== 'object') return null;
     const message = clampMessage(raw.message);
@@ -343,7 +395,7 @@ function refreshMemoryMarkersForCurrentLocation() {
     entries.forEach((entry) => {
         const worldPos = latLonToWorldSafe(entry.lat, entry.lon);
         if (!isFiniteNumber(worldPos.x) || !isFiniteNumber(worldPos.z)) return;
-        const y = getGroundYAt(worldPos.x, worldPos.z);
+        const y = getTopSurfaceYAt(worldPos.x, worldPos.z);
         const marker = createMarkerForEntry(entry, worldPos.x, y, worldPos.z);
         group.add(marker);
     });
@@ -409,7 +461,7 @@ function openMemoryComposer(defaultType = 'pin') {
     if (!memoryPersistenceEnabled) {
         setComposerStatus('Persistent storage unavailable. Enable local storage for this site.', true);
     } else {
-        setComposerStatus('Drop point: your current ground position.', false);
+        setComposerStatus('Drop point: your current surface position.', false);
     }
     updateComposerCharCount();
     input.focus();

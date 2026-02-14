@@ -37,7 +37,7 @@ Entries reflect changes made relative to the most recent public release.
 - Space info panel metric rows are now reusable for planets, asteroids, spacecraft, and galaxies.
 - POI map rendering now follows legend category filters on both minimap and large map.
 - Dynamic map/property/historic UI templates now escape untrusted string fields before insertion.
-- Module loader cache-bust chain incremented through `v=33` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Module loader cache-bust chain incremented through `v=34` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### Fixed
 - Non-responsive title menu interactions for suggested/custom selection after UI rework.
@@ -50,6 +50,7 @@ Entries reflect changes made relative to the most recent public release.
 - Missing hard cap for user-placed build blocks (now limited to 100).
 - Walking-mode HUD street label not showing the active/nearest road name.
 - Redundant global delete-all blocks menu option (kept existing clear-current-location flow only).
+- Memory markers rendering at terrain ground instead of top surface when placed on roofs/blocks.
 
 ---
 

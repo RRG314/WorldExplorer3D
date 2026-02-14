@@ -44,7 +44,7 @@ The current branch documentation set includes updates for:
 - Brick block builder controls (`B`, click place, shift-click remove, clear current location, 100-block cap)
 - Security/storage boilerplate notice for persistent memory data
 - Dynamic UI text escaping in map/property/historic panels
-- Cache-bust loader chain alignment through `v=33`
+- Cache-bust loader chain alignment through `v=34`
 
 ## Maintainer Notes
 

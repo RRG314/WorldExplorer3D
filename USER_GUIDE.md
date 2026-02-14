@@ -627,6 +627,7 @@ Placement uses your current Earth-mode position (car, walk, or drone reference p
 
 - Memory markers are persisted in browser local storage on this device/browser profile.
 - They reload automatically when you revisit that location.
+- Markers are placed/rendered on the highest local surface (build blocks, roofs, then ground).
 - Memory markers are also shown on minimap and large map.
 - Pin/flower visibility can be toggled independently in the legend.
 - Limits: 200 chars per message, 300 markers per location, 1500 markers total.

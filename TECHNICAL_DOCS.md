@@ -42,7 +42,7 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - Memory composer now includes `Delete All` with confirmation.
 - POI and memory markers now render on both minimap and large map overlays.
 - Voxel-style brick builder subsystem added (`js/blocks.js`) with click place/stack and shift-click removal.
-- Loader cache-bust chain is aligned through `v=33` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Loader cache-bust chain is aligned through `v=34` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### High-Level Architecture
 
@@ -582,6 +582,7 @@ Key implementation files:
 - Bulk removal: memory composer `Delete All` action with browser confirm prompt
 - Rebuild timing: markers clear during world reload and rehydrate after location load completes
 - Map integration: pin/flower markers render in minimap and large map drawing pass (`js/map.js`)
+- Surface resolution: marker Y is resolved to the highest local surface (build block top, building roof, then terrain ground)
 - Legend integration: `mapLayers.memoryPins` and `mapLayers.memoryFlowers` gate each marker type independently
 
 Core public hooks:

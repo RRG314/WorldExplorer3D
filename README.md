@@ -113,6 +113,7 @@ Block builder actions:
 - Removal: click marker and choose `Remove Marker`
 - Bulk removal: `Delete All` button in memory composer (with confirmation)
 - Map visibility: memory markers are shown on minimap and large map
+- Surface snap: markers render on top of the highest local surface (build blocks, building roofs, then ground)
 - Legend filters: `📍 Pin` and `🌸 Flower` checkboxes control visibility independently
 - Verification: run `getMemoryPersistenceStatus()` in browser console
 
@@ -140,7 +141,7 @@ Block builder actions:
 - Runtime is split into multiple JS files (`js/*.js`) with no build step.
 - Shared/global runtime state is still used across core systems.
 - ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
-- Cache-bust version alignment across loader chain is currently `v=33`.
+- Cache-bust version alignment across loader chain is currently `v=34`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
 ## Freeze Snapshot (2026-02-14)
