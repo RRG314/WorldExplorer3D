@@ -182,6 +182,9 @@ function updateCamera() {
 }
 
 function updateHUD() {
+    // Keep controls panel sections and header synchronized with the active mode.
+    if (typeof updateControlsModeUI === 'function') updateControlsModeUI();
+
     if (droneMode) {
         // Calculate ground elevation for altitude display
         let groundY = 0;
@@ -313,24 +316,6 @@ function updateHUD() {
         modeInfo.classList.add('show');
     }
 
-    // Update control visibility based on mode
-    const drivingControls = document.getElementById('drivingControls');
-    const walkingControls = document.getElementById('walkingControls');
-    const droneControls = document.getElementById('droneControls');
-
-    if (droneMode) {
-        if (drivingControls) drivingControls.style.display = 'none';
-        if (walkingControls) walkingControls.style.display = 'none';
-        if (droneControls) droneControls.style.display = 'block';
-    } else if (Walk && Walk.state.mode === 'walk') {
-        if (drivingControls) drivingControls.style.display = 'none';
-        if (walkingControls) walkingControls.style.display = 'block';
-        if (droneControls) droneControls.style.display = 'none';
-    } else {
-        if (drivingControls) drivingControls.style.display = 'block';
-        if (walkingControls) walkingControls.style.display = 'none';
-        if (droneControls) droneControls.style.display = 'none';
-    }
 }
 
 // OSM Tile functions
