@@ -378,13 +378,13 @@ function getAdaptiveLoadProfile(loadDepth, mode = getPerfModeValue()) {
             featureRadiusScale: 0.82,
             poiRadiusScale: 0.78,
             maxRoadWays: 2600,
-            maxBuildingWays: 8200,
+            maxBuildingWays: 10500,
             maxLanduseWays: 3500,
             maxPoiNodes: 1300,
             roadsPerTile: 110,
             roadsMinPerTile: 26,
-            buildingsPerTile: 220,
-            buildingsMinPerTile: 56,
+            buildingsPerTile: 300,
+            buildingsMinPerTile: 84,
             landusePerTile: 84,
             landuseMinPerTile: 18,
             poiPerTile: 45,
@@ -397,13 +397,13 @@ function getAdaptiveLoadProfile(loadDepth, mode = getPerfModeValue()) {
             featureRadiusScale: 0.86,
             poiRadiusScale: 0.82,
             maxRoadWays: 3400,
-            maxBuildingWays: 10500,
+            maxBuildingWays: 13000,
             maxLanduseWays: 4800,
             maxPoiNodes: 1700,
             roadsPerTile: 140,
             roadsMinPerTile: 34,
-            buildingsPerTile: 280,
-            buildingsMinPerTile: 72,
+            buildingsPerTile: 360,
+            buildingsMinPerTile: 100,
             landusePerTile: 110,
             landuseMinPerTile: 24,
             poiPerTile: 60,
@@ -946,7 +946,7 @@ function batchNearLodBuildingMeshes() {
         mergedMesh.renderOrder = group.renderOrder;
         mergedMesh.castShadow = true;
         mergedMesh.receiveShadow = true;
-        mergedMesh.frustumCulled = true;
+        mergedMesh.frustumCulled = false;
 
         let centerX = 0;
         let centerZ = 0;
@@ -1087,7 +1087,7 @@ function batchLanduseMeshes() {
         mergedMesh.renderOrder = group.renderOrder;
         mergedMesh.receiveShadow = false;
         mergedMesh.castShadow = false;
-        mergedMesh.frustumCulled = true;
+        mergedMesh.frustumCulled = false;
 
         let centerX = 0;
         let centerZ = 0;
@@ -1814,7 +1814,9 @@ async function loadRoads() {
             // Process buildings
             showLoad(`Loading buildings... (${buildingWays.length})`);
             const roadBuildingCellSize = 120;
-            const buildingRoadRadiusCells = 3; // ~360m coverage around loaded roads
+            const buildingRoadRadiusCells = useRdtBudgeting
+                ? (rdtLoadComplexity >= 6 ? 5 : 4)
+                : 3;
             const roadCoverageCells = new Set();
 
             roads.forEach(rd => {
@@ -1876,10 +1878,10 @@ async function loadRoads() {
 
                 if (lodTier === 'mid' && useRdtBudgeting) {
                     const midKeepRatio =
-                        rdtLoadComplexity >= 6 ? 0.62 :
-                        rdtLoadComplexity === 5 ? 0.70 :
-                        rdtLoadComplexity === 4 ? 0.78 :
-                                                  0.86;
+                        rdtLoadComplexity >= 6 ? 0.78 :
+                        rdtLoadComplexity === 5 ? 0.84 :
+                        rdtLoadComplexity === 4 ? 0.90 :
+                                                  0.94;
                     if (br1 > midKeepRatio) {
                         loadMetrics.lod.midSkipped += 1;
                         return;
@@ -2943,7 +2945,7 @@ function updateWorldLod(force = false) {
 
     if (!force && _lastLodReady) {
         const moved = Math.hypot(refX - _lastLodRefX, refZ - _lastLodRefZ);
-        const minMoveForLodUpdate = droneMode ? 8 : 12;
+        const minMoveForLodUpdate = droneMode ? 4 : 8;
         if (moved < minMoveForLodUpdate) return;
     }
     _lastLodRefX = refX;
@@ -2964,29 +2966,32 @@ function updateWorldLod(force = false) {
         const mesh = buildingMeshes[i];
         if (!mesh) continue;
 
-        if (mesh.userData?.isBuildingBatch) {
-            mesh.visible = true;
-            const tier = mesh.userData?.lodTier || 'near';
-            const count = Math.max(1, mesh.userData?.batchCount || 1);
-            if (tier === 'mid') midVisible += count;
-            else nearVisible += count;
-            continue;
-        }
-
         const center = getMeshLodCenter(mesh);
         if (!center) continue;
 
+        const tier = mesh.userData?.lodTier || 'near';
+        const isBatch = !!mesh.userData?.isBuildingBatch;
         const radius = Number.isFinite(mesh.userData?.lodRadius) ? mesh.userData.lodRadius : 0;
-        const visibleDist = lodThresholds.farVisible + Math.min(1200, radius);
+        let visibleDist;
+        if (tier === 'mid') {
+            const batchBoost = isBatch ? Math.min(900, radius * 0.65) : Math.min(450, radius);
+            visibleDist = lodThresholds.mid + batchBoost;
+        } else {
+            const batchBoost = isBatch ? Math.min(1300, radius) : Math.min(800, radius);
+            visibleDist = lodThresholds.farVisible + batchBoost;
+        }
         const dx = center.x - refX;
         const dz = center.z - refZ;
         const distSq = dx * dx + dz * dz;
-        const visible = distSq <= (visibleDist * visibleDist);
+        const hysteresis = tier === 'mid'
+            ? (droneMode ? 320 : 240)
+            : (droneMode ? 260 : 180);
+        const limitDist = mesh.visible ? (visibleDist + hysteresis) : visibleDist;
+        const visible = distSq <= (limitDist * limitDist);
         mesh.visible = visible;
         if (!visible) continue;
 
-        const tier = mesh.userData?.lodTier || 'near';
-        const count = Math.max(1, mesh.userData?.isBuildingBatch ? (mesh.userData?.batchCount || 1) : 1);
+        const count = isBatch ? Math.max(1, mesh.userData?.batchCount || 1) : 1;
         if (tier === 'mid') midVisible += count;
         else nearVisible += count;
     }
