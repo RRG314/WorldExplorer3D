@@ -761,20 +761,22 @@ function createAsteroidBelt() {
   beltGeo.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
 
   const beltMat = new THREE.PointsMaterial({
-    size: 4.5,
+    size: 2.4,
     vertexColors: true,
     transparent: true,
-    opacity: 0.75,
-    sizeAttenuation: true
+    opacity: 0.9,
+    sizeAttenuation: false,
+    depthWrite: false
   });
 
   solarSystem.asteroidBelt = new THREE.Points(beltGeo, beltMat);
   solarSystem.asteroidBelt.name = 'asteroidBelt';
+  solarSystem.asteroidBelt.renderOrder = 3;
   solarSystem.group.add(solarSystem.asteroidBelt);
 
   // --- Asteroid belt boundary rings (inner and outer edge) ---
-  createBeltBoundaryRing(belt.innerAU, 0x665544, 'beltInnerEdge');
-  createBeltBoundaryRing(belt.outerAU, 0x665544, 'beltOuterEdge');
+  createBeltBoundaryRing(belt.innerAU, 0xb48357, 'beltInnerEdge');
+  createBeltBoundaryRing(belt.outerAU, 0xb48357, 'beltOuterEdge');
 
   // --- Named large asteroids as meshes ---
   createNamedAsteroids();
@@ -825,20 +827,22 @@ function createKuiperBelt() {
   beltGeo.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
 
   const beltMat = new THREE.PointsMaterial({
-    size: 3.2,
+    size: 1.9,
     vertexColors: true,
     transparent: true,
-    opacity: 0.58,
-    sizeAttenuation: true
+    opacity: 0.82,
+    sizeAttenuation: false,
+    depthWrite: false
   });
 
   solarSystem.kuiperBelt = new THREE.Points(beltGeo, beltMat);
   solarSystem.kuiperBelt.name = 'kuiperBelt';
+  solarSystem.kuiperBelt.renderOrder = 3;
   solarSystem.group.add(solarSystem.kuiperBelt);
 
   // Boundary guide rings for context.
-  createBeltBoundaryRing(belt.innerAU, 0x4c5e7a, 'kuiperInnerEdge');
-  createBeltBoundaryRing(belt.outerAU, 0x4c5e7a, 'kuiperOuterEdge');
+  createBeltBoundaryRing(belt.innerAU, 0x7baee0, 'kuiperInnerEdge');
+  createBeltBoundaryRing(belt.outerAU, 0x7baee0, 'kuiperOuterEdge');
 }
 
 function createBeltBoundaryRing(radiusAU, color, name) {
@@ -857,7 +861,7 @@ function createBeltBoundaryRing(radiusAU, color, name) {
   const mat = new THREE.LineBasicMaterial({
     color: color,
     transparent: true,
-    opacity: 0.12,
+    opacity: 0.34,
     linewidth: 1
   });
   const ring = new THREE.LineLoop(geo, mat);
