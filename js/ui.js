@@ -164,6 +164,7 @@ function setupUI() {
   const gameShareTwitter = document.getElementById('gameShareTwitter');
   const gameShareInstagram = document.getElementById('gameShareInstagram');
   const gameShareText = document.getElementById('gameShareText');
+  const coordsReadout = document.getElementById('coords');
 
   // Load saved API keys from localStorage
   const savedRentcast = localStorage.getItem('rentcastApiKey');
@@ -573,6 +574,18 @@ function setupUI() {
     }
     window.prompt('Copy experience link:', experienceLink);
     return false;
+  }
+
+  if (coordsReadout) {
+    coordsReadout.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      try {
+        const link = buildShareableExperienceLink();
+        await copyShareLinkWithFallback(link);
+      } catch (err) {
+        console.warn('[share] Unable to copy coords share link:', err);
+      }
+    });
   }
 
   function openShareWindow(targetUrl) {
