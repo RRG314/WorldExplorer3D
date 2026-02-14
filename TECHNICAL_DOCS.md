@@ -12,6 +12,7 @@ Developer guide for World Explorer 3D. Architecture, code structure, and customi
 - [API Integration](#api-integration)
 - [Rendering Pipeline](#rendering-pipeline)
 - [Persistent Memory Markers](#persistent-memory-markers)
+- [Security and Storage Notes](#security-and-storage-notes)
 - [Performance Optimization](#performance-optimization)
 - [Customization Guide](#customization-guide)
 - [Troubleshooting](#troubleshooting)
@@ -37,7 +38,9 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - Deep-sky galaxy catalog added in `solar-system.js` with RA/Dec placement and click inspection.
 - Deep-space renderer envelope expanded (`space.js` camera far clip and star shell range) to support farther galaxy distances.
 - Persistent memory marker subsystem added (`js/memory.js`) with place/remove flow.
-- Loader cache-bust chain is aligned through `v=23` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Memory composer now includes `Delete All` with confirmation.
+- POI and memory markers now render on both minimap and large map overlays.
+- Loader cache-bust chain is aligned through `v=27` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### High-Level Architecture
 
@@ -570,9 +573,12 @@ Key implementation files:
 - Marker types: `pin` and `flower`
 - Message length cap: `200` characters
 - Storage key: `worldExplorer3D.memories.v1`
+- Limits: `300` per location, `1500` total, ~`1500KB` serialized payload cap
 - Placement guard: storage round-trip verification must pass before placement is enabled
 - Removal: click marker hitbox in world, then use `Remove Marker`
+- Bulk removal: memory composer `Delete All` action with browser confirm prompt
 - Rebuild timing: markers clear during world reload and rehydrate after location load completes
+- Map integration: pin/flower markers render in minimap and large map drawing pass (`js/map.js`)
 
 Core public hooks:
 
@@ -581,6 +587,18 @@ Core public hooks:
 - `refreshMemoryMarkersForCurrentLocation()`
 - `clearMemoryMarkersForWorldReload()`
 - `getMemoryPersistenceStatus()`
+- `getMemoryEntriesForCurrentLocation()`
+
+## Security and Storage Notes
+
+Current memory persistence model is client-side only.
+
+- Storage medium: browser `localStorage`, same-origin readable, no encryption at rest.
+- Data scope: per browser profile on one device; no automatic server sync.
+- Reliability: blocked storage (privacy mode/extensions/policies) disables placement.
+- User controls: per-marker remove and global `Delete All` are available in UI.
+- Deployment guidance: add response headers (`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy`) at host/CDN level.
+- Content guidance: memory notes are user-generated text; treat as untrusted input and keep rendering via `textContent` (no `innerHTML` path).
 
 ## Performance Optimization
 

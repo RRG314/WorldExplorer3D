@@ -22,6 +22,9 @@ Entries reflect changes made relative to the most recent public release.
 - Start-menu Controls tab coverage for space-flight keys and interactions.
 - Persistent memory marker module (`js/memory.js`) for placeable pin/flower notes (200-char limit).
 - In-world memory marker removal flow (`Remove Marker`) to erase pins/pull flowers.
+- Memory composer bulk-delete action (`Delete All`) with confirmation.
+- Memory pin/flower overlay rendering on minimap and large map.
+- Security/storage notice document for persistent memory behavior and disclaimer boilerplate.
 
 ### Changed
 - Technical documentation examples now show deterministic RNG usage patterns aligned with the `rdt.js` seeded runtime helpers.
@@ -29,13 +32,15 @@ Entries reflect changes made relative to the most recent public release.
 - Restored main-style location selection behavior (`Custom` card + suggested city cards) and integrated launch-mode toggles at top of Location tab.
 - Expanded deep-space render envelope: farther star shell, farther galaxy placement, larger visual galaxy scale.
 - Space info panel metric rows are now reusable for planets, asteroids, spacecraft, and galaxies.
-- Module loader cache-bust chain incremented through `v=23` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- POI map rendering now follows legend category filters on both minimap and large map.
+- Module loader cache-bust chain incremented through `v=27` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### Fixed
 - Non-responsive title menu interactions for suggested/custom selection after UI rework.
 - Belt rendering visibility issues caused by distance attenuation and low-contrast boundary rings.
 - Stale client asset issues caused by outdated cache-bust query strings after pushes.
 - False-positive "persistent" memory behavior when browser storage is unavailable (marker placement now gated by storage round-trip check).
+- Large-map POI click handling blocked by old POI-mode gate even when legend filters were enabled.
 
 ---
 

@@ -529,8 +529,8 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
         });
     }
 
-    // Draw POIs on minimap
-    if (poiMode && pois.length > 0) {
+    // Draw POIs on minimap and large map based on legend layer filters
+    if (pois.length > 0) {
         pois.forEach(poi => {
             // Check if this POI category is visible
             if (!isPOIVisible(poi.type)) return;

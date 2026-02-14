@@ -37,7 +37,7 @@ Open `http://localhost:8000`.
 - Space layer with Earth, Moon, and solar-system transitions in the same runtime.
 - Title menu launch-mode selector (Earth / Moon / Space) with one-click starts.
 - Click-to-inspect deep-space objects (planets, asteroids, spacecraft, galaxies).
-- Persistent memory markers (pin/flower + short note) with in-world remove action.
+- Persistent memory markers (pin/flower + short note) with in-world remove and bulk delete actions.
 - Deterministic runtime seeding and complexity logic through RDT + RGE256-based paths.
 
 ## Core Features
@@ -49,6 +49,8 @@ Open `http://localhost:8000`.
 - Real estate overlays (Estated, ATTOM, RentCast, and fallback data).
 - Persistent location memories: place/remove pins or flowers with 200-char messages.
 - Minimap + full map with teleport and layer toggles.
+- POIs render on minimap/large map according to legend category filters.
+- Memory pins/flowers render on minimap/large map for location recall.
 - Time-of-day lighting and sky/constellation systems.
 
 ### Gameplay
@@ -85,8 +87,9 @@ Open `http://localhost:8000`.
 
 Memory marker actions:
 
-- `Exploration` menu -> `Place Memory`
+- `🌸` memory button (above controls) -> open composer
 - Click marker in-world -> `Remove Marker`
+- Memory composer -> `Delete All`
 
 ## Persistent Memory Markers
 
@@ -94,16 +97,28 @@ Memory marker actions:
 - Message length: up to `200` characters
 - Storage: browser `localStorage` (`worldExplorer3D.memories.v1`)
 - Scope: per location center key (`LOC` rounded to 5 decimals)
+- Limits: `300` per location, `1500` total, ~`1500KB` max payload
 - Persistence guard: placement is disabled if browser storage round-trip check fails
 - Removal: click marker and choose `Remove Marker`
+- Bulk removal: `Delete All` button in memory composer (with confirmation)
+- Map visibility: memory markers are shown on minimap and large map
 - Verification: run `getMemoryPersistenceStatus()` in browser console
+
+## Security and Storage Notice
+
+- Memory notes are stored locally in this browser profile, not encrypted, and not auto-synced to other devices.
+- Anyone with access to this browser profile can read local memory notes.
+- Clearing site data or browser storage will remove saved memories.
+- Do not store secrets, credentials, or sensitive personal information in memory notes.
+- Browser storage can be blocked by privacy mode/extensions; when blocked, memory placement is disabled.
+- Recommended deployment headers: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, and a restrictive `Permissions-Policy`.
 
 ## Architecture Status (Current)
 
 - Runtime is split into multiple JS files (`js/*.js`) with no build step.
 - Shared/global runtime state is still used across core systems.
 - ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
-- Cache-bust version alignment across loader chain is currently `v=23`.
+- Cache-bust version alignment across loader chain is currently `v=27`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
 ## Freeze Snapshot (2026-02-14)
@@ -114,6 +129,9 @@ Memory marker actions:
 - Added clickable galaxy background objects with distance/sky-position metadata in the inspector.
 - Updated start-menu Controls tab to include space-flight controls.
 - Added persistent memory markers (pin/flower), 200-char notes, and marker removal flow.
+- Added memory `Delete All` action in composer with confirmation.
+- Added memory pin/flower visibility on minimap and large map.
+- Restored POI marker rendering on minimap and large map by legend category filters.
 
 ## Repository Structure
 
@@ -173,6 +191,7 @@ Current direction:
 - `KNOWN_ISSUES.md` - active gaps and contributor targets
 - `CONTRIBUTING.md` - contribution workflow
 - `CHANGELOG.md` - release history
+- `SECURITY_STORAGE_NOTICE.md` - persistent-memory storage and security disclaimer boilerplate
 
 ## Known Issues / Help Wanted
 

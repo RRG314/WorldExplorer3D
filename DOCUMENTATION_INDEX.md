@@ -15,6 +15,7 @@ This index lists the documentation that exists in this branch today.
 | `KNOWN_ISSUES.md` | Current gaps, regressions, and contribution targets |
 | `CONTRIBUTING.md` | Contribution process and PR rules |
 | `CHANGELOG.md` | Version and release changes |
+| `SECURITY_STORAGE_NOTICE.md` | Memory-storage behavior, security baseline, and disclaimer boilerplate |
 | `ACKNOWLEDGEMENTS.md` | Third-party and first-party research attributions |
 | `LICENSE` | Proprietary, all-rights-reserved source-available license |
 
@@ -37,7 +38,10 @@ The current branch documentation set includes updates for:
 - Asteroid belt + Kuiper belt visual layers
 - Clickable deep-sky galaxies with inspector info
 - Persistent memory markers (pin/flower + 200-char notes + remove flow)
-- Cache-bust loader chain alignment through `v=23`
+- Memory composer `Delete All` flow with confirmation
+- POI + memory marker rendering on minimap and large map overlays
+- Security/storage boilerplate notice for persistent memory data
+- Cache-bust loader chain alignment through `v=27`
 
 ## Maintainer Notes
 

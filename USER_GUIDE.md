@@ -51,7 +51,7 @@ Complete guide to using World Explorer 3D. Learn every feature, control, and sec
 7. **Start Exploring!**
    - You spawn in a car
    - Drive around and discover the city
-   - Use `Exploration > Place Memory` to drop persistent pin/flower notes
+   - Use the `🌸` memory button (above controls) to drop persistent pin/flower notes
 
 ### Interface Overview
 
@@ -69,6 +69,8 @@ Located in bottom-left corner:
 - Blue arrow = your position/direction
 - Red circle = destination (in timed modes)
 - Green dots = checkpoints
+- Colored POI dots/icons = points of interest (based on legend filters)
+- Red/pink memory markers = placed pins/flowers
 - Gray = roads, green = parks
 
 #### Coordinates Display
@@ -337,7 +339,8 @@ Toggle in the legend (📋 button):
 - **Roads**: Street overlay
 - **Land Use**: Parks, water, zones
 - **Properties**: Real estate markers (if enabled)
-- **POIs**: Points of interest
+- **POIs**: Points of interest (render on minimap + large map by category filters)
+- **Memory Markers**: Your pin/flower notes (render on minimap + large map)
 - **Historic Sites**: Historic markers
 
 #### Controls
@@ -367,6 +370,8 @@ Open with 📋 button:
 | 🏢 Green | Properties for sale |
 | 🏢 Blue | Properties for rent |
 | 📍 Red | Points of interest |
+| 📍 Red Pin | Memory pin marker |
+| 🌸 Pink/Yellow | Memory flower marker |
 | 🏛️ Purple | Historic sites |
 | 🚩 Red | Destination (Time Trial) |
 | ✓ Green | Checkpoints |
@@ -590,8 +595,8 @@ Use memory markers to leave notes directly in the world.
 
 ### How to Place
 
-1. Open `Exploration` float menu.
-2. Click `Place Memory`.
+1. Click the `🌸` memory button above the controls panel.
+2. Memory composer opens.
 3. Choose marker type (`Pin` or `Flower`).
 4. Enter your message.
 5. Click `Place Marker`.
@@ -604,12 +609,21 @@ Placement uses your current Earth-mode position (car, walk, or drone reference p
 2. Memory info panel opens.
 3. Click `Remove Marker`.
 
+### Delete All Memories
+
+1. Open the memory composer (`🌸` button).
+2. Click `Delete All`.
+3. Confirm the prompt.
+
 ### Persistence Behavior
 
 - Memory markers are persisted in browser local storage on this device/browser profile.
 - They reload automatically when you revisit that location.
+- Memory markers are also shown on minimap and large map.
+- Limits: 200 chars per message, 300 markers per location, 1500 markers total.
 - If browser storage is blocked/disabled, placement is disabled and a warning is shown.
 - Markers are not automatically synced between different browsers/devices.
+- Notes are not encrypted; do not store passwords, keys, or sensitive personal data.
 - Optional check: run `getMemoryPersistenceStatus()` in browser console.
 
 ## Advanced Features
@@ -795,6 +809,12 @@ A: Yes, optimized for tablets and phones with touch controls.
 **Q: Can I save my progress?**
 A: Full gameplay state is not saved, but memory markers (pin/flower notes) are persisted locally in your browser.
 
+**Q: Where are memory notes stored?**
+A: In browser local storage (`worldExplorer3D.memories.v1`) on this device/profile only.
+
+**Q: Are memory notes secure/private?**
+A: They are local-only but not encrypted. Anyone with access to this browser profile can read them.
+
 **Q: Is it multiplayer?**
 A: Not yet, but planned for future updates.
 
@@ -923,7 +943,7 @@ Quick reference for all controls:
 |-----|--------|
 | M | Toggle Map |
 | N | Next City |
-| Exploration menu > Place Memory | Create persistent pin/flower note |
+| 🌸 Memory Button | Create persistent pin/flower note |
 | R | Record Track |
 | Esc | Pause |
 

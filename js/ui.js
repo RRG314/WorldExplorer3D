@@ -103,8 +103,8 @@ function setupUI() {
                 }
             }
 
-            // Check if click is on a POI marker
-            if (poiMode && pois.length > 0) {
+            // Check if click is on a POI marker (based on legend layer filters)
+            if (pois.length > 0) {
                 for (const poi of pois) {
                     if (!isPOIVisible(poi.type)) continue;
                     const screenPos = worldToScreenLarge(poi.x, poi.z);
