@@ -377,7 +377,7 @@ const GALAXIES = [
   }
 ];
 
-const GALAXY_VISUAL_SCALE = 1.35;
+const GALAXY_VISUAL_SCALE = 1.6;
 
 // ---------------------------------------------------------------------------
 // SOLAR SYSTEM STATE
@@ -563,7 +563,7 @@ function mapGalaxyDistanceToScene(distanceLy) {
   const minLog = Math.log10(minLy);
   const maxLog = Math.log10(maxLy);
   const t = (Math.log10(clamped) - minLog) / (maxLog - minLog);
-  return 62000 + t * 30000;
+  return 160000 + t * 160000;
 }
 
 // ---------------------------------------------------------------------------

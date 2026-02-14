@@ -281,8 +281,8 @@ function createSpaceFlightScene() {
   spaceFlight.scene = new THREE.Scene();
   spaceFlight.scene.background = new THREE.Color(0x000008);
 
-  // Camera - extended far plane for real proportional AU-scale solar system + deep starfield
-  spaceFlight.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 100000);
+  // Camera - extended far plane for deep-space galaxy layer
+  spaceFlight.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.5, 450000);
 
   // Renderer (capped pixel ratio for Chromebook performance)
   spaceFlight.renderer = new THREE.WebGLRenderer({
@@ -329,12 +329,12 @@ function createSpaceStarfield() {
   const starVerts = [];
   const starColors = [];
 
-  // Massive starfield sphere surrounding entire proportional solar system
+  // Massive starfield shell pushed farther so distant galaxies feel deep.
   for (let i = 0; i < 8000; i++) {
-    // Place stars in a hollow shell between 30000 and 90000 units
+    // Place stars in a hollow shell between 140000 and 360000 units
     const theta = Math.random() * Math.PI * 2;
     const phi = Math.acos(2 * Math.random() - 1);
-    const r = 30000 + Math.random() * 60000;
+    const r = 140000 + Math.random() * 220000;
     starVerts.push(
       r * Math.sin(phi) * Math.cos(theta),
       r * Math.sin(phi) * Math.sin(theta),
