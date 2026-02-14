@@ -10,7 +10,8 @@ const BUILD_BLOCK_COLORS = [0xb55239, 0xa74631, 0x9a3d2b, 0xc16345];
 const BUILD_STORAGE_KEY = 'worldExplorer3D.buildBlocks.v1';
 const BUILD_STORAGE_TEST_KEY = 'worldExplorer3D.buildBlocks.test';
 const BUILD_LOCATION_PRECISION = 5;
-const BUILD_MAX_TOTAL = 6000;
+const BUILD_MAX_PER_LOCATION = 100;
+const BUILD_MAX_TOTAL = 100;
 
 let buildModeEnabled = false;
 let buildGroup = null;
@@ -20,6 +21,7 @@ let buildRaycaster = null;
 let buildPersistenceEnabled = false;
 let buildPersistenceDetail = 'Not initialized.';
 let buildEntries = [];
+let buildIndicatorResetTimer = null;
 
 const buildBlocks = new Map();
 const buildColumns = new Map();
@@ -102,6 +104,47 @@ function getBuildPersistenceStatus() {
         detail: buildPersistenceDetail,
         storageKey: BUILD_STORAGE_KEY
     };
+}
+
+function getBuildLimits() {
+    const locationKey = getCurrentLocationKey();
+    let locationCount = 0;
+    if (locationKey) {
+        locationCount = buildEntries.reduce((count, entry) =>
+            count + (entry.locationKey === locationKey ? 1 : 0), 0);
+    }
+    return {
+        maxPerLocation: BUILD_MAX_PER_LOCATION,
+        maxTotal: BUILD_MAX_TOTAL,
+        currentLocationCount: locationCount,
+        totalCount: buildEntries.length
+    };
+}
+
+function getBuildIndicatorDefaultHtml() {
+    return '🧱 Build Mode ON<br>Click to place blocks, Shift+Click to remove.<br>Press B to toggle.';
+}
+
+function showBuildTransientMessage(text) {
+    const indicator = document.getElementById('buildModeIndicator');
+    if (!indicator) return;
+    indicator.classList.add('show');
+    indicator.innerHTML = `🧱 ${String(text || '').slice(0, 160)}`;
+
+    if (buildIndicatorResetTimer) {
+        clearTimeout(buildIndicatorResetTimer);
+        buildIndicatorResetTimer = null;
+    }
+    buildIndicatorResetTimer = setTimeout(() => {
+        const target = document.getElementById('buildModeIndicator');
+        if (!target) return;
+        if (buildModeEnabled) {
+            target.innerHTML = getBuildIndicatorDefaultHtml();
+        } else {
+            target.classList.remove('show');
+        }
+        buildIndicatorResetTimer = null;
+    }, 2200);
 }
 
 function canPersistBuildBlocks() {
@@ -285,15 +328,24 @@ function persistPlacedBuildBlock(gx, gy, gz, materialIndex) {
     const locationKey = getCurrentLocationKey();
     if (!locationKey || !getLocRef()) return false;
 
+    const existingIndex = buildEntries.findIndex((entry) =>
+        entry.locationKey === locationKey && entry.gx === gx && entry.gy === gy && entry.gz === gz
+    );
+    if (existingIndex < 0) {
+        const locationCount = buildEntries.reduce((count, entry) =>
+            count + (entry.locationKey === locationKey ? 1 : 0), 0);
+        if (locationCount >= BUILD_MAX_PER_LOCATION || buildEntries.length >= BUILD_MAX_TOTAL) {
+            return false;
+        }
+    }
+
     const worldX = toWorldCoord(gx);
     const worldZ = toWorldCoord(gz);
     const latLon = worldToLatLonSafe(worldX, worldZ);
     if (!latLon || !isFiniteNumber(latLon.lat) || !isFiniteNumber(latLon.lon)) return false;
 
     const prev = buildEntries.slice();
-    const idx = buildEntries.findIndex((entry) =>
-        entry.locationKey === locationKey && entry.gx === gx && entry.gy === gy && entry.gz === gz
-    );
+    const idx = existingIndex;
 
     const nextEntry = normalizeBuildEntry({
         id: idx >= 0 ? buildEntries[idx].id : undefined,
@@ -360,6 +412,18 @@ function clearPersistedBuildBlocksForCurrentLocation() {
     return true;
 }
 
+function clearPersistedBuildBlocksEverywhere() {
+    if (!buildPersistenceEnabled) return true;
+    if (buildEntries.length === 0) return true;
+    const previous = buildEntries;
+    buildEntries = [];
+    if (!saveBuildEntriesToStorage()) {
+        buildEntries = previous;
+        return false;
+    }
+    return true;
+}
+
 function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
     if (!Number.isFinite(gx) || !Number.isFinite(gy) || !Number.isFinite(gz)) return false;
     const group = ensureBuildGroup();
@@ -369,6 +433,17 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
 
     const key = blockKey(gx, gy, gz);
     if (buildBlocks.has(key)) return false;
+
+    const enforceLimit = options.enforceLimit !== false;
+    if (enforceLimit) {
+        const limits = getBuildLimits();
+        if (buildBlocks.size >= BUILD_MAX_PER_LOCATION ||
+            limits.currentLocationCount >= BUILD_MAX_PER_LOCATION ||
+            limits.totalCount >= BUILD_MAX_TOTAL) {
+            showBuildTransientMessage(`Limit reached (${BUILD_MAX_PER_LOCATION} blocks max). Remove some or use Delete All Blocks.`);
+            return false;
+        }
+    }
 
     const idx = Number.isInteger(materialIndex)
         ? Math.max(0, Math.min(buildMaterials.length - 1, materialIndex))
@@ -391,7 +466,13 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
     addBuildColumnEntry(gx, gy, gz);
 
     if (options.persist !== false) {
-        persistPlacedBuildBlock(gx, gy, gz, idx);
+        if (!persistPlacedBuildBlock(gx, gy, gz, idx)) {
+            if (mesh.parent) mesh.parent.remove(mesh);
+            buildBlocks.delete(key);
+            removeBuildColumnEntry(gx, gy, gz);
+            showBuildTransientMessage(`Limit reached (${BUILD_MAX_PER_LOCATION} blocks max). Remove some or use Delete All Blocks.`);
+            return false;
+        }
     }
     return true;
 }
@@ -423,6 +504,13 @@ function clearRenderedBuildBlocks() {
 function clearAllBuildBlocks(options = {}) {
     if (options.persist !== false) {
         clearPersistedBuildBlocksForCurrentLocation();
+    }
+    clearRenderedBuildBlocks();
+}
+
+function clearAllBuildBlocksEverywhere(options = {}) {
+    if (options.persist !== false) {
+        clearPersistedBuildBlocksEverywhere();
     }
     clearRenderedBuildBlocks();
 }
@@ -495,6 +583,9 @@ function updateBuildModeUI() {
 
     const indicator = document.getElementById('buildModeIndicator');
     if (indicator) {
+        if (buildModeEnabled) {
+            indicator.innerHTML = getBuildIndicatorDefaultHtml();
+        }
         indicator.classList.toggle('show', buildModeEnabled);
     }
 }
@@ -637,7 +728,7 @@ function refreshBlockBuilderForCurrentLocation() {
         if (!isFiniteNumber(worldPos.x) || !isFiniteNumber(worldPos.z)) return;
         const gx = toGridCoord(worldPos.x);
         const gz = toGridCoord(worldPos.z);
-        placeBuildBlock(gx, Math.round(entry.gy), gz, entry.materialIndex, { persist: false });
+        placeBuildBlock(gx, Math.round(entry.gy), gz, entry.materialIndex, { persist: false, enforceLimit: false });
     });
 }
 
@@ -650,8 +741,10 @@ buildEntries = loadBuildEntriesFromStorage();
 
 Object.assign(globalThis, {
     clearAllBuildBlocks,
+    clearAllBuildBlocksEverywhere,
     clearBlockBuilderForWorldReload,
     getBuildCollisionAtWorldXZ,
+    getBuildLimits,
     getBuildPersistenceStatus,
     getBuildTopSurfaceAtWorldXZ,
     handleBlockBuilderClick,
@@ -663,8 +756,10 @@ Object.assign(globalThis, {
 
 export {
     clearAllBuildBlocks,
+    clearAllBuildBlocksEverywhere,
     clearBlockBuilderForWorldReload,
     getBuildCollisionAtWorldXZ,
+    getBuildLimits,
     getBuildPersistenceStatus,
     getBuildTopSurfaceAtWorldXZ,
     handleBlockBuilderClick,

@@ -27,6 +27,7 @@ Entries reflect changes made relative to the most recent public release.
 - Legend-layer checkboxes for memory `Pin` and `Flower` overlays.
 - Brick block builder module (`js/blocks.js`) with in-world place/stack/remove controls.
 - Persistent per-location build-block storage (`worldExplorer3D.buildBlocks.v1`) with runtime status hook (`getBuildPersistenceStatus()`).
+- Global block purge action (`💥 Delete All Blocks`) for full browser-side block reset across locations.
 - Security/storage notice document for persistent memory behavior and disclaimer boilerplate.
 
 ### Changed
@@ -37,7 +38,7 @@ Entries reflect changes made relative to the most recent public release.
 - Space info panel metric rows are now reusable for planets, asteroids, spacecraft, and galaxies.
 - POI map rendering now follows legend category filters on both minimap and large map.
 - Dynamic map/property/historic UI templates now escape untrusted string fields before insertion.
-- Module loader cache-bust chain incremented through `v=30` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Module loader cache-bust chain incremented through `v=31` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### Fixed
 - Non-responsive title menu interactions for suggested/custom selection after UI rework.
@@ -47,6 +48,7 @@ Entries reflect changes made relative to the most recent public release.
 - Large-map POI click handling blocked by old POI-mode gate even when legend filters were enabled.
 - Build blocks being wiped during world reload instead of rehydrating from storage.
 - Walking physics not treating placed build blocks as climbable/standable collision surfaces.
+- Missing hard cap for user-placed build blocks (now limited to 100).
 
 ---
 

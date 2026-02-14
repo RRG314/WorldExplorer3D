@@ -81,6 +81,8 @@ Block builder action:
 | Click (build mode on) | Place brick block |
 | Shift+Click (build mode on) | Remove targeted block |
 | `🎮 Game Mode` -> `🧹 Clear Blocks` | Remove all build blocks for current location (including saved blocks) |
+| `🎮 Game Mode` -> `💥 Delete All Blocks` | Remove all saved build blocks in this browser (all locations) |
+| Block cap | Up to `100` total blocks can be stored for now |
 
 ## 5. Troubleshooting
 
@@ -100,7 +102,7 @@ Block builder action:
 
 - Clear browser cache.
 - Verify cache-bust values are aligned across `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
-- Current freeze snapshot cache-bust target is `v=30`.
+- Current freeze snapshot cache-bust target is `v=31`.
 
 ### Memory markers not persisting
 
