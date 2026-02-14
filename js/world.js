@@ -374,17 +374,17 @@ function getAdaptiveLoadProfile(loadDepth, mode = getPerfModeValue()) {
     // Depth-aware RDT budgets: high depth = much tighter caps.
     const profileByDepth =
         depth >= 6 ? {
-            radii: [0.017, 0.021, 0.024],
-            featureRadiusScale: 0.82,
-            poiRadiusScale: 0.78,
-            maxRoadWays: 2600,
-            maxBuildingWays: 10500,
+            radii: [0.018, 0.023, 0.027],
+            featureRadiusScale: 0.90,
+            poiRadiusScale: 0.84,
+            maxRoadWays: 3000,
+            maxBuildingWays: 14000,
             maxLanduseWays: 3500,
             maxPoiNodes: 1300,
-            roadsPerTile: 110,
-            roadsMinPerTile: 26,
-            buildingsPerTile: 300,
-            buildingsMinPerTile: 84,
+            roadsPerTile: 130,
+            roadsMinPerTile: 34,
+            buildingsPerTile: 360,
+            buildingsMinPerTile: 100,
             landusePerTile: 84,
             landuseMinPerTile: 18,
             poiPerTile: 45,
@@ -865,7 +865,7 @@ function batchNearLodBuildingMeshes() {
         const mesh = buildingMeshes[i];
         if (!mesh) continue;
         const tier = mesh.userData?.lodTier || 'near';
-        if (tier !== 'near' || mesh.userData?.isBuildingBatch) {
+        if ((tier !== 'near' && tier !== 'mid') || mesh.userData?.isBuildingBatch) {
             keep.push(mesh);
             continue;
         }
@@ -874,18 +874,20 @@ function batchNearLodBuildingMeshes() {
             continue;
         }
 
-        const key = materialBatchKey(mesh.material);
-        if (!key) {
+        const matKey = materialBatchKey(mesh.material);
+        if (!matKey) {
             keep.push(mesh);
             continue;
         }
+        const key = `${tier}|${matKey}`;
 
         let group = groups.get(key);
         if (!group) {
             group = {
                 meshes: [],
                 material: mesh.material,
-                renderOrder: mesh.renderOrder || 0
+                renderOrder: mesh.renderOrder || 0,
+                lodTier: tier
             };
             groups.set(key, group);
         }
@@ -964,7 +966,7 @@ function batchNearLodBuildingMeshes() {
         }
 
         mergedMesh.userData = {
-            lodTier: 'near',
+            lodTier: group.lodTier || 'near',
             isBuildingBatch: true,
             isNearBuildingBatch: true,
             batchCount: group.meshes.length,
@@ -1830,6 +1832,7 @@ async function loadRoads() {
             });
 
             function isBuildingNearLoadedRoad(pts) {
+                if (useRdtBudgeting) return true;
                 if (!pts || pts.length === 0 || roadCoverageCells.size === 0) return true;
                 let sumX = 0, sumZ = 0;
                 for (let i = 0; i < pts.length; i++) {
@@ -1865,7 +1868,7 @@ async function loadRoads() {
                 const centerDist = Math.hypot(centerX, centerZ);
                 const lodTier = centerDist <= lodNearDist
                     ? 'near'
-                    : (centerDist <= lodMidDist ? 'mid' : 'far');
+                    : (centerDist <= lodThresholds.farVisible ? 'mid' : 'far');
                 if (lodTier === 'far') {
                     loadMetrics.lod.farSkipped += 1;
                     return;
@@ -1875,18 +1878,6 @@ async function loadRoads() {
                 const bSeed = (rdtSeed ^ (way.id >>> 0)) >>> 0;
                 const br1 = rand01FromInt(bSeed);
                 const br2 = rand01FromInt(bSeed ^ 0x9e3779b9);
-
-                if (lodTier === 'mid' && useRdtBudgeting) {
-                    const midKeepRatio =
-                        rdtLoadComplexity >= 6 ? 0.78 :
-                        rdtLoadComplexity === 5 ? 0.84 :
-                        rdtLoadComplexity === 4 ? 0.90 :
-                                                  0.94;
-                    if (br1 > midKeepRatio) {
-                        loadMetrics.lod.midSkipped += 1;
-                        return;
-                    }
-                }
 
                 // Get building height from tags or estimate
                 let height = 10; // default
@@ -1905,9 +1896,7 @@ async function loadRoads() {
                     else height = 8 + br1 * 12;
                 }
 
-                if (lodTier === 'near') {
-                    registerBuildingCollision(pts, height);
-                }
+                registerBuildingCollision(pts, height);
 
                 // Calculate terrain stats for building footprint
                 let avgElevation = 0;
@@ -1928,36 +1917,28 @@ async function loadRoads() {
                 const colors = ['#888888', '#7788aa', '#998877', '#667788'];
                 const baseColor = colors[Math.floor(br2 * colors.length)];
                 const bt = way.tags.building || 'yes';
-                let mesh = null;
+                const shape = new THREE.Shape();
+                pts.forEach((p, i) => {
+                    if (i === 0) shape.moveTo(p.x, -p.z);
+                    else shape.lineTo(p.x, -p.z);
+                });
+                shape.closePath();
 
-                if (lodTier === 'near') {
-                    // Near tier: full geometry + collision
-                    const shape = new THREE.Shape();
-                    pts.forEach((p, i) => {
-                        if (i === 0) shape.moveTo(p.x, -p.z);
-                        else shape.lineTo(p.x, -p.z);
-                    });
-                    shape.closePath();
+                const extrudeSettings = { depth: height, bevelEnabled: false };
+                const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+                geo.rotateX(-Math.PI / 2);
 
-                    const extrudeSettings = { depth: height, bevelEnabled: false };
-                    const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-                    geo.rotateX(-Math.PI / 2);
+                const bldgMat = (typeof getBuildingMaterial === 'function')
+                    ? getBuildingMaterial(bt, bSeed, baseColor)
+                    : new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.85, metalness: 0.05 });
 
-                    const bldgMat = (typeof getBuildingMaterial === 'function')
-                        ? getBuildingMaterial(bt, bSeed, baseColor)
-                        : new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.85, metalness: 0.05 });
-
-                    mesh = new THREE.Mesh(geo, bldgMat);
-                    mesh.position.y = avgElevation;
-                    mesh.userData.buildingFootprint = pts;
-                    mesh.userData.avgElevation = avgElevation;
-                    mesh.userData.lodTier = 'near';
-                    mesh.castShadow = true;
-                    mesh.receiveShadow = true;
-                } else {
-                    // Mid tier: simplified box mesh, no collision registration
-                    mesh = createMidLodBuildingMesh(pts, height, avgElevation, baseColor);
-                }
+                const mesh = new THREE.Mesh(geo, bldgMat);
+                mesh.position.y = avgElevation;
+                mesh.userData.buildingFootprint = pts;
+                mesh.userData.avgElevation = avgElevation;
+                mesh.userData.lodTier = lodTier;
+                mesh.castShadow = lodTier === 'near';
+                mesh.receiveShadow = true;
 
                 if (!mesh) return;
                 scene.add(mesh);
@@ -1980,10 +1961,6 @@ async function loadRoads() {
                     }
                 }
             });
-            const batchedMidCount = batchMidLodBuildingMeshes();
-            if (batchedMidCount > 0) {
-                loadMetrics.lod.midBatched = batchedMidCount;
-            }
             const batchedNearCount = batchNearLodBuildingMeshes();
             if (batchedNearCount > 0) {
                 loadMetrics.lod.nearBatched = batchedNearCount;
