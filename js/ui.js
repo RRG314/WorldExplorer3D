@@ -21,6 +21,9 @@ function setupUI() {
     if (historicBtn) {
         historicBtn.addEventListener('click', toggleHistoric);
     }
+    if (typeof setupMemoryUI === 'function') {
+        setupMemoryUI();
+    }
 
     // Property Controls
     const radiusSlider = document.getElementById('radiusSlider');
@@ -505,6 +508,13 @@ function setupUI() {
         ['hud','minimap','modeHud','police','floatMenuContainer','mainMenuBtn','pauseScreen','resultScreen','caughtScreen','controlsTab','coords','realEstateBtn','historicBtn'].forEach(id => document.getElementById(id).classList.remove('show'));
     });
     document.getElementById('fNextCity').addEventListener('click', () => { nextCity(); closeAllFloatMenus(); });
+    const memoryBtn = document.getElementById('fMemory');
+    if (memoryBtn) {
+        memoryBtn.addEventListener('click', () => {
+            if (typeof openMemoryComposer === 'function') openMemoryComposer();
+            closeAllFloatMenus();
+        });
+    }
     document.getElementById('fSatellite').addEventListener('click', () => {
         satelliteView = !satelliteView;
         document.getElementById('fSatellite').classList.toggle('on', satelliteView);

@@ -320,6 +320,43 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #historicBtn.show{display:block}
 #historicBtn:hover{transform:scale(1.1);box-shadow:0 12px 32px rgba(245,158,11,0.5)}
 #historicPanel.show{display:flex}
+
+/* Persistent memory markers */
+#memoryComposer{position:fixed;right:20px;bottom:20px;width:min(360px,calc(100vw - 28px));background:rgba(255,255,255,0.98);border:none;border-radius:14px;box-shadow:0 16px 40px rgba(0,0,0,0.28);padding:14px;z-index:140;display:none;backdrop-filter:blur(8px)}
+#memoryComposer.show{display:block}
+.memoryComposerTitle{font-family:'Poppins',sans-serif;font-size:15px;font-weight:700;color:#1f2937}
+.memoryComposerSub{font-size:11px;color:#64748b;margin-top:2px;margin-bottom:10px}
+.memoryTypeRow{display:flex;gap:8px;margin-bottom:10px}
+.memoryTypeBtn{flex:1;background:#f1f5f9;border:2px solid #dbe4ef;border-radius:10px;padding:8px 10px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.2s}
+.memoryTypeBtn:hover{border-color:#cbd5e1;background:#e9eff7}
+.memoryTypeBtn.active{border-color:#6366f1;background:#e0e7ff;color:#3730a3}
+#memoryMessageInput{width:100%;min-height:90px;max-height:180px;resize:vertical;border:2px solid #e2e8f0;border-radius:10px;padding:10px 12px;font-family:'Inter',sans-serif;font-size:13px;line-height:1.4;color:#334155}
+#memoryMessageInput:focus{outline:none;border-color:#818cf8;box-shadow:0 0 0 3px rgba(129,140,248,0.2)}
+.memoryComposerMeta{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+#memoryComposerStatus{font-size:11px;color:#64748b}
+#memoryComposerStatus.error{color:#b91c1c}
+#memoryCharCount{font-size:11px;color:#64748b;font-weight:600}
+.memoryActionRow{display:flex;gap:8px;margin-top:10px}
+.memoryActionBtn{flex:1;border:none;border-radius:10px;padding:10px 12px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;cursor:pointer;transition:all 0.2s}
+#memoryCancelBtn{background:#e2e8f0;color:#334155}
+#memoryCancelBtn:hover{background:#cbd5e1}
+#memoryPlaceBtn{background:#4f46e5;color:#ffffff}
+#memoryPlaceBtn:hover{background:#4338ca}
+
+#memoryInfoPanel{position:fixed;top:95px;right:20px;width:min(340px,calc(100vw - 28px));background:rgba(17,24,39,0.94);color:#e2e8f0;border:1px solid rgba(99,102,241,0.4);border-radius:12px;box-shadow:0 16px 38px rgba(0,0,0,0.35);padding:12px;display:none;z-index:135}
+#memoryInfoPanel.show{display:block}
+#memoryInfoTitle{font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;color:#c7d2fe;margin-bottom:6px}
+#memoryInfoText{font-size:13px;line-height:1.5;color:#f8fafc;white-space:pre-wrap;word-break:break-word}
+#memoryInfoMeta{font-size:11px;color:#93c5fd;margin-top:8px}
+.memoryInfoActions{display:flex;gap:8px;margin-top:10px}
+.memoryInfoBtn{flex:1;border:none;border-radius:8px;padding:8px 10px;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;cursor:pointer}
+#memoryInfoCloseBtn{background:#1e293b;color:#e2e8f0}
+#memoryDeleteBtn{background:#b91c1c;color:#ffffff}
+
+@media (max-width: 768px){
+  #memoryComposer{left:10px;right:10px;bottom:12px;width:auto}
+  #memoryInfoPanel{left:10px;right:10px;top:72px;width:auto}
+}
 </style>
 </head>
 <body>
@@ -502,6 +539,7 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="ctrl-row"><span class="ctrl-key">LAND ON ... Button</span><span class="ctrl-action">Land when in range</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Click Planets/Asteroids/Galaxies</span><span class="ctrl-action">Inspect deep-space object info</span></div>
 <div class="ctrl-section">Other</div>
+<div class="ctrl-row"><span class="ctrl-key">Exploration Menu</span><span class="ctrl-action">Place/remove memory pin or flower</span></div>
 <div class="ctrl-row"><span class="ctrl-key">R</span><span class="ctrl-action">Record/Stop Track</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Esc</span><span class="ctrl-action">Pause</span></div>
 </div>
@@ -722,6 +760,7 @@ Explore the area
 <div style="border-top:1px solid #e2e8f0;margin:6px 0"></div>
 <div class="floatItem" id="fHome">🏠 Menu</div>
 <div class="floatItem" id="fNextCity">📍 New Location</div>
+<div class="floatItem" id="fMemory">🌸 Place Memory</div>
 </div>
 </div>
 
@@ -762,6 +801,35 @@ Explore the area
 </div>
 </div>
 </div>
+
+<div id="memoryComposer">
+<div class="memoryComposerTitle">Memory Marker</div>
+<div class="memoryComposerSub">Place a pin or flower with a short note (200 chars max).</div>
+<div class="memoryTypeRow">
+<button id="memoryTypePin" class="memoryTypeBtn active" type="button">📍 Pin</button>
+<button id="memoryTypeFlower" class="memoryTypeBtn" type="button">🌸 Flower</button>
+</div>
+<textarea id="memoryMessageInput" maxlength="200" placeholder="Leave a short memory note..."></textarea>
+<div class="memoryComposerMeta">
+<div id="memoryComposerStatus"></div>
+<div id="memoryCharCount">0/200</div>
+</div>
+<div class="memoryActionRow">
+<button id="memoryCancelBtn" class="memoryActionBtn" type="button">Cancel</button>
+<button id="memoryPlaceBtn" class="memoryActionBtn" type="button">Place Marker</button>
+</div>
+</div>
+
+<div id="memoryInfoPanel">
+<div id="memoryInfoTitle">Memory Marker</div>
+<div id="memoryInfoText"></div>
+<div id="memoryInfoMeta"></div>
+<div class="memoryInfoActions">
+<button id="memoryInfoCloseBtn" class="memoryInfoBtn" type="button">Close</button>
+<button id="memoryDeleteBtn" class="memoryInfoBtn" type="button">Remove Marker</button>
+</div>
+</div>
+
 <button class="mainMenuBtn" id="mainMenuBtn">🏠 Main Menu</button>
 <div id="controlsTab"><div id="ctrlHeader">🎮 Controls ▼</div><div id="ctrlContent" class="hidden">
 <div id="drivingControls">
@@ -804,6 +872,7 @@ Explore the area
 <b>🌙 Space & Map:</b><br>
 • Click Moon - Travel to moon<br>
 • Click Stars - View constellation<br>
+• Exploration menu > Place Memory - Drop/remove pin or flower notes<br>
 • Right Click Map - Teleport<br>
 • Left Click Map - View info
 </div></div>
@@ -899,5 +968,5 @@ Explore the area
 <div id="pauseScreen"><div class="pauseTitle">PAUSED</div><button class="pauseBtn" id="resumeBtn">Resume</button><button class="pauseBtn" id="restartBtn">Restart</button><button class="pauseBtn" id="menuBtn">Main Menu</button></div>
 <div id="resultScreen"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
 <div id="caughtScreen"><div class="caughtBox"><div class="caughtTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
-<script type="module" src="js/bootstrap.js?v=21"></script>
+<script type="module" src="js/bootstrap.js?v=22"></script>
 </body></html>
