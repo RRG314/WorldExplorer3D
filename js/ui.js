@@ -574,7 +574,8 @@ function setupUI() {
   }
 
   function openShareWindow(targetUrl) {
-    const popup = window.open(targetUrl, '_blank', 'noopener,noreferrer,width=760,height=760');
+    // Use normal browser new-tab behavior instead of popup-sized windows.
+    const popup = window.open(targetUrl, '_blank', 'noopener,noreferrer');
     if (popup && typeof popup.focus === 'function') popup.focus();
     if (!popup) {
       setGameShareStatus('Popup blocked. Allow popups to open share links.');
