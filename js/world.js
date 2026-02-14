@@ -1,4 +1,4 @@
-import { ctx as appCtx } from "./shared-context.js?v=53"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=54"; // ============================================================================
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
@@ -234,6 +234,42 @@ function getPerfModeValue() {
   return mode === 'baseline' ? 'baseline' : 'rdt';
 }
 
+function clampNumber(value, min, max, fallback = 1) {
+  if (!Number.isFinite(value)) return fallback;
+  return Math.max(min, Math.min(max, value));
+}
+
+function scaledInt(value, scale, min = 1) {
+  if (!Number.isFinite(value)) return min;
+  return Math.max(min, Math.round(value * scale));
+}
+
+function getRuntimeDynamicBudget(mode = getPerfModeValue()) {
+  const state = typeof appCtx.getDynamicBudgetState === 'function' ?
+  appCtx.getDynamicBudgetState() :
+  null;
+  const defaultState = {
+    auto: false,
+    tier: 'balanced',
+    budgetScale: 1,
+    lodScale: 1
+  };
+  const source = state && typeof state === 'object' ? state : defaultState;
+  const budgetScale =
+  mode === 'baseline' ?
+  clampNumber(source.budgetScale, 0.80, 1.00, 1) :
+  clampNumber(source.budgetScale, 0.78, 1.16, 1);
+  const lodScale =
+  mode === 'baseline' ?
+  clampNumber(source.lodScale, 0.90, 1.00, 1) :
+  clampNumber(source.lodScale, 0.85, 1.14, 1);
+  return {
+    ...source,
+    budgetScale,
+    lodScale
+  };
+}
+
 function wayCenterLatLon(way, nodeMap) {
   if (!way?.nodes?.length) return null;
 
@@ -413,40 +449,49 @@ function getRoadSubdivisionStep(roadType, tileDepth, mode = getPerfModeValue()) 
   return Math.max(2.0, Math.min(7.0, maxDist));
 }
 
-function getWorldLodThresholds(loadDepth, mode = getPerfModeValue()) {
+function getWorldLodThresholds(loadDepth, mode = getPerfModeValue(), lodScale = 1) {
+  const scale = clampNumber(lodScale, 0.75, 1.25, 1);
   if (mode === 'baseline') {
-    return { near: 1200, mid: 2400, farVisible: 2700 };
+    const nearBase = 1200;
+    const near = Math.max(900, Math.round(nearBase * scale));
+    const mid = Math.max(near + 600, Math.round(2400 * scale));
+    const farVisible = Math.max(mid + 240, Math.round(2700 * scale));
+    return { near, mid, farVisible };
   }
 
   const depth = Math.max(0, loadDepth | 0);
   // Keep RDT adaptive with smoother pop control, but avoid over-expanding visibility.
-  const near = Math.max(980, 1500 - depth * 45);
-  const mid = near + 1320;
+  const nearBase = Math.max(980, 1500 - depth * 45);
+  const near = Math.max(900, Math.round(nearBase * scale));
+  const mid = Math.max(near + 540, Math.round((nearBase + 1320) * scale));
   return { near, mid, farVisible: mid + 450 };
 }
 
-function getAdaptiveLoadProfile(loadDepth, mode = getPerfModeValue()) {
+function getAdaptiveLoadProfile(loadDepth, mode = getPerfModeValue(), budgetScale = 1) {
   const depth = Math.max(0, loadDepth | 0);
+  const scale = clampNumber(budgetScale, 0.65, 1.35, 1);
+  const radiusScale = clampNumber(Math.sqrt(scale), 0.88, 1.08, 1);
+  const scaledRadii = (radii) => radii.map((r) => Number((r * radiusScale).toFixed(5)));
 
   if (mode === 'baseline') {
     return {
-      radii: [0.02, 0.025, 0.03],
-      featureRadiusScale: 1.0,
-      poiRadiusScale: 1.0,
-      maxRoadWays: 20000,
-      maxBuildingWays: 50000,
-      maxLanduseWays: 15000,
-      maxPoiNodes: 8000,
+      radii: scaledRadii([0.02, 0.025, 0.03]),
+      featureRadiusScale: clampNumber(1.0 * radiusScale, 0.90, 1.02, 1),
+      poiRadiusScale: clampNumber(1.0 * radiusScale, 0.88, 1.02, 1),
+      maxRoadWays: scaledInt(20000, scale, 3200),
+      maxBuildingWays: scaledInt(50000, scale, 7000),
+      maxLanduseWays: scaledInt(15000, scale, 2200),
+      maxPoiNodes: scaledInt(8000, scale, 1200),
       tileBudgetCfg: {
         tileDegrees: FEATURE_TILE_DEGREES,
-        roadsPerTile: 520,
-        roadsMinPerTile: 240,
-        buildingsPerTile: 1200,
-        buildingsMinPerTile: 600,
-        landusePerTile: 320,
-        landuseMinPerTile: 150,
-        poiPerTile: 200,
-        poiMinPerTile: 90
+        roadsPerTile: scaledInt(520, scale, 120),
+        roadsMinPerTile: scaledInt(240, scale, 48),
+        buildingsPerTile: scaledInt(1200, scale, 220),
+        buildingsMinPerTile: scaledInt(600, scale, 120),
+        landusePerTile: scaledInt(320, scale, 70),
+        landuseMinPerTile: scaledInt(150, scale, 35),
+        poiPerTile: scaledInt(200, scale, 40),
+        poiMinPerTile: scaledInt(90, scale, 20)
       },
       overpassTimeoutMs: 30000,
       maxTotalLoadMs: 62000
@@ -532,23 +577,23 @@ function getAdaptiveLoadProfile(loadDepth, mode = getPerfModeValue()) {
   };
 
   return {
-    radii: profileByDepth.radii,
-    featureRadiusScale: profileByDepth.featureRadiusScale,
-    poiRadiusScale: profileByDepth.poiRadiusScale,
-    maxRoadWays: profileByDepth.maxRoadWays,
-    maxBuildingWays: profileByDepth.maxBuildingWays,
-    maxLanduseWays: profileByDepth.maxLanduseWays,
-    maxPoiNodes: profileByDepth.maxPoiNodes,
+    radii: scaledRadii(profileByDepth.radii),
+    featureRadiusScale: clampNumber(profileByDepth.featureRadiusScale * radiusScale, 0.75, 1.12, profileByDepth.featureRadiusScale),
+    poiRadiusScale: clampNumber(profileByDepth.poiRadiusScale * radiusScale, 0.70, 1.12, profileByDepth.poiRadiusScale),
+    maxRoadWays: scaledInt(profileByDepth.maxRoadWays, scale, 900),
+    maxBuildingWays: scaledInt(profileByDepth.maxBuildingWays, scale, 2400),
+    maxLanduseWays: scaledInt(profileByDepth.maxLanduseWays, scale, 600),
+    maxPoiNodes: scaledInt(profileByDepth.maxPoiNodes, scale, 240),
     tileBudgetCfg: {
       tileDegrees: FEATURE_TILE_DEGREES,
-      roadsPerTile: profileByDepth.roadsPerTile,
-      roadsMinPerTile: profileByDepth.roadsMinPerTile,
-      buildingsPerTile: profileByDepth.buildingsPerTile,
-      buildingsMinPerTile: profileByDepth.buildingsMinPerTile,
-      landusePerTile: profileByDepth.landusePerTile,
-      landuseMinPerTile: profileByDepth.landuseMinPerTile,
-      poiPerTile: profileByDepth.poiPerTile,
-      poiMinPerTile: profileByDepth.poiMinPerTile
+      roadsPerTile: scaledInt(profileByDepth.roadsPerTile, scale, 18),
+      roadsMinPerTile: scaledInt(profileByDepth.roadsMinPerTile, scale, 8),
+      buildingsPerTile: scaledInt(profileByDepth.buildingsPerTile, scale, 32),
+      buildingsMinPerTile: scaledInt(profileByDepth.buildingsMinPerTile, scale, 14),
+      landusePerTile: scaledInt(profileByDepth.landusePerTile, scale, 10),
+      landuseMinPerTile: scaledInt(profileByDepth.landuseMinPerTile, scale, 4),
+      poiPerTile: scaledInt(profileByDepth.poiPerTile, scale, 6),
+      poiMinPerTile: scaledInt(profileByDepth.poiMinPerTile, scale, 3)
     },
     overpassTimeoutMs: profileByDepth.overpassTimeoutMs,
     maxTotalLoadMs: profileByDepth.maxTotalLoadMs
@@ -1585,11 +1630,16 @@ async function loadRoads(retryPass = 0) {
 
   // RDT complexity index: location-derived complexity used by adaptive mode.
   appCtx.rdtSeed = appCtx.hashGeoToInt(appCtx.LOC.lat, appCtx.LOC.lon, appCtx.gameMode === 'trial' ? 1 : appCtx.gameMode === 'checkpoint' ? 2 : 0);
+  const sharedSeedOverrideRaw = Number(appCtx.sharedSeedOverride);
+  if (Number.isFinite(sharedSeedOverrideRaw)) {
+    appCtx.rdtSeed = (Math.floor(sharedSeedOverrideRaw) | 0) >>> 0;
+  }
   const rawRdtComplexity = appCtx.rdtDepth(appCtx.rdtSeed, 1.5);
   const rdtLoadComplexity = appCtx.rdtDepth(appCtx.rdtSeed % 1000000 + 2, 1.5);
   appCtx.rdtComplexity = useRdtBudgeting ? rawRdtComplexity : 0;
 
-  const loadProfile = getAdaptiveLoadProfile(rdtLoadComplexity, perfModeNow);
+  const dynamicBudgetState = getRuntimeDynamicBudget(perfModeNow);
+  const loadProfile = getAdaptiveLoadProfile(rdtLoadComplexity, perfModeNow, dynamicBudgetState.budgetScale);
   const radii = loadProfile.radii.slice();
   const featureRadiusScale = loadProfile.featureRadiusScale;
   const poiRadiusScale = loadProfile.poiRadiusScale;
@@ -1599,7 +1649,9 @@ async function loadRoads(retryPass = 0) {
   const maxPoiNodes = loadProfile.maxPoiNodes;
   const tileBudgetCfg = loadProfile.tileBudgetCfg;
 
-  const lodThresholds = getWorldLodThresholds(rdtLoadComplexity, perfModeNow);
+  const lodThresholds = getWorldLodThresholds(rdtLoadComplexity, perfModeNow, dynamicBudgetState.lodScale);
+  appCtx.dynamicBudgetScale = dynamicBudgetState.budgetScale;
+  appCtx.dynamicLodScale = dynamicBudgetState.lodScale;
 
   const overpassTimeoutMs = loadProfile.overpassTimeoutMs;
   const maxTotalLoadMs = loadProfile.maxTotalLoadMs;
@@ -1611,6 +1663,8 @@ async function loadRoads(retryPass = 0) {
   loadMetrics.radii = radii.slice();
   loadMetrics.lodThresholds = lodThresholds;
   loadMetrics.loadProfile = {
+    dynamicBudgetScale: dynamicBudgetState.budgetScale,
+    dynamicLodScale: dynamicBudgetState.lodScale,
     maxRoadWays,
     maxBuildingWays,
     maxLanduseWays,
@@ -1618,6 +1672,13 @@ async function loadRoads(retryPass = 0) {
     tileBudgetCfg,
     overpassTimeoutMs,
     maxTotalLoadMs
+  };
+  loadMetrics.dynamicBudget = {
+    auto: !!dynamicBudgetState.auto,
+    tier: dynamicBudgetState.tier || 'balanced',
+    budgetScale: dynamicBudgetState.budgetScale,
+    lodScale: dynamicBudgetState.lodScale,
+    reason: dynamicBudgetState.reason || null
   };
 
   let loaded = false;
@@ -3194,10 +3255,11 @@ function updateWorldLod(force = false) {
   _lastLodReady = true;
 
   const mode = getPerfModeValue();
+  const dynamicBudgetState = getRuntimeDynamicBudget(mode);
   const depthForLod = typeof appCtx.rdtLoadComplexity === 'number' ? appCtx.rdtLoadComplexity :
 
   typeof appCtx.rdtComplexity === 'number' ? appCtx.rdtComplexity : 0;
-  const lodThresholds = getWorldLodThresholds(depthForLod, mode);
+  const lodThresholds = getWorldLodThresholds(depthForLod, mode, dynamicBudgetState.lodScale);
   const poiMidSq = lodThresholds.mid * lodThresholds.mid;
 
   let nearVisible = 0;

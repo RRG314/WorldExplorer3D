@@ -1,4 +1,4 @@
-import { ctx as appCtx } from "./shared-context.js?v=53"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=54"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
 
@@ -153,6 +153,8 @@ function setupUI() {
   const perfApplyReload = document.getElementById('perfApplyReload');
   const perfCopySnapshot = document.getElementById('perfCopySnapshot');
   const perfSettingsStatus = document.getElementById('perfSettingsStatus');
+  const shareExperienceBtn = document.getElementById('shareExperienceBtn');
+  const shareExperienceStatus = document.getElementById('shareExperienceStatus');
 
   // Load saved API keys from localStorage
   const savedRentcast = localStorage.getItem('rentcastApiKey');
@@ -324,6 +326,235 @@ function setupUI() {
     });
   }
 
+  const sharedExperienceParams = (() => {
+    const params = new URLSearchParams(window.location.search);
+    const hasKnown =
+    params.has('loc') ||
+    params.has('lat') ||
+    params.has('lon') ||
+    params.has('gm') ||
+    params.has('mode') ||
+    params.has('camMode') ||
+    params.has('seed');
+    if (!hasKnown) return null;
+
+    const toNum = (key) => {
+      const value = Number(params.get(key));
+      return Number.isFinite(value) ? value : null;
+    };
+    const normalizeLaunch = (value) => {
+      if (value === 'moon' || value === 'space') return value;
+      return 'earth';
+    };
+    const normalizeGameMode = (value) => {
+      if (value === 'trial' || value === 'checkpoint') return value;
+      return value === 'free' ? 'free' : null;
+    };
+    const normalizeTravelMode = (value) => {
+      if (value === 'driving' || value === 'walking' || value === 'drone' || value === 'rocket') return value;
+      return null;
+    };
+
+    return {
+      loc: params.get('loc') || null,
+      lat: toNum('lat'),
+      lon: toNum('lon'),
+      name: params.get('lname') || null,
+      launch: params.has('launch') ? normalizeLaunch(params.get('launch')) : null,
+      gameMode: normalizeGameMode(params.get('gm')),
+      perfMode: params.get('pm') === 'baseline' ? 'baseline' : params.get('pm') === 'rdt' ? 'rdt' : null,
+      seed: toNum('seed'),
+      travelMode: normalizeTravelMode(params.get('mode')),
+      camMode: (() => {
+        const v = toNum('camMode');
+        return Number.isFinite(v) ? Math.max(0, Math.min(2, Math.round(v))) : null;
+      })(),
+      refX: toNum('rx'),
+      refY: toNum('ry'),
+      refZ: toNum('rz'),
+      yaw: toNum('yaw'),
+      pitch: toNum('pitch')
+    };
+  })();
+
+  function applySharedRuntimeState() {
+    const pending = appCtx.pendingExperienceState;
+    if (!pending || typeof pending !== 'object') return;
+
+    const setDriveMode = () => {
+      appCtx.droneMode = false;
+      if (appCtx.Walk) appCtx.Walk.setModeDrive();
+      if (appCtx.carMesh) appCtx.carMesh.visible = true;
+      const fDriving = document.getElementById('fDriving');
+      const fWalk = document.getElementById('fWalk');
+      const fDrone = document.getElementById('fDrone');
+      if (fDriving) fDriving.classList.add('on');
+      if (fWalk) fWalk.classList.remove('on');
+      if (fDrone) fDrone.classList.remove('on');
+    };
+    const setWalkMode = () => {
+      appCtx.droneMode = false;
+      if (appCtx.Walk && appCtx.Walk.state.mode !== 'walk') appCtx.Walk.toggleWalk();
+      const fDriving = document.getElementById('fDriving');
+      const fWalk = document.getElementById('fWalk');
+      const fDrone = document.getElementById('fDrone');
+      if (fDriving) fDriving.classList.remove('on');
+      if (fWalk) fWalk.classList.add('on');
+      if (fDrone) fDrone.classList.remove('on');
+    };
+    const setDroneMode = () => {
+      if (!appCtx.droneMode) {
+        appCtx.droneMode = true;
+        if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') appCtx.Walk.setModeDrive();
+      }
+      const fDriving = document.getElementById('fDriving');
+      const fWalk = document.getElementById('fWalk');
+      const fDrone = document.getElementById('fDrone');
+      if (fDriving) fDriving.classList.remove('on');
+      if (fWalk) fWalk.classList.remove('on');
+      if (fDrone) fDrone.classList.add('on');
+    };
+
+    const mode = pending.travelMode || getCurrentTravelMode();
+    if (pending.travelMode === 'walking') setWalkMode();else
+    if (pending.travelMode === 'drone') setDroneMode();else
+    if (pending.travelMode === 'driving') setDriveMode();
+
+    const x = Number.isFinite(pending.refX) ? pending.refX : null;
+    const y = Number.isFinite(pending.refY) ? pending.refY : null;
+    const z = Number.isFinite(pending.refZ) ? pending.refZ : null;
+    const yaw = Number.isFinite(pending.yaw) ? pending.yaw : null;
+    const pitch = Number.isFinite(pending.pitch) ? pending.pitch : null;
+    const terrainYAt = (tx, tz) =>
+    typeof appCtx.terrainMeshHeightAt === 'function' ?
+    appCtx.terrainMeshHeightAt(tx, tz) :
+    appCtx.elevationWorldYAtWorldXZ(tx, tz);
+
+    if (mode === 'drone') {
+      if (Number.isFinite(x)) appCtx.drone.x = x;
+      if (Number.isFinite(z)) appCtx.drone.z = z;
+      appCtx.drone.y = Number.isFinite(y) ? y : terrainYAt(appCtx.drone.x, appCtx.drone.z) + 45;
+      if (Number.isFinite(yaw)) appCtx.drone.yaw = yaw;
+      if (Number.isFinite(pitch)) appCtx.drone.pitch = pitch;
+    } else if (mode === 'walking' && appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker) {
+      const walker = appCtx.Walk.state.walker;
+      if (Number.isFinite(x)) walker.x = x;
+      if (Number.isFinite(z)) walker.z = z;
+      const groundY = terrainYAt(walker.x, walker.z);
+      walker.y = Number.isFinite(y) ? y : groundY + 1.7;
+      walker.vy = 0;
+      if (Number.isFinite(yaw)) {
+        walker.yaw = yaw;
+        walker.angle = yaw;
+      }
+      if (appCtx.Walk.state.characterMesh) {
+        appCtx.Walk.state.characterMesh.position.set(walker.x, walker.y - 1.7, walker.z);
+        appCtx.Walk.state.characterMesh.rotation.y = Number.isFinite(yaw) ? yaw : appCtx.Walk.state.characterMesh.rotation.y;
+      }
+      appCtx.car.x = walker.x;
+      appCtx.car.z = walker.z;
+      appCtx.car.angle = Number.isFinite(yaw) ? yaw : appCtx.car.angle;
+    } else {
+      if (Number.isFinite(x)) appCtx.car.x = x;
+      if (Number.isFinite(z)) appCtx.car.z = z;
+      appCtx.car.y = Number.isFinite(y) ? y : terrainYAt(appCtx.car.x, appCtx.car.z) + 1.2;
+      if (Number.isFinite(yaw)) appCtx.car.angle = yaw;
+      appCtx.car.speed = 0;
+      appCtx.car.vx = 0;
+      appCtx.car.vz = 0;
+      if (appCtx.carMesh) {
+        appCtx.carMesh.position.set(appCtx.car.x, appCtx.car.y, appCtx.car.z);
+        appCtx.carMesh.rotation.y = appCtx.car.angle;
+      }
+    }
+
+    if (Number.isFinite(pending.camMode)) {
+      appCtx.camMode = pending.camMode;
+    }
+    if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
+    if (typeof appCtx.updateCamera === 'function') appCtx.updateCamera();
+    appCtx.pendingExperienceState = null;
+  }
+
+  function getCurrentTravelMode() {
+    if (typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return 'rocket';
+    if (appCtx.droneMode) return 'drone';
+    if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk') return 'walking';
+    return 'driving';
+  }
+
+  function buildShareableExperienceLink() {
+    const url = new URL(window.location.href);
+    const params = new URLSearchParams();
+    const mode = getCurrentTravelMode();
+    const launchMode =
+    typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT) ? 'space' :
+    appCtx.onMoon ? 'moon' :
+    (appCtx.loadingScreenMode === 'moon' || appCtx.loadingScreenMode === 'space' ? appCtx.loadingScreenMode : titleLaunchMode);
+    const fmt = (value, digits = 3) => Number(value).toFixed(digits);
+
+    if (appCtx.selLoc === 'custom') {
+      params.set('loc', 'custom');
+      const cLat = Number(appCtx.customLoc?.lat);
+      const cLon = Number(appCtx.customLoc?.lon);
+      if (Number.isFinite(cLat)) params.set('lat', cLat.toFixed(6));
+      if (Number.isFinite(cLon)) params.set('lon', cLon.toFixed(6));
+      const cName = (appCtx.customLoc?.name || 'Custom Location').trim();
+      if (cName) params.set('lname', cName.slice(0, 80));
+    } else if (appCtx.selLoc && appCtx.LOCS && appCtx.LOCS[appCtx.selLoc]) {
+      params.set('loc', appCtx.selLoc);
+    }
+
+    if (launchMode) params.set('launch', launchMode);
+    if (appCtx.gameMode) params.set('gm', appCtx.gameMode);
+    if (typeof appCtx.getPerfMode === 'function') params.set('pm', appCtx.getPerfMode());
+    if (Number.isFinite(appCtx.rdtSeed)) params.set('seed', String(appCtx.rdtSeed >>> 0));
+    if (Number.isFinite(appCtx.camMode)) params.set('camMode', String(Math.max(0, Math.min(2, appCtx.camMode | 0))));
+    params.set('mode', mode);
+
+    if (mode === 'drone') {
+      params.set('rx', fmt(appCtx.drone?.x || 0));
+      params.set('ry', fmt(appCtx.drone?.y || 0));
+      params.set('rz', fmt(appCtx.drone?.z || 0));
+      params.set('yaw', fmt(appCtx.drone?.yaw || 0, 4));
+      params.set('pitch', fmt(appCtx.drone?.pitch || 0, 4));
+    } else if (mode === 'walking' && appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker) {
+      const walker = appCtx.Walk.state.walker;
+      params.set('rx', fmt(walker.x || 0));
+      params.set('ry', fmt(walker.y || 0));
+      params.set('rz', fmt(walker.z || 0));
+      params.set('yaw', fmt(walker.yaw || walker.angle || 0, 4));
+    } else {
+      params.set('rx', fmt(appCtx.car?.x || 0));
+      params.set('ry', fmt(appCtx.car?.y || 0));
+      params.set('rz', fmt(appCtx.car?.z || 0));
+      params.set('yaw', fmt(appCtx.car?.angle || 0, 4));
+    }
+
+    url.search = params.toString();
+    url.hash = '';
+    return url.toString();
+  }
+
+  if (shareExperienceBtn) {
+    shareExperienceBtn.addEventListener('click', async () => {
+      try {
+        const experienceLink = buildShareableExperienceLink();
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+          await navigator.clipboard.writeText(experienceLink);
+          if (shareExperienceStatus) shareExperienceStatus.textContent = 'Experience link copied to clipboard.';
+        } else {
+          window.prompt('Copy experience link:', experienceLink);
+          if (shareExperienceStatus) shareExperienceStatus.textContent = 'Experience link generated.';
+        }
+      } catch (err) {
+        if (shareExperienceStatus) {
+          shareExperienceStatus.textContent = `Unable to build share link: ${err?.message || err}`;
+        }
+      }
+    });
+  }
+
   // Tabs
   document.querySelectorAll('.tab-btn').forEach((btn) => btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
@@ -419,6 +650,79 @@ function setupUI() {
 
   // Initial panel state.
   setTitleLocationMode(appCtx.selLoc === 'custom' ? 'custom' : 'suggested');
+
+  // Optional share-link payload: seed/location/mode/camera from URL query.
+  if (sharedExperienceParams) {
+    const validGameModes = new Set(['free', 'trial', 'checkpoint']);
+    if (sharedExperienceParams.gameMode && validGameModes.has(sharedExperienceParams.gameMode)) {
+      appCtx.gameMode = sharedExperienceParams.gameMode;
+      const targetModeEl = document.querySelector(`.mode[data-mode="${sharedExperienceParams.gameMode}"]`);
+      if (targetModeEl) {
+        document.querySelectorAll('.mode').forEach((e) => e.classList.remove('sel'));
+        targetModeEl.classList.add('sel');
+      }
+    }
+
+    if (sharedExperienceParams.perfMode && typeof appCtx.setPerfMode === 'function') {
+      appCtx.setPerfMode(sharedExperienceParams.perfMode);
+      if (perfModeSelect) perfModeSelect.value = sharedExperienceParams.perfMode;
+    }
+
+    const hasCustomCoords = Number.isFinite(sharedExperienceParams.lat) && Number.isFinite(sharedExperienceParams.lon);
+    const hasPresetLoc = !!(
+    sharedExperienceParams.loc &&
+    sharedExperienceParams.loc !== 'custom' &&
+    appCtx.LOCS &&
+    appCtx.LOCS[sharedExperienceParams.loc]);
+
+    if (hasCustomCoords || sharedExperienceParams.loc === 'custom') {
+      const lat = hasCustomCoords ? sharedExperienceParams.lat : Number(appCtx.customLoc?.lat || 0);
+      const lon = hasCustomCoords ? sharedExperienceParams.lon : Number(appCtx.customLoc?.lon || 0);
+      const customLatInput = document.getElementById('customLat');
+      const customLonInput = document.getElementById('customLon');
+      if (customLatInput && Number.isFinite(lat)) customLatInput.value = lat.toFixed(6);
+      if (customLonInput && Number.isFinite(lon)) customLonInput.value = lon.toFixed(6);
+      appCtx.customLoc = {
+        lat: Number.isFinite(lat) ? lat : appCtx.customLoc?.lat || 0,
+        lon: Number.isFinite(lon) ? lon : appCtx.customLoc?.lon || 0,
+        name: sharedExperienceParams.name || appCtx.customLoc?.name || 'Shared Location'
+      };
+      appCtx.selLoc = 'custom';
+      setTitleLocationMode('custom');
+    } else if (hasPresetLoc) {
+      const selectedLocKey = sharedExperienceParams.loc;
+      const selectedLocCard = document.querySelector(`.loc[data-loc="${selectedLocKey}"]`);
+      if (selectedLocCard) {
+        document.querySelectorAll('.loc').forEach((e) => e.classList.remove('sel'));
+        selectedLocCard.classList.add('sel');
+      }
+      appCtx.selLoc = selectedLocKey;
+      if (customPanel) customPanel.classList.remove('show');
+      setLaunchMode('earth');
+    }
+
+    if (sharedExperienceParams.launch) setLaunchMode(sharedExperienceParams.launch);
+
+    if (Number.isFinite(sharedExperienceParams.seed)) {
+      appCtx.sharedSeedOverride = (Math.floor(sharedExperienceParams.seed) | 0) >>> 0;
+    }
+
+    appCtx.pendingExperienceState = {
+      travelMode: sharedExperienceParams.travelMode,
+      camMode: sharedExperienceParams.camMode,
+      refX: sharedExperienceParams.refX,
+      refY: sharedExperienceParams.refY,
+      refZ: sharedExperienceParams.refZ,
+      yaw: sharedExperienceParams.yaw,
+      pitch: sharedExperienceParams.pitch
+    };
+
+    if (shareExperienceStatus) {
+      shareExperienceStatus.textContent = 'Share link loaded. Start Explore to apply location/mode/camera.';
+    } else if (perfSettingsStatus) {
+      perfSettingsStatus.textContent = 'Share link loaded. Start Explore to apply location/mode/camera.';
+    }
+  }
 
   // Custom location search - universal search for any location
   document.getElementById('locationSearchBtn').addEventListener('click', appCtx.searchLocation);
@@ -537,6 +841,7 @@ function setupUI() {
       appCtx.setBuildModeEnabled(false);
     }
     updateControlsModeUI();
+    applySharedRuntimeState();
 
     // Set initial map view button states
     document.getElementById('mapRoadsToggle').classList.add('active'); // Roads on by default

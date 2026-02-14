@@ -1,4 +1,4 @@
-import { ctx as appCtx } from "./shared-context.js?v=53"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=54"; // ============================================================================
 // blocks.js - Lightweight voxel-style builder (place/stack/remove brick blocks)
 // ============================================================================
 

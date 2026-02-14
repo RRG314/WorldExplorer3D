@@ -1,4 +1,4 @@
-import { ctx as appCtx } from "./shared-context.js?v=53"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=54"; // ============================================================================
 // perf.js - Runtime performance mode + benchmark telemetry for RDT comparisons
 // ============================================================================
 
@@ -6,14 +6,28 @@ const PERF_MODE_RDT = 'rdt';
 const PERF_MODE_BASELINE = 'baseline';
 const PERF_STORAGE_MODE_KEY = 'worldExplorerPerfMode';
 const PERF_STORAGE_OVERLAY_KEY = 'worldExplorerPerfOverlay';
+const PERF_STORAGE_AUTO_QUALITY_KEY = 'worldExplorerPerfAutoQuality';
+const PERF_QUALITY_TIER_PERFORMANCE = 'performance';
+const PERF_QUALITY_TIER_BALANCED = 'balanced';
+const PERF_QUALITY_TIER_QUALITY = 'quality';
 const PERF_SPIKE_WINDOW_SIZE = 1800;
 const PERF_SPIKE_16_7_MS = 16.7;
 const PERF_SPIKE_33_3_MS = 33.3;
 const PERF_SPIKE_50_MS = 50;
 const PERF_SPIKE_100_MS = 100;
+const AUTO_QUALITY_EVAL_INTERVAL_S = 2.0;
+const AUTO_QUALITY_DEGRADE_FPS = 50;
+const AUTO_QUALITY_RECOVER_FPS = 57;
+const AUTO_QUALITY_DEGRADE_FRAME_MS = 23.0;
+const AUTO_QUALITY_RECOVER_FRAME_MS = 18.2;
+const AUTO_QUALITY_DEGRADE_STREAK = 3;
+const AUTO_QUALITY_RECOVER_STREAK = 6;
+const AUTO_QUALITY_COOLDOWN_S = 12;
 
 let perfMode = PERF_MODE_RDT;
 let perfOverlayEnabled = false;
+let perfAutoQualityEnabled = true;
+let perfAutoQualityTier = PERF_QUALITY_TIER_BALANCED;
 
 let _perfFps = 0;
 let _perfFrameMs = 0;
@@ -36,6 +50,12 @@ let _perfWindowSpikeOver33_3 = 0;
 let _perfWindowSpikeOver50 = 0;
 let _perfWindowSpikeOver100 = 0;
 let _perfWindowMaxFrameMs = 0;
+let _perfAutoQualityEvalClock = 0;
+let _perfAutoQualityCooldown = 0;
+let _perfAutoQualityLowStreak = 0;
+let _perfAutoQualityHighStreak = 0;
+let _perfAutoQualityLastChangeAt = 0;
+let _perfAutoQualityLastReason = 'init';
 
 const perfStats = {
   mode: PERF_MODE_RDT,
@@ -54,6 +74,14 @@ const perfStats = {
     terrainRing: typeof appCtx.TERRAIN_RING === 'number' ? appCtx.TERRAIN_RING : 0,
     lodVisible: { near: 0, mid: 0 },
     worldCounts: { roads: 0, buildings: 0, poiMeshes: 0, landuseMeshes: 0 },
+    quality: {
+      auto: true,
+      tier: PERF_QUALITY_TIER_BALANCED,
+      budgetScale: 1,
+      lodScale: 1,
+      changedAt: 0,
+      reason: 'init'
+    },
     spikes: {
       windowFrames: 0,
       over16_7: 0,
@@ -209,6 +237,38 @@ function normalizePerfMode(mode) {
   return mode === PERF_MODE_BASELINE ? PERF_MODE_BASELINE : PERF_MODE_RDT;
 }
 
+function normalizePerfQualityTier(tier) {
+  if (tier === PERF_QUALITY_TIER_PERFORMANCE) return PERF_QUALITY_TIER_PERFORMANCE;
+  if (tier === PERF_QUALITY_TIER_QUALITY) return PERF_QUALITY_TIER_QUALITY;
+  return PERF_QUALITY_TIER_BALANCED;
+}
+
+function getPerfQualityProfile(tier = perfAutoQualityTier) {
+  const normalized = normalizePerfQualityTier(tier);
+  if (normalized === PERF_QUALITY_TIER_PERFORMANCE) {
+    return {
+      tier: normalized,
+      label: 'Performance',
+      budgetScale: 0.82,
+      lodScale: 0.90
+    };
+  }
+  if (normalized === PERF_QUALITY_TIER_QUALITY) {
+    return {
+      tier: normalized,
+      label: 'Quality',
+      budgetScale: 1.10,
+      lodScale: 1.08
+    };
+  }
+  return {
+    tier: PERF_QUALITY_TIER_BALANCED,
+    label: 'Balanced',
+    budgetScale: 1.0,
+    lodScale: 1.0
+  };
+}
+
 function getPerfMode() {
   return perfMode;
 }
@@ -232,6 +292,110 @@ function setPerfOverlayEnabled(enabled, options = {}) {
   const persist = options.persist !== false;
   if (persist) writeStorage(PERF_STORAGE_OVERLAY_KEY, perfOverlayEnabled ? '1' : '0');
   return perfOverlayEnabled;
+}
+
+function getPerfAutoQualityEnabled() {
+  return !!perfAutoQualityEnabled;
+}
+
+function setPerfAutoQualityEnabled(enabled, options = {}) {
+  perfAutoQualityEnabled = !!enabled;
+  if (!perfAutoQualityEnabled) {
+    _perfAutoQualityLowStreak = 0;
+    _perfAutoQualityHighStreak = 0;
+    _perfAutoQualityCooldown = 0;
+  }
+  const persist = options.persist !== false;
+  if (persist) writeStorage(PERF_STORAGE_AUTO_QUALITY_KEY, perfAutoQualityEnabled ? '1' : '0');
+  return perfAutoQualityEnabled;
+}
+
+function getPerfAutoQualityTier() {
+  return perfAutoQualityTier;
+}
+
+function setPerfAutoQualityTier(tier, options = {}) {
+  const normalized = normalizePerfQualityTier(tier);
+  perfAutoQualityTier = normalized;
+  _perfAutoQualityLastReason = options.reason || _perfAutoQualityLastReason;
+  _perfAutoQualityLastChangeAt = Date.now();
+  return perfAutoQualityTier;
+}
+
+function _perfQualityTierIndex(tier) {
+  switch (normalizePerfQualityTier(tier)) {
+    case PERF_QUALITY_TIER_PERFORMANCE:return 0;
+    case PERF_QUALITY_TIER_QUALITY:return 2;
+    default:return 1;
+  }
+}
+
+function _stepPerfAutoQuality(dt, fps, frameMs) {
+  if (!perfAutoQualityEnabled) return;
+  if (!Number.isFinite(dt) || dt <= 0) return;
+
+  _perfAutoQualityEvalClock += dt;
+  _perfAutoQualityCooldown = Math.max(0, _perfAutoQualityCooldown - dt);
+  if (_perfAutoQualityEvalClock < AUTO_QUALITY_EVAL_INTERVAL_S) return;
+  _perfAutoQualityEvalClock = 0;
+
+  const spikeMetrics = getPerfSpikeMetrics(false);
+  const windowFrames = Math.max(1, spikeMetrics.windowFrames || 0);
+  const over33Ratio = (spikeMetrics.over33_3 || 0) / windowFrames;
+  const lowPressure =
+  Number.isFinite(fps) && fps > 0 && fps < AUTO_QUALITY_DEGRADE_FPS ||
+  Number.isFinite(frameMs) && frameMs > AUTO_QUALITY_DEGRADE_FRAME_MS ||
+  over33Ratio > 0.14 ||
+  (spikeMetrics.maxFrameMs || 0) > 55;
+  const highHeadroom =
+  Number.isFinite(fps) && fps >= AUTO_QUALITY_RECOVER_FPS &&
+  Number.isFinite(frameMs) && frameMs <= AUTO_QUALITY_RECOVER_FRAME_MS &&
+  over33Ratio < 0.05;
+
+  if (lowPressure) {
+    _perfAutoQualityLowStreak += 1;
+    _perfAutoQualityHighStreak = 0;
+  } else if (highHeadroom) {
+    _perfAutoQualityHighStreak += 1;
+    _perfAutoQualityLowStreak = Math.max(0, _perfAutoQualityLowStreak - 1);
+  } else {
+    _perfAutoQualityLowStreak = Math.max(0, _perfAutoQualityLowStreak - 1);
+    _perfAutoQualityHighStreak = Math.max(0, _perfAutoQualityHighStreak - 1);
+  }
+
+  if (_perfAutoQualityCooldown > 0) return;
+
+  const tierIdx = _perfQualityTierIndex(perfAutoQualityTier);
+  if (_perfAutoQualityLowStreak >= AUTO_QUALITY_DEGRADE_STREAK && tierIdx > 0) {
+    const nextTier = tierIdx === 2 ? PERF_QUALITY_TIER_BALANCED : PERF_QUALITY_TIER_PERFORMANCE;
+    setPerfAutoQualityTier(nextTier, { reason: 'fps_down' });
+    _perfAutoQualityCooldown = AUTO_QUALITY_COOLDOWN_S;
+    _perfAutoQualityLowStreak = 0;
+    _perfAutoQualityHighStreak = 0;
+    return;
+  }
+
+  if (_perfAutoQualityHighStreak >= AUTO_QUALITY_RECOVER_STREAK && tierIdx < 2) {
+    const nextTier = tierIdx === 0 ? PERF_QUALITY_TIER_BALANCED : PERF_QUALITY_TIER_QUALITY;
+    setPerfAutoQualityTier(nextTier, { reason: 'fps_up' });
+    _perfAutoQualityCooldown = AUTO_QUALITY_COOLDOWN_S;
+    _perfAutoQualityLowStreak = 0;
+    _perfAutoQualityHighStreak = 0;
+  }
+}
+
+function getDynamicBudgetState() {
+  const effectiveTier = perfAutoQualityEnabled ? perfAutoQualityTier : PERF_QUALITY_TIER_BALANCED;
+  const profile = getPerfQualityProfile(effectiveTier);
+  return {
+    auto: !!perfAutoQualityEnabled,
+    tier: effectiveTier,
+    label: profile.label,
+    budgetScale: profile.budgetScale,
+    lodScale: profile.lodScale,
+    changedAt: _perfAutoQualityLastChangeAt,
+    reason: _perfAutoQualityLastReason
+  };
 }
 
 function setPerfLiveStat(key, value) {
@@ -332,6 +496,8 @@ function recordPerfFrame(dt) {
     return 0;
   })();
   perfStats.live.speedMph = currentSpeedMph;
+  _stepPerfAutoQuality(dt, perfStats.live.fps, perfStats.live.frameMs);
+  perfStats.live.quality = getDynamicBudgetState();
 }
 
 function recordPerfRendererInfo(rendererRef) {
@@ -380,6 +546,7 @@ function capturePerfSnapshot(extra = {}) {
     mode: perfMode,
     fps: Number((perfStats.live.fps || 0).toFixed(2)),
     frameMs: Number((perfStats.live.frameMs || 0).toFixed(2)),
+    dynamicBudget: getDynamicBudgetState(),
     renderer: { ...perfStats.renderer },
     live: { ...perfStats.live },
     spikes: spikeMetrics,
@@ -416,10 +583,12 @@ function updatePerfPanel(force = false) {
   const lod = live.lodVisible || {};
   const counts = live.worldCounts || {};
   const spikes = live.spikes || getPerfSpikeMetrics(false);
+  const quality = live.quality || getDynamicBudgetState();
 
   const lines = [
   `MODE: ${String(perfMode).toUpperCase()}`,
   `FPS: ${(live.fps || 0).toFixed(1)} | FRAME: ${(live.frameMs || 0).toFixed(1)} ms`,
+  `QUALITY: ${quality.auto ? 'AUTO' : 'LOCK'} ${String(quality.tier || 'balanced').toUpperCase()} | SCALE ${(quality.budgetScale || 1).toFixed(2)}`,
   `DRAW: ${formatPerfNumber(r.calls)} | TRI: ${formatPerfNumber(r.triangles)}`,
   `GEO: ${formatPerfNumber(r.geometries)} | TEX: ${formatPerfNumber(r.textures)} | PROG: ${formatPerfNumber(r.programs)}`,
   `LOAD: ${Number.isFinite(lastLoad.loadMs) ? `${lastLoad.loadMs} ms` : '--'}`,
@@ -439,6 +608,7 @@ setPerfMode(readStorage(PERF_STORAGE_MODE_KEY), { persist: false });
 // Always start hidden so benchmark diagnostics are opt-in for every session.
 setPerfOverlayEnabled(false, { persist: false });
 writeStorage(PERF_STORAGE_OVERLAY_KEY, '0');
+setPerfAutoQualityEnabled(readStorage(PERF_STORAGE_AUTO_QUALITY_KEY) !== '0', { persist: false });
 
 exposeMutableGlobal('perfMode', () => perfMode, (value) => {
   setPerfMode(value, { persist: false });
@@ -446,20 +616,34 @@ exposeMutableGlobal('perfMode', () => perfMode, (value) => {
 exposeMutableGlobal('perfOverlayEnabled', () => perfOverlayEnabled, (value) => {
   setPerfOverlayEnabled(value, { persist: false });
 });
+exposeMutableGlobal('perfAutoQualityEnabled', () => perfAutoQualityEnabled, (value) => {
+  setPerfAutoQualityEnabled(value, { persist: false });
+});
+exposeMutableGlobal('perfAutoQualityTier', () => perfAutoQualityTier, (value) => {
+  setPerfAutoQualityTier(value, { reason: 'external' });
+});
 
 Object.assign(appCtx, {
+  PERF_QUALITY_TIER_BALANCED,
+  PERF_QUALITY_TIER_PERFORMANCE,
+  PERF_QUALITY_TIER_QUALITY,
   PERF_MODE_BASELINE,
   PERF_MODE_RDT,
   capturePerfSnapshot,
   copyPerfSnapshotToClipboard,
   finishPerfLoad,
+  getDynamicBudgetState,
   getPerfMode,
+  getPerfAutoQualityEnabled,
+  getPerfAutoQualityTier,
   getPerfSpikeMetrics,
   getPerfOverlayEnabled,
   mergePerfLiveStats,
   perfStats,
   recordPerfFrame,
   recordPerfRendererInfo,
+  setPerfAutoQualityEnabled,
+  setPerfAutoQualityTier,
   setPerfLiveStat,
   setPerfMode,
   setPerfOverlayEnabled,
@@ -468,20 +652,30 @@ Object.assign(appCtx, {
 });
 
 export {
+  PERF_QUALITY_TIER_BALANCED,
+  PERF_QUALITY_TIER_PERFORMANCE,
+  PERF_QUALITY_TIER_QUALITY,
   PERF_MODE_BASELINE,
   PERF_MODE_RDT,
   capturePerfSnapshot,
   copyPerfSnapshotToClipboard,
   finishPerfLoad,
+  getDynamicBudgetState,
   getPerfMode,
+  getPerfAutoQualityEnabled,
+  getPerfAutoQualityTier,
   getPerfSpikeMetrics,
   getPerfOverlayEnabled,
   mergePerfLiveStats,
+  perfAutoQualityEnabled,
+  perfAutoQualityTier,
   perfMode,
   perfOverlayEnabled,
   perfStats,
   recordPerfFrame,
   recordPerfRendererInfo,
+  setPerfAutoQualityEnabled,
+  setPerfAutoQualityTier,
   setPerfLiveStat,
   setPerfMode,
   setPerfOverlayEnabled,
