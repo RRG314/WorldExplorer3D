@@ -15,7 +15,7 @@
 // roadmap is to migrate those fallback paths to an optimized deterministic custom
 // PRNG pipeline derived from RGE-256-oriented work.
 // ============================================================================
-import { ctx as appCtx } from "./shared-context.js?v=52";
+import { ctx as appCtx } from "./shared-context.js?v=53";
 
 // ===== RDT (Recursive Division Tree) depth =====
 // Iterative log-based division depth measure of an integer magnitude.

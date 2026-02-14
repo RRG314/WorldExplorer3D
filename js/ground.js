@@ -1,4 +1,4 @@
-import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=53"; // ============================================================================
 // ground.js - Unified Ground Height Service
 // Single source of truth for y(x,z) used by terrain, roads, and vehicles
 // ============================================================================

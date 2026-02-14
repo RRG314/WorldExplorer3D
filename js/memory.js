@@ -1,4 +1,4 @@
-import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=53"; // ============================================================================
 // memory.js - Persistent memory markers (pin/flower + short note)
 // ============================================================================
 

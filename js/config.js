@@ -1,7 +1,7 @@
 // ============================================================================
 // config.js - Game configuration, locations, and constants
 // ============================================================================
-import { ctx as appCtx } from "./shared-context.js?v=52";
+import { ctx as appCtx } from "./shared-context.js?v=53";
 
 const LOCS = {
   baltimore: { name: 'Baltimore', lat: 39.2904, lon: -76.6122 },
