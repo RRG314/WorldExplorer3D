@@ -389,8 +389,8 @@ function getAdaptiveLoadProfile(loadDepth, mode = getPerfModeValue()) {
             landuseMinPerTile: 22,
             poiPerTile: 52,
             poiMinPerTile: 14,
-            overpassTimeoutMs: 17000,
-            maxTotalLoadMs: 42000
+            overpassTimeoutMs: 19000,
+            maxTotalLoadMs: 50000
         } :
         depth === 5 ? {
             radii: [0.019, 0.024, 0.028],
@@ -1284,13 +1284,14 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity) {
     }
 }
 
-async function loadRoads() {
+async function loadRoads(retryPass = 0) {
     const locName = selLoc === 'custom' ? (customLoc?.name || 'Custom') : LOCS[selLoc].name;
     const perfModeNow = getPerfModeValue();
     const useRdtBudgeting = perfModeNow === 'rdt';
     const loadMetrics = {
         mode: perfModeNow,
         location: locName,
+        retryPass,
         success: false,
         lod: { near: 0, mid: 0, midSkipped: 0, farSkipped: 0 },
         roads: { requested: 0, selected: 0, sourcePoints: 0, decimatedPoints: 0, subdividedPoints: 0, vertices: 0 },
@@ -2673,7 +2674,19 @@ async function loadRoads() {
             }
         }
     }
-    if (!loaded) { showLoad('Failed to load. Click to retry.'); document.getElementById('loading').onclick = () => { document.getElementById('loading').onclick = null; loadRoads(); }; }
+    if (!loaded && retryPass < 1) {
+        console.warn('[WorldLoad] Initial pass failed. Retrying once automatically...');
+        showLoad('Retrying map data...');
+        worldLoading = false;
+        return loadRoads(retryPass + 1);
+    }
+    if (!loaded) {
+        showLoad('Failed to load. Click to retry.');
+        document.getElementById('loading').onclick = () => {
+            document.getElementById('loading').onclick = null;
+            loadRoads();
+        };
+    }
     worldLoading = false;
     if (typeof setPerfLiveStat === 'function') {
         setPerfLiveStat('lodVisible', { near: loadMetrics.lod.near, mid: loadMetrics.lod.mid });
