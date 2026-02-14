@@ -1153,7 +1153,7 @@ function batchLanduseMeshes() {
     globalThis._lastLanduseBatchStats = {
         groupCount: groups.size,
         batchMeshCount: batched.length,
-        sourceMeshCount
+        sourceMeshCount: sourceCount
     };
     return sourceCount;
 }
