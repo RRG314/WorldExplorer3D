@@ -34,12 +34,13 @@ Open `http://localhost:8000`.
 
 ## 3. First 60 Seconds
 
-1. Open the app and pick a city.
-2. Start in Free Roam mode.
-3. Drive with `WASD` or arrow keys.
-4. Press `F` for walk mode.
-5. Press `6` for drone mode.
-6. Press `M` for large map.
+1. Open the app and pick a city (or use Custom search).
+2. Choose launch mode: `Earth`, `Moon`, or `Space`.
+3. Start in Free Roam mode.
+4. Drive with `WASD` or arrow keys.
+5. Press `F` for walk mode.
+6. Press `6` for drone mode.
+7. Press `M` for large map.
 
 ## 4. Essential Controls
 
@@ -53,6 +54,14 @@ Open `http://localhost:8000`.
 | `C` | Camera cycle |
 | `M` | Large map |
 | `Esc` | Pause |
+
+Space-flight specific:
+
+| Key | Action |
+| --- | --- |
+| `Arrow Keys` | Rocket steering (yaw/pitch) |
+| `Space` | Thrust / boost |
+| `Shift` | Brake / decelerate |
 
 ## 5. Troubleshooting
 
@@ -71,7 +80,8 @@ Open `http://localhost:8000`.
 ### Inconsistent assets after updates
 
 - Clear browser cache.
-- Verify cache-bust values in `index.html`, `js/modules/manifest.js`, and `js/app-entry.js` are aligned.
+- Verify cache-bust values are aligned across `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
+- Current freeze snapshot cache-bust target is `v=21`.
 
 ## 6. Where to Go Next
 

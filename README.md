@@ -35,6 +35,8 @@ Open `http://localhost:8000`.
 - Terrain-aware road and building conformance using Terrarium elevation data.
 - Three movement modes sharing one world state: driving, walking, drone.
 - Space layer with Earth, Moon, and solar-system transitions in the same runtime.
+- Title menu launch-mode selector (Earth / Moon / Space) with one-click starts.
+- Click-to-inspect deep-space objects (planets, asteroids, spacecraft, galaxies).
 - Deterministic runtime seeding and complexity logic through RDT + RGE256-based paths.
 
 ## Core Features
@@ -56,7 +58,10 @@ Open `http://localhost:8000`.
 ### Space Layer
 
 - Earth to space flight transitions.
+- Start directly in Earth, Moon, or Space from the title menu.
 - Solar-system visualization and navigation.
+- Main asteroid belt and Kuiper belt visual layers.
+- Clickable deep-sky galaxy catalog (RA/Dec-positioned) with info panel.
 - Moon landing / return flows.
 
 ## Controls (Default)
@@ -81,7 +86,16 @@ Open `http://localhost:8000`.
 - Runtime is split into multiple JS files (`js/*.js`) with no build step.
 - Shared/global runtime state is still used across core systems.
 - ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
+- Cache-bust version alignment across loader chain is currently `v=21`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
+
+## Freeze Snapshot (2026-02-14)
+
+- Restored main-branch title menu behavior for location selection with working custom/suggested interactions.
+- Added title launch selectors: `Earth`, `Moon`, `Space`.
+- Added Kuiper belt and improved belt visibility (particle + band layers).
+- Added clickable galaxy background objects with distance/sky-position metadata in the inspector.
+- Updated start-menu Controls tab to include space-flight controls.
 
 ## Repository Structure
 

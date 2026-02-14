@@ -27,6 +27,17 @@ This index lists the documentation that exists in this branch today.
 5. `KNOWN_ISSUES.md`
 6. `CONTRIBUTING.md`
 
+## Current Freeze Scope (2026-02-14)
+
+The current branch documentation set includes updates for:
+
+- Restored main-style location selection behavior (`Suggested` + `Custom`)
+- Title launch-mode selectors (`Earth`, `Moon`, `Space`)
+- Space-flight controls listed in start-menu Controls tab
+- Asteroid belt + Kuiper belt visual layers
+- Clickable deep-sky galaxies with inspector info
+- Cache-bust loader chain alignment through `v=21`
+
 ## Maintainer Notes
 
 - Keep this index aligned with files that actually exist in the branch.

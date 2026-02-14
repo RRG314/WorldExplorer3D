@@ -81,6 +81,8 @@ This ensures:
 - Cloud layer with visibility toggle
 - Moon surface generation and lunar exploration
 - Solar system planet rendering with JPL orbital mechanics
+- Main asteroid belt and Kuiper belt visualization layers
+- Deep-sky galaxy rendering (RA/Dec sky positioning) with click inspection
 - Space flight transition sequence (rocket launch, heliocentric flight, landing)
 - Centralized environment state machine (Earth / Space Flight / Moon)
 
@@ -88,10 +90,12 @@ This ensures:
 
 ### 6. UI & Map Layer
 - HUD (speedometer, compass, mode indicators, boost bar)
+- Title menu launch-mode selectors (Earth / Moon / Space)
 - Floating menu for global actions
 - Minimap and full-screen interactive map via canvas
 - Zoomable large map with layer toggles (satellite, roads, landuse, POIs)
 - Pause, results, and alert overlays
+- Start-menu controls tab (driving/walking/drone/space-flight mappings)
 - Property panels, historic site cards, modal system
 
 **Files:** `hud.js`, `map.js`, `ui.js`
@@ -102,7 +106,7 @@ This ensures:
 
 The world initialization follows this sequence:
 
-1. **Choose location** -- user selects from preset cities or enters custom coordinates
+1. **Choose location + launch mode** -- user selects preset/custom Earth location or chooses Moon/Space launch mode
 2. **Set origin** -- `LOC` is set to the geographic center; `geoToWorld()` maps all coordinates relative to this point
 3. **Fetch OSM data** -- Overpass API query retrieves roads, buildings, land use, and POIs within a bounding box
 4. **Generate road meshes** -- road segments are created with width based on highway type and speed limits from tags
@@ -124,6 +128,7 @@ Location switching (`nextCity()`, `searchLocation()`) re-runs steps 1--11, clear
 
 Key state groups:
 - **Location state** -- `LOC`, `customLoc`, `selLoc` (current geographic origin)
+- **Title launch state** -- `loadingScreenMode`, launch toggles (`earth` / `moon` / `space`)
 - **Vehicle state** -- `car` object (position, velocity, angle, grip, boost)
 - **Input state** -- `keys` object (currently pressed keys)
 - **World data** -- `roads[]`, `buildings[]`, `landuses[]`, `pois[]` (loaded geometry)
@@ -133,7 +138,7 @@ Key state groups:
 - **Environment state** -- `ENV` (EARTH, SPACE_FLIGHT, MOON), managed by `env.js` state machine
 - **Terrain state** -- `terrainTileCache`, `terrainGroup`, elevation flags
 - **Space flight state** -- `spaceFlight` object (rocket, velocity, mode, scene/camera/renderer)
-- **Astronomical data** -- `BRIGHT_STARS`, `CONSTELLATION_LINES` (catalog data), `SOLAR_SYSTEM_PLANETS` (JPL orbital elements)
+- **Astronomical data** -- `BRIGHT_STARS`, `CONSTELLATION_LINES`, `SOLAR_SYSTEM_PLANETS`, asteroid/Kuiper belt config, deep-sky `GALAXIES` catalog
 
 State is currently unencapsulated (global mutable variables). This is the primary area for future architectural improvement -- introducing accessor patterns or a state manager would reduce coupling between subsystems.
 
@@ -150,7 +155,7 @@ The engine is organized into modular files for maintainability:
 
 ### JavaScript Modules (`js/` directory)
 
-All scripts share the global scope (plain `<script>` tags, not ES6 modules). Load order matters -- earlier scripts define variables used by later ones. This is intentional for build-free deployment; ES module migration is planned once subsystem boundaries are stable.
+Runtime boot uses ES modules (`index.html` → `js/bootstrap.js` → `js/modules/manifest.js` → `js/app-entry.js`) while preserving shared globals across subsystems. Load order still matters because systems intentionally interoperate through global state; migration remains incremental to avoid regressions.
 
 | File | Lines | Purpose |
 |------|-------|---------|
@@ -200,7 +205,7 @@ RDT/RGE research provenance and implementation notes:
 
 - **OSM geometry inconsistencies** -- OpenStreetMap data varies widely in quality; buildings may lack height tags, roads may have missing or conflicting metadata, and some geometries contain self-intersecting polygons
 - **Terrain tile resolution limits** -- Terrarium tiles at zoom 13 provide ~19m/pixel resolution; this creates visible stairstepping on steep terrain and blending seams at tile boundaries
-- **Floating-point precision** -- large world coordinates (SCALE = 100000) can cause jitter at extreme distances from the origin; camera near/far clipping (0.5 to 10000) is tuned to minimize z-fighting but cannot eliminate it entirely
+- **Floating-point precision** -- large world coordinates (SCALE = 100000) can cause jitter at extreme distances from the origin; deep-space camera clipping (0.5 to 450000 in space mode) is tuned for distant belts/galaxies but still carries precision and z-order tradeoffs
 - **Scene rebuild cost** -- switching locations requires clearing and regenerating all meshes (roads, buildings, terrain, land use, POIs); there is no incremental chunk loading, so location switches are blocking operations
 - **Browser performance constraints** -- garbage collection pauses, draw call limits, and texture memory budgets are all hard constraints; the engine uses reduced texture sizes, simplified geometry, and throttled updates to stay within budget
 - **Elevation alignment timing** -- terrain tiles load asynchronously; roads and buildings may briefly float or clip until tile data arrives and `rebuildRoadsWithTerrain()` / `repositionBuildingsWithTerrain()` complete

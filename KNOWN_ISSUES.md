@@ -71,6 +71,27 @@ How to help:
 - Report reproducible interaction conflicts.
 - Submit focused fixes in `js/input.js`, `js/ui.js`, `styles.css`.
 
+### 7. Deep-Space Realism vs Playability Tuning
+
+- Galaxy and belt distances are intentionally visualized at compressed scales to remain explorable.
+- Further balancing is needed between realism, readability, and practical travel time.
+
+How to help:
+
+- Propose data-driven distance/scale presets for "visual" vs "realistic" space mode.
+- Validate inspector usability at extreme distances.
+- Focus edits in `js/solar-system.js` and `js/space.js`.
+
+### 8. Cache-Bust Drift During Rapid Iteration
+
+- Loader cache-bust values can fall out of sync across boot files after frequent hotfixes.
+- This can make new features appear missing even when code is already pushed.
+
+How to help:
+
+- Verify cache-bust alignment in `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
+- Consider adding a lightweight CI check that fails on version mismatch.
+
 ## Reporting Format
 
 When reporting issues, include:

@@ -4,6 +4,7 @@ Developer guide for World Explorer 3D. Architecture, code structure, and customi
 
 ## Table of Contents
 - [Architecture Overview](#architecture-overview)
+- [Branch Freeze Updates (2026-02)](#branch-freeze-updates-2026-02)
 - [Technology Stack](#technology-stack)
 - [File Structure](#file-structure)
 - [Core Systems](#core-systems)
@@ -24,6 +25,17 @@ World Explorer 3D is built as a **no-build static-site runtime**:
 - Easy GitHub Pages deployment
 - Runtime split across `index.html`, `styles.css`, and `js/*`
 - ES module boot with compatibility for shared global-state subsystems
+
+## Branch Freeze Updates (2026-02)
+
+This branch snapshot includes these runtime additions beyond the previous doc baseline:
+
+- Start-menu Location tab now includes launch selectors: `Earth`, `Moon`, `Space`.
+- Start-menu Controls tab now includes dedicated space-flight controls.
+- Solar-system layer now renders both the main asteroid belt and the Kuiper belt.
+- Deep-sky galaxy catalog added in `solar-system.js` with RA/Dec placement and click inspection.
+- Deep-space renderer envelope expanded (`space.js` camera far clip and star shell range) to support farther galaxy distances.
+- Loader cache-bust chain is aligned through `v=21` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### High-Level Architecture
 
@@ -535,6 +547,19 @@ function createSky() {
 }
 ```
 
+### Deep-Space Objects (Belts + Galaxies)
+
+Current space rendering layers include:
+
+- Main asteroid belt + Kuiper belt (particle layers and volume bands)
+- Clickable solar-system objects (planets, asteroids, spacecraft)
+- Clickable RA/Dec-positioned galaxy sprites with inspector data
+
+Key implementation files:
+
+- `js/solar-system.js`: belts, galaxies, click raycast integration, info panel content
+- `js/space.js`: deep-space camera clipping and star shell depth envelope
+
 ## Performance Optimization
 
 ### Rendering Optimizations
@@ -771,6 +796,14 @@ document.getElementById('myElement').addEventListener('click', () => {
 **Issue**: Properties Not Showing**
 - **Cause**: API keys missing or invalid
 - **Fix**: Check configuration, verify keys in dashboards
+
+**Issue: Latest pushed UI/features not appearing**
+- **Cause**: stale module assets from mismatched cache-bust query values
+- **Fix**: hard refresh and verify the same cache-bust value is present in:
+  - `index.html` (`bootstrap.js?...`)
+  - `js/bootstrap.js` (`manifest.js?...`, `script-loader.js?...`)
+  - `js/modules/manifest.js` (`CACHE_BUST`)
+  - `js/app-entry.js` (module import query suffixes)
 
 ### Debugging Tools
 
