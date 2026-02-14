@@ -856,6 +856,7 @@ function buildMergedGeometry(batch) {
 }
 
 function batchNearLodBuildingMeshes() {
+    try {
     if (!Array.isArray(buildingMeshes) || buildingMeshes.length < 2) return 0;
 
     const keep = [];
@@ -1001,9 +1002,20 @@ function batchNearLodBuildingMeshes() {
         sourceMeshCount
     };
     return sourceMeshCount;
+    } catch (err) {
+        console.warn('[WorldLoad] batchNearLodBuildingMeshes failed:', err);
+        globalThis._lastBuildingBatchStats = {
+            groupCount: 0,
+            batchMeshCount: 0,
+            sourceMeshCount: 0,
+            error: err?.message || String(err)
+        };
+        return 0;
+    }
 }
 
 function batchLanduseMeshes() {
+    try {
     if (!Array.isArray(landuseMeshes) || landuseMeshes.length < 4) return 0;
 
     const keep = [];
@@ -1156,6 +1168,16 @@ function batchLanduseMeshes() {
         sourceMeshCount: sourceCount
     };
     return sourceCount;
+    } catch (err) {
+        console.warn('[WorldLoad] batchLanduseMeshes failed:', err);
+        globalThis._lastLanduseBatchStats = {
+            groupCount: 0,
+            batchMeshCount: 0,
+            sourceMeshCount: 0,
+            error: err?.message || String(err)
+        };
+        return 0;
+    }
 }
 
 function clearBuildingSpatialIndex() {
@@ -2556,6 +2578,12 @@ async function loadRoads(retryPass = 0) {
             }
         } catch (e) {
             const isLastAttempt = r === radii[radii.length - 1];
+            if (roads.length > 0) {
+                console.warn('[WorldLoad] Recovering with partially loaded world data.');
+                loadMetrics.error = e?.message || String(e);
+                finalizeLoadedWorld('partial_after_error');
+                break;
+            }
             if (!isLastAttempt) {
                 console.warn('Road loading attempt failed, retrying with larger area...', e);
                 showLoad('Retrying map data...');
@@ -2563,12 +2591,6 @@ async function loadRoads(retryPass = 0) {
             }
 
             console.error('Road loading failed after all attempts:', e);
-            if (roads.length > 0) {
-                console.warn('[WorldLoad] Recovering with partially loaded world data.');
-                loadMetrics.error = e?.message || String(e);
-                finalizeLoadedWorld('partial_after_error');
-                break;
-            }
             // If this is the last attempt and we still have no roads, create a default environment
             if (roads.length === 0) {
                 // Debug log removed
