@@ -38,6 +38,7 @@ Open `http://localhost:8000`.
 - Title menu launch-mode selector (Earth / Moon / Space) with one-click starts.
 - Click-to-inspect deep-space objects (planets, asteroids, spacecraft, galaxies).
 - Persistent memory markers (pin/flower + short note) with in-world remove and bulk delete actions.
+- Minecraft-style brick block builder (place, stack, and remove blocks in-world).
 - Deterministic runtime seeding and complexity logic through RDT + RGE256-based paths.
 
 ## Core Features
@@ -52,6 +53,7 @@ Open `http://localhost:8000`.
 - POIs render on minimap/large map according to legend category filters.
 - Memory pins/flowers render on minimap/large map for location recall.
 - Legend includes independent memory-layer toggles for `📍 Pin` and `🌸 Flower`.
+- Brick block build mode supports click-to-place stacking and shift-click removal.
 - Time-of-day lighting and sky/constellation systems.
 
 ### Gameplay
@@ -82,6 +84,7 @@ Open `http://localhost:8000`.
 | Camera | `C` | Cycle camera views |
 | Map | `M` | Toggle large map |
 | Utility | `N` | Next city |
+| Utility | `B` | Toggle block build mode |
 | Utility | `R` | Track recording |
 | Utility | `` ` `` | Debug overlay |
 | Utility | `Esc` | Pause |
@@ -91,6 +94,13 @@ Memory marker actions:
 - `🌸` memory button (above controls) -> open composer
 - Click marker in-world -> `Remove Marker`
 - Memory composer -> `Delete All`
+
+Block builder actions:
+
+- `B` -> toggle build mode
+- `Click` (build mode on) -> place brick block
+- `Shift+Click` (build mode on) -> remove targeted block
+- `🎮 Game Mode` menu -> `🧱 Build Mode` and `🧹 Clear Blocks`
 
 ## Persistent Memory Markers
 
@@ -121,7 +131,7 @@ Memory marker actions:
 - Runtime is split into multiple JS files (`js/*.js`) with no build step.
 - Shared/global runtime state is still used across core systems.
 - ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
-- Cache-bust version alignment across loader chain is currently `v=28`.
+- Cache-bust version alignment across loader chain is currently `v=29`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
 ## Freeze Snapshot (2026-02-14)
@@ -136,6 +146,7 @@ Memory marker actions:
 - Added memory pin/flower visibility on minimap and large map.
 - Added separate legend checkboxes for memory `Pin` and `Flower` overlays (larger marker labels/icons).
 - Restored POI marker rendering on minimap and large map by legend category filters.
+- Added Minecraft-style brick block builder with stacking/removal controls.
 
 ## Repository Structure
 
@@ -167,6 +178,7 @@ js/
   hud.js
   map.js
   memory.js
+  blocks.js
   ui.js
   main.js
 ```

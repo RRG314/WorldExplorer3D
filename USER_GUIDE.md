@@ -179,6 +179,7 @@ Click header to expand/collapse in-game controls reference (includes driving, wa
 - `Space` - Handbrake (drift/emergency stop)
 - `Ctrl` - Boost (when bar is filled)
 - `Shift` - Off-road mode toggle
+- `B` - Toggle brick build mode
 
 #### Physics
 - **Realistic handling**: Car has momentum and turning radius
@@ -216,6 +217,7 @@ Click header to expand/collapse in-game controls reference (includes driving, wa
 - `Space` - Jump
 - `Shift` - Run (2x speed)
 - `Right Click + Drag` - Free look with mouse
+- `B` - Toggle brick build mode
 
 #### Movement
 - **Walking speed**: ~3 mph
@@ -254,6 +256,7 @@ Click header to expand/collapse in-game controls reference (includes driving, wa
 - `←` - Turn left
 - `→` - Turn right
 - `Mouse` - Free look
+- `B` - Toggle brick build mode
 
 #### Movement
 - **Fly speed**: ~20 mph
@@ -633,6 +636,23 @@ Placement uses your current Earth-mode position (car, walk, or drone reference p
 - UI paths that render dynamic memory/property/POI text now escape content before HTML insertion.
 - Optional check: run `getMemoryPersistenceStatus()` in browser console.
 
+## Brick Builder
+
+Create Minecraft-style brick stacks directly in the world.
+
+### Builder Controls
+
+- Press `B` to toggle build mode on/off.
+- Click in the world to place a brick block.
+- `Shift + Click` a placed block to remove it.
+- Use `🎮 Game Mode` -> `🧹 Clear Blocks` to wipe all build blocks for the current session.
+
+### How Stacking Works
+
+- Aim at an existing block face and click to attach a new block to that face.
+- Keep clicking to stack vertically or extend walls horizontally.
+- Build mode works in driving, walking, and drone exploration contexts.
+
 ## Advanced Features
 
 ### Track Recording
@@ -723,6 +743,8 @@ Located on right side of screen:
    - Start challenges
    - View high scores
    - Mode selection
+   - Toggle brick build mode
+   - Clear all placed build blocks (session)
 
 4. **🌿 Environment**:
    - Weather controls (if available)
@@ -950,6 +972,7 @@ Quick reference for all controls:
 |-----|--------|
 | M | Toggle Map |
 | N | Next City |
+| B | Toggle brick build mode |
 | 🌸 Memory Button | Create persistent pin/flower note |
 | R | Record Track |
 | Esc | Pause |
@@ -970,6 +993,8 @@ Quick reference for all controls:
 | Click Star | View Constellation |
 | Click Planet/Asteroid/Spacecraft/Galaxy | Open space inspector info |
 | Click Memory Marker | Open/remove memory note |
+| Click (Build Mode On) | Place brick block |
+| Shift+Click (Build Mode On) | Remove targeted brick block |
 | Right Click Map | Teleport |
 | Left Click Map | View Info |
 

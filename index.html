@@ -179,6 +179,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #coords{bottom:180px;left:10px;font-size:10px;padding:8px 12px}
   #controlsTab{left:140px;max-width:180px;font-size:11px}
   #memoryFlowerFloatBtn{left:140px;bottom:72px}
+  #buildModeIndicator{left:10px;bottom:66px;font-size:10px;padding:8px 10px;max-width:220px}
 
   /* Property panel */
   #propertyPanel{width:90vw;right:5vw;top:10px;max-height:70vh}
@@ -221,6 +222,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #coords{bottom:160px;left:5px;font-size:9px;padding:6px 10px}
   #controlsTab{left:115px;max-width:150px;font-size:10px;bottom:15px}
   #memoryFlowerFloatBtn{left:115px;bottom:66px}
+  #buildModeIndicator{left:5px;bottom:60px;font-size:9px;padding:7px 9px;max-width:190px}
 
   /* Property panel for phones */
   #propertyPanel{width:95vw;right:2.5vw;top:5px;max-height:75vh}
@@ -263,6 +265,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #memoryFlowerFloatBtn{position:fixed;bottom:78px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#ec4899,#db2777);border:none;border-radius:50%;color:#ffffff;font-size:23px;cursor:pointer;box-shadow:0 10px 26px rgba(236,72,153,0.38);z-index:101;display:none;transition:all 0.2s}
 #memoryFlowerFloatBtn.show{display:flex;align-items:center;justify-content:center}
 #memoryFlowerFloatBtn:hover{transform:scale(1.08);box-shadow:0 14px 34px rgba(236,72,153,0.45)}
+#buildModeIndicator{position:fixed;left:20px;bottom:78px;background:rgba(17,24,39,0.88);border:1px solid rgba(251,146,60,0.7);border-radius:10px;padding:9px 12px;font-size:11px;color:#fdba74;z-index:101;display:none;max-width:280px;line-height:1.45;box-shadow:0 8px 20px rgba(0,0,0,0.25)}
+#buildModeIndicator.show{display:block}
 #coords{position:fixed;bottom:200px;left:20px;background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:10px 14px;font-size:11px;color:#475569;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
 #coords.show{display:block}
 #loading{position:fixed;inset:0;background:#000 url('loading-bg.jpg') center center/cover no-repeat;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:300;cursor:pointer}
@@ -812,6 +816,8 @@ Explore the area
 <div class="floatItem" id="fPolice">🚔 Police</div>
 <div class="floatItem" id="fTrack">🏁 Record Track</div>
 <div class="floatItem" id="fEraseTrack">🗑️ Erase Track</div>
+<div class="floatItem" id="fBlockBuild">🧱 Build Mode</div>
+<div class="floatItem" id="fClearBlocks">🧹 Clear Blocks</div>
 <div class="floatItem" id="fRespawn">🎯 Respawn</div>
 <div class="floatItem" id="fRespawnRand">🎲 Random Respawn</div>
 </div>
@@ -861,6 +867,7 @@ Explore the area
 
 <button class="mainMenuBtn" id="mainMenuBtn">🏠 Main Menu</button>
 <button id="memoryFlowerFloatBtn" title="Place Flower Memory">🌸</button>
+<div id="buildModeIndicator">🧱 Build Mode ON<br>Click to place blocks, Shift+Click to remove.<br>Press B to toggle.</div>
 <div id="controlsTab"><div id="ctrlHeader">🛞 Controls ▼</div><div id="ctrlContent" class="hidden">
 <div id="drivingControls">
 <b>🚗 Driving Mode:</b><br>
@@ -872,7 +879,9 @@ Explore the area
 • F - Toggle walk mode<br>
 • 6 - Toggle drone mode<br>
 • M - Toggle map<br>
-• N - Next city
+• N - Next city<br>
+• B - Toggle build mode<br>
+• Click place block, Shift+Click remove
 </div>
 <div id="walkingControls" style="display:none">
 <b>🚶 Walking Mode:</b><br>
@@ -883,7 +892,9 @@ Explore the area
 • Right Click + Drag - Mouse look<br>
 • C - Camera view<br>
 • F - Toggle drive mode<br>
-• 6 - Toggle drone mode
+• 6 - Toggle drone mode<br>
+• B - Toggle build mode<br>
+• Click place block, Shift+Click remove
 </div>
 <div id="droneControls" style="display:none">
 <b>🚁 Drone Mode:</b><br>
@@ -892,7 +903,9 @@ Explore the area
 • Mouse - Look around<br>
 • Space - Fly up<br>
 • Ctrl/Shift - Fly down<br>
-• 6 - Exit drone mode
+• 6 - Exit drone mode<br>
+• B - Toggle build mode<br>
+• Click place block, Shift+Click remove
 </div>
 <div id="rocketControls" style="display:none">
 <b>🚀 Rocket Mode:</b><br>
@@ -994,5 +1007,5 @@ Explore the area
 <div id="pauseScreen"><div class="pauseTitle">PAUSED</div><button class="pauseBtn" id="resumeBtn">Resume</button><button class="pauseBtn" id="restartBtn">Restart</button><button class="pauseBtn" id="menuBtn">Main Menu</button></div>
 <div id="resultScreen"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
 <div id="caughtScreen"><div class="caughtBox"><div class="caughtTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
-<script type="module" src="js/bootstrap.js?v=28"></script>
+<script type="module" src="js/bootstrap.js?v=29"></script>
 </body></html>

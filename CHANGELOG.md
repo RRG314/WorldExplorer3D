@@ -25,6 +25,7 @@ Entries reflect changes made relative to the most recent public release.
 - Memory composer bulk-delete action (`Delete All`) with confirmation.
 - Memory pin/flower overlay rendering on minimap and large map.
 - Legend-layer checkboxes for memory `Pin` and `Flower` overlays.
+- Brick block builder module (`js/blocks.js`) with in-world place/stack/remove controls.
 - Security/storage notice document for persistent memory behavior and disclaimer boilerplate.
 
 ### Changed
@@ -35,7 +36,7 @@ Entries reflect changes made relative to the most recent public release.
 - Space info panel metric rows are now reusable for planets, asteroids, spacecraft, and galaxies.
 - POI map rendering now follows legend category filters on both minimap and large map.
 - Dynamic map/property/historic UI templates now escape untrusted string fields before insertion.
-- Module loader cache-bust chain incremented through `v=28` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Module loader cache-bust chain incremented through `v=29` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### Fixed
 - Non-responsive title menu interactions for suggested/custom selection after UI rework.

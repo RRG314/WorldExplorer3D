@@ -12,6 +12,7 @@ Developer guide for World Explorer 3D. Architecture, code structure, and customi
 - [API Integration](#api-integration)
 - [Rendering Pipeline](#rendering-pipeline)
 - [Persistent Memory Markers](#persistent-memory-markers)
+- [Brick Block Builder](#brick-block-builder)
 - [Security and Storage Notes](#security-and-storage-notes)
 - [Performance Optimization](#performance-optimization)
 - [Customization Guide](#customization-guide)
@@ -40,7 +41,8 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - Persistent memory marker subsystem added (`js/memory.js`) with place/remove flow.
 - Memory composer now includes `Delete All` with confirmation.
 - POI and memory markers now render on both minimap and large map overlays.
-- Loader cache-bust chain is aligned through `v=28` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Voxel-style brick builder subsystem added (`js/blocks.js`) with click place/stack and shift-click removal.
+- Loader cache-bust chain is aligned through `v=29` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### High-Level Architecture
 
@@ -151,6 +153,7 @@ WorldExplorer3D/
    ├─ hud.js
    ├─ map.js
    ├─ memory.js
+   ├─ blocks.js
    ├─ ui.js
    └─ main.js
 ```
@@ -589,6 +592,26 @@ Core public hooks:
 - `clearMemoryMarkersForWorldReload()`
 - `getMemoryPersistenceStatus()`
 - `getMemoryEntriesForCurrentLocation()`
+
+## Brick Block Builder
+
+`js/blocks.js` adds a lightweight voxel-style building interaction:
+
+- Toggle: `B` key or `🎮 Game Mode` -> `🧱 Build Mode`
+- Place: click world while build mode is enabled
+- Remove: `Shift + Click` an existing placed block
+- Stacking: clicks on existing block faces place adjacent blocks by face normal
+- Session control: `🎮 Game Mode` -> `🧹 Clear Blocks`
+- Reload behavior: blocks are cleared during `loadRoads()` via `clearBlockBuilderForWorldReload()`
+
+Core public hooks:
+
+- `toggleBlockBuildMode()`
+- `setBuildModeEnabled(state)`
+- `handleBlockBuilderClick(event)`
+- `clearAllBuildBlocks()`
+- `clearBlockBuilderForWorldReload()`
+- `refreshBlockBuilderForCurrentLocation()`
 
 ## Security and Storage Notes
 

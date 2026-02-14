@@ -452,6 +452,9 @@ function setupUI() {
             document.getElementById('fWalk').classList.remove('on');
             document.getElementById('fDrone').classList.remove('on');
         }
+        if (typeof setBuildModeEnabled === 'function') {
+            setBuildModeEnabled(false);
+        }
         updateControlsModeUI();
 
         // Set initial map view button states
@@ -504,6 +507,7 @@ function setupUI() {
     globalThis.updateControlsModeUI = updateControlsModeUI;
     function goToMainMenu() {
         gameStarted = false; paused = false; clearObjectives(); clearPolice(); policeOn = false; eraseTrack(); closePropertyPanel(); closeHistoricPanel(); clearPropertyMarkers(); realEstateMode = false; historicMode = false;
+        if (typeof setBuildModeEnabled === 'function') setBuildModeEnabled(false);
         document.querySelectorAll('.floatMenu').forEach(m => m.classList.remove('open'));
         document.getElementById('titleScreen').classList.remove('hidden');
         ['hud','minimap','modeHud','police','floatMenuContainer','mainMenuBtn','pauseScreen','resultScreen','caughtScreen','controlsTab','coords','realEstateBtn','historicBtn','memoryFlowerFloatBtn'].forEach(id => {
@@ -598,6 +602,23 @@ function setupUI() {
         if (policeOn) spawnPolice(); else clearPolice();
         closeAllFloatMenus();
     });
+    const buildModeItem = document.getElementById('fBlockBuild');
+    if (buildModeItem) {
+        buildModeItem.addEventListener('click', () => {
+            if (typeof toggleBlockBuildMode === 'function') toggleBlockBuildMode();
+            closeAllFloatMenus();
+        });
+    }
+    const clearBlocksItem = document.getElementById('fClearBlocks');
+    if (clearBlocksItem) {
+        clearBlocksItem.addEventListener('click', () => {
+            if (typeof clearAllBuildBlocks === 'function') {
+                const confirmed = globalThis.confirm('Clear all placed build blocks for this session?');
+                if (confirmed) clearAllBuildBlocks();
+            }
+            closeAllFloatMenus();
+        });
+    }
     // Travel mode switchers - mutually exclusive
     document.getElementById('fDriving').addEventListener('click', () => {
         // Switch to driving mode

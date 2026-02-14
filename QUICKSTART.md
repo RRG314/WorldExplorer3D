@@ -54,6 +54,7 @@ Open `http://localhost:8000`.
 | `6` | Drone mode toggle |
 | `C` | Camera cycle |
 | `M` | Large map |
+| `B` | Block build mode toggle |
 | `Esc` | Pause |
 
 Space-flight specific:
@@ -71,6 +72,15 @@ Memory marker action:
 | `🌸` memory button (above controls) | Open persistent memory composer |
 | Click memory marker -> `Remove Marker` | Erase pin / pull flower |
 | Memory composer -> `Delete All` | Remove all local memory markers |
+
+Block builder action:
+
+| Action | Result |
+| --- | --- |
+| Press `B` | Toggle build mode |
+| Click (build mode on) | Place brick block |
+| Shift+Click (build mode on) | Remove targeted block |
+| `🎮 Game Mode` -> `🧹 Clear Blocks` | Remove all build blocks for current session |
 
 ## 5. Troubleshooting
 
@@ -90,7 +100,7 @@ Memory marker action:
 
 - Clear browser cache.
 - Verify cache-bust values are aligned across `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
-- Current freeze snapshot cache-bust target is `v=28`.
+- Current freeze snapshot cache-bust target is `v=29`.
 
 ### Memory markers not persisting
 
