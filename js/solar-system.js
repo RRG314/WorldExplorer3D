@@ -377,6 +377,8 @@ const GALAXIES = [
   }
 ];
 
+const GALAXY_VISUAL_SCALE = 1.35;
+
 // ---------------------------------------------------------------------------
 // SOLAR SYSTEM STATE
 // ---------------------------------------------------------------------------
@@ -1462,7 +1464,7 @@ function createGalaxies() {
     group.position.copy(pos);
 
     const texture = createGalaxySpriteTexture(galaxy.color);
-    const coreSize = galaxy.visualSize || 820;
+    const coreSize = (galaxy.visualSize || 820) * GALAXY_VISUAL_SCALE;
 
     const core = new THREE.Sprite(new THREE.SpriteMaterial({
       map: texture,
@@ -1480,11 +1482,11 @@ function createGalaxies() {
       opacity: 0.28,
       depthWrite: false
     }));
-    halo.scale.set(coreSize * 2.0, coreSize * 2.0, 1);
+    halo.scale.set(coreSize * 2.2, coreSize * 2.2, 1);
     halo.renderOrder = 3;
     group.add(halo);
 
-    const hitRadius = Math.max(coreSize * 0.35, 220);
+    const hitRadius = Math.max(coreSize * 0.45, 300);
     const hitbox = new THREE.Mesh(
       new THREE.SphereGeometry(hitRadius, 8, 8),
       new THREE.MeshBasicMaterial({ visible: false })
