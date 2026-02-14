@@ -148,6 +148,11 @@ function setupUI() {
     const saveApiKeyBtn = document.getElementById('saveApiKey');
     const realEstateToggle = document.getElementById('realEstateToggle');
     const toggleLabel = document.getElementById('realEstateToggleLabel');
+    const perfModeSelect = document.getElementById('perfModeSelect');
+    const perfOverlayToggle = document.getElementById('perfOverlayToggle');
+    const perfApplyReload = document.getElementById('perfApplyReload');
+    const perfCopySnapshot = document.getElementById('perfCopySnapshot');
+    const perfSettingsStatus = document.getElementById('perfSettingsStatus');
 
     // Load saved API keys from localStorage
     const savedRentcast = localStorage.getItem('rentcastApiKey');
@@ -241,6 +246,81 @@ function setupUI() {
             localStorage.setItem('realEstateEnabled', enabled);
             toggleLabel.style.background = enabled ? '#f0f4ff' : '#f8fafc';
             toggleLabel.style.borderColor = enabled ? '#667eea' : '#e2e8f0';
+        });
+    }
+
+    // Performance benchmark controls (RDT vs baseline)
+    if (perfModeSelect) {
+        const currentMode = (typeof getPerfMode === 'function') ? getPerfMode() : (perfMode || 'rdt');
+        perfModeSelect.value = currentMode === 'baseline' ? 'baseline' : 'rdt';
+    }
+    if (perfOverlayToggle) {
+        const overlayEnabled = (typeof getPerfOverlayEnabled === 'function')
+            ? getPerfOverlayEnabled()
+            : !!perfOverlayEnabled;
+        perfOverlayToggle.checked = overlayEnabled;
+    }
+
+    if (perfModeSelect) {
+        perfModeSelect.addEventListener('change', (e) => {
+            const selectedMode = e.target.value === 'baseline' ? 'baseline' : 'rdt';
+            if (typeof setPerfMode === 'function') setPerfMode(selectedMode);
+            if (perfSettingsStatus) {
+                perfSettingsStatus.textContent = selectedMode === 'baseline'
+                    ? 'Baseline selected. Use Apply + Reload World to rebuild with baseline budgets.'
+                    : 'RDT selected. Use Apply + Reload World to rebuild with adaptive budgets.';
+            }
+            if (typeof updatePerfPanel === 'function') updatePerfPanel(true);
+        });
+    }
+
+    if (perfOverlayToggle) {
+        perfOverlayToggle.addEventListener('change', (e) => {
+            const enabled = !!e.target.checked;
+            if (typeof setPerfOverlayEnabled === 'function') setPerfOverlayEnabled(enabled);
+            if (perfSettingsStatus) {
+                perfSettingsStatus.textContent = enabled
+                    ? 'Live overlay enabled. Benchmark values will be shown during gameplay.'
+                    : 'Live overlay disabled.';
+            }
+            if (typeof updatePerfPanel === 'function') updatePerfPanel(true);
+        });
+    }
+
+    if (perfApplyReload) {
+        perfApplyReload.addEventListener('click', async () => {
+            const selectedMode = perfModeSelect?.value === 'baseline' ? 'baseline' : 'rdt';
+            if (typeof setPerfMode === 'function') setPerfMode(selectedMode);
+
+            if (perfSettingsStatus) {
+                perfSettingsStatus.textContent = gameStarted
+                    ? `Applying ${selectedMode.toUpperCase()} mode and reloading world...`
+                    : `Saved ${selectedMode.toUpperCase()} mode. It will apply when you start.`;
+            }
+
+            if (gameStarted && typeof loadRoads === 'function') {
+                await loadRoads();
+                if (perfSettingsStatus) {
+                    perfSettingsStatus.textContent = `${selectedMode.toUpperCase()} mode applied and world reloaded.`;
+                }
+            }
+            if (typeof updatePerfPanel === 'function') updatePerfPanel(true);
+        });
+    }
+
+    if (perfCopySnapshot) {
+        perfCopySnapshot.addEventListener('click', async () => {
+            try {
+                if (typeof copyPerfSnapshotToClipboard !== 'function') {
+                    throw new Error('Snapshot exporter unavailable');
+                }
+                await copyPerfSnapshotToClipboard();
+                if (perfSettingsStatus) perfSettingsStatus.textContent = 'Benchmark snapshot copied to clipboard.';
+            } catch (err) {
+                if (perfSettingsStatus) {
+                    perfSettingsStatus.textContent = `Unable to copy snapshot: ${err?.message || err}`;
+                }
+            }
         });
     }
 
@@ -365,6 +445,7 @@ function setupUI() {
         const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
         if (memoryFlowerFloatBtn) memoryFlowerFloatBtn.classList.add('show');
         gameStarted = true;
+        if (typeof updatePerfPanel === 'function') updatePerfPanel(true);
         switchEnv(ENV.EARTH);
 
         // Show exploration mode message
@@ -519,6 +600,7 @@ function setupUI() {
         const memoryInfoPanel = document.getElementById('memoryInfoPanel');
         if (memoryInfoPanel) memoryInfoPanel.classList.remove('show');
         updateControlsModeUI();
+        if (typeof updatePerfPanel === 'function') updatePerfPanel(true);
     }
 
     // Float menu

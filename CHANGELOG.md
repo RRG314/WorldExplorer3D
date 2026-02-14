@@ -15,6 +15,10 @@ Entries reflect changes made relative to the most recent public release.
 - `KNOWN_ISSUES.md` with contributor-focused engineering targets.
 - Repository baseline files for consistency: `.editorconfig`, `.eslintrc.cjs`, `.prettierrc.json`, `.prettierignore`.
 - Updated GitHub issue templates for structured bug and feature intake.
+- Title-screen benchmark mode controls for `RDT` vs `Baseline` switching.
+- Benchmark snapshot export and optional in-game live perf overlay controls.
+- Overpass fetch telemetry fields in snapshots (`overpassSource`, `overpassEndpoint`, `overpassCacheAgeMs`).
+- In-memory Overpass response cache with endpoint preference reuse for faster repeat loads.
 - Title launch mode row (`Earth`, `Moon`, `Space`) in the start menu.
 - Kuiper belt simulation layer in `solar-system.js` with region HUD context.
 - Explicit visual belt bands for both asteroid and Kuiper belts for reliable visibility.
@@ -28,6 +32,9 @@ Entries reflect changes made relative to the most recent public release.
 - Brick block builder module (`js/blocks.js`) with in-world place/stack/remove controls.
 - Persistent per-location build-block storage (`worldExplorer3D.buildBlocks.v1`) with runtime status hook (`getBuildPersistenceStatus()`).
 - Security/storage notice document for persistent memory behavior and disclaimer boilerplate.
+- GitHub Actions workflows for CI (`.github/workflows/ci.yml`) and Pages deployment (`.github/workflows/pages.yml`).
+- PR template for structured contributor submissions (`.github/pull_request_template.md`).
+- Repository Pages readiness validator script (`.github/scripts/check-pages-readiness.mjs`).
 
 ### Changed
 - Technical documentation examples now show deterministic RNG usage patterns aligned with the `rdt.js` seeded runtime helpers.
@@ -37,7 +44,9 @@ Entries reflect changes made relative to the most recent public release.
 - Space info panel metric rows are now reusable for planets, asteroids, spacecraft, and galaxies.
 - POI map rendering now follows legend category filters on both minimap and large map.
 - Dynamic map/property/historic UI templates now escape untrusted string fields before insertion.
-- Module loader cache-bust chain incremented through `v=34` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Top benchmark/debug overlays now auto-anchor between top HUD widgets to avoid overlap with controls.
+- Module loader cache-bust chain incremented through `v=50` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Core docs now include benchmark workflow instructions and supporting measured stats for RDT vs baseline and cache-backed repeat loads.
 
 ### Fixed
 - Non-responsive title menu interactions for suggested/custom selection after UI rework.
@@ -51,6 +60,9 @@ Entries reflect changes made relative to the most recent public release.
 - Walking-mode HUD street label not showing the active/nearest road name.
 - Redundant global delete-all blocks menu option (kept existing clear-current-location flow only).
 - Memory markers rendering at terrain ground instead of top surface when placed on roofs/blocks.
+- Load regressions caused by partial retry accumulation after runtime errors in world-load passes.
+- World-load failure path where batching errors could abort load completion instead of recovering.
+- Intermittent stale-client behavior after hotfix pushes due to cache-bust drift (resolved with aligned loader version updates).
 
 ---
 
@@ -111,4 +123,4 @@ Entries reflect changes made relative to the most recent public release.
 - Road elevation issues causing clipping or z-fighting in some areas
 - Inconsistent grounding behavior when switching cities
 ---
-Most recently updated on 02/10/26
+Most recently updated on 02/14/26

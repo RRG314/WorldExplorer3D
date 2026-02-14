@@ -9,6 +9,7 @@ Developer guide for World Explorer 3D. Architecture, code structure, and customi
 - [File Structure](#file-structure)
 - [Core Systems](#core-systems)
 - [Deterministic RDT & RGE-256 Layer](#deterministic-rdt--rge-256-layer)
+- [Benchmark Mode (RDT vs Baseline)](#benchmark-mode-rdt-vs-baseline)
 - [API Integration](#api-integration)
 - [Rendering Pipeline](#rendering-pipeline)
 - [Persistent Memory Markers](#persistent-memory-markers)
@@ -42,7 +43,10 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - Memory composer now includes `Delete All` with confirmation.
 - POI and memory markers now render on both minimap and large map overlays.
 - Voxel-style brick builder subsystem added (`js/blocks.js`) with click place/stack and shift-click removal.
-- Loader cache-bust chain is aligned through `v=34` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Runtime benchmark settings panel added in title-screen `Settings` for `RDT` vs `Baseline` mode switching.
+- Perf snapshot export path added (`Copy Snapshot`) and optional in-game benchmark overlay.
+- Overpass endpoint preference + in-memory response cache added for faster repeat loads.
+- Loader cache-bust chain is aligned through `v=50` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### High-Level Architecture
 
@@ -357,6 +361,65 @@ World Explorer 3D includes a deterministic utility layer in `js/rdt.js` that com
 
 The engine already uses deterministic PRNG paths in key procedural systems. Some subsystems still use `Math.random` for non-critical effects and compatibility. Ongoing work is to continue replacing those paths with deterministic stream-based RNG to maximize reproducibility.
 
+## Benchmark Mode (RDT vs Baseline)
+
+The engine includes a user-facing benchmark switch so performance can be compared without code changes.
+
+### Runtime controls
+
+- UI location: `index.html` -> `Settings` tab -> `⚡ Performance Benchmark`
+- Mode selector: `#perfModeSelect`
+- Overlay toggle: `#perfOverlayToggle`
+- Apply/reload action: `#perfApplyReload`
+- Snapshot export action: `#perfCopySnapshot`
+
+### Mode semantics
+
+- `rdt`: uses adaptive feature budgets, RDT depth-driven limits, and mixed collider detail.
+- `baseline`: disables RDT budgeting and uses full baseline budgets.
+
+### Persistence and defaults
+
+- Mode storage key: `worldExplorerPerfMode`
+- Overlay storage key: `worldExplorerPerfOverlay`
+- Overlay default: forced OFF each session (`setPerfOverlayEnabled(false, { persist: false })` in `js/perf.js`) so diagnostics remain opt-in.
+
+### Overlay anchoring and placement
+
+- `js/main.js` exposes `positionTopOverlays()` and computes placement from live element bounds.
+- Debug overlay (`#debugOverlay`) is centered between `#hud` and `#modeHud`.
+- Benchmark panel (`#perfPanel`) is centered between `#modeHud` and `#mainMenuBtn`.
+- Repositioning runs during HUD-throttled updates, perf panel refreshes, debug toggle, and `resize`.
+
+### Snapshot schema highlights
+
+`capturePerfSnapshot()` exports JSON with:
+
+- top-level render stats (`fps`, `frameMs`, `renderer.*`)
+- live counts (`live.worldCounts`, `live.lodVisible`)
+- last world-load summary (`lastLoad.*`)
+
+`world.js` appends load diagnostics:
+
+- `lastLoad.overpassSource` (`network` or `memory-cache`)
+- `lastLoad.overpassEndpoint`
+- `lastLoad.overpassCacheAgeMs`
+- per-phase timings in `lastLoad.phases`
+
+### Supporting test stats (Baltimore, 2026-02-14)
+
+| Scenario | overpassSource | loadMs | fetchOverpass | fps | frameMs | draw calls | triangles |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline (network) | `network` | `5551` | `4267` | `60.00` | `16.71` | `453` | `2,888,718` |
+| RDT (network) | `network` | `4669` | `3519` | `60.00` | `16.67` | `1149` | `2,174,223` |
+| RDT (memory-cache repeat) | `memory-cache` | `2202-2246` | `0` | `59.99-60.00` | `16.59-16.66` | `957-1131` | `2,250,431-2,259,359` |
+
+Current takeaway from these runs:
+
+- RDT startup is faster than baseline for this dataset.
+- Repeat RDT loads are much faster when Overpass fetch is served from memory cache.
+- Draw-call variance is still a tuning target in RDT mode.
+
 ## API Integration
 
 ### OSM / Tile Integration
@@ -634,6 +697,14 @@ Current memory persistence model is client-side only.
 
 ## Performance Optimization
 
+Current implemented strategies in this branch:
+
+- Per-mode budget control (`rdt` adaptive limits vs `baseline` full limits)
+- Merged/batched road, building, and landuse geometry paths
+- Mixed-detail collider budgeting (full near, simplified mid for RDT)
+- Overpass endpoint racing with preferred-endpoint reuse
+- In-memory Overpass response cache for repeat loads at the same location envelope
+
 ### Rendering Optimizations
 
 **Level of Detail (LOD)**:
@@ -876,6 +947,7 @@ document.getElementById('myElement').addEventListener('click', () => {
   - `js/bootstrap.js` (`manifest.js?...`, `script-loader.js?...`)
   - `js/modules/manifest.js` (`CACHE_BUST`)
   - `js/app-entry.js` (module import query suffixes)
+  - Current expected value: `v=50`
 
 ### Debugging Tools
 

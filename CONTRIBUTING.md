@@ -45,6 +45,7 @@ Before opening a PR:
 3. City switch works without major terrain/building breakage.
 4. Space transitions still work (if touched).
 5. Any changed docs are updated in the same PR.
+6. CI checks pass in GitHub (`CI` workflow).
 
 ## 6. Testing a Change
 
@@ -90,17 +91,28 @@ Optional local checks:
 ```bash
 npx eslint js/*.js js/modules/*.js
 npx prettier --check "**/*.{md,js,css,html,json,yml,yaml}"
+for f in js/*.js js/modules/*.js; do node --check "$f"; done
+node .github/scripts/check-pages-readiness.mjs
 ```
 
 If you do not have these tools installed, run manual validation and document that in your PR.
 
-## 9. Security
+## 9. GitHub Workflows
+
+- `CI` workflow:
+  - runs JS syntax checks (`node --check`)
+  - runs static Pages readiness checks (`.github/scripts/check-pages-readiness.mjs`)
+- `Deploy Pages` workflow:
+  - deploys static site artifact for `main` and `rdt-engine`
+  - requires GitHub Pages source to be set to `GitHub Actions`
+
+## 10. Security
 
 Do not post security-sensitive findings in public issues.
 
 Report privately to the maintainer email listed in repository documentation.
 
-## 10. License Reminder
+## 11. License Reminder
 
 Submitting a contribution does not grant redistribution rights to project code.
 This remains a source-available, all-rights-reserved repository unless the license file changes in a future release.

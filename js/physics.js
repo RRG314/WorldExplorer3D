@@ -78,63 +78,100 @@ function checkBuildingCollision(x, z, carRadius = 2) {
             continue; // Car is far from this building
         }
 
-        // Check if car center is inside building
-        const isInside = pointInPolygon(x, z, building.pts);
+        const hasPolygon = Array.isArray(building.pts) && building.pts.length >= 3;
+        const isInside = hasPolygon
+            ? pointInPolygon(x, z, building.pts)
+            : (x >= building.minX && x <= building.maxX && z >= building.minZ && z <= building.maxZ);
 
         // Find nearest edge and distance
         let nearestEdgeDist = Infinity;
         let nearestEdgeInfo = null;
 
-        const ptsLen = building.pts.length;
-        for (let j = 0; j < ptsLen; j++) {
-            const p1 = building.pts[j];
-            const p2 = building.pts[(j + 1) % ptsLen];
+        if (hasPolygon) {
+            const ptsLen = building.pts.length;
+            for (let j = 0; j < ptsLen; j++) {
+                const p1 = building.pts[j];
+                const p2 = building.pts[(j + 1) % ptsLen];
 
-            // Distance from point to line segment
-            const dx = p2.x - p1.x;
-            const dz = p2.z - p1.z;
-            const len2 = dx * dx + dz * dz;
+                // Distance from point to line segment
+                const dx = p2.x - p1.x;
+                const dz = p2.z - p1.z;
+                const len2 = dx * dx + dz * dz;
 
-            if (len2 === 0) continue;
+                if (len2 === 0) continue;
 
-            let t = ((x - p1.x) * dx + (z - p1.z) * dz) / len2;
-            t = Math.max(0, Math.min(1, t));
+                let t = ((x - p1.x) * dx + (z - p1.z) * dz) / len2;
+                t = Math.max(0, Math.min(1, t));
 
-            const nearestX = p1.x + t * dx;
-            const nearestZ = p1.z + t * dz;
-            const distSq = (x - nearestX) * (x - nearestX) + (z - nearestZ) * (z - nearestZ);
+                const nearestX = p1.x + t * dx;
+                const nearestZ = p1.z + t * dz;
+                const distSq = (x - nearestX) * (x - nearestX) + (z - nearestZ) * (z - nearestZ);
 
-            // Use squared distance for comparison (avoid sqrt until needed)
-            if (distSq < nearestEdgeDist * nearestEdgeDist) {
-                const dist = Math.sqrt(distSq);
-                nearestEdgeDist = dist;
+                // Use squared distance for comparison (avoid sqrt until needed)
+                if (distSq < nearestEdgeDist * nearestEdgeDist) {
+                    const dist = Math.sqrt(distSq);
+                    nearestEdgeDist = dist;
 
-                // Calculate perpendicular direction from edge
-                let perpX = -dz;
-                let perpZ = dx;
-                const perpLen = Math.sqrt(perpX * perpX + perpZ * perpZ);
+                    // Calculate perpendicular direction from edge
+                    let perpX = -dz;
+                    let perpZ = dx;
+                    const perpLen = Math.sqrt(perpX * perpX + perpZ * perpZ);
 
-                if (perpLen > 0) {
-                    perpX /= perpLen;
-                    perpZ /= perpLen;
+                    if (perpLen > 0) {
+                        perpX /= perpLen;
+                        perpZ /= perpLen;
 
-                    const toCarX = x - nearestX;
-                    const toCarZ = z - nearestZ;
-                    const dotProduct = toCarX * perpX + toCarZ * perpZ;
+                        const toCarX = x - nearestX;
+                        const toCarZ = z - nearestZ;
+                        const dotProduct = toCarX * perpX + toCarZ * perpZ;
 
-                    if (dotProduct < 0) {
-                        perpX = -perpX;
-                        perpZ = -perpZ;
+                        if (dotProduct < 0) {
+                            perpX = -perpX;
+                            perpZ = -perpZ;
+                        }
+
+                        nearestEdgeInfo = {
+                            nearestX,
+                            nearestZ,
+                            pushX: perpX,
+                            pushZ: perpZ,
+                            dist
+                        };
                     }
-
-                    nearestEdgeInfo = {
-                        nearestX,
-                        nearestZ,
-                        pushX: perpX,
-                        pushZ: perpZ,
-                        dist
-                    };
                 }
+            }
+        } else {
+            const nearestX = Math.max(building.minX, Math.min(x, building.maxX));
+            const nearestZ = Math.max(building.minZ, Math.min(z, building.maxZ));
+            if (isInside) {
+                const distLeft = Math.max(0, x - building.minX);
+                const distRight = Math.max(0, building.maxX - x);
+                const distBottom = Math.max(0, z - building.minZ);
+                const distTop = Math.max(0, building.maxZ - z);
+                const minDist = Math.min(distLeft, distRight, distBottom, distTop);
+                nearestEdgeDist = minDist;
+                if (minDist === distLeft) {
+                    nearestEdgeInfo = { nearestX: building.minX, nearestZ: z, pushX: -1, pushZ: 0, dist: minDist };
+                } else if (minDist === distRight) {
+                    nearestEdgeInfo = { nearestX: building.maxX, nearestZ: z, pushX: 1, pushZ: 0, dist: minDist };
+                } else if (minDist === distBottom) {
+                    nearestEdgeInfo = { nearestX: x, nearestZ: building.minZ, pushX: 0, pushZ: -1, dist: minDist };
+                } else {
+                    nearestEdgeInfo = { nearestX: x, nearestZ: building.maxZ, pushX: 0, pushZ: 1, dist: minDist };
+                }
+            } else {
+                const diffX = x - nearestX;
+                const diffZ = z - nearestZ;
+                const dist = Math.hypot(diffX, diffZ);
+                nearestEdgeDist = dist;
+                const inv = dist > 1e-6 ? (1 / dist) : 0;
+                nearestEdgeInfo = {
+                    nearestX,
+                    nearestZ,
+                    pushX: diffX * inv,
+                    pushZ: diffZ * inv,
+                    dist
+                };
             }
         }
 
