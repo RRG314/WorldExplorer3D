@@ -777,6 +777,7 @@ function createAsteroidBelt() {
   // --- Asteroid belt boundary rings (inner and outer edge) ---
   createBeltBoundaryRing(belt.innerAU, 0xb48357, 'beltInnerEdge');
   createBeltBoundaryRing(belt.outerAU, 0xb48357, 'beltOuterEdge');
+  createBeltVolumeBand(belt.innerAU, belt.outerAU, 0xb48357, 0.09, 'asteroidBeltBand', 1.5);
 
   // --- Named large asteroids as meshes ---
   createNamedAsteroids();
@@ -843,6 +844,7 @@ function createKuiperBelt() {
   // Boundary guide rings for context.
   createBeltBoundaryRing(belt.innerAU, 0x7baee0, 'kuiperInnerEdge');
   createBeltBoundaryRing(belt.outerAU, 0x7baee0, 'kuiperOuterEdge');
+  createBeltVolumeBand(belt.innerAU, belt.outerAU, 0x7baee0, 0.06, 'kuiperBeltBand', 2.8);
 }
 
 function createBeltBoundaryRing(radiusAU, color, name) {
@@ -867,6 +869,27 @@ function createBeltBoundaryRing(radiusAU, color, name) {
   const ring = new THREE.LineLoop(geo, mat);
   ring.name = name;
   solarSystem.group.add(ring);
+}
+
+function createBeltVolumeBand(innerAU, outerAU, color, opacity, name, tiltDeg) {
+  const innerRadius = innerAU * AU_TO_SCENE;
+  const outerRadius = outerAU * AU_TO_SCENE;
+  const ringGeo = new THREE.RingGeometry(innerRadius, outerRadius, 256, 1);
+  const ringMat = new THREE.MeshBasicMaterial({
+    color: color,
+    transparent: true,
+    opacity: opacity,
+    side: THREE.DoubleSide,
+    depthWrite: false
+  });
+  const beltBand = new THREE.Mesh(ringGeo, ringMat);
+  beltBand.name = name;
+  beltBand.rotation.x = -Math.PI / 2;
+  if (typeof tiltDeg === 'number' && tiltDeg !== 0) {
+    beltBand.rotation.z = tiltDeg * _SS_DEG2RAD;
+  }
+  beltBand.renderOrder = 1;
+  solarSystem.group.add(beltBand);
 }
 
 function createNamedAsteroids() {
