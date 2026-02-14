@@ -1,6 +1,7 @@
 // ============================================================================
 // config.js - Game configuration, locations, and constants
 // ============================================================================
+import { ctx } from "./shared-context.js?v=52";
 
 const LOCS = {
     baltimore: { name: 'Baltimore', lat: 39.2904, lon: -76.6122 },
@@ -107,7 +108,7 @@ const POI_TYPES = {
 };
 
 function exposeMutableGlobal(name, getter, setter) {
-    Object.defineProperty(globalThis, name, {
+    Object.defineProperty(ctx, name, {
         configurable: true,
         enumerable: true,
         get: getter,
@@ -122,7 +123,7 @@ exposeMutableGlobal('terrainEnabled', () => terrainEnabled, (v) => { terrainEnab
 exposeMutableGlobal('roadsNeedRebuild', () => roadsNeedRebuild, (v) => { roadsNeedRebuild = v; });
 exposeMutableGlobal('lastRoadRebuildCheck', () => lastRoadRebuildCheck, (v) => { lastRoadRebuildCheck = v; });
 
-Object.assign(globalThis, {
+Object.assign(ctx, {
     LANDUSE_STYLES,
     LOCS,
     METERS_PER_WORLD_UNIT,

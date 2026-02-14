@@ -1,4 +1,4 @@
-// ============================================================================
+import { ctx } from "./shared-context.js?v=52"; // ============================================================================
 // terrain.js - Terrain elevation system (Terrarium tiles)
 // ============================================================================
 
@@ -26,15 +26,15 @@ const terrain = {
 // expensive raycasting (which was O(triangles) and caused browser freezes).
 // =====================
 function terrainMeshHeightAt(x, z) {
-  if (!terrainGroup || terrainGroup.children.length === 0) {
+  if (!ctx.terrainGroup || ctx.terrainGroup.children.length === 0) {
     return elevationWorldYAtWorldXZ(x, z);
   }
 
-  const segs = TERRAIN_SEGMENTS;
+  const segs = ctx.TERRAIN_SEGMENTS;
   const vps = segs + 1; // vertices per side
 
-  for (let c = 0; c < terrainGroup.children.length; c++) {
-    const mesh = terrainGroup.children[c];
+  for (let c = 0; c < ctx.terrainGroup.children.length; c++) {
+    const mesh = ctx.terrainGroup.children[c];
     const info = mesh.userData?.terrainTile;
     if (!info) continue;
 
@@ -131,8 +131,8 @@ function calculateCurvature(pts, i) {
   const len2 = Math.sqrt(dx2 * dx2 + dz2 * dz2) || 1;
 
   // Normalize
-  const nx1 = dx1 / len1, nz1 = dz1 / len1;
-  const nx2 = dx2 / len2, nz2 = dz2 / len2;
+  const nx1 = dx1 / len1,nz1 = dz1 / len1;
+  const nx2 = dx2 / len2,nz2 = dz2 / len2;
 
   // Dot product gives cos(angle)
   const dot = nx1 * nx2 + nz1 * nz2;
@@ -194,32 +194,32 @@ function tileXYToLatLonBounds(x, y, z) {
   const lonW = x / n * 360 - 180;
   const lonE = (x + 1) / n * 360 - 180;
 
-  const latN = (180 / Math.PI) * Math.atan(Math.sinh(Math.PI * (1 - 2 * (y / n))));
-  const latS = (180 / Math.PI) * Math.atan(Math.sinh(Math.PI * (1 - 2 * ((y + 1) / n))));
+  const latN = 180 / Math.PI * Math.atan(Math.sinh(Math.PI * (1 - 2 * (y / n))));
+  const latS = 180 / Math.PI * Math.atan(Math.sinh(Math.PI * (1 - 2 * ((y + 1) / n))));
 
   return { latN, latS, lonW, lonE };
 }
 
 // Terrarium encoding: height_m = (R*256 + G + B/256) - 32768
 function decodeTerrariumRGB(r, g, b) {
-  return (r * 256 + g + b / 256) - 32768;
+  return r * 256 + g + b / 256 - 32768;
 }
 
 function getOrLoadTerrainTile(z, x, y) {
   const key = `${z}/${x}/${y}`;
-  if (terrainTileCache.has(key)) return terrainTileCache.get(key);
+  if (ctx.terrainTileCache.has(key)) return ctx.terrainTileCache.get(key);
 
   const img = new Image();
   img.crossOrigin = 'anonymous';
-  img.src = TERRAIN_TILE_URL(z, x, y);
+  img.src = ctx.TERRAIN_TILE_URL(z, x, y);
 
   const tile = { img, loaded: false, elev: null, w: 256, h: 256 };
-  terrainTileCache.set(key, tile);
+  ctx.terrainTileCache.set(key, tile);
 
   img.onload = () => {
     try {
       const canvas = document.createElement('canvas');
-      canvas.width = 256; canvas.height = 256;
+      canvas.width = 256;canvas.height = 256;
       const ctx = canvas.getContext('2d', { willReadFrequently: true });
       ctx.drawImage(img, 0, 0);
       const { data } = ctx.getImageData(0, 0, 256, 256);
@@ -232,10 +232,10 @@ function getOrLoadTerrainTile(z, x, y) {
 
       tile.loaded = true;
       tile.elev = elev;
-      
+
       // IMPORTANT: After tile loads, reapply heights to any terrain meshes using this tile
-      if (terrainGroup) {
-        terrainGroup.children.forEach(mesh => {
+      if (ctx.terrainGroup) {
+        ctx.terrainGroup.children.forEach((mesh) => {
           const tileInfo = mesh.userData?.terrainTile;
           if (tileInfo && tileInfo.z === z && tileInfo.tx === x && tileInfo.ty === y) {
             // Tile loaded - reapply heights
@@ -243,14 +243,14 @@ function getOrLoadTerrainTile(z, x, y) {
           }
         });
       }
-      
+
       // Immediately schedule road + building rebuild when terrain data arrives
       // Use a short debounce (60ms) so multiple tiles loading at once batch together
-      roadsNeedRebuild = true;
+      ctx.roadsNeedRebuild = true;
       if (!terrain._rebuildTimer) {
         terrain._rebuildTimer = setTimeout(() => {
           terrain._rebuildTimer = null;
-          if (roadsNeedRebuild && !onMoon) {
+          if (ctx.roadsNeedRebuild && !ctx.onMoon) {
             rebuildRoadsWithTerrain();
             repositionBuildingsWithTerrain();
           }
@@ -275,21 +275,21 @@ function getOrLoadTerrainTile(z, x, y) {
 function sampleTileElevationMeters(tile, u, v) {
   if (!tile || !tile.loaded || !tile.elev) return 0;
 
-  const w = 256, h = 256;
+  const w = 256,h = 256;
   const x = Math.max(0, Math.min(w - 1, u * (w - 1)));
   const y = Math.max(0, Math.min(h - 1, v * (h - 1)));
 
-  const x0 = Math.floor(x), y0 = Math.floor(y);
-  const x1 = Math.min(w - 1, x0 + 1), y1 = Math.min(h - 1, y0 + 1);
+  const x0 = Math.floor(x),y0 = Math.floor(y);
+  const x1 = Math.min(w - 1, x0 + 1),y1 = Math.min(h - 1, y0 + 1);
 
-  const sx = x - x0, sy = y - y0;
+  const sx = x - x0,sy = y - y0;
 
   const i00 = y0 * w + x0;
   const i10 = y0 * w + x1;
   const i01 = y1 * w + x0;
   const i11 = y1 * w + x1;
 
-  const e00 = tile.elev[i00], e10 = tile.elev[i10], e01 = tile.elev[i01], e11 = tile.elev[i11];
+  const e00 = tile.elev[i00],e10 = tile.elev[i10],e01 = tile.elev[i01],e11 = tile.elev[i11];
 
   const ex0 = e00 + (e10 - e00) * sx;
   const ex1 = e01 + (e11 - e01) * sx;
@@ -297,14 +297,14 @@ function sampleTileElevationMeters(tile, u, v) {
 }
 
 function worldToLatLon(x, z) {
-  const lat = LOC.lat - (z / SCALE);
-  const lon = LOC.lon + (x / (SCALE * Math.cos(LOC.lat * Math.PI / 180)));
+  const lat = ctx.LOC.lat - z / ctx.SCALE;
+  const lon = ctx.LOC.lon + x / (ctx.SCALE * Math.cos(ctx.LOC.lat * Math.PI / 180));
   return { lat, lon };
 }
 
 function elevationMetersAtLatLon(lat, lon) {
-  const t = latLonToTileXY(lat, lon, TERRAIN_ZOOM);
-  const tile = getOrLoadTerrainTile(TERRAIN_ZOOM, t.x, t.y);
+  const t = latLonToTileXY(lat, lon, ctx.TERRAIN_ZOOM);
+  const tile = getOrLoadTerrainTile(ctx.TERRAIN_ZOOM, t.x, t.y);
   if (!tile.loaded) return 0;
 
   const u = t.xf - t.x;
@@ -315,21 +315,21 @@ function elevationMetersAtLatLon(lat, lon) {
 function elevationWorldYAtWorldXZ(x, z) {
   const { lat, lon } = worldToLatLon(x, z);
   const meters = elevationMetersAtLatLon(lat, lon);
-  return meters * WORLD_UNITS_PER_METER * TERRAIN_Y_EXAGGERATION;
+  return meters * ctx.WORLD_UNITS_PER_METER * ctx.TERRAIN_Y_EXAGGERATION;
 }
 
 function ensureTerrainGroup() {
-  if (!terrainGroup) {
-    terrainGroup = new THREE.Group();
-    terrainGroup.name = 'TerrainGroup';
-    scene.add(terrainGroup);
+  if (!ctx.terrainGroup) {
+    ctx.terrainGroup = new THREE.Group();
+    ctx.terrainGroup.name = 'TerrainGroup';
+    ctx.scene.add(ctx.terrainGroup);
   }
 }
 
 function clearTerrainMeshes() {
-  if (!terrainGroup) return;
-  while (terrainGroup.children.length) {
-    const m = terrainGroup.children.pop();
+  if (!ctx.terrainGroup) return;
+  while (ctx.terrainGroup.children.length) {
+    const m = ctx.terrainGroup.children.pop();
     if (m.geometry) m.geometry.dispose();
     if (m.material) m.material.dispose();
   }
@@ -337,10 +337,10 @@ function clearTerrainMeshes() {
 
 function buildTerrainTileMesh(z, tx, ty) {
   const bounds = tileXYToLatLonBounds(tx, ty, z);
-  const pNW = geoToWorld(bounds.latN, bounds.lonW);
-  const pNE = geoToWorld(bounds.latN, bounds.lonE);
-  const pSW = geoToWorld(bounds.latS, bounds.lonW);
-  const pCenter = geoToWorld((bounds.latN + bounds.latS) * 0.5, (bounds.lonW + bounds.lonE) * 0.5);
+  const pNW = ctx.geoToWorld(bounds.latN, bounds.lonW);
+  const pNE = ctx.geoToWorld(bounds.latN, bounds.lonE);
+  const pSW = ctx.geoToWorld(bounds.latS, bounds.lonW);
+  const pCenter = ctx.geoToWorld((bounds.latN + bounds.latS) * 0.5, (bounds.lonW + bounds.lonE) * 0.5);
 
   const width = Math.hypot(pNE.x - pNW.x, pNE.z - pNW.z);
   const depth = Math.hypot(pSW.x - pNW.x, pSW.z - pNW.z);
@@ -348,14 +348,14 @@ function buildTerrainTileMesh(z, tx, ty) {
   const cx = pCenter.x;
   const cz = pCenter.z;
 
-  const geo = new THREE.PlaneGeometry(width, depth, TERRAIN_SEGMENTS, TERRAIN_SEGMENTS);
+  const geo = new THREE.PlaneGeometry(width, depth, ctx.TERRAIN_SEGMENTS, ctx.TERRAIN_SEGMENTS);
   geo.rotateX(-Math.PI / 2);
 
   // Tile grass every ~25 world units (~28 meters) for visible detail from car/walking
   const repeats = Math.max(10, Math.round(width / 25));
 
   const mat = new THREE.MeshStandardMaterial({
-    color: (typeof grassDiffuse !== 'undefined' && grassDiffuse) ? 0xffffff : 0x6b8e4a,
+    color: typeof ctx.grassDiffuse !== 'undefined' && ctx.grassDiffuse ? 0xffffff : 0x6b8e4a,
     roughness: 0.95,
     metalness: 0.0,
     side: THREE.DoubleSide,
@@ -366,21 +366,21 @@ function buildTerrainTileMesh(z, tx, ty) {
   });
 
   // Apply grass PBR textures if loaded
-  if (typeof grassDiffuse !== 'undefined' && grassDiffuse) {
-    mat.map = grassDiffuse.clone();
+  if (typeof ctx.grassDiffuse !== 'undefined' && ctx.grassDiffuse) {
+    mat.map = ctx.grassDiffuse.clone();
     mat.map.wrapS = mat.map.wrapT = THREE.RepeatWrapping;
     mat.map.repeat.set(repeats, repeats);
     mat.map.needsUpdate = true;
   }
-  if (typeof grassNormal !== 'undefined' && grassNormal) {
-    mat.normalMap = grassNormal.clone();
+  if (typeof ctx.grassNormal !== 'undefined' && ctx.grassNormal) {
+    mat.normalMap = ctx.grassNormal.clone();
     mat.normalMap.wrapS = mat.normalMap.wrapT = THREE.RepeatWrapping;
     mat.normalMap.repeat.set(repeats, repeats);
     mat.normalMap.needsUpdate = true;
     mat.normalScale = new THREE.Vector2(0.6, 0.6);
   }
-  if (typeof grassRoughness !== 'undefined' && grassRoughness) {
-    mat.roughnessMap = grassRoughness.clone();
+  if (typeof ctx.grassRoughness !== 'undefined' && ctx.grassRoughness) {
+    mat.roughnessMap = ctx.grassRoughness.clone();
     mat.roughnessMap.wrapS = mat.roughnessMap.wrapT = THREE.RepeatWrapping;
     mat.roughnessMap.repeat.set(repeats, repeats);
     mat.roughnessMap.needsUpdate = true;
@@ -434,7 +434,7 @@ function applyHeightsToTerrainMesh(mesh) {
     const u = (lon - bounds.lonW) / lonRange;
     const v = (bounds.latN - lat) / latRange;
     const meters = sampleTileElevationMeters(tile, u, v);
-    const y = meters * WORLD_UNITS_PER_METER * TERRAIN_Y_EXAGGERATION;
+    const y = meters * ctx.WORLD_UNITS_PER_METER * ctx.TERRAIN_Y_EXAGGERATION;
     elevations.push(y);
     minElevation = Math.min(minElevation, y);
     maxElevation = Math.max(maxElevation, y);
@@ -460,7 +460,7 @@ function applyHeightsToTerrainMesh(mesh) {
 
 function resetTerrainStreamingState() {
   lastTerrainCenterKey = null;
-  lastDynamicTerrainRing = TERRAIN_RING;
+  lastDynamicTerrainRing = ctx.TERRAIN_RING;
   terrain._lastUpdatePos.x = 0;
   terrain._lastUpdatePos.z = 0;
   terrain._cachedIntersections = null;
@@ -480,7 +480,7 @@ function detectRoadIntersections(roads) {
     if (!road.pts || road.pts.length < 2) return;
 
     // Check first and last points (endpoints)
-    [0, road.pts.length - 1].forEach(idx => {
+    [0, road.pts.length - 1].forEach((idx) => {
       const pt = road.pts[idx];
       const key = `${Math.round(pt.x * 10)},${Math.round(pt.z * 10)}`; // 0.1 precision
 
@@ -496,7 +496,7 @@ function detectRoadIntersections(roads) {
   intersections.forEach((data, key) => {
     if (data.roads.length >= 2) {
       // Calculate max width for intersection cap sizing
-      const maxWidth = Math.max(...data.roads.map(r => r.width));
+      const maxWidth = Math.max(...data.roads.map((r) => r.width));
       result.push({ x: data.x, z: data.z, roads: data.roads, maxWidth });
     }
   });
@@ -569,7 +569,7 @@ function buildIntersectionCap(x, z, radius, segments = 16) {
 
   // Ring vertices
   for (let i = 0; i <= segments; i++) {
-    const angle = (i / segments) * Math.PI * 2;
+    const angle = i / segments * Math.PI * 2;
     const px = x + Math.cos(angle) * radius;
     const pz = z + Math.sin(angle) * radius;
     const py = cachedTerrainHeight(px, pz) + 0.25;
@@ -585,19 +585,19 @@ function buildIntersectionCap(x, z, radius, segments = 16) {
 }
 
 let lastTerrainCenterKey = null;
-let lastDynamicTerrainRing = TERRAIN_RING;
+let lastDynamicTerrainRing = ctx.TERRAIN_RING;
 
 function getStreamingSpeedMph() {
-  if (droneMode && drone) return Math.max(0, Math.abs((drone.speed || 0) * 1.8));
-  if (Walk && Walk.state && Walk.state.mode === 'walk') {
-    return Math.max(0, Math.abs(Walk.state.walker?.speedMph || 0));
+  if (ctx.droneMode && ctx.drone) return Math.max(0, Math.abs((ctx.drone.speed || 0) * 1.8));
+  if (ctx.Walk && ctx.Walk.state && ctx.Walk.state.mode === 'walk') {
+    return Math.max(0, Math.abs(ctx.Walk.state.walker?.speedMph || 0));
   }
-  return Math.max(0, Math.abs((car?.speed || 0) * 0.5));
+  return Math.max(0, Math.abs((ctx.car?.speed || 0) * 0.5));
 }
 
 function getDynamicTerrainRing() {
-  const baseRing = Math.max(1, TERRAIN_RING);
-  const mode = (typeof getPerfMode === 'function') ? getPerfMode() : (perfMode || 'rdt');
+  const baseRing = Math.max(1, ctx.TERRAIN_RING);
+  const mode = typeof ctx.getPerfMode === 'function' ? ctx.getPerfMode() : ctx.perfMode || 'rdt';
   if (mode === 'baseline') return baseRing;
 
   const mph = getStreamingSpeedMph();
@@ -607,17 +607,17 @@ function getDynamicTerrainRing() {
 }
 
 function updateTerrainAround(x, z) {
-  if (!terrainEnabled) return;
+  if (!ctx.terrainEnabled) return;
 
   ensureTerrainGroup();
 
   const { lat, lon } = worldToLatLon(x, z);
-  const t = latLonToTileXY(lat, lon, TERRAIN_ZOOM);
-  const centerKey = `${TERRAIN_ZOOM}/${t.x}/${t.y}`;
+  const t = latLonToTileXY(lat, lon, ctx.TERRAIN_ZOOM);
+  const centerKey = `${ctx.TERRAIN_ZOOM}/${t.x}/${t.y}`;
   const activeRing = getDynamicTerrainRing();
   const ringChanged = activeRing !== lastDynamicTerrainRing;
   lastDynamicTerrainRing = activeRing;
-  if (typeof setPerfLiveStat === 'function') setPerfLiveStat('terrainRing', activeRing);
+  if (typeof ctx.setPerfLiveStat === 'function') ctx.setPerfLiveStat('terrainRing', activeRing);
 
   // OPTIMIZATION: Skip if same tile AND haven't moved enough (but always run on first call)
   if (lastTerrainCenterKey !== null) {
@@ -641,13 +641,13 @@ function updateTerrainAround(x, z) {
       for (let dy = -activeRing; dy <= activeRing; dy++) {
         const tx = t.x + dx;
         const ty = t.y + dy;
-        const mesh = buildTerrainTileMesh(TERRAIN_ZOOM, tx, ty);
-        terrainGroup.add(mesh);
+        const mesh = buildTerrainTileMesh(ctx.TERRAIN_ZOOM, tx, ty);
+        ctx.terrainGroup.add(mesh);
       }
     }
 
     // Only rebuild roads when terrain tiles actually change (not every frame)
-    if (roads.length > 0 && !onMoon) {
+    if (ctx.roads.length > 0 && !ctx.onMoon) {
       rebuildRoadsWithTerrain();
       repositionBuildingsWithTerrain();
     }
@@ -656,7 +656,7 @@ function updateTerrainAround(x, z) {
 
 // Rebuild roads to follow current terrain elevation with improved conformance
 function rebuildRoadsWithTerrain() {
-  if (!terrainEnabled || roads.length === 0 || onMoon) return;
+  if (!ctx.terrainEnabled || ctx.roads.length === 0 || ctx.onMoon) return;
 
   // Disable debug mode before rebuild to prevent stuck materials
   if (roadDebugMode && typeof disableRoadDebugMode === 'function') {
@@ -666,7 +666,7 @@ function rebuildRoadsWithTerrain() {
   // Check if terrain tiles are loaded
   let tilesLoaded = 0;
   let tilesTotal = 0;
-  terrainTileCache.forEach(tile => {
+  ctx.terrainTileCache.forEach((tile) => {
     tilesTotal++;
     if (tile.loaded) tilesLoaded++;
   });
@@ -675,24 +675,24 @@ function rebuildRoadsWithTerrain() {
 
   // OPTIMIZATION: Only clear height cache if road count changed (roads added/removed)
   // Otherwise keep cached heights for better performance
-  const roadCountChanged = roads.length !== terrain._lastRoadCount;
+  const roadCountChanged = ctx.roads.length !== terrain._lastRoadCount;
   if (roadCountChanged) {
     clearTerrainHeightCache();
-    terrain._lastRoadCount = roads.length;
+    terrain._lastRoadCount = ctx.roads.length;
   }
 
   // Remove old road meshes
-  roadMeshes.forEach(m => {
-    scene.remove(m);
+  ctx.roadMeshes.forEach((m) => {
+    ctx.scene.remove(m);
     if (m.geometry) m.geometry.dispose();
     if (m.material) m.material.dispose();
   });
-  roadMeshes = [];
+  ctx.roadMeshes = [];
 
   // OPTIMIZATION: Cache intersection detection - only recalculate if roads changed
   let intersections;
   if (roadCountChanged || !terrain._cachedIntersections) {
-    intersections = detectRoadIntersections(roads);
+    intersections = detectRoadIntersections(ctx.roads);
     terrain._cachedIntersections = intersections;
   } else {
     intersections = terrain._cachedIntersections;
@@ -705,11 +705,11 @@ function rebuildRoadsWithTerrain() {
   const roadCapBatchVerts = [];
   const roadCapBatchIdx = [];
 
-  const roadMat = (typeof asphaltTex !== 'undefined' && asphaltTex) ? new THREE.MeshStandardMaterial({
-    map: asphaltTex,
-    normalMap: asphaltNormal || undefined,
+  const roadMat = typeof ctx.asphaltTex !== 'undefined' && ctx.asphaltTex ? new THREE.MeshStandardMaterial({
+    map: ctx.asphaltTex,
+    normalMap: ctx.asphaltNormal || undefined,
     normalScale: new THREE.Vector2(0.8, 0.8),
-    roughnessMap: asphaltRoughness || undefined,
+    roughnessMap: ctx.asphaltRoughness || undefined,
     roughness: 0.95,
     metalness: 0.05,
     side: THREE.DoubleSide,
@@ -740,11 +740,11 @@ function rebuildRoadsWithTerrain() {
     polygonOffsetUnits: -1
   });
 
-  const capMat = (typeof asphaltTex !== 'undefined' && asphaltTex) ? new THREE.MeshStandardMaterial({
-    map: asphaltTex,
-    normalMap: asphaltNormal || undefined,
+  const capMat = typeof ctx.asphaltTex !== 'undefined' && ctx.asphaltTex ? new THREE.MeshStandardMaterial({
+    map: ctx.asphaltTex,
+    normalMap: ctx.asphaltNormal || undefined,
     normalScale: new THREE.Vector2(0.8, 0.8),
-    roughnessMap: asphaltRoughness || undefined,
+    roughnessMap: ctx.asphaltRoughness || undefined,
     roughness: 0.95,
     metalness: 0.05,
     side: THREE.DoubleSide,
@@ -766,7 +766,7 @@ function rebuildRoadsWithTerrain() {
   });
 
   // Rebuild each road with improved terrain conformance
-  roads.forEach((road) => {
+  ctx.roads.forEach((road) => {
     const { width } = road;
     const hw = width / 2;
 
@@ -789,7 +789,7 @@ function rebuildRoadsWithTerrain() {
     for (let pass = 0; pass < 1; pass++) {
       for (let i = 1; i < pts.length - 1; i++) {
         centerHeights[i] = centerHeights[i] * 0.6 +
-          (centerHeights[i - 1] + centerHeights[i + 1]) * 0.2;
+        (centerHeights[i - 1] + centerHeights[i + 1]) * 0.2;
       }
     }
 
@@ -855,7 +855,7 @@ function rebuildRoadsWithTerrain() {
   });
 
   // Build intersection cap patches
-  intersections.forEach(intersection => {
+  intersections.forEach((intersection) => {
     const avgWidth = intersection.roads.reduce((sum, r) => sum + r.width, 0) / intersection.roads.length;
     const radius = avgWidth * 0.5;
     const capData = buildIntersectionCap(intersection.x, intersection.z, radius, 24);
@@ -875,8 +875,8 @@ function rebuildRoadsWithTerrain() {
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;
     Object.assign(mesh.userData, userData);
-    scene.add(mesh);
-    roadMeshes.push(mesh);
+    ctx.scene.add(mesh);
+    ctx.roadMeshes.push(mesh);
     return mesh;
   };
 
@@ -890,7 +890,7 @@ function rebuildRoadsWithTerrain() {
     capMat.dispose();
   }
 
-  roadsNeedRebuild = false;
+  ctx.roadsNeedRebuild = false;
 
   // Run validation if enabled
   if (typeof validateRoadTerrainConformance === 'function') {
@@ -945,27 +945,27 @@ function reprojectWaterwayMeshToTerrain(mesh) {
 
 // Reposition buildings and landuse to follow terrain
 function repositionBuildingsWithTerrain() {
-  if (!terrainEnabled || onMoon) return;
+  if (!ctx.terrainEnabled || ctx.onMoon) return;
 
   let buildingsRepositioned = 0;
   let landuseRepositioned = 0;
   let poisRepositioned = 0;
 
   // Reposition buildings using terrain mesh surface
-  buildingMeshes.forEach(mesh => {
+  ctx.buildingMeshes.forEach((mesh) => {
     const pts = mesh.userData.buildingFootprint;
     if (!pts || pts.length === 0) return;
 
-    const fallbackElevation = Number.isFinite(mesh.userData?.avgElevation)
-      ? mesh.userData.avgElevation
-      : 0;
+    const fallbackElevation = Number.isFinite(mesh.userData?.avgElevation) ?
+    mesh.userData.avgElevation :
+    0;
 
     // Use minimum elevation of footprint corners so building sits on terrain.
     // Prefer terrain mesh samples; if unavailable, fall back to base elevation
     // model to avoid buildings popping/floating while tiles stream in.
     let minElevation = Infinity;
     let sampleCount = 0;
-    pts.forEach(p => {
+    pts.forEach((p) => {
       let h = terrainMeshHeightAt(p.x, p.z);
       if ((!Number.isFinite(h) || h === 0) && typeof elevationWorldYAtWorldXZ === 'function') {
         h = elevationWorldYAtWorldXZ(p.x, p.z);
@@ -979,15 +979,15 @@ function repositionBuildingsWithTerrain() {
       minElevation = Number.isFinite(fallbackElevation) ? fallbackElevation : 0;
     }
 
-    const midLodHalfHeight = Number.isFinite(mesh.userData?.midLodHalfHeight)
-      ? mesh.userData.midLodHalfHeight
-      : 0;
+    const midLodHalfHeight = Number.isFinite(mesh.userData?.midLodHalfHeight) ?
+    mesh.userData.midLodHalfHeight :
+    0;
     mesh.position.y = minElevation + midLodHalfHeight;
     buildingsRepositioned++;
   });
 
   // Reposition landuse areas - deform vertices to follow terrain mesh surface
-  landuseMeshes.forEach(mesh => {
+  ctx.landuseMeshes.forEach((mesh) => {
     if (mesh.userData?.isWaterwayLine) {
       if (reprojectWaterwayMeshToTerrain(mesh)) landuseRepositioned++;
       return;
@@ -998,7 +998,7 @@ function repositionBuildingsWithTerrain() {
 
     // Recalculate average elevation from terrain mesh
     let avgElevation = 0;
-    pts.forEach(p => {
+    pts.forEach((p) => {
       avgElevation += terrainMeshHeightAt(p.x, p.z);
     });
     avgElevation /= pts.length;
@@ -1009,15 +1009,15 @@ function repositionBuildingsWithTerrain() {
     const positions = mesh.geometry.attributes.position;
     if (positions) {
       const isWaterPolygon = mesh.userData?.landuseType === 'water';
-      const flattenFactor = isWaterPolygon
-        ? (Number.isFinite(mesh.userData?.waterFlattenFactor) ? mesh.userData.waterFlattenFactor : 0.12)
-        : 1.0;
+      const flattenFactor = isWaterPolygon ?
+      Number.isFinite(mesh.userData?.waterFlattenFactor) ? mesh.userData.waterFlattenFactor : 0.12 :
+      1.0;
       const vertexOffset = isWaterPolygon ? 0.08 : 0.05;
       for (let i = 0; i < positions.count; i++) {
         const x = positions.getX(i);
         const z = positions.getZ(i);
         const tY = terrainMeshHeightAt(x, z);
-        positions.setY(i, ((tY - avgElevation) * flattenFactor) + vertexOffset);
+        positions.setY(i, (tY - avgElevation) * flattenFactor + vertexOffset);
       }
       positions.needsUpdate = true;
       mesh.geometry.computeVertexNormals();
@@ -1026,7 +1026,7 @@ function repositionBuildingsWithTerrain() {
   });
 
   // Reposition POI markers using terrain mesh surface
-  poiMeshes.forEach(mesh => {
+  ctx.poiMeshes.forEach((mesh) => {
     const pos = mesh.userData.poiPosition;
     if (!pos) return;
 
@@ -1037,7 +1037,7 @@ function repositionBuildingsWithTerrain() {
   });
 
   // Reposition street furniture using terrain mesh surface
-  streetFurnitureMeshes.forEach(group => {
+  ctx.streetFurnitureMeshes.forEach((group) => {
     if (!group.userData || !group.userData.furniturePos) return;
     const pos = group.userData.furniturePos;
     const tY = terrainMeshHeightAt(pos.x, pos.z);
@@ -1061,8 +1061,8 @@ function disableRoadDebugMode() {
   roadDebugMode = false;
 
   // Clear debug meshes
-  roadDebugMeshes.forEach(m => {
-    scene.remove(m);
+  roadDebugMeshes.forEach((m) => {
+    ctx.scene.remove(m);
     if (m.geometry) m.geometry.dispose();
     if (m.material) m.material.dispose();
   });
@@ -1083,7 +1083,7 @@ function disableRoadDebugMode() {
   */
 
   // Restore original road materials
-  roadMeshes.forEach(mesh => {
+  ctx.roadMeshes.forEach((mesh) => {
     if (mesh.userData._originalMaterial) {
       mesh.material.dispose();
       mesh.material = mesh.userData._originalMaterial;
@@ -1098,8 +1098,8 @@ function toggleRoadDebugMode() {
   roadDebugMode = !roadDebugMode;
 
   // Clear existing debug meshes
-  roadDebugMeshes.forEach(m => {
-    scene.remove(m);
+  roadDebugMeshes.forEach((m) => {
+    ctx.scene.remove(m);
     if (m.geometry) m.geometry.dispose();
     if (m.material) m.material.dispose();
   });
@@ -1126,7 +1126,7 @@ function toggleRoadDebugMode() {
     */
 
     // Override road materials with solid color
-    roadMeshes.forEach(mesh => {
+    ctx.roadMeshes.forEach((mesh) => {
       if (mesh.userData.isRoadSkirt || mesh.userData.isIntersectionCap) return;
 
       if (!mesh.userData._originalMaterial) {
@@ -1139,7 +1139,7 @@ function toggleRoadDebugMode() {
     });
 
     // Draw road edge lines and sample points
-    roadMeshes.forEach(mesh => {
+    ctx.roadMeshes.forEach((mesh) => {
       if (mesh.userData.isRoadSkirt || mesh.userData.isIntersectionCap) return;
 
       const pos = mesh.geometry.attributes.position;
@@ -1159,7 +1159,7 @@ function toggleRoadDebugMode() {
         const lineGeo = new THREE.BufferGeometry().setFromPoints(points);
         const lineMat = new THREE.LineBasicMaterial({ color: 0xffff00, linewidth: 2 });
         const line = new THREE.Line(lineGeo, lineMat);
-        scene.add(line);
+        ctx.scene.add(line);
         roadDebugMeshes.push(line);
       }
 
@@ -1169,13 +1169,13 @@ function toggleRoadDebugMode() {
         const sphereMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
         const sphere = new THREE.Mesh(sphereGeo, sphereMat);
         sphere.position.copy(points[i]);
-        scene.add(sphere);
+        ctx.scene.add(sphere);
         roadDebugMeshes.push(sphere);
       }
     });
 
     // Highlight problem areas (road below terrain)
-    roadMeshes.forEach(mesh => {
+    ctx.roadMeshes.forEach((mesh) => {
       if (mesh.userData.isRoadSkirt || mesh.userData.isIntersectionCap) return;
 
       const pos = mesh.geometry.attributes.position;
@@ -1194,7 +1194,7 @@ function toggleRoadDebugMode() {
           const markerMat = new THREE.MeshBasicMaterial({ color: 0xff00ff }); // Magenta warning
           const marker = new THREE.Mesh(markerGeo, markerMat);
           marker.position.set(x, y + 1, z);
-          scene.add(marker);
+          ctx.scene.add(marker);
           roadDebugMeshes.push(marker);
         }
       }
@@ -1216,7 +1216,7 @@ function toggleRoadDebugMode() {
     */
 
     // Restore original road materials
-    roadMeshes.forEach(mesh => {
+    ctx.roadMeshes.forEach((mesh) => {
       if (mesh.userData._originalMaterial) {
         mesh.material = mesh.userData._originalMaterial;
         delete mesh.userData._originalMaterial;
@@ -1231,7 +1231,7 @@ function toggleRoadDebugMode() {
 // =====================
 
 function validateRoadTerrainConformance() {
-  if (!terrainEnabled || roads.length === 0 || onMoon) return;
+  if (!ctx.terrainEnabled || ctx.roads.length === 0 || ctx.onMoon) return;
 
   console.log('🔬 Validating road-terrain conformance...');
 
@@ -1239,14 +1239,14 @@ function validateRoadTerrainConformance() {
   let issuesFound = 0;
   const worstDeltas = [];
 
-  roadMeshes.forEach((mesh, meshIdx) => {
+  ctx.roadMeshes.forEach((mesh, meshIdx) => {
     if (mesh.userData.isRoadSkirt || mesh.userData.isIntersectionCap) return;
 
     const pos = mesh.geometry.attributes.position;
     if (!pos) return;
 
     const roadIdx = mesh.userData.roadIdx;
-    const road = roads[roadIdx];
+    const road = ctx.roads[roadIdx];
     if (!road) return;
 
     // Sample every 5th vertex (performance)
@@ -1283,7 +1283,7 @@ function validateRoadTerrainConformance() {
   if (issuesFound > 0) {
     console.warn(`⚠️  Found ${issuesFound} points where road is below terrain (delta < -0.05)`);
     console.warn('Worst 10 deltas:');
-    worstDeltas.slice(0, 10).forEach(d => {
+    worstDeltas.slice(0, 10).forEach((d) => {
       console.warn(`  ${d.roadName}: delta=${d.delta}m at ${d.worldPos} (${d.lat}, ${d.lon})`);
     });
   } else {
@@ -1291,7 +1291,7 @@ function validateRoadTerrainConformance() {
   }
 
   // Check for gaps at intersections
-  const intersections = detectRoadIntersections(roads);
+  const intersections = detectRoadIntersections(ctx.roads);
   console.log(`📍 Detected ${intersections.length} intersections`);
 
   return {
@@ -1302,7 +1302,7 @@ function validateRoadTerrainConformance() {
   };
 }
 
-Object.assign(globalThis, {
+Object.assign(ctx, {
   applyHeightsToTerrainMesh,
   buildRoadSkirts,
   buildTerrainTileMesh,
@@ -1320,8 +1320,10 @@ Object.assign(globalThis, {
   repositionBuildingsWithTerrain,
   resetTerrainStreamingState,
   sampleTileElevationMeters,
+  subdivideRoadPoints,
   terrainMeshHeightAt,
   tileXYToLatLonBounds,
+  toggleRoadDebugMode,
   updateTerrainAround,
   validateRoadTerrainConformance,
   worldToLatLon
@@ -1345,9 +1347,10 @@ export {
   repositionBuildingsWithTerrain,
   resetTerrainStreamingState,
   sampleTileElevationMeters,
+  subdivideRoadPoints,
   terrainMeshHeightAt,
   tileXYToLatLonBounds,
+  toggleRoadDebugMode,
   updateTerrainAround,
   validateRoadTerrainConformance,
-  worldToLatLon
-};
+  worldToLatLon };

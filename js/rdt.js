@@ -15,6 +15,7 @@
 // roadmap is to migrate those fallback paths to an optimized deterministic custom
 // PRNG pipeline derived from RGE-256-oriented work.
 // ============================================================================
+import { ctx } from "./shared-context.js?v=52";
 
 // ===== RDT (Recursive Division Tree) depth =====
 // Iterative log-based division depth measure of an integer magnitude.
@@ -101,7 +102,7 @@ let rdtComplexity = 0;  // rdtDepth result for current location
 })();
 
 function exposeMutableGlobal(name, getter, setter) {
-    Object.defineProperty(globalThis, name, {
+    Object.defineProperty(ctx, name, {
         configurable: true,
         enumerable: true,
         get: getter,
@@ -111,7 +112,7 @@ function exposeMutableGlobal(name, getter, setter) {
 
 exposeMutableGlobal('rdtSeed', () => rdtSeed, (v) => { rdtSeed = v; });
 exposeMutableGlobal('rdtComplexity', () => rdtComplexity, (v) => { rdtComplexity = v; });
-Object.assign(globalThis, { rdtDepth, hashGeoToInt, rand01FromInt, seededRandom });
+Object.assign(ctx, { rdtDepth, hashGeoToInt, rand01FromInt, seededRandom });
 
 export {
     hashGeoToInt,

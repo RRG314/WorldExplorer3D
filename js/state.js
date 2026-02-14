@@ -1,6 +1,7 @@
 // ============================================================================
 // state.js - Global application state variables
 // ============================================================================
+import { ctx } from "./shared-context.js?v=52";
 
 // Property State
 let properties = [];
@@ -636,7 +637,7 @@ const CONSTELLATION_LINES = {
 };
 
 
-Object.assign(globalThis, {
+Object.assign(ctx, {
   BRIGHT_STARS,
   CONSTELLATION_LINES,
   PropertyUI,
