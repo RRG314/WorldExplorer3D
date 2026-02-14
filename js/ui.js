@@ -155,6 +155,13 @@ function setupUI() {
   const perfSettingsStatus = document.getElementById('perfSettingsStatus');
   const shareExperienceBtn = document.getElementById('shareExperienceBtn');
   const shareExperienceStatus = document.getElementById('shareExperienceStatus');
+  const gameShareFloatBtn = document.getElementById('gameShareFloatBtn');
+  const gameShareMenu = document.getElementById('gameShareMenu');
+  const gameShareStatus = document.getElementById('gameShareStatus');
+  const gameShareFacebook = document.getElementById('gameShareFacebook');
+  const gameShareTwitter = document.getElementById('gameShareTwitter');
+  const gameShareInstagram = document.getElementById('gameShareInstagram');
+  const gameShareText = document.getElementById('gameShareText');
 
   // Load saved API keys from localStorage
   const savedRentcast = localStorage.getItem('rentcastApiKey');
@@ -547,22 +554,98 @@ function setupUI() {
     return url.toString();
   }
 
+  function setGameShareStatus(message = '') {
+    if (!gameShareStatus) return;
+    gameShareStatus.textContent = message;
+  }
+
+  function closeGameShareMenu() {
+    if (gameShareMenu) gameShareMenu.classList.remove('show');
+    setGameShareStatus('');
+  }
+
+  async function copyShareLinkWithFallback(experienceLink) {
+    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+      await navigator.clipboard.writeText(experienceLink);
+      return true;
+    }
+    window.prompt('Copy experience link:', experienceLink);
+    return false;
+  }
+
+  function openShareWindow(targetUrl) {
+    const popup = window.open(targetUrl, '_blank', 'noopener,noreferrer,width=760,height=760');
+    if (!popup) window.location.href = targetUrl;
+  }
+
   if (shareExperienceBtn) {
     shareExperienceBtn.addEventListener('click', async () => {
       try {
         const experienceLink = buildShareableExperienceLink();
-        if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-          await navigator.clipboard.writeText(experienceLink);
-          if (shareExperienceStatus) shareExperienceStatus.textContent = 'Experience link copied to clipboard.';
-        } else {
-          window.prompt('Copy experience link:', experienceLink);
-          if (shareExperienceStatus) shareExperienceStatus.textContent = 'Experience link generated.';
-        }
+        const copied = await copyShareLinkWithFallback(experienceLink);
+        if (shareExperienceStatus) shareExperienceStatus.textContent = copied ? 'Experience link copied to clipboard.' : 'Experience link generated.';
       } catch (err) {
         if (shareExperienceStatus) {
           shareExperienceStatus.textContent = `Unable to build share link: ${err?.message || err}`;
         }
       }
+    });
+  }
+
+  if (gameShareFloatBtn && gameShareMenu) {
+    gameShareFloatBtn.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const shouldOpen = !gameShareMenu.classList.contains('show');
+      closeAllFloatMenus();
+      if (shouldOpen) gameShareMenu.classList.add('show');
+    });
+    gameShareMenu.addEventListener('click', (event) => {
+      event.stopPropagation();
+    });
+  }
+
+  if (gameShareFacebook) {
+    gameShareFacebook.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const link = buildShareableExperienceLink();
+      openShareWindow(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`);
+      closeGameShareMenu();
+    });
+  }
+
+  if (gameShareTwitter) {
+    gameShareTwitter.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const link = buildShareableExperienceLink();
+      const text = 'Check out my World Explorer 3D experience.';
+      openShareWindow(`https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`);
+      closeGameShareMenu();
+    });
+  }
+
+  if (gameShareText) {
+    gameShareText.addEventListener('click', (event) => {
+      event.stopPropagation();
+      const link = buildShareableExperienceLink();
+      const body = encodeURIComponent(`Check out my World Explorer 3D experience: ${link}`);
+      const smsUrl = /iPhone|iPad|iPod/i.test(navigator.userAgent) ? `sms:&body=${body}` : `sms:?body=${body}`;
+      window.location.href = smsUrl;
+      closeGameShareMenu();
+    });
+  }
+
+  if (gameShareInstagram) {
+    gameShareInstagram.addEventListener('click', async (event) => {
+      event.stopPropagation();
+      try {
+        const link = buildShareableExperienceLink();
+        await copyShareLinkWithFallback(link);
+        setGameShareStatus('Link copied. Paste into Instagram DM, Story, or bio.');
+      } catch (err) {
+        setGameShareStatus('Could not copy link automatically. Use the title-screen share button.');
+      }
+      openShareWindow('https://www.instagram.com/');
+      setTimeout(() => closeGameShareMenu(), 2600);
     });
   }
 
@@ -761,6 +844,8 @@ function setupUI() {
     document.getElementById('historicBtn').classList.add('show');
     const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
     if (memoryFlowerFloatBtn) memoryFlowerFloatBtn.classList.add('show');
+    if (gameShareFloatBtn) gameShareFloatBtn.classList.add('show');
+    closeGameShareMenu();
     appCtx.gameStarted = true;
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     appCtx.switchEnv(appCtx.ENV.EARTH);
@@ -875,6 +960,7 @@ function setupUI() {
   // Helper function to close all float menus
   function closeAllFloatMenus() {
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
+    closeGameShareMenu();
   }
   const ctrlHeader = document.getElementById('ctrlHeader');
   const ctrlContent = document.getElementById('ctrlContent');
@@ -909,7 +995,7 @@ function setupUI() {
     if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
     document.getElementById('titleScreen').classList.remove('hidden');
-    ['hud', 'minimap', 'modeHud', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn'].forEach((id) => {
+    ['hud', 'minimap', 'modeHud', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('show');
     });
