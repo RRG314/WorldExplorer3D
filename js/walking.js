@@ -43,7 +43,8 @@ function createWalkingModule(opts) {
     wallJumpVelocity: 6.5,      // Upward velocity when wall jumping
     wallJumpOutward: 2.0,       // Outward push when wall jumping
     wallDetectRadius: 1.5,      // Distance to detect walls for wall jumping
-    wallJumpCooldown: 0.3       // Seconds between wall jumps
+    wallJumpCooldown: 0.3,      // Seconds between wall jumps
+    blockStepHeight: 0.65       // Max step-up without jumping
   };
 
   // Walk mode terrain stream/rebuild throttle so low-power devices keep up.
@@ -585,6 +586,19 @@ function createWalkingModule(opts) {
         }
     }
 
+    // Stand on top of placed build blocks (persistent brick builder).
+    if (typeof getBuildTopSurfaceAtWorldXZ === 'function') {
+        const feetY = state.walker.y - CFG.eyeHeight;
+        const topY = getBuildTopSurfaceAtWorldXZ(
+            state.walker.x,
+            state.walker.z,
+            feetY + CFG.blockStepHeight
+        );
+        if (Number.isFinite(topY) && topY > effectiveGroundY) {
+            effectiveGroundY = topY;
+        }
+    }
+
     // Check if on ground (with small tolerance)
     state.walker.onGround = Math.abs(state.walker.y - (effectiveGroundY + CFG.eyeHeight)) < 0.3;
 
@@ -641,40 +655,49 @@ function createWalkingModule(opts) {
       let newX = state.walker.x + moveX + strafeX;
       let newZ = state.walker.z + moveZ + strafeZ;
 
-      // Building collision: block movement into buildings unless walker is above roof
-      if (!onMoon && (getBuildingsArray || getNearbyBuildings)) {
-        const allBuildings = queryBuildings(newX, newZ, 32) || [];
+      // Collision against buildings and user-placed build blocks.
+      const checkBuildings = !onMoon && (getBuildingsArray || getNearbyBuildings);
+      const checkBuildBlocks = typeof getBuildCollisionAtWorldXZ === 'function';
+      if (checkBuildings || checkBuildBlocks) {
+        const allBuildings = checkBuildings ? (queryBuildings(newX, newZ, 32) || []) : [];
         const walkerFeetY = state.walker.y - CFG.eyeHeight;
 
-        // Helper: check if position is blocked by any building
-        function isBlockedByBuilding(px, pz) {
-          for (let i = 0; i < allBuildings.length; i++) {
-            const b = allBuildings[i];
-            if (px < b.minX || px > b.maxX || pz < b.minZ || pz > b.maxZ) continue;
+        function isBlockedByWorld(px, pz) {
+          if (checkBuildings) {
+            for (let i = 0; i < allBuildings.length; i++) {
+              const b = allBuildings[i];
+              if (px < b.minX || px > b.maxX || pz < b.minZ || pz > b.maxZ) continue;
 
-            let bTerrainY = 0;
-            if (typeof terrainMeshHeightAt === 'function') {
-              bTerrainY = terrainMeshHeightAt(px, pz);
-            } else if (typeof elevationWorldYAtWorldXZ === 'function') {
-              bTerrainY = elevationWorldYAtWorldXZ(px, pz);
+              let bTerrainY = 0;
+              if (typeof terrainMeshHeightAt === 'function') {
+                bTerrainY = terrainMeshHeightAt(px, pz);
+              } else if (typeof elevationWorldYAtWorldXZ === 'function') {
+                bTerrainY = elevationWorldYAtWorldXZ(px, pz);
+              }
+              const roofY = bTerrainY + b.height;
+
+              // Allow if walker is at or above roof level (can walk on roof or land on it)
+              if (walkerFeetY >= roofY - 1.0) continue;
+
+              const inside = isPointInPolygon ? isPointInPolygon(px, pz, b.pts) : isInsideBuilding(px, pz, b);
+              if (inside) return true;
             }
-            const roofY = bTerrainY + b.height;
-
-            // Allow if walker is at or above roof level (can walk on roof or land on it)
-            if (walkerFeetY >= roofY - 1.0) continue;
-
-            const inside = isPointInPolygon ? isPointInPolygon(px, pz, b.pts) : isInsideBuilding(px, pz, b);
-            if (inside) return true;
           }
+
+          if (checkBuildBlocks) {
+            const blockCollision = getBuildCollisionAtWorldXZ(px, pz, walkerFeetY, CFG.blockStepHeight);
+            if (blockCollision && blockCollision.blocked) return true;
+          }
+
           return false;
         }
 
         // Try full move first
-        if (isBlockedByBuilding(newX, newZ)) {
+        if (isBlockedByWorld(newX, newZ)) {
           // Try sliding along X only
-          const slideX = isBlockedByBuilding(newX, state.walker.z);
+          const slideX = isBlockedByWorld(newX, state.walker.z);
           // Try sliding along Z only
-          const slideZ = isBlockedByBuilding(state.walker.x, newZ);
+          const slideZ = isBlockedByWorld(state.walker.x, newZ);
 
           if (!slideX) {
             newZ = state.walker.z; // Block Z, allow X

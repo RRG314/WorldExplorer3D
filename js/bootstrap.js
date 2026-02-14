@@ -4,8 +4,8 @@ import {
   moduleEntrypoint,
   vendorScriptsCritical,
   vendorScriptsOptional
-} from './modules/manifest.js?v=29';
-import { loadScriptList } from './modules/script-loader.js?v=29';
+} from './modules/manifest.js?v=30';
+import { loadScriptList } from './modules/script-loader.js?v=30';
 
 async function boot() {
   try {

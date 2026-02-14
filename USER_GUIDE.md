@@ -645,13 +645,15 @@ Create Minecraft-style brick stacks directly in the world.
 - Press `B` to toggle build mode on/off.
 - Click in the world to place a brick block.
 - `Shift + Click` a placed block to remove it.
-- Use `🎮 Game Mode` -> `🧹 Clear Blocks` to wipe all build blocks for the current session.
+- Use `🎮 Game Mode` -> `🧹 Clear Blocks` to wipe all build blocks for the current location (including saved blocks).
 
 ### How Stacking Works
 
 - Aim at an existing block face and click to attach a new block to that face.
 - Keep clicking to stack vertically or extend walls horizontally.
 - Build mode works in driving, walking, and drone exploration contexts.
+- In walking mode, placed blocks are climbable/standable surfaces.
+- Placed blocks are persisted in browser storage per location and reload automatically when returning.
 
 ## Advanced Features
 
@@ -744,7 +746,7 @@ Located on right side of screen:
    - View high scores
    - Mode selection
    - Toggle brick build mode
-   - Clear all placed build blocks (session)
+   - Clear all placed build blocks (current location)
 
 4. **🌿 Environment**:
    - Weather controls (if available)

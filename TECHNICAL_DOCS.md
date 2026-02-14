@@ -42,7 +42,7 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - Memory composer now includes `Delete All` with confirmation.
 - POI and memory markers now render on both minimap and large map overlays.
 - Voxel-style brick builder subsystem added (`js/blocks.js`) with click place/stack and shift-click removal.
-- Loader cache-bust chain is aligned through `v=29` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Loader cache-bust chain is aligned through `v=30` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### High-Level Architecture
 
@@ -601,8 +601,10 @@ Core public hooks:
 - Place: click world while build mode is enabled
 - Remove: `Shift + Click` an existing placed block
 - Stacking: clicks on existing block faces place adjacent blocks by face normal
-- Session control: `🎮 Game Mode` -> `🧹 Clear Blocks`
-- Reload behavior: blocks are cleared during `loadRoads()` via `clearBlockBuilderForWorldReload()`
+- Persistence: blocks are saved in Earth mode per location in localStorage (`worldExplorer3D.buildBlocks.v1`)
+- Clear control: `🎮 Game Mode` -> `🧹 Clear Blocks` removes current-location rendered + saved blocks
+- Reload behavior: rendered blocks are cleared during `loadRoads()`, then current-location saved blocks are rehydrated
+- Walk physics integration: block tops participate in walkable ground/collision checks for climbing/standing
 
 Core public hooks:
 
@@ -611,6 +613,9 @@ Core public hooks:
 - `handleBlockBuilderClick(event)`
 - `clearAllBuildBlocks()`
 - `clearBlockBuilderForWorldReload()`
+- `getBuildTopSurfaceAtWorldXZ(x, z, maxTopY)`
+- `getBuildCollisionAtWorldXZ(x, z, feetY, stepHeight)`
+- `getBuildPersistenceStatus()`
 - `refreshBlockBuilderForCurrentLocation()`
 
 ## Security and Storage Notes

@@ -53,7 +53,7 @@ Open `http://localhost:8000`.
 - POIs render on minimap/large map according to legend category filters.
 - Memory pins/flowers render on minimap/large map for location recall.
 - Legend includes independent memory-layer toggles for `📍 Pin` and `🌸 Flower`.
-- Brick block build mode supports click-to-place stacking and shift-click removal.
+- Brick block build mode supports click-to-place stacking, shift-click removal, walk-mode climbing, and per-location persistence.
 - Time-of-day lighting and sky/constellation systems.
 
 ### Gameplay
@@ -100,14 +100,14 @@ Block builder actions:
 - `B` -> toggle build mode
 - `Click` (build mode on) -> place brick block
 - `Shift+Click` (build mode on) -> remove targeted block
-- `🎮 Game Mode` menu -> `🧱 Build Mode` and `🧹 Clear Blocks`
+- `🎮 Game Mode` menu -> `🧱 Build Mode` and `🧹 Clear Blocks` (current location, including saved blocks)
 
 ## Persistent Memory Markers
 
 - Marker types: `Pin` and `Flower`
 - Message length: up to `200` characters
 - Storage: browser `localStorage` (`worldExplorer3D.memories.v1`)
-- Scope: per location center key (`LOC` rounded to 5 decimals)
+- Scope: Earth-mode, per location center key (`LOC` rounded to 5 decimals)
 - Limits: `300` per location, `1500` total, ~`1500KB` max payload
 - Persistence guard: placement is disabled if browser storage round-trip check fails
 - Removal: click marker and choose `Remove Marker`
@@ -115,6 +115,14 @@ Block builder actions:
 - Map visibility: memory markers are shown on minimap and large map
 - Legend filters: `📍 Pin` and `🌸 Flower` checkboxes control visibility independently
 - Verification: run `getMemoryPersistenceStatus()` in browser console
+
+## Persistent Build Blocks
+
+- Storage: browser `localStorage` (`worldExplorer3D.buildBlocks.v1`)
+- Scope: per location center key (`LOC` rounded to 5 decimals)
+- In-world behavior: place/stack/remove blocks and stand or climb on them in walking mode
+- Clear behavior: `🧹 Clear Blocks` removes rendered and saved blocks for the current location
+- Verification: run `getBuildPersistenceStatus()` in browser console
 
 ## Security and Storage Notice
 
@@ -131,7 +139,7 @@ Block builder actions:
 - Runtime is split into multiple JS files (`js/*.js`) with no build step.
 - Shared/global runtime state is still used across core systems.
 - ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
-- Cache-bust version alignment across loader chain is currently `v=29`.
+- Cache-bust version alignment across loader chain is currently `v=30`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
 ## Freeze Snapshot (2026-02-14)
@@ -147,6 +155,7 @@ Block builder actions:
 - Added separate legend checkboxes for memory `Pin` and `Flower` overlays (larger marker labels/icons).
 - Restored POI marker rendering on minimap and large map by legend category filters.
 - Added Minecraft-style brick block builder with stacking/removal controls.
+- Added persistent per-location block storage and walk-mode climbing support on placed blocks.
 
 ## Repository Structure
 

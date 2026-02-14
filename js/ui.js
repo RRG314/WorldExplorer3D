@@ -613,7 +613,7 @@ function setupUI() {
     if (clearBlocksItem) {
         clearBlocksItem.addEventListener('click', () => {
             if (typeof clearAllBuildBlocks === 'function') {
-                const confirmed = globalThis.confirm('Clear all placed build blocks for this session?');
+                const confirmed = globalThis.confirm('Clear all placed build blocks for this location? This also removes saved blocks from browser storage.');
                 if (confirmed) clearAllBuildBlocks();
             }
             closeAllFloatMenus();

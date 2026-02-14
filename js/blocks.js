@@ -3,20 +3,193 @@
 // ============================================================================
 
 const BUILD_BLOCK_SIZE = 1;
+const BUILD_HALF = BUILD_BLOCK_SIZE * 0.5;
 const BUILD_MAX_DISTANCE = 260;
 const BUILD_BLOCK_COLORS = [0xb55239, 0xa74631, 0x9a3d2b, 0xc16345];
+
+const BUILD_STORAGE_KEY = 'worldExplorer3D.buildBlocks.v1';
+const BUILD_STORAGE_TEST_KEY = 'worldExplorer3D.buildBlocks.test';
+const BUILD_LOCATION_PRECISION = 5;
+const BUILD_MAX_TOTAL = 6000;
 
 let buildModeEnabled = false;
 let buildGroup = null;
 let buildGeometry = null;
 let buildRaycaster = null;
 
+let buildPersistenceEnabled = false;
+let buildPersistenceDetail = 'Not initialized.';
+let buildEntries = [];
+
 const buildBlocks = new Map();
+const buildColumns = new Map();
 const buildMaterials = [];
 const buildMouse = typeof THREE !== 'undefined' ? new THREE.Vector2() : null;
 const buildPlane = typeof THREE !== 'undefined' ? new THREE.Plane(new THREE.Vector3(0, 1, 0), 0) : null;
 const buildTempPoint = typeof THREE !== 'undefined' ? new THREE.Vector3() : null;
 const buildNormalMatrix = typeof THREE !== 'undefined' ? new THREE.Matrix3() : null;
+
+function isFiniteNumber(v) {
+    return Number.isFinite(v);
+}
+
+function toGridCoord(v) {
+    return Math.round(v / BUILD_BLOCK_SIZE);
+}
+
+function toWorldCoord(g) {
+    return g * BUILD_BLOCK_SIZE;
+}
+
+function blockKey(gx, gy, gz) {
+    return `${gx}|${gy}|${gz}`;
+}
+
+function columnKey(gx, gz) {
+    return `${gx}|${gz}`;
+}
+
+function getLocRef() {
+    const loc = globalThis.LOC;
+    if (!loc || !isFiniteNumber(loc.lat) || !isFiniteNumber(loc.lon)) return null;
+    return loc;
+}
+
+function getCurrentLocationKey() {
+    const loc = getLocRef();
+    if (!loc) return null;
+    return `${loc.lat.toFixed(BUILD_LOCATION_PRECISION)},${loc.lon.toFixed(BUILD_LOCATION_PRECISION)}`;
+}
+
+function worldToLatLonSafe(x, z) {
+    if (typeof worldToLatLon === 'function') {
+        const ll = worldToLatLon(x, z);
+        if (ll && isFiniteNumber(ll.lat) && isFiniteNumber(ll.lon)) return ll;
+    }
+    const loc = getLocRef();
+    if (!loc || !isFiniteNumber(SCALE) || SCALE === 0) return null;
+    const lat = loc.lat - (z / SCALE);
+    const lon = loc.lon + (x / (SCALE * Math.cos(loc.lat * Math.PI / 180)));
+    return { lat, lon };
+}
+
+function latLonToWorldSafe(lat, lon) {
+    const loc = getLocRef();
+    if (!loc || !isFiniteNumber(SCALE) || SCALE === 0) return { x: NaN, z: NaN };
+    const x = (lon - loc.lon) * SCALE * Math.cos(loc.lat * Math.PI / 180);
+    const z = -(lat - loc.lat) * SCALE;
+    return { x, z };
+}
+
+function detectBuildStorage() {
+    try {
+        if (!globalThis.localStorage) {
+            return { enabled: false, detail: 'localStorage is unavailable in this environment.' };
+        }
+        localStorage.setItem(BUILD_STORAGE_TEST_KEY, 'ok');
+        const probe = localStorage.getItem(BUILD_STORAGE_TEST_KEY);
+        localStorage.removeItem(BUILD_STORAGE_TEST_KEY);
+        if (probe !== 'ok') return { enabled: false, detail: 'Storage round-trip check failed.' };
+        return { enabled: true, detail: 'Storage round-trip check passed.' };
+    } catch (err) {
+        return { enabled: false, detail: `Storage access blocked: ${err && err.message ? err.message : String(err)}` };
+    }
+}
+
+function getBuildPersistenceStatus() {
+    return {
+        enabled: buildPersistenceEnabled,
+        detail: buildPersistenceDetail,
+        storageKey: BUILD_STORAGE_KEY
+    };
+}
+
+function canPersistBuildBlocks() {
+    if (typeof isEnv === 'function' && typeof ENV !== 'undefined') {
+        return isEnv(ENV.EARTH);
+    }
+    return !onMoon;
+}
+
+function normalizeBuildEntry(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const locationKey = String(raw.locationKey || '');
+    const lat = Number(raw.lat);
+    const lon = Number(raw.lon);
+    const gy = Number(raw.gy);
+    const gx = Number(raw.gx);
+    const gz = Number(raw.gz);
+    const materialIndex = Number(raw.materialIndex);
+
+    if (!locationKey) return null;
+    if (!isFiniteNumber(lat) || !isFiniteNumber(lon)) return null;
+    if (!isFiniteNumber(gy)) return null;
+
+    return {
+        id: String(raw.id || `blk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
+        locationKey,
+        lat: Number(lat.toFixed(7)),
+        lon: Number(lon.toFixed(7)),
+        gx: Number.isInteger(gx) ? gx : null,
+        gy: Math.round(gy),
+        gz: Number.isInteger(gz) ? gz : null,
+        materialIndex: Number.isInteger(materialIndex) ? materialIndex : 0,
+        createdAt: String(raw.createdAt || new Date().toISOString())
+    };
+}
+
+function loadBuildEntriesFromStorage() {
+    if (!buildPersistenceEnabled) return [];
+    try {
+        const raw = localStorage.getItem(BUILD_STORAGE_KEY);
+        if (!raw) return [];
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return [];
+        const normalized = parsed.map(normalizeBuildEntry).filter(Boolean);
+        if (normalized.length <= BUILD_MAX_TOTAL) return normalized;
+        return normalized.slice(normalized.length - BUILD_MAX_TOTAL);
+    } catch (err) {
+        console.warn('[blocks] Failed to read storage:', err);
+        return [];
+    }
+}
+
+function saveBuildEntriesToStorage() {
+    if (!buildPersistenceEnabled) return false;
+    try {
+        localStorage.setItem(BUILD_STORAGE_KEY, JSON.stringify(buildEntries));
+        return true;
+    } catch (err) {
+        buildPersistenceEnabled = false;
+        buildPersistenceDetail = `Storage write failed: ${err && err.message ? err.message : String(err)}`;
+        console.warn('[blocks] Failed to save storage:', err);
+        return false;
+    }
+}
+
+function getBuildEntriesForCurrentLocation() {
+    const locationKey = getCurrentLocationKey();
+    if (!locationKey) return [];
+    return buildEntries.filter((entry) => entry.locationKey === locationKey);
+}
+
+function addBuildColumnEntry(gx, gy, gz) {
+    const key = columnKey(gx, gz);
+    let ys = buildColumns.get(key);
+    if (!ys) {
+        ys = new Set();
+        buildColumns.set(key, ys);
+    }
+    ys.add(gy);
+}
+
+function removeBuildColumnEntry(gx, gy, gz) {
+    const key = columnKey(gx, gz);
+    const ys = buildColumns.get(key);
+    if (!ys) return;
+    ys.delete(gy);
+    if (ys.size === 0) buildColumns.delete(key);
+}
 
 function getBuildRaycaster() {
     if (!buildRaycaster && typeof THREE !== 'undefined') {
@@ -53,18 +226,6 @@ function ensureBuildGroup() {
         scene.add(buildGroup);
     }
     return buildGroup;
-}
-
-function toGridCoord(v) {
-    return Math.round(v / BUILD_BLOCK_SIZE);
-}
-
-function toWorldCoord(g) {
-    return g * BUILD_BLOCK_SIZE;
-}
-
-function blockKey(gx, gy, gz) {
-    return `${gx}|${gy}|${gz}`;
 }
 
 function getBuildReferencePosition() {
@@ -118,7 +279,88 @@ function snapFaceNormalToAxis(faceNormal, object) {
     return { x: 0, y: 0, z: worldNormal.z >= 0 ? 1 : -1 };
 }
 
-function placeBuildBlock(gx, gy, gz, materialIndex = null) {
+function persistPlacedBuildBlock(gx, gy, gz, materialIndex) {
+    if (!buildPersistenceEnabled) return true;
+    if (!canPersistBuildBlocks()) return true;
+    const locationKey = getCurrentLocationKey();
+    if (!locationKey || !getLocRef()) return false;
+
+    const worldX = toWorldCoord(gx);
+    const worldZ = toWorldCoord(gz);
+    const latLon = worldToLatLonSafe(worldX, worldZ);
+    if (!latLon || !isFiniteNumber(latLon.lat) || !isFiniteNumber(latLon.lon)) return false;
+
+    const prev = buildEntries.slice();
+    const idx = buildEntries.findIndex((entry) =>
+        entry.locationKey === locationKey && entry.gx === gx && entry.gy === gy && entry.gz === gz
+    );
+
+    const nextEntry = normalizeBuildEntry({
+        id: idx >= 0 ? buildEntries[idx].id : undefined,
+        locationKey,
+        lat: latLon.lat,
+        lon: latLon.lon,
+        gx,
+        gy,
+        gz,
+        materialIndex: Number.isInteger(materialIndex) ? materialIndex : 0,
+        createdAt: idx >= 0 ? buildEntries[idx].createdAt : new Date().toISOString()
+    });
+    if (!nextEntry) return false;
+
+    if (idx >= 0) buildEntries[idx] = nextEntry;
+    else buildEntries.push(nextEntry);
+
+    if (buildEntries.length > BUILD_MAX_TOTAL) {
+        buildEntries = buildEntries.slice(buildEntries.length - BUILD_MAX_TOTAL);
+    }
+
+    if (!saveBuildEntriesToStorage()) {
+        buildEntries = prev;
+        return false;
+    }
+    return true;
+}
+
+function persistRemovedBuildBlock(gx, gy, gz) {
+    if (!buildPersistenceEnabled) return true;
+    if (!canPersistBuildBlocks()) return true;
+    const locationKey = getCurrentLocationKey();
+    if (!locationKey) return false;
+
+    const next = buildEntries.filter((entry) =>
+        !(entry.locationKey === locationKey && entry.gx === gx && entry.gy === gy && entry.gz === gz)
+    );
+    if (next.length === buildEntries.length) return true;
+
+    const prev = buildEntries;
+    buildEntries = next;
+    if (!saveBuildEntriesToStorage()) {
+        buildEntries = prev;
+        return false;
+    }
+    return true;
+}
+
+function clearPersistedBuildBlocksForCurrentLocation() {
+    if (!buildPersistenceEnabled) return true;
+    if (!canPersistBuildBlocks()) return true;
+    const locationKey = getCurrentLocationKey();
+    if (!locationKey) return false;
+
+    const next = buildEntries.filter((entry) => entry.locationKey !== locationKey);
+    if (next.length === buildEntries.length) return true;
+
+    const prev = buildEntries;
+    buildEntries = next;
+    if (!saveBuildEntriesToStorage()) {
+        buildEntries = prev;
+        return false;
+    }
+    return true;
+}
+
+function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
     if (!Number.isFinite(gx) || !Number.isFinite(gy) || !Number.isFinite(gz)) return false;
     const group = ensureBuildGroup();
     if (!group) return false;
@@ -131,6 +373,7 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null) {
     const idx = Number.isInteger(materialIndex)
         ? Math.max(0, Math.min(buildMaterials.length - 1, materialIndex))
         : Math.floor(Math.random() * buildMaterials.length);
+
     const mesh = new THREE.Mesh(buildGeometry, buildMaterials[idx]);
     mesh.position.set(toWorldCoord(gx), toWorldCoord(gy), toWorldCoord(gz));
     mesh.castShadow = true;
@@ -145,25 +388,102 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null) {
 
     group.add(mesh);
     buildBlocks.set(key, mesh);
+    addBuildColumnEntry(gx, gy, gz);
+
+    if (options.persist !== false) {
+        persistPlacedBuildBlock(gx, gy, gz, idx);
+    }
     return true;
 }
 
-function removeBuildBlock(gx, gy, gz) {
+function removeBuildBlock(gx, gy, gz, options = {}) {
     const key = blockKey(gx, gy, gz);
     const mesh = buildBlocks.get(key);
     if (!mesh) return false;
     if (mesh.parent) mesh.parent.remove(mesh);
     buildBlocks.delete(key);
+    removeBuildColumnEntry(gx, gy, gz);
+
+    if (options.persist !== false) {
+        persistRemovedBuildBlock(gx, gy, gz);
+    }
     return true;
 }
 
-function clearAllBuildBlocks() {
+function clearRenderedBuildBlocks() {
     buildBlocks.clear();
+    buildColumns.clear();
     if (!buildGroup) return;
     while (buildGroup.children.length > 0) {
         const child = buildGroup.children[buildGroup.children.length - 1];
         buildGroup.remove(child);
     }
+}
+
+function clearAllBuildBlocks(options = {}) {
+    if (options.persist !== false) {
+        clearPersistedBuildBlocksForCurrentLocation();
+    }
+    clearRenderedBuildBlocks();
+}
+
+function forEachBlockAtWorldXZ(x, z, cb) {
+    if (!Number.isFinite(x) || !Number.isFinite(z) || typeof cb !== 'function') return;
+    const baseGX = toGridCoord(x);
+    const baseGZ = toGridCoord(z);
+    const epsilon = 0.000001;
+
+    for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+            const gx = baseGX + dx;
+            const gz = baseGZ + dz;
+            const cx = toWorldCoord(gx);
+            const cz = toWorldCoord(gz);
+            if (Math.abs(x - cx) > BUILD_HALF + epsilon || Math.abs(z - cz) > BUILD_HALF + epsilon) continue;
+
+            const ys = buildColumns.get(columnKey(gx, gz));
+            if (!ys || ys.size === 0) continue;
+            ys.forEach((gy) => cb(gx, gy, gz));
+        }
+    }
+}
+
+function getBuildTopSurfaceAtWorldXZ(x, z, maxTopY = Infinity) {
+    let best = -Infinity;
+    forEachBlockAtWorldXZ(x, z, (_, gy) => {
+        const topY = toWorldCoord(gy) + BUILD_HALF;
+        if (topY <= maxTopY + 0.0001 && topY > best) best = topY;
+    });
+    return Number.isFinite(best) ? best : null;
+}
+
+function getBuildCollisionAtWorldXZ(x, z, feetY, stepHeight = 0.65) {
+    if (!Number.isFinite(feetY)) {
+        return { blocked: false, stepTopY: null };
+    }
+
+    let blocked = false;
+    let stepTopY = -Infinity;
+
+    forEachBlockAtWorldXZ(x, z, (_, gy) => {
+        const bottomY = toWorldCoord(gy) - BUILD_HALF;
+        const topY = toWorldCoord(gy) + BUILD_HALF;
+
+        if (feetY < bottomY - 0.02) return;
+        if (feetY >= topY - 0.02) return;
+
+        const requiredStep = topY - feetY;
+        if (requiredStep <= stepHeight + 0.0001) {
+            if (topY > stepTopY) stepTopY = topY;
+            return;
+        }
+        blocked = true;
+    });
+
+    return {
+        blocked,
+        stepTopY: Number.isFinite(stepTopY) ? stepTopY : null
+    };
 }
 
 function updateBuildModeUI() {
@@ -267,7 +587,7 @@ function raycastBuildAction(event) {
         point.y = getSurfaceYAt(point.x, point.z);
     }
 
-    const gy = toGridCoord(point.y + BUILD_BLOCK_SIZE * 0.5);
+    const gy = toGridCoord(point.y + BUILD_HALF);
     return {
         kind: 'place',
         gx: toGridCoord(point.x),
@@ -303,16 +623,37 @@ function handleBlockBuilderClick(event) {
 }
 
 function clearBlockBuilderForWorldReload() {
-    clearAllBuildBlocks();
+    clearRenderedBuildBlocks();
 }
 
 function refreshBlockBuilderForCurrentLocation() {
     ensureBuildGroup();
+    clearRenderedBuildBlocks();
+
+    const entries = getBuildEntriesForCurrentLocation();
+    entries.forEach((entry) => {
+        if (!isFiniteNumber(entry.lat) || !isFiniteNumber(entry.lon) || !isFiniteNumber(entry.gy)) return;
+        const worldPos = latLonToWorldSafe(entry.lat, entry.lon);
+        if (!isFiniteNumber(worldPos.x) || !isFiniteNumber(worldPos.z)) return;
+        const gx = toGridCoord(worldPos.x);
+        const gz = toGridCoord(worldPos.z);
+        placeBuildBlock(gx, Math.round(entry.gy), gz, entry.materialIndex, { persist: false });
+    });
 }
+
+{
+    const storageState = detectBuildStorage();
+    buildPersistenceEnabled = storageState.enabled;
+    buildPersistenceDetail = storageState.detail;
+}
+buildEntries = loadBuildEntriesFromStorage();
 
 Object.assign(globalThis, {
     clearAllBuildBlocks,
     clearBlockBuilderForWorldReload,
+    getBuildCollisionAtWorldXZ,
+    getBuildPersistenceStatus,
+    getBuildTopSurfaceAtWorldXZ,
     handleBlockBuilderClick,
     placeBuildBlock,
     refreshBlockBuilderForCurrentLocation,
@@ -323,6 +664,9 @@ Object.assign(globalThis, {
 export {
     clearAllBuildBlocks,
     clearBlockBuilderForWorldReload,
+    getBuildCollisionAtWorldXZ,
+    getBuildPersistenceStatus,
+    getBuildTopSurfaceAtWorldXZ,
     handleBlockBuilderClick,
     placeBuildBlock,
     refreshBlockBuilderForCurrentLocation,

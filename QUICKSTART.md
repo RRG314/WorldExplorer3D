@@ -80,7 +80,7 @@ Block builder action:
 | Press `B` | Toggle build mode |
 | Click (build mode on) | Place brick block |
 | Shift+Click (build mode on) | Remove targeted block |
-| `🎮 Game Mode` -> `🧹 Clear Blocks` | Remove all build blocks for current session |
+| `🎮 Game Mode` -> `🧹 Clear Blocks` | Remove all build blocks for current location (including saved blocks) |
 
 ## 5. Troubleshooting
 
@@ -100,7 +100,7 @@ Block builder action:
 
 - Clear browser cache.
 - Verify cache-bust values are aligned across `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
-- Current freeze snapshot cache-bust target is `v=29`.
+- Current freeze snapshot cache-bust target is `v=30`.
 
 ### Memory markers not persisting
 
