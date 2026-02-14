@@ -554,11 +554,95 @@ function createMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8ca0
     mesh.position.set((minX + maxX) * 0.5, avgElevation + h * 0.5, (minZ + maxZ) * 0.5);
     mesh.userData.buildingFootprint = pts;
     mesh.userData.midLodHalfHeight = h * 0.5;
+    mesh.userData.midLodDims = { w, h, d };
+    mesh.userData.midLodColor = colorHex;
     mesh.userData.avgElevation = avgElevation;
     mesh.userData.lodTier = 'mid';
     mesh.castShadow = false;
     mesh.receiveShadow = true;
     return mesh;
+}
+
+function batchMidLodBuildingMeshes() {
+    if (!Array.isArray(buildingMeshes) || buildingMeshes.length === 0) return 0;
+
+    const mids = [];
+    const keep = [];
+    for (let i = 0; i < buildingMeshes.length; i++) {
+        const mesh = buildingMeshes[i];
+        if (mesh?.userData?.lodTier === 'mid' && !mesh.userData?.isBuildingBatch) {
+            mids.push(mesh);
+        } else {
+            keep.push(mesh);
+        }
+    }
+
+    if (mids.length < 2) return 0;
+
+    const instGeom = new THREE.BoxGeometry(1, 1, 1);
+    const instMat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.92,
+        metalness: 0.02
+    });
+    const instanced = new THREE.InstancedMesh(instGeom, instMat, mids.length);
+    instanced.castShadow = false;
+    instanced.receiveShadow = true;
+    instanced.frustumCulled = true;
+    instanced.userData = {
+        lodTier: 'mid',
+        isBuildingBatch: true,
+        isMidBuildingInstanceBatch: true,
+        batchCount: mids.length
+    };
+
+    const matrix = new THREE.Matrix4();
+    const quat = new THREE.Quaternion();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    const color = new THREE.Color();
+    let sumX = 0;
+    let sumZ = 0;
+    const instanceXZ = new Array(mids.length);
+
+    for (let i = 0; i < mids.length; i++) {
+        const mesh = mids[i];
+        const dims = mesh.userData?.midLodDims || { w: 1, h: 1, d: 1 };
+        position.set(mesh.position.x, mesh.position.y, mesh.position.z);
+        scale.set(dims.w || 1, dims.h || 1, dims.d || 1);
+        matrix.compose(position, quat, scale);
+        instanced.setMatrixAt(i, matrix);
+
+        const c = mesh.userData?.midLodColor || '#7f8ca0';
+        color.set(c);
+        instanced.setColorAt(i, color);
+        sumX += mesh.position.x;
+        sumZ += mesh.position.z;
+        instanceXZ[i] = { x: mesh.position.x, z: mesh.position.z };
+
+        scene.remove(mesh);
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) mesh.material.dispose();
+    }
+
+    const centerX = mids.length > 0 ? (sumX / mids.length) : 0;
+    const centerZ = mids.length > 0 ? (sumZ / mids.length) : 0;
+    let maxRadius = 0;
+    for (let i = 0; i < instanceXZ.length; i++) {
+        const p = instanceXZ[i];
+        if (!p) continue;
+        const d = Math.hypot(p.x - centerX, p.z - centerZ);
+        if (d > maxRadius) maxRadius = d;
+    }
+    instanced.userData.lodCenter = { x: centerX, z: centerZ };
+    instanced.userData.lodRadius = maxRadius;
+
+    instanced.instanceMatrix.needsUpdate = true;
+    if (instanced.instanceColor) instanced.instanceColor.needsUpdate = true;
+
+    scene.add(instanced);
+    buildingMeshes = [...keep, instanced];
+    return mids.length;
 }
 
 function latLonToTileFloat(lat, lon, zoom) {
@@ -662,6 +746,387 @@ function decimatePoints(pts, maxPoints, preserveClosedRing = false) {
         if (first !== last) out.push(first);
     }
     return out;
+}
+
+function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
+    if (!Array.isArray(verts) || verts.length === 0) return;
+    const baseVertex = targetVerts.length / 3;
+    targetVerts.push(...verts);
+    if (Array.isArray(indices) && indices.length > 0) {
+        for (let i = 0; i < indices.length; i++) {
+            targetIndices.push(indices[i] + baseVertex);
+        }
+    } else {
+        const addedVerts = verts.length / 3;
+        for (let i = 0; i < addedVerts; i++) {
+            targetIndices.push(baseVertex + i);
+        }
+    }
+}
+
+function materialBatchKey(material) {
+    if (!material || Array.isArray(material)) return null;
+    const colorHex = material.color ? material.color.getHexString() : '';
+    const emissiveHex = material.emissive ? material.emissive.getHexString() : '';
+    const mapId = material.map ? material.map.uuid : '-';
+    const normalId = material.normalMap ? material.normalMap.uuid : '-';
+    const roughnessId = material.roughnessMap ? material.roughnessMap.uuid : '-';
+    return [
+        material.type || '',
+        mapId,
+        normalId,
+        roughnessId,
+        colorHex,
+        emissiveHex,
+        Number(material.emissiveIntensity || 0).toFixed(3),
+        Number(material.roughness || 0).toFixed(3),
+        Number(material.metalness || 0).toFixed(3),
+        material.transparent ? 1 : 0,
+        Number(material.opacity ?? 1).toFixed(3),
+        material.side ?? 0,
+        material.depthWrite ? 1 : 0,
+        material.depthTest ? 1 : 0,
+        material.polygonOffset ? 1 : 0,
+        Number(material.polygonOffsetFactor || 0).toFixed(3),
+        Number(material.polygonOffsetUnits || 0).toFixed(3)
+    ].join('|');
+}
+
+function appendGeometryWithTransform(batch, geometry, matrix) {
+    if (!geometry?.attributes?.position) return 0;
+
+    const posAttr = geometry.attributes.position;
+    const normAttr = geometry.attributes.normal;
+    const uvAttr = geometry.attributes.uv;
+    const baseVertex = batch.positions.length / 3;
+
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(matrix);
+    const v = new THREE.Vector3();
+    const n = new THREE.Vector3();
+
+    for (let i = 0; i < posAttr.count; i++) {
+        v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
+        batch.positions.push(v.x, v.y, v.z);
+
+        if (normAttr) {
+            n.fromBufferAttribute(normAttr, i).applyMatrix3(normalMatrix).normalize();
+            batch.normals.push(n.x, n.y, n.z);
+        } else {
+            batch.normals.push(0, 1, 0);
+        }
+
+        if (uvAttr) {
+            batch.uvs.push(uvAttr.getX(i), uvAttr.getY(i));
+        } else {
+            batch.uvs.push(0, 0);
+        }
+    }
+
+    if (geometry.index) {
+        const indexArr = geometry.index.array;
+        for (let i = 0; i < indexArr.length; i++) {
+            batch.indices.push(indexArr[i] + baseVertex);
+        }
+    } else {
+        for (let i = 0; i < posAttr.count; i++) {
+            batch.indices.push(baseVertex + i);
+        }
+    }
+
+    return posAttr.count;
+}
+
+function buildMergedGeometry(batch) {
+    if (!batch.positions.length || !batch.indices.length) return null;
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(batch.positions, 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(batch.normals, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(batch.uvs, 2));
+
+    const vertexCount = batch.positions.length / 3;
+    const indexArray = vertexCount > 65535 ? new Uint32Array(batch.indices) : new Uint16Array(batch.indices);
+    geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));
+    geometry.computeBoundingSphere();
+    geometry.computeBoundingBox();
+    return geometry;
+}
+
+function batchNearLodBuildingMeshes() {
+    if (!Array.isArray(buildingMeshes) || buildingMeshes.length < 2) return 0;
+
+    const keep = [];
+    const groups = new Map();
+
+    for (let i = 0; i < buildingMeshes.length; i++) {
+        const mesh = buildingMeshes[i];
+        if (!mesh) continue;
+        const tier = mesh.userData?.lodTier || 'near';
+        if (tier !== 'near' || mesh.userData?.isBuildingBatch) {
+            keep.push(mesh);
+            continue;
+        }
+        if (!mesh.geometry || !mesh.material || Array.isArray(mesh.material)) {
+            keep.push(mesh);
+            continue;
+        }
+
+        const key = materialBatchKey(mesh.material);
+        if (!key) {
+            keep.push(mesh);
+            continue;
+        }
+
+        let group = groups.get(key);
+        if (!group) {
+            group = {
+                meshes: [],
+                material: mesh.material,
+                renderOrder: mesh.renderOrder || 0
+            };
+            groups.set(key, group);
+        }
+        group.meshes.push(mesh);
+    }
+
+    if (groups.size === 0) return 0;
+
+    const batchedMeshes = [];
+    let sourceMeshCount = 0;
+    const xzPoints = [];
+
+    groups.forEach(group => {
+        if (!group || !Array.isArray(group.meshes) || group.meshes.length < 2) {
+            if (group?.meshes?.length === 1) keep.push(group.meshes[0]);
+            return;
+        }
+
+        const batch = { positions: [], normals: [], uvs: [], indices: [] };
+        xzPoints.length = 0;
+
+        for (let i = 0; i < group.meshes.length; i++) {
+            const mesh = group.meshes[i];
+            mesh.updateMatrixWorld(true);
+            appendGeometryWithTransform(batch, mesh.geometry, mesh.matrixWorld);
+
+            let cx = Number.isFinite(mesh.position?.x) ? mesh.position.x : 0;
+            let cz = Number.isFinite(mesh.position?.z) ? mesh.position.z : 0;
+            const footprint = mesh.userData?.buildingFootprint;
+            if (Array.isArray(footprint) && footprint.length > 0) {
+                let sumX = 0;
+                let sumZ = 0;
+                for (let p = 0; p < footprint.length; p++) {
+                    sumX += footprint[p].x;
+                    sumZ += footprint[p].z;
+                }
+                cx = sumX / footprint.length;
+                cz = sumZ / footprint.length;
+            } else if (mesh.geometry) {
+                if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+                const bs = mesh.geometry.boundingSphere;
+                if (bs) {
+                    cx = bs.center.x + cx;
+                    cz = bs.center.z + cz;
+                }
+            }
+            xzPoints.push({ x: cx, z: cz });
+        }
+
+        const geometry = buildMergedGeometry(batch);
+        if (!geometry) {
+            keep.push(...group.meshes);
+            return;
+        }
+
+        const material = group.material.clone();
+        const mergedMesh = new THREE.Mesh(geometry, material);
+        mergedMesh.renderOrder = group.renderOrder;
+        mergedMesh.castShadow = true;
+        mergedMesh.receiveShadow = true;
+        mergedMesh.frustumCulled = true;
+
+        let centerX = 0;
+        let centerZ = 0;
+        for (let i = 0; i < xzPoints.length; i++) {
+            centerX += xzPoints[i].x;
+            centerZ += xzPoints[i].z;
+        }
+        centerX /= xzPoints.length;
+        centerZ /= xzPoints.length;
+
+        let maxRadius = 0;
+        for (let i = 0; i < xzPoints.length; i++) {
+            const d = Math.hypot(xzPoints[i].x - centerX, xzPoints[i].z - centerZ);
+            if (d > maxRadius) maxRadius = d;
+        }
+
+        mergedMesh.userData = {
+            lodTier: 'near',
+            isBuildingBatch: true,
+            isNearBuildingBatch: true,
+            batchCount: group.meshes.length,
+            lodCenter: { x: centerX, z: centerZ },
+            lodRadius: maxRadius
+        };
+
+        scene.add(mergedMesh);
+        batchedMeshes.push(mergedMesh);
+
+        for (let i = 0; i < group.meshes.length; i++) {
+            const src = group.meshes[i];
+            scene.remove(src);
+            if (src.geometry) src.geometry.dispose();
+            if (src.material) src.material.dispose();
+        }
+        sourceMeshCount += group.meshes.length;
+    });
+
+    if (!batchedMeshes.length) return 0;
+    buildingMeshes = [...keep, ...batchedMeshes];
+    return sourceMeshCount;
+}
+
+function batchLanduseMeshes() {
+    if (!Array.isArray(landuseMeshes) || landuseMeshes.length < 4) return 0;
+
+    const keep = [];
+    const groups = new Map();
+
+    for (let i = 0; i < landuseMeshes.length; i++) {
+        const mesh = landuseMeshes[i];
+        if (!mesh || mesh.userData?.isLanduseBatch) {
+            if (mesh) keep.push(mesh);
+            continue;
+        }
+        if (!mesh.geometry || !mesh.material || Array.isArray(mesh.material)) {
+            keep.push(mesh);
+            continue;
+        }
+
+        const matKey = materialBatchKey(mesh.material);
+        if (!matKey) {
+            keep.push(mesh);
+            continue;
+        }
+        const type = mesh.userData?.landuseType || 'unknown';
+        const isWaterwayLine = !!mesh.userData?.isWaterwayLine;
+        const key = `${type}|${isWaterwayLine ? 1 : 0}|${mesh.renderOrder || 0}|${matKey}`;
+
+        let group = groups.get(key);
+        if (!group) {
+            group = {
+                meshes: [],
+                material: mesh.material,
+                renderOrder: mesh.renderOrder || 0,
+                landuseType: type,
+                isWaterwayLine,
+                alwaysVisible: false,
+                anyVisible: false
+            };
+            groups.set(key, group);
+        }
+        group.meshes.push(mesh);
+        group.alwaysVisible = group.alwaysVisible || !!mesh.userData?.alwaysVisible;
+        group.anyVisible = group.anyVisible || !!mesh.visible;
+    }
+
+    if (!groups.size) return 0;
+
+    const batched = [];
+    let sourceCount = 0;
+    const xzPoints = [];
+
+    groups.forEach(group => {
+        if (!group || !Array.isArray(group.meshes) || group.meshes.length < 2) {
+            if (group?.meshes?.length === 1) keep.push(group.meshes[0]);
+            return;
+        }
+
+        const batch = { positions: [], normals: [], uvs: [], indices: [] };
+        xzPoints.length = 0;
+
+        for (let i = 0; i < group.meshes.length; i++) {
+            const mesh = group.meshes[i];
+            mesh.updateMatrixWorld(true);
+            appendGeometryWithTransform(batch, mesh.geometry, mesh.matrixWorld);
+
+            let cx = Number.isFinite(mesh.position?.x) ? mesh.position.x : 0;
+            let cz = Number.isFinite(mesh.position?.z) ? mesh.position.z : 0;
+            const footprint = mesh.userData?.landuseFootprint || mesh.userData?.waterwayCenterline;
+            if (Array.isArray(footprint) && footprint.length > 0) {
+                let sumX = 0;
+                let sumZ = 0;
+                for (let p = 0; p < footprint.length; p++) {
+                    sumX += footprint[p].x;
+                    sumZ += footprint[p].z;
+                }
+                cx = sumX / footprint.length;
+                cz = sumZ / footprint.length;
+            } else if (mesh.geometry) {
+                if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+                const bs = mesh.geometry.boundingSphere;
+                if (bs) {
+                    cx = bs.center.x + cx;
+                    cz = bs.center.z + cz;
+                }
+            }
+            xzPoints.push({ x: cx, z: cz });
+        }
+
+        const geometry = buildMergedGeometry(batch);
+        if (!geometry) {
+            keep.push(...group.meshes);
+            return;
+        }
+
+        const material = group.material.clone();
+        const mergedMesh = new THREE.Mesh(geometry, material);
+        mergedMesh.renderOrder = group.renderOrder;
+        mergedMesh.receiveShadow = false;
+        mergedMesh.castShadow = false;
+        mergedMesh.frustumCulled = true;
+
+        let centerX = 0;
+        let centerZ = 0;
+        for (let i = 0; i < xzPoints.length; i++) {
+            centerX += xzPoints[i].x;
+            centerZ += xzPoints[i].z;
+        }
+        centerX /= xzPoints.length;
+        centerZ /= xzPoints.length;
+
+        let maxRadius = 0;
+        for (let i = 0; i < xzPoints.length; i++) {
+            const d = Math.hypot(xzPoints[i].x - centerX, xzPoints[i].z - centerZ);
+            if (d > maxRadius) maxRadius = d;
+        }
+
+        mergedMesh.userData = {
+            landuseType: group.landuseType,
+            isWaterwayLine: !!group.isWaterwayLine,
+            isLanduseBatch: true,
+            alwaysVisible: group.alwaysVisible,
+            batchCount: group.meshes.length,
+            lodCenter: { x: centerX, z: centerZ },
+            lodRadius: maxRadius
+        };
+        mergedMesh.visible = group.anyVisible || group.alwaysVisible;
+
+        scene.add(mergedMesh);
+        batched.push(mergedMesh);
+
+        for (let i = 0; i < group.meshes.length; i++) {
+            const src = group.meshes[i];
+            scene.remove(src);
+            if (src.geometry) src.geometry.dispose();
+            if (src.material) src.material.dispose();
+        }
+        sourceCount += group.meshes.length;
+    });
+
+    if (!batched.length) return 0;
+    landuseMeshes = [...keep, ...batched];
+    return sourceCount;
 }
 
 function clearBuildingSpatialIndex() {
@@ -1113,6 +1578,58 @@ async function loadRoads() {
 
             // Process roads
             showLoad(`Loading roads... (${roadWays.length})`);
+            const roadMainBatchVerts = [];
+            const roadMainBatchIdx = [];
+            const roadSkirtBatchVerts = [];
+            const roadSkirtBatchIdx = [];
+            const roadMarkBatchVerts = [];
+            const roadMarkBatchIdx = [];
+
+            const roadMainMaterial = asphaltTex ? new THREE.MeshStandardMaterial({
+                map: asphaltTex,
+                normalMap: asphaltNormal,
+                normalScale: new THREE.Vector2(0.8, 0.8),
+                roughnessMap: asphaltRoughness,
+                roughness: 0.95,
+                metalness: 0.05,
+                side: THREE.DoubleSide,
+                polygonOffset: true,
+                polygonOffsetFactor: -2,
+                polygonOffsetUnits: -2,
+                depthWrite: true,
+                depthTest: true
+            }) : new THREE.MeshStandardMaterial({
+                color: 0x333333,
+                roughness: 0.95,
+                metalness: 0.05,
+                side: THREE.DoubleSide,
+                polygonOffset: true,
+                polygonOffsetFactor: -2,
+                polygonOffsetUnits: -2,
+                depthWrite: true,
+                depthTest: true
+            });
+
+            const roadSkirtMaterial = new THREE.MeshStandardMaterial({
+                color: 0x222222,
+                roughness: 0.95,
+                metalness: 0.05,
+                side: THREE.DoubleSide,
+                polygonOffset: true,
+                polygonOffsetFactor: -1,
+                polygonOffsetUnits: -1
+            });
+
+            const roadMarkMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffee,
+                emissive: 0x444444,
+                emissiveIntensity: 0.3,
+                roughness: 0.8,
+                polygonOffset: true,
+                polygonOffsetFactor: -6,
+                polygonOffsetUnits: -6
+            });
+
             roadWays.forEach(way => {
                 const pts = way.nodes.map(id => nodes[id]).filter(n => n).map(n => geoToWorld(n.lat, n.lon));
                 if (pts.length < 2) return;
@@ -1218,44 +1735,7 @@ async function loadRoads() {
                     }
                 }
 
-                // Build main road mesh
-                const geo = new THREE.BufferGeometry();
-                geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-                geo.setIndex(indices);
-                geo.computeVertexNormals();
-
-                // Road material with improved polygon offset
-                const roadMat = asphaltTex ? new THREE.MeshStandardMaterial({
-                    map: asphaltTex,
-                    normalMap: asphaltNormal,
-                    normalScale: new THREE.Vector2(0.8, 0.8),
-                    roughnessMap: asphaltRoughness,
-                    roughness: 0.95,
-                    metalness: 0.05,
-                    side: THREE.DoubleSide,
-                    polygonOffset: true,
-                    polygonOffsetFactor: -2,
-                    polygonOffsetUnits: -2,
-                    depthWrite: true,
-                    depthTest: true
-                }) : new THREE.MeshStandardMaterial({
-                    color: 0x333333,
-                    roughness: 0.95,
-                    metalness: 0.05,
-                    side: THREE.DoubleSide,
-                    polygonOffset: true,
-                    polygonOffsetFactor: -2,
-                    polygonOffsetUnits: -2,
-                    depthWrite: true,
-                    depthTest: true
-                });
-
-                const mesh = new THREE.Mesh(geo, roadMat);
-                mesh.renderOrder = 2;
-                mesh.receiveShadow = true;
-                mesh.frustumCulled = false;
-                scene.add(mesh);
-                roadMeshes.push(mesh);
+                appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
                 loadMetrics.roads.vertices += verts.length / 3;
 
                 // Build road skirts (edge curtains) to hide terrain peeking
@@ -1263,28 +1743,7 @@ async function loadRoads() {
                 if (typeof buildRoadSkirts === 'function') {
                     const skirtData = buildRoadSkirts(leftEdge, rightEdge, 3.0);
                     if (skirtData.verts.length > 0) {
-                        const skirtGeo = new THREE.BufferGeometry();
-                        skirtGeo.setAttribute('position', new THREE.Float32BufferAttribute(skirtData.verts, 3));
-                        skirtGeo.setIndex(skirtData.indices);
-                        skirtGeo.computeVertexNormals();
-
-                        const skirtMat = new THREE.MeshStandardMaterial({
-                            color: 0x222222,
-                            roughness: 0.95,
-                            metalness: 0.05,
-                            side: THREE.DoubleSide,
-                            polygonOffset: true,
-                            polygonOffsetFactor: -1,
-                            polygonOffsetUnits: -1
-                        });
-
-                        const skirtMesh = new THREE.Mesh(skirtGeo, skirtMat);
-                        skirtMesh.renderOrder = 1;
-                        skirtMesh.receiveShadow = true;
-                        skirtMesh.frustumCulled = false;
-                        skirtMesh.userData.isRoadSkirt = true;
-                        scene.add(skirtMesh);
-                        roadMeshes.push(skirtMesh);
+                        appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
                         loadMetrics.roads.vertices += skirtData.verts.length / 3;
                     }
                 }
@@ -1319,24 +1778,33 @@ async function loadRoads() {
                         dist += segLen;
                     }
                     if (markVerts.length > 0) {
-                        const markGeo = new THREE.BufferGeometry();
-                        markGeo.setAttribute('position', new THREE.Float32BufferAttribute(markVerts, 3));
-                        markGeo.setIndex(markIdx);
-                        const markMesh = new THREE.Mesh(markGeo, new THREE.MeshStandardMaterial({
-                            color: 0xffffee,
-                            emissive: 0x444444,
-                            emissiveIntensity: 0.3,
-                            roughness: 0.8,
-                            polygonOffset: true,
-                            polygonOffsetFactor: -6,
-                            polygonOffsetUnits: -6
-                        }));
-                        markMesh.renderOrder = 3; // Layer 3 - renders on top of roads
-                        scene.add(markMesh); roadMeshes.push(markMesh);
+                        appendIndexedGeometry(roadMarkBatchVerts, roadMarkBatchIdx, markVerts, markIdx);
                         loadMetrics.roads.vertices += markVerts.length / 3;
                     }
                 }
             });
+
+            const buildRoadBatchMesh = (verts, indices, material, renderOrder, userData = null) => {
+                if (!verts.length || !indices.length) return null;
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+                geo.setIndex(indices);
+                geo.computeVertexNormals();
+                const mesh = new THREE.Mesh(geo, material);
+                mesh.renderOrder = renderOrder;
+                mesh.receiveShadow = true;
+                mesh.frustumCulled = true;
+                if (userData && typeof userData === 'object') {
+                    Object.assign(mesh.userData, userData);
+                }
+                scene.add(mesh);
+                roadMeshes.push(mesh);
+                return mesh;
+            };
+
+            buildRoadBatchMesh(roadMainBatchVerts, roadMainBatchIdx, roadMainMaterial, 2, { isRoadBatch: true });
+            buildRoadBatchMesh(roadSkirtBatchVerts, roadSkirtBatchIdx, roadSkirtMaterial, 1, { isRoadBatch: true, isRoadSkirt: true });
+            buildRoadBatchMesh(roadMarkBatchVerts, roadMarkBatchIdx, roadMarkMaterial, 3, { isRoadBatch: true, isRoadMarking: true });
 
             // Process buildings
             showLoad(`Loading buildings... (${buildingWays.length})`);
@@ -1505,6 +1973,14 @@ async function loadRoads() {
                     }
                 }
             });
+            const batchedMidCount = batchMidLodBuildingMeshes();
+            if (batchedMidCount > 0) {
+                loadMetrics.lod.midBatched = batchedMidCount;
+            }
+            const batchedNearCount = batchNearLodBuildingMeshes();
+            if (batchedNearCount > 0) {
+                loadMetrics.lod.nearBatched = batchedNearCount;
+            }
 
             function addLandusePolygon(pts, landuseType, holeRings = []) {
                 if (!pts || pts.length < 3) return;
@@ -1826,6 +2302,10 @@ async function loadRoads() {
                 }
             } catch (waterErr) {
                 console.warn('[Water] Vector water load failed, continuing without vector water layer.', waterErr);
+            }
+            const batchedLanduseCount = batchLanduseMeshes();
+            if (batchedLanduseCount > 0) {
+                loadMetrics.lod.landuseBatched = batchedLanduseCount;
             }
 
             // Process POIs for meaning in the world
@@ -2398,12 +2878,57 @@ function pointInPolygon(x, z, polygon) {
     return inside;
 }
 
+function getMeshLodCenter(mesh) {
+    if (!mesh) return null;
+    const cached = mesh.userData?.lodCenter;
+    if (cached && Number.isFinite(cached.x) && Number.isFinite(cached.z)) return cached;
+
+    const poiPos = mesh.userData?.poiPosition;
+    if (poiPos && Number.isFinite(poiPos.x) && Number.isFinite(poiPos.z)) {
+        return poiPos;
+    }
+
+    const footprint = mesh.userData?.buildingFootprint || mesh.userData?.landuseFootprint;
+    if (Array.isArray(footprint) && footprint.length > 0) {
+        let sumX = 0;
+        let sumZ = 0;
+        for (let i = 0; i < footprint.length; i++) {
+            sumX += footprint[i].x;
+            sumZ += footprint[i].z;
+        }
+        const center = { x: sumX / footprint.length, z: sumZ / footprint.length };
+        mesh.userData.lodCenter = center;
+        return center;
+    }
+
+    if (mesh.geometry) {
+        if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+        const bs = mesh.geometry.boundingSphere;
+        if (bs && Number.isFinite(bs.center.x) && Number.isFinite(bs.center.z)) {
+            const px = Number.isFinite(mesh.position?.x) ? mesh.position.x : 0;
+            const pz = Number.isFinite(mesh.position?.z) ? mesh.position.z : 0;
+            const center = { x: bs.center.x + px, z: bs.center.z + pz };
+            mesh.userData.lodCenter = center;
+            return center;
+        }
+    }
+
+    if (mesh.position && Number.isFinite(mesh.position.x) && Number.isFinite(mesh.position.z)) {
+        return { x: mesh.position.x, z: mesh.position.z };
+    }
+    return null;
+}
+
 let _lastLodRefX = 0;
 let _lastLodRefZ = 0;
 let _lastLodReady = false;
 
 function updateWorldLod(force = false) {
-    if (!buildingMeshes || buildingMeshes.length === 0) return;
+    if ((!buildingMeshes || buildingMeshes.length === 0)
+        && (!poiMeshes || poiMeshes.length === 0)
+        && (!landuseMeshes || landuseMeshes.length === 0)) {
+        return;
+    }
 
     const ref = (Walk && Walk.state && Walk.state.mode === 'walk' && Walk.state.walker)
         ? Walk.state.walker
@@ -2422,7 +2947,6 @@ function updateWorldLod(force = false) {
     const mode = getPerfModeValue();
     const depthForLod = (typeof rdtComplexity === 'number') ? rdtComplexity : 0;
     const lodThresholds = getWorldLodThresholds(depthForLod, mode);
-    const visibleSq = lodThresholds.farVisible * lodThresholds.farVisible;
     const poiMidSq = lodThresholds.mid * lodThresholds.mid;
 
     let nearVisible = 0;
@@ -2430,30 +2954,68 @@ function updateWorldLod(force = false) {
 
     for (let i = 0; i < buildingMeshes.length; i++) {
         const mesh = buildingMeshes[i];
-        if (!mesh || !mesh.position) continue;
+        if (!mesh) continue;
 
-        const dx = mesh.position.x - refX;
-        const dz = mesh.position.z - refZ;
+        const center = getMeshLodCenter(mesh);
+        if (!center) continue;
+
+        const radius = Number.isFinite(mesh.userData?.lodRadius) ? mesh.userData.lodRadius : 0;
+        const visibleDist = lodThresholds.farVisible + Math.min(1200, radius);
+        const dx = center.x - refX;
+        const dz = center.z - refZ;
         const distSq = dx * dx + dz * dz;
-        const visible = distSq <= visibleSq;
+        const visible = distSq <= (visibleDist * visibleDist);
         mesh.visible = visible;
         if (!visible) continue;
 
         const tier = mesh.userData?.lodTier || 'near';
-        if (tier === 'mid') midVisible += 1;
-        else nearVisible += 1;
+        const count = Math.max(1, mesh.userData?.isBuildingBatch ? (mesh.userData?.batchCount || 1) : 1);
+        if (tier === 'mid') midVisible += count;
+        else nearVisible += count;
     }
 
     for (let i = 0; i < poiMeshes.length; i++) {
         const mesh = poiMeshes[i];
-        if (!mesh || !mesh.position) continue;
+        if (!mesh) continue;
+        const center = getMeshLodCenter(mesh);
+        if (!center) continue;
 
-        const dx = mesh.position.x - refX;
-        const dz = mesh.position.z - refZ;
+        const dx = center.x - refX;
+        const dz = center.z - refZ;
         const distSq = dx * dx + dz * dz;
         const tier = mesh.userData?.lodTier || 'near';
-        const withinLod = tier === 'mid' ? (distSq <= poiMidSq) : (distSq <= visibleSq);
+        const radius = Number.isFinite(mesh.userData?.lodRadius) ? mesh.userData.lodRadius : 0;
+        const nearDist = lodThresholds.farVisible + Math.min(600, radius);
+        const withinLod = tier === 'mid' ? (distSq <= poiMidSq) : (distSq <= nearDist * nearDist);
         mesh.visible = !!poiMode && withinLod;
+    }
+
+    const landuseVisibleDist = lodThresholds.mid + 120;
+    const landuseSq = landuseVisibleDist * landuseVisibleDist;
+    for (let i = 0; i < landuseMeshes.length; i++) {
+        const mesh = landuseMeshes[i];
+        if (!mesh) continue;
+
+        const alwaysVisible = !!mesh.userData?.alwaysVisible;
+        if (!landUseVisible && !alwaysVisible) {
+            mesh.visible = false;
+            continue;
+        }
+        if (alwaysVisible) {
+            mesh.visible = true;
+            continue;
+        }
+
+        const center = getMeshLodCenter(mesh);
+        if (!center) {
+            mesh.visible = landUseVisible;
+            continue;
+        }
+
+        const dx = center.x - refX;
+        const dz = center.z - refZ;
+        const distSq = dx * dx + dz * dz;
+        mesh.visible = distSq <= landuseSq;
     }
 
     if (typeof setPerfLiveStat === 'function') {
