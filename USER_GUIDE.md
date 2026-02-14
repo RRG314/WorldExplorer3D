@@ -646,7 +646,6 @@ Create Minecraft-style brick stacks directly in the world.
 - Click in the world to place a brick block.
 - `Shift + Click` a placed block to remove it.
 - Use `🎮 Game Mode` -> `🧹 Clear Blocks` to wipe all build blocks for the current location (including saved blocks).
-- Use `🎮 Game Mode` -> `💥 Delete All Blocks` to erase all saved build blocks across all locations.
 
 ### How Stacking Works
 
@@ -749,7 +748,6 @@ Located on right side of screen:
    - Mode selection
    - Toggle brick build mode
    - Clear all placed build blocks (current location)
-   - Delete all saved build blocks (all locations)
 
 4. **🌿 Environment**:
    - Weather controls (if available)
@@ -979,7 +977,6 @@ Quick reference for all controls:
 | N | Next City |
 | B | Toggle brick build mode |
 | Game Menu -> Clear Blocks | Clear current-location build blocks |
-| Game Menu -> Delete All Blocks | Delete all saved build blocks |
 | 🌸 Memory Button | Create persistent pin/flower note |
 | R | Record Track |
 | Esc | Pause |

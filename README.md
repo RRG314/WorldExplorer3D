@@ -100,7 +100,7 @@ Block builder actions:
 - `B` -> toggle build mode
 - `Click` (build mode on) -> place brick block
 - `Shift+Click` (build mode on) -> remove targeted block
-- `🎮 Game Mode` menu -> `🧱 Build Mode`, `🧹 Clear Blocks`, `💥 Delete All Blocks`
+- `🎮 Game Mode` menu -> `🧱 Build Mode` and `🧹 Clear Blocks`
 
 ## Persistent Memory Markers
 
@@ -123,7 +123,6 @@ Block builder actions:
 - In-world behavior: place/stack/remove blocks and stand or climb on them in walking mode
 - Build limit: `100` max blocks for now
 - Clear behavior: `🧹 Clear Blocks` removes rendered and saved blocks for the current location
-- Global reset: `💥 Delete All Blocks` removes all saved blocks from this browser across all locations
 - Verification: run `getBuildPersistenceStatus()` in browser console
 
 ## Security and Storage Notice
@@ -141,7 +140,7 @@ Block builder actions:
 - Runtime is split into multiple JS files (`js/*.js`) with no build step.
 - Shared/global runtime state is still used across core systems.
 - ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
-- Cache-bust version alignment across loader chain is currently `v=32`.
+- Cache-bust version alignment across loader chain is currently `v=33`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
 ## Freeze Snapshot (2026-02-14)

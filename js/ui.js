@@ -619,16 +619,6 @@ function setupUI() {
             closeAllFloatMenus();
         });
     }
-    const deleteAllBlocksItem = document.getElementById('fDeleteAllBlocks');
-    if (deleteAllBlocksItem) {
-        deleteAllBlocksItem.addEventListener('click', () => {
-            if (typeof clearAllBuildBlocksEverywhere === 'function') {
-                const confirmed = globalThis.confirm('Delete ALL saved build blocks from this browser across all locations? This cannot be undone.');
-                if (confirmed) clearAllBuildBlocksEverywhere();
-            }
-            closeAllFloatMenus();
-        });
-    }
     // Travel mode switchers - mutually exclusive
     document.getElementById('fDriving').addEventListener('click', () => {
         // Switch to driving mode

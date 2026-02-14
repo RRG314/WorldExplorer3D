@@ -412,18 +412,6 @@ function clearPersistedBuildBlocksForCurrentLocation() {
     return true;
 }
 
-function clearPersistedBuildBlocksEverywhere() {
-    if (!buildPersistenceEnabled) return true;
-    if (buildEntries.length === 0) return true;
-    const previous = buildEntries;
-    buildEntries = [];
-    if (!saveBuildEntriesToStorage()) {
-        buildEntries = previous;
-        return false;
-    }
-    return true;
-}
-
 function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
     if (!Number.isFinite(gx) || !Number.isFinite(gy) || !Number.isFinite(gz)) return false;
     const group = ensureBuildGroup();
@@ -440,7 +428,7 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
         if (buildBlocks.size >= BUILD_MAX_PER_LOCATION ||
             limits.currentLocationCount >= BUILD_MAX_PER_LOCATION ||
             limits.totalCount >= BUILD_MAX_TOTAL) {
-            showBuildTransientMessage(`Limit reached (${BUILD_MAX_PER_LOCATION} blocks max). Remove some or use Delete All Blocks.`);
+            showBuildTransientMessage(`Limit reached (${BUILD_MAX_PER_LOCATION} blocks max). Remove some blocks to continue.`);
             return false;
         }
     }
@@ -470,7 +458,7 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
             if (mesh.parent) mesh.parent.remove(mesh);
             buildBlocks.delete(key);
             removeBuildColumnEntry(gx, gy, gz);
-            showBuildTransientMessage(`Limit reached (${BUILD_MAX_PER_LOCATION} blocks max). Remove some or use Delete All Blocks.`);
+            showBuildTransientMessage(`Limit reached (${BUILD_MAX_PER_LOCATION} blocks max). Remove some blocks to continue.`);
             return false;
         }
     }
@@ -504,13 +492,6 @@ function clearRenderedBuildBlocks() {
 function clearAllBuildBlocks(options = {}) {
     if (options.persist !== false) {
         clearPersistedBuildBlocksForCurrentLocation();
-    }
-    clearRenderedBuildBlocks();
-}
-
-function clearAllBuildBlocksEverywhere(options = {}) {
-    if (options.persist !== false) {
-        clearPersistedBuildBlocksEverywhere();
     }
     clearRenderedBuildBlocks();
 }
@@ -741,7 +722,6 @@ buildEntries = loadBuildEntriesFromStorage();
 
 Object.assign(globalThis, {
     clearAllBuildBlocks,
-    clearAllBuildBlocksEverywhere,
     clearBlockBuilderForWorldReload,
     getBuildCollisionAtWorldXZ,
     getBuildLimits,
@@ -756,7 +736,6 @@ Object.assign(globalThis, {
 
 export {
     clearAllBuildBlocks,
-    clearAllBuildBlocksEverywhere,
     clearBlockBuilderForWorldReload,
     getBuildCollisionAtWorldXZ,
     getBuildLimits,

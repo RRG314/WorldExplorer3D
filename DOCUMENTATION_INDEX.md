@@ -41,10 +41,10 @@ The current branch documentation set includes updates for:
 - Memory composer `Delete All` flow with confirmation
 - POI + memory marker rendering on minimap and large map overlays
 - Legend checkboxes for independent memory pin/flower visibility on maps
-- Brick block builder controls (`B`, click place, shift-click remove, clear current location, delete all, 100-block cap)
+- Brick block builder controls (`B`, click place, shift-click remove, clear current location, 100-block cap)
 - Security/storage boilerplate notice for persistent memory data
 - Dynamic UI text escaping in map/property/historic panels
-- Cache-bust loader chain alignment through `v=32`
+- Cache-bust loader chain alignment through `v=33`
 
 ## Maintainer Notes
 

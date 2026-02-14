@@ -42,7 +42,7 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - Memory composer now includes `Delete All` with confirmation.
 - POI and memory markers now render on both minimap and large map overlays.
 - Voxel-style brick builder subsystem added (`js/blocks.js`) with click place/stack and shift-click removal.
-- Loader cache-bust chain is aligned through `v=32` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Loader cache-bust chain is aligned through `v=33` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### High-Level Architecture
 
@@ -604,7 +604,6 @@ Core public hooks:
 - Persistence: blocks are saved in Earth mode per location in localStorage (`worldExplorer3D.buildBlocks.v1`)
 - Limit: currently capped to `100` blocks maximum
 - Clear control: `🎮 Game Mode` -> `🧹 Clear Blocks` removes current-location rendered + saved blocks
-- Global control: `🎮 Game Mode` -> `💥 Delete All Blocks` removes all saved build blocks in this browser
 - Reload behavior: rendered blocks are cleared during `loadRoads()`, then current-location saved blocks are rehydrated
 - Walk physics integration: block tops participate in walkable ground/collision checks for climbing/standing
 
@@ -614,7 +613,6 @@ Core public hooks:
 - `setBuildModeEnabled(state)`
 - `handleBlockBuilderClick(event)`
 - `clearAllBuildBlocks()`
-- `clearAllBuildBlocksEverywhere()`
 - `clearBlockBuilderForWorldReload()`
 - `getBuildTopSurfaceAtWorldXZ(x, z, maxTopY)`
 - `getBuildCollisionAtWorldXZ(x, z, feetY, stepHeight)`
