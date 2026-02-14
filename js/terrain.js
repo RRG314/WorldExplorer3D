@@ -460,6 +460,7 @@ function applyHeightsToTerrainMesh(mesh) {
 
 function resetTerrainStreamingState() {
   lastTerrainCenterKey = null;
+  lastDynamicTerrainRing = TERRAIN_RING;
   terrain._lastUpdatePos.x = 0;
   terrain._lastUpdatePos.z = 0;
   terrain._cachedIntersections = null;
@@ -568,6 +569,26 @@ function buildIntersectionCap(x, z, radius, segments = 16) {
 }
 
 let lastTerrainCenterKey = null;
+let lastDynamicTerrainRing = TERRAIN_RING;
+
+function getStreamingSpeedMph() {
+  if (droneMode && drone) return Math.max(0, Math.abs((drone.speed || 0) * 1.8));
+  if (Walk && Walk.state && Walk.state.mode === 'walk') {
+    return Math.max(0, Math.abs(Walk.state.walker?.speedMph || 0));
+  }
+  return Math.max(0, Math.abs((car?.speed || 0) * 0.5));
+}
+
+function getDynamicTerrainRing() {
+  const baseRing = Math.max(1, TERRAIN_RING);
+  const mode = (typeof getPerfMode === 'function') ? getPerfMode() : (perfMode || 'rdt');
+  if (mode === 'baseline') return baseRing;
+
+  const mph = getStreamingSpeedMph();
+  if (mph >= 120) return Math.max(1, baseRing - 2);
+  if (mph >= 70) return Math.max(1, baseRing - 1);
+  return baseRing;
+}
 
 function updateTerrainAround(x, z) {
   if (!terrainEnabled) return;
@@ -577,6 +598,10 @@ function updateTerrainAround(x, z) {
   const { lat, lon } = worldToLatLon(x, z);
   const t = latLonToTileXY(lat, lon, TERRAIN_ZOOM);
   const centerKey = `${TERRAIN_ZOOM}/${t.x}/${t.y}`;
+  const activeRing = getDynamicTerrainRing();
+  const ringChanged = activeRing !== lastDynamicTerrainRing;
+  lastDynamicTerrainRing = activeRing;
+  if (typeof setPerfLiveStat === 'function') setPerfLiveStat('terrainRing', activeRing);
 
   // OPTIMIZATION: Skip if same tile AND haven't moved enough (but always run on first call)
   if (lastTerrainCenterKey !== null) {
@@ -584,10 +609,10 @@ function updateTerrainAround(x, z) {
     const dz = z - terrain._lastUpdatePos.z;
     const distMoved = Math.sqrt(dx * dx + dz * dz);
 
-    if (centerKey === lastTerrainCenterKey && distMoved < 5.0) return;
+    if (centerKey === lastTerrainCenterKey && distMoved < 5.0 && !ringChanged) return;
   }
 
-  const tilesChanged = centerKey !== lastTerrainCenterKey;
+  const tilesChanged = centerKey !== lastTerrainCenterKey || ringChanged;
   lastTerrainCenterKey = centerKey;
   terrain._lastUpdatePos.x = x;
   terrain._lastUpdatePos.z = z;
@@ -596,8 +621,8 @@ function updateTerrainAround(x, z) {
   if (tilesChanged) {
     clearTerrainMeshes();
 
-    for (let dx = -TERRAIN_RING; dx <= TERRAIN_RING; dx++) {
-      for (let dy = -TERRAIN_RING; dy <= TERRAIN_RING; dy++) {
+    for (let dx = -activeRing; dx <= activeRing; dx++) {
+      for (let dy = -activeRing; dy <= activeRing; dy++) {
         const tx = t.x + dx;
         const ty = t.y + dy;
         const mesh = buildTerrainTileMesh(TERRAIN_ZOOM, tx, ty);
@@ -663,7 +688,8 @@ function rebuildRoadsWithTerrain() {
     const hw = width / 2;
 
     // Curvature-aware subdivision: straight = 2-5m, curves = 0.5-2m
-    const pts = subdivideRoadPoints(road.pts, 3.5);
+    const detail = Number.isFinite(road?.subdivideMaxDist) ? road.subdivideMaxDist : 3.5;
+    const pts = subdivideRoadPoints(road.pts, detail);
 
     const verts = [], indices = [];
     const leftEdge = [], rightEdge = [];
@@ -952,7 +978,10 @@ function repositionBuildingsWithTerrain() {
       minElevation = Number.isFinite(fallbackElevation) ? fallbackElevation : 0;
     }
 
-    mesh.position.y = minElevation;
+    const midLodHalfHeight = Number.isFinite(mesh.userData?.midLodHalfHeight)
+      ? mesh.userData.midLodHalfHeight
+      : 0;
+    mesh.position.y = minElevation + midLodHalfHeight;
     buildingsRepositioned++;
   });
 

@@ -4,6 +4,8 @@
 
 let _hudTimer = 0;
 let _mapTimer = 0;
+let _lodTimer = 0;
+let _perfPanelTimer = 0;
 const DEFAULT_LOADING_BG = 'loading-bg.jpg';
 const TRANSITION_LOADING = {
     space: { background: 'space-transition.png', text: 'Preparing Space Flight...' },
@@ -26,6 +28,8 @@ function renderLoop(t = 0) {
 
     const dt = Math.min((t - lastTime) / 1000, 0.1);
     lastTime = t;
+    if (typeof recordPerfFrame === 'function') recordPerfFrame(dt);
+
     if (gameStarted) {
         update(dt);
         updateCamera();
@@ -43,6 +47,13 @@ function renderLoop(t = 0) {
             _mapTimer = 0;
             drawMinimap();
             if (showLargeMap) drawLargeMap();
+        }
+
+        // LOD visibility updates run at low frequency to avoid per-frame overhead.
+        _lodTimer += dt;
+        if (_lodTimer > 0.2) {
+            _lodTimer = 0;
+            if (typeof updateWorldLod === 'function') updateWorldLod(false);
         }
     }
 
@@ -89,6 +100,16 @@ function renderLoop(t = 0) {
         composer.render();
     } else {
         renderer.render(scene, camera);
+    }
+
+    if (typeof recordPerfRendererInfo === 'function') {
+        recordPerfRendererInfo(renderer);
+    }
+
+    _perfPanelTimer += dt;
+    if (_perfPanelTimer > 0.2) {
+        _perfPanelTimer = 0;
+        if (typeof updatePerfPanel === 'function') updatePerfPanel(false);
     }
 }
 
