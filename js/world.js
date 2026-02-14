@@ -337,10 +337,10 @@ function getWorldLodThresholds(loadDepth, mode = getPerfModeValue()) {
     }
 
     const depth = Math.max(0, loadDepth | 0);
-    // Keep RDT adaptive, but bias toward richer startup visibility to reduce pop-in.
-    const near = Math.max(1050, 1580 - depth * 42);
-    const mid = near + 1360;
-    return { near, mid, farVisible: mid + 500 };
+    // Keep RDT adaptive with smoother pop control, but avoid over-expanding visibility.
+    const near = Math.max(980, 1500 - depth * 45);
+    const mid = near + 1320;
+    return { near, mid, farVisible: mid + 450 };
 }
 
 function getAdaptiveLoadProfile(loadDepth, mode = getPerfModeValue()) {
@@ -986,8 +986,20 @@ function batchNearLodBuildingMeshes() {
         sourceMeshCount += group.meshes.length;
     });
 
-    if (!batchedMeshes.length) return 0;
+    if (!batchedMeshes.length) {
+        globalThis._lastBuildingBatchStats = {
+            groupCount: groups.size,
+            batchMeshCount: 0,
+            sourceMeshCount: 0
+        };
+        return 0;
+    }
     buildingMeshes = [...keep, ...batchedMeshes];
+    globalThis._lastBuildingBatchStats = {
+        groupCount: groups.size,
+        batchMeshCount: batchedMeshes.length,
+        sourceMeshCount
+    };
     return sourceMeshCount;
 }
 
@@ -1129,8 +1141,20 @@ function batchLanduseMeshes() {
         sourceCount += group.meshes.length;
     });
 
-    if (!batched.length) return 0;
+    if (!batched.length) {
+        globalThis._lastLanduseBatchStats = {
+            groupCount: groups.size,
+            batchMeshCount: 0,
+            sourceMeshCount: 0
+        };
+        return 0;
+    }
     landuseMeshes = [...keep, ...batched];
+    globalThis._lastLanduseBatchStats = {
+        groupCount: groups.size,
+        batchMeshCount: batched.length,
+        sourceMeshCount
+    };
     return sourceCount;
 }
 
@@ -1273,8 +1297,11 @@ async function loadRoads() {
         buildings: { requested: 0, selected: 0 },
         colliders: { full: 0, simplified: 0 },
         landuse: { requested: 0, selected: 0 },
-        pois: { requested: 0, selected: 0, near: 0, mid: 0, far: 0 }
+        pois: { requested: 0, selected: 0, near: 0, mid: 0, far: 0 },
+        phases: {}
     };
+    globalThis._lastBuildingBatchStats = null;
+    globalThis._lastLanduseBatchStats = null;
     if (typeof startPerfLoad === 'function') {
         startPerfLoad('world-load', { mode: perfModeNow, location: locName });
     }
@@ -1286,6 +1313,20 @@ async function loadRoads() {
         loadMetrics.success = !!success;
         const payload = { ...loadMetrics, ...extra };
         if (typeof finishPerfLoad === 'function') finishPerfLoad(payload);
+    };
+    const _phaseStartedAt = Object.create(null);
+    const _phaseTotals = Object.create(null);
+    const startLoadPhase = (name) => {
+        if (!name) return;
+        _phaseStartedAt[name] = performance.now();
+    };
+    const endLoadPhase = (name) => {
+        if (!name) return;
+        const startedAt = _phaseStartedAt[name];
+        if (!Number.isFinite(startedAt)) return;
+        const dt = performance.now() - startedAt;
+        _phaseTotals[name] = (_phaseTotals[name] || 0) + dt;
+        delete _phaseStartedAt[name];
     };
 
     showLoad('Loading ' + locName + '...');
@@ -1524,10 +1565,17 @@ async function loadRoads() {
                 node["leisure"~"park|stadium|sports_centre|playground"]${poiBounds};
             );out body;>;out skel qt;`;
             const loadDeadline = loadStartedAt + maxTotalLoadMs;
-            const data = await fetchOverpassJSON(q, overpassTimeoutMs, loadDeadline);
+            startLoadPhase('fetchOverpass');
+            let data;
+            try {
+                data = await fetchOverpassJSON(q, overpassTimeoutMs, loadDeadline);
+            } finally {
+                endLoadPhase('fetchOverpass');
+            }
             const nodes = {};
             data.elements.filter(e => e.type === 'node').forEach(n => nodes[n.id] = n);
 
+            startLoadPhase('featureBudgeting');
             const allRoadWays = data.elements.filter(e => e.type === 'way' && e.tags?.highway);
             const roadWays = limitWaysByTileBudget(allRoadWays, nodes, {
                 globalCap: maxRoadWays,
@@ -1546,7 +1594,7 @@ async function loadRoads() {
                 tileDegrees: tileBudgetCfg.tileDegrees,
                 useRdt: useRdtBudgeting,
                 spreadAcrossArea: true,
-                coreRatio: 0.45
+                coreRatio: useRdtBudgeting ? 0.35 : 0.45
             });
 
             const allLanduseWays = data.elements.filter(e =>
@@ -1583,6 +1631,7 @@ async function loadRoads() {
             loadMetrics.landuse.selected = landuseWays.length;
             loadMetrics.pois.requested = allPoiNodes.length;
             loadMetrics.pois.selected = poiNodes.length;
+            endLoadPhase('featureBudgeting');
 
             if (
                 roadWays.length < allRoadWays.length ||
@@ -1601,6 +1650,7 @@ async function loadRoads() {
 
             // Process roads
             showLoad(`Loading roads... (${roadWays.length})`);
+            startLoadPhase('buildRoadGeometry');
             const roadMainBatchVerts = [];
             const roadMainBatchIdx = [];
             const roadSkirtBatchVerts = [];
@@ -1830,9 +1880,11 @@ async function loadRoads() {
             buildRoadBatchMesh(roadMainBatchVerts, roadMainBatchIdx, roadMainMaterial, 2, { isRoadBatch: true });
             buildRoadBatchMesh(roadSkirtBatchVerts, roadSkirtBatchIdx, roadSkirtMaterial, 1, { isRoadBatch: true, isRoadSkirt: true });
             buildRoadBatchMesh(roadMarkBatchVerts, roadMarkBatchIdx, roadMarkMaterial, 3, { isRoadBatch: true, isRoadMarking: true });
+            endLoadPhase('buildRoadGeometry');
 
             // Process buildings
             showLoad(`Loading buildings... (${buildingWays.length})`);
+            startLoadPhase('buildBuildingGeometry');
             const roadBuildingCellSize = 120;
             const buildingRoadRadiusCells = useRdtBudgeting
                 ? (rdtLoadComplexity >= 6 ? 5 : 4)
@@ -1869,7 +1921,6 @@ async function loadRoads() {
 
             const lodNearDist = lodThresholds.near;
             const lodMidDist = lodThresholds.mid;
-            const fullColliderDist = lodThresholds.near + (useRdtBudgeting ? 520 : 900);
 
             buildingWays.forEach(way => {
                 const pts = way.nodes.map(id => nodes[id]).filter(n => n).map(n => geoToWorld(n.lat, n.lon));
@@ -1915,10 +1966,7 @@ async function loadRoads() {
                     else height = 8 + br1 * 12;
                 }
 
-                const colliderDetail =
-                    useRdtBudgeting && lodTier === 'mid' && centerDist > fullColliderDist
-                        ? 'bbox'
-                        : 'full';
+                const colliderDetail = (useRdtBudgeting && lodTier !== 'near') ? 'bbox' : 'full';
                 registerBuildingCollision(pts, height, { detail: colliderDetail, centerX, centerZ });
                 if (colliderDetail === 'full') loadMetrics.colliders.full += 1;
                 else loadMetrics.colliders.simplified += 1;
@@ -1986,10 +2034,16 @@ async function loadRoads() {
                     }
                 }
             });
+            endLoadPhase('buildBuildingGeometry');
+            startLoadPhase('batchBuildingGeometry');
             const batchedNearCount = batchNearLodBuildingMeshes();
             if (batchedNearCount > 0) {
                 loadMetrics.lod.nearBatched = batchedNearCount;
             }
+            if (globalThis._lastBuildingBatchStats) {
+                loadMetrics.buildingBatching = { ...globalThis._lastBuildingBatchStats };
+            }
+            endLoadPhase('batchBuildingGeometry');
 
             function addLandusePolygon(pts, landuseType, holeRings = []) {
                 if (!pts || pts.length < 3) return;
@@ -2291,6 +2345,7 @@ async function loadRoads() {
             }
 
             showLoad(`Loading land use... (${landuseWays.length})`);
+            startLoadPhase('buildLanduseGeometry');
             landuseWays.forEach(way => {
                 const landuseType = classifyLanduseType(way.tags);
                 if (!landuseType) return;
@@ -2312,13 +2367,20 @@ async function loadRoads() {
             } catch (waterErr) {
                 console.warn('[Water] Vector water load failed, continuing without vector water layer.', waterErr);
             }
+            endLoadPhase('buildLanduseGeometry');
+            startLoadPhase('batchLanduseGeometry');
             const batchedLanduseCount = batchLanduseMeshes();
             if (batchedLanduseCount > 0) {
                 loadMetrics.lod.landuseBatched = batchedLanduseCount;
             }
+            if (globalThis._lastLanduseBatchStats) {
+                loadMetrics.landuseBatching = { ...globalThis._lastLanduseBatchStats };
+            }
+            endLoadPhase('batchLanduseGeometry');
 
             // Process POIs for meaning in the world
             showLoad(`Loading POIs... (${poiNodes.length})`);
+            startLoadPhase('buildPoiGeometry');
             poiNodes.forEach(node => {
                 const tags = node.tags;
                 let poiKey = null;
@@ -2427,11 +2489,14 @@ async function loadRoads() {
                     }
                 }
             });
+            endLoadPhase('buildPoiGeometry');
 
             if (roads.length > 0) {
                 // Generate street furniture (signs, trees, lights, trash cans)
                 showLoad('Adding details...');
+                startLoadPhase('buildStreetFurniture');
                 generateStreetFurniture();
+                endLoadPhase('buildStreetFurniture');
 
                 loaded = true;
                 spawnOnRoad();
@@ -2618,6 +2683,11 @@ async function loadRoads() {
             poiMeshes: poiMeshes.length,
             landuseMeshes: landuseMeshes.length
         });
+    }
+    if (_phaseTotals && typeof _phaseTotals === 'object') {
+        loadMetrics.phases = Object.fromEntries(
+            Object.entries(_phaseTotals).map(([name, ms]) => [name, Math.round(ms)])
+        );
     }
     finalizePerfLoad(loaded, {
         roadsFinal: roads.length,
