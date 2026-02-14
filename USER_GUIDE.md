@@ -4,6 +4,7 @@ Complete guide to using World Explorer 3D. Learn every feature, control, and sec
 
 ## Table of Contents
 - [Getting Started](#getting-started)
+- [Performance Benchmark Mode (RDT vs Baseline)](#performance-benchmark-mode-rdt-vs-baseline)
 - [Game Modes](#game-modes)
 - [Movement Systems](#movement-systems)
 - [Camera Controls](#camera-controls)
@@ -78,6 +79,51 @@ Shows your current GPS position (lat/lon)
 
 #### Controls Tab
 Click header to expand/collapse in-game controls reference (includes driving, walking, drone, and space-flight controls)
+
+## Performance Benchmark Mode (RDT vs Baseline)
+
+Use the title screen `Settings` tab to compare the two world-loading modes.
+
+### Where to find it
+
+1. Open `Settings`.
+2. Go to `⚡ Performance Benchmark`.
+3. Select:
+   - `RDT Optimized` for adaptive budgets.
+   - `Baseline (No RDT Budgeting)` for full-budget loading.
+4. Click `Apply + Reload World`.
+5. Click `Copy Snapshot` to export the current JSON metrics.
+
+### Overlay behavior
+
+- `Show live benchmark overlay in-game` is opt-in.
+- Overlay is OFF by default each session to avoid confusing non-technical users.
+- Debug overlay (`\``) is auto-centered between speed HUD and mode HUD.
+- Benchmark overlay is auto-centered between mode HUD and `Main Menu`.
+- Overlay positions auto-refresh when toggled and on viewport resize.
+
+### What to compare in snapshots
+
+- `lastLoad.loadMs` (total load time)
+- `lastLoad.phases.fetchOverpass` (network portion)
+- `renderer.calls` (draw calls)
+- `renderer.triangles`
+- `fps` and `frameMs`
+- `lastLoad.overpassSource` (`network` or `memory-cache`)
+
+### Supporting test stats (Baltimore, 2026-02-14)
+
+| Scenario | loadMs | fetchOverpass | fps | frameMs | draw calls |
+|---|---:|---:|---:|---:|---:|
+| Baseline (network) | `5551` | `4267` | `60.00` | `16.71` | `453` |
+| RDT (network) | `4669` | `3519` | `60.00` | `16.67` | `1149` |
+| RDT (memory-cache repeat loads) | `2202-2246` | `0` | `59.99-60.00` | `16.59-16.66` | `957-1131` |
+
+Interpretation:
+
+- RDT is currently faster at startup in the captured network run.
+- RDT repeat loads are significantly faster when Overpass data is reused from memory cache.
+- Draw calls still vary and can remain higher in RDT than baseline in some scenes.
 
 ## Game Modes
 
@@ -632,7 +678,7 @@ Placement uses your current Earth-mode position (car, walk, or drone reference p
 - Pin/flower visibility can be toggled independently in the legend.
 - Limits: 200 chars per message, 300 markers per location, 1500 markers total.
 - If browser storage is blocked/disabled, placement is disabled and a warning is shown.
-- Markers are local-only by default, but can sync across clients when Supabase multiplayer is configured.
+- Markers are not automatically synced between different browsers/devices.
 - Notes are not encrypted; do not store passwords, keys, or sensitive personal data.
 - UI paths that render dynamic memory/property/POI text now escape content before HTML insertion.
 - Optional check: run `getMemoryPersistenceStatus()` in browser console.
@@ -843,21 +889,27 @@ A: Yes, optimized for tablets and phones with touch controls.
 A: Full gameplay state is not saved, but memory markers (pin/flower notes) are persisted locally in your browser.
 
 **Q: Where are memory notes stored?**
-A: Always in browser local storage (`worldExplorer3D.memories.v1`), and optionally in Supabase (`public.world_placeables`) if multiplayer sync is configured.
+A: In browser local storage (`worldExplorer3D.memories.v1`) on this device/profile only.
 
 **Q: Are memory notes secure/private?**
-A: Notes are not encrypted. If Supabase sync is enabled, notes are shared with clients in the same area.
+A: They are local-only but not encrypted. Anyone with access to this browser profile can read them.
 
 **Q: Is it multiplayer?**
-A: Yes, optional Supabase sync shares nearby blocks, pins, and flowers (including notes) across clients in Earth mode.
+A: Not yet, but planned for future updates.
 
 **Q: Can I add custom cities?**
 A: Yes, enter any GPS coordinates in Settings.
 
 ### Technical Questions
 
+**Q: How do I switch between RDT and baseline mode?**
+A: Main Menu -> `Settings` -> `⚡ Performance Benchmark` -> choose mode -> `Apply + Reload World`.
+
+**Q: How do I export benchmark data?**
+A: In the same benchmark panel, click `Copy Snapshot` to copy JSON to clipboard.
+
 **Q: Why is loading slow?**
-A: Depends on internet speed. Satellite images are large files.
+A: First loads are network-bound (Overpass + tiles). Repeat loads can be much faster when `lastLoad.overpassSource` shows `memory-cache`.
 
 **Q: The game is laggy, what do I do?**
 A: Close other tabs, reduce graphics quality, use fewer map layers.

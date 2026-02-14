@@ -8,8 +8,11 @@ const OVERPASS_ENDPOINTS = [
     'https://overpass.kumi.systems/api/interpreter'
 ];
 
-const OVERPASS_STAGGER_MS = 450;
+const OVERPASS_STAGGER_MS = 220;
 const OVERPASS_MIN_TIMEOUT_MS = 5000;
+const OVERPASS_MEMORY_CACHE_TTL_MS = 6 * 60 * 1000;
+const OVERPASS_MEMORY_CACHE_MAX = 6;
+const OVERPASS_LOC_EPSILON = 1e-7;
 const WATER_VECTOR_TILE_ZOOM = 13;
 const WATER_VECTOR_TILE_FETCH_TIMEOUT_MS = 8000;
 const WATER_VECTOR_TILE_ENDPOINT = (z, x, y) =>
@@ -17,6 +20,87 @@ const WATER_VECTOR_TILE_ENDPOINT = (z, x, y) =>
 let _vectorTileLibPromise = null;
 const BUILDING_INDEX_CELL_SIZE = 120;
 let buildingSpatialIndex = new Map();
+const FEATURE_TILE_DEGREES = 0.002;
+const _rdtTileDepthCache = new Map();
+const _overpassMemoryCache = [];
+let _lastOverpassEndpoint = null;
+
+function sameLocation(a, b) {
+    return Math.abs((a?.lat || 0) - (b?.lat || 0)) <= OVERPASS_LOC_EPSILON
+        && Math.abs((a?.lon || 0) - (b?.lon || 0)) <= OVERPASS_LOC_EPSILON;
+}
+
+function pruneOverpassMemoryCache(nowMs = Date.now()) {
+    for (let i = _overpassMemoryCache.length - 1; i >= 0; i--) {
+        if (nowMs - _overpassMemoryCache[i].savedAt > OVERPASS_MEMORY_CACHE_TTL_MS) {
+            _overpassMemoryCache.splice(i, 1);
+        }
+    }
+}
+
+function findOverpassMemoryCache(meta) {
+    if (!meta) return null;
+    const nowMs = Date.now();
+    pruneOverpassMemoryCache(nowMs);
+
+    let best = null;
+    for (let i = 0; i < _overpassMemoryCache.length; i++) {
+        const entry = _overpassMemoryCache[i];
+        if (!sameLocation(entry.meta, meta)) continue;
+        if (entry.meta.roadsRadius + 1e-9 < meta.roadsRadius) continue;
+        if (entry.meta.featureRadius + 1e-9 < meta.featureRadius) continue;
+        if (entry.meta.poiRadius + 1e-9 < meta.poiRadius) continue;
+
+        if (!best || entry.savedAt > best.savedAt) best = entry;
+    }
+    if (!best) return null;
+
+    best.lastHitAt = nowMs;
+    return best;
+}
+
+function storeOverpassMemoryCache(meta, data, endpoint) {
+    if (!meta || !data || !Array.isArray(data.elements)) return;
+
+    const nowMs = Date.now();
+    pruneOverpassMemoryCache(nowMs);
+
+    const existingIdx = _overpassMemoryCache.findIndex(entry =>
+        sameLocation(entry.meta, meta)
+        && Math.abs(entry.meta.roadsRadius - meta.roadsRadius) < 1e-9
+        && Math.abs(entry.meta.featureRadius - meta.featureRadius) < 1e-9
+        && Math.abs(entry.meta.poiRadius - meta.poiRadius) < 1e-9
+    );
+
+    const record = {
+        meta: {
+            lat: meta.lat,
+            lon: meta.lon,
+            roadsRadius: meta.roadsRadius,
+            featureRadius: meta.featureRadius,
+            poiRadius: meta.poiRadius
+        },
+        data,
+        endpoint: endpoint || null,
+        savedAt: nowMs,
+        lastHitAt: nowMs
+    };
+
+    if (existingIdx >= 0) _overpassMemoryCache.splice(existingIdx, 1);
+    _overpassMemoryCache.unshift(record);
+
+    while (_overpassMemoryCache.length > OVERPASS_MEMORY_CACHE_MAX) {
+        _overpassMemoryCache.pop();
+    }
+}
+
+function orderedOverpassEndpoints() {
+    if (!_lastOverpassEndpoint || !OVERPASS_ENDPOINTS.includes(_lastOverpassEndpoint)) {
+        return OVERPASS_ENDPOINTS.slice();
+    }
+    const rest = OVERPASS_ENDPOINTS.filter(ep => ep !== _lastOverpassEndpoint);
+    return [_lastOverpassEndpoint, ...rest];
+}
 
 async function getVectorTileLib() {
     if (_vectorTileLibPromise) return _vectorTileLibPromise;
@@ -145,6 +229,507 @@ function limitNodesByDistance(nodes, limit) {
     return nodes.slice().sort((a, b) => nodeDistanceSq(a) - nodeDistanceSq(b)).slice(0, limit);
 }
 
+function getPerfModeValue() {
+    const mode = (typeof getPerfMode === 'function') ? getPerfMode() : perfMode;
+    return mode === 'baseline' ? 'baseline' : 'rdt';
+}
+
+function wayCenterLatLon(way, nodeMap) {
+    if (!way?.nodes?.length) return null;
+
+    let latSum = 0;
+    let lonSum = 0;
+    let count = 0;
+    const sampleCount = Math.min(way.nodes.length, 8);
+
+    for (let i = 0; i < sampleCount; i++) {
+        const n = nodeMap[way.nodes[i]];
+        if (!n) continue;
+        latSum += n.lat;
+        lonSum += n.lon;
+        count += 1;
+    }
+    if (count === 0) return null;
+
+    return { lat: latSum / count, lon: lonSum / count };
+}
+
+function featureTileKeyForLatLon(lat, lon, tileDegrees = FEATURE_TILE_DEGREES) {
+    const cx = Math.floor(lat / tileDegrees);
+    const cz = Math.floor(lon / tileDegrees);
+    return `${cx},${cz}`;
+}
+
+function rdtDepthForFeatureTile(tileKey, tileDegrees = FEATURE_TILE_DEGREES) {
+    const cacheKey = `${tileDegrees}:${tileKey}`;
+    if (_rdtTileDepthCache.has(cacheKey)) return _rdtTileDepthCache.get(cacheKey);
+
+    const [cxRaw, czRaw] = tileKey.split(',');
+    const cx = Number(cxRaw);
+    const cz = Number(czRaw);
+    const lat = Number.isFinite(cx) ? cx * tileDegrees : 0;
+    const lon = Number.isFinite(cz) ? cz * tileDegrees : 0;
+    const seed = hashGeoToInt(lat, lon, 31);
+    const depth = rdtDepth((seed % 1000000) + 2, 1.5);
+    _rdtTileDepthCache.set(cacheKey, depth);
+    return depth;
+}
+
+function rdtTileCap(baseCap, minCap, depth) {
+    const d = Math.max(0, depth | 0);
+    const scale =
+        d <= 2 ? 1.0 :
+        d === 3 ? 0.90 :
+        d === 4 ? 0.82 :
+        d === 5 ? 0.72 :
+                  0.62;
+    return Math.max(minCap, Math.floor(baseCap * scale));
+}
+
+function limitWaysByTileBudget(ways, nodeMap, options = {}) {
+    if (!Array.isArray(ways) || ways.length === 0) return [];
+
+    const globalCap = Number.isFinite(options.globalCap) ? Math.max(0, options.globalCap) : ways.length;
+    const basePerTile = Number.isFinite(options.basePerTile) ? Math.max(1, options.basePerTile) : ways.length;
+    const minPerTile = Number.isFinite(options.minPerTile) ? Math.max(1, options.minPerTile) : 1;
+    const tileDegrees = Number.isFinite(options.tileDegrees) ? options.tileDegrees : FEATURE_TILE_DEGREES;
+    const useRdt = !!options.useRdt;
+    const compareFn = typeof options.compareFn === 'function' ? options.compareFn : null;
+    const spreadAcrossArea = !!options.spreadAcrossArea;
+    const coreRatio = Number.isFinite(options.coreRatio) ? options.coreRatio : 0.5;
+
+    if (globalCap <= 0) return [];
+
+    const buckets = new Map();
+    ways.forEach((way) => {
+        const center = wayCenterLatLon(way, nodeMap);
+        if (!center) return;
+        const tileKey = featureTileKeyForLatLon(center.lat, center.lon, tileDegrees);
+        let bucket = buckets.get(tileKey);
+        if (!bucket) {
+            bucket = [];
+            buckets.set(tileKey, bucket);
+        }
+        bucket.push(way);
+    });
+
+    const selected = [];
+    buckets.forEach((bucket, tileKey) => {
+        let cap = basePerTile;
+        if (useRdt) {
+            const depth = rdtDepthForFeatureTile(tileKey, tileDegrees);
+            cap = rdtTileCap(basePerTile, minPerTile, depth);
+        }
+
+        if (bucket.length > cap) {
+            selected.push(...limitWaysByDistance(
+                bucket,
+                nodeMap,
+                cap,
+                compareFn,
+                spreadAcrossArea ? { spreadAcrossArea: true, coreRatio } : {}
+            ));
+        } else {
+            selected.push(...bucket);
+        }
+    });
+
+    if (selected.length <= globalCap) return selected;
+    return limitWaysByDistance(
+        selected,
+        nodeMap,
+        globalCap,
+        compareFn,
+        spreadAcrossArea ? { spreadAcrossArea: true, coreRatio } : {}
+    );
+}
+
+function limitNodesByTileBudget(nodes, options = {}) {
+    if (!Array.isArray(nodes) || nodes.length === 0) return [];
+
+    const globalCap = Number.isFinite(options.globalCap) ? Math.max(0, options.globalCap) : nodes.length;
+    const basePerTile = Number.isFinite(options.basePerTile) ? Math.max(1, options.basePerTile) : nodes.length;
+    const minPerTile = Number.isFinite(options.minPerTile) ? Math.max(1, options.minPerTile) : 1;
+    const tileDegrees = Number.isFinite(options.tileDegrees) ? options.tileDegrees : FEATURE_TILE_DEGREES;
+    const useRdt = !!options.useRdt;
+
+    if (globalCap <= 0) return [];
+
+    const buckets = new Map();
+    nodes.forEach((node) => {
+        if (!Number.isFinite(node?.lat) || !Number.isFinite(node?.lon)) return;
+        const tileKey = featureTileKeyForLatLon(node.lat, node.lon, tileDegrees);
+        let bucket = buckets.get(tileKey);
+        if (!bucket) {
+            bucket = [];
+            buckets.set(tileKey, bucket);
+        }
+        bucket.push(node);
+    });
+
+    const selected = [];
+    buckets.forEach((bucket, tileKey) => {
+        let cap = basePerTile;
+        if (useRdt) {
+            const depth = rdtDepthForFeatureTile(tileKey, tileDegrees);
+            cap = rdtTileCap(basePerTile, minPerTile, depth);
+        }
+
+        if (bucket.length > cap) {
+            bucket.sort((a, b) => nodeDistanceSq(a) - nodeDistanceSq(b));
+            selected.push(...bucket.slice(0, cap));
+        } else {
+            selected.push(...bucket);
+        }
+    });
+
+    if (selected.length <= globalCap) return selected;
+    return limitNodesByDistance(selected, globalCap);
+}
+
+function getRoadSubdivisionStep(roadType, tileDepth, mode = getPerfModeValue()) {
+    let maxDist = 3.5;
+
+    if (mode === 'baseline') {
+        maxDist = 3.6;
+    } else if (tileDepth >= 6) {
+        maxDist = 6.0;
+    } else if (tileDepth === 5) {
+        maxDist = 5.0;
+    } else if (tileDepth === 4) {
+        maxDist = 4.2;
+    } else if (tileDepth === 3) {
+        maxDist = 3.6;
+    } else {
+        maxDist = 3.0;
+    }
+
+    if (roadType?.includes('motorway') || roadType?.includes('trunk')) {
+        maxDist *= 0.82;
+    } else if (roadType?.includes('primary') || roadType?.includes('secondary')) {
+        maxDist *= 0.90;
+    }
+
+    return Math.max(2.0, Math.min(7.0, maxDist));
+}
+
+function getWorldLodThresholds(loadDepth, mode = getPerfModeValue()) {
+    if (mode === 'baseline') {
+        return { near: 1200, mid: 2400, farVisible: 2700 };
+    }
+
+    const depth = Math.max(0, loadDepth | 0);
+    // Keep RDT adaptive with smoother pop control, but avoid over-expanding visibility.
+    const near = Math.max(980, 1500 - depth * 45);
+    const mid = near + 1320;
+    return { near, mid, farVisible: mid + 450 };
+}
+
+function getAdaptiveLoadProfile(loadDepth, mode = getPerfModeValue()) {
+    const depth = Math.max(0, loadDepth | 0);
+
+    if (mode === 'baseline') {
+        return {
+            radii: [0.02, 0.025, 0.03],
+            featureRadiusScale: 1.0,
+            poiRadiusScale: 1.0,
+            maxRoadWays: 20000,
+            maxBuildingWays: 50000,
+            maxLanduseWays: 15000,
+            maxPoiNodes: 8000,
+            tileBudgetCfg: {
+                tileDegrees: FEATURE_TILE_DEGREES,
+                roadsPerTile: 520,
+                roadsMinPerTile: 240,
+                buildingsPerTile: 1200,
+                buildingsMinPerTile: 600,
+                landusePerTile: 320,
+                landuseMinPerTile: 150,
+                poiPerTile: 200,
+                poiMinPerTile: 90
+            },
+            overpassTimeoutMs: 30000,
+            maxTotalLoadMs: 62000
+        };
+    }
+
+    // Depth-aware RDT budgets: high depth = much tighter caps.
+    const profileByDepth =
+        depth >= 6 ? {
+            radii: [0.019, 0.024, 0.029],
+            featureRadiusScale: 0.96,
+            poiRadiusScale: 0.88,
+            maxRoadWays: 3400,
+            maxBuildingWays: 18000,
+            maxLanduseWays: 4200,
+            maxPoiNodes: 1600,
+            roadsPerTile: 155,
+            roadsMinPerTile: 40,
+            buildingsPerTile: 460,
+            buildingsMinPerTile: 130,
+            landusePerTile: 100,
+            landuseMinPerTile: 22,
+            poiPerTile: 52,
+            poiMinPerTile: 14,
+            overpassTimeoutMs: 19000,
+            maxTotalLoadMs: 50000
+        } :
+        depth === 5 ? {
+            radii: [0.019, 0.024, 0.028],
+            featureRadiusScale: 0.94,
+            poiRadiusScale: 0.86,
+            maxRoadWays: 3900,
+            maxBuildingWays: 17000,
+            maxLanduseWays: 5200,
+            maxPoiNodes: 1900,
+            roadsPerTile: 165,
+            roadsMinPerTile: 40,
+            buildingsPerTile: 430,
+            buildingsMinPerTile: 120,
+            landusePerTile: 124,
+            landuseMinPerTile: 28,
+            poiPerTile: 66,
+            poiMinPerTile: 18,
+            overpassTimeoutMs: 19000,
+            maxTotalLoadMs: 44000
+        } :
+        depth === 4 ? {
+            radii: [0.019, 0.024, 0.028],
+            featureRadiusScale: 0.93,
+            poiRadiusScale: 0.86,
+            maxRoadWays: 4300,
+            maxBuildingWays: 15000,
+            maxLanduseWays: 6200,
+            maxPoiNodes: 2200,
+            roadsPerTile: 185,
+            roadsMinPerTile: 48,
+            buildingsPerTile: 420,
+            buildingsMinPerTile: 110,
+            landusePerTile: 138,
+            landuseMinPerTile: 30,
+            poiPerTile: 80,
+            poiMinPerTile: 20,
+            overpassTimeoutMs: 22000,
+            maxTotalLoadMs: 50000
+        } : {
+            radii: [0.02, 0.025, 0.03],
+            featureRadiusScale: 0.95,
+            poiRadiusScale: 0.90,
+            maxRoadWays: 5600,
+            maxBuildingWays: 17000,
+            maxLanduseWays: 8500,
+            maxPoiNodes: 2800,
+            roadsPerTile: 220,
+            roadsMinPerTile: 60,
+            buildingsPerTile: 500,
+            buildingsMinPerTile: 140,
+            landusePerTile: 165,
+            landuseMinPerTile: 44,
+            poiPerTile: 100,
+            poiMinPerTile: 28,
+            overpassTimeoutMs: 26000,
+            maxTotalLoadMs: 56000
+        };
+
+    return {
+        radii: profileByDepth.radii,
+        featureRadiusScale: profileByDepth.featureRadiusScale,
+        poiRadiusScale: profileByDepth.poiRadiusScale,
+        maxRoadWays: profileByDepth.maxRoadWays,
+        maxBuildingWays: profileByDepth.maxBuildingWays,
+        maxLanduseWays: profileByDepth.maxLanduseWays,
+        maxPoiNodes: profileByDepth.maxPoiNodes,
+        tileBudgetCfg: {
+            tileDegrees: FEATURE_TILE_DEGREES,
+            roadsPerTile: profileByDepth.roadsPerTile,
+            roadsMinPerTile: profileByDepth.roadsMinPerTile,
+            buildingsPerTile: profileByDepth.buildingsPerTile,
+            buildingsMinPerTile: profileByDepth.buildingsMinPerTile,
+            landusePerTile: profileByDepth.landusePerTile,
+            landuseMinPerTile: profileByDepth.landuseMinPerTile,
+            poiPerTile: profileByDepth.poiPerTile,
+            poiMinPerTile: profileByDepth.poiMinPerTile
+        },
+        overpassTimeoutMs: profileByDepth.overpassTimeoutMs,
+        maxTotalLoadMs: profileByDepth.maxTotalLoadMs
+    };
+}
+
+function decimateRoadCenterlineByDepth(pts, roadType, tileDepth, mode = getPerfModeValue()) {
+    if (!Array.isArray(pts) || pts.length < 3) return pts;
+    if (mode === 'baseline') return pts;
+
+    const depth = Math.max(0, tileDepth | 0);
+    if (depth < 4) return pts;
+
+    let minSpacing =
+        depth >= 6 ? 16 :
+        depth === 5 ? 12 :
+                      8;
+    if (roadType?.includes('motorway') || roadType?.includes('trunk')) {
+        minSpacing *= 0.75;
+    } else if (roadType?.includes('service') || roadType?.includes('residential')) {
+        minSpacing *= 1.15;
+    }
+
+    const maxStraightTurn =
+        depth >= 6 ? 0.20 :
+        depth === 5 ? 0.24 :
+                      0.28;
+
+    const out = [pts[0]];
+    let lastKept = pts[0];
+
+    for (let i = 1; i < pts.length - 1; i++) {
+        const prev = pts[i - 1];
+        const curr = pts[i];
+        const next = pts[i + 1];
+
+        const dLast = Math.hypot(curr.x - lastKept.x, curr.z - lastKept.z);
+
+        const ax = curr.x - prev.x;
+        const az = curr.z - prev.z;
+        const bx = next.x - curr.x;
+        const bz = next.z - curr.z;
+        const al = Math.hypot(ax, az);
+        const bl = Math.hypot(bx, bz);
+
+        let turn = 0;
+        if (al > 1e-6 && bl > 1e-6) {
+            const dot = (ax * bx + az * bz) / (al * bl);
+            turn = Math.acos(Math.max(-1, Math.min(1, dot)));
+        }
+
+        const isTurn = turn > maxStraightTurn;
+        if (!isTurn && dLast < minSpacing) continue;
+
+        out.push(curr);
+        lastKept = curr;
+    }
+
+    const last = pts[pts.length - 1];
+    if (out[out.length - 1] !== last) out.push(last);
+    return out;
+}
+
+function createMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8ca0') {
+    if (!pts || pts.length < 3) return null;
+
+    let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+    pts.forEach((p) => {
+        minX = Math.min(minX, p.x);
+        maxX = Math.max(maxX, p.x);
+        minZ = Math.min(minZ, p.z);
+        maxZ = Math.max(maxZ, p.z);
+    });
+
+    const w = Math.max(4, maxX - minX);
+    const d = Math.max(4, maxZ - minZ);
+    const h = Math.max(6, Number.isFinite(height) ? height : 10);
+
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const mat = new THREE.MeshStandardMaterial({
+        color: colorHex,
+        roughness: 0.92,
+        metalness: 0.02
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.set((minX + maxX) * 0.5, avgElevation + h * 0.5, (minZ + maxZ) * 0.5);
+    mesh.userData.buildingFootprint = pts;
+    mesh.userData.midLodHalfHeight = h * 0.5;
+    mesh.userData.midLodDims = { w, h, d };
+    mesh.userData.midLodColor = colorHex;
+    mesh.userData.avgElevation = avgElevation;
+    mesh.userData.lodTier = 'mid';
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    return mesh;
+}
+
+function batchMidLodBuildingMeshes() {
+    if (!Array.isArray(buildingMeshes) || buildingMeshes.length === 0) return 0;
+
+    const mids = [];
+    const keep = [];
+    for (let i = 0; i < buildingMeshes.length; i++) {
+        const mesh = buildingMeshes[i];
+        if (mesh?.userData?.lodTier === 'mid' && !mesh.userData?.isBuildingBatch) {
+            mids.push(mesh);
+        } else {
+            keep.push(mesh);
+        }
+    }
+
+    if (mids.length < 2) return 0;
+
+    const instGeom = new THREE.BoxGeometry(1, 1, 1);
+    const instMat = new THREE.MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.92,
+        metalness: 0.02
+    });
+    const instanced = new THREE.InstancedMesh(instGeom, instMat, mids.length);
+    instanced.castShadow = false;
+    instanced.receiveShadow = true;
+    // InstancedMesh bounds can become stale for large-spread instance sets.
+    // Keep visible and rely on explicit world LOD gating to avoid pop/disappear artifacts.
+    instanced.frustumCulled = false;
+    instanced.userData = {
+        lodTier: 'mid',
+        isBuildingBatch: true,
+        isMidBuildingInstanceBatch: true,
+        batchCount: mids.length
+    };
+
+    const matrix = new THREE.Matrix4();
+    const quat = new THREE.Quaternion();
+    const position = new THREE.Vector3();
+    const scale = new THREE.Vector3();
+    const color = new THREE.Color();
+    let sumX = 0;
+    let sumZ = 0;
+    const instanceXZ = new Array(mids.length);
+
+    for (let i = 0; i < mids.length; i++) {
+        const mesh = mids[i];
+        const dims = mesh.userData?.midLodDims || { w: 1, h: 1, d: 1 };
+        position.set(mesh.position.x, mesh.position.y, mesh.position.z);
+        scale.set(dims.w || 1, dims.h || 1, dims.d || 1);
+        matrix.compose(position, quat, scale);
+        instanced.setMatrixAt(i, matrix);
+
+        const c = mesh.userData?.midLodColor || '#7f8ca0';
+        color.set(c);
+        instanced.setColorAt(i, color);
+        sumX += mesh.position.x;
+        sumZ += mesh.position.z;
+        instanceXZ[i] = { x: mesh.position.x, z: mesh.position.z };
+
+        scene.remove(mesh);
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) mesh.material.dispose();
+    }
+
+    const centerX = mids.length > 0 ? (sumX / mids.length) : 0;
+    const centerZ = mids.length > 0 ? (sumZ / mids.length) : 0;
+    let maxRadius = 0;
+    for (let i = 0; i < instanceXZ.length; i++) {
+        const p = instanceXZ[i];
+        if (!p) continue;
+        const d = Math.hypot(p.x - centerX, p.z - centerZ);
+        if (d > maxRadius) maxRadius = d;
+    }
+    instanced.userData.lodCenter = { x: centerX, z: centerZ };
+    instanced.userData.lodRadius = maxRadius;
+
+    instanced.instanceMatrix.needsUpdate = true;
+    if (instanced.instanceColor) instanced.instanceColor.needsUpdate = true;
+
+    scene.add(instanced);
+    buildingMeshes = [...keep, instanced];
+    return mids.length;
+}
+
 function latLonToTileFloat(lat, lon, zoom) {
     const n = Math.pow(2, zoom);
     const x = (lon + 180) / 360 * n;
@@ -248,6 +833,435 @@ function decimatePoints(pts, maxPoints, preserveClosedRing = false) {
     return out;
 }
 
+function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
+    if (!Array.isArray(verts) || verts.length === 0) return;
+    const baseVertex = targetVerts.length / 3;
+    targetVerts.push(...verts);
+    if (Array.isArray(indices) && indices.length > 0) {
+        for (let i = 0; i < indices.length; i++) {
+            targetIndices.push(indices[i] + baseVertex);
+        }
+    } else {
+        const addedVerts = verts.length / 3;
+        for (let i = 0; i < addedVerts; i++) {
+            targetIndices.push(baseVertex + i);
+        }
+    }
+}
+
+function materialBatchKey(material) {
+    if (!material || Array.isArray(material)) return null;
+    const colorHex = material.color ? material.color.getHexString() : '';
+    const emissiveHex = material.emissive ? material.emissive.getHexString() : '';
+    const mapId = material.map ? material.map.uuid : '-';
+    const normalId = material.normalMap ? material.normalMap.uuid : '-';
+    const roughnessId = material.roughnessMap ? material.roughnessMap.uuid : '-';
+    return [
+        material.type || '',
+        mapId,
+        normalId,
+        roughnessId,
+        colorHex,
+        emissiveHex,
+        Number(material.emissiveIntensity || 0).toFixed(3),
+        Number(material.roughness || 0).toFixed(3),
+        Number(material.metalness || 0).toFixed(3),
+        material.transparent ? 1 : 0,
+        Number(material.opacity ?? 1).toFixed(3),
+        material.side ?? 0,
+        material.depthWrite ? 1 : 0,
+        material.depthTest ? 1 : 0,
+        material.polygonOffset ? 1 : 0,
+        Number(material.polygonOffsetFactor || 0).toFixed(3),
+        Number(material.polygonOffsetUnits || 0).toFixed(3)
+    ].join('|');
+}
+
+function appendGeometryWithTransform(batch, geometry, matrix) {
+    if (!geometry?.attributes?.position) return 0;
+
+    const posAttr = geometry.attributes.position;
+    const normAttr = geometry.attributes.normal;
+    const uvAttr = geometry.attributes.uv;
+    const baseVertex = batch.positions.length / 3;
+
+    const normalMatrix = new THREE.Matrix3().getNormalMatrix(matrix);
+    const v = new THREE.Vector3();
+    const n = new THREE.Vector3();
+
+    for (let i = 0; i < posAttr.count; i++) {
+        v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
+        batch.positions.push(v.x, v.y, v.z);
+
+        if (normAttr) {
+            n.fromBufferAttribute(normAttr, i).applyMatrix3(normalMatrix).normalize();
+            batch.normals.push(n.x, n.y, n.z);
+        } else {
+            batch.normals.push(0, 1, 0);
+        }
+
+        if (uvAttr) {
+            batch.uvs.push(uvAttr.getX(i), uvAttr.getY(i));
+        } else {
+            batch.uvs.push(0, 0);
+        }
+    }
+
+    if (geometry.index) {
+        const indexArr = geometry.index.array;
+        for (let i = 0; i < indexArr.length; i++) {
+            batch.indices.push(indexArr[i] + baseVertex);
+        }
+    } else {
+        for (let i = 0; i < posAttr.count; i++) {
+            batch.indices.push(baseVertex + i);
+        }
+    }
+
+    return posAttr.count;
+}
+
+function buildMergedGeometry(batch) {
+    if (!batch.positions.length || !batch.indices.length) return null;
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(batch.positions, 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(batch.normals, 3));
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute(batch.uvs, 2));
+
+    const vertexCount = batch.positions.length / 3;
+    const indexArray = vertexCount > 65535 ? new Uint32Array(batch.indices) : new Uint16Array(batch.indices);
+    geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));
+    geometry.computeBoundingSphere();
+    geometry.computeBoundingBox();
+    return geometry;
+}
+
+function batchNearLodBuildingMeshes() {
+    try {
+    if (!Array.isArray(buildingMeshes) || buildingMeshes.length < 2) return 0;
+
+    const keep = [];
+    const groups = new Map();
+
+    for (let i = 0; i < buildingMeshes.length; i++) {
+        const mesh = buildingMeshes[i];
+        if (!mesh) continue;
+        const tier = mesh.userData?.lodTier || 'near';
+        if ((tier !== 'near' && tier !== 'mid') || mesh.userData?.isBuildingBatch) {
+            keep.push(mesh);
+            continue;
+        }
+        if (!mesh.geometry || !mesh.material || Array.isArray(mesh.material)) {
+            keep.push(mesh);
+            continue;
+        }
+
+        const matKey = materialBatchKey(mesh.material);
+        if (!matKey) {
+            keep.push(mesh);
+            continue;
+        }
+        const key = `${tier}|${matKey}`;
+
+        let group = groups.get(key);
+        if (!group) {
+            group = {
+                meshes: [],
+                material: mesh.material,
+                renderOrder: mesh.renderOrder || 0,
+                lodTier: tier
+            };
+            groups.set(key, group);
+        }
+        group.meshes.push(mesh);
+    }
+
+    if (groups.size === 0) return 0;
+
+    const batchedMeshes = [];
+    let sourceMeshCount = 0;
+    const xzPoints = [];
+
+    groups.forEach(group => {
+        if (!group || !Array.isArray(group.meshes) || group.meshes.length < 2) {
+            if (group?.meshes?.length === 1) keep.push(group.meshes[0]);
+            return;
+        }
+
+        const batch = { positions: [], normals: [], uvs: [], indices: [] };
+        xzPoints.length = 0;
+
+        for (let i = 0; i < group.meshes.length; i++) {
+            const mesh = group.meshes[i];
+            mesh.updateMatrixWorld(true);
+            appendGeometryWithTransform(batch, mesh.geometry, mesh.matrixWorld);
+
+            let cx = Number.isFinite(mesh.position?.x) ? mesh.position.x : 0;
+            let cz = Number.isFinite(mesh.position?.z) ? mesh.position.z : 0;
+            const footprint = mesh.userData?.buildingFootprint;
+            if (Array.isArray(footprint) && footprint.length > 0) {
+                let sumX = 0;
+                let sumZ = 0;
+                for (let p = 0; p < footprint.length; p++) {
+                    sumX += footprint[p].x;
+                    sumZ += footprint[p].z;
+                }
+                cx = sumX / footprint.length;
+                cz = sumZ / footprint.length;
+            } else if (mesh.geometry) {
+                if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+                const bs = mesh.geometry.boundingSphere;
+                if (bs) {
+                    cx = bs.center.x + cx;
+                    cz = bs.center.z + cz;
+                }
+            }
+            xzPoints.push({ x: cx, z: cz });
+        }
+
+        const geometry = buildMergedGeometry(batch);
+        if (!geometry) {
+            keep.push(...group.meshes);
+            return;
+        }
+
+        const material = group.material.clone();
+        const mergedMesh = new THREE.Mesh(geometry, material);
+        mergedMesh.renderOrder = group.renderOrder;
+        mergedMesh.castShadow = true;
+        mergedMesh.receiveShadow = true;
+        mergedMesh.frustumCulled = false;
+
+        let centerX = 0;
+        let centerZ = 0;
+        for (let i = 0; i < xzPoints.length; i++) {
+            centerX += xzPoints[i].x;
+            centerZ += xzPoints[i].z;
+        }
+        centerX /= xzPoints.length;
+        centerZ /= xzPoints.length;
+
+        let maxRadius = 0;
+        for (let i = 0; i < xzPoints.length; i++) {
+            const d = Math.hypot(xzPoints[i].x - centerX, xzPoints[i].z - centerZ);
+            if (d > maxRadius) maxRadius = d;
+        }
+
+        mergedMesh.userData = {
+            lodTier: group.lodTier || 'near',
+            isBuildingBatch: true,
+            isNearBuildingBatch: true,
+            batchCount: group.meshes.length,
+            lodCenter: { x: centerX, z: centerZ },
+            lodRadius: maxRadius
+        };
+
+        scene.add(mergedMesh);
+        batchedMeshes.push(mergedMesh);
+
+        for (let i = 0; i < group.meshes.length; i++) {
+            const src = group.meshes[i];
+            scene.remove(src);
+            if (src.geometry) src.geometry.dispose();
+            if (src.material) src.material.dispose();
+        }
+        sourceMeshCount += group.meshes.length;
+    });
+
+    if (!batchedMeshes.length) {
+        globalThis._lastBuildingBatchStats = {
+            groupCount: groups.size,
+            batchMeshCount: 0,
+            sourceMeshCount: 0
+        };
+        return 0;
+    }
+    buildingMeshes = [...keep, ...batchedMeshes];
+    globalThis._lastBuildingBatchStats = {
+        groupCount: groups.size,
+        batchMeshCount: batchedMeshes.length,
+        sourceMeshCount
+    };
+    return sourceMeshCount;
+    } catch (err) {
+        console.warn('[WorldLoad] batchNearLodBuildingMeshes failed:', err);
+        globalThis._lastBuildingBatchStats = {
+            groupCount: 0,
+            batchMeshCount: 0,
+            sourceMeshCount: 0,
+            error: err?.message || String(err)
+        };
+        return 0;
+    }
+}
+
+function batchLanduseMeshes() {
+    try {
+    if (!Array.isArray(landuseMeshes) || landuseMeshes.length < 4) return 0;
+
+    const keep = [];
+    const groups = new Map();
+
+    for (let i = 0; i < landuseMeshes.length; i++) {
+        const mesh = landuseMeshes[i];
+        if (!mesh || mesh.userData?.isLanduseBatch) {
+            if (mesh) keep.push(mesh);
+            continue;
+        }
+        if (!mesh.geometry || !mesh.material || Array.isArray(mesh.material)) {
+            keep.push(mesh);
+            continue;
+        }
+
+        const matKey = materialBatchKey(mesh.material);
+        if (!matKey) {
+            keep.push(mesh);
+            continue;
+        }
+        const type = mesh.userData?.landuseType || 'unknown';
+        const isWaterwayLine = !!mesh.userData?.isWaterwayLine;
+        const key = `${type}|${isWaterwayLine ? 1 : 0}|${mesh.renderOrder || 0}|${matKey}`;
+
+        let group = groups.get(key);
+        if (!group) {
+            group = {
+                meshes: [],
+                material: mesh.material,
+                renderOrder: mesh.renderOrder || 0,
+                landuseType: type,
+                isWaterwayLine,
+                alwaysVisible: false,
+                anyVisible: false
+            };
+            groups.set(key, group);
+        }
+        group.meshes.push(mesh);
+        group.alwaysVisible = group.alwaysVisible || !!mesh.userData?.alwaysVisible;
+        group.anyVisible = group.anyVisible || !!mesh.visible;
+    }
+
+    if (!groups.size) return 0;
+
+    const batched = [];
+    let sourceCount = 0;
+    const xzPoints = [];
+
+    groups.forEach(group => {
+        if (!group || !Array.isArray(group.meshes) || group.meshes.length < 2) {
+            if (group?.meshes?.length === 1) keep.push(group.meshes[0]);
+            return;
+        }
+
+        const batch = { positions: [], normals: [], uvs: [], indices: [] };
+        xzPoints.length = 0;
+
+        for (let i = 0; i < group.meshes.length; i++) {
+            const mesh = group.meshes[i];
+            mesh.updateMatrixWorld(true);
+            appendGeometryWithTransform(batch, mesh.geometry, mesh.matrixWorld);
+
+            let cx = Number.isFinite(mesh.position?.x) ? mesh.position.x : 0;
+            let cz = Number.isFinite(mesh.position?.z) ? mesh.position.z : 0;
+            const footprint = mesh.userData?.landuseFootprint || mesh.userData?.waterwayCenterline;
+            if (Array.isArray(footprint) && footprint.length > 0) {
+                let sumX = 0;
+                let sumZ = 0;
+                for (let p = 0; p < footprint.length; p++) {
+                    sumX += footprint[p].x;
+                    sumZ += footprint[p].z;
+                }
+                cx = sumX / footprint.length;
+                cz = sumZ / footprint.length;
+            } else if (mesh.geometry) {
+                if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+                const bs = mesh.geometry.boundingSphere;
+                if (bs) {
+                    cx = bs.center.x + cx;
+                    cz = bs.center.z + cz;
+                }
+            }
+            xzPoints.push({ x: cx, z: cz });
+        }
+
+        const geometry = buildMergedGeometry(batch);
+        if (!geometry) {
+            keep.push(...group.meshes);
+            return;
+        }
+
+        const material = group.material.clone();
+        const mergedMesh = new THREE.Mesh(geometry, material);
+        mergedMesh.renderOrder = group.renderOrder;
+        mergedMesh.receiveShadow = false;
+        mergedMesh.castShadow = false;
+        mergedMesh.frustumCulled = false;
+
+        let centerX = 0;
+        let centerZ = 0;
+        for (let i = 0; i < xzPoints.length; i++) {
+            centerX += xzPoints[i].x;
+            centerZ += xzPoints[i].z;
+        }
+        centerX /= xzPoints.length;
+        centerZ /= xzPoints.length;
+
+        let maxRadius = 0;
+        for (let i = 0; i < xzPoints.length; i++) {
+            const d = Math.hypot(xzPoints[i].x - centerX, xzPoints[i].z - centerZ);
+            if (d > maxRadius) maxRadius = d;
+        }
+
+        mergedMesh.userData = {
+            landuseType: group.landuseType,
+            isWaterwayLine: !!group.isWaterwayLine,
+            isLanduseBatch: true,
+            alwaysVisible: group.alwaysVisible,
+            batchCount: group.meshes.length,
+            lodCenter: { x: centerX, z: centerZ },
+            lodRadius: maxRadius
+        };
+        mergedMesh.visible = group.anyVisible || group.alwaysVisible;
+
+        scene.add(mergedMesh);
+        batched.push(mergedMesh);
+
+        for (let i = 0; i < group.meshes.length; i++) {
+            const src = group.meshes[i];
+            scene.remove(src);
+            if (src.geometry) src.geometry.dispose();
+            if (src.material) src.material.dispose();
+        }
+        sourceCount += group.meshes.length;
+    });
+
+    if (!batched.length) {
+        globalThis._lastLanduseBatchStats = {
+            groupCount: groups.size,
+            batchMeshCount: 0,
+            sourceMeshCount: 0
+        };
+        return 0;
+    }
+    landuseMeshes = [...keep, ...batched];
+    globalThis._lastLanduseBatchStats = {
+        groupCount: groups.size,
+        batchMeshCount: batched.length,
+        sourceMeshCount: sourceCount
+    };
+    return sourceCount;
+    } catch (err) {
+        console.warn('[WorldLoad] batchLanduseMeshes failed:', err);
+        globalThis._lastLanduseBatchStats = {
+            groupCount: 0,
+            batchMeshCount: 0,
+            sourceMeshCount: 0,
+            error: err?.message || String(err)
+        };
+        return 0;
+    }
+}
+
 function clearBuildingSpatialIndex() {
     buildingSpatialIndex = new Map();
 }
@@ -301,11 +1315,19 @@ function getNearbyBuildings(x, z, radius = 80) {
     return out;
 }
 
-async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity) {
+async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheMeta = null) {
+    const cached = findOverpassMemoryCache(cacheMeta);
+    if (cached?.data?.elements) {
+        cached.data._overpassEndpoint = cached.endpoint ? `${cached.endpoint} (memory-cache)` : 'memory-cache';
+        cached.data._overpassSource = 'memory-cache';
+        cached.data._overpassCacheAgeMs = Math.max(0, Date.now() - cached.savedAt);
+        return cached.data;
+    }
+
     const controllers = [];
     const errors = [];
-
-    const attempts = OVERPASS_ENDPOINTS.map((endpoint, idx) => (async () => {
+    const endpoints = orderedOverpassEndpoints();
+    const attempts = endpoints.map((endpoint, idx) => (async () => {
         const staggerMs = idx * OVERPASS_STAGGER_MS;
         if (staggerMs > 0) await delayMs(staggerMs);
 
@@ -352,6 +1374,10 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity) {
             }
 
             data._overpassEndpoint = endpoint;
+            data._overpassSource = 'network';
+            data._overpassCacheAgeMs = 0;
+            _lastOverpassEndpoint = endpoint;
+            storeOverpassMemoryCache(cacheMeta, data, endpoint);
             return data;
         } catch (err) {
             const reason = err?.name === 'AbortError'
@@ -374,8 +1400,52 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity) {
     }
 }
 
-async function loadRoads() {
+async function loadRoads(retryPass = 0) {
     const locName = selLoc === 'custom' ? (customLoc?.name || 'Custom') : LOCS[selLoc].name;
+    const perfModeNow = getPerfModeValue();
+    const useRdtBudgeting = perfModeNow === 'rdt';
+    const loadMetrics = {
+        mode: perfModeNow,
+        location: locName,
+        retryPass,
+        success: false,
+        lod: { near: 0, mid: 0, midSkipped: 0, farSkipped: 0 },
+        roads: { requested: 0, selected: 0, sourcePoints: 0, decimatedPoints: 0, subdividedPoints: 0, vertices: 0 },
+        buildings: { requested: 0, selected: 0 },
+        colliders: { full: 0, simplified: 0 },
+        landuse: { requested: 0, selected: 0 },
+        pois: { requested: 0, selected: 0, near: 0, mid: 0, far: 0 },
+        phases: {}
+    };
+    globalThis._lastBuildingBatchStats = null;
+    globalThis._lastLanduseBatchStats = null;
+    if (typeof startPerfLoad === 'function') {
+        startPerfLoad('world-load', { mode: perfModeNow, location: locName });
+    }
+
+    let _perfLoadFinalized = false;
+    const finalizePerfLoad = (success, extra = {}) => {
+        if (_perfLoadFinalized) return;
+        _perfLoadFinalized = true;
+        loadMetrics.success = !!success;
+        const payload = { ...loadMetrics, ...extra };
+        if (typeof finishPerfLoad === 'function') finishPerfLoad(payload);
+    };
+    const _phaseStartedAt = Object.create(null);
+    const _phaseTotals = Object.create(null);
+    const startLoadPhase = (name) => {
+        if (!name) return;
+        _phaseStartedAt[name] = performance.now();
+    };
+    const endLoadPhase = (name) => {
+        if (!name) return;
+        const startedAt = _phaseStartedAt[name];
+        if (!Number.isFinite(startedAt)) return;
+        const dt = performance.now() - startedAt;
+        _phaseTotals[name] = (_phaseTotals[name] || 0) + dt;
+        delete _phaseStartedAt[name];
+    };
+
     showLoad('Loading ' + locName + '...');
     worldLoading = true;
     if (typeof clearMemoryMarkersForWorldReload === 'function') {
@@ -480,6 +1550,7 @@ async function loadRoads() {
         if (isNaN(lat) || isNaN(lon)) {
             showLoad('Enter valid coordinates');
             worldLoading = false;
+            finalizePerfLoad(false, { reason: 'invalid_coordinates' });
             return;
         }
         LOC = { lat, lon };
@@ -512,48 +1583,116 @@ async function loadRoads() {
         if (typeof updateTerrainAround === 'function') updateTerrainAround(0, 0);
     }
 
-    // RDT complexity index: derive adaptive query strategy from location
+    // RDT complexity index: location-derived complexity used by adaptive mode.
     rdtSeed = hashGeoToInt(LOC.lat, LOC.lon, gameMode === 'trial' ? 1 : gameMode === 'checkpoint' ? 2 : 0);
-    rdtComplexity = rdtDepth(rdtSeed, 1.5);
-    // Use a lower-bit slice for load profile because full 32-bit hash depth
-    // tends to saturate at high values across many cities.
+    const rawRdtComplexity = rdtDepth(rdtSeed, 1.5);
     const rdtLoadComplexity = rdtDepth((rdtSeed % 1000000) + 2, 1.5);
+    rdtComplexity = useRdtBudgeting ? rawRdtComplexity : 0;
 
-    // Match WorldExplorer3D-style coverage: larger concentric query windows
-    // that keep roads/buildings/landuse aligned across the same loaded area.
-    const radii =
-        rdtLoadComplexity <= 4 ? [0.02] :
-        rdtLoadComplexity <= 5 ? [0.02, 0.025] :
-                             [0.02, 0.025, 0.03];
+    const loadProfile = getAdaptiveLoadProfile(rdtLoadComplexity, perfModeNow);
+    const radii = loadProfile.radii.slice();
+    const featureRadiusScale = loadProfile.featureRadiusScale;
+    const poiRadiusScale = loadProfile.poiRadiusScale;
+    const maxRoadWays = loadProfile.maxRoadWays;
+    const maxBuildingWays = loadProfile.maxBuildingWays;
+    const maxLanduseWays = loadProfile.maxLanduseWays;
+    const maxPoiNodes = loadProfile.maxPoiNodes;
+    const tileBudgetCfg = loadProfile.tileBudgetCfg;
 
-    const featureRadiusScale = 1.0;
-    const poiRadiusScale = 1.0;
+    const lodThresholds = getWorldLodThresholds(rdtLoadComplexity, perfModeNow);
 
-    // High caps preserve completeness for dense cities; limits only guard extremes.
-    const maxRoadWays = 20000;
-    const maxBuildingWays = 50000;
-    const maxLanduseWays = 15000;
-    const maxPoiNodes = 8000;
-
-    // Higher request budget for larger full-coverage payloads.
-    const overpassTimeoutMs = rdtLoadComplexity <= 4 ? 20000 : 30000;
-    const maxTotalLoadMs = rdtLoadComplexity <= 4 ? 52000 : 62000;
+    const overpassTimeoutMs = loadProfile.overpassTimeoutMs;
+    const maxTotalLoadMs = loadProfile.maxTotalLoadMs;
     const loadStartedAt = performance.now();
+
+    loadMetrics.rdtLoadComplexity = rdtLoadComplexity;
+    loadMetrics.rdtComplexity = rawRdtComplexity;
+    loadMetrics.radii = radii.slice();
+    loadMetrics.lodThresholds = lodThresholds;
+    loadMetrics.loadProfile = {
+        maxRoadWays,
+        maxBuildingWays,
+        maxLanduseWays,
+        maxPoiNodes,
+        tileBudgetCfg,
+        overpassTimeoutMs,
+        maxTotalLoadMs
+    };
 
     let loaded = false;
 
-    function registerBuildingCollision(pts, height) {
+    function registerBuildingCollision(pts, height, options = {}) {
+        if (!Array.isArray(pts) || pts.length < 3) return null;
+        const detail = options.detail === 'bbox' ? 'bbox' : 'full';
         let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        let sumX = 0, sumZ = 0;
         pts.forEach(p => {
             minX = Math.min(minX, p.x);
             maxX = Math.max(maxX, p.x);
             minZ = Math.min(minZ, p.z);
             maxZ = Math.max(maxZ, p.z);
+            sumX += p.x;
+            sumZ += p.z;
         });
-        const building = { pts, minX, maxX, minZ, maxZ, height };
+        const centerX = Number.isFinite(options.centerX) ? options.centerX : (sumX / pts.length);
+        const centerZ = Number.isFinite(options.centerZ) ? options.centerZ : (sumZ / pts.length);
+        const building = {
+            pts: detail === 'full' ? pts : null,
+            minX,
+            maxX,
+            minZ,
+            maxZ,
+            height,
+            centerX,
+            centerZ,
+            colliderDetail: detail
+        };
         buildings.push(building);
         addBuildingToSpatialIndex(building);
         return building;
+    }
+
+    function recordLoadWarning(label, err) {
+        const message = `${label}: ${err?.message || err}`;
+        if (!Array.isArray(loadMetrics.warnings)) loadMetrics.warnings = [];
+        if (loadMetrics.warnings.length < 10) loadMetrics.warnings.push(message);
+        console.warn(`[WorldLoad] ${label} failed:`, err);
+    }
+
+    function safeLoadCall(label, fn) {
+        try {
+            return fn();
+        } catch (err) {
+            recordLoadWarning(label, err);
+            return null;
+        }
+    }
+
+    function finalizeLoadedWorld(reason = 'primary') {
+        loaded = true;
+        if (reason && reason !== 'primary') {
+            loadMetrics.recoveryReason = reason;
+            loadMetrics.partialRecovery = true;
+        }
+
+        safeLoadCall('spawnOnRoad', () => spawnOnRoad());
+        if (terrainEnabled && !onMoon && typeof updateTerrainAround === 'function') {
+            safeLoadCall('updateTerrainAround', () => updateTerrainAround(car.x, car.z));
+        }
+        if (typeof refreshMemoryMarkersForCurrentLocation === 'function') {
+            safeLoadCall('refreshMemoryMarkersForCurrentLocation', () => refreshMemoryMarkersForCurrentLocation());
+        }
+        if (typeof refreshBlockBuilderForCurrentLocation === 'function') {
+            safeLoadCall('refreshBlockBuilderForCurrentLocation', () => refreshBlockBuilderForCurrentLocation());
+        }
+        if (typeof updateWorldLod === 'function') {
+            safeLoadCall('updateWorldLod', () => updateWorldLod(true));
+        }
+        hideLoad();
+        if (typeof alignStarFieldToLocation === 'function') {
+            safeLoadCall('alignStarFieldToLocation', () => alignStarFieldToLocation(LOC.lat, LOC.lon));
+        }
+        if (gameStarted) safeLoadCall('startMode', () => startMode());
     }
 
     for (const r of radii) {
@@ -567,6 +1706,13 @@ async function loadRoads() {
             showLoad('Loading map data...');
             const featureRadius = r * featureRadiusScale;
             const poiRadius = r * poiRadiusScale;
+            const overpassCacheMeta = {
+                lat: LOC.lat,
+                lon: LOC.lon,
+                roadsRadius: r,
+                featureRadius,
+                poiRadius
+            };
 
             const roadsBounds = `(${LOC.lat-r},${LOC.lon-r},${LOC.lat+r},${LOC.lon+r})`;
             const featureBounds = `(${LOC.lat-featureRadius},${LOC.lon-featureRadius},${LOC.lat+featureRadius},${LOC.lon+featureRadius})`;
@@ -586,30 +1732,42 @@ async function loadRoads() {
                 node["leisure"~"park|stadium|sports_centre|playground"]${poiBounds};
             );out body;>;out skel qt;`;
             const loadDeadline = loadStartedAt + maxTotalLoadMs;
-            const data = await fetchOverpassJSON(q, overpassTimeoutMs, loadDeadline);
+            startLoadPhase('fetchOverpass');
+            let data;
+            try {
+                data = await fetchOverpassJSON(q, overpassTimeoutMs, loadDeadline, overpassCacheMeta);
+            } finally {
+                endLoadPhase('fetchOverpass');
+            }
+            if (data?._overpassSource) loadMetrics.overpassSource = data._overpassSource;
+            if (data?._overpassEndpoint) loadMetrics.overpassEndpoint = data._overpassEndpoint;
+            if (Number.isFinite(data?._overpassCacheAgeMs)) {
+                loadMetrics.overpassCacheAgeMs = Math.floor(data._overpassCacheAgeMs);
+            }
             const nodes = {};
             data.elements.filter(e => e.type === 'node').forEach(n => nodes[n.id] = n);
 
+            startLoadPhase('featureBudgeting');
             const allRoadWays = data.elements.filter(e => e.type === 'way' && e.tags?.highway);
-            const roadWays = allRoadWays.length > maxRoadWays
-                ? limitWaysByDistance(
-                    allRoadWays,
-                    nodes,
-                    maxRoadWays,
-                    (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
-                )
-                : allRoadWays;
+            const roadWays = limitWaysByTileBudget(allRoadWays, nodes, {
+                globalCap: maxRoadWays,
+                basePerTile: tileBudgetCfg.roadsPerTile,
+                minPerTile: tileBudgetCfg.roadsMinPerTile,
+                tileDegrees: tileBudgetCfg.tileDegrees,
+                useRdt: useRdtBudgeting,
+                compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
+            });
 
             const allBuildingWays = data.elements.filter(e => e.type === 'way' && e.tags?.building);
-            const buildingWays = allBuildingWays.length > maxBuildingWays
-                ? limitWaysByDistance(
-                    allBuildingWays,
-                    nodes,
-                    maxBuildingWays,
-                    null,
-                    { spreadAcrossArea: true, coreRatio: 0.45 }
-                )
-                : allBuildingWays;
+            const buildingWays = limitWaysByTileBudget(allBuildingWays, nodes, {
+                globalCap: maxBuildingWays,
+                basePerTile: tileBudgetCfg.buildingsPerTile,
+                minPerTile: tileBudgetCfg.buildingsMinPerTile,
+                tileDegrees: tileBudgetCfg.tileDegrees,
+                useRdt: useRdtBudgeting,
+                spreadAcrossArea: true,
+                coreRatio: useRdtBudgeting ? 0.35 : 0.45
+            });
 
             const allLanduseWays = data.elements.filter(e =>
                 e.type === 'way' &&
@@ -620,21 +1778,103 @@ async function loadRoads() {
                     e.tags.leisure === 'park'
                 )
             );
-            const landuseWays = allLanduseWays.length > maxLanduseWays
-                ? limitWaysByDistance(allLanduseWays, nodes, maxLanduseWays)
-                : allLanduseWays;
+            const landuseWays = limitWaysByTileBudget(allLanduseWays, nodes, {
+                globalCap: maxLanduseWays,
+                basePerTile: tileBudgetCfg.landusePerTile,
+                minPerTile: tileBudgetCfg.landuseMinPerTile,
+                tileDegrees: tileBudgetCfg.tileDegrees,
+                useRdt: useRdtBudgeting
+            });
 
             const allPoiNodes = data.elements.filter(e => e.type === 'node' && e.tags);
-            const poiNodes = limitNodesByDistance(allPoiNodes, maxPoiNodes);
+            const poiNodes = limitNodesByTileBudget(allPoiNodes, {
+                globalCap: maxPoiNodes,
+                basePerTile: tileBudgetCfg.poiPerTile,
+                minPerTile: tileBudgetCfg.poiMinPerTile,
+                tileDegrees: tileBudgetCfg.tileDegrees,
+                useRdt: useRdtBudgeting
+            });
 
-            if (roadWays.length < allRoadWays.length || buildingWays.length < allBuildingWays.length) {
+            loadMetrics.roads.requested = allRoadWays.length;
+            loadMetrics.roads.selected = roadWays.length;
+            loadMetrics.buildings.requested = allBuildingWays.length;
+            loadMetrics.buildings.selected = buildingWays.length;
+            loadMetrics.landuse.requested = allLanduseWays.length;
+            loadMetrics.landuse.selected = landuseWays.length;
+            loadMetrics.pois.requested = allPoiNodes.length;
+            loadMetrics.pois.selected = poiNodes.length;
+            endLoadPhase('featureBudgeting');
+
+            if (
+                roadWays.length < allRoadWays.length ||
+                buildingWays.length < allBuildingWays.length ||
+                landuseWays.length < allLanduseWays.length ||
+                poiNodes.length < allPoiNodes.length
+            ) {
                 console.warn(
-                    `[WorldLoad] Applied adaptive limits (roads ${roadWays.length}/${allRoadWays.length}, buildings ${buildingWays.length}/${allBuildingWays.length}).`
+                    `[WorldLoad] Applied adaptive limits `
+                    + `(roads ${roadWays.length}/${allRoadWays.length}, `
+                    + `buildings ${buildingWays.length}/${allBuildingWays.length}, `
+                    + `landuse ${landuseWays.length}/${allLanduseWays.length}, `
+                    + `pois ${poiNodes.length}/${allPoiNodes.length}).`
                 );
             }
 
             // Process roads
             showLoad(`Loading roads... (${roadWays.length})`);
+            startLoadPhase('buildRoadGeometry');
+            const roadMainBatchVerts = [];
+            const roadMainBatchIdx = [];
+            const roadSkirtBatchVerts = [];
+            const roadSkirtBatchIdx = [];
+            const roadMarkBatchVerts = [];
+            const roadMarkBatchIdx = [];
+
+            const roadMainMaterial = asphaltTex ? new THREE.MeshStandardMaterial({
+                map: asphaltTex,
+                normalMap: asphaltNormal,
+                normalScale: new THREE.Vector2(0.8, 0.8),
+                roughnessMap: asphaltRoughness,
+                roughness: 0.95,
+                metalness: 0.05,
+                side: THREE.DoubleSide,
+                polygonOffset: true,
+                polygonOffsetFactor: -2,
+                polygonOffsetUnits: -2,
+                depthWrite: true,
+                depthTest: true
+            }) : new THREE.MeshStandardMaterial({
+                color: 0x333333,
+                roughness: 0.95,
+                metalness: 0.05,
+                side: THREE.DoubleSide,
+                polygonOffset: true,
+                polygonOffsetFactor: -2,
+                polygonOffsetUnits: -2,
+                depthWrite: true,
+                depthTest: true
+            });
+
+            const roadSkirtMaterial = new THREE.MeshStandardMaterial({
+                color: 0x222222,
+                roughness: 0.95,
+                metalness: 0.05,
+                side: THREE.DoubleSide,
+                polygonOffset: true,
+                polygonOffsetFactor: -1,
+                polygonOffsetUnits: -1
+            });
+
+            const roadMarkMaterial = new THREE.MeshStandardMaterial({
+                color: 0xffffee,
+                emissive: 0x444444,
+                emissiveIntensity: 0.3,
+                roughness: 0.8,
+                polygonOffset: true,
+                polygonOffsetFactor: -6,
+                polygonOffsetUnits: -6
+            });
+
             roadWays.forEach(way => {
                 const pts = way.nodes.map(id => nodes[id]).filter(n => n).map(n => geoToWorld(n.lat, n.lon));
                 if (pts.length < 2) return;
@@ -642,11 +1882,34 @@ async function loadRoads() {
                 const width = type.includes('motorway') ? 16 : type.includes('trunk') ? 14 : type.includes('primary') ? 12 : type.includes('secondary') ? 10 : 8;
                 const limit = type.includes('motorway') ? 65 : type.includes('trunk') ? 55 : type.includes('primary') ? 40 : type.includes('secondary') ? 35 : 25;
                 const name = way.tags?.name || type.charAt(0).toUpperCase() + type.slice(1);
-                roads.push({ pts, width, limit, name, type });
+                const centerLatLon = wayCenterLatLon(way, nodes);
+                const roadTileKey = centerLatLon
+                    ? featureTileKeyForLatLon(centerLatLon.lat, centerLatLon.lon, tileBudgetCfg.tileDegrees)
+                    : null;
+                const roadTileDepth = useRdtBudgeting && roadTileKey
+                    ? rdtDepthForFeatureTile(roadTileKey, tileBudgetCfg.tileDegrees)
+                    : 0;
+                const roadSubdivideStep = getRoadSubdivisionStep(type, roadTileDepth, perfModeNow);
+                const decimatedRoadPts = decimateRoadCenterlineByDepth(pts, type, roadTileDepth, perfModeNow);
+
+                roads.push({
+                    pts: decimatedRoadPts,
+                    width,
+                    limit,
+                    name,
+                    type,
+                    lodDepth: roadTileDepth,
+                    subdivideMaxDist: roadSubdivideStep
+                });
                 const hw = width / 2;
 
                 // Curvature-aware subdivision: straight = 2-5m, curves = 0.5-2m
-                const subdPts = typeof subdivideRoadPoints === 'function' ? subdivideRoadPoints(pts, 3.5) : pts;
+                const subdPts = typeof subdivideRoadPoints === 'function'
+                    ? subdivideRoadPoints(decimatedRoadPts, roadSubdivideStep)
+                    : decimatedRoadPts;
+                loadMetrics.roads.sourcePoints += pts.length;
+                loadMetrics.roads.decimatedPoints += decimatedRoadPts.length;
+                loadMetrics.roads.subdividedPoints += subdPts.length;
 
                 // Use cached height function if available
                 const _tmh = typeof cachedTerrainHeight === 'function' ? cachedTerrainHeight :
@@ -717,72 +1980,16 @@ async function loadRoads() {
                     }
                 }
 
-                // Build main road mesh
-                const geo = new THREE.BufferGeometry();
-                geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-                geo.setIndex(indices);
-                geo.computeVertexNormals();
-
-                // Road material with improved polygon offset
-                const roadMat = asphaltTex ? new THREE.MeshStandardMaterial({
-                    map: asphaltTex,
-                    normalMap: asphaltNormal,
-                    normalScale: new THREE.Vector2(0.8, 0.8),
-                    roughnessMap: asphaltRoughness,
-                    roughness: 0.95,
-                    metalness: 0.05,
-                    side: THREE.DoubleSide,
-                    polygonOffset: true,
-                    polygonOffsetFactor: -2,
-                    polygonOffsetUnits: -2,
-                    depthWrite: true,
-                    depthTest: true
-                }) : new THREE.MeshStandardMaterial({
-                    color: 0x333333,
-                    roughness: 0.95,
-                    metalness: 0.05,
-                    side: THREE.DoubleSide,
-                    polygonOffset: true,
-                    polygonOffsetFactor: -2,
-                    polygonOffsetUnits: -2,
-                    depthWrite: true,
-                    depthTest: true
-                });
-
-                const mesh = new THREE.Mesh(geo, roadMat);
-                mesh.renderOrder = 2;
-                mesh.receiveShadow = true;
-                mesh.frustumCulled = false;
-                scene.add(mesh);
-                roadMeshes.push(mesh);
+                appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
+                loadMetrics.roads.vertices += verts.length / 3;
 
                 // Build road skirts (edge curtains) to hide terrain peeking
                 // Increased depth from 1.5 to 3.0 for better coverage on steep slopes
                 if (typeof buildRoadSkirts === 'function') {
                     const skirtData = buildRoadSkirts(leftEdge, rightEdge, 3.0);
                     if (skirtData.verts.length > 0) {
-                        const skirtGeo = new THREE.BufferGeometry();
-                        skirtGeo.setAttribute('position', new THREE.Float32BufferAttribute(skirtData.verts, 3));
-                        skirtGeo.setIndex(skirtData.indices);
-                        skirtGeo.computeVertexNormals();
-
-                        const skirtMat = new THREE.MeshStandardMaterial({
-                            color: 0x222222,
-                            roughness: 0.95,
-                            metalness: 0.05,
-                            side: THREE.DoubleSide,
-                            polygonOffset: true,
-                            polygonOffsetFactor: -1,
-                            polygonOffsetUnits: -1
-                        });
-
-                        const skirtMesh = new THREE.Mesh(skirtGeo, skirtMat);
-                        skirtMesh.renderOrder = 1;
-                        skirtMesh.receiveShadow = true;
-                        skirtMesh.frustumCulled = false;
-                        skirtMesh.userData.isRoadSkirt = true;
-                        scene.add(skirtMesh);
-                        roadMeshes.push(skirtMesh);
+                        appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
+                        loadMetrics.roads.vertices += skirtData.verts.length / 3;
                     }
                 }
 
@@ -791,8 +1998,8 @@ async function loadRoads() {
                     const markVerts = [], markIdx = [];
                     const mw = 0.15, dashLen = 6, gapLen = 6; // Increased gap for performance
                     let dist = 0;
-                    for (let i = 0; i < pts.length - 1; i++) {
-                        const p1 = pts[i], p2 = pts[i + 1];
+                    for (let i = 0; i < decimatedRoadPts.length - 1; i++) {
+                        const p1 = decimatedRoadPts[i], p2 = decimatedRoadPts[i + 1];
                         const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
                         const dx = (p2.x - p1.x) / segLen, dz = (p2.z - p1.z) / segLen;
                         const nx = -dz, nz = dx;
@@ -816,28 +2023,44 @@ async function loadRoads() {
                         dist += segLen;
                     }
                     if (markVerts.length > 0) {
-                        const markGeo = new THREE.BufferGeometry();
-                        markGeo.setAttribute('position', new THREE.Float32BufferAttribute(markVerts, 3));
-                        markGeo.setIndex(markIdx);
-                        const markMesh = new THREE.Mesh(markGeo, new THREE.MeshStandardMaterial({
-                            color: 0xffffee,
-                            emissive: 0x444444,
-                            emissiveIntensity: 0.3,
-                            roughness: 0.8,
-                            polygonOffset: true,
-                            polygonOffsetFactor: -6,
-                            polygonOffsetUnits: -6
-                        }));
-                        markMesh.renderOrder = 3; // Layer 3 - renders on top of roads
-                        scene.add(markMesh); roadMeshes.push(markMesh);
+                        appendIndexedGeometry(roadMarkBatchVerts, roadMarkBatchIdx, markVerts, markIdx);
+                        loadMetrics.roads.vertices += markVerts.length / 3;
                     }
                 }
             });
 
+            const buildRoadBatchMesh = (verts, indices, material, renderOrder, userData = null) => {
+                if (!verts.length || !indices.length) return null;
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+                const vertexCount = verts.length / 3;
+                const indexArray = vertexCount > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
+                geo.setIndex(new THREE.BufferAttribute(indexArray, 1));
+                geo.computeVertexNormals();
+                const mesh = new THREE.Mesh(geo, material);
+                mesh.renderOrder = renderOrder;
+                mesh.receiveShadow = true;
+                mesh.frustumCulled = false;
+                if (userData && typeof userData === 'object') {
+                    Object.assign(mesh.userData, userData);
+                }
+                scene.add(mesh);
+                roadMeshes.push(mesh);
+                return mesh;
+            };
+
+            buildRoadBatchMesh(roadMainBatchVerts, roadMainBatchIdx, roadMainMaterial, 2, { isRoadBatch: true });
+            buildRoadBatchMesh(roadSkirtBatchVerts, roadSkirtBatchIdx, roadSkirtMaterial, 1, { isRoadBatch: true, isRoadSkirt: true });
+            buildRoadBatchMesh(roadMarkBatchVerts, roadMarkBatchIdx, roadMarkMaterial, 3, { isRoadBatch: true, isRoadMarking: true });
+            endLoadPhase('buildRoadGeometry');
+
             // Process buildings
             showLoad(`Loading buildings... (${buildingWays.length})`);
+            startLoadPhase('buildBuildingGeometry');
             const roadBuildingCellSize = 120;
-            const buildingRoadRadiusCells = 3; // ~360m coverage around loaded roads
+            const buildingRoadRadiusCells = useRdtBudgeting
+                ? (rdtLoadComplexity >= 6 ? 5 : 4)
+                : 3;
             const roadCoverageCells = new Set();
 
             roads.forEach(rd => {
@@ -851,6 +2074,7 @@ async function loadRoads() {
             });
 
             function isBuildingNearLoadedRoad(pts) {
+                if (useRdtBudgeting) return true;
                 if (!pts || pts.length === 0 || roadCoverageCells.size === 0) return true;
                 let sumX = 0, sumZ = 0;
                 for (let i = 0; i < pts.length; i++) {
@@ -867,10 +2091,30 @@ async function loadRoads() {
                 return false;
             }
 
+            const lodNearDist = lodThresholds.near;
+            const lodMidDist = lodThresholds.mid;
+
             buildingWays.forEach(way => {
                 const pts = way.nodes.map(id => nodes[id]).filter(n => n).map(n => geoToWorld(n.lat, n.lon));
                 if (pts.length < 3) return;
                 if (!isBuildingNearLoadedRoad(pts)) return;
+
+                let centerX = 0;
+                let centerZ = 0;
+                for (let i = 0; i < pts.length; i++) {
+                    centerX += pts[i].x;
+                    centerZ += pts[i].z;
+                }
+                centerX /= pts.length;
+                centerZ /= pts.length;
+                const centerDist = Math.hypot(centerX, centerZ);
+                const lodTier = centerDist <= lodNearDist
+                    ? 'near'
+                    : (centerDist <= lodThresholds.farVisible ? 'mid' : 'far');
+                if (lodTier === 'far') {
+                    loadMetrics.lod.farSkipped += 1;
+                    return;
+                }
 
                 // RDT-seeded deterministic random for this building
                 const bSeed = (rdtSeed ^ (way.id >>> 0)) >>> 0;
@@ -894,7 +2138,10 @@ async function loadRoads() {
                     else height = 8 + br1 * 12;
                 }
 
-                registerBuildingCollision(pts, height);
+                const colliderDetail = (useRdtBudgeting && lodTier !== 'near') ? 'bbox' : 'full';
+                registerBuildingCollision(pts, height, { detail: colliderDetail, centerX, centerZ });
+                if (colliderDetail === 'full') loadMetrics.colliders.full += 1;
+                else loadMetrics.colliders.simplified += 1;
 
                 // Calculate terrain stats for building footprint
                 let avgElevation = 0;
@@ -911,7 +2158,10 @@ async function loadRoads() {
                     ? (maxElevation - minElevation)
                     : 0;
 
-                // Create extruded building shape
+                // Deterministic facade selection (matches original texture style)
+                const colors = ['#888888', '#7788aa', '#998877', '#667788'];
+                const baseColor = colors[Math.floor(br2 * colors.length)];
+                const bt = way.tags.building || 'yes';
                 const shape = new THREE.Shape();
                 pts.forEach((p, i) => {
                     if (i === 0) shape.moveTo(p.x, -p.z);
@@ -923,10 +2173,6 @@ async function loadRoads() {
                 const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
                 geo.rotateX(-Math.PI / 2);
 
-                // Deterministic facade selection (matches original texture style)
-                const colors = ['#888888', '#7788aa', '#998877', '#667788'];
-                const baseColor = colors[Math.floor(br2 * colors.length)];
-                const bt = way.tags.building || 'yes';
                 const bldgMat = (typeof getBuildingMaterial === 'function')
                     ? getBuildingMaterial(bt, bSeed, baseColor)
                     : new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.85, metalness: 0.05 });
@@ -935,14 +2181,19 @@ async function loadRoads() {
                 mesh.position.y = avgElevation;
                 mesh.userData.buildingFootprint = pts;
                 mesh.userData.avgElevation = avgElevation;
-                mesh.castShadow = true;
+                mesh.userData.lodTier = lodTier;
+                mesh.castShadow = lodTier === 'near';
                 mesh.receiveShadow = true;
+
+                if (!mesh) return;
                 scene.add(mesh);
                 buildingMeshes.push(mesh);
+                if (lodTier === 'near') loadMetrics.lod.near += 1;
+                else loadMetrics.lod.mid += 1;
 
                 // On steep terrain, add a terrain-conforming apron to hide
                 // exposed flat foundation planes around the footprint.
-                if (typeof createBuildingGroundPatch === 'function' && slopeRange >= 0.7) {
+                if (lodTier === 'near' && typeof createBuildingGroundPatch === 'function' && slopeRange >= 0.7) {
                     const groundPatch = createBuildingGroundPatch(pts, avgElevation);
                     if (groundPatch) {
                         groundPatch.userData.landuseFootprint = pts;
@@ -955,6 +2206,16 @@ async function loadRoads() {
                     }
                 }
             });
+            endLoadPhase('buildBuildingGeometry');
+            startLoadPhase('batchBuildingGeometry');
+            const batchedNearCount = batchNearLodBuildingMeshes();
+            if (batchedNearCount > 0) {
+                loadMetrics.lod.nearBatched = batchedNearCount;
+            }
+            if (globalThis._lastBuildingBatchStats) {
+                loadMetrics.buildingBatching = { ...globalThis._lastBuildingBatchStats };
+            }
+            endLoadPhase('batchBuildingGeometry');
 
             function addLandusePolygon(pts, landuseType, holeRings = []) {
                 if (!pts || pts.length < 3) return;
@@ -1256,6 +2517,7 @@ async function loadRoads() {
             }
 
             showLoad(`Loading land use... (${landuseWays.length})`);
+            startLoadPhase('buildLanduseGeometry');
             landuseWays.forEach(way => {
                 const landuseType = classifyLanduseType(way.tags);
                 if (!landuseType) return;
@@ -1277,9 +2539,20 @@ async function loadRoads() {
             } catch (waterErr) {
                 console.warn('[Water] Vector water load failed, continuing without vector water layer.', waterErr);
             }
+            endLoadPhase('buildLanduseGeometry');
+            startLoadPhase('batchLanduseGeometry');
+            const batchedLanduseCount = batchLanduseMeshes();
+            if (batchedLanduseCount > 0) {
+                loadMetrics.lod.landuseBatched = batchedLanduseCount;
+            }
+            if (globalThis._lastLanduseBatchStats) {
+                loadMetrics.landuseBatching = { ...globalThis._lastLanduseBatchStats };
+            }
+            endLoadPhase('batchLanduseGeometry');
 
             // Process POIs for meaning in the world
             showLoad(`Loading POIs... (${poiNodes.length})`);
+            startLoadPhase('buildPoiGeometry');
             poiNodes.forEach(node => {
                 const tags = node.tags;
                 let poiKey = null;
@@ -1304,41 +2577,61 @@ async function loadRoads() {
                 if (poiKey && POI_TYPES[poiKey]) {
                     const pos = geoToWorld(node.lat, node.lon);
                     const poiData = POI_TYPES[poiKey];
+                    const centerDist = Math.hypot(pos.x, pos.z);
+                    const poiTier = centerDist <= lodNearDist
+                        ? 'near'
+                        : (centerDist <= lodMidDist ? 'mid' : 'far');
 
                     // Get terrain elevation at POI location
                     const terrainY = elevationWorldYAtWorldXZ(pos.x, pos.z);
 
-                    // Create POI marker
-                    const geometry = new THREE.CylinderGeometry(1.5, 1.5, 4, 8);
-                    const material = new THREE.MeshLambertMaterial({
-                        color: poiData.color,
-                        emissive: poiData.color,
-                        emissiveIntensity: 0.3
-                    });
-                    const mesh = new THREE.Mesh(geometry, material);
-                    mesh.position.set(pos.x, terrainY + 2, pos.z);
-                    mesh.userData.poiPosition = { x: pos.x, z: pos.z };
-                    mesh.userData.isPOIMarker = true;
-                    mesh.castShadow = false;
-                    mesh.visible = !!poiMode;
-                    scene.add(mesh);
-                    poiMeshes.push(mesh);
+                    if (poiTier === 'near') {
+                        loadMetrics.pois.near += 1;
+                    } else if (poiTier === 'mid') {
+                        loadMetrics.pois.mid += 1;
+                    } else {
+                        loadMetrics.pois.far += 1;
+                    }
 
-                    // Add top sphere cap
-                    const capGeo = new THREE.SphereGeometry(1.8, 8, 6);
-                    const capMat = new THREE.MeshLambertMaterial({
-                        color: poiData.color,
-                        emissive: poiData.color,
-                        emissiveIntensity: 0.4
-                    });
-                    const cap = new THREE.Mesh(capGeo, capMat);
-                    cap.position.set(pos.x, terrainY + 4, pos.z);
-                    cap.userData.poiPosition = { x: pos.x, z: pos.z }; // Store for repositioning
-                    cap.userData.isCapMesh = true; // Mark as cap (2 units higher)
-                    cap.userData.isPOIMarker = true;
-                    cap.visible = !!poiMode;
-                    scene.add(cap);
-                    poiMeshes.push(cap);
+                    if (poiTier !== 'far') {
+                        // Near: full marker + cap. Mid: simpler single marker.
+                        const markerRadius = poiTier === 'near' ? 1.5 : 1.2;
+                        const markerHeight = poiTier === 'near' ? 4 : 3;
+                        const markerSegments = poiTier === 'near' ? 8 : 6;
+                        const geometry = new THREE.CylinderGeometry(markerRadius, markerRadius, markerHeight, markerSegments);
+                        const material = new THREE.MeshLambertMaterial({
+                            color: poiData.color,
+                            emissive: poiData.color,
+                            emissiveIntensity: poiTier === 'near' ? 0.3 : 0.18
+                        });
+                        const mesh = new THREE.Mesh(geometry, material);
+                        mesh.position.set(pos.x, terrainY + markerHeight * 0.5, pos.z);
+                        mesh.userData.poiPosition = { x: pos.x, z: pos.z };
+                        mesh.userData.isPOIMarker = true;
+                        mesh.userData.lodTier = poiTier;
+                        mesh.castShadow = false;
+                        mesh.visible = !!poiMode;
+                        scene.add(mesh);
+                        poiMeshes.push(mesh);
+
+                        if (poiTier === 'near') {
+                            const capGeo = new THREE.SphereGeometry(1.8, 8, 6);
+                            const capMat = new THREE.MeshLambertMaterial({
+                                color: poiData.color,
+                                emissive: poiData.color,
+                                emissiveIntensity: 0.4
+                            });
+                            const cap = new THREE.Mesh(capGeo, capMat);
+                            cap.position.set(pos.x, terrainY + 4, pos.z);
+                            cap.userData.poiPosition = { x: pos.x, z: pos.z };
+                            cap.userData.isCapMesh = true;
+                            cap.userData.isPOIMarker = true;
+                            cap.userData.lodTier = 'near';
+                            cap.visible = !!poiMode;
+                            scene.add(cap);
+                            poiMeshes.push(cap);
+                        }
+                    }
 
                     // Store POI data
                     pois.push({
@@ -1346,6 +2639,7 @@ async function loadRoads() {
                         z: pos.z,
                         type: poiKey,
                         name: tags.name || poiData.category,
+                        lodTier: poiTier,
                         ...poiData
                     });
 
@@ -1361,33 +2655,28 @@ async function loadRoads() {
                             description: tags.description || tags['name:en'] || null,
                             wikipedia: tags.wikipedia || tags['wikipedia:en'] || null,
                             wikidata: tags.wikidata || null,
+                            lodTier: poiTier,
                             ...poiData
                         });
                     }
                 }
             });
+            endLoadPhase('buildPoiGeometry');
 
             if (roads.length > 0) {
                 // Generate street furniture (signs, trees, lights, trash cans)
                 showLoad('Adding details...');
-                generateStreetFurniture();
+                startLoadPhase('buildStreetFurniture');
+                try {
+                    generateStreetFurniture();
+                } catch (err) {
+                    loadMetrics.streetFurnitureError = err?.message || String(err);
+                    recordLoadWarning('generateStreetFurniture', err);
+                } finally {
+                    endLoadPhase('buildStreetFurniture');
+                }
 
-                loaded = true;
-                spawnOnRoad();
-                if (terrainEnabled && !onMoon && typeof updateTerrainAround === 'function') {
-                    updateTerrainAround(car.x, car.z);
-                }
-                if (typeof refreshMemoryMarkersForCurrentLocation === 'function') {
-                    refreshMemoryMarkersForCurrentLocation();
-                }
-                if (typeof refreshBlockBuilderForCurrentLocation === 'function') {
-                    refreshBlockBuilderForCurrentLocation();
-                }
-                hideLoad();
-                // Align star field to current location
-                alignStarFieldToLocation(LOC.lat, LOC.lon);
-                if (gameStarted) startMode();
-                // Debug log removed
+                finalizeLoadedWorld('primary');
             }
             else {
                 console.warn('No roads found in data, trying larger area...');
@@ -1395,6 +2684,12 @@ async function loadRoads() {
             }
         } catch (e) {
             const isLastAttempt = r === radii[radii.length - 1];
+            if (roads.length > 0) {
+                console.warn('[WorldLoad] Recovering with partially loaded world data.');
+                loadMetrics.error = e?.message || String(e);
+                finalizeLoadedWorld('partial_after_error');
+                break;
+            }
             if (!isLastAttempt) {
                 console.warn('Road loading attempt failed, retrying with larger area...', e);
                 showLoad('Retrying map data...');
@@ -1410,7 +2705,15 @@ async function loadRoads() {
                 // Create a simple crossroad
                 const makeRoad = (x1, z1, x2, z2, width = 10) => {
                     const pts = [{x: x1, z: z1}, {x: x2, z: z2}];
-                    roads.push({ pts, width, limit: 35, name: 'Main Street', type: 'primary' });
+                    roads.push({
+                        pts,
+                        width,
+                        limit: 35,
+                        name: 'Main Street',
+                        type: 'primary',
+                        lodDepth: 0,
+                        subdivideMaxDist: getRoadSubdivisionStep('primary', 0, perfModeNow)
+                    });
 
                     const hw = width / 2;
                     const verts = [], indices = [];
@@ -1516,25 +2819,52 @@ async function loadRoads() {
                 makeBuilding(-50, 50, 25, 20, 10);
                 makeBuilding(50, -50, 30, 25, 14);
 
-                loaded = true;
-                spawnOnRoad();
-                if (terrainEnabled && !onMoon && typeof updateTerrainAround === 'function') {
-                    updateTerrainAround(car.x, car.z);
-                }
-                if (typeof refreshMemoryMarkersForCurrentLocation === 'function') {
-                    refreshMemoryMarkersForCurrentLocation();
-                }
-                if (typeof refreshBlockBuilderForCurrentLocation === 'function') {
-                    refreshBlockBuilderForCurrentLocation();
-                }
-                hideLoad();
-                if (gameStarted) startMode();
-                // Debug log removed
+                finalizeLoadedWorld('synthetic_fallback');
             }
         }
     }
-    if (!loaded) { showLoad('Failed to load. Click to retry.'); document.getElementById('loading').onclick = () => { document.getElementById('loading').onclick = null; loadRoads(); }; }
+    if (!loaded && roads.length > 0) {
+        console.warn('[WorldLoad] Completing with partially loaded roads.');
+        finalizeLoadedWorld('post_loop_partial');
+    }
+    if (!loaded && retryPass < 1) {
+        console.warn('[WorldLoad] Initial pass failed. Retrying once automatically...');
+        showLoad('Retrying map data...');
+        worldLoading = false;
+        return loadRoads(retryPass + 1);
+    }
+    if (!loaded) {
+        showLoad('Failed to load. Click to retry.');
+        document.getElementById('loading').onclick = () => {
+            document.getElementById('loading').onclick = null;
+            loadRoads();
+        };
+    }
     worldLoading = false;
+    if (typeof setPerfLiveStat === 'function') {
+        setPerfLiveStat('lodVisible', { near: loadMetrics.lod.near, mid: loadMetrics.lod.mid });
+        setPerfLiveStat('worldCounts', {
+            roads: roads.length,
+            buildings: buildingMeshes.length,
+            poiMeshes: poiMeshes.length,
+            landuseMeshes: landuseMeshes.length
+        });
+    }
+    if (_phaseTotals && typeof _phaseTotals === 'object') {
+        loadMetrics.phases = Object.fromEntries(
+            Object.entries(_phaseTotals).map(([name, ms]) => [name, Math.round(ms)])
+        );
+    }
+    finalizePerfLoad(loaded, {
+        roadsFinal: roads.length,
+        roadVertices: Math.round(loadMetrics.roads.vertices || 0),
+        buildingMeshes: buildingMeshes.length,
+        buildingColliders: buildings.length,
+        buildingCollidersFull: loadMetrics.colliders.full,
+        buildingCollidersSimplified: loadMetrics.colliders.simplified,
+        poiMeshes: poiMeshes.length,
+        landuseMeshes: landuseMeshes.length
+    });
 }
 
 function spawnOnRoad() {
@@ -1793,6 +3123,171 @@ function pointInPolygon(x, z, polygon) {
         if (intersect) inside = !inside;
     }
     return inside;
+}
+
+function getMeshLodCenter(mesh) {
+    if (!mesh) return null;
+    const cached = mesh.userData?.lodCenter;
+    if (cached && Number.isFinite(cached.x) && Number.isFinite(cached.z)) return cached;
+
+    const poiPos = mesh.userData?.poiPosition;
+    if (poiPos && Number.isFinite(poiPos.x) && Number.isFinite(poiPos.z)) {
+        return poiPos;
+    }
+
+    const footprint = mesh.userData?.buildingFootprint || mesh.userData?.landuseFootprint;
+    if (Array.isArray(footprint) && footprint.length > 0) {
+        let sumX = 0;
+        let sumZ = 0;
+        for (let i = 0; i < footprint.length; i++) {
+            sumX += footprint[i].x;
+            sumZ += footprint[i].z;
+        }
+        const center = { x: sumX / footprint.length, z: sumZ / footprint.length };
+        mesh.userData.lodCenter = center;
+        return center;
+    }
+
+    if (mesh.geometry) {
+        if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+        const bs = mesh.geometry.boundingSphere;
+        if (bs && Number.isFinite(bs.center.x) && Number.isFinite(bs.center.z)) {
+            const px = Number.isFinite(mesh.position?.x) ? mesh.position.x : 0;
+            const pz = Number.isFinite(mesh.position?.z) ? mesh.position.z : 0;
+            const center = { x: bs.center.x + px, z: bs.center.z + pz };
+            mesh.userData.lodCenter = center;
+            return center;
+        }
+    }
+
+    if (mesh.position && Number.isFinite(mesh.position.x) && Number.isFinite(mesh.position.z)) {
+        return { x: mesh.position.x, z: mesh.position.z };
+    }
+    return null;
+}
+
+let _lastLodRefX = 0;
+let _lastLodRefZ = 0;
+let _lastLodReady = false;
+
+function updateWorldLod(force = false) {
+    if ((!buildingMeshes || buildingMeshes.length === 0)
+        && (!poiMeshes || poiMeshes.length === 0)
+        && (!landuseMeshes || landuseMeshes.length === 0)) {
+        return;
+    }
+
+    const ref = (Walk && Walk.state && Walk.state.mode === 'walk' && Walk.state.walker)
+        ? Walk.state.walker
+        : (droneMode ? drone : car);
+    const refX = Number.isFinite(ref?.x) ? ref.x : 0;
+    const refZ = Number.isFinite(ref?.z) ? ref.z : 0;
+
+    if (!force && _lastLodReady) {
+        const moved = Math.hypot(refX - _lastLodRefX, refZ - _lastLodRefZ);
+        const minMoveForLodUpdate = droneMode ? 4 : 8;
+        if (moved < minMoveForLodUpdate) return;
+    }
+    _lastLodRefX = refX;
+    _lastLodRefZ = refZ;
+    _lastLodReady = true;
+
+    const mode = getPerfModeValue();
+    const depthForLod = (typeof rdtLoadComplexity === 'number')
+        ? rdtLoadComplexity
+        : ((typeof rdtComplexity === 'number') ? rdtComplexity : 0);
+    const lodThresholds = getWorldLodThresholds(depthForLod, mode);
+    const poiMidSq = lodThresholds.mid * lodThresholds.mid;
+
+    let nearVisible = 0;
+    let midVisible = 0;
+
+    for (let i = 0; i < buildingMeshes.length; i++) {
+        const mesh = buildingMeshes[i];
+        if (!mesh) continue;
+
+        const center = getMeshLodCenter(mesh);
+        if (!center) continue;
+
+        const tier = mesh.userData?.lodTier || 'near';
+        const isBatch = !!mesh.userData?.isBuildingBatch;
+        const radius = Number.isFinite(mesh.userData?.lodRadius) ? mesh.userData.lodRadius : 0;
+        let visibleDist;
+        if (tier === 'mid') {
+            const batchBoost = isBatch ? Math.min(900, radius * 0.65) : Math.min(450, radius);
+            visibleDist = lodThresholds.mid + batchBoost;
+        } else {
+            const batchBoost = isBatch ? Math.min(1300, radius) : Math.min(800, radius);
+            visibleDist = lodThresholds.farVisible + batchBoost;
+        }
+        const dx = center.x - refX;
+        const dz = center.z - refZ;
+        const distSq = dx * dx + dz * dz;
+        const hysteresis = tier === 'mid'
+            ? (droneMode ? 460 : 280)
+            : (droneMode ? 380 : 220);
+        const limitDist = mesh.visible ? (visibleDist + hysteresis) : visibleDist;
+        const visible = distSq <= (limitDist * limitDist);
+        mesh.visible = visible;
+        if (!visible) continue;
+
+        const count = isBatch ? Math.max(1, mesh.userData?.batchCount || 1) : 1;
+        if (tier === 'mid') midVisible += count;
+        else nearVisible += count;
+    }
+
+    for (let i = 0; i < poiMeshes.length; i++) {
+        const mesh = poiMeshes[i];
+        if (!mesh) continue;
+        const center = getMeshLodCenter(mesh);
+        if (!center) continue;
+
+        const dx = center.x - refX;
+        const dz = center.z - refZ;
+        const distSq = dx * dx + dz * dz;
+        const tier = mesh.userData?.lodTier || 'near';
+        const radius = Number.isFinite(mesh.userData?.lodRadius) ? mesh.userData.lodRadius : 0;
+        const nearDist = lodThresholds.farVisible + Math.min(600, radius);
+        const withinLod = tier === 'mid' ? (distSq <= poiMidSq) : (distSq <= nearDist * nearDist);
+        mesh.visible = !!poiMode && withinLod;
+    }
+
+    const landuseVisibleDist = lodThresholds.mid + 120;
+    const landuseSq = landuseVisibleDist * landuseVisibleDist;
+    for (let i = 0; i < landuseMeshes.length; i++) {
+        const mesh = landuseMeshes[i];
+        if (!mesh) continue;
+
+        const alwaysVisible = !!mesh.userData?.alwaysVisible;
+        if (!landUseVisible && !alwaysVisible) {
+            mesh.visible = false;
+            continue;
+        }
+        if (alwaysVisible) {
+            mesh.visible = true;
+            continue;
+        }
+
+        if (mesh.userData?.isLanduseBatch) {
+            mesh.visible = !!landUseVisible;
+            continue;
+        }
+
+        const center = getMeshLodCenter(mesh);
+        if (!center) {
+            mesh.visible = landUseVisible;
+            continue;
+        }
+
+        const dx = center.x - refX;
+        const dz = center.z - refZ;
+        const distSq = dx * dx + dz * dz;
+        mesh.visible = distSq <= landuseSq;
+    }
+
+    if (typeof setPerfLiveStat === 'function') {
+        setPerfLiveStat('lodVisible', { near: nearVisible, mid: midVisible });
+    }
 }
 
 // ============================================================================
@@ -2079,7 +3574,8 @@ Object.assign(globalThis, {
     minimapScreenToWorld,
     pointInPolygon,
     spawnOnRoad,
-    teleportToLocation
+    teleportToLocation,
+    updateWorldLod
 });
 
 export {
@@ -2090,5 +3586,6 @@ export {
     minimapScreenToWorld,
     pointInPolygon,
     spawnOnRoad,
-    teleportToLocation
+    teleportToLocation,
+    updateWorldLod
 };

@@ -460,6 +460,7 @@ function applyHeightsToTerrainMesh(mesh) {
 
 function resetTerrainStreamingState() {
   lastTerrainCenterKey = null;
+  lastDynamicTerrainRing = TERRAIN_RING;
   terrain._lastUpdatePos.x = 0;
   terrain._lastUpdatePos.z = 0;
   terrain._cachedIntersections = null;
@@ -501,6 +502,22 @@ function detectRoadIntersections(roads) {
   });
 
   return result;
+}
+
+function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
+  if (!Array.isArray(verts) || verts.length === 0) return;
+  const baseVertex = targetVerts.length / 3;
+  targetVerts.push(...verts);
+  if (Array.isArray(indices) && indices.length > 0) {
+    for (let i = 0; i < indices.length; i++) {
+      targetIndices.push(indices[i] + baseVertex);
+    }
+  } else {
+    const count = verts.length / 3;
+    for (let i = 0; i < count; i++) {
+      targetIndices.push(baseVertex + i);
+    }
+  }
 }
 
 // Build road skirts (vertical curtains) to hide terrain peeking
@@ -568,6 +585,26 @@ function buildIntersectionCap(x, z, radius, segments = 16) {
 }
 
 let lastTerrainCenterKey = null;
+let lastDynamicTerrainRing = TERRAIN_RING;
+
+function getStreamingSpeedMph() {
+  if (droneMode && drone) return Math.max(0, Math.abs((drone.speed || 0) * 1.8));
+  if (Walk && Walk.state && Walk.state.mode === 'walk') {
+    return Math.max(0, Math.abs(Walk.state.walker?.speedMph || 0));
+  }
+  return Math.max(0, Math.abs((car?.speed || 0) * 0.5));
+}
+
+function getDynamicTerrainRing() {
+  const baseRing = Math.max(1, TERRAIN_RING);
+  const mode = (typeof getPerfMode === 'function') ? getPerfMode() : (perfMode || 'rdt');
+  if (mode === 'baseline') return baseRing;
+
+  const mph = getStreamingSpeedMph();
+  if (mph >= 120) return Math.max(1, baseRing - 2);
+  if (mph >= 70) return Math.max(1, baseRing - 1);
+  return baseRing;
+}
 
 function updateTerrainAround(x, z) {
   if (!terrainEnabled) return;
@@ -577,6 +614,10 @@ function updateTerrainAround(x, z) {
   const { lat, lon } = worldToLatLon(x, z);
   const t = latLonToTileXY(lat, lon, TERRAIN_ZOOM);
   const centerKey = `${TERRAIN_ZOOM}/${t.x}/${t.y}`;
+  const activeRing = getDynamicTerrainRing();
+  const ringChanged = activeRing !== lastDynamicTerrainRing;
+  lastDynamicTerrainRing = activeRing;
+  if (typeof setPerfLiveStat === 'function') setPerfLiveStat('terrainRing', activeRing);
 
   // OPTIMIZATION: Skip if same tile AND haven't moved enough (but always run on first call)
   if (lastTerrainCenterKey !== null) {
@@ -584,10 +625,10 @@ function updateTerrainAround(x, z) {
     const dz = z - terrain._lastUpdatePos.z;
     const distMoved = Math.sqrt(dx * dx + dz * dz);
 
-    if (centerKey === lastTerrainCenterKey && distMoved < 5.0) return;
+    if (centerKey === lastTerrainCenterKey && distMoved < 5.0 && !ringChanged) return;
   }
 
-  const tilesChanged = centerKey !== lastTerrainCenterKey;
+  const tilesChanged = centerKey !== lastTerrainCenterKey || ringChanged;
   lastTerrainCenterKey = centerKey;
   terrain._lastUpdatePos.x = x;
   terrain._lastUpdatePos.z = z;
@@ -596,8 +637,8 @@ function updateTerrainAround(x, z) {
   if (tilesChanged) {
     clearTerrainMeshes();
 
-    for (let dx = -TERRAIN_RING; dx <= TERRAIN_RING; dx++) {
-      for (let dy = -TERRAIN_RING; dy <= TERRAIN_RING; dy++) {
+    for (let dx = -activeRing; dx <= activeRing; dx++) {
+      for (let dy = -activeRing; dy <= activeRing; dy++) {
         const tx = t.x + dx;
         const ty = t.y + dy;
         const mesh = buildTerrainTileMesh(TERRAIN_ZOOM, tx, ty);
@@ -657,16 +698,86 @@ function rebuildRoadsWithTerrain() {
     intersections = terrain._cachedIntersections;
   }
 
+  const roadMainBatchVerts = [];
+  const roadMainBatchIdx = [];
+  const roadSkirtBatchVerts = [];
+  const roadSkirtBatchIdx = [];
+  const roadCapBatchVerts = [];
+  const roadCapBatchIdx = [];
+
+  const roadMat = (typeof asphaltTex !== 'undefined' && asphaltTex) ? new THREE.MeshStandardMaterial({
+    map: asphaltTex,
+    normalMap: asphaltNormal || undefined,
+    normalScale: new THREE.Vector2(0.8, 0.8),
+    roughnessMap: asphaltRoughness || undefined,
+    roughness: 0.95,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+    depthWrite: true,
+    depthTest: true
+  }) : new THREE.MeshStandardMaterial({
+    color: 0x333333,
+    roughness: 0.95,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2,
+    depthWrite: true,
+    depthTest: true
+  });
+
+  const skirtMat = new THREE.MeshStandardMaterial({
+    color: 0x222222,
+    roughness: 0.95,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -1,
+    polygonOffsetUnits: -1
+  });
+
+  const capMat = (typeof asphaltTex !== 'undefined' && asphaltTex) ? new THREE.MeshStandardMaterial({
+    map: asphaltTex,
+    normalMap: asphaltNormal || undefined,
+    normalScale: new THREE.Vector2(0.8, 0.8),
+    roughnessMap: asphaltRoughness || undefined,
+    roughness: 0.95,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -3,
+    polygonOffsetUnits: -3,
+    depthWrite: true,
+    depthTest: true
+  }) : new THREE.MeshStandardMaterial({
+    color: 0x3a3a3a,
+    roughness: 0.95,
+    metalness: 0.05,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -3,
+    polygonOffsetUnits: -3,
+    depthWrite: true,
+    depthTest: true
+  });
+
   // Rebuild each road with improved terrain conformance
-  roads.forEach((road, roadIdx) => {
+  roads.forEach((road) => {
     const { width } = road;
     const hw = width / 2;
 
     // Curvature-aware subdivision: straight = 2-5m, curves = 0.5-2m
-    const pts = subdivideRoadPoints(road.pts, 3.5);
+    const detail = Number.isFinite(road?.subdivideMaxDist) ? road.subdivideMaxDist : 3.5;
+    const pts = subdivideRoadPoints(road.pts, detail);
 
-    const verts = [], indices = [];
-    const leftEdge = [], rightEdge = [];
+    const verts = [];
+    const indices = [];
+    const leftEdge = [];
+    const rightEdge = [];
 
     // First pass: sample terrain heights at center of each road point
     const centerHeights = new Float64Array(pts.length);
@@ -692,176 +803,92 @@ function rebuildRoadsWithTerrain() {
         dx = pts[1].x - p.x;
         dz = pts[1].z - p.z;
       } else if (i === pts.length - 1) {
-        dx = p.x - pts[i-1].x;
-        dz = p.z - pts[i-1].z;
+        dx = p.x - pts[i - 1].x;
+        dz = p.z - pts[i - 1].z;
       } else {
-        dx = pts[i+1].x - pts[i-1].x;
-        dz = pts[i+1].z - pts[i-1].z;
+        dx = pts[i + 1].x - pts[i - 1].x;
+        dz = pts[i + 1].z - pts[i - 1].z;
       }
 
-      const len = Math.sqrt(dx*dx + dz*dz) || 1;
-      const nx = -dz / len, nz = dx / len; // Perpendicular (left direction)
+      const len = Math.sqrt(dx * dx + dz * dz) || 1;
+      const nx = -dz / len;
+      const nz = dx / len;
 
-      // Calculate left and right edge positions
       const leftX = p.x + nx * hw;
       const leftZ = p.z + nz * hw;
       const rightX = p.x - nx * hw;
       const rightZ = p.z - nz * hw;
 
-      // DIRECTLY snap BOTH edges to terrain (no tilt clamping!)
       let leftY = cachedTerrainHeight(leftX, leftZ);
       let rightY = cachedTerrainHeight(rightX, rightZ);
-
-      // Add vertical bias to prevent z-fighting and terrain peeking
-      // Increased from 0.10 to 0.25 to handle steep slopes
-      const verticalBias = 0.25; // 25cm above terrain
+      const verticalBias = 0.25;
       leftY += verticalBias;
       rightY += verticalBias;
 
-      // Store edge vertices (will be smoothed later)
       leftEdge.push({ x: leftX, y: leftY, z: leftZ });
       rightEdge.push({ x: rightX, y: rightY, z: rightZ });
     }
 
     // OPTIMIZATION: Smooth edge heights to eliminate micro-bumps (reduced from 2 to 1 pass)
-    // This prevents terrain from poking through at vertices
     for (let pass = 0; pass < 1; pass++) {
       for (let i = 1; i < leftEdge.length - 1; i++) {
-        leftEdge[i].y = leftEdge[i].y * 0.6 + (leftEdge[i-1].y + leftEdge[i+1].y) * 0.2;
-        rightEdge[i].y = rightEdge[i].y * 0.6 + (rightEdge[i-1].y + rightEdge[i+1].y) * 0.2;
+        leftEdge[i].y = leftEdge[i].y * 0.6 + (leftEdge[i - 1].y + leftEdge[i + 1].y) * 0.2;
+        rightEdge[i].y = rightEdge[i].y * 0.6 + (rightEdge[i - 1].y + rightEdge[i + 1].y) * 0.2;
       }
     }
 
-    // Now push smoothed vertices to geometry
     for (let i = 0; i < leftEdge.length; i++) {
       verts.push(leftEdge[i].x, leftEdge[i].y, leftEdge[i].z);
       verts.push(rightEdge[i].x, rightEdge[i].y, rightEdge[i].z);
-
-      // Create quad indices
       if (i < leftEdge.length - 1) {
         const vi = i * 2;
-        indices.push(vi, vi+1, vi+2, vi+1, vi+3, vi+2);
+        indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
       }
     }
-
-    // Build main road mesh
-    const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-    geo.setIndex(indices);
-    geo.computeVertexNormals();
-
-    // Road material with improved polygon offset
-    const roadMat = (typeof asphaltTex !== 'undefined' && asphaltTex) ? new THREE.MeshStandardMaterial({
-      map: asphaltTex,
-      normalMap: asphaltNormal || undefined,
-      normalScale: new THREE.Vector2(0.8, 0.8),
-      roughnessMap: asphaltRoughness || undefined,
-      roughness: 0.95,
-      metalness: 0.05,
-      side: THREE.DoubleSide,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
-      depthWrite: true,
-      depthTest: true
-    }) : new THREE.MeshStandardMaterial({
-      color: 0x333333,
-      roughness: 0.95,
-      metalness: 0.05,
-      side: THREE.DoubleSide,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2,
-      depthWrite: true,
-      depthTest: true
-    });
-
-    const mesh = new THREE.Mesh(geo, roadMat);
-    mesh.renderOrder = 2;
-    mesh.receiveShadow = true;
-    mesh.frustumCulled = false;
-    mesh.userData.roadIdx = roadIdx;
-    scene.add(mesh);
-    roadMeshes.push(mesh);
+    appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
 
     // Build road skirts (edge curtains) to hide terrain peeking
-    // Increased depth from 1.5 to 3.0 for better coverage on steep slopes
     const skirtData = buildRoadSkirts(leftEdge, rightEdge, 3.0);
     if (skirtData.verts.length > 0) {
-      const skirtGeo = new THREE.BufferGeometry();
-      skirtGeo.setAttribute('position', new THREE.Float32BufferAttribute(skirtData.verts, 3));
-      skirtGeo.setIndex(skirtData.indices);
-      skirtGeo.computeVertexNormals();
-
-      // Skirt material (same as road, slightly darker)
-      const skirtMat = new THREE.MeshStandardMaterial({
-        color: 0x222222,
-        roughness: 0.95,
-        metalness: 0.05,
-        side: THREE.DoubleSide,
-        polygonOffset: true,
-        polygonOffsetFactor: -1,
-        polygonOffsetUnits: -1
-      });
-
-      const skirtMesh = new THREE.Mesh(skirtGeo, skirtMat);
-      skirtMesh.renderOrder = 1;
-      skirtMesh.receiveShadow = true;
-      skirtMesh.frustumCulled = false;
-      skirtMesh.userData.isRoadSkirt = true;
-      skirtMesh.userData.roadIdx = roadIdx;
-      scene.add(skirtMesh);
-      roadMeshes.push(skirtMesh);
+      appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
     }
   });
 
   // Build intersection cap patches
   intersections.forEach(intersection => {
-    // FIXED: Reduced radius from 0.7 to 0.5 to prevent bulging beyond road edges
-    // Use average width instead of max to better fit the actual intersection
     const avgWidth = intersection.roads.reduce((sum, r) => sum + r.width, 0) / intersection.roads.length;
-    const radius = avgWidth * 0.5; // Tighter fit - half the average road width
+    const radius = avgWidth * 0.5;
     const capData = buildIntersectionCap(intersection.x, intersection.z, radius, 24);
-
-    const capGeo = new THREE.BufferGeometry();
-    capGeo.setAttribute('position', new THREE.Float32BufferAttribute(capData.verts, 3));
-    capGeo.setIndex(capData.indices);
-    capGeo.computeVertexNormals();
-
-    // Intersection cap material (slightly brighter than roads to stand out)
-    const capMat = (typeof asphaltTex !== 'undefined' && asphaltTex) ? new THREE.MeshStandardMaterial({
-      map: asphaltTex,
-      normalMap: asphaltNormal || undefined,
-      normalScale: new THREE.Vector2(0.8, 0.8),
-      roughnessMap: asphaltRoughness || undefined,
-      roughness: 0.95,
-      metalness: 0.05,
-      side: THREE.DoubleSide,
-      polygonOffset: true,
-      polygonOffsetFactor: -3,
-      polygonOffsetUnits: -3,
-      depthWrite: true,
-      depthTest: true
-    }) : new THREE.MeshStandardMaterial({
-      color: 0x3a3a3a,
-      roughness: 0.95,
-      metalness: 0.05,
-      side: THREE.DoubleSide,
-      polygonOffset: true,
-      polygonOffsetFactor: -3,
-      polygonOffsetUnits: -3,
-      depthWrite: true,
-      depthTest: true
-    });
-
-    const capMesh = new THREE.Mesh(capGeo, capMat);
-    capMesh.renderOrder = 3;
-    capMesh.receiveShadow = true;
-    capMesh.frustumCulled = false;
-    capMesh.userData.isIntersectionCap = true;
-    scene.add(capMesh);
-    roadMeshes.push(capMesh);
+    appendIndexedGeometry(roadCapBatchVerts, roadCapBatchIdx, capData.verts, capData.indices);
   });
+
+  const buildRoadBatchMesh = (verts, indices, material, renderOrder, userData = {}) => {
+    if (!verts.length || !indices.length) return null;
+    const geo = new THREE.BufferGeometry();
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+    const vertexCount = verts.length / 3;
+    const indexArray = vertexCount > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
+    geo.setIndex(new THREE.BufferAttribute(indexArray, 1));
+    geo.computeVertexNormals();
+    const mesh = new THREE.Mesh(geo, material);
+    mesh.renderOrder = renderOrder;
+    mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
+    Object.assign(mesh.userData, userData);
+    scene.add(mesh);
+    roadMeshes.push(mesh);
+    return mesh;
+  };
+
+  if (!buildRoadBatchMesh(roadMainBatchVerts, roadMainBatchIdx, roadMat, 2, { isRoadBatch: true })) {
+    roadMat.dispose();
+  }
+  if (!buildRoadBatchMesh(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtMat, 1, { isRoadBatch: true, isRoadSkirt: true })) {
+    skirtMat.dispose();
+  }
+  if (!buildRoadBatchMesh(roadCapBatchVerts, roadCapBatchIdx, capMat, 3, { isRoadBatch: true, isIntersectionCap: true })) {
+    capMat.dispose();
+  }
 
   roadsNeedRebuild = false;
 
@@ -952,7 +979,10 @@ function repositionBuildingsWithTerrain() {
       minElevation = Number.isFinite(fallbackElevation) ? fallbackElevation : 0;
     }
 
-    mesh.position.y = minElevation;
+    const midLodHalfHeight = Number.isFinite(mesh.userData?.midLodHalfHeight)
+      ? mesh.userData.midLodHalfHeight
+      : 0;
+    mesh.position.y = minElevation + midLodHalfHeight;
     buildingsRepositioned++;
   });
 

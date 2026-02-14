@@ -7,20 +7,8 @@ This project includes a client-side persistent memory feature (pin/flower notes)
 - Storage location: browser `localStorage`
 - Storage key: `worldExplorer3D.memories.v1`
 - Storage scope: current browser profile on current device
-- Sync behavior: local-only unless Supabase multiplayer is configured
+- Sync behavior: no automatic cross-device/cloud sync
 - Encryption: not encrypted at rest
-
-## Supabase Multiplayer Storage (Optional)
-
-When Supabase sync is configured, blocks and memory markers are also written to:
-
-- Table: `public.world_placeables`
-- Record types: `block`, `pin`, `flower`
-- Deletion model: tombstones (`deleted_at`) instead of hard deletes
-- Auth mode: anonymous client id (`author_id`)
-
-Memory note content is shared with any client in the same chunked area.
-Do not place sensitive data in notes.
 
 ## Data Limits
 
@@ -38,7 +26,6 @@ Do not place sensitive data in notes.
 ## Security Baseline (Current)
 
 - User-generated memory text is rendered as plain text (not HTML)
-- Supabase sync sanitizes note text and clamps it to 200 chars before write
 - Dynamic map/property/historic strings are escaped before HTML template insertion
 - Placement is blocked if storage round-trip checks fail
 - Marker data is treated as untrusted content

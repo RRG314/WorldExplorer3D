@@ -10,7 +10,6 @@ This index lists the documentation that exists in this branch today.
 | `QUICKSTART.md` | Local run, Pages deploy, first 60 seconds |
 | `USER_GUIDE.md` | End-user feature guide |
 | `API_SETUP.md` | Real-estate API setup and verification |
-| `SUPABASE_SETUP.md` | Multiplayer sync setup, schema, and security baseline |
 | `TECHNICAL_DOCS.md` | Developer-level systems and implementation notes |
 | `ARCHITECTURE.md` | Runtime architecture and subsystem boundaries |
 | `KNOWN_ISSUES.md` | Current gaps, regressions, and contribution targets |
@@ -43,10 +42,13 @@ The current branch documentation set includes updates for:
 - POI + memory marker rendering on minimap and large map overlays
 - Legend checkboxes for independent memory pin/flower visibility on maps
 - Brick block builder controls (`B`, click place, shift-click remove, clear current location, 100-block cap)
-- Optional Supabase multiplayer sync for blocks + memory markers by nearby chunk
+- Title-screen performance benchmark controls (`RDT` vs `Baseline`, overlay toggle, snapshot copy)
+- Top-bar overlay anchoring for debug and benchmark panels between their target HUD widgets
+- Overpass endpoint preference and in-memory cache behavior for repeat-load acceleration
+- Supporting benchmark stats documentation from captured Baltimore test runs (network + memory-cache)
 - Security/storage boilerplate notice for persistent memory data
 - Dynamic UI text escaping in map/property/historic panels
-- Cache-bust loader chain alignment through `v=35`
+- Cache-bust loader chain alignment through `v=50`
 
 ## Maintainer Notes
 

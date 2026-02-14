@@ -146,21 +146,18 @@ function setupUI() {
     const attomKeyInput = document.getElementById('attomKeyInput');
     const estatedKeyInput = document.getElementById('estatedKeyInput');
     const saveApiKeyBtn = document.getElementById('saveApiKey');
-    const supabaseUrlInput = document.getElementById('supabaseUrlInput');
-    const supabaseAnonKeyInput = document.getElementById('supabaseAnonKeyInput');
-    const saveSupabaseConfigBtn = document.getElementById('saveSupabaseConfig');
-    const supabaseSyncStatusEl = document.getElementById('supabaseSyncStatus');
     const realEstateToggle = document.getElementById('realEstateToggle');
     const toggleLabel = document.getElementById('realEstateToggleLabel');
-    const SUPABASE_URL_STORAGE_KEY = 'worldExplorer3D.supabase.url';
-    const SUPABASE_ANON_STORAGE_KEY = 'worldExplorer3D.supabase.anonKey';
+    const perfModeSelect = document.getElementById('perfModeSelect');
+    const perfOverlayToggle = document.getElementById('perfOverlayToggle');
+    const perfApplyReload = document.getElementById('perfApplyReload');
+    const perfCopySnapshot = document.getElementById('perfCopySnapshot');
+    const perfSettingsStatus = document.getElementById('perfSettingsStatus');
 
     // Load saved API keys from localStorage
     const savedRentcast = localStorage.getItem('rentcastApiKey');
     const savedAttom = localStorage.getItem('attomApiKey');
     const savedEstated = localStorage.getItem('estatedApiKey');
-    const savedSupabaseUrl = localStorage.getItem(SUPABASE_URL_STORAGE_KEY);
-    const savedSupabaseAnon = localStorage.getItem(SUPABASE_ANON_STORAGE_KEY);
 
     if (savedRentcast) {
         apiConfig.rentcast = savedRentcast;
@@ -173,12 +170,6 @@ function setupUI() {
     if (savedEstated) {
         apiConfig.estated = savedEstated;
         if (estatedKeyInput) estatedKeyInput.value = savedEstated;
-    }
-    if (savedSupabaseUrl && supabaseUrlInput) {
-        supabaseUrlInput.value = savedSupabaseUrl;
-    }
-    if (savedSupabaseAnon && supabaseAnonKeyInput) {
-        supabaseAnonKeyInput.value = savedSupabaseAnon;
     }
 
     // Load real estate mode preference
@@ -248,48 +239,6 @@ function setupUI() {
         });
     }
 
-    function renderSupabaseSyncStatus() {
-        if (!supabaseSyncStatusEl) return;
-        let status = null;
-        if (typeof getWorldSyncStatus === 'function') {
-            status = getWorldSyncStatus();
-        }
-        if (!status) {
-            supabaseSyncStatusEl.textContent = 'Sync status unavailable.';
-            supabaseSyncStatusEl.style.color = '#6b7280';
-            return;
-        }
-        supabaseSyncStatusEl.textContent = status.detail || 'No sync status.';
-        supabaseSyncStatusEl.style.color = status.error ? '#dc2626' : '#047857';
-    }
-
-    if (saveSupabaseConfigBtn) {
-        saveSupabaseConfigBtn.addEventListener('click', async () => {
-            const url = supabaseUrlInput ? supabaseUrlInput.value.trim() : '';
-            const anonKey = supabaseAnonKeyInput ? supabaseAnonKeyInput.value.trim() : '';
-
-            if (!url || !anonKey) {
-                localStorage.removeItem(SUPABASE_URL_STORAGE_KEY);
-                localStorage.removeItem(SUPABASE_ANON_STORAGE_KEY);
-                if (typeof saveSupabaseSyncConfig === 'function') {
-                    await saveSupabaseSyncConfig('', '');
-                }
-                renderSupabaseSyncStatus();
-                return;
-            }
-
-            if (typeof saveSupabaseSyncConfig === 'function') {
-                await saveSupabaseSyncConfig(url, anonKey);
-            } else {
-                localStorage.setItem(SUPABASE_URL_STORAGE_KEY, url);
-                localStorage.setItem(SUPABASE_ANON_STORAGE_KEY, anonKey);
-            }
-            renderSupabaseSyncStatus();
-        });
-    }
-    renderSupabaseSyncStatus();
-    setInterval(renderSupabaseSyncStatus, 2500);
-
     // Real estate toggle
     if (realEstateToggle && toggleLabel) {
         realEstateToggle.addEventListener('change', (e) => {
@@ -297,6 +246,81 @@ function setupUI() {
             localStorage.setItem('realEstateEnabled', enabled);
             toggleLabel.style.background = enabled ? '#f0f4ff' : '#f8fafc';
             toggleLabel.style.borderColor = enabled ? '#667eea' : '#e2e8f0';
+        });
+    }
+
+    // Performance benchmark controls (RDT vs baseline)
+    if (perfModeSelect) {
+        const currentMode = (typeof getPerfMode === 'function') ? getPerfMode() : (perfMode || 'rdt');
+        perfModeSelect.value = currentMode === 'baseline' ? 'baseline' : 'rdt';
+    }
+    if (perfOverlayToggle) {
+        const overlayEnabled = (typeof getPerfOverlayEnabled === 'function')
+            ? getPerfOverlayEnabled()
+            : !!perfOverlayEnabled;
+        perfOverlayToggle.checked = overlayEnabled;
+    }
+
+    if (perfModeSelect) {
+        perfModeSelect.addEventListener('change', (e) => {
+            const selectedMode = e.target.value === 'baseline' ? 'baseline' : 'rdt';
+            if (typeof setPerfMode === 'function') setPerfMode(selectedMode);
+            if (perfSettingsStatus) {
+                perfSettingsStatus.textContent = selectedMode === 'baseline'
+                    ? 'Baseline selected. Use Apply + Reload World to rebuild with baseline budgets.'
+                    : 'RDT selected. Use Apply + Reload World to rebuild with adaptive budgets.';
+            }
+            if (typeof updatePerfPanel === 'function') updatePerfPanel(true);
+        });
+    }
+
+    if (perfOverlayToggle) {
+        perfOverlayToggle.addEventListener('change', (e) => {
+            const enabled = !!e.target.checked;
+            if (typeof setPerfOverlayEnabled === 'function') setPerfOverlayEnabled(enabled);
+            if (perfSettingsStatus) {
+                perfSettingsStatus.textContent = enabled
+                    ? 'Live overlay enabled. Benchmark values will be shown during gameplay.'
+                    : 'Live overlay disabled.';
+            }
+            if (typeof updatePerfPanel === 'function') updatePerfPanel(true);
+        });
+    }
+
+    if (perfApplyReload) {
+        perfApplyReload.addEventListener('click', async () => {
+            const selectedMode = perfModeSelect?.value === 'baseline' ? 'baseline' : 'rdt';
+            if (typeof setPerfMode === 'function') setPerfMode(selectedMode);
+
+            if (perfSettingsStatus) {
+                perfSettingsStatus.textContent = gameStarted
+                    ? `Applying ${selectedMode.toUpperCase()} mode and reloading world...`
+                    : `Saved ${selectedMode.toUpperCase()} mode. It will apply when you start.`;
+            }
+
+            if (gameStarted && typeof loadRoads === 'function') {
+                await loadRoads();
+                if (perfSettingsStatus) {
+                    perfSettingsStatus.textContent = `${selectedMode.toUpperCase()} mode applied and world reloaded.`;
+                }
+            }
+            if (typeof updatePerfPanel === 'function') updatePerfPanel(true);
+        });
+    }
+
+    if (perfCopySnapshot) {
+        perfCopySnapshot.addEventListener('click', async () => {
+            try {
+                if (typeof copyPerfSnapshotToClipboard !== 'function') {
+                    throw new Error('Snapshot exporter unavailable');
+                }
+                await copyPerfSnapshotToClipboard();
+                if (perfSettingsStatus) perfSettingsStatus.textContent = 'Benchmark snapshot copied to clipboard.';
+            } catch (err) {
+                if (perfSettingsStatus) {
+                    perfSettingsStatus.textContent = `Unable to copy snapshot: ${err?.message || err}`;
+                }
+            }
         });
     }
 
@@ -421,6 +445,7 @@ function setupUI() {
         const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
         if (memoryFlowerFloatBtn) memoryFlowerFloatBtn.classList.add('show');
         gameStarted = true;
+        if (typeof updatePerfPanel === 'function') updatePerfPanel(true);
         switchEnv(ENV.EARTH);
 
         // Show exploration mode message
@@ -575,6 +600,7 @@ function setupUI() {
         const memoryInfoPanel = document.getElementById('memoryInfoPanel');
         if (memoryInfoPanel) memoryInfoPanel.classList.remove('show');
         updateControlsModeUI();
+        if (typeof updatePerfPanel === 'function') updatePerfPanel(true);
     }
 
     // Float menu

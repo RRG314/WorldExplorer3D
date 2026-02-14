@@ -10,6 +10,16 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --debug-overlay-top:20px;
+  --debug-overlay-left:clamp(190px,24vw,470px);
+  --debug-overlay-z:145;
+  --perf-panel-top:20px;
+  --perf-panel-right:180px;
+  --perf-panel-min-width:260px;
+  --perf-panel-max-width:320px;
+  --perf-panel-z:145;
+}
 body{background:#f5f7fa;overflow:hidden;font-family:'Inter',sans-serif;-webkit-user-select:none;user-select:none;touch-action:pan-x pan-y;-webkit-tap-highlight-color:transparent}
 button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 input,textarea{-webkit-user-select:text;user-select:text}
@@ -190,6 +200,15 @@ input,textarea{-webkit-user-select:text;user-select:text}
   /* Modal adjustments */
   .modal-content{width:95vw;max-height:90vh}
   .modal-title{font-size:18px}
+
+  :root{
+    --debug-overlay-top:10px;
+    --debug-overlay-left:clamp(130px,33vw,250px);
+    --perf-panel-top:10px;
+    --perf-panel-right:130px;
+    --perf-panel-min-width:210px;
+    --perf-panel-max-width:270px;
+  }
 }
 
 @media (max-width: 480px) {
@@ -246,6 +265,15 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .pauseBtn{min-width:140px;padding:12px 30px;font-size:13px}
   .resultBox, .caughtBox{padding:30px 40px}
   #resultTitle, .caughtTitle{font-size:24px}
+
+  :root{
+    --debug-overlay-top:6px;
+    --debug-overlay-left:108px;
+    --perf-panel-top:6px;
+    --perf-panel-right:88px;
+    --perf-panel-min-width:175px;
+    --perf-panel-max-width:228px;
+  }
 }
 
 /* Landscape orientation adjustments */
@@ -255,6 +283,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #propertyPanel{max-height:85vh}
   .logo{font-size:clamp(24px, 6vw, 48px);margin:0}
   .sub{font-size:11px;letter-spacing:2px;margin:0}
+
+  :root{
+    --debug-overlay-top:8px;
+    --perf-panel-top:8px;
+  }
 }
 
 #controlsTab{position:fixed;bottom:20px;left:200px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;z-index:100;display:none;font-size:12px;color:#475569;max-width:220px;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
@@ -448,6 +481,29 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 </div>
 <div style="margin-bottom:24px">
 <div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+⚡ Performance Benchmark
+</div>
+<div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:14px">
+<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">Mode</label>
+<select id="perfModeSelect" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;color:#1e293b;margin-bottom:12px">
+<option value="rdt">RDT Optimized</option>
+<option value="baseline">Baseline (No RDT Budgeting)</option>
+</select>
+<label style="display:flex;align-items:center;gap:10px;font-size:12px;color:#334155;margin-bottom:12px;cursor:pointer">
+<input type="checkbox" id="perfOverlayToggle" style="width:16px;height:16px;cursor:pointer">
+Show live benchmark overlay in-game
+</label>
+<div style="display:flex;gap:8px;margin-bottom:8px">
+<button id="perfApplyReload" style="flex:1;background:#0ea5e9;border:none;border-radius:8px;padding:9px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:12px">Apply + Reload World</button>
+<button id="perfCopySnapshot" style="flex:1;background:#475569;border:none;border-radius:8px;padding:9px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:12px">Copy Snapshot</button>
+</div>
+<div id="perfSettingsStatus" style="font-size:11px;color:#64748b;min-height:16px">
+Use this to compare RDT and baseline with real runtime data.
+</div>
+</div>
+</div>
+<div style="margin-bottom:24px">
+<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
 🏠 Real Estate Mode
 </div>
 <label style="display:flex;align-items:center;gap:12px;cursor:pointer;padding:12px;background:#f8fafc;border-radius:8px;border:2px solid #e2e8f0;transition:all 0.2s" id="realEstateToggleLabel">
@@ -482,19 +538,6 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <input type="text" id="rentcastKeyInput" placeholder="Enter your RentCast API key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:4px">
 <div style="font-size:10px;color:#64748b;margin-bottom:8px">
 ℹ️ 100 free requests/month. Get key at <a href="https://rentcast.io" target="_blank" style="color:#667eea">RentCast.io</a>
-</div>
-</div>
-<div style="margin-bottom:14px;padding-top:12px;border-top:1px solid #e2e8f0">
-<div style="font-size:12px;font-weight:700;color:#1e293b;margin-bottom:8px">🌐 Multiplayer Sync (Supabase)</div>
-<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">Supabase Project URL</label>
-<input type="text" id="supabaseUrlInput" placeholder="https://your-project.supabase.co" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:10px">
-<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">Supabase Anon Key</label>
-<input type="text" id="supabaseAnonKeyInput" placeholder="Paste Supabase anon public key" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;margin-bottom:8px">
-<button id="saveSupabaseConfig" style="background:#0f766e;border:none;border-radius:8px;padding:10px 20px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.2s;width:100%;margin-bottom:8px">
-🌐 Save Supabase Sync Config
-</button>
-<div id="supabaseSyncStatus" style="font-size:10px;color:#64748b;line-height:1.4">
-Supabase sync is disabled until URL and anon key are saved.
 </div>
 </div>
 <button id="saveApiKey" style="background:#667eea;border:none;border-radius:8px;padding:10px 20px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:13px;transition:all 0.2s;width:100%">
@@ -1015,10 +1058,11 @@ Explore the area
   </div>
 </div>
 
-<div id="debugOverlay" style="position:fixed;bottom:20px;right:200px;background:rgba(0,0,0,0.8);color:#0f0;font-family:monospace;font-size:11px;padding:10px 14px;border-radius:8px;z-index:200;display:none;line-height:1.6;pointer-events:none;white-space:pre"></div>
+<div id="debugOverlay" style="position:fixed;top:var(--debug-overlay-top,20px);left:var(--debug-overlay-left,clamp(190px,24vw,470px));background:rgba(0,0,0,0.8);color:#0f0;font-family:monospace;font-size:11px;padding:10px 14px;border-radius:8px;z-index:var(--debug-overlay-z,145);display:none;line-height:1.6;pointer-events:none;white-space:pre"></div>
+<div id="perfPanel" style="position:fixed;top:var(--perf-panel-top,20px);right:var(--perf-panel-right,180px);background:rgba(2,6,23,0.85);color:#38bdf8;font-family:monospace;font-size:11px;padding:10px 12px;border-radius:8px;z-index:var(--perf-panel-z,145);display:none;line-height:1.45;white-space:pre;pointer-events:none;border:1px solid rgba(56,189,248,0.4);min-width:var(--perf-panel-min-width,260px);max-width:var(--perf-panel-max-width,320px)"></div>
 <div id="loading"><div class="spinner"></div><div id="loadText">Loading...</div></div>
 <div id="pauseScreen"><div class="pauseTitle">PAUSED</div><button class="pauseBtn" id="resumeBtn">Resume</button><button class="pauseBtn" id="restartBtn">Restart</button><button class="pauseBtn" id="menuBtn">Main Menu</button></div>
 <div id="resultScreen"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
 <div id="caughtScreen"><div class="caughtBox"><div class="caughtTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
-<script type="module" src="js/bootstrap.js?v=35"></script>
+<script type="module" src="js/bootstrap.js?v=50"></script>
 </body></html>

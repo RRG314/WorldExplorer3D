@@ -7,7 +7,6 @@ This guide walks you through setting up API keys for World Explorer 3D's real es
 - [Rentcast API](#rentcast-api)
 - [Attom API](#attom-api)
 - [Estated API](#estated-api)
-- [Supabase Multiplayer Sync](#supabase-multiplayer-sync)
 - [Configuration](#configuration)
 - [Testing](#testing)
 - [Troubleshooting](#troubleshooting)
@@ -127,38 +126,6 @@ Using multiple APIs provides:
 
 ### API Documentation
 [https://estated.com/developers/docs](https://estated.com/developers/docs)
-
-## Supabase Multiplayer Sync
-
-World Explorer 3D supports Supabase sync for shared:
-
-- build blocks (`block`)
-- memory pins (`pin`)
-- memory flowers (`flower`)
-
-### Setup
-
-1. Create a Supabase project.
-2. Run SQL from `supabase/world_placeables.sql`.
-3. Copy your `Project URL` and `anon public key`.
-4. In app: `Settings` -> `Multiplayer Sync (Supabase)` -> Save.
-
-### Current Sync Model
-
-- Chunking: 200 world units, 5x5 nearby chunk polling.
-- Poll interval: ~3.5 seconds.
-- Remove model: tombstones (`deleted_at`) instead of hard delete.
-- Environment scope: Earth mode sync enabled.
-
-### Security Baseline
-
-- Type allowlist: `block`, `pin`, `flower`
-- Note clamp: 200 chars
-- Note sanitization: plain-text only (no HTML tags)
-- Client write throttle: 30 writes/minute
-- Soft chunk caps: 2000 blocks/chunk, 200 memory markers/chunk
-
-For full details, see `SUPABASE_SETUP.md`.
 
 ## Configuration
 

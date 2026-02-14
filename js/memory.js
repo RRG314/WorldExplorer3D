@@ -35,8 +35,6 @@ function isValidLatLon(lat, lon) {
 function clampMessage(raw) {
     return String(raw || '')
         .replace(/\r\n?/g, '\n')
-        .replace(/<[^>]*>/g, '')
-        .replace(/[<>]/g, '')
         .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
         .trim()
         .slice(0, MEMORY_MAX_MESSAGE_LENGTH);
@@ -106,38 +104,6 @@ function latLonToWorldSafe(lat, lon) {
     const x = (lon - LOC.lon) * SCALE * Math.cos(LOC.lat * Math.PI / 180);
     const z = -(lat - LOC.lat) * SCALE;
     return { x, z };
-}
-
-function getMemoryEnvKey() {
-    if (typeof isEnv === 'function' && typeof ENV !== 'undefined') {
-        if (isEnv(ENV.SPACE_FLIGHT)) return 'space';
-        if (isEnv(ENV.MOON)) return 'moon';
-        return 'earth';
-    }
-    if (onMoon) return 'moon';
-    return 'earth';
-}
-
-function queueMemorySyncAction(action) {
-    if (typeof enqueueWorldPlaceableSync !== 'function') return false;
-    try {
-        return enqueueWorldPlaceableSync(action);
-    } catch (err) {
-        console.warn('[memory] Failed to queue sync action:', err);
-        return false;
-    }
-}
-
-function memoryEntriesMatch(a, b) {
-    if (!a || !b) return false;
-    return a.id === b.id &&
-        a.type === b.type &&
-        a.message === b.message &&
-        a.lat === b.lat &&
-        a.lon === b.lon &&
-        a.locationKey === b.locationKey &&
-        a.locationLabel === b.locationLabel &&
-        a.createdAt === b.createdAt;
 }
 
 function getGroundYAt(x, z) {
@@ -536,7 +502,6 @@ function hideMemoryInfo() {
 
 function removeMemoryById(id) {
     if (!memoryPersistenceEnabled) return false;
-    const removedEntry = memoryEntries.find((entry) => entry.id === id) || null;
     const next = memoryEntries.filter((entry) => entry.id !== id);
     if (next.length === memoryEntries.length) return false;
     const previous = memoryEntries;
@@ -545,60 +510,18 @@ function removeMemoryById(id) {
         memoryEntries = previous;
         return false;
     }
-    if (removedEntry) {
-        const worldPos = latLonToWorldSafe(removedEntry.lat, removedEntry.lon);
-        const y = getTopSurfaceYAt(worldPos.x, worldPos.z);
-        queueMemorySyncAction({
-            op: 'delete',
-            id: removedEntry.id,
-            type: removedEntry.type === 'flower' ? 'flower' : 'pin',
-            env: getMemoryEnvKey(),
-            locationKey: removedEntry.locationKey,
-            x: worldPos.x,
-            y,
-            z: worldPos.z,
-            lat: removedEntry.lat,
-            lon: removedEntry.lon,
-            createdAt: removedEntry.createdAt,
-            meta: {
-                note: removedEntry.message,
-                locationLabel: removedEntry.locationLabel
-            }
-        });
-    }
     refreshMemoryMarkersForCurrentLocation();
     return true;
 }
 
 function removeAllMemories() {
     if (memoryEntries.length === 0) return true;
-    const previous = memoryEntries.slice();
+    const previous = memoryEntries;
     memoryEntries = [];
     if (memoryPersistenceEnabled && !saveMemoryEntriesToStorage()) {
         memoryEntries = previous;
         return false;
     }
-    previous.forEach((entry) => {
-        const worldPos = latLonToWorldSafe(entry.lat, entry.lon);
-        const y = getTopSurfaceYAt(worldPos.x, worldPos.z);
-        queueMemorySyncAction({
-            op: 'delete',
-            id: entry.id,
-            type: entry.type === 'flower' ? 'flower' : 'pin',
-            env: getMemoryEnvKey(),
-            locationKey: entry.locationKey,
-            x: worldPos.x,
-            y,
-            z: worldPos.z,
-            lat: entry.lat,
-            lon: entry.lon,
-            createdAt: entry.createdAt,
-            meta: {
-                note: entry.message,
-                locationLabel: entry.locationLabel
-            }
-        });
-    });
     hideMemoryInfo();
     refreshMemoryMarkersForCurrentLocation();
     return true;
@@ -671,132 +594,8 @@ function placeMemoryFromComposer() {
         setComposerStatus('Failed to persist marker. Check browser storage permissions.', true);
         return;
     }
-    const worldPos = latLonToWorldSafe(entry.lat, entry.lon);
-    const y = getTopSurfaceYAt(worldPos.x, worldPos.z);
-    queueMemorySyncAction({
-        op: 'upsert',
-        id: entry.id,
-        type: entry.type,
-        env: getMemoryEnvKey(),
-        locationKey: entry.locationKey,
-        x: worldPos.x,
-        y,
-        z: worldPos.z,
-        lat: entry.lat,
-        lon: entry.lon,
-        createdAt: entry.createdAt,
-        meta: {
-            note: entry.message,
-            locationLabel: entry.locationLabel
-        }
-    });
     refreshMemoryMarkersForCurrentLocation();
     closeMemoryComposer();
-}
-
-function normalizeRemoteMemorySyncRow(raw) {
-    if (!raw || typeof raw !== 'object') return null;
-
-    const id = String(raw.id || '').trim();
-    if (!id) return null;
-
-    const type = String(raw.type || '').toLowerCase();
-    if (type !== 'pin' && type !== 'flower') return null;
-
-    const lat = Number(raw.lat);
-    const lon = Number(raw.lon);
-    if (!isFiniteNumber(lat) || !isFiniteNumber(lon) || !isValidLatLon(lat, lon)) return null;
-
-    const locationKey = String(raw.locationKey || raw.location_key || '').trim();
-    if (!locationKey) return null;
-
-    const meta = raw.meta && typeof raw.meta === 'object' ? raw.meta : {};
-    const message = clampMessage(meta.note || raw.message || '');
-    const locationLabel = clampLocationLabel(meta.locationLabel || raw.locationLabel || 'Unknown');
-    const createdAt = parseDateSafe(raw.createdAt || raw.created_at || new Date().toISOString());
-    const deletedAt = raw.deletedAt || raw.deleted_at || null;
-
-    return {
-        id,
-        type: type === 'flower' ? 'flower' : 'pin',
-        message,
-        lat: Number(lat.toFixed(7)),
-        lon: Number(lon.toFixed(7)),
-        locationKey,
-        locationLabel,
-        createdAt,
-        deletedAt: deletedAt ? String(deletedAt) : null
-    };
-}
-
-function mergeRemoteMemorySyncRows(rows) {
-    if (!Array.isArray(rows) || rows.length === 0) return false;
-
-    let changed = false;
-    let needsRefresh = false;
-    const currentLocationKey = getCurrentLocationKey();
-
-    rows.forEach((raw) => {
-        const row = normalizeRemoteMemorySyncRow(raw);
-        if (!row) return;
-
-        if (row.deletedAt) {
-            const idx = memoryEntries.findIndex((entry) => entry.id === row.id);
-            if (idx >= 0) {
-                const removedEntry = memoryEntries[idx];
-                memoryEntries.splice(idx, 1);
-                changed = true;
-                if (removedEntry && removedEntry.locationKey === currentLocationKey) {
-                    needsRefresh = true;
-                }
-            }
-            return;
-        }
-
-        if (!row.message) return;
-
-        const nextEntry = normalizeMemoryEntry({
-            id: row.id,
-            type: row.type,
-            message: row.message,
-            lat: row.lat,
-            lon: row.lon,
-            locationKey: row.locationKey,
-            locationLabel: row.locationLabel,
-            createdAt: row.createdAt
-        });
-        if (!nextEntry) return;
-
-        const existingIdx = memoryEntries.findIndex((entry) => entry.id === nextEntry.id);
-        if (existingIdx >= 0) {
-            const prevEntry = memoryEntries[existingIdx];
-            if (!memoryEntriesMatch(prevEntry, nextEntry)) {
-                memoryEntries[existingIdx] = nextEntry;
-                changed = true;
-                if (prevEntry.locationKey === currentLocationKey || nextEntry.locationKey === currentLocationKey) {
-                    needsRefresh = true;
-                }
-            }
-        } else {
-            memoryEntries.push(nextEntry);
-            changed = true;
-            if (nextEntry.locationKey === currentLocationKey) needsRefresh = true;
-        }
-    });
-
-    if (memoryEntries.length > MEMORY_MAX_TOTAL) {
-        memoryEntries = memoryEntries.slice(memoryEntries.length - MEMORY_MAX_TOTAL);
-        changed = true;
-        needsRefresh = true;
-    }
-
-    if (changed && memoryPersistenceEnabled) {
-        saveMemoryEntriesToStorage();
-    }
-    if (needsRefresh) {
-        refreshMemoryMarkersForCurrentLocation();
-    }
-    return changed;
 }
 
 function onMemorySceneClick(event) {
@@ -922,7 +721,6 @@ Object.assign(globalThis, {
     closeMemoryComposer,
     getMemoryEntriesForCurrentLocation,
     getMemoryPersistenceStatus,
-    mergeRemoteMemorySyncRows,
     openMemoryComposer,
     refreshMemoryMarkersForCurrentLocation,
     setupMemoryUI
@@ -933,7 +731,6 @@ export {
     closeMemoryComposer,
     getMemoryEntriesForCurrentLocation,
     getMemoryPersistenceStatus,
-    mergeRemoteMemorySyncRows,
     openMemoryComposer,
     refreshMemoryMarkersForCurrentLocation,
     setupMemoryUI

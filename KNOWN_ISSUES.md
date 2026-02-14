@@ -92,16 +92,27 @@ How to help:
 - Verify cache-bust alignment in `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
 - Consider adding a lightweight CI check that fails on version mismatch.
 
-### 9. Supabase Multiplayer Hardening
+### 9. Memory Marker Portability
 
-- Multiplayer sync is available, but currently uses client-side polling and anonymous writes.
-- Strong abuse protection (server-side rate limits, moderation, and audit workflows) still needs hardening.
+- Persistent memory markers are intentionally stored in browser localStorage and do not auto-sync across devices/browsers.
+- Users may perceive this as data loss when switching devices or using strict private-mode settings.
 
 How to help:
 
-- Add Supabase Edge Function rate limiting and write quotas.
-- Expand RLS checks for stricter per-type payload validation.
-- Add operational monitoring for write spikes and chunk hotspots.
+- Evaluate optional import/export tooling for memory entries.
+- Add clear UX copy around device/browser storage scope.
+- Keep storage-capability checks aligned with `js/memory.js`.
+
+### 10. RDT Draw-Call Variance vs Baseline
+
+- RDT mode can still produce higher draw-call counts than baseline in some city views even when total content is reduced.
+- Visual smoothness is stable at 60 FPS in recent Baltimore captures, but draw-call spread remains wider than desired.
+
+How to help:
+
+- Capture paired snapshots using benchmark controls (`RDT` + `Baseline`) from the same location and camera state.
+- Profile render batch fragmentation paths in `js/world.js` (roads, street furniture, and material-group splits).
+- Propose optimizations that preserve current visual richness and collision behavior.
 
 ## Reporting Format
 

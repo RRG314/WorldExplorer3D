@@ -495,7 +495,9 @@ function createWalkingModule(opts) {
       // Check if walker is above this roof or close to it (within 2 units below to allow landing)
       if (walkerY - CFG.eyeHeight >= roofY - 0.5) {
         // Check if inside building polygon
-        const inside = isPointInPolygon ? isPointInPolygon(x, z, b.pts) : isInsideBuilding(x, z, b);
+        const inside = (isPointInPolygon && b.pts && b.pts.length > 0)
+          ? isPointInPolygon(x, z, b.pts)
+          : isInsideBuilding(x, z, b);
         if (inside) {
           if (!bestRoof || roofY > bestRoof.roofY) {
             bestRoof = { roofY, building: b };
@@ -679,7 +681,9 @@ function createWalkingModule(opts) {
               // Allow if walker is at or above roof level (can walk on roof or land on it)
               if (walkerFeetY >= roofY - 1.0) continue;
 
-              const inside = isPointInPolygon ? isPointInPolygon(px, pz, b.pts) : isInsideBuilding(px, pz, b);
+              const inside = (isPointInPolygon && b.pts && b.pts.length > 0)
+                ? isPointInPolygon(px, pz, b.pts)
+                : isInsideBuilding(px, pz, b);
               if (inside) return true;
             }
           }

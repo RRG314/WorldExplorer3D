@@ -39,7 +39,6 @@ Open `http://localhost:8000`.
 - Click-to-inspect deep-space objects (planets, asteroids, spacecraft, galaxies).
 - Persistent memory markers (pin/flower + short note) with in-world remove and bulk delete actions.
 - Minecraft-style brick block builder (place, stack, and remove blocks in-world).
-- Optional Supabase multiplayer sync layer for shared blocks + pins/flowers by nearby chunks.
 - Deterministic runtime seeding and complexity logic through RDT + RGE256-based paths.
 
 ## Core Features
@@ -50,7 +49,6 @@ Open `http://localhost:8000`.
 - Real-time road network, buildings, land use, POI overlays.
 - Real estate overlays (Estated, ATTOM, RentCast, and fallback data).
 - Persistent location memories: place/remove pins or flowers with 200-char messages.
-- Optional Supabase sync for shared memory markers and block edits across clients in the same area.
 - Minimap + full map with teleport and layer toggles.
 - POIs render on minimap/large map according to legend category filters.
 - Memory pins/flowers render on minimap/large map for location recall.
@@ -104,12 +102,52 @@ Block builder actions:
 - `Shift+Click` (build mode on) -> remove targeted block
 - `🎮 Game Mode` menu -> `🧱 Build Mode` and `🧹 Clear Blocks`
 
+## Performance Mode Switch (RDT vs Baseline)
+
+Use the built-in benchmark controls from the title screen:
+
+1. Open `Settings` tab.
+2. In `⚡ Performance Benchmark`, pick `RDT Optimized` or `Baseline (No RDT Budgeting)`.
+3. Optional: enable `Show live benchmark overlay in-game` (default is OFF each session).
+4. Click `Apply + Reload World`.
+5. Click `Copy Snapshot` to copy a JSON benchmark payload.
+
+In-game overlay placement:
+
+- Debug overlay (`\``) is centered between the speed HUD and mode HUD.
+- Benchmark overlay is centered between the mode HUD and `Main Menu`.
+- Both overlays auto-reposition on resize and when toggled so controls stay unobstructed.
+
+Snapshot fields to compare:
+
+- `lastLoad.loadMs`
+- `lastLoad.phases.fetchOverpass`
+- `renderer.calls`
+- `renderer.triangles`
+- `fps` and `frameMs`
+- `lastLoad.overpassSource` (`network` or `memory-cache`)
+
+## Supporting Benchmark Stats (Baltimore, 2026-02-14)
+
+Measured from in-app snapshot exports:
+
+| Scenario | overpassSource | loadMs | fetchOverpass | fps | frameMs | draw calls | triangles |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline (network) | `network` | `5551` | `4267` | `60.00` | `16.71` | `453` | `2,888,718` |
+| RDT (network) | `network` | `4669` | `3519` | `60.00` | `16.67` | `1149` | `2,174,223` |
+| RDT (repeat load) | `memory-cache` | `2202-2246` | `0` | `59.99-60.00` | `16.59-16.66` | `957-1131` | `2,250,431-2,259,359` |
+
+Interpretation:
+
+- RDT startup is faster than baseline in the captured run.
+- Repeat RDT loads are substantially faster due to memory-cached Overpass responses.
+- Draw calls in RDT are still higher than baseline and remain an active tuning area.
+
 ## Persistent Memory Markers
 
 - Marker types: `Pin` and `Flower`
 - Message length: up to `200` characters
 - Storage: browser `localStorage` (`worldExplorer3D.memories.v1`)
-- Optional multiplayer backend: Supabase (`public.world_placeables`) for shared markers
 - Scope: Earth-mode, per location center key (`LOC` rounded to 5 decimals)
 - Limits: `300` per location, `1500` total, ~`1500KB` max payload
 - Persistence guard: placement is disabled if browser storage round-trip check fails
@@ -123,7 +161,6 @@ Block builder actions:
 ## Persistent Build Blocks
 
 - Storage: browser `localStorage` (`worldExplorer3D.buildBlocks.v1`)
-- Optional multiplayer backend: Supabase (`public.world_placeables`) for shared block edits
 - Scope: per location center key (`LOC` rounded to 5 decimals)
 - In-world behavior: place/stack/remove blocks and stand or climb on them in walking mode
 - Build limit: `100` max blocks for now
@@ -132,8 +169,7 @@ Block builder actions:
 
 ## Security and Storage Notice
 
-- Memory notes are stored locally in this browser profile, not encrypted.
-- Optional Supabase sync shares memory text and block edits with other clients in the same area.
+- Memory notes are stored locally in this browser profile, not encrypted, and not auto-synced to other devices.
 - Anyone with access to this browser profile can read local memory notes.
 - Clearing site data or browser storage will remove saved memories.
 - Do not store secrets, credentials, or sensitive personal information in memory notes.
@@ -146,7 +182,7 @@ Block builder actions:
 - Runtime is split into multiple JS files (`js/*.js`) with no build step.
 - Shared/global runtime state is still used across core systems.
 - ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
-- Cache-bust version alignment across loader chain is currently `v=35`.
+- Cache-bust version alignment across loader chain is currently `v=50`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
 ## Freeze Snapshot (2026-02-14)
@@ -163,6 +199,8 @@ Block builder actions:
 - Restored POI marker rendering on minimap and large map by legend category filters.
 - Added Minecraft-style brick block builder with stacking/removal controls.
 - Added persistent per-location block storage and walk-mode climbing support on placed blocks.
+- Added runtime performance benchmark mode switch (`RDT` vs `Baseline`) with in-game snapshot export.
+- Added Overpass endpoint preference plus memory-cache reuse for faster repeat city loads.
 
 ## Repository Structure
 
@@ -195,7 +233,6 @@ js/
   map.js
   memory.js
   blocks.js
-  sync.js
   ui.js
   main.js
 ```
@@ -225,7 +262,6 @@ Current direction:
 - `CONTRIBUTING.md` - contribution workflow
 - `CHANGELOG.md` - release history
 - `SECURITY_STORAGE_NOTICE.md` - persistent-memory storage and security disclaimer boilerplate
-- `SUPABASE_SETUP.md` - multiplayer sync setup + SQL schema notes
 
 ## Known Issues / Help Wanted
 
