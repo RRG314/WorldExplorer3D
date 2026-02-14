@@ -337,9 +337,10 @@ function getWorldLodThresholds(loadDepth, mode = getPerfModeValue()) {
     }
 
     const depth = Math.max(0, loadDepth | 0);
-    const near = Math.max(700, 1250 - depth * 70);
-    const mid = near + 850;
-    return { near, mid, farVisible: mid + 260 };
+    // RDT keeps tighter budgets, but avoid overly aggressive pop-in.
+    const near = Math.max(900, 1450 - depth * 55);
+    const mid = near + 1250;
+    return { near, mid, farVisible: mid + 380 };
 }
 
 function getAdaptiveLoadProfile(loadDepth, mode = getPerfModeValue()) {
@@ -588,7 +589,9 @@ function batchMidLodBuildingMeshes() {
     const instanced = new THREE.InstancedMesh(instGeom, instMat, mids.length);
     instanced.castShadow = false;
     instanced.receiveShadow = true;
-    instanced.frustumCulled = true;
+    // InstancedMesh bounds can become stale for large-spread instance sets.
+    // Keep visible and rely on explicit world LOD gating to avoid pop/disappear artifacts.
+    instanced.frustumCulled = false;
     instanced.userData = {
         lodTier: 'mid',
         isBuildingBatch: true,
@@ -1788,12 +1791,14 @@ async function loadRoads() {
                 if (!verts.length || !indices.length) return null;
                 const geo = new THREE.BufferGeometry();
                 geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-                geo.setIndex(indices);
+                const vertexCount = verts.length / 3;
+                const indexArray = vertexCount > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
+                geo.setIndex(new THREE.BufferAttribute(indexArray, 1));
                 geo.computeVertexNormals();
                 const mesh = new THREE.Mesh(geo, material);
                 mesh.renderOrder = renderOrder;
                 mesh.receiveShadow = true;
-                mesh.frustumCulled = true;
+                mesh.frustumCulled = false;
                 if (userData && typeof userData === 'object') {
                     Object.assign(mesh.userData, userData);
                 }
@@ -1871,10 +1876,10 @@ async function loadRoads() {
 
                 if (lodTier === 'mid' && useRdtBudgeting) {
                     const midKeepRatio =
-                        rdtLoadComplexity >= 6 ? 0.32 :
-                        rdtLoadComplexity === 5 ? 0.45 :
-                        rdtLoadComplexity === 4 ? 0.58 :
-                                                  0.72;
+                        rdtLoadComplexity >= 6 ? 0.62 :
+                        rdtLoadComplexity === 5 ? 0.70 :
+                        rdtLoadComplexity === 4 ? 0.78 :
+                                                  0.86;
                     if (br1 > midKeepRatio) {
                         loadMetrics.lod.midSkipped += 1;
                         return;
@@ -2938,14 +2943,17 @@ function updateWorldLod(force = false) {
 
     if (!force && _lastLodReady) {
         const moved = Math.hypot(refX - _lastLodRefX, refZ - _lastLodRefZ);
-        if (moved < 20) return;
+        const minMoveForLodUpdate = droneMode ? 8 : 12;
+        if (moved < minMoveForLodUpdate) return;
     }
     _lastLodRefX = refX;
     _lastLodRefZ = refZ;
     _lastLodReady = true;
 
     const mode = getPerfModeValue();
-    const depthForLod = (typeof rdtComplexity === 'number') ? rdtComplexity : 0;
+    const depthForLod = (typeof rdtLoadComplexity === 'number')
+        ? rdtLoadComplexity
+        : ((typeof rdtComplexity === 'number') ? rdtComplexity : 0);
     const lodThresholds = getWorldLodThresholds(depthForLod, mode);
     const poiMidSq = lodThresholds.mid * lodThresholds.mid;
 
@@ -2955,6 +2963,15 @@ function updateWorldLod(force = false) {
     for (let i = 0; i < buildingMeshes.length; i++) {
         const mesh = buildingMeshes[i];
         if (!mesh) continue;
+
+        if (mesh.userData?.isBuildingBatch) {
+            mesh.visible = true;
+            const tier = mesh.userData?.lodTier || 'near';
+            const count = Math.max(1, mesh.userData?.batchCount || 1);
+            if (tier === 'mid') midVisible += count;
+            else nearVisible += count;
+            continue;
+        }
 
         const center = getMeshLodCenter(mesh);
         if (!center) continue;
@@ -3003,6 +3020,11 @@ function updateWorldLod(force = false) {
         }
         if (alwaysVisible) {
             mesh.visible = true;
+            continue;
+        }
+
+        if (mesh.userData?.isLanduseBatch) {
+            mesh.visible = !!landUseVisible;
             continue;
         }
 

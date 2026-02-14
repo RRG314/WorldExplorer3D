@@ -866,12 +866,14 @@ function rebuildRoadsWithTerrain() {
     if (!verts.length || !indices.length) return null;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-    geo.setIndex(indices);
+    const vertexCount = verts.length / 3;
+    const indexArray = vertexCount > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
+    geo.setIndex(new THREE.BufferAttribute(indexArray, 1));
     geo.computeVertexNormals();
     const mesh = new THREE.Mesh(geo, material);
     mesh.renderOrder = renderOrder;
     mesh.receiveShadow = true;
-    mesh.frustumCulled = true;
+    mesh.frustumCulled = false;
     Object.assign(mesh.userData, userData);
     scene.add(mesh);
     roadMeshes.push(mesh);
