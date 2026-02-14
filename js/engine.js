@@ -1750,6 +1750,9 @@ function init() {
     });
 
     setupUI();
+    if (typeof initializeRegisteredFeatures === 'function') {
+        initializeRegisteredFeatures({ reason: 'engine-init' });
+    }
     renderLoop();
 }
 

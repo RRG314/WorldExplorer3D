@@ -639,6 +639,7 @@ Key implementation files:
 - Marker types: `pin` and `flower`
 - Message length cap: `200` characters
 - Storage key: `worldExplorer3D.memories.v1`
+- Storage schema: `schemaVersion: 2` payload with legacy-array migration on load
 - Limits: `300` per location, `1500` total, ~`1500KB` serialized payload cap
 - Placement guard: storage round-trip verification must pass before placement is enabled
 - Removal: click marker hitbox in world, then use `Remove Marker`
@@ -656,6 +657,9 @@ Core public hooks:
 - `clearMemoryMarkersForWorldReload()`
 - `getMemoryPersistenceStatus()`
 - `getMemoryEntriesForCurrentLocation()`
+- `exportMemoryPack({ scope })`
+- `importMemoryPack(rawPack, { conflictMode })`
+- `downloadMemoryPack({ scope })`
 
 ## Brick Block Builder
 
@@ -666,6 +670,7 @@ Core public hooks:
 - Remove: `Shift + Click` an existing placed block
 - Stacking: clicks on existing block faces place adjacent blocks by face normal
 - Persistence: blocks are saved in Earth mode per location in localStorage (`worldExplorer3D.buildBlocks.v1`)
+- Storage schema: `schemaVersion: 2` payload with legacy-array migration on load
 - Limit: currently capped to `100` blocks maximum
 - Clear control: `🎮 Game Mode` -> `🧹 Clear Blocks` removes current-location rendered + saved blocks
 - Reload behavior: rendered blocks are cleared during `loadRoads()`, then current-location saved blocks are rehydrated
@@ -683,6 +688,15 @@ Core public hooks:
 - `getBuildLimits()`
 - `getBuildPersistenceStatus()`
 - `refreshBlockBuilderForCurrentLocation()`
+- `exportBuildPack({ scope })`
+- `importBuildPack(rawPack, { conflictMode })`
+- `downloadBuildPack({ scope })`
+
+Cross-system world edits pack (platform registry):
+
+- `exportWorldEditsPack({ scope })`
+- `importWorldEditsPack(rawPack, { conflictMode })`
+- `downloadWorldEditsPack({ scope })`
 
 ## Security and Storage Notes
 

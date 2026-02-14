@@ -48,6 +48,7 @@ Fallback (manual branch publish):
 - Persistent memory markers (pin/flower + short note) with in-world remove and bulk delete actions.
 - Minecraft-style brick block builder (place, stack, and remove blocks in-world).
 - Deterministic runtime seeding and complexity logic through RDT + RGE256-based paths.
+- Platform feature registry with lifecycle hooks and capability APIs (`js/platform-registry.js`).
 
 ## Core Features
 
@@ -156,6 +157,7 @@ Interpretation:
 - Marker types: `Pin` and `Flower`
 - Message length: up to `200` characters
 - Storage: browser `localStorage` (`worldExplorer3D.memories.v1`)
+- Schema: versioned payload (`schemaVersion: 2`) with automatic migration from legacy array storage
 - Scope: Earth-mode, per location center key (`LOC` rounded to 5 decimals)
 - Limits: `300` per location, `1500` total, ~`1500KB` max payload
 - Persistence guard: placement is disabled if browser storage round-trip check fails
@@ -165,15 +167,30 @@ Interpretation:
 - Surface snap: markers render on top of the highest local surface (build blocks, building roofs, then ground)
 - Legend filters: `📍 Pin` and `🌸 Flower` checkboxes control visibility independently
 - Verification: run `getMemoryPersistenceStatus()` in browser console
+- Import/export:
+  - `exportMemoryPack({ scope: 'current' | 'all' })`
+  - `importMemoryPack(jsonOrObject, { conflictMode: 'keep-existing' | 'replace-location' | 'replace-all' })`
+  - `downloadMemoryPack({ scope: 'current' | 'all' })`
 
 ## Persistent Build Blocks
 
 - Storage: browser `localStorage` (`worldExplorer3D.buildBlocks.v1`)
+- Schema: versioned payload (`schemaVersion: 2`) with automatic migration from legacy array storage
 - Scope: per location center key (`LOC` rounded to 5 decimals)
 - In-world behavior: place/stack/remove blocks and stand or climb on them in walking mode
 - Build limit: `100` max blocks for now
 - Clear behavior: `🧹 Clear Blocks` removes rendered and saved blocks for the current location
 - Verification: run `getBuildPersistenceStatus()` in browser console
+- Import/export:
+  - `exportBuildPack({ scope: 'current' | 'all' })`
+  - `importBuildPack(jsonOrObject, { conflictMode: 'keep-existing' | 'replace-location' | 'replace-all' })`
+  - `downloadBuildPack({ scope: 'current' | 'all' })`
+
+Cross-system world edits pack:
+
+- `exportWorldEditsPack({ scope: 'current' | 'all' })`
+- `importWorldEditsPack(jsonOrObject, { conflictMode: 'keep-existing' | 'replace-location' | 'replace-all' })`
+- `downloadWorldEditsPack({ scope: 'current' | 'all' })`
 
 ## Security and Storage Notice
 

@@ -4,6 +4,11 @@
 
 const MEMORY_STORAGE_KEY = 'worldExplorer3D.memories.v1';
 const MEMORY_STORAGE_TEST_KEY = 'worldExplorer3D.memories.test';
+const MEMORY_SCHEMA_VERSION = 2;
+const MEMORY_PACK_KIND = 'worldExplorer3D.memoryPack';
+const MEMORY_CONFLICT_KEEP_EXISTING = 'keep-existing';
+const MEMORY_CONFLICT_REPLACE_LOCATION = 'replace-location';
+const MEMORY_CONFLICT_REPLACE_ALL = 'replace-all';
 const MEMORY_MAX_MESSAGE_LENGTH = 200;
 const MEMORY_MAX_LOCATION_LABEL_LENGTH = 120;
 const MEMORY_MAX_PER_LOCATION = 300;
@@ -54,6 +59,156 @@ function parseDateSafe(iso) {
     return dt.toISOString();
 }
 
+function createMemoryEntryId() {
+    return `mem_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeLocationKey(rawKey, lat = null, lon = null) {
+    const key = String(rawKey || '').trim();
+    if (key) return key;
+    const currentKey = getCurrentLocationKey();
+    if (currentKey) return currentKey;
+    if (isFiniteNumber(lat) && isFiniteNumber(lon)) {
+        return `${lat.toFixed(MEMORY_LOCATION_PRECISION)},${lon.toFixed(MEMORY_LOCATION_PRECISION)}`;
+    }
+    return '';
+}
+
+function sanitizeMemoryEntries(entries) {
+    if (!Array.isArray(entries)) return [];
+    const normalized = entries.map(normalizeMemoryEntry).filter(Boolean);
+    if (normalized.length <= MEMORY_MAX_TOTAL) return normalized;
+    return normalized.slice(normalized.length - MEMORY_MAX_TOTAL);
+}
+
+function parseMemoryPayload(rawParsed) {
+    if (Array.isArray(rawParsed)) {
+        return {
+            schemaVersion: 1,
+            entries: rawParsed,
+            migrated: true
+        };
+    }
+    if (rawParsed && typeof rawParsed === 'object') {
+        const schemaVersion = Number(rawParsed.schemaVersion || rawParsed.version || 1);
+        const entries = Array.isArray(rawParsed.entries)
+            ? rawParsed.entries
+            : Array.isArray(rawParsed.memories)
+                ? rawParsed.memories
+                : null;
+        if (entries) {
+            return {
+                schemaVersion: Number.isFinite(schemaVersion) ? schemaVersion : 1,
+                entries,
+                migrated: schemaVersion !== MEMORY_SCHEMA_VERSION || !Array.isArray(rawParsed.entries)
+            };
+        }
+    }
+    return null;
+}
+
+function createMemoryPayload(entries, schemaVersion = MEMORY_SCHEMA_VERSION) {
+    return {
+        kind: MEMORY_PACK_KIND,
+        schemaVersion,
+        updatedAt: new Date().toISOString(),
+        entries: entries.map((entry) => ({
+            id: entry.id,
+            type: entry.type === 'flower' ? 'flower' : 'pin',
+            message: clampMessage(entry.message),
+            lat: Number(entry.lat),
+            lon: Number(entry.lon),
+            locationKey: normalizeLocationKey(entry.locationKey, Number(entry.lat), Number(entry.lon)),
+            locationLabel: clampLocationLabel(entry.locationLabel),
+            createdAt: parseDateSafe(entry.createdAt)
+        }))
+    };
+}
+
+function getMemoryConflictMode(raw) {
+    const value = String(raw || MEMORY_CONFLICT_KEEP_EXISTING).toLowerCase();
+    if (value === MEMORY_CONFLICT_REPLACE_LOCATION) return MEMORY_CONFLICT_REPLACE_LOCATION;
+    if (value === MEMORY_CONFLICT_REPLACE_ALL) return MEMORY_CONFLICT_REPLACE_ALL;
+    return MEMORY_CONFLICT_KEEP_EXISTING;
+}
+
+function dedupeMemoryEntriesById(entries) {
+    const byId = new Map();
+    entries.forEach((entry) => {
+        const normalized = normalizeMemoryEntry(entry);
+        if (!normalized) return;
+        const existing = byId.get(normalized.id);
+        if (!existing) {
+            byId.set(normalized.id, normalized);
+            return;
+        }
+        const existingTs = new Date(existing.createdAt).getTime();
+        const candidateTs = new Date(normalized.createdAt).getTime();
+        if (!Number.isFinite(existingTs) || candidateTs >= existingTs) {
+            byId.set(normalized.id, normalized);
+        }
+    });
+    return Array.from(byId.values()).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+}
+
+function mergeImportedMemoryEntries(importedEntries, conflictMode) {
+    const normalizedImported = dedupeMemoryEntriesById(importedEntries);
+    if (normalizedImported.length === 0) {
+        return {
+            nextEntries: memoryEntries.slice(),
+            importedCount: 0,
+            skippedCount: 0,
+            removedCount: 0
+        };
+    }
+
+    if (conflictMode === MEMORY_CONFLICT_REPLACE_ALL) {
+        const trimmed = normalizedImported.length <= MEMORY_MAX_TOTAL
+            ? normalizedImported
+            : normalizedImported.slice(normalizedImported.length - MEMORY_MAX_TOTAL);
+        return {
+            nextEntries: trimmed,
+            importedCount: trimmed.length,
+            skippedCount: Math.max(0, normalizedImported.length - trimmed.length),
+            removedCount: memoryEntries.length
+        };
+    }
+
+    let baseEntries = memoryEntries.slice();
+    let removedCount = 0;
+    if (conflictMode === MEMORY_CONFLICT_REPLACE_LOCATION) {
+        const replaceKeys = new Set(normalizedImported.map((entry) => entry.locationKey).filter(Boolean));
+        const originalCount = baseEntries.length;
+        baseEntries = baseEntries.filter((entry) => !replaceKeys.has(entry.locationKey));
+        removedCount = originalCount - baseEntries.length;
+    }
+
+    const existingIds = new Set(baseEntries.map((entry) => entry.id));
+    const merged = baseEntries.slice();
+    let importedCount = 0;
+    let skippedCount = 0;
+
+    normalizedImported.forEach((entry) => {
+        if (existingIds.has(entry.id)) {
+            skippedCount += 1;
+            return;
+        }
+        merged.push(entry);
+        existingIds.add(entry.id);
+        importedCount += 1;
+    });
+
+    const trimmed = merged.length <= MEMORY_MAX_TOTAL ? merged : merged.slice(merged.length - MEMORY_MAX_TOTAL);
+    skippedCount += Math.max(0, merged.length - trimmed.length);
+
+    return {
+        nextEntries: trimmed,
+        importedCount,
+        skippedCount,
+        removedCount
+    };
+}
+
 function detectPersistentStorage() {
     try {
         if (!globalThis.localStorage) {
@@ -75,7 +230,8 @@ function getMemoryPersistenceStatus() {
     return {
         enabled: memoryPersistenceEnabled,
         detail: memoryPersistenceDetail,
-        storageKey: MEMORY_STORAGE_KEY
+        storageKey: MEMORY_STORAGE_KEY,
+        schemaVersion: MEMORY_SCHEMA_VERSION
     };
 }
 
@@ -173,12 +329,12 @@ function normalizeMemoryEntry(raw) {
     const lon = Number(raw.lon);
     if (!message || !isFiniteNumber(lat) || !isFiniteNumber(lon) || !isValidLatLon(lat, lon)) return null;
     return {
-        id: String(raw.id || `mem_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
+        id: String(raw.id || createMemoryEntryId()),
         type: raw.type === 'flower' ? 'flower' : 'pin',
         message,
         lat,
         lon,
-        locationKey: String(raw.locationKey || ''),
+        locationKey: normalizeLocationKey(raw.locationKey, lat, lon),
         locationLabel: clampLocationLabel(raw.locationLabel),
         createdAt: parseDateSafe(raw.createdAt)
     };
@@ -190,10 +346,17 @@ function loadMemoryEntriesFromStorage() {
         const raw = localStorage.getItem(MEMORY_STORAGE_KEY);
         if (!raw) return [];
         const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-        const normalized = parsed.map(normalizeMemoryEntry).filter(Boolean);
-        if (normalized.length <= MEMORY_MAX_TOTAL) return normalized;
-        return normalized.slice(normalized.length - MEMORY_MAX_TOTAL);
+        const payload = parseMemoryPayload(parsed);
+        if (!payload) return [];
+        const normalized = sanitizeMemoryEntries(payload.entries);
+        if (payload.migrated) {
+            try {
+                localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(createMemoryPayload(normalized)));
+            } catch (migrationErr) {
+                console.warn('[memory] Failed to persist migrated payload:', migrationErr);
+            }
+        }
+        return normalized;
     } catch (err) {
         console.warn('[memory] Failed to read storage:', err);
         return [];
@@ -203,13 +366,19 @@ function loadMemoryEntriesFromStorage() {
 function saveMemoryEntriesToStorage() {
     if (!memoryPersistenceEnabled) return false;
     try {
-        const payload = JSON.stringify(memoryEntries);
-        if (payload.length > MEMORY_MAX_STORAGE_BYTES) {
+        const sanitizedEntries = sanitizeMemoryEntries(memoryEntries);
+        if (sanitizedEntries.length !== memoryEntries.length) {
+            memoryEntries = sanitizedEntries;
+        }
+
+        const payloadObj = createMemoryPayload(memoryEntries);
+        const serializedPayload = JSON.stringify(payloadObj);
+        if (serializedPayload.length > MEMORY_MAX_STORAGE_BYTES) {
             memoryPersistenceDetail = `Storage limit reached (${Math.round(MEMORY_MAX_STORAGE_BYTES / 1024)}KB). Remove some memories and try again.`;
             updatePersistenceHint();
             return false;
         }
-        localStorage.setItem(MEMORY_STORAGE_KEY, payload);
+        localStorage.setItem(MEMORY_STORAGE_KEY, serializedPayload);
         return true;
     } catch (err) {
         memoryPersistenceEnabled = false;
@@ -527,6 +696,94 @@ function removeAllMemories() {
     return true;
 }
 
+function buildMemoryExportPack(scope = 'current') {
+    const resolvedScope = scope === 'all' ? 'all' : 'current';
+    const sourceEntries = resolvedScope === 'all' ? memoryEntries : getEntriesForCurrentLocation();
+    return {
+        kind: MEMORY_PACK_KIND,
+        schemaVersion: MEMORY_SCHEMA_VERSION,
+        exportedAt: new Date().toISOString(),
+        scope: resolvedScope,
+        locationKey: resolvedScope === 'current' ? getCurrentLocationKey() : null,
+        locationLabel: resolvedScope === 'current' ? clampLocationLabel(getCurrentLocationLabel()) : null,
+        entries: sourceEntries.map((entry) => ({
+            id: entry.id,
+            type: entry.type === 'flower' ? 'flower' : 'pin',
+            message: clampMessage(entry.message),
+            lat: Number(entry.lat),
+            lon: Number(entry.lon),
+            locationKey: normalizeLocationKey(entry.locationKey, Number(entry.lat), Number(entry.lon)),
+            locationLabel: clampLocationLabel(entry.locationLabel),
+            createdAt: parseDateSafe(entry.createdAt)
+        }))
+    };
+}
+
+function exportMemoryPack(options = {}) {
+    return buildMemoryExportPack(options.scope);
+}
+
+function downloadMemoryPack(options = {}) {
+    const pack = buildMemoryExportPack(options.scope);
+    if (typeof document === 'undefined' || typeof Blob === 'undefined' || typeof URL === 'undefined') {
+        return false;
+    }
+    const scopeLabel = pack.scope === 'all' ? 'all' : (pack.locationKey || 'current');
+    const safeScope = String(scopeLabel).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const fileName = options.fileName || `worldexplorer3d-memory-${safeScope}-${Date.now()}.json`;
+    const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json' });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = href;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 0);
+    return true;
+}
+
+function importMemoryPack(rawPack, options = {}) {
+    if (!memoryPersistenceEnabled) {
+        return { ok: false, error: 'Persistent storage unavailable.' };
+    }
+
+    let parsed;
+    try {
+        parsed = typeof rawPack === 'string' ? JSON.parse(rawPack) : rawPack;
+    } catch (err) {
+        return { ok: false, error: `Invalid JSON: ${err && err.message ? err.message : String(err)}` };
+    }
+
+    const payload = parseMemoryPayload(parsed);
+    if (!payload) {
+        return { ok: false, error: 'Unsupported memory pack format.' };
+    }
+
+    const importedEntries = sanitizeMemoryEntries(payload.entries);
+    const conflictMode = getMemoryConflictMode(options.conflictMode || options.conflict);
+    const mergeResult = mergeImportedMemoryEntries(importedEntries, conflictMode);
+    const previousEntries = memoryEntries.slice();
+    memoryEntries = mergeResult.nextEntries;
+
+    if (!saveMemoryEntriesToStorage()) {
+        memoryEntries = previousEntries;
+        return { ok: false, error: memoryPersistenceDetail || 'Failed to persist imported memories.' };
+    }
+
+    refreshMemoryMarkersForCurrentLocation();
+    return {
+        ok: true,
+        schemaVersion: MEMORY_SCHEMA_VERSION,
+        importedTotal: importedEntries.length,
+        importedApplied: mergeResult.importedCount,
+        skipped: mergeResult.skippedCount,
+        removed: mergeResult.removedCount,
+        totalAfterImport: memoryEntries.length,
+        conflictMode
+    };
+}
+
 function placeMemoryFromComposer() {
     if (!gameStarted) return;
     if (!memoryPersistenceEnabled) {
@@ -578,7 +835,7 @@ function placeMemoryFromComposer() {
 
     const nowIso = new Date().toISOString();
     const entry = {
-        id: `mem_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+        id: createMemoryEntryId(),
         type: selectedMemoryType === 'flower' ? 'flower' : 'pin',
         message,
         lat: Number(latLon.lat.toFixed(7)),
@@ -708,6 +965,35 @@ function setupMemoryUI() {
     updatePersistenceHint();
 }
 
+function registerMemoryFeature() {
+    if (typeof registerFeature !== 'function') return;
+    registerFeature({
+        id: 'memory.markers',
+        name: 'Memory Markers',
+        version: '1.0.0',
+        init() {
+            setupMemoryUI();
+        },
+        onEnvEnter(nextEnv) {
+            if (nextEnv === (globalThis.ENV && globalThis.ENV.EARTH)) {
+                refreshMemoryMarkersForCurrentLocation();
+            }
+        },
+        onEnvExit(prevEnv, nextEnv) {
+            if (prevEnv === (globalThis.ENV && globalThis.ENV.EARTH) && nextEnv !== prevEnv) {
+                closeMemoryComposer();
+                hideMemoryInfo();
+                clearRenderedMemoryMarkers();
+            }
+        },
+        dispose() {
+            closeMemoryComposer();
+            hideMemoryInfo();
+            clearRenderedMemoryMarkers();
+        }
+    }, { replace: true });
+}
+
 {
     const storageState = detectPersistentStorage();
     memoryPersistenceEnabled = storageState.enabled;
@@ -715,11 +1001,15 @@ function setupMemoryUI() {
 }
 memoryEntries = loadMemoryEntriesFromStorage();
 bindMemorySceneClick();
+registerMemoryFeature();
 
 Object.assign(globalThis, {
     clearMemoryMarkersForWorldReload,
     closeMemoryComposer,
+    downloadMemoryPack,
+    exportMemoryPack,
     getMemoryEntriesForCurrentLocation,
+    importMemoryPack,
     getMemoryPersistenceStatus,
     openMemoryComposer,
     refreshMemoryMarkersForCurrentLocation,
@@ -729,7 +1019,10 @@ Object.assign(globalThis, {
 export {
     clearMemoryMarkersForWorldReload,
     closeMemoryComposer,
+    downloadMemoryPack,
+    exportMemoryPack,
     getMemoryEntriesForCurrentLocation,
+    importMemoryPack,
     getMemoryPersistenceStatus,
     openMemoryComposer,
     refreshMemoryMarkersForCurrentLocation,

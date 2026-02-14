@@ -3,6 +3,7 @@
 import './rdt.js?v=50';
 import './config.js?v=50';
 import './state.js?v=50';
+import './platform-registry.js?v=50';
 import './perf.js?v=50';
 import './env.js?v=50';
 import './real-estate.js?v=50';

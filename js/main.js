@@ -83,6 +83,9 @@ function renderLoop(t = 0) {
     if (gameStarted) {
         update(dt);
         updateCamera();
+        if (typeof updateRegisteredFeatures === 'function') {
+            updateRegisteredFeatures(dt, { reason: 'render-loop' });
+        }
 
         // Throttle HUD DOM writes to ~15fps (every ~66ms)
         _hudTimer += dt;

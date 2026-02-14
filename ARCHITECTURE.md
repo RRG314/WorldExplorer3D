@@ -168,6 +168,7 @@ Runtime boot uses ES modules (`index.html` → `js/bootstrap.js` → `js/modules
 | `config.js` | ~100 | Locations, scale, terrain settings, landuse/POI types |
 | `rdt.js` | ~90 | Recursive Division Tree depth metric, geo hashing, seeded RNG, self-tests |
 | `state.js` | ~630 | All state variables, star catalog data, constellation lines |
+| `platform-registry.js` | ~420 | Feature registry, lifecycle hooks, capability API, world edits pack helpers |
 | `env.js` | ~110 | Centralized environment state machine (Earth/Space Flight/Moon) |
 | `real-estate.js` | ~315 | Property API layer (Estated, ATTOM, RentCast) and demo data |
 | `ground.js` | ~136 | Unified ground height service (terrain, road surface, normals) |
@@ -184,8 +185,19 @@ Runtime boot uses ES modules (`index.html` → `js/bootstrap.js` → `js/modules
 | `hud.js` | ~299 | HUD updates, camera system, sky positioning |
 | `map.js` | ~723 | Minimap and large map rendering |
 | `memory.js` | ~535 | Persistent marker subsystem (pin/flower + note + remove flow) |
+| `blocks.js` | ~1000 | Persistent block builder subsystem (place/stack/remove + collision integration) |
 | `main.js` | ~82 | Main render loop and environment dispatch |
 | `ui.js` | ~618 | UI setup, event binding, entry point (`init()` call) |
+
+### Platform Registry Layer
+
+`js/platform-registry.js` introduces a lightweight platform contract:
+
+- `registerFeature({ id, init, update, dispose, onEnvEnter, onEnvExit, ... })`
+- global lifecycle controls: `initializeRegisteredFeatures`, `updateRegisteredFeatures`, `disposeRegisteredFeatures`
+- transition notifications from `env.js` via `notifyFeatureEnvTransition(oldEnv, newEnv)`
+- capability API via `registerCapability` / `getCapability` (ground, surface, raycast, world refs, UI slots)
+- cross-system edit portability helpers: `exportWorldEditsPack`, `importWorldEditsPack`, `downloadWorldEditsPack`
 
 ---
 ## Deterministic RDT Layer

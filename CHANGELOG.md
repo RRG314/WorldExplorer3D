@@ -35,6 +35,8 @@ Entries reflect changes made relative to the most recent public release.
 - GitHub Actions workflows for CI (`.github/workflows/ci.yml`) and Pages deployment (`.github/workflows/pages.yml`).
 - PR template for structured contributor submissions (`.github/pull_request_template.md`).
 - Repository Pages readiness validator script (`.github/scripts/check-pages-readiness.mjs`).
+- Platform feature registry module (`js/platform-registry.js`) with lifecycle hooks and capability API.
+- Memory/block import-export APIs with bundled world-edits pack export/import helpers.
 
 ### Changed
 - Technical documentation examples now show deterministic RNG usage patterns aligned with the `rdt.js` seeded runtime helpers.
@@ -47,6 +49,7 @@ Entries reflect changes made relative to the most recent public release.
 - Top benchmark/debug overlays now auto-anchor between top HUD widgets to avoid overlap with controls.
 - Module loader cache-bust chain incremented through `v=50` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 - Core docs now include benchmark workflow instructions and supporting measured stats for RDT vs baseline and cache-backed repeat loads.
+- Persistent memory and build-block storage now use versioned payloads with migration from legacy array saves.
 
 ### Fixed
 - Non-responsive title menu interactions for suggested/custom selection after UI rework.

@@ -9,6 +9,11 @@ const BUILD_BLOCK_COLORS = [0xb55239, 0xa74631, 0x9a3d2b, 0xc16345];
 
 const BUILD_STORAGE_KEY = 'worldExplorer3D.buildBlocks.v1';
 const BUILD_STORAGE_TEST_KEY = 'worldExplorer3D.buildBlocks.test';
+const BUILD_SCHEMA_VERSION = 2;
+const BUILD_PACK_KIND = 'worldExplorer3D.buildPack';
+const BUILD_CONFLICT_KEEP_EXISTING = 'keep-existing';
+const BUILD_CONFLICT_REPLACE_LOCATION = 'replace-location';
+const BUILD_CONFLICT_REPLACE_ALL = 'replace-all';
 const BUILD_LOCATION_PRECISION = 5;
 const BUILD_MAX_PER_LOCATION = 100;
 const BUILD_MAX_TOTAL = 100;
@@ -83,6 +88,163 @@ function latLonToWorldSafe(lat, lon) {
     return { x, z };
 }
 
+function createBuildEntryId() {
+    return `blk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeBuildLocationKey(rawKey, lat = null, lon = null) {
+    const key = String(rawKey || '').trim();
+    if (key) return key;
+    const currentKey = getCurrentLocationKey();
+    if (currentKey) return currentKey;
+    if (isFiniteNumber(lat) && isFiniteNumber(lon)) {
+        return `${lat.toFixed(BUILD_LOCATION_PRECISION)},${lon.toFixed(BUILD_LOCATION_PRECISION)}`;
+    }
+    return '';
+}
+
+function sanitizeBuildEntries(entries) {
+    if (!Array.isArray(entries)) return [];
+    const normalized = entries.map(normalizeBuildEntry).filter(Boolean);
+    if (normalized.length <= BUILD_MAX_TOTAL) return normalized;
+    return normalized.slice(normalized.length - BUILD_MAX_TOTAL);
+}
+
+function parseBuildPayload(rawParsed) {
+    if (Array.isArray(rawParsed)) {
+        return {
+            schemaVersion: 1,
+            entries: rawParsed,
+            migrated: true
+        };
+    }
+    if (rawParsed && typeof rawParsed === 'object') {
+        const schemaVersion = Number(rawParsed.schemaVersion || rawParsed.version || 1);
+        const entries = Array.isArray(rawParsed.entries)
+            ? rawParsed.entries
+            : Array.isArray(rawParsed.blocks)
+                ? rawParsed.blocks
+                : null;
+        if (entries) {
+            return {
+                schemaVersion: Number.isFinite(schemaVersion) ? schemaVersion : 1,
+                entries,
+                migrated: schemaVersion !== BUILD_SCHEMA_VERSION || !Array.isArray(rawParsed.entries)
+            };
+        }
+    }
+    return null;
+}
+
+function createBuildPayload(entries, schemaVersion = BUILD_SCHEMA_VERSION) {
+    return {
+        kind: BUILD_PACK_KIND,
+        schemaVersion,
+        updatedAt: new Date().toISOString(),
+        entries: entries.map((entry) => ({
+            id: String(entry.id || createBuildEntryId()),
+            locationKey: normalizeBuildLocationKey(entry.locationKey, Number(entry.lat), Number(entry.lon)),
+            lat: Number(entry.lat),
+            lon: Number(entry.lon),
+            gx: Number.isInteger(entry.gx) ? entry.gx : null,
+            gy: Math.round(Number(entry.gy) || 0),
+            gz: Number.isInteger(entry.gz) ? entry.gz : null,
+            materialIndex: Number.isInteger(entry.materialIndex) ? entry.materialIndex : 0,
+            createdAt: String(entry.createdAt || new Date().toISOString())
+        }))
+    };
+}
+
+function getBuildConflictMode(raw) {
+    const value = String(raw || BUILD_CONFLICT_REPLACE_LOCATION).toLowerCase();
+    if (value === BUILD_CONFLICT_KEEP_EXISTING) return BUILD_CONFLICT_KEEP_EXISTING;
+    if (value === BUILD_CONFLICT_REPLACE_ALL) return BUILD_CONFLICT_REPLACE_ALL;
+    return BUILD_CONFLICT_REPLACE_LOCATION;
+}
+
+function getBuildEntryIdentity(entry) {
+    return `${normalizeBuildLocationKey(entry.locationKey, Number(entry.lat), Number(entry.lon))}|${entry.gx}|${entry.gy}|${entry.gz}`;
+}
+
+function dedupeBuildEntries(entries) {
+    const byIdentity = new Map();
+    entries.forEach((entry) => {
+        const normalized = normalizeBuildEntry(entry);
+        if (!normalized) return;
+        const key = getBuildEntryIdentity(normalized);
+        const existing = byIdentity.get(key);
+        if (!existing) {
+            byIdentity.set(key, normalized);
+            return;
+        }
+        const existingTs = new Date(existing.createdAt).getTime();
+        const candidateTs = new Date(normalized.createdAt).getTime();
+        if (!Number.isFinite(existingTs) || candidateTs >= existingTs) {
+            byIdentity.set(key, normalized);
+        }
+    });
+    return Array.from(byIdentity.values()).sort((a, b) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+}
+
+function mergeImportedBuildEntries(importedEntries, conflictMode) {
+    const normalizedImported = dedupeBuildEntries(importedEntries);
+    if (normalizedImported.length === 0) {
+        return {
+            nextEntries: buildEntries.slice(),
+            importedCount: 0,
+            skippedCount: 0,
+            removedCount: 0
+        };
+    }
+
+    if (conflictMode === BUILD_CONFLICT_REPLACE_ALL) {
+        const trimmed = normalizedImported.length <= BUILD_MAX_TOTAL
+            ? normalizedImported
+            : normalizedImported.slice(normalizedImported.length - BUILD_MAX_TOTAL);
+        return {
+            nextEntries: trimmed,
+            importedCount: trimmed.length,
+            skippedCount: Math.max(0, normalizedImported.length - trimmed.length),
+            removedCount: buildEntries.length
+        };
+    }
+
+    let baseEntries = buildEntries.slice();
+    let removedCount = 0;
+    if (conflictMode === BUILD_CONFLICT_REPLACE_LOCATION) {
+        const replaceKeys = new Set(normalizedImported.map((entry) => entry.locationKey).filter(Boolean));
+        const originalCount = baseEntries.length;
+        baseEntries = baseEntries.filter((entry) => !replaceKeys.has(entry.locationKey));
+        removedCount = originalCount - baseEntries.length;
+    }
+
+    const existingIdentity = new Set(baseEntries.map((entry) => getBuildEntryIdentity(entry)));
+    const merged = baseEntries.slice();
+    let importedCount = 0;
+    let skippedCount = 0;
+
+    normalizedImported.forEach((entry) => {
+        const identity = getBuildEntryIdentity(entry);
+        if (existingIdentity.has(identity)) {
+            skippedCount += 1;
+            return;
+        }
+        merged.push(entry);
+        existingIdentity.add(identity);
+        importedCount += 1;
+    });
+
+    const trimmed = merged.length <= BUILD_MAX_TOTAL ? merged : merged.slice(merged.length - BUILD_MAX_TOTAL);
+    skippedCount += Math.max(0, merged.length - trimmed.length);
+
+    return {
+        nextEntries: trimmed,
+        importedCount,
+        skippedCount,
+        removedCount
+    };
+}
+
 function detectBuildStorage() {
     try {
         if (!globalThis.localStorage) {
@@ -102,7 +264,8 @@ function getBuildPersistenceStatus() {
     return {
         enabled: buildPersistenceEnabled,
         detail: buildPersistenceDetail,
-        storageKey: BUILD_STORAGE_KEY
+        storageKey: BUILD_STORAGE_KEY,
+        schemaVersion: BUILD_SCHEMA_VERSION
     };
 }
 
@@ -156,9 +319,9 @@ function canPersistBuildBlocks() {
 
 function normalizeBuildEntry(raw) {
     if (!raw || typeof raw !== 'object') return null;
-    const locationKey = String(raw.locationKey || '');
     const lat = Number(raw.lat);
     const lon = Number(raw.lon);
+    const locationKey = normalizeBuildLocationKey(raw.locationKey, lat, lon);
     const gy = Number(raw.gy);
     const gx = Number(raw.gx);
     const gz = Number(raw.gz);
@@ -169,7 +332,7 @@ function normalizeBuildEntry(raw) {
     if (!isFiniteNumber(gy)) return null;
 
     return {
-        id: String(raw.id || `blk_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
+        id: String(raw.id || createBuildEntryId()),
         locationKey,
         lat: Number(lat.toFixed(7)),
         lon: Number(lon.toFixed(7)),
@@ -187,10 +350,17 @@ function loadBuildEntriesFromStorage() {
         const raw = localStorage.getItem(BUILD_STORAGE_KEY);
         if (!raw) return [];
         const parsed = JSON.parse(raw);
-        if (!Array.isArray(parsed)) return [];
-        const normalized = parsed.map(normalizeBuildEntry).filter(Boolean);
-        if (normalized.length <= BUILD_MAX_TOTAL) return normalized;
-        return normalized.slice(normalized.length - BUILD_MAX_TOTAL);
+        const payload = parseBuildPayload(parsed);
+        if (!payload) return [];
+        const normalized = sanitizeBuildEntries(payload.entries);
+        if (payload.migrated) {
+            try {
+                localStorage.setItem(BUILD_STORAGE_KEY, JSON.stringify(createBuildPayload(normalized)));
+            } catch (migrationErr) {
+                console.warn('[blocks] Failed to persist migrated payload:', migrationErr);
+            }
+        }
+        return normalized;
     } catch (err) {
         console.warn('[blocks] Failed to read storage:', err);
         return [];
@@ -200,7 +370,11 @@ function loadBuildEntriesFromStorage() {
 function saveBuildEntriesToStorage() {
     if (!buildPersistenceEnabled) return false;
     try {
-        localStorage.setItem(BUILD_STORAGE_KEY, JSON.stringify(buildEntries));
+        const sanitizedEntries = sanitizeBuildEntries(buildEntries);
+        if (sanitizedEntries.length !== buildEntries.length) {
+            buildEntries = sanitizedEntries;
+        }
+        localStorage.setItem(BUILD_STORAGE_KEY, JSON.stringify(createBuildPayload(buildEntries)));
         return true;
     } catch (err) {
         buildPersistenceEnabled = false;
@@ -496,6 +670,94 @@ function clearAllBuildBlocks(options = {}) {
     clearRenderedBuildBlocks();
 }
 
+function buildBlocksExportPack(scope = 'current') {
+    const resolvedScope = scope === 'all' ? 'all' : 'current';
+    const sourceEntries = resolvedScope === 'all' ? buildEntries : getBuildEntriesForCurrentLocation();
+    return {
+        kind: BUILD_PACK_KIND,
+        schemaVersion: BUILD_SCHEMA_VERSION,
+        exportedAt: new Date().toISOString(),
+        scope: resolvedScope,
+        locationKey: resolvedScope === 'current' ? getCurrentLocationKey() : null,
+        entries: sourceEntries.map((entry) => ({
+            id: String(entry.id || createBuildEntryId()),
+            locationKey: normalizeBuildLocationKey(entry.locationKey, Number(entry.lat), Number(entry.lon)),
+            lat: Number(entry.lat),
+            lon: Number(entry.lon),
+            gx: Number.isInteger(entry.gx) ? entry.gx : null,
+            gy: Math.round(Number(entry.gy) || 0),
+            gz: Number.isInteger(entry.gz) ? entry.gz : null,
+            materialIndex: Number.isInteger(entry.materialIndex) ? entry.materialIndex : 0,
+            createdAt: String(entry.createdAt || new Date().toISOString())
+        }))
+    };
+}
+
+function exportBuildPack(options = {}) {
+    return buildBlocksExportPack(options.scope);
+}
+
+function downloadBuildPack(options = {}) {
+    const pack = buildBlocksExportPack(options.scope);
+    if (typeof document === 'undefined' || typeof Blob === 'undefined' || typeof URL === 'undefined') {
+        return false;
+    }
+    const scopeLabel = pack.scope === 'all' ? 'all' : (pack.locationKey || 'current');
+    const safeScope = String(scopeLabel).replace(/[^a-zA-Z0-9._-]/g, '_');
+    const fileName = options.fileName || `worldexplorer3d-blocks-${safeScope}-${Date.now()}.json`;
+    const blob = new Blob([JSON.stringify(pack, null, 2)], { type: 'application/json' });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = href;
+    anchor.download = fileName;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    setTimeout(() => URL.revokeObjectURL(href), 0);
+    return true;
+}
+
+function importBuildPack(rawPack, options = {}) {
+    if (!buildPersistenceEnabled) {
+        return { ok: false, error: 'Persistent storage unavailable.' };
+    }
+
+    let parsed;
+    try {
+        parsed = typeof rawPack === 'string' ? JSON.parse(rawPack) : rawPack;
+    } catch (err) {
+        return { ok: false, error: `Invalid JSON: ${err && err.message ? err.message : String(err)}` };
+    }
+
+    const payload = parseBuildPayload(parsed);
+    if (!payload) {
+        return { ok: false, error: 'Unsupported build pack format.' };
+    }
+
+    const importedEntries = sanitizeBuildEntries(payload.entries);
+    const conflictMode = getBuildConflictMode(options.conflictMode || options.conflict);
+    const mergeResult = mergeImportedBuildEntries(importedEntries, conflictMode);
+    const previousEntries = buildEntries.slice();
+    buildEntries = mergeResult.nextEntries;
+
+    if (!saveBuildEntriesToStorage()) {
+        buildEntries = previousEntries;
+        return { ok: false, error: buildPersistenceDetail || 'Failed to persist imported blocks.' };
+    }
+
+    refreshBlockBuilderForCurrentLocation();
+    return {
+        ok: true,
+        schemaVersion: BUILD_SCHEMA_VERSION,
+        importedTotal: importedEntries.length,
+        importedApplied: mergeResult.importedCount,
+        skipped: mergeResult.skippedCount,
+        removed: mergeResult.removedCount,
+        totalAfterImport: buildEntries.length,
+        conflictMode
+    };
+}
+
 function forEachBlockAtWorldXZ(x, z, cb) {
     if (!Number.isFinite(x) || !Number.isFinite(z) || typeof cb !== 'function') return;
     const baseGX = toGridCoord(x);
@@ -713,21 +975,54 @@ function refreshBlockBuilderForCurrentLocation() {
     });
 }
 
+function registerBuildFeature() {
+    if (typeof registerFeature !== 'function') return;
+    registerFeature({
+        id: 'build.blocks',
+        name: 'Build Blocks',
+        version: '1.0.0',
+        init() {
+            ensureBuildGroup();
+        },
+        onEnvEnter(nextEnv) {
+            if (nextEnv === (globalThis.ENV && globalThis.ENV.EARTH)) {
+                refreshBlockBuilderForCurrentLocation();
+                return;
+            }
+            setBuildModeEnabled(false);
+        },
+        onEnvExit(prevEnv, nextEnv) {
+            if (prevEnv === (globalThis.ENV && globalThis.ENV.EARTH) && nextEnv !== prevEnv) {
+                setBuildModeEnabled(false);
+                clearRenderedBuildBlocks();
+            }
+        },
+        dispose() {
+            setBuildModeEnabled(false);
+            clearRenderedBuildBlocks();
+        }
+    }, { replace: true });
+}
+
 {
     const storageState = detectBuildStorage();
     buildPersistenceEnabled = storageState.enabled;
     buildPersistenceDetail = storageState.detail;
 }
 buildEntries = loadBuildEntriesFromStorage();
+registerBuildFeature();
 
 Object.assign(globalThis, {
     clearAllBuildBlocks,
     clearBlockBuilderForWorldReload,
+    downloadBuildPack,
+    exportBuildPack,
     getBuildCollisionAtWorldXZ,
     getBuildLimits,
     getBuildPersistenceStatus,
     getBuildTopSurfaceAtWorldXZ,
     handleBlockBuilderClick,
+    importBuildPack,
     placeBuildBlock,
     refreshBlockBuilderForCurrentLocation,
     setBuildModeEnabled,
@@ -737,11 +1032,14 @@ Object.assign(globalThis, {
 export {
     clearAllBuildBlocks,
     clearBlockBuilderForWorldReload,
+    downloadBuildPack,
+    exportBuildPack,
     getBuildCollisionAtWorldXZ,
     getBuildLimits,
     getBuildPersistenceStatus,
     getBuildTopSurfaceAtWorldXZ,
     handleBlockBuilderClick,
+    importBuildPack,
     placeBuildBlock,
     refreshBlockBuilderForCurrentLocation,
     setBuildModeEnabled,

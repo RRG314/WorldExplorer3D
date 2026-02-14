@@ -77,6 +77,9 @@ function switchEnv(newEnv) {
     if (typeof globalThis.updateControlsModeUI === 'function') {
         globalThis.updateControlsModeUI();
     }
+    if (typeof globalThis.notifyFeatureEnvTransition === 'function') {
+        globalThis.notifyFeatureEnvTransition(oldEnv, newEnv, { reason: 'switchEnv' });
+    }
 
     return true;
 }
