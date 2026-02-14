@@ -944,6 +944,7 @@ Explore the area
   const MODES = ['suggested', 'custom', 'moon', 'space'];
   const panelIds = { suggested: 'suggestedPanel', custom: 'customPanel', moon: 'moonPanel', space: 'spacePanel' };
   const buttonIds = { suggested: 'suggestedToggle', custom: 'customToggle', moon: 'moonToggle', space: 'spaceToggle' };
+  let didBindListeners = false;
 
   const fallbackSetTitleMode = (mode) => {
     const nextMode = MODES.includes(mode) ? mode : 'suggested';
@@ -979,24 +980,128 @@ Explore the area
     fallbackSetTitleMode('suggested');
   };
 
+  const fallbackSearchLocation = async () => {
+    const input = document.getElementById('locationSearch');
+    const status = document.getElementById('locationSearchStatus') || document.getElementById('searchStatus');
+    const latEl = document.getElementById('customLat');
+    const lonEl = document.getElementById('customLon');
+    if (!input || !status || !latEl || !lonEl) return;
+
+    const query = input.value.trim();
+    if (!query) {
+      status.textContent = 'Please enter a location';
+      status.style.color = '#dc2626';
+      return;
+    }
+
+    status.textContent = 'Searching...';
+    status.style.color = '#6b7280';
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    try {
+      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(query)}`;
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (!Array.isArray(data) || data.length === 0) {
+        throw new Error('Location not found');
+      }
+
+      const result = data.find(d => d.type === 'city' || d.type === 'town' || d.class === 'place') || data[0];
+      const lat = parseFloat(result.lat);
+      const lon = parseFloat(result.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('Invalid coordinates');
+
+      latEl.value = lat.toFixed(4);
+      lonEl.value = lon.toFixed(4);
+      globalThis.customLoc = { lat, lon, name: (result.display_name || query).split(',')[0] || query };
+      globalThis.selLoc = 'custom';
+      fallbackSetTitleMode('custom');
+
+      const name = globalThis.customLoc.name || query;
+      status.textContent = `✓ Found: ${name}`;
+      status.style.color = '#059669';
+    } catch (err) {
+      status.textContent = `✗ Search failed: ${err?.message || 'Unknown error'}`;
+      status.style.color = '#dc2626';
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  };
+
   globalThis.handleTitleModeClick = (mode) => {
     if (typeof globalThis.setTitleLocationMode === 'function') {
-      globalThis.setTitleLocationMode(mode);
-      return;
+      try { globalThis.setTitleLocationMode(mode); } catch (e) { console.warn('[title-ui] setTitleLocationMode failed:', e); }
     }
     fallbackSetTitleMode(mode);
   };
 
   globalThis.handleSuggestedCardClick = (targetEl) => {
     if (typeof globalThis.selectSuggestedLocationCard === 'function') {
-      globalThis.selectSuggestedLocationCard(targetEl);
-      return;
+      try { globalThis.selectSuggestedLocationCard(targetEl); } catch (e) { console.warn('[title-ui] selectSuggestedLocationCard failed:', e); }
     }
     fallbackSelectSuggestedCard(targetEl);
   };
 
+  globalThis.handleTitleSearchClick = async () => {
+    if (typeof globalThis.searchLocation === 'function') {
+      try {
+        await globalThis.searchLocation();
+        return;
+      } catch (e) {
+        console.warn('[title-ui] searchLocation failed, using fallback search:', e);
+      }
+    }
+    await fallbackSearchLocation();
+  };
+
+  const bindFallbackListeners = () => {
+    if (didBindListeners) return;
+    didBindListeners = true;
+
+    Object.entries(buttonIds).forEach(([mode, id]) => {
+      const button = document.getElementById(id);
+      if (!button) return;
+      button.addEventListener('click', () => globalThis.handleTitleModeClick(mode));
+    });
+
+    const suggestedPanel = document.getElementById('suggestedPanel');
+    if (suggestedPanel) {
+      suggestedPanel.addEventListener('click', (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const card = target.closest('.loc[data-loc]');
+        if (!card) return;
+        globalThis.handleSuggestedCardClick(card);
+      });
+    }
+
+    const searchBtn = document.getElementById('locationSearchBtn');
+    if (searchBtn) {
+      searchBtn.addEventListener('click', () => { void globalThis.handleTitleSearchClick(); });
+    }
+
+    const searchInput = document.getElementById('locationSearch');
+    if (searchInput) {
+      searchInput.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter') return;
+        event.preventDefault();
+        void globalThis.handleTitleSearchClick();
+      });
+    }
+  };
+
   const initFallback = () => {
-    if (typeof globalThis.setTitleLocationMode === 'function') return;
+    bindFallbackListeners();
+
+    // Ensure at least one suggested city is selected.
+    const defaultCard = document.querySelector('#suggestedPanel .loc.sel') || document.querySelector('#suggestedPanel .loc[data-loc="baltimore"]');
+    if (defaultCard && !document.querySelector('#suggestedPanel .loc.sel')) {
+      defaultCard.classList.add('sel');
+    }
+
     fallbackSetTitleMode(globalThis.selLoc === 'custom' ? 'custom' : 'suggested');
   };
 
@@ -1007,5 +1112,5 @@ Explore the area
   }
 })();
 </script>
-<script type="module" src="js/bootstrap.js?v=16"></script>
+<script type="module" src="js/bootstrap.js?v=17"></script>
 </body></html>
