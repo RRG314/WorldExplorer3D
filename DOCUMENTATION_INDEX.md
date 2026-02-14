@@ -40,8 +40,10 @@ The current branch documentation set includes updates for:
 - Persistent memory markers (pin/flower + 200-char notes + remove flow)
 - Memory composer `Delete All` flow with confirmation
 - POI + memory marker rendering on minimap and large map overlays
+- Legend checkboxes for independent memory pin/flower visibility on maps
 - Security/storage boilerplate notice for persistent memory data
-- Cache-bust loader chain alignment through `v=27`
+- Dynamic UI text escaping in map/property/historic panels
+- Cache-bust loader chain alignment through `v=28`
 
 ## Maintainer Notes
 

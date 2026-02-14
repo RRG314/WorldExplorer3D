@@ -49,7 +49,10 @@ let mapLayers = {
   // Police
   police: true,
   // Roads
-  roads: true
+  roads: true,
+  // Memory markers
+  memoryPins: true,
+  memoryFlowers: true
 };
 
 // Property UI References

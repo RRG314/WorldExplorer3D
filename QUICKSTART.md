@@ -41,7 +41,7 @@ Open `http://localhost:8000`.
 5. Press `F` for walk mode.
 6. Press `6` for drone mode.
 7. Press `M` for large map.
-8. Open `Exploration` menu and try `Place Memory` (pin/flower + note).
+8. Click the `🌸` memory button and place a pin/flower memory note.
 
 ## 4. Essential Controls
 
@@ -68,8 +68,9 @@ Memory marker action:
 
 | Action | Result |
 | --- | --- |
-| `Exploration` menu -> `Place Memory` | Open persistent memory composer |
+| `🌸` memory button (above controls) | Open persistent memory composer |
 | Click memory marker -> `Remove Marker` | Erase pin / pull flower |
+| Memory composer -> `Delete All` | Remove all local memory markers |
 
 ## 5. Troubleshooting
 
@@ -89,7 +90,7 @@ Memory marker action:
 
 - Clear browser cache.
 - Verify cache-bust values are aligned across `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
-- Current freeze snapshot cache-bust target is `v=23`.
+- Current freeze snapshot cache-bust target is `v=28`.
 
 ### Memory markers not persisting
 

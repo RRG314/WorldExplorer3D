@@ -24,6 +24,7 @@ Entries reflect changes made relative to the most recent public release.
 - In-world memory marker removal flow (`Remove Marker`) to erase pins/pull flowers.
 - Memory composer bulk-delete action (`Delete All`) with confirmation.
 - Memory pin/flower overlay rendering on minimap and large map.
+- Legend-layer checkboxes for memory `Pin` and `Flower` overlays.
 - Security/storage notice document for persistent memory behavior and disclaimer boilerplate.
 
 ### Changed
@@ -33,7 +34,8 @@ Entries reflect changes made relative to the most recent public release.
 - Expanded deep-space render envelope: farther star shell, farther galaxy placement, larger visual galaxy scale.
 - Space info panel metric rows are now reusable for planets, asteroids, spacecraft, and galaxies.
 - POI map rendering now follows legend category filters on both minimap and large map.
-- Module loader cache-bust chain incremented through `v=27` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Dynamic map/property/historic UI templates now escape untrusted string fields before insertion.
+- Module loader cache-bust chain incremented through `v=28` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### Fixed
 - Non-responsive title menu interactions for suggested/custom selection after UI rework.

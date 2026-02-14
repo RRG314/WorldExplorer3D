@@ -26,6 +26,7 @@ This project includes a client-side persistent memory feature (pin/flower notes)
 ## Security Baseline (Current)
 
 - User-generated memory text is rendered as plain text (not HTML)
+- Dynamic map/property/historic strings are escaped before HTML template insertion
 - Placement is blocked if storage round-trip checks fail
 - Marker data is treated as untrusted content
 
@@ -46,4 +47,3 @@ Use this in UI/help/privacy copy:
 > Notes are not automatically synced to other devices.  
 > Anyone with access to this browser profile may be able to view saved notes.  
 > Do not store passwords, API keys, or sensitive personal information in memory notes.
-

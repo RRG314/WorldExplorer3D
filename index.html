@@ -670,11 +670,23 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
   </div>
 
   <div style="margin-bottom:12px">
-    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff">MEMORY MARKERS</div>
-    <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
-      <div style="margin-bottom:3px"><span style="color:#ef4444">📍</span> Pin memories</div>
-      <div style="margin-bottom:3px"><span style="color:#ec4899">🌸</span> Flower memories</div>
-      <div style="margin-bottom:3px">Shown on minimap and large map</div>
+    <div style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff">MEMORY MARKERS</div>
+    <div style="font-size:11px;line-height:1.5;padding-left:24px;opacity:0.95">
+      <div style="margin-bottom:4px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterMemoryPins" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <label for="filterMemoryPins" style="cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px">
+          <span style="color:#ef4444;font-size:16px;line-height:1">📍</span>
+          Pin memories
+        </label>
+      </div>
+      <div style="margin-bottom:4px;display:flex;align-items:center;gap:6px">
+        <input type="checkbox" id="filterMemoryFlowers" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <label for="filterMemoryFlowers" style="cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px">
+          <span style="color:#ec4899;font-size:16px;line-height:1">🌸</span>
+          Flower memories
+        </label>
+      </div>
+      <div style="margin-bottom:3px;font-size:10px;opacity:0.85">Shown on minimap and large map</div>
     </div>
   </div>
 
@@ -982,5 +994,5 @@ Explore the area
 <div id="pauseScreen"><div class="pauseTitle">PAUSED</div><button class="pauseBtn" id="resumeBtn">Resume</button><button class="pauseBtn" id="restartBtn">Restart</button><button class="pauseBtn" id="menuBtn">Main Menu</button></div>
 <div id="resultScreen"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
 <div id="caughtScreen"><div class="caughtBox"><div class="caughtTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
-<script type="module" src="js/bootstrap.js?v=23"></script>
+<script type="module" src="js/bootstrap.js?v=28"></script>
 </body></html>

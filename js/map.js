@@ -563,46 +563,52 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
 
     // Draw memory pins/flowers on both minimap and large map
     if (typeof getMemoryEntriesForCurrentLocation === 'function') {
-        const memoryEntries = getMemoryEntriesForCurrentLocation();
-        if (Array.isArray(memoryEntries) && memoryEntries.length > 0) {
-            memoryEntries.forEach((entry) => {
-                if (!entry || !Number.isFinite(entry.lat) || !Number.isFinite(entry.lon)) return;
-                const pos = latLonToScreen(entry.lat, entry.lon);
-                if (Math.abs(pos.x - mx) >= w / 2 || Math.abs(pos.y - my) >= h / 2) return;
+        const showPins = mapLayers.memoryPins !== false;
+        const showFlowers = mapLayers.memoryFlowers !== false;
+        if (showPins || showFlowers) {
+            const memoryEntries = getMemoryEntriesForCurrentLocation();
+            if (Array.isArray(memoryEntries) && memoryEntries.length > 0) {
+                memoryEntries.forEach((entry) => {
+                    if (!entry || !Number.isFinite(entry.lat) || !Number.isFinite(entry.lon)) return;
+                    if (entry.type === 'flower' && !showFlowers) return;
+                    if (entry.type !== 'flower' && !showPins) return;
+                    const pos = latLonToScreen(entry.lat, entry.lon);
+                    if (Math.abs(pos.x - mx) >= w / 2 || Math.abs(pos.y - my) >= h / 2) return;
 
-                const base = isLarge ? 6 : 4;
-                if (entry.type === 'flower') {
-                    ctx.fillStyle = '#ec4899';
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = isLarge ? 2 : 1;
-                    ctx.beginPath();
-                    ctx.arc(pos.x, pos.y, base, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.stroke();
-                    ctx.fillStyle = '#facc15';
-                    ctx.beginPath();
-                    ctx.arc(pos.x, pos.y, base * 0.45, 0, Math.PI * 2);
-                    ctx.fill();
-                } else {
-                    ctx.fillStyle = '#ef4444';
-                    ctx.strokeStyle = '#ffffff';
-                    ctx.lineWidth = isLarge ? 2 : 1;
-                    ctx.save();
-                    ctx.translate(pos.x, pos.y);
-                    ctx.beginPath();
-                    ctx.arc(0, -base * 0.2, base * 0.75, 0, Math.PI * 2);
-                    ctx.fill();
-                    ctx.stroke();
-                    ctx.beginPath();
-                    ctx.moveTo(0, base * 1.25);
-                    ctx.lineTo(-base * 0.35, base * 0.2);
-                    ctx.lineTo(base * 0.35, base * 0.2);
-                    ctx.closePath();
-                    ctx.fill();
-                    ctx.stroke();
-                    ctx.restore();
-                }
-            });
+                    const base = isLarge ? 6 : 4;
+                    if (entry.type === 'flower') {
+                        ctx.fillStyle = '#ec4899';
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = isLarge ? 2 : 1;
+                        ctx.beginPath();
+                        ctx.arc(pos.x, pos.y, base, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.fillStyle = '#facc15';
+                        ctx.beginPath();
+                        ctx.arc(pos.x, pos.y, base * 0.45, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else {
+                        ctx.fillStyle = '#ef4444';
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = isLarge ? 2 : 1;
+                        ctx.save();
+                        ctx.translate(pos.x, pos.y);
+                        ctx.beginPath();
+                        ctx.arc(0, -base * 0.2, base * 0.75, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(0, base * 1.25);
+                        ctx.lineTo(-base * 0.35, base * 0.2);
+                        ctx.lineTo(base * 0.35, base * 0.2);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                });
+            }
         }
     }
 

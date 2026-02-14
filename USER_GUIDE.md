@@ -341,6 +341,7 @@ Toggle in the legend (📋 button):
 - **Properties**: Real estate markers (if enabled)
 - **POIs**: Points of interest (render on minimap + large map by category filters)
 - **Memory Markers**: Your pin/flower notes (render on minimap + large map)
+- **Memory Layer Filters**: Separate legend checkboxes for `📍 Pin` and `🌸 Flower`
 - **Historic Sites**: Historic markers
 
 #### Controls
@@ -375,6 +376,10 @@ Open with 📋 button:
 | 🏛️ Purple | Historic sites |
 | 🚩 Red | Destination (Time Trial) |
 | ✓ Green | Checkpoints |
+
+Legend controls:
+- Use `📍 Pin memories` checkbox to hide/show only pin memories.
+- Use `🌸 Flower memories` checkbox to hide/show only flower memories.
 
 ### Tips
 - Use map to plan routes
@@ -620,10 +625,12 @@ Placement uses your current Earth-mode position (car, walk, or drone reference p
 - Memory markers are persisted in browser local storage on this device/browser profile.
 - They reload automatically when you revisit that location.
 - Memory markers are also shown on minimap and large map.
+- Pin/flower visibility can be toggled independently in the legend.
 - Limits: 200 chars per message, 300 markers per location, 1500 markers total.
 - If browser storage is blocked/disabled, placement is disabled and a warning is shown.
 - Markers are not automatically synced between different browsers/devices.
 - Notes are not encrypted; do not store passwords, keys, or sensitive personal data.
+- UI paths that render dynamic memory/property/POI text now escape content before HTML insertion.
 - Optional check: run `getMemoryPersistenceStatus()` in browser console.
 
 ## Advanced Features

@@ -51,6 +51,7 @@ Open `http://localhost:8000`.
 - Minimap + full map with teleport and layer toggles.
 - POIs render on minimap/large map according to legend category filters.
 - Memory pins/flowers render on minimap/large map for location recall.
+- Legend includes independent memory-layer toggles for `📍 Pin` and `🌸 Flower`.
 - Time-of-day lighting and sky/constellation systems.
 
 ### Gameplay
@@ -102,6 +103,7 @@ Memory marker actions:
 - Removal: click marker and choose `Remove Marker`
 - Bulk removal: `Delete All` button in memory composer (with confirmation)
 - Map visibility: memory markers are shown on minimap and large map
+- Legend filters: `📍 Pin` and `🌸 Flower` checkboxes control visibility independently
 - Verification: run `getMemoryPersistenceStatus()` in browser console
 
 ## Security and Storage Notice
@@ -111,6 +113,7 @@ Memory marker actions:
 - Clearing site data or browser storage will remove saved memories.
 - Do not store secrets, credentials, or sensitive personal information in memory notes.
 - Browser storage can be blocked by privacy mode/extensions; when blocked, memory placement is disabled.
+- Dynamic map/property/historic text is escaped before being inserted into HTML templates.
 - Recommended deployment headers: `X-Content-Type-Options: nosniff`, `Referrer-Policy: strict-origin-when-cross-origin`, `X-Frame-Options: DENY`, and a restrictive `Permissions-Policy`.
 
 ## Architecture Status (Current)
@@ -118,7 +121,7 @@ Memory marker actions:
 - Runtime is split into multiple JS files (`js/*.js`) with no build step.
 - Shared/global runtime state is still used across core systems.
 - ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
-- Cache-bust version alignment across loader chain is currently `v=27`.
+- Cache-bust version alignment across loader chain is currently `v=28`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
 ## Freeze Snapshot (2026-02-14)
@@ -131,6 +134,7 @@ Memory marker actions:
 - Added persistent memory markers (pin/flower), 200-char notes, and marker removal flow.
 - Added memory `Delete All` action in composer with confirmation.
 - Added memory pin/flower visibility on minimap and large map.
+- Added separate legend checkboxes for memory `Pin` and `Flower` overlays (larger marker labels/icons).
 - Restored POI marker rendering on minimap and large map by legend category filters.
 
 ## Repository Structure

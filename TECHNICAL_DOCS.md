@@ -40,7 +40,7 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - Persistent memory marker subsystem added (`js/memory.js`) with place/remove flow.
 - Memory composer now includes `Delete All` with confirmation.
 - POI and memory markers now render on both minimap and large map overlays.
-- Loader cache-bust chain is aligned through `v=27` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Loader cache-bust chain is aligned through `v=28` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### High-Level Architecture
 
@@ -579,6 +579,7 @@ Key implementation files:
 - Bulk removal: memory composer `Delete All` action with browser confirm prompt
 - Rebuild timing: markers clear during world reload and rehydrate after location load completes
 - Map integration: pin/flower markers render in minimap and large map drawing pass (`js/map.js`)
+- Legend integration: `mapLayers.memoryPins` and `mapLayers.memoryFlowers` gate each marker type independently
 
 Core public hooks:
 
@@ -598,7 +599,7 @@ Current memory persistence model is client-side only.
 - Reliability: blocked storage (privacy mode/extensions/policies) disables placement.
 - User controls: per-marker remove and global `Delete All` are available in UI.
 - Deployment guidance: add response headers (`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy`) at host/CDN level.
-- Content guidance: memory notes are user-generated text; treat as untrusted input and keep rendering via `textContent` (no `innerHTML` path).
+- Content guidance: memory notes and external data are untrusted; keep text paths on `textContent` where practical and escape dynamic values before `innerHTML` templates.
 
 ## Performance Optimization
 
