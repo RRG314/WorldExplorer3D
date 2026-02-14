@@ -47,7 +47,7 @@ The current branch documentation set includes updates for:
 - Supporting benchmark stats documentation from captured Baltimore test runs (network + memory-cache)
 - Security/storage boilerplate notice for persistent memory data
 - Dynamic UI text escaping in map/property/historic panels
-- Cache-bust loader chain alignment through `v=49`
+- Cache-bust loader chain alignment through `v=50`
 
 ## Maintainer Notes
 

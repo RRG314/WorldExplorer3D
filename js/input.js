@@ -2,6 +2,12 @@
 // input.js - Keyboard handling, track recording, city switching
 // ============================================================================
 
+function isDebugToggleKey(code, event) {
+    if (code === 'Backquote' || code === 'F8') return true;
+    const key = event?.key;
+    return key === '`' || key === '~';
+}
+
 function onKey(code, event) {
     if (!gameStarted) return;
 
@@ -95,8 +101,9 @@ function onKey(code, event) {
         document.getElementById('fWalk').classList.remove('on');
         if (typeof updateControlsModeUI === 'function') updateControlsModeUI();
     }
-    // Debug overlay toggle (Backtick ` key)
-    if (code === 'Backquote') {
+    // Debug overlay toggle (Backtick key; F8 fallback for keyboard-layout variance)
+    if (isDebugToggleKey(code, event)) {
+        if (event?.repeat) return;
         window._debugMode = !window._debugMode;
         const overlay = document.getElementById('debugOverlay');
         if (overlay) overlay.style.display = window._debugMode ? 'block' : 'none';
@@ -111,8 +118,11 @@ function onKey(code, event) {
         }
         if (!window._debugMode && window._debugMarker) {
             scene.remove(window._debugMarker);
+            if (window._debugMarker.geometry) window._debugMarker.geometry.dispose();
+            if (window._debugMarker.material) window._debugMarker.material.dispose();
             window._debugMarker = null;
         }
+        return;
     }
 
     if (code === 'KeyR') {

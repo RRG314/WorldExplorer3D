@@ -77,25 +77,74 @@ function renderLoop(t = 0) {
     }
 
     // Debug overlay update (throttled to HUD rate)
-    if (window._debugMode && gameStarted && !droneMode && _hudTimer === 0) {
+    if (window._debugMode && gameStarted && _hudTimer === 0) {
         const overlay = document.getElementById('debugOverlay');
         if (overlay) {
-            const onRd = car.onRoad ? 'YES' : 'no';
-            const tY = elevationWorldYAtWorldXZ(car.x, car.z).toFixed(2);
-            const carYVal = car.y !== undefined ? car.y.toFixed(2) : '?';
-            const roadName = car.road ? car.road.name : '-';
-            const nr = findNearestRoad(car.x, car.z);
-            const rdist = nr.dist !== undefined ? nr.dist.toFixed(1) : '?';
+            let modeLabel = 'drive';
+            let refX = Number.isFinite(car?.x) ? car.x : 0;
+            let refZ = Number.isFinite(car?.z) ? car.z : 0;
+            let refY = Number.isFinite(car?.y) ? car.y : null;
+            let onRoadValue = !!car?.onRoad;
+            let roadName = car?.road?.name || '-';
+
+            if (droneMode) {
+                modeLabel = 'drone';
+                refX = Number.isFinite(drone?.x) ? drone.x : refX;
+                refZ = Number.isFinite(drone?.z) ? drone.z : refZ;
+                refY = Number.isFinite(drone?.y) ? drone.y : refY;
+            } else if (Walk && Walk.state && Walk.state.mode === 'walk' && Walk.state.walker) {
+                modeLabel = 'walk';
+                refX = Number.isFinite(Walk.state.walker.x) ? Walk.state.walker.x : refX;
+                refZ = Number.isFinite(Walk.state.walker.z) ? Walk.state.walker.z : refZ;
+                refY = Number.isFinite(Walk.state.walker.y) ? Walk.state.walker.y : refY;
+            }
+
+            const nr = findNearestRoad(refX, refZ);
+            const roadDist = Number.isFinite(nr?.dist) ? nr.dist : null;
+            if (modeLabel !== 'drive') {
+                roadName = nr?.road?.name || roadName;
+                const halfWidth = nr?.road?.width ? (nr.road.width * 0.5) : 5;
+                onRoadValue = Number.isFinite(roadDist) ? roadDist <= (halfWidth + 3) : false;
+            }
+
+            const onRd = onRoadValue ? 'YES' : 'no';
+            const tY = elevationWorldYAtWorldXZ(refX, refZ).toFixed(2);
+            const refYVal = Number.isFinite(refY) ? refY.toFixed(2) : '?';
+            const rdist = Number.isFinite(roadDist) ? roadDist.toFixed(1) : '?';
+            const speed = modeLabel === 'drone'
+                ? Math.round(Math.abs((drone?.speed || 0) * 1.8))
+                : modeLabel === 'walk'
+                    ? Math.round(Math.abs(Walk?.state?.walker?.speedMph || 0))
+                    : Math.round(Math.abs((car?.speed || 0) * 0.5));
             overlay.textContent =
-                `Car Y: ${carYVal}  Terrain Y: ${tY}\n` +
+                `Mode: ${modeLabel.toUpperCase()}  Speed: ${speed} mph\n` +
+                `Ref Y: ${refYVal}  Terrain Y: ${tY}\n` +
                 `On road: ${onRd}  dist: ${rdist}\n` +
                 `Road: ${roadName}`;
         }
         // Update debug marker position
         if (window._debugMarker) {
-            const debugY = elevationWorldYAtWorldXZ(car.x, car.z);
-            window._debugMarker.position.set(car.x, debugY, car.z);
-            window._debugMarker.material.color.setHex(car.onRoad ? 0x00ff00 : 0xffff00);
+            let markerX = Number.isFinite(car?.x) ? car.x : 0;
+            let markerZ = Number.isFinite(car?.z) ? car.z : 0;
+            let markerOnRoad = !!car?.onRoad;
+
+            if (droneMode) {
+                markerX = Number.isFinite(drone?.x) ? drone.x : markerX;
+                markerZ = Number.isFinite(drone?.z) ? drone.z : markerZ;
+                const nr = findNearestRoad(markerX, markerZ);
+                const halfWidth = nr?.road?.width ? (nr.road.width * 0.5) : 5;
+                markerOnRoad = Number.isFinite(nr?.dist) ? nr.dist <= (halfWidth + 3) : false;
+            } else if (Walk && Walk.state && Walk.state.mode === 'walk' && Walk.state.walker) {
+                markerX = Number.isFinite(Walk.state.walker.x) ? Walk.state.walker.x : markerX;
+                markerZ = Number.isFinite(Walk.state.walker.z) ? Walk.state.walker.z : markerZ;
+                const nr = findNearestRoad(markerX, markerZ);
+                const halfWidth = nr?.road?.width ? (nr.road.width * 0.5) : 5;
+                markerOnRoad = Number.isFinite(nr?.dist) ? nr.dist <= (halfWidth + 3) : false;
+            }
+
+            const debugY = elevationWorldYAtWorldXZ(markerX, markerZ);
+            window._debugMarker.position.set(markerX, debugY, markerZ);
+            window._debugMarker.material.color.setHex(markerOnRoad ? 0x00ff00 : 0xffff00);
         }
     }
 

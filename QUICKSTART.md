@@ -124,7 +124,7 @@ Block builder action:
 
 - Clear browser cache.
 - Verify cache-bust values are aligned across `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
-- Current freeze snapshot cache-bust target is `v=49`.
+- Current freeze snapshot cache-bust target is `v=50`.
 
 ### Memory markers not persisting
 
