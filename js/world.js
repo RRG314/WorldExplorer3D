@@ -198,9 +198,9 @@ function rdtTileCap(baseCap, minCap, depth) {
     const scale =
         d <= 2 ? 1.0 :
         d === 3 ? 0.90 :
-        d === 4 ? 0.78 :
-        d === 5 ? 0.64 :
-                  0.52;
+        d === 4 ? 0.82 :
+        d === 5 ? 0.72 :
+                  0.62;
     return Math.max(minCap, Math.floor(baseCap * scale));
 }
 
@@ -337,10 +337,10 @@ function getWorldLodThresholds(loadDepth, mode = getPerfModeValue()) {
     }
 
     const depth = Math.max(0, loadDepth | 0);
-    // RDT keeps tighter budgets, but avoid overly aggressive pop-in.
-    const near = Math.max(900, 1450 - depth * 55);
-    const mid = near + 1250;
-    return { near, mid, farVisible: mid + 380 };
+    // Keep RDT adaptive, but bias toward richer startup visibility to reduce pop-in.
+    const near = Math.max(1050, 1580 - depth * 42);
+    const mid = near + 1360;
+    return { near, mid, farVisible: mid + 500 };
 }
 
 function getAdaptiveLoadProfile(loadDepth, mode = getPerfModeValue()) {
@@ -374,55 +374,55 @@ function getAdaptiveLoadProfile(loadDepth, mode = getPerfModeValue()) {
     // Depth-aware RDT budgets: high depth = much tighter caps.
     const profileByDepth =
         depth >= 6 ? {
-            radii: [0.018, 0.023, 0.027],
-            featureRadiusScale: 0.90,
-            poiRadiusScale: 0.84,
-            maxRoadWays: 3000,
-            maxBuildingWays: 14000,
-            maxLanduseWays: 3500,
-            maxPoiNodes: 1300,
-            roadsPerTile: 130,
-            roadsMinPerTile: 34,
-            buildingsPerTile: 360,
-            buildingsMinPerTile: 100,
-            landusePerTile: 84,
-            landuseMinPerTile: 18,
-            poiPerTile: 45,
-            poiMinPerTile: 12,
-            overpassTimeoutMs: 16000,
-            maxTotalLoadMs: 38000
+            radii: [0.019, 0.024, 0.029],
+            featureRadiusScale: 0.96,
+            poiRadiusScale: 0.88,
+            maxRoadWays: 3400,
+            maxBuildingWays: 18000,
+            maxLanduseWays: 4200,
+            maxPoiNodes: 1600,
+            roadsPerTile: 155,
+            roadsMinPerTile: 40,
+            buildingsPerTile: 460,
+            buildingsMinPerTile: 130,
+            landusePerTile: 100,
+            landuseMinPerTile: 22,
+            poiPerTile: 52,
+            poiMinPerTile: 14,
+            overpassTimeoutMs: 17000,
+            maxTotalLoadMs: 42000
         } :
         depth === 5 ? {
-            radii: [0.018, 0.022, 0.026],
-            featureRadiusScale: 0.86,
-            poiRadiusScale: 0.82,
-            maxRoadWays: 3400,
-            maxBuildingWays: 13000,
-            maxLanduseWays: 4800,
-            maxPoiNodes: 1700,
-            roadsPerTile: 140,
-            roadsMinPerTile: 34,
-            buildingsPerTile: 360,
-            buildingsMinPerTile: 100,
-            landusePerTile: 110,
-            landuseMinPerTile: 24,
-            poiPerTile: 60,
-            poiMinPerTile: 16,
+            radii: [0.019, 0.024, 0.028],
+            featureRadiusScale: 0.94,
+            poiRadiusScale: 0.86,
+            maxRoadWays: 3900,
+            maxBuildingWays: 17000,
+            maxLanduseWays: 5200,
+            maxPoiNodes: 1900,
+            roadsPerTile: 165,
+            roadsMinPerTile: 40,
+            buildingsPerTile: 430,
+            buildingsMinPerTile: 120,
+            landusePerTile: 124,
+            landuseMinPerTile: 28,
+            poiPerTile: 66,
+            poiMinPerTile: 18,
             overpassTimeoutMs: 19000,
             maxTotalLoadMs: 44000
         } :
         depth === 4 ? {
-            radii: [0.019, 0.023, 0.027],
-            featureRadiusScale: 0.90,
+            radii: [0.019, 0.024, 0.028],
+            featureRadiusScale: 0.93,
             poiRadiusScale: 0.86,
             maxRoadWays: 4300,
-            maxBuildingWays: 13500,
+            maxBuildingWays: 15000,
             maxLanduseWays: 6200,
             maxPoiNodes: 2200,
-            roadsPerTile: 170,
-            roadsMinPerTile: 44,
-            buildingsPerTile: 360,
-            buildingsMinPerTile: 90,
+            roadsPerTile: 185,
+            roadsMinPerTile: 48,
+            buildingsPerTile: 420,
+            buildingsMinPerTile: 110,
             landusePerTile: 138,
             landuseMinPerTile: 30,
             poiPerTile: 80,
@@ -948,7 +948,7 @@ function batchNearLodBuildingMeshes() {
         mergedMesh.renderOrder = group.renderOrder;
         mergedMesh.castShadow = true;
         mergedMesh.receiveShadow = true;
-        mergedMesh.frustumCulled = true;
+        mergedMesh.frustumCulled = false;
 
         let centerX = 0;
         let centerZ = 0;
@@ -1089,7 +1089,7 @@ function batchLanduseMeshes() {
         mergedMesh.renderOrder = group.renderOrder;
         mergedMesh.receiveShadow = false;
         mergedMesh.castShadow = false;
-        mergedMesh.frustumCulled = true;
+        mergedMesh.frustumCulled = false;
 
         let centerX = 0;
         let centerZ = 0;
@@ -1271,6 +1271,7 @@ async function loadRoads() {
         lod: { near: 0, mid: 0, midSkipped: 0, farSkipped: 0 },
         roads: { requested: 0, selected: 0, sourcePoints: 0, decimatedPoints: 0, subdividedPoints: 0, vertices: 0 },
         buildings: { requested: 0, selected: 0 },
+        colliders: { full: 0, simplified: 0 },
         landuse: { requested: 0, selected: 0 },
         pois: { requested: 0, selected: 0, near: 0, mid: 0, far: 0 }
     };
@@ -1462,15 +1463,32 @@ async function loadRoads() {
 
     let loaded = false;
 
-    function registerBuildingCollision(pts, height) {
+    function registerBuildingCollision(pts, height, options = {}) {
+        if (!Array.isArray(pts) || pts.length < 3) return null;
+        const detail = options.detail === 'bbox' ? 'bbox' : 'full';
         let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
+        let sumX = 0, sumZ = 0;
         pts.forEach(p => {
             minX = Math.min(minX, p.x);
             maxX = Math.max(maxX, p.x);
             minZ = Math.min(minZ, p.z);
             maxZ = Math.max(maxZ, p.z);
+            sumX += p.x;
+            sumZ += p.z;
         });
-        const building = { pts, minX, maxX, minZ, maxZ, height };
+        const centerX = Number.isFinite(options.centerX) ? options.centerX : (sumX / pts.length);
+        const centerZ = Number.isFinite(options.centerZ) ? options.centerZ : (sumZ / pts.length);
+        const building = {
+            pts: detail === 'full' ? pts : null,
+            minX,
+            maxX,
+            minZ,
+            maxZ,
+            height,
+            centerX,
+            centerZ,
+            colliderDetail: detail
+        };
         buildings.push(building);
         addBuildingToSpatialIndex(building);
         return building;
@@ -1851,6 +1869,7 @@ async function loadRoads() {
 
             const lodNearDist = lodThresholds.near;
             const lodMidDist = lodThresholds.mid;
+            const fullColliderDist = lodThresholds.near + (useRdtBudgeting ? 520 : 900);
 
             buildingWays.forEach(way => {
                 const pts = way.nodes.map(id => nodes[id]).filter(n => n).map(n => geoToWorld(n.lat, n.lon));
@@ -1896,7 +1915,13 @@ async function loadRoads() {
                     else height = 8 + br1 * 12;
                 }
 
-                registerBuildingCollision(pts, height);
+                const colliderDetail =
+                    useRdtBudgeting && lodTier === 'mid' && centerDist > fullColliderDist
+                        ? 'bbox'
+                        : 'full';
+                registerBuildingCollision(pts, height, { detail: colliderDetail, centerX, centerZ });
+                if (colliderDetail === 'full') loadMetrics.colliders.full += 1;
+                else loadMetrics.colliders.simplified += 1;
 
                 // Calculate terrain stats for building footprint
                 let avgElevation = 0;
@@ -2599,6 +2624,8 @@ async function loadRoads() {
         roadVertices: Math.round(loadMetrics.roads.vertices || 0),
         buildingMeshes: buildingMeshes.length,
         buildingColliders: buildings.length,
+        buildingCollidersFull: loadMetrics.colliders.full,
+        buildingCollidersSimplified: loadMetrics.colliders.simplified,
         poiMeshes: poiMeshes.length,
         landuseMeshes: landuseMeshes.length
     });
@@ -2961,8 +2988,8 @@ function updateWorldLod(force = false) {
         const dz = center.z - refZ;
         const distSq = dx * dx + dz * dz;
         const hysteresis = tier === 'mid'
-            ? (droneMode ? 320 : 240)
-            : (droneMode ? 260 : 180);
+            ? (droneMode ? 460 : 280)
+            : (droneMode ? 380 : 220);
         const limitDist = mesh.visible ? (visibleDist + hysteresis) : visibleDist;
         const visible = distSq <= (limitDist * limitDist);
         mesh.visible = visible;

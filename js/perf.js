@@ -265,7 +265,9 @@ function updatePerfPanel(force = false) {
 }
 
 setPerfMode(readStorage(PERF_STORAGE_MODE_KEY), { persist: false });
-setPerfOverlayEnabled(readStorage(PERF_STORAGE_OVERLAY_KEY) === '1', { persist: false });
+// Always start hidden so benchmark diagnostics are opt-in for every session.
+setPerfOverlayEnabled(false, { persist: false });
+writeStorage(PERF_STORAGE_OVERLAY_KEY, '0');
 
 exposeMutableGlobal('perfMode', () => perfMode, (value) => {
     setPerfMode(value, { persist: false });
