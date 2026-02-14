@@ -384,6 +384,13 @@ The engine includes a user-facing benchmark switch so performance can be compare
 - Overlay storage key: `worldExplorerPerfOverlay`
 - Overlay default: forced OFF each session (`setPerfOverlayEnabled(false, { persist: false })` in `js/perf.js`) so diagnostics remain opt-in.
 
+### Overlay anchoring and placement
+
+- `js/main.js` exposes `positionTopOverlays()` and computes placement from live element bounds.
+- Debug overlay (`#debugOverlay`) is centered between `#hud` and `#modeHud`.
+- Benchmark panel (`#perfPanel`) is centered between `#modeHud` and `#mainMenuBtn`.
+- Repositioning runs during HUD-throttled updates, perf panel refreshes, debug toggle, and `resize`.
+
 ### Snapshot schema highlights
 
 `capturePerfSnapshot()` exports JSON with:

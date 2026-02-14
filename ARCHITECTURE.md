@@ -215,6 +215,7 @@ Benchmark switching is a first-class runtime path, not a separate build.
 - `js/perf.js` owns mode state (`rdt`/`baseline`), overlay state, and snapshot capture/export.
 - `js/ui.js` binds title-screen controls (`#perfModeSelect`, `#perfOverlayToggle`, `#perfApplyReload`, `#perfCopySnapshot`).
 - `js/world.js` consumes mode selection to apply adaptive (RDT) or baseline budgets and records per-load diagnostics.
+- `js/main.js` exposes `positionTopOverlays()` to anchor debug/perf overlays between top HUD widgets.
 
 Snapshot payloads include:
 

@@ -98,6 +98,9 @@ Use the title screen `Settings` tab to compare the two world-loading modes.
 
 - `Show live benchmark overlay in-game` is opt-in.
 - Overlay is OFF by default each session to avoid confusing non-technical users.
+- Debug overlay (`\``) is auto-centered between speed HUD and mode HUD.
+- Benchmark overlay is auto-centered between mode HUD and `Main Menu`.
+- Overlay positions auto-refresh when toggled and on viewport resize.
 
 ### What to compare in snapshots
 

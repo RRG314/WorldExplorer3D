@@ -112,6 +112,12 @@ Use the built-in benchmark controls from the title screen:
 4. Click `Apply + Reload World`.
 5. Click `Copy Snapshot` to copy a JSON benchmark payload.
 
+In-game overlay placement:
+
+- Debug overlay (`\``) is centered between the speed HUD and mode HUD.
+- Benchmark overlay is centered between the mode HUD and `Main Menu`.
+- Both overlays auto-reposition on resize and when toggled so controls stay unobstructed.
+
 Snapshot fields to compare:
 
 - `lastLoad.loadMs`

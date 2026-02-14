@@ -43,6 +43,7 @@ The current branch documentation set includes updates for:
 - Legend checkboxes for independent memory pin/flower visibility on maps
 - Brick block builder controls (`B`, click place, shift-click remove, clear current location, 100-block cap)
 - Title-screen performance benchmark controls (`RDT` vs `Baseline`, overlay toggle, snapshot copy)
+- Top-bar overlay anchoring for debug and benchmark panels between their target HUD widgets
 - Overpass endpoint preference and in-memory cache behavior for repeat-load acceleration
 - Supporting benchmark stats documentation from captured Baltimore test runs (network + memory-cache)
 - Security/storage boilerplate notice for persistent memory data

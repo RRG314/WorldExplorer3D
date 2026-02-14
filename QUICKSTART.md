@@ -52,7 +52,8 @@ Open `http://localhost:8000`.
 3. Optional: check `Show live benchmark overlay in-game` (default is OFF).
 4. Click `Apply + Reload World`.
 5. Click `Copy Snapshot` and paste the JSON into your notes.
-6. Compare:
+6. Overlay placement: debug sits between speed/mode HUD; benchmark sits between mode HUD/Main Menu.
+7. Compare:
    - `lastLoad.loadMs`
    - `lastLoad.phases.fetchOverpass`
    - `renderer.calls`
