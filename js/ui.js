@@ -452,6 +452,7 @@ function setupUI() {
             document.getElementById('fWalk').classList.remove('on');
             document.getElementById('fDrone').classList.remove('on');
         }
+        updateControlsModeUI();
 
         // Set initial map view button states
         document.getElementById('mapRoadsToggle').classList.add('active'); // Roads on by default
@@ -473,6 +474,34 @@ function setupUI() {
     function closeAllFloatMenus() {
         document.querySelectorAll('.floatMenu').forEach(m => m.classList.remove('open'));
     }
+    const ctrlHeader = document.getElementById('ctrlHeader');
+    const ctrlContent = document.getElementById('ctrlContent');
+    const drivingControls = document.getElementById('drivingControls');
+    const walkingControls = document.getElementById('walkingControls');
+    const droneControls = document.getElementById('droneControls');
+    const rocketControls = document.getElementById('rocketControls');
+
+    function detectControlsMode() {
+        if (typeof isEnv === 'function' && typeof ENV !== 'undefined' && isEnv(ENV.SPACE_FLIGHT)) return 'rocket';
+        if (droneMode) return 'drone';
+        if (Walk && Walk.state && Walk.state.mode === 'walk') return 'walking';
+        return 'driving';
+    }
+
+    function updateControlsModeUI() {
+        const mode = detectControlsMode();
+        if (drivingControls) drivingControls.style.display = mode === 'driving' ? 'block' : 'none';
+        if (walkingControls) walkingControls.style.display = mode === 'walking' ? 'block' : 'none';
+        if (droneControls) droneControls.style.display = mode === 'drone' ? 'block' : 'none';
+        if (rocketControls) rocketControls.style.display = mode === 'rocket' ? 'block' : 'none';
+        if (ctrlHeader) {
+            const modeLabel = mode === 'walking' ? 'Walking' : mode === 'drone' ? 'Drone' : mode === 'rocket' ? 'Rocket' : 'Driving';
+            const arrow = ctrlContent && ctrlContent.classList.contains('hidden') ? '▼' : '▲';
+            ctrlHeader.textContent = `🛞 ${modeLabel} ${arrow}`;
+        }
+    }
+
+    globalThis.updateControlsModeUI = updateControlsModeUI;
     function goToMainMenu() {
         gameStarted = false; paused = false; clearObjectives(); clearPolice(); policeOn = false; eraseTrack(); closePropertyPanel(); closeHistoricPanel(); clearPropertyMarkers(); realEstateMode = false; historicMode = false;
         document.querySelectorAll('.floatMenu').forEach(m => m.classList.remove('open'));
@@ -481,9 +510,11 @@ function setupUI() {
             const el = document.getElementById(id);
             if (el) el.classList.remove('show');
         });
+        if (ctrlContent) ctrlContent.classList.add('hidden');
         if (typeof closeMemoryComposer === 'function') closeMemoryComposer();
         const memoryInfoPanel = document.getElementById('memoryInfoPanel');
         if (memoryInfoPanel) memoryInfoPanel.classList.remove('show');
+        updateControlsModeUI();
     }
 
     // Float menu
@@ -584,6 +615,7 @@ function setupUI() {
         document.getElementById('fDriving').classList.add('on');
         document.getElementById('fWalk').classList.remove('on');
         document.getElementById('fDrone').classList.remove('on');
+        updateControlsModeUI();
         closeAllFloatMenus();
     });
 
@@ -603,6 +635,7 @@ function setupUI() {
             document.getElementById('fWalk').classList.add('on');
             document.getElementById('fDrone').classList.remove('on');
         }
+        updateControlsModeUI();
         closeAllFloatMenus();
     });
 
@@ -644,6 +677,7 @@ function setupUI() {
         document.getElementById('fDriving').classList.remove('on');
         document.getElementById('fWalk').classList.remove('on');
         document.getElementById('fDrone').classList.add('on');
+        updateControlsModeUI();
         closeAllFloatMenus();
     });
 
@@ -729,7 +763,13 @@ function setupUI() {
         document.getElementById('fConstellations').classList.toggle('on', constellationsVisible);
         closeAllFloatMenus();
     });
-    document.getElementById('ctrlHeader').addEventListener('click', () => document.getElementById('ctrlContent').classList.toggle('hidden'));
+    if (ctrlHeader && ctrlContent) {
+        ctrlHeader.addEventListener('click', (e) => {
+            e.stopPropagation();
+            ctrlContent.classList.toggle('hidden');
+            updateControlsModeUI();
+        });
+    }
 
     // Main Menu Button
     document.getElementById('mainMenuBtn').addEventListener('click', () => {
@@ -743,9 +783,14 @@ function setupUI() {
         // Check if click is outside float menu container
         const floatContainer = document.getElementById('floatMenuContainer');
         const mainMenuBtn = document.getElementById('mainMenuBtn');
+        const controlsTab = document.getElementById('controlsTab');
 
         if (!floatContainer.contains(e.target) && e.target !== mainMenuBtn) {
             closeAllFloatMenus();
+        }
+        if (controlsTab && !controlsTab.contains(e.target) && ctrlContent) {
+            ctrlContent.classList.add('hidden');
+            updateControlsModeUI();
         }
     });
 
