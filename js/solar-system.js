@@ -267,6 +267,117 @@ const SPACECRAFT = [
 ];
 
 // ---------------------------------------------------------------------------
+// NEARBY GALAXIES (equatorial RA/Dec, J2000 approximate)
+// Rendered on a deep background sphere so relative sky positions are preserved.
+// ---------------------------------------------------------------------------
+const GALAXIES = [
+  {
+    name: 'Andromeda Galaxy (M31)',
+    type: 'Spiral Galaxy',
+    constellation: 'Andromeda',
+    raDeg: 10.6847,
+    decDeg: 41.2690,
+    raText: '00h 42m 44s',
+    decText: '+41d 16m',
+    distanceLy: 2540000,
+    color: 0xc7dcff,
+    visualSize: 1250,
+    description: 'Nearest major spiral galaxy to the Milky Way. Expected to merge with our galaxy in about 4.5 billion years.'
+  },
+  {
+    name: 'Triangulum Galaxy (M33)',
+    type: 'Spiral Galaxy',
+    constellation: 'Triangulum',
+    raDeg: 23.4621,
+    decDeg: 30.6599,
+    raText: '01h 33m 51s',
+    decText: '+30d 39m',
+    distanceLy: 2730000,
+    color: 0xb9d0ff,
+    visualSize: 980,
+    description: 'Third-largest galaxy in the Local Group, after Andromeda and the Milky Way.'
+  },
+  {
+    name: 'Large Magellanic Cloud',
+    type: 'Barred Spiral Dwarf Galaxy',
+    constellation: 'Dorado/Mensa',
+    raDeg: 80.8942,
+    decDeg: -69.7561,
+    raText: '05h 23m 35s',
+    decText: '-69d 45m',
+    distanceLy: 163000,
+    color: 0xa8c3ff,
+    visualSize: 900,
+    description: 'Satellite galaxy of the Milky Way containing intense star-forming regions such as the Tarantula Nebula.'
+  },
+  {
+    name: 'Small Magellanic Cloud',
+    type: 'Dwarf Irregular Galaxy',
+    constellation: 'Tucana',
+    raDeg: 13.1867,
+    decDeg: -72.8286,
+    raText: '00h 52m 45s',
+    decText: '-72d 49m',
+    distanceLy: 200000,
+    color: 0x9eb8f2,
+    visualSize: 760,
+    description: 'Companion dwarf galaxy to the Milky Way and the Large Magellanic Cloud.'
+  },
+  {
+    name: 'Bode\'s Galaxy (M81)',
+    type: 'Grand Design Spiral Galaxy',
+    constellation: 'Ursa Major',
+    raDeg: 148.8882,
+    decDeg: 69.0653,
+    raText: '09h 55m 33s',
+    decText: '+69d 04m',
+    distanceLy: 11800000,
+    color: 0xc9ddff,
+    visualSize: 860,
+    description: 'A bright nearby spiral galaxy with a massive central black hole and pronounced spiral arms.'
+  },
+  {
+    name: 'Centaurus A (NGC 5128)',
+    type: 'Lenticular / Active Galaxy',
+    constellation: 'Centaurus',
+    raDeg: 201.3651,
+    decDeg: -43.0191,
+    raText: '13h 25m 28s',
+    decText: '-43d 01m',
+    distanceLy: 12000000,
+    color: 0xffc69f,
+    visualSize: 900,
+    description: 'Peculiar galaxy with a dark dust lane and a powerful active galactic nucleus.'
+  },
+  {
+    name: 'Whirlpool Galaxy (M51)',
+    type: 'Interacting Spiral Galaxy',
+    constellation: 'Canes Venatici',
+    raDeg: 202.4696,
+    decDeg: 47.1952,
+    raText: '13h 29m 53s',
+    decText: '+47d 12m',
+    distanceLy: 23000000,
+    color: 0xbfd4ff,
+    visualSize: 820,
+    description: 'Classic face-on spiral interacting with companion galaxy NGC 5195.'
+  },
+  {
+    name: 'Sombrero Galaxy (M104)',
+    type: 'Unbarred Spiral Galaxy',
+    constellation: 'Virgo',
+    raDeg: 189.9975,
+    decDeg: -11.6231,
+    raText: '12h 40m 00s',
+    decText: '-11d 37m',
+    distanceLy: 31000000,
+    color: 0xffd5b8,
+    visualSize: 780,
+    description: 'Edge-on galaxy known for its prominent dust lane and bright central bulge.'
+  }
+];
+
+// ---------------------------------------------------------------------------
 // SOLAR SYSTEM STATE
 // ---------------------------------------------------------------------------
 const solarSystem = {
@@ -280,6 +391,7 @@ const solarSystem = {
   kuiperBelt: null,     // THREE.Points particle system for Kuiper belt
   asteroidMeshes: [],   // named large asteroids { mesh, hitbox, asteroid, realPosition }
   spacecraftMeshes: [], // spacecraft { mesh, hitbox, spacecraft, orbitData }
+  galaxyMeshes: [],     // background galaxies { mesh, hitbox, galaxy, visualDistance }
   orbitMarkers: [],     // glowing markers showing current planet position on orbit
   orbitsVisible: true,  // toggle for active orbit display
   infoPanel: null,
@@ -430,6 +542,26 @@ function distanceAU(pos1, pos2) {
   const dy = pos1.y - pos2.y;
   const dz = pos1.z - pos2.z;
   return Math.sqrt(dx * dx + dy * dy + dz * dz);
+}
+
+function raDecToScenePosition(raDeg, decDeg, radiusScene) {
+  const ra = raDeg * _SS_DEG2RAD;
+  const dec = decDeg * _SS_DEG2RAD;
+  return new THREE.Vector3(
+    radiusScene * Math.cos(dec) * Math.cos(ra),
+    radiusScene * Math.sin(dec),
+    radiusScene * Math.cos(dec) * Math.sin(ra)
+  );
+}
+
+function mapGalaxyDistanceToScene(distanceLy) {
+  const minLy = 160000;
+  const maxLy = 31000000;
+  const clamped = Math.min(maxLy, Math.max(minLy, distanceLy));
+  const minLog = Math.log10(minLy);
+  const maxLog = Math.log10(maxLy);
+  const t = (Math.log10(clamped) - minLog) / (maxLog - minLog);
+  return 62000 + t * 30000;
 }
 
 // ---------------------------------------------------------------------------
@@ -615,6 +747,11 @@ function initSolarSystem(spaceScene) {
   // ---------------------------------------------------------------------------
   createSpacecraft();
 
+  // ---------------------------------------------------------------------------
+  // GALAXIES - deep background targets in real sky directions (RA/Dec)
+  // ---------------------------------------------------------------------------
+  createGalaxies();
+
   // Position all objects based on current date
   updateSolarSystemPositions(now);
 
@@ -646,7 +783,8 @@ function initSolarSystem(spaceScene) {
     solarSystem.asteroidMeshes.length, 'named asteroids +',
     ASTEROID_BELT.count, 'belt particles +',
     KUIPER_BELT.count, 'kuiper particles +',
-    solarSystem.spacecraftMeshes.length, 'spacecraft + Sun');
+    solarSystem.spacecraftMeshes.length, 'spacecraft +',
+    solarSystem.galaxyMeshes.length, 'galaxies + Sun');
 }
 
 // ---------------------------------------------------------------------------
@@ -1280,6 +1418,91 @@ function updateSpacecraftPositions() {
   });
 }
 
+const galaxyTextureCache = new Map();
+
+function createGalaxySpriteTexture(colorHex) {
+  const key = String(colorHex);
+  if (galaxyTextureCache.has(key)) return galaxyTextureCache.get(key);
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 256;
+  const ctx = canvas.getContext('2d');
+  const color = new THREE.Color(colorHex);
+  const r = Math.round(color.r * 255);
+  const g = Math.round(color.g * 255);
+  const b = Math.round(color.b * 255);
+
+  const grad = ctx.createRadialGradient(128, 128, 4, 128, 128, 118);
+  grad.addColorStop(0.0, 'rgba(255,255,255,0.98)');
+  grad.addColorStop(0.2, 'rgba(' + r + ',' + g + ',' + b + ',0.95)');
+  grad.addColorStop(0.65, 'rgba(' + r + ',' + g + ',' + b + ',0.35)');
+  grad.addColorStop(1.0, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.beginPath();
+  ctx.arc(128, 128, 118, 0, Math.PI * 2);
+  ctx.fill();
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.needsUpdate = true;
+  galaxyTextureCache.set(key, texture);
+  return texture;
+}
+
+function createGalaxies() {
+  solarSystem.galaxyMeshes = [];
+
+  GALAXIES.forEach((galaxy, i) => {
+    const group = new THREE.Group();
+    group.name = galaxy.name;
+    group.userData = { isGalaxy: true, galaxyIndex: i };
+
+    const visualDistance = mapGalaxyDistanceToScene(galaxy.distanceLy);
+    const pos = raDecToScenePosition(galaxy.raDeg, galaxy.decDeg, visualDistance);
+    group.position.copy(pos);
+
+    const texture = createGalaxySpriteTexture(galaxy.color);
+    const coreSize = galaxy.visualSize || 820;
+
+    const core = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      opacity: 0.95,
+      depthWrite: false
+    }));
+    core.scale.set(coreSize, coreSize, 1);
+    core.renderOrder = 4;
+    group.add(core);
+
+    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
+      map: texture,
+      transparent: true,
+      opacity: 0.28,
+      depthWrite: false
+    }));
+    halo.scale.set(coreSize * 2.0, coreSize * 2.0, 1);
+    halo.renderOrder = 3;
+    group.add(halo);
+
+    const hitRadius = Math.max(coreSize * 0.35, 220);
+    const hitbox = new THREE.Mesh(
+      new THREE.SphereGeometry(hitRadius, 8, 8),
+      new THREE.MeshBasicMaterial({ visible: false })
+    );
+    hitbox.userData = { isGalaxy: true, galaxyIndex: i };
+    group.add(hitbox);
+
+    solarSystem.group.add(group);
+
+    solarSystem.galaxyMeshes.push({
+      mesh: group,
+      hitbox,
+      galaxy,
+      visualDistance
+    });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // UPDATE MOON POSITIONS
 // ---------------------------------------------------------------------------
@@ -1532,6 +1755,11 @@ function onSolarSystemClick(event) {
     clickables.push(entry.mesh);
     clickables.push(entry.hitbox);
   });
+  // Galaxies
+  solarSystem.galaxyMeshes.forEach(entry => {
+    clickables.push(entry.mesh);
+    clickables.push(entry.hitbox);
+  });
   // Also test Sun
   clickables.push(solarSystem.sunMesh);
 
@@ -1541,7 +1769,7 @@ function onSolarSystemClick(event) {
     const hit = intersects[0].object;
     // Walk up to find planet, asteroid, or spacecraft data
     let target = hit;
-    while (target && !target.userData.isPlanet && !target.userData.isAsteroid && !target.userData.isSpacecraft && target.parent) {
+    while (target && !target.userData.isPlanet && !target.userData.isAsteroid && !target.userData.isSpacecraft && !target.userData.isGalaxy && target.parent) {
       target = target.parent;
     }
 
@@ -1557,6 +1785,10 @@ function onSolarSystemClick(event) {
       const idx = target.userData.spacecraftIndex;
       const entry = solarSystem.spacecraftMeshes.find(e => e.spacecraft === SPACECRAFT[idx]);
       if (entry) showSpacecraftInfo(entry);
+    } else if (target && target.userData.isGalaxy) {
+      const idx = target.userData.galaxyIndex;
+      const entry = solarSystem.galaxyMeshes.find(e => e.galaxy === GALAXIES[idx]);
+      if (entry) showGalaxyInfo(entry);
     } else if (hit === solarSystem.sunMesh || hit.parent === solarSystem.sunMesh) {
       showSunInfo();
     }
@@ -1598,16 +1830,34 @@ function createInfoPanel() {
     <div id="ssInfoType" style="margin-bottom:8px;color:#10b981;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:1px;"></div>
     <div id="ssInfoDesc" style="margin-bottom:12px;color:#94a3b8;font-family:Inter,sans-serif;font-size:12px;"></div>
     <div style="background:rgba(102,126,234,0.15);border-radius:8px;padding:12px;margin-bottom:0;">
-      <div style="font-size:10px;opacity:0.7;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">ORBITAL DATA</div>
-      <div style="margin-bottom:6px;">Mean Distance: <span id="ssInfoDistAU" style="color:#fbbf24;font-weight:600;"></span></div>
-      <div style="margin-bottom:6px;">Mean Distance: <span id="ssInfoDistKM" style="color:#fbbf24;font-weight:600;"></span></div>
-      <div>Current from Earth: <span id="ssInfoDistEarth" style="color:#0fc;font-weight:600;"></span></div>
+      <div id="ssInfoMetaLabel" style="font-size:10px;opacity:0.7;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">ORBITAL DATA</div>
+      <div style="margin-bottom:6px;"><span id="ssInfoMetric1Label">Mean Distance</span>: <span id="ssInfoDistAU" style="color:#fbbf24;font-weight:600;"></span></div>
+      <div style="margin-bottom:6px;"><span id="ssInfoMetric2Label">Mean Distance</span>: <span id="ssInfoDistKM" style="color:#fbbf24;font-weight:600;"></span></div>
+      <div><span id="ssInfoMetric3Label">Current from Earth</span>: <span id="ssInfoDistEarth" style="color:#0fc;font-weight:600;"></span></div>
     </div>
   `;
   document.body.appendChild(panel);
   solarSystem.infoPanel = panel;
 
   document.getElementById('ssInfoClose').addEventListener('click', hidePlanetInfo);
+}
+
+function setInfoMetricBlock(metaLabel, metric1Label, metric1Value, metric2Label, metric2Value, metric3Label, metric3Value) {
+  const metaEl = document.getElementById('ssInfoMetaLabel');
+  const metric1LabelEl = document.getElementById('ssInfoMetric1Label');
+  const metric2LabelEl = document.getElementById('ssInfoMetric2Label');
+  const metric3LabelEl = document.getElementById('ssInfoMetric3Label');
+  const metric1ValueEl = document.getElementById('ssInfoDistAU');
+  const metric2ValueEl = document.getElementById('ssInfoDistKM');
+  const metric3ValueEl = document.getElementById('ssInfoDistEarth');
+
+  if (metaEl) metaEl.textContent = metaLabel;
+  if (metric1LabelEl) metric1LabelEl.textContent = metric1Label;
+  if (metric2LabelEl) metric2LabelEl.textContent = metric2Label;
+  if (metric3LabelEl) metric3LabelEl.textContent = metric3Label;
+  if (metric1ValueEl) metric1ValueEl.textContent = metric1Value;
+  if (metric2ValueEl) metric2ValueEl.textContent = metric2Value;
+  if (metric3ValueEl) metric3ValueEl.textContent = metric3Value;
 }
 
 function showPlanetInfo(entry) {
@@ -1620,10 +1870,15 @@ function showPlanetInfo(entry) {
   document.getElementById('ssInfoTitle').textContent = planet.name;
   document.getElementById('ssInfoType').textContent = planet.type;
   document.getElementById('ssInfoDesc').textContent = planet.description;
-  document.getElementById('ssInfoDistAU').textContent = planet.meanDistanceAU.toFixed(3) + ' AU';
-  document.getElementById('ssInfoDistKM').textContent = formatKM(planet.meanDistanceKM) + ' km';
-  document.getElementById('ssInfoDistEarth').textContent =
-    distEarth.toFixed(3) + ' AU (' + formatKM(distEarthKM) + ' km)';
+  setInfoMetricBlock(
+    'ORBITAL DATA',
+    'Mean Distance',
+    planet.meanDistanceAU.toFixed(3) + ' AU',
+    'Mean Distance',
+    formatKM(planet.meanDistanceKM) + ' km',
+    'Current from Earth',
+    distEarth.toFixed(3) + ' AU (' + formatKM(distEarthKM) + ' km)'
+  );
 
   solarSystem.infoPanel.style.display = 'block';
   solarSystem.selectedPlanet = entry;
@@ -1645,15 +1900,20 @@ function showSunInfo() {
   document.getElementById('ssInfoType').textContent = 'G-type Main Sequence Star';
   document.getElementById('ssInfoDesc').textContent =
     'Our star. Contains 99.86% of the solar system\'s mass. Surface temperature ~5,500\u00B0C.';
-  document.getElementById('ssInfoDistAU').textContent = '0 AU (center)';
-  document.getElementById('ssInfoDistKM').textContent = '0 km';
 
   const now = new Date();
   const earthPos = getEarthHelioPos(now);
   const distSun = Math.sqrt(earthPos.x * earthPos.x + earthPos.y * earthPos.y + earthPos.z * earthPos.z);
   const distSunKM = distSun * 149597870.7;
-  document.getElementById('ssInfoDistEarth').textContent =
-    distSun.toFixed(3) + ' AU (' + formatKM(distSunKM) + ' km)';
+  setInfoMetricBlock(
+    'STELLAR DATA',
+    'Position',
+    '0 AU (center)',
+    'Reference Distance',
+    '0 km',
+    'Current from Earth',
+    distSun.toFixed(3) + ' AU (' + formatKM(distSunKM) + ' km)'
+  );
 
   solarSystem.infoPanel.style.display = 'block';
   solarSystem.selectedPlanet = null;
@@ -1669,10 +1929,15 @@ function showAsteroidInfo(entry) {
   document.getElementById('ssInfoTitle').textContent = asteroid.name;
   document.getElementById('ssInfoType').textContent = asteroid.type + ' (Asteroid Belt)';
   document.getElementById('ssInfoDesc').textContent = asteroid.description;
-  document.getElementById('ssInfoDistAU').textContent = asteroid.meanDistanceAU.toFixed(3) + ' AU';
-  document.getElementById('ssInfoDistKM').textContent = formatKM(asteroid.meanDistanceKM) + ' km';
-  document.getElementById('ssInfoDistEarth').textContent =
-    distEarth.toFixed(3) + ' AU (' + formatKM(distEarthKM) + ' km)';
+  setInfoMetricBlock(
+    'BELT OBJECT DATA',
+    'Mean Distance',
+    asteroid.meanDistanceAU.toFixed(3) + ' AU',
+    'Mean Distance',
+    formatKM(asteroid.meanDistanceKM) + ' km',
+    'Current from Earth',
+    distEarth.toFixed(3) + ' AU (' + formatKM(distEarthKM) + ' km)'
+  );
 
   solarSystem.infoPanel.style.display = 'block';
   solarSystem.selectedPlanet = entry; // reuse for distance updates
@@ -1684,23 +1949,31 @@ function showSpacecraftInfo(entry) {
   document.getElementById('ssInfoType').textContent = craft.type;
   document.getElementById('ssInfoDesc').textContent = craft.description;
 
+  let distAUText;
   if (craft.orbit === 'heliocentric') {
-    document.getElementById('ssInfoDistAU').textContent = craft.realDistanceAU + ' AU (actual)';
+    distAUText = craft.realDistanceAU + ' AU (actual)';
   } else if (craft.orbit === 'L2') {
-    document.getElementById('ssInfoDistAU').textContent = 'Sun-Earth L2 Point';
+    distAUText = 'Sun-Earth L2 Point';
   } else {
-    document.getElementById('ssInfoDistAU').textContent = craft.realDistanceKM + ' km altitude';
+    distAUText = craft.realDistanceKM + ' km altitude';
   }
 
-  document.getElementById('ssInfoDistKM').textContent = formatKM(craft.realDistanceKM) + ' km from Earth';
+  let sceneDistText = '---';
 
   // Compute visual scene distance from rocket
   if (spaceFlight.rocket) {
     const dist = Math.floor(spaceFlight.rocket.position.distanceTo(entry.mesh.position));
-    document.getElementById('ssInfoDistEarth').textContent = dist + ' (scene distance)';
-  } else {
-    document.getElementById('ssInfoDistEarth').textContent = '---';
+    sceneDistText = dist + ' (scene distance)';
   }
+  setInfoMetricBlock(
+    'MISSION DATA',
+    'Reference Distance',
+    distAUText,
+    'From Earth',
+    formatKM(craft.realDistanceKM) + ' km',
+    'Current from Rocket',
+    sceneDistText
+  );
 
   solarSystem.infoPanel.style.display = 'block';
   solarSystem.selectedPlanet = null; // no AU distance updates for spacecraft
@@ -1718,6 +1991,39 @@ function formatKM(km) {
   if (km >= 1e6) return (km / 1e6).toFixed(1) + 'M';
   if (km >= 1e3) return (km / 1e3).toFixed(0) + 'K';
   return Math.round(km).toString();
+}
+
+function formatLightYears(ly) {
+  if (ly >= 1e9) return (ly / 1e9).toFixed(2) + ' billion';
+  if (ly >= 1e6) return (ly / 1e6).toFixed(2) + ' million';
+  if (ly >= 1e3) return (ly / 1e3).toFixed(1) + ' thousand';
+  return Math.round(ly).toString();
+}
+
+function showGalaxyInfo(entry) {
+  const galaxy = entry.galaxy;
+  document.getElementById('ssInfoTitle').textContent = galaxy.name;
+  document.getElementById('ssInfoType').textContent = galaxy.type + ' • ' + galaxy.constellation;
+  document.getElementById('ssInfoDesc').textContent = galaxy.description;
+
+  let sceneDistText = '---';
+  if (spaceFlight.rocket) {
+    const dist = Math.floor(spaceFlight.rocket.position.distanceTo(entry.mesh.position));
+    sceneDistText = dist + ' (scene distance)';
+  }
+
+  setInfoMetricBlock(
+    'DEEP SKY DATA',
+    'Sky Position',
+    'RA ' + galaxy.raText + ' | Dec ' + galaxy.decText,
+    'Distance',
+    formatLightYears(galaxy.distanceLy) + ' ly',
+    'Current from Rocket',
+    sceneDistText
+  );
+
+  solarSystem.infoPanel.style.display = 'block';
+  solarSystem.selectedPlanet = null;
 }
 
 function setSpaceLandingButtonText(text) {
