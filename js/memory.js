@@ -318,6 +318,19 @@ function getEntriesForCurrentLocation() {
     return memoryEntries.filter((entry) => entry.locationKey === key);
 }
 
+function getMemoryEntriesForCurrentLocation() {
+    return getEntriesForCurrentLocation().map((entry) => ({
+        id: entry.id,
+        type: entry.type,
+        lat: entry.lat,
+        lon: entry.lon,
+        message: entry.message,
+        locationKey: entry.locationKey,
+        locationLabel: entry.locationLabel,
+        createdAt: entry.createdAt
+    }));
+}
+
 function refreshMemoryMarkersForCurrentLocation() {
     const group = ensureMemoryGroup();
     if (!group) return;
@@ -654,6 +667,7 @@ bindMemorySceneClick();
 Object.assign(globalThis, {
     clearMemoryMarkersForWorldReload,
     closeMemoryComposer,
+    getMemoryEntriesForCurrentLocation,
     getMemoryPersistenceStatus,
     openMemoryComposer,
     refreshMemoryMarkersForCurrentLocation,
@@ -663,6 +677,7 @@ Object.assign(globalThis, {
 export {
     clearMemoryMarkersForWorldReload,
     closeMemoryComposer,
+    getMemoryEntriesForCurrentLocation,
     getMemoryPersistenceStatus,
     openMemoryComposer,
     refreshMemoryMarkersForCurrentLocation,
