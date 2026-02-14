@@ -1,4 +1,4 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // game.js - Game modes, police, POI, real estate UI, historic sites, navigation
 // ============================================================================
 
@@ -6,9 +6,9 @@ function updateNearbyPOI() {
   const poiInfo = document.getElementById('poiInfo');
 
   // Only update POI display if POI mode is enabled
-  if (!ctx.poiMode) {
-    if (ctx.nearestPOI) {
-      ctx.nearestPOI = null;
+  if (!appCtx.poiMode) {
+    if (appCtx.nearestPOI) {
+      appCtx.nearestPOI = null;
       poiInfo.style.display = 'none';
     }
     return;
@@ -17,9 +17,9 @@ function updateNearbyPOI() {
   let closest = null;
   let minDist = Infinity;
 
-  ctx.pois.forEach((poi) => {
-    const dx = poi.x - ctx.car.x;
-    const dz = poi.z - ctx.car.z;
+  appCtx.pois.forEach((poi) => {
+    const dx = poi.x - appCtx.car.x;
+    const dz = poi.z - appCtx.car.z;
     const dist = Math.sqrt(dx * dx + dz * dz);
 
     if (dist < minDist && dist < 150) {// Within 150m
@@ -28,15 +28,15 @@ function updateNearbyPOI() {
     }
   });
 
-  if (closest && (closest !== ctx.nearestPOI || Math.abs(closest.dist - ctx.nearestPOI?.dist) > 5)) {
-    ctx.nearestPOI = closest;
+  if (closest && (closest !== appCtx.nearestPOI || Math.abs(closest.dist - appCtx.nearestPOI?.dist) > 5)) {
+    appCtx.nearestPOI = closest;
     document.getElementById('poiIcon').textContent = closest.icon;
     document.getElementById('poiName').textContent = closest.name;
     document.getElementById('poiCategory').textContent = closest.category;
     document.getElementById('poiDistance').textContent = Math.floor(closest.dist) + 'm ahead';
     poiInfo.style.display = 'block';
-  } else if (!closest && ctx.nearestPOI) {
-    ctx.nearestPOI = null;
+  } else if (!closest && appCtx.nearestPOI) {
+    appCtx.nearestPOI = null;
     poiInfo.style.display = 'none';
   }
 }
@@ -118,7 +118,7 @@ function createPropertyCard(p) {
   const badge = sourceBadges[p.source] || sourceBadges.demo;
   const sourceTag = `<div style="position:absolute;top:6px;right:6px;background:${badge.bgColor};color:${badge.color};padding:3px 6px;border-radius:4px;font-size:9px;font-weight:700;border:1px solid ${badge.color}">${badge.text}</div>`;
 
-  const isSelected = ctx.selectedProperty && ctx.selectedProperty.id === p.id;
+  const isSelected = appCtx.selectedProperty && appCtx.selectedProperty.id === p.id;
   const distance = Math.round(toFiniteNumber(p.distance, 0));
   const distanceText = distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : distance + 'm';
 
@@ -138,26 +138,26 @@ function createPropertyCard(p) {
 }
 
 function updatePropertyPanel() {
-  if (!ctx.PropertyUI.list) return;
+  if (!appCtx.PropertyUI.list) return;
 
   // Calculate distances and add to properties
-  ctx.properties.forEach((p) => {
-    const dx = p.x - ctx.car.x;
-    const dz = p.z - ctx.car.z;
+  appCtx.properties.forEach((p) => {
+    const dx = p.x - appCtx.car.x;
+    const dz = p.z - appCtx.car.z;
     p.distance = Math.sqrt(dx * dx + dz * dz);
   });
 
   // Filter by radius
-  const radiusMeters = ctx.propertyRadius * 1000;
-  let filtered = ctx.properties.filter((p) => p.distance <= radiusMeters);
+  const radiusMeters = appCtx.propertyRadius * 1000;
+  let filtered = appCtx.properties.filter((p) => p.distance <= radiusMeters);
 
   // Filter by property type (sale/rent/all)
-  if (ctx.propertyTypeFilter !== 'all') {
-    filtered = filtered.filter((p) => p.priceType === ctx.propertyTypeFilter);
+  if (appCtx.propertyTypeFilter !== 'all') {
+    filtered = filtered.filter((p) => p.priceType === appCtx.propertyTypeFilter);
   }
 
   // Sort properties
-  switch (ctx.propertySort) {
+  switch (appCtx.propertySort) {
     case 'distance':
       filtered.sort((a, b) => a.distance - b.distance);
       break;
@@ -178,22 +178,22 @@ function updatePropertyPanel() {
   // Update count and source display
   document.getElementById('propertyCount').textContent = `${filtered.length} Properties`;
   const sources = {};
-  ctx.properties.forEach((p) => sources[p.source] = (sources[p.source] || 0) + 1);
+  appCtx.properties.forEach((p) => sources[p.source] = (sources[p.source] || 0) + 1);
   const sourceText = Object.entries(sources).map(([k, v]) => `${v} ${k}`).join(', ');
   document.getElementById('propertySource').textContent = sourceText;
 
   // Update data source label in header
-  const hasRealData = ctx.properties.some((p) => !p.isDemo && p.source !== 'demo');
+  const hasRealData = appCtx.properties.some((p) => !p.isDemo && p.source !== 'demo');
   const primarySource = hasRealData ?
-  ctx.properties.find((p) => p.source === 'rentcast') ? 'RentCast (Live)' :
-  ctx.properties.find((p) => p.source === 'estated') ? 'Estated (Live)' :
-  ctx.properties.find((p) => p.source === 'attom') ? 'ATTOM (Live)' : 'Demo Data' :
+  appCtx.properties.find((p) => p.source === 'rentcast') ? 'RentCast (Live)' :
+  appCtx.properties.find((p) => p.source === 'estated') ? 'Estated (Live)' :
+  appCtx.properties.find((p) => p.source === 'attom') ? 'ATTOM (Live)' : 'Demo Data' :
   'Demo Data';
   document.getElementById('dataSourceLabel').textContent = `Source: ${primarySource}`;
 
   // Render cards
-  ctx.PropertyUI.list.innerHTML = filtered.map(createPropertyCard).join('');
-  if (ctx.PropertyUI.panel) ctx.PropertyUI.panel.classList.add('show');
+  appCtx.PropertyUI.list.innerHTML = filtered.map(createPropertyCard).join('');
+  if (appCtx.PropertyUI.panel) appCtx.PropertyUI.panel.classList.add('show');
 }
 
 function togglePropertyFilters() {
@@ -242,7 +242,7 @@ function isPOIVisible(poiType) {
   };
 
   const category = categoryMap[poiType];
-  return category ? ctx.mapLayers[category] : false;
+  return category ? appCtx.mapLayers[category] : false;
 }
 
 function closeLegend() {
@@ -250,38 +250,38 @@ function closeLegend() {
 }
 
 function updateMapLayers() {
-  ctx.mapLayers.properties = document.getElementById('filterProperties').checked;
-  ctx.mapLayers.navigation = document.getElementById('filterNavigation').checked;
-  ctx.mapLayers.schools = document.getElementById('filterSchools').checked;
-  ctx.mapLayers.healthcare = document.getElementById('filterHealthcare').checked;
-  ctx.mapLayers.emergency = document.getElementById('filterEmergency').checked;
-  ctx.mapLayers.food = document.getElementById('filterFood').checked;
-  ctx.mapLayers.shopping = document.getElementById('filterShopping').checked;
-  ctx.mapLayers.culture = document.getElementById('filterCulture').checked;
-  ctx.mapLayers.historic = document.getElementById('filterHistoric').checked;
-  ctx.mapLayers.parks = document.getElementById('filterParks').checked;
-  ctx.mapLayers.parking = document.getElementById('filterParking').checked;
-  ctx.mapLayers.fuel = document.getElementById('filterFuel').checked;
-  ctx.mapLayers.banks = document.getElementById('filterBanks').checked;
-  ctx.mapLayers.postal = document.getElementById('filterPostal').checked;
-  ctx.mapLayers.hotels = document.getElementById('filterHotels').checked;
-  ctx.mapLayers.tourism = document.getElementById('filterTourism').checked;
-  ctx.mapLayers.checkpoints = document.getElementById('filterCheckpoints').checked;
-  ctx.mapLayers.destination = document.getElementById('filterDestination').checked;
-  ctx.mapLayers.customTrack = document.getElementById('filterCustomTrack').checked;
-  ctx.mapLayers.police = document.getElementById('filterPolice').checked;
-  ctx.mapLayers.memoryPins = document.getElementById('filterMemoryPins').checked;
-  ctx.mapLayers.memoryFlowers = document.getElementById('filterMemoryFlowers').checked;
+  appCtx.mapLayers.properties = document.getElementById('filterProperties').checked;
+  appCtx.mapLayers.navigation = document.getElementById('filterNavigation').checked;
+  appCtx.mapLayers.schools = document.getElementById('filterSchools').checked;
+  appCtx.mapLayers.healthcare = document.getElementById('filterHealthcare').checked;
+  appCtx.mapLayers.emergency = document.getElementById('filterEmergency').checked;
+  appCtx.mapLayers.food = document.getElementById('filterFood').checked;
+  appCtx.mapLayers.shopping = document.getElementById('filterShopping').checked;
+  appCtx.mapLayers.culture = document.getElementById('filterCulture').checked;
+  appCtx.mapLayers.historic = document.getElementById('filterHistoric').checked;
+  appCtx.mapLayers.parks = document.getElementById('filterParks').checked;
+  appCtx.mapLayers.parking = document.getElementById('filterParking').checked;
+  appCtx.mapLayers.fuel = document.getElementById('filterFuel').checked;
+  appCtx.mapLayers.banks = document.getElementById('filterBanks').checked;
+  appCtx.mapLayers.postal = document.getElementById('filterPostal').checked;
+  appCtx.mapLayers.hotels = document.getElementById('filterHotels').checked;
+  appCtx.mapLayers.tourism = document.getElementById('filterTourism').checked;
+  appCtx.mapLayers.checkpoints = document.getElementById('filterCheckpoints').checked;
+  appCtx.mapLayers.destination = document.getElementById('filterDestination').checked;
+  appCtx.mapLayers.customTrack = document.getElementById('filterCustomTrack').checked;
+  appCtx.mapLayers.police = document.getElementById('filterPolice').checked;
+  appCtx.mapLayers.memoryPins = document.getElementById('filterMemoryPins').checked;
+  appCtx.mapLayers.memoryFlowers = document.getElementById('filterMemoryFlowers').checked;
 
   // Update parent checkboxes
-  const allPOIs = ctx.mapLayers.schools && ctx.mapLayers.healthcare && ctx.mapLayers.emergency &&
-  ctx.mapLayers.food && ctx.mapLayers.shopping && ctx.mapLayers.culture &&
-  ctx.mapLayers.historic && ctx.mapLayers.parks && ctx.mapLayers.parking &&
-  ctx.mapLayers.fuel && ctx.mapLayers.banks && ctx.mapLayers.postal &&
-  ctx.mapLayers.hotels && ctx.mapLayers.tourism;
+  const allPOIs = appCtx.mapLayers.schools && appCtx.mapLayers.healthcare && appCtx.mapLayers.emergency &&
+  appCtx.mapLayers.food && appCtx.mapLayers.shopping && appCtx.mapLayers.culture &&
+  appCtx.mapLayers.historic && appCtx.mapLayers.parks && appCtx.mapLayers.parking &&
+  appCtx.mapLayers.fuel && appCtx.mapLayers.banks && appCtx.mapLayers.postal &&
+  appCtx.mapLayers.hotels && appCtx.mapLayers.tourism;
   document.getElementById('filterPOIsAll').checked = allPOIs;
 
-  const allGameElements = ctx.mapLayers.checkpoints && ctx.mapLayers.destination && ctx.mapLayers.customTrack;
+  const allGameElements = appCtx.mapLayers.checkpoints && appCtx.mapLayers.destination && appCtx.mapLayers.customTrack;
   document.getElementById('filterGameElementsAll').checked = allGameElements;
 }
 
@@ -311,7 +311,7 @@ function toggleAllLayers(state) {
   document.getElementById('filterMemoryPins').checked = state;
   document.getElementById('filterMemoryFlowers').checked = state;
   document.getElementById('filterRoads').checked = state;
-  ctx.showRoads = state;
+  appCtx.showRoads = state;
   document.getElementById('mapRoadsToggle').classList.toggle('active', state);
   const floatRoads = document.getElementById('fRoads');
   if (floatRoads) floatRoads.classList.toggle('on', state);
@@ -346,11 +346,11 @@ function toggleAllGameElements() {
 }
 
 function toggleRoads() {
-  ctx.showRoads = document.getElementById('filterRoads').checked;
-  ctx.mapLayers.roads = ctx.showRoads;
-  document.getElementById('mapRoadsToggle').classList.toggle('active', ctx.showRoads);
+  appCtx.showRoads = document.getElementById('filterRoads').checked;
+  appCtx.mapLayers.roads = appCtx.showRoads;
+  document.getElementById('mapRoadsToggle').classList.toggle('active', appCtx.showRoads);
   const floatRoads = document.getElementById('fRoads');
-  if (floatRoads) floatRoads.classList.toggle('on', ctx.showRoads);
+  if (floatRoads) floatRoads.classList.toggle('on', appCtx.showRoads);
 }
 
 function closeMapInfo() {
@@ -366,7 +366,7 @@ function showMapInfo(type, data) {
 
   if (type === 'property') {
     title.textContent = '🏠 Property Details';
-    const distance = Math.round(Math.sqrt((toFiniteNumber(data.x, 0) - ctx.car.x) ** 2 + (toFiniteNumber(data.z, 0) - ctx.car.z) ** 2));
+    const distance = Math.round(Math.sqrt((toFiniteNumber(data.x, 0) - appCtx.car.x) ** 2 + (toFiniteNumber(data.z, 0) - appCtx.car.z) ** 2));
     const distanceText = distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : distance + 'm';
     const safeId = escapeJsString(data.id);
     const safeAddress = escapeHtml(data.address || 'Address unavailable');
@@ -406,7 +406,7 @@ function showMapInfo(type, data) {
     const safeName = escapeHtml(data.name || 'Point of Interest');
     const safeCategory = escapeHtml(data.category || 'POI');
     const safeNameJs = escapeJsString(data.name || 'POI');
-    const distance = Math.round(Math.sqrt((safeX - ctx.car.x) ** 2 + (safeZ - ctx.car.z) ** 2));
+    const distance = Math.round(Math.sqrt((safeX - appCtx.car.x) ** 2 + (safeZ - appCtx.car.z) ** 2));
     const distanceText = distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : distance + 'm';
 
     content.innerHTML = `
@@ -424,7 +424,7 @@ function showMapInfo(type, data) {
     const safeName = escapeHtml(data.name || 'Historic Site');
     const safeCategory = escapeHtml(data.category || 'Historic');
     const safeNameJs = escapeJsString(data.name || 'Historic Site');
-    const distance = Math.round(Math.sqrt((toFiniteNumber(data.x, 0) - ctx.car.x) ** 2 + (toFiniteNumber(data.z, 0) - ctx.car.z) ** 2));
+    const distance = Math.round(Math.sqrt((toFiniteNumber(data.x, 0) - appCtx.car.x) ** 2 + (toFiniteNumber(data.z, 0) - appCtx.car.z) ** 2));
     const distanceText = distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : distance + 'm';
 
     content.innerHTML = `
@@ -442,19 +442,19 @@ function showMapInfo(type, data) {
 }
 
 function navigateToPOI(x, z, name) {
-  ctx.selectedProperty = null;
-  ctx.selectedHistoric = null;
-  ctx.showNavigation = true;
+  appCtx.selectedProperty = null;
+  appCtx.selectedHistoric = null;
+  appCtx.showNavigation = true;
 
-  createNavigationRoute(ctx.car.x, ctx.car.z, x, z);
+  createNavigationRoute(appCtx.car.x, appCtx.car.z, x, z);
   // Debug log removed
 }
 
 function openModalById(id) {
-  const p = ctx.properties.find((x) => x.id === id);
-  if (!p || !ctx.PropertyUI.modal) return;
+  const p = appCtx.properties.find((x) => x.id === id);
+  if (!p || !appCtx.PropertyUI.modal) return;
 
-  ctx.PropertyUI.modalTitle.textContent = p.address || 'Property';
+  appCtx.PropertyUI.modalTitle.textContent = p.address || 'Property';
 
   const safeId = escapeJsString(p.id);
   const safePrice = toFiniteNumber(p.price, 0);
@@ -491,7 +491,7 @@ function openModalById(id) {
         ${notice.text}
        </div>`;
 
-  const isSelected = ctx.selectedProperty && ctx.selectedProperty.id === p.id;
+  const isSelected = appCtx.selectedProperty && appCtx.selectedProperty.id === p.id;
   const navButtons = `
     <div style="display:flex;gap:8px;margin-top:16px">
       <button onclick="navigateToProperty('${safeId}')" style="flex:1;background:${isSelected ? '#10b981' : '#667eea'};border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;transition:all 0.2s">
@@ -501,7 +501,7 @@ function openModalById(id) {
     </div>
   `;
 
-  ctx.PropertyUI.modalBody.innerHTML = `
+  appCtx.PropertyUI.modalBody.innerHTML = `
     ${sourceNotice}
     ${photos}
     <div class="prop-stat">
@@ -539,22 +539,22 @@ function openModalById(id) {
     ${navButtons}
     ${safeSourceUrl ? `<button onclick="window.open('${escapeJsString(safeSourceUrl)}','_blank','noopener,noreferrer')" style="width:100%;margin-top:8px;background:#64748b;border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer">🔗 View Full Listing</button>` : ''}
   `;
-  ctx.PropertyUI.modal.classList.add('show');
+  appCtx.PropertyUI.modal.classList.add('show');
 }
 
 function closeModal() {
-  if (ctx.PropertyUI.modal) ctx.PropertyUI.modal.classList.remove('show');
+  if (appCtx.PropertyUI.modal) appCtx.PropertyUI.modal.classList.remove('show');
 }
 
 function closePropertyPanel() {
-  if (ctx.PropertyUI.panel) ctx.PropertyUI.panel.classList.remove('show');
+  if (appCtx.PropertyUI.panel) appCtx.PropertyUI.panel.classList.remove('show');
 }
 
 function toggleRealEstate() {
-  ctx.realEstateMode = !ctx.realEstateMode;
-  if (ctx.PropertyUI.button) ctx.PropertyUI.button.classList.toggle('active', ctx.realEstateMode);
+  appCtx.realEstateMode = !appCtx.realEstateMode;
+  if (appCtx.PropertyUI.button) appCtx.PropertyUI.button.classList.toggle('active', appCtx.realEstateMode);
 
-  if (ctx.realEstateMode) {
+  if (appCtx.realEstateMode) {
     loadPropertiesAtCurrentLocation();
   } else {
     closePropertyPanel();
@@ -563,24 +563,24 @@ function toggleRealEstate() {
 }
 
 async function loadPropertiesAtCurrentLocation() {
-  const lat = ctx.LOC.lat - ctx.car.z / ctx.SCALE;
-  const lon = ctx.LOC.lon + ctx.car.x / (ctx.SCALE * Math.cos(ctx.LOC.lat * Math.PI / 180));
+  const lat = appCtx.LOC.lat - appCtx.car.z / appCtx.SCALE;
+  const lon = appCtx.LOC.lon + appCtx.car.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
 
   // Check if we have any API keys configured
-  const hasRealAPI = ctx.apiConfig.estated || ctx.apiConfig.attom || ctx.apiConfig.rentcast;
+  const hasRealAPI = appCtx.apiConfig.estated || appCtx.apiConfig.attom || appCtx.apiConfig.rentcast;
   const message = hasRealAPI ? 'Fetching real data...' : 'Fetching demo data...';
 
-  ctx.showLoad(message);
-  ctx.properties = (await ctx.PropertyAPI.fetchProperties(lat, lon, 1)) || [];
-  ctx.hideLoad();
+  appCtx.showLoad(message);
+  appCtx.properties = (await appCtx.PropertyAPI.fetchProperties(lat, lon, 1)) || [];
+  appCtx.hideLoad();
 
-  if (ctx.properties.length > 0) {
+  if (appCtx.properties.length > 0) {
     updatePropertyPanel();
     renderPropertyMarkers();
 
     // Count by source
     const sources = {};
-    ctx.properties.forEach((p) => {
+    appCtx.properties.forEach((p) => {
       sources[p.source] = (sources[p.source] || 0) + 1;
     });
 
@@ -597,8 +597,8 @@ async function loadPropertiesAtCurrentLocation() {
 function renderPropertyMarkers() {
   clearPropertyMarkers();
 
-  ctx.properties.forEach((prop) => {
-    const pos = ctx.geoToWorld(prop.lat, prop.lon);
+  appCtx.properties.forEach((prop) => {
+    const pos = appCtx.geoToWorld(prop.lat, prop.lon);
 
     // Create 3D marker for property
     const height = Math.log10(prop.price) * 2; // Height based on price
@@ -613,8 +613,8 @@ function renderPropertyMarkers() {
     const mesh = new THREE.Mesh(geometry, material);
     mesh.position.set(pos.x, height / 2, pos.z);
     mesh.castShadow = true;
-    ctx.scene.add(mesh);
-    ctx.propMarkers.push(mesh);
+    appCtx.scene.add(mesh);
+    appCtx.propMarkers.push(mesh);
 
     // Add price label on top
     const labelGeo = new THREE.SphereGeometry(1.5, 8, 8);
@@ -625,8 +625,8 @@ function renderPropertyMarkers() {
     });
     const label = new THREE.Mesh(labelGeo, labelMat);
     label.position.set(pos.x, height + 1.5, pos.z);
-    ctx.scene.add(label);
-    ctx.propMarkers.push(label);
+    appCtx.scene.add(label);
+    appCtx.propMarkers.push(label);
 
     // Add photo billboard if property has image
     if (prop.primaryPhoto) {
@@ -666,8 +666,8 @@ function renderPropertyMarkers() {
           billboard.userData.isBillboard = true;
           billboard.userData.propertyId = prop.id;
 
-          ctx.scene.add(billboard);
-          ctx.propMarkers.push(billboard);
+          appCtx.scene.add(billboard);
+          appCtx.propMarkers.push(billboard);
         } catch (e) {
           console.warn('Canvas rendering failed for:', prop.primaryPhoto, e);
         }
@@ -696,8 +696,8 @@ function renderPropertyMarkers() {
             billboard.userData.isBillboard = true;
             billboard.userData.propertyId = prop.id;
 
-            ctx.scene.add(billboard);
-            ctx.propMarkers.push(billboard);
+            appCtx.scene.add(billboard);
+            appCtx.propMarkers.push(billboard);
           },
           undefined,
           function (error) {
@@ -712,8 +712,8 @@ function renderPropertyMarkers() {
 }
 
 function clearPropertyMarkers() {
-  ctx.propMarkers.forEach((m) => {
-    ctx.scene.remove(m);
+  appCtx.propMarkers.forEach((m) => {
+    appCtx.scene.remove(m);
     if (m.geometry) m.geometry.dispose();
     if (m.material) {
       if (Array.isArray(m.material)) {
@@ -723,17 +723,17 @@ function clearPropertyMarkers() {
       }
     }
   });
-  ctx.propMarkers = [];
+  appCtx.propMarkers = [];
 }
 
 // ==================== HISTORIC SITES SYSTEM ====================
 
 function toggleHistoric() {
-  ctx.historicMode = !ctx.historicMode;
+  appCtx.historicMode = !appCtx.historicMode;
   const btn = document.getElementById('historicBtn');
-  if (btn) btn.classList.toggle('active', ctx.historicMode);
+  if (btn) btn.classList.toggle('active', appCtx.historicMode);
 
-  if (ctx.historicMode) {
+  if (appCtx.historicMode) {
     updateHistoricPanel();
   } else {
     closeHistoricPanel();
@@ -745,30 +745,30 @@ function updateHistoricPanel() {
   if (!list) return;
 
   // Only show if historic mode is active
-  if (!ctx.historicMode) return;
+  if (!appCtx.historicMode) return;
 
   // Calculate distances
-  ctx.historicSites.forEach((site) => {
-    const dx = site.x - ctx.car.x;
-    const dz = site.z - ctx.car.z;
+  appCtx.historicSites.forEach((site) => {
+    const dx = site.x - appCtx.car.x;
+    const dz = site.z - appCtx.car.z;
     site.distance = Math.sqrt(dx * dx + dz * dz);
   });
 
   // Sort by distance
-  ctx.historicSites.sort((a, b) => a.distance - b.distance);
+  appCtx.historicSites.sort((a, b) => a.distance - b.distance);
 
   // Update count
-  document.getElementById('historicCount').textContent = `${ctx.historicSites.length} Sites`;
+  document.getElementById('historicCount').textContent = `${appCtx.historicSites.length} Sites`;
 
   // Create cards
-  list.innerHTML = ctx.historicSites.map(createHistoricCard).join('');
+  list.innerHTML = appCtx.historicSites.map(createHistoricCard).join('');
   document.getElementById('historicPanel').classList.add('show');
 }
 
 function createHistoricCard(site) {
   const distance = Math.round(toFiniteNumber(site.distance, 0));
   const distanceText = distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : distance + 'm';
-  const isSelected = ctx.selectedHistoric && ctx.selectedHistoric.name === site.name;
+  const isSelected = appCtx.selectedHistoric && appCtx.selectedHistoric.name === site.name;
   const safeName = escapeHtml(site.name || 'Historic Site');
   const safeNameJs = escapeJsString(site.name || 'Historic Site');
   const safeCategory = escapeHtml(site.category || 'Historic');
@@ -789,10 +789,10 @@ function createHistoricCard(site) {
 }
 
 async function openHistoricModal(siteName) {
-  const site = ctx.historicSites.find((s) => s.name === siteName);
-  if (!site || !ctx.PropertyUI.modal) return;
+  const site = appCtx.historicSites.find((s) => s.name === siteName);
+  if (!site || !appCtx.PropertyUI.modal) return;
 
-  ctx.PropertyUI.modalTitle.textContent = site.name || 'Historic Site';
+  appCtx.PropertyUI.modalTitle.textContent = site.name || 'Historic Site';
   const safeNameJs = escapeJsString(site.name || 'Historic Site');
   const safeCategory = escapeHtml(site.category || 'Historic');
   const safeIcon = escapeHtml(site.icon || '⛩️');
@@ -820,7 +820,7 @@ async function openHistoricModal(siteName) {
 
   const distance = Math.round(toFiniteNumber(site.distance, 0));
   const distanceText = distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : distance + 'm';
-  const isSelected = ctx.selectedHistoric && ctx.selectedHistoric.name === site.name;
+  const isSelected = appCtx.selectedHistoric && appCtx.selectedHistoric.name === site.name;
   const safeFact = escapeHtml(fact);
   const wikiSlug = typeof site.wikipedia === 'string' ? site.wikipedia.trim().replace(/\s+/g, '_') : '';
   const wikiUrl = wikiSlug ? `https://wikipedia.org/wiki/${encodeURIComponent(wikiSlug)}` : '';
@@ -834,7 +834,7 @@ async function openHistoricModal(siteName) {
     </div>
   `;
 
-  ctx.PropertyUI.modalBody.innerHTML = `
+  appCtx.PropertyUI.modalBody.innerHTML = `
     <div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#78350f">
       <strong>⛩️ Historic Site</strong><br>
       ${safeFact}
@@ -857,18 +857,18 @@ async function openHistoricModal(siteName) {
     ${navButtons}
     ${wikiUrl ? `<button onclick="window.open('${escapeJsString(wikiUrl)}','_blank','noopener,noreferrer')" style="width:100%;margin-top:8px;background:#64748b;border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer">📖 Wikipedia</button>` : ''}
   `;
-  ctx.PropertyUI.modal.classList.add('show');
+  appCtx.PropertyUI.modal.classList.add('show');
 }
 
 function navigateToHistoric(siteName) {
-  const site = ctx.historicSites.find((s) => s.name === siteName);
+  const site = appCtx.historicSites.find((s) => s.name === siteName);
   if (!site) return;
 
-  ctx.selectedHistoric = site;
-  ctx.selectedProperty = null; // Clear property navigation
-  ctx.showNavigation = true;
+  appCtx.selectedHistoric = site;
+  appCtx.selectedProperty = null; // Clear property navigation
+  appCtx.showNavigation = true;
 
-  createNavigationRoute(ctx.car.x, ctx.car.z, site.x, site.z);
+  createNavigationRoute(appCtx.car.x, appCtx.car.z, site.x, site.z);
   updateHistoricPanel();
   closeModal();
 
@@ -881,14 +881,14 @@ function closeHistoricPanel() {
 
 // Navigation system
 function navigateToProperty(propertyId) {
-  const prop = ctx.properties.find((p) => p.id === propertyId);
+  const prop = appCtx.properties.find((p) => p.id === propertyId);
   if (!prop) return;
 
-  ctx.selectedProperty = prop;
-  ctx.showNavigation = true;
+  appCtx.selectedProperty = prop;
+  appCtx.showNavigation = true;
 
   // Create navigation route - simple straight line for now
-  createNavigationRoute(ctx.car.x, ctx.car.z, prop.x, prop.z);
+  createNavigationRoute(appCtx.car.x, appCtx.car.z, prop.x, prop.z);
 
   // Update UI
   updatePropertyPanel();
@@ -898,35 +898,35 @@ function navigateToProperty(propertyId) {
 }
 
 function clearNavigation() {
-  ctx.selectedProperty = null;
-  ctx.selectedHistoric = null;
-  ctx.showNavigation = false;
+  appCtx.selectedProperty = null;
+  appCtx.selectedHistoric = null;
+  appCtx.showNavigation = false;
 
-  if (ctx.navigationRoute) {
-    ctx.scene.remove(ctx.navigationRoute);
-    ctx.navigationRoute = null;
+  if (appCtx.navigationRoute) {
+    appCtx.scene.remove(appCtx.navigationRoute);
+    appCtx.navigationRoute = null;
   }
 
-  if (ctx.navigationMarker) {
-    ctx.scene.remove(ctx.navigationMarker);
-    ctx.navigationMarker = null;
+  if (appCtx.navigationMarker) {
+    appCtx.scene.remove(appCtx.navigationMarker);
+    appCtx.navigationMarker = null;
   }
 
   // Hide navigation HUD
   document.getElementById('navigationHud').style.display = 'none';
 
   updatePropertyPanel();
-  if (ctx.historicMode) updateHistoricPanel();
+  if (appCtx.historicMode) updateHistoricPanel();
   closeModal();
 }
 
 function createNavigationRoute(fromX, fromZ, toX, toZ) {
   // Remove old route and marker
-  if (ctx.navigationRoute) {
-    ctx.scene.remove(ctx.navigationRoute);
+  if (appCtx.navigationRoute) {
+    appCtx.scene.remove(appCtx.navigationRoute);
   }
-  if (ctx.navigationMarker) {
-    ctx.scene.remove(ctx.navigationMarker);
+  if (appCtx.navigationMarker) {
+    appCtx.scene.remove(appCtx.navigationMarker);
   }
 
   // Create glowing line from current position to destination
@@ -954,8 +954,8 @@ function createNavigationRoute(fromX, fromZ, toX, toZ) {
     opacity: 0.8
   });
 
-  ctx.navigationRoute = new THREE.Mesh(tubeGeometry, tubeMaterial);
-  ctx.scene.add(ctx.navigationRoute);
+  appCtx.navigationRoute = new THREE.Mesh(tubeGeometry, tubeMaterial);
+  appCtx.scene.add(appCtx.navigationRoute);
 
   // Create destination marker - a glowing beacon
   const markerGroup = new THREE.Group();
@@ -987,12 +987,12 @@ function createNavigationRoute(fromX, fromZ, toX, toZ) {
   markerGroup.add(beam);
 
   markerGroup.position.set(toX, 0, toZ);
-  ctx.navigationMarker = markerGroup;
-  ctx.scene.add(ctx.navigationMarker);
+  appCtx.navigationMarker = markerGroup;
+  appCtx.scene.add(appCtx.navigationMarker);
 
   // Animate marker (pulsing effect)
   const animateMarker = () => {
-    if (ctx.navigationMarker && ctx.navigationMarker.parent) {
+    if (appCtx.navigationMarker && appCtx.navigationMarker.parent) {
       const time = Date.now() * 0.003;
       sphere.scale.setScalar(1 + Math.sin(time) * 0.2);
       sphere.material.opacity = 0.5 + Math.sin(time) * 0.2;
@@ -1005,27 +1005,27 @@ function createNavigationRoute(fromX, fromZ, toX, toZ) {
 function updateNavigationRoute() {
   const navHud = document.getElementById('navigationHud');
 
-  if (ctx.showNavigation) {
-    const destination = ctx.selectedProperty || ctx.selectedHistoric;
+  if (appCtx.showNavigation) {
+    const destination = appCtx.selectedProperty || appCtx.selectedHistoric;
     if (destination) {
       // Get current position based on active mode
       let currentX, currentZ, currentAngle;
 
-      if (ctx.droneMode) {
+      if (appCtx.droneMode) {
         // Drone mode
-        currentX = ctx.drone.x;
-        currentZ = ctx.drone.z;
-        currentAngle = ctx.drone.yaw;
-      } else if (ctx.Walk && ctx.Walk.state.mode === 'walk') {
+        currentX = appCtx.drone.x;
+        currentZ = appCtx.drone.z;
+        currentAngle = appCtx.drone.yaw;
+      } else if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
         // Walking mode
-        currentX = ctx.Walk.state.walker.x;
-        currentZ = ctx.Walk.state.walker.z;
-        currentAngle = ctx.Walk.state.walker.yaw;
+        currentX = appCtx.Walk.state.walker.x;
+        currentZ = appCtx.Walk.state.walker.z;
+        currentAngle = appCtx.Walk.state.walker.yaw;
       } else {
         // Driving mode
-        currentX = ctx.car.x;
-        currentZ = ctx.car.z;
-        currentAngle = ctx.car.angle;
+        currentX = appCtx.car.x;
+        currentZ = appCtx.car.z;
+        currentAngle = appCtx.car.angle;
       }
 
       createNavigationRoute(currentX, currentZ, destination.x, destination.z);
@@ -1050,7 +1050,7 @@ function updateNavigationRoute() {
       // Update HUD
       navHud.style.display = 'block';
       document.getElementById('navDestination').textContent =
-      ctx.selectedProperty ? ctx.selectedProperty.address.substring(0, 30) : ctx.selectedHistoric.name.substring(0, 30);
+      appCtx.selectedProperty ? appCtx.selectedProperty.address.substring(0, 30) : appCtx.selectedHistoric.name.substring(0, 30);
 
       // Format distance
       if (dist < 1000) {
@@ -1064,7 +1064,7 @@ function updateNavigationRoute() {
 
       // Check if arrived (within 10 meters)
       if (dist < 10) {
-        const name = ctx.selectedProperty ? ctx.selectedProperty.address : ctx.selectedHistoric.name;
+        const name = appCtx.selectedProperty ? appCtx.selectedProperty.address : appCtx.selectedHistoric.name;
         // Debug log removed
         document.getElementById('navDistance').textContent = '✓ Arrived!';
         // Optionally auto-clear navigation on arrival after a delay
@@ -1078,21 +1078,21 @@ function updateNavigationRoute() {
 }
 
 function updatePolice(dt) {
-  if (!ctx.policeOn || ctx.police.length === 0) return;
-  const mph = Math.abs(ctx.car.speed * 0.5);
-  const limit = ctx.car.road?.limit || 25;
+  if (!appCtx.policeOn || appCtx.police.length === 0) return;
+  const mph = Math.abs(appCtx.car.speed * 0.5);
+  const limit = appCtx.car.road?.limit || 25;
   const speeding = mph > limit;
-  ctx.police.forEach((cop) => {
+  appCtx.police.forEach((cop) => {
     cop.siren += dt * 10;
     if (cop.cooldown > 0) cop.cooldown -= dt;
-    const dx = ctx.car.x - cop.x,dz = ctx.car.z - cop.z,dist = Math.hypot(dx, dz);
+    const dx = appCtx.car.x - cop.x,dz = appCtx.car.z - cop.z,dist = Math.hypot(dx, dz);
 
     // Start chasing if speeding and within range
-    if (speeding && dist < ctx.CFG.policeDist) cop.chasing = true;
+    if (speeding && dist < appCtx.CFG.policeDist) cop.chasing = true;
 
     // REMOVED: Don't stop chasing when below speed limit - they keep chasing once started!
     // Only stop chasing if very far away (gave up the chase)
-    if (dist > ctx.CFG.policeDist * 1.5) cop.chasing = false;
+    if (dist > appCtx.CFG.policeDist * 1.5) cop.chasing = false;
 
     if (cop.chasing) {
       const ta = Math.atan2(dx, dz);
@@ -1100,9 +1100,9 @@ function updatePolice(dt) {
       while (ad > Math.PI) ad -= Math.PI * 2;
       while (ad < -Math.PI) ad += Math.PI * 2;
       cop.angle += ad * 4 * dt;
-      if (dist > 50) cop.speed += ctx.CFG.policeAccel * dt;else
+      if (dist > 50) cop.speed += appCtx.CFG.policeAccel * dt;else
       cop.speed *= 0.95;
-      cop.speed = Math.min(cop.speed, ctx.CFG.policeSpd);
+      cop.speed = Math.min(cop.speed, appCtx.CFG.policeSpd);
       cop.mesh.children[2].material.color.setHex(Math.sin(cop.siren) > 0 ? 0xff0000 : 0x440000);
       cop.mesh.children[3].material.color.setHex(Math.sin(cop.siren) > 0 ? 0x000044 : 0x0066ff);
     } else cop.speed *= 0.98;
@@ -1117,7 +1117,7 @@ function updatePolice(dt) {
       cop.z = cnz;
     } else {
       // When not chasing, try to stay on road
-      const nr = ctx.findNearestRoad(cnx, cnz);
+      const nr = appCtx.findNearestRoad(cnx, cnz);
       if (nr.dist < 50) {
         cop.x = cnx;
         cop.z = cnz;
@@ -1130,19 +1130,19 @@ function updatePolice(dt) {
     // Find surface below police
     let policeY = 0;
 
-    if (ctx.terrainEnabled) {
-      let baseY = ctx.elevationWorldYAtWorldXZ(cop.x, cop.z);
+    if (appCtx.terrainEnabled) {
+      let baseY = appCtx.elevationWorldYAtWorldXZ(cop.x, cop.z);
 
       // Check if near road
-      const nearRoad = ctx.findNearestRoad(cop.x, cop.z);
+      const nearRoad = appCtx.findNearestRoad(cop.x, cop.z);
 
-      if (nearRoad.dist < 20 && ctx.roadMeshes.length > 0) {
+      if (nearRoad.dist < 20 && appCtx.roadMeshes.length > 0) {
         // Near road - raycast against roads
-        const raycaster = ctx._getPhysRaycaster();
-        ctx._physRayStart.set(cop.x, 200, cop.z);
-        raycaster.set(ctx._physRayStart, ctx._physRayDir);
+        const raycaster = appCtx._getPhysRaycaster();
+        appCtx._physRayStart.set(cop.x, 200, cop.z);
+        raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
 
-        const roadHits = raycaster.intersectObjects(ctx.roadMeshes, false);
+        const roadHits = raycaster.intersectObjects(appCtx.roadMeshes, false);
 
         if (roadHits.length > 0) {
           policeY = roadHits[0].point.y;
@@ -1160,18 +1160,18 @@ function updatePolice(dt) {
 
     // Collision with player
     if (dist < 4 && cop.chasing && cop.cooldown <= 0) {
-      ctx.policeHits++;
+      appCtx.policeHits++;
       cop.cooldown = 2;
-      ctx.car.speed *= 0.3;
+      appCtx.car.speed *= 0.3;
       cop.speed = 0;
-      document.getElementById('police').textContent = '💔 ' + ctx.policeHits + '/3';
-      if (ctx.policeHits >= 3) {ctx.paused = true;document.getElementById('caughtScreen').classList.add('show');}
+      document.getElementById('police').textContent = '💔 ' + appCtx.policeHits + '/3';
+      if (appCtx.policeHits >= 3) {appCtx.paused = true;document.getElementById('caughtScreen').classList.add('show');}
     }
   });
 }
 
 function spawnPolice() {
-  ctx.policeMeshes.forEach((m) => ctx.scene.remove(m));ctx.policeMeshes = [];ctx.police = [];ctx.policeHits = 0;
+  appCtx.policeMeshes.forEach((m) => appCtx.scene.remove(m));appCtx.policeMeshes = [];appCtx.police = [];appCtx.policeHits = 0;
   document.getElementById('police').textContent = '💔 0/3';
   for (let i = 0; i < 2; i++) {
     const mesh = new THREE.Group();
@@ -1183,37 +1183,37 @@ function spawnPolice() {
     sr.position.set(-0.3, 0.92, 0);mesh.add(sr);
     const sb = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.12, 0.2), new THREE.MeshStandardMaterial({ color: 0x0066ff, emissive: 0x0066ff, emissiveIntensity: 1.5 })); // Reduced from 3
     sb.position.set(0.3, 0.92, 0);mesh.add(sb);
-    const ang = ctx.car.angle + Math.PI + (i === 0 ? 0.4 : -0.4);
+    const ang = appCtx.car.angle + Math.PI + (i === 0 ? 0.4 : -0.4);
     const dist = 50 + i * 20;
-    const spawnX = ctx.car.x + Math.sin(ang) * dist;
-    const spawnZ = ctx.car.z + Math.cos(ang) * dist;
+    const spawnX = appCtx.car.x + Math.sin(ang) * dist;
+    const spawnZ = appCtx.car.z + Math.cos(ang) * dist;
 
     // Find surface at spawn position (should be on road since spawning behind player)
     let spawnY = 0;
-    if (ctx.terrainEnabled && ctx.roadMeshes.length > 0) {
-      const raycaster = ctx._getPhysRaycaster();
-      ctx._physRayStart.set(spawnX, 200, spawnZ);
-      raycaster.set(ctx._physRayStart, ctx._physRayDir);
+    if (appCtx.terrainEnabled && appCtx.roadMeshes.length > 0) {
+      const raycaster = appCtx._getPhysRaycaster();
+      appCtx._physRayStart.set(spawnX, 200, spawnZ);
+      raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
 
-      const roadHits = raycaster.intersectObjects(ctx.roadMeshes, false);
+      const roadHits = raycaster.intersectObjects(appCtx.roadMeshes, false);
 
       if (roadHits.length > 0) {
         spawnY = roadHits[0].point.y;
       } else {
         // Fallback to terrain
-        spawnY = ctx.elevationWorldYAtWorldXZ(spawnX, spawnZ);
+        spawnY = appCtx.elevationWorldYAtWorldXZ(spawnX, spawnZ);
       }
     }
 
     mesh.position.set(spawnX, spawnY, spawnZ);
-    ctx.scene.add(mesh);ctx.policeMeshes.push(mesh);
-    ctx.police.push({ mesh, x: spawnX, z: spawnZ, angle: ctx.car.angle, speed: 0, siren: i * Math.PI, chasing: false, cooldown: 0 });
+    appCtx.scene.add(mesh);appCtx.policeMeshes.push(mesh);
+    appCtx.police.push({ mesh, x: spawnX, z: spawnZ, angle: appCtx.car.angle, speed: 0, siren: i * Math.PI, chasing: false, cooldown: 0 });
   }
 }
 
 function clearPolice() {
-  ctx.policeMeshes.forEach((m) => {
-    ctx.scene.remove(m);
+  appCtx.policeMeshes.forEach((m) => {
+    appCtx.scene.remove(m);
     if (m.geometry) m.geometry.dispose();
     if (m.material) {
       if (Array.isArray(m.material)) {
@@ -1223,15 +1223,15 @@ function clearPolice() {
       }
     }
   });
-  ctx.policeMeshes = [];
-  ctx.police = [];
+  appCtx.policeMeshes = [];
+  appCtx.police = [];
 }
 
-function pickRoadPt() {if (ctx.roads.length === 0) return null;const rd = ctx.roads[Math.floor(Math.random() * ctx.roads.length)];return rd.pts[Math.floor(Math.random() * rd.pts.length)];}
+function pickRoadPt() {if (appCtx.roads.length === 0) return null;const rd = appCtx.roads[Math.floor(Math.random() * appCtx.roads.length)];return rd.pts[Math.floor(Math.random() * rd.pts.length)];}
 
 function clearObjectives() {
-  ctx.cpMeshes.forEach((m) => {
-    ctx.scene.remove(m);
+  appCtx.cpMeshes.forEach((m) => {
+    appCtx.scene.remove(m);
     if (m.geometry) m.geometry.dispose();
     if (m.material) {
       if (Array.isArray(m.material)) {
@@ -1241,23 +1241,23 @@ function clearObjectives() {
       }
     }
   });
-  ctx.cpMeshes = [];
-  ctx.checkpoints = [];
-  ctx.cpCollected = 0;
-  if (ctx.destMesh) {
-    ctx.scene.remove(ctx.destMesh);
-    if (ctx.destMesh.geometry) ctx.destMesh.geometry.dispose();
-    if (ctx.destMesh.material) {
-      if (Array.isArray(ctx.destMesh.material)) {
-        ctx.destMesh.material.forEach((mat) => mat.dispose());
+  appCtx.cpMeshes = [];
+  appCtx.checkpoints = [];
+  appCtx.cpCollected = 0;
+  if (appCtx.destMesh) {
+    appCtx.scene.remove(appCtx.destMesh);
+    if (appCtx.destMesh.geometry) appCtx.destMesh.geometry.dispose();
+    if (appCtx.destMesh.material) {
+      if (Array.isArray(appCtx.destMesh.material)) {
+        appCtx.destMesh.material.forEach((mat) => mat.dispose());
       } else {
-        ctx.destMesh.material.dispose();
+        appCtx.destMesh.material.dispose();
       }
     }
-    ctx.destMesh = null;
+    appCtx.destMesh = null;
   }
-  ctx.destination = null;
-  ctx.trialDone = false;
+  appCtx.destination = null;
+  appCtx.trialDone = false;
 }
 
 function spawnDest() {
@@ -1265,19 +1265,19 @@ function spawnDest() {
   let best = null;
   for (let i = 0; i < 40; i++) {
     const p = pickRoadPt();if (!p) continue;
-    const d = Math.hypot(p.x - ctx.car.x, p.z - ctx.car.z);
+    const d = Math.hypot(p.x - appCtx.car.x, p.z - appCtx.car.z);
     if (d > 400 && d < 1200) {best = p;break;}
-    if (!best || d > Math.hypot(best.x - ctx.car.x, best.z - ctx.car.z)) best = p;
+    if (!best || d > Math.hypot(best.x - appCtx.car.x, best.z - appCtx.car.z)) best = p;
   }
   if (!best) return;
-  ctx.destination = { x: best.x, z: best.z };
+  appCtx.destination = { x: best.x, z: best.z };
   const grp = new THREE.Group();
   const ring = new THREE.Mesh(new THREE.TorusGeometry(12, 1, 8, 24), new THREE.MeshBasicMaterial({ color: 0xffcc00 }));
   ring.rotation.x = Math.PI / 2;ring.position.y = 0.5;grp.add(ring);
   const beam = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 40, 8), new THREE.MeshBasicMaterial({ color: 0xffcc00, transparent: true, opacity: 0.3 }));
   beam.position.y = 20;grp.add(beam);
   grp.position.set(best.x, 0, best.z);
-  ctx.scene.add(grp);ctx.destMesh = grp;
+  appCtx.scene.add(grp);appCtx.destMesh = grp;
 }
 
 function spawnCheckpoints() {
@@ -1286,38 +1286,38 @@ function spawnCheckpoints() {
     let p = null;
     for (let t = 0; t < 60; t++) {
       const c = pickRoadPt();if (!c) continue;
-      if (Math.hypot(c.x - ctx.car.x, c.z - ctx.car.z) < 250) continue;
-      if (ctx.checkpoints.every((cp) => Math.hypot(c.x - cp.x, c.z - cp.z) > 200)) {p = c;break;}
+      if (Math.hypot(c.x - appCtx.car.x, c.z - appCtx.car.z) < 250) continue;
+      if (appCtx.checkpoints.every((cp) => Math.hypot(c.x - cp.x, c.z - cp.z) > 200)) {p = c;break;}
     }
     if (!p) p = pickRoadPt();
     if (!p) continue;
-    ctx.checkpoints.push({ x: p.x, z: p.z, collected: false, idx: i + 1 });
+    appCtx.checkpoints.push({ x: p.x, z: p.z, collected: false, idx: i + 1 });
     const grp = new THREE.Group();
     const ring = new THREE.Mesh(new THREE.TorusGeometry(10, 0.8, 8, 20), new THREE.MeshBasicMaterial({ color: 0xff3366 }));
     ring.rotation.x = Math.PI / 2;ring.position.y = 0.5;grp.add(ring);
     grp.position.set(p.x, 0, p.z);
-    ctx.scene.add(grp);ctx.cpMeshes.push(grp);
+    appCtx.scene.add(grp);appCtx.cpMeshes.push(grp);
   }
 }
 
-function startMode() {ctx.gameTimer = 0;clearObjectives();if (ctx.gameMode === 'trial') spawnDest();else if (ctx.gameMode === 'checkpoint') spawnCheckpoints();}
+function startMode() {appCtx.gameTimer = 0;clearObjectives();if (appCtx.gameMode === 'trial') spawnDest();else if (appCtx.gameMode === 'checkpoint') spawnCheckpoints();}
 
 function updateMode(dt) {
-  if (ctx.gameMode === 'trial' || ctx.gameMode === 'checkpoint') ctx.gameTimer += dt;
-  ctx.cpMeshes.forEach((m) => m.rotation.y += dt * 1.5);
-  if (ctx.destMesh) ctx.destMesh.rotation.y += dt * 1.2;
-  if (ctx.gameMode === 'trial' && ctx.destination && !ctx.trialDone) {
-    const d = Math.hypot(ctx.destination.x - ctx.car.x, ctx.destination.z - ctx.car.z);
-    if (d < ctx.CFG.cpRadius) {ctx.trialDone = true;showResult('Destination Reached!', 'Time: ' + fmtTime(ctx.gameTimer));} else
-    if (ctx.gameTimer > ctx.CFG.trialTime) showResult("Time's Up!", 'Result: Failed');
+  if (appCtx.gameMode === 'trial' || appCtx.gameMode === 'checkpoint') appCtx.gameTimer += dt;
+  appCtx.cpMeshes.forEach((m) => m.rotation.y += dt * 1.5);
+  if (appCtx.destMesh) appCtx.destMesh.rotation.y += dt * 1.2;
+  if (appCtx.gameMode === 'trial' && appCtx.destination && !appCtx.trialDone) {
+    const d = Math.hypot(appCtx.destination.x - appCtx.car.x, appCtx.destination.z - appCtx.car.z);
+    if (d < appCtx.CFG.cpRadius) {appCtx.trialDone = true;showResult('Destination Reached!', 'Time: ' + fmtTime(appCtx.gameTimer));} else
+    if (appCtx.gameTimer > appCtx.CFG.trialTime) showResult("Time's Up!", 'Result: Failed');
   }
-  if (ctx.gameMode === 'checkpoint') {
-    for (let i = 0; i < ctx.checkpoints.length; i++) {
-      const cp = ctx.checkpoints[i];if (cp.collected) continue;
-      if (Math.hypot(cp.x - ctx.car.x, cp.z - ctx.car.z) < ctx.CFG.cpRadius) {
-        cp.collected = true;ctx.cpCollected++;
-        if (ctx.cpMeshes[i]) ctx.cpMeshes[i].visible = false;
-        if (ctx.cpCollected >= ctx.checkpoints.length) showResult('All Checkpoints!', 'Time: ' + fmtTime(ctx.gameTimer));
+  if (appCtx.gameMode === 'checkpoint') {
+    for (let i = 0; i < appCtx.checkpoints.length; i++) {
+      const cp = appCtx.checkpoints[i];if (cp.collected) continue;
+      if (Math.hypot(cp.x - appCtx.car.x, cp.z - appCtx.car.z) < appCtx.CFG.cpRadius) {
+        cp.collected = true;appCtx.cpCollected++;
+        if (appCtx.cpMeshes[i]) appCtx.cpMeshes[i].visible = false;
+        if (appCtx.cpCollected >= appCtx.checkpoints.length) showResult('All Checkpoints!', 'Time: ' + fmtTime(appCtx.gameTimer));
         break;
       }
     }
@@ -1325,10 +1325,10 @@ function updateMode(dt) {
 }
 
 function fmtTime(s) {s = Math.max(0, Math.floor(s));return String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');}
-function showResult(title, stats) {document.getElementById('resultTitle').textContent = title;document.getElementById('resultStats').textContent = stats;document.getElementById('resultScreen').classList.add('show');ctx.paused = true;}
+function showResult(title, stats) {document.getElementById('resultTitle').textContent = title;document.getElementById('resultStats').textContent = stats;document.getElementById('resultScreen').classList.add('show');appCtx.paused = true;}
 function hideResult() {document.getElementById('resultScreen').classList.remove('show');}
 
-Object.assign(ctx, {
+Object.assign(appCtx, {
   clearNavigation,
   clearObjectives,
   clearPolice,

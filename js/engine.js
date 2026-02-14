@@ -1,4 +1,4 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // engine.js - Three.js initialization, renderer, scene, lighting, car mesh
 // ============================================================================
 
@@ -8,29 +8,29 @@ let buildingNormalMap = null,buildingRoughnessMap = null;
 let currentGpuTier = 'high';
 
 function syncTextureGlobals() {
-  ctx.asphaltTex = asphaltTex;
-  ctx.asphaltNormal = asphaltNormal;
-  ctx.asphaltRoughness = asphaltRoughness;
-  ctx.grassDiffuse = grassDiffuse;
-  ctx.grassNormal = grassNormal;
-  ctx.grassRoughness = grassRoughness;
-  ctx.pavementDiffuse = pavementDiffuse;
-  ctx.pavementNormal = pavementNormal;
-  ctx.pavementRoughness = pavementRoughness;
-  ctx.concreteDiffuse = concreteDiffuse;
-  ctx.concreteNormal = concreteNormal;
-  ctx.concreteRoughness = concreteRoughness;
-  ctx.brickDiffuse = brickDiffuse;
-  ctx.brickNormal = brickNormal;
-  ctx.brickRoughness = brickRoughness;
-  ctx.buildingNormalMap = buildingNormalMap;
-  ctx.buildingRoughnessMap = buildingRoughnessMap;
-  ctx.windowTextures = windowTextures;
+  appCtx.asphaltTex = asphaltTex;
+  appCtx.asphaltNormal = asphaltNormal;
+  appCtx.asphaltRoughness = asphaltRoughness;
+  appCtx.grassDiffuse = grassDiffuse;
+  appCtx.grassNormal = grassNormal;
+  appCtx.grassRoughness = grassRoughness;
+  appCtx.pavementDiffuse = pavementDiffuse;
+  appCtx.pavementNormal = pavementNormal;
+  appCtx.pavementRoughness = pavementRoughness;
+  appCtx.concreteDiffuse = concreteDiffuse;
+  appCtx.concreteNormal = concreteNormal;
+  appCtx.concreteRoughness = concreteRoughness;
+  appCtx.brickDiffuse = brickDiffuse;
+  appCtx.brickNormal = brickNormal;
+  appCtx.brickRoughness = brickRoughness;
+  appCtx.buildingNormalMap = buildingNormalMap;
+  appCtx.buildingRoughnessMap = buildingRoughnessMap;
+  appCtx.windowTextures = windowTextures;
 }
 
 function clearWindowTextureCache() {
   windowTextures = {};
-  ctx.windowTextures = windowTextures;
+  appCtx.windowTextures = windowTextures;
 }
 
 // PBR ground textures (grass for terrain)
@@ -53,7 +53,7 @@ function createAsphaltTexture() {
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#2a2a2a';ctx.fillRect(0, 0, 256, 256);
   // RDT-seeded deterministic asphalt speckle
-  const rng = typeof ctx.seededRandom === 'function' ? ctx.seededRandom(ctx.rdtSeed ^ 0xA5FA17) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xA5FA17) : Math.random.bind(Math);
   for (let i = 0; i < 2000; i++) {
     const x = rng() * 256,y = rng() * 256;
     const brightness = 20 + rng() * 40;
@@ -72,7 +72,7 @@ function createAsphaltNormal() {
   canvas.height = 128;
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#8080ff';ctx.fillRect(0, 0, 128, 128);
-  const rng = typeof ctx.seededRandom === 'function' ? ctx.seededRandom(ctx.rdtSeed ^ 0xB0B041) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xB0B041) : Math.random.bind(Math);
   for (let i = 0; i < 500; i++) {
     const x = rng() * 128,y = rng() * 128;
     ctx.fillStyle = `rgb(${120 + rng() * 20}, ${120 + rng() * 20}, ${230 + rng() * 25})`;
@@ -93,7 +93,7 @@ function createRoughnessMap() {
   ctx.fillStyle = '#e0e0e0'; // High roughness
   ctx.fillRect(0, 0, 128, 128);
   // RDT-seeded deterministic roughness variation
-  const rng = typeof ctx.seededRandom === 'function' ? ctx.seededRandom(ctx.rdtSeed ^ 0xC0FFEE) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xC0FFEE) : Math.random.bind(Math);
   for (let i = 0; i < 800; i++) {
     const x = rng() * 128;
     const y = rng() * 128;
@@ -128,7 +128,7 @@ function createBuildingNormalMap() {
     ctx.fillRect(x, 0, 1, 256);
   }
   // Subtle brick-like variation
-  const rng = typeof ctx.seededRandom === 'function' ? ctx.seededRandom(0xB21C4) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(0xB21C4) : Math.random.bind(Math);
   for (let i = 0; i < 400; i++) {
     const x = rng() * 128,y = rng() * 256;
     ctx.fillStyle = `rgb(${124 + rng() * 12}, ${124 + rng() * 12}, ${240 + rng() * 15})`;
@@ -156,7 +156,7 @@ function createBuildingRoughnessMap() {
     }
   }
   // Add variation
-  const rng = typeof ctx.seededRandom === 'function' ? ctx.seededRandom(0xA0060) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(0xA0060) : Math.random.bind(Math);
   for (let i = 0; i < 200; i++) {
     const x = rng() * 64,y = rng() * 128;
     const b = 180 + rng() * 55;
@@ -171,7 +171,7 @@ function createBuildingRoughnessMap() {
 
 function createWindowTexture(baseColor, seed) {
   // Cache key includes location seed so textures are deterministic per city
-  const cacheKey = baseColor + '_' + (ctx.rdtSeed || 0);
+  const cacheKey = baseColor + '_' + (appCtx.rdtSeed || 0);
   if (windowTextures[cacheKey]) return windowTextures[cacheKey];
 
   const canvas = document.createElement('canvas');
@@ -182,8 +182,8 @@ function createWindowTexture(baseColor, seed) {
   const ww = 10,wh = 12,spacing = 3; // Smaller windows
 
   // Use RDT-seeded random for deterministic window lights per location
-  const rng = typeof ctx.seededRandom === 'function' ?
-  ctx.seededRandom((seed || ctx.rdtSeed || 42) ^ cacheKey.length) :
+  const rng = typeof appCtx.seededRandom === 'function' ?
+  appCtx.seededRandom((seed || appCtx.rdtSeed || 42) ^ cacheKey.length) :
   Math.random.bind(Math);
 
   for (let floor = 0; floor < 18; floor++) {
@@ -278,7 +278,7 @@ function createProceduralGrassNormal() {
   ctx.fillStyle = '#8080ff';
   ctx.fillRect(0, 0, size, size);
 
-  const rng = typeof ctx.seededRandom === 'function' ? ctx.seededRandom(ctx.rdtSeed ^ 0xB14DE5) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xB14DE5) : Math.random.bind(Math);
 
   // Grass blade normals (directional perturbations)
   for (let i = 0; i < 5000; i++) {
@@ -322,7 +322,7 @@ function createProceduralGrassRoughness() {
   ctx.fillStyle = '#d8d8d8';
   ctx.fillRect(0, 0, size, size);
 
-  const rng = typeof ctx.seededRandom === 'function' ? ctx.seededRandom(ctx.rdtSeed ^ 0xD1B7) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xD1B7) : Math.random.bind(Math);
 
   // Variation - some spots slightly smoother (dewy grass) or rougher (dry patches)
   for (let i = 0; i < 2000; i++) {
@@ -358,7 +358,7 @@ function createConcreteFacadeTexture() {
   ctx.fillStyle = '#9a9590';
   ctx.fillRect(0, 0, size, size);
 
-  const rng = typeof ctx.seededRandom === 'function' ? ctx.seededRandom(ctx.rdtSeed ^ 0xC0C0) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xC0C0) : Math.random.bind(Math);
 
   // Concrete grain noise
   for (let i = 0; i < 8000; i++) {
@@ -399,7 +399,7 @@ function createConcreteNormalMap() {
   ctx.fillStyle = '#8080ff';
   ctx.fillRect(0, 0, size, size);
 
-  const rng = typeof ctx.seededRandom === 'function' ? ctx.seededRandom(ctx.rdtSeed ^ 0xC1C1) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xC1C1) : Math.random.bind(Math);
 
   // Panel joint normals
   for (let y = 0; y < size; y += 64) {
@@ -430,7 +430,7 @@ function createConcreteRoughnessMap() {
   ctx.fillStyle = '#cccccc';
   ctx.fillRect(0, 0, size, size);
 
-  const rng = typeof ctx.seededRandom === 'function' ? ctx.seededRandom(ctx.rdtSeed ^ 0xC2C2) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xC2C2) : Math.random.bind(Math);
 
   for (let i = 0; i < 2000; i++) {
     const x = rng() * size,y = rng() * size;
@@ -450,7 +450,7 @@ function createBrickFacadeTexture() {
   canvas.width = size;canvas.height = size;
   const ctx = canvas.getContext('2d');
 
-  const rng = typeof ctx.seededRandom === 'function' ? ctx.seededRandom(ctx.rdtSeed ^ 0xB41C) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xB41C) : Math.random.bind(Math);
 
   // Mortar base color
   ctx.fillStyle = '#b0a89a';
@@ -499,7 +499,7 @@ function createBrickNormalMap() {
   ctx.fillRect(0, 0, size, size);
 
   const brickH = 16,brickW = 36,mortarW = 3;
-  const rng = typeof ctx.seededRandom === 'function' ? ctx.seededRandom(ctx.rdtSeed ^ 0xB41D) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xB41D) : Math.random.bind(Math);
 
   // Mortar groove normals (recessed)
   for (let row = 0; row < size / (brickH + mortarW); row++) {
@@ -544,7 +544,7 @@ function createBrickRoughnessMap() {
   ctx.fillRect(0, 0, size, size);
 
   const brickH = 8,brickW = 18,mortarW = 2;
-  const rng = typeof ctx.seededRandom === 'function' ? ctx.seededRandom(ctx.rdtSeed ^ 0xB41E) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xB41E) : Math.random.bind(Math);
 
   // Mortar is rougher than brick
   for (let row = 0; row < size / (brickH + mortarW); row++) {
@@ -577,7 +577,7 @@ function createPavementTexture() {
   ctx.fillStyle = '#b0aba5';
   ctx.fillRect(0, 0, size, size);
 
-  const rng = typeof ctx.seededRandom === 'function' ? ctx.seededRandom(ctx.rdtSeed ^ 0xDA7E) : Math.random.bind(Math);
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xDA7E) : Math.random.bind(Math);
 
   // Concrete grain
   for (let i = 0; i < 10000; i++) {
@@ -698,9 +698,9 @@ function createBuildingGroundPatch(pts, avgElevation) {
   for (let i = 0; i < positions.count; i++) {
     const x = positions.getX(i);
     const z = positions.getZ(i);
-    const terrainY = typeof ctx.terrainMeshHeightAt === 'function' ?
-    ctx.terrainMeshHeightAt(x, z) :
-    ctx.elevationWorldYAtWorldXZ(x, z);
+    const terrainY = typeof appCtx.terrainMeshHeightAt === 'function' ?
+    appCtx.terrainMeshHeightAt(x, z) :
+    appCtx.elevationWorldYAtWorldXZ(x, z);
     const useY = terrainY === 0 && Math.abs(avgElevation) > 2 ? avgElevation : terrainY;
     positions.setY(i, useY - avgElevation + 0.05);
   }
@@ -914,8 +914,8 @@ function initPBRTextures(maxAniso) {
 
 // Apply grass textures to existing terrain meshes (called after textures load)
 function applyGrassToTerrain() {
-  if (!grassDiffuse || !ctx.terrainGroup) return;
-  ctx.terrainGroup.children.forEach(function (mesh) {
+  if (!grassDiffuse || !appCtx.terrainGroup) return;
+  appCtx.terrainGroup.children.forEach(function (mesh) {
     if (!mesh.userData || !mesh.userData.terrainTile) return;
     const mat = mesh.material;
     if (!mat) return;
@@ -923,8 +923,8 @@ function applyGrassToTerrain() {
     // Calculate tile world size for proper texture tiling
     const info = mesh.userData.terrainTile;
     const bounds = info.bounds;
-    const pNW = ctx.geoToWorld(bounds.latN, bounds.lonW);
-    const pNE = ctx.geoToWorld(bounds.latN, bounds.lonE);
+    const pNW = appCtx.geoToWorld(bounds.latN, bounds.lonW);
+    const pNE = appCtx.geoToWorld(bounds.latN, bounds.lonE);
     const tileWidth = Math.abs(pNE.x - pNW.x);
     // Tile grass every ~25 world units (~28 meters) for visible detail
     const repeats = Math.max(10, Math.round(tileWidth / 25));
@@ -951,8 +951,8 @@ function applyGrassToTerrain() {
 
 // Get building material based on building type (deterministic per building)
 function getBuildingMaterial(buildingType, bSeed, baseColorHex) {
-  const br1 = ctx.rand01FromInt(bSeed);
-  const br2 = ctx.rand01FromInt(bSeed ^ 0x12345);
+  const br1 = appCtx.rand01FromInt(bSeed);
+  const br2 = appCtx.rand01FromInt(bSeed ^ 0x12345);
 
   // Decide facade type based on building type and seed
   let facadeType = 'window'; // default: procedural windows
@@ -1036,45 +1036,45 @@ const CFG = {
 
 // ESM compatibility bridge:
 // physics/game/hud reference CFG as a global symbol.
-Object.assign(ctx, { CFG });
+Object.assign(appCtx, { CFG });
 
 function setupPostProcessingPipeline() {
-  if (!ctx.renderer || !ctx.scene || !ctx.camera) return false;
+  if (!appCtx.renderer || !appCtx.scene || !appCtx.camera) return false;
   if (currentGpuTier === 'low') return false;
   if (typeof THREE.EffectComposer === 'undefined' || typeof THREE.RenderPass === 'undefined') return false;
 
   try {
-    ctx.composer = new THREE.EffectComposer(ctx.renderer);
-    ctx.composer.setSize(innerWidth, innerHeight);
+    appCtx.composer = new THREE.EffectComposer(appCtx.renderer);
+    appCtx.composer.setSize(innerWidth, innerHeight);
 
-    const renderPass = new THREE.RenderPass(ctx.scene, ctx.camera);
-    ctx.composer.addPass(renderPass);
+    const renderPass = new THREE.RenderPass(appCtx.scene, appCtx.camera);
+    appCtx.composer.addPass(renderPass);
 
-    ctx.bloomPass = null;
+    appCtx.bloomPass = null;
     if (typeof THREE.UnrealBloomPass !== 'undefined') {
       try {
         const bloomW = Math.floor(innerWidth / 2);
         const bloomH = Math.floor(innerHeight / 2);
-        ctx.bloomPass = new THREE.UnrealBloomPass(
+        appCtx.bloomPass = new THREE.UnrealBloomPass(
           new THREE.Vector2(bloomW, bloomH),
           0.15, // strength - very subtle
           0.4, // radius
           0.85 // threshold - only bright things bloom
         );
-        ctx.composer.addPass(ctx.bloomPass);
+        appCtx.composer.addPass(appCtx.bloomPass);
       } catch (e) {
         console.warn('Bloom not available:', e);
       }
     }
 
-    ctx.smaaPass = null;
+    appCtx.smaaPass = null;
     if (typeof THREE.SMAAPass !== 'undefined') {
       try {
-        ctx.smaaPass = new THREE.SMAAPass(
-          innerWidth * ctx.renderer.getPixelRatio(),
-          innerHeight * ctx.renderer.getPixelRatio()
+        appCtx.smaaPass = new THREE.SMAAPass(
+          innerWidth * appCtx.renderer.getPixelRatio(),
+          innerHeight * appCtx.renderer.getPixelRatio()
         );
-        ctx.composer.addPass(ctx.smaaPass);
+        appCtx.composer.addPass(appCtx.smaaPass);
       } catch (e) {
         console.warn('SMAA not available:', e);
       }
@@ -1083,15 +1083,15 @@ function setupPostProcessingPipeline() {
     return true;
   } catch (e) {
     console.warn('Post-processing not available:', e);
-    ctx.composer = null;
-    ctx.bloomPass = null;
-    ctx.smaaPass = null;
+    appCtx.composer = null;
+    appCtx.bloomPass = null;
+    appCtx.smaaPass = null;
     return false;
   }
 }
 
 function tryEnablePostProcessing() {
-  if (ctx.composer) return true;
+  if (appCtx.composer) return true;
   const enabled = setupPostProcessingPipeline();
   if (enabled) {
     console.log('[engine] Post-processing enabled after deferred script load.');
@@ -1143,14 +1143,14 @@ function init() {
     console.warn('Could not get GPU info:', e);
   }
 
-  ctx.scene = new THREE.Scene();
-  ctx.scene.background = new THREE.Color(0x87ceeb);
-  ctx.scene.fog = new THREE.FogExp2(0xb8d4e8, 0.00035);
+  appCtx.scene = new THREE.Scene();
+  appCtx.scene.background = new THREE.Color(0x87ceeb);
+  appCtx.scene.fog = new THREE.FogExp2(0xb8d4e8, 0.00035);
 
   // Camera - tighter near/far ratio improves depth precision.
   // Stars are at r=5000 so far must cover that. logarithmicDepthBuffer (below)
   // compensates for the wide range.
-  ctx.camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.5, 12000);
+  appCtx.camera = new THREE.PerspectiveCamera(70, innerWidth / innerHeight, 0.5, 12000);
 
   // === RENDERER WITH MAXIMUM COMPATIBILITY ===
   let rendererCreated = false;
@@ -1195,7 +1195,7 @@ function init() {
   for (let i = 0; i < rendererOptions.length && !rendererCreated; i++) {
     try {
       // Debug log removed
-      ctx.renderer = new THREE.WebGLRenderer(rendererOptions[i]);
+      appCtx.renderer = new THREE.WebGLRenderer(rendererOptions[i]);
       rendererCreated = true;
       // Debug log removed
     } catch (e) {
@@ -1203,28 +1203,28 @@ function init() {
     }
   }
 
-  if (!rendererCreated || !ctx.renderer) {
+  if (!rendererCreated || !appCtx.renderer) {
     alert('Failed to create 3D renderer. Your graphics card may not support WebGL properly.');
     document.getElementById('loading').innerHTML = '<div style="color:#f66;padding:40px;text-align:center;">Renderer Creation Failed<br><br>Your GPU may not support the required features.</div>';
     return;
   }
 
-  ctx.renderer.setSize(innerWidth, innerHeight);
+  appCtx.renderer.setSize(innerWidth, innerHeight);
   try {
     // When using post-processing we need manual resets so renderer.info
     // accumulates all passes in a frame instead of only the final pass.
-    ctx.renderer.info.autoReset = false;
+    appCtx.renderer.info.autoReset = false;
   } catch {
+
+
 
 
     // Ignore unsupported renderer.info configurations.
   } // === GPU TIER DETECTION ===
   // Detect GPU capability to adapt quality settings across the board
   let gpuTier = 'high'; // high, mid, low
-  try {
-    const debugExt = ctx.renderer.getContext().getExtension('WEBGL_debug_renderer_info');
-    if (debugExt) {
-      const gpuRenderer = ctx.renderer.getContext().getParameter(debugExt.UNMASKED_RENDERER_WEBGL).toLowerCase();
+  try {const debugExt = appCtx.renderer.getContext().getExtension('WEBGL_debug_renderer_info');if (debugExt) {
+      const gpuRenderer = appCtx.renderer.getContext().getParameter(debugExt.UNMASKED_RENDERER_WEBGL).toLowerCase();
       const isMobile = /mobile|mali|adreno|powervr|apple gpu|sgx|tegra/.test(gpuRenderer);
       const isIntegrated = /intel|uhd|iris|hd graphics|mesa|swiftshader|llvmpipe/.test(gpuRenderer);
       if (isMobile || /swiftshader|llvmpipe/.test(gpuRenderer)) {
@@ -1240,43 +1240,43 @@ function init() {
 
   // Adaptive pixel ratio: high=1.5, mid=1.25, low=1
   const pixelRatioCap = gpuTier === 'high' ? 1.5 : gpuTier === 'mid' ? 1.25 : 1;
-  ctx.renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
+  appCtx.renderer.setPixelRatio(Math.min(window.devicePixelRatio, pixelRatioCap));
 
   // Physically correct lighting for realistic PBR
   try {
-    ctx.renderer.physicallyCorrectLights = true;
+    appCtx.renderer.physicallyCorrectLights = true;
   } catch (e) {
     console.warn('Physically correct lights not supported');
   }
 
   try {
-    ctx.renderer.outputEncoding = THREE.sRGBEncoding;
+    appCtx.renderer.outputEncoding = THREE.sRGBEncoding;
   } catch (e) {
     console.warn('sRGB encoding not supported');
   }
 
   try {
-    ctx.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    ctx.renderer.toneMappingExposure = 0.9;
+    appCtx.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    appCtx.renderer.toneMappingExposure = 0.9;
   } catch (e) {
     console.warn('Tone mapping not supported');
   }
 
   try {
-    ctx.renderer.shadowMap.enabled = true;
+    appCtx.renderer.shadowMap.enabled = true;
     // PCFSoft on high/mid, Basic on low
-    ctx.renderer.shadowMap.type = gpuTier === 'low' ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
+    appCtx.renderer.shadowMap.type = gpuTier === 'low' ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
   } catch (e) {
     console.warn('Shadows not supported, trying basic');
     try {
-      ctx.renderer.shadowMap.enabled = true;
-      ctx.renderer.shadowMap.type = THREE.BasicShadowMap;
+      appCtx.renderer.shadowMap.enabled = true;
+      appCtx.renderer.shadowMap.type = THREE.BasicShadowMap;
     } catch (e2) {
       console.warn('Shadows not supported at all');
     }
   }
 
-  document.body.prepend(ctx.renderer.domElement);
+  document.body.prepend(appCtx.renderer.domElement);
 
   currentGpuTier = gpuTier;
   if (!setupPostProcessingPipeline()) {
@@ -1294,7 +1294,7 @@ function init() {
     buildingRoughnessMap = createBuildingRoughnessMap();
 
     // Apply anisotropic filtering to ground textures for sharper distant roads
-    const maxAniso = ctx.renderer.capabilities.getMaxAnisotropy();
+    const maxAniso = appCtx.renderer.capabilities.getMaxAnisotropy();
     const aniso = Math.min(maxAniso, 8);
     if (asphaltTex) asphaltTex.anisotropy = aniso;
     if (asphaltNormal) asphaltNormal.anisotropy = aniso;
@@ -1312,7 +1312,7 @@ function init() {
   // === REAL HDR ENVIRONMENT (Poly Haven - Free) ===
   // Using a real HDR gives massively better reflections on car paint, glass, and buildings
   try {
-    const pmremGenerator = new THREE.PMREMGenerator(ctx.renderer);
+    const pmremGenerator = new THREE.PMREMGenerator(appCtx.renderer);
     pmremGenerator.compileEquirectangularShader();
 
     // Try loading real HDR from Poly Haven (free CDN)
@@ -1326,7 +1326,7 @@ function init() {
       function (hdrTexture) {
         hdrTexture.mapping = THREE.EquirectangularReflectionMapping;
         const envMap = pmremGenerator.fromEquirectangular(hdrTexture).texture;
-        ctx.scene.environment = envMap;
+        appCtx.scene.environment = envMap;
         hdrTexture.dispose();
         pmremGenerator.dispose();
         // Debug log removed
@@ -1354,7 +1354,7 @@ function init() {
       const envMesh = new THREE.Mesh(envGeo, envMat);
       envScene.add(envMesh);
       const envMap = pmremGenerator.fromScene(envScene, 0.04).texture;
-      ctx.scene.environment = envMap;
+      appCtx.scene.environment = envMap;
       pmremGenerator.dispose();
       // Debug log removed
     } catch (e) {
@@ -1363,43 +1363,43 @@ function init() {
   }
 
   // Advanced lighting - store references for day/night cycle
-  ctx.hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x545454, 0.4);
-  ctx.scene.add(ctx.hemiLight);
+  appCtx.hemiLight = new THREE.HemisphereLight(0x87ceeb, 0x545454, 0.4);
+  appCtx.scene.add(appCtx.hemiLight);
 
-  ctx.sun = new THREE.DirectionalLight(0xfff5e1, 1.2);
-  ctx.sun.position.set(100, 150, 50);
-  ctx.sun.castShadow = true;
+  appCtx.sun = new THREE.DirectionalLight(0xfff5e1, 1.2);
+  appCtx.sun.position.set(100, 150, 50);
+  appCtx.sun.castShadow = true;
   const shadowRes = gpuTier === 'high' ? 1024 : gpuTier === 'mid' ? 512 : 256;
-  ctx.sun.shadow.mapSize.width = shadowRes;
-  ctx.sun.shadow.mapSize.height = shadowRes;
-  ctx.sun.shadow.camera.left = -120;
-  ctx.sun.shadow.camera.right = 120;
-  ctx.sun.shadow.camera.top = 120;
-  ctx.sun.shadow.camera.bottom = -120;
-  ctx.sun.shadow.camera.near = 0.5;
-  ctx.sun.shadow.camera.far = 500;
-  ctx.sun.shadow.bias = -0.0001;
-  ctx.sun.shadow.normalBias = 0.02;
-  ctx.sun.shadow.radius = 3; // Soft shadow edges (PCFSoftShadowMap)
-  ctx.scene.add(ctx.sun);
+  appCtx.sun.shadow.mapSize.width = shadowRes;
+  appCtx.sun.shadow.mapSize.height = shadowRes;
+  appCtx.sun.shadow.camera.left = -120;
+  appCtx.sun.shadow.camera.right = 120;
+  appCtx.sun.shadow.camera.top = 120;
+  appCtx.sun.shadow.camera.bottom = -120;
+  appCtx.sun.shadow.camera.near = 0.5;
+  appCtx.sun.shadow.camera.far = 500;
+  appCtx.sun.shadow.bias = -0.0001;
+  appCtx.sun.shadow.normalBias = 0.02;
+  appCtx.sun.shadow.radius = 3; // Soft shadow edges (PCFSoftShadowMap)
+  appCtx.scene.add(appCtx.sun);
 
-  ctx.fillLight = new THREE.DirectionalLight(0x9db4ff, 0.3);
-  ctx.fillLight.position.set(-50, 50, -50);
-  ctx.scene.add(ctx.fillLight);
+  appCtx.fillLight = new THREE.DirectionalLight(0x9db4ff, 0.3);
+  appCtx.fillLight.position.set(-50, 50, -50);
+  appCtx.scene.add(appCtx.fillLight);
 
-  ctx.ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
-  ctx.scene.add(ctx.ambientLight);
+  appCtx.ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
+  appCtx.scene.add(appCtx.ambientLight);
 
   // === ADD SUN VISUAL ===
-  ctx.sunSphere = new THREE.Mesh(
+  appCtx.sunSphere = new THREE.Mesh(
     new THREE.SphereGeometry(40, 16, 8),
     new THREE.MeshBasicMaterial({
       color: 0xffdd00,
       fog: false
     })
   );
-  ctx.sunSphere.position.set(500, 800, 200); // Much higher: 800 units up, above clouds
-  ctx.scene.add(ctx.sunSphere);
+  appCtx.sunSphere.position.set(500, 800, 200); // Much higher: 800 units up, above clouds
+  appCtx.scene.add(appCtx.sunSphere);
 
   // Add sun glow effect
   const sunGlow = new THREE.Mesh(
@@ -1411,23 +1411,23 @@ function init() {
       fog: false
     })
   );
-  sunGlow.position.copy(ctx.sunSphere.position);
-  ctx.scene.add(sunGlow);
+  sunGlow.position.copy(appCtx.sunSphere.position);
+  appCtx.scene.add(sunGlow);
 
   // Store reference to sun glow for toggling
-  ctx.sunSphere.userData.glow = sunGlow;
+  appCtx.sunSphere.userData.glow = sunGlow;
 
   // === ADD MOON VISUAL ===
-  ctx.moonSphere = new THREE.Mesh(
+  appCtx.moonSphere = new THREE.Mesh(
     new THREE.SphereGeometry(35, 16, 8),
     new THREE.MeshBasicMaterial({
       color: 0xccccdd,
       fog: false
     })
   );
-  ctx.moonSphere.position.set(-500, 800, -200);
-  ctx.moonSphere.visible = false; // Hidden during day
-  ctx.scene.add(ctx.moonSphere);
+  appCtx.moonSphere.position.set(-500, 800, -200);
+  appCtx.moonSphere.visible = false; // Hidden during day
+  appCtx.scene.add(appCtx.moonSphere);
 
   // Add moon glow
   const moonGlow = new THREE.Mesh(
@@ -1439,15 +1439,15 @@ function init() {
       fog: false
     })
   );
-  moonGlow.position.copy(ctx.moonSphere.position);
+  moonGlow.position.copy(appCtx.moonSphere.position);
   moonGlow.visible = false;
-  ctx.scene.add(moonGlow);
+  appCtx.scene.add(moonGlow);
 
   // Store reference to moon glow for toggling
-  ctx.moonSphere.userData.glow = moonGlow;
+  appCtx.moonSphere.userData.glow = moonGlow;
 
   // === ADD CLOUDS ===
-  ctx.cloudGroup = new THREE.Group();
+  appCtx.cloudGroup = new THREE.Group();
   const cloudMat = new THREE.MeshLambertMaterial({
     color: 0xffffff,
     transparent: true,
@@ -1477,7 +1477,7 @@ function init() {
       300 + Math.random() * 200,
       (Math.random() - 0.5) * 4000
     );
-    ctx.cloudGroup.add(cloud);
+    appCtx.cloudGroup.add(cloud);
   }
 
   // A few large clouds
@@ -1503,13 +1503,13 @@ function init() {
       350 + Math.random() * 150,
       (Math.random() - 0.5) * 5000
     );
-    ctx.cloudGroup.add(largeCloud);
+    appCtx.cloudGroup.add(largeCloud);
   }
 
-  ctx.scene.add(ctx.cloudGroup);
+  appCtx.scene.add(appCtx.cloudGroup);
 
   // Create star field (hidden during day, visible at night)
-  ctx.starField = ctx.createStarField();
+  appCtx.starField = appCtx.createStarField();
 
   // Ground plane - solid green fallback beneath terrain (no texture to avoid sky-like artifacts)
   const groundMat = new THREE.MeshStandardMaterial({ color: 0x4a7a2e, roughness: 0.95, metalness: 0 });
@@ -1518,11 +1518,11 @@ function init() {
   ground.position.y = -0.1; // Slightly below terrain tiles (acts as fallback)
   ground.receiveShadow = true;
   ground.userData.isGroundPlane = true;
-  ctx.scene.add(ground);
+  appCtx.scene.add(ground);
 
   // Car with REALISTIC PBR materials (with error handling)
   try {
-    ctx.carMesh = new THREE.Group();
+    appCtx.carMesh = new THREE.Group();
 
     // === CAR PAINT (MeshStandardMaterial - good look, better perf) ===
     const bodyMat = new THREE.MeshStandardMaterial({
@@ -1534,10 +1534,10 @@ function init() {
 
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 3.5), bodyMat);
     body.position.y = 0.5;body.castShadow = true;body.receiveShadow = true;
-    ctx.carMesh.add(body);
+    appCtx.carMesh.add(body);
     const roof = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.4, 1.5), bodyMat);
     roof.position.set(0, 0.95, -0.2);roof.castShadow = true;
-    ctx.carMesh.add(roof);
+    appCtx.carMesh.add(roof);
 
     // === GLASS (MeshStandardMaterial - transparent, better perf) ===
     const glassMat = new THREE.MeshStandardMaterial({
@@ -1552,48 +1552,48 @@ function init() {
     const windshield = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.35, 0.1), glassMat);
     windshield.position.set(0, 0.85, 0.55);
     windshield.rotation.x = -0.3;
-    ctx.carMesh.add(windshield);
+    appCtx.carMesh.add(windshield);
 
     const wheelGeo = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12);
     const wheelMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.9, metalness: 0.1 });
     const wheelPositions = [[-0.85, 0.35, 1.1], [0.85, 0.35, 1.1], [-0.85, 0.35, -1.1], [0.85, 0.35, -1.1]];
-    ctx.wheelMeshes = [];
+    appCtx.wheelMeshes = [];
     wheelPositions.forEach((pos) => {
       const wheel = new THREE.Mesh(wheelGeo, wheelMat);
       wheel.rotation.z = Math.PI / 2;
       wheel.position.set(pos[0], pos[1], pos[2]);
       wheel.castShadow = true;
-      ctx.carMesh.add(wheel);
-      ctx.wheelMeshes.push(wheel);
+      appCtx.carMesh.add(wheel);
+      appCtx.wheelMeshes.push(wheel);
     });
 
     const lightMat = new THREE.MeshStandardMaterial({ color: 0xffffee, emissive: 0xffffaa, emissiveIntensity: 1.0, roughness: 0.1, metalness: 0.1 });
     const hl1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.05), lightMat);
     hl1.position.set(-0.55, 0.45, 1.76);
-    ctx.carMesh.add(hl1);
+    appCtx.carMesh.add(hl1);
     const hl2 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.05), lightMat);
     hl2.position.set(0.55, 0.45, 1.76);
-    ctx.carMesh.add(hl2);
+    appCtx.carMesh.add(hl2);
 
     const tailMat = new THREE.MeshStandardMaterial({ color: 0xff0000, emissive: 0xff0000, emissiveIntensity: 0.8, roughness: 0.2, metalness: 0.1 });
     const tl1 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.05), tailMat);
     tl1.position.set(-0.55, 0.45, -1.76);
-    ctx.carMesh.add(tl1);
+    appCtx.carMesh.add(tl1);
     const tl2 = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.15, 0.05), tailMat);
     tl2.position.set(0.55, 0.45, -1.76);
-    ctx.carMesh.add(tl2);
+    appCtx.carMesh.add(tl2);
 
     // Keep car.y physics semantics unchanged; only lower rendered geometry to ground tires.
     const CAR_VISUAL_Y_OFFSET = -1.1;
-    ctx.carMesh.children.forEach((child) => {
+    appCtx.carMesh.children.forEach((child) => {
       if (child && child.position) child.position.y += CAR_VISUAL_Y_OFFSET;
     });
 
-    ctx.scene.add(ctx.carMesh);
+    appCtx.scene.add(appCtx.carMesh);
 
     // Car casts shadow but doesn't need to receive
-    ctx.carMesh.castShadow = true;
-    ctx.carMesh.traverse((child) => {
+    appCtx.carMesh.castShadow = true;
+    appCtx.carMesh.traverse((child) => {
       if (child.isMesh) {
         child.castShadow = true;
         child.receiveShadow = false;
@@ -1609,42 +1609,42 @@ function init() {
 
   // Initialize Walking Module
   try {
-    ctx.Walk = ctx.createWalkingModule({
+    appCtx.Walk = appCtx.createWalkingModule({
       THREE,
-      scene: ctx.scene,
-      camera: ctx.camera,
-      keys: ctx.keys,
-      car: ctx.car,
-      carMesh: ctx.carMesh,
-      getBuildingsArray: () => ctx.buildings, // Pass function for dynamic buildings access
+      scene: appCtx.scene,
+      camera: appCtx.camera,
+      keys: appCtx.keys,
+      car: appCtx.car,
+      carMesh: appCtx.carMesh,
+      getBuildingsArray: () => appCtx.buildings, // Pass function for dynamic buildings access
       getNearbyBuildings: (x, z, radius) =>
-      typeof ctx.getNearbyBuildings === 'function' ?
-      ctx.getNearbyBuildings(x, z, radius) : ctx.buildings,
+      typeof appCtx.getNearbyBuildings === 'function' ?
+      appCtx.getNearbyBuildings(x, z, radius) : appCtx.buildings,
 
 
-      isPointInPolygon: ctx.pointInPolygon
+      isPointInPolygon: appCtx.pointInPolygon
     });
-    window.Walk = ctx.Walk;
+    window.Walk = appCtx.Walk;
     // Start in walking mode by default (character visible, car hidden)
-    ctx.Walk.setModeWalk();
+    appCtx.Walk.setModeWalk();
   } catch (e) {
     console.error('Walking module initialization failed:', e);
     console.error('Stack:', e.stack);
   }
 
   // Initialize sky raycaster for star selection
-  ctx.skyRaycaster = new THREE.Raycaster();
-  ctx.skyRaycaster.far = 10000; // Reach stars on enlarged celestial sphere (5000m radius)
+  appCtx.skyRaycaster = new THREE.Raycaster();
+  appCtx.skyRaycaster.far = 10000; // Reach stars on enlarged celestial sphere (5000m radius)
 
   addEventListener('resize', () => {
-    ctx.camera.aspect = innerWidth / innerHeight;
-    ctx.camera.updateProjectionMatrix();
-    ctx.renderer.setSize(innerWidth, innerHeight);
-    if (ctx.composer) ctx.composer.setSize(innerWidth, innerHeight);
-    if (ctx.smaaPass) ctx.smaaPass.setSize(innerWidth * ctx.renderer.getPixelRatio(), innerHeight * ctx.renderer.getPixelRatio());
+    appCtx.camera.aspect = innerWidth / innerHeight;
+    appCtx.camera.updateProjectionMatrix();
+    appCtx.renderer.setSize(innerWidth, innerHeight);
+    if (appCtx.composer) appCtx.composer.setSize(innerWidth, innerHeight);
+    if (appCtx.smaaPass) appCtx.smaaPass.setSize(innerWidth * appCtx.renderer.getPixelRatio(), innerHeight * appCtx.renderer.getPixelRatio());
   });
-  addEventListener('keydown', (e) => {ctx.keys[e.code] = true;ctx.onKey(e.code, e);});
-  addEventListener('keyup', (e) => ctx.keys[e.code] = false);
+  addEventListener('keydown', (e) => {appCtx.keys[e.code] = true;appCtx.onKey(e.code, e);});
+  addEventListener('keyup', (e) => appCtx.keys[e.code] = false);
 
   // Mouse movement for camera control
   let lastMouseX = 0;
@@ -1654,8 +1654,8 @@ function init() {
 
   // Double-click to toggle mouse look in walking mode
   addEventListener('dblclick', (e) => {
-    if (!ctx.gameStarted) return;
-    if (ctx.Walk && ctx.Walk.state.mode === 'walk') {
+    if (!appCtx.gameStarted) return;
+    if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
       window.walkMouseLookActive = !window.walkMouseLookActive;
       lastMouseX = e.clientX;
       lastMouseY = e.clientY;
@@ -1663,22 +1663,22 @@ function init() {
   });
 
   addEventListener('mousedown', (e) => {
-    if (!ctx.gameStarted) return;
+    if (!appCtx.gameStarted) return;
 
     // Left click - check for Apollo 11 flag click
-    if (e.button === 0 && ctx.onMoon && ctx.apollo11Flag) {
+    if (e.button === 0 && appCtx.onMoon && appCtx.apollo11Flag) {
       const mouse = new THREE.Vector2();
       mouse.x = e.clientX / window.innerWidth * 2 - 1;
       mouse.y = -(e.clientY / window.innerHeight) * 2 + 1;
 
       const raycaster = new THREE.Raycaster();
-      raycaster.setFromCamera(mouse, ctx.camera);
+      raycaster.setFromCamera(mouse, appCtx.camera);
 
       // Check all children of the flag group (including invisible hitbox)
-      const intersects = raycaster.intersectObjects(ctx.apollo11Flag.children, true);
+      const intersects = raycaster.intersectObjects(appCtx.apollo11Flag.children, true);
       if (intersects.length > 0) {
         // Clicked on Apollo 11 flag!
-        ctx.showApollo11Info();
+        appCtx.showApollo11Info();
         return;
       }
     }
@@ -1699,10 +1699,10 @@ function init() {
   });
 
   addEventListener('mousemove', (e) => {
-    if (!ctx.gameStarted) return;
+    if (!appCtx.gameStarted) return;
 
     // Walking mode: respond to double-click toggle OR right-click hold
-    const walkLookActive = ctx.Walk && ctx.Walk.state.mode === 'walk' && window.walkMouseLookActive;
+    const walkLookActive = appCtx.Walk && appCtx.Walk.state.mode === 'walk' && window.walkMouseLookActive;
     if (!mouseActive && !walkLookActive) return;
 
     const deltaX = e.clientX - lastMouseX;
@@ -1713,45 +1713,45 @@ function init() {
     const sensitivity = 0.005;
 
     // Drone mode camera control
-    if (ctx.droneMode) {
-      ctx.drone.yaw -= deltaX * sensitivity;
-      ctx.drone.pitch += deltaY * sensitivity;
-      ctx.drone.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, ctx.drone.pitch));
+    if (appCtx.droneMode) {
+      appCtx.drone.yaw -= deltaX * sensitivity;
+      appCtx.drone.pitch += deltaY * sensitivity;
+      appCtx.drone.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.drone.pitch));
     }
     // Walking mode camera control
-    else if (ctx.Walk && ctx.Walk.state.mode === 'walk') {
-      ctx.Walk.state.walker.yaw -= deltaX * sensitivity;
-      ctx.Walk.state.walker.pitch += deltaY * sensitivity;
-      ctx.Walk.state.walker.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, ctx.Walk.state.walker.pitch));
+    else if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
+      appCtx.Walk.state.walker.yaw -= deltaX * sensitivity;
+      appCtx.Walk.state.walker.pitch += deltaY * sensitivity;
+      appCtx.Walk.state.walker.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.Walk.state.walker.pitch));
     }
   });
 
   // Prevent context menu on right click
   addEventListener('contextmenu', (e) => {
-    if (ctx.gameStarted && (ctx.droneMode || ctx.Walk && ctx.Walk.state.mode === 'walk')) {
+    if (appCtx.gameStarted && (appCtx.droneMode || appCtx.Walk && appCtx.Walk.state.mode === 'walk')) {
       e.preventDefault();
     }
   });
 
   // Click event for star selection
   addEventListener('click', (e) => {
-    if (!ctx.gameStarted) return;
+    if (!appCtx.gameStarted) return;
 
-    if (typeof ctx.handleBlockBuilderClick === 'function' && ctx.handleBlockBuilderClick(e)) {
+    if (typeof appCtx.handleBlockBuilderClick === 'function' && appCtx.handleBlockBuilderClick(e)) {
       return;
     }
 
     // Check for moon click FIRST (higher priority than stars)
-    if (ctx.checkMoonClick(e.clientX, e.clientY)) {
+    if (appCtx.checkMoonClick(e.clientX, e.clientY)) {
       return; // Moon was clicked, don't check stars
     }
 
-    ctx.checkStarClick(e.clientX, e.clientY);
+    appCtx.checkStarClick(e.clientX, e.clientY);
   });
 
 }
 
-Object.assign(ctx, {
+Object.assign(appCtx, {
   clearWindowTextureCache,
   createBuildingGroundPatch,
   getBuildingMaterial,

@@ -1,4 +1,4 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // blocks.js - Lightweight voxel-style builder (place/stack/remove brick blocks)
 // ============================================================================
 
@@ -52,7 +52,7 @@ function columnKey(gx, gz) {
 }
 
 function getLocRef() {
-  const loc = ctx.LOC;
+  const loc = appCtx.LOC;
   if (!loc || !isFiniteNumber(loc.lat) || !isFiniteNumber(loc.lon)) return null;
   return loc;
 }
@@ -64,22 +64,22 @@ function getCurrentLocationKey() {
 }
 
 function worldToLatLonSafe(x, z) {
-  if (typeof ctx.worldToLatLon === 'function') {
-    const ll = ctx.worldToLatLon(x, z);
+  if (typeof appCtx.worldToLatLon === 'function') {
+    const ll = appCtx.worldToLatLon(x, z);
     if (ll && isFiniteNumber(ll.lat) && isFiniteNumber(ll.lon)) return ll;
   }
   const loc = getLocRef();
-  if (!loc || !isFiniteNumber(ctx.SCALE) || ctx.SCALE === 0) return null;
-  const lat = loc.lat - z / ctx.SCALE;
-  const lon = loc.lon + x / (ctx.SCALE * Math.cos(loc.lat * Math.PI / 180));
+  if (!loc || !isFiniteNumber(appCtx.SCALE) || appCtx.SCALE === 0) return null;
+  const lat = loc.lat - z / appCtx.SCALE;
+  const lon = loc.lon + x / (appCtx.SCALE * Math.cos(loc.lat * Math.PI / 180));
   return { lat, lon };
 }
 
 function latLonToWorldSafe(lat, lon) {
   const loc = getLocRef();
-  if (!loc || !isFiniteNumber(ctx.SCALE) || ctx.SCALE === 0) return { x: NaN, z: NaN };
-  const x = (lon - loc.lon) * ctx.SCALE * Math.cos(loc.lat * Math.PI / 180);
-  const z = -(lat - loc.lat) * ctx.SCALE;
+  if (!loc || !isFiniteNumber(appCtx.SCALE) || appCtx.SCALE === 0) return { x: NaN, z: NaN };
+  const x = (lon - loc.lon) * appCtx.SCALE * Math.cos(loc.lat * Math.PI / 180);
+  const z = -(lat - loc.lat) * appCtx.SCALE;
   return { x, z };
 }
 
@@ -148,10 +148,10 @@ function showBuildTransientMessage(text) {
 }
 
 function canPersistBuildBlocks() {
-  if (typeof ctx.isEnv === 'function' && typeof ctx.ENV !== 'undefined') {
-    return ctx.isEnv(ctx.ENV.EARTH);
+  if (typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined') {
+    return appCtx.isEnv(appCtx.ENV.EARTH);
   }
-  return !ctx.onMoon;
+  return !appCtx.onMoon;
 }
 
 function normalizeBuildEntry(raw) {
@@ -260,41 +260,41 @@ function ensureBuildGeometry() {
 }
 
 function ensureBuildGroup() {
-  if (!ctx.scene || typeof THREE === 'undefined') return null;
+  if (!appCtx.scene || typeof THREE === 'undefined') return null;
   if (!buildGroup) {
     buildGroup = new THREE.Group();
     buildGroup.name = 'buildBlocksGroup';
   }
-  if (buildGroup.parent !== ctx.scene) {
-    ctx.scene.add(buildGroup);
+  if (buildGroup.parent !== appCtx.scene) {
+    appCtx.scene.add(buildGroup);
   }
   return buildGroup;
 }
 
 function getBuildReferencePosition() {
-  if (ctx.droneMode) {
-    return { x: ctx.drone.x, y: ctx.drone.y, z: ctx.drone.z };
+  if (appCtx.droneMode) {
+    return { x: appCtx.drone.x, y: appCtx.drone.y, z: appCtx.drone.z };
   }
-  if (ctx.Walk && ctx.Walk.state && ctx.Walk.state.mode === 'walk' && ctx.Walk.state.walker) {
+  if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker) {
     return {
-      x: ctx.Walk.state.walker.x,
-      y: ctx.Walk.state.walker.y,
-      z: ctx.Walk.state.walker.z
+      x: appCtx.Walk.state.walker.x,
+      y: appCtx.Walk.state.walker.y,
+      z: appCtx.Walk.state.walker.z
     };
   }
-  return { x: ctx.car.x, y: ctx.car.y || 0, z: ctx.car.z };
+  return { x: appCtx.car.x, y: appCtx.car.y || 0, z: appCtx.car.z };
 }
 
 function getSurfaceYAt(x, z) {
-  if (ctx.onMoon && ctx.moonSurface && typeof ctx._getPhysRaycaster === 'function' && ctx._physRayStart && ctx._physRayDir) {
-    const raycaster = ctx._getPhysRaycaster();
-    ctx._physRayStart.set(x, 2000, z);
-    raycaster.set(ctx._physRayStart, ctx._physRayDir);
-    const hits = raycaster.intersectObject(ctx.moonSurface, false);
+  if (appCtx.onMoon && appCtx.moonSurface && typeof appCtx._getPhysRaycaster === 'function' && appCtx._physRayStart && appCtx._physRayDir) {
+    const raycaster = appCtx._getPhysRaycaster();
+    appCtx._physRayStart.set(x, 2000, z);
+    raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
+    const hits = raycaster.intersectObject(appCtx.moonSurface, false);
     if (hits.length > 0) return hits[0].point.y;
   }
-  if (typeof ctx.terrainMeshHeightAt === 'function') return ctx.terrainMeshHeightAt(x, z);
-  if (typeof ctx.elevationWorldYAtWorldXZ === 'function') return ctx.elevationWorldYAtWorldXZ(x, z);
+  if (typeof appCtx.terrainMeshHeightAt === 'function') return appCtx.terrainMeshHeightAt(x, z);
+  if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') return appCtx.elevationWorldYAtWorldXZ(x, z);
   return 0;
 }
 
@@ -575,15 +575,15 @@ function setBuildModeEnabled(nextState) {
   buildModeEnabled = !!nextState;
   if (buildModeEnabled) {
     ensureBuildGroup();
-    if (typeof ctx.clearStarSelection === 'function') ctx.clearStarSelection();
+    if (typeof appCtx.clearStarSelection === 'function') appCtx.clearStarSelection();
   }
   updateBuildModeUI();
   return buildModeEnabled;
 }
 
 function toggleBlockBuildMode(forceState) {
-  if (!ctx.gameStarted) return false;
-  if (typeof ctx.isEnv === 'function' && typeof ctx.ENV !== 'undefined' && ctx.isEnv(ctx.ENV.SPACE_FLIGHT)) {
+  if (!appCtx.gameStarted) return false;
+  if (typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) {
     return false;
   }
   const next = typeof forceState === 'boolean' ? forceState : !buildModeEnabled;
@@ -592,12 +592,12 @@ function toggleBlockBuildMode(forceState) {
 
 function raycastBuildAction(event) {
   const raycaster = getBuildRaycaster();
-  if (!raycaster || !ctx.camera || !ctx.renderer || !buildMouse) return null;
+  if (!raycaster || !appCtx.camera || !appCtx.renderer || !buildMouse) return null;
 
-  const canvasRect = ctx.renderer.domElement.getBoundingClientRect();
+  const canvasRect = appCtx.renderer.domElement.getBoundingClientRect();
   buildMouse.x = (event.clientX - canvasRect.left) / canvasRect.width * 2 - 1;
   buildMouse.y = -((event.clientY - canvasRect.top) / canvasRect.height) * 2 + 1;
-  raycaster.setFromCamera(buildMouse, ctx.camera);
+  raycaster.setFromCamera(buildMouse, appCtx.camera);
 
   // Existing blocks take precedence for stacking/removal.
   if (buildGroup && buildGroup.children.length > 0) {
@@ -625,23 +625,23 @@ function raycastBuildAction(event) {
   // Place on world surface if not targeting an existing block.
   let point = null;
   const worldTargets = [];
-  if (Array.isArray(ctx.roadMeshes)) {
-    ctx.roadMeshes.forEach((mesh) => {
+  if (Array.isArray(appCtx.roadMeshes)) {
+    appCtx.roadMeshes.forEach((mesh) => {
       if (mesh && mesh.visible) worldTargets.push(mesh);
     });
   }
-  if (Array.isArray(ctx.buildingMeshes)) {
-    ctx.buildingMeshes.forEach((mesh) => {
+  if (Array.isArray(appCtx.buildingMeshes)) {
+    appCtx.buildingMeshes.forEach((mesh) => {
       if (mesh && mesh.visible) worldTargets.push(mesh);
     });
   }
-  if (Array.isArray(ctx.landuseMeshes)) {
-    ctx.landuseMeshes.forEach((mesh) => {
+  if (Array.isArray(appCtx.landuseMeshes)) {
+    appCtx.landuseMeshes.forEach((mesh) => {
       if (mesh && mesh.visible) worldTargets.push(mesh);
     });
   }
-  if (ctx.onMoon && ctx.moonSurface && ctx.moonSurface.visible !== false) {
-    worldTargets.push(ctx.moonSurface);
+  if (appCtx.onMoon && appCtx.moonSurface && appCtx.moonSurface.visible !== false) {
+    worldTargets.push(appCtx.moonSurface);
   }
 
   if (worldTargets.length > 0) {
@@ -669,8 +669,8 @@ function raycastBuildAction(event) {
 }
 
 function handleBlockBuilderClick(event) {
-  if (!buildModeEnabled || !ctx.gameStarted || ctx.paused || ctx.showLargeMap) return false;
-  if (typeof ctx.isEnv === 'function' && typeof ctx.ENV !== 'undefined' && ctx.isEnv(ctx.ENV.SPACE_FLIGHT)) return false;
+  if (!buildModeEnabled || !appCtx.gameStarted || appCtx.paused || appCtx.showLargeMap) return false;
+  if (typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return false;
   if (isBuildClickBlocked(event.target)) return false;
 
   const action = raycastBuildAction(event);
@@ -720,7 +720,7 @@ function refreshBlockBuilderForCurrentLocation() {
 }
 buildEntries = loadBuildEntriesFromStorage();
 
-Object.assign(ctx, {
+Object.assign(appCtx, {
   clearAllBuildBlocks,
   clearBlockBuilderForWorldReload,
   getBuildCollisionAtWorldXZ,

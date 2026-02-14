@@ -1,4 +1,4 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
@@ -167,15 +167,15 @@ function wayCenterDistanceSq(way, nodeMap) {
 
   const lat = latSum / count;
   const lon = lonSum / count;
-  const dLat = lat - ctx.LOC.lat;
-  const dLon = (lon - ctx.LOC.lon) * Math.cos(ctx.LOC.lat * Math.PI / 180);
+  const dLat = lat - appCtx.LOC.lat;
+  const dLon = (lon - appCtx.LOC.lon) * Math.cos(appCtx.LOC.lat * Math.PI / 180);
   return dLat * dLat + dLon * dLon;
 }
 
 function nodeDistanceSq(node) {
   if (!node) return Infinity;
-  const dLat = node.lat - ctx.LOC.lat;
-  const dLon = (node.lon - ctx.LOC.lon) * Math.cos(ctx.LOC.lat * Math.PI / 180);
+  const dLat = node.lat - appCtx.LOC.lat;
+  const dLon = (node.lon - appCtx.LOC.lon) * Math.cos(appCtx.LOC.lat * Math.PI / 180);
   return dLat * dLat + dLon * dLon;
 }
 
@@ -230,7 +230,7 @@ function limitNodesByDistance(nodes, limit) {
 }
 
 function getPerfModeValue() {
-  const mode = typeof ctx.getPerfMode === 'function' ? ctx.getPerfMode() : ctx.perfMode;
+  const mode = typeof appCtx.getPerfMode === 'function' ? appCtx.getPerfMode() : appCtx.perfMode;
   return mode === 'baseline' ? 'baseline' : 'rdt';
 }
 
@@ -269,8 +269,8 @@ function rdtDepthForFeatureTile(tileKey, tileDegrees = FEATURE_TILE_DEGREES) {
   const cz = Number(czRaw);
   const lat = Number.isFinite(cx) ? cx * tileDegrees : 0;
   const lon = Number.isFinite(cz) ? cz * tileDegrees : 0;
-  const seed = ctx.hashGeoToInt(lat, lon, 31);
-  const depth = ctx.rdtDepth(seed % 1000000 + 2, 1.5);
+  const seed = appCtx.hashGeoToInt(lat, lon, 31);
+  const depth = appCtx.rdtDepth(seed % 1000000 + 2, 1.5);
   _rdtTileDepthCache.set(cacheKey, depth);
   return depth;
 }
@@ -647,12 +647,12 @@ function createMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8ca0
 }
 
 function batchMidLodBuildingMeshes() {
-  if (!Array.isArray(ctx.buildingMeshes) || ctx.buildingMeshes.length === 0) return 0;
+  if (!Array.isArray(appCtx.buildingMeshes) || appCtx.buildingMeshes.length === 0) return 0;
 
   const mids = [];
   const keep = [];
-  for (let i = 0; i < ctx.buildingMeshes.length; i++) {
-    const mesh = ctx.buildingMeshes[i];
+  for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
+    const mesh = appCtx.buildingMeshes[i];
     if (mesh?.userData?.lodTier === 'mid' && !mesh.userData?.isBuildingBatch) {
       mids.push(mesh);
     } else {
@@ -705,7 +705,7 @@ function batchMidLodBuildingMeshes() {
     sumZ += mesh.position.z;
     instanceXZ[i] = { x: mesh.position.x, z: mesh.position.z };
 
-    ctx.scene.remove(mesh);
+    appCtx.scene.remove(mesh);
     if (mesh.geometry) mesh.geometry.dispose();
     if (mesh.material) mesh.material.dispose();
   }
@@ -725,8 +725,8 @@ function batchMidLodBuildingMeshes() {
   instanced.instanceMatrix.needsUpdate = true;
   if (instanced.instanceColor) instanced.instanceColor.needsUpdate = true;
 
-  ctx.scene.add(instanced);
-  ctx.buildingMeshes = [...keep, instanced];
+  appCtx.scene.add(instanced);
+  appCtx.buildingMeshes = [...keep, instanced];
   return mids.length;
 }
 
@@ -771,7 +771,7 @@ function normalizeWorldRingFromLonLat(coords, maxPoints = 900) {
   for (let i = 0; i < coords.length; i++) {
     const c = coords[i];
     if (!Array.isArray(c) || c.length < 2) continue;
-    const p = ctx.geoToWorld(c[1], c[0]); // GeoJSON: [lon, lat]
+    const p = appCtx.geoToWorld(c[1], c[0]); // GeoJSON: [lon, lat]
     pts.push(p);
   }
   if (pts.length < 3) return null;
@@ -793,7 +793,7 @@ function worldLinePointsFromLonLat(coords, maxPoints = 1000) {
   for (let i = 0; i < coords.length; i++) {
     const c = coords[i];
     if (!Array.isArray(c) || c.length < 2) continue;
-    pts.push(ctx.geoToWorld(c[1], c[0]));
+    pts.push(appCtx.geoToWorld(c[1], c[0]));
   }
   if (pts.length < 2) return null;
   return decimatePoints(pts, maxPoints, false);
@@ -801,7 +801,7 @@ function worldLinePointsFromLonLat(coords, maxPoints = 1000) {
 
 function classifyLanduseType(tags) {
   if (!tags) return null;
-  if (tags.landuse && ctx.LANDUSE_STYLES[tags.landuse]) return tags.landuse;
+  if (tags.landuse && appCtx.LANDUSE_STYLES[tags.landuse]) return tags.landuse;
   if (tags.natural === 'wood') return 'wood';
   if (tags.leisure === 'park') return 'park';
   return null;
@@ -939,13 +939,13 @@ function buildMergedGeometry(batch) {
 
 function batchNearLodBuildingMeshes() {
   try {
-    if (!Array.isArray(ctx.buildingMeshes) || ctx.buildingMeshes.length < 2) return 0;
+    if (!Array.isArray(appCtx.buildingMeshes) || appCtx.buildingMeshes.length < 2) return 0;
 
     const keep = [];
     const groups = new Map();
 
-    for (let i = 0; i < ctx.buildingMeshes.length; i++) {
-      const mesh = ctx.buildingMeshes[i];
+    for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
+      const mesh = appCtx.buildingMeshes[i];
       if (!mesh) continue;
       const tier = mesh.userData?.lodTier || 'near';
       if (tier !== 'near' && tier !== 'mid' || mesh.userData?.isBuildingBatch) {
@@ -1057,12 +1057,12 @@ function batchNearLodBuildingMeshes() {
         lodRadius: maxRadius
       };
 
-      ctx.scene.add(mergedMesh);
+      appCtx.scene.add(mergedMesh);
       batchedMeshes.push(mergedMesh);
 
       for (let i = 0; i < group.meshes.length; i++) {
         const src = group.meshes[i];
-        ctx.scene.remove(src);
+        appCtx.scene.remove(src);
         if (src.geometry) src.geometry.dispose();
         if (src.material) src.material.dispose();
       }
@@ -1070,15 +1070,15 @@ function batchNearLodBuildingMeshes() {
     });
 
     if (!batchedMeshes.length) {
-      ctx._lastBuildingBatchStats = {
+      appCtx._lastBuildingBatchStats = {
         groupCount: groups.size,
         batchMeshCount: 0,
         sourceMeshCount: 0
       };
       return 0;
     }
-    ctx.buildingMeshes = [...keep, ...batchedMeshes];
-    ctx._lastBuildingBatchStats = {
+    appCtx.buildingMeshes = [...keep, ...batchedMeshes];
+    appCtx._lastBuildingBatchStats = {
       groupCount: groups.size,
       batchMeshCount: batchedMeshes.length,
       sourceMeshCount
@@ -1086,7 +1086,7 @@ function batchNearLodBuildingMeshes() {
     return sourceMeshCount;
   } catch (err) {
     console.warn('[WorldLoad] batchNearLodBuildingMeshes failed:', err);
-    ctx._lastBuildingBatchStats = {
+    appCtx._lastBuildingBatchStats = {
       groupCount: 0,
       batchMeshCount: 0,
       sourceMeshCount: 0,
@@ -1098,13 +1098,13 @@ function batchNearLodBuildingMeshes() {
 
 function batchLanduseMeshes() {
   try {
-    if (!Array.isArray(ctx.landuseMeshes) || ctx.landuseMeshes.length < 4) return 0;
+    if (!Array.isArray(appCtx.landuseMeshes) || appCtx.landuseMeshes.length < 4) return 0;
 
     const keep = [];
     const groups = new Map();
 
-    for (let i = 0; i < ctx.landuseMeshes.length; i++) {
-      const mesh = ctx.landuseMeshes[i];
+    for (let i = 0; i < appCtx.landuseMeshes.length; i++) {
+      const mesh = appCtx.landuseMeshes[i];
       if (!mesh || mesh.userData?.isLanduseBatch) {
         if (mesh) keep.push(mesh);
         continue;
@@ -1223,12 +1223,12 @@ function batchLanduseMeshes() {
       };
       mergedMesh.visible = group.anyVisible || group.alwaysVisible;
 
-      ctx.scene.add(mergedMesh);
+      appCtx.scene.add(mergedMesh);
       batched.push(mergedMesh);
 
       for (let i = 0; i < group.meshes.length; i++) {
         const src = group.meshes[i];
-        ctx.scene.remove(src);
+        appCtx.scene.remove(src);
         if (src.geometry) src.geometry.dispose();
         if (src.material) src.material.dispose();
       }
@@ -1236,15 +1236,15 @@ function batchLanduseMeshes() {
     });
 
     if (!batched.length) {
-      ctx._lastLanduseBatchStats = {
+      appCtx._lastLanduseBatchStats = {
         groupCount: groups.size,
         batchMeshCount: 0,
         sourceMeshCount: 0
       };
       return 0;
     }
-    ctx.landuseMeshes = [...keep, ...batched];
-    ctx._lastLanduseBatchStats = {
+    appCtx.landuseMeshes = [...keep, ...batched];
+    appCtx._lastLanduseBatchStats = {
       groupCount: groups.size,
       batchMeshCount: batched.length,
       sourceMeshCount: sourceCount
@@ -1252,7 +1252,7 @@ function batchLanduseMeshes() {
     return sourceCount;
   } catch (err) {
     console.warn('[WorldLoad] batchLanduseMeshes failed:', err);
-    ctx._lastLanduseBatchStats = {
+    appCtx._lastLanduseBatchStats = {
       groupCount: 0,
       batchMeshCount: 0,
       sourceMeshCount: 0,
@@ -1287,8 +1287,8 @@ function addBuildingToSpatialIndex(building) {
 }
 
 function getNearbyBuildings(x, z, radius = 80) {
-  if (!Number.isFinite(x) || !Number.isFinite(z)) return ctx.buildings;
-  if (!buildingSpatialIndex || buildingSpatialIndex.size === 0) return ctx.buildings;
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return appCtx.buildings;
+  if (!buildingSpatialIndex || buildingSpatialIndex.size === 0) return appCtx.buildings;
 
   const queryRadius = Math.max(20, radius);
   const minCellX = Math.floor((x - queryRadius) / BUILDING_INDEX_CELL_SIZE);
@@ -1401,7 +1401,7 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheM
 }
 
 async function loadRoads(retryPass = 0) {
-  const locName = ctx.selLoc === 'custom' ? ctx.customLoc?.name || 'Custom' : ctx.LOCS[ctx.selLoc].name;
+  const locName = appCtx.selLoc === 'custom' ? appCtx.customLoc?.name || 'Custom' : appCtx.LOCS[appCtx.selLoc].name;
   const perfModeNow = getPerfModeValue();
   const useRdtBudgeting = perfModeNow === 'rdt';
   const loadMetrics = {
@@ -1417,10 +1417,10 @@ async function loadRoads(retryPass = 0) {
     pois: { requested: 0, selected: 0, near: 0, mid: 0, far: 0 },
     phases: {}
   };
-  ctx._lastBuildingBatchStats = null;
-  ctx._lastLanduseBatchStats = null;
-  if (typeof ctx.startPerfLoad === 'function') {
-    ctx.startPerfLoad('world-load', { mode: perfModeNow, location: locName });
+  appCtx._lastBuildingBatchStats = null;
+  appCtx._lastLanduseBatchStats = null;
+  if (typeof appCtx.startPerfLoad === 'function') {
+    appCtx.startPerfLoad('world-load', { mode: perfModeNow, location: locName });
   }
 
   let _perfLoadFinalized = false;
@@ -1429,7 +1429,7 @@ async function loadRoads(retryPass = 0) {
     _perfLoadFinalized = true;
     loadMetrics.success = !!success;
     const payload = { ...loadMetrics, ...extra };
-    if (typeof ctx.finishPerfLoad === 'function') ctx.finishPerfLoad(payload);
+    if (typeof appCtx.finishPerfLoad === 'function') appCtx.finishPerfLoad(payload);
   };
   const _phaseStartedAt = Object.create(null);
   const _phaseTotals = Object.create(null);
@@ -1446,17 +1446,17 @@ async function loadRoads(retryPass = 0) {
     delete _phaseStartedAt[name];
   };
 
-  ctx.showLoad('Loading ' + locName + '...');
-  ctx.worldLoading = true;
-  if (typeof ctx.clearMemoryMarkersForWorldReload === 'function') {
-    ctx.clearMemoryMarkersForWorldReload();
+  appCtx.showLoad('Loading ' + locName + '...');
+  appCtx.worldLoading = true;
+  if (typeof appCtx.clearMemoryMarkersForWorldReload === 'function') {
+    appCtx.clearMemoryMarkersForWorldReload();
   }
-  if (typeof ctx.clearBlockBuilderForWorldReload === 'function') {
-    ctx.clearBlockBuilderForWorldReload();
+  if (typeof appCtx.clearBlockBuilderForWorldReload === 'function') {
+    appCtx.clearBlockBuilderForWorldReload();
   }
   // Properly dispose of all meshes to prevent memory leaks
-  ctx.roadMeshes.forEach((m) => {
-    ctx.scene.remove(m);
+  appCtx.roadMeshes.forEach((m) => {
+    appCtx.scene.remove(m);
     if (m.geometry) m.geometry.dispose();
     if (m.material) {
       if (Array.isArray(m.material)) {
@@ -1466,10 +1466,10 @@ async function loadRoads(retryPass = 0) {
       }
     }
   });
-  ctx.roadMeshes = [];ctx.roads = [];
+  appCtx.roadMeshes = [];appCtx.roads = [];
 
-  ctx.buildingMeshes.forEach((m) => {
-    ctx.scene.remove(m);
+  appCtx.buildingMeshes.forEach((m) => {
+    appCtx.scene.remove(m);
     if (m.geometry) m.geometry.dispose();
     if (m.material) {
       if (Array.isArray(m.material)) {
@@ -1479,11 +1479,11 @@ async function loadRoads(retryPass = 0) {
       }
     }
   });
-  ctx.buildingMeshes = [];ctx.buildings = [];
+  appCtx.buildingMeshes = [];appCtx.buildings = [];
   clearBuildingSpatialIndex();
 
-  ctx.landuseMeshes.forEach((m) => {
-    ctx.scene.remove(m);
+  appCtx.landuseMeshes.forEach((m) => {
+    appCtx.scene.remove(m);
     if (m.geometry) m.geometry.dispose();
     if (m.material) {
       if (Array.isArray(m.material)) {
@@ -1493,10 +1493,10 @@ async function loadRoads(retryPass = 0) {
       }
     }
   });
-  ctx.landuseMeshes = [];ctx.landuses = [];ctx.waterAreas = [];ctx.waterways = [];
+  appCtx.landuseMeshes = [];appCtx.landuses = [];appCtx.waterAreas = [];appCtx.waterways = [];
 
-  ctx.poiMeshes.forEach((m) => {
-    ctx.scene.remove(m);
+  appCtx.poiMeshes.forEach((m) => {
+    appCtx.scene.remove(m);
     if (m.geometry) m.geometry.dispose();
     if (m.material) {
       if (Array.isArray(m.material)) {
@@ -1506,10 +1506,10 @@ async function loadRoads(retryPass = 0) {
       }
     }
   });
-  ctx.poiMeshes = [];ctx.pois = [];
+  appCtx.poiMeshes = [];appCtx.pois = [];
 
-  ctx.historicMarkers.forEach((m) => {
-    ctx.scene.remove(m);
+  appCtx.historicMarkers.forEach((m) => {
+    appCtx.scene.remove(m);
     if (m.geometry) m.geometry.dispose();
     if (m.material) {
       if (Array.isArray(m.material)) {
@@ -1519,10 +1519,10 @@ async function loadRoads(retryPass = 0) {
       }
     }
   });
-  ctx.historicMarkers = [];ctx.historicSites = [];
+  appCtx.historicMarkers = [];appCtx.historicSites = [];
 
-  ctx.streetFurnitureMeshes.forEach((m) => {
-    ctx.scene.remove(m);
+  appCtx.streetFurnitureMeshes.forEach((m) => {
+    appCtx.scene.remove(m);
     if (m.geometry) m.geometry.dispose();
     if (m.material) {
       if (Array.isArray(m.material)) {
@@ -1532,62 +1532,62 @@ async function loadRoads(retryPass = 0) {
       }
     }
   });
-  ctx.streetFurnitureMeshes = [];
+  appCtx.streetFurnitureMeshes = [];
   _signTextureCache.clear();_geoSignText = null;
-  if (typeof ctx.clearWindowTextureCache === 'function') {
-    ctx.clearWindowTextureCache(); // Clear RDT-keyed window texture cache for new location
+  if (typeof appCtx.clearWindowTextureCache === 'function') {
+    appCtx.clearWindowTextureCache(); // Clear RDT-keyed window texture cache for new location
   } else {
-    ctx.windowTextures = {};
+    appCtx.windowTextures = {};
   }
-  if (typeof ctx.invalidateRoadCache === 'function') ctx.invalidateRoadCache(); // Clear cached road result
+  if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache(); // Clear cached road result
 
   // Flag that roads will need rebuilding after terrain loads
-  ctx.roadsNeedRebuild = true;
+  appCtx.roadsNeedRebuild = true;
 
-  if (ctx.selLoc === 'custom') {
+  if (appCtx.selLoc === 'custom') {
     const lat = parseFloat(document.getElementById('customLat').value);
     const lon = parseFloat(document.getElementById('customLon').value);
     if (isNaN(lat) || isNaN(lon)) {
-      ctx.showLoad('Enter valid coordinates');
-      ctx.worldLoading = false;
+      appCtx.showLoad('Enter valid coordinates');
+      appCtx.worldLoading = false;
       finalizePerfLoad(false, { reason: 'invalid_coordinates' });
       return;
     }
-    ctx.LOC = { lat, lon };
-    ctx.customLoc = { lat, lon, name: ctx.customLoc?.name || 'Custom' };
+    appCtx.LOC = { lat, lon };
+    appCtx.customLoc = { lat, lon, name: appCtx.customLoc?.name || 'Custom' };
   } else {
-    ctx.LOC = { lat: ctx.LOCS[ctx.selLoc].lat, lon: ctx.LOCS[ctx.selLoc].lon };
+    appCtx.LOC = { lat: appCtx.LOCS[appCtx.selLoc].lat, lon: appCtx.LOCS[appCtx.selLoc].lon };
   }
 
   // Prevent old-city coordinates from driving terrain stream while loading.
-  ctx.car.x = 0;
-  ctx.car.z = 0;
-  ctx.car.vx = 0;
-  ctx.car.vz = 0;
-  ctx.car.vy = 0;
-  if (ctx.drone) {
-    ctx.drone.x = 0;
-    ctx.drone.z = 0;
+  appCtx.car.x = 0;
+  appCtx.car.z = 0;
+  appCtx.car.vx = 0;
+  appCtx.car.vz = 0;
+  appCtx.car.vy = 0;
+  if (appCtx.drone) {
+    appCtx.drone.x = 0;
+    appCtx.drone.z = 0;
   }
-  if (ctx.Walk && ctx.Walk.state && ctx.Walk.state.walker) {
-    ctx.Walk.state.walker.x = 0;
-    ctx.Walk.state.walker.z = 0;
-    ctx.Walk.state.walker.vy = 0;
+  if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker) {
+    appCtx.Walk.state.walker.x = 0;
+    appCtx.Walk.state.walker.z = 0;
+    appCtx.Walk.state.walker.vy = 0;
   }
 
   // Reset terrain streaming state when location origin changes so stale tiles
   // from the previous city cannot remain at mismatched world coordinates.
-  if (ctx.terrainEnabled && !ctx.onMoon) {
-    if (typeof ctx.resetTerrainStreamingState === 'function') ctx.resetTerrainStreamingState();
-    if (typeof ctx.clearTerrainMeshes === 'function') ctx.clearTerrainMeshes();
-    if (typeof ctx.updateTerrainAround === 'function') ctx.updateTerrainAround(0, 0);
+  if (appCtx.terrainEnabled && !appCtx.onMoon) {
+    if (typeof appCtx.resetTerrainStreamingState === 'function') appCtx.resetTerrainStreamingState();
+    if (typeof appCtx.clearTerrainMeshes === 'function') appCtx.clearTerrainMeshes();
+    if (typeof appCtx.updateTerrainAround === 'function') appCtx.updateTerrainAround(0, 0);
   }
 
   // RDT complexity index: location-derived complexity used by adaptive mode.
-  ctx.rdtSeed = ctx.hashGeoToInt(ctx.LOC.lat, ctx.LOC.lon, ctx.gameMode === 'trial' ? 1 : ctx.gameMode === 'checkpoint' ? 2 : 0);
-  const rawRdtComplexity = ctx.rdtDepth(ctx.rdtSeed, 1.5);
-  const rdtLoadComplexity = ctx.rdtDepth(ctx.rdtSeed % 1000000 + 2, 1.5);
-  ctx.rdtComplexity = useRdtBudgeting ? rawRdtComplexity : 0;
+  appCtx.rdtSeed = appCtx.hashGeoToInt(appCtx.LOC.lat, appCtx.LOC.lon, appCtx.gameMode === 'trial' ? 1 : appCtx.gameMode === 'checkpoint' ? 2 : 0);
+  const rawRdtComplexity = appCtx.rdtDepth(appCtx.rdtSeed, 1.5);
+  const rdtLoadComplexity = appCtx.rdtDepth(appCtx.rdtSeed % 1000000 + 2, 1.5);
+  appCtx.rdtComplexity = useRdtBudgeting ? rawRdtComplexity : 0;
 
   const loadProfile = getAdaptiveLoadProfile(rdtLoadComplexity, perfModeNow);
   const radii = loadProfile.radii.slice();
@@ -1606,7 +1606,7 @@ async function loadRoads(retryPass = 0) {
   const loadStartedAt = performance.now();
 
   loadMetrics.rdtLoadComplexity = rdtLoadComplexity;
-  ctx.rdtLoadComplexity = rdtLoadComplexity;
+  appCtx.rdtLoadComplexity = rdtLoadComplexity;
   loadMetrics.rdtComplexity = rawRdtComplexity;
   loadMetrics.radii = radii.slice();
   loadMetrics.lodThresholds = lodThresholds;
@@ -1648,7 +1648,7 @@ async function loadRoads(retryPass = 0) {
       centerZ,
       colliderDetail: detail
     };
-    ctx.buildings.push(building);
+    appCtx.buildings.push(building);
     addBuildingToSpatialIndex(building);
     return building;
   }
@@ -1677,23 +1677,23 @@ async function loadRoads(retryPass = 0) {
     }
 
     safeLoadCall('spawnOnRoad', () => spawnOnRoad());
-    if (ctx.terrainEnabled && !ctx.onMoon && typeof ctx.updateTerrainAround === 'function') {
-      safeLoadCall('updateTerrainAround', () => ctx.updateTerrainAround(ctx.car.x, ctx.car.z));
+    if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.updateTerrainAround === 'function') {
+      safeLoadCall('updateTerrainAround', () => appCtx.updateTerrainAround(appCtx.car.x, appCtx.car.z));
     }
-    if (typeof ctx.refreshMemoryMarkersForCurrentLocation === 'function') {
-      safeLoadCall('refreshMemoryMarkersForCurrentLocation', () => ctx.refreshMemoryMarkersForCurrentLocation());
+    if (typeof appCtx.refreshMemoryMarkersForCurrentLocation === 'function') {
+      safeLoadCall('refreshMemoryMarkersForCurrentLocation', () => appCtx.refreshMemoryMarkersForCurrentLocation());
     }
-    if (typeof ctx.refreshBlockBuilderForCurrentLocation === 'function') {
-      safeLoadCall('refreshBlockBuilderForCurrentLocation', () => ctx.refreshBlockBuilderForCurrentLocation());
+    if (typeof appCtx.refreshBlockBuilderForCurrentLocation === 'function') {
+      safeLoadCall('refreshBlockBuilderForCurrentLocation', () => appCtx.refreshBlockBuilderForCurrentLocation());
     }
     if (typeof updateWorldLod === 'function') {
       safeLoadCall('updateWorldLod', () => updateWorldLod(true));
     }
-    ctx.hideLoad();
-    if (typeof ctx.alignStarFieldToLocation === 'function') {
-      safeLoadCall('alignStarFieldToLocation', () => ctx.alignStarFieldToLocation(ctx.LOC.lat, ctx.LOC.lon));
+    appCtx.hideLoad();
+    if (typeof appCtx.alignStarFieldToLocation === 'function') {
+      safeLoadCall('alignStarFieldToLocation', () => appCtx.alignStarFieldToLocation(appCtx.LOC.lat, appCtx.LOC.lon));
     }
-    if (ctx.gameStarted) safeLoadCall('startMode', () => ctx.startMode());
+    if (appCtx.gameStarted) safeLoadCall('startMode', () => appCtx.startMode());
   }
 
   for (const r of radii) {
@@ -1704,20 +1704,20 @@ async function loadRoads(retryPass = 0) {
         break;
       }
 
-      ctx.showLoad('Loading map data...');
+      appCtx.showLoad('Loading map data...');
       const featureRadius = r * featureRadiusScale;
       const poiRadius = r * poiRadiusScale;
       const overpassCacheMeta = {
-        lat: ctx.LOC.lat,
-        lon: ctx.LOC.lon,
+        lat: appCtx.LOC.lat,
+        lon: appCtx.LOC.lon,
         roadsRadius: r,
         featureRadius,
         poiRadius
       };
 
-      const roadsBounds = `(${ctx.LOC.lat - r},${ctx.LOC.lon - r},${ctx.LOC.lat + r},${ctx.LOC.lon + r})`;
-      const featureBounds = `(${ctx.LOC.lat - featureRadius},${ctx.LOC.lon - featureRadius},${ctx.LOC.lat + featureRadius},${ctx.LOC.lon + featureRadius})`;
-      const poiBounds = `(${ctx.LOC.lat - poiRadius},${ctx.LOC.lon - poiRadius},${ctx.LOC.lat + poiRadius},${ctx.LOC.lon + poiRadius})`;
+      const roadsBounds = `(${appCtx.LOC.lat - r},${appCtx.LOC.lon - r},${appCtx.LOC.lat + r},${appCtx.LOC.lon + r})`;
+      const featureBounds = `(${appCtx.LOC.lat - featureRadius},${appCtx.LOC.lon - featureRadius},${appCtx.LOC.lat + featureRadius},${appCtx.LOC.lon + featureRadius})`;
+      const poiBounds = `(${appCtx.LOC.lat - poiRadius},${appCtx.LOC.lon - poiRadius},${appCtx.LOC.lat + poiRadius},${appCtx.LOC.lon + poiRadius})`;
 
       // Load roads, buildings, landuse, and POIs in one comprehensive query.
       const q = `[out:json][timeout:${Math.max(8, Math.floor(overpassTimeoutMs / 1000))}];(
@@ -1822,7 +1822,7 @@ async function loadRoads(retryPass = 0) {
       }
 
       // Process roads
-      ctx.showLoad(`Loading roads... (${roadWays.length})`);
+      appCtx.showLoad(`Loading roads... (${roadWays.length})`);
       startLoadPhase('buildRoadGeometry');
       const roadMainBatchVerts = [];
       const roadMainBatchIdx = [];
@@ -1831,11 +1831,11 @@ async function loadRoads(retryPass = 0) {
       const roadMarkBatchVerts = [];
       const roadMarkBatchIdx = [];
 
-      const roadMainMaterial = ctx.asphaltTex ? new THREE.MeshStandardMaterial({
-        map: ctx.asphaltTex,
-        normalMap: ctx.asphaltNormal,
+      const roadMainMaterial = appCtx.asphaltTex ? new THREE.MeshStandardMaterial({
+        map: appCtx.asphaltTex,
+        normalMap: appCtx.asphaltNormal,
         normalScale: new THREE.Vector2(0.8, 0.8),
-        roughnessMap: ctx.asphaltRoughness,
+        roughnessMap: appCtx.asphaltRoughness,
         roughness: 0.95,
         metalness: 0.05,
         side: THREE.DoubleSide,
@@ -1877,7 +1877,7 @@ async function loadRoads(retryPass = 0) {
       });
 
       roadWays.forEach((way) => {
-        const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => ctx.geoToWorld(n.lat, n.lon));
+        const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
         if (pts.length < 2) return;
         const type = way.tags?.highway || 'residential';
         const width = type.includes('motorway') ? 16 : type.includes('trunk') ? 14 : type.includes('primary') ? 12 : type.includes('secondary') ? 10 : 8;
@@ -1893,7 +1893,7 @@ async function loadRoads(retryPass = 0) {
         const roadSubdivideStep = getRoadSubdivisionStep(type, roadTileDepth, perfModeNow);
         const decimatedRoadPts = decimateRoadCenterlineByDepth(pts, type, roadTileDepth, perfModeNow);
 
-        ctx.roads.push({
+        appCtx.roads.push({
           pts: decimatedRoadPts,
           width,
           limit,
@@ -1905,16 +1905,16 @@ async function loadRoads(retryPass = 0) {
         const hw = width / 2;
 
         // Curvature-aware subdivision: straight = 2-5m, curves = 0.5-2m
-        const subdPts = typeof ctx.subdivideRoadPoints === 'function' ?
-        ctx.subdivideRoadPoints(decimatedRoadPts, roadSubdivideStep) :
+        const subdPts = typeof appCtx.subdivideRoadPoints === 'function' ?
+        appCtx.subdivideRoadPoints(decimatedRoadPts, roadSubdivideStep) :
         decimatedRoadPts;
         loadMetrics.roads.sourcePoints += pts.length;
         loadMetrics.roads.decimatedPoints += decimatedRoadPts.length;
         loadMetrics.roads.subdividedPoints += subdPts.length;
 
         // Use cached height function if available
-        const _tmh = typeof ctx.cachedTerrainHeight === 'function' ? ctx.cachedTerrainHeight :
-        typeof ctx.terrainMeshHeightAt === 'function' ? ctx.terrainMeshHeightAt : ctx.elevationWorldYAtWorldXZ;
+        const _tmh = typeof appCtx.cachedTerrainHeight === 'function' ? appCtx.cachedTerrainHeight :
+        typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt : appCtx.elevationWorldYAtWorldXZ;
 
         // Sample center heights and smooth them
         const cHeights = new Float64Array(subdPts.length);
@@ -1986,8 +1986,8 @@ async function loadRoads(retryPass = 0) {
 
         // Build road skirts (edge curtains) to hide terrain peeking
         // Increased depth from 1.5 to 3.0 for better coverage on steep slopes
-        if (typeof ctx.buildRoadSkirts === 'function') {
-          const skirtData = ctx.buildRoadSkirts(leftEdge, rightEdge, 3.0);
+        if (typeof appCtx.buildRoadSkirts === 'function') {
+          const skirtData = appCtx.buildRoadSkirts(leftEdge, rightEdge, 3.0);
           if (skirtData.verts.length > 0) {
             appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
             loadMetrics.roads.vertices += skirtData.verts.length / 3;
@@ -2009,7 +2009,7 @@ async function loadRoads(retryPass = 0) {
               if (Math.floor((dist + segDist) / (dashLen + gapLen)) % 2 === 0) {
                 const x = p1.x + dx * segDist,z = p1.z + dz * segDist;
                 const len = Math.min(dashLen, segLen - segDist);
-                const y = (typeof ctx.terrainMeshHeightAt === 'function' ? ctx.terrainMeshHeightAt(x, z) : ctx.elevationWorldYAtWorldXZ(x, z)) + 0.25; // Just above road surface
+                const y = (typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ(x, z)) + 0.25; // Just above road surface
                 const vi = markVerts.length / 3;
                 markVerts.push(
                   x + nx * mw, y, z + nz * mw,
@@ -2045,8 +2045,8 @@ async function loadRoads(retryPass = 0) {
         if (userData && typeof userData === 'object') {
           Object.assign(mesh.userData, userData);
         }
-        ctx.scene.add(mesh);
-        ctx.roadMeshes.push(mesh);
+        appCtx.scene.add(mesh);
+        appCtx.roadMeshes.push(mesh);
         return mesh;
       };
 
@@ -2056,7 +2056,7 @@ async function loadRoads(retryPass = 0) {
       endLoadPhase('buildRoadGeometry');
 
       // Process buildings
-      ctx.showLoad(`Loading buildings... (${buildingWays.length})`);
+      appCtx.showLoad(`Loading buildings... (${buildingWays.length})`);
       startLoadPhase('buildBuildingGeometry');
       const roadBuildingCellSize = 120;
       const buildingRoadRadiusCells = useRdtBudgeting ?
@@ -2064,7 +2064,7 @@ async function loadRoads(retryPass = 0) {
       3;
       const roadCoverageCells = new Set();
 
-      ctx.roads.forEach((rd) => {
+      appCtx.roads.forEach((rd) => {
         if (!rd || !rd.pts) return;
         for (let i = 0; i < rd.pts.length; i += 2) {
           const p = rd.pts[i];
@@ -2096,7 +2096,7 @@ async function loadRoads(retryPass = 0) {
       const lodMidDist = lodThresholds.mid;
 
       buildingWays.forEach((way) => {
-        const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => ctx.geoToWorld(n.lat, n.lon));
+        const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
         if (pts.length < 3) return;
         if (!isBuildingNearLoadedRoad(pts)) return;
 
@@ -2118,9 +2118,9 @@ async function loadRoads(retryPass = 0) {
         }
 
         // RDT-seeded deterministic random for this building
-        const bSeed = (ctx.rdtSeed ^ way.id >>> 0) >>> 0;
-        const br1 = ctx.rand01FromInt(bSeed);
-        const br2 = ctx.rand01FromInt(bSeed ^ 0x9e3779b9);
+        const bSeed = (appCtx.rdtSeed ^ way.id >>> 0) >>> 0;
+        const br1 = appCtx.rand01FromInt(bSeed);
+        const br2 = appCtx.rand01FromInt(bSeed ^ 0x9e3779b9);
 
         // Get building height from tags or estimate
         let height = 10; // default
@@ -2149,7 +2149,7 @@ async function loadRoads(retryPass = 0) {
         let minElevation = Infinity;
         let maxElevation = -Infinity;
         pts.forEach((p) => {
-          const h = ctx.elevationWorldYAtWorldXZ(p.x, p.z);
+          const h = appCtx.elevationWorldYAtWorldXZ(p.x, p.z);
           avgElevation += h;
           if (h < minElevation) minElevation = h;
           if (h > maxElevation) maxElevation = h;
@@ -2174,8 +2174,8 @@ async function loadRoads(retryPass = 0) {
         const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
         geo.rotateX(-Math.PI / 2);
 
-        const bldgMat = typeof ctx.getBuildingMaterial === 'function' ?
-        ctx.getBuildingMaterial(bt, bSeed, baseColor) :
+        const bldgMat = typeof appCtx.getBuildingMaterial === 'function' ?
+        appCtx.getBuildingMaterial(bt, bSeed, baseColor) :
         new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.85, metalness: 0.05 });
 
         const mesh = new THREE.Mesh(geo, bldgMat);
@@ -2187,23 +2187,23 @@ async function loadRoads(retryPass = 0) {
         mesh.receiveShadow = true;
 
         if (!mesh) return;
-        ctx.scene.add(mesh);
-        ctx.buildingMeshes.push(mesh);
+        appCtx.scene.add(mesh);
+        appCtx.buildingMeshes.push(mesh);
         if (lodTier === 'near') loadMetrics.lod.near += 1;else
         loadMetrics.lod.mid += 1;
 
         // On steep terrain, add a terrain-conforming apron to hide
         // exposed flat foundation planes around the footprint.
-        if (lodTier === 'near' && typeof ctx.createBuildingGroundPatch === 'function' && slopeRange >= 0.7) {
-          const groundPatch = ctx.createBuildingGroundPatch(pts, avgElevation);
+        if (lodTier === 'near' && typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.7) {
+          const groundPatch = appCtx.createBuildingGroundPatch(pts, avgElevation);
           if (groundPatch) {
             groundPatch.userData.landuseFootprint = pts;
             groundPatch.userData.landuseType = 'buildingGround';
             groundPatch.userData.avgElevation = avgElevation;
             groundPatch.userData.alwaysVisible = true;
             groundPatch.visible = true;
-            ctx.scene.add(groundPatch);
-            ctx.landuseMeshes.push(groundPatch);
+            appCtx.scene.add(groundPatch);
+            appCtx.landuseMeshes.push(groundPatch);
           }
         }
       });
@@ -2213,8 +2213,8 @@ async function loadRoads(retryPass = 0) {
       if (batchedNearCount > 0) {
         loadMetrics.lod.nearBatched = batchedNearCount;
       }
-      if (ctx._lastBuildingBatchStats) {
-        loadMetrics.buildingBatching = { ...ctx._lastBuildingBatchStats };
+      if (appCtx._lastBuildingBatchStats) {
+        loadMetrics.buildingBatching = { ...appCtx._lastBuildingBatchStats };
       }
       endLoadPhase('batchBuildingGeometry');
 
@@ -2234,7 +2234,7 @@ async function loadRoads(retryPass = 0) {
 
         let avgElevation = 0;
         ring.forEach((p) => {
-          avgElevation += ctx.elevationWorldYAtWorldXZ(p.x, p.z);
+          avgElevation += appCtx.elevationWorldYAtWorldXZ(p.x, p.z);
         });
         avgElevation /= ring.length;
 
@@ -2267,7 +2267,7 @@ async function loadRoads(retryPass = 0) {
         for (let i = 0; i < positions.count; i++) {
           const x = positions.getX(i);
           const z = positions.getZ(i);
-          const terrainY = ctx.elevationWorldYAtWorldXZ(x, z);
+          const terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
           const useY = terrainY === 0 && Math.abs(avgElevation) > 2 ? avgElevation : terrainY;
           positions.setY(i, (useY - avgElevation) * waterFlattenFactor + (isWater ? 0.08 : 0.02));
         }
@@ -2275,7 +2275,7 @@ async function loadRoads(retryPass = 0) {
         geometry.computeVertexNormals();
 
         const material = new THREE.MeshStandardMaterial(isWater ? {
-          color: ctx.LANDUSE_STYLES.water.color,
+          color: appCtx.LANDUSE_STYLES.water.color,
           emissive: 0x0f355a,
           emissiveIntensity: 0.30,
           roughness: 0.14,
@@ -2288,7 +2288,7 @@ async function loadRoads(retryPass = 0) {
           polygonOffsetFactor: -6,
           polygonOffsetUnits: -6
         } : {
-          color: ctx.LANDUSE_STYLES[landuseType].color,
+          color: appCtx.LANDUSE_STYLES[landuseType].color,
           roughness: 0.95,
           metalness: 0.0,
           transparent: true,
@@ -2308,13 +2308,13 @@ async function loadRoads(retryPass = 0) {
         mesh.userData.landuseType = landuseType;
         mesh.userData.waterFlattenFactor = waterFlattenFactor;
         mesh.receiveShadow = false;
-        mesh.visible = ctx.landUseVisible || mesh.userData.alwaysVisible;
-        ctx.scene.add(mesh);
-        ctx.landuseMeshes.push(mesh);
-        ctx.landuses.push({ type: landuseType, pts: ring });
+        mesh.visible = appCtx.landUseVisible || mesh.userData.alwaysVisible;
+        appCtx.scene.add(mesh);
+        appCtx.landuseMeshes.push(mesh);
+        appCtx.landuses.push({ type: landuseType, pts: ring });
 
         if (isWater) {
-          ctx.waterAreas.push({ type: 'water', pts: ring });
+          appCtx.waterAreas.push({ type: 'water', pts: ring });
         }
       }
 
@@ -2337,7 +2337,7 @@ async function loadRoads(retryPass = 0) {
         const width = waterwayWidthFromTags(tags);
         const halfWidth = width * 0.5;
         const verticalBias = 0.14;
-        const _h = typeof ctx.terrainMeshHeightAt === 'function' ? ctx.terrainMeshHeightAt : ctx.elevationWorldYAtWorldXZ;
+        const _h = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt : appCtx.elevationWorldYAtWorldXZ;
         const verts = [];
         const indices = [];
 
@@ -2406,9 +2406,9 @@ async function loadRoads(retryPass = 0) {
         mesh.userData.waterwayWidth = width;
         mesh.userData.waterwayBias = verticalBias;
         mesh.visible = true;
-        ctx.scene.add(mesh);
-        ctx.landuseMeshes.push(mesh);
-        ctx.waterways.push({
+        appCtx.scene.add(mesh);
+        appCtx.landuseMeshes.push(mesh);
+        appCtx.waterways.push({
           type: tags?.kind || tags?.waterway || 'waterway',
           width,
           pts: centerline
@@ -2517,22 +2517,22 @@ async function loadRoads(retryPass = 0) {
         return { polygons, lines, tiles: tileJobs.length, okTiles };
       }
 
-      ctx.showLoad(`Loading land use... (${landuseWays.length})`);
+      appCtx.showLoad(`Loading land use... (${landuseWays.length})`);
       startLoadPhase('buildLanduseGeometry');
       landuseWays.forEach((way) => {
         const landuseType = classifyLanduseType(way.tags);
         if (!landuseType) return;
-        const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => ctx.geoToWorld(n.lat, n.lon));
+        const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
         addLandusePolygon(pts, landuseType);
       });
 
-      ctx.showLoad('Loading water...');
+      appCtx.showLoad('Loading water...');
       try {
         const waterSummary = await loadVectorTileWaterCoverage(
-          ctx.LOC.lat - featureRadius,
-          ctx.LOC.lon - featureRadius,
-          ctx.LOC.lat + featureRadius,
-          ctx.LOC.lon + featureRadius
+          appCtx.LOC.lat - featureRadius,
+          appCtx.LOC.lon - featureRadius,
+          appCtx.LOC.lat + featureRadius,
+          appCtx.LOC.lon + featureRadius
         );
         if (waterSummary.polygons === 0 && waterSummary.lines === 0) {
           console.warn(`[Water] Vector tiles loaded but no water features in bounds (tiles ok ${waterSummary.okTiles}/${waterSummary.tiles}).`);
@@ -2546,13 +2546,13 @@ async function loadRoads(retryPass = 0) {
       if (batchedLanduseCount > 0) {
         loadMetrics.lod.landuseBatched = batchedLanduseCount;
       }
-      if (ctx._lastLanduseBatchStats) {
-        loadMetrics.landuseBatching = { ...ctx._lastLanduseBatchStats };
+      if (appCtx._lastLanduseBatchStats) {
+        loadMetrics.landuseBatching = { ...appCtx._lastLanduseBatchStats };
       }
       endLoadPhase('batchLanduseGeometry');
 
       // Process POIs for meaning in the world
-      ctx.showLoad(`Loading POIs... (${poiNodes.length})`);
+      appCtx.showLoad(`Loading POIs... (${poiNodes.length})`);
       startLoadPhase('buildPoiGeometry');
       poiNodes.forEach((node) => {
         const tags = node.tags;
@@ -2575,16 +2575,16 @@ async function loadRoads(retryPass = 0) {
           poiKey = `leisure=${tags.leisure}`;
         }
 
-        if (poiKey && ctx.POI_TYPES[poiKey]) {
-          const pos = ctx.geoToWorld(node.lat, node.lon);
-          const poiData = ctx.POI_TYPES[poiKey];
+        if (poiKey && appCtx.POI_TYPES[poiKey]) {
+          const pos = appCtx.geoToWorld(node.lat, node.lon);
+          const poiData = appCtx.POI_TYPES[poiKey];
           const centerDist = Math.hypot(pos.x, pos.z);
           const poiTier = centerDist <= lodNearDist ?
           'near' :
           centerDist <= lodMidDist ? 'mid' : 'far';
 
           // Get terrain elevation at POI location
-          const terrainY = ctx.elevationWorldYAtWorldXZ(pos.x, pos.z);
+          const terrainY = appCtx.elevationWorldYAtWorldXZ(pos.x, pos.z);
 
           if (poiTier === 'near') {
             loadMetrics.pois.near += 1;
@@ -2611,9 +2611,9 @@ async function loadRoads(retryPass = 0) {
             mesh.userData.isPOIMarker = true;
             mesh.userData.lodTier = poiTier;
             mesh.castShadow = false;
-            mesh.visible = !!ctx.poiMode;
-            ctx.scene.add(mesh);
-            ctx.poiMeshes.push(mesh);
+            mesh.visible = !!appCtx.poiMode;
+            appCtx.scene.add(mesh);
+            appCtx.poiMeshes.push(mesh);
 
             if (poiTier === 'near') {
               const capGeo = new THREE.SphereGeometry(1.8, 8, 6);
@@ -2628,14 +2628,14 @@ async function loadRoads(retryPass = 0) {
               cap.userData.isCapMesh = true;
               cap.userData.isPOIMarker = true;
               cap.userData.lodTier = 'near';
-              cap.visible = !!ctx.poiMode;
-              ctx.scene.add(cap);
-              ctx.poiMeshes.push(cap);
+              cap.visible = !!appCtx.poiMode;
+              appCtx.scene.add(cap);
+              appCtx.poiMeshes.push(cap);
             }
           }
 
           // Store POI data
-          ctx.pois.push({
+          appCtx.pois.push({
             x: pos.x,
             z: pos.z,
             type: poiKey,
@@ -2646,7 +2646,7 @@ async function loadRoads(retryPass = 0) {
 
           // Store historic sites separately for historic panel
           if (tags.historic) {
-            ctx.historicSites.push({
+            appCtx.historicSites.push({
               x: pos.x,
               z: pos.z,
               lat: node.lat,
@@ -2664,9 +2664,9 @@ async function loadRoads(retryPass = 0) {
       });
       endLoadPhase('buildPoiGeometry');
 
-      if (ctx.roads.length > 0) {
+      if (appCtx.roads.length > 0) {
         // Generate street furniture (signs, trees, lights, trash cans)
-        ctx.showLoad('Adding details...');
+        appCtx.showLoad('Adding details...');
         startLoadPhase('buildStreetFurniture');
         try {
           generateStreetFurniture();
@@ -2681,11 +2681,11 @@ async function loadRoads(retryPass = 0) {
       } else
       {
         console.warn('No roads found in data, trying larger area...');
-        ctx.showLoad('No roads found, trying larger area...');
+        appCtx.showLoad('No roads found, trying larger area...');
       }
     } catch (e) {
       const isLastAttempt = r === radii[radii.length - 1];
-      if (ctx.roads.length > 0) {
+      if (appCtx.roads.length > 0) {
         console.warn('[WorldLoad] Recovering with partially loaded world data.');
         loadMetrics.error = e?.message || String(e);
         finalizeLoadedWorld('partial_after_error');
@@ -2693,20 +2693,20 @@ async function loadRoads(retryPass = 0) {
       }
       if (!isLastAttempt) {
         console.warn('Road loading attempt failed, retrying with larger area...', e);
-        ctx.showLoad('Retrying map data...');
+        appCtx.showLoad('Retrying map data...');
         continue;
       }
 
       console.error('Road loading failed after all attempts:', e);
       // If this is the last attempt and we still have no roads, create a default environment
-      if (ctx.roads.length === 0) {
+      if (appCtx.roads.length === 0) {
         // Debug log removed
-        ctx.showLoad('Creating default environment...');
+        appCtx.showLoad('Creating default environment...');
 
         // Create a simple crossroad
         const makeRoad = (x1, z1, x2, z2, width = 10) => {
           const pts = [{ x: x1, z: z1 }, { x: x2, z: z2 }];
-          ctx.roads.push({
+          appCtx.roads.push({
             pts,
             width,
             limit: 35,
@@ -2723,8 +2723,8 @@ async function loadRoads(retryPass = 0) {
             const dx = pts[1].x - pts[0].x,dz = pts[1].z - pts[0].z;
             const len = Math.sqrt(dx * dx + dz * dz) || 1;
             const nx = -dz / len,nz = dx / len;
-            const y1 = ctx.elevationWorldYAtWorldXZ(p.x + nx * hw, p.z + nz * hw) + 0.3;
-            const y2 = ctx.elevationWorldYAtWorldXZ(p.x - nx * hw, p.z - nz * hw) + 0.3;
+            const y1 = appCtx.elevationWorldYAtWorldXZ(p.x + nx * hw, p.z + nz * hw) + 0.3;
+            const y2 = appCtx.elevationWorldYAtWorldXZ(p.x - nx * hw, p.z - nz * hw) + 0.3;
             verts.push(p.x + nx * hw, y1, p.z + nz * hw);
             verts.push(p.x - nx * hw, y2, p.z - nz * hw);
             if (i < pts.length - 1) {const vi = i * 2;indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);}
@@ -2745,7 +2745,7 @@ async function loadRoads(retryPass = 0) {
           mesh.renderOrder = 2;
           mesh.receiveShadow = true;
           mesh.frustumCulled = false;
-          ctx.scene.add(mesh);ctx.roadMeshes.push(mesh);
+          appCtx.scene.add(mesh);appCtx.roadMeshes.push(mesh);
         };
 
         // Create roads in a cross pattern
@@ -2780,7 +2780,7 @@ async function loadRoads(retryPass = 0) {
           let minElevation = Infinity;
           let maxElevation = -Infinity;
           pts.forEach((p) => {
-            const hTerrain = ctx.elevationWorldYAtWorldXZ(p.x, p.z);
+            const hTerrain = appCtx.elevationWorldYAtWorldXZ(p.x, p.z);
             avgElevation += hTerrain;
             if (hTerrain < minElevation) minElevation = hTerrain;
             if (hTerrain > maxElevation) maxElevation = hTerrain;
@@ -2795,19 +2795,19 @@ async function loadRoads(retryPass = 0) {
 
           mesh.castShadow = true;
           mesh.receiveShadow = true;
-          ctx.scene.add(mesh);
-          ctx.buildingMeshes.push(mesh);
+          appCtx.scene.add(mesh);
+          appCtx.buildingMeshes.push(mesh);
 
-          if (typeof ctx.createBuildingGroundPatch === 'function' && slopeRange >= 0.7) {
-            const groundPatch = ctx.createBuildingGroundPatch(pts, avgElevation);
+          if (typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.7) {
+            const groundPatch = appCtx.createBuildingGroundPatch(pts, avgElevation);
             if (groundPatch) {
               groundPatch.userData.landuseFootprint = pts;
               groundPatch.userData.landuseType = 'buildingGround';
               groundPatch.userData.avgElevation = avgElevation;
               groundPatch.userData.alwaysVisible = true;
               groundPatch.visible = true;
-              ctx.scene.add(groundPatch);
-              ctx.landuseMeshes.push(groundPatch);
+              appCtx.scene.add(groundPatch);
+              appCtx.landuseMeshes.push(groundPatch);
             }
           }
         };
@@ -2824,31 +2824,31 @@ async function loadRoads(retryPass = 0) {
       }
     }
   }
-  if (!loaded && ctx.roads.length > 0) {
+  if (!loaded && appCtx.roads.length > 0) {
     console.warn('[WorldLoad] Completing with partially loaded roads.');
     finalizeLoadedWorld('post_loop_partial');
   }
   if (!loaded && retryPass < 1) {
     console.warn('[WorldLoad] Initial pass failed. Retrying once automatically...');
-    ctx.showLoad('Retrying map data...');
-    ctx.worldLoading = false;
+    appCtx.showLoad('Retrying map data...');
+    appCtx.worldLoading = false;
     return loadRoads(retryPass + 1);
   }
   if (!loaded) {
-    ctx.showLoad('Failed to load. Click to retry.');
+    appCtx.showLoad('Failed to load. Click to retry.');
     document.getElementById('loading').onclick = () => {
       document.getElementById('loading').onclick = null;
       loadRoads();
     };
   }
-  ctx.worldLoading = false;
-  if (typeof ctx.setPerfLiveStat === 'function') {
-    ctx.setPerfLiveStat('lodVisible', { near: loadMetrics.lod.near, mid: loadMetrics.lod.mid });
-    ctx.setPerfLiveStat('worldCounts', {
-      roads: ctx.roads.length,
-      buildings: ctx.buildingMeshes.length,
-      poiMeshes: ctx.poiMeshes.length,
-      landuseMeshes: ctx.landuseMeshes.length
+  appCtx.worldLoading = false;
+  if (typeof appCtx.setPerfLiveStat === 'function') {
+    appCtx.setPerfLiveStat('lodVisible', { near: loadMetrics.lod.near, mid: loadMetrics.lod.mid });
+    appCtx.setPerfLiveStat('worldCounts', {
+      roads: appCtx.roads.length,
+      buildings: appCtx.buildingMeshes.length,
+      poiMeshes: appCtx.poiMeshes.length,
+      landuseMeshes: appCtx.landuseMeshes.length
     });
   }
   if (_phaseTotals && typeof _phaseTotals === 'object') {
@@ -2857,19 +2857,19 @@ async function loadRoads(retryPass = 0) {
     );
   }
   finalizePerfLoad(loaded, {
-    roadsFinal: ctx.roads.length,
+    roadsFinal: appCtx.roads.length,
     roadVertices: Math.round(loadMetrics.roads.vertices || 0),
-    buildingMeshes: ctx.buildingMeshes.length,
-    buildingColliders: ctx.buildings.length,
+    buildingMeshes: appCtx.buildingMeshes.length,
+    buildingColliders: appCtx.buildings.length,
     buildingCollidersFull: loadMetrics.colliders.full,
     buildingCollidersSimplified: loadMetrics.colliders.simplified,
-    poiMeshes: ctx.poiMeshes.length,
-    landuseMeshes: ctx.landuseMeshes.length
+    poiMeshes: appCtx.poiMeshes.length,
+    landuseMeshes: appCtx.landuseMeshes.length
   });
 }
 
 function spawnOnRoad() {
-  if (!ctx.roads || ctx.roads.length === 0) return;
+  if (!appCtx.roads || appCtx.roads.length === 0) return;
 
   function spawnRoadPenalty(type) {
     if (!type) return 0;
@@ -2883,7 +2883,7 @@ function spawnOnRoad() {
   // Pick the road point closest to the location center, with light penalties for
   // highway-like roads so initial spawn stays in the city core.
   let best = null;
-  ctx.roads.forEach((rd) => {
+  appCtx.roads.forEach((rd) => {
     if (!rd || !rd.pts || rd.pts.length < 2) return;
     const penalty = spawnRoadPenalty(rd.type);
     for (let i = 0; i < rd.pts.length; i++) {
@@ -2898,38 +2898,38 @@ function spawnOnRoad() {
 
   const rd = best.road;
   const idx = best.idx;
-  ctx.car.x = rd.pts[idx].x;
-  ctx.car.z = rd.pts[idx].z;
+  appCtx.car.x = rd.pts[idx].x;
+  appCtx.car.z = rd.pts[idx].z;
 
   if (idx < rd.pts.length - 1) {
-    ctx.car.angle = Math.atan2(rd.pts[idx + 1].x - rd.pts[idx].x, rd.pts[idx + 1].z - rd.pts[idx].z);
+    appCtx.car.angle = Math.atan2(rd.pts[idx + 1].x - rd.pts[idx].x, rd.pts[idx + 1].z - rd.pts[idx].z);
   } else if (idx > 0) {
-    ctx.car.angle = Math.atan2(rd.pts[idx].x - rd.pts[idx - 1].x, rd.pts[idx].z - rd.pts[idx - 1].z);
+    appCtx.car.angle = Math.atan2(rd.pts[idx].x - rd.pts[idx - 1].x, rd.pts[idx].z - rd.pts[idx - 1].z);
   }
-  ctx.car.speed = 0;ctx.car.vx = 0;ctx.car.vz = 0;
-  const _spawnH = typeof ctx.terrainMeshHeightAt === 'function' ? ctx.terrainMeshHeightAt : ctx.elevationWorldYAtWorldXZ;
-  const spawnY = typeof ctx.GroundHeight !== 'undefined' && ctx.GroundHeight && typeof ctx.GroundHeight.carCenterY === 'function' ?
-  ctx.GroundHeight.carCenterY(ctx.car.x, ctx.car.z, true, 1.2) :
-  _spawnH(ctx.car.x, ctx.car.z) + 1.2;
-  ctx.car.y = spawnY;
-  if (ctx.carMesh) {
-    ctx.carMesh.position.set(ctx.car.x, spawnY, ctx.car.z);
-    ctx.carMesh.rotation.y = ctx.car.angle;
+  appCtx.car.speed = 0;appCtx.car.vx = 0;appCtx.car.vz = 0;
+  const _spawnH = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt : appCtx.elevationWorldYAtWorldXZ;
+  const spawnY = typeof appCtx.GroundHeight !== 'undefined' && appCtx.GroundHeight && typeof appCtx.GroundHeight.carCenterY === 'function' ?
+  appCtx.GroundHeight.carCenterY(appCtx.car.x, appCtx.car.z, true, 1.2) :
+  _spawnH(appCtx.car.x, appCtx.car.z) + 1.2;
+  appCtx.car.y = spawnY;
+  if (appCtx.carMesh) {
+    appCtx.carMesh.position.set(appCtx.car.x, spawnY, appCtx.car.z);
+    appCtx.carMesh.rotation.y = appCtx.car.angle;
   }
 
   // Keep walker state aligned with current car spawn so switching back to
   // driving mode cannot snap to stale coordinates from the previous city.
-  if (ctx.Walk && ctx.Walk.state && ctx.Walk.state.walker) {
+  if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker) {
     const groundY = spawnY - 1.2;
-    ctx.Walk.state.walker.x = ctx.car.x;
-    ctx.Walk.state.walker.z = ctx.car.z;
-    ctx.Walk.state.walker.y = groundY + 1.7;
-    ctx.Walk.state.walker.vy = 0;
-    ctx.Walk.state.walker.angle = ctx.car.angle;
-    ctx.Walk.state.walker.yaw = ctx.car.angle;
-    if (ctx.Walk.state.characterMesh && ctx.Walk.state.mode === 'walk') {
-      ctx.Walk.state.characterMesh.position.set(ctx.car.x, groundY, ctx.car.z);
-      ctx.Walk.state.characterMesh.rotation.y = ctx.car.angle;
+    appCtx.Walk.state.walker.x = appCtx.car.x;
+    appCtx.Walk.state.walker.z = appCtx.car.z;
+    appCtx.Walk.state.walker.y = groundY + 1.7;
+    appCtx.Walk.state.walker.vy = 0;
+    appCtx.Walk.state.walker.angle = appCtx.car.angle;
+    appCtx.Walk.state.walker.yaw = appCtx.car.angle;
+    if (appCtx.Walk.state.characterMesh && appCtx.Walk.state.mode === 'walk') {
+      appCtx.Walk.state.characterMesh.position.set(appCtx.car.x, groundY, appCtx.car.z);
+      appCtx.Walk.state.characterMesh.rotation.y = appCtx.car.angle;
     }
   }
 }
@@ -2938,7 +2938,7 @@ function teleportToLocation(worldX, worldZ) {
   // Try to snap to nearest road if available
   const nearest = findNearestRoad(worldX, worldZ);
   let targetX = worldX,targetZ = worldZ;
-  let targetAngle = ctx.car.angle;
+  let targetAngle = appCtx.car.angle;
 
   // If we found a road within reasonable distance, snap to it
   if (nearest.road && nearest.dist < 50) {
@@ -2967,41 +2967,41 @@ function teleportToLocation(worldX, worldZ) {
   }
 
   // Update car position
-  ctx.car.x = targetX;
-  ctx.car.z = targetZ;
-  ctx.car.angle = targetAngle;
-  ctx.car.speed = 0;
-  ctx.car.vx = 0;
-  ctx.car.vz = 0;
-  const _teleH = typeof ctx.terrainMeshHeightAt === 'function' ? ctx.terrainMeshHeightAt : ctx.elevationWorldYAtWorldXZ;
-  const teleportY = typeof ctx.GroundHeight !== 'undefined' && ctx.GroundHeight && typeof ctx.GroundHeight.carCenterY === 'function' ?
-  ctx.GroundHeight.carCenterY(ctx.car.x, ctx.car.z, true, 1.2) :
-  _teleH(ctx.car.x, ctx.car.z) + 1.2;
-  ctx.car.y = teleportY;
-  ctx.carMesh.position.set(ctx.car.x, teleportY, ctx.car.z);
-  ctx.carMesh.rotation.y = ctx.car.angle;
+  appCtx.car.x = targetX;
+  appCtx.car.z = targetZ;
+  appCtx.car.angle = targetAngle;
+  appCtx.car.speed = 0;
+  appCtx.car.vx = 0;
+  appCtx.car.vz = 0;
+  const _teleH = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt : appCtx.elevationWorldYAtWorldXZ;
+  const teleportY = typeof appCtx.GroundHeight !== 'undefined' && appCtx.GroundHeight && typeof appCtx.GroundHeight.carCenterY === 'function' ?
+  appCtx.GroundHeight.carCenterY(appCtx.car.x, appCtx.car.z, true, 1.2) :
+  _teleH(appCtx.car.x, appCtx.car.z) + 1.2;
+  appCtx.car.y = teleportY;
+  appCtx.carMesh.position.set(appCtx.car.x, teleportY, appCtx.car.z);
+  appCtx.carMesh.rotation.y = appCtx.car.angle;
 
   // Keep walker position aligned with teleports so mode switching stays stable.
-  if (ctx.Walk && ctx.Walk.state && ctx.Walk.state.walker) {
+  if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker) {
     const groundY = teleportY - 1.2;
-    ctx.Walk.state.walker.x = targetX;
-    ctx.Walk.state.walker.z = targetZ;
-    ctx.Walk.state.walker.y = groundY + 1.7;
-    ctx.Walk.state.walker.vy = 0;
-    ctx.Walk.state.walker.angle = targetAngle;
-    ctx.Walk.state.walker.yaw = targetAngle;
-    ctx.Walk.state.walker.speed = 0;
-    if (ctx.Walk.state.characterMesh && ctx.Walk.state.mode === 'walk') {
-      ctx.Walk.state.characterMesh.position.set(targetX, groundY, targetZ);
-      ctx.Walk.state.characterMesh.rotation.y = targetAngle;
+    appCtx.Walk.state.walker.x = targetX;
+    appCtx.Walk.state.walker.z = targetZ;
+    appCtx.Walk.state.walker.y = groundY + 1.7;
+    appCtx.Walk.state.walker.vy = 0;
+    appCtx.Walk.state.walker.angle = targetAngle;
+    appCtx.Walk.state.walker.yaw = targetAngle;
+    appCtx.Walk.state.walker.speed = 0;
+    if (appCtx.Walk.state.characterMesh && appCtx.Walk.state.mode === 'walk') {
+      appCtx.Walk.state.characterMesh.position.set(targetX, groundY, targetZ);
+      appCtx.Walk.state.characterMesh.rotation.y = targetAngle;
     }
   }
 
   // Update drone position if in drone mode
-  if (ctx.droneMode) {
-    ctx.drone.x = targetX;
-    ctx.drone.z = targetZ;
-    ctx.drone.yaw = targetAngle;
+  if (appCtx.droneMode) {
+    appCtx.drone.x = targetX;
+    appCtx.drone.z = targetZ;
+    appCtx.drone.yaw = targetAngle;
   }
 
   // Debug log removed
@@ -3009,9 +3009,9 @@ function teleportToLocation(worldX, worldZ) {
 
 // Convert minimap screen coordinates to world coordinates
 function minimapScreenToWorld(screenX, screenY) {
-  const ref = ctx.Walk ? ctx.Walk.getMapRefPosition(ctx.droneMode, ctx.drone) : { x: ctx.car.x, z: ctx.car.z };
-  const refLat = ctx.LOC.lat - ref.z / ctx.SCALE;
-  const refLon = ctx.LOC.lon + ref.x / (ctx.SCALE * Math.cos(ctx.LOC.lat * Math.PI / 180));
+  const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
+  const refLat = appCtx.LOC.lat - ref.z / appCtx.SCALE;
+  const refLon = appCtx.LOC.lon + ref.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
 
   const zoom = 17; // Minimap zoom level
   const n = Math.pow(2, zoom);
@@ -3037,19 +3037,19 @@ function minimapScreenToWorld(screenX, screenY) {
   const lat = lat_rad * 180 / Math.PI;
 
   // Convert lat/lon to world coords
-  const worldX = (lon - ctx.LOC.lon) * ctx.SCALE * Math.cos(ctx.LOC.lat * Math.PI / 180);
-  const worldZ = -(lat - ctx.LOC.lat) * ctx.SCALE;
+  const worldX = (lon - appCtx.LOC.lon) * appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180);
+  const worldZ = -(lat - appCtx.LOC.lat) * appCtx.SCALE;
 
   return { x: worldX, z: worldZ };
 }
 
 // Convert large map screen coordinates to world coordinates
 function largeMapScreenToWorld(screenX, screenY) {
-  const ref = ctx.Walk ? ctx.Walk.getMapRefPosition(ctx.droneMode, ctx.drone) : { x: ctx.car.x, z: ctx.car.z };
-  const refLat = ctx.LOC.lat - ref.z / ctx.SCALE;
-  const refLon = ctx.LOC.lon + ref.x / (ctx.SCALE * Math.cos(ctx.LOC.lat * Math.PI / 180));
+  const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
+  const refLat = appCtx.LOC.lat - ref.z / appCtx.SCALE;
+  const refLon = appCtx.LOC.lon + ref.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
 
-  const zoom = ctx.largeMapZoom;
+  const zoom = appCtx.largeMapZoom;
   const n = Math.pow(2, zoom);
   const xtile_float = (refLon + 180) / 360 * n;
   const ytile_float = (1 - Math.log(Math.tan(refLat * Math.PI / 180) + 1 / Math.cos(refLat * Math.PI / 180)) / Math.PI) / 2 * n;
@@ -3073,8 +3073,8 @@ function largeMapScreenToWorld(screenX, screenY) {
   const lat = lat_rad * 180 / Math.PI;
 
   // Convert lat/lon to world coords
-  const worldX = (lon - ctx.LOC.lon) * ctx.SCALE * Math.cos(ctx.LOC.lat * Math.PI / 180);
-  const worldZ = -(lat - ctx.LOC.lat) * ctx.SCALE;
+  const worldX = (lon - appCtx.LOC.lon) * appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180);
+  const worldZ = -(lat - appCtx.LOC.lat) * appCtx.SCALE;
 
   return { x: worldX, z: worldZ };
 }
@@ -3086,8 +3086,8 @@ function findNearestRoad(x, z) {
   _nearRoadResult.road = null;
   _nearRoadResult.dist = Infinity;
 
-  for (let r = 0; r < ctx.roads.length; r++) {
-    const road = ctx.roads[r];
+  for (let r = 0; r < appCtx.roads.length; r++) {
+    const road = appCtx.roads[r];
     const pts = road.pts;
     // Quick bounding box skip: check if first point is way too far
     const fp = pts[0];
@@ -3172,21 +3172,21 @@ let _lastLodRefZ = 0;
 let _lastLodReady = false;
 
 function updateWorldLod(force = false) {
-  if ((!ctx.buildingMeshes || ctx.buildingMeshes.length === 0) && (
-  !ctx.poiMeshes || ctx.poiMeshes.length === 0) && (
-  !ctx.landuseMeshes || ctx.landuseMeshes.length === 0)) {
+  if ((!appCtx.buildingMeshes || appCtx.buildingMeshes.length === 0) && (
+  !appCtx.poiMeshes || appCtx.poiMeshes.length === 0) && (
+  !appCtx.landuseMeshes || appCtx.landuseMeshes.length === 0)) {
     return;
   }
 
-  const ref = ctx.Walk && ctx.Walk.state && ctx.Walk.state.mode === 'walk' && ctx.Walk.state.walker ?
-  ctx.Walk.state.walker :
-  ctx.droneMode ? ctx.drone : ctx.car;
+  const ref = appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker ?
+  appCtx.Walk.state.walker :
+  appCtx.droneMode ? appCtx.drone : appCtx.car;
   const refX = Number.isFinite(ref?.x) ? ref.x : 0;
   const refZ = Number.isFinite(ref?.z) ? ref.z : 0;
 
   if (!force && _lastLodReady) {
     const moved = Math.hypot(refX - _lastLodRefX, refZ - _lastLodRefZ);
-    const minMoveForLodUpdate = ctx.droneMode ? 4 : 8;
+    const minMoveForLodUpdate = appCtx.droneMode ? 4 : 8;
     if (moved < minMoveForLodUpdate) return;
   }
   _lastLodRefX = refX;
@@ -3194,17 +3194,17 @@ function updateWorldLod(force = false) {
   _lastLodReady = true;
 
   const mode = getPerfModeValue();
-  const depthForLod = typeof ctx.rdtLoadComplexity === 'number' ? ctx.rdtLoadComplexity :
+  const depthForLod = typeof appCtx.rdtLoadComplexity === 'number' ? appCtx.rdtLoadComplexity :
 
-  typeof ctx.rdtComplexity === 'number' ? ctx.rdtComplexity : 0;
+  typeof appCtx.rdtComplexity === 'number' ? appCtx.rdtComplexity : 0;
   const lodThresholds = getWorldLodThresholds(depthForLod, mode);
   const poiMidSq = lodThresholds.mid * lodThresholds.mid;
 
   let nearVisible = 0;
   let midVisible = 0;
 
-  for (let i = 0; i < ctx.buildingMeshes.length; i++) {
-    const mesh = ctx.buildingMeshes[i];
+  for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
+    const mesh = appCtx.buildingMeshes[i];
     if (!mesh) continue;
 
     const center = getMeshLodCenter(mesh);
@@ -3225,8 +3225,8 @@ function updateWorldLod(force = false) {
     const dz = center.z - refZ;
     const distSq = dx * dx + dz * dz;
     const hysteresis = tier === 'mid' ?
-    ctx.droneMode ? 460 : 280 :
-    ctx.droneMode ? 380 : 220;
+    appCtx.droneMode ? 460 : 280 :
+    appCtx.droneMode ? 380 : 220;
     const limitDist = mesh.visible ? visibleDist + hysteresis : visibleDist;
     const visible = distSq <= limitDist * limitDist;
     mesh.visible = visible;
@@ -3237,8 +3237,8 @@ function updateWorldLod(force = false) {
     nearVisible += count;
   }
 
-  for (let i = 0; i < ctx.poiMeshes.length; i++) {
-    const mesh = ctx.poiMeshes[i];
+  for (let i = 0; i < appCtx.poiMeshes.length; i++) {
+    const mesh = appCtx.poiMeshes[i];
     if (!mesh) continue;
     const center = getMeshLodCenter(mesh);
     if (!center) continue;
@@ -3250,17 +3250,17 @@ function updateWorldLod(force = false) {
     const radius = Number.isFinite(mesh.userData?.lodRadius) ? mesh.userData.lodRadius : 0;
     const nearDist = lodThresholds.farVisible + Math.min(600, radius);
     const withinLod = tier === 'mid' ? distSq <= poiMidSq : distSq <= nearDist * nearDist;
-    mesh.visible = !!ctx.poiMode && withinLod;
+    mesh.visible = !!appCtx.poiMode && withinLod;
   }
 
   const landuseVisibleDist = lodThresholds.mid + 120;
   const landuseSq = landuseVisibleDist * landuseVisibleDist;
-  for (let i = 0; i < ctx.landuseMeshes.length; i++) {
-    const mesh = ctx.landuseMeshes[i];
+  for (let i = 0; i < appCtx.landuseMeshes.length; i++) {
+    const mesh = appCtx.landuseMeshes[i];
     if (!mesh) continue;
 
     const alwaysVisible = !!mesh.userData?.alwaysVisible;
-    if (!ctx.landUseVisible && !alwaysVisible) {
+    if (!appCtx.landUseVisible && !alwaysVisible) {
       mesh.visible = false;
       continue;
     }
@@ -3270,13 +3270,13 @@ function updateWorldLod(force = false) {
     }
 
     if (mesh.userData?.isLanduseBatch) {
-      mesh.visible = !!ctx.landUseVisible;
+      mesh.visible = !!appCtx.landUseVisible;
       continue;
     }
 
     const center = getMeshLodCenter(mesh);
     if (!center) {
-      mesh.visible = ctx.landUseVisible;
+      mesh.visible = appCtx.landUseVisible;
       continue;
     }
 
@@ -3286,8 +3286,8 @@ function updateWorldLod(force = false) {
     mesh.visible = distSq <= landuseSq;
   }
 
-  if (typeof ctx.setPerfLiveStat === 'function') {
-    ctx.setPerfLiveStat('lodVisible', { near: nearVisible, mid: midVisible });
+  if (typeof appCtx.setPerfLiveStat === 'function') {
+    appCtx.setPerfLiveStat('lodVisible', { near: nearVisible, mid: midVisible });
   }
 }
 
@@ -3365,7 +3365,7 @@ function _getSignMaterial(name) {
 }
 
 function createStreetSign(x, z, name, roadAngle) {
-  const y = typeof ctx.terrainMeshHeightAt === 'function' ? ctx.terrainMeshHeightAt(x, z) : ctx.elevationWorldYAtWorldXZ(x, z);
+  const y = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ(x, z);
   const group = new THREE.Group();
 
   // Pole
@@ -3396,12 +3396,12 @@ function createStreetSign(x, z, name, roadAngle) {
   group.position.set(x, y, z);
   group.rotation.y = roadAngle;
   group.userData.furniturePos = { x, z };
-  ctx.scene.add(group);
-  ctx.streetFurnitureMeshes.push(group);
+  appCtx.scene.add(group);
+  appCtx.streetFurnitureMeshes.push(group);
 }
 
 function createTree(x, z, sizeVariation) {
-  const y = typeof ctx.terrainMeshHeightAt === 'function' ? ctx.terrainMeshHeightAt(x, z) : ctx.elevationWorldYAtWorldXZ(x, z);
+  const y = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ(x, z);
   const group = new THREE.Group();
   const scale = 0.7 + sizeVariation * 0.8;
 
@@ -3420,12 +3420,12 @@ function createTree(x, z, sizeVariation) {
 
   group.position.set(x, y, z);
   group.userData.furniturePos = { x, z };
-  ctx.scene.add(group);
-  ctx.streetFurnitureMeshes.push(group);
+  appCtx.scene.add(group);
+  appCtx.streetFurnitureMeshes.push(group);
 }
 
 function createLightPost(x, z) {
-  const y = typeof ctx.terrainMeshHeightAt === 'function' ? ctx.terrainMeshHeightAt(x, z) : ctx.elevationWorldYAtWorldXZ(x, z);
+  const y = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ(x, z);
   const group = new THREE.Group();
 
   const pole = new THREE.Mesh(_geoLampPole, _matPole);
@@ -3438,12 +3438,12 @@ function createLightPost(x, z) {
 
   group.position.set(x, y, z);
   group.userData.furniturePos = { x, z };
-  ctx.scene.add(group);
-  ctx.streetFurnitureMeshes.push(group);
+  appCtx.scene.add(group);
+  appCtx.streetFurnitureMeshes.push(group);
 }
 
 function createTrashCan(x, z) {
-  const y = typeof ctx.terrainMeshHeightAt === 'function' ? ctx.terrainMeshHeightAt(x, z) : ctx.elevationWorldYAtWorldXZ(x, z);
+  const y = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ(x, z);
   const group = new THREE.Group();
 
   const body = new THREE.Mesh(_geoTrashBody, _matTrashBody);
@@ -3456,8 +3456,8 @@ function createTrashCan(x, z) {
 
   group.position.set(x, y, z);
   group.userData.furniturePos = { x, z };
-  ctx.scene.add(group);
-  ctx.streetFurnitureMeshes.push(group);
+  appCtx.scene.add(group);
+  appCtx.streetFurnitureMeshes.push(group);
 }
 
 function generateStreetFurniture() {
@@ -3467,7 +3467,7 @@ function generateStreetFurniture() {
   // --- STREET SIGNS: place at intervals along named roads ---
   const signSpacing = 120; // One sign every ~120 world units
   const signedRoads = new Set();
-  ctx.roads.forEach((road) => {
+  appCtx.roads.forEach((road) => {
     if (!road.name || road.name === road.type.charAt(0).toUpperCase() + road.type.slice(1)) return;
     if (signedRoads.has(road.name)) return;
     signedRoads.add(road.name);
@@ -3499,7 +3499,7 @@ function generateStreetFurniture() {
   });
 
   // --- TREES: place in parks and green areas ---
-  ctx.landuses.forEach((lu) => {
+  appCtx.landuses.forEach((lu) => {
     if (lu.type !== 'park' && lu.type !== 'wood' && lu.type !== 'forest' &&
     lu.type !== 'garden' && lu.type !== 'grass' && lu.type !== 'meadow' &&
     lu.type !== 'village_green' && lu.type !== 'recreation_ground') return;
@@ -3539,7 +3539,7 @@ function generateStreetFurniture() {
 
   // --- LIGHT POSTS: along major roads at intervals ---
   const lampSpacing = 80;
-  ctx.roads.forEach((road) => {
+  appCtx.roads.forEach((road) => {
     if (road.width < 12) return; // Only major roads
     let distAccum = 0;
     for (let i = 0; i < road.pts.length - 1; i++) {
@@ -3559,7 +3559,7 @@ function generateStreetFurniture() {
   });
 
   // --- TRASH CANS: near some POIs ---
-  ctx.pois.forEach((poi, i) => {
+  appCtx.pois.forEach((poi, i) => {
     if (i % 5 !== 0) return; // Every 5th POI
     const offset = 3 + Math.random() * 2;
     const angle = Math.random() * Math.PI * 2;
@@ -3567,7 +3567,7 @@ function generateStreetFurniture() {
   });
 }
 
-Object.assign(ctx, {
+Object.assign(appCtx, {
   findNearestRoad,
   getNearbyBuildings,
   largeMapScreenToWorld,

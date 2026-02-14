@@ -1,4 +1,4 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // input.js - Keyboard handling, track recording, city switching
 // ============================================================================
 
@@ -9,97 +9,97 @@ function isDebugToggleKey(code, event) {
 }
 
 function onKey(code, event) {
-  if (!ctx.gameStarted) return;
+  if (!appCtx.gameStarted) return;
 
   // Walking mode toggle (F key)
   if (code === 'KeyF') {
     // Debug log removed
-    if (ctx.Walk) {
+    if (appCtx.Walk) {
       // Debug log removed
-      ctx.Walk.toggleWalk();
+      appCtx.Walk.toggleWalk();
 
       // Clear star selection when switching modes
-      ctx.clearStarSelection();
+      appCtx.clearStarSelection();
 
       // Disable drone mode if walking
-      if (ctx.Walk.state.mode === 'walk') {
-        ctx.droneMode = false;
+      if (appCtx.Walk.state.mode === 'walk') {
+        appCtx.droneMode = false;
       }
 
       // Update all travel mode button states
       if (document.getElementById('fWalk')) {
-        const isWalking = ctx.Walk.state.mode === 'walk';
+        const isWalking = appCtx.Walk.state.mode === 'walk';
         document.getElementById('fWalk').classList.toggle('on', isWalking);
         document.getElementById('fDriving').classList.toggle('on', !isWalking);
         document.getElementById('fDrone').classList.remove('on');
         if (!isWalking) {
-          ctx.droneMode = false;
-          if (typeof ctx.camMode !== 'undefined') ctx.camMode = 0;
-          if (ctx.carMesh) ctx.carMesh.visible = true;
+          appCtx.droneMode = false;
+          if (typeof appCtx.camMode !== 'undefined') appCtx.camMode = 0;
+          if (appCtx.carMesh) appCtx.carMesh.visible = true;
         }
       }
     } else {
       console.error('Walk module does not exist!');
     }
-    if (typeof ctx.updateControlsModeUI === 'function') ctx.updateControlsModeUI();
+    if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
     return;
   }
 
   // Builder mode toggle (B key)
   if (code === 'KeyB') {
-    if (typeof ctx.toggleBlockBuildMode === 'function') {
-      ctx.toggleBlockBuildMode();
+    if (typeof appCtx.toggleBlockBuildMode === 'function') {
+      appCtx.toggleBlockBuildMode();
     }
     return;
   }
 
   // Camera view toggle when walking (C key) - first/third person
   if (code === 'KeyC') {
-    if (ctx.Walk && ctx.Walk.state.mode === 'walk') {
-      ctx.Walk.toggleView();
+    if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
+      appCtx.Walk.toggleView();
     } else {
-      ctx.camMode = (ctx.camMode + 1) % 3; // Normal car camera cycling
+      appCtx.camMode = (appCtx.camMode + 1) % 3; // Normal car camera cycling
     }
     return;
   }
 
   if (code === 'Digit6') {
-    ctx.droneMode = !ctx.droneMode;
+    appCtx.droneMode = !appCtx.droneMode;
 
     // Clear star selection when switching modes
-    ctx.clearStarSelection();
+    appCtx.clearStarSelection();
 
-    if (ctx.droneMode) {
+    if (appCtx.droneMode) {
       // Disable walking mode if active
-      if (ctx.Walk && ctx.Walk.state.mode === 'walk') {
-        ctx.Walk.setModeDrive();
+      if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
+        appCtx.Walk.setModeDrive();
       }
       // Initialize drone position above current position
-      const ref = ctx.Walk ? ctx.Walk.getMapRefPosition(false, null) : { x: ctx.car.x, z: ctx.car.z };
-      ctx.drone.x = ref.x;
-      ctx.drone.z = ref.z;
-      ctx.drone.yaw = ctx.car.angle;
-      ctx.drone.roll = 0;
+      const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(false, null) : { x: appCtx.car.x, z: appCtx.car.z };
+      appCtx.drone.x = ref.x;
+      appCtx.drone.z = ref.z;
+      appCtx.drone.yaw = appCtx.car.angle;
+      appCtx.drone.roll = 0;
 
       // On the moon, raycast to find actual ground height so drone spawns near surface
-      if (ctx.onMoon && ctx.moonSurface) {
-        const rc = ctx._getPhysRaycaster();
-        ctx._physRayStart.set(ref.x, 2000, ref.z);
-        rc.set(ctx._physRayStart, ctx._physRayDir);
-        const hits = rc.intersectObject(ctx.moonSurface, false);
-        ctx.drone.y = (hits.length > 0 ? hits[0].point.y : -100) + 10;
-        ctx.drone.pitch = -0.2;
+      if (appCtx.onMoon && appCtx.moonSurface) {
+        const rc = appCtx._getPhysRaycaster();
+        appCtx._physRayStart.set(ref.x, 2000, ref.z);
+        rc.set(appCtx._physRayStart, appCtx._physRayDir);
+        const hits = rc.intersectObject(appCtx.moonSurface, false);
+        appCtx.drone.y = (hits.length > 0 ? hits[0].point.y : -100) + 10;
+        appCtx.drone.pitch = -0.2;
       } else {
-        ctx.drone.y = 50;
-        ctx.drone.pitch = -0.3;
+        appCtx.drone.y = 50;
+        appCtx.drone.pitch = -0.3;
       }
     }
 
     // Update all travel mode button states
-    document.getElementById('fDrone').classList.toggle('on', ctx.droneMode);
-    document.getElementById('fDriving').classList.toggle('on', !ctx.droneMode);
+    document.getElementById('fDrone').classList.toggle('on', appCtx.droneMode);
+    document.getElementById('fDriving').classList.toggle('on', !appCtx.droneMode);
     document.getElementById('fWalk').classList.remove('on');
-    if (typeof ctx.updateControlsModeUI === 'function') ctx.updateControlsModeUI();
+    if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
   }
   // Debug overlay toggle (Backtick key; F8 fallback for keyboard-layout variance)
   if (isDebugToggleKey(code, event)) {
@@ -107,7 +107,7 @@ function onKey(code, event) {
     window._debugMode = !window._debugMode;
     const overlay = document.getElementById('debugOverlay');
     if (overlay) overlay.style.display = window._debugMode ? 'block' : 'none';
-    if (typeof ctx.positionTopOverlays === 'function') ctx.positionTopOverlays();
+    if (typeof appCtx.positionTopOverlays === 'function') appCtx.positionTopOverlays();
 
     // Create/destroy debug marker under car
     if (window._debugMode && !window._debugMarker) {
@@ -115,10 +115,10 @@ function onKey(code, event) {
       const markerMat = new THREE.MeshBasicMaterial({ color: 0x00ff00, depthTest: false, transparent: true, opacity: 0.8 });
       window._debugMarker = new THREE.Mesh(markerGeo, markerMat);
       window._debugMarker.renderOrder = 999;
-      ctx.scene.add(window._debugMarker);
+      appCtx.scene.add(window._debugMarker);
     }
     if (!window._debugMode && window._debugMarker) {
-      ctx.scene.remove(window._debugMarker);
+      appCtx.scene.remove(window._debugMarker);
       if (window._debugMarker.geometry) window._debugMarker.geometry.dispose();
       if (window._debugMarker.material) window._debugMarker.material.dispose();
       window._debugMarker = null;
@@ -129,80 +129,80 @@ function onKey(code, event) {
   if (code === 'KeyR') {
     // Shift+R: Toggle Road Debug Mode (terrain conformance visualization)
     // R: Toggle track recording (default)
-    if (event && event.shiftKey && typeof ctx.toggleRoadDebugMode === 'function') {
-      ctx.toggleRoadDebugMode();
+    if (event && event.shiftKey && typeof appCtx.toggleRoadDebugMode === 'function') {
+      appCtx.toggleRoadDebugMode();
     } else {
       toggleTrackRecording();
     }
   }
   if (code === 'KeyN') nextCity();
   if (code === 'KeyM') {
-    ctx.showLargeMap = !ctx.showLargeMap;
-    document.getElementById('largeMap').classList.toggle('show', ctx.showLargeMap);
+    appCtx.showLargeMap = !appCtx.showLargeMap;
+    document.getElementById('largeMap').classList.toggle('show', appCtx.showLargeMap);
   }
-  if (ctx.showLargeMap && (code === 'Equal' || code === 'NumpadAdd')) {
-    if (ctx.largeMapZoom < 18) {
-      ctx.largeMapZoom++;
-      document.getElementById('zoomLevel').textContent = 'Z: ' + ctx.largeMapZoom;
+  if (appCtx.showLargeMap && (code === 'Equal' || code === 'NumpadAdd')) {
+    if (appCtx.largeMapZoom < 18) {
+      appCtx.largeMapZoom++;
+      document.getElementById('zoomLevel').textContent = 'Z: ' + appCtx.largeMapZoom;
     }
   }
-  if (ctx.showLargeMap && (code === 'Minus' || code === 'NumpadSubtract')) {
-    if (ctx.largeMapZoom > 10) {
-      ctx.largeMapZoom--;
-      document.getElementById('zoomLevel').textContent = 'Z: ' + ctx.largeMapZoom;
+  if (appCtx.showLargeMap && (code === 'Minus' || code === 'NumpadSubtract')) {
+    if (appCtx.largeMapZoom > 10) {
+      appCtx.largeMapZoom--;
+      document.getElementById('zoomLevel').textContent = 'Z: ' + appCtx.largeMapZoom;
     }
   }
   if (code === 'Escape' && !document.getElementById('resultScreen').classList.contains('show') && !document.getElementById('caughtScreen').classList.contains('show')) {
-    if (ctx.showLargeMap) {
-      ctx.showLargeMap = false;
+    if (appCtx.showLargeMap) {
+      appCtx.showLargeMap = false;
       document.getElementById('largeMap').classList.remove('show');
     } else {
-      ctx.paused = !ctx.paused;
-      document.getElementById('pauseScreen').classList.toggle('show', ctx.paused);
+      appCtx.paused = !appCtx.paused;
+      document.getElementById('pauseScreen').classList.toggle('show', appCtx.paused);
     }
   }
 }
 
 function toggleTrackRecording() {
-  ctx.isRecording = !ctx.isRecording;
-  document.getElementById('fTrack').classList.toggle('recording', ctx.isRecording);
-  document.getElementById('fTrack').textContent = ctx.isRecording ? '⏹️ Stop Recording' : '🏁 Record Track';
-  if (ctx.isRecording) ctx.customTrack = [];
+  appCtx.isRecording = !appCtx.isRecording;
+  document.getElementById('fTrack').classList.toggle('recording', appCtx.isRecording);
+  document.getElementById('fTrack').textContent = appCtx.isRecording ? '⏹️ Stop Recording' : '🏁 Record Track';
+  if (appCtx.isRecording) appCtx.customTrack = [];
 }
 
 function eraseTrack() {
-  ctx.customTrack = [];
-  ctx.isRecording = false;
+  appCtx.customTrack = [];
+  appCtx.isRecording = false;
   document.getElementById('fTrack').classList.remove('recording');
   document.getElementById('fTrack').textContent = '🏁 Record Track';
-  if (ctx.trackMesh) {ctx.scene.remove(ctx.trackMesh);ctx.trackMesh = null;}
+  if (appCtx.trackMesh) {appCtx.scene.remove(appCtx.trackMesh);appCtx.trackMesh = null;}
 }
 
 function updateTrack() {
-  if (!ctx.isRecording) return;
-  const last = ctx.customTrack[ctx.customTrack.length - 1];
-  if (!last || Math.hypot(ctx.car.x - last.x, ctx.car.z - last.z) > 5) {
-    ctx.customTrack.push({ x: ctx.car.x, z: ctx.car.z });
+  if (!appCtx.isRecording) return;
+  const last = appCtx.customTrack[appCtx.customTrack.length - 1];
+  if (!last || Math.hypot(appCtx.car.x - last.x, appCtx.car.z - last.z) > 5) {
+    appCtx.customTrack.push({ x: appCtx.car.x, z: appCtx.car.z });
     rebuildTrackMesh();
   }
 }
 
 function rebuildTrackMesh() {
-  if (ctx.trackMesh) ctx.scene.remove(ctx.trackMesh);
-  if (ctx.customTrack.length < 2) return;
+  if (appCtx.trackMesh) appCtx.scene.remove(appCtx.trackMesh);
+  if (appCtx.customTrack.length < 2) return;
   const hw = 8;
   const verts = [],indices = [];
-  for (let i = 0; i < ctx.customTrack.length; i++) {
-    const p = ctx.customTrack[i];
+  for (let i = 0; i < appCtx.customTrack.length; i++) {
+    const p = appCtx.customTrack[i];
     let dx, dz;
-    if (i === 0) {dx = ctx.customTrack[1].x - p.x;dz = ctx.customTrack[1].z - p.z;} else
-    if (i === ctx.customTrack.length - 1) {dx = p.x - ctx.customTrack[i - 1].x;dz = p.z - ctx.customTrack[i - 1].z;} else
-    {dx = ctx.customTrack[i + 1].x - ctx.customTrack[i - 1].x;dz = ctx.customTrack[i + 1].z - ctx.customTrack[i - 1].z;}
+    if (i === 0) {dx = appCtx.customTrack[1].x - p.x;dz = appCtx.customTrack[1].z - p.z;} else
+    if (i === appCtx.customTrack.length - 1) {dx = p.x - appCtx.customTrack[i - 1].x;dz = p.z - appCtx.customTrack[i - 1].z;} else
+    {dx = appCtx.customTrack[i + 1].x - appCtx.customTrack[i - 1].x;dz = appCtx.customTrack[i + 1].z - appCtx.customTrack[i - 1].z;}
     const len = Math.sqrt(dx * dx + dz * dz) || 1;
     const nx = -dz / len,nz = dx / len;
     verts.push(p.x + nx * hw, 0.03, p.z + nz * hw);
     verts.push(p.x - nx * hw, 0.03, p.z - nz * hw);
-    if (i < ctx.customTrack.length - 1) {
+    if (i < appCtx.customTrack.length - 1) {
       const vi = i * 2;
       indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
     }
@@ -211,18 +211,18 @@ function rebuildTrackMesh() {
   geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
   geo.setIndex(indices);
   geo.computeVertexNormals();
-  ctx.trackMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: ctx.isRecording ? 0xff6644 : 0xffaa00, side: THREE.DoubleSide, transparent: true, opacity: 0.7 }));
-  ctx.scene.add(ctx.trackMesh);
+  appCtx.trackMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: appCtx.isRecording ? 0xff6644 : 0xffaa00, side: THREE.DoubleSide, transparent: true, opacity: 0.7 }));
+  appCtx.scene.add(appCtx.trackMesh);
 }
 
 function nextCity() {
-  if (ctx.selLoc === 'custom') {
-    ctx.selLoc = ctx.locKeys[0];
+  if (appCtx.selLoc === 'custom') {
+    appCtx.selLoc = appCtx.locKeys[0];
   } else {
-    const idx = ctx.locKeys.indexOf(ctx.selLoc);
-    ctx.selLoc = ctx.locKeys[(idx + 1) % ctx.locKeys.length];
+    const idx = appCtx.locKeys.indexOf(appCtx.selLoc);
+    appCtx.selLoc = appCtx.locKeys[(idx + 1) % appCtx.locKeys.length];
   }
-  ctx.loadRoads();
+  appCtx.loadRoads();
 }
 
 async function searchLocation() {
@@ -412,15 +412,15 @@ async function searchLocation() {
     // Debug log removed
 
     // Set custom location
-    ctx.customLoc = { lat, lon, name: locationName };
-    ctx.selLoc = 'custom';
+    appCtx.customLoc = { lat, lon, name: locationName };
+    appCtx.selLoc = 'custom';
 
     // Debug log removed
     // Debug log removed
 
     // Update UI to show custom location panel as active
-    if (typeof ctx.setTitleLocationMode === 'function') {
-      ctx.setTitleLocationMode('custom');
+    if (typeof appCtx.setTitleLocationMode === 'function') {
+      appCtx.setTitleLocationMode('custom');
     }
 
     // Debug log removed
@@ -432,21 +432,21 @@ async function searchLocation() {
     // Debug log removed
 
     // If game is running, reload the world
-    if (typeof ctx.gameStarted !== 'undefined' && ctx.gameStarted) {
+    if (typeof appCtx.gameStarted !== 'undefined' && appCtx.gameStarted) {
       // Debug log removed
-      await ctx.loadRoads();
+      await appCtx.loadRoads();
       // Debug log removed
 
       // Keep the vehicle on a valid road spawn after reloading location data.
-      if (typeof ctx.spawnOnRoad === 'function') ctx.spawnOnRoad();
+      if (typeof appCtx.spawnOnRoad === 'function') appCtx.spawnOnRoad();
 
       // Debug log removed
     } else {
 
 
+
       // Debug log removed
     } // Debug log removed
-
   } catch (e) {
     console.error('=== SEARCH LOCATION DEBUG END - ERROR ===');
     console.error('Search error:', e);
@@ -456,7 +456,7 @@ async function searchLocation() {
   }
 }
 
-Object.assign(ctx, {
+Object.assign(appCtx, {
   eraseTrack,
   nextCity,
   onKey,

@@ -1,4 +1,4 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // env.js - Centralized Environment State Manager
 // ============================================================================
 // Single source of truth for which environment is active.
@@ -66,16 +66,16 @@ function switchEnv(newEnv) {
   _syncLegacyFlags(newEnv);
 
   // Building blocks are an Earth/Moon interaction; disable during space flight.
-  if (newEnv === ENV.SPACE_FLIGHT && typeof ctx.setBuildModeEnabled === 'function') {
-    ctx.setBuildModeEnabled(false);
+  if (newEnv === ENV.SPACE_FLIGHT && typeof appCtx.setBuildModeEnabled === 'function') {
+    appCtx.setBuildModeEnabled(false);
   }
 
   _transitioning = false;
 
   // Update debug HUD
   _updateEnvDebug();
-  if (typeof ctx.updateControlsModeUI === 'function') {
-    ctx.updateControlsModeUI();
+  if (typeof appCtx.updateControlsModeUI === 'function') {
+    appCtx.updateControlsModeUI();
   }
 
   return true;
@@ -85,16 +85,16 @@ function switchEnv(newEnv) {
 function _syncLegacyFlags(env) {
   switch (env) {
     case ENV.EARTH:
-      ctx.onMoon = false;
-      ctx.travelingToMoon = false;
+      appCtx.onMoon = false;
+      appCtx.travelingToMoon = false;
       break;
     case ENV.SPACE_FLIGHT:
       // travelingToMoon is set by the caller before switchEnv
       // onMoon stays whatever it was (could be leaving Earth or Moon)
       break;
     case ENV.MOON:
-      ctx.onMoon = true;
-      ctx.travelingToMoon = false;
+      appCtx.onMoon = true;
+      appCtx.travelingToMoon = false;
       break;
   }
 }
@@ -116,6 +116,6 @@ function _updateEnvDebug() {
   _envDebugEl.textContent = 'ENV:' + (_activeEnv || 'INIT');
 }
 
-Object.assign(ctx, { ENV, getEnv, isEnv, switchEnv });
+Object.assign(appCtx, { ENV, getEnv, isEnv, switchEnv });
 
 export { ENV, getEnv, isEnv, switchEnv };

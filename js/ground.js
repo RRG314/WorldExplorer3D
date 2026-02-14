@@ -1,4 +1,4 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // ground.js - Unified Ground Height Service
 // Single source of truth for y(x,z) used by terrain, roads, and vehicles
 // ============================================================================
@@ -41,10 +41,10 @@ const GroundHeight = {
    */
   terrainY(x, z) {
     // Use terrain mesh grid sampling when available for accurate surface height
-    if (typeof ctx.terrainMeshHeightAt === 'function') {
-      return ctx.terrainMeshHeightAt(x, z);
+    if (typeof appCtx.terrainMeshHeightAt === 'function') {
+      return appCtx.terrainMeshHeightAt(x, z);
     }
-    return ctx.elevationWorldYAtWorldXZ(x, z);
+    return appCtx.elevationWorldYAtWorldXZ(x, z);
   },
 
   /**
@@ -58,14 +58,14 @@ const GroundHeight = {
   // Exact road mesh sample from rendered road geometry. Falls back to null if unavailable.
   roadMeshY(x, z) {
     if (typeof THREE === 'undefined') return null;
-    if (!Array.isArray(ctx.roadMeshes) || ctx.roadMeshes.length === 0) return null;
+    if (!Array.isArray(appCtx.roadMeshes) || appCtx.roadMeshes.length === 0) return null;
 
     this._ensureVectors();
     if (!this._roadRaycaster || !this._roadRayStart || !this._roadRayDir) return null;
 
     this._roadRayStart.set(x, 1500, z);
     this._roadRaycaster.set(this._roadRayStart, this._roadRayDir);
-    const hits = this._roadRaycaster.intersectObjects(ctx.roadMeshes, false);
+    const hits = this._roadRaycaster.intersectObjects(appCtx.roadMeshes, false);
     if (!hits || hits.length === 0) return null;
     const y = hits[0]?.point?.y;
     return Number.isFinite(y) ? y : null;
@@ -96,7 +96,7 @@ const GroundHeight = {
     this._ensureVectors();
 
     const tY = this.terrainY(x, z);
-    const nr = ctx.findNearestRoad(x, z);
+    const nr = appCtx.findNearestRoad(x, z);
     const roadHW = nr.road ? nr.road.width / 2 : 0;
 
     let y, source;
@@ -171,9 +171,9 @@ const GroundHeight = {
   // -------------------------------------------------------------------------
   invalidate() {
 
+
     // Currently stateless per-call; placeholder for future caching.
   } };
-
-Object.assign(ctx, { GroundHeight });
+Object.assign(appCtx, { GroundHeight });
 
 export { GroundHeight };

@@ -1,4 +1,4 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // memory.js - Persistent memory markers (pin/flower + short note)
 // ============================================================================
 
@@ -80,35 +80,35 @@ function getMemoryPersistenceStatus() {
 }
 
 function getCurrentLocationKey() {
-  if (!ctx.LOC || !isFiniteNumber(ctx.LOC.lat) || !isFiniteNumber(ctx.LOC.lon)) return null;
-  return `${ctx.LOC.lat.toFixed(MEMORY_LOCATION_PRECISION)},${ctx.LOC.lon.toFixed(MEMORY_LOCATION_PRECISION)}`;
+  if (!appCtx.LOC || !isFiniteNumber(appCtx.LOC.lat) || !isFiniteNumber(appCtx.LOC.lon)) return null;
+  return `${appCtx.LOC.lat.toFixed(MEMORY_LOCATION_PRECISION)},${appCtx.LOC.lon.toFixed(MEMORY_LOCATION_PRECISION)}`;
 }
 
 function getCurrentLocationLabel() {
-  if (ctx.selLoc === 'custom') return ctx.customLoc && ctx.customLoc.name ? ctx.customLoc.name : 'Custom Location';
-  if (ctx.LOCS && ctx.selLoc && ctx.LOCS[ctx.selLoc]) return ctx.LOCS[ctx.selLoc].name;
+  if (appCtx.selLoc === 'custom') return appCtx.customLoc && appCtx.customLoc.name ? appCtx.customLoc.name : 'Custom Location';
+  if (appCtx.LOCS && appCtx.selLoc && appCtx.LOCS[appCtx.selLoc]) return appCtx.LOCS[appCtx.selLoc].name;
   return 'Current Location';
 }
 
 function worldToLatLonSafe(x, z) {
-  if (typeof ctx.worldToLatLon === 'function') {
-    const ll = ctx.worldToLatLon(x, z);
+  if (typeof appCtx.worldToLatLon === 'function') {
+    const ll = appCtx.worldToLatLon(x, z);
     if (ll && isFiniteNumber(ll.lat) && isFiniteNumber(ll.lon)) return ll;
   }
-  const lat = ctx.LOC.lat - z / ctx.SCALE;
-  const lon = ctx.LOC.lon + x / (ctx.SCALE * Math.cos(ctx.LOC.lat * Math.PI / 180));
+  const lat = appCtx.LOC.lat - z / appCtx.SCALE;
+  const lon = appCtx.LOC.lon + x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
   return { lat, lon };
 }
 
 function latLonToWorldSafe(lat, lon) {
-  const x = (lon - ctx.LOC.lon) * ctx.SCALE * Math.cos(ctx.LOC.lat * Math.PI / 180);
-  const z = -(lat - ctx.LOC.lat) * ctx.SCALE;
+  const x = (lon - appCtx.LOC.lon) * appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180);
+  const z = -(lat - appCtx.LOC.lat) * appCtx.SCALE;
   return { x, z };
 }
 
 function getGroundYAt(x, z) {
-  if (typeof ctx.elevationWorldYAtWorldXZ === 'function') {
-    const y = ctx.elevationWorldYAtWorldXZ(x, z);
+  if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
+    const y = appCtx.elevationWorldYAtWorldXZ(x, z);
     if (isFiniteNumber(y)) return y;
   }
   return 0;
@@ -116,8 +116,8 @@ function getGroundYAt(x, z) {
 
 function isInsideFootprintSafe(x, z, pts) {
   if (!Array.isArray(pts) || pts.length < 3) return false;
-  if (typeof ctx.pointInPolygon === 'function') {
-    return !!ctx.pointInPolygon(x, z, pts);
+  if (typeof appCtx.pointInPolygon === 'function') {
+    return !!appCtx.pointInPolygon(x, z, pts);
   }
   let inside = false;
   for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
@@ -130,9 +130,9 @@ function isInsideFootprintSafe(x, z, pts) {
 }
 
 function getBuildingRoofYAt(x, z, groundY) {
-  if (!Array.isArray(ctx.buildings) || ctx.buildings.length === 0) return null;
-  const candidates = typeof ctx.getNearbyBuildings === 'function' ?
-  ctx.getNearbyBuildings(x, z, 28) || [] : ctx.buildings;
+  if (!Array.isArray(appCtx.buildings) || appCtx.buildings.length === 0) return null;
+  const candidates = typeof appCtx.getNearbyBuildings === 'function' ?
+  appCtx.getNearbyBuildings(x, z, 28) || [] : appCtx.buildings;
 
   if (!Array.isArray(candidates) || candidates.length === 0) return null;
 
@@ -158,8 +158,8 @@ function getTopSurfaceYAt(x, z) {
   const roofY = getBuildingRoofYAt(x, z, groundY);
   if (isFiniteNumber(roofY) && roofY > topY) topY = roofY;
 
-  if (typeof ctx.getBuildTopSurfaceAtWorldXZ === 'function') {
-    const blockY = ctx.getBuildTopSurfaceAtWorldXZ(x, z, Infinity);
+  if (typeof appCtx.getBuildTopSurfaceAtWorldXZ === 'function') {
+    const blockY = appCtx.getBuildTopSurfaceAtWorldXZ(x, z, Infinity);
     if (isFiniteNumber(blockY) && blockY > topY) topY = blockY;
   }
 
@@ -252,13 +252,13 @@ function disposeObject3D(obj) {
 }
 
 function ensureMemoryGroup() {
-  if (!ctx.scene) return null;
+  if (!appCtx.scene) return null;
   if (!memoryGroup) {
     memoryGroup = new THREE.Group();
     memoryGroup.name = 'memoryMarkers';
   }
-  if (memoryGroup.parent !== ctx.scene) {
-    ctx.scene.add(memoryGroup);
+  if (memoryGroup.parent !== appCtx.scene) {
+    appCtx.scene.add(memoryGroup);
   }
   return memoryGroup;
 }
@@ -389,7 +389,7 @@ function refreshMemoryMarkersForCurrentLocation() {
 
   clearRenderedMemoryMarkers();
 
-  if (!ctx.isEnv || !ctx.ENV || !ctx.isEnv(ctx.ENV.EARTH)) return;
+  if (!appCtx.isEnv || !appCtx.ENV || !appCtx.isEnv(appCtx.ENV.EARTH)) return;
 
   const entries = getEntriesForCurrentLocation();
   entries.forEach((entry) => {
@@ -415,14 +415,14 @@ function clearMemoryMarkersForWorldReload() {
 }
 
 function getPlacementReferencePosition() {
-  if (ctx.droneMode && ctx.drone) {
-    return { x: ctx.drone.x, z: ctx.drone.z };
+  if (appCtx.droneMode && appCtx.drone) {
+    return { x: appCtx.drone.x, z: appCtx.drone.z };
   }
-  if (ctx.Walk && ctx.Walk.state && ctx.Walk.state.mode === 'walk' && ctx.Walk.state.walker) {
-    return { x: ctx.Walk.state.walker.x, z: ctx.Walk.state.walker.z };
+  if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker) {
+    return { x: appCtx.Walk.state.walker.x, z: appCtx.Walk.state.walker.z };
   }
-  if (ctx.car) {
-    return { x: ctx.car.x, z: ctx.car.z };
+  if (appCtx.car) {
+    return { x: appCtx.car.x, z: appCtx.car.z };
   }
   return null;
 }
@@ -451,7 +451,7 @@ function updateComposerCharCount() {
 }
 
 function openMemoryComposer(defaultType = 'pin') {
-  if (!ctx.gameStarted) return;
+  if (!appCtx.gameStarted) return;
   const panel = document.getElementById('memoryComposer');
   const input = document.getElementById('memoryMessageInput');
   if (!panel || !input) return;
@@ -528,12 +528,12 @@ function removeAllMemories() {
 }
 
 function placeMemoryFromComposer() {
-  if (!ctx.gameStarted) return;
+  if (!appCtx.gameStarted) return;
   if (!memoryPersistenceEnabled) {
     setComposerStatus('Persistent storage unavailable. Marker placement is disabled.', true);
     return;
   }
-  if (!ctx.isEnv || !ctx.ENV || !ctx.isEnv(ctx.ENV.EARTH)) {
+  if (!appCtx.isEnv || !appCtx.ENV || !appCtx.isEnv(appCtx.ENV.EARTH)) {
     setComposerStatus('Memories can only be placed while in Earth mode.', true);
     return;
   }
@@ -599,16 +599,16 @@ function placeMemoryFromComposer() {
 }
 
 function onMemorySceneClick(event) {
-  if (!ctx.gameStarted) return;
-  if (!ctx.isEnv || !ctx.ENV || !ctx.isEnv(ctx.ENV.EARTH)) return;
-  if (!ctx.renderer || !ctx.camera || memoryHitboxes.length === 0) return;
+  if (!appCtx.gameStarted) return;
+  if (!appCtx.isEnv || !appCtx.ENV || !appCtx.isEnv(appCtx.ENV.EARTH)) return;
+  if (!appCtx.renderer || !appCtx.camera || memoryHitboxes.length === 0) return;
 
   const target = event.target;
   if (target && target.closest && target.closest('#memoryComposer, #memoryInfoPanel, #floatMenuContainer, #largeMap, #titleScreen, #propertyPanel, #historicPanel, #propertyModal, #controlsTab')) {
     return;
   }
 
-  const canvas = ctx.renderer.domElement;
+  const canvas = appCtx.renderer.domElement;
   if (!canvas) return;
   const rect = canvas.getBoundingClientRect();
   const x = event.clientX;
@@ -617,7 +617,7 @@ function onMemorySceneClick(event) {
 
   memoryMouse.x = (x - rect.left) / rect.width * 2 - 1;
   memoryMouse.y = -((y - rect.top) / rect.height) * 2 + 1;
-  memoryRaycaster.setFromCamera(memoryMouse, ctx.camera);
+  memoryRaycaster.setFromCamera(memoryMouse, appCtx.camera);
   const intersections = memoryRaycaster.intersectObjects(memoryHitboxes, false);
   if (!intersections || intersections.length === 0) return;
 
@@ -716,7 +716,7 @@ function setupMemoryUI() {
 memoryEntries = loadMemoryEntriesFromStorage();
 bindMemorySceneClick();
 
-Object.assign(ctx, {
+Object.assign(appCtx, {
   clearMemoryMarkersForWorldReload,
   closeMemoryComposer,
   getMemoryEntriesForCurrentLocation,

@@ -1,4 +1,4 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // real-estate.js - Property API and real estate data system
 // ============================================================================
 
@@ -22,7 +22,7 @@ const generateDemoProperties = (centerLat, centerLon, count = 20) => {
     const lonOffset = (Math.random() - 0.5) * 0.01;
     const lat = centerLat + latOffset;
     const lon = centerLon + lonOffset;
-    const worldPos = ctx.geoToWorld(lat, lon);
+    const worldPos = appCtx.geoToWorld(lat, lon);
 
     const priceType = Math.random() > 0.6 ? 'sale' : 'rent';
     const basePrice = priceType === 'sale' ?
@@ -212,7 +212,7 @@ const PropertyAPI = {
     return data.map((p, i) => {
       const lat = p.address?.lat || p.parcel?.lat || 0;
       const lon = p.address?.lon || p.parcel?.lon || 0;
-      const worldPos = ctx.geoToWorld(lat, lon);
+      const worldPos = appCtx.geoToWorld(lat, lon);
 
       return {
         id: p.parcel?.apn || `estated-${i}`,
@@ -247,7 +247,7 @@ const PropertyAPI = {
     return data.map((p, i) => {
       const lat = p.location?.latitude || 0;
       const lon = p.location?.longitude || 0;
-      const worldPos = ctx.geoToWorld(lat, lon);
+      const worldPos = appCtx.geoToWorld(lat, lon);
 
       const assessment = p.assessment?.assessed || {};
       const building = p.building || {};
@@ -284,7 +284,7 @@ const PropertyAPI = {
   // Normalize RentCast data (existing)
   normalizeRentCast(data, priceType) {
     return data.map((p, i) => {
-      const worldPos = ctx.geoToWorld(p.latitude || 0, p.longitude || 0);
+      const worldPos = appCtx.geoToWorld(p.latitude || 0, p.longitude || 0);
       return {
         id: p.id || `rc-${priceType}-${i}`,
         address: p.formattedAddress || p.addressLine1 || 'Unknown',
@@ -314,6 +314,6 @@ const PropertyAPI = {
   }
 };
 
-Object.assign(ctx, { apiConfig, PropertyAPI, generateDemoProperties });
+Object.assign(appCtx, { apiConfig, PropertyAPI, generateDemoProperties });
 
 export { apiConfig, generateDemoProperties, PropertyAPI };

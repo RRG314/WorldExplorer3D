@@ -1,4 +1,4 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // perf.js - Runtime performance mode + benchmark telemetry for RDT comparisons
 // ============================================================================
 
@@ -51,7 +51,7 @@ const perfStats = {
   },
   live: {
     speedMph: 0,
-    terrainRing: typeof ctx.TERRAIN_RING === 'number' ? ctx.TERRAIN_RING : 0,
+    terrainRing: typeof appCtx.TERRAIN_RING === 'number' ? appCtx.TERRAIN_RING : 0,
     lodVisible: { near: 0, mid: 0 },
     worldCounts: { roads: 0, buildings: 0, poiMeshes: 0, landuseMeshes: 0 },
     spikes: {
@@ -181,7 +181,7 @@ function getPerfSpikeMetrics(includePercentiles = false) {
 }
 
 function exposeMutableGlobal(name, getter, setter) {
-  Object.defineProperty(ctx, name, {
+  Object.defineProperty(appCtx, name, {
     configurable: true,
     enumerable: true,
     get: getter,
@@ -202,9 +202,9 @@ function writeStorage(key, value) {
     localStorage.setItem(key, value);
   } catch {
 
+
     // Ignore storage failures (private browsing / blocked storage).
   }}
-
 function normalizePerfMode(mode) {
   return mode === PERF_MODE_BASELINE ? PERF_MODE_BASELINE : PERF_MODE_RDT;
 }
@@ -315,19 +315,19 @@ function recordPerfFrame(dt) {
   perfStats.live.spikes = getPerfSpikeMetrics(false);
 
   const currentSpeedMph = (() => {
-    if (typeof ctx.droneMode !== 'undefined' && ctx.droneMode && typeof ctx.drone !== 'undefined') {
-      return Math.max(0, Math.abs((ctx.drone.speed || 0) * 1.8));
+    if (typeof appCtx.droneMode !== 'undefined' && appCtx.droneMode && typeof appCtx.drone !== 'undefined') {
+      return Math.max(0, Math.abs((appCtx.drone.speed || 0) * 1.8));
     }
     if (
-    typeof ctx.Walk !== 'undefined' && ctx.Walk &&
+    typeof appCtx.Walk !== 'undefined' && appCtx.Walk &&
 
-    ctx.Walk.state &&
-    ctx.Walk.state.mode === 'walk')
+    appCtx.Walk.state &&
+    appCtx.Walk.state.mode === 'walk')
     {
-      return Math.max(0, Math.abs(ctx.Walk.state.walker?.speedMph || 0));
+      return Math.max(0, Math.abs(appCtx.Walk.state.walker?.speedMph || 0));
     }
-    if (typeof ctx.car !== 'undefined' && ctx.car) {
-      return Math.max(0, Math.abs((ctx.car.speed || 0) * 0.5));
+    if (typeof appCtx.car !== 'undefined' && appCtx.car) {
+      return Math.max(0, Math.abs((appCtx.car.speed || 0) * 0.5));
     }
     return 0;
   })();
@@ -350,10 +350,10 @@ function recordPerfRendererInfo(rendererRef) {
   perfStats.renderer.programs = programs || 0;
 
   perfStats.live.worldCounts = {
-    roads: typeof ctx.roads !== 'undefined' && Array.isArray(ctx.roads) ? ctx.roads.length : 0,
-    buildings: typeof ctx.buildingMeshes !== 'undefined' && Array.isArray(ctx.buildingMeshes) ? ctx.buildingMeshes.length : 0,
-    poiMeshes: typeof ctx.poiMeshes !== 'undefined' && Array.isArray(ctx.poiMeshes) ? ctx.poiMeshes.length : 0,
-    landuseMeshes: typeof ctx.landuseMeshes !== 'undefined' && Array.isArray(ctx.landuseMeshes) ? ctx.landuseMeshes.length : 0
+    roads: typeof appCtx.roads !== 'undefined' && Array.isArray(appCtx.roads) ? appCtx.roads.length : 0,
+    buildings: typeof appCtx.buildingMeshes !== 'undefined' && Array.isArray(appCtx.buildingMeshes) ? appCtx.buildingMeshes.length : 0,
+    poiMeshes: typeof appCtx.poiMeshes !== 'undefined' && Array.isArray(appCtx.poiMeshes) ? appCtx.poiMeshes.length : 0,
+    landuseMeshes: typeof appCtx.landuseMeshes !== 'undefined' && Array.isArray(appCtx.landuseMeshes) ? appCtx.landuseMeshes.length : 0
   };
   perfStats.updatedAt = Date.now();
 }
@@ -367,10 +367,10 @@ function formatPerfNumber(n) {
 
 function capturePerfSnapshot(extra = {}) {
   const locName = (() => {
-    if (typeof ctx.selLoc === 'undefined') return 'Unknown';
-    if (ctx.selLoc === 'custom' && typeof ctx.customLoc !== 'undefined') return ctx.customLoc?.name || 'Custom';
-    if (typeof ctx.LOCS !== 'undefined' && ctx.LOCS && ctx.LOCS[ctx.selLoc]) return ctx.LOCS[ctx.selLoc].name;
-    return String(ctx.selLoc);
+    if (typeof appCtx.selLoc === 'undefined') return 'Unknown';
+    if (appCtx.selLoc === 'custom' && typeof appCtx.customLoc !== 'undefined') return appCtx.customLoc?.name || 'Custom';
+    if (typeof appCtx.LOCS !== 'undefined' && appCtx.LOCS && appCtx.LOCS[appCtx.selLoc]) return appCtx.LOCS[appCtx.selLoc].name;
+    return String(appCtx.selLoc);
   })();
 
   const spikeMetrics = getPerfSpikeMetrics(true);
@@ -403,7 +403,7 @@ function updatePerfPanel(force = false) {
   const panel = document.getElementById('perfPanel');
   if (!panel) return;
 
-  const shouldShow = !!perfOverlayEnabled && !!ctx.gameStarted;
+  const shouldShow = !!perfOverlayEnabled && !!appCtx.gameStarted;
   if (!shouldShow) {
     panel.style.display = 'none';
     return;
@@ -432,7 +432,7 @@ function updatePerfPanel(force = false) {
   if (force || panel.textContent !== lines.join('\n')) {
     panel.textContent = lines.join('\n');
   }
-  if (typeof ctx.positionTopOverlays === 'function') ctx.positionTopOverlays();
+  if (typeof appCtx.positionTopOverlays === 'function') appCtx.positionTopOverlays();
 }
 
 setPerfMode(readStorage(PERF_STORAGE_MODE_KEY), { persist: false });
@@ -447,7 +447,7 @@ exposeMutableGlobal('perfOverlayEnabled', () => perfOverlayEnabled, (value) => {
   setPerfOverlayEnabled(value, { persist: false });
 });
 
-Object.assign(ctx, {
+Object.assign(appCtx, {
   PERF_MODE_BASELINE,
   PERF_MODE_RDT,
   capturePerfSnapshot,

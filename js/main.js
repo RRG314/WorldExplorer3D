@@ -1,4 +1,4 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // main.js - Main game loop, render loop, loading helpers
 // ============================================================================
 
@@ -47,7 +47,7 @@ function _positionOverlayBetween(overlay, leftRect, rightRect) {
 }
 
 function positionTopOverlays() {
-  if (!ctx.gameStarted) return;
+  if (!appCtx.gameStarted) return;
   const modeHudRect = _isVisibleRect(document.getElementById('modeHud'));
   if (!modeHudRect) return;
 
@@ -68,27 +68,27 @@ function renderLoop(t = 0) {
   requestAnimationFrame(renderLoop);
 
   // Skip main rendering entirely during space flight (huge perf save)
-  if (ctx.isEnv(ctx.ENV.SPACE_FLIGHT) || ctx.spaceFlight && ctx.spaceFlight.active) {
-    ctx.lastTime = t;
+  if (appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT) || appCtx.spaceFlight && appCtx.spaceFlight.active) {
+    appCtx.lastTime = t;
     return;
   }
 
-  const dt = Math.min((t - ctx.lastTime) / 1000, 0.1);
-  ctx.lastTime = t;
-  if (typeof ctx.recordPerfFrame === 'function') ctx.recordPerfFrame(dt);
-  if (ctx.renderer?.info?.autoReset === false && typeof ctx.renderer.info.reset === 'function') {
-    ctx.renderer.info.reset();
+  const dt = Math.min((t - appCtx.lastTime) / 1000, 0.1);
+  appCtx.lastTime = t;
+  if (typeof appCtx.recordPerfFrame === 'function') appCtx.recordPerfFrame(dt);
+  if (appCtx.renderer?.info?.autoReset === false && typeof appCtx.renderer.info.reset === 'function') {
+    appCtx.renderer.info.reset();
   }
 
-  if (ctx.gameStarted) {
-    ctx.update(dt);
-    ctx.updateCamera();
+  if (appCtx.gameStarted) {
+    appCtx.update(dt);
+    appCtx.updateCamera();
 
     // Throttle HUD DOM writes to ~15fps (every ~66ms)
     _hudTimer += dt;
     if (_hudTimer > 0.066) {
       _hudTimer = 0;
-      ctx.updateHUD();
+      appCtx.updateHUD();
       positionTopOverlays();
     }
 
@@ -96,20 +96,20 @@ function renderLoop(t = 0) {
     _mapTimer += dt;
     if (_mapTimer > 0.1) {
       _mapTimer = 0;
-      ctx.drawMinimap();
-      if (ctx.showLargeMap) ctx.drawLargeMap();
+      appCtx.drawMinimap();
+      if (appCtx.showLargeMap) appCtx.drawLargeMap();
     }
 
     // LOD visibility updates run at low frequency to avoid per-frame overhead.
     _lodTimer += dt;
     if (_lodTimer > 0.2) {
       _lodTimer = 0;
-      if (typeof ctx.updateWorldLod === 'function') ctx.updateWorldLod(false);
+      if (typeof appCtx.updateWorldLod === 'function') appCtx.updateWorldLod(false);
     }
   }
 
   // Animate Apollo 11 beacon pulse (only on moon, throttled)
-  if (window.apollo11Beacon && ctx.isEnv(ctx.ENV.MOON) && _hudTimer === 0) {
+  if (window.apollo11Beacon && appCtx.isEnv(appCtx.ENV.MOON) && _hudTimer === 0) {
     const pulseTime = t / 1000;
     const pulse = 0.5 + 0.5 * Math.sin(pulseTime * 2);
 
@@ -125,29 +125,29 @@ function renderLoop(t = 0) {
   }
 
   // Debug overlay update (throttled to HUD rate)
-  if (window._debugMode && ctx.gameStarted && _hudTimer === 0) {
+  if (window._debugMode && appCtx.gameStarted && _hudTimer === 0) {
     const overlay = document.getElementById('debugOverlay');
     if (overlay) {
       let modeLabel = 'drive';
-      let refX = Number.isFinite(ctx.car?.x) ? ctx.car.x : 0;
-      let refZ = Number.isFinite(ctx.car?.z) ? ctx.car.z : 0;
-      let refY = Number.isFinite(ctx.car?.y) ? ctx.car.y : null;
-      let onRoadValue = !!ctx.car?.onRoad;
-      let roadName = ctx.car?.road?.name || '-';
+      let refX = Number.isFinite(appCtx.car?.x) ? appCtx.car.x : 0;
+      let refZ = Number.isFinite(appCtx.car?.z) ? appCtx.car.z : 0;
+      let refY = Number.isFinite(appCtx.car?.y) ? appCtx.car.y : null;
+      let onRoadValue = !!appCtx.car?.onRoad;
+      let roadName = appCtx.car?.road?.name || '-';
 
-      if (ctx.droneMode) {
+      if (appCtx.droneMode) {
         modeLabel = 'drone';
-        refX = Number.isFinite(ctx.drone?.x) ? ctx.drone.x : refX;
-        refZ = Number.isFinite(ctx.drone?.z) ? ctx.drone.z : refZ;
-        refY = Number.isFinite(ctx.drone?.y) ? ctx.drone.y : refY;
-      } else if (ctx.Walk && ctx.Walk.state && ctx.Walk.state.mode === 'walk' && ctx.Walk.state.walker) {
+        refX = Number.isFinite(appCtx.drone?.x) ? appCtx.drone.x : refX;
+        refZ = Number.isFinite(appCtx.drone?.z) ? appCtx.drone.z : refZ;
+        refY = Number.isFinite(appCtx.drone?.y) ? appCtx.drone.y : refY;
+      } else if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker) {
         modeLabel = 'walk';
-        refX = Number.isFinite(ctx.Walk.state.walker.x) ? ctx.Walk.state.walker.x : refX;
-        refZ = Number.isFinite(ctx.Walk.state.walker.z) ? ctx.Walk.state.walker.z : refZ;
-        refY = Number.isFinite(ctx.Walk.state.walker.y) ? ctx.Walk.state.walker.y : refY;
+        refX = Number.isFinite(appCtx.Walk.state.walker.x) ? appCtx.Walk.state.walker.x : refX;
+        refZ = Number.isFinite(appCtx.Walk.state.walker.z) ? appCtx.Walk.state.walker.z : refZ;
+        refY = Number.isFinite(appCtx.Walk.state.walker.y) ? appCtx.Walk.state.walker.y : refY;
       }
 
-      const nr = ctx.findNearestRoad(refX, refZ);
+      const nr = appCtx.findNearestRoad(refX, refZ);
       const roadDist = Number.isFinite(nr?.dist) ? nr.dist : null;
       if (modeLabel !== 'drive') {
         roadName = nr?.road?.name || roadName;
@@ -156,14 +156,14 @@ function renderLoop(t = 0) {
       }
 
       const onRd = onRoadValue ? 'YES' : 'no';
-      const tY = ctx.elevationWorldYAtWorldXZ(refX, refZ).toFixed(2);
+      const tY = appCtx.elevationWorldYAtWorldXZ(refX, refZ).toFixed(2);
       const refYVal = Number.isFinite(refY) ? refY.toFixed(2) : '?';
       const rdist = Number.isFinite(roadDist) ? roadDist.toFixed(1) : '?';
       const speed = modeLabel === 'drone' ?
-      Math.round(Math.abs((ctx.drone?.speed || 0) * 1.8)) :
+      Math.round(Math.abs((appCtx.drone?.speed || 0) * 1.8)) :
       modeLabel === 'walk' ?
-      Math.round(Math.abs(ctx.Walk?.state?.walker?.speedMph || 0)) :
-      Math.round(Math.abs((ctx.car?.speed || 0) * 0.5));
+      Math.round(Math.abs(appCtx.Walk?.state?.walker?.speedMph || 0)) :
+      Math.round(Math.abs((appCtx.car?.speed || 0) * 0.5));
       overlay.textContent =
       `Mode: ${modeLabel.toUpperCase()}  Speed: ${speed} mph\n` +
       `Ref Y: ${refYVal}  Terrain Y: ${tY}\n` +
@@ -172,44 +172,44 @@ function renderLoop(t = 0) {
     }
     // Update debug marker position
     if (window._debugMarker) {
-      let markerX = Number.isFinite(ctx.car?.x) ? ctx.car.x : 0;
-      let markerZ = Number.isFinite(ctx.car?.z) ? ctx.car.z : 0;
-      let markerOnRoad = !!ctx.car?.onRoad;
+      let markerX = Number.isFinite(appCtx.car?.x) ? appCtx.car.x : 0;
+      let markerZ = Number.isFinite(appCtx.car?.z) ? appCtx.car.z : 0;
+      let markerOnRoad = !!appCtx.car?.onRoad;
 
-      if (ctx.droneMode) {
-        markerX = Number.isFinite(ctx.drone?.x) ? ctx.drone.x : markerX;
-        markerZ = Number.isFinite(ctx.drone?.z) ? ctx.drone.z : markerZ;
-        const nr = ctx.findNearestRoad(markerX, markerZ);
+      if (appCtx.droneMode) {
+        markerX = Number.isFinite(appCtx.drone?.x) ? appCtx.drone.x : markerX;
+        markerZ = Number.isFinite(appCtx.drone?.z) ? appCtx.drone.z : markerZ;
+        const nr = appCtx.findNearestRoad(markerX, markerZ);
         const halfWidth = nr?.road?.width ? nr.road.width * 0.5 : 5;
         markerOnRoad = Number.isFinite(nr?.dist) ? nr.dist <= halfWidth + 3 : false;
-      } else if (ctx.Walk && ctx.Walk.state && ctx.Walk.state.mode === 'walk' && ctx.Walk.state.walker) {
-        markerX = Number.isFinite(ctx.Walk.state.walker.x) ? ctx.Walk.state.walker.x : markerX;
-        markerZ = Number.isFinite(ctx.Walk.state.walker.z) ? ctx.Walk.state.walker.z : markerZ;
-        const nr = ctx.findNearestRoad(markerX, markerZ);
+      } else if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker) {
+        markerX = Number.isFinite(appCtx.Walk.state.walker.x) ? appCtx.Walk.state.walker.x : markerX;
+        markerZ = Number.isFinite(appCtx.Walk.state.walker.z) ? appCtx.Walk.state.walker.z : markerZ;
+        const nr = appCtx.findNearestRoad(markerX, markerZ);
         const halfWidth = nr?.road?.width ? nr.road.width * 0.5 : 5;
         markerOnRoad = Number.isFinite(nr?.dist) ? nr.dist <= halfWidth + 3 : false;
       }
 
-      const debugY = ctx.elevationWorldYAtWorldXZ(markerX, markerZ);
+      const debugY = appCtx.elevationWorldYAtWorldXZ(markerX, markerZ);
       window._debugMarker.position.set(markerX, debugY, markerZ);
       window._debugMarker.material.color.setHex(markerOnRoad ? 0x00ff00 : 0xffff00);
     }
   }
 
-  if (ctx.composer) {
-    ctx.composer.render();
+  if (appCtx.composer) {
+    appCtx.composer.render();
   } else {
-    ctx.renderer.render(ctx.scene, ctx.camera);
+    appCtx.renderer.render(appCtx.scene, appCtx.camera);
   }
 
-  if (typeof ctx.recordPerfRendererInfo === 'function') {
-    ctx.recordPerfRendererInfo(ctx.renderer);
+  if (typeof appCtx.recordPerfRendererInfo === 'function') {
+    appCtx.recordPerfRendererInfo(appCtx.renderer);
   }
 
   _perfPanelTimer += dt;
   if (_perfPanelTimer > 0.2) {
     _perfPanelTimer = 0;
-    if (typeof ctx.updatePerfPanel === 'function') ctx.updatePerfPanel(false);
+    if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(false);
     positionTopOverlays();
   }
 }
@@ -220,7 +220,7 @@ function showLoad(txt, options = {}) {
   if (!loading || !loadText) return;
 
   const spinner = loading.querySelector('.spinner');
-  const selectedMode = options.mode || ctx.loadingScreenMode || 'earth';
+  const selectedMode = options.mode || appCtx.loadingScreenMode || 'earth';
   const themedBg = LOADING_BG_BY_MODE[selectedMode] || DEFAULT_LOADING_BG;
   const background = options.background || themedBg;
   const overlay = Number.isFinite(options.overlay) ? options.overlay : 0.32;
@@ -270,6 +270,6 @@ window.addEventListener('resize', () => {
   requestAnimationFrame(() => positionTopOverlays());
 }, { passive: true });
 
-Object.assign(ctx, { hideLoad, positionTopOverlays, renderLoop, showLoad, showTransitionLoad });
+Object.assign(appCtx, { hideLoad, positionTopOverlays, renderLoop, showLoad, showTransitionLoad });
 
 export { hideLoad, positionTopOverlays, renderLoop, showLoad, showTransitionLoad };

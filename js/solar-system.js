@@ -1,4 +1,4 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // solar-system.js - Solar System Planet Rendering for Space Flight Mode
 // Heliocentric orbital model based on JPL "Approximate Positions of the Planets"
 // ============================================================================
@@ -774,8 +774,8 @@ function initSolarSystem(spaceScene) {
   createToggleButton();
 
   // Add click listener for the space flight canvas
-  if (ctx.spaceFlight.canvas) {
-    ctx.spaceFlight.canvas.addEventListener('click', onSolarSystemClick);
+  if (appCtx.spaceFlight.canvas) {
+    appCtx.spaceFlight.canvas.addEventListener('click', onSolarSystemClick);
   }
 
   solarSystem.initialized = true;
@@ -1368,8 +1368,8 @@ function updateSpacecraftPositions() {
 
   // Get Earth's scene position (Earth is a direct scene child, not in the group)
   let earthPos = null;
-  if (ctx.spaceFlight && ctx.spaceFlight.earth) {
-    earthPos = ctx.spaceFlight.earth.position;
+  if (appCtx.spaceFlight && appCtx.spaceFlight.earth) {
+    earthPos = appCtx.spaceFlight.earth.position;
   }
 
   // Get Sun's position for L2 calculation (anti-Sun direction from Earth)
@@ -1697,23 +1697,23 @@ function getAllSpaceBodies() {
   });
 
   // Earth (direct scene child, not in group)
-  if (ctx.spaceFlight && ctx.spaceFlight.earth) {
+  if (appCtx.spaceFlight && appCtx.spaceFlight.earth) {
     bodies.push({
       name: 'Earth',
-      position: ctx.spaceFlight.earth.position.clone(),
+      position: appCtx.spaceFlight.earth.position.clone(),
       radius: 50,
-      mesh: ctx.spaceFlight.earth,
+      mesh: appCtx.spaceFlight.earth,
       landable: true
     });
   }
 
   // Moon (direct scene child, not in group)
-  if (ctx.spaceFlight && ctx.spaceFlight.moon) {
+  if (appCtx.spaceFlight && appCtx.spaceFlight.moon) {
     bodies.push({
       name: 'Moon',
-      position: ctx.spaceFlight.moon.position.clone(),
+      position: appCtx.spaceFlight.moon.position.clone(),
       radius: 13.5,
-      mesh: ctx.spaceFlight.moon,
+      mesh: appCtx.spaceFlight.moon,
       landable: true
     });
   }
@@ -1734,12 +1734,12 @@ function setSolarSystemCenter(position) {
 // CLICK HANDLING / RAYCASTING
 // ---------------------------------------------------------------------------
 function onSolarSystemClick(event) {
-  if (!ctx.spaceFlight.active || !solarSystem.visible || !solarSystem.group) return;
+  if (!appCtx.spaceFlight.active || !solarSystem.visible || !solarSystem.group) return;
 
   solarSystem.mouse.x = event.clientX / window.innerWidth * 2 - 1;
   solarSystem.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
 
-  solarSystem.raycaster.setFromCamera(solarSystem.mouse, ctx.spaceFlight.camera);
+  solarSystem.raycaster.setFromCamera(solarSystem.mouse, appCtx.spaceFlight.camera);
 
   // Collect all clickable objects (meshes + hitboxes)
   const clickables = [];
@@ -1963,8 +1963,8 @@ function showSpacecraftInfo(entry) {
   let sceneDistText = '---';
 
   // Compute visual scene distance from rocket
-  if (ctx.spaceFlight.rocket) {
-    const dist = Math.floor(ctx.spaceFlight.rocket.position.distanceTo(entry.mesh.position));
+  if (appCtx.spaceFlight.rocket) {
+    const dist = Math.floor(appCtx.spaceFlight.rocket.position.distanceTo(entry.mesh.position));
     sceneDistText = dist + ' (scene distance)';
   }
   setInfoMetricBlock(
@@ -2009,8 +2009,8 @@ function showGalaxyInfo(entry) {
   document.getElementById('ssInfoDesc').textContent = galaxy.description;
 
   let sceneDistText = '---';
-  if (ctx.spaceFlight.rocket) {
-    const dist = Math.floor(ctx.spaceFlight.rocket.position.distanceTo(entry.mesh.position));
+  if (appCtx.spaceFlight.rocket) {
+    const dist = Math.floor(appCtx.spaceFlight.rocket.position.distanceTo(entry.mesh.position));
     sceneDistText = dist + ' (scene distance)';
   }
 
@@ -2045,46 +2045,46 @@ function triggerSpaceLanding(text) {
 
 function handleSpaceReturnAction() {
   // If already on the moon, use the existing direct return flow.
-  if (typeof ctx.onMoon !== 'undefined' && ctx.onMoon) {
-    if (typeof ctx.returnToEarth === 'function') ctx.returnToEarth();
+  if (typeof appCtx.onMoon !== 'undefined' && appCtx.onMoon) {
+    if (typeof appCtx.returnToEarth === 'function') appCtx.returnToEarth();
     return;
   }
 
   // In space flight, run direct transfer/landing back to Earth.
-  if (ctx.spaceFlight && ctx.spaceFlight.active) {
-    if (typeof ctx.forceSpaceFlightLanding === 'function') {
-      const forced = ctx.forceSpaceFlightLanding('Earth');
+  if (appCtx.spaceFlight && appCtx.spaceFlight.active) {
+    if (typeof appCtx.forceSpaceFlightLanding === 'function') {
+      const forced = appCtx.forceSpaceFlightLanding('Earth');
       if (forced) return;
     }
-    if (typeof ctx.setSpaceFlightLandingTarget === 'function') {
-      const handled = ctx.setSpaceFlightLandingTarget('Earth', { force: true, autoLand: true });
+    if (typeof appCtx.setSpaceFlightLandingTarget === 'function') {
+      const handled = appCtx.setSpaceFlightLandingTarget('Earth', { force: true, autoLand: true });
       if (handled) return;
     }
-    ctx.spaceFlight.destination = 'earth';
+    appCtx.spaceFlight.destination = 'earth';
     triggerSpaceLanding('LAND ON EARTH');
     return;
   }
 
-  if (typeof ctx.returnToEarth === 'function') ctx.returnToEarth();
+  if (typeof appCtx.returnToEarth === 'function') appCtx.returnToEarth();
 }
 
 function handleMoonLandingAction() {
-  if (ctx.spaceFlight && ctx.spaceFlight.active) {
-    if (typeof ctx.forceSpaceFlightLanding === 'function') {
-      const forced = ctx.forceSpaceFlightLanding('Moon');
+  if (appCtx.spaceFlight && appCtx.spaceFlight.active) {
+    if (typeof appCtx.forceSpaceFlightLanding === 'function') {
+      const forced = appCtx.forceSpaceFlightLanding('Moon');
       if (forced) return;
     }
-    if (typeof ctx.setSpaceFlightLandingTarget === 'function') {
-      const handled = ctx.setSpaceFlightLandingTarget('Moon', { force: true, autoLand: true });
+    if (typeof appCtx.setSpaceFlightLandingTarget === 'function') {
+      const handled = appCtx.setSpaceFlightLandingTarget('Moon', { force: true, autoLand: true });
       if (handled) return;
     }
-    ctx.spaceFlight.destination = 'moon';
+    appCtx.spaceFlight.destination = 'moon';
     triggerSpaceLanding('LAND ON MOON');
     return;
   }
 
-  if (typeof ctx.directTravelToMoon === 'function' && !(typeof ctx.travelingToMoon !== 'undefined' && ctx.travelingToMoon)) {
-    ctx.directTravelToMoon();
+  if (typeof appCtx.directTravelToMoon === 'function' && !(typeof appCtx.travelingToMoon !== 'undefined' && appCtx.travelingToMoon)) {
+    appCtx.directTravelToMoon();
   }
 }
 
@@ -2244,9 +2244,9 @@ function updateSolarSystem() {
 // PROXIMITY HUD - shows planet name/distance when rocket flies near
 // ---------------------------------------------------------------------------
 function updateProximityHUD() {
-  if (!ctx.spaceFlight.rocket) return;
+  if (!appCtx.spaceFlight.rocket) return;
 
-  const rocketWorldPos = ctx.spaceFlight.rocket.position;
+  const rocketWorldPos = appCtx.spaceFlight.rocket.position;
   let closestDist = Infinity;
   let closestName = '';
 
@@ -2330,15 +2330,15 @@ function updateProximityHUD() {
   }
 
   // Also check Earth and Moon (they're not in the group)
-  if (ctx.spaceFlight.earth) {
-    const dist = rocketWorldPos.distanceTo(ctx.spaceFlight.earth.position);
+  if (appCtx.spaceFlight.earth) {
+    const dist = rocketWorldPos.distanceTo(appCtx.spaceFlight.earth.position);
     if (dist < closestDist) {
       closestDist = dist;
       closestName = 'Earth';
     }
   }
-  if (ctx.spaceFlight.moon) {
-    const dist = rocketWorldPos.distanceTo(ctx.spaceFlight.moon.position);
+  if (appCtx.spaceFlight.moon) {
+    const dist = rocketWorldPos.distanceTo(appCtx.spaceFlight.moon.position);
     if (dist < closestDist) {
       closestDist = dist;
       closestName = 'Moon';
@@ -2391,7 +2391,7 @@ function updateProximityHUD() {
   }
 }
 
-Object.assign(ctx, {
+Object.assign(appCtx, {
   getAllSpaceBodies,
   getEarthHelioScenePosition,
   getMoonScenePosition,

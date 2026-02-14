@@ -1,4 +1,4 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // map.js - Minimap and large map rendering
 // ============================================================================
 
@@ -15,7 +15,7 @@ function latLonToTile(lat, lon, zoom) {
 }
 
 function loadTile(x, y, zoom) {
-  const key = `${ctx.satelliteView ? 'sat' : 'osm'}-${zoom}/${x}/${y}`;
+  const key = `${appCtx.satelliteView ? 'sat' : 'osm'}-${zoom}/${x}/${y}`;
   if (tileCache.has(key)) {
     return tileCache.get(key);
   }
@@ -23,7 +23,7 @@ function loadTile(x, y, zoom) {
   const img = new Image();
   img.crossOrigin = 'anonymous';
 
-  if (ctx.satelliteView) {
+  if (appCtx.satelliteView) {
     // OPTION 1: Esri World Imagery (Free, open to use, high quality)
     // This is from ArcGIS Online and is widely used in open-source projects
     img.src = `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${zoom}/${y}/${x}`;
@@ -56,15 +56,15 @@ function drawLargeMap() {
 
 function worldToScreenLarge(worldX, worldZ) {
   // Convert world coords to lat/lon
-  const lat = ctx.LOC.lat - worldZ / ctx.SCALE;
-  const lon = ctx.LOC.lon + worldX / (ctx.SCALE * Math.cos(ctx.LOC.lat * Math.PI / 180));
+  const lat = appCtx.LOC.lat - worldZ / appCtx.SCALE;
+  const lon = appCtx.LOC.lon + worldX / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
 
   // Use Walk module for proper reference position
-  const ref = ctx.Walk ? ctx.Walk.getMapRefPosition(ctx.droneMode, ctx.drone) : { x: ctx.car.x, z: ctx.car.z };
-  const refLat = ctx.LOC.lat - ref.z / ctx.SCALE;
-  const refLon = ctx.LOC.lon + ref.x / (ctx.SCALE * Math.cos(ctx.LOC.lat * Math.PI / 180));
+  const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
+  const refLat = appCtx.LOC.lat - ref.z / appCtx.SCALE;
+  const refLon = appCtx.LOC.lon + ref.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
 
-  const zoom = ctx.largeMapZoom;
+  const zoom = appCtx.largeMapZoom;
   const n = Math.pow(2, zoom);
   const xtile_float = (refLon + 180) / 360 * n;
   const ytile_float = (1 - Math.log(Math.tan(refLat * Math.PI / 180) + 1 / Math.cos(refLat * Math.PI / 180)) / Math.PI) / 2 * n;
@@ -85,20 +85,20 @@ function worldToScreenLarge(worldX, worldZ) {
 
 function drawMapOnCanvas(ctx, w, h, isLarge) {
   // MOON MAP - Show actual terrain surface with craters (dotted version)
-  if (ctx.onMoon && ctx.moonSurface) {
+  if (appCtx.onMoon && appCtx.moonSurface) {
     // Clear with black space background
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, w, h);
 
     // Get current position for map centering
-    const centerX = ctx.Walk && ctx.Walk.state.mode === 'walk' ? ctx.Walk.state.walker.x : ctx.car.x;
-    const centerZ = ctx.Walk && ctx.Walk.state.mode === 'walk' ? ctx.Walk.state.walker.z : ctx.car.z;
+    const centerX = appCtx.Walk && appCtx.Walk.state.mode === 'walk' ? appCtx.Walk.state.walker.x : appCtx.car.x;
+    const centerZ = appCtx.Walk && appCtx.Walk.state.mode === 'walk' ? appCtx.Walk.state.walker.z : appCtx.car.z;
 
     // Map scale: show area around player
     const mapRange = isLarge ? 2000 : 500; // meters to show
 
     // Sample moon surface geometry for minimap
-    const geometry = ctx.moonSurface.geometry;
+    const geometry = appCtx.moonSurface.geometry;
     const positions = geometry.attributes.position;
     const colors = geometry.attributes.color;
 
@@ -173,7 +173,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     ctx.restore();
 
     // Draw player position
-    if (ctx.Walk && ctx.Walk.state.mode === 'walk') {
+    if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
       // Walking - draw as person icon
       ctx.fillStyle = '#00ff00';
       ctx.strokeStyle = '#000000';
@@ -190,14 +190,14 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
       // Calculate heading from velocity direction (actual travel direction)
       // On minimap: X is horizontal, Z maps to vertical
       // Triangle tip at (0,-8) points "up" so we need angle from -Y axis
-      const speed = Math.sqrt(ctx.car.vx * ctx.car.vx + ctx.car.vz * ctx.car.vz);
+      const speed = Math.sqrt(appCtx.car.vx * appCtx.car.vx + appCtx.car.vz * appCtx.car.vz);
       let directionAngle;
       if (speed > 0.1) {
         // Use velocity direction when moving
-        directionAngle = Math.atan2(ctx.car.vx, -ctx.car.vz);
+        directionAngle = Math.atan2(appCtx.car.vx, -appCtx.car.vz);
       } else {
         // Use car angle when stationary (keeps last direction)
-        directionAngle = ctx.car.angle;
+        directionAngle = appCtx.car.angle;
       }
       ctx.rotate(directionAngle);
 
@@ -290,14 +290,14 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   }
 
   // Use Walk module for proper reference position
-  const ref = ctx.Walk ? ctx.Walk.getMapRefPosition(ctx.droneMode, ctx.drone) : { x: ctx.car.x, z: ctx.car.z };
+  const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
 
   // Convert world coords back to lat/lon
-  const refLat = ctx.LOC.lat - ref.z / ctx.SCALE;
-  const refLon = ctx.LOC.lon + ref.x / (ctx.SCALE * Math.cos(ctx.LOC.lat * Math.PI / 180));
+  const refLat = appCtx.LOC.lat - ref.z / appCtx.SCALE;
+  const refLon = appCtx.LOC.lon + ref.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
 
   // Zoom level based on map size
-  const zoom = isLarge ? ctx.largeMapZoom : 17;
+  const zoom = isLarge ? appCtx.largeMapZoom : 17;
 
   // Get tile coordinates and pixel position within tile
   const n = Math.pow(2, zoom);
@@ -347,8 +347,8 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
 
   // Helper function to convert world coords to screen position
   const worldToScreen = (worldX, worldZ) => {
-    const lat = ctx.LOC.lat - worldZ / ctx.SCALE;
-    const lon = ctx.LOC.lon + worldX / (ctx.SCALE * Math.cos(ctx.LOC.lat * Math.PI / 180));
+    const lat = appCtx.LOC.lat - worldZ / appCtx.SCALE;
+    const lon = appCtx.LOC.lon + worldX / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
 
     const n = Math.pow(2, zoom);
     const xt = (lon + 180) / 360 * n;
@@ -370,10 +370,10 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
 
   // Draw explicit OSM-derived water overlays (harbors/lakes/rivers/canals)
   // so water stays readable even where custom vector layers dominate the view.
-  if (ctx.waterAreas.length > 0 || ctx.waterways.length > 0) {
+  if (appCtx.waterAreas.length > 0 || appCtx.waterways.length > 0) {
     const viewPad = isLarge ? 100 : 45;
 
-    if (ctx.waterAreas.length > 0) {
+    if (appCtx.waterAreas.length > 0) {
       ctx.save();
       ctx.fillStyle = isLarge ? 'rgba(66, 142, 224, 0.30)' : 'rgba(66, 142, 224, 0.24)';
       ctx.strokeStyle = isLarge ? 'rgba(160, 220, 255, 0.55)' : 'rgba(160, 220, 255, 0.45)';
@@ -381,7 +381,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
       ctx.lineJoin = 'round';
       ctx.lineCap = 'round';
 
-      ctx.waterAreas.forEach((area) => {
+      appCtx.waterAreas.forEach((area) => {
         if (!area?.pts || area.pts.length < 3) return;
 
         let inView = false;
@@ -402,13 +402,13 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
       ctx.restore();
     }
 
-    if (ctx.waterways.length > 0) {
+    if (appCtx.waterways.length > 0) {
       ctx.save();
       ctx.strokeStyle = isLarge ? 'rgba(70, 160, 240, 0.90)' : 'rgba(70, 160, 240, 0.82)';
       ctx.lineCap = 'round';
       ctx.lineJoin = 'round';
 
-      ctx.waterways.forEach((way) => {
+      appCtx.waterways.forEach((way) => {
         if (!way?.pts || way.pts.length < 2) return;
 
         let inView = false;
@@ -434,8 +434,8 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   }
 
   // Draw road overlay (if enabled)
-  if (ctx.showRoads && ctx.roads.length > 0) {
-    ctx.roads.forEach((road) => {
+  if (appCtx.showRoads && appCtx.roads.length > 0) {
+    appCtx.roads.forEach((road) => {
       if (!road.pts || road.pts.length < 2) return;
 
       // Determine road color and width based on type
@@ -496,8 +496,8 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   }
 
   // Draw game elements using proper coordinate conversion
-  if (ctx.mapLayers.checkpoints && ctx.gameMode === 'checkpoint') {
-    ctx.checkpoints.forEach((cp) => {
+  if (appCtx.mapLayers.checkpoints && appCtx.gameMode === 'checkpoint') {
+    appCtx.checkpoints.forEach((cp) => {
       if (cp.collected) return;
       const pos = worldToScreen(cp.x, cp.z);
       if (Math.abs(pos.x - mx) < w / 2 && Math.abs(pos.y - my) < h / 2) {
@@ -509,16 +509,16 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     });
   }
 
-  if (ctx.mapLayers.destination && ctx.gameMode === 'trial' && ctx.destination) {
-    const pos = worldToScreen(ctx.destination.x, ctx.destination.z);
-    ctx.fillStyle = ctx.trialDone ? '#0f8' : '#fc0';
+  if (appCtx.mapLayers.destination && appCtx.gameMode === 'trial' && appCtx.destination) {
+    const pos = worldToScreen(appCtx.destination.x, appCtx.destination.z);
+    ctx.fillStyle = appCtx.trialDone ? '#0f8' : '#fc0';
     ctx.beginPath();
     ctx.arc(pos.x, pos.y, isLarge ? 10 : 5, 0, Math.PI * 2);
     ctx.fill();
   }
 
-  if (ctx.mapLayers.police && ctx.policeOn) {
-    ctx.police.forEach((cop) => {
+  if (appCtx.mapLayers.police && appCtx.policeOn) {
+    appCtx.police.forEach((cop) => {
       const pos = worldToScreen(cop.x, cop.z);
       if (Math.abs(pos.x - mx) < w / 2 && Math.abs(pos.y - my) < h / 2) {
         ctx.fillStyle = cop.chasing ? '#f00' : '#06f';
@@ -530,10 +530,10 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   }
 
   // Draw POIs on minimap and large map based on legend layer filters
-  if (ctx.pois.length > 0) {
-    ctx.pois.forEach((poi) => {
+  if (appCtx.pois.length > 0) {
+    appCtx.pois.forEach((poi) => {
       // Check if this POI category is visible
-      if (!ctx.isPOIVisible(poi.type)) return;
+      if (!appCtx.isPOIVisible(poi.type)) return;
 
       const pos = worldToScreen(poi.x, poi.z);
       const dist = Math.sqrt(Math.pow(pos.x - mx, 2) + Math.pow(pos.y - my, 2));
@@ -562,11 +562,11 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   }
 
   // Draw memory pins/flowers on both minimap and large map
-  if (typeof ctx.getMemoryEntriesForCurrentLocation === 'function') {
-    const showPins = ctx.mapLayers.memoryPins !== false;
-    const showFlowers = ctx.mapLayers.memoryFlowers !== false;
+  if (typeof appCtx.getMemoryEntriesForCurrentLocation === 'function') {
+    const showPins = appCtx.mapLayers.memoryPins !== false;
+    const showFlowers = appCtx.mapLayers.memoryFlowers !== false;
     if (showPins || showFlowers) {
-      const memoryEntries = ctx.getMemoryEntriesForCurrentLocation();
+      const memoryEntries = appCtx.getMemoryEntriesForCurrentLocation();
       if (Array.isArray(memoryEntries) && memoryEntries.length > 0) {
         memoryEntries.forEach((entry) => {
           if (!entry || !Number.isFinite(entry.lat) || !Number.isFinite(entry.lon)) return;
@@ -613,8 +613,8 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   }
 
   // Draw properties on minimap
-  if (ctx.mapLayers.properties && ctx.realEstateMode && ctx.properties.length > 0) {
-    ctx.properties.forEach((prop) => {
+  if (appCtx.mapLayers.properties && appCtx.realEstateMode && appCtx.properties.length > 0) {
+    appCtx.properties.forEach((prop) => {
       const pos = worldToScreen(prop.x, prop.z);
 
       // Only show properties within visible range
@@ -648,11 +648,11 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   }
 
   // Draw navigation route if active
-  if (ctx.mapLayers.navigation && ctx.showNavigation) {
-    const destination = ctx.selectedProperty || ctx.selectedHistoric;
+  if (appCtx.mapLayers.navigation && appCtx.showNavigation) {
+    const destination = appCtx.selectedProperty || appCtx.selectedHistoric;
     if (destination) {
       // Use Walk module to get proper player position
-      const ref = ctx.Walk ? ctx.Walk.getMapRefPosition(ctx.droneMode, ctx.drone) : { x: ctx.car.x, z: ctx.car.z };
+      const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
       const playerPos = worldToScreen(ref.x, ref.z);
       const destPos = worldToScreen(destination.x, destination.z);
 
@@ -676,8 +676,8 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
 
       // Draw distance label on large map
       if (isLarge) {
-        const dx = destination.x - ctx.car.x;
-        const dz = destination.z - ctx.car.z;
+        const dx = destination.x - appCtx.car.x;
+        const dz = destination.z - appCtx.car.z;
         const dist = Math.sqrt(dx * dx + dz * dz);
         ctx.font = 'bold 12px Arial';
         ctx.textAlign = 'center';
@@ -691,11 +691,11 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     }
   }
 
-  if (ctx.mapLayers.customTrack && ctx.customTrack.length >= 2) {
-    ctx.strokeStyle = ctx.isRecording ? '#f64' : '#fa0';
+  if (appCtx.mapLayers.customTrack && appCtx.customTrack.length >= 2) {
+    ctx.strokeStyle = appCtx.isRecording ? '#f64' : '#fa0';
     ctx.lineWidth = isLarge ? 5 : 3;
     ctx.beginPath();
-    ctx.customTrack.forEach((p, i) => {
+    appCtx.customTrack.forEach((p, i) => {
       const pos = worldToScreen(p.x, p.z);
       if (i === 0) ctx.moveTo(pos.x, pos.y);else
       ctx.lineTo(pos.x, pos.y);
@@ -706,13 +706,13 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   // Draw vehicle icons
   const iconSize = isLarge ? 16 : 8;
 
-  if (ctx.droneMode && isLarge) {
+  if (appCtx.droneMode && isLarge) {
     // Show car position on large map when in drone mode
-    const carPos = worldToScreen(ctx.car.x, ctx.car.z);
+    const carPos = worldToScreen(appCtx.car.x, appCtx.car.z);
     if (Math.abs(carPos.x - mx) < w / 2 && Math.abs(carPos.y - my) < h / 2) {
       ctx.save();
       ctx.translate(carPos.x, carPos.y);
-      ctx.rotate(ctx.car.angle);
+      ctx.rotate(appCtx.car.angle);
       ctx.fillStyle = '#f36';
       ctx.strokeStyle = '#fff';
       ctx.lineWidth = 2;
@@ -728,10 +728,10 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   }
 
   // Draw drone or car or walker icon at center (always at mx, my)
-  if (ctx.droneMode) {
+  if (appCtx.droneMode) {
     ctx.save();
     ctx.translate(mx, my);
-    ctx.rotate(-ctx.drone.yaw);
+    ctx.rotate(-appCtx.drone.yaw);
     ctx.fillStyle = '#0cf';
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = isLarge ? 3 : 2;
@@ -746,11 +746,11 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     ctx.lineTo(-iconSize / 2, iconSize / 2);
     ctx.stroke();
     ctx.restore();
-  } else if (ctx.Walk && ctx.Walk.state.mode === 'walk') {
+  } else if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
     // Walking mode - show person icon
     ctx.save();
     ctx.translate(mx, my);
-    ctx.rotate(-ctx.Walk.state.walker.angle);
+    ctx.rotate(-appCtx.Walk.state.walker.angle);
     ctx.fillStyle = '#4488ff';
     ctx.strokeStyle = '#fff';
     ctx.lineWidth = isLarge ? 3 : 2;
@@ -777,14 +777,14 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     // Calculate heading from velocity direction (actual travel direction)
     // On minimap: X is horizontal, Z maps to vertical
     // Triangle tip at (0,-iconSize) points "up" so we need angle from -Y axis
-    const speed = Math.sqrt(ctx.car.vx * ctx.car.vx + ctx.car.vz * ctx.car.vz);
+    const speed = Math.sqrt(appCtx.car.vx * appCtx.car.vx + appCtx.car.vz * appCtx.car.vz);
     let directionAngle;
     if (speed > 0.1) {
       // Use velocity direction when moving
-      directionAngle = Math.atan2(ctx.car.vx, -ctx.car.vz);
+      directionAngle = Math.atan2(appCtx.car.vx, -appCtx.car.vz);
     } else {
       // Use car angle when stationary (keeps last direction)
-      directionAngle = ctx.car.angle;
+      directionAngle = appCtx.car.angle;
     }
     ctx.rotate(directionAngle);
 
@@ -846,7 +846,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
 }
 
 
-Object.assign(ctx, {
+Object.assign(appCtx, {
   drawLargeMap,
   drawMapOnCanvas,
   drawMinimap,

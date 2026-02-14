@@ -1,28 +1,28 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
 
 function setupUI() {
   // Initialize Property UI References
-  ctx.PropertyUI.panel = document.getElementById('propertyPanel');
-  ctx.PropertyUI.list = document.getElementById('propertyList');
-  ctx.PropertyUI.modal = document.getElementById('propertyModal');
-  ctx.PropertyUI.modalTitle = document.getElementById('modalTitle');
-  ctx.PropertyUI.modalBody = document.getElementById('modalBody');
-  ctx.PropertyUI.button = document.getElementById('realEstateBtn');
+  appCtx.PropertyUI.panel = document.getElementById('propertyPanel');
+  appCtx.PropertyUI.list = document.getElementById('propertyList');
+  appCtx.PropertyUI.modal = document.getElementById('propertyModal');
+  appCtx.PropertyUI.modalTitle = document.getElementById('modalTitle');
+  appCtx.PropertyUI.modalBody = document.getElementById('modalBody');
+  appCtx.PropertyUI.button = document.getElementById('realEstateBtn');
 
   // Real Estate Button
-  if (ctx.PropertyUI.button) {
-    ctx.PropertyUI.button.addEventListener('click', ctx.toggleRealEstate);
+  if (appCtx.PropertyUI.button) {
+    appCtx.PropertyUI.button.addEventListener('click', appCtx.toggleRealEstate);
   }
 
   // Historic Sites Button
   const historicBtn = document.getElementById('historicBtn');
   if (historicBtn) {
-    historicBtn.addEventListener('click', ctx.toggleHistoric);
+    historicBtn.addEventListener('click', appCtx.toggleHistoric);
   }
-  if (typeof ctx.setupMemoryUI === 'function') {
-    ctx.setupMemoryUI();
+  if (typeof appCtx.setupMemoryUI === 'function') {
+    appCtx.setupMemoryUI();
   }
 
   // Property Controls
@@ -34,22 +34,22 @@ function setupUI() {
 
   if (radiusSlider && radiusValue) {
     radiusSlider.addEventListener('input', (e) => {
-      ctx.propertyRadius = parseFloat(e.target.value);
-      radiusValue.textContent = ctx.propertyRadius.toFixed(1) + ' km';
-      if (ctx.realEstateMode) ctx.updatePropertyPanel();
+      appCtx.propertyRadius = parseFloat(e.target.value);
+      radiusValue.textContent = appCtx.propertyRadius.toFixed(1) + ' km';
+      if (appCtx.realEstateMode) appCtx.updatePropertyPanel();
     });
   }
 
   if (sortSelect) {
     sortSelect.addEventListener('change', (e) => {
-      ctx.propertySort = e.target.value;
-      if (ctx.realEstateMode) ctx.updatePropertyPanel();
+      appCtx.propertySort = e.target.value;
+      if (appCtx.realEstateMode) appCtx.updatePropertyPanel();
     });
   }
 
   if (refreshBtn) {
     refreshBtn.addEventListener('click', () => {
-      if (ctx.realEstateMode) ctx.loadPropertiesAtCurrentLocation();
+      if (appCtx.realEstateMode) appCtx.loadPropertiesAtCurrentLocation();
     });
   }
 
@@ -70,59 +70,59 @@ function setupUI() {
       btn.style.color = '#ffffff';
       btn.classList.add('active');
 
-      ctx.propertyTypeFilter = btn.dataset.type;
+      appCtx.propertyTypeFilter = btn.dataset.type;
 
       // Update the panel
-      if (ctx.realEstateMode) ctx.updatePropertyPanel();
+      if (appCtx.realEstateMode) appCtx.updatePropertyPanel();
     });
   });
 
   if (clearFilterBtn) {
-    clearFilterBtn.addEventListener('click', ctx.clearNavigation);
+    clearFilterBtn.addEventListener('click', appCtx.clearNavigation);
   }
 
   // Large Map Canvas Click Detection
   const largeMapCanvas = document.getElementById('largeMapCanvas');
   if (largeMapCanvas) {
     largeMapCanvas.addEventListener('click', (e) => {
-      if (!ctx.showLargeMap) return;
+      if (!appCtx.showLargeMap) return;
 
       const rect = largeMapCanvas.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
       const clickY = e.clientY - rect.top;
 
       // Check if click is on a property marker
-      if (ctx.mapLayers.properties && ctx.realEstateMode) {
-        for (const prop of ctx.properties) {
-          const screenPos = ctx.worldToScreenLarge(prop.x, prop.z);
+      if (appCtx.mapLayers.properties && appCtx.realEstateMode) {
+        for (const prop of appCtx.properties) {
+          const screenPos = appCtx.worldToScreenLarge(prop.x, prop.z);
           const dist = Math.sqrt((clickX - screenPos.x) ** 2 + (clickY - screenPos.y) ** 2);
           if (dist < 10) {
-            ctx.showMapInfo('property', prop);
+            appCtx.showMapInfo('property', prop);
             return;
           }
         }
       }
 
       // Check if click is on a POI marker (based on legend layer filters)
-      if (ctx.pois.length > 0) {
-        for (const poi of ctx.pois) {
-          if (!ctx.isPOIVisible(poi.type)) continue;
-          const screenPos = ctx.worldToScreenLarge(poi.x, poi.z);
+      if (appCtx.pois.length > 0) {
+        for (const poi of appCtx.pois) {
+          if (!appCtx.isPOIVisible(poi.type)) continue;
+          const screenPos = appCtx.worldToScreenLarge(poi.x, poi.z);
           const dist = Math.sqrt((clickX - screenPos.x) ** 2 + (clickY - screenPos.y) ** 2);
           if (dist < 8) {
-            ctx.showMapInfo('poi', poi);
+            appCtx.showMapInfo('poi', poi);
             return;
           }
         }
       }
 
       // Check if click is on a historic site
-      if (ctx.mapLayers.historic && ctx.historicSites.length > 0) {
-        for (const site of ctx.historicSites) {
-          const screenPos = ctx.worldToScreenLarge(site.x, site.z);
+      if (appCtx.mapLayers.historic && appCtx.historicSites.length > 0) {
+        for (const site of appCtx.historicSites) {
+          const screenPos = appCtx.worldToScreenLarge(site.x, site.z);
           const dist = Math.sqrt((clickX - screenPos.x) ** 2 + (clickY - screenPos.y) ** 2);
           if (dist < 8) {
-            ctx.showMapInfo('historic', site);
+            appCtx.showMapInfo('historic', site);
             return;
           }
         }
@@ -131,13 +131,13 @@ function setupUI() {
 
     largeMapCanvas.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      if (!ctx.showLargeMap) return;
+      if (!appCtx.showLargeMap) return;
 
       const rect = largeMapCanvas.getBoundingClientRect();
       const clickX = e.clientX - rect.left;
       const clickY = e.clientY - rect.top;
-      const worldPos = ctx.largeMapScreenToWorld(clickX, clickY);
-      ctx.teleportToLocation(worldPos.x, worldPos.z);
+      const worldPos = appCtx.largeMapScreenToWorld(clickX, clickY);
+      appCtx.teleportToLocation(worldPos.x, worldPos.z);
     });
   }
 
@@ -160,15 +160,15 @@ function setupUI() {
   const savedEstated = localStorage.getItem('estatedApiKey');
 
   if (savedRentcast) {
-    ctx.apiConfig.rentcast = savedRentcast;
+    appCtx.apiConfig.rentcast = savedRentcast;
     if (rentcastKeyInput) rentcastKeyInput.value = savedRentcast;
   }
   if (savedAttom) {
-    ctx.apiConfig.attom = savedAttom;
+    appCtx.apiConfig.attom = savedAttom;
     if (attomKeyInput) attomKeyInput.value = savedAttom;
   }
   if (savedEstated) {
-    ctx.apiConfig.estated = savedEstated;
+    appCtx.apiConfig.estated = savedEstated;
     if (estatedKeyInput) estatedKeyInput.value = savedEstated;
   }
 
@@ -188,11 +188,11 @@ function setupUI() {
       if (estatedKeyInput) {
         const key = estatedKeyInput.value.trim();
         if (key) {
-          ctx.apiConfig.estated = key;
+          appCtx.apiConfig.estated = key;
           localStorage.setItem('estatedApiKey', key);
           savedCount++;
         } else {
-          ctx.apiConfig.estated = null;
+          appCtx.apiConfig.estated = null;
           localStorage.removeItem('estatedApiKey');
         }
       }
@@ -201,11 +201,11 @@ function setupUI() {
       if (attomKeyInput) {
         const key = attomKeyInput.value.trim();
         if (key) {
-          ctx.apiConfig.attom = key;
+          appCtx.apiConfig.attom = key;
           localStorage.setItem('attomApiKey', key);
           savedCount++;
         } else {
-          ctx.apiConfig.attom = null;
+          appCtx.apiConfig.attom = null;
           localStorage.removeItem('attomApiKey');
         }
       }
@@ -214,11 +214,11 @@ function setupUI() {
       if (rentcastKeyInput) {
         const key = rentcastKeyInput.value.trim();
         if (key) {
-          ctx.apiConfig.rentcast = key;
+          appCtx.apiConfig.rentcast = key;
           localStorage.setItem('rentcastApiKey', key);
           savedCount++;
         } else {
-          ctx.apiConfig.rentcast = null;
+          appCtx.apiConfig.rentcast = null;
           localStorage.removeItem('rentcastApiKey');
         }
       }
@@ -251,70 +251,70 @@ function setupUI() {
 
   // Performance benchmark controls (RDT vs baseline)
   if (perfModeSelect) {
-    const currentMode = typeof ctx.getPerfMode === 'function' ? ctx.getPerfMode() : ctx.perfMode || 'rdt';
+    const currentMode = typeof appCtx.getPerfMode === 'function' ? appCtx.getPerfMode() : appCtx.perfMode || 'rdt';
     perfModeSelect.value = currentMode === 'baseline' ? 'baseline' : 'rdt';
   }
   if (perfOverlayToggle) {
-    const overlayEnabled = typeof ctx.getPerfOverlayEnabled === 'function' ?
-    ctx.getPerfOverlayEnabled() :
-    !!ctx.perfOverlayEnabled;
+    const overlayEnabled = typeof appCtx.getPerfOverlayEnabled === 'function' ?
+    appCtx.getPerfOverlayEnabled() :
+    !!appCtx.perfOverlayEnabled;
     perfOverlayToggle.checked = overlayEnabled;
   }
 
   if (perfModeSelect) {
     perfModeSelect.addEventListener('change', (e) => {
       const selectedMode = e.target.value === 'baseline' ? 'baseline' : 'rdt';
-      if (typeof ctx.setPerfMode === 'function') ctx.setPerfMode(selectedMode);
+      if (typeof appCtx.setPerfMode === 'function') appCtx.setPerfMode(selectedMode);
       if (perfSettingsStatus) {
         perfSettingsStatus.textContent = selectedMode === 'baseline' ?
         'Baseline selected. Use Apply + Reload World to rebuild with baseline budgets.' :
         'RDT selected. Use Apply + Reload World to rebuild with adaptive budgets.';
       }
-      if (typeof ctx.updatePerfPanel === 'function') ctx.updatePerfPanel(true);
+      if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     });
   }
 
   if (perfOverlayToggle) {
     perfOverlayToggle.addEventListener('change', (e) => {
       const enabled = !!e.target.checked;
-      if (typeof ctx.setPerfOverlayEnabled === 'function') ctx.setPerfOverlayEnabled(enabled);
+      if (typeof appCtx.setPerfOverlayEnabled === 'function') appCtx.setPerfOverlayEnabled(enabled);
       if (perfSettingsStatus) {
         perfSettingsStatus.textContent = enabled ?
         'Live overlay enabled. Benchmark values will be shown during gameplay.' :
         'Live overlay disabled.';
       }
-      if (typeof ctx.updatePerfPanel === 'function') ctx.updatePerfPanel(true);
+      if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     });
   }
 
   if (perfApplyReload) {
     perfApplyReload.addEventListener('click', async () => {
       const selectedMode = perfModeSelect?.value === 'baseline' ? 'baseline' : 'rdt';
-      if (typeof ctx.setPerfMode === 'function') ctx.setPerfMode(selectedMode);
+      if (typeof appCtx.setPerfMode === 'function') appCtx.setPerfMode(selectedMode);
 
       if (perfSettingsStatus) {
-        perfSettingsStatus.textContent = ctx.gameStarted ?
+        perfSettingsStatus.textContent = appCtx.gameStarted ?
         `Applying ${selectedMode.toUpperCase()} mode and reloading world...` :
         `Saved ${selectedMode.toUpperCase()} mode. It will apply when you start.`;
       }
 
-      if (ctx.gameStarted && typeof ctx.loadRoads === 'function') {
-        await ctx.loadRoads();
+      if (appCtx.gameStarted && typeof appCtx.loadRoads === 'function') {
+        await appCtx.loadRoads();
         if (perfSettingsStatus) {
           perfSettingsStatus.textContent = `${selectedMode.toUpperCase()} mode applied and world reloaded.`;
         }
       }
-      if (typeof ctx.updatePerfPanel === 'function') ctx.updatePerfPanel(true);
+      if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     });
   }
 
   if (perfCopySnapshot) {
     perfCopySnapshot.addEventListener('click', async () => {
       try {
-        if (typeof ctx.copyPerfSnapshotToClipboard !== 'function') {
+        if (typeof appCtx.copyPerfSnapshotToClipboard !== 'function') {
           throw new Error('Snapshot exporter unavailable');
         }
-        await ctx.copyPerfSnapshotToClipboard();
+        await appCtx.copyPerfSnapshotToClipboard();
         if (perfSettingsStatus) perfSettingsStatus.textContent = 'Benchmark snapshot copied to clipboard.';
       } catch (err) {
         if (perfSettingsStatus) {
@@ -350,7 +350,7 @@ function setupUI() {
       if (!btn) return;
       btn.classList.toggle('active', btnMode === nextMode);
     });
-    ctx.loadingScreenMode = nextMode;
+    appCtx.loadingScreenMode = nextMode;
   };
 
   const setTitleLocationMode = (mode) => {
@@ -367,7 +367,7 @@ function setupUI() {
         document.querySelectorAll('.loc').forEach((e) => e.classList.remove('sel'));
         customCard.classList.add('sel');
       }
-      ctx.selLoc = 'custom';
+      appCtx.selLoc = 'custom';
       if (customPanel) customPanel.classList.add('show');
       return;
     }
@@ -377,7 +377,7 @@ function setupUI() {
     if (selectedSuggested) {
       document.querySelectorAll('.loc').forEach((e) => e.classList.remove('sel'));
       selectedSuggested.classList.add('sel');
-      ctx.selLoc = selectedSuggested.dataset.loc;
+      appCtx.selLoc = selectedSuggested.dataset.loc;
     }
     if (customPanel) customPanel.classList.remove('show');
   };
@@ -385,9 +385,9 @@ function setupUI() {
   document.querySelectorAll('.loc').forEach((el) => el.addEventListener('click', () => {
     document.querySelectorAll('.loc').forEach((e) => e.classList.remove('sel'));
     el.classList.add('sel');
-    ctx.selLoc = el.dataset.loc;
-    if (customPanel) customPanel.classList.toggle('show', ctx.selLoc === 'custom');
-    if (ctx.selLoc === 'custom') {
+    appCtx.selLoc = el.dataset.loc;
+    if (customPanel) customPanel.classList.toggle('show', appCtx.selLoc === 'custom');
+    if (appCtx.selLoc === 'custom') {
       setTitleLocationMode('custom');
     } else {
       setLaunchMode('earth');
@@ -405,34 +405,34 @@ function setupUI() {
   }
 
   // Exposed so searchLocation() can force the custom selector active.
-  ctx.setTitleLocationMode = setTitleLocationMode;
-  ctx.selectSuggestedLocationCard = (targetEl) => {
+  appCtx.setTitleLocationMode = setTitleLocationMode;
+  appCtx.selectSuggestedLocationCard = (targetEl) => {
     if (!targetEl) return;
     const selectedLoc = targetEl.closest('.loc[data-loc]');
     if (!selectedLoc || selectedLoc.dataset.loc === 'custom') return;
     document.querySelectorAll('.loc').forEach((e) => e.classList.remove('sel'));
     selectedLoc.classList.add('sel');
-    ctx.selLoc = selectedLoc.dataset.loc;
+    appCtx.selLoc = selectedLoc.dataset.loc;
     if (customPanel) customPanel.classList.remove('show');
     setLaunchMode('earth');
   };
 
   // Initial panel state.
-  setTitleLocationMode(ctx.selLoc === 'custom' ? 'custom' : 'suggested');
+  setTitleLocationMode(appCtx.selLoc === 'custom' ? 'custom' : 'suggested');
 
   // Custom location search - universal search for any location
-  document.getElementById('locationSearchBtn').addEventListener('click', ctx.searchLocation);
-  document.getElementById('locationSearch').addEventListener('keypress', (e) => {if (e.key === 'Enter') ctx.searchLocation();});
+  document.getElementById('locationSearchBtn').addEventListener('click', appCtx.searchLocation);
+  document.getElementById('locationSearch').addEventListener('keypress', (e) => {if (e.key === 'Enter') appCtx.searchLocation();});
   // Game modes
   document.querySelectorAll('.mode').forEach((el) => el.addEventListener('click', () => {
     document.querySelectorAll('.mode').forEach((e) => e.classList.remove('sel'));
     el.classList.add('sel');
-    ctx.gameMode = el.dataset.mode;
+    appCtx.gameMode = el.dataset.mode;
   }));
   // Start
   document.getElementById('startBtn').addEventListener('click', async () => {
     const launchMode = titleLaunchMode;
-    ctx.loadingScreenMode = launchMode === 'moon' ? 'moon' : launchMode === 'space' ? 'space' : 'earth';
+    appCtx.loadingScreenMode = launchMode === 'moon' ? 'moon' : launchMode === 'space' ? 'space' : 'earth';
     document.getElementById('titleScreen').classList.add('hidden');
     document.getElementById('hud').classList.add('show');
     document.getElementById('minimap').classList.add('show');
@@ -444,9 +444,9 @@ function setupUI() {
     document.getElementById('historicBtn').classList.add('show');
     const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
     if (memoryFlowerFloatBtn) memoryFlowerFloatBtn.classList.add('show');
-    ctx.gameStarted = true;
-    if (typeof ctx.updatePerfPanel === 'function') ctx.updatePerfPanel(true);
-    ctx.switchEnv(ctx.ENV.EARTH);
+    appCtx.gameStarted = true;
+    if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
+    appCtx.switchEnv(appCtx.ENV.EARTH);
 
     // Show exploration mode message
     const explorationMsg = document.getElementById('explorationModeMsg');
@@ -485,42 +485,42 @@ function setupUI() {
     }
 
     // Load visible terrain immediately so grass appears even while road APIs are pending.
-    if (typeof ctx.updateTerrainAround === 'function' && ctx.terrainEnabled && !ctx.onMoon) {
-      const startRef = ctx.Walk && ctx.Walk.state && ctx.Walk.state.walker ?
-      ctx.Walk.state.walker : ctx.car;
+    if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
+      const startRef = appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker ?
+      appCtx.Walk.state.walker : appCtx.car;
 
-      ctx.updateTerrainAround(startRef.x || 0, startRef.z || 0);
+      appCtx.updateTerrainAround(startRef.x || 0, startRef.z || 0);
     }
 
     // Load roads and world data (may take longer if Overpass endpoints are slow).
-    await ctx.loadRoads();
+    await appCtx.loadRoads();
 
     // Refresh terrain around final spawn/reference position after roads finish.
-    if (typeof ctx.updateTerrainAround === 'function' && ctx.terrainEnabled && !ctx.onMoon) {
-      const postLoadRef = ctx.Walk && ctx.Walk.state && ctx.Walk.state.mode === 'walk' && ctx.Walk.state.walker ?
-      ctx.Walk.state.walker : ctx.car;
+    if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
+      const postLoadRef = appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker ?
+      appCtx.Walk.state.walker : appCtx.car;
 
-      ctx.updateTerrainAround(postLoadRef.x || 0, postLoadRef.z || 0);
+      appCtx.updateTerrainAround(postLoadRef.x || 0, postLoadRef.z || 0);
     }
 
     // Start in WALKING mode with third-person camera
-    if (ctx.Walk) {
-      ctx.Walk.setModeWalk();
-      ctx.Walk.state.view = 'third'; // Ensure third-person view
-      if (ctx.carMesh) ctx.carMesh.visible = false;
-      if (ctx.Walk.state.characterMesh) ctx.Walk.state.characterMesh.visible = true;
+    if (appCtx.Walk) {
+      appCtx.Walk.setModeWalk();
+      appCtx.Walk.state.view = 'third'; // Ensure third-person view
+      if (appCtx.carMesh) appCtx.carMesh.visible = false;
+      if (appCtx.Walk.state.characterMesh) appCtx.Walk.state.characterMesh.visible = true;
 
       // Force initial camera to third-person position behind character
       // Without this, camera starts at origin and looks like first person
-      const w = ctx.Walk.state.walker;
-      const back = ctx.Walk.CFG.thirdPersonDist;
-      const up = ctx.Walk.CFG.thirdPersonHeight;
-      ctx.camera.position.set(
+      const w = appCtx.Walk.state.walker;
+      const back = appCtx.Walk.CFG.thirdPersonDist;
+      const up = appCtx.Walk.CFG.thirdPersonHeight;
+      appCtx.camera.position.set(
         w.x - Math.sin(w.yaw) * back,
         w.y + up,
         w.z - Math.cos(w.yaw) * back
       );
-      ctx.camera.lookAt(w.x, w.y, w.z);
+      appCtx.camera.lookAt(w.x, w.y, w.z);
 
       // Update UI button states to reflect walking mode
       document.getElementById('fDriving').classList.remove('on');
@@ -528,13 +528,13 @@ function setupUI() {
       document.getElementById('fDrone').classList.remove('on');
     } else {
       // Fallback to driving if Walk module not available
-      if (ctx.carMesh) ctx.carMesh.visible = true;
+      if (appCtx.carMesh) appCtx.carMesh.visible = true;
       document.getElementById('fDriving').classList.add('on');
       document.getElementById('fWalk').classList.remove('on');
       document.getElementById('fDrone').classList.remove('on');
     }
-    if (typeof ctx.setBuildModeEnabled === 'function') {
-      ctx.setBuildModeEnabled(false);
+    if (typeof appCtx.setBuildModeEnabled === 'function') {
+      appCtx.setBuildModeEnabled(false);
     }
     updateControlsModeUI();
 
@@ -544,13 +544,13 @@ function setupUI() {
     document.getElementById('fLandUse').classList.remove('on');
     document.getElementById('fLandUseRE').classList.remove('on');
     // Reset default loading theme for normal in-game loading after start.
-    ctx.loadingScreenMode = 'earth';
+    appCtx.loadingScreenMode = 'earth';
 
     // Optional launch-mode shortcuts from title selector.
-    if (launchMode === 'moon' && !ctx.onMoon && !ctx.travelingToMoon) {
-      ctx.directTravelToMoon();
-    } else if (launchMode === 'space' && !ctx.onMoon && !ctx.travelingToMoon) {
-      ctx.travelToMoon();
+    if (launchMode === 'moon' && !appCtx.onMoon && !appCtx.travelingToMoon) {
+      appCtx.directTravelToMoon();
+    } else if (launchMode === 'space' && !appCtx.onMoon && !appCtx.travelingToMoon) {
+      appCtx.travelToMoon();
     }
   });
 
@@ -566,9 +566,9 @@ function setupUI() {
   const rocketControls = document.getElementById('rocketControls');
 
   function detectControlsMode() {
-    if (typeof ctx.isEnv === 'function' && typeof ctx.ENV !== 'undefined' && ctx.isEnv(ctx.ENV.SPACE_FLIGHT)) return 'rocket';
-    if (ctx.droneMode) return 'drone';
-    if (ctx.Walk && ctx.Walk.state && ctx.Walk.state.mode === 'walk') return 'walking';
+    if (typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return 'rocket';
+    if (appCtx.droneMode) return 'drone';
+    if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk') return 'walking';
     return 'driving';
   }
 
@@ -585,10 +585,10 @@ function setupUI() {
     }
   }
 
-  ctx.updateControlsModeUI = updateControlsModeUI;
+  appCtx.updateControlsModeUI = updateControlsModeUI;
   function goToMainMenu() {
-    ctx.gameStarted = false;ctx.paused = false;ctx.clearObjectives();ctx.clearPolice();ctx.policeOn = false;ctx.eraseTrack();ctx.closePropertyPanel();ctx.closeHistoricPanel();ctx.clearPropertyMarkers();ctx.realEstateMode = false;ctx.historicMode = false;
-    if (typeof ctx.setBuildModeEnabled === 'function') ctx.setBuildModeEnabled(false);
+    appCtx.gameStarted = false;appCtx.paused = false;appCtx.clearObjectives();appCtx.clearPolice();appCtx.policeOn = false;appCtx.eraseTrack();appCtx.closePropertyPanel();appCtx.closeHistoricPanel();appCtx.clearPropertyMarkers();appCtx.realEstateMode = false;appCtx.historicMode = false;
+    if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
     document.getElementById('titleScreen').classList.remove('hidden');
     ['hud', 'minimap', 'modeHud', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn'].forEach((id) => {
@@ -596,11 +596,11 @@ function setupUI() {
       if (el) el.classList.remove('show');
     });
     if (ctrlContent) ctrlContent.classList.add('hidden');
-    if (typeof ctx.closeMemoryComposer === 'function') ctx.closeMemoryComposer();
+    if (typeof appCtx.closeMemoryComposer === 'function') appCtx.closeMemoryComposer();
     const memoryInfoPanel = document.getElementById('memoryInfoPanel');
     if (memoryInfoPanel) memoryInfoPanel.classList.remove('show');
     updateControlsModeUI();
-    if (typeof ctx.updatePerfPanel === 'function') ctx.updatePerfPanel(true);
+    if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
   }
 
   // Float menu
@@ -634,69 +634,69 @@ function setupUI() {
 
   const homeMenuItem = document.getElementById('fHome');
   if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);
-  document.getElementById('fNextCity').addEventListener('click', () => {ctx.nextCity();closeAllFloatMenus();});
+  document.getElementById('fNextCity').addEventListener('click', () => {appCtx.nextCity();closeAllFloatMenus();});
   const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
   if (memoryFlowerFloatBtn) {
     memoryFlowerFloatBtn.addEventListener('click', () => {
-      if (typeof ctx.openMemoryComposer === 'function') ctx.openMemoryComposer('flower');
+      if (typeof appCtx.openMemoryComposer === 'function') appCtx.openMemoryComposer('flower');
       closeAllFloatMenus();
     });
   }
   document.getElementById('fSatellite').addEventListener('click', () => {
-    ctx.satelliteView = !ctx.satelliteView;
-    document.getElementById('fSatellite').classList.toggle('on', ctx.satelliteView);
-    document.getElementById('mapSatelliteToggle').classList.toggle('active', ctx.satelliteView);
+    appCtx.satelliteView = !appCtx.satelliteView;
+    document.getElementById('fSatellite').classList.toggle('on', appCtx.satelliteView);
+    document.getElementById('mapSatelliteToggle').classList.toggle('active', appCtx.satelliteView);
     closeAllFloatMenus();
   });
   document.getElementById('fRoads').addEventListener('click', () => {
-    ctx.showRoads = !ctx.showRoads;
-    document.getElementById('fRoads').classList.toggle('on', ctx.showRoads);
-    document.getElementById('mapRoadsToggle').classList.toggle('active', ctx.showRoads);
+    appCtx.showRoads = !appCtx.showRoads;
+    document.getElementById('fRoads').classList.toggle('on', appCtx.showRoads);
+    document.getElementById('mapRoadsToggle').classList.toggle('active', appCtx.showRoads);
     closeAllFloatMenus();
   });
   document.getElementById('fLandUse').addEventListener('click', () => {
-    ctx.landUseVisible = !ctx.landUseVisible;
-    document.getElementById('fLandUse').classList.toggle('on', ctx.landUseVisible);
-    document.getElementById('fLandUseRE').classList.toggle('on', ctx.landUseVisible);
+    appCtx.landUseVisible = !appCtx.landUseVisible;
+    document.getElementById('fLandUse').classList.toggle('on', appCtx.landUseVisible);
+    document.getElementById('fLandUseRE').classList.toggle('on', appCtx.landUseVisible);
     // Keep water features visible even when general land-use overlay is off.
-    ctx.landuseMeshes.forEach((m) => {
+    appCtx.landuseMeshes.forEach((m) => {
       const alwaysVisible = !!(m && m.userData && m.userData.alwaysVisible);
-      m.visible = ctx.landUseVisible || alwaysVisible;
+      m.visible = appCtx.landUseVisible || alwaysVisible;
     });
     closeAllFloatMenus();
   });
   document.getElementById('fLandUseRE').addEventListener('click', () => {
-    ctx.landUseVisible = !ctx.landUseVisible;
-    document.getElementById('fLandUse').classList.toggle('on', ctx.landUseVisible);
-    document.getElementById('fLandUseRE').classList.toggle('on', ctx.landUseVisible);
+    appCtx.landUseVisible = !appCtx.landUseVisible;
+    document.getElementById('fLandUse').classList.toggle('on', appCtx.landUseVisible);
+    document.getElementById('fLandUseRE').classList.toggle('on', appCtx.landUseVisible);
     // Keep water features visible even when general land-use overlay is off.
-    ctx.landuseMeshes.forEach((m) => {
+    appCtx.landuseMeshes.forEach((m) => {
       const alwaysVisible = !!(m && m.userData && m.userData.alwaysVisible);
-      m.visible = ctx.landUseVisible || alwaysVisible;
+      m.visible = appCtx.landUseVisible || alwaysVisible;
     });
     closeAllFloatMenus();
   });
-  document.getElementById('fTimeOfDay').addEventListener('click', () => {ctx.cycleTimeOfDay();});
+  document.getElementById('fTimeOfDay').addEventListener('click', () => {appCtx.cycleTimeOfDay();});
   document.getElementById('fPolice').addEventListener('click', () => {
-    ctx.policeOn = !ctx.policeOn;
-    document.getElementById('fPolice').classList.toggle('on', ctx.policeOn);
-    document.getElementById('police').classList.toggle('show', ctx.policeOn);
-    if (ctx.policeOn) ctx.spawnPolice();else ctx.clearPolice();
+    appCtx.policeOn = !appCtx.policeOn;
+    document.getElementById('fPolice').classList.toggle('on', appCtx.policeOn);
+    document.getElementById('police').classList.toggle('show', appCtx.policeOn);
+    if (appCtx.policeOn) appCtx.spawnPolice();else appCtx.clearPolice();
     closeAllFloatMenus();
   });
   const buildModeItem = document.getElementById('fBlockBuild');
   if (buildModeItem) {
     buildModeItem.addEventListener('click', () => {
-      if (typeof ctx.toggleBlockBuildMode === 'function') ctx.toggleBlockBuildMode();
+      if (typeof appCtx.toggleBlockBuildMode === 'function') appCtx.toggleBlockBuildMode();
       closeAllFloatMenus();
     });
   }
   const clearBlocksItem = document.getElementById('fClearBlocks');
   if (clearBlocksItem) {
     clearBlocksItem.addEventListener('click', () => {
-      if (typeof ctx.clearAllBuildBlocks === 'function') {
+      if (typeof appCtx.clearAllBuildBlocks === 'function') {
         const confirmed = globalThis.confirm('Clear all placed build blocks for this location? This also removes saved blocks from browser storage.');
-        if (confirmed) ctx.clearAllBuildBlocks();
+        if (confirmed) appCtx.clearAllBuildBlocks();
       }
       closeAllFloatMenus();
     });
@@ -704,15 +704,15 @@ function setupUI() {
   // Travel mode switchers - mutually exclusive
   document.getElementById('fDriving').addEventListener('click', () => {
     // Switch to driving mode
-    ctx.droneMode = false;
-    if (ctx.Walk) {
-      ctx.Walk.setModeDrive();
+    appCtx.droneMode = false;
+    if (appCtx.Walk) {
+      appCtx.Walk.setModeDrive();
     }
-    if (typeof ctx.camMode !== 'undefined') ctx.camMode = 0;
-    if (ctx.carMesh) ctx.carMesh.visible = true;
+    if (typeof appCtx.camMode !== 'undefined') appCtx.camMode = 0;
+    if (appCtx.carMesh) appCtx.carMesh.visible = true;
 
     // Clear star selection
-    ctx.clearStarSelection();
+    appCtx.clearStarSelection();
 
     // Update button states
     document.getElementById('fDriving').classList.add('on');
@@ -724,14 +724,14 @@ function setupUI() {
 
   document.getElementById('fWalk').addEventListener('click', () => {
     // Switch to walking mode
-    ctx.droneMode = false;
-    if (ctx.Walk) {
-      if (ctx.Walk.state.mode !== 'walk') {
-        ctx.Walk.toggleWalk();
+    appCtx.droneMode = false;
+    if (appCtx.Walk) {
+      if (appCtx.Walk.state.mode !== 'walk') {
+        appCtx.Walk.toggleWalk();
       }
 
       // Clear star selection
-      ctx.clearStarSelection();
+      appCtx.clearStarSelection();
 
       // Update button states
       document.getElementById('fDriving').classList.remove('on');
@@ -744,37 +744,37 @@ function setupUI() {
 
   document.getElementById('fDrone').addEventListener('click', () => {
     // Switch to drone mode
-    if (!ctx.droneMode) {
-      ctx.droneMode = true;
+    if (!appCtx.droneMode) {
+      appCtx.droneMode = true;
 
       // Disable walking mode if active
-      if (ctx.Walk && ctx.Walk.state.mode === 'walk') {
-        ctx.Walk.setModeDrive();
+      if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
+        appCtx.Walk.setModeDrive();
       }
 
       // Initialize drone position above current position
-      const ref = ctx.Walk ? ctx.Walk.getMapRefPosition(false, null) : { x: ctx.car.x, z: ctx.car.z };
-      ctx.drone.x = ref.x;
-      ctx.drone.z = ref.z;
-      ctx.drone.yaw = ctx.car.angle;
-      ctx.drone.roll = 0;
+      const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(false, null) : { x: appCtx.car.x, z: appCtx.car.z };
+      appCtx.drone.x = ref.x;
+      appCtx.drone.z = ref.z;
+      appCtx.drone.yaw = appCtx.car.angle;
+      appCtx.drone.roll = 0;
 
       // On the moon, raycast to find actual ground height so drone spawns near surface
-      if (ctx.onMoon && ctx.moonSurface) {
-        const rc = ctx._getPhysRaycaster();
-        ctx._physRayStart.set(ref.x, 2000, ref.z);
-        rc.set(ctx._physRayStart, ctx._physRayDir);
-        const hits = rc.intersectObject(ctx.moonSurface, false);
-        ctx.drone.y = (hits.length > 0 ? hits[0].point.y : -100) + 10;
-        ctx.drone.pitch = -0.2;
+      if (appCtx.onMoon && appCtx.moonSurface) {
+        const rc = appCtx._getPhysRaycaster();
+        appCtx._physRayStart.set(ref.x, 2000, ref.z);
+        rc.set(appCtx._physRayStart, appCtx._physRayDir);
+        const hits = rc.intersectObject(appCtx.moonSurface, false);
+        appCtx.drone.y = (hits.length > 0 ? hits[0].point.y : -100) + 10;
+        appCtx.drone.pitch = -0.2;
       } else {
-        ctx.drone.y = 50;
-        ctx.drone.pitch = -0.3;
+        appCtx.drone.y = 50;
+        appCtx.drone.pitch = -0.3;
       }
     }
 
     // Clear star selection
-    ctx.clearStarSelection();
+    appCtx.clearStarSelection();
 
     // Update button states
     document.getElementById('fDriving').classList.remove('on');
@@ -785,85 +785,85 @@ function setupUI() {
   });
 
   document.getElementById('fSpaceDirect').addEventListener('click', () => {
-    if (ctx.onMoon) {
-      ctx.returnToEarth();
-    } else if (!ctx.travelingToMoon) {
-      ctx.directTravelToMoon();
+    if (appCtx.onMoon) {
+      appCtx.returnToEarth();
+    } else if (!appCtx.travelingToMoon) {
+      appCtx.directTravelToMoon();
     }
     closeAllFloatMenus();
   });
   document.getElementById('fSpaceRocket').addEventListener('click', () => {
-    if (ctx.onMoon) {
-      ctx.returnToEarth();
-    } else if (!ctx.travelingToMoon) {
-      ctx.travelToMoon();
+    if (appCtx.onMoon) {
+      appCtx.returnToEarth();
+    } else if (!appCtx.travelingToMoon) {
+      appCtx.travelToMoon();
     }
     closeAllFloatMenus();
   });
   document.getElementById('fRealEstate').addEventListener('click', () => {
-    ctx.toggleRealEstate();
-    document.getElementById('fRealEstate').classList.toggle('on', ctx.realEstateMode);
+    appCtx.toggleRealEstate();
+    document.getElementById('fRealEstate').classList.toggle('on', appCtx.realEstateMode);
     closeAllFloatMenus();
   });
   document.getElementById('fHistoric').addEventListener('click', () => {
-    ctx.toggleHistoric();
-    document.getElementById('fHistoric').classList.toggle('on', ctx.historicMode);
+    appCtx.toggleHistoric();
+    document.getElementById('fHistoric').classList.toggle('on', appCtx.historicMode);
     closeAllFloatMenus();
   });
   document.getElementById('fPOI').addEventListener('click', () => {
-    ctx.poiMode = !ctx.poiMode;
-    document.getElementById('fPOI').classList.toggle('on', ctx.poiMode);
-    ctx.poiMeshes.forEach((m) => {
-      if (m) m.visible = !!ctx.poiMode;
+    appCtx.poiMode = !appCtx.poiMode;
+    document.getElementById('fPOI').classList.toggle('on', appCtx.poiMode);
+    appCtx.poiMeshes.forEach((m) => {
+      if (m) m.visible = !!appCtx.poiMode;
     });
-    if (!ctx.poiMode) {
+    if (!appCtx.poiMode) {
       const poiInfo = document.getElementById('poiInfo');
       if (poiInfo) poiInfo.style.display = 'none';
     }
     closeAllFloatMenus();
   });
-  document.getElementById('fRespawn').addEventListener('click', () => {ctx.spawnOnRoad();closeAllFloatMenus();});
+  document.getElementById('fRespawn').addEventListener('click', () => {appCtx.spawnOnRoad();closeAllFloatMenus();});
   document.getElementById('fRespawnRand').addEventListener('click', () => {
-    if (ctx.roads.length > 0) {
-      const rd = ctx.roads[Math.floor(Math.random() * ctx.roads.length)];
+    if (appCtx.roads.length > 0) {
+      const rd = appCtx.roads[Math.floor(Math.random() * appCtx.roads.length)];
       const idx = Math.floor(Math.random() * rd.pts.length);
-      ctx.car.x = rd.pts[idx].x;ctx.car.z = rd.pts[idx].z;
-      if (idx < rd.pts.length - 1) ctx.car.angle = Math.atan2(rd.pts[idx + 1].x - rd.pts[idx].x, rd.pts[idx + 1].z - rd.pts[idx].z);
-      ctx.car.speed = 0;ctx.car.vx = 0;ctx.car.vz = 0;
-      const _respawnH = typeof ctx.terrainMeshHeightAt === 'function' ? ctx.terrainMeshHeightAt : ctx.elevationWorldYAtWorldXZ;
-      const spawnY = typeof ctx.GroundHeight !== 'undefined' && ctx.GroundHeight && typeof ctx.GroundHeight.carCenterY === 'function' ?
-      ctx.GroundHeight.carCenterY(ctx.car.x, ctx.car.z, true, 1.2) :
-      _respawnH(ctx.car.x, ctx.car.z) + 1.2;
-      ctx.car.y = spawnY;
-      ctx.carMesh.position.set(ctx.car.x, spawnY, ctx.car.z);ctx.carMesh.rotation.y = ctx.car.angle;
-      if (ctx.Walk && ctx.Walk.state && ctx.Walk.state.walker) {
+      appCtx.car.x = rd.pts[idx].x;appCtx.car.z = rd.pts[idx].z;
+      if (idx < rd.pts.length - 1) appCtx.car.angle = Math.atan2(rd.pts[idx + 1].x - rd.pts[idx].x, rd.pts[idx + 1].z - rd.pts[idx].z);
+      appCtx.car.speed = 0;appCtx.car.vx = 0;appCtx.car.vz = 0;
+      const _respawnH = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt : appCtx.elevationWorldYAtWorldXZ;
+      const spawnY = typeof appCtx.GroundHeight !== 'undefined' && appCtx.GroundHeight && typeof appCtx.GroundHeight.carCenterY === 'function' ?
+      appCtx.GroundHeight.carCenterY(appCtx.car.x, appCtx.car.z, true, 1.2) :
+      _respawnH(appCtx.car.x, appCtx.car.z) + 1.2;
+      appCtx.car.y = spawnY;
+      appCtx.carMesh.position.set(appCtx.car.x, spawnY, appCtx.car.z);appCtx.carMesh.rotation.y = appCtx.car.angle;
+      if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker) {
         const groundY = spawnY - 1.2;
-        ctx.Walk.state.walker.x = ctx.car.x;
-        ctx.Walk.state.walker.z = ctx.car.z;
-        ctx.Walk.state.walker.y = groundY + 1.7;
-        ctx.Walk.state.walker.vy = 0;
-        ctx.Walk.state.walker.angle = ctx.car.angle;
-        ctx.Walk.state.walker.yaw = ctx.car.angle;
-        if (ctx.Walk.state.characterMesh && ctx.Walk.state.mode === 'walk') {
-          ctx.Walk.state.characterMesh.position.set(ctx.car.x, groundY, ctx.car.z);
-          ctx.Walk.state.characterMesh.rotation.y = ctx.car.angle;
+        appCtx.Walk.state.walker.x = appCtx.car.x;
+        appCtx.Walk.state.walker.z = appCtx.car.z;
+        appCtx.Walk.state.walker.y = groundY + 1.7;
+        appCtx.Walk.state.walker.vy = 0;
+        appCtx.Walk.state.walker.angle = appCtx.car.angle;
+        appCtx.Walk.state.walker.yaw = appCtx.car.angle;
+        if (appCtx.Walk.state.characterMesh && appCtx.Walk.state.mode === 'walk') {
+          appCtx.Walk.state.characterMesh.position.set(appCtx.car.x, groundY, appCtx.car.z);
+          appCtx.Walk.state.characterMesh.rotation.y = appCtx.car.angle;
         }
       }
     }
     closeAllFloatMenus();
   });
-  document.getElementById('fTrack').addEventListener('click', () => {ctx.toggleTrackRecording();closeAllFloatMenus();});
-  document.getElementById('fEraseTrack').addEventListener('click', () => {ctx.eraseTrack();closeAllFloatMenus();});
+  document.getElementById('fTrack').addEventListener('click', () => {appCtx.toggleTrackRecording();closeAllFloatMenus();});
+  document.getElementById('fEraseTrack').addEventListener('click', () => {appCtx.eraseTrack();closeAllFloatMenus();});
   document.getElementById('fClouds').addEventListener('click', () => {
-    ctx.cloudsVisible = !ctx.cloudsVisible;
-    if (ctx.cloudGroup) ctx.cloudGroup.visible = ctx.cloudsVisible;
-    document.getElementById('fClouds').classList.toggle('on', !ctx.cloudsVisible);
+    appCtx.cloudsVisible = !appCtx.cloudsVisible;
+    if (appCtx.cloudGroup) appCtx.cloudGroup.visible = appCtx.cloudsVisible;
+    document.getElementById('fClouds').classList.toggle('on', !appCtx.cloudsVisible);
     closeAllFloatMenus();
   });
   document.getElementById('fConstellations').addEventListener('click', () => {
-    ctx.constellationsVisible = !ctx.constellationsVisible;
-    if (ctx.allConstellationLines) ctx.allConstellationLines.visible = ctx.constellationsVisible;
-    document.getElementById('fConstellations').classList.toggle('on', ctx.constellationsVisible);
+    appCtx.constellationsVisible = !appCtx.constellationsVisible;
+    if (appCtx.allConstellationLines) appCtx.allConstellationLines.visible = appCtx.constellationsVisible;
+    document.getElementById('fConstellations').classList.toggle('on', appCtx.constellationsVisible);
     closeAllFloatMenus();
   });
   if (ctrlHeader && ctrlContent) {
@@ -881,7 +881,7 @@ function setupUI() {
 
   // Close float menus when clicking outside
   document.addEventListener('click', (e) => {
-    if (!ctx.gameStarted) return;
+    if (!appCtx.gameStarted) return;
 
     // Check if click is outside float menu container
     const floatContainer = document.getElementById('floatMenuContainer');
@@ -897,17 +897,17 @@ function setupUI() {
     }
   });
 
-  document.getElementById('resumeBtn').addEventListener('click', () => {ctx.paused = false;document.getElementById('pauseScreen').classList.remove('show');});
-  document.getElementById('restartBtn').addEventListener('click', () => {ctx.paused = false;document.getElementById('pauseScreen').classList.remove('show');ctx.startMode();});
+  document.getElementById('resumeBtn').addEventListener('click', () => {appCtx.paused = false;document.getElementById('pauseScreen').classList.remove('show');});
+  document.getElementById('restartBtn').addEventListener('click', () => {appCtx.paused = false;document.getElementById('pauseScreen').classList.remove('show');appCtx.startMode();});
   document.getElementById('menuBtn').addEventListener('click', () => goToMainMenu());
-  document.getElementById('caughtBtn').addEventListener('click', () => {document.getElementById('caughtScreen').classList.remove('show');ctx.policeHits = 0;ctx.paused = false;document.getElementById('police').textContent = '💔 0/3';ctx.spawnOnRoad();});
-  document.getElementById('againBtn').addEventListener('click', () => {ctx.hideResult();ctx.paused = false;ctx.startMode();});
-  document.getElementById('freeBtn').addEventListener('click', () => {ctx.hideResult();ctx.paused = false;ctx.gameMode = 'free';ctx.clearObjectives();});
-  document.getElementById('resMenuBtn').addEventListener('click', () => {ctx.hideResult();goToMainMenu();});
+  document.getElementById('caughtBtn').addEventListener('click', () => {document.getElementById('caughtScreen').classList.remove('show');appCtx.policeHits = 0;appCtx.paused = false;document.getElementById('police').textContent = '💔 0/3';appCtx.spawnOnRoad();});
+  document.getElementById('againBtn').addEventListener('click', () => {appCtx.hideResult();appCtx.paused = false;appCtx.startMode();});
+  document.getElementById('freeBtn').addEventListener('click', () => {appCtx.hideResult();appCtx.paused = false;appCtx.gameMode = 'free';appCtx.clearObjectives();});
+  document.getElementById('resMenuBtn').addEventListener('click', () => {appCtx.hideResult();goToMainMenu();});
 
   // Map controls
   document.getElementById('minimap').addEventListener('click', () => {
-    ctx.showLargeMap = true;
+    appCtx.showLargeMap = true;
     document.getElementById('largeMap').classList.add('show');
   });
   document.getElementById('minimap').addEventListener('contextmenu', (e) => {
@@ -915,11 +915,11 @@ function setupUI() {
     const rect = e.target.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
-    const worldPos = ctx.minimapScreenToWorld(x, y);
-    ctx.teleportToLocation(worldPos.x, worldPos.z);
+    const worldPos = appCtx.minimapScreenToWorld(x, y);
+    appCtx.teleportToLocation(worldPos.x, worldPos.z);
   });
   document.getElementById('mapClose').addEventListener('click', () => {
-    ctx.showLargeMap = false;
+    appCtx.showLargeMap = false;
     document.getElementById('largeMap').classList.remove('show');
   });
   document.getElementById('mapLegend').addEventListener('click', (e) => {
@@ -929,68 +929,68 @@ function setupUI() {
   });
   document.getElementById('largeMap').addEventListener('click', (e) => {
     if (e.target.id === 'largeMap') {
-      ctx.showLargeMap = false;
+      appCtx.showLargeMap = false;
       document.getElementById('largeMap').classList.remove('show');
     }
   });
   document.getElementById('mapSatelliteToggle').addEventListener('click', (e) => {
     e.stopPropagation();
-    ctx.satelliteView = !ctx.satelliteView;
-    document.getElementById('mapSatelliteToggle').classList.toggle('active', ctx.satelliteView);
-    document.getElementById('fSatellite').classList.toggle('on', ctx.satelliteView);
+    appCtx.satelliteView = !appCtx.satelliteView;
+    document.getElementById('mapSatelliteToggle').classList.toggle('active', appCtx.satelliteView);
+    document.getElementById('fSatellite').classList.toggle('on', appCtx.satelliteView);
   });
   document.getElementById('mapRoadsToggle').addEventListener('click', (e) => {
     e.stopPropagation();
-    ctx.showRoads = !ctx.showRoads;
-    document.getElementById('mapRoadsToggle').classList.toggle('active', ctx.showRoads);
-    document.getElementById('fRoads').classList.toggle('on', ctx.showRoads);
+    appCtx.showRoads = !appCtx.showRoads;
+    document.getElementById('mapRoadsToggle').classList.toggle('active', appCtx.showRoads);
+    document.getElementById('fRoads').classList.toggle('on', appCtx.showRoads);
   });
   document.getElementById('mapZoomIn').addEventListener('click', (e) => {
     e.stopPropagation();
-    if (ctx.largeMapZoom < 18) {
-      ctx.largeMapZoom++;
-      document.getElementById('zoomLevel').textContent = 'Z: ' + ctx.largeMapZoom;
+    if (appCtx.largeMapZoom < 18) {
+      appCtx.largeMapZoom++;
+      document.getElementById('zoomLevel').textContent = 'Z: ' + appCtx.largeMapZoom;
     }
   });
   document.getElementById('mapZoomOut').addEventListener('click', (e) => {
     e.stopPropagation();
-    if (ctx.largeMapZoom > 10) {
-      ctx.largeMapZoom--;
-      document.getElementById('zoomLevel').textContent = 'Z: ' + ctx.largeMapZoom;
+    if (appCtx.largeMapZoom > 10) {
+      appCtx.largeMapZoom--;
+      document.getElementById('zoomLevel').textContent = 'Z: ' + appCtx.largeMapZoom;
     }
   });
 
   const legendCloseBtn = document.getElementById('legendCloseBtn');
   if (legendCloseBtn) {
-    legendCloseBtn.addEventListener('click', () => ctx.closeLegend());
+    legendCloseBtn.addEventListener('click', () => appCtx.closeLegend());
   }
   const legendShowAllBtn = document.getElementById('legendShowAllBtn');
   if (legendShowAllBtn) {
-    legendShowAllBtn.addEventListener('click', () => ctx.toggleAllLayers(true));
+    legendShowAllBtn.addEventListener('click', () => appCtx.toggleAllLayers(true));
   }
   const legendHideAllBtn = document.getElementById('legendHideAllBtn');
   if (legendHideAllBtn) {
-    legendHideAllBtn.addEventListener('click', () => ctx.toggleAllLayers(false));
+    legendHideAllBtn.addEventListener('click', () => appCtx.toggleAllLayers(false));
   }
   const mapInfoCloseBtn = document.getElementById('mapInfoCloseBtn');
   if (mapInfoCloseBtn) {
-    mapInfoCloseBtn.addEventListener('click', () => ctx.closeMapInfo());
+    mapInfoCloseBtn.addEventListener('click', () => appCtx.closeMapInfo());
   }
   const closePropertyPanelBtn = document.getElementById('closePropertyPanelBtn');
   if (closePropertyPanelBtn) {
-    closePropertyPanelBtn.addEventListener('click', () => ctx.closePropertyPanel());
+    closePropertyPanelBtn.addEventListener('click', () => appCtx.closePropertyPanel());
   }
   const propertyFiltersToggle = document.getElementById('propertyFiltersToggle');
   if (propertyFiltersToggle) {
-    propertyFiltersToggle.addEventListener('click', () => ctx.togglePropertyFilters());
+    propertyFiltersToggle.addEventListener('click', () => appCtx.togglePropertyFilters());
   }
   const closeHistoricPanelBtn = document.getElementById('closeHistoricPanelBtn');
   if (closeHistoricPanelBtn) {
-    closeHistoricPanelBtn.addEventListener('click', () => ctx.closeHistoricPanel());
+    closeHistoricPanelBtn.addEventListener('click', () => appCtx.closeHistoricPanel());
   }
   const closeModalBtn = document.getElementById('closeModalBtn');
   if (closeModalBtn) {
-    closeModalBtn.addEventListener('click', () => ctx.closeModal());
+    closeModalBtn.addEventListener('click', () => appCtx.closeModal());
   }
 
   const legendPanel = document.getElementById('legendPanel');
@@ -1001,23 +1001,23 @@ function setupUI() {
       if (!target.id || !target.id.startsWith('filter')) return;
 
       if (target.id === 'filterPOIsAll') {
-        ctx.toggleAllPOIs();
+        appCtx.toggleAllPOIs();
         return;
       }
       if (target.id === 'filterGameElementsAll') {
-        ctx.toggleAllGameElements();
+        appCtx.toggleAllGameElements();
         return;
       }
       if (target.id === 'filterRoads') {
-        ctx.toggleRoads();
+        appCtx.toggleRoads();
         return;
       }
-      ctx.updateMapLayers();
+      appCtx.updateMapLayers();
     });
   }
 }
 
 // Entry point - initialize the application
-Object.assign(ctx, { setupUI });
+Object.assign(appCtx, { setupUI });
 
 export { setupUI };

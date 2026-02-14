@@ -1,9 +1,9 @@
-import { ctx } from "./shared-context.js?v=52"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=52"; // ============================================================================
 // sky.js - Time of day, starfield, constellations, moon system
 // ============================================================================
 
 function setTimeOfDay(time) {
-  ctx.timeOfDay = time;
+  appCtx.timeOfDay = time;
 
   const times = {
     day: {
@@ -79,59 +79,59 @@ function setTimeOfDay(time) {
   const config = times[time];
 
   // Update sky background color
-  ctx.scene.background.setHex(config.skyColor);
+  appCtx.scene.background.setHex(config.skyColor);
 
   // Update lights
-  ctx.hemiLight.color.setHex(config.skyColor);
-  ctx.hemiLight.groundColor.setHex(config.groundColor);
-  ctx.hemiLight.intensity = config.hemiIntensity;
+  appCtx.hemiLight.color.setHex(config.skyColor);
+  appCtx.hemiLight.groundColor.setHex(config.groundColor);
+  appCtx.hemiLight.intensity = config.hemiIntensity;
 
-  ctx.sun.color.setHex(config.sunColor);
-  ctx.sun.intensity = config.sunIntensity;
-  ctx.sun.position.set(...config.sunPos);
+  appCtx.sun.color.setHex(config.sunColor);
+  appCtx.sun.intensity = config.sunIntensity;
+  appCtx.sun.position.set(...config.sunPos);
 
-  ctx.fillLight.color.setHex(config.fillColor);
-  ctx.fillLight.intensity = config.fillIntensity;
+  appCtx.fillLight.color.setHex(config.fillColor);
+  appCtx.fillLight.intensity = config.fillIntensity;
 
-  ctx.ambientLight.color.setHex(config.ambientColor);
-  ctx.ambientLight.intensity = config.ambientIntensity;
+  appCtx.ambientLight.color.setHex(config.ambientColor);
+  appCtx.ambientLight.intensity = config.ambientIntensity;
 
   // Update sun sphere
-  if (ctx.sunSphere) {
-    ctx.sunSphere.position.copy(ctx.sun.position);
-    ctx.sunSphere.material.color.setHex(config.sunColor);
-    if (ctx.sunSphere.material.emissive) {
-      ctx.sunSphere.material.emissive.setHex(config.sunColor);
+  if (appCtx.sunSphere) {
+    appCtx.sunSphere.position.copy(appCtx.sun.position);
+    appCtx.sunSphere.material.color.setHex(config.sunColor);
+    if (appCtx.sunSphere.material.emissive) {
+      appCtx.sunSphere.material.emissive.setHex(config.sunColor);
     }
     // Show sun during day/sunrise/sunset, hide at night
-    ctx.sunSphere.visible = time !== 'night';
-    if (ctx.sunSphere.userData.glow) {
-      ctx.sunSphere.userData.glow.visible = time !== 'night';
+    appCtx.sunSphere.visible = time !== 'night';
+    if (appCtx.sunSphere.userData.glow) {
+      appCtx.sunSphere.userData.glow.visible = time !== 'night';
     }
   }
 
   // Show moon only at night
-  if (ctx.moonSphere) {
-    ctx.moonSphere.visible = time === 'night';
-    if (ctx.moonSphere.userData.glow) {
-      ctx.moonSphere.userData.glow.visible = time === 'night';
+  if (appCtx.moonSphere) {
+    appCtx.moonSphere.visible = time === 'night';
+    if (appCtx.moonSphere.userData.glow) {
+      appCtx.moonSphere.userData.glow.visible = time === 'night';
     }
   }
 
   // Show stars at night and during sunrise/sunset (dimmer)
-  if (ctx.starField) {
+  if (appCtx.starField) {
     if (time === 'night') {
-      ctx.starField.visible = true;
+      appCtx.starField.visible = true;
       // Full brightness at night
-      ctx.starField.children.forEach((child) => {
+      appCtx.starField.children.forEach((child) => {
         if (child.material) {
           child.material.opacity = child.userData.baseOpacity || child.material.opacity;
         }
       });
     } else if (time === 'sunset' || time === 'sunrise') {
-      ctx.starField.visible = true;
+      appCtx.starField.visible = true;
       // Dim stars during twilight
-      ctx.starField.children.forEach((child) => {
+      appCtx.starField.children.forEach((child) => {
         if (child.material && child.material.transparent) {
           if (!child.userData.baseOpacity) {
             child.userData.baseOpacity = child.material.opacity;
@@ -140,21 +140,21 @@ function setTimeOfDay(time) {
         }
       });
     } else {
-      ctx.starField.visible = false;
+      appCtx.starField.visible = false;
     }
   }
 
   // Update fog (exponential for natural atmospheric perspective)
-  ctx.scene.fog = new THREE.FogExp2(config.fogColor, config.fogDensity);
+  appCtx.scene.fog = new THREE.FogExp2(config.fogColor, config.fogDensity);
 
   // Update tone mapping exposure
-  if (ctx.renderer) {
-    ctx.renderer.toneMappingExposure = config.exposure;
+  if (appCtx.renderer) {
+    appCtx.renderer.toneMappingExposure = config.exposure;
   }
 
   // Adjust bloom per time of day (stronger at night for lights)
-  if (ctx.bloomPass && config.bloomStrength !== undefined) {
-    ctx.bloomPass.strength = config.bloomStrength;
+  if (appCtx.bloomPass && config.bloomStrength !== undefined) {
+    appCtx.bloomPass.strength = config.bloomStrength;
   }
 
   // Update button icon
@@ -168,7 +168,7 @@ function setTimeOfDay(time) {
 
 function cycleTimeOfDay() {
   const cycle = ['day', 'sunset', 'night', 'sunrise'];
-  const currentIndex = cycle.indexOf(ctx.timeOfDay);
+  const currentIndex = cycle.indexOf(appCtx.timeOfDay);
   const nextIndex = (currentIndex + 1) % cycle.length;
   setTimeOfDay(cycle[nextIndex]);
 }
@@ -197,7 +197,7 @@ function createStarField() {
   }
 
   // Create individual star points
-  ctx.BRIGHT_STARS.forEach((star) => {
+  appCtx.BRIGHT_STARS.forEach((star) => {
     const pos = raDecToVector(star.ra, star.dec);
 
     // SIZE BASED ON REALISTIC APPEARANCE
@@ -267,8 +267,8 @@ function createStarField() {
   });
 
   // Create constellation lines grouped by constellation - store for toggling
-  ctx.allConstellationLines = new THREE.Group();
-  ctx.allConstellationLines.visible = false; // Hidden by default
+  appCtx.allConstellationLines = new THREE.Group();
+  appCtx.allConstellationLines.visible = false; // Hidden by default
 
   const normalLineMaterial = new THREE.LineBasicMaterial({
     color: 0x4488aa,
@@ -277,7 +277,7 @@ function createStarField() {
     fog: false
   });
 
-  Object.entries(ctx.CONSTELLATION_LINES).forEach(([constellationName, lines]) => {
+  Object.entries(appCtx.CONSTELLATION_LINES).forEach(([constellationName, lines]) => {
     lines.forEach((line) => {
       const points = [];
       points.push(raDecToVector(line[0][0], line[0][1]));
@@ -286,11 +286,11 @@ function createStarField() {
       const geometry = new THREE.BufferGeometry().setFromPoints(points);
       const lineSegment = new THREE.Line(geometry, normalLineMaterial);
       lineSegment.userData = { constellation: constellationName };
-      ctx.allConstellationLines.add(lineSegment);
+      appCtx.allConstellationLines.add(lineSegment);
     });
   });
 
-  group.add(ctx.allConstellationLines);
+  group.add(appCtx.allConstellationLines);
 
   // Add some fainter background stars for depth
   const faintStarCount = 2000;
@@ -329,7 +329,7 @@ function createStarField() {
   group.add(faintStars);
 
   group.visible = false; // Hidden during day
-  ctx.scene.add(group);
+  appCtx.scene.add(group);
 
   // Debug log removed
   return group;
@@ -337,35 +337,35 @@ function createStarField() {
 
 // Function to align star field with current location
 function alignStarFieldToLocation(lat, lng) {
-  if (!ctx.starField) return;
+  if (!appCtx.starField) return;
 
   // Reset rotation
-  ctx.starField.rotation.set(0, 0, 0);
+  appCtx.starField.rotation.set(0, 0, 0);
 
   // Rotate based on latitude (tilt the celestial sphere)
   // At equator (0°), Polaris is on horizon
   // At North Pole (90°), Polaris is overhead
   const latRad = lat * Math.PI / 180;
-  ctx.starField.rotation.x = Math.PI / 2 - latRad; // Tilt sphere
+  appCtx.starField.rotation.x = Math.PI / 2 - latRad; // Tilt sphere
 
   // Rotate based on longitude (rotate around polar axis)
   // This simulates Earth's rotation
   const lngRad = lng * Math.PI / 180;
-  ctx.starField.rotation.y = -lngRad; // Rotate to match longitude
+  appCtx.starField.rotation.y = -lngRad; // Rotate to match longitude
 
   // Debug log removed
 }
 
 function highlightConstellation(constellationName) {
   // Clear previous highlight
-  if (ctx.highlightedConstellation) {
-    ctx.highlightedConstellation.parent.remove(ctx.highlightedConstellation);
-    ctx.highlightedConstellation = null;
+  if (appCtx.highlightedConstellation) {
+    appCtx.highlightedConstellation.parent.remove(appCtx.highlightedConstellation);
+    appCtx.highlightedConstellation = null;
   }
 
   if (!constellationName || constellationName === "Planet") return;
 
-  const lines = ctx.CONSTELLATION_LINES[constellationName];
+  const lines = appCtx.CONSTELLATION_LINES[constellationName];
   if (!lines) return;
 
   // Create highlighted version
@@ -398,8 +398,8 @@ function highlightConstellation(constellationName) {
     group.add(lineSegment);
   });
 
-  ctx.starField.add(group);
-  ctx.highlightedConstellation = group;
+  appCtx.starField.add(group);
+  appCtx.highlightedConstellation = group;
   // Debug log removed
 }
 
@@ -454,37 +454,37 @@ function clearStarSelection() {
   const info = document.getElementById('starInfo');
   if (info) info.style.display = 'none';
 
-  if (ctx.highlightedConstellation) {
-    ctx.highlightedConstellation.parent.remove(ctx.highlightedConstellation);
-    ctx.highlightedConstellation = null;
+  if (appCtx.highlightedConstellation) {
+    appCtx.highlightedConstellation.parent.remove(appCtx.highlightedConstellation);
+    appCtx.highlightedConstellation = null;
   }
 
-  ctx.selectedStar = null;
+  appCtx.selectedStar = null;
 }
 
 function checkStarClick(clientX, clientY) {
-  if (!ctx.starField || !ctx.starField.visible || !ctx.skyRaycaster) return;
+  if (!appCtx.starField || !appCtx.starField.visible || !appCtx.skyRaycaster) return;
 
   // Calculate mouse position in normalized device coordinates
   const mouse = new THREE.Vector2();
   mouse.x = clientX / window.innerWidth * 2 - 1;
   mouse.y = -(clientY / window.innerHeight) * 2 + 1;
 
-  ctx.skyRaycaster.setFromCamera(mouse, ctx.camera);
+  appCtx.skyRaycaster.setFromCamera(mouse, appCtx.camera);
 
   // Get all clickable stars
   const clickableStars = [];
-  ctx.starField.traverse((obj) => {
+  appCtx.starField.traverse((obj) => {
     if (obj.userData && obj.userData.isClickable) {
       clickableStars.push(obj);
     }
   });
 
-  const intersects = ctx.skyRaycaster.intersectObjects(clickableStars);
+  const intersects = appCtx.skyRaycaster.intersectObjects(clickableStars);
 
   if (intersects.length > 0) {
     const star = intersects[0].object.userData;
-    ctx.selectedStar = star;
+    appCtx.selectedStar = star;
     showStarInfo(star);
     highlightConstellation(star.constellation);
     // Debug log removed
@@ -495,18 +495,18 @@ function checkStarClick(clientX, clientY) {
 
 // Check if moon was clicked
 function checkMoonClick(clientX, clientY) {
-  if (!ctx.moonSphere || !ctx.moonSphere.visible || ctx.travelingToMoon || ctx.onMoon) return false;
+  if (!appCtx.moonSphere || !appCtx.moonSphere.visible || appCtx.travelingToMoon || appCtx.onMoon) return false;
 
   const mouse = new THREE.Vector2();
   mouse.x = clientX / window.innerWidth * 2 - 1;
   mouse.y = -(clientY / window.innerHeight) * 2 + 1;
 
-  if (!ctx.skyRaycaster) {
-    ctx.skyRaycaster = new THREE.Raycaster();
+  if (!appCtx.skyRaycaster) {
+    appCtx.skyRaycaster = new THREE.Raycaster();
   }
-  ctx.skyRaycaster.setFromCamera(mouse, ctx.camera);
+  appCtx.skyRaycaster.setFromCamera(mouse, appCtx.camera);
 
-  const intersects = ctx.skyRaycaster.intersectObject(ctx.moonSphere);
+  const intersects = appCtx.skyRaycaster.intersectObject(appCtx.moonSphere);
 
   if (intersects.length > 0) {
     // Debug log removed
@@ -518,35 +518,35 @@ function checkMoonClick(clientX, clientY) {
 
 // Direct travel to moon (bypasses space flight module)
 async function directTravelToMoon() {
-  if (ctx.travelingToMoon || ctx.onMoon) return;
+  if (appCtx.travelingToMoon || appCtx.onMoon) return;
 
-  if (typeof ctx.showTransitionLoad === 'function') {
-    await ctx.showTransitionLoad('moon');
-    if (ctx.travelingToMoon || ctx.onMoon) return;
+  if (typeof appCtx.showTransitionLoad === 'function') {
+    await appCtx.showTransitionLoad('moon');
+    if (appCtx.travelingToMoon || appCtx.onMoon) return;
   }
 
-  ctx.travelingToMoon = true;
+  appCtx.travelingToMoon = true;
 
   // Save Earth position
-  ctx.earthPosition = {
-    x: ctx.car.x,
-    z: ctx.car.z,
-    angle: ctx.car.angle
+  appCtx.earthPosition = {
+    x: appCtx.car.x,
+    z: appCtx.car.z,
+    angle: appCtx.car.angle
   };
 
-  ctx.paused = true;
-  ctx.scene.background = new THREE.Color(0x000000);
+  appCtx.paused = true;
+  appCtx.scene.background = new THREE.Color(0x000000);
 
-  if (ctx.terrainGroup) {ctx.terrainGroup.visible = false;ctx.scene.remove(ctx.terrainGroup);}
-  if (ctx.cloudGroup) {ctx.cloudGroup.visible = false;ctx.scene.remove(ctx.cloudGroup);}
-  ctx.roadMeshes.forEach((m) => {m.visible = false;ctx.scene.remove(m);});
-  ctx.buildingMeshes.forEach((m) => {m.visible = false;ctx.scene.remove(m);});
-  ctx.landuseMeshes.forEach((m) => {m.visible = false;ctx.scene.remove(m);});
-  ctx.poiMeshes.forEach((m) => {m.visible = false;ctx.scene.remove(m);});
-  ctx.streetFurnitureMeshes.forEach((m) => {m.visible = false;ctx.scene.remove(m);});
+  if (appCtx.terrainGroup) {appCtx.terrainGroup.visible = false;appCtx.scene.remove(appCtx.terrainGroup);}
+  if (appCtx.cloudGroup) {appCtx.cloudGroup.visible = false;appCtx.scene.remove(appCtx.cloudGroup);}
+  appCtx.roadMeshes.forEach((m) => {m.visible = false;appCtx.scene.remove(m);});
+  appCtx.buildingMeshes.forEach((m) => {m.visible = false;appCtx.scene.remove(m);});
+  appCtx.landuseMeshes.forEach((m) => {m.visible = false;appCtx.scene.remove(m);});
+  appCtx.poiMeshes.forEach((m) => {m.visible = false;appCtx.scene.remove(m);});
+  appCtx.streetFurnitureMeshes.forEach((m) => {m.visible = false;appCtx.scene.remove(m);});
 
-  const moonPos = ctx.moonSphere.position.clone();
-  const startPos = ctx.camera.position.clone();
+  const moonPos = appCtx.moonSphere.position.clone();
+  const startPos = appCtx.camera.position.clone();
   const startTime = Date.now();
   const duration = 3000;
 
@@ -556,8 +556,8 @@ async function directTravelToMoon() {
     const eased = progress < 0.5 ?
     2 * progress * progress :
     1 - Math.pow(-2 * progress + 2, 2) / 2;
-    ctx.camera.position.lerpVectors(startPos, moonPos, eased);
-    ctx.camera.lookAt(moonPos);
+    appCtx.camera.position.lerpVectors(startPos, moonPos, eased);
+    appCtx.camera.lookAt(moonPos);
     if (progress < 1) {
       requestAnimationFrame(animate);
     } else {
@@ -569,15 +569,15 @@ async function directTravelToMoon() {
 
 // Direct return to Earth (bypasses space flight module)
 function returnToEarthDirect() {
-  if (!ctx.onMoon || ctx.travelingToMoon) return;
+  if (!appCtx.onMoon || appCtx.travelingToMoon) return;
 
-  ctx.travelingToMoon = true;
-  ctx.paused = true;
+  appCtx.travelingToMoon = true;
+  appCtx.paused = true;
   hideReturnToEarthButton();
 
-  const startPos = ctx.camera.position.clone();
+  const startPos = appCtx.camera.position.clone();
   const earthCameraPos = new THREE.Vector3(
-    ctx.earthPosition.x, 50, ctx.earthPosition.z + 20
+    appCtx.earthPosition.x, 50, appCtx.earthPosition.z + 20
   );
   const startTime = Date.now();
   const duration = 3000;
@@ -588,7 +588,7 @@ function returnToEarthDirect() {
     const eased = progress < 0.5 ?
     2 * progress * progress :
     1 - Math.pow(-2 * progress + 2, 2) / 2;
-    ctx.camera.position.lerpVectors(startPos, earthCameraPos, eased);
+    appCtx.camera.position.lerpVectors(startPos, earthCameraPos, eased);
     if (progress < 1) {
       requestAnimationFrame(animate);
     } else {
@@ -600,73 +600,73 @@ function returnToEarthDirect() {
 
 // Travel to the moon with smooth animation
 async function travelToMoon() {
-  if (ctx.travelingToMoon || ctx.onMoon) return;
+  if (appCtx.travelingToMoon || appCtx.onMoon) return;
 
-  if (typeof ctx.showTransitionLoad === 'function') {
-    await ctx.showTransitionLoad('space');
-    if (ctx.travelingToMoon || ctx.onMoon) return;
+  if (typeof appCtx.showTransitionLoad === 'function') {
+    await appCtx.showTransitionLoad('space');
+    if (appCtx.travelingToMoon || appCtx.onMoon) return;
   }
 
   // Use the new space flight system if available
-  if (typeof ctx.startSpaceFlightToMoon === 'function') {
-    ctx.startSpaceFlightToMoon();
+  if (typeof appCtx.startSpaceFlightToMoon === 'function') {
+    appCtx.startSpaceFlightToMoon();
     return;
   }
 
   // Fallback to original behavior if space.js not loaded
-  ctx.travelingToMoon = true;
+  appCtx.travelingToMoon = true;
 
   // Save Earth position
-  ctx.earthPosition = {
-    x: ctx.car.x,
-    z: ctx.car.z,
-    angle: ctx.car.angle
+  appCtx.earthPosition = {
+    x: appCtx.car.x,
+    z: appCtx.car.z,
+    angle: appCtx.car.angle
   };
 
   // Disable controls during travel
-  ctx.paused = true;
+  appCtx.paused = true;
 
   // IMMEDIATELY set background to black for space
-  ctx.scene.background = new THREE.Color(0x000000);
+  appCtx.scene.background = new THREE.Color(0x000000);
 
   // IMMEDIATELY hide Earth terrain to prevent "green sheet" during travel
-  if (ctx.terrainGroup) {
-    ctx.terrainGroup.visible = false;
-    ctx.scene.remove(ctx.terrainGroup);
+  if (appCtx.terrainGroup) {
+    appCtx.terrainGroup.visible = false;
+    appCtx.scene.remove(appCtx.terrainGroup);
   }
-  if (ctx.cloudGroup) {
-    ctx.cloudGroup.visible = false;
-    ctx.scene.remove(ctx.cloudGroup);
+  if (appCtx.cloudGroup) {
+    appCtx.cloudGroup.visible = false;
+    appCtx.scene.remove(appCtx.cloudGroup);
   }
 
   // Hide Earth ground plane (grass texture fallback)
-  ctx.scene.traverse((obj) => {
+  appCtx.scene.traverse((obj) => {
     if (obj.userData && obj.userData.isGroundPlane) {
       obj.visible = false;
     }
   });
 
   // Remove all city meshes from scene
-  ctx.roadMeshes.forEach((m) => {
+  appCtx.roadMeshes.forEach((m) => {
     m.visible = false;
-    ctx.scene.remove(m);
+    appCtx.scene.remove(m);
   });
-  ctx.buildingMeshes.forEach((m) => {
+  appCtx.buildingMeshes.forEach((m) => {
     m.visible = false;
-    ctx.scene.remove(m);
+    appCtx.scene.remove(m);
   });
-  ctx.landuseMeshes.forEach((m) => {
+  appCtx.landuseMeshes.forEach((m) => {
     m.visible = false;
-    ctx.scene.remove(m);
+    appCtx.scene.remove(m);
   });
-  ctx.poiMeshes.forEach((m) => {
+  appCtx.poiMeshes.forEach((m) => {
     m.visible = false;
-    ctx.scene.remove(m);
+    appCtx.scene.remove(m);
   });
 
   // Get moon position
-  const moonPos = ctx.moonSphere.position.clone();
-  const startPos = ctx.camera.position.clone();
+  const moonPos = appCtx.moonSphere.position.clone();
+  const startPos = appCtx.camera.position.clone();
   const startTime = Date.now();
   const duration = 3000; // 3 second travel
 
@@ -681,8 +681,8 @@ async function travelToMoon() {
     1 - Math.pow(-2 * progress + 2, 2) / 2;
 
     // Interpolate camera to moon
-    ctx.camera.position.lerpVectors(startPos, moonPos, eased);
-    ctx.camera.lookAt(moonPos);
+    appCtx.camera.position.lerpVectors(startPos, moonPos, eased);
+    appCtx.camera.lookAt(moonPos);
 
     if (progress < 1) {
       requestAnimationFrame(animate);
@@ -700,22 +700,22 @@ async function travelToMoon() {
 function arriveAtMoon() {
   // Debug log removed
 
-  ctx.switchEnv(ctx.ENV.MOON); // sets onMoon=true, travelingToMoon=false
+  appCtx.switchEnv(appCtx.ENV.MOON); // sets onMoon=true, travelingToMoon=false
 
   // IMMEDIATELY set black background and hide car to prevent earth ground flash
-  ctx.scene.background = new THREE.Color(0x000000);
-  ctx.scene.fog = new THREE.FogExp2(0x000000, 0.00005);
-  if (ctx.carMesh) ctx.carMesh.visible = false;
-  ctx.paused = true; // Pause rendering updates until moon is ready
+  appCtx.scene.background = new THREE.Color(0x000000);
+  appCtx.scene.fog = new THREE.FogExp2(0x000000, 0.00005);
+  if (appCtx.carMesh) appCtx.carMesh.visible = false;
+  appCtx.paused = true; // Pause rendering updates until moon is ready
 
   // Reset to driving mode so everything starts clean at the landing site
-  if (ctx.droneMode) {
-    ctx.droneMode = false;
+  if (appCtx.droneMode) {
+    appCtx.droneMode = false;
     const droneBtn = document.getElementById('fDrone');
     if (droneBtn) droneBtn.classList.remove('on');
   }
-  if (ctx.Walk && ctx.Walk.state.mode === 'walk') {
-    ctx.Walk.setModeDrive();
+  if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
+    appCtx.Walk.setModeDrive();
   }
   const drivingBtn = document.getElementById('fDriving');
   if (drivingBtn) drivingBtn.classList.add('on');
@@ -731,63 +731,63 @@ function arriveAtMoon() {
   // Earth terrain already hidden during travel animation
 
   // Hide ALL earth objects to prevent any flash of earth ground
-  if (ctx.terrainGroup) {
-    ctx.terrainGroup.visible = false;
-    ctx.scene.remove(ctx.terrainGroup);
+  if (appCtx.terrainGroup) {
+    appCtx.terrainGroup.visible = false;
+    appCtx.scene.remove(appCtx.terrainGroup);
   }
-  if (ctx.cloudGroup) {
-    ctx.cloudGroup.visible = false;
-    ctx.scene.remove(ctx.cloudGroup);
+  if (appCtx.cloudGroup) {
+    appCtx.cloudGroup.visible = false;
+    appCtx.scene.remove(appCtx.cloudGroup);
   }
-  ctx.scene.traverse((obj) => {
+  appCtx.scene.traverse((obj) => {
     if (obj.userData && obj.userData.isGroundPlane) {
       obj.visible = false;
     }
   });
 
   // Hide moon sphere (we're on it now!)
-  ctx.moonSphere.visible = false;
-  if (ctx.moonSphere.userData.glow) ctx.moonSphere.userData.glow.visible = false;
+  appCtx.moonSphere.visible = false;
+  if (appCtx.moonSphere.userData.glow) appCtx.moonSphere.userData.glow.visible = false;
 
   // Create moon surface
-  if (!ctx.moonSurface) {
+  if (!appCtx.moonSurface) {
     createMoonSurface();
     // Car positioning will happen after moonSurface is fully created
     // (positionCarOnMoon is called in createMoonSurface's setTimeout)
   } else {
     // Re-add and show all moon objects (safe even if already in scene)
-    ctx.moonSurface.visible = true;
-    ctx.scene.add(ctx.moonSurface);
-    if (window.apollo11Beacon) {window.apollo11Beacon.visible = true;ctx.scene.add(window.apollo11Beacon);}
-    if (apollo11Flag) {apollo11Flag.visible = true;ctx.scene.add(apollo11Flag);}
+    appCtx.moonSurface.visible = true;
+    appCtx.scene.add(appCtx.moonSurface);
+    if (window.apollo11Beacon) {window.apollo11Beacon.visible = true;appCtx.scene.add(window.apollo11Beacon);}
+    if (apollo11Flag) {apollo11Flag.visible = true;appCtx.scene.add(apollo11Flag);}
     // Re-add tagged moon objects (plaque, pole, footprints)
     if (window._moonObjects) {
-      window._moonObjects.forEach((obj) => {obj.visible = true;ctx.scene.add(obj);});
+      window._moonObjects.forEach((obj) => {obj.visible = true;appCtx.scene.add(obj);});
     }
     // Position car immediately if moonSurface already exists
     positionCarOnMoon();
     // Show car and unpause now that moon is ready
-    if (ctx.carMesh) ctx.carMesh.visible = true;
-    ctx.paused = false;
+    if (appCtx.carMesh) appCtx.carMesh.visible = true;
+    appCtx.paused = false;
   }
 
   // Adjust lighting for moon - stronger sun for better shading and shadows
-  if (ctx.sun) {
-    ctx.sun.intensity = 2.0; // Brighter sun for stronger shadows on moon
-    ctx.sun.position.set(100, 200, 100); // Higher angle for better shadow casting
+  if (appCtx.sun) {
+    appCtx.sun.intensity = 2.0; // Brighter sun for stronger shadows on moon
+    appCtx.sun.position.set(100, 200, 100); // Higher angle for better shadow casting
   }
-  if (ctx.ambientLight) {
-    ctx.ambientLight.intensity = 0.15; // Lower ambient for more dramatic shadows
+  if (appCtx.ambientLight) {
+    appCtx.ambientLight.intensity = 0.15; // Lower ambient for more dramatic shadows
   }
-  if (ctx.fillLight) {
-    ctx.fillLight.intensity = 0.1; // Very low fill light
+  if (appCtx.fillLight) {
+    appCtx.fillLight.intensity = 0.1; // Very low fill light
   }
 
   // ALWAYS show stars on the moon (no atmosphere to block them!)
-  if (ctx.starField) {
-    ctx.starField.visible = true;
+  if (appCtx.starField) {
+    appCtx.starField.visible = true;
     // Full brightness for stars on moon
-    ctx.starField.children.forEach((child) => {
+    appCtx.starField.children.forEach((child) => {
       if (child.material) {
         child.material.opacity = child.userData.baseOpacity || 1.0;
       }
@@ -936,12 +936,12 @@ function createMoonSurface() {
     flatShading: false
   });
 
-  ctx.moonSurface = new THREE.Mesh(geometry, material);
-  ctx.moonSurface.receiveShadow = true;
-  ctx.moonSurface.castShadow = true;
-  ctx.moonSurface.frustumCulled = false; // Always render - prevents disappearing at high drone altitude
-  ctx.moonSurface.position.y = -100;
-  ctx.scene.add(ctx.moonSurface);
+  appCtx.moonSurface = new THREE.Mesh(geometry, material);
+  appCtx.moonSurface.receiveShadow = true;
+  appCtx.moonSurface.castShadow = true;
+  appCtx.moonSurface.frustumCulled = false; // Always render - prevents disappearing at high drone altitude
+  appCtx.moonSurface.position.y = -100;
+  appCtx.scene.add(appCtx.moonSurface);
 
   // Delay Apollo 11 landing site creation to ensure moonSurface is fully in scene
   setTimeout(() => {
@@ -949,22 +949,22 @@ function createMoonSurface() {
     // Position car after both moonSurface and landing site are ready
     positionCarOnMoon();
     // Now that moon surface and car are positioned, reveal the car and unpause
-    if (ctx.carMesh) ctx.carMesh.visible = true;
+    if (appCtx.carMesh) appCtx.carMesh.visible = true;
     // Snap camera to car position immediately to avoid seeing earth ground
-    if (ctx.camera) {
+    if (appCtx.camera) {
       const camD = 10,camH = 5;
-      ctx.camera.position.set(
-        ctx.car.x - Math.sin(ctx.car.angle) * camD,
-        ctx.car.y + camH,
-        ctx.car.z - Math.cos(ctx.car.angle) * camD
+      appCtx.camera.position.set(
+        appCtx.car.x - Math.sin(appCtx.car.angle) * camD,
+        appCtx.car.y + camH,
+        appCtx.car.z - Math.cos(appCtx.car.angle) * camD
       );
-      ctx.camera.lookAt(ctx.car.x, ctx.car.y + 0.5, ctx.car.z);
+      appCtx.camera.lookAt(appCtx.car.x, appCtx.car.y + 0.5, appCtx.car.z);
       // Reset the smoothed lookAt target so chase cam doesn't lerp from old position
-      if (ctx.camera.userData) {
-        ctx.camera.userData.lookTarget = { x: ctx.car.x, y: ctx.car.y + 0.5, z: ctx.car.z };
+      if (appCtx.camera.userData) {
+        appCtx.camera.userData.lookTarget = { x: appCtx.car.x, y: appCtx.car.y + 0.5, z: appCtx.car.z };
       }
     }
-    ctx.paused = false;
+    appCtx.paused = false;
   }, 150);
 
   // Debug log removed
@@ -976,52 +976,52 @@ function createMoonSurface() {
 function positionCarOnMoon() {
   // Position car on moon surface at APOLLO 11 LANDING SITE!
   // Eagle Crater location from real Apollo 11 data
-  ctx.car.x = 200; // Apollo 11 Eagle Crater X coordinate
-  ctx.car.z = -500; // Apollo 11 Eagle Crater Z coordinate
-  if (typeof ctx.invalidateRoadCache === 'function') ctx.invalidateRoadCache();
+  appCtx.car.x = 200; // Apollo 11 Eagle Crater X coordinate
+  appCtx.car.z = -500; // Apollo 11 Eagle Crater Z coordinate
+  if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
 
   // Ensure moonSurface world matrix is up-to-date for raycasting
-  ctx.moonSurface.updateMatrixWorld(true);
+  appCtx.moonSurface.updateMatrixWorld(true);
 
   // Find the ACTUAL ground height at spawn position using raycasting
   const spawnRaycaster = new THREE.Raycaster();
-  const spawnRayStart = new THREE.Vector3(ctx.car.x, 1000, ctx.car.z);
+  const spawnRayStart = new THREE.Vector3(appCtx.car.x, 1000, appCtx.car.z);
   const spawnRayDir = new THREE.Vector3(0, -1, 0);
   spawnRaycaster.set(spawnRayStart, spawnRayDir);
 
-  const spawnHits = spawnRaycaster.intersectObject(ctx.moonSurface, false);
+  const spawnHits = spawnRaycaster.intersectObject(appCtx.moonSurface, false);
   let groundHeight;
   if (spawnHits.length > 0) {
     groundHeight = spawnHits[0].point.y;
-    ctx.car.y = groundHeight + 1.2; // Car height above ground
+    appCtx.car.y = groundHeight + 1.2; // Car height above ground
   } else {
     // Fallback if raycast fails - use moonSurface base position
-    groundHeight = ctx.moonSurface.position.y;
-    ctx.car.y = groundHeight + 2;
-    console.warn('⚠️ Spawn raycast failed, using fallback Y=' + ctx.car.y);
+    groundHeight = appCtx.moonSurface.position.y;
+    appCtx.car.y = groundHeight + 2;
+    console.warn('⚠️ Spawn raycast failed, using fallback Y=' + appCtx.car.y);
   }
 
-  ctx.car.vx = 0;
-  ctx.car.vz = 0;
-  ctx.car.vy = 0; // No initial vertical velocity
-  ctx.car.angle = 0;
+  appCtx.car.vx = 0;
+  appCtx.car.vz = 0;
+  appCtx.car.vy = 0; // No initial vertical velocity
+  appCtx.car.angle = 0;
 
   // Also position drone at the landing site with correct height
-  ctx.drone.x = ctx.car.x;
-  ctx.drone.z = ctx.car.z;
-  ctx.drone.y = groundHeight + 10; // 10m above surface
-  ctx.drone.pitch = -0.2;
-  ctx.drone.yaw = 0;
-  ctx.drone.roll = 0;
+  appCtx.drone.x = appCtx.car.x;
+  appCtx.drone.z = appCtx.car.z;
+  appCtx.drone.y = groundHeight + 10; // 10m above surface
+  appCtx.drone.pitch = -0.2;
+  appCtx.drone.yaw = 0;
+  appCtx.drone.roll = 0;
 
   // Reset walker position so it doesn't carry over Earth coordinates
-  if (ctx.Walk && ctx.Walk.state && ctx.Walk.state.walker) {
-    ctx.Walk.state.walker.x = ctx.car.x;
-    ctx.Walk.state.walker.z = ctx.car.z;
-    ctx.Walk.state.walker.y = groundHeight + 1.7;
-    ctx.Walk.state.walker.vy = 0;
-    ctx.Walk.state.walker.angle = 0;
-    ctx.Walk.state.walker.yaw = 0;
+  if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker) {
+    appCtx.Walk.state.walker.x = appCtx.car.x;
+    appCtx.Walk.state.walker.z = appCtx.car.z;
+    appCtx.Walk.state.walker.y = groundHeight + 1.7;
+    appCtx.Walk.state.walker.vy = 0;
+    appCtx.Walk.state.walker.angle = 0;
+    appCtx.Walk.state.walker.yaw = 0;
   }
 }
 
@@ -1045,13 +1045,13 @@ function createApollo11LandingSite() {
   raycaster.set(rayStart, rayDir);
 
   // Debug log removed
-  const hits = raycaster.intersectObject(ctx.moonSurface, false);
+  const hits = raycaster.intersectObject(appCtx.moonSurface, false);
 
   if (hits.length === 0) {
     console.error('❌ Could not find ground at Apollo 11 site!');
-    console.error('Moon surface exists:', !!ctx.moonSurface);
-    console.error('Moon surface in scene:', ctx.scene.children.includes(ctx.moonSurface));
-    console.error('Moon surface position:', ctx.moonSurface ? ctx.moonSurface.position : 'N/A');
+    console.error('Moon surface exists:', !!appCtx.moonSurface);
+    console.error('Moon surface in scene:', appCtx.scene.children.includes(appCtx.moonSurface));
+    console.error('Moon surface position:', appCtx.moonSurface ? appCtx.moonSurface.position : 'N/A');
     return;
   }
 
@@ -1072,7 +1072,7 @@ function createApollo11LandingSite() {
   plaque.castShadow = true;
   plaque.receiveShadow = true;
   plaque.userData.moonObject = true;
-  ctx.scene.add(plaque);
+  appCtx.scene.add(plaque);
   window._moonObjects.push(plaque);
 
   // Add a tall marker pole so it's visible from a distance
@@ -1088,7 +1088,7 @@ function createApollo11LandingSite() {
   pole.position.set(landingX - 8, groundY + 4, landingZ);
   pole.castShadow = true;
   pole.userData.moonObject = true;
-  ctx.scene.add(pole);
+  appCtx.scene.add(pole);
   window._moonObjects.push(pole);
 
   // Create American flag as a GROUP (makes it easier to click)
@@ -1172,7 +1172,7 @@ function createApollo11LandingSite() {
     quote: '"That\'s one small step for man, one giant leap for mankind."'
   };
 
-  ctx.scene.add(apollo11Flag);
+  appCtx.scene.add(apollo11Flag);
 
   // Add BEACON - tall light beam visible from anywhere on the moon
   const beaconGroup = new THREE.Group();
@@ -1210,7 +1210,7 @@ function createApollo11LandingSite() {
 
   // Position beacon at landing site
   beaconGroup.position.set(landingX, groundY, landingZ);
-  ctx.scene.add(beaconGroup);
+  appCtx.scene.add(beaconGroup);
 
   // Store reference for animation
   window.apollo11Beacon = beaconGroup;
@@ -1240,7 +1240,7 @@ function createApollo11LandingSite() {
       landingZ + Math.sin(angle) * radius
     );
     raycaster.set(fpRayStart, rayDir);
-    const fpHits = raycaster.intersectObject(ctx.moonSurface, false);
+    const fpHits = raycaster.intersectObject(appCtx.moonSurface, false);
     if (fpHits.length > 0) {
       footprint.position.set(
         landingX + Math.cos(angle) * radius,
@@ -1249,7 +1249,7 @@ function createApollo11LandingSite() {
       );
       footprint.rotation.x = -Math.PI / 2;
       footprint.userData.moonObject = true;
-      ctx.scene.add(footprint);
+      appCtx.scene.add(footprint);
       window._moonObjects.push(footprint);
     }
   }
@@ -1346,21 +1346,21 @@ function showApollo11Info() {
 
 // Return to Earth
 function returnToEarth() {
-  if (!ctx.onMoon || ctx.travelingToMoon) return;
+  if (!appCtx.onMoon || appCtx.travelingToMoon) return;
 
   // Always use direct travel for return (no space flight)
 
-  ctx.travelingToMoon = true;
-  ctx.paused = true;
+  appCtx.travelingToMoon = true;
+  appCtx.paused = true;
 
   // Hide return button
   hideReturnToEarthButton();
 
-  const startPos = ctx.camera.position.clone();
+  const startPos = appCtx.camera.position.clone();
   const earthCameraPos = new THREE.Vector3(
-    ctx.earthPosition.x,
+    appCtx.earthPosition.x,
     50,
-    ctx.earthPosition.z + 20
+    appCtx.earthPosition.z + 20
   );
   const startTime = Date.now();
   const duration = 3000;
@@ -1373,7 +1373,7 @@ function returnToEarth() {
     2 * progress * progress :
     1 - Math.pow(-2 * progress + 2, 2) / 2;
 
-    ctx.camera.position.lerpVectors(startPos, earthCameraPos, eased);
+    appCtx.camera.position.lerpVectors(startPos, earthCameraPos, eased);
 
     if (progress < 1) {
       requestAnimationFrame(animate);
@@ -1387,7 +1387,7 @@ function returnToEarth() {
 
 // Arrive back at Earth
 function arriveAtEarth() {
-  ctx.switchEnv(ctx.ENV.EARTH); // sets onMoon=false, travelingToMoon=false
+  appCtx.switchEnv(appCtx.ENV.EARTH); // sets onMoon=false, travelingToMoon=false
 
   // Update space menu button labels
   const directBtn = document.getElementById('fSpaceDirect');
@@ -1396,79 +1396,79 @@ function arriveAtEarth() {
   if (rocketBtn) rocketBtn.textContent = '🚀 Rocket to Moon';
 
   // Restore Earth position
-  ctx.car.x = ctx.earthPosition.x;
-  ctx.car.z = ctx.earthPosition.z;
-  ctx.car.angle = ctx.earthPosition.angle;
-  ctx.car.vx = 0;
-  ctx.car.vz = 0;
-  ctx.car.vy = 0; // Reset vertical velocity
-  ctx.car.y = 0; // Reset vertical position
-  if (typeof ctx.invalidateRoadCache === 'function') ctx.invalidateRoadCache();
+  appCtx.car.x = appCtx.earthPosition.x;
+  appCtx.car.z = appCtx.earthPosition.z;
+  appCtx.car.angle = appCtx.earthPosition.angle;
+  appCtx.car.vx = 0;
+  appCtx.car.vz = 0;
+  appCtx.car.vy = 0; // Reset vertical velocity
+  appCtx.car.y = 0; // Reset vertical position
+  if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
 
   // Show Earth terrain and objects - RE-ADD to scene
-  if (ctx.terrainGroup) {
-    ctx.terrainGroup.visible = true;
-    ctx.scene.add(ctx.terrainGroup);
+  if (appCtx.terrainGroup) {
+    appCtx.terrainGroup.visible = true;
+    appCtx.scene.add(appCtx.terrainGroup);
   }
-  if (ctx.cloudGroup) {
-    ctx.cloudGroup.visible = true;
-    ctx.scene.add(ctx.cloudGroup);
+  if (appCtx.cloudGroup) {
+    appCtx.cloudGroup.visible = true;
+    appCtx.scene.add(appCtx.cloudGroup);
   }
 
   // Show Earth ground plane (grass texture fallback)
-  ctx.scene.traverse((obj) => {
+  appCtx.scene.traverse((obj) => {
     if (obj.userData && obj.userData.isGroundPlane) {
       obj.visible = true;
     }
   });
 
   // Re-add all city meshes to scene
-  ctx.roadMeshes.forEach((m) => {
+  appCtx.roadMeshes.forEach((m) => {
     m.visible = true;
-    ctx.scene.add(m);
+    appCtx.scene.add(m);
   });
-  ctx.buildingMeshes.forEach((m) => {
+  appCtx.buildingMeshes.forEach((m) => {
     m.visible = true;
-    ctx.scene.add(m);
+    appCtx.scene.add(m);
   });
-  ctx.landuseMeshes.forEach((m) => {
-    m.visible = ctx.landUseVisible || !!m.userData?.alwaysVisible;
-    ctx.scene.add(m);
+  appCtx.landuseMeshes.forEach((m) => {
+    m.visible = appCtx.landUseVisible || !!m.userData?.alwaysVisible;
+    appCtx.scene.add(m);
   });
-  ctx.poiMeshes.forEach((m) => {
-    m.visible = !!ctx.poiMode;
-    ctx.scene.add(m);
+  appCtx.poiMeshes.forEach((m) => {
+    m.visible = !!appCtx.poiMode;
+    appCtx.scene.add(m);
   });
-  ctx.streetFurnitureMeshes.forEach((m) => {
+  appCtx.streetFurnitureMeshes.forEach((m) => {
     m.visible = true;
-    ctx.scene.add(m);
+    appCtx.scene.add(m);
   });
 
   // Hide moon surface
   // Hide ALL moon objects (surface, flag, beacon, plaque, pole, footprints)
-  if (ctx.moonSurface) {ctx.moonSurface.visible = false;ctx.scene.remove(ctx.moonSurface);}
-  if (window.apollo11Beacon) {window.apollo11Beacon.visible = false;ctx.scene.remove(window.apollo11Beacon);}
-  if (apollo11Flag) {apollo11Flag.visible = false;ctx.scene.remove(apollo11Flag);}
+  if (appCtx.moonSurface) {appCtx.moonSurface.visible = false;appCtx.scene.remove(appCtx.moonSurface);}
+  if (window.apollo11Beacon) {window.apollo11Beacon.visible = false;appCtx.scene.remove(window.apollo11Beacon);}
+  if (apollo11Flag) {apollo11Flag.visible = false;appCtx.scene.remove(apollo11Flag);}
   if (window._moonObjects) {
-    window._moonObjects.forEach((obj) => {obj.visible = false;ctx.scene.remove(obj);});
+    window._moonObjects.forEach((obj) => {obj.visible = false;appCtx.scene.remove(obj);});
   }
 
   // Restore Earth lighting
-  if (ctx.sun) {
-    ctx.sun.intensity = 1.2; // Normal Earth sun intensity
-    ctx.sun.position.set(100, 150, 50); // Normal Earth sun position
+  if (appCtx.sun) {
+    appCtx.sun.intensity = 1.2; // Normal Earth sun intensity
+    appCtx.sun.position.set(100, 150, 50); // Normal Earth sun position
   }
-  if (ctx.ambientLight) {
-    ctx.ambientLight.intensity = 0.3; // Normal ambient light
+  if (appCtx.ambientLight) {
+    appCtx.ambientLight.intensity = 0.3; // Normal ambient light
   }
-  if (ctx.fillLight) {
-    ctx.fillLight.intensity = 0.3; // Normal fill light
+  if (appCtx.fillLight) {
+    appCtx.fillLight.intensity = 0.3; // Normal fill light
   }
 
   // Restore sky based on time of day
-  setTimeOfDay(ctx.timeOfDay);
+  setTimeOfDay(appCtx.timeOfDay);
 
-  ctx.paused = false;
+  appCtx.paused = false;
 
   // Debug log removed
 }
@@ -1507,7 +1507,7 @@ function hideReturnToEarthButton() {
 
 // Check if car collides with any building and return collision info
 
-Object.assign(ctx, {
+Object.assign(appCtx, {
   apollo11Flag,
   alignStarFieldToLocation,
   arriveAtEarth,
