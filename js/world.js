@@ -381,6 +381,9 @@ async function loadRoads() {
     if (typeof clearMemoryMarkersForWorldReload === 'function') {
         clearMemoryMarkersForWorldReload();
     }
+    if (typeof clearBlockBuilderForWorldReload === 'function') {
+        clearBlockBuilderForWorldReload();
+    }
     // Properly dispose of all meshes to prevent memory leaks
     roadMeshes.forEach(m => {
         scene.remove(m);
@@ -1377,6 +1380,9 @@ async function loadRoads() {
                 if (typeof refreshMemoryMarkersForCurrentLocation === 'function') {
                     refreshMemoryMarkersForCurrentLocation();
                 }
+                if (typeof refreshBlockBuilderForCurrentLocation === 'function') {
+                    refreshBlockBuilderForCurrentLocation();
+                }
                 hideLoad();
                 // Align star field to current location
                 alignStarFieldToLocation(LOC.lat, LOC.lon);
@@ -1517,6 +1523,9 @@ async function loadRoads() {
                 }
                 if (typeof refreshMemoryMarkersForCurrentLocation === 'function') {
                     refreshMemoryMarkersForCurrentLocation();
+                }
+                if (typeof refreshBlockBuilderForCurrentLocation === 'function') {
+                    refreshBlockBuilderForCurrentLocation();
                 }
                 hideLoad();
                 if (gameStarted) startMode();

@@ -41,7 +41,7 @@ Open `http://localhost:8000`.
 5. Press `F` for walk mode.
 6. Press `6` for drone mode.
 7. Press `M` for large map.
-8. Open `Exploration` menu and try `Place Memory` (pin/flower + note).
+8. Click the `🌸` memory button and place a pin/flower memory note.
 
 ## 4. Essential Controls
 
@@ -54,6 +54,7 @@ Open `http://localhost:8000`.
 | `6` | Drone mode toggle |
 | `C` | Camera cycle |
 | `M` | Large map |
+| `B` | Block build mode toggle |
 | `Esc` | Pause |
 
 Space-flight specific:
@@ -68,8 +69,19 @@ Memory marker action:
 
 | Action | Result |
 | --- | --- |
-| `Exploration` menu -> `Place Memory` | Open persistent memory composer |
+| `🌸` memory button (above controls) | Open persistent memory composer |
 | Click memory marker -> `Remove Marker` | Erase pin / pull flower |
+| Memory composer -> `Delete All` | Remove all local memory markers |
+
+Block builder action:
+
+| Action | Result |
+| --- | --- |
+| Press `B` | Toggle build mode |
+| Click (build mode on) | Place brick block |
+| Shift+Click (build mode on) | Remove targeted block |
+| `🎮 Game Mode` -> `🧹 Clear Blocks` | Remove all build blocks for current location (including saved blocks) |
+| Block cap | Up to `100` total blocks can be stored for now |
 
 ## 5. Troubleshooting
 
@@ -89,7 +101,7 @@ Memory marker action:
 
 - Clear browser cache.
 - Verify cache-bust values are aligned across `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
-- Current freeze snapshot cache-bust target is `v=23`.
+- Current freeze snapshot cache-bust target is `v=34`.
 
 ### Memory markers not persisting
 

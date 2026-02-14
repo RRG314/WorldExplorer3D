@@ -39,6 +39,14 @@ function onKey(code, event) {
         return;
     }
 
+    // Builder mode toggle (B key)
+    if (code === 'KeyB') {
+        if (typeof toggleBlockBuildMode === 'function') {
+            toggleBlockBuildMode();
+        }
+        return;
+    }
+
     // Camera view toggle when walking (C key) - first/third person
     if (code === 'KeyC') {
         if (Walk && Walk.state.mode === 'walk') {

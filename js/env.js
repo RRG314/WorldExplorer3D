@@ -65,6 +65,11 @@ function switchEnv(newEnv) {
     // Sync legacy state flags for backward compatibility
     _syncLegacyFlags(newEnv);
 
+    // Building blocks are an Earth/Moon interaction; disable during space flight.
+    if (newEnv === ENV.SPACE_FLIGHT && typeof globalThis.setBuildModeEnabled === 'function') {
+        globalThis.setBuildModeEnabled(false);
+    }
+
     _transitioning = false;
 
     // Update debug HUD

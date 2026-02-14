@@ -359,6 +359,14 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
 
         return { x: mx + px, y: my + py };
     };
+    const latLonToScreen = (lat, lon) => {
+        const n = Math.pow(2, zoom);
+        const xt = (lon + 180) / 360 * n;
+        const yt = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
+        const px = (xt - centerTileX) * 256 - pixelOffsetX;
+        const py = (yt - centerTileY) * 256 - pixelOffsetY;
+        return { x: mx + px, y: my + py };
+    };
 
     // Draw explicit OSM-derived water overlays (harbors/lakes/rivers/canals)
     // so water stays readable even where custom vector layers dominate the view.
@@ -521,8 +529,8 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
         });
     }
 
-    // Draw POIs on minimap
-    if (poiMode && pois.length > 0) {
+    // Draw POIs on minimap and large map based on legend layer filters
+    if (pois.length > 0) {
         pois.forEach(poi => {
             // Check if this POI category is visible
             if (!isPOIVisible(poi.type)) return;
@@ -551,6 +559,57 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
                 }
             }
         });
+    }
+
+    // Draw memory pins/flowers on both minimap and large map
+    if (typeof getMemoryEntriesForCurrentLocation === 'function') {
+        const showPins = mapLayers.memoryPins !== false;
+        const showFlowers = mapLayers.memoryFlowers !== false;
+        if (showPins || showFlowers) {
+            const memoryEntries = getMemoryEntriesForCurrentLocation();
+            if (Array.isArray(memoryEntries) && memoryEntries.length > 0) {
+                memoryEntries.forEach((entry) => {
+                    if (!entry || !Number.isFinite(entry.lat) || !Number.isFinite(entry.lon)) return;
+                    if (entry.type === 'flower' && !showFlowers) return;
+                    if (entry.type !== 'flower' && !showPins) return;
+                    const pos = latLonToScreen(entry.lat, entry.lon);
+                    if (Math.abs(pos.x - mx) >= w / 2 || Math.abs(pos.y - my) >= h / 2) return;
+
+                    const base = isLarge ? 6 : 4;
+                    if (entry.type === 'flower') {
+                        ctx.fillStyle = '#ec4899';
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = isLarge ? 2 : 1;
+                        ctx.beginPath();
+                        ctx.arc(pos.x, pos.y, base, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.fillStyle = '#facc15';
+                        ctx.beginPath();
+                        ctx.arc(pos.x, pos.y, base * 0.45, 0, Math.PI * 2);
+                        ctx.fill();
+                    } else {
+                        ctx.fillStyle = '#ef4444';
+                        ctx.strokeStyle = '#ffffff';
+                        ctx.lineWidth = isLarge ? 2 : 1;
+                        ctx.save();
+                        ctx.translate(pos.x, pos.y);
+                        ctx.beginPath();
+                        ctx.arc(0, -base * 0.2, base * 0.75, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.beginPath();
+                        ctx.moveTo(0, base * 1.25);
+                        ctx.lineTo(-base * 0.35, base * 0.2);
+                        ctx.lineTo(base * 0.35, base * 0.2);
+                        ctx.closePath();
+                        ctx.fill();
+                        ctx.stroke();
+                        ctx.restore();
+                    }
+                });
+            }
+        }
     }
 
     // Draw properties on minimap

@@ -1730,6 +1730,10 @@ function init() {
     addEventListener('click', (e) => {
         if (!gameStarted) return;
 
+        if (typeof handleBlockBuilderClick === 'function' && handleBlockBuilderClick(e)) {
+            return;
+        }
+
         // Check for moon click FIRST (higher priority than stars)
         if (checkMoonClick(e.clientX, e.clientY)) {
             return; // Moon was clicked, don't check stars

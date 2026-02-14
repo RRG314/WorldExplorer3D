@@ -51,7 +51,7 @@ Complete guide to using World Explorer 3D. Learn every feature, control, and sec
 7. **Start Exploring!**
    - You spawn in a car
    - Drive around and discover the city
-   - Use `Exploration > Place Memory` to drop persistent pin/flower notes
+   - Use the `🌸` memory button (above controls) to drop persistent pin/flower notes
 
 ### Interface Overview
 
@@ -69,6 +69,8 @@ Located in bottom-left corner:
 - Blue arrow = your position/direction
 - Red circle = destination (in timed modes)
 - Green dots = checkpoints
+- Colored POI dots/icons = points of interest (based on legend filters)
+- Red/pink memory markers = placed pins/flowers
 - Gray = roads, green = parks
 
 #### Coordinates Display
@@ -177,6 +179,7 @@ Click header to expand/collapse in-game controls reference (includes driving, wa
 - `Space` - Handbrake (drift/emergency stop)
 - `Ctrl` - Boost (when bar is filled)
 - `Shift` - Off-road mode toggle
+- `B` - Toggle brick build mode
 
 #### Physics
 - **Realistic handling**: Car has momentum and turning radius
@@ -214,6 +217,7 @@ Click header to expand/collapse in-game controls reference (includes driving, wa
 - `Space` - Jump
 - `Shift` - Run (2x speed)
 - `Right Click + Drag` - Free look with mouse
+- `B` - Toggle brick build mode
 
 #### Movement
 - **Walking speed**: ~3 mph
@@ -252,6 +256,7 @@ Click header to expand/collapse in-game controls reference (includes driving, wa
 - `←` - Turn left
 - `→` - Turn right
 - `Mouse` - Free look
+- `B` - Toggle brick build mode
 
 #### Movement
 - **Fly speed**: ~20 mph
@@ -337,7 +342,9 @@ Toggle in the legend (📋 button):
 - **Roads**: Street overlay
 - **Land Use**: Parks, water, zones
 - **Properties**: Real estate markers (if enabled)
-- **POIs**: Points of interest
+- **POIs**: Points of interest (render on minimap + large map by category filters)
+- **Memory Markers**: Your pin/flower notes (render on minimap + large map)
+- **Memory Layer Filters**: Separate legend checkboxes for `📍 Pin` and `🌸 Flower`
 - **Historic Sites**: Historic markers
 
 #### Controls
@@ -367,9 +374,15 @@ Open with 📋 button:
 | 🏢 Green | Properties for sale |
 | 🏢 Blue | Properties for rent |
 | 📍 Red | Points of interest |
+| 📍 Red Pin | Memory pin marker |
+| 🌸 Pink/Yellow | Memory flower marker |
 | 🏛️ Purple | Historic sites |
 | 🚩 Red | Destination (Time Trial) |
 | ✓ Green | Checkpoints |
+
+Legend controls:
+- Use `📍 Pin memories` checkbox to hide/show only pin memories.
+- Use `🌸 Flower memories` checkbox to hide/show only flower memories.
 
 ### Tips
 - Use map to plan routes
@@ -590,8 +603,8 @@ Use memory markers to leave notes directly in the world.
 
 ### How to Place
 
-1. Open `Exploration` float menu.
-2. Click `Place Memory`.
+1. Click the `🌸` memory button above the controls panel.
+2. Memory composer opens.
 3. Choose marker type (`Pin` or `Flower`).
 4. Enter your message.
 5. Click `Place Marker`.
@@ -604,13 +617,45 @@ Placement uses your current Earth-mode position (car, walk, or drone reference p
 2. Memory info panel opens.
 3. Click `Remove Marker`.
 
+### Delete All Memories
+
+1. Open the memory composer (`🌸` button).
+2. Click `Delete All`.
+3. Confirm the prompt.
+
 ### Persistence Behavior
 
 - Memory markers are persisted in browser local storage on this device/browser profile.
 - They reload automatically when you revisit that location.
+- Markers are placed/rendered on the highest local surface (build blocks, roofs, then ground).
+- Memory markers are also shown on minimap and large map.
+- Pin/flower visibility can be toggled independently in the legend.
+- Limits: 200 chars per message, 300 markers per location, 1500 markers total.
 - If browser storage is blocked/disabled, placement is disabled and a warning is shown.
 - Markers are not automatically synced between different browsers/devices.
+- Notes are not encrypted; do not store passwords, keys, or sensitive personal data.
+- UI paths that render dynamic memory/property/POI text now escape content before HTML insertion.
 - Optional check: run `getMemoryPersistenceStatus()` in browser console.
+
+## Brick Builder
+
+Create Minecraft-style brick stacks directly in the world.
+
+### Builder Controls
+
+- Press `B` to toggle build mode on/off.
+- Click in the world to place a brick block.
+- `Shift + Click` a placed block to remove it.
+- Use `🎮 Game Mode` -> `🧹 Clear Blocks` to wipe all build blocks for the current location (including saved blocks).
+
+### How Stacking Works
+
+- Aim at an existing block face and click to attach a new block to that face.
+- Keep clicking to stack vertically or extend walls horizontally.
+- Build mode works in driving, walking, and drone exploration contexts.
+- In walking mode, placed blocks are climbable/standable surfaces.
+- Placed blocks are persisted in browser storage per location and reload automatically when returning.
+- Hard cap: up to `100` blocks can be stored for now.
 
 ## Advanced Features
 
@@ -702,6 +747,8 @@ Located on right side of screen:
    - Start challenges
    - View high scores
    - Mode selection
+   - Toggle brick build mode
+   - Clear all placed build blocks (current location)
 
 4. **🌿 Environment**:
    - Weather controls (if available)
@@ -794,6 +841,12 @@ A: Yes, optimized for tablets and phones with touch controls.
 
 **Q: Can I save my progress?**
 A: Full gameplay state is not saved, but memory markers (pin/flower notes) are persisted locally in your browser.
+
+**Q: Where are memory notes stored?**
+A: In browser local storage (`worldExplorer3D.memories.v1`) on this device/profile only.
+
+**Q: Are memory notes secure/private?**
+A: They are local-only but not encrypted. Anyone with access to this browser profile can read them.
 
 **Q: Is it multiplayer?**
 A: Not yet, but planned for future updates.
@@ -923,7 +976,9 @@ Quick reference for all controls:
 |-----|--------|
 | M | Toggle Map |
 | N | Next City |
-| Exploration menu > Place Memory | Create persistent pin/flower note |
+| B | Toggle brick build mode |
+| Game Menu -> Clear Blocks | Clear current-location build blocks |
+| 🌸 Memory Button | Create persistent pin/flower note |
 | R | Record Track |
 | Esc | Pause |
 
@@ -943,6 +998,8 @@ Quick reference for all controls:
 | Click Star | View Constellation |
 | Click Planet/Asteroid/Spacecraft/Galaxy | Open space inspector info |
 | Click Memory Marker | Open/remove memory note |
+| Click (Build Mode On) | Place brick block |
+| Shift+Click (Build Mode On) | Remove targeted brick block |
 | Right Click Map | Teleport |
 | Left Click Map | View Info |
 

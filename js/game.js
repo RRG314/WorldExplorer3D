@@ -47,11 +47,58 @@ function formatPrice(v) {
   return '$' + Math.round(v).toLocaleString();
 }
 
+function escapeHtml(value) {
+  return String(value ?? '').replace(/[&<>"']/g, (ch) => ({
+    '&': '&amp;',
+    '<': '&lt;',
+    '>': '&gt;',
+    '"': '&quot;',
+    "'": '&#39;'
+  }[ch]));
+}
+
+function escapeJsString(value) {
+  return String(value ?? '')
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'")
+    .replace(/\r/g, '')
+    .replace(/\n/g, '\\n')
+    .replace(/</g, '\\x3C')
+    .replace(/>/g, '\\x3E');
+}
+
+function toFiniteNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function sanitizeHttpUrl(raw) {
+  if (!raw) return '';
+  try {
+    const baseHref = (globalThis.location && globalThis.location.href) ? globalThis.location.href : 'https://example.com/';
+    const parsed = new URL(String(raw), baseHref);
+    if (parsed.protocol === 'http:' || parsed.protocol === 'https:') return parsed.href;
+    return '';
+  } catch {
+    return '';
+  }
+}
+
 function createPropertyCard(p) {
+  const safeId = escapeJsString(p.id);
+  const safeAddress = escapeHtml(p.address || 'Address unavailable');
+  const safePrice = toFiniteNumber(p.price, 0);
+  const safeBeds = toFiniteNumber(p.beds, 0);
+  const safeBaths = toFiniteNumber(p.baths, 0);
+  const safeSqft = Math.round(toFiniteNumber(p.sqft, 0));
+  const safeLat = toFiniteNumber(p.lat, 0);
+  const safeLon = toFiniteNumber(p.lon, 0);
+  const safePrimaryPhoto = sanitizeHttpUrl(p.primaryPhoto);
+
   // Photo with intelligent fallback
   let photoHTML;
-  if (p.primaryPhoto) {
-    photoHTML = `<img src="${p.primaryPhoto}" alt="${p.address}" crossorigin="anonymous" onerror="this.onerror=null; this.src='https://maps.googleapis.com/maps/api/streetview?size=400x300&location=${p.lat},${p.lon}&key=YOUR_API_KEY&source=outdoor'">`;
+  if (safePrimaryPhoto) {
+    photoHTML = `<img src="${escapeHtml(safePrimaryPhoto)}" alt="${safeAddress}" crossorigin="anonymous" referrerpolicy="no-referrer" onerror="this.onerror=null; this.src='https://maps.googleapis.com/maps/api/streetview?size=400x300&location=${safeLat},${safeLon}&key=YOUR_API_KEY&source=outdoor'">`;
   } else {
     // Fallback to street view if available (will show generic placeholder if street view fails)
     photoHTML = `<div style="width:100%;height:100%;background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);display:flex;align-items:center;justify-content:center;flex-direction:column;color:white">
@@ -72,20 +119,20 @@ function createPropertyCard(p) {
   const sourceTag = `<div style="position:absolute;top:6px;right:6px;background:${badge.bgColor};color:${badge.color};padding:3px 6px;border-radius:4px;font-size:9px;font-weight:700;border:1px solid ${badge.color}">${badge.text}</div>`;
 
   const isSelected = selectedProperty && selectedProperty.id === p.id;
-  const distance = Math.round(p.distance);
+  const distance = Math.round(toFiniteNumber(p.distance, 0));
   const distanceText = distance > 1000 ? (distance/1000).toFixed(1) + 'km' : distance + 'm';
 
   return `
-  <div class="property-card" onclick="openModalById('${p.id}')" style="position:relative;margin-bottom:10px">
+  <div class="property-card" onclick="openModalById('${safeId}')" style="position:relative;margin-bottom:10px">
     <div class="prop-photo" style="height:140px">${photoHTML}${sourceTag}</div>
     <div class="prop-info">
       <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px">
-        <div class="prop-price" style="font-size:18px">${formatPrice(p.price)}${p.priceType==='rent'?'/mo':''}</div>
-        <div style="font-size:11px;color:#10b981;font-weight:600;background:#d1fae5;padding:3px 6px;border-radius:4px">📍 ${distanceText}</div>
+        <div class="prop-price" style="font-size:18px">${formatPrice(safePrice)}${p.priceType==='rent'?'/mo':''}</div>
+        <div style="font-size:11px;color:#10b981;font-weight:600;background:#d1fae5;padding:3px 6px;border-radius:4px">📍 ${escapeHtml(distanceText)}</div>
       </div>
-      <div class="prop-address" style="font-size:12px">${p.address}</div>
-      <div class="prop-details" style="font-size:11px;gap:8px">🛏 ${p.beds} 🚿 ${p.baths} 📐 ${p.sqft}</div>
-      <button onclick="event.stopPropagation(); navigateToProperty('${p.id}')" style="width:100%;background:${isSelected ? '#10b981' : '#667eea'};border:none;border-radius:6px;padding:6px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:11px;margin-top:6px;transition:all 0.2s">${isSelected ? '✓ Navigating' : '🧭 Navigate'}</button>
+      <div class="prop-address" style="font-size:12px">${safeAddress}</div>
+      <div class="prop-details" style="font-size:11px;gap:8px">🛏 ${safeBeds} 🚿 ${safeBaths} 📐 ${safeSqft}</div>
+      <button onclick="event.stopPropagation(); navigateToProperty('${safeId}')" style="width:100%;background:${isSelected ? '#10b981' : '#667eea'};border:none;border-radius:6px;padding:6px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:11px;margin-top:6px;transition:all 0.2s">${isSelected ? '✓ Navigating' : '🧭 Navigate'}</button>
     </div>
   </div>`;
 }
@@ -223,6 +270,8 @@ function updateMapLayers() {
   mapLayers.destination = document.getElementById('filterDestination').checked;
   mapLayers.customTrack = document.getElementById('filterCustomTrack').checked;
   mapLayers.police = document.getElementById('filterPolice').checked;
+  mapLayers.memoryPins = document.getElementById('filterMemoryPins').checked;
+  mapLayers.memoryFlowers = document.getElementById('filterMemoryFlowers').checked;
 
   // Update parent checkboxes
   const allPOIs = mapLayers.schools && mapLayers.healthcare && mapLayers.emergency &&
@@ -259,6 +308,8 @@ function toggleAllLayers(state) {
   document.getElementById('filterDestination').checked = state;
   document.getElementById('filterCustomTrack').checked = state;
   document.getElementById('filterPolice').checked = state;
+  document.getElementById('filterMemoryPins').checked = state;
+  document.getElementById('filterMemoryFlowers').checked = state;
   document.getElementById('filterRoads').checked = state;
   showRoads = state;
   document.getElementById('mapRoadsToggle').classList.toggle('active', state);
@@ -315,58 +366,77 @@ function showMapInfo(type, data) {
 
   if (type === 'property') {
     title.textContent = '🏠 Property Details';
-    const distance = Math.round(Math.sqrt((data.x - car.x)**2 + (data.z - car.z)**2));
+    const distance = Math.round(Math.sqrt((toFiniteNumber(data.x, 0) - car.x)**2 + (toFiniteNumber(data.z, 0) - car.z)**2));
     const distanceText = distance > 1000 ? (distance/1000).toFixed(1) + 'km' : distance + 'm';
+    const safeId = escapeJsString(data.id);
+    const safeAddress = escapeHtml(data.address || 'Address unavailable');
+    const safeCity = escapeHtml(data.city || '');
+    const safeState = escapeHtml(data.state || '');
+    const safeZipCode = escapeHtml(data.zipCode || '');
+    const safePropertyType = escapeHtml(data.propertyType || 'Unknown');
+    const safeBeds = toFiniteNumber(data.beds, 0);
+    const safeBaths = toFiniteNumber(data.baths, 0);
+    const safeSqft = toFiniteNumber(data.sqft, 0);
+    const safeYearBuilt = escapeHtml(data.yearBuilt || 'N/A');
+    const safePrice = toFiniteNumber(data.price, 0);
 
     content.innerHTML = `
       <div style="margin-bottom:12px">
-        <div style="font-size:16px;font-weight:bold;color:#0ff;margin-bottom:6px">${formatPrice(data.price)}${data.priceType==='rent'?'/mo':''}</div>
-        <div style="font-size:12px;opacity:0.9;margin-bottom:4px">${data.address}</div>
-        <div style="font-size:11px;opacity:0.8">${data.city}, ${data.state} ${data.zipCode}</div>
+        <div style="font-size:16px;font-weight:bold;color:#0ff;margin-bottom:6px">${formatPrice(safePrice)}${data.priceType==='rent'?'/mo':''}</div>
+        <div style="font-size:12px;opacity:0.9;margin-bottom:4px">${safeAddress}</div>
+        <div style="font-size:11px;opacity:0.8">${safeCity}, ${safeState} ${safeZipCode}</div>
       </div>
       <div style="margin-bottom:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:10px">
-        <div>🛏️ <strong>${data.beds}</strong> beds</div>
-        <div>🚿 <strong>${data.baths}</strong> baths</div>
-        <div>📐 <strong>${data.sqft}</strong> sqft</div>
-        <div>📅 <strong>${data.yearBuilt || 'N/A'}</strong></div>
+        <div>🛏️ <strong>${safeBeds}</strong> beds</div>
+        <div>🚿 <strong>${safeBaths}</strong> baths</div>
+        <div>📐 <strong>${safeSqft}</strong> sqft</div>
+        <div>📅 <strong>${safeYearBuilt}</strong></div>
       </div>
       <div style="margin-bottom:12px;font-size:10px">
-        <div style="opacity:0.8">📍 Distance: <strong>${distanceText}</strong></div>
-        <div style="opacity:0.8">🏷️ Type: <strong>${data.propertyType}</strong></div>
+        <div style="opacity:0.8">📍 Distance: <strong>${escapeHtml(distanceText)}</strong></div>
+        <div style="opacity:0.8">🏷️ Type: <strong>${safePropertyType}</strong></div>
       </div>
-      <button onclick="navigateToProperty('${data.id}'); closeMapInfo();" style="width:100%;background:#0fc;color:#000;border:none;border-radius:6px;padding:10px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:11px;margin-bottom:6px">🧭 NAVIGATE HERE</button>
-      <button onclick="openModalById('${data.id}'); closeMapInfo();" style="width:100%;background:rgba(0,255,200,0.2);color:#0fc;border:1px solid #0fc;border-radius:6px;padding:8px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:10px">📋 FULL DETAILS</button>
+      <button onclick="navigateToProperty('${safeId}'); closeMapInfo();" style="width:100%;background:#0fc;color:#000;border:none;border-radius:6px;padding:10px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:11px;margin-bottom:6px">🧭 NAVIGATE HERE</button>
+      <button onclick="openModalById('${safeId}'); closeMapInfo();" style="width:100%;background:rgba(0,255,200,0.2);color:#0fc;border:1px solid #0fc;border-radius:6px;padding:8px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:10px">📋 FULL DETAILS</button>
     `;
   } else if (type === 'poi') {
-    title.textContent = data.icon + ' ' + data.category;
-    const distance = Math.round(Math.sqrt((data.x - car.x)**2 + (data.z - car.z)**2));
+    title.textContent = `${data.icon || '📍'} ${data.category || 'POI'}`;
+    const safeX = toFiniteNumber(data.x, 0);
+    const safeZ = toFiniteNumber(data.z, 0);
+    const safeName = escapeHtml(data.name || 'Point of Interest');
+    const safeCategory = escapeHtml(data.category || 'POI');
+    const safeNameJs = escapeJsString(data.name || 'POI');
+    const distance = Math.round(Math.sqrt((safeX - car.x)**2 + (safeZ - car.z)**2));
     const distanceText = distance > 1000 ? (distance/1000).toFixed(1) + 'km' : distance + 'm';
 
     content.innerHTML = `
       <div style="margin-bottom:12px">
-        <div style="font-size:16px;font-weight:bold;color:#0ff;margin-bottom:6px">${data.name}</div>
-        <div style="font-size:11px;opacity:0.8">${data.category}</div>
+        <div style="font-size:16px;font-weight:bold;color:#0ff;margin-bottom:6px">${safeName}</div>
+        <div style="font-size:11px;opacity:0.8">${safeCategory}</div>
       </div>
       <div style="margin-bottom:12px;font-size:10px">
-        <div style="opacity:0.8">📍 Distance: <strong>${distanceText}</strong></div>
+        <div style="opacity:0.8">📍 Distance: <strong>${escapeHtml(distanceText)}</strong></div>
       </div>
-      <button onclick="navigateToPOI(${data.x}, ${data.z}, '${data.name}'); closeMapInfo();" style="width:100%;background:#0fc;color:#000;border:none;border-radius:6px;padding:10px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:11px">🧭 NAVIGATE HERE</button>
+      <button onclick="navigateToPOI(${safeX}, ${safeZ}, '${safeNameJs}'); closeMapInfo();" style="width:100%;background:#0fc;color:#000;border:none;border-radius:6px;padding:10px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:11px">🧭 NAVIGATE HERE</button>
     `;
   } else if (type === 'historic') {
     title.textContent = '⛩️ Historic Site';
-    const distance = Math.round(Math.sqrt((data.x - car.x)**2 + (data.z - car.z)**2));
+    const safeName = escapeHtml(data.name || 'Historic Site');
+    const safeCategory = escapeHtml(data.category || 'Historic');
+    const safeNameJs = escapeJsString(data.name || 'Historic Site');
+    const distance = Math.round(Math.sqrt((toFiniteNumber(data.x, 0) - car.x)**2 + (toFiniteNumber(data.z, 0) - car.z)**2));
     const distanceText = distance > 1000 ? (distance/1000).toFixed(1) + 'km' : distance + 'm';
 
     content.innerHTML = `
       <div style="margin-bottom:12px">
-        <div style="font-size:16px;font-weight:bold;color:#f59e0b;margin-bottom:6px">${data.name}</div>
-        <div style="font-size:11px;opacity:0.8">${data.category}</div>
+        <div style="font-size:16px;font-weight:bold;color:#f59e0b;margin-bottom:6px">${safeName}</div>
+        <div style="font-size:11px;opacity:0.8">${safeCategory}</div>
       </div>
       <div style="margin-bottom:12px;font-size:10px">
-        <div style="opacity:0.8">📍 Distance: <strong>${distanceText}</strong></div>
+        <div style="opacity:0.8">📍 Distance: <strong>${escapeHtml(distanceText)}</strong></div>
       </div>
-      <button onclick="navigateToHistoric('${data.name}'); closeMapInfo();" style="width:100%;background:#f59e0b;color:#000;border:none;border-radius:6px;padding:10px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:11px;margin-bottom:6px">🧭 NAVIGATE HERE</button>
-      <button onclick="openHistoricModal('${data.name}'); closeMapInfo();" style="width:100%;background:rgba(245,158,11,0.2);color:#f59e0b;border:1px solid #f59e0b;border-radius:6px;padding:8px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:10px">📋 FULL DETAILS</button>
+      <button onclick="navigateToHistoric('${safeNameJs}'); closeMapInfo();" style="width:100%;background:#f59e0b;color:#000;border:none;border-radius:6px;padding:10px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:11px;margin-bottom:6px">🧭 NAVIGATE HERE</button>
+      <button onclick="openHistoricModal('${safeNameJs}'); closeMapInfo();" style="width:100%;background:rgba(245,158,11,0.2);color:#f59e0b;border:1px solid #f59e0b;border-radius:6px;padding:8px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:10px">📋 FULL DETAILS</button>
     `;
   }
 }
@@ -384,12 +454,27 @@ function openModalById(id) {
   const p = properties.find(x => x.id === id);
   if (!p || !PropertyUI.modal) return;
 
-  PropertyUI.modalTitle.textContent = p.address;
+  PropertyUI.modalTitle.textContent = p.address || 'Property';
 
-  const photos = p.photos && p.photos.length > 0
-    ? p.photos.slice(0, 3).map(url => `<img src="${url}" crossorigin="anonymous" style="width:100%;border-radius:12px;margin-bottom:12px" onerror="this.style.display='none'">`).join('')
-    : p.primaryPhoto
-    ? `<img src="${p.primaryPhoto}" crossorigin="anonymous" style="width:100%;border-radius:12px;margin-bottom:16px" onerror="this.style.display='none'">`
+  const safeId = escapeJsString(p.id);
+  const safePrice = toFiniteNumber(p.price, 0);
+  const safeBeds = toFiniteNumber(p.beds, 0);
+  const safeBaths = toFiniteNumber(p.baths, 0);
+  const safeSqft = Math.round(toFiniteNumber(p.sqft, 0));
+  const safePricePerSqft = toFiniteNumber(p.pricePerSqft, 0);
+  const safePropertyType = escapeHtml(p.propertyType || 'Unknown');
+  const safeYearBuilt = escapeHtml(p.yearBuilt || 'N/A');
+  const safeDaysOnMarket = toFiniteNumber(p.daysOnMarket, 0);
+  const safeSourceUrl = sanitizeHttpUrl(p.sourceUrl);
+  const safePhotoUrls = Array.isArray(p.photos) ? p.photos.map(sanitizeHttpUrl).filter(Boolean).slice(0, 3) : [];
+  const safePrimaryPhoto = sanitizeHttpUrl(p.primaryPhoto);
+
+  const photos = safePhotoUrls.length > 0
+    ? safePhotoUrls
+      .map(url => `<img src="${escapeHtml(url)}" crossorigin="anonymous" referrerpolicy="no-referrer" style="width:100%;border-radius:12px;margin-bottom:12px" onerror="this.style.display='none'">`)
+      .join('')
+    : safePrimaryPhoto
+    ? `<img src="${escapeHtml(safePrimaryPhoto)}" crossorigin="anonymous" referrerpolicy="no-referrer" style="width:100%;border-radius:12px;margin-bottom:16px" onerror="this.style.display='none'">`
     : `<div style="width:100%;height:200px;background:#f1f5f9;border-radius:12px;margin-bottom:16px;display:flex;align-items:center;justify-content:center;font-size:64px">🏠</div>`;
 
   // Source notice
@@ -409,7 +494,7 @@ function openModalById(id) {
   const isSelected = selectedProperty && selectedProperty.id === p.id;
   const navButtons = `
     <div style="display:flex;gap:8px;margin-top:16px">
-      <button onclick="navigateToProperty('${p.id}')" style="flex:1;background:${isSelected ? '#10b981' : '#667eea'};border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;transition:all 0.2s">
+      <button onclick="navigateToProperty('${safeId}')" style="flex:1;background:${isSelected ? '#10b981' : '#667eea'};border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;transition:all 0.2s">
         ${isSelected ? '✓ Navigating' : '🧭 Navigate Here'}
       </button>
       ${isSelected ? `<button onclick="clearNavigation()" style="flex:1;background:#ef4444;border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;transition:all 0.2s">✕ Clear Route</button>` : ''}
@@ -421,38 +506,38 @@ function openModalById(id) {
     ${photos}
     <div class="prop-stat">
       <span class="prop-stat-label">Price</span>
-      <span class="prop-stat-value">${formatPrice(p.price)}${p.priceType==='rent'?'/mo':''}</span>
+      <span class="prop-stat-value">${formatPrice(safePrice)}${p.priceType==='rent'?'/mo':''}</span>
     </div>
     <div class="prop-stat">
       <span class="prop-stat-label">Bedrooms</span>
-      <span class="prop-stat-value">${p.beds}</span>
+      <span class="prop-stat-value">${safeBeds}</span>
     </div>
     <div class="prop-stat">
       <span class="prop-stat-label">Bathrooms</span>
-      <span class="prop-stat-value">${p.baths}</span>
+      <span class="prop-stat-value">${safeBaths}</span>
     </div>
     <div class="prop-stat">
       <span class="prop-stat-label">Square Feet</span>
-      <span class="prop-stat-value">${p.sqft.toLocaleString()}</span>
+      <span class="prop-stat-value">${safeSqft.toLocaleString()}</span>
     </div>
     <div class="prop-stat">
       <span class="prop-stat-label">Price per sqft</span>
-      <span class="prop-stat-value">${formatPrice(p.pricePerSqft)}</span>
+      <span class="prop-stat-value">${formatPrice(safePricePerSqft)}</span>
     </div>
     <div class="prop-stat">
       <span class="prop-stat-label">Property Type</span>
-      <span class="prop-stat-value">${p.propertyType}</span>
+      <span class="prop-stat-value">${safePropertyType}</span>
     </div>
     <div class="prop-stat">
       <span class="prop-stat-label">Year Built</span>
-      <span class="prop-stat-value">${p.yearBuilt || 'N/A'}</span>
+      <span class="prop-stat-value">${safeYearBuilt}</span>
     </div>
-    ${p.daysOnMarket ? `<div class="prop-stat">
+    ${safeDaysOnMarket > 0 ? `<div class="prop-stat">
       <span class="prop-stat-label">Days on Market</span>
-      <span class="prop-stat-value">${p.daysOnMarket}</span>
+      <span class="prop-stat-value">${safeDaysOnMarket}</span>
     </div>` : ''}
     ${navButtons}
-    ${p.sourceUrl ? `<button onclick="window.open('${p.sourceUrl}','_blank')" style="width:100%;margin-top:8px;background:#64748b;border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer">🔗 View Full Listing</button>` : ''}
+    ${safeSourceUrl ? `<button onclick="window.open('${escapeJsString(safeSourceUrl)}','_blank','noopener,noreferrer')" style="width:100%;margin-top:8px;background:#64748b;border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer">🔗 View Full Listing</button>` : ''}
   `;
   PropertyUI.modal.classList.add('show');
 }
@@ -681,18 +766,22 @@ function updateHistoricPanel() {
 }
 
 function createHistoricCard(site) {
-  const distance = Math.round(site.distance);
+  const distance = Math.round(toFiniteNumber(site.distance, 0));
   const distanceText = distance > 1000 ? (distance/1000).toFixed(1) + 'km' : distance + 'm';
   const isSelected = selectedHistoric && selectedHistoric.name === site.name;
+  const safeName = escapeHtml(site.name || 'Historic Site');
+  const safeNameJs = escapeJsString(site.name || 'Historic Site');
+  const safeCategory = escapeHtml(site.category || 'Historic');
+  const safeIcon = escapeHtml(site.icon || '⛩️');
 
   return `
-    <div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:12px;padding:12px;margin-bottom:10px;cursor:pointer;transition:all 0.2s" onclick="openHistoricModal('${site.name}')">
+    <div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:12px;padding:12px;margin-bottom:10px;cursor:pointer;transition:all 0.2s" onclick="openHistoricModal('${safeNameJs}')">
       <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:6px">
-        <div style="font-size:16px;font-weight:700;color:#78350f;flex:1">${site.icon} ${site.name}</div>
-        <div style="font-size:11px;color:#d97706;font-weight:600;background:#fff;padding:3px 6px;border-radius:4px">📍 ${distanceText}</div>
+        <div style="font-size:16px;font-weight:700;color:#78350f;flex:1">${safeIcon} ${safeName}</div>
+        <div style="font-size:11px;color:#d97706;font-weight:600;background:#fff;padding:3px 6px;border-radius:4px">📍 ${escapeHtml(distanceText)}</div>
       </div>
-      <div style="font-size:11px;color:#92400e;margin-bottom:8px">${site.category}</div>
-      <button onclick="event.stopPropagation(); navigateToHistoric('${site.name}')" style="width:100%;background:${isSelected ? '#10b981' : '#f59e0b'};border:none;border-radius:6px;padding:6px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:11px;transition:all 0.2s">
+      <div style="font-size:11px;color:#92400e;margin-bottom:8px">${safeCategory}</div>
+      <button onclick="event.stopPropagation(); navigateToHistoric('${safeNameJs}')" style="width:100%;background:${isSelected ? '#10b981' : '#f59e0b'};border:none;border-radius:6px;padding:6px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:11px;transition:all 0.2s">
         ${isSelected ? '✓ Navigating' : '🧭 Get Directions'}
       </button>
     </div>
@@ -703,17 +792,23 @@ async function openHistoricModal(siteName) {
   const site = historicSites.find(s => s.name === siteName);
   if (!site || !PropertyUI.modal) return;
 
-  PropertyUI.modalTitle.textContent = site.name;
+  PropertyUI.modalTitle.textContent = site.name || 'Historic Site';
+  const safeNameJs = escapeJsString(site.name || 'Historic Site');
+  const safeCategory = escapeHtml(site.category || 'Historic');
+  const safeIcon = escapeHtml(site.icon || '⛩️');
+  const safeLat = toFiniteNumber(site.lat, 0).toFixed(4);
+  const safeLon = toFiniteNumber(site.lon, 0).toFixed(4);
 
   let fact = 'Historic site with cultural significance.';
 
   // Try to get Wikipedia info if available
-  if (site.wikidata) {
+  const wikidataId = typeof site.wikidata === 'string' ? site.wikidata.trim() : '';
+  if (wikidataId && /^[A-Za-z0-9_-]+$/.test(wikidataId)) {
     try {
-      const response = await fetch(`https://www.wikidata.org/wiki/Special:EntityData/${site.wikidata}.json`);
+      const response = await fetch(`https://www.wikidata.org/wiki/Special:EntityData/${wikidataId}.json`);
       if (response.ok) {
         const data = await response.json();
-        const entity = data.entities[site.wikidata];
+        const entity = data.entities[wikidataId];
         if (entity && entity.descriptions && entity.descriptions.en) {
           fact = entity.descriptions.en.value;
         }
@@ -723,13 +818,16 @@ async function openHistoricModal(siteName) {
     }
   }
 
-  const distance = Math.round(site.distance);
+  const distance = Math.round(toFiniteNumber(site.distance, 0));
   const distanceText = distance > 1000 ? (distance/1000).toFixed(1) + 'km' : distance + 'm';
   const isSelected = selectedHistoric && selectedHistoric.name === site.name;
+  const safeFact = escapeHtml(fact);
+  const wikiSlug = typeof site.wikipedia === 'string' ? site.wikipedia.trim().replace(/\s+/g, '_') : '';
+  const wikiUrl = wikiSlug ? `https://wikipedia.org/wiki/${encodeURIComponent(wikiSlug)}` : '';
 
   const navButtons = `
     <div style="display:flex;gap:8px;margin-top:16px">
-      <button onclick="navigateToHistoric('${site.name}')" style="flex:1;background:${isSelected ? '#10b981' : '#f59e0b'};border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;transition:all 0.2s">
+      <button onclick="navigateToHistoric('${safeNameJs}')" style="flex:1;background:${isSelected ? '#10b981' : '#f59e0b'};border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;transition:all 0.2s">
         ${isSelected ? '✓ Navigating' : '🧭 Navigate Here'}
       </button>
       ${isSelected ? `<button onclick="clearNavigation()" style="flex:1;background:#ef4444;border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;transition:all 0.2s">✕ Clear Route</button>` : ''}
@@ -739,25 +837,25 @@ async function openHistoricModal(siteName) {
   PropertyUI.modalBody.innerHTML = `
     <div style="background:#fef3c7;border:2px solid #f59e0b;border-radius:8px;padding:12px;margin-bottom:16px;font-size:12px;color:#78350f">
       <strong>⛩️ Historic Site</strong><br>
-      ${fact}
+      ${safeFact}
     </div>
     <div style="width:100%;height:200px;background:#f5f5f5;border-radius:12px;margin-bottom:16px;display:flex;align-items:center;justify-content:center;font-size:64px">
-      ${site.icon}
+      ${safeIcon}
     </div>
     <div class="prop-stat">
       <span class="prop-stat-label">Type</span>
-      <span class="prop-stat-value">${site.category}</span>
+      <span class="prop-stat-value">${safeCategory}</span>
     </div>
     <div class="prop-stat">
       <span class="prop-stat-label">Distance</span>
-      <span class="prop-stat-value">${distanceText}</span>
+      <span class="prop-stat-value">${escapeHtml(distanceText)}</span>
     </div>
     <div class="prop-stat">
       <span class="prop-stat-label">Location</span>
-      <span class="prop-stat-value">${site.lat.toFixed(4)}, ${site.lon.toFixed(4)}</span>
+      <span class="prop-stat-value">${safeLat}, ${safeLon}</span>
     </div>
     ${navButtons}
-    ${site.wikipedia ? `<button onclick="window.open('https://wikipedia.org/wiki/${site.wikipedia}','_blank')" style="width:100%;margin-top:8px;background:#64748b;border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer">📖 Wikipedia</button>` : ''}
+    ${wikiUrl ? `<button onclick="window.open('${escapeJsString(wikiUrl)}','_blank','noopener,noreferrer')" style="width:100%;margin-top:8px;background:#64748b;border:none;border-radius:8px;padding:12px 24px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer">📖 Wikipedia</button>` : ''}
   `;
   PropertyUI.modal.classList.add('show');
 }
@@ -1227,7 +1325,7 @@ function updateMode(dt) {
 }
 
 function fmtTime(s) { s = Math.max(0, Math.floor(s)); return String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0'); }
-function showResult(title, stats) { document.getElementById('resultTitle').textContent = title; document.getElementById('resultStats').innerHTML = stats; document.getElementById('resultScreen').classList.add('show'); paused = true; }
+function showResult(title, stats) { document.getElementById('resultTitle').textContent = title; document.getElementById('resultStats').textContent = stats; document.getElementById('resultScreen').classList.add('show'); paused = true; }
 function hideResult() { document.getElementById('resultScreen').classList.remove('show'); }
 
 Object.assign(globalThis, {

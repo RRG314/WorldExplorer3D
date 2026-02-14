@@ -22,6 +22,12 @@ Entries reflect changes made relative to the most recent public release.
 - Start-menu Controls tab coverage for space-flight keys and interactions.
 - Persistent memory marker module (`js/memory.js`) for placeable pin/flower notes (200-char limit).
 - In-world memory marker removal flow (`Remove Marker`) to erase pins/pull flowers.
+- Memory composer bulk-delete action (`Delete All`) with confirmation.
+- Memory pin/flower overlay rendering on minimap and large map.
+- Legend-layer checkboxes for memory `Pin` and `Flower` overlays.
+- Brick block builder module (`js/blocks.js`) with in-world place/stack/remove controls.
+- Persistent per-location build-block storage (`worldExplorer3D.buildBlocks.v1`) with runtime status hook (`getBuildPersistenceStatus()`).
+- Security/storage notice document for persistent memory behavior and disclaimer boilerplate.
 
 ### Changed
 - Technical documentation examples now show deterministic RNG usage patterns aligned with the `rdt.js` seeded runtime helpers.
@@ -29,13 +35,22 @@ Entries reflect changes made relative to the most recent public release.
 - Restored main-style location selection behavior (`Custom` card + suggested city cards) and integrated launch-mode toggles at top of Location tab.
 - Expanded deep-space render envelope: farther star shell, farther galaxy placement, larger visual galaxy scale.
 - Space info panel metric rows are now reusable for planets, asteroids, spacecraft, and galaxies.
-- Module loader cache-bust chain incremented through `v=23` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- POI map rendering now follows legend category filters on both minimap and large map.
+- Dynamic map/property/historic UI templates now escape untrusted string fields before insertion.
+- Module loader cache-bust chain incremented through `v=34` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
 ### Fixed
 - Non-responsive title menu interactions for suggested/custom selection after UI rework.
 - Belt rendering visibility issues caused by distance attenuation and low-contrast boundary rings.
 - Stale client asset issues caused by outdated cache-bust query strings after pushes.
 - False-positive "persistent" memory behavior when browser storage is unavailable (marker placement now gated by storage round-trip check).
+- Large-map POI click handling blocked by old POI-mode gate even when legend filters were enabled.
+- Build blocks being wiped during world reload instead of rehydrating from storage.
+- Walking physics not treating placed build blocks as climbable/standable collision surfaces.
+- Missing hard cap for user-placed build blocks (now limited to 100).
+- Walking-mode HUD street label not showing the active/nearest road name.
+- Redundant global delete-all blocks menu option (kept existing clear-current-location flow only).
+- Memory markers rendering at terrain ground instead of top surface when placed on roofs/blocks.
 
 ---
 

@@ -5,7 +5,10 @@
 const MEMORY_STORAGE_KEY = 'worldExplorer3D.memories.v1';
 const MEMORY_STORAGE_TEST_KEY = 'worldExplorer3D.memories.test';
 const MEMORY_MAX_MESSAGE_LENGTH = 200;
+const MEMORY_MAX_LOCATION_LABEL_LENGTH = 120;
 const MEMORY_MAX_PER_LOCATION = 300;
+const MEMORY_MAX_TOTAL = 1500;
+const MEMORY_MAX_STORAGE_BYTES = 1500000;
 const MEMORY_LOCATION_PRECISION = 5;
 
 let memoryEntries = [];
@@ -25,8 +28,24 @@ function isFiniteNumber(v) {
     return Number.isFinite(v);
 }
 
+function isValidLatLon(lat, lon) {
+    return lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180;
+}
+
 function clampMessage(raw) {
-    return String(raw || '').trim().slice(0, MEMORY_MAX_MESSAGE_LENGTH);
+    return String(raw || '')
+        .replace(/\r\n?/g, '\n')
+        .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/g, '')
+        .trim()
+        .slice(0, MEMORY_MAX_MESSAGE_LENGTH);
+}
+
+function clampLocationLabel(raw) {
+    const cleaned = String(raw || '')
+        .replace(/[\u0000-\u001F\u007F]/g, ' ')
+        .trim()
+        .slice(0, MEMORY_MAX_LOCATION_LABEL_LENGTH);
+    return cleaned || 'Unknown';
 }
 
 function parseDateSafe(iso) {
@@ -95,12 +114,64 @@ function getGroundYAt(x, z) {
     return 0;
 }
 
+function isInsideFootprintSafe(x, z, pts) {
+    if (!Array.isArray(pts) || pts.length < 3) return false;
+    if (typeof pointInPolygon === 'function') {
+        return !!pointInPolygon(x, z, pts);
+    }
+    let inside = false;
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+        const xi = pts[i].x, zi = pts[i].z;
+        const xj = pts[j].x, zj = pts[j].z;
+        const intersect = ((zi > z) !== (zj > z)) && (x < (xj - xi) * (z - zi) / (zj - zi) + xi);
+        if (intersect) inside = !inside;
+    }
+    return inside;
+}
+
+function getBuildingRoofYAt(x, z, groundY) {
+    if (!Array.isArray(buildings) || buildings.length === 0) return null;
+    const candidates = (typeof getNearbyBuildings === 'function')
+        ? (getNearbyBuildings(x, z, 28) || [])
+        : buildings;
+    if (!Array.isArray(candidates) || candidates.length === 0) return null;
+
+    let bestRoofY = -Infinity;
+    for (let i = 0; i < candidates.length; i++) {
+        const b = candidates[i];
+        if (!b) continue;
+        if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) continue;
+        if (!isInsideFootprintSafe(x, z, b.pts)) continue;
+        const height = Number(b.height);
+        if (!isFiniteNumber(height) || height <= 0) continue;
+        const roofY = groundY + height;
+        if (roofY > bestRoofY) bestRoofY = roofY;
+    }
+
+    return Number.isFinite(bestRoofY) ? bestRoofY : null;
+}
+
+function getTopSurfaceYAt(x, z) {
+    const groundY = getGroundYAt(x, z);
+    let topY = groundY;
+
+    const roofY = getBuildingRoofYAt(x, z, groundY);
+    if (isFiniteNumber(roofY) && roofY > topY) topY = roofY;
+
+    if (typeof getBuildTopSurfaceAtWorldXZ === 'function') {
+        const blockY = getBuildTopSurfaceAtWorldXZ(x, z, Infinity);
+        if (isFiniteNumber(blockY) && blockY > topY) topY = blockY;
+    }
+
+    return topY;
+}
+
 function normalizeMemoryEntry(raw) {
     if (!raw || typeof raw !== 'object') return null;
     const message = clampMessage(raw.message);
     const lat = Number(raw.lat);
     const lon = Number(raw.lon);
-    if (!message || !isFiniteNumber(lat) || !isFiniteNumber(lon)) return null;
+    if (!message || !isFiniteNumber(lat) || !isFiniteNumber(lon) || !isValidLatLon(lat, lon)) return null;
     return {
         id: String(raw.id || `mem_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`),
         type: raw.type === 'flower' ? 'flower' : 'pin',
@@ -108,7 +179,7 @@ function normalizeMemoryEntry(raw) {
         lat,
         lon,
         locationKey: String(raw.locationKey || ''),
-        locationLabel: String(raw.locationLabel || 'Unknown'),
+        locationLabel: clampLocationLabel(raw.locationLabel),
         createdAt: parseDateSafe(raw.createdAt)
     };
 }
@@ -120,7 +191,9 @@ function loadMemoryEntriesFromStorage() {
         if (!raw) return [];
         const parsed = JSON.parse(raw);
         if (!Array.isArray(parsed)) return [];
-        return parsed.map(normalizeMemoryEntry).filter(Boolean);
+        const normalized = parsed.map(normalizeMemoryEntry).filter(Boolean);
+        if (normalized.length <= MEMORY_MAX_TOTAL) return normalized;
+        return normalized.slice(normalized.length - MEMORY_MAX_TOTAL);
     } catch (err) {
         console.warn('[memory] Failed to read storage:', err);
         return [];
@@ -130,7 +203,13 @@ function loadMemoryEntriesFromStorage() {
 function saveMemoryEntriesToStorage() {
     if (!memoryPersistenceEnabled) return false;
     try {
-        localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(memoryEntries));
+        const payload = JSON.stringify(memoryEntries);
+        if (payload.length > MEMORY_MAX_STORAGE_BYTES) {
+            memoryPersistenceDetail = `Storage limit reached (${Math.round(MEMORY_MAX_STORAGE_BYTES / 1024)}KB). Remove some memories and try again.`;
+            updatePersistenceHint();
+            return false;
+        }
+        localStorage.setItem(MEMORY_STORAGE_KEY, payload);
         return true;
     } catch (err) {
         memoryPersistenceEnabled = false;
@@ -148,7 +227,7 @@ function updatePersistenceHint() {
         hint.textContent = 'Saved persistently in this browser (local storage).';
         hint.classList.remove('warn');
     } else {
-        hint.textContent = 'Persistent browser storage is unavailable. Marker placement is disabled.';
+        hint.textContent = memoryPersistenceDetail || 'Persistent browser storage is unavailable. Marker placement is disabled.';
         hint.classList.add('warn');
     }
 }
@@ -291,6 +370,19 @@ function getEntriesForCurrentLocation() {
     return memoryEntries.filter((entry) => entry.locationKey === key);
 }
 
+function getMemoryEntriesForCurrentLocation() {
+    return getEntriesForCurrentLocation().map((entry) => ({
+        id: entry.id,
+        type: entry.type,
+        lat: entry.lat,
+        lon: entry.lon,
+        message: entry.message,
+        locationKey: entry.locationKey,
+        locationLabel: entry.locationLabel,
+        createdAt: entry.createdAt
+    }));
+}
+
 function refreshMemoryMarkersForCurrentLocation() {
     const group = ensureMemoryGroup();
     if (!group) return;
@@ -303,7 +395,7 @@ function refreshMemoryMarkersForCurrentLocation() {
     entries.forEach((entry) => {
         const worldPos = latLonToWorldSafe(entry.lat, entry.lon);
         if (!isFiniteNumber(worldPos.x) || !isFiniteNumber(worldPos.z)) return;
-        const y = getGroundYAt(worldPos.x, worldPos.z);
+        const y = getTopSurfaceYAt(worldPos.x, worldPos.z);
         const marker = createMarkerForEntry(entry, worldPos.x, y, worldPos.z);
         group.add(marker);
     });
@@ -369,7 +461,7 @@ function openMemoryComposer(defaultType = 'pin') {
     if (!memoryPersistenceEnabled) {
         setComposerStatus('Persistent storage unavailable. Enable local storage for this site.', true);
     } else {
-        setComposerStatus('Drop point: your current ground position.', false);
+        setComposerStatus('Drop point: your current surface position.', false);
     }
     updateComposerCharCount();
     input.focus();
@@ -422,6 +514,19 @@ function removeMemoryById(id) {
     return true;
 }
 
+function removeAllMemories() {
+    if (memoryEntries.length === 0) return true;
+    const previous = memoryEntries;
+    memoryEntries = [];
+    if (memoryPersistenceEnabled && !saveMemoryEntriesToStorage()) {
+        memoryEntries = previous;
+        return false;
+    }
+    hideMemoryInfo();
+    refreshMemoryMarkersForCurrentLocation();
+    return true;
+}
+
 function placeMemoryFromComposer() {
     if (!gameStarted) return;
     if (!memoryPersistenceEnabled) {
@@ -448,6 +553,11 @@ function placeMemoryFromComposer() {
         return;
     }
 
+    if (memoryEntries.length >= MEMORY_MAX_TOTAL) {
+        setComposerStatus(`Total memory limit reached (${MEMORY_MAX_TOTAL}). Remove some memories first.`, true);
+        return;
+    }
+
     const currentCount = memoryEntries.reduce((count, entry) => count + (entry.locationKey === locationKey ? 1 : 0), 0);
     if (currentCount >= MEMORY_MAX_PER_LOCATION) {
         setComposerStatus(`Limit reached (${MEMORY_MAX_PER_LOCATION}) for this location. Remove one first.`, true);
@@ -471,10 +581,10 @@ function placeMemoryFromComposer() {
         id: `mem_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
         type: selectedMemoryType === 'flower' ? 'flower' : 'pin',
         message,
-        lat: latLon.lat,
-        lon: latLon.lon,
+        lat: Number(latLon.lat.toFixed(7)),
+        lon: Number(latLon.lon.toFixed(7)),
         locationKey,
-        locationLabel: getCurrentLocationLabel(),
+        locationLabel: clampLocationLabel(getCurrentLocationLabel()),
         createdAt: nowIso
     };
 
@@ -539,6 +649,7 @@ function setupMemoryUI() {
     const flowerBtn = document.getElementById('memoryTypeFlower');
     const placeBtn = document.getElementById('memoryPlaceBtn');
     const cancelBtn = document.getElementById('memoryCancelBtn');
+    const deleteAllBtn = document.getElementById('memoryDeleteAllBtn');
     const closeInfoBtn = document.getElementById('memoryInfoCloseBtn');
     const deleteInfoBtn = document.getElementById('memoryDeleteBtn');
     const homeBtn = document.getElementById('fHome');
@@ -560,6 +671,21 @@ function setupMemoryUI() {
     if (flowerBtn) flowerBtn.addEventListener('click', () => setComposerType('flower'));
     if (placeBtn) placeBtn.addEventListener('click', placeMemoryFromComposer);
     if (cancelBtn) cancelBtn.addEventListener('click', closeMemoryComposer);
+    if (deleteAllBtn) {
+        deleteAllBtn.addEventListener('click', () => {
+            if (memoryEntries.length === 0) {
+                setComposerStatus('No memories to delete.', false);
+                return;
+            }
+            const confirmed = globalThis.confirm(`Delete all ${memoryEntries.length} memories in this browser? This cannot be undone.`);
+            if (!confirmed) return;
+            if (removeAllMemories()) {
+                setComposerStatus('All memories deleted.', false);
+            } else {
+                setComposerStatus('Failed to delete all memories.', true);
+            }
+        });
+    }
     if (closeInfoBtn) closeInfoBtn.addEventListener('click', hideMemoryInfo);
 
     if (deleteInfoBtn) {
@@ -593,6 +719,7 @@ bindMemorySceneClick();
 Object.assign(globalThis, {
     clearMemoryMarkersForWorldReload,
     closeMemoryComposer,
+    getMemoryEntriesForCurrentLocation,
     getMemoryPersistenceStatus,
     openMemoryComposer,
     refreshMemoryMarkersForCurrentLocation,
@@ -602,6 +729,7 @@ Object.assign(globalThis, {
 export {
     clearMemoryMarkersForWorldReload,
     closeMemoryComposer,
+    getMemoryEntriesForCurrentLocation,
     getMemoryPersistenceStatus,
     openMemoryComposer,
     refreshMemoryMarkersForCurrentLocation,
