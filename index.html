@@ -350,19 +350,19 @@ input,textarea{-webkit-user-select:text;user-select:text}
 </div>
 <div class="tab-content active" id="tab-location">
 <div class="location-switch-row">
-<button class="location-switch-btn active" id="suggestedToggle" data-mode="suggested" type="button" onclick="if(window.setTitleLocationMode) window.setTitleLocationMode('suggested')">
+<button class="location-switch-btn active" id="suggestedToggle" data-mode="suggested" type="button" onclick="if(window.handleTitleModeClick) window.handleTitleModeClick('suggested')">
 <span class="switch-title">📍 Suggested</span>
 <span class="switch-sub">Popular city list</span>
 </button>
-<button class="location-switch-btn" id="customToggle" data-mode="custom" type="button" onclick="if(window.setTitleLocationMode) window.setTitleLocationMode('custom')">
+<button class="location-switch-btn" id="customToggle" data-mode="custom" type="button" onclick="if(window.handleTitleModeClick) window.handleTitleModeClick('custom')">
 <span class="switch-title">🌍 Custom</span>
 <span class="switch-sub">Any place search</span>
 </button>
-<button class="location-switch-btn" id="moonToggle" data-mode="moon" type="button" onclick="if(window.setTitleLocationMode) window.setTitleLocationMode('moon')">
+<button class="location-switch-btn" id="moonToggle" data-mode="moon" type="button" onclick="if(window.handleTitleModeClick) window.handleTitleModeClick('moon')">
 <span class="switch-title">🌙 Moon</span>
 <span class="switch-sub">Direct moon start</span>
 </button>
-<button class="location-switch-btn" id="spaceToggle" data-mode="space" type="button" onclick="if(window.setTitleLocationMode) window.setTitleLocationMode('space')">
+<button class="location-switch-btn" id="spaceToggle" data-mode="space" type="button" onclick="if(window.handleTitleModeClick) window.handleTitleModeClick('space')">
 <span class="switch-title">🚀 Space</span>
 <span class="switch-sub">Start in space flight</span>
 </button>
@@ -372,21 +372,21 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <div class="suggested-note">Choose from existing city suggestions.</div>
 <div class="suggested-list">
 <div class="loc-grid suggested-grid">
-<div class="loc sel" data-loc="baltimore" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Baltimore</div><div class="loc-region">Maryland, USA</div></div>
-<div class="loc" data-loc="hollywood" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Hollywood</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="newyork" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">New York</div><div class="loc-region">New York, USA</div></div>
-<div class="loc" data-loc="miami" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Miami</div><div class="loc-region">Florida, USA</div></div>
-<div class="loc" data-loc="tokyo" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Tokyo</div><div class="loc-region">Japan</div></div>
-<div class="loc" data-loc="monaco" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Monaco</div><div class="loc-region">Monte Carlo</div></div>
-<div class="loc" data-loc="nurburgring" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Nürburgring</div><div class="loc-region">Germany</div></div>
-<div class="loc" data-loc="lasvegas" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Las Vegas</div><div class="loc-region">Nevada, USA</div></div>
-<div class="loc" data-loc="london" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">London</div><div class="loc-region">United Kingdom</div></div>
-<div class="loc" data-loc="paris" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Paris</div><div class="loc-region">France</div></div>
-<div class="loc" data-loc="dubai" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Dubai</div><div class="loc-region">UAE</div></div>
-<div class="loc" data-loc="sanfrancisco" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">San Francisco</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="losangeles" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Los Angeles</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="chicago" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Chicago</div><div class="loc-region">Illinois, USA</div></div>
-<div class="loc" data-loc="seattle" onclick="if(window.selectSuggestedLocationCard) window.selectSuggestedLocationCard(this)"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
+<div class="loc sel" data-loc="baltimore" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Baltimore</div><div class="loc-region">Maryland, USA</div></div>
+<div class="loc" data-loc="hollywood" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Hollywood</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="newyork" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">New York</div><div class="loc-region">New York, USA</div></div>
+<div class="loc" data-loc="miami" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Miami</div><div class="loc-region">Florida, USA</div></div>
+<div class="loc" data-loc="tokyo" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Tokyo</div><div class="loc-region">Japan</div></div>
+<div class="loc" data-loc="monaco" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Monaco</div><div class="loc-region">Monte Carlo</div></div>
+<div class="loc" data-loc="nurburgring" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Nürburgring</div><div class="loc-region">Germany</div></div>
+<div class="loc" data-loc="lasvegas" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Las Vegas</div><div class="loc-region">Nevada, USA</div></div>
+<div class="loc" data-loc="london" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">London</div><div class="loc-region">United Kingdom</div></div>
+<div class="loc" data-loc="paris" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Paris</div><div class="loc-region">France</div></div>
+<div class="loc" data-loc="dubai" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Dubai</div><div class="loc-region">UAE</div></div>
+<div class="loc" data-loc="sanfrancisco" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">San Francisco</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="losangeles" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Los Angeles</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="chicago" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Chicago</div><div class="loc-region">Illinois, USA</div></div>
+<div class="loc" data-loc="seattle" onclick="if(window.handleSuggestedCardClick) window.handleSuggestedCardClick(this)"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
 </div>
 </div>
 </div>
@@ -939,5 +939,73 @@ Explore the area
 <div id="pauseScreen"><div class="pauseTitle">PAUSED</div><button class="pauseBtn" id="resumeBtn">Resume</button><button class="pauseBtn" id="restartBtn">Restart</button><button class="pauseBtn" id="menuBtn">Main Menu</button></div>
 <div id="resultScreen"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
 <div id="caughtScreen"><div class="caughtBox"><div class="caughtTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
-<script type="module" src="js/bootstrap.js?v=15"></script>
+<script>
+(() => {
+  const MODES = ['suggested', 'custom', 'moon', 'space'];
+  const panelIds = { suggested: 'suggestedPanel', custom: 'customPanel', moon: 'moonPanel', space: 'spacePanel' };
+  const buttonIds = { suggested: 'suggestedToggle', custom: 'customToggle', moon: 'moonToggle', space: 'spaceToggle' };
+
+  const fallbackSetTitleMode = (mode) => {
+    const nextMode = MODES.includes(mode) ? mode : 'suggested';
+
+    Object.entries(buttonIds).forEach(([btnMode, id]) => {
+      const button = document.getElementById(id);
+      if (button) button.classList.toggle('active', btnMode === nextMode);
+    });
+
+    Object.entries(panelIds).forEach(([panelMode, id]) => {
+      const panel = document.getElementById(id);
+      if (panel) panel.classList.toggle('show', panelMode === nextMode);
+    });
+
+    if (nextMode === 'suggested') {
+      const selected = document.querySelector('#suggestedPanel .loc.sel');
+      if (selected?.dataset?.loc) globalThis.selLoc = selected.dataset.loc;
+      globalThis.loadingScreenMode = 'earth';
+    } else if (nextMode === 'custom') {
+      globalThis.selLoc = 'custom';
+      globalThis.loadingScreenMode = 'earth';
+    } else {
+      globalThis.loadingScreenMode = nextMode;
+    }
+  };
+
+  const fallbackSelectSuggestedCard = (targetEl) => {
+    const selectedLoc = targetEl?.closest?.('.loc[data-loc]');
+    if (!selectedLoc) return;
+    document.querySelectorAll('#suggestedPanel .loc').forEach((el) => el.classList.remove('sel'));
+    selectedLoc.classList.add('sel');
+    globalThis.selLoc = selectedLoc.dataset.loc || globalThis.selLoc || 'baltimore';
+    fallbackSetTitleMode('suggested');
+  };
+
+  globalThis.handleTitleModeClick = (mode) => {
+    if (typeof globalThis.setTitleLocationMode === 'function') {
+      globalThis.setTitleLocationMode(mode);
+      return;
+    }
+    fallbackSetTitleMode(mode);
+  };
+
+  globalThis.handleSuggestedCardClick = (targetEl) => {
+    if (typeof globalThis.selectSuggestedLocationCard === 'function') {
+      globalThis.selectSuggestedLocationCard(targetEl);
+      return;
+    }
+    fallbackSelectSuggestedCard(targetEl);
+  };
+
+  const initFallback = () => {
+    if (typeof globalThis.setTitleLocationMode === 'function') return;
+    fallbackSetTitleMode(globalThis.selLoc === 'custom' ? 'custom' : 'suggested');
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initFallback, { once: true });
+  } else {
+    initFallback();
+  }
+})();
+</script>
+<script type="module" src="js/bootstrap.js?v=16"></script>
 </body></html>
