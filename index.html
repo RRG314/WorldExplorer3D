@@ -31,28 +31,14 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .tab-btn.active::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px;background:#667eea}
 .tab-content{display:none;padding:24px;overflow-y:auto;flex:1;background:rgba(255,255,255,0.3)}
 .tab-content.active{display:block}
-#tab-location{overflow:hidden;padding:18px;display:none;flex-direction:column}
-#tab-location.active{display:flex}
 
 /* Location Grid */
 .loc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .loc-grid.custom-centered{grid-template-columns:1fr;max-width:300px;margin:0 auto}
-.suggested-grid{grid-template-columns:1fr}
-.location-switch-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-bottom:12px}
-.location-switch-btn{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.9);border-radius:10px;padding:10px 12px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.2s;text-align:left;display:flex;flex-direction:column;gap:4px;min-height:70px;justify-content:center}
-.location-switch-btn:hover{border-color:#cbd5e1;background:#f1f5f9}
-.location-switch-btn.active{border-color:#667eea;background:#f0f4ff;color:#3b5bdb;box-shadow:0 4px 12px rgba(102,126,234,0.15)}
-.menu-container,
-#tab-location .location-switch-row,
-#tab-location .location-switch-btn,
-#tab-location .location-panel,
-#tab-location .loc{position:relative;z-index:2;pointer-events:auto}
-.switch-title{font-size:13px;font-weight:600;line-height:1.2}
-.switch-sub{font-size:11px;font-weight:500;line-height:1.2;color:#64748b}
-.location-panel{display:none}
-.location-panel.show{display:block}
-.suggested-note{font-size:11px;color:#64748b;margin:0 0 10px 2px}
-.suggested-list{max-height:min(50vh,420px);overflow-y:auto;padding-right:4px;border:1px solid rgba(226,232,240,0.9);border-radius:12px;padding:6px;background:rgba(255,255,255,0.6)}
+.launch-switch-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.launch-switch-btn{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.9);border-radius:10px;padding:10px 12px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.2s;min-height:44px}
+.launch-switch-btn:hover{border-color:#cbd5e1;background:#f1f5f9}
+.launch-switch-btn.active{border-color:#667eea;background:#f0f4ff;color:#3b5bdb;box-shadow:0 4px 12px rgba(102,126,234,0.15)}
 .loc{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.8);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s}
 .loc:hover{border-color:rgba(203,213,225,0.9);background:rgba(241,245,249,0.95);transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.08)}
 .loc.sel{border-color:rgba(102,126,234,0.8);background:rgba(240,244,255,0.9);box-shadow:0 4px 12px rgba(102,126,234,0.2)}
@@ -64,12 +50,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .loc.custom .loc-name{color:#92400e}
 
 /* Custom Location Panel */
-#customPanel{display:none;margin-top:0;padding:20px;background:rgba(255,251,235,0.9);border:2px solid rgba(252,211,77,0.8);border-radius:12px;backdrop-filter:blur(10px);max-height:min(50vh,420px);overflow-y:auto}
+#customPanel{display:none;margin-top:16px;padding:20px;background:rgba(255,251,235,0.9);border:2px solid rgba(252,211,77,0.8);border-radius:12px;max-height:60vh;overflow-y:auto;backdrop-filter:blur(10px)}
 #customPanel.show{display:block}
-.launch-panel{padding:18px;border-radius:12px;border:2px solid rgba(165,180,252,0.75);background:rgba(238,242,255,0.88)}
-.launch-panel.space{border-color:rgba(125,211,252,0.75);background:rgba(15,23,42,0.78);color:#e2e8f0}
-.launch-title{font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;margin-bottom:8px}
-.launch-copy{font-size:12px;line-height:1.6}
 .custom-title{font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;color:#92400e;margin-bottom:16px;text-align:center}
 .custom-row{margin-bottom:14px}
 .custom-row label{display:block;font-size:12px;font-weight:500;color:#78716c;margin-bottom:8px}
@@ -187,8 +169,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .sub{font-size:15px;letter-spacing:2px}
   .menu-container{width:min(96vw,740px);max-height:calc(100dvh - 145px)}
   .loc-grid{grid-template-columns:1fr;gap:10px}
-  .location-switch-row{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .suggested-list{max-height:38vh}
+  .launch-switch-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
   .tab-btn{font-size:12px;padding:12px 8px}
 
   /* HUD elements */
@@ -222,8 +203,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .logo{font-size:clamp(28px, 10vw, 48px);letter-spacing:2px}
   .sub{font-size:13px;letter-spacing:2px;margin:0}
   .menu-container{width:99vw;max-height:calc(100dvh - 126px)}
-  .location-switch-row{grid-template-columns:1fr}
-  .suggested-list{max-height:32vh}
+  .launch-switch-row{grid-template-columns:1fr}
   .tab-btn{font-size:11px;padding:10px 6px}
   .tab-content{padding:16px}
   .custom-title{font-size:13px}
@@ -268,7 +248,6 @@ input,textarea{-webkit-user-select:text;user-select:text}
 @media (max-height: 500px) and (orientation: landscape) {
   .menu-container{max-height:calc(100dvh - 88px);width:min(95vw,980px)}
   .tab-content{max-height:60vh}
-  .suggested-list{max-height:40vh}
   #propertyPanel{max-height:85vh}
   .logo{font-size:clamp(24px, 6vw, 48px);margin:0}
   .sub{font-size:11px;letter-spacing:2px;margin:0}
@@ -354,49 +333,15 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <button class="tab-btn" data-tab="controls">Controls</button>
 </div>
 <div class="tab-content active" id="tab-location">
-<div class="location-switch-row">
-<button class="location-switch-btn active" id="suggestedToggle" data-mode="suggested" type="button">
-<span class="switch-title">📍 Suggested</span>
-<span class="switch-sub">Popular city list</span>
-</button>
-<button class="location-switch-btn" id="customToggle" data-mode="custom" type="button">
-<span class="switch-title">🌍 Custom</span>
-<span class="switch-sub">Any place search</span>
-</button>
-<button class="location-switch-btn" id="moonToggle" data-mode="moon" type="button">
-<span class="switch-title">🌙 Moon</span>
-<span class="switch-sub">Direct moon start</span>
-</button>
-<button class="location-switch-btn" id="spaceToggle" data-mode="space" type="button">
-<span class="switch-title">🚀 Space</span>
-<span class="switch-sub">Start in space flight</span>
-</button>
+<div class="launch-switch-row">
+<button class="launch-switch-btn active" id="earthLaunchToggle" data-launch="earth" type="button">🌍 Earth</button>
+<button class="launch-switch-btn" id="moonLaunchToggle" data-launch="moon" type="button">🌙 Moon</button>
+<button class="launch-switch-btn" id="spaceLaunchToggle" data-launch="space" type="button">🚀 Space</button>
 </div>
-
-<div id="suggestedPanel" class="location-panel show">
-<div class="suggested-note">Choose from existing city suggestions.</div>
-<div class="suggested-list">
-<div class="loc-grid suggested-grid">
-<div class="loc sel" data-loc="baltimore"><div class="loc-name">Baltimore</div><div class="loc-region">Maryland, USA</div></div>
-<div class="loc" data-loc="hollywood"><div class="loc-name">Hollywood</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="newyork"><div class="loc-name">New York</div><div class="loc-region">New York, USA</div></div>
-<div class="loc" data-loc="miami"><div class="loc-name">Miami</div><div class="loc-region">Florida, USA</div></div>
-<div class="loc" data-loc="tokyo"><div class="loc-name">Tokyo</div><div class="loc-region">Japan</div></div>
-<div class="loc" data-loc="monaco"><div class="loc-name">Monaco</div><div class="loc-region">Monte Carlo</div></div>
-<div class="loc" data-loc="nurburgring"><div class="loc-name">Nürburgring</div><div class="loc-region">Germany</div></div>
-<div class="loc" data-loc="lasvegas"><div class="loc-name">Las Vegas</div><div class="loc-region">Nevada, USA</div></div>
-<div class="loc" data-loc="london"><div class="loc-name">London</div><div class="loc-region">United Kingdom</div></div>
-<div class="loc" data-loc="paris"><div class="loc-name">Paris</div><div class="loc-region">France</div></div>
-<div class="loc" data-loc="dubai"><div class="loc-name">Dubai</div><div class="loc-region">UAE</div></div>
-<div class="loc" data-loc="sanfrancisco"><div class="loc-name">San Francisco</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="losangeles"><div class="loc-name">Los Angeles</div><div class="loc-region">California, USA</div></div>
-<div class="loc" data-loc="chicago"><div class="loc-name">Chicago</div><div class="loc-region">Illinois, USA</div></div>
-<div class="loc" data-loc="seattle"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
+<div class="loc-grid custom-centered">
+<div class="loc custom" data-loc="custom"><div class="loc-name">🌍 Custom</div><div class="loc-region">Any Location</div></div>
 </div>
-</div>
-</div>
-
-<div id="customPanel" class="location-panel">
+<div id="customPanel">
 <div class="custom-title">🌍 Enter Any Location Worldwide</div>
 
 <div class="custom-row">
@@ -421,19 +366,22 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div style="font-size:11px;margin-top:6px;color:#6b7280">Right-click on Google Maps and copy coordinates</div>
 </div>
 </div>
-
-<div id="moonPanel" class="location-panel">
-<div class="launch-panel">
-<div class="launch-title">🌙 Direct Moon Start</div>
-<div class="launch-copy">Launch into exploration and land directly on the Moon surface after loading.</div>
-</div>
-</div>
-
-<div id="spacePanel" class="location-panel">
-<div class="launch-panel space">
-<div class="launch-title">🚀 Start In Space Flight</div>
-<div class="launch-copy">Begin in orbital flight mode so you can fly immediately and choose when to land.</div>
-</div>
+<div class="loc-grid">
+<div class="loc sel" data-loc="baltimore"><div class="loc-name">Baltimore</div><div class="loc-region">Maryland, USA</div></div>
+<div class="loc" data-loc="hollywood"><div class="loc-name">Hollywood</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="newyork"><div class="loc-name">New York</div><div class="loc-region">New York, USA</div></div>
+<div class="loc" data-loc="miami"><div class="loc-name">Miami</div><div class="loc-region">Florida, USA</div></div>
+<div class="loc" data-loc="tokyo"><div class="loc-name">Tokyo</div><div class="loc-region">Japan</div></div>
+<div class="loc" data-loc="monaco"><div class="loc-name">Monaco</div><div class="loc-region">Monte Carlo</div></div>
+<div class="loc" data-loc="nurburgring"><div class="loc-name">Nürburgring</div><div class="loc-region">Germany</div></div>
+<div class="loc" data-loc="lasvegas"><div class="loc-name">Las Vegas</div><div class="loc-region">Nevada, USA</div></div>
+<div class="loc" data-loc="london"><div class="loc-name">London</div><div class="loc-region">United Kingdom</div></div>
+<div class="loc" data-loc="paris"><div class="loc-name">Paris</div><div class="loc-region">France</div></div>
+<div class="loc" data-loc="dubai"><div class="loc-name">Dubai</div><div class="loc-region">UAE</div></div>
+<div class="loc" data-loc="sanfrancisco"><div class="loc-name">San Francisco</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="losangeles"><div class="loc-name">Los Angeles</div><div class="loc-region">California, USA</div></div>
+<div class="loc" data-loc="chicago"><div class="loc-name">Chicago</div><div class="loc-region">Illinois, USA</div></div>
+<div class="loc" data-loc="seattle"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
 </div>
 </div>
 <div class="tab-content" id="tab-settings">
@@ -944,241 +892,5 @@ Explore the area
 <div id="pauseScreen"><div class="pauseTitle">PAUSED</div><button class="pauseBtn" id="resumeBtn">Resume</button><button class="pauseBtn" id="restartBtn">Restart</button><button class="pauseBtn" id="menuBtn">Main Menu</button></div>
 <div id="resultScreen"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
 <div id="caughtScreen"><div class="caughtBox"><div class="caughtTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
-<script>
-(() => {
-  const MODES = ['suggested', 'custom', 'moon', 'space'];
-  const panelIds = { suggested: 'suggestedPanel', custom: 'customPanel', moon: 'moonPanel', space: 'spacePanel' };
-  const buttonIds = { suggested: 'suggestedToggle', custom: 'customToggle', moon: 'moonToggle', space: 'spaceToggle' };
-  let didBindListeners = false;
-
-  const fallbackSetTitleMode = (mode) => {
-    const nextMode = MODES.includes(mode) ? mode : 'suggested';
-
-    Object.entries(buttonIds).forEach(([btnMode, id]) => {
-      const button = document.getElementById(id);
-      if (button) button.classList.toggle('active', btnMode === nextMode);
-    });
-
-    Object.entries(panelIds).forEach(([panelMode, id]) => {
-      const panel = document.getElementById(id);
-      if (panel) panel.classList.toggle('show', panelMode === nextMode);
-    });
-
-    if (nextMode === 'suggested') {
-      const selected = document.querySelector('#suggestedPanel .loc.sel');
-      if (selected && selected.dataset && selected.dataset.loc) {
-        globalThis.selLoc = selected.dataset.loc;
-      }
-      globalThis.loadingScreenMode = 'earth';
-    } else if (nextMode === 'custom') {
-      globalThis.selLoc = 'custom';
-      globalThis.loadingScreenMode = 'earth';
-    } else {
-      globalThis.loadingScreenMode = nextMode;
-    }
-  };
-
-  const fallbackSelectSuggestedCard = (targetEl) => {
-    const selectedLoc = targetEl && typeof targetEl.closest === 'function'
-      ? targetEl.closest('.loc[data-loc]')
-      : null;
-    if (!selectedLoc) return;
-    document.querySelectorAll('#suggestedPanel .loc').forEach((el) => el.classList.remove('sel'));
-    selectedLoc.classList.add('sel');
-    globalThis.selLoc = selectedLoc.dataset.loc || globalThis.selLoc || 'baltimore';
-    fallbackSetTitleMode('suggested');
-  };
-
-  const fallbackSearchLocation = async () => {
-    const input = document.getElementById('locationSearch');
-    const status = document.getElementById('locationSearchStatus') || document.getElementById('searchStatus');
-    const latEl = document.getElementById('customLat');
-    const lonEl = document.getElementById('customLon');
-    if (!input || !status || !latEl || !lonEl) return;
-
-    const query = input.value.trim();
-    if (!query) {
-      status.textContent = 'Please enter a location';
-      status.style.color = '#dc2626';
-      return;
-    }
-
-    status.textContent = 'Searching...';
-    status.style.color = '#6b7280';
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-    try {
-      const url = `https://nominatim.openstreetmap.org/search?format=json&limit=5&q=${encodeURIComponent(query)}`;
-      const res = await fetch(url, { signal: controller.signal });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (!Array.isArray(data) || data.length === 0) {
-        throw new Error('Location not found');
-      }
-
-      const result = data.find(d => d.type === 'city' || d.type === 'town' || d.class === 'place') || data[0];
-      const lat = parseFloat(result.lat);
-      const lon = parseFloat(result.lon);
-      if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('Invalid coordinates');
-
-      latEl.value = lat.toFixed(4);
-      lonEl.value = lon.toFixed(4);
-      globalThis.customLoc = { lat, lon, name: (result.display_name || query).split(',')[0] || query };
-      globalThis.selLoc = 'custom';
-      fallbackSetTitleMode('custom');
-
-      const name = globalThis.customLoc.name || query;
-      status.textContent = `✓ Found: ${name}`;
-      status.style.color = '#059669';
-    } catch (err) {
-      const errorMessage = (err && err.message) ? err.message : 'Unknown error';
-      status.textContent = `✗ Search failed: ${errorMessage}`;
-      status.style.color = '#dc2626';
-    } finally {
-      clearTimeout(timeoutId);
-    }
-  };
-
-  globalThis.handleTitleModeClick = (mode) => {
-    if (typeof globalThis.setTitleLocationMode === 'function') {
-      try { globalThis.setTitleLocationMode(mode); } catch (e) { console.warn('[title-ui] setTitleLocationMode failed:', e); }
-    }
-    fallbackSetTitleMode(mode);
-  };
-
-  globalThis.handleSuggestedCardClick = (targetEl) => {
-    if (typeof globalThis.selectSuggestedLocationCard === 'function') {
-      try { globalThis.selectSuggestedLocationCard(targetEl); } catch (e) { console.warn('[title-ui] selectSuggestedLocationCard failed:', e); }
-    }
-    fallbackSelectSuggestedCard(targetEl);
-  };
-
-  globalThis.handleTitleSearchClick = async () => {
-    if (typeof globalThis.searchLocation === 'function') {
-      try {
-        await globalThis.searchLocation();
-        return;
-      } catch (e) {
-        console.warn('[title-ui] searchLocation failed, using fallback search:', e);
-      }
-    }
-    await fallbackSearchLocation();
-  };
-
-  const bindFallbackListeners = () => {
-    if (didBindListeners) return;
-    didBindListeners = true;
-
-    const handleModeActivation = (mode, event) => {
-      if (event) {
-        if (event.cancelable) event.preventDefault();
-        event.stopPropagation();
-      }
-      if (typeof globalThis.setTitleLocationMode === 'function') {
-        try {
-          globalThis.setTitleLocationMode(mode);
-        } catch (e) {
-          console.warn('[title-ui] setTitleLocationMode failed:', e);
-        }
-      }
-      fallbackSetTitleMode(mode);
-    };
-
-    const handleSuggestedActivation = (card) => {
-      if (!card) return;
-      if (typeof globalThis.selectSuggestedLocationCard === 'function') {
-        try {
-          globalThis.selectSuggestedLocationCard(card);
-        } catch (e) {
-          console.warn('[title-ui] selectSuggestedLocationCard failed:', e);
-        }
-      }
-      fallbackSelectSuggestedCard(card);
-    };
-
-    const handleSearchActivation = async () => {
-      if (typeof globalThis.searchLocation === 'function') {
-        try {
-          await globalThis.searchLocation();
-          return;
-        } catch (e) {
-          console.warn('[title-ui] searchLocation failed, using fallback search:', e);
-        }
-      }
-      await fallbackSearchLocation();
-    };
-
-    Object.entries(buttonIds).forEach(([mode, id]) => {
-      const button = document.getElementById(id);
-      if (!button) return;
-      button.addEventListener('click', (event) => handleModeActivation(mode, event));
-      button.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter' && event.key !== ' ') return;
-        handleModeActivation(mode, event);
-      });
-    });
-
-    const suggestedPanel = document.getElementById('suggestedPanel');
-    if (suggestedPanel) {
-      suggestedPanel.addEventListener('click', (event) => {
-        const target = event.target;
-        if (!(target instanceof Element)) return;
-        let card = target.closest ? target.closest('.loc[data-loc]') : null;
-        if (!card) {
-          let node = target;
-          while (node && node !== suggestedPanel) {
-            if (node.classList && node.classList.contains('loc') && node.getAttribute('data-loc')) {
-              card = node;
-              break;
-            }
-            node = node.parentElement;
-          }
-        }
-        if (!card) return;
-        handleSuggestedActivation(card);
-      });
-    }
-
-    const searchBtn = document.getElementById('locationSearchBtn');
-    if (searchBtn) {
-      searchBtn.addEventListener('click', (event) => {
-        if (event.cancelable) event.preventDefault();
-        event.stopPropagation();
-        void handleSearchActivation();
-      });
-    }
-
-    const searchInput = document.getElementById('locationSearch');
-    if (searchInput) {
-      searchInput.addEventListener('keydown', (event) => {
-        if (event.key !== 'Enter') return;
-        event.preventDefault();
-        void handleSearchActivation();
-      });
-    }
-  };
-
-  const initFallback = () => {
-    bindFallbackListeners();
-
-    // Ensure at least one suggested city is selected.
-    const defaultCard = document.querySelector('#suggestedPanel .loc.sel') || document.querySelector('#suggestedPanel .loc[data-loc="baltimore"]');
-    if (defaultCard && !document.querySelector('#suggestedPanel .loc.sel')) {
-      defaultCard.classList.add('sel');
-    }
-
-    fallbackSetTitleMode(globalThis.selLoc === 'custom' ? 'custom' : 'suggested');
-  };
-
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', initFallback, { once: true });
-  } else {
-    initFallback();
-  }
-})();
-</script>
-<script src="js/title-menu-fix.js?v=18"></script>
 <script type="module" src="js/bootstrap.js?v=17"></script>
 </body></html>

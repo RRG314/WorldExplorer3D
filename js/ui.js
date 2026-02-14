@@ -248,96 +248,93 @@ function setupUI() {
         btn.classList.add('active');
         document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
     }));
-    // Locations
-    const suggestedPanel = document.getElementById('suggestedPanel');
+    // Locations (main-branch behavior with Moon/Space launch buttons)
     const customPanel = document.getElementById('customPanel');
-    const moonPanel = document.getElementById('moonPanel');
-    const spacePanel = document.getElementById('spacePanel');
-    const locationPanels = { suggested: suggestedPanel, custom: customPanel, moon: moonPanel, space: spacePanel };
-    const suggestedToggle = document.getElementById('suggestedToggle');
-    const customToggle = document.getElementById('customToggle');
-    const moonToggle = document.getElementById('moonToggle');
-    const spaceToggle = document.getElementById('spaceToggle');
-    const locationModeButtons = { suggested: suggestedToggle, custom: customToggle, moon: moonToggle, space: spaceToggle };
+    const earthLaunchToggle = document.getElementById('earthLaunchToggle');
+    const moonLaunchToggle = document.getElementById('moonLaunchToggle');
+    const spaceLaunchToggle = document.getElementById('spaceLaunchToggle');
+    const launchModeButtons = {
+        earth: earthLaunchToggle,
+        moon: moonLaunchToggle,
+        space: spaceLaunchToggle
+    };
     let titleLaunchMode = 'earth'; // earth | moon | space
 
-    const getSelectedSuggestedLoc = () => {
-        const selected = document.querySelector('#suggestedPanel .loc.sel');
-        if (selected) return selected.dataset.loc;
-        const fallback = document.querySelector('#suggestedPanel .loc[data-loc="baltimore"]');
-        if (fallback) {
-            fallback.classList.add('sel');
-            return fallback.dataset.loc;
-        }
-        return 'baltimore';
-    };
-
-    const setTitleLocationMode = (mode) => {
-        const nextMode = ['suggested', 'custom', 'moon', 'space'].includes(mode) ? mode : 'suggested';
-        const activePanel = locationPanels[nextMode] || locationPanels.suggested;
-
-        Object.entries(locationModeButtons).forEach(([btnMode, btn]) => {
+    const setLaunchMode = (mode) => {
+        const nextMode = mode === 'moon' || mode === 'space' ? mode : 'earth';
+        titleLaunchMode = nextMode;
+        Object.entries(launchModeButtons).forEach(([btnMode, btn]) => {
             if (!btn) return;
             btn.classList.toggle('active', btnMode === nextMode);
         });
-        Object.values(locationPanels).forEach(panel => {
-            if (!panel) return;
-            panel.classList.toggle('show', panel === activePanel);
-        });
+        globalThis.loadingScreenMode = nextMode;
+    };
 
-        if (nextMode === 'suggested') {
-            selLoc = getSelectedSuggestedLoc();
-            titleLaunchMode = 'earth';
-            globalThis.loadingScreenMode = 'earth';
-        } else if (nextMode === 'custom') {
-            selLoc = 'custom';
-            titleLaunchMode = 'earth';
-            globalThis.loadingScreenMode = 'earth';
-        } else {
-            titleLaunchMode = nextMode;
-            globalThis.loadingScreenMode = nextMode;
-            if (selLoc === 'custom') {
-                const customLatEl = document.getElementById('customLat');
-                const customLonEl = document.getElementById('customLon');
-                const latInput = customLatEl ? parseFloat(customLatEl.value) : NaN;
-                const lonInput = customLonEl ? parseFloat(customLonEl.value) : NaN;
-                if (Number.isNaN(latInput) || Number.isNaN(lonInput)) {
-                    selLoc = getSelectedSuggestedLoc();
-                }
-            }
+    const setTitleLocationMode = (mode) => {
+        if (mode === 'moon' || mode === 'space') {
+            setLaunchMode(mode);
+            return;
         }
+
+        setLaunchMode('earth');
+
+        if (mode === 'custom') {
+            const customCard = document.querySelector('.loc[data-loc="custom"]');
+            if (customCard) {
+                document.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
+                customCard.classList.add('sel');
+            }
+            selLoc = 'custom';
+            if (customPanel) customPanel.classList.add('show');
+            return;
+        }
+
+        const selectedSuggested = document.querySelector('.loc.sel:not([data-loc="custom"])')
+            || document.querySelector('.loc[data-loc="baltimore"]');
+        if (selectedSuggested) {
+            document.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
+            selectedSuggested.classList.add('sel');
+            selLoc = selectedSuggested.dataset.loc;
+        }
+        if (customPanel) customPanel.classList.remove('show');
     };
 
-    const selectSuggestedLocationCard = (targetEl) => {
-        if (!suggestedPanel || !targetEl) return;
-        const selectedLoc = targetEl.closest('.loc[data-loc]');
-        if (!selectedLoc) return;
-        suggestedPanel.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
-        selectedLoc.classList.add('sel');
-        selLoc = selectedLoc.dataset.loc;
-        setTitleLocationMode('suggested');
-    };
+    document.querySelectorAll('.loc').forEach(el => el.addEventListener('click', () => {
+        document.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
+        el.classList.add('sel');
+        selLoc = el.dataset.loc;
+        if (customPanel) customPanel.classList.toggle('show', selLoc === 'custom');
+        if (selLoc === 'custom') {
+            setTitleLocationMode('custom');
+        } else {
+            setLaunchMode('earth');
+        }
+    }));
 
-    if (suggestedPanel) {
-        suggestedPanel.addEventListener('click', (event) => {
-            const clickTarget = event.target;
-            if (!(clickTarget instanceof Element)) return;
-            selectSuggestedLocationCard(clickTarget);
-        });
+    if (earthLaunchToggle) {
+        earthLaunchToggle.addEventListener('click', () => setLaunchMode('earth'));
     }
-
-    Object.entries(locationModeButtons).forEach(([mode, btn]) => {
-        if (!btn) return;
-        btn.addEventListener('click', () => {
-            setTitleLocationMode(mode);
-        });
-    });
+    if (moonLaunchToggle) {
+        moonLaunchToggle.addEventListener('click', () => setLaunchMode('moon'));
+    }
+    if (spaceLaunchToggle) {
+        spaceLaunchToggle.addEventListener('click', () => setLaunchMode('space'));
+    }
 
     // Exposed so searchLocation() can force the custom selector active.
     globalThis.setTitleLocationMode = setTitleLocationMode;
-    globalThis.selectSuggestedLocationCard = selectSuggestedLocationCard;
+    globalThis.selectSuggestedLocationCard = (targetEl) => {
+        if (!targetEl) return;
+        const selectedLoc = targetEl.closest('.loc[data-loc]');
+        if (!selectedLoc || selectedLoc.dataset.loc === 'custom') return;
+        document.querySelectorAll('.loc').forEach(e => e.classList.remove('sel'));
+        selectedLoc.classList.add('sel');
+        selLoc = selectedLoc.dataset.loc;
+        if (customPanel) customPanel.classList.remove('show');
+        setLaunchMode('earth');
+    };
 
-    // Initial panel state (default to suggested list unless custom location is already selected).
+    // Initial panel state.
     setTitleLocationMode(selLoc === 'custom' ? 'custom' : 'suggested');
 
     // Custom location search - universal search for any location
