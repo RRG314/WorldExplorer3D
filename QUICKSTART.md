@@ -71,9 +71,9 @@ Reference test (Baltimore, 2026-02-14):
 
 ## 5. Share an Experience Link
 
-1. Open `Settings`.
-2. Click `Copy Experience Link`.
-3. Share the copied URL.
+1. On the title screen, use the footer share icons (`Copy`, `Share`, `Facebook`, `X`, `Instagram`, `Text`).
+2. In-game, use the blue share arrow above the flower button for quick share actions.
+3. You can also tap/click the coordinate readout to copy a live experience link directly.
 4. Recipient opens the URL and presses `Explore` to apply linked mode/camera/pose state.
 
 ## 6. Essential Controls
@@ -81,7 +81,7 @@ Reference test (Baltimore, 2026-02-14):
 | Key | Action |
 | --- | --- |
 | `WASD` / `Arrow Keys` | Move/steer |
-| `Space` | Handbrake |
+| `Space` | Brake / handbrake |
 | `Ctrl` | Boost |
 | `F` | Walk mode toggle |
 | `6` | Drone mode toggle |
@@ -116,7 +116,29 @@ Block builder action:
 | `🎮 Game Mode` -> `🧹 Clear Blocks` | Remove all build blocks for current location (including saved blocks) |
 | Block cap | Up to `100` total blocks can be stored for now |
 
-## 7. Troubleshooting
+## 7. Mobile Touch Controls (Quick Reference)
+
+- Driving:
+  - Left side: `▲` accelerate, `Brake` button, `▼` reverse/decelerate
+  - Right side: `◀ ▶` steering
+- Walking:
+  - Left pad: look
+  - Right pad: move
+  - Left action buttons: `Jump`, `Run`
+- Drone:
+  - Left pad: look
+  - Right pad: move
+  - Left action buttons: `Ascend`, `Descend`
+- Space flight:
+  - Right pad: steer/pitch
+  - Left action buttons: `Accelerate`, `Decelerate`
+
+Moon vehicle note:
+
+- Moon driving includes low-gravity airborne float behavior over hills/craters.
+- Earth driving keeps standard grounded terrain follow behavior.
+
+## 8. Troubleshooting
 
 ### Black or blank view
 
@@ -142,7 +164,7 @@ Block builder action:
 - Avoid strict private/incognito settings that block storage.
 - Confirm marker placement is not showing a storage warning in the composer.
 
-## 8. Where to Go Next
+## 9. Where to Go Next
 
 - Usage details: `USER_GUIDE.md`
 - Engineering details: `TECHNICAL_DOCS.md`

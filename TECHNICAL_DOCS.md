@@ -49,6 +49,9 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - Auto quality manager added in `js/perf.js` with FPS/frame-time driven budget tiers.
 - World-load profile scaling now consumes dynamic budget/LOD state in `js/world.js`.
 - Shareable experience link export/import added in `js/ui.js` (`Copy Experience Link` + URL param parsing).
+- Share surfaces expanded to title-footer icon rail, in-game share quick menu, and coordinate-readout click-copy.
+- Mobile touch-control profiles added for driving, walking, drone, and rocket modes with per-mode bindings/layout.
+- Moon-only low-gravity airborne terrain-follow behavior added for lunar driving crest/crater transitions.
 - Overpass endpoint preference + in-memory response cache added for faster repeat loads.
 - Loader cache-bust chain is aligned through `v=54` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 
@@ -232,6 +235,11 @@ function updateCarPhysics(dt) {
 }
 ```
 
+Current branch note:
+- Earth driving uses grounded terrain-follow integration.
+- Moon driving applies low-gravity airborne integration over steep terrain transitions (hill crests/crater edges).
+- This lunar airborne behavior is intentionally gated to moon context only.
+
 **Walking Physics**:
 ```javascript
 function updateWalkerPhysics(dt) {
@@ -376,7 +384,10 @@ The engine includes a user-facing benchmark switch so performance can be compare
 - Overlay toggle: `#perfOverlayToggle`
 - Apply/reload action: `#perfApplyReload`
 - Snapshot export action: `#perfCopySnapshot`
-- Experience link action: `#shareExperienceBtn`
+- Title share copy action: `#shareExperienceBtn`
+- Title share icons: `#titleShareNative`, `#titleShareFacebook`, `#titleShareTwitter`, `#titleShareInstagram`, `#titleShareText`
+- In-game share entry: `#gameShareFloatBtn` + `#gameShareMenu`
+- Coordinate share copy surface: `#coords` click/tap
 
 ### Mode semantics
 

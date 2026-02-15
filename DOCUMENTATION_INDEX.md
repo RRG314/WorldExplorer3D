@@ -46,6 +46,9 @@ The current branch documentation set includes updates for:
 - Title-screen performance benchmark controls (`RDT` vs `Baseline`, overlay toggle, snapshot copy)
 - Auto quality manager with FPS/frame-time dynamic budgets (`perf.js` -> `world.js`)
 - Shareable experience link export/import (`Copy Experience Link`, URL payload parsing/apply)
+- Title/footer + in-game share icon surfaces (copy/native/social/text) plus coordinate-readout click-copy
+- Mobile touch-control profile coverage for driving, walking, drone, and rocket modes
+- Moon-only low-gravity airborne car behavior over terrain crests/crater drops (Earth driving unchanged)
 - Top-bar overlay anchoring for debug and benchmark panels between their target HUD widgets
 - Overpass endpoint preference and in-memory cache behavior for repeat-load acceleration
 - Supporting benchmark stats documentation from captured Baltimore test runs (network + memory-cache)

@@ -71,13 +71,14 @@ Open `http://localhost:8000`.
 - Main asteroid belt and Kuiper belt visual layers.
 - Clickable deep-sky galaxy catalog (RA/Dec-positioned) with info panel.
 - Moon landing / return flows.
+- Moon-only terrain airborne vehicle behavior for crater/hill transitions (Earth driving remains grounded).
 
 ## Controls (Default)
 
 | Area | Key | Action |
 | --- | --- | --- |
 | Movement | `WASD` / `Arrow Keys` | Drive / steer |
-| Movement | `Space` | Handbrake / drift |
+| Movement | `Space` | Brake / handbrake |
 | Movement | `Ctrl` | Boost |
 | Movement | `Shift` | Sprint in walking mode |
 | Modes | `F` | Toggle walking mode |
@@ -102,6 +103,13 @@ Block builder actions:
 - `Click` (build mode on) -> place brick block
 - `Shift+Click` (build mode on) -> remove targeted block
 - `🎮 Game Mode` menu -> `🧱 Build Mode` and `🧹 Clear Blocks`
+
+Mobile touch controls (auto-enabled on touch-first clients):
+
+- Driving: left stack = `Accelerate` / `Brake` / `Decelerate`; right pad = steering
+- Walking: left pad = camera look, right pad = movement, action stack = `Jump` / `Run`
+- Drone: left pad = camera look, right pad = movement, action stack = `Ascend` / `Descend`
+- Rocket: left stack = `Accelerate` / `Decelerate`, right pad = steer/pitch
 
 ## Performance Mode Switch (RDT vs Baseline)
 
@@ -133,10 +141,11 @@ Snapshot fields to compare:
 
 ## Shareable Experience Links
 
-Use the title-screen `Settings` tab:
+Share actions are available in both title and in-game UI:
 
-1. Click `Copy Experience Link`.
-2. Share the copied URL.
+1. Title screen footer: use circular `Copy`, `Share`, `Facebook`, `X`, `Instagram`, or `Text` icons.
+2. In-game: use the blue share arrow above the flower button for the same quick actions.
+3. Tap/click the live coordinate readout to copy your current experience link directly.
 
 The URL payload supports:
 
@@ -229,6 +238,10 @@ Interpretation:
 - Added runtime performance benchmark mode switch (`RDT` vs `Baseline`) with in-game snapshot export.
 - Added FPS/frame-time auto quality manager (`perf.js`) with dynamic budget/LOD scaling consumed by `world.js`.
 - Added shareable experience link export/import for seed/location/mode/camera runtime context.
+- Added mobile-first touch navigation profiles for driving, walking, drone, and rocket modes.
+- Added title-footer social share icon rail plus in-game share arrow quick menu.
+- Added clickable coordinate readout share-copy shortcut.
+- Added moon-only terrain airborne/float vehicle behavior for hills/crater transitions.
 - Added Overpass endpoint preference plus memory-cache reuse for faster repeat city loads.
 
 ## Repository Structure

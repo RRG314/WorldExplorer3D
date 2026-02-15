@@ -35,6 +35,9 @@ Entries reflect changes made relative to the most recent public release.
 - Brick block builder module (`js/blocks.js`) with in-world place/stack/remove controls.
 - Persistent per-location build-block storage (`worldExplorer3D.buildBlocks.v1`) with runtime status hook (`getBuildPersistenceStatus()`).
 - Security/storage notice document for persistent memory behavior and disclaimer boilerplate.
+- Touch-first control profiles for mobile across driving, walking, drone, and rocket modes.
+- Expanded share entry points: title-footer icon rail, in-game share quick menu, and coordinate-readout click-copy.
+- Moon-only low-gravity terrain airborne handling for lunar driving over hill/crater transitions.
 
 ### Changed
 - Technical documentation examples now show deterministic RNG usage patterns aligned with the `rdt.js` seeded runtime helpers.
@@ -47,6 +50,7 @@ Entries reflect changes made relative to the most recent public release.
 - Top benchmark/debug overlays now auto-anchor between top HUD widgets to avoid overlap with controls.
 - Module loader cache-bust chain incremented through `v=54` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
 - Core docs now include benchmark workflow instructions and supporting measured stats for RDT vs baseline and cache-backed repeat loads.
+- Documentation set refreshed to match current control surfaces, mobile touch layouts, and share UI paths.
 
 ### Fixed
 - Non-responsive title menu interactions for suggested/custom selection after UI rework.
@@ -65,6 +69,7 @@ Entries reflect changes made relative to the most recent public release.
 - Intermittent stale-client behavior after hotfix pushes due to cache-bust drift (resolved with aligned loader version updates).
 - Share-link parsing bug where missing `lat/lon` could coerce to `0` and incorrectly force custom location payloads.
 - Pre-start share-link copy path now preserves pending mode/camera/seed state loaded from URL parameters.
+- Earth driving physics no longer applies moon-style low-gravity airborne terrain behavior (now moon-only as intended).
 
 ---
 

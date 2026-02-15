@@ -131,7 +131,13 @@ Interpretation:
 
 ## Shareable Experience Links
 
-Use `Settings -> Copy Experience Link` to generate a URL that captures:
+Share actions are available in both title and in-game UI:
+
+- Title screen footer circular icons: `Copy`, `Share`, `Facebook`, `X`, `Instagram`, `Text`
+- In-game blue share arrow above the flower button
+- Coordinate readout click/tap (copies current live experience link)
+
+Every share entry point generates a URL that captures:
 
 - location (`loc`, or custom `lat/lon` + `lname`)
 - game mode (`gm`)
@@ -240,14 +246,15 @@ Open that URL and the app will preload the title-screen state, then apply mode/c
 - `S` / `↓` - Brake / Reverse
 - `A` / `←` - Turn left (while moving)
 - `D` / `→` - Turn right (while moving)
-- `Space` - Handbrake (drift/emergency stop)
+- `Space` - Brake / handbrake
 - `Ctrl` - Boost (when bar is filled)
 - `Shift` - Off-road mode toggle
 - `B` - Toggle brick build mode
 
 #### Physics
 - **Realistic handling**: Car has momentum and turning radius
-- **Drift system**: Hold space while turning
+- **Brake-first handling**: `Space` is brake/handbrake input
+- **Slip-aware drift indicator**: DRIFT lights from high-speed slip angle (not a separate drift key mode)
 - **Boost system**: Fills automatically over time
 - **Off-road**: Slower on grass/dirt unless in off-road mode
 - **Collisions**: Can bump into buildings (car respawns)
@@ -351,6 +358,26 @@ Open that URL and the app will preload the title-screen state, then apply mode/c
 | Walking | Driving | `F` | Teleports back to car |
 | Any | Drone | `6` | Position saved |
 | Drone | Previous | `6` | Returns to saved position |
+
+### Mobile Touch Controls (Auto-Enabled on Touch Devices)
+
+#### Driving Layout
+- **Left side**: `▲` accelerate, `Brake` button, `▼` reverse/decelerate
+- **Right side**: `◀ ▶` steering
+
+#### Walking Layout
+- **Left pad**: camera look
+- **Right pad**: movement
+- **Left action buttons**: `Jump`, `Run`
+
+#### Drone Layout
+- **Left pad**: camera look
+- **Right pad**: movement
+- **Left action buttons**: `Ascend`, `Descend`
+
+#### Space-Flight Layout
+- **Right pad**: steer + pitch
+- **Left action buttons**: `Accelerate`, `Decelerate`
 
 ## Camera Controls
 
@@ -568,6 +595,8 @@ You can enter space systems in three ways:
 - **Jumping**: Press Space to jump very high
 - **Running**: Hold Shift for faster movement
 - **Drone mode**: Works normally
+- **Lunar driving float behavior**: Cars can go lightly airborne over hill crests/crater edges on moon terrain
+- **Earth unchanged**: This airborne car behavior is moon-only; Earth keeps normal grounded terrain follow
 
 ### Apollo 11 Landing Site
 
@@ -848,7 +877,7 @@ Press `Esc` to pause:
 ### Driving Tips
 
 1. **Boost Management**: Don't waste boost on turns
-2. **Drift Corners**: Handbrake helps tight turns
+2. **Brake Before Tight Turns**: Use Space to scrub speed cleanly
 3. **Speed Limit**: Informational only, go faster if needed
 4. **Off-Road**: Remember Shift for better grass/dirt handling
 5. **Camera Angle**: Switch views (C) for better visibility
@@ -901,7 +930,7 @@ Press `Esc` to pause:
 A: Yes, for satellite imagery and real estate data.
 
 **Q: Does it work on mobile?**
-A: Yes, optimized for tablets and phones with touch controls.
+A: Yes. Touch UI is mode-aware with dedicated mobile layouts for driving, walking, drone, and space flight.
 
 **Q: Can I save my progress?**
 A: Full gameplay state is not saved, but memory markers (pin/flower notes) are persisted locally in your browser.
@@ -927,7 +956,7 @@ A: Main Menu -> `Settings` -> `⚡ Performance Benchmark` -> choose mode -> `App
 A: In the same benchmark panel, click `Copy Snapshot` to copy JSON to clipboard.
 
 **Q: How do I share the exact experience setup with someone else?**
-A: In `Settings`, click `Copy Experience Link` and share the generated URL.
+A: Use title-footer share icons, the in-game blue share arrow, or tap the coordinate readout to copy/share the same encoded experience link.
 
 **Q: Why is loading slow?**
 A: First loads are network-bound (Overpass + tiles). Repeat loads can be much faster when `lastLoad.overpassSource` shows `memory-cache`.
@@ -1032,9 +1061,9 @@ Quick reference for all controls:
 | S/↓ | Back/Brake |
 | A/← | Left/Turn Left |
 | D/→ | Right/Turn Right |
-| Space | Handbrake/Jump/Up |
-| Shift | Run/Off-Road/Down |
-| Ctrl | Boost/Down |
+| Space | Brake/Handbrake or Jump or Thrust |
+| Shift | Run or Off-Road or Descend/Decelerate |
+| Ctrl | Boost |
 
 ### Mode & View
 | Key | Action |
