@@ -155,6 +155,11 @@ function setupUI() {
   const perfSettingsStatus = document.getElementById('perfSettingsStatus');
   const shareExperienceBtn = document.getElementById('shareExperienceBtn');
   const shareExperienceStatus = document.getElementById('shareExperienceStatus');
+  const titleShareNative = document.getElementById('titleShareNative');
+  const titleShareFacebook = document.getElementById('titleShareFacebook');
+  const titleShareTwitter = document.getElementById('titleShareTwitter');
+  const titleShareInstagram = document.getElementById('titleShareInstagram');
+  const titleShareText = document.getElementById('titleShareText');
   const gameShareFloatBtn = document.getElementById('gameShareFloatBtn');
   const gameShareMenu = document.getElementById('gameShareMenu');
   const gameShareStatus = document.getElementById('gameShareStatus');
@@ -562,6 +567,11 @@ function setupUI() {
     gameShareStatus.textContent = message;
   }
 
+  function setTitleShareStatus(message = '') {
+    if (!shareExperienceStatus) return;
+    shareExperienceStatus.textContent = message;
+  }
+
   function closeGameShareMenu() {
     if (gameShareMenu) gameShareMenu.classList.remove('show');
     setGameShareStatus('');
@@ -569,8 +579,12 @@ function setupUI() {
 
   async function copyShareLinkWithFallback(experienceLink) {
     if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-      await navigator.clipboard.writeText(experienceLink);
-      return true;
+      try {
+        await navigator.clipboard.writeText(experienceLink);
+        return true;
+      } catch (_) {
+        // Fall through to prompt fallback when clipboard access is blocked.
+      }
     }
     window.prompt('Copy experience link:', experienceLink);
     return false;
@@ -588,12 +602,13 @@ function setupUI() {
     });
   }
 
-  function openShareWindow(targetUrl) {
+  function openShareWindow(targetUrl, onBlocked = null) {
     // Use normal browser new-tab behavior instead of popup-sized windows.
     const popup = window.open(targetUrl, '_blank', 'noopener,noreferrer');
     if (popup && typeof popup.focus === 'function') popup.focus();
     if (!popup) {
-      setGameShareStatus('Popup blocked. Allow popups to open share links.');
+      if (typeof onBlocked === 'function') onBlocked();
+      else setGameShareStatus('Popup blocked. Allow popups to open share links.');
       return false;
     }
     return true;
@@ -604,12 +619,99 @@ function setupUI() {
       try {
         const experienceLink = buildShareableExperienceLink();
         const copied = await copyShareLinkWithFallback(experienceLink);
-        if (shareExperienceStatus) shareExperienceStatus.textContent = copied ? 'Experience link copied to clipboard.' : 'Experience link generated.';
+        setTitleShareStatus(copied ? 'Experience link copied to clipboard.' : 'Experience link generated.');
       } catch (err) {
-        if (shareExperienceStatus) {
-          shareExperienceStatus.textContent = `Unable to build share link: ${err?.message || err}`;
+        setTitleShareStatus(`Unable to build share link: ${err?.message || err}`);
+      }
+    });
+  }
+
+  if (titleShareNative && !(navigator.share && typeof navigator.share === 'function')) {
+    titleShareNative.style.display = 'none';
+  }
+
+  if (titleShareNative) {
+    titleShareNative.addEventListener('click', async () => {
+      const link = buildShareableExperienceLink();
+      const payload = {
+        title: 'World Explorer 3D',
+        text: 'Check out my World Explorer 3D experience.',
+        url: link
+      };
+      try {
+        if (navigator.share && typeof navigator.share === 'function') {
+          await navigator.share(payload);
+          setTitleShareStatus('Share completed.');
+        } else {
+          await copyShareLinkWithFallback(link);
+          setTitleShareStatus('Link copied to clipboard.');
+        }
+      } catch (err) {
+        if (err && err.name === 'AbortError') return;
+        try {
+          await copyShareLinkWithFallback(link);
+          setTitleShareStatus('Share cancelled. Link copied to clipboard.');
+        } catch (copyErr) {
+          setTitleShareStatus(`Unable to share link: ${copyErr?.message || copyErr}`);
         }
       }
+    });
+  }
+
+  if (titleShareFacebook) {
+    titleShareFacebook.addEventListener('click', async () => {
+      const link = buildShareableExperienceLink();
+      const opened = openShareWindow(
+        `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(link)}`,
+        () => setTitleShareStatus('Popup blocked. Link copied for manual share.')
+      );
+      if (!opened) {
+        await copyShareLinkWithFallback(link);
+        return;
+      }
+      setTitleShareStatus('Opened Facebook share.');
+    });
+  }
+
+  if (titleShareTwitter) {
+    titleShareTwitter.addEventListener('click', async () => {
+      const link = buildShareableExperienceLink();
+      const text = 'Check out my World Explorer 3D experience.';
+      const opened = openShareWindow(
+        `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(link)}`,
+        () => setTitleShareStatus('Popup blocked. Link copied for manual share.')
+      );
+      if (!opened) {
+        await copyShareLinkWithFallback(link);
+        return;
+      }
+      setTitleShareStatus('Opened Twitter share.');
+    });
+  }
+
+  if (titleShareText) {
+    titleShareText.addEventListener('click', async () => {
+      const link = buildShareableExperienceLink();
+      const body = encodeURIComponent(`Check out my World Explorer 3D experience: ${link}`);
+      const smsUrl = /iPhone|iPad|iPod/i.test(navigator.userAgent) ? `sms:&body=${body}` : `sms:?body=${body}`;
+      const opened = openShareWindow(
+        smsUrl,
+        () => setTitleShareStatus('Text share blocked. Link copied for manual share.')
+      );
+      if (!opened) {
+        await copyShareLinkWithFallback(link);
+        return;
+      }
+      setTitleShareStatus('Opened text share.');
+    });
+  }
+
+  if (titleShareInstagram) {
+    titleShareInstagram.addEventListener('click', async () => {
+      const link = buildShareableExperienceLink();
+      await copyShareLinkWithFallback(link);
+      openShareWindow('https://www.instagram.com/', () => setTitleShareStatus('Instagram blocked. Link copied for manual share.'));
+      setTitleShareStatus('Link copied. Paste into Instagram DM, story, or bio.');
     });
   }
 

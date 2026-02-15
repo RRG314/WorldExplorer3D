@@ -103,6 +103,19 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .start-section{padding:20px 24px;border-top:2px solid #e8eef5;flex-shrink:0;background:rgba(248,250,252,0.8);backdrop-filter:blur(10px)}
 .startBtn{width:100%;background:linear-gradient(135deg,#0f3460 0%,#533483 100%);border:2px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;color:#ffffff;cursor:pointer;letter-spacing:2px;transition:all 0.3s;text-transform:uppercase;box-shadow:0 4px 20px rgba(83,52,131,0.4)}
 .startBtn:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(83,52,131,0.6),0 0 30px rgba(15,52,96,0.5);border-color:rgba(255,255,255,0.4)}
+.title-footer{padding:10px 12px 12px;border-top:1px solid #dbe4ef;background:rgba(248,250,252,0.88);backdrop-filter:blur(10px);flex-shrink:0}
+.title-share-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.title-share-btn{border:none;border-radius:8px;padding:8px 6px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.title-share-btn.copy{background:#0f766e}
+.title-share-btn.native{background:#1d4ed8}
+.title-share-btn.facebook{background:#2563eb}
+.title-share-btn.twitter{background:#334155}
+.title-share-btn.instagram{background:linear-gradient(135deg,#f97316,#ec4899)}
+.title-share-btn.text{background:#0f766e}
+#shareExperienceStatus{font-size:10px;color:#64748b;min-height:14px;margin-top:6px;text-align:center}
+.title-license{margin-top:6px;padding-top:6px;border-top:1px solid #dbe4ef;font-size:10px;color:#64748b;line-height:1.35;text-align:center}
+.title-license a{color:#1d4ed8;font-weight:600;text-decoration:none}
+.title-license a:hover{text-decoration:underline}
 
 /* HUD */
 #hud{position:fixed;top:20px;left:20px;z-index:100;display:none}
@@ -125,7 +138,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #minimap{position:fixed;bottom:20px;left:20px;width:160px;height:160px;background:rgba(255,255,255,0.95);border:none;border-radius:16px;z-index:100;display:none;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 #minimap.show{display:block}
 #minimap:hover{box-shadow:0 12px 32px rgba(0,0,0,0.15)}
-#largeMap{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:150;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+#largeMap{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:220;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 #largeMap.show{display:flex}
 #largeMapCanvas{border:none;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
 #mapClose{position:absolute;top:30px;right:30px;background:#ffffff;border:none;color:#1e293b;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;padding:12px 24px;cursor:pointer;border-radius:10px;transition:all 0.2s;z-index:200}
@@ -178,11 +191,12 @@ input,textarea{-webkit-user-select:text;user-select:text}
   /* HUD elements */
   #hud{top:10px;left:10px;font-size:11px}
   #minimap{width:120px;height:120px}
-  #coords{bottom:180px;left:10px;font-size:10px;padding:8px 12px}
-  #controlsTab{left:140px;max-width:180px;font-size:11px}
-  #memoryFlowerFloatBtn{left:140px;bottom:72px}
-  #gameShareFloatBtn{left:140px;bottom:124px}
-  #gameShareMenu{left:85px;bottom:176px}
+  #coords{bottom:180px!important;left:10px!important;font-size:10px;padding:8px 12px}
+  #controlsTab{left:50%!important;transform:translateX(-50%)!important;width:min(280px,calc(100vw - 20px))!important;max-width:none!important;font-size:11px;bottom:106px!important;max-height:56vh!important}
+  #ctrlContent{max-height:calc(56vh - 44px)!important}
+  #memoryFlowerFloatBtn{left:140px!important;bottom:72px!important}
+  #gameShareFloatBtn{left:140px!important;bottom:124px!important}
+  #gameShareMenu{left:85px!important;bottom:176px!important}
   #buildModeIndicator{left:10px;bottom:66px;font-size:10px;padding:8px 10px;max-width:220px}
 
   /* Property panel */
@@ -230,11 +244,12 @@ input,textarea{-webkit-user-select:text;user-select:text}
   /* HUD elements for phones */
   #hud{top:5px;left:5px;font-size:10px}
   #minimap{width:100px;height:100px}
-  #coords{bottom:160px;left:5px;font-size:9px;padding:6px 10px}
-  #controlsTab{left:115px;max-width:150px;font-size:10px;bottom:15px}
-  #memoryFlowerFloatBtn{left:115px;bottom:66px}
-  #gameShareFloatBtn{left:115px;bottom:118px}
-  #gameShareMenu{left:60px;bottom:170px}
+  #coords{bottom:160px!important;left:5px!important;font-size:9px;padding:6px 10px}
+  #controlsTab{left:50%!important;transform:translateX(-50%)!important;width:min(270px,calc(100vw - 16px))!important;max-width:none!important;font-size:10px;bottom:100px!important;max-height:52vh!important}
+  #ctrlContent{max-height:calc(52vh - 40px)!important}
+  #memoryFlowerFloatBtn{left:115px!important;bottom:66px!important}
+  #gameShareFloatBtn{left:115px!important;bottom:118px!important}
+  #gameShareMenu{left:60px!important;bottom:170px!important}
   #buildModeIndicator{left:5px;bottom:60px;font-size:9px;padding:7px 9px;max-width:190px}
 
   /* Property panel for phones */
@@ -284,10 +299,10 @@ input,textarea{-webkit-user-select:text;user-select:text}
   }
 }
 
-#controlsTab{position:fixed;bottom:20px;left:200px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;z-index:104;display:none;font-size:12px;color:#475569;max-width:220px;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
+#controlsTab{position:fixed;bottom:20px;left:200px;transform:none;width:220px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;z-index:104;display:none;font-size:12px;color:#475569;max-width:220px;max-height:60vh;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 #controlsTab.show{display:block}
 #ctrlHeader{padding:12px 16px;cursor:pointer;color:#667eea;font-family:'Poppins',sans-serif;font-weight:600}
-#ctrlContent{padding:12px 16px;border-top:2px solid #f1f5f9;line-height:1.8}
+#ctrlContent{padding:12px 16px;border-top:2px solid #f1f5f9;line-height:1.8;max-height:calc(60vh - 48px);overflow-y:auto}
 #ctrlContent.hidden{display:none}
 #memoryFlowerFloatBtn{position:fixed;bottom:78px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#ec4899,#db2777);border:none;border-radius:50%;color:#ffffff;font-size:23px;cursor:pointer;box-shadow:0 10px 26px rgba(236,72,153,0.38);z-index:101;display:none;transition:all 0.2s}
 #memoryFlowerFloatBtn.show{display:flex;align-items:center;justify-content:center}
@@ -503,12 +518,6 @@ Show live benchmark overlay in-game
 <div id="perfSettingsStatus" style="font-size:11px;color:#64748b;min-height:16px">
 Use this to compare RDT and baseline with real runtime data.
 </div>
-<div style="margin-top:12px;padding-top:10px;border-top:1px solid #dbe4ef">
-<button id="shareExperienceBtn" style="width:100%;background:#0f766e;border:none;border-radius:8px;padding:9px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:12px">Copy Experience Link</button>
-<div id="shareExperienceStatus" style="font-size:11px;color:#64748b;min-height:16px;margin-top:6px">
-Share seed, location, mode, and camera context in one URL.
-</div>
-</div>
 </div>
 </div>
 <div style="margin-bottom:24px">
@@ -622,6 +631,22 @@ Share seed, location, mode, and camera context in one URL.
 </div>
 </div>
 <div class="start-section"><button class="startBtn" id="startBtn">EXPLORE</button></div>
+<div class="title-footer">
+<div class="title-share-row">
+<button id="shareExperienceBtn" class="title-share-btn copy">🔗 Copy Link</button>
+<button id="titleShareNative" class="title-share-btn native">📤 Share...</button>
+<button id="titleShareFacebook" class="title-share-btn facebook">📘 Facebook</button>
+<button id="titleShareTwitter" class="title-share-btn twitter">𝕏 Twitter</button>
+<button id="titleShareInstagram" class="title-share-btn instagram">📷 Instagram</button>
+<button id="titleShareText" class="title-share-btn text">💬 Text</button>
+</div>
+<div id="shareExperienceStatus">Share seed, location, mode, and camera context in one URL.</div>
+<div class="title-license">
+Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fonts under SIL OFL · API providers under their own terms.
+<br>
+<a href="LICENSE" target="_blank">License</a> · <a href="ACKNOWLEDGEMENTS.md" target="_blank">Acknowledgements</a>
+</div>
+</div>
 </div>
 </div>
 <div id="hud"><div class="hud-box">
