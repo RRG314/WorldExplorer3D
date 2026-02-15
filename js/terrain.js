@@ -213,7 +213,7 @@ function getOrLoadTerrainTile(z, x, y) {
   img.crossOrigin = 'anonymous';
   img.src = appCtx.TERRAIN_TILE_URL(z, x, y);
 
-  const tile = { img, loaded: false, elev: null, w: 256, h: 256 };
+  const tile = { img, loaded: false, failed: false, elev: null, w: 256, h: 256 };
   appCtx.terrainTileCache.set(key, tile);
 
   img.onload = () => {
@@ -231,6 +231,7 @@ function getOrLoadTerrainTile(z, x, y) {
       }
 
       tile.loaded = true;
+      tile.failed = false;
       tile.elev = elev;
 
       // IMPORTANT: After tile loads, reapply heights to any terrain meshes using this tile
@@ -259,12 +260,14 @@ function getOrLoadTerrainTile(z, x, y) {
     } catch (e) {
       console.warn('Terrain tile decode failed:', z, x, y, e);
       tile.loaded = false;
+      tile.failed = true;
       tile.elev = null;
     }
   };
 
   img.onerror = () => {
     tile.loaded = false;
+    tile.failed = true;
     tile.elev = null;
   };
 
@@ -399,11 +402,20 @@ function buildTerrainTileMesh(z, tx, ty) {
   mesh.userData.isTerrainMesh = true; // Mark as terrain for debug mode
 
   applyHeightsToTerrainMesh(mesh);
-  if (mesh.userData.pendingTerrainTile) {
-    mesh.visible = false;
-  }
 
   return mesh;
+}
+
+function applyFlatFallbackToTerrainMesh(mesh) {
+  if (!mesh || !mesh.geometry || !mesh.geometry.attributes?.position) return;
+  const pos = mesh.geometry.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    pos.setY(i, 0);
+  }
+  pos.needsUpdate = true;
+  mesh.geometry.computeVertexNormals();
+  mesh.position.y = 0;
+  mesh.visible = true;
 }
 
 function applyHeightsToTerrainMesh(mesh) {
@@ -414,7 +426,9 @@ function applyHeightsToTerrainMesh(mesh) {
   const tile = getOrLoadTerrainTile(z, tx, ty);
   if (!tile.loaded) {
     mesh.userData.pendingTerrainTile = true;
-    mesh.visible = false;
+    // Mobile networks can fail/lag elevation tile fetches; keep terrain visible
+    // with a flat fallback mesh until decoded heights arrive.
+    applyFlatFallbackToTerrainMesh(mesh);
     return;
   }
 

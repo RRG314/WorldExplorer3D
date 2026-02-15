@@ -1,6 +1,7 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#f5f7fa;overflow:hidden;font-family:'Inter',sans-serif;-webkit-user-select:none;user-select:none;touch-action:pan-x pan-y;-webkit-tap-highlight-color:transparent}
 button,input,select,textarea{-webkit-tap-highlight-color:transparent}
+button{touch-action:manipulation}
 input,textarea{-webkit-user-select:text;user-select:text}
 
 /* Title Screen */
@@ -147,6 +148,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #titleScreen{padding-top:max(14px,calc(env(safe-area-inset-top) + 10px));padding-bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px))}
   .menu-container{max-height:calc(100dvh - 248px)}
 }
+@media (min-width:1024px){
+  .title-share-row{position:fixed;right:12px;top:50%;transform:translateY(-50%);flex-direction:column;flex-wrap:nowrap;gap:12px;z-index:3}
+  .title-footer{width:min(920px,95vw)}
+  #shareExperienceStatus,.title-license{padding-right:76px}
+}
 
 /* Responsive adjustments for float menus */
 @media (max-width: 768px) {
@@ -168,16 +174,19 @@ input,textarea{-webkit-user-select:text;user-select:text}
   /* HUD elements */
   #hud{top:10px;left:10px;font-size:11px}
   #minimap{width:120px;height:120px}
-  #coords{bottom:180px!important;left:10px!important;font-size:10px;padding:8px 12px}
+  #coords{bottom:158px!important;left:10px!important;font-size:10px;padding:8px 12px}
   #controlsTab{left:50%!important;transform:translateX(-50%)!important;width:min(280px,calc(100vw - 20px))!important;max-width:none!important;font-size:11px;bottom:106px!important;max-height:56vh!important}
-  #controlsTab.compact{width:auto!important;max-width:max-content!important}
+  #controlsTab.compact{width:auto!important;max-width:max-content!important;left:62%!important;transform:translateX(-50%)!important}
   #controlsTab.compact #ctrlHeader{padding:9px 12px;font-size:12px}
   #ctrlContent{max-height:calc(56vh - 44px)!important}
+  #gameShareFloatBtn{left:140px!important;bottom:24px!important}
+  #memoryFlowerFloatBtn{left:140px!important;bottom:76px!important}
+  #gameShareMenu{left:85px!important;bottom:128px!important}
   #mobileTouchControls{inset:0}
   .mobilePad{width:114px;height:114px;top:58%}
   #mobileMovePad{right:8px}
   #mobileLookPad{left:8px}
-  #mobileActionStack{top:64%}
+  #mobileActionStack{left:8px;top:72%;width:114px}
   .mobileActionBtn{min-width:82px;padding:9px 12px;font-size:11px}
 
   /* Property panel */
@@ -216,16 +225,19 @@ input,textarea{-webkit-user-select:text;user-select:text}
   /* HUD elements for phones */
   #hud{top:5px;left:5px;font-size:10px}
   #minimap{width:100px;height:100px}
-  #coords{bottom:160px!important;left:5px!important;font-size:9px;padding:6px 10px}
+  #coords{bottom:144px!important;left:5px!important;font-size:9px;padding:6px 10px}
   #controlsTab{left:50%!important;transform:translateX(-50%)!important;width:min(270px,calc(100vw - 16px))!important;max-width:none!important;font-size:10px;bottom:100px!important;max-height:52vh!important}
-  #controlsTab.compact{width:auto!important;max-width:max-content!important}
+  #controlsTab.compact{width:auto!important;max-width:max-content!important;left:64%!important;transform:translateX(-50%)!important}
   #controlsTab.compact #ctrlHeader{padding:8px 10px;font-size:11px}
   #ctrlContent{max-height:calc(52vh - 40px)!important}
+  #gameShareFloatBtn{left:113px!important;bottom:22px!important}
+  #memoryFlowerFloatBtn{left:113px!important;bottom:74px!important}
+  #gameShareMenu{left:58px!important;bottom:126px!important}
   #mobileTouchControls{inset:0}
   .mobilePad{width:104px;height:104px;top:60%}
   #mobileMovePad{right:6px}
   #mobileLookPad{left:6px}
-  #mobileActionStack{top:66%}
+  #mobileActionStack{left:6px;top:74%;width:104px}
   .mobileNavBtn{font-size:16px}
   .mobileActionBtn{min-width:76px;padding:8px 10px;font-size:10px}
 
@@ -282,7 +294,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .mobileNavBtn.right{grid-column:3;grid-row:2}
 .mobileNavBtn.down{grid-column:2;grid-row:3}
 .mobilePadLabel{grid-column:2;grid-row:2;border-radius:10px;background:rgba(255,255,255,0.85);color:#334155;font-size:9px;font-weight:700;letter-spacing:0.7px;display:flex;align-items:center;justify-content:center;text-transform:uppercase}
-#mobileActionStack{position:absolute;left:50%;top:62%;transform:translate(-50%,-50%);display:flex;flex-direction:column;gap:8px;pointer-events:none}
+#mobileActionStack{position:absolute;left:10px;top:73%;transform:none;display:flex;flex-direction:column;gap:8px;pointer-events:none;width:126px}
 .mobileActionBtn{min-width:88px;padding:10px 14px;border:none;border-radius:12px;background:rgba(15,23,42,0.62);backdrop-filter:blur(6px);color:#ffffff;font-size:12px;font-weight:700;letter-spacing:0.3px;pointer-events:auto;touch-action:none;box-shadow:0 8px 18px rgba(0,0,0,0.24)}
 .mobileActionBtn.active{background:rgba(37,99,235,0.82);transform:scale(0.97)}
 .mobilePad.hidden,.mobileActionBtn.hidden{display:none}

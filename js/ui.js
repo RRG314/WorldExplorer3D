@@ -1350,17 +1350,8 @@ function setupUI() {
   function bindMobileHoldButton(btn) {
     if (!btn) return;
 
-    const onPress = (event) => {
-      if (btn.disabled) return;
-      const key = btn.dataset.key;
-      const channel = btn.dataset.channel || 'earth';
-      if (!key) return;
-      event.preventDefault();
-      event.stopPropagation();
-      if (typeof btn.setPointerCapture === 'function' && Number.isFinite(event.pointerId)) {
-        try {btn.setPointerCapture(event.pointerId);} catch (_) {}
-      }
-      const token = `${btn.id}:${event.pointerId}`;
+    const beginHold = (token, channel, key) => {
+      if (!token || !key) return;
       if (mobileActivePointers.has(token)) return;
       mobileActivePointers.set(token, { channel, key, buttonId: btn.id });
       holdVirtualKey(channel, key);
@@ -1369,8 +1360,7 @@ function setupUI() {
       btn.classList.add('active');
     };
 
-    const onRelease = (event) => {
-      const token = `${btn.id}:${event.pointerId}`;
+    const endHold = (token) => {
       const held = mobileActivePointers.get(token);
       if (!held) return;
       mobileActivePointers.delete(token);
@@ -1384,10 +1374,63 @@ function setupUI() {
       }
     };
 
-    btn.addEventListener('pointerdown', onPress);
-    btn.addEventListener('pointerup', onRelease);
-    btn.addEventListener('pointercancel', onRelease);
-    btn.addEventListener('lostpointercapture', onRelease);
+    const onPointerPress = (event) => {
+      if (btn.disabled) return;
+      const key = btn.dataset.key;
+      const channel = btn.dataset.channel || 'earth';
+      if (!key) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof btn.setPointerCapture === 'function' && Number.isFinite(event.pointerId)) {
+        try {btn.setPointerCapture(event.pointerId);} catch (_) {}
+      }
+      const pointerId = Number.isFinite(event.pointerId) ? event.pointerId : 0;
+      beginHold(`${btn.id}:p:${pointerId}`, channel, key);
+    };
+
+    const onPointerRelease = (event) => {
+      const pointerId = Number.isFinite(event.pointerId) ? event.pointerId : 0;
+      endHold(`${btn.id}:p:${pointerId}`);
+    };
+
+    const onTouchPress = (event) => {
+      if (btn.disabled) return;
+      const key = btn.dataset.key;
+      const channel = btn.dataset.channel || 'earth';
+      if (!key) return;
+      const changed = event.changedTouches;
+      if (!changed || changed.length === 0) return;
+      event.preventDefault();
+      event.stopPropagation();
+      for (let i = 0; i < changed.length; i++) {
+        const id = changed[i]?.identifier;
+        if (!Number.isFinite(id)) continue;
+        beginHold(`${btn.id}:t:${id}`, channel, key);
+      }
+    };
+
+    const onTouchRelease = (event) => {
+      const changed = event.changedTouches;
+      if (!changed || changed.length === 0) return;
+      event.preventDefault();
+      for (let i = 0; i < changed.length; i++) {
+        const id = changed[i]?.identifier;
+        if (!Number.isFinite(id)) continue;
+        endHold(`${btn.id}:t:${id}`);
+      }
+    };
+
+    const supportsPointerEvents = typeof window !== 'undefined' && 'PointerEvent' in window;
+    if (supportsPointerEvents) {
+      btn.addEventListener('pointerdown', onPointerPress);
+      btn.addEventListener('pointerup', onPointerRelease);
+      btn.addEventListener('pointercancel', onPointerRelease);
+      btn.addEventListener('lostpointercapture', onPointerRelease);
+    } else {
+      btn.addEventListener('touchstart', onTouchPress, { passive: false });
+      btn.addEventListener('touchend', onTouchRelease, { passive: false });
+      btn.addEventListener('touchcancel', onTouchRelease, { passive: false });
+    }
     btn.addEventListener('contextmenu', (event) => event.preventDefault());
   }
 
