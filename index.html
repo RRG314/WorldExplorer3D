@@ -104,7 +104,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .start-section{padding:20px 24px;border-top:2px solid #e8eef5;flex-shrink:0;background:rgba(248,250,252,0.8);backdrop-filter:blur(10px)}
 .startBtn{width:100%;background:linear-gradient(135deg,#0f3460 0%,#533483 100%);border:2px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;color:#ffffff;cursor:pointer;letter-spacing:2px;transition:all 0.3s;text-transform:uppercase;box-shadow:0 4px 20px rgba(83,52,131,0.4)}
 .startBtn:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(83,52,131,0.6),0 0 30px rgba(15,52,96,0.5);border-color:rgba(255,255,255,0.4)}
-.title-footer{width:min(720px,95vw);padding:8px 10px 2px;display:flex;flex-direction:column;align-items:center;gap:8px;position:relative;z-index:1}
+.title-footer{width:min(740px,95vw);padding:2px 10px 0;display:flex;flex-direction:column;align-items:center;gap:2px;position:relative;z-index:1}
 .title-share-row{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
 .title-share-btn{width:44px;height:44px;border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#ffffff;box-shadow:0 8px 22px rgba(15,23,42,0.35);transition:transform 0.18s ease,box-shadow 0.18s ease,filter 0.18s ease}
 .title-share-btn:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 12px 28px rgba(15,23,42,0.45)}
@@ -118,18 +118,18 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .title-share-btn.text{background:#0f766e}
 .title-share-btn.facebook svg,.title-share-btn.twitter svg{fill:currentColor;stroke:none}
 #shareExperienceStatus{display:none}
-.title-license{font-size:10px;color:rgba(226,232,240,0.9);line-height:1.35;text-align:center;text-shadow:0 2px 8px rgba(2,6,23,0.55);padding:2px 8px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:min(980px,95vw)}
+.title-license{font-size:10px;color:rgba(226,232,240,0.9);line-height:1.35;text-align:center;text-shadow:0 2px 8px rgba(2,6,23,0.55);padding:0 8px;max-width:min(980px,95vw)}
 .title-license a{color:#bfdbfe;font-weight:600;text-decoration:none}
 .title-license a:hover{text-decoration:underline}
 @media (min-width: 769px){
   #titleScreen{padding-top:max(14px,calc(env(safe-area-inset-top) + 10px));padding-bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px))}
-  .menu-container{width:min(760px,95vw);max-height:calc(100dvh - 210px)}
+  .menu-container{width:min(780px,95vw);max-height:calc(100dvh - 190px)}
   .title-license{font-size:11px;padding:0 10px}
 }
 @media (min-width: 1024px){
   .title-share-row{position:fixed;right:12px;top:50%;transform:translateY(-50%);flex-direction:column;flex-wrap:nowrap;gap:12px;z-index:3}
-  .title-footer{width:min(980px,95vw)}
-  .title-license{padding-right:0}
+  .title-footer{width:calc(100vw - 20px);margin-top:-4px}
+  .title-license{padding-right:0;max-width:calc(100vw - 120px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
 
 /* HUD */
@@ -734,7 +734,7 @@ Use this to compare RDT and baseline with real runtime data.
 </div>
 <div id="shareExperienceStatus"></div>
 <div class="title-license">
-Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fonts under SIL OFL · API providers under their own terms · <a href="LICENSE" target="_blank">License</a> · <a href="ACKNOWLEDGEMENTS.md" target="_blank">Acknowledgements</a>
+Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fonts under SIL OFL · API providers under their own terms · © 2026 Steven Reid. All Rights Reserved. · <a href="LICENSE" target="_blank">License</a> · <a href="ACKNOWLEDGEMENTS.md" target="_blank">Acknowledgements</a>
 </div>
 </div>
 </div>

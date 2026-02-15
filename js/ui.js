@@ -5,17 +5,18 @@ import { ctx as appCtx } from "./shared-context.js?v=54"; // ===================
 function setupUI() {
   const bindTouchFriendlyPress = (el, handler) => {
     if (!el || typeof handler !== 'function') return;
-    let ignoreClickUntil = 0;
+    let suppressNextClick = false;
     const run = (event) => handler(event);
 
     el.addEventListener('pointerup', (event) => {
       if (!event || event.pointerType === 'mouse') return;
-      ignoreClickUntil = Date.now() + 450;
+      suppressNextClick = true;
       run(event);
     });
 
     el.addEventListener('click', (event) => {
-      if (Date.now() < ignoreClickUntil) {
+      if (suppressNextClick) {
+        suppressNextClick = false;
         if (event?.cancelable) event.preventDefault();
         return;
       }
@@ -1524,25 +1525,17 @@ function setupUI() {
     if (!isTouchPreferredClient) return;
     const shieldTargets = document.querySelectorAll([
       '#floatMenuContainer',
-      '#floatMenuContainer *',
       '#controlsTab',
-      '#controlsTab *',
       '#mainMenuBtn',
       '#memoryFlowerFloatBtn',
       '#gameShareFloatBtn',
       '#gameShareMenu',
       '#mobileTouchControls',
-      '#mobileTouchControls *',
       '#largeMap',
-      '#largeMap *',
       '#propertyPanel',
-      '#propertyPanel *',
       '#historicPanel',
-      '#historicPanel *',
       '#memoryComposer',
-      '#memoryComposer *',
-      '#memoryInfoPanel',
-      '#memoryInfoPanel *'
+      '#memoryInfoPanel'
     ].join(','));
     const stop = (event) => {
       if (!appCtx.gameStarted) return;
@@ -1595,33 +1588,52 @@ function setupUI() {
   }
 
   // Float menu
+  const FLOAT_MENU_BY_BUTTON = {
+    travelBtn: 'travelMenu',
+    realEstateFloatBtn: 'realEstateMenu',
+    exploreBtn: 'exploreMenu',
+    gameBtn: 'gameMenu'
+  };
+
+  const toggleFloatMenuByButton = (buttonId) => {
+    const menuId = FLOAT_MENU_BY_BUTTON[buttonId];
+    if (!menuId) return;
+    const menu = document.getElementById(menuId);
+    if (!menu) return;
+    const isOpen = menu.classList.contains('open');
+    document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
+    if (!isOpen) menu.classList.add('open');
+  };
+
+  const floatMenuContainer = document.getElementById('floatMenuContainer');
+  if (floatMenuContainer && isTouchPreferredClient) {
+    floatMenuContainer.addEventListener('touchend', (event) => {
+      if (!appCtx.gameStarted) return;
+      const target = event.target instanceof Element ? event.target : null;
+      if (!target) return;
+
+      const menuBtn = target.closest('.floatBtn');
+      if (menuBtn && menuBtn.id) {
+        event.preventDefault();
+        event.stopPropagation();
+        toggleFloatMenuByButton(menuBtn.id);
+        return;
+      }
+
+      const menuItem = target.closest('.floatItem');
+      if (menuItem) {
+        event.preventDefault();
+        event.stopPropagation();
+        menuItem.click();
+      }
+    }, { passive: false });
+  }
+
   // Three separate float menu buttons
-  bindTouchFriendlyPress(document.getElementById('travelBtn'), () => {
-    const menu = document.getElementById('travelMenu');
-    const isOpen = menu.classList.contains('open');
-    // Close all menus
-    document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
-    // Toggle this menu
-    if (!isOpen) menu.classList.add('open');
-  });
-  bindTouchFriendlyPress(document.getElementById('realEstateFloatBtn'), () => {
-    const menu = document.getElementById('realEstateMenu');
-    const isOpen = menu.classList.contains('open');
-    document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
-    if (!isOpen) menu.classList.add('open');
-  });
-  bindTouchFriendlyPress(document.getElementById('exploreBtn'), () => {
-    const menu = document.getElementById('exploreMenu');
-    const isOpen = menu.classList.contains('open');
-    document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
-    if (!isOpen) menu.classList.add('open');
-  });
-  bindTouchFriendlyPress(document.getElementById('gameBtn'), () => {
-    const menu = document.getElementById('gameMenu');
-    const isOpen = menu.classList.contains('open');
-    document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
-    if (!isOpen) menu.classList.add('open');
-  });
+  document.getElementById('travelBtn').addEventListener('click', () => toggleFloatMenuByButton('travelBtn'));
+  document.getElementById('realEstateFloatBtn').addEventListener('click', () => toggleFloatMenuByButton('realEstateFloatBtn'));
+  document.getElementById('exploreBtn').addEventListener('click', () => toggleFloatMenuByButton('exploreBtn'));
+  document.getElementById('gameBtn').addEventListener('click', () => toggleFloatMenuByButton('gameBtn'));
 
   const homeMenuItem = document.getElementById('fHome');
   if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);
