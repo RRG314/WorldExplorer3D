@@ -1165,6 +1165,7 @@ function setupUI() {
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
     closeGameShareMenu();
   }
+  const controlsTab = document.getElementById('controlsTab');
   const ctrlHeader = document.getElementById('ctrlHeader');
   const ctrlContent = document.getElementById('ctrlContent');
   const drivingControls = document.getElementById('drivingControls');
@@ -1447,12 +1448,52 @@ function setupUI() {
     mobileTouchControls.classList.remove('show');
   }
 
+  function installMobileUiPointerShield() {
+    if (!isTouchPreferredClient) return;
+    const shieldTargets = document.querySelectorAll([
+      '#floatMenuContainer',
+      '#floatMenuContainer *',
+      '#controlsTab',
+      '#controlsTab *',
+      '#mainMenuBtn',
+      '#memoryFlowerFloatBtn',
+      '#gameShareFloatBtn',
+      '#gameShareMenu',
+      '#mobileTouchControls',
+      '#mobileTouchControls *',
+      '#largeMap',
+      '#largeMap *',
+      '#propertyPanel',
+      '#propertyPanel *',
+      '#historicPanel',
+      '#historicPanel *',
+      '#memoryComposer',
+      '#memoryComposer *',
+      '#memoryInfoPanel',
+      '#memoryInfoPanel *'
+    ].join(','));
+    const stop = (event) => {
+      if (!appCtx.gameStarted) return;
+      event.stopPropagation();
+    };
+    const events = ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'click', 'dblclick', 'touchstart', 'touchend'];
+    shieldTargets.forEach((el) => {
+      events.forEach((eventName) => el.addEventListener(eventName, stop, eventName.startsWith('touch') ? { passive: true } : undefined));
+    });
+  }
+
+  installMobileUiPointerShield();
+
   function updateControlsModeUI() {
     const mode = detectControlsMode();
     if (drivingControls) drivingControls.style.display = mode === 'driving' ? 'block' : 'none';
     if (walkingControls) walkingControls.style.display = mode === 'walking' ? 'block' : 'none';
     if (droneControls) droneControls.style.display = mode === 'drone' ? 'block' : 'none';
     if (rocketControls) rocketControls.style.display = mode === 'rocket' ? 'block' : 'none';
+    if (controlsTab && ctrlContent) {
+      const compact = isTouchPreferredClient && ctrlContent.classList.contains('hidden');
+      controlsTab.classList.toggle('compact', compact);
+    }
     if (ctrlHeader) {
       const modeLabel = mode === 'walking' ? 'Walking Mode' : mode === 'drone' ? 'Drone Mode' : mode === 'rocket' ? 'Rocket Mode' : 'Driving Mode';
       const arrow = ctrlContent && ctrlContent.classList.contains('hidden') ? '▼' : '▲';
@@ -1764,7 +1805,6 @@ function setupUI() {
     // Check if click is outside float menu container
     const floatContainer = document.getElementById('floatMenuContainer');
     const mainMenuBtn = document.getElementById('mainMenuBtn');
-    const controlsTab = document.getElementById('controlsTab');
 
     if (!floatContainer.contains(e.target) && e.target !== mainMenuBtn) {
       closeAllFloatMenus();
