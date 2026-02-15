@@ -78,7 +78,7 @@ function initSpaceFlightUI() {
   // Flight HUD
   const hud = document.createElement('div');
   hud.id = 'spaceFlightHUD';
-  hud.style.cssText = 'position:fixed;bottom:20px;left:20px;background:rgba(10,10,30,0.95);border:2px solid #667eea;border-radius:12px;padding:16px;color:#fff;font-family:Orbitron,sans-serif;font-size:13px;z-index:10001;display:none;min-width:280px;';
+  hud.style.cssText = 'position:fixed;bottom:20px;left:20px;background:rgba(10,10,30,0.95);border:2px solid #667eea;border-radius:12px;padding:16px;color:#fff;font-family:Orbitron,sans-serif;font-size:13px;z-index:10001;display:none;min-width:248px;';
   hud.innerHTML = `
     <div style="font-size:16px;color:#667eea;margin-bottom:12px;font-weight:700;display:flex;align-items:center;gap:8px;">
       <span style="font-size:24px;">🚀</span> SPACE FLIGHT
@@ -97,13 +97,6 @@ function initSpaceFlightUI() {
     <button id="sfLandBtn" style="width:100%;padding:12px;background:#667eea;border:none;border-radius:8px;color:#fff;font-weight:600;cursor:pointer;font-family:Orbitron,sans-serif;transition:all 0.2s;opacity:0.5;" disabled>
       EXPLORE SOLAR SYSTEM
     </button>
-    <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(102,126,234,0.3);font-size:10px;line-height:1.6;opacity:0.8;">
-      <b>CONTROLS:</b><br>
-      ←/→ - Turn Left/Right<br>
-      ↑/↓ - Pitch Up/Down<br>
-      Space - Boost<br>
-      Shift - Brake
-    </div>
   `;
   document.body.appendChild(hud);
   appCtx.spaceFlight.hud = hud;

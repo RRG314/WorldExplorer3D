@@ -3,6 +3,26 @@ import { ctx as appCtx } from "./shared-context.js?v=54"; // ===================
 // ============================================================================
 
 function setupUI() {
+  const bindTouchFriendlyPress = (el, handler) => {
+    if (!el || typeof handler !== 'function') return;
+    let ignoreClickUntil = 0;
+    const run = (event) => handler(event);
+
+    el.addEventListener('pointerup', (event) => {
+      if (!event || event.pointerType === 'mouse') return;
+      ignoreClickUntil = Date.now() + 450;
+      run(event);
+    });
+
+    el.addEventListener('click', (event) => {
+      if (Date.now() < ignoreClickUntil) {
+        if (event?.cancelable) event.preventDefault();
+        return;
+      }
+      run(event);
+    });
+  };
+
   // Initialize Property UI References
   appCtx.PropertyUI.panel = document.getElementById('propertyPanel');
   appCtx.PropertyUI.list = document.getElementById('propertyList');
@@ -735,7 +755,7 @@ function setupUI() {
   }
 
   if (gameShareFloatBtn && gameShareMenu) {
-    gameShareFloatBtn.addEventListener('click', (event) => {
+    bindTouchFriendlyPress(gameShareFloatBtn, (event) => {
       event.stopPropagation();
       const shouldOpen = !gameShareMenu.classList.contains('show');
       closeAllFloatMenus();
@@ -1058,7 +1078,7 @@ function setupUI() {
     // Debug log removed
     let explorationMsgTimeout;
 
-    if (explorationMsg) {
+    if (explorationMsg && !isTouchPreferredClient) {
       // Debug log removed
       explorationMsg.style.display = 'block';
       explorationMsg.style.opacity = '0';
@@ -1087,6 +1107,8 @@ function setupUI() {
       explorationMsgTimeout = setTimeout(() => {
         hideExplorationMsg();
       }, 5000);
+    } else if (explorationMsg) {
+      explorationMsg.style.display = 'none';
     }
 
     // Load visible terrain immediately so grass appears even while road APIs are pending.
@@ -1185,17 +1207,21 @@ function setupUI() {
   const MOBILE_CONTROL_PROFILES = {
     driving: {
       moveLabel: 'Drive',
-      lookLabel: 'Look',
+      lookLabel: 'Steer',
       move: {
         up: { channel: 'earth', key: 'KeyW' },
         down: { channel: 'earth', key: 'KeyS' },
+        left: null,
+        right: null
+      },
+      look: {
+        up: null,
+        down: null,
         left: { channel: 'earth', key: 'KeyA' },
         right: { channel: 'earth', key: 'KeyD' }
       },
-      look: null,
       actions: [
-        { label: 'Brake', binding: { channel: 'earth', key: 'Space' } },
-        { label: 'Boost', binding: { channel: 'earth', key: 'ControlLeft' } }
+        { label: 'Brake', binding: { channel: 'earth', key: 'Space' } }
       ]
     },
     walking: {
@@ -1249,8 +1275,8 @@ function setupUI() {
         right: { channel: 'space', key: 'arrowright' }
       },
       actions: [
-        { label: 'Thrust', binding: { channel: 'space', key: ' ' } },
-        { label: 'Brake', binding: { channel: 'space', key: 'shift' } }
+        { label: 'Accelerate', binding: { channel: 'space', key: ' ' } },
+        { label: 'Decelerate', binding: { channel: 'space', key: 'shift' } }
       ]
     }
   };
@@ -1319,7 +1345,7 @@ function setupUI() {
   function applyPadProfile(prefix, padEl, bindings, labelEl, labelText) {
     const visible = !!bindings;
     if (padEl) padEl.classList.toggle('hidden', !visible);
-    if (labelEl && labelText) labelEl.textContent = labelText;
+    if (labelEl) labelEl.textContent = labelText || '';
     bindPadButton(prefix, 'Up', bindings?.up || null);
     bindPadButton(prefix, 'Down', bindings?.down || null);
     bindPadButton(prefix, 'Left', bindings?.left || null);
@@ -1472,6 +1498,9 @@ function setupUI() {
       mobileTouchControls.dataset.mode = mode;
     }
 
+    mobileTouchControls.classList.remove('mode-driving', 'mode-walking', 'mode-drone', 'mode-rocket');
+    mobileTouchControls.classList.add(`mode-${mode}`);
+
     mobileTouchControls.style.zIndex = inSpaceFlight ? '10002' : '106';
     const profile = MOBILE_CONTROL_PROFILES[mode] || MOBILE_CONTROL_PROFILES.driving;
     applyPadProfile('mobileMove', mobileMovePad, profile.move, mobileMoveLabel, profile.moveLabel || 'Move');
@@ -1567,7 +1596,7 @@ function setupUI() {
 
   // Float menu
   // Three separate float menu buttons
-  document.getElementById('travelBtn').addEventListener('click', () => {
+  bindTouchFriendlyPress(document.getElementById('travelBtn'), () => {
     const menu = document.getElementById('travelMenu');
     const isOpen = menu.classList.contains('open');
     // Close all menus
@@ -1575,19 +1604,19 @@ function setupUI() {
     // Toggle this menu
     if (!isOpen) menu.classList.add('open');
   });
-  document.getElementById('realEstateFloatBtn').addEventListener('click', () => {
+  bindTouchFriendlyPress(document.getElementById('realEstateFloatBtn'), () => {
     const menu = document.getElementById('realEstateMenu');
     const isOpen = menu.classList.contains('open');
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
     if (!isOpen) menu.classList.add('open');
   });
-  document.getElementById('exploreBtn').addEventListener('click', () => {
+  bindTouchFriendlyPress(document.getElementById('exploreBtn'), () => {
     const menu = document.getElementById('exploreMenu');
     const isOpen = menu.classList.contains('open');
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
     if (!isOpen) menu.classList.add('open');
   });
-  document.getElementById('gameBtn').addEventListener('click', () => {
+  bindTouchFriendlyPress(document.getElementById('gameBtn'), () => {
     const menu = document.getElementById('gameMenu');
     const isOpen = menu.classList.contains('open');
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
@@ -1599,7 +1628,7 @@ function setupUI() {
   document.getElementById('fNextCity').addEventListener('click', () => {appCtx.nextCity();closeAllFloatMenus();});
   const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
   if (memoryFlowerFloatBtn) {
-    memoryFlowerFloatBtn.addEventListener('click', () => {
+    bindTouchFriendlyPress(memoryFlowerFloatBtn, () => {
       if (typeof appCtx.openMemoryComposer === 'function') appCtx.openMemoryComposer('flower');
       closeAllFloatMenus();
     });
