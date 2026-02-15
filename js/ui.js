@@ -170,6 +170,25 @@ function setupUI() {
   const gameShareInstagram = document.getElementById('gameShareInstagram');
   const gameShareText = document.getElementById('gameShareText');
   const coordsReadout = document.getElementById('coords');
+  const mobileTouchControls = document.getElementById('mobileTouchControls');
+  const mobileMovePad = document.getElementById('mobileMovePad');
+  const mobileLookPad = document.getElementById('mobileLookPad');
+  const mobileMoveLabel = document.getElementById('mobileMoveLabel');
+  const mobileLookLabel = document.getElementById('mobileLookLabel');
+  const mobileActionPrimary = document.getElementById('mobileActionPrimary');
+  const mobileActionSecondary = document.getElementById('mobileActionSecondary');
+  const mobileHoldButtons = [
+    'mobileMoveUp',
+    'mobileMoveLeft',
+    'mobileMoveRight',
+    'mobileMoveDown',
+    'mobileLookUp',
+    'mobileLookLeft',
+    'mobileLookRight',
+    'mobileLookDown',
+    'mobileActionPrimary',
+    'mobileActionSecondary'
+  ].map((id) => document.getElementById(id)).filter(Boolean);
 
   // Load saved API keys from localStorage
   const savedRentcast = localStorage.getItem('rentcastApiKey');
@@ -1152,12 +1171,280 @@ function setupUI() {
   const walkingControls = document.getElementById('walkingControls');
   const droneControls = document.getElementById('droneControls');
   const rocketControls = document.getElementById('rocketControls');
+  const isTouchPreferredClient = (() => {
+    try {
+      return (navigator.maxTouchPoints || 0) > 0 || window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    } catch (_) {
+      return (navigator.maxTouchPoints || 0) > 0 || 'ontouchstart' in window;
+    }
+  })();
+  const mobileHeldCounts = new Map();
+  const mobileActivePointers = new Map();
+
+  const MOBILE_CONTROL_PROFILES = {
+    driving: {
+      moveLabel: 'Drive',
+      lookLabel: 'Look',
+      move: {
+        up: { channel: 'earth', key: 'KeyW' },
+        down: { channel: 'earth', key: 'KeyS' },
+        left: { channel: 'earth', key: 'KeyA' },
+        right: { channel: 'earth', key: 'KeyD' }
+      },
+      look: null,
+      actions: [
+        { label: 'Brake', binding: { channel: 'earth', key: 'Space' } },
+        { label: 'Boost', binding: { channel: 'earth', key: 'ControlLeft' } }
+      ]
+    },
+    walking: {
+      moveLabel: 'Move',
+      lookLabel: 'Look',
+      move: {
+        up: { channel: 'earth', key: 'ArrowUp' },
+        down: { channel: 'earth', key: 'ArrowDown' },
+        left: { channel: 'earth', key: 'ArrowLeft' },
+        right: { channel: 'earth', key: 'ArrowRight' }
+      },
+      look: {
+        up: { channel: 'earth', key: 'KeyW' },
+        down: { channel: 'earth', key: 'KeyS' },
+        left: { channel: 'earth', key: 'KeyA' },
+        right: { channel: 'earth', key: 'KeyD' }
+      },
+      actions: [
+        { label: 'Jump', binding: { channel: 'earth', key: 'Space' } },
+        { label: 'Run', binding: { channel: 'earth', key: 'ShiftLeft' } }
+      ]
+    },
+    drone: {
+      moveLabel: 'Move',
+      lookLabel: 'Look',
+      move: {
+        up: { channel: 'earth', key: 'KeyW' },
+        down: { channel: 'earth', key: 'KeyS' },
+        left: { channel: 'earth', key: 'KeyA' },
+        right: { channel: 'earth', key: 'KeyD' }
+      },
+      look: {
+        up: { channel: 'earth', key: 'ArrowUp' },
+        down: { channel: 'earth', key: 'ArrowDown' },
+        left: { channel: 'earth', key: 'ArrowLeft' },
+        right: { channel: 'earth', key: 'ArrowRight' }
+      },
+      actions: [
+        { label: 'Ascend', binding: { channel: 'earth', key: 'Space' } },
+        { label: 'Descend', binding: { channel: 'earth', key: 'ShiftLeft' } }
+      ]
+    },
+    rocket: {
+      moveLabel: 'Move',
+      lookLabel: 'Steer',
+      move: null,
+      look: {
+        up: { channel: 'space', key: 'arrowup' },
+        down: { channel: 'space', key: 'arrowdown' },
+        left: { channel: 'space', key: 'arrowleft' },
+        right: { channel: 'space', key: 'arrowright' }
+      },
+      actions: [
+        { label: 'Thrust', binding: { channel: 'space', key: ' ' } },
+        { label: 'Brake', binding: { channel: 'space', key: 'shift' } }
+      ]
+    }
+  };
+
+  function setVirtualInputPressed(channel, key, pressed) {
+    if (!key) return;
+    if (channel === 'space') {
+      if (!appCtx.spaceFlight || !appCtx.spaceFlight.keys) return;
+      appCtx.spaceFlight.keys[key] = pressed;
+      return;
+    }
+    if (!appCtx.keys) return;
+    appCtx.keys[key] = pressed;
+  }
+
+  function holdVirtualKey(channel, key) {
+    const id = `${channel}:${key}`;
+    const nextCount = (mobileHeldCounts.get(id) || 0) + 1;
+    mobileHeldCounts.set(id, nextCount);
+    if (nextCount === 1) setVirtualInputPressed(channel, key, true);
+  }
+
+  function releaseVirtualKey(channel, key) {
+    const id = `${channel}:${key}`;
+    const current = mobileHeldCounts.get(id) || 0;
+    if (current <= 1) {
+      mobileHeldCounts.delete(id);
+      setVirtualInputPressed(channel, key, false);
+      return;
+    }
+    mobileHeldCounts.set(id, current - 1);
+  }
+
+  function clearVirtualHeldInputs() {
+    for (const id of mobileHeldCounts.keys()) {
+      const sep = id.indexOf(':');
+      const channel = sep >= 0 ? id.slice(0, sep) : 'earth';
+      const key = sep >= 0 ? id.slice(sep + 1) : id;
+      setVirtualInputPressed(channel, key, false);
+    }
+    mobileHeldCounts.clear();
+    mobileActivePointers.clear();
+    mobileHoldButtons.forEach((btn) => {
+      if (!btn) return;
+      btn.classList.remove('active');
+      delete btn.dataset.activeCount;
+    });
+  }
+
+  function bindPadButton(prefix, direction, binding) {
+    const btn = document.getElementById(`${prefix}${direction}`);
+    if (!btn) return;
+    if (!binding || !binding.key) {
+      btn.dataset.key = '';
+      btn.dataset.channel = '';
+      btn.disabled = true;
+      btn.classList.add('hidden');
+      return;
+    }
+    btn.dataset.key = binding.key;
+    btn.dataset.channel = binding.channel || 'earth';
+    btn.disabled = false;
+    btn.classList.remove('hidden');
+  }
+
+  function applyPadProfile(prefix, padEl, bindings, labelEl, labelText) {
+    const visible = !!bindings;
+    if (padEl) padEl.classList.toggle('hidden', !visible);
+    if (labelEl && labelText) labelEl.textContent = labelText;
+    bindPadButton(prefix, 'Up', bindings?.up || null);
+    bindPadButton(prefix, 'Down', bindings?.down || null);
+    bindPadButton(prefix, 'Left', bindings?.left || null);
+    bindPadButton(prefix, 'Right', bindings?.right || null);
+  }
+
+  function applyActionProfile(actions) {
+    const nextActions = Array.isArray(actions) ? actions : [];
+    const actionButtons = [mobileActionPrimary, mobileActionSecondary];
+    actionButtons.forEach((btn, idx) => {
+      if (!btn) return;
+      const action = nextActions[idx];
+      if (!action || !action.binding || !action.binding.key) {
+        btn.dataset.key = '';
+        btn.dataset.channel = '';
+        btn.disabled = true;
+        btn.classList.add('hidden');
+        return;
+      }
+      btn.textContent = action.label || `Action ${idx + 1}`;
+      btn.dataset.key = action.binding.key;
+      btn.dataset.channel = action.binding.channel || 'earth';
+      btn.disabled = false;
+      btn.classList.remove('hidden');
+    });
+  }
+
+  function bindMobileHoldButton(btn) {
+    if (!btn) return;
+
+    const onPress = (event) => {
+      if (btn.disabled) return;
+      const key = btn.dataset.key;
+      const channel = btn.dataset.channel || 'earth';
+      if (!key) return;
+      event.preventDefault();
+      event.stopPropagation();
+      if (typeof btn.setPointerCapture === 'function' && Number.isFinite(event.pointerId)) {
+        try {btn.setPointerCapture(event.pointerId);} catch (_) {}
+      }
+      const token = `${btn.id}:${event.pointerId}`;
+      if (mobileActivePointers.has(token)) return;
+      mobileActivePointers.set(token, { channel, key, buttonId: btn.id });
+      holdVirtualKey(channel, key);
+      const activeCount = (Number(btn.dataset.activeCount) || 0) + 1;
+      btn.dataset.activeCount = String(activeCount);
+      btn.classList.add('active');
+    };
+
+    const onRelease = (event) => {
+      const token = `${btn.id}:${event.pointerId}`;
+      const held = mobileActivePointers.get(token);
+      if (!held) return;
+      mobileActivePointers.delete(token);
+      releaseVirtualKey(held.channel, held.key);
+      const activeCount = Math.max(0, (Number(btn.dataset.activeCount) || 0) - 1);
+      if (activeCount > 0) {
+        btn.dataset.activeCount = String(activeCount);
+      } else {
+        delete btn.dataset.activeCount;
+        btn.classList.remove('active');
+      }
+    };
+
+    btn.addEventListener('pointerdown', onPress);
+    btn.addEventListener('pointerup', onRelease);
+    btn.addEventListener('pointercancel', onRelease);
+    btn.addEventListener('lostpointercapture', onRelease);
+    btn.addEventListener('contextmenu', (event) => event.preventDefault());
+  }
 
   function detectControlsMode() {
-    if (typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return 'rocket';
+    if (
+      (typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) ||
+      (appCtx.spaceFlight && appCtx.spaceFlight.active))
+    {
+      return 'rocket';
+    }
     if (appCtx.droneMode) return 'drone';
     if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk') return 'walking';
     return 'driving';
+  }
+
+  function updateMobileTouchControls(mode = detectControlsMode()) {
+    if (!mobileTouchControls || !isTouchPreferredClient) return;
+    const titleScreen = document.getElementById('titleScreen');
+    const titleVisible = !!(titleScreen && !titleScreen.classList.contains('hidden'));
+    const inSpaceFlight = mode === 'rocket';
+    const controlsExpanded = !!(ctrlContent && !ctrlContent.classList.contains('hidden'));
+    const blocked =
+      titleVisible ||
+      !appCtx.gameStarted ||
+      (appCtx.paused && !inSpaceFlight) ||
+      (!inSpaceFlight && appCtx.showLargeMap) ||
+      (!inSpaceFlight && controlsExpanded);
+
+    if (blocked) {
+      if (mobileTouchControls.classList.contains('show')) {
+        mobileTouchControls.classList.remove('show');
+      }
+      clearVirtualHeldInputs();
+      return;
+    }
+
+    if (mobileTouchControls.dataset.mode !== mode) {
+      clearVirtualHeldInputs();
+      mobileTouchControls.dataset.mode = mode;
+    }
+
+    mobileTouchControls.style.zIndex = inSpaceFlight ? '10002' : '106';
+    const profile = MOBILE_CONTROL_PROFILES[mode] || MOBILE_CONTROL_PROFILES.driving;
+    applyPadProfile('mobileMove', mobileMovePad, profile.move, mobileMoveLabel, profile.moveLabel || 'Move');
+    applyPadProfile('mobileLook', mobileLookPad, profile.look, mobileLookLabel, profile.lookLabel || 'Look');
+    applyActionProfile(profile.actions);
+    mobileTouchControls.classList.add('show');
+  }
+
+  if (mobileTouchControls && isTouchPreferredClient) {
+    mobileHoldButtons.forEach((btn) => bindMobileHoldButton(btn));
+    window.addEventListener('blur', clearVirtualHeldInputs);
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) clearVirtualHeldInputs();
+    });
+    setInterval(() => updateMobileTouchControls(), 220);
+  } else if (mobileTouchControls) {
+    mobileTouchControls.classList.remove('show');
   }
 
   function updateControlsModeUI() {
@@ -1171,18 +1458,21 @@ function setupUI() {
       const arrow = ctrlContent && ctrlContent.classList.contains('hidden') ? '▼' : '▲';
       ctrlHeader.textContent = `⚙️ ${modeLabel} ${arrow}`;
     }
+    updateMobileTouchControls(mode);
   }
 
   appCtx.updateControlsModeUI = updateControlsModeUI;
+  appCtx.updateMobileTouchControls = updateMobileTouchControls;
   function goToMainMenu() {
     appCtx.gameStarted = false;appCtx.paused = false;appCtx.clearObjectives();appCtx.clearPolice();appCtx.policeOn = false;appCtx.eraseTrack();appCtx.closePropertyPanel();appCtx.closeHistoricPanel();appCtx.clearPropertyMarkers();appCtx.realEstateMode = false;appCtx.historicMode = false;
     if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
     document.getElementById('titleScreen').classList.remove('hidden');
-    ['hud', 'minimap', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu'].forEach((id) => {
+    ['hud', 'minimap', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('show');
     });
+    clearVirtualHeldInputs();
     if (ctrlContent) ctrlContent.classList.add('hidden');
     if (typeof appCtx.closeMemoryComposer === 'function') appCtx.closeMemoryComposer();
     const memoryInfoPanel = document.getElementById('memoryInfoPanel');

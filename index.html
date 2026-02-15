@@ -197,6 +197,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #memoryFlowerFloatBtn{left:140px!important;bottom:72px!important}
   #gameShareFloatBtn{left:140px!important;bottom:124px!important}
   #gameShareMenu{left:85px!important;bottom:176px!important}
+  #mobileTouchControls{height:156px}
+  .mobilePad{width:114px;height:114px}
+  #mobileMovePad{left:8px}
+  #mobileLookPad{right:8px}
+  .mobileActionBtn{min-width:82px;padding:9px 12px;font-size:11px}
   #buildModeIndicator{left:10px;bottom:66px;font-size:10px;padding:8px 10px;max-width:220px}
 
   /* Property panel */
@@ -250,6 +255,12 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #memoryFlowerFloatBtn{left:115px!important;bottom:66px!important}
   #gameShareFloatBtn{left:115px!important;bottom:118px!important}
   #gameShareMenu{left:60px!important;bottom:170px!important}
+  #mobileTouchControls{height:146px}
+  .mobilePad{width:104px;height:104px}
+  #mobileMovePad{left:6px}
+  #mobileLookPad{right:6px}
+  .mobileNavBtn{font-size:16px}
+  .mobileActionBtn{min-width:76px;padding:8px 10px;font-size:10px}
   #buildModeIndicator{left:5px;bottom:60px;font-size:9px;padding:7px 9px;max-width:190px}
 
   /* Property panel for phones */
@@ -304,6 +315,25 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #ctrlHeader{padding:12px 16px;cursor:pointer;color:#667eea;font-family:'Poppins',sans-serif;font-weight:600}
 #ctrlContent{padding:12px 16px;border-top:2px solid #f1f5f9;line-height:1.8;max-height:calc(60vh - 48px);overflow-y:auto}
 #ctrlContent.hidden{display:none}
+#mobileTouchControls{position:fixed;left:0;right:0;bottom:calc(10px + env(safe-area-inset-bottom));height:168px;display:none;pointer-events:none;z-index:106}
+#mobileTouchControls.show{display:block}
+.mobilePad{position:absolute;bottom:0;width:126px;height:126px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:4px;pointer-events:none}
+#mobileMovePad{left:10px}
+#mobileLookPad{right:10px}
+.mobileNavBtn{border:none;border-radius:10px;background:rgba(15,23,42,0.62);backdrop-filter:blur(6px);color:#ffffff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:auto;touch-action:none;box-shadow:0 6px 16px rgba(0,0,0,0.24)}
+.mobileNavBtn.active{background:rgba(37,99,235,0.82);transform:scale(0.97)}
+.mobileNavBtn.up{grid-column:2;grid-row:1}
+.mobileNavBtn.left{grid-column:1;grid-row:2}
+.mobileNavBtn.right{grid-column:3;grid-row:2}
+.mobileNavBtn.down{grid-column:2;grid-row:3}
+.mobilePadLabel{grid-column:2;grid-row:2;border-radius:10px;background:rgba(255,255,255,0.85);color:#334155;font-size:9px;font-weight:700;letter-spacing:0.7px;display:flex;align-items:center;justify-content:center;text-transform:uppercase}
+#mobileActionStack{position:absolute;left:50%;transform:translateX(-50%);bottom:0;display:flex;flex-direction:column;gap:8px;pointer-events:none}
+.mobileActionBtn{min-width:88px;padding:10px 14px;border:none;border-radius:12px;background:rgba(15,23,42,0.62);backdrop-filter:blur(6px);color:#ffffff;font-size:12px;font-weight:700;letter-spacing:0.3px;pointer-events:auto;touch-action:none;box-shadow:0 8px 18px rgba(0,0,0,0.24)}
+.mobileActionBtn.active{background:rgba(37,99,235,0.82);transform:scale(0.97)}
+.mobilePad.hidden,.mobileActionBtn.hidden{display:none}
+@media (hover:hover) and (pointer:fine){
+  #mobileTouchControls{display:none!important}
+}
 #memoryFlowerFloatBtn{position:fixed;bottom:78px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#ec4899,#db2777);border:none;border-radius:50%;color:#ffffff;font-size:23px;cursor:pointer;box-shadow:0 10px 26px rgba(236,72,153,0.38);z-index:101;display:none;transition:all 0.2s}
 #memoryFlowerFloatBtn.show{display:flex;align-items:center;justify-content:center}
 #memoryFlowerFloatBtn:hover{transform:scale(1.08);box-shadow:0 14px 34px rgba(236,72,153,0.45)}
@@ -1020,6 +1050,26 @@ Explore the area
 • LAND ON ... Button - Land when in range
 </div>
 </div></div>
+<div id="mobileTouchControls" aria-label="Mobile navigation controls">
+<div id="mobileMovePad" class="mobilePad" aria-label="Movement pad">
+<button id="mobileMoveUp" class="mobileNavBtn up" type="button" aria-label="Move up">▲</button>
+<button id="mobileMoveLeft" class="mobileNavBtn left" type="button" aria-label="Move left">◀</button>
+<button id="mobileMoveRight" class="mobileNavBtn right" type="button" aria-label="Move right">▶</button>
+<button id="mobileMoveDown" class="mobileNavBtn down" type="button" aria-label="Move down">▼</button>
+<div id="mobileMoveLabel" class="mobilePadLabel">Move</div>
+</div>
+<div id="mobileActionStack" aria-label="Mode actions">
+<button id="mobileActionPrimary" class="mobileActionBtn" type="button">Action 1</button>
+<button id="mobileActionSecondary" class="mobileActionBtn" type="button">Action 2</button>
+</div>
+<div id="mobileLookPad" class="mobilePad" aria-label="Look pad">
+<button id="mobileLookUp" class="mobileNavBtn up" type="button" aria-label="Look up">▲</button>
+<button id="mobileLookLeft" class="mobileNavBtn left" type="button" aria-label="Look left">◀</button>
+<button id="mobileLookRight" class="mobileNavBtn right" type="button" aria-label="Look right">▶</button>
+<button id="mobileLookDown" class="mobileNavBtn down" type="button" aria-label="Look down">▼</button>
+<div id="mobileLookLabel" class="mobilePadLabel">Look</div>
+</div>
+</div>
 
 <!-- Real Estate System -->
 <button id="realEstateBtn" title="Toggle Real Estate">🏠</button>
