@@ -530,97 +530,47 @@ function update(dt) {
   let carY = 1.2;
 
   if (appCtx.onMoon && appCtx.moonSurface) {
+    appCtx.moonSurface.updateMatrixWorld(true);
     const raycaster = _getPhysRaycaster();
-    _physRayStart.set(appCtx.car.x, 200, appCtx.car.z);
-    raycaster.set(_physRayStart, _physRayDir || new THREE.Vector3(0, -1, 0));
+    const sampleMoonSurfaceY = (sx, sz) => {
+      _physRayStart.set(sx, 1200, sz);
+      raycaster.set(_physRayStart, _physRayDir || new THREE.Vector3(0, -1, 0));
+      const sampleHits = raycaster.intersectObject(appCtx.moonSurface, false);
+      return sampleHits.length > 0 ? sampleHits[0].point.y + 1.2 : null;
+    };
 
-    const hits = raycaster.intersectObject(appCtx.moonSurface, false);
+    const targetY = sampleMoonSurfaceY(appCtx.car.x, appCtx.car.z);
 
-    if (hits.length > 0) {
-      const groundY = hits[0].point.y + 1.2;
-      const groundNormal = hits[0].face.normal;
-
-      const isAirborne = appCtx.car.y > groundY + 0.3;
-      appCtx.car.isAirborne = isAirborne;
-
-      if (isAirborne) {
-        // Use realistic gravity based on location
-        const GRAVITY = appCtx.onMoon ? -1.62 : -9.8; // Moon: 1.62 m/s², Earth: 9.8 m/s²
-        appCtx.car.vy += GRAVITY * dt;
-        appCtx.car.y += appCtx.car.vy * dt;
-
-        if (appCtx.car.y <= groundY) {
-          appCtx.car.y = groundY;
-          appCtx.car.vy = 0;
-        }
-        carY = appCtx.car.y;
-      } else {
-        const slopeAngle = Math.acos(groundNormal.y);
-        // Moon: much easier to launch off edges/hills (low gravity)
-        const isRamp = slopeAngle > 0.05;
-
-        const carDirX = Math.sin(appCtx.car.angle);
-        const carDirZ = Math.cos(appCtx.car.angle);
-
-        const movingUp = groundNormal.x * carDirX + groundNormal.z * carDirZ < -0.05;
-        const fastEnough = Math.abs(appCtx.car.speed) > 5;
-
-        if (isRamp && movingUp && fastEnough) {
-          // Stronger launch on moon due to low gravity
-          const launchSpeed = Math.abs(appCtx.car.speed) * 0.35;
-          appCtx.car.vy = launchSpeed * (1 + slopeAngle * 4);
-          appCtx.car.y = groundY + 0.2;
-        } else {
-          appCtx.car.y = groundY;
-          appCtx.car.vy = 0;
-        }
-
-        carY = appCtx.car.y;
-      }
-    }
-  } else if (appCtx.terrainEnabled) {
-    const surfaceY = typeof appCtx.GroundHeight !== 'undefined' && appCtx.GroundHeight && typeof appCtx.GroundHeight.driveSurfaceY === 'function' ?
-    appCtx.GroundHeight.driveSurfaceY(appCtx.car.x, appCtx.car.z, !!appCtx.car.onRoad) :
-    (typeof appCtx.terrainMeshHeightAt === 'function' ?
-    appCtx.terrainMeshHeightAt(appCtx.car.x, appCtx.car.z) :
-    appCtx.elevationWorldYAtWorldXZ(appCtx.car.x, appCtx.car.z)) + (appCtx.car.onRoad ? 0.2 : 0);
-
-    const targetY = surfaceY + 1.2;
-    const speedAbs = Math.abs(appCtx.car.speed || 0);
-
-    if (appCtx.onMoon) {
+    if (targetY !== null) {
+      const speedAbs = Math.abs(appCtx.car.speed || 0);
       const prevSurfaceY = Number.isFinite(appCtx.car._lastSurfaceY) ? appCtx.car._lastSurfaceY : targetY;
       const surfaceDelta = targetY - prevSurfaceY;
       const surfaceVel = dt > 1e-4 ? surfaceDelta / dt : 0;
-      const dropAway = prevSurfaceY - targetY;
-      const clearanceAboveGround = (appCtx.car.y || targetY) - targetY;
+      const currentY = Number.isFinite(appCtx.car.y) ? appCtx.car.y : targetY;
+      const clearanceAboveGround = currentY - targetY;
 
-      // Sample forward terrain to detect crests and crater lips.
-      const fwdStep = Math.min(8, Math.max(2.5, speedAbs * 0.09 + 2.5));
+      // Detect crest/drop transitions ahead of the car so launches work with keyboard or touch.
+      const fwdStep = Math.min(12, Math.max(3, speedAbs * 0.14 + 2.5));
       const dirX = Math.sin(appCtx.car.angle || 0);
       const dirZ = Math.cos(appCtx.car.angle || 0);
-      const sampleX = appCtx.car.x + dirX * fwdStep;
-      const sampleZ = appCtx.car.z + dirZ * fwdStep;
-      const sampleSurface = typeof appCtx.GroundHeight !== 'undefined' && appCtx.GroundHeight && typeof appCtx.GroundHeight.driveSurfaceY === 'function' ?
-      appCtx.GroundHeight.driveSurfaceY(sampleX, sampleZ, !!appCtx.car.onRoad) :
-      (typeof appCtx.terrainMeshHeightAt === 'function' ?
-      appCtx.terrainMeshHeightAt(sampleX, sampleZ) :
-      appCtx.elevationWorldYAtWorldXZ(sampleX, sampleZ)) + (appCtx.car.onRoad ? 0.2 : 0);
-      const forwardSlope = (sampleSurface + 1.2 - targetY) / fwdStep;
+      const aheadY = sampleMoonSurfaceY(appCtx.car.x + dirX * fwdStep, appCtx.car.z + dirZ * fwdStep);
+      const forwardSlope = aheadY === null ? 0 : (aheadY - targetY) / fwdStep;
+      const dropAhead = aheadY === null ? 0 : targetY - aheadY;
 
       const alreadyAirborne = !!appCtx.car.isAirborne;
       const crestLaunch =
-      speedAbs > 8 &&
-      surfaceVel > 0.35 &&
-      forwardSlope < -0.11;
-      const dropLaunch =
-      speedAbs > 6 &&
-      (dropAway > 0.22 || clearanceAboveGround > 0.18);
+      speedAbs > 1.6 &&
+      surfaceVel > 0.06 &&
+      forwardSlope < -0.012;
+      const craterDropLaunch =
+      speedAbs > 1.5 &&
+      dropAhead > 0.05;
+      const separationLaunch = clearanceAboveGround > 0.14;
 
-      if (!alreadyAirborne && (crestLaunch || dropLaunch)) {
-        const launchVyFromTerrain = Math.max(0, surfaceVel * 0.35);
-        const launchVyFromSpeed = Math.max(0, (speedAbs - 6) * 0.02);
-        appCtx.car.vy = Math.max(appCtx.car.vy, launchVyFromTerrain + launchVyFromSpeed);
+      if (!alreadyAirborne && (crestLaunch || craterDropLaunch || separationLaunch)) {
+        const launchFromRise = Math.max(0, surfaceVel * 0.5);
+        const launchFromSpeed = Math.max(0, (speedAbs - 1.5) * 0.09);
+        appCtx.car.vy = Math.max(appCtx.car.vy, launchFromRise + launchFromSpeed);
         appCtx.car.isAirborne = true;
         appCtx.car._terrainAirTimer = 0;
       }
@@ -628,7 +578,7 @@ function update(dt) {
       if (appCtx.car.isAirborne) {
         appCtx.car._terrainAirTimer += dt;
         appCtx.car.vy += MOON_FLOAT_GRAVITY * dt;
-        appCtx.car.y += appCtx.car.vy * dt;
+        appCtx.car.y = currentY + appCtx.car.vy * dt;
 
         const canLand = appCtx.car._terrainAirTimer > 0.05;
         if (canLand && appCtx.car.y <= targetY) {
@@ -639,18 +589,14 @@ function update(dt) {
         }
         carY = appCtx.car.y;
       } else {
-        if (appCtx.car.y === undefined || appCtx.car.y === 0) {
+        const diff = targetY - currentY;
+        if (Math.abs(diff) > 20 || Math.abs(diff) < 0.01) {
           carY = targetY;
         } else {
-          const diff = targetY - appCtx.car.y;
-          if (Math.abs(diff) > 20 || Math.abs(diff) < 0.01) {
-            carY = targetY;
-          } else {
-            const baseLerp = appCtx.car.onRoad ? 16 : 10;
-            const speedBoost = Math.min(8, speedAbs * 0.08);
-            const lerpRate = Math.min(1.0, dt * (baseLerp + speedBoost));
-            carY = appCtx.car.y + diff * lerpRate;
-          }
+          const baseLerp = 10;
+          const speedBoost = Math.min(10, speedAbs * 0.11);
+          const lerpRate = Math.min(1.0, dt * (baseLerp + speedBoost));
+          carY = currentY + diff * lerpRate;
         }
         appCtx.car.y = carY;
         appCtx.car.vy = 0;
@@ -660,25 +606,39 @@ function update(dt) {
 
       appCtx.car._lastSurfaceY = targetY;
     } else {
-      if (appCtx.car.y === undefined || appCtx.car.y === 0) {
-        carY = targetY;
-      } else {
-        const diff = targetY - appCtx.car.y;
-        if (Math.abs(diff) > 20 || Math.abs(diff) < 0.01) {
-          carY = targetY;
-        } else {
-          const baseLerp = appCtx.car.onRoad ? 16 : 10;
-          const speedBoost = Math.min(8, speedAbs * 0.08);
-          const lerpRate = Math.min(1.0, dt * (baseLerp + speedBoost));
-          carY = appCtx.car.y + diff * lerpRate;
-        }
-      }
-      appCtx.car.y = carY;
-      appCtx.car.vy = 0;
       appCtx.car.isAirborne = false;
       appCtx.car._terrainAirTimer = 0;
       appCtx.car._lastSurfaceY = null;
+      if (!Number.isFinite(appCtx.car.y)) appCtx.car.y = (appCtx.moonSurface.position?.y || -100) + 1.2;
+      carY = appCtx.car.y;
     }
+  } else if (appCtx.terrainEnabled) {
+    const surfaceY = typeof appCtx.GroundHeight !== 'undefined' && appCtx.GroundHeight && typeof appCtx.GroundHeight.driveSurfaceY === 'function' ?
+    appCtx.GroundHeight.driveSurfaceY(appCtx.car.x, appCtx.car.z, !!appCtx.car.onRoad) :
+    (typeof appCtx.terrainMeshHeightAt === 'function' ?
+    appCtx.terrainMeshHeightAt(appCtx.car.x, appCtx.car.z) :
+    appCtx.elevationWorldYAtWorldXZ(appCtx.car.x, appCtx.car.z)) + (appCtx.car.onRoad ? 0.2 : 0);
+
+    const targetY = surfaceY + 1.2;
+    const speedAbs = Math.abs(appCtx.car.speed || 0);
+    if (appCtx.car.y === undefined || appCtx.car.y === 0) {
+      carY = targetY;
+    } else {
+      const diff = targetY - appCtx.car.y;
+      if (Math.abs(diff) > 20 || Math.abs(diff) < 0.01) {
+        carY = targetY;
+      } else {
+        const baseLerp = appCtx.car.onRoad ? 16 : 10;
+        const speedBoost = Math.min(8, speedAbs * 0.08);
+        const lerpRate = Math.min(1.0, dt * (baseLerp + speedBoost));
+        carY = appCtx.car.y + diff * lerpRate;
+      }
+    }
+    appCtx.car.y = carY;
+    appCtx.car.vy = 0;
+    appCtx.car.isAirborne = false;
+    appCtx.car._terrainAirTimer = 0;
+    appCtx.car._lastSurfaceY = null;
   }
 
   appCtx.carMesh.position.set(appCtx.car.x, carY, appCtx.car.z);

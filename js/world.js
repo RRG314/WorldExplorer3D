@@ -1490,6 +1490,28 @@ async function loadRoads(retryPass = 0) {
     _phaseTotals[name] = (_phaseTotals[name] || 0) + dt;
     delete _phaseStartedAt[name];
   };
+  const earthSceneSuppressed = () => {
+    if (appCtx.onMoon || appCtx.travelingToMoon) return true;
+    if (typeof appCtx.isEnv === 'function' && appCtx.ENV) {
+      return !appCtx.isEnv(appCtx.ENV.EARTH);
+    }
+    return false;
+  };
+  const hideEarthSceneMeshes = () => {
+    const hideList = (arr) => {
+      if (!Array.isArray(arr)) return;
+      arr.forEach((mesh) => {
+        if (!mesh) return;
+        mesh.visible = false;
+        if (mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
+      });
+    };
+    hideList(appCtx.roadMeshes);
+    hideList(appCtx.buildingMeshes);
+    hideList(appCtx.landuseMeshes);
+    hideList(appCtx.poiMeshes);
+    hideList(appCtx.streetFurnitureMeshes);
+  };
 
   appCtx.showLoad('Loading ' + locName + '...');
   appCtx.worldLoading = true;
@@ -1731,6 +1753,15 @@ async function loadRoads(retryPass = 0) {
   }
 
   function finalizeLoadedWorld(reason = 'primary') {
+    if (earthSceneSuppressed()) {
+      loaded = true;
+      loadMetrics.recoveryReason = 'env_changed_during_load';
+      loadMetrics.partialRecovery = true;
+      hideEarthSceneMeshes();
+      appCtx.hideLoad();
+      return;
+    }
+
     loaded = true;
     if (reason && reason !== 'primary') {
       loadMetrics.recoveryReason = reason;
@@ -1805,6 +1836,13 @@ async function loadRoads(retryPass = 0) {
       if (data?._overpassEndpoint) loadMetrics.overpassEndpoint = data._overpassEndpoint;
       if (Number.isFinite(data?._overpassCacheAgeMs)) {
         loadMetrics.overpassCacheAgeMs = Math.floor(data._overpassCacheAgeMs);
+      }
+      if (earthSceneSuppressed()) {
+        loaded = true;
+        loadMetrics.recoveryReason = 'env_changed_during_fetch';
+        loadMetrics.partialRecovery = true;
+        hideEarthSceneMeshes();
+        break;
       }
       const nodes = {};
       data.elements.filter((e) => e.type === 'node').forEach((n) => nodes[n.id] = n);
@@ -3233,6 +3271,27 @@ let _lastLodRefZ = 0;
 let _lastLodReady = false;
 
 function updateWorldLod(force = false) {
+  if (appCtx.onMoon || appCtx.travelingToMoon || (typeof appCtx.isEnv === 'function' && appCtx.ENV && !appCtx.isEnv(appCtx.ENV.EARTH))) {
+    const hideList = (arr) => {
+      if (!Array.isArray(arr)) return;
+      for (let i = 0; i < arr.length; i++) {
+        const mesh = arr[i];
+        if (!mesh) continue;
+        mesh.visible = false;
+        if (mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
+      }
+    };
+    hideList(appCtx.roadMeshes);
+    hideList(appCtx.buildingMeshes);
+    hideList(appCtx.landuseMeshes);
+    hideList(appCtx.poiMeshes);
+    hideList(appCtx.streetFurnitureMeshes);
+    if (typeof appCtx.setPerfLiveStat === 'function') {
+      appCtx.setPerfLiveStat('lodVisible', { near: 0, mid: 0 });
+    }
+    return;
+  }
+
   if ((!appCtx.buildingMeshes || appCtx.buildingMeshes.length === 0) && (
   !appCtx.poiMeshes || appCtx.poiMeshes.length === 0) && (
   !appCtx.landuseMeshes || appCtx.landuseMeshes.length === 0)) {
