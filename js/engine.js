@@ -1749,6 +1749,18 @@ function init() {
     appCtx.checkStarClick(e.clientX, e.clientY);
   });
 
+  // Touch fallback for mobile browsers that do not reliably emit click on canvas taps.
+  addEventListener('touchend', (e) => {
+    if (!appCtx.gameStarted) return;
+    if (typeof appCtx.handleBlockBuilderClick !== 'function') return;
+    if (!e.changedTouches || e.changedTouches.length === 0) return;
+    const handled = appCtx.handleBlockBuilderClick(e);
+    if (handled) {
+      if (e.cancelable) e.preventDefault();
+      e.stopPropagation();
+    }
+  }, { passive: false });
+
 }
 
 Object.assign(appCtx, {
