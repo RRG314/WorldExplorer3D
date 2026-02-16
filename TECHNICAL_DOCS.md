@@ -239,6 +239,7 @@ Current branch note:
 - Earth driving uses grounded terrain-follow integration.
 - Moon driving applies low-gravity airborne integration over steep terrain transitions (hill crests/crater edges).
 - This lunar airborne behavior is intentionally gated to moon context only.
+- Moon vehicle height sampling now updates moon-surface world matrices before raycasts to keep desktop and mobile behavior aligned.
 
 **Walking Physics**:
 ```javascript
@@ -745,6 +746,8 @@ Current implemented strategies in this branch:
 - Mixed-detail collider budgeting (full near, simplified mid for RDT)
 - Overpass endpoint racing with preferred-endpoint reuse
 - In-memory Overpass response cache for repeat loads at the same location envelope
+- Environment-safe world loading: if env changes to moon/space mid-load, Earth mesh arrays are force-hidden and not re-attached
+- Moon-scene isolation guard in transition flow to prevent Earth mesh bleed-through on desktop during late async completion
 
 ### Rendering Optimizations
 

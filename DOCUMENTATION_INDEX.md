@@ -49,6 +49,8 @@ The current branch documentation set includes updates for:
 - Title/footer + in-game share icon surfaces (copy/native/social/text) plus coordinate-readout click-copy
 - Mobile touch-control profile coverage for driving, walking, drone, and rocket modes
 - Moon-only low-gravity airborne car behavior over terrain crests/crater drops (Earth driving unchanged)
+- Desktop moon scene-isolation guards to prevent Earth mesh bleed-through during async world-load transitions
+- Enhanced moon terrain readability (local relief + shading contrast + lunar rock cues) for desktop/mobile movement clarity
 - Top-bar overlay anchoring for debug and benchmark panels between their target HUD widgets
 - Overpass endpoint preference and in-memory cache behavior for repeat-load acceleration
 - Supporting benchmark stats documentation from captured Baltimore test runs (network + memory-cache)

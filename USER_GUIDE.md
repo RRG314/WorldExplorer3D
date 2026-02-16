@@ -586,7 +586,7 @@ You can enter space systems in three ways:
 
 #### Features
 - **Low Gravity**: Jump 6x higher than Earth
-- **Gray Terrain**: Moon-like rocky surface
+- **Improved Lunar Surface**: Stronger crater/relief contrast with added rock cues for better depth and motion readability
 - **Starry Sky**: Clear view of stars
 - **Apollo 11 Landing Site**: Historic location
 
@@ -596,6 +596,7 @@ You can enter space systems in three ways:
 - **Running**: Hold Shift for faster movement
 - **Drone mode**: Works normally
 - **Lunar driving float behavior**: Cars can go lightly airborne over hill crests/crater edges on moon terrain
+- **Desktop and mobile parity**: Moon driving float behavior now triggers consistently on both desktop and mobile
 - **Earth unchanged**: This airborne car behavior is moon-only; Earth keeps normal grounded terrain follow
 
 ### Apollo 11 Landing Site

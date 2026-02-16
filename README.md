@@ -242,6 +242,8 @@ Interpretation:
 - Added title-footer social share icon rail plus in-game share arrow quick menu.
 - Added clickable coordinate readout share-copy shortcut.
 - Added moon-only terrain airborne/float vehicle behavior for hills/crater transitions.
+- Hardened moon environment isolation so Earth meshes cannot leak into moon view on desktop after async world loads.
+- Tuned desktop lunar-driving airborne triggers and improved moon terrain readability (local relief + stronger shading + additional rock cues).
 - Added Overpass endpoint preference plus memory-cache reuse for faster repeat city loads.
 
 ## Repository Structure

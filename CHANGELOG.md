@@ -70,6 +70,10 @@ Entries reflect changes made relative to the most recent public release.
 - Share-link parsing bug where missing `lat/lon` could coerce to `0` and incorrectly force custom location payloads.
 - Pre-start share-link copy path now preserves pending mode/camera/seed state loaded from URL parameters.
 - Earth driving physics no longer applies moon-style low-gravity airborne terrain behavior (now moon-only as intended).
+- Desktop moon transition no longer leaks Earth world meshes into moon view after async load completion (roads/buildings/landuse/POIs/furniture are now force-suppressed while moon/space is active).
+- Moon/space load race handling now prevents late Earth-load passes from re-attaching city meshes during non-Earth environments.
+- Desktop lunar driving now consistently triggers low-gravity airborne float behavior over subtle crater/hill transitions (updated launch thresholds + raycast matrix sync).
+- Moon terrain readability improved with stronger local relief near spawn, slope-aware shading, and denser lunar rock cues for movement depth perception.
 
 ---
 
