@@ -221,7 +221,7 @@ Interpretation:
 - Cache-bust version alignment across loader chain is currently `v=54`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
-## Freeze Snapshot (2026-02-14)
+## Freeze Snapshot (2026-02-16)
 
 - Restored main-branch title menu behavior for location selection with working custom/suggested interactions.
 - Added title launch selectors: `Earth`, `Moon`, `Space`.
@@ -245,6 +245,7 @@ Interpretation:
 - Hardened moon environment isolation so Earth meshes cannot leak into moon view on desktop after async world loads.
 - Tuned desktop lunar-driving airborne triggers and improved moon terrain readability (local relief + stronger shading + additional rock cues).
 - Added Overpass endpoint preference plus memory-cache reuse for faster repeat city loads.
+- Updated `TECHNICAL_DOCS.md` and `SYSTEMS_INVENTORY_REPORT_2026-02-14.md` with the moon runtime stabilization pass and validation notes.
 
 ## Repository Structure
 
