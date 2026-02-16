@@ -34,7 +34,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .sub{font-family:'Righteous',cursive;font-size:clamp(13px,1.7vw,20px);line-height:1.25;color:rgba(255,255,255,0.9);letter-spacing:clamp(1px,0.45vw,4px);margin:0;font-weight:400;text-shadow:0 2px 10px rgba(0,0,0,0.35);position:relative;z-index:1;text-align:center;max-width:min(94vw,1100px);padding:0 8px;flex-shrink:0}
 
 /* Menu Container with Tabs */
-.title-main-row{width:min(1140px,96vw);display:flex;align-items:flex-start;justify-content:center;gap:14px;position:relative;z-index:1;flex:0 1 auto}
+.title-main-row{width:min(860px,96vw);display:flex;align-items:flex-start;justify-content:center;position:relative;z-index:1;flex:0 1 auto}
 .menu-container{background:rgba(255,255,255,0.85);backdrop-filter:blur(20px);border:2px solid rgba(255,255,255,0.3);border-radius:20px;width:min(720px,95vw);max-height:calc(100dvh - 220px);display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,0.4),0 0 40px rgba(83,52,131,0.3);position:relative;z-index:1;flex:0 1 auto}
 .tab-nav{display:flex;border-bottom:2px solid rgba(232,238,245,0.5);flex-shrink:0;background:rgba(248,250,252,0.6);backdrop-filter:blur(10px);border-radius:18px 18px 0 0}
 .tab-btn{flex:1;background:transparent;border:none;padding:16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:#64748b;cursor:pointer;transition:all 0.3s;position:relative}
@@ -123,7 +123,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .title-license a{color:#bfdbfe;font-weight:600;text-decoration:none}
 .title-license a:hover{text-decoration:underline}
 
-.flowerChallengePanel{width:min(320px,92vw);background:rgba(12,23,43,0.78);backdrop-filter:blur(12px);border:1px solid rgba(147,197,253,0.35);border-radius:16px;padding:14px 14px 12px;color:#e2e8f0;box-shadow:0 18px 42px rgba(2,6,23,0.38);display:flex;flex-direction:column;gap:10px;max-height:calc(100dvh - 258px);overflow:hidden}
+.flowerChallengeToggleBtn{position:fixed;top:max(12px,calc(env(safe-area-inset-top) + 8px));right:12px;background:rgba(15,23,42,0.88);border:1px solid rgba(147,197,253,0.55);border-radius:12px;padding:9px 12px;color:#e2e8f0;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 10px 24px rgba(2,6,23,0.35);display:flex;align-items:center;gap:6px;z-index:4;backdrop-filter:blur(8px);transition:transform 0.16s ease,filter 0.16s ease}
+.flowerChallengeToggleBtn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+.flowerChallengeToggleBtn:active{transform:scale(0.98)}
+.flowerChallengePanel{position:fixed;top:max(66px,calc(env(safe-area-inset-top) + 62px));right:12px;width:min(340px,calc(100vw - 24px));background:rgba(12,23,43,0.92);backdrop-filter:blur(12px);border:1px solid rgba(147,197,253,0.35);border-radius:16px;padding:14px 14px 12px;color:#e2e8f0;box-shadow:0 18px 42px rgba(2,6,23,0.38);display:none;flex-direction:column;gap:10px;max-height:calc(100dvh - 92px);overflow:hidden;z-index:4}
+.flowerChallengePanel.open{display:flex}
 .flowerChallengeHeader{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .flowerChallengeTitle{font-family:'Orbitron',sans-serif;font-size:14px;letter-spacing:0.6px;color:#fef2f2}
 .flowerChallengeBadge{font-size:11px;background:rgba(220,38,38,0.2);border:1px solid rgba(248,113,113,0.55);color:#fecaca;padding:3px 8px;border-radius:999px;font-weight:600}
@@ -150,13 +154,14 @@ input,textarea{-webkit-user-select:text;user-select:text}
 @media (min-width: 769px){
   #titleScreen{padding-top:max(14px,calc(env(safe-area-inset-top) + 10px));padding-bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px))}
   .menu-container{width:min(780px,95vw);max-height:calc(100dvh - 190px)}
-  .flowerChallengePanel{max-height:calc(100dvh - 210px)}
+  .flowerChallengePanel{max-height:calc(100dvh - 120px)}
   .title-license{font-size:11px;padding:0 10px}
 }
 @media (min-width: 1024px){
-  .title-main-row{width:min(1220px,98vw);gap:18px}
+  .title-main-row{width:min(900px,98vw)}
   .menu-container{width:min(820px,95vw)}
-  .flowerChallengePanel{width:min(340px,30vw)}
+  .flowerChallengeToggleBtn{top:max(14px,calc(env(safe-area-inset-top) + 10px));right:14px}
+  .flowerChallengePanel{right:14px;width:min(350px,32vw)}
   .title-share-row{position:fixed;right:12px;top:50%;transform:translateY(-50%);flex-direction:column;flex-wrap:nowrap;gap:12px;z-index:3}
   .title-footer{width:calc(100vw - 20px);margin-top:-4px}
   .title-license{padding-right:0;max-width:calc(100vw - 120px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -230,7 +235,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .sub{font-size:15px;letter-spacing:2px}
   .title-main-row{width:min(98vw,760px);flex-direction:column;align-items:center;gap:10px}
   .menu-container{width:min(96vw,740px);max-height:calc(100dvh - 145px)}
-  .flowerChallengePanel{width:min(96vw,740px);max-height:220px}
+  .flowerChallengeToggleBtn{top:max(10px,calc(env(safe-area-inset-top) + 6px));right:10px;padding:8px 10px;font-size:11px}
+  .flowerChallengePanel{top:max(58px,calc(env(safe-area-inset-top) + 54px));left:8px;right:8px;width:auto;max-height:52dvh;padding:10px}
   .flowerLeaderboard{max-height:110px}
   .loc-grid{grid-template-columns:1fr;gap:10px}
   .launch-switch-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
@@ -299,7 +305,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .sub{font-size:13px;letter-spacing:2px;margin:0}
   .title-main-row{width:99vw;gap:8px}
   .menu-container{width:99vw;max-height:calc(100dvh - 126px)}
-  .flowerChallengePanel{width:99vw;max-height:205px;padding:10px}
+  .flowerChallengeToggleBtn{right:8px;padding:7px 9px;font-size:10px}
+  .flowerChallengePanel{left:6px;right:6px;top:max(54px,calc(env(safe-area-inset-top) + 50px));width:auto;max-height:50dvh;padding:9px}
   .flowerChallengeTitle{font-size:13px}
   .flowerChallengeBadge{font-size:10px}
   .flowerChallengeName{font-size:11px;padding:7px 8px}
@@ -564,6 +571,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <div id="titleScreen">
 <div class="logo">WORLD EXPLORER</div>
 <div class="sub">Explore Any Place on Earth and Beyond</div>
+<button id="flowerChallengeToggleBtn" class="flowerChallengeToggleBtn" type="button" aria-label="Toggle challenge leaderboard" aria-controls="flowerChallengePanel" aria-expanded="false">🏁 Leaderboard</button>
 <div class="title-main-row">
 <div class="menu-container">
 <div class="tab-nav">

@@ -29,6 +29,8 @@ const challengeState = {
 };
 
 const ui = {
+  titlePanel: null,
+  titleToggleBtn: null,
   status: null,
   titleNameInput: null,
   titleLocation: null,
@@ -45,6 +47,7 @@ const ui = {
 };
 
 let challengeUiBound = false;
+let lastTitleToggleTouchMs = 0;
 
 function isFiniteNumber(value) {
   return Number.isFinite(value);
@@ -128,6 +131,26 @@ function setTitleStatus(message, tone = 'info') {
   ui.status.classList.remove('error', 'ok');
   if (tone === 'error') ui.status.classList.add('error');
   if (tone === 'ok') ui.status.classList.add('ok');
+}
+
+function setTitlePanelOpen(open) {
+  if (!ui.titlePanel) return;
+  const shouldOpen = !!open;
+  ui.titlePanel.classList.toggle('open', shouldOpen);
+  if (ui.titleToggleBtn) {
+    ui.titleToggleBtn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+  }
+}
+
+function toggleTitlePanel() {
+  if (!ui.titlePanel) return;
+  const shouldOpen = !ui.titlePanel.classList.contains('open');
+  setTitlePanelOpen(shouldOpen);
+  if (shouldOpen) refreshFlowerLeaderboard();
+}
+
+function closeTitlePanel() {
+  setTitlePanelOpen(false);
 }
 
 function setGameHud(message, elapsedMs = null) {
@@ -676,6 +699,7 @@ function consumePendingFlowerChallengeStart() {
 }
 
 function requestFlowerChallengeFromTitle() {
+  setTitlePanelOpen(true);
   const selectedLocation = getSelectedTitleLocationLabel();
   if (!selectedLocation) {
     setTitleStatus('Pick a location first.', 'error');
@@ -795,6 +819,8 @@ function bindFlowerActionMenu() {
 function setupFlowerChallenge() {
   if (challengeUiBound) return;
 
+  ui.titlePanel = document.getElementById('flowerChallengePanel');
+  ui.titleToggleBtn = document.getElementById('flowerChallengeToggleBtn');
   ui.status = document.getElementById('flowerChallengeStatus');
   ui.titleNameInput = document.getElementById('flowerPlayerName');
   ui.titleLocation = document.getElementById('flowerChallengeLocation');
@@ -820,6 +846,20 @@ function setupFlowerChallenge() {
     });
   }
 
+  if (ui.titleToggleBtn) {
+    ui.titleToggleBtn.addEventListener('click', (event) => {
+      if (Date.now() - lastTitleToggleTouchMs < 420) return;
+      event.stopPropagation();
+      toggleTitlePanel();
+    });
+    ui.titleToggleBtn.addEventListener('touchend', (event) => {
+      if (event.cancelable) event.preventDefault();
+      event.stopPropagation();
+      lastTitleToggleTouchMs = Date.now();
+      toggleTitlePanel();
+    }, { passive: false });
+  }
+
   if (ui.titleStartBtn) {
     ui.titleStartBtn.addEventListener('click', () => {
       requestFlowerChallengeFromTitle();
@@ -832,12 +872,31 @@ function setupFlowerChallenge() {
     });
   }
 
+  document.addEventListener('click', (event) => {
+    if (!ui.titlePanel || !ui.titlePanel.classList.contains('open')) return;
+    if (!(event.target instanceof Element)) return;
+    if (event.target.closest('#flowerChallengePanel') || event.target.closest('#flowerChallengeToggleBtn')) return;
+    closeTitlePanel();
+  });
+
   challengeUiBound = true;
+  setTitlePanelOpen(false);
   refreshFlowerLeaderboard();
 }
 
+function getFlowerChallengeBackendStatus() {
+  return {
+    configPresent: !!readFirebaseConfig(),
+    firebaseReady: !!challengeState.firebaseReady,
+    backend: challengeState.leaderboardBackend,
+    challengeActive: !!challengeState.active
+  };
+}
+
 Object.assign(appCtx, {
+  closeFlowerChallengeTitlePanel: closeTitlePanel,
   consumePendingFlowerChallengeStart,
+  getFlowerChallengeBackendStatus,
   refreshFlowerLeaderboard,
   requestFlowerChallengeFromTitle,
   setupFlowerChallenge,
@@ -847,8 +906,14 @@ Object.assign(appCtx, {
   updateFlowerChallenge
 });
 
+if (typeof globalThis !== 'undefined') {
+  globalThis.getFlowerChallengeBackendStatus = getFlowerChallengeBackendStatus;
+}
+
 export {
+  closeTitlePanel,
   consumePendingFlowerChallengeStart,
+  getFlowerChallengeBackendStatus,
   refreshFlowerLeaderboard,
   requestFlowerChallengeFromTitle,
   setupFlowerChallenge,

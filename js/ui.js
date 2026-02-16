@@ -1597,6 +1597,7 @@ function setupUI() {
     if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
     document.getElementById('titleScreen').classList.remove('hidden');
+    if (typeof appCtx.closeFlowerChallengeTitlePanel === 'function') appCtx.closeFlowerChallengeTitlePanel();
     ['hud', 'minimap', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'flowerChallengeHud', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('show');
