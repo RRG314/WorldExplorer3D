@@ -5,6 +5,7 @@ Developer guide for World Explorer 3D. Architecture, code structure, and customi
 ## Table of Contents
 - [Architecture Overview](#architecture-overview)
 - [Branch Freeze Updates (2026-02)](#branch-freeze-updates-2026-02)
+- [Moon Runtime Stabilization Update (2026-02-16)](#moon-runtime-stabilization-update-2026-02-16)
 - [Technology Stack](#technology-stack)
 - [File Structure](#file-structure)
 - [Core Systems](#core-systems)
@@ -54,6 +55,28 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - Moon-only low-gravity airborne terrain-follow behavior added for lunar driving crest/crater transitions.
 - Overpass endpoint preference + in-memory response cache added for faster repeat loads.
 - Loader cache-bust chain is aligned through `v=54` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+- Moon desktop scene isolation hardened so Earth mesh sets are force-suppressed while moon/space env is active.
+- Async world-load race handling now prevents late Earth fetch completion from reattaching Earth meshes during moon/space sessions.
+- Lunar terrain near Apollo spawn now includes stronger local relief variation for better movement readability.
+
+## Moon Runtime Stabilization Update (2026-02-16)
+
+This update specifically addresses the desktop moon reliability regressions and aligns desktop/mobile lunar behavior.
+
+- `js/sky.js`
+  - `arriveAtMoon()` now force-hides/removes Earth mesh arrays (roads/buildings/landuse/POIs/street furniture) as a final transition guard.
+  - Moon surface generator adds local relief around spawn to improve perceived depth and motion cues.
+- `js/world.js`
+  - World-load path now detects non-Earth runtime env during/after fetch and exits with safe partial recovery instead of reattaching Earth meshes.
+  - `updateWorldLod()` now applies Earth-only visibility policy and actively suppresses Earth meshes in moon/space contexts.
+- `js/physics.js`
+  - Moon surface world matrix is refreshed before raycast sampling.
+  - Lunar crest/drop airborne thresholds and launch impulse blending are tuned for consistent desktop low-gravity float behavior.
+
+Validation artifact set:
+
+- `output/playwright/moon-desktop-check-after-fix.json`
+- `output/playwright/moon-desktop-check-after-fix.png`
 
 ### High-Level Architecture
 

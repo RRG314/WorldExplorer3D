@@ -1,8 +1,8 @@
-# Systems Inventory Report (Freeze)
+# Systems Inventory Report (Freeze + Update)
 
-Date: 2026-02-14  
-Branch: `codex/rdt-impact-main-snapshot`  
-Scope: Runtime feature/system inventory with validation summary
+Date: 2026-02-16  
+Branch: `rdt-engine`  
+Scope: Runtime feature/system inventory with moon-runtime stabilization validation summary
 
 ## 1. Executive Summary
 
@@ -15,6 +15,7 @@ World Explorer 3D currently ships as a browser-first ES module runtime with thes
 - Deep-space solar-system and galaxy interaction layer
 - Performance benchmark and adaptive budget controls
 - Shareable experience URL export/import
+- Moon scene-isolation safeguards that prevent Earth mesh bleed during moon/space runtime
 
 ## 2. Core System Inventory
 
@@ -101,6 +102,21 @@ World Explorer 3D currently ships as a browser-first ES module runtime with thes
   - Apply runtime mode/camera/pose after world start
   - Supports custom location payloads (`lat/lon/lname`)
 
+### 3.7 Moon Runtime Stabilization Update (2026-02-16)
+
+- Transition hardening in `js/sky.js`
+  - Earth mesh arrays (roads/buildings/landuse/POIs/street furniture) are force-hidden/removed on moon arrival.
+  - Prevents desktop moon sessions from showing stale Earth geometry after asynchronous world-load completion.
+- Load-race mitigation in `js/world.js`
+  - World-load pass now detects non-Earth env during/after Overpass fetch and exits as partial recovery without reattaching Earth meshes.
+  - `updateWorldLod()` now enforces Earth-only visibility and suppresses Earth meshes during moon/space contexts.
+- Lunar drive physics parity in `js/physics.js`
+  - Moon surface matrix update is forced before raycast sampling.
+  - Crest/drop launch thresholds and impulse blending adjusted for consistent low-gravity airborne behavior on desktop.
+- Lunar terrain readability improvements in `js/sky.js`
+  - Added local relief variation near Apollo spawn area.
+  - Kept slope-aware shading and dense rock cues for better perceived motion/depth.
+
 ## 4. URL Payload Contract (Share Links)
 
 Supported params:
@@ -142,6 +158,12 @@ Interpretation:
 - RDT repeat loads are significantly faster when Overpass is cache-served.
 - Draw-call variance remains a known tuning axis.
 
+Moon stabilization validation snapshot (2026-02-15 desktop):
+
+| Scenario | env | onMoon | Earth meshes attached | airborne ticks | y-range |
+| --- | --- | --- | ---: | ---: | ---: |
+| Moon desktop driving check | MOON | true | 0 | 33 / 34 | 1.61 |
+
 ## 7. Verification Checklist (This Update)
 
 ### 7.1 Static checks
@@ -149,6 +171,8 @@ Interpretation:
 - `node --check js/perf.js` passed
 - `node --check js/world.js` passed
 - `node --check js/ui.js` passed
+- `node --check js/physics.js` passed
+- `node --check js/sky.js` passed
 - `node --check js/app-entry.js` passed
 - `node --check js/bootstrap.js` passed
 - `node --check js/modules/manifest.js` passed
@@ -166,10 +190,16 @@ Interpretation:
 - Start-flow smoke test verified:
   - HUD displayed and title screen hid after start
   - No runtime JS exceptions observed in smoke pass
+- Moon desktop runtime check verified:
+  - `env=MOON`, `onMoon=true`
+  - Earth mesh attachment counts on moon were all zero
+  - Moon-driving airborne integration triggered repeatedly during desktop driving sample
+  - Artifacts:
+    - `output/playwright/moon-desktop-check-after-fix.json`
+    - `output/playwright/moon-desktop-check-after-fix.png`
 
 ## 8. Known Constraints
 
 - Runtime still uses shared global state across modules; full subsystem isolation remains iterative.
 - External map/Overpass/vector endpoints remain network-dependent and may vary by availability.
 - Draw-call behavior can still vary by location density and active mode.
-
