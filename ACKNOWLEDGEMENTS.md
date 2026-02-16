@@ -1,6 +1,8 @@
 # Acknowledgements 🙏
 
-World Explorer 3D acknowledges and thanks the following third-party projects, services, and individuals that made this software possible.
+Last reviewed: 2026-02-16
+
+World Explorer acknowledges and thanks the following third-party projects, services, and individuals that made this software possible.
 
 ---
 
@@ -108,7 +110,7 @@ data about roads, trails, cafés, railway stations, and much more, all over the 
 - Requires API key
 - Subject to Rentcast Terms of Service
 - Free tier available with limitations
-- Data accuracy not guaranteed by World Explorer 3D
+- Data accuracy not guaranteed by World Explorer
 
 ### Attom Data Solutions API
 
@@ -254,7 +256,7 @@ All fonts used under the SIL Open Font License (OFL), Version 1.1
 
 ## First-Party Research Algorithms
 
-World Explorer 3D also includes original deterministic algorithm work by Steven Reid.
+World Explorer also includes original deterministic algorithm work by Steven Reid.
 These are first-party research components used in the engine (not external third-party dependencies).
 
 ### Recursive Division Tree (RDT)
@@ -386,18 +388,18 @@ These are first-party research components used in the engine (not external third
 
 ### Attribution Requirements
 
-When using World Explorer 3D, the following attributions are **REQUIRED**:
+When using World Explorer, the following attributions are **REQUIRED**:
 
 **In-Application Credits**:
 ```
-World Explorer 3D © 2026. All Rights Reserved.
+World Explorer © 2026. All Rights Reserved.
 Powered by Three.js (MIT License)
 Map data © OpenStreetMap contributors
 ```
 
 **For Public Demonstrations**:
 ```
-World Explorer 3D - Proprietary Software
+World Explorer - Proprietary Software
 © 2026 All Rights Reserved
 
 Built with:
@@ -408,7 +410,7 @@ Built with:
 
 ### Third-Party Terms
 
-Users of World Explorer 3D must comply with all applicable third-party terms of service, including but not limited to:
+Users of World Explorer must comply with all applicable third-party terms of service, including but not limited to:
 - OpenStreetMap Open Database License (ODbL)
 - Real Estate API Terms of Service
 - Font licenses (OFL)
@@ -416,7 +418,7 @@ Users of World Explorer 3D must comply with all applicable third-party terms of 
 
 ### Data Accuracy Disclaimer
 
-Real estate data is provided by third-party APIs. World Explorer 3D:
+Real estate data is provided by third-party APIs. World Explorer:
 - Does not guarantee accuracy of property information
 - Is not responsible for outdated or incorrect data
 - Recommends independent verification for any decisions
@@ -434,7 +436,7 @@ Map data is provided by OpenStreetMap contributors and is:
 
 ## Contribution Acknowledgments
 
-While World Explorer 3D is proprietary software, we acknowledge concepts and techniques learned from:
+While World Explorer is proprietary software, we acknowledge concepts and techniques learned from:
 
 - Open-source Three.js examples and documentation
 - WebGL tutorials and educational resources
@@ -460,7 +462,7 @@ sreid1118@gmail.com
 
 ## Closing Statement
 
-World Explorer 3D would not be possible without the incredible work of:
+World Explorer would not be possible without the incredible work of:
 - Three.js team and contributors
 - OpenStreetMap community and contributors
 - Font designers and foundries
@@ -471,7 +473,7 @@ Thank you all for your contributions to the technologies and standards that make
 
 ---
 
-**World Explorer 3D**  
+**World Explorer**  
 Proprietary Software - All Rights Reserved  
 © 2026
 

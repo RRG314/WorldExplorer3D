@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Explorer | Earth to Space to Moon</title>
+  <meta name="description" content="Explore Earth, launch into space, and land on the Moon in a single session.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+  <script src="/js/firebase-project-config.js"></script>
+  <style>
+    :root {
+      --bg-0: #071324;
+      --bg-1: #0f2742;
+      --bg-2: #1f4f73;
+      --ink: #e6f2ff;
+      --muted: #b7cde0;
+      --card: rgba(7, 19, 36, 0.72);
+      --line: rgba(183, 205, 224, 0.24);
+      --accent: #ffc857;
+      --accent-2: #53c4ff;
+      --ok: #4dd69f;
+      --danger: #ff6b6b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 20% 20%, rgba(83, 196, 255, 0.2), transparent 45%),
+        radial-gradient(circle at 80% 10%, rgba(255, 200, 87, 0.18), transparent 40%),
+        linear-gradient(170deg, var(--bg-2), var(--bg-1) 52%, var(--bg-0));
+      min-height: 100vh;
+      font-family: 'Barlow', sans-serif;
+      line-height: 1.45;
+    }
+
+    a { color: inherit; }
+
+    .shell {
+      width: min(1120px, 92vw);
+      margin: 0 auto;
+      padding: 28px 0 42px;
+    }
+
+    .hero {
+      border: 1px solid var(--line);
+      border-radius: 22px;
+      overflow: hidden;
+      background: rgba(8, 18, 34, 0.68);
+      box-shadow: 0 24px 48px rgba(2, 8, 18, 0.35);
+      margin-bottom: 26px;
+    }
+
+    .hero-grid {
+      display: grid;
+      grid-template-columns: 1.1fr 1fr;
+      gap: 0;
+      min-height: 430px;
+    }
+
+    .hero-copy {
+      padding: 34px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 16px;
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      width: fit-content;
+      align-items: center;
+      gap: 8px;
+      background: rgba(77, 214, 159, 0.12);
+      border: 1px solid rgba(77, 214, 159, 0.38);
+      border-radius: 999px;
+      color: #a2efd0;
+      padding: 6px 12px;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    h1 {
+      margin: 0;
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: clamp(34px, 5vw, 54px);
+      line-height: 0.98;
+      letter-spacing: 0.015em;
+    }
+
+    .hero-brand {
+      display: block;
+      margin-bottom: 8px;
+      color: #a2efd0;
+      font-size: clamp(22px, 2.5vw, 30px);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+    }
+
+    .hero-headline { display: block; }
+
+    .lead {
+      margin: 0;
+      color: var(--muted);
+      font-size: clamp(17px, 2vw, 21px);
+      max-width: 34ch;
+    }
+
+    .cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .btn {
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: 12px 18px;
+      font-size: 15px;
+      font-weight: 700;
+      letter-spacing: 0.015em;
+      text-decoration: none;
+      cursor: pointer;
+      transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease;
+    }
+
+    .btn:hover { transform: translateY(-1px); filter: brightness(1.04); }
+
+    .btn-play {
+      background: var(--accent-2);
+      color: #03192d;
+      box-shadow: 0 10px 24px rgba(83, 196, 255, 0.34);
+    }
+
+    .btn-trial {
+      background: var(--accent);
+      color: #271900;
+      box-shadow: 0 10px 24px rgba(255, 200, 87, 0.28);
+    }
+
+    .btn-ghost {
+      background: rgba(9, 24, 44, 0.6);
+      color: var(--ink);
+      border-color: var(--line);
+    }
+
+    .status-note {
+      min-height: 20px;
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .perf-note {
+      margin: 0;
+      font-size: 13px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
+      padding-top: 12px;
+    }
+
+    .hero-media {
+      background: url('/assets/landing/hero.jpg') center center / cover no-repeat;
+      position: relative;
+      min-height: 280px;
+    }
+
+    .hero-media::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(180deg, rgba(9, 23, 42, 0) 20%, rgba(9, 23, 42, 0.58));
+    }
+
+    section {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--card);
+      padding: 20px;
+      margin-bottom: 18px;
+      backdrop-filter: blur(6px);
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-family: 'Chakra Petch', sans-serif;
+      letter-spacing: 0.02em;
+      font-size: clamp(24px, 3vw, 31px);
+    }
+
+    .shots {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .shot {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: #030a14;
+    }
+
+    .shot img {
+      width: 100%;
+      aspect-ratio: 16 / 10;
+      object-fit: cover;
+      display: block;
+    }
+
+    .shot span {
+      display: block;
+      padding: 8px 10px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .features {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .feature {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(4, 12, 24, 0.35);
+    }
+
+    .feature h3 {
+      margin: 0 0 6px;
+      font-size: 17px;
+      font-family: 'Chakra Petch', sans-serif;
+    }
+
+    .feature p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    .pricing {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .price-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      background: rgba(4, 12, 24, 0.35);
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .price-card strong {
+      font-size: 22px;
+      font-family: 'Chakra Petch', sans-serif;
+    }
+
+    .price-card ul {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .price-card.pro { border-color: rgba(255, 200, 87, 0.5); }
+    .price-card.supporter { border-color: rgba(83, 196, 255, 0.45); }
+
+    .faq {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .qa {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(4, 12, 24, 0.35);
+    }
+
+    .qa h3 {
+      margin: 0 0 6px;
+      font-size: 16px;
+      font-family: 'Chakra Petch', sans-serif;
+    }
+
+    .qa p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    footer {
+      border-top: 1px solid var(--line);
+      margin-top: 18px;
+      padding-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 16px;
+      align-items: center;
+    }
+
+    footer a { color: #d5e9ff; text-decoration: none; }
+    footer a:hover { text-decoration: underline; }
+
+    @media (max-width: 980px) {
+      .hero-grid { grid-template-columns: 1fr; }
+      .shots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .pricing { grid-template-columns: 1fr; }
+      .faq { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .shell { width: min(1120px, 94vw); }
+      .hero-copy { padding: 22px; }
+      .shots { grid-template-columns: 1fr; }
+      .features { grid-template-columns: 1fr; }
+      .btn { width: 100%; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <div class="eyebrow">Live World Runtime</div>
+          <h1><span class="hero-brand">World Explorer</span><span class="hero-headline">Earth -> Space -> Moon in one session</span></h1>
+          <p class="lead">Drive, walk, and fly a continuous world. Then launch to orbit and land on the Moon without loading a second app.</p>
+          <div class="cta-row">
+            <a class="btn btn-play" href="/app/">Play Now</a>
+            <button class="btn btn-trial" id="startTrialBtn" type="button">Start 2-Day Trial</button>
+            <a class="btn btn-ghost" href="/account/">Account</a>
+          </div>
+          <p id="startTrialStatus" class="status-note"></p>
+          <p class="perf-note">Performance note: Desktop recommended for best frame rate and rendering quality.</p>
+        </div>
+        <div class="hero-media" aria-hidden="true"></div>
+      </div>
+    </section>
+
+    <section>
+      <h2>Visual Proof</h2>
+      <div class="shots">
+        <figure class="shot">
+          <img src="/assets/landing/city.jpg" alt="City terrain runtime screenshot">
+          <span>Urban exploration and map overlays</span>
+        </figure>
+        <figure class="shot">
+          <img src="/assets/landing/hero.jpg" alt="World Explorer title and runtime screenshot">
+          <span>Single runtime session from launch</span>
+        </figure>
+        <figure class="shot">
+          <img src="/assets/landing/space.jpg" alt="Spaceflight transition screenshot">
+          <span>Earth-to-space transition mode</span>
+        </figure>
+        <figure class="shot">
+          <img src="/assets/landing/moon.jpg" alt="Moon terrain screenshot">
+          <span>Lunar driving and exploration</span>
+        </figure>
+      </div>
+    </section>
+
+    <section>
+      <h2>Feature Grid</h2>
+      <div class="features">
+        <article class="feature"><h3>Unified World Loop</h3><p>Stay in one simulation while switching between driving, walking, drone, and rocket.</p></article>
+        <article class="feature"><h3>Map + Terrain Runtime</h3><p>OSM-backed roads, POIs, and adaptive terrain detail for large-scale traversal.</p></article>
+        <article class="feature"><h3>Challenge Layer</h3><p>Timed red-flower challenge with leaderboard storage and repeatable starts.</p></article>
+        <article class="feature"><h3>Memory Markers</h3><p>Drop location-based notes and flowers as part of your exploration trail.</p></article>
+        <article class="feature"><h3>Mobile Controls</h3><p>Dual-pad touch controls for small screens with mode-specific action bindings.</p></article>
+        <article class="feature"><h3>Plan-Gated Perks</h3><p>Free core exploration plus optional Supporter/Pro features and billing controls.</p></article>
+      </div>
+    </section>
+
+    <section>
+      <h2>Pricing</h2>
+      <div class="pricing">
+        <article class="price-card">
+          <strong>Free</strong>
+          <div>$0 / month</div>
+          <ul>
+            <li>Full core exploration loop</li>
+            <li>Local-only saves</li>
+            <li>No Pro-only demo access</li>
+          </ul>
+        </article>
+        <article class="price-card supporter">
+          <strong>Supporter</strong>
+          <div>$1 / month</div>
+          <ul>
+            <li>Full access</li>
+            <li>Cloud sync enabled</li>
+            <li>Supports ongoing development</li>
+          </ul>
+        </article>
+        <article class="price-card pro">
+          <strong>Pro</strong>
+          <div>$5 / month</div>
+          <ul>
+            <li>Everything in Supporter</li>
+            <li>Early playable demos</li>
+            <li>Priority contact + feature consideration</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section>
+      <h2>FAQ</h2>
+      <div class="faq">
+        <article class="qa"><h3>Does it run on mobile?</h3><p>Yes. The runtime includes mobile controls, but desktop is recommended for highest visual quality and smoother frame pacing.</p></article>
+        <article class="qa"><h3>How demanding is it?</h3><p>The app adapts LOD dynamically. Larger cities and space transitions still perform best on modern desktop GPUs.</p></article>
+        <article class="qa"><h3>How do saves work?</h3><p>Free plan keeps local browser data. Supporter and Pro can use cloud-backed sync through Firestore.</p></article>
+        <article class="qa"><h3>Where does map data come from?</h3><p>OpenStreetMap contributors (ODbL), with additional optional provider APIs configured by the user.</p></article>
+      </div>
+    </section>
+
+    <footer>
+      <a href="/legal/privacy">Privacy</a>
+      <a href="/legal/terms">Terms</a>
+      <span>OpenStreetMap data © OpenStreetMap contributors (ODbL)</span>
+      <a href="mailto:hello@worldexplorer.app">Contact</a>
+      <a href="https://github.com/RRG314/WorldExplorer" target="_blank" rel="noreferrer">GitHub</a>
+    </footer>
+  </div>
+
+  <script type="module">
+    import { hasFirebaseConfig } from '/js/firebase-init.js';
+    import { ensureSignedIn } from '/js/auth-ui.js';
+    import { ensureEntitlements } from '/js/entitlements.js';
+
+    const startTrialBtn = document.getElementById('startTrialBtn');
+    const statusEl = document.getElementById('startTrialStatus');
+
+    function setStatus(message, isError = false) {
+      statusEl.textContent = message || '';
+      statusEl.style.color = isError ? 'var(--danger)' : 'var(--muted)';
+    }
+
+    startTrialBtn.addEventListener('click', async () => {
+      startTrialBtn.disabled = true;
+      setStatus('Preparing trial...');
+
+      try {
+        if (!hasFirebaseConfig()) {
+          setStatus('Firebase config not set yet. Opening app in free mode until config is provided.', true);
+          window.location.assign('/app/?startTrial=1');
+          return;
+        }
+
+        const user = await ensureSignedIn();
+        if (!user) {
+          setStatus('Continue sign-in in the popup/redirect to activate your trial.');
+          return;
+        }
+
+        await ensureEntitlements(user);
+        window.location.assign('/app/?startTrial=1');
+      } catch (err) {
+        console.error('[landing] Trial start failed:', err);
+        setStatus(err && err.message ? err.message : 'Could not start trial right now.', true);
+      } finally {
+        startTrialBtn.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

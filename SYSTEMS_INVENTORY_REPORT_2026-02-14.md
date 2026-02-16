@@ -1,192 +1,141 @@
-# Systems Inventory Report (Freeze)
+# Systems Inventory Report
 
-Date: 2026-02-14  
-Branch: `codex/rdt-impact-main-snapshot`  
-Scope: Runtime feature/system inventory with validation summary
+Date: 2026-02-16
+Repository: `WorldExplorer`
+Branch baseline: `codex/firebase-hosting-rollout`
+Project target: `worldexplorer3d-d9b83`
+
+This report reflects the current Firebase-hosted product stack and replaces older snapshot assumptions.
 
 ## 1. Executive Summary
 
-World Explorer 3D currently ships as a browser-first ES module runtime with these major platform layers:
+World Explorer is operating as a multi-page Firebase Hosting product with integrated subscription billing.
 
-- Geospatial world generation (roads/buildings/landuse/POIs)
-- Terrain streaming + elevation-aware geometry conformance
-- Four movement contexts (driving, walking, drone, space flight)
-- Persistent local user edits (memories + build blocks)
-- Deep-space solar-system and galaxy interaction layer
-- Performance benchmark and adaptive budget controls
-- Shareable experience URL export/import
-- Timed red-flower challenge with leaderboard persistence
+Primary capability areas:
 
-## 2. Core System Inventory
+- Public landing and legal pages
+- WebGL runtime at `/app/`
+- Account/billing management at `/account/`
+- Firebase Auth + Firestore entitlement management
+- Stripe subscription checkout and customer portal via Cloud Functions
 
-| System | Subsystem | Status | Primary Files |
-| --- | --- | --- | --- |
-| Runtime boot | ES module loader chain + bootstrap | Active | `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, `js/app-entry.js` |
-| Runtime state | Shared module context + state containers | Active | `js/shared-context.js`, `js/state.js`, `js/config.js` |
-| Rendering engine | Three.js scene/camera/material pipeline | Active | `js/engine.js`, `js/main.js` |
-| Input and controls | Keyboard/mouse controls + mode switching | Active | `js/input.js`, `js/ui.js`, `js/walking.js` |
-| Physics | Vehicle, walker, grounding, road proximity | Active | `js/physics.js`, `js/ground.js` |
-| World loading | OSM Overpass fetch, feature budgets, mesh build | Active | `js/world.js` |
-| Terrain | Terrarium tile decode + streaming ring | Active | `js/terrain.js` |
-| Minimap/maps | Minimap + large map + legend filters | Active | `js/map.js`, `js/ui.js` |
-| HUD/UI | Start menu, overlays, in-game panels | Active | `index.html`, `styles.css`, `js/ui.js`, `js/hud.js` |
-| Real estate | Property overlays + API-backed providers | Active | `js/real-estate.js` |
-| Space stack | Earth/Moon/space flight transitions | Active | `js/space.js`, `js/env.js` |
-| Solar/deep-sky | Solar system, asteroid belt, Kuiper belt, galaxies | Active | `js/solar-system.js` |
-| Persistence | Memory markers + block builder storage | Active | `js/memory.js`, `js/blocks.js` |
-| Challenge gameplay | Timed red-flower challenge + leaderboard | Active | `js/flower-challenge.js`, `js/ui.js`, `index.html` |
-| Determinism | RDT seed/depth + deterministic random paths | Active | `js/rdt.js`, `js/world.js`, `js/engine.js` |
-| Performance | Benchmark modes + snapshot export + live stats | Active | `js/perf.js`, `js/world.js`, `js/main.js`, `js/ui.js` |
+## 2. Active Route Inventory
 
-## 3. Feature Inventory
+| Route | Purpose | Source File |
+| --- | --- | --- |
+| `/` | Landing page and pricing | `public/index.html` |
+| `/app/` | Runtime/game UI | `public/app/index.html` |
+| `/account/` | Plan + billing controls | `public/account/index.html` |
+| `/legal/privacy` | Privacy policy | `public/legal/privacy.html` |
+| `/legal/terms` | Terms | `public/legal/terms.html` |
 
-### 3.1 Geospatial World
+## 3. Hosting and Backend Inventory
 
-- Preset cities + custom location search
-- Overpass multi-endpoint fetch with fallback strategy
-- Roads with adaptive subdivision/decimation
-- Buildings with deterministic facade/material variation
-- Land-use and water layers (including vector-tile water attempts)
-- POI extraction and in-world POI meshes with LOD behavior
-- Street furniture generation
+### Hosting (`firebase.json`)
 
-### 3.2 Movement and Camera
+- Hosting root: `public`
+- Static cache headers for assets and HTML
+- Rewrites:
+  - `/createCheckoutSession`
+  - `/createPortalSession`
+  - `/stripeWebhook`
+  - `/legal/privacy`
+  - `/legal/terms`
 
-- Driving mode
-- Walking mode (3rd-person/character + climbing support on blocks)
-- Drone mode
-- Space-flight mode
-- Camera modes (`camMode` 0/1/2 in Earth runtime)
+### Functions (`functions/index.js`)
 
-### 3.3 Space and Astronomy
+| Function | Auth Required | Purpose |
+| --- | --- | --- |
+| `createCheckoutSession` | Yes | Create Stripe subscription checkout URL |
+| `createPortalSession` | Yes | Create Stripe billing portal URL |
+| `stripeWebhook` | No (Stripe signed) | Apply subscription state updates |
 
-- Earth↔Moon↔space transitions
-- Solar-system model and body inspection
-- Asteroid belt and Kuiper belt visualization
-- Clickable galaxy catalog with info panel
+## 4. Data Inventory (Firestore)
 
-### 3.4 Persistent Player Authored Content
+### `users` collection
 
-- Memory markers
-  - Types: pin/flower
-  - Note length cap: 200 chars
-  - Remove single marker + delete-all by location
-  - Minimap + large map rendering with legend filters
-- Build blocks
-  - Place/stack/remove
-  - Stand/climb interactions in walking mode
-  - Per-location persistence
-  - 100 block cap
+Stores per-user account state:
 
-### 3.5 Benchmark and Optimization Controls
+- identity fields
+- plan and subscription status
+- trial end time
+- entitlement flags
+- Stripe customer/subscription IDs
 
-- Mode switch: `RDT` vs `Baseline`
-- Snapshot export JSON
-- Optional in-game benchmark overlay
-- Overpass source telemetry (`network` vs `memory-cache`)
-- Phase timing telemetry (`lastLoad.phases`)
-- Frame spike metrics (`>16.7`, `>33.3`, `>50`, `>100`, `p95`, `p99`)
+### `flowerLeaderboard` collection
 
-### 3.6 New Additions (Verified in this pass)
+Challenge leaderboard entries.
 
-- Auto quality manager in `perf.js`
-  - Runtime tiering: `performance` / `balanced` / `quality`
-  - Inputs: FPS, frame-time EMA, spike ratios, max frame spikes
-  - Hysteresis and cooldown to avoid oscillation
-- Dynamic budget scaling in `world.js`
-  - Scales adaptive load profile budgets at runtime
-  - Scales LOD thresholds at runtime
-  - Persists active dynamic budget state into load metrics (`lastLoad.dynamicBudget`)
-- Shareable experience links in `ui.js`
-  - Export from Settings: `Copy Experience Link`
-  - Parse URL params on load (location/mode/perf/seed/camera/pose)
-  - Apply runtime mode/camera/pose after world start
-  - Supports custom location payloads (`lat/lon/lname`)
+Rules summary:
 
-### 3.7 Challenge Gameplay Layer
+- public read
+- authenticated create
+- no update/delete
 
-- `Find The Red Flower` timed challenge
-  - Title-screen top-right leaderboard toggle opens challenge panel
-  - In-game flower action menu entry
-  - Live objective/timer HUD while active
-  - Completion support for walk, drive, and drone actors
-- Leaderboard persistence
-  - Preferred backend: Firebase Firestore collection `flowerLeaderboard`
-  - Automatic fallback: local browser storage
-  - Runtime backend probe: `getFlowerChallengeBackendStatus()`
+## 5. Subscription and Entitlement Inventory
 
-## 4. URL Payload Contract (Share Links)
+Plan states used by runtime:
 
-Supported params:
+- `free`
+- `trial`
+- `supporter`
+- `pro`
 
-- `loc` or `loc=custom` + `lat` + `lon` + optional `lname`
-- `launch` (`earth|moon|space`)
-- `gm` (`free|trial|checkpoint`)
-- `pm` (`rdt|baseline`)
-- `seed` (deterministic override)
-- `mode` (`driving|walking|drone|rocket`)
-- `camMode` (`0|1|2`)
-- `rx`, `ry`, `rz`, `yaw`, optional `pitch`
+Trial rules:
 
-## 5. Persistence and Storage Inventory
+- first sign-in initializes a 48-hour trial
+- expired trial with no active subscription downgrades to free
 
-| Feature | Storage Key | Scope | Notes |
-| --- | --- | --- | --- |
-| Memory markers | `worldExplorer3D.memories.v1` | Per rounded location key | 200-char notes, remove single, delete-all |
-| Build blocks | `worldExplorer3D.buildBlocks.v1` | Per rounded location key | 100-block cap |
-| Flower challenge leaderboard | `worldExplorer3D.flowerChallenge.localLeaderboard.v1` | Browser profile | Used when Firebase is unavailable |
-| Flower challenge player name | `worldExplorer3D.flowerChallenge.playerName` | Browser profile | Last entered challenge name |
-| Optional Firebase config | `worldExplorer3D.firebaseConfig` | Browser profile | Read only when provided by user |
-| Perf mode | `worldExplorerPerfMode` | Browser profile | `rdt` or `baseline` |
-| Perf overlay toggle | `worldExplorerPerfOverlay` | Browser profile | Forced OFF on each fresh session start |
-| Auto quality toggle | `worldExplorerPerfAutoQuality` | Browser profile | Enabled by default unless explicitly disabled |
-| Real estate toggle | `realEstateEnabled` | Browser profile | UI preference |
-| API keys | `estatedApiKey`, `attomApiKey`, `rentcastApiKey` | Browser profile | Client-side storage (user-provided) |
+Stripe event coverage:
 
-## 6. Performance Summary (Current Documented Baseline)
+- `checkout.session.completed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
 
-Captured Baltimore benchmark references (2026-02-14):
+## 6. Frontend Module Inventory
 
-| Scenario | loadMs | fetchOverpass | fps | frameMs | draw calls |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| Baseline (network) | 5551 | 4267 | 60.00 | 16.71 | 453 |
-| RDT (network) | 4669 | 3519 | 60.00 | 16.67 | 1149 |
-| RDT (memory-cache repeat) | 2202-2246 | 0 | 59.99-60.00 | 16.59-16.66 | 957-1131 |
+| Module | Role |
+| --- | --- |
+| `public/js/firebase-init.js` | Firebase app/auth/db initialization |
+| `public/js/auth-ui.js` | Sign in/up/reset/sign out workflows |
+| `public/js/entitlements.js` | User doc creation, trial checks, plan gating |
+| `public/js/billing.js` | Authenticated calls to checkout/portal functions |
+| `public/js/firebase-project-config.js` | Hosted Firebase web config injection |
 
-Interpretation:
+## 7. Operational Configuration Inventory
 
-- RDT startup load is faster than baseline in captured runs.
-- RDT repeat loads are significantly faster when Overpass is cache-served.
-- Draw-call variance remains a known tuning axis.
+Current function runtime keys expected:
 
-## 7. Verification Checklist (This Update)
+- `stripe.secret`
+- `stripe.webhook`
+- `stripe.price_supporter`
+- `stripe.price_pro`
 
-### 7.1 Static checks
+Current implementation still uses legacy `functions.config()` access.
 
-- `node --check js/perf.js` passed
-- `node --check js/world.js` passed
-- `node --check js/ui.js` passed
-- `node --check js/flower-challenge.js` passed
-- `node --check js/app-entry.js` passed
-- `node --check js/bootstrap.js` passed
-- `node --check js/modules/manifest.js` passed
-- `node --check js/main.js` passed
+## 8. Risk Inventory
 
-### 7.2 Browser smoke checks (Playwright)
+High priority operational risks:
 
-- Share-link import state load verified:
-  - `loc=seattle`, `gm=trial`, `pm=baseline`, `mode=driving`, `camMode=2`, `seed=12345`
-  - UI reflected loaded state in Settings and mode selection
-- Snapshot export payload verified:
-  - Contains `dynamicBudget` with numeric `budgetScale` and `lodScale`
-- Share-link export payload verified:
-  - Preserves expected `loc/gm/pm/mode/camMode/seed`
-- Start-flow smoke test verified:
-  - HUD displayed and title screen hid after start
-  - No runtime JS exceptions observed in smoke pass
+1. runtime-config deprecation cutoff (March 2026)
+2. Node 20 function runtime deprecation timeline
+3. test/live Stripe credential mode mismatch during manual setup
 
-## 8. Known Constraints
+## 9. Validation Artifacts Inventory
 
-- Runtime still uses shared global state across modules; full subsystem isolation remains iterative.
-- External map/Overpass/vector endpoints remain network-dependent and may vary by availability.
-- Draw-call behavior can still vary by location density and active mode.
+Recent workflow includes local and hosted smoke checks for:
+
+- auth float panel behavior
+- top HUD removal
+- Pro panel auto-hide behavior
+- landing hero title presence
+- account upgrade flow and function deployment
+
+Artifacts are under:
+
+- `output/playwright/`
+
+## 10. Documentation Integrity Status
+
+Top-level docs were refreshed on 2026-02-16 to align with this inventory and current deployment behavior.

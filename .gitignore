@@ -1,0 +1,14 @@
+.DS_Store
+.firebase/
+node_modules/
+functions/node_modules/
+output/
+test-results/
+coverage/
+*.log
+
+# Local backup/reference snapshots not part of production repo
+WorldExplorer3D-rdt-engine/
+_style_reference_worldexplorer3d/
+world-explorer-esm/
+three.js

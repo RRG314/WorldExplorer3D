@@ -1,0 +1,297 @@
+Original prompt: i need to make sure this funtions on mobile properly for all screens
+
+- Initialized mobile hardening pass.
+- Relocating title-menu share links + license disclosure to bottom footer per user direction.
+- Next: run Playwright mobile viewport checks across title/menu/in-game/map overlays and fix issues.
+
+- Moved title share links out of Settings into dedicated bottom menu footer.
+- Moved license/attribution into standalone footer line at bottom of title menu.
+- Added title footer share targets: Copy, native Share, Facebook, X, Instagram, Text.
+- Fixed mobile map close blocker by raising `#largeMap` z-index above `#mainMenuBtn`.
+- Fixed small-phone controls overflow by capping controls panel height and making `#ctrlContent` scrollable.
+- Mobile smoke tested with Playwright:
+  - iPhone 12 full flow (title tabs, start, controls panel, large map, share menu, return to title)
+  - iPhone SE and iPad Mini spot checks
+  - No console/page errors in generated reports.
+- Artifacts:
+  - output/playwright/mobile-smoke-report.json
+  - output/playwright/mobile-matrix-report.json
+- Added mode-aware mobile touch navigation scaffold:
+  - New mobile dual-pad HUD (move + look) and two action buttons.
+  - Wiring started in `js/ui.js` to map touch holds to existing key state (earth + space flight channels).
+  - Next: run Playwright mobile checks (Android profile) and tune placement/behavior.
+- Implemented mode-aware mobile navigation controls in `index.html` + `js/ui.js` (+ mirrored `styles.css`):
+  - Touch-only controller with move pad, look/steer pad, and two action hold buttons.
+  - Mode profiles wired to existing inputs:
+    - Driving: Drive pad + Brake/Boost
+    - Walking: Move pad + Look pad + Jump/Run
+    - Drone: Move pad + Look pad + Ascend/Descend
+    - Rocket: Steer pad + Thrust/Brake (space input channel)
+  - Dynamic visibility rules: hide on title, map overlay, non-space pause, or expanded controls tab.
+  - Space-flight compatibility: controller z-index elevates above `#spaceFlightCanvas`.
+  - Added hold-state safety: pointer capture, per-key hold counts, release on blur/visibility change.
+- Validation:
+  - `node --check js/ui.js` passed.
+  - Android (Pixel 5) Playwright checks confirm mode switching + correct bindings + no console errors.
+  - Verified action button active/inactive hold lifecycle with pointerdown/up simulation.
+- Desktop title clipping fix (post-share-footer layout):
+  - Root cause: `#titleScreen` vertical centering with taller menu+footer stack caused inaccessible top content on common desktop heights.
+  - Fix: top-anchor title stack (`justify-content:flex-start`), tighten vertical paddings/gaps, and reduce desktop menu max-height budget.
+  - Synced same title/menu height constraints in `styles.css` for consistency.
+- Validation run:
+  - Playwright desktop screenshot: `output/playwright/title-desktop-after-fix.png` (logo fully visible).
+  - Playwright mobile screenshot: `output/playwright/title-mobile-after-fix.png` (no regression observed).
+  - Console/page errors: none (`output/playwright/title-desktop-after-fix.errors.json`, `output/playwright/title-mobile-after-fix.errors.json`).
+- Mobile interaction reliability + layout pass:
+  - Added touch-action hygiene (`button{touch-action:manipulation}`) and mobile hold-input fallback path in `js/ui.js` for browsers without PointerEvent support.
+  - Repositioned mobile action stack so `Jump`/`Run` sit under left/look pad.
+  - Adjusted mobile compact controls pill placement to avoid blocking minimap-side action icons.
+  - Tuned mobile coords readout downshift to avoid overlap with mobile action buttons.
+  - Reworked mobile share/flower placement next to minimap and fixed stacking so both remain clickable.
+  - Desktop title share icons now pinned as a right-edge vertical rail on wide screens.
+- Terrain mobile visibility hardening:
+  - `js/terrain.js` now keeps terrain meshes visible with a flat fallback while elevation tiles are pending/failed (instead of hiding meshes), so mobile users still see ground.
+  - Terrain tiles now mark `failed` state for decode/network failures.
+- Validation artifacts:
+  - `output/playwright/mobile-desktop-button-check-report.json`
+  - `output/playwright/mobile-final-layout-check-report.json`
+  - `output/playwright/mobile-final-layout-check.png`
+  - `output/playwright/mobile-final-layout-check-after-clicks.png`
+  - `output/playwright/desktop-title-share-right-edge.png`
+  - Key checks passed in latest run: mobile action button press/release state, memory composer open, share menu open, return-to-title path, and no console errors in test reports.
+- Follow-up mobile overlap fix:
+  - Shifted compact controls pill right on mobile (`left:62%` / `64%`) to avoid intercepting minimap-side action icons.
+  - Finalized minimap-side icon stack (flower/share) + share menu anchoring for small screens.
+  - Raised flower/share z-index above float menu row while keeping controls pill on top.
+- Final verification run:
+  - `output/playwright/final-mobile-desktop-verify-report.json`
+  - Pass: `memoryComposerOpen=true`, `shareMenuOpen=true`, action hold active/release transitions true, return-to-title true, desktop right-edge share rail bounds near viewport edge, and no console/page errors.
+  - Screens: `output/playwright/mobile-final-ingame-verify.png`, `output/playwright/mobile-final-title-verify.png`, `output/playwright/desktop-final-share-verify.png`.
+- Space/mobile/title UX pass (2026-02-15):
+  - Removed the controls text block from the in-flight space HUD (`js/space.js`) and reduced HUD min width so HUD footprint is smaller.
+  - Kept rocket mobile actions explicit as `Accelerate` + `Decelerate` and repositioned rocket touch controls in CSS:
+    - steering pad on right middle
+    - action stack on left middle, above the space HUD
+  - Added touch-friendly press binding helper in `js/ui.js` and applied it to float menu toggles + flower/share float buttons to improve coarse-pointer reliability.
+  - Desktop title adjustments (`index.html`):
+    - removed default "Share seed/location/mode/camera" line
+    - expanded desktop menu container sizing
+    - forced license strip to single-line format under menu.
+- Validation artifacts (post-patch):
+  - `output/playwright/mobile-space-layout-after-patch.png`
+  - `output/playwright/mobile-space-layout-after-patch.json`
+  - `output/playwright/desktop-title-after-patch-menu-size-license.png`
+  - `output/playwright/desktop-title-after-patch-menu-size-license.json`
+- Key validation points:
+  - Space mode mobile shows `Accelerate` and `Decelerate` labels; action stack rect is above HUD rect.
+  - Space HUD no longer includes the controls-text block.
+  - Desktop title status line is hidden and license is one-line with no wrap.
+- Follow-up mobile float menu regression fix (2026-02-15):
+  - Root cause identified: mobile pointer shield listeners on descendant (`*`) nodes blocked bubbling from icon/text children to button handlers.
+  - Updated `installMobileUiPointerShield` to bind only root UI containers (not descendant wildcards), preserving in-component event flow.
+  - Added touch delegation on `#floatMenuContainer` for `.floatBtn` and `.floatItem` (`touchend`, passive:false) so mobile taps reliably open menus and invoke item actions.
+  - Removed touch double-toggle on float buttons by switching float menu button handlers back to plain `click` and relying on touch delegation for touch devices.
+- Desktop title/footer pass:
+  - Added legal line: `© 2026 Steven Reid. All Rights Reserved.` in title footer license text.
+  - Expanded desktop menu sizing and tightened menu-to-footer spacing.
+  - Kept license text on a single line across the bottom with wider max-width.
+- Validation:
+  - Mobile touch action checks: `output/playwright/mobile-float-options-fixed-v6.json`
+  - Mobile screenshot with menus/controls: `output/playwright/mobile-float-options-fixed-v6.png`
+  - Desktop footer checks: `output/playwright/desktop-title-footer-rights-v4.png`
+- Moon-only driving physics fix + documentation alignment pass (2026-02-15):
+  - Patched `js/physics.js` so low-gravity crest/crater airborne terrain behavior is gated to moon context only.
+  - Earth terrain branch now remains grounded (smooth terrain-follow), and lunar terrain branch keeps low-gravity airborne handling.
+  - Updated docs to reflect latest upgrades/controls/share surfaces:
+    - `README.md`
+    - `QUICKSTART.md`
+    - `USER_GUIDE.md`
+    - `TECHNICAL_DOCS.md`
+    - `DOCUMENTATION_INDEX.md`
+    - `CHANGELOG.md`
+  - Doc updates include:
+    - moon-only airborne car behavior note
+    - touch/mobile control profiles by mode
+    - share entry points (title footer icons, in-game share arrow, coordinate readout copy)
+    - current all-rights-reserved/legal wording continuity
+- Validation:
+  - `node --check js/physics.js` passed.
+  - Skill-script run (`web_game_playwright_client`) produced black canvas captures in this environment; fallback visual smoke done via direct Playwright page screenshot.
+  - Fallback smoke artifact:
+    - `output/playwright/moon-only-physics-docs-pagecheck.png` (title/menu render confirmed)
+    - `output/playwright/moon-only-physics-docs-pagecheck.json` (no console/page errors)
+- Follow-up TODO for next agent:
+  - If needed, run an interactive moon-driving scenario capture to visually confirm airborne crest behavior in-flight (the automated canvas-capture client selected a black frame buffer in this environment).
+- Moon desktop physics + scene isolation fix pass (2026-02-15):
+  - `js/sky.js`:
+    - In `arriveAtMoon()`, added hard Earth-world suppression for roads/buildings/landuse/POIs/street-furniture (visible=false + scene.remove) as final guard.
+    - Enhanced lunar terrain detail near Apollo spawn in `sampleMoonHeight()` with local relief/ridge terms to improve movement readability.
+  - `js/world.js`:
+    - Added environment guard helpers in `loadRoads()` to detect Earth-scene suppression (`onMoon`, `travelingToMoon`, non-EARTH env).
+    - If env changes during load/fetch, world load now exits as partial recovery and force-hides Earth meshes instead of repopulating scene.
+    - `updateWorldLod()` now early-hides/removes Earth mesh arrays whenever env is Moon/Space/not-Earth.
+  - `js/physics.js`:
+    - Moon branch now calls `moonSurface.updateMatrixWorld(true)` before raycasts.
+    - Lowered/tuned moon launch thresholds and launch impulse scaling so desktop keyboard driving triggers low-gravity airtime consistently on slopes/crater edges.
+- Validation:
+  - Syntax: `node --check js/physics.js`, `node --check js/sky.js`, `node --check js/world.js` all pass.
+  - Desktop moon scenario artifact: `output/playwright/moon-desktop-check-after-fix.json`
+    - `env: MOON`, `onMoon: true`
+    - attached Earth meshes on moon: roads/buildings/landuse/pois/furniture all `0`
+    - local moon height variance around spawn: range `8.43`
+    - drive sample: `airborneTicks: 33/34`, `yRange: 1.61`
+  - Screenshot artifact: `output/playwright/moon-desktop-check-after-fix.png` shows no upside-down Earth city mesh bleed-through.
+- Mobile build placement reliability fix (2026-02-16):
+  - Root cause: build placement relied on `click` only; some mobile/touch flows suppress or delay click on canvas taps.
+  - `js/engine.js`: added touch fallback listener (`touchend`, passive:false) that routes to `handleBlockBuilderClick`.
+  - `js/blocks.js`: added touch/pointer coordinate normalization (`getEventClientPoint`) and touch-click dedupe guard so a single tap places one block (no double-place when both touchend + click fire).
+  - Validation (Pixel 5 emulation): `output/mobile_build_single_tap_check.mjs` reports `delta: 1` per tap; screenshot shows placed block in-world (`output/mobile_build_ctxcheck.png`).
+- Red flower challenge + leaderboard implementation pass (2026-02-16):
+  - Added `js/flower-challenge.js` and wired via `js/app-entry.js`.
+  - New feature includes:
+    - random red flower challenge marker spawn on Earth surfaces,
+    - timer HUD + completion detection for driving/walking/drone,
+    - title-screen leaderboard panel with player name + location-aware start,
+    - Firebase Firestore leaderboard support with localStorage fallback.
+  - Added title UI panel + in-game flower action menu + challenge HUD in `index.html`.
+  - `js/ui.js` integration:
+    - initializes challenge module,
+    - supports pending title-start challenge trigger after world load (with retries),
+    - flower float button now opens flower action menu,
+    - main-menu flow stops active challenge and refreshes leaderboard,
+    - fixed outside-click menu handling so flower/share menus are not instantly closed.
+  - `js/physics.js` now calls `appCtx.updateFlowerChallenge(dt)` every frame before mode early-returns, so challenge works in walking/drone/car.
+- Validation artifacts (2026-02-16):
+  - Syntax checks: `node --check` passed for `js/flower-challenge.js`, `js/ui.js`, `js/physics.js`, `js/app-entry.js`.
+  - Skill client run artifacts:
+    - `output/playwright/flower-challenge-client/` (client still produced black canvas captures in this environment).
+    - `output/playwright/flower-challenge-client-rerun/` (same capture limitation).
+  - Direct Playwright validation (full-page screenshots + assertions):
+    - `output/playwright/flower-challenge-manual-rerun/report.json`
+      - `titlePanelVisible=true`
+      - `titleButtonVisible=true`
+      - `leaderboardRendered=true`
+      - `titleHidden=true` after challenge start
+      - `hudVisible=true`
+      - `flowerMenuOpen=true`
+      - `flowerHudAfterFloat=true`
+      - `errorCount=0`
+    - Screens:
+      - `output/playwright/flower-challenge-manual-rerun/title-with-leaderboard.png`
+      - `output/playwright/flower-challenge-manual-rerun/ingame-after-title-find-flower.png`
+      - `output/playwright/flower-challenge-manual-rerun/ingame-after-flower-menu.png`
+- Follow-up note:
+  - To enable shared cloud leaderboard, provide Firebase web config via `window.WORLD_EXPLORER_FIREBASE` or `localStorage['worldExplorer3D.firebaseConfig']` with `apiKey`, `projectId`, `appId` (+ optional authDomain/storageBucket/messagingSenderId).
+- Title leaderboard declutter pass (2026-02-16 follow-up):
+  - Converted title challenge panel from always-on layout block into a top-right floating overlay.
+  - Added `#flowerChallengeToggleBtn` (top-right) to open/close leaderboard panel on desktop and mobile.
+  - `#flowerChallengePanel` now defaults hidden and uses `.open` state for display.
+  - Restored menu-centered title layout width so selector area is no longer compressed by leaderboard.
+  - Added close-on-outside-click behavior for title leaderboard panel.
+  - Added explicit touchend handling with ghost-click guard for reliable mobile toggle.
+  - Added `closeFlowerChallengeTitlePanel()` hook and wired title return path in `js/ui.js` to keep panel closed by default when returning to title.
+  - Added global runtime check helper: `getFlowerChallengeBackendStatus()`.
+- Validation (Playwright manual run):
+  - `output/playwright/flower-leaderboard-toggle-manual/report.json` => `pass: true`
+  - Desktop: toggle exists, panel opens, outside-click closes.
+  - Mobile (Pixel 5): toggle exists, panel opens on tap.
+  - Screens:
+    - `output/playwright/flower-leaderboard-toggle-manual/desktop-initial.png`
+    - `output/playwright/flower-leaderboard-toggle-manual/desktop-panel-open.png`
+    - `output/playwright/flower-leaderboard-toggle-manual/mobile-panel-open.png`
+- Firebase setup status note:
+  - Code path remains Firebase-ready with fallback; runtime verification helper now available in console via `getFlowerChallengeBackendStatus()`.
+- Firebase Hosting + billing rollout scaffold (2026-02-16):
+  - Added new production-style structure:
+    - `public/index.html` (marketing + pricing + trial CTA)
+    - `public/app/index.html` (runtime moved from repo root)
+    - `public/account/index.html`
+    - `public/legal/privacy.html`, `public/legal/terms.html`
+    - `public/legal/privacy/index.html`, `public/legal/terms/index.html` (local static route compatibility)
+    - `public/js/firebase-init.js`, `public/js/auth-ui.js`, `public/js/entitlements.js`, `public/js/billing.js`
+    - `functions/index.js`, `functions/package.json`
+    - `firebase.json`, `.firebaserc`, `firestore.rules`, `firestore.indexes.json`
+  - Migrated runtime assets to `public/app/` and copied landing visuals to `public/assets/landing/`.
+  - App entitlement integration:
+    - Added auth/plan HUD in `/app/` with plan badge and account actions.
+    - Added Pro-only panel for early demo toggles + direct communication links.
+    - Enforced hide for Pro-only UI when not Pro.
+    - Added trial-trigger sign-in flow for `?startTrial=1`.
+  - Trial/plan logic implemented in `public/js/entitlements.js`:
+    - First sign-in creates `users/{uid}` with `plan="trial"` + `trialEndsAt=now+48h`.
+    - Trial gets Supporter-level entitlements except Pro perks.
+    - Trial expiration downgrades to Free when no active subscription.
+  - Stripe Functions implemented:
+    - `createCheckoutSession(plan)`
+    - `createPortalSession()`
+    - `stripeWebhook()`
+    - Firestore plan/entitlement updates from subscription events.
+  - Cloud-sync gating:
+    - `public/app/js/flower-challenge.js` now gates Firebase leaderboard usage behind entitlements (`cloudSync`), defaulting Free users to local fallback.
+- Validation (2026-02-16):
+  - Syntax checks passed:
+    - `node --check functions/index.js`
+    - `node --check public/js/{firebase-init,auth-ui,entitlements,billing}.js`
+    - `node --check public/app/js/flower-challenge.js`
+  - Installed Functions deps in `functions/` (`npm install`) successfully.
+  - Browser smoke artifacts:
+    - `output/playwright/firebase-rollout-account-smoke/shot-0.png`
+    - `output/playwright/firebase-rollout-landing-smoke/shot-0.png`
+    - `output/playwright/firebase-rollout-app-smoke/shot-0.png`
+    - `output/playwright/firebase-rollout-app-smoke/shot-1.png`
+    - `output/playwright/firebase-rollout-app-smoke/latest.png`
+    - `output/playwright/firebase-rollout-routecheck/report.json`
+  - Final routecheck result:
+    - `/`, `/app/`, `/account/`, `/legal/privacy`, `/legal/terms` all `200` with `errorCount=0` in report.
+- Remaining setup for deploy:
+  - Set `.firebaserc` project id (`your-firebase-project-id`).
+  - Provide Firebase web config at runtime (`window.WORLD_EXPLORER_FIREBASE` or `localStorage['worldExplorer3D.firebaseConfig']`).
+  - Configure Stripe function config keys:
+    - `stripe.secret`
+    - `stripe.webhook`
+    - `stripe.price_supporter`
+    - `stripe.price_pro`
+- Auth HUD declutter + float auth state fix (2026-02-16):
+  - `public/app/index.html`:
+    - removed stale references to deleted top-center plan/account HUD elements (`appPlanBadge`, `appSignOutBtn`, `appAccountBtn`) from runtime script.
+    - kept account controls exclusively inside the left auth float panel (`#authSignedInBlock` with `#authAccountBtn` + `#authSignOutBtn`).
+    - `renderState` now updates the top-left float button label (`Sign In / Sign Up` vs `Account`) and switches between auth form vs signed-in block in-panel.
+    - sign-out now routes through `#authSignOutBtn` and closes the float panel.
+  - Validation:
+    - Skill client run artifact: `output/playwright/hud-removal-client/shot-0.png`.
+    - Targeted Playwright interaction test: `output/playwright/hud-auth-panel-report.json` (`pass: true`, `hudExists: false`, panel open/close checks true, `errorCount: 0`).
+    - Screens: `output/playwright/hud-auth-panel-open.png`, `output/playwright/hud-auth-panel-closed.png`.
+- Pro panel auto-hide + landing hero title update (2026-02-16):
+  - `public/app/index.html`:
+    - added `scheduleProPanelAutoHide(isPro)` with `PRO_PANEL_AUTO_HIDE_MS=4500`.
+    - non-Pro plans now show the `PRO EARLY ACCESS` panel briefly on load, then auto-hide.
+    - Pro plan keeps panel available (no auto-hide) for demo toggles/links.
+  - `public/index.html`:
+    - updated hero `h1` to include a dedicated `World Explorer` brand line above the existing Earth->Space->Moon headline.
+    - added `.hero-brand` and `.hero-headline` styling.
+  - Validation artifacts:
+    - `output/playwright/pro-hide-and-landing-title-report.json` (`pass: true`)
+    - `output/playwright/pro-panel-initial.png`
+    - `output/playwright/pro-panel-after-delay.png`
+    - `output/playwright/landing-world-explorer-title.png`
+- Full top-level documentation refresh (2026-02-16):
+  - Updated all primary docs to match active Firebase Hosting + Stripe subscription architecture in `WorldExplorer`.
+  - Rewrote setup flows for auth, trial, plans, webhooks, price IDs, and deploy verification.
+  - Replaced outdated repo references (`WorldExplorer3D`) in active contributor docs.
+  - Added explicit operational warnings for:
+    - `functions.config()` deprecation deadline (March 2026)
+    - Node 20 runtime deprecation timeline
+  - Updated files:
+    - `README.md`
+    - `QUICKSTART.md`
+    - `ARCHITECTURE.md`
+    - `API_SETUP.md`
+    - `USER_GUIDE.md`
+    - `TECHNICAL_DOCS.md`
+    - `DOCUMENTATION_INDEX.md`
+    - `CHANGELOG.md`
+    - `KNOWN_ISSUES.md`
+    - `SECURITY_STORAGE_NOTICE.md`
+    - `SYSTEMS_INVENTORY_REPORT_2026-02-14.md`
+    - `CONTRIBUTING.md`
+    - `ACKNOWLEDGEMENTS.md`

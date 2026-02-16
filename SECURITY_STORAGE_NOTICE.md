@@ -1,49 +1,68 @@
 # Security and Storage Notice
 
-This project includes a client-side persistent memory feature (pin/flower notes).
+Last reviewed: 2026-02-16
 
-## How Memory Data Is Stored
+This document summarizes current storage and security behavior for auth, billing, and user-generated data.
 
-- Storage location: browser `localStorage`
-- Storage key: `worldExplorer3D.memories.v1`
-- Storage scope: current browser profile on current device
-- Sync behavior: no automatic cross-device/cloud sync
-- Encryption: not encrypted at rest
+## 1. Auth and Identity
 
-## Data Limits
+- Authentication is handled by Firebase Auth.
+- Supported providers: Google and Email/Password.
+- ID tokens are used to authorize checkout/portal function calls.
 
-- Message length: `200` characters
-- Max markers per location: `300`
-- Max markers total: `1500`
-- Max serialized payload: about `1500KB`
+## 2. Billing and Payment Data
 
-## User Controls
+- Stripe secret keys and webhook secrets are server-side only.
+- Frontend does not store Stripe secret credentials.
+- Payment card data is handled by Stripe Checkout/Portal; it is not stored in this repository or in Firestore.
 
-- Remove one marker: click marker in world, then `Remove Marker`
-- Remove all markers: open memory composer and click `Delete All` (with confirmation)
-- Full reset alternative: clear browser site data for this origin
+## 3. Firestore Data
 
-## Security Baseline (Current)
+### `users/{uid}`
 
-- User-generated memory text is rendered as plain text (not HTML)
-- Dynamic map/property/historic strings are escaped before HTML template insertion
-- Placement is blocked if storage round-trip checks fail
-- Marker data is treated as untrusted content
+Stores:
 
-## Recommended Deployment Headers
+- plan state (`free|trial|supporter|pro`)
+- trial timing
+- subscription references (`stripeCustomerId`, `stripeSubscriptionId`)
+- entitlement flags
 
-Set these at the web server/CDN:
+Rules:
 
-- `X-Content-Type-Options: nosniff`
-- `Referrer-Policy: strict-origin-when-cross-origin`
-- `X-Frame-Options: DENY`
-- `Permissions-Policy: geolocation=(), camera=(), microphone=()`
+- user can read/write only their own document.
 
-## Boilerplate Disclaimer Text
+### `flowerLeaderboard/{entryId}`
 
-Use this in UI/help/privacy copy:
+- publicly readable leaderboard entries
+- authenticated create
+- update/delete disabled by rules
 
-> Memory notes are saved locally in this browser and are not encrypted.  
-> Notes are not automatically synced to other devices.  
-> Anyone with access to this browser profile may be able to view saved notes.  
-> Do not store passwords, API keys, or sensitive personal information in memory notes.
+## 4. Browser Local Storage
+
+Current runtime uses browser storage for some local features/settings:
+
+- optional Firebase config fallback (`worldExplorer3D.firebaseConfig`)
+- challenge local fallback leaderboard
+- memory markers
+- build blocks
+- some UI/perf toggles
+
+Treat browser-stored user data as local-device data, not guaranteed cloud backup.
+
+## 5. Recommended Operational Controls
+
+- Rotate Stripe keys/secrets immediately if exposed.
+- Keep Firebase project IAM limited to necessary admins.
+- Monitor function logs for auth and webhook failures.
+- Use HTTPS-only hosting endpoints.
+
+## 6. Current Security Debt
+
+- Functions still use legacy runtime config (`functions.config`) and require migration to params/secrets.
+- Node 20 runtime deprecation requires scheduled upgrade.
+
+## 7. User-Facing Disclosure Guidance
+
+Suggested privacy copy:
+
+> World Explorer uses Firebase Authentication and Firestore for account, trial, and subscription state. Payments are processed by Stripe. Card details are handled by Stripe and are not stored by World Explorer.

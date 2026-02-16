@@ -1,414 +1,206 @@
-# API Setup Guide 🔑
+# API and Service Setup Guide
 
-This guide walks you through setting up API keys for World Explorer 3D's real estate features.
+Last reviewed: 2026-02-16
 
-## Table of Contents
-- [Overview](#overview)
-- [Rentcast API](#rentcast-api)
-- [Attom API](#attom-api)
-- [Estated API](#estated-api)
-- [Configuration](#configuration)
-- [Testing](#testing)
-- [Troubleshooting](#troubleshooting)
+This guide covers all external services used by the current deployment.
 
-## Overview
+## 1. Firebase Services
 
-World Explorer 3D can display real-time real estate data by integrating with three property data APIs:
+### 1.1 Hosting
 
-| API | Primary Data | Coverage | Free Tier |
-|-----|-------------|----------|-----------|
-| **Rentcast** | Rental estimates, property values | USA | ✅ Yes |
-| **Attom** | Property details, sales history | USA | ✅ Limited |
-| **Estated** | Property values, owner info | USA | ✅ Yes |
+Configured via `firebase.json`.
 
-**Note**: All APIs are optional. The game works perfectly without them—you just won't see real estate data.
+- Hosting root: `public/`
+- Function rewrites for billing endpoints
+- Legal route rewrites
 
-## Why Multiple APIs?
+### 1.2 Auth
 
-Each API provides different data and has different coverage:
-- **Rentcast**: Best for rental properties and market trends
-- **Attom**: Most comprehensive property details and school data
-- **Estated**: Good balance of data and ease of use
+Enable in Firebase Console -> Authentication -> Sign-in method:
 
-Using multiple APIs provides:
-- Better data coverage (fallback if one fails)
-- More complete property information
-- Redundancy for reliability
+- `Email/Password`
+- `Google`
 
-## Rentcast API
+### 1.3 Firestore
 
-### Sign Up
+Collections used:
 
-1. Visit [rentcast.io](https://www.rentcast.io)
-2. Click "Get Started" or "Sign Up"
-3. Create a free account
-4. Verify your email address
+- `users`
+- `flowerLeaderboard`
 
-### Get API Key
+Rules file: `/Users/stevenreid/Documents/New project/firestore.rules`
 
-1. Log in to your Rentcast dashboard
-2. Navigate to "API Keys" section
-3. Click "Create New Key" or "Generate Key"
-4. Copy your API key
-5. **Important**: Keep this key private!
+## 2. Frontend Firebase Config
 
-### Free Tier Limits
-- 500 requests per month
-- Rate limit: 10 requests per minute
-- All basic property data included
+Current project config is stored in:
 
-### Pricing (if you need more)
-- **Starter**: $49/month - 5,000 requests
-- **Professional**: $149/month - 25,000 requests
-- **Enterprise**: Custom pricing
+- `/Users/stevenreid/Documents/New project/public/js/firebase-project-config.js`
 
-### API Documentation
-[https://developers.rentcast.io/docs](https://developers.rentcast.io/docs)
+It sets:
 
-## Attom API
-
-### Sign Up
-
-1. Visit [attomdata.com](https://www.attomdata.com)
-2. Click "Get Started" or "Developer Portal"
-3. Register for a developer account
-4. Complete the verification process
-
-### Get API Key
-
-1. Log in to the Attom Developer Portal
-2. Go to "My Account" → "API Keys"
-3. Request a new API key
-4. Select the appropriate plan
-5. Copy your API key once approved
-
-### Free Tier Limits
-- Limited trial period (typically 14-30 days)
-- 500-1,000 requests during trial
-- May require credit card for verification
-
-### Pricing
-- **Property Basic**: $199/month - 5,000 requests
-- **Property Premium**: $499/month - 25,000 requests
-- **Enterprise**: Custom pricing
-
-**Note**: Attom is more expensive but provides the most comprehensive data.
-
-### API Documentation
-[https://api.gateway.attomdata.com/propertyapi/v1.0.0/](https://api.gateway.attomdata.com/propertyapi/v1.0.0/)
-
-## Estated API
-
-### Sign Up
-
-1. Visit [estated.com](https://estated.com)
-2. Click "Get API Access"
-3. Fill out the registration form
-4. Verify your email
-
-### Get API Key
-
-1. Log in to your Estated account
-2. Navigate to "API" section
-3. Your API key should be displayed
-4. Copy the key
-5. Store it securely
-
-### Free Tier Limits
-- 500 requests per month
-- Rate limit: 5 requests per second
-- Basic property data included
-
-### Pricing
-- **Developer**: $50/month - 5,000 requests
-- **Startup**: $200/month - 25,000 requests
-- **Business**: $500/month - 100,000 requests
-
-### API Documentation
-[https://estated.com/developers/docs](https://estated.com/developers/docs)
-
-## Configuration
-
-### In-App Configuration
-
-1. **Launch World Explorer 3D**
-   - Open the HTML file in your browser
-
-2. **Open Settings Tab**
-   - Click the "Settings" tab in the main menu
-
-3. **Scroll to API Configuration**
-   - Find the "🔑 API Configuration" section
-
-4. **Enter Your API Keys**
-   ```
-   Rentcast API Key: [paste your key here]
-   Attom API Key:    [paste your key here]
-   Estated API Key:  [paste your key here]
-   ```
-
-5. **Save Configuration**
-   - Click "Save API Keys" button
-   - Keys are saved to browser localStorage
-   - They persist across sessions
-
-6. **Enable Real Estate Mode**
-   - Check "Enable Real Estate Features" toggle
-   - This must be enabled to see property data
-
-### Configuration Verification
-
-After saving, the app will:
-- ✅ Store keys securely in localStorage
-- ✅ Show confirmation message
-- ✅ Keys persist until you clear browser data
-
-### Manual Configuration (Advanced)
-
-If you prefer to edit the code directly:
-
-1. Open `index.html` (or the relevant `js/*.js` file) in a text editor
-2. Find the initialization section (search for `apiConfig`)
-3. Add your keys:
-
-```javascript
-const apiConfig = {
-    rentcast: 'YOUR_RENTCAST_KEY_HERE',
-    attom: 'YOUR_ATTOM_KEY_HERE',
-    estated: 'YOUR_ESTATED_KEY_HERE'
+```js
+window.WORLD_EXPLORER_FIREBASE = {
+  apiKey,
+  authDomain,
+  projectId,
+  appId,
+  storageBucket,
+  messagingSenderId
 };
 ```
 
-4. Save the file
-5. Reload in browser
+Fallback storage key supported by runtime:
 
-**Warning**: Hard-coding keys in HTML is less secure. Anyone with access to the file can see them.
+- `worldExplorer3D.firebaseConfig`
 
-## Testing
+## 3. Stripe Setup
 
-### Test Real Estate Mode
+### 3.1 Create products/prices
 
-1. **Start the Game**
-   - Select a US city (e.g., Baltimore, New York)
-   - Choose "Free Roam" mode
-   - Ensure "Enable Real Estate Features" is checked
-   - Click "EXPLORE"
+Stripe Dashboard -> Products:
 
-2. **Look for Property Markers**
-   - Green floating markers should appear on buildings
-   - Each marker represents a property with data
+- Supporter product, recurring monthly price `$1`
+- Pro product, recurring monthly price `$5`
 
-3. **Click a Property**
-   - Walk/drive near a property marker
-   - Click it or press the interaction button
-   - A panel should open with property details
+Copy price IDs (`price_...`), not product IDs (`prod_...`).
 
-4. **Check the Data**
-   - If you see property information → Keys working! ✅
-   - If you see "No data available" → Check configuration ❌
+### 3.2 Create webhook destination
 
-### Test Individual APIs
+Stripe Workbench -> Webhooks -> Create destination:
 
-#### Test Rentcast
-Look for:
-- Estimated monthly rent
-- Property value
-- Market trends
+- Endpoint URL:
+  - `https://us-central1-worldexplorer3d-d9b83.cloudfunctions.net/stripeWebhook`
+- Payload style: `Snapshot`
+- Events:
+  - `checkout.session.completed`
+  - `customer.subscription.created`
+  - `customer.subscription.updated`
+  - `customer.subscription.deleted`
 
-#### Test Attom
-Look for:
-- Property details (bedrooms, bathrooms, square footage)
-- Sale history
-- Tax assessment
-- School information
+Copy signing secret (`whsec_...`).
 
-#### Test Estated
-Look for:
-- Property valuation
-- Owner information
-- Lot size
-- Year built
+### 3.3 Set function config values
 
-### API Status Check
+```bash
+cd "/Users/stevenreid/Documents/New project"
+firebase experiments:enable legacyRuntimeConfigCommands
+firebase functions:config:set \
+  stripe.secret="sk_test_or_live_..." \
+  stripe.webhook="whsec_..." \
+  stripe.price_supporter="price_..." \
+  stripe.price_pro="price_..."
+firebase deploy --only functions
+```
 
-Check if APIs are responding:
+Check values:
 
-1. Open browser console (F12 or Right Click → Inspect → Console)
-2. Look for API responses
-3. Successful calls show: `Property data loaded: [property details]`
-4. Failed calls show: `API error: [error message]`
+```bash
+firebase functions:config:get
+```
 
-## Troubleshooting
+Do not keep placeholders like `...` or `REAL`.
 
-### "Invalid API Key" Error
+## 4. Function Endpoint Contracts
 
-**Possible Causes**:
-- Key was copied incorrectly (extra spaces, missing characters)
-- Key has expired or been revoked
-- API account is inactive
+### `POST /createCheckoutSession`
 
-**Solutions**:
-1. Re-copy the key from the provider dashboard
-2. Verify the key is active in your account
-3. Generate a new key if necessary
-4. Check for extra spaces when pasting
+Auth: bearer Firebase ID token required.
 
-### "API Limit Reached" Error
+Request body:
 
-**Possible Causes**:
-- You've exceeded your monthly request limit
-- Rate limit exceeded (too many requests too fast)
+```json
+{ "plan": "supporter" }
+```
 
-**Solutions**:
-1. Wait until next billing cycle
-2. Upgrade to a higher tier
-3. Reduce the number of properties displayed (use filters)
-4. Use fewer APIs simultaneously
+or
 
-### No Properties Showing
+```json
+{ "plan": "pro" }
+```
 
-**Possible Causes**:
-- Real Estate Mode not enabled
-- No API keys configured
-- Location outside API coverage
-- Network connection issues
+Success response:
 
-**Solutions**:
-1. Enable "Real Estate Features" in Settings
-2. Verify API keys are saved
-3. Try a major US city
-4. Check internet connection
-5. Check browser console for errors
+```json
+{ "url": "https://checkout.stripe.com/..." }
+```
 
-### Properties Show "No Data Available"
+### `POST /createPortalSession`
 
-**Possible Causes**:
-- Property not in API database
-- API returned empty response
-- Location lacks coverage
+Auth: bearer Firebase ID token required.
 
-**Solutions**:
-1. Try different properties
-2. Use multiple APIs (fallback)
-3. Check API provider coverage maps
-4. Some areas have limited data
+Request body:
 
-### Slow Performance with Real Estate Mode
+```json
+{}
+```
 
-**Possible Causes**:
-- Too many API calls
-- Too many property markers
-- Slow internet connection
+Success response:
 
-**Solutions**:
-1. Reduce visible property count (add price filters)
-2. Close other browser tabs
-3. Disable one or more APIs
-4. Use a faster internet connection
+```json
+{ "url": "https://billing.stripe.com/..." }
+```
 
-### API Key Not Persisting
+### `POST /stripeWebhook`
 
-**Possible Causes**:
-- Browser in private/incognito mode
-- localStorage disabled
-- Browser data cleared
+Public endpoint called by Stripe.
 
-**Solutions**:
-1. Use normal browsing mode (not incognito)
-2. Enable localStorage in browser settings
-3. Re-enter keys after clearing data
-4. Consider hard-coding keys (less secure)
+- Validates `stripe-signature`
+- Applies plan updates in Firestore
 
-## Security Best Practices
+## 5. Optional Real Estate APIs (Legacy Feature Layer)
 
-### Protecting Your API Keys
+The runtime still supports optional client-side property APIs.
 
-1. **Never Share Keys**
-   - Don't post them publicly
-   - Don't commit them to version control
-   - Don't share the HTML file with keys embedded
+Supported keys (stored client-side if used):
 
-2. **Use Environment Variables** (Advanced)
-   - For production deployments
-   - Keep keys on server-side
-   - Use proxy endpoints
+- `rentcastApiKey`
+- `attomApiKey`
+- `estatedApiKey`
 
-3. **Monitor Usage**
-   - Check API dashboards regularly
-   - Set up usage alerts
-   - Watch for unusual activity
+These are optional and not required for auth/billing.
 
-4. **Rotate Keys Regularly**
-   - Generate new keys every 3-6 months
-   - Revoke old keys after rotation
-   - Update all instances
+## 6. Troubleshooting
 
-5. **Limit Key Permissions**
-   - Only enable needed endpoints
-   - Set IP restrictions if available
-   - Use read-only access when possible
+### `Unable to create checkout session.`
 
-## API Comparison
+Likely causes:
 
-| Feature | Rentcast | Attom | Estated |
-|---------|----------|-------|---------|
-| **Ease of Setup** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ |
-| **Free Tier** | Generous | Limited | Good |
-| **Data Quality** | ⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ |
-| **Coverage** | USA only | USA only | USA only |
-| **Response Speed** | Fast | Medium | Fast |
-| **Documentation** | Excellent | Good | Good |
-| **Cost** | Low | High | Medium |
+- invalid `stripe.secret`
+- missing `stripe.price_supporter`/`stripe.price_pro`
+- auth token not present
 
-## Recommendations
+Check:
 
-### For Beginners
-Start with **Rentcast**:
-- Easy to set up
-- Good free tier
-- Comprehensive documentation
+```bash
+firebase functions:log --only createCheckoutSession -n 50
+```
 
-### For Best Data
-Use **Attom** if budget allows:
-- Most detailed property information
-- Best for serious applications
-- Professional-grade data
+### Stripe auth error `Invalid API Key provided`
 
-### For Balance
-Use **Estated**:
-- Good data quality
-- Reasonable pricing
-- Easy integration
+- wrong key mode (test vs live)
+- placeholder value stored
 
-### For Maximum Coverage
-Use **All Three**:
-- Best data availability
-- Automatic fallback
-- Most comprehensive information
+### Webhook not updating plan
 
-## Support
+Check:
 
-### API Provider Support
+- webhook endpoint URL correctness
+- webhook event list includes all 4 required events
+- `stripe.webhook` signing secret matches destination
 
-**Rentcast**: support@rentcast.io
-**Attom**: [Support Portal](https://api.gateway.attomdata.com/support)
-**Estated**: support@estated.com
+Then inspect logs:
 
-### World Explorer Support
+```bash
+firebase functions:log --only stripeWebhook -n 50
+```
 
-For integration issues with World Explorer:
-- Check the [User Guide](USER_GUIDE.md)
-- Review [Known Issues](KNOWN_ISSUES.md)
-- Open a GitHub issue
+## 7. Required Near-Term Migration
 
-## Additional Resources
+Current functions use `functions.config()`.
 
-- [Rentcast Documentation](https://developers.rentcast.io/docs)
-- [Attom API Reference](https://api.gateway.attomdata.com/propertyapi/v1.0.0/)
-- [Estated Developer Docs](https://estated.com/developers/docs)
-- [Overpass API](https://overpass-api.de/)
-- [OpenStreetMap Copyright and Attribution](https://www.openstreetmap.org/copyright)
+Before March 2026, migrate to Firebase Params/Secret Manager:
 
----
-
-**Last Updated**: February 2026 | [Back to README](README.md)
+- `stripe.secret`
+- `stripe.webhook`
+- `stripe.price_supporter`
+- `stripe.price_pro`

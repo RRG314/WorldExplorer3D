@@ -1,0 +1,59 @@
+{
+  "hosting": {
+    "public": "public",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css|jpg|jpeg|png|webp|svg|ico|woff|woff2|ttf|map|glb|gltf)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=31536000, immutable"
+          }
+        ]
+      },
+      {
+        "source": "**/*.html",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=300"
+          }
+        ]
+      }
+    ],
+    "rewrites": [
+      {
+        "source": "/createCheckoutSession",
+        "function": "createCheckoutSession"
+      },
+      {
+        "source": "/createPortalSession",
+        "function": "createPortalSession"
+      },
+      {
+        "source": "/stripeWebhook",
+        "function": "stripeWebhook"
+      },
+      {
+        "source": "/legal/privacy",
+        "destination": "/legal/privacy.html"
+      },
+      {
+        "source": "/legal/terms",
+        "destination": "/legal/terms.html"
+      }
+    ]
+  },
+  "functions": {
+    "source": "functions"
+  },
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  }
+}
