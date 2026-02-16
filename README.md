@@ -38,6 +38,7 @@ Open `http://localhost:8000`.
 - Title menu launch-mode selector (Earth / Moon / Space) with one-click starts.
 - Click-to-inspect deep-space objects (planets, asteroids, spacecraft, galaxies).
 - Persistent memory markers (pin/flower + short note) with in-world remove and bulk delete actions.
+- "Find The Red Flower" timed challenge with top-right title-screen leaderboard toggle and in-game timer HUD.
 - Minecraft-style brick block builder (place, stack, and remove blocks in-world).
 - Deterministic runtime seeding and complexity logic through RDT + RGE256-based paths.
 - Shareable experience links (seed/location/mode/camera context) from the Settings panel.
@@ -163,6 +164,23 @@ When a shared URL is opened:
 - a status note confirms payload load
 - mode/camera/pose state is applied after `Explore` starts
 
+## Find The Red Flower Challenge
+
+- Title screen uses the top-right `🏁 Leaderboard` button to open the challenge panel.
+- In-game `🌸` button opens:
+  - `🌸 Place Memory Flower`
+  - `🔴 Find Red Flower`
+- Challenge completion supports walking, driving, and drone modes.
+- Timer HUD displays while active and auto-hides after completion.
+- Leaderboard storage behavior:
+  - Primary: Firestore collection `flowerLeaderboard`
+  - Fallback: browser localStorage (`worldExplorer3D.flowerChallenge.localLeaderboard.v1`)
+- Optional Firebase config can be provided either:
+  - as `window.WORLD_EXPLORER_FIREBASE` before app boot, or
+  - in localStorage key `worldExplorer3D.firebaseConfig`
+- Runtime backend check:
+  - run `getFlowerChallengeBackendStatus()` in browser console to see whether leaderboard is on Firebase or local fallback.
+
 ## Supporting Benchmark Stats (Baltimore, 2026-02-14)
 
 Measured from in-app snapshot exports:
@@ -221,7 +239,7 @@ Interpretation:
 - Cache-bust version alignment across loader chain is currently `v=54`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
-## Freeze Snapshot (2026-02-16)
+## Freeze Snapshot (2026-02-14)
 
 - Restored main-branch title menu behavior for location selection with working custom/suggested interactions.
 - Added title launch selectors: `Earth`, `Moon`, `Space`.
@@ -245,7 +263,6 @@ Interpretation:
 - Hardened moon environment isolation so Earth meshes cannot leak into moon view on desktop after async world loads.
 - Tuned desktop lunar-driving airborne triggers and improved moon terrain readability (local relief + stronger shading + additional rock cues).
 - Added Overpass endpoint preference plus memory-cache reuse for faster repeat city loads.
-- Updated `TECHNICAL_DOCS.md` and `SYSTEMS_INVENTORY_REPORT_2026-02-14.md` with the moon runtime stabilization pass and validation notes.
 
 ## Repository Structure
 

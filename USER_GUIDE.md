@@ -6,6 +6,7 @@ Complete guide to using World Explorer 3D. Learn every feature, control, and sec
 - [Getting Started](#getting-started)
 - [Performance Benchmark Mode (RDT vs Baseline)](#performance-benchmark-mode-rdt-vs-baseline)
 - [Shareable Experience Links](#shareable-experience-links)
+- [Find The Red Flower Challenge](#find-the-red-flower-challenge)
 - [Game Modes](#game-modes)
 - [Movement Systems](#movement-systems)
 - [Camera Controls](#camera-controls)
@@ -148,6 +149,34 @@ Every share entry point generates a URL that captures:
 - runtime pose (`rx`, `ry`, `rz`, `yaw`, optional `pitch`)
 
 Open that URL and the app will preload the title-screen state, then apply mode/camera/pose after you press `Explore`.
+
+## Find The Red Flower Challenge
+
+Timed challenge flow:
+
+1. On the title screen, select a location.
+2. Tap/click the top-right `🏁 Leaderboard` button to open the challenge panel.
+3. Optionally set your player name.
+4. Click `Find Flower` to start loading into the challenge.
+5. In-game, find and touch the red flower using walking, driving, or drone mode.
+6. Your finish time is recorded to the leaderboard.
+
+In-game entry point:
+
+- Tap/click the `🌸` button and select `🔴 Find Red Flower`.
+- `🌸 Place Memory Flower` stays available in the same menu.
+
+What you will see:
+
+- A top-center challenge HUD with objective + running timer.
+- A completion message after touching the flower.
+- Updated leaderboard rows on return to title or manual refresh.
+
+Leaderboard storage behavior:
+
+- Uses Firebase Firestore when configured.
+- Falls back to local browser leaderboard storage if Firebase is unavailable.
+- Backend check: run `getFlowerChallengeBackendStatus()` in the browser console.
 
 ## Game Modes
 

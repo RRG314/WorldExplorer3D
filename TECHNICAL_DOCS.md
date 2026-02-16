@@ -5,13 +5,13 @@ Developer guide for World Explorer 3D. Architecture, code structure, and customi
 ## Table of Contents
 - [Architecture Overview](#architecture-overview)
 - [Branch Freeze Updates (2026-02)](#branch-freeze-updates-2026-02)
-- [Moon Runtime Stabilization Update (2026-02-16)](#moon-runtime-stabilization-update-2026-02-16)
 - [Technology Stack](#technology-stack)
 - [File Structure](#file-structure)
 - [Core Systems](#core-systems)
 - [Deterministic RDT & RGE-256 Layer](#deterministic-rdt--rge-256-layer)
 - [Benchmark Mode (RDT vs Baseline)](#benchmark-mode-rdt-vs-baseline)
 - [Shareable Experience Link Payload](#shareable-experience-link-payload)
+- [Red Flower Challenge + Leaderboard](#red-flower-challenge--leaderboard)
 - [API Integration](#api-integration)
 - [Rendering Pipeline](#rendering-pipeline)
 - [Persistent Memory Markers](#persistent-memory-markers)
@@ -51,32 +51,12 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - World-load profile scaling now consumes dynamic budget/LOD state in `js/world.js`.
 - Shareable experience link export/import added in `js/ui.js` (`Copy Experience Link` + URL param parsing).
 - Share surfaces expanded to title-footer icon rail, in-game share quick menu, and coordinate-readout click-copy.
+- Timed "Find The Red Flower" challenge module added (`js/flower-challenge.js`) with top-right title toggle/panel entry + in-game flower action menu.
+- Leaderboard persistence now supports Firebase Firestore (`flowerLeaderboard`) with automatic local fallback.
 - Mobile touch-control profiles added for driving, walking, drone, and rocket modes with per-mode bindings/layout.
 - Moon-only low-gravity airborne terrain-follow behavior added for lunar driving crest/crater transitions.
 - Overpass endpoint preference + in-memory response cache added for faster repeat loads.
 - Loader cache-bust chain is aligned through `v=54` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
-- Moon desktop scene isolation hardened so Earth mesh sets are force-suppressed while moon/space env is active.
-- Async world-load race handling now prevents late Earth fetch completion from reattaching Earth meshes during moon/space sessions.
-- Lunar terrain near Apollo spawn now includes stronger local relief variation for better movement readability.
-
-## Moon Runtime Stabilization Update (2026-02-16)
-
-This update specifically addresses the desktop moon reliability regressions and aligns desktop/mobile lunar behavior.
-
-- `js/sky.js`
-  - `arriveAtMoon()` now force-hides/removes Earth mesh arrays (roads/buildings/landuse/POIs/street furniture) as a final transition guard.
-  - Moon surface generator adds local relief around spawn to improve perceived depth and motion cues.
-- `js/world.js`
-  - World-load path now detects non-Earth runtime env during/after fetch and exits with safe partial recovery instead of reattaching Earth meshes.
-  - `updateWorldLod()` now applies Earth-only visibility policy and actively suppresses Earth meshes in moon/space contexts.
-- `js/physics.js`
-  - Moon surface world matrix is refreshed before raycast sampling.
-  - Lunar crest/drop airborne thresholds and launch impulse blending are tuned for consistent desktop low-gravity float behavior.
-
-Validation artifact set:
-
-- `output/playwright/moon-desktop-check-after-fix.json`
-- `output/playwright/moon-desktop-check-after-fix.png`
 
 ### High-Level Architecture
 
@@ -188,6 +168,7 @@ WorldExplorer3D/
    ├─ map.js
    ├─ memory.js
    ├─ blocks.js
+   ├─ flower-challenge.js
    ├─ ui.js
    └─ main.js
 ```
@@ -484,6 +465,64 @@ Flow:
 2. Parsed runtime state is cached in `appCtx.pendingExperienceState`.
 3. After world start, runtime mode/camera/pose is applied.
 4. `Copy Experience Link` regenerates a URL from active state or pending shared state.
+
+## Red Flower Challenge + Leaderboard
+
+Runtime module: `js/flower-challenge.js`
+
+Primary responsibilities:
+
+- Challenge start/stop lifecycle and marker cleanup.
+- Random Earth-only red-flower spawn within visible world range.
+- In-game timer HUD updates while challenge is active.
+- Completion detection for `driving`, `walking`, and `drone` actors.
+- Title-screen leaderboard rendering and refresh.
+
+UI integration points:
+
+- Title toggle/panel: `#flowerChallengeToggleBtn`, `#flowerChallengePanel`, `#titleFindFlowerBtn`, `#titleFlowerRefreshBtn`
+- In-game action menu: `#flowerActionMenu` opened from `#memoryFlowerFloatBtn`
+- In-game HUD: `#flowerChallengeHud`, `#flowerChallengeHudStatus`, `#flowerChallengeHudTimer`
+
+Panel behavior:
+
+- Title challenge panel is hidden by default and opened with `.open`.
+- `#flowerChallengeToggleBtn` controls panel visibility on desktop + touch/mobile.
+- Outside click closes the title panel while preserving in-panel interactions.
+
+App context methods exposed by the module:
+
+- `setupFlowerChallenge()`
+- `requestFlowerChallengeFromTitle()`
+- `consumePendingFlowerChallengeStart()`
+- `startFlowerChallenge(source)`
+- `stopFlowerChallenge(options)`
+- `toggleFlowerActionMenu()`
+- `updateFlowerChallenge(dt)`
+- `refreshFlowerLeaderboard()`
+- `closeFlowerChallengeTitlePanel()`
+- `getFlowerChallengeBackendStatus()`
+
+Persistence strategy:
+
+- Preferred backend: Firestore collection `flowerLeaderboard`
+- Fallback backend: localStorage key `worldExplorer3D.flowerChallenge.localLeaderboard.v1`
+- Player-name cache: localStorage key `worldExplorer3D.flowerChallenge.playerName`
+
+Firebase config injection (optional):
+
+- Global object before boot:
+  - `window.WORLD_EXPLORER_FIREBASE = { apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId }`
+- Or localStorage key:
+  - `worldExplorer3D.firebaseConfig` with same JSON shape.
+
+If Firebase modules/config fail to load, challenge and leaderboard continue using local fallback without blocking gameplay.
+
+Runtime backend probe:
+
+- Global helper is exposed for quick verification:
+  - `getFlowerChallengeBackendStatus()`
+  - returns `{ configPresent, firebaseReady, backend, challengeActive }`
 
 ## API Integration
 

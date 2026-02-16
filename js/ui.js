@@ -45,6 +45,9 @@ function setupUI() {
   if (typeof appCtx.setupMemoryUI === 'function') {
     appCtx.setupMemoryUI();
   }
+  if (typeof appCtx.setupFlowerChallenge === 'function') {
+    appCtx.setupFlowerChallenge();
+  }
 
   // Property Controls
   const radiusSlider = document.getElementById('radiusSlider');
@@ -1056,6 +1059,9 @@ function setupUI() {
   }));
   // Start
   document.getElementById('startBtn').addEventListener('click', async () => {
+    const pendingFlowerChallengeRequested = typeof appCtx.consumePendingFlowerChallengeStart === 'function' ?
+    appCtx.consumePendingFlowerChallengeStart() :
+    false;
     const launchMode = titleLaunchMode;
     appCtx.loadingScreenMode = launchMode === 'moon' ? 'moon' : launchMode === 'space' ? 'space' : 'earth';
     document.getElementById('titleScreen').classList.add('hidden');
@@ -1166,6 +1172,17 @@ function setupUI() {
     }
     updateControlsModeUI();
     applySharedRuntimeState();
+    if (pendingFlowerChallengeRequested && typeof appCtx.startFlowerChallenge === 'function') {
+      let challengeStartAttempts = 0;
+      const attemptStartChallenge = () => {
+        challengeStartAttempts++;
+        const started = appCtx.startFlowerChallenge('title');
+        if (!started && challengeStartAttempts < 4) {
+          setTimeout(attemptStartChallenge, 1200);
+        }
+      };
+      attemptStartChallenge();
+    }
 
     // Set initial map view button states
     document.getElementById('mapRoadsToggle').classList.add('active'); // Roads on by default
@@ -1187,6 +1204,10 @@ function setupUI() {
   function closeAllFloatMenus() {
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
     closeGameShareMenu();
+    if (typeof appCtx.toggleFlowerActionMenu === 'function') {
+      const menuEl = document.getElementById('flowerActionMenu');
+      if (menuEl && menuEl.classList.contains('open')) appCtx.toggleFlowerActionMenu();
+    }
   }
   const controlsTab = document.getElementById('controlsTab');
   const ctrlHeader = document.getElementById('ctrlHeader');
@@ -1528,6 +1549,7 @@ function setupUI() {
       '#controlsTab',
       '#mainMenuBtn',
       '#memoryFlowerFloatBtn',
+      '#flowerActionMenu',
       '#gameShareFloatBtn',
       '#gameShareMenu',
       '#mobileTouchControls',
@@ -1571,13 +1593,17 @@ function setupUI() {
   appCtx.updateMobileTouchControls = updateMobileTouchControls;
   function goToMainMenu() {
     appCtx.gameStarted = false;appCtx.paused = false;appCtx.clearObjectives();appCtx.clearPolice();appCtx.policeOn = false;appCtx.eraseTrack();appCtx.closePropertyPanel();appCtx.closeHistoricPanel();appCtx.clearPropertyMarkers();appCtx.realEstateMode = false;appCtx.historicMode = false;
+    if (typeof appCtx.stopFlowerChallenge === 'function') appCtx.stopFlowerChallenge();
     if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
     document.getElementById('titleScreen').classList.remove('hidden');
-    ['hud', 'minimap', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
+    if (typeof appCtx.closeFlowerChallengeTitlePanel === 'function') appCtx.closeFlowerChallengeTitlePanel();
+    ['hud', 'minimap', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'flowerChallengeHud', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('show');
     });
+    const flowerActionMenu = document.getElementById('flowerActionMenu');
+    if (flowerActionMenu) flowerActionMenu.classList.remove('open');
     clearVirtualHeldInputs();
     if (ctrlContent) ctrlContent.classList.add('hidden');
     if (typeof appCtx.closeMemoryComposer === 'function') appCtx.closeMemoryComposer();
@@ -1585,6 +1611,7 @@ function setupUI() {
     if (memoryInfoPanel) memoryInfoPanel.classList.remove('show');
     updateControlsModeUI();
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
+    if (typeof appCtx.refreshFlowerLeaderboard === 'function') appCtx.refreshFlowerLeaderboard();
   }
 
   // Float menu
@@ -1641,8 +1668,10 @@ function setupUI() {
   const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
   if (memoryFlowerFloatBtn) {
     bindTouchFriendlyPress(memoryFlowerFloatBtn, () => {
-      if (typeof appCtx.openMemoryComposer === 'function') appCtx.openMemoryComposer('flower');
-      closeAllFloatMenus();
+      document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
+      closeGameShareMenu();
+      if (typeof appCtx.toggleFlowerActionMenu === 'function') appCtx.toggleFlowerActionMenu();
+      else if (typeof appCtx.openMemoryComposer === 'function') appCtx.openMemoryComposer('flower');
     });
   }
   document.getElementById('fSatellite').addEventListener('click', () => {
@@ -1889,8 +1918,30 @@ function setupUI() {
     // Check if click is outside float menu container
     const floatContainer = document.getElementById('floatMenuContainer');
     const mainMenuBtn = document.getElementById('mainMenuBtn');
+    const memoryFlowerBtn = document.getElementById('memoryFlowerFloatBtn');
+    const flowerActionMenu = document.getElementById('flowerActionMenu');
+    const gameShareBtn = document.getElementById('gameShareFloatBtn');
+    const gameShareMenuEl = document.getElementById('gameShareMenu');
+    const target = e.target instanceof Element ? e.target : null;
+    const isFloatControlClick = !!(
+      target &&
+      (
+      target.closest('#memoryFlowerFloatBtn') ||
+      target.closest('#flowerActionMenu') ||
+      target.closest('#gameShareFloatBtn') ||
+      target.closest('#gameShareMenu'))
+    );
 
-    if (!floatContainer.contains(e.target) && e.target !== mainMenuBtn) {
+    if (
+      !isFloatControlClick &&
+      floatContainer &&
+      !floatContainer.contains(e.target) &&
+      e.target !== mainMenuBtn &&
+      (!memoryFlowerBtn || !memoryFlowerBtn.contains(e.target)) &&
+      (!flowerActionMenu || !flowerActionMenu.contains(e.target)) &&
+      (!gameShareBtn || !gameShareBtn.contains(e.target)) &&
+      (!gameShareMenuEl || !gameShareMenuEl.contains(e.target)))
+    {
       closeAllFloatMenus();
     }
     if (controlsTab && !controlsTab.contains(e.target) && ctrlContent) {
