@@ -140,6 +140,8 @@ function setTitlePanelOpen(open) {
   if (ui.titleToggleBtn) {
     ui.titleToggleBtn.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
   }
+  const titleScreen = document.getElementById('titleScreen');
+  if (titleScreen) titleScreen.classList.toggle('title-screen-leaderboard-open', shouldOpen);
 }
 
 function toggleTitlePanel() {
