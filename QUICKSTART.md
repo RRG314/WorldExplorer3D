@@ -76,7 +76,17 @@ Reference test (Baltimore, 2026-02-14):
 3. You can also tap/click the coordinate readout to copy a live experience link directly.
 4. Recipient opens the URL and presses `Explore` to apply linked mode/camera/pose state.
 
-## 6. Essential Controls
+## 6. Find The Red Flower Challenge (Quick Start)
+
+1. On the title screen, select a location.
+2. Tap/click top-right `🏁 Leaderboard`.
+3. Enter a player name (optional).
+4. Click `Find Flower`.
+5. In-game, touch the red flower using walk/drive/drone to finish the timed run.
+6. Check leaderboard backend status in console:
+   - `getFlowerChallengeBackendStatus()`
+
+## 7. Essential Controls
 
 | Key | Action |
 | --- | --- |
@@ -116,7 +126,7 @@ Block builder action:
 | `🎮 Game Mode` -> `🧹 Clear Blocks` | Remove all build blocks for current location (including saved blocks) |
 | Block cap | Up to `100` total blocks can be stored for now |
 
-## 7. Mobile Touch Controls (Quick Reference)
+## 8. Mobile Touch Controls (Quick Reference)
 
 - Driving:
   - Left side: `▲` accelerate, `Brake` button, `▼` reverse/decelerate
@@ -138,7 +148,7 @@ Moon vehicle note:
 - Moon driving includes low-gravity airborne float behavior over hills/craters.
 - Earth driving keeps standard grounded terrain follow behavior.
 
-## 8. Troubleshooting
+## 9. Troubleshooting
 
 ### Black or blank view
 

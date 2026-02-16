@@ -34,6 +34,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .sub{font-family:'Righteous',cursive;font-size:clamp(13px,1.7vw,20px);line-height:1.25;color:rgba(255,255,255,0.9);letter-spacing:clamp(1px,0.45vw,4px);margin:0;font-weight:400;text-shadow:0 2px 10px rgba(0,0,0,0.35);position:relative;z-index:1;text-align:center;max-width:min(94vw,1100px);padding:0 8px;flex-shrink:0}
 
 /* Menu Container with Tabs */
+.title-main-row{width:min(860px,96vw);display:flex;align-items:flex-start;justify-content:center;position:relative;z-index:1;flex:0 1 auto}
 .menu-container{background:rgba(255,255,255,0.85);backdrop-filter:blur(20px);border:2px solid rgba(255,255,255,0.3);border-radius:20px;width:min(720px,95vw);max-height:calc(100dvh - 220px);display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,0.4),0 0 40px rgba(83,52,131,0.3);position:relative;z-index:1;flex:0 1 auto}
 .tab-nav{display:flex;border-bottom:2px solid rgba(232,238,245,0.5);flex-shrink:0;background:rgba(248,250,252,0.6);backdrop-filter:blur(10px);border-radius:18px 18px 0 0}
 .tab-btn{flex:1;background:transparent;border:none;padding:16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:#64748b;cursor:pointer;transition:all 0.3s;position:relative}
@@ -121,16 +122,48 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .title-license{font-size:10px;color:rgba(226,232,240,0.9);line-height:1.35;text-align:center;text-shadow:0 2px 8px rgba(2,6,23,0.55);padding:0 8px;max-width:min(980px,95vw)}
 .title-license a{color:#bfdbfe;font-weight:600;text-decoration:none}
 .title-license a:hover{text-decoration:underline}
-/* Keep title challenge/leaderboard overlays above share icon rail */
-#flowerChallengePanel,.flowerChallengePanel,#leaderboardPanel,.leaderboardPanel{z-index:12!important}
-#flowerChallengeToggleBtn,#leaderboardToggleBtn{z-index:13!important}
+
+.flowerChallengeToggleBtn{position:fixed;top:max(12px,calc(env(safe-area-inset-top) + 8px));right:12px;background:rgba(15,23,42,0.88);border:1px solid rgba(147,197,253,0.55);border-radius:12px;padding:9px 12px;color:#e2e8f0;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 10px 24px rgba(2,6,23,0.35);display:flex;align-items:center;gap:6px;z-index:260;backdrop-filter:blur(8px);transition:transform 0.16s ease,filter 0.16s ease}
+.flowerChallengeToggleBtn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+.flowerChallengeToggleBtn:active{transform:scale(0.98)}
+.flowerChallengePanel{position:fixed;top:max(66px,calc(env(safe-area-inset-top) + 62px));right:12px;width:min(340px,calc(100vw - 24px));background:rgba(12,23,43,0.92);backdrop-filter:blur(12px);border:1px solid rgba(147,197,253,0.35);border-radius:16px;padding:14px 14px 12px;color:#e2e8f0;box-shadow:0 18px 42px rgba(2,6,23,0.38);display:none;flex-direction:column;gap:10px;max-height:calc(100dvh - 92px);overflow:hidden;z-index:255}
+.flowerChallengePanel.open{display:flex}
+.title-screen-leaderboard-open .title-share-row{opacity:0;pointer-events:none}
+.flowerChallengeHeader{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.flowerChallengeTitle{font-family:'Orbitron',sans-serif;font-size:14px;letter-spacing:0.6px;color:#fef2f2}
+.flowerChallengeBadge{font-size:11px;background:rgba(220,38,38,0.2);border:1px solid rgba(248,113,113,0.55);color:#fecaca;padding:3px 8px;border-radius:999px;font-weight:600}
+.flowerChallengeBody{display:flex;flex-direction:column;gap:9px;overflow:hidden}
+.flowerChallengeHint{font-size:11px;color:rgba(226,232,240,0.85);line-height:1.35}
+.flowerChallengeLocation{font-size:11px;color:#cbd5e1}
+.flowerChallengeLocation b{color:#f8fafc}
+.flowerChallengeRow{display:flex;gap:8px;align-items:center}
+.flowerChallengeName{flex:1;min-width:0;background:rgba(15,23,42,0.74);border:1px solid rgba(148,163,184,0.45);border-radius:9px;color:#f8fafc;padding:8px 10px;font-size:12px}
+.flowerChallengeName:focus{outline:none;border-color:#60a5fa;box-shadow:0 0 0 2px rgba(96,165,250,0.22)}
+.flowerChallengeBtn{background:#dc2626;border:1px solid rgba(252,165,165,0.55);border-radius:10px;color:#fff;padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:transform 0.16s ease,filter 0.16s ease}
+.flowerChallengeBtn:hover{transform:translateY(-1px);filter:brightness(1.08)}
+.flowerChallengeBtn.refresh{background:#0f766e;border-color:rgba(45,212,191,0.5)}
+.flowerChallengeStatus{min-height:16px;font-size:11px;color:#bfdbfe}
+.flowerChallengeStatus.ok{color:#86efac}
+.flowerChallengeStatus.error{color:#fca5a5}
+.flowerLeaderboard{display:flex;flex-direction:column;gap:6px;list-style:none;max-height:220px;overflow:auto;padding:0;margin:0}
+.flowerLeaderboardItem{display:grid;grid-template-columns:auto 1fr auto;gap:6px 8px;background:rgba(15,23,42,0.6);border:1px solid rgba(148,163,184,0.28);border-radius:10px;padding:7px 9px;font-size:11px;align-items:center}
+.flowerLeaderboardRank{color:#fbbf24;font-weight:700}
+.flowerLeaderboardPlayer{font-weight:600;color:#f8fafc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flowerLeaderboardTime{font-family:'Orbitron',sans-serif;color:#93c5fd}
+.flowerLeaderboardLoc{grid-column:1/-1;color:#cbd5e1;font-size:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.flowerLeaderboardEmpty{background:rgba(15,23,42,0.45);border:1px dashed rgba(148,163,184,0.35);border-radius:10px;padding:12px;font-size:11px;color:#cbd5e1;text-align:center}
 @media (min-width: 769px){
   #titleScreen{padding-top:max(14px,calc(env(safe-area-inset-top) + 10px));padding-bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px))}
   .menu-container{width:min(780px,95vw);max-height:calc(100dvh - 190px)}
+  .flowerChallengePanel{max-height:calc(100dvh - 120px)}
   .title-license{font-size:11px;padding:0 10px}
 }
 @media (min-width: 1024px){
-  .title-share-row{position:fixed;right:12px;top:50%;transform:translateY(-50%);flex-direction:column;flex-wrap:nowrap;gap:12px;z-index:3}
+  .title-main-row{width:min(900px,98vw)}
+  .menu-container{width:min(820px,95vw)}
+  .flowerChallengeToggleBtn{top:max(14px,calc(env(safe-area-inset-top) + 10px));right:14px}
+  .flowerChallengePanel{right:14px;width:min(350px,32vw)}
+  .title-share-row{position:fixed;right:12px;top:50%;transform:translateY(-50%);flex-direction:column;flex-wrap:nowrap;gap:12px;z-index:3;transition:opacity 0.16s ease}
   .title-footer{width:calc(100vw - 20px);margin-top:-4px}
   .title-license{padding-right:0;max-width:calc(100vw - 120px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 }
@@ -201,7 +234,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
 
   /* Title screen mobile adjustments */
   .sub{font-size:15px;letter-spacing:2px}
+  .title-main-row{width:min(98vw,760px);flex-direction:column;align-items:center;gap:10px}
   .menu-container{width:min(96vw,740px);max-height:calc(100dvh - 145px)}
+  .flowerChallengeToggleBtn{top:max(10px,calc(env(safe-area-inset-top) + 6px));right:10px;padding:8px 10px;font-size:11px}
+  .flowerChallengePanel{top:max(58px,calc(env(safe-area-inset-top) + 54px));left:8px;right:8px;width:auto;max-height:52dvh;padding:10px}
+  .flowerLeaderboard{max-height:110px}
   .loc-grid{grid-template-columns:1fr;gap:10px}
   .launch-switch-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
   .tab-btn{font-size:12px;padding:12px 8px}
@@ -217,6 +254,10 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #gameShareFloatBtn{left:140px!important;bottom:24px!important}
   #memoryFlowerFloatBtn{left:140px!important;bottom:76px!important}
   #gameShareMenu{left:85px!important;bottom:128px!important}
+  #flowerActionMenu{left:84px!important;bottom:126px!important;min-width:192px}
+  #flowerChallengeHud{top:74px;left:50%;transform:translateX(-50%);padding:8px 10px}
+  #flowerChallengeHudStatus{font-size:11px}
+  #flowerChallengeHudTimer{font-size:11px;min-width:54px}
   #mobileTouchControls{inset:0}
   .mobilePad{width:114px;height:114px;top:58%}
   #mobileMovePad{right:8px}
@@ -263,7 +304,16 @@ input,textarea{-webkit-user-select:text;user-select:text}
   /* Title screen for small phones */
   .logo{font-size:clamp(28px, 10vw, 48px);letter-spacing:2px}
   .sub{font-size:13px;letter-spacing:2px;margin:0}
+  .title-main-row{width:99vw;gap:8px}
   .menu-container{width:99vw;max-height:calc(100dvh - 126px)}
+  .flowerChallengeToggleBtn{right:8px;padding:7px 9px;font-size:10px}
+  .flowerChallengePanel{left:6px;right:6px;top:max(54px,calc(env(safe-area-inset-top) + 50px));width:auto;max-height:50dvh;padding:9px}
+  .flowerChallengeTitle{font-size:13px}
+  .flowerChallengeBadge{font-size:10px}
+  .flowerChallengeName{font-size:11px;padding:7px 8px}
+  .flowerChallengeBtn{font-size:11px;padding:8px 9px}
+  .flowerLeaderboard{max-height:96px}
+  .flowerLeaderboardItem{font-size:10px}
   .launch-switch-row{grid-template-columns:1fr}
   .tab-btn{font-size:11px;padding:10px 6px}
   .tab-content{padding:16px}
@@ -284,6 +334,10 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #gameShareFloatBtn{left:113px!important;bottom:22px!important}
   #memoryFlowerFloatBtn{left:113px!important;bottom:74px!important}
   #gameShareMenu{left:58px!important;bottom:126px!important}
+  #flowerActionMenu{left:56px!important;bottom:124px!important;min-width:176px}
+  #flowerChallengeHud{top:68px;padding:7px 9px}
+  #flowerChallengeHudStatus{font-size:10px}
+  #flowerChallengeHudTimer{font-size:10px;min-width:48px}
   #mobileTouchControls{inset:0}
   .mobilePad{width:104px;height:104px;top:60%}
   #mobileMovePad{right:6px}
@@ -389,6 +443,12 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #memoryFlowerFloatBtn{position:fixed;bottom:78px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#ec4899,#db2777);border:none;border-radius:50%;color:#ffffff;font-size:23px;cursor:pointer;box-shadow:0 10px 26px rgba(236,72,153,0.38);z-index:103;display:none;transition:all 0.2s}
 #memoryFlowerFloatBtn.show{display:flex;align-items:center;justify-content:center}
 #memoryFlowerFloatBtn:hover{transform:scale(1.08);box-shadow:0 14px 34px rgba(236,72,153,0.45)}
+#flowerActionMenu{position:fixed;left:145px;bottom:132px;min-width:208px;background:rgba(255,255,255,0.97);border:1px solid rgba(148,163,184,0.4);border-radius:12px;box-shadow:0 12px 28px rgba(15,23,42,0.22);padding:8px;display:none;z-index:104;backdrop-filter:blur(8px)}
+#flowerActionMenu.open{display:block}
+.flowerActionOption{width:100%;border:none;background:#f8fafc;color:#334155;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;border-radius:8px;padding:8px 10px;text-align:left;cursor:pointer;margin:2px 0}
+.flowerActionOption:hover{background:#e2e8f0}
+.flowerActionOption.danger{background:#fef2f2;color:#b91c1c}
+.flowerActionOption.danger:hover{background:#fee2e2}
 #gameShareFloatBtn{position:fixed;bottom:130px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;border-radius:50%;color:#ffffff;cursor:pointer;box-shadow:0 10px 24px rgba(37,99,235,0.35);z-index:103;display:none;transition:all 0.2s;padding:0}
 #gameShareFloatBtn.show{display:flex;align-items:center;justify-content:center}
 #gameShareFloatBtn:hover{transform:scale(1.08);box-shadow:0 14px 34px rgba(37,99,235,0.42)}
@@ -402,6 +462,10 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #buildModeIndicator.show{display:block}
 #coords{position:fixed;bottom:200px;left:20px;background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:10px 14px;font-size:11px;color:#475569;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1);cursor:pointer}
 #coords.show{display:block}
+#flowerChallengeHud{position:fixed;top:88px;left:50%;transform:translateX(-50%);display:none;align-items:center;gap:10px;background:rgba(15,23,42,0.84);color:#f8fafc;border:1px solid rgba(248,113,113,0.65);border-radius:12px;padding:9px 14px;z-index:140;backdrop-filter:blur(8px);box-shadow:0 10px 26px rgba(15,23,42,0.35)}
+#flowerChallengeHud.show{display:flex}
+#flowerChallengeHudStatus{font-size:12px;font-weight:700;letter-spacing:0.3px}
+#flowerChallengeHudTimer{font-family:'Orbitron',sans-serif;font-size:12px;color:#fecaca;min-width:60px;text-align:right}
 #loading{position:fixed;inset:0;background:#000 url('loading-bg.jpg') center center/cover no-repeat;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:300;cursor:pointer}
 #loading.show{display:flex}
 .spinner{width:48px;height:48px;border:4px solid rgba(255,255,255,0.3);border-top-color:#ffffff;border-radius:50%;animation:spin 1s linear infinite}
@@ -508,6 +572,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <div id="titleScreen">
 <div class="logo">WORLD EXPLORER</div>
 <div class="sub">Explore Any Place on Earth and Beyond</div>
+<button id="flowerChallengeToggleBtn" class="flowerChallengeToggleBtn" type="button" aria-label="Toggle challenge leaderboard" aria-controls="flowerChallengePanel" aria-expanded="false">🏁 Leaderboard</button>
+<div class="title-main-row">
 <div class="menu-container">
 <div class="tab-nav">
 <button class="tab-btn active" data-tab="location">Location</button>
@@ -714,6 +780,26 @@ Use this to compare RDT and baseline with real runtime data.
 </div>
 <div class="start-section"><button class="startBtn" id="startBtn">EXPLORE</button></div>
 </div>
+<aside id="flowerChallengePanel" class="flowerChallengePanel">
+<div class="flowerChallengeHeader">
+<div class="flowerChallengeTitle">Find The Red Flower</div>
+<div class="flowerChallengeBadge">Timed Challenge</div>
+</div>
+<div class="flowerChallengeBody">
+<div class="flowerChallengeHint">Start a timed run. Reach the randomly spawned red flower using walk, drive, or drone.</div>
+<div class="flowerChallengeLocation">Location: <b id="flowerChallengeLocation">Baltimore</b></div>
+<div class="flowerChallengeRow">
+<input id="flowerPlayerName" class="flowerChallengeName" type="text" maxlength="24" placeholder="Player Name" value="Explorer">
+<button id="titleFindFlowerBtn" class="flowerChallengeBtn" type="button">Find Flower</button>
+<button id="titleFlowerRefreshBtn" class="flowerChallengeBtn refresh" type="button">Refresh</button>
+</div>
+<div id="flowerChallengeStatus" class="flowerChallengeStatus"></div>
+<ol id="flowerLeaderboardList" class="flowerLeaderboard">
+<li class="flowerLeaderboardEmpty">Loading leaderboard...</li>
+</ol>
+</div>
+</aside>
+</div>
 <div class="title-footer">
 <div class="title-share-row" aria-label="Share links">
 <button id="shareExperienceBtn" class="title-share-btn copy" type="button" aria-label="Copy Link" title="Copy Link">
@@ -749,6 +835,10 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fon
 <div class="indicators"><span class="ind" id="indBrake">BRK</span><span class="ind" id="indBoost">BOOST</span><span class="ind" id="indDrift">DRIFT</span><span class="ind" id="indOff">OFF</span></div>
 </div></div>
 <div id="coords">--</div>
+<div id="flowerChallengeHud">
+<span id="flowerChallengeHudStatus"></span>
+<span id="flowerChallengeHudTimer"></span>
+</div>
 <div id="offRoadWarn"></div>
 <canvas id="minimap" width="150" height="150"></canvas>
 <div id="largeMap">
@@ -1048,6 +1138,11 @@ Explore the area
 
 <button class="mainMenuBtn" id="mainMenuBtn">🏠 Main Menu</button>
 <button id="memoryFlowerFloatBtn" title="Place Flower Memory">🌸</button>
+<div id="flowerActionMenu" aria-label="Flower Actions">
+<button id="flowerActionMemoryBtn" class="flowerActionOption" type="button">🌸 Place Memory Flower</button>
+<button id="flowerActionChallengeBtn" class="flowerActionOption danger" type="button">🔴 Find Red Flower</button>
+<button id="flowerActionCloseBtn" class="flowerActionOption" type="button">Close</button>
+</div>
 <button id="gameShareFloatBtn" title="Share This Experience" aria-label="Share This Experience">
 <svg class="shareIcon" viewBox="0 0 24 24" aria-hidden="true">
 <path d="M12 16V4"></path>

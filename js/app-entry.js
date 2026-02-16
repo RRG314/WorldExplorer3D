@@ -22,6 +22,7 @@ import './map.js?v=54';
 import { renderLoop } from './main.js?v=54';
 import './memory.js?v=54';
 import './blocks.js?v=54';
+import './flower-challenge.js?v=54';
 import { setupUI } from './ui.js?v=54';
 
 let _booted = false;

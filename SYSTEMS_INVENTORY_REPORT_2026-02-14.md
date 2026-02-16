@@ -1,8 +1,8 @@
-# Systems Inventory Report (Freeze + Update)
+# Systems Inventory Report (Freeze)
 
-Date: 2026-02-16  
-Branch: `rdt-engine`  
-Scope: Runtime feature/system inventory with moon-runtime stabilization validation summary
+Date: 2026-02-14  
+Branch: `codex/rdt-impact-main-snapshot`  
+Scope: Runtime feature/system inventory with validation summary
 
 ## 1. Executive Summary
 
@@ -15,7 +15,7 @@ World Explorer 3D currently ships as a browser-first ES module runtime with thes
 - Deep-space solar-system and galaxy interaction layer
 - Performance benchmark and adaptive budget controls
 - Shareable experience URL export/import
-- Moon scene-isolation safeguards that prevent Earth mesh bleed during moon/space runtime
+- Timed red-flower challenge with leaderboard persistence
 
 ## 2. Core System Inventory
 
@@ -34,6 +34,7 @@ World Explorer 3D currently ships as a browser-first ES module runtime with thes
 | Space stack | Earth/Moon/space flight transitions | Active | `js/space.js`, `js/env.js` |
 | Solar/deep-sky | Solar system, asteroid belt, Kuiper belt, galaxies | Active | `js/solar-system.js` |
 | Persistence | Memory markers + block builder storage | Active | `js/memory.js`, `js/blocks.js` |
+| Challenge gameplay | Timed red-flower challenge + leaderboard | Active | `js/flower-challenge.js`, `js/ui.js`, `index.html` |
 | Determinism | RDT seed/depth + deterministic random paths | Active | `js/rdt.js`, `js/world.js`, `js/engine.js` |
 | Performance | Benchmark modes + snapshot export + live stats | Active | `js/perf.js`, `js/world.js`, `js/main.js`, `js/ui.js` |
 
@@ -102,20 +103,17 @@ World Explorer 3D currently ships as a browser-first ES module runtime with thes
   - Apply runtime mode/camera/pose after world start
   - Supports custom location payloads (`lat/lon/lname`)
 
-### 3.7 Moon Runtime Stabilization Update (2026-02-16)
+### 3.7 Challenge Gameplay Layer
 
-- Transition hardening in `js/sky.js`
-  - Earth mesh arrays (roads/buildings/landuse/POIs/street furniture) are force-hidden/removed on moon arrival.
-  - Prevents desktop moon sessions from showing stale Earth geometry after asynchronous world-load completion.
-- Load-race mitigation in `js/world.js`
-  - World-load pass now detects non-Earth env during/after Overpass fetch and exits as partial recovery without reattaching Earth meshes.
-  - `updateWorldLod()` now enforces Earth-only visibility and suppresses Earth meshes during moon/space contexts.
-- Lunar drive physics parity in `js/physics.js`
-  - Moon surface matrix update is forced before raycast sampling.
-  - Crest/drop launch thresholds and impulse blending adjusted for consistent low-gravity airborne behavior on desktop.
-- Lunar terrain readability improvements in `js/sky.js`
-  - Added local relief variation near Apollo spawn area.
-  - Kept slope-aware shading and dense rock cues for better perceived motion/depth.
+- `Find The Red Flower` timed challenge
+  - Title-screen top-right leaderboard toggle opens challenge panel
+  - In-game flower action menu entry
+  - Live objective/timer HUD while active
+  - Completion support for walk, drive, and drone actors
+- Leaderboard persistence
+  - Preferred backend: Firebase Firestore collection `flowerLeaderboard`
+  - Automatic fallback: local browser storage
+  - Runtime backend probe: `getFlowerChallengeBackendStatus()`
 
 ## 4. URL Payload Contract (Share Links)
 
@@ -136,6 +134,9 @@ Supported params:
 | --- | --- | --- | --- |
 | Memory markers | `worldExplorer3D.memories.v1` | Per rounded location key | 200-char notes, remove single, delete-all |
 | Build blocks | `worldExplorer3D.buildBlocks.v1` | Per rounded location key | 100-block cap |
+| Flower challenge leaderboard | `worldExplorer3D.flowerChallenge.localLeaderboard.v1` | Browser profile | Used when Firebase is unavailable |
+| Flower challenge player name | `worldExplorer3D.flowerChallenge.playerName` | Browser profile | Last entered challenge name |
+| Optional Firebase config | `worldExplorer3D.firebaseConfig` | Browser profile | Read only when provided by user |
 | Perf mode | `worldExplorerPerfMode` | Browser profile | `rdt` or `baseline` |
 | Perf overlay toggle | `worldExplorerPerfOverlay` | Browser profile | Forced OFF on each fresh session start |
 | Auto quality toggle | `worldExplorerPerfAutoQuality` | Browser profile | Enabled by default unless explicitly disabled |
@@ -158,12 +159,6 @@ Interpretation:
 - RDT repeat loads are significantly faster when Overpass is cache-served.
 - Draw-call variance remains a known tuning axis.
 
-Moon stabilization validation snapshot (2026-02-15 desktop):
-
-| Scenario | env | onMoon | Earth meshes attached | airborne ticks | y-range |
-| --- | --- | --- | ---: | ---: | ---: |
-| Moon desktop driving check | MOON | true | 0 | 33 / 34 | 1.61 |
-
 ## 7. Verification Checklist (This Update)
 
 ### 7.1 Static checks
@@ -171,8 +166,7 @@ Moon stabilization validation snapshot (2026-02-15 desktop):
 - `node --check js/perf.js` passed
 - `node --check js/world.js` passed
 - `node --check js/ui.js` passed
-- `node --check js/physics.js` passed
-- `node --check js/sky.js` passed
+- `node --check js/flower-challenge.js` passed
 - `node --check js/app-entry.js` passed
 - `node --check js/bootstrap.js` passed
 - `node --check js/modules/manifest.js` passed
@@ -190,13 +184,6 @@ Moon stabilization validation snapshot (2026-02-15 desktop):
 - Start-flow smoke test verified:
   - HUD displayed and title screen hid after start
   - No runtime JS exceptions observed in smoke pass
-- Moon desktop runtime check verified:
-  - `env=MOON`, `onMoon=true`
-  - Earth mesh attachment counts on moon were all zero
-  - Moon-driving airborne integration triggered repeatedly during desktop driving sample
-  - Artifacts:
-    - `output/playwright/moon-desktop-check-after-fix.json`
-    - `output/playwright/moon-desktop-check-after-fix.png`
 
 ## 8. Known Constraints
 
