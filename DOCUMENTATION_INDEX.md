@@ -16,7 +16,7 @@ This index lists the documentation that exists in this branch today.
 | `CONTRIBUTING.md` | Contribution process and PR rules |
 | `CHANGELOG.md` | Version and release changes |
 | `SECURITY_STORAGE_NOTICE.md` | Memory-storage behavior, security baseline, and disclaimer boilerplate |
-| `SYSTEMS_INVENTORY_REPORT_2026-02-14.md` | Full systems, subsystems, and feature inventory snapshot |
+| `SYSTEMS_INVENTORY_REPORT_2026-02-14.md` | Full systems, subsystems, and feature inventory snapshot (updated 2026-02-16) |
 | `ACKNOWLEDGEMENTS.md` | Third-party and first-party research attributions |
 | `LICENSE` | Proprietary, all-rights-reserved source-available license |
 
@@ -29,7 +29,7 @@ This index lists the documentation that exists in this branch today.
 5. `KNOWN_ISSUES.md`
 6. `CONTRIBUTING.md`
 
-## Current Freeze Scope (2026-02-14)
+## Current Freeze Scope (2026-02-16)
 
 The current branch documentation set includes updates for:
 
@@ -51,6 +51,7 @@ The current branch documentation set includes updates for:
 - Moon-only low-gravity airborne car behavior over terrain crests/crater drops (Earth driving unchanged)
 - Desktop moon scene-isolation guards to prevent Earth mesh bleed-through during async world-load transitions
 - Enhanced moon terrain readability (local relief + shading contrast + lunar rock cues) for desktop/mobile movement clarity
+- Technical docs + inventory report now include moon runtime stabilization implementation and desktop validation artifacts
 - Top-bar overlay anchoring for debug and benchmark panels between their target HUD widgets
 - Overpass endpoint preference and in-memory cache behavior for repeat-load acceleration
 - Supporting benchmark stats documentation from captured Baltimore test runs (network + memory-cache)

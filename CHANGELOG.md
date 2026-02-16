@@ -38,6 +38,7 @@ Entries reflect changes made relative to the most recent public release.
 - Touch-first control profiles for mobile across driving, walking, drone, and rocket modes.
 - Expanded share entry points: title-footer icon rail, in-game share quick menu, and coordinate-readout click-copy.
 - Moon-only low-gravity terrain airborne handling for lunar driving over hill/crater transitions.
+- Moon runtime stabilization documentation coverage in `TECHNICAL_DOCS.md` and `SYSTEMS_INVENTORY_REPORT_2026-02-14.md` (desktop validation + scene-isolation notes).
 
 ### Changed
 - Technical documentation examples now show deterministic RNG usage patterns aligned with the `rdt.js` seeded runtime helpers.
@@ -134,4 +135,4 @@ Entries reflect changes made relative to the most recent public release.
 - Road elevation issues causing clipping or z-fighting in some areas
 - Inconsistent grounding behavior when switching cities
 ---
-Most recently updated on 02/14/26
+Most recently updated on 02/16/26
