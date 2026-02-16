@@ -1,7 +1,7 @@
 # Systems Inventory Report (Freeze)
 
 Date: 2026-02-14  
-Branch: `codex/rdt-impact-main-snapshot`  
+Branch: `main`  
 Scope: Runtime feature/system inventory with validation summary
 
 ## 1. Executive Summary
