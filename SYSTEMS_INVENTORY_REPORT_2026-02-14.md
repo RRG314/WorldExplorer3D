@@ -15,6 +15,7 @@ World Explorer 3D currently ships as a browser-first ES module runtime with thes
 - Deep-space solar-system and galaxy interaction layer
 - Performance benchmark and adaptive budget controls
 - Shareable experience URL export/import
+- Timed red-flower challenge with leaderboard persistence
 
 ## 2. Core System Inventory
 
@@ -33,6 +34,7 @@ World Explorer 3D currently ships as a browser-first ES module runtime with thes
 | Space stack | Earth/Moon/space flight transitions | Active | `js/space.js`, `js/env.js` |
 | Solar/deep-sky | Solar system, asteroid belt, Kuiper belt, galaxies | Active | `js/solar-system.js` |
 | Persistence | Memory markers + block builder storage | Active | `js/memory.js`, `js/blocks.js` |
+| Challenge gameplay | Timed red-flower challenge + leaderboard | Active | `js/flower-challenge.js`, `js/ui.js`, `index.html` |
 | Determinism | RDT seed/depth + deterministic random paths | Active | `js/rdt.js`, `js/world.js`, `js/engine.js` |
 | Performance | Benchmark modes + snapshot export + live stats | Active | `js/perf.js`, `js/world.js`, `js/main.js`, `js/ui.js` |
 
@@ -101,6 +103,17 @@ World Explorer 3D currently ships as a browser-first ES module runtime with thes
   - Apply runtime mode/camera/pose after world start
   - Supports custom location payloads (`lat/lon/lname`)
 
+### 3.7 Challenge Gameplay Layer
+
+- `Find The Red Flower` timed challenge
+  - Title-screen challenge panel (right side)
+  - In-game flower action menu entry
+  - Live objective/timer HUD while active
+  - Completion support for walk, drive, and drone actors
+- Leaderboard persistence
+  - Preferred backend: Firebase Firestore collection `flowerLeaderboard`
+  - Automatic fallback: local browser storage
+
 ## 4. URL Payload Contract (Share Links)
 
 Supported params:
@@ -120,6 +133,9 @@ Supported params:
 | --- | --- | --- | --- |
 | Memory markers | `worldExplorer3D.memories.v1` | Per rounded location key | 200-char notes, remove single, delete-all |
 | Build blocks | `worldExplorer3D.buildBlocks.v1` | Per rounded location key | 100-block cap |
+| Flower challenge leaderboard | `worldExplorer3D.flowerChallenge.localLeaderboard.v1` | Browser profile | Used when Firebase is unavailable |
+| Flower challenge player name | `worldExplorer3D.flowerChallenge.playerName` | Browser profile | Last entered challenge name |
+| Optional Firebase config | `worldExplorer3D.firebaseConfig` | Browser profile | Read only when provided by user |
 | Perf mode | `worldExplorerPerfMode` | Browser profile | `rdt` or `baseline` |
 | Perf overlay toggle | `worldExplorerPerfOverlay` | Browser profile | Forced OFF on each fresh session start |
 | Auto quality toggle | `worldExplorerPerfAutoQuality` | Browser profile | Enabled by default unless explicitly disabled |
@@ -149,6 +165,7 @@ Interpretation:
 - `node --check js/perf.js` passed
 - `node --check js/world.js` passed
 - `node --check js/ui.js` passed
+- `node --check js/flower-challenge.js` passed
 - `node --check js/app-entry.js` passed
 - `node --check js/bootstrap.js` passed
 - `node --check js/modules/manifest.js` passed
@@ -172,4 +189,3 @@ Interpretation:
 - Runtime still uses shared global state across modules; full subsystem isolation remains iterative.
 - External map/Overpass/vector endpoints remain network-dependent and may vary by availability.
 - Draw-call behavior can still vary by location density and active mode.
-

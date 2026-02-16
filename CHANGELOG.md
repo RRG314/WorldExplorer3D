@@ -38,6 +38,9 @@ Entries reflect changes made relative to the most recent public release.
 - Touch-first control profiles for mobile across driving, walking, drone, and rocket modes.
 - Expanded share entry points: title-footer icon rail, in-game share quick menu, and coordinate-readout click-copy.
 - Moon-only low-gravity terrain airborne handling for lunar driving over hill/crater transitions.
+- "Find The Red Flower" timed challenge system with random in-world red flower spawn on Earth and a live in-game timer HUD.
+- Title-screen leaderboard panel with location-scoped challenge start flow and optional player-name entry.
+- Firebase-backed leaderboard support with automatic localStorage fallback when Firebase config/network is unavailable.
 
 ### Changed
 - Technical documentation examples now show deterministic RNG usage patterns aligned with the `rdt.js` seeded runtime helpers.

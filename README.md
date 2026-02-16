@@ -38,6 +38,7 @@ Open `http://localhost:8000`.
 - Title menu launch-mode selector (Earth / Moon / Space) with one-click starts.
 - Click-to-inspect deep-space objects (planets, asteroids, spacecraft, galaxies).
 - Persistent memory markers (pin/flower + short note) with in-world remove and bulk delete actions.
+- "Find The Red Flower" timed challenge with title-screen leaderboard and in-game timer HUD.
 - Minecraft-style brick block builder (place, stack, and remove blocks in-world).
 - Deterministic runtime seeding and complexity logic through RDT + RGE256-based paths.
 - Shareable experience links (seed/location/mode/camera context) from the Settings panel.
@@ -162,6 +163,21 @@ When a shared URL is opened:
 - title-screen state is prefilled from params
 - a status note confirms payload load
 - mode/camera/pose state is applied after `Explore` starts
+
+## Find The Red Flower Challenge
+
+- Title-screen right panel starts a timed red-flower challenge for the selected location.
+- In-game `🌸` button opens:
+  - `🌸 Place Memory Flower`
+  - `🔴 Find Red Flower`
+- Challenge completion supports walking, driving, and drone modes.
+- Timer HUD displays while active and auto-hides after completion.
+- Leaderboard storage behavior:
+  - Primary: Firestore collection `flowerLeaderboard`
+  - Fallback: browser localStorage (`worldExplorer3D.flowerChallenge.localLeaderboard.v1`)
+- Optional Firebase config can be provided either:
+  - as `window.WORLD_EXPLORER_FIREBASE` before app boot, or
+  - in localStorage key `worldExplorer3D.firebaseConfig`
 
 ## Supporting Benchmark Stats (Baltimore, 2026-02-14)
 

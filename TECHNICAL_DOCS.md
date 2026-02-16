@@ -11,6 +11,7 @@ Developer guide for World Explorer 3D. Architecture, code structure, and customi
 - [Deterministic RDT & RGE-256 Layer](#deterministic-rdt--rge-256-layer)
 - [Benchmark Mode (RDT vs Baseline)](#benchmark-mode-rdt-vs-baseline)
 - [Shareable Experience Link Payload](#shareable-experience-link-payload)
+- [Red Flower Challenge + Leaderboard](#red-flower-challenge--leaderboard)
 - [API Integration](#api-integration)
 - [Rendering Pipeline](#rendering-pipeline)
 - [Persistent Memory Markers](#persistent-memory-markers)
@@ -50,6 +51,8 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - World-load profile scaling now consumes dynamic budget/LOD state in `js/world.js`.
 - Shareable experience link export/import added in `js/ui.js` (`Copy Experience Link` + URL param parsing).
 - Share surfaces expanded to title-footer icon rail, in-game share quick menu, and coordinate-readout click-copy.
+- Timed "Find The Red Flower" challenge module added (`js/flower-challenge.js`) with title-panel entry + in-game flower action menu.
+- Leaderboard persistence now supports Firebase Firestore (`flowerLeaderboard`) with automatic local fallback.
 - Mobile touch-control profiles added for driving, walking, drone, and rocket modes with per-mode bindings/layout.
 - Moon-only low-gravity airborne terrain-follow behavior added for lunar driving crest/crater transitions.
 - Overpass endpoint preference + in-memory response cache added for faster repeat loads.
@@ -165,6 +168,7 @@ WorldExplorer3D/
    ├─ map.js
    ├─ memory.js
    ├─ blocks.js
+   ├─ flower-challenge.js
    ├─ ui.js
    └─ main.js
 ```
@@ -461,6 +465,50 @@ Flow:
 2. Parsed runtime state is cached in `appCtx.pendingExperienceState`.
 3. After world start, runtime mode/camera/pose is applied.
 4. `Copy Experience Link` regenerates a URL from active state or pending shared state.
+
+## Red Flower Challenge + Leaderboard
+
+Runtime module: `js/flower-challenge.js`
+
+Primary responsibilities:
+
+- Challenge start/stop lifecycle and marker cleanup.
+- Random Earth-only red-flower spawn within visible world range.
+- In-game timer HUD updates while challenge is active.
+- Completion detection for `driving`, `walking`, and `drone` actors.
+- Title-screen leaderboard rendering and refresh.
+
+UI integration points:
+
+- Title panel: `#flowerChallengePanel`, `#titleFindFlowerBtn`, `#titleFlowerRefreshBtn`
+- In-game action menu: `#flowerActionMenu` opened from `#memoryFlowerFloatBtn`
+- In-game HUD: `#flowerChallengeHud`, `#flowerChallengeHudStatus`, `#flowerChallengeHudTimer`
+
+App context methods exposed by the module:
+
+- `setupFlowerChallenge()`
+- `requestFlowerChallengeFromTitle()`
+- `consumePendingFlowerChallengeStart()`
+- `startFlowerChallenge(source)`
+- `stopFlowerChallenge(options)`
+- `toggleFlowerActionMenu()`
+- `updateFlowerChallenge(dt)`
+- `refreshFlowerLeaderboard()`
+
+Persistence strategy:
+
+- Preferred backend: Firestore collection `flowerLeaderboard`
+- Fallback backend: localStorage key `worldExplorer3D.flowerChallenge.localLeaderboard.v1`
+- Player-name cache: localStorage key `worldExplorer3D.flowerChallenge.playerName`
+
+Firebase config injection (optional):
+
+- Global object before boot:
+  - `window.WORLD_EXPLORER_FIREBASE = { apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId }`
+- Or localStorage key:
+  - `worldExplorer3D.firebaseConfig` with same JSON shape.
+
+If Firebase modules/config fail to load, challenge and leaderboard continue using local fallback without blocking gameplay.
 
 ## API Integration
 

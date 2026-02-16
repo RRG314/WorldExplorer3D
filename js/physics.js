@@ -247,6 +247,7 @@ function updateDrone(dt) {
 
 function update(dt) {
   if (appCtx.paused || !appCtx.gameStarted) return;
+  if (typeof appCtx.updateFlowerChallenge === 'function') appCtx.updateFlowerChallenge(dt);
 
   if (appCtx.droneMode) {
     updateDrone(dt);
