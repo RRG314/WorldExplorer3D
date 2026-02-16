@@ -5,6 +5,7 @@ Complete guide to using World Explorer 3D. Learn every feature, control, and sec
 ## Table of Contents
 - [Getting Started](#getting-started)
 - [Performance Benchmark Mode (RDT vs Baseline)](#performance-benchmark-mode-rdt-vs-baseline)
+- [Shareable Experience Links](#shareable-experience-links)
 - [Game Modes](#game-modes)
 - [Movement Systems](#movement-systems)
 - [Camera Controls](#camera-controls)
@@ -93,6 +94,7 @@ Use the title screen `Settings` tab to compare the two world-loading modes.
    - `Baseline (No RDT Budgeting)` for full-budget loading.
 4. Click `Apply + Reload World`.
 5. Click `Copy Snapshot` to export the current JSON metrics.
+6. Auto quality manager runs by default and continuously tunes runtime budget tier from live FPS/frame timing.
 
 ### Overlay behavior
 
@@ -110,6 +112,8 @@ Use the title screen `Settings` tab to compare the two world-loading modes.
 - `renderer.triangles`
 - `fps` and `frameMs`
 - `lastLoad.overpassSource` (`network` or `memory-cache`)
+- `dynamicBudget.tier` / `dynamicBudget.budgetScale` / `dynamicBudget.lodScale`
+- `lastLoad.dynamicBudget.*` to confirm which budget tier was used for that load
 
 ### Supporting test stats (Baltimore, 2026-02-14)
 
@@ -124,6 +128,26 @@ Interpretation:
 - RDT is currently faster at startup in the captured network run.
 - RDT repeat loads are significantly faster when Overpass data is reused from memory cache.
 - Draw calls still vary and can remain higher in RDT than baseline in some scenes.
+
+## Shareable Experience Links
+
+Share actions are available in both title and in-game UI:
+
+- Title screen footer circular icons: `Copy`, `Share`, `Facebook`, `X`, `Instagram`, `Text`
+- In-game blue share arrow above the flower button
+- Coordinate readout click/tap (copies current live experience link)
+
+Every share entry point generates a URL that captures:
+
+- location (`loc`, or custom `lat/lon` + `lname`)
+- game mode (`gm`)
+- performance mode (`pm`)
+- seed (`seed`)
+- movement mode (`mode`)
+- camera mode (`camMode`)
+- runtime pose (`rx`, `ry`, `rz`, `yaw`, optional `pitch`)
+
+Open that URL and the app will preload the title-screen state, then apply mode/camera/pose after you press `Explore`.
 
 ## Game Modes
 
@@ -222,14 +246,15 @@ Interpretation:
 - `S` / `↓` - Brake / Reverse
 - `A` / `←` - Turn left (while moving)
 - `D` / `→` - Turn right (while moving)
-- `Space` - Handbrake (drift/emergency stop)
+- `Space` - Brake / handbrake
 - `Ctrl` - Boost (when bar is filled)
 - `Shift` - Off-road mode toggle
 - `B` - Toggle brick build mode
 
 #### Physics
 - **Realistic handling**: Car has momentum and turning radius
-- **Drift system**: Hold space while turning
+- **Brake-first handling**: `Space` is brake/handbrake input
+- **Slip-aware drift indicator**: DRIFT lights from high-speed slip angle (not a separate drift key mode)
 - **Boost system**: Fills automatically over time
 - **Off-road**: Slower on grass/dirt unless in off-road mode
 - **Collisions**: Can bump into buildings (car respawns)
@@ -333,6 +358,26 @@ Interpretation:
 | Walking | Driving | `F` | Teleports back to car |
 | Any | Drone | `6` | Position saved |
 | Drone | Previous | `6` | Returns to saved position |
+
+### Mobile Touch Controls (Auto-Enabled on Touch Devices)
+
+#### Driving Layout
+- **Left side**: `▲` accelerate, `Brake` button, `▼` reverse/decelerate
+- **Right side**: `◀ ▶` steering
+
+#### Walking Layout
+- **Left pad**: camera look
+- **Right pad**: movement
+- **Left action buttons**: `Jump`, `Run`
+
+#### Drone Layout
+- **Left pad**: camera look
+- **Right pad**: movement
+- **Left action buttons**: `Ascend`, `Descend`
+
+#### Space-Flight Layout
+- **Right pad**: steer + pitch
+- **Left action buttons**: `Accelerate`, `Decelerate`
 
 ## Camera Controls
 
@@ -541,7 +586,7 @@ You can enter space systems in three ways:
 
 #### Features
 - **Low Gravity**: Jump 6x higher than Earth
-- **Gray Terrain**: Moon-like rocky surface
+- **Improved Lunar Surface**: Stronger crater/relief contrast with added rock cues for better depth and motion readability
 - **Starry Sky**: Clear view of stars
 - **Apollo 11 Landing Site**: Historic location
 
@@ -550,6 +595,9 @@ You can enter space systems in three ways:
 - **Jumping**: Press Space to jump very high
 - **Running**: Hold Shift for faster movement
 - **Drone mode**: Works normally
+- **Lunar driving float behavior**: Cars can go lightly airborne over hill crests/crater edges on moon terrain
+- **Desktop and mobile parity**: Moon driving float behavior now triggers consistently on both desktop and mobile
+- **Earth unchanged**: This airborne car behavior is moon-only; Earth keeps normal grounded terrain follow
 
 ### Apollo 11 Landing Site
 
@@ -830,7 +878,7 @@ Press `Esc` to pause:
 ### Driving Tips
 
 1. **Boost Management**: Don't waste boost on turns
-2. **Drift Corners**: Handbrake helps tight turns
+2. **Brake Before Tight Turns**: Use Space to scrub speed cleanly
 3. **Speed Limit**: Informational only, go faster if needed
 4. **Off-Road**: Remember Shift for better grass/dirt handling
 5. **Camera Angle**: Switch views (C) for better visibility
@@ -883,7 +931,7 @@ Press `Esc` to pause:
 A: Yes, for satellite imagery and real estate data.
 
 **Q: Does it work on mobile?**
-A: Yes, optimized for tablets and phones with touch controls.
+A: Yes. Touch UI is mode-aware with dedicated mobile layouts for driving, walking, drone, and space flight.
 
 **Q: Can I save my progress?**
 A: Full gameplay state is not saved, but memory markers (pin/flower notes) are persisted locally in your browser.
@@ -907,6 +955,9 @@ A: Main Menu -> `Settings` -> `⚡ Performance Benchmark` -> choose mode -> `App
 
 **Q: How do I export benchmark data?**
 A: In the same benchmark panel, click `Copy Snapshot` to copy JSON to clipboard.
+
+**Q: How do I share the exact experience setup with someone else?**
+A: Use title-footer share icons, the in-game blue share arrow, or tap the coordinate readout to copy/share the same encoded experience link.
 
 **Q: Why is loading slow?**
 A: First loads are network-bound (Overpass + tiles). Repeat loads can be much faster when `lastLoad.overpassSource` shows `memory-cache`.
@@ -1011,9 +1062,9 @@ Quick reference for all controls:
 | S/↓ | Back/Brake |
 | A/← | Left/Turn Left |
 | D/→ | Right/Turn Right |
-| Space | Handbrake/Jump/Up |
-| Shift | Run/Off-Road/Down |
-| Ctrl | Boost/Down |
+| Space | Brake/Handbrake or Jump or Thrust |
+| Shift | Run or Off-Road or Descend/Decelerate |
+| Ctrl | Boost |
 
 ### Mode & View
 | Key | Action |
