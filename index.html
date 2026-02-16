@@ -121,6 +121,9 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .title-license{font-size:10px;color:rgba(226,232,240,0.9);line-height:1.35;text-align:center;text-shadow:0 2px 8px rgba(2,6,23,0.55);padding:0 8px;max-width:min(980px,95vw)}
 .title-license a{color:#bfdbfe;font-weight:600;text-decoration:none}
 .title-license a:hover{text-decoration:underline}
+/* Keep title challenge/leaderboard overlays above share icon rail */
+#flowerChallengePanel,.flowerChallengePanel,#leaderboardPanel,.leaderboardPanel{z-index:12!important}
+#flowerChallengeToggleBtn,#leaderboardToggleBtn{z-index:13!important}
 @media (min-width: 769px){
   #titleScreen{padding-top:max(14px,calc(env(safe-area-inset-top) + 10px));padding-bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px))}
   .menu-container{width:min(780px,95vw);max-height:calc(100dvh - 190px)}
