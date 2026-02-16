@@ -22,10 +22,11 @@
 }
 body{background:#f5f7fa;overflow:hidden;font-family:'Inter',sans-serif;-webkit-user-select:none;user-select:none;touch-action:pan-x pan-y;-webkit-tap-highlight-color:transparent}
 button,input,select,textarea{-webkit-tap-highlight-color:transparent}
+button{touch-action:manipulation}
 input,textarea{-webkit-user-select:text;user-select:text}
 
 /* Title Screen */
-#titleScreen{position:fixed;inset:0;background:#000 url('title-bg.jpg') center center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:center;padding-top:max(24px,calc(env(safe-area-inset-top) + 10px));padding-right:12px;padding-bottom:max(24px,calc(env(safe-area-inset-bottom) + 12px));padding-left:12px;gap:clamp(10px,1.5vh,16px);z-index:200;overflow-y:auto;overflow-x:hidden;isolation:isolate}
+#titleScreen{position:fixed;inset:0;background:#000 url('title-bg.jpg') center center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:max(12px,calc(env(safe-area-inset-top) + 8px));padding-right:12px;padding-bottom:max(16px,calc(env(safe-area-inset-bottom) + 10px));padding-left:12px;gap:clamp(8px,1.2vh,14px);z-index:200;overflow-y:auto;overflow-x:hidden;isolation:isolate}
 #titleScreen::before{content:'';position:absolute;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(1px);pointer-events:none;z-index:0}
 #titleScreen.hidden{display:none}
 .logo{font-family:'Orbitron',sans-serif;font-size:clamp(36px, 8vw, 72px);font-weight:900;line-height:1.05;color:#ffffff;letter-spacing:clamp(3px, 1vw, 8px);text-transform:uppercase;text-shadow:0 0 30px rgba(83,52,131,0.8),0 0 60px rgba(15,52,96,0.6),0 4px 20px rgba(0,0,0,0.4);position:relative;z-index:1;margin:0;animation:titleGlow 3s ease-in-out infinite;text-align:center;padding:0 20px;flex-shrink:0}
@@ -33,7 +34,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .sub{font-family:'Righteous',cursive;font-size:clamp(13px,1.7vw,20px);line-height:1.25;color:rgba(255,255,255,0.9);letter-spacing:clamp(1px,0.45vw,4px);margin:0;font-weight:400;text-shadow:0 2px 10px rgba(0,0,0,0.35);position:relative;z-index:1;text-align:center;max-width:min(94vw,1100px);padding:0 8px;flex-shrink:0}
 
 /* Menu Container with Tabs */
-.menu-container{background:rgba(255,255,255,0.85);backdrop-filter:blur(20px);border:2px solid rgba(255,255,255,0.3);border-radius:20px;width:min(640px,95vw);max-height:calc(100dvh - 170px);display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,0.4),0 0 40px rgba(83,52,131,0.3);position:relative;z-index:1;flex:0 1 auto}
+.menu-container{background:rgba(255,255,255,0.85);backdrop-filter:blur(20px);border:2px solid rgba(255,255,255,0.3);border-radius:20px;width:min(720px,95vw);max-height:calc(100dvh - 220px);display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,0.4),0 0 40px rgba(83,52,131,0.3);position:relative;z-index:1;flex:0 1 auto}
 .tab-nav{display:flex;border-bottom:2px solid rgba(232,238,245,0.5);flex-shrink:0;background:rgba(248,250,252,0.6);backdrop-filter:blur(10px);border-radius:18px 18px 0 0}
 .tab-btn{flex:1;background:transparent;border:none;padding:16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:#64748b;cursor:pointer;transition:all 0.3s;position:relative}
 .tab-btn:hover{color:#475569;background:rgba(241,245,249,0.6)}
@@ -103,6 +104,33 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .start-section{padding:20px 24px;border-top:2px solid #e8eef5;flex-shrink:0;background:rgba(248,250,252,0.8);backdrop-filter:blur(10px)}
 .startBtn{width:100%;background:linear-gradient(135deg,#0f3460 0%,#533483 100%);border:2px solid rgba(255,255,255,0.2);border-radius:12px;padding:18px;font-family:'Orbitron',sans-serif;font-size:16px;font-weight:700;color:#ffffff;cursor:pointer;letter-spacing:2px;transition:all 0.3s;text-transform:uppercase;box-shadow:0 4px 20px rgba(83,52,131,0.4)}
 .startBtn:hover{transform:translateY(-3px);box-shadow:0 12px 40px rgba(83,52,131,0.6),0 0 30px rgba(15,52,96,0.5);border-color:rgba(255,255,255,0.4)}
+.title-footer{width:min(740px,95vw);padding:2px 10px 0;display:flex;flex-direction:column;align-items:center;gap:2px;position:relative;z-index:1}
+.title-share-row{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+.title-share-btn{width:44px;height:44px;border:none;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#ffffff;box-shadow:0 8px 22px rgba(15,23,42,0.35);transition:transform 0.18s ease,box-shadow 0.18s ease,filter 0.18s ease}
+.title-share-btn:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 12px 28px rgba(15,23,42,0.45)}
+.title-share-btn:active{transform:scale(0.98)}
+.title-share-btn svg{width:20px;height:20px;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none}
+.title-share-btn.copy{background:#0f766e}
+.title-share-btn.native{background:#1d4ed8}
+.title-share-btn.facebook{background:#1877f2}
+.title-share-btn.twitter{background:#0f172a}
+.title-share-btn.instagram{background:linear-gradient(135deg,#f97316,#ec4899)}
+.title-share-btn.text{background:#0f766e}
+.title-share-btn.facebook svg,.title-share-btn.twitter svg{fill:currentColor;stroke:none}
+#shareExperienceStatus{display:none}
+.title-license{font-size:10px;color:rgba(226,232,240,0.9);line-height:1.35;text-align:center;text-shadow:0 2px 8px rgba(2,6,23,0.55);padding:0 8px;max-width:min(980px,95vw)}
+.title-license a{color:#bfdbfe;font-weight:600;text-decoration:none}
+.title-license a:hover{text-decoration:underline}
+@media (min-width: 769px){
+  #titleScreen{padding-top:max(14px,calc(env(safe-area-inset-top) + 10px));padding-bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px))}
+  .menu-container{width:min(780px,95vw);max-height:calc(100dvh - 190px)}
+  .title-license{font-size:11px;padding:0 10px}
+}
+@media (min-width: 1024px){
+  .title-share-row{position:fixed;right:12px;top:50%;transform:translateY(-50%);flex-direction:column;flex-wrap:nowrap;gap:12px;z-index:3}
+  .title-footer{width:calc(100vw - 20px);margin-top:-4px}
+  .title-license{padding-right:0;max-width:calc(100vw - 120px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+}
 
 /* HUD */
 #hud{position:fixed;top:20px;left:20px;z-index:100;display:none}
@@ -125,23 +153,16 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #minimap{position:fixed;bottom:20px;left:20px;width:160px;height:160px;background:rgba(255,255,255,0.95);border:none;border-radius:16px;z-index:100;display:none;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 #minimap.show{display:block}
 #minimap:hover{box-shadow:0 12px 32px rgba(0,0,0,0.15)}
-#largeMap{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:150;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+#largeMap{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:220;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 #largeMap.show{display:flex}
 #largeMapCanvas{border:none;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
 #mapClose{position:absolute;top:30px;right:30px;background:#ffffff;border:none;color:#1e293b;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;padding:12px 24px;cursor:pointer;border-radius:10px;transition:all 0.2s;z-index:200}
 #mapClose:hover{background:#f1f5f9;transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.1)}
 #mapSatelliteToggle.active,#mapRoadsToggle.active{background:#0fc !important;color:#000 !important}
-#modeHud{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:8px 16px;z-index:100;text-align:center;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
-#modeHud.show{display:block}
-#modeTitle{font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;color:#667eea;text-transform:uppercase;letter-spacing:0.5px}
-#modeTimer{font-family:'Poppins',sans-serif;font-size:16px;font-weight:700;color:#1e293b;margin-top:2px;display:none}
-#modeTimer.show{display:block}
-#modeInfo{font-size:10px;color:#64748b;margin-top:2px;display:none}
-#modeInfo.show{display:block}
 #police{position:fixed;top:20px;right:20px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;padding:10px 16px;color:#dc2626;font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;z-index:100;display:none;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 #police.show{display:block}
 /* Float Menus - Three separate menus in triangle formation */
-.floatMenuContainer{position:fixed;bottom:20px;right:20px;z-index:100;display:none;flex-direction:column;align-items:center;gap:12px}
+.floatMenuContainer{position:fixed;bottom:20px;right:20px;z-index:118;display:none;flex-direction:column;align-items:center;gap:12px}
 .floatMenuContainer.show{display:flex}
 .floatMenu{display:flex;flex-direction:column;align-items:center;position:relative}
 .floatMenuRow{display:flex;gap:12px;justify-content:center}
@@ -154,7 +175,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .floatBtn.game{color:#a855f7}
 .btnIcon{font-size:20px;line-height:1}
 .btnText{font-size:14px;font-weight:600;white-space:nowrap}
-.floatItems{position:fixed;bottom:140px;right:20px;display:none;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto;min-width:160px;max-width:200px;z-index:102}
+.floatItems{position:fixed;bottom:140px;right:20px;display:none;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto;min-width:160px;max-width:200px;z-index:120}
 .floatMenu.open .floatItems{display:flex}
 .floatItem{background:#ffffff;border:none;border-radius:10px;padding:10px 16px;color:#475569;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.1);transition:all 0.2s;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .floatItem:hover{background:#f8fafc;transform:translateX(-4px);box-shadow:0 6px 16px rgba(0,0,0,0.15)}
@@ -185,12 +206,26 @@ input,textarea{-webkit-user-select:text;user-select:text}
   /* HUD elements */
   #hud{top:10px;left:10px;font-size:11px}
   #minimap{width:120px;height:120px}
-  #modeHud{top:10px;font-size:10px;padding:6px 12px}
-  #coords{bottom:180px;left:10px;font-size:10px;padding:8px 12px}
-  #controlsTab{left:140px;max-width:180px;font-size:11px}
-  #memoryFlowerFloatBtn{left:140px;bottom:72px}
-  #gameShareFloatBtn{left:140px;bottom:124px}
-  #gameShareMenu{left:85px;bottom:176px}
+  #coords{bottom:158px!important;left:10px!important;font-size:10px;padding:8px 12px}
+  #controlsTab{left:50%!important;transform:translateX(-50%)!important;width:min(280px,calc(100vw - 20px))!important;max-width:none!important;font-size:11px;bottom:106px!important;max-height:56vh!important}
+  #controlsTab.compact{width:auto!important;max-width:max-content!important;left:62%!important;transform:translateX(-50%)!important}
+  #controlsTab.compact #ctrlHeader{padding:9px 12px;font-size:12px}
+  #ctrlContent{max-height:calc(56vh - 44px)!important}
+  #gameShareFloatBtn{left:140px!important;bottom:24px!important}
+  #memoryFlowerFloatBtn{left:140px!important;bottom:76px!important}
+  #gameShareMenu{left:85px!important;bottom:128px!important}
+  #mobileTouchControls{inset:0}
+  .mobilePad{width:114px;height:114px;top:58%}
+  #mobileMovePad{right:8px}
+  #mobileLookPad{left:8px}
+  #mobileActionStack{left:8px;top:72%;width:114px}
+  #mobileTouchControls.mode-rocket #mobileLookPad{left:auto;right:8px;top:58%}
+  #mobileTouchControls.mode-rocket #mobileActionStack{left:8px;top:50%;width:114px;transform:translateY(-50%)}
+  #mobileTouchControls.mode-rocket .mobileActionBtn{min-width:114px}
+  #mobileTouchControls.mode-driving #mobileActionStack{left:8px;top:58%;width:114px;transform:translateY(-50%)}
+  #mobileTouchControls.mode-driving .mobileActionBtn{min-width:114px}
+  .mobileActionBtn{min-width:82px;padding:9px 12px;font-size:11px}
+  .title-share-btn{width:42px;height:42px}
   #buildModeIndicator{left:10px;bottom:66px;font-size:10px;padding:8px 10px;max-width:220px}
 
   /* Property panel */
@@ -238,13 +273,28 @@ input,textarea{-webkit-user-select:text;user-select:text}
   /* HUD elements for phones */
   #hud{top:5px;left:5px;font-size:10px}
   #minimap{width:100px;height:100px}
-  #modeHud{top:5px;font-size:9px;padding:5px 10px}
-  #modeTimer{font-size:14px}
-  #coords{bottom:160px;left:5px;font-size:9px;padding:6px 10px}
-  #controlsTab{left:115px;max-width:150px;font-size:10px;bottom:15px}
-  #memoryFlowerFloatBtn{left:115px;bottom:66px}
-  #gameShareFloatBtn{left:115px;bottom:118px}
-  #gameShareMenu{left:60px;bottom:170px}
+  #coords{bottom:144px!important;left:5px!important;font-size:9px;padding:6px 10px}
+  #controlsTab{left:50%!important;transform:translateX(-50%)!important;width:min(270px,calc(100vw - 16px))!important;max-width:none!important;font-size:10px;bottom:100px!important;max-height:52vh!important}
+  #controlsTab.compact{width:auto!important;max-width:max-content!important;left:64%!important;transform:translateX(-50%)!important}
+  #controlsTab.compact #ctrlHeader{padding:8px 10px;font-size:11px}
+  #ctrlContent{max-height:calc(52vh - 40px)!important}
+  #gameShareFloatBtn{left:113px!important;bottom:22px!important}
+  #memoryFlowerFloatBtn{left:113px!important;bottom:74px!important}
+  #gameShareMenu{left:58px!important;bottom:126px!important}
+  #mobileTouchControls{inset:0}
+  .mobilePad{width:104px;height:104px;top:60%}
+  #mobileMovePad{right:6px}
+  #mobileLookPad{left:6px}
+  #mobileActionStack{left:6px;top:74%;width:104px}
+  #mobileTouchControls.mode-rocket #mobileLookPad{left:auto;right:6px;top:60%}
+  #mobileTouchControls.mode-rocket #mobileActionStack{left:6px;top:50%;width:104px;transform:translateY(-50%)}
+  #mobileTouchControls.mode-rocket .mobileActionBtn{min-width:104px}
+  #mobileTouchControls.mode-driving #mobileActionStack{left:6px;top:60%;width:104px;transform:translateY(-50%)}
+  #mobileTouchControls.mode-driving .mobileActionBtn{min-width:104px}
+  .mobileNavBtn{font-size:16px}
+  .mobileActionBtn{min-width:76px;padding:8px 10px;font-size:10px}
+  .title-share-btn{width:38px;height:38px}
+  .title-share-btn svg{width:18px;height:18px}
   #buildModeIndicator{left:5px;bottom:60px;font-size:9px;padding:7px 9px;max-width:190px}
 
   /* Property panel for phones */
@@ -294,17 +344,52 @@ input,textarea{-webkit-user-select:text;user-select:text}
   }
 }
 
-#controlsTab{position:fixed;bottom:20px;left:200px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;z-index:100;display:none;font-size:12px;color:#475569;max-width:220px;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
+#controlsTab{position:fixed;bottom:20px;left:200px;transform:none;width:220px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;z-index:104;display:none;font-size:12px;color:#475569;max-width:220px;max-height:60vh;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 #controlsTab.show{display:block}
 #ctrlHeader{padding:12px 16px;cursor:pointer;color:#667eea;font-family:'Poppins',sans-serif;font-weight:600}
-#ctrlContent{padding:12px 16px;border-top:2px solid #f1f5f9;line-height:1.8}
+#ctrlContent{padding:12px 16px;border-top:2px solid #f1f5f9;line-height:1.8;max-height:calc(60vh - 48px);overflow-y:auto}
 #ctrlContent.hidden{display:none}
-#memoryFlowerFloatBtn{position:fixed;bottom:78px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#ec4899,#db2777);border:none;border-radius:50%;color:#ffffff;font-size:23px;cursor:pointer;box-shadow:0 10px 26px rgba(236,72,153,0.38);z-index:101;display:none;transition:all 0.2s}
+#controlsTab.compact{width:max-content;max-width:max-content;overflow:visible}
+#controlsTab.compact #ctrlHeader{white-space:nowrap;padding:10px 14px}
+#mobileTouchControls{position:fixed;inset:0;display:none;pointer-events:none;z-index:106}
+#mobileTouchControls.show{display:block}
+.mobilePad{position:absolute;top:58%;transform:translateY(-50%);width:126px;height:126px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:4px;pointer-events:none}
+#mobileMovePad{right:10px}
+#mobileLookPad{left:10px}
+.mobileNavBtn{border:none;border-radius:10px;background:rgba(15,23,42,0.62);backdrop-filter:blur(6px);color:#ffffff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:auto;touch-action:none;box-shadow:0 6px 16px rgba(0,0,0,0.24)}
+.mobileNavBtn.active{background:rgba(37,99,235,0.82);transform:scale(0.97)}
+.mobileNavBtn.up{grid-column:2;grid-row:1}
+.mobileNavBtn.left{grid-column:1;grid-row:2}
+.mobileNavBtn.right{grid-column:3;grid-row:2}
+.mobileNavBtn.down{grid-column:2;grid-row:3}
+.mobilePadLabel{grid-column:2;grid-row:2;border-radius:10px;background:rgba(255,255,255,0.85);color:#334155;font-size:9px;font-weight:700;letter-spacing:0.7px;display:flex;align-items:center;justify-content:center;text-transform:uppercase}
+#mobileActionStack{position:absolute;left:10px;top:73%;transform:none;display:flex;flex-direction:column;gap:8px;pointer-events:none;width:126px}
+.mobileActionBtn{min-width:88px;padding:10px 14px;border:none;border-radius:12px;background:rgba(15,23,42,0.62);backdrop-filter:blur(6px);color:#ffffff;font-size:12px;font-weight:700;letter-spacing:0.3px;pointer-events:auto;touch-action:none;box-shadow:0 8px 18px rgba(0,0,0,0.24)}
+.mobileActionBtn.active{background:rgba(37,99,235,0.82);transform:scale(0.97)}
+.mobilePad.hidden,.mobileActionBtn.hidden{display:none}
+#mobileTouchControls.mode-driving #mobileMoveLeft,
+#mobileTouchControls.mode-driving #mobileMoveRight,
+#mobileTouchControls.mode-driving #mobileLookUp,
+#mobileTouchControls.mode-driving #mobileLookDown{display:none}
+#mobileTouchControls.mode-driving #mobileMoveLabel,
+#mobileTouchControls.mode-driving #mobileLookLabel{display:none}
+#mobileTouchControls.mode-driving #mobileActionStack{left:10px;top:58%;transform:translateY(-50%);width:126px}
+#mobileTouchControls.mode-driving .mobileActionBtn{min-width:126px}
+#mobileTouchControls.mode-driving #mobileActionSecondary{display:none!important}
+#mobileTouchControls.mode-rocket #mobileMovePad{display:none}
+#mobileTouchControls.mode-rocket #mobileLookPad{left:auto;right:10px;top:58%}
+#mobileTouchControls.mode-rocket #mobileActionStack{left:10px;top:50%;transform:translateY(-50%);width:126px}
+#mobileTouchControls.mode-rocket .mobileActionBtn{min-width:126px}
+@media (hover:hover) and (pointer:fine){
+  #mobileTouchControls{display:none!important}
+}
+#memoryFlowerFloatBtn{position:fixed;bottom:78px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#ec4899,#db2777);border:none;border-radius:50%;color:#ffffff;font-size:23px;cursor:pointer;box-shadow:0 10px 26px rgba(236,72,153,0.38);z-index:103;display:none;transition:all 0.2s}
 #memoryFlowerFloatBtn.show{display:flex;align-items:center;justify-content:center}
 #memoryFlowerFloatBtn:hover{transform:scale(1.08);box-shadow:0 14px 34px rgba(236,72,153,0.45)}
-#gameShareFloatBtn{position:fixed;bottom:130px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;border-radius:50%;color:#ffffff;font-size:22px;cursor:pointer;box-shadow:0 10px 24px rgba(37,99,235,0.35);z-index:102;display:none;transition:all 0.2s}
+#gameShareFloatBtn{position:fixed;bottom:130px;left:200px;width:46px;height:46px;background:linear-gradient(135deg,#2563eb,#1d4ed8);border:none;border-radius:50%;color:#ffffff;cursor:pointer;box-shadow:0 10px 24px rgba(37,99,235,0.35);z-index:103;display:none;transition:all 0.2s;padding:0}
 #gameShareFloatBtn.show{display:flex;align-items:center;justify-content:center}
 #gameShareFloatBtn:hover{transform:scale(1.08);box-shadow:0 14px 34px rgba(37,99,235,0.42)}
+#gameShareFloatBtn .shareIcon{width:22px;height:22px;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;fill:none}
 #gameShareMenu{position:fixed;left:145px;bottom:182px;width:158px;background:rgba(255,255,255,0.96);border:1px solid rgba(148,163,184,0.35);border-radius:12px;box-shadow:0 12px 26px rgba(15,23,42,0.2);padding:8px;display:none;z-index:103;backdrop-filter:blur(8px)}
 #gameShareMenu.show{display:block}
 .gameShareOption{width:100%;border:none;background:#f8fafc;color:#334155;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;border-radius:8px;padding:7px 8px;cursor:pointer;text-align:left;margin:2px 0}
@@ -312,7 +397,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #gameShareStatus{font-size:10px;line-height:1.25;color:#475569;min-height:12px;margin-top:6px}
 #buildModeIndicator{position:fixed;left:20px;bottom:78px;background:rgba(17,24,39,0.88);border:1px solid rgba(251,146,60,0.7);border-radius:10px;padding:9px 12px;font-size:11px;color:#fdba74;z-index:101;display:none;max-width:280px;line-height:1.45;box-shadow:0 8px 20px rgba(0,0,0,0.25)}
 #buildModeIndicator.show{display:block}
-#coords{position:fixed;bottom:200px;left:20px;background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:10px 14px;font-size:11px;color:#475569;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+#coords{position:fixed;bottom:200px;left:20px;background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:10px 14px;font-size:11px;color:#475569;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1);cursor:pointer}
 #coords.show{display:block}
 #loading{position:fixed;inset:0;background:#000 url('loading-bg.jpg') center center/cover no-repeat;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:300;cursor:pointer}
 #loading.show{display:flex}
@@ -626,6 +711,32 @@ Use this to compare RDT and baseline with real runtime data.
 </div>
 <div class="start-section"><button class="startBtn" id="startBtn">EXPLORE</button></div>
 </div>
+<div class="title-footer">
+<div class="title-share-row" aria-label="Share links">
+<button id="shareExperienceBtn" class="title-share-btn copy" type="button" aria-label="Copy Link" title="Copy Link">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 15l6-6"></path><path d="M7.5 18a3 3 0 0 1 0-4.2l2.1-2.1"></path><path d="M16.5 6a3 3 0 0 1 0 4.2l-2.1 2.1"></path></svg>
+</button>
+<button id="titleShareNative" class="title-share-btn native" type="button" aria-label="Share" title="Share">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v11"></path><path d="M7.5 7.5L12 3l4.5 4.5"></path><path d="M5 13v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5"></path></svg>
+</button>
+<button id="titleShareFacebook" class="title-share-btn facebook" type="button" aria-label="Share to Facebook" title="Facebook">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 21v-7h2.2l.3-2.7h-2.5v-1.7c0-.8.2-1.4 1.4-1.4H16V5.8c-.4-.1-1.2-.2-2.2-.2-2.2 0-3.7 1.3-3.7 3.8v2h-2.1V14h2.1v7h3.4z"></path></svg>
+</button>
+<button id="titleShareTwitter" class="title-share-btn twitter" type="button" aria-label="Share to X" title="X">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h3.9l3.4 4.9L15.7 4H20l-6.5 7.4L20.4 20h-3.9l-3.9-5.5L7.6 20H3.3l6.8-7.8z"></path></svg>
+</button>
+<button id="titleShareInstagram" class="title-share-btn instagram" type="button" aria-label="Instagram" title="Instagram">
+<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="16" height="16" rx="4"></rect><circle cx="12" cy="12" r="3.5"></circle><circle cx="17.2" cy="6.8" r="1"></circle></svg>
+</button>
+<button id="titleShareText" class="title-share-btn text" type="button" aria-label="Text Message" title="Text">
+<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 6h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H10l-4.5 3V17H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2z"></path></svg>
+</button>
+</div>
+<div id="shareExperienceStatus"></div>
+<div class="title-license">
+Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fonts under SIL OFL · API providers under their own terms · © 2026 Steven Reid. All Rights Reserved. · <a href="LICENSE" target="_blank">License</a> · <a href="ACKNOWLEDGEMENTS.md" target="_blank">Acknowledgements</a>
+</div>
+</div>
 </div>
 <div id="hud"><div class="hud-box">
 <div id="speed">0</div>
@@ -644,18 +755,18 @@ Use this to compare RDT and baseline with real runtime data.
 <div id="legendPanel" style="position:absolute;top:20px;left:20px;background:rgba(0,0,0,0.95);border:2px solid #0fc;color:#0fc;font-family:Orbitron;border-radius:12px;padding:16px;max-width:340px;display:none;max-height:calc(100% - 40px);overflow-y:auto;z-index:200">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #0fc;padding-bottom:8px">
     <div style="font-size:14px;font-weight:bold">MAP LEGEND & FILTERS</div>
-    <button onclick="closeLegend()" style="background:transparent;border:none;color:#0fc;font-size:18px;cursor:pointer;padding:0;width:24px;height:24px">×</button>
+    <button id="legendCloseBtn" style="background:transparent;border:none;color:#0fc;font-size:18px;cursor:pointer;padding:0;width:24px;height:24px">×</button>
   </div>
 
   <div style="margin-bottom:12px;padding:8px;background:rgba(0,255,200,0.1);border-radius:6px">
     <div style="font-size:10px;margin-bottom:6px;opacity:0.8">Toggle map features on/off:</div>
-    <button onclick="toggleAllLayers(true)" style="background:#0fc;color:#000;border:none;padding:4px 8px;border-radius:4px;font-size:9px;cursor:pointer;margin-right:6px;font-family:Orbitron;font-weight:bold">Show All</button>
-    <button onclick="toggleAllLayers(false)" style="background:#f36;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:9px;cursor:pointer;font-family:Orbitron;font-weight:bold">Hide All</button>
+    <button id="legendShowAllBtn" style="background:#0fc;color:#000;border:none;padding:4px 8px;border-radius:4px;font-size:9px;cursor:pointer;margin-right:6px;font-family:Orbitron;font-weight:bold">Show All</button>
+    <button id="legendHideAllBtn" style="background:#f36;color:#fff;border:none;padding:4px 8px;border-radius:4px;font-size:9px;cursor:pointer;font-family:Orbitron;font-weight:bold">Hide All</button>
   </div>
 
   <div style="margin-bottom:12px">
     <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
-      <input type="checkbox" id="filterProperties" checked onchange="updateMapLayers()" style="cursor:pointer">
+      <input type="checkbox" id="filterProperties" checked style="cursor:pointer">
       <label for="filterProperties" style="cursor:pointer">PROPERTIES</label>
     </div>
     <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
@@ -667,7 +778,7 @@ Use this to compare RDT and baseline with real runtime data.
 
   <div style="margin-bottom:12px">
     <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
-      <input type="checkbox" id="filterNavigation" checked onchange="updateMapLayers()" style="cursor:pointer">
+      <input type="checkbox" id="filterNavigation" checked style="cursor:pointer">
       <label for="filterNavigation" style="cursor:pointer">NAVIGATION ROUTE</label>
     </div>
     <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
@@ -678,64 +789,64 @@ Use this to compare RDT and baseline with real runtime data.
 
   <div style="margin-bottom:12px">
     <div style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff;display:flex;align-items:center;gap:6px">
-      <input type="checkbox" id="filterPOIsAll" checked onchange="toggleAllPOIs()" style="cursor:pointer">
+      <input type="checkbox" id="filterPOIsAll" checked style="cursor:pointer">
       <label for="filterPOIsAll" style="cursor:pointer">POINTS OF INTEREST</label>
     </div>
     <div style="font-size:10px;line-height:1.4;padding-left:24px;opacity:0.9">
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterSchools" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterSchools" checked style="cursor:pointer">
         <label for="filterSchools" style="cursor:pointer">🏫 Schools & Universities</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterHealthcare" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterHealthcare" checked style="cursor:pointer">
         <label for="filterHealthcare" style="cursor:pointer">🏥 Healthcare</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterEmergency" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterEmergency" checked style="cursor:pointer">
         <label for="filterEmergency" style="cursor:pointer">👮 Police & 🚒 Fire</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterFood" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterFood" checked style="cursor:pointer">
         <label for="filterFood" style="cursor:pointer">🍽️ Restaurants & Cafes</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterShopping" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterShopping" checked style="cursor:pointer">
         <label for="filterShopping" style="cursor:pointer">🏪 Shopping & Malls</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterCulture" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterCulture" checked style="cursor:pointer">
         <label for="filterCulture" style="cursor:pointer">🏛️ Museums & Attractions</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterHistoric" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterHistoric" checked style="cursor:pointer">
         <label for="filterHistoric" style="cursor:pointer">🗿 Historic Sites</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterParks" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterParks" checked style="cursor:pointer">
         <label for="filterParks" style="cursor:pointer">🌳 Parks & Recreation</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterParking" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterParking" checked style="cursor:pointer">
         <label for="filterParking" style="cursor:pointer">🅿️ Parking</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterFuel" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterFuel" checked style="cursor:pointer">
         <label for="filterFuel" style="cursor:pointer">⛽ Gas Stations</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterBanks" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterBanks" checked style="cursor:pointer">
         <label for="filterBanks" style="cursor:pointer">🏦 Banks</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterPostal" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterPostal" checked style="cursor:pointer">
         <label for="filterPostal" style="cursor:pointer">📮 Post Offices</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterHotels" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterHotels" checked style="cursor:pointer">
         <label for="filterHotels" style="cursor:pointer">🏨 Hotels</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterTourism" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterTourism" checked style="cursor:pointer">
         <label for="filterTourism" style="cursor:pointer">⭐ Tourism & Viewpoints</label>
       </div>
     </div>
@@ -745,14 +856,14 @@ Use this to compare RDT and baseline with real runtime data.
     <div style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff">MEMORY MARKERS</div>
     <div style="font-size:11px;line-height:1.5;padding-left:24px;opacity:0.95">
       <div style="margin-bottom:4px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterMemoryPins" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterMemoryPins" checked style="cursor:pointer">
         <label for="filterMemoryPins" style="cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px">
           <span style="color:#ef4444;font-size:16px;line-height:1">📍</span>
           Pin memories
         </label>
       </div>
       <div style="margin-bottom:4px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterMemoryFlowers" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterMemoryFlowers" checked style="cursor:pointer">
         <label for="filterMemoryFlowers" style="cursor:pointer;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px">
           <span style="color:#ec4899;font-size:16px;line-height:1">🌸</span>
           Flower memories
@@ -764,20 +875,20 @@ Use this to compare RDT and baseline with real runtime data.
 
   <div style="margin-bottom:12px">
     <div style="font-size:11px;font-weight:bold;margin-bottom:8px;color:#0ff;display:flex;align-items:center;gap:6px">
-      <input type="checkbox" id="filterGameElementsAll" checked onchange="toggleAllGameElements()" style="cursor:pointer">
+      <input type="checkbox" id="filterGameElementsAll" checked style="cursor:pointer">
       <label for="filterGameElementsAll" style="cursor:pointer">GAME ELEMENTS</label>
     </div>
     <div style="font-size:10px;line-height:1.4;padding-left:24px;opacity:0.9">
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterCheckpoints" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterCheckpoints" checked style="cursor:pointer">
         <label for="filterCheckpoints" style="cursor:pointer"><span style="color:#f36">●</span> Checkpoints (game mode)</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterDestination" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterDestination" checked style="cursor:pointer">
         <label for="filterDestination" style="cursor:pointer"><span style="color:#fc0">●</span> Trial Destination</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterCustomTrack" checked onchange="updateMapLayers()" style="cursor:pointer">
+        <input type="checkbox" id="filterCustomTrack" checked style="cursor:pointer">
         <label for="filterCustomTrack" style="cursor:pointer"><span style="color:#fa0">━━</span> Custom Track</label>
       </div>
     </div>
@@ -785,7 +896,7 @@ Use this to compare RDT and baseline with real runtime data.
 
   <div style="margin-bottom:12px">
     <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
-      <input type="checkbox" id="filterPolice" checked onchange="updateMapLayers()" style="cursor:pointer">
+      <input type="checkbox" id="filterPolice" checked style="cursor:pointer">
       <label for="filterPolice" style="cursor:pointer">POLICE CARS</label>
     </div>
     <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
@@ -796,7 +907,7 @@ Use this to compare RDT and baseline with real runtime data.
 
   <div style="margin-bottom:12px">
     <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
-      <input type="checkbox" id="filterRoads" checked onchange="toggleRoads()" style="cursor:pointer">
+      <input type="checkbox" id="filterRoads" checked style="cursor:pointer">
       <label for="filterRoads" style="cursor:pointer">ROAD OVERLAY</label>
     </div>
     <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
@@ -816,7 +927,7 @@ Use this to compare RDT and baseline with real runtime data.
 <div id="mapInfoPanel" style="position:absolute;top:20px;right:20px;background:rgba(0,0,0,0.95);border:2px solid #0fc;color:#0fc;font-family:Orbitron;border-radius:12px;padding:16px;width:280px;display:none;max-height:calc(100% - 40px);overflow-y:auto">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;border-bottom:1px solid #0fc;padding-bottom:8px">
     <div style="font-size:14px;font-weight:bold" id="mapInfoTitle">Location Info</div>
-    <button onclick="closeMapInfo()" style="background:transparent;border:none;color:#0fc;font-size:18px;cursor:pointer;padding:0;width:24px;height:24px">×</button>
+    <button id="mapInfoCloseBtn" style="background:transparent;border:none;color:#0fc;font-size:18px;cursor:pointer;padding:0;width:24px;height:24px">×</button>
   </div>
   <div id="mapInfoContent" style="font-size:11px;line-height:1.6"></div>
 </div>
@@ -830,7 +941,6 @@ Use this to compare RDT and baseline with real runtime data.
 <div style="background:rgba(0,0,0,0.8);border:1px solid #0fc;color:#0fc;font-family:Orbitron;font-size:12px;padding:5px 10px;border-radius:6px;text-align:center" id="zoomLevel">Z: 14</div>
 </div>
 </div>
-<div id="modeHud"><div id="modeTitle">Free Roam</div><div id="modeTimer">--:--</div><div id="modeInfo"></div></div>
 <div id="explorationModeMsg" style="position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.85);border:3px solid #667eea;border-radius:16px;padding:24px 48px;color:#ffffff;font-family:'Orbitron',sans-serif;font-size:28px;font-weight:700;z-index:1000;display:none;box-shadow:0 8px 32px rgba(0,0,0,0.5);text-align:center;letter-spacing:1px;cursor:pointer;pointer-events:auto">
 Explore the area
 </div>
@@ -935,8 +1045,16 @@ Explore the area
 
 <button class="mainMenuBtn" id="mainMenuBtn">🏠 Main Menu</button>
 <button id="memoryFlowerFloatBtn" title="Place Flower Memory">🌸</button>
-<button id="gameShareFloatBtn" title="Share This Experience">↗</button>
+<button id="gameShareFloatBtn" title="Share This Experience" aria-label="Share This Experience">
+<svg class="shareIcon" viewBox="0 0 24 24" aria-hidden="true">
+<path d="M12 16V4"></path>
+<path d="M8 8l4-4 4 4"></path>
+<path d="M4 13v5a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"></path>
+</svg>
+</button>
 <div id="gameShareMenu" aria-label="Share Experience Menu">
+<button id="gameShareCopy" class="gameShareOption" type="button">🔗 Copy Link</button>
+<button id="gameShareNative" class="gameShareOption" type="button">📤 Share...</button>
 <button id="gameShareFacebook" class="gameShareOption" type="button">📘 Facebook</button>
 <button id="gameShareTwitter" class="gameShareOption" type="button">𝕏 Twitter</button>
 <button id="gameShareInstagram" class="gameShareOption" type="button">📷 Instagram</button>
@@ -944,7 +1062,7 @@ Explore the area
 <div id="gameShareStatus"></div>
 </div>
 <div id="buildModeIndicator">🧱 Build Mode ON<br>Click to place blocks, Shift+Click to remove.<br>Press B to toggle.</div>
-<div id="controlsTab"><div id="ctrlHeader">🛞 Controls ▼</div><div id="ctrlContent" class="hidden">
+<div id="controlsTab"><div id="ctrlHeader">⚙️ Driving Mode ▼</div><div id="ctrlContent" class="hidden">
 <div id="drivingControls">
 <b>🚗 Driving Mode:</b><br>
 • WASD/Arrows - Drive<br>
@@ -991,6 +1109,26 @@ Explore the area
 • LAND ON ... Button - Land when in range
 </div>
 </div></div>
+<div id="mobileTouchControls" aria-label="Mobile navigation controls">
+<div id="mobileMovePad" class="mobilePad" aria-label="Movement pad">
+<button id="mobileMoveUp" class="mobileNavBtn up" type="button" aria-label="Move up">▲</button>
+<button id="mobileMoveLeft" class="mobileNavBtn left" type="button" aria-label="Move left">◀</button>
+<button id="mobileMoveRight" class="mobileNavBtn right" type="button" aria-label="Move right">▶</button>
+<button id="mobileMoveDown" class="mobileNavBtn down" type="button" aria-label="Move down">▼</button>
+<div id="mobileMoveLabel" class="mobilePadLabel">Move</div>
+</div>
+<div id="mobileActionStack" aria-label="Mode actions">
+<button id="mobileActionPrimary" class="mobileActionBtn" type="button">Action 1</button>
+<button id="mobileActionSecondary" class="mobileActionBtn" type="button">Action 2</button>
+</div>
+<div id="mobileLookPad" class="mobilePad" aria-label="Look pad">
+<button id="mobileLookUp" class="mobileNavBtn up" type="button" aria-label="Look up">▲</button>
+<button id="mobileLookLeft" class="mobileNavBtn left" type="button" aria-label="Look left">◀</button>
+<button id="mobileLookRight" class="mobileNavBtn right" type="button" aria-label="Look right">▶</button>
+<button id="mobileLookDown" class="mobileNavBtn down" type="button" aria-label="Look down">▼</button>
+<div id="mobileLookLabel" class="mobilePadLabel">Look</div>
+</div>
+</div>
 
 <!-- Real Estate System -->
 <button id="realEstateBtn" title="Toggle Real Estate">🏠</button>
@@ -1000,9 +1138,9 @@ Explore the area
       <div class="panel-title">Properties</div>
       <div style="font-size:10px;opacity:0.9;margin-top:2px" id="dataSourceLabel">Source: Demo Data</div>
     </div>
-    <button class="panel-close" onclick="closePropertyPanel()">×</button>
+    <button class="panel-close" id="closePropertyPanelBtn">×</button>
   </div>
-  <div style="padding:12px 16px;background:#f1f5f9;border-bottom:2px solid #e2e8f0;cursor:pointer" onclick="togglePropertyFilters()">
+  <div id="propertyFiltersToggle" style="padding:12px 16px;background:#f1f5f9;border-bottom:2px solid #e2e8f0;cursor:pointer">
     <div style="display:flex;justify-content:space-between;align-items:center">
       <div>
         <span id="propertyCount" style="font-size:11px;color:#64748b;font-weight:600">0 Properties</span>
@@ -1060,7 +1198,7 @@ Explore the area
 <div id="historicPanel" style="position:fixed;top:20px;right:20px;width:380px;max-height:80vh;background:rgba(255,255,255,0.98);border:none;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.2);z-index:110;display:none;overflow:hidden;backdrop-filter:blur(10px);flex-direction:column">
   <div class="panel-header" style="background:linear-gradient(135deg,#f59e0b,#d97706)">
     <div class="panel-title">Historic Sites</div>
-    <button class="panel-close" onclick="closeHistoricPanel()">×</button>
+    <button class="panel-close" id="closeHistoricPanelBtn">×</button>
   </div>
   <div style="padding:12px 16px;background:#fef3c7;font-size:11px;color:#78350f;font-weight:600;border-bottom:2px solid #f59e0b">
     <span id="historicCount">0 Sites</span> • From OpenStreetMap
@@ -1072,7 +1210,7 @@ Explore the area
   <div class="modal-content">
     <div class="modal-header">
       <div class="modal-title" id="modalTitle"></div>
-      <button class="modal-close" onclick="closeModal()">×</button>
+      <button class="modal-close" id="closeModalBtn">×</button>
     </div>
     <div class="modal-body" id="modalBody"></div>
   </div>
@@ -1084,5 +1222,5 @@ Explore the area
 <div id="pauseScreen"><div class="pauseTitle">PAUSED</div><button class="pauseBtn" id="resumeBtn">Resume</button><button class="pauseBtn" id="restartBtn">Restart</button><button class="pauseBtn" id="menuBtn">Main Menu</button></div>
 <div id="resultScreen"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
 <div id="caughtScreen"><div class="caughtBox"><div class="caughtTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
-<script type="module" src="js/bootstrap.js?v=50"></script>
+<script type="module" src="js/bootstrap.js?v=54"></script>
 </body></html>

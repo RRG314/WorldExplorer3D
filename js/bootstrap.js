@@ -4,8 +4,8 @@ import {
   moduleEntrypoint,
   vendorScriptsCritical,
   vendorScriptsOptional
-} from './modules/manifest.js?v=50';
-import { loadScriptList } from './modules/script-loader.js?v=50';
+} from './modules/manifest.js?v=54';
+import { loadScriptList } from './modules/script-loader.js?v=54';
 
 async function boot() {
   try {
@@ -16,20 +16,23 @@ async function boot() {
     await loadScriptList(resolvedClassicScripts, { timeoutMs: 12000 });
 
     const entrypoint = new URL(moduleEntrypoint, import.meta.url).toString();
-    await import(entrypoint);
+    const appModule = await import(entrypoint);
+    const appApi = typeof appModule.bootApp === 'function'
+      ? appModule.bootApp()
+      : appModule;
     console.log('[bootstrap] World Explorer loaded through ES module entrypoint:', entrypoint);
 
     if (vendorScriptsOptional.length > 0) {
       loadScriptList(vendorScriptsOptional, { timeoutMs: 10000 })
         .then(() => {
-          if (typeof globalThis.tryEnablePostProcessing === 'function') {
-            globalThis.tryEnablePostProcessing();
+          if (typeof appApi?.tryEnablePostProcessing === 'function') {
+            appApi.tryEnablePostProcessing();
           }
         })
         .catch((err) => {
           console.warn('[bootstrap] Optional rendering scripts not fully available:', err);
-          if (typeof globalThis.tryEnablePostProcessing === 'function') {
-            globalThis.tryEnablePostProcessing();
+          if (typeof appApi?.tryEnablePostProcessing === 'function') {
+            appApi.tryEnablePostProcessing();
           }
         });
     }

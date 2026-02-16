@@ -1,10 +1,11 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#f5f7fa;overflow:hidden;font-family:'Inter',sans-serif;-webkit-user-select:none;user-select:none;touch-action:pan-x pan-y;-webkit-tap-highlight-color:transparent}
 button,input,select,textarea{-webkit-tap-highlight-color:transparent}
+button{touch-action:manipulation}
 input,textarea{-webkit-user-select:text;user-select:text}
 
 /* Title Screen */
-#titleScreen{position:fixed;inset:0;background:#000 url('images/title-bg.jpg') center center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:max(14px,env(safe-area-inset-top));padding-right:12px;padding-bottom:max(14px,env(safe-area-inset-bottom));padding-left:12px;gap:clamp(8px,1.8vh,18px);z-index:200;overflow-y:auto;overflow-x:hidden}
+#titleScreen{position:fixed;inset:0;background:#000 url('images/title-bg.jpg') center center/cover no-repeat;display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding-top:max(12px,calc(env(safe-area-inset-top) + 8px));padding-right:12px;padding-bottom:max(16px,calc(env(safe-area-inset-bottom) + 10px));padding-left:12px;gap:clamp(8px,1.2vh,14px);z-index:200;overflow-y:auto;overflow-x:hidden}
 #titleScreen::before{content:'';position:absolute;inset:0;background:rgba(0,0,0,0.35);backdrop-filter:blur(1px)}
 #titleScreen.hidden{display:none}
 .logo{font-family:'Orbitron',sans-serif;font-size:clamp(36px, 8vw, 72px);font-weight:900;line-height:1.05;color:#ffffff;letter-spacing:clamp(3px, 1vw, 8px);text-transform:uppercase;text-shadow:0 0 30px rgba(83,52,131,0.8),0 0 60px rgba(15,52,96,0.6),0 4px 20px rgba(0,0,0,0.4);position:relative;z-index:1;margin:0;animation:titleGlow 3s ease-in-out infinite;text-align:center;padding:0 20px;flex-shrink:0}
@@ -12,7 +13,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .sub{font-family:'Righteous',cursive;font-size:clamp(13px,1.7vw,20px);line-height:1.25;color:rgba(255,255,255,0.9);letter-spacing:clamp(1px,0.45vw,4px);margin:0;font-weight:400;text-shadow:0 2px 10px rgba(0,0,0,0.35);position:relative;z-index:1;text-align:center;max-width:min(94vw,1100px);padding:0 8px;flex-shrink:0}
 
 /* Menu Container with Tabs */
-.menu-container{background:rgba(255,255,255,0.85);backdrop-filter:blur(20px);border:2px solid rgba(255,255,255,0.3);border-radius:20px;width:min(520px,95vw);max-height:calc(100dvh - 180px);display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,0.4),0 0 40px rgba(83,52,131,0.3);position:relative;z-index:1;flex:0 1 auto}
+.menu-container{background:rgba(255,255,255,0.85);backdrop-filter:blur(20px);border:2px solid rgba(255,255,255,0.3);border-radius:20px;width:min(520px,95vw);max-height:calc(100dvh - 240px);display:flex;flex-direction:column;box-shadow:0 30px 80px rgba(0,0,0,0.4),0 0 40px rgba(83,52,131,0.3);position:relative;z-index:1;flex:0 1 auto}
 .tab-nav{display:flex;border-bottom:2px solid rgba(232,238,245,0.5);flex-shrink:0;background:rgba(248,250,252,0.6);backdrop-filter:blur(10px);border-radius:18px 18px 0 0}
 .tab-btn{flex:1;background:transparent;border:none;padding:16px;font-family:'Inter',sans-serif;font-size:13px;font-weight:500;color:#64748b;cursor:pointer;transition:all 0.3s;position:relative}
 .tab-btn:hover{color:#475569;background:rgba(241,245,249,0.6)}
@@ -109,23 +110,16 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #minimap{position:fixed;bottom:20px;left:20px;width:160px;height:160px;background:rgba(255,255,255,0.95);border:none;border-radius:16px;z-index:100;display:none;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 #minimap.show{display:block}
 #minimap:hover{box-shadow:0 12px 32px rgba(0,0,0,0.15)}
-#largeMap{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:150;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+#largeMap{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:220;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 #largeMap.show{display:flex}
 #largeMapCanvas{border:none;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
 #mapClose{position:absolute;top:30px;right:30px;background:#ffffff;border:none;color:#1e293b;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;padding:12px 24px;cursor:pointer;border-radius:10px;transition:all 0.2s;z-index:200}
 #mapClose:hover{background:#f1f5f9;transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.1)}
 #mapSatelliteToggle.active,#mapRoadsToggle.active{background:#0fc !important;color:#000 !important}
-#modeHud{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:8px 16px;z-index:100;text-align:center;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
-#modeHud.show{display:block}
-#modeTitle{font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;color:#667eea;text-transform:uppercase;letter-spacing:0.5px}
-#modeTimer{font-family:'Poppins',sans-serif;font-size:16px;font-weight:700;color:#1e293b;margin-top:2px;display:none}
-#modeTimer.show{display:block}
-#modeInfo{font-size:10px;color:#64748b;margin-top:2px;display:none}
-#modeInfo.show{display:block}
 #police{position:fixed;top:20px;right:20px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;padding:10px 16px;color:#dc2626;font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;z-index:100;display:none;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 #police.show{display:block}
 /* Float Menus - Three separate menus in triangle formation */
-.floatMenuContainer{position:fixed;bottom:20px;right:20px;z-index:100;display:none;flex-direction:column;align-items:center;gap:12px}
+.floatMenuContainer{position:fixed;bottom:20px;right:20px;z-index:112;display:none;flex-direction:column;align-items:center;gap:12px}
 .floatMenuContainer.show{display:flex}
 .floatMenu{display:flex;flex-direction:column;align-items:center;position:relative}
 .floatMenuRow{display:flex;gap:12px;justify-content:center}
@@ -150,6 +144,16 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .mainMenuBtn.show{display:block}
 .mainMenuBtn:hover{background:rgba(255,255,255,1);transform:translateY(-2px);box-shadow:0 8px 24px rgba(0,0,0,0.15);border-color:#667eea}
 
+@media (min-width:769px){
+  #titleScreen{padding-top:max(14px,calc(env(safe-area-inset-top) + 10px));padding-bottom:max(18px,calc(env(safe-area-inset-bottom) + 12px))}
+  .menu-container{max-height:calc(100dvh - 248px)}
+}
+@media (min-width:1024px){
+  .title-share-row{position:fixed;right:12px;top:50%;transform:translateY(-50%);flex-direction:column;flex-wrap:nowrap;gap:12px;z-index:3}
+  .title-footer{width:min(920px,95vw)}
+  #shareExperienceStatus,.title-license{padding-right:76px}
+}
+
 /* Responsive adjustments for float menus */
 @media (max-width: 768px) {
   .floatMenuContainer{bottom:10px;right:10px}
@@ -170,9 +174,20 @@ input,textarea{-webkit-user-select:text;user-select:text}
   /* HUD elements */
   #hud{top:10px;left:10px;font-size:11px}
   #minimap{width:120px;height:120px}
-  #modeHud{top:10px;font-size:10px;padding:6px 12px}
-  #coords{bottom:180px;left:10px;font-size:10px;padding:8px 12px}
-  #controlsTab{left:140px;max-width:180px;font-size:11px}
+  #coords{bottom:158px!important;left:10px!important;font-size:10px;padding:8px 12px}
+  #controlsTab{left:50%!important;transform:translateX(-50%)!important;width:min(280px,calc(100vw - 20px))!important;max-width:none!important;font-size:11px;bottom:106px!important;max-height:56vh!important}
+  #controlsTab.compact{width:auto!important;max-width:max-content!important;left:62%!important;transform:translateX(-50%)!important}
+  #controlsTab.compact #ctrlHeader{padding:9px 12px;font-size:12px}
+  #ctrlContent{max-height:calc(56vh - 44px)!important}
+  #gameShareFloatBtn{left:140px!important;bottom:24px!important}
+  #memoryFlowerFloatBtn{left:140px!important;bottom:76px!important}
+  #gameShareMenu{left:85px!important;bottom:128px!important}
+  #mobileTouchControls{inset:0}
+  .mobilePad{width:114px;height:114px;top:58%}
+  #mobileMovePad{right:8px}
+  #mobileLookPad{left:8px}
+  #mobileActionStack{left:8px;top:72%;width:114px}
+  .mobileActionBtn{min-width:82px;padding:9px 12px;font-size:11px}
 
   /* Property panel */
   #propertyPanel{width:90vw;right:5vw;top:10px;max-height:70vh}
@@ -210,10 +225,21 @@ input,textarea{-webkit-user-select:text;user-select:text}
   /* HUD elements for phones */
   #hud{top:5px;left:5px;font-size:10px}
   #minimap{width:100px;height:100px}
-  #modeHud{top:5px;font-size:9px;padding:5px 10px}
-  #modeTimer{font-size:14px}
-  #coords{bottom:160px;left:5px;font-size:9px;padding:6px 10px}
-  #controlsTab{left:115px;max-width:150px;font-size:10px;bottom:15px}
+  #coords{bottom:144px!important;left:5px!important;font-size:9px;padding:6px 10px}
+  #controlsTab{left:50%!important;transform:translateX(-50%)!important;width:min(270px,calc(100vw - 16px))!important;max-width:none!important;font-size:10px;bottom:100px!important;max-height:52vh!important}
+  #controlsTab.compact{width:auto!important;max-width:max-content!important;left:64%!important;transform:translateX(-50%)!important}
+  #controlsTab.compact #ctrlHeader{padding:8px 10px;font-size:11px}
+  #ctrlContent{max-height:calc(52vh - 40px)!important}
+  #gameShareFloatBtn{left:113px!important;bottom:22px!important}
+  #memoryFlowerFloatBtn{left:113px!important;bottom:74px!important}
+  #gameShareMenu{left:58px!important;bottom:126px!important}
+  #mobileTouchControls{inset:0}
+  .mobilePad{width:104px;height:104px;top:60%}
+  #mobileMovePad{right:6px}
+  #mobileLookPad{left:6px}
+  #mobileActionStack{left:6px;top:74%;width:104px}
+  .mobileNavBtn{font-size:16px}
+  .mobileActionBtn{min-width:76px;padding:8px 10px;font-size:10px}
 
   /* Property panel for phones */
   #propertyPanel{width:95vw;right:2.5vw;top:5px;max-height:75vh}
@@ -249,12 +275,33 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .sub{font-size:11px;letter-spacing:2px;margin:0}
 }
 
-#controlsTab{position:fixed;bottom:20px;left:200px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;z-index:100;display:none;font-size:12px;color:#475569;max-width:220px;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
+#controlsTab{position:fixed;bottom:20px;left:200px;transform:none;width:220px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;z-index:104;display:none;font-size:12px;color:#475569;max-width:220px;max-height:60vh;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 #controlsTab.show{display:block}
 #ctrlHeader{padding:12px 16px;cursor:pointer;color:#667eea;font-family:'Poppins',sans-serif;font-weight:600}
-#ctrlContent{padding:12px 16px;border-top:2px solid #f1f5f9;line-height:1.8}
+#ctrlContent{padding:12px 16px;border-top:2px solid #f1f5f9;line-height:1.8;max-height:calc(60vh - 48px);overflow-y:auto}
 #ctrlContent.hidden{display:none}
-#coords{position:fixed;bottom:200px;left:20px;background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:10px 14px;font-size:11px;color:#475569;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1)}
+#controlsTab.compact{width:max-content;max-width:max-content;overflow:visible}
+#controlsTab.compact #ctrlHeader{white-space:nowrap;padding:10px 14px}
+#mobileTouchControls{position:fixed;inset:0;display:none;pointer-events:none;z-index:106}
+#mobileTouchControls.show{display:block}
+.mobilePad{position:absolute;top:58%;transform:translateY(-50%);width:126px;height:126px;display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);gap:4px;pointer-events:none}
+#mobileMovePad{right:10px}
+#mobileLookPad{left:10px}
+.mobileNavBtn{border:none;border-radius:10px;background:rgba(15,23,42,0.62);backdrop-filter:blur(6px);color:#ffffff;font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;pointer-events:auto;touch-action:none;box-shadow:0 6px 16px rgba(0,0,0,0.24)}
+.mobileNavBtn.active{background:rgba(37,99,235,0.82);transform:scale(0.97)}
+.mobileNavBtn.up{grid-column:2;grid-row:1}
+.mobileNavBtn.left{grid-column:1;grid-row:2}
+.mobileNavBtn.right{grid-column:3;grid-row:2}
+.mobileNavBtn.down{grid-column:2;grid-row:3}
+.mobilePadLabel{grid-column:2;grid-row:2;border-radius:10px;background:rgba(255,255,255,0.85);color:#334155;font-size:9px;font-weight:700;letter-spacing:0.7px;display:flex;align-items:center;justify-content:center;text-transform:uppercase}
+#mobileActionStack{position:absolute;left:10px;top:73%;transform:none;display:flex;flex-direction:column;gap:8px;pointer-events:none;width:126px}
+.mobileActionBtn{min-width:88px;padding:10px 14px;border:none;border-radius:12px;background:rgba(15,23,42,0.62);backdrop-filter:blur(6px);color:#ffffff;font-size:12px;font-weight:700;letter-spacing:0.3px;pointer-events:auto;touch-action:none;box-shadow:0 8px 18px rgba(0,0,0,0.24)}
+.mobileActionBtn.active{background:rgba(37,99,235,0.82);transform:scale(0.97)}
+.mobilePad.hidden,.mobileActionBtn.hidden{display:none}
+@media (hover:hover) and (pointer:fine){
+  #mobileTouchControls{display:none!important}
+}
+#coords{position:fixed;bottom:200px;left:20px;background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:10px 14px;font-size:11px;color:#475569;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1);cursor:pointer}
 #coords.show{display:block}
 #loading{position:fixed;inset:0;background:#000 url('images/loading-bg.jpg') center center/cover no-repeat;display:none;align-items:center;justify-content:center;flex-direction:column;z-index:300;cursor:pointer}
 #loading.show{display:flex}

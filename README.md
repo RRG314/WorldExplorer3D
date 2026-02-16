@@ -23,14 +23,6 @@ Open `http://localhost:8000`.
 
 ### GitHub Pages deployment
 
-Recommended (automated):
-
-1. In GitHub, go to `Settings > Pages`.
-2. Set source to `GitHub Actions`.
-3. Push to `rdt-engine` (or `main`) and let `Deploy Pages` workflow publish automatically.
-
-Fallback (manual branch publish):
-
 1. Push this branch to your repository.
 2. In GitHub, go to `Settings > Pages`.
 3. Set source to `Deploy from a branch`.
@@ -48,7 +40,7 @@ Fallback (manual branch publish):
 - Persistent memory markers (pin/flower + short note) with in-world remove and bulk delete actions.
 - Minecraft-style brick block builder (place, stack, and remove blocks in-world).
 - Deterministic runtime seeding and complexity logic through RDT + RGE256-based paths.
-- Platform feature registry with lifecycle hooks and capability APIs (`js/platform-registry.js`).
+- Shareable experience links (seed/location/mode/camera context) from the Settings panel.
 
 ## Core Features
 
@@ -79,13 +71,14 @@ Fallback (manual branch publish):
 - Main asteroid belt and Kuiper belt visual layers.
 - Clickable deep-sky galaxy catalog (RA/Dec-positioned) with info panel.
 - Moon landing / return flows.
+- Moon-only terrain airborne vehicle behavior for crater/hill transitions (Earth driving remains grounded).
 
 ## Controls (Default)
 
 | Area | Key | Action |
 | --- | --- | --- |
 | Movement | `WASD` / `Arrow Keys` | Drive / steer |
-| Movement | `Space` | Handbrake / drift |
+| Movement | `Space` | Brake / handbrake |
 | Movement | `Ctrl` | Boost |
 | Movement | `Shift` | Sprint in walking mode |
 | Modes | `F` | Toggle walking mode |
@@ -111,6 +104,13 @@ Block builder actions:
 - `Shift+Click` (build mode on) -> remove targeted block
 - `🎮 Game Mode` menu -> `🧱 Build Mode` and `🧹 Clear Blocks`
 
+Mobile touch controls (auto-enabled on touch-first clients):
+
+- Driving: left stack = `Accelerate` / `Brake` / `Decelerate`; right pad = steering
+- Walking: left pad = camera look, right pad = movement, action stack = `Jump` / `Run`
+- Drone: left pad = camera look, right pad = movement, action stack = `Ascend` / `Descend`
+- Rocket: left stack = `Accelerate` / `Decelerate`, right pad = steer/pitch
+
 ## Performance Mode Switch (RDT vs Baseline)
 
 Use the built-in benchmark controls from the title screen:
@@ -120,6 +120,7 @@ Use the built-in benchmark controls from the title screen:
 3. Optional: enable `Show live benchmark overlay in-game` (default is OFF each session).
 4. Click `Apply + Reload World`.
 5. Click `Copy Snapshot` to copy a JSON benchmark payload.
+6. Auto quality manager runs by default and adjusts runtime budget tier (`performance`, `balanced`, `quality`) from live FPS/frame-time pressure.
 
 In-game overlay placement:
 
@@ -135,6 +136,32 @@ Snapshot fields to compare:
 - `renderer.triangles`
 - `fps` and `frameMs`
 - `lastLoad.overpassSource` (`network` or `memory-cache`)
+- `dynamicBudget.*` (top-level snapshot quality/budget state)
+- `lastLoad.dynamicBudget.*` (quality/budget state used during that load)
+
+## Shareable Experience Links
+
+Share actions are available in both title and in-game UI:
+
+1. Title screen footer: use circular `Copy`, `Share`, `Facebook`, `X`, `Instagram`, or `Text` icons.
+2. In-game: use the blue share arrow above the flower button for the same quick actions.
+3. Tap/click the live coordinate readout to copy your current experience link directly.
+
+The URL payload supports:
+
+- location (`loc`, or custom `lat/lon` + `lname`)
+- game mode (`gm`)
+- performance mode (`pm`)
+- deterministic seed (`seed`)
+- movement mode (`mode`)
+- camera mode (`camMode`)
+- runtime pose (`rx`, `ry`, `rz`, `yaw`, optional `pitch`)
+
+When a shared URL is opened:
+
+- title-screen state is prefilled from params
+- a status note confirms payload load
+- mode/camera/pose state is applied after `Explore` starts
 
 ## Supporting Benchmark Stats (Baltimore, 2026-02-14)
 
@@ -157,7 +184,6 @@ Interpretation:
 - Marker types: `Pin` and `Flower`
 - Message length: up to `200` characters
 - Storage: browser `localStorage` (`worldExplorer3D.memories.v1`)
-- Schema: versioned payload (`schemaVersion: 2`) with automatic migration from legacy array storage
 - Scope: Earth-mode, per location center key (`LOC` rounded to 5 decimals)
 - Limits: `300` per location, `1500` total, ~`1500KB` max payload
 - Persistence guard: placement is disabled if browser storage round-trip check fails
@@ -167,30 +193,15 @@ Interpretation:
 - Surface snap: markers render on top of the highest local surface (build blocks, building roofs, then ground)
 - Legend filters: `📍 Pin` and `🌸 Flower` checkboxes control visibility independently
 - Verification: run `getMemoryPersistenceStatus()` in browser console
-- Import/export:
-  - `exportMemoryPack({ scope: 'current' | 'all' })`
-  - `importMemoryPack(jsonOrObject, { conflictMode: 'keep-existing' | 'replace-location' | 'replace-all' })`
-  - `downloadMemoryPack({ scope: 'current' | 'all' })`
 
 ## Persistent Build Blocks
 
 - Storage: browser `localStorage` (`worldExplorer3D.buildBlocks.v1`)
-- Schema: versioned payload (`schemaVersion: 2`) with automatic migration from legacy array storage
 - Scope: per location center key (`LOC` rounded to 5 decimals)
 - In-world behavior: place/stack/remove blocks and stand or climb on them in walking mode
 - Build limit: `100` max blocks for now
 - Clear behavior: `🧹 Clear Blocks` removes rendered and saved blocks for the current location
 - Verification: run `getBuildPersistenceStatus()` in browser console
-- Import/export:
-  - `exportBuildPack({ scope: 'current' | 'all' })`
-  - `importBuildPack(jsonOrObject, { conflictMode: 'keep-existing' | 'replace-location' | 'replace-all' })`
-  - `downloadBuildPack({ scope: 'current' | 'all' })`
-
-Cross-system world edits pack:
-
-- `exportWorldEditsPack({ scope: 'current' | 'all' })`
-- `importWorldEditsPack(jsonOrObject, { conflictMode: 'keep-existing' | 'replace-location' | 'replace-all' })`
-- `downloadWorldEditsPack({ scope: 'current' | 'all' })`
 
 ## Security and Storage Notice
 
@@ -207,7 +218,7 @@ Cross-system world edits pack:
 - Runtime is split into multiple JS files (`js/*.js`) with no build step.
 - Shared/global runtime state is still used across core systems.
 - ES module boot and loading (`js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`) is active.
-- Cache-bust version alignment across loader chain is currently `v=50`.
+- Cache-bust version alignment across loader chain is currently `v=54`.
 - Full subsystem encapsulation is in progress; migration is iterative to avoid regressions.
 
 ## Freeze Snapshot (2026-02-14)
@@ -225,6 +236,14 @@ Cross-system world edits pack:
 - Added Minecraft-style brick block builder with stacking/removal controls.
 - Added persistent per-location block storage and walk-mode climbing support on placed blocks.
 - Added runtime performance benchmark mode switch (`RDT` vs `Baseline`) with in-game snapshot export.
+- Added FPS/frame-time auto quality manager (`perf.js`) with dynamic budget/LOD scaling consumed by `world.js`.
+- Added shareable experience link export/import for seed/location/mode/camera runtime context.
+- Added mobile-first touch navigation profiles for driving, walking, drone, and rocket modes.
+- Added title-footer social share icon rail plus in-game share arrow quick menu.
+- Added clickable coordinate readout share-copy shortcut.
+- Added moon-only terrain airborne/float vehicle behavior for hills/crater transitions.
+- Hardened moon environment isolation so Earth meshes cannot leak into moon view on desktop after async world loads.
+- Tuned desktop lunar-driving airborne triggers and improved moon terrain readability (local relief + stronger shading + additional rock cues).
 - Added Overpass endpoint preference plus memory-cache reuse for faster repeat city loads.
 
 ## Repository Structure
