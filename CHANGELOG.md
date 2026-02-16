@@ -41,6 +41,8 @@ Entries reflect changes made relative to the most recent public release.
 - "Find The Red Flower" timed challenge system with random in-world red flower spawn on Earth and a live in-game timer HUD.
 - Title-screen leaderboard panel with location-scoped challenge start flow and optional player-name entry.
 - Firebase-backed leaderboard support with automatic localStorage fallback when Firebase config/network is unavailable.
+- Title-screen leaderboard decluttered into a top-right floating toggle (`🏁 Leaderboard`) with mobile touch-open support.
+- Runtime Firebase/local backend status probe exposed via `getFlowerChallengeBackendStatus()`.
 
 ### Changed
 - Technical documentation examples now show deterministic RNG usage patterns aligned with the `rdt.js` seeded runtime helpers.

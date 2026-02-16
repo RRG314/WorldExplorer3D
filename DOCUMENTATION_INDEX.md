@@ -56,6 +56,8 @@ The current branch documentation set includes updates for:
 - Supporting benchmark stats documentation from captured Baltimore test runs (network + memory-cache)
 - Security/storage boilerplate notice for persistent memory data
 - Dynamic UI text escaping in map/property/historic panels
+- Red-flower leaderboard moved to a top-right floating title toggle (`🏁 Leaderboard`) for reduced selector clutter
+- Firebase/local leaderboard runtime check helper documented (`getFlowerChallengeBackendStatus()`)
 - Cache-bust loader chain alignment through `v=54`
 
 ## Maintainer Notes

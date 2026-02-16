@@ -51,7 +51,7 @@ This branch snapshot includes these runtime additions beyond the previous doc ba
 - World-load profile scaling now consumes dynamic budget/LOD state in `js/world.js`.
 - Shareable experience link export/import added in `js/ui.js` (`Copy Experience Link` + URL param parsing).
 - Share surfaces expanded to title-footer icon rail, in-game share quick menu, and coordinate-readout click-copy.
-- Timed "Find The Red Flower" challenge module added (`js/flower-challenge.js`) with title-panel entry + in-game flower action menu.
+- Timed "Find The Red Flower" challenge module added (`js/flower-challenge.js`) with top-right title toggle/panel entry + in-game flower action menu.
 - Leaderboard persistence now supports Firebase Firestore (`flowerLeaderboard`) with automatic local fallback.
 - Mobile touch-control profiles added for driving, walking, drone, and rocket modes with per-mode bindings/layout.
 - Moon-only low-gravity airborne terrain-follow behavior added for lunar driving crest/crater transitions.
@@ -480,9 +480,15 @@ Primary responsibilities:
 
 UI integration points:
 
-- Title panel: `#flowerChallengePanel`, `#titleFindFlowerBtn`, `#titleFlowerRefreshBtn`
+- Title toggle/panel: `#flowerChallengeToggleBtn`, `#flowerChallengePanel`, `#titleFindFlowerBtn`, `#titleFlowerRefreshBtn`
 - In-game action menu: `#flowerActionMenu` opened from `#memoryFlowerFloatBtn`
 - In-game HUD: `#flowerChallengeHud`, `#flowerChallengeHudStatus`, `#flowerChallengeHudTimer`
+
+Panel behavior:
+
+- Title challenge panel is hidden by default and opened with `.open`.
+- `#flowerChallengeToggleBtn` controls panel visibility on desktop + touch/mobile.
+- Outside click closes the title panel while preserving in-panel interactions.
 
 App context methods exposed by the module:
 
@@ -494,6 +500,8 @@ App context methods exposed by the module:
 - `toggleFlowerActionMenu()`
 - `updateFlowerChallenge(dt)`
 - `refreshFlowerLeaderboard()`
+- `closeFlowerChallengeTitlePanel()`
+- `getFlowerChallengeBackendStatus()`
 
 Persistence strategy:
 
@@ -509,6 +517,12 @@ Firebase config injection (optional):
   - `worldExplorer3D.firebaseConfig` with same JSON shape.
 
 If Firebase modules/config fail to load, challenge and leaderboard continue using local fallback without blocking gameplay.
+
+Runtime backend probe:
+
+- Global helper is exposed for quick verification:
+  - `getFlowerChallengeBackendStatus()`
+  - returns `{ configPresent, firebaseReady, backend, challengeActive }`
 
 ## API Integration
 

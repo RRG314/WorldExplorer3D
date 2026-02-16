@@ -155,10 +155,11 @@ Open that URL and the app will preload the title-screen state, then apply mode/c
 Timed challenge flow:
 
 1. On the title screen, select a location.
-2. In the right leaderboard panel, optionally set your player name.
-3. Click `Find Flower` to start loading into the challenge.
-4. In-game, find and touch the red flower using walking, driving, or drone mode.
-5. Your finish time is recorded to the leaderboard.
+2. Tap/click the top-right `🏁 Leaderboard` button to open the challenge panel.
+3. Optionally set your player name.
+4. Click `Find Flower` to start loading into the challenge.
+5. In-game, find and touch the red flower using walking, driving, or drone mode.
+6. Your finish time is recorded to the leaderboard.
 
 In-game entry point:
 
@@ -175,6 +176,7 @@ Leaderboard storage behavior:
 
 - Uses Firebase Firestore when configured.
 - Falls back to local browser leaderboard storage if Firebase is unavailable.
+- Backend check: run `getFlowerChallengeBackendStatus()` in the browser console.
 
 ## Game Modes
 

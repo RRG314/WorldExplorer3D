@@ -106,13 +106,14 @@ World Explorer 3D currently ships as a browser-first ES module runtime with thes
 ### 3.7 Challenge Gameplay Layer
 
 - `Find The Red Flower` timed challenge
-  - Title-screen challenge panel (right side)
+  - Title-screen top-right leaderboard toggle opens challenge panel
   - In-game flower action menu entry
   - Live objective/timer HUD while active
   - Completion support for walk, drive, and drone actors
 - Leaderboard persistence
   - Preferred backend: Firebase Firestore collection `flowerLeaderboard`
   - Automatic fallback: local browser storage
+  - Runtime backend probe: `getFlowerChallengeBackendStatus()`
 
 ## 4. URL Payload Contract (Share Links)
 
