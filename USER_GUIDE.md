@@ -10,6 +10,12 @@ This guide is for players and subscribers using the hosted World Explorer experi
 - Play runtime: `https://worldexplorer3d-d9b83.web.app/app/`
 - Account/billing: `https://worldexplorer3d-d9b83.web.app/account/`
 
+GitHub mirror URLs (when using Pages):
+
+- Landing: `https://rrg314.github.io/WorldExplorer/`
+- Play runtime: `https://rrg314.github.io/WorldExplorer/app/`
+- Account: `https://rrg314.github.io/WorldExplorer/account/`
+
 ## 2. Sign In and Trial
 
 On `/app/`, use the top-left `Sign In / Sign Up` button.
@@ -66,8 +72,9 @@ Checkout flow:
 
 ### Auth button
 
-- Top-left floating button opens auth/account panel
+- Top-left floating button opens auth/account panel on title screen
 - Clicking outside closes the panel
+- During gameplay, the auth/account button is hidden
 
 ### Pro panel
 

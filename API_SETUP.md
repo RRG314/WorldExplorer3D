@@ -21,6 +21,10 @@ Enable in Firebase Console -> Authentication -> Sign-in method:
 - `Email/Password`
 - `Google`
 
+Also add authorized domain(s) for GitHub Pages testing/deploy:
+
+- `rrg314.github.io`
+
 ### 1.3 Firestore
 
 Collections used:
@@ -118,6 +122,12 @@ or
 { "plan": "pro" }
 ```
 
+Optional field for GitHub Pages/subpath return routing:
+
+```json
+{ "returnUrlBase": "https://rrg314.github.io/WorldExplorer" }
+```
+
 Success response:
 
 ```json
@@ -132,6 +142,12 @@ Request body:
 
 ```json
 {}
+```
+
+Optional field for GitHub Pages/subpath return routing:
+
+```json
+{ "returnUrlBase": "https://rrg314.github.io/WorldExplorer" }
 ```
 
 Success response:

@@ -43,6 +43,7 @@ At minimum:
 3. auth float opens/closes
 4. `/account/` loads
 5. no new console errors in core flows
+6. GitHub Pages mirror (`/WorldExplorer/` subpath) still loads key routes if frontend routing or paths changed
 
 If billing touched:
 
@@ -67,6 +68,7 @@ Any behavior change must update docs in the same PR:
 - `TECHNICAL_DOCS.md`
 - `USER_GUIDE.md`
 - `CHANGELOG.md`
+- `GITHUB_DEPLOYMENT.md` (if deployment/routing/cache behavior is affected)
 
 ## 6. PR Format
 

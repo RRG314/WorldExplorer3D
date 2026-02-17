@@ -95,6 +95,17 @@ Potential improvement:
 
 - evaluate 2nd gen migration and dependency modernization after config/runtime migration.
 
+### 9. Browser Cache Path Drift on GitHub Pages
+
+Observed issue:
+
+- Some clients request stale legacy module paths (for example `/WorldExplorer/js/app-entry.js`) after deployment changes.
+
+Mitigation:
+
+- compatibility bridge files under `public/js/` now forward stale loader paths to current `/app/js/` runtime
+- users may still need hard refresh/site-data clear on first visit after major deploy transitions
+
 ## Reporting Checklist
 
 When filing issues include:

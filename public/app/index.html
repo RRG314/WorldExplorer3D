@@ -1506,6 +1506,19 @@ function setAuthMode(mode) {
   authPasswordInput.autocomplete = isSignUp ? 'new-password' : 'current-password';
 }
 
+function isTitleScreenVisible() {
+  const titleScreen = document.getElementById('titleScreen');
+  return !!(titleScreen && !titleScreen.classList.contains('hidden'));
+}
+
+function updateAuthOverlayVisibility() {
+  const titleVisible = isTitleScreenVisible();
+  appSignInBtn.hidden = !titleVisible;
+  if (!titleVisible) {
+    closeAuthPanel();
+  }
+}
+
 function openAuthPanel() {
   authFloatPanel.hidden = false;
   appSignInBtn.setAttribute('aria-expanded', 'true');
@@ -1573,6 +1586,8 @@ function renderState(state, user) {
   } else {
     setProStatus('Free plan active. Cloud sync and Pro-only tools are disabled.');
   }
+
+  updateAuthOverlayVisibility();
 }
 
 function clearEntitlementSubscription() {
@@ -1690,7 +1705,7 @@ authForgotBtn.addEventListener('click', async () => {
 });
 
 document.addEventListener('pointerdown', (event) => {
-  if (authFloatPanel.hidden) return;
+  if (appSignInBtn.hidden || authFloatPanel.hidden) return;
   const target = event.target;
   if (target === appSignInBtn || authFloatPanel.contains(target)) return;
   closeAuthPanel();
@@ -1756,6 +1771,13 @@ observeAuth(async (user) => {
 });
 
 setAuthMode('signin');
+updateAuthOverlayVisibility();
+
+const titleScreenObserverTarget = document.getElementById('titleScreen');
+if (titleScreenObserverTarget) {
+  const titleObserver = new MutationObserver(() => updateAuthOverlayVisibility());
+  titleObserver.observe(titleScreenObserverTarget, { attributes: true, attributeFilter: ['class'] });
+}
 </script>
 <script type="module" src="js/bootstrap.js?v=54"></script>
 </body></html>

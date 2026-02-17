@@ -69,6 +69,19 @@ Caching model:
 - static assets: immutable 1 year
 - HTML: short cache (`max-age=300`)
 
+### 3.1 GitHub Pages Mirror Mode
+
+The project also supports GitHub Pages publication from `public/` via:
+
+- `.github/workflows/deploy-pages-public.yml`
+- branch: `codex/github-pages-compat`
+
+In this mode:
+
+- route structure remains `/`, `/app/`, `/account/`, `/legal/*`
+- Firebase Functions still handle checkout/portal/webhook endpoints
+- frontend `billing.js` resolves direct function origin for non-Firebase-hosting domains
+
 ## 4. Identity and Entitlements Flow
 
 ### 4.1 Auth

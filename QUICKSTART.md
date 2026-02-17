@@ -30,6 +30,20 @@ Open:
 - `http://localhost:4173/app/`
 - `http://localhost:4173/account/`
 
+## 3A. GitHub Pages (This Repo)
+
+1. Push branch `codex/github-pages-compat`.
+2. In GitHub repo settings, set Pages source to `GitHub Actions`.
+3. Ensure workflow `.github/workflows/deploy-pages-public.yml` succeeds.
+4. Open:
+   - `https://rrg314.github.io/WorldExplorer/`
+   - `https://rrg314.github.io/WorldExplorer/app/`
+5. Hard refresh if stale scripts are cached.
+
+See full guide:
+
+- `/Users/stevenreid/Documents/New project/GITHUB_DEPLOYMENT.md`
+
 ## 4. Firebase Project Setup
 
 ```bash

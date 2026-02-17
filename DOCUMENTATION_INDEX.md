@@ -14,6 +14,7 @@ This index tracks the top-level documentation set in the active `WorldExplorer` 
 | `TECHNICAL_DOCS.md` | Engineering reference and endpoint contracts |
 | `USER_GUIDE.md` | End-user instructions for app/account flows |
 | `API_SETUP.md` | External services setup (Firebase, Stripe, optional APIs) |
+| `GITHUB_DEPLOYMENT.md` | GitHub Pages deployment modes, cache/path troubleshooting |
 | `KNOWN_ISSUES.md` | Current risks, debt, and pending migration work |
 | `CHANGELOG.md` | Recent releases and notable updates |
 | `CONTRIBUTING.md` | Contribution standards and validation expectations |

@@ -84,6 +84,12 @@ Endpoints called:
 - `/createCheckoutSession`
 - `/createPortalSession`
 
+GitHub Pages compatibility behavior:
+
+- detects non-Firebase-hosting domain
+- resolves direct Cloud Functions origin via Firebase `projectId`
+- sends `returnUrlBase` so Stripe returns to subpath deployments (for example `/WorldExplorer`)
+
 ## 4. Cloud Functions
 
 Source: `/Users/stevenreid/Documents/New project/functions/index.js`
@@ -134,6 +140,11 @@ Defined in `firebase.json`.
 - short cache for HTML
 - function rewrites for checkout/portal/webhook
 - legal route rewrites
+
+GitHub Pages mirror mode:
+
+- Uses `.github/workflows/deploy-pages-public.yml` to publish `public/`
+- No Firebase rewrites available on Pages; billing calls use direct function URL resolution
 
 ## 7. Plan State Model
 
@@ -208,6 +219,7 @@ Currently set using legacy runtime config commands.
 1. `functions.config()` deprecation (March 2026 shutdown)
 2. Node 20 runtime deprecation warnings for Functions
 3. dual runtime copies (legacy root and active `/public/app`) can cause confusion
+4. browser stale-cache edge cases can request legacy `/js/*` entrypoints after route/layout changes
 
 ## 12. Immediate Migration Plan (Recommended)
 

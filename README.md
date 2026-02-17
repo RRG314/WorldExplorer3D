@@ -83,6 +83,18 @@ Open:
 - `http://localhost:4173/app/`
 - `http://localhost:4173/account/`
 
+## GitHub Pages Deployment
+
+This repo supports GitHub Pages via GitHub Actions publishing from `public/`.
+
+- Branch: `codex/github-pages-compat`
+- Workflow: `.github/workflows/deploy-pages-public.yml`
+- Pages source: `GitHub Actions`
+
+Full deployment and troubleshooting guide:
+
+- `/Users/stevenreid/Documents/New project/GITHUB_DEPLOYMENT.md`
+
 ## Firebase Deployment
 
 ### Prerequisites

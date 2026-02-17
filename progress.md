@@ -353,3 +353,30 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Removed duplicate hero visual card from `Visual Proof` and switched that section to a 3-column layout.
   - Verification screenshot:
     - `output/playwright/landing-after-title-image-cleanup.png`
+- Landing image fit + auth-visibility gating update (2026-02-17):
+  - `public/index.html`:
+    - hero media switched to `<img class="hero-media-img">` with `object-fit:cover` and bottom-origin scaling for non-stretched bottom-scene-only rendering.
+    - removed stretch artifacts from prior background-size-only approach.
+  - `public/app/index.html`:
+    - added title-screen visibility gating for auth/account float button.
+    - `#appSignInBtn` now shows only while `#titleScreen` is visible.
+    - auth panel auto-closes when gameplay starts (title hidden).
+  - Validation artifacts:
+    - `output/playwright/landing-auth-visibility-fix/report.json`
+    - `output/playwright/landing-auth-visibility-fix/landing-after-fix.png`
+    - `output/playwright/landing-auth-visibility-fix/app-title-before-start.png`
+    - `output/playwright/landing-auth-visibility-fix/app-after-start.png`
+    - `output/playwright/landing-hero-bottom-crop-final-v2.png`
+    - `output/playwright/final-request-check/report.json`
+- GitHub documentation coverage expansion (2026-02-17):
+  - Added `GITHUB_DEPLOYMENT.md` and linked/updated:
+    - `README.md`
+    - `QUICKSTART.md`
+    - `DOCUMENTATION_INDEX.md`
+    - `ARCHITECTURE.md`
+    - `API_SETUP.md`
+    - `USER_GUIDE.md`
+    - `TECHNICAL_DOCS.md`
+    - `KNOWN_ISSUES.md`
+    - `CONTRIBUTING.md`
+    - `CHANGELOG.md`

@@ -156,9 +156,20 @@
     }
 
     .hero-media {
-      background: #020913 url('./assets/landing/hero.jpg') center 100% / auto 190% no-repeat;
       position: relative;
       min-height: 280px;
+      background: #020913;
+      overflow: hidden;
+    }
+
+    .hero-media-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      object-position: center bottom;
+      display: block;
+      transform: scale(2.15);
+      transform-origin: center bottom;
     }
 
     .hero-media::before {
@@ -331,7 +342,9 @@
           <p id="startTrialStatus" class="status-note"></p>
           <p class="perf-note">Performance note: Desktop recommended for best frame rate and rendering quality.</p>
         </div>
-        <div class="hero-media" aria-hidden="true"></div>
+        <div class="hero-media" aria-hidden="true">
+          <img class="hero-media-img" src="./assets/landing/hero.jpg" alt="">
+        </div>
       </div>
     </section>
 

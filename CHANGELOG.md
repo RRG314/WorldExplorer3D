@@ -30,12 +30,21 @@
   - Google sign-in
   - password reset
   - outside-click collapse behavior
+- GitHub Pages deployment docs:
+  - `GITHUB_DEPLOYMENT.md`
+- Stale-cache compatibility bridge modules:
+  - `public/js/bootstrap.js`
+  - `public/js/app-entry.js`
+  - `public/js/modules/manifest.js`
+  - `public/js/modules/script-loader.js`
 
 ### Changed
 
 - App auth/account controls moved to left floating panel; top-center plan/account HUD removed.
 - Pro early-access panel now auto-hides after a short delay for non-Pro users.
 - Landing hero now includes explicit `World Explorer` title line.
+- Landing hero image now uses contained `<img>` rendering with bottom-scene cropping (no stretch and no stacked-card duplication).
+- In-app auth/account float button now appears on title screen only and is hidden during gameplay.
 - Firebase project targeting aligned to `worldexplorer3d-d9b83` in `.firebaserc`.
 - Firestore rules and hosting rewrites aligned with subscription flow.
 
