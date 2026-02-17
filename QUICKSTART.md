@@ -1,182 +1,166 @@
 # Quick Start
 
-## 1. Run Locally
+This guide gets World Explorer running locally and on Firebase with subscriptions enabled.
 
-### Option A: Python (recommended)
+## 1. Prerequisites
+
+- Node.js `20` or newer
+- npm
+- Firebase CLI (`npm i -g firebase-tools`)
+- Firebase project (current default: `worldexplorer3d-d9b83`)
+- Stripe account (test and/or live)
+
+## 2. Install Dependencies
 
 ```bash
-python -m http.server 8000
+cd "/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine"
+cd functions && npm install && cd ..
 ```
 
-Open `http://localhost:8000`.
-
-### Option B: Node
+## 3. Run Locally
 
 ```bash
-npx http-server -p 8000
+cd "/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine"
+python3 -m http.server --directory public 4173
 ```
 
-Open `http://localhost:8000`.
+Open:
 
-### Option C: VS Code Live Server
+- `http://localhost:4173/`
+- `http://localhost:4173/app/`
+- `http://localhost:4173/account/`
 
-1. Install Live Server extension.
-2. Open this folder.
-3. Start Live Server from `index.html`.
+## 3A. GitHub Pages (This Repo)
 
-## 2. Deploy to GitHub Pages
+1. Push branch `codex/github-pages-compat`.
+2. In GitHub repo settings, set Pages source to `GitHub Actions`.
+3. Ensure workflow `.github/workflows/deploy-pages-public.yml` succeeds.
+4. Open:
+   - `https://rrg314.github.io/WorldExplorer/`
+   - `https://rrg314.github.io/WorldExplorer/app/`
+5. Hard refresh if stale scripts are cached.
 
-1. Push your branch.
-2. In GitHub: `Settings > Pages`.
-3. Set source to `Deploy from a branch`.
-4. Select the target branch and `/ (root)`.
-5. Save and wait for deployment.
+See full guide:
 
-## 3. First 60 Seconds
+- `/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine/GITHUB_DEPLOYMENT.md`
 
-1. Open the app and pick a city (or use Custom search).
-2. Choose launch mode: `Earth`, `Moon`, or `Space`.
-3. Start in Free Roam mode.
-4. Drive with `WASD` or arrow keys.
-5. Press `F` for walk mode.
-6. Press `6` for drone mode.
-7. Press `M` for large map.
-8. Click the `🌸` memory button and place a pin/flower memory note.
+## 4. Firebase Project Setup
 
-## 4. RDT vs Baseline Benchmark (2-Minute Workflow)
+```bash
+cd "/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine"
+firebase login
+firebase use worldexplorer3d-d9b83
+```
 
-1. In the title screen, open `Settings`.
-2. In `⚡ Performance Benchmark`, choose a mode:
-   - `RDT Optimized`
-   - `Baseline (No RDT Budgeting)`
-3. Optional: check `Show live benchmark overlay in-game` (default is OFF).
-4. Click `Apply + Reload World`.
-5. Click `Copy Snapshot` and paste the JSON into your notes.
-6. Auto quality manager is enabled by default and adjusts runtime budget tier from live FPS/frame-time pressure.
-7. Overlay placement: debug sits between speed/mode HUD; benchmark sits between mode HUD/Main Menu.
-8. Compare:
-   - `lastLoad.loadMs`
-   - `lastLoad.phases.fetchOverpass`
-   - `renderer.calls`
-   - `renderer.triangles`
-   - `fps` / `frameMs`
-   - `lastLoad.overpassSource` (`network` vs `memory-cache`)
-   - `dynamicBudget.*` and `lastLoad.dynamicBudget.*`
+If `.firebaserc` points to a different project, update it before deploying.
 
-Reference test (Baltimore, 2026-02-14):
+## 5. Firebase Auth Setup (Console)
 
-- Baseline network load: `5551 ms`
-- RDT network load: `4669 ms`
-- RDT repeat load with memory cache: `2202-2246 ms` (`fetchOverpass: 0 ms`)
+In Firebase Console for your project:
 
-## 5. Share an Experience Link
+1. Open `Authentication`
+2. Enable at least:
+   - `Email/Password`
+   - `Google`
 
-1. On the title screen, use the footer share icons (`Copy`, `Share`, `Facebook`, `X`, `Instagram`, `Text`).
-2. In-game, use the blue share arrow above the flower button for quick share actions.
-3. You can also tap/click the coordinate readout to copy a live experience link directly.
-4. Recipient opens the URL and presses `Explore` to apply linked mode/camera/pose state.
+Without this, sign-in/sign-up UI opens but cannot authenticate.
 
-## 6. Find The Red Flower Challenge (Quick Start)
+## 6. Stripe Setup (Test or Live)
 
-1. On the title screen, select a location.
-2. Tap/click top-right `🏁 Leaderboard`.
-3. Enter a player name (optional).
-4. Click `Find Flower`.
-5. In-game, touch the red flower using walk/drive/drone to finish the timed run.
-6. Check leaderboard backend status in console:
-   - `getFlowerChallengeBackendStatus()`
+### 6.1 Create products and prices
 
-## 7. Essential Controls
+Create two recurring monthly prices:
 
-| Key | Action |
-| --- | --- |
-| `WASD` / `Arrow Keys` | Move/steer |
-| `Space` | Brake / handbrake |
-| `Ctrl` | Boost |
-| `F` | Walk mode toggle |
-| `6` | Drone mode toggle |
-| `C` | Camera cycle |
-| `M` | Large map |
-| `B` | Block build mode toggle |
-| `Esc` | Pause |
+- Supporter: `$1/month`
+- Pro: `$5/month`
 
-Space-flight specific:
+Copy the two `price_...` IDs.
 
-| Key | Action |
-| --- | --- |
-| `Arrow Keys` | Rocket steering (yaw/pitch) |
-| `Space` | Thrust / boost |
-| `Shift` | Brake / decelerate |
+### 6.2 Configure webhook destination
 
-Memory marker action:
+Stripe Workbench -> Webhooks -> Create destination:
 
-| Action | Result |
-| --- | --- |
-| `🌸` memory button (above controls) | Open persistent memory composer |
-| Click memory marker -> `Remove Marker` | Erase pin / pull flower |
-| Memory composer -> `Delete All` | Remove all local memory markers |
+- Endpoint URL:
+  - `https://us-central1-worldexplorer3d-d9b83.cloudfunctions.net/stripeWebhook`
+- Events:
+  - `checkout.session.completed`
+  - `customer.subscription.created`
+  - `customer.subscription.updated`
+  - `customer.subscription.deleted`
 
-Block builder action:
+Copy signing secret `whsec_...`.
 
-| Action | Result |
-| --- | --- |
-| Press `B` | Toggle build mode |
-| Click (build mode on) | Place brick block |
-| Shift+Click (build mode on) | Remove targeted block |
-| `🎮 Game Mode` -> `🧹 Clear Blocks` | Remove all build blocks for current location (including saved blocks) |
-| Block cap | Up to `100` total blocks can be stored for now |
+### 6.3 Set Firebase function config
 
-## 8. Mobile Touch Controls (Quick Reference)
+```bash
+cd "/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine"
+firebase experiments:enable legacyRuntimeConfigCommands
+firebase functions:config:set \
+  stripe.secret="sk_test_or_live_..." \
+  stripe.webhook="whsec_..." \
+  stripe.price_supporter="price_..." \
+  stripe.price_pro="price_..."
+```
 
-- Driving:
-  - Left side: `▲` accelerate, `Brake` button, `▼` reverse/decelerate
-  - Right side: `◀ ▶` steering
-- Walking:
-  - Left pad: look
-  - Right pad: move
-  - Left action buttons: `Jump`, `Run`
-- Drone:
-  - Left pad: look
-  - Right pad: move
-  - Left action buttons: `Ascend`, `Descend`
-- Space flight:
-  - Right pad: steer/pitch
-  - Left action buttons: `Accelerate`, `Decelerate`
+Deploy functions:
 
-Moon vehicle note:
+```bash
+firebase deploy --only functions
+```
 
-- Moon driving includes low-gravity airborne float behavior over hills/craters.
-- Earth driving keeps standard grounded terrain follow behavior.
+Verify stored values:
 
-## 9. Troubleshooting
+```bash
+firebase functions:config:get
+```
 
-### Black or blank view
+If you see placeholders like `...` or `REAL`, checkout will fail.
 
-- Use Chrome, Edge, or Firefox with WebGL enabled.
-- Hard refresh (`Ctrl+Shift+R` or `Cmd+Shift+R`).
-- Check browser console for script/network errors.
+## 7. Deploy Hosting + Firestore + Functions
 
-### Missing map/city geometry
+```bash
+cd "/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine"
+firebase deploy
+```
 
-- Wait for OSM and terrain fetches to complete.
-- Retry with a different city to compare.
-- Confirm internet connectivity and Overpass availability.
+## 8. Smoke Test Checklist
 
-### Inconsistent assets after updates
+1. Open hosted app URL from Firebase deploy output.
+2. Landing page loads and includes World Explorer title.
+3. `/app/`:
+   - Sign In / Sign Up float opens and closes correctly.
+   - Pro panel appears briefly, then auto-hides for non-Pro plans.
+4. `/account/`:
+   - Current plan visible.
+   - Upgrade buttons open Stripe Checkout.
+5. Complete checkout (test card in test mode).
+6. Confirm Firestore `users/{uid}` updated (`plan`, `subscriptionStatus`, `entitlements`).
 
-- Clear browser cache.
-- Verify cache-bust values are aligned across `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
-- Current freeze snapshot cache-bust target is `v=54`.
+Logs when troubleshooting:
 
-### Memory markers not persisting
+```bash
+cd "/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine"
+firebase functions:log --only createCheckoutSession -n 50
+firebase functions:log --only stripeWebhook -n 50
+```
 
-- Ensure browser local storage is enabled for this site.
-- Avoid strict private/incognito settings that block storage.
-- Confirm marker placement is not showing a storage warning in the composer.
+## 9. Common Failures
 
-## 9. Where to Go Next
+- `Missing Firebase config (WORLD_EXPLORER_FIREBASE)`
+  - Ensure `public/js/firebase-project-config.js` exists and loads.
+- `Unable to create checkout session.`
+  - Usually invalid/missing Stripe secret or price IDs.
+- Stripe `401 Invalid API Key`
+  - Wrong key mode or placeholder value in config.
+- Blaze plan error during deploy
+  - Upgrade Firebase project billing plan.
 
-- Usage details: `USER_GUIDE.md`
-- Engineering details: `TECHNICAL_DOCS.md`
-- Known gaps: `KNOWN_ISSUES.md`
-- Contributing process: `CONTRIBUTING.md`
+## 10. Production Follow-up (Important)
+
+Before March 2026:
+
+- Migrate from `functions.config()` to Firebase Params/Secret Manager.
+
+Before October 2026:
+
+- Upgrade Functions runtime from Node 20 to Node 22.

@@ -1,77 +1,44 @@
-# World Explorer 3D Documentation Index
+# Documentation Index
 
-This index lists the documentation that exists in this branch today.
+Last reviewed: 2026-02-16
 
-## Core Documents
+This index tracks the top-level documentation set in the active `WorldExplorer` repository.
 
-| File | Purpose |
+## Core Product Docs
+
+| File | Scope |
 | --- | --- |
-| `README.md` | Project overview, architecture stage, quick start pointers |
-| `QUICKSTART.md` | Local run, Pages deploy, first 60 seconds |
-| `USER_GUIDE.md` | End-user feature guide |
-| `API_SETUP.md` | Real-estate API setup and verification |
-| `TECHNICAL_DOCS.md` | Developer-level systems and implementation notes |
-| `ARCHITECTURE.md` | Runtime architecture and subsystem boundaries |
-| `KNOWN_ISSUES.md` | Current gaps, regressions, and contribution targets |
-| `CONTRIBUTING.md` | Contribution process and PR rules |
-| `CHANGELOG.md` | Version and release changes |
-| `SECURITY_STORAGE_NOTICE.md` | Memory-storage behavior, security baseline, and disclaimer boilerplate |
-| `SYSTEMS_INVENTORY_REPORT_2026-02-14.md` | Full systems, subsystems, and feature inventory snapshot |
-| `ACKNOWLEDGEMENTS.md` | Third-party and first-party research attributions |
-| `LICENSE` | Proprietary, all-rights-reserved source-available license |
+| `README.md` | Project overview, routes, pricing model, deploy baseline |
+| `QUICKSTART.md` | Fast setup path for local + Firebase + Stripe |
+| `ARCHITECTURE.md` | Current system architecture and data flows |
+| `TECHNICAL_DOCS.md` | Engineering reference and endpoint contracts |
+| `USER_GUIDE.md` | End-user instructions for app/account flows |
+| `API_SETUP.md` | External services setup (Firebase, Stripe, optional APIs) |
+| `GITHUB_DEPLOYMENT.md` | GitHub Pages deployment modes, cache/path troubleshooting |
+| `KNOWN_ISSUES.md` | Current risks, debt, and pending migration work |
+| `CHANGELOG.md` | Recent releases and notable updates |
+| `CONTRIBUTING.md` | Contribution standards and validation expectations |
+| `SECURITY_STORAGE_NOTICE.md` | Data handling and security/storage notes |
+| `SYSTEMS_INVENTORY_REPORT_2026-02-14.md` | Current system inventory snapshot (updated content) |
+| `ACKNOWLEDGEMENTS.md` | Attribution and third-party acknowledgements |
+| `progress.md` | Working log and handoff notes across coding sessions |
 
 ## Recommended Reading Order
 
 1. `README.md`
 2. `QUICKSTART.md`
 3. `USER_GUIDE.md`
-4. `TECHNICAL_DOCS.md`
-5. `KNOWN_ISSUES.md`
-6. `CONTRIBUTING.md`
+4. `ARCHITECTURE.md`
+5. `TECHNICAL_DOCS.md`
+6. `API_SETUP.md`
+7. `KNOWN_ISSUES.md`
 
-## Current Freeze Scope (2026-02-14)
+## Production Baseline Covered by This Doc Set
 
-The current branch documentation set includes updates for:
-
-- Restored main-style location selection behavior (`Suggested` + `Custom`)
-- Title launch-mode selectors (`Earth`, `Moon`, `Space`)
-- Space-flight controls listed in start-menu Controls tab
-- Asteroid belt + Kuiper belt visual layers
-- Clickable deep-sky galaxies with inspector info
-- Persistent memory markers (pin/flower + 200-char notes + remove flow)
-- Memory composer `Delete All` flow with confirmation
-- POI + memory marker rendering on minimap and large map overlays
-- Legend checkboxes for independent memory pin/flower visibility on maps
-- Brick block builder controls (`B`, click place, shift-click remove, clear current location, 100-block cap)
-- Title-screen performance benchmark controls (`RDT` vs `Baseline`, overlay toggle, snapshot copy)
-- Auto quality manager with FPS/frame-time dynamic budgets (`perf.js` -> `world.js`)
-- Shareable experience link export/import (`Copy Experience Link`, URL payload parsing/apply)
-- Title/footer + in-game share icon surfaces (copy/native/social/text) plus coordinate-readout click-copy
-- Mobile touch-control profile coverage for driving, walking, drone, and rocket modes
-- Moon-only low-gravity airborne car behavior over terrain crests/crater drops (Earth driving unchanged)
-- Desktop moon scene-isolation guards to prevent Earth mesh bleed-through during async world-load transitions
-- Enhanced moon terrain readability (local relief + shading contrast + lunar rock cues) for desktop/mobile movement clarity
-- Top-bar overlay anchoring for debug and benchmark panels between their target HUD widgets
-- Overpass endpoint preference and in-memory cache behavior for repeat-load acceleration
-- Supporting benchmark stats documentation from captured Baltimore test runs (network + memory-cache)
-- Security/storage boilerplate notice for persistent memory data
-- Dynamic UI text escaping in map/property/historic panels
-- Red-flower leaderboard moved to a top-right floating title toggle (`🏁 Leaderboard`) for reduced selector clutter
-- Firebase/local leaderboard runtime check helper documented (`getFlowerChallengeBackendStatus()`)
-- Cache-bust loader chain alignment through `v=54`
-
-## Maintainer Notes
-
-- Keep this index aligned with files that actually exist in the branch.
-- If a doc is removed or renamed, update this file in the same commit.
-- If a new contributor-facing doc is added, list it here.
-
-## License Alignment
-
-This repository is public-source-visible but proprietary.
-
-- Code visibility: public
-- Reuse rights: restricted
-- License model: source-available, all rights reserved
-
-See `LICENSE` for full terms.
+- Firebase Hosting route structure (`/`, `/app/`, `/account/`, legal pages)
+- Firebase Auth + Firestore entitlements
+- 2-day trial behavior and plan downgrade rules
+- Stripe checkout, portal, and webhook processing
+- Required Stripe events and config keys
+- Deployment commands and troubleshooting logs
+- Current deprecation and migration requirements
