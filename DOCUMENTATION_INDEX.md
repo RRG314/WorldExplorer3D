@@ -1,6 +1,6 @@
 # Documentation Index
 
-Last reviewed: 2026-02-16
+Last reviewed: 2026-02-17
 
 This index tracks the top-level documentation set in the active `WorldExplorer` repository.
 
@@ -17,8 +17,10 @@ This index tracks the top-level documentation set in the active `WorldExplorer` 
 | `GITHUB_DEPLOYMENT.md` | GitHub Pages deployment modes, cache/path troubleshooting |
 | `KNOWN_ISSUES.md` | Current risks, debt, and pending migration work |
 | `CHANGELOG.md` | Recent releases and notable updates |
+| `INITIAL_LAUNCH_RELEASE_2026-02-17.md` | Professional initial-launch release narrative with badges, citations, and licensing checklist |
 | `CONTRIBUTING.md` | Contribution standards and validation expectations |
 | `SECURITY_STORAGE_NOTICE.md` | Data handling and security/storage notes |
+| `COMPLETE_INVENTORY_REPORT_2026-02-17.md` | Full personal/internal product inventory (systems/subsystems/features/options) |
 | `SYSTEMS_INVENTORY_REPORT_2026-02-14.md` | Current system inventory snapshot (updated content) |
 | `ACKNOWLEDGEMENTS.md` | Attribution and third-party acknowledgements |
 | `progress.md` | Working log and handoff notes across coding sessions |

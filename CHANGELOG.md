@@ -37,6 +37,12 @@
   - `public/js/app-entry.js`
   - `public/js/modules/manifest.js`
   - `public/js/modules/script-loader.js`
+- Complete personal/internal inventory report:
+  - `COMPLETE_INVENTORY_REPORT_2026-02-17.md`
+  - includes full system/subsystem/feature/option catalog
+- Initial launch release document:
+  - `INITIAL_LAUNCH_RELEASE_2026-02-17.md`
+  - includes badge-ready release narrative, RDT/PRNG citations, and licensing/attribution checklist
 
 ### Changed
 
