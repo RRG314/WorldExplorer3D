@@ -1,106 +1,97 @@
-# Contributing to World Explorer 3D
+# Contributing to World Explorer
 
 Thanks for contributing.
 
-This repository is public for source visibility, but it is proprietary and all rights are reserved.
-By contributing, you agree that maintainers may use, modify, and relicense your submitted changes inside this project.
+This repository is source-visible but proprietary (`LICENSE`).
+Contributions are accepted at maintainer discretion.
 
-## 1. Before You Start
+## 1. Repository and Branching
 
-- Read `README.md`, `TECHNICAL_DOCS.md`, and `KNOWN_ISSUES.md`.
-- Open or reference an issue for non-trivial work.
-- Keep changes scoped and regression-safe.
+Canonical repository:
+
+- `https://github.com/RRG314/WorldExplorer.git`
+
+Preferred working branch pattern:
+
+- `codex/<feature-or-fix-name>`
 
 ## 2. Local Setup
 
 ```bash
-git clone https://github.com/RRG314/WorldExplorer3D.git
-cd WorldExplorer3D
-python -m http.server 8000
+git clone https://github.com/RRG314/WorldExplorer.git
+cd WorldExplorer
+cd functions && npm install && cd ..
+python3 -m http.server --directory public 4173
 ```
 
-Open `http://localhost:8000`.
+## 3. Active Source of Truth
 
-## 3. Project Layout
+Use these paths for production behavior:
 
-- Entry: `index.html`
-- Styles: `styles.css`
-- Runtime: `js/*.js`
-- Module boot: `js/bootstrap.js`, `js/app-entry.js`, `js/modules/*`
-- Docs: `*.md`
+- `public/` (all hosted pages/assets)
+- `functions/` (billing backend)
+- `firebase.json`, `.firebaserc`, `firestore.rules`
 
-## 4. Development Rules
+Do not assume root legacy runtime files (`index.html`, `js/`) are the active deployed path.
 
-- Preserve existing behavior unless the issue explicitly changes it.
-- Avoid broad refactors in bug-fix PRs.
-- Keep deterministic behavior deterministic (do not introduce random regressions).
-- Prefer small commits with clear messages.
+## 4. Required Validation Before PR
 
-## 5. Validation Checklist
+At minimum:
 
-Before opening a PR:
+1. `/` loads
+2. `/app/` loads
+3. auth float opens/closes
+4. `/account/` loads
+5. no new console errors in core flows
+6. GitHub Pages mirror (`/WorldExplorer/` subpath) still loads key routes if frontend routing or paths changed
 
-1. App loads without console errors.
-2. Driving, walking, and drone mode transitions work.
-3. City switch works without major terrain/building breakage.
-4. Space transitions still work (if touched).
-5. Any changed docs are updated in the same PR.
+If billing touched:
 
-## 6. Testing a Change
+1. checkout session creation tested
+2. webhook event handling validated in logs
+3. Firestore user plan updates confirmed
+4. `Secret Scan` GitHub Action passes (gitleaks)
 
-Minimum manual matrix (run relevant items):
-
-- Cities: Baltimore, Monaco, San Francisco
-- Modes: drive, walk, drone
-- Maps: minimap + large map
-- Environment: Earth and space toggles (if changed)
-
-Capture the following in PR notes:
-
-- What you changed
-- What you tested
-- Any known follow-up risks
-
-## 7. Pull Request Rules
-
-Use this PR format:
-
-- Summary
-- Root cause
-- Fix details
-- Validation steps
-- Screenshots/video (UI/rendering changes)
-
-PR expectations:
-
-- One concern per PR when possible
-- No unrelated formatting churn
-- Documentation updates included when behavior changes
-
-## 8. Style and Consistency
-
-This repo includes a no-build formatting/lint baseline:
-
-- `.editorconfig`
-- `.eslintrc.cjs`
-- `.prettierrc.json`
-
-Optional local checks:
+Useful commands:
 
 ```bash
-npx eslint js/*.js js/modules/*.js
-npx prettier --check "**/*.{md,js,css,html,json,yml,yaml}"
+firebase functions:log --only createCheckoutSession -n 50
+firebase functions:log --only stripeWebhook -n 50
 ```
 
-If you do not have these tools installed, run manual validation and document that in your PR.
+## 5. Documentation Rule
 
-## 9. Security
+Any behavior change must update docs in the same PR:
 
-Do not post security-sensitive findings in public issues.
+- `README.md`
+- `QUICKSTART.md`
+- `ARCHITECTURE.md`
+- `TECHNICAL_DOCS.md`
+- `USER_GUIDE.md`
+- `CHANGELOG.md`
+- `GITHUB_DEPLOYMENT.md` (if deployment/routing/cache behavior is affected)
 
-Report privately to the maintainer email listed in repository documentation.
+## 6. PR Format
 
-## 10. License Reminder
+Use this structure:
 
-Submitting a contribution does not grant redistribution rights to project code.
-This remains a source-available, all-rights-reserved repository unless the license file changes in a future release.
+1. Summary
+2. Problem
+3. Fix
+4. Validation
+5. Risks / follow-ups
+
+Include screenshots for UI changes and log snippets for backend fixes.
+
+## 7. Security and Secrets
+
+- Never commit secret keys.
+- Never include real `sk_live`, `whsec`, or private tokens in markdown/screenshots.
+- Use placeholders in docs and examples.
+
+## 8. Current Mandatory Follow-up Work
+
+Contributors touching backend config/runtime should be aware:
+
+- migrate off `functions.config()` to params/secrets before March 2026
+- upgrade functions runtime from Node 20 to Node 22

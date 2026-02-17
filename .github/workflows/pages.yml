@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - rdt-engine
+      - codex/gh-root-pages-product-sync
   workflow_dispatch:
 
 permissions:

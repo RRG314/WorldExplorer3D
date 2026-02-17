@@ -1,52 +1,44 @@
-// ES module bootstrap: modular loader + legacy app compatibility.
-import {
-  classicScripts,
-  moduleEntrypoint,
-  vendorScriptsCritical,
-  vendorScriptsOptional
-} from './modules/manifest.js?v=54';
-import { loadScriptList } from './modules/script-loader.js?v=54';
+const CACHE_BUST = 'v=54';
 
-async function boot() {
-  try {
-    await loadScriptList(vendorScriptsCritical, { timeoutMs: 12000 });
-    const resolvedClassicScripts = classicScripts.map(
-      (relativePath) => new URL(relativePath, import.meta.url).toString()
-    );
-    await loadScriptList(resolvedClassicScripts, { timeoutMs: 12000 });
+function normalizeRepoBase(pathname = '/') {
+  const path = String(pathname || '/');
+  const jsMarker = '/js/';
+  const appMarker = '/app';
 
-    const entrypoint = new URL(moduleEntrypoint, import.meta.url).toString();
-    const appModule = await import(entrypoint);
-    const appApi = typeof appModule.bootApp === 'function'
-      ? appModule.bootApp()
-      : appModule;
-    console.log('[bootstrap] World Explorer loaded through ES module entrypoint:', entrypoint);
-
-    if (vendorScriptsOptional.length > 0) {
-      loadScriptList(vendorScriptsOptional, { timeoutMs: 10000 })
-        .then(() => {
-          if (typeof appApi?.tryEnablePostProcessing === 'function') {
-            appApi.tryEnablePostProcessing();
-          }
-        })
-        .catch((err) => {
-          console.warn('[bootstrap] Optional rendering scripts not fully available:', err);
-          if (typeof appApi?.tryEnablePostProcessing === 'function') {
-            appApi.tryEnablePostProcessing();
-          }
-        });
-    }
-  } catch (error) {
-    console.error('[bootstrap] Fatal load error:', error);
-    const loadingText = document.getElementById('loadText');
-    if (loadingText) {
-      loadingText.textContent = 'Failed to load scripts. Check console for details.';
-    }
-    const loading = document.getElementById('loading');
-    if (loading) {
-      loading.classList.add('show');
-    }
+  if (path.includes(jsMarker)) {
+    return path.slice(0, path.indexOf(jsMarker));
   }
+
+  if (path.includes(appMarker)) {
+    return path.slice(0, path.indexOf(appMarker));
+  }
+
+  const trimmed = path.replace(/\/+$/, '');
+  if (!trimmed) return '';
+  return trimmed;
 }
 
-boot();
+function redirectToApp() {
+  const base = normalizeRepoBase(window.location.pathname);
+  const target = `${base}/app/${window.location.search || ''}${window.location.hash || ''}`;
+  window.location.replace(target);
+}
+
+function bootCompat() {
+  const pathname = String(window.location.pathname || '/');
+
+  if (/\/app$/.test(pathname)) {
+    window.location.replace(`${pathname}/${window.location.search || ''}${window.location.hash || ''}`);
+    return;
+  }
+
+  if (!/\/app(?:\/|$)/.test(pathname)) {
+    redirectToApp();
+    return;
+  }
+
+  const entry = new URL(`../app/js/bootstrap.js?${CACHE_BUST}`, import.meta.url).toString();
+  import(entry);
+}
+
+bootCompat();

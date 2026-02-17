@@ -1,1142 +1,142 @@
-# User Guide 📖
-
-Complete guide to using World Explorer 3D. Learn every feature, control, and secret.
-
-## Table of Contents
-- [Getting Started](#getting-started)
-- [Performance Benchmark Mode (RDT vs Baseline)](#performance-benchmark-mode-rdt-vs-baseline)
-- [Shareable Experience Links](#shareable-experience-links)
-- [Find The Red Flower Challenge](#find-the-red-flower-challenge)
-- [Game Modes](#game-modes)
-- [Movement Systems](#movement-systems)
-- [Camera Controls](#camera-controls)
-- [Map System](#map-system)
-- [Real Estate Features](#real-estate-features)
-- [Space Exploration](#space-exploration)
-- [Persistent Memories](#persistent-memories)
-- [Advanced Features](#advanced-features)
-- [Tips & Tricks](#tips--tricks)
-- [FAQ](#faq)
-
-## Getting Started
-
-### First Launch
-
-1. **Open the Application**
-   - Start a local server in the repo root (`python -m http.server 8000`)
-   - Open `http://localhost:8000` in your browser
-
-2. **Main Menu Appears**
-   - You'll see tabs: Location, Settings, Controls
-   - The logo and tagline at the top
-
-3. **Choose Your Location**
-   - **Preset Cities**: Click any city card (Baltimore is selected by default)
-   - **Search Address**: Enter an address in the search box
-   - **Custom Coordinates**: Enter latitude and longitude
-
-4. **Choose Launch Mode (Top of Location Tab)**
-   - **Earth**: Standard city/world start
-   - **Moon**: Start directly in lunar environment
-   - **Space**: Start in space-flight mode
-
-5. **Select Game Mode**
-   - Free Roam (recommended for first time)
-   - Time Trial
-   - Checkpoints
-
-6. **Click "EXPLORE"**
-   - The world begins loading
-   - Satellite imagery downloads
-   - Buildings and terrain generate
-   - Wait 5-15 seconds depending on connection
-
-7. **Start Exploring!**
-   - You spawn in a car
-   - Drive around and discover the city
-   - Use the `🌸` memory button (above controls) to drop persistent pin/flower notes
-
-### Interface Overview
-
-#### HUD (Head-Up Display)
-Located in top-left corner:
-- **Speed**: Current MPH
-- **Speed Limit**: Current road's speed limit
-- **Boost Bar**: Shows available boost energy
-- **Street Name**: Current street/location
-- **Indicators**: BRK (braking), BOOST (boosting), DRIFT (drifting), OFF (off-road)
-
-#### Minimap
-Located in bottom-left corner:
-- Shows nearby area
-- Blue arrow = your position/direction
-- Red circle = destination (in timed modes)
-- Green dots = checkpoints
-- Colored POI dots/icons = points of interest (based on legend filters)
-- Red/pink memory markers = placed pins/flowers
-- Gray = roads, green = parks
-
-#### Coordinates Display
-Shows your current GPS position (lat/lon)
-
-#### Controls Tab
-Click header to expand/collapse in-game controls reference (includes driving, walking, drone, and space-flight controls)
-
-## Performance Benchmark Mode (RDT vs Baseline)
-
-Use the title screen `Settings` tab to compare the two world-loading modes.
+# User Guide
 
-### Where to find it
+Last reviewed: 2026-02-16
 
-1. Open `Settings`.
-2. Go to `⚡ Performance Benchmark`.
-3. Select:
-   - `RDT Optimized` for adaptive budgets.
-   - `Baseline (No RDT Budgeting)` for full-budget loading.
-4. Click `Apply + Reload World`.
-5. Click `Copy Snapshot` to export the current JSON metrics.
-6. Auto quality manager runs by default and continuously tunes runtime budget tier from live FPS/frame timing.
-
-### Overlay behavior
-
-- `Show live benchmark overlay in-game` is opt-in.
-- Overlay is OFF by default each session to avoid confusing non-technical users.
-- Debug overlay (`\``) is auto-centered between speed HUD and mode HUD.
-- Benchmark overlay is auto-centered between mode HUD and `Main Menu`.
-- Overlay positions auto-refresh when toggled and on viewport resize.
+This guide is for players and subscribers using the hosted World Explorer experience.
 
-### What to compare in snapshots
+## 1. Where to Start
 
-- `lastLoad.loadMs` (total load time)
-- `lastLoad.phases.fetchOverpass` (network portion)
-- `renderer.calls` (draw calls)
-- `renderer.triangles`
-- `fps` and `frameMs`
-- `lastLoad.overpassSource` (`network` or `memory-cache`)
-- `dynamicBudget.tier` / `dynamicBudget.budgetScale` / `dynamicBudget.lodScale`
-- `lastLoad.dynamicBudget.*` to confirm which budget tier was used for that load
+- Landing page: `https://worldexplorer3d-d9b83.web.app/`
+- Play runtime: `https://worldexplorer3d-d9b83.web.app/app/`
+- Account/billing: `https://worldexplorer3d-d9b83.web.app/account/`
 
-### Supporting test stats (Baltimore, 2026-02-14)
+GitHub mirror URLs (when using Pages):
 
-| Scenario | loadMs | fetchOverpass | fps | frameMs | draw calls |
-|---|---:|---:|---:|---:|---:|
-| Baseline (network) | `5551` | `4267` | `60.00` | `16.71` | `453` |
-| RDT (network) | `4669` | `3519` | `60.00` | `16.67` | `1149` |
-| RDT (memory-cache repeat loads) | `2202-2246` | `0` | `59.99-60.00` | `16.59-16.66` | `957-1131` |
+- Landing: `https://rrg314.github.io/WorldExplorer/`
+- Play runtime: `https://rrg314.github.io/WorldExplorer/app/`
+- Account: `https://rrg314.github.io/WorldExplorer/account/`
 
-Interpretation:
+## 2. Sign In and Trial
 
-- RDT is currently faster at startup in the captured network run.
-- RDT repeat loads are significantly faster when Overpass data is reused from memory cache.
-- Draw calls still vary and can remain higher in RDT than baseline in some scenes.
+On `/app/`, use the top-left `Sign In / Sign Up` button.
 
-## Shareable Experience Links
+Available login methods:
 
-Share actions are available in both title and in-game UI:
+- Email/password
+- Google
 
-- Title screen footer circular icons: `Copy`, `Share`, `Facebook`, `X`, `Instagram`, `Text`
-- In-game blue share arrow above the flower button
-- Coordinate readout click/tap (copies current live experience link)
+Trial behavior:
 
-Every share entry point generates a URL that captures:
+- First successful sign-in creates a 2-day trial automatically
+- Trial is no-card-required
+- Trial gives full access equivalent to Supporter, without Pro-only perks
 
-- location (`loc`, or custom `lat/lon` + `lname`)
-- game mode (`gm`)
-- performance mode (`pm`)
-- seed (`seed`)
-- movement mode (`mode`)
-- camera mode (`camMode`)
-- runtime pose (`rx`, `ry`, `rz`, `yaw`, optional `pitch`)
+## 3. Plan Levels
 
-Open that URL and the app will preload the title-screen state, then apply mode/camera/pose after you press `Explore`.
+### Free
 
-## Find The Red Flower Challenge
+- Core exploration available
+- Cloud sync disabled
+- Pro-only controls hidden/locked
 
-Timed challenge flow:
+### Supporter ($1/month)
 
-1. On the title screen, select a location.
-2. Tap/click the top-right `🏁 Leaderboard` button to open the challenge panel.
-3. Optionally set your player name.
-4. Click `Find Flower` to start loading into the challenge.
-5. In-game, find and touch the red flower using walking, driving, or drone mode.
-6. Your finish time is recorded to the leaderboard.
+- Full app access
+- Cloud sync entitlement enabled
+- Supports ongoing development
 
-In-game entry point:
+### Pro ($5/month)
 
-- Tap/click the `🌸` button and select `🔴 Find Red Flower`.
-- `🌸 Place Memory Flower` stays available in the same menu.
+- Everything in Supporter
+- Early-access demo controls
+- Priority contact/feature consideration entitlements
 
-What you will see:
+## 4. Upgrading and Billing
 
-- A top-center challenge HUD with objective + running timer.
-- A completion message after touching the flower.
-- Updated leaderboard rows on return to title or manual refresh.
+Use `/account/` to:
 
-Leaderboard storage behavior:
+- upgrade to Supporter
+- upgrade to Pro
+- open Stripe billing portal
+- sign out
 
-- Uses Firebase Firestore when configured.
-- Falls back to local browser leaderboard storage if Firebase is unavailable.
-- Backend check: run `getFlowerChallengeBackendStatus()` in the browser console.
+Checkout flow:
 
-## Game Modes
+1. click upgrade button
+2. app redirects to Stripe Checkout
+3. complete purchase
+4. Stripe webhook updates your plan in Firestore
+5. account page reflects new plan
 
-### Free Roam 🚗
+## 5. In-App UI Notes
 
-**Perfect for**: First-time players, sightseeing, relaxation
+### Auth button
 
-**Description**: Explore the city with no time limits or objectives. Drive, walk, or fly anywhere.
+- Top-left floating button opens auth/account panel on title screen
+- Clicking outside closes the panel
+- During gameplay, the auth/account button is hidden
 
-**Features**:
-- No timer or score
-- No restrictions
-- Full access to all features
-- Moon travel enabled
-- Real estate browsing
-
-**Tips**:
-- Take your time discovering landmarks
-- Try different camera angles
-- Experiment with all movement modes
-- Visit the moon at night
-
-### Time Trial ⏱️
-
-**Perfect for**: Speed challenges, learning city layouts
-
-**Description**: Race to reach a random destination as fast as possible.
-
-**How It Works**:
-1. Game spawns you at a random location
-2. Red marker shows destination
-3. Timer starts immediately
-4. Navigate to the destination
-5. Timer stops when you arrive
-6. Score based on time
-
-**Features**:
-- Random destinations each round
-- Visible destination marker
-- Timer display
-- Best time tracking
-- Multiple difficulty levels (based on distance)
-
-**Tips**:
-- Use the map (M key) to plan route
-- Boost on straightaways
-- Cut through parks if allowed
-- Learn shortcuts
-
-**Scoring**:
-- Under 1 minute: ⭐⭐⭐⭐⭐
-- 1-2 minutes: ⭐⭐⭐⭐
-- 2-3 minutes: ⭐⭐⭐
-- 3-5 minutes: ⭐⭐
-- Over 5 minutes: ⭐
-
-### Checkpoint Challenge 🏁
-
-**Perfect for**: Completionists, exploration with purpose
-
-**Description**: Collect all checkpoints scattered across the map.
-
-**How It Works**:
-1. Multiple checkpoints spawn around the city
-2. Green markers show locations
-3. Drive/walk through checkpoints to collect them
-4. Timer tracks total time
-5. Collect all to complete the challenge
-
-**Features**:
-- 10-20 checkpoints per session
-- Visible on minimap and in-world
-- Checkpoints disappear when collected
-- Counter shows progress (e.g., "5/15")
-- No specific order required
-
-**Tips**:
-- Open map to see all checkpoint locations
-- Plan an efficient route
-- Use drone mode for hard-to-reach checkpoints
-- Some checkpoints may be on rooftops
-
-**Scoring**:
-- Based on time to collect all
-- Bonus for collecting in order (if nearby)
-- Penalties for crashes/resets
-
-## Movement Systems
-
-### Driving Mode 🚗
-
-**Default starting mode**. Control a car to explore the city.
-
-#### Controls
-- `W` / `↑` - Gas pedal (accelerate)
-- `S` / `↓` - Brake / Reverse
-- `A` / `←` - Turn left (while moving)
-- `D` / `→` - Turn right (while moving)
-- `Space` - Brake / handbrake
-- `Ctrl` - Boost (when bar is filled)
-- `Shift` - Off-road mode toggle
-- `B` - Toggle brick build mode
-
-#### Physics
-- **Realistic handling**: Car has momentum and turning radius
-- **Brake-first handling**: `Space` is brake/handbrake input
-- **Slip-aware drift indicator**: DRIFT lights from high-speed slip angle (not a separate drift key mode)
-- **Boost system**: Fills automatically over time
-- **Off-road**: Slower on grass/dirt unless in off-road mode
-- **Collisions**: Can bump into buildings (car respawns)
-
-#### Tips
-- Hold boost for straightaways
-- Tap brake before sharp turns
-- Use handbrake for 90° corners
-- Off-road mode helps on unpaved surfaces
-- Speed limit is shown but not enforced
-
-#### HUD Indicators
-- **BRK**: Lit when braking
-- **BOOST**: Lit when boosting
-- **DRIFT**: Lit when drifting
-- **OFF**: Lit in off-road mode
-
-### Walking Mode 🚶
-
-**Toggle with F key**. Explore on foot with first-person view.
-
-#### Controls
-- `↑` - Walk forward
-- `↓` - Walk backward
-- `←` - Strafe left
-- `→` - Strafe right
-- `W` - Look up
-- `S` - Look down
-- `A` - Look left
-- `D` - Look right
-- `Space` - Jump
-- `Shift` - Run (2x speed)
-- `Right Click + Drag` - Free look with mouse
-- `B` - Toggle brick build mode
-
-#### Movement
-- **Walking speed**: ~3 mph
-- **Running speed**: ~6 mph (hold Shift)
-- **Jump height**: ~6 feet
-- **Jump on moon**: ~36 feet (low gravity!)
-
-#### Tips
-- Use mouse look for easier camera control
-- Hold Shift to run
-- Jump to climb over small obstacles
-- Great for exploring interiors and tight spaces
-- Can walk up gentle slopes
-
-#### When to Use
-- Exploring buildings up close
-- Finding hidden checkpoints
-- Moon exploration (low gravity jumping!)
-- Taking screenshots
-- Investigating property details
-
-### Drone Mode 🚁
-
-**Toggle with 6 key**. Fly freely through the air.
-
-#### Controls
-- `W` - Move forward
-- `S` - Move backward
-- `A` - Strafe left
-- `D` - Strafe right
-- `Space` - Fly up
-- `Shift` - Fly down
-- `Ctrl` - Fly down (alternative)
-- `↑` - Look up
-- `↓` - Look down
-- `←` - Turn left
-- `→` - Turn right
-- `Mouse` - Free look
-- `B` - Toggle brick build mode
-
-#### Movement
-- **Fly speed**: ~20 mph
-- **Vertical speed**: ~15 mph
-- **No gravity**: Free flight in any direction
-- **No collisions**: Can fly through buildings
-- **Unlimited range**: Fly anywhere
-
-#### Tips
-- Perfect for aerial photography
-- Use to reach high checkpoints
-- Scout routes from above
-- Explore rooftops
-- Find hidden areas
-
-#### When to Use
-- Collecting elevated checkpoints
-- Surveying the city layout
-- Taking aerial screenshots
-- Reaching inaccessible areas
-- Quick transportation
-
-### Mode Switching
-
-| From | To | Key | Note |
-|------|----|----|------|
-| Driving | Walking | `F` | Car remains at location |
-| Walking | Driving | `F` | Teleports back to car |
-| Any | Drone | `6` | Position saved |
-| Drone | Previous | `6` | Returns to saved position |
-
-### Mobile Touch Controls (Auto-Enabled on Touch Devices)
-
-#### Driving Layout
-- **Left side**: `▲` accelerate, `Brake` button, `▼` reverse/decelerate
-- **Right side**: `◀ ▶` steering
-
-#### Walking Layout
-- **Left pad**: camera look
-- **Right pad**: movement
-- **Left action buttons**: `Jump`, `Run`
-
-#### Drone Layout
-- **Left pad**: camera look
-- **Right pad**: movement
-- **Left action buttons**: `Ascend`, `Descend`
-
-#### Space-Flight Layout
-- **Right pad**: steer + pitch
-- **Left action buttons**: `Accelerate`, `Decelerate`
-
-## Camera Controls
-
-### Camera Modes
-
-Press `C` to cycle through modes:
-
-#### 1. Third Person (Default)
-- Camera behind and above vehicle/character
-- Best for driving and general exploration
-- Good situational awareness
-
-#### 2. First Person
-- Inside the car or character's eyes
-- Most immersive view
-- Best for realism
-
-#### 3. Overhead
-- Bird's eye view from above
-- Best for navigation and orientation
-- Good for seeing checkpoints
-
-### Look Back
-
-- Press and hold `V` to look behind you
-- Useful while driving in reverse
-- Helps avoid rear collisions
-
-### Mouse Look (Walking/Drone)
-
-- **Right-click and drag**: Free camera movement
-- **Sensitivity**: Adjustable in code
-- **Works in**: Walking and Drone modes only
-
-## Map System
-
-### Opening the Map
-
-- Press `M` to open/close the large map
-- Shows entire city area
-- Real-time position tracking
-
-### Map Features
-
-#### Your Position
-- **Blue arrow**: Shows your location and facing direction
-- **Updates in real-time**: Moves as you move
-
-#### Map Layers
-
-Toggle in the legend (📋 button):
-- **Satellite**: Aerial imagery
-- **Roads**: Street overlay
-- **Land Use**: Parks, water, zones
-- **Properties**: Real estate markers (if enabled)
-- **POIs**: Points of interest (render on minimap + large map by category filters)
-- **Memory Markers**: Your pin/flower notes (render on minimap + large map)
-- **Memory Layer Filters**: Separate legend checkboxes for `📍 Pin` and `🌸 Flower`
-- **Historic Sites**: Historic markers
-
-#### Controls
-- **Zoom In**: Click + button or mouse wheel
-- **Zoom Out**: Click - button or mouse wheel
-- **Zoom level**: Shown in corner (10-18)
-- **Pan**: Click and drag
-
-#### Interactive Elements
-
-**Right-Click on Map**:
-- Teleports you to that location
-- Car/character respawns there
-- Instant travel
-
-**Left-Click on Marker**:
-- Properties: View property details
-- POIs: View location information
-- Historic sites: View historical facts
-
-### Map Legend
-
-Open with 📋 button:
-
-| Symbol | Meaning |
-|--------|---------|
-| 🏢 Green | Properties for sale |
-| 🏢 Blue | Properties for rent |
-| 📍 Red | Points of interest |
-| 📍 Red Pin | Memory pin marker |
-| 🌸 Pink/Yellow | Memory flower marker |
-| 🏛️ Purple | Historic sites |
-| 🚩 Red | Destination (Time Trial) |
-| ✓ Green | Checkpoints |
-
-Legend controls:
-- Use `📍 Pin memories` checkbox to hide/show only pin memories.
-- Use `🌸 Flower memories` checkbox to hide/show only flower memories.
-
-### Tips
-- Use map to plan routes
-- Right-click teleport saves time
-- Check legend for marker meanings
-- Zoom in to see street names
-- Toggle layers to reduce clutter
-
-## Real Estate Features
-
-### Enabling Real Estate Mode
-
-1. **In Main Menu**:
-   - Settings tab → Enable Real Estate Features
-   
-2. **In-Game**:
-   - Float menu → 🏘️ Real Estate button
-
-3. **Requirements**:
-   - At least one API key configured
-   - In a supported location (USA cities)
-
-### Viewing Properties
-
-#### In 3D World
-- Green/blue markers float above buildings
-- Green = For Sale
-- Blue = For Rent
-- Walk/drive near a property
-- Property panel automatically opens
-
-#### On Map
-- Properties shown as markers
-- Click marker to view details
-- Colors indicate sale/rent status
-
-### Property Panel
-
-Shows detailed information:
-
-**Basic Info**:
-- Address
-- Property type (house, condo, apartment)
-- Status (for sale/rent)
-
-**Pricing**:
-- Sale price or monthly rent
-- Price per square foot
-- Market value estimate
-
-**Details**:
-- Bedrooms and bathrooms
-- Square footage
-- Lot size
-- Year built
-
-**Additional**:
-- School ratings
-- Crime data
-- Nearby amenities
-- Property history
-
-### Property Search
-
-Use the Float Menu → Real Estate:
-
-**Filters**:
-- Price range
-- Property type
-- Number of bedrooms
-- Square footage
-- Neighborhood
-
-**Actions**:
-- View on map
-- Navigate to property
-- Save favorites (if implemented)
-- Compare properties
-
-### Tips
-- Use filters to reduce marker clutter
-- Check multiple APIs for best data
-- Property data may not be available for all buildings
-- Right-click map near property to inspect area
-
-## Space Exploration
-
-### Launch Options
-
-You can enter space systems in three ways:
-
-1. **Earth launch**: Start on Earth and travel naturally.
-2. **Moon launch**: Start directly on the moon.
-3. **Space launch**: Start directly in space flight.
-
-### Traveling to the Moon
-
-#### How to Travel
-1. **Look at the sky**: Night time is best
-2. **Find the moon**: Large white sphere
-3. **Click on it**: Left-click directly on the moon
-4. **Watch the journey**: Automatic cinematic flight
-
-#### Requirements
-- Must be on Earth (not already on moon)
-- Moon must be visible in sky
-- Not in menu/paused
-
-### Moon Environment
-
-#### Features
-- **Low Gravity**: Jump 6x higher than Earth
-- **Improved Lunar Surface**: Stronger crater/relief contrast with added rock cues for better depth and motion readability
-- **Starry Sky**: Clear view of stars
-- **Apollo 11 Landing Site**: Historic location
-
-#### Movement
-- **Walking recommended**: Best way to explore
-- **Jumping**: Press Space to jump very high
-- **Running**: Hold Shift for faster movement
-- **Drone mode**: Works normally
-- **Lunar driving float behavior**: Cars can go lightly airborne over hill crests/crater edges on moon terrain
-- **Desktop and mobile parity**: Moon driving float behavior now triggers consistently on both desktop and mobile
-- **Earth unchanged**: This airborne car behavior is moon-only; Earth keeps normal grounded terrain follow
-
-### Apollo 11 Landing Site
-
-#### Finding It
-- Located near center of landing area
-- Look for American flag
-- Flag is quite large and visible
-
-#### Interaction
-1. **Walk towards the flag**
-2. **Click on the flag**: Left-click when close
-3. **Information panel opens**: Mission details
-
-#### Mission Information
-- Launch date: July 16, 1969
-- Landing date: July 20, 1969
-- Astronauts: Neil Armstrong, Buzz Aldrin, Michael Collins
-- Mission duration: 8 days, 3 hours
-- Famous quote included
-- Historical context
-
-### Star Constellations
-
-#### Viewing Stars
-- **Night time**: Stars visible in sky
-- **Better on moon**: Clearer view, no atmosphere
-- **Look up**: Point camera towards sky
-
-#### Interaction
-1. **Click on a bright star**
-2. **Constellation highlights**: Stars in the constellation glow
-3. **Information panel**: Shows constellation details
-
-#### Available Constellations
-- Orion
-- Ursa Major (Big Dipper)
-- Ursa Minor (Little Dipper)
-- Cassiopeia
-- And many more!
-
-### Space Flight Controls
-
-When in space-flight mode:
-
-- `Arrow Keys` - Steer rocket (yaw/pitch)
-- `Space` - Thrust / boost
-- `Shift` - Brake / decelerate
-- `LAND ON ...` button - Land when near a valid body
-
-### Solar System Objects
-
-You can click objects in space to inspect details:
-
-- Planets
-- Named asteroids
-- Spacecraft
-- Galaxies (deep-sky catalog)
-
-### Belts and Deep-Sky Layers
-
-- **Main Asteroid Belt** between Mars and Jupiter
-- **Kuiper Belt** beyond Neptune
-- **Galaxies** are shown as distant background targets in real sky directions (RA/Dec placement)
-
-### Returning to Earth
-
-**Two Methods**:
-
-1. **UI Buttons**:
-   - Look for "Return to Earth" buttons
-   - Click to teleport back
-
-2. **Navigation**:
-   - Press `N` key (Next City)
-   - Teleports back to Earth
-
-**Your Car**:
-- Returns to same location you left it
-- All progress saved
-
-### Tips
-- Visit moon at night for best visibility
-- Low gravity jumping is fun!
-- Try finding all visible constellations
-- Take screenshots of Earth from the moon
-- Experiment with drone mode on the moon
-
-## Persistent Memories
-
-Use memory markers to leave notes directly in the world.
-
-### What You Can Place
-
-- `📍 Pin`
-- `🌸 Flower`
-- Message up to `200` characters
-
-### How to Place
-
-1. Click the `🌸` memory button above the controls panel.
-2. Memory composer opens.
-3. Choose marker type (`Pin` or `Flower`).
-4. Enter your message.
-5. Click `Place Marker`.
-
-Placement uses your current Earth-mode position (car, walk, or drone reference point).
-
-### How to Remove (Erase / Pull Up)
-
-1. Click a placed marker in the world.
-2. Memory info panel opens.
-3. Click `Remove Marker`.
-
-### Delete All Memories
-
-1. Open the memory composer (`🌸` button).
-2. Click `Delete All`.
-3. Confirm the prompt.
-
-### Persistence Behavior
-
-- Memory markers are persisted in browser local storage on this device/browser profile.
-- They reload automatically when you revisit that location.
-- Markers are placed/rendered on the highest local surface (build blocks, roofs, then ground).
-- Memory markers are also shown on minimap and large map.
-- Pin/flower visibility can be toggled independently in the legend.
-- Limits: 200 chars per message, 300 markers per location, 1500 markers total.
-- If browser storage is blocked/disabled, placement is disabled and a warning is shown.
-- Markers are not automatically synced between different browsers/devices.
-- Notes are not encrypted; do not store passwords, keys, or sensitive personal data.
-- UI paths that render dynamic memory/property/POI text now escape content before HTML insertion.
-- Optional check: run `getMemoryPersistenceStatus()` in browser console.
-
-## Brick Builder
-
-Create Minecraft-style brick stacks directly in the world.
-
-### Builder Controls
-
-- Press `B` to toggle build mode on/off.
-- Click in the world to place a brick block.
-- `Shift + Click` a placed block to remove it.
-- Use `🎮 Game Mode` -> `🧹 Clear Blocks` to wipe all build blocks for the current location (including saved blocks).
-
-### How Stacking Works
-
-- Aim at an existing block face and click to attach a new block to that face.
-- Keep clicking to stack vertically or extend walls horizontally.
-- Build mode works in driving, walking, and drone exploration contexts.
-- In walking mode, placed blocks are climbable/standable surfaces.
-- Placed blocks are persisted in browser storage per location and reload automatically when returning.
-- Hard cap: up to `100` blocks can be stored for now.
-
-## Advanced Features
-
-### Track Recording
-
-#### Recording a Track
-1. Press `R` to start recording
-2. Drive your route
-3. Press `R` again to stop
-4. Track is saved
-
-#### Features
-- Records exact path taken
-- Saves speed at each point
-- Includes mode (driving/walking/drone)
-- Can replay later
-
-#### Uses
-- Save favorite routes
-- Share paths with others
-- Remember scenic drives
-- Document exploration
-
-### Off-Road Mode
-
-#### Activation
-- Press and hold `Shift` while driving
-- "OFF" indicator lights up
-- Better handling on unpaved terrain
-
-#### Benefits
-- Faster on grass and dirt
-- Reduced speed penalty
-- Better traction
-- Can cut across parks
-
-#### When to Use
-- Shortcuts through parks
-- Exploring rural areas
-- Time trials with off-road routes
-- When roads are too slow
-
-### HUD Information
-
-#### Speed Indicator
-- Shows current speed in MPH
-- Updates in real-time
-- Works in all modes
-
-#### Speed Limit
-- Shows current road's speed limit
-- Updates as you change roads
-- Not enforced (no penalties)
-
-#### Street Names
-- Shows current street name
-- Updates as you move
-- Helps with navigation
-
-### Teleportation
-
-#### Next City (N key)
-- Instantly moves to next preset city
-- Cycles through all available cities
-- Useful for quick travel
-
-#### Map Right-Click
-- Teleport to exact coordinates
-- Most precise method
-- Works anywhere visible on map
-
-### Float Menu
-
-Located on right side of screen:
-
-**Buttons**:
-1. **🌍 Exploration**: 
-   - POI browser
-   - Navigation tools
-   - Location search
-   - Place persistent memory markers
-
-2. **🏘️ Real Estate**:
-   - Property browser
-   - Filters and search
-   - Market analysis
-
-3. **🎮 Game Mode**:
-   - Start challenges
-   - View high scores
-   - Mode selection
-   - Toggle brick build mode
-   - Clear all placed build blocks (current location)
-
-4. **🌿 Environment**:
-   - Weather controls (if available)
-   - Time of day
-   - Map layers
-
-### Pause Menu
-
-Press `Esc` to pause:
-
-**Options**:
-- Resume
-- Change Settings
-- Restart
-- Exit to Menu
-
-**Settings Available**:
-- Graphics quality
-- Control sensitivity
-- Audio volume (if implemented)
-- API configuration
-
-## Tips & Tricks
-
-### General Tips
-
-1. **Start with Free Roam**: Learn controls before trying timed modes
-2. **Check Controls Tab**: Reference controls in main menu
-3. **Use Map Frequently**: Press M often for orientation
-4. **Try All Modes**: Each offers unique experience
-5. **Explore at Night**: Different atmosphere and moon is visible
-
-### Driving Tips
-
-1. **Boost Management**: Don't waste boost on turns
-2. **Brake Before Tight Turns**: Use Space to scrub speed cleanly
-3. **Speed Limit**: Informational only, go faster if needed
-4. **Off-Road**: Remember Shift for better grass/dirt handling
-5. **Camera Angle**: Switch views (C) for better visibility
-
-### Navigation Tips
-
-1. **Minimap**: Always visible in corner
-2. **Street Names**: Help confirm location
-3. **Landmarks**: Note memorable buildings
-4. **Map Zoom**: Zoom in for street-level detail
-5. **Right-Click Teleport**: Saves time in Free Roam
-
-### Challenge Tips
-
-1. **Time Trial**: Use map to plan route before starting
-2. **Checkpoints**: Get the closest ones first
-3. **Drone Mode**: Great for hard-to-reach checkpoints
-4. **Practice**: Learn city layout in Free Roam first
-5. **Shortcuts**: Look for paths through parks
-
-### Performance Tips
-
-1. **Close Other Tabs**: Free up RAM
-2. **Lower Graphics**: If experiencing lag
-3. **Reduce Map Layers**: Toggle off unnecessary ones
-4. **Limit Properties**: Use price filters
-5. **Restart Browser**: If performance degrades
-
-### Exploration Tips
+### Pro panel
 
-1. **Walk Around**: Get out of car to see details
-2. **Visit Rooftops**: Use drone mode
-3. **Check Properties**: Interesting real estate data
-4. **Look for Easter Eggs**: Hidden surprises
-5. **Visit Different Times**: Day/night differences
+- Non-Pro users see the Pro info panel briefly on load
+- Panel auto-hides after a few seconds
+- Pro users keep access to Pro controls
 
-### Moon Tips
+## 6. Gameplay Controls
 
-1. **Jump High**: Low gravity is fun!
-2. **Find the Flag**: Historic Apollo 11 site
-3. **Look at Earth**: Beautiful view
-4. **Try Drone Mode**: Fly on the moon
-5. **Click Stars**: Learn constellations
+### Desktop
 
-## FAQ
+- Move/drive: `WASD` or arrows
+- Brake/space actions: `Space`
+- Boost/sprint: `Ctrl` or `Shift` depending on mode
+- Toggle walk: `F`
+- Toggle drone: `6`
+- Large map: `M`
+- Pause: `Esc`
 
-### General Questions
+### Touch/Mobile
 
-**Q: Do I need an internet connection?**
-A: Yes, for satellite imagery and real estate data.
+Mode-specific touch controls are shown automatically:
 
-**Q: Does it work on mobile?**
-A: Yes. Touch UI is mode-aware with dedicated mobile layouts for driving, walking, drone, and space flight.
+- driving
+- walking
+- drone
+- rocket/space flight
 
-**Q: Can I save my progress?**
-A: Full gameplay state is not saved, but memory markers (pin/flower notes) are persisted locally in your browser.
+Desktop is still recommended for highest performance.
 
-**Q: Where are memory notes stored?**
-A: In browser local storage (`worldExplorer3D.memories.v1`) on this device/profile only.
+## 7. Leaderboard and Memories
 
-**Q: Are memory notes secure/private?**
-A: They are local-only but not encrypted. Anyone with access to this browser profile can read them.
+- Red-flower challenge supports leaderboard entries.
+- Leaderboard uses Firestore when available, with local fallback when unavailable.
+- Memory markers and several user settings rely on browser storage.
 
-**Q: Is it multiplayer?**
-A: Not yet, but planned for future updates.
+## 8. Privacy and Terms
 
-**Q: Can I add custom cities?**
-A: Yes, enter any GPS coordinates in Settings.
+Required legal pages:
 
-### Technical Questions
+- Privacy: `/legal/privacy`
+- Terms: `/legal/terms`
 
-**Q: How do I switch between RDT and baseline mode?**
-A: Main Menu -> `Settings` -> `⚡ Performance Benchmark` -> choose mode -> `Apply + Reload World`.
+## 9. Troubleshooting
 
-**Q: How do I export benchmark data?**
-A: In the same benchmark panel, click `Copy Snapshot` to copy JSON to clipboard.
+### Sign-in panel opens but login fails
 
-**Q: How do I share the exact experience setup with someone else?**
-A: Use title-footer share icons, the in-game blue share arrow, or tap the coordinate readout to copy/share the same encoded experience link.
+Likely Auth provider disabled in Firebase project.
 
-**Q: Why is loading slow?**
-A: First loads are network-bound (Overpass + tiles). Repeat loads can be much faster when `lastLoad.overpassSource` shows `memory-cache`.
+### Upgrade button says checkout session failed
 
-**Q: The game is laggy, what do I do?**
-A: Close other tabs, reduce graphics quality, use fewer map layers.
+Usually Stripe config mismatch (key mode, invalid key, or missing price IDs).
 
-**Q: Can I run this offline?**
-A: No, requires internet for map data.
+### Plan does not update after payment
 
-**Q: What browsers are supported?**
-A: Chrome, Firefox, Safari, Edge (latest versions recommended).
+Webhook may not be configured correctly.
 
-**Q: Can I modify the code?**
-A: Yes. It is a no-build static site with `index.html`, `styles.css`, and modular files in `js/`. See [Technical Documentation](TECHNICAL_DOCS.md).
+### Dangerous site warning in browser
 
-### Gameplay Questions
+If this appears, do not enter credentials until verified in Search Console/Safe Browsing review and domain reputation checks.
 
-**Q: How do I win?**
-A: Free Roam has no win condition. Timed modes score based on time.
+## 10. Support Path
 
-**Q: Can I fly a plane?**
-A: Drone mode is similar to flying.
-
-**Q: Where is the Apollo 11 flag?**
-A: On the moon, near the center of the landing area.
-
-**Q: How do I get off the moon?**
-A: Press N or click "Return to Earth" button.
-
-**Q: Why can I click galaxies in space?**
-A: Galaxies are selectable deep-sky objects with info panels for visual guidance and educational context.
-
-**Q: Are memory markers really persistent?**
-A: Yes. Marker placement is only enabled after a browser storage round-trip check passes, and markers are saved to local storage on this browser profile.
-
-**Q: Why can't I jump in driving mode?**
-A: Cars can't jump. Switch to walking mode (F key).
-
-### Real Estate Questions
-
-**Q: Why aren't properties showing?**
-A: Ensure Real Estate Mode is enabled and API keys are configured.
-
-**Q: Do I need all three API keys?**
-A: No, any one will work. Multiple APIs provide better coverage.
-
-**Q: Why is property data missing?**
-A: APIs may not have data for all properties or areas.
-
-**Q: Is the property data accurate?**
-A: Data is from third-party APIs. Always verify independently.
-
-**Q: Can I buy properties through the app?**
-A: No, this is for viewing data only.
-
-### Controls Questions
-
-**Q: Can I customize controls?**
-A: Not in the UI currently. Can modify code directly.
-
-**Q: Why isn't mouse look working?**
-A: Only works in Walking and Drone modes. Use right-click and drag.
-
-**Q: How do I change camera?**
-A: Press C to cycle through views.
-
-**Q: What does the V key do?**
-A: Look behind you (hold key).
-
-**Q: Can I use a gamepad?**
-A: Not currently supported.
-
-### Troubleshooting
-
-**Q: Nothing happens when I click EXPLORE**
-A: Check browser console for errors. May need to allow popups.
-
-**Q: Properties aren't clickable**
-A: Make sure Real Estate Mode is enabled in Settings.
-
-**Q: Map won't open**
-A: Press M key or click map button in float menu.
-
-**Q: I'm stuck in a building**
-A: Right-click map to teleport out, or press N for next city.
-
-**Q: Car disappeared**
-A: Press F twice (walk mode then back to drive).
-
-**Q: Memory markers are not saving**
-A: Ensure browser local storage is enabled for the site and that private/incognito settings are not blocking storage.
-
-## Keyboard Reference Card
-
-Quick reference for all controls:
-
-### Movement
-| Key | Action |
-|-----|--------|
-| W/↑ | Forward/Gas |
-| S/↓ | Back/Brake |
-| A/← | Left/Turn Left |
-| D/→ | Right/Turn Right |
-| Space | Brake/Handbrake or Jump or Thrust |
-| Shift | Run or Off-Road or Descend/Decelerate |
-| Ctrl | Boost |
-
-### Mode & View
-| Key | Action |
-|-----|--------|
-| F | Toggle Walk/Drive |
-| 6 | Toggle Drone |
-| C | Cycle Camera |
-| V | Look Back |
-
-### Navigation
-| Key | Action |
-|-----|--------|
-| M | Toggle Map |
-| N | Next City |
-| B | Toggle brick build mode |
-| Game Menu -> Clear Blocks | Clear current-location build blocks |
-| 🌸 Memory Button | Create persistent pin/flower note |
-| R | Record Track |
-| Esc | Pause |
-
-### Space Flight
-| Key | Action |
-|-----|--------|
-| Arrow Keys | Rocket steering (yaw/pitch) |
-| Space | Thrust / Boost |
-| Shift | Brake / Decelerate |
-| LAND ON button | Attempt landing when in range |
-
-### Mouse
-| Action | Function |
-|--------|----------|
-| Right Click + Drag | Camera Look |
-| Click Moon | Travel to Moon |
-| Click Star | View Constellation |
-| Click Planet/Asteroid/Spacecraft/Galaxy | Open space inspector info |
-| Click Memory Marker | Open/remove memory note |
-| Click (Build Mode On) | Place brick block |
-| Shift+Click (Build Mode On) | Remove targeted brick block |
-| Right Click Map | Teleport |
-| Left Click Map | View Info |
-
----
-
-**Need More Help?** Check the [README](README.md) or [Technical Documentation](TECHNICAL_DOCS.md)
-
-**Last Updated**: February 2026
+- Pro users get priority contact links from in-app/account surfaces.
+- Feature suggestions can be submitted through the configured issue/contact channels.

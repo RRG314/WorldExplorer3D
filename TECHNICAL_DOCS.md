@@ -1,1138 +1,228 @@
-# Technical Documentation 🔧
+# Technical Documentation
 
-Developer guide for World Explorer 3D. Architecture, code structure, and customization.
+Last reviewed: 2026-02-16
 
-## Table of Contents
-- [Architecture Overview](#architecture-overview)
-- [Branch Freeze Updates (2026-02)](#branch-freeze-updates-2026-02)
-- [Technology Stack](#technology-stack)
-- [File Structure](#file-structure)
-- [Core Systems](#core-systems)
-- [Deterministic RDT & RGE-256 Layer](#deterministic-rdt--rge-256-layer)
-- [Benchmark Mode (RDT vs Baseline)](#benchmark-mode-rdt-vs-baseline)
-- [Shareable Experience Link Payload](#shareable-experience-link-payload)
-- [Red Flower Challenge + Leaderboard](#red-flower-challenge--leaderboard)
-- [API Integration](#api-integration)
-- [Rendering Pipeline](#rendering-pipeline)
-- [Persistent Memory Markers](#persistent-memory-markers)
-- [Brick Block Builder](#brick-block-builder)
-- [Security and Storage Notes](#security-and-storage-notes)
-- [Performance Optimization](#performance-optimization)
-- [Customization Guide](#customization-guide)
-- [Troubleshooting](#troubleshooting)
+This document is the engineering reference for the currently deployed World Explorer stack.
 
-## Architecture Overview
+## 1. Runtime Stack Summary
 
-### Design Philosophy
+Frontend:
 
-World Explorer 3D is built as a **no-build static-site runtime**:
-- No bundler required
-- Browser-native execution
-- Easy GitHub Pages deployment
-- Runtime split across `index.html`, `styles.css`, and `js/*`
-- ES module boot with compatibility for shared global-state subsystems
+- Static pages and assets served by Firebase Hosting
+- ES module runtime in `/public/app/js/`
+- Shared auth/entitlement/billing modules in `/public/js/`
 
-## Branch Freeze Updates (2026-02)
+Backend:
 
-This branch snapshot includes these runtime additions beyond the previous doc baseline:
+- Firebase Functions (1st gen, Node 20 currently)
+- Stripe API calls in function layer
+- Firestore for user plan state
 
-- Start-menu Location tab now includes launch selectors: `Earth`, `Moon`, `Space`.
-- Start-menu Controls tab now includes dedicated space-flight controls.
-- Solar-system layer now renders both the main asteroid belt and the Kuiper belt.
-- Deep-sky galaxy catalog added in `solar-system.js` with RA/Dec placement and click inspection.
-- Deep-space renderer envelope expanded (`space.js` camera far clip and star shell range) to support farther galaxy distances.
-- Persistent memory marker subsystem added (`js/memory.js`) with place/remove flow.
-- Memory composer now includes `Delete All` with confirmation.
-- POI and memory markers now render on both minimap and large map overlays.
-- Voxel-style brick builder subsystem added (`js/blocks.js`) with click place/stack and shift-click removal.
-- Runtime benchmark settings panel added in title-screen `Settings` for `RDT` vs `Baseline` mode switching.
-- Perf snapshot export path added (`Copy Snapshot`) and optional in-game benchmark overlay.
-- Auto quality manager added in `js/perf.js` with FPS/frame-time driven budget tiers.
-- World-load profile scaling now consumes dynamic budget/LOD state in `js/world.js`.
-- Shareable experience link export/import added in `js/ui.js` (`Copy Experience Link` + URL param parsing).
-- Share surfaces expanded to title-footer icon rail, in-game share quick menu, and coordinate-readout click-copy.
-- Timed "Find The Red Flower" challenge module added (`js/flower-challenge.js`) with top-right title toggle/panel entry + in-game flower action menu.
-- Leaderboard persistence now supports Firebase Firestore (`flowerLeaderboard`) with automatic local fallback.
-- Mobile touch-control profiles added for driving, walking, drone, and rocket modes with per-mode bindings/layout.
-- Moon-only low-gravity airborne terrain-follow behavior added for lunar driving crest/crater transitions.
-- Overpass endpoint preference + in-memory response cache added for faster repeat loads.
-- Loader cache-bust chain is aligned through `v=54` (`index.html`, `bootstrap.js`, `manifest.js`, `app-entry.js`).
+## 2. Active Application Structure
 
-### High-Level Architecture
-
-```
-┌─────────────────────────────────────────┐
-│          HTML5 Application              │
-├─────────────────────────────────────────┤
-│  UI Layer (HTML/CSS)                    │
-│  ├─ Main Menu                           │
-│  ├─ HUD System                          │
-│  ├─ Property Panel                      │
-│  └─ Map Interface                       │
-├─────────────────────────────────────────┤
-│  Game Logic (JavaScript)                │
-│  ├─ Input Handler                       │
-│  ├─ Physics Engine                      │
-│  ├─ Game Mode Controller                │
-│  └─ State Manager                       │
-├─────────────────────────────────────────┤
-│  3D Graphics (Three.js)                 │
-│  ├─ Scene Management                    │
-│  ├─ Camera System                       │
-│  ├─ Mesh Generation                     │
-│  └─ Material System                     │
-├─────────────────────────────────────────┤
-│  Data Layer                             │
-│  ├─ OpenStreetMap / Overpass Data       │
-│  ├─ Real Estate APIs                    │
-│  ├─ LocalStorage (memory markers)       │
-│  └─ Configuration                       │
-└─────────────────────────────────────────┘
+```text
+public/
+  index.html
+  account/index.html
+  app/index.html
+  js/
+    firebase-init.js
+    auth-ui.js
+    entitlements.js
+    billing.js
+    firebase-project-config.js
+functions/
+  index.js
+  package.json
+firebase.json
+firestore.rules
 ```
 
-## Technology Stack
+## 3. Frontend Modules
 
-### Core Technologies
+### `public/js/firebase-init.js`
 
-**Three.js r128**
-- 3D rendering engine
-- Scene graph management
-- WebGL abstraction
-- Geometry and material system
+Responsibilities:
 
-**Vanilla JavaScript (ES6+)**
-- No frameworks or libraries (except Three.js)
-- Modern ES6+ features
-- Async/await for API calls
-- Class-based architecture
+- read config from `window.WORLD_EXPLORER_FIREBASE` or localStorage fallback
+- initialize Firebase App/Auth/Firestore
+- expose helper methods for config introspection and set/update
 
-**HTML5**
-- Semantic markup
-- Canvas elements (2D map, WebGL)
-- Local storage API
-- Geolocation API (future)
+Storage key:
 
-**CSS3**
-- Flexbox/Grid layouts
-- Animations and transitions
-- Media queries for responsive design
-- Custom properties (CSS variables)
+- `worldExplorer3D.firebaseConfig`
 
-### External APIs
+### `public/js/auth-ui.js`
 
-**OpenStreetMap / Overpass**
-- Road network and building footprints
-- Land use and POI data
-- Historic and amenity metadata
+Responsibilities:
 
-**Terrain Tiles (Terrarium)**
-- Elevation decode source
-- Terrain mesh grounding and sampling
+- email/password sign in
+- email/password sign up
+- Google sign in (popup with redirect fallback)
+- password reset
+- auth-state observer callback utilities
 
-**Real Estate APIs**
-- Rentcast: Property valuations
-- Attom: Property details
-- Estated: Market data
+### `public/js/entitlements.js`
 
-## File Structure
+Responsibilities:
 
-### Static-Site Organization
+- ensure user profile exists (`users/{uid}`)
+- create initial `trial` plan for first-time users
+- compute plan-specific entitlements
+- downgrade expired trials to free when no active subscription
+- broadcast entitlements changes to app via custom event and global state
 
-```
-WorldExplorer3D/
-├─ index.html
-├─ styles.css
-├─ .nojekyll
-└─ js/
-   ├─ bootstrap.js
-   ├─ app-entry.js
-   ├─ modules/
-   │  ├─ manifest.js
-   │  └─ script-loader.js
-   ├─ config.js
-   ├─ state.js
-   ├─ env.js
-   ├─ rdt.js
-   ├─ world.js
-   ├─ terrain.js
-   ├─ ground.js
-   ├─ engine.js
-   ├─ physics.js
-   ├─ walking.js
-   ├─ sky.js
-   ├─ solar-system.js
-   ├─ space.js
-   ├─ game.js
-   ├─ input.js
-   ├─ hud.js
-   ├─ map.js
-   ├─ memory.js
-   ├─ blocks.js
-   ├─ flower-challenge.js
-   ├─ ui.js
-   └─ main.js
-```
+### `public/js/billing.js`
 
-### Code Organization Principles
+Responsibilities:
 
-1. **Configuration First**: Constants and config at top
-2. **State Declaration**: Global state variables
-3. **Initialization**: Setup functions
-4. **Core Systems**: Physics, rendering, input
-5. **Game Logic**: Modes, objectives, scoring
-6. **UI Controllers**: Menu, HUD, panels
-7. **Utilities**: Helper functions
-8. **Event Handlers**: Last section
+- call function endpoints with Firebase ID token
+- redirect to Stripe Checkout or Billing Portal
 
-## Core Systems
+Endpoints called:
 
-### 1. Initialization System
+- `/createCheckoutSession`
+- `/createPortalSession`
 
-```javascript
-async function init() {
-    // 1. Setup Three.js scene
-    // 2. Initialize camera
-    // 3. Setup renderer
-    // 4. Create lights
-    // 5. Initialize input handlers
-    // 6. Setup UI event listeners
-    // 7. Start render loop
-}
-```
+GitHub Pages compatibility behavior:
 
-**Key Functions**:
-- `init()`: Main initialization
-- `setupUI()`: UI event binding
-- `createScene()`: Three.js scene creation
-- `initMap()`: 2D map initialization
+- detects non-Firebase-hosting domain
+- resolves direct Cloud Functions origin via Firebase `projectId`
+- sends `returnUrlBase` so Stripe returns to subpath deployments (for example `/WorldExplorer`)
 
-### 2. State Management
+## 4. Cloud Functions
 
-**Global State Object**:
-```javascript
-const state = {
-    mode: 'drive',        // 'drive', 'walk', 'drone'
-    gameMode: 'free',     // 'free', 'trial', 'checkpoint'
-    paused: false,
-    onMoon: false,
-    walker: { x, y, z, angle, vy, onGround },
-    car: { x, z, angle, velocity, wheelAngle }
-}
-```
+Source: `/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine/functions/index.js`
 
-**State Updates**:
-- Physics loop updates state
-- Render loop reads state
-- Input handlers modify state
-- Game modes control state transitions
+### `createCheckoutSession`
 
-### 3. Physics Engine
+- validates bearer token via `verifyIdToken`
+- validates requested plan (`supporter|pro`)
+- resolves or creates Stripe customer
+- creates subscription checkout session
+- returns `{ url }`
 
-**Vehicle Physics**:
-```javascript
-function updateCarPhysics(dt) {
-    // Acceleration from input
-    // Friction and drag
-    // Turning mechanics
-    // Collision detection
-    // Position integration
-}
+### `createPortalSession`
+
+- validates bearer token
+- resolves `stripeCustomerId` from Firestore user doc
+- creates Stripe billing portal session
+- returns `{ url }`
+
+### `stripeWebhook`
+
+- validates signature with `stripe.webhooks.constructEvent`
+- processes:
+  - `checkout.session.completed`
+  - `customer.subscription.created`
+  - `customer.subscription.updated`
+  - `customer.subscription.deleted`
+- updates user plan and entitlements in Firestore
+
+## 5. Firestore Rules Snapshot
+
+`users/{userId}`:
+
+- owner read/write only
+
+`flowerLeaderboard/{entryId}`:
+
+- public read
+- authenticated create
+- update/delete blocked
+
+## 6. Hosting and Rewrites
+
+Defined in `firebase.json`.
+
+- hosting root: `public`
+- immutable caching for static assets
+- short cache for HTML
+- function rewrites for checkout/portal/webhook
+- legal route rewrites
+
+GitHub Pages mirror mode:
+
+- Uses `.github/workflows/deploy-pages-public.yml` to publish `public/`
+- No Firebase rewrites available on Pages; billing calls use direct function URL resolution
+
+## 7. Plan State Model
+
+Plan values in use:
+
+- `free`
+- `trial`
+- `supporter`
+- `pro`
+
+Subscription statuses treated as active:
+
+- `active`
+- `trialing`
+- `past_due`
+
+## 8. UI State Decisions
+
+### App (`public/app/index.html`)
+
+- Auth/account actions live in top-left float panel
+- Top-center plan/account HUD removed
+- Pro panel auto-hide for non-Pro users (`~4.5s`)
+
+### Account (`public/account/index.html`)
+
+- plan and trial status display
+- upgrade buttons and billing management
+- sign-out control
+
+## 9. Deployment and Operations
+
+### Full deploy
+
+```bash
+cd "/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine"
+firebase deploy
 ```
 
-Current branch note:
-- Earth driving uses grounded terrain-follow integration.
-- Moon driving applies low-gravity airborne integration over steep terrain transitions (hill crests/crater edges).
-- This lunar airborne behavior is intentionally gated to moon context only.
-- Moon vehicle height sampling now updates moon-surface world matrices before raycasts to keep desktop and mobile behavior aligned.
+### Functions-only deploy
 
-**Walking Physics**:
-```javascript
-function updateWalkerPhysics(dt) {
-    // Movement input
-    // Gravity simulation
-    // Ground detection
-    // Jump mechanics
-    // Collision handling
-}
+```bash
+firebase deploy --only functions
 ```
 
-**Drone Physics**:
-```javascript
-function updateDronePhysics(dt) {
-    // Free-form movement
-    // No gravity
-    // No collisions
-    // 6-DOF control
-}
+### Hosting-only deploy
+
+```bash
+firebase deploy --only hosting
 ```
 
-### 4. Input System
+### Logs
 
-**Keyboard Handling**:
-```javascript
-const keys = {};
-
-addEventListener('keydown', (e) => {
-    keys[e.code] = true;
-    onKey(e.code); // Handle special keys
-});
-
-addEventListener('keyup', (e) => {
-    keys[e.code] = false;
-});
+```bash
+firebase functions:log --only createCheckoutSession -n 50
+firebase functions:log --only stripeWebhook -n 50
 ```
 
-**Mouse Handling**:
-```javascript
-addEventListener('mousedown', (e) => {
-    if (e.button === 2) { // Right click
-        mouseActive = true;
-        // Camera control
-    }
-});
+## 10. Stripe Configuration Contract
 
-addEventListener('click', (e) => {
-    // Moon click
-    // Star click
-    // UI interactions
-});
-```
+Runtime config keys expected by functions:
 
-### 5. Rendering Pipeline
+- `stripe.secret`
+- `stripe.webhook`
+- `stripe.price_supporter`
+- `stripe.price_pro`
 
-**Main Render Loop**:
-```javascript
-function renderLoop() {
-    requestAnimationFrame(renderLoop);
-    
-    const dt = getDeltaTime();
-    
-    // Update physics
-    updatePhysics(dt);
-    
-    // Update camera
-    updateCamera();
-    
-    // Update HUD
-    updateHUD();
-    
-    // Update map
-    updateMinimap();
-    
-    // Render 3D scene
-    renderer.render(scene, camera);
-}
-```
+Currently set using legacy runtime config commands.
 
-**Rendering Order**:
-1. Clear buffers
-2. Update matrices
-3. Frustum culling
-4. Depth sorting (transparent objects)
-5. Draw opaque objects
-6. Draw transparent objects
-7. Post-processing (if any)
+## 11. Known Technical Debt
 
-### 6. Camera System
+1. `functions.config()` deprecation (March 2026 shutdown)
+2. Node 20 runtime deprecation warnings for Functions
+3. dual runtime copies (legacy root and active `/public/app`) can cause confusion
+4. browser stale-cache edge cases can request legacy `/js/*` entrypoints after route/layout changes
 
-**Camera Modes**:
-```javascript
-const cameraMode = 0; // 0: third-person, 1: first-person, 2: overhead
+## 12. Immediate Migration Plan (Recommended)
 
-function updateCamera() {
-    switch(cameraMode) {
-        case 0: updateThirdPersonCamera(); break;
-        case 1: updateFirstPersonCamera(); break;
-        case 2: updateOverheadCamera(); break;
-    }
-}
-```
-
-**Camera Positioning**:
-- Smooth interpolation (lerp)
-- Target tracking
-- Collision avoidance
-- Mode-specific offset
-
-## Deterministic RDT & RGE-256 Layer
-
-World Explorer 3D includes a deterministic utility layer in `js/rdt.js` that combines:
-- **RDT complexity indexing** (`rdtDepth`) for adaptive world/physics behavior
-- **Stable geographic seeding** (`hashGeoToInt`) keyed to location and mode
-- **RGE256ctr deterministic PRNG wrappers** (`rand01FromInt`, `seededRandom`) for reproducible procedural generation
-
-### Research Provenance (First-Party)
-
-- Reid, S. (2025). *Recursive Division Tree: A Log-Log Algorithm for Integer Depth*. Zenodo. DOI: https://doi.org/10.5281/zenodo.18012166
-- Reid, S. (2025). *RGE-256: A New ARX-Based Pseudorandom Number Generator With Structured Entropy and Empirical Validation*. Zenodo. DOI: https://doi.org/10.5281/zenodo.17982804
-- RGE-256 core repository: https://github.com/RRG314/rge256
-- RGE-256 demo app: https://github.com/RRG314/RGE-256-app
-
-### Current Runtime Integration
-
-- `world.js` computes `rdtSeed` + `rdtComplexity` during load and adapts query strategy.
-- `engine.js` and `world.js` use seeded deterministic paths for procedural road/building/window variation.
-- `physics.js` uses RDT complexity to throttle expensive nearest-road checks with safety overrides.
-
-### Deterministic PRNG Direction
-
-The engine already uses deterministic PRNG paths in key procedural systems. Some subsystems still use `Math.random` for non-critical effects and compatibility. Ongoing work is to continue replacing those paths with deterministic stream-based RNG to maximize reproducibility.
-
-## Benchmark Mode (RDT vs Baseline)
-
-The engine includes a user-facing benchmark switch so performance can be compared without code changes.
-
-### Runtime controls
-
-- UI location: `index.html` -> `Settings` tab -> `⚡ Performance Benchmark`
-- Mode selector: `#perfModeSelect`
-- Overlay toggle: `#perfOverlayToggle`
-- Apply/reload action: `#perfApplyReload`
-- Snapshot export action: `#perfCopySnapshot`
-- Title share copy action: `#shareExperienceBtn`
-- Title share icons: `#titleShareNative`, `#titleShareFacebook`, `#titleShareTwitter`, `#titleShareInstagram`, `#titleShareText`
-- In-game share entry: `#gameShareFloatBtn` + `#gameShareMenu`
-- Coordinate share copy surface: `#coords` click/tap
-
-### Mode semantics
-
-- `rdt`: uses adaptive feature budgets, RDT depth-driven limits, and mixed collider detail.
-- `baseline`: disables RDT budgeting and uses full baseline budgets.
-- Auto quality (default ON): adjusts dynamic budget tier (`performance`, `balanced`, `quality`) from live FPS/frame-time and frame-spike pressure.
-
-### Persistence and defaults
-
-- Mode storage key: `worldExplorerPerfMode`
-- Overlay storage key: `worldExplorerPerfOverlay`
-- Auto-quality storage key: `worldExplorerPerfAutoQuality`
-- Overlay default: forced OFF each session (`setPerfOverlayEnabled(false, { persist: false })` in `js/perf.js`) so diagnostics remain opt-in.
-
-### Overlay anchoring and placement
-
-- `js/main.js` exposes `positionTopOverlays()` and computes placement from live element bounds.
-- Debug overlay (`#debugOverlay`) is centered between `#hud` and the virtual top-center anchor.
-- Benchmark panel (`#perfPanel`) is centered between the virtual top-center anchor and `#mainMenuBtn`.
-- Repositioning runs during HUD-throttled updates, perf panel refreshes, debug toggle, and `resize`.
-
-### Snapshot schema highlights
-
-`capturePerfSnapshot()` exports JSON with:
-
-- top-level render stats (`fps`, `frameMs`, `renderer.*`)
-- live counts (`live.worldCounts`, `live.lodVisible`)
-- dynamic quality budget state (`dynamicBudget.*`, `live.quality.*`)
-- last world-load summary (`lastLoad.*`)
-
-`world.js` appends load diagnostics:
-
-- `lastLoad.overpassSource` (`network` or `memory-cache`)
-- `lastLoad.overpassEndpoint`
-- `lastLoad.overpassCacheAgeMs`
-- `lastLoad.dynamicBudget` (budget tier and scales used for that load)
-- per-phase timings in `lastLoad.phases`
-
-### Supporting test stats (Baltimore, 2026-02-14)
-
-| Scenario | overpassSource | loadMs | fetchOverpass | fps | frameMs | draw calls | triangles |
-| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
-| Baseline (network) | `network` | `5551` | `4267` | `60.00` | `16.71` | `453` | `2,888,718` |
-| RDT (network) | `network` | `4669` | `3519` | `60.00` | `16.67` | `1149` | `2,174,223` |
-| RDT (memory-cache repeat) | `memory-cache` | `2202-2246` | `0` | `59.99-60.00` | `16.59-16.66` | `957-1131` | `2,250,431-2,259,359` |
-
-Current takeaway from these runs:
-
-- RDT startup is faster than baseline for this dataset.
-- Repeat RDT loads are much faster when Overpass fetch is served from memory cache.
-- Draw-call variance is still a tuning target in RDT mode.
-
-## Shareable Experience Link Payload
-
-`ui.js` supports copying and parsing URL payloads for reproducible runs:
-
-- `loc` (`baltimore`, `seattle`, etc.) or `custom` with:
-- `lat`, `lon`, `lname` (custom location coordinates/name)
-- `launch` (`earth`, `moon`, `space`)
-- `gm` (`free`, `trial`, `checkpoint`)
-- `pm` (`rdt`, `baseline`)
-- `seed` (deterministic seed override routed to `world.js` as `sharedSeedOverride`)
-- `mode` (`driving`, `walking`, `drone`, `rocket`)
-- `camMode` (`0`, `1`, `2`)
-- `rx`, `ry`, `rz`, `yaw`, optional `pitch` (runtime pose)
-
-Flow:
-
-1. On boot, `ui.js` parses query params and preloads title-screen selections.
-2. Parsed runtime state is cached in `appCtx.pendingExperienceState`.
-3. After world start, runtime mode/camera/pose is applied.
-4. `Copy Experience Link` regenerates a URL from active state or pending shared state.
-
-## Red Flower Challenge + Leaderboard
-
-Runtime module: `js/flower-challenge.js`
-
-Primary responsibilities:
-
-- Challenge start/stop lifecycle and marker cleanup.
-- Random Earth-only red-flower spawn within visible world range.
-- In-game timer HUD updates while challenge is active.
-- Completion detection for `driving`, `walking`, and `drone` actors.
-- Title-screen leaderboard rendering and refresh.
-
-UI integration points:
-
-- Title toggle/panel: `#flowerChallengeToggleBtn`, `#flowerChallengePanel`, `#titleFindFlowerBtn`, `#titleFlowerRefreshBtn`
-- In-game action menu: `#flowerActionMenu` opened from `#memoryFlowerFloatBtn`
-- In-game HUD: `#flowerChallengeHud`, `#flowerChallengeHudStatus`, `#flowerChallengeHudTimer`
-
-Panel behavior:
-
-- Title challenge panel is hidden by default and opened with `.open`.
-- `#flowerChallengeToggleBtn` controls panel visibility on desktop + touch/mobile.
-- Outside click closes the title panel while preserving in-panel interactions.
-
-App context methods exposed by the module:
-
-- `setupFlowerChallenge()`
-- `requestFlowerChallengeFromTitle()`
-- `consumePendingFlowerChallengeStart()`
-- `startFlowerChallenge(source)`
-- `stopFlowerChallenge(options)`
-- `toggleFlowerActionMenu()`
-- `updateFlowerChallenge(dt)`
-- `refreshFlowerLeaderboard()`
-- `closeFlowerChallengeTitlePanel()`
-- `getFlowerChallengeBackendStatus()`
-
-Persistence strategy:
-
-- Preferred backend: Firestore collection `flowerLeaderboard`
-- Fallback backend: localStorage key `worldExplorer3D.flowerChallenge.localLeaderboard.v1`
-- Player-name cache: localStorage key `worldExplorer3D.flowerChallenge.playerName`
-
-Firebase config injection (optional):
-
-- Global object before boot:
-  - `window.WORLD_EXPLORER_FIREBASE = { apiKey, authDomain, projectId, storageBucket, messagingSenderId, appId }`
-- Or localStorage key:
-  - `worldExplorer3D.firebaseConfig` with same JSON shape.
-
-If Firebase modules/config fail to load, challenge and leaderboard continue using local fallback without blocking gameplay.
-
-Runtime backend probe:
-
-- Global helper is exposed for quick verification:
-  - `getFlowerChallengeBackendStatus()`
-  - returns `{ configPresent, firebaseReady, backend, challengeActive }`
-
-## API Integration
-
-### OSM / Tile Integration
-
-**Tile Loading System**:
-```javascript
-function loadMapTile(lat, lon, zoom) {
-    const tileCoords = latLonToTile(lat, lon, zoom);
-    const url = `https://tile.openstreetmap.org/${zoom}/${tileCoords.x}/${tileCoords.y}.png`;
-    
-    return new Promise((resolve, reject) => {
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
-        img.onload = () => resolve(img);
-        img.onerror = reject;
-        img.src = url;
-    });
-}
-```
-
-**Coordinate Conversion**:
-```javascript
-// Lat/Lon to Tile Coordinates
-function latLonToTile(lat, lon, zoom) {
-    const n = Math.pow(2, zoom);
-    const x = Math.floor((lon + 180) / 360 * n);
-    const y = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 
-        1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n);
-    return { x, y };
-}
-
-// Lat/Lon to World Coordinates
-function latLonToWorld(lat, lon) {
-    const x = (lon - centerLon) * metersPerDegree;
-    const z = (centerLat - lat) * metersPerDegree;
-    return { x, z };
-}
-```
-
-### Real Estate APIs
-
-**API Call Structure**:
-```javascript
-async function fetchPropertyData(lat, lon) {
-    const promises = [];
-    
-    // Try Rentcast
-    if (apiConfig.rentcast) {
-        promises.push(fetchRentcast(lat, lon));
-    }
-    
-    // Try Attom
-    if (apiConfig.attom) {
-        promises.push(fetchAttom(lat, lon));
-    }
-    
-    // Try Estated
-    if (apiConfig.estated) {
-        promises.push(fetchEstated(lat, lon));
-    }
-    
-    const results = await Promise.allSettled(promises);
-    return mergePropertyData(results);
-}
-```
-
-**Error Handling**:
-```javascript
-async function fetchWithRetry(url, options, retries = 3) {
-    for (let i = 0; i < retries; i++) {
-        try {
-            const response = await fetch(url, options);
-            if (!response.ok) throw new Error(`HTTP ${response.status}`);
-            return await response.json();
-        } catch (error) {
-            if (i === retries - 1) throw error;
-            await new Promise(r => setTimeout(r, 1000 * (i + 1)));
-        }
-    }
-}
-```
-
-## Rendering Pipeline
-
-### Terrain Generation
-
-**Height Map Creation**:
-```javascript
-function generateTerrain(width, height, resolution) {
-    const geometry = new THREE.PlaneGeometry(
-        width, height, 
-        resolution, resolution
-    );
-    
-    // Apply elevation data
-    const positions = geometry.attributes.position;
-    for (let i = 0; i < positions.count; i++) {
-        const elevation = getElevation(positions.getX(i), positions.getZ(i));
-        positions.setY(i, elevation);
-    }
-    
-    geometry.computeVertexNormals();
-    return geometry;
-}
-```
-
-**Texture Application**:
-```javascript
-function createTerrainMaterial(satelliteImage) {
-    const texture = new THREE.Texture(satelliteImage);
-    texture.needsUpdate = true;
-    
-    return new THREE.MeshStandardMaterial({
-        map: texture,
-        roughness: 0.8,
-        metalness: 0.2
-    });
-}
-```
-
-### Building Generation
-
-**Procedural Buildings**:
-```javascript
-function createBuilding(x, z, width, depth, height) {
-    const geometry = new THREE.BoxGeometry(width, height, depth);
-    const material = new THREE.MeshStandardMaterial({
-        color: randomBuildingColor(),
-        roughness: 0.7,
-        metalness: 0.3
-    });
-    
-    const building = new THREE.Mesh(geometry, material);
-    building.position.set(x, height / 2, z);
-    building.castShadow = true;
-    building.receiveShadow = true;
-    
-    return building;
-}
-```
-
-**Building Placement**:
-```javascript
-function placeBuildings(roads, density) {
-    const buildings = [];
-    
-    for (const road of roads) {
-        const buildingsAlongRoad = generateBuildingsAlongRoad(road, density);
-        buildings.push(...buildingsAlongRoad);
-    }
-    
-    return buildings;
-}
-```
-
-### Lighting System
-
-**Dynamic Lighting**:
-```javascript
-function updateLighting(timeOfDay) {
-    // Sun position
-    const sunAngle = (timeOfDay / 24) * Math.PI * 2;
-    directionalLight.position.set(
-        Math.cos(sunAngle) * 1000,
-        Math.sin(sunAngle) * 1000,
-        0
-    );
-    
-    // Ambient light intensity
-    ambientLight.intensity = 0.3 + Math.sin(sunAngle) * 0.2;
-    
-    // Sky color
-    const skyColor = getSkyColor(timeOfDay);
-    scene.background = new THREE.Color(skyColor);
-}
-```
-
-### Sky System
-
-**Sky Gradient**:
-```javascript
-function createSky() {
-    const skyGeometry = new THREE.SphereGeometry(5000, 32, 32);
-    const skyMaterial = new THREE.ShaderMaterial({
-        uniforms: {
-            topColor: { value: new THREE.Color(0x0077ff) },
-            bottomColor: { value: new THREE.Color(0xffffff) },
-            offset: { value: 400 },
-            exponent: { value: 0.6 }
-        },
-        vertexShader: `...`,
-        fragmentShader: `...`,
-        side: THREE.BackSide
-    });
-    
-    return new THREE.Mesh(skyGeometry, skyMaterial);
-}
-```
-
-### Deep-Space Objects (Belts + Galaxies)
-
-Current space rendering layers include:
-
-- Main asteroid belt + Kuiper belt (particle layers and volume bands)
-- Clickable solar-system objects (planets, asteroids, spacecraft)
-- Clickable RA/Dec-positioned galaxy sprites with inspector data
-
-Key implementation files:
-
-- `js/solar-system.js`: belts, galaxies, click raycast integration, info panel content
-- `js/space.js`: deep-space camera clipping and star shell depth envelope
-
-## Persistent Memory Markers
-
-`js/memory.js` adds a persistent marker subsystem for Earth-mode locations:
-
-- Marker types: `pin` and `flower`
-- Message length cap: `200` characters
-- Storage key: `worldExplorer3D.memories.v1`
-- Limits: `300` per location, `1500` total, ~`1500KB` serialized payload cap
-- Placement guard: storage round-trip verification must pass before placement is enabled
-- Removal: click marker hitbox in world, then use `Remove Marker`
-- Bulk removal: memory composer `Delete All` action with browser confirm prompt
-- Rebuild timing: markers clear during world reload and rehydrate after location load completes
-- Map integration: pin/flower markers render in minimap and large map drawing pass (`js/map.js`)
-- Surface resolution: marker Y is resolved to the highest local surface (build block top, building roof, then terrain ground)
-- Legend integration: `mapLayers.memoryPins` and `mapLayers.memoryFlowers` gate each marker type independently
-
-Core public hooks:
-
-- `setupMemoryUI()`
-- `openMemoryComposer()`
-- `refreshMemoryMarkersForCurrentLocation()`
-- `clearMemoryMarkersForWorldReload()`
-- `getMemoryPersistenceStatus()`
-- `getMemoryEntriesForCurrentLocation()`
-
-## Brick Block Builder
-
-`js/blocks.js` adds a lightweight voxel-style building interaction:
-
-- Toggle: `B` key or `🎮 Game Mode` -> `🧱 Build Mode`
-- Place: click world while build mode is enabled
-- Remove: `Shift + Click` an existing placed block
-- Stacking: clicks on existing block faces place adjacent blocks by face normal
-- Persistence: blocks are saved in Earth mode per location in localStorage (`worldExplorer3D.buildBlocks.v1`)
-- Limit: currently capped to `100` blocks maximum
-- Clear control: `🎮 Game Mode` -> `🧹 Clear Blocks` removes current-location rendered + saved blocks
-- Reload behavior: rendered blocks are cleared during `loadRoads()`, then current-location saved blocks are rehydrated
-- Walk physics integration: block tops participate in walkable ground/collision checks for climbing/standing
-
-Core public hooks:
-
-- `toggleBlockBuildMode()`
-- `setBuildModeEnabled(state)`
-- `handleBlockBuilderClick(event)`
-- `clearAllBuildBlocks()`
-- `clearBlockBuilderForWorldReload()`
-- `getBuildTopSurfaceAtWorldXZ(x, z, maxTopY)`
-- `getBuildCollisionAtWorldXZ(x, z, feetY, stepHeight)`
-- `getBuildLimits()`
-- `getBuildPersistenceStatus()`
-- `refreshBlockBuilderForCurrentLocation()`
-
-## Security and Storage Notes
-
-Current memory persistence model is client-side only.
-
-- Storage medium: browser `localStorage`, same-origin readable, no encryption at rest.
-- Data scope: per browser profile on one device; no automatic server sync.
-- Reliability: blocked storage (privacy mode/extensions/policies) disables placement.
-- User controls: per-marker remove and global `Delete All` are available in UI.
-- Deployment guidance: add response headers (`X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, `Permissions-Policy`) at host/CDN level.
-- Content guidance: memory notes and external data are untrusted; keep text paths on `textContent` where practical and escape dynamic values before `innerHTML` templates.
-
-## Performance Optimization
-
-Current implemented strategies in this branch:
-
-- Per-mode budget control (`rdt` adaptive limits vs `baseline` full limits)
-- Merged/batched road, building, and landuse geometry paths
-- Mixed-detail collider budgeting (full near, simplified mid for RDT)
-- Overpass endpoint racing with preferred-endpoint reuse
-- In-memory Overpass response cache for repeat loads at the same location envelope
-- Environment-safe world loading: if env changes to moon/space mid-load, Earth mesh arrays are force-hidden and not re-attached
-- Moon-scene isolation guard in transition flow to prevent Earth mesh bleed-through on desktop during late async completion
-
-### Rendering Optimizations
-
-**Level of Detail (LOD)**:
-```javascript
-// Use simpler meshes for distant objects
-function createLODBuilding(x, z, distance) {
-    if (distance > 1000) {
-        return createSimpleBox(x, z);
-    } else if (distance > 500) {
-        return createMediumDetailBuilding(x, z);
-    } else {
-        return createHighDetailBuilding(x, z);
-    }
-}
-```
-
-**Frustum Culling**:
-- Automatic via Three.js
-- Only visible objects rendered
-- Significant performance gain
-
-**Instanced Rendering**:
-```javascript
-// For repeated objects (trees, lampposts)
-const instancedGeometry = new THREE.InstancedBufferGeometry();
-const instancedMesh = new THREE.InstancedMesh(
-    geometry,
-    material,
-    count
-);
-```
-
-### Memory Management
-
-**Texture Management**:
-```javascript
-function disposeTexture(texture) {
-    if (texture) {
-        texture.dispose();
-        texture = null;
-    }
-}
-
-function clearOldTiles() {
-    const visibleTiles = getVisibleTiles();
-    for (const tile of loadedTiles) {
-        if (!visibleTiles.includes(tile)) {
-            disposeTile(tile);
-        }
-    }
-}
-```
-
-**Geometry Pooling**:
-```javascript
-const geometryPool = {
-    box: new THREE.BoxGeometry(1, 1, 1),
-    sphere: new THREE.SphereGeometry(1, 16, 16),
-    cylinder: new THREE.CylinderGeometry(1, 1, 1, 16)
-};
-
-// Reuse geometries instead of creating new ones
-```
-
-### Update Optimizations
-
-**Delta Time**:
-```javascript
-let lastTime = performance.now();
-
-function getDeltaTime() {
-    const currentTime = performance.now();
-    const dt = (currentTime - lastTime) / 1000;
-    lastTime = currentTime;
-    return Math.min(dt, 0.1); // Cap at 100ms
-}
-```
-
-**Update Frequency**:
-```javascript
-let physicsAccumulator = 0;
-const PHYSICS_TIMESTEP = 1/60;
-
-function update(dt) {
-    physicsAccumulator += dt;
-    
-    while (physicsAccumulator >= PHYSICS_TIMESTEP) {
-        updatePhysics(PHYSICS_TIMESTEP);
-        physicsAccumulator -= PHYSICS_TIMESTEP;
-    }
-    
-    updateCamera(dt);
-    updateHUD(dt);
-}
-```
-
-## Customization Guide
-
-### Adding New Cities
-
-```javascript
-const locations = {
-    // Add your city here
-    mycity: {
-        name: 'My City',
-        region: 'My State, My Country',
-        lat: 12.3456,
-        lon: -78.9012
-    }
-};
-```
-
-Then add HTML:
-```html
-<div class="loc" data-loc="mycity">
-    <div class="loc-name">My City</div>
-    <div class="loc-region">My State, My Country</div>
-</div>
-```
-
-### Customizing Physics
-
-**Car Handling**:
-```javascript
-// At top of file, find these constants
-const MAX_SPEED = 35;           // Maximum speed
-const ACCELERATION = 15;        // Acceleration rate
-const FRICTION = 0.95;          // Friction coefficient
-const TURN_SPEED = 2.0;         // Turning sensitivity
-const DRIFT_FACTOR = 0.7;       // Drift amount
-```
-
-**Walking Speed**:
-```javascript
-const WALK_SPEED = 8;           // Walking speed
-const RUN_MULTIPLIER = 2;       // Running speed multiplier
-const JUMP_VELOCITY = 10;       // Jump strength
-const GRAVITY = -25;            // Gravity strength
-```
-
-### Adding New Game Modes
-
-```javascript
-// 1. Add mode to menu
-<div class="mode" data-mode="mymode">
-    <div class="mode-icon">🎮</div>
-    <div>
-        <div class="mode-name">My Mode</div>
-        <div class="mode-desc">Description of my mode</div>
-    </div>
-    <div class="mode-check">✓</div>
-</div>
-
-// 2. Add mode logic
-function startMyMode() {
-    gameMode = 'mymode';
-    // Initialize mode
-}
-
-function updateMyMode(dt) {
-    // Mode-specific logic
-}
-
-// 3. Add to mode switcher
-function startMode() {
-    switch(gameMode) {
-        case 'mymode': startMyMode(); break;
-        // ... other modes
-    }
-}
-```
-
-### Customizing Graphics
-
-**Building Colors**:
-```javascript
-function randomBuildingColor() {
-    const colors = [
-        0xcccccc,  // Gray
-        0xdddddd,  // Light gray
-        0xe8d5b7,  // Beige
-        // Add your colors here (hex format)
-    ];
-    const rng = typeof seededRandom === 'function'
-        ? seededRandom((rdtSeed || 0) ^ 0xB11D)
-        : Math.random.bind(Math);
-    return colors[Math.floor(rng() * colors.length)];
-}
-```
-
-**Car Appearance**:
-```javascript
-const carMaterial = new THREE.MeshStandardMaterial({
-    color: 0xff0000,        // Change color
-    metalness: 0.8,         // Change metallicness
-    roughness: 0.2          // Change roughness
-});
-```
-
-### Adding UI Elements
-
-```html
-<!-- Add to HTML section -->
-<div id="myElement" class="my-class">
-    Content here
-</div>
-```
-
-```javascript
-// Add event handler in setupUI()
-document.getElementById('myElement').addEventListener('click', () => {
-    // Handle click
-});
-```
-
-## Troubleshooting
-
-### Common Issues
-
-**Issue: Black Screen**
-- **Cause**: WebGL not supported or initialization failed
-- **Fix**: Check browser console, update graphics drivers
-
-**Issue: Terrain Not Loading**
-- **Cause**: Terrain tile provider or network error
-- **Fix**: Check console, wait a moment, try again
-
-**Issue: Poor Performance**
-- **Cause**: Too many objects, old hardware
-- **Fix**: Reduce building density, lower resolution
-
-**Issue**: Properties Not Showing**
-- **Cause**: API keys missing or invalid
-- **Fix**: Check configuration, verify keys in dashboards
-
-**Issue: Latest pushed UI/features not appearing**
-- **Cause**: stale module assets from mismatched cache-bust query values
-- **Fix**: hard refresh and verify the same cache-bust value is present in:
-  - `index.html` (`bootstrap.js?...`)
-  - `js/bootstrap.js` (`manifest.js?...`, `script-loader.js?...`)
-  - `js/modules/manifest.js` (`CACHE_BUST`)
-  - `js/app-entry.js` (module import query suffixes)
-  - Current expected value: `v=54`
-
-### Debugging Tools
-
-**Console Logging**:
-```javascript
-// Enable debug mode
-const DEBUG = true;
-
-function debugLog(message, data) {
-    if (DEBUG) {
-        console.log(`[DEBUG] ${message}`, data);
-    }
-}
-```
-
-**Performance Monitoring**:
-```javascript
-// Three.js stats
-import Stats from 'three/examples/jsm/libs/stats.module.js';
-
-const stats = new Stats();
-document.body.appendChild(stats.dom);
-
-function renderLoop() {
-    stats.begin();
-    // ... render code
-    stats.end();
-}
-```
-
-**Network Monitoring**:
-- Use browser DevTools Network tab
-- Check API response codes
-- Monitor payload sizes
-
-### Performance Profiling
-
-**Chrome DevTools**:
-1. Open DevTools (F12)
-2. Go to Performance tab
-3. Click Record
-4. Perform actions
-5. Stop recording
-6. Analyze flame graph
-
-**Key Metrics**:
-- Frame time (should be < 16.67ms for 60fps)
-- JavaScript execution time
-- Rendering time
-- Memory usage
-
-## Best Practices
-
-### Code Organization
-
-1. **Constants at Top**: Easy to find and modify
-2. **Functions Before Use**: Avoid hoisting confusion
-3. **Comment Complex Logic**: Explain the "why"
-4. **Consistent Naming**: camelCase for variables/functions
-5. **Single Responsibility**: One function, one purpose
-
-### Performance
-
-1. **Minimize DOM Access**: Cache elements
-2. **Use RequestAnimationFrame**: For smooth rendering
-3. **Throttle Heavy Operations**: Use timers
-4. **Dispose Unused Objects**: Prevent memory leaks
-5. **Profile Regularly**: Find bottlenecks early
-
-### API Usage
-
-1. **Cache Responses**: Avoid redundant calls
-2. **Handle Errors Gracefully**: Don't crash on API failure
-3. **Respect Rate Limits**: Implement delays
-4. **Validate Data**: Check API responses
-5. **Provide Fallbacks**: Multiple API sources
-
----
-
-**For More Information**: See [README](README.md) and [User Guide](USER_GUIDE.md)
-
-**Last Updated**: February 2026
+1. Migrate Stripe settings from `functions.config()` to Firebase Params/Secret Manager.
+2. Upgrade `firebase-functions` and function runtime to Node 22.
+3. Remove or archive legacy root runtime once operational confidence in `/public/app` is complete.

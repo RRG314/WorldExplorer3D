@@ -1,129 +1,117 @@
-# Known Issues and How to Help
+# Known Issues
 
-This file tracks current engineering gaps and contribution targets.
+Last reviewed: 2026-02-16
+
+This file tracks active risks and required follow-up work.
 
 ## High Priority
 
-### 1. Road/Terrain Conformance Edge Cases
+### 1. Firebase Runtime Config Deprecation (March 2026)
 
-- Some cities still show local clipping, floating edges, or sharp drop-offs after reloads.
-- Priority areas: steep terrain transitions, city-switch rebuild timing, road shoulder smoothing.
+Current functions use `functions.config().stripe.*`.
 
-How to help:
+Risk:
 
-- Reproduce in Baltimore, Monaco, and San Francisco.
-- Capture before/after screenshots plus console logs.
-- Propose isolated fixes in `js/terrain.js`, `js/world.js`, `js/ground.js`.
+- Deploys depending on runtime config commands will fail when service is shut down.
 
-### 2. Building Grounding on Slopes
+Required fix:
 
-- Building base behavior can diverge between walk and drive mode updates.
-- Need consistent terrain anchoring in all movement modes.
+- migrate Stripe settings to Firebase Params/Secret Manager.
 
-How to help:
+### 2. Cloud Functions Node 20 Deprecation
 
-- Validate mode-switch consistency.
-- Add fixes that preserve footprint alignment.
-- Avoid regressing flat-city behavior.
+Cloud warnings indicate Node 20 lifecycle end is approaching.
 
-### 3. Space Flight Control Balance
+Required fix:
 
-- Earth launch and gravity balancing still need tuning for controllable ascent.
-- Autopilot and return flows need more deterministic behavior.
+- upgrade Functions runtime to Node 22 and validate dependencies.
 
-How to help:
+### 3. Dual Runtime Copies in Repository
 
-- Test launch from Earth and Moon.
-- Propose parameter-level changes first (before structural rewrites).
-- Include controlled test scenarios in PR description.
+Active deployed runtime is under `public/app/`, while legacy root runtime files remain.
+
+Risk:
+
+- edits can accidentally be made to wrong path.
+
+Required fix:
+
+- either archive/remove legacy root runtime or add stricter guardrails and CI checks.
 
 ## Medium Priority
 
-### 4. Performance Hotspots
+### 4. Stripe Mode Drift (Test vs Live)
 
-- Dense-city loads can still spike CPU/GPU usage.
-- Rebuild paths and per-frame geometry checks are major suspects.
+Operational issue observed repeatedly during setup.
 
-How to help:
+Risk:
 
-- Profile city load and mode switch paths.
-- Propose throttling/caching improvements with measured impact.
+- mixed key/price/webhook modes cause checkout failure.
 
-### 5. ES Module Migration Tasks
+Mitigation:
 
-- Module boot exists, but subsystems still rely on shared globals.
-- Migration should preserve behavior while reducing coupling.
+- keep explicit mode-specific setup checklists in docs
+- verify `firebase functions:config:get` values before billing tests
 
-How to help:
+### 5. Safe Browsing Reputation Flags
 
-- Migrate one subsystem at a time.
-- Add compatibility shims where required.
-- Document migration boundaries in `TECHNICAL_DOCS.md`.
+A browser dangerous-site warning was observed on hosted URL in prior testing.
 
-### 6. Mobile and Touch Control Quirks
+Risk:
 
-- Input responsiveness and HUD interactions vary across devices.
-- Need better touch parity without breaking desktop controls.
+- user trust and signup conversion impact.
 
-How to help:
+Mitigation:
 
-- Test on iOS/Android browsers.
-- Report reproducible interaction conflicts.
-- Submit focused fixes in `js/input.js`, `js/ui.js`, `styles.css`.
+- verify Search Console/Safe Browsing status
+- use custom domain and security review workflow
 
-### 7. Deep-Space Realism vs Playability Tuning
+### 6. Cloud Sync Feature Completeness
 
-- Galaxy and belt distances are intentionally visualized at compressed scales to remain explorable.
-- Further balancing is needed between realism, readability, and practical travel time.
+Entitlement includes cloud sync flags, but full gameplay memory/block sync behavior is still primarily local-storage based.
 
-How to help:
+Risk:
 
-- Propose data-driven distance/scale presets for "visual" vs "realistic" space mode.
-- Validate inspector usability at extreme distances.
-- Focus edits in `js/solar-system.js` and `js/space.js`.
+- perceived mismatch between plan messaging and implementation depth.
 
-### 8. Cache-Bust Drift During Rapid Iteration
+Mitigation:
 
-- Loader cache-bust values can fall out of sync across boot files after frequent hotfixes.
-- This can make new features appear missing even when code is already pushed.
+- define and ship explicit Firestore sync scope for Supporter/Pro saves.
 
-How to help:
+## Low Priority
 
-- Verify cache-bust alignment in `index.html`, `js/bootstrap.js`, `js/modules/manifest.js`, and `js/app-entry.js`.
-- Consider adding a lightweight CI check that fails on version mismatch.
+### 7. Auth UX Polishing
 
-### 9. Memory Marker Portability
+Float auth panel behavior is functional, but additional polish can improve UX:
 
-- Persistent memory markers are intentionally stored in browser localStorage and do not auto-sync across devices/browsers.
-- Users may perceive this as data loss when switching devices or using strict private-mode settings.
+- loading states and field-level validation styling
+- stronger inline provider-status messaging
 
-How to help:
+### 8. Function Generation and Dependency Upgrades
 
-- Evaluate optional import/export tooling for memory entries.
-- Add clear UX copy around device/browser storage scope.
-- Keep storage-capability checks aligned with `js/memory.js`.
+Current deployment remains 1st gen functions.
 
-### 10. RDT Draw-Call Variance vs Baseline
+Potential improvement:
 
-- RDT mode can still produce higher draw-call counts than baseline in some city views even when total content is reduced.
-- Visual smoothness is stable at 60 FPS in recent Baltimore captures, but draw-call spread remains wider than desired.
+- evaluate 2nd gen migration and dependency modernization after config/runtime migration.
 
-How to help:
+### 9. Browser Cache Path Drift on GitHub Pages
 
-- Capture paired snapshots using benchmark controls (`RDT` + `Baseline`) from the same location and camera state.
-- Profile render batch fragmentation paths in `js/world.js` (roads, street furniture, and material-group splits).
-- Propose optimizations that preserve current visual richness and collision behavior.
+Observed issue:
 
-## Reporting Format
+- Some clients request stale legacy module paths (for example `/WorldExplorer/js/app-entry.js`) after deployment changes.
 
-When reporting issues, include:
+Mitigation:
 
-1. City/location used
-2. Mode used (drive/walk/drone/space)
-3. Steps to reproduce
-4. Expected vs actual behavior
-5. Browser + OS
-6. Console errors
-7. Screenshot or short video
+- compatibility bridge files under `public/js/` now forward stale loader paths to current `/app/js/` runtime
+- users may still need hard refresh/site-data clear on first visit after major deploy transitions
 
-Use issue templates in `.github/ISSUE_TEMPLATE/` for consistency.
+## Reporting Checklist
+
+When filing issues include:
+
+1. URL and route (`/`, `/app/`, `/account/`)
+2. signed-in or signed-out state
+3. exact error text
+4. function log excerpt if backend-related
+5. reproduction steps and browser/device
