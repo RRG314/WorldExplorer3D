@@ -50,6 +50,7 @@ If billing touched:
 1. checkout session creation tested
 2. webhook event handling validated in logs
 3. Firestore user plan updates confirmed
+4. `Secret Scan` GitHub Action passes (gitleaks)
 
 Useful commands:
 
