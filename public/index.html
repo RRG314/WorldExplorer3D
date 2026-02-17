@@ -70,39 +70,30 @@
       gap: 16px;
     }
 
-    .eyebrow {
-      display: inline-flex;
-      width: fit-content;
-      align-items: center;
-      gap: 8px;
-      background: rgba(77, 214, 159, 0.12);
-      border: 1px solid rgba(77, 214, 159, 0.38);
-      border-radius: 999px;
-      color: #a2efd0;
-      padding: 6px 12px;
-      font-size: 13px;
-      font-weight: 600;
-      letter-spacing: 0.02em;
-    }
-
     h1 {
       margin: 0;
       font-family: 'Chakra Petch', sans-serif;
       font-size: clamp(34px, 5vw, 54px);
-      line-height: 0.98;
+      line-height: 1.02;
       letter-spacing: 0.015em;
     }
 
     .hero-brand {
       display: block;
-      margin-bottom: 8px;
+      margin-bottom: 10px;
       color: #a2efd0;
-      font-size: clamp(22px, 2.5vw, 30px);
-      letter-spacing: 0.16em;
+      font-size: clamp(40px, 6.2vw, 78px);
+      letter-spacing: 0.1em;
       text-transform: uppercase;
     }
 
-    .hero-headline { display: block; }
+    .hero-headline {
+      display: block;
+      font-size: clamp(24px, 2.8vw, 40px);
+      letter-spacing: 0.04em;
+      color: #dbe8ff;
+      line-height: 1.08;
+    }
 
     .lead {
       margin: 0;
@@ -165,7 +156,7 @@
     }
 
     .hero-media {
-      background: url('./assets/landing/hero.jpg') center center / cover no-repeat;
+      background: #020913 url('./assets/landing/hero.jpg') center 100% / auto 190% no-repeat;
       position: relative;
       min-height: 280px;
     }
@@ -195,7 +186,7 @@
 
     .shots {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 12px;
     }
 
@@ -330,7 +321,6 @@
     <section class="hero">
       <div class="hero-grid">
         <div class="hero-copy">
-          <div class="eyebrow">Live World Runtime</div>
           <h1><span class="hero-brand">World Explorer 3D</span><span class="hero-headline">Explore Any Place on Earth and Beyond</span></h1>
           <p class="lead">Drive, walk, and fly any place in the world. Then launch to orbit and land on the Moon all without leaving your seat.</p>
           <div class="cta-row">
@@ -351,10 +341,6 @@
         <figure class="shot">
           <img src="./assets/landing/city.jpg" alt="City terrain runtime screenshot">
           <span>Urban exploration and map overlays</span>
-        </figure>
-        <figure class="shot">
-          <img src="./assets/landing/hero.jpg" alt="World Explorer title and runtime screenshot">
-          <span>Single runtime session from launch</span>
         </figure>
         <figure class="shot">
           <img src="./assets/landing/space.jpg" alt="Spaceflight transition screenshot">

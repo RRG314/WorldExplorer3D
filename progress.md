@@ -346,3 +346,10 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Updated lead sentence per requested wording:
     - `Drive, walk, and fly any place in the world. Then launch to orbit and land on the Moon all without leaving your seat.`
   - Updated page `<title>` accordingly.
+- Landing hero visual cleanup pass (2026-02-17):
+  - Removed `Live World Runtime` badge from hero.
+  - Increased `World Explorer 3D` hero title sizing and reduced subtitle emphasis so title is visually dominant.
+  - Changed hero media crop to emphasize the lower half of the image (single-scene look vs stacked look).
+  - Removed duplicate hero visual card from `Visual Proof` and switched that section to a 3-column layout.
+  - Verification screenshot:
+    - `output/playwright/landing-after-title-image-cleanup.png`
