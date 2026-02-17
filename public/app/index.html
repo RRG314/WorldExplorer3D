@@ -8,7 +8,7 @@
 <meta name="theme-color" content="#1a1a2e">
 <title>World Explorer 3D</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
-<script src="/js/firebase-project-config.js"></script>
+<script src="../js/firebase-project-config.js"></script>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -921,7 +921,7 @@ Use this to compare RDT and baseline with real runtime data.
 </div>
 <div id="shareExperienceStatus"></div>
 <div class="title-license">
-Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fonts under SIL OFL · API providers under their own terms · © 2026 Steven Reid. All Rights Reserved. · <a href="/legal/terms" target="_blank">Terms</a> · <a href="/legal/privacy" target="_blank">Privacy</a>
+Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fonts under SIL OFL · API providers under their own terms · © 2026 Steven Reid. All Rights Reserved. · <a href="../legal/terms" target="_blank">Terms</a> · <a href="../legal/privacy" target="_blank">Privacy</a>
 </div>
 </div>
 </div>
@@ -1714,11 +1714,11 @@ authSignOutBtn.addEventListener('click', async () => {
 });
 
 authAccountBtn.addEventListener('click', () => {
-  window.location.assign('/account/');
+  window.location.assign('../account/');
 });
 
 upgradeFromAppBtn.addEventListener('click', () => {
-  window.location.assign('/account/');
+  window.location.assign('../account/');
 });
 
 earlyDemoToggleA.addEventListener('click', () => toggleEarlyDemo('buildA'));

@@ -117,6 +117,31 @@ function currentBaseUrl(req) {
   return `https://${process.env.GCLOUD_PROJECT}.web.app`;
 }
 
+function sanitizeReturnBaseUrl(raw) {
+  const value = String(raw || '').trim();
+  if (!value) return '';
+
+  try {
+    const parsed = new URL(value);
+    const isLocal = parsed.hostname === 'localhost' || parsed.hostname === '127.0.0.1';
+    if (parsed.protocol !== 'https:' && !(parsed.protocol === 'http:' && isLocal)) {
+      return '';
+    }
+
+    parsed.hash = '';
+    parsed.search = '';
+    return parsed.toString().replace(/\/$/, '');
+  } catch (_) {
+    return '';
+  }
+}
+
+function resolveReturnBaseUrl(req) {
+  const candidate = req && req.body && typeof req.body.returnUrlBase === 'string' ? req.body.returnUrlBase : '';
+  const sanitized = sanitizeReturnBaseUrl(candidate);
+  return sanitized || currentBaseUrl(req);
+}
+
 function planFromPriceId(priceId, cfg) {
   if (!priceId) return 'free';
   if (priceId === cfg.price_pro) return 'pro';
@@ -251,7 +276,7 @@ exports.createCheckoutSession = functions.region('us-central1').https.onRequest(
       );
     }
 
-    const baseUrl = currentBaseUrl(req);
+    const baseUrl = resolveReturnBaseUrl(req);
     const session = await stripe.checkout.sessions.create({
       mode: 'subscription',
       customer: customerId,
@@ -300,7 +325,7 @@ exports.createPortalSession = functions.region('us-central1').https.onRequest(as
       return;
     }
 
-    const baseUrl = currentBaseUrl(req);
+    const baseUrl = resolveReturnBaseUrl(req);
     const session = await stripe.billingPortal.sessions.create({
       customer: customerId,
       return_url: `${baseUrl}/account/`

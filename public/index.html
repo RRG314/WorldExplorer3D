@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
-  <script src="/js/firebase-project-config.js"></script>
+  <script src="./js/firebase-project-config.js"></script>
   <style>
     :root {
       --bg-0: #071324;
@@ -165,7 +165,7 @@
     }
 
     .hero-media {
-      background: url('/assets/landing/hero.jpg') center center / cover no-repeat;
+      background: url('./assets/landing/hero.jpg') center center / cover no-repeat;
       position: relative;
       min-height: 280px;
     }
@@ -334,9 +334,9 @@
           <h1><span class="hero-brand">World Explorer</span><span class="hero-headline">Earth -> Space -> Moon in one session</span></h1>
           <p class="lead">Drive, walk, and fly a continuous world. Then launch to orbit and land on the Moon without loading a second app.</p>
           <div class="cta-row">
-            <a class="btn btn-play" href="/app/">Play Now</a>
+            <a class="btn btn-play" href="./app/">Play Now</a>
             <button class="btn btn-trial" id="startTrialBtn" type="button">Start 2-Day Trial</button>
-            <a class="btn btn-ghost" href="/account/">Account</a>
+            <a class="btn btn-ghost" href="./account/">Account</a>
           </div>
           <p id="startTrialStatus" class="status-note"></p>
           <p class="perf-note">Performance note: Desktop recommended for best frame rate and rendering quality.</p>
@@ -349,19 +349,19 @@
       <h2>Visual Proof</h2>
       <div class="shots">
         <figure class="shot">
-          <img src="/assets/landing/city.jpg" alt="City terrain runtime screenshot">
+          <img src="./assets/landing/city.jpg" alt="City terrain runtime screenshot">
           <span>Urban exploration and map overlays</span>
         </figure>
         <figure class="shot">
-          <img src="/assets/landing/hero.jpg" alt="World Explorer title and runtime screenshot">
+          <img src="./assets/landing/hero.jpg" alt="World Explorer title and runtime screenshot">
           <span>Single runtime session from launch</span>
         </figure>
         <figure class="shot">
-          <img src="/assets/landing/space.jpg" alt="Spaceflight transition screenshot">
+          <img src="./assets/landing/space.jpg" alt="Spaceflight transition screenshot">
           <span>Earth-to-space transition mode</span>
         </figure>
         <figure class="shot">
-          <img src="/assets/landing/moon.jpg" alt="Moon terrain screenshot">
+          <img src="./assets/landing/moon.jpg" alt="Moon terrain screenshot">
           <span>Lunar driving and exploration</span>
         </figure>
       </div>
@@ -423,8 +423,8 @@
     </section>
 
     <footer>
-      <a href="/legal/privacy">Privacy</a>
-      <a href="/legal/terms">Terms</a>
+      <a href="./legal/privacy">Privacy</a>
+      <a href="./legal/terms">Terms</a>
       <span>OpenStreetMap data © OpenStreetMap contributors (ODbL)</span>
       <a href="mailto:hello@worldexplorer.app">Contact</a>
       <a href="https://github.com/RRG314/WorldExplorer" target="_blank" rel="noreferrer">GitHub</a>
@@ -432,9 +432,9 @@
   </div>
 
   <script type="module">
-    import { hasFirebaseConfig } from '/js/firebase-init.js';
-    import { ensureSignedIn } from '/js/auth-ui.js';
-    import { ensureEntitlements } from '/js/entitlements.js';
+    import { hasFirebaseConfig } from './js/firebase-init.js';
+    import { ensureSignedIn } from './js/auth-ui.js';
+    import { ensureEntitlements } from './js/entitlements.js';
 
     const startTrialBtn = document.getElementById('startTrialBtn');
     const statusEl = document.getElementById('startTrialStatus');
@@ -451,7 +451,7 @@
       try {
         if (!hasFirebaseConfig()) {
           setStatus('Firebase config not set yet. Opening app in free mode until config is provided.', true);
-          window.location.assign('/app/?startTrial=1');
+          window.location.assign('./app/?startTrial=1');
           return;
         }
 
@@ -462,7 +462,7 @@
         }
 
         await ensureEntitlements(user);
-        window.location.assign('/app/?startTrial=1');
+        window.location.assign('./app/?startTrial=1');
       } catch (err) {
         console.error('[landing] Trial start failed:', err);
         setStatus(err && err.message ? err.message : 'Could not start trial right now.', true);

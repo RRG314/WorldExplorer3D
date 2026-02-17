@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
-  <script src="/js/firebase-project-config.js"></script>
+  <script src="../js/firebase-project-config.js"></script>
   <style>
     :root {
       --bg: #081425;
@@ -208,7 +208,7 @@
   <div class="wrap">
     <div class="top">
       <h1>Account</h1>
-      <a href="/app/">Back to App</a>
+      <a href="../app/">Back to App</a>
     </div>
     <p class="sub">Manage plan status, upgrades, and billing portal access.</p>
 
@@ -264,8 +264,8 @@
       </div>
 
       <div class="links">
-        <a href="/legal/privacy">Privacy</a>
-        <a href="/legal/terms">Terms</a>
+        <a href="../legal/privacy">Privacy</a>
+        <a href="../legal/terms">Terms</a>
         <a href="mailto:hello@worldexplorer.app">Contact</a>
         <a href="https://github.com/RRG314/WorldExplorer" target="_blank" rel="noreferrer">GitHub</a>
       </div>
@@ -273,10 +273,10 @@
   </div>
 
   <script type="module">
-    import { hasFirebaseConfig } from '/js/firebase-init.js';
-    import { ensureSignedIn, observeAuth, signOutUser } from '/js/auth-ui.js';
-    import { ensureEntitlements, formatRemainingTrial, subscribeEntitlements } from '/js/entitlements.js';
-    import { redirectToCheckout, redirectToPortal } from '/js/billing.js';
+    import { hasFirebaseConfig } from '../js/firebase-init.js';
+    import { ensureSignedIn, observeAuth, signOutUser } from '../js/auth-ui.js';
+    import { ensureEntitlements, formatRemainingTrial, subscribeEntitlements } from '../js/entitlements.js';
+    import { redirectToCheckout, redirectToPortal } from '../js/billing.js';
 
     const authPrompt = document.getElementById('authPrompt');
     const accountPanel = document.getElementById('accountPanel');

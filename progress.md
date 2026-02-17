@@ -295,3 +295,28 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `SYSTEMS_INVENTORY_REPORT_2026-02-14.md`
     - `CONTRIBUTING.md`
     - `ACKNOWLEDGEMENTS.md`
+- GitHub Pages compatibility branch pass (2026-02-16/17):
+  - Branch target: `codex/github-pages-compat` (explicitly isolated from live Firebase deployment).
+  - Updated site routes/imports for subpath hosting (`/WorldExplorer/`) with relative paths:
+    - `public/index.html`
+    - `public/app/index.html`
+    - `public/account/index.html`
+  - Updated legal back links for both clean-route and static-html variants:
+    - `public/legal/privacy.html` -> `../`
+    - `public/legal/terms.html` -> `../`
+    - `public/legal/privacy/index.html` -> `../../`
+    - `public/legal/terms/index.html` -> `../../`
+  - Billing client now supports non-Firebase-hosting origins by resolving direct function origin from Firebase config and preserving repo subpath return URLs:
+    - `public/js/billing.js`
+  - Functions now accept sanitized `returnUrlBase` (https or localhost http) for checkout/portal return URLs:
+    - `functions/index.js`
+  - Validation:
+    - Skill client run artifact (known black-canvas limitation in this env): `output/playwright/gh-pages-web-game-client/shot-0.png`.
+    - Fallback Playwright route smoke artifacts:
+      - `output/playwright/gh-pages-subpath-smoke/report.json`
+      - `output/playwright/gh-pages-subpath-smoke/landing.png`
+      - `output/playwright/gh-pages-subpath-smoke/app.png`
+      - `output/playwright/gh-pages-subpath-smoke/account.png`
+      - `output/playwright/gh-pages-subpath-smoke/legal-privacy.png`
+      - `output/playwright/gh-pages-subpath-smoke/legal-terms.png`
+    - Route checks confirmed: landing, app, account, privacy/terms pages, and legal back-to-home navigation all work under `/WorldExplorer/`.
