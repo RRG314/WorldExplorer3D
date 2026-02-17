@@ -326,3 +326,16 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `.github/workflows/deploy-pages-public.yml`
   - Added `public/.nojekyll` so Pages serves files exactly from artifact without Jekyll processing side effects.
   - Note: GitHub repo Pages setting must be `Build and deployment -> Source: GitHub Actions` for this workflow to control the published site.
+- GitHub Pages stale-cache loader compatibility fix (2026-02-17):
+  - Symptom addressed: browser console 404s on legacy paths like `/WorldExplorer/js/app-entry.js?v=54` and `/WorldExplorer/js/*.js` after Pages source switched to `public/`.
+  - Added compatibility loader bridge files so legacy cached loader URLs resolve to current `/app/js` runtime:
+    - `public/js/bootstrap.js` (redirects non-app stale entrypoints to `/app/`, otherwise loads `/app/js/bootstrap.js`)
+    - `public/js/app-entry.js` (re-exports `/app/js/app-entry.js`)
+    - `public/js/modules/manifest.js` (points module entry to `/app/js/app-entry.js`)
+    - `public/js/modules/script-loader.js` (loader API compatibility)
+  - Validation:
+    - `output/playwright/gh-pages-compat-shim/report.json` (`pass: true`)
+    - Screens:
+      - `output/playwright/gh-pages-compat-shim/landing-before-shim.png`
+      - `output/playwright/gh-pages-compat-shim/after-shim-import.png`
+      - `output/playwright/gh-pages-compat-shim/app-direct.png`
