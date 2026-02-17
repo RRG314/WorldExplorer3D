@@ -380,3 +380,10 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `KNOWN_ISSUES.md`
     - `CONTRIBUTING.md`
     - `CHANGELOG.md`
+- Repo security automation (2026-02-17):
+  - Added GitHub Actions secret scan workflow:
+    - `.github/workflows/secret-scan.yml`
+  - Added gitleaks config with explicit allowlist for:
+    - public Firebase web API key in frontend config
+    - documented placeholder tokens (`sk_...`, `whsec_...`, `price_...`)
+  - Updated `CONTRIBUTING.md` validation checklist to require passing `Secret Scan` workflow when relevant.
