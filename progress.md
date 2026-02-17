@@ -320,3 +320,9 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
       - `output/playwright/gh-pages-subpath-smoke/legal-privacy.png`
       - `output/playwright/gh-pages-subpath-smoke/legal-terms.png`
     - Route checks confirmed: landing, app, account, privacy/terms pages, and legal back-to-home navigation all work under `/WorldExplorer/`.
+- GitHub Pages publishing fix (2026-02-17):
+  - Root cause of old page on GitHub: Pages was serving repo root (legacy `index.html`) instead of `public/index.html`.
+  - Added workflow to publish `public/` as GitHub Pages artifact on `codex/github-pages-compat`:
+    - `.github/workflows/deploy-pages-public.yml`
+  - Added `public/.nojekyll` so Pages serves files exactly from artifact without Jekyll processing side effects.
+  - Note: GitHub repo Pages setting must be `Build and deployment -> Source: GitHub Actions` for this workflow to control the published site.
