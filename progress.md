@@ -339,3 +339,10 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
       - `output/playwright/gh-pages-compat-shim/landing-before-shim.png`
       - `output/playwright/gh-pages-compat-shim/after-shim-import.png`
       - `output/playwright/gh-pages-compat-shim/app-direct.png`
+- Landing hero copy alignment update (2026-02-17):
+  - Updated landing headline to match in-game branding language:
+    - `World Explorer 3D`
+    - `Explore Any Place on Earth and Beyond`
+  - Updated lead sentence per requested wording:
+    - `Drive, walk, and fly any place in the world. Then launch to orbit and land on the Moon all without leaving your seat.`
+  - Updated page `<title>` accordingly.
