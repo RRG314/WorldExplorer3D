@@ -43,6 +43,10 @@
 - Initial launch release document:
   - `INITIAL_LAUNCH_RELEASE_2026-02-17.md`
   - includes badge-ready release narrative, RDT/PRNG citations, and licensing/attribution checklist
+- Runtime graphics beta control:
+  - `Photoreal Buildings (Beta)` toggle in title-screen Settings
+  - persisted setting key: `worldExplorerPhotorealBuildings`
+  - safe fallback to standard building materials if photoreal path fails
 
 ### Changed
 
@@ -53,6 +57,7 @@
 - In-app auth/account float button now appears on title screen only and is hidden during gameplay.
 - Firebase project targeting aligned to `worldexplorer3d-d9b83` in `.firebaserc`.
 - Firestore rules and hosting rewrites aligned with subscription flow.
+- GitHub Pages docs now include explicit branch-root deployment mode (`Deploy from a branch`, `/ (root)`) for root-runtime publishing without changing Firebase-hosted paths.
 
 ### Fixed
 

@@ -1,6 +1,6 @@
 # Documentation Index
 
-Last reviewed: 2026-02-17
+Last reviewed: 2026-02-18
 
 This index tracks the top-level documentation set in the active `WorldExplorer` repository.
 
@@ -38,6 +38,7 @@ This index tracks the top-level documentation set in the active `WorldExplorer` 
 ## Production Baseline Covered by This Doc Set
 
 - Firebase Hosting route structure (`/`, `/app/`, `/account/`, legal pages)
+- GitHub Pages branch-root mode (`Deploy from a branch`, `/ (root)`)
 - Firebase Auth + Firestore entitlements
 - 2-day trial behavior and plan downgrade rules
 - Stripe checkout, portal, and webhook processing

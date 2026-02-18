@@ -387,3 +387,43 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - public Firebase web API key in frontend config
     - documented placeholder tokens (`sk_...`, `whsec_...`, `price_...`)
   - Updated `CONTRIBUTING.md` validation checklist to require passing `Secret Scan` workflow when relevant.
+- Root Pages photoreal-building beta implementation (2026-02-18):
+  - User direction updated: keep Firebase-served `public/app` runtime untouched; target GitHub Pages branch-root runtime (`index.html` + `js/*`) as source of truth.
+  - Added title-screen Settings control in root runtime:
+    - `index.html`: `Photoreal Buildings (Beta)` section with `#photorealBuildingsToggle`, status text, and warning copy.
+  - Added root runtime state + material pipeline:
+    - `js/engine.js`:
+      - persisted state key: `worldExplorerPhotorealBuildings`
+      - exported APIs: `getPhotorealBuildingsEnabled()`, `setPhotorealBuildingsEnabled()`
+      - `appCtx.photorealBuildingsEnabled` getter/setter bridge
+      - photoreal material profile in `getBuildingMaterial()` with guarded fallback to existing standard materials.
+  - Added root runtime UI behavior:
+    - `js/ui.js`:
+      - initializes toggle from runtime state/local storage
+      - updates visual state + status text
+      - if toggled during active run, attempts world reload and auto-reverts on failure.
+  - Firebase safety guard applied:
+    - reverted interim edits in `public/app/index.html`, `public/app/js/ui.js`, `public/app/js/engine.js` to avoid unintended Firebase runtime changes.
+  - Root Pages documentation updates:
+    - `README.md`: added branch-root Pages setup (`Deploy from a branch`, `/ (root)`) and photoreal feature note.
+    - `GITHUB_DEPLOYMENT.md`: branch-root mode now documented as primary path for root runtime publication.
+    - `USER_GUIDE.md`: added photoreal toggle usage notes and clarified Pages URL modes.
+    - `CHANGELOG.md`: recorded photoreal beta toggle + root Pages deployment clarification.
+  - Validation:
+    - Syntax checks:
+      - `node --check js/engine.js`
+      - `node --check js/ui.js`
+    - Skill client run (known environment limitation):
+      - `output/playwright/photoreal-buildings-beta-run/shot-0.png` and `shot-1.png` (black-canvas capture limitation observed again).
+    - Fallback Playwright smoke (root runtime) with no console/page errors:
+      - `output/playwright/photoreal-root-final-smoke/report.json` (`pass: true`, `errorCount: 0`)
+      - `output/playwright/photoreal-root-final-smoke/root-settings-photoreal.png`
+      - `output/playwright/photoreal-root-final-smoke/root-ingame-after-start.png`
+    - Additional manual automation artifacts retained for traceability:
+      - `output/playwright/photoreal-buildings-manual/`
+      - `output/playwright/photoreal-buildings-manual-ingame/`
+      - `output/playwright/photoreal-buildings-public-app-smoke/`
+- Secret hygiene re-check (2026-02-18):
+  - No Stripe private keys discovered in code.
+  - Pattern scan hits are placeholders/docs and allowed public Firebase web API key in `public/js/firebase-project-config.js`.
+  - `gitleaks` binary not installed locally; relied on regex scan + existing repo secret-scan workflow config.

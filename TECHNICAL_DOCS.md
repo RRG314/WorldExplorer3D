@@ -1,6 +1,6 @@
 # Technical Documentation
 
-Last reviewed: 2026-02-16
+Last reviewed: 2026-02-18
 
 This document is the engineering reference for the currently deployed World Explorer stack.
 
@@ -36,6 +36,14 @@ functions/
   package.json
 firebase.json
 firestore.rules
+```
+
+Branch-root Pages mode also serves:
+
+```text
+index.html
+js/
+styles.css
 ```
 
 ## 3. Frontend Modules
@@ -168,6 +176,12 @@ Subscription statuses treated as active:
 - Auth/account actions live in top-left float panel
 - Top-center plan/account HUD removed
 - Pro panel auto-hide for non-Pro users (`~4.5s`)
+
+### Root runtime (`index.html`)
+
+- Used when GitHub Pages is configured for branch-root publishing
+- Includes `Photoreal Buildings (Beta)` setting in the Settings tab
+- Photoreal preference persistence key: `worldExplorerPhotorealBuildings`
 
 ### Account (`public/account/index.html`)
 

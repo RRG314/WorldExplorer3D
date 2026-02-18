@@ -6,6 +6,38 @@ import { ctx as appCtx } from "./shared-context.js?v=54"; // ===================
 let asphaltTex,asphaltNormal,asphaltRoughness,windowTextures = {};
 let buildingNormalMap = null,buildingRoughnessMap = null;
 let currentGpuTier = 'high';
+const PHOTOREAL_BUILDINGS_STORAGE_KEY = 'worldExplorerPhotorealBuildings';
+let photorealBuildingsEnabled = false;
+let photorealMaterialFallbackLogged = false;
+
+function readStorageValue(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorageValue(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage write failures (private mode / blocked storage).
+  }
+}
+
+function getPhotorealBuildingsEnabled() {
+  return !!photorealBuildingsEnabled;
+}
+
+function setPhotorealBuildingsEnabled(enabled, options = {}) {
+  photorealBuildingsEnabled = !!enabled;
+  const persist = options.persist !== false;
+  if (persist) {
+    writeStorageValue(PHOTOREAL_BUILDINGS_STORAGE_KEY, photorealBuildingsEnabled ? '1' : '0');
+  }
+  return photorealBuildingsEnabled;
+}
 
 function syncTextureGlobals() {
   appCtx.asphaltTex = asphaltTex;
@@ -44,6 +76,15 @@ let brickDiffuse = null,brickNormal = null,brickRoughness = null;
 let pbrTexturesLoaded = { grass: false, pavement: false, concrete: false, brick: false };
 
 syncTextureGlobals();
+setPhotorealBuildingsEnabled(readStorageValue(PHOTOREAL_BUILDINGS_STORAGE_KEY) === '1', { persist: false });
+Object.defineProperty(appCtx, 'photorealBuildingsEnabled', {
+  configurable: true,
+  enumerable: true,
+  get: () => photorealBuildingsEnabled,
+  set: (value) => {
+    setPhotorealBuildingsEnabled(value, { persist: false });
+  }
+});
 
 // ===== PROCEDURAL TEXTURES =====
 function createAsphaltTexture() {
@@ -950,6 +991,68 @@ function applyGrassToTerrain() {
 }
 
 // Get building material based on building type (deterministic per building)
+function createPhotorealBuildingMaterial(facadeType, baseColorHex, bSeed) {
+  const usePhysical = typeof THREE.MeshPhysicalMaterial === 'function';
+  const MaterialClass = usePhysical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+  const glossNoise = appCtx.rand01FromInt((bSeed ^ 0x6F2A4) >>> 0);
+
+  if (facadeType === 'concrete' && pbrTexturesLoaded.concrete && concreteDiffuse) {
+    const options = {
+      map: concreteDiffuse,
+      normalMap: concreteNormal,
+      normalScale: new THREE.Vector2(0.56, 0.56),
+      roughnessMap: concreteRoughness,
+      roughness: 0.74 + glossNoise * 0.12,
+      metalness: 0.05,
+      envMapIntensity: 1.0 + glossNoise * 0.25
+    };
+    if (usePhysical) {
+      options.clearcoat = 0.06 + glossNoise * 0.04;
+      options.clearcoatRoughness = 0.5;
+    }
+    return new MaterialClass(options);
+  }
+
+  if (facadeType === 'brick' && pbrTexturesLoaded.brick && brickDiffuse) {
+    const options = {
+      map: brickDiffuse,
+      normalMap: brickNormal,
+      normalScale: new THREE.Vector2(0.68, 0.68),
+      roughnessMap: brickRoughness,
+      roughness: 0.72 + glossNoise * 0.10,
+      metalness: 0.03,
+      envMapIntensity: 0.95 + glossNoise * 0.2
+    };
+    if (usePhysical) {
+      options.clearcoat = 0.04;
+      options.clearcoatRoughness = 0.55;
+    }
+    return new MaterialClass(options);
+  }
+
+  const windowTex = createWindowTexture(baseColorHex, bSeed);
+  const options = {
+    map: windowTex,
+    color: baseColorHex,
+    roughness: 0.56 + glossNoise * 0.10,
+    metalness: 0.08,
+    envMapIntensity: 1.05 + glossNoise * 0.25
+  };
+  if (usePhysical) {
+    options.clearcoat = 0.22 + glossNoise * 0.10;
+    options.clearcoatRoughness = 0.36;
+  }
+  const mat = new MaterialClass(options);
+  if (buildingNormalMap) {
+    mat.normalMap = buildingNormalMap;
+    mat.normalScale = new THREE.Vector2(0.45, 0.45);
+  }
+  if (buildingRoughnessMap) {
+    mat.roughnessMap = buildingRoughnessMap;
+  }
+  return mat;
+}
+
 function getBuildingMaterial(buildingType, bSeed, baseColorHex) {
   const br1 = appCtx.rand01FromInt(bSeed);
   const br2 = appCtx.rand01FromInt(bSeed ^ 0x12345);
@@ -969,6 +1072,18 @@ function getBuildingMaterial(buildingType, bSeed, baseColorHex) {
     // Mixed: ~30% concrete, ~25% brick, ~45% windowed
     if (br2 < 0.30) facadeType = 'concrete';else
     if (br2 < 0.55) facadeType = 'brick';
+  }
+
+  if (photorealBuildingsEnabled) {
+    try {
+      const photorealMaterial = createPhotorealBuildingMaterial(facadeType, baseColorHex, bSeed);
+      if (photorealMaterial) return photorealMaterial;
+    } catch (err) {
+      if (!photorealMaterialFallbackLogged) {
+        console.warn('[engine] Photoreal material path failed. Falling back to standard building materials.', err);
+        photorealMaterialFallbackLogged = true;
+      }
+    }
   }
 
   if (facadeType === 'concrete' && pbrTexturesLoaded.concrete && concreteDiffuse) {
@@ -1766,14 +1881,18 @@ function init() {
 Object.assign(appCtx, {
   clearWindowTextureCache,
   createBuildingGroundPatch,
+  getPhotorealBuildingsEnabled,
   getBuildingMaterial,
   init,
+  setPhotorealBuildingsEnabled,
   tryEnablePostProcessing
 });
 
 export {
   clearWindowTextureCache,
   createBuildingGroundPatch,
+  getPhotorealBuildingsEnabled,
   getBuildingMaterial,
   init,
+  setPhotorealBuildingsEnabled,
   tryEnablePostProcessing };

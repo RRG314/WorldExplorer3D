@@ -172,6 +172,9 @@ function setupUI() {
   const saveApiKeyBtn = document.getElementById('saveApiKey');
   const realEstateToggle = document.getElementById('realEstateToggle');
   const toggleLabel = document.getElementById('realEstateToggleLabel');
+  const photorealBuildingsToggle = document.getElementById('photorealBuildingsToggle');
+  const photorealBuildingsToggleLabel = document.getElementById('photorealBuildingsToggleLabel');
+  const photorealSettingsStatus = document.getElementById('photorealSettingsStatus');
   const perfModeSelect = document.getElementById('perfModeSelect');
   const perfOverlayToggle = document.getElementById('perfOverlayToggle');
   const perfApplyReload = document.getElementById('perfApplyReload');
@@ -238,6 +241,24 @@ function setupUI() {
     if (realEstateToggle) realEstateToggle.checked = true;
     if (toggleLabel) toggleLabel.style.background = '#f0f4ff';
   }
+
+  const updatePhotorealSettingsUI = (enabled) => {
+    if (photorealBuildingsToggleLabel) {
+      photorealBuildingsToggleLabel.style.background = enabled ? '#ecfeff' : '#f8fafc';
+      photorealBuildingsToggleLabel.style.borderColor = enabled ? '#06b6d4' : '#e2e8f0';
+    }
+    if (photorealSettingsStatus) {
+      photorealSettingsStatus.textContent = enabled ?
+      'Photoreal materials enabled. Toggle while in-game to rebuild buildings with the beta profile.' :
+      'Standard building materials enabled for maximum stability and performance.';
+    }
+  };
+
+  const photorealEnabled = typeof appCtx.getPhotorealBuildingsEnabled === 'function' ?
+  appCtx.getPhotorealBuildingsEnabled() :
+  !!appCtx.photorealBuildingsEnabled;
+  if (photorealBuildingsToggle) photorealBuildingsToggle.checked = photorealEnabled;
+  updatePhotorealSettingsUI(photorealEnabled);
 
   // Save API keys
   if (saveApiKeyBtn) {
@@ -306,6 +327,51 @@ function setupUI() {
       localStorage.setItem('realEstateEnabled', enabled);
       toggleLabel.style.background = enabled ? '#f0f4ff' : '#f8fafc';
       toggleLabel.style.borderColor = enabled ? '#667eea' : '#e2e8f0';
+    });
+  }
+
+  if (photorealBuildingsToggle) {
+    photorealBuildingsToggle.addEventListener('change', async (e) => {
+      const nextEnabled = !!e.target.checked;
+      const previousEnabled = typeof appCtx.getPhotorealBuildingsEnabled === 'function' ?
+      appCtx.getPhotorealBuildingsEnabled() :
+      !!appCtx.photorealBuildingsEnabled;
+
+      if (typeof appCtx.setPhotorealBuildingsEnabled === 'function') {
+        appCtx.setPhotorealBuildingsEnabled(nextEnabled);
+      } else {
+        appCtx.photorealBuildingsEnabled = nextEnabled;
+      }
+      updatePhotorealSettingsUI(nextEnabled);
+
+      if (photorealSettingsStatus) {
+        photorealSettingsStatus.textContent = appCtx.gameStarted ?
+        `Applying ${nextEnabled ? 'photoreal' : 'standard'} materials and rebuilding world...` :
+        `${nextEnabled ? 'Photoreal' : 'Standard'} materials saved. It will apply on Explore.`;
+      }
+
+      if (appCtx.gameStarted && typeof appCtx.loadRoads === 'function') {
+        photorealBuildingsToggle.disabled = true;
+        try {
+          await appCtx.loadRoads();
+          if (photorealSettingsStatus) {
+            photorealSettingsStatus.textContent = `${nextEnabled ? 'Photoreal' : 'Standard'} building materials applied.`;
+          }
+        } catch (err) {
+          if (typeof appCtx.setPhotorealBuildingsEnabled === 'function') {
+            appCtx.setPhotorealBuildingsEnabled(previousEnabled);
+          } else {
+            appCtx.photorealBuildingsEnabled = previousEnabled;
+          }
+          photorealBuildingsToggle.checked = previousEnabled;
+          updatePhotorealSettingsUI(previousEnabled);
+          if (photorealSettingsStatus) {
+            photorealSettingsStatus.textContent = `Reload failed: ${err?.message || err}. Restored previous setting.`;
+          }
+        } finally {
+          photorealBuildingsToggle.disabled = false;
+        }
+      }
     });
   }
 

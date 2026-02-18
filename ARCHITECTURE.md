@@ -1,6 +1,6 @@
 # Architecture
 
-Last reviewed: 2026-02-16
+Last reviewed: 2026-02-18
 
 This document describes the current deployed architecture in the `WorldExplorer` repository.
 
@@ -81,6 +81,15 @@ In this mode:
 - route structure remains `/`, `/app/`, `/account/`, `/legal/*`
 - Firebase Functions still handle checkout/portal/webhook endpoints
 - frontend `billing.js` resolves direct function origin for non-Firebase-hosting domains
+
+### 3.2 GitHub Pages Branch-Root Mode
+
+For branch-root Pages deployments (`Deploy from a branch`, `/ (root)`):
+
+- runtime entrypoint is root `index.html`
+- runtime modules are root `js/*`
+- Firebase-hosted `public/app/*` behavior remains unchanged unless separately deployed
+- root runtime now includes `Photoreal Buildings (Beta)` settings control backed by local storage key `worldExplorerPhotorealBuildings`
 
 ## 4. Identity and Entitlements Flow
 
@@ -191,6 +200,5 @@ Required planned work:
 
 ## 10. Legacy/Reference Artifacts
 
-Root-level legacy files (`index.html`, `js/`, `styles.css`) remain in repo history/reference, but production Hosting paths are under `public/`.
-
-Use `public/app/index.html` as the active runtime entrypoint for deployed behavior.
+Root-level runtime files (`index.html`, `js/`, `styles.css`) are used for branch-root Pages mode.
+Firebase-hosted production behavior continues to use `public/app/index.html`.

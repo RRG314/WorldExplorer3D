@@ -1,20 +1,21 @@
 # User Guide
 
-Last reviewed: 2026-02-16
+Last reviewed: 2026-02-18
 
 This guide is for players and subscribers using the hosted World Explorer experience.
 
 ## 1. Where to Start
 
+Firebase-hosted URLs:
+
 - Landing page: `https://worldexplorer3d-d9b83.web.app/`
 - Play runtime: `https://worldexplorer3d-d9b83.web.app/app/`
 - Account/billing: `https://worldexplorer3d-d9b83.web.app/account/`
 
-GitHub mirror URLs (when using Pages):
+GitHub Pages URLs:
 
-- Landing: `https://rrg314.github.io/WorldExplorer/`
-- Play runtime: `https://rrg314.github.io/WorldExplorer/app/`
-- Account: `https://rrg314.github.io/WorldExplorer/account/`
+- Branch-root mode: `https://rrg314.github.io/WorldExplorer/` (root runtime)
+- `public/` mode (if configured): `https://rrg314.github.io/WorldExplorer/app/` and `.../account/`
 
 ## 2. Sign In and Trial
 
@@ -81,6 +82,13 @@ Checkout flow:
 - Non-Pro users see the Pro info panel briefly on load
 - Panel auto-hides after a few seconds
 - Pro users keep access to Pro controls
+
+### Graphics settings
+
+- Open `Settings` on the title screen
+- `Photoreal Buildings (Beta)` toggles enhanced building materials
+- Setting is stored in browser local storage (`worldExplorerPhotorealBuildings`)
+- If changed before starting, it applies on next `Explore`
 
 ## 6. Gameplay Controls
 

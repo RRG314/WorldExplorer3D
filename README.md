@@ -7,6 +7,7 @@ World Explorer is a browser-based 3D exploration runtime with a production Fireb
 - Account and billing at `/account/`
 - Firebase Auth + Firestore entitlements
 - Stripe subscriptions through Firebase Cloud Functions
+- Photoreal Buildings (Beta) toggle in runtime Settings
 
 Repository: `https://github.com/RRG314/WorldExplorer.git`
 
@@ -85,9 +86,20 @@ Open:
 
 ## GitHub Pages Deployment
 
-This repo supports GitHub Pages via GitHub Actions publishing from `public/`.
+This repo supports two Pages modes:
 
-- Branch: `codex/github-pages-compat`
+- Branch-root mode (requested): Pages serves repository root (`index.html`, `js/`, `styles.css`)
+- `public/` artifact mode: GitHub Actions publishes `public/`
+
+Branch-root mode setup (no workflow required):
+
+1. GitHub -> `Settings -> Pages`
+2. `Build and deployment -> Source: Deploy from a branch`
+3. Branch: your target branch
+4. Folder: `/ (root)`
+
+`public/` artifact mode (existing workflow):
+
 - Workflow: `.github/workflows/deploy-pages-public.yml`
 - Pages source: `GitHub Actions`
 
