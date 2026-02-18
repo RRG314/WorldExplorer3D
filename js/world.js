@@ -698,8 +698,175 @@ function isPhotorealBuildingsEnabled() {
   return !!appCtx.photorealBuildingsEnabled;
 }
 
-function getPhotorealDetailMaterials() {
-  if (appCtx._photorealDetailMaterials) return appCtx._photorealDetailMaterials;
+function roofStyleProfile(styleId) {
+  if (styleId === 'metal') {
+    return {
+      baseColor: 0x6a737d,
+      roughness: 0.58,
+      metalness: 0.26,
+      envMapIntensity: 0.55,
+      clearcoat: 0.06,
+      clearcoatRoughness: 0.58,
+      repeat: 8
+    };
+  }
+  if (styleId === 'concrete') {
+    return {
+      baseColor: 0x7e8084,
+      roughness: 0.90,
+      metalness: 0.04,
+      envMapIntensity: 0.33,
+      clearcoat: 0.01,
+      clearcoatRoughness: 0.85,
+      repeat: 7
+    };
+  }
+  if (styleId === 'gravel') {
+    return {
+      baseColor: 0x585d64,
+      roughness: 0.95,
+      metalness: 0.02,
+      envMapIntensity: 0.28,
+      clearcoat: 0.0,
+      clearcoatRoughness: 0.9,
+      repeat: 9
+    };
+  }
+  if (styleId === 'tile') {
+    return {
+      baseColor: 0x744435,
+      roughness: 0.86,
+      metalness: 0.03,
+      envMapIntensity: 0.35,
+      clearcoat: 0.02,
+      clearcoatRoughness: 0.78,
+      repeat: 6
+    };
+  }
+  return {
+    baseColor: 0x373c43,
+    roughness: 0.92,
+    metalness: 0.02,
+    envMapIntensity: 0.30,
+    clearcoat: 0.0,
+    clearcoatRoughness: 0.88,
+    repeat: 8
+  };
+}
+
+function chooseRoofStyle(buildingType, styleRand) {
+  const bt = String(buildingType || 'yes').toLowerCase();
+  if (bt === 'industrial' || bt === 'warehouse' || bt === 'factory' || bt === 'retail') {
+    return styleRand > 0.45 ? 'metal' : 'concrete';
+  }
+  if (bt === 'house' || bt === 'detached' || bt === 'residential' || bt === 'apartments') {
+    return styleRand > 0.28 ? 'tile' : 'membrane';
+  }
+  if (styleRand < 0.28) return 'concrete';
+  if (styleRand < 0.52) return 'gravel';
+  if (styleRand < 0.72) return 'metal';
+  return 'membrane';
+}
+
+function buildPhotorealRoofTexture(styleId, toneBucket, bSeed) {
+  const cacheKey = `${styleId}-${toneBucket}`;
+  if (!appCtx._photorealRoofTextureCache) appCtx._photorealRoofTextureCache = new Map();
+  if (appCtx._photorealRoofTextureCache.has(cacheKey)) {
+    return appCtx._photorealRoofTextureCache.get(cacheKey);
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const seed = ((bSeed || 0) ^ toneBucket * 2654435761 ^ styleId.length * 2246822519) >>> 0;
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(seed) : Math.random.bind(Math);
+  const profile = roofStyleProfile(styleId);
+  const baseColor = new THREE.Color(profile.baseColor);
+  baseColor.offsetHSL(0, 0, (toneBucket - 2) * 0.028);
+  const hiColor = baseColor.clone().offsetHSL(0, 0, 0.07);
+  const lowColor = baseColor.clone().offsetHSL(0, 0, -0.08);
+
+  ctx.fillStyle = `#${baseColor.getHexString()}`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const grainStep = styleId === 'tile' ? 2 : 3;
+  for (let y = 0; y < canvas.height; y += grainStep) {
+    for (let x = 0; x < canvas.width; x += grainStep) {
+      const shade = rng() > 0.5 ? hiColor : lowColor;
+      const alpha = 0.05 + rng() * 0.10;
+      ctx.fillStyle = `rgba(${Math.round(shade.r * 255)},${Math.round(shade.g * 255)},${Math.round(shade.b * 255)},${alpha.toFixed(3)})`;
+      ctx.fillRect(x, y, grainStep, grainStep);
+    }
+  }
+
+  if (styleId === 'metal') {
+    ctx.strokeStyle = 'rgba(20,24,30,0.22)';
+    ctx.lineWidth = 1;
+    for (let x = 6; x < canvas.width; x += 10) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+  } else if (styleId === 'tile') {
+    ctx.strokeStyle = 'rgba(18,15,12,0.20)';
+    ctx.lineWidth = 1;
+    for (let y = 8; y < canvas.height; y += 12) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+  } else if (styleId === 'concrete') {
+    ctx.strokeStyle = 'rgba(35,38,42,0.18)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 7; i++) {
+      const x1 = rng() * canvas.width;
+      const y1 = rng() * canvas.height;
+      const x2 = Math.min(canvas.width, x1 + (rng() * 34 + 14));
+      const y2 = y1 + (rng() * 16 - 8);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+  } else {
+    ctx.strokeStyle = 'rgba(16,18,22,0.18)';
+    ctx.lineWidth = 1;
+    for (let y = 10; y < canvas.height; y += 18) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(profile.repeat, profile.repeat);
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  appCtx._photorealRoofTextureCache.set(cacheKey, tex);
+  return tex;
+}
+
+function getPhotorealDetailMaterials(bSeed, buildingType) {
+  if (!appCtx._photorealDetailMaterialCache) appCtx._photorealDetailMaterialCache = new Map();
+
+  const styleRand = appCtx.rand01FromInt(((bSeed || 0) ^ 0x73af2d) >>> 0);
+  const toneRand = appCtx.rand01FromInt(((bSeed || 0) ^ 0x15b4c3) >>> 0);
+  const roofStyle = chooseRoofStyle(buildingType, styleRand);
+  const toneBucket = Math.floor(toneRand * 5);
+  const cacheKey = `${roofStyle}-${toneBucket}`;
+  if (appCtx._photorealDetailMaterialCache.has(cacheKey)) {
+    return appCtx._photorealDetailMaterialCache.get(cacheKey);
+  }
+
+  const profile = roofStyleProfile(roofStyle);
+  const roofTex = buildPhotorealRoofTexture(roofStyle, toneBucket, bSeed);
 
   const usePhysical = typeof THREE.MeshPhysicalMaterial === 'function';
   const RoofClass = usePhysical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
@@ -707,45 +874,42 @@ function getPhotorealDetailMaterials() {
   const UtilityClass = usePhysical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
 
   const roofMat = new RoofClass({
-    color: 0x2a3644,
-    roughness: 0.62,
-    metalness: 0.40,
-    envMapIntensity: 1.05,
-    clearcoat: usePhysical ? 0.22 : undefined,
-    clearcoatRoughness: usePhysical ? 0.42 : undefined
+    color: new THREE.Color(profile.baseColor).offsetHSL(0, 0, (toneBucket - 2) * 0.028),
+    map: roofTex,
+    roughness: profile.roughness,
+    metalness: profile.metalness,
+    envMapIntensity: profile.envMapIntensity,
+    clearcoat: usePhysical ? profile.clearcoat : undefined,
+    clearcoatRoughness: usePhysical ? profile.clearcoatRoughness : undefined
   });
 
   const trimMat = new FacadeClass({
-    color: 0x4a5d75,
-    roughness: 0.44,
-    metalness: 0.35,
-    envMapIntensity: 1.25,
-    clearcoat: usePhysical ? 0.30 : undefined,
-    clearcoatRoughness: usePhysical ? 0.30 : undefined
+    color: new THREE.Color(0x5b6574).offsetHSL(0, 0, (toneBucket - 2) * 0.018),
+    roughness: 0.72,
+    metalness: 0.12,
+    envMapIntensity: 0.55,
+    clearcoat: usePhysical ? 0.05 : undefined,
+    clearcoatRoughness: usePhysical ? 0.75 : undefined
   });
 
   const utilityMat = new UtilityClass({
-    color: 0x5d6875,
-    roughness: 0.70,
-    metalness: 0.22,
-    envMapIntensity: 0.95,
-    clearcoat: usePhysical ? 0.10 : undefined,
-    clearcoatRoughness: usePhysical ? 0.55 : undefined
+    color: new THREE.Color(0x697380).offsetHSL(0, 0, (toneBucket - 2) * 0.022),
+    roughness: 0.82,
+    metalness: 0.14,
+    envMapIntensity: 0.44,
+    clearcoat: usePhysical ? 0.04 : undefined,
+    clearcoatRoughness: usePhysical ? 0.76 : undefined
   });
 
   const antennaMat = new THREE.MeshStandardMaterial({
-    color: 0xd8dee8,
-    roughness: 0.35,
-    metalness: 0.82
+    color: 0xb6c0cc,
+    roughness: 0.36,
+    metalness: 0.80
   });
 
-  appCtx._photorealDetailMaterials = {
-    roofMat,
-    trimMat,
-    utilityMat,
-    antennaMat
-  };
-  return appCtx._photorealDetailMaterials;
+  const materialSet = { roofMat, trimMat, utilityMat, antennaMat };
+  appCtx._photorealDetailMaterialCache.set(cacheKey, materialSet);
+  return materialSet;
 }
 
 function addPhotorealBuildingDetailMeshes(mesh, bSeed, buildingType = 'yes', lodTier = 'near') {
@@ -779,12 +943,12 @@ function addPhotorealBuildingDetailMeshes(mesh, bSeed, buildingType = 'yes', lod
   const rng = typeof appCtx.seededRandom === 'function' ?
   appCtx.seededRandom(((bSeed || 0) ^ 0x31fa6d) >>> 0) :
   Math.random.bind(Math);
-  const mats = getPhotorealDetailMaterials();
+  const mats = getPhotorealDetailMaterials(bSeed, buildingType);
   const group = new THREE.Group();
   group.userData.photorealBuildingDetail = true;
 
-  // Roof cap for stronger silhouette and reflected highlights.
-  const roofInset = Math.max(0.9, Math.min(width, depth) * 0.035);
+  // Keep roof coverage almost full so the base facade material does not read as glass on top faces.
+  const roofInset = Math.max(0.08, Math.min(0.35, Math.min(width, depth) * 0.012));
   const roofW = Math.max(2.2, width - roofInset * 2);
   const roofD = Math.max(2.2, depth - roofInset * 2);
   const roofThickness = Math.max(0.30, Math.min(1.4, height * 0.022));

@@ -456,3 +456,15 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `output/playwright/photoreal-ultra-deterministic/photoreal-on-title.png`
   - Skill-run artifact for traceability:
     - `output/playwright/photoreal-ultra-skill-run/`
+- Roof realism correction pass (2026-02-18):
+  - User feedback addressed: roofs should not look like glass and should not all look identical.
+  - `js/world.js` updates:
+    - Added deterministic roof-style system (`membrane`, `concrete`, `gravel`, `metal`, `tile`) based on building type + seed.
+    - Added procedural roof texture generator with style-specific patterns and tone buckets.
+    - Reduced roof reflectivity and metalness; raised roughness to keep roof response matte/non-glass.
+    - Expanded roof-cap coverage so top faces are mostly covered by roof material instead of facade material.
+  - Validation artifacts:
+    - `output/playwright/roof-material-fix-check/photoreal-ingame-roof-fix.png`
+    - `output/playwright/roof-material-topview-check/photoreal-off-topview.png`
+    - `output/playwright/roof-material-topview-check/photoreal-on-topview.png`
+    - `output/playwright/roof-material-topview-check/report.json` (0 errors in both variants)
