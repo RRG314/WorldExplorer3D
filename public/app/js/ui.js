@@ -407,7 +407,7 @@ function setupUI() {
       return 'earth';
     };
     const normalizeGameMode = (value) => {
-      if (value === 'trial' || value === 'checkpoint' || value === 'painttown') return value;
+      if (value === 'trial' || value === 'checkpoint' || value === 'painttown' || value === 'police' || value === 'flower') return value;
       return value === 'free' ? 'free' : null;
     };
     const normalizeTravelMode = (value) => {
@@ -975,7 +975,7 @@ function setupUI() {
 
   // Optional share-link payload: seed/location/mode/camera from URL query.
   if (sharedExperienceParams) {
-    const validGameModes = new Set(['free', 'trial', 'checkpoint', 'painttown']);
+    const validGameModes = new Set(['free', 'trial', 'checkpoint', 'painttown', 'police', 'flower']);
     if (sharedExperienceParams.gameMode && validGameModes.has(sharedExperienceParams.gameMode)) {
       appCtx.gameMode = sharedExperienceParams.gameMode;
       const targetModeEl = document.querySelector(`.mode[data-mode="${sharedExperienceParams.gameMode}"]`);

@@ -673,3 +673,45 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Screens:
     - `output/playwright/root-landing-and-block-walk-check-v2/root-landing.png`
     - `output/playwright/root-landing-and-block-walk-check-v2/app-block-test.png`
+- Game-mode and challenge scoring pass (2026-02-18):
+  - Paint Town objective updated from percent emphasis to building-count objective over 2 minutes in:
+    - `js/game.js`
+    - `public/app/js/game.js`
+  - Paint Town HUD/result text now reports building count first (no percent in HUD/result summary), with timer set to `02:00` challenge length.
+  - Added title Game Mode cards in `public/app/index.html`:
+    - `Police Chase` (`data-mode="police"`)
+    - `Find the Flower` (`data-mode="flower"`)
+  - Updated Paint Town card description and leaderboard hint copy to 2-minute building-count wording.
+  - Extended share-link game-mode parsing/validation in:
+    - `js/ui.js`
+    - `public/app/js/ui.js`
+    to accept `police` and `flower` game modes.
+  - Game mode runtime wiring in `js/game.js` + `public/app/js/game.js`:
+    - `police` mode now auto-enables police pursuit + HUD/toggle state on mode start.
+    - `flower` mode now auto-starts the red flower challenge on mode start.
+    - mode starts now clear stale police/flower state before activating selected mode.
+  - Paint leaderboard ranking/metric updated in:
+    - `js/flower-challenge.js`
+    - `public/app/js/flower-challenge.js`
+    so `painttown` sorts by `paintedBuildings` (descending) and displays `N bldgs` metric.
+  - Remote paint leaderboard query now orders by `paintedBuildings` instead of `paintedPct`.
+  - Paint score status text updated to building-count messaging (`painted X buildings in 2:00 ...`).
+
+- Validation (2026-02-18):
+  - Syntax checks passed:
+    - `node --check js/game.js`
+    - `node --check public/app/js/game.js`
+    - `node --check js/flower-challenge.js`
+    - `node --check public/app/js/flower-challenge.js`
+    - `node --check js/ui.js`
+    - `node --check public/app/js/ui.js`
+  - Skill client run executed:
+    - `output/playwright/painttown-modes-check/shot-0.png`
+    - `output/playwright/painttown-modes-check/shot-1.png`
+    - note: this client still captured black frames in this environment.
+  - Direct Playwright fallback checks:
+    - `output/playwright/mode-smoke-check/painttown.png` (shows Paint Town HUD with ~`01:59` and building count)
+    - `output/playwright/mode-smoke-check/flower.png` (shows auto-start flower HUD)
+    - `output/playwright/mode-smoke-check/police.png`
+    - `output/playwright/mode-smoke-check/summary.json`
+  - Title menu DOM assertion confirms new cards are present with expected descriptions for `painttown`, `police`, and `flower`.

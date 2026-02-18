@@ -1227,7 +1227,7 @@ function clearPolice() {
   appCtx.police = [];
 }
 
-const PAINT_TOWN_DURATION_SEC = 60;
+const PAINT_TOWN_DURATION_SEC = 120;
 
 function ensurePaintTownState() {
   if (!appCtx.paintTown) {
@@ -1494,12 +1494,10 @@ function updatePaintTownHud(message = '') {
     return;
   }
 
-  const total = Math.max(1, state.totalBuildings);
-  const pct = Math.min(100, state.paintedBuildings / total * 100);
   const hint = message || state.lastHint || 'Reach any rooftop and it auto-paints red.';
   hud.innerHTML =
   `<div style="font-weight:700;color:#fecaca;letter-spacing:0.02em;margin-bottom:4px">🟥 Paint the Town Red</div>` +
-  `<div>Time: <b>${fmtTime(state.timerSec)}</b> • Painted: <b>${state.paintedBuildings}/${state.totalBuildings}</b> (${pct.toFixed(1)}%)</div>` +
+  `<div>Time: <b>${fmtTime(state.timerSec)}</b> • Buildings: <b>${state.paintedBuildings}/${state.totalBuildings}</b></div>` +
   `<div style="margin-top:4px;color:#cbd5e1;font-size:11px">${hint}</div>`;
   hud.style.display = 'block';
   hud.classList.add('show');
@@ -1539,7 +1537,7 @@ function startPaintTownMode() {
   state.totalBuildings = buildingKeys.size;
   state.active = true;
   state.timerSec = PAINT_TOWN_DURATION_SEC;
-  state.lastHint = 'Reach a rooftop. Buildings auto-paint when you land on top.';
+  state.lastHint = '2-minute challenge: paint as many buildings as possible by landing on rooftops.';
   state.autoPaintTickSec = 0;
   state.scoreSubmitted = false;
 
@@ -1574,7 +1572,7 @@ function stopPaintTownMode({ showSummary = false } = {}) {
   }
   showResult(
     'Paint the Town Red',
-    `Painted ${state.paintedBuildings}/${state.totalBuildings} buildings (${pct.toFixed(1)}%) in ${fmtTime(PAINT_TOWN_DURATION_SEC)}`
+    `Painted ${state.paintedBuildings} buildings in ${fmtTime(PAINT_TOWN_DURATION_SEC)} (${state.totalBuildings} available)`
   );
 }
 
@@ -1680,9 +1678,24 @@ function spawnCheckpoints() {
 function startMode() {
   appCtx.gameTimer = 0;
   clearObjectives();
+  clearPolice();
+  appCtx.policeOn = false;
+  const policeHud = document.getElementById('police');
+  if (policeHud) policeHud.classList.remove('show');
+  const policeToggle = document.getElementById('fPolice');
+  if (policeToggle) policeToggle.classList.remove('on');
+  if (typeof appCtx.stopFlowerChallenge === 'function') appCtx.stopFlowerChallenge();
   if (appCtx.gameMode === 'trial') spawnDest();else
   if (appCtx.gameMode === 'checkpoint') spawnCheckpoints();else
-  if (appCtx.gameMode === 'painttown') startPaintTownMode();
+  if (appCtx.gameMode === 'painttown') startPaintTownMode();else
+  if (appCtx.gameMode === 'police') {
+    appCtx.policeOn = true;
+    if (policeHud) policeHud.classList.add('show');
+    if (policeToggle) policeToggle.classList.add('on');
+    spawnPolice();
+  } else if (appCtx.gameMode === 'flower' && typeof appCtx.startFlowerChallenge === 'function') {
+    appCtx.startFlowerChallenge('game-mode');
+  }
 }
 
 function updateMode(dt) {

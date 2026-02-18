@@ -303,8 +303,10 @@ function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
 
   if (challenge === 'flower') {
     if (!Number.isFinite(timeMs) || timeMs <= 0) return null;
-  } else if (!Number.isFinite(paintedPct) || paintedPct < 0) {
-    return null;
+  } else {
+    const hasCount = Number.isFinite(paintedBuildings) && paintedBuildings >= 0;
+    const hasPct = Number.isFinite(paintedPct) && paintedPct >= 0;
+    if (!hasCount && !hasPct) return null;
   }
 
   return {
@@ -334,10 +336,10 @@ function sortLeaderboardEntries(entries, challengeType = 'flower') {
 function compareLeaderboardEntries(a, b, challengeType = 'flower') {
   const normalizedType = normalizeChallengeType(challengeType);
   if (normalizedType === 'painttown') {
-    const pctDelta = (Number(b.paintedPct) || 0) - (Number(a.paintedPct) || 0);
-    if (Math.abs(pctDelta) > 0.0001) return pctDelta;
     const countDelta = (Number(b.paintedBuildings) || 0) - (Number(a.paintedBuildings) || 0);
     if (countDelta !== 0) return countDelta;
+    const pctDelta = (Number(b.paintedPct) || 0) - (Number(a.paintedPct) || 0);
+    if (Math.abs(pctDelta) > 0.0001) return pctDelta;
     return String(b.foundAt || '').localeCompare(String(a.foundAt || ''));
   }
   return (Number(a.timeMs) || Infinity) - (Number(b.timeMs) || Infinity);
@@ -383,7 +385,7 @@ async function readRemoteLeaderboard(challengeType = 'flower') {
     const q = normalizedType === 'painttown' ?
     firestoreMod.query(
       leaderboardRef,
-      firestoreMod.orderBy('paintedPct', 'desc'),
+      firestoreMod.orderBy('paintedBuildings', 'desc'),
       firestoreMod.limit(LEADERBOARD_LIMIT)
     ) :
     firestoreMod.query(
@@ -451,7 +453,7 @@ function renderLeaderboard(entries) {
 
   ui.titleList.innerHTML = entries.map((entry, idx) => {
     const metric = challengeType === 'painttown' ?
-    `${(Number(entry.paintedPct) || 0).toFixed(1)}%` :
+    `${Math.max(0, Math.round(Number(entry.paintedBuildings) || 0))} bldgs` :
     `${((Number(entry.timeMs) || 0) / 1000).toFixed(2)}s`;
     const locationLine = challengeType === 'painttown' ?
     `${safeText(entry.location)} • ${safeText((entry.paintedBuildings || 0) + '/' + (entry.totalBuildings || 0))}` :
@@ -527,7 +529,7 @@ function capturePaintTownEntry(payload = {}) {
     paintedPct: Number.isFinite(paintedPct) ? paintedPct : 0,
     paintedBuildings: Number.isFinite(paintedBuildings) ? paintedBuildings : 0,
     totalBuildings: Number.isFinite(totalBuildings) ? totalBuildings : 0,
-    timeMs: Number.isFinite(durationMs) && durationMs > 0 ? durationMs : 60000,
+    timeMs: Number.isFinite(durationMs) && durationMs > 0 ? durationMs : 120000,
     location: loc,
     lat: ll.lat,
     lon: ll.lon,
@@ -546,7 +548,7 @@ async function submitPaintTownScore(payload = {}) {
   }
   await refreshFlowerLeaderboard(challengeState.leaderboardView);
   setTitleStatus(
-    `${entry.player} painted ${(entry.paintedPct || 0).toFixed(1)}% in ${entry.location}.`,
+    `${entry.player} painted ${entry.paintedBuildings || 0} buildings in 2:00 at ${entry.location}.`,
     'ok'
   );
   return entry;
