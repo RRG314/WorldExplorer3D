@@ -576,3 +576,22 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Consider weighted score multiplier for painting tall/high-complexity buildings.
 - Minor follow-up (2026-02-18):
   - Added extra UI exclusion targets for paint click handling (`#minimap`, `#hud`, `#coords`) to avoid accidental paint-attempt feedback when interacting with HUD overlays.
+- Title Games tab + Paint Town wiring pass (2026-02-18):
+  - Confirmed dedicated `Games` tab is present and game mode cards are removed from Settings on both root and `public/app` HTML.
+  - Added title-start objective initialization in `js/ui.js` + `public/app/js/ui.js` by invoking `appCtx.startMode()` after world-load setup; ensures selected title game mode (including Paint Town) activates on first launch.
+  - Hardened Paint Town rooftop auto-paint logic in `js/game.js` + `public/app/js/game.js`:
+    - actor priority now uses drone when active, then walking, then car,
+    - roof-height sampling now falls back safely when terrain sampling returns non-finite values,
+    - candidate scan now supports preferred + fallback vertical bands and wider fallback search.
+- Validation artifacts (2026-02-18):
+  - Skill-loop run: `output/playwright/web-game-client-roof-fix/` (client still captures black canvas in this environment).
+  - Direct Playwright verification: `output/playwright/paint-town-final-check/report.json`.
+    - `hasGamesTab=true`
+    - `gamesTabActive=true`
+    - `settingsHasGameModes=false`
+    - `runtime.autoPaintWorked=true` (painted `1` building in scripted rooftop test)
+    - `runtime.scoreSubmitted=true`
+    - `runtime.listHasPaintMetric=true`
+  - Screens:
+    - `output/playwright/paint-town-final-check/title-games-tab.png`
+    - `output/playwright/paint-town-final-check/painttown-runtime.png`

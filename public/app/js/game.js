@@ -1228,31 +1228,6 @@ function clearPolice() {
 }
 
 const PAINT_TOWN_DURATION_SEC = 60;
-const PAINT_TOWN_UI_IGNORE_SELECTOR = [
-'#titleScreen',
-'#pauseScreen',
-'#resultScreen',
-'#caughtScreen',
-'#controlsTab',
-'#floatMenuContainer',
-'#mainMenuBtn',
-'#largeMap',
-'#minimap',
-'#hud',
-'#coords',
-'#flowerActionMenu',
-'#gameShareMenu',
-'#propertyPanel',
-'#propertyModal',
-'#modal',
-'#mobileTouchControls',
-'#memoryComposer',
-'#flowerChallengePanel',
-'#flowerChallengeToggleBtn',
-'#authPanel']
-.join(',');
-
-let paintTownClickHandlerInstalled = false;
 
 function ensurePaintTownState() {
   if (!appCtx.paintTown) {
@@ -1262,7 +1237,9 @@ function ensurePaintTownState() {
       paintedBuildings: 0,
       paintedKeys: new Set(),
       timerSec: PAINT_TOWN_DURATION_SEC,
-      lastHint: ''
+      lastHint: '',
+      autoPaintTickSec: 0,
+      scoreSubmitted: false
     };
   }
   if (!(appCtx.paintTown.paintedKeys instanceof Set)) {
@@ -1300,14 +1277,14 @@ function ensurePaintTownHud() {
 }
 
 function getPaintTownActorState() {
+  if (appCtx.droneMode && appCtx.drone) {
+    return { x: appCtx.drone.x, z: appCtx.drone.z, feetY: appCtx.drone.y, mode: 'drone' };
+  }
+
   if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker) {
     const walker = appCtx.Walk.state.walker;
     const eyeHeight = appCtx.Walk?.CFG?.eyeHeight || 1.7;
     return { x: walker.x, z: walker.z, feetY: walker.y - eyeHeight, mode: 'walking' };
-  }
-
-  if (appCtx.droneMode && appCtx.drone) {
-    return { x: appCtx.drone.x, z: appCtx.drone.z, feetY: appCtx.drone.y, mode: 'drone' };
   }
 
   if (appCtx.car) {
@@ -1332,17 +1309,25 @@ function buildingContainsPoint(building, x, z) {
   if (!building) return false;
   if (x < building.minX || x > building.maxX || z < building.minZ || z > building.maxZ) return false;
   if (Array.isArray(building.pts) && building.pts.length >= 3 && typeof appCtx.pointInPolygon === 'function') {
-    return !!appCtx.pointInPolygon(x, z, building.pts);
+    if (appCtx.pointInPolygon(x, z, building.pts)) return true;
+    // Fallback to bbox acceptance for complex/concave OSM rings where centroid sampling is imperfect.
+    return true;
   }
   return true;
 }
 
 function getBuildingRoofY(building, x, z) {
-  const baseY = Number.isFinite(building?.baseY) ?
-  building.baseY :
-  typeof appCtx.terrainMeshHeightAt === 'function' ?
-  appCtx.terrainMeshHeightAt(x, z) :
-  appCtx.elevationWorldYAtWorldXZ(x, z);
+  let baseY = Number.isFinite(building?.baseY) ? building.baseY : NaN;
+  if (!Number.isFinite(baseY) && typeof appCtx.terrainMeshHeightAt === 'function') {
+    baseY = appCtx.terrainMeshHeightAt(x, z);
+  }
+  if (!Number.isFinite(baseY) && typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
+    baseY = appCtx.elevationWorldYAtWorldXZ(x, z);
+  }
+  if (!Number.isFinite(baseY) && Number.isFinite(building?.minY)) {
+    baseY = building.minY;
+  }
+  if (!Number.isFinite(baseY)) baseY = 0;
   return baseY + (Number.isFinite(building?.height) ? building.height : 0);
 }
 
@@ -1357,23 +1342,55 @@ function footprintsMatch(a, b) {
 }
 
 function findPaintableRoofBuilding(actor) {
-  const candidates = typeof appCtx.getNearbyBuildings === 'function' ?
+  const mode = actor?.mode === 'drone' ? 'drone' : 'ground';
+  const preferredMin = mode === 'drone' ? -2.5 : -1.5;
+  const preferredMax = mode === 'drone' ? 9.5 : 4.0;
+  const fallbackAbsDelta = mode === 'drone' ? 14 : 6;
+
+  function pickCandidate(best, candidate) {
+    if (!best) return candidate;
+    if (candidate.absDelta < best.absDelta - 0.02) return candidate;
+    if (Math.abs(candidate.absDelta - best.absDelta) <= 0.02 && candidate.roofY > best.roofY) return candidate;
+    return best;
+  }
+
+  function scanCandidates(candidates) {
+    if (!Array.isArray(candidates) || candidates.length === 0) return null;
+    let bestPreferred = null;
+    let bestFallback = null;
+
+    for (let i = 0; i < candidates.length; i++) {
+      const building = candidates[i];
+      if (!buildingContainsPoint(building, actor.x, actor.z)) continue;
+      const roofY = getBuildingRoofY(building, actor.x, actor.z);
+      const verticalDelta = actor.feetY - roofY;
+      if (!Number.isFinite(verticalDelta)) continue;
+      const absDelta = Math.abs(verticalDelta);
+      const candidate = { building, roofY, key: getBuildingKey(building, i), absDelta };
+
+      if (verticalDelta >= preferredMin && verticalDelta <= preferredMax) {
+        bestPreferred = pickCandidate(bestPreferred, candidate);
+        continue;
+      }
+      if (absDelta <= fallbackAbsDelta) {
+        bestFallback = pickCandidate(bestFallback, candidate);
+      }
+    }
+
+    return bestPreferred || bestFallback;
+  }
+
+  const nearby = typeof appCtx.getNearbyBuildings === 'function' ?
   appCtx.getNearbyBuildings(actor.x, actor.z, 14) :
   appCtx.buildings;
-  if (!Array.isArray(candidates) || candidates.length === 0) return null;
 
-  let best = null;
-  for (let i = 0; i < candidates.length; i++) {
-    const building = candidates[i];
-    if (!buildingContainsPoint(building, actor.x, actor.z)) continue;
-    const roofY = getBuildingRoofY(building, actor.x, actor.z);
-    const verticalDelta = actor.feetY - roofY;
-    if (verticalDelta < -1.2 || verticalDelta > 4.5) continue;
-    if (!best || roofY > best.roofY) {
-      best = { building, roofY, key: getBuildingKey(building, i) };
-    }
+  const nearbyHit = scanCandidates(nearby);
+  if (nearbyHit) return nearbyHit;
+
+  if (nearby !== appCtx.buildings) {
+    return scanCandidates(appCtx.buildings);
   }
-  return best;
+  return null;
 }
 
 function getBuildingMeshesForKey(key, building = null) {
@@ -1479,7 +1496,7 @@ function updatePaintTownHud(message = '') {
 
   const total = Math.max(1, state.totalBuildings);
   const pct = Math.min(100, state.paintedBuildings / total * 100);
-  const hint = message || state.lastHint || 'Land on a rooftop and click/tap to paint that building.';
+  const hint = message || state.lastHint || 'Reach any rooftop and it auto-paints red.';
   hud.innerHTML =
   `<div style="font-weight:700;color:#fecaca;letter-spacing:0.02em;margin-bottom:4px">🟥 Paint the Town Red</div>` +
   `<div>Time: <b>${fmtTime(state.timerSec)}</b> • Painted: <b>${state.paintedBuildings}/${state.totalBuildings}</b> (${pct.toFixed(1)}%)</div>` +
@@ -1496,6 +1513,8 @@ function resetPaintTownMode() {
   state.paintedKeys.clear();
   state.timerSec = PAINT_TOWN_DURATION_SEC;
   state.lastHint = '';
+  state.autoPaintTickSec = 0;
+  state.scoreSubmitted = false;
 
   if (Array.isArray(appCtx.buildingMeshes)) {
     for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
@@ -1520,8 +1539,9 @@ function startPaintTownMode() {
   state.totalBuildings = buildingKeys.size;
   state.active = true;
   state.timerSec = PAINT_TOWN_DURATION_SEC;
-  state.lastHint = 'Land on a rooftop and click/tap to paint the building red.';
-  installPaintTownClickHandler();
+  state.lastHint = 'Reach a rooftop. Buildings auto-paint when you land on top.';
+  state.autoPaintTickSec = 0;
+  state.scoreSubmitted = false;
 
   if (state.totalBuildings <= 0) {
     state.active = false;
@@ -1541,57 +1561,45 @@ function stopPaintTownMode({ showSummary = false } = {}) {
   const pct = state.totalBuildings > 0 ?
   Math.min(100, state.paintedBuildings / state.totalBuildings * 100) :
   0;
+  if (!state.scoreSubmitted && typeof appCtx.submitPaintTownScore === 'function') {
+    state.scoreSubmitted = true;
+    const actor = getPaintTownActorState();
+    appCtx.submitPaintTownScore({
+      paintedPct: pct,
+      paintedBuildings: state.paintedBuildings,
+      totalBuildings: state.totalBuildings,
+      durationMs: PAINT_TOWN_DURATION_SEC * 1000,
+      mode: actor?.mode || 'driving'
+    });
+  }
   showResult(
     'Paint the Town Red',
     `Painted ${state.paintedBuildings}/${state.totalBuildings} buildings (${pct.toFixed(1)}%) in ${fmtTime(PAINT_TOWN_DURATION_SEC)}`
   );
 }
 
-function handlePaintTownClick(event) {
+function attemptAutoPaintFromActor() {
   const state = ensurePaintTownState();
   if (!state.active || appCtx.paused || !appCtx.gameStarted || appCtx.gameMode !== 'painttown') return;
-  if (event.button !== undefined && event.button !== 0) return;
-
-  const target = event.target instanceof Element ? event.target : null;
-  if (target && (target.closest(PAINT_TOWN_UI_IGNORE_SELECTOR) || target.closest('button, a, input, select, textarea, label'))) {
-    return;
-  }
 
   const actor = getPaintTownActorState();
   if (!actor) return;
 
   const hit = findPaintableRoofBuilding(actor);
-  if (!hit) {
-    state.lastHint = 'Get onto a roof first, then click/tap to paint.';
-    updatePaintTownHud();
-    return;
-  }
-
-  if (state.paintedKeys.has(hit.key)) {
-    state.lastHint = 'That building is already painted.';
-    updatePaintTownHud();
-    return;
-  }
+  if (!hit) return;
+  if (state.paintedKeys.has(hit.key)) return;
 
   state.paintedKeys.add(hit.key);
   state.paintedBuildings = state.paintedKeys.size;
   const meshes = getBuildingMeshesForKey(hit.key, hit.building);
   meshes.forEach((mesh) => applyPaintToBuildingMesh(mesh));
-  state.lastHint = `Painted building ${state.paintedBuildings}/${state.totalBuildings}.`;
+  state.lastHint = `Auto-painted ${state.paintedBuildings}/${state.totalBuildings}.`;
 
   if (state.paintedBuildings >= state.totalBuildings && state.totalBuildings > 0) {
     stopPaintTownMode({ showSummary: true });
-  } else {
-    updatePaintTownHud();
+    return;
   }
-
-  if (event.cancelable) event.preventDefault();
-}
-
-function installPaintTownClickHandler() {
-  if (paintTownClickHandlerInstalled) return;
-  window.addEventListener('pointerdown', handlePaintTownClick, { passive: false });
-  paintTownClickHandlerInstalled = true;
+  updatePaintTownHud();
 }
 
 function pickRoadPt() {if (appCtx.roads.length === 0) return null;const rd = appCtx.roads[Math.floor(Math.random() * appCtx.roads.length)];return rd.pts[Math.floor(Math.random() * rd.pts.length)];}
@@ -1701,6 +1709,11 @@ function updateMode(dt) {
     const state = ensurePaintTownState();
     if (state.active) {
       state.timerSec = Math.max(0, PAINT_TOWN_DURATION_SEC - appCtx.gameTimer);
+      state.autoPaintTickSec = Math.max(0, (state.autoPaintTickSec || 0) - dt);
+      if (state.autoPaintTickSec <= 0) {
+        state.autoPaintTickSec = 0.15;
+        attemptAutoPaintFromActor();
+      }
       updatePaintTownHud();
       if (state.timerSec <= 0) stopPaintTownMode({ showSummary: true });
     }

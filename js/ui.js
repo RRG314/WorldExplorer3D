@@ -1239,6 +1239,9 @@ function setupUI() {
     }
     updateControlsModeUI();
     applySharedRuntimeState();
+    if (typeof appCtx.startMode === 'function') {
+      appCtx.startMode();
+    }
     if (pendingFlowerChallengeRequested && typeof appCtx.startFlowerChallenge === 'function') {
       let challengeStartAttempts = 0;
       const attemptStartChallenge = () => {
