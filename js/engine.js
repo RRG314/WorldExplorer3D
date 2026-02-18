@@ -41,7 +41,63 @@ function setPhotorealBuildingsEnabled(enabled, options = {}) {
   if (persist) {
     writeStorageValue(PHOTOREAL_BUILDINGS_STORAGE_KEY, photorealBuildingsEnabled ? '1' : '0');
   }
+  applyPhotorealRenderProfile();
   return photorealBuildingsEnabled;
+}
+
+function getShadowBaseResolutionForTier() {
+  return currentGpuTier === 'high' ? 1024 : currentGpuTier === 'mid' ? 512 : 256;
+}
+
+function getShadowPhotorealResolutionForTier() {
+  return currentGpuTier === 'high' ? 2048 : currentGpuTier === 'mid' ? 1024 : 256;
+}
+
+function applyPhotorealRenderProfile() {
+  if (!appCtx || !appCtx.renderer) return;
+
+  try {
+    appCtx.renderer.toneMappingExposure = photorealBuildingsEnabled ? 1.02 : 0.9;
+  } catch {
+    // Ignore tone mapping write failures on incompatible renderers.
+  }
+
+  if (appCtx.scene?.fog && typeof appCtx.scene.fog.density === 'number') {
+    appCtx.scene.fog.density = photorealBuildingsEnabled ? 0.00026 : 0.00035;
+  }
+  if (appCtx.scene?.fog && appCtx.scene.fog.color) {
+    appCtx.scene.fog.color.set(photorealBuildingsEnabled ? 0xc4d6e8 : 0xb8d4e8);
+  }
+
+  if (appCtx.hemiLight) appCtx.hemiLight.intensity = photorealBuildingsEnabled ? 0.34 : 0.4;
+  if (appCtx.sun) appCtx.sun.intensity = photorealBuildingsEnabled ? 1.36 : 1.2;
+  if (appCtx.fillLight) appCtx.fillLight.intensity = photorealBuildingsEnabled ? 0.38 : 0.3;
+  if (appCtx.ambientLight) appCtx.ambientLight.intensity = photorealBuildingsEnabled ? 0.22 : 0.3;
+
+  if (appCtx.sun?.shadow) {
+    appCtx.sun.shadow.normalBias = photorealBuildingsEnabled ? 0.015 : 0.02;
+    appCtx.sun.shadow.radius = photorealBuildingsEnabled ? 2.4 : 3;
+    const targetShadowRes = photorealBuildingsEnabled ?
+    getShadowPhotorealResolutionForTier() :
+    getShadowBaseResolutionForTier();
+    if (appCtx.sun.shadow.mapSize.width !== targetShadowRes || appCtx.sun.shadow.mapSize.height !== targetShadowRes) {
+      appCtx.sun.shadow.mapSize.width = targetShadowRes;
+      appCtx.sun.shadow.mapSize.height = targetShadowRes;
+      if (appCtx.sun.shadow.map && typeof appCtx.sun.shadow.map.dispose === 'function') {
+        appCtx.sun.shadow.map.dispose();
+      }
+      if (appCtx.sun.shadow.camera && typeof appCtx.sun.shadow.camera.updateProjectionMatrix === 'function') {
+        appCtx.sun.shadow.camera.updateProjectionMatrix();
+      }
+      appCtx.sun.shadow.needsUpdate = true;
+    }
+  }
+
+  if (appCtx.bloomPass) {
+    appCtx.bloomPass.strength = photorealBuildingsEnabled ? 0.18 : 0.15;
+    appCtx.bloomPass.radius = photorealBuildingsEnabled ? 0.35 : 0.4;
+    appCtx.bloomPass.threshold = photorealBuildingsEnabled ? 0.82 : 0.85;
+  }
 }
 
 function syncTextureGlobals() {
@@ -1602,6 +1658,7 @@ function init() {
   if (!setupPostProcessingPipeline()) {
     console.log('Post-processing skipped (GPU tier: ' + gpuTier + ')');
   }
+  applyPhotorealRenderProfile();
 
   // Create textures after Three.js is loaded
   try {
@@ -1709,6 +1766,7 @@ function init() {
 
   appCtx.ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
   appCtx.scene.add(appCtx.ambientLight);
+  applyPhotorealRenderProfile();
 
   // === ADD SUN VISUAL ===
   appCtx.sunSphere = new THREE.Mesh(

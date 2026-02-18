@@ -691,6 +691,194 @@ function createMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8ca0
   return mesh;
 }
 
+function isPhotorealBuildingsEnabled() {
+  if (typeof appCtx.getPhotorealBuildingsEnabled === 'function') {
+    return !!appCtx.getPhotorealBuildingsEnabled();
+  }
+  return !!appCtx.photorealBuildingsEnabled;
+}
+
+function getPhotorealDetailMaterials() {
+  if (appCtx._photorealDetailMaterials) return appCtx._photorealDetailMaterials;
+
+  const usePhysical = typeof THREE.MeshPhysicalMaterial === 'function';
+  const RoofClass = usePhysical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+  const FacadeClass = usePhysical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+  const UtilityClass = usePhysical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+
+  const roofMat = new RoofClass({
+    color: 0x2a3644,
+    roughness: 0.62,
+    metalness: 0.40,
+    envMapIntensity: 1.05,
+    clearcoat: usePhysical ? 0.22 : undefined,
+    clearcoatRoughness: usePhysical ? 0.42 : undefined
+  });
+
+  const trimMat = new FacadeClass({
+    color: 0x4a5d75,
+    roughness: 0.44,
+    metalness: 0.35,
+    envMapIntensity: 1.25,
+    clearcoat: usePhysical ? 0.30 : undefined,
+    clearcoatRoughness: usePhysical ? 0.30 : undefined
+  });
+
+  const utilityMat = new UtilityClass({
+    color: 0x5d6875,
+    roughness: 0.70,
+    metalness: 0.22,
+    envMapIntensity: 0.95,
+    clearcoat: usePhysical ? 0.10 : undefined,
+    clearcoatRoughness: usePhysical ? 0.55 : undefined
+  });
+
+  const antennaMat = new THREE.MeshStandardMaterial({
+    color: 0xd8dee8,
+    roughness: 0.35,
+    metalness: 0.82
+  });
+
+  appCtx._photorealDetailMaterials = {
+    roofMat,
+    trimMat,
+    utilityMat,
+    antennaMat
+  };
+  return appCtx._photorealDetailMaterials;
+}
+
+function addPhotorealBuildingDetailMeshes(mesh, bSeed, buildingType = 'yes', lodTier = 'near') {
+  if (!mesh || lodTier !== 'near' || !isPhotorealBuildingsEnabled()) return;
+  if (mesh.userData?.photorealDetailApplied) return;
+  if (!mesh.geometry) return;
+
+  const geo = mesh.geometry;
+  if (!geo.boundingBox) geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  if (!bb) return;
+
+  const minX = bb.min.x;
+  const maxX = bb.max.x;
+  const minY = bb.min.y;
+  const maxY = bb.max.y;
+  const minZ = bb.min.z;
+  const maxZ = bb.max.z;
+
+  const width = maxX - minX;
+  const depth = maxZ - minZ;
+  const height = maxY - minY;
+  if (!Number.isFinite(width) || !Number.isFinite(depth) || !Number.isFinite(height)) return;
+  if (width < 9 || depth < 9 || height < 8) return;
+
+  const centerX = (minX + maxX) * 0.5;
+  const centerZ = (minZ + maxZ) * 0.5;
+  const topY = maxY;
+  const area = width * depth;
+
+  const rng = typeof appCtx.seededRandom === 'function' ?
+  appCtx.seededRandom(((bSeed || 0) ^ 0x31fa6d) >>> 0) :
+  Math.random.bind(Math);
+  const mats = getPhotorealDetailMaterials();
+  const group = new THREE.Group();
+  group.userData.photorealBuildingDetail = true;
+
+  // Roof cap for stronger silhouette and reflected highlights.
+  const roofInset = Math.max(0.9, Math.min(width, depth) * 0.035);
+  const roofW = Math.max(2.2, width - roofInset * 2);
+  const roofD = Math.max(2.2, depth - roofInset * 2);
+  const roofThickness = Math.max(0.30, Math.min(1.4, height * 0.022));
+  const roofCap = new THREE.Mesh(
+    new THREE.BoxGeometry(roofW, roofThickness, roofD),
+    mats.roofMat
+  );
+  roofCap.position.set(centerX, topY + roofThickness * 0.5 + 0.04, centerZ);
+  roofCap.castShadow = true;
+  roofCap.receiveShadow = true;
+  group.add(roofCap);
+
+  // Parapet ring.
+  const parapetH = Math.max(0.55, Math.min(2.1, height * 0.032));
+  const parapetT = Math.max(0.22, Math.min(0.8, Math.min(width, depth) * 0.022));
+  const px = width * 0.5 - parapetT * 0.5;
+  const pz = depth * 0.5 - parapetT * 0.5;
+  const parapetY = topY + parapetH * 0.5 + roofThickness;
+  const parapets = [
+  { w: width, d: parapetT, x: centerX, z: centerZ - pz },
+  { w: width, d: parapetT, x: centerX, z: centerZ + pz },
+  { w: parapetT, d: depth - parapetT * 2, x: centerX - px, z: centerZ },
+  { w: parapetT, d: depth - parapetT * 2, x: centerX + px, z: centerZ }];
+
+  parapets.forEach((p) => {
+    if (p.w <= 0.1 || p.d <= 0.1) return;
+    const wall = new THREE.Mesh(new THREE.BoxGeometry(p.w, parapetH, p.d), mats.trimMat);
+    wall.position.set(p.x, parapetY, p.z);
+    wall.castShadow = true;
+    wall.receiveShadow = true;
+    group.add(wall);
+  });
+
+  // Facade bands break up flat elevations.
+  const bandCount = height > 55 ? 3 : height > 28 ? 2 : 1;
+  for (let i = 0; i < bandCount; i++) {
+    const t = bandCount === 1 ? 0.52 : (i + 1) / (bandCount + 1);
+    const bandY = minY + height * t;
+    const bandH = Math.max(0.16, Math.min(0.65, height * 0.0105));
+    const band = new THREE.Mesh(
+      new THREE.BoxGeometry(width * 1.01, bandH, depth * 1.01),
+      mats.trimMat
+    );
+    band.position.set(centerX, bandY, centerZ);
+    band.castShadow = false;
+    band.receiveShadow = true;
+    group.add(band);
+  }
+
+  // Roof mechanical units.
+  const unitCount = Math.max(1, Math.min(7, Math.floor(area / 170)));
+  const roofSafeW = Math.max(2, roofW - parapetT * 4);
+  const roofSafeD = Math.max(2, roofD - parapetT * 4);
+  const roofTopY = topY + roofThickness + 0.05;
+  for (let i = 0; i < unitCount; i++) {
+    const uw = 1.4 + rng() * Math.min(6.2, width * 0.20);
+    const ud = 1.2 + rng() * Math.min(5.4, depth * 0.20);
+    const uh = 0.8 + rng() * Math.min(2.8, height * 0.09);
+    const ux = centerX + (rng() * 2 - 1) * roofSafeW * 0.38;
+    const uz = centerZ + (rng() * 2 - 1) * roofSafeD * 0.38;
+    const unit = new THREE.Mesh(new THREE.BoxGeometry(uw, uh, ud), mats.utilityMat);
+    unit.position.set(ux, roofTopY + uh * 0.5, uz);
+    unit.castShadow = true;
+    unit.receiveShadow = true;
+    group.add(unit);
+  }
+
+  // Optional water tank/antenna for taller buildings.
+  const bt = String(buildingType || 'yes').toLowerCase();
+  if (height > 22 && bt !== 'house' && bt !== 'detached' && bt !== 'residential' && rng() > 0.45) {
+    const tankR = Math.max(0.5, Math.min(1.8, Math.min(width, depth) * 0.055));
+    const tankH = tankR * (1.5 + rng() * 1.1);
+    const tx = centerX + (rng() * 2 - 1) * roofSafeW * 0.25;
+    const tz = centerZ + (rng() * 2 - 1) * roofSafeD * 0.25;
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(tankR, tankR * 1.06, tankH, 16), mats.utilityMat);
+    tank.position.set(tx, roofTopY + tankH * 0.5, tz);
+    tank.castShadow = true;
+    tank.receiveShadow = true;
+    group.add(tank);
+  }
+
+  if (height > 34 && rng() > 0.58) {
+    const mastH = 3 + rng() * Math.min(9, height * 0.18);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.10, mastH, 10), mats.antennaMat);
+    mast.position.set(centerX + (rng() * 2 - 1) * roofSafeW * 0.12, roofTopY + mastH * 0.5, centerZ + (rng() * 2 - 1) * roofSafeD * 0.12);
+    mast.castShadow = true;
+    mast.receiveShadow = true;
+    group.add(mast);
+  }
+
+  mesh.add(group);
+  mesh.userData.photorealDetailApplied = true;
+}
+
 function batchMidLodBuildingMeshes() {
   if (!Array.isArray(appCtx.buildingMeshes) || appCtx.buildingMeshes.length === 0) return 0;
 
@@ -2291,6 +2479,10 @@ async function loadRoads(retryPass = 0) {
         if (lodTier === 'near') loadMetrics.lod.near += 1;else
         loadMetrics.lod.mid += 1;
 
+        if (lodTier === 'near') {
+          addPhotorealBuildingDetailMeshes(mesh, bSeed, bt, lodTier);
+        }
+
         // On steep terrain, add a terrain-conforming apron to hide
         // exposed flat foundation planes around the footprint.
         if (lodTier === 'near' && typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.7) {
@@ -2896,6 +3088,9 @@ async function loadRoads(retryPass = 0) {
           mesh.receiveShadow = true;
           appCtx.scene.add(mesh);
           appCtx.buildingMeshes.push(mesh);
+
+          const detailSeed = ((appCtx.rdtSeed || 0) ^ ((Math.floor(x * 100) * 73856093 ^ Math.floor(z * 100) * 19349663) >>> 0)) >>> 0;
+          addPhotorealBuildingDetailMeshes(mesh, detailSeed, 'fallback', 'near');
 
           if (typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.7) {
             const groundPatch = appCtx.createBuildingGroundPatch(pts, avgElevation);

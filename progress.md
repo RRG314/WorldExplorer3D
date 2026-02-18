@@ -439,3 +439,20 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `output/playwright/photoreal-visual-check/ingame-standard-enabled.png`
     - `output/playwright/photoreal-visual-check/errors.json` (empty)
   - Result: photoreal mode now produces clearly different, more reflective blue-glass high-rise facades vs baseline brick/flat mix.
+- Photoreal ultra pass (root runtime, 2026-02-18):
+  - `js/engine.js`
+    - Added `applyPhotorealRenderProfile()` and wired it into toggle + init lifecycle.
+    - Photoreal mode now adjusts exposure, fog, directional/fill/ambient lighting, bloom tuning, and dynamic shadow map resolution by GPU tier.
+    - Shadow map is rebuilt on mode transition to ensure quality uplift is actually applied at runtime.
+  - `js/world.js`
+    - Added photoreal near-LOD detail synthesis for buildings:
+      - roof caps, parapet rings, facade bands, rooftop mechanical units, optional tanks/antennas.
+    - Applied to OSM near LOD meshes and fallback synthetic city meshes using deterministic seeds.
+  - Deterministic validation artifacts:
+    - `output/playwright/photoreal-ultra-deterministic/report.json` (both variants pass, 0 errors)
+    - `output/playwright/photoreal-ultra-deterministic/photoreal-off-ingame.png`
+    - `output/playwright/photoreal-ultra-deterministic/photoreal-on-ingame.png`
+    - `output/playwright/photoreal-ultra-deterministic/photoreal-off-title.png`
+    - `output/playwright/photoreal-ultra-deterministic/photoreal-on-title.png`
+  - Skill-run artifact for traceability:
+    - `output/playwright/photoreal-ultra-skill-run/`
