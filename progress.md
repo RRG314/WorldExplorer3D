@@ -525,3 +525,54 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `output/playwright/roof-hvac-final-smoke/street.png`
     - `output/playwright/roof-hvac-final-smoke/topview.png`
     - `output/playwright/roof-hvac-final-smoke/errors.json` (empty)
+- Paint the Town Red game mode pass (2026-02-18):
+  - Added new title game mode option in both root and Firebase app entry HTML:
+    - `index.html` mode card `data-mode="painttown"`
+    - `public/app/index.html` mode card `data-mode="painttown"`
+  - Added mode wiring in UI state parsing + share-link parsing:
+    - `js/ui.js`, `public/app/js/ui.js`
+    - supports `gm=painttown` query mode
+    - toggles `appCtx.disableNearBuildingBatching` when entering runtime with paint mode selected
+    - hides new HUD element (`paintTownHud`) on main-menu return
+  - Added full Paint the Town Red runtime logic:
+    - `js/game.js`, `public/app/js/game.js`
+    - 60-second timer challenge
+    - click/tap while on a rooftop paints the active building red
+    - progress tracking against total loaded building count for current city
+    - in-game HUD (`#paintTownHud`) with timer/progress/hint text
+    - result modal summary at timeout (or 100% painted)
+    - restores original building materials/details on mode reset/exit
+  - Added per-building identity and roof base metadata in world loader:
+    - `js/world.js`, `public/app/js/world.js`
+    - collision records now carry `sourceBuildingId`, `buildingType`, `baseY`
+    - building meshes carry `userData.sourceBuildingId`
+    - near-building batching is skipped when `appCtx.disableNearBuildingBatching` is true (paint mode)
+    - added fallback synthetic building IDs for non-OSM fallback city generation
+
+- Validation (2026-02-18):
+  - Syntax checks passed:
+    - `node --check js/game.js`
+    - `node --check js/ui.js`
+    - `node --check js/world.js`
+    - `node --check public/app/js/game.js`
+    - `node --check public/app/js/ui.js`
+    - `node --check public/app/js/world.js`
+  - Skill client run:
+    - `output/playwright/paint-town-skill-run-title/shot-0.png`
+    - `output/playwright/paint-town-skill-run-title/state-0.json`
+  - Playwright DOM + gameplay checks:
+    - `output/playwright/paint-town-manual-check/report.json`
+    - `output/playwright/paint-town-manual-check/ingame-before-click.png`
+    - `output/playwright/paint-town-manual-check/ingame-after-click.png`
+    - `output/playwright/paint-town-roof-paint-check/report.json`
+    - `output/playwright/paint-town-roof-paint-check/after-roof-paint-click.png`
+  - Key pass criteria observed:
+    - Paint HUD appears in `painttown` mode.
+    - Ground click updates hint (`Get onto a roof first...`).
+    - Forced roof-position click paints a building and increments counter (`Painted: 1/...`).
+
+- Follow-up TODOs:
+  - Consider adding a small mode-only minimap heat overlay for painted vs unpainted footprint regions (optional UX enhancement).
+  - Consider weighted score multiplier for painting tall/high-complexity buildings.
+- Minor follow-up (2026-02-18):
+  - Added extra UI exclusion targets for paint click handling (`#minimap`, `#hud`, `#coords`) to avoid accidental paint-attempt feedback when interacting with HUD overlays.

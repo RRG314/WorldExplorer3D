@@ -1651,7 +1651,14 @@ async function loadRoads(retryPass = 0) {
   }
 
   // RDT complexity index: location-derived complexity used by adaptive mode.
-  appCtx.rdtSeed = appCtx.hashGeoToInt(appCtx.LOC.lat, appCtx.LOC.lon, appCtx.gameMode === 'trial' ? 1 : appCtx.gameMode === 'checkpoint' ? 2 : 0);
+  appCtx.rdtSeed = appCtx.hashGeoToInt(
+    appCtx.LOC.lat,
+    appCtx.LOC.lon,
+    appCtx.gameMode === 'trial' ? 1 :
+    appCtx.gameMode === 'checkpoint' ? 2 :
+    appCtx.gameMode === 'painttown' ? 3 :
+    0
+  );
   const sharedSeedOverrideRaw = Number(appCtx.sharedSeedOverride);
   if (Number.isFinite(sharedSeedOverrideRaw)) {
     appCtx.rdtSeed = (Math.floor(sharedSeedOverrideRaw) | 0) >>> 0;
@@ -1729,7 +1736,10 @@ async function loadRoads(retryPass = 0) {
       height,
       centerX,
       centerZ,
-      colliderDetail: detail
+      colliderDetail: detail,
+      sourceBuildingId: options.sourceBuildingId || null,
+      buildingType: options.buildingType || 'yes',
+      baseY: Number.isFinite(options.baseY) ? options.baseY : null
     };
     appCtx.buildings.push(building);
     addBuildingToSpatialIndex(building);
@@ -2238,8 +2248,16 @@ async function loadRoads(retryPass = 0) {
           height = 8 + br1 * 12;
         }
 
+        const bt = way.tags.building || 'yes';
+        const sourceBuildingId = way.id ? String(way.id) : `osm-${Math.round(centerX * 10)}-${Math.round(centerZ * 10)}`;
         const colliderDetail = useRdtBudgeting && lodTier !== 'near' ? 'bbox' : 'full';
-        registerBuildingCollision(pts, height, { detail: colliderDetail, centerX, centerZ });
+        const colliderRef = registerBuildingCollision(pts, height, {
+          detail: colliderDetail,
+          centerX,
+          centerZ,
+          sourceBuildingId,
+          buildingType: bt
+        });
         if (colliderDetail === 'full') loadMetrics.colliders.full += 1;else
         loadMetrics.colliders.simplified += 1;
 
@@ -2261,7 +2279,6 @@ async function loadRoads(retryPass = 0) {
         // Deterministic facade selection (matches original texture style)
         const colors = ['#888888', '#7788aa', '#998877', '#667788'];
         const baseColor = colors[Math.floor(br2 * colors.length)];
-        const bt = way.tags.building || 'yes';
         const shape = new THREE.Shape();
         pts.forEach((p, i) => {
           if (i === 0) shape.moveTo(p.x, -p.z);else
@@ -2282,10 +2299,14 @@ async function loadRoads(retryPass = 0) {
         mesh.userData.buildingFootprint = pts;
         mesh.userData.avgElevation = avgElevation;
         mesh.userData.lodTier = lodTier;
+        mesh.userData.sourceBuildingId = sourceBuildingId;
+        mesh.userData.buildingType = bt;
         mesh.castShadow = lodTier === 'near';
         mesh.receiveShadow = true;
+        if (colliderRef) {
+          colliderRef.baseY = avgElevation;
+        }
 
-        if (!mesh) return;
         appCtx.scene.add(mesh);
         appCtx.buildingMeshes.push(mesh);
         if (lodTier === 'near') loadMetrics.lod.near += 1;else
@@ -2308,7 +2329,7 @@ async function loadRoads(retryPass = 0) {
       });
       endLoadPhase('buildBuildingGeometry');
       startLoadPhase('batchBuildingGeometry');
-      const batchedNearCount = batchNearLodBuildingMeshes();
+      const batchedNearCount = appCtx.disableNearBuildingBatching ? 0 : batchNearLodBuildingMeshes();
       if (batchedNearCount > 0) {
         loadMetrics.lod.nearBatched = batchedNearCount;
       }
@@ -2854,14 +2875,18 @@ async function loadRoads(retryPass = 0) {
         makeRoad(-150, 150, 150, -150, 10); // Diagonal 2
 
         // Create a few simple buildings
-        const makeBuilding = (x, z, w, d, h) => {
+        const makeBuilding = (x, z, w, d, h, idx = 0) => {
           const pts = [
           { x: x - w / 2, z: z - d / 2 },
           { x: x + w / 2, z: z - d / 2 },
           { x: x + w / 2, z: z + d / 2 },
           { x: x - w / 2, z: z + d / 2 }];
 
-          registerBuildingCollision(pts, h);
+          const sourceBuildingId = `fallback-${idx}-${Math.round(x)}-${Math.round(z)}`;
+          const colliderRef = registerBuildingCollision(pts, h, {
+            sourceBuildingId,
+            buildingType: 'fallback'
+          });
 
           const shape = new THREE.Shape();
           shape.moveTo(pts[0].x, pts[0].z);
@@ -2891,6 +2916,9 @@ async function loadRoads(retryPass = 0) {
           mesh.position.y = avgElevation;
           mesh.userData.buildingFootprint = pts; // Store for repositioning
           mesh.userData.avgElevation = avgElevation;
+          mesh.userData.sourceBuildingId = sourceBuildingId;
+          mesh.userData.buildingType = 'fallback';
+          if (colliderRef) colliderRef.baseY = avgElevation;
 
           mesh.castShadow = true;
           mesh.receiveShadow = true;
@@ -2912,12 +2940,12 @@ async function loadRoads(retryPass = 0) {
         };
 
         // Add buildings around the crossroad
-        makeBuilding(-80, -80, 40, 30, 15);
-        makeBuilding(80, -80, 35, 40, 20);
-        makeBuilding(-80, 80, 45, 35, 18);
-        makeBuilding(80, 80, 30, 35, 12);
-        makeBuilding(-50, 50, 25, 20, 10);
-        makeBuilding(50, -50, 30, 25, 14);
+        makeBuilding(-80, -80, 40, 30, 15, 0);
+        makeBuilding(80, -80, 35, 40, 20, 1);
+        makeBuilding(-80, 80, 45, 35, 18, 2);
+        makeBuilding(80, 80, 30, 35, 12, 3);
+        makeBuilding(-50, 50, 25, 20, 10, 4);
+        makeBuilding(50, -50, 30, 25, 14, 5);
 
         finalizeLoadedWorld('synthetic_fallback');
       }

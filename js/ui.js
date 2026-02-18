@@ -473,7 +473,7 @@ function setupUI() {
       return 'earth';
     };
     const normalizeGameMode = (value) => {
-      if (value === 'trial' || value === 'checkpoint') return value;
+      if (value === 'trial' || value === 'checkpoint' || value === 'painttown') return value;
       return value === 'free' ? 'free' : null;
     };
     const normalizeTravelMode = (value) => {
@@ -1041,7 +1041,7 @@ function setupUI() {
 
   // Optional share-link payload: seed/location/mode/camera from URL query.
   if (sharedExperienceParams) {
-    const validGameModes = new Set(['free', 'trial', 'checkpoint']);
+    const validGameModes = new Set(['free', 'trial', 'checkpoint', 'painttown']);
     if (sharedExperienceParams.gameMode && validGameModes.has(sharedExperienceParams.gameMode)) {
       appCtx.gameMode = sharedExperienceParams.gameMode;
       const targetModeEl = document.querySelector(`.mode[data-mode="${sharedExperienceParams.gameMode}"]`);
@@ -1145,6 +1145,7 @@ function setupUI() {
     appCtx.gameStarted = true;
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     appCtx.switchEnv(appCtx.ENV.EARTH);
+    appCtx.disableNearBuildingBatching = appCtx.gameMode === 'painttown';
 
     // Show exploration mode message
     const explorationMsg = document.getElementById('explorationModeMsg');
@@ -1664,7 +1665,7 @@ function setupUI() {
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
     document.getElementById('titleScreen').classList.remove('hidden');
     if (typeof appCtx.closeFlowerChallengeTitlePanel === 'function') appCtx.closeFlowerChallengeTitlePanel();
-    ['hud', 'minimap', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'flowerChallengeHud', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
+    ['hud', 'minimap', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'flowerChallengeHud', 'paintTownHud', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('show');
     });
@@ -2021,7 +2022,13 @@ function setupUI() {
   document.getElementById('menuBtn').addEventListener('click', () => goToMainMenu());
   document.getElementById('caughtBtn').addEventListener('click', () => {document.getElementById('caughtScreen').classList.remove('show');appCtx.policeHits = 0;appCtx.paused = false;document.getElementById('police').textContent = '💔 0/3';appCtx.spawnOnRoad();});
   document.getElementById('againBtn').addEventListener('click', () => {appCtx.hideResult();appCtx.paused = false;appCtx.startMode();});
-  document.getElementById('freeBtn').addEventListener('click', () => {appCtx.hideResult();appCtx.paused = false;appCtx.gameMode = 'free';appCtx.clearObjectives();});
+  document.getElementById('freeBtn').addEventListener('click', () => {
+    appCtx.hideResult();
+    appCtx.paused = false;
+    appCtx.gameMode = 'free';
+    appCtx.disableNearBuildingBatching = false;
+    appCtx.clearObjectives();
+  });
   document.getElementById('resMenuBtn').addEventListener('click', () => {appCtx.hideResult();goToMainMenu();});
 
   // Map controls
