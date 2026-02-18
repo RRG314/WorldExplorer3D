@@ -595,3 +595,34 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Screens:
     - `output/playwright/paint-town-final-check/title-games-tab.png`
     - `output/playwright/paint-town-final-check/painttown-runtime.png`
+- Paint mode + moon physics + block collision pass (2026-02-18):
+  - `js/physics.js` (+ mirrored `public/app/js/physics.js`):
+    - Paint mode timer/updates now continue while in drone and walking modes by calling `updateMode(dt)` before early returns.
+    - Moon car tuning adjusted for less bounce and better launch traction:
+      - stronger low-speed throttle response,
+      - reduced over-sensitive airborne triggers,
+      - stronger ground follow smoothing,
+      - higher effective gravity for vehicle airborne arc (`MOON_CAR_GRAVITY`).
+    - Added car-vs-build-block collision sampling using `getBuildCollisionAtWorldXZ(...)` so cars cannot drive through placed blocks.
+  - `js/blocks.js` (+ mirrored `public/app/js/blocks.js`):
+    - Added terrain mesh targets (`terrainGroup.children`) to block placement raycast so grass/terrain clicks resolve at true clicked world points.
+  - `js/walking.js` (+ mirrored `public/app/js/walking.js`):
+    - Build blocks made non-solid for walker movement (no block collision blocking, no standing-on-block override), matching requested walk-through behavior.
+  - Next: run syntax checks + Playwright smoke focused on Paint the Town Red, moon driving feel, terrain block placement, and car/build-block collision.
+- Follow-up validation + stabilization (2026-02-18):
+  - Verified paint-mode countdown now updates in walking mode after physics update-loop patch.
+  - Verified rooftop landing paint trigger works after teleport-to-roof check (painted count increments).
+  - Verified block placement on terrain/grass uses terrain ray hit and places near clicked point (grid-quantized error ~0.50 units).
+  - Verified car is blocked by placed blocks while walker can pass through the same blocks.
+  - Verified moon driving tuning: stronger initial acceleration and reduced bounce/airtime (no runaway airborne behavior during sample drive).
+- Consolidated validation artifacts:
+  - Report: `output/playwright/paint-moon-block-fix-check-v2/report.json` (`pass: true`, `errorCount: 0`)
+  - Screens:
+    - `output/playwright/paint-moon-block-fix-check-v2/painttown-initial.png`
+    - `output/playwright/paint-moon-block-fix-check-v2/painttown-after-roof-teleport.png`
+    - `output/playwright/paint-moon-block-fix-check-v2/block-placement-after-click.png`
+    - `output/playwright/paint-moon-block-fix-check-v2/car-walker-block-check.png`
+    - `output/playwright/paint-moon-block-fix-check-v2/moon-driving-check.png`
+- Skill client rerun:
+  - `output/playwright/paint-moon-block-fix-skill-run-2/`
+  - Captures remain black in this environment with the generic web-game client (known canvas-capture limitation), so direct Playwright screenshots/report above were used as source-of-truth validation.

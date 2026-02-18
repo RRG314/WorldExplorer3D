@@ -588,18 +588,7 @@ function createWalkingModule(opts) {
       }
     }
 
-    // Stand on top of placed build blocks (persistent brick builder).
-    if (typeof appCtx.getBuildTopSurfaceAtWorldXZ === 'function') {
-      const feetY = state.walker.y - CFG.eyeHeight;
-      const topY = appCtx.getBuildTopSurfaceAtWorldXZ(
-        state.walker.x,
-        state.walker.z,
-        feetY + CFG.blockStepHeight
-      );
-      if (Number.isFinite(topY) && topY > effectiveGroundY) {
-        effectiveGroundY = topY;
-      }
-    }
+    // Build blocks are intentionally non-solid for walking mode.
 
     // Check if on ground (with small tolerance)
     state.walker.onGround = Math.abs(state.walker.y - (effectiveGroundY + CFG.eyeHeight)) < 0.3;
@@ -659,7 +648,7 @@ function createWalkingModule(opts) {
 
       // Collision against buildings and user-placed build blocks.
       const checkBuildings = !appCtx.onMoon && (getBuildingsArray || getNearbyBuildings);
-      const checkBuildBlocks = typeof appCtx.getBuildCollisionAtWorldXZ === 'function';
+      const checkBuildBlocks = false;
       if (checkBuildings || checkBuildBlocks) {
         const allBuildings = checkBuildings ? queryBuildings(newX, newZ, 32) || [] : [];
         const walkerFeetY = state.walker.y - CFG.eyeHeight;
@@ -686,11 +675,6 @@ function createWalkingModule(opts) {
               isInsideBuilding(px, pz, b);
               if (inside) return true;
             }
-          }
-
-          if (checkBuildBlocks) {
-            const blockCollision = appCtx.getBuildCollisionAtWorldXZ(px, pz, walkerFeetY, CFG.blockStepHeight);
-            if (blockCollision && blockCollision.blocked) return true;
           }
 
           return false;

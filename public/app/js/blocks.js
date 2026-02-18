@@ -686,6 +686,11 @@ function raycastBuildAction(event) {
       if (mesh && mesh.visible) worldTargets.push(mesh);
     });
   }
+  if (appCtx.terrainGroup && Array.isArray(appCtx.terrainGroup.children)) {
+    appCtx.terrainGroup.children.forEach((mesh) => {
+      if (mesh && mesh.visible) worldTargets.push(mesh);
+    });
+  }
   if (appCtx.onMoon && appCtx.moonSurface && appCtx.moonSurface.visible !== false) {
     worldTargets.push(appCtx.moonSurface);
   }
