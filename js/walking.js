@@ -588,7 +588,18 @@ function createWalkingModule(opts) {
       }
     }
 
-    // Build blocks are intentionally non-solid for walking mode.
+    // Stand on top of placed build blocks (persistent brick builder).
+    if (typeof appCtx.getBuildTopSurfaceAtWorldXZ === 'function') {
+      const feetY = state.walker.y - CFG.eyeHeight;
+      const topY = appCtx.getBuildTopSurfaceAtWorldXZ(
+        state.walker.x,
+        state.walker.z,
+        feetY + CFG.blockStepHeight
+      );
+      if (Number.isFinite(topY) && topY > effectiveGroundY) {
+        effectiveGroundY = topY;
+      }
+    }
 
     // Check if on ground (with small tolerance)
     state.walker.onGround = Math.abs(state.walker.y - (effectiveGroundY + CFG.eyeHeight)) < 0.3;
@@ -648,32 +659,57 @@ function createWalkingModule(opts) {
 
       // Collision against buildings and user-placed build blocks.
       const checkBuildings = !appCtx.onMoon && (getBuildingsArray || getNearbyBuildings);
-      const checkBuildBlocks = false;
+      const checkBuildBlocks = typeof appCtx.getBuildCollisionAtWorldXZ === 'function';
       if (checkBuildings || checkBuildBlocks) {
         const allBuildings = checkBuildings ? queryBuildings(newX, newZ, 32) || [] : [];
         const walkerFeetY = state.walker.y - CFG.eyeHeight;
+        const sampleRadius = 0.28;
+        const collisionSamples = [
+          [0, 0],
+          [sampleRadius, 0],
+          [-sampleRadius, 0],
+          [0, sampleRadius],
+          [0, -sampleRadius]
+        ];
 
         function isBlockedByWorld(px, pz) {
-          if (checkBuildings) {
-            for (let i = 0; i < allBuildings.length; i++) {
-              const b = allBuildings[i];
-              if (px < b.minX || px > b.maxX || pz < b.minZ || pz > b.maxZ) continue;
+          for (let s = 0; s < collisionSamples.length; s++) {
+            const sample = collisionSamples[s];
+            const sx = px + sample[0];
+            const sz = pz + sample[1];
 
-              let bTerrainY = 0;
-              if (typeof appCtx.terrainMeshHeightAt === 'function') {
-                bTerrainY = appCtx.terrainMeshHeightAt(px, pz);
-              } else if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
-                bTerrainY = appCtx.elevationWorldYAtWorldXZ(px, pz);
+            if (checkBuildings) {
+              for (let i = 0; i < allBuildings.length; i++) {
+                const b = allBuildings[i];
+                if (sx < b.minX || sx > b.maxX || sz < b.minZ || sz > b.maxZ) continue;
+
+                let bTerrainY = 0;
+                if (typeof appCtx.terrainMeshHeightAt === 'function') {
+                  bTerrainY = appCtx.terrainMeshHeightAt(sx, sz);
+                } else if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
+                  bTerrainY = appCtx.elevationWorldYAtWorldXZ(sx, sz);
+                }
+                const roofY = bTerrainY + b.height;
+
+                // Allow if walker is at or above roof level (can walk on roof or land on it)
+                if (walkerFeetY >= roofY - 1.0) continue;
+
+                const inside = isPointInPolygon && b.pts && b.pts.length > 0 ?
+                isPointInPolygon(sx, sz, b.pts) :
+                isInsideBuilding(sx, sz, b);
+                if (inside) return true;
               }
-              const roofY = bTerrainY + b.height;
+            }
 
-              // Allow if walker is at or above roof level (can walk on roof or land on it)
-              if (walkerFeetY >= roofY - 1.0) continue;
-
-              const inside = isPointInPolygon && b.pts && b.pts.length > 0 ?
-              isPointInPolygon(px, pz, b.pts) :
-              isInsideBuilding(px, pz, b);
-              if (inside) return true;
+            if (checkBuildBlocks) {
+              const blockCollision = appCtx.getBuildCollisionAtWorldXZ(
+                sx,
+                sz,
+                walkerFeetY,
+                CFG.blockStepHeight,
+                CFG.eyeHeight * 0.95
+              );
+              if (blockCollision && blockCollision.blocked) return true;
             }
           }
 

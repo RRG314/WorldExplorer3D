@@ -655,3 +655,21 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Screens:
     - `output/playwright/landing-gameplay-gallery-check/landing-gameplay-top.png`
     - `output/playwright/landing-gameplay-gallery-check/landing-gameplay-scrolled.png`
+- Root landing + walker block solidity hotfix (2026-02-18):
+  - `index.html` (repo root): replaced runtime HTML with immediate redirect to `./public/index.html` so opening `/` shows the Firebase landing page.
+  - Restored walker/block solidity + standing behavior in:
+    - `js/walking.js`
+    - `public/app/js/walking.js`
+  - Extended block collision volume checks in:
+    - `js/blocks.js`
+    - `public/app/js/blocks.js`
+    - `getBuildCollisionAtWorldXZ(...)` now supports `bodyHeight` and uses full actor vertical volume checks (not feet-only), preventing torso-level pass-through.
+- Validation:
+  - `output/playwright/root-landing-and-block-walk-check-v2/report.json`
+    - landing root title present + `Gameplay` heading true
+    - walker blocked by 2-high block wall (`blocked=true`)
+    - walker remains standing on block top (`standStable=true`, `onGround=true`)
+    - `errorCount=0`
+  - Screens:
+    - `output/playwright/root-landing-and-block-walk-check-v2/root-landing.png`
+    - `output/playwright/root-landing-and-block-walk-check-v2/app-block-test.png`
