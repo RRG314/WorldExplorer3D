@@ -513,3 +513,15 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `output/playwright/roof-hvac-fix-deterministic/topview-2.png`
     - `output/playwright/roof-hvac-fix-deterministic/errors.json` (empty)
     - `output/playwright/roof-hvac-sparsity-skill-run/`
+- Procedural texture determinism cleanup (2026-02-18):
+  - `js/engine.js`:
+    - Replaced mixed `Math.random()` calls with seeded `rng()` in:
+      - `createProceduralGrassTexture`
+      - `createPavementTexture`
+      - `createPavementNormalMap`
+      - `createPavementRoughnessMap`
+    - Removes dead/unused seeded RNG setup and keeps RDT world texture generation reproducible.
+  - Validation artifacts:
+    - `output/playwright/roof-hvac-final-smoke/street.png`
+    - `output/playwright/roof-hvac-final-smoke/topview.png`
+    - `output/playwright/roof-hvac-final-smoke/errors.json` (empty)

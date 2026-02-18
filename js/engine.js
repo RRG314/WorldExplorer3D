@@ -493,6 +493,7 @@ function createProceduralGrassTexture() {
   const canvas = document.createElement('canvas');
   canvas.width = size;canvas.height = size;
   const ctx = canvas.getContext('2d');
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0x6A551A) : Math.random.bind(Math);
 
   // Strong green base - unmistakably grass
   ctx.fillStyle = '#3a6b22';
@@ -500,40 +501,40 @@ function createProceduralGrassTexture() {
 
   // Layer 1: Earthy undertone patches (dirt showing through)
   for (let i = 0; i < 150; i++) {
-    const x = Math.random() * size,y = Math.random() * size;
-    const b = 55 + Math.random() * 40;
-    ctx.fillStyle = `rgba(${b + 25}, ${b + 15}, ${b - 5}, ${0.08 + Math.random() * 0.1})`;
+    const x = rng() * size,y = rng() * size;
+    const b = 55 + rng() * 40;
+    ctx.fillStyle = `rgba(${b + 25}, ${b + 15}, ${b - 5}, ${0.08 + rng() * 0.1})`;
     ctx.beginPath();
-    ctx.ellipse(x, y, 4 + Math.random() * 12, 3 + Math.random() * 8, Math.random() * Math.PI, 0, Math.PI * 2);
+    ctx.ellipse(x, y, 4 + rng() * 12, 3 + rng() * 8, rng() * Math.PI, 0, Math.PI * 2);
     ctx.fill();
   }
 
   // Layer 2: Dark green grass clumps (shadow areas)
   for (let i = 0; i < 2000; i++) {
-    const x = Math.random() * size,y = Math.random() * size;
-    const g = 60 + Math.random() * 40;
-    ctx.fillStyle = `rgba(${20 + Math.random() * 20}, ${g}, ${5 + Math.random() * 15}, 0.3)`;
+    const x = rng() * size,y = rng() * size;
+    const g = 60 + rng() * 40;
+    ctx.fillStyle = `rgba(${20 + rng() * 20}, ${g}, ${5 + rng() * 15}, 0.3)`;
     ctx.beginPath();
-    ctx.ellipse(x, y, 1 + Math.random() * 3, 0.5 + Math.random() * 1.5, Math.random() * Math.PI, 0, Math.PI * 2);
+    ctx.ellipse(x, y, 1 + rng() * 3, 0.5 + rng() * 1.5, rng() * Math.PI, 0, Math.PI * 2);
     ctx.fill();
   }
 
   // Layer 3: Grass blades - clearly visible green strokes
   ctx.lineCap = 'round';
   for (let i = 0; i < 6000; i++) {
-    const x = Math.random() * size,y = Math.random() * size;
-    const g = 100 + Math.random() * 90;
-    const r = 25 + Math.random() * 45;
-    const b = 5 + Math.random() * 20;
-    const alpha = 0.3 + Math.random() * 0.5;
+    const x = rng() * size,y = rng() * size;
+    const g = 100 + rng() * 90;
+    const r = 25 + rng() * 45;
+    const b = 5 + rng() * 20;
+    const alpha = 0.3 + rng() * 0.5;
     ctx.strokeStyle = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-    ctx.lineWidth = 0.5 + Math.random() * 1.2;
-    const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.6;
-    const len = 3 + Math.random() * 8;
+    ctx.lineWidth = 0.5 + rng() * 1.2;
+    const angle = -Math.PI / 2 + (rng() - 0.5) * 0.6;
+    const len = 3 + rng() * 8;
     ctx.beginPath();
     ctx.moveTo(x, y);
     ctx.quadraticCurveTo(
-      x + Math.cos(angle) * len * 0.5 + (Math.random() - 0.5) * 2,
+      x + Math.cos(angle) * len * 0.5 + (rng() - 0.5) * 2,
       y + Math.sin(angle) * len * 0.5,
       x + Math.cos(angle) * len,
       y + Math.sin(angle) * len
@@ -543,9 +544,9 @@ function createProceduralGrassTexture() {
 
   // Layer 4: Bright highlights on grass tips
   for (let i = 0; i < 2000; i++) {
-    const x = Math.random() * size,y = Math.random() * size;
-    ctx.fillStyle = `rgba(${70 + Math.random() * 50}, ${150 + Math.random() * 80}, ${20 + Math.random() * 30}, ${0.15 + Math.random() * 0.25})`;
-    ctx.fillRect(x, y, 1, 1 + Math.random());
+    const x = rng() * size,y = rng() * size;
+    ctx.fillStyle = `rgba(${70 + rng() * 50}, ${150 + rng() * 80}, ${20 + rng() * 30}, ${0.15 + rng() * 0.25})`;
+    ctx.fillRect(x, y, 1, 1 + rng());
   }
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -867,8 +868,8 @@ function createPavementTexture() {
 
   // Concrete grain
   for (let i = 0; i < 10000; i++) {
-    const x = Math.random() * size,y = Math.random() * size;
-    const b = 140 + Math.random() * 60;
+    const x = rng() * size,y = rng() * size;
+    const b = 140 + rng() * 60;
     ctx.fillStyle = `rgba(${b + 5}, ${b}, ${b - 5}, 0.12)`;
     ctx.fillRect(x, y, 1, 1);
   }
@@ -885,10 +886,10 @@ function createPavementTexture() {
 
   // Subtle stains/weathering
   for (let i = 0; i < 40; i++) {
-    const x = Math.random() * size,y = Math.random() * size;
-    ctx.fillStyle = `rgba(${80 + Math.random() * 40}, ${75 + Math.random() * 40}, ${70 + Math.random() * 40}, ${0.04 + Math.random() * 0.06})`;
+    const x = rng() * size,y = rng() * size;
+    ctx.fillStyle = `rgba(${80 + rng() * 40}, ${75 + rng() * 40}, ${70 + rng() * 40}, ${0.04 + rng() * 0.06})`;
     ctx.beginPath();
-    ctx.ellipse(x, y, 5 + Math.random() * 20, 3 + Math.random() * 10, Math.random() * Math.PI, 0, Math.PI * 2);
+    ctx.ellipse(x, y, 5 + rng() * 20, 3 + rng() * 10, rng() * Math.PI, 0, Math.PI * 2);
     ctx.fill();
   }
 
@@ -903,6 +904,7 @@ function createPavementNormalMap() {
   const canvas = document.createElement('canvas');
   canvas.width = size;canvas.height = size;
   const ctx = canvas.getContext('2d');
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xDA7F) : Math.random.bind(Math);
 
   ctx.fillStyle = '#8080ff';
   ctx.fillRect(0, 0, size, size);
@@ -923,9 +925,9 @@ function createPavementNormalMap() {
 
   // Surface micro-bumps
   for (let i = 0; i < 3000; i++) {
-    const x = Math.random() * size,y = Math.random() * size;
-    ctx.fillStyle = `rgb(${123 + Math.random() * 14}, ${123 + Math.random() * 14}, ${240 + Math.random() * 15})`;
-    ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+    const x = rng() * size,y = rng() * size;
+    ctx.fillStyle = `rgb(${123 + rng() * 14}, ${123 + rng() * 14}, ${240 + rng() * 15})`;
+    ctx.fillRect(x, y, 1 + rng() * 2, 1 + rng() * 2);
   }
 
   const texture = new THREE.CanvasTexture(canvas);
@@ -938,16 +940,17 @@ function createPavementRoughnessMap() {
   const canvas = document.createElement('canvas');
   canvas.width = size;canvas.height = size;
   const ctx = canvas.getContext('2d');
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xDA80) : Math.random.bind(Math);
 
   // Concrete is moderately rough
   ctx.fillStyle = '#c8c8c8';
   ctx.fillRect(0, 0, size, size);
 
   for (let i = 0; i < 2000; i++) {
-    const x = Math.random() * size,y = Math.random() * size;
-    const b = 170 + Math.random() * 60;
+    const x = rng() * size,y = rng() * size;
+    const b = 170 + rng() * 60;
     ctx.fillStyle = `rgb(${b}, ${b}, ${b})`;
-    ctx.fillRect(x, y, 1 + Math.random() * 2, 1 + Math.random() * 2);
+    ctx.fillRect(x, y, 1 + rng() * 2, 1 + rng() * 2);
   }
 
   const texture = new THREE.CanvasTexture(canvas);
