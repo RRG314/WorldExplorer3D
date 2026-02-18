@@ -853,6 +853,35 @@ function buildPhotorealRoofTexture(styleId, toneBucket, bSeed) {
   return tex;
 }
 
+function getBuildingRoofMaterial(bSeed, buildingType, forcePhotoreal = isPhotorealBuildingsEnabled()) {
+  if (!appCtx._buildingRoofMaterialCache) appCtx._buildingRoofMaterialCache = new Map();
+
+  const styleRand = appCtx.rand01FromInt(((bSeed || 0) ^ 0x73af2d) >>> 0);
+  const toneRand = appCtx.rand01FromInt(((bSeed || 0) ^ 0x15b4c3) >>> 0);
+  const roofStyle = chooseRoofStyle(buildingType, styleRand);
+  const toneBucket = Math.floor(toneRand * 5);
+  const cacheKey = `${forcePhotoreal ? 'photoreal' : 'standard'}-${roofStyle}-${toneBucket}`;
+  if (appCtx._buildingRoofMaterialCache.has(cacheKey)) {
+    return appCtx._buildingRoofMaterialCache.get(cacheKey);
+  }
+
+  const profile = roofStyleProfile(roofStyle);
+  const roofTex = buildPhotorealRoofTexture(roofStyle, toneBucket, bSeed);
+  const usePhysical = forcePhotoreal && typeof THREE.MeshPhysicalMaterial === 'function';
+  const RoofClass = usePhysical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+  const roofMat = new RoofClass({
+    color: new THREE.Color(profile.baseColor).offsetHSL(0, 0, (toneBucket - 2) * 0.028),
+    map: roofTex,
+    roughness: profile.roughness + (forcePhotoreal ? 0.0 : 0.03),
+    metalness: forcePhotoreal ? profile.metalness : Math.min(profile.metalness, 0.10),
+    envMapIntensity: forcePhotoreal ? profile.envMapIntensity : Math.min(profile.envMapIntensity, 0.42),
+    clearcoat: usePhysical ? profile.clearcoat : undefined,
+    clearcoatRoughness: usePhysical ? profile.clearcoatRoughness : undefined
+  });
+  appCtx._buildingRoofMaterialCache.set(cacheKey, roofMat);
+  return roofMat;
+}
+
 function getPhotorealDetailMaterials(bSeed, buildingType) {
   if (!appCtx._photorealDetailMaterialCache) appCtx._photorealDetailMaterialCache = new Map();
 
@@ -865,32 +894,8 @@ function getPhotorealDetailMaterials(bSeed, buildingType) {
     return appCtx._photorealDetailMaterialCache.get(cacheKey);
   }
 
-  const profile = roofStyleProfile(roofStyle);
-  const roofTex = buildPhotorealRoofTexture(roofStyle, toneBucket, bSeed);
-
   const usePhysical = typeof THREE.MeshPhysicalMaterial === 'function';
-  const RoofClass = usePhysical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
-  const FacadeClass = usePhysical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
   const UtilityClass = usePhysical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
-
-  const roofMat = new RoofClass({
-    color: new THREE.Color(profile.baseColor).offsetHSL(0, 0, (toneBucket - 2) * 0.028),
-    map: roofTex,
-    roughness: profile.roughness,
-    metalness: profile.metalness,
-    envMapIntensity: profile.envMapIntensity,
-    clearcoat: usePhysical ? profile.clearcoat : undefined,
-    clearcoatRoughness: usePhysical ? profile.clearcoatRoughness : undefined
-  });
-
-  const trimMat = new FacadeClass({
-    color: new THREE.Color(0x5b6574).offsetHSL(0, 0, (toneBucket - 2) * 0.018),
-    roughness: 0.72,
-    metalness: 0.12,
-    envMapIntensity: 0.55,
-    clearcoat: usePhysical ? 0.05 : undefined,
-    clearcoatRoughness: usePhysical ? 0.75 : undefined
-  });
 
   const utilityMat = new UtilityClass({
     color: new THREE.Color(0x697380).offsetHSL(0, 0, (toneBucket - 2) * 0.022),
@@ -907,7 +912,11 @@ function getPhotorealDetailMaterials(bSeed, buildingType) {
     metalness: 0.80
   });
 
-  const materialSet = { roofMat, trimMat, utilityMat, antennaMat };
+  const materialSet = {
+    roofMat: getBuildingRoofMaterial(bSeed, buildingType, true),
+    utilityMat,
+    antennaMat
+  };
   appCtx._photorealDetailMaterialCache.set(cacheKey, materialSet);
   return materialSet;
 }
@@ -947,62 +956,13 @@ function addPhotorealBuildingDetailMeshes(mesh, bSeed, buildingType = 'yes', lod
   const group = new THREE.Group();
   group.userData.photorealBuildingDetail = true;
 
-  // Keep roof coverage almost full so the base facade material does not read as glass on top faces.
-  const roofInset = Math.max(0.08, Math.min(0.35, Math.min(width, depth) * 0.012));
-  const roofW = Math.max(2.2, width - roofInset * 2);
-  const roofD = Math.max(2.2, depth - roofInset * 2);
-  const roofThickness = Math.max(0.30, Math.min(1.4, height * 0.022));
-  const roofCap = new THREE.Mesh(
-    new THREE.BoxGeometry(roofW, roofThickness, roofD),
-    mats.roofMat
-  );
-  roofCap.position.set(centerX, topY + roofThickness * 0.5 + 0.04, centerZ);
-  roofCap.castShadow = true;
-  roofCap.receiveShadow = true;
-  group.add(roofCap);
-
-  // Parapet ring.
-  const parapetH = Math.max(0.55, Math.min(2.1, height * 0.032));
-  const parapetT = Math.max(0.22, Math.min(0.8, Math.min(width, depth) * 0.022));
-  const px = width * 0.5 - parapetT * 0.5;
-  const pz = depth * 0.5 - parapetT * 0.5;
-  const parapetY = topY + parapetH * 0.5 + roofThickness;
-  const parapets = [
-  { w: width, d: parapetT, x: centerX, z: centerZ - pz },
-  { w: width, d: parapetT, x: centerX, z: centerZ + pz },
-  { w: parapetT, d: depth - parapetT * 2, x: centerX - px, z: centerZ },
-  { w: parapetT, d: depth - parapetT * 2, x: centerX + px, z: centerZ }];
-
-  parapets.forEach((p) => {
-    if (p.w <= 0.1 || p.d <= 0.1) return;
-    const wall = new THREE.Mesh(new THREE.BoxGeometry(p.w, parapetH, p.d), mats.trimMat);
-    wall.position.set(p.x, parapetY, p.z);
-    wall.castShadow = true;
-    wall.receiveShadow = true;
-    group.add(wall);
-  });
-
-  // Facade bands break up flat elevations.
-  const bandCount = height > 55 ? 3 : height > 28 ? 2 : 1;
-  for (let i = 0; i < bandCount; i++) {
-    const t = bandCount === 1 ? 0.52 : (i + 1) / (bandCount + 1);
-    const bandY = minY + height * t;
-    const bandH = Math.max(0.16, Math.min(0.65, height * 0.0105));
-    const band = new THREE.Mesh(
-      new THREE.BoxGeometry(width * 1.01, bandH, depth * 1.01),
-      mats.trimMat
-    );
-    band.position.set(centerX, bandY, centerZ);
-    band.castShadow = false;
-    band.receiveShadow = true;
-    group.add(band);
-  }
-
   // Roof mechanical units.
+  const roofW = Math.max(2.2, width - 1.0);
+  const roofD = Math.max(2.2, depth - 1.0);
   const unitCount = Math.max(1, Math.min(7, Math.floor(area / 170)));
-  const roofSafeW = Math.max(2, roofW - parapetT * 4);
-  const roofSafeD = Math.max(2, roofD - parapetT * 4);
-  const roofTopY = topY + roofThickness + 0.05;
+  const roofSafeW = Math.max(2, roofW - 1.2);
+  const roofSafeD = Math.max(2, roofD - 1.2);
+  const roofTopY = topY + 0.08;
   for (let i = 0; i < unitCount; i++) {
     const uw = 1.4 + rng() * Math.min(6.2, width * 0.20);
     const ud = 1.2 + rng() * Math.min(5.4, depth * 0.20);
@@ -2621,15 +2581,22 @@ async function loadRoads(retryPass = 0) {
         });
         shape.closePath();
 
-        const extrudeSettings = { depth: height, bevelEnabled: false };
+        const extrudeSettings = {
+          depth: height,
+          bevelEnabled: false,
+          // material 0 => caps (roof/floor), material 1 => side walls
+          material: 0,
+          extrudeMaterial: 1
+        };
         const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
         geo.rotateX(-Math.PI / 2);
 
-        const bldgMat = typeof appCtx.getBuildingMaterial === 'function' ?
+        const sideMaterial = typeof appCtx.getBuildingMaterial === 'function' ?
         appCtx.getBuildingMaterial(bt, bSeed, baseColor) :
         new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.85, metalness: 0.05 });
+        const roofMaterial = getBuildingRoofMaterial(bSeed, bt, isPhotorealBuildingsEnabled());
 
-        const mesh = new THREE.Mesh(geo, bldgMat);
+        const mesh = new THREE.Mesh(geo, [roofMaterial, sideMaterial]);
         mesh.position.y = avgElevation;
         mesh.userData.buildingFootprint = pts;
         mesh.userData.avgElevation = avgElevation;
@@ -3224,11 +3191,21 @@ async function loadRoads(retryPass = 0) {
           for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i].x, pts[i].z);
           shape.lineTo(pts[0].x, pts[0].z);
 
-          const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
+          const geo = new THREE.ExtrudeGeometry(shape, {
+            depth: h,
+            bevelEnabled: false,
+            material: 0,
+            extrudeMaterial: 1
+          });
           geo.rotateX(-Math.PI / 2);
-          const color = [0x8899aa, 0x887766, 0x7788aa, 0x887799][Math.floor(Math.random() * 4)];
-          const mat = new THREE.MeshLambertMaterial({ color });
-          const mesh = new THREE.Mesh(geo, mat);
+          const colorPalette = ['#8899aa', '#887766', '#7788aa', '#887799'];
+          const detailSeed = ((appCtx.rdtSeed || 0) ^ ((Math.floor(x * 100) * 73856093 ^ Math.floor(z * 100) * 19349663) >>> 0)) >>> 0;
+          const color = colorPalette[Math.floor(appCtx.rand01FromInt(detailSeed ^ 0x91ac7) * colorPalette.length)];
+          const sideMaterial = typeof appCtx.getBuildingMaterial === 'function' ?
+          appCtx.getBuildingMaterial('fallback', detailSeed, color) :
+          new THREE.MeshStandardMaterial({ color, roughness: 0.84, metalness: 0.05 });
+          const roofMaterial = getBuildingRoofMaterial(detailSeed, 'fallback', isPhotorealBuildingsEnabled());
+          const mesh = new THREE.Mesh(geo, [roofMaterial, sideMaterial]);
 
           // Calculate terrain stats for building
           let avgElevation = 0;
@@ -3253,7 +3230,6 @@ async function loadRoads(retryPass = 0) {
           appCtx.scene.add(mesh);
           appCtx.buildingMeshes.push(mesh);
 
-          const detailSeed = ((appCtx.rdtSeed || 0) ^ ((Math.floor(x * 100) * 73856093 ^ Math.floor(z * 100) * 19349663) >>> 0)) >>> 0;
           addPhotorealBuildingDetailMeshes(mesh, detailSeed, 'fallback', 'near');
 
           if (typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.7) {

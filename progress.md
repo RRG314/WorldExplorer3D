@@ -468,3 +468,28 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `output/playwright/roof-material-topview-check/photoreal-off-topview.png`
     - `output/playwright/roof-material-topview-check/photoreal-on-topview.png`
     - `output/playwright/roof-material-topview-check/report.json` (0 errors in both variants)
+- Facade + roof alignment correction pass (2026-02-18):
+  - User feedback addressed:
+    - prevent all-glass tops
+    - remove protruding/misaligned horizontal layers
+    - improve facade diversity so cities look less uniform.
+  - `js/world.js`:
+    - Buildings now use 2-material extrusion (`material:0`, `extrudeMaterial:1`) so caps/roof and side walls are separate materials.
+    - Added `getBuildingRoofMaterial(...)` and applied roof material to all generated buildings (OSM + synthetic fallback), including non-photoreal mode.
+    - Removed photoreal overlay geometry that caused artifacts:
+      - removed roof cap overlay/parapet ring
+      - removed facade band meshes that protruded/misaligned.
+    - Kept rooftop units/antenna detail meshes only.
+  - `js/engine.js`:
+    - Expanded facade system with new photoreal procedural facade families:
+      - `stone`, `stucco`, `panel`, `mixed`, `window`
+    - Added cached procedural texture-set generator (diffuse/normal/roughness/emissive) for facade families.
+    - Rebalanced photoreal facade selection by building type to reduce full-glass towers and increase material diversity.
+    - Reduced glassy response on window materials (higher roughness, lower metalness/env, less aggressive clearcoat).
+  - Validation artifacts:
+    - `output/playwright/facade-roof-fix-deterministic/report.json` (0 errors)
+    - `output/playwright/facade-roof-fix-deterministic/photoreal-on-street.png`
+    - `output/playwright/facade-roof-fix-deterministic/photoreal-on-topview.png`
+    - `output/playwright/facade-roof-fix-deterministic/photoreal-off-street.png`
+    - `output/playwright/facade-roof-fix-deterministic/photoreal-off-topview.png`
+    - `output/playwright/facade-roof-fix-skill-run/`
