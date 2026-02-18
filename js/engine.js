@@ -9,6 +9,11 @@ let currentGpuTier = 'high';
 const PHOTOREAL_BUILDINGS_STORAGE_KEY = 'worldExplorerPhotorealBuildings';
 let photorealBuildingsEnabled = false;
 let photorealMaterialFallbackLogged = false;
+let photorealWindowSeed = null;
+let photorealWindowDiffuse = null;
+let photorealWindowNormal = null;
+let photorealWindowRoughness = null;
+let photorealWindowEmissive = null;
 
 function readStorageValue(key) {
   try {
@@ -63,6 +68,189 @@ function syncTextureGlobals() {
 function clearWindowTextureCache() {
   windowTextures = {};
   appCtx.windowTextures = windowTextures;
+}
+
+function disposeTexture(texture) {
+  if (!texture || typeof texture.dispose !== 'function') return;
+  texture.dispose();
+}
+
+function disposePhotorealWindowTextures() {
+  disposeTexture(photorealWindowDiffuse);
+  disposeTexture(photorealWindowNormal);
+  disposeTexture(photorealWindowRoughness);
+  disposeTexture(photorealWindowEmissive);
+  photorealWindowDiffuse = null;
+  photorealWindowNormal = null;
+  photorealWindowRoughness = null;
+  photorealWindowEmissive = null;
+  photorealWindowSeed = null;
+}
+
+function createPhotorealWindowTextureSet() {
+  const nextSeed = Number.isFinite(Number(appCtx.rdtSeed)) ? (Math.floor(Number(appCtx.rdtSeed)) | 0) >>> 0 : 0;
+  if (photorealWindowSeed === nextSeed && photorealWindowDiffuse && photorealWindowNormal && photorealWindowRoughness && photorealWindowEmissive) {
+    return {
+      diff: photorealWindowDiffuse,
+      nor: photorealWindowNormal,
+      rough: photorealWindowRoughness,
+      emissive: photorealWindowEmissive
+    };
+  }
+
+  disposePhotorealWindowTextures();
+
+  const width = 256;
+  const height = 512;
+  const cols = 8;
+  const rows = 20;
+  const cellW = width / cols;
+  const cellH = height / rows;
+  const frame = 2;
+  const rng = typeof appCtx.seededRandom === 'function' ?
+  appCtx.seededRandom(nextSeed ^ 0x94D1A) :
+  Math.random.bind(Math);
+
+  const diffCanvas = document.createElement('canvas');
+  diffCanvas.width = width;
+  diffCanvas.height = height;
+  const diffCtx = diffCanvas.getContext('2d');
+
+  const roughCanvas = document.createElement('canvas');
+  roughCanvas.width = width;
+  roughCanvas.height = height;
+  const roughCtx = roughCanvas.getContext('2d');
+
+  const normalCanvas = document.createElement('canvas');
+  normalCanvas.width = width;
+  normalCanvas.height = height;
+  const normalCtx = normalCanvas.getContext('2d');
+
+  const emissiveCanvas = document.createElement('canvas');
+  emissiveCanvas.width = width;
+  emissiveCanvas.height = height;
+  const emissiveCtx = emissiveCanvas.getContext('2d');
+
+  // Reflective sky gradient base.
+  const skyGradient = diffCtx.createLinearGradient(0, 0, 0, height);
+  skyGradient.addColorStop(0, '#5f7ea8');
+  skyGradient.addColorStop(0.45, '#2f4564');
+  skyGradient.addColorStop(1, '#152334');
+  diffCtx.fillStyle = skyGradient;
+  diffCtx.fillRect(0, 0, width, height);
+
+  // Default roughness: moderately glossy glass.
+  roughCtx.fillStyle = '#474747';
+  roughCtx.fillRect(0, 0, width, height);
+
+  // Neutral normal map base.
+  normalCtx.fillStyle = '#8080ff';
+  normalCtx.fillRect(0, 0, width, height);
+
+  // Emissive map base starts dark.
+  emissiveCtx.fillStyle = '#000000';
+  emissiveCtx.fillRect(0, 0, width, height);
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      const x = col * cellW + frame;
+      const y = row * cellH + frame;
+      const w = cellW - frame * 2;
+      const h = cellH - frame * 2;
+      const lit = rng() > 0.82;
+      const reflection = rng();
+      const blueLift = Math.floor(24 + reflection * 44);
+      const alpha = 0.55 + reflection * 0.35;
+
+      diffCtx.fillStyle = `rgba(${18 + blueLift}, ${38 + blueLift}, ${70 + blueLift}, ${alpha.toFixed(3)})`;
+      diffCtx.fillRect(x, y, w, h);
+
+      // Horizontal reflection streaks.
+      diffCtx.fillStyle = `rgba(190, 220, 255, ${(0.05 + reflection * 0.10).toFixed(3)})`;
+      diffCtx.fillRect(x + 1, y + h * 0.2, w - 2, Math.max(1, h * 0.08));
+      diffCtx.fillRect(x + 1, y + h * 0.62, w - 2, Math.max(1, h * 0.05));
+
+      if (lit) {
+        const warm = 168 + Math.floor(rng() * 60);
+        diffCtx.fillStyle = `rgba(${warm}, ${150 + Math.floor(rng() * 55)}, ${85 + Math.floor(rng() * 45)}, 0.22)`;
+        diffCtx.fillRect(x + 1, y + 1, w - 2, h - 2);
+        emissiveCtx.fillStyle = `rgb(${120 + Math.floor(rng() * 70)}, ${95 + Math.floor(rng() * 55)}, ${45 + Math.floor(rng() * 40)})`;
+        emissiveCtx.fillRect(x + 1, y + 1, w - 2, h - 2);
+      }
+
+      // Glass is smoother than frames.
+      const windowRough = 26 + Math.floor(rng() * 26);
+      roughCtx.fillStyle = `rgb(${windowRough}, ${windowRough}, ${windowRough})`;
+      roughCtx.fillRect(x, y, w, h);
+    }
+  }
+
+  // Metal frame overlays.
+  diffCtx.strokeStyle = 'rgba(14, 22, 34, 0.92)';
+  diffCtx.lineWidth = 2;
+  for (let c = 0; c <= cols; c++) {
+    const x = Math.round(c * cellW) + 0.5;
+    diffCtx.beginPath();
+    diffCtx.moveTo(x, 0);
+    diffCtx.lineTo(x, height);
+    diffCtx.stroke();
+
+    roughCtx.strokeStyle = '#b8b8b8';
+    roughCtx.lineWidth = 2;
+    roughCtx.beginPath();
+    roughCtx.moveTo(x, 0);
+    roughCtx.lineTo(x, height);
+    roughCtx.stroke();
+
+    normalCtx.strokeStyle = '#7676ff';
+    normalCtx.lineWidth = 2;
+    normalCtx.beginPath();
+    normalCtx.moveTo(x, 0);
+    normalCtx.lineTo(x, height);
+    normalCtx.stroke();
+  }
+  for (let r = 0; r <= rows; r++) {
+    const y = Math.round(r * cellH) + 0.5;
+    diffCtx.beginPath();
+    diffCtx.moveTo(0, y);
+    diffCtx.lineTo(width, y);
+    diffCtx.stroke();
+
+    roughCtx.strokeStyle = '#a8a8a8';
+    roughCtx.lineWidth = 2;
+    roughCtx.beginPath();
+    roughCtx.moveTo(0, y);
+    roughCtx.lineTo(width, y);
+    roughCtx.stroke();
+
+    normalCtx.strokeStyle = '#7878ff';
+    normalCtx.lineWidth = 2;
+    normalCtx.beginPath();
+    normalCtx.moveTo(0, y);
+    normalCtx.lineTo(width, y);
+    normalCtx.stroke();
+  }
+
+  const buildTex = (canvas, encoding = null) => {
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+    tex.repeat.set(1.8, 3.8);
+    if (encoding) tex.encoding = encoding;
+    return tex;
+  };
+
+  photorealWindowDiffuse = buildTex(diffCanvas, THREE.sRGBEncoding);
+  photorealWindowNormal = buildTex(normalCanvas);
+  photorealWindowRoughness = buildTex(roughCanvas);
+  photorealWindowEmissive = buildTex(emissiveCanvas, THREE.sRGBEncoding);
+  photorealWindowSeed = nextSeed;
+
+  return {
+    diff: photorealWindowDiffuse,
+    nor: photorealWindowNormal,
+    rough: photorealWindowRoughness,
+    emissive: photorealWindowEmissive
+  };
 }
 
 // PBR ground textures (grass for terrain)
@@ -1007,9 +1195,10 @@ function createPhotorealBuildingMaterial(facadeType, baseColorHex, bSeed) {
       envMapIntensity: 1.0 + glossNoise * 0.25
     };
     if (usePhysical) {
-      options.clearcoat = 0.06 + glossNoise * 0.04;
-      options.clearcoatRoughness = 0.5;
+      options.clearcoat = 0.12 + glossNoise * 0.06;
+      options.clearcoatRoughness = 0.45;
     }
+    options.color = new THREE.Color(0xaab3bf);
     return new MaterialClass(options);
   }
 
@@ -1024,49 +1213,52 @@ function createPhotorealBuildingMaterial(facadeType, baseColorHex, bSeed) {
       envMapIntensity: 0.95 + glossNoise * 0.2
     };
     if (usePhysical) {
-      options.clearcoat = 0.04;
-      options.clearcoatRoughness = 0.55;
+      options.clearcoat = 0.10;
+      options.clearcoatRoughness = 0.48;
     }
+    options.color = new THREE.Color(0xa88e7b);
     return new MaterialClass(options);
   }
 
-  const windowTex = createWindowTexture(baseColorHex, bSeed);
+  const photorealWindowSet = createPhotorealWindowTextureSet();
+  const baseWindowColor = new THREE.Color(baseColorHex).lerp(new THREE.Color(0x99b9df), 0.70);
   const options = {
-    map: windowTex,
-    color: baseColorHex,
-    roughness: 0.56 + glossNoise * 0.10,
-    metalness: 0.08,
-    envMapIntensity: 1.05 + glossNoise * 0.25
+    map: photorealWindowSet.diff,
+    normalMap: photorealWindowSet.nor,
+    roughnessMap: photorealWindowSet.rough,
+    emissiveMap: photorealWindowSet.emissive,
+    color: baseWindowColor,
+    emissive: new THREE.Color(0x1d2c45),
+    emissiveIntensity: 0.24 + glossNoise * 0.12,
+    roughness: 0.25 + glossNoise * 0.08,
+    metalness: 0.78,
+    envMapIntensity: 1.55 + glossNoise * 0.45
   };
   if (usePhysical) {
-    options.clearcoat = 0.22 + glossNoise * 0.10;
-    options.clearcoatRoughness = 0.36;
+    options.clearcoat = 0.86 + glossNoise * 0.08;
+    options.clearcoatRoughness = 0.16;
+    options.ior = 1.52;
   }
   const mat = new MaterialClass(options);
-  if (buildingNormalMap) {
-    mat.normalMap = buildingNormalMap;
-    mat.normalScale = new THREE.Vector2(0.45, 0.45);
-  }
-  if (buildingRoughnessMap) {
-    mat.roughnessMap = buildingRoughnessMap;
-  }
+  mat.normalScale = new THREE.Vector2(0.72, 0.72);
   return mat;
 }
 
 function getBuildingMaterial(buildingType, bSeed, baseColorHex) {
   const br1 = appCtx.rand01FromInt(bSeed);
   const br2 = appCtx.rand01FromInt(bSeed ^ 0x12345);
+  const bt = String(buildingType || 'yes').toLowerCase();
 
   // Decide facade type based on building type and seed
   let facadeType = 'window'; // default: procedural windows
 
-  if (buildingType === 'industrial' || buildingType === 'warehouse') {
+  if (bt === 'industrial' || bt === 'warehouse') {
     facadeType = 'concrete';
-  } else if (buildingType === 'house' || buildingType === 'residential' || buildingType === 'detached') {
+  } else if (bt === 'house' || bt === 'residential' || bt === 'detached') {
     facadeType = br1 > 0.4 ? 'brick' : 'window';
-  } else if (buildingType === 'apartments') {
+  } else if (bt === 'apartments') {
     facadeType = br1 > 0.6 ? 'concrete' : 'window';
-  } else if (buildingType === 'church' || buildingType === 'cathedral') {
+  } else if (bt === 'church' || bt === 'cathedral') {
     facadeType = 'brick';
   } else {
     // Mixed: ~30% concrete, ~25% brick, ~45% windowed
@@ -1075,6 +1267,19 @@ function getBuildingMaterial(buildingType, bSeed, baseColorHex) {
   }
 
   if (photorealBuildingsEnabled) {
+    // In photoreal mode, bias city-scale generic buildings toward glass facades.
+    const residentialLike = bt === 'house' || bt === 'residential' || bt === 'detached';
+    const worshipLike = bt === 'church' || bt === 'cathedral' || bt === 'mosque' || bt === 'synagogue' || bt === 'temple';
+    const industrialLike = bt === 'industrial' || bt === 'warehouse';
+    if (!residentialLike && !worshipLike && !industrialLike) {
+      if (br2 < 0.20) facadeType = 'concrete';else
+      if (br2 < 0.32) facadeType = 'brick';else
+      facadeType = 'window';
+    }
+    if (bt === 'apartments') {
+      facadeType = br1 > 0.22 ? 'window' : 'concrete';
+    }
+
     try {
       const photorealMaterial = createPhotorealBuildingMaterial(facadeType, baseColorHex, bSeed);
       if (photorealMaterial) return photorealMaterial;

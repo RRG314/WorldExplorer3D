@@ -427,3 +427,15 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - No Stripe private keys discovered in code.
   - Pattern scan hits are placeholders/docs and allowed public Firebase web API key in `public/js/firebase-project-config.js`.
   - `gitleaks` binary not installed locally; relied on regex scan + existing repo secret-scan workflow config.
+- Photoreal visual-impact tuning pass (root runtime only, 2026-02-18):
+  - Root cause for "no visible change": initial photoreal mode reused near-identical facade texture paths with only subtle material scalar changes.
+  - `js/engine.js` updated with a stronger photoreal profile:
+    - Added generated curtain-wall texture set (diffuse/normal/roughness/emissive) keyed by `rdtSeed` and cached.
+    - Added city-building facade rebalance in photoreal mode (generic towers bias toward glass).
+    - Increased physical shading contrast (clearcoat/IOR/env intensity/tint) for concrete/brick/window photoreal paths.
+    - Maintained guarded fallback to standard material pipeline on any photoreal failure.
+  - Validation artifacts (root runtime A/B):
+    - `output/playwright/photoreal-visual-check/ingame-photoreal-enabled.png`
+    - `output/playwright/photoreal-visual-check/ingame-standard-enabled.png`
+    - `output/playwright/photoreal-visual-check/errors.json` (empty)
+  - Result: photoreal mode now produces clearly different, more reflective blue-glass high-rise facades vs baseline brick/flat mix.
