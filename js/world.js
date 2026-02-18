@@ -897,13 +897,18 @@ function getPhotorealDetailMaterials(bSeed, buildingType) {
   const usePhysical = typeof THREE.MeshPhysicalMaterial === 'function';
   const UtilityClass = usePhysical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
 
-  const utilityMat = new UtilityClass({
-    color: new THREE.Color(0x697380).offsetHSL(0, 0, (toneBucket - 2) * 0.022),
-    roughness: 0.82,
-    metalness: 0.14,
-    envMapIntensity: 0.44,
-    clearcoat: usePhysical ? 0.04 : undefined,
-    clearcoatRoughness: usePhysical ? 0.76 : undefined
+  const utilityMats = [];
+  const grayOffsets = [-0.05, -0.02, 0.01, 0.04];
+  grayOffsets.forEach((offset) => {
+    const mat = new UtilityClass({
+      color: new THREE.Color(0x697380).offsetHSL(0, 0, (toneBucket - 2) * 0.022 + offset),
+      roughness: 0.80 + Math.abs(offset) * 0.25,
+      metalness: 0.14,
+      envMapIntensity: 0.44,
+      clearcoat: usePhysical ? 0.04 : undefined,
+      clearcoatRoughness: usePhysical ? 0.76 : undefined
+    });
+    utilityMats.push(mat);
   });
 
   const antennaMat = new THREE.MeshStandardMaterial({
@@ -913,12 +918,49 @@ function getPhotorealDetailMaterials(bSeed, buildingType) {
   });
 
   const materialSet = {
-    roofMat: getBuildingRoofMaterial(bSeed, buildingType, true),
-    utilityMat,
+    utilityMats,
     antennaMat
   };
   appCtx._photorealDetailMaterialCache.set(cacheKey, materialSet);
   return materialSet;
+}
+
+function pointInPolygonXZ(x, z, polygon) {
+  if (!Array.isArray(polygon) || polygon.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x;
+    const zi = polygon[i].z;
+    const xj = polygon[j].x;
+    const zj = polygon[j].z;
+    const intersects = zi > z !== zj > z && x < (xj - xi) * (z - zi) / ((zj - zi) || 1e-9) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function pickRoofPlacementPoint(footprint, centerX, centerZ, halfSpanX, halfSpanZ, rng) {
+  const hasPoly = Array.isArray(footprint) && footprint.length >= 3;
+  const spreadX = Math.max(0.5, halfSpanX);
+  const spreadZ = Math.max(0.5, halfSpanZ);
+  if (!hasPoly) {
+    return {
+      x: centerX + (rng() * 2 - 1) * spreadX * 0.75,
+      z: centerZ + (rng() * 2 - 1) * spreadZ * 0.75
+    };
+  }
+
+  for (let attempt = 0; attempt < 16; attempt++) {
+    const x = centerX + (rng() * 2 - 1) * spreadX * 0.86;
+    const z = centerZ + (rng() * 2 - 1) * spreadZ * 0.86;
+    if (pointInPolygonXZ(x, z, footprint)) return { x, z };
+  }
+
+  if (pointInPolygonXZ(centerX, centerZ, footprint)) return { x: centerX, z: centerZ };
+  return {
+    x: centerX + (rng() * 2 - 1) * spreadX * 0.35,
+    z: centerZ + (rng() * 2 - 1) * spreadZ * 0.35
+  };
 }
 
 function addPhotorealBuildingDetailMeshes(mesh, bSeed, buildingType = 'yes', lodTier = 'near') {
@@ -955,36 +997,72 @@ function addPhotorealBuildingDetailMeshes(mesh, bSeed, buildingType = 'yes', lod
   const mats = getPhotorealDetailMaterials(bSeed, buildingType);
   const group = new THREE.Group();
   group.userData.photorealBuildingDetail = true;
+  const footprint = mesh.userData?.buildingFootprint;
+  const bt = String(buildingType || 'yes').toLowerCase();
+  const houseLike = bt === 'house' || bt === 'detached' || bt === 'residential';
+  const apartmentLike = bt === 'apartments';
+  const industrialLike = bt === 'industrial' || bt === 'warehouse' || bt === 'factory' || bt === 'retail';
+  const officeLike = bt === 'office' || bt === 'commercial' || bt === 'skyscraper';
 
   // Roof mechanical units.
-  const roofW = Math.max(2.2, width - 1.0);
-  const roofD = Math.max(2.2, depth - 1.0);
-  const unitCount = Math.max(1, Math.min(7, Math.floor(area / 170)));
-  const roofSafeW = Math.max(2, roofW - 1.2);
-  const roofSafeD = Math.max(2, roofD - 1.2);
-  const roofTopY = topY + 0.08;
+  const roofHalfW = Math.max(1.2, width * 0.5 - 0.85);
+  const roofHalfD = Math.max(1.2, depth * 0.5 - 0.85);
+  const roofTopY = topY + 0.03;
+
+  let hvacChance = 0.34;
+  let maxUnits = Math.max(1, Math.min(3, Math.floor(area / 230)));
+  if (houseLike || area < 130 || height < 10) {
+    hvacChance = 0.0;
+    maxUnits = 0;
+  } else if (apartmentLike) {
+    hvacChance = 0.20;
+    maxUnits = Math.max(1, Math.min(2, Math.floor(area / 260) + 1));
+  } else if (officeLike) {
+    hvacChance = 0.52;
+    maxUnits = Math.max(1, Math.min(4, Math.floor(area / 200)));
+  } else if (industrialLike) {
+    hvacChance = 0.72;
+    maxUnits = Math.max(2, Math.min(5, Math.floor(area / 180)));
+  }
+  const unitCount = maxUnits > 0 && rng() < hvacChance ?
+  Math.max(1, Math.min(maxUnits, 1 + Math.floor(rng() * (maxUnits + 0.35)))) :
+  0;
+
   for (let i = 0; i < unitCount; i++) {
-    const uw = 1.4 + rng() * Math.min(6.2, width * 0.20);
-    const ud = 1.2 + rng() * Math.min(5.4, depth * 0.20);
-    const uh = 0.8 + rng() * Math.min(2.8, height * 0.09);
-    const ux = centerX + (rng() * 2 - 1) * roofSafeW * 0.38;
-    const uz = centerZ + (rng() * 2 - 1) * roofSafeD * 0.38;
-    const unit = new THREE.Mesh(new THREE.BoxGeometry(uw, uh, ud), mats.utilityMat);
-    unit.position.set(ux, roofTopY + uh * 0.5, uz);
+    const uw = 1.2 + rng() * Math.min(4.8, width * 0.14);
+    const ud = 1.1 + rng() * Math.min(4.2, depth * 0.14);
+    const uh = 0.6 + rng() * Math.min(2.1, height * 0.07);
+    const placement = pickRoofPlacementPoint(
+      footprint,
+      centerX,
+      centerZ,
+      Math.max(0.8, roofHalfW - uw * 0.65),
+      Math.max(0.8, roofHalfD - ud * 0.65),
+      rng
+    );
+    const utilMat = mats.utilityMats[Math.floor(rng() * mats.utilityMats.length)] || mats.utilityMats[0];
+    const unit = new THREE.Mesh(new THREE.BoxGeometry(uw, uh, ud), utilMat);
+    unit.position.set(placement.x, roofTopY + uh * 0.5, placement.z);
     unit.castShadow = true;
     unit.receiveShadow = true;
     group.add(unit);
   }
 
   // Optional water tank/antenna for taller buildings.
-  const bt = String(buildingType || 'yes').toLowerCase();
-  if (height > 22 && bt !== 'house' && bt !== 'detached' && bt !== 'residential' && rng() > 0.45) {
+  if (height > 22 && !houseLike && rng() > 0.57) {
     const tankR = Math.max(0.5, Math.min(1.8, Math.min(width, depth) * 0.055));
     const tankH = tankR * (1.5 + rng() * 1.1);
-    const tx = centerX + (rng() * 2 - 1) * roofSafeW * 0.25;
-    const tz = centerZ + (rng() * 2 - 1) * roofSafeD * 0.25;
-    const tank = new THREE.Mesh(new THREE.CylinderGeometry(tankR, tankR * 1.06, tankH, 16), mats.utilityMat);
-    tank.position.set(tx, roofTopY + tankH * 0.5, tz);
+    const placement = pickRoofPlacementPoint(
+      footprint,
+      centerX,
+      centerZ,
+      Math.max(0.8, roofHalfW - tankR * 1.4),
+      Math.max(0.8, roofHalfD - tankR * 1.4),
+      rng
+    );
+    const utilMat = mats.utilityMats[Math.floor(rng() * mats.utilityMats.length)] || mats.utilityMats[0];
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(tankR, tankR * 1.06, tankH, 16), utilMat);
+    tank.position.set(placement.x, roofTopY + tankH * 0.5, placement.z);
     tank.castShadow = true;
     tank.receiveShadow = true;
     group.add(tank);
@@ -993,7 +1071,15 @@ function addPhotorealBuildingDetailMeshes(mesh, bSeed, buildingType = 'yes', lod
   if (height > 34 && rng() > 0.58) {
     const mastH = 3 + rng() * Math.min(9, height * 0.18);
     const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.10, mastH, 10), mats.antennaMat);
-    mast.position.set(centerX + (rng() * 2 - 1) * roofSafeW * 0.12, roofTopY + mastH * 0.5, centerZ + (rng() * 2 - 1) * roofSafeD * 0.12);
+    const placement = pickRoofPlacementPoint(
+      footprint,
+      centerX,
+      centerZ,
+      Math.max(0.6, roofHalfW - 0.35),
+      Math.max(0.6, roofHalfD - 0.35),
+      rng
+    );
+    mast.position.set(placement.x, roofTopY + mastH * 0.5, placement.z);
     mast.castShadow = true;
     mast.receiveShadow = true;
     group.add(mast);

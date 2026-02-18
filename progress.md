@@ -493,3 +493,23 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `output/playwright/facade-roof-fix-deterministic/photoreal-off-street.png`
     - `output/playwright/facade-roof-fix-deterministic/photoreal-off-topview.png`
     - `output/playwright/facade-roof-fix-skill-run/`
+- Rooftop detail density/alignment refinement (2026-02-18):
+  - User feedback addressed:
+    - too many HVAC units
+    - single-color rooftop units
+    - rooftop props appearing off-roof / floating on irregular footprints.
+  - `js/world.js` updates:
+    - Added rooftop placement helpers:
+      - `pointInPolygonXZ(...)`
+      - `pickRoofPlacementPoint(...)`
+    - HVAC density now building-type-aware and probabilistic (houses/small buildings default to no rooftop HVAC).
+    - HVAC count caps reduced and scaled by footprint area.
+    - Rooftop utility materials now use a deterministic palette of slight gray variations.
+    - Rooftop props (HVAC/tank/antenna) now sample points constrained to building footprint to avoid overhang/floating placement.
+    - Removed unused `roofMat` entry from photoreal detail material set.
+  - Validation artifacts:
+    - `output/playwright/roof-hvac-fix-deterministic/street.png`
+    - `output/playwright/roof-hvac-fix-deterministic/topview-1.png`
+    - `output/playwright/roof-hvac-fix-deterministic/topview-2.png`
+    - `output/playwright/roof-hvac-fix-deterministic/errors.json` (empty)
+    - `output/playwright/roof-hvac-sparsity-skill-run/`
