@@ -626,3 +626,32 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
 - Skill client rerun:
   - `output/playwright/paint-moon-block-fix-skill-run-2/`
   - Captures remain black in this environment with the generic web-game client (known canvas-capture limitation), so direct Playwright screenshots/report above were used as source-of-truth validation.
+- Landing page gameplay gallery pass (2026-02-18):
+  - `public/index.html`:
+    - Renamed section heading from `Visual Proof` to `Gameplay`.
+    - Replaced 3 static proof shots with a 12-card gameplay gallery using user-provided screenshots.
+    - Added per-image titles + descriptions.
+    - Made gameplay section vertically scrollable (`.gameplayGalleryWrap`) to keep landing page height compact.
+  - Added assets under `public/assets/landing/gameplay/`:
+    - `drone-baltimore.png`
+    - `fly-in-space.png`
+    - `walk-on-moon.png`
+    - `build-with-blocks.png`
+    - `drive-baltimore.png`
+    - `drive-on-moon.png`
+    - `drone-monaco.png`
+    - `drone-on-moon.png`
+    - `paint-town-red.png`
+    - `place-flower-memory.png`
+    - `police-chase.png`
+    - `flee-cops.png`
+- Validation:
+  - `output/playwright/landing-gameplay-gallery-check/report.json`
+    - `sectionTitle=Gameplay`
+    - `cards=12`
+    - `scrollable=true`
+    - `imgSrcOk=true`
+    - `errorCount=0`
+  - Screens:
+    - `output/playwright/landing-gameplay-gallery-check/landing-gameplay-top.png`
+    - `output/playwright/landing-gameplay-gallery-check/landing-gameplay-scrolled.png`
