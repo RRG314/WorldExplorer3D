@@ -1,6 +1,6 @@
 # Architecture
 
-Last reviewed: 2026-02-16
+Last reviewed: 2026-02-19
 
 This document describes the current deployed architecture in the `WorldExplorer` repository.
 
@@ -36,6 +36,7 @@ public/
   legal/privacy.html
   legal/terms.html
   assets/landing/*
+  assets/landing/gameplay/*
   js/
     firebase-init.js
     firebase-project-config.js
@@ -81,6 +82,15 @@ In this mode:
 - route structure remains `/`, `/app/`, `/account/`, `/legal/*`
 - Firebase Functions still handle checkout/portal/webhook endpoints
 - frontend `billing.js` resolves direct function origin for non-Firebase-hosting domains
+
+### 3.2 GitHub Pages Branch-Root Mode
+
+For branch-root Pages deployments (`Deploy from a branch`, `/ (root)`):
+
+- runtime entrypoint is root `index.html`
+- runtime modules are root `js/*`
+- Firebase-hosted `public/app/*` behavior remains unchanged unless separately deployed
+- root runtime now includes `Photoreal Buildings (Beta)` settings control backed by local storage key `worldExplorerPhotorealBuildings`
 
 ## 4. Identity and Entitlements Flow
 
@@ -163,6 +173,12 @@ Typical fields:
 - public-read leaderboard entries for challenge mode
 - writes require authenticated user
 
+### Paint challenge leaderboard behavior
+
+- Runtime challenge logic supports a `paintTownLeaderboard` collection path.
+- On this branch, Firestore rules explicitly allow `flowerLeaderboard` writes and
+  paint leaderboard cloud writes may fall back to local storage behavior.
+
 ## 7. Runtime UI Architecture (App)
 
 In `/app/`:
@@ -170,6 +186,15 @@ In `/app/`:
 - Left floating auth control is the auth/account surface.
 - Pro panel is informational for non-Pro and auto-hides after ~4.5s.
 - Top-center plan/account HUD has been removed to avoid title overlap.
+- Title-screen `Game Mode` options currently include:
+  - Free Roam
+  - Time Trial
+  - Checkpoints
+  - Paint the Town Red
+  - Police Chase
+  - Find the Flower
+- Paint mode HUD presents timer + painted building count for a fixed 2-minute run.
+- Build mode blocks are integrated into both vehicle and walking collision paths.
 
 ## 8. Security Boundaries
 
@@ -191,6 +216,5 @@ Required planned work:
 
 ## 10. Legacy/Reference Artifacts
 
-Root-level legacy files (`index.html`, `js/`, `styles.css`) remain in repo history/reference, but production Hosting paths are under `public/`.
-
-Use `public/app/index.html` as the active runtime entrypoint for deployed behavior.
+Root-level runtime files (`index.html`, `js/`, `styles.css`) are used for branch-root Pages mode.
+Firebase-hosted production behavior continues to use `public/app/index.html`.

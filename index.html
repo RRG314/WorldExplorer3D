@@ -195,31 +195,59 @@
       font-size: clamp(24px, 3vw, 31px);
     }
 
-    .shots {
+    .gameplayGalleryWrap {
+      max-height: min(72vh, 980px);
+      overflow-y: auto;
+      padding-right: 6px;
+      scrollbar-width: thin;
+      scrollbar-color: rgba(183, 205, 224, 0.45) transparent;
+    }
+
+    .gameplayGalleryWrap::-webkit-scrollbar {
+      width: 10px;
+    }
+
+    .gameplayGalleryWrap::-webkit-scrollbar-thumb {
+      background: rgba(183, 205, 224, 0.34);
+      border-radius: 999px;
+    }
+
+    .gameplayGallery {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 12px;
     }
 
-    .shot {
+    .gameplayCard {
       border: 1px solid var(--line);
       border-radius: 12px;
       overflow: hidden;
       background: #030a14;
     }
 
-    .shot img {
+    .gameplayCard img {
       width: 100%;
-      aspect-ratio: 16 / 10;
+      aspect-ratio: 16 / 9;
       object-fit: cover;
       display: block;
     }
 
-    .shot span {
-      display: block;
-      padding: 8px 10px;
-      font-size: 13px;
+    .gameplayMeta {
+      padding: 10px 11px 12px;
+    }
+
+    .gameplayMeta h3 {
+      margin: 0 0 5px;
+      font-size: 15px;
+      font-family: 'Chakra Petch', sans-serif;
+      color: #dceeff;
+    }
+
+    .gameplayMeta p {
+      margin: 0;
       color: var(--muted);
+      font-size: 13px;
+      line-height: 1.35;
     }
 
     .features {
@@ -312,7 +340,7 @@
 
     @media (max-width: 980px) {
       .hero-grid { grid-template-columns: 1fr; }
-      .shots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .gameplayGallery { grid-template-columns: 1fr; }
       .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .pricing { grid-template-columns: 1fr; }
       .faq { grid-template-columns: 1fr; }
@@ -321,7 +349,7 @@
     @media (max-width: 640px) {
       .shell { width: min(1120px, 94vw); }
       .hero-copy { padding: 22px; }
-      .shots { grid-template-columns: 1fr; }
+      .gameplayGalleryWrap { max-height: min(76vh, 1020px); }
       .features { grid-template-columns: 1fr; }
       .btn { width: 100%; text-align: center; }
     }
@@ -349,20 +377,58 @@
     </section>
 
     <section>
-      <h2>Visual Proof</h2>
-      <div class="shots">
-        <figure class="shot">
-          <img src="./assets/landing/city.jpg" alt="City terrain runtime screenshot">
-          <span>Urban exploration and map overlays</span>
-        </figure>
-        <figure class="shot">
-          <img src="./assets/landing/space.jpg" alt="Spaceflight transition screenshot">
-          <span>Earth-to-space transition mode</span>
-        </figure>
-        <figure class="shot">
-          <img src="./assets/landing/moon.jpg" alt="Moon terrain screenshot">
-          <span>Lunar driving and exploration</span>
-        </figure>
+      <h2>Gameplay</h2>
+      <div class="gameplayGalleryWrap">
+        <div class="gameplayGallery">
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/drone-baltimore.png" alt="Drone view over Baltimore skyline">
+            <figcaption class="gameplayMeta"><h3>Drone Recon: Baltimore</h3><p>High-altitude drone mode with full city coverage and live HUD telemetry.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/fly-in-space.png" alt="Space flight view with orbital paths and controls">
+            <figcaption class="gameplayMeta"><h3>Orbital Space Flight</h3><p>Rocket traversal in a solar-system scene with moon targeting and flight metrics.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/walk-on-moon.png" alt="Walking on the moon surface">
+            <figcaption class="gameplayMeta"><h3>Moon Surface Walking</h3><p>Switch from vehicle to on-foot exploration directly on lunar terrain.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/build-with-blocks.png" alt="Block building mode with placed structures">
+            <figcaption class="gameplayMeta"><h3>Block Builder</h3><p>Minecraft-style block placement for custom structures and world experimentation.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/drive-baltimore.png" alt="Driving through Baltimore streets">
+            <figcaption class="gameplayMeta"><h3>Street Driving</h3><p>Third-person car handling through dense urban blocks and road networks.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/drive-on-moon.png" alt="Driving a car on the moon">
+            <figcaption class="gameplayMeta"><h3>Moon Driving</h3><p>Low-gravity vehicle traversal tuned for stable traction on lunar surfaces.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/drone-monaco.png" alt="Drone view over Monaco coastline">
+            <figcaption class="gameplayMeta"><h3>Drone Recon: Monaco</h3><p>Coastal city flyovers with broad terrain visibility and persistent map context.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/drone-on-moon.png" alt="Drone mode on moon with star field">
+            <figcaption class="gameplayMeta"><h3>Moon Drone Mode</h3><p>Aerial lunar scans with crater visibility and navigation overlays.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/paint-town-red.png" alt="Paint the Town Red rooftop challenge in progress">
+            <figcaption class="gameplayMeta"><h3>Paint the Town Red</h3><p>Timed challenge mode where rooftops and buildings are painted as objectives.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/place-flower-memory.png" alt="Memory flower marker with popup details">
+            <figcaption class="gameplayMeta"><h3>Memory Flower Markers</h3><p>Place location-linked memories with quick actions for review and cleanup.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/police-chase.png" alt="Police pursuing the player car">
+            <figcaption class="gameplayMeta"><h3>Police Chase</h3><p>Dynamic pursuit encounters while driving through the city.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/flee-cops.png" alt="Busted modal after getting caught by police">
+            <figcaption class="gameplayMeta"><h3>Failure State Feedback</h3><p>Clear in-game fail screens with immediate retry flow.</p></figcaption>
+          </figure>
+        </div>
       </div>
     </section>
 

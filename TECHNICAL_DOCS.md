@@ -1,6 +1,6 @@
 # Technical Documentation
 
-Last reviewed: 2026-02-16
+Last reviewed: 2026-02-19
 
 This document is the engineering reference for the currently deployed World Explorer stack.
 
@@ -25,6 +25,7 @@ public/
   index.html
   account/index.html
   app/index.html
+  assets/landing/gameplay/*
   js/
     firebase-init.js
     auth-ui.js
@@ -36,6 +37,14 @@ functions/
   package.json
 firebase.json
 firestore.rules
+```
+
+Branch-root Pages mode also serves:
+
+```text
+index.html
+js/
+styles.css
 ```
 
 ## 3. Frontend Modules
@@ -90,9 +99,42 @@ GitHub Pages compatibility behavior:
 - resolves direct Cloud Functions origin via Firebase `projectId`
 - sends `returnUrlBase` so Stripe returns to subpath deployments (for example `/WorldExplorer`)
 
-## 4. Cloud Functions
+## 4. Runtime Gameplay Systems
 
-Source: `/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine/functions/index.js`
+Primary runtime modules:
+
+- `public/app/js/game.js`
+- `public/app/js/flower-challenge.js`
+- `public/app/js/blocks.js`
+- `public/app/js/physics.js`
+- `public/app/js/walking.js`
+
+Implemented game modes in title-screen selector:
+
+- `free`
+- `trial`
+- `checkpoint`
+- `painttown`
+- `police`
+- `flower`
+
+Paint challenge behavior (`painttown`):
+
+- fixed 2-minute timer (`120s`)
+- score model is building count (`paintedBuildings`) out of total available
+- rooftop auto-paint detection updates building material state and HUD
+
+Block/build behavior:
+
+- block placement uses camera raycasts against runtime world targets
+- vehicle physics checks `getBuildCollisionAtWorldXZ(...)` for blocking collisions
+- walking module checks both side collision and top-surface standing via:
+  - `getBuildCollisionAtWorldXZ(...)`
+  - `getBuildTopSurfaceAtWorldXZ(...)`
+
+## 5. Cloud Functions
+
+Source: `/Users/stevenreid/Documents/New project/functions/index.js`
 
 ### `createCheckoutSession`
 
@@ -119,7 +161,7 @@ Source: `/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine/func
   - `customer.subscription.deleted`
 - updates user plan and entitlements in Firestore
 
-## 5. Firestore Rules Snapshot
+## 6. Firestore Rules Snapshot
 
 `users/{userId}`:
 
@@ -131,7 +173,13 @@ Source: `/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine/func
 - authenticated create
 - update/delete blocked
 
-## 6. Hosting and Rewrites
+Notes:
+
+- Runtime challenge code also supports a `paintTownLeaderboard` collection path.
+- On this branch, Firestore rules are currently explicit for `flowerLeaderboard`;
+  when paint leaderboard cloud writes are not permitted, runtime falls back to local storage.
+
+## 7. Hosting and Rewrites
 
 Defined in `firebase.json`.
 
@@ -146,7 +194,7 @@ GitHub Pages mirror mode:
 - Uses `.github/workflows/deploy-pages-public.yml` to publish `public/`
 - No Firebase rewrites available on Pages; billing calls use direct function URL resolution
 
-## 7. Plan State Model
+## 8. Plan State Model
 
 Plan values in use:
 
@@ -161,7 +209,7 @@ Subscription statuses treated as active:
 - `trialing`
 - `past_due`
 
-## 8. UI State Decisions
+## 9. UI State Decisions
 
 ### App (`public/app/index.html`)
 
@@ -169,18 +217,24 @@ Subscription statuses treated as active:
 - Top-center plan/account HUD removed
 - Pro panel auto-hide for non-Pro users (`~4.5s`)
 
+### Root runtime (`index.html`)
+
+- Used when GitHub Pages is configured for branch-root publishing
+- Includes `Photoreal Buildings (Beta)` setting in the Settings tab
+- Photoreal preference persistence key: `worldExplorerPhotorealBuildings`
+
 ### Account (`public/account/index.html`)
 
 - plan and trial status display
 - upgrade buttons and billing management
 - sign-out control
 
-## 9. Deployment and Operations
+## 10. Deployment and Operations
 
 ### Full deploy
 
 ```bash
-cd "/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine"
+cd "/Users/stevenreid/Documents/New project"
 firebase deploy
 ```
 
@@ -203,7 +257,7 @@ firebase functions:log --only createCheckoutSession -n 50
 firebase functions:log --only stripeWebhook -n 50
 ```
 
-## 10. Stripe Configuration Contract
+## 11. Stripe Configuration Contract
 
 Runtime config keys expected by functions:
 
@@ -214,14 +268,14 @@ Runtime config keys expected by functions:
 
 Currently set using legacy runtime config commands.
 
-## 11. Known Technical Debt
+## 12. Known Technical Debt
 
 1. `functions.config()` deprecation (March 2026 shutdown)
 2. Node 20 runtime deprecation warnings for Functions
 3. dual runtime copies (legacy root and active `/public/app`) can cause confusion
 4. browser stale-cache edge cases can request legacy `/js/*` entrypoints after route/layout changes
 
-## 12. Immediate Migration Plan (Recommended)
+## 13. Immediate Migration Plan (Recommended)
 
 1. Migrate Stripe settings from `functions.config()` to Firebase Params/Secret Manager.
 2. Upgrade `firebase-functions` and function runtime to Node 22.

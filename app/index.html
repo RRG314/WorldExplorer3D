@@ -138,6 +138,9 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .flowerChallengeLocation{font-size:11px;color:#cbd5e1}
 .flowerChallengeLocation b{color:#f8fafc}
 .flowerChallengeRow{display:flex;gap:8px;align-items:center}
+.flowerLeaderboardTabs{display:flex;gap:8px;margin-top:2px}
+.flowerLeaderboardTab{flex:1;background:rgba(15,23,42,0.64);border:1px solid rgba(148,163,184,0.38);border-radius:9px;color:#cbd5e1;padding:7px 10px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.16s ease}
+.flowerLeaderboardTab.active{background:rgba(59,130,246,0.24);border-color:rgba(96,165,250,0.68);color:#eff6ff}
 .flowerChallengeName{flex:1;min-width:0;background:rgba(15,23,42,0.74);border:1px solid rgba(148,163,184,0.45);border-radius:9px;color:#f8fafc;padding:8px 10px;font-size:12px}
 .flowerChallengeName:focus{outline:none;border-color:#60a5fa;box-shadow:0 0 0 2px rgba(96,165,250,0.22)}
 .flowerChallengeBtn{background:#dc2626;border:1px solid rgba(252,165,165,0.55);border-radius:10px;color:#fff;padding:9px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;transition:transform 0.16s ease,filter 0.16s ease}
@@ -675,6 +678,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <div class="menu-container">
 <div class="tab-nav">
 <button class="tab-btn active" data-tab="location">Location</button>
+<button class="tab-btn" data-tab="games">Games</button>
 <button class="tab-btn" data-tab="settings">Settings</button>
 <button class="tab-btn" data-tab="controls">Controls</button>
 </div>
@@ -730,7 +734,7 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="loc" data-loc="seattle"><div class="loc-name">Seattle</div><div class="loc-region">Washington, USA</div></div>
 </div>
 </div>
-<div class="tab-content" id="tab-settings">
+<div class="tab-content" id="tab-games">
 <div style="padding:8px 0">
 <div style="margin-bottom:24px">
 <div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
@@ -740,9 +744,16 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="mode sel" data-mode="free"><div class="mode-icon">🚗</div><div><div class="mode-name">Free Roam</div><div class="mode-desc">Explore the city at your own pace</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="trial"><div class="mode-icon">⏱️</div><div><div class="mode-name">Time Trial</div><div class="mode-desc">Race to the destination as fast as you can</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="checkpoint"><div class="mode-icon">🏁</div><div><div class="mode-name">Checkpoints</div><div class="mode-desc">Collect all markers scattered across the map</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="painttown"><div class="mode-icon">🟥</div><div><div class="mode-name">Paint the Town Red</div><div class="mode-desc">Land on rooftops to auto-paint buildings. Score as many as possible in 2 minutes.</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="police"><div class="mode-icon">🚔</div><div><div class="mode-name">Police Chase</div><div class="mode-desc">Start with police pursuit enabled and survive the chase.</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="flower"><div class="mode-icon">🌹</div><div><div class="mode-name">Find the Flower</div><div class="mode-desc">Instantly start the red flower hunt and race for the fastest time.</div></div><div class="mode-check">✓</div></div>
 <div style="grid-column:1/-1;padding:12px 0;text-align:center;font-size:11px;color:#64748b;border-top:2px solid #e8eef5;margin-top:8px;">💡 Toggle walking mode anytime with <b>F</b> key or float menu</div>
 </div>
 </div>
+</div>
+</div>
+<div class="tab-content" id="tab-settings">
+<div style="padding:8px 0">
 <div style="margin-bottom:24px">
 <div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
 ⚡ Performance Benchmark
@@ -880,12 +891,16 @@ Use this to compare RDT and baseline with real runtime data.
 </div>
 <aside id="flowerChallengePanel" class="flowerChallengePanel">
 <div class="flowerChallengeHeader">
-<div class="flowerChallengeTitle">Find The Red Flower</div>
-<div class="flowerChallengeBadge">Timed Challenge</div>
+<div class="flowerChallengeTitle">Challenge Leaderboard</div>
+<div class="flowerChallengeBadge">Flower + Paint</div>
 </div>
 <div class="flowerChallengeBody">
-<div class="flowerChallengeHint">Start a timed run. Reach the randomly spawned red flower using walk, drive, or drone.</div>
+<div class="flowerChallengeHint">Track your best challenge runs. Flower is fastest time. Paint is most buildings painted in 2 minutes.</div>
 <div class="flowerChallengeLocation">Location: <b id="flowerChallengeLocation">Baltimore</b></div>
+<div class="flowerLeaderboardTabs">
+<button id="leaderboardTabFlower" class="flowerLeaderboardTab active" type="button">🌹 Flower</button>
+<button id="leaderboardTabPaintTown" class="flowerLeaderboardTab" type="button">🟥 Paint Town</button>
+</div>
 <div class="flowerChallengeRow">
 <input id="flowerPlayerName" class="flowerChallengeName" type="text" maxlength="24" placeholder="Player Name" value="Explorer">
 <button id="titleFindFlowerBtn" class="flowerChallengeBtn" type="button">Find Flower</button>
