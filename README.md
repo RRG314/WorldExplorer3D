@@ -7,6 +7,7 @@ World Explorer is a browser-based 3D exploration runtime with a production Fireb
 - Account and billing at `/account/`
 - Firebase Auth + Firestore entitlements
 - Stripe subscriptions through Firebase Cloud Functions
+- Photoreal Buildings (Beta) toggle in runtime Settings
 
 Repository: `https://github.com/RRG314/WorldExplorer.git`
 
@@ -22,6 +23,29 @@ All rights are reserved unless explicitly granted by the owner.
 - `/account/` - plan status, upgrades, billing portal
 - `/legal/privacy` - privacy policy
 - `/legal/terms` - terms
+
+## Current Gameplay Highlights
+
+- Earth exploration with live switching between:
+  - driving
+  - walking
+  - drone
+- Space flight and Moon travel:
+  - direct moon transfer
+  - rocket-to-moon mode
+  - return-to-earth flow
+- Challenge modes from title-screen `Game Mode`:
+  - Free Roam
+  - Time Trial
+  - Checkpoints
+  - Paint the Town Red (2-minute building-paint challenge)
+  - Police Chase
+  - Find the Flower
+- Build mode improvements:
+  - click-accurate placement across roads/terrain/surfaces
+  - vehicle collision against placed blocks
+  - walking collision + standing on top of placed blocks
+- Scrollable landing-page `Gameplay` visual section with expanded screenshots and captions
 
 ## Plan and Trial Model
 
@@ -51,6 +75,7 @@ public/
   legal/privacy.html
   legal/terms.html
   assets/landing/*
+  assets/landing/gameplay/*     # gameplay gallery visuals
   js/firebase-init.js
   js/auth-ui.js
   js/entitlements.js
@@ -73,7 +98,7 @@ Notes:
 ## Local Development
 
 ```bash
-cd "/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine"
+cd "/Users/stevenreid/Documents/New project"
 python3 -m http.server --directory public 4173
 ```
 
@@ -85,15 +110,26 @@ Open:
 
 ## GitHub Pages Deployment
 
-This repo supports GitHub Pages via GitHub Actions publishing from `public/`.
+This repo supports two Pages modes:
 
-- Branch: `codex/github-pages-compat`
+- Branch-root mode (requested): Pages serves repository root (`index.html`, `js/`, `styles.css`)
+- `public/` artifact mode: GitHub Actions publishes `public/`
+
+Branch-root mode setup (no workflow required):
+
+1. GitHub -> `Settings -> Pages`
+2. `Build and deployment -> Source: Deploy from a branch`
+3. Branch: your target branch
+4. Folder: `/ (root)`
+
+`public/` artifact mode (existing workflow):
+
 - Workflow: `.github/workflows/deploy-pages-public.yml`
 - Pages source: `GitHub Actions`
 
 Full deployment and troubleshooting guide:
 
-- `/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine/GITHUB_DEPLOYMENT.md`
+- `/Users/stevenreid/Documents/New project/GITHUB_DEPLOYMENT.md`
 
 ## Firebase Deployment
 
@@ -107,7 +143,7 @@ Full deployment and troubleshooting guide:
 ### Deploy
 
 ```bash
-cd "/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine"
+cd "/Users/stevenreid/Documents/New project"
 firebase login
 firebase use worldexplorer3d-d9b83
 firebase deploy
@@ -128,7 +164,7 @@ firebase deploy
 3. Configure function runtime values:
 
 ```bash
-cd "/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine"
+cd "/Users/stevenreid/Documents/New project"
 firebase experiments:enable legacyRuntimeConfigCommands
 firebase functions:config:set \
   stripe.secret="sk_live_..." \
@@ -177,6 +213,13 @@ Key fields used by runtime/account/functions:
 - `stripeSubscriptionId`
 - `entitlements`
 
+## Challenge Data Notes
+
+- Runtime challenge panel supports both `flower` and `paint town` leaderboard views.
+- Cloud leaderboard writes are enabled for authenticated users where Firestore
+  rules/collections are configured.
+- Local-storage fallback remains active when cloud writes are unavailable.
+
 ## Current Operational Notes
 
 - Cloud Functions currently use `functions.config().stripe.*` and emit Firebase deprecation warnings.
@@ -185,11 +228,12 @@ Key fields used by runtime/account/functions:
 
 ## Documentation Map
 
-- `/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine/QUICKSTART.md`
-- `/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine/ARCHITECTURE.md`
-- `/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine/API_SETUP.md`
-- `/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine/USER_GUIDE.md`
-- `/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine/TECHNICAL_DOCS.md`
-- `/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine/KNOWN_ISSUES.md`
-- `/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine/CHANGELOG.md`
-- `/Users/stevenreid/Documents/New project/WorldExplorer3D-rdt-engine/progress.md`
+- `/Users/stevenreid/Documents/New project/QUICKSTART.md`
+- `/Users/stevenreid/Documents/New project/ARCHITECTURE.md`
+- `/Users/stevenreid/Documents/New project/API_SETUP.md`
+- `/Users/stevenreid/Documents/New project/USER_GUIDE.md`
+- `/Users/stevenreid/Documents/New project/TECHNICAL_DOCS.md`
+- `/Users/stevenreid/Documents/New project/KNOWN_ISSUES.md`
+- `/Users/stevenreid/Documents/New project/CHANGELOG.md`
+- `/Users/stevenreid/Documents/New project/progress.md`
+- `/Users/stevenreid/Documents/New project/COMPLETE_INVENTORY_REPORT_2026-02-19.md`
