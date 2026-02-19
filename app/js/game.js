@@ -1227,9 +1227,384 @@ function clearPolice() {
   appCtx.police = [];
 }
 
+const PAINT_TOWN_DURATION_SEC = 120;
+
+function ensurePaintTownState() {
+  if (!appCtx.paintTown) {
+    appCtx.paintTown = {
+      active: false,
+      totalBuildings: 0,
+      paintedBuildings: 0,
+      paintedKeys: new Set(),
+      timerSec: PAINT_TOWN_DURATION_SEC,
+      lastHint: '',
+      autoPaintTickSec: 0,
+      scoreSubmitted: false
+    };
+  }
+  if (!(appCtx.paintTown.paintedKeys instanceof Set)) {
+    appCtx.paintTown.paintedKeys = new Set();
+  }
+  return appCtx.paintTown;
+}
+
+function ensurePaintTownHud() {
+  let hud = document.getElementById('paintTownHud');
+  if (hud) return hud;
+
+  hud = document.createElement('div');
+  hud.id = 'paintTownHud';
+  hud.style.position = 'fixed';
+  hud.style.top = '20px';
+  hud.style.left = '50%';
+  hud.style.transform = 'translateX(-50%)';
+  hud.style.zIndex = '90';
+  hud.style.minWidth = '280px';
+  hud.style.maxWidth = '72vw';
+  hud.style.padding = '10px 14px';
+  hud.style.borderRadius = '14px';
+  hud.style.border = '1px solid rgba(220, 38, 38, 0.45)';
+  hud.style.background = 'rgba(10, 15, 28, 0.86)';
+  hud.style.backdropFilter = 'blur(6px)';
+  hud.style.boxShadow = '0 10px 24px rgba(0, 0, 0, 0.35)';
+  hud.style.color = '#f8fafc';
+  hud.style.fontFamily = "'Poppins', sans-serif";
+  hud.style.fontSize = '12px';
+  hud.style.lineHeight = '1.35';
+  hud.style.display = 'none';
+  document.body.appendChild(hud);
+  return hud;
+}
+
+function getPaintTownActorState() {
+  if (appCtx.droneMode && appCtx.drone) {
+    return { x: appCtx.drone.x, z: appCtx.drone.z, feetY: appCtx.drone.y, mode: 'drone' };
+  }
+
+  if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker) {
+    const walker = appCtx.Walk.state.walker;
+    const eyeHeight = appCtx.Walk?.CFG?.eyeHeight || 1.7;
+    return { x: walker.x, z: walker.z, feetY: walker.y - eyeHeight, mode: 'walking' };
+  }
+
+  if (appCtx.car) {
+    return { x: appCtx.car.x, z: appCtx.car.z, feetY: appCtx.car.y, mode: 'driving' };
+  }
+
+  return null;
+}
+
+function getBuildingKey(building, index = 0) {
+  if (!building) return `building-${index}`;
+  if (building.sourceBuildingId) return String(building.sourceBuildingId);
+  if (building._paintTownKey) return building._paintTownKey;
+  const cx = Number.isFinite(building.centerX) ? Math.round(building.centerX * 10) : index;
+  const cz = Number.isFinite(building.centerZ) ? Math.round(building.centerZ * 10) : index;
+  const h = Number.isFinite(building.height) ? Math.round(building.height * 10) : 0;
+  building._paintTownKey = `building-${cx}-${cz}-${h}-${index}`;
+  return building._paintTownKey;
+}
+
+function buildingContainsPoint(building, x, z) {
+  if (!building) return false;
+  if (x < building.minX || x > building.maxX || z < building.minZ || z > building.maxZ) return false;
+  if (Array.isArray(building.pts) && building.pts.length >= 3 && typeof appCtx.pointInPolygon === 'function') {
+    if (appCtx.pointInPolygon(x, z, building.pts)) return true;
+    // Fallback to bbox acceptance for complex/concave OSM rings where centroid sampling is imperfect.
+    return true;
+  }
+  return true;
+}
+
+function getBuildingRoofY(building, x, z) {
+  let baseY = Number.isFinite(building?.baseY) ? building.baseY : NaN;
+  if (!Number.isFinite(baseY) && typeof appCtx.terrainMeshHeightAt === 'function') {
+    baseY = appCtx.terrainMeshHeightAt(x, z);
+  }
+  if (!Number.isFinite(baseY) && typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
+    baseY = appCtx.elevationWorldYAtWorldXZ(x, z);
+  }
+  if (!Number.isFinite(baseY) && Number.isFinite(building?.minY)) {
+    baseY = building.minY;
+  }
+  if (!Number.isFinite(baseY)) baseY = 0;
+  return baseY + (Number.isFinite(building?.height) ? building.height : 0);
+}
+
+function footprintsMatch(a, b) {
+  if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length || a.length === 0) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (Math.abs(a[i].x - b[i].x) > 0.05 || Math.abs(a[i].z - b[i].z) > 0.05) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function findPaintableRoofBuilding(actor) {
+  const mode = actor?.mode === 'drone' ? 'drone' : 'ground';
+  const preferredMin = mode === 'drone' ? -2.5 : -1.5;
+  const preferredMax = mode === 'drone' ? 9.5 : 4.0;
+  const fallbackAbsDelta = mode === 'drone' ? 14 : 6;
+
+  function pickCandidate(best, candidate) {
+    if (!best) return candidate;
+    if (candidate.absDelta < best.absDelta - 0.02) return candidate;
+    if (Math.abs(candidate.absDelta - best.absDelta) <= 0.02 && candidate.roofY > best.roofY) return candidate;
+    return best;
+  }
+
+  function scanCandidates(candidates) {
+    if (!Array.isArray(candidates) || candidates.length === 0) return null;
+    let bestPreferred = null;
+    let bestFallback = null;
+
+    for (let i = 0; i < candidates.length; i++) {
+      const building = candidates[i];
+      if (!buildingContainsPoint(building, actor.x, actor.z)) continue;
+      const roofY = getBuildingRoofY(building, actor.x, actor.z);
+      const verticalDelta = actor.feetY - roofY;
+      if (!Number.isFinite(verticalDelta)) continue;
+      const absDelta = Math.abs(verticalDelta);
+      const candidate = { building, roofY, key: getBuildingKey(building, i), absDelta };
+
+      if (verticalDelta >= preferredMin && verticalDelta <= preferredMax) {
+        bestPreferred = pickCandidate(bestPreferred, candidate);
+        continue;
+      }
+      if (absDelta <= fallbackAbsDelta) {
+        bestFallback = pickCandidate(bestFallback, candidate);
+      }
+    }
+
+    return bestPreferred || bestFallback;
+  }
+
+  const nearby = typeof appCtx.getNearbyBuildings === 'function' ?
+  appCtx.getNearbyBuildings(actor.x, actor.z, 14) :
+  appCtx.buildings;
+
+  const nearbyHit = scanCandidates(nearby);
+  if (nearbyHit) return nearbyHit;
+
+  if (nearby !== appCtx.buildings) {
+    return scanCandidates(appCtx.buildings);
+  }
+  return null;
+}
+
+function getBuildingMeshesForKey(key, building = null) {
+  if (!Array.isArray(appCtx.buildingMeshes) || appCtx.buildingMeshes.length === 0) return [];
+  const out = [];
+  for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
+    const mesh = appCtx.buildingMeshes[i];
+    if (!mesh || mesh.userData?.isBuildingBatch) continue;
+    const meshKey = mesh.userData?.sourceBuildingId ? String(mesh.userData.sourceBuildingId) : null;
+    if (meshKey && meshKey === key) {
+      out.push(mesh);
+      continue;
+    }
+    if (!building || !Array.isArray(building.pts)) continue;
+    const footprint = mesh.userData?.buildingFootprint;
+    if (!Array.isArray(footprint) || footprint.length === 0) continue;
+    if (footprint === building.pts || footprintsMatch(footprint, building.pts)) {
+      out.push(mesh);
+    }
+  }
+  return out;
+}
+
+function createPaintTownMaterial(baseMaterial, colorHex) {
+  const mat = baseMaterial?.isMaterial ?
+  baseMaterial.clone() :
+  new THREE.MeshStandardMaterial({ roughness: 0.8, metalness: 0.08 });
+
+  if (mat.color && typeof mat.color.setHex === 'function') {
+    mat.color.setHex(colorHex);
+  }
+  if ('map' in mat) mat.map = null;
+  if ('normalMap' in mat) mat.normalMap = null;
+  if ('roughnessMap' in mat) mat.roughnessMap = null;
+  if ('metalnessMap' in mat) mat.metalnessMap = null;
+  if ('aoMap' in mat) mat.aoMap = null;
+  if ('bumpMap' in mat) mat.bumpMap = null;
+  if ('emissive' in mat && mat.emissive && typeof mat.emissive.setHex === 'function') {
+    mat.emissive.setHex(0x220000);
+    mat.emissiveIntensity = 0.24;
+  }
+  if ('roughness' in mat && Number.isFinite(mat.roughness)) mat.roughness = Math.max(0.62, mat.roughness);
+  if ('metalness' in mat && Number.isFinite(mat.metalness)) mat.metalness = Math.min(0.2, mat.metalness);
+  mat.needsUpdate = true;
+  return mat;
+}
+
+function applyPaintToBuildingMesh(mesh) {
+  if (!mesh || mesh.userData?.paintTownPainted) return;
+
+  mesh.userData.paintTownOriginalMaterial = mesh.material;
+  const paintMaterials = Array.isArray(mesh.material) ?
+  mesh.material.map((mat, idx) => createPaintTownMaterial(mat, idx === 0 ? 0x8f1118 : 0xd61f2c)) :
+  createPaintTownMaterial(mesh.material, 0xd61f2c);
+  mesh.material = paintMaterials;
+  mesh.userData.paintTownPaintMaterials = paintMaterials;
+  mesh.userData.paintTownPainted = true;
+
+  const detailVisibility = [];
+  mesh.children.forEach((child) => {
+    if (child?.userData?.photorealBuildingDetail) {
+      detailVisibility.push({ child, visible: child.visible });
+      child.visible = false;
+    }
+  });
+  mesh.userData.paintTownDetailVisibility = detailVisibility;
+}
+
+function restorePaintTownMesh(mesh) {
+  if (!mesh || !mesh.userData?.paintTownPainted) return;
+
+  if (mesh.userData.paintTownOriginalMaterial) {
+    mesh.material = mesh.userData.paintTownOriginalMaterial;
+  }
+
+  const paintMaterials = mesh.userData.paintTownPaintMaterials;
+  if (Array.isArray(paintMaterials)) {
+    paintMaterials.forEach((mat) => mat?.dispose && mat.dispose());
+  } else if (paintMaterials?.dispose) {
+    paintMaterials.dispose();
+  }
+
+  if (Array.isArray(mesh.userData.paintTownDetailVisibility)) {
+    mesh.userData.paintTownDetailVisibility.forEach((entry) => {
+      if (entry?.child) entry.child.visible = !!entry.visible;
+    });
+  }
+
+  delete mesh.userData.paintTownOriginalMaterial;
+  delete mesh.userData.paintTownPaintMaterials;
+  delete mesh.userData.paintTownDetailVisibility;
+  delete mesh.userData.paintTownPainted;
+}
+
+function updatePaintTownHud(message = '') {
+  const state = ensurePaintTownState();
+  const hud = ensurePaintTownHud();
+  if (!state.active) {
+    hud.style.display = 'none';
+    hud.classList.remove('show');
+    return;
+  }
+
+  const hint = message || state.lastHint || 'Reach any rooftop and it auto-paints red.';
+  hud.innerHTML =
+  `<div style="font-weight:700;color:#fecaca;letter-spacing:0.02em;margin-bottom:4px">🟥 Paint the Town Red</div>` +
+  `<div>Time: <b>${fmtTime(state.timerSec)}</b> • Buildings: <b>${state.paintedBuildings}/${state.totalBuildings}</b></div>` +
+  `<div style="margin-top:4px;color:#cbd5e1;font-size:11px">${hint}</div>`;
+  hud.style.display = 'block';
+  hud.classList.add('show');
+}
+
+function resetPaintTownMode() {
+  const state = ensurePaintTownState();
+  state.active = false;
+  state.totalBuildings = 0;
+  state.paintedBuildings = 0;
+  state.paintedKeys.clear();
+  state.timerSec = PAINT_TOWN_DURATION_SEC;
+  state.lastHint = '';
+  state.autoPaintTickSec = 0;
+  state.scoreSubmitted = false;
+
+  if (Array.isArray(appCtx.buildingMeshes)) {
+    for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
+      restorePaintTownMesh(appCtx.buildingMeshes[i]);
+    }
+  }
+  updatePaintTownHud('');
+}
+
+function startPaintTownMode() {
+  const state = ensurePaintTownState();
+  resetPaintTownMode();
+  appCtx.disableNearBuildingBatching = true;
+
+  const buildingKeys = new Set();
+  if (Array.isArray(appCtx.buildings)) {
+    for (let i = 0; i < appCtx.buildings.length; i++) {
+      buildingKeys.add(getBuildingKey(appCtx.buildings[i], i));
+    }
+  }
+
+  state.totalBuildings = buildingKeys.size;
+  state.active = true;
+  state.timerSec = PAINT_TOWN_DURATION_SEC;
+  state.lastHint = '2-minute challenge: paint as many buildings as possible by landing on rooftops.';
+  state.autoPaintTickSec = 0;
+  state.scoreSubmitted = false;
+
+  if (state.totalBuildings <= 0) {
+    state.active = false;
+    state.lastHint = 'No paintable buildings found yet. Reload world or choose a denser city.';
+  }
+
+  updatePaintTownHud();
+}
+
+function stopPaintTownMode({ showSummary = false } = {}) {
+  const state = ensurePaintTownState();
+  if (!state.active && !showSummary) return;
+  state.active = false;
+  updatePaintTownHud();
+
+  if (!showSummary) return;
+  const pct = state.totalBuildings > 0 ?
+  Math.min(100, state.paintedBuildings / state.totalBuildings * 100) :
+  0;
+  if (!state.scoreSubmitted && typeof appCtx.submitPaintTownScore === 'function') {
+    state.scoreSubmitted = true;
+    const actor = getPaintTownActorState();
+    appCtx.submitPaintTownScore({
+      paintedPct: pct,
+      paintedBuildings: state.paintedBuildings,
+      totalBuildings: state.totalBuildings,
+      durationMs: PAINT_TOWN_DURATION_SEC * 1000,
+      mode: actor?.mode || 'driving'
+    });
+  }
+  showResult(
+    'Paint the Town Red',
+    `Painted ${state.paintedBuildings} buildings in ${fmtTime(PAINT_TOWN_DURATION_SEC)} (${state.totalBuildings} available)`
+  );
+}
+
+function attemptAutoPaintFromActor() {
+  const state = ensurePaintTownState();
+  if (!state.active || appCtx.paused || !appCtx.gameStarted || appCtx.gameMode !== 'painttown') return;
+
+  const actor = getPaintTownActorState();
+  if (!actor) return;
+
+  const hit = findPaintableRoofBuilding(actor);
+  if (!hit) return;
+  if (state.paintedKeys.has(hit.key)) return;
+
+  state.paintedKeys.add(hit.key);
+  state.paintedBuildings = state.paintedKeys.size;
+  const meshes = getBuildingMeshesForKey(hit.key, hit.building);
+  meshes.forEach((mesh) => applyPaintToBuildingMesh(mesh));
+  state.lastHint = `Auto-painted ${state.paintedBuildings}/${state.totalBuildings}.`;
+
+  if (state.paintedBuildings >= state.totalBuildings && state.totalBuildings > 0) {
+    stopPaintTownMode({ showSummary: true });
+    return;
+  }
+  updatePaintTownHud();
+}
+
 function pickRoadPt() {if (appCtx.roads.length === 0) return null;const rd = appCtx.roads[Math.floor(Math.random() * appCtx.roads.length)];return rd.pts[Math.floor(Math.random() * rd.pts.length)];}
 
 function clearObjectives() {
+  resetPaintTownMode();
+  if (appCtx.gameMode !== 'painttown') appCtx.disableNearBuildingBatching = false;
   appCtx.cpMeshes.forEach((m) => {
     appCtx.scene.remove(m);
     if (m.geometry) m.geometry.dispose();
@@ -1300,10 +1675,31 @@ function spawnCheckpoints() {
   }
 }
 
-function startMode() {appCtx.gameTimer = 0;clearObjectives();if (appCtx.gameMode === 'trial') spawnDest();else if (appCtx.gameMode === 'checkpoint') spawnCheckpoints();}
+function startMode() {
+  appCtx.gameTimer = 0;
+  clearObjectives();
+  clearPolice();
+  appCtx.policeOn = false;
+  const policeHud = document.getElementById('police');
+  if (policeHud) policeHud.classList.remove('show');
+  const policeToggle = document.getElementById('fPolice');
+  if (policeToggle) policeToggle.classList.remove('on');
+  if (typeof appCtx.stopFlowerChallenge === 'function') appCtx.stopFlowerChallenge();
+  if (appCtx.gameMode === 'trial') spawnDest();else
+  if (appCtx.gameMode === 'checkpoint') spawnCheckpoints();else
+  if (appCtx.gameMode === 'painttown') startPaintTownMode();else
+  if (appCtx.gameMode === 'police') {
+    appCtx.policeOn = true;
+    if (policeHud) policeHud.classList.add('show');
+    if (policeToggle) policeToggle.classList.add('on');
+    spawnPolice();
+  } else if (appCtx.gameMode === 'flower' && typeof appCtx.startFlowerChallenge === 'function') {
+    appCtx.startFlowerChallenge('game-mode');
+  }
+}
 
 function updateMode(dt) {
-  if (appCtx.gameMode === 'trial' || appCtx.gameMode === 'checkpoint') appCtx.gameTimer += dt;
+  if (appCtx.gameMode === 'trial' || appCtx.gameMode === 'checkpoint' || appCtx.gameMode === 'painttown') appCtx.gameTimer += dt;
   appCtx.cpMeshes.forEach((m) => m.rotation.y += dt * 1.5);
   if (appCtx.destMesh) appCtx.destMesh.rotation.y += dt * 1.2;
   if (appCtx.gameMode === 'trial' && appCtx.destination && !appCtx.trialDone) {
@@ -1320,6 +1716,19 @@ function updateMode(dt) {
         if (appCtx.cpCollected >= appCtx.checkpoints.length) showResult('All Checkpoints!', 'Time: ' + fmtTime(appCtx.gameTimer));
         break;
       }
+    }
+  }
+  if (appCtx.gameMode === 'painttown') {
+    const state = ensurePaintTownState();
+    if (state.active) {
+      state.timerSec = Math.max(0, PAINT_TOWN_DURATION_SEC - appCtx.gameTimer);
+      state.autoPaintTickSec = Math.max(0, (state.autoPaintTickSec || 0) - dt);
+      if (state.autoPaintTickSec <= 0) {
+        state.autoPaintTickSec = 0.15;
+        attemptAutoPaintFromActor();
+      }
+      updatePaintTownHud();
+      if (state.timerSec <= 0) stopPaintTownMode({ showSummary: true });
     }
   }
 }
@@ -1357,7 +1766,9 @@ Object.assign(appCtx, {
   spawnCheckpoints,
   spawnDest,
   spawnPolice,
+  startPaintTownMode,
   startMode,
+  stopPaintTownMode,
   toggleAllGameElements,
   toggleAllLayers,
   toggleAllPOIs,
@@ -1403,7 +1814,9 @@ export {
   spawnCheckpoints,
   spawnDest,
   spawnPolice,
+  startPaintTownMode,
   startMode,
+  stopPaintTownMode,
   toggleAllGameElements,
   toggleAllLayers,
   toggleAllPOIs,

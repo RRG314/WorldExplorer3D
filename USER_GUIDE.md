@@ -1,20 +1,21 @@
 # User Guide
 
-Last reviewed: 2026-02-16
+Last reviewed: 2026-02-19
 
 This guide is for players and subscribers using the hosted World Explorer experience.
 
 ## 1. Where to Start
 
+Firebase-hosted URLs:
+
 - Landing page: `https://worldexplorer3d-d9b83.web.app/`
 - Play runtime: `https://worldexplorer3d-d9b83.web.app/app/`
 - Account/billing: `https://worldexplorer3d-d9b83.web.app/account/`
 
-GitHub mirror URLs (when using Pages):
+GitHub Pages URLs:
 
-- Landing: `https://rrg314.github.io/WorldExplorer/`
-- Play runtime: `https://rrg314.github.io/WorldExplorer/app/`
-- Account: `https://rrg314.github.io/WorldExplorer/account/`
+- Branch-root mode: `https://rrg314.github.io/WorldExplorer/` (root runtime)
+- `public/` mode (if configured): `https://rrg314.github.io/WorldExplorer/app/` and `.../account/`
 
 ## 2. Sign In and Trial
 
@@ -82,7 +83,23 @@ Checkout flow:
 - Panel auto-hides after a few seconds
 - Pro users keep access to Pro controls
 
+### Graphics settings
+
+- Open `Settings` on the title screen
+- `Photoreal Buildings (Beta)` toggles enhanced building materials
+- Setting is stored in browser local storage (`worldExplorerPhotorealBuildings`)
+- If changed before starting, it applies on next `Explore`
+
 ## 6. Gameplay Controls
+
+### Game Modes (Title Screen -> Game Mode)
+
+- Free Roam: open exploration with no objective timer
+- Time Trial: reach destination before timer expires
+- Checkpoints: collect all checkpoints as quickly as possible
+- Paint the Town Red: 2-minute rooftop challenge; score is buildings painted
+- Police Chase: starts with police pursuit enabled
+- Find the Flower: starts the red-flower challenge immediately
 
 ### Desktop
 
@@ -105,10 +122,15 @@ Mode-specific touch controls are shown automatically:
 
 Desktop is still recommended for highest performance.
 
-## 7. Leaderboard and Memories
+## 7. Challenges, Build Mode, and Memories
 
-- Red-flower challenge supports leaderboard entries.
-- Leaderboard uses Firestore when available, with local fallback when unavailable.
+- Red-flower challenge supports leaderboard entries (best time).
+- Paint challenge supports leaderboard entries (most buildings painted in 2:00).
+- Challenge panel includes both `Flower` and `Paint` leaderboard tabs.
+- Leaderboards use Firestore when available, with local fallback when unavailable.
+- Build mode supports click-based block placement on world surfaces.
+- Cars collide with placed blocks.
+- Walking character collides with block sides and can stand on top of blocks.
 - Memory markers and several user settings rely on browser storage.
 
 ## 8. Privacy and Terms

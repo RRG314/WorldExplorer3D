@@ -569,11 +569,12 @@ function getBuildTopSurfaceAtWorldXZ(x, z, maxTopY = Infinity) {
   return Number.isFinite(best) ? best : null;
 }
 
-function getBuildCollisionAtWorldXZ(x, z, feetY, stepHeight = 0.65) {
+function getBuildCollisionAtWorldXZ(x, z, feetY, stepHeight = 0.65, bodyHeight = 0) {
   if (!Number.isFinite(feetY)) {
     return { blocked: false, stepTopY: null };
   }
 
+  const actorTopY = feetY + Math.max(0, Number.isFinite(bodyHeight) ? bodyHeight : 0);
   let blocked = false;
   let stepTopY = -Infinity;
 
@@ -581,7 +582,9 @@ function getBuildCollisionAtWorldXZ(x, z, feetY, stepHeight = 0.65) {
     const bottomY = toWorldCoord(gy) - BUILD_HALF;
     const topY = toWorldCoord(gy) + BUILD_HALF;
 
-    if (feetY < bottomY - 0.02) return;
+    // Block is fully above the actor volume.
+    if (actorTopY <= bottomY + 0.02) return;
+    // Actor feet already above this block.
     if (feetY >= topY - 0.02) return;
 
     const requiredStep = topY - feetY;
@@ -683,6 +686,11 @@ function raycastBuildAction(event) {
   }
   if (Array.isArray(appCtx.landuseMeshes)) {
     appCtx.landuseMeshes.forEach((mesh) => {
+      if (mesh && mesh.visible) worldTargets.push(mesh);
+    });
+  }
+  if (appCtx.terrainGroup && Array.isArray(appCtx.terrainGroup.children)) {
+    appCtx.terrainGroup.children.forEach((mesh) => {
       if (mesh && mesh.visible) worldTargets.push(mesh);
     });
   }

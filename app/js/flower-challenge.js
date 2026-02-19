@@ -1,9 +1,11 @@
 import { ctx as appCtx } from "./shared-context.js?v=54";
 
 const LOCAL_LEADERBOARD_KEY = 'worldExplorer3D.flowerChallenge.localLeaderboard.v1';
+const LOCAL_PAINT_LEADERBOARD_KEY = 'worldExplorer3D.paintTown.localLeaderboard.v1';
 const PLAYER_NAME_KEY = 'worldExplorer3D.flowerChallenge.playerName';
 const FIREBASE_CONFIG_KEY = 'worldExplorer3D.firebaseConfig';
 const FIREBASE_COLLECTION = 'flowerLeaderboard';
+const FIREBASE_PAINT_COLLECTION = 'paintTownLeaderboard';
 const LEADERBOARD_LIMIT = 10;
 const FLOWER_MIN_DISTANCE = 120;
 const FLOWER_MAX_DISTANCE = 2600;
@@ -24,6 +26,7 @@ const challengeState = {
   firebaseReady: false,
   firebase: null,
   leaderboardBackend: 'local',
+  leaderboardView: 'flower',
   statusTimer: null,
   lastHudRenderMs: 0
 };
@@ -36,6 +39,8 @@ const ui = {
   titleLocation: null,
   titleStartBtn: null,
   titleRefreshBtn: null,
+  titleFlowerTabBtn: null,
+  titlePaintTabBtn: null,
   titleList: null,
   hud: null,
   gameStatus: null,
@@ -69,6 +74,22 @@ function safeText(value) {
     '"': '&quot;',
     "'": '&#39;'
   })[ch]);
+}
+
+function normalizeChallengeType(raw) {
+  return raw === 'painttown' ? 'painttown' : 'flower';
+}
+
+function getLeaderboardStorageKey(challengeType) {
+  return normalizeChallengeType(challengeType) === 'painttown' ?
+  LOCAL_PAINT_LEADERBOARD_KEY :
+  LOCAL_LEADERBOARD_KEY;
+}
+
+function getLeaderboardCollection(challengeType) {
+  return normalizeChallengeType(challengeType) === 'painttown' ?
+  FIREBASE_PAINT_COLLECTION :
+  FIREBASE_COLLECTION;
 }
 
 function getSelectedTitleLocationLabel() {
@@ -243,7 +264,6 @@ async function ensureFirebase() {
     resetFirebaseInitState();
     return false;
   }
-
   if (challengeState.firebaseInitPromise) return challengeState.firebaseInitPromise;
 
   challengeState.firebaseInitPromise = (async () => {
@@ -288,26 +308,40 @@ async function ensureFirebase() {
 if (typeof globalThis.addEventListener === 'function') {
   globalThis.addEventListener('we3d-entitlements-changed', () => {
     resetFirebaseInitState();
-    refreshFlowerLeaderboard();
+    refreshFlowerLeaderboard(challengeState.leaderboardView);
   });
 }
 
-function normalizeLeaderboardEntry(raw) {
+function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
   if (!raw || typeof raw !== 'object') return null;
+  const challenge = normalizeChallengeType(forcedChallengeType || raw.challenge || raw.challengeType);
   const player = sanitizePlayerName(raw.player || raw.name || 'Explorer');
-  const timeMs = Number(raw.timeMs);
-  if (!Number.isFinite(timeMs) || timeMs <= 0) return null;
-
   const location = String(raw.location || 'Unknown Location').slice(0, 80);
   const lat = Number(raw.lat);
   const lon = Number(raw.lon);
   const mode = String(raw.mode || 'driving').slice(0, 24);
   const foundAt = raw.foundAt || raw.createdAtIso || new Date().toISOString();
+  const timeMs = Number(raw.timeMs);
+  const paintedPct = Number(raw.paintedPct);
+  const paintedBuildings = Number(raw.paintedBuildings);
+  const totalBuildings = Number(raw.totalBuildings);
+
+  if (challenge === 'flower') {
+    if (!Number.isFinite(timeMs) || timeMs <= 0) return null;
+  } else {
+    const hasCount = Number.isFinite(paintedBuildings) && paintedBuildings >= 0;
+    const hasPct = Number.isFinite(paintedPct) && paintedPct >= 0;
+    if (!hasCount && !hasPct) return null;
+  }
 
   return {
     id: String(raw.id || raw.docId || `entry_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`),
+    challenge,
     player,
-    timeMs,
+    timeMs: Number.isFinite(timeMs) && timeMs > 0 ? timeMs : null,
+    paintedPct: Number.isFinite(paintedPct) ? Math.max(0, Math.min(100, paintedPct)) : null,
+    paintedBuildings: Number.isFinite(paintedBuildings) ? Math.max(0, Math.round(paintedBuildings)) : 0,
+    totalBuildings: Number.isFinite(totalBuildings) ? Math.max(0, Math.round(totalBuildings)) : 0,
     location,
     lat: Number.isFinite(lat) ? lat : null,
     lon: Number.isFinite(lon) ? lon : null,
@@ -316,35 +350,70 @@ function normalizeLeaderboardEntry(raw) {
   };
 }
 
-function readLocalLeaderboard() {
+function sortLeaderboardEntries(entries, challengeType = 'flower') {
+  const normalizedType = normalizeChallengeType(challengeType);
+  if (normalizedType === 'painttown') {
+    return entries.slice().sort((a, b) => compareLeaderboardEntries(a, b, normalizedType));
+  }
+  return entries.slice().sort((a, b) => compareLeaderboardEntries(a, b, normalizedType));
+}
+
+function compareLeaderboardEntries(a, b, challengeType = 'flower') {
+  const normalizedType = normalizeChallengeType(challengeType);
+  if (normalizedType === 'painttown') {
+    const countDelta = (Number(b.paintedBuildings) || 0) - (Number(a.paintedBuildings) || 0);
+    if (countDelta !== 0) return countDelta;
+    const pctDelta = (Number(b.paintedPct) || 0) - (Number(a.paintedPct) || 0);
+    if (Math.abs(pctDelta) > 0.0001) return pctDelta;
+    return String(b.foundAt || '').localeCompare(String(a.foundAt || ''));
+  }
+  return (Number(a.timeMs) || Infinity) - (Number(b.timeMs) || Infinity);
+}
+
+function readLocalLeaderboard(challengeType = 'flower') {
+  const normalizedType = normalizeChallengeType(challengeType);
   try {
-    const raw = localStorage.getItem(LOCAL_LEADERBOARD_KEY);
+    const raw = localStorage.getItem(getLeaderboardStorageKey(normalizedType));
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
-    return parsed.map(normalizeLeaderboardEntry).filter(Boolean).sort((a, b) => a.timeMs - b.timeMs).slice(0, LEADERBOARD_LIMIT);
+    return sortLeaderboardEntries(
+      parsed.map((entry) => normalizeLeaderboardEntry(entry, normalizedType)).filter(Boolean),
+      normalizedType
+    ).slice(0, LEADERBOARD_LIMIT);
   } catch (_) {
     return [];
   }
 }
 
-function writeLocalLeaderboard(entries) {
+function writeLocalLeaderboard(challengeType, entries) {
+  const normalizedType = normalizeChallengeType(challengeType);
   try {
-    localStorage.setItem(LOCAL_LEADERBOARD_KEY, JSON.stringify(entries.slice(0, LEADERBOARD_LIMIT)));
+    localStorage.setItem(
+      getLeaderboardStorageKey(normalizedType),
+      JSON.stringify(sortLeaderboardEntries(entries, normalizedType).slice(0, LEADERBOARD_LIMIT))
+    );
     return true;
   } catch (_) {
     return false;
   }
 }
 
-async function readRemoteLeaderboard() {
+async function readRemoteLeaderboard(challengeType = 'flower') {
+  const normalizedType = normalizeChallengeType(challengeType);
   const ready = await ensureFirebase();
   if (!ready || !challengeState.firebase) return null;
 
   try {
     const { db, firestoreMod } = challengeState.firebase;
-    const leaderboardRef = firestoreMod.collection(db, FIREBASE_COLLECTION);
-    const q = firestoreMod.query(
+    const leaderboardRef = firestoreMod.collection(db, getLeaderboardCollection(normalizedType));
+    const q = normalizedType === 'painttown' ?
+    firestoreMod.query(
+      leaderboardRef,
+      firestoreMod.orderBy('paintedBuildings', 'desc'),
+      firestoreMod.limit(LEADERBOARD_LIMIT)
+    ) :
+    firestoreMod.query(
       leaderboardRef,
       firestoreMod.orderBy('timeMs', 'asc'),
       firestoreMod.limit(LEADERBOARD_LIMIT)
@@ -352,9 +421,9 @@ async function readRemoteLeaderboard() {
 
     const snap = await firestoreMod.getDocs(q);
     const entries = snap.docs.
-    map((doc) => normalizeLeaderboardEntry({ ...doc.data(), id: doc.id })).
+    map((doc) => normalizeLeaderboardEntry({ ...doc.data(), id: doc.id }, normalizedType)).
     filter(Boolean).
-    sort((a, b) => a.timeMs - b.timeMs).
+    sort((a, b) => compareLeaderboardEntries(a, b, normalizedType)).
     slice(0, LEADERBOARD_LIMIT);
 
     return entries;
@@ -365,22 +434,28 @@ async function readRemoteLeaderboard() {
   }
 }
 
-async function writeRemoteLeaderboard(entry) {
+async function writeRemoteLeaderboard(challengeType, entry) {
+  const normalizedType = normalizeChallengeType(challengeType);
   const ready = await ensureFirebase();
   if (!ready || !challengeState.firebase) return false;
 
   try {
     const { db, firestoreMod } = challengeState.firebase;
-    await firestoreMod.addDoc(firestoreMod.collection(db, FIREBASE_COLLECTION), {
+    const payload = {
+      challenge: normalizedType,
       player: entry.player,
       timeMs: entry.timeMs,
+      paintedPct: entry.paintedPct,
+      paintedBuildings: entry.paintedBuildings,
+      totalBuildings: entry.totalBuildings,
       location: entry.location,
       lat: entry.lat,
       lon: entry.lon,
       mode: entry.mode,
       createdAtIso: entry.foundAt,
       createdAt: firestoreMod.serverTimestamp()
-    });
+    };
+    await firestoreMod.addDoc(firestoreMod.collection(db, getLeaderboardCollection(normalizedType)), payload);
     challengeState.leaderboardBackend = 'firebase';
     return true;
   } catch (err) {
@@ -392,41 +467,62 @@ async function writeRemoteLeaderboard(entry) {
 
 function renderLeaderboard(entries) {
   if (!ui.titleList) return;
+  const challengeType = normalizeChallengeType(challengeState.leaderboardView);
 
   if (!entries || entries.length === 0) {
-    ui.titleList.innerHTML = '<li class="flowerLeaderboardEmpty">No runs yet. Be the first.</li>';
+    ui.titleList.innerHTML = challengeType === 'painttown' ?
+    '<li class="flowerLeaderboardEmpty">No paint runs yet. Reach rooftops to paint and post a score.</li>' :
+    '<li class="flowerLeaderboardEmpty">No flower runs yet. Be the first.</li>';
     return;
   }
 
   ui.titleList.innerHTML = entries.map((entry, idx) => {
-    const sec = (entry.timeMs / 1000).toFixed(2);
+    const metric = challengeType === 'painttown' ?
+    `${Math.max(0, Math.round(Number(entry.paintedBuildings) || 0))} bldgs` :
+    `${((Number(entry.timeMs) || 0) / 1000).toFixed(2)}s`;
+    const locationLine = challengeType === 'painttown' ?
+    `${safeText(entry.location)} • ${safeText((entry.paintedBuildings || 0) + '/' + (entry.totalBuildings || 0))}` :
+    safeText(entry.location);
     return `<li class="flowerLeaderboardItem">
       <span class="flowerLeaderboardRank">#${idx + 1}</span>
       <span class="flowerLeaderboardPlayer">${safeText(entry.player)}</span>
-      <span class="flowerLeaderboardTime">${safeText(sec)}s</span>
-      <span class="flowerLeaderboardLoc">${safeText(entry.location)}</span>
+      <span class="flowerLeaderboardTime">${safeText(metric)}</span>
+      <span class="flowerLeaderboardLoc">${locationLine}</span>
     </li>`;
   }).join('');
 }
 
-async function refreshFlowerLeaderboard() {
-  const remoteEntries = await readRemoteLeaderboard();
-  const entries = remoteEntries || readLocalLeaderboard();
+async function refreshFlowerLeaderboard(challengeType = challengeState.leaderboardView || 'flower') {
+  const normalizedType = normalizeChallengeType(challengeType);
+  challengeState.leaderboardView = normalizedType;
+  if (ui.titleFlowerTabBtn) ui.titleFlowerTabBtn.classList.toggle('active', normalizedType === 'flower');
+  if (ui.titlePaintTabBtn) ui.titlePaintTabBtn.classList.toggle('active', normalizedType === 'painttown');
+  if (ui.titleStartBtn) {
+    const flowerView = normalizedType === 'flower';
+    ui.titleStartBtn.style.display = flowerView ? '' : 'none';
+    ui.titleStartBtn.disabled = !flowerView;
+  }
+  const remoteEntries = await readRemoteLeaderboard(normalizedType);
+  const entries = remoteEntries || readLocalLeaderboard(normalizedType);
   renderLeaderboard(entries);
 
   if (ui.status) {
-    const backendLabel = challengeState.leaderboardBackend === 'firebase' ? 'Firebase live leaderboard' : 'Local leaderboard fallback';
+    const prefix = normalizedType === 'painttown' ? 'Paint leaderboard' : 'Flower leaderboard';
+    const backendLabel = challengeState.leaderboardBackend === 'firebase' ?
+    `${prefix}: Firebase live` :
+    `${prefix}: Local fallback`;
     ui.status.dataset.backend = backendLabel;
   }
 
   return entries;
 }
 
-function storeLocalResult(entry) {
-  const current = readLocalLeaderboard();
+function storeLocalResult(challengeType, entry) {
+  const normalizedType = normalizeChallengeType(challengeType);
+  const current = readLocalLeaderboard(normalizedType);
   current.push(entry);
-  current.sort((a, b) => a.timeMs - b.timeMs);
-  writeLocalLeaderboard(current.slice(0, LEADERBOARD_LIMIT));
+  const sorted = sortLeaderboardEntries(current, normalizedType).slice(0, LEADERBOARD_LIMIT);
+  writeLocalLeaderboard(normalizedType, sorted);
 }
 
 function worldToLatLon(x, z) {
@@ -439,6 +535,53 @@ function worldToLatLon(x, z) {
     lat: Number((baseLat - z / scale).toFixed(6)),
     lon: Number((baseLon + x / (scale * cosLat)).toFixed(6))
   };
+}
+
+function capturePaintTownEntry(payload = {}) {
+  const player = resolvePlayerName();
+  const loc = getRuntimeLocationLabel();
+  const actor = getActiveActorPosition() || { x: appCtx.car?.x || 0, z: appCtx.car?.z || 0 };
+  const ll = worldToLatLon(actor.x || 0, actor.z || 0);
+  const paintedPct = Number(payload.paintedPct);
+  const paintedBuildings = Number(payload.paintedBuildings);
+  const totalBuildings = Number(payload.totalBuildings);
+  const durationMs = Number(payload.durationMs);
+
+  return normalizeLeaderboardEntry({
+    id: `paint_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+    challenge: 'painttown',
+    player,
+    paintedPct: Number.isFinite(paintedPct) ? paintedPct : 0,
+    paintedBuildings: Number.isFinite(paintedBuildings) ? paintedBuildings : 0,
+    totalBuildings: Number.isFinite(totalBuildings) ? totalBuildings : 0,
+    timeMs: Number.isFinite(durationMs) && durationMs > 0 ? durationMs : 120000,
+    location: loc,
+    lat: ll.lat,
+    lon: ll.lon,
+    mode: String(payload.mode || inferTravelMode()),
+    foundAt: new Date().toISOString()
+  }, 'painttown');
+}
+
+async function submitPaintTownScore(payload = {}) {
+  const entry = capturePaintTownEntry(payload);
+  if (!entry) return null;
+
+  const remoteSaved = await writeRemoteLeaderboard('painttown', entry);
+  if (!remoteSaved) {
+    storeLocalResult('painttown', entry);
+  }
+  await refreshFlowerLeaderboard(challengeState.leaderboardView);
+  setTitleStatus(
+    `${entry.player} painted ${entry.paintedBuildings || 0} buildings in 2:00 at ${entry.location}.`,
+    'ok'
+  );
+  return entry;
+}
+
+function setChallengeLeaderboardView(challengeType = 'flower') {
+  challengeState.leaderboardView = normalizeChallengeType(challengeType);
+  return refreshFlowerLeaderboard(challengeState.leaderboardView);
 }
 
 function isInsidePolygon(x, z, pts) {
@@ -652,12 +795,12 @@ async function completeChallenge() {
   challengeState.active = false;
   removeFlowerMarker();
 
-  const remoteSaved = await writeRemoteLeaderboard(entry);
+  const remoteSaved = await writeRemoteLeaderboard('flower', entry);
   if (!remoteSaved) {
-    storeLocalResult(entry);
+    storeLocalResult('flower', entry);
   }
 
-  await refreshFlowerLeaderboard();
+  await refreshFlowerLeaderboard(challengeState.leaderboardView);
 
   setTitleStatus(
     `${entry.player} found the red flower in ${(entry.timeMs / 1000).toFixed(2)}s at ${entry.location}.`,
@@ -854,6 +997,8 @@ function setupFlowerChallenge() {
   ui.titleLocation = document.getElementById('flowerChallengeLocation');
   ui.titleStartBtn = document.getElementById('titleFindFlowerBtn');
   ui.titleRefreshBtn = document.getElementById('titleFlowerRefreshBtn');
+  ui.titleFlowerTabBtn = document.getElementById('leaderboardTabFlower');
+  ui.titlePaintTabBtn = document.getElementById('leaderboardTabPaintTown');
   ui.titleList = document.getElementById('flowerLeaderboardList');
   ui.hud = document.getElementById('flowerChallengeHud');
   ui.gameStatus = document.getElementById('flowerChallengeHudStatus');
@@ -896,7 +1041,19 @@ function setupFlowerChallenge() {
 
   if (ui.titleRefreshBtn) {
     ui.titleRefreshBtn.addEventListener('click', () => {
-      refreshFlowerLeaderboard();
+      refreshFlowerLeaderboard(challengeState.leaderboardView);
+    });
+  }
+
+  if (ui.titleFlowerTabBtn) {
+    ui.titleFlowerTabBtn.addEventListener('click', () => {
+      setChallengeLeaderboardView('flower');
+    });
+  }
+
+  if (ui.titlePaintTabBtn) {
+    ui.titlePaintTabBtn.addEventListener('click', () => {
+      setChallengeLeaderboardView('painttown');
     });
   }
 
@@ -909,7 +1066,7 @@ function setupFlowerChallenge() {
 
   challengeUiBound = true;
   setTitlePanelOpen(false);
-  refreshFlowerLeaderboard();
+  refreshFlowerLeaderboard(challengeState.leaderboardView);
 }
 
 function getFlowerChallengeBackendStatus() {
@@ -927,8 +1084,10 @@ Object.assign(appCtx, {
   getFlowerChallengeBackendStatus,
   refreshFlowerLeaderboard,
   requestFlowerChallengeFromTitle,
+  setChallengeLeaderboardView,
   setupFlowerChallenge,
   startFlowerChallenge,
+  submitPaintTownScore,
   stopFlowerChallenge,
   toggleFlowerActionMenu,
   updateFlowerChallenge
@@ -944,8 +1103,10 @@ export {
   getFlowerChallengeBackendStatus,
   refreshFlowerLeaderboard,
   requestFlowerChallengeFromTitle,
+  setChallengeLeaderboardView,
   setupFlowerChallenge,
   startFlowerChallenge,
+  submitPaintTownScore,
   stopFlowerChallenge,
   toggleFlowerActionMenu,
   updateFlowerChallenge
