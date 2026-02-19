@@ -1,6 +1,6 @@
 # User Guide
 
-Last reviewed: 2026-02-18
+Last reviewed: 2026-02-19
 
 This guide is for players and subscribers using the hosted World Explorer experience.
 
@@ -92,6 +92,15 @@ Checkout flow:
 
 ## 6. Gameplay Controls
 
+### Game Modes (Title Screen -> Game Mode)
+
+- Free Roam: open exploration with no objective timer
+- Time Trial: reach destination before timer expires
+- Checkpoints: collect all checkpoints as quickly as possible
+- Paint the Town Red: 2-minute rooftop challenge; score is buildings painted
+- Police Chase: starts with police pursuit enabled
+- Find the Flower: starts the red-flower challenge immediately
+
 ### Desktop
 
 - Move/drive: `WASD` or arrows
@@ -113,10 +122,15 @@ Mode-specific touch controls are shown automatically:
 
 Desktop is still recommended for highest performance.
 
-## 7. Leaderboard and Memories
+## 7. Challenges, Build Mode, and Memories
 
-- Red-flower challenge supports leaderboard entries.
-- Leaderboard uses Firestore when available, with local fallback when unavailable.
+- Red-flower challenge supports leaderboard entries (best time).
+- Paint challenge supports leaderboard entries (most buildings painted in 2:00).
+- Challenge panel includes both `Flower` and `Paint` leaderboard tabs.
+- Leaderboards use Firestore when available, with local fallback when unavailable.
+- Build mode supports click-based block placement on world surfaces.
+- Cars collide with placed blocks.
+- Walking character collides with block sides and can stand on top of blocks.
 - Memory markers and several user settings rely on browser storage.
 
 ## 8. Privacy and Terms

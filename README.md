@@ -24,6 +24,29 @@ All rights are reserved unless explicitly granted by the owner.
 - `/legal/privacy` - privacy policy
 - `/legal/terms` - terms
 
+## Current Gameplay Highlights
+
+- Earth exploration with live switching between:
+  - driving
+  - walking
+  - drone
+- Space flight and Moon travel:
+  - direct moon transfer
+  - rocket-to-moon mode
+  - return-to-earth flow
+- Challenge modes from title-screen `Game Mode`:
+  - Free Roam
+  - Time Trial
+  - Checkpoints
+  - Paint the Town Red (2-minute building-paint challenge)
+  - Police Chase
+  - Find the Flower
+- Build mode improvements:
+  - click-accurate placement across roads/terrain/surfaces
+  - vehicle collision against placed blocks
+  - walking collision + standing on top of placed blocks
+- Scrollable landing-page `Gameplay` visual section with expanded screenshots and captions
+
 ## Plan and Trial Model
 
 - `Free`
@@ -52,6 +75,7 @@ public/
   legal/privacy.html
   legal/terms.html
   assets/landing/*
+  assets/landing/gameplay/*     # gameplay gallery visuals
   js/firebase-init.js
   js/auth-ui.js
   js/entitlements.js
@@ -189,6 +213,13 @@ Key fields used by runtime/account/functions:
 - `stripeSubscriptionId`
 - `entitlements`
 
+## Challenge Data Notes
+
+- Runtime challenge panel supports both `flower` and `paint town` leaderboard views.
+- Cloud leaderboard writes are enabled for authenticated users where Firestore
+  rules/collections are configured.
+- Local-storage fallback remains active when cloud writes are unavailable.
+
 ## Current Operational Notes
 
 - Cloud Functions currently use `functions.config().stripe.*` and emit Firebase deprecation warnings.
@@ -205,3 +236,4 @@ Key fields used by runtime/account/functions:
 - `/Users/stevenreid/Documents/New project/KNOWN_ISSUES.md`
 - `/Users/stevenreid/Documents/New project/CHANGELOG.md`
 - `/Users/stevenreid/Documents/New project/progress.md`
+- `/Users/stevenreid/Documents/New project/COMPLETE_INVENTORY_REPORT_2026-02-19.md`

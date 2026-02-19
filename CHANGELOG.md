@@ -4,6 +4,23 @@
 
 ### Added
 
+- New title-screen game modes:
+  - `Paint the Town Red`
+  - `Police Chase`
+  - `Find the Flower`
+- Paint challenge progression and scoring model:
+  - 2-minute timer
+  - score tracked as `painted buildings` (count) rather than percentage display
+  - leaderboard support for best building-count runs
+- Dual challenge leaderboard categories in the challenge panel:
+  - `Flower` (fastest time)
+  - `Paint` (most buildings in 2:00)
+- Expanded landing page gameplay gallery with additional screenshots and descriptions
+  covering:
+  - Earth driving/walking/drone
+  - Moon driving/walking/drone
+  - Space flight
+  - Paint challenge, police chase, and memory interactions
 - Firebase Hosting production route split:
   - `/`
   - `/app/`
@@ -50,6 +67,18 @@
 
 ### Changed
 
+- Paint the Town Red HUD copy and status format now emphasizes
+  `Time + Buildings painted/total buildings`.
+- Moon vehicle movement tuned for more realistic behavior:
+  - stronger low-speed acceleration response
+  - better ground adhesion on uneven lunar terrain
+  - reduced "bouncing ball" feel during normal driving
+- Build mode placement uses world raycast targets (roads, terrain, surfaces) so
+  blocks land at the clicked world position more consistently across ground types.
+- Build block interactions updated:
+  - vehicles are blocked by placed blocks
+  - walking character can stand on top of blocks
+  - walking character no longer phases through block walls
 - App auth/account controls moved to left floating panel; top-center plan/account HUD removed.
 - Pro early-access panel now auto-hides after a short delay for non-Pro users.
 - Landing hero now includes explicit `World Explorer` title line.
@@ -61,11 +90,42 @@
 
 ### Fixed
 
+- Paint challenge rooftop landing detection now reliably applies building paint
+  and updates challenge counters.
+- Paint challenge timer/readout synchronization issues in HUD messaging.
+- Character/build-block collision gaps that previously allowed walking through
+  placed blocks.
 - Auth panel hidden-row rendering bug (`.auth-row[hidden]`).
 - Auto-open sign-in behavior from `?startTrial=1`; now prompts without forced panel open.
 - Auth panel close behavior (outside click and ESC reliability).
 - Checkout failures caused by missing Stripe config now return actionable errors.
 - Dangerous-site false-positive risk reduced by removing unstable proxy fallback from app input path.
+
+## [2026-02-18]
+
+### Gameplay Update
+
+- Added `Paint the Town Red`, `Police Chase`, and `Find the Flower` to title-screen
+  `Game Mode` selection.
+- Switched Paint challenge scoring UI from percentage emphasis to building-count
+  challenge output over a fixed 2-minute run.
+- Expanded challenge leaderboard support to include paint runs and flower runs.
+- Updated build-mode collision behavior so:
+  - cars are blocked by placed blocks
+  - players collide with block walls
+  - players can stand on top of placed blocks
+
+### Documentation Update
+
+- Updated branch docs to reflect current gameplay systems and challenge modes:
+  - `README.md`
+  - `USER_GUIDE.md`
+  - `TECHNICAL_DOCS.md`
+  - `ARCHITECTURE.md`
+  - `KNOWN_ISSUES.md`
+  - `DOCUMENTATION_INDEX.md`
+- Added updated inventory snapshot:
+  - `COMPLETE_INVENTORY_REPORT_2026-02-19.md`
 
 ## [2026-02-16]
 

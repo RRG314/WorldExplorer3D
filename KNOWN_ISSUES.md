@@ -1,6 +1,6 @@
 # Known Issues
 
-Last reviewed: 2026-02-16
+Last reviewed: 2026-02-19
 
 This file tracks active risks and required follow-up work.
 
@@ -40,7 +40,22 @@ Required fix:
 
 ## Medium Priority
 
-### 4. Stripe Mode Drift (Test vs Live)
+### 4. Paint Challenge Cloud Leaderboard Rule Coverage
+
+Current runtime supports both flower and paint leaderboard data paths.
+Firestore rules currently define explicit create permissions for `flowerLeaderboard`.
+
+Risk:
+
+- Paint leaderboard cloud writes can fail policy checks and silently fall back to
+  local leaderboard behavior for some users.
+
+Mitigation:
+
+- add explicit Firestore rule coverage for paint leaderboard collection path
+- verify with emulator + production rules test
+
+### 5. Stripe Mode Drift (Test vs Live)
 
 Operational issue observed repeatedly during setup.
 
@@ -53,7 +68,7 @@ Mitigation:
 - keep explicit mode-specific setup checklists in docs
 - verify `firebase functions:config:get` values before billing tests
 
-### 5. Safe Browsing Reputation Flags
+### 6. Safe Browsing Reputation Flags
 
 A browser dangerous-site warning was observed on hosted URL in prior testing.
 
@@ -66,7 +81,7 @@ Mitigation:
 - verify Search Console/Safe Browsing status
 - use custom domain and security review workflow
 
-### 6. Cloud Sync Feature Completeness
+### 7. Cloud Sync Feature Completeness
 
 Entitlement includes cloud sync flags, but full gameplay memory/block sync behavior is still primarily local-storage based.
 
@@ -80,14 +95,14 @@ Mitigation:
 
 ## Low Priority
 
-### 7. Auth UX Polishing
+### 8. Auth UX Polishing
 
 Float auth panel behavior is functional, but additional polish can improve UX:
 
 - loading states and field-level validation styling
 - stronger inline provider-status messaging
 
-### 8. Function Generation and Dependency Upgrades
+### 9. Function Generation and Dependency Upgrades
 
 Current deployment remains 1st gen functions.
 
@@ -95,7 +110,7 @@ Potential improvement:
 
 - evaluate 2nd gen migration and dependency modernization after config/runtime migration.
 
-### 9. Browser Cache Path Drift on GitHub Pages
+### 10. Browser Cache Path Drift on GitHub Pages
 
 Observed issue:
 
