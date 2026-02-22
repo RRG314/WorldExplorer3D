@@ -1623,7 +1623,8 @@ function setupUI() {
     travelBtn: 'travelMenu',
     realEstateFloatBtn: 'realEstateMenu',
     exploreBtn: 'exploreMenu',
-    gameBtn: 'gameMenu'
+    gameBtn: 'gameMenu',
+    multiplayerBtn: 'multiplayerMenu'
   };
 
   const toggleFloatMenuByButton = (buttonId) => {
@@ -1665,6 +1666,10 @@ function setupUI() {
   document.getElementById('realEstateFloatBtn').addEventListener('click', () => toggleFloatMenuByButton('realEstateFloatBtn'));
   document.getElementById('exploreBtn').addEventListener('click', () => toggleFloatMenuByButton('exploreBtn'));
   document.getElementById('gameBtn').addEventListener('click', () => toggleFloatMenuByButton('gameBtn'));
+  const multiplayerBtn = document.getElementById('multiplayerBtn');
+  if (multiplayerBtn) {
+    multiplayerBtn.addEventListener('click', () => toggleFloatMenuByButton('multiplayerBtn'));
+  }
 
   const homeMenuItem = document.getElementById('fHome');
   if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);

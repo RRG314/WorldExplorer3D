@@ -605,12 +605,90 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #proAccessStatus{min-height:16px;font-size:11px;color:#93c5fd}
 .pro-access-panel[hidden],.pro-access-actions[hidden],.pro-access-links[hidden]{display:none!important}
 
+.floatBtn.multiplayer{color:#16a34a}
+.floatItem.disabled{opacity:0.45;pointer-events:none}
+
+.mp-card{background:#f8fafc;border:2px solid #dbe5f5;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
+.mp-title{font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;color:#14532d}
+.mp-plan-state{font-size:12px;color:#334155;line-height:1.45}
+.mp-plan-state.warn{color:#b91c1c}
+.mp-row{display:flex;gap:8px;flex-wrap:wrap}
+.mp-input{flex:1;min-width:160px;border:2px solid #dbe5f5;border-radius:8px;padding:10px 11px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b}
+.mp-input:focus{outline:none;border-color:#60a5fa;box-shadow:0 0 0 3px rgba(96,165,250,0.16)}
+.mp-select{border:2px solid #dbe5f5;border-radius:8px;padding:10px 11px;font-size:13px;font-family:'Inter',sans-serif;color:#1e293b;background:#ffffff;min-width:140px}
+.mp-select:focus{outline:none;border-color:#60a5fa;box-shadow:0 0 0 3px rgba(96,165,250,0.16)}
+.mp-btn{border:none;border-radius:8px;padding:10px 12px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;cursor:pointer}
+.mp-btn.primary{background:#16a34a;color:#ffffff}
+.mp-btn.secondary{background:#0f172a;color:#e2e8f0}
+.mp-btn.warn{background:#f59e0b;color:#381d00}
+.mp-status{min-height:16px;font-size:11px;color:#64748b}
+.mp-subtitle{font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;color:#1d4ed8}
+.mp-room-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:180px;overflow:auto}
+.mpRoomItem{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px}
+.mpRoomInfo{display:flex;flex-direction:column;gap:2px;min-width:0}
+.mpRoomName{font-size:12px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mpRoomMeta{font-size:11px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mpRoomJoinBtn{flex:0 0 auto;padding:8px 10px}
+.mpRoomEmpty{font-size:11px;color:#64748b;background:#f8fafc;border:1px dashed #cbd5e1;border-radius:8px;padding:10px;text-align:center}
+.mpLine{font-size:11px;color:#475569;line-height:1.4}
+.mpLine strong{color:#0f172a}
+.mp-check{display:flex;align-items:center;gap:8px;background:#f1f5f9;border:1px solid #dbe5f5;border-radius:8px;padding:9px 10px;font-size:12px;color:#334155}
+.mp-check input{width:15px;height:15px;cursor:pointer}
+.mp-pill{display:inline-flex;align-items:center;gap:6px;background:#e2e8f0;border:1px solid #cbd5e1;border-radius:999px;padding:4px 8px;font-size:10px;font-weight:700;color:#334155}
+.mp-row .mpSmallBtn{padding:8px 10px;font-size:11px}
+.mpMeta{font-size:10px;color:#64748b;line-height:1.35}
+.mpFeedList{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:160px;overflow:auto}
+.mpFeedItem{background:#f8fafc;border:1px solid #dbe5f5;border-radius:8px;padding:8px}
+.mpFeedTitle{font-size:12px;font-weight:700;color:#0f172a}
+.mpFeedMeta{font-size:10px;color:#64748b;margin-top:3px;line-height:1.3}
+.mpArtifactList .mpRoomItem{align-items:flex-start}
+.mpArtifactInfo{display:flex;flex-direction:column;gap:3px;min-width:0}
+.mpArtifactTitle{font-size:12px;font-weight:700;color:#e2e8f0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mpArtifactMeta{font-size:10px;color:#94a3b8;line-height:1.35}
+
+.room-panel-modal{position:fixed;inset:0;display:none;align-items:center;justify-content:center;z-index:240;background:rgba(2,6,23,0.74);backdrop-filter:blur(4px);padding:14px}
+.room-panel-modal.show{display:flex}
+.room-panel{width:min(480px,calc(100vw - 26px));max-height:min(82vh,720px);display:flex;flex-direction:column;background:rgba(9,18,32,0.96);border:1px solid rgba(148,163,184,0.35);border-radius:16px;box-shadow:0 20px 44px rgba(2,6,23,0.5);color:#e2e8f0;overflow:hidden}
+.room-panel-head{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid rgba(148,163,184,0.24)}
+.room-panel-title{font-family:'Orbitron',sans-serif;font-size:13px;letter-spacing:0.04em;color:#bbf7d0}
+.room-panel-close{border:none;background:#1e293b;color:#cbd5e1;border-radius:999px;padding:6px 10px;font-size:12px;cursor:pointer}
+.room-panel-body{padding:12px 14px;display:flex;flex-direction:column;gap:10px;overflow:auto}
+.room-meta{background:rgba(15,23,42,0.8);border:1px solid rgba(148,163,184,0.28);border-radius:10px;padding:10px}
+.room-meta-code{font-size:13px;font-weight:700;color:#a7f3d0}
+.room-meta-name{font-size:11px;color:#cbd5e1;margin-top:4px}
+.room-player-head{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#cbd5e1}
+.mp-player-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;max-height:200px;overflow:auto}
+.mpPlayerItem{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;background:rgba(15,23,42,0.66);border:1px solid rgba(148,163,184,0.28);border-radius:9px}
+.mpPlayerName{font-size:12px;color:#f8fafc;font-weight:600}
+.mpPlayerMeta{font-size:11px;color:#94a3b8}
+.mpPlayerEmpty{font-size:11px;color:#94a3b8;padding:10px;background:rgba(15,23,42,0.42);border:1px dashed rgba(148,163,184,0.3);border-radius:9px;text-align:center}
+#roomPanelStatus{min-height:16px;font-size:11px;color:#93c5fd}
+
+.room-chat-drawer{position:fixed;right:12px;bottom:max(14px,calc(env(safe-area-inset-bottom) + 12px));z-index:130;width:min(340px,calc(100vw - 18px));max-height:min(56vh,440px);display:flex;flex-direction:column;background:rgba(9,18,32,0.95);border:1px solid rgba(148,163,184,0.42);border-radius:14px;box-shadow:0 16px 36px rgba(2,6,23,0.45);transform:translateY(120%);opacity:0;pointer-events:none;transition:transform 0.22s ease,opacity 0.22s ease}
+.room-chat-drawer.open{transform:translateY(0);opacity:1;pointer-events:auto}
+.room-chat-head{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid rgba(148,163,184,0.25);font-size:12px;color:#bbf7d0;font-family:'Poppins',sans-serif}
+.room-chat-head button{border:none;background:#1e293b;color:#cbd5e1;border-radius:999px;padding:5px 8px;font-size:11px;cursor:pointer}
+.room-chat-body{padding:10px 12px;display:flex;flex-direction:column;gap:8px}
+.room-chat-messages{max-height:min(34vh,260px);overflow:auto;display:flex;flex-direction:column;gap:8px}
+.mpChatRow{padding:8px 9px;background:rgba(15,23,42,0.66);border:1px solid rgba(148,163,184,0.24);border-radius:8px}
+.mpChatRow.mine{border-color:rgba(34,197,94,0.55);background:rgba(20,83,45,0.44)}
+.mpChatHead{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#bfdbfe;margin-bottom:4px}
+.mpChatText{font-size:12px;color:#f8fafc;line-height:1.35;word-break:break-word}
+.mpChatReport{border:none;background:#dc2626;color:#fee2e2;border-radius:999px;padding:3px 8px;font-size:10px;cursor:pointer}
+.mpChatEmpty{font-size:11px;color:#94a3b8;background:rgba(15,23,42,0.38);border:1px dashed rgba(148,163,184,0.24);border-radius:8px;padding:10px;text-align:center}
+.room-chat-compose{display:flex;gap:8px}
+.room-chat-compose .mp-input{min-width:0;background:#0f172a;color:#e2e8f0;border-color:rgba(148,163,184,0.42)}
+.room-chat-compose .mp-btn{padding:9px 12px}
+#roomChatStatus{min-height:15px;font-size:11px;color:#93c5fd}
+#roomChatToggleBtn.on{background:#16a34a;color:#fff}
+
 @media (max-width: 768px){
   #memoryComposer{left:10px;right:10px;bottom:12px;width:auto}
   #memoryInfoPanel{left:10px;right:10px;top:72px;width:auto}
   .auth-float-toggle{top:max(8px,calc(env(safe-area-inset-top) + 6px));left:10px;padding:8px 11px;font-size:11px}
   .auth-float-panel{top:max(48px,calc(env(safe-area-inset-top) + 46px));left:8px;right:8px;width:auto}
   .pro-access-panel{top:max(54px,calc(env(safe-area-inset-top) + 52px));padding:10px}
+  .room-chat-drawer{right:8px;bottom:max(8px,calc(env(safe-area-inset-bottom) + 8px));width:min(360px,calc(100vw - 12px))}
 }
 </style>
 </head>
@@ -679,6 +757,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <div class="tab-nav">
 <button class="tab-btn active" data-tab="location">Location</button>
 <button class="tab-btn" data-tab="games">Games</button>
+<button class="tab-btn" data-tab="multiplayer">Multiplayer</button>
 <button class="tab-btn" data-tab="settings">Settings</button>
 <button class="tab-btn" data-tab="controls">Controls</button>
 </div>
@@ -750,6 +829,80 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div style="grid-column:1/-1;padding:12px 0;text-align:center;font-size:11px;color:#64748b;border-top:2px solid #e8eef5;margin-top:8px;">💡 Toggle walking mode anytime with <b>F</b> key or float menu</div>
 </div>
 </div>
+</div>
+</div>
+<div class="tab-content" id="tab-multiplayer">
+<div class="mp-card">
+<div class="mp-title">🌐 Multiplayer Platform</div>
+<div id="mpPlanState" class="mp-plan-state">Sign in to access multiplayer rooms.</div>
+<div class="mp-row">
+<input id="mpTitleCodeInput" class="mp-input" type="text" maxlength="8" placeholder="Room code (AB12CD)">
+<button id="mpTitleJoinBtn" class="mp-btn secondary" type="button">Join</button>
+<button id="mpTitleCreateBtn" class="mp-btn primary" type="button">Create</button>
+</div>
+<div class="mp-row">
+<select id="mpTitleVisibilitySelect" class="mp-select" aria-label="Room visibility">
+<option value="private" selected>Private Room</option>
+<option value="public">Public Room</option>
+</select>
+<input id="mpTitleLocationTagInput" class="mp-input" type="text" maxlength="80" placeholder="Optional location tag (Tokyo, Paris, Moon Base)">
+</div>
+<div class="mp-row">
+<button id="mpTitlePanelBtn" class="mp-btn secondary" type="button">Room Panel</button>
+<button id="mpTitleInviteBtn" class="mp-btn secondary" type="button">Invite Link</button>
+<button id="mpTitleLeaveBtn" class="mp-btn secondary" type="button">Leave</button>
+</div>
+<div class="mp-row">
+<button id="mpTitleTrialBtn" class="mp-btn warn" type="button">Start Trial / Upgrade</button>
+</div>
+<div id="mpTitleStatus" class="mp-status"></div>
+<div class="mp-subtitle">Public Rooms Near A City</div>
+<div class="mp-row">
+<input id="mpBrowseCityInput" class="mp-input" type="text" maxlength="48" placeholder="City (e.g. Tokyo)">
+<button id="mpBrowseBtn" class="mp-btn secondary" type="button">Find Rooms</button>
+</div>
+<div id="mpBrowseStatus" class="mp-status">Browse room metadata only (no live presence stream).</div>
+<ul id="mpBrowseList" class="mp-room-list">
+<li class="mpRoomEmpty">Search a city to find public rooms.</li>
+</ul>
+
+<div class="mp-subtitle">Featured Public Rooms</div>
+<div class="mp-row">
+<button id="mpFeaturedRefreshBtn" class="mp-btn secondary mpSmallBtn" type="button">Refresh Featured</button>
+</div>
+<ul id="mpFeaturedList" class="mp-room-list">
+<li class="mpRoomEmpty">Featured rooms will appear here.</li>
+</ul>
+
+<div class="mp-subtitle">Friends</div>
+<div id="mpFriendsStatus" class="mp-status">Add recent players as friends to invite them faster.</div>
+<ul id="mpFriendsList" class="mp-room-list">
+<li class="mpRoomEmpty">No friends yet.</li>
+</ul>
+
+<div class="mp-subtitle">Recent Players</div>
+<ul id="mpRecentPlayersList" class="mp-room-list">
+<li class="mpRoomEmpty">Play with others to populate your recent list.</li>
+</ul>
+
+<div class="mp-subtitle">Incoming Invites</div>
+<ul id="mpInvitesList" class="mp-room-list">
+<li class="mpRoomEmpty">No incoming invites.</li>
+</ul>
+
+<div class="mp-subtitle">Weekly Pulse</div>
+<div id="mpWeeklyLoop" class="mpLine">Weekly featured location: loading...</div>
+<div id="mpWeeklyEvent" class="mp-status">Event cadence updates after sign-in.</div>
+
+<div class="mp-subtitle">Platform Activity</div>
+<ul id="mpActivityList" class="mpFeedList">
+<li class="mpRoomEmpty">No activity yet.</li>
+</ul>
+
+<div class="mp-subtitle">Top Explorers</div>
+<ul id="mpLeaderboardList" class="mpFeedList">
+<li class="mpRoomEmpty">Leaderboard updates as explorers participate.</li>
+</ul>
 </div>
 </div>
 <div class="tab-content" id="tab-settings">
@@ -1217,6 +1370,19 @@ Explore the area
 </div>
 </div>
 </div>
+<div class="floatMenuRow">
+<div class="floatMenu" id="multiplayerMenu">
+<button class="floatBtn multiplayer" id="multiplayerBtn"><span class="btnIcon">🌐</span><span class="btnText">Multiplayer</span></button>
+<div class="floatItems">
+<div class="floatItem" id="fMpCreate">🆕 Create Room</div>
+<div class="floatItem" id="fMpJoin">🔑 Join Room</div>
+<div class="floatItem" id="fMpInvite">🔗 Invite Link</div>
+<div class="floatItem" id="fMpLeave">🚪 Leave Room</div>
+<div class="floatItem on" id="fMpGhosts">👻 Toggle Ghosts</div>
+<div class="floatItem" id="fMpChat">💬 Toggle Chat</div>
+</div>
+</div>
+</div>
 </div>
 <div class="floatItem" id="fHome" style="display:none">🏠 Menu</div>
 
@@ -1426,6 +1592,104 @@ Explore the area
     <div class="modal-body" id="modalBody"></div>
   </div>
 </div>
+<div id="roomPanelModal" class="room-panel-modal" aria-hidden="true">
+  <section class="room-panel" role="dialog" aria-label="Multiplayer room panel">
+    <div class="room-panel-head">
+      <div class="room-panel-title">MULTIPLAYER ROOM</div>
+      <button id="roomPanelCloseBtn" class="room-panel-close" type="button">Close</button>
+    </div>
+    <div class="room-panel-body">
+      <div class="room-meta">
+        <div id="roomPanelRoomCode" class="room-meta-code">Not in a room</div>
+        <div id="roomPanelRoomName" class="room-meta-name">Create or join to start multiplayer.</div>
+      </div>
+      <div class="mp-row">
+        <input id="roomPanelCodeInput" class="mp-input" type="text" maxlength="8" placeholder="Room code (AB12CD)">
+        <button id="roomPanelJoinBtn" class="mp-btn secondary" type="button">Join</button>
+        <button id="roomPanelCreateBtn" class="mp-btn primary" type="button">Create</button>
+      </div>
+      <div class="mp-row">
+        <select id="roomPanelVisibilitySelect" class="mp-select" aria-label="Room visibility">
+          <option value="private" selected>Private Room</option>
+          <option value="public">Public Room</option>
+        </select>
+        <input id="roomPanelLocationTagInput" class="mp-input" type="text" maxlength="80" placeholder="Optional location tag (Tokyo, Paris, Moon Base)">
+      </div>
+      <div class="mp-row">
+        <button id="roomPanelInviteBtn" class="mp-btn secondary" type="button">Invite Link</button>
+        <button id="roomPanelLeaveBtn" class="mp-btn secondary" type="button">Leave Room</button>
+        <button id="roomPanelTrialBtn" class="mp-btn warn" type="button">Trial / Upgrade</button>
+      </div>
+      <div class="room-player-head">
+        <span>Players Live</span>
+        <span id="roomPanelPlayerCount">0</span>
+      </div>
+      <ul id="roomPanelPlayerList" class="mp-player-list">
+        <li class="mpPlayerEmpty">No active room.</li>
+      </ul>
+      <div class="mp-subtitle">Room Settings</div>
+      <div class="mp-row">
+        <input id="roomPanelNameInput" class="mp-input" type="text" maxlength="80" placeholder="Room name (optional)">
+      </div>
+      <div class="mp-row">
+        <label class="mp-check" for="roomPanelFeaturedToggle">
+          <input id="roomPanelFeaturedToggle" type="checkbox">
+          Feature this room publicly
+        </label>
+        <button id="roomPanelSaveSettingsBtn" class="mp-btn secondary mpSmallBtn" type="button">Save Room</button>
+      </div>
+
+      <div class="mp-subtitle">Home Base</div>
+      <div class="mp-row">
+        <input id="roomHomeBaseNameInput" class="mp-input" type="text" maxlength="80" placeholder="Home base name (Moon Base Alpha)">
+      </div>
+      <div class="mp-row">
+        <input id="roomHomeBaseDescInput" class="mp-input" type="text" maxlength="240" placeholder="Short description">
+      </div>
+      <div class="mp-row">
+        <button id="roomHomeBaseSaveBtn" class="mp-btn secondary mpSmallBtn" type="button">Save Home Base Here</button>
+      </div>
+      <div id="roomHomeBaseCurrent" class="mpMeta">No home base set.</div>
+
+      <div class="mp-subtitle">Shared Artifacts</div>
+      <div class="mp-row">
+        <select id="roomArtifactTypeSelect" class="mp-select" aria-label="Artifact type">
+          <option value="pin">Pin</option>
+          <option value="landmark">Landmark</option>
+          <option value="build-area">Build Area</option>
+          <option value="memory-board">Memory Board</option>
+        </select>
+        <input id="roomArtifactTitleInput" class="mp-input" type="text" maxlength="80" placeholder="Artifact title">
+      </div>
+      <div class="mp-row">
+        <input id="roomArtifactTextInput" class="mp-input" type="text" maxlength="280" placeholder="Short note (optional)">
+      </div>
+      <div class="mp-row">
+        <button id="roomArtifactCreateBtn" class="mp-btn secondary mpSmallBtn" type="button">Drop Artifact At Current Position</button>
+      </div>
+      <ul id="roomArtifactList" class="mp-room-list mpArtifactList">
+        <li class="mpRoomEmpty">No shared artifacts yet.</li>
+      </ul>
+      <div id="roomPanelStatus"></div>
+    </div>
+  </section>
+</div>
+<aside id="roomChatDrawer" class="room-chat-drawer" aria-label="Room chat">
+  <div class="room-chat-head">
+    <span>Room Chat</span>
+    <button id="roomChatCloseBtn" type="button">Close</button>
+  </div>
+  <div class="room-chat-body">
+    <div id="roomChatMessages" class="room-chat-messages">
+      <div class="mpChatEmpty">Join a room to enable chat.</div>
+    </div>
+    <div class="room-chat-compose">
+      <input id="roomChatInput" class="mp-input" type="text" maxlength="500" placeholder="Send message (max 500 chars)">
+      <button id="roomChatSendBtn" class="mp-btn primary" type="button">Send</button>
+    </div>
+    <div id="roomChatStatus"></div>
+  </div>
+</aside>
 
 <div id="debugOverlay" style="position:fixed;top:var(--debug-overlay-top,20px);left:var(--debug-overlay-left,clamp(190px,24vw,470px));background:rgba(0,0,0,0.8);color:#0f0;font-family:monospace;font-size:11px;padding:10px 14px;border-radius:8px;z-index:var(--debug-overlay-z,145);display:none;line-height:1.6;pointer-events:none;white-space:pre"></div>
 <div id="perfPanel" style="position:fixed;top:var(--perf-panel-top,20px);right:var(--perf-panel-right,180px);background:rgba(2,6,23,0.85);color:#38bdf8;font-family:monospace;font-size:11px;padding:10px 12px;border-radius:8px;z-index:var(--perf-panel-z,145);display:none;line-height:1.45;white-space:pre;pointer-events:none;border:1px solid rgba(56,189,248,0.4);min-width:var(--perf-panel-min-width,260px);max-width:var(--perf-panel-max-width,320px)"></div>
@@ -1443,7 +1707,13 @@ import {
   signOutUser,
   signUpWithEmailPassword
 } from '../js/auth-ui.js';
-import { ensureEntitlements, formatRemainingTrial, getFreeEntitlementsState, subscribeEntitlements } from '../js/entitlements.js';
+import {
+  ensureEntitlements,
+  formatRemainingTrial,
+  getFreeEntitlementsState,
+  startTrialIfEligible,
+  subscribeEntitlements
+} from '../js/entitlements.js';
 
 const appSignInBtn = document.getElementById('appSignInBtn');
 const proAccessPanel = document.getElementById('proAccessPanel');
@@ -1477,6 +1747,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const wantsTrial = urlParams.get('startTrial') === '1';
 
 let attemptedTrialSignIn = false;
+let attemptedTrialActivation = false;
 let unsubscribeEntitlements = null;
 let currentState = getFreeEntitlementsState();
 let authMode = 'signin';
@@ -1599,7 +1870,7 @@ function renderState(state, user) {
   } else if (plan === 'supporter' || plan === 'trial') {
     setProStatus('Full access active. Upgrade to Pro for early demos and priority communication.');
   } else {
-    setProStatus('Free plan active. Cloud sync and Pro-only tools are disabled.');
+    setProStatus('Free plan active. Multiplayer is locked until trial or upgrade.');
   }
 
   updateAuthOverlayVisibility();
@@ -1627,6 +1898,28 @@ async function applySignedInState(user) {
   unsubscribeEntitlements = subscribeEntitlements(user, (nextState) => {
     renderState(nextState, user);
   });
+}
+
+async function activateTrialFromUrlIfNeeded(user) {
+  if (!wantsTrial || !user || attemptedTrialActivation) return;
+  attemptedTrialActivation = true;
+
+  try {
+    const nextState = await startTrialIfEligible(user);
+    renderState(nextState, user);
+    if (nextState.plan === 'trial') {
+      setAuthStatus('2-day trial activated. Multiplayer is now unlocked.');
+      setProStatus(`Trial active (${formatRemainingTrial(nextState) || 'active'}). Upgrade to keep multiplayer after trial.`);
+    } else if (nextState.plan === 'supporter' || nextState.plan === 'pro') {
+      setAuthStatus('Paid plan already active. Multiplayer is unlocked.');
+    } else {
+      setAuthStatus('Trial was not activated.', true);
+    }
+  } catch (err) {
+    const message = err && err.message ? err.message : 'Could not start trial right now.';
+    setAuthStatus(message, true);
+    setProStatus(message, true);
+  }
 }
 
 function toggleEarlyDemo(demoKey) {
@@ -1778,6 +2071,7 @@ observeAuth(async (user) => {
 
   try {
     await applySignedInState(user);
+    await activateTrialFromUrlIfNeeded(user);
   } catch (err) {
     console.error('[app] failed to load entitlements:', err);
     setProStatus('Failed to load account plan. Using local free mode.', true);

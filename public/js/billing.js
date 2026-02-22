@@ -98,3 +98,29 @@ export async function redirectToPortal() {
   const url = await createPortalSession();
   globalThis.location.assign(url);
 }
+
+export async function getAccountOverview() {
+  const payload = await postFunction('/getAccountOverview', {});
+  return payload && payload.overview ? payload.overview : null;
+}
+
+export async function listBillingReceipts(options = {}) {
+  const body = {};
+  if (Number.isFinite(Number(options.limit))) body.limit = Number(options.limit);
+  if (options.startingAfter) body.startingAfter = String(options.startingAfter);
+  const payload = await postFunction('/listBillingReceipts', body);
+  return {
+    receipts: Array.isArray(payload && payload.receipts) ? payload.receipts : [],
+    hasMore: !!(payload && payload.hasMore)
+  };
+}
+
+export async function updateAccountProfile(displayName) {
+  const payload = await postFunction('/updateAccountProfile', { displayName });
+  return payload || {};
+}
+
+export async function startTrial() {
+  const payload = await postFunction('/startTrial', {});
+  return payload || {};
+}

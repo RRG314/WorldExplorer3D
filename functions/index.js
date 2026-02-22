@@ -5,9 +5,9 @@ const Stripe = require('stripe');
 admin.initializeApp();
 const db = admin.firestore();
 
-const TRIAL_DURATION_MS = 48 * 60 * 60 * 1000;
 const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
-const ALLOWED_PLANS = new Set(['supporter', 'pro']);
+const ALLOWED_PLANS = new Set(['support', 'supporter', 'pro']);
+const TRIAL_DURATION_MS = 48 * 60 * 60 * 1000;
 
 function stripeConfig() {
   const cfg = functions.config().stripe || {};
@@ -28,7 +28,7 @@ function getStripeClient() {
 }
 
 function planEntitlements(plan) {
-  const normalized = String(plan || '').toLowerCase();
+  const normalized = normalizePlan(plan);
 
   if (normalized === 'pro') {
     return {
@@ -64,6 +64,7 @@ function planEntitlements(plan) {
 
 function normalizePlan(plan) {
   const lowered = String(plan || '').toLowerCase();
+  if (lowered === 'support') return 'supporter';
   if (lowered === 'pro' || lowered === 'supporter' || lowered === 'trial') return lowered;
   return 'free';
 }
@@ -150,9 +151,52 @@ function planFromPriceId(priceId, cfg) {
 }
 
 function priceIdForPlan(plan, cfg) {
-  if (plan === 'pro') return cfg.price_pro;
-  if (plan === 'supporter') return cfg.price_supporter;
+  const normalized = normalizePlan(plan);
+  if (normalized === 'pro') return cfg.price_pro;
+  if (normalized === 'supporter') return cfg.price_supporter;
   return '';
+}
+
+function parsePositiveInt(value, fallback = 20, min = 1, max = 50) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(min, Math.min(max, Math.floor(n)));
+}
+
+function timestampToMillis(value) {
+  if (!value) return null;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function normalizeDisplayName(value) {
+  const cleaned = String(value || '').trim().replace(/\s+/g, ' ');
+  return cleaned.slice(0, 60);
+}
+
+async function assertStripeCustomerOwnership(stripe, customerId, uid, expectedEmail = '') {
+  if (!stripe || !customerId || !uid) return false;
+  const customer = await stripe.customers.retrieve(customerId);
+  if (!customer || customer.deleted) return false;
+
+  const metadataUid = customer.metadata && customer.metadata.uid ? String(customer.metadata.uid) : '';
+  if (metadataUid && metadataUid === uid) return true;
+
+  const normalizedExpectedEmail = String(expectedEmail || '').trim().toLowerCase();
+  const normalizedCustomerEmail = String(customer.email || '').trim().toLowerCase();
+  if (!normalizedExpectedEmail || normalizedExpectedEmail !== normalizedCustomerEmail) {
+    return false;
+  }
+
+  const nextMetadata = {
+    ...(customer.metadata || {}),
+    uid
+  };
+  await stripe.customers.update(customerId, { metadata: nextMetadata });
+  return true;
 }
 
 async function ensureUserDoc(uid, email, displayName) {
@@ -172,15 +216,14 @@ async function ensureUserDoc(uid, email, displayName) {
     return existing;
   }
 
-  const trialEndsAt = admin.firestore.Timestamp.fromMillis(Date.now() + TRIAL_DURATION_MS);
   const created = {
     uid,
     email: email || '',
     displayName: displayName || '',
-    plan: 'trial',
-    trialEndsAt,
+    plan: 'free',
+    trialEndsAt: null,
     subscriptionStatus: 'none',
-    entitlements: planEntitlements('trial'),
+    entitlements: planEntitlements('free'),
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   };
@@ -243,7 +286,7 @@ exports.createCheckoutSession = functions.region('us-central1').https.onRequest(
   try {
     const requestedPlan = normalizePlan(req.body && req.body.plan);
     if (!ALLOWED_PLANS.has(requestedPlan)) {
-      res.status(400).json({ error: 'Invalid plan. Use supporter or pro.' });
+      res.status(400).json({ error: 'Invalid plan. Use support/supporter or pro.' });
       return;
     }
 
@@ -259,6 +302,18 @@ exports.createCheckoutSession = functions.region('us-central1').https.onRequest(
 
     const stripe = getStripeClient();
     let customerId = userDoc.stripeCustomerId || null;
+
+    if (customerId) {
+      const ownedByUser = await assertStripeCustomerOwnership(
+        stripe,
+        customerId,
+        auth.uid,
+        userRecord.email || userDoc.email || ''
+      );
+      if (!ownedByUser) {
+        customerId = null;
+      }
+    }
 
     if (!customerId) {
       const customer = await stripe.customers.create({
@@ -316,12 +371,24 @@ exports.createPortalSession = functions.region('us-central1').https.onRequest(as
   try {
     const stripe = getStripeClient();
     const userRef = db.collection('users').doc(auth.uid);
+    const authUser = await admin.auth().getUser(auth.uid);
     const userSnap = await userRef.get();
     const userData = userSnap.exists ? userSnap.data() || {} : {};
 
     let customerId = userData.stripeCustomerId || null;
     if (!customerId) {
       res.status(400).json({ error: 'No Stripe customer found for this account.' });
+      return;
+    }
+
+    const ownedByUser = await assertStripeCustomerOwnership(
+      stripe,
+      customerId,
+      auth.uid,
+      authUser.email || userData.email || ''
+    );
+    if (!ownedByUser) {
+      res.status(403).json({ error: 'Stripe customer ownership could not be verified.' });
       return;
     }
 
@@ -335,6 +402,255 @@ exports.createPortalSession = functions.region('us-central1').https.onRequest(as
   } catch (err) {
     console.error('[createPortalSession] failed:', err);
     res.status(500).json({ error: 'Unable to create billing portal session.' });
+  }
+});
+
+exports.startTrial = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const authUser = await admin.auth().getUser(auth.uid);
+    const existing = await ensureUserDoc(auth.uid, authUser.email || '', authUser.displayName || '');
+    const nowMs = Date.now();
+
+    const existingPlan = normalizePlan(existing.plan);
+    const subscriptionStatus = String(existing.subscriptionStatus || 'none');
+    const trialEndsAtMs = timestampToMillis(existing.trialEndsAt);
+    const trialConsumedAtMs = timestampToMillis(existing.trialConsumedAt);
+
+    if (existingPlan === 'supporter' || existingPlan === 'pro' || hasActiveSubscription(subscriptionStatus)) {
+      res.status(200).json({
+        status: 'already-paid',
+        plan: existingPlan,
+        trialEndsAtMs: trialEndsAtMs || null
+      });
+      return;
+    }
+
+    if (existingPlan === 'trial' && trialEndsAtMs && trialEndsAtMs > nowMs) {
+      res.status(200).json({
+        status: 'already-active',
+        plan: 'trial',
+        trialEndsAtMs
+      });
+      return;
+    }
+
+    if (trialConsumedAtMs || (trialEndsAtMs && trialEndsAtMs <= nowMs)) {
+      res.status(403).json({
+        error: 'Trial already used. Upgrade to Supporter or Pro for multiplayer access.'
+      });
+      return;
+    }
+
+    const trialStartsAt = admin.firestore.Timestamp.fromMillis(nowMs);
+    const trialEndsAt = admin.firestore.Timestamp.fromMillis(nowMs + TRIAL_DURATION_MS);
+    await db.collection('users').doc(auth.uid).set(
+      {
+        uid: auth.uid,
+        email: authUser.email || existing.email || '',
+        displayName: authUser.displayName || existing.displayName || '',
+        plan: 'trial',
+        subscriptionStatus,
+        trialStartsAt,
+        trialEndsAt,
+        trialConsumedAt: trialStartsAt,
+        entitlements: planEntitlements('trial'),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+
+    res.status(200).json({
+      status: 'activated',
+      plan: 'trial',
+      trialEndsAtMs: nowMs + TRIAL_DURATION_MS
+    });
+  } catch (err) {
+    console.error('[startTrial] failed:', err);
+    res.status(500).json({ error: 'Unable to start trial right now.' });
+  }
+});
+
+exports.getAccountOverview = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const userRef = db.collection('users').doc(auth.uid);
+    const authUser = await admin.auth().getUser(auth.uid);
+    const userSnap = await userRef.get();
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+
+    const plan = normalizePlan(userData.plan);
+    const trialStartsAtMs = timestampToMillis(userData.trialStartsAt);
+    const trialEndsAtMs = timestampToMillis(userData.trialEndsAt);
+    const trialConsumedAtMs = timestampToMillis(userData.trialConsumedAt);
+    const stripeCustomerId = userData.stripeCustomerId || null;
+    const stripeSubscriptionId = userData.stripeSubscriptionId || null;
+
+    const overview = {
+      uid: auth.uid,
+      email: authUser.email || userData.email || '',
+      emailVerified: !!authUser.emailVerified,
+      displayName: authUser.displayName || userData.displayName || '',
+      providers: Array.isArray(authUser.providerData) ? authUser.providerData.map((p) => p.providerId).filter(Boolean) : [],
+      authCreatedAt: authUser.metadata && authUser.metadata.creationTime ? authUser.metadata.creationTime : null,
+      authLastSignInAt: authUser.metadata && authUser.metadata.lastSignInTime ? authUser.metadata.lastSignInTime : null,
+      plan,
+      subscriptionStatus: String(userData.subscriptionStatus || 'none'),
+      trialStartsAtMs,
+      trialEndsAtMs,
+      trialConsumedAtMs,
+      stripeCustomerId,
+      stripeSubscriptionId,
+      nextBillingAtMs: null,
+      cancelAtPeriodEnd: null
+    };
+
+    if (stripeCustomerId && stripeSubscriptionId) {
+      try {
+        const stripe = getStripeClient();
+        const ownedByUser = await assertStripeCustomerOwnership(
+          stripe,
+          stripeCustomerId,
+          auth.uid,
+          overview.email || userData.email || ''
+        );
+        if (!ownedByUser) {
+          throw new Error('Stripe customer ownership mismatch.');
+        }
+        const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        if (String(subscription.customer || '') !== String(stripeCustomerId)) {
+          throw new Error('Stripe subscription/customer mismatch.');
+        }
+        overview.subscriptionStatus = String(subscription.status || overview.subscriptionStatus || 'none');
+        overview.nextBillingAtMs = subscription.current_period_end ? Number(subscription.current_period_end) * 1000 : null;
+        overview.cancelAtPeriodEnd = !!subscription.cancel_at_period_end;
+      } catch (err) {
+        console.warn('[getAccountOverview] Unable to load subscription details:', err.message || err);
+      }
+    }
+
+    res.status(200).json({ overview });
+  } catch (err) {
+    console.error('[getAccountOverview] failed:', err);
+    res.status(500).json({ error: 'Unable to load account overview.' });
+  }
+});
+
+exports.listBillingReceipts = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const userRef = db.collection('users').doc(auth.uid);
+    const authUser = await admin.auth().getUser(auth.uid);
+    const userSnap = await userRef.get();
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+    const stripeCustomerId = userData.stripeCustomerId || null;
+
+    if (!stripeCustomerId) {
+      res.status(200).json({ receipts: [] });
+      return;
+    }
+
+    const stripe = getStripeClient();
+    const ownedByUser = await assertStripeCustomerOwnership(
+      stripe,
+      stripeCustomerId,
+      auth.uid,
+      authUser.email || userData.email || ''
+    );
+    if (!ownedByUser) {
+      res.status(403).json({ error: 'Stripe customer ownership could not be verified.' });
+      return;
+    }
+
+    const listLimit = parsePositiveInt(req.body && req.body.limit, 20, 1, 40);
+    const startingAfter = req.body && typeof req.body.startingAfter === 'string' ? req.body.startingAfter.trim() : '';
+
+    const params = {
+      customer: stripeCustomerId,
+      limit: listLimit
+    };
+    if (startingAfter) params.starting_after = startingAfter;
+
+    const invoiceList = await stripe.invoices.list(params);
+    const receipts = Array.isArray(invoiceList.data) ? invoiceList.data.map((invoice) => ({
+      id: invoice.id,
+      number: invoice.number || invoice.id,
+      status: invoice.status || 'unknown',
+      currency: String(invoice.currency || 'usd').toUpperCase(),
+      total: Number.isFinite(invoice.total) ? invoice.total : 0,
+      amountPaid: Number.isFinite(invoice.amount_paid) ? invoice.amount_paid : 0,
+      amountDue: Number.isFinite(invoice.amount_due) ? invoice.amount_due : 0,
+      createdAtMs: invoice.created ? Number(invoice.created) * 1000 : null,
+      paidAtMs: invoice.status_transitions && invoice.status_transitions.paid_at
+        ? Number(invoice.status_transitions.paid_at) * 1000
+        : null,
+      periodStartMs: invoice.period_start ? Number(invoice.period_start) * 1000 : null,
+      periodEndMs: invoice.period_end ? Number(invoice.period_end) * 1000 : null,
+      hostedInvoiceUrl: invoice.hosted_invoice_url || null,
+      invoicePdfUrl: invoice.invoice_pdf || null
+    })) : [];
+
+    res.status(200).json({
+      receipts,
+      hasMore: !!invoiceList.has_more
+    });
+  } catch (err) {
+    console.error('[listBillingReceipts] failed:', err);
+    res.status(500).json({ error: 'Unable to load billing receipts.' });
+  }
+});
+
+exports.updateAccountProfile = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const displayName = normalizeDisplayName(req.body && req.body.displayName);
+    if (!displayName) {
+      res.status(400).json({ error: 'Display name is required.' });
+      return;
+    }
+
+    await admin.auth().updateUser(auth.uid, { displayName });
+    await db.collection('users').doc(auth.uid).set({
+      displayName,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    res.status(200).json({ displayName });
+  } catch (err) {
+    console.error('[updateAccountProfile] failed:', err);
+    res.status(500).json({ error: 'Unable to update account profile.' });
   }
 });
 

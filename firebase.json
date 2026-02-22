@@ -36,6 +36,22 @@
         "function": "createPortalSession"
       },
       {
+        "source": "/getAccountOverview",
+        "function": "getAccountOverview"
+      },
+      {
+        "source": "/listBillingReceipts",
+        "function": "listBillingReceipts"
+      },
+      {
+        "source": "/updateAccountProfile",
+        "function": "updateAccountProfile"
+      },
+      {
+        "source": "/startTrial",
+        "function": "startTrial"
+      },
+      {
         "source": "/stripeWebhook",
         "function": "stripeWebhook"
       },

@@ -715,3 +715,309 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `output/playwright/mode-smoke-check/police.png`
     - `output/playwright/mode-smoke-check/summary.json`
   - Title menu DOM assertion confirms new cards are present with expected descriptions for `painttown`, `police`, and `flower`.
+- Implemented Phase 1 multiplayer foundation in `public/app`:
+  - Added new modules under `public/app/js/multiplayer/`:
+    - `rooms.js` (create/join/leave/listen room lifecycle with 6-char room codes)
+    - `presence.js` (3s heartbeat, 2s min write throttle, movement/rotation threshold, live players listener)
+    - `chat.js` (send/listen last 50, 500-char cap, client profanity filter, report hook)
+    - `ghosts.js` (scene ghost markers + name tags, self ghost hidden, 30 FPS tick)
+    - `ui-room.js` (title-tab + in-game multiplayer UI orchestration, invite links, player list, chat drawer)
+- Wired multiplayer startup in `public/app/js/app-entry.js` so multiplayer initializes only after auth readiness via `observeAuth`.
+- Updated `public/app/index.html`:
+  - Added title menu Multiplayer tab entry point.
+  - Added in-game float-menu Multiplayer section with required actions.
+  - Added Room Panel modal + collapsed-by-default Chat Drawer containers.
+  - Added styling for room/chat/multiplayer controls.
+- Updated `public/app/js/ui.js` float-menu toggler map to include `multiplayerBtn`.
+- Updated landing page `public/index.html` with Multiplayer entry point and pricing copy aligned to free/trial/supporter/pro multiplayer gating.
+- Replaced `firestore.rules` with multiplayer-aware rules for rooms, presence, and chat including:
+  - auth-only room actions
+  - private-room membership reads
+  - self-only presence writes
+  - 2s presence write throttle
+  - chat length cap + member-only chat
+  - plan gating (trial/supporter/pro only)
+- Next: run static syntax checks + smoke test in browser (room create/join path, chat, ghost render, and UI flow), then adjust any runtime integration gaps.
+- Validation (multiplayer integration pass):
+  - `node --check` passed for:
+    - `public/app/js/app-entry.js`
+    - `public/app/js/ui.js`
+    - `public/app/js/multiplayer/{rooms,presence,chat,ghosts,ui-room}.js`
+  - Skill-mandated Playwright client runs executed:
+    - `output/web-game-mp-title/shot-0.png`
+    - `output/web-game-mp-ingame/shot-0.png`
+    - Note: the skill client's canvas capture remained black in this environment (known WebGL capture quirk).
+  - Supplemental Playwright visual verification (full-page captures):
+    - `output/playwright/multiplayer-tab.png` (Multiplayer tab visible and interactive on title menu)
+    - `output/playwright/multiplayer-ingame.png` (app starts and transitions to in-game loading state)
+    - `output/playwright/multiplayer-console-errors.json` (empty array; no JS/page errors in this pass)
+  - Additional artifact: `output/web-game-mp-title-headed/errors-0.json` contains only `/favicon.ico` 404 from local static server.
+- Follow-up hardening: improved room create/join error messaging for permission-denied cases to surface likely causes (plan access/rules/code mismatch) in UI.
+- Multiplayer entitlement gating correction + support alias hardening (2026-02-22):
+  - Fixed trial flow so multiplayer is NOT auto-unlocked on first sign-in.
+  - `public/js/entitlements.js` changes:
+    - New users now initialize as `free` (not `trial`).
+    - Added `startTrialIfEligible(user)` export for explicit 2-day trial activation.
+    - Trial activation behavior:
+      - starts trial if user is free and has not consumed trial
+      - preserves active paid plans
+      - blocks re-use after trial expiration with clear error
+    - Added plan alias normalization: `support` -> `supporter`.
+  - `public/app/index.html` auth script changes:
+    - Imports and uses `startTrialIfEligible`.
+    - `?startTrial=1` now actively starts trial after sign-in (instead of only showing copy).
+    - Updated free-plan status text to explicitly state multiplayer is locked until trial/upgrade.
+  - `functions/index.js` hardening:
+    - New user docs created as `free` with free entitlements.
+    - Added support alias handling in checkout normalization (`support` accepted, normalized to `supporter`).
+  - `firestore.rules` updates:
+    - multiplayer plan gate now accepts `support` alias in addition to `supporter`.
+    - restored `paintTownLeaderboard` read/create rules parity with `flowerLeaderboard` to avoid regression.
+  - `public/app/js/multiplayer/ui-room.js` plan gate now accepts both `support` and `supporter` for multiplayer access.
+
+- Validation (2026-02-22):
+  - Syntax checks passed:
+    - `node --check public/js/entitlements.js`
+    - `node --check public/app/js/multiplayer/ui-room.js`
+    - `node --check functions/index.js`
+  - Skill client rerun (`web_game_playwright_client`) completed:
+    - `output/web-game-mp-trial-check/shot-0.png`
+    - `output/web-game-mp-trial-check/shot-1.png`
+    - `output/web-game-mp-trial-check-headed/shot-0.png`
+    - note: canvas capture remains black in this environment (headless + headed).
+  - Fallback Playwright full-page verification (from `public/` static root):
+    - `output/playwright/landing-multiplayer-entry.png`
+    - `output/playwright/app-multiplayer-tab-entry.png`
+    - `output/playwright/mp-entry-verification.json`
+  - Verified from JSON report:
+    - landing has multiplayer CTA (`./app/?tab=multiplayer`)
+    - app has multiplayer tab + plan state + float multiplayer controls
+    - free-plan lock text shown: `Free plan: Multiplayer is locked until you start trial or upgrade.`
+    - no console/page errors in fallback Playwright run.
+
+- Remaining deployment step (manual in Firebase console):
+  - enable Firestore TTL on:
+    - `rooms/*/players/*` using `expiresAt`
+    - `rooms/*/chat/*` using `expiresAt`
+- Cost guardrail follow-up:
+  - `public/js/entitlements.js` `ensureUserDoc(...)` now only patches `email/displayName` when values actually changed, avoiding an unnecessary write on every entitlement refresh.
+- Presence UX hardening (2026-02-22):
+  - Updated `public/app/js/multiplayer/presence.js` to hide stale players client-side when `lastSeenAt` is older than 15 seconds.
+  - Existing `expiresAt` filter remains in place; TTL continues as background cleanup only.
+- Validation:
+  - `node --check public/app/js/multiplayer/presence.js` passed.
+  - Skill client run: `output/web-game-mp-presence-filter/shot-0.png` (canvas capture still black in this environment).
+- Phase 2 implementation (soft location + cheap public browsing) (2026-02-22):
+  - Added room location tag + city key support in room model and client serialization:
+    - `public/app/js/multiplayer/rooms.js`
+      - new normalization helpers: `normalizeCityKey(...)`, `normalizeLocationTag(...)`
+      - room docs now include `cityKey` and optional `locationTag`
+      - create room path accepts `locationTag` + `locationName`
+      - exported `findPublicRoomsByCity(cityInput, {scanLimit,resultLimit})`
+      - browse query reads only room docs (`rooms` where `visibility == public`), no players/presence subscriptions.
+  - Added Phase 2 UI controls and browser in `public/app/index.html` + `public/app/js/multiplayer/ui-room.js`:
+    - Create options:
+      - visibility selector (`private`/`public`)
+      - optional location tag input (`Tokyo`, `Paris`, `Moon Base`)
+    - Browse section:
+      - city input + `Find Rooms`
+      - room list showing room metadata only (name, location tag, world kind, code)
+      - join action from list (still plan-gated for free users)
+    - Room panel modal mirrors create options (visibility + location tag).
+  - Security rules expanded in `firestore.rules`:
+    - `rooms` validation now allows/validates `cityKey` and optional `locationTag`
+    - helper validators added (`validCityKey`, `validLocationTag`)
+    - room read policy updated so signed-in users can read public rooms (enables browsing) while players/chat remain entitlement-gated.
+
+- Validation (Phase 2):
+  - Syntax checks passed:
+    - `node --check public/app/js/multiplayer/rooms.js`
+    - `node --check public/app/js/multiplayer/ui-room.js`
+  - Skill client run executed:
+    - `output/web-game-mp-phase2/shot-0.png`
+    - note: canvas capture remains black in this environment.
+  - Fallback Playwright checks:
+    - `output/playwright/app-multiplayer-phase2.png`
+    - `output/playwright/app-multiplayer-phase2.json`
+    - `output/playwright/app-multiplayer-phase2-panel.png`
+    - `output/playwright/app-multiplayer-phase2-panel.json`
+  - Verified:
+    - title multiplayer tab now includes visibility selector, location tag input, city browse input/button/list
+    - room panel includes mirrored visibility + location tag controls
+    - no console/page errors in fallback checks.
+
+- Next deployment note:
+  - Firestore rules changed and must be deployed before Phase 2 browsing works in production.
+- Phase 2 follow-up polish:
+  - Create flow now treats location tag as truly optional for private rooms.
+  - Public room creation auto-falls back to current location name only when no tag is provided.
+  - Additional Playwright check:
+    - `output/playwright/app-multiplayer-phase2-v2.png`
+    - `output/playwright/app-multiplayer-phase2-v2.json`
+    - confirmed defaults: visibility=`private`, location tag input empty, and no console/page errors.
+- TTL verification pass (2026-02-22):
+  - Confirmed `expiresAt` is written as Firestore `Timestamp` on all active multiplayer TTL paths:
+    - Presence heartbeat update: `public/app/js/multiplayer/presence.js:133`
+    - Presence stop/leave short expiry: `public/app/js/multiplayer/presence.js:173`
+    - Room create owner presence seed: `public/app/js/multiplayer/rooms.js:247`
+    - Room join presence seed: `public/app/js/multiplayer/rooms.js:302`
+    - Room leave short expiry: `public/app/js/multiplayer/rooms.js:350`
+    - Chat message write: `public/app/js/multiplayer/chat.js:102`
+  - Note: code uses `Timestamp.fromMillis(...)`, which is equivalent to `Timestamp.fromDate(new Date(...))` for TTL purposes.
+- Security + performance hardening pass (2026-02-22):
+  - Strong anti-chat-spam protections implemented:
+    - Client-side guardrails in `public/app/js/multiplayer/chat.js`:
+      - minimum interval throttle
+      - burst window cap
+      - duplicate-message cooldown block
+    - Server-backed transactional enforcement in `public/app/js/multiplayer/chat.js`:
+      - each chat send now writes `chat/{msgId}` + `chatState/{uid}` in a single Firestore transaction
+      - room user state tracks `lastMessageAt`, `windowStartedAt`, `windowCount`, `expiresAt`
+  - Firestore rules strengthened for chat and rooms:
+    - `firestore.rules`:
+      - public rooms now require non-empty `cityKey` + `locationTag`
+      - added `chatState` schema validation and transition validation
+      - chat create now requires valid rate-limited `chatState` transition (`getAfter` checks)
+      - `chatState` subcollection rules added (`create/update` self/member only, validated)
+  - Performance optimizations:
+    - `public/app/js/multiplayer/rooms.js`:
+      - city browse now queries by indexed fields directly (`cityKey == X` and `visibility == public`) instead of broad scan+client filter
+    - `public/app/js/multiplayer/presence.js`:
+      - players listener now uses query `limit(24)` to cap read amplification
+    - `public/app/js/multiplayer/ui-room.js`:
+      - ghost ticker avoids scene ghost work when no active room
+
+- Validation (security/perf pass):
+  - Syntax checks passed:
+    - `node --check public/app/js/multiplayer/chat.js`
+    - `node --check public/app/js/multiplayer/rooms.js`
+    - `node --check public/app/js/multiplayer/presence.js`
+    - `node --check public/app/js/multiplayer/ui-room.js`
+  - Firestore emulator rule compile attempt blocked locally (no Java runtime installed):
+    - `firebase emulators:exec --only firestore ...` failed with Java missing
+  - Fallback Playwright verification:
+    - `output/playwright/app-multiplayer-security-perf-pass.png`
+    - `output/playwright/app-multiplayer-security-perf-pass.json`
+    - confirmed multiplayer security/perf UI controls present and no console/page errors.
+  - Skill client run executed:
+    - `output/web-game-mp-security-perf/shot-0.png`
+    - note: known black canvas capture in this environment.
+- Account center + security hardening pass (2026-02-22):
+  - Added secure server-side account APIs in `functions/index.js`:
+    - `startTrial` (auth-required 2-day trial activation, one-time gate via `trialConsumedAt`)
+    - `getAccountOverview` (uid/email/displayName/providers/plan/subscription + billing timing)
+    - `listBillingReceipts` (user-scoped Stripe invoice list)
+    - `updateAccountProfile` (displayName update in Auth + Firestore)
+  - Added Stripe ownership checks in backend (`assertStripeCustomerOwnership`) and applied them to checkout/portal/receipts/overview flows to prevent cross-customer access from tampered client data.
+  - Added Hosting rewrite for `/startTrial` in `firebase.json`.
+  - Client trial activation moved to trusted function call:
+    - `public/js/billing.js` now exports `startTrial()`.
+    - `public/js/entitlements.js` `startTrialIfEligible()` now calls backend function instead of writing `plan/trial` fields directly from client.
+  - Tightened user profile document writes in `firestore.rules`:
+    - Users can only create/update their own profile-safe fields directly.
+    - Billing/plan/subscription/trial/entitlements/Stripe fields are immutable from client writes.
+  - Chat rule hardening in `firestore.rules`:
+    - Room chat create/read now requires room `rules.allowChat == true`.
+  - Account UI completion in `public/account/index.html`:
+    - Identity panel (username edit/save, linked email, providers, uid)
+    - Billing status panel (subscription status, next billing, customer id)
+    - Receipts panel with hosted invoice/PDF links
+    - Refresh account data + refresh receipts actions wired to backend APIs
+    - Status handling and signed-out reset behavior
+
+- Multiplayer performance pass (2026-02-22):
+  - `public/app/js/multiplayer/rooms.js`: public room browsing query now uses `orderBy('createdAt', 'desc')` for stable recent-first results.
+  - `public/app/js/multiplayer/presence.js`: player listener now orders by `lastSeenAt desc` before limiting so active players are prioritized.
+  - Added Firestore composite index in `firestore.indexes.json` for public room city browsing:
+    - `rooms` on `(cityKey ASC, visibility ASC, createdAt DESC)`.
+
+- Validation run (2026-02-22):
+  - Syntax checks passed:
+    - `node --check functions/index.js`
+    - `node --check public/js/billing.js`
+    - `node --check public/js/entitlements.js`
+    - `node --check public/app/js/multiplayer/rooms.js`
+    - `node --check public/app/js/multiplayer/presence.js`
+    - `node --check public/app/js/multiplayer/chat.js`
+  - Skill Playwright client run artifact:
+    - `output/playwright/account-hardening-webgame/shot-0.png` (canvas capture remained black in this environment)
+  - Direct Playwright smoke (fallback visual + console checks):
+    - `output/playwright/account-center-smoke/account-page.png`
+    - `output/playwright/account-center-smoke/report.json` (`errorCount=0`)
+    - `output/playwright/account-security-app-smoke/app-title.png`
+    - `output/playwright/account-security-app-smoke/report.json` (`errorCount=0`, multiplayer tab/card present)
+
+- Environment limitation:
+  - Firestore emulator/rules compile check via `firebase-tools emulators:exec` could not run because Java runtime is not installed in this environment.
+
+- Follow-up TODO for deploy verification:
+  - Deploy updated Functions + Firestore rules/indexes and re-test signed-in flows:
+    - Start trial from app (`?startTrial=1`) should call backend `/startTrial`.
+    - Account page should show real receipt list and subscription metadata for paid users.
+    - Confirm users can no longer modify `plan`/Stripe fields directly in Firestore.
+- Follow-up entitlement integrity fix (2026-02-22):
+  - `public/js/entitlements.js` no longer attempts client writes to downgrade expired trial plans (plan fields are now rule-protected).
+  - `firestore.rules` `userPlan()` now treats expired `trial` as `free` at read-time using `request.time` vs `trialEndsAt`, so multiplayer access is denied immediately after expiry even before cleanup writes.
+  - Re-ran app/title smoke after this change:
+    - `output/playwright/account-security-app-smoke/report.json` (`errorCount=0`)
+
+- Phase 3 security hardening + validation pass (2026-02-22):
+  - XSS mitigation for multiplayer UI templates:
+    - Added explicit HTML escaping helpers in `public/app/js/multiplayer/ui-room.js`.
+    - Updated dynamic `innerHTML` render paths (browse/featured/friends/recent/invites/activity/leaderboard/artifacts/player list/chat) to escape both text and attribute values before injection.
+  - Invite-spam + authorization hardening:
+    - `public/app/js/multiplayer/social.js` now uses deterministic invite doc IDs (`<fromUid>_<roomCode>`) and resend cooldown guards (client gate + existing-doc updatedAt check).
+    - `firestore.rules` invite rules now require:
+      - valid deterministic invite doc ID
+      - sender is signed in and member of the invited room
+      - sender has friend relation to target (`users/{fromUid}/friends/{toUid}`)
+      - timestamp sanity (`createdAt/updatedAt == request.time`, `expiresAt > request.time`)
+      - sender refresh throttling (`> 30s` between invite refresh updates)
+      - strict key allowlists on invite seen updates
+  - Additional rules hardening:
+    - Chat payload now enforces `createdAt == request.time` and future `expiresAt`.
+    - Activity feed entries now enforce `createdAt == request.time` and future `expiresAt`.
+    - Explorer leaderboard updates now require request-time timestamps and a minimum write spacing (`>1s`) to reduce spam inflation.
+
+- Validation artifacts (post-hardening):
+  - Syntax checks passed:
+    - `node --check public/app/js/multiplayer/ui-room.js`
+    - `node --check public/app/js/multiplayer/social.js`
+    - `node --check public/app/js/multiplayer/rooms.js`
+    - `node --check public/app/js/multiplayer/chat.js`
+    - `node --check public/app/js/multiplayer/loop.js`
+  - Skill client run artifact (known environment issue: black canvas):
+    - `output/playwright/phase3-skill-run/shot-0.png`
+    - `output/playwright/phase3-skill-run/shot-1.png`
+  - Direct Playwright smoke (DOM + visual + console checks):
+    - `output/playwright/phase3-platform-smoke/multiplayer-tab.png`
+    - `output/playwright/phase3-platform-smoke/room-panel.png`
+    - `output/playwright/phase3-platform-smoke/report.json`
+    - Result: all targeted section checks true; `errorCount=0`.
+
+- Environment note:
+  - Firestore emulator/rules compile still cannot be executed locally without Java runtime in this environment.
+
+- Java + security test harness setup (2026-02-22):
+  - Installed free OpenJDK via Homebrew: `openjdk@21`.
+  - Added shell config exports to `~/.zshrc`:
+    - `PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH`
+    - `JAVA_HOME=/opt/homebrew/opt/openjdk@21`
+  - Verified emulator boot now works:
+    - `firebase emulators:exec --only firestore "echo firestore-emulator-ok"` succeeded.
+
+- Added repeatable Firestore security tests:
+  - Initialized root npm package for tooling (`package.json`, `package-lock.json`).
+  - Installed free dev dependencies:
+    - `@firebase/rules-unit-testing`
+    - `firebase`
+  - Added test file:
+    - `tests/firestore.rules.security.test.mjs`
+  - Added npm scripts:
+    - `npm test`
+    - `npm run test:rules`
+    - Script includes Java path/JAVA_HOME so it works even in shells without profile loading.
+
+- Security test run result:
+  - `npm test` passed.
+  - 12/12 Firestore security checks passed (private-room reads, presence self-write enforcement, chat size/rate transition checks, invite abuse checks, activity feed auth checks).

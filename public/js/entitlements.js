@@ -1,5 +1,4 @@
 import {
-  Timestamp,
   doc,
   getDoc,
   onSnapshot,
@@ -7,9 +6,9 @@ import {
   setDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { initFirebase } from './firebase-init.js';
+import { startTrial as requestTrialStart } from './billing.js';
 
 const USERS_COLLECTION = 'users';
-const TRIAL_DURATION_MS = 48 * 60 * 60 * 1000;
 const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
 
 const FREE_ENTITLEMENTS = Object.freeze({
@@ -60,7 +59,7 @@ function cloneEntitlements(source) {
 }
 
 export function entitlementsForPlan(plan) {
-  switch (String(plan || '').toLowerCase()) {
+  switch (normalizePlan(plan)) {
     case 'trial':
       return cloneEntitlements(TRIAL_ENTITLEMENTS);
     case 'supporter':
@@ -74,6 +73,7 @@ export function entitlementsForPlan(plan) {
 
 function normalizePlan(plan) {
   const lowered = String(plan || '').toLowerCase();
+  if (lowered === 'support') return 'supporter';
   if (lowered === 'trial' || lowered === 'supporter' || lowered === 'pro') return lowered;
   return 'free';
 }
@@ -166,18 +166,30 @@ async function ensureUserDoc(user) {
   const snap = await getDoc(ref);
 
   if (snap.exists()) {
-    return normalizeProfile(user.uid, snap.data());
+    const existing = snap.data() || {};
+    const nextEmail = user.email || existing.email || '';
+    const nextDisplayName = user.displayName || existing.displayName || '';
+    const needsPatch = nextEmail !== (existing.email || '') || nextDisplayName !== (existing.displayName || '');
+
+    if (needsPatch) {
+      await setDoc(ref, {
+        email: nextEmail,
+        displayName: nextDisplayName,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    }
+
+    return normalizeProfile(user.uid, {
+      ...existing,
+      email: nextEmail,
+      displayName: nextDisplayName
+    });
   }
 
-  const trialEndsAt = Timestamp.fromMillis(Date.now() + TRIAL_DURATION_MS);
   const created = {
     uid: user.uid,
     email: user.email || '',
     displayName: user.displayName || '',
-    plan: 'trial',
-    subscriptionStatus: 'none',
-    trialEndsAt,
-    entitlements: entitlementsForPlan('trial'),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
@@ -186,21 +198,25 @@ async function ensureUserDoc(user) {
   return normalizeProfile(user.uid, created);
 }
 
-async function applyTrialDowngradeIfNeeded(profile) {
+export async function startTrialIfEligible(user) {
+  if (!user) {
+    throw new Error('Sign in to start your trial.');
+  }
+
   const services = initFirebase();
-  if (!services || !services.db || !profile || !profile.uid) return profile;
+  if (!services || !services.db) {
+    throw new Error('Firebase config is missing. Trial cannot start yet.');
+  }
+  await requestTrialStart();
+  return ensureEntitlements(user);
+}
+
+async function applyTrialDowngradeIfNeeded(profile) {
+  if (!profile || !profile.uid) return profile;
 
   if (!isTrialExpired(profile) || hasActiveSubscription(profile)) {
     return profile;
   }
-
-  const patch = {
-    plan: 'free',
-    entitlements: entitlementsForPlan('free'),
-    updatedAt: serverTimestamp()
-  };
-
-  await setDoc(doc(services.db, USERS_COLLECTION, profile.uid), patch, { merge: true });
   return {
     ...profile,
     plan: 'free',

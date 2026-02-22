@@ -173,6 +173,108 @@
       font-size: 14px;
     }
 
+    .section-title {
+      margin: 16px 0 8px;
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 18px;
+      letter-spacing: 0.03em;
+    }
+
+    .identity-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .identity-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(5, 17, 32, 0.45);
+    }
+
+    .mono {
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 16px;
+      overflow-wrap: anywhere;
+    }
+
+    .inline-field {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .inline-field input {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(2, 11, 24, 0.62);
+      color: var(--ink);
+      font-size: 14px;
+      padding: 10px 14px;
+    }
+
+    .inline-field input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(90, 200, 255, 0.2);
+    }
+
+    .receipt-list {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(5, 17, 32, 0.45);
+    }
+
+    .receipt-item {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border-top: 1px solid rgba(174, 202, 226, 0.18);
+    }
+
+    .receipt-item:first-child { border-top: none; }
+
+    .receipt-title {
+      font-weight: 700;
+      font-size: 14px;
+      margin: 0 0 2px;
+    }
+
+    .receipt-meta {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .receipt-right {
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .receipt-right a {
+      color: #d6ebff;
+      text-decoration: none;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .receipt-empty {
+      padding: 14px 12px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
     .links {
       display: flex;
       flex-wrap: wrap;
@@ -198,6 +300,9 @@
     @media (max-width: 780px) {
       .status { grid-template-columns: 1fr; }
       .plans { grid-template-columns: 1fr; }
+      .identity-grid { grid-template-columns: 1fr; }
+      .receipt-item { grid-template-columns: 1fr; }
+      .receipt-right { justify-content: flex-start; }
       .actions button { width: 100%; }
       .top { flex-wrap: wrap; }
       .top a { width: 100%; text-align: center; }
@@ -237,10 +342,49 @@
         <button id="upgradeSupporterBtn" class="btn-supporter" type="button">Upgrade to Supporter ($1/mo)</button>
         <button id="upgradeProBtn" class="btn-pro" type="button">Upgrade to Pro ($5/mo)</button>
         <button id="manageBillingBtn" class="btn-ghost" type="button">Manage Billing</button>
+        <button id="refreshAccountBtn" class="btn-ghost" type="button">Refresh Account Data</button>
         <button id="signOutBtn" class="btn-ghost" type="button">Sign Out</button>
       </div>
 
       <p id="statusLine"></p>
+
+      <h2 class="section-title">Identity</h2>
+      <div class="identity-grid">
+        <article class="identity-card">
+          <span class="label">Username</span>
+          <p id="usernameValue" class="mono">Explorer</p>
+          <div class="inline-field">
+            <input id="usernameInput" type="text" maxlength="60" placeholder="Set display name">
+            <button id="saveUsernameBtn" class="btn-primary" type="button">Save</button>
+          </div>
+          <p class="hint">Shown in multiplayer rooms and account records.</p>
+        </article>
+        <article class="identity-card">
+          <span class="label">Linked Email</span>
+          <p id="emailValue" class="mono">-</p>
+          <p id="emailVerifiedValue" class="hint">Verification: unknown</p>
+          <span class="label" style="margin-top:10px">Account ID</span>
+          <p id="uidValue" class="mono">-</p>
+          <p id="providersValue" class="hint">Sign-in providers: -</p>
+        </article>
+      </div>
+
+      <h2 class="section-title">Billing & Receipts</h2>
+      <div class="identity-grid">
+        <article class="identity-card">
+          <span class="label">Subscription Status</span>
+          <p id="subscriptionStatusValue" class="mono">none</p>
+          <p id="nextBillingValue" class="hint">Next billing: not scheduled.</p>
+          <p id="customerValue" class="hint">Customer: not linked.</p>
+        </article>
+        <article class="identity-card">
+          <span class="label">Recent Receipts</span>
+          <button id="refreshReceiptsBtn" class="btn-ghost" type="button">Refresh Receipts</button>
+          <div id="receiptList" class="receipt-list">
+            <div class="receipt-empty">No receipts found yet.</div>
+          </div>
+        </article>
+      </div>
 
       <div class="plans">
         <article class="plan">
@@ -276,7 +420,13 @@
     import { hasFirebaseConfig } from '../js/firebase-init.js';
     import { ensureSignedIn, observeAuth, signOutUser } from '../js/auth-ui.js';
     import { ensureEntitlements, formatRemainingTrial, subscribeEntitlements } from '../js/entitlements.js';
-    import { redirectToCheckout, redirectToPortal } from '../js/billing.js';
+    import {
+      getAccountOverview,
+      listBillingReceipts,
+      redirectToCheckout,
+      redirectToPortal,
+      updateAccountProfile
+    } from '../js/billing.js';
 
     const authPrompt = document.getElementById('authPrompt');
     const accountPanel = document.getElementById('accountPanel');
@@ -285,6 +435,19 @@
     const upgradeSupporterBtn = document.getElementById('upgradeSupporterBtn');
     const upgradeProBtn = document.getElementById('upgradeProBtn');
     const manageBillingBtn = document.getElementById('manageBillingBtn');
+    const refreshAccountBtn = document.getElementById('refreshAccountBtn');
+    const saveUsernameBtn = document.getElementById('saveUsernameBtn');
+    const refreshReceiptsBtn = document.getElementById('refreshReceiptsBtn');
+    const usernameValue = document.getElementById('usernameValue');
+    const usernameInput = document.getElementById('usernameInput');
+    const emailValue = document.getElementById('emailValue');
+    const emailVerifiedValue = document.getElementById('emailVerifiedValue');
+    const uidValue = document.getElementById('uidValue');
+    const providersValue = document.getElementById('providersValue');
+    const subscriptionStatusValue = document.getElementById('subscriptionStatusValue');
+    const nextBillingValue = document.getElementById('nextBillingValue');
+    const customerValue = document.getElementById('customerValue');
+    const receiptList = document.getElementById('receiptList');
     const statusLine = document.getElementById('statusLine');
     const planLabel = document.getElementById('planLabel');
     const planDetail = document.getElementById('planDetail');
@@ -293,6 +456,7 @@
 
     let unsubscribeEntitlements = null;
     let signedInUser = null;
+    let currentEntitlementState = null;
 
     function setStatus(message, type = 'neutral') {
       statusLine.textContent = message || '';
@@ -302,15 +466,157 @@
     }
 
     function setBusy(busy) {
-      [signInBtn, signOutBtn, upgradeSupporterBtn, upgradeProBtn, manageBillingBtn].forEach((btn) => {
+      [signInBtn, signOutBtn, upgradeSupporterBtn, upgradeProBtn, manageBillingBtn, refreshAccountBtn, saveUsernameBtn, refreshReceiptsBtn].forEach((btn) => {
         if (!btn) return;
         btn.disabled = busy;
       });
     }
 
+    function formatDateTime(ms) {
+      const value = Number(ms);
+      if (!Number.isFinite(value) || value <= 0) return null;
+
+      try {
+        return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+      } catch (_) {
+        return new Date(value).toISOString();
+      }
+    }
+
+    function formatCurrency(cents, currency = 'USD') {
+      const value = Number(cents);
+      if (!Number.isFinite(value)) return '-';
+      const normalizedCurrency = String(currency || 'USD').toUpperCase();
+      try {
+        return new Intl.NumberFormat(undefined, {
+          style: 'currency',
+          currency: normalizedCurrency,
+          minimumFractionDigits: 2
+        }).format(value / 100);
+      } catch (_) {
+        return `${(value / 100).toFixed(2)} ${normalizedCurrency}`;
+      }
+    }
+
+    function normalizeStatusLabel(value) {
+      const text = String(value || 'none').replace(/_/g, ' ');
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
+    function clearChildren(node) {
+      while (node && node.firstChild) node.removeChild(node.firstChild);
+    }
+
+    function resetIdentityUi() {
+      usernameValue.textContent = 'Explorer';
+      usernameInput.value = '';
+      emailValue.textContent = '-';
+      emailVerifiedValue.textContent = 'Verification: unknown';
+      uidValue.textContent = '-';
+      providersValue.textContent = 'Sign-in providers: -';
+      subscriptionStatusValue.textContent = 'none';
+      nextBillingValue.textContent = 'Next billing: not scheduled.';
+      customerValue.textContent = 'Customer: not linked.';
+      renderReceipts([]);
+    }
+
+    function renderReceipts(receipts = []) {
+      if (!receiptList) return;
+      clearChildren(receiptList);
+
+      if (!Array.isArray(receipts) || !receipts.length) {
+        const empty = document.createElement('div');
+        empty.className = 'receipt-empty';
+        empty.textContent = 'No receipts found yet.';
+        receiptList.appendChild(empty);
+        return;
+      }
+
+      receipts.forEach((receipt) => {
+        const row = document.createElement('div');
+        row.className = 'receipt-item';
+
+        const left = document.createElement('div');
+        const title = document.createElement('p');
+        title.className = 'receipt-title';
+        title.textContent = receipt.number || receipt.id || 'Invoice';
+        const meta = document.createElement('p');
+        meta.className = 'receipt-meta';
+        const createdAt = formatDateTime(receipt.createdAtMs);
+        meta.textContent = createdAt ? `${normalizeStatusLabel(receipt.status)} • ${createdAt}` : normalizeStatusLabel(receipt.status);
+        left.appendChild(title);
+        left.appendChild(meta);
+
+        const middle = document.createElement('div');
+        const amountLine = document.createElement('p');
+        amountLine.className = 'receipt-title';
+        amountLine.textContent = formatCurrency(receipt.amountPaid || receipt.total || 0, receipt.currency || 'USD');
+        const periodLine = document.createElement('p');
+        periodLine.className = 'receipt-meta';
+        const start = formatDateTime(receipt.periodStartMs);
+        const end = formatDateTime(receipt.periodEndMs);
+        periodLine.textContent = start && end ? `${start} to ${end}` : 'Billing period unavailable';
+        middle.appendChild(amountLine);
+        middle.appendChild(periodLine);
+
+        const right = document.createElement('div');
+        right.className = 'receipt-right';
+        if (receipt.hostedInvoiceUrl) {
+          const hosted = document.createElement('a');
+          hosted.href = String(receipt.hostedInvoiceUrl);
+          hosted.target = '_blank';
+          hosted.rel = 'noreferrer';
+          hosted.textContent = 'View';
+          right.appendChild(hosted);
+        }
+        if (receipt.invoicePdfUrl) {
+          const pdf = document.createElement('a');
+          pdf.href = String(receipt.invoicePdfUrl);
+          pdf.target = '_blank';
+          pdf.rel = 'noreferrer';
+          pdf.textContent = 'PDF';
+          right.appendChild(pdf);
+        }
+        if (!right.childElementCount) {
+          const span = document.createElement('span');
+          span.className = 'receipt-meta';
+          span.textContent = 'No links';
+          right.appendChild(span);
+        }
+
+        row.appendChild(left);
+        row.appendChild(middle);
+        row.appendChild(right);
+        receiptList.appendChild(row);
+      });
+    }
+
+    function applyOverviewToUi(overview) {
+      const fallbackName = signedInUser?.displayName || 'Explorer';
+      const displayName = String(overview?.displayName || fallbackName || 'Explorer').trim() || 'Explorer';
+      const email = String(overview?.email || signedInUser?.email || '-');
+      const providers = Array.isArray(overview?.providers) && overview.providers.length ? overview.providers.join(', ') : '-';
+      const verified = overview?.emailVerified === true ? 'Verified' : 'Not verified';
+      const status = normalizeStatusLabel(overview?.subscriptionStatus || currentEntitlementState?.subscriptionStatus || 'none');
+      const nextBilling = formatDateTime(overview?.nextBillingAtMs);
+
+      usernameValue.textContent = displayName;
+      if (document.activeElement !== usernameInput) {
+        usernameInput.value = displayName;
+      }
+      emailValue.textContent = email;
+      emailVerifiedValue.textContent = `Verification: ${verified}`;
+      uidValue.textContent = String(overview?.uid || signedInUser?.uid || '-');
+      providersValue.textContent = `Sign-in providers: ${providers}`;
+      subscriptionStatusValue.textContent = status;
+      nextBillingValue.textContent = nextBilling ? `Next billing: ${nextBilling}.` : 'Next billing: not scheduled.';
+      customerValue.textContent = overview?.stripeCustomerId ? `Customer: ${overview.stripeCustomerId}` : 'Customer: not linked.';
+    }
+
     function renderSignedOutState() {
       authPrompt.style.display = hasFirebaseConfig() ? 'block' : 'none';
       accountPanel.style.display = hasFirebaseConfig() ? 'none' : 'block';
+      resetIdentityUi();
 
       if (!hasFirebaseConfig()) {
         planLabel.textContent = 'Free';
@@ -324,6 +630,7 @@
     }
 
     function applyPlanUi(state) {
+      currentEntitlementState = state || null;
       planLabel.textContent = state.planLabel;
 
       if (state.plan === 'pro') {
@@ -350,6 +657,50 @@
       manageBillingBtn.disabled = !(state.stripeCustomerId || state.plan === 'supporter' || state.plan === 'pro');
     }
 
+    async function refreshOverview() {
+      const overview = await getAccountOverview();
+      applyOverviewToUi(overview);
+      return overview;
+    }
+
+    async function refreshReceipts() {
+      const payload = await listBillingReceipts({ limit: 20 });
+      const receipts = payload && Array.isArray(payload.receipts) ? payload.receipts : [];
+      renderReceipts(receipts);
+      return receipts;
+    }
+
+    async function refreshAccountData(options = {}) {
+      if (!signedInUser) return;
+      const silent = !!options.silent;
+      if (!silent) setStatus('Refreshing account data...');
+
+      const [overviewResult, receiptsResult] = await Promise.allSettled([
+        refreshOverview(),
+        refreshReceipts()
+      ]);
+
+      if (overviewResult.status === 'rejected') {
+        console.error('[account] overview refresh failed:', overviewResult.reason);
+      }
+      if (receiptsResult.status === 'rejected') {
+        console.error('[account] receipts refresh failed:', receiptsResult.reason);
+      }
+
+      if (overviewResult.status === 'rejected' && receiptsResult.status === 'rejected') {
+        const errMessage =
+          overviewResult.reason?.message ||
+          receiptsResult.reason?.message ||
+          'Could not refresh account data.';
+        setStatus(errMessage, 'warn');
+        return;
+      }
+
+      if (!silent) {
+        setStatus('Account data refreshed.', 'ok');
+      }
+    }
+
     async function handleSignedIn(user) {
       signedInUser = user;
       authPrompt.style.display = 'none';
@@ -359,6 +710,7 @@
 
       const state = await ensureEntitlements(user);
       applyPlanUi(state);
+      await refreshAccountData({ silent: true });
       setStatus(`Signed in as ${user.email || user.uid}.`, 'ok');
 
       unsubscribeEntitlements = subscribeEntitlements(user, (nextState) => {
@@ -400,6 +752,62 @@
         setStatus('Could not sign out.', 'warn');
       } finally {
         setBusy(false);
+      }
+    });
+
+    refreshAccountBtn.addEventListener('click', async () => {
+      if (!signedInUser) return;
+      setBusy(true);
+      try {
+        await refreshAccountData();
+      } catch (err) {
+        setStatus(err && err.message ? err.message : 'Could not refresh account data.', 'warn');
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    refreshReceiptsBtn.addEventListener('click', async () => {
+      if (!signedInUser) return;
+      setBusy(true);
+      setStatus('Refreshing receipts...');
+      try {
+        await refreshReceipts();
+        setStatus('Receipts refreshed.', 'ok');
+      } catch (err) {
+        setStatus(err && err.message ? err.message : 'Could not refresh receipts.', 'warn');
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    saveUsernameBtn.addEventListener('click', async () => {
+      if (!signedInUser) return;
+      const nextName = String(usernameInput.value || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+      if (!nextName) {
+        setStatus('Display name cannot be empty.', 'warn');
+        return;
+      }
+
+      setBusy(true);
+      setStatus('Saving display name...');
+      try {
+        await updateAccountProfile(nextName);
+        await refreshOverview();
+        await ensureEntitlements(signedInUser);
+        setStatus('Display name updated.', 'ok');
+      } catch (err) {
+        console.error('[account] update display name failed:', err);
+        setStatus(err && err.message ? err.message : 'Could not update display name.', 'warn');
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    usernameInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        saveUsernameBtn.click();
       }
     });
 
