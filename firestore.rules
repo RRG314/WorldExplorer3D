@@ -61,13 +61,16 @@ service cloud.firestore {
     }
 
     function roomCreateLimitFromData(data) {
-      return data is map &&
+      let planLimit = planRoomCreateLimit(userPlan());
+      let storedLimit = data is map &&
         ('roomCreateLimit' in data) &&
         data.roomCreateLimit is int &&
         data.roomCreateLimit >= 0 &&
         data.roomCreateLimit <= 10000
           ? data.roomCreateLimit
-          : planRoomCreateLimit(userPlan());
+          : planLimit;
+
+      return storedLimit >= planLimit ? storedLimit : planLimit;
     }
 
     function canConsumeRoomCreateQuota() {

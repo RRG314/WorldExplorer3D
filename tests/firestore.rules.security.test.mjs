@@ -259,6 +259,26 @@ await runCheck('owner can create room with quota increment in same batch', async
   await assertSucceeds(batch.commit());
 });
 
+await runCheck('owner can create room when stored limit is stale but plan limit is valid', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'users', OWNER_UID), {
+      roomCreateCount: 0,
+      roomCreateLimit: 0
+    }, { merge: true });
+  });
+
+  const roomCode = 'QT12AD';
+  const batch = writeBatch(ownerDb);
+  batch.set(doc(ownerDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID));
+  batch.set(doc(ownerDb, 'users', OWNER_UID), {
+    roomCreateCount: 1,
+    roomCreateLimit: 3,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await assertSucceeds(batch.commit());
+});
+
 await runCheck('member can upsert own paint claim in room', async () => {
   await assertSucceeds(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'paintClaims', 'building_001'), {
     key: 'building-001',

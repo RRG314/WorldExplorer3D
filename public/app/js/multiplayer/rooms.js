@@ -324,7 +324,10 @@ async function createRoom(options = {}) {
           ? Math.max(0, Math.min(10000, Math.floor(Number(profile.roomCreateLimit))))
           : null;
         const planLimit = roomCreateLimitForPlan(plan);
-        const baseRoomCreateLimit = persistedLimit == null ? planLimit : persistedLimit;
+        const baseRoomCreateLimit = Math.max(
+          planLimit,
+          persistedLimit == null ? planLimit : persistedLimit
+        );
         const roomCreateLimit = isAdmin
           ? Math.max(
               ROOM_CREATE_LIMITS_BY_PLAN.admin,

@@ -1175,3 +1175,13 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `node tests/painttown.integration.test.mjs` passed (`output/playwright/painttown-physics-check/report.json`).
 - Multiplayer reliability follow-up (2026-02-23):
   - `createRoom(...)` owner presence write now also preserves existing `joinedAt` and `role` if an owner player doc already exists (helps avoid update-rule rejection on rare re-used room code/orphan player doc cases).
+- Multiplayer create-room permission-denied root-fix (2026-02-23):
+  - Fixed stale room quota mismatch path that could block valid paid/trial users with generic "Missing or insufficient permissions".
+  - Firestore rules update (`firestore.rules`):
+    - `roomCreateLimitFromData(...)` now floors stored limit to at least the plan-derived limit (`max(storedLimit, planLimit)`), which prevents stale `roomCreateLimit: 0` from overriding an active plan.
+  - Client update (`public/app/js/multiplayer/rooms.js`):
+    - create-room transaction now writes `roomCreateLimit` as `max(planLimit, persistedLimit)` for non-admin users.
+  - Added regression test (`tests/firestore.rules.security.test.mjs`):
+    - `owner can create room when stored limit is stale but plan limit is valid`.
+  - Validation:
+    - `npm test` now 17/17 passing.
