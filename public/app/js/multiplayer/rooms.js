@@ -28,6 +28,17 @@ const ROOM_PRESENCE_TTL_MS = 90 * 1000;
 const DEFAULT_MAX_PLAYERS = 12;
 const CITY_KEY_MAX_LEN = 48;
 const PUBLIC_ROOM_RESULT_LIMIT = 20;
+const PAINT_TOWN_MIN_TIME_LIMIT_SEC = 30;
+const PAINT_TOWN_MAX_TIME_LIMIT_SEC = 1800;
+const DEFAULT_PAINT_TOWN_RULES = Object.freeze({
+  allowChat: true,
+  allowGhosts: true,
+  paintTimeLimitSec: 120,
+  paintTouchMode: 'any',
+  allowPaintballGun: true,
+  allowRoofAutoPaint: true
+});
+const VALID_PAINT_TOUCH_MODES = new Set(['off', 'roof', 'any']);
 const ROOM_CREATE_LIMITS_BY_PLAN = Object.freeze({
   free: 0,
   trial: 3,
@@ -131,6 +142,56 @@ function normalizeWorld(world = {}) {
   return normalized;
 }
 
+function normalizePaintTimeLimitSec(raw) {
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return DEFAULT_PAINT_TOWN_RULES.paintTimeLimitSec;
+  return Math.max(
+    PAINT_TOWN_MIN_TIME_LIMIT_SEC,
+    Math.min(PAINT_TOWN_MAX_TIME_LIMIT_SEC, Math.floor(parsed))
+  );
+}
+
+function normalizePaintTouchMode(raw) {
+  const mode = String(raw || '').toLowerCase();
+  return VALID_PAINT_TOUCH_MODES.has(mode) ? mode : DEFAULT_PAINT_TOWN_RULES.paintTouchMode;
+}
+
+function normalizeRoomRules(rawRules = {}) {
+  const source = rawRules && typeof rawRules === 'object' ? rawRules : {};
+  return {
+    allowChat: source.allowChat !== false,
+    allowGhosts: source.allowGhosts !== false,
+    paintTimeLimitSec: normalizePaintTimeLimitSec(source.paintTimeLimitSec),
+    paintTouchMode: normalizePaintTouchMode(source.paintTouchMode),
+    allowPaintballGun: source.allowPaintballGun !== false,
+    allowRoofAutoPaint: source.allowRoofAutoPaint !== false
+  };
+}
+
+function hashStringToUint32(input) {
+  const text = String(input || '');
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+function deriveRoomDeterministicSeed(roomLike = {}) {
+  const roomId = normalizeCode(roomLike.code || roomLike.id || '');
+  const world = normalizeWorld(roomLike.world || {});
+  const rawSeed = String(world.seed || '').trim();
+  const numericSeed = Number(rawSeed);
+  if (Number.isFinite(numericSeed)) {
+    return (Math.floor(numericSeed) | 0) >>> 0;
+  }
+
+  const baseSeed = rawSeed || `${world.kind}:${world.lat.toFixed(6)},${world.lon.toFixed(6)}`;
+  const mixed = `${baseSeed}|${world.kind}|${world.lat.toFixed(6)}|${world.lon.toFixed(6)}|${roomId}`;
+  return hashStringToUint32(mixed) >>> 0;
+}
+
 function normalizeVisibility(raw) {
   const visibility = String(raw || '').toLowerCase();
   return visibility === 'public' ? 'public' : 'private';
@@ -193,10 +254,7 @@ function toRoomObject(roomSnap) {
     cityKey,
     locationTag,
     world,
-    rules: {
-      allowChat: data.rules?.allowChat !== false,
-      allowGhosts: data.rules?.allowGhosts !== false
-    }
+    rules: normalizeRoomRules(data.rules || {})
   };
 }
 
@@ -219,6 +277,7 @@ async function createRoom(options = {}) {
   const locationName = String(options.locationName || '').trim().slice(0, 80);
   const locationTag = normalizeLocationTag(options.locationTag, world, locationName || roomName || world.seed);
   const cityKey = locationTag ? locationTag.cityKey : '';
+  const roomRules = normalizeRoomRules(options.rules || {});
   const userRef = doc(db, USERS_COLLECTION, user.uid);
 
   // Ensure the user profile exists so quota consumption can be validated by rules.
@@ -270,10 +329,7 @@ async function createRoom(options = {}) {
           mods: { [user.uid]: true },
           cityKey,
           world,
-          rules: {
-            allowChat: true,
-            allowGhosts: true
-          }
+          rules: roomRules
         };
 
         if (locationTag) roomPayload.locationTag = locationTag;
@@ -445,6 +501,10 @@ async function updateRoomSettings(roomId, updates = {}) {
     String(updates.name || currentRoom.name || '').trim().slice(0, 80)
   );
   const cityKey = locationTag ? locationTag.cityKey : '';
+  const nextRules = normalizeRoomRules({
+    ...(currentRoom.rules || {}),
+    ...(updates.rules && typeof updates.rules === 'object' ? updates.rules : {})
+  });
 
   const payload = {
     visibility,
@@ -455,6 +515,7 @@ async function updateRoomSettings(roomId, updates = {}) {
     payload.name = String(updates.name || '').trim().slice(0, 80);
   }
 
+  payload.rules = nextRules;
   payload.cityKey = cityKey;
   if (locationTag) {
     payload.locationTag = locationTag;
@@ -645,6 +706,7 @@ async function setHomeBase(roomId, homeBase = {}) {
 
 export {
   createRoom,
+  deriveRoomDeterministicSeed,
   findPublicRoomsByCity,
   findFeaturedPublicRooms,
   getCurrentRoom,

@@ -1054,3 +1054,18 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `output/web-game-mp/manual-room-panel.json`
     - `output/web-game-account/manual-check.png`
     - `output/web-game-account/manual-check.json`
+- Paint Town multiplayer deterministic/physics validation pass (2026-02-22 UTC):
+  - Added `tests/painttown.integration.test.mjs` (Playwright integration harness).
+  - Test boots `/public/app/index.html`, selects Paint the Town mode, enters game, then asserts:
+    - deterministic room seeding via `deriveRoomDeterministicSeed` (same room => same seed, changed room code => different seed),
+    - touch-paint claim creation,
+    - paintball shot + physics update loop + claim creation,
+    - zero runtime console/page errors during run.
+  - Improved target acquisition in test via in-view building raycast scan (reliable hit points across camera setups).
+  - Latest report: `output/playwright/painttown-physics-check/report.json` => `pass: true`.
+  - Latest screenshots:
+    - `output/playwright/painttown-physics-check/title-painttown-selected.png`
+    - `output/playwright/painttown-physics-check/ingame-painttown.png`
+    - `output/playwright/painttown-physics-check/ingame-painttown-after-tests.png`
+- Firestore security regression rerun:
+  - `npm test` => `Security checks complete: 16/16 passed`.

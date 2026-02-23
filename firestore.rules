@@ -159,6 +159,30 @@ service cloud.firestore {
         locationTag.kind == worldKind;
     }
 
+    function validPaintTouchMode(mode) {
+      return mode in ['off', 'roof', 'any'];
+    }
+
+    function validRoomRulesData(rules) {
+      return rules is map &&
+        rules.keys().hasOnly([
+          'allowChat',
+          'allowGhosts',
+          'paintTimeLimitSec',
+          'paintTouchMode',
+          'allowPaintballGun',
+          'allowRoofAutoPaint'
+        ]) &&
+        rules.allowChat is bool &&
+        rules.allowGhosts is bool &&
+        rules.paintTimeLimitSec is int &&
+        rules.paintTimeLimitSec >= 30 &&
+        rules.paintTimeLimitSec <= 1800 &&
+        validPaintTouchMode(rules.paintTouchMode) &&
+        rules.allowPaintballGun is bool &&
+        rules.allowRoofAutoPaint is bool;
+    }
+
     function validAnchorData(anchor) {
       return anchor is map &&
         anchor.keys().hasOnly(['kind', 'lat', 'lon', 'x', 'y', 'z']) &&
@@ -215,10 +239,7 @@ service cloud.firestore {
         request.resource.data.world.seed.size() <= 100 &&
         request.resource.data.world.lat is number &&
         request.resource.data.world.lon is number &&
-        request.resource.data.rules is map &&
-        request.resource.data.rules.keys().hasOnly(['allowChat', 'allowGhosts']) &&
-        request.resource.data.rules.allowChat is bool &&
-        request.resource.data.rules.allowGhosts is bool &&
+        validRoomRulesData(request.resource.data.rules) &&
         (
           !('locationTag' in request.resource.data) ||
           validLocationTag(
@@ -276,10 +297,7 @@ service cloud.firestore {
         request.resource.data.world.seed.size() <= 100 &&
         request.resource.data.world.lat is number &&
         request.resource.data.world.lon is number &&
-        request.resource.data.rules is map &&
-        request.resource.data.rules.keys().hasOnly(['allowChat', 'allowGhosts']) &&
-        request.resource.data.rules.allowChat is bool &&
-        request.resource.data.rules.allowGhosts is bool &&
+        validRoomRulesData(request.resource.data.rules) &&
         (
           !('locationTag' in request.resource.data) ||
           validLocationTag(
@@ -767,6 +785,49 @@ service cloud.firestore {
         request.resource.data.createdAt == resource.data.createdAt;
     }
 
+    function validPaintClaimId(claimId) {
+      return claimId is string &&
+        claimId.size() > 0 &&
+        claimId.size() <= 120 &&
+        claimId.matches('^[A-Za-z0-9._-]+$');
+    }
+
+    function validPaintClaimData(claimId) {
+      return validPaintClaimId(claimId) &&
+        request.resource.data.keys().hasOnly([
+          'key',
+          'colorHex',
+          'colorName',
+          'method',
+          'uid',
+          'displayName',
+          'updatedAt',
+          'expiresAt'
+        ]) &&
+        request.resource.data.key is string &&
+        request.resource.data.key.size() > 0 &&
+        request.resource.data.key.size() <= 120 &&
+        request.resource.data.colorHex is string &&
+        request.resource.data.colorHex.matches('^#[0-9A-Fa-f]{6}$') &&
+        request.resource.data.colorName is string &&
+        request.resource.data.colorName.size() > 0 &&
+        request.resource.data.colorName.size() <= 24 &&
+        request.resource.data.method in ['roof', 'touch-roof', 'touch-any', 'gun'] &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() > 0 &&
+        request.resource.data.displayName.size() <= 48 &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.expiresAt is timestamp &&
+        request.resource.data.expiresAt > request.time;
+    }
+
+    function validPaintClaimUpdate(claimId) {
+      return validPaintClaimData(claimId) &&
+        request.resource.data.key == resource.data.key;
+    }
+
     function validHomeBaseData() {
       return request.resource.data.keys().hasOnly([
           'name',
@@ -980,6 +1041,18 @@ service cloud.firestore {
         allow delete: if isMultiplayerEntitled() &&
           isRoomMember(roomId) &&
           (request.auth.uid == resource.data.ownerUid || canManageRoom(roomId));
+      }
+
+      match /paintClaims/{claimId} {
+        allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
+        allow create: if isMultiplayerEntitled() &&
+          isRoomMember(roomId) &&
+          validPaintClaimData(claimId);
+        allow update: if isMultiplayerEntitled() &&
+          isRoomMember(roomId) &&
+          request.auth.uid == resource.data.uid &&
+          validPaintClaimUpdate(claimId);
+        allow delete: if false;
       }
 
       match /state/{stateId} {

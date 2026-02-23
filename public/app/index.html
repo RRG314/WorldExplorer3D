@@ -823,7 +823,7 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="mode sel" data-mode="free"><div class="mode-icon">🚗</div><div><div class="mode-name">Free Roam</div><div class="mode-desc">Explore the city at your own pace</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="trial"><div class="mode-icon">⏱️</div><div><div class="mode-name">Time Trial</div><div class="mode-desc">Race to the destination as fast as you can</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="checkpoint"><div class="mode-icon">🏁</div><div><div class="mode-name">Checkpoints</div><div class="mode-desc">Collect all markers scattered across the map</div></div><div class="mode-check">✓</div></div>
-<div class="mode" data-mode="painttown"><div class="mode-icon">🟥</div><div><div class="mode-name">Paint the Town Red</div><div class="mode-desc">Land on rooftops to auto-paint buildings. Score as many as possible in 2 minutes.</div></div><div class="mode-check">✓</div></div>
+<div class="mode" data-mode="painttown"><div class="mode-icon">🟥</div><div><div class="mode-name">Paint the Town Red</div><div class="mode-desc">Use touch paint or paintball gun to claim buildings. Room rules can enforce roof-only or gun-only rounds.</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="police"><div class="mode-icon">🚔</div><div><div class="mode-name">Police Chase</div><div class="mode-desc">Start with police pursuit enabled and survive the chase.</div></div><div class="mode-check">✓</div></div>
 <div class="mode" data-mode="flower"><div class="mode-icon">🌹</div><div><div class="mode-name">Find the Flower</div><div class="mode-desc">Instantly start the red flower hunt and race for the fastest time.</div></div><div class="mode-check">✓</div></div>
 <div style="grid-column:1/-1;padding:12px 0;text-align:center;font-size:11px;color:#64748b;border-top:2px solid #e8eef5;margin-top:8px;">💡 Toggle walking mode anytime with <b>F</b> key or float menu</div>
@@ -1628,6 +1628,24 @@ Explore the area
       <div class="mp-subtitle">Room Settings</div>
       <div class="mp-row">
         <input id="roomPanelNameInput" class="mp-input" type="text" maxlength="80" placeholder="Room name (optional)">
+      </div>
+      <div class="mp-row">
+        <input id="roomPanelPaintTimeInput" class="mp-input" type="number" min="30" max="1800" step="15" value="120" placeholder="Paint round time (seconds)">
+        <select id="roomPanelPaintTouchModeSelect" class="mp-select" aria-label="Paint touch mode">
+          <option value="off">Touch Paint Off</option>
+          <option value="roof">Touch Roof Only</option>
+          <option value="any" selected>Touch Anywhere</option>
+        </select>
+      </div>
+      <div class="mp-row">
+        <label class="mp-check" for="roomPanelPaintAllowGunToggle">
+          <input id="roomPanelPaintAllowGunToggle" type="checkbox" checked>
+          Allow paintball gun
+        </label>
+        <label class="mp-check" for="roomPanelPaintAllowRoofAutoToggle">
+          <input id="roomPanelPaintAllowRoofAutoToggle" type="checkbox" checked>
+          Auto-paint on rooftop landings
+        </label>
       </div>
       <div class="mp-row">
         <label class="mp-check" for="roomPanelFeaturedToggle">

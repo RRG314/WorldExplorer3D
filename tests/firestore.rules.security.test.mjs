@@ -79,7 +79,11 @@ function privateRoomDoc() {
     },
     rules: {
       allowChat: true,
-      allowGhosts: true
+      allowGhosts: true,
+      paintTimeLimitSec: 120,
+      paintTouchMode: 'any',
+      allowPaintballGun: true,
+      allowRoofAutoPaint: true
     }
   };
 }
@@ -106,7 +110,11 @@ function roomCreateDoc(roomCode, ownerUid) {
     },
     rules: {
       allowChat: true,
-      allowGhosts: true
+      allowGhosts: true,
+      paintTimeLimitSec: 120,
+      paintTouchMode: 'any',
+      allowPaintballGun: true,
+      allowRoofAutoPaint: true
     }
   };
 }
@@ -249,6 +257,32 @@ await runCheck('owner can create room with quota increment in same batch', async
     updatedAt: serverTimestamp()
   }, { merge: true });
   await assertSucceeds(batch.commit());
+});
+
+await runCheck('member can upsert own paint claim in room', async () => {
+  await assertSucceeds(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'paintClaims', 'building_001'), {
+    key: 'building-001',
+    colorHex: '#1D4ED8',
+    colorName: 'Blue',
+    method: 'gun',
+    uid: MEMBER_UID,
+    displayName: 'Member',
+    updatedAt: serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  }));
+});
+
+await runCheck('non-member cannot write room paint claim', async () => {
+  await assertFails(setDoc(doc(attackerDb, 'rooms', ROOM_ID, 'paintClaims', 'building_002'), {
+    key: 'building-002',
+    colorHex: '#16A34A',
+    colorName: 'Green',
+    method: 'touch-any',
+    uid: ATTACKER_UID,
+    displayName: 'Attacker',
+    updatedAt: serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  }));
 });
 
 await runCheck('owner oversize chat message blocked', async () => {

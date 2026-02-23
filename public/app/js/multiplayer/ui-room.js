@@ -10,6 +10,7 @@ import {
 import { listenPlayers, startPresence, stopPresence } from './presence.js?v=54';
 import {
   createRoom,
+  deriveRoomDeterministicSeed,
   findFeaturedPublicRooms,
   findPublicRoomsByCity,
   getCurrentRoom,
@@ -22,6 +23,11 @@ import {
   setHomeBase,
   updateRoomSettings
 } from './rooms.js?v=54';
+import {
+  listenPaintClaims,
+  normalizeColorHex as normalizePaintColorHex,
+  upsertPaintClaim
+} from './painttown.js?v=54';
 import {
   addFriend,
   dismissInvite,
@@ -61,6 +67,29 @@ function escapeHtml(value) {
 
 function safeHtml(value, max = 120) {
   return escapeHtml(sanitizeText(value, max));
+}
+
+const PAINT_TOUCH_MODES = new Set(['off', 'roof', 'any']);
+
+function normalizePaintTouchMode(raw) {
+  const mode = String(raw || '').toLowerCase();
+  return PAINT_TOUCH_MODES.has(mode) ? mode : 'any';
+}
+
+function normalizePaintTimeLimitSec(raw) {
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return 120;
+  return Math.max(30, Math.min(1800, Math.floor(parsed)));
+}
+
+function normalizePaintRules(rawRules = {}) {
+  const source = rawRules && typeof rawRules === 'object' ? rawRules : {};
+  return {
+    paintTimeLimitSec: normalizePaintTimeLimitSec(source.paintTimeLimitSec),
+    paintTouchMode: normalizePaintTouchMode(source.paintTouchMode),
+    allowPaintballGun: source.allowPaintballGun !== false,
+    allowRoofAutoPaint: source.allowRoofAutoPaint !== false
+  };
 }
 
 function toMillis(value) {
@@ -295,6 +324,10 @@ function initMultiplayerPlatform() {
     roomPanelPlayerCount: document.getElementById('roomPanelPlayerCount'),
     roomPanelNameInput: document.getElementById('roomPanelNameInput'),
     roomPanelFeaturedToggle: document.getElementById('roomPanelFeaturedToggle'),
+    roomPanelPaintTimeInput: document.getElementById('roomPanelPaintTimeInput'),
+    roomPanelPaintTouchModeSelect: document.getElementById('roomPanelPaintTouchModeSelect'),
+    roomPanelPaintAllowGunToggle: document.getElementById('roomPanelPaintAllowGunToggle'),
+    roomPanelPaintAllowRoofAutoToggle: document.getElementById('roomPanelPaintAllowRoofAutoToggle'),
     roomPanelSaveSettingsBtn: document.getElementById('roomPanelSaveSettingsBtn'),
     roomHomeBaseNameInput: document.getElementById('roomHomeBaseNameInput'),
     roomHomeBaseDescInput: document.getElementById('roomHomeBaseDescInput'),
@@ -343,11 +376,13 @@ function initMultiplayerPlatform() {
     homeBase: null,
     pendingRoomCode: normalizeCode(new URLSearchParams(window.location.search).get('room')),
     pendingRoomPrompted: false,
+    activeRoomWorldSignature: '',
     unsubRoom: null,
     unsubPlayers: null,
     unsubChat: null,
     unsubArtifacts: null,
     unsubHomeBase: null,
+    unsubPaintClaims: null,
     unsubFriends: null,
     unsubRecentPlayers: null,
     unsubInvites: null,
@@ -410,6 +445,113 @@ function initMultiplayerPlatform() {
     const titleValue = sanitizeText(refs.titleRoomNameInput?.value || '', 80);
     if (refs.roomPanelModal?.classList.contains('show')) return roomPanelValue || titleValue;
     return titleValue || roomPanelValue;
+  }
+
+  function readPaintRulesFromPanel() {
+    return normalizePaintRules({
+      paintTimeLimitSec: refs.roomPanelPaintTimeInput?.value,
+      paintTouchMode: refs.roomPanelPaintTouchModeSelect?.value,
+      allowPaintballGun: refs.roomPanelPaintAllowGunToggle ? !!refs.roomPanelPaintAllowGunToggle.checked : true,
+      allowRoofAutoPaint: refs.roomPanelPaintAllowRoofAutoToggle ? !!refs.roomPanelPaintAllowRoofAutoToggle.checked : true
+    });
+  }
+
+  function applyPaintRulesToPanel(room) {
+    const rules = normalizePaintRules(room?.rules || {});
+    if (refs.roomPanelPaintTimeInput && document.activeElement !== refs.roomPanelPaintTimeInput) {
+      refs.roomPanelPaintTimeInput.value = String(rules.paintTimeLimitSec);
+    }
+    if (refs.roomPanelPaintTouchModeSelect) {
+      refs.roomPanelPaintTouchModeSelect.value = normalizePaintTouchMode(rules.paintTouchMode);
+    }
+    if (refs.roomPanelPaintAllowGunToggle) {
+      refs.roomPanelPaintAllowGunToggle.checked = rules.allowPaintballGun === true;
+    }
+    if (refs.roomPanelPaintAllowRoofAutoToggle) {
+      refs.roomPanelPaintAllowRoofAutoToggle.checked = rules.allowRoofAutoPaint === true;
+    }
+  }
+
+  function roomWorldSignature(room) {
+    if (!room || !room.world) return '';
+    const world = room.world || {};
+    const kind = String(world.kind || 'earth').toLowerCase();
+    const seed = String(world.seed || '').trim();
+    const lat = finiteNumber(world.lat, 0).toFixed(6);
+    const lon = finiteNumber(world.lon, 0).toFixed(6);
+    return `${kind}|${seed}|${lat}|${lon}`;
+  }
+
+  function applyRoomPaintMultiplayerConfig(room) {
+    if (!room) return;
+    const roomSeed = deriveRoomDeterministicSeed(room);
+    const rules = normalizePaintRules(room.rules || {});
+    appCtx.paintTownRoomRules = { ...rules };
+    if (typeof appCtx.setPaintTownMultiplayerConfig === 'function') {
+      appCtx.setPaintTownMultiplayerConfig({
+        roomId: room.id,
+        uid: state.authUser?.uid || '',
+        roomSeed,
+        rules
+      });
+    }
+  }
+
+  function installPaintClaimPublisher() {
+    appCtx.publishPaintTownClaim = async (claim = {}) => {
+      if (!state.currentRoom?.id) return;
+      const key = sanitizeText(claim.key || '', 120);
+      if (!key) return;
+      await upsertPaintClaim(state.currentRoom.code, {
+        key,
+        colorHex: normalizePaintColorHex(claim.colorHex || '#D61F2C'),
+        colorName: sanitizeText(claim.colorName || '', 24),
+        method: sanitizeText(claim.method || 'touch-any', 24)
+      });
+    };
+  }
+
+  async function syncRoomWorldContext(room, force = false) {
+    if (!room || !room.world) return;
+
+    const signature = roomWorldSignature(room);
+    if (!force && signature && state.activeRoomWorldSignature === signature) return;
+    state.activeRoomWorldSignature = signature;
+
+    const world = room.world || {};
+    const roomSeed = deriveRoomDeterministicSeed(room);
+    appCtx.sharedSeedOverride = roomSeed;
+    applyRoomPaintMultiplayerConfig(room);
+    installPaintClaimPublisher();
+
+    const lat = finiteNumber(world.lat, null);
+    const lon = finiteNumber(world.lon, null);
+    const kind = String(world.kind || 'earth').toLowerCase();
+
+    if (kind !== 'earth' || !Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return;
+    }
+
+    appCtx.customLoc = {
+      lat,
+      lon,
+      name: sanitizeText(room.name || room.locationTag?.label || room.code || 'Room World', 80) || 'Room World'
+    };
+    appCtx.selLoc = 'custom';
+
+    const customLatInput = document.getElementById('customLat');
+    const customLonInput = document.getElementById('customLon');
+    if (customLatInput) customLatInput.value = lat.toFixed(6);
+    if (customLonInput) customLonInput.value = lon.toFixed(6);
+
+    if (appCtx.gameStarted && !appCtx.worldLoading && typeof appCtx.loadRoads === 'function') {
+      setStatus(`Syncing room world ${room.code} (seed ${roomSeed})...`);
+      try {
+        await appCtx.loadRoads();
+      } catch (err) {
+        console.warn('[multiplayer][ui] room world sync failed:', err);
+      }
+    }
   }
 
   function syncCreateOptionFields(source = 'title') {
@@ -638,6 +780,10 @@ function initMultiplayerPlatform() {
     if (refs.roomArtifactCreateBtn) refs.roomArtifactCreateBtn.disabled = !hasRoom;
     if (refs.roomPanelFeaturedToggle) refs.roomPanelFeaturedToggle.disabled = !hasRoom;
     if (refs.roomPanelNameInput) refs.roomPanelNameInput.disabled = !hasRoom;
+    if (refs.roomPanelPaintTimeInput) refs.roomPanelPaintTimeInput.disabled = !hasRoom;
+    if (refs.roomPanelPaintTouchModeSelect) refs.roomPanelPaintTouchModeSelect.disabled = !hasRoom;
+    if (refs.roomPanelPaintAllowGunToggle) refs.roomPanelPaintAllowGunToggle.disabled = !hasRoom;
+    if (refs.roomPanelPaintAllowRoofAutoToggle) refs.roomPanelPaintAllowRoofAutoToggle.disabled = !hasRoom;
     if (refs.roomHomeBaseNameInput) refs.roomHomeBaseNameInput.disabled = !hasRoom;
     if (refs.roomHomeBaseDescInput) refs.roomHomeBaseDescInput.disabled = !hasRoom;
     if (refs.roomArtifactTypeSelect) refs.roomArtifactTypeSelect.disabled = !hasRoom;
@@ -656,6 +802,7 @@ function initMultiplayerPlatform() {
       if (refs.roomPanelRoomName) refs.roomPanelRoomName.textContent = 'Create or join to start multiplayer.';
       if (refs.roomPanelNameInput) refs.roomPanelNameInput.value = '';
       if (refs.roomPanelFeaturedToggle) refs.roomPanelFeaturedToggle.checked = false;
+      applyPaintRulesToPanel(null);
       return;
     }
 
@@ -674,6 +821,7 @@ function initMultiplayerPlatform() {
     if (refs.roomPanelFeaturedToggle) {
       refs.roomPanelFeaturedToggle.checked = room.visibility === 'public' && room.featured === true;
     }
+    applyPaintRulesToPanel(room);
   }
 
   function renderPlayerList() {
@@ -739,11 +887,13 @@ function initMultiplayerPlatform() {
     if (typeof state.unsubChat === 'function') state.unsubChat();
     if (typeof state.unsubArtifacts === 'function') state.unsubArtifacts();
     if (typeof state.unsubHomeBase === 'function') state.unsubHomeBase();
+    if (typeof state.unsubPaintClaims === 'function') state.unsubPaintClaims();
     state.unsubRoom = null;
     state.unsubPlayers = null;
     state.unsubChat = null;
     state.unsubArtifacts = null;
     state.unsubHomeBase = null;
+    state.unsubPaintClaims = null;
   }
 
   function clearGlobalSubscriptions() {
@@ -765,10 +915,17 @@ function initMultiplayerPlatform() {
     }
 
     state.currentRoom = null;
+    state.activeRoomWorldSignature = '';
     state.players = [];
     state.messages = [];
     state.artifacts = [];
     state.homeBase = null;
+    if (typeof appCtx.clearPaintTownMultiplayerConfig === 'function') {
+      appCtx.clearPaintTownMultiplayerConfig();
+    }
+    if (Object.prototype.hasOwnProperty.call(appCtx, 'publishPaintTownClaim')) {
+      delete appCtx.publishPaintTownClaim;
+    }
     if (state.ghostManager) state.ghostManager.clear();
     setChatOpen(false);
     renderRoomMeta();
@@ -894,16 +1051,19 @@ function initMultiplayerPlatform() {
       const featured = !!refs.roomPanelFeaturedToggle?.checked;
       const nextVisibility = featured ? 'public' : normalizeVisibilitySelection(readVisibilitySelection());
       const nextLocationTag = sanitizeText(readLocationTagInput() || state.currentRoom.locationTag?.label || '', 80);
+      const paintRules = readPaintRulesFromPanel();
 
       const updated = await updateRoomSettings(state.currentRoom.code, {
         name: nextName,
         featured,
         visibility: nextVisibility,
-        locationTag: nextLocationTag ? { label: nextLocationTag, city: nextLocationTag, kind: state.currentRoom.world?.kind || 'earth' } : null
+        locationTag: nextLocationTag ? { label: nextLocationTag, city: nextLocationTag, kind: state.currentRoom.world?.kind || 'earth' } : null,
+        rules: paintRules
       });
 
       if (updated) {
         state.currentRoom = updated;
+        applyRoomPaintMultiplayerConfig(updated);
         renderRoomMeta();
         setStatus('Room settings updated.');
       }
@@ -1054,6 +1214,8 @@ function initMultiplayerPlatform() {
     state.currentRoom = room;
     state.artifacts = [];
     state.homeBase = null;
+    applyRoomPaintMultiplayerConfig(room);
+    installPaintClaimPublisher();
     setInputCode(refs, room.code);
     if (refs.titleVisibilitySelect) refs.titleVisibilitySelect.value = normalizeVisibilitySelection(room.visibility);
     if (refs.roomPanelVisibilitySelect) refs.roomPanelVisibilitySelect.value = normalizeVisibilitySelection(room.visibility);
@@ -1082,6 +1244,8 @@ function initMultiplayerPlatform() {
         return;
       }
       state.currentRoom = nextRoom;
+      applyRoomPaintMultiplayerConfig(nextRoom);
+      await syncRoomWorldContext(nextRoom, false);
       renderRoomMeta();
       updateToggleStates();
     });
@@ -1114,7 +1278,17 @@ function initMultiplayerPlatform() {
       renderHomeBase();
     });
 
+    state.unsubPaintClaims = listenPaintClaims(room.id, (claims) => {
+      if (typeof appCtx.applyPaintTownRemoteClaimsFromSync === 'function') {
+        appCtx.applyPaintTownRemoteClaimsFromSync({
+          roomId: room.id,
+          claims: Array.isArray(claims) ? claims : []
+        });
+      }
+    });
+
     startPresence(room.id, readPoseSnapshot);
+    await syncRoomWorldContext(room, false);
 
     const invite = buildInviteLink(room.code);
     if (invite) {
@@ -1123,7 +1297,7 @@ function initMultiplayerPlatform() {
       window.history.replaceState({}, '', url.toString());
     }
 
-    setStatus(`Connected to ${originLabel}: ${room.code}`);
+    setStatus(`Connected to ${originLabel}: ${room.code} (seed ${deriveRoomDeterministicSeed(room)}).`);
   }
 
   async function handleCreateRoom() {
@@ -1134,6 +1308,7 @@ function initMultiplayerPlatform() {
       const roomName = sanitizeText(readRoomNameInput(), 80);
       const visibility = readVisibilitySelection();
       const locationTagText = sanitizeText(readLocationTagInput(), 80);
+      const paintRules = readPaintRulesFromPanel();
       const effectiveLocationTag = visibility === 'public'
         ? (locationTagText || world.name)
         : locationTagText;
@@ -1143,6 +1318,7 @@ function initMultiplayerPlatform() {
         featured: false,
         maxPlayers: 12,
         world,
+        rules: paintRules,
         locationName: roomName || world.name,
         locationTag: effectiveLocationTag ? { label: effectiveLocationTag, city: effectiveLocationTag, kind: world.kind } : null
       });
@@ -1674,6 +1850,12 @@ function initMultiplayerPlatform() {
   if (state.currentRoom && state.currentRoom.id) {
     activateRoom(state.currentRoom, 'current room');
   } else {
+    if (typeof appCtx.clearPaintTownMultiplayerConfig === 'function') {
+      appCtx.clearPaintTownMultiplayerConfig();
+    }
+    if (Object.prototype.hasOwnProperty.call(appCtx, 'publishPaintTownClaim')) {
+      delete appCtx.publishPaintTownClaim;
+    }
     renderRoomMeta();
     renderPlayerList();
     renderChat();
