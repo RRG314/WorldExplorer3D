@@ -1109,3 +1109,55 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Confirmed multiplayer float is now a compact circular icon near the flower/share cluster in-game (`output/playwright/painttown-physics-check/ingame-painttown-after-tests.png`).
 - Remaining operational step: deploy updated Firestore rules/functions/hosting as needed after commit.
 - Updated security test fixture values for new quota policy (`supporter/supported owner roomCreateLimit=3`) and revalidated: `npm test` still 16/16 pass.
+- Paint Town input update (2026-02-23):
+  - Mapped paintball fire to keyboard `Shift` while Paint Town is active.
+  - Removed right-click paintball alt-fire path so right-click is reserved for camera control.
+  - Removed walk-mode double-click camera toggle in engine input handling (no more dblclick camera state flips while rapid firing).
+  - Updated Paint Town expanded HUD hint to mention `Shift` firing.
+  - Hardened paint input focus guard so hidden title/menu focus does not block gameplay key input.
+- Validation:
+  - `node --check public/app/js/engine.js` and `node --check public/app/js/game.js` passed.
+  - `node tests/painttown.integration.test.mjs` passed (`output/playwright/painttown-physics-check/report.json`).
+  - Focused control checks:
+    - Shift key triggers paintball shot (`shiftTriggeredShot: true` in `output/playwright/painttown-shift-camera-check/result.json`).
+    - Double-click no longer toggles walk mouse look (`dblClickDidNotToggleWalkMouseLook: true`).
+    - Right-click no longer shoots paintballs (`rightClickDidNotShoot: true`).
+
+- Dead-code cleanup + mobile validation pass (2026-02-23):
+  - Removed clearly unused variables/helpers with no runtime effect:
+    - `sortedPaintTownColorEntries()` (unused helper) removed from `js/game.js` and `public/app/js/game.js`.
+    - Removed unused locals/params in game flow (`name` arg in `navigateToPOI`, stale `sourceStr` block, unused catch/error bindings).
+    - Removed unused locals in engine texture/debug helpers (`brickW`, `rng`, `gpuInfo` assignment) in root + public app copies.
+  - Syntax checks passed:
+    - `node --check js/game.js`
+    - `node --check public/app/js/game.js`
+    - `node --check js/engine.js`
+    - `node --check public/app/js/engine.js`
+  - Static dead-code scan run (`eslint` no-unused-vars/no-unreachable/no-constant-condition):
+    - Only remaining hits are `openHistoricModal` in both game files (referenced by inline `onclick` strings, so kept intentionally).
+  - Skill-required Playwright client run executed (`output/playwright/deadcode-cleanup-skill-run/`), with known headless canvas-black capture limitation in this environment.
+  - Direct mobile smoke run (iPhone 12 viewport) passed with no console/page errors:
+    - report: `output/playwright/deadcode-mobile-smoke-v3/report.json` (`pass: true`)
+    - screenshots:
+      - `output/playwright/deadcode-mobile-smoke-v3/mobile-title.png`
+      - `output/playwright/deadcode-mobile-smoke-v3/mobile-ingame.png`
+      - `output/playwright/deadcode-mobile-smoke-v3/mobile-ingame-game-menu.png`
+- Dead-code cleanup follow-up fix (2026-02-23):
+  - Restored missing `rng` declaration in `js/engine.js:createPavementTexture()` after dead-code pass removed a still-used local.
+  - Revalidated syntax (`node --check` for root/public game+engine files).
+  - Revalidated gameplay integration (`node tests/painttown.integration.test.mjs` => `output/playwright/painttown-physics-check/report.json` pass=true).
+- About page + founder profile page added (2026-02-23):
+  - New page created at `public/about/index.html` with polished grammar and no em dashes.
+  - Includes two sections:
+    - `About` platform overview (browser-native, deterministic real-world multiplayer stack).
+    - `Founder` profile section for Steven Reid.
+  - Added navigation links to About from:
+    - landing footer (`public/index.html`)
+    - app title footer (`public/app/index.html`)
+    - account links block (`public/account/index.html`)
+  - Added route convenience files:
+    - `public/about.html` -> redirects to `public/about/`
+    - `about/index.html` -> root-level redirect for root-hosted/static branch workflows.
+  - Validation:
+    - Playwright check report: `output/playwright/about-page-check/report.json` (`pass: true`, `errors: []`).
+    - Screenshot: `output/playwright/about-page-check/about-desktop.png`.

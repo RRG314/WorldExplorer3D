@@ -543,7 +543,7 @@ function createBrickRoughnessMap() {
   ctx.fillStyle = '#c0c0c0';
   ctx.fillRect(0, 0, size, size);
 
-  const brickH = 8,brickW = 18,mortarW = 2;
+  const brickH = 8,mortarW = 2;
   const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xB41E) : Math.random.bind(Math);
 
   // Mortar is rougher than brick
@@ -576,8 +576,6 @@ function createPavementTexture() {
   // Concrete/sidewalk base color - light gray
   ctx.fillStyle = '#b0aba5';
   ctx.fillRect(0, 0, size, size);
-
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xDA7E) : Math.random.bind(Math);
 
   // Concrete grain
   for (let i = 0; i < 10000; i++) {
@@ -1136,7 +1134,7 @@ function init() {
   try {
     const debugInfo = gl.getExtension('WEBGL_debug_renderer_info');
     if (debugInfo) {
-      const gpuInfo = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
+      gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL);
       // Debug log removed
     }
   } catch (e) {

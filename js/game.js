@@ -441,7 +441,7 @@ function showMapInfo(type, data) {
   }
 }
 
-function navigateToPOI(x, z, name) {
+function navigateToPOI(x, z) {
   appCtx.selectedProperty = null;
   appCtx.selectedHistoric = null;
   appCtx.showNavigation = true;
@@ -577,18 +577,6 @@ async function loadPropertiesAtCurrentLocation() {
   if (appCtx.properties.length > 0) {
     updatePropertyPanel();
     renderPropertyMarkers();
-
-    // Count by source
-    const sources = {};
-    appCtx.properties.forEach((p) => {
-      sources[p.source] = (sources[p.source] || 0) + 1;
-    });
-
-    const sourceStr = Object.entries(sources).
-    map(([src, count]) => `${count} ${src}`).
-    join(', ');
-
-    // Debug log removed
   } else {
     console.warn('No properties loaded');
   }
@@ -700,7 +688,7 @@ function renderPropertyMarkers() {
             appCtx.propMarkers.push(billboard);
           },
           undefined,
-          function (error) {
+          function () {
             console.warn('Failed to load property image:', prop.primaryPhoto);
           }
         );
@@ -813,7 +801,7 @@ async function openHistoricModal(siteName) {
           fact = entity.descriptions.en.value;
         }
       }
-    } catch (e) {
+    } catch {
       console.warn('Could not fetch Wikidata info');
     }
   }
@@ -1064,7 +1052,6 @@ function updateNavigationRoute() {
 
       // Check if arrived (within 10 meters)
       if (dist < 10) {
-        const name = appCtx.selectedProperty ? appCtx.selectedProperty.address : appCtx.selectedHistoric.name;
         // Debug log removed
         document.getElementById('navDistance').textContent = '✓ Arrived!';
         // Optionally auto-clear navigation on arrival after a delay
@@ -1821,17 +1808,6 @@ function applyRemotePaintTownClaims(claims = [], roomId = '') {
   }
   state.remoteSyncRevision += 1;
   updatePaintTownHud();
-}
-
-function sortedPaintTownColorEntries() {
-  const state = ensurePaintTownState();
-  return Object.entries(state.colorCounts || {})
-    .map(([hex, count]) => ({
-      hex: normalizePaintColorHex(hex, PAINT_TOWN_DEFAULT_COLOR.hex),
-      count: Number.isFinite(Number(count)) ? Math.max(0, Math.floor(Number(count))) : 0
-    }))
-    .filter((entry) => entry.count > 0)
-    .sort((a, b) => b.count - a.count);
 }
 
 function setPaintTownPlayerColor(colorHex) {
