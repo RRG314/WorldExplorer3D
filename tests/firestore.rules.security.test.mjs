@@ -279,6 +279,92 @@ await runCheck('owner can create room when stored limit is stale but plan limit 
   await assertSucceeds(batch.commit());
 });
 
+await runCheck('owner can create room when profile includes legacy fields', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'users', OWNER_UID), {
+      roomCreateCount: 1,
+      roomCreateLimit: 3,
+      legacyTheme: 'nebula',
+      profileVersion: 2,
+      updatedAt: Timestamp.fromMillis(Date.now() - 15_000)
+    }, { merge: true });
+  });
+
+  const roomCode = 'QT12AE';
+  const batch = writeBatch(ownerDb);
+  batch.set(doc(ownerDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID));
+  batch.set(doc(ownerDb, 'users', OWNER_UID), {
+    roomCreateCount: 2,
+    roomCreateLimit: 3,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await assertSucceeds(batch.commit());
+});
+
+await runCheck('owner can create room when legacy profile is missing uid field', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    const ts = Timestamp.fromMillis(Date.now() - 120_000);
+    await setDoc(doc(db, 'users', OWNER_UID), {
+      email: `${OWNER_UID}@example.test`,
+      displayName: 'Owner',
+      createdAt: ts,
+      updatedAt: ts,
+      plan: 'support',
+      subscriptionStatus: 'active',
+      trialStartsAt: null,
+      trialEndsAt: null,
+      trialConsumedAt: null,
+      entitlements: {
+        multiplayer: true,
+        earlyAccess: false
+      },
+      roomCreateCount: 0,
+      roomCreateLimit: 3,
+      stripeCustomerId: '',
+      stripeSubscriptionId: '',
+      billingCycleAnchorAt: null,
+      cancelAtPeriodEnd: false
+    });
+  });
+
+  const roomCode = 'QT12AG';
+  const batch = writeBatch(ownerDb);
+  batch.set(doc(ownerDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID));
+  batch.set(doc(ownerDb, 'users', OWNER_UID), {
+    uid: OWNER_UID,
+    email: `${OWNER_UID}@example.test`,
+    displayName: 'Owner',
+    roomCreateCount: 1,
+    roomCreateLimit: 3,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await assertSucceeds(batch.commit());
+});
+
+await runCheck('admin status can create room even if plan field is stale free', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'users', OWNER_UID), {
+      plan: 'free',
+      subscriptionStatus: 'admin',
+      roomCreateCount: 0,
+      roomCreateLimit: 10000
+    }, { merge: true });
+  });
+
+  const roomCode = 'QT12AF';
+  const batch = writeBatch(ownerDb);
+  batch.set(doc(ownerDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID));
+  batch.set(doc(ownerDb, 'users', OWNER_UID), {
+    roomCreateCount: 1,
+    roomCreateLimit: 10000,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await assertSucceeds(batch.commit());
+});
+
 await runCheck('member can upsert own paint claim in room', async () => {
   await assertSucceeds(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'paintClaims', 'building_001'), {
     key: 'building-001',

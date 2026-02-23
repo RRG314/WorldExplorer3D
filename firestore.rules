@@ -21,17 +21,25 @@ service cloud.firestore {
     function userPlan() {
       return !hasUserDoc() ? 'free' :
         (
-          userDocData().plan == 'trial'
-            ? (
-                userDocData().trialEndsAt is timestamp &&
-                request.time < userDocData().trialEndsAt
-                  ? 'trial'
-                  : 'free'
-              )
+          userDocData().subscriptionStatus == 'admin'
+            ? 'pro'
             : (
-                userDocData().plan in ['support', 'supporter', 'pro']
-                  ? userDocData().plan
-                  : 'free'
+                userDocData().plan == 'trial'
+                  ? (
+                      userDocData().trialEndsAt is timestamp &&
+                      request.time < userDocData().trialEndsAt
+                        ? 'trial'
+                        : 'free'
+                    )
+                  : (
+                      userDocData().plan in ['support', 'supporter', 'pro']
+                        ? (
+                            userDocData().plan == 'support'
+                              ? 'supporter'
+                              : userDocData().plan
+                          )
+                        : 'free'
+                    )
               )
         );
     }
@@ -540,27 +548,21 @@ service cloud.firestore {
     }
 
     function validUserSelfUpdate(userId) {
-      return request.resource.data.keys().hasOnly([
+      let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
+
+      return changedKeys.hasOnly([
           'uid',
           'email',
           'displayName',
-          'createdAt',
           'updatedAt',
-          'plan',
-          'subscriptionStatus',
-          'trialStartsAt',
-          'trialEndsAt',
-          'trialConsumedAt',
-          'entitlements',
-          'stripeCustomerId',
-          'stripeSubscriptionId',
-          'billingCycleAnchorAt',
-          'cancelAtPeriodEnd',
           'roomCreateCount',
           'roomCreateLimit'
         ]) &&
         request.resource.data.uid == userId &&
-        request.resource.data.uid == resource.data.uid &&
+        (
+          !('uid' in resource.data) ||
+          request.resource.data.uid == resource.data.uid
+        ) &&
         request.resource.data.email is string &&
         request.resource.data.email.size() <= 320 &&
         request.resource.data.displayName is string &&
@@ -578,7 +580,6 @@ service cloud.firestore {
             request.resource.data.roomCreateLimit <= 10000
           )) &&
         request.resource.data.updatedAt is timestamp &&
-        request.resource.data.createdAt == resource.data.createdAt &&
         userProtectedBillingFieldsUnchanged() &&
         validRoomQuotaCountersOnSelfUpdate();
     }

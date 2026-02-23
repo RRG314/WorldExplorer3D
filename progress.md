@@ -1185,3 +1185,16 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `owner can create room when stored limit is stale but plan limit is valid`.
   - Validation:
     - `npm test` now 17/17 passing.
+
+- Multiplayer permission denial deep-dive (2026-02-23):
+  - Root-cause class identified: strict `users/{uid}` update validation could block room creation when profile docs contain legacy fields outside the old allowlist.
+  - Hardened `firestore.rules`:
+    - `userPlan()` now treats `subscriptionStatus == 'admin'` as multiplayer-entitled (`pro`) and normalizes `support` -> `supporter`.
+    - `validUserSelfUpdate()` now validates only changed keys via `diff(...).affectedKeys().hasOnly(...)`, so unchanged legacy fields no longer block quota updates during room creation.
+  - Added regression tests in `tests/firestore.rules.security.test.mjs`:
+    - owner room create succeeds with legacy profile fields present.
+    - admin-status room create succeeds even if stale `plan` is `free`.
+  - Validation: `npm test` passed (`19/19`).
+  - Added legacy profile compatibility for missing `uid` on user docs (self-healing on next room-create quota update).
+  - Added regression test: owner can create room when legacy profile is missing `uid`.
+  - Validation rerun: `npm test` passed (`20/20`).
