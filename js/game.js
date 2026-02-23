@@ -1230,11 +1230,15 @@ function clearPolice() {
 const PAINT_TOWN_DURATION_SEC = 120;
 const PAINT_TOWN_MIN_DURATION_SEC = 30;
 const PAINT_TOWN_MAX_DURATION_SEC = 1800;
-const PAINTBALL_SPEED_MPS = 72;
-const PAINTBALL_GRAVITY_MPS2 = 26;
+const PAINTBALL_SPEED_MPS = 42;
+const PAINTBALL_GRAVITY_MPS2 = 22;
 const PAINTBALL_RADIUS_M = 0.22;
-const PAINTBALL_LIFETIME_SEC = 3.0;
+const PAINTBALL_LIFETIME_SEC = 4.5;
 const PAINTBALL_SHOT_COOLDOWN_MS = 180;
+const PAINTBALL_MAX_ACTIVE = 24;
+const PAINT_SPLAT_LIFETIME_SEC = 3.5;
+const PAINT_SPLAT_MAX_ACTIVE = 96;
+const PAINT_SPLAT_RADIUS_M = 0.42;
 const PAINT_TOWN_TOUCH_MODES = new Set(['off', 'roof', 'any']);
 const PAINT_TOWN_METHODS = new Set(['roof', 'touch-roof', 'touch-any', 'gun']);
 const PAINT_TOWN_COLORS = Object.freeze([
@@ -1341,9 +1345,10 @@ function ensurePaintTownState() {
       sourceIdToKey: new Map(),
       footprintToKey: new Map(),
       playerColorHex: getPreferredPaintTownColor(),
-      activeTool: 'touch',
+      activeTool: 'gun',
       rules: normalizePaintTownRules(),
       paintballs: [],
+      paintSplats: [],
       inputBound: false,
       multiplayerRoomId: '',
       multiplayerUid: '',
@@ -1351,6 +1356,8 @@ function ensurePaintTownState() {
       remoteSyncRevision: 0,
       lastShotAtMs: 0,
       hudBound: false,
+      hudExpanded: false,
+      hudRenderSig: '',
       latestRemoteClaims: []
     };
   }
@@ -1372,6 +1379,9 @@ function ensurePaintTownState() {
   if (!Array.isArray(appCtx.paintTown.paintballs)) {
     appCtx.paintTown.paintballs = [];
   }
+  if (!Array.isArray(appCtx.paintTown.paintSplats)) {
+    appCtx.paintTown.paintSplats = [];
+  }
   if (!Array.isArray(appCtx.paintTown.latestRemoteClaims)) {
     appCtx.paintTown.latestRemoteClaims = [];
   }
@@ -1384,7 +1394,9 @@ function ensurePaintTownState() {
     appCtx.paintTown.playerColorHex,
     getPreferredPaintTownColor()
   );
-  appCtx.paintTown.activeTool = String(appCtx.paintTown.activeTool || '').toLowerCase() === 'gun' ? 'gun' : 'touch';
+  appCtx.paintTown.activeTool = String(appCtx.paintTown.activeTool || '').toLowerCase() === 'touch' ? 'touch' : 'gun';
+  appCtx.paintTown.hudExpanded = appCtx.paintTown.hudExpanded === true;
+  appCtx.paintTown.hudRenderSig = String(appCtx.paintTown.hudRenderSig || '');
   return appCtx.paintTown;
 }
 
@@ -1399,19 +1411,20 @@ function ensurePaintTownHud() {
   hud.style.left = '50%';
   hud.style.transform = 'translateX(-50%)';
   hud.style.zIndex = '90';
-  hud.style.minWidth = '280px';
-  hud.style.maxWidth = '72vw';
-  hud.style.padding = '10px 14px';
-  hud.style.borderRadius = '14px';
+  hud.style.minWidth = '220px';
+  hud.style.maxWidth = '88vw';
+  hud.style.padding = '8px 10px';
+  hud.style.borderRadius = '12px';
   hud.style.border = '1px solid rgba(220, 38, 38, 0.45)';
   hud.style.background = 'rgba(10, 15, 28, 0.86)';
   hud.style.backdropFilter = 'blur(6px)';
   hud.style.boxShadow = '0 10px 24px rgba(0, 0, 0, 0.35)';
   hud.style.color = '#f8fafc';
   hud.style.fontFamily = "'Poppins', sans-serif";
-  hud.style.fontSize = '12px';
+  hud.style.fontSize = '11px';
   hud.style.lineHeight = '1.35';
   hud.style.display = 'none';
+  hud.style.pointerEvents = 'auto';
   document.body.appendChild(hud);
   return hud;
 }
@@ -1711,8 +1724,8 @@ function paintTownAllowsGun() {
 }
 
 function preferredPaintTownTool() {
-  if (paintTownAllowsTouch()) return 'touch';
   if (paintTownAllowsGun()) return 'gun';
+  if (paintTownAllowsTouch()) return 'touch';
   return 'touch';
 }
 
@@ -1839,52 +1852,73 @@ function setPaintTownActiveTool(nextTool) {
   state.activeTool = desired;
 }
 
-function updatePaintTownHud(message = '') {
+function updatePaintTownHud(message = '', options = {}) {
   const state = ensurePaintTownState();
   const hud = ensurePaintTownHud();
   if (!state.active) {
     hud.style.display = 'none';
     hud.classList.remove('show');
+    state.hudRenderSig = '';
     return;
   }
 
+  const force = options && options.force === true;
   const rules = getPaintTownRules();
-  const hint = message || state.lastHint || 'Paint buildings using your selected tool.';
+  const hint = message || state.lastHint || '';
   const canTouch = rules.paintTouchMode !== 'off';
   const canGun = rules.allowPaintballGun === true;
   if (state.activeTool === 'touch' && !canTouch) state.activeTool = canGun ? 'gun' : preferredPaintTownTool();
   if (state.activeTool === 'gun' && !canGun) state.activeTool = canTouch ? 'touch' : preferredPaintTownTool();
 
-  const colorButtons = PAINT_TOWN_COLORS.map((entry) => {
-    const active = normalizePaintColorHex(state.playerColorHex) === normalizePaintColorHex(entry.hex);
-    return `<button type="button" data-paint-color="${entry.hex}" title="${entry.name}" style="width:18px;height:18px;border-radius:999px;border:${active ? '2px solid #f8fafc' : '1px solid rgba(248,250,252,0.35)'};background:${entry.hex};cursor:pointer;padding:0;outline:none"></button>`;
-  }).join('');
+  const timeText = fmtTime(state.timerSec);
+  const countText = `${state.paintedBuildings}/${state.totalBuildings}`;
+  const hudSignature = [
+    timeText,
+    countText,
+    state.hudExpanded ? 'expanded' : 'compact',
+    state.activeTool,
+    normalizePaintColorHex(state.playerColorHex, PAINT_TOWN_DEFAULT_COLOR.hex),
+    hint
+  ].join('|');
+  if (!force && hudSignature === state.hudRenderSig) return;
+  state.hudRenderSig = hudSignature;
 
-  const toolButtons = [
-    { id: 'touch', label: rules.paintTouchMode === 'roof' ? 'Touch Roof' : 'Touch Paint', enabled: canTouch },
-    { id: 'gun', label: 'Paintball Gun', enabled: canGun }
-  ].map((tool) => {
-    const active = state.activeTool === tool.id;
-    const disabled = !tool.enabled;
-    return `<button type="button" data-paint-tool="${tool.id}" ${disabled ? 'disabled' : ''} style="border:${active ? '1px solid #f8fafc' : '1px solid rgba(148,163,184,0.55)'};background:${active ? 'rgba(30,64,175,0.45)' : 'rgba(15,23,42,0.45)'};color:${disabled ? '#64748b' : '#e2e8f0'};border-radius:8px;padding:4px 8px;font-size:10px;font-weight:600;cursor:${disabled ? 'not-allowed' : 'pointer'}">${tool.label}</button>`;
-  }).join('');
+  if (!state.hudExpanded) {
+    hud.innerHTML = '' +
+      `<button type="button" data-paint-toggle="open" style="display:flex;align-items:center;gap:12px;width:100%;background:transparent;border:0;color:#f8fafc;padding:0;margin:0;font:inherit;cursor:pointer">` +
+      `<span style="font-weight:700">Time ${timeText}</span>` +
+      `<span style="font-weight:700">Painted ${countText}</span>` +
+      `<span style="margin-left:auto;color:#cbd5e1;font-size:12px">▾</span>` +
+      `</button>`;
+  } else {
+    const colorButtons = PAINT_TOWN_COLORS.map((entry) => {
+      const normalizedEntryHex = normalizePaintColorHex(entry.hex);
+      const active = normalizePaintColorHex(state.playerColorHex) === normalizedEntryHex;
+      return `<button type="button" data-paint-color="${normalizedEntryHex}" title="${entry.name}" style="width:20px;height:20px;border-radius:999px;border:${active ? '2px solid #f8fafc' : '1px solid rgba(248,250,252,0.35)'};background:${normalizedEntryHex};cursor:pointer;padding:0;outline:none"></button>`;
+    }).join('');
 
-  const topColors = sortedPaintTownColorEntries()
-    .slice(0, 3)
-    .map((entry) => {
-      const name = paintColorNameFromHex(entry.hex);
-      return `<span style="display:inline-flex;align-items:center;gap:4px"><span style="width:8px;height:8px;border-radius:999px;background:${entry.hex};display:inline-block"></span>${name}: ${entry.count}</span>`;
-    })
-    .join(' • ') || 'No painted buildings yet.';
+    const toolButtons = [
+      { id: 'touch', label: rules.paintTouchMode === 'roof' ? 'Touch (Roof)' : 'Touch', enabled: canTouch },
+      { id: 'gun', label: 'Paintball Gun', enabled: canGun }
+    ].map((tool) => {
+      const active = state.activeTool === tool.id;
+      const disabled = !tool.enabled;
+      return `<button type="button" data-paint-tool="${tool.id}" ${disabled ? 'disabled' : ''} style="border:${active ? '1px solid #f8fafc' : '1px solid rgba(148,163,184,0.55)'};background:${active ? 'rgba(30,64,175,0.45)' : 'rgba(15,23,42,0.45)'};color:${disabled ? '#64748b' : '#e2e8f0'};border-radius:8px;padding:5px 9px;font-size:11px;font-weight:600;cursor:${disabled ? 'not-allowed' : 'pointer'}">${tool.label}</button>`;
+    }).join('');
 
-  hud.innerHTML = '' +
-    `<div style="font-weight:700;color:#fecaca;letter-spacing:0.02em;margin-bottom:4px">🟥 Paint the Town</div>` +
-    `<div>Time: <b>${fmtTime(state.timerSec)}</b> • Your Buildings: <b>${state.paintedBuildings}/${state.totalBuildings}</b></div>` +
-    `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px">${toolButtons}</div>` +
-    `<div style="display:flex;align-items:center;gap:6px;margin-top:6px"><span style="font-size:10px;color:#cbd5e1">Color:</span>${colorButtons}</div>` +
-    `<div style="margin-top:6px;color:#cbd5e1;font-size:10px">Leaderboard: ${topColors}</div>` +
-    `<div style="margin-top:4px;color:#cbd5e1;font-size:10px">Rules • ${rules.paintTimeLimitSec}s • touch:${rules.paintTouchMode} • gun:${canGun ? 'on' : 'off'} • roof-auto:${rules.allowRoofAutoPaint ? 'on' : 'off'}</div>` +
-    `<div style="margin-top:5px;color:#cbd5e1;font-size:11px">${hint}</div>`;
+    const selectedColorName = paintColorNameFromHex(state.playerColorHex);
+    hud.innerHTML = '' +
+      `<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">` +
+      `<div style="font-weight:700;color:#fecaca">🟥 Paint the Town</div>` +
+      `<button type="button" data-paint-toggle="close" style="margin-left:auto;border:1px solid rgba(148,163,184,0.6);background:rgba(15,23,42,0.45);color:#e2e8f0;border-radius:8px;padding:3px 8px;font-size:11px;cursor:pointer">Collapse</button>` +
+      `</div>` +
+      `<div style="font-weight:600">Time: ${timeText} • Buildings: ${countText}</div>` +
+      `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px">${toolButtons}</div>` +
+      `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px"><span style="font-size:11px;color:#cbd5e1">Color:</span>${colorButtons}<span style="font-size:11px;color:#cbd5e1">(${selectedColorName})</span></div>` +
+      `<div style="margin-top:6px;color:#cbd5e1;font-size:11px">Gun shots arc with gravity. Aim higher for far targets.</div>` +
+      (hint ? `<div style="margin-top:4px;color:#cbd5e1;font-size:11px">${hint}</div>` : '');
+  }
+
   hud.style.display = 'block';
   hud.classList.add('show');
 
@@ -1893,16 +1927,31 @@ function updatePaintTownHud(message = '') {
     hud.addEventListener('click', (event) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
+
+      const toggleBtn = target.closest('button[data-paint-toggle]');
+      if (toggleBtn instanceof HTMLElement) {
+        state.hudExpanded = String(toggleBtn.dataset.paintToggle || '') === 'open';
+        state.hudRenderSig = '';
+        updatePaintTownHud('', { force: true });
+        return;
+      }
+
       const colorBtn = target.closest('button[data-paint-color]');
       if (colorBtn instanceof HTMLElement) {
         const nextHex = String(colorBtn.dataset.paintColor || '').trim();
-        if (nextHex) setPaintTownPlayerColor(nextHex);
+        if (nextHex) {
+          setPaintTownPlayerColor(nextHex);
+          state.hudRenderSig = '';
+          updatePaintTownHud('', { force: true });
+        }
         return;
       }
+
       const toolBtn = target.closest('button[data-paint-tool]');
       if (toolBtn instanceof HTMLElement) {
         setPaintTownActiveTool(toolBtn.dataset.paintTool || '');
-        updatePaintTownHud();
+        state.hudRenderSig = '';
+        updatePaintTownHud('', { force: true });
       }
     });
   }
@@ -1920,6 +1969,82 @@ function clearPaintballs() {
   if (!Array.isArray(state.paintballs) || state.paintballs.length === 0) return;
   state.paintballs.forEach((projectile) => removePaintballProjectile(projectile));
   state.paintballs = [];
+}
+
+function removePaintSplat(splat) {
+  if (!splat) return;
+  if (splat.mesh?.parent) splat.mesh.parent.remove(splat.mesh);
+  if (splat.mesh?.geometry?.dispose) splat.mesh.geometry.dispose();
+  if (splat.mesh?.material?.dispose) splat.mesh.material.dispose();
+}
+
+function clearPaintSplats() {
+  const state = ensurePaintTownState();
+  if (!Array.isArray(state.paintSplats) || state.paintSplats.length === 0) return;
+  state.paintSplats.forEach((splat) => removePaintSplat(splat));
+  state.paintSplats = [];
+}
+
+function createPaintSplatMesh(colorHex) {
+  if (typeof THREE === 'undefined') return null;
+  const mesh = new THREE.Mesh(
+    new THREE.CircleGeometry(PAINT_SPLAT_RADIUS_M, 12),
+    new THREE.MeshBasicMaterial({
+      color: paintColorHexToInt(colorHex),
+      transparent: true,
+      opacity: 0.72,
+      depthWrite: false
+    })
+  );
+  mesh.rotation.x = -Math.PI * 0.5;
+  mesh.renderOrder = 12;
+  mesh.frustumCulled = true;
+  return mesh;
+}
+
+function spawnPaintSplatAt(point, colorHex) {
+  const state = ensurePaintTownState();
+  if (!appCtx.scene || !Array.isArray(state.paintSplats)) return;
+  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) return;
+  const mesh = createPaintSplatMesh(colorHex);
+  if (!mesh) return;
+
+  const y = Number.isFinite(point.y) ? point.y : 0;
+  mesh.position.set(point.x, y + 0.025, point.z);
+  appCtx.scene.add(mesh);
+
+  while (state.paintSplats.length >= PAINT_SPLAT_MAX_ACTIVE) {
+    const oldest = state.paintSplats.shift();
+    removePaintSplat(oldest);
+  }
+  state.paintSplats.push({
+    mesh,
+    lifeSec: PAINT_SPLAT_LIFETIME_SEC,
+    maxLifeSec: PAINT_SPLAT_LIFETIME_SEC
+  });
+}
+
+function updatePaintSplats(dt) {
+  const state = ensurePaintTownState();
+  if (!Array.isArray(state.paintSplats) || state.paintSplats.length === 0) return;
+  for (let i = state.paintSplats.length - 1; i >= 0; i--) {
+    const splat = state.paintSplats[i];
+    if (!splat || !splat.mesh) {
+      state.paintSplats.splice(i, 1);
+      continue;
+    }
+    splat.lifeSec -= dt;
+    const lifeRatio = splat.maxLifeSec > 0 ? Math.max(0, Math.min(1, splat.lifeSec / splat.maxLifeSec)) : 0;
+    if (splat.mesh.material && typeof splat.mesh.material.opacity === 'number') {
+      splat.mesh.material.opacity = 0.18 + lifeRatio * 0.54;
+    }
+    const scale = 0.95 + (1 - lifeRatio) * 0.22;
+    splat.mesh.scale.setScalar(scale);
+    if (splat.lifeSec <= 0) {
+      removePaintSplat(splat);
+      state.paintSplats.splice(i, 1);
+    }
+  }
 }
 
 function getPaintTownRaycaster() {
@@ -1963,7 +2088,7 @@ function projectPaintTownRay(clientX, clientY) {
 function shouldIgnorePaintTownInput(eventTarget) {
   if (!(eventTarget instanceof Element)) return false;
   return !!eventTarget.closest(
-    '#titleScreen, #roomPanelModal, #largeMap, #propertyPanel, #propertyModal, #historicPanel, #pauseScreen, #resultScreen, #caughtScreen, #flowerChallengePanel, #gameShareMenu, #controlsTab, #settings-menu, #memoryComposer, #memoryPanel'
+    '#titleScreen, #roomPanelModal, #largeMap, #propertyPanel, #propertyModal, #historicPanel, #pauseScreen, #resultScreen, #caughtScreen, #flowerChallengePanel, #gameShareMenu, #controlsTab, #settings-menu, #memoryComposer, #memoryPanel, #paintTownHud'
   );
 }
 
@@ -2095,6 +2220,11 @@ function firePaintball(clientX, clientY) {
   mesh.position.set(origin.x + dir.x * 1.8, origin.y + dir.y * 1.8, origin.z + dir.z * 1.8);
   appCtx.scene.add(mesh);
 
+  while (state.paintballs.length >= PAINTBALL_MAX_ACTIVE) {
+    const oldest = state.paintballs.shift();
+    removePaintballProjectile(oldest);
+  }
+
   const velocity = dir.multiplyScalar(PAINTBALL_SPEED_MPS);
   state.paintballs.push({
     mesh,
@@ -2159,6 +2289,7 @@ function tryTouchPaintAt(clientX, clientY) {
 
 function updatePaintballProjectiles(dt) {
   const state = ensurePaintTownState();
+  updatePaintSplats(dt);
   if (!Array.isArray(state.paintballs) || state.paintballs.length === 0) return;
 
   const meshes = getPaintTownRaycastMeshes();
@@ -2223,6 +2354,11 @@ function updatePaintballProjectiles(dt) {
         if (Number.isFinite(h)) terrainY = h;
       }
       if (Number.isFinite(terrainY) && shot.mesh.position.y <= terrainY + 0.1) {
+        spawnPaintSplatAt({
+          x: shot.mesh.position.x,
+          y: terrainY,
+          z: shot.mesh.position.z
+        }, shot.colorHex);
         consumed = true;
       }
     }
@@ -2248,6 +2384,7 @@ function resetPaintTownMode() {
   state.scoreSubmitted = false;
   state.lastShotAtMs = 0;
   clearPaintballs();
+  clearPaintSplats();
 
   if (Array.isArray(appCtx.buildingMeshes)) {
     for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
@@ -2298,6 +2435,7 @@ function stopPaintTownMode({ showSummary = false } = {}) {
   if (!state.active && !showSummary) return;
   state.active = false;
   clearPaintballs();
+  clearPaintSplats();
   updatePaintTownHud();
 
   if (!showSummary) return;
@@ -2572,6 +2710,10 @@ Object.assign(appCtx, {
       totalBuildings: Number(state.totalBuildings || 0),
       paintedBuildings: Number(state.paintedBuildings || 0),
       paintballs: Array.isArray(state.paintballs) ? state.paintballs.length : 0,
+      paintSplats: Array.isArray(state.paintSplats) ? state.paintSplats.length : 0,
+      playerColorHex: normalizePaintColorHex(state.playerColorHex, PAINT_TOWN_DEFAULT_COLOR.hex),
+      activeTool: String(state.activeTool || ''),
+      hudExpanded: state.hudExpanded === true,
       rules: { ...(state.rules || {}) },
       colorCounts: { ...(state.colorCounts || {}) },
       claims: state.claimsByKey instanceof Map

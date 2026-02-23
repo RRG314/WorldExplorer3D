@@ -1084,3 +1084,14 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Syntax checks pass for all edited JS files.
   - Firestore rules regression tests pass: `16/16`.
   - Paint Town integration test still passes after admin changes.
+- Paint Town gameplay pass (2026-02-23):
+  - Implemented real paintball miss splats with TTL cleanup (`PAINT_SPLAT_LIFETIME_SEC`) and hard active-cap (`PAINT_SPLAT_MAX_ACTIVE`) to protect rendering cost.
+  - Added active paintball cap (`PAINTBALL_MAX_ACTIVE`) to prevent runaway projectile draw/update load.
+  - Fixed paint HUD input conflict by excluding `#paintTownHud` from world paint pointer handler hit path, which restores color-picker/tool button reliability.
+  - Simplified Paint Town HUD default view to minimal compact strip (time + painted count), with click-to-expand controls for tool and color.
+  - Synced the same game logic to `/js/game.js` for root/static parity.
+- Paint Town validation pass (2026-02-23):
+  - `node tests/painttown.integration.test.mjs` rerun; latest report pass=true at `output/playwright/painttown-physics-check/report.json`.
+  - Verified compact HUD visual in `output/playwright/painttown-physics-check/ingame-painttown-after-tests.png`.
+  - Deterministic HUD event check with simulated pointerdown/up/click on color chip now changes `playerColorHex` without spawning paintballs (`beforePaintballs=0`, `afterPaintballs=0`).
+  - Deterministic splat lifecycle check confirms miss splats appear and self-clean (`splatsMid=1`, `splatsAfter=0`) using fixed-terrain test harness.
