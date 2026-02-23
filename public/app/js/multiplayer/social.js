@@ -68,10 +68,31 @@ function toMillis(value) {
   return null;
 }
 
+function normalizeBasePath(pathname = '/') {
+  const path = String(pathname || '/');
+  const anchors = ['/app/', '/account/', '/legal/'];
+  for (const anchor of anchors) {
+    const idx = path.indexOf(anchor);
+    if (idx >= 0) return path.slice(0, idx);
+  }
+
+  if (path === '/' || path === '') return '';
+  if (path.endsWith('/')) return path.slice(0, -1);
+
+  const lastSlash = path.lastIndexOf('/');
+  return lastSlash > 0 ? path.slice(0, lastSlash) : '';
+}
+
+function resolveAppUrlBase() {
+  const origin = window.location?.origin || '';
+  const basePath = normalizeBasePath(window.location?.pathname || '/');
+  return `${origin}${basePath}/app/`;
+}
+
 function buildInviteLink(code) {
   const normalized = normalizeCode(code);
   if (!normalized) return '';
-  const url = new URL(window.location.href);
+  const url = new URL(resolveAppUrlBase());
   url.searchParams.set('room', normalized);
   url.searchParams.set('tab', 'multiplayer');
   url.searchParams.delete('startTrial');

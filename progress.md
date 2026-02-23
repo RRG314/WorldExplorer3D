@@ -1040,3 +1040,17 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `Weekly Pulse` absent
     - `Platform Activity` absent
     - manual friend controls present.
+- Multiplayer/account social + room quota validation pass (2026-02-22):
+  - Firestore rules tests passed: 14/14 (`npm test`).
+  - Cross-platform rules test runner remains portable (`scripts/test-rules.mjs` auto-detects Java and firebase CLI fallback).
+  - UI smoke (local static server + Playwright):
+    - Multiplayer tab shows room name input and create/join controls.
+    - Room panel includes friends list, incoming invites list, and recent players list.
+    - Account page includes username editor, friends/invites controls, and room quota card.
+  - Generated artifacts:
+    - `output/web-game-mp/manual-check.png`
+    - `output/web-game-mp/manual-check.json`
+    - `output/web-game-mp/manual-room-panel.png`
+    - `output/web-game-mp/manual-room-panel.json`
+    - `output/web-game-account/manual-check.png`
+    - `output/web-game-account/manual-check.json`

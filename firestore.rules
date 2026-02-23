@@ -36,6 +36,61 @@ service cloud.firestore {
         );
     }
 
+    function planRoomCreateLimit(plan) {
+      return plan == 'pro'
+        ? 25
+        : (
+            plan in ['support', 'supporter']
+              ? 10
+              : (
+                  plan == 'trial'
+                    ? 3
+                    : 0
+                )
+          );
+    }
+
+    function roomCreateCountFromData(data) {
+      return data is map &&
+        ('roomCreateCount' in data) &&
+        data.roomCreateCount is int &&
+        data.roomCreateCount >= 0 &&
+        data.roomCreateCount <= 10000
+          ? data.roomCreateCount
+          : 0;
+    }
+
+    function roomCreateLimitFromData(data) {
+      return data is map &&
+        ('roomCreateLimit' in data) &&
+        data.roomCreateLimit is int &&
+        data.roomCreateLimit >= 0 &&
+        data.roomCreateLimit <= 10000
+          ? data.roomCreateLimit
+          : planRoomCreateLimit(userPlan());
+    }
+
+    function canConsumeRoomCreateQuota() {
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      let beforeData = hasUserDoc() ? userDocData() : null;
+      let afterExists = existsAfter(userPath);
+      let afterData = afterExists ? getAfter(userPath).data : null;
+      let beforeCount = roomCreateCountFromData(beforeData);
+      let beforeLimit = roomCreateLimitFromData(beforeData);
+
+      return hasUserDoc() &&
+        afterExists &&
+        afterData is map &&
+        ('roomCreateCount' in afterData) &&
+        afterData.roomCreateCount is int &&
+        afterData.roomCreateCount == beforeCount + 1 &&
+        ('roomCreateLimit' in afterData) &&
+        afterData.roomCreateLimit is int &&
+        afterData.roomCreateLimit == beforeLimit &&
+        beforeLimit > 0 &&
+        beforeCount < beforeLimit;
+    }
+
     function isMultiplayerEntitled() {
       return isSignedIn() && userPlan() in ['trial', 'support', 'supporter', 'pro'];
     }
@@ -116,7 +171,8 @@ service cloud.firestore {
     }
 
     function validRoomCore(roomId) {
-      return request.resource.data.keys().hasOnly([
+      return canConsumeRoomCreateQuota() &&
+        request.resource.data.keys().hasOnly([
           'code',
           'createdAt',
           'createdBy',
@@ -413,13 +469,27 @@ service cloud.firestore {
           'email',
           'displayName',
           'createdAt',
-          'updatedAt'
+          'updatedAt',
+          'roomCreateCount',
+          'roomCreateLimit'
         ]) &&
         request.resource.data.uid == userId &&
         request.resource.data.email is string &&
         request.resource.data.email.size() <= 320 &&
         request.resource.data.displayName is string &&
         request.resource.data.displayName.size() <= 60 &&
+        (!('roomCreateCount' in request.resource.data) ||
+          (
+            request.resource.data.roomCreateCount is int &&
+            request.resource.data.roomCreateCount >= 0 &&
+            request.resource.data.roomCreateCount <= 10000
+          )) &&
+        (!('roomCreateLimit' in request.resource.data) ||
+          (
+            request.resource.data.roomCreateLimit is int &&
+            request.resource.data.roomCreateLimit >= 0 &&
+            request.resource.data.roomCreateLimit <= 10000
+          )) &&
         request.resource.data.createdAt is timestamp &&
         request.resource.data.updatedAt is timestamp;
     }
@@ -435,6 +505,17 @@ service cloud.firestore {
         request.resource.data.stripeSubscriptionId == resource.data.stripeSubscriptionId &&
         request.resource.data.billingCycleAnchorAt == resource.data.billingCycleAnchorAt &&
         request.resource.data.cancelAtPeriodEnd == resource.data.cancelAtPeriodEnd;
+    }
+
+    function validRoomQuotaCountersOnSelfUpdate() {
+      let beforeCount = roomCreateCountFromData(resource.data);
+      let beforeLimit = roomCreateLimitFromData(resource.data);
+      let afterCount = roomCreateCountFromData(request.resource.data);
+      let afterLimit = roomCreateLimitFromData(request.resource.data);
+
+      return afterLimit == beforeLimit &&
+        afterCount >= beforeCount &&
+        afterCount <= beforeCount + 1;
     }
 
     function validUserSelfUpdate(userId) {
@@ -453,7 +534,9 @@ service cloud.firestore {
           'stripeCustomerId',
           'stripeSubscriptionId',
           'billingCycleAnchorAt',
-          'cancelAtPeriodEnd'
+          'cancelAtPeriodEnd',
+          'roomCreateCount',
+          'roomCreateLimit'
         ]) &&
         request.resource.data.uid == userId &&
         request.resource.data.uid == resource.data.uid &&
@@ -461,9 +544,22 @@ service cloud.firestore {
         request.resource.data.email.size() <= 320 &&
         request.resource.data.displayName is string &&
         request.resource.data.displayName.size() <= 60 &&
+        (!('roomCreateCount' in request.resource.data) ||
+          (
+            request.resource.data.roomCreateCount is int &&
+            request.resource.data.roomCreateCount >= 0 &&
+            request.resource.data.roomCreateCount <= 10000
+          )) &&
+        (!('roomCreateLimit' in request.resource.data) ||
+          (
+            request.resource.data.roomCreateLimit is int &&
+            request.resource.data.roomCreateLimit >= 0 &&
+            request.resource.data.roomCreateLimit <= 10000
+          )) &&
         request.resource.data.updatedAt is timestamp &&
         request.resource.data.createdAt == resource.data.createdAt &&
-        userProtectedBillingFieldsUnchanged();
+        userProtectedBillingFieldsUnchanged() &&
+        validRoomQuotaCountersOnSelfUpdate();
     }
 
     function validFriendData(friendUid) {

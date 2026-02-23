@@ -20,6 +20,7 @@ import { initFirebase } from '../../../js/firebase-init.js';
 const ROOM_CODE_LENGTH = 6;
 const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const ROOM_COLLECTION = 'rooms';
+const USERS_COLLECTION = 'users';
 const PLAYER_COLLECTION = 'players';
 const ROOM_STATE_COLLECTION = 'state';
 const HOME_BASE_DOC = 'homeBase';
@@ -27,6 +28,13 @@ const ROOM_PRESENCE_TTL_MS = 90 * 1000;
 const DEFAULT_MAX_PLAYERS = 12;
 const CITY_KEY_MAX_LEN = 48;
 const PUBLIC_ROOM_RESULT_LIMIT = 20;
+const ROOM_CREATE_LIMITS_BY_PLAN = Object.freeze({
+  free: 0,
+  trial: 3,
+  support: 10,
+  supporter: 10,
+  pro: 25
+});
 
 let currentRoom = null;
 
@@ -55,6 +63,24 @@ function normalizeCode(input) {
   const raw = String(input || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
   if (!raw) return '';
   return raw.slice(0, ROOM_CODE_LENGTH);
+}
+
+function normalizePlanForLimits(raw) {
+  const plan = String(raw || '').toLowerCase();
+  if (plan === 'support') return 'supporter';
+  if (plan === 'trial' || plan === 'supporter' || plan === 'pro') return plan;
+  return 'free';
+}
+
+function roomCreateLimitForPlan(plan) {
+  const normalized = normalizePlanForLimits(plan);
+  return ROOM_CREATE_LIMITS_BY_PLAN[normalized] || ROOM_CREATE_LIMITS_BY_PLAN.free;
+}
+
+function normalizeRoomCreateCount(raw) {
+  const parsed = Number(raw);
+  if (!Number.isFinite(parsed)) return 0;
+  return Math.max(0, Math.min(10000, Math.floor(parsed)));
 }
 
 function randomCode() {
@@ -193,6 +219,19 @@ async function createRoom(options = {}) {
   const locationName = String(options.locationName || '').trim().slice(0, 80);
   const locationTag = normalizeLocationTag(options.locationTag, world, locationName || roomName || world.seed);
   const cityKey = locationTag ? locationTag.cityKey : '';
+  const userRef = doc(db, USERS_COLLECTION, user.uid);
+
+  // Ensure the user profile exists so quota consumption can be validated by rules.
+  const userSnap = await getDoc(userRef);
+  if (!userSnap.exists()) {
+    await setDoc(userRef, {
+      uid: user.uid,
+      email: String(user.email || '').trim().slice(0, 320),
+      displayName: displayName.slice(0, 60),
+      createdAt: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  }
 
   let createdCode = null;
 
@@ -209,6 +248,14 @@ async function createRoom(options = {}) {
         const existing = await tx.get(roomRef);
         if (existing.exists()) {
           throw new Error('ROOM_CODE_COLLISION');
+        }
+        const profileSnap = await tx.get(userRef);
+        const profile = profileSnap.exists() ? (profileSnap.data() || {}) : {};
+        const roomCreateCount = normalizeRoomCreateCount(profile.roomCreateCount);
+        const roomCreateLimit = roomCreateLimitForPlan(profile.plan || 'free');
+
+        if (roomCreateLimit <= 0 || roomCreateCount >= roomCreateLimit) {
+          throw new Error('ROOM_CREATE_LIMIT_REACHED');
         }
 
         const roomPayload = {
@@ -231,6 +278,14 @@ async function createRoom(options = {}) {
 
         if (locationTag) roomPayload.locationTag = locationTag;
         tx.set(roomRef, roomPayload);
+        tx.set(userRef, {
+          uid: user.uid,
+          email: String(user.email || profile.email || '').trim().slice(0, 320),
+          displayName: displayName.slice(0, 60),
+          roomCreateCount: roomCreateCount + 1,
+          roomCreateLimit,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
       });
 
       createdCode = code;
@@ -238,6 +293,9 @@ async function createRoom(options = {}) {
     } catch (err) {
       if (String(err?.message || '') === 'ROOM_CODE_COLLISION') {
         continue;
+      }
+      if (String(err?.message || '') === 'ROOM_CREATE_LIMIT_REACHED') {
+        throw new Error('Room creation limit reached for your plan. Rename or reuse existing rooms, or upgrade for a higher limit.');
       }
       throw err;
     }

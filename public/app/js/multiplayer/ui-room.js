@@ -1,4 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=54';
+import { startTrialIfEligible } from '../../../js/entitlements.js';
 import { createArtifact, listenArtifacts, removeArtifact } from './artifacts.js?v=54';
 import { CHAT_MAX_LENGTH, listenChat, reportMessage, sendMessage } from './chat.js?v=54';
 import { createGhostManager } from './ghosts.js?v=54';
@@ -252,6 +253,7 @@ function initMultiplayerPlatform() {
     titleStatus: document.getElementById('mpTitleStatus'),
     titlePlanState: document.getElementById('mpPlanState'),
     titleCodeInput: document.getElementById('mpTitleCodeInput'),
+    titleRoomNameInput: document.getElementById('mpTitleRoomNameInput'),
     titleVisibilitySelect: document.getElementById('mpTitleVisibilitySelect'),
     titleLocationTagInput: document.getElementById('mpTitleLocationTagInput'),
     titleCreateBtn: document.getElementById('mpTitleCreateBtn'),
@@ -278,6 +280,7 @@ function initMultiplayerPlatform() {
     roomPanelModal: document.getElementById('roomPanelModal'),
     roomPanelCloseBtn: document.getElementById('roomPanelCloseBtn'),
     roomPanelCodeInput: document.getElementById('roomPanelCodeInput'),
+    roomPanelCreateNameInput: document.getElementById('roomPanelCreateNameInput'),
     roomPanelVisibilitySelect: document.getElementById('roomPanelVisibilitySelect'),
     roomPanelLocationTagInput: document.getElementById('roomPanelLocationTagInput'),
     roomPanelCreateBtn: document.getElementById('roomPanelCreateBtn'),
@@ -402,16 +405,28 @@ function initMultiplayerPlatform() {
     return titleValue || roomPanelValue;
   }
 
+  function readRoomNameInput() {
+    const roomPanelValue = sanitizeText(refs.roomPanelCreateNameInput?.value || '', 80);
+    const titleValue = sanitizeText(refs.titleRoomNameInput?.value || '', 80);
+    if (refs.roomPanelModal?.classList.contains('show')) return roomPanelValue || titleValue;
+    return titleValue || roomPanelValue;
+  }
+
   function syncCreateOptionFields(source = 'title') {
     const visibility = source === 'panel'
       ? normalizeVisibilitySelection(refs.roomPanelVisibilitySelect?.value)
       : normalizeVisibilitySelection(refs.titleVisibilitySelect?.value);
+    const roomName = source === 'panel'
+      ? sanitizeText(refs.roomPanelCreateNameInput?.value || '', 80)
+      : sanitizeText(refs.titleRoomNameInput?.value || '', 80);
     const locationTag = source === 'panel'
       ? sanitizeText(refs.roomPanelLocationTagInput?.value || '', 80)
       : sanitizeText(refs.titleLocationTagInput?.value || '', 80);
 
     if (refs.titleVisibilitySelect) refs.titleVisibilitySelect.value = visibility;
     if (refs.roomPanelVisibilitySelect) refs.roomPanelVisibilitySelect.value = visibility;
+    if (refs.titleRoomNameInput) refs.titleRoomNameInput.value = roomName;
+    if (refs.roomPanelCreateNameInput) refs.roomPanelCreateNameInput.value = roomName;
     if (refs.titleLocationTagInput) refs.titleLocationTagInput.value = locationTag;
     if (refs.roomPanelLocationTagInput) refs.roomPanelLocationTagInput.value = locationTag;
   }
@@ -1042,6 +1057,11 @@ function initMultiplayerPlatform() {
     setInputCode(refs, room.code);
     if (refs.titleVisibilitySelect) refs.titleVisibilitySelect.value = normalizeVisibilitySelection(room.visibility);
     if (refs.roomPanelVisibilitySelect) refs.roomPanelVisibilitySelect.value = normalizeVisibilitySelection(room.visibility);
+    const roomName = sanitizeText(room.name || '', 80);
+    if (roomName) {
+      if (refs.titleRoomNameInput) refs.titleRoomNameInput.value = roomName;
+      if (refs.roomPanelCreateNameInput) refs.roomPanelCreateNameInput.value = roomName;
+    }
     const locationLabel = sanitizeText(room.locationTag?.label || '', 80);
     if (locationLabel) {
       if (refs.titleLocationTagInput) refs.titleLocationTagInput.value = locationLabel;
@@ -1111,18 +1131,19 @@ function initMultiplayerPlatform() {
 
     try {
       const world = readWorldContext();
+      const roomName = sanitizeText(readRoomNameInput(), 80);
       const visibility = readVisibilitySelection();
       const locationTagText = sanitizeText(readLocationTagInput(), 80);
       const effectiveLocationTag = visibility === 'public'
         ? (locationTagText || world.name)
         : locationTagText;
       const room = await createRoom({
-        name: `${world.name} Session`,
+        name: roomName || `${world.name} Session`,
         visibility,
         featured: false,
         maxPlayers: 12,
         world,
-        locationName: world.name,
+        locationName: roomName || world.name,
         locationTag: effectiveLocationTag ? { label: effectiveLocationTag, city: effectiveLocationTag, kind: world.kind } : null
       });
 
@@ -1132,11 +1153,34 @@ function initMultiplayerPlatform() {
       const inviteLink = buildInviteLink(room.code);
       if (inviteLink) {
         await copyText(inviteLink);
-        setStatus(`${visibility === 'public' ? 'Public' : 'Private'} room ${room.code} created. Invite link copied.`);
+        const named = room.name ? `${room.name} (${room.code})` : room.code;
+        setStatus(`${visibility === 'public' ? 'Public' : 'Private'} room ${named} created. Invite link copied.`);
       }
     } catch (err) {
       console.error('[multiplayer][ui] create room failed:', err);
       setStatus(err?.message || 'Could not create room.', true);
+    }
+  }
+
+  async function ensureInviteJoinAccess() {
+    if (canUseMultiplayer(state.entitlement)) return true;
+    if (!state.authUser) {
+      setStatus('Sign in to accept invites.', true);
+      return false;
+    }
+
+    try {
+      setStatus('Starting your 2-day trial so you can join this invite...');
+      const next = await startTrialIfEligible(state.authUser);
+      state.entitlement = {
+        ...state.entitlement,
+        ...next
+      };
+      applyEntitlementCopy();
+      return canUseMultiplayer(state.entitlement);
+    } catch (err) {
+      setStatus(err?.message || 'Invite requires trial or paid plan.', true);
+      return false;
     }
   }
 
@@ -1307,6 +1351,8 @@ function initMultiplayerPlatform() {
 
     refs.titleVisibilitySelect?.addEventListener('change', () => syncCreateOptionFields('title'));
     refs.roomPanelVisibilitySelect?.addEventListener('change', () => syncCreateOptionFields('panel'));
+    refs.titleRoomNameInput?.addEventListener('input', () => syncCreateOptionFields('title'));
+    refs.roomPanelCreateNameInput?.addEventListener('input', () => syncCreateOptionFields('panel'));
     refs.titleLocationTagInput?.addEventListener('input', () => syncCreateOptionFields('title'));
     refs.roomPanelLocationTagInput?.addEventListener('input', () => syncCreateOptionFields('panel'));
 
@@ -1532,6 +1578,8 @@ function initMultiplayerPlatform() {
         if (!inviteId || !roomCode) return;
         try {
           await markInviteSeen(inviteId, true);
+          const canJoin = await ensureInviteJoinAccess();
+          if (!canJoin) return;
           setInputCode(refs, roomCode);
           await handleJoinRoom(roomCode);
         } catch (err) {

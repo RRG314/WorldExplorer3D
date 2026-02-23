@@ -82,7 +82,7 @@
 
     .status {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
       gap: 10px;
       margin-bottom: 12px;
     }
@@ -206,6 +206,12 @@
       margin-top: 10px;
     }
 
+    .stack-field {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
     .inline-field input {
       border: 1px solid var(--line);
       border-radius: 999px;
@@ -275,6 +281,54 @@
       color: var(--muted);
     }
 
+    .social-list {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(5, 17, 32, 0.45);
+    }
+
+    .social-item {
+      display: grid;
+      gap: 8px;
+      padding: 10px 12px;
+      border-top: 1px solid rgba(174, 202, 226, 0.18);
+    }
+
+    .social-item:first-child { border-top: none; }
+
+    .social-title {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .social-meta {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .social-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .social-actions button {
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+
+    #socialStatus {
+      min-height: 18px;
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
     .links {
       display: flex;
       flex-wrap: wrap;
@@ -336,6 +390,11 @@
           <p id="trialLabel" class="value">Not active</p>
           <p id="trialDetail" class="hint">No trial is currently running.</p>
         </article>
+        <article class="status-item">
+          <span class="label">Room Quota</span>
+          <p id="roomQuotaLabel" class="value">0 / 0</p>
+          <p id="roomQuotaDetail" class="hint">Rooms created from this account.</p>
+        </article>
       </div>
 
       <div class="actions">
@@ -366,6 +425,34 @@
           <span class="label" style="margin-top:10px">Account ID</span>
           <p id="uidValue" class="mono">-</p>
           <p id="providersValue" class="hint">Sign-in providers: -</p>
+        </article>
+      </div>
+
+      <h2 class="section-title">Friends & Invites</h2>
+      <div class="identity-grid">
+        <article class="identity-card">
+          <span class="label">Friends</span>
+          <p class="hint">Add friends by account ID, then invite them with a room code.</p>
+          <div class="stack-field">
+            <input id="friendUidInput" type="text" maxlength="128" placeholder="Friend account ID (UID)">
+            <input id="friendNameInput" type="text" maxlength="48" placeholder="Friend display name (optional)">
+            <button id="addFriendBtn" class="btn-primary" type="button">Add Friend</button>
+          </div>
+          <div class="stack-field">
+            <input id="inviteRoomCodeInput" type="text" maxlength="8" placeholder="Room code to invite to (AB12CD)">
+            <input id="inviteMessageInput" type="text" maxlength="120" placeholder="Invite message (optional)">
+          </div>
+          <div id="socialStatus">Sign in to manage friends and invites.</div>
+          <div id="friendsList" class="social-list">
+            <div class="receipt-empty">No friends yet.</div>
+          </div>
+        </article>
+        <article class="identity-card">
+          <span class="label">Incoming Invites</span>
+          <p class="hint">Open invites in app. Free users can start their 2-day trial directly from an invite.</p>
+          <div id="invitesList" class="social-list">
+            <div class="receipt-empty">No incoming invites.</div>
+          </div>
         </article>
       </div>
 
@@ -419,7 +506,7 @@
   <script type="module">
     import { hasFirebaseConfig } from '../js/firebase-init.js';
     import { ensureSignedIn, observeAuth, signOutUser } from '../js/auth-ui.js';
-    import { ensureEntitlements, formatRemainingTrial, subscribeEntitlements } from '../js/entitlements.js';
+    import { ensureEntitlements, formatRemainingTrial, startTrialIfEligible, subscribeEntitlements } from '../js/entitlements.js';
     import {
       getAccountOverview,
       listBillingReceipts,
@@ -427,6 +514,15 @@
       redirectToPortal,
       updateAccountProfile
     } from '../js/billing.js';
+    import {
+      addFriend,
+      dismissInvite,
+      listenFriends,
+      listenIncomingInvites,
+      markInviteSeen,
+      removeFriend,
+      sendInviteToFriend
+    } from '../app/js/multiplayer/social.js?v=54';
 
     const authPrompt = document.getElementById('authPrompt');
     const accountPanel = document.getElementById('accountPanel');
@@ -449,14 +545,28 @@
     const customerValue = document.getElementById('customerValue');
     const receiptList = document.getElementById('receiptList');
     const statusLine = document.getElementById('statusLine');
+    const socialStatus = document.getElementById('socialStatus');
     const planLabel = document.getElementById('planLabel');
     const planDetail = document.getElementById('planDetail');
     const trialLabel = document.getElementById('trialLabel');
     const trialDetail = document.getElementById('trialDetail');
+    const roomQuotaLabel = document.getElementById('roomQuotaLabel');
+    const roomQuotaDetail = document.getElementById('roomQuotaDetail');
+    const friendUidInput = document.getElementById('friendUidInput');
+    const friendNameInput = document.getElementById('friendNameInput');
+    const addFriendBtn = document.getElementById('addFriendBtn');
+    const inviteRoomCodeInput = document.getElementById('inviteRoomCodeInput');
+    const inviteMessageInput = document.getElementById('inviteMessageInput');
+    const friendsList = document.getElementById('friendsList');
+    const invitesList = document.getElementById('invitesList');
 
     let unsubscribeEntitlements = null;
+    let unsubscribeFriends = null;
+    let unsubscribeInvites = null;
     let signedInUser = null;
     let currentEntitlementState = null;
+    let currentFriends = [];
+    let currentInvites = [];
 
     function setStatus(message, type = 'neutral') {
       statusLine.textContent = message || '';
@@ -465,8 +575,48 @@
       if (type === 'warn') statusLine.classList.add('warn');
     }
 
+    function setSocialStatus(message, type = 'neutral') {
+      if (!socialStatus) return;
+      socialStatus.textContent = message || '';
+      socialStatus.classList.remove('ok', 'warn');
+      if (type === 'ok') socialStatus.classList.add('ok');
+      if (type === 'warn') socialStatus.classList.add('warn');
+    }
+
+    function clearSubscriptions() {
+      if (typeof unsubscribeEntitlements === 'function') {
+        unsubscribeEntitlements();
+      }
+      if (typeof unsubscribeFriends === 'function') {
+        unsubscribeFriends();
+      }
+      if (typeof unsubscribeInvites === 'function') {
+        unsubscribeInvites();
+      }
+      unsubscribeEntitlements = null;
+      unsubscribeFriends = null;
+      unsubscribeInvites = null;
+    }
+
+    function normalizeRoomCode(raw) {
+      return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    }
+
+    function canUseMultiplayerPlan(plan) {
+      const value = String(plan || '').toLowerCase();
+      return value === 'trial' || value === 'support' || value === 'supporter' || value === 'pro';
+    }
+
+    function inviteJoinUrl(code) {
+      const roomCode = normalizeRoomCode(code);
+      const target = new URL('../app/', window.location.href);
+      target.searchParams.set('tab', 'multiplayer');
+      target.searchParams.set('room', roomCode);
+      return target.toString();
+    }
+
     function setBusy(busy) {
-      [signInBtn, signOutBtn, upgradeSupporterBtn, upgradeProBtn, manageBillingBtn, refreshAccountBtn, saveUsernameBtn, refreshReceiptsBtn].forEach((btn) => {
+      [signInBtn, signOutBtn, upgradeSupporterBtn, upgradeProBtn, manageBillingBtn, refreshAccountBtn, saveUsernameBtn, refreshReceiptsBtn, addFriendBtn].forEach((btn) => {
         if (!btn) return;
         btn.disabled = busy;
       });
@@ -507,6 +657,130 @@
       while (node && node.firstChild) node.removeChild(node.firstChild);
     }
 
+    function timestampLikeToMillis(value) {
+      if (!value) return null;
+      if (typeof value.toMillis === 'function') return value.toMillis();
+      if (typeof value.seconds === 'number') return value.seconds * 1000;
+      const parsed = Date.parse(String(value));
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function renderFriends(rows = []) {
+      if (!friendsList) return;
+      clearChildren(friendsList);
+      if (!Array.isArray(rows) || !rows.length) {
+        const empty = document.createElement('div');
+        empty.className = 'receipt-empty';
+        empty.textContent = 'No friends yet.';
+        friendsList.appendChild(empty);
+        return;
+      }
+
+      rows.forEach((friend) => {
+        const row = document.createElement('div');
+        row.className = 'social-item';
+
+        const title = document.createElement('p');
+        title.className = 'social-title';
+        title.textContent = String(friend.displayName || 'Explorer');
+
+        const meta = document.createElement('p');
+        meta.className = 'social-meta';
+        const source = String(friend.source || 'manual');
+        meta.textContent = `${String(friend.uid || '')} • source: ${source}`;
+
+        const actions = document.createElement('div');
+        actions.className = 'social-actions';
+
+        const inviteBtn = document.createElement('button');
+        inviteBtn.type = 'button';
+        inviteBtn.className = 'btn-ghost';
+        inviteBtn.textContent = 'Invite';
+        inviteBtn.dataset.inviteFriend = String(friend.uid || '');
+        actions.appendChild(inviteBtn);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn-ghost';
+        removeBtn.textContent = 'Remove';
+        removeBtn.dataset.removeFriend = String(friend.uid || '');
+        actions.appendChild(removeBtn);
+
+        row.appendChild(title);
+        row.appendChild(meta);
+        row.appendChild(actions);
+        friendsList.appendChild(row);
+      });
+    }
+
+    function renderInvites(rows = []) {
+      if (!invitesList) return;
+      clearChildren(invitesList);
+      if (!Array.isArray(rows) || !rows.length) {
+        const empty = document.createElement('div');
+        empty.className = 'receipt-empty';
+        empty.textContent = 'No incoming invites.';
+        invitesList.appendChild(empty);
+        return;
+      }
+
+      rows.forEach((invite) => {
+        const row = document.createElement('div');
+        row.className = 'social-item';
+
+        const title = document.createElement('p');
+        title.className = 'social-title';
+        title.textContent = `${String(invite.fromDisplayName || 'Explorer')} invited you`;
+
+        const meta = document.createElement('p');
+        meta.className = 'social-meta';
+        const roomCode = normalizeRoomCode(invite.roomCode || '');
+        const roomLabel = String(invite.roomName || roomCode || 'Room');
+        const createdAtMs = timestampLikeToMillis(invite.createdAt);
+        const when = createdAtMs ? formatDateTime(createdAtMs) : null;
+        meta.textContent = `${roomLabel} (${roomCode})${when ? ` • ${when}` : ''}`;
+
+        const actions = document.createElement('div');
+        actions.className = 'social-actions';
+
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'btn-ghost';
+        openBtn.textContent = 'Open In App';
+        openBtn.dataset.acceptInvite = String(invite.id || '');
+        openBtn.dataset.roomCode = roomCode;
+        actions.appendChild(openBtn);
+
+        if (!canUseMultiplayerPlan(currentEntitlementState?.plan)) {
+          const trialBtn = document.createElement('button');
+          trialBtn.type = 'button';
+          trialBtn.className = 'btn-primary';
+          trialBtn.textContent = 'Start Trial + Join';
+          trialBtn.dataset.trialInvite = String(invite.id || '');
+          trialBtn.dataset.roomCode = roomCode;
+          actions.appendChild(trialBtn);
+        }
+
+        const dismissBtn = document.createElement('button');
+        dismissBtn.type = 'button';
+        dismissBtn.className = 'btn-ghost';
+        dismissBtn.textContent = 'Dismiss';
+        dismissBtn.dataset.dismissInvite = String(invite.id || '');
+        actions.appendChild(dismissBtn);
+
+        row.appendChild(title);
+        row.appendChild(meta);
+        if (invite.message) {
+          const note = document.createElement('p');
+          note.className = 'social-meta';
+          note.textContent = String(invite.message);
+          row.appendChild(note);
+        }
+        row.appendChild(actions);
+        invitesList.appendChild(row);
+      });
+    }
+
     function resetIdentityUi() {
       usernameValue.textContent = 'Explorer';
       usernameInput.value = '';
@@ -517,7 +791,18 @@
       subscriptionStatusValue.textContent = 'none';
       nextBillingValue.textContent = 'Next billing: not scheduled.';
       customerValue.textContent = 'Customer: not linked.';
+      roomQuotaLabel.textContent = '0 / 0';
+      roomQuotaDetail.textContent = 'Rooms created from this account.';
+      if (friendUidInput) friendUidInput.value = '';
+      if (friendNameInput) friendNameInput.value = '';
+      if (inviteRoomCodeInput) inviteRoomCodeInput.value = '';
+      if (inviteMessageInput) inviteMessageInput.value = '';
+      currentFriends = [];
+      currentInvites = [];
+      renderFriends([]);
+      renderInvites([]);
       renderReceipts([]);
+      setSocialStatus('Sign in to manage friends and invites.');
     }
 
     function renderReceipts(receipts = []) {
@@ -599,6 +884,8 @@
       const verified = overview?.emailVerified === true ? 'Verified' : 'Not verified';
       const status = normalizeStatusLabel(overview?.subscriptionStatus || currentEntitlementState?.subscriptionStatus || 'none');
       const nextBilling = formatDateTime(overview?.nextBillingAtMs);
+      const roomCreateCount = Number.isFinite(Number(overview?.roomCreateCount)) ? Math.max(0, Math.floor(Number(overview.roomCreateCount))) : 0;
+      const roomCreateLimit = Number.isFinite(Number(overview?.roomCreateLimit)) ? Math.max(0, Math.floor(Number(overview.roomCreateLimit))) : 0;
 
       usernameValue.textContent = displayName;
       if (document.activeElement !== usernameInput) {
@@ -611,6 +898,10 @@
       subscriptionStatusValue.textContent = status;
       nextBillingValue.textContent = nextBilling ? `Next billing: ${nextBilling}.` : 'Next billing: not scheduled.';
       customerValue.textContent = overview?.stripeCustomerId ? `Customer: ${overview.stripeCustomerId}` : 'Customer: not linked.';
+      roomQuotaLabel.textContent = `${roomCreateCount} / ${roomCreateLimit}`;
+      roomQuotaDetail.textContent = roomCreateLimit > 0
+        ? `You can create ${Math.max(0, roomCreateLimit - roomCreateCount)} more room${roomCreateLimit - roomCreateCount === 1 ? '' : 's'} on this plan.`
+        : 'Room creation requires multiplayer trial or paid plan.';
     }
 
     function renderSignedOutState() {
@@ -655,6 +946,7 @@
       upgradeSupporterBtn.disabled = state.plan === 'supporter' || state.plan === 'pro';
       upgradeProBtn.disabled = state.plan === 'pro';
       manageBillingBtn.disabled = !(state.stripeCustomerId || state.plan === 'supporter' || state.plan === 'pro');
+      renderInvites(currentInvites);
     }
 
     async function refreshOverview() {
@@ -701,6 +993,27 @@
       }
     }
 
+    function startSocialSubscriptions() {
+      if (!signedInUser) {
+        currentFriends = [];
+        currentInvites = [];
+        renderFriends([]);
+        renderInvites([]);
+        return;
+      }
+      if (typeof unsubscribeFriends === 'function') unsubscribeFriends();
+      if (typeof unsubscribeInvites === 'function') unsubscribeInvites();
+      unsubscribeFriends = listenFriends((rows) => {
+        currentFriends = Array.isArray(rows) ? rows : [];
+        renderFriends(currentFriends);
+      });
+      unsubscribeInvites = listenIncomingInvites((rows) => {
+        currentInvites = Array.isArray(rows) ? rows : [];
+        renderInvites(currentInvites);
+      });
+      setSocialStatus('Friends and invites are live.', 'ok');
+    }
+
     async function handleSignedIn(user) {
       signedInUser = user;
       authPrompt.style.display = 'none';
@@ -711,6 +1024,7 @@
       const state = await ensureEntitlements(user);
       applyPlanUi(state);
       await refreshAccountData({ silent: true });
+      startSocialSubscriptions();
       setStatus(`Signed in as ${user.email || user.uid}.`, 'ok');
 
       unsubscribeEntitlements = subscribeEntitlements(user, (nextState) => {
@@ -739,10 +1053,7 @@
     signOutBtn.addEventListener('click', async () => {
       setBusy(true);
       try {
-        if (unsubscribeEntitlements) {
-          unsubscribeEntitlements();
-          unsubscribeEntitlements = null;
-        }
+        clearSubscriptions();
         await signOutUser();
         signedInUser = null;
         renderSignedOutState();
@@ -778,6 +1089,132 @@
         setStatus(err && err.message ? err.message : 'Could not refresh receipts.', 'warn');
       } finally {
         setBusy(false);
+      }
+    });
+
+    async function handleAddFriendFromForm() {
+      if (!signedInUser) {
+        setSocialStatus('Sign in first.', 'warn');
+        return;
+      }
+      const friendUid = String(friendUidInput?.value || '').trim();
+      if (!friendUid) {
+        setSocialStatus('Enter a friend account ID (UID).', 'warn');
+        return;
+      }
+      const displayName = String(friendNameInput?.value || '').trim().slice(0, 48) || 'Explorer';
+      try {
+        await addFriend(friendUid, displayName, 'manual');
+        if (friendUidInput) friendUidInput.value = '';
+        if (friendNameInput) friendNameInput.value = '';
+        setSocialStatus('Friend added.', 'ok');
+      } catch (err) {
+        setSocialStatus(err?.message || 'Could not add friend.', 'warn');
+      }
+    }
+
+    addFriendBtn.addEventListener('click', handleAddFriendFromForm);
+    friendUidInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        handleAddFriendFromForm();
+      }
+    });
+    friendNameInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        handleAddFriendFromForm();
+      }
+    });
+
+    friendsList.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const inviteBtn = target.closest('button[data-invite-friend]');
+      if (inviteBtn instanceof HTMLElement) {
+        const friendUid = String(inviteBtn.dataset.inviteFriend || '').trim();
+        const roomCode = normalizeRoomCode(inviteRoomCodeInput?.value || '');
+        if (!friendUid) return;
+        if (!roomCode) {
+          setSocialStatus('Enter a room code before sending invite.', 'warn');
+          return;
+        }
+        try {
+          const message = String(inviteMessageInput?.value || '').trim().slice(0, 120);
+          const link = await sendInviteToFriend(
+            friendUid,
+            roomCode,
+            roomCode,
+            message || `Join me in room ${roomCode}`
+          );
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(link);
+          }
+          setSocialStatus('Invite sent. Link copied.', 'ok');
+        } catch (err) {
+          setSocialStatus(err?.message || 'Could not send invite.', 'warn');
+        }
+        return;
+      }
+
+      const removeBtn = target.closest('button[data-remove-friend]');
+      if (removeBtn instanceof HTMLElement) {
+        const friendUid = String(removeBtn.dataset.removeFriend || '').trim();
+        if (!friendUid) return;
+        try {
+          await removeFriend(friendUid);
+          setSocialStatus('Friend removed.', 'ok');
+        } catch (err) {
+          setSocialStatus(err?.message || 'Could not remove friend.', 'warn');
+        }
+      }
+    });
+
+    invitesList.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const acceptBtn = target.closest('button[data-accept-invite]');
+      if (acceptBtn instanceof HTMLElement) {
+        const inviteId = String(acceptBtn.dataset.acceptInvite || '').trim();
+        const roomCode = normalizeRoomCode(acceptBtn.dataset.roomCode || '');
+        if (!inviteId || !roomCode) return;
+        try {
+          await markInviteSeen(inviteId, true);
+          window.location.assign(inviteJoinUrl(roomCode));
+        } catch (err) {
+          setSocialStatus(err?.message || 'Could not open invite.', 'warn');
+        }
+        return;
+      }
+
+      const trialBtn = target.closest('button[data-trial-invite]');
+      if (trialBtn instanceof HTMLElement) {
+        const inviteId = String(trialBtn.dataset.trialInvite || '').trim();
+        const roomCode = normalizeRoomCode(trialBtn.dataset.roomCode || '');
+        if (!inviteId || !roomCode) return;
+        try {
+          await startTrialIfEligible(signedInUser);
+          await refreshAccountData({ silent: true });
+          await markInviteSeen(inviteId, true);
+          window.location.assign(inviteJoinUrl(roomCode));
+        } catch (err) {
+          setSocialStatus(err?.message || 'Could not start trial from invite.', 'warn');
+        }
+        return;
+      }
+
+      const dismissBtn = target.closest('button[data-dismiss-invite]');
+      if (dismissBtn instanceof HTMLElement) {
+        const inviteId = String(dismissBtn.dataset.dismissInvite || '').trim();
+        if (!inviteId) return;
+        try {
+          await dismissInvite(inviteId);
+          setSocialStatus('Invite dismissed.', 'ok');
+        } catch (err) {
+          setSocialStatus(err?.message || 'Could not dismiss invite.', 'warn');
+        }
       }
     });
 
@@ -864,10 +1301,7 @@
         if (!user) {
           renderSignedOutState();
           signedInUser = null;
-          if (unsubscribeEntitlements) {
-            unsubscribeEntitlements();
-            unsubscribeEntitlements = null;
-          }
+          clearSubscriptions();
           return;
         }
 

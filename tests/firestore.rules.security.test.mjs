@@ -84,6 +84,33 @@ function privateRoomDoc() {
   };
 }
 
+function roomCreateDoc(roomCode, ownerUid) {
+  return {
+    code: roomCode,
+    createdAt: serverTimestamp(),
+    createdBy: ownerUid,
+    name: 'Quota Test Room',
+    visibility: 'private',
+    featured: false,
+    maxPlayers: 12,
+    ownerUid,
+    mods: {
+      [ownerUid]: true
+    },
+    cityKey: '',
+    world: {
+      kind: 'earth',
+      seed: 'latlon:0,0',
+      lat: 0,
+      lon: 0
+    },
+    rules: {
+      allowChat: true,
+      allowGhosts: true
+    }
+  };
+}
+
 function userDoc(uid, displayName) {
   const ts = Timestamp.fromMillis(Date.now() - 120_000);
   return {
@@ -101,6 +128,8 @@ function userDoc(uid, displayName) {
       multiplayer: true,
       earlyAccess: false
     },
+    roomCreateCount: 0,
+    roomCreateLimit: 10,
     stripeCustomerId: '',
     stripeSubscriptionId: '',
     billingCycleAnchorAt: null,
@@ -203,6 +232,23 @@ await runCheck('member can update own presence with valid payload', async () => 
     }
   };
   await assertSucceeds(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'players', MEMBER_UID), payload));
+});
+
+await runCheck('owner cannot create room without consuming quota', async () => {
+  const roomCode = 'QT12AB';
+  await assertFails(setDoc(doc(ownerDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID)));
+});
+
+await runCheck('owner can create room with quota increment in same batch', async () => {
+  const roomCode = 'QT12AC';
+  const batch = writeBatch(ownerDb);
+  batch.set(doc(ownerDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID));
+  batch.set(doc(ownerDb, 'users', OWNER_UID), {
+    roomCreateCount: 1,
+    roomCreateLimit: 10,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await assertSucceeds(batch.commit());
 });
 
 await runCheck('owner oversize chat message blocked', async () => {

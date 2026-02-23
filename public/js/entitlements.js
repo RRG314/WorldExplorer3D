@@ -10,6 +10,12 @@ import { startTrial as requestTrialStart } from './billing.js';
 
 const USERS_COLLECTION = 'users';
 const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
+const ROOM_CREATE_LIMITS = Object.freeze({
+  free: 0,
+  trial: 3,
+  supporter: 10,
+  pro: 25
+});
 
 const FREE_ENTITLEMENTS = Object.freeze({
   fullAccess: true,
@@ -78,6 +84,17 @@ function normalizePlan(plan) {
   return 'free';
 }
 
+function roomCreateLimitForPlan(plan) {
+  const normalized = normalizePlan(plan);
+  return ROOM_CREATE_LIMITS[normalized] || ROOM_CREATE_LIMITS.free;
+}
+
+function normalizeRoomCreateCount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(10000, Math.floor(n)));
+}
+
 function planLabel(plan) {
   if (plan === 'trial') return 'Trial';
   if (plan === 'supporter') return 'Supporter';
@@ -110,6 +127,8 @@ function normalizeProfile(uid, raw = {}) {
   const entitlements = raw.entitlements && typeof raw.entitlements === 'object' ?
     cloneEntitlements({ ...entitlementsForPlan(plan), ...raw.entitlements }) :
     entitlementsForPlan(plan);
+  const roomCreateCount = normalizeRoomCreateCount(raw.roomCreateCount);
+  const roomCreateLimit = roomCreateLimitForPlan(plan);
 
   return {
     uid,
@@ -120,6 +139,8 @@ function normalizeProfile(uid, raw = {}) {
     stripeSubscriptionId: raw.stripeSubscriptionId || null,
     trialEndsAt: raw.trialEndsAt || null,
     trialEndsAtMs: timestampToMillis(raw.trialEndsAt),
+    roomCreateCount,
+    roomCreateLimit,
     entitlements,
     updatedAt: raw.updatedAt || null
   };
@@ -135,6 +156,8 @@ function freeState() {
     stripeSubscriptionId: null,
     trialEndsAt: null,
     trialEndsAtMs: null,
+    roomCreateCount: 0,
+    roomCreateLimit: ROOM_CREATE_LIMITS.free,
     entitlements: entitlementsForPlan('free'),
     updatedAt: null
   };
@@ -150,6 +173,8 @@ function broadcastEntitlements(state, user = null) {
     planLabel: state.planLabel,
     subscriptionStatus: state.subscriptionStatus,
     trialEndsAtMs: state.trialEndsAtMs,
+    roomCreateCount: state.roomCreateCount,
+    roomCreateLimit: state.roomCreateLimit,
     entitlements: { ...state.entitlements }
   };
 
@@ -167,14 +192,34 @@ async function ensureUserDoc(user) {
 
   if (snap.exists()) {
     const existing = snap.data() || {};
+    const plan = normalizePlan(existing.plan);
     const nextEmail = user.email || existing.email || '';
     const nextDisplayName = user.displayName || existing.displayName || '';
-    const needsPatch = nextEmail !== (existing.email || '') || nextDisplayName !== (existing.displayName || '');
+    const existingRoomCreateCount = Number.isFinite(Number(existing.roomCreateCount))
+      ? Math.floor(Number(existing.roomCreateCount))
+      : null;
+    const existingRoomCreateLimit = Number.isFinite(Number(existing.roomCreateLimit))
+      ? Math.floor(Number(existing.roomCreateLimit))
+      : null;
+    const nextRoomCreateCount = existingRoomCreateCount == null
+      ? 0
+      : normalizeRoomCreateCount(existingRoomCreateCount);
+    const nextRoomCreateLimit = existingRoomCreateLimit == null
+      ? roomCreateLimitForPlan(plan)
+      : Math.max(0, Math.min(10000, existingRoomCreateLimit));
+    const needsPatch = (
+      nextEmail !== (existing.email || '') ||
+      nextDisplayName !== (existing.displayName || '') ||
+      nextRoomCreateCount !== existingRoomCreateCount ||
+      nextRoomCreateLimit !== existingRoomCreateLimit
+    );
 
     if (needsPatch) {
       await setDoc(ref, {
         email: nextEmail,
         displayName: nextDisplayName,
+        roomCreateCount: nextRoomCreateCount,
+        roomCreateLimit: nextRoomCreateLimit,
         updatedAt: serverTimestamp()
       }, { merge: true });
     }
@@ -182,7 +227,9 @@ async function ensureUserDoc(user) {
     return normalizeProfile(user.uid, {
       ...existing,
       email: nextEmail,
-      displayName: nextDisplayName
+      displayName: nextDisplayName,
+      roomCreateCount: nextRoomCreateCount,
+      roomCreateLimit: nextRoomCreateLimit
     });
   }
 
@@ -190,6 +237,8 @@ async function ensureUserDoc(user) {
     uid: user.uid,
     email: user.email || '',
     displayName: user.displayName || '',
+    roomCreateCount: 0,
+    roomCreateLimit: roomCreateLimitForPlan('free'),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };

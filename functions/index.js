@@ -8,6 +8,12 @@ const db = admin.firestore();
 const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
 const ALLOWED_PLANS = new Set(['support', 'supporter', 'pro']);
 const TRIAL_DURATION_MS = 48 * 60 * 60 * 1000;
+const ROOM_CREATE_LIMITS = Object.freeze({
+  free: 0,
+  trial: 3,
+  supporter: 10,
+  pro: 25
+});
 
 function stripeConfig() {
   const cfg = functions.config().stripe || {};
@@ -67,6 +73,17 @@ function normalizePlan(plan) {
   if (lowered === 'support') return 'supporter';
   if (lowered === 'pro' || lowered === 'supporter' || lowered === 'trial') return lowered;
   return 'free';
+}
+
+function roomCreateLimitForPlan(plan) {
+  const normalized = normalizePlan(plan);
+  return ROOM_CREATE_LIMITS[normalized] || ROOM_CREATE_LIMITS.free;
+}
+
+function normalizeRoomCreateCount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(10000, Math.floor(n)));
 }
 
 function hasActiveSubscription(status) {
@@ -205,25 +222,37 @@ async function ensureUserDoc(uid, email, displayName) {
 
   if (snap.exists) {
     const existing = snap.data() || {};
+    const plan = normalizePlan(existing.plan);
+    const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
+    const roomCreateLimit = roomCreateLimitForPlan(plan);
     await ref.set(
       {
         email: email || existing.email || '',
         displayName: displayName || existing.displayName || '',
+        roomCreateCount,
+        roomCreateLimit,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       },
       { merge: true }
     );
-    return existing;
+    return {
+      ...existing,
+      roomCreateCount,
+      roomCreateLimit
+    };
   }
 
+  const plan = 'free';
   const created = {
     uid,
     email: email || '',
     displayName: displayName || '',
-    plan: 'free',
+    plan,
     trialEndsAt: null,
     subscriptionStatus: 'none',
-    entitlements: planEntitlements('free'),
+    entitlements: planEntitlements(plan),
+    roomCreateCount: 0,
+    roomCreateLimit: roomCreateLimitForPlan(plan),
     createdAt: admin.firestore.FieldValue.serverTimestamp(),
     updatedAt: admin.firestore.FieldValue.serverTimestamp()
   };
@@ -259,14 +288,21 @@ async function upsertPlanFromSubscription({ uid, customerId, subscriptionId, sta
   const active = hasActiveSubscription(status);
   const fallbackPlan = active ? 'free' : await resolveFallbackPlan(uid);
   const plan = active ? normalizePlan(paidPlan) : fallbackPlan;
+  const userRef = db.collection('users').doc(uid);
+  const userSnap = await userRef.get();
+  const userData = userSnap.exists ? userSnap.data() || {} : {};
+  const roomCreateCount = normalizeRoomCreateCount(userData.roomCreateCount);
+  const roomCreateLimit = roomCreateLimitForPlan(plan);
 
-  await db.collection('users').doc(uid).set(
+  await userRef.set(
     {
       stripeCustomerId: customerId || null,
       stripeSubscriptionId: subscriptionId || null,
       subscriptionStatus: status || 'none',
       plan,
       entitlements: planEntitlements(plan),
+      roomCreateCount,
+      roomCreateLimit,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     },
     { merge: true }
@@ -452,6 +488,8 @@ exports.startTrial = functions.region('us-central1').https.onRequest(async (req,
 
     const trialStartsAt = admin.firestore.Timestamp.fromMillis(nowMs);
     const trialEndsAt = admin.firestore.Timestamp.fromMillis(nowMs + TRIAL_DURATION_MS);
+    const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
+    const roomCreateLimit = roomCreateLimitForPlan('trial');
     await db.collection('users').doc(auth.uid).set(
       {
         uid: auth.uid,
@@ -463,6 +501,8 @@ exports.startTrial = functions.region('us-central1').https.onRequest(async (req,
         trialEndsAt,
         trialConsumedAt: trialStartsAt,
         entitlements: planEntitlements('trial'),
+        roomCreateCount,
+        roomCreateLimit,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       },
       { merge: true }
@@ -501,6 +541,8 @@ exports.getAccountOverview = functions.region('us-central1').https.onRequest(asy
     const trialConsumedAtMs = timestampToMillis(userData.trialConsumedAt);
     const stripeCustomerId = userData.stripeCustomerId || null;
     const stripeSubscriptionId = userData.stripeSubscriptionId || null;
+    const roomCreateCount = normalizeRoomCreateCount(userData.roomCreateCount);
+    const roomCreateLimit = roomCreateLimitForPlan(plan);
 
     const overview = {
       uid: auth.uid,
@@ -517,6 +559,8 @@ exports.getAccountOverview = functions.region('us-central1').https.onRequest(asy
       trialConsumedAtMs,
       stripeCustomerId,
       stripeSubscriptionId,
+      roomCreateCount,
+      roomCreateLimit,
       nextBillingAtMs: null,
       cancelAtPeriodEnd: null
     };
