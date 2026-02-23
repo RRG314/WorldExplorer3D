@@ -4,10 +4,7 @@ import { CHAT_MAX_LENGTH, listenChat, reportMessage, sendMessage } from './chat.
 import { createGhostManager } from './ghosts.js?v=54';
 import {
   bumpExplorerLeaderboard,
-  getWeeklyEventMessage,
-  listenActivityFeed,
-  listenExplorerLeaderboard,
-  postActivity
+  listenExplorerLeaderboard
 } from './loop.js?v=54';
 import { listenPlayers, startPresence, stopPresence } from './presence.js?v=54';
 import {
@@ -32,6 +29,7 @@ import {
   listenRecentPlayers,
   markInviteSeen,
   recordRecentPlayers,
+  removeFriend,
   sendInviteToFriend
 } from './social.js?v=54';
 
@@ -269,12 +267,12 @@ function initMultiplayerPlatform() {
     titleFeaturedRefreshBtn: document.getElementById('mpFeaturedRefreshBtn'),
     titleFeaturedList: document.getElementById('mpFeaturedList'),
     titleFriendsStatus: document.getElementById('mpFriendsStatus'),
+    titleFriendUidInput: document.getElementById('mpFriendUidInput'),
+    titleFriendNameInput: document.getElementById('mpFriendNameInput'),
+    titleAddFriendBtn: document.getElementById('mpAddFriendBtn'),
     titleFriendsList: document.getElementById('mpFriendsList'),
     titleRecentPlayersList: document.getElementById('mpRecentPlayersList'),
     titleInvitesList: document.getElementById('mpInvitesList'),
-    titleWeeklyLoop: document.getElementById('mpWeeklyLoop'),
-    titleWeeklyEvent: document.getElementById('mpWeeklyEvent'),
-    titleActivityList: document.getElementById('mpActivityList'),
     titleLeaderboardList: document.getElementById('mpLeaderboardList'),
 
     roomPanelModal: document.getElementById('roomPanelModal'),
@@ -337,7 +335,6 @@ function initMultiplayerPlatform() {
     friends: [],
     recentPlayers: [],
     invites: [],
-    activityFeed: [],
     leaderboard: [],
     artifacts: [],
     homeBase: null,
@@ -351,7 +348,6 @@ function initMultiplayerPlatform() {
     unsubFriends: null,
     unsubRecentPlayers: null,
     unsubInvites: null,
-    unsubActivityFeed: null,
     unsubLeaderboard: null
   };
 
@@ -471,7 +467,7 @@ function initMultiplayerPlatform() {
       return;
     }
     if (!state.friends.length) {
-      refs.titleFriendsList.innerHTML = '<li class="mpRoomEmpty">No friends yet. Add people from Recent Players.</li>';
+      refs.titleFriendsList.innerHTML = '<li class="mpRoomEmpty">No friends yet. Add by UID above or from Recent Players.</li>';
       return;
     }
     refs.titleFriendsList.innerHTML = state.friends.map((friend) => {
@@ -523,25 +519,6 @@ function initMultiplayerPlatform() {
     }).join('');
   }
 
-  function renderActivityFeed() {
-    if (!refs.titleActivityList) return;
-    if (!state.authUser) {
-      refs.titleActivityList.innerHTML = '<li class="mpRoomEmpty">Sign in to view activity feed.</li>';
-      return;
-    }
-    if (!state.activityFeed.length) {
-      refs.titleActivityList.innerHTML = '<li class="mpRoomEmpty">No activity yet.</li>';
-      return;
-    }
-    refs.titleActivityList.innerHTML = state.activityFeed.map((entry) => {
-      const display = safeHtml(entry.displayName || 'Explorer', 48);
-      const text = safeHtml(entry.text || '', 140);
-      const room = normalizeCode(entry.roomCode || '');
-      const meta = `${formatRelativeTime(entry.createdAt)}${room ? ` • ${room}` : ''}`;
-      return `<li class="mpFeedItem"><div class="mpFeedTitle">${display}</div><div class="mpFeedMeta">${text || safeHtml(entry.type || 'activity update', 32)}</div><div class="mpFeedMeta">${escapeHtml(meta)}</div></li>`;
-    }).join('');
-  }
-
   function renderLeaderboard() {
     if (!refs.titleLeaderboardList) return;
     if (!state.leaderboard.length) {
@@ -554,16 +531,6 @@ function initMultiplayerPlatform() {
       const summary = `Score ${Math.max(0, Number(entry.score || 0))} • Rooms ${Math.max(0, Number(entry.roomsJoined || 0))} • Artifacts ${Math.max(0, Number(entry.artifactsShared || 0))}`;
       return `<li class="mpFeedItem"><div class="mpFeedTitle">#${rank} ${display}</div><div class="mpFeedMeta">${escapeHtml(summary)}</div><div class="mpFeedMeta">last active ${escapeHtml(formatRelativeTime(entry.lastActiveAt))}</div></li>`;
     }).join('');
-  }
-
-  function renderWeeklyLoop() {
-    const weekly = getWeeklyEventMessage(new Date());
-    if (refs.titleWeeklyLoop) {
-      refs.titleWeeklyLoop.innerHTML = `Weekly featured location: <strong>${safeHtml(weekly.featured.city, 48)}</strong> (${escapeHtml(sanitizeText(weekly.featured.kind || 'earth', 16).toUpperCase())})`;
-    }
-    if (refs.titleWeeklyEvent) {
-      refs.titleWeeklyEvent.textContent = weekly.message;
-    }
   }
 
   function renderArtifacts() {
@@ -661,6 +628,10 @@ function initMultiplayerPlatform() {
     if (refs.roomArtifactTypeSelect) refs.roomArtifactTypeSelect.disabled = !hasRoom;
     if (refs.roomArtifactTitleInput) refs.roomArtifactTitleInput.disabled = !hasRoom;
     if (refs.roomArtifactTextInput) refs.roomArtifactTextInput.disabled = !hasRoom;
+    const signedIn = !!state.authUser;
+    if (refs.titleAddFriendBtn) refs.titleAddFriendBtn.disabled = !signedIn;
+    if (refs.titleFriendUidInput) refs.titleFriendUidInput.disabled = !signedIn;
+    if (refs.titleFriendNameInput) refs.titleFriendNameInput.disabled = !signedIn;
   }
 
   function renderRoomMeta() {
@@ -764,12 +735,10 @@ function initMultiplayerPlatform() {
     if (typeof state.unsubFriends === 'function') state.unsubFriends();
     if (typeof state.unsubRecentPlayers === 'function') state.unsubRecentPlayers();
     if (typeof state.unsubInvites === 'function') state.unsubInvites();
-    if (typeof state.unsubActivityFeed === 'function') state.unsubActivityFeed();
     if (typeof state.unsubLeaderboard === 'function') state.unsubLeaderboard();
     state.unsubFriends = null;
     state.unsubRecentPlayers = null;
     state.unsubInvites = null;
-    state.unsubActivityFeed = null;
     state.unsubLeaderboard = null;
   }
 
@@ -855,12 +824,10 @@ function initMultiplayerPlatform() {
       state.friends = [];
       state.recentPlayers = [];
       state.invites = [];
-      state.activityFeed = [];
       state.leaderboard = [];
       renderFriends();
       renderRecentPlayers();
       renderInvites();
-      renderActivityFeed();
       renderLeaderboard();
       renderFeaturedRooms();
       return;
@@ -882,12 +849,6 @@ function initMultiplayerPlatform() {
       state.unsubInvites = listenIncomingInvites((rows) => {
         state.invites = rows;
         renderInvites();
-      });
-    }
-    if (!state.unsubActivityFeed) {
-      state.unsubActivityFeed = listenActivityFeed((rows) => {
-        state.activityFeed = rows;
-        renderActivityFeed();
       });
     }
     if (!state.unsubLeaderboard) {
@@ -962,12 +923,6 @@ function initMultiplayerPlatform() {
           z: finiteNumber(pose.pose.z, 0)
         }
       });
-      await postActivity('home-base-updated', {
-        roomCode: state.currentRoom.code,
-        roomName: currentRoomName(),
-        cityKey: state.currentRoom.cityKey,
-        text: `updated home base in ${currentRoomName()}`
-      });
       setStatus('Home base saved.');
     } catch (err) {
       setStatus(err?.message || 'Could not save home base.', true);
@@ -1007,12 +962,6 @@ function initMultiplayerPlatform() {
       if (refs.roomArtifactTextInput) refs.roomArtifactTextInput.value = '';
 
       await bumpExplorerLeaderboard({ artifactsShared: 1 });
-      await postActivity('artifact-added', {
-        roomCode: state.currentRoom.code,
-        roomName: currentRoomName(),
-        cityKey: state.currentRoom.cityKey,
-        text: `shared a ${type} in ${currentRoomName()}`
-      });
       setStatus('Artifact saved.');
     } catch (err) {
       setStatus(err?.message || 'Could not save artifact.', true);
@@ -1029,22 +978,36 @@ function initMultiplayerPlatform() {
     }
   }
 
-  async function handleAddFriend(friendUid, displayName) {
+  async function handleAddFriend(friendUid, displayName, source = 'manual') {
     if (!state.authUser) {
       setStatus('Sign in to add friends.', true);
       return;
     }
     try {
-      await addFriend(friendUid, displayName, 'recent');
+      const safeSource = source === 'recent' ? 'recent' : 'manual';
+      await addFriend(friendUid, displayName, safeSource);
       await bumpExplorerLeaderboard({ friendsAdded: 1 });
-      await postActivity('friend-added', {
-        text: `added ${sanitizeText(displayName || 'a friend', 48)}`
-      });
       if (refs.titleFriendsStatus) refs.titleFriendsStatus.textContent = 'Friend added successfully.';
       setStatus('Friend added.');
     } catch (err) {
       setStatus(err?.message || 'Could not add friend.', true);
     }
+  }
+
+  async function handleManualAddFriend() {
+    if (!state.authUser) {
+      setStatus('Sign in to add friends.', true);
+      return;
+    }
+    const friendUid = sanitizeText(refs.titleFriendUidInput?.value || '', 128);
+    if (!friendUid) {
+      setStatus('Enter a friend UID to add them.', true);
+      return;
+    }
+    const displayName = sanitizeText(refs.titleFriendNameInput?.value || '', 48) || 'Explorer';
+    await handleAddFriend(friendUid, displayName, 'manual');
+    if (refs.titleFriendUidInput) refs.titleFriendUidInput.value = '';
+    if (refs.titleFriendNameInput) refs.titleFriendNameInput.value = '';
   }
 
   async function handleInviteFriend(friendUid) {
@@ -1165,12 +1128,6 @@ function initMultiplayerPlatform() {
 
       await activateRoom(room, 'created room');
       await bumpExplorerLeaderboard({ roomsJoined: 1 });
-      await postActivity('room-created', {
-        roomCode: room.code,
-        roomName: currentRoomName(),
-        cityKey: room.cityKey,
-        text: `created room ${room.code}`
-      });
       await refreshFeaturedRooms(true);
       const inviteLink = buildInviteLink(room.code);
       if (inviteLink) {
@@ -1231,12 +1188,6 @@ function initMultiplayerPlatform() {
       const room = await joinRoomByCode(code);
       await activateRoom(room, 'joined room');
       await bumpExplorerLeaderboard({ roomsJoined: 1 });
-      await postActivity('room-joined', {
-        roomCode: room.code,
-        roomName: currentRoomName(),
-        cityKey: room.cityKey,
-        text: `joined room ${room.code}`
-      });
       await refreshFeaturedRooms(true);
       setStatus(`Joined room ${room.code}.`);
       closeRoomPanel();
@@ -1316,7 +1267,6 @@ function initMultiplayerPlatform() {
 
   function applyEntitlementCopy() {
     refreshPlanLabel();
-    renderWeeklyLoop();
 
     const allowed = canUseMultiplayer(state.entitlement);
     if (!state.authUser) {
@@ -1484,6 +1434,9 @@ function initMultiplayerPlatform() {
 
     refs.titleBrowseBtn?.addEventListener('click', handleBrowseRooms);
     refs.titleFeaturedRefreshBtn?.addEventListener('click', () => refreshFeaturedRooms(false));
+    refs.titleAddFriendBtn?.addEventListener('click', () => {
+      handleManualAddFriend();
+    });
     refs.roomPanelSaveSettingsBtn?.addEventListener('click', handleSaveRoomSettings);
     refs.roomHomeBaseSaveBtn?.addEventListener('click', handleSaveHomeBase);
     refs.roomArtifactCreateBtn?.addEventListener('click', handleCreateArtifact);
@@ -1491,6 +1444,18 @@ function initMultiplayerPlatform() {
       if (event.key === 'Enter') {
         event.preventDefault();
         handleBrowseRooms();
+      }
+    });
+    refs.titleFriendUidInput?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        handleManualAddFriend();
+      }
+    });
+    refs.titleFriendNameInput?.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        handleManualAddFriend();
       }
     });
     refs.titleBrowseList?.addEventListener('click', (event) => {
@@ -1544,7 +1509,7 @@ function initMultiplayerPlatform() {
       if (addBtn instanceof HTMLElement) {
         const friendUid = sanitizeText(addBtn.dataset.addFriend || '', 80);
         const playerName = sanitizeText(addBtn.dataset.playerName || 'Explorer', 48);
-        if (friendUid) await handleAddFriend(friendUid, playerName);
+        if (friendUid) await handleAddFriend(friendUid, playerName, 'recent');
         return;
       }
       const joinBtn = target.closest('button[data-join-recent]');
@@ -1650,7 +1615,6 @@ function initMultiplayerPlatform() {
     renderFriends();
     renderRecentPlayers();
     renderInvites();
-    renderActivityFeed();
     renderLeaderboard();
   }
 
@@ -1658,7 +1622,6 @@ function initMultiplayerPlatform() {
   syncCreateOptionFields('title');
   activateMultiplayerTabFromQuery();
   ensureGhostTicker();
-  renderWeeklyLoop();
 
   if (state.currentRoom && state.currentRoom.id) {
     activateRoom(state.currentRoom, 'current room');
@@ -1673,7 +1636,6 @@ function initMultiplayerPlatform() {
     renderFriends();
     renderRecentPlayers();
     renderInvites();
-    renderActivityFeed();
     renderLeaderboard();
     updateToggleStates();
     applyEntitlementCopy();

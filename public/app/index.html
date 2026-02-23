@@ -875,7 +875,12 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 </ul>
 
 <div class="mp-subtitle">Friends</div>
-<div id="mpFriendsStatus" class="mp-status">Add recent players as friends to invite them faster.</div>
+<div id="mpFriendsStatus" class="mp-status">Add friends by UID or from Recent Players to invite them fast.</div>
+<div class="mp-row">
+<input id="mpFriendUidInput" class="mp-input" type="text" maxlength="128" placeholder="Friend UID">
+<input id="mpFriendNameInput" class="mp-input" type="text" maxlength="48" placeholder="Display name (optional)">
+<button id="mpAddFriendBtn" class="mp-btn secondary" type="button">Add Friend</button>
+</div>
 <ul id="mpFriendsList" class="mp-room-list">
 <li class="mpRoomEmpty">No friends yet.</li>
 </ul>
@@ -888,15 +893,6 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="mp-subtitle">Incoming Invites</div>
 <ul id="mpInvitesList" class="mp-room-list">
 <li class="mpRoomEmpty">No incoming invites.</li>
-</ul>
-
-<div class="mp-subtitle">Weekly Pulse</div>
-<div id="mpWeeklyLoop" class="mpLine">Weekly featured location: loading...</div>
-<div id="mpWeeklyEvent" class="mp-status">Event cadence updates after sign-in.</div>
-
-<div class="mp-subtitle">Platform Activity</div>
-<ul id="mpActivityList" class="mpFeedList">
-<li class="mpRoomEmpty">No activity yet.</li>
 </ul>
 
 <div class="mp-subtitle">Top Explorers</div>

@@ -5,7 +5,7 @@
   "main": "three.js",
   "scripts": {
     "test": "npm run test:rules",
-    "test:rules": "JAVA_HOME=/opt/homebrew/opt/openjdk@21 PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH firebase emulators:exec --only firestore \"node tests/firestore.rules.security.test.mjs\""
+    "test:rules": "node scripts/test-rules.mjs"
   },
   "repository": {
     "type": "git",

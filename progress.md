@@ -1021,3 +1021,22 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
 - Security test run result:
   - `npm test` passed.
   - 12/12 Firestore security checks passed (private-room reads, presence self-write enforcement, chat size/rate transition checks, invite abuse checks, activity feed auth checks).
+- Cross-platform multiplayer hardening + root test portability:
+  - Removed `Weekly Pulse` and `Platform Activity` blocks from `public/app/index.html` and disconnected related UI listeners in `public/app/js/multiplayer/ui-room.js`.
+  - Fixed social wiring bug by importing `removeFriend` in `ui-room.js` (button action now resolves at runtime).
+  - Added direct social onboarding controls in multiplayer title tab:
+    - `mpFriendUidInput`, `mpFriendNameInput`, `mpAddFriendBtn`
+    - Enter/click handlers now call `addFriend(..., 'manual')`.
+  - Preserved leaderboard updates and invite flow while removing activity feed posting dependencies.
+  - Replaced macOS-only rules test script with cross-platform runner:
+    - Added `scripts/test-rules.mjs`
+    - `package.json` now uses `node scripts/test-rules.mjs`
+    - Runner auto-detects Java via `JAVA_HOME` and common paths, sets env for emulator process, and falls back from `firebase` CLI to `npx firebase-tools`.
+- Validation:
+  - `node --check public/app/js/multiplayer/ui-room.js` passed.
+  - `node --check scripts/test-rules.mjs` passed.
+  - `npm test` passed (Firestore rules security suite 12/12).
+  - Playwright multiplayer DOM smoke check confirms:
+    - `Weekly Pulse` absent
+    - `Platform Activity` absent
+    - manual friend controls present.
