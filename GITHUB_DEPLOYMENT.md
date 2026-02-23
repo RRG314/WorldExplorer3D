@@ -1,100 +1,74 @@
 # GitHub Deployment Guide
 
-Last reviewed: 2026-02-18
+Last reviewed: 2026-02-23
 
-This guide documents the current GitHub-hosted deployment modes and required Firebase/Stripe integrations.
+This guide covers publishing the project from repository root on GitHub Pages while still using Firebase/Stripe backends.
 
-## 1. Deployment Modes
+## 1. Recommended Mode: Branch Root
 
-### 1.1 `WorldExplorer` repository (branch-root Pages mode)
+Use GitHub Pages with `Deploy from a branch` and `/ (root)`.
 
-- Repository: `https://github.com/RRG314/WorldExplorer.git`
-- Publish model: `Deploy from a branch` with folder `/ (root)`
-- Runtime entrypoint: root `index.html` (with root `js/` modules)
-- This is the preferred mode when you want the game to run directly from branch root.
+Steps:
 
-GitHub Pages settings:
+1. Push your target branch (for example `steven/product`).
+2. In GitHub: `Settings -> Pages`.
+3. `Source: Deploy from a branch`.
+4. Branch: target branch.
+5. Folder: `/ (root)`.
 
-1. `Settings -> Pages`
-2. `Build and deployment -> Source: Deploy from a branch`
-3. Select your target branch
-4. Select folder `/ (root)`
-5. Save and wait for GitHub Pages publish
+Root runtime files used by Pages:
 
-### 1.2 `WorldExplorer` repository (`public/` artifact mode, optional)
+- `index.html`
+- `js/*`
+- `styles.css`
 
-- Publish model: GitHub Actions deploys `public/` as the Pages artifact
-- Workflow file: `.github/workflows/deploy-pages-public.yml`
-- Use this only if you explicitly want Pages to mirror Firebase Hosting route structure from `public/`.
+## 2. Firebase Dependencies Still Required
 
-### 1.3 `WorldExplorer3D` mirror repository (branch-root mode)
+Even on GitHub Pages, these remain required:
 
-- Repository: `https://github.com/RRG314/WorldExplorer3D.git`
-- Branch model for root hosting: branch root (`/`) contains runnable site files
-- Pages source can remain branch-root based, or use existing Pages workflow that uploads `path: .`
+- Firebase Auth
+- Firestore
+- Cloud Functions
+- Stripe webhook + prices
 
-Use this mode when you want a branch that runs directly from repository root with no `public/` prefix.
+Ensure Firebase Auth authorized domain includes:
 
-## 2. Firebase + Stripe Requirements (All Modes)
+- `rrg314.github.io`
 
-Static hosting can be GitHub Pages, but auth/billing still depend on Firebase/Stripe:
+## 3. Cloud Functions Deployment
 
-1. Firebase Auth authorized domains must include your Pages host:
-   - `rrg314.github.io`
-2. Frontend Firebase config must load (`window.WORLD_EXPLORER_FIREBASE`).
-3. Cloud Functions must be deployed from the latest branch code:
-   - `createCheckoutSession`
-   - `createPortalSession`
-   - `stripeWebhook`
-4. Stripe webhook destination remains:
-   - `https://us-central1-worldexplorer3d-d9b83.cloudfunctions.net/stripeWebhook`
-
-## 3. Required One-Time Command After Billing Changes
-
-Run from this repository after function changes:
+After backend changes:
 
 ```bash
 cd "/Users/stevenreid/Documents/New project"
-git checkout codex/github-pages-compat
 firebase use worldexplorer3d-d9b83
 firebase deploy --only functions
 ```
 
-## 4. Cache/Path Troubleshooting
+## 4. Firestore Deployment
 
-### Symptom
+```bash
+firebase deploy --only firestore:rules
+firebase deploy --only firestore:indexes
+```
 
-Console shows 404s for stale paths like:
+## 5. Pages Validation Checklist
 
-- `/WorldExplorer/js/app-entry.js?v=54`
-- `/WorldExplorer/js/*.js`
+After publish:
 
-### Cause
+1. Root page loads with no module 404s.
+2. App starts and game modes open.
+3. PaintTown controls:
+   - `Ctrl` fires paintball
+   - right-click camera hold works
+   - double-left-click does not toggle camera mode
+4. Multiplayer panel opens and room actions work.
+5. Account page loads and shows profile/plan/receipt/friends sections.
 
-Browser cached older loader paths while the app moved to `/app/js/`.
+## 6. Cache Troubleshooting
 
-### Mitigation now in repo
+If you see stale JS path errors:
 
-Compatibility bridge files in `public/js/`:
-
-- `bootstrap.js`
-- `app-entry.js`
-- `modules/manifest.js`
-- `modules/script-loader.js`
-
-These bridge stale cache paths to `/app/js/` until user cache is refreshed.
-
-### Client-side recovery
-
-1. Hard refresh (`Cmd+Shift+R`)
-2. If needed, clear site data for `rrg314.github.io`
-
-## 5. Validation Checklist
-
-After each GitHub deploy:
-
-1. Root URL loads and renders start/title UI with no module 404s.
-2. `Settings -> Photoreal Buildings (Beta)` toggle is visible and persists after refresh.
-3. Auth/account button visible on title screen only; hidden during gameplay.
-4. Billing flow still redirects to Stripe (for enabled plans/config).
-5. Legal and account links resolve for the selected deployment mode (`/` root mode or `/account/`/`/legal/*` in `public/` mode).
+1. Hard refresh (`Ctrl+F5` or `Cmd+Shift+R`).
+2. Clear site data for the GitHub Pages domain.
+3. Re-open the page.

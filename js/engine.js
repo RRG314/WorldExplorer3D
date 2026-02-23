@@ -2307,17 +2307,7 @@ function init() {
   let lastMouseX = 0;
   let lastMouseY = 0;
   let mouseActive = false;
-  window.walkMouseLookActive = false; // Toggled by double-click in walking mode
-
-  // Double-click to toggle mouse look in walking mode
-  addEventListener('dblclick', (e) => {
-    if (!appCtx.gameStarted) return;
-    if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
-      window.walkMouseLookActive = !window.walkMouseLookActive;
-      lastMouseX = e.clientX;
-      lastMouseY = e.clientY;
-    }
-  });
+  window.walkMouseLookActive = false;
 
   addEventListener('mousedown', (e) => {
     if (!appCtx.gameStarted) return;
@@ -2358,7 +2348,7 @@ function init() {
   addEventListener('mousemove', (e) => {
     if (!appCtx.gameStarted) return;
 
-    // Walking mode: respond to double-click toggle OR right-click hold
+    // Walking mode: respond to right-click/middle-click hold
     const walkLookActive = appCtx.Walk && appCtx.Walk.state.mode === 'walk' && window.walkMouseLookActive;
     if (!mouseActive && !walkLookActive) return;
 

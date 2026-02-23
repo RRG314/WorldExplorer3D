@@ -1,222 +1,151 @@
 # API and Service Setup Guide
 
-Last reviewed: 2026-02-16
+Last reviewed: 2026-02-23
 
-This guide covers all external services used by the current deployment.
+Setup checklist for Firebase, Firestore, and Stripe used by the current platform.
 
-## 1. Firebase Services
+## 1. Firebase Project
 
-### 1.1 Hosting
+```bash
+firebase login
+firebase use worldexplorer3d-d9b83
+```
 
-Configured via `firebase.json`.
+## 2. Authentication
 
-- Hosting root: `public/`
-- Function rewrites for billing endpoints
-- Legal route rewrites
+Enable providers in Firebase Console:
 
-### 1.2 Auth
+- Email/Password
+- Google
 
-Enable in Firebase Console -> Authentication -> Sign-in method:
-
-- `Email/Password`
-- `Google`
-
-Also add authorized domain(s) for GitHub Pages testing/deploy:
+For GitHub Pages testing, ensure authorized domain includes:
 
 - `rrg314.github.io`
 
-### 1.3 Firestore
+## 3. Firestore
 
-Collections used:
+### 3.1 Deploy rules and indexes
 
-- `users`
-- `flowerLeaderboard`
-
-Rules file: `/Users/stevenreid/Documents/New project/firestore.rules`
-
-## 2. Frontend Firebase Config
-
-Current project config is stored in:
-
-- `/Users/stevenreid/Documents/New project/public/js/firebase-project-config.js`
-
-It sets:
-
-```js
-window.WORLD_EXPLORER_FIREBASE = {
-  apiKey,
-  authDomain,
-  projectId,
-  appId,
-  storageBucket,
-  messagingSenderId
-};
+```bash
+firebase deploy --only firestore:rules
+firebase deploy --only firestore:indexes
 ```
 
-Fallback storage key supported by runtime:
+### 3.2 Active collections
+
+- `users`
+- `rooms`
+- `flowerLeaderboard`
+- `paintTownLeaderboard`
+- `activityFeed`
+- `explorerLeaderboard`
+
+Room subcollections:
+
+- `players`
+- `chat`
+- `chatState`
+- `artifacts`
+- `paintClaims`
+- `state`
+
+User subcollections:
+
+- `friends`
+- `recentPlayers`
+- `incomingInvites`
+
+### 3.3 TTL policies (recommended)
+
+Create TTL policies on `expiresAt` for collection groups:
+
+- `players`
+- `chat`
+- `chatState`
+- `incomingInvites`
+- `recentPlayers`
+- `activityFeed`
+- `artifacts`
+
+Important: TTL is asynchronous cleanup. Client-side stale filtering is still required for real-time UX.
+
+## 4. Frontend Firebase Config
+
+Set web config in:
+
+- `public/js/firebase-project-config.js`
+
+Runtime expects:
+
+- `apiKey`
+- `authDomain`
+- `projectId`
+- `appId`
+- optional: `storageBucket`, `messagingSenderId`
+
+Fallback key (local override):
 
 - `worldExplorer3D.firebaseConfig`
 
-## 3. Stripe Setup
+## 5. Stripe Setup
 
-### 3.1 Create products/prices
+### 5.1 Products/prices
 
-Stripe Dashboard -> Products:
+Create recurring monthly prices:
 
-- Supporter product, recurring monthly price `$1`
-- Pro product, recurring monthly price `$5`
+- Supporter (`$1`)
+- Pro (`$5`)
 
-Copy price IDs (`price_...`), not product IDs (`prod_...`).
+### 5.2 Webhook endpoint
 
-### 3.2 Create webhook destination
+- `https://us-central1-worldexplorer3d-d9b83.cloudfunctions.net/stripeWebhook`
 
-Stripe Workbench -> Webhooks -> Create destination:
+Subscribe to:
 
-- Endpoint URL:
-  - `https://us-central1-worldexplorer3d-d9b83.cloudfunctions.net/stripeWebhook`
-- Payload style: `Snapshot`
-- Events:
-  - `checkout.session.completed`
-  - `customer.subscription.created`
-  - `customer.subscription.updated`
-  - `customer.subscription.deleted`
+- `checkout.session.completed`
+- `customer.subscription.created`
+- `customer.subscription.updated`
+- `customer.subscription.deleted`
 
-Copy signing secret (`whsec_...`).
-
-### 3.3 Set function config values
+### 5.3 Function runtime config
 
 ```bash
-cd "/Users/stevenreid/Documents/New project"
 firebase experiments:enable legacyRuntimeConfigCommands
 firebase functions:config:set \
-  stripe.secret="sk_test_or_live_..." \
+  stripe.secret="sk_live_or_test_..." \
   stripe.webhook="whsec_..." \
   stripe.price_supporter="price_..." \
   stripe.price_pro="price_..."
 firebase deploy --only functions
 ```
 
-Check values:
+## 6. Function Endpoints
+
+Authenticated endpoints:
+
+- `POST /createCheckoutSession`
+- `POST /createPortalSession`
+- `POST /startTrial`
+- `POST /enableAdminTester`
+- `GET /getAccountOverview`
+- `GET /listBillingReceipts`
+- `POST /updateAccountProfile`
+
+Public endpoint:
+
+- `POST /stripeWebhook`
+
+## 7. Validation Commands
+
+Rules tests:
 
 ```bash
-firebase functions:config:get
+npm test
 ```
 
-Do not keep placeholders like `...` or `REAL`.
-
-## 4. Function Endpoint Contracts
-
-### `POST /createCheckoutSession`
-
-Auth: bearer Firebase ID token required.
-
-Request body:
-
-```json
-{ "plan": "supporter" }
-```
-
-or
-
-```json
-{ "plan": "pro" }
-```
-
-Optional field for GitHub Pages/subpath return routing:
-
-```json
-{ "returnUrlBase": "https://rrg314.github.io/WorldExplorer" }
-```
-
-Success response:
-
-```json
-{ "url": "https://checkout.stripe.com/..." }
-```
-
-### `POST /createPortalSession`
-
-Auth: bearer Firebase ID token required.
-
-Request body:
-
-```json
-{}
-```
-
-Optional field for GitHub Pages/subpath return routing:
-
-```json
-{ "returnUrlBase": "https://rrg314.github.io/WorldExplorer" }
-```
-
-Success response:
-
-```json
-{ "url": "https://billing.stripe.com/..." }
-```
-
-### `POST /stripeWebhook`
-
-Public endpoint called by Stripe.
-
-- Validates `stripe-signature`
-- Applies plan updates in Firestore
-
-## 5. Optional Real Estate APIs (Legacy Feature Layer)
-
-The runtime still supports optional client-side property APIs.
-
-Supported keys (stored client-side if used):
-
-- `rentcastApiKey`
-- `attomApiKey`
-- `estatedApiKey`
-
-These are optional and not required for auth/billing.
-
-## 6. Troubleshooting
-
-### `Unable to create checkout session.`
-
-Likely causes:
-
-- invalid `stripe.secret`
-- missing `stripe.price_supporter`/`stripe.price_pro`
-- auth token not present
-
-Check:
+Function logs:
 
 ```bash
 firebase functions:log --only createCheckoutSession -n 50
-```
-
-### Stripe auth error `Invalid API Key provided`
-
-- wrong key mode (test vs live)
-- placeholder value stored
-
-### Webhook not updating plan
-
-Check:
-
-- webhook endpoint URL correctness
-- webhook event list includes all 4 required events
-- `stripe.webhook` signing secret matches destination
-
-Then inspect logs:
-
-```bash
 firebase functions:log --only stripeWebhook -n 50
 ```
-
-## 7. Required Near-Term Migration
-
-Current functions use `functions.config()`.
-
-Before March 2026, migrate to Firebase Params/Secret Manager:
-
-- `stripe.secret`
-- `stripe.webhook`
-- `stripe.price_supporter`
-- `stripe.price_pro`

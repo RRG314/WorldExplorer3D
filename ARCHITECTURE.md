@@ -1,220 +1,139 @@
 # Architecture
 
-Last reviewed: 2026-02-19
+Last reviewed: 2026-02-23
 
-This document describes the current deployed architecture in the `WorldExplorer` repository.
+This document describes the current platform architecture for gameplay, multiplayer, account, and billing.
 
-## 1. Platform Topology
+## 1. System Topology
 
-World Explorer is split into static frontend pages plus server-side billing functions.
+### Frontend surfaces
 
-### Frontend (Firebase Hosting)
+- Root runtime: `index.html` + `js/*` (GitHub Pages branch-root)
+- Firebase/public runtime: `public/app/index.html` + `public/app/js/*`
+- Landing/marketing: `public/index.html`
+- Account: `public/account/index.html`
 
-- `/` (`public/index.html`): marketing + pricing + trial CTA
-- `/app/` (`public/app/index.html`): WebGL runtime
-- `/account/` (`public/account/index.html`): plan management + billing actions
-- `/legal/privacy`, `/legal/terms`: subscription-required legal pages
+### Backend services
 
-### Backend (Firebase Functions, 1st Gen, `us-central1`)
+- Firebase Authentication
+- Cloud Firestore (rules + indexes + TTL)
+- Firebase Cloud Functions (`functions/index.js`)
+- Stripe (Checkout, Billing Portal, Webhooks)
+
+## 2. Runtime Layers
+
+### Gameplay runtime
+
+- 3D engine and modes in `game.js`, `engine.js`, and related modules
+- PaintTown subsystem with touch + paintball projectile pipeline
+- Mode/rule sync hooks exposed through shared context APIs
+
+### Multiplayer runtime modules
+
+Under `public/app/js/multiplayer/`:
+
+- `rooms.js`: room create/join/leave/listening and deterministic room seed helpers
+- `presence.js`: heartbeat pose updates and player listeners
+- `chat.js`: room chat send/listen/report helpers
+- `ghosts.js`: ghost markers in world scene
+- `painttown.js`: multiplayer PaintTown state sync
+- `artifacts.js`: shared artifacts and home-base state helpers
+- `social.js`: friends, invites, recent players
+- `ui-room.js`: room panel, chat drawer, social UI wiring
+- `loop.js`: orchestration
+
+## 3. Firestore Data Domains
+
+Top-level collections:
+
+- `users/{uid}`
+- `rooms/{roomId}`
+- `flowerLeaderboard/{entryId}`
+- `paintTownLeaderboard/{entryId}`
+- `activityFeed/{entryId}`
+- `explorerLeaderboard/{uid}`
+
+Room subcollections:
+
+- `players/{uid}`
+- `chat/{msgId}`
+- `chatState/{uid}`
+- `artifacts/{artifactId}`
+- `paintClaims/{claimId}`
+- `state/homeBase`
+
+User subcollections:
+
+- `friends/{friendUid}`
+- `recentPlayers/{otherUid}`
+- `incomingInvites/{inviteId}`
+
+## 4. Security Architecture (Firestore Rules)
+
+Key rule guarantees:
+
+- auth required for protected reads/writes
+- room visibility + membership enforced per room read
+- multiplayer entitlement gate (`trial/supporter/pro`)
+- room create quota checked using user counters
+- owner/mod boundaries for room-managed resources
+- presence write throttle (`respectsPresenceWriteThrottle`)
+- chat content and state transition validation
+- invite sender/receiver ownership validation
+- leaderboard write constraints
+
+## 5. Billing and Account API Architecture
+
+Cloud Functions (`us-central1`):
 
 - `createCheckoutSession`
 - `createPortalSession`
+- `startTrial`
+- `enableAdminTester`
+- `getAccountOverview`
+- `listBillingReceipts`
+- `updateAccountProfile`
 - `stripeWebhook`
 
-### Data (Firestore)
+Account page consumes these APIs and merges with auth + Firestore state for:
 
-- `users/{uid}` for plan/trial/entitlements/subscription references
-- `flowerLeaderboard/{entryId}` for challenge leaderboard
+- profile identity data
+- plan/trial/quota status
+- receipts
+- friends/invites actions
 
-## 2. Directory Architecture
+## 6. PaintTown Input Architecture
 
-```text
-public/
-  index.html
-  app/index.html
-  account/index.html
-  legal/privacy.html
-  legal/terms.html
-  assets/landing/*
-  assets/landing/gameplay/*
-  js/
-    firebase-init.js
-    firebase-project-config.js
-    auth-ui.js
-    entitlements.js
-    billing.js
-functions/
-  index.js
-  package.json
-firebase.json
-.firebaserc
-firestore.rules
-firestore.indexes.json
-```
+Current behavior:
 
-## 3. Hosting Routing Model
+- paintball fire key: `ControlLeft` / `ControlRight` (`Ctrl`)
+- no right-click paint firing
+- left click/touch obeys tool/rule mode
+- right/middle click hold controls camera
+- double-click camera toggle removed
 
-Configured in `firebase.json`:
+This behavior is synchronized in both runtime code paths:
 
-- Static pages/assets served from `public/`
-- Function rewrites:
-  - `/createCheckoutSession` -> `createCheckoutSession`
-  - `/createPortalSession` -> `createPortalSession`
-  - `/stripeWebhook` -> `stripeWebhook`
-- Legal convenience rewrites:
-  - `/legal/privacy` -> `/legal/privacy.html`
-  - `/legal/terms` -> `/legal/terms.html`
+- `public/app/js/game.js` and `public/app/js/engine.js`
+- `js/game.js` and `js/engine.js`
 
-Caching model:
+## 7. Performance and Cleanup Controls
 
-- static assets: immutable 1 year
-- HTML: short cache (`max-age=300`)
+- presence writes throttled (2s+)
+- movement/pose updates gated by thresholds + interval
+- chat query bounded (latest window)
+- paintball and splat arrays capped with TTL-style client cleanup
+- Firestore TTL for expiring collections (`expiresAt` field)
 
-### 3.1 GitHub Pages Mirror Mode
+## 8. Deployment Architecture
 
-The project also supports GitHub Pages publication from `public/` via:
+### GitHub Pages
 
-- `.github/workflows/deploy-pages-public.yml`
-- branch: `codex/github-pages-compat`
+- Branch-root mode serves root runtime directly.
 
-In this mode:
+### Firebase Hosting
 
-- route structure remains `/`, `/app/`, `/account/`, `/legal/*`
-- Firebase Functions still handle checkout/portal/webhook endpoints
-- frontend `billing.js` resolves direct function origin for non-Firebase-hosting domains
+- Serves `public/` with route split (`/`, `/app/`, `/account/`, legal pages)
+- Rewrites function endpoints to Cloud Functions where configured
 
-### 3.2 GitHub Pages Branch-Root Mode
-
-For branch-root Pages deployments (`Deploy from a branch`, `/ (root)`):
-
-- runtime entrypoint is root `index.html`
-- runtime modules are root `js/*`
-- Firebase-hosted `public/app/*` behavior remains unchanged unless separately deployed
-- root runtime now includes `Photoreal Buildings (Beta)` settings control backed by local storage key `worldExplorerPhotorealBuildings`
-
-## 4. Identity and Entitlements Flow
-
-### 4.1 Auth
-
-Auth providers are Firebase Authentication.
-
-Frontend path:
-
-- `public/js/auth-ui.js` handles Email/Password and Google sign-in
-- App listens to auth state in `/app/` and `/account/`
-
-### 4.2 Trial creation
-
-On first sign-in:
-
-- `ensureEntitlements(user)` creates `users/{uid}` if missing
-- default plan = `trial`
-- `trialEndsAt = now + 48h`
-
-### 4.3 Expiration handling
-
-On entitlements resolution/subscription refresh:
-
-- if trial expired and no active subscription, state downgrades to `free`
-
-### 4.4 Plan gates
-
-- `free`: core exploration only; no cloud sync, no Pro UI
-- `trial`/`supporter`: full access, no Pro-only perks
-- `pro`: full access + early demo/contact/feature flags
-
-## 5. Billing Architecture
-
-### 5.1 Checkout
-
-1. User clicks upgrade in `/account/`
-2. Frontend `billing.js` calls `/createCheckoutSession` with bearer token
-3. Function validates user, resolves Stripe customer, creates subscription checkout session
-4. Frontend redirects browser to Stripe Checkout URL
-
-### 5.2 Billing Portal
-
-1. User clicks `Manage Billing`
-2. Frontend calls `/createPortalSession`
-3. Function creates Stripe billing portal session for linked customer
-4. Browser redirects to Stripe portal
-
-### 5.3 Webhooks
-
-`stripeWebhook` verifies `stripe-signature` then processes:
-
-- `checkout.session.completed`
-- `customer.subscription.created`
-- `customer.subscription.updated`
-- `customer.subscription.deleted`
-
-Function writes canonical subscription state to `users/{uid}`.
-
-## 6. Firestore Model (Current)
-
-### `users/{uid}`
-
-Typical fields:
-
-- `uid`
-- `email`
-- `displayName`
-- `plan`
-- `subscriptionStatus`
-- `trialEndsAt`
-- `entitlements`
-- `stripeCustomerId`
-- `stripeSubscriptionId`
-- `createdAt`
-- `updatedAt`
-
-### `flowerLeaderboard/{entryId}`
-
-- public-read leaderboard entries for challenge mode
-- writes require authenticated user
-
-### Paint challenge leaderboard behavior
-
-- Runtime challenge logic supports a `paintTownLeaderboard` collection path.
-- On this branch, Firestore rules explicitly allow `flowerLeaderboard` writes and
-  paint leaderboard cloud writes may fall back to local storage behavior.
-
-## 7. Runtime UI Architecture (App)
-
-In `/app/`:
-
-- Left floating auth control is the auth/account surface.
-- Pro panel is informational for non-Pro and auto-hides after ~4.5s.
-- Top-center plan/account HUD has been removed to avoid title overlap.
-- Title-screen `Game Mode` options currently include:
-  - Free Roam
-  - Time Trial
-  - Checkpoints
-  - Paint the Town Red
-  - Police Chase
-  - Find the Flower
-- Paint mode HUD presents timer + painted building count for a fixed 2-minute run.
-- Build mode blocks are integrated into both vehicle and walking collision paths.
-
-## 8. Security Boundaries
-
-- Firebase Auth token required for checkout/portal functions.
-- Stripe secret/webhook secret are server-side only.
-- Frontend never stores Stripe secret keys.
-- Firestore rules restrict `users/{uid}` to owner-only read/write.
-
-## 9. Operational Constraints
-
-- Functions currently use `functions.config().stripe.*`.
-- Firebase has announced runtime-config deprecation (March 2026).
-- Node 20 runtime deprecation warning is active.
-
-Required planned work:
-
-1. migrate to Firebase Params/Secret Manager
-2. move functions runtime to Node 22
-
-## 10. Legacy/Reference Artifacts
-
-Root-level runtime files (`index.html`, `js/`, `styles.css`) are used for branch-root Pages mode.
-Firebase-hosted production behavior continues to use `public/app/index.html`.
+Both rely on the same Firebase project config and backend services.

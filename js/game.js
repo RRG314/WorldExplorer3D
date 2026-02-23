@@ -1355,6 +1355,7 @@ function ensurePaintTownState() {
       roomSeed: null,
       remoteSyncRevision: 0,
       lastShotAtMs: 0,
+      ctrlFireLatched: false,
       hudBound: false,
       hudExpanded: false,
       hudRenderSig: '',
@@ -1395,6 +1396,7 @@ function ensurePaintTownState() {
     getPreferredPaintTownColor()
   );
   appCtx.paintTown.activeTool = String(appCtx.paintTown.activeTool || '').toLowerCase() === 'touch' ? 'touch' : 'gun';
+  appCtx.paintTown.ctrlFireLatched = appCtx.paintTown.ctrlFireLatched === true;
   appCtx.paintTown.hudExpanded = appCtx.paintTown.hudExpanded === true;
   appCtx.paintTown.hudRenderSig = String(appCtx.paintTown.hudRenderSig || '');
   return appCtx.paintTown;
@@ -1915,7 +1917,7 @@ function updatePaintTownHud(message = '', options = {}) {
       `<div style="font-weight:600">Time: ${timeText} • Buildings: ${countText}</div>` +
       `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px">${toolButtons}</div>` +
       `<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:7px"><span style="font-size:11px;color:#cbd5e1">Color:</span>${colorButtons}<span style="font-size:11px;color:#cbd5e1">(${selectedColorName})</span></div>` +
-      `<div style="margin-top:6px;color:#cbd5e1;font-size:11px">Gun shots arc with gravity. Aim higher for far targets.</div>` +
+      `<div style="margin-top:6px;color:#cbd5e1;font-size:11px">Press Ctrl (Control) to fire paintballs. Gun shots arc with gravity, so aim higher for far targets.</div>` +
       (hint ? `<div style="margin-top:4px;color:#cbd5e1;font-size:11px">${hint}</div>` : '');
   }
 
@@ -2087,9 +2089,17 @@ function projectPaintTownRay(clientX, clientY) {
 
 function shouldIgnorePaintTownInput(eventTarget) {
   if (!(eventTarget instanceof Element)) return false;
-  return !!eventTarget.closest(
+  const blocker = eventTarget.closest(
     '#titleScreen, #roomPanelModal, #largeMap, #propertyPanel, #propertyModal, #historicPanel, #pauseScreen, #resultScreen, #caughtScreen, #flowerChallengePanel, #gameShareMenu, #controlsTab, #settings-menu, #memoryComposer, #memoryPanel, #paintTownHud'
   );
+  if (!blocker) return false;
+
+  // Do not block gameplay when focus remains on a hidden title/menu element.
+  if (blocker.classList.contains('hidden')) return false;
+  if (blocker.hasAttribute('hidden')) return false;
+  const style = globalThis.getComputedStyle ? globalThis.getComputedStyle(blocker) : null;
+  if (style && (style.display === 'none' || style.visibility === 'hidden')) return false;
+  return true;
 }
 
 function ensurePaintTownInputBindings() {
@@ -2102,14 +2112,13 @@ function ensurePaintTownInputBindings() {
     if (!paintState.active || appCtx.paused || !appCtx.gameStarted || appCtx.gameMode !== 'painttown') return;
     if (appCtx.worldLoading) return;
     if (shouldIgnorePaintTownInput(event.target)) return;
-    if (event instanceof MouseEvent && event.button !== 0 && event.button !== 2) return;
+    if (event instanceof MouseEvent && event.button !== 0) return;
 
     const canTouch = paintTownAllowsTouch();
     const canGun = paintTownAllowsGun();
     const pointerType = String(event.pointerType || '').toLowerCase();
     const isPrimaryTap = pointerType === 'touch' || pointerType === 'pen' || !(event instanceof MouseEvent) || event.button === 0;
-    const isAltFire = event instanceof MouseEvent && event.button === 2;
-    const useGun = paintState.activeTool === 'gun' || isAltFire;
+    const useGun = paintState.activeTool === 'gun';
 
     if (!useGun && canTouch && isPrimaryTap) {
       const touched = tryTouchPaintAt(event.clientX, event.clientY);
@@ -2133,6 +2142,21 @@ function ensurePaintTownInputBindings() {
     if (event.repeat) return;
 
     const key = String(event.key || '').toLowerCase();
+    const code = String(event.code || '');
+    const isCtrlFireKey =
+      key === 'control' ||
+      key === 'ctrl' ||
+      code === 'ControlLeft' ||
+      code === 'ControlRight' ||
+      code === 'Control';
+    if (isCtrlFireKey) {
+      if (!paintTownAllowsGun()) return;
+      const cx = window.innerWidth * 0.5;
+      const cy = window.innerHeight * 0.5;
+      if (firePaintball(cx, cy)) event.preventDefault();
+      return;
+    }
+
     if (key === 'g' || key === 'p') {
       if (!paintTownAllowsGun()) return;
       const cx = window.innerWidth * 0.5;
@@ -2609,6 +2633,16 @@ function updateMode(dt) {
   }
   if (appCtx.gameMode === 'painttown') {
     const state = ensurePaintTownState();
+    const ctrlHeld = !!(appCtx.keys?.ControlLeft || appCtx.keys?.ControlRight);
+    if (state.active && ctrlHeld && !state.ctrlFireLatched && paintTownAllowsGun()) {
+      const cx = window.innerWidth * 0.5;
+      const cy = window.innerHeight * 0.5;
+      state.ctrlFireLatched = firePaintball(cx, cy);
+    }
+    if (!ctrlHeld) {
+      state.ctrlFireLatched = false;
+    }
+
     if (state.active) updatePaintballProjectiles(dt);
     if (state.active) {
       const durationSec = normalizePaintDurationSec(state.rules?.paintTimeLimitSec);

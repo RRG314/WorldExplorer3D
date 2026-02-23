@@ -1,164 +1,105 @@
 # User Guide
 
-Last reviewed: 2026-02-19
+Last reviewed: 2026-02-23
 
-This guide is for players and subscribers using the hosted World Explorer experience.
+This guide covers current player-facing behavior for app, multiplayer, and account pages.
 
-## 1. Where to Start
+## 1. Start and Sign In
 
-Firebase-hosted URLs:
+- Main app: `/app/`
+- Account page: `/account/`
+- Sign in with Email/Password or Google.
 
-- Landing page: `https://worldexplorer3d-d9b83.web.app/`
-- Play runtime: `https://worldexplorer3d-d9b83.web.app/app/`
-- Account/billing: `https://worldexplorer3d-d9b83.web.app/account/`
+## 2. Plans and Multiplayer Access
 
-GitHub Pages URLs:
+- `Free`: multiplayer locked.
+- `Trial` (2 days): multiplayer unlocked temporarily.
+- `Supporter`: multiplayer unlocked, room create limit `3`.
+- `Pro`: multiplayer unlocked, room create limit `10`, extras messaging.
 
-- Branch-root mode: `https://rrg314.github.io/WorldExplorer/` (root runtime)
-- `public/` mode (if configured): `https://rrg314.github.io/WorldExplorer/app/` and `.../account/`
+Free users can start trial from account flow and eligible invite flow.
 
-## 2. Sign In and Trial
+## 3. Profile and Account Data
 
-On `/app/`, use the top-left `Sign In / Sign Up` button.
+Account page includes:
 
-Available login methods:
+- Username (display name) edit/save
+- Linked email + verification state
+- Account UID and auth providers
+- Plan and trial status
+- Room quota usage
+- Billing status and Stripe receipts
+- Friends list and incoming invites
 
-- Email/password
-- Google
+## 4. Friends and Invites
 
-Trial behavior:
+From account page:
 
-- First successful sign-in creates a 2-day trial automatically
-- Trial is no-card-required
-- Trial gives full access equivalent to Supporter, without Pro-only perks
+1. Add friend using their account UID.
+2. Enter room code and optional message.
+3. Send invite to friend.
+4. Invitee opens invite link to jump into room flow.
 
-## 3. Plan Levels
+Users can remove friends and dismiss/mark invites.
 
-### Free
+## 5. Multiplayer Room Flow
 
-- Core exploration available
-- Cloud sync disabled
-- Pro-only controls hidden/locked
+In Multiplayer tab:
 
-### Supporter ($1/month)
+- Create room (private/public, optional name, optional location tag)
+- Join by room code or invite link
+- Share invite link
+- Leave room
+- Open room panel and chat
 
-- Full app access
-- Cloud sync entitlement enabled
-- Supports ongoing development
+Room settings support owner-managed updates and optional public discovery fields.
 
-### Pro ($5/month)
+## 6. Game Modes
 
-- Everything in Supporter
-- Early-access demo controls
-- Priority contact/feature consideration entitlements
+- Free Roam
+- Time Trial
+- Checkpoints
+- Paint the Town
+- Police Chase
+- Find the Flower
 
-## 4. Upgrading and Billing
+## 7. Paint the Town Controls
 
-Use `/account/` to:
+### Minimal HUD
 
-- upgrade to Supporter
-- upgrade to Pro
-- open Stripe billing portal
-- sign out
+Collapsed HUD shows:
 
-Checkout flow:
+- Remaining time
+- Painted buildings count
 
-1. click upgrade button
-2. app redirects to Stripe Checkout
-3. complete purchase
-4. Stripe webhook updates your plan in Firestore
-5. account page reflects new plan
+Tap/click HUD to expand advanced controls.
 
-## 5. In-App UI Notes
+### Paint controls
 
-### Auth button
+- Fire paintball from center: `Ctrl`
+- Alternate fire: `G` or `P`
+- Select color: `1-6`
+- Toggle touch/gun tool: `T`
+- Left click/touch: paint interaction based on active tool/rules
 
-- Top-left floating button opens auth/account panel on title screen
-- Clicking outside closes the panel
-- During gameplay, the auth/account button is hidden
+### Camera controls in gameplay
 
-### Pro panel
+- Right-click hold or middle-click hold: camera look
+- Double-left-click camera toggle is disabled
 
-- Non-Pro users see the Pro info panel briefly on load
-- Panel auto-hides after a few seconds
-- Pro users keep access to Pro controls
+## 8. Chat and Safety
 
-### Graphics settings
+Room chat is member-only and filtered by server rules:
 
-- Open `Settings` on the title screen
-- `Photoreal Buildings (Beta)` toggles enhanced building materials
-- Setting is stored in browser local storage (`worldExplorerPhotorealBuildings`)
-- If changed before starting, it applies on next `Explore`
+- message size limits
+- write rate checks
+- membership checks
 
-## 6. Gameplay Controls
-
-### Game Modes (Title Screen -> Game Mode)
-
-- Free Roam: open exploration with no objective timer
-- Time Trial: reach destination before timer expires
-- Checkpoints: collect all checkpoints as quickly as possible
-- Paint the Town Red: 2-minute rooftop challenge; score is buildings painted
-- Police Chase: starts with police pursuit enabled
-- Find the Flower: starts the red-flower challenge immediately
-
-### Desktop
-
-- Move/drive: `WASD` or arrows
-- Brake/space actions: `Space`
-- Boost/sprint: `Ctrl` or `Shift` depending on mode
-- Toggle walk: `F`
-- Toggle drone: `6`
-- Large map: `M`
-- Pause: `Esc`
-
-### Touch/Mobile
-
-Mode-specific touch controls are shown automatically:
-
-- driving
-- walking
-- drone
-- rocket/space flight
-
-Desktop is still recommended for highest performance.
-
-## 7. Challenges, Build Mode, and Memories
-
-- Red-flower challenge supports leaderboard entries (best time).
-- Paint challenge supports leaderboard entries (most buildings painted in 2:00).
-- Challenge panel includes both `Flower` and `Paint` leaderboard tabs.
-- Leaderboards use Firestore when available, with local fallback when unavailable.
-- Build mode supports click-based block placement on world surfaces.
-- Cars collide with placed blocks.
-- Walking character collides with block sides and can stand on top of blocks.
-- Memory markers and several user settings rely on browser storage.
-
-## 8. Privacy and Terms
-
-Required legal pages:
-
-- Privacy: `/legal/privacy`
-- Terms: `/legal/terms`
+Reported/flagged messages are supported by chat state fields.
 
 ## 9. Troubleshooting
 
-### Sign-in panel opens but login fails
-
-Likely Auth provider disabled in Firebase project.
-
-### Upgrade button says checkout session failed
-
-Usually Stripe config mismatch (key mode, invalid key, or missing price IDs).
-
-### Plan does not update after payment
-
-Webhook may not be configured correctly.
-
-### Dangerous site warning in browser
-
-If this appears, do not enter credentials until verified in Search Console/Safe Browsing review and domain reputation checks.
-
-## 10. Support Path
-
-- Pro users get priority contact links from in-app/account surfaces.
-- Feature suggestions can be submitted through the configured issue/contact channels.
+- If multiplayer stays locked: check current plan/trial in account page.
+- If invites fail: verify friend relationship exists first.
+- If receipts missing: refresh receipts on account page and verify Stripe subscription.
+- If room data lags: allow a short delay for snapshot updates and TTL cleanup.
