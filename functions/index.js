@@ -8,6 +8,7 @@ const db = admin.firestore();
 const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
 const ALLOWED_PLANS = new Set(['support', 'supporter', 'pro']);
 const TRIAL_DURATION_MS = 48 * 60 * 60 * 1000;
+const ADMIN_TEST_ROOM_CREATE_LIMIT = 10000;
 const ROOM_CREATE_LIMITS = Object.freeze({
   free: 0,
   trial: 3,
@@ -23,6 +24,46 @@ function stripeConfig() {
     price_supporter: cfg.price_supporter || '',
     price_pro: cfg.price_pro || ''
   };
+}
+
+function adminConfig() {
+  const cfg = functions.config().admin || {};
+  return {
+    allowedEmails: cfg.allowed_emails || process.env.WE3D_ADMIN_EMAILS || '',
+    allowedUids: cfg.allowed_uids || process.env.WE3D_ADMIN_UIDS || ''
+  };
+}
+
+function parseCsvSet(value, normalize = (item) => item) {
+  return new Set(
+    String(value || '')
+      .split(',')
+      .map((part) => normalize(String(part || '').trim()))
+      .filter(Boolean)
+  );
+}
+
+function normalizeEmail(value) {
+  return String(value || '').trim().toLowerCase();
+}
+
+function isAllowlistedAdminCandidate(authUser, uid) {
+  const cfg = adminConfig();
+  const allowedUidSet = parseCsvSet(cfg.allowedUids);
+  if (allowedUidSet.has(String(uid || '').trim())) {
+    return { allowed: true, source: 'uid' };
+  }
+
+  const allowedEmailSet = parseCsvSet(cfg.allowedEmails, normalizeEmail);
+  const email = normalizeEmail(authUser && authUser.email ? authUser.email : '');
+  if (email && allowedEmailSet.has(email)) {
+    if (authUser && authUser.emailVerified === true) {
+      return { allowed: true, source: 'email' };
+    }
+    return { allowed: false, reason: 'Email is allowlisted but not verified yet.' };
+  }
+
+  return { allowed: false, reason: 'Your account is not on the admin allowlist.' };
 }
 
 function getStripeClient() {
@@ -224,7 +265,13 @@ async function ensureUserDoc(uid, email, displayName) {
     const existing = snap.data() || {};
     const plan = normalizePlan(existing.plan);
     const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
-    const roomCreateLimit = roomCreateLimitForPlan(plan);
+    const existingLimit = Number.isFinite(Number(existing.roomCreateLimit))
+      ? Math.max(0, Math.min(10000, Math.floor(Number(existing.roomCreateLimit))))
+      : null;
+    const isAdminOverride = String(existing.subscriptionStatus || '').toLowerCase() === 'admin';
+    const roomCreateLimit = isAdminOverride
+      ? Math.max(existingLimit || 0, ADMIN_TEST_ROOM_CREATE_LIMIT)
+      : roomCreateLimitForPlan(plan);
     await ref.set(
       {
         email: email || existing.email || '',
@@ -292,7 +339,13 @@ async function upsertPlanFromSubscription({ uid, customerId, subscriptionId, sta
   const userSnap = await userRef.get();
   const userData = userSnap.exists ? userSnap.data() || {} : {};
   const roomCreateCount = normalizeRoomCreateCount(userData.roomCreateCount);
-  const roomCreateLimit = roomCreateLimitForPlan(plan);
+  const isAdminOverride = String(userData.subscriptionStatus || '').toLowerCase() === 'admin';
+  const existingLimit = Number.isFinite(Number(userData.roomCreateLimit))
+    ? Math.max(0, Math.min(10000, Math.floor(Number(userData.roomCreateLimit))))
+    : 0;
+  const roomCreateLimit = isAdminOverride
+    ? Math.max(existingLimit, ADMIN_TEST_ROOM_CREATE_LIMIT)
+    : roomCreateLimitForPlan(plan);
 
   await userRef.set(
     {
@@ -519,6 +572,74 @@ exports.startTrial = functions.region('us-central1').https.onRequest(async (req,
   }
 });
 
+exports.enableAdminTester = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const authUser = await admin.auth().getUser(auth.uid);
+    const allowlistResult = isAllowlistedAdminCandidate(authUser, auth.uid);
+    if (!allowlistResult.allowed) {
+      res.status(403).json({
+        error: allowlistResult.reason || 'Account is not allowlisted for admin access.'
+      });
+      return;
+    }
+
+    const existingClaims = authUser.customClaims || {};
+    const nextClaims = {
+      ...existingClaims,
+      admin: true,
+      role: 'admin'
+    };
+    const claimsChanged = existingClaims.admin !== true || existingClaims.role !== 'admin';
+    if (claimsChanged) {
+      await admin.auth().setCustomUserClaims(auth.uid, nextClaims);
+    }
+
+    const existingDoc = await ensureUserDoc(
+      auth.uid,
+      authUser.email || '',
+      authUser.displayName || ''
+    );
+    const roomCreateCount = normalizeRoomCreateCount(existingDoc.roomCreateCount);
+    const roomCreateLimit = ADMIN_TEST_ROOM_CREATE_LIMIT;
+
+    await db.collection('users').doc(auth.uid).set(
+      {
+        uid: auth.uid,
+        email: authUser.email || existingDoc.email || '',
+        displayName: authUser.displayName || existingDoc.displayName || '',
+        plan: 'pro',
+        subscriptionStatus: 'admin',
+        entitlements: planEntitlements('pro'),
+        roomCreateCount,
+        roomCreateLimit,
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      },
+      { merge: true }
+    );
+
+    res.status(200).json({
+      enabled: true,
+      plan: 'pro',
+      subscriptionStatus: 'admin',
+      roomCreateLimit,
+      claimsChanged,
+      allowlistSource: allowlistResult.source
+    });
+  } catch (err) {
+    console.error('[enableAdminTester] failed:', err);
+    res.status(500).json({ error: 'Unable to enable admin test access right now.' });
+  }
+});
+
 exports.getAccountOverview = functions.region('us-central1').https.onRequest(async (req, res) => {
   if (setCors(req, res)) return;
   if (req.method !== 'POST') {
@@ -532,6 +653,7 @@ exports.getAccountOverview = functions.region('us-central1').https.onRequest(asy
   try {
     const userRef = db.collection('users').doc(auth.uid);
     const authUser = await admin.auth().getUser(auth.uid);
+    const customClaims = authUser.customClaims || {};
     const userSnap = await userRef.get();
     const userData = userSnap.exists ? userSnap.data() || {} : {};
 
@@ -542,13 +664,23 @@ exports.getAccountOverview = functions.region('us-central1').https.onRequest(asy
     const stripeCustomerId = userData.stripeCustomerId || null;
     const stripeSubscriptionId = userData.stripeSubscriptionId || null;
     const roomCreateCount = normalizeRoomCreateCount(userData.roomCreateCount);
-    const roomCreateLimit = roomCreateLimitForPlan(plan);
+    const rawRoomCreateLimit = Number.isFinite(Number(userData.roomCreateLimit))
+      ? Math.max(0, Math.min(10000, Math.floor(Number(userData.roomCreateLimit))))
+      : roomCreateLimitForPlan(plan);
+    const isAdmin = customClaims.admin === true ||
+      String(customClaims.role || '').toLowerCase() === 'admin' ||
+      String(userData.subscriptionStatus || '').toLowerCase() === 'admin';
+    const roomCreateLimit = isAdmin
+      ? Math.max(rawRoomCreateLimit, ADMIN_TEST_ROOM_CREATE_LIMIT)
+      : rawRoomCreateLimit;
 
     const overview = {
       uid: auth.uid,
       email: authUser.email || userData.email || '',
       emailVerified: !!authUser.emailVerified,
       displayName: authUser.displayName || userData.displayName || '',
+      isAdmin,
+      role: isAdmin ? 'admin' : 'member',
       providers: Array.isArray(authUser.providerData) ? authUser.providerData.map((p) => p.providerId).filter(Boolean) : [],
       authCreatedAt: authUser.metadata && authUser.metadata.creationTime ? authUser.metadata.creationTime : null,
       authLastSignInAt: authUser.metadata && authUser.metadata.lastSignInTime ? authUser.metadata.lastSignInTime : null,

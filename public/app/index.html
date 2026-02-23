@@ -1861,6 +1861,7 @@ function renderState(state, user) {
   currentState = state || getFreeEntitlementsState();
 
   const plan = currentState.plan || 'free';
+  const adminMode = currentState.isAdmin === true || currentState.subscriptionStatus === 'admin';
   const trialText = plan === 'trial' ? ` (${formatRemainingTrial(currentState) || 'active'})` : '';
 
   const signedIn = !!user;
@@ -1874,14 +1875,16 @@ function renderState(state, user) {
     authUserSummary.textContent = '';
   }
 
-  const isPro = plan === 'pro';
+  const isPro = adminMode || plan === 'pro';
   scheduleProPanelAutoHide(isPro);
   proAccessActions.hidden = !isPro;
   proAccessLinks.hidden = !isPro;
   proAccessState.textContent = isPro ? 'Unlocked' : 'Locked (Pro only)';
   upgradeFromAppBtn.style.display = isPro ? 'none' : 'inline-flex';
 
-  if (isPro) {
+  if (adminMode) {
+    setProStatus('Admin test mode active: Pro and multiplayer features are unlocked.');
+  } else if (isPro) {
     setProStatus('Pro perks enabled: early demos, direct contact, feature suggestions.');
   } else if (plan === 'supporter' || plan === 'trial') {
     setProStatus('Full access active. Upgrade to Pro for early demos and priority communication.');
@@ -1939,7 +1942,7 @@ async function activateTrialFromUrlIfNeeded(user) {
 }
 
 function toggleEarlyDemo(demoKey) {
-  if (currentState.plan !== 'pro') {
+  if (currentState.plan !== 'pro' && currentState.isAdmin !== true) {
     setProStatus('Early demo toggles require Pro.', true);
     return;
   }

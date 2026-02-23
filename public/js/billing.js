@@ -124,3 +124,8 @@ export async function startTrial() {
   const payload = await postFunction('/startTrial', {});
   return payload || {};
 }
+
+export async function enableAdminTester() {
+  const payload = await postFunction('/enableAdminTester', {});
+  return payload || {};
+}

@@ -113,9 +113,11 @@ function formatRelativeTime(value) {
 function readPlanState() {
   const globalState = globalThis.__WE3D_ENTITLEMENTS__ || {};
   const plan = String(globalState.plan || 'free').toLowerCase();
+  const isAdmin = globalState.isAdmin === true || String(globalState.role || '').toLowerCase() === 'admin';
   return {
     plan,
-    planLabel: String(globalState.planLabel || (plan ? plan[0].toUpperCase() + plan.slice(1) : 'Free')),
+    planLabel: String(globalState.planLabel || (isAdmin ? 'Admin' : (plan ? plan[0].toUpperCase() + plan.slice(1) : 'Free'))),
+    isAdmin,
     isAuthenticated: !!globalState.isAuthenticated,
     uid: String(globalState.uid || ''),
     displayName: sanitizeText(globalState.displayName || '', 48)
@@ -123,7 +125,7 @@ function readPlanState() {
 }
 
 function canUseMultiplayer(planState) {
-  return ENABLED_PLANS.has(String(planState?.plan || '').toLowerCase());
+  return planState?.isAdmin === true || ENABLED_PLANS.has(String(planState?.plan || '').toLowerCase());
 }
 
 function copyText(text) {
@@ -735,6 +737,11 @@ function initMultiplayerPlatform() {
   function refreshPlanLabel() {
     if (!refs.titlePlanState) return;
     const plan = state.entitlement.plan;
+    if (state.entitlement.isAdmin === true) {
+      refs.titlePlanState.textContent = 'Admin mode: Multiplayer + Pro features unlocked for live testing.';
+      refs.titlePlanState.classList.remove('warn');
+      return;
+    }
     if (plan === 'pro') {
       refs.titlePlanState.textContent = 'Pro: Multiplayer + Early demos + direct feedback channel.';
       refs.titlePlanState.classList.remove('warn');

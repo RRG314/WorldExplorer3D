@@ -1069,3 +1069,18 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `output/playwright/painttown-physics-check/ingame-painttown-after-tests.png`
 - Firestore security regression rerun:
   - `npm test` => `Security checks complete: 16/16 passed`.
+- Admin security hardening pass (2026-02-22 UTC):
+  - Added secure admin access endpoint in Cloud Functions: `/enableAdminTester`.
+  - Admin activation is allowlist-based (`functions.config().admin.allowed_emails` / `allowed_uids`) and email allowlist requires verified email.
+  - Admin activation applies server-side only (cannot be spoofed client-side):
+    - sets custom claims `{ admin: true, role: 'admin' }`
+    - updates user doc to `plan: pro`, `subscriptionStatus: admin`, `roomCreateLimit: 10000`.
+  - Preserved admin room quota in server profile upkeep paths (`ensureUserDoc` and subscription upserts).
+  - Added account UI control for enablement and status display (`Admin Access` card + `Enable Admin Test Access` button).
+  - Added billing client wrapper `enableAdminTester()` and entitlement/admin-mode UI handling updates.
+  - Multiplayer UI now recognizes admin entitlement payload (`isAdmin`) and updates copy/gating accordingly.
+  - Room creation transaction now uses persisted `roomCreateLimit` from user profile (if present), enabling server-issued elevated limits without client tampering.
+- Validation:
+  - Syntax checks pass for all edited JS files.
+  - Firestore rules regression tests pass: `16/16`.
+  - Paint Town integration test still passes after admin changes.

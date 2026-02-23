@@ -395,11 +395,17 @@
           <p id="roomQuotaLabel" class="value">0 / 0</p>
           <p id="roomQuotaDetail" class="hint">Rooms created from this account.</p>
         </article>
+        <article class="status-item">
+          <span class="label">Admin Access</span>
+          <p id="adminAccessLabel" class="value">Off</p>
+          <p id="adminAccessDetail" class="hint">Allowlist-protected test admin mode.</p>
+        </article>
       </div>
 
       <div class="actions">
         <button id="upgradeSupporterBtn" class="btn-supporter" type="button">Upgrade to Supporter ($1/mo)</button>
         <button id="upgradeProBtn" class="btn-pro" type="button">Upgrade to Pro ($5/mo)</button>
+        <button id="enableAdminBtn" class="btn-ghost" type="button">Enable Admin Test Access</button>
         <button id="manageBillingBtn" class="btn-ghost" type="button">Manage Billing</button>
         <button id="refreshAccountBtn" class="btn-ghost" type="button">Refresh Account Data</button>
         <button id="signOutBtn" class="btn-ghost" type="button">Sign Out</button>
@@ -508,6 +514,7 @@
     import { ensureSignedIn, observeAuth, signOutUser } from '../js/auth-ui.js';
     import { ensureEntitlements, formatRemainingTrial, startTrialIfEligible, subscribeEntitlements } from '../js/entitlements.js';
     import {
+      enableAdminTester,
       getAccountOverview,
       listBillingReceipts,
       redirectToCheckout,
@@ -530,6 +537,7 @@
     const signOutBtn = document.getElementById('signOutBtn');
     const upgradeSupporterBtn = document.getElementById('upgradeSupporterBtn');
     const upgradeProBtn = document.getElementById('upgradeProBtn');
+    const enableAdminBtn = document.getElementById('enableAdminBtn');
     const manageBillingBtn = document.getElementById('manageBillingBtn');
     const refreshAccountBtn = document.getElementById('refreshAccountBtn');
     const saveUsernameBtn = document.getElementById('saveUsernameBtn');
@@ -552,6 +560,8 @@
     const trialDetail = document.getElementById('trialDetail');
     const roomQuotaLabel = document.getElementById('roomQuotaLabel');
     const roomQuotaDetail = document.getElementById('roomQuotaDetail');
+    const adminAccessLabel = document.getElementById('adminAccessLabel');
+    const adminAccessDetail = document.getElementById('adminAccessDetail');
     const friendUidInput = document.getElementById('friendUidInput');
     const friendNameInput = document.getElementById('friendNameInput');
     const addFriendBtn = document.getElementById('addFriendBtn');
@@ -604,7 +614,7 @@
 
     function canUseMultiplayerPlan(plan) {
       const value = String(plan || '').toLowerCase();
-      return value === 'trial' || value === 'support' || value === 'supporter' || value === 'pro';
+      return value === 'trial' || value === 'support' || value === 'supporter' || value === 'pro' || value === 'admin';
     }
 
     function inviteJoinUrl(code) {
@@ -616,7 +626,7 @@
     }
 
     function setBusy(busy) {
-      [signInBtn, signOutBtn, upgradeSupporterBtn, upgradeProBtn, manageBillingBtn, refreshAccountBtn, saveUsernameBtn, refreshReceiptsBtn, addFriendBtn].forEach((btn) => {
+      [signInBtn, signOutBtn, upgradeSupporterBtn, upgradeProBtn, enableAdminBtn, manageBillingBtn, refreshAccountBtn, saveUsernameBtn, refreshReceiptsBtn, addFriendBtn].forEach((btn) => {
         if (!btn) return;
         btn.disabled = busy;
       });
@@ -793,6 +803,8 @@
       customerValue.textContent = 'Customer: not linked.';
       roomQuotaLabel.textContent = '0 / 0';
       roomQuotaDetail.textContent = 'Rooms created from this account.';
+      adminAccessLabel.textContent = 'Off';
+      adminAccessDetail.textContent = 'Allowlist-protected test admin mode.';
       if (friendUidInput) friendUidInput.value = '';
       if (friendNameInput) friendNameInput.value = '';
       if (inviteRoomCodeInput) inviteRoomCodeInput.value = '';
@@ -886,6 +898,7 @@
       const nextBilling = formatDateTime(overview?.nextBillingAtMs);
       const roomCreateCount = Number.isFinite(Number(overview?.roomCreateCount)) ? Math.max(0, Math.floor(Number(overview.roomCreateCount))) : 0;
       const roomCreateLimit = Number.isFinite(Number(overview?.roomCreateLimit)) ? Math.max(0, Math.floor(Number(overview.roomCreateLimit))) : 0;
+      const isAdmin = overview?.isAdmin === true || String(overview?.subscriptionStatus || '').toLowerCase() === 'admin';
 
       usernameValue.textContent = displayName;
       if (document.activeElement !== usernameInput) {
@@ -902,6 +915,14 @@
       roomQuotaDetail.textContent = roomCreateLimit > 0
         ? `You can create ${Math.max(0, roomCreateLimit - roomCreateCount)} more room${roomCreateLimit - roomCreateCount === 1 ? '' : 's'} on this plan.`
         : 'Room creation requires multiplayer trial or paid plan.';
+      adminAccessLabel.textContent = isAdmin ? 'On' : 'Off';
+      adminAccessDetail.textContent = isAdmin
+        ? 'Admin test access is active on this account.'
+        : 'Allowlist-protected test admin mode.';
+      if (enableAdminBtn) {
+        enableAdminBtn.disabled = isAdmin;
+        enableAdminBtn.textContent = isAdmin ? 'Admin Access Active' : 'Enable Admin Test Access';
+      }
     }
 
     function renderSignedOutState() {
@@ -924,7 +945,9 @@
       currentEntitlementState = state || null;
       planLabel.textContent = state.planLabel;
 
-      if (state.plan === 'pro') {
+      if (state.isAdmin === true || state.subscriptionStatus === 'admin') {
+        planDetail.textContent = 'Admin test access active with full multiplayer and elevated room quota.';
+      } else if (state.plan === 'pro') {
         planDetail.textContent = 'Pro perks unlocked, including early demos and priority communication.';
       } else if (state.plan === 'supporter') {
         planDetail.textContent = 'Supporter active with full access and cloud sync.';
@@ -943,9 +966,14 @@
         trialDetail.textContent = 'No trial currently running.';
       }
 
-      upgradeSupporterBtn.disabled = state.plan === 'supporter' || state.plan === 'pro';
-      upgradeProBtn.disabled = state.plan === 'pro';
-      manageBillingBtn.disabled = !(state.stripeCustomerId || state.plan === 'supporter' || state.plan === 'pro');
+      const adminMode = state.isAdmin === true || state.subscriptionStatus === 'admin';
+      upgradeSupporterBtn.disabled = adminMode || state.plan === 'supporter' || state.plan === 'pro';
+      upgradeProBtn.disabled = adminMode || state.plan === 'pro';
+      manageBillingBtn.disabled = adminMode || !(state.stripeCustomerId || state.plan === 'supporter' || state.plan === 'pro');
+      if (enableAdminBtn) {
+        enableAdminBtn.disabled = adminMode;
+        enableAdminBtn.textContent = adminMode ? 'Admin Access Active' : 'Enable Admin Test Access';
+      }
       renderInvites(currentInvites);
     }
 
@@ -1073,6 +1101,23 @@
         await refreshAccountData();
       } catch (err) {
         setStatus(err && err.message ? err.message : 'Could not refresh account data.', 'warn');
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    enableAdminBtn.addEventListener('click', async () => {
+      if (!signedInUser) return;
+      setBusy(true);
+      setStatus('Requesting admin test access...');
+      try {
+        await enableAdminTester();
+        await ensureEntitlements(signedInUser);
+        await refreshAccountData({ silent: true });
+        setStatus('Admin test access enabled. Refresh complete.', 'ok');
+      } catch (err) {
+        console.error('[account] enable admin access failed:', err);
+        setStatus(err && err.message ? err.message : 'Could not enable admin access.', 'warn');
       } finally {
         setBusy(false);
       }

@@ -44,7 +44,8 @@ const ROOM_CREATE_LIMITS_BY_PLAN = Object.freeze({
   trial: 3,
   support: 10,
   supporter: 10,
-  pro: 25
+  pro: 25,
+  admin: 10000
 });
 
 let currentRoom = null;
@@ -79,7 +80,7 @@ function normalizeCode(input) {
 function normalizePlanForLimits(raw) {
   const plan = String(raw || '').toLowerCase();
   if (plan === 'support') return 'supporter';
-  if (plan === 'trial' || plan === 'supporter' || plan === 'pro') return plan;
+  if (plan === 'trial' || plan === 'supporter' || plan === 'pro' || plan === 'admin') return plan;
   return 'free';
 }
 
@@ -311,7 +312,12 @@ async function createRoom(options = {}) {
         const profileSnap = await tx.get(userRef);
         const profile = profileSnap.exists() ? (profileSnap.data() || {}) : {};
         const roomCreateCount = normalizeRoomCreateCount(profile.roomCreateCount);
-        const roomCreateLimit = roomCreateLimitForPlan(profile.plan || 'free');
+        const persistedLimit = Number.isFinite(Number(profile.roomCreateLimit))
+          ? Math.max(0, Math.min(10000, Math.floor(Number(profile.roomCreateLimit))))
+          : null;
+        const roomCreateLimit = persistedLimit == null
+          ? roomCreateLimitForPlan(profile.plan || 'free')
+          : persistedLimit;
 
         if (roomCreateLimit <= 0 || roomCreateCount >= roomCreateLimit) {
           throw new Error('ROOM_CREATE_LIMIT_REACHED');

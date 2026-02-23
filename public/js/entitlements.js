@@ -16,6 +16,7 @@ const ROOM_CREATE_LIMITS = Object.freeze({
   supporter: 10,
   pro: 25
 });
+const ADMIN_TEST_ROOM_CREATE_LIMIT = 10000;
 
 const FREE_ENTITLEMENTS = Object.freeze({
   fullAccess: true,
@@ -124,16 +125,24 @@ function isTrialExpired(profile, nowMs = Date.now()) {
 
 function normalizeProfile(uid, raw = {}) {
   const plan = normalizePlan(raw.plan);
-  const entitlements = raw.entitlements && typeof raw.entitlements === 'object' ?
-    cloneEntitlements({ ...entitlementsForPlan(plan), ...raw.entitlements }) :
-    entitlementsForPlan(plan);
+  const isAdmin = String(raw.subscriptionStatus || '').toLowerCase() === 'admin';
+  const baseEntitlements = entitlementsForPlan(isAdmin ? 'pro' : plan);
+  const entitlements = raw.entitlements && typeof raw.entitlements === 'object'
+    ? cloneEntitlements({ ...baseEntitlements, ...raw.entitlements })
+    : baseEntitlements;
   const roomCreateCount = normalizeRoomCreateCount(raw.roomCreateCount);
-  const roomCreateLimit = roomCreateLimitForPlan(plan);
+  const persistedRoomCreateLimit = Number.isFinite(Number(raw.roomCreateLimit))
+    ? Math.max(0, Math.min(10000, Math.floor(Number(raw.roomCreateLimit))))
+    : roomCreateLimitForPlan(plan);
+  const roomCreateLimit = isAdmin
+    ? Math.max(persistedRoomCreateLimit, ADMIN_TEST_ROOM_CREATE_LIMIT)
+    : persistedRoomCreateLimit;
 
   return {
     uid,
     plan,
-    planLabel: planLabel(plan),
+    planLabel: isAdmin ? 'Admin' : planLabel(plan),
+    isAdmin,
     subscriptionStatus: String(raw.subscriptionStatus || 'none'),
     stripeCustomerId: raw.stripeCustomerId || null,
     stripeSubscriptionId: raw.stripeSubscriptionId || null,
@@ -151,6 +160,7 @@ function freeState() {
     uid: null,
     plan: 'free',
     planLabel: 'Free',
+    isAdmin: false,
     subscriptionStatus: 'none',
     stripeCustomerId: null,
     stripeSubscriptionId: null,
@@ -169,6 +179,8 @@ function broadcastEntitlements(state, user = null) {
     uid: user ? user.uid : null,
     email: user && user.email ? user.email : null,
     displayName: user && user.displayName ? user.displayName : null,
+    isAdmin: !!state.isAdmin,
+    role: state.isAdmin ? 'admin' : 'member',
     plan: state.plan,
     planLabel: state.planLabel,
     subscriptionStatus: state.subscriptionStatus,
@@ -344,11 +356,11 @@ export function getFreeEntitlementsState() {
 }
 
 export function isProPlan(state) {
-  return !!state && state.plan === 'pro';
+  return !!state && (state.plan === 'pro' || state.isAdmin === true);
 }
 
 export function isSupporterOrTrial(state) {
-  return !!state && (state.plan === 'supporter' || state.plan === 'trial' || state.plan === 'pro');
+  return !!state && (state.plan === 'supporter' || state.plan === 'trial' || state.plan === 'pro' || state.isAdmin === true);
 }
 
 export function formatRemainingTrial(state) {
