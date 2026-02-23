@@ -1161,3 +1161,17 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Validation:
     - Playwright check report: `output/playwright/about-page-check/report.json` (`pass: true`, `errors: []`).
     - Screenshot: `output/playwright/about-page-check/about-desktop.png`.
+- Multiplayer permission-denied reliability fix (2026-02-23):
+  - Root cause found in join flow: `joinRoomByCode` always rewrote `role` and `joinedAt`, but Firestore rules require those fields to remain unchanged on player-doc updates.
+  - Updated `public/app/js/multiplayer/rooms.js`:
+    - Added `normalizePlayerRole(...)` helper.
+    - `joinRoomByCode(...)` now reads existing player doc when accessible and preserves `joinedAt` + `role` on rejoin/update writes.
+    - This resolves self-join / rejoin permission-denied cases where player doc already exists.
+  - Added room-create quota write alignment hardening:
+    - Room create transaction now mirrors persisted `roomCreateLimit` when present (uses plan-derived fallback only when missing), matching rules `canConsumeRoomCreateQuota()` requirement that limit stays unchanged.
+  - Validation:
+    - `node --check public/app/js/multiplayer/rooms.js` passed.
+    - `npm test` passed (Firestore rules security suite 16/16).
+    - `node tests/painttown.integration.test.mjs` passed (`output/playwright/painttown-physics-check/report.json`).
+- Multiplayer reliability follow-up (2026-02-23):
+  - `createRoom(...)` owner presence write now also preserves existing `joinedAt` and `role` if an owner player doc already exists (helps avoid update-rule rejection on rare re-used room code/orphan player doc cases).

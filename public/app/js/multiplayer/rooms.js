@@ -95,6 +95,12 @@ function normalizeRoomCreateCount(raw) {
   return Math.max(0, Math.min(10000, Math.floor(parsed)));
 }
 
+function normalizePlayerRole(raw, fallback = 'member') {
+  const role = String(raw || '').toLowerCase();
+  if (role === 'owner' || role === 'mod' || role === 'member') return role;
+  return fallback;
+}
+
 function randomCode() {
   let out = '';
   for (let i = 0; i < ROOM_CODE_LENGTH; i++) {
@@ -318,12 +324,13 @@ async function createRoom(options = {}) {
           ? Math.max(0, Math.min(10000, Math.floor(Number(profile.roomCreateLimit))))
           : null;
         const planLimit = roomCreateLimitForPlan(plan);
+        const baseRoomCreateLimit = persistedLimit == null ? planLimit : persistedLimit;
         const roomCreateLimit = isAdmin
           ? Math.max(
               ROOM_CREATE_LIMITS_BY_PLAN.admin,
-              persistedLimit == null ? ROOM_CREATE_LIMITS_BY_PLAN.admin : persistedLimit
+              baseRoomCreateLimit
             )
-          : planLimit;
+          : baseRoomCreateLimit;
 
         if (roomCreateLimit <= 0 || roomCreateCount >= roomCreateLimit) {
           throw new Error('ROOM_CREATE_LIMIT_REACHED');
@@ -374,14 +381,29 @@ async function createRoom(options = {}) {
   }
 
   const ownerPlayerRef = doc(db, ROOM_COLLECTION, createdCode, PLAYER_COLLECTION, user.uid);
+  let ownerJoinedAt = null;
+  let ownerRole = 'owner';
+  try {
+    const existingOwnerSnap = await getDoc(ownerPlayerRef);
+    if (existingOwnerSnap.exists()) {
+      const existingOwner = existingOwnerSnap.data() || {};
+      if (existingOwner.joinedAt && typeof existingOwner.joinedAt.toMillis === 'function') {
+        ownerJoinedAt = existingOwner.joinedAt;
+      }
+      ownerRole = normalizePlayerRole(existingOwner.role, 'owner');
+    }
+  } catch (err) {
+    if (String(err?.code || '') !== 'permission-denied') throw err;
+  }
+
   try {
     await setDoc(ownerPlayerRef, {
       uid: user.uid,
       displayName,
-      joinedAt: serverTimestamp(),
+      joinedAt: ownerJoinedAt || serverTimestamp(),
       lastSeenAt: serverTimestamp(),
       expiresAt: Timestamp.fromMillis(Date.now() + ROOM_PRESENCE_TTL_MS),
-      role: 'owner',
+      role: ownerRole,
       mode: world.kind === 'space' ? 'space' : world.kind === 'moon' ? 'moon' : 'walk',
       frame: {
         kind: world.kind,
@@ -428,15 +450,31 @@ async function joinRoomByCode(codeInput, options = {}) {
   const displayName = resolveDisplayName(user, options.displayName);
   const roomRef = doc(db, ROOM_COLLECTION, code);
   const playerRef = doc(db, ROOM_COLLECTION, code, PLAYER_COLLECTION, user.uid);
+  let preservedJoinedAt = null;
+  let preservedRole = 'member';
+
+  try {
+    const existingPlayerSnap = await getDoc(playerRef);
+    if (existingPlayerSnap.exists()) {
+      const existingPlayer = existingPlayerSnap.data() || {};
+      if (existingPlayer.joinedAt && typeof existingPlayer.joinedAt.toMillis === 'function') {
+        preservedJoinedAt = existingPlayer.joinedAt;
+      }
+      preservedRole = normalizePlayerRole(existingPlayer.role, 'member');
+    }
+  } catch (err) {
+    // If we cannot read an existing player doc yet, proceed with a create-style payload.
+    if (String(err?.code || '') !== 'permission-denied') throw err;
+  }
 
   try {
     await setDoc(playerRef, {
       uid: user.uid,
       displayName,
-      joinedAt: serverTimestamp(),
+      joinedAt: preservedJoinedAt || serverTimestamp(),
       lastSeenAt: serverTimestamp(),
       expiresAt: Timestamp.fromMillis(Date.now() + ROOM_PRESENCE_TTL_MS),
-      role: 'member',
+      role: preservedRole,
       mode: 'walk',
       frame: {
         kind: 'earth',
