@@ -42,9 +42,9 @@ const VALID_PAINT_TOUCH_MODES = new Set(['off', 'roof', 'any']);
 const ROOM_CREATE_LIMITS_BY_PLAN = Object.freeze({
   free: 0,
   trial: 3,
-  support: 10,
-  supporter: 10,
-  pro: 25,
+  support: 3,
+  supporter: 3,
+  pro: 10,
   admin: 10000
 });
 
@@ -311,13 +311,19 @@ async function createRoom(options = {}) {
         }
         const profileSnap = await tx.get(userRef);
         const profile = profileSnap.exists() ? (profileSnap.data() || {}) : {};
+        const plan = normalizePlanForLimits(profile.plan || 'free');
+        const isAdmin = String(profile.subscriptionStatus || '').toLowerCase() === 'admin';
         const roomCreateCount = normalizeRoomCreateCount(profile.roomCreateCount);
         const persistedLimit = Number.isFinite(Number(profile.roomCreateLimit))
           ? Math.max(0, Math.min(10000, Math.floor(Number(profile.roomCreateLimit))))
           : null;
-        const roomCreateLimit = persistedLimit == null
-          ? roomCreateLimitForPlan(profile.plan || 'free')
-          : persistedLimit;
+        const planLimit = roomCreateLimitForPlan(plan);
+        const roomCreateLimit = isAdmin
+          ? Math.max(
+              ROOM_CREATE_LIMITS_BY_PLAN.admin,
+              persistedLimit == null ? ROOM_CREATE_LIMITS_BY_PLAN.admin : persistedLimit
+            )
+          : planLimit;
 
         if (roomCreateLimit <= 0 || roomCreateCount >= roomCreateLimit) {
           throw new Error('ROOM_CREATE_LIMIT_REACHED');

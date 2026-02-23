@@ -12,8 +12,8 @@ const ADMIN_TEST_ROOM_CREATE_LIMIT = 10000;
 const ROOM_CREATE_LIMITS = Object.freeze({
   free: 0,
   trial: 3,
-  supporter: 10,
-  pro: 25
+  supporter: 3,
+  pro: 10
 });
 
 function stripeConfig() {
@@ -667,12 +667,14 @@ exports.getAccountOverview = functions.region('us-central1').https.onRequest(asy
     const rawRoomCreateLimit = Number.isFinite(Number(userData.roomCreateLimit))
       ? Math.max(0, Math.min(10000, Math.floor(Number(userData.roomCreateLimit))))
       : roomCreateLimitForPlan(plan);
+    const planRoomCreateLimit = roomCreateLimitForPlan(plan);
     const isAdmin = customClaims.admin === true ||
       String(customClaims.role || '').toLowerCase() === 'admin' ||
       String(userData.subscriptionStatus || '').toLowerCase() === 'admin';
+    const allowlistResult = isAllowlistedAdminCandidate(authUser, auth.uid);
     const roomCreateLimit = isAdmin
       ? Math.max(rawRoomCreateLimit, ADMIN_TEST_ROOM_CREATE_LIMIT)
-      : rawRoomCreateLimit;
+      : planRoomCreateLimit;
 
     const overview = {
       uid: auth.uid,
@@ -680,6 +682,7 @@ exports.getAccountOverview = functions.region('us-central1').https.onRequest(asy
       emailVerified: !!authUser.emailVerified,
       displayName: authUser.displayName || userData.displayName || '',
       isAdmin,
+      adminTesterEligible: !!allowlistResult.allowed,
       role: isAdmin ? 'admin' : 'member',
       providers: Array.isArray(authUser.providerData) ? authUser.providerData.map((p) => p.providerId).filter(Boolean) : [],
       authCreatedAt: authUser.metadata && authUser.metadata.creationTime ? authUser.metadata.creationTime : null,

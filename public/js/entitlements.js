@@ -13,8 +13,8 @@ const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
 const ROOM_CREATE_LIMITS = Object.freeze({
   free: 0,
   trial: 3,
-  supporter: 10,
-  pro: 25
+  supporter: 3,
+  pro: 10
 });
 const ADMIN_TEST_ROOM_CREATE_LIMIT = 10000;
 
@@ -134,9 +134,10 @@ function normalizeProfile(uid, raw = {}) {
   const persistedRoomCreateLimit = Number.isFinite(Number(raw.roomCreateLimit))
     ? Math.max(0, Math.min(10000, Math.floor(Number(raw.roomCreateLimit))))
     : roomCreateLimitForPlan(plan);
+  const planRoomCreateLimit = roomCreateLimitForPlan(plan);
   const roomCreateLimit = isAdmin
     ? Math.max(persistedRoomCreateLimit, ADMIN_TEST_ROOM_CREATE_LIMIT)
-    : persistedRoomCreateLimit;
+    : planRoomCreateLimit;
 
   return {
     uid,
@@ -210,20 +211,27 @@ async function ensureUserDoc(user) {
     const existingRoomCreateCount = Number.isFinite(Number(existing.roomCreateCount))
       ? Math.floor(Number(existing.roomCreateCount))
       : null;
-    const existingRoomCreateLimit = Number.isFinite(Number(existing.roomCreateLimit))
+    const existingRoomCreateLimitRaw = Number.isFinite(Number(existing.roomCreateLimit))
       ? Math.floor(Number(existing.roomCreateLimit))
       : null;
+    const isAdmin = String(existing.subscriptionStatus || '').toLowerCase() === 'admin';
+    const planRoomCreateLimit = roomCreateLimitForPlan(plan);
     const nextRoomCreateCount = existingRoomCreateCount == null
       ? 0
       : normalizeRoomCreateCount(existingRoomCreateCount);
-    const nextRoomCreateLimit = existingRoomCreateLimit == null
-      ? roomCreateLimitForPlan(plan)
-      : Math.max(0, Math.min(10000, existingRoomCreateLimit));
+    const nextRoomCreateLimit = isAdmin
+      ? Math.max(
+          ADMIN_TEST_ROOM_CREATE_LIMIT,
+          existingRoomCreateLimitRaw == null
+            ? ADMIN_TEST_ROOM_CREATE_LIMIT
+            : Math.max(0, Math.min(10000, existingRoomCreateLimitRaw))
+        )
+      : planRoomCreateLimit;
     const needsPatch = (
       nextEmail !== (existing.email || '') ||
       nextDisplayName !== (existing.displayName || '') ||
       nextRoomCreateCount !== existingRoomCreateCount ||
-      nextRoomCreateLimit !== existingRoomCreateLimit
+      nextRoomCreateLimit !== existingRoomCreateLimitRaw
     );
 
     if (needsPatch) {

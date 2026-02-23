@@ -38,10 +38,10 @@ service cloud.firestore {
 
     function planRoomCreateLimit(plan) {
       return plan == 'pro'
-        ? 25
+        ? 10
         : (
             plan in ['support', 'supporter']
-              ? 10
+              ? 3
               : (
                   plan == 'trial'
                     ? 3

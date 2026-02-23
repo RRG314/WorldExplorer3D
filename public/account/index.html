@@ -396,6 +396,11 @@
           <p id="roomQuotaDetail" class="hint">Rooms created from this account.</p>
         </article>
         <article class="status-item">
+          <span class="label">Extras</span>
+          <p id="extrasLabel" class="value">Locked</p>
+          <p id="extrasDetail" class="hint">Upcoming demo: Mars Rover.</p>
+        </article>
+        <article class="status-item">
           <span class="label">Admin Access</span>
           <p id="adminAccessLabel" class="value">Off</p>
           <p id="adminAccessDetail" class="hint">Allowlist-protected test admin mode.</p>
@@ -560,6 +565,8 @@
     const trialDetail = document.getElementById('trialDetail');
     const roomQuotaLabel = document.getElementById('roomQuotaLabel');
     const roomQuotaDetail = document.getElementById('roomQuotaDetail');
+    const extrasLabel = document.getElementById('extrasLabel');
+    const extrasDetail = document.getElementById('extrasDetail');
     const adminAccessLabel = document.getElementById('adminAccessLabel');
     const adminAccessDetail = document.getElementById('adminAccessDetail');
     const friendUidInput = document.getElementById('friendUidInput');
@@ -575,6 +582,7 @@
     let unsubscribeInvites = null;
     let signedInUser = null;
     let currentEntitlementState = null;
+    let currentAdminTesterEligible = false;
     let currentFriends = [];
     let currentInvites = [];
 
@@ -899,6 +907,7 @@
       const roomCreateCount = Number.isFinite(Number(overview?.roomCreateCount)) ? Math.max(0, Math.floor(Number(overview.roomCreateCount))) : 0;
       const roomCreateLimit = Number.isFinite(Number(overview?.roomCreateLimit)) ? Math.max(0, Math.floor(Number(overview.roomCreateLimit))) : 0;
       const isAdmin = overview?.isAdmin === true || String(overview?.subscriptionStatus || '').toLowerCase() === 'admin';
+      const adminTesterEligible = overview?.adminTesterEligible === true;
 
       usernameValue.textContent = displayName;
       if (document.activeElement !== usernameInput) {
@@ -919,7 +928,9 @@
       adminAccessDetail.textContent = isAdmin
         ? 'Admin test access is active on this account.'
         : 'Allowlist-protected test admin mode.';
+      currentAdminTesterEligible = adminTesterEligible;
       if (enableAdminBtn) {
+        enableAdminBtn.hidden = !adminTesterEligible;
         enableAdminBtn.disabled = isAdmin;
         enableAdminBtn.textContent = isAdmin ? 'Admin Access Active' : 'Enable Admin Test Access';
       }
@@ -939,6 +950,11 @@
       } else {
         setStatus('Sign in to manage your account.', 'neutral');
       }
+      currentAdminTesterEligible = false;
+      if (enableAdminBtn) {
+        enableAdminBtn.hidden = true;
+        enableAdminBtn.disabled = false;
+      }
     }
 
     function applyPlanUi(state) {
@@ -957,6 +973,17 @@
         planDetail.textContent = 'Free plan: core exploration with local-only saves.';
       }
 
+      if (state.isAdmin === true || state.subscriptionStatus === 'admin' || state.plan === 'pro') {
+        extrasLabel.textContent = 'Mars Rover';
+        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover (Pro early access queue).';
+      } else if (state.plan === 'supporter' || state.plan === 'trial') {
+        extrasLabel.textContent = 'Preview';
+        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Upgrade to Pro for early access.';
+      } else {
+        extrasLabel.textContent = 'Locked';
+        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover.';
+      }
+
       if (state.plan === 'trial') {
         const remaining = formatRemainingTrial(state);
         trialLabel.textContent = remaining === 'expired' ? 'Expired' : 'Active';
@@ -971,6 +998,7 @@
       upgradeProBtn.disabled = adminMode || state.plan === 'pro';
       manageBillingBtn.disabled = adminMode || !(state.stripeCustomerId || state.plan === 'supporter' || state.plan === 'pro');
       if (enableAdminBtn) {
+        enableAdminBtn.hidden = !currentAdminTesterEligible;
         enableAdminBtn.disabled = adminMode;
         enableAdminBtn.textContent = adminMode ? 'Admin Access Active' : 'Enable Admin Test Access';
       }

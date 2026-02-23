@@ -257,6 +257,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #ctrlContent{max-height:calc(56vh - 44px)!important}
   #gameShareFloatBtn{left:140px!important;bottom:24px!important}
   #memoryFlowerFloatBtn{left:140px!important;bottom:76px!important}
+  #multiplayerMenu{left:192px!important;bottom:76px!important}
+  #multiplayerMenu.open .floatItems{left:84px!important;right:auto!important;bottom:126px!important}
   #gameShareMenu{left:85px!important;bottom:128px!important}
   #flowerActionMenu{left:84px!important;bottom:126px!important;min-width:192px}
   #flowerChallengeHud{top:74px;left:50%;transform:translateX(-50%);padding:8px 10px}
@@ -337,6 +339,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #ctrlContent{max-height:calc(52vh - 40px)!important}
   #gameShareFloatBtn{left:113px!important;bottom:22px!important}
   #memoryFlowerFloatBtn{left:113px!important;bottom:74px!important}
+  #multiplayerMenu{left:165px!important;bottom:74px!important}
+  #multiplayerMenu.open .floatItems{left:56px!important;right:auto!important;bottom:124px!important}
   #gameShareMenu{left:58px!important;bottom:126px!important}
   #flowerActionMenu{left:56px!important;bottom:124px!important;min-width:176px}
   #flowerChallengeHud{top:68px;padding:7px 9px}
@@ -594,18 +598,39 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .pro-access-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .pro-access-title{font-family:'Orbitron',sans-serif;font-size:12px;letter-spacing:0.08em;color:#fde68a}
 .pro-access-state{font-size:11px;color:#e2e8f0}
-.pro-access-actions{display:flex;flex-wrap:wrap;gap:8px}
+.pro-access-note{font-size:12px;color:#cbd5e1;line-height:1.4}
 .pro-access-btn{border:none;border-radius:999px;padding:8px 12px;font-size:12px;font-weight:700;cursor:pointer}
-#earlyDemoToggleA{background:#6366f1;color:#ffffff}
-#earlyDemoToggleB{background:#0ea5e9;color:#06263f}
 #upgradeFromAppBtn{background:#f59e0b;color:#381d00}
 .pro-access-links{display:flex;flex-wrap:wrap;gap:8px}
 .pro-access-links a{font-size:12px;font-weight:600;color:#bfdbfe;text-decoration:none;border:1px solid rgba(148,163,184,0.38);padding:6px 10px;border-radius:999px;background:rgba(15,23,42,0.58)}
 .pro-access-links a:hover{text-decoration:underline}
 #proAccessStatus{min-height:16px;font-size:11px;color:#93c5fd}
-.pro-access-panel[hidden],.pro-access-actions[hidden],.pro-access-links[hidden]{display:none!important}
+.pro-access-panel[hidden]{display:none!important}
 
-.floatBtn.multiplayer{color:#16a34a}
+.floatBtn.multiplayer{
+  width:46px;
+  height:46px;
+  min-width:46px;
+  padding:0;
+  border-radius:50%;
+  background:linear-gradient(135deg,#16a34a,#15803d);
+  color:#ffffff;
+  box-shadow:0 10px 24px rgba(22,163,74,0.34);
+  font-size:20px;
+}
+#multiplayerMenu{
+  position:fixed;
+  left:252px;
+  bottom:78px;
+  z-index:104;
+}
+#multiplayerBtn .btnText{display:none}
+#multiplayerBtn .btnIcon{font-size:20px}
+#multiplayerMenu.open .floatItems{
+  left:145px;
+  right:auto;
+  bottom:182px;
+}
 .floatItem.disabled{opacity:0.45;pointer-events:none}
 
 .mp-card{background:#f8fafc;border:2px solid #dbe5f5;border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px}
@@ -735,16 +760,9 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <aside id="proAccessPanel" class="pro-access-panel" hidden>
   <div class="pro-access-head">
     <div class="pro-access-title">PRO EARLY ACCESS</div>
-    <div id="proAccessState" class="pro-access-state">Locked</div>
+    <div id="proAccessState" class="pro-access-state">Upcoming</div>
   </div>
-  <div id="proAccessActions" class="pro-access-actions" hidden>
-    <button id="earlyDemoToggleA" class="pro-access-btn" type="button">Toggle Demo Build A</button>
-    <button id="earlyDemoToggleB" class="pro-access-btn" type="button">Toggle Demo Build B</button>
-  </div>
-  <div id="proAccessLinks" class="pro-access-links" hidden>
-    <a href="mailto:hello@worldexplorer.app?subject=World%20Explorer%20Pro%20Feedback">Contact the Developer</a>
-    <a href="https://github.com/RRG314/WorldExplorer/issues/new?title=Pro%20Feature%20Suggestion" target="_blank" rel="noreferrer">Suggest a Feature</a>
-  </div>
+  <div class="pro-access-note">Upcoming demo soon available: Mars Rover.</div>
   <button id="upgradeFromAppBtn" class="pro-access-btn" type="button">Upgrade to Pro in Account</button>
   <div id="proAccessStatus"></div>
 </aside>
@@ -1369,7 +1387,7 @@ Explore the area
 </div>
 <div class="floatMenuRow">
 <div class="floatMenu" id="multiplayerMenu">
-<button class="floatBtn multiplayer" id="multiplayerBtn"><span class="btnIcon">🌐</span><span class="btnText">Multiplayer</span></button>
+<button class="floatBtn multiplayer" id="multiplayerBtn" title="Multiplayer" aria-label="Multiplayer"><span class="btnIcon">👥</span><span class="btnText">Multiplayer</span></button>
 <div class="floatItems">
 <div class="floatItem" id="fMpCreate">🆕 Create Room</div>
 <div class="floatItem" id="fMpJoin">🔑 Join Room</div>
@@ -1734,11 +1752,7 @@ import {
 const appSignInBtn = document.getElementById('appSignInBtn');
 const proAccessPanel = document.getElementById('proAccessPanel');
 const proAccessState = document.getElementById('proAccessState');
-const proAccessActions = document.getElementById('proAccessActions');
-const proAccessLinks = document.getElementById('proAccessLinks');
 const proAccessStatus = document.getElementById('proAccessStatus');
-const earlyDemoToggleA = document.getElementById('earlyDemoToggleA');
-const earlyDemoToggleB = document.getElementById('earlyDemoToggleB');
 const upgradeFromAppBtn = document.getElementById('upgradeFromAppBtn');
 const authFloatPanel = document.getElementById('authFloatPanel');
 const authModeSignInBtn = document.getElementById('authModeSignInBtn');
@@ -1768,7 +1782,7 @@ let unsubscribeEntitlements = null;
 let currentState = getFreeEntitlementsState();
 let authMode = 'signin';
 let proPanelAutoHideTimer = null;
-const PRO_PANEL_AUTO_HIDE_MS = 4500;
+const PRO_PANEL_AUTO_HIDE_MS = 2000;
 
 function setProStatus(message, isWarn = false) {
   proAccessStatus.textContent = message || '';
@@ -1780,15 +1794,13 @@ function setAuthStatus(message, isWarn = false) {
   authPanelStatus.style.color = isWarn ? '#fca5a5' : '#93c5fd';
 }
 
-function scheduleProPanelAutoHide(isPro) {
+function scheduleProPanelAutoHide() {
   if (proPanelAutoHideTimer) {
     clearTimeout(proPanelAutoHideTimer);
     proPanelAutoHideTimer = null;
   }
 
   proAccessPanel.hidden = false;
-  if (isPro) return;
-
   proPanelAutoHideTimer = window.setTimeout(() => {
     proAccessPanel.hidden = true;
     proPanelAutoHideTimer = null;
@@ -1876,18 +1888,16 @@ function renderState(state, user) {
   }
 
   const isPro = adminMode || plan === 'pro';
-  scheduleProPanelAutoHide(isPro);
-  proAccessActions.hidden = !isPro;
-  proAccessLinks.hidden = !isPro;
-  proAccessState.textContent = isPro ? 'Unlocked' : 'Locked (Pro only)';
+  scheduleProPanelAutoHide();
+  proAccessState.textContent = isPro ? 'Pro Early Access' : 'Locked (Pro only)';
   upgradeFromAppBtn.style.display = isPro ? 'none' : 'inline-flex';
 
   if (adminMode) {
-    setProStatus('Admin test mode active: Pro and multiplayer features are unlocked.');
+    setProStatus('Admin test mode active. Upcoming demo soon available: Mars Rover.');
   } else if (isPro) {
-    setProStatus('Pro perks enabled: early demos, direct contact, feature suggestions.');
+    setProStatus('Pro access active. Upcoming demo soon available: Mars Rover.');
   } else if (plan === 'supporter' || plan === 'trial') {
-    setProStatus('Full access active. Upgrade to Pro for early demos and priority communication.');
+    setProStatus('Full access active. Upgrade to Pro for upcoming early demo access (Mars Rover).');
   } else {
     setProStatus('Free plan active. Multiplayer is locked until trial or upgrade.');
   }
@@ -1939,18 +1949,6 @@ async function activateTrialFromUrlIfNeeded(user) {
     setAuthStatus(message, true);
     setProStatus(message, true);
   }
-}
-
-function toggleEarlyDemo(demoKey) {
-  if (currentState.plan !== 'pro' && currentState.isAdmin !== true) {
-    setProStatus('Early demo toggles require Pro.', true);
-    return;
-  }
-  const key = `worldExplorer.earlyDemo.${demoKey}`;
-  const prev = localStorage.getItem(key) === 'on';
-  const next = !prev;
-  localStorage.setItem(key, next ? 'on' : 'off');
-  setProStatus(`${demoKey} is now ${next ? 'enabled' : 'disabled'}.`);
 }
 
 appSignInBtn.addEventListener('click', (event) => {
@@ -2062,9 +2060,6 @@ authAccountBtn.addEventListener('click', () => {
 upgradeFromAppBtn.addEventListener('click', () => {
   window.location.assign('../account/');
 });
-
-earlyDemoToggleA.addEventListener('click', () => toggleEarlyDemo('buildA'));
-earlyDemoToggleB.addEventListener('click', () => toggleEarlyDemo('buildB'));
 
 if (!hasFirebaseConfig()) {
   setProStatus('Missing Firebase config. App runs in free mode until config is provided.', true);

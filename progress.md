@@ -1095,3 +1095,17 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Verified compact HUD visual in `output/playwright/painttown-physics-check/ingame-painttown-after-tests.png`.
   - Deterministic HUD event check with simulated pointerdown/up/click on color chip now changes `playerColorHex` without spawning paintballs (`beforePaintballs=0`, `afterPaintballs=0`).
   - Deterministic splat lifecycle check confirms miss splats appear and self-clean (`splatsMid=1`, `splatsAfter=0`) using fixed-terrain test harness.
+
+- Follow-up request implemented in-progress (2026-02-23):
+  - Removed Pro Demo A/B toggles from app overlay and switched Pro panel to `Upcoming demo soon available: Mars Rover`.
+  - Reduced Pro banner auto-hide from 4.5s to 2s and now auto-hides for all plans to prevent title-tab blocking.
+  - Began quota hardening update: Supporter room limit -> 3, Pro -> 10 across Cloud Functions, client entitlements, multiplayer room create path, and Firestore rules.
+  - Added account-page `Extras` status card and started allowlist-only visibility logic for `Enable Admin Test Access` button.
+  - Next: mirror updated public files into root app/account/js copies, then run lint/checks/tests and push.
+- Validation completed for this pass:
+  - `npm test` -> PASS (`tests/firestore.rules.security.test.mjs` 16/16).
+  - `node tests/painttown.integration.test.mjs` -> PASS (`output/playwright/painttown-physics-check/report.json`).
+  - Confirmed Pro panel auto-hide after 2.4s with Playwright (`output/playwright/pro-panel-check/result.json`: `hiddenAfter2_4s=true`).
+  - Confirmed multiplayer float is now a compact circular icon near the flower/share cluster in-game (`output/playwright/painttown-physics-check/ingame-painttown-after-tests.png`).
+- Remaining operational step: deploy updated Firestore rules/functions/hosting as needed after commit.
+- Updated security test fixture values for new quota policy (`supporter/supported owner roomCreateLimit=3`) and revalidated: `npm test` still 16/16 pass.

@@ -137,7 +137,7 @@ function userDoc(uid, displayName) {
       earlyAccess: false
     },
     roomCreateCount: 0,
-    roomCreateLimit: 10,
+    roomCreateLimit: 3,
     stripeCustomerId: '',
     stripeSubscriptionId: '',
     billingCycleAnchorAt: null,
@@ -253,7 +253,7 @@ await runCheck('owner can create room with quota increment in same batch', async
   batch.set(doc(ownerDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID));
   batch.set(doc(ownerDb, 'users', OWNER_UID), {
     roomCreateCount: 1,
-    roomCreateLimit: 10,
+    roomCreateLimit: 3,
     updatedAt: serverTimestamp()
   }, { merge: true });
   await assertSucceeds(batch.commit());
