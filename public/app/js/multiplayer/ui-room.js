@@ -721,6 +721,21 @@ function initMultiplayerPlatform() {
     }
   }
 
+  function upsertOwnedRoomLocal(room) {
+    if (!room || !state.authUser || !state.authUser.uid) return;
+    const ownerUid = String(room.ownerUid || '');
+    if (!ownerUid || ownerUid !== state.authUser.uid) return;
+    const code = normalizeCode(room.code || room.id || '');
+    if (!code) return;
+
+    const next = Array.isArray(state.ownedRooms) ? [...state.ownedRooms] : [];
+    const idx = next.findIndex((entry) => normalizeCode(entry.code || entry.id || '') === code);
+    if (idx >= 0) next[idx] = room;
+    else next.unshift(room);
+    state.ownedRooms = next;
+    renderOwnedRooms();
+  }
+
   function renderLeaderboard() {
     if (!refs.titleLeaderboardList) return;
     if (!state.leaderboard.length) {
@@ -1313,6 +1328,7 @@ function initMultiplayerPlatform() {
 
     clearSubscriptions();
     state.currentRoom = room;
+    upsertOwnedRoomLocal(room);
     state.artifacts = [];
     state.homeBase = null;
     applyRoomPaintMultiplayerConfig(room);

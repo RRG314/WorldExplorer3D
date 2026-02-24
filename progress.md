@@ -1320,3 +1320,56 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - delete room
     - confirm invite trial-gate path on a free account
     - confirm direct invite join on entitled account.
+
+- Mobile multiplayer float alignment pass (2026-02-24):
+  - Root cause: mobile CSS offsets placed `#multiplayerMenu` over the right-side float menu row (overlapping `#exploreBtn`) on phone viewports.
+  - Updated mobile position rules in `app/index.html` (mirrored to `public/app/index.html`):
+    - `@media (max-width: 768px)`:
+      - `#gameShareFloatBtn` -> `left:10px`, `bottom:24px`
+      - `#memoryFlowerFloatBtn` -> `left:10px`, `bottom:76px`
+      - `#multiplayerMenu` -> `left:62px`, `bottom:76px`
+      - adjusted popup menu anchors (`#multiplayerMenu.open .floatItems`, `#gameShareMenu`, `#flowerActionMenu`) to left-side stack
+    - `@media (max-width: 480px)`:
+      - `#gameShareFloatBtn` -> `left:8px`, `bottom:22px`
+      - `#memoryFlowerFloatBtn` -> `left:8px`, `bottom:74px`
+      - `#multiplayerMenu` -> `left:58px`, `bottom:74px`
+      - adjusted popup anchors to left-side stack
+    - Added `@media (max-width: 360px)` narrow-phone override:
+      - lift flower + multiplayer row to `bottom:126px` so SE-sized screens avoid overlap with `Explore` row
+      - lift related popups to `bottom:176px`
+
+- Validation artifacts:
+  - `output/playwright/mobile-layout-after.json`
+  - `output/playwright/mobile-layout-matrix-after-fix2.json`
+  - `output/playwright/mobile-app-iphone-se-after-fix2.png`
+  - `output/playwright/mobile-app-iphone-12-after-fix2.png`
+  - `output/playwright/mobile-app-pixel-5-after-fix2.png`
+  - `output/playwright/mobile-app-title-auth-after-fix2.json`
+  - `output/playwright/mobile-app-title-auth-after-fix2.png`
+
+- Validation results:
+  - iPhone SE / iPhone 12 / Pixel 5: `overlapMpExplore=false`, `overlapFlowerExplore=false`, `overlapMpControls=false`, `yDelta=0` (multiplayer level with flower).
+  - Title/app mobile UI: account button visible, auth panel opens, no horizontal overflow, no console errors.
+
+- Multiplayer reopen + mobile accessibility follow-up (2026-02-24):
+  - Issue reproduced from user report:
+    - "My Rooms" section was too far down and could be occluded by the fixed `EXPLORE` button on mobile title layouts.
+    - In-game mobile float layout had prior overlap risk between multiplayer button and right-side menu on narrow widths.
+  - Fixes applied:
+    - `app/index.html` (+ mirrored `public/app/index.html`):
+      - moved "My Rooms" block higher in the multiplayer tab (directly after room code/join/create row).
+      - added multiplayer tab bottom padding to preserve click-space above fixed start button:
+        - base: `#tab-multiplayer { padding-bottom:130px }`
+        - `<=768px`: `padding-bottom:150px`
+        - `<=480px`: `padding-bottom:170px`
+      - kept mobile float button stack aligned left and added narrow-phone (`<=360px`) override so flower/multiplayer stay level and clear of menu row.
+    - `app/js/multiplayer/ui-room.js` (+ mirrored public copy):
+      - added `upsertOwnedRoomLocal(room)` and call from `activateRoom(...)` so newly created owner rooms appear immediately in "My Rooms" even before Firestore listener refresh.
+  - Validation artifacts:
+    - `output/playwright/mobile-mp-float-after-reorder2.json`
+    - `output/playwright/mobile-multiplayer-title-after-reorder2.png`
+    - `output/playwright/mobile-ingame-float-after-reorder2.png`
+    - `output/playwright/mobile-title-myrooms-matrix.json`
+  - Validation results:
+    - iPhone 12: `My Rooms` no longer overlaps start button on title tab; in-game multiplayer button level with flower and no overlap with Explore control row.
+    - iPhone SE + Pixel 5: `My Rooms` non-overlapping; no horizontal overflow; no console errors.

@@ -43,6 +43,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .tab-btn.active{color:#667eea;background:rgba(255,255,255,0.8)}
 .tab-btn.active::after{content:'';position:absolute;bottom:-2px;left:0;right:0;height:2px;background:#667eea}
 .tab-content{display:none;padding:24px;overflow-y:auto;flex:1;background:rgba(255,255,255,0.3)}
+#tab-multiplayer{padding-bottom:130px}
 .tab-content.active{display:block}
 
 /* Location Grid */
@@ -246,6 +247,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .loc-grid{grid-template-columns:1fr;gap:10px}
   .launch-switch-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
   .tab-btn{font-size:12px;padding:12px 8px}
+  #tab-multiplayer{padding-bottom:150px}
 
   /* HUD elements */
   #hud{top:10px;left:10px;font-size:11px}
@@ -255,12 +257,12 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #controlsTab.compact{width:auto!important;max-width:max-content!important;left:62%!important;transform:translateX(-50%)!important}
   #controlsTab.compact #ctrlHeader{padding:9px 12px;font-size:12px}
   #ctrlContent{max-height:calc(56vh - 44px)!important}
-  #gameShareFloatBtn{left:140px!important;bottom:24px!important}
-  #memoryFlowerFloatBtn{left:140px!important;bottom:76px!important}
-  #multiplayerMenu{left:192px!important;bottom:76px!important}
-  #multiplayerMenu.open .floatItems{left:84px!important;right:auto!important;bottom:126px!important}
-  #gameShareMenu{left:85px!important;bottom:128px!important}
-  #flowerActionMenu{left:84px!important;bottom:126px!important;min-width:192px}
+  #gameShareFloatBtn{left:10px!important;bottom:24px!important}
+  #memoryFlowerFloatBtn{left:10px!important;bottom:76px!important}
+  #multiplayerMenu{left:62px!important;bottom:76px!important}
+  #multiplayerMenu.open .floatItems{left:10px!important;right:auto!important;bottom:126px!important}
+  #gameShareMenu{left:10px!important;bottom:128px!important}
+  #flowerActionMenu{left:10px!important;bottom:126px!important;min-width:192px}
   #flowerChallengeHud{top:74px;left:50%;transform:translateX(-50%);padding:8px 10px}
   #flowerChallengeHudStatus{font-size:11px}
   #flowerChallengeHudTimer{font-size:11px;min-width:54px}
@@ -323,6 +325,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .launch-switch-row{grid-template-columns:1fr}
   .tab-btn{font-size:11px;padding:10px 6px}
   .tab-content{padding:16px}
+  #tab-multiplayer{padding-bottom:170px}
   .custom-title{font-size:13px}
   .custom-row label{font-size:11px}
   .search-row input, .coords-row input{font-size:13px;padding:10px}
@@ -337,12 +340,12 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #controlsTab.compact{width:auto!important;max-width:max-content!important;left:64%!important;transform:translateX(-50%)!important}
   #controlsTab.compact #ctrlHeader{padding:8px 10px;font-size:11px}
   #ctrlContent{max-height:calc(52vh - 40px)!important}
-  #gameShareFloatBtn{left:113px!important;bottom:22px!important}
-  #memoryFlowerFloatBtn{left:113px!important;bottom:74px!important}
-  #multiplayerMenu{left:165px!important;bottom:74px!important}
-  #multiplayerMenu.open .floatItems{left:56px!important;right:auto!important;bottom:124px!important}
-  #gameShareMenu{left:58px!important;bottom:126px!important}
-  #flowerActionMenu{left:56px!important;bottom:124px!important;min-width:176px}
+  #gameShareFloatBtn{left:8px!important;bottom:22px!important}
+  #memoryFlowerFloatBtn{left:8px!important;bottom:74px!important}
+  #multiplayerMenu{left:58px!important;bottom:74px!important}
+  #multiplayerMenu.open .floatItems{left:8px!important;right:auto!important;bottom:124px!important}
+  #gameShareMenu{left:8px!important;bottom:126px!important}
+  #flowerActionMenu{left:8px!important;bottom:124px!important;min-width:176px}
   #flowerChallengeHud{top:68px;padding:7px 9px}
   #flowerChallengeHudStatus{font-size:10px}
   #flowerChallengeHudTimer{font-size:10px;min-width:48px}
@@ -393,6 +396,13 @@ input,textarea{-webkit-user-select:text;user-select:text}
     --perf-panel-min-width:175px;
     --perf-panel-max-width:228px;
   }
+}
+
+@media (max-width: 360px) {
+  #memoryFlowerFloatBtn{left:8px!important;bottom:126px!important}
+  #multiplayerMenu{left:58px!important;bottom:126px!important}
+  #multiplayerMenu.open .floatItems{left:8px!important;right:auto!important;bottom:176px!important}
+  #flowerActionMenu{left:8px!important;bottom:176px!important;min-width:164px}
 }
 
 /* Landscape orientation adjustments */
@@ -859,6 +869,11 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <button id="mpTitleJoinBtn" class="mp-btn secondary" type="button">Join</button>
 <button id="mpTitleCreateBtn" class="mp-btn primary" type="button">Create</button>
 </div>
+<div class="mp-subtitle">My Rooms</div>
+<div id="mpOwnedRoomsStatus" class="mp-status">Rooms you create appear here. You can reopen or delete your own rooms.</div>
+<ul id="mpOwnedRoomsList" class="mp-room-list">
+<li class="mpRoomEmpty">Sign in to load your rooms.</li>
+</ul>
 <div class="mp-row">
 <select id="mpTitleVisibilitySelect" class="mp-select" aria-label="Room visibility">
 <option value="private" selected>Private Room</option>
@@ -876,6 +891,7 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <button id="mpTitleTrialBtn" class="mp-btn warn" type="button">Start Trial / Upgrade</button>
 </div>
 <div id="mpTitleStatus" class="mp-status"></div>
+
 <div class="mp-subtitle">Public Rooms Near A City</div>
 <div class="mp-row">
 <input id="mpBrowseCityInput" class="mp-input" type="text" maxlength="48" placeholder="City (e.g. Tokyo)">
@@ -913,12 +929,6 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="mp-subtitle">Incoming Invites</div>
 <ul id="mpInvitesList" class="mp-room-list">
 <li class="mpRoomEmpty">No incoming invites.</li>
-</ul>
-
-<div class="mp-subtitle">My Rooms</div>
-<div id="mpOwnedRoomsStatus" class="mp-status">Rooms you create appear here. You can reopen or delete your own rooms.</div>
-<ul id="mpOwnedRoomsList" class="mp-room-list">
-<li class="mpRoomEmpty">Sign in to load your rooms.</li>
 </ul>
 
 <div class="mp-subtitle">Top Explorers</div>
