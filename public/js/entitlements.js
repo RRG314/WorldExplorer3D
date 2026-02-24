@@ -143,21 +143,23 @@ async function hasAdminTokenClaim(user, forceRefresh = false) {
   }
 }
 
-function normalizeProfile(uid, raw = {}) {
-  const plan = normalizePlan(raw.plan);
-  const isAdmin = String(raw.subscriptionStatus || '').toLowerCase() === 'admin';
-  const baseEntitlements = entitlementsForPlan(isAdmin ? 'pro' : plan);
+function normalizeProfile(uid, raw = {}, options = {}) {
+  const basePlan = normalizePlan(raw.plan);
+  const hasAdminStatus = String(raw.subscriptionStatus || '').toLowerCase() === 'admin';
+  const hasAdminClaim = options && options.adminClaim === true;
+  const isAdmin = hasAdminStatus || hasAdminClaim;
+  const plan = isAdmin ? 'pro' : basePlan;
+  const baseEntitlements = entitlementsForPlan(plan);
   const entitlements = raw.entitlements && typeof raw.entitlements === 'object'
     ? cloneEntitlements({ ...baseEntitlements, ...raw.entitlements })
     : baseEntitlements;
   const roomCreateCount = normalizeRoomCreateCount(raw.roomCreateCount);
   const persistedRoomCreateLimit = normalizeRoomCreateLimitOrNull(raw.roomCreateLimit);
   const planRoomCreateLimit = roomCreateLimitForPlan(plan);
-  const rulesLimit = Math.max(
+  const roomCreateLimit = Math.max(
     planRoomCreateLimit,
     persistedRoomCreateLimit == null ? planRoomCreateLimit : persistedRoomCreateLimit
   );
-  const roomCreateLimit = isAdmin ? rulesLimit : planRoomCreateLimit;
 
   return {
     uid,
@@ -222,6 +224,7 @@ async function ensureUserDoc(user) {
 
   const ref = doc(services.db, USERS_COLLECTION, user.uid);
   const snap = await getDoc(ref);
+  const initialAdminClaim = await hasAdminTokenClaim(user, false);
 
   if (snap.exists()) {
     const existing = snap.data() || {};
@@ -231,7 +234,7 @@ async function ensureUserDoc(user) {
     const existingRoomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
     const existingRoomCreateLimitRaw = normalizeRoomCreateLimitOrNull(existing.roomCreateLimit);
     const isAdminStatus = String(existing.subscriptionStatus || '').toLowerCase() === 'admin';
-    const isAdminClaim = await hasAdminTokenClaim(user, isAdminStatus);
+    const isAdminClaim = isAdminStatus ? true : initialAdminClaim;
     const rulesPlan = isAdminStatus || isAdminClaim ? 'pro' : plan;
     const planRoomCreateLimit = roomCreateLimitForPlan(rulesPlan);
     const nextRoomCreateCount = existingRoomCreateCount;
@@ -268,7 +271,7 @@ async function ensureUserDoc(user) {
       displayName: nextDisplayName,
       roomCreateCount: nextRoomCreateCount,
       roomCreateLimit: nextRoomCreateLimit
-    });
+    }, { adminClaim: isAdminClaim });
   }
 
   const created = {
@@ -276,13 +279,13 @@ async function ensureUserDoc(user) {
     email: user.email || '',
     displayName: user.displayName || '',
     roomCreateCount: 0,
-    roomCreateLimit: roomCreateLimitForPlan('free'),
+    roomCreateLimit: initialAdminClaim ? ADMIN_TEST_ROOM_CREATE_LIMIT : roomCreateLimitForPlan('free'),
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()
   };
 
   await setDoc(ref, created, { merge: true });
-  return normalizeProfile(user.uid, created);
+  return normalizeProfile(user.uid, created, { adminClaim: initialAdminClaim });
 }
 
 export async function startTrialIfEligible(user) {
@@ -321,13 +324,9 @@ export async function ensureEntitlements(user) {
 
   let profile = await ensureUserDoc(user);
   profile = await applyTrialDowngradeIfNeeded(profile);
+  const adminClaim = profile.isAdmin === true ? true : await hasAdminTokenClaim(user, false);
 
-  const state = {
-    ...profile,
-    plan: normalizePlan(profile.plan),
-    planLabel: planLabel(normalizePlan(profile.plan)),
-    entitlements: cloneEntitlements(profile.entitlements)
-  };
+  const state = normalizeProfile(user.uid, profile, { adminClaim });
 
   broadcastEntitlements(state, user);
   return state;
@@ -359,12 +358,8 @@ export function subscribeEntitlements(user, callback) {
 
     let profile = normalizeProfile(user.uid, snap.data());
     profile = await applyTrialDowngradeIfNeeded(profile);
-    const state = {
-      ...profile,
-      plan: normalizePlan(profile.plan),
-      planLabel: planLabel(normalizePlan(profile.plan)),
-      entitlements: cloneEntitlements(profile.entitlements)
-    };
+    const adminClaim = profile.isAdmin === true ? true : await hasAdminTokenClaim(user, false);
+    const state = normalizeProfile(user.uid, profile, { adminClaim });
 
     broadcastEntitlements(state, user);
     if (typeof callback === 'function') callback(state);

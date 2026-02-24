@@ -1409,3 +1409,19 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Ran `develop-web-game` Playwright client after patch.
   - Added targeted Playwright checks confirming saved-room open event fires from button, row click, and keyboard activation (unauth state shows expected "Sign in to open saved rooms.").
 - Cache bust bump to `v=62` across multiplayer imports/bootstraps (`app` + `public/app` + root/public bootstrap shims) so saved-room fixes load immediately after deploy without stale browser cache.
+
+- Multiplayer saved-room/open regression pass (2026-02-24):
+  - Ran browser automation `output/playwright/debug-open-button.mjs` against `http://127.0.0.1:4173/app/` to trace Saved Room `Open` path and entitlement gating.
+  - Captured latest trace/report at `output/playwright/open-button-debug/report.json` and screenshot `output/playwright/open-button-debug/final.png`.
+  - Failure path confirmed in UI code: `handleOpenOwnedRoom -> handleJoinRoom -> ensureAccessOrWarn`; stale/free entitlement state can block room open/join.
+  - Hardened entitlement refresh path in multiplayer UI before deny:
+    - `app/js/multiplayer/ui-room.js`
+    - `public/app/js/multiplayer/ui-room.js`
+  - Fixed admin/pro room creation coupling bug by always writing room quota counters in same batch as room create (rules-compatible):
+    - `app/js/multiplayer/rooms.js`
+    - `public/app/js/multiplayer/rooms.js`
+  - Fixed admin claim handling in entitlement normalization and state broadcasts:
+    - `js/entitlements.js`
+    - mirrored to `public/js/entitlements.js`
+  - Unified entitlement module cache-bust to `v=62` across root/app/account/public entrypoints to avoid stale mixed versions.
+  - Validation: `node --check` passed for all changed JS modules, `npm run test:rules` passed (33/33).

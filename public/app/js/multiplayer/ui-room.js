@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { startTrialIfEligible } from '../../../js/entitlements.js?v=61';
+import { ensureEntitlements, startTrialIfEligible } from '../../../js/entitlements.js?v=62';
 import { createArtifact, listenArtifacts, removeArtifact } from './artifacts.js?v=55';
 import {
   clearMySharedBlocks,
@@ -1057,13 +1057,27 @@ function initMultiplayerPlatform() {
     }, 33);
   }
 
-  function ensureAccessOrWarn(actionLabel = 'this action') {
+  async function ensureAccessOrWarn(actionLabel = 'this action') {
     if (!state.authUser) {
       setStatus(`Sign in is required for ${actionLabel}.`, true);
       return false;
     }
     if (!canUseMultiplayer(state.entitlement)) {
-      setStatus('Multiplayer is locked on Free. Start your 2-day trial or upgrade to Supporter/Pro.', true);
+      try {
+        const refreshed = await ensureEntitlements(state.authUser);
+        state.entitlement = {
+          ...state.entitlement,
+          ...refreshed
+        };
+      } catch (err) {
+        console.warn('[multiplayer][ui] entitlement refresh failed:', err);
+      }
+    }
+    if (!canUseMultiplayer(state.entitlement)) {
+      const plan = String(state.entitlement?.plan || 'free');
+      const subStatus = String(state.entitlement?.subscriptionStatus || 'none');
+      const admin = state.entitlement?.isAdmin === true ? 'yes' : 'no';
+      setStatus(`Multiplayer is locked on Free. Start your 2-day trial or upgrade to Supporter/Pro. (plan=${plan}, subStatus=${subStatus}, admin=${admin})`, true);
       return false;
     }
     return true;
@@ -1487,7 +1501,7 @@ function initMultiplayerPlatform() {
   }
 
   async function handleCreateRoom() {
-    if (!ensureAccessOrWarn('creating a room')) return;
+    if (!(await ensureAccessOrWarn('creating a room'))) return;
 
     try {
       const world = readWorldContext();
@@ -1582,7 +1596,7 @@ function initMultiplayerPlatform() {
   }
 
   async function handleJoinRoom(codeOverride = '') {
-    if (!ensureAccessOrWarn('joining a room')) return;
+    if (!(await ensureAccessOrWarn('joining a room'))) return;
 
     const code = normalizeCode(codeOverride || pullCodeFromInputs(refs));
     if (!code) {
