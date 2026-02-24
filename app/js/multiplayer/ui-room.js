@@ -1,6 +1,12 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { startTrialIfEligible } from '../../../js/entitlements.js?v=60';
+import { startTrialIfEligible } from '../../../js/entitlements.js?v=61';
 import { createArtifact, listenArtifacts, removeArtifact } from './artifacts.js?v=55';
+import {
+  clearMySharedBlocks,
+  listenSharedBlocks,
+  removeSharedBlock,
+  upsertSharedBlock
+} from './blocks.js?v=61';
 import { CHAT_MAX_LENGTH, listenChat, reportMessage, sendMessage } from './chat.js?v=55';
 import { createGhostManager } from './ghosts.js?v=55';
 import {
@@ -18,13 +24,13 @@ import {
   joinRoomByCode,
   leaveRoom,
   listenHomeBase,
-  listenOwnedRooms,
+  listenMyRooms,
   listenRoom,
   normalizeCityKey,
   normalizeCode,
   setHomeBase,
   updateRoomSettings
-} from './rooms.js?v=60';
+} from './rooms.js?v=61';
 import {
   listenPaintClaims,
   normalizeColorHex as normalizePaintColorHex,
@@ -390,6 +396,7 @@ function initMultiplayerPlatform() {
     unsubPlayers: null,
     unsubChat: null,
     unsubArtifacts: null,
+    unsubSharedBlocks: null,
     unsubHomeBase: null,
     unsubPaintClaims: null,
     unsubFriends: null,
@@ -691,16 +698,16 @@ function initMultiplayerPlatform() {
     if (!state.authUser) {
       refs.titleOwnedRoomsList.innerHTML = '<li class="mpRoomEmpty">Sign in to manage rooms you created.</li>';
       if (refs.titleOwnedRoomsStatus) {
-        refs.titleOwnedRoomsStatus.textContent = 'Sign in to access your created rooms.';
+        refs.titleOwnedRoomsStatus.textContent = 'Sign in to access your saved rooms.';
         refs.titleOwnedRoomsStatus.style.color = '#64748b';
       }
       return;
     }
 
     if (!state.ownedRooms.length) {
-      refs.titleOwnedRoomsList.innerHTML = '<li class="mpRoomEmpty">No rooms created yet.</li>';
+      refs.titleOwnedRoomsList.innerHTML = '<li class="mpRoomEmpty">No saved rooms yet.</li>';
       if (refs.titleOwnedRoomsStatus) {
-        refs.titleOwnedRoomsStatus.textContent = 'Create a room to add it to your owner list.';
+        refs.titleOwnedRoomsStatus.textContent = 'Create or join a room to save it here for quick return.';
         refs.titleOwnedRoomsStatus.style.color = '#64748b';
       }
       return;
@@ -710,28 +717,35 @@ function initMultiplayerPlatform() {
       const code = normalizeCode(room.code || room.id || '');
       const name = safeHtml(room.name || code || 'Untitled Room', 80);
       const visibility = safeHtml(room.visibility || 'private', 16);
+      const role = safeHtml(room.role || (room.ownerUid === state.authUser?.uid ? 'owner' : 'member'), 16);
       const location = safeHtml(room.locationTag?.label || room.locationTag?.city || '', 80);
       const locationMeta = location ? ` • ${location}` : '';
-      return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${name}</div><div class="mpRoomMeta">${escapeHtml(code)} • ${visibility}${locationMeta}</div></div><div class="mp-row"><button class="mp-btn secondary mpSmallBtn" data-open-owned-room="${escapeHtml(code)}" type="button">Open</button><button class="mp-btn secondary mpSmallBtn" data-delete-owned-room="${escapeHtml(code)}" type="button">Delete</button></div></li>`;
+      const canDelete = String(room.ownerUid || '') === String(state.authUser?.uid || '');
+      const deleteBtn = canDelete
+        ? `<button class="mp-btn secondary mpSmallBtn" data-delete-owned-room="${escapeHtml(code)}" type="button">Delete</button>`
+        : '';
+      return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${name}</div><div class="mpRoomMeta">${escapeHtml(code)} • ${visibility} • ${role}${locationMeta}</div></div><div class="mp-row"><button class="mp-btn secondary mpSmallBtn" data-open-owned-room="${escapeHtml(code)}" type="button">Open</button>${deleteBtn}</div></li>`;
     }).join('');
 
     if (refs.titleOwnedRoomsStatus) {
-      refs.titleOwnedRoomsStatus.textContent = `${state.ownedRooms.length} room${state.ownedRooms.length === 1 ? '' : 's'} in your owner list.`;
+      refs.titleOwnedRoomsStatus.textContent = `${state.ownedRooms.length} saved room${state.ownedRooms.length === 1 ? '' : 's'}. Use Open to return anytime.`;
       refs.titleOwnedRoomsStatus.style.color = '#64748b';
     }
   }
 
   function upsertOwnedRoomLocal(room) {
     if (!room || !state.authUser || !state.authUser.uid) return;
-    const ownerUid = String(room.ownerUid || '');
-    if (!ownerUid || ownerUid !== state.authUser.uid) return;
     const code = normalizeCode(room.code || room.id || '');
     if (!code) return;
 
+    const normalized = {
+      ...room,
+      role: String(room.role || (String(room.ownerUid || '') === String(state.authUser.uid) ? 'owner' : 'member')).toLowerCase()
+    };
     const next = Array.isArray(state.ownedRooms) ? [...state.ownedRooms] : [];
     const idx = next.findIndex((entry) => normalizeCode(entry.code || entry.id || '') === code);
-    if (idx >= 0) next[idx] = room;
-    else next.unshift(room);
+    if (idx >= 0) next[idx] = normalized;
+    else next.unshift(normalized);
     state.ownedRooms = next;
     renderOwnedRooms();
   }
@@ -951,12 +965,14 @@ function initMultiplayerPlatform() {
     if (typeof state.unsubPlayers === 'function') state.unsubPlayers();
     if (typeof state.unsubChat === 'function') state.unsubChat();
     if (typeof state.unsubArtifacts === 'function') state.unsubArtifacts();
+    if (typeof state.unsubSharedBlocks === 'function') state.unsubSharedBlocks();
     if (typeof state.unsubHomeBase === 'function') state.unsubHomeBase();
     if (typeof state.unsubPaintClaims === 'function') state.unsubPaintClaims();
     state.unsubRoom = null;
     state.unsubPlayers = null;
     state.unsubChat = null;
     state.unsubArtifacts = null;
+    state.unsubSharedBlocks = null;
     state.unsubHomeBase = null;
     state.unsubPaintClaims = null;
   }
@@ -976,6 +992,12 @@ function initMultiplayerPlatform() {
 
   async function deactivateRoom(localOnly = false) {
     clearSubscriptions();
+    if (typeof appCtx.configureSharedBuildSync === 'function') {
+      appCtx.configureSharedBuildSync({ enabled: false });
+    }
+    if (typeof appCtx.setSharedBuildEntries === 'function') {
+      appCtx.setSharedBuildEntries([]);
+    }
     await stopPresence();
     if (!localOnly) {
       await leaveRoom();
@@ -1093,7 +1115,7 @@ function initMultiplayerPlatform() {
       });
     }
     if (!state.unsubOwnedRooms) {
-      state.unsubOwnedRooms = listenOwnedRooms((rows) => {
+      state.unsubOwnedRooms = listenMyRooms((rows) => {
         state.ownedRooms = rows;
         renderOwnedRooms();
       });
@@ -1329,6 +1351,15 @@ function initMultiplayerPlatform() {
     clearSubscriptions();
     state.currentRoom = room;
     upsertOwnedRoomLocal(room);
+    if (typeof appCtx.configureSharedBuildSync === 'function') {
+      appCtx.configureSharedBuildSync({
+        enabled: true,
+        roomId: room.id,
+        upsert: (entry) => upsertSharedBlock(room.id, entry),
+        remove: (entry) => removeSharedBlock(room.id, entry),
+        clearMine: () => clearMySharedBlocks(room.id)
+      });
+    }
     state.artifacts = [];
     state.homeBase = null;
     applyRoomPaintMultiplayerConfig(room);
@@ -1388,6 +1419,12 @@ function initMultiplayerPlatform() {
     state.unsubArtifacts = listenArtifacts(room.id, (artifacts) => {
       state.artifacts = artifacts;
       renderArtifacts();
+    });
+
+    state.unsubSharedBlocks = listenSharedBlocks(room.id, (blocks) => {
+      if (typeof appCtx.setSharedBuildEntries === 'function') {
+        appCtx.setSharedBuildEntries(Array.isArray(blocks) ? blocks : []);
+      }
     });
 
     state.unsubHomeBase = listenHomeBase(room.id, (homeBase) => {

@@ -1,4 +1,4 @@
-const CACHE_BUST = 'v=60';
+const CACHE_BUST = 'v=61';
 
 function normalizeRepoBase(pathname = '/') {
   const path = String(pathname || '/');

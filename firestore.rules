@@ -661,6 +661,58 @@ service cloud.firestore {
         request.resource.data.expiresAt is timestamp;
     }
 
+    function validSavedRoomWorld(world) {
+      return world is map &&
+        world.keys().hasOnly(['kind', 'seed', 'lat', 'lon']) &&
+        world.kind in ['earth', 'moon', 'space'] &&
+        world.seed is string &&
+        world.seed.size() <= 100 &&
+        world.lat is number &&
+        world.lon is number;
+    }
+
+    function validSavedRoomLocationTag(tag) {
+      return tag is map &&
+        tag.keys().hasOnly(['label', 'city', 'cityKey', 'kind']) &&
+        tag.label is string &&
+        tag.label.size() > 0 &&
+        tag.label.size() <= 80 &&
+        tag.city is string &&
+        tag.city.size() > 0 &&
+        tag.city.size() <= 48 &&
+        validCityKey(tag.cityKey) &&
+        tag.kind in ['earth', 'moon', 'space'];
+    }
+
+    function validMyRoomData(roomCode) {
+      return request.resource.data.keys().hasOnly([
+          'code',
+          'name',
+          'ownerUid',
+          'visibility',
+          'role',
+          'world',
+          'locationTag',
+          'createdAt',
+          'updatedAt',
+          'lastJoinedAt'
+        ]) &&
+        request.resource.data.code is string &&
+        request.resource.data.code == roomCode &&
+        request.resource.data.code.matches('^[A-Z0-9]{6}$') &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() <= 80 &&
+        request.resource.data.ownerUid is string &&
+        request.resource.data.ownerUid.size() <= 128 &&
+        request.resource.data.visibility in ['private', 'public'] &&
+        request.resource.data.role in ['owner', 'mod', 'member'] &&
+        validSavedRoomWorld(request.resource.data.world) &&
+        (!('locationTag' in request.resource.data) || validSavedRoomLocationTag(request.resource.data.locationTag)) &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.lastJoinedAt is timestamp;
+    }
+
     function validInviteDocId(inviteId, senderUid, roomCode) {
       return inviteId is string &&
         inviteId.size() <= 96 &&
@@ -821,6 +873,50 @@ service cloud.firestore {
         request.resource.data.ownerUid == resource.data.ownerUid &&
         request.resource.data.ownerDisplayName == resource.data.ownerDisplayName &&
         request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function validRoomBlockId(blockId) {
+      return blockId is string &&
+        blockId.size() > 0 &&
+        blockId.size() <= 64 &&
+        blockId.matches('^-?[0-9]+_-?[0-9]+_-?[0-9]+$');
+    }
+
+    function validRoomBlockData(blockId) {
+      return validRoomBlockId(blockId) &&
+        request.resource.data.keys().hasOnly([
+          'id',
+          'gx',
+          'gy',
+          'gz',
+          'materialIndex',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.id is string &&
+        request.resource.data.id == blockId &&
+        request.resource.data.gx is int &&
+        request.resource.data.gx >= -50000 &&
+        request.resource.data.gx <= 50000 &&
+        request.resource.data.gy is int &&
+        request.resource.data.gy >= -50000 &&
+        request.resource.data.gy <= 50000 &&
+        request.resource.data.gz is int &&
+        request.resource.data.gz >= -50000 &&
+        request.resource.data.gz <= 50000 &&
+        request.resource.data.materialIndex is int &&
+        request.resource.data.materialIndex >= 0 &&
+        request.resource.data.materialIndex <= 64 &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.updatedAt == request.time;
+    }
+
+    function validRoomBlockUpdate(blockId) {
+      return validRoomBlockData(blockId) &&
+        request.resource.data.createdBy == resource.data.createdBy;
     }
 
     function validPaintClaimId(claimId) {
@@ -1012,6 +1108,16 @@ service cloud.firestore {
           validIncomingInviteSenderUpdate(userId, inviteId);
         allow delete: if isSelf(userId) || request.auth.uid == resource.data.fromUid;
       }
+
+      match /myRooms/{roomCode} {
+        allow read: if isSelf(userId);
+        allow create: if isSelf(userId) && validMyRoomData(roomCode);
+        allow update: if isSelf(userId) &&
+          validMyRoomData(roomCode) &&
+          request.resource.data.code == resource.data.code &&
+          request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isSelf(userId);
+      }
     }
 
     match /flowerLeaderboard/{entryId} {
@@ -1079,6 +1185,20 @@ service cloud.firestore {
         allow delete: if isMultiplayerEntitled() &&
           isRoomMember(roomId) &&
           (request.auth.uid == resource.data.ownerUid || canManageRoom(roomId));
+      }
+
+      match /blocks/{blockId} {
+        allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
+        allow create: if isMultiplayerEntitled() &&
+          isRoomMember(roomId) &&
+          validRoomBlockData(blockId);
+        allow update: if isMultiplayerEntitled() &&
+          isRoomMember(roomId) &&
+          resource.data.createdBy == request.auth.uid &&
+          validRoomBlockUpdate(blockId);
+        allow delete: if isMultiplayerEntitled() &&
+          isRoomMember(roomId) &&
+          (resource.data.createdBy == request.auth.uid || canManageRoom(roomId));
       }
 
       match /paintClaims/{claimId} {

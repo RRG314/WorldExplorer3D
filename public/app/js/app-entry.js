@@ -23,9 +23,9 @@ import './hud.js?v=55';
 import './map.js?v=55';
 import { renderLoop } from './main.js?v=55';
 import './memory.js?v=55';
-import './blocks.js?v=55';
+import './blocks.js?v=56';
 import './flower-challenge.js?v=55';
-import { initMultiplayerPlatform } from './multiplayer/ui-room.js?v=60';
+import { initMultiplayerPlatform } from './multiplayer/ui-room.js?v=61';
 import { setupUI } from './ui.js?v=55';
 
 let _booted = false;

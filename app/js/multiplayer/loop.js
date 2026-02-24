@@ -12,7 +12,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
-import { normalizeCityKey, normalizeCode } from './rooms.js?v=60';
+import { normalizeCityKey, normalizeCode } from './rooms.js?v=61';
 
 const ACTIVITY_FEED_COLLECTION = 'activityFeed';
 const LEADERBOARD_COLLECTION = 'explorerLeaderboard';

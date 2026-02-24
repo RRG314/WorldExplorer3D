@@ -1373,3 +1373,24 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Validation results:
     - iPhone 12: `My Rooms` no longer overlaps start button on title tab; in-game multiplayer button level with flower and no overlap with Explore control row.
     - iPhone SE + Pixel 5: `My Rooms` non-overlapping; no horizontal overflow; no console errors.
+- Room return persistence pass (2026-02-24):
+  - Added persistent per-user room shortcuts in Firestore: `users/{uid}/myRooms/{roomCode}`.
+  - `app/js/multiplayer/rooms.js` now upserts `myRooms` on create/join/update and removes owner shortcut on room delete.
+  - Added `listenMyRooms(...)` and switched multiplayer UI room list subscription from owner-query to saved-room-query so users can reopen rooms they created or joined.
+  - Updated My Rooms copy in title multiplayer panel to clarify reopen behavior and owner-only delete behavior.
+  - Added Firestore rules for `users/{uid}/myRooms/{roomCode}` and tests for self-only access.
+  - Added/kept shared room block persistence (`rooms/{roomId}/blocks/{blockId}`) integration and rules coverage.
+- Cache busting update:
+  - Bumped multiplayer/runtime import versions to force fresh module fetch on GitHub Pages (`v=61` for room-related module imports and bootstrap chain).
+  - Bumped app entry block module import to `blocks.js?v=56` so shared block sync code is not stale.
+- Validation:
+  - Syntax checks passed for updated JS modules.
+  - Firestore rules tests passed: `31/31` (`npm run test:rules`).
+  - Playwright client smoke run executed; latest screenshots: `/Users/stevenreid/Documents/New project/output/web-game/shot-0.png`, `/Users/stevenreid/Documents/New project/output/web-game/shot-1.png`.
+- TODO for next agent:
+  - Run an authenticated manual browser check against deployed Hosting/Pages to confirm `myRooms` list populates with real user accounts and room reopen/delete flows on production config.
+- Additional room-flow verification (2026-02-24):
+  - Ran emulator-backed integration script through `firebase emulators:exec` for create/join/return/delete flow with new `myRooms` ledger.
+  - Result: pass (`output/playwright/room-flow-backend-check/report.json`): owner create works, member join works, both users receive saved-room entry, owner delete operations succeed.
+  - Runtime DOM state check passed for Multiplayer tab activation + My Rooms controls presence:
+    - `output/playwright/room-return-statecheck/report.json`

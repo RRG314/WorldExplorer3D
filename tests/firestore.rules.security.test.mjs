@@ -146,6 +146,32 @@ function userDoc(uid, displayName) {
   };
 }
 
+function savedRoomDoc(roomCode, ownerUid, role = 'owner') {
+  const ts = Timestamp.fromMillis(Date.now() - 30_000);
+  return {
+    code: roomCode,
+    name: 'Saved Room',
+    ownerUid,
+    visibility: 'private',
+    role,
+    world: {
+      kind: 'earth',
+      seed: 'latlon:0,0',
+      lat: 0,
+      lon: 0
+    },
+    locationTag: {
+      label: 'Baltimore',
+      city: 'Baltimore',
+      cityKey: 'baltimore',
+      kind: 'earth'
+    },
+    createdAt: ts,
+    updatedAt: ts,
+    lastJoinedAt: ts
+  };
+}
+
 async function seedData(testEnv) {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();
@@ -515,6 +541,71 @@ await runCheck('non-member cannot write room paint claim', async () => {
     updatedAt: serverTimestamp(),
     expiresAt: Timestamp.fromMillis(Date.now() + 7 * 24 * 60 * 60 * 1000)
   }));
+});
+
+await runCheck('member can create shared room block', async () => {
+  await assertSucceeds(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'blocks', '10_2_4'), {
+    id: '10_2_4',
+    gx: 10,
+    gy: 2,
+    gz: 4,
+    materialIndex: 1,
+    createdBy: MEMBER_UID,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('non-member cannot create shared room block', async () => {
+  await assertFails(setDoc(doc(attackerDb, 'rooms', ROOM_ID, 'blocks', '3_1_2'), {
+    id: '3_1_2',
+    gx: 3,
+    gy: 1,
+    gz: 2,
+    materialIndex: 0,
+    createdBy: ATTACKER_UID,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('member cannot overwrite shared block owned by another user', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'rooms', ROOM_ID, 'blocks', '8_4_2'), {
+      id: '8_4_2',
+      gx: 8,
+      gy: 4,
+      gz: 2,
+      materialIndex: 2,
+      createdBy: OWNER_UID,
+      createdAt: Timestamp.fromMillis(Date.now() - 10_000),
+      updatedAt: Timestamp.fromMillis(Date.now() - 10_000)
+    });
+  });
+
+  await assertFails(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'blocks', '8_4_2'), {
+    id: '8_4_2',
+    gx: 8,
+    gy: 4,
+    gz: 2,
+    materialIndex: 3,
+    createdBy: MEMBER_UID,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }, { merge: true }));
+});
+
+await runCheck('user can save own room shortcut entry', async () => {
+  await assertSucceeds(setDoc(doc(ownerDb, 'users', OWNER_UID, 'myRooms', ROOM_ID), savedRoomDoc(ROOM_ID, OWNER_UID, 'owner')));
+});
+
+await runCheck('attacker cannot read another user saved room shortcuts', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'users', OWNER_UID, 'myRooms', ROOM_ID)));
+});
+
+await runCheck('attacker cannot write another user saved room shortcuts', async () => {
+  await assertFails(setDoc(doc(attackerDb, 'users', OWNER_UID, 'myRooms', ROOM_ID), savedRoomDoc(ROOM_ID, OWNER_UID, 'member')));
 });
 
 await runCheck('owner oversize chat message blocked', async () => {

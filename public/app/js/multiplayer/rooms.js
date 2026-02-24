@@ -23,6 +23,7 @@ const ROOM_CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const ROOM_COLLECTION = 'rooms';
 const USERS_COLLECTION = 'users';
 const PLAYER_COLLECTION = 'players';
+const MY_ROOMS_COLLECTION = 'myRooms';
 const ROOM_STATE_COLLECTION = 'state';
 const HOME_BASE_DOC = 'homeBase';
 const ROOM_PRESENCE_TTL_MS = 90 * 1000;
@@ -30,6 +31,7 @@ const DEFAULT_MAX_PLAYERS = 12;
 const CITY_KEY_MAX_LEN = 48;
 const PUBLIC_ROOM_RESULT_LIMIT = 20;
 const OWNED_ROOM_RESULT_LIMIT = 40;
+const MY_ROOMS_RESULT_LIMIT = 80;
 const PAINT_TOWN_MIN_TIME_LIMIT_SEC = 30;
 const PAINT_TOWN_MAX_TIME_LIMIT_SEC = 1800;
 const DEFAULT_PAINT_TOWN_RULES = Object.freeze({
@@ -307,6 +309,66 @@ function toRoomObject(roomSnap) {
   };
 }
 
+function toSavedRoomObject(savedSnap) {
+  const data = savedSnap && savedSnap.data ? savedSnap.data() : null;
+  if (!data) return null;
+
+  const world = normalizeWorld(data.world || {});
+  const locationTag = normalizeLocationTag(data.locationTag, world, String(data.name || '').trim());
+  const createdAtMs = typeof data.createdAt?.toMillis === 'function' ? data.createdAt.toMillis() : null;
+  const lastJoinedAtMs = typeof data.lastJoinedAt?.toMillis === 'function'
+    ? data.lastJoinedAt.toMillis()
+    : null;
+
+  return {
+    id: savedSnap.id,
+    code: normalizeCode(data.code || savedSnap.id || ''),
+    name: String(data.name || ''),
+    visibility: normalizeVisibility(data.visibility),
+    ownerUid: String(data.ownerUid || ''),
+    role: normalizePlayerRole(data.role || 'member'),
+    world,
+    locationTag,
+    createdAtMs,
+    lastJoinedAtMs
+  };
+}
+
+function myRoomsCollection(db, uid) {
+  return collection(db, USERS_COLLECTION, uid, MY_ROOMS_COLLECTION);
+}
+
+async function upsertMyRoomRecord(roomLike, role = 'member') {
+  const { db } = getServices();
+  const user = requireSignedInUser();
+  const code = normalizeCode(roomLike?.code || roomLike?.id || '');
+  if (!code) return;
+
+  const world = normalizeWorld(roomLike?.world || {});
+  const locationTag = normalizeLocationTag(
+    roomLike?.locationTag,
+    world,
+    String(roomLike?.name || '').trim()
+  );
+
+  const payload = {
+    code,
+    name: String(roomLike?.name || '').trim().slice(0, 80),
+    ownerUid: String(roomLike?.ownerUid || ''),
+    visibility: normalizeVisibility(roomLike?.visibility),
+    role: normalizePlayerRole(role, 'member'),
+    world,
+    updatedAt: serverTimestamp(),
+    lastJoinedAt: serverTimestamp(),
+    createdAt: serverTimestamp()
+  };
+
+  if (locationTag) payload.locationTag = locationTag;
+  else payload.locationTag = deleteField();
+
+  await setDoc(doc(myRoomsCollection(db, user.uid), code), payload, { merge: true });
+}
+
 function setCurrentRoom(nextRoom) {
   currentRoom = nextRoom ? cloneObject(nextRoom) : null;
   globalThis.dispatchEvent(new CustomEvent('we3d-room-changed', {
@@ -523,6 +585,11 @@ async function createRoom(options = {}) {
   }
 
   setCurrentRoom(room);
+  try {
+    await upsertMyRoomRecord(room, 'owner');
+  } catch (err) {
+    console.warn('[multiplayer][rooms] Failed to persist room in myRooms after create:', err);
+  }
   return room;
 }
 
@@ -594,6 +661,12 @@ async function joinRoomByCode(codeInput, options = {}) {
 
   const room = toRoomObject(roomSnap);
   setCurrentRoom(room);
+  try {
+    const role = room && room.ownerUid === user.uid ? 'owner' : 'member';
+    await upsertMyRoomRecord(room, role);
+  } catch (err) {
+    console.warn('[multiplayer][rooms] Failed to persist room in myRooms after join:', err);
+  }
   return room;
 }
 
@@ -665,6 +738,14 @@ async function updateRoomSettings(roomId, updates = {}) {
   await setDoc(roomRef, payload, { merge: true });
   const nextSnap = await getDoc(roomRef);
   const nextRoom = toRoomObject(nextSnap);
+  if (nextRoom) {
+    try {
+      const role = nextRoom.ownerUid === user.uid ? 'owner' : 'member';
+      await upsertMyRoomRecord(nextRoom, role);
+    } catch (err) {
+      console.warn('[multiplayer][rooms] Failed to sync myRooms after room update:', err);
+    }
+  }
   if (nextRoom && getCurrentRoom()?.id === normalizedRoomId) {
     setCurrentRoom(nextRoom);
   }
@@ -764,6 +845,43 @@ async function listOwnedRooms(options = {}) {
   return sortRoomsByCreatedAtDesc(rows);
 }
 
+function listenMyRooms(callback, options = {}) {
+  if (typeof callback !== 'function') return () => {};
+  const user = getCurrentUser();
+  if (!user || !user.uid) {
+    callback([]);
+    return () => {};
+  }
+
+  let db;
+  try {
+    ({ db } = getServices());
+  } catch (_) {
+    callback([]);
+    return () => {};
+  }
+
+  const resultLimit = Math.max(1, Math.min(150, Math.floor(Number(options.resultLimit || MY_ROOMS_RESULT_LIMIT))));
+  const q = query(
+    myRoomsCollection(db, user.uid),
+    orderBy('lastJoinedAt', 'desc'),
+    limit(resultLimit)
+  );
+
+  return onSnapshot(q, (snap) => {
+    const rows = [];
+    snap.forEach((savedSnap) => {
+      const room = toSavedRoomObject(savedSnap);
+      if (!room) return;
+      rows.push(room);
+    });
+    callback(rows);
+  }, (err) => {
+    console.warn('[multiplayer][rooms] listenMyRooms failed:', err);
+    callback([]);
+  });
+}
+
 function listenOwnedRooms(callback, options = {}) {
   if (typeof callback !== 'function') return () => {};
   const user = getCurrentUser();
@@ -819,6 +937,11 @@ async function deleteOwnedRoom(roomCode) {
   }
 
   await deleteDoc(roomRef);
+  try {
+    await deleteDoc(doc(db, USERS_COLLECTION, user.uid, MY_ROOMS_COLLECTION, normalizedCode));
+  } catch (err) {
+    console.warn('[multiplayer][rooms] Failed to remove deleted room from myRooms:', err);
+  }
   if (currentRoom && normalizeCode(currentRoom.code) === normalizedCode) {
     setCurrentRoom(null);
   }
@@ -940,6 +1063,7 @@ export {
   joinRoomByCode,
   leaveRoom,
   listOwnedRooms,
+  listenMyRooms,
   listenOwnedRooms,
   listenRoom,
   listenHomeBase,
