@@ -408,19 +408,23 @@ async function createRoom(options = {}) {
 
       if (locationTag) roomPayload.locationTag = locationTag;
 
-      const batch = writeBatch(db);
-      batch.set(roomRef, roomPayload);
-      batch.set(userRef, {
-        uid: user.uid,
-        email: String(user.email || profile.email || '').trim().slice(0, 320),
-        displayName: displayName.slice(0, 60),
-        roomCreateCount: roomCreateCount + 1,
-        roomCreateLimit: hasAdminTokenClaim
-          ? Math.max(roomCreateLimit, ROOM_CREATE_LIMITS_BY_PLAN.admin)
-          : roomCreateLimit,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
-      await batch.commit();
+      if (hasAdminTokenClaim) {
+        // Admin claims bypass room quota coupling in rules; avoid unnecessary
+        // user profile writes that can be blocked by stricter self-update guards.
+        await setDoc(roomRef, roomPayload);
+      } else {
+        const batch = writeBatch(db);
+        batch.set(roomRef, roomPayload);
+        batch.set(userRef, {
+          uid: user.uid,
+          email: String(user.email || profile.email || '').trim().slice(0, 320),
+          displayName: displayName.slice(0, 60),
+          roomCreateCount: roomCreateCount + 1,
+          roomCreateLimit,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+        await batch.commit();
+      }
 
       createdCode = code;
       break;

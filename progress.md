@@ -1271,3 +1271,13 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - all multiplayer module imports of `rooms.js` -> `v=57`
     - all page/ui imports of `entitlements.js` -> `v=57` (root/app/account + public copies)
   - Verified via Playwright network capture: only `entitlements.js?v=57` and `rooms.js?v=57` loaded (no legacy v55/v56 duplicates for these modules).
+- Multiplayer room-create production reliability pass (2026-02-24):
+  - Implemented admin-claim create path decoupling in `app/js/multiplayer/rooms.js` + `public/app/js/multiplayer/rooms.js`:
+    - when auth token has admin claim, create now writes only `rooms/{code}` (no coupled `users/{uid}` quota write in same commit).
+    - non-admin path remains batch room+quota update to preserve quota enforcement.
+  - Ran rules suite: `npm run test:rules` -> 23/23 passed.
+  - Ran web-game Playwright smoke against local app (`/app/`) and inspected screenshots:
+    - `output/playwright/multiplayer-room-create-smoke/shot-0.png`
+    - `output/playwright/multiplayer-room-create-smoke/shot-1.png`
+    - no console/page errors emitted by the run.
+  - Confirmed runtime loaded `rooms.js?v=59` and `ui-room.js?v=59` on `/app/` in local HTTP logs.
