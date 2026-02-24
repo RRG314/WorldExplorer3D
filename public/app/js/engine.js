@@ -1,4 +1,4 @@
-import { ctx as appCtx } from "./shared-context.js?v=54"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // engine.js - Three.js initialization, renderer, scene, lighting, car mesh
 // ============================================================================
 

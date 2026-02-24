@@ -516,9 +516,9 @@
   </div>
 
   <script type="module">
-    import { hasFirebaseConfig } from '../js/firebase-init.js';
-    import { ensureSignedIn, observeAuth, signOutUser } from '../js/auth-ui.js';
-    import { ensureEntitlements, formatRemainingTrial, startTrialIfEligible, subscribeEntitlements } from '../js/entitlements.js';
+    import { hasFirebaseConfig } from '../js/firebase-init.js?v=55';
+    import { ensureSignedIn, observeAuth, signOutUser } from '../js/auth-ui.js?v=55';
+    import { ensureEntitlements, formatRemainingTrial, startTrialIfEligible, subscribeEntitlements } from '../js/entitlements.js?v=55';
     import {
       enableAdminTester,
       getAccountOverview,
@@ -526,7 +526,7 @@
       redirectToCheckout,
       redirectToPortal,
       updateAccountProfile
-    } from '../js/billing.js';
+    } from '../js/billing.js?v=55';
     import {
       addFriend,
       dismissInvite,
@@ -535,7 +535,7 @@
       markInviteSeen,
       removeFriend,
       sendInviteToFriend
-    } from '../app/js/multiplayer/social.js?v=54';
+    } from '../app/js/multiplayer/social.js?v=55';
 
     const authPrompt = document.getElementById('authPrompt');
     const accountPanel = document.getElementById('accountPanel');

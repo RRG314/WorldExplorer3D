@@ -1213,3 +1213,9 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Added regression test: admin custom claim can create room even if profile is free with zero quota.
   - Validation: `npm test` passed (`21/21`).
   - Deployed updated Firestore rules to `worldexplorer3d-d9b83`.
+- Frontend cache-busting hotfix for module export mismatch (2026-02-24):
+  - Root cause: JS assets were served with `Cache-Control: immutable`, while import paths reused `?v=54`; clients could keep stale `entitlements.js` without `startTrialIfEligible`.
+  - Bumped module version tags across `public` from `?v=54` to `?v=55`.
+  - Added explicit `?v=55` to non-versioned imports for `firebase-init.js`, `auth-ui.js`, `entitlements.js`, and `billing.js` in app/account/landing entry modules.
+  - Updated multiplayer UI import to `../../../js/entitlements.js?v=55`.
+  - Validation: `npm test` passed (`21/21`).

@@ -1,13 +1,13 @@
-import { ctx as appCtx } from '../shared-context.js?v=54';
-import { startTrialIfEligible } from '../../../js/entitlements.js';
-import { createArtifact, listenArtifacts, removeArtifact } from './artifacts.js?v=54';
-import { CHAT_MAX_LENGTH, listenChat, reportMessage, sendMessage } from './chat.js?v=54';
-import { createGhostManager } from './ghosts.js?v=54';
+import { ctx as appCtx } from '../shared-context.js?v=55';
+import { startTrialIfEligible } from '../../../js/entitlements.js?v=55';
+import { createArtifact, listenArtifacts, removeArtifact } from './artifacts.js?v=55';
+import { CHAT_MAX_LENGTH, listenChat, reportMessage, sendMessage } from './chat.js?v=55';
+import { createGhostManager } from './ghosts.js?v=55';
 import {
   bumpExplorerLeaderboard,
   listenExplorerLeaderboard
-} from './loop.js?v=54';
-import { listenPlayers, startPresence, stopPresence } from './presence.js?v=54';
+} from './loop.js?v=55';
+import { listenPlayers, startPresence, stopPresence } from './presence.js?v=55';
 import {
   createRoom,
   deriveRoomDeterministicSeed,
@@ -22,12 +22,12 @@ import {
   normalizeCode,
   setHomeBase,
   updateRoomSettings
-} from './rooms.js?v=54';
+} from './rooms.js?v=55';
 import {
   listenPaintClaims,
   normalizeColorHex as normalizePaintColorHex,
   upsertPaintClaim
-} from './painttown.js?v=54';
+} from './painttown.js?v=55';
 import {
   addFriend,
   dismissInvite,
@@ -38,7 +38,7 @@ import {
   recordRecentPlayers,
   removeFriend,
   sendInviteToFriend
-} from './social.js?v=54';
+} from './social.js?v=55';
 
 const ENABLED_PLANS = new Set(['trial', 'support', 'supporter', 'pro']);
 

@@ -1732,7 +1732,7 @@ Explore the area
 <div id="resultScreen"><div class="resultBox"><div id="resultTitle">Complete!</div><div id="resultStats"></div><button class="pauseBtn" id="againBtn">Play Again</button><button class="pauseBtn" id="freeBtn">Free Roam</button><button class="pauseBtn" id="resMenuBtn">Menu</button></div></div>
 <div id="caughtScreen"><div class="caughtBox"><div class="caughtTitle">🚔 BUSTED!</div><div class="caughtText">You've been caught!</div><button class="caughtBtn" id="caughtBtn">Try Again</button></div></div>
 <script type="module">
-import { hasFirebaseConfig } from '../js/firebase-init.js';
+import { hasFirebaseConfig } from '../js/firebase-init.js?v=55';
 import {
   observeAuth,
   requestPasswordReset,
@@ -1740,14 +1740,14 @@ import {
   signInWithGoogle,
   signOutUser,
   signUpWithEmailPassword
-} from '../js/auth-ui.js';
+} from '../js/auth-ui.js?v=55';
 import {
   ensureEntitlements,
   formatRemainingTrial,
   getFreeEntitlementsState,
   startTrialIfEligible,
   subscribeEntitlements
-} from '../js/entitlements.js';
+} from '../js/entitlements.js?v=55';
 
 const appSignInBtn = document.getElementById('appSignInBtn');
 const proAccessPanel = document.getElementById('proAccessPanel');
@@ -2102,5 +2102,5 @@ if (titleScreenObserverTarget) {
   titleObserver.observe(titleScreenObserverTarget, { attributes: true, attributeFilter: ['class'] });
 }
 </script>
-<script type="module" src="js/bootstrap.js?v=54"></script>
+<script type="module" src="js/bootstrap.js?v=55"></script>
 </body></html>
