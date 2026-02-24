@@ -1206,3 +1206,10 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - Retries on 404/501 to avoid hard failures when rewrites are incomplete.
   - Added missing Hosting rewrite in `firebase.json` for `/enableAdminTester`.
   - Validation: `node --check public/js/billing.js` and `npm test` (`20/20`) passed.
+- Firestore rules admin-claim hardening pass (2026-02-24):
+  - Added safe `isAdminToken()` checks that guard token property access with `'in'` checks to avoid evaluation errors.
+  - Expanded multiplayer entitlement path to honor admin custom claims (`request.auth.token.admin/role`) and admin status strings in user doc.
+  - Allowed admin quota self-updates to raise room limit when needed (without affecting non-admin quota enforcement).
+  - Added regression test: admin custom claim can create room even if profile is free with zero quota.
+  - Validation: `npm test` passed (`21/21`).
+  - Deployed updated Firestore rules to `worldexplorer3d-d9b83`.

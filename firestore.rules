@@ -9,6 +9,19 @@ service cloud.firestore {
       return isSignedIn() && request.auth.uid == uid;
     }
 
+    function isAdminToken() {
+      return isSignedIn() && (
+        (
+          'admin' in request.auth.token &&
+          request.auth.token.admin == true
+        ) ||
+        (
+          'role' in request.auth.token &&
+          request.auth.token.role in ['admin', 'ADMIN']
+        )
+      );
+    }
+
     function hasUserDoc() {
       return isSignedIn() &&
         exists(/databases/$(database)/documents/users/$(request.auth.uid));
@@ -21,7 +34,8 @@ service cloud.firestore {
     function userPlan() {
       return !hasUserDoc() ? 'free' :
         (
-          userDocData().subscriptionStatus == 'admin'
+          isAdminToken() ||
+          userDocData().subscriptionStatus in ['admin', 'Admin', 'ADMIN']
             ? 'pro'
             : (
                 userDocData().plan == 'trial'
@@ -89,7 +103,8 @@ service cloud.firestore {
       let beforeCount = roomCreateCountFromData(beforeData);
       let beforeLimit = roomCreateLimitFromData(beforeData);
 
-      return hasUserDoc() &&
+      return isAdminToken() || (
+        hasUserDoc() &&
         afterExists &&
         afterData is map &&
         ('roomCreateCount' in afterData) &&
@@ -99,7 +114,8 @@ service cloud.firestore {
         afterData.roomCreateLimit is int &&
         afterData.roomCreateLimit == beforeLimit &&
         beforeLimit > 0 &&
-        beforeCount < beforeLimit;
+        beforeCount < beforeLimit
+      );
     }
 
     function isMultiplayerEntitled() {
@@ -542,9 +558,18 @@ service cloud.firestore {
       let afterCount = roomCreateCountFromData(request.resource.data);
       let afterLimit = roomCreateLimitFromData(request.resource.data);
 
-      return afterLimit == beforeLimit &&
-        afterCount >= beforeCount &&
-        afterCount <= beforeCount + 1;
+      return isAdminToken()
+        ? (
+            afterCount >= beforeCount &&
+            afterCount <= beforeCount + 1 &&
+            afterLimit >= beforeLimit &&
+            afterLimit <= 10000
+          )
+        : (
+            afterLimit == beforeLimit &&
+            afterCount >= beforeCount &&
+            afterCount <= beforeCount + 1
+          );
     }
 
     function validUserSelfUpdate(userId) {
@@ -558,13 +583,16 @@ service cloud.firestore {
           'roomCreateCount',
           'roomCreateLimit'
         ]) &&
+        ('uid' in request.resource.data) &&
         request.resource.data.uid == userId &&
         (
           !('uid' in resource.data) ||
           request.resource.data.uid == resource.data.uid
         ) &&
+        ('email' in request.resource.data) &&
         request.resource.data.email is string &&
         request.resource.data.email.size() <= 320 &&
+        ('displayName' in request.resource.data) &&
         request.resource.data.displayName is string &&
         request.resource.data.displayName.size() <= 60 &&
         (!('roomCreateCount' in request.resource.data) ||

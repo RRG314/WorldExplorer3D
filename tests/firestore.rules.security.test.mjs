@@ -193,6 +193,7 @@ const testEnv = await initializeTestEnvironment({
 await seedData(testEnv);
 
 const ownerDb = testEnv.authenticatedContext(OWNER_UID).firestore();
+const adminClaimsDb = testEnv.authenticatedContext(OWNER_UID, { admin: true, role: 'admin' }).firestore();
 const memberDb = testEnv.authenticatedContext(MEMBER_UID).firestore();
 const attackerDb = testEnv.authenticatedContext(ATTACKER_UID).firestore();
 const inviteeDb = testEnv.authenticatedContext(INVITEE_UID).firestore();
@@ -358,6 +359,48 @@ await runCheck('admin status can create room even if plan field is stale free', 
   const batch = writeBatch(ownerDb);
   batch.set(doc(ownerDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID));
   batch.set(doc(ownerDb, 'users', OWNER_UID), {
+    uid: OWNER_UID,
+    email: `${OWNER_UID}@example.test`,
+    displayName: 'Owner',
+    roomCreateCount: 1,
+    roomCreateLimit: 10000,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await assertSucceeds(batch.commit());
+});
+
+await runCheck('admin custom claim can create room even when profile plan is free and limit is zero', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    const ts = Timestamp.fromMillis(Date.now() - 120_000);
+    await setDoc(doc(db, 'users', OWNER_UID), {
+      uid: OWNER_UID,
+      email: `${OWNER_UID}@example.test`,
+      displayName: 'Owner',
+      createdAt: ts,
+      updatedAt: ts,
+      plan: 'free',
+      subscriptionStatus: 'none',
+      trialStartsAt: null,
+      trialEndsAt: null,
+      trialConsumedAt: null,
+      entitlements: {
+        multiplayer: false,
+        earlyAccess: false
+      },
+      roomCreateCount: 0,
+      roomCreateLimit: 0,
+      stripeCustomerId: '',
+      stripeSubscriptionId: '',
+      billingCycleAnchorAt: null,
+      cancelAtPeriodEnd: false
+    });
+  });
+
+  const roomCode = 'QT12AH';
+  const batch = writeBatch(adminClaimsDb);
+  batch.set(doc(adminClaimsDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID));
+  batch.set(doc(adminClaimsDb, 'users', OWNER_UID), {
     roomCreateCount: 1,
     roomCreateLimit: 10000,
     updatedAt: serverTimestamp()
