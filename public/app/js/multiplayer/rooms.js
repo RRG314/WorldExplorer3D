@@ -9,9 +9,9 @@ import {
   onSnapshot,
   orderBy,
   query,
-  runTransaction,
   serverTimestamp,
   setDoc,
+  writeBatch,
   where
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
@@ -286,10 +286,14 @@ async function createRoom(options = {}) {
   const cityKey = locationTag ? locationTag.cityKey : '';
   const roomRules = normalizeRoomRules(options.rules || {});
   const userRef = doc(db, USERS_COLLECTION, user.uid);
+  const entitlement = globalThis.__WE3D_ENTITLEMENTS__ || {};
+  const entitlementAdminHint =
+    entitlement.isAdmin === true || String(entitlement.role || '').toLowerCase() === 'admin';
 
-  // Ensure the user profile exists so quota consumption can be validated by rules.
-  const userSnap = await getDoc(userRef);
-  if (!userSnap.exists()) {
+  async function ensureUserProfile() {
+    let snap = await getDoc(userRef);
+    if (snap.exists()) return snap;
+
     await setDoc(userRef, {
       uid: user.uid,
       email: String(user.email || '').trim().slice(0, 320),
@@ -297,9 +301,14 @@ async function createRoom(options = {}) {
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp()
     }, { merge: true });
+    snap = await getDoc(userRef);
+    return snap;
   }
 
+  let profileSnap = await ensureUserProfile();
+
   let createdCode = null;
+  let lastDeniedErr = null;
 
   for (let attempt = 0; attempt < 16; attempt++) {
     const code = normalizeCode(options.code || randomCode());
@@ -308,78 +317,83 @@ async function createRoom(options = {}) {
     }
 
     const roomRef = doc(db, ROOM_COLLECTION, code);
+    const profile = profileSnap.exists() ? (profileSnap.data() || {}) : {};
+    const plan = normalizePlanForLimits(profile.plan || 'free');
+    const isAdmin = entitlementAdminHint || String(profile.subscriptionStatus || '').toLowerCase() === 'admin';
+    const roomCreateCount = normalizeRoomCreateCount(profile.roomCreateCount);
+    const persistedLimit = Number.isFinite(Number(profile.roomCreateLimit))
+      ? Math.max(0, Math.min(10000, Math.floor(Number(profile.roomCreateLimit))))
+      : null;
+    const planLimit = roomCreateLimitForPlan(plan);
+    const baseRoomCreateLimit = Math.max(
+      planLimit,
+      persistedLimit == null ? planLimit : persistedLimit
+    );
+    const roomCreateLimit = isAdmin
+      ? Math.max(
+          ROOM_CREATE_LIMITS_BY_PLAN.admin,
+          baseRoomCreateLimit
+        )
+      : baseRoomCreateLimit;
+
+    if (roomCreateLimit <= 0 || roomCreateCount >= roomCreateLimit) {
+      throw new Error('Room creation limit reached for your plan. Rename or reuse existing rooms, or upgrade for a higher limit.');
+    }
 
     try {
-      await runTransaction(db, async (tx) => {
-        const existing = await tx.get(roomRef);
-        if (existing.exists()) {
-          throw new Error('ROOM_CODE_COLLISION');
-        }
-        const profileSnap = await tx.get(userRef);
-        const profile = profileSnap.exists() ? (profileSnap.data() || {}) : {};
-        const plan = normalizePlanForLimits(profile.plan || 'free');
-        const isAdmin = String(profile.subscriptionStatus || '').toLowerCase() === 'admin';
-        const roomCreateCount = normalizeRoomCreateCount(profile.roomCreateCount);
-        const persistedLimit = Number.isFinite(Number(profile.roomCreateLimit))
-          ? Math.max(0, Math.min(10000, Math.floor(Number(profile.roomCreateLimit))))
-          : null;
-        const planLimit = roomCreateLimitForPlan(plan);
-        const baseRoomCreateLimit = Math.max(
-          planLimit,
-          persistedLimit == null ? planLimit : persistedLimit
-        );
-        const roomCreateLimit = isAdmin
-          ? Math.max(
-              ROOM_CREATE_LIMITS_BY_PLAN.admin,
-              baseRoomCreateLimit
-            )
-          : baseRoomCreateLimit;
+      const roomPayload = {
+        code,
+        createdAt: serverTimestamp(),
+        createdBy: user.uid,
+        name: roomName,
+        visibility,
+        featured,
+        maxPlayers,
+        ownerUid: user.uid,
+        mods: { [user.uid]: true },
+        cityKey,
+        world,
+        rules: roomRules
+      };
 
-        if (roomCreateLimit <= 0 || roomCreateCount >= roomCreateLimit) {
-          throw new Error('ROOM_CREATE_LIMIT_REACHED');
-        }
+      if (locationTag) roomPayload.locationTag = locationTag;
 
-        const roomPayload = {
-          code,
-          createdAt: serverTimestamp(),
-          createdBy: user.uid,
-          name: roomName,
-          visibility,
-          featured,
-          maxPlayers,
-          ownerUid: user.uid,
-          mods: { [user.uid]: true },
-          cityKey,
-          world,
-          rules: roomRules
-        };
-
-        if (locationTag) roomPayload.locationTag = locationTag;
-        tx.set(roomRef, roomPayload);
-        tx.set(userRef, {
-          uid: user.uid,
-          email: String(user.email || profile.email || '').trim().slice(0, 320),
-          displayName: displayName.slice(0, 60),
-          roomCreateCount: roomCreateCount + 1,
-          roomCreateLimit,
-          updatedAt: serverTimestamp()
-        }, { merge: true });
-      });
+      const batch = writeBatch(db);
+      batch.set(roomRef, roomPayload);
+      batch.set(userRef, {
+        uid: user.uid,
+        email: String(user.email || profile.email || '').trim().slice(0, 320),
+        displayName: displayName.slice(0, 60),
+        roomCreateCount: roomCreateCount + 1,
+        roomCreateLimit,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+      await batch.commit();
 
       createdCode = code;
       break;
     } catch (err) {
-      if (String(err?.message || '') === 'ROOM_CODE_COLLISION') {
+      const errCode = String(err?.code || '');
+      if (!options.code && (errCode === 'permission-denied' || errCode === 'aborted' || errCode === 'failed-precondition')) {
+        if (errCode === 'permission-denied') lastDeniedErr = err;
+        try {
+          profileSnap = await getDoc(userRef);
+        } catch (_) {
+          // Keep prior snapshot and continue best effort retries.
+        }
         continue;
       }
-      if (String(err?.message || '') === 'ROOM_CREATE_LIMIT_REACHED') {
-        throw new Error('Room creation limit reached for your plan. Rename or reuse existing rooms, or upgrade for a higher limit.');
+      if (options.code && errCode === 'permission-denied') {
+        throw new Error('That room code is unavailable. Try another code.');
       }
       throw err;
     }
   }
 
   if (!createdCode) {
+    if (lastDeniedErr) {
+      throw new Error('Room creation was denied by Firestore. Confirm Firestore rules are deployed, your account has multiplayer entitlement, and App Check is configured (or disabled for Firestore).');
+    }
     throw new Error('Unable to reserve a room code. Please retry.');
   }
 

@@ -1225,3 +1225,9 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Kept Firebase hosting behavior unchanged (`firebase.json` still serves `public/`).
   - Validation: local static serve returned 200 for `/`, `/app/`, and `/js/entitlements.js?v=55`; app page includes `bootstrap.js?v=55` and `entitlements.js?v=55` imports.
   - Regression check: `npm test` passed (`21/21`).
+- Multiplayer room-creation blocker fix (2026-02-24):
+  - Root cause identified: create flow used a transaction `get()` on target room code before create; Firestore rules intentionally deny reads for non-existent private room docs, causing create to fail with `Missing or insufficient permissions`.
+  - Refactored `app/js/multiplayer/rooms.js` and `public/app/js/multiplayer/rooms.js` create path to atomic `writeBatch` (room doc + quota counter update) with retry on random-code collision-like permission failures.
+  - Added clearer terminal error when Firestore denies all create attempts (rules/App Check/entitlement guidance).
+  - Kept TTL/presence/join logic unchanged.
+  - Validation: `npm run test:rules` passes `21/21` after patch.
