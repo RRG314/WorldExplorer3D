@@ -91,9 +91,17 @@ function roomCreateLimitForPlan(plan) {
 }
 
 function normalizeRoomCreateCount(value) {
-  const n = Number(value);
-  if (!Number.isFinite(n)) return 0;
-  return Math.max(0, Math.min(10000, Math.floor(n)));
+  if (typeof value !== 'number' || !Number.isFinite(value)) return 0;
+  const n = Math.floor(value);
+  if (n !== value) return 0;
+  return Math.max(0, Math.min(10000, n));
+}
+
+function normalizeRoomCreateLimitOrNull(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+  const n = Math.floor(value);
+  if (n !== value) return null;
+  return Math.max(0, Math.min(10000, n));
 }
 
 function planLabel(plan) {
@@ -143,13 +151,13 @@ function normalizeProfile(uid, raw = {}) {
     ? cloneEntitlements({ ...baseEntitlements, ...raw.entitlements })
     : baseEntitlements;
   const roomCreateCount = normalizeRoomCreateCount(raw.roomCreateCount);
-  const persistedRoomCreateLimit = Number.isFinite(Number(raw.roomCreateLimit))
-    ? Math.max(0, Math.min(10000, Math.floor(Number(raw.roomCreateLimit))))
-    : roomCreateLimitForPlan(plan);
+  const persistedRoomCreateLimit = normalizeRoomCreateLimitOrNull(raw.roomCreateLimit);
   const planRoomCreateLimit = roomCreateLimitForPlan(plan);
-  const roomCreateLimit = isAdmin
-    ? Math.max(persistedRoomCreateLimit, ADMIN_TEST_ROOM_CREATE_LIMIT)
-    : planRoomCreateLimit;
+  const rulesLimit = Math.max(
+    planRoomCreateLimit,
+    persistedRoomCreateLimit == null ? planRoomCreateLimit : persistedRoomCreateLimit
+  );
+  const roomCreateLimit = isAdmin ? rulesLimit : planRoomCreateLimit;
 
   return {
     uid,
@@ -220,22 +228,14 @@ async function ensureUserDoc(user) {
     const plan = normalizePlan(existing.plan);
     const nextEmail = user.email || existing.email || '';
     const nextDisplayName = user.displayName || existing.displayName || '';
-    const existingRoomCreateCount = Number.isFinite(Number(existing.roomCreateCount))
-      ? Math.floor(Number(existing.roomCreateCount))
-      : null;
-    const existingRoomCreateLimitRaw = Number.isFinite(Number(existing.roomCreateLimit))
-      ? Math.floor(Number(existing.roomCreateLimit))
-      : null;
+    const existingRoomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
+    const existingRoomCreateLimitRaw = normalizeRoomCreateLimitOrNull(existing.roomCreateLimit);
     const isAdminStatus = String(existing.subscriptionStatus || '').toLowerCase() === 'admin';
     const isAdminClaim = await hasAdminTokenClaim(user, isAdminStatus);
     const rulesPlan = isAdminStatus || isAdminClaim ? 'pro' : plan;
     const planRoomCreateLimit = roomCreateLimitForPlan(rulesPlan);
-    const nextRoomCreateCount = existingRoomCreateCount == null
-      ? 0
-      : normalizeRoomCreateCount(existingRoomCreateCount);
-    const normalizedStoredLimit = existingRoomCreateLimitRaw == null
-      ? null
-      : Math.max(0, Math.min(10000, existingRoomCreateLimitRaw));
+    const nextRoomCreateCount = existingRoomCreateCount;
+    const normalizedStoredLimit = existingRoomCreateLimitRaw;
     const nextRoomCreateLimit = isAdminClaim
       ? Math.max(
           ADMIN_TEST_ROOM_CREATE_LIMIT,

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { startTrialIfEligible } from '../../../js/entitlements.js?v=57';
+import { startTrialIfEligible } from '../../../js/entitlements.js?v=58';
 import { createArtifact, listenArtifacts, removeArtifact } from './artifacts.js?v=55';
 import { CHAT_MAX_LENGTH, listenChat, reportMessage, sendMessage } from './chat.js?v=55';
 import { createGhostManager } from './ghosts.js?v=55';
@@ -22,7 +22,7 @@ import {
   normalizeCode,
   setHomeBase,
   updateRoomSettings
-} from './rooms.js?v=57';
+} from './rooms.js?v=58';
 import {
   listenPaintClaims,
   normalizeColorHex as normalizePaintColorHex,

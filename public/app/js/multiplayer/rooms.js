@@ -89,10 +89,16 @@ function roomCreateLimitForPlan(plan) {
   return ROOM_CREATE_LIMITS_BY_PLAN[normalized] || ROOM_CREATE_LIMITS_BY_PLAN.free;
 }
 
+function firestoreRuleIntOrNull(raw) {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return null;
+  const floored = Math.floor(raw);
+  if (floored !== raw) return null;
+  return Math.max(0, Math.min(10000, floored));
+}
+
 function normalizeRoomCreateCount(raw) {
-  const parsed = Number(raw);
-  if (!Number.isFinite(parsed)) return 0;
-  return Math.max(0, Math.min(10000, Math.floor(parsed)));
+  const parsed = firestoreRuleIntOrNull(raw);
+  return parsed == null ? 0 : parsed;
 }
 
 function formatRoomCreateDeniedMessage(err, context = {}) {
@@ -121,6 +127,8 @@ function formatRoomCreateDeniedMessage(err, context = {}) {
     `adminClaim=${context.hasAdminTokenClaim ? 'yes' : 'no'}`,
     `count=${Number.isFinite(context.roomCreateCount) ? context.roomCreateCount : 0}`,
     `limit=${Number.isFinite(context.localLimit) ? context.localLimit : 0}`,
+    `rawCountType=${String(context.rawCountType || 'unknown')}`,
+    `rawLimitType=${String(context.rawLimitType || 'unknown')}`,
     `entitlement=${entitlementHint}`
   ].join(', ');
 
@@ -367,9 +375,7 @@ async function createRoom(options = {}) {
       ? 'pro'
       : normalizePlanForLimits(profile.plan || 'free');
     const roomCreateCount = normalizeRoomCreateCount(profile.roomCreateCount);
-    const persistedLimit = Number.isFinite(Number(profile.roomCreateLimit))
-      ? Math.max(0, Math.min(10000, Math.floor(Number(profile.roomCreateLimit))))
-      : null;
+    const persistedLimit = firestoreRuleIntOrNull(profile.roomCreateLimit);
     const planLimit = roomCreateLimitForPlan(plan);
     const roomCreateLimit = Math.max(
       planLimit,
@@ -429,6 +435,8 @@ async function createRoom(options = {}) {
             hasAdminTokenClaim,
             roomCreateCount,
             localLimit: localRoomCreateLimit,
+            rawCountType: typeof profile.roomCreateCount,
+            rawLimitType: typeof profile.roomCreateLimit,
             hasEntitlement
           };
         }
