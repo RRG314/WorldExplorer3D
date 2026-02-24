@@ -95,6 +95,38 @@ function normalizeRoomCreateCount(raw) {
   return Math.max(0, Math.min(10000, Math.floor(parsed)));
 }
 
+function formatRoomCreateDeniedMessage(err, context = {}) {
+  const code = String(err?.code || 'unknown');
+  const rawMessage = String(err?.message || '').trim();
+  const messageLower = rawMessage.toLowerCase();
+  const entitlementHint = context.hasEntitlement
+    ? 'entitled'
+    : 'not-entitled';
+
+  let cause = 'Firestore rules or project config denied the create-room write.';
+  if (messageLower.includes('app check')) {
+    cause = 'Firestore App Check enforcement appears active for this app.';
+  } else if (!context.hasEntitlement) {
+    cause = 'Account is currently not multiplayer-entitled in Firestore user data.';
+  } else if (context.localLimit <= 0) {
+    cause = 'Room create limit is zero for this account state.';
+  } else if (context.roomCreateCount >= context.localLimit) {
+    cause = 'Room create limit has been reached for this account.';
+  }
+
+  const ctx = [
+    `code=${code}`,
+    `plan=${String(context.plan || 'free')}`,
+    `subStatus=${String(context.subscriptionStatus || 'none')}`,
+    `adminClaim=${context.hasAdminTokenClaim ? 'yes' : 'no'}`,
+    `count=${Number.isFinite(context.roomCreateCount) ? context.roomCreateCount : 0}`,
+    `limit=${Number.isFinite(context.localLimit) ? context.localLimit : 0}`,
+    `entitlement=${entitlementHint}`
+  ].join(', ');
+
+  return `Room creation denied by Firestore. ${cause} (${ctx})${rawMessage ? ` Raw: ${rawMessage}` : ''}`;
+}
+
 function normalizePlayerRole(raw, fallback = 'member') {
   const role = String(raw || '').toLowerCase();
   if (role === 'owner' || role === 'mod' || role === 'member') return role;
@@ -320,6 +352,7 @@ async function createRoom(options = {}) {
 
   let createdCode = null;
   let lastDeniedErr = null;
+  let lastDeniedContext = null;
 
   for (let attempt = 0; attempt < 16; attempt++) {
     const code = normalizeCode(options.code || randomCode());
@@ -345,6 +378,7 @@ async function createRoom(options = {}) {
     const localRoomCreateLimit = hasAdminTokenClaim
       ? Math.max(roomCreateLimit, ROOM_CREATE_LIMITS_BY_PLAN.admin)
       : roomCreateLimit;
+    const hasEntitlement = plan === 'trial' || plan === 'support' || plan === 'supporter' || plan === 'pro';
 
     if (localRoomCreateLimit <= 0 || roomCreateCount >= localRoomCreateLimit) {
       throw new Error('Room creation limit reached for your plan. Rename or reuse existing rooms, or upgrade for a higher limit.');
@@ -387,7 +421,17 @@ async function createRoom(options = {}) {
     } catch (err) {
       const errCode = String(err?.code || '');
       if (!options.code && (errCode === 'permission-denied' || errCode === 'aborted' || errCode === 'failed-precondition')) {
-        if (errCode === 'permission-denied') lastDeniedErr = err;
+        if (errCode === 'permission-denied') {
+          lastDeniedErr = err;
+          lastDeniedContext = {
+            plan,
+            subscriptionStatus: String(profile.subscriptionStatus || 'none'),
+            hasAdminTokenClaim,
+            roomCreateCount,
+            localLimit: localRoomCreateLimit,
+            hasEntitlement
+          };
+        }
         try {
           profileSnap = await getDoc(userRef);
         } catch (_) {
@@ -404,7 +448,7 @@ async function createRoom(options = {}) {
 
   if (!createdCode) {
     if (lastDeniedErr) {
-      throw new Error('Room creation was denied by Firestore. Confirm Firestore rules are deployed, your account has multiplayer entitlement, and App Check is configured (or disabled for Firestore).');
+      throw new Error(formatRoomCreateDeniedMessage(lastDeniedErr, lastDeniedContext || {}));
     }
     throw new Error('Unable to reserve a room code. Please retry.');
   }
