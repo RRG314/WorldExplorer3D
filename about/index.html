@@ -4,13 +4,186 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>About | World Explorer</title>
-  <meta http-equiv="refresh" content="0; url=../public/about/index.html">
-  <script>
-    window.location.replace('../public/about/index.html');
-  </script>
+  <meta name="description" content="About World Explorer and its founder, Steven Reid.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg-0: #071324;
+      --bg-1: #0f2742;
+      --bg-2: #1f4f73;
+      --ink: #e6f2ff;
+      --muted: #b7cde0;
+      --card: rgba(7, 19, 36, 0.72);
+      --line: rgba(183, 205, 224, 0.24);
+      --accent: #53c4ff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 20% 20%, rgba(83, 196, 255, 0.2), transparent 45%),
+        radial-gradient(circle at 80% 10%, rgba(255, 200, 87, 0.16), transparent 40%),
+        linear-gradient(170deg, var(--bg-2), var(--bg-1) 52%, var(--bg-0));
+      min-height: 100vh;
+      font-family: 'Barlow', sans-serif;
+      line-height: 1.55;
+    }
+
+    a { color: inherit; }
+
+    .shell {
+      width: min(980px, 92vw);
+      margin: 0 auto;
+      padding: 24px 0 44px;
+    }
+
+    .top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .brand {
+      margin: 0;
+      font-family: 'Chakra Petch', sans-serif;
+      letter-spacing: 0.03em;
+      font-size: clamp(24px, 4vw, 40px);
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+
+    .links a {
+      text-decoration: none;
+      border: 1px solid var(--line);
+      background: rgba(9, 24, 44, 0.7);
+      border-radius: 999px;
+      padding: 8px 14px;
+      font-weight: 700;
+      font-size: 14px;
+    }
+
+    .intro {
+      margin: 0 0 16px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    section {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--card);
+      padding: 20px;
+      margin-bottom: 16px;
+      backdrop-filter: blur(6px);
+    }
+
+    h2 {
+      margin: 0 0 12px;
+      font-family: 'Chakra Petch', sans-serif;
+      letter-spacing: 0.02em;
+      font-size: clamp(24px, 3vw, 30px);
+      color: #dff0ff;
+    }
+
+    p {
+      margin: 0 0 12px;
+      color: #d7e8f8;
+      font-size: 17px;
+    }
+
+    p:last-child { margin-bottom: 0; }
+
+    ul {
+      margin: 8px 0 14px;
+      padding-left: 20px;
+    }
+
+    li {
+      margin: 0 0 8px;
+      color: #d7e8f8;
+      font-size: 17px;
+    }
+
+    .founder-name {
+      font-weight: 800;
+      color: var(--accent);
+    }
+
+    footer {
+      margin-top: 20px;
+      border-top: 1px solid var(--line);
+      padding-top: 14px;
+      font-size: 14px;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 12px;
+    }
+
+    @media (max-width: 780px) {
+      .top { flex-direction: column; align-items: flex-start; }
+      .links { width: 100%; }
+      .links a { flex: 1 1 auto; text-align: center; }
+      p, li { font-size: 16px; }
+    }
+  </style>
 </head>
 <body>
-  <p>Redirecting to About page...</p>
-  <p><a href="../public/about/index.html">Continue</a></p>
+  <div class="shell">
+    <div class="top">
+      <h1 class="brand">About World Explorer</h1>
+      <div class="links">
+        <a href="../">Home</a>
+        <a href="../app/">Open App</a>
+        <a href="../account/">Account</a>
+      </div>
+    </div>
+
+    <p class="intro">World Explorer is an independent browser platform focused on real-world spatial exploration, multiplayer collaboration, and long-term technical expansion.</p>
+
+    <section>
+      <h2>About</h2>
+      <p>World Explorer is a browser-native, real-world multiplayer exploration and building platform. It lets anyone explore real cities, transition into space, land on the Moon, and share those environments with others in room-based sessions, all directly in the browser.</p>
+      <p>Unlike traditional map viewers or fictional game worlds, World Explorer is anchored to real geographic coordinates and built on a deterministic spatial engine. Environments are procedurally generated with performance-aware systems, so shared experiences stay consistent without heavy server infrastructure.</p>
+      <p>Users can:</p>
+      <ul>
+        <li>Explore real-world locations.</li>
+        <li>Drive, walk, or fly through environments.</li>
+        <li>Enter shared multiplayer rooms.</li>
+        <li>Build with blocks and place artifacts.</li>
+        <li>Participate in interactive modes like Paint the Town.</li>
+        <li>Transition from Earth to space in one runtime.</li>
+      </ul>
+      <p>The platform is designed to be expandable. Rooms act as shared world instances where users can modify space collaboratively. Over time, World Explorer aims to support deeper customization, persistent user-created environments, and broader integrations while remaining lightweight and accessible.</p>
+      <p>World Explorer is independently developed and maintained, with a focus on architectural clarity, scalability, and long-term expandability. This is the beginning of a shared real-world spatial layer, built step by step.</p>
+    </section>
+
+    <section>
+      <h2>Founder</h2>
+      <p><span class="founder-name">World Explorer is created and maintained by Steven Reid.</span></p>
+      <p>My interest has always been understanding how systems work at a foundational level. Not just using tools, but rebuilding them to understand their mechanics. Much of what powers World Explorer comes from that mindset.</p>
+      <p>Rather than relying only on existing abstractions, I often approach problems by implementing my own versions of the components I want to understand, from deterministic procedural systems to custom pseudo-random number generators and performance-aware spatial logic. Building from first principles has been my way to learn deeply and to shape the architecture intentionally.</p>
+      <p>My interests span physics, machine learning, spatial computation, and large-scale systems. I am especially drawn to ideas at the edges of conventional boundaries, not for novelty, but to explore how unconventional approaches can become practical and scalable.</p>
+      <p>World Explorer reflects that curiosity. It is an evolving platform built from the ground up, designed to be expandable, structurally coherent, and technically deliberate.</p>
+      <p>This is an independent project developed step by step, with a focus on clarity, experimentation, and long-term architectural vision.</p>
+    </section>
+
+    <footer>
+      <a href="../legal/privacy">Privacy</a>
+      <a href="../legal/terms">Terms</a>
+      <span>© 2026 Steven Reid. All Rights Reserved.</span>
+    </footer>
+  </div>
 </body>
 </html>

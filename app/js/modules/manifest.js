@@ -16,6 +16,6 @@ export const vendorScriptsOptional = [
   'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js'
 ];
 
-export const moduleEntrypoint = `../app/js/app-entry.js?${CACHE_BUST}`;
+export const moduleEntrypoint = `./app-entry.js?${CACHE_BUST}`;
 
 export const classicScripts = [];

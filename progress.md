@@ -1219,3 +1219,9 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Added explicit `?v=55` to non-versioned imports for `firebase-init.js`, `auth-ui.js`, `entitlements.js`, and `billing.js` in app/account/landing entry modules.
   - Updated multiplayer UI import to `../../../js/entitlements.js?v=55`.
   - Validation: `npm test` passed (`21/21`).
+- Root-run restore (2026-02-24):
+  - Mirrored working `public` web app to repository root so root-hosted static deployments (e.g., GitHub Pages from branch root) run without `/public` redirect dependency.
+  - Synced paths to root: `app/`, `account/`, `legal/`, `about/`, `assets/`, `js/`, and `index.html`.
+  - Kept Firebase hosting behavior unchanged (`firebase.json` still serves `public/`).
+  - Validation: local static serve returned 200 for `/`, `/app/`, and `/js/entitlements.js?v=55`; app page includes `bootstrap.js?v=55` and `entitlements.js?v=55` imports.
+  - Regression check: `npm test` passed (`21/21`).

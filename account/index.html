@@ -1,0 +1,1392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Explorer Account</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+  <script src="../js/firebase-project-config.js"></script>
+  <style>
+    :root {
+      --bg: #081425;
+      --panel: rgba(12, 31, 55, 0.82);
+      --line: rgba(174, 202, 226, 0.3);
+      --ink: #eaf4ff;
+      --muted: #afc4d8;
+      --accent: #5ac8ff;
+      --gold: #ffc857;
+      --ok: #59d39c;
+      --warn: #ff8b8b;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Barlow', sans-serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 16% 16%, rgba(90, 200, 255, 0.18), transparent 44%),
+        radial-gradient(circle at 82% 12%, rgba(255, 200, 87, 0.14), transparent 36%),
+        linear-gradient(170deg, #12365a, var(--bg));
+      min-height: 100vh;
+    }
+
+    .wrap {
+      width: min(980px, 92vw);
+      margin: 0 auto;
+      padding: 26px 0 40px;
+    }
+
+    .top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+
+    .top a {
+      color: var(--ink);
+      text-decoration: none;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-weight: 600;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(30px, 5vw, 44px);
+      font-family: 'Chakra Petch', sans-serif;
+      letter-spacing: 0.02em;
+    }
+
+    .sub {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: var(--panel);
+      backdrop-filter: blur(6px);
+      padding: 18px;
+      margin-top: 16px;
+      box-shadow: 0 18px 38px rgba(4, 10, 20, 0.35);
+    }
+
+    .status {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .status-item {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(5, 17, 32, 0.45);
+    }
+
+    .label {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .value {
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 24px;
+      margin: 0;
+    }
+
+    .hint {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    button {
+      border: 1px solid transparent;
+      border-radius: 999px;
+      padding: 11px 16px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.16s ease, filter 0.16s ease;
+    }
+
+    button:hover { transform: translateY(-1px); filter: brightness(1.05); }
+    button:disabled { opacity: 0.56; cursor: not-allowed; transform: none; }
+
+    .btn-primary { background: var(--accent); color: #032137; }
+    .btn-supporter { background: #5fc8ff; color: #06253e; }
+    .btn-pro { background: var(--gold); color: #392700; }
+    .btn-ghost { background: rgba(8, 22, 40, 0.58); border-color: var(--line); color: var(--ink); }
+
+    .plans {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .plan {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(5, 17, 32, 0.45);
+    }
+
+    .plan h2 {
+      margin: 0;
+      font-size: 20px;
+      font-family: 'Chakra Petch', sans-serif;
+    }
+
+    .plan p {
+      margin: 6px 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .plan ul {
+      margin: 6px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .section-title {
+      margin: 16px 0 8px;
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 18px;
+      letter-spacing: 0.03em;
+    }
+
+    .identity-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .identity-card {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(5, 17, 32, 0.45);
+    }
+
+    .mono {
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 16px;
+      overflow-wrap: anywhere;
+    }
+
+    .inline-field {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .stack-field {
+      display: grid;
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .inline-field input {
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      background: rgba(2, 11, 24, 0.62);
+      color: var(--ink);
+      font-size: 14px;
+      padding: 10px 14px;
+    }
+
+    .inline-field input:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(90, 200, 255, 0.2);
+    }
+
+    .receipt-list {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(5, 17, 32, 0.45);
+    }
+
+    .receipt-item {
+      display: grid;
+      grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 10px;
+      align-items: center;
+      padding: 10px 12px;
+      border-top: 1px solid rgba(174, 202, 226, 0.18);
+    }
+
+    .receipt-item:first-child { border-top: none; }
+
+    .receipt-title {
+      font-weight: 700;
+      font-size: 14px;
+      margin: 0 0 2px;
+    }
+
+    .receipt-meta {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .receipt-right {
+      display: flex;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .receipt-right a {
+      color: #d6ebff;
+      text-decoration: none;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 6px 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .receipt-empty {
+      padding: 14px 12px;
+      font-size: 14px;
+      color: var(--muted);
+    }
+
+    .social-list {
+      margin-top: 10px;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      overflow: hidden;
+      background: rgba(5, 17, 32, 0.45);
+    }
+
+    .social-item {
+      display: grid;
+      gap: 8px;
+      padding: 10px 12px;
+      border-top: 1px solid rgba(174, 202, 226, 0.18);
+    }
+
+    .social-item:first-child { border-top: none; }
+
+    .social-title {
+      margin: 0;
+      font-size: 14px;
+      font-weight: 700;
+    }
+
+    .social-meta {
+      margin: 0;
+      font-size: 12px;
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+
+    .social-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .social-actions button {
+      padding: 8px 12px;
+      font-size: 12px;
+    }
+
+    #socialStatus {
+      min-height: 18px;
+      margin-top: 8px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 12px;
+      font-size: 14px;
+    }
+
+    .links a { color: #d6ebff; }
+
+    #authPrompt { display: none; }
+
+    #statusLine {
+      min-height: 20px;
+      font-size: 13px;
+      color: var(--muted);
+      margin-top: 6px;
+    }
+
+    .ok { color: var(--ok) !important; }
+    .warn { color: var(--warn) !important; }
+
+    @media (max-width: 780px) {
+      .status { grid-template-columns: 1fr; }
+      .plans { grid-template-columns: 1fr; }
+      .identity-grid { grid-template-columns: 1fr; }
+      .receipt-item { grid-template-columns: 1fr; }
+      .receipt-right { justify-content: flex-start; }
+      .actions button { width: 100%; }
+      .top { flex-wrap: wrap; }
+      .top a { width: 100%; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="top">
+      <h1>Account</h1>
+      <a href="../app/">Back to App</a>
+    </div>
+    <p class="sub">Manage plan status, upgrades, and billing portal access.</p>
+
+    <section class="panel" id="authPrompt">
+      <p class="hint">Sign in to view and manage your trial or subscription.</p>
+      <div class="actions">
+        <button id="signInBtn" class="btn-primary" type="button">Sign In</button>
+      </div>
+    </section>
+
+    <section class="panel" id="accountPanel">
+      <div class="status">
+        <article class="status-item">
+          <span class="label">Current Plan</span>
+          <p id="planLabel" class="value">Free</p>
+          <p id="planDetail" class="hint">Core exploration active.</p>
+        </article>
+        <article class="status-item">
+          <span class="label">Trial</span>
+          <p id="trialLabel" class="value">Not active</p>
+          <p id="trialDetail" class="hint">No trial is currently running.</p>
+        </article>
+        <article class="status-item">
+          <span class="label">Room Quota</span>
+          <p id="roomQuotaLabel" class="value">0 / 0</p>
+          <p id="roomQuotaDetail" class="hint">Rooms created from this account.</p>
+        </article>
+        <article class="status-item">
+          <span class="label">Extras</span>
+          <p id="extrasLabel" class="value">Locked</p>
+          <p id="extrasDetail" class="hint">Upcoming demo: Mars Rover.</p>
+        </article>
+        <article class="status-item">
+          <span class="label">Admin Access</span>
+          <p id="adminAccessLabel" class="value">Off</p>
+          <p id="adminAccessDetail" class="hint">Allowlist-protected test admin mode.</p>
+        </article>
+      </div>
+
+      <div class="actions">
+        <button id="upgradeSupporterBtn" class="btn-supporter" type="button">Upgrade to Supporter ($1/mo)</button>
+        <button id="upgradeProBtn" class="btn-pro" type="button">Upgrade to Pro ($5/mo)</button>
+        <button id="enableAdminBtn" class="btn-ghost" type="button">Enable Admin Test Access</button>
+        <button id="manageBillingBtn" class="btn-ghost" type="button">Manage Billing</button>
+        <button id="refreshAccountBtn" class="btn-ghost" type="button">Refresh Account Data</button>
+        <button id="signOutBtn" class="btn-ghost" type="button">Sign Out</button>
+      </div>
+
+      <p id="statusLine"></p>
+
+      <h2 class="section-title">Identity</h2>
+      <div class="identity-grid">
+        <article class="identity-card">
+          <span class="label">Username</span>
+          <p id="usernameValue" class="mono">Explorer</p>
+          <div class="inline-field">
+            <input id="usernameInput" type="text" maxlength="60" placeholder="Set display name">
+            <button id="saveUsernameBtn" class="btn-primary" type="button">Save</button>
+          </div>
+          <p class="hint">Shown in multiplayer rooms and account records.</p>
+        </article>
+        <article class="identity-card">
+          <span class="label">Linked Email</span>
+          <p id="emailValue" class="mono">-</p>
+          <p id="emailVerifiedValue" class="hint">Verification: unknown</p>
+          <span class="label" style="margin-top:10px">Account ID</span>
+          <p id="uidValue" class="mono">-</p>
+          <p id="providersValue" class="hint">Sign-in providers: -</p>
+        </article>
+      </div>
+
+      <h2 class="section-title">Friends & Invites</h2>
+      <div class="identity-grid">
+        <article class="identity-card">
+          <span class="label">Friends</span>
+          <p class="hint">Add friends by account ID, then invite them with a room code.</p>
+          <div class="stack-field">
+            <input id="friendUidInput" type="text" maxlength="128" placeholder="Friend account ID (UID)">
+            <input id="friendNameInput" type="text" maxlength="48" placeholder="Friend display name (optional)">
+            <button id="addFriendBtn" class="btn-primary" type="button">Add Friend</button>
+          </div>
+          <div class="stack-field">
+            <input id="inviteRoomCodeInput" type="text" maxlength="8" placeholder="Room code to invite to (AB12CD)">
+            <input id="inviteMessageInput" type="text" maxlength="120" placeholder="Invite message (optional)">
+          </div>
+          <div id="socialStatus">Sign in to manage friends and invites.</div>
+          <div id="friendsList" class="social-list">
+            <div class="receipt-empty">No friends yet.</div>
+          </div>
+        </article>
+        <article class="identity-card">
+          <span class="label">Incoming Invites</span>
+          <p class="hint">Open invites in app. Free users can start their 2-day trial directly from an invite.</p>
+          <div id="invitesList" class="social-list">
+            <div class="receipt-empty">No incoming invites.</div>
+          </div>
+        </article>
+      </div>
+
+      <h2 class="section-title">Billing & Receipts</h2>
+      <div class="identity-grid">
+        <article class="identity-card">
+          <span class="label">Subscription Status</span>
+          <p id="subscriptionStatusValue" class="mono">none</p>
+          <p id="nextBillingValue" class="hint">Next billing: not scheduled.</p>
+          <p id="customerValue" class="hint">Customer: not linked.</p>
+        </article>
+        <article class="identity-card">
+          <span class="label">Recent Receipts</span>
+          <button id="refreshReceiptsBtn" class="btn-ghost" type="button">Refresh Receipts</button>
+          <div id="receiptList" class="receipt-list">
+            <div class="receipt-empty">No receipts found yet.</div>
+          </div>
+        </article>
+      </div>
+
+      <div class="plans">
+        <article class="plan">
+          <h2>Supporter</h2>
+          <p>$1/month</p>
+          <ul>
+            <li>Full world access</li>
+            <li>Cloud sync enabled</li>
+            <li>Supports future updates</li>
+          </ul>
+        </article>
+        <article class="plan">
+          <h2>Pro</h2>
+          <p>$5/month</p>
+          <ul>
+            <li>Everything in Supporter</li>
+            <li>Early playable demos</li>
+            <li>Priority contact and feature consideration</li>
+          </ul>
+        </article>
+      </div>
+
+      <div class="links">
+        <a href="../about/">About</a>
+        <a href="../legal/privacy">Privacy</a>
+        <a href="../legal/terms">Terms</a>
+        <a href="mailto:hello@worldexplorer.app">Contact</a>
+        <a href="https://github.com/RRG314/WorldExplorer" target="_blank" rel="noreferrer">GitHub</a>
+      </div>
+    </section>
+  </div>
+
+  <script type="module">
+    import { hasFirebaseConfig } from '../js/firebase-init.js?v=55';
+    import { ensureSignedIn, observeAuth, signOutUser } from '../js/auth-ui.js?v=55';
+    import { ensureEntitlements, formatRemainingTrial, startTrialIfEligible, subscribeEntitlements } from '../js/entitlements.js?v=55';
+    import {
+      enableAdminTester,
+      getAccountOverview,
+      listBillingReceipts,
+      redirectToCheckout,
+      redirectToPortal,
+      updateAccountProfile
+    } from '../js/billing.js?v=55';
+    import {
+      addFriend,
+      dismissInvite,
+      listenFriends,
+      listenIncomingInvites,
+      markInviteSeen,
+      removeFriend,
+      sendInviteToFriend
+    } from '../app/js/multiplayer/social.js?v=55';
+
+    const authPrompt = document.getElementById('authPrompt');
+    const accountPanel = document.getElementById('accountPanel');
+    const signInBtn = document.getElementById('signInBtn');
+    const signOutBtn = document.getElementById('signOutBtn');
+    const upgradeSupporterBtn = document.getElementById('upgradeSupporterBtn');
+    const upgradeProBtn = document.getElementById('upgradeProBtn');
+    const enableAdminBtn = document.getElementById('enableAdminBtn');
+    const manageBillingBtn = document.getElementById('manageBillingBtn');
+    const refreshAccountBtn = document.getElementById('refreshAccountBtn');
+    const saveUsernameBtn = document.getElementById('saveUsernameBtn');
+    const refreshReceiptsBtn = document.getElementById('refreshReceiptsBtn');
+    const usernameValue = document.getElementById('usernameValue');
+    const usernameInput = document.getElementById('usernameInput');
+    const emailValue = document.getElementById('emailValue');
+    const emailVerifiedValue = document.getElementById('emailVerifiedValue');
+    const uidValue = document.getElementById('uidValue');
+    const providersValue = document.getElementById('providersValue');
+    const subscriptionStatusValue = document.getElementById('subscriptionStatusValue');
+    const nextBillingValue = document.getElementById('nextBillingValue');
+    const customerValue = document.getElementById('customerValue');
+    const receiptList = document.getElementById('receiptList');
+    const statusLine = document.getElementById('statusLine');
+    const socialStatus = document.getElementById('socialStatus');
+    const planLabel = document.getElementById('planLabel');
+    const planDetail = document.getElementById('planDetail');
+    const trialLabel = document.getElementById('trialLabel');
+    const trialDetail = document.getElementById('trialDetail');
+    const roomQuotaLabel = document.getElementById('roomQuotaLabel');
+    const roomQuotaDetail = document.getElementById('roomQuotaDetail');
+    const extrasLabel = document.getElementById('extrasLabel');
+    const extrasDetail = document.getElementById('extrasDetail');
+    const adminAccessLabel = document.getElementById('adminAccessLabel');
+    const adminAccessDetail = document.getElementById('adminAccessDetail');
+    const friendUidInput = document.getElementById('friendUidInput');
+    const friendNameInput = document.getElementById('friendNameInput');
+    const addFriendBtn = document.getElementById('addFriendBtn');
+    const inviteRoomCodeInput = document.getElementById('inviteRoomCodeInput');
+    const inviteMessageInput = document.getElementById('inviteMessageInput');
+    const friendsList = document.getElementById('friendsList');
+    const invitesList = document.getElementById('invitesList');
+
+    let unsubscribeEntitlements = null;
+    let unsubscribeFriends = null;
+    let unsubscribeInvites = null;
+    let signedInUser = null;
+    let currentEntitlementState = null;
+    let currentAdminTesterEligible = false;
+    let currentFriends = [];
+    let currentInvites = [];
+
+    function setStatus(message, type = 'neutral') {
+      statusLine.textContent = message || '';
+      statusLine.classList.remove('ok', 'warn');
+      if (type === 'ok') statusLine.classList.add('ok');
+      if (type === 'warn') statusLine.classList.add('warn');
+    }
+
+    function setSocialStatus(message, type = 'neutral') {
+      if (!socialStatus) return;
+      socialStatus.textContent = message || '';
+      socialStatus.classList.remove('ok', 'warn');
+      if (type === 'ok') socialStatus.classList.add('ok');
+      if (type === 'warn') socialStatus.classList.add('warn');
+    }
+
+    function clearSubscriptions() {
+      if (typeof unsubscribeEntitlements === 'function') {
+        unsubscribeEntitlements();
+      }
+      if (typeof unsubscribeFriends === 'function') {
+        unsubscribeFriends();
+      }
+      if (typeof unsubscribeInvites === 'function') {
+        unsubscribeInvites();
+      }
+      unsubscribeEntitlements = null;
+      unsubscribeFriends = null;
+      unsubscribeInvites = null;
+    }
+
+    function normalizeRoomCode(raw) {
+      return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
+    }
+
+    function canUseMultiplayerPlan(plan) {
+      const value = String(plan || '').toLowerCase();
+      return value === 'trial' || value === 'support' || value === 'supporter' || value === 'pro' || value === 'admin';
+    }
+
+    function inviteJoinUrl(code) {
+      const roomCode = normalizeRoomCode(code);
+      const target = new URL('../app/', window.location.href);
+      target.searchParams.set('tab', 'multiplayer');
+      target.searchParams.set('room', roomCode);
+      return target.toString();
+    }
+
+    function setBusy(busy) {
+      [signInBtn, signOutBtn, upgradeSupporterBtn, upgradeProBtn, enableAdminBtn, manageBillingBtn, refreshAccountBtn, saveUsernameBtn, refreshReceiptsBtn, addFriendBtn].forEach((btn) => {
+        if (!btn) return;
+        btn.disabled = busy;
+      });
+    }
+
+    function formatDateTime(ms) {
+      const value = Number(ms);
+      if (!Number.isFinite(value) || value <= 0) return null;
+
+      try {
+        return new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(value));
+      } catch (_) {
+        return new Date(value).toISOString();
+      }
+    }
+
+    function formatCurrency(cents, currency = 'USD') {
+      const value = Number(cents);
+      if (!Number.isFinite(value)) return '-';
+      const normalizedCurrency = String(currency || 'USD').toUpperCase();
+      try {
+        return new Intl.NumberFormat(undefined, {
+          style: 'currency',
+          currency: normalizedCurrency,
+          minimumFractionDigits: 2
+        }).format(value / 100);
+      } catch (_) {
+        return `${(value / 100).toFixed(2)} ${normalizedCurrency}`;
+      }
+    }
+
+    function normalizeStatusLabel(value) {
+      const text = String(value || 'none').replace(/_/g, ' ');
+      return text.charAt(0).toUpperCase() + text.slice(1);
+    }
+
+    function clearChildren(node) {
+      while (node && node.firstChild) node.removeChild(node.firstChild);
+    }
+
+    function timestampLikeToMillis(value) {
+      if (!value) return null;
+      if (typeof value.toMillis === 'function') return value.toMillis();
+      if (typeof value.seconds === 'number') return value.seconds * 1000;
+      const parsed = Date.parse(String(value));
+      return Number.isFinite(parsed) ? parsed : null;
+    }
+
+    function renderFriends(rows = []) {
+      if (!friendsList) return;
+      clearChildren(friendsList);
+      if (!Array.isArray(rows) || !rows.length) {
+        const empty = document.createElement('div');
+        empty.className = 'receipt-empty';
+        empty.textContent = 'No friends yet.';
+        friendsList.appendChild(empty);
+        return;
+      }
+
+      rows.forEach((friend) => {
+        const row = document.createElement('div');
+        row.className = 'social-item';
+
+        const title = document.createElement('p');
+        title.className = 'social-title';
+        title.textContent = String(friend.displayName || 'Explorer');
+
+        const meta = document.createElement('p');
+        meta.className = 'social-meta';
+        const source = String(friend.source || 'manual');
+        meta.textContent = `${String(friend.uid || '')} • source: ${source}`;
+
+        const actions = document.createElement('div');
+        actions.className = 'social-actions';
+
+        const inviteBtn = document.createElement('button');
+        inviteBtn.type = 'button';
+        inviteBtn.className = 'btn-ghost';
+        inviteBtn.textContent = 'Invite';
+        inviteBtn.dataset.inviteFriend = String(friend.uid || '');
+        actions.appendChild(inviteBtn);
+
+        const removeBtn = document.createElement('button');
+        removeBtn.type = 'button';
+        removeBtn.className = 'btn-ghost';
+        removeBtn.textContent = 'Remove';
+        removeBtn.dataset.removeFriend = String(friend.uid || '');
+        actions.appendChild(removeBtn);
+
+        row.appendChild(title);
+        row.appendChild(meta);
+        row.appendChild(actions);
+        friendsList.appendChild(row);
+      });
+    }
+
+    function renderInvites(rows = []) {
+      if (!invitesList) return;
+      clearChildren(invitesList);
+      if (!Array.isArray(rows) || !rows.length) {
+        const empty = document.createElement('div');
+        empty.className = 'receipt-empty';
+        empty.textContent = 'No incoming invites.';
+        invitesList.appendChild(empty);
+        return;
+      }
+
+      rows.forEach((invite) => {
+        const row = document.createElement('div');
+        row.className = 'social-item';
+
+        const title = document.createElement('p');
+        title.className = 'social-title';
+        title.textContent = `${String(invite.fromDisplayName || 'Explorer')} invited you`;
+
+        const meta = document.createElement('p');
+        meta.className = 'social-meta';
+        const roomCode = normalizeRoomCode(invite.roomCode || '');
+        const roomLabel = String(invite.roomName || roomCode || 'Room');
+        const createdAtMs = timestampLikeToMillis(invite.createdAt);
+        const when = createdAtMs ? formatDateTime(createdAtMs) : null;
+        meta.textContent = `${roomLabel} (${roomCode})${when ? ` • ${when}` : ''}`;
+
+        const actions = document.createElement('div');
+        actions.className = 'social-actions';
+
+        const openBtn = document.createElement('button');
+        openBtn.type = 'button';
+        openBtn.className = 'btn-ghost';
+        openBtn.textContent = 'Open In App';
+        openBtn.dataset.acceptInvite = String(invite.id || '');
+        openBtn.dataset.roomCode = roomCode;
+        actions.appendChild(openBtn);
+
+        if (!canUseMultiplayerPlan(currentEntitlementState?.plan)) {
+          const trialBtn = document.createElement('button');
+          trialBtn.type = 'button';
+          trialBtn.className = 'btn-primary';
+          trialBtn.textContent = 'Start Trial + Join';
+          trialBtn.dataset.trialInvite = String(invite.id || '');
+          trialBtn.dataset.roomCode = roomCode;
+          actions.appendChild(trialBtn);
+        }
+
+        const dismissBtn = document.createElement('button');
+        dismissBtn.type = 'button';
+        dismissBtn.className = 'btn-ghost';
+        dismissBtn.textContent = 'Dismiss';
+        dismissBtn.dataset.dismissInvite = String(invite.id || '');
+        actions.appendChild(dismissBtn);
+
+        row.appendChild(title);
+        row.appendChild(meta);
+        if (invite.message) {
+          const note = document.createElement('p');
+          note.className = 'social-meta';
+          note.textContent = String(invite.message);
+          row.appendChild(note);
+        }
+        row.appendChild(actions);
+        invitesList.appendChild(row);
+      });
+    }
+
+    function resetIdentityUi() {
+      usernameValue.textContent = 'Explorer';
+      usernameInput.value = '';
+      emailValue.textContent = '-';
+      emailVerifiedValue.textContent = 'Verification: unknown';
+      uidValue.textContent = '-';
+      providersValue.textContent = 'Sign-in providers: -';
+      subscriptionStatusValue.textContent = 'none';
+      nextBillingValue.textContent = 'Next billing: not scheduled.';
+      customerValue.textContent = 'Customer: not linked.';
+      roomQuotaLabel.textContent = '0 / 0';
+      roomQuotaDetail.textContent = 'Rooms created from this account.';
+      adminAccessLabel.textContent = 'Off';
+      adminAccessDetail.textContent = 'Allowlist-protected test admin mode.';
+      if (friendUidInput) friendUidInput.value = '';
+      if (friendNameInput) friendNameInput.value = '';
+      if (inviteRoomCodeInput) inviteRoomCodeInput.value = '';
+      if (inviteMessageInput) inviteMessageInput.value = '';
+      currentFriends = [];
+      currentInvites = [];
+      renderFriends([]);
+      renderInvites([]);
+      renderReceipts([]);
+      setSocialStatus('Sign in to manage friends and invites.');
+    }
+
+    function renderReceipts(receipts = []) {
+      if (!receiptList) return;
+      clearChildren(receiptList);
+
+      if (!Array.isArray(receipts) || !receipts.length) {
+        const empty = document.createElement('div');
+        empty.className = 'receipt-empty';
+        empty.textContent = 'No receipts found yet.';
+        receiptList.appendChild(empty);
+        return;
+      }
+
+      receipts.forEach((receipt) => {
+        const row = document.createElement('div');
+        row.className = 'receipt-item';
+
+        const left = document.createElement('div');
+        const title = document.createElement('p');
+        title.className = 'receipt-title';
+        title.textContent = receipt.number || receipt.id || 'Invoice';
+        const meta = document.createElement('p');
+        meta.className = 'receipt-meta';
+        const createdAt = formatDateTime(receipt.createdAtMs);
+        meta.textContent = createdAt ? `${normalizeStatusLabel(receipt.status)} • ${createdAt}` : normalizeStatusLabel(receipt.status);
+        left.appendChild(title);
+        left.appendChild(meta);
+
+        const middle = document.createElement('div');
+        const amountLine = document.createElement('p');
+        amountLine.className = 'receipt-title';
+        amountLine.textContent = formatCurrency(receipt.amountPaid || receipt.total || 0, receipt.currency || 'USD');
+        const periodLine = document.createElement('p');
+        periodLine.className = 'receipt-meta';
+        const start = formatDateTime(receipt.periodStartMs);
+        const end = formatDateTime(receipt.periodEndMs);
+        periodLine.textContent = start && end ? `${start} to ${end}` : 'Billing period unavailable';
+        middle.appendChild(amountLine);
+        middle.appendChild(periodLine);
+
+        const right = document.createElement('div');
+        right.className = 'receipt-right';
+        if (receipt.hostedInvoiceUrl) {
+          const hosted = document.createElement('a');
+          hosted.href = String(receipt.hostedInvoiceUrl);
+          hosted.target = '_blank';
+          hosted.rel = 'noreferrer';
+          hosted.textContent = 'View';
+          right.appendChild(hosted);
+        }
+        if (receipt.invoicePdfUrl) {
+          const pdf = document.createElement('a');
+          pdf.href = String(receipt.invoicePdfUrl);
+          pdf.target = '_blank';
+          pdf.rel = 'noreferrer';
+          pdf.textContent = 'PDF';
+          right.appendChild(pdf);
+        }
+        if (!right.childElementCount) {
+          const span = document.createElement('span');
+          span.className = 'receipt-meta';
+          span.textContent = 'No links';
+          right.appendChild(span);
+        }
+
+        row.appendChild(left);
+        row.appendChild(middle);
+        row.appendChild(right);
+        receiptList.appendChild(row);
+      });
+    }
+
+    function applyOverviewToUi(overview) {
+      const fallbackName = signedInUser?.displayName || 'Explorer';
+      const displayName = String(overview?.displayName || fallbackName || 'Explorer').trim() || 'Explorer';
+      const email = String(overview?.email || signedInUser?.email || '-');
+      const providers = Array.isArray(overview?.providers) && overview.providers.length ? overview.providers.join(', ') : '-';
+      const verified = overview?.emailVerified === true ? 'Verified' : 'Not verified';
+      const status = normalizeStatusLabel(overview?.subscriptionStatus || currentEntitlementState?.subscriptionStatus || 'none');
+      const nextBilling = formatDateTime(overview?.nextBillingAtMs);
+      const roomCreateCount = Number.isFinite(Number(overview?.roomCreateCount)) ? Math.max(0, Math.floor(Number(overview.roomCreateCount))) : 0;
+      const roomCreateLimit = Number.isFinite(Number(overview?.roomCreateLimit)) ? Math.max(0, Math.floor(Number(overview.roomCreateLimit))) : 0;
+      const isAdmin = overview?.isAdmin === true || String(overview?.subscriptionStatus || '').toLowerCase() === 'admin';
+      const adminTesterEligible = overview?.adminTesterEligible === true;
+
+      usernameValue.textContent = displayName;
+      if (document.activeElement !== usernameInput) {
+        usernameInput.value = displayName;
+      }
+      emailValue.textContent = email;
+      emailVerifiedValue.textContent = `Verification: ${verified}`;
+      uidValue.textContent = String(overview?.uid || signedInUser?.uid || '-');
+      providersValue.textContent = `Sign-in providers: ${providers}`;
+      subscriptionStatusValue.textContent = status;
+      nextBillingValue.textContent = nextBilling ? `Next billing: ${nextBilling}.` : 'Next billing: not scheduled.';
+      customerValue.textContent = overview?.stripeCustomerId ? `Customer: ${overview.stripeCustomerId}` : 'Customer: not linked.';
+      roomQuotaLabel.textContent = `${roomCreateCount} / ${roomCreateLimit}`;
+      roomQuotaDetail.textContent = roomCreateLimit > 0
+        ? `You can create ${Math.max(0, roomCreateLimit - roomCreateCount)} more room${roomCreateLimit - roomCreateCount === 1 ? '' : 's'} on this plan.`
+        : 'Room creation requires multiplayer trial or paid plan.';
+      adminAccessLabel.textContent = isAdmin ? 'On' : 'Off';
+      adminAccessDetail.textContent = isAdmin
+        ? 'Admin test access is active on this account.'
+        : 'Allowlist-protected test admin mode.';
+      currentAdminTesterEligible = adminTesterEligible;
+      if (enableAdminBtn) {
+        enableAdminBtn.hidden = !adminTesterEligible;
+        enableAdminBtn.disabled = isAdmin;
+        enableAdminBtn.textContent = isAdmin ? 'Admin Access Active' : 'Enable Admin Test Access';
+      }
+    }
+
+    function renderSignedOutState() {
+      authPrompt.style.display = hasFirebaseConfig() ? 'block' : 'none';
+      accountPanel.style.display = hasFirebaseConfig() ? 'none' : 'block';
+      resetIdentityUi();
+
+      if (!hasFirebaseConfig()) {
+        planLabel.textContent = 'Free';
+        planDetail.textContent = 'Firebase config is missing. Add config to enable trial and billing.';
+        trialLabel.textContent = 'Unavailable';
+        trialDetail.textContent = 'Set WORLD_EXPLORER_FIREBASE to enable account features.';
+        setStatus('Missing Firebase config (WORLD_EXPLORER_FIREBASE).', 'warn');
+      } else {
+        setStatus('Sign in to manage your account.', 'neutral');
+      }
+      currentAdminTesterEligible = false;
+      if (enableAdminBtn) {
+        enableAdminBtn.hidden = true;
+        enableAdminBtn.disabled = false;
+      }
+    }
+
+    function applyPlanUi(state) {
+      currentEntitlementState = state || null;
+      planLabel.textContent = state.planLabel;
+
+      if (state.isAdmin === true || state.subscriptionStatus === 'admin') {
+        planDetail.textContent = 'Admin test access active with full multiplayer and elevated room quota.';
+      } else if (state.plan === 'pro') {
+        planDetail.textContent = 'Pro perks unlocked, including early demos and priority communication.';
+      } else if (state.plan === 'supporter') {
+        planDetail.textContent = 'Supporter active with full access and cloud sync.';
+      } else if (state.plan === 'trial') {
+        planDetail.textContent = 'Trial active with full access (Pro-only perks disabled).';
+      } else {
+        planDetail.textContent = 'Free plan: core exploration with local-only saves.';
+      }
+
+      if (state.isAdmin === true || state.subscriptionStatus === 'admin' || state.plan === 'pro') {
+        extrasLabel.textContent = 'Mars Rover';
+        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover (Pro early access queue).';
+      } else if (state.plan === 'supporter' || state.plan === 'trial') {
+        extrasLabel.textContent = 'Preview';
+        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Upgrade to Pro for early access.';
+      } else {
+        extrasLabel.textContent = 'Locked';
+        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover.';
+      }
+
+      if (state.plan === 'trial') {
+        const remaining = formatRemainingTrial(state);
+        trialLabel.textContent = remaining === 'expired' ? 'Expired' : 'Active';
+        trialDetail.textContent = remaining && remaining !== 'expired' ? `${remaining}.` : 'Trial expired. Upgrade to keep premium perks.';
+      } else {
+        trialLabel.textContent = 'Not active';
+        trialDetail.textContent = 'No trial currently running.';
+      }
+
+      const adminMode = state.isAdmin === true || state.subscriptionStatus === 'admin';
+      upgradeSupporterBtn.disabled = adminMode || state.plan === 'supporter' || state.plan === 'pro';
+      upgradeProBtn.disabled = adminMode || state.plan === 'pro';
+      manageBillingBtn.disabled = adminMode || !(state.stripeCustomerId || state.plan === 'supporter' || state.plan === 'pro');
+      if (enableAdminBtn) {
+        enableAdminBtn.hidden = !currentAdminTesterEligible;
+        enableAdminBtn.disabled = adminMode;
+        enableAdminBtn.textContent = adminMode ? 'Admin Access Active' : 'Enable Admin Test Access';
+      }
+      renderInvites(currentInvites);
+    }
+
+    async function refreshOverview() {
+      const overview = await getAccountOverview();
+      applyOverviewToUi(overview);
+      return overview;
+    }
+
+    async function refreshReceipts() {
+      const payload = await listBillingReceipts({ limit: 20 });
+      const receipts = payload && Array.isArray(payload.receipts) ? payload.receipts : [];
+      renderReceipts(receipts);
+      return receipts;
+    }
+
+    async function refreshAccountData(options = {}) {
+      if (!signedInUser) return;
+      const silent = !!options.silent;
+      if (!silent) setStatus('Refreshing account data...');
+
+      const [overviewResult, receiptsResult] = await Promise.allSettled([
+        refreshOverview(),
+        refreshReceipts()
+      ]);
+
+      if (overviewResult.status === 'rejected') {
+        console.error('[account] overview refresh failed:', overviewResult.reason);
+      }
+      if (receiptsResult.status === 'rejected') {
+        console.error('[account] receipts refresh failed:', receiptsResult.reason);
+      }
+
+      if (overviewResult.status === 'rejected' && receiptsResult.status === 'rejected') {
+        const errMessage =
+          overviewResult.reason?.message ||
+          receiptsResult.reason?.message ||
+          'Could not refresh account data.';
+        setStatus(errMessage, 'warn');
+        return;
+      }
+
+      if (!silent) {
+        setStatus('Account data refreshed.', 'ok');
+      }
+    }
+
+    function startSocialSubscriptions() {
+      if (!signedInUser) {
+        currentFriends = [];
+        currentInvites = [];
+        renderFriends([]);
+        renderInvites([]);
+        return;
+      }
+      if (typeof unsubscribeFriends === 'function') unsubscribeFriends();
+      if (typeof unsubscribeInvites === 'function') unsubscribeInvites();
+      unsubscribeFriends = listenFriends((rows) => {
+        currentFriends = Array.isArray(rows) ? rows : [];
+        renderFriends(currentFriends);
+      });
+      unsubscribeInvites = listenIncomingInvites((rows) => {
+        currentInvites = Array.isArray(rows) ? rows : [];
+        renderInvites(currentInvites);
+      });
+      setSocialStatus('Friends and invites are live.', 'ok');
+    }
+
+    async function handleSignedIn(user) {
+      signedInUser = user;
+      authPrompt.style.display = 'none';
+      accountPanel.style.display = 'block';
+
+      if (unsubscribeEntitlements) unsubscribeEntitlements();
+
+      const state = await ensureEntitlements(user);
+      applyPlanUi(state);
+      await refreshAccountData({ silent: true });
+      startSocialSubscriptions();
+      setStatus(`Signed in as ${user.email || user.uid}.`, 'ok');
+
+      unsubscribeEntitlements = subscribeEntitlements(user, (nextState) => {
+        applyPlanUi(nextState);
+      });
+    }
+
+    signInBtn.addEventListener('click', async () => {
+      setBusy(true);
+      setStatus('Signing in...');
+      try {
+        const user = await ensureSignedIn();
+        if (user) {
+          await handleSignedIn(user);
+        } else {
+          setStatus('Continue sign-in in the popup/redirect flow.');
+        }
+      } catch (err) {
+        console.error('[account] sign-in failed:', err);
+        setStatus(err && err.message ? err.message : 'Sign-in failed.', 'warn');
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    signOutBtn.addEventListener('click', async () => {
+      setBusy(true);
+      try {
+        clearSubscriptions();
+        await signOutUser();
+        signedInUser = null;
+        renderSignedOutState();
+        setStatus('Signed out.');
+      } catch (err) {
+        console.error('[account] sign-out failed:', err);
+        setStatus('Could not sign out.', 'warn');
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    refreshAccountBtn.addEventListener('click', async () => {
+      if (!signedInUser) return;
+      setBusy(true);
+      try {
+        await refreshAccountData();
+      } catch (err) {
+        setStatus(err && err.message ? err.message : 'Could not refresh account data.', 'warn');
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    enableAdminBtn.addEventListener('click', async () => {
+      if (!signedInUser) return;
+      setBusy(true);
+      setStatus('Requesting admin test access...');
+      try {
+        await enableAdminTester();
+        await ensureEntitlements(signedInUser);
+        await refreshAccountData({ silent: true });
+        setStatus('Admin test access enabled. Refresh complete.', 'ok');
+      } catch (err) {
+        console.error('[account] enable admin access failed:', err);
+        setStatus(err && err.message ? err.message : 'Could not enable admin access.', 'warn');
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    refreshReceiptsBtn.addEventListener('click', async () => {
+      if (!signedInUser) return;
+      setBusy(true);
+      setStatus('Refreshing receipts...');
+      try {
+        await refreshReceipts();
+        setStatus('Receipts refreshed.', 'ok');
+      } catch (err) {
+        setStatus(err && err.message ? err.message : 'Could not refresh receipts.', 'warn');
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    async function handleAddFriendFromForm() {
+      if (!signedInUser) {
+        setSocialStatus('Sign in first.', 'warn');
+        return;
+      }
+      const friendUid = String(friendUidInput?.value || '').trim();
+      if (!friendUid) {
+        setSocialStatus('Enter a friend account ID (UID).', 'warn');
+        return;
+      }
+      const displayName = String(friendNameInput?.value || '').trim().slice(0, 48) || 'Explorer';
+      try {
+        await addFriend(friendUid, displayName, 'manual');
+        if (friendUidInput) friendUidInput.value = '';
+        if (friendNameInput) friendNameInput.value = '';
+        setSocialStatus('Friend added.', 'ok');
+      } catch (err) {
+        setSocialStatus(err?.message || 'Could not add friend.', 'warn');
+      }
+    }
+
+    addFriendBtn.addEventListener('click', handleAddFriendFromForm);
+    friendUidInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        handleAddFriendFromForm();
+      }
+    });
+    friendNameInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        handleAddFriendFromForm();
+      }
+    });
+
+    friendsList.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const inviteBtn = target.closest('button[data-invite-friend]');
+      if (inviteBtn instanceof HTMLElement) {
+        const friendUid = String(inviteBtn.dataset.inviteFriend || '').trim();
+        const roomCode = normalizeRoomCode(inviteRoomCodeInput?.value || '');
+        if (!friendUid) return;
+        if (!roomCode) {
+          setSocialStatus('Enter a room code before sending invite.', 'warn');
+          return;
+        }
+        try {
+          const message = String(inviteMessageInput?.value || '').trim().slice(0, 120);
+          const link = await sendInviteToFriend(
+            friendUid,
+            roomCode,
+            roomCode,
+            message || `Join me in room ${roomCode}`
+          );
+          if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+            await navigator.clipboard.writeText(link);
+          }
+          setSocialStatus('Invite sent. Link copied.', 'ok');
+        } catch (err) {
+          setSocialStatus(err?.message || 'Could not send invite.', 'warn');
+        }
+        return;
+      }
+
+      const removeBtn = target.closest('button[data-remove-friend]');
+      if (removeBtn instanceof HTMLElement) {
+        const friendUid = String(removeBtn.dataset.removeFriend || '').trim();
+        if (!friendUid) return;
+        try {
+          await removeFriend(friendUid);
+          setSocialStatus('Friend removed.', 'ok');
+        } catch (err) {
+          setSocialStatus(err?.message || 'Could not remove friend.', 'warn');
+        }
+      }
+    });
+
+    invitesList.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const acceptBtn = target.closest('button[data-accept-invite]');
+      if (acceptBtn instanceof HTMLElement) {
+        const inviteId = String(acceptBtn.dataset.acceptInvite || '').trim();
+        const roomCode = normalizeRoomCode(acceptBtn.dataset.roomCode || '');
+        if (!inviteId || !roomCode) return;
+        try {
+          await markInviteSeen(inviteId, true);
+          window.location.assign(inviteJoinUrl(roomCode));
+        } catch (err) {
+          setSocialStatus(err?.message || 'Could not open invite.', 'warn');
+        }
+        return;
+      }
+
+      const trialBtn = target.closest('button[data-trial-invite]');
+      if (trialBtn instanceof HTMLElement) {
+        const inviteId = String(trialBtn.dataset.trialInvite || '').trim();
+        const roomCode = normalizeRoomCode(trialBtn.dataset.roomCode || '');
+        if (!inviteId || !roomCode) return;
+        try {
+          await startTrialIfEligible(signedInUser);
+          await refreshAccountData({ silent: true });
+          await markInviteSeen(inviteId, true);
+          window.location.assign(inviteJoinUrl(roomCode));
+        } catch (err) {
+          setSocialStatus(err?.message || 'Could not start trial from invite.', 'warn');
+        }
+        return;
+      }
+
+      const dismissBtn = target.closest('button[data-dismiss-invite]');
+      if (dismissBtn instanceof HTMLElement) {
+        const inviteId = String(dismissBtn.dataset.dismissInvite || '').trim();
+        if (!inviteId) return;
+        try {
+          await dismissInvite(inviteId);
+          setSocialStatus('Invite dismissed.', 'ok');
+        } catch (err) {
+          setSocialStatus(err?.message || 'Could not dismiss invite.', 'warn');
+        }
+      }
+    });
+
+    saveUsernameBtn.addEventListener('click', async () => {
+      if (!signedInUser) return;
+      const nextName = String(usernameInput.value || '').trim().replace(/\s+/g, ' ').slice(0, 60);
+      if (!nextName) {
+        setStatus('Display name cannot be empty.', 'warn');
+        return;
+      }
+
+      setBusy(true);
+      setStatus('Saving display name...');
+      try {
+        await updateAccountProfile(nextName);
+        await refreshOverview();
+        await ensureEntitlements(signedInUser);
+        setStatus('Display name updated.', 'ok');
+      } catch (err) {
+        console.error('[account] update display name failed:', err);
+        setStatus(err && err.message ? err.message : 'Could not update display name.', 'warn');
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    usernameInput.addEventListener('keydown', (event) => {
+      if (event.key === 'Enter') {
+        event.preventDefault();
+        saveUsernameBtn.click();
+      }
+    });
+
+    upgradeSupporterBtn.addEventListener('click', async () => {
+      if (!signedInUser) return;
+      setBusy(true);
+      setStatus('Opening Stripe Checkout for Supporter...');
+      try {
+        await redirectToCheckout('supporter');
+      } catch (err) {
+        console.error('[account] Supporter checkout failed:', err);
+        setStatus(err && err.message ? err.message : 'Checkout failed.', 'warn');
+        setBusy(false);
+      }
+    });
+
+    upgradeProBtn.addEventListener('click', async () => {
+      if (!signedInUser) return;
+      setBusy(true);
+      setStatus('Opening Stripe Checkout for Pro...');
+      try {
+        await redirectToCheckout('pro');
+      } catch (err) {
+        console.error('[account] Pro checkout failed:', err);
+        setStatus(err && err.message ? err.message : 'Checkout failed.', 'warn');
+        setBusy(false);
+      }
+    });
+
+    manageBillingBtn.addEventListener('click', async () => {
+      if (!signedInUser) return;
+      setBusy(true);
+      setStatus('Opening billing portal...');
+      try {
+        await redirectToPortal();
+      } catch (err) {
+        console.error('[account] Portal failed:', err);
+        setStatus(err && err.message ? err.message : 'Could not open billing portal.', 'warn');
+        setBusy(false);
+      }
+    });
+
+    const checkoutStatus = new URLSearchParams(window.location.search).get('checkout');
+    if (checkoutStatus === 'success') {
+      setStatus('Checkout complete. Plan updates can take a few seconds after webhook processing.', 'ok');
+    } else if (checkoutStatus === 'cancel') {
+      setStatus('Checkout canceled. No changes were made.', 'warn');
+    }
+
+    if (!hasFirebaseConfig()) {
+      renderSignedOutState();
+    } else {
+      observeAuth(async (user) => {
+        if (!user) {
+          renderSignedOutState();
+          signedInUser = null;
+          clearSubscriptions();
+          return;
+        }
+
+        try {
+          await handleSignedIn(user);
+        } catch (err) {
+          console.error('[account] failed to load state:', err);
+          setStatus('Could not load account status.', 'warn');
+        }
+      });
+    }
+  </script>
+</body>
+</html>
