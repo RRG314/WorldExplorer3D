@@ -28,12 +28,9 @@ function isFirebaseHostingDomain(hostname = '') {
   return hostname.endsWith('.web.app') || hostname.endsWith('.firebaseapp.com');
 }
 
-function getFunctionsOrigin() {
+function getDirectFunctionsOrigin() {
   const override = String(globalThis.WORLD_EXPLORER_FUNCTIONS_ORIGIN || '').trim();
   if (override) return override.replace(/\/$/, '');
-
-  const hostname = String(globalThis.location && globalThis.location.hostname ? globalThis.location.hostname : '');
-  if (isFirebaseHostingDomain(hostname)) return '';
 
   const cfg = readFirebaseConfig();
   const projectId = cfg && cfg.projectId ? String(cfg.projectId).trim() : '';
@@ -42,35 +39,75 @@ function getFunctionsOrigin() {
   return `https://${DEFAULT_FUNCTIONS_REGION}-${projectId}.cloudfunctions.net`;
 }
 
-function functionUrl(path) {
-  const origin = getFunctionsOrigin();
-  return origin ? `${origin}${path}` : path;
+function normalizeFunctionPath(path) {
+  const value = String(path || '').trim();
+  if (!value) return '/';
+  return value.startsWith('/') ? value : `/${value}`;
+}
+
+function buildFunctionCandidates(path) {
+  const normalizedPath = normalizeFunctionPath(path);
+  const directOrigin = getDirectFunctionsOrigin();
+  const hostname = String(globalThis.location && globalThis.location.hostname ? globalThis.location.hostname : '');
+  const onFirebaseHosting = isFirebaseHostingDomain(hostname);
+  const candidates = [];
+
+  if (onFirebaseHosting) {
+    candidates.push(normalizedPath);
+    if (directOrigin) candidates.push(`${directOrigin}${normalizedPath}`);
+  } else {
+    if (directOrigin) candidates.push(`${directOrigin}${normalizedPath}`);
+    candidates.push(normalizedPath);
+  }
+
+  return [...new Set(candidates)];
 }
 
 async function postFunction(path, body = {}) {
   const token = await getCurrentUserToken(true);
-  const res = await fetch(functionUrl(path), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify(body)
-  });
+  const candidates = buildFunctionCandidates(path);
+  let lastError = null;
 
-  let payload = null;
-  try {
-    payload = await res.json();
-  } catch (_) {
-    payload = null;
+  for (let i = 0; i < candidates.length; i++) {
+    const url = candidates[i];
+    const isLast = i === candidates.length - 1;
+
+    try {
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(body)
+      });
+
+      let payload = null;
+      try {
+        payload = await res.json();
+      } catch (_) {
+        payload = null;
+      }
+
+      if ((res.status === 404 || res.status === 501) && !isLast) {
+        continue;
+      }
+
+      if (!res.ok) {
+        const message = payload && payload.error ? payload.error : `Request failed (${res.status})`;
+        throw new Error(message);
+      }
+
+      return payload || {};
+    } catch (err) {
+      lastError = err;
+      if (!isLast) continue;
+      throw err;
+    }
   }
 
-  if (!res.ok) {
-    const message = payload && payload.error ? payload.error : `Request failed (${res.status})`;
-    throw new Error(message);
-  }
-
-  return payload || {};
+  if (lastError) throw lastError;
+  throw new Error('Function endpoint unavailable.');
 }
 
 export async function createCheckoutSession(plan) {

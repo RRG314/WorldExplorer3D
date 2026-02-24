@@ -1198,3 +1198,11 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Added legacy profile compatibility for missing `uid` on user docs (self-healing on next room-create quota update).
   - Added regression test: owner can create room when legacy profile is missing `uid`.
   - Validation rerun: `npm test` passed (`20/20`).
+- Multiplayer trial/admin unlock reliability patch (2026-02-24):
+  - Confirmed production endpoint gap: `/enableAdminTester` returned 404 on Hosting while Cloud Function exists.
+  - Updated `public/js/billing.js` to use endpoint candidates with automatic fallback:
+    - On Firebase Hosting: try relative rewrite path first, then direct Cloud Function URL.
+    - On non-Firebase hosts (e.g., GitHub Pages): try direct Cloud Function URL first, then relative path.
+    - Retries on 404/501 to avoid hard failures when rewrites are incomplete.
+  - Added missing Hosting rewrite in `firebase.json` for `/enableAdminTester`.
+  - Validation: `node --check public/js/billing.js` and `npm test` (`20/20`) passed.

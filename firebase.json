@@ -52,6 +52,10 @@
         "function": "startTrial"
       },
       {
+        "source": "/enableAdminTester",
+        "function": "enableAdminTester"
+      },
+      {
         "source": "/stripeWebhook",
         "function": "stripeWebhook"
       },
