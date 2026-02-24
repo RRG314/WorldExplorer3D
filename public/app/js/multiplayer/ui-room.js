@@ -22,7 +22,7 @@ import {
   normalizeCode,
   setHomeBase,
   updateRoomSettings
-} from './rooms.js?v=55';
+} from './rooms.js?v=56';
 import {
   listenPaintClaims,
   normalizeColorHex as normalizePaintColorHex,

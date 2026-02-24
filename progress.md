@@ -1231,3 +1231,12 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Added clearer terminal error when Firestore denies all create attempts (rules/App Check/entitlement guidance).
   - Kept TTL/presence/join logic unchanged.
   - Validation: `npm run test:rules` passes `21/21` after patch.
+- Cache-bust follow-up (2026-02-24):
+  - Bumped runtime import versions to force delivery of multiplayer room-create fix under immutable JS caching.
+  - Updated to `v=56` chain:
+    - app/public `app/index.html` bootstrap script tag
+    - app/public `app/js/bootstrap.js` manifest import
+    - app/public `app/js/modules/manifest.js` `CACHE_BUST`
+    - app/public `app/js/app-entry.js` multiplayer ui-room import
+    - app/public `app/js/multiplayer/ui-room.js` rooms import
+    - root `js/bootstrap.js` cache-bust constant.
