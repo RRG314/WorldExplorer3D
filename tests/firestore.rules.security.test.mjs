@@ -10,6 +10,7 @@ import {
 import {
   Timestamp,
   collection,
+  deleteDoc,
   doc,
   getDoc,
   serverTimestamp,
@@ -541,6 +542,31 @@ await runCheck('owner oversize chat message blocked', async () => {
   await assertFails(batch.commit());
 });
 
+await runCheck('owner chat with external link is blocked', async () => {
+  const msgRef = doc(collection(ownerDb, 'rooms', ROOM_ID, 'chat'));
+  const stateRef = doc(ownerDb, 'rooms', ROOM_ID, 'chatState', OWNER_UID);
+  const batch = writeBatch(ownerDb);
+  batch.set(msgRef, {
+    uid: OWNER_UID,
+    displayName: 'Owner',
+    text: 'join me at https://example.test',
+    createdAt: serverTimestamp(),
+    expiresAt: FUTURE_CHAT,
+    flags: {
+      reported: false
+    }
+  });
+  batch.set(stateRef, {
+    uid: OWNER_UID,
+    lastMessageAt: serverTimestamp(),
+    windowStartedAt: serverTimestamp(),
+    windowCount: 1,
+    updatedAt: serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
+  });
+  await assertFails(batch.commit());
+});
+
 await runCheck('member valid chat write with state transition succeeds', async () => {
   const msgRef = doc(collection(memberDb, 'rooms', ROOM_ID, 'chat'));
   const stateRef = doc(memberDb, 'rooms', ROOM_ID, 'chatState', MEMBER_UID);
@@ -565,6 +591,12 @@ await runCheck('member valid chat write with state transition succeeds', async (
     expiresAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
   });
   await assertSucceeds(batch.commit());
+});
+
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'users', OWNER_UID), userDoc(OWNER_UID, 'Owner'));
+  await setDoc(doc(db, 'users', ATTACKER_UID), userDoc(ATTACKER_UID, 'Attacker'));
 });
 
 await runCheck('attacker cannot create invite even if they add friend', async () => {
@@ -650,6 +682,32 @@ await runCheck('owner can post valid activity feed', async () => {
     createdAt: serverTimestamp(),
     expiresAt: Timestamp.fromMillis(Date.now() + 14 * 24 * 60 * 60 * 1000)
   }));
+});
+
+await runCheck('room owner can delete their room even without active multiplayer entitlement', async () => {
+  const roomCode = 'QT12AK';
+
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'rooms', roomCode), {
+      ...privateRoomDoc(),
+      code: roomCode,
+      ownerUid: OWNER_UID,
+      createdBy: OWNER_UID
+    });
+    await setDoc(doc(db, 'users', OWNER_UID), {
+      plan: 'free',
+      subscriptionStatus: 'none',
+      roomCreateCount: 0,
+      roomCreateLimit: 0,
+      entitlements: {
+        multiplayer: false,
+        earlyAccess: false
+      }
+    }, { merge: true });
+  });
+
+  await assertSucceeds(deleteDoc(doc(ownerDb, 'rooms', roomCode)));
 });
 
 const failed = checks.filter((c) => !c.ok);

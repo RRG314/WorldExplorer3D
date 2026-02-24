@@ -13,7 +13,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
-import { normalizeCode } from './rooms.js?v=59';
+import { normalizeCode } from './rooms.js?v=60';
 
 const ROOM_COLLECTION = 'rooms';
 const CHAT_COLLECTION = 'chat';
@@ -36,6 +36,25 @@ const PROFANITY_PATTERNS = [
   /\bb+i+t+c+h+\w*\b/ig,
   /\ba+s+s+h+o+l+e+\w*\b/ig,
   /\bm+o+t+h+e+r+f+u+c+k+e*r*\w*\b/ig
+];
+
+const SAFETY_BLOCK_PATTERNS = [
+  {
+    pattern: /(https?:\/\/|www\.)/i,
+    message: 'For safety, links are not allowed in room chat.'
+  },
+  {
+    pattern: /\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b/i,
+    message: 'For safety, email addresses are not allowed in room chat.'
+  },
+  {
+    pattern: /(?:\+?\d[\d\s().-]{8,}\d)/,
+    message: 'For safety, phone numbers are not allowed in room chat.'
+  },
+  {
+    pattern: /\b(discord|telegram|snapchat|whatsapp|kik)\b/i,
+    message: 'For safety, external contact handles are not allowed in room chat.'
+  }
 ];
 
 const roomRateState = new Map();
@@ -138,6 +157,14 @@ function applyProfanityFilter(text) {
   };
 }
 
+function enforceChatSafetyPolicy(text) {
+  for (const rule of SAFETY_BLOCK_PATTERNS) {
+    if (rule.pattern.test(text)) {
+      throw new Error(rule.message);
+    }
+  }
+}
+
 async function sendMessage(roomId, text) {
   const user = getCurrentUser();
   if (!user || !user.uid) {
@@ -150,6 +177,7 @@ async function sendMessage(roomId, text) {
   }
 
   const clampedText = clampMessage(text);
+  enforceChatSafetyPolicy(clampedText);
   const filtered = applyProfanityFilter(clampedText);
   checkClientRateLimit(normalizedRoomId, filtered.text);
 

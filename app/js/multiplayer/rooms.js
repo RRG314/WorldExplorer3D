@@ -1,6 +1,7 @@
 import {
   collection,
   Timestamp,
+  deleteDoc,
   deleteField,
   doc,
   getDoc,
@@ -28,6 +29,7 @@ const ROOM_PRESENCE_TTL_MS = 90 * 1000;
 const DEFAULT_MAX_PLAYERS = 12;
 const CITY_KEY_MAX_LEN = 48;
 const PUBLIC_ROOM_RESULT_LIMIT = 20;
+const OWNED_ROOM_RESULT_LIMIT = 40;
 const PAINT_TOWN_MIN_TIME_LIMIT_SEC = 30;
 const PAINT_TOWN_MAX_TIME_LIMIT_SEC = 1800;
 const DEFAULT_PAINT_TOWN_RULES = Object.freeze({
@@ -733,6 +735,95 @@ async function findPublicRoomsByCity(cityInput, options = {}) {
   return matches.slice(0, resultLimit);
 }
 
+function sortRoomsByCreatedAtDesc(rooms = []) {
+  return [...rooms].sort((a, b) => {
+    const aMs = Number.isFinite(Number(a?.createdAtMs)) ? Number(a.createdAtMs) : 0;
+    const bMs = Number.isFinite(Number(b?.createdAtMs)) ? Number(b.createdAtMs) : 0;
+    return bMs - aMs;
+  });
+}
+
+async function listOwnedRooms(options = {}) {
+  const { db } = getServices();
+  const user = requireSignedInUser();
+
+  const resultLimit = Math.max(1, Math.min(100, Math.floor(Number(options.resultLimit || OWNED_ROOM_RESULT_LIMIT))));
+  const q = query(
+    collection(db, ROOM_COLLECTION),
+    where('ownerUid', '==', user.uid),
+    limit(resultLimit)
+  );
+
+  const snap = await getDocs(q);
+  const rows = [];
+  snap.forEach((roomSnap) => {
+    const room = toRoomObject(roomSnap);
+    if (!room) return;
+    rows.push(room);
+  });
+  return sortRoomsByCreatedAtDesc(rows);
+}
+
+function listenOwnedRooms(callback, options = {}) {
+  if (typeof callback !== 'function') return () => {};
+  const user = getCurrentUser();
+  if (!user || !user.uid) {
+    callback([]);
+    return () => {};
+  }
+
+  let db;
+  try {
+    ({ db } = getServices());
+  } catch (_) {
+    callback([]);
+    return () => {};
+  }
+
+  const resultLimit = Math.max(1, Math.min(100, Math.floor(Number(options.resultLimit || OWNED_ROOM_RESULT_LIMIT))));
+  const q = query(
+    collection(db, ROOM_COLLECTION),
+    where('ownerUid', '==', user.uid),
+    limit(resultLimit)
+  );
+
+  return onSnapshot(q, (snap) => {
+    const rows = [];
+    snap.forEach((roomSnap) => {
+      const room = toRoomObject(roomSnap);
+      if (!room) return;
+      rows.push(room);
+    });
+    callback(sortRoomsByCreatedAtDesc(rows));
+  }, (err) => {
+    console.warn('[multiplayer][rooms] listenOwnedRooms failed:', err);
+    callback([]);
+  });
+}
+
+async function deleteOwnedRoom(roomCode) {
+  const { db } = getServices();
+  const user = requireSignedInUser();
+  const normalizedCode = normalizeCode(roomCode);
+  if (!normalizedCode) throw new Error('Enter a valid 6-character room code.');
+
+  const roomRef = doc(db, ROOM_COLLECTION, normalizedCode);
+  const roomSnap = await getDoc(roomRef);
+  if (!roomSnap.exists()) {
+    throw new Error('Room not found.');
+  }
+
+  const room = toRoomObject(roomSnap);
+  if (!room || room.ownerUid !== user.uid) {
+    throw new Error('Only the room owner can delete this room.');
+  }
+
+  await deleteDoc(roomRef);
+  if (currentRoom && normalizeCode(currentRoom.code) === normalizedCode) {
+    setCurrentRoom(null);
+  }
+}
+
 async function findFeaturedPublicRooms(options = {}) {
   const { db } = getServices();
   requireSignedInUser();
@@ -841,12 +932,15 @@ async function setHomeBase(roomId, homeBase = {}) {
 
 export {
   createRoom,
+  deleteOwnedRoom,
   deriveRoomDeterministicSeed,
   findPublicRoomsByCity,
   findFeaturedPublicRooms,
   getCurrentRoom,
   joinRoomByCode,
   leaveRoom,
+  listOwnedRooms,
+  listenOwnedRooms,
   listenRoom,
   listenHomeBase,
   normalizeCityKey,

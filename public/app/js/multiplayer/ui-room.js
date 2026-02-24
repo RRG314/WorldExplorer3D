@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { startTrialIfEligible } from '../../../js/entitlements.js?v=59';
+import { startTrialIfEligible } from '../../../js/entitlements.js?v=60';
 import { createArtifact, listenArtifacts, removeArtifact } from './artifacts.js?v=55';
 import { CHAT_MAX_LENGTH, listenChat, reportMessage, sendMessage } from './chat.js?v=55';
 import { createGhostManager } from './ghosts.js?v=55';
@@ -10,6 +10,7 @@ import {
 import { listenPlayers, startPresence, stopPresence } from './presence.js?v=55';
 import {
   createRoom,
+  deleteOwnedRoom,
   deriveRoomDeterministicSeed,
   findFeaturedPublicRooms,
   findPublicRoomsByCity,
@@ -17,12 +18,13 @@ import {
   joinRoomByCode,
   leaveRoom,
   listenHomeBase,
+  listenOwnedRooms,
   listenRoom,
   normalizeCityKey,
   normalizeCode,
   setHomeBase,
   updateRoomSettings
-} from './rooms.js?v=59';
+} from './rooms.js?v=60';
 import {
   listenPaintClaims,
   normalizeColorHex as normalizePaintColorHex,
@@ -162,6 +164,7 @@ function buildInviteLink(code) {
   const url = new URL(window.location.href);
   url.searchParams.set('room', normalized);
   url.searchParams.set('tab', 'multiplayer');
+  url.searchParams.set('invite', '1');
   url.searchParams.delete('startTrial');
   return url.toString();
 }
@@ -306,6 +309,8 @@ function initMultiplayerPlatform() {
     titleFriendsList: document.getElementById('mpFriendsList'),
     titleRecentPlayersList: document.getElementById('mpRecentPlayersList'),
     titleInvitesList: document.getElementById('mpInvitesList'),
+    titleOwnedRoomsStatus: document.getElementById('mpOwnedRoomsStatus'),
+    titleOwnedRoomsList: document.getElementById('mpOwnedRoomsList'),
     titleLeaderboardList: document.getElementById('mpLeaderboardList'),
 
     roomPanelModal: document.getElementById('roomPanelModal'),
@@ -373,11 +378,13 @@ function initMultiplayerPlatform() {
     friends: [],
     recentPlayers: [],
     invites: [],
+    ownedRooms: [],
     leaderboard: [],
     artifacts: [],
     homeBase: null,
     pendingRoomCode: normalizeCode(new URLSearchParams(window.location.search).get('room')),
     pendingRoomPrompted: false,
+    pendingRoomInFlight: false,
     activeRoomWorldSignature: '',
     unsubRoom: null,
     unsubPlayers: null,
@@ -388,6 +395,7 @@ function initMultiplayerPlatform() {
     unsubFriends: null,
     unsubRecentPlayers: null,
     unsubInvites: null,
+    unsubOwnedRooms: null,
     unsubLeaderboard: null
   };
 
@@ -678,6 +686,41 @@ function initMultiplayerPlatform() {
     }).join('');
   }
 
+  function renderOwnedRooms() {
+    if (!refs.titleOwnedRoomsList) return;
+    if (!state.authUser) {
+      refs.titleOwnedRoomsList.innerHTML = '<li class="mpRoomEmpty">Sign in to manage rooms you created.</li>';
+      if (refs.titleOwnedRoomsStatus) {
+        refs.titleOwnedRoomsStatus.textContent = 'Sign in to access your created rooms.';
+        refs.titleOwnedRoomsStatus.style.color = '#64748b';
+      }
+      return;
+    }
+
+    if (!state.ownedRooms.length) {
+      refs.titleOwnedRoomsList.innerHTML = '<li class="mpRoomEmpty">No rooms created yet.</li>';
+      if (refs.titleOwnedRoomsStatus) {
+        refs.titleOwnedRoomsStatus.textContent = 'Create a room to add it to your owner list.';
+        refs.titleOwnedRoomsStatus.style.color = '#64748b';
+      }
+      return;
+    }
+
+    refs.titleOwnedRoomsList.innerHTML = state.ownedRooms.map((room) => {
+      const code = normalizeCode(room.code || room.id || '');
+      const name = safeHtml(room.name || code || 'Untitled Room', 80);
+      const visibility = safeHtml(room.visibility || 'private', 16);
+      const location = safeHtml(room.locationTag?.label || room.locationTag?.city || '', 80);
+      const locationMeta = location ? ` • ${location}` : '';
+      return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${name}</div><div class="mpRoomMeta">${escapeHtml(code)} • ${visibility}${locationMeta}</div></div><div class="mp-row"><button class="mp-btn secondary mpSmallBtn" data-open-owned-room="${escapeHtml(code)}" type="button">Open</button><button class="mp-btn secondary mpSmallBtn" data-delete-owned-room="${escapeHtml(code)}" type="button">Delete</button></div></li>`;
+    }).join('');
+
+    if (refs.titleOwnedRoomsStatus) {
+      refs.titleOwnedRoomsStatus.textContent = `${state.ownedRooms.length} room${state.ownedRooms.length === 1 ? '' : 's'} in your owner list.`;
+      refs.titleOwnedRoomsStatus.style.color = '#64748b';
+    }
+  }
+
   function renderLeaderboard() {
     if (!refs.titleLeaderboardList) return;
     if (!state.leaderboard.length) {
@@ -907,10 +950,12 @@ function initMultiplayerPlatform() {
     if (typeof state.unsubFriends === 'function') state.unsubFriends();
     if (typeof state.unsubRecentPlayers === 'function') state.unsubRecentPlayers();
     if (typeof state.unsubInvites === 'function') state.unsubInvites();
+    if (typeof state.unsubOwnedRooms === 'function') state.unsubOwnedRooms();
     if (typeof state.unsubLeaderboard === 'function') state.unsubLeaderboard();
     state.unsubFriends = null;
     state.unsubRecentPlayers = null;
     state.unsubInvites = null;
+    state.unsubOwnedRooms = null;
     state.unsubLeaderboard = null;
   }
 
@@ -1003,10 +1048,12 @@ function initMultiplayerPlatform() {
       state.friends = [];
       state.recentPlayers = [];
       state.invites = [];
+      state.ownedRooms = [];
       state.leaderboard = [];
       renderFriends();
       renderRecentPlayers();
       renderInvites();
+      renderOwnedRooms();
       renderLeaderboard();
       renderFeaturedRooms();
       return;
@@ -1028,6 +1075,12 @@ function initMultiplayerPlatform() {
       state.unsubInvites = listenIncomingInvites((rows) => {
         state.invites = rows;
         renderInvites();
+      });
+    }
+    if (!state.unsubOwnedRooms) {
+      state.unsubOwnedRooms = listenOwnedRooms((rows) => {
+        state.ownedRooms = rows;
+        renderOwnedRooms();
       });
     }
     if (!state.unsubLeaderboard) {
@@ -1208,6 +1261,47 @@ function initMultiplayerPlatform() {
       setStatus('Invite sent and link copied.');
     } catch (err) {
       setStatus(err?.message || 'Could not send invite.', true);
+    }
+  }
+
+  async function handleDeleteOwnedRoom(roomCode) {
+    if (!state.authUser) {
+      setStatus('Sign in to delete rooms you created.', true);
+      return;
+    }
+
+    const normalizedCode = normalizeCode(roomCode);
+    if (!normalizedCode) {
+      setStatus('Invalid room code.', true);
+      return;
+    }
+
+    const roomRecord = state.ownedRooms.find((room) => normalizeCode(room.code || room.id || '') === normalizedCode) || null;
+    const label = sanitizeText(roomRecord?.name || normalizedCode, 80);
+    const confirmed = window.confirm(`Delete room "${label}" (${normalizedCode})? This cannot be undone.`);
+    if (!confirmed) return;
+
+    try {
+      if (state.currentRoom && normalizeCode(state.currentRoom.code || state.currentRoom.id || '') === normalizedCode) {
+        await deactivateRoom(false);
+      }
+
+      await deleteOwnedRoom(normalizedCode);
+
+      const url = new URL(window.location.href);
+      if (normalizeCode(url.searchParams.get('room')) === normalizedCode) {
+        url.searchParams.delete('room');
+        url.searchParams.delete('invite');
+        window.history.replaceState({}, '', url.toString());
+      }
+
+      state.browseRooms = state.browseRooms.filter((room) => normalizeCode(room.code || room.id || '') !== normalizedCode);
+      state.featuredRooms = state.featuredRooms.filter((room) => normalizeCode(room.code || room.id || '') !== normalizedCode);
+      renderBrowseRooms();
+      renderFeaturedRooms();
+      setStatus(`Deleted room ${normalizedCode}.`);
+    } catch (err) {
+      setStatus(err?.message || 'Could not delete room.', true);
     }
   }
 
@@ -1479,17 +1573,52 @@ function initMultiplayerPlatform() {
     }
   }
 
-  function attemptPendingRoomJoin() {
-    if (state.pendingRoomPrompted || !state.pendingRoomCode) return;
+  async function attemptPendingRoomJoin() {
+    if (state.pendingRoomPrompted || !state.pendingRoomCode || state.pendingRoomInFlight) return;
     if (!state.authUser) return;
-    if (!canUseMultiplayer(state.entitlement)) return;
 
-    state.pendingRoomPrompted = true;
-    const shouldJoin = window.confirm(`Join room ${state.pendingRoomCode}?`);
-    if (!shouldJoin) return;
+    const inviteCode = normalizeCode(state.pendingRoomCode);
+    if (!inviteCode) return;
 
-    setInputCode(refs, state.pendingRoomCode);
-    handleJoinRoom(state.pendingRoomCode);
+    state.pendingRoomInFlight = true;
+    try {
+      if (canUseMultiplayer(state.entitlement)) {
+        state.pendingRoomPrompted = true;
+        setStatus(`Invite accepted. Joining room ${inviteCode}...`);
+        setInputCode(refs, inviteCode);
+        await handleJoinRoom(inviteCode);
+        return;
+      }
+
+      const shouldStartTrial = window.confirm(
+        `Invite to room ${inviteCode}. Multiplayer is locked on Free.\n\nStart your 2-day trial now to join?`
+      );
+      state.pendingRoomPrompted = true;
+      if (!shouldStartTrial) {
+        setStatus('Invite requires trial or paid plan. Start your trial to continue.', true);
+        return;
+      }
+
+      setStatus('Starting your 2-day trial from invite...');
+      const next = await startTrialIfEligible(state.authUser);
+      state.entitlement = {
+        ...state.entitlement,
+        ...next
+      };
+      applyEntitlementCopy();
+
+      if (!canUseMultiplayer(state.entitlement)) {
+        setStatus('Trial start did not unlock multiplayer yet. Refresh and try again.', true);
+        return;
+      }
+
+      setInputCode(refs, inviteCode);
+      await handleJoinRoom(inviteCode);
+    } catch (err) {
+      setStatus(err?.message || 'Could not complete invite flow.', true);
+    } finally {
+      state.pendingRoomInFlight = false;
+    }
   }
 
   function applyEntitlementCopy() {
@@ -1497,7 +1626,11 @@ function initMultiplayerPlatform() {
 
     const allowed = canUseMultiplayer(state.entitlement);
     if (!state.authUser) {
-      setStatus('Sign in to create or join multiplayer rooms.');
+      if (state.pendingRoomCode) {
+        setStatus(`Invite detected for room ${state.pendingRoomCode}. Sign in to continue.`);
+      } else {
+        setStatus('Sign in to create or join multiplayer rooms.');
+      }
       setBrowseStatus('Sign in to browse public rooms.');
       if (refs.titleFriendsStatus) refs.titleFriendsStatus.textContent = 'Sign in to build your social graph.';
       return;
@@ -1783,6 +1916,27 @@ function initMultiplayerPlatform() {
       }
     });
 
+    refs.titleOwnedRoomsList?.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+
+      const openBtn = target.closest('button[data-open-owned-room]');
+      if (openBtn instanceof HTMLElement) {
+        const roomCode = normalizeCode(openBtn.dataset.openOwnedRoom || '');
+        if (!roomCode) return;
+        setInputCode(refs, roomCode);
+        await handleJoinRoom(roomCode);
+        return;
+      }
+
+      const deleteBtn = target.closest('button[data-delete-owned-room]');
+      if (deleteBtn instanceof HTMLElement) {
+        const roomCode = normalizeCode(deleteBtn.dataset.deleteOwnedRoom || '');
+        if (!roomCode) return;
+        await handleDeleteOwnedRoom(roomCode);
+      }
+    });
+
     refs.roomArtifactList?.addEventListener('click', (event) => {
       const target = event.target;
       if (!(target instanceof HTMLElement)) return;
@@ -1846,6 +2000,7 @@ function initMultiplayerPlatform() {
     renderFriends();
     renderRecentPlayers();
     renderInvites();
+    renderOwnedRooms();
     renderLeaderboard();
   }
 
@@ -1873,6 +2028,7 @@ function initMultiplayerPlatform() {
     renderFriends();
     renderRecentPlayers();
     renderInvites();
+    renderOwnedRooms();
     renderLeaderboard();
     updateToggleStates();
     applyEntitlementCopy();

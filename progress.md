@@ -1281,3 +1281,42 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `output/playwright/multiplayer-room-create-smoke/shot-1.png`
     - no console/page errors emitted by the run.
   - Confirmed runtime loaded `rooms.js?v=59` and `ui-room.js?v=59` on `/app/` in local HTTP logs.
+
+- Multiplayer ownership + invite safety pass (2026-02-24):
+  - Added owner-room management in multiplayer:
+    - `listOwnedRooms`, `listenOwnedRooms`, and `deleteOwnedRoom` in `app/js/multiplayer/rooms.js` (+ mirrored `public/app/js/multiplayer/rooms.js`).
+    - Title multiplayer panel now renders "My Rooms" with `Open` and `Delete` actions for owner-created rooms.
+    - Owner delete flow confirms action, leaves active room if needed, removes matching URL invite params, and refreshes browse/featured lists.
+  - Invite-link flow hardened:
+    - All invite URL builders now append `invite=1`.
+    - Pending invite join path now does entitlement-aware branching:
+      - entitled users auto-join room;
+      - free users are prompted to start 2-day trial and only join after successful unlock.
+    - Signed-out invite state now shows explicit sign-in prompt with room code context.
+  - Kid-safety chat policy updates:
+    - Client `chat.js` now blocks links, emails, phone numbers, and external contact-handle solicitation keywords before send.
+    - Firestore rules enforce same chat constraints server-side.
+  - Firestore rule behavior updates:
+    - Room owners can delete their own room even when not currently entitled (owner control retained).
+    - Invite create/sender update now requires multiplayer entitlement.
+  - Legal copy updates:
+    - Terms and Privacy updated (root + `public/`) for multiplayer conduct, child/guardian language, moderation/enforcement, and multiplayer data retention/safety statements.
+  - Cache-bust roll:
+    - Bumped multiplayer/entry bootstrap references from `v=59` to `v=60` to force fresh client module load.
+
+- Verification run (2026-02-24):
+  - `npm run test:rules` => 25/25 passed (including new chat safety and owner-delete tests).
+  - `node --check` passed for all modified JS files.
+  - Web-game Playwright client run completed against local `/app/` (`output/playwright/multiplayer-verify/`).
+  - Direct Playwright smoke report:
+    - `output/playwright/multiplayer-direct-check.json`
+    - `output/playwright/multiplayer-direct-check.png`
+    - State confirms multiplayer tab active, pane active, owner-room UI containers present, and no console/page errors.
+
+- Next agent TODO:
+  - After push/deploy, run one live production verification with a real signed-in account:
+    - create room
+    - open room from My Rooms
+    - delete room
+    - confirm invite trial-gate path on a free account
+    - confirm direct invite join on entitled account.

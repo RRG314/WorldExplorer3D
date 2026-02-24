@@ -26,6 +26,7 @@
       <li>Plan state in Firestore, including trial end date, plan tier, and entitlement flags.</li>
       <li>Stripe customer/subscription identifiers for billing management.</li>
       <li>Optional in-app cloud data when enabled by plan (for example, synced challenge/saves).</li>
+      <li>Multiplayer metadata such as room membership, friend links, recent player records, invite records, and room chat content.</li>
     </ul>
 
     <h2>Billing Data</h2>
@@ -37,13 +38,17 @@
       <li>Grant and enforce trial/subscription entitlements.</li>
       <li>Provide customer billing portal access.</li>
       <li>Operate and improve service reliability.</li>
+      <li>Moderate multiplayer abuse and enforce chat/social safety policies.</li>
     </ul>
 
     <h2>Data Sharing</h2>
     <p>Data is shared only with service providers required to operate the app (Firebase and Stripe) or where legally required.</p>
 
     <h2>Data Retention</h2>
-    <p>Account plan records are retained while your account remains active. You may request account deletion by contacting support.</p>
+    <p>Account plan records are retained while your account remains active. Multiplayer data uses automatic expiration for short-lived records (presence, invites, and chat state windows), with additional cleanup policies for abuse prevention. You may request account deletion by contacting support.</p>
+
+    <h2>Children's Privacy and Safety</h2>
+    <p>Where required by law, child users should access the service only with parent or guardian permission. We apply safety controls to multiplayer chat, including anti-spam and contact-sharing restrictions, to reduce risk in child-accessible environments.</p>
 
     <h2>Contact</h2>
     <p>For privacy requests, email <a href="mailto:hello@worldexplorer.app">hello@worldexplorer.app</a>.</p>

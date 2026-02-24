@@ -704,6 +704,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .room-chat-compose{display:flex;gap:8px}
 .room-chat-compose .mp-input{min-width:0;background:#0f172a;color:#e2e8f0;border-color:rgba(148,163,184,0.42)}
 .room-chat-compose .mp-btn{padding:9px 12px}
+.mpChatPolicy{font-size:11px;line-height:1.4;color:#93c5fd}
 #roomChatStatus{min-height:15px;font-size:11px;color:#93c5fd}
 #roomChatToggleBtn.on{background:#16a34a;color:#fff}
 
@@ -912,6 +913,12 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div class="mp-subtitle">Incoming Invites</div>
 <ul id="mpInvitesList" class="mp-room-list">
 <li class="mpRoomEmpty">No incoming invites.</li>
+</ul>
+
+<div class="mp-subtitle">My Rooms</div>
+<div id="mpOwnedRoomsStatus" class="mp-status">Rooms you create appear here. You can reopen or delete your own rooms.</div>
+<ul id="mpOwnedRoomsList" class="mp-room-list">
+<li class="mpRoomEmpty">Sign in to load your rooms.</li>
 </ul>
 
 <div class="mp-subtitle">Top Explorers</div>
@@ -1721,6 +1728,7 @@ Explore the area
       <input id="roomChatInput" class="mp-input" type="text" maxlength="500" placeholder="Send message (max 500 chars)">
       <button id="roomChatSendBtn" class="mp-btn primary" type="button">Send</button>
     </div>
+    <div class="mpChatPolicy">Safety rules: no links, no personal contact info, and no harassment. Use Report on abusive messages.</div>
     <div id="roomChatStatus"></div>
   </div>
 </aside>
@@ -1747,7 +1755,7 @@ import {
   getFreeEntitlementsState,
   startTrialIfEligible,
   subscribeEntitlements
-} from '../js/entitlements.js?v=59';
+} from '../js/entitlements.js?v=60';
 
 const appSignInBtn = document.getElementById('appSignInBtn');
 const proAccessPanel = document.getElementById('proAccessPanel');
@@ -2102,5 +2110,5 @@ if (titleScreenObserverTarget) {
   titleObserver.observe(titleScreenObserverTarget, { attributes: true, attributeFilter: ['class'] });
 }
 </script>
-<script type="module" src="js/bootstrap.js?v=59"></script>
+<script type="module" src="js/bootstrap.js?v=60"></script>
 </body></html>

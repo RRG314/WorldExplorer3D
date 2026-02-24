@@ -414,6 +414,10 @@ service cloud.firestore {
         request.resource.data.text is string &&
         request.resource.data.text.size() > 0 &&
         request.resource.data.text.size() <= 500 &&
+        !request.resource.data.text.matches('.*([Hh][Tt][Tt][Pp][Ss]?://|[Ww][Ww][Ww]\\.).*') &&
+        !request.resource.data.text.matches('.*[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}.*') &&
+        !request.resource.data.text.matches('.*[0-9][0-9 ()+-]{8,}[0-9].*') &&
+        !request.resource.data.text.matches('.*([Dd][Ii][Ss][Cc][Oo][Rr][Dd]|[Tt][Ee][Ll][Ee][Gg][Rr][Aa][Mm]|[Ss][Nn][Aa][Pp][Cc][Hh][Aa][Tt]|[Ww][Hh][Aa][Tt][Ss][Aa][Pp][Pp]|[Kk][Ii][Kk]).*') &&
         request.resource.data.createdAt is timestamp &&
         request.resource.data.createdAt == request.time &&
         request.resource.data.expiresAt is timestamp &&
@@ -664,7 +668,8 @@ service cloud.firestore {
     }
 
     function validIncomingInviteCreate(userId, inviteId) {
-      return request.resource.data.keys().hasOnly([
+      return isMultiplayerEntitled() &&
+        request.resource.data.keys().hasOnly([
           'fromUid',
           'fromDisplayName',
           'toUid',
@@ -736,6 +741,7 @@ service cloud.firestore {
 
     function validIncomingInviteSenderUpdate(userId, inviteId) {
       return isSignedIn() &&
+        isMultiplayerEntitled() &&
         request.auth.uid == resource.data.fromUid &&
         request.auth.uid != userId &&
         request.resource.data.keys().hasOnly([
@@ -1037,7 +1043,7 @@ service cloud.firestore {
       allow read: if canReadRoom(roomId);
       allow create: if isMultiplayerEntitled() && validRoomCore(roomId);
       allow update: if isMultiplayerEntitled() && isRoomOwner(roomId) && validRoomUpdate(roomId);
-      allow delete: if isMultiplayerEntitled() && isRoomOwner(roomId);
+      allow delete: if isSignedIn() && isRoomOwner(roomId);
 
       match /players/{uid} {
         allow read: if isMultiplayerEntitled() && canReadRoom(roomId);

@@ -13,7 +13,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
-import { normalizeCode } from './rooms.js?v=59';
+import { normalizeCode } from './rooms.js?v=60';
 
 const USERS_COLLECTION = 'users';
 const FRIENDS_COLLECTION = 'friends';
@@ -95,6 +95,7 @@ function buildInviteLink(code) {
   const url = new URL(resolveAppUrlBase());
   url.searchParams.set('room', normalized);
   url.searchParams.set('tab', 'multiplayer');
+  url.searchParams.set('invite', '1');
   url.searchParams.delete('startTrial');
   return url.toString();
 }
