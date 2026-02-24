@@ -25,7 +25,7 @@ import { renderLoop } from './main.js?v=55';
 import './memory.js?v=55';
 import './blocks.js?v=56';
 import './flower-challenge.js?v=55';
-import { initMultiplayerPlatform } from './multiplayer/ui-room.js?v=61';
+import { initMultiplayerPlatform } from './multiplayer/ui-room.js?v=62';
 import { setupUI } from './ui.js?v=55';
 
 let _booted = false;

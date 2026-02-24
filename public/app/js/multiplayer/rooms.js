@@ -343,6 +343,7 @@ async function upsertMyRoomRecord(roomLike, role = 'member') {
   const user = requireSignedInUser();
   const code = normalizeCode(roomLike?.code || roomLike?.id || '');
   if (!code) return;
+  const roomRef = doc(myRoomsCollection(db, user.uid), code);
 
   const world = normalizeWorld(roomLike?.world || {});
   const locationTag = normalizeLocationTag(
@@ -350,6 +351,22 @@ async function upsertMyRoomRecord(roomLike, role = 'member') {
     world,
     String(roomLike?.name || '').trim()
   );
+  let preservedCreatedAt = null;
+  const roomCreatedAt = roomLike?.createdAt && typeof roomLike.createdAt.toMillis === 'function'
+    ? roomLike.createdAt
+    : null;
+
+  try {
+    const existingSnap = await getDoc(roomRef);
+    if (existingSnap.exists()) {
+      const existing = existingSnap.data() || {};
+      if (existing.createdAt && typeof existing.createdAt.toMillis === 'function') {
+        preservedCreatedAt = existing.createdAt;
+      }
+    }
+  } catch (_) {
+    // Best effort only. Falling back to room timestamp or server timestamp is safe.
+  }
 
   const payload = {
     code,
@@ -360,13 +377,13 @@ async function upsertMyRoomRecord(roomLike, role = 'member') {
     world,
     updatedAt: serverTimestamp(),
     lastJoinedAt: serverTimestamp(),
-    createdAt: serverTimestamp()
+    createdAt: preservedCreatedAt || roomCreatedAt || serverTimestamp()
   };
 
   if (locationTag) payload.locationTag = locationTag;
   else payload.locationTag = deleteField();
 
-  await setDoc(doc(myRoomsCollection(db, user.uid), code), payload, { merge: true });
+  await setDoc(roomRef, payload, { merge: true });
 }
 
 function setCurrentRoom(nextRoom) {

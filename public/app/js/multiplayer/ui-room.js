@@ -30,7 +30,7 @@ import {
   normalizeCode,
   setHomeBase,
   updateRoomSettings
-} from './rooms.js?v=61';
+} from './rooms.js?v=62';
 import {
   listenPaintClaims,
   normalizeColorHex as normalizePaintColorHex,
@@ -192,6 +192,15 @@ function setInputCode(refs, code) {
   const normalized = normalizeCode(code);
   if (refs.titleCodeInput) refs.titleCodeInput.value = normalized;
   if (refs.roomPanelCodeInput) refs.roomPanelCodeInput.value = normalized;
+}
+
+function eventElementTarget(event) {
+  const rawTarget = event?.target;
+  if (rawTarget instanceof Element) return rawTarget;
+  if (rawTarget instanceof Node && rawTarget.parentElement instanceof Element) {
+    return rawTarget.parentElement;
+  }
+  return null;
 }
 
 function isWalkModeActive() {
@@ -724,7 +733,7 @@ function initMultiplayerPlatform() {
       const deleteBtn = canDelete
         ? `<button class="mp-btn secondary mpSmallBtn" data-delete-owned-room="${escapeHtml(code)}" type="button">Delete</button>`
         : '';
-      return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${name}</div><div class="mpRoomMeta">${escapeHtml(code)} • ${visibility} • ${role}${locationMeta}</div></div><div class="mp-row"><button class="mp-btn secondary mpSmallBtn" data-open-owned-room="${escapeHtml(code)}" type="button">Open</button>${deleteBtn}</div></li>`;
+      return `<li class="mpRoomItem" data-owned-room-code="${escapeHtml(code)}" tabindex="0" role="button" aria-label="Open room ${escapeHtml(code)}"><div class="mpRoomInfo"><div class="mpRoomName">${name}</div><div class="mpRoomMeta">${escapeHtml(code)} • ${visibility} • ${role}${locationMeta}</div></div><div class="mp-row"><button class="mp-btn secondary mpSmallBtn" data-open-owned-room="${escapeHtml(code)}" type="button">Open</button>${deleteBtn}</div></li>`;
     }).join('');
 
     if (refs.titleOwnedRoomsStatus) {
@@ -1340,6 +1349,29 @@ function initMultiplayerPlatform() {
     } catch (err) {
       setStatus(err?.message || 'Could not delete room.', true);
     }
+  }
+
+  async function handleOpenOwnedRoom(roomCode) {
+    if (!state.authUser) {
+      setStatus('Sign in to open saved rooms.', true);
+      return;
+    }
+    const normalizedCode = normalizeCode(roomCode);
+    if (!normalizedCode) {
+      setStatus('Invalid saved room code.', true);
+      return;
+    }
+
+    const activeCode = normalizeCode(state.currentRoom?.code || state.currentRoom?.id || '');
+    if (activeCode && activeCode === normalizedCode) {
+      setInputCode(refs, normalizedCode);
+      setStatus(`Already in room ${normalizedCode}.`);
+      return;
+    }
+
+    setInputCode(refs, normalizedCode);
+    setStatus(`Opening room ${normalizedCode}...`);
+    await handleJoinRoom(normalizedCode);
   }
 
   async function activateRoom(room, originLabel = 'room') {
@@ -1970,15 +2002,14 @@ function initMultiplayerPlatform() {
     });
 
     refs.titleOwnedRoomsList?.addEventListener('click', async (event) => {
-      const target = event.target;
-      if (!(target instanceof HTMLElement)) return;
+      const target = eventElementTarget(event);
+      if (!target) return;
 
       const openBtn = target.closest('button[data-open-owned-room]');
       if (openBtn instanceof HTMLElement) {
         const roomCode = normalizeCode(openBtn.dataset.openOwnedRoom || '');
         if (!roomCode) return;
-        setInputCode(refs, roomCode);
-        await handleJoinRoom(roomCode);
+        await handleOpenOwnedRoom(roomCode);
         return;
       }
 
@@ -1987,7 +2018,27 @@ function initMultiplayerPlatform() {
         const roomCode = normalizeCode(deleteBtn.dataset.deleteOwnedRoom || '');
         if (!roomCode) return;
         await handleDeleteOwnedRoom(roomCode);
+        return;
       }
+
+      const roomRow = target.closest('li[data-owned-room-code]');
+      if (roomRow instanceof HTMLElement) {
+        const roomCode = normalizeCode(roomRow.dataset.ownedRoomCode || '');
+        if (!roomCode) return;
+        await handleOpenOwnedRoom(roomCode);
+      }
+    });
+
+    refs.titleOwnedRoomsList?.addEventListener('keydown', async (event) => {
+      if (event.key !== 'Enter' && event.key !== ' ') return;
+      const target = eventElementTarget(event);
+      if (!target) return;
+      const roomRow = target.closest('li[data-owned-room-code]');
+      if (!(roomRow instanceof HTMLElement)) return;
+      const roomCode = normalizeCode(roomRow.dataset.ownedRoomCode || '');
+      if (!roomCode) return;
+      event.preventDefault();
+      await handleOpenOwnedRoom(roomCode);
     });
 
     refs.roomArtifactList?.addEventListener('click', (event) => {

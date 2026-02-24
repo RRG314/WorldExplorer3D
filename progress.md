@@ -1394,3 +1394,18 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Result: pass (`output/playwright/room-flow-backend-check/report.json`): owner create works, member join works, both users receive saved-room entry, owner delete operations succeed.
   - Runtime DOM state check passed for Multiplayer tab activation + My Rooms controls presence:
     - `output/playwright/room-return-statecheck/report.json`
+
+- Saved-room open reliability pass (2026-02-24):
+  - Hardened owned-room click handling in `app/js/multiplayer/ui-room.js` + `public/app/js/multiplayer/ui-room.js` with robust event target normalization (`Element`/`Node`), row-level open fallback, and keyboard open (`Enter`/`Space`).
+  - Added explicit `handleOpenOwnedRoom(...)` flow with clear status messages and same-room short-circuit.
+  - Added `data-owned-room-code` row metadata so mobile/desktop taps on the row open the room.
+- Saved-room persistence write fix:
+  - `upsertMyRoomRecord(...)` now preserves existing `createdAt` on updates (instead of overwriting every upsert), preventing `myRooms` rule update denials.
+  - Updated both app and public copies of `rooms.js`.
+- Security/rules coverage update:
+  - Added tests for owner-only room deletion (`non-owner cannot delete`, `owner can delete`).
+  - `npm run test:rules` now passes `33/33`.
+- Browser validation notes:
+  - Ran `develop-web-game` Playwright client after patch.
+  - Added targeted Playwright checks confirming saved-room open event fires from button, row click, and keyboard activation (unauth state shows expected "Sign in to open saved rooms.").
+- Cache bust bump to `v=62` across multiplayer imports/bootstraps (`app` + `public/app` + root/public bootstrap shims) so saved-room fixes load immediately after deploy without stale browser cache.

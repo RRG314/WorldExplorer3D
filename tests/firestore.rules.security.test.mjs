@@ -247,6 +247,30 @@ await runCheck('non-member cannot read private room doc', async () => {
   await assertFails(getDoc(doc(attackerDb, 'rooms', ROOM_ID)));
 });
 
+await runCheck('non-owner cannot delete room', async () => {
+  await assertFails(deleteDoc(doc(memberDb, 'rooms', ROOM_ID)));
+});
+
+await runCheck('owner can delete room they created', async () => {
+  const removableRoomCode = 'RM1DEL';
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'rooms', removableRoomCode), {
+      ...privateRoomDoc(),
+      code: removableRoomCode
+    });
+    await setDoc(
+      doc(db, 'rooms', removableRoomCode, 'players', OWNER_UID),
+      {
+        ...playerDoc(OWNER_UID, 'Owner', 'owner'),
+        joinCode: removableRoomCode
+      }
+    );
+  });
+
+  await assertSucceeds(deleteDoc(doc(ownerDb, 'rooms', removableRoomCode)));
+});
+
 await runCheck('member cannot write other player presence', async () => {
   await assertFails(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'players', OWNER_UID), playerDoc(OWNER_UID, 'Owner', 'owner')));
 });
