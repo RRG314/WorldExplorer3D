@@ -289,6 +289,17 @@ async function createRoom(options = {}) {
   const entitlement = globalThis.__WE3D_ENTITLEMENTS__ || {};
   const entitlementAdminHint =
     entitlement.isAdmin === true || String(entitlement.role || '').toLowerCase() === 'admin';
+  let hasAdminTokenClaim = false;
+
+  if (typeof user.getIdTokenResult === 'function') {
+    try {
+      const tokenResult = await user.getIdTokenResult(entitlementAdminHint);
+      const claims = tokenResult && tokenResult.claims ? tokenResult.claims : {};
+      hasAdminTokenClaim = claims.admin === true || String(claims.role || '').toLowerCase() === 'admin';
+    } catch (err) {
+      console.warn('[multiplayer] Unable to refresh auth token claims for room create:', err);
+    }
+  }
 
   async function ensureUserProfile() {
     let snap = await getDoc(userRef);
@@ -318,25 +329,24 @@ async function createRoom(options = {}) {
 
     const roomRef = doc(db, ROOM_COLLECTION, code);
     const profile = profileSnap.exists() ? (profileSnap.data() || {}) : {};
-    const plan = normalizePlanForLimits(profile.plan || 'free');
-    const isAdmin = entitlementAdminHint || String(profile.subscriptionStatus || '').toLowerCase() === 'admin';
+    const profileIndicatesAdmin = String(profile.subscriptionStatus || '').toLowerCase() === 'admin';
+    const plan = profileIndicatesAdmin || hasAdminTokenClaim
+      ? 'pro'
+      : normalizePlanForLimits(profile.plan || 'free');
     const roomCreateCount = normalizeRoomCreateCount(profile.roomCreateCount);
     const persistedLimit = Number.isFinite(Number(profile.roomCreateLimit))
       ? Math.max(0, Math.min(10000, Math.floor(Number(profile.roomCreateLimit))))
       : null;
     const planLimit = roomCreateLimitForPlan(plan);
-    const baseRoomCreateLimit = Math.max(
+    const roomCreateLimit = Math.max(
       planLimit,
       persistedLimit == null ? planLimit : persistedLimit
     );
-    const roomCreateLimit = isAdmin
-      ? Math.max(
-          ROOM_CREATE_LIMITS_BY_PLAN.admin,
-          baseRoomCreateLimit
-        )
-      : baseRoomCreateLimit;
+    const localRoomCreateLimit = hasAdminTokenClaim
+      ? Math.max(roomCreateLimit, ROOM_CREATE_LIMITS_BY_PLAN.admin)
+      : roomCreateLimit;
 
-    if (roomCreateLimit <= 0 || roomCreateCount >= roomCreateLimit) {
+    if (localRoomCreateLimit <= 0 || roomCreateCount >= localRoomCreateLimit) {
       throw new Error('Room creation limit reached for your plan. Rename or reuse existing rooms, or upgrade for a higher limit.');
     }
 
@@ -365,7 +375,9 @@ async function createRoom(options = {}) {
         email: String(user.email || profile.email || '').trim().slice(0, 320),
         displayName: displayName.slice(0, 60),
         roomCreateCount: roomCreateCount + 1,
-        roomCreateLimit,
+        roomCreateLimit: hasAdminTokenClaim
+          ? Math.max(roomCreateLimit, ROOM_CREATE_LIMITS_BY_PLAN.admin)
+          : roomCreateLimit,
         updatedAt: serverTimestamp()
       }, { merge: true });
       await batch.commit();

@@ -11,7 +11,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
-import { normalizeCode } from './rooms.js?v=55';
+import { normalizeCode } from './rooms.js?v=57';
 
 const ROOM_COLLECTION = 'rooms';
 const PAINT_CLAIMS_COLLECTION = 'paintClaims';

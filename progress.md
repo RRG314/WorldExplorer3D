@@ -1240,3 +1240,34 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - app/public `app/js/app-entry.js` multiplayer ui-room import
     - app/public `app/js/multiplayer/ui-room.js` rooms import
     - root `js/bootstrap.js` cache-bust constant.
+- Multiplayer room-create permission hotfix (2026-02-24):
+  - Root cause: client sometimes wrote `roomCreateLimit: 10000` from admin hint even when auth token had no admin claim; Firestore rules reject that mismatch in `canConsumeRoomCreateQuota`.
+  - Updated room creation in both `app/js/multiplayer/rooms.js` and `public/app/js/multiplayer/rooms.js`:
+    - Refresh/read token claims once before create attempts.
+    - Compute quota write limit to match Firestore rule math unless admin claim is truly present.
+    - Keep admin-claim path elevated while keeping non-claim/admin-status path rules-compatible.
+  - Updated entitlement sync in `js/entitlements.js` and `public/js/entitlements.js`:
+    - Added token-claim detection helper.
+    - Avoid client-side profile writes that attempt privileged limit inflation without admin claim.
+- Added regression coverage in `tests/firestore.rules.security.test.mjs`:
+  - New check: admin status without token claim cannot inflate room limit in quota write.
+  - New check: same profile can create room when using rules-derived limit.
+- Fixed multiplayer module cache/version split:
+  - Synchronized all multiplayer imports to `./rooms.js?v=56` so only one `rooms` module instance loads.
+- Validation:
+  - `npm run test:rules` => 23/23 passed.
+  - Local Playwright smoke on `http://127.0.0.1:4173/app/`:
+    - No page/console errors.
+    - Multiplayer tab rendered.
+    - Confirmed only one rooms module request (`/app/js/multiplayer/rooms.js?v=56`).
+  - Artifacts: `output/playwright/multiplayer-local-smoke/report.json`, `output/playwright/multiplayer-local-smoke/app-multiplayer-tab.png`.
+- Cache invalidation pass (2026-02-24 follow-up):
+  - Bumped multiplayer/boot cache keys to `v=57` so immutable browser caches pick up the room-create and entitlements fixes.
+  - Updated imports/pages to avoid mixed old/new module instances:
+    - `app/index.html`, `public/app/index.html` bootstrap query -> `v=57`
+    - `app/js/bootstrap.js`, `public/app/js/bootstrap.js` manifest query -> `v=57`
+    - `app/js/modules/manifest.js`, `public/app/js/modules/manifest.js` CACHE_BUST -> `v=57`
+    - `app/js/app-entry.js`, `public/app/js/app-entry.js` ui-room import -> `v=57`
+    - all multiplayer module imports of `rooms.js` -> `v=57`
+    - all page/ui imports of `entitlements.js` -> `v=57` (root/app/account + public copies)
+  - Verified via Playwright network capture: only `entitlements.js?v=57` and `rooms.js?v=57` loaded (no legacy v55/v56 duplicates for these modules).

@@ -369,6 +369,88 @@ await runCheck('admin status can create room even if plan field is stale free', 
   await assertSucceeds(batch.commit());
 });
 
+await runCheck('admin status without admin token claim cannot inflate room limit in quota write', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    const ts = Timestamp.fromMillis(Date.now() - 120_000);
+    await setDoc(doc(db, 'users', OWNER_UID), {
+      uid: OWNER_UID,
+      email: `${OWNER_UID}@example.test`,
+      displayName: 'Owner',
+      createdAt: ts,
+      updatedAt: ts,
+      plan: 'free',
+      subscriptionStatus: 'admin',
+      trialStartsAt: null,
+      trialEndsAt: null,
+      trialConsumedAt: null,
+      entitlements: {
+        multiplayer: true,
+        earlyAccess: true
+      },
+      roomCreateCount: 0,
+      stripeCustomerId: '',
+      stripeSubscriptionId: '',
+      billingCycleAnchorAt: null,
+      cancelAtPeriodEnd: false
+    });
+  });
+
+  const roomCode = 'QT12AI';
+  const batch = writeBatch(ownerDb);
+  batch.set(doc(ownerDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID));
+  batch.set(doc(ownerDb, 'users', OWNER_UID), {
+    uid: OWNER_UID,
+    email: `${OWNER_UID}@example.test`,
+    displayName: 'Owner',
+    roomCreateCount: 1,
+    roomCreateLimit: 10000,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await assertFails(batch.commit());
+});
+
+await runCheck('admin status without admin token claim can create room with rules-derived quota limit', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    const ts = Timestamp.fromMillis(Date.now() - 120_000);
+    await setDoc(doc(db, 'users', OWNER_UID), {
+      uid: OWNER_UID,
+      email: `${OWNER_UID}@example.test`,
+      displayName: 'Owner',
+      createdAt: ts,
+      updatedAt: ts,
+      plan: 'free',
+      subscriptionStatus: 'admin',
+      trialStartsAt: null,
+      trialEndsAt: null,
+      trialConsumedAt: null,
+      entitlements: {
+        multiplayer: true,
+        earlyAccess: true
+      },
+      roomCreateCount: 0,
+      stripeCustomerId: '',
+      stripeSubscriptionId: '',
+      billingCycleAnchorAt: null,
+      cancelAtPeriodEnd: false
+    });
+  });
+
+  const roomCode = 'QT12AJ';
+  const batch = writeBatch(ownerDb);
+  batch.set(doc(ownerDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID));
+  batch.set(doc(ownerDb, 'users', OWNER_UID), {
+    uid: OWNER_UID,
+    email: `${OWNER_UID}@example.test`,
+    displayName: 'Owner',
+    roomCreateCount: 1,
+    roomCreateLimit: 10,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await assertSucceeds(batch.commit());
+});
+
 await runCheck('admin custom claim can create room even when profile plan is free and limit is zero', async () => {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();

@@ -123,6 +123,18 @@ function isTrialExpired(profile, nowMs = Date.now()) {
   return nowMs > trialEndsAtMs;
 }
 
+async function hasAdminTokenClaim(user, forceRefresh = false) {
+  if (!user || typeof user.getIdTokenResult !== 'function') return false;
+  try {
+    const tokenResult = await user.getIdTokenResult(forceRefresh);
+    const claims = tokenResult && tokenResult.claims ? tokenResult.claims : {};
+    return claims.admin === true || String(claims.role || '').toLowerCase() === 'admin';
+  } catch (err) {
+    console.warn('[entitlements] Unable to read auth token claims:', err);
+    return false;
+  }
+}
+
 function normalizeProfile(uid, raw = {}) {
   const plan = normalizePlan(raw.plan);
   const isAdmin = String(raw.subscriptionStatus || '').toLowerCase() === 'admin';
@@ -214,19 +226,25 @@ async function ensureUserDoc(user) {
     const existingRoomCreateLimitRaw = Number.isFinite(Number(existing.roomCreateLimit))
       ? Math.floor(Number(existing.roomCreateLimit))
       : null;
-    const isAdmin = String(existing.subscriptionStatus || '').toLowerCase() === 'admin';
-    const planRoomCreateLimit = roomCreateLimitForPlan(plan);
+    const isAdminStatus = String(existing.subscriptionStatus || '').toLowerCase() === 'admin';
+    const isAdminClaim = await hasAdminTokenClaim(user, isAdminStatus);
+    const rulesPlan = isAdminStatus || isAdminClaim ? 'pro' : plan;
+    const planRoomCreateLimit = roomCreateLimitForPlan(rulesPlan);
     const nextRoomCreateCount = existingRoomCreateCount == null
       ? 0
       : normalizeRoomCreateCount(existingRoomCreateCount);
-    const nextRoomCreateLimit = isAdmin
+    const normalizedStoredLimit = existingRoomCreateLimitRaw == null
+      ? null
+      : Math.max(0, Math.min(10000, existingRoomCreateLimitRaw));
+    const nextRoomCreateLimit = isAdminClaim
       ? Math.max(
           ADMIN_TEST_ROOM_CREATE_LIMIT,
-          existingRoomCreateLimitRaw == null
-            ? ADMIN_TEST_ROOM_CREATE_LIMIT
-            : Math.max(0, Math.min(10000, existingRoomCreateLimitRaw))
+          normalizedStoredLimit == null ? ADMIN_TEST_ROOM_CREATE_LIMIT : normalizedStoredLimit
         )
-      : planRoomCreateLimit;
+      : Math.max(
+          planRoomCreateLimit,
+          normalizedStoredLimit == null ? planRoomCreateLimit : normalizedStoredLimit
+        );
     const needsPatch = (
       nextEmail !== (existing.email || '') ||
       nextDisplayName !== (existing.displayName || '') ||
