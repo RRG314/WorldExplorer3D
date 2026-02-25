@@ -1,0 +1,1444 @@
+Original prompt: i need to make sure this funtions on mobile properly for all screens
+
+- Initialized mobile hardening pass.
+- Relocating title-menu share links + license disclosure to bottom footer per user direction.
+- Next: run Playwright mobile viewport checks across title/menu/in-game/map overlays and fix issues.
+
+- Moved title share links out of Settings into dedicated bottom menu footer.
+- Moved license/attribution into standalone footer line at bottom of title menu.
+- Added title footer share targets: Copy, native Share, Facebook, X, Instagram, Text.
+- Fixed mobile map close blocker by raising `#largeMap` z-index above `#mainMenuBtn`.
+- Fixed small-phone controls overflow by capping controls panel height and making `#ctrlContent` scrollable.
+- Mobile smoke tested with Playwright:
+  - iPhone 12 full flow (title tabs, start, controls panel, large map, share menu, return to title)
+  - iPhone SE and iPad Mini spot checks
+  - No console/page errors in generated reports.
+- Artifacts:
+  - output/playwright/mobile-smoke-report.json
+  - output/playwright/mobile-matrix-report.json
+- Added mode-aware mobile touch navigation scaffold:
+  - New mobile dual-pad HUD (move + look) and two action buttons.
+  - Wiring started in `js/ui.js` to map touch holds to existing key state (earth + space flight channels).
+  - Next: run Playwright mobile checks (Android profile) and tune placement/behavior.
+- Implemented mode-aware mobile navigation controls in `index.html` + `js/ui.js` (+ mirrored `styles.css`):
+  - Touch-only controller with move pad, look/steer pad, and two action hold buttons.
+  - Mode profiles wired to existing inputs:
+    - Driving: Drive pad + Brake/Boost
+    - Walking: Move pad + Look pad + Jump/Run
+    - Drone: Move pad + Look pad + Ascend/Descend
+    - Rocket: Steer pad + Thrust/Brake (space input channel)
+  - Dynamic visibility rules: hide on title, map overlay, non-space pause, or expanded controls tab.
+  - Space-flight compatibility: controller z-index elevates above `#spaceFlightCanvas`.
+  - Added hold-state safety: pointer capture, per-key hold counts, release on blur/visibility change.
+- Validation:
+  - `node --check js/ui.js` passed.
+  - Android (Pixel 5) Playwright checks confirm mode switching + correct bindings + no console errors.
+  - Verified action button active/inactive hold lifecycle with pointerdown/up simulation.
+- Desktop title clipping fix (post-share-footer layout):
+  - Root cause: `#titleScreen` vertical centering with taller menu+footer stack caused inaccessible top content on common desktop heights.
+  - Fix: top-anchor title stack (`justify-content:flex-start`), tighten vertical paddings/gaps, and reduce desktop menu max-height budget.
+  - Synced same title/menu height constraints in `styles.css` for consistency.
+- Validation run:
+  - Playwright desktop screenshot: `output/playwright/title-desktop-after-fix.png` (logo fully visible).
+  - Playwright mobile screenshot: `output/playwright/title-mobile-after-fix.png` (no regression observed).
+  - Console/page errors: none (`output/playwright/title-desktop-after-fix.errors.json`, `output/playwright/title-mobile-after-fix.errors.json`).
+- Mobile interaction reliability + layout pass:
+  - Added touch-action hygiene (`button{touch-action:manipulation}`) and mobile hold-input fallback path in `js/ui.js` for browsers without PointerEvent support.
+  - Repositioned mobile action stack so `Jump`/`Run` sit under left/look pad.
+  - Adjusted mobile compact controls pill placement to avoid blocking minimap-side action icons.
+  - Tuned mobile coords readout downshift to avoid overlap with mobile action buttons.
+  - Reworked mobile share/flower placement next to minimap and fixed stacking so both remain clickable.
+  - Desktop title share icons now pinned as a right-edge vertical rail on wide screens.
+- Terrain mobile visibility hardening:
+  - `js/terrain.js` now keeps terrain meshes visible with a flat fallback while elevation tiles are pending/failed (instead of hiding meshes), so mobile users still see ground.
+  - Terrain tiles now mark `failed` state for decode/network failures.
+- Validation artifacts:
+  - `output/playwright/mobile-desktop-button-check-report.json`
+  - `output/playwright/mobile-final-layout-check-report.json`
+  - `output/playwright/mobile-final-layout-check.png`
+  - `output/playwright/mobile-final-layout-check-after-clicks.png`
+  - `output/playwright/desktop-title-share-right-edge.png`
+  - Key checks passed in latest run: mobile action button press/release state, memory composer open, share menu open, return-to-title path, and no console errors in test reports.
+- Follow-up mobile overlap fix:
+  - Shifted compact controls pill right on mobile (`left:62%` / `64%`) to avoid intercepting minimap-side action icons.
+  - Finalized minimap-side icon stack (flower/share) + share menu anchoring for small screens.
+  - Raised flower/share z-index above float menu row while keeping controls pill on top.
+- Final verification run:
+  - `output/playwright/final-mobile-desktop-verify-report.json`
+  - Pass: `memoryComposerOpen=true`, `shareMenuOpen=true`, action hold active/release transitions true, return-to-title true, desktop right-edge share rail bounds near viewport edge, and no console/page errors.
+  - Screens: `output/playwright/mobile-final-ingame-verify.png`, `output/playwright/mobile-final-title-verify.png`, `output/playwright/desktop-final-share-verify.png`.
+- Space/mobile/title UX pass (2026-02-15):
+  - Removed the controls text block from the in-flight space HUD (`js/space.js`) and reduced HUD min width so HUD footprint is smaller.
+  - Kept rocket mobile actions explicit as `Accelerate` + `Decelerate` and repositioned rocket touch controls in CSS:
+    - steering pad on right middle
+    - action stack on left middle, above the space HUD
+  - Added touch-friendly press binding helper in `js/ui.js` and applied it to float menu toggles + flower/share float buttons to improve coarse-pointer reliability.
+  - Desktop title adjustments (`index.html`):
+    - removed default "Share seed/location/mode/camera" line
+    - expanded desktop menu container sizing
+    - forced license strip to single-line format under menu.
+- Validation artifacts (post-patch):
+  - `output/playwright/mobile-space-layout-after-patch.png`
+  - `output/playwright/mobile-space-layout-after-patch.json`
+  - `output/playwright/desktop-title-after-patch-menu-size-license.png`
+  - `output/playwright/desktop-title-after-patch-menu-size-license.json`
+- Key validation points:
+  - Space mode mobile shows `Accelerate` and `Decelerate` labels; action stack rect is above HUD rect.
+  - Space HUD no longer includes the controls-text block.
+  - Desktop title status line is hidden and license is one-line with no wrap.
+- Follow-up mobile float menu regression fix (2026-02-15):
+  - Root cause identified: mobile pointer shield listeners on descendant (`*`) nodes blocked bubbling from icon/text children to button handlers.
+  - Updated `installMobileUiPointerShield` to bind only root UI containers (not descendant wildcards), preserving in-component event flow.
+  - Added touch delegation on `#floatMenuContainer` for `.floatBtn` and `.floatItem` (`touchend`, passive:false) so mobile taps reliably open menus and invoke item actions.
+  - Removed touch double-toggle on float buttons by switching float menu button handlers back to plain `click` and relying on touch delegation for touch devices.
+- Desktop title/footer pass:
+  - Added legal line: `© 2026 Steven Reid. All Rights Reserved.` in title footer license text.
+  - Expanded desktop menu sizing and tightened menu-to-footer spacing.
+  - Kept license text on a single line across the bottom with wider max-width.
+- Validation:
+  - Mobile touch action checks: `output/playwright/mobile-float-options-fixed-v6.json`
+  - Mobile screenshot with menus/controls: `output/playwright/mobile-float-options-fixed-v6.png`
+  - Desktop footer checks: `output/playwright/desktop-title-footer-rights-v4.png`
+- Moon-only driving physics fix + documentation alignment pass (2026-02-15):
+  - Patched `js/physics.js` so low-gravity crest/crater airborne terrain behavior is gated to moon context only.
+  - Earth terrain branch now remains grounded (smooth terrain-follow), and lunar terrain branch keeps low-gravity airborne handling.
+  - Updated docs to reflect latest upgrades/controls/share surfaces:
+    - `README.md`
+    - `QUICKSTART.md`
+    - `USER_GUIDE.md`
+    - `TECHNICAL_DOCS.md`
+    - `DOCUMENTATION_INDEX.md`
+    - `CHANGELOG.md`
+  - Doc updates include:
+    - moon-only airborne car behavior note
+    - touch/mobile control profiles by mode
+    - share entry points (title footer icons, in-game share arrow, coordinate readout copy)
+    - current all-rights-reserved/legal wording continuity
+- Validation:
+  - `node --check js/physics.js` passed.
+  - Skill-script run (`web_game_playwright_client`) produced black canvas captures in this environment; fallback visual smoke done via direct Playwright page screenshot.
+  - Fallback smoke artifact:
+    - `output/playwright/moon-only-physics-docs-pagecheck.png` (title/menu render confirmed)
+    - `output/playwright/moon-only-physics-docs-pagecheck.json` (no console/page errors)
+- Follow-up TODO for next agent:
+  - If needed, run an interactive moon-driving scenario capture to visually confirm airborne crest behavior in-flight (the automated canvas-capture client selected a black frame buffer in this environment).
+- Moon desktop physics + scene isolation fix pass (2026-02-15):
+  - `js/sky.js`:
+    - In `arriveAtMoon()`, added hard Earth-world suppression for roads/buildings/landuse/POIs/street-furniture (visible=false + scene.remove) as final guard.
+    - Enhanced lunar terrain detail near Apollo spawn in `sampleMoonHeight()` with local relief/ridge terms to improve movement readability.
+  - `js/world.js`:
+    - Added environment guard helpers in `loadRoads()` to detect Earth-scene suppression (`onMoon`, `travelingToMoon`, non-EARTH env).
+    - If env changes during load/fetch, world load now exits as partial recovery and force-hides Earth meshes instead of repopulating scene.
+    - `updateWorldLod()` now early-hides/removes Earth mesh arrays whenever env is Moon/Space/not-Earth.
+  - `js/physics.js`:
+    - Moon branch now calls `moonSurface.updateMatrixWorld(true)` before raycasts.
+    - Lowered/tuned moon launch thresholds and launch impulse scaling so desktop keyboard driving triggers low-gravity airtime consistently on slopes/crater edges.
+- Validation:
+  - Syntax: `node --check js/physics.js`, `node --check js/sky.js`, `node --check js/world.js` all pass.
+  - Desktop moon scenario artifact: `output/playwright/moon-desktop-check-after-fix.json`
+    - `env: MOON`, `onMoon: true`
+    - attached Earth meshes on moon: roads/buildings/landuse/pois/furniture all `0`
+    - local moon height variance around spawn: range `8.43`
+    - drive sample: `airborneTicks: 33/34`, `yRange: 1.61`
+  - Screenshot artifact: `output/playwright/moon-desktop-check-after-fix.png` shows no upside-down Earth city mesh bleed-through.
+- Mobile build placement reliability fix (2026-02-16):
+  - Root cause: build placement relied on `click` only; some mobile/touch flows suppress or delay click on canvas taps.
+  - `js/engine.js`: added touch fallback listener (`touchend`, passive:false) that routes to `handleBlockBuilderClick`.
+  - `js/blocks.js`: added touch/pointer coordinate normalization (`getEventClientPoint`) and touch-click dedupe guard so a single tap places one block (no double-place when both touchend + click fire).
+  - Validation (Pixel 5 emulation): `output/mobile_build_single_tap_check.mjs` reports `delta: 1` per tap; screenshot shows placed block in-world (`output/mobile_build_ctxcheck.png`).
+- Red flower challenge + leaderboard implementation pass (2026-02-16):
+  - Added `js/flower-challenge.js` and wired via `js/app-entry.js`.
+  - New feature includes:
+    - random red flower challenge marker spawn on Earth surfaces,
+    - timer HUD + completion detection for driving/walking/drone,
+    - title-screen leaderboard panel with player name + location-aware start,
+    - Firebase Firestore leaderboard support with localStorage fallback.
+  - Added title UI panel + in-game flower action menu + challenge HUD in `index.html`.
+  - `js/ui.js` integration:
+    - initializes challenge module,
+    - supports pending title-start challenge trigger after world load (with retries),
+    - flower float button now opens flower action menu,
+    - main-menu flow stops active challenge and refreshes leaderboard,
+    - fixed outside-click menu handling so flower/share menus are not instantly closed.
+  - `js/physics.js` now calls `appCtx.updateFlowerChallenge(dt)` every frame before mode early-returns, so challenge works in walking/drone/car.
+- Validation artifacts (2026-02-16):
+  - Syntax checks: `node --check` passed for `js/flower-challenge.js`, `js/ui.js`, `js/physics.js`, `js/app-entry.js`.
+  - Skill client run artifacts:
+    - `output/playwright/flower-challenge-client/` (client still produced black canvas captures in this environment).
+    - `output/playwright/flower-challenge-client-rerun/` (same capture limitation).
+  - Direct Playwright validation (full-page screenshots + assertions):
+    - `output/playwright/flower-challenge-manual-rerun/report.json`
+      - `titlePanelVisible=true`
+      - `titleButtonVisible=true`
+      - `leaderboardRendered=true`
+      - `titleHidden=true` after challenge start
+      - `hudVisible=true`
+      - `flowerMenuOpen=true`
+      - `flowerHudAfterFloat=true`
+      - `errorCount=0`
+    - Screens:
+      - `output/playwright/flower-challenge-manual-rerun/title-with-leaderboard.png`
+      - `output/playwright/flower-challenge-manual-rerun/ingame-after-title-find-flower.png`
+      - `output/playwright/flower-challenge-manual-rerun/ingame-after-flower-menu.png`
+- Follow-up note:
+  - To enable shared cloud leaderboard, provide Firebase web config via `window.WORLD_EXPLORER_FIREBASE` or `localStorage['worldExplorer3D.firebaseConfig']` with `apiKey`, `projectId`, `appId` (+ optional authDomain/storageBucket/messagingSenderId).
+- Title leaderboard declutter pass (2026-02-16 follow-up):
+  - Converted title challenge panel from always-on layout block into a top-right floating overlay.
+  - Added `#flowerChallengeToggleBtn` (top-right) to open/close leaderboard panel on desktop and mobile.
+  - `#flowerChallengePanel` now defaults hidden and uses `.open` state for display.
+  - Restored menu-centered title layout width so selector area is no longer compressed by leaderboard.
+  - Added close-on-outside-click behavior for title leaderboard panel.
+  - Added explicit touchend handling with ghost-click guard for reliable mobile toggle.
+  - Added `closeFlowerChallengeTitlePanel()` hook and wired title return path in `js/ui.js` to keep panel closed by default when returning to title.
+  - Added global runtime check helper: `getFlowerChallengeBackendStatus()`.
+- Validation (Playwright manual run):
+  - `output/playwright/flower-leaderboard-toggle-manual/report.json` => `pass: true`
+  - Desktop: toggle exists, panel opens, outside-click closes.
+  - Mobile (Pixel 5): toggle exists, panel opens on tap.
+  - Screens:
+    - `output/playwright/flower-leaderboard-toggle-manual/desktop-initial.png`
+    - `output/playwright/flower-leaderboard-toggle-manual/desktop-panel-open.png`
+    - `output/playwright/flower-leaderboard-toggle-manual/mobile-panel-open.png`
+- Firebase setup status note:
+  - Code path remains Firebase-ready with fallback; runtime verification helper now available in console via `getFlowerChallengeBackendStatus()`.
+- Firebase Hosting + billing rollout scaffold (2026-02-16):
+  - Added new production-style structure:
+    - `public/index.html` (marketing + pricing + trial CTA)
+    - `public/app/index.html` (runtime moved from repo root)
+    - `public/account/index.html`
+    - `public/legal/privacy.html`, `public/legal/terms.html`
+    - `public/legal/privacy/index.html`, `public/legal/terms/index.html` (local static route compatibility)
+    - `public/js/firebase-init.js`, `public/js/auth-ui.js`, `public/js/entitlements.js`, `public/js/billing.js`
+    - `functions/index.js`, `functions/package.json`
+    - `firebase.json`, `.firebaserc`, `firestore.rules`, `firestore.indexes.json`
+  - Migrated runtime assets to `public/app/` and copied landing visuals to `public/assets/landing/`.
+  - App entitlement integration:
+    - Added auth/plan HUD in `/app/` with plan badge and account actions.
+    - Added Pro-only panel for early demo toggles + direct communication links.
+    - Enforced hide for Pro-only UI when not Pro.
+    - Added trial-trigger sign-in flow for `?startTrial=1`.
+  - Trial/plan logic implemented in `public/js/entitlements.js`:
+    - First sign-in creates `users/{uid}` with `plan="trial"` + `trialEndsAt=now+48h`.
+    - Trial gets Supporter-level entitlements except Pro perks.
+    - Trial expiration downgrades to Free when no active subscription.
+  - Stripe Functions implemented:
+    - `createCheckoutSession(plan)`
+    - `createPortalSession()`
+    - `stripeWebhook()`
+    - Firestore plan/entitlement updates from subscription events.
+  - Cloud-sync gating:
+    - `public/app/js/flower-challenge.js` now gates Firebase leaderboard usage behind entitlements (`cloudSync`), defaulting Free users to local fallback.
+- Validation (2026-02-16):
+  - Syntax checks passed:
+    - `node --check functions/index.js`
+    - `node --check public/js/{firebase-init,auth-ui,entitlements,billing}.js`
+    - `node --check public/app/js/flower-challenge.js`
+  - Installed Functions deps in `functions/` (`npm install`) successfully.
+  - Browser smoke artifacts:
+    - `output/playwright/firebase-rollout-account-smoke/shot-0.png`
+    - `output/playwright/firebase-rollout-landing-smoke/shot-0.png`
+    - `output/playwright/firebase-rollout-app-smoke/shot-0.png`
+    - `output/playwright/firebase-rollout-app-smoke/shot-1.png`
+    - `output/playwright/firebase-rollout-app-smoke/latest.png`
+    - `output/playwright/firebase-rollout-routecheck/report.json`
+  - Final routecheck result:
+    - `/`, `/app/`, `/account/`, `/legal/privacy`, `/legal/terms` all `200` with `errorCount=0` in report.
+- Remaining setup for deploy:
+  - Set `.firebaserc` project id (`your-firebase-project-id`).
+  - Provide Firebase web config at runtime (`window.WORLD_EXPLORER_FIREBASE` or `localStorage['worldExplorer3D.firebaseConfig']`).
+  - Configure Stripe function config keys:
+    - `stripe.secret`
+    - `stripe.webhook`
+    - `stripe.price_supporter`
+    - `stripe.price_pro`
+- Auth HUD declutter + float auth state fix (2026-02-16):
+  - `public/app/index.html`:
+    - removed stale references to deleted top-center plan/account HUD elements (`appPlanBadge`, `appSignOutBtn`, `appAccountBtn`) from runtime script.
+    - kept account controls exclusively inside the left auth float panel (`#authSignedInBlock` with `#authAccountBtn` + `#authSignOutBtn`).
+    - `renderState` now updates the top-left float button label (`Sign In / Sign Up` vs `Account`) and switches between auth form vs signed-in block in-panel.
+    - sign-out now routes through `#authSignOutBtn` and closes the float panel.
+  - Validation:
+    - Skill client run artifact: `output/playwright/hud-removal-client/shot-0.png`.
+    - Targeted Playwright interaction test: `output/playwright/hud-auth-panel-report.json` (`pass: true`, `hudExists: false`, panel open/close checks true, `errorCount: 0`).
+    - Screens: `output/playwright/hud-auth-panel-open.png`, `output/playwright/hud-auth-panel-closed.png`.
+- Pro panel auto-hide + landing hero title update (2026-02-16):
+  - `public/app/index.html`:
+    - added `scheduleProPanelAutoHide(isPro)` with `PRO_PANEL_AUTO_HIDE_MS=4500`.
+    - non-Pro plans now show the `PRO EARLY ACCESS` panel briefly on load, then auto-hide.
+    - Pro plan keeps panel available (no auto-hide) for demo toggles/links.
+  - `public/index.html`:
+    - updated hero `h1` to include a dedicated `World Explorer` brand line above the existing Earth->Space->Moon headline.
+    - added `.hero-brand` and `.hero-headline` styling.
+  - Validation artifacts:
+    - `output/playwright/pro-hide-and-landing-title-report.json` (`pass: true`)
+    - `output/playwright/pro-panel-initial.png`
+    - `output/playwright/pro-panel-after-delay.png`
+    - `output/playwright/landing-world-explorer-title.png`
+- Full top-level documentation refresh (2026-02-16):
+  - Updated all primary docs to match active Firebase Hosting + Stripe subscription architecture in `WorldExplorer`.
+  - Rewrote setup flows for auth, trial, plans, webhooks, price IDs, and deploy verification.
+  - Replaced outdated repo references (`WorldExplorer3D`) in active contributor docs.
+  - Added explicit operational warnings for:
+    - `functions.config()` deprecation deadline (March 2026)
+    - Node 20 runtime deprecation timeline
+  - Updated files:
+    - `README.md`
+    - `QUICKSTART.md`
+    - `ARCHITECTURE.md`
+    - `API_SETUP.md`
+    - `USER_GUIDE.md`
+    - `TECHNICAL_DOCS.md`
+    - `DOCUMENTATION_INDEX.md`
+    - `CHANGELOG.md`
+    - `KNOWN_ISSUES.md`
+    - `SECURITY_STORAGE_NOTICE.md`
+    - `SYSTEMS_INVENTORY_REPORT_2026-02-14.md`
+    - `CONTRIBUTING.md`
+    - `ACKNOWLEDGEMENTS.md`
+- GitHub Pages compatibility branch pass (2026-02-16/17):
+  - Branch target: `codex/github-pages-compat` (explicitly isolated from live Firebase deployment).
+  - Updated site routes/imports for subpath hosting (`/WorldExplorer/`) with relative paths:
+    - `public/index.html`
+    - `public/app/index.html`
+    - `public/account/index.html`
+  - Updated legal back links for both clean-route and static-html variants:
+    - `public/legal/privacy.html` -> `../`
+    - `public/legal/terms.html` -> `../`
+    - `public/legal/privacy/index.html` -> `../../`
+    - `public/legal/terms/index.html` -> `../../`
+  - Billing client now supports non-Firebase-hosting origins by resolving direct function origin from Firebase config and preserving repo subpath return URLs:
+    - `public/js/billing.js`
+  - Functions now accept sanitized `returnUrlBase` (https or localhost http) for checkout/portal return URLs:
+    - `functions/index.js`
+  - Validation:
+    - Skill client run artifact (known black-canvas limitation in this env): `output/playwright/gh-pages-web-game-client/shot-0.png`.
+    - Fallback Playwright route smoke artifacts:
+      - `output/playwright/gh-pages-subpath-smoke/report.json`
+      - `output/playwright/gh-pages-subpath-smoke/landing.png`
+      - `output/playwright/gh-pages-subpath-smoke/app.png`
+      - `output/playwright/gh-pages-subpath-smoke/account.png`
+      - `output/playwright/gh-pages-subpath-smoke/legal-privacy.png`
+      - `output/playwright/gh-pages-subpath-smoke/legal-terms.png`
+    - Route checks confirmed: landing, app, account, privacy/terms pages, and legal back-to-home navigation all work under `/WorldExplorer/`.
+- GitHub Pages publishing fix (2026-02-17):
+  - Root cause of old page on GitHub: Pages was serving repo root (legacy `index.html`) instead of `public/index.html`.
+  - Added workflow to publish `public/` as GitHub Pages artifact on `codex/github-pages-compat`:
+    - `.github/workflows/deploy-pages-public.yml`
+  - Added `public/.nojekyll` so Pages serves files exactly from artifact without Jekyll processing side effects.
+  - Note: GitHub repo Pages setting must be `Build and deployment -> Source: GitHub Actions` for this workflow to control the published site.
+- GitHub Pages stale-cache loader compatibility fix (2026-02-17):
+  - Symptom addressed: browser console 404s on legacy paths like `/WorldExplorer/js/app-entry.js?v=54` and `/WorldExplorer/js/*.js` after Pages source switched to `public/`.
+  - Added compatibility loader bridge files so legacy cached loader URLs resolve to current `/app/js` runtime:
+    - `public/js/bootstrap.js` (redirects non-app stale entrypoints to `/app/`, otherwise loads `/app/js/bootstrap.js`)
+    - `public/js/app-entry.js` (re-exports `/app/js/app-entry.js`)
+    - `public/js/modules/manifest.js` (points module entry to `/app/js/app-entry.js`)
+    - `public/js/modules/script-loader.js` (loader API compatibility)
+  - Validation:
+    - `output/playwright/gh-pages-compat-shim/report.json` (`pass: true`)
+    - Screens:
+      - `output/playwright/gh-pages-compat-shim/landing-before-shim.png`
+      - `output/playwright/gh-pages-compat-shim/after-shim-import.png`
+      - `output/playwright/gh-pages-compat-shim/app-direct.png`
+- Landing hero copy alignment update (2026-02-17):
+  - Updated landing headline to match in-game branding language:
+    - `World Explorer 3D`
+    - `Explore Any Place on Earth and Beyond`
+  - Updated lead sentence per requested wording:
+    - `Drive, walk, and fly any place in the world. Then launch to orbit and land on the Moon all without leaving your seat.`
+  - Updated page `<title>` accordingly.
+- Landing hero visual cleanup pass (2026-02-17):
+  - Removed `Live World Runtime` badge from hero.
+  - Increased `World Explorer 3D` hero title sizing and reduced subtitle emphasis so title is visually dominant.
+  - Changed hero media crop to emphasize the lower half of the image (single-scene look vs stacked look).
+  - Removed duplicate hero visual card from `Visual Proof` and switched that section to a 3-column layout.
+  - Verification screenshot:
+    - `output/playwright/landing-after-title-image-cleanup.png`
+- Landing image fit + auth-visibility gating update (2026-02-17):
+  - `public/index.html`:
+    - hero media switched to `<img class="hero-media-img">` with `object-fit:cover` and bottom-origin scaling for non-stretched bottom-scene-only rendering.
+    - removed stretch artifacts from prior background-size-only approach.
+  - `public/app/index.html`:
+    - added title-screen visibility gating for auth/account float button.
+    - `#appSignInBtn` now shows only while `#titleScreen` is visible.
+    - auth panel auto-closes when gameplay starts (title hidden).
+  - Validation artifacts:
+    - `output/playwright/landing-auth-visibility-fix/report.json`
+    - `output/playwright/landing-auth-visibility-fix/landing-after-fix.png`
+    - `output/playwright/landing-auth-visibility-fix/app-title-before-start.png`
+    - `output/playwright/landing-auth-visibility-fix/app-after-start.png`
+    - `output/playwright/landing-hero-bottom-crop-final-v2.png`
+    - `output/playwright/final-request-check/report.json`
+- GitHub documentation coverage expansion (2026-02-17):
+  - Added `GITHUB_DEPLOYMENT.md` and linked/updated:
+    - `README.md`
+    - `QUICKSTART.md`
+    - `DOCUMENTATION_INDEX.md`
+    - `ARCHITECTURE.md`
+    - `API_SETUP.md`
+    - `USER_GUIDE.md`
+    - `TECHNICAL_DOCS.md`
+    - `KNOWN_ISSUES.md`
+    - `CONTRIBUTING.md`
+    - `CHANGELOG.md`
+- Repo security automation (2026-02-17):
+  - Added GitHub Actions secret scan workflow:
+    - `.github/workflows/secret-scan.yml`
+  - Added gitleaks config with explicit allowlist for:
+    - public Firebase web API key in frontend config
+    - documented placeholder tokens (`sk_...`, `whsec_...`, `price_...`)
+  - Updated `CONTRIBUTING.md` validation checklist to require passing `Secret Scan` workflow when relevant.
+- Root Pages photoreal-building beta implementation (2026-02-18):
+  - User direction updated: keep Firebase-served `public/app` runtime untouched; target GitHub Pages branch-root runtime (`index.html` + `js/*`) as source of truth.
+  - Added title-screen Settings control in root runtime:
+    - `index.html`: `Photoreal Buildings (Beta)` section with `#photorealBuildingsToggle`, status text, and warning copy.
+  - Added root runtime state + material pipeline:
+    - `js/engine.js`:
+      - persisted state key: `worldExplorerPhotorealBuildings`
+      - exported APIs: `getPhotorealBuildingsEnabled()`, `setPhotorealBuildingsEnabled()`
+      - `appCtx.photorealBuildingsEnabled` getter/setter bridge
+      - photoreal material profile in `getBuildingMaterial()` with guarded fallback to existing standard materials.
+  - Added root runtime UI behavior:
+    - `js/ui.js`:
+      - initializes toggle from runtime state/local storage
+      - updates visual state + status text
+      - if toggled during active run, attempts world reload and auto-reverts on failure.
+  - Firebase safety guard applied:
+    - reverted interim edits in `public/app/index.html`, `public/app/js/ui.js`, `public/app/js/engine.js` to avoid unintended Firebase runtime changes.
+  - Root Pages documentation updates:
+    - `README.md`: added branch-root Pages setup (`Deploy from a branch`, `/ (root)`) and photoreal feature note.
+    - `GITHUB_DEPLOYMENT.md`: branch-root mode now documented as primary path for root runtime publication.
+    - `USER_GUIDE.md`: added photoreal toggle usage notes and clarified Pages URL modes.
+    - `CHANGELOG.md`: recorded photoreal beta toggle + root Pages deployment clarification.
+  - Validation:
+    - Syntax checks:
+      - `node --check js/engine.js`
+      - `node --check js/ui.js`
+    - Skill client run (known environment limitation):
+      - `output/playwright/photoreal-buildings-beta-run/shot-0.png` and `shot-1.png` (black-canvas capture limitation observed again).
+    - Fallback Playwright smoke (root runtime) with no console/page errors:
+      - `output/playwright/photoreal-root-final-smoke/report.json` (`pass: true`, `errorCount: 0`)
+      - `output/playwright/photoreal-root-final-smoke/root-settings-photoreal.png`
+      - `output/playwright/photoreal-root-final-smoke/root-ingame-after-start.png`
+    - Additional manual automation artifacts retained for traceability:
+      - `output/playwright/photoreal-buildings-manual/`
+      - `output/playwright/photoreal-buildings-manual-ingame/`
+      - `output/playwright/photoreal-buildings-public-app-smoke/`
+- Secret hygiene re-check (2026-02-18):
+  - No Stripe private keys discovered in code.
+  - Pattern scan hits are placeholders/docs and allowed public Firebase web API key in `public/js/firebase-project-config.js`.
+  - `gitleaks` binary not installed locally; relied on regex scan + existing repo secret-scan workflow config.
+- Photoreal visual-impact tuning pass (root runtime only, 2026-02-18):
+  - Root cause for "no visible change": initial photoreal mode reused near-identical facade texture paths with only subtle material scalar changes.
+  - `js/engine.js` updated with a stronger photoreal profile:
+    - Added generated curtain-wall texture set (diffuse/normal/roughness/emissive) keyed by `rdtSeed` and cached.
+    - Added city-building facade rebalance in photoreal mode (generic towers bias toward glass).
+    - Increased physical shading contrast (clearcoat/IOR/env intensity/tint) for concrete/brick/window photoreal paths.
+    - Maintained guarded fallback to standard material pipeline on any photoreal failure.
+  - Validation artifacts (root runtime A/B):
+    - `output/playwright/photoreal-visual-check/ingame-photoreal-enabled.png`
+    - `output/playwright/photoreal-visual-check/ingame-standard-enabled.png`
+    - `output/playwright/photoreal-visual-check/errors.json` (empty)
+  - Result: photoreal mode now produces clearly different, more reflective blue-glass high-rise facades vs baseline brick/flat mix.
+- Photoreal ultra pass (root runtime, 2026-02-18):
+  - `js/engine.js`
+    - Added `applyPhotorealRenderProfile()` and wired it into toggle + init lifecycle.
+    - Photoreal mode now adjusts exposure, fog, directional/fill/ambient lighting, bloom tuning, and dynamic shadow map resolution by GPU tier.
+    - Shadow map is rebuilt on mode transition to ensure quality uplift is actually applied at runtime.
+  - `js/world.js`
+    - Added photoreal near-LOD detail synthesis for buildings:
+      - roof caps, parapet rings, facade bands, rooftop mechanical units, optional tanks/antennas.
+    - Applied to OSM near LOD meshes and fallback synthetic city meshes using deterministic seeds.
+  - Deterministic validation artifacts:
+    - `output/playwright/photoreal-ultra-deterministic/report.json` (both variants pass, 0 errors)
+    - `output/playwright/photoreal-ultra-deterministic/photoreal-off-ingame.png`
+    - `output/playwright/photoreal-ultra-deterministic/photoreal-on-ingame.png`
+    - `output/playwright/photoreal-ultra-deterministic/photoreal-off-title.png`
+    - `output/playwright/photoreal-ultra-deterministic/photoreal-on-title.png`
+  - Skill-run artifact for traceability:
+    - `output/playwright/photoreal-ultra-skill-run/`
+- Roof realism correction pass (2026-02-18):
+  - User feedback addressed: roofs should not look like glass and should not all look identical.
+  - `js/world.js` updates:
+    - Added deterministic roof-style system (`membrane`, `concrete`, `gravel`, `metal`, `tile`) based on building type + seed.
+    - Added procedural roof texture generator with style-specific patterns and tone buckets.
+    - Reduced roof reflectivity and metalness; raised roughness to keep roof response matte/non-glass.
+    - Expanded roof-cap coverage so top faces are mostly covered by roof material instead of facade material.
+  - Validation artifacts:
+    - `output/playwright/roof-material-fix-check/photoreal-ingame-roof-fix.png`
+    - `output/playwright/roof-material-topview-check/photoreal-off-topview.png`
+    - `output/playwright/roof-material-topview-check/photoreal-on-topview.png`
+    - `output/playwright/roof-material-topview-check/report.json` (0 errors in both variants)
+- Facade + roof alignment correction pass (2026-02-18):
+  - User feedback addressed:
+    - prevent all-glass tops
+    - remove protruding/misaligned horizontal layers
+    - improve facade diversity so cities look less uniform.
+  - `js/world.js`:
+    - Buildings now use 2-material extrusion (`material:0`, `extrudeMaterial:1`) so caps/roof and side walls are separate materials.
+    - Added `getBuildingRoofMaterial(...)` and applied roof material to all generated buildings (OSM + synthetic fallback), including non-photoreal mode.
+    - Removed photoreal overlay geometry that caused artifacts:
+      - removed roof cap overlay/parapet ring
+      - removed facade band meshes that protruded/misaligned.
+    - Kept rooftop units/antenna detail meshes only.
+  - `js/engine.js`:
+    - Expanded facade system with new photoreal procedural facade families:
+      - `stone`, `stucco`, `panel`, `mixed`, `window`
+    - Added cached procedural texture-set generator (diffuse/normal/roughness/emissive) for facade families.
+    - Rebalanced photoreal facade selection by building type to reduce full-glass towers and increase material diversity.
+    - Reduced glassy response on window materials (higher roughness, lower metalness/env, less aggressive clearcoat).
+  - Validation artifacts:
+    - `output/playwright/facade-roof-fix-deterministic/report.json` (0 errors)
+    - `output/playwright/facade-roof-fix-deterministic/photoreal-on-street.png`
+    - `output/playwright/facade-roof-fix-deterministic/photoreal-on-topview.png`
+    - `output/playwright/facade-roof-fix-deterministic/photoreal-off-street.png`
+    - `output/playwright/facade-roof-fix-deterministic/photoreal-off-topview.png`
+    - `output/playwright/facade-roof-fix-skill-run/`
+- Rooftop detail density/alignment refinement (2026-02-18):
+  - User feedback addressed:
+    - too many HVAC units
+    - single-color rooftop units
+    - rooftop props appearing off-roof / floating on irregular footprints.
+  - `js/world.js` updates:
+    - Added rooftop placement helpers:
+      - `pointInPolygonXZ(...)`
+      - `pickRoofPlacementPoint(...)`
+    - HVAC density now building-type-aware and probabilistic (houses/small buildings default to no rooftop HVAC).
+    - HVAC count caps reduced and scaled by footprint area.
+    - Rooftop utility materials now use a deterministic palette of slight gray variations.
+    - Rooftop props (HVAC/tank/antenna) now sample points constrained to building footprint to avoid overhang/floating placement.
+    - Removed unused `roofMat` entry from photoreal detail material set.
+  - Validation artifacts:
+    - `output/playwright/roof-hvac-fix-deterministic/street.png`
+    - `output/playwright/roof-hvac-fix-deterministic/topview-1.png`
+    - `output/playwright/roof-hvac-fix-deterministic/topview-2.png`
+    - `output/playwright/roof-hvac-fix-deterministic/errors.json` (empty)
+    - `output/playwright/roof-hvac-sparsity-skill-run/`
+- Procedural texture determinism cleanup (2026-02-18):
+  - `js/engine.js`:
+    - Replaced mixed `Math.random()` calls with seeded `rng()` in:
+      - `createProceduralGrassTexture`
+      - `createPavementTexture`
+      - `createPavementNormalMap`
+      - `createPavementRoughnessMap`
+    - Removes dead/unused seeded RNG setup and keeps RDT world texture generation reproducible.
+  - Validation artifacts:
+    - `output/playwright/roof-hvac-final-smoke/street.png`
+    - `output/playwright/roof-hvac-final-smoke/topview.png`
+    - `output/playwright/roof-hvac-final-smoke/errors.json` (empty)
+- Paint the Town Red game mode pass (2026-02-18):
+  - Added new title game mode option in both root and Firebase app entry HTML:
+    - `index.html` mode card `data-mode="painttown"`
+    - `public/app/index.html` mode card `data-mode="painttown"`
+  - Added mode wiring in UI state parsing + share-link parsing:
+    - `js/ui.js`, `public/app/js/ui.js`
+    - supports `gm=painttown` query mode
+    - toggles `appCtx.disableNearBuildingBatching` when entering runtime with paint mode selected
+    - hides new HUD element (`paintTownHud`) on main-menu return
+  - Added full Paint the Town Red runtime logic:
+    - `js/game.js`, `public/app/js/game.js`
+    - 60-second timer challenge
+    - click/tap while on a rooftop paints the active building red
+    - progress tracking against total loaded building count for current city
+    - in-game HUD (`#paintTownHud`) with timer/progress/hint text
+    - result modal summary at timeout (or 100% painted)
+    - restores original building materials/details on mode reset/exit
+  - Added per-building identity and roof base metadata in world loader:
+    - `js/world.js`, `public/app/js/world.js`
+    - collision records now carry `sourceBuildingId`, `buildingType`, `baseY`
+    - building meshes carry `userData.sourceBuildingId`
+    - near-building batching is skipped when `appCtx.disableNearBuildingBatching` is true (paint mode)
+    - added fallback synthetic building IDs for non-OSM fallback city generation
+
+- Validation (2026-02-18):
+  - Syntax checks passed:
+    - `node --check js/game.js`
+    - `node --check js/ui.js`
+    - `node --check js/world.js`
+    - `node --check public/app/js/game.js`
+    - `node --check public/app/js/ui.js`
+    - `node --check public/app/js/world.js`
+  - Skill client run:
+    - `output/playwright/paint-town-skill-run-title/shot-0.png`
+    - `output/playwright/paint-town-skill-run-title/state-0.json`
+  - Playwright DOM + gameplay checks:
+    - `output/playwright/paint-town-manual-check/report.json`
+    - `output/playwright/paint-town-manual-check/ingame-before-click.png`
+    - `output/playwright/paint-town-manual-check/ingame-after-click.png`
+    - `output/playwright/paint-town-roof-paint-check/report.json`
+    - `output/playwright/paint-town-roof-paint-check/after-roof-paint-click.png`
+  - Key pass criteria observed:
+    - Paint HUD appears in `painttown` mode.
+    - Ground click updates hint (`Get onto a roof first...`).
+    - Forced roof-position click paints a building and increments counter (`Painted: 1/...`).
+
+- Follow-up TODOs:
+  - Consider adding a small mode-only minimap heat overlay for painted vs unpainted footprint regions (optional UX enhancement).
+  - Consider weighted score multiplier for painting tall/high-complexity buildings.
+- Minor follow-up (2026-02-18):
+  - Added extra UI exclusion targets for paint click handling (`#minimap`, `#hud`, `#coords`) to avoid accidental paint-attempt feedback when interacting with HUD overlays.
+- Title Games tab + Paint Town wiring pass (2026-02-18):
+  - Confirmed dedicated `Games` tab is present and game mode cards are removed from Settings on both root and `public/app` HTML.
+  - Added title-start objective initialization in `js/ui.js` + `public/app/js/ui.js` by invoking `appCtx.startMode()` after world-load setup; ensures selected title game mode (including Paint Town) activates on first launch.
+  - Hardened Paint Town rooftop auto-paint logic in `js/game.js` + `public/app/js/game.js`:
+    - actor priority now uses drone when active, then walking, then car,
+    - roof-height sampling now falls back safely when terrain sampling returns non-finite values,
+    - candidate scan now supports preferred + fallback vertical bands and wider fallback search.
+- Validation artifacts (2026-02-18):
+  - Skill-loop run: `output/playwright/web-game-client-roof-fix/` (client still captures black canvas in this environment).
+  - Direct Playwright verification: `output/playwright/paint-town-final-check/report.json`.
+    - `hasGamesTab=true`
+    - `gamesTabActive=true`
+    - `settingsHasGameModes=false`
+    - `runtime.autoPaintWorked=true` (painted `1` building in scripted rooftop test)
+    - `runtime.scoreSubmitted=true`
+    - `runtime.listHasPaintMetric=true`
+  - Screens:
+    - `output/playwright/paint-town-final-check/title-games-tab.png`
+    - `output/playwright/paint-town-final-check/painttown-runtime.png`
+- Paint mode + moon physics + block collision pass (2026-02-18):
+  - `js/physics.js` (+ mirrored `public/app/js/physics.js`):
+    - Paint mode timer/updates now continue while in drone and walking modes by calling `updateMode(dt)` before early returns.
+    - Moon car tuning adjusted for less bounce and better launch traction:
+      - stronger low-speed throttle response,
+      - reduced over-sensitive airborne triggers,
+      - stronger ground follow smoothing,
+      - higher effective gravity for vehicle airborne arc (`MOON_CAR_GRAVITY`).
+    - Added car-vs-build-block collision sampling using `getBuildCollisionAtWorldXZ(...)` so cars cannot drive through placed blocks.
+  - `js/blocks.js` (+ mirrored `public/app/js/blocks.js`):
+    - Added terrain mesh targets (`terrainGroup.children`) to block placement raycast so grass/terrain clicks resolve at true clicked world points.
+  - `js/walking.js` (+ mirrored `public/app/js/walking.js`):
+    - Build blocks made non-solid for walker movement (no block collision blocking, no standing-on-block override), matching requested walk-through behavior.
+  - Next: run syntax checks + Playwright smoke focused on Paint the Town Red, moon driving feel, terrain block placement, and car/build-block collision.
+- Follow-up validation + stabilization (2026-02-18):
+  - Verified paint-mode countdown now updates in walking mode after physics update-loop patch.
+  - Verified rooftop landing paint trigger works after teleport-to-roof check (painted count increments).
+  - Verified block placement on terrain/grass uses terrain ray hit and places near clicked point (grid-quantized error ~0.50 units).
+  - Verified car is blocked by placed blocks while walker can pass through the same blocks.
+  - Verified moon driving tuning: stronger initial acceleration and reduced bounce/airtime (no runaway airborne behavior during sample drive).
+- Consolidated validation artifacts:
+  - Report: `output/playwright/paint-moon-block-fix-check-v2/report.json` (`pass: true`, `errorCount: 0`)
+  - Screens:
+    - `output/playwright/paint-moon-block-fix-check-v2/painttown-initial.png`
+    - `output/playwright/paint-moon-block-fix-check-v2/painttown-after-roof-teleport.png`
+    - `output/playwright/paint-moon-block-fix-check-v2/block-placement-after-click.png`
+    - `output/playwright/paint-moon-block-fix-check-v2/car-walker-block-check.png`
+    - `output/playwright/paint-moon-block-fix-check-v2/moon-driving-check.png`
+- Skill client rerun:
+  - `output/playwright/paint-moon-block-fix-skill-run-2/`
+  - Captures remain black in this environment with the generic web-game client (known canvas-capture limitation), so direct Playwright screenshots/report above were used as source-of-truth validation.
+- Landing page gameplay gallery pass (2026-02-18):
+  - `public/index.html`:
+    - Renamed section heading from `Visual Proof` to `Gameplay`.
+    - Replaced 3 static proof shots with a 12-card gameplay gallery using user-provided screenshots.
+    - Added per-image titles + descriptions.
+    - Made gameplay section vertically scrollable (`.gameplayGalleryWrap`) to keep landing page height compact.
+  - Added assets under `public/assets/landing/gameplay/`:
+    - `drone-baltimore.png`
+    - `fly-in-space.png`
+    - `walk-on-moon.png`
+    - `build-with-blocks.png`
+    - `drive-baltimore.png`
+    - `drive-on-moon.png`
+    - `drone-monaco.png`
+    - `drone-on-moon.png`
+    - `paint-town-red.png`
+    - `place-flower-memory.png`
+    - `police-chase.png`
+    - `flee-cops.png`
+- Validation:
+  - `output/playwright/landing-gameplay-gallery-check/report.json`
+    - `sectionTitle=Gameplay`
+    - `cards=12`
+    - `scrollable=true`
+    - `imgSrcOk=true`
+    - `errorCount=0`
+  - Screens:
+    - `output/playwright/landing-gameplay-gallery-check/landing-gameplay-top.png`
+    - `output/playwright/landing-gameplay-gallery-check/landing-gameplay-scrolled.png`
+- Root landing + walker block solidity hotfix (2026-02-18):
+  - `index.html` (repo root): replaced runtime HTML with immediate redirect to `./public/index.html` so opening `/` shows the Firebase landing page.
+  - Restored walker/block solidity + standing behavior in:
+    - `js/walking.js`
+    - `public/app/js/walking.js`
+  - Extended block collision volume checks in:
+    - `js/blocks.js`
+    - `public/app/js/blocks.js`
+    - `getBuildCollisionAtWorldXZ(...)` now supports `bodyHeight` and uses full actor vertical volume checks (not feet-only), preventing torso-level pass-through.
+- Validation:
+  - `output/playwright/root-landing-and-block-walk-check-v2/report.json`
+    - landing root title present + `Gameplay` heading true
+    - walker blocked by 2-high block wall (`blocked=true`)
+    - walker remains standing on block top (`standStable=true`, `onGround=true`)
+    - `errorCount=0`
+  - Screens:
+    - `output/playwright/root-landing-and-block-walk-check-v2/root-landing.png`
+    - `output/playwright/root-landing-and-block-walk-check-v2/app-block-test.png`
+- Game-mode and challenge scoring pass (2026-02-18):
+  - Paint Town objective updated from percent emphasis to building-count objective over 2 minutes in:
+    - `js/game.js`
+    - `public/app/js/game.js`
+  - Paint Town HUD/result text now reports building count first (no percent in HUD/result summary), with timer set to `02:00` challenge length.
+  - Added title Game Mode cards in `public/app/index.html`:
+    - `Police Chase` (`data-mode="police"`)
+    - `Find the Flower` (`data-mode="flower"`)
+  - Updated Paint Town card description and leaderboard hint copy to 2-minute building-count wording.
+  - Extended share-link game-mode parsing/validation in:
+    - `js/ui.js`
+    - `public/app/js/ui.js`
+    to accept `police` and `flower` game modes.
+  - Game mode runtime wiring in `js/game.js` + `public/app/js/game.js`:
+    - `police` mode now auto-enables police pursuit + HUD/toggle state on mode start.
+    - `flower` mode now auto-starts the red flower challenge on mode start.
+    - mode starts now clear stale police/flower state before activating selected mode.
+  - Paint leaderboard ranking/metric updated in:
+    - `js/flower-challenge.js`
+    - `public/app/js/flower-challenge.js`
+    so `painttown` sorts by `paintedBuildings` (descending) and displays `N bldgs` metric.
+  - Remote paint leaderboard query now orders by `paintedBuildings` instead of `paintedPct`.
+  - Paint score status text updated to building-count messaging (`painted X buildings in 2:00 ...`).
+
+- Validation (2026-02-18):
+  - Syntax checks passed:
+    - `node --check js/game.js`
+    - `node --check public/app/js/game.js`
+    - `node --check js/flower-challenge.js`
+    - `node --check public/app/js/flower-challenge.js`
+    - `node --check js/ui.js`
+    - `node --check public/app/js/ui.js`
+  - Skill client run executed:
+    - `output/playwright/painttown-modes-check/shot-0.png`
+    - `output/playwright/painttown-modes-check/shot-1.png`
+    - note: this client still captured black frames in this environment.
+  - Direct Playwright fallback checks:
+    - `output/playwright/mode-smoke-check/painttown.png` (shows Paint Town HUD with ~`01:59` and building count)
+    - `output/playwright/mode-smoke-check/flower.png` (shows auto-start flower HUD)
+    - `output/playwright/mode-smoke-check/police.png`
+    - `output/playwright/mode-smoke-check/summary.json`
+  - Title menu DOM assertion confirms new cards are present with expected descriptions for `painttown`, `police`, and `flower`.
+- Implemented Phase 1 multiplayer foundation in `public/app`:
+  - Added new modules under `public/app/js/multiplayer/`:
+    - `rooms.js` (create/join/leave/listen room lifecycle with 6-char room codes)
+    - `presence.js` (3s heartbeat, 2s min write throttle, movement/rotation threshold, live players listener)
+    - `chat.js` (send/listen last 50, 500-char cap, client profanity filter, report hook)
+    - `ghosts.js` (scene ghost markers + name tags, self ghost hidden, 30 FPS tick)
+    - `ui-room.js` (title-tab + in-game multiplayer UI orchestration, invite links, player list, chat drawer)
+- Wired multiplayer startup in `public/app/js/app-entry.js` so multiplayer initializes only after auth readiness via `observeAuth`.
+- Updated `public/app/index.html`:
+  - Added title menu Multiplayer tab entry point.
+  - Added in-game float-menu Multiplayer section with required actions.
+  - Added Room Panel modal + collapsed-by-default Chat Drawer containers.
+  - Added styling for room/chat/multiplayer controls.
+- Updated `public/app/js/ui.js` float-menu toggler map to include `multiplayerBtn`.
+- Updated landing page `public/index.html` with Multiplayer entry point and pricing copy aligned to free/trial/supporter/pro multiplayer gating.
+- Replaced `firestore.rules` with multiplayer-aware rules for rooms, presence, and chat including:
+  - auth-only room actions
+  - private-room membership reads
+  - self-only presence writes
+  - 2s presence write throttle
+  - chat length cap + member-only chat
+  - plan gating (trial/supporter/pro only)
+- Next: run static syntax checks + smoke test in browser (room create/join path, chat, ghost render, and UI flow), then adjust any runtime integration gaps.
+- Validation (multiplayer integration pass):
+  - `node --check` passed for:
+    - `public/app/js/app-entry.js`
+    - `public/app/js/ui.js`
+    - `public/app/js/multiplayer/{rooms,presence,chat,ghosts,ui-room}.js`
+  - Skill-mandated Playwright client runs executed:
+    - `output/web-game-mp-title/shot-0.png`
+    - `output/web-game-mp-ingame/shot-0.png`
+    - Note: the skill client's canvas capture remained black in this environment (known WebGL capture quirk).
+  - Supplemental Playwright visual verification (full-page captures):
+    - `output/playwright/multiplayer-tab.png` (Multiplayer tab visible and interactive on title menu)
+    - `output/playwright/multiplayer-ingame.png` (app starts and transitions to in-game loading state)
+    - `output/playwright/multiplayer-console-errors.json` (empty array; no JS/page errors in this pass)
+  - Additional artifact: `output/web-game-mp-title-headed/errors-0.json` contains only `/favicon.ico` 404 from local static server.
+- Follow-up hardening: improved room create/join error messaging for permission-denied cases to surface likely causes (plan access/rules/code mismatch) in UI.
+- Multiplayer entitlement gating correction + support alias hardening (2026-02-22):
+  - Fixed trial flow so multiplayer is NOT auto-unlocked on first sign-in.
+  - `public/js/entitlements.js` changes:
+    - New users now initialize as `free` (not `trial`).
+    - Added `startTrialIfEligible(user)` export for explicit 2-day trial activation.
+    - Trial activation behavior:
+      - starts trial if user is free and has not consumed trial
+      - preserves active paid plans
+      - blocks re-use after trial expiration with clear error
+    - Added plan alias normalization: `support` -> `supporter`.
+  - `public/app/index.html` auth script changes:
+    - Imports and uses `startTrialIfEligible`.
+    - `?startTrial=1` now actively starts trial after sign-in (instead of only showing copy).
+    - Updated free-plan status text to explicitly state multiplayer is locked until trial/upgrade.
+  - `functions/index.js` hardening:
+    - New user docs created as `free` with free entitlements.
+    - Added support alias handling in checkout normalization (`support` accepted, normalized to `supporter`).
+  - `firestore.rules` updates:
+    - multiplayer plan gate now accepts `support` alias in addition to `supporter`.
+    - restored `paintTownLeaderboard` read/create rules parity with `flowerLeaderboard` to avoid regression.
+  - `public/app/js/multiplayer/ui-room.js` plan gate now accepts both `support` and `supporter` for multiplayer access.
+
+- Validation (2026-02-22):
+  - Syntax checks passed:
+    - `node --check public/js/entitlements.js`
+    - `node --check public/app/js/multiplayer/ui-room.js`
+    - `node --check functions/index.js`
+  - Skill client rerun (`web_game_playwright_client`) completed:
+    - `output/web-game-mp-trial-check/shot-0.png`
+    - `output/web-game-mp-trial-check/shot-1.png`
+    - `output/web-game-mp-trial-check-headed/shot-0.png`
+    - note: canvas capture remains black in this environment (headless + headed).
+  - Fallback Playwright full-page verification (from `public/` static root):
+    - `output/playwright/landing-multiplayer-entry.png`
+    - `output/playwright/app-multiplayer-tab-entry.png`
+    - `output/playwright/mp-entry-verification.json`
+  - Verified from JSON report:
+    - landing has multiplayer CTA (`./app/?tab=multiplayer`)
+    - app has multiplayer tab + plan state + float multiplayer controls
+    - free-plan lock text shown: `Free plan: Multiplayer is locked until you start trial or upgrade.`
+    - no console/page errors in fallback Playwright run.
+
+- Remaining deployment step (manual in Firebase console):
+  - enable Firestore TTL on:
+    - `rooms/*/players/*` using `expiresAt`
+    - `rooms/*/chat/*` using `expiresAt`
+- Cost guardrail follow-up:
+  - `public/js/entitlements.js` `ensureUserDoc(...)` now only patches `email/displayName` when values actually changed, avoiding an unnecessary write on every entitlement refresh.
+- Presence UX hardening (2026-02-22):
+  - Updated `public/app/js/multiplayer/presence.js` to hide stale players client-side when `lastSeenAt` is older than 15 seconds.
+  - Existing `expiresAt` filter remains in place; TTL continues as background cleanup only.
+- Validation:
+  - `node --check public/app/js/multiplayer/presence.js` passed.
+  - Skill client run: `output/web-game-mp-presence-filter/shot-0.png` (canvas capture still black in this environment).
+- Phase 2 implementation (soft location + cheap public browsing) (2026-02-22):
+  - Added room location tag + city key support in room model and client serialization:
+    - `public/app/js/multiplayer/rooms.js`
+      - new normalization helpers: `normalizeCityKey(...)`, `normalizeLocationTag(...)`
+      - room docs now include `cityKey` and optional `locationTag`
+      - create room path accepts `locationTag` + `locationName`
+      - exported `findPublicRoomsByCity(cityInput, {scanLimit,resultLimit})`
+      - browse query reads only room docs (`rooms` where `visibility == public`), no players/presence subscriptions.
+  - Added Phase 2 UI controls and browser in `public/app/index.html` + `public/app/js/multiplayer/ui-room.js`:
+    - Create options:
+      - visibility selector (`private`/`public`)
+      - optional location tag input (`Tokyo`, `Paris`, `Moon Base`)
+    - Browse section:
+      - city input + `Find Rooms`
+      - room list showing room metadata only (name, location tag, world kind, code)
+      - join action from list (still plan-gated for free users)
+    - Room panel modal mirrors create options (visibility + location tag).
+  - Security rules expanded in `firestore.rules`:
+    - `rooms` validation now allows/validates `cityKey` and optional `locationTag`
+    - helper validators added (`validCityKey`, `validLocationTag`)
+    - room read policy updated so signed-in users can read public rooms (enables browsing) while players/chat remain entitlement-gated.
+
+- Validation (Phase 2):
+  - Syntax checks passed:
+    - `node --check public/app/js/multiplayer/rooms.js`
+    - `node --check public/app/js/multiplayer/ui-room.js`
+  - Skill client run executed:
+    - `output/web-game-mp-phase2/shot-0.png`
+    - note: canvas capture remains black in this environment.
+  - Fallback Playwright checks:
+    - `output/playwright/app-multiplayer-phase2.png`
+    - `output/playwright/app-multiplayer-phase2.json`
+    - `output/playwright/app-multiplayer-phase2-panel.png`
+    - `output/playwright/app-multiplayer-phase2-panel.json`
+  - Verified:
+    - title multiplayer tab now includes visibility selector, location tag input, city browse input/button/list
+    - room panel includes mirrored visibility + location tag controls
+    - no console/page errors in fallback checks.
+
+- Next deployment note:
+  - Firestore rules changed and must be deployed before Phase 2 browsing works in production.
+- Phase 2 follow-up polish:
+  - Create flow now treats location tag as truly optional for private rooms.
+  - Public room creation auto-falls back to current location name only when no tag is provided.
+  - Additional Playwright check:
+    - `output/playwright/app-multiplayer-phase2-v2.png`
+    - `output/playwright/app-multiplayer-phase2-v2.json`
+    - confirmed defaults: visibility=`private`, location tag input empty, and no console/page errors.
+- TTL verification pass (2026-02-22):
+  - Confirmed `expiresAt` is written as Firestore `Timestamp` on all active multiplayer TTL paths:
+    - Presence heartbeat update: `public/app/js/multiplayer/presence.js:133`
+    - Presence stop/leave short expiry: `public/app/js/multiplayer/presence.js:173`
+    - Room create owner presence seed: `public/app/js/multiplayer/rooms.js:247`
+    - Room join presence seed: `public/app/js/multiplayer/rooms.js:302`
+    - Room leave short expiry: `public/app/js/multiplayer/rooms.js:350`
+    - Chat message write: `public/app/js/multiplayer/chat.js:102`
+  - Note: code uses `Timestamp.fromMillis(...)`, which is equivalent to `Timestamp.fromDate(new Date(...))` for TTL purposes.
+- Security + performance hardening pass (2026-02-22):
+  - Strong anti-chat-spam protections implemented:
+    - Client-side guardrails in `public/app/js/multiplayer/chat.js`:
+      - minimum interval throttle
+      - burst window cap
+      - duplicate-message cooldown block
+    - Server-backed transactional enforcement in `public/app/js/multiplayer/chat.js`:
+      - each chat send now writes `chat/{msgId}` + `chatState/{uid}` in a single Firestore transaction
+      - room user state tracks `lastMessageAt`, `windowStartedAt`, `windowCount`, `expiresAt`
+  - Firestore rules strengthened for chat and rooms:
+    - `firestore.rules`:
+      - public rooms now require non-empty `cityKey` + `locationTag`
+      - added `chatState` schema validation and transition validation
+      - chat create now requires valid rate-limited `chatState` transition (`getAfter` checks)
+      - `chatState` subcollection rules added (`create/update` self/member only, validated)
+  - Performance optimizations:
+    - `public/app/js/multiplayer/rooms.js`:
+      - city browse now queries by indexed fields directly (`cityKey == X` and `visibility == public`) instead of broad scan+client filter
+    - `public/app/js/multiplayer/presence.js`:
+      - players listener now uses query `limit(24)` to cap read amplification
+    - `public/app/js/multiplayer/ui-room.js`:
+      - ghost ticker avoids scene ghost work when no active room
+
+- Validation (security/perf pass):
+  - Syntax checks passed:
+    - `node --check public/app/js/multiplayer/chat.js`
+    - `node --check public/app/js/multiplayer/rooms.js`
+    - `node --check public/app/js/multiplayer/presence.js`
+    - `node --check public/app/js/multiplayer/ui-room.js`
+  - Firestore emulator rule compile attempt blocked locally (no Java runtime installed):
+    - `firebase emulators:exec --only firestore ...` failed with Java missing
+  - Fallback Playwright verification:
+    - `output/playwright/app-multiplayer-security-perf-pass.png`
+    - `output/playwright/app-multiplayer-security-perf-pass.json`
+    - confirmed multiplayer security/perf UI controls present and no console/page errors.
+  - Skill client run executed:
+    - `output/web-game-mp-security-perf/shot-0.png`
+    - note: known black canvas capture in this environment.
+- Account center + security hardening pass (2026-02-22):
+  - Added secure server-side account APIs in `functions/index.js`:
+    - `startTrial` (auth-required 2-day trial activation, one-time gate via `trialConsumedAt`)
+    - `getAccountOverview` (uid/email/displayName/providers/plan/subscription + billing timing)
+    - `listBillingReceipts` (user-scoped Stripe invoice list)
+    - `updateAccountProfile` (displayName update in Auth + Firestore)
+  - Added Stripe ownership checks in backend (`assertStripeCustomerOwnership`) and applied them to checkout/portal/receipts/overview flows to prevent cross-customer access from tampered client data.
+  - Added Hosting rewrite for `/startTrial` in `firebase.json`.
+  - Client trial activation moved to trusted function call:
+    - `public/js/billing.js` now exports `startTrial()`.
+    - `public/js/entitlements.js` `startTrialIfEligible()` now calls backend function instead of writing `plan/trial` fields directly from client.
+  - Tightened user profile document writes in `firestore.rules`:
+    - Users can only create/update their own profile-safe fields directly.
+    - Billing/plan/subscription/trial/entitlements/Stripe fields are immutable from client writes.
+  - Chat rule hardening in `firestore.rules`:
+    - Room chat create/read now requires room `rules.allowChat == true`.
+  - Account UI completion in `public/account/index.html`:
+    - Identity panel (username edit/save, linked email, providers, uid)
+    - Billing status panel (subscription status, next billing, customer id)
+    - Receipts panel with hosted invoice/PDF links
+    - Refresh account data + refresh receipts actions wired to backend APIs
+    - Status handling and signed-out reset behavior
+
+- Multiplayer performance pass (2026-02-22):
+  - `public/app/js/multiplayer/rooms.js`: public room browsing query now uses `orderBy('createdAt', 'desc')` for stable recent-first results.
+  - `public/app/js/multiplayer/presence.js`: player listener now orders by `lastSeenAt desc` before limiting so active players are prioritized.
+  - Added Firestore composite index in `firestore.indexes.json` for public room city browsing:
+    - `rooms` on `(cityKey ASC, visibility ASC, createdAt DESC)`.
+
+- Validation run (2026-02-22):
+  - Syntax checks passed:
+    - `node --check functions/index.js`
+    - `node --check public/js/billing.js`
+    - `node --check public/js/entitlements.js`
+    - `node --check public/app/js/multiplayer/rooms.js`
+    - `node --check public/app/js/multiplayer/presence.js`
+    - `node --check public/app/js/multiplayer/chat.js`
+  - Skill Playwright client run artifact:
+    - `output/playwright/account-hardening-webgame/shot-0.png` (canvas capture remained black in this environment)
+  - Direct Playwright smoke (fallback visual + console checks):
+    - `output/playwright/account-center-smoke/account-page.png`
+    - `output/playwright/account-center-smoke/report.json` (`errorCount=0`)
+    - `output/playwright/account-security-app-smoke/app-title.png`
+    - `output/playwright/account-security-app-smoke/report.json` (`errorCount=0`, multiplayer tab/card present)
+
+- Environment limitation:
+  - Firestore emulator/rules compile check via `firebase-tools emulators:exec` could not run because Java runtime is not installed in this environment.
+
+- Follow-up TODO for deploy verification:
+  - Deploy updated Functions + Firestore rules/indexes and re-test signed-in flows:
+    - Start trial from app (`?startTrial=1`) should call backend `/startTrial`.
+    - Account page should show real receipt list and subscription metadata for paid users.
+    - Confirm users can no longer modify `plan`/Stripe fields directly in Firestore.
+- Follow-up entitlement integrity fix (2026-02-22):
+  - `public/js/entitlements.js` no longer attempts client writes to downgrade expired trial plans (plan fields are now rule-protected).
+  - `firestore.rules` `userPlan()` now treats expired `trial` as `free` at read-time using `request.time` vs `trialEndsAt`, so multiplayer access is denied immediately after expiry even before cleanup writes.
+  - Re-ran app/title smoke after this change:
+    - `output/playwright/account-security-app-smoke/report.json` (`errorCount=0`)
+
+- Phase 3 security hardening + validation pass (2026-02-22):
+  - XSS mitigation for multiplayer UI templates:
+    - Added explicit HTML escaping helpers in `public/app/js/multiplayer/ui-room.js`.
+    - Updated dynamic `innerHTML` render paths (browse/featured/friends/recent/invites/activity/leaderboard/artifacts/player list/chat) to escape both text and attribute values before injection.
+  - Invite-spam + authorization hardening:
+    - `public/app/js/multiplayer/social.js` now uses deterministic invite doc IDs (`<fromUid>_<roomCode>`) and resend cooldown guards (client gate + existing-doc updatedAt check).
+    - `firestore.rules` invite rules now require:
+      - valid deterministic invite doc ID
+      - sender is signed in and member of the invited room
+      - sender has friend relation to target (`users/{fromUid}/friends/{toUid}`)
+      - timestamp sanity (`createdAt/updatedAt == request.time`, `expiresAt > request.time`)
+      - sender refresh throttling (`> 30s` between invite refresh updates)
+      - strict key allowlists on invite seen updates
+  - Additional rules hardening:
+    - Chat payload now enforces `createdAt == request.time` and future `expiresAt`.
+    - Activity feed entries now enforce `createdAt == request.time` and future `expiresAt`.
+    - Explorer leaderboard updates now require request-time timestamps and a minimum write spacing (`>1s`) to reduce spam inflation.
+
+- Validation artifacts (post-hardening):
+  - Syntax checks passed:
+    - `node --check public/app/js/multiplayer/ui-room.js`
+    - `node --check public/app/js/multiplayer/social.js`
+    - `node --check public/app/js/multiplayer/rooms.js`
+    - `node --check public/app/js/multiplayer/chat.js`
+    - `node --check public/app/js/multiplayer/loop.js`
+  - Skill client run artifact (known environment issue: black canvas):
+    - `output/playwright/phase3-skill-run/shot-0.png`
+    - `output/playwright/phase3-skill-run/shot-1.png`
+  - Direct Playwright smoke (DOM + visual + console checks):
+    - `output/playwright/phase3-platform-smoke/multiplayer-tab.png`
+    - `output/playwright/phase3-platform-smoke/room-panel.png`
+    - `output/playwright/phase3-platform-smoke/report.json`
+    - Result: all targeted section checks true; `errorCount=0`.
+
+- Environment note:
+  - Firestore emulator/rules compile still cannot be executed locally without Java runtime in this environment.
+
+- Java + security test harness setup (2026-02-22):
+  - Installed free OpenJDK via Homebrew: `openjdk@21`.
+  - Added shell config exports to `~/.zshrc`:
+    - `PATH=/opt/homebrew/opt/openjdk@21/bin:$PATH`
+    - `JAVA_HOME=/opt/homebrew/opt/openjdk@21`
+  - Verified emulator boot now works:
+    - `firebase emulators:exec --only firestore "echo firestore-emulator-ok"` succeeded.
+
+- Added repeatable Firestore security tests:
+  - Initialized root npm package for tooling (`package.json`, `package-lock.json`).
+  - Installed free dev dependencies:
+    - `@firebase/rules-unit-testing`
+    - `firebase`
+  - Added test file:
+    - `tests/firestore.rules.security.test.mjs`
+  - Added npm scripts:
+    - `npm test`
+    - `npm run test:rules`
+    - Script includes Java path/JAVA_HOME so it works even in shells without profile loading.
+
+- Security test run result:
+  - `npm test` passed.
+  - 12/12 Firestore security checks passed (private-room reads, presence self-write enforcement, chat size/rate transition checks, invite abuse checks, activity feed auth checks).
+- Cross-platform multiplayer hardening + root test portability:
+  - Removed `Weekly Pulse` and `Platform Activity` blocks from `public/app/index.html` and disconnected related UI listeners in `public/app/js/multiplayer/ui-room.js`.
+  - Fixed social wiring bug by importing `removeFriend` in `ui-room.js` (button action now resolves at runtime).
+  - Added direct social onboarding controls in multiplayer title tab:
+    - `mpFriendUidInput`, `mpFriendNameInput`, `mpAddFriendBtn`
+    - Enter/click handlers now call `addFriend(..., 'manual')`.
+  - Preserved leaderboard updates and invite flow while removing activity feed posting dependencies.
+  - Replaced macOS-only rules test script with cross-platform runner:
+    - Added `scripts/test-rules.mjs`
+    - `package.json` now uses `node scripts/test-rules.mjs`
+    - Runner auto-detects Java via `JAVA_HOME` and common paths, sets env for emulator process, and falls back from `firebase` CLI to `npx firebase-tools`.
+- Validation:
+  - `node --check public/app/js/multiplayer/ui-room.js` passed.
+  - `node --check scripts/test-rules.mjs` passed.
+  - `npm test` passed (Firestore rules security suite 12/12).
+  - Playwright multiplayer DOM smoke check confirms:
+    - `Weekly Pulse` absent
+    - `Platform Activity` absent
+    - manual friend controls present.
+- Multiplayer/account social + room quota validation pass (2026-02-22):
+  - Firestore rules tests passed: 14/14 (`npm test`).
+  - Cross-platform rules test runner remains portable (`scripts/test-rules.mjs` auto-detects Java and firebase CLI fallback).
+  - UI smoke (local static server + Playwright):
+    - Multiplayer tab shows room name input and create/join controls.
+    - Room panel includes friends list, incoming invites list, and recent players list.
+    - Account page includes username editor, friends/invites controls, and room quota card.
+  - Generated artifacts:
+    - `output/web-game-mp/manual-check.png`
+    - `output/web-game-mp/manual-check.json`
+    - `output/web-game-mp/manual-room-panel.png`
+    - `output/web-game-mp/manual-room-panel.json`
+    - `output/web-game-account/manual-check.png`
+    - `output/web-game-account/manual-check.json`
+- Paint Town multiplayer deterministic/physics validation pass (2026-02-22 UTC):
+  - Added `tests/painttown.integration.test.mjs` (Playwright integration harness).
+  - Test boots `/public/app/index.html`, selects Paint the Town mode, enters game, then asserts:
+    - deterministic room seeding via `deriveRoomDeterministicSeed` (same room => same seed, changed room code => different seed),
+    - touch-paint claim creation,
+    - paintball shot + physics update loop + claim creation,
+    - zero runtime console/page errors during run.
+  - Improved target acquisition in test via in-view building raycast scan (reliable hit points across camera setups).
+  - Latest report: `output/playwright/painttown-physics-check/report.json` => `pass: true`.
+  - Latest screenshots:
+    - `output/playwright/painttown-physics-check/title-painttown-selected.png`
+    - `output/playwright/painttown-physics-check/ingame-painttown.png`
+    - `output/playwright/painttown-physics-check/ingame-painttown-after-tests.png`
+- Firestore security regression rerun:
+  - `npm test` => `Security checks complete: 16/16 passed`.
+- Admin security hardening pass (2026-02-22 UTC):
+  - Added secure admin access endpoint in Cloud Functions: `/enableAdminTester`.
+  - Admin activation is allowlist-based (`functions.config().admin.allowed_emails` / `allowed_uids`) and email allowlist requires verified email.
+  - Admin activation applies server-side only (cannot be spoofed client-side):
+    - sets custom claims `{ admin: true, role: 'admin' }`
+    - updates user doc to `plan: pro`, `subscriptionStatus: admin`, `roomCreateLimit: 10000`.
+  - Preserved admin room quota in server profile upkeep paths (`ensureUserDoc` and subscription upserts).
+  - Added account UI control for enablement and status display (`Admin Access` card + `Enable Admin Test Access` button).
+  - Added billing client wrapper `enableAdminTester()` and entitlement/admin-mode UI handling updates.
+  - Multiplayer UI now recognizes admin entitlement payload (`isAdmin`) and updates copy/gating accordingly.
+  - Room creation transaction now uses persisted `roomCreateLimit` from user profile (if present), enabling server-issued elevated limits without client tampering.
+- Validation:
+  - Syntax checks pass for all edited JS files.
+  - Firestore rules regression tests pass: `16/16`.
+  - Paint Town integration test still passes after admin changes.
+- Paint Town gameplay pass (2026-02-23):
+  - Implemented real paintball miss splats with TTL cleanup (`PAINT_SPLAT_LIFETIME_SEC`) and hard active-cap (`PAINT_SPLAT_MAX_ACTIVE`) to protect rendering cost.
+  - Added active paintball cap (`PAINTBALL_MAX_ACTIVE`) to prevent runaway projectile draw/update load.
+  - Fixed paint HUD input conflict by excluding `#paintTownHud` from world paint pointer handler hit path, which restores color-picker/tool button reliability.
+  - Simplified Paint Town HUD default view to minimal compact strip (time + painted count), with click-to-expand controls for tool and color.
+  - Synced the same game logic to `/js/game.js` for root/static parity.
+- Paint Town validation pass (2026-02-23):
+  - `node tests/painttown.integration.test.mjs` rerun; latest report pass=true at `output/playwright/painttown-physics-check/report.json`.
+  - Verified compact HUD visual in `output/playwright/painttown-physics-check/ingame-painttown-after-tests.png`.
+  - Deterministic HUD event check with simulated pointerdown/up/click on color chip now changes `playerColorHex` without spawning paintballs (`beforePaintballs=0`, `afterPaintballs=0`).
+  - Deterministic splat lifecycle check confirms miss splats appear and self-clean (`splatsMid=1`, `splatsAfter=0`) using fixed-terrain test harness.
+
+- Follow-up request implemented in-progress (2026-02-23):
+  - Removed Pro Demo A/B toggles from app overlay and switched Pro panel to `Upcoming demo soon available: Mars Rover`.
+  - Reduced Pro banner auto-hide from 4.5s to 2s and now auto-hides for all plans to prevent title-tab blocking.
+  - Began quota hardening update: Supporter room limit -> 3, Pro -> 10 across Cloud Functions, client entitlements, multiplayer room create path, and Firestore rules.
+  - Added account-page `Extras` status card and started allowlist-only visibility logic for `Enable Admin Test Access` button.
+  - Next: mirror updated public files into root app/account/js copies, then run lint/checks/tests and push.
+- Validation completed for this pass:
+  - `npm test` -> PASS (`tests/firestore.rules.security.test.mjs` 16/16).
+  - `node tests/painttown.integration.test.mjs` -> PASS (`output/playwright/painttown-physics-check/report.json`).
+  - Confirmed Pro panel auto-hide after 2.4s with Playwright (`output/playwright/pro-panel-check/result.json`: `hiddenAfter2_4s=true`).
+  - Confirmed multiplayer float is now a compact circular icon near the flower/share cluster in-game (`output/playwright/painttown-physics-check/ingame-painttown-after-tests.png`).
+- Remaining operational step: deploy updated Firestore rules/functions/hosting as needed after commit.
+- Updated security test fixture values for new quota policy (`supporter/supported owner roomCreateLimit=3`) and revalidated: `npm test` still 16/16 pass.
+- Paint Town input update (2026-02-23):
+  - Mapped paintball fire to keyboard `Shift` while Paint Town is active.
+  - Removed right-click paintball alt-fire path so right-click is reserved for camera control.
+  - Removed walk-mode double-click camera toggle in engine input handling (no more dblclick camera state flips while rapid firing).
+  - Updated Paint Town expanded HUD hint to mention `Shift` firing.
+  - Hardened paint input focus guard so hidden title/menu focus does not block gameplay key input.
+- Validation:
+  - `node --check public/app/js/engine.js` and `node --check public/app/js/game.js` passed.
+  - `node tests/painttown.integration.test.mjs` passed (`output/playwright/painttown-physics-check/report.json`).
+  - Focused control checks:
+    - Shift key triggers paintball shot (`shiftTriggeredShot: true` in `output/playwright/painttown-shift-camera-check/result.json`).
+    - Double-click no longer toggles walk mouse look (`dblClickDidNotToggleWalkMouseLook: true`).
+    - Right-click no longer shoots paintballs (`rightClickDidNotShoot: true`).
+
+- Dead-code cleanup + mobile validation pass (2026-02-23):
+  - Removed clearly unused variables/helpers with no runtime effect:
+    - `sortedPaintTownColorEntries()` (unused helper) removed from `js/game.js` and `public/app/js/game.js`.
+    - Removed unused locals/params in game flow (`name` arg in `navigateToPOI`, stale `sourceStr` block, unused catch/error bindings).
+    - Removed unused locals in engine texture/debug helpers (`brickW`, `rng`, `gpuInfo` assignment) in root + public app copies.
+  - Syntax checks passed:
+    - `node --check js/game.js`
+    - `node --check public/app/js/game.js`
+    - `node --check js/engine.js`
+    - `node --check public/app/js/engine.js`
+  - Static dead-code scan run (`eslint` no-unused-vars/no-unreachable/no-constant-condition):
+    - Only remaining hits are `openHistoricModal` in both game files (referenced by inline `onclick` strings, so kept intentionally).
+  - Skill-required Playwright client run executed (`output/playwright/deadcode-cleanup-skill-run/`), with known headless canvas-black capture limitation in this environment.
+  - Direct mobile smoke run (iPhone 12 viewport) passed with no console/page errors:
+    - report: `output/playwright/deadcode-mobile-smoke-v3/report.json` (`pass: true`)
+    - screenshots:
+      - `output/playwright/deadcode-mobile-smoke-v3/mobile-title.png`
+      - `output/playwright/deadcode-mobile-smoke-v3/mobile-ingame.png`
+      - `output/playwright/deadcode-mobile-smoke-v3/mobile-ingame-game-menu.png`
+- Dead-code cleanup follow-up fix (2026-02-23):
+  - Restored missing `rng` declaration in `js/engine.js:createPavementTexture()` after dead-code pass removed a still-used local.
+  - Revalidated syntax (`node --check` for root/public game+engine files).
+  - Revalidated gameplay integration (`node tests/painttown.integration.test.mjs` => `output/playwright/painttown-physics-check/report.json` pass=true).
+- About page + founder profile page added (2026-02-23):
+  - New page created at `public/about/index.html` with polished grammar and no em dashes.
+  - Includes two sections:
+    - `About` platform overview (browser-native, deterministic real-world multiplayer stack).
+    - `Founder` profile section for Steven Reid.
+  - Added navigation links to About from:
+    - landing footer (`public/index.html`)
+    - app title footer (`public/app/index.html`)
+    - account links block (`public/account/index.html`)
+  - Added route convenience files:
+    - `public/about.html` -> redirects to `public/about/`
+    - `about/index.html` -> root-level redirect for root-hosted/static branch workflows.
+  - Validation:
+    - Playwright check report: `output/playwright/about-page-check/report.json` (`pass: true`, `errors: []`).
+    - Screenshot: `output/playwright/about-page-check/about-desktop.png`.
+- Multiplayer permission-denied reliability fix (2026-02-23):
+  - Root cause found in join flow: `joinRoomByCode` always rewrote `role` and `joinedAt`, but Firestore rules require those fields to remain unchanged on player-doc updates.
+  - Updated `public/app/js/multiplayer/rooms.js`:
+    - Added `normalizePlayerRole(...)` helper.
+    - `joinRoomByCode(...)` now reads existing player doc when accessible and preserves `joinedAt` + `role` on rejoin/update writes.
+    - This resolves self-join / rejoin permission-denied cases where player doc already exists.
+  - Added room-create quota write alignment hardening:
+    - Room create transaction now mirrors persisted `roomCreateLimit` when present (uses plan-derived fallback only when missing), matching rules `canConsumeRoomCreateQuota()` requirement that limit stays unchanged.
+  - Validation:
+    - `node --check public/app/js/multiplayer/rooms.js` passed.
+    - `npm test` passed (Firestore rules security suite 16/16).
+    - `node tests/painttown.integration.test.mjs` passed (`output/playwright/painttown-physics-check/report.json`).
+- Multiplayer reliability follow-up (2026-02-23):
+  - `createRoom(...)` owner presence write now also preserves existing `joinedAt` and `role` if an owner player doc already exists (helps avoid update-rule rejection on rare re-used room code/orphan player doc cases).
+- Multiplayer create-room permission-denied root-fix (2026-02-23):
+  - Fixed stale room quota mismatch path that could block valid paid/trial users with generic "Missing or insufficient permissions".
+  - Firestore rules update (`firestore.rules`):
+    - `roomCreateLimitFromData(...)` now floors stored limit to at least the plan-derived limit (`max(storedLimit, planLimit)`), which prevents stale `roomCreateLimit: 0` from overriding an active plan.
+  - Client update (`public/app/js/multiplayer/rooms.js`):
+    - create-room transaction now writes `roomCreateLimit` as `max(planLimit, persistedLimit)` for non-admin users.
+  - Added regression test (`tests/firestore.rules.security.test.mjs`):
+    - `owner can create room when stored limit is stale but plan limit is valid`.
+  - Validation:
+    - `npm test` now 17/17 passing.
+
+- Multiplayer permission denial deep-dive (2026-02-23):
+  - Root-cause class identified: strict `users/{uid}` update validation could block room creation when profile docs contain legacy fields outside the old allowlist.
+  - Hardened `firestore.rules`:
+    - `userPlan()` now treats `subscriptionStatus == 'admin'` as multiplayer-entitled (`pro`) and normalizes `support` -> `supporter`.
+    - `validUserSelfUpdate()` now validates only changed keys via `diff(...).affectedKeys().hasOnly(...)`, so unchanged legacy fields no longer block quota updates during room creation.
+  - Added regression tests in `tests/firestore.rules.security.test.mjs`:
+    - owner room create succeeds with legacy profile fields present.
+    - admin-status room create succeeds even if stale `plan` is `free`.
+  - Validation: `npm test` passed (`19/19`).
+  - Added legacy profile compatibility for missing `uid` on user docs (self-healing on next room-create quota update).
+  - Added regression test: owner can create room when legacy profile is missing `uid`.
+  - Validation rerun: `npm test` passed (`20/20`).
+- Multiplayer trial/admin unlock reliability patch (2026-02-24):
+  - Confirmed production endpoint gap: `/enableAdminTester` returned 404 on Hosting while Cloud Function exists.
+  - Updated `public/js/billing.js` to use endpoint candidates with automatic fallback:
+    - On Firebase Hosting: try relative rewrite path first, then direct Cloud Function URL.
+    - On non-Firebase hosts (e.g., GitHub Pages): try direct Cloud Function URL first, then relative path.
+    - Retries on 404/501 to avoid hard failures when rewrites are incomplete.
+  - Added missing Hosting rewrite in `firebase.json` for `/enableAdminTester`.
+  - Validation: `node --check public/js/billing.js` and `npm test` (`20/20`) passed.
+- Firestore rules admin-claim hardening pass (2026-02-24):
+  - Added safe `isAdminToken()` checks that guard token property access with `'in'` checks to avoid evaluation errors.
+  - Expanded multiplayer entitlement path to honor admin custom claims (`request.auth.token.admin/role`) and admin status strings in user doc.
+  - Allowed admin quota self-updates to raise room limit when needed (without affecting non-admin quota enforcement).
+  - Added regression test: admin custom claim can create room even if profile is free with zero quota.
+  - Validation: `npm test` passed (`21/21`).
+  - Deployed updated Firestore rules to `worldexplorer3d-d9b83`.
+- Frontend cache-busting hotfix for module export mismatch (2026-02-24):
+  - Root cause: JS assets were served with `Cache-Control: immutable`, while import paths reused `?v=54`; clients could keep stale `entitlements.js` without `startTrialIfEligible`.
+  - Bumped module version tags across `public` from `?v=54` to `?v=55`.
+  - Added explicit `?v=55` to non-versioned imports for `firebase-init.js`, `auth-ui.js`, `entitlements.js`, and `billing.js` in app/account/landing entry modules.
+  - Updated multiplayer UI import to `../../../js/entitlements.js?v=55`.
+  - Validation: `npm test` passed (`21/21`).
+- Root-run restore (2026-02-24):
+  - Mirrored working `public` web app to repository root so root-hosted static deployments (e.g., GitHub Pages from branch root) run without `/public` redirect dependency.
+  - Synced paths to root: `app/`, `account/`, `legal/`, `about/`, `assets/`, `js/`, and `index.html`.
+  - Kept Firebase hosting behavior unchanged (`firebase.json` still serves `public/`).
+  - Validation: local static serve returned 200 for `/`, `/app/`, and `/js/entitlements.js?v=55`; app page includes `bootstrap.js?v=55` and `entitlements.js?v=55` imports.
+  - Regression check: `npm test` passed (`21/21`).
+- Multiplayer room-creation blocker fix (2026-02-24):
+  - Root cause identified: create flow used a transaction `get()` on target room code before create; Firestore rules intentionally deny reads for non-existent private room docs, causing create to fail with `Missing or insufficient permissions`.
+  - Refactored `app/js/multiplayer/rooms.js` and `public/app/js/multiplayer/rooms.js` create path to atomic `writeBatch` (room doc + quota counter update) with retry on random-code collision-like permission failures.
+  - Added clearer terminal error when Firestore denies all create attempts (rules/App Check/entitlement guidance).
+  - Kept TTL/presence/join logic unchanged.
+  - Validation: `npm run test:rules` passes `21/21` after patch.
+- Cache-bust follow-up (2026-02-24):
+  - Bumped runtime import versions to force delivery of multiplayer room-create fix under immutable JS caching.
+  - Updated to `v=56` chain:
+    - app/public `app/index.html` bootstrap script tag
+    - app/public `app/js/bootstrap.js` manifest import
+    - app/public `app/js/modules/manifest.js` `CACHE_BUST`
+    - app/public `app/js/app-entry.js` multiplayer ui-room import
+    - app/public `app/js/multiplayer/ui-room.js` rooms import
+    - root `js/bootstrap.js` cache-bust constant.
+- Multiplayer room-create permission hotfix (2026-02-24):
+  - Root cause: client sometimes wrote `roomCreateLimit: 10000` from admin hint even when auth token had no admin claim; Firestore rules reject that mismatch in `canConsumeRoomCreateQuota`.
+  - Updated room creation in both `app/js/multiplayer/rooms.js` and `public/app/js/multiplayer/rooms.js`:
+    - Refresh/read token claims once before create attempts.
+    - Compute quota write limit to match Firestore rule math unless admin claim is truly present.
+    - Keep admin-claim path elevated while keeping non-claim/admin-status path rules-compatible.
+  - Updated entitlement sync in `js/entitlements.js` and `public/js/entitlements.js`:
+    - Added token-claim detection helper.
+    - Avoid client-side profile writes that attempt privileged limit inflation without admin claim.
+- Added regression coverage in `tests/firestore.rules.security.test.mjs`:
+  - New check: admin status without token claim cannot inflate room limit in quota write.
+  - New check: same profile can create room when using rules-derived limit.
+- Fixed multiplayer module cache/version split:
+  - Synchronized all multiplayer imports to `./rooms.js?v=56` so only one `rooms` module instance loads.
+- Validation:
+  - `npm run test:rules` => 23/23 passed.
+  - Local Playwright smoke on `http://127.0.0.1:4173/app/`:
+    - No page/console errors.
+    - Multiplayer tab rendered.
+    - Confirmed only one rooms module request (`/app/js/multiplayer/rooms.js?v=56`).
+  - Artifacts: `output/playwright/multiplayer-local-smoke/report.json`, `output/playwright/multiplayer-local-smoke/app-multiplayer-tab.png`.
+- Cache invalidation pass (2026-02-24 follow-up):
+  - Bumped multiplayer/boot cache keys to `v=57` so immutable browser caches pick up the room-create and entitlements fixes.
+  - Updated imports/pages to avoid mixed old/new module instances:
+    - `app/index.html`, `public/app/index.html` bootstrap query -> `v=57`
+    - `app/js/bootstrap.js`, `public/app/js/bootstrap.js` manifest query -> `v=57`
+    - `app/js/modules/manifest.js`, `public/app/js/modules/manifest.js` CACHE_BUST -> `v=57`
+    - `app/js/app-entry.js`, `public/app/js/app-entry.js` ui-room import -> `v=57`
+    - all multiplayer module imports of `rooms.js` -> `v=57`
+    - all page/ui imports of `entitlements.js` -> `v=57` (root/app/account + public copies)
+  - Verified via Playwright network capture: only `entitlements.js?v=57` and `rooms.js?v=57` loaded (no legacy v55/v56 duplicates for these modules).
+- Multiplayer room-create production reliability pass (2026-02-24):
+  - Implemented admin-claim create path decoupling in `app/js/multiplayer/rooms.js` + `public/app/js/multiplayer/rooms.js`:
+    - when auth token has admin claim, create now writes only `rooms/{code}` (no coupled `users/{uid}` quota write in same commit).
+    - non-admin path remains batch room+quota update to preserve quota enforcement.
+  - Ran rules suite: `npm run test:rules` -> 23/23 passed.
+  - Ran web-game Playwright smoke against local app (`/app/`) and inspected screenshots:
+    - `output/playwright/multiplayer-room-create-smoke/shot-0.png`
+    - `output/playwright/multiplayer-room-create-smoke/shot-1.png`
+    - no console/page errors emitted by the run.
+  - Confirmed runtime loaded `rooms.js?v=59` and `ui-room.js?v=59` on `/app/` in local HTTP logs.
+
+- Multiplayer ownership + invite safety pass (2026-02-24):
+  - Added owner-room management in multiplayer:
+    - `listOwnedRooms`, `listenOwnedRooms`, and `deleteOwnedRoom` in `app/js/multiplayer/rooms.js` (+ mirrored `public/app/js/multiplayer/rooms.js`).
+    - Title multiplayer panel now renders "My Rooms" with `Open` and `Delete` actions for owner-created rooms.
+    - Owner delete flow confirms action, leaves active room if needed, removes matching URL invite params, and refreshes browse/featured lists.
+  - Invite-link flow hardened:
+    - All invite URL builders now append `invite=1`.
+    - Pending invite join path now does entitlement-aware branching:
+      - entitled users auto-join room;
+      - free users are prompted to start 2-day trial and only join after successful unlock.
+    - Signed-out invite state now shows explicit sign-in prompt with room code context.
+  - Kid-safety chat policy updates:
+    - Client `chat.js` now blocks links, emails, phone numbers, and external contact-handle solicitation keywords before send.
+    - Firestore rules enforce same chat constraints server-side.
+  - Firestore rule behavior updates:
+    - Room owners can delete their own room even when not currently entitled (owner control retained).
+    - Invite create/sender update now requires multiplayer entitlement.
+  - Legal copy updates:
+    - Terms and Privacy updated (root + `public/`) for multiplayer conduct, child/guardian language, moderation/enforcement, and multiplayer data retention/safety statements.
+  - Cache-bust roll:
+    - Bumped multiplayer/entry bootstrap references from `v=59` to `v=60` to force fresh client module load.
+
+- Verification run (2026-02-24):
+  - `npm run test:rules` => 25/25 passed (including new chat safety and owner-delete tests).
+  - `node --check` passed for all modified JS files.
+  - Web-game Playwright client run completed against local `/app/` (`output/playwright/multiplayer-verify/`).
+  - Direct Playwright smoke report:
+    - `output/playwright/multiplayer-direct-check.json`
+    - `output/playwright/multiplayer-direct-check.png`
+    - State confirms multiplayer tab active, pane active, owner-room UI containers present, and no console/page errors.
+
+- Next agent TODO:
+  - After push/deploy, run one live production verification with a real signed-in account:
+    - create room
+    - open room from My Rooms
+    - delete room
+    - confirm invite trial-gate path on a free account
+    - confirm direct invite join on entitled account.
+
+- Mobile multiplayer float alignment pass (2026-02-24):
+  - Root cause: mobile CSS offsets placed `#multiplayerMenu` over the right-side float menu row (overlapping `#exploreBtn`) on phone viewports.
+  - Updated mobile position rules in `app/index.html` (mirrored to `public/app/index.html`):
+    - `@media (max-width: 768px)`:
+      - `#gameShareFloatBtn` -> `left:10px`, `bottom:24px`
+      - `#memoryFlowerFloatBtn` -> `left:10px`, `bottom:76px`
+      - `#multiplayerMenu` -> `left:62px`, `bottom:76px`
+      - adjusted popup menu anchors (`#multiplayerMenu.open .floatItems`, `#gameShareMenu`, `#flowerActionMenu`) to left-side stack
+    - `@media (max-width: 480px)`:
+      - `#gameShareFloatBtn` -> `left:8px`, `bottom:22px`
+      - `#memoryFlowerFloatBtn` -> `left:8px`, `bottom:74px`
+      - `#multiplayerMenu` -> `left:58px`, `bottom:74px`
+      - adjusted popup anchors to left-side stack
+    - Added `@media (max-width: 360px)` narrow-phone override:
+      - lift flower + multiplayer row to `bottom:126px` so SE-sized screens avoid overlap with `Explore` row
+      - lift related popups to `bottom:176px`
+
+- Validation artifacts:
+  - `output/playwright/mobile-layout-after.json`
+  - `output/playwright/mobile-layout-matrix-after-fix2.json`
+  - `output/playwright/mobile-app-iphone-se-after-fix2.png`
+  - `output/playwright/mobile-app-iphone-12-after-fix2.png`
+  - `output/playwright/mobile-app-pixel-5-after-fix2.png`
+  - `output/playwright/mobile-app-title-auth-after-fix2.json`
+  - `output/playwright/mobile-app-title-auth-after-fix2.png`
+
+- Validation results:
+  - iPhone SE / iPhone 12 / Pixel 5: `overlapMpExplore=false`, `overlapFlowerExplore=false`, `overlapMpControls=false`, `yDelta=0` (multiplayer level with flower).
+  - Title/app mobile UI: account button visible, auth panel opens, no horizontal overflow, no console errors.
+
+- Multiplayer reopen + mobile accessibility follow-up (2026-02-24):
+  - Issue reproduced from user report:
+    - "My Rooms" section was too far down and could be occluded by the fixed `EXPLORE` button on mobile title layouts.
+    - In-game mobile float layout had prior overlap risk between multiplayer button and right-side menu on narrow widths.
+  - Fixes applied:
+    - `app/index.html` (+ mirrored `public/app/index.html`):
+      - moved "My Rooms" block higher in the multiplayer tab (directly after room code/join/create row).
+      - added multiplayer tab bottom padding to preserve click-space above fixed start button:
+        - base: `#tab-multiplayer { padding-bottom:130px }`
+        - `<=768px`: `padding-bottom:150px`
+        - `<=480px`: `padding-bottom:170px`
+      - kept mobile float button stack aligned left and added narrow-phone (`<=360px`) override so flower/multiplayer stay level and clear of menu row.
+    - `app/js/multiplayer/ui-room.js` (+ mirrored public copy):
+      - added `upsertOwnedRoomLocal(room)` and call from `activateRoom(...)` so newly created owner rooms appear immediately in "My Rooms" even before Firestore listener refresh.
+  - Validation artifacts:
+    - `output/playwright/mobile-mp-float-after-reorder2.json`
+    - `output/playwright/mobile-multiplayer-title-after-reorder2.png`
+    - `output/playwright/mobile-ingame-float-after-reorder2.png`
+    - `output/playwright/mobile-title-myrooms-matrix.json`
+  - Validation results:
+    - iPhone 12: `My Rooms` no longer overlaps start button on title tab; in-game multiplayer button level with flower and no overlap with Explore control row.
+    - iPhone SE + Pixel 5: `My Rooms` non-overlapping; no horizontal overflow; no console errors.
+- Room return persistence pass (2026-02-24):
+  - Added persistent per-user room shortcuts in Firestore: `users/{uid}/myRooms/{roomCode}`.
+  - `app/js/multiplayer/rooms.js` now upserts `myRooms` on create/join/update and removes owner shortcut on room delete.
+  - Added `listenMyRooms(...)` and switched multiplayer UI room list subscription from owner-query to saved-room-query so users can reopen rooms they created or joined.
+  - Updated My Rooms copy in title multiplayer panel to clarify reopen behavior and owner-only delete behavior.
+  - Added Firestore rules for `users/{uid}/myRooms/{roomCode}` and tests for self-only access.
+  - Added/kept shared room block persistence (`rooms/{roomId}/blocks/{blockId}`) integration and rules coverage.
+- Cache busting update:
+  - Bumped multiplayer/runtime import versions to force fresh module fetch on GitHub Pages (`v=61` for room-related module imports and bootstrap chain).
+  - Bumped app entry block module import to `blocks.js?v=56` so shared block sync code is not stale.
+- Validation:
+  - Syntax checks passed for updated JS modules.
+  - Firestore rules tests passed: `31/31` (`npm run test:rules`).
+  - Playwright client smoke run executed; latest screenshots: `/Users/stevenreid/Documents/New project/output/web-game/shot-0.png`, `/Users/stevenreid/Documents/New project/output/web-game/shot-1.png`.
+- TODO for next agent:
+  - Run an authenticated manual browser check against deployed Hosting/Pages to confirm `myRooms` list populates with real user accounts and room reopen/delete flows on production config.
+- Additional room-flow verification (2026-02-24):
+  - Ran emulator-backed integration script through `firebase emulators:exec` for create/join/return/delete flow with new `myRooms` ledger.
+  - Result: pass (`output/playwright/room-flow-backend-check/report.json`): owner create works, member join works, both users receive saved-room entry, owner delete operations succeed.
+  - Runtime DOM state check passed for Multiplayer tab activation + My Rooms controls presence:
+    - `output/playwright/room-return-statecheck/report.json`
+
+- Saved-room open reliability pass (2026-02-24):
+  - Hardened owned-room click handling in `app/js/multiplayer/ui-room.js` + `public/app/js/multiplayer/ui-room.js` with robust event target normalization (`Element`/`Node`), row-level open fallback, and keyboard open (`Enter`/`Space`).
+  - Added explicit `handleOpenOwnedRoom(...)` flow with clear status messages and same-room short-circuit.
+  - Added `data-owned-room-code` row metadata so mobile/desktop taps on the row open the room.
+- Saved-room persistence write fix:
+  - `upsertMyRoomRecord(...)` now preserves existing `createdAt` on updates (instead of overwriting every upsert), preventing `myRooms` rule update denials.
+  - Updated both app and public copies of `rooms.js`.
+- Security/rules coverage update:
+  - Added tests for owner-only room deletion (`non-owner cannot delete`, `owner can delete`).
+  - `npm run test:rules` now passes `33/33`.
+- Browser validation notes:
+  - Ran `develop-web-game` Playwright client after patch.
+  - Added targeted Playwright checks confirming saved-room open event fires from button, row click, and keyboard activation (unauth state shows expected "Sign in to open saved rooms.").
+- Cache bust bump to `v=62` across multiplayer imports/bootstraps (`app` + `public/app` + root/public bootstrap shims) so saved-room fixes load immediately after deploy without stale browser cache.
+
+- Multiplayer saved-room/open regression pass (2026-02-24):
+  - Ran browser automation `output/playwright/debug-open-button.mjs` against `http://127.0.0.1:4173/app/` to trace Saved Room `Open` path and entitlement gating.
+  - Captured latest trace/report at `output/playwright/open-button-debug/report.json` and screenshot `output/playwright/open-button-debug/final.png`.
+  - Failure path confirmed in UI code: `handleOpenOwnedRoom -> handleJoinRoom -> ensureAccessOrWarn`; stale/free entitlement state can block room open/join.
+  - Hardened entitlement refresh path in multiplayer UI before deny:
+    - `app/js/multiplayer/ui-room.js`
+    - `public/app/js/multiplayer/ui-room.js`
+  - Fixed admin/pro room creation coupling bug by always writing room quota counters in same batch as room create (rules-compatible):
+    - `app/js/multiplayer/rooms.js`
+    - `public/app/js/multiplayer/rooms.js`
+  - Fixed admin claim handling in entitlement normalization and state broadcasts:
+    - `js/entitlements.js`
+    - mirrored to `public/js/entitlements.js`
+  - Unified entitlement module cache-bust to `v=62` across root/app/account/public entrypoints to avoid stale mixed versions.
+  - Validation: `node --check` passed for all changed JS modules, `npm run test:rules` passed (33/33).
+- Multiplayer ghost quality pass (2026-02-24):
+  - Replaced remote ghost sphere marker with mode-based proxy models in `app/js/multiplayer/ghosts.js` (+ mirrored `public/...`):
+    - walk -> blocky character proxy
+    - drive -> car proxy
+    - drone -> quad-style proxy
+    - space -> rocket proxy
+  - Added velocity-aware smoothing/extrapolation:
+    - predicts target between heartbeat updates using pose velocity
+    - damped interpolation with distance-based stiffness
+    - yaw smoothing and simple proxy animation (walker limbs, wheel spin, rotor spin)
+  - Preserved name tags and upgraded placement by proxy type.
+  - Cache-bust updates to force fresh load of new ghost module:
+    - `app/js/multiplayer/ui-room.js` imports `ghosts.js?v=56` (and mirrored public copy)
+    - app module cache bumped to `v=63` (`app-entry`, bootstrap/manifest, and app index references; mirrored public copies)
+  - Validation:
+    - `node --check` passed for changed JS modules.
+    - Playwright smoke: `output/playwright/ghost-proxy-smoke/report.json` reports `ok: true`, with car-like and walker-like mesh signatures and no console/page errors.

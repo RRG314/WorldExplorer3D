@@ -1,0 +1,25 @@
+{
+  "name": "new-project",
+  "version": "1.0.0",
+  "description": "World Explorer is a browser-based 3D exploration runtime with a production Firebase deployment stack:",
+  "main": "three.js",
+  "scripts": {
+    "test": "npm run test:rules",
+    "test:rules": "node scripts/test-rules.mjs"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RRG314/WorldExplorer.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/RRG314/WorldExplorer/issues"
+  },
+  "homepage": "https://github.com/RRG314/WorldExplorer#readme",
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.0",
+    "firebase": "^12.9.0"
+  }
+}

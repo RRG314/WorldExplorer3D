@@ -1,0 +1,1249 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    function isAdminToken() {
+      return isSignedIn() && (
+        (
+          'admin' in request.auth.token &&
+          request.auth.token.admin == true
+        ) ||
+        (
+          'role' in request.auth.token &&
+          request.auth.token.role in ['admin', 'ADMIN']
+        )
+      );
+    }
+
+    function hasUserDoc() {
+      return isSignedIn() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function userDocData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function userPlan() {
+      return !hasUserDoc() ? 'free' :
+        (
+          isAdminToken() ||
+          userDocData().subscriptionStatus in ['admin', 'Admin', 'ADMIN']
+            ? 'pro'
+            : (
+                userDocData().plan == 'trial'
+                  ? (
+                      userDocData().trialEndsAt is timestamp &&
+                      request.time < userDocData().trialEndsAt
+                        ? 'trial'
+                        : 'free'
+                    )
+                  : (
+                      userDocData().plan in ['support', 'supporter', 'pro']
+                        ? (
+                            userDocData().plan == 'support'
+                              ? 'supporter'
+                              : userDocData().plan
+                          )
+                        : 'free'
+                    )
+              )
+        );
+    }
+
+    function planRoomCreateLimit(plan) {
+      return plan == 'pro'
+        ? 10
+        : (
+            plan in ['support', 'supporter']
+              ? 3
+              : (
+                  plan == 'trial'
+                    ? 3
+                    : 0
+                )
+          );
+    }
+
+    function roomCreateCountFromData(data) {
+      return data is map &&
+        ('roomCreateCount' in data) &&
+        data.roomCreateCount is int &&
+        data.roomCreateCount >= 0 &&
+        data.roomCreateCount <= 10000
+          ? data.roomCreateCount
+          : 0;
+    }
+
+    function roomCreateLimitFromData(data) {
+      let planLimit = planRoomCreateLimit(userPlan());
+      let storedLimit = data is map &&
+        ('roomCreateLimit' in data) &&
+        data.roomCreateLimit is int &&
+        data.roomCreateLimit >= 0 &&
+        data.roomCreateLimit <= 10000
+          ? data.roomCreateLimit
+          : planLimit;
+
+      return storedLimit >= planLimit ? storedLimit : planLimit;
+    }
+
+    function canConsumeRoomCreateQuota() {
+      let userPath = /databases/$(database)/documents/users/$(request.auth.uid);
+      let beforeData = hasUserDoc() ? userDocData() : null;
+      let afterExists = existsAfter(userPath);
+      let afterData = afterExists ? getAfter(userPath).data : null;
+      let beforeCount = roomCreateCountFromData(beforeData);
+      let beforeLimit = roomCreateLimitFromData(beforeData);
+
+      return isAdminToken() || (
+        hasUserDoc() &&
+        afterExists &&
+        afterData is map &&
+        ('roomCreateCount' in afterData) &&
+        afterData.roomCreateCount is int &&
+        afterData.roomCreateCount == beforeCount + 1 &&
+        ('roomCreateLimit' in afterData) &&
+        afterData.roomCreateLimit is int &&
+        afterData.roomCreateLimit == beforeLimit &&
+        beforeLimit > 0 &&
+        beforeCount < beforeLimit
+      );
+    }
+
+    function isMultiplayerEntitled() {
+      return isSignedIn() && userPlan() in ['trial', 'support', 'supporter', 'pro'];
+    }
+
+    function roomExists(roomId) {
+      return exists(/databases/$(database)/documents/rooms/$(roomId));
+    }
+
+    function roomData(roomId) {
+      return get(/databases/$(database)/documents/rooms/$(roomId)).data;
+    }
+
+    function isRoomOwner(roomId) {
+      return isSignedIn() && roomExists(roomId) && roomData(roomId).ownerUid == request.auth.uid;
+    }
+
+    function isRoomMember(roomId) {
+      return isSignedIn() && roomExists(roomId) && (
+        roomData(roomId).ownerUid == request.auth.uid ||
+        exists(/databases/$(database)/documents/rooms/$(roomId)/players/$(request.auth.uid))
+      );
+    }
+
+    function canReadRoom(roomId) {
+      return isSignedIn() && roomExists(roomId) && (
+        roomData(roomId).visibility == 'public' ||
+        isRoomMember(roomId)
+      );
+    }
+
+    function roomAllowsChat(roomId) {
+      return roomExists(roomId) &&
+        roomData(roomId).rules is map &&
+        roomData(roomId).rules.allowChat == true;
+    }
+
+    function isRoomMod(roomId) {
+      return isSignedIn() &&
+        roomExists(roomId) &&
+        roomData(roomId).mods is map &&
+        roomData(roomId).mods[request.auth.uid] == true;
+    }
+
+    function canManageRoom(roomId) {
+      return isRoomOwner(roomId) || isRoomMod(roomId);
+    }
+
+    function validCityKey(cityKey) {
+      return cityKey is string &&
+        cityKey.size() <= 48 &&
+        (cityKey.size() == 0 || cityKey.matches('^[a-z0-9-]+$'));
+    }
+
+    function validLocationTag(locationTag, cityKey, worldKind) {
+      return locationTag is map &&
+        locationTag.keys().hasOnly(['label', 'city', 'cityKey', 'kind']) &&
+        locationTag.label is string &&
+        locationTag.label.size() > 0 &&
+        locationTag.label.size() <= 80 &&
+        locationTag.city is string &&
+        locationTag.city.size() > 0 &&
+        locationTag.city.size() <= 48 &&
+        locationTag.cityKey is string &&
+        locationTag.cityKey == cityKey &&
+        locationTag.kind in ['earth', 'moon', 'space'] &&
+        locationTag.kind == worldKind;
+    }
+
+    function validPaintTouchMode(mode) {
+      return mode in ['off', 'roof', 'any'];
+    }
+
+    function validRoomRulesData(rules) {
+      return rules is map &&
+        rules.keys().hasOnly([
+          'allowChat',
+          'allowGhosts',
+          'paintTimeLimitSec',
+          'paintTouchMode',
+          'allowPaintballGun',
+          'allowRoofAutoPaint'
+        ]) &&
+        rules.allowChat is bool &&
+        rules.allowGhosts is bool &&
+        rules.paintTimeLimitSec is int &&
+        rules.paintTimeLimitSec >= 30 &&
+        rules.paintTimeLimitSec <= 1800 &&
+        validPaintTouchMode(rules.paintTouchMode) &&
+        rules.allowPaintballGun is bool &&
+        rules.allowRoofAutoPaint is bool;
+    }
+
+    function validAnchorData(anchor) {
+      return anchor is map &&
+        anchor.keys().hasOnly(['kind', 'lat', 'lon', 'x', 'y', 'z']) &&
+        anchor.kind in ['earth', 'moon', 'space'] &&
+        anchor.lat is number &&
+        anchor.lon is number &&
+        anchor.x is number &&
+        anchor.y is number &&
+        anchor.z is number;
+    }
+
+    function validRoomCore(roomId) {
+      return canConsumeRoomCreateQuota() &&
+        request.resource.data.keys().hasOnly([
+          'code',
+          'createdAt',
+          'createdBy',
+          'name',
+          'visibility',
+          'maxPlayers',
+          'ownerUid',
+          'mods',
+          'featured',
+          'cityKey',
+          'locationTag',
+          'world',
+          'rules'
+        ]) &&
+        request.resource.data.code == roomId &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.ownerUid == request.auth.uid &&
+        request.resource.data.visibility in ['private', 'public'] &&
+        request.resource.data.maxPlayers is int &&
+        request.resource.data.maxPlayers >= 2 &&
+        request.resource.data.maxPlayers <= 32 &&
+        (!('featured' in request.resource.data) || request.resource.data.featured is bool) &&
+        (
+          !('featured' in request.resource.data) ||
+          request.resource.data.featured == false ||
+          request.resource.data.visibility == 'public'
+        ) &&
+        validCityKey(request.resource.data.cityKey) &&
+        (
+          request.resource.data.visibility != 'public' ||
+          (
+            request.resource.data.cityKey.size() > 0 &&
+            ('locationTag' in request.resource.data)
+          )
+        ) &&
+        request.resource.data.world is map &&
+        request.resource.data.world.keys().hasOnly(['kind', 'seed', 'lat', 'lon']) &&
+        request.resource.data.world.kind in ['earth', 'moon', 'space'] &&
+        request.resource.data.world.seed is string &&
+        request.resource.data.world.seed.size() <= 100 &&
+        request.resource.data.world.lat is number &&
+        request.resource.data.world.lon is number &&
+        validRoomRulesData(request.resource.data.rules) &&
+        (
+          !('locationTag' in request.resource.data) ||
+          validLocationTag(
+            request.resource.data.locationTag,
+            request.resource.data.cityKey,
+            request.resource.data.world.kind
+          )
+        ) &&
+        (!('name' in request.resource.data) ||
+          (request.resource.data.name is string && request.resource.data.name.size() <= 80)) &&
+        (!('mods' in request.resource.data) || request.resource.data.mods[request.auth.uid] == true);
+    }
+
+    function validRoomUpdate(roomId) {
+      return request.resource.data.keys().hasOnly([
+          'code',
+          'createdAt',
+          'createdBy',
+          'name',
+          'visibility',
+          'maxPlayers',
+          'ownerUid',
+          'mods',
+          'featured',
+          'cityKey',
+          'locationTag',
+          'world',
+          'rules'
+        ]) &&
+        request.resource.data.code == resource.data.code &&
+        request.resource.data.createdBy == resource.data.createdBy &&
+        request.resource.data.ownerUid == resource.data.ownerUid &&
+        request.resource.data.visibility in ['private', 'public'] &&
+        request.resource.data.maxPlayers is int &&
+        request.resource.data.maxPlayers >= 2 &&
+        request.resource.data.maxPlayers <= 32 &&
+        (!('featured' in request.resource.data) || request.resource.data.featured is bool) &&
+        (
+          !('featured' in request.resource.data) ||
+          request.resource.data.featured == false ||
+          request.resource.data.visibility == 'public'
+        ) &&
+        validCityKey(request.resource.data.cityKey) &&
+        (
+          request.resource.data.visibility != 'public' ||
+          (
+            request.resource.data.cityKey.size() > 0 &&
+            ('locationTag' in request.resource.data)
+          )
+        ) &&
+        request.resource.data.world is map &&
+        request.resource.data.world.keys().hasOnly(['kind', 'seed', 'lat', 'lon']) &&
+        request.resource.data.world.kind in ['earth', 'moon', 'space'] &&
+        request.resource.data.world.seed is string &&
+        request.resource.data.world.seed.size() <= 100 &&
+        request.resource.data.world.lat is number &&
+        request.resource.data.world.lon is number &&
+        validRoomRulesData(request.resource.data.rules) &&
+        (
+          !('locationTag' in request.resource.data) ||
+          validLocationTag(
+            request.resource.data.locationTag,
+            request.resource.data.cityKey,
+            request.resource.data.world.kind
+          )
+        ) &&
+        (!('name' in request.resource.data) ||
+          (request.resource.data.name is string && request.resource.data.name.size() <= 80));
+    }
+
+    function validPoseData(pose) {
+      return pose is map &&
+        pose.keys().hasOnly(['x', 'y', 'z', 'yaw', 'pitch', 'vx', 'vy', 'vz']) &&
+        pose.x is number &&
+        pose.y is number &&
+        pose.z is number &&
+        pose.yaw is number &&
+        pose.pitch is number &&
+        pose.vx is number &&
+        pose.vy is number &&
+        pose.vz is number;
+    }
+
+    function validFrameData(frame) {
+      return frame is map &&
+        frame.keys().hasOnly(['kind', 'locLat', 'locLon']) &&
+        frame.kind in ['earth', 'moon', 'space'] &&
+        frame.locLat is number &&
+        frame.locLon is number;
+    }
+
+    function validPlayerDoc(roomId, uid) {
+      return request.resource.data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'joinedAt',
+          'lastSeenAt',
+          'expiresAt',
+          'role',
+          'mode',
+          'frame',
+          'pose',
+          'joinCode'
+        ]) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() > 0 &&
+        request.resource.data.displayName.size() <= 48 &&
+        request.resource.data.joinedAt is timestamp &&
+        request.resource.data.lastSeenAt is timestamp &&
+        request.resource.data.expiresAt is timestamp &&
+        request.resource.data.role in ['owner', 'mod', 'member'] &&
+        request.resource.data.mode in ['drive', 'walk', 'drone', 'space', 'moon'] &&
+        validFrameData(request.resource.data.frame) &&
+        validPoseData(request.resource.data.pose) &&
+        (!('joinCode' in request.resource.data) ||
+          (request.resource.data.joinCode is string && request.resource.data.joinCode == roomData(roomId).code));
+    }
+
+    function canJoinByCode(roomId) {
+      return roomExists(roomId) &&
+        request.resource.data.joinCode is string &&
+        request.resource.data.joinCode == roomData(roomId).code;
+    }
+
+    function respectsPresenceWriteThrottle() {
+      return resource == null ||
+        !(resource.data.lastSeenAt is timestamp) ||
+        request.time > resource.data.lastSeenAt + duration.value(2, 's');
+    }
+
+    function validChatPayload() {
+      return request.resource.data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'text',
+          'createdAt',
+          'expiresAt',
+          'flags'
+        ]) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() > 0 &&
+        request.resource.data.displayName.size() <= 48 &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() > 0 &&
+        request.resource.data.text.size() <= 500 &&
+        !request.resource.data.text.matches('.*([Hh][Tt][Tt][Pp][Ss]?://|[Ww][Ww][Ww]\\.).*') &&
+        !request.resource.data.text.matches('.*[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}.*') &&
+        !request.resource.data.text.matches('.*[0-9][0-9 ()+-]{8,}[0-9].*') &&
+        !request.resource.data.text.matches('.*([Dd][Ii][Ss][Cc][Oo][Rr][Dd]|[Tt][Ee][Ll][Ee][Gg][Rr][Aa][Mm]|[Ss][Nn][Aa][Pp][Cc][Hh][Aa][Tt]|[Ww][Hh][Aa][Tt][Ss][Aa][Pp][Pp]|[Kk][Ii][Kk]).*') &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.expiresAt is timestamp &&
+        request.resource.data.expiresAt > request.time &&
+        request.resource.data.flags is map &&
+        request.resource.data.flags.keys().hasOnly(['reported', 'autoFiltered']) &&
+        request.resource.data.flags.reported == false &&
+        (!('autoFiltered' in request.resource.data.flags) ||
+          request.resource.data.flags.autoFiltered is bool);
+    }
+
+    function validChatStateData(stateData, uid) {
+      return stateData.keys().hasOnly([
+          'uid',
+          'lastMessageAt',
+          'windowStartedAt',
+          'windowCount',
+          'updatedAt',
+          'expiresAt'
+        ]) &&
+        stateData.uid == uid &&
+        stateData.lastMessageAt is timestamp &&
+        stateData.windowStartedAt is timestamp &&
+        stateData.windowCount is int &&
+        stateData.windowCount >= 1 &&
+        stateData.windowCount <= 5 &&
+        stateData.updatedAt is timestamp &&
+        stateData.expiresAt is timestamp;
+    }
+
+    function validChatStateTransition(roomId, uid) {
+      let statePath = /databases/$(database)/documents/rooms/$(roomId)/chatState/$(uid);
+      let afterExists = existsAfter(statePath);
+      let beforeExists = exists(statePath);
+      let afterData = afterExists ? getAfter(statePath).data : null;
+      let beforeData = beforeExists ? get(statePath).data : null;
+
+      return afterExists &&
+        validChatStateData(afterData, uid) &&
+        afterData.lastMessageAt == request.time &&
+        afterData.updatedAt == request.time &&
+        (
+          !beforeExists ?
+            afterData.windowCount == 1 &&
+            afterData.windowStartedAt == request.time
+          :
+            beforeData.lastMessageAt is timestamp &&
+            beforeData.windowStartedAt is timestamp &&
+            beforeData.windowCount is int &&
+            beforeData.windowCount >= 1 &&
+            request.time > beforeData.lastMessageAt + duration.value(2, 's') &&
+            (
+              request.time <= beforeData.windowStartedAt + duration.value(20, 's') ?
+                afterData.windowStartedAt == beforeData.windowStartedAt &&
+                afterData.windowCount == beforeData.windowCount + 1 &&
+                afterData.windowCount <= 5
+              :
+                afterData.windowStartedAt == request.time &&
+                afterData.windowCount == 1
+            )
+        );
+    }
+
+    function validChatCreate(roomId) {
+      return validChatPayload() &&
+        validChatStateTransition(roomId, request.auth.uid);
+    }
+
+    function validChatReportUpdate() {
+      return request.resource.data.uid == resource.data.uid &&
+        request.resource.data.displayName == resource.data.displayName &&
+        request.resource.data.text == resource.data.text &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.expiresAt == resource.data.expiresAt &&
+        request.resource.data.flags is map &&
+        request.resource.data.flags.keys().hasOnly([
+          'reported',
+          'autoFiltered',
+          'reportReason',
+          'reportedBy',
+          'reportedAt'
+        ]) &&
+        request.resource.data.flags.reported == true &&
+        (!('autoFiltered' in request.resource.data.flags) ||
+          request.resource.data.flags.autoFiltered is bool) &&
+        (!('reportReason' in request.resource.data.flags) ||
+          (request.resource.data.flags.reportReason is string &&
+            request.resource.data.flags.reportReason.size() <= 120)) &&
+        (!('reportedBy' in request.resource.data.flags) ||
+          request.resource.data.flags.reportedBy == request.auth.uid) &&
+        (!('reportedAt' in request.resource.data.flags) ||
+          request.resource.data.flags.reportedAt is timestamp);
+    }
+
+    function validUserSelfCreate(userId) {
+      return request.resource.data.keys().hasOnly([
+          'uid',
+          'email',
+          'displayName',
+          'createdAt',
+          'updatedAt',
+          'roomCreateCount',
+          'roomCreateLimit'
+        ]) &&
+        request.resource.data.uid == userId &&
+        request.resource.data.email is string &&
+        request.resource.data.email.size() <= 320 &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() <= 60 &&
+        (!('roomCreateCount' in request.resource.data) ||
+          (
+            request.resource.data.roomCreateCount is int &&
+            request.resource.data.roomCreateCount >= 0 &&
+            request.resource.data.roomCreateCount <= 10000
+          )) &&
+        (!('roomCreateLimit' in request.resource.data) ||
+          (
+            request.resource.data.roomCreateLimit is int &&
+            request.resource.data.roomCreateLimit >= 0 &&
+            request.resource.data.roomCreateLimit <= 10000
+          )) &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt is timestamp;
+    }
+
+    function userProtectedBillingFieldsUnchanged() {
+      return request.resource.data.plan == resource.data.plan &&
+        request.resource.data.subscriptionStatus == resource.data.subscriptionStatus &&
+        request.resource.data.trialStartsAt == resource.data.trialStartsAt &&
+        request.resource.data.trialEndsAt == resource.data.trialEndsAt &&
+        request.resource.data.trialConsumedAt == resource.data.trialConsumedAt &&
+        request.resource.data.entitlements == resource.data.entitlements &&
+        request.resource.data.stripeCustomerId == resource.data.stripeCustomerId &&
+        request.resource.data.stripeSubscriptionId == resource.data.stripeSubscriptionId &&
+        request.resource.data.billingCycleAnchorAt == resource.data.billingCycleAnchorAt &&
+        request.resource.data.cancelAtPeriodEnd == resource.data.cancelAtPeriodEnd;
+    }
+
+    function validRoomQuotaCountersOnSelfUpdate() {
+      let beforeCount = roomCreateCountFromData(resource.data);
+      let beforeLimit = roomCreateLimitFromData(resource.data);
+      let afterCount = roomCreateCountFromData(request.resource.data);
+      let afterLimit = roomCreateLimitFromData(request.resource.data);
+
+      return isAdminToken()
+        ? (
+            afterCount >= beforeCount &&
+            afterCount <= beforeCount + 1 &&
+            afterLimit >= beforeLimit &&
+            afterLimit <= 10000
+          )
+        : (
+            afterLimit == beforeLimit &&
+            afterCount >= beforeCount &&
+            afterCount <= beforeCount + 1
+          );
+    }
+
+    function validUserSelfUpdate(userId) {
+      let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
+
+      return changedKeys.hasOnly([
+          'uid',
+          'email',
+          'displayName',
+          'updatedAt',
+          'roomCreateCount',
+          'roomCreateLimit'
+        ]) &&
+        ('uid' in request.resource.data) &&
+        request.resource.data.uid == userId &&
+        (
+          !('uid' in resource.data) ||
+          request.resource.data.uid == resource.data.uid
+        ) &&
+        ('email' in request.resource.data) &&
+        request.resource.data.email is string &&
+        request.resource.data.email.size() <= 320 &&
+        ('displayName' in request.resource.data) &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() <= 60 &&
+        (!('roomCreateCount' in request.resource.data) ||
+          (
+            request.resource.data.roomCreateCount is int &&
+            request.resource.data.roomCreateCount >= 0 &&
+            request.resource.data.roomCreateCount <= 10000
+          )) &&
+        (!('roomCreateLimit' in request.resource.data) ||
+          (
+            request.resource.data.roomCreateLimit is int &&
+            request.resource.data.roomCreateLimit >= 0 &&
+            request.resource.data.roomCreateLimit <= 10000
+          )) &&
+        request.resource.data.updatedAt is timestamp &&
+        userProtectedBillingFieldsUnchanged() &&
+        validRoomQuotaCountersOnSelfUpdate();
+    }
+
+    function validFriendData(friendUid) {
+      return request.resource.data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'source',
+          'addedAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.uid == friendUid &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() > 0 &&
+        request.resource.data.displayName.size() <= 48 &&
+        request.resource.data.source in ['manual', 'recent'] &&
+        request.resource.data.addedAt is timestamp &&
+        request.resource.data.updatedAt is timestamp;
+    }
+
+    function validRecentPlayerData(otherUid) {
+      return request.resource.data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'roomCode',
+          'roomName',
+          'lastPlayedAt',
+          'sharedSessions',
+          'updatedAt',
+          'expiresAt'
+        ]) &&
+        request.resource.data.uid == otherUid &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() > 0 &&
+        request.resource.data.displayName.size() <= 48 &&
+        request.resource.data.roomCode is string &&
+        request.resource.data.roomCode.size() > 0 &&
+        request.resource.data.roomCode.size() <= 8 &&
+        request.resource.data.roomName is string &&
+        request.resource.data.roomName.size() <= 80 &&
+        request.resource.data.lastPlayedAt is timestamp &&
+        request.resource.data.sharedSessions is int &&
+        request.resource.data.sharedSessions >= 1 &&
+        request.resource.data.sharedSessions <= 5000 &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.expiresAt is timestamp;
+    }
+
+    function validSavedRoomWorld(world) {
+      return world is map &&
+        world.keys().hasOnly(['kind', 'seed', 'lat', 'lon']) &&
+        world.kind in ['earth', 'moon', 'space'] &&
+        world.seed is string &&
+        world.seed.size() <= 100 &&
+        world.lat is number &&
+        world.lon is number;
+    }
+
+    function validSavedRoomLocationTag(tag) {
+      return tag is map &&
+        tag.keys().hasOnly(['label', 'city', 'cityKey', 'kind']) &&
+        tag.label is string &&
+        tag.label.size() > 0 &&
+        tag.label.size() <= 80 &&
+        tag.city is string &&
+        tag.city.size() > 0 &&
+        tag.city.size() <= 48 &&
+        validCityKey(tag.cityKey) &&
+        tag.kind in ['earth', 'moon', 'space'];
+    }
+
+    function validMyRoomData(roomCode) {
+      return request.resource.data.keys().hasOnly([
+          'code',
+          'name',
+          'ownerUid',
+          'visibility',
+          'role',
+          'world',
+          'locationTag',
+          'createdAt',
+          'updatedAt',
+          'lastJoinedAt'
+        ]) &&
+        request.resource.data.code is string &&
+        request.resource.data.code == roomCode &&
+        request.resource.data.code.matches('^[A-Z0-9]{6}$') &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() <= 80 &&
+        request.resource.data.ownerUid is string &&
+        request.resource.data.ownerUid.size() <= 128 &&
+        request.resource.data.visibility in ['private', 'public'] &&
+        request.resource.data.role in ['owner', 'mod', 'member'] &&
+        validSavedRoomWorld(request.resource.data.world) &&
+        (!('locationTag' in request.resource.data) || validSavedRoomLocationTag(request.resource.data.locationTag)) &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.lastJoinedAt is timestamp;
+    }
+
+    function validInviteDocId(inviteId, senderUid, roomCode) {
+      return inviteId is string &&
+        inviteId.size() <= 96 &&
+        inviteId == senderUid + '_' + roomCode;
+    }
+
+    function validIncomingInviteCreate(userId, inviteId) {
+      return isMultiplayerEntitled() &&
+        request.resource.data.keys().hasOnly([
+          'fromUid',
+          'fromDisplayName',
+          'toUid',
+          'roomCode',
+          'roomName',
+          'inviteLink',
+          'message',
+          'seen',
+          'createdAt',
+          'updatedAt',
+          'expiresAt'
+        ]) &&
+        request.resource.data.fromUid == request.auth.uid &&
+        request.resource.data.toUid == userId &&
+        validInviteDocId(inviteId, request.auth.uid, request.resource.data.roomCode) &&
+        request.resource.data.fromDisplayName is string &&
+        request.resource.data.fromDisplayName.size() > 0 &&
+        request.resource.data.fromDisplayName.size() <= 48 &&
+        request.resource.data.roomCode is string &&
+        request.resource.data.roomCode.matches('^[A-Z0-9]{6}$') &&
+        request.resource.data.roomName is string &&
+        request.resource.data.roomName.size() <= 80 &&
+        request.resource.data.inviteLink is string &&
+        request.resource.data.inviteLink.size() > 0 &&
+        request.resource.data.inviteLink.size() <= 500 &&
+        request.resource.data.message is string &&
+        request.resource.data.message.size() <= 120 &&
+        request.resource.data.seen == false &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.expiresAt is timestamp &&
+        request.resource.data.expiresAt > request.time &&
+        roomExists(request.resource.data.roomCode) &&
+        isRoomMember(request.resource.data.roomCode) &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)/friends/$(userId));
+    }
+
+    function validIncomingInviteSeenUpdate(userId) {
+      return request.auth.uid == userId &&
+        request.resource.data.keys().hasOnly([
+          'fromUid',
+          'fromDisplayName',
+          'toUid',
+          'roomCode',
+          'roomName',
+          'inviteLink',
+          'message',
+          'seen',
+          'createdAt',
+          'updatedAt',
+          'expiresAt'
+        ]) &&
+        request.resource.data.fromUid == resource.data.fromUid &&
+        request.resource.data.fromDisplayName == resource.data.fromDisplayName &&
+        request.resource.data.toUid == resource.data.toUid &&
+        request.resource.data.toUid == userId &&
+        request.resource.data.roomCode == resource.data.roomCode &&
+        request.resource.data.roomName == resource.data.roomName &&
+        request.resource.data.inviteLink == resource.data.inviteLink &&
+        request.resource.data.message == resource.data.message &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.expiresAt == resource.data.expiresAt &&
+        request.resource.data.seen is bool &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.updatedAt == request.time;
+    }
+
+    function validIncomingInviteSenderUpdate(userId, inviteId) {
+      return isSignedIn() &&
+        isMultiplayerEntitled() &&
+        request.auth.uid == resource.data.fromUid &&
+        request.auth.uid != userId &&
+        request.resource.data.keys().hasOnly([
+          'fromUid',
+          'fromDisplayName',
+          'toUid',
+          'roomCode',
+          'roomName',
+          'inviteLink',
+          'message',
+          'seen',
+          'createdAt',
+          'updatedAt',
+          'expiresAt'
+        ]) &&
+        request.resource.data.fromUid == resource.data.fromUid &&
+        request.resource.data.toUid == resource.data.toUid &&
+        request.resource.data.toUid == userId &&
+        request.resource.data.roomCode == resource.data.roomCode &&
+        validInviteDocId(inviteId, request.auth.uid, request.resource.data.roomCode) &&
+        request.resource.data.fromDisplayName is string &&
+        request.resource.data.fromDisplayName.size() > 0 &&
+        request.resource.data.fromDisplayName.size() <= 48 &&
+        request.resource.data.roomName is string &&
+        request.resource.data.roomName.size() <= 80 &&
+        request.resource.data.inviteLink is string &&
+        request.resource.data.inviteLink.size() > 0 &&
+        request.resource.data.inviteLink.size() <= 500 &&
+        request.resource.data.message is string &&
+        request.resource.data.message.size() <= 120 &&
+        request.resource.data.seen == false &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.expiresAt is timestamp &&
+        request.resource.data.expiresAt > request.time &&
+        (!('updatedAt' in resource.data) ||
+          !(resource.data.updatedAt is timestamp) ||
+          request.time > resource.data.updatedAt + duration.value(30, 's')) &&
+        roomExists(request.resource.data.roomCode) &&
+        isRoomMember(request.resource.data.roomCode) &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)/friends/$(userId));
+    }
+
+    function validArtifactData() {
+      return request.resource.data.keys().hasOnly([
+          'ownerUid',
+          'ownerDisplayName',
+          'type',
+          'title',
+          'text',
+          'visibility',
+          'anchor',
+          'createdAt',
+          'updatedAt',
+          'expiresAt'
+        ]) &&
+        request.resource.data.ownerUid is string &&
+        request.resource.data.ownerUid.size() > 0 &&
+        request.resource.data.ownerDisplayName is string &&
+        request.resource.data.ownerDisplayName.size() > 0 &&
+        request.resource.data.ownerDisplayName.size() <= 48 &&
+        request.resource.data.type in ['pin', 'build-area', 'landmark', 'memory-board'] &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() > 0 &&
+        request.resource.data.title.size() <= 80 &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() <= 280 &&
+        request.resource.data.visibility in ['room', 'public'] &&
+        validAnchorData(request.resource.data.anchor) &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt is timestamp &&
+        (!('expiresAt' in request.resource.data) || request.resource.data.expiresAt is timestamp);
+    }
+
+    function validArtifactUpdate() {
+      return validArtifactData() &&
+        request.resource.data.ownerUid == resource.data.ownerUid &&
+        request.resource.data.ownerDisplayName == resource.data.ownerDisplayName &&
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function validRoomBlockId(blockId) {
+      return blockId is string &&
+        blockId.size() > 0 &&
+        blockId.size() <= 64 &&
+        blockId.matches('^-?[0-9]+_-?[0-9]+_-?[0-9]+$');
+    }
+
+    function validRoomBlockData(blockId) {
+      return validRoomBlockId(blockId) &&
+        request.resource.data.keys().hasOnly([
+          'id',
+          'gx',
+          'gy',
+          'gz',
+          'materialIndex',
+          'createdBy',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.id is string &&
+        request.resource.data.id == blockId &&
+        request.resource.data.gx is int &&
+        request.resource.data.gx >= -50000 &&
+        request.resource.data.gx <= 50000 &&
+        request.resource.data.gy is int &&
+        request.resource.data.gy >= -50000 &&
+        request.resource.data.gy <= 50000 &&
+        request.resource.data.gz is int &&
+        request.resource.data.gz >= -50000 &&
+        request.resource.data.gz <= 50000 &&
+        request.resource.data.materialIndex is int &&
+        request.resource.data.materialIndex >= 0 &&
+        request.resource.data.materialIndex <= 64 &&
+        request.resource.data.createdBy == request.auth.uid &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.updatedAt == request.time;
+    }
+
+    function validRoomBlockUpdate(blockId) {
+      return validRoomBlockData(blockId) &&
+        request.resource.data.createdBy == resource.data.createdBy;
+    }
+
+    function validPaintClaimId(claimId) {
+      return claimId is string &&
+        claimId.size() > 0 &&
+        claimId.size() <= 120 &&
+        claimId.matches('^[A-Za-z0-9._-]+$');
+    }
+
+    function validPaintClaimData(claimId) {
+      return validPaintClaimId(claimId) &&
+        request.resource.data.keys().hasOnly([
+          'key',
+          'colorHex',
+          'colorName',
+          'method',
+          'uid',
+          'displayName',
+          'updatedAt',
+          'expiresAt'
+        ]) &&
+        request.resource.data.key is string &&
+        request.resource.data.key.size() > 0 &&
+        request.resource.data.key.size() <= 120 &&
+        request.resource.data.colorHex is string &&
+        request.resource.data.colorHex.matches('^#[0-9A-Fa-f]{6}$') &&
+        request.resource.data.colorName is string &&
+        request.resource.data.colorName.size() > 0 &&
+        request.resource.data.colorName.size() <= 24 &&
+        request.resource.data.method in ['roof', 'touch-roof', 'touch-any', 'gun'] &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() > 0 &&
+        request.resource.data.displayName.size() <= 48 &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.updatedAt == request.time &&
+        request.resource.data.expiresAt is timestamp &&
+        request.resource.data.expiresAt > request.time;
+    }
+
+    function validPaintClaimUpdate(claimId) {
+      return validPaintClaimData(claimId) &&
+        request.resource.data.key == resource.data.key;
+    }
+
+    function validHomeBaseData() {
+      return request.resource.data.keys().hasOnly([
+          'name',
+          'description',
+          'anchor',
+          'createdAt',
+          'updatedAt',
+          'updatedBy'
+        ]) &&
+        request.resource.data.name is string &&
+        request.resource.data.name.size() > 0 &&
+        request.resource.data.name.size() <= 80 &&
+        request.resource.data.description is string &&
+        request.resource.data.description.size() <= 240 &&
+        validAnchorData(request.resource.data.anchor) &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.updatedBy == request.auth.uid;
+    }
+
+    function validHomeBaseUpdate() {
+      return validHomeBaseData() &&
+        request.resource.data.createdAt == resource.data.createdAt;
+    }
+
+    function validActivityEntry() {
+      return request.resource.data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'type',
+          'roomCode',
+          'roomName',
+          'cityKey',
+          'text',
+          'createdAt',
+          'expiresAt'
+        ]) &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() > 0 &&
+        request.resource.data.displayName.size() <= 48 &&
+        request.resource.data.type in [
+          'room-created',
+          'room-joined',
+          'artifact-added',
+          'home-base-updated',
+          'friend-added'
+        ] &&
+        request.resource.data.roomCode is string &&
+        request.resource.data.roomCode.size() <= 8 &&
+        request.resource.data.roomName is string &&
+        request.resource.data.roomName.size() <= 80 &&
+        validCityKey(request.resource.data.cityKey) &&
+        request.resource.data.text is string &&
+        request.resource.data.text.size() <= 140 &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.createdAt == request.time &&
+        request.resource.data.expiresAt is timestamp &&
+        request.resource.data.expiresAt > request.time;
+    }
+
+    function validExplorerLeaderboardCreate(uid) {
+      return request.resource.data.keys().hasOnly([
+          'uid',
+          'displayName',
+          'roomsJoined',
+          'artifactsShared',
+          'friendsAdded',
+          'score',
+          'lastActiveAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.uid == uid &&
+        request.resource.data.displayName is string &&
+        request.resource.data.displayName.size() > 0 &&
+        request.resource.data.displayName.size() <= 48 &&
+        request.resource.data.roomsJoined is int &&
+        request.resource.data.roomsJoined >= 0 &&
+        request.resource.data.roomsJoined <= 500000 &&
+        request.resource.data.artifactsShared is int &&
+        request.resource.data.artifactsShared >= 0 &&
+        request.resource.data.artifactsShared <= 500000 &&
+        request.resource.data.friendsAdded is int &&
+        request.resource.data.friendsAdded >= 0 &&
+        request.resource.data.friendsAdded <= 500000 &&
+        request.resource.data.score is int &&
+        request.resource.data.score >= 0 &&
+        request.resource.data.score <= 5000000 &&
+        request.resource.data.lastActiveAt is timestamp &&
+        request.resource.data.updatedAt is timestamp;
+    }
+
+    function validExplorerLeaderboardUpdate(uid) {
+      return validExplorerLeaderboardCreate(uid) &&
+        request.resource.data.lastActiveAt == request.time &&
+        request.resource.data.updatedAt == request.time &&
+        (
+          !(resource.data.updatedAt is timestamp) ||
+          request.time > resource.data.updatedAt + duration.value(1, 's')
+        ) &&
+        request.resource.data.roomsJoined >= resource.data.roomsJoined &&
+        request.resource.data.roomsJoined <= resource.data.roomsJoined + 1 &&
+        request.resource.data.artifactsShared >= resource.data.artifactsShared &&
+        request.resource.data.artifactsShared <= resource.data.artifactsShared + 2 &&
+        request.resource.data.friendsAdded >= resource.data.friendsAdded &&
+        request.resource.data.friendsAdded <= resource.data.friendsAdded + 1 &&
+        request.resource.data.score >= resource.data.score &&
+        request.resource.data.score <= resource.data.score + 20;
+    }
+
+    match /users/{userId} {
+      allow read: if isSelf(userId);
+      allow create: if isSelf(userId) && validUserSelfCreate(userId);
+      allow update: if isSelf(userId) && validUserSelfUpdate(userId);
+      allow delete: if false;
+
+      match /friends/{friendUid} {
+        allow read: if isSelf(userId);
+        allow create: if isSelf(userId) && validFriendData(friendUid);
+        allow update: if isSelf(userId) &&
+          validFriendData(friendUid) &&
+          request.resource.data.uid == resource.data.uid &&
+          request.resource.data.addedAt == resource.data.addedAt;
+        allow delete: if isSelf(userId);
+      }
+
+      match /recentPlayers/{otherUid} {
+        allow read: if isSelf(userId);
+        allow create: if isSelf(userId) && validRecentPlayerData(otherUid);
+        allow update: if isSelf(userId) &&
+          validRecentPlayerData(otherUid) &&
+          request.resource.data.uid == resource.data.uid &&
+          request.resource.data.sharedSessions >= resource.data.sharedSessions &&
+          request.resource.data.sharedSessions <= resource.data.sharedSessions + 1;
+        allow delete: if isSelf(userId);
+      }
+
+      match /incomingInvites/{inviteId} {
+        allow read: if isSelf(userId);
+        allow create: if isSignedIn() &&
+          request.auth.uid != userId &&
+          validIncomingInviteCreate(userId, inviteId);
+        allow update: if validIncomingInviteSeenUpdate(userId) ||
+          validIncomingInviteSenderUpdate(userId, inviteId);
+        allow delete: if isSelf(userId) || request.auth.uid == resource.data.fromUid;
+      }
+
+      match /myRooms/{roomCode} {
+        allow read: if isSelf(userId);
+        allow create: if isSelf(userId) && validMyRoomData(roomCode);
+        allow update: if isSelf(userId) &&
+          validMyRoomData(roomCode) &&
+          request.resource.data.code == resource.data.code &&
+          request.resource.data.createdAt == resource.data.createdAt;
+        allow delete: if isSelf(userId);
+      }
+    }
+
+    match /flowerLeaderboard/{entryId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    match /paintTownLeaderboard/{entryId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    match /activityFeed/{entryId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && validActivityEntry();
+      allow update, delete: if false;
+    }
+
+    match /explorerLeaderboard/{uid} {
+      allow read: if true;
+      allow create: if isSelf(uid) && validExplorerLeaderboardCreate(uid);
+      allow update: if isSelf(uid) && validExplorerLeaderboardUpdate(uid);
+      allow delete: if false;
+    }
+
+    match /rooms/{roomId} {
+      allow read: if canReadRoom(roomId);
+      allow create: if isMultiplayerEntitled() && validRoomCore(roomId);
+      allow update: if isMultiplayerEntitled() && isRoomOwner(roomId) && validRoomUpdate(roomId);
+      allow delete: if isSignedIn() && isRoomOwner(roomId);
+
+      match /players/{uid} {
+        allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
+        allow create: if isMultiplayerEntitled() &&
+          isSelf(uid) &&
+          roomExists(roomId) &&
+          validPlayerDoc(roomId, uid) &&
+          (
+            isRoomOwner(roomId) ||
+            roomData(roomId).visibility == 'public' ||
+            canJoinByCode(roomId)
+          );
+        allow update: if isMultiplayerEntitled() &&
+          isSelf(uid) &&
+          isRoomMember(roomId) &&
+          validPlayerDoc(roomId, uid) &&
+          request.resource.data.role == resource.data.role &&
+          request.resource.data.joinedAt == resource.data.joinedAt &&
+          respectsPresenceWriteThrottle();
+        allow delete: if isMultiplayerEntitled() && (isSelf(uid) || isRoomOwner(roomId));
+      }
+
+      match /artifacts/{artifactId} {
+        allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
+        allow create: if isMultiplayerEntitled() &&
+          isRoomMember(roomId) &&
+          request.resource.data.ownerUid == request.auth.uid &&
+          validArtifactData();
+        allow update: if isMultiplayerEntitled() &&
+          isRoomMember(roomId) &&
+          validArtifactUpdate() &&
+          (request.auth.uid == resource.data.ownerUid || canManageRoom(roomId));
+        allow delete: if isMultiplayerEntitled() &&
+          isRoomMember(roomId) &&
+          (request.auth.uid == resource.data.ownerUid || canManageRoom(roomId));
+      }
+
+      match /blocks/{blockId} {
+        allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
+        allow create: if isMultiplayerEntitled() &&
+          isRoomMember(roomId) &&
+          validRoomBlockData(blockId);
+        allow update: if isMultiplayerEntitled() &&
+          isRoomMember(roomId) &&
+          resource.data.createdBy == request.auth.uid &&
+          validRoomBlockUpdate(blockId);
+        allow delete: if isMultiplayerEntitled() &&
+          isRoomMember(roomId) &&
+          (resource.data.createdBy == request.auth.uid || canManageRoom(roomId));
+      }
+
+      match /paintClaims/{claimId} {
+        allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
+        allow create: if isMultiplayerEntitled() &&
+          isRoomMember(roomId) &&
+          validPaintClaimData(claimId);
+        allow update: if isMultiplayerEntitled() &&
+          isRoomMember(roomId) &&
+          request.auth.uid == resource.data.uid &&
+          validPaintClaimUpdate(claimId);
+        allow delete: if false;
+      }
+
+      match /state/{stateId} {
+        allow read: if isMultiplayerEntitled() && canReadRoom(roomId);
+        allow create: if isMultiplayerEntitled() &&
+          stateId == 'homeBase' &&
+          canManageRoom(roomId) &&
+          validHomeBaseData();
+        allow update: if isMultiplayerEntitled() &&
+          stateId == 'homeBase' &&
+          canManageRoom(roomId) &&
+          validHomeBaseUpdate();
+        allow delete: if false;
+      }
+
+      match /chat/{msgId} {
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId) && roomAllowsChat(roomId);
+        allow create: if isMultiplayerEntitled() &&
+          isRoomMember(roomId) &&
+          roomAllowsChat(roomId) &&
+          validChatCreate(roomId);
+        allow update: if isMultiplayerEntitled() && isRoomMember(roomId) && validChatReportUpdate();
+        allow delete: if false;
+      }
+
+      match /chatState/{uid} {
+        allow read: if isMultiplayerEntitled() && isRoomMember(roomId);
+        allow create, update: if isMultiplayerEntitled() &&
+          isSelf(uid) &&
+          isRoomMember(roomId) &&
+          validChatStateTransition(roomId, uid);
+        allow delete: if false;
+      }
+    }
+  }
+}

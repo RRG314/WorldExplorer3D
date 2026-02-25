@@ -1,164 +1,154 @@
 # User Guide
 
-Last reviewed: 2026-02-19
+Last reviewed: 2026-02-25
 
-This guide is for players and subscribers using the hosted World Explorer experience.
+This guide explains current player-facing behavior across app, multiplayer, and account features.
 
-## 1. Where to Start
+## 1. Sign In and Navigation
 
-Firebase-hosted URLs:
+Main routes:
 
-- Landing page: `https://worldexplorer3d-d9b83.web.app/`
-- Play runtime: `https://worldexplorer3d-d9b83.web.app/app/`
-- Account/billing: `https://worldexplorer3d-d9b83.web.app/account/`
+- App: `/app/`
+- Account: `/account/`
+- About: `/about/`
 
-GitHub Pages URLs:
+Use `Sign In / Sign Up` to authenticate with Email/Password or Google.
 
-- Branch-root mode: `https://rrg314.github.io/WorldExplorer/` (root runtime)
-- `public/` mode (if configured): `https://rrg314.github.io/WorldExplorer/app/` and `.../account/`
+## 2. Plans, Trial, and Multiplayer Access
 
-## 2. Sign In and Trial
+- `Free`: single-player only, multiplayer locked
+- `Trial` (2 days): multiplayer enabled temporarily, room limit `3`
+- `Supporter`: multiplayer enabled, room limit `3`
+- `Pro`: multiplayer enabled, room limit `10`
 
-On `/app/`, use the top-left `Sign In / Sign Up` button.
+Invite flow behavior:
 
-Available login methods:
+- existing multiplayer-enabled users go straight to room join
+- free users can start trial from invite and then join
 
-- Email/password
-- Google
+## 3. Account Page Features
 
-Trial behavior:
+The account page includes:
 
-- First successful sign-in creates a 2-day trial automatically
-- Trial is no-card-required
-- Trial gives full access equivalent to Supporter, without Pro-only perks
+- plan and trial status
+- room quota (`created / limit`)
+- extras card
+- admin status (allowlisted accounts only)
+- username update
+- linked email + verification state
+- account UID + auth providers
+- billing portal and receipt list
+- friends list and incoming invites
+- close account (permanent delete with confirmation and recent-sign-in safety check)
 
-## 3. Plan Levels
+## 4. Friends and Invites
 
-### Free
+1. Add friend by UID.
+2. Enter room code and optional message.
+3. Send invite.
+4. Invitee opens join action and enters app multiplayer tab with room code prefilled.
 
-- Core exploration available
-- Cloud sync disabled
-- Pro-only controls hidden/locked
+You can remove friends and dismiss invites.
 
-### Supporter ($1/month)
+## 5. Multiplayer Rooms
 
-- Full app access
-- Cloud sync entitlement enabled
-- Supports ongoing development
+### Create room
 
-### Pro ($5/month)
+In `Multiplayer` tab:
 
-- Everything in Supporter
-- Early-access demo controls
-- Priority contact/feature consideration entitlements
+- choose visibility (`Private` or `Public`)
+- optional room name
+- optional location tag
+- click `Create`
 
-## 4. Upgrading and Billing
+### Join room
 
-Use `/account/` to:
+- enter 6-character code and click `Join`
+- or open invite link with `?room=AB12CD`
 
-- upgrade to Supporter
-- upgrade to Pro
-- open Stripe billing portal
-- sign out
+### Save/open/delete room
 
-Checkout flow:
+Saved room behavior:
 
-1. click upgrade button
-2. app redirects to Stripe Checkout
-3. complete purchase
-4. Stripe webhook updates your plan in Firestore
-5. account page reflects new plan
+- rooms you create or join are saved under your account (`users/{uid}/myRooms/{roomCode}`)
+- use `Open` on saved room list to return to that room
+- if you are owner, `Delete` permanently removes the room document
+- room documents persist until owner deletion (TTL does not delete room docs)
 
-## 5. In-App UI Notes
+### Leave room
 
-### Auth button
+- `Leave` exits active room and stops your presence heartbeat
 
-- Top-left floating button opens auth/account panel on title screen
-- Clicking outside closes the panel
-- During gameplay, the auth/account button is hidden
+## 6. Multiplayer Data Lifetime
 
-### Pro panel
+Persistent until explicit delete:
 
-- Non-Pro users see the Pro info panel briefly on load
-- Panel auto-hides after a few seconds
-- Pro users keep access to Pro controls
+- room docs
+- saved room shortcuts (`myRooms`)
+- room settings
+- shared blocks
+- paint claims
+- home base state
 
-### Graphics settings
+TTL-managed cleanup:
 
-- Open `Settings` on the title screen
-- `Photoreal Buildings (Beta)` toggles enhanced building materials
-- Setting is stored in browser local storage (`worldExplorerPhotorealBuildings`)
-- If changed before starting, it applies on next `Explore`
+- `players`
+- `chat`
+- `chatState`
+- `incomingInvites`
+- `recentPlayers`
+- `activityFeed`
+- `artifacts`
 
-## 6. Gameplay Controls
+## 7. Chat and Safety
 
-### Game Modes (Title Screen -> Game Mode)
+Chat protections:
 
-- Free Roam: open exploration with no objective timer
-- Time Trial: reach destination before timer expires
-- Checkpoints: collect all checkpoints as quickly as possible
-- Paint the Town Red: 2-minute rooftop challenge; score is buildings painted
-- Police Chase: starts with police pursuit enabled
-- Find the Flower: starts the red-flower challenge immediately
+- max message length: 500
+- duplicate suppression window
+- client and server cooldown + burst limits
+- links/contact handles blocked
+- profanity masking
+- report action writes report flags
 
-### Desktop
+## 8. Paint the Town
 
-- Move/drive: `WASD` or arrows
-- Brake/space actions: `Space`
-- Boost/sprint: `Ctrl` or `Shift` depending on mode
-- Toggle walk: `F`
-- Toggle drone: `6`
-- Large map: `M`
-- Pause: `Esc`
+Key behavior:
 
-### Touch/Mobile
+- choose color, claim buildings by touch or paintball gun
+- paintballs follow projectile arc with gravity
+- paint splats auto-expire for performance
+- minimal HUD collapsed by default (`Time`, `Painted`) and expandable for details
 
-Mode-specific touch controls are shown automatically:
+Controls:
+
+- fire paintball: `Ctrl` (also `G` / `P`)
+- choose color: `1-6`
+- toggle tool: `T`
+- left click/tap paints according to active tool and room rules
+
+## 9. Camera and Input Basics
+
+- right-click or middle-click hold: camera look
+- double-left-click camera toggle: disabled
+
+For full control mapping by mode, see `CONTROLS_REFERENCE.md`.
+
+## 10. Mobile Behavior
+
+Mobile controls provide virtual pads and action buttons for:
 
 - driving
 - walking
 - drone
-- rocket/space flight
+- rocket
 
-Desktop is still recommended for highest performance.
+Mobile and desktop share the same gameplay systems and multiplayer state.
 
-## 7. Challenges, Build Mode, and Memories
+## 11. Troubleshooting
 
-- Red-flower challenge supports leaderboard entries (best time).
-- Paint challenge supports leaderboard entries (most buildings painted in 2:00).
-- Challenge panel includes both `Flower` and `Paint` leaderboard tabs.
-- Leaderboards use Firestore when available, with local fallback when unavailable.
-- Build mode supports click-based block placement on world surfaces.
-- Cars collide with placed blocks.
-- Walking character collides with block sides and can stand on top of blocks.
-- Memory markers and several user settings rely on browser storage.
-
-## 8. Privacy and Terms
-
-Required legal pages:
-
-- Privacy: `/legal/privacy`
-- Terms: `/legal/terms`
-
-## 9. Troubleshooting
-
-### Sign-in panel opens but login fails
-
-Likely Auth provider disabled in Firebase project.
-
-### Upgrade button says checkout session failed
-
-Usually Stripe config mismatch (key mode, invalid key, or missing price IDs).
-
-### Plan does not update after payment
-
-Webhook may not be configured correctly.
-
-### Dangerous site warning in browser
-
-If this appears, do not enter credentials until verified in Search Console/Safe Browsing review and domain reputation checks.
-
-## 10. Support Path
-
-- Pro users get priority contact links from in-app/account surfaces.
-- Feature suggestions can be submitted through the configured issue/contact channels.
+- If `Create`/`Join` does nothing, hard refresh and verify current user is signed in.
+- If room actions fail with permissions, confirm deployed Firestore rules and active plan/trial.
+- If saved room `Open` fails, confirm the room code exists and owner has not deleted the room.
+- If invites fail, verify friend relationship exists first.
+- If billing/receipts are missing, refresh account data and inspect function logs.
