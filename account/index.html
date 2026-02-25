@@ -401,7 +401,7 @@
           <p id="extrasLabel" class="value">Locked</p>
           <p id="extrasDetail" class="hint">Upcoming demo: Mars Rover.</p>
         </article>
-        <article class="status-item">
+        <article class="status-item" id="adminStatusCard" hidden>
           <span class="label">Admin Access</span>
           <p id="adminAccessLabel" class="value">Off</p>
           <p id="adminAccessDetail" class="hint">Allowlist-protected test admin mode.</p>
@@ -572,6 +572,7 @@
     const roomQuotaDetail = document.getElementById('roomQuotaDetail');
     const extrasLabel = document.getElementById('extrasLabel');
     const extrasDetail = document.getElementById('extrasDetail');
+    const adminStatusCard = document.getElementById('adminStatusCard');
     const adminAccessLabel = document.getElementById('adminAccessLabel');
     const adminAccessDetail = document.getElementById('adminAccessDetail');
     const friendUidInput = document.getElementById('friendUidInput');
@@ -644,6 +645,18 @@
         if (!btn) return;
         btn.disabled = busy;
       });
+    }
+
+    function syncAdminUiVisibility(isAdmin, adminTesterEligible) {
+      const hasAdminVisibility = isAdmin === true || adminTesterEligible === true;
+      if (adminStatusCard) {
+        adminStatusCard.hidden = !hasAdminVisibility;
+      }
+      if (enableAdminBtn) {
+        enableAdminBtn.hidden = !adminTesterEligible;
+        enableAdminBtn.disabled = isAdmin;
+        enableAdminBtn.textContent = isAdmin ? 'Admin Access Active' : 'Enable Admin Test Access';
+      }
     }
 
     function formatDateTime(ms) {
@@ -935,11 +948,7 @@
         ? 'Admin test access is active on this account.'
         : 'Allowlist-protected test admin mode.';
       currentAdminTesterEligible = adminTesterEligible;
-      if (enableAdminBtn) {
-        enableAdminBtn.hidden = !adminTesterEligible;
-        enableAdminBtn.disabled = isAdmin;
-        enableAdminBtn.textContent = isAdmin ? 'Admin Access Active' : 'Enable Admin Test Access';
-      }
+      syncAdminUiVisibility(isAdmin, adminTesterEligible);
     }
 
     function renderSignedOutState() {
@@ -957,10 +966,7 @@
         setStatus('Sign in to manage your account.', 'neutral');
       }
       currentAdminTesterEligible = false;
-      if (enableAdminBtn) {
-        enableAdminBtn.hidden = true;
-        enableAdminBtn.disabled = false;
-      }
+      syncAdminUiVisibility(false, false);
     }
 
     function applyPlanUi(state) {
@@ -1003,11 +1009,7 @@
       upgradeSupporterBtn.disabled = adminMode || state.plan === 'supporter' || state.plan === 'pro';
       upgradeProBtn.disabled = adminMode || state.plan === 'pro';
       manageBillingBtn.disabled = adminMode || !(state.stripeCustomerId || state.plan === 'supporter' || state.plan === 'pro');
-      if (enableAdminBtn) {
-        enableAdminBtn.hidden = !currentAdminTesterEligible;
-        enableAdminBtn.disabled = adminMode;
-        enableAdminBtn.textContent = adminMode ? 'Admin Access Active' : 'Enable Admin Test Access';
-      }
+      syncAdminUiVisibility(adminMode, currentAdminTesterEligible);
       renderInvites(currentInvites);
     }
 

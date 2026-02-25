@@ -1465,3 +1465,11 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Updated entitlements parsing (`js/entitlements.js` + mirrored `public/js/entitlements.js`) to read `trialEndsAtMs` when `trialEndsAt` is absent.
   - Added rules regression: trial user with only `trialEndsAtMs` can create a room with quota increment.
   - Deployed `firestore:rules` and `functions:startTrial` to `worldexplorer3d-d9b83`.
+
+- Admin test visibility hardening pass (2026-02-25):
+  - Updated `/account/index.html` and `/public/account/index.html` so `Admin Access` card is hidden by default and shown only when `isAdmin` or `adminTesterEligible` is true.
+  - Added `syncAdminUiVisibility(isAdmin, adminTesterEligible)` helper to keep status card and `Enable Admin Test Access` button state consistent across overview, plan updates, and signed-out state.
+  - Regression checks:
+    - `npm run test` passed (`36/36` Firestore security tests).
+    - Direct Playwright DOM check passed for signed-out state (`adminCardHidden=true`, `adminBtnHidden=true`, no console errors).
+    - Artifact: `output/playwright/account-admin-visibility/report.json` + `output/playwright/account-admin-visibility/account-signed-out.png`.
