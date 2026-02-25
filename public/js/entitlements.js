@@ -170,7 +170,7 @@ function normalizeProfile(uid, raw = {}, options = {}) {
     stripeCustomerId: raw.stripeCustomerId || null,
     stripeSubscriptionId: raw.stripeSubscriptionId || null,
     trialEndsAt: raw.trialEndsAt || null,
-    trialEndsAtMs: timestampToMillis(raw.trialEndsAt),
+    trialEndsAtMs: timestampToMillis(raw.trialEndsAt) || timestampToMillis(raw.trialEndsAtMs),
     roomCreateCount,
     roomCreateLimit,
     entitlements,

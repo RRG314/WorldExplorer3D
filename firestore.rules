@@ -42,6 +42,10 @@ service cloud.firestore {
           (
             data.trialEndsAt is number &&
             request.time.toMillis() < data.trialEndsAt
+          ) ||
+          (
+            data.trialEndsAtMs is number &&
+            request.time.toMillis() < data.trialEndsAtMs
           )
         );
     }

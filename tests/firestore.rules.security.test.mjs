@@ -392,6 +392,37 @@ await runCheck('trial user with legacy numeric trialEndsAt can create room with 
   await assertSucceeds(batch.commit());
 });
 
+await runCheck('trial user with legacy trialEndsAtMs can create room with quota increment', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    const nowMs = Date.now();
+    await setDoc(doc(db, 'users', OWNER_UID), {
+      plan: 'trial',
+      subscriptionStatus: 'none',
+      trialStartsAt: Timestamp.fromMillis(nowMs - 30_000),
+      trialEndsAt: null,
+      trialEndsAtMs: nowMs + 24 * 60 * 60 * 1000,
+      trialConsumedAt: Timestamp.fromMillis(nowMs - 30_000),
+      entitlements: {
+        multiplayer: true,
+        earlyAccess: false
+      },
+      roomCreateCount: 0,
+      roomCreateLimit: 3
+    }, { merge: true });
+  });
+
+  const roomCode = 'QT12AM';
+  const batch = writeBatch(ownerDb);
+  batch.set(doc(ownerDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID));
+  batch.set(doc(ownerDb, 'users', OWNER_UID), {
+    roomCreateCount: 1,
+    roomCreateLimit: 3,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await assertSucceeds(batch.commit());
+});
+
 await runCheck('owner can create room when profile includes legacy fields', async () => {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();

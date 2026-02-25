@@ -1459,3 +1459,9 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `npm run test:rules` passes (35/35).
     - `node --check` passes for updated JS files.
     - Ran develop-web-game Playwright client smoke (`output/web-game/trial-room-fix*`); capture remains black in this headless WebGL environment, with no new console/page error artifacts emitted.
+- Trial legacy-compat follow-up (2026-02-25):
+  - Extended trial entitlement compatibility to accept legacy `trialEndsAtMs` in Firestore rules.
+  - Updated `startTrial` Cloud Function to normalize from `trialEndsAtMs`/`trialConsumedAtMs` fallback fields.
+  - Updated entitlements parsing (`js/entitlements.js` + mirrored `public/js/entitlements.js`) to read `trialEndsAtMs` when `trialEndsAt` is absent.
+  - Added rules regression: trial user with only `trialEndsAtMs` can create a room with quota increment.
+  - Deployed `firestore:rules` and `functions:startTrial` to `worldexplorer3d-d9b83`.

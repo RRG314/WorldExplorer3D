@@ -622,8 +622,8 @@ exports.startTrial = functions.region('us-central1').https.onRequest(async (req,
 
     const existingPlan = normalizePlan(existing.plan);
     const subscriptionStatus = String(existing.subscriptionStatus || 'none');
-    const trialEndsAtMs = timestampToMillis(existing.trialEndsAt);
-    const trialConsumedAtMs = timestampToMillis(existing.trialConsumedAt);
+    const trialEndsAtMs = timestampToMillis(existing.trialEndsAt) || timestampToMillis(existing.trialEndsAtMs);
+    const trialConsumedAtMs = timestampToMillis(existing.trialConsumedAt) || timestampToMillis(existing.trialConsumedAtMs);
 
     if (existingPlan === 'supporter' || existingPlan === 'pro' || hasActiveSubscription(subscriptionStatus)) {
       res.status(200).json({
