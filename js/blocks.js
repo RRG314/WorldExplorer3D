@@ -22,6 +22,7 @@ let buildPersistenceEnabled = false;
 let buildPersistenceDetail = 'Not initialized.';
 let buildEntries = [];
 let buildIndicatorResetTimer = null;
+let lastTouchLikePlacement = null;
 
 const buildBlocks = new Map();
 const buildColumns = new Map();
@@ -240,6 +241,48 @@ function getBuildRaycaster() {
     buildRaycaster.far = 1200;
   }
   return buildRaycaster;
+}
+
+function getEventClientPoint(event) {
+  if (!event) return null;
+  if (Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
+    return { x: event.clientX, y: event.clientY };
+  }
+  const changed = event.changedTouches;
+  if (changed && changed.length > 0) {
+    const touch = changed[0];
+    if (touch && Number.isFinite(touch.clientX) && Number.isFinite(touch.clientY)) {
+      return { x: touch.clientX, y: touch.clientY };
+    }
+  }
+  const touches = event.touches;
+  if (touches && touches.length > 0) {
+    const touch = touches[0];
+    if (touch && Number.isFinite(touch.clientX) && Number.isFinite(touch.clientY)) {
+      return { x: touch.clientX, y: touch.clientY };
+    }
+  }
+  return null;
+}
+
+function isTouchLikeBuildEvent(event) {
+  if (!event) return false;
+  if (event.source === 'touch') return true;
+  if (event.pointerType && event.pointerType !== 'mouse') return true;
+  const type = typeof event.type === 'string' ? event.type : '';
+  return type.startsWith('touch');
+}
+
+function shouldIgnoreClickAfterTouch(point, event) {
+  if (!lastTouchLikePlacement || !point) return false;
+  if (isTouchLikeBuildEvent(event)) return false;
+  const type = typeof event.type === 'string' ? event.type : '';
+  if (type !== 'click' && type !== 'mouseup') return false;
+  const dt = Date.now() - lastTouchLikePlacement.ts;
+  if (dt < 0 || dt > 700) return false;
+  const dx = Math.abs(point.x - lastTouchLikePlacement.x);
+  const dy = Math.abs(point.y - lastTouchLikePlacement.y);
+  return dx <= 6 && dy <= 6;
 }
 
 function ensureBuildMaterials() {
@@ -526,11 +569,12 @@ function getBuildTopSurfaceAtWorldXZ(x, z, maxTopY = Infinity) {
   return Number.isFinite(best) ? best : null;
 }
 
-function getBuildCollisionAtWorldXZ(x, z, feetY, stepHeight = 0.65) {
+function getBuildCollisionAtWorldXZ(x, z, feetY, stepHeight = 0.65, bodyHeight = 0) {
   if (!Number.isFinite(feetY)) {
     return { blocked: false, stepTopY: null };
   }
 
+  const actorTopY = feetY + Math.max(0, Number.isFinite(bodyHeight) ? bodyHeight : 0);
   let blocked = false;
   let stepTopY = -Infinity;
 
@@ -538,7 +582,9 @@ function getBuildCollisionAtWorldXZ(x, z, feetY, stepHeight = 0.65) {
     const bottomY = toWorldCoord(gy) - BUILD_HALF;
     const topY = toWorldCoord(gy) + BUILD_HALF;
 
-    if (feetY < bottomY - 0.02) return;
+    // Block is fully above the actor volume.
+    if (actorTopY <= bottomY + 0.02) return;
+    // Actor feet already above this block.
     if (feetY >= topY - 0.02) return;
 
     const requiredStep = topY - feetY;
@@ -594,9 +640,12 @@ function raycastBuildAction(event) {
   const raycaster = getBuildRaycaster();
   if (!raycaster || !appCtx.camera || !appCtx.renderer || !buildMouse) return null;
 
+  const clientPoint = getEventClientPoint(event);
+  if (!clientPoint) return null;
+
   const canvasRect = appCtx.renderer.domElement.getBoundingClientRect();
-  buildMouse.x = (event.clientX - canvasRect.left) / canvasRect.width * 2 - 1;
-  buildMouse.y = -((event.clientY - canvasRect.top) / canvasRect.height) * 2 + 1;
+  buildMouse.x = (clientPoint.x - canvasRect.left) / canvasRect.width * 2 - 1;
+  buildMouse.y = -((clientPoint.y - canvasRect.top) / canvasRect.height) * 2 + 1;
   raycaster.setFromCamera(buildMouse, appCtx.camera);
 
   // Existing blocks take precedence for stacking/removal.
@@ -640,6 +689,11 @@ function raycastBuildAction(event) {
       if (mesh && mesh.visible) worldTargets.push(mesh);
     });
   }
+  if (appCtx.terrainGroup && Array.isArray(appCtx.terrainGroup.children)) {
+    appCtx.terrainGroup.children.forEach((mesh) => {
+      if (mesh && mesh.visible) worldTargets.push(mesh);
+    });
+  }
   if (appCtx.onMoon && appCtx.moonSurface && appCtx.moonSurface.visible !== false) {
     worldTargets.push(appCtx.moonSurface);
   }
@@ -672,6 +726,9 @@ function handleBlockBuilderClick(event) {
   if (!buildModeEnabled || !appCtx.gameStarted || appCtx.paused || appCtx.showLargeMap) return false;
   if (typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return false;
   if (isBuildClickBlocked(event.target)) return false;
+  const point = getEventClientPoint(event);
+  if (!point) return false;
+  if (shouldIgnoreClickAfterTouch(point, event)) return false;
 
   const action = raycastBuildAction(event);
   if (!action) return false;
@@ -685,10 +742,16 @@ function handleBlockBuilderClick(event) {
 
   if (action.kind === 'remove') {
     removeBuildBlock(action.gx, action.gy, action.gz);
+    if (isTouchLikeBuildEvent(event)) {
+      lastTouchLikePlacement = { x: point.x, y: point.y, ts: Date.now() };
+    }
     return true;
   }
   if (action.kind === 'place') {
     placeBuildBlock(action.gx, action.gy, action.gz);
+    if (isTouchLikeBuildEvent(event)) {
+      lastTouchLikePlacement = { x: point.x, y: point.y, ts: Date.now() };
+    }
     return true;
   }
   return false;

@@ -1,239 +1,172 @@
 # World Explorer
 
-World Explorer is a browser-based 3D exploration runtime with a production Firebase deployment stack:
+Last reviewed: 2026-02-25
 
-- Public marketing site and legal pages
-- WebGL runtime at `/app/`
-- Account and billing at `/account/`
-- Firebase Auth + Firestore entitlements
-- Stripe subscriptions through Firebase Cloud Functions
-- Photoreal Buildings (Beta) toggle in runtime Settings
+World Explorer is a browser-native 3D exploration platform with real-location traversal, game modes, multiplayer rooms, account/billing, and Firebase-backed persistence.
 
-Repository: `https://github.com/RRG314/WorldExplorer.git`
+## Runtime Surfaces
 
-## License
+- Root landing: `/index.html`
+- App runtime: `/app/index.html`
+- Account center: `/account/index.html`
+- About page: `/about/index.html`
+- Legal pages: `/legal/privacy`, `/legal/terms`
 
-This repository is source-visible but proprietary (`LICENSE`).
-All rights are reserved unless explicitly granted by the owner.
+## Core Product Features
 
-## Current Production Routes
-
-- `/` - landing page and pricing
-- `/app/` - game/runtime
-- `/account/` - plan status, upgrades, billing portal
-- `/legal/privacy` - privacy policy
-- `/legal/terms` - terms
-
-## Current Gameplay Highlights
-
-- Earth exploration with live switching between:
-  - driving
-  - walking
-  - drone
-- Space flight and Moon travel:
-  - direct moon transfer
-  - rocket-to-moon mode
-  - return-to-earth flow
-- Challenge modes from title-screen `Game Mode`:
+- Earth, Moon, and Space traversal
+- Game modes:
   - Free Roam
   - Time Trial
   - Checkpoints
-  - Paint the Town Red (2-minute building-paint challenge)
+  - Paint the Town
   - Police Chase
   - Find the Flower
-- Build mode improvements:
-  - click-accurate placement across roads/terrain/surfaces
-  - vehicle collision against placed blocks
-  - walking collision + standing on top of placed blocks
-- Scrollable landing-page `Gameplay` visual section with expanded screenshots and captions
+- Multiplayer platform:
+  - private/public rooms
+  - room code + invite links
+  - saved rooms (open again later)
+  - owner delete for owned rooms
+  - live presence, chat, friends, invites, recent players
+  - shared blocks, paint claims, artifacts, home base
+- Account center:
+  - plan/trial state
+  - room quota usage
+  - username + linked email + providers
+  - Stripe billing portal + receipts
+  - permanent account closure (self-serve delete flow)
 
-## Plan and Trial Model
+## Multiplayer Rendering and Update Model
 
-- `Free`
-  - Core exploration
-  - No cloud sync
-  - No Pro-only controls
-- `Trial` (2 days, no card)
-  - Created on first sign-in
-  - Full access equivalent to Supporter (no Pro-only perks)
-  - Auto-downgrades to Free when expired and no active subscription
-- `Supporter` (`$1/mo`)
-  - Full access
-  - Cloud sync entitlement enabled
-- `Pro` (`$5/mo`)
-  - Full access
-  - Early demo toggles
-  - Priority contact/feature consideration entitlements
+Current ghost rendering is no longer bubble-only:
 
-## Repository Layout (Active)
+- walking players render as character proxies
+- driving players render as car proxies
+- drone/space modes render as dedicated lightweight proxies
+- remote motion uses interpolation + extrapolation + teleport clamping for smoother movement on 3s presence heartbeats
 
-```text
-public/
-  index.html                    # landing
-  app/index.html                # runtime
-  account/index.html            # account + billing
-  legal/privacy.html
-  legal/terms.html
-  assets/landing/*
-  assets/landing/gameplay/*     # gameplay gallery visuals
-  js/firebase-init.js
-  js/auth-ui.js
-  js/entitlements.js
-  js/billing.js
-  js/firebase-project-config.js
-functions/
-  index.js                      # createCheckoutSession/createPortalSession/stripeWebhook
-  package.json
-firebase.json
-.firebaserc
-firestore.rules
-firestore.indexes.json
-```
+## Access and Quotas
 
-Notes:
+- `Free`: multiplayer locked
+- `Trial` (2 days): multiplayer enabled, room create limit `3`
+- `Supporter`: multiplayer enabled, room create limit `3`
+- `Pro`: multiplayer enabled, room create limit `10`
+- Admin tester mode: allowlist-only, higher room limit
 
-- `public/` is the only Firebase Hosting root.
-- Root-level legacy runtime files (`index.html`, `js/`, `styles.css`) still exist for historical/local reference, but production serves `public/app/index.html`.
+## Controls
+
+Full controls are documented in:
+
+- `CONTROLS_REFERENCE.md`
+- in-app `Controls` tab
+
+Paint the Town key controls:
+
+- `Ctrl` (and `G` / `P`) fires paintball shots
+- `1-6` picks color
+- `T` toggles touch vs gun tool
+- right-click camera look is enabled
+- double-left-click camera toggle is disabled
+
+## Firestore Security and TTL
+
+Firestore rules enforce:
+
+- authenticated access for protected data
+- room membership and ownership boundaries
+- room quota write coupling
+- presence self-write and write throttling
+- chat validation and anti-spam state checks
+- friend/invite ownership constraints
+
+TTL `expiresAt` should be enabled for:
+
+- `players`
+- `chat`
+- `chatState`
+- `incomingInvites`
+- `recentPlayers`
+- `activityFeed`
+- `artifacts`
+
+## Repository Layout
+
+Active runtime and backend paths:
+
+- `app/` -> primary app surface (`/app`)
+- `js/` -> root compatibility/runtime glue and shared account/auth/billing modules
+- `public/` -> Firebase Hosting root mirror
+- `functions/` -> Cloud Functions API and Stripe webhook
+- `tests/` -> Firestore rules and PaintTown integration tests
+
+Reference/legacy folders not used by active app routing:
+
+- `WorldExplorer3D-rdt-engine/`
+- `_style_reference_worldexplorer3d/`
+- `world-explorer-esm/`
 
 ## Local Development
 
+Install dependencies:
+
 ```bash
 cd "/Users/stevenreid/Documents/New project"
+npm install
+cd functions && npm install && cd ..
+```
+
+Run Firebase-style local static hosting (`public` root):
+
+```bash
 python3 -m http.server --directory public 4173
 ```
 
 Open:
 
-- `http://localhost:4173/`
-- `http://localhost:4173/app/`
-- `http://localhost:4173/account/`
+- `http://127.0.0.1:4173/`
+- `http://127.0.0.1:4173/app/`
+- `http://127.0.0.1:4173/account/`
 
-## GitHub Pages Deployment
+## Testing
 
-This repo supports two Pages modes:
-
-- Branch-root mode (requested): Pages serves repository root (`index.html`, `js/`, `styles.css`)
-- `public/` artifact mode: GitHub Actions publishes `public/`
-
-Branch-root mode setup (no workflow required):
-
-1. GitHub -> `Settings -> Pages`
-2. `Build and deployment -> Source: Deploy from a branch`
-3. Branch: your target branch
-4. Folder: `/ (root)`
-
-`public/` artifact mode (existing workflow):
-
-- Workflow: `.github/workflows/deploy-pages-public.yml`
-- Pages source: `GitHub Actions`
-
-Full deployment and troubleshooting guide:
-
-- `/Users/stevenreid/Documents/New project/GITHUB_DEPLOYMENT.md`
-
-## Firebase Deployment
-
-### Prerequisites
-
-- Node.js 20+ installed
-- Firebase CLI installed
-- Firebase project created (`worldexplorer3d-d9b83` currently configured)
-- Blaze plan enabled (required for Cloud Functions + Artifact Registry)
-
-### Deploy
+Rules/security test suite:
 
 ```bash
-cd "/Users/stevenreid/Documents/New project"
-firebase login
+npm test
+```
+
+PaintTown deterministic seed + paintball flow test:
+
+```bash
+node tests/painttown.integration.test.mjs
+```
+
+## Deployment
+
+GitHub Pages (branch root) and Firebase Hosting are both supported.
+
+GitHub Pages:
+
+- source branch: `steven/product`
+- folder: `/ (root)`
+
+Firebase:
+
+```bash
 firebase use worldexplorer3d-d9b83
 firebase deploy
 ```
 
-## Stripe Setup (Production)
+## Documentation
 
-1. Create products/prices in Stripe Live:
-   - Supporter: recurring monthly `$1`
-   - Pro: recurring monthly `$5`
-2. Create live webhook destination in Stripe Workbench:
-   - URL: `https://us-central1-worldexplorer3d-d9b83.cloudfunctions.net/stripeWebhook`
-   - Events:
-     - `checkout.session.completed`
-     - `customer.subscription.created`
-     - `customer.subscription.updated`
-     - `customer.subscription.deleted`
-3. Configure function runtime values:
-
-```bash
-cd "/Users/stevenreid/Documents/New project"
-firebase experiments:enable legacyRuntimeConfigCommands
-firebase functions:config:set \
-  stripe.secret="sk_live_..." \
-  stripe.webhook="whsec_..." \
-  stripe.price_supporter="price_..." \
-  stripe.price_pro="price_..."
-firebase deploy --only functions
-```
-
-4. Verify:
-
-```bash
-firebase functions:config:get
-firebase functions:log --only createCheckoutSession -n 30
-firebase functions:log --only stripeWebhook -n 30
-```
-
-Important:
-
-- Use real keys/IDs, not placeholders.
-- Do not store secret keys in frontend code.
-- Keep test-mode and live-mode credentials separated.
-
-## Firebase Frontend Config
-
-Frontend Firebase web config is loaded from `public/js/firebase-project-config.js` into `window.WORLD_EXPLORER_FIREBASE`.
-
-Required fields:
-
-- `apiKey`
-- `projectId`
-- `appId`
-
-Optional fallback is localStorage key `worldExplorer3D.firebaseConfig`.
-
-## Firestore Data Model (Subscription Layer)
-
-Collection: `users/{uid}`
-
-Key fields used by runtime/account/functions:
-
-- `plan`: `free | trial | supporter | pro`
-- `trialEndsAt`
-- `subscriptionStatus`
-- `stripeCustomerId`
-- `stripeSubscriptionId`
-- `entitlements`
-
-## Challenge Data Notes
-
-- Runtime challenge panel supports both `flower` and `paint town` leaderboard views.
-- Cloud leaderboard writes are enabled for authenticated users where Firestore
-  rules/collections are configured.
-- Local-storage fallback remains active when cloud writes are unavailable.
-
-## Current Operational Notes
-
-- Cloud Functions currently use `functions.config().stripe.*` and emit Firebase deprecation warnings.
-- Migration to Firebase Params/Secret Manager is required before March 2026 runtime-config shutdown.
-- Node 20 runtime deprecation warnings are active; schedule upgrade to Node 22 for Functions.
-
-## Documentation Map
-
-- `/Users/stevenreid/Documents/New project/QUICKSTART.md`
-- `/Users/stevenreid/Documents/New project/ARCHITECTURE.md`
-- `/Users/stevenreid/Documents/New project/API_SETUP.md`
-- `/Users/stevenreid/Documents/New project/USER_GUIDE.md`
-- `/Users/stevenreid/Documents/New project/TECHNICAL_DOCS.md`
-- `/Users/stevenreid/Documents/New project/KNOWN_ISSUES.md`
-- `/Users/stevenreid/Documents/New project/CHANGELOG.md`
-- `/Users/stevenreid/Documents/New project/progress.md`
-- `/Users/stevenreid/Documents/New project/COMPLETE_INVENTORY_REPORT_2026-02-19.md`
+- `QUICKSTART.md`
+- `USER_GUIDE.md`
+- `CONTROLS_REFERENCE.md`
+- `ARCHITECTURE.md`
+- `TECHNICAL_DOCS.md`
+- `API_SETUP.md`
+- `GITHUB_DEPLOYMENT.md`
+- `KNOWN_ISSUES.md`
+- `CHANGELOG.md`
+- `DOCUMENTATION_INDEX.md`
+- `COMPLETE_INVENTORY_REPORT_2026-02-25.md`

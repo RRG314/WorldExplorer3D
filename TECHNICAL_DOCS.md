@@ -1,282 +1,190 @@
 # Technical Documentation
 
-Last reviewed: 2026-02-19
+Last reviewed: 2026-02-25
 
-This document is the engineering reference for the currently deployed World Explorer stack.
+Engineering reference for runtime modules, multiplayer behavior, rules, and test flow.
 
-## 1. Runtime Stack Summary
+## 1. Source-of-Truth Code Paths
 
-Frontend:
+Primary gameplay source:
 
-- Static pages and assets served by Firebase Hosting
-- ES module runtime in `/public/app/js/`
-- Shared auth/entitlement/billing modules in `/public/js/`
+- `app/index.html`
+- `app/js/*`
 
-Backend:
+Compatibility/mirror paths:
 
-- Firebase Functions (1st gen, Node 20 currently)
-- Stripe API calls in function layer
-- Firestore for user plan state
+- root compatibility loader: `js/*`
+- Firebase hosting mirror: `public/*`
 
-## 2. Active Application Structure
+When changing behavior, update `app/*` first and keep mirrored paths aligned.
 
-```text
-public/
-  index.html
-  account/index.html
-  app/index.html
-  assets/landing/gameplay/*
-  js/
-    firebase-init.js
-    auth-ui.js
-    entitlements.js
-    billing.js
-    firebase-project-config.js
-functions/
-  index.js
-  package.json
-firebase.json
-firestore.rules
-```
+## 2. Module Contracts
 
-Branch-root Pages mode also serves:
+### 2.1 Boot and loading
 
-```text
-index.html
-js/
-styles.css
-```
+- `app/js/bootstrap.js` -> vendor loader + module entrypoint import
+- `app/js/modules/manifest.js` -> cache-bust and script manifest
+- `app/js/app-entry.js` -> boot contract, auth observer, multiplayer init
 
-## 3. Frontend Modules
+### 2.2 Multiplayer contracts
 
-### `public/js/firebase-init.js`
+`app/js/multiplayer/rooms.js`
 
-Responsibilities:
+- `createRoom(options)`
+- `joinRoomByCode(code)`
+- `leaveRoom()`
+- `listenRoom(roomId, callback)`
+- `listenMyRooms(callback)`
+- `listenOwnedRooms(callback)`
+- `deleteOwnedRoom(roomCode)`
+- `deriveRoomDeterministicSeed(roomLike)`
 
-- read config from `window.WORLD_EXPLORER_FIREBASE` or localStorage fallback
-- initialize Firebase App/Auth/Firestore
-- expose helper methods for config introspection and set/update
+`app/js/multiplayer/presence.js`
 
-Storage key:
+- `startPresence(roomId, getPoseFn)`
+- `stopPresence()`
+- `listenPlayers(roomId, callback)`
 
-- `worldExplorer3D.firebaseConfig`
+Timing constants:
 
-### `public/js/auth-ui.js`
+- heartbeat: `3000ms`
+- min write interval: `2000ms`
+- movement threshold: `1.0m`
+- rotation threshold: `0.08 rad`
 
-Responsibilities:
+`app/js/multiplayer/ghosts.js`
 
-- email/password sign in
-- email/password sign up
-- Google sign in (popup with redirect fallback)
-- password reset
-- auth-state observer callback utilities
+- `createGhostManager(scene, options)`
 
-### `public/js/entitlements.js`
+Current behavior:
 
-Responsibilities:
+- mode-based remote proxies (character/car/drone/space)
+- velocity extrapolation
+- damped interpolation and yaw smoothing
+- teleport distance clamp
+- 30 FPS ghost tick budget
 
-- ensure user profile exists (`users/{uid}`)
-- create initial `trial` plan for first-time users
-- compute plan-specific entitlements
-- downgrade expired trials to free when no active subscription
-- broadcast entitlements changes to app via custom event and global state
+`app/js/multiplayer/chat.js`
 
-### `public/js/billing.js`
+- `sendMessage(roomId, text)`
+- `listenChat(roomId, callback)`
+- `reportMessage(roomId, messageId, reason)`
 
-Responsibilities:
+Spam/safety controls:
 
-- call function endpoints with Firebase ID token
-- redirect to Stripe Checkout or Billing Portal
+- max length: 500
+- client interval/burst/duplicate gates
+- server interval/burst gates via `chatState`
+- contact/link pattern blocking
+- profanity masking
 
-Endpoints called:
+`app/js/multiplayer/social.js`
 
-- `/createCheckoutSession`
-- `/createPortalSession`
+- `addFriend`, `removeFriend`
+- `sendInviteToFriend`
+- `listenFriends`, `listenIncomingInvites`, `listenRecentPlayers`
+- `markInviteSeen`, `dismissInvite`
 
-GitHub Pages compatibility behavior:
+`app/js/multiplayer/ui-room.js`
 
-- detects non-Firebase-hosting domain
-- resolves direct Cloud Functions origin via Firebase `projectId`
-- sends `returnUrlBase` so Stripe returns to subpath deployments (for example `/WorldExplorer`)
+- multiplayer panel wiring
+- saved-room list rendering and open/delete handlers
+- chat drawer wiring
+- entitlement checks + invite trial path
 
-## 4. Runtime Gameplay Systems
+## 3. Paint the Town Runtime Notes
 
-Primary runtime modules:
+Main implementation: `app/js/game.js`.
 
-- `public/app/js/game.js`
-- `public/app/js/flower-challenge.js`
-- `public/app/js/blocks.js`
-- `public/app/js/physics.js`
-- `public/app/js/walking.js`
+State highlights:
 
-Implemented game modes in title-screen selector:
+- `paintballs[]`
+- `paintSplats[]`
+- `claimsByKey`
+- `colorCounts`
 
-- `free`
-- `trial`
-- `checkpoint`
-- `painttown`
-- `police`
-- `flower`
+Input highlights:
 
-Paint challenge behavior (`painttown`):
+- `Ctrl`/`G`/`P` fire paintball
+- `1-6` color select
+- `T` tool toggle
+- pointer/touch paint by active tool and room rule
 
-- fixed 2-minute timer (`120s`)
-- score model is building count (`paintedBuildings`) out of total available
-- rooftop auto-paint detection updates building material state and HUD
+Physics/perf highlights:
 
-Block/build behavior:
+- projectile arc with gravity
+- max active paintballs cap
+- splat lifetime cleanup
+- multiplayer claim publish hook
 
-- block placement uses camera raycasts against runtime world targets
-- vehicle physics checks `getBuildCollisionAtWorldXZ(...)` for blocking collisions
-- walking module checks both side collision and top-surface standing via:
-  - `getBuildCollisionAtWorldXZ(...)`
-  - `getBuildTopSurfaceAtWorldXZ(...)`
+## 4. Account and Billing Technical Notes
 
-## 5. Cloud Functions
+Frontend modules:
 
-Source: `/Users/stevenreid/Documents/New project/functions/index.js`
+- `js/auth-ui.js`
+- `js/entitlements.js`
+- `js/billing.js`
+- `js/firebase-init.js`
 
-### `createCheckoutSession`
+Account page:
 
-- validates bearer token via `verifyIdToken`
-- validates requested plan (`supporter|pro`)
-- resolves or creates Stripe customer
-- creates subscription checkout session
-- returns `{ url }`
+- `account/index.html` (module script section wires auth/entitlements/billing/social)
 
-### `createPortalSession`
+Functions backend:
 
-- validates bearer token
-- resolves `stripeCustomerId` from Firestore user doc
-- creates Stripe billing portal session
-- returns `{ url }`
+- `functions/index.js`
 
-### `stripeWebhook`
+Endpoints:
 
-- validates signature with `stripe.webhooks.constructEvent`
-- processes:
-  - `checkout.session.completed`
-  - `customer.subscription.created`
-  - `customer.subscription.updated`
-  - `customer.subscription.deleted`
-- updates user plan and entitlements in Firestore
+- `createCheckoutSession`
+- `createPortalSession`
+- `startTrial`
+- `enableAdminTester`
+- `getAccountOverview`
+- `listBillingReceipts`
+- `updateAccountProfile`
+- `deleteAccount`
+- `stripeWebhook`
 
-## 6. Firestore Rules Snapshot
+## 5. Firestore Rules and Data Integrity
 
-`users/{userId}`:
+Rules file: `firestore.rules`
 
-- owner read/write only
+Notable validation families:
 
-`flowerLeaderboard/{entryId}`:
+- room payload and update validators
+- user profile and quota validators
+- player/presence validators
+- chat/chatState validators
+- social and invite validators
+- blocks/claims/artifacts/homeBase validators
 
-- public read
-- authenticated create
-- update/delete blocked
+Indexes file: `firestore.indexes.json`
 
-Notes:
+- public city query index
+- featured room query index
 
-- Runtime challenge code also supports a `paintTownLeaderboard` collection path.
-- On this branch, Firestore rules are currently explicit for `flowerLeaderboard`;
-  when paint leaderboard cloud writes are not permitted, runtime falls back to local storage.
+## 6. Testing and Verification
 
-## 7. Hosting and Rewrites
-
-Defined in `firebase.json`.
-
-- hosting root: `public`
-- immutable caching for static assets
-- short cache for HTML
-- function rewrites for checkout/portal/webhook
-- legal route rewrites
-
-GitHub Pages mirror mode:
-
-- Uses `.github/workflows/deploy-pages-public.yml` to publish `public/`
-- No Firebase rewrites available on Pages; billing calls use direct function URL resolution
-
-## 8. Plan State Model
-
-Plan values in use:
-
-- `free`
-- `trial`
-- `supporter`
-- `pro`
-
-Subscription statuses treated as active:
-
-- `active`
-- `trialing`
-- `past_due`
-
-## 9. UI State Decisions
-
-### App (`public/app/index.html`)
-
-- Auth/account actions live in top-left float panel
-- Top-center plan/account HUD removed
-- Pro panel auto-hide for non-Pro users (`~4.5s`)
-
-### Root runtime (`index.html`)
-
-- Used when GitHub Pages is configured for branch-root publishing
-- Includes `Photoreal Buildings (Beta)` setting in the Settings tab
-- Photoreal preference persistence key: `worldExplorerPhotorealBuildings`
-
-### Account (`public/account/index.html`)
-
-- plan and trial status display
-- upgrade buttons and billing management
-- sign-out control
-
-## 10. Deployment and Operations
-
-### Full deploy
+Rules test runner:
 
 ```bash
-cd "/Users/stevenreid/Documents/New project"
-firebase deploy
+npm test
 ```
 
-### Functions-only deploy
+PaintTown integration:
 
 ```bash
-firebase deploy --only functions
+node tests/painttown.integration.test.mjs
 ```
 
-### Hosting-only deploy
+Artifacts:
 
-```bash
-firebase deploy --only hosting
-```
+- rules logs via emulator output
+- Playwright screenshots/reports under `output/playwright/*`
 
-### Logs
+## 7. Control Reference
 
-```bash
-firebase functions:log --only createCheckoutSession -n 50
-firebase functions:log --only stripeWebhook -n 50
-```
+Canonical control matrix is maintained in:
 
-## 11. Stripe Configuration Contract
-
-Runtime config keys expected by functions:
-
-- `stripe.secret`
-- `stripe.webhook`
-- `stripe.price_supporter`
-- `stripe.price_pro`
-
-Currently set using legacy runtime config commands.
-
-## 12. Known Technical Debt
-
-1. `functions.config()` deprecation (March 2026 shutdown)
-2. Node 20 runtime deprecation warnings for Functions
-3. dual runtime copies (legacy root and active `/public/app`) can cause confusion
-4. browser stale-cache edge cases can request legacy `/js/*` entrypoints after route/layout changes
-
-## 13. Immediate Migration Plan (Recommended)
-
-1. Migrate Stripe settings from `functions.config()` to Firebase Params/Secret Manager.
-2. Upgrade `firebase-functions` and function runtime to Node 22.
-3. Remove or archive legacy root runtime once operational confidence in `/public/app` is complete.
+- `CONTROLS_REFERENCE.md`

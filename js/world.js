@@ -691,6 +691,404 @@ function createMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8ca0
   return mesh;
 }
 
+function isPhotorealBuildingsEnabled() {
+  if (typeof appCtx.getPhotorealBuildingsEnabled === 'function') {
+    return !!appCtx.getPhotorealBuildingsEnabled();
+  }
+  return !!appCtx.photorealBuildingsEnabled;
+}
+
+function roofStyleProfile(styleId) {
+  if (styleId === 'metal') {
+    return {
+      baseColor: 0x6a737d,
+      roughness: 0.58,
+      metalness: 0.26,
+      envMapIntensity: 0.55,
+      clearcoat: 0.06,
+      clearcoatRoughness: 0.58,
+      repeat: 8
+    };
+  }
+  if (styleId === 'concrete') {
+    return {
+      baseColor: 0x7e8084,
+      roughness: 0.90,
+      metalness: 0.04,
+      envMapIntensity: 0.33,
+      clearcoat: 0.01,
+      clearcoatRoughness: 0.85,
+      repeat: 7
+    };
+  }
+  if (styleId === 'gravel') {
+    return {
+      baseColor: 0x585d64,
+      roughness: 0.95,
+      metalness: 0.02,
+      envMapIntensity: 0.28,
+      clearcoat: 0.0,
+      clearcoatRoughness: 0.9,
+      repeat: 9
+    };
+  }
+  if (styleId === 'tile') {
+    return {
+      baseColor: 0x744435,
+      roughness: 0.86,
+      metalness: 0.03,
+      envMapIntensity: 0.35,
+      clearcoat: 0.02,
+      clearcoatRoughness: 0.78,
+      repeat: 6
+    };
+  }
+  return {
+    baseColor: 0x373c43,
+    roughness: 0.92,
+    metalness: 0.02,
+    envMapIntensity: 0.30,
+    clearcoat: 0.0,
+    clearcoatRoughness: 0.88,
+    repeat: 8
+  };
+}
+
+function chooseRoofStyle(buildingType, styleRand) {
+  const bt = String(buildingType || 'yes').toLowerCase();
+  if (bt === 'industrial' || bt === 'warehouse' || bt === 'factory' || bt === 'retail') {
+    return styleRand > 0.45 ? 'metal' : 'concrete';
+  }
+  if (bt === 'house' || bt === 'detached' || bt === 'residential' || bt === 'apartments') {
+    return styleRand > 0.28 ? 'tile' : 'membrane';
+  }
+  if (styleRand < 0.28) return 'concrete';
+  if (styleRand < 0.52) return 'gravel';
+  if (styleRand < 0.72) return 'metal';
+  return 'membrane';
+}
+
+function buildPhotorealRoofTexture(styleId, toneBucket, bSeed) {
+  const cacheKey = `${styleId}-${toneBucket}`;
+  if (!appCtx._photorealRoofTextureCache) appCtx._photorealRoofTextureCache = new Map();
+  if (appCtx._photorealRoofTextureCache.has(cacheKey)) {
+    return appCtx._photorealRoofTextureCache.get(cacheKey);
+  }
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 128;
+  canvas.height = 128;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return null;
+
+  const seed = ((bSeed || 0) ^ toneBucket * 2654435761 ^ styleId.length * 2246822519) >>> 0;
+  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(seed) : Math.random.bind(Math);
+  const profile = roofStyleProfile(styleId);
+  const baseColor = new THREE.Color(profile.baseColor);
+  baseColor.offsetHSL(0, 0, (toneBucket - 2) * 0.028);
+  const hiColor = baseColor.clone().offsetHSL(0, 0, 0.07);
+  const lowColor = baseColor.clone().offsetHSL(0, 0, -0.08);
+
+  ctx.fillStyle = `#${baseColor.getHexString()}`;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  const grainStep = styleId === 'tile' ? 2 : 3;
+  for (let y = 0; y < canvas.height; y += grainStep) {
+    for (let x = 0; x < canvas.width; x += grainStep) {
+      const shade = rng() > 0.5 ? hiColor : lowColor;
+      const alpha = 0.05 + rng() * 0.10;
+      ctx.fillStyle = `rgba(${Math.round(shade.r * 255)},${Math.round(shade.g * 255)},${Math.round(shade.b * 255)},${alpha.toFixed(3)})`;
+      ctx.fillRect(x, y, grainStep, grainStep);
+    }
+  }
+
+  if (styleId === 'metal') {
+    ctx.strokeStyle = 'rgba(20,24,30,0.22)';
+    ctx.lineWidth = 1;
+    for (let x = 6; x < canvas.width; x += 10) {
+      ctx.beginPath();
+      ctx.moveTo(x, 0);
+      ctx.lineTo(x, canvas.height);
+      ctx.stroke();
+    }
+  } else if (styleId === 'tile') {
+    ctx.strokeStyle = 'rgba(18,15,12,0.20)';
+    ctx.lineWidth = 1;
+    for (let y = 8; y < canvas.height; y += 12) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+  } else if (styleId === 'concrete') {
+    ctx.strokeStyle = 'rgba(35,38,42,0.18)';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 7; i++) {
+      const x1 = rng() * canvas.width;
+      const y1 = rng() * canvas.height;
+      const x2 = Math.min(canvas.width, x1 + (rng() * 34 + 14));
+      const y2 = y1 + (rng() * 16 - 8);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+  } else {
+    ctx.strokeStyle = 'rgba(16,18,22,0.18)';
+    ctx.lineWidth = 1;
+    for (let y = 10; y < canvas.height; y += 18) {
+      ctx.beginPath();
+      ctx.moveTo(0, y);
+      ctx.lineTo(canvas.width, y);
+      ctx.stroke();
+    }
+  }
+
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.repeat.set(profile.repeat, profile.repeat);
+  tex.anisotropy = 8;
+  tex.needsUpdate = true;
+  appCtx._photorealRoofTextureCache.set(cacheKey, tex);
+  return tex;
+}
+
+function getBuildingRoofMaterial(bSeed, buildingType, forcePhotoreal = isPhotorealBuildingsEnabled()) {
+  if (!appCtx._buildingRoofMaterialCache) appCtx._buildingRoofMaterialCache = new Map();
+
+  const styleRand = appCtx.rand01FromInt(((bSeed || 0) ^ 0x73af2d) >>> 0);
+  const toneRand = appCtx.rand01FromInt(((bSeed || 0) ^ 0x15b4c3) >>> 0);
+  const roofStyle = chooseRoofStyle(buildingType, styleRand);
+  const toneBucket = Math.floor(toneRand * 5);
+  const cacheKey = `${forcePhotoreal ? 'photoreal' : 'standard'}-${roofStyle}-${toneBucket}`;
+  if (appCtx._buildingRoofMaterialCache.has(cacheKey)) {
+    return appCtx._buildingRoofMaterialCache.get(cacheKey);
+  }
+
+  const profile = roofStyleProfile(roofStyle);
+  const roofTex = buildPhotorealRoofTexture(roofStyle, toneBucket, bSeed);
+  const usePhysical = forcePhotoreal && typeof THREE.MeshPhysicalMaterial === 'function';
+  const RoofClass = usePhysical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+  const roofMat = new RoofClass({
+    color: new THREE.Color(profile.baseColor).offsetHSL(0, 0, (toneBucket - 2) * 0.028),
+    map: roofTex,
+    roughness: profile.roughness + (forcePhotoreal ? 0.0 : 0.03),
+    metalness: forcePhotoreal ? profile.metalness : Math.min(profile.metalness, 0.10),
+    envMapIntensity: forcePhotoreal ? profile.envMapIntensity : Math.min(profile.envMapIntensity, 0.42),
+    clearcoat: usePhysical ? profile.clearcoat : undefined,
+    clearcoatRoughness: usePhysical ? profile.clearcoatRoughness : undefined
+  });
+  appCtx._buildingRoofMaterialCache.set(cacheKey, roofMat);
+  return roofMat;
+}
+
+function getPhotorealDetailMaterials(bSeed, buildingType) {
+  if (!appCtx._photorealDetailMaterialCache) appCtx._photorealDetailMaterialCache = new Map();
+
+  const styleRand = appCtx.rand01FromInt(((bSeed || 0) ^ 0x73af2d) >>> 0);
+  const toneRand = appCtx.rand01FromInt(((bSeed || 0) ^ 0x15b4c3) >>> 0);
+  const roofStyle = chooseRoofStyle(buildingType, styleRand);
+  const toneBucket = Math.floor(toneRand * 5);
+  const cacheKey = `${roofStyle}-${toneBucket}`;
+  if (appCtx._photorealDetailMaterialCache.has(cacheKey)) {
+    return appCtx._photorealDetailMaterialCache.get(cacheKey);
+  }
+
+  const usePhysical = typeof THREE.MeshPhysicalMaterial === 'function';
+  const UtilityClass = usePhysical ? THREE.MeshPhysicalMaterial : THREE.MeshStandardMaterial;
+
+  const utilityMats = [];
+  const grayOffsets = [-0.05, -0.02, 0.01, 0.04];
+  grayOffsets.forEach((offset) => {
+    const mat = new UtilityClass({
+      color: new THREE.Color(0x697380).offsetHSL(0, 0, (toneBucket - 2) * 0.022 + offset),
+      roughness: 0.80 + Math.abs(offset) * 0.25,
+      metalness: 0.14,
+      envMapIntensity: 0.44,
+      clearcoat: usePhysical ? 0.04 : undefined,
+      clearcoatRoughness: usePhysical ? 0.76 : undefined
+    });
+    utilityMats.push(mat);
+  });
+
+  const antennaMat = new THREE.MeshStandardMaterial({
+    color: 0xb6c0cc,
+    roughness: 0.36,
+    metalness: 0.80
+  });
+
+  const materialSet = {
+    utilityMats,
+    antennaMat
+  };
+  appCtx._photorealDetailMaterialCache.set(cacheKey, materialSet);
+  return materialSet;
+}
+
+function pointInPolygonXZ(x, z, polygon) {
+  if (!Array.isArray(polygon) || polygon.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x;
+    const zi = polygon[i].z;
+    const xj = polygon[j].x;
+    const zj = polygon[j].z;
+    const intersects = zi > z !== zj > z && x < (xj - xi) * (z - zi) / ((zj - zi) || 1e-9) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function pickRoofPlacementPoint(footprint, centerX, centerZ, halfSpanX, halfSpanZ, rng) {
+  const hasPoly = Array.isArray(footprint) && footprint.length >= 3;
+  const spreadX = Math.max(0.5, halfSpanX);
+  const spreadZ = Math.max(0.5, halfSpanZ);
+  if (!hasPoly) {
+    return {
+      x: centerX + (rng() * 2 - 1) * spreadX * 0.75,
+      z: centerZ + (rng() * 2 - 1) * spreadZ * 0.75
+    };
+  }
+
+  for (let attempt = 0; attempt < 16; attempt++) {
+    const x = centerX + (rng() * 2 - 1) * spreadX * 0.86;
+    const z = centerZ + (rng() * 2 - 1) * spreadZ * 0.86;
+    if (pointInPolygonXZ(x, z, footprint)) return { x, z };
+  }
+
+  if (pointInPolygonXZ(centerX, centerZ, footprint)) return { x: centerX, z: centerZ };
+  return {
+    x: centerX + (rng() * 2 - 1) * spreadX * 0.35,
+    z: centerZ + (rng() * 2 - 1) * spreadZ * 0.35
+  };
+}
+
+function addPhotorealBuildingDetailMeshes(mesh, bSeed, buildingType = 'yes', lodTier = 'near') {
+  if (!mesh || lodTier !== 'near' || !isPhotorealBuildingsEnabled()) return;
+  if (mesh.userData?.photorealDetailApplied) return;
+  if (!mesh.geometry) return;
+
+  const geo = mesh.geometry;
+  if (!geo.boundingBox) geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  if (!bb) return;
+
+  const minX = bb.min.x;
+  const maxX = bb.max.x;
+  const minY = bb.min.y;
+  const maxY = bb.max.y;
+  const minZ = bb.min.z;
+  const maxZ = bb.max.z;
+
+  const width = maxX - minX;
+  const depth = maxZ - minZ;
+  const height = maxY - minY;
+  if (!Number.isFinite(width) || !Number.isFinite(depth) || !Number.isFinite(height)) return;
+  if (width < 9 || depth < 9 || height < 8) return;
+
+  const centerX = (minX + maxX) * 0.5;
+  const centerZ = (minZ + maxZ) * 0.5;
+  const topY = maxY;
+  const area = width * depth;
+
+  const rng = typeof appCtx.seededRandom === 'function' ?
+  appCtx.seededRandom(((bSeed || 0) ^ 0x31fa6d) >>> 0) :
+  Math.random.bind(Math);
+  const mats = getPhotorealDetailMaterials(bSeed, buildingType);
+  const group = new THREE.Group();
+  group.userData.photorealBuildingDetail = true;
+  const footprint = mesh.userData?.buildingFootprint;
+  const bt = String(buildingType || 'yes').toLowerCase();
+  const houseLike = bt === 'house' || bt === 'detached' || bt === 'residential';
+  const apartmentLike = bt === 'apartments';
+  const industrialLike = bt === 'industrial' || bt === 'warehouse' || bt === 'factory' || bt === 'retail';
+  const officeLike = bt === 'office' || bt === 'commercial' || bt === 'skyscraper';
+
+  // Roof mechanical units.
+  const roofHalfW = Math.max(1.2, width * 0.5 - 0.85);
+  const roofHalfD = Math.max(1.2, depth * 0.5 - 0.85);
+  const roofTopY = topY + 0.03;
+
+  let hvacChance = 0.34;
+  let maxUnits = Math.max(1, Math.min(3, Math.floor(area / 230)));
+  if (houseLike || area < 130 || height < 10) {
+    hvacChance = 0.0;
+    maxUnits = 0;
+  } else if (apartmentLike) {
+    hvacChance = 0.20;
+    maxUnits = Math.max(1, Math.min(2, Math.floor(area / 260) + 1));
+  } else if (officeLike) {
+    hvacChance = 0.52;
+    maxUnits = Math.max(1, Math.min(4, Math.floor(area / 200)));
+  } else if (industrialLike) {
+    hvacChance = 0.72;
+    maxUnits = Math.max(2, Math.min(5, Math.floor(area / 180)));
+  }
+  const unitCount = maxUnits > 0 && rng() < hvacChance ?
+  Math.max(1, Math.min(maxUnits, 1 + Math.floor(rng() * (maxUnits + 0.35)))) :
+  0;
+
+  for (let i = 0; i < unitCount; i++) {
+    const uw = 1.2 + rng() * Math.min(4.8, width * 0.14);
+    const ud = 1.1 + rng() * Math.min(4.2, depth * 0.14);
+    const uh = 0.6 + rng() * Math.min(2.1, height * 0.07);
+    const placement = pickRoofPlacementPoint(
+      footprint,
+      centerX,
+      centerZ,
+      Math.max(0.8, roofHalfW - uw * 0.65),
+      Math.max(0.8, roofHalfD - ud * 0.65),
+      rng
+    );
+    const utilMat = mats.utilityMats[Math.floor(rng() * mats.utilityMats.length)] || mats.utilityMats[0];
+    const unit = new THREE.Mesh(new THREE.BoxGeometry(uw, uh, ud), utilMat);
+    unit.position.set(placement.x, roofTopY + uh * 0.5, placement.z);
+    unit.castShadow = true;
+    unit.receiveShadow = true;
+    group.add(unit);
+  }
+
+  // Optional water tank/antenna for taller buildings.
+  if (height > 22 && !houseLike && rng() > 0.57) {
+    const tankR = Math.max(0.5, Math.min(1.8, Math.min(width, depth) * 0.055));
+    const tankH = tankR * (1.5 + rng() * 1.1);
+    const placement = pickRoofPlacementPoint(
+      footprint,
+      centerX,
+      centerZ,
+      Math.max(0.8, roofHalfW - tankR * 1.4),
+      Math.max(0.8, roofHalfD - tankR * 1.4),
+      rng
+    );
+    const utilMat = mats.utilityMats[Math.floor(rng() * mats.utilityMats.length)] || mats.utilityMats[0];
+    const tank = new THREE.Mesh(new THREE.CylinderGeometry(tankR, tankR * 1.06, tankH, 16), utilMat);
+    tank.position.set(placement.x, roofTopY + tankH * 0.5, placement.z);
+    tank.castShadow = true;
+    tank.receiveShadow = true;
+    group.add(tank);
+  }
+
+  if (height > 34 && rng() > 0.58) {
+    const mastH = 3 + rng() * Math.min(9, height * 0.18);
+    const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.10, mastH, 10), mats.antennaMat);
+    const placement = pickRoofPlacementPoint(
+      footprint,
+      centerX,
+      centerZ,
+      Math.max(0.6, roofHalfW - 0.35),
+      Math.max(0.6, roofHalfD - 0.35),
+      rng
+    );
+    mast.position.set(placement.x, roofTopY + mastH * 0.5, placement.z);
+    mast.castShadow = true;
+    mast.receiveShadow = true;
+    group.add(mast);
+  }
+
+  mesh.add(group);
+  mesh.userData.photorealDetailApplied = true;
+}
+
 function batchMidLodBuildingMeshes() {
   if (!Array.isArray(appCtx.buildingMeshes) || appCtx.buildingMeshes.length === 0) return 0;
 
@@ -1651,7 +2049,14 @@ async function loadRoads(retryPass = 0) {
   }
 
   // RDT complexity index: location-derived complexity used by adaptive mode.
-  appCtx.rdtSeed = appCtx.hashGeoToInt(appCtx.LOC.lat, appCtx.LOC.lon, appCtx.gameMode === 'trial' ? 1 : appCtx.gameMode === 'checkpoint' ? 2 : 0);
+  appCtx.rdtSeed = appCtx.hashGeoToInt(
+    appCtx.LOC.lat,
+    appCtx.LOC.lon,
+    appCtx.gameMode === 'trial' ? 1 :
+    appCtx.gameMode === 'checkpoint' ? 2 :
+    appCtx.gameMode === 'painttown' ? 3 :
+    0
+  );
   const sharedSeedOverrideRaw = Number(appCtx.sharedSeedOverride);
   if (Number.isFinite(sharedSeedOverrideRaw)) {
     appCtx.rdtSeed = (Math.floor(sharedSeedOverrideRaw) | 0) >>> 0;
@@ -1729,7 +2134,10 @@ async function loadRoads(retryPass = 0) {
       height,
       centerX,
       centerZ,
-      colliderDetail: detail
+      colliderDetail: detail,
+      sourceBuildingId: options.sourceBuildingId || null,
+      buildingType: options.buildingType || 'yes',
+      baseY: Number.isFinite(options.baseY) ? options.baseY : null
     };
     appCtx.buildings.push(building);
     addBuildingToSpatialIndex(building);
@@ -2239,7 +2647,15 @@ async function loadRoads(retryPass = 0) {
         }
 
         const colliderDetail = useRdtBudgeting && lodTier !== 'near' ? 'bbox' : 'full';
-        registerBuildingCollision(pts, height, { detail: colliderDetail, centerX, centerZ });
+        const bt = way.tags.building || 'yes';
+        const sourceBuildingId = way.id ? String(way.id) : `osm-${Math.round(centerX * 10)}-${Math.round(centerZ * 10)}`;
+        const colliderRef = registerBuildingCollision(pts, height, {
+          detail: colliderDetail,
+          centerX,
+          centerZ,
+          sourceBuildingId,
+          buildingType: bt
+        });
         if (colliderDetail === 'full') loadMetrics.colliders.full += 1;else
         loadMetrics.colliders.simplified += 1;
 
@@ -2261,7 +2677,6 @@ async function loadRoads(retryPass = 0) {
         // Deterministic facade selection (matches original texture style)
         const colors = ['#888888', '#7788aa', '#998877', '#667788'];
         const baseColor = colors[Math.floor(br2 * colors.length)];
-        const bt = way.tags.building || 'yes';
         const shape = new THREE.Shape();
         pts.forEach((p, i) => {
           if (i === 0) shape.moveTo(p.x, -p.z);else
@@ -2269,27 +2684,42 @@ async function loadRoads(retryPass = 0) {
         });
         shape.closePath();
 
-        const extrudeSettings = { depth: height, bevelEnabled: false };
+        const extrudeSettings = {
+          depth: height,
+          bevelEnabled: false,
+          // material 0 => caps (roof/floor), material 1 => side walls
+          material: 0,
+          extrudeMaterial: 1
+        };
         const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
         geo.rotateX(-Math.PI / 2);
 
-        const bldgMat = typeof appCtx.getBuildingMaterial === 'function' ?
+        const sideMaterial = typeof appCtx.getBuildingMaterial === 'function' ?
         appCtx.getBuildingMaterial(bt, bSeed, baseColor) :
         new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.85, metalness: 0.05 });
+        const roofMaterial = getBuildingRoofMaterial(bSeed, bt, isPhotorealBuildingsEnabled());
 
-        const mesh = new THREE.Mesh(geo, bldgMat);
+        const mesh = new THREE.Mesh(geo, [roofMaterial, sideMaterial]);
         mesh.position.y = avgElevation;
         mesh.userData.buildingFootprint = pts;
         mesh.userData.avgElevation = avgElevation;
         mesh.userData.lodTier = lodTier;
+        mesh.userData.sourceBuildingId = sourceBuildingId;
+        mesh.userData.buildingType = bt;
         mesh.castShadow = lodTier === 'near';
         mesh.receiveShadow = true;
+        if (colliderRef) {
+          colliderRef.baseY = avgElevation;
+        }
 
-        if (!mesh) return;
         appCtx.scene.add(mesh);
         appCtx.buildingMeshes.push(mesh);
         if (lodTier === 'near') loadMetrics.lod.near += 1;else
         loadMetrics.lod.mid += 1;
+
+        if (lodTier === 'near') {
+          addPhotorealBuildingDetailMeshes(mesh, bSeed, bt, lodTier);
+        }
 
         // On steep terrain, add a terrain-conforming apron to hide
         // exposed flat foundation planes around the footprint.
@@ -2308,7 +2738,7 @@ async function loadRoads(retryPass = 0) {
       });
       endLoadPhase('buildBuildingGeometry');
       startLoadPhase('batchBuildingGeometry');
-      const batchedNearCount = batchNearLodBuildingMeshes();
+      const batchedNearCount = appCtx.disableNearBuildingBatching ? 0 : batchNearLodBuildingMeshes();
       if (batchedNearCount > 0) {
         loadMetrics.lod.nearBatched = batchedNearCount;
       }
@@ -2854,25 +3284,39 @@ async function loadRoads(retryPass = 0) {
         makeRoad(-150, 150, 150, -150, 10); // Diagonal 2
 
         // Create a few simple buildings
-        const makeBuilding = (x, z, w, d, h) => {
+        const makeBuilding = (x, z, w, d, h, idx = 0) => {
           const pts = [
           { x: x - w / 2, z: z - d / 2 },
           { x: x + w / 2, z: z - d / 2 },
           { x: x + w / 2, z: z + d / 2 },
           { x: x - w / 2, z: z + d / 2 }];
 
-          registerBuildingCollision(pts, h);
+          const sourceBuildingId = `fallback-${idx}-${Math.round(x)}-${Math.round(z)}`;
+          const colliderRef = registerBuildingCollision(pts, h, {
+            sourceBuildingId,
+            buildingType: 'fallback'
+          });
 
           const shape = new THREE.Shape();
           shape.moveTo(pts[0].x, pts[0].z);
           for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i].x, pts[i].z);
           shape.lineTo(pts[0].x, pts[0].z);
 
-          const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
+          const geo = new THREE.ExtrudeGeometry(shape, {
+            depth: h,
+            bevelEnabled: false,
+            material: 0,
+            extrudeMaterial: 1
+          });
           geo.rotateX(-Math.PI / 2);
-          const color = [0x8899aa, 0x887766, 0x7788aa, 0x887799][Math.floor(Math.random() * 4)];
-          const mat = new THREE.MeshLambertMaterial({ color });
-          const mesh = new THREE.Mesh(geo, mat);
+          const colorPalette = ['#8899aa', '#887766', '#7788aa', '#887799'];
+          const detailSeed = ((appCtx.rdtSeed || 0) ^ ((Math.floor(x * 100) * 73856093 ^ Math.floor(z * 100) * 19349663) >>> 0)) >>> 0;
+          const color = colorPalette[Math.floor(appCtx.rand01FromInt(detailSeed ^ 0x91ac7) * colorPalette.length)];
+          const sideMaterial = typeof appCtx.getBuildingMaterial === 'function' ?
+          appCtx.getBuildingMaterial('fallback', detailSeed, color) :
+          new THREE.MeshStandardMaterial({ color, roughness: 0.84, metalness: 0.05 });
+          const roofMaterial = getBuildingRoofMaterial(detailSeed, 'fallback', isPhotorealBuildingsEnabled());
+          const mesh = new THREE.Mesh(geo, [roofMaterial, sideMaterial]);
 
           // Calculate terrain stats for building
           let avgElevation = 0;
@@ -2891,11 +3335,16 @@ async function loadRoads(retryPass = 0) {
           mesh.position.y = avgElevation;
           mesh.userData.buildingFootprint = pts; // Store for repositioning
           mesh.userData.avgElevation = avgElevation;
+          mesh.userData.sourceBuildingId = sourceBuildingId;
+          mesh.userData.buildingType = 'fallback';
+          if (colliderRef) colliderRef.baseY = avgElevation;
 
           mesh.castShadow = true;
           mesh.receiveShadow = true;
           appCtx.scene.add(mesh);
           appCtx.buildingMeshes.push(mesh);
+
+          addPhotorealBuildingDetailMeshes(mesh, detailSeed, 'fallback', 'near');
 
           if (typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.7) {
             const groundPatch = appCtx.createBuildingGroundPatch(pts, avgElevation);
@@ -2912,12 +3361,12 @@ async function loadRoads(retryPass = 0) {
         };
 
         // Add buildings around the crossroad
-        makeBuilding(-80, -80, 40, 30, 15);
-        makeBuilding(80, -80, 35, 40, 20);
-        makeBuilding(-80, 80, 45, 35, 18);
-        makeBuilding(80, 80, 30, 35, 12);
-        makeBuilding(-50, 50, 25, 20, 10);
-        makeBuilding(50, -50, 30, 25, 14);
+        makeBuilding(-80, -80, 40, 30, 15, 0);
+        makeBuilding(80, -80, 35, 40, 20, 1);
+        makeBuilding(-80, 80, 45, 35, 18, 2);
+        makeBuilding(80, 80, 30, 35, 12, 3);
+        makeBuilding(-50, 50, 25, 20, 10, 4);
+        makeBuilding(50, -50, 30, 25, 14, 5);
 
         finalizeLoadedWorld('synthetic_fallback');
       }

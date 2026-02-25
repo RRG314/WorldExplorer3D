@@ -3,14 +3,12 @@ title = "WorldExplorer Secret Scan Config"
 [extend]
 useDefault = true
 
-[[allowlists]]
-description = "Public Firebase Web API key used by frontend config"
-regexes = [
-  '''AIzaSyDu-IXMWLU5UExjtPWfJ3BEHXg4xxvE3UU'''
+[allowlist]
+description = "Public Firebase client config and documentation placeholders"
+paths = [
+  '''js/firebase-project-config\.js''',
+  '''public/js/firebase-project-config\.js'''
 ]
-
-[[allowlists]]
-description = "Documentation placeholders only (not real credentials)"
 regexes = [
   '''sk_(live|test)_\.\.\.''',
   '''whsec_\.\.\.''',
