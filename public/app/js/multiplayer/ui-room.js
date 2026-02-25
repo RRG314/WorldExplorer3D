@@ -1512,7 +1512,7 @@ function initMultiplayerPlatform() {
       const effectiveLocationTag = visibility === 'public'
         ? (locationTagText || world.name)
         : locationTagText;
-      const room = await createRoom({
+      const createPayload = {
         name: roomName || `${world.name} Session`,
         visibility,
         featured: false,
@@ -1521,7 +1521,33 @@ function initMultiplayerPlatform() {
         rules: paintRules,
         locationName: roomName || world.name,
         locationTag: effectiveLocationTag ? { label: effectiveLocationTag, city: effectiveLocationTag, kind: world.kind } : null
-      });
+      };
+      const trialPlan = String(state.entitlement?.plan || '').toLowerCase() === 'trial';
+      let room = null;
+
+      try {
+        room = await createRoom(createPayload);
+      } catch (err) {
+        const errCode = String(err?.code || '').toLowerCase();
+        const errMessage = String(err?.message || '').toLowerCase();
+        const permissionDenied = errCode.includes('permission') ||
+          errMessage.includes('permission-denied') ||
+          errMessage.includes('missing or insufficient permissions') ||
+          errMessage.includes('insufficient permissions');
+
+        if (trialPlan && permissionDenied && state.authUser) {
+          setStatus('Trial access is syncing. Retrying room create...');
+          const next = await startTrialIfEligible(state.authUser);
+          state.entitlement = {
+            ...state.entitlement,
+            ...next
+          };
+          applyEntitlementCopy();
+          room = await createRoom(createPayload);
+        } else {
+          throw err;
+        }
+      }
 
       await activateRoom(room, 'created room');
       await bumpExplorerLeaderboard({ roomsJoined: 1 });

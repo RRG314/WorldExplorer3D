@@ -331,6 +331,67 @@ await runCheck('owner can create room when stored limit is stale but plan limit 
   await assertSucceeds(batch.commit());
 });
 
+await runCheck('trial user with timestamp trialEndsAt can create room with quota increment', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    const trialStart = Timestamp.fromMillis(Date.now() - 30_000);
+    const trialEnd = Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000);
+    await setDoc(doc(db, 'users', OWNER_UID), {
+      plan: 'trial',
+      subscriptionStatus: 'none',
+      trialStartsAt: trialStart,
+      trialEndsAt: trialEnd,
+      trialConsumedAt: trialStart,
+      entitlements: {
+        multiplayer: true,
+        earlyAccess: false
+      },
+      roomCreateCount: 0,
+      roomCreateLimit: 3
+    }, { merge: true });
+  });
+
+  const roomCode = 'QT12AK';
+  const batch = writeBatch(ownerDb);
+  batch.set(doc(ownerDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID));
+  batch.set(doc(ownerDb, 'users', OWNER_UID), {
+    roomCreateCount: 1,
+    roomCreateLimit: 3,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await assertSucceeds(batch.commit());
+});
+
+await runCheck('trial user with legacy numeric trialEndsAt can create room with quota increment', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    const nowMs = Date.now();
+    await setDoc(doc(db, 'users', OWNER_UID), {
+      plan: 'trial',
+      subscriptionStatus: 'none',
+      trialStartsAt: Timestamp.fromMillis(nowMs - 30_000),
+      trialEndsAt: nowMs + 24 * 60 * 60 * 1000,
+      trialConsumedAt: Timestamp.fromMillis(nowMs - 30_000),
+      entitlements: {
+        multiplayer: true,
+        earlyAccess: false
+      },
+      roomCreateCount: 0,
+      roomCreateLimit: 3
+    }, { merge: true });
+  });
+
+  const roomCode = 'QT12AL';
+  const batch = writeBatch(ownerDb);
+  batch.set(doc(ownerDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID));
+  batch.set(doc(ownerDb, 'users', OWNER_UID), {
+    roomCreateCount: 1,
+    roomCreateLimit: 3,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await assertSucceeds(batch.commit());
+});
+
 await runCheck('owner can create room when profile includes legacy fields', async () => {
   await testEnv.withSecurityRulesDisabled(async (ctx) => {
     const db = ctx.firestore();

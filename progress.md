@@ -1442,3 +1442,20 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Validation:
     - `node --check` passed for changed JS modules.
     - Playwright smoke: `output/playwright/ghost-proxy-smoke/report.json` reports `ok: true`, with car-like and walker-like mesh signatures and no console/page errors.
+
+- Trial-mode room create fix pass (2026-02-25):
+  - Root cause identified: Firestore rules required `users/{uid}.trialEndsAt` to be a timestamp for multiplayer entitlement; legacy docs with numeric millis looked trial-entitled in UI but failed room create writes.
+  - Rules hardening in `firestore.rules`:
+    - Added `hasActiveTrialWindow(data)` to accept active trial windows from timestamp or legacy numeric millis (`request.time.toMillis() < trialEndsAt`).
+    - Updated `userPlan()` to use normalized `data` map and the new trial-window helper.
+  - Cloud Function normalization in `functions/index.js` (`startTrial`):
+    - For already-active trial users, added legacy field normalization to rewrite `trialStartsAt`/`trialEndsAt`/`trialConsumedAt` as Firestore timestamps and refresh trial entitlements/quota fields.
+  - UI self-heal in `public/app/js/multiplayer/ui-room.js`:
+    - On trial-plan room-create permission denial, auto-runs trial sync (`startTrialIfEligible`) once and retries create.
+  - Added rules regression coverage in `tests/firestore.rules.security.test.mjs`:
+    - `trial` + timestamp `trialEndsAt` room create succeeds with quota increment.
+    - `trial` + legacy numeric `trialEndsAt` room create succeeds with quota increment.
+  - Validation:
+    - `npm run test:rules` passes (35/35).
+    - `node --check` passes for updated JS files.
+    - Ran develop-web-game Playwright client smoke (`output/web-game/trial-room-fix*`); capture remains black in this headless WebGL environment, with no new console/page error artifacts emitted.

@@ -128,6 +128,12 @@ function normalizeRoomCreateCount(value) {
   return Math.max(0, Math.min(10000, Math.floor(n)));
 }
 
+function normalizeRoomCreateLimit(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(10000, Math.floor(n)));
+}
+
 function hasActiveSubscription(status) {
   return ACTIVE_SUB_STATUSES.has(String(status || '').toLowerCase());
 }
@@ -629,6 +635,40 @@ exports.startTrial = functions.region('us-central1').https.onRequest(async (req,
     }
 
     if (existingPlan === 'trial' && trialEndsAtMs && trialEndsAtMs > nowMs) {
+      const trialEndsAtIsTimestamp = existing.trialEndsAt && typeof existing.trialEndsAt.toMillis === 'function';
+      const trialStartsAtIsTimestamp = existing.trialStartsAt && typeof existing.trialStartsAt.toMillis === 'function';
+      const trialConsumedAtIsTimestamp = existing.trialConsumedAt && typeof existing.trialConsumedAt.toMillis === 'function';
+
+      if (!trialEndsAtIsTimestamp || !trialStartsAtIsTimestamp || !trialConsumedAtIsTimestamp) {
+        const normalizedTrialEndsAt = admin.firestore.Timestamp.fromMillis(trialEndsAtMs);
+        const normalizedTrialStartMs = trialStartsAtIsTimestamp
+          ? existing.trialStartsAt.toMillis()
+          : Math.max(nowMs - TRIAL_DURATION_MS, trialEndsAtMs - TRIAL_DURATION_MS);
+        const normalizedTrialStartsAt = admin.firestore.Timestamp.fromMillis(normalizedTrialStartMs);
+        const normalizedTrialConsumedAt = trialConsumedAtIsTimestamp
+          ? existing.trialConsumedAt
+          : normalizedTrialStartsAt;
+        const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
+        const roomCreateLimit = Math.max(
+          roomCreateLimitForPlan('trial'),
+          normalizeRoomCreateLimit(existing.roomCreateLimit)
+        );
+
+        await db.collection('users').doc(auth.uid).set(
+          {
+            plan: 'trial',
+            trialStartsAt: normalizedTrialStartsAt,
+            trialEndsAt: normalizedTrialEndsAt,
+            trialConsumedAt: normalizedTrialConsumedAt,
+            entitlements: planEntitlements('trial'),
+            roomCreateCount,
+            roomCreateLimit,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          },
+          { merge: true }
+        );
+      }
+
       res.status(200).json({
         status: 'already-active',
         plan: 'trial',

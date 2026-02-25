@@ -31,26 +31,37 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
     }
 
+    function hasActiveTrialWindow(data) {
+      return data is map &&
+        data.plan == 'trial' &&
+        (
+          (
+            data.trialEndsAt is timestamp &&
+            request.time < data.trialEndsAt
+          ) ||
+          (
+            data.trialEndsAt is number &&
+            request.time.toMillis() < data.trialEndsAt
+          )
+        );
+    }
+
     function userPlan() {
-      return !hasUserDoc() ? 'free' :
+      let data = hasUserDoc() && userDocData() is map ? userDocData() : null;
+      return data == null ? 'free' :
         (
           isAdminToken() ||
-          userDocData().subscriptionStatus in ['admin', 'Admin', 'ADMIN']
+          data.subscriptionStatus in ['admin', 'Admin', 'ADMIN']
             ? 'pro'
             : (
-                userDocData().plan == 'trial'
-                  ? (
-                      userDocData().trialEndsAt is timestamp &&
-                      request.time < userDocData().trialEndsAt
-                        ? 'trial'
-                        : 'free'
-                    )
+                hasActiveTrialWindow(data)
+                  ? 'trial'
                   : (
-                      userDocData().plan in ['support', 'supporter', 'pro']
+                      data.plan in ['support', 'supporter', 'pro']
                         ? (
-                            userDocData().plan == 'support'
+                            data.plan == 'support'
                               ? 'supporter'
-                              : userDocData().plan
+                              : data.plan
                           )
                         : 'free'
                     )
