@@ -3,15 +3,12 @@ title = "WorldExplorer Secret Scan Config"
 [extend]
 useDefault = true
 
-[[allowlists]]
-description = "Firebase web config key paths (public client key expected)"
+[allowlist]
+description = "Public Firebase client config and documentation placeholders"
 paths = [
   '''js/firebase-project-config\.js''',
   '''public/js/firebase-project-config\.js'''
 ]
-
-[[allowlists]]
-description = "Documentation placeholders only (not real credentials)"
 regexes = [
   '''sk_(live|test)_\.\.\.''',
   '''whsec_\.\.\.''',
