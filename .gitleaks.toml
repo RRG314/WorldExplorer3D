@@ -4,9 +4,10 @@ title = "WorldExplorer Secret Scan Config"
 useDefault = true
 
 [[allowlists]]
-description = "Public Firebase Web API key used by frontend config"
-regexes = [
-  '''AIzaSyDu-IXMWLU5UExjtPWfJ3BEHXg4xxvE3UU'''
+description = "Firebase web config key paths (public client key expected)"
+paths = [
+  '''js/firebase-project-config\.js''',
+  '''public/js/firebase-project-config\.js'''
 ]
 
 [[allowlists]]

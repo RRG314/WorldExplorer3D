@@ -1,99 +1,140 @@
 # Technical Documentation
 
-Last reviewed: 2026-02-23
+Last reviewed: 2026-02-25
 
-Engineering reference for current runtime, backend APIs, rules, and test flow.
+Engineering reference for runtime modules, multiplayer behavior, rules, and test flow.
 
-## 1. Code Paths
+## 1. Source-of-Truth Code Paths
 
-### Runtime path A (Firebase/public)
+Primary gameplay source:
 
-- Entry: `public/app/index.html`
-- Modules: `public/app/js/*`
+- `app/index.html`
+- `app/js/*`
 
-### Runtime path B (GitHub Pages root)
+Compatibility/mirror paths:
 
-- Entry: `index.html`
-- Modules: `js/*`
+- root compatibility loader: `js/*`
+- Firebase hosting mirror: `public/*`
 
-Input and game-mode behavior should remain mirrored between both paths.
+When changing behavior, update `app/*` first and keep mirrored paths aligned.
 
-## 2. Multiplayer Module Contracts
+## 2. Module Contracts
 
-`public/app/js/multiplayer/rooms.js`
+### 2.1 Boot and loading
 
-- room lifecycle (create/join/leave)
-- room listeners
-- deterministic room seed helper used by game logic
+- `app/js/bootstrap.js` -> vendor loader + module entrypoint import
+- `app/js/modules/manifest.js` -> cache-bust and script manifest
+- `app/js/app-entry.js` -> boot contract, auth observer, multiplayer init
 
-`public/app/js/multiplayer/presence.js`
+### 2.2 Multiplayer contracts
 
-- throttled heartbeat updates
-- pose + mode + frame synchronization
-- live player list snapshots
+`app/js/multiplayer/rooms.js`
 
-`public/app/js/multiplayer/chat.js`
+- `createRoom(options)`
+- `joinRoomByCode(code)`
+- `leaveRoom()`
+- `listenRoom(roomId, callback)`
+- `listenMyRooms(callback)`
+- `listenOwnedRooms(callback)`
+- `deleteOwnedRoom(roomCode)`
+- `deriveRoomDeterministicSeed(roomLike)`
 
-- send/listen/report chat messages
-- room-scoped chat state and limits
+`app/js/multiplayer/presence.js`
 
-`public/app/js/multiplayer/social.js`
+- `startPresence(roomId, getPoseFn)`
+- `stopPresence()`
+- `listenPlayers(roomId, callback)`
 
-- friends CRUD
-- incoming invite listener and updates
-- invite send flow with cooldown gate
-- recent player writes/listeners
+Timing constants:
 
-`public/app/js/multiplayer/artifacts.js`
+- heartbeat: `3000ms`
+- min write interval: `2000ms`
+- movement threshold: `1.0m`
+- rotation threshold: `0.08 rad`
 
-- shared artifacts CRUD
-- room home-base state read/write
+`app/js/multiplayer/ghosts.js`
 
-`public/app/js/multiplayer/painttown.js`
+- `createGhostManager(scene, options)`
 
-- PaintTown room-state sync and claim propagation
+Current behavior:
 
-## 3. PaintTown Runtime Notes
+- mode-based remote proxies (character/car/drone/space)
+- velocity extrapolation
+- damped interpolation and yaw smoothing
+- teleport distance clamp
+- 30 FPS ghost tick budget
 
-Main implementation lives in `game.js`.
+`app/js/multiplayer/chat.js`
 
-### State highlights
+- `sendMessage(roomId, text)`
+- `listenChat(roomId, callback)`
+- `reportMessage(roomId, messageId, reason)`
 
-- `paintballs[]` active projectile pool
-- `paintSplats[]` temporary ground/impact visual pool
-- `claimsByKey` authoritative paint ownership state
-- color counters and leaderboard submission hooks
+Spam/safety controls:
 
-### Input bindings
+- max length: 500
+- client interval/burst/duplicate gates
+- server interval/burst gates via `chatState`
+- contact/link pattern blocking
+- profanity masking
 
-- `Ctrl` fires paintball from center aim
-- `G`/`P` alternate fire keys
-- `T` toggles tool
-- `1-6` choose color
-- left click handles touch/tool paint action
-- right click no longer triggers paint fire
+`app/js/multiplayer/social.js`
 
-### Camera interaction
+- `addFriend`, `removeFriend`
+- `sendInviteToFriend`
+- `listenFriends`, `listenIncomingInvites`, `listenRecentPlayers`
+- `markInviteSeen`, `dismissInvite`
 
-- right/middle mouse hold for look
-- double-click walk camera toggle removed
+`app/js/multiplayer/ui-room.js`
 
-## 4. Firestore Rules Focus Areas
+- multiplayer panel wiring
+- saved-room list rendering and open/delete handlers
+- chat drawer wiring
+- entitlement checks + invite trial path
 
-`firestore.rules` enforces:
+## 3. Paint the Town Runtime Notes
 
-- entitlement gate for multiplayer operations
-- per-plan room create limits
-- transactional room create quota consumption
-- room/private visibility rules
-- player doc self-write only + rate throttle
-- chat validation and membership checks
-- invite validity and anti-forgery checks
-- artifact and home-base ownership/manager checks
+Main implementation: `app/js/game.js`.
 
-## 5. Cloud Function API Surface
+State highlights:
 
-From `functions/index.js`:
+- `paintballs[]`
+- `paintSplats[]`
+- `claimsByKey`
+- `colorCounts`
+
+Input highlights:
+
+- `Ctrl`/`G`/`P` fire paintball
+- `1-6` color select
+- `T` tool toggle
+- pointer/touch paint by active tool and room rule
+
+Physics/perf highlights:
+
+- projectile arc with gravity
+- max active paintballs cap
+- splat lifetime cleanup
+- multiplayer claim publish hook
+
+## 4. Account and Billing Technical Notes
+
+Frontend modules:
+
+- `js/auth-ui.js`
+- `js/entitlements.js`
+- `js/billing.js`
+- `js/firebase-init.js`
+
+Account page:
+
+- `account/index.html` (module script section wires auth/entitlements/billing/social)
+
+Functions backend:
+
+- `functions/index.js`
+
+Endpoints:
 
 - `createCheckoutSession`
 - `createPortalSession`
@@ -102,35 +143,48 @@ From `functions/index.js`:
 - `getAccountOverview`
 - `listBillingReceipts`
 - `updateAccountProfile`
+- `deleteAccount`
 - `stripeWebhook`
 
-## 6. Testing
+## 5. Firestore Rules and Data Integrity
 
-### Firestore rules security tests
+Rules file: `firestore.rules`
+
+Notable validation families:
+
+- room payload and update validators
+- user profile and quota validators
+- player/presence validators
+- chat/chatState validators
+- social and invite validators
+- blocks/claims/artifacts/homeBase validators
+
+Indexes file: `firestore.indexes.json`
+
+- public city query index
+- featured room query index
+
+## 6. Testing and Verification
+
+Rules test runner:
 
 ```bash
 npm test
 ```
 
-Uses `scripts/test-rules.mjs` (cross-platform Java detection) and executes:
-
-- `tests/firestore.rules.security.test.mjs`
-
-### PaintTown integration test
+PaintTown integration:
 
 ```bash
 node tests/painttown.integration.test.mjs
 ```
 
-Validates:
+Artifacts:
 
-- deterministic seeding behavior
-- touch paint flow
-- gun/physics paint claim flow
+- rules logs via emulator output
+- Playwright screenshots/reports under `output/playwright/*`
 
-## 7. Performance Guardrails
+## 7. Control Reference
 
-- presence writes throttled and threshold-gated
-- chat query windows bounded
-- paintball/splat pools bounded and auto-pruned
-- transient Firestore docs should include `expiresAt` for TTL cleanup
+Canonical control matrix is maintained in:
+
+- `CONTROLS_REFERENCE.md`

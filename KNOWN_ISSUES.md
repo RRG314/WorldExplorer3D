@@ -1,6 +1,6 @@
 # Known Issues
 
-Last reviewed: 2026-02-23
+Last reviewed: 2026-02-25
 
 Current risks and follow-up items for this branch.
 

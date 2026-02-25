@@ -1,163 +1,156 @@
 # World Explorer
 
-Last reviewed: 2026-02-23
+Last reviewed: 2026-02-25
 
-World Explorer is a browser-based 3D exploration game platform with:
+World Explorer is a browser-native 3D exploration platform with real-location traversal, game modes, multiplayer rooms, account/billing, and Firebase-backed persistence.
+
+## Runtime Surfaces
+
+- Root landing: `/index.html`
+- App runtime: `/app/index.html`
+- Account center: `/account/index.html`
+- About page: `/about/index.html`
+- Legal pages: `/legal/privacy`, `/legal/terms`
+
+## Core Product Features
 
 - Earth, Moon, and Space traversal
-- Single-player game modes (including Paint the Town)
-- Multiplayer rooms with live presence, chat, invites, friends, and shared artifacts
-- Account management (plan, trial, username, linked email, receipts, room quota)
-- Firebase Auth + Firestore data/security + Stripe billing
+- Game modes:
+  - Free Roam
+  - Time Trial
+  - Checkpoints
+  - Paint the Town
+  - Police Chase
+  - Find the Flower
+- Multiplayer platform:
+  - private/public rooms
+  - room code + invite links
+  - saved rooms (open again later)
+  - owner delete for owned rooms
+  - live presence, chat, friends, invites, recent players
+  - shared blocks, paint claims, artifacts, home base
+- Account center:
+  - plan/trial state
+  - room quota usage
+  - username + linked email + providers
+  - Stripe billing portal + receipts
+  - permanent account closure (self-serve delete flow)
 
-## Runtime Entrypoints
+## Multiplayer Rendering and Update Model
 
-The repository supports both hosting layouts:
+Current ghost rendering is no longer bubble-only:
 
-- Root runtime: `/index.html` + `/js/*` (GitHub Pages branch-root mode)
-- Firebase/public runtime: `public/app/index.html` + `public/app/js/*`
+- walking players render as character proxies
+- driving players render as car proxies
+- drone/space modes render as dedicated lightweight proxies
+- remote motion uses interpolation + extrapolation + teleport clamping for smoother movement on 3s presence heartbeats
 
-Both runtimes are kept aligned for gameplay controls and multiplayer behavior.
+## Access and Quotas
 
-## Core Features
+- `Free`: multiplayer locked
+- `Trial` (2 days): multiplayer enabled, room create limit `3`
+- `Supporter`: multiplayer enabled, room create limit `3`
+- `Pro`: multiplayer enabled, room create limit `10`
+- Admin tester mode: allowlist-only, higher room limit
 
-### Exploration and modes
+## Controls
 
-- Free Roam
-- Time Trial
-- Checkpoints
-- Paint the Town
-- Police Chase
-- Find the Flower
+Full controls are documented in:
 
-### Paint the Town
+- `CONTROLS_REFERENCE.md`
+- in-app `Controls` tab
 
-- Touch paint and paintball gun options
-- Real projectile arc with gravity
-- Paintball splats fade automatically to protect performance
-- Multiplayer color competition and shared paint claims
-- Minimal HUD (time + painted count) with expandable details
+Paint the Town key controls:
 
-### Multiplayer platform
+- `Ctrl` (and `G` / `P`) fires paintball shots
+- `1-6` picks color
+- `T` toggles touch vs gun tool
+- right-click camera look is enabled
+- double-left-click camera toggle is disabled
 
-- Private/public rooms with owner/mod controls
-- Room code join + invite-link join
-- Presence and ghost markers
-- Room chat with spam controls
-- Friends, incoming invites, recent players
-- Shared artifacts and room home base state
+## Firestore Security and TTL
 
-## Plan and Access Model
+Firestore rules enforce:
 
-- `Free`
-  - Single-player access
-  - No multiplayer room create/join
-- `Trial` (2 days)
-  - Multiplayer unlocked temporarily
-  - Can be started from account or invite flow (when eligible)
-  - Room create limit: `3`
-- `Supporter` ($1/month)
-  - Multiplayer enabled
-  - Room create limit: `3`
-- `Pro` ($5/month)
-  - Multiplayer enabled
-  - Room create limit: `10`
-  - Extras section shows upcoming demo messaging
-- Admin tester mode is allowlist-only and hidden for non-eligible users.
+- authenticated access for protected data
+- room membership and ownership boundaries
+- room quota write coupling
+- presence self-write and write throttling
+- chat validation and anti-spam state checks
+- friend/invite ownership constraints
 
-## Input and Camera Controls (Paint the Town)
+TTL `expiresAt` should be enabled for:
 
-- Fire paintball from center aim: `Ctrl` (`ControlLeft` / `ControlRight`)
-- Alternate fire keys: `G` / `P`
-- Color quick-select: `1-6`
-- Toggle tool: `T`
-- Mouse painting: left click only (no right-click paint fire)
-- Camera look: right-click or middle-click hold
-- Double-left-click camera toggle is disabled
-
-## Firestore Security and Cost Controls
-
-Implemented protections include:
-
-- Auth required for protected writes
-- Room membership checks for room data access
-- Presence write throttling (`>= 2s` between updates)
-- Chat payload validation + cooldown state checks
-- Friends/invite ownership checks
-- Room quota enforcement via user counters and rules
-- Strict field validation for room/player/chat/artifact/state payloads
-
-TTL cleanup is expected on these collection groups (configure in Firestore Console):
-
-- `players.expiresAt`
-- `chat.expiresAt`
-- `chatState.expiresAt`
-- `incomingInvites.expiresAt`
-- `recentPlayers.expiresAt`
-- `activityFeed.expiresAt`
-- `artifacts.expiresAt`
+- `players`
+- `chat`
+- `chatState`
+- `incomingInvites`
+- `recentPlayers`
+- `activityFeed`
+- `artifacts`
 
 ## Repository Layout
 
-```text
-public/
-  index.html
-  app/index.html
-  app/js/multiplayer/*
-  account/index.html
-  js/*                        # auth/entitlements/billing/firebase config
-functions/
-  index.js                    # billing/account/trial/admin APIs + Stripe webhook
-firestore.rules
-firestore.indexes.json
-tests/
-  firestore.rules.security.test.mjs
-  painttown.integration.test.mjs
-scripts/
-  test-rules.mjs
-index.html                    # root runtime entry
-js/*                          # root runtime modules
-```
+Active runtime and backend paths:
+
+- `app/` -> primary app surface (`/app`)
+- `js/` -> root compatibility/runtime glue and shared account/auth/billing modules
+- `public/` -> Firebase Hosting root mirror
+- `functions/` -> Cloud Functions API and Stripe webhook
+- `tests/` -> Firestore rules and PaintTown integration tests
+
+Reference/legacy folders not used by active app routing:
+
+- `WorldExplorer3D-rdt-engine/`
+- `_style_reference_worldexplorer3d/`
+- `world-explorer-esm/`
 
 ## Local Development
+
+Install dependencies:
 
 ```bash
 cd "/Users/stevenreid/Documents/New project"
 npm install
 cd functions && npm install && cd ..
+```
+
+Run Firebase-style local static hosting (`public` root):
+
+```bash
 python3 -m http.server --directory public 4173
 ```
 
 Open:
 
-- `http://localhost:4173/`
-- `http://localhost:4173/app/`
-- `http://localhost:4173/account/`
+- `http://127.0.0.1:4173/`
+- `http://127.0.0.1:4173/app/`
+- `http://127.0.0.1:4173/account/`
 
 ## Testing
 
-Firestore rules/security tests:
+Rules/security test suite:
 
 ```bash
 npm test
 ```
 
-PaintTown deterministic seed + physics integration check:
+PaintTown deterministic seed + paintball flow test:
 
 ```bash
 node tests/painttown.integration.test.mjs
 ```
 
-## Deploy
+## Deployment
 
-### GitHub Pages (branch root)
+GitHub Pages (branch root) and Firebase Hosting are both supported.
 
-1. GitHub -> `Settings -> Pages`
-2. Source: `Deploy from a branch`
-3. Branch: `steven/product` (or your target)
-4. Folder: `/ (root)`
+GitHub Pages:
 
-### Firebase
+- source branch: `steven/product`
+- folder: `/ (root)`
+
+Firebase:
 
 ```bash
 firebase use worldexplorer3d-d9b83
@@ -168,6 +161,7 @@ firebase deploy
 
 - `QUICKSTART.md`
 - `USER_GUIDE.md`
+- `CONTROLS_REFERENCE.md`
 - `ARCHITECTURE.md`
 - `TECHNICAL_DOCS.md`
 - `API_SETUP.md`
@@ -175,4 +169,4 @@ firebase deploy
 - `KNOWN_ISSUES.md`
 - `CHANGELOG.md`
 - `DOCUMENTATION_INDEX.md`
-- `COMPLETE_INVENTORY_REPORT_2026-02-22.md`
+- `COMPLETE_INVENTORY_REPORT_2026-02-25.md`

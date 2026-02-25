@@ -1,105 +1,154 @@
 # User Guide
 
-Last reviewed: 2026-02-23
+Last reviewed: 2026-02-25
 
-This guide covers current player-facing behavior for app, multiplayer, and account pages.
+This guide explains current player-facing behavior across app, multiplayer, and account features.
 
-## 1. Start and Sign In
+## 1. Sign In and Navigation
 
-- Main app: `/app/`
-- Account page: `/account/`
-- Sign in with Email/Password or Google.
+Main routes:
 
-## 2. Plans and Multiplayer Access
+- App: `/app/`
+- Account: `/account/`
+- About: `/about/`
 
-- `Free`: multiplayer locked.
-- `Trial` (2 days): multiplayer unlocked temporarily.
-- `Supporter`: multiplayer unlocked, room create limit `3`.
-- `Pro`: multiplayer unlocked, room create limit `10`, extras messaging.
+Use `Sign In / Sign Up` to authenticate with Email/Password or Google.
 
-Free users can start trial from account flow and eligible invite flow.
+## 2. Plans, Trial, and Multiplayer Access
 
-## 3. Profile and Account Data
+- `Free`: single-player only, multiplayer locked
+- `Trial` (2 days): multiplayer enabled temporarily, room limit `3`
+- `Supporter`: multiplayer enabled, room limit `3`
+- `Pro`: multiplayer enabled, room limit `10`
 
-Account page includes:
+Invite flow behavior:
 
-- Username (display name) edit/save
-- Linked email + verification state
-- Account UID and auth providers
-- Plan and trial status
-- Room quota usage
-- Billing status and Stripe receipts
-- Friends list and incoming invites
+- existing multiplayer-enabled users go straight to room join
+- free users can start trial from invite and then join
+
+## 3. Account Page Features
+
+The account page includes:
+
+- plan and trial status
+- room quota (`created / limit`)
+- extras card
+- admin status (allowlisted accounts only)
+- username update
+- linked email + verification state
+- account UID + auth providers
+- billing portal and receipt list
+- friends list and incoming invites
+- close account (permanent delete with confirmation and recent-sign-in safety check)
 
 ## 4. Friends and Invites
 
-From account page:
-
-1. Add friend using their account UID.
+1. Add friend by UID.
 2. Enter room code and optional message.
-3. Send invite to friend.
-4. Invitee opens invite link to jump into room flow.
+3. Send invite.
+4. Invitee opens join action and enters app multiplayer tab with room code prefilled.
 
-Users can remove friends and dismiss/mark invites.
+You can remove friends and dismiss invites.
 
-## 5. Multiplayer Room Flow
+## 5. Multiplayer Rooms
 
-In Multiplayer tab:
+### Create room
 
-- Create room (private/public, optional name, optional location tag)
-- Join by room code or invite link
-- Share invite link
-- Leave room
-- Open room panel and chat
+In `Multiplayer` tab:
 
-Room settings support owner-managed updates and optional public discovery fields.
+- choose visibility (`Private` or `Public`)
+- optional room name
+- optional location tag
+- click `Create`
 
-## 6. Game Modes
+### Join room
 
-- Free Roam
-- Time Trial
-- Checkpoints
-- Paint the Town
-- Police Chase
-- Find the Flower
+- enter 6-character code and click `Join`
+- or open invite link with `?room=AB12CD`
 
-## 7. Paint the Town Controls
+### Save/open/delete room
 
-### Minimal HUD
+Saved room behavior:
 
-Collapsed HUD shows:
+- rooms you create or join are saved under your account (`users/{uid}/myRooms/{roomCode}`)
+- use `Open` on saved room list to return to that room
+- if you are owner, `Delete` permanently removes the room document
+- room documents persist until owner deletion (TTL does not delete room docs)
 
-- Remaining time
-- Painted buildings count
+### Leave room
 
-Tap/click HUD to expand advanced controls.
+- `Leave` exits active room and stops your presence heartbeat
 
-### Paint controls
+## 6. Multiplayer Data Lifetime
 
-- Fire paintball from center: `Ctrl`
-- Alternate fire: `G` or `P`
-- Select color: `1-6`
-- Toggle touch/gun tool: `T`
-- Left click/touch: paint interaction based on active tool/rules
+Persistent until explicit delete:
 
-### Camera controls in gameplay
+- room docs
+- saved room shortcuts (`myRooms`)
+- room settings
+- shared blocks
+- paint claims
+- home base state
 
-- Right-click hold or middle-click hold: camera look
-- Double-left-click camera toggle is disabled
+TTL-managed cleanup:
 
-## 8. Chat and Safety
+- `players`
+- `chat`
+- `chatState`
+- `incomingInvites`
+- `recentPlayers`
+- `activityFeed`
+- `artifacts`
 
-Room chat is member-only and filtered by server rules:
+## 7. Chat and Safety
 
-- message size limits
-- write rate checks
-- membership checks
+Chat protections:
 
-Reported/flagged messages are supported by chat state fields.
+- max message length: 500
+- duplicate suppression window
+- client and server cooldown + burst limits
+- links/contact handles blocked
+- profanity masking
+- report action writes report flags
 
-## 9. Troubleshooting
+## 8. Paint the Town
 
-- If multiplayer stays locked: check current plan/trial in account page.
-- If invites fail: verify friend relationship exists first.
-- If receipts missing: refresh receipts on account page and verify Stripe subscription.
-- If room data lags: allow a short delay for snapshot updates and TTL cleanup.
+Key behavior:
+
+- choose color, claim buildings by touch or paintball gun
+- paintballs follow projectile arc with gravity
+- paint splats auto-expire for performance
+- minimal HUD collapsed by default (`Time`, `Painted`) and expandable for details
+
+Controls:
+
+- fire paintball: `Ctrl` (also `G` / `P`)
+- choose color: `1-6`
+- toggle tool: `T`
+- left click/tap paints according to active tool and room rules
+
+## 9. Camera and Input Basics
+
+- right-click or middle-click hold: camera look
+- double-left-click camera toggle: disabled
+
+For full control mapping by mode, see `CONTROLS_REFERENCE.md`.
+
+## 10. Mobile Behavior
+
+Mobile controls provide virtual pads and action buttons for:
+
+- driving
+- walking
+- drone
+- rocket
+
+Mobile and desktop share the same gameplay systems and multiplayer state.
+
+## 11. Troubleshooting
+
+- If `Create`/`Join` does nothing, hard refresh and verify current user is signed in.
+- If room actions fail with permissions, confirm deployed Firestore rules and active plan/trial.
+- If saved room `Open` fails, confirm the room code exists and owner has not deleted the room.
+- If invites fail, verify friend relationship exists first.
+- If billing/receipts are missing, refresh account data and inspect function logs.

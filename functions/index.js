@@ -8,6 +8,7 @@ const db = admin.firestore();
 const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
 const ALLOWED_PLANS = new Set(['support', 'supporter', 'pro']);
 const TRIAL_DURATION_MS = 48 * 60 * 60 * 1000;
+const DELETE_ACCOUNT_MAX_AUTH_AGE_SECONDS = 10 * 60;
 const ADMIN_TEST_ROOM_CREATE_LIMIT = 10000;
 const ROOM_CREATE_LIMITS = Object.freeze({
   free: 0,
@@ -131,9 +132,53 @@ function hasActiveSubscription(status) {
   return ACTIVE_SUB_STATUSES.has(String(status || '').toLowerCase());
 }
 
+function normalizeOrigin(value) {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    return `${parsed.protocol}//${parsed.host}`.toLowerCase();
+  } catch (_) {
+    return '';
+  }
+}
+
+function allowedOrigins() {
+  const cfg = functions.config().cors || {};
+  const configured = parseCsvSet(cfg.allowed_origins || process.env.WE3D_ALLOWED_ORIGINS || '', normalizeOrigin);
+  const projectId = String(process.env.GCLOUD_PROJECT || '').trim();
+  const defaults = new Set([
+    'https://rrg314.github.io'
+  ]);
+
+  if (projectId) {
+    defaults.add(`https://${projectId}.web.app`);
+    defaults.add(`https://${projectId}.firebaseapp.com`);
+  }
+
+  configured.forEach((origin) => defaults.add(origin));
+  return defaults;
+}
+
+function originIsAllowed(origin, allowlist) {
+  const normalized = normalizeOrigin(origin);
+  if (!normalized) return false;
+  if (normalized.startsWith('http://localhost:')) return true;
+  if (normalized.startsWith('http://127.0.0.1:')) return true;
+  return allowlist.has(normalized);
+}
+
 function setCors(req, res) {
-  const origin = req.get('origin') || '*';
-  res.set('Access-Control-Allow-Origin', origin);
+  const requestOrigin = req.get('origin') || '';
+  const allowlist = allowedOrigins();
+
+  if (requestOrigin && !originIsAllowed(requestOrigin, allowlist)) {
+    res.status(403).json({ error: 'Origin not allowed.' });
+    return true;
+  }
+
+  const allowOrigin = requestOrigin || '*';
+  res.set('Access-Control-Allow-Origin', allowOrigin);
   res.set('Vary', 'Origin');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
@@ -219,6 +264,66 @@ function parsePositiveInt(value, fallback = 20, min = 1, max = 50) {
   const n = Number(value);
   if (!Number.isFinite(n)) return fallback;
   return Math.max(min, Math.min(max, Math.floor(n)));
+}
+
+async function deleteDocsByQuery(query, batchSize = 200) {
+  const limit = Math.max(10, Math.min(500, Number(batchSize) || 200));
+  while (true) {
+    const snap = await query.limit(limit).get();
+    if (snap.empty) return;
+    const batch = db.batch();
+    snap.docs.forEach((doc) => batch.delete(doc.ref));
+    await batch.commit();
+    if (snap.size < limit) return;
+  }
+}
+
+async function deleteRoomTree(roomRef) {
+  if (db && typeof db.recursiveDelete === 'function') {
+    await db.recursiveDelete(roomRef);
+    return;
+  }
+
+  const subcollections = ['players', 'chat', 'chatState', 'artifacts', 'blocks', 'paintClaims', 'state'];
+  for (const name of subcollections) {
+    await deleteDocsByQuery(roomRef.collection(name));
+  }
+  await roomRef.delete();
+}
+
+async function deleteUserData(uid) {
+  if (!uid) return;
+
+  const userRef = db.collection('users').doc(uid);
+
+  const ownedRoomsSnap = await db.collection('rooms').where('ownerUid', '==', uid).get();
+  for (const roomDoc of ownedRoomsSnap.docs) {
+    await deleteRoomTree(roomDoc.ref);
+  }
+
+  await deleteDocsByQuery(db.collectionGroup('players').where('uid', '==', uid));
+  await deleteDocsByQuery(db.collectionGroup('chatState').where('uid', '==', uid));
+  await deleteDocsByQuery(db.collectionGroup('friends').where('uid', '==', uid));
+  await deleteDocsByQuery(db.collectionGroup('recentPlayers').where('uid', '==', uid));
+  await deleteDocsByQuery(db.collectionGroup('incomingInvites').where('fromUid', '==', uid));
+  await deleteDocsByQuery(db.collectionGroup('artifacts').where('ownerUid', '==', uid));
+  await deleteDocsByQuery(db.collectionGroup('blocks').where('createdBy', '==', uid));
+  await deleteDocsByQuery(db.collectionGroup('paintClaims').where('uid', '==', uid));
+
+  await deleteDocsByQuery(db.collection('flowerLeaderboard').where('uid', '==', uid));
+  await deleteDocsByQuery(db.collection('paintTownLeaderboard').where('uid', '==', uid));
+  await deleteDocsByQuery(db.collection('activityFeed').where('uid', '==', uid));
+  await db.collection('explorerLeaderboard').doc(uid).delete().catch(() => {});
+
+  if (db && typeof db.recursiveDelete === 'function') {
+    await db.recursiveDelete(userRef);
+  } else {
+    await deleteDocsByQuery(userRef.collection('friends'));
+    await deleteDocsByQuery(userRef.collection('recentPlayers'));
+    await deleteDocsByQuery(userRef.collection('incomingInvites'));
+    await deleteDocsByQuery(userRef.collection('myRooms'));
+    await userRef.delete().catch(() => {});
+  }
 }
 
 function timestampToMillis(value) {
@@ -830,6 +935,76 @@ exports.updateAccountProfile = functions.region('us-central1').https.onRequest(a
   } catch (err) {
     console.error('[updateAccountProfile] failed:', err);
     res.status(500).json({ error: 'Unable to update account profile.' });
+  }
+});
+
+exports.deleteAccount = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  const confirmation = String(req.body && req.body.confirmation ? req.body.confirmation : '').trim();
+  if (confirmation !== 'DELETE') {
+    res.status(400).json({ error: 'Confirmation token is missing. Send confirmation: DELETE.' });
+    return;
+  }
+
+  const authTimeSec = Number(auth.auth_time || 0);
+  const nowSec = Math.floor(Date.now() / 1000);
+  if (!Number.isFinite(authTimeSec) || authTimeSec <= 0 || nowSec - authTimeSec > DELETE_ACCOUNT_MAX_AUTH_AGE_SECONDS) {
+    res.status(401).json({ error: 'Recent sign-in required. Sign out and sign in again, then retry account deletion.' });
+    return;
+  }
+
+  try {
+    const uid = auth.uid;
+    const userRef = db.collection('users').doc(uid);
+    const authUser = await admin.auth().getUser(uid);
+    const userSnap = await userRef.get();
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+
+    const stripeCustomerId = String(userData.stripeCustomerId || '').trim();
+    const stripeSubscriptionId = String(userData.stripeSubscriptionId || '').trim();
+    if (stripeSubscriptionId) {
+      const stripe = getStripeClient();
+      if (stripeCustomerId) {
+        const ownedByUser = await assertStripeCustomerOwnership(
+          stripe,
+          stripeCustomerId,
+          uid,
+          authUser.email || userData.email || ''
+        );
+        if (!ownedByUser) {
+          res.status(403).json({ error: 'Unable to verify billing ownership for account deletion.' });
+          return;
+        }
+      }
+
+      try {
+        const subscription = await stripe.subscriptions.retrieve(stripeSubscriptionId);
+        const normalizedStatus = String(subscription && subscription.status ? subscription.status : '').toLowerCase();
+        if (normalizedStatus && normalizedStatus !== 'canceled' && normalizedStatus !== 'incomplete_expired') {
+          await stripe.subscriptions.cancel(stripeSubscriptionId);
+        }
+      } catch (err) {
+        console.error('[deleteAccount] subscription cancel failed:', err);
+        res.status(500).json({ error: 'Could not cancel active subscription. Try again or contact support.' });
+        return;
+      }
+    }
+
+    await deleteUserData(uid);
+    await admin.auth().deleteUser(uid);
+
+    res.status(200).json({ deleted: true });
+  } catch (err) {
+    console.error('[deleteAccount] failed:', err);
+    res.status(500).json({ error: 'Unable to delete account right now.' });
   }
 });
 

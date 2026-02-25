@@ -166,3 +166,8 @@ export async function enableAdminTester() {
   const payload = await postFunction('/enableAdminTester', {});
   return payload || {};
 }
+
+export async function deleteAccount() {
+  const payload = await postFunction('/deleteAccount', { confirmation: 'DELETE' });
+  return payload || {};
+}

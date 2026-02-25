@@ -139,6 +139,7 @@
     .btn-supporter { background: #5fc8ff; color: #06253e; }
     .btn-pro { background: var(--gold); color: #392700; }
     .btn-ghost { background: rgba(8, 22, 40, 0.58); border-color: var(--line); color: var(--ink); }
+    .btn-danger { background: #b93844; border-color: #e18289; color: #fff3f4; }
 
     .plans {
       display: grid;
@@ -414,6 +415,7 @@
         <button id="manageBillingBtn" class="btn-ghost" type="button">Manage Billing</button>
         <button id="refreshAccountBtn" class="btn-ghost" type="button">Refresh Account Data</button>
         <button id="signOutBtn" class="btn-ghost" type="button">Sign Out</button>
+        <button id="deleteAccountBtn" class="btn-danger" type="button">Delete Account</button>
       </div>
 
       <p id="statusLine"></p>
@@ -525,8 +527,9 @@
       listBillingReceipts,
       redirectToCheckout,
       redirectToPortal,
-      updateAccountProfile
-    } from '../js/billing.js?v=55';
+      updateAccountProfile,
+      deleteAccount
+    } from '../js/billing.js?v=56';
     import {
       addFriend,
       dismissInvite,
@@ -548,6 +551,7 @@
     const refreshAccountBtn = document.getElementById('refreshAccountBtn');
     const saveUsernameBtn = document.getElementById('saveUsernameBtn');
     const refreshReceiptsBtn = document.getElementById('refreshReceiptsBtn');
+    const deleteAccountBtn = document.getElementById('deleteAccountBtn');
     const usernameValue = document.getElementById('usernameValue');
     const usernameInput = document.getElementById('usernameInput');
     const emailValue = document.getElementById('emailValue');
@@ -636,7 +640,7 @@
     }
 
     function setBusy(busy) {
-      [signInBtn, signOutBtn, upgradeSupporterBtn, upgradeProBtn, enableAdminBtn, manageBillingBtn, refreshAccountBtn, saveUsernameBtn, refreshReceiptsBtn, addFriendBtn].forEach((btn) => {
+      [signInBtn, signOutBtn, upgradeSupporterBtn, upgradeProBtn, enableAdminBtn, manageBillingBtn, refreshAccountBtn, saveUsernameBtn, refreshReceiptsBtn, addFriendBtn, deleteAccountBtn].forEach((btn) => {
         if (!btn) return;
         btn.disabled = busy;
       });
@@ -1119,6 +1123,47 @@
       } catch (err) {
         console.error('[account] sign-out failed:', err);
         setStatus('Could not sign out.', 'warn');
+      } finally {
+        setBusy(false);
+      }
+    });
+
+    deleteAccountBtn.addEventListener('click', async () => {
+      if (!signedInUser) return;
+
+      const typed = globalThis.prompt('Type DELETE to permanently remove your account.');
+      if (typed !== 'DELETE') {
+        setStatus('Account deletion canceled.', 'warn');
+        return;
+      }
+
+      const confirmed = globalThis.confirm(
+        'This permanently deletes your account, profile, friends, invites, saved rooms, and owned rooms. This cannot be undone.'
+      );
+      if (!confirmed) {
+        setStatus('Account deletion canceled.', 'warn');
+        return;
+      }
+
+      setBusy(true);
+      setStatus('Deleting account...');
+      try {
+        await deleteAccount();
+        clearSubscriptions();
+        signedInUser = null;
+        try {
+          await signOutUser();
+        } catch (_) {
+          // User may already be deleted in Auth; ignore sign-out errors.
+        }
+        renderSignedOutState();
+        setStatus('Account deleted. Redirecting to home...', 'ok');
+        globalThis.setTimeout(() => {
+          globalThis.location.assign('../');
+        }, 1200);
+      } catch (err) {
+        console.error('[account] delete account failed:', err);
+        setStatus(err && err.message ? err.message : 'Could not delete account.', 'warn');
       } finally {
         setBusy(false);
       }

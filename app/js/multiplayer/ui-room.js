@@ -8,7 +8,7 @@ import {
   upsertSharedBlock
 } from './blocks.js?v=61';
 import { CHAT_MAX_LENGTH, listenChat, reportMessage, sendMessage } from './chat.js?v=55';
-import { createGhostManager } from './ghosts.js?v=55';
+import { createGhostManager } from './ghosts.js?v=56';
 import {
   bumpExplorerLeaderboard,
   listenExplorerLeaderboard

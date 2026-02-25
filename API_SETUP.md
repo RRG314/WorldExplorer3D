@@ -1,6 +1,6 @@
 # API and Service Setup Guide
 
-Last reviewed: 2026-02-23
+Last reviewed: 2026-02-25
 
 Setup checklist for Firebase, Firestore, and Stripe used by the current platform.
 
@@ -33,6 +33,8 @@ firebase deploy --only firestore:indexes
 
 ### 3.2 Active collections
 
+Top-level:
+
 - `users`
 - `rooms`
 - `flowerLeaderboard`
@@ -46,6 +48,7 @@ Room subcollections:
 - `chat`
 - `chatState`
 - `artifacts`
+- `blocks`
 - `paintClaims`
 - `state`
 
@@ -54,8 +57,9 @@ User subcollections:
 - `friends`
 - `recentPlayers`
 - `incomingInvites`
+- `myRooms`
 
-### 3.3 TTL policies (recommended)
+### 3.3 TTL policies
 
 Create TTL policies on `expiresAt` for collection groups:
 
@@ -67,9 +71,34 @@ Create TTL policies on `expiresAt` for collection groups:
 - `activityFeed`
 - `artifacts`
 
-Important: TTL is asynchronous cleanup. Client-side stale filtering is still required for real-time UX.
+TTL is asynchronous cleanup. Keep client-side stale filtering for real-time UX.
 
-## 4. Frontend Firebase Config
+## 4. App Check
+
+App Check is optional for this branch configuration.
+
+- If Firestore App Check enforcement is enabled in your Firebase project, configure App Check for this app.
+- If you do not want App Check right now, keep Firestore App Check enforcement disabled.
+
+## 4.1 CORS Allowlist (Functions)
+
+Functions now enforce a CORS origin allowlist.
+
+Defaults allowed:
+
+- `https://rrg314.github.io`
+- `https://worldexplorer3d-d9b83.web.app`
+- `https://worldexplorer3d-d9b83.firebaseapp.com`
+- local dev origins (`http://localhost:*`, `http://127.0.0.1:*`)
+
+Optional custom domains:
+
+```bash
+firebase functions:config:set cors.allowed_origins="https://yourdomain.com,https://staging.yourdomain.com"
+firebase deploy --only functions
+```
+
+## 5. Frontend Firebase Config
 
 Set web config in:
 
@@ -83,20 +112,20 @@ Runtime expects:
 - `appId`
 - optional: `storageBucket`, `messagingSenderId`
 
-Fallback key (local override):
+Local override key:
 
 - `worldExplorer3D.firebaseConfig`
 
-## 5. Stripe Setup
+## 6. Stripe Setup
 
-### 5.1 Products/prices
+### 6.1 Products/prices
 
 Create recurring monthly prices:
 
 - Supporter (`$1`)
 - Pro (`$5`)
 
-### 5.2 Webhook endpoint
+### 6.2 Webhook endpoint
 
 - `https://us-central1-worldexplorer3d-d9b83.cloudfunctions.net/stripeWebhook`
 
@@ -107,7 +136,7 @@ Subscribe to:
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
 
-### 5.3 Function runtime config
+### 6.3 Function runtime config
 
 ```bash
 firebase experiments:enable legacyRuntimeConfigCommands
@@ -119,7 +148,15 @@ firebase functions:config:set \
 firebase deploy --only functions
 ```
 
-## 6. Function Endpoints
+Optional admin allowlist config:
+
+```bash
+firebase functions:config:set \
+  admin.allowed_emails="you@example.com" \
+  admin.allowed_uids="your_uid"
+```
+
+## 7. Function Endpoints
 
 Authenticated endpoints:
 
@@ -127,15 +164,16 @@ Authenticated endpoints:
 - `POST /createPortalSession`
 - `POST /startTrial`
 - `POST /enableAdminTester`
-- `GET /getAccountOverview`
-- `GET /listBillingReceipts`
+- `POST /getAccountOverview`
+- `POST /listBillingReceipts`
 - `POST /updateAccountProfile`
+- `POST /deleteAccount`
 
 Public endpoint:
 
 - `POST /stripeWebhook`
 
-## 7. Validation Commands
+## 8. Validation Commands
 
 Rules tests:
 

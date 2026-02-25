@@ -1,90 +1,107 @@
 # Architecture
 
-Last reviewed: 2026-02-23
+Last reviewed: 2026-02-25
 
-This document describes the current platform architecture for gameplay, multiplayer, account, and billing.
+This document describes the current platform architecture for gameplay, multiplayer, account, billing, and security.
 
 ## 1. System Topology
 
 ### Frontend surfaces
 
-- Root runtime: `index.html` + `js/*` (GitHub Pages branch-root)
-- Firebase/public runtime: `public/app/index.html` + `public/app/js/*`
-- Landing/marketing: `public/index.html`
-- Account: `public/account/index.html`
+- root landing/runtime compatibility: `index.html` + `js/*`
+- main app runtime: `app/index.html` + `app/js/*`
+- account center: `account/index.html`
+- about/legal content: `about/index.html`, `legal/*`
+- Firebase-hosted mirror under `public/*`
 
 ### Backend services
 
 - Firebase Authentication
-- Cloud Firestore (rules + indexes + TTL)
-- Firebase Cloud Functions (`functions/index.js`)
-- Stripe (Checkout, Billing Portal, Webhooks)
+- Cloud Firestore
+- Cloud Functions (`functions/index.js`)
+- Stripe Checkout/Billing Portal/Webhooks
 
 ## 2. Runtime Layers
 
-### Gameplay runtime
+### 2.1 App runtime
 
-- 3D engine and modes in `game.js`, `engine.js`, and related modules
-- PaintTown subsystem with touch + paintball projectile pipeline
-- Mode/rule sync hooks exposed through shared context APIs
+- bootstrap and module load: `app/js/bootstrap.js`, `app/js/modules/*`, `app/js/app-entry.js`
+- engine/state: `engine.js`, `state.js`, `shared-context.js`, `main.js`
+- world and rendering: `world.js`, `terrain.js`, `ground.js`, `map.js`, `sky.js`, `solar-system.js`, `space.js`
+- movement and controls: `input.js`, `physics.js`, `walking.js`, `hud.js`, `ui.js`
+- gameplay systems: `game.js`, `flower-challenge.js`, `blocks.js`, `memory.js`, `real-estate.js`
 
-### Multiplayer runtime modules
+### 2.2 Multiplayer runtime modules (`app/js/multiplayer`)
 
-Under `public/app/js/multiplayer/`:
-
-- `rooms.js`: room create/join/leave/listening and deterministic room seed helpers
-- `presence.js`: heartbeat pose updates and player listeners
-- `chat.js`: room chat send/listen/report helpers
-- `ghosts.js`: ghost markers in world scene
-- `painttown.js`: multiplayer PaintTown state sync
-- `artifacts.js`: shared artifacts and home-base state helpers
+- `rooms.js`: room lifecycle, settings, deterministic seed, saved room shortcuts, owner delete
+- `presence.js`: heartbeat and pose writes, stale filtering
+- `ghosts.js`: remote proxy rendering and smoothing
+- `chat.js`: chat send/listen/report and anti-spam controls
 - `social.js`: friends, invites, recent players
-- `ui-room.js`: room panel, chat drawer, social UI wiring
-- `loop.js`: orchestration
+- `artifacts.js`: shared artifacts and home base
+- `blocks.js`: shared block sync
+- `painttown.js`: paint claim sync
+- `loop.js`: leaderboard and activity feed utilities
+- `ui-room.js`: multiplayer UI orchestration
 
-## 3. Firestore Data Domains
+## 3. Multiplayer State Model
 
-Top-level collections:
+### 3.1 Persistent room state
 
-- `users/{uid}`
+Persistent unless owner deletes room:
+
 - `rooms/{roomId}`
-- `flowerLeaderboard/{entryId}`
-- `paintTownLeaderboard/{entryId}`
-- `activityFeed/{entryId}`
-- `explorerLeaderboard/{uid}`
+- `users/{uid}/myRooms/{roomCode}`
+- `rooms/{roomId}/blocks/*`
+- `rooms/{roomId}/paintClaims/*`
+- `rooms/{roomId}/state/homeBase`
 
-Room subcollections:
+### 3.2 Ephemeral state with TTL
 
-- `players/{uid}`
-- `chat/{msgId}`
-- `chatState/{uid}`
-- `artifacts/{artifactId}`
-- `paintClaims/{claimId}`
-- `state/homeBase`
+- `rooms/{roomId}/players/*`
+- `rooms/{roomId}/chat/*`
+- `rooms/{roomId}/chatState/*`
+- `users/{uid}/incomingInvites/*`
+- `users/{uid}/recentPlayers/*`
+- `activityFeed/*`
+- `rooms/{roomId}/artifacts/*`
 
-User subcollections:
+Client-side stale filtering is still used for real-time UX.
 
-- `friends/{friendUid}`
-- `recentPlayers/{otherUid}`
-- `incomingInvites/{inviteId}`
+## 4. Multiplayer Visual Sync Model
 
-## 4. Security Architecture (Firestore Rules)
+Presence cadence and filtering:
 
-Key rule guarantees:
+- heartbeat interval: `3s`
+- min write interval: `2s`
+- movement threshold: `1.0m`
+- rotation threshold: `0.08 rad`
+- stale player hide threshold: `15s`
 
-- auth required for protected reads/writes
-- room visibility + membership enforced per room read
-- multiplayer entitlement gate (`trial/supporter/pro`)
-- room create quota checked using user counters
-- owner/mod boundaries for room-managed resources
-- presence write throttle (`respectsPresenceWriteThrottle`)
-- chat content and state transition validation
-- invite sender/receiver ownership validation
-- leaderboard write constraints
+Ghost rendering (`ghosts.js`):
 
-## 5. Billing and Account API Architecture
+- mode-based proxies: `walker`, `car`, `drone`, `space`
+- prediction: velocity-based extrapolation from last server pose
+- smoothing: damped interpolation and yaw smoothing
+- jump protection: teleport clamp for large deltas
+- render cadence: internal tick capped to ~30 FPS
 
-Cloud Functions (`us-central1`):
+## 5. Security Architecture (Firestore Rules)
+
+Rule domains enforce:
+
+- auth and entitlement requirements
+- room visibility/member/owner/mod boundaries
+- room-create quota coupling with user counter writes
+- presence write ownership and throttling checks
+- chat payload + chatState transition validation
+- friend/invite ownership constraints
+- saved-room ownership constraints (`myRooms`)
+- block/claim/artifact/homeBase validation by room permissions
+
+## 6. Billing and Account API Architecture
+
+Functions API (`us-central1`):
 
 - `createCheckoutSession`
 - `createPortalSession`
@@ -93,47 +110,30 @@ Cloud Functions (`us-central1`):
 - `getAccountOverview`
 - `listBillingReceipts`
 - `updateAccountProfile`
+- `deleteAccount`
 - `stripeWebhook`
 
-Account page consumes these APIs and merges with auth + Firestore state for:
+Account page merges:
 
-- profile identity data
-- plan/trial/quota status
-- receipts
-- friends/invites actions
+- Firebase Auth user state
+- Firestore user profile and social data
+- Cloud Function account/billing responses
 
-## 6. PaintTown Input Architecture
-
-Current behavior:
-
-- paintball fire key: `ControlLeft` / `ControlRight` (`Ctrl`)
-- no right-click paint firing
-- left click/touch obeys tool/rule mode
-- right/middle click hold controls camera
-- double-click camera toggle removed
-
-This behavior is synchronized in both runtime code paths:
-
-- `public/app/js/game.js` and `public/app/js/engine.js`
-- `js/game.js` and `js/engine.js`
-
-## 7. Performance and Cleanup Controls
-
-- presence writes throttled (2s+)
-- movement/pose updates gated by thresholds + interval
-- chat query bounded (latest window)
-- paintball and splat arrays capped with TTL-style client cleanup
-- Firestore TTL for expiring collections (`expiresAt` field)
-
-## 8. Deployment Architecture
-
-### GitHub Pages
-
-- Branch-root mode serves root runtime directly.
+## 7. Deployment Architecture
 
 ### Firebase Hosting
 
-- Serves `public/` with route split (`/`, `/app/`, `/account/`, legal pages)
-- Rewrites function endpoints to Cloud Functions where configured
+- hosting root: `public/`
+- function rewrites for account/billing APIs
+- legal page rewrites
 
-Both rely on the same Firebase project config and backend services.
+### GitHub Pages
+
+- branch-root deploy supported
+- root loader routes to `/app/` and uses app module entrypoints
+
+## 8. Validation Architecture
+
+- Firestore rules tests: `tests/firestore.rules.security.test.mjs`
+- PaintTown integration test: `tests/painttown.integration.test.mjs`
+- rule-test launcher: `scripts/test-rules.mjs` (cross-platform Java detection)

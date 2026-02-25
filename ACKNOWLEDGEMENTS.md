@@ -456,7 +456,7 @@ This acknowledgements file is maintained to ensure proper credit is given to all
 **Version**: 1.0.0
 
 If you believe your work should be acknowledged and is not listed, please contact:
-sreid1118@gmail.com
+hello@worldexplorer.app
 
 ---
 
@@ -477,4 +477,4 @@ Thank you all for your contributions to the technologies and standards that make
 Proprietary Software - All Rights Reserved  
 © 2026
 
-For licensing inquiries: sreid1118@gmail.com
+For licensing inquiries: hello@worldexplorer.app

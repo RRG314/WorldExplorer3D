@@ -1,14 +1,14 @@
 # Quick Start
 
-Last reviewed: 2026-02-23
+Last reviewed: 2026-02-25
 
-This is the fastest path to run, test, and deploy the current World Explorer platform.
+Fast path to run, test, and deploy the current World Explorer platform.
 
-## 1. Prerequisites (Free tooling)
+## 1. Prerequisites (Free Tooling)
 
 - Node.js 20+
 - npm
-- Python 3 (for local static hosting)
+- Python 3
 - Firebase CLI (`npm i -g firebase-tools`)
 - Java 21 JRE/JDK (for Firestore emulator tests)
 
@@ -28,27 +28,46 @@ cd functions && npm install && cd ..
 
 ## 3. Run Locally
 
+### Option A: Firebase-hosting style (`public` root)
+
 ```bash
-cd "/Users/stevenreid/Documents/New project"
 python3 -m http.server --directory public 4173
 ```
 
 Open:
 
-- `http://localhost:4173/`
-- `http://localhost:4173/app/`
-- `http://localhost:4173/account/`
+- `http://127.0.0.1:4173/`
+- `http://127.0.0.1:4173/app/`
+- `http://127.0.0.1:4173/account/`
+
+### Option B: branch-root pages style (repository root)
+
+```bash
+python3 -m http.server 4174
+```
+
+Open:
+
+- `http://127.0.0.1:4174/`
 
 ## 4. Quick Functional Check
 
-1. Open `Game Mode` -> select `Paint the Town` -> start game.
-2. Verify controls:
-   - `Ctrl` fires paintball shots
-   - left click paints based on active tool/rules
-   - right-click hold rotates camera
-   - double-left-click does not toggle camera mode
-3. Open Multiplayer tab and verify room panel loads.
-4. Open account page and verify username/friends/invites/receipt sections render.
+1. Open app -> `Games` -> choose `Paint the Town` -> `Explore`.
+2. Validate controls:
+   - `Ctrl` fires paintball
+   - `1-6` color select
+   - `T` toggles paint tool
+   - right-click hold camera look works
+   - double-left-click does not toggle camera
+3. Open Multiplayer tab:
+   - create room
+   - join by code
+   - verify saved room list has `Open` and (owner) `Delete`
+4. Open account page and verify:
+   - plan/trial/quota
+   - username
+   - receipts
+   - friends/invites
 
 ## 5. Firestore Rules/Security Test
 
@@ -56,8 +75,9 @@ Open:
 npm test
 ```
 
-This runs the Firestore emulator and executes:
+Runs:
 
+- `scripts/test-rules.mjs`
 - `tests/firestore.rules.security.test.mjs`
 
 ## 6. PaintTown Integration Test
@@ -66,7 +86,7 @@ This runs the Firestore emulator and executes:
 node tests/painttown.integration.test.mjs
 ```
 
-Output report:
+Report path:
 
 - `output/playwright/painttown-physics-check/report.json`
 
@@ -77,14 +97,12 @@ firebase login
 firebase use worldexplorer3d-d9b83
 ```
 
-Enable Auth providers in Firebase Console:
+Enable auth providers in Firebase Console:
 
 - Email/Password
 - Google
 
-## 8. Stripe Setup (for paid plans)
-
-Set function runtime config values:
+## 8. Stripe Setup (Paid Plans)
 
 ```bash
 firebase experiments:enable legacyRuntimeConfigCommands
@@ -93,17 +111,12 @@ firebase functions:config:set \
   stripe.webhook="whsec_..." \
   stripe.price_supporter="price_..." \
   stripe.price_pro="price_..."
-```
-
-Deploy functions:
-
-```bash
 firebase deploy --only functions
 ```
 
-## 9. Firestore TTL (must configure once)
+## 9. Firestore TTL Setup
 
-Create TTL policies in Firestore Console for these collection groups using `expiresAt`:
+Configure TTL in Firestore Console using `expiresAt` on these collection groups:
 
 - `players`
 - `chat`
@@ -113,24 +126,27 @@ Create TTL policies in Firestore Console for these collection groups using `expi
 - `activityFeed`
 - `artifacts`
 
-TTL is async cleanup. Real-time UX still depends on client-side stale filtering.
+TTL is background cleanup, not real-time state propagation.
 
 ## 10. Deploy
 
-Full deploy:
+### Firebase
 
 ```bash
 firebase deploy
 ```
 
-Or GitHub Pages branch-root publish:
+### GitHub Pages (branch root)
 
-1. Push `steven/product` (or target branch)
-2. GitHub Pages -> Deploy from branch -> `/ (root)`
+1. Push target branch (`steven/product`).
+2. GitHub -> Settings -> Pages.
+3. Source: Deploy from a branch.
+4. Branch: `steven/product`.
+5. Folder: `/ (root)`.
 
 ## 11. Troubleshooting
 
-- If rules tests fail with Java errors: verify `java -version`.
-- If billing fails: verify Stripe key/price/webhook values and function logs.
-- If users cannot sign in: verify Firebase Auth providers and domain allowlist.
-- If multiplayer data fails: verify Firestore rules/indexes deployed and TTL configured.
+- Rules tests fail with Java errors -> verify `java -version`.
+- Multiplayer create/join denied -> redeploy Firestore rules and verify plan/trial state.
+- Saved room open fails -> verify room still exists and owner has not deleted it.
+- Billing errors -> verify Stripe config + function logs.

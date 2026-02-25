@@ -56,6 +56,10 @@
         "function": "enableAdminTester"
       },
       {
+        "source": "/deleteAccount",
+        "function": "deleteAccount"
+      },
+      {
         "source": "/stripeWebhook",
         "function": "stripeWebhook"
       },

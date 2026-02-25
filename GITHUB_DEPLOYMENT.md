@@ -1,8 +1,8 @@
 # GitHub Deployment Guide
 
-Last reviewed: 2026-02-23
+Last reviewed: 2026-02-25
 
-This guide covers publishing the project from repository root on GitHub Pages while still using Firebase/Stripe backends.
+This guide covers publishing from repository root on GitHub Pages while still using Firebase Auth, Firestore, and Stripe backends.
 
 ## 1. Recommended Mode: Branch Root
 
@@ -21,6 +21,11 @@ Root runtime files used by Pages:
 - `index.html`
 - `js/*`
 - `styles.css`
+
+App route files are still required for runtime:
+
+- `app/index.html`
+- `app/js/*`
 
 ## 2. Firebase Dependencies Still Required
 

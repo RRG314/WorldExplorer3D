@@ -1425,3 +1425,20 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - mirrored to `public/js/entitlements.js`
   - Unified entitlement module cache-bust to `v=62` across root/app/account/public entrypoints to avoid stale mixed versions.
   - Validation: `node --check` passed for all changed JS modules, `npm run test:rules` passed (33/33).
+- Multiplayer ghost quality pass (2026-02-24):
+  - Replaced remote ghost sphere marker with mode-based proxy models in `app/js/multiplayer/ghosts.js` (+ mirrored `public/...`):
+    - walk -> blocky character proxy
+    - drive -> car proxy
+    - drone -> quad-style proxy
+    - space -> rocket proxy
+  - Added velocity-aware smoothing/extrapolation:
+    - predicts target between heartbeat updates using pose velocity
+    - damped interpolation with distance-based stiffness
+    - yaw smoothing and simple proxy animation (walker limbs, wheel spin, rotor spin)
+  - Preserved name tags and upgraded placement by proxy type.
+  - Cache-bust updates to force fresh load of new ghost module:
+    - `app/js/multiplayer/ui-room.js` imports `ghosts.js?v=56` (and mirrored public copy)
+    - app module cache bumped to `v=63` (`app-entry`, bootstrap/manifest, and app index references; mirrored public copies)
+  - Validation:
+    - `node --check` passed for changed JS modules.
+    - Playwright smoke: `output/playwright/ghost-proxy-smoke/report.json` reports `ok: true`, with car-like and walker-like mesh signatures and no console/page errors.

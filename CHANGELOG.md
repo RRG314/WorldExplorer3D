@@ -1,5 +1,24 @@
 # Changelog
 
+## [2026-02-25]
+
+### Changed
+
+- Added new full inventory snapshot: `COMPLETE_INVENTORY_REPORT_2026-02-25.md`.
+- Added canonical controls documentation: `CONTROLS_REFERENCE.md`.
+- Refreshed core docs to match current runtime behavior and persisted room flow:
+  - `README.md`
+  - `QUICKSTART.md`
+  - `USER_GUIDE.md`
+  - `ARCHITECTURE.md`
+  - `TECHNICAL_DOCS.md`
+  - `DOCUMENTATION_INDEX.md`
+
+### Notes
+
+- Multiplayer remote visuals now documented as mode-based proxies (character/car/drone/space) with smoothing and extrapolation.
+- Saved room behavior now explicitly documented (open/delete/persistence model).
+
 ## [2026-02-23]
 
 ### Changed
