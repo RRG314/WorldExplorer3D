@@ -89,8 +89,8 @@ function privateRoomDoc() {
   };
 }
 
-function roomCreateDoc(roomCode, ownerUid) {
-  return {
+function roomCreateDoc(roomCode, ownerUid, overrides = {}) {
+  const base = {
     code: roomCode,
     createdAt: serverTimestamp(),
     createdBy: ownerUid,
@@ -118,6 +118,20 @@ function roomCreateDoc(roomCode, ownerUid) {
       allowRoofAutoPaint: true
     }
   };
+  const normalized = { ...base, ...overrides };
+  if (overrides.world) {
+    normalized.world = { ...base.world, ...overrides.world };
+  }
+  if (overrides.rules) {
+    normalized.rules = { ...base.rules, ...overrides.rules };
+  }
+  if (overrides.mods) {
+    normalized.mods = { ...base.mods, ...overrides.mods };
+  }
+  if (overrides.locationTag) {
+    normalized.locationTag = { ...overrides.locationTag };
+  }
+  return normalized;
 }
 
 function userDoc(uid, displayName) {
@@ -323,6 +337,107 @@ await runCheck('owner can create room when stored limit is stale but plan limit 
   const roomCode = 'QT12AD';
   const batch = writeBatch(ownerDb);
   batch.set(doc(ownerDb, 'rooms', roomCode), roomCreateDoc(roomCode, OWNER_UID));
+  batch.set(doc(ownerDb, 'users', OWNER_UID), {
+    roomCreateCount: 1,
+    roomCreateLimit: 3,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await assertSucceeds(batch.commit());
+});
+
+await runCheck('owner can create moon room with quota increment', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'users', OWNER_UID), {
+      plan: 'support',
+      subscriptionStatus: 'active',
+      roomCreateCount: 0,
+      roomCreateLimit: 3
+    }, { merge: true });
+  });
+
+  const roomCode = 'QT12MH';
+  const batch = writeBatch(ownerDb);
+  batch.set(
+    doc(ownerDb, 'rooms', roomCode),
+    roomCreateDoc(roomCode, OWNER_UID, {
+      name: 'Moon Session',
+      world: {
+        kind: 'moon',
+        seed: 'latlon:0.67408,23.47297',
+        lat: 0.67408,
+        lon: 23.47297
+      }
+    })
+  );
+  batch.set(doc(ownerDb, 'users', OWNER_UID), {
+    roomCreateCount: 1,
+    roomCreateLimit: 3,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await assertSucceeds(batch.commit());
+});
+
+await runCheck('owner can create space room with quota increment', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'users', OWNER_UID), {
+      plan: 'support',
+      subscriptionStatus: 'active',
+      roomCreateCount: 0,
+      roomCreateLimit: 3
+    }, { merge: true });
+  });
+
+  const roomCode = 'QT12SP';
+  const batch = writeBatch(ownerDb);
+  batch.set(
+    doc(ownerDb, 'rooms', roomCode),
+    roomCreateDoc(roomCode, OWNER_UID, {
+      name: 'Space Session',
+      world: {
+        kind: 'space',
+        seed: 'latlon:0.00000,0.00000',
+        lat: 0,
+        lon: 0
+      }
+    })
+  );
+  batch.set(doc(ownerDb, 'users', OWNER_UID), {
+    roomCreateCount: 1,
+    roomCreateLimit: 3,
+    updatedAt: serverTimestamp()
+  }, { merge: true });
+  await assertSucceeds(batch.commit());
+});
+
+await runCheck('owner can create public city-tagged room with quota increment', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'users', OWNER_UID), {
+      plan: 'support',
+      subscriptionStatus: 'active',
+      roomCreateCount: 0,
+      roomCreateLimit: 3
+    }, { merge: true });
+  });
+
+  const roomCode = 'QT12PB';
+  const batch = writeBatch(ownerDb);
+  batch.set(
+    doc(ownerDb, 'rooms', roomCode),
+    roomCreateDoc(roomCode, OWNER_UID, {
+      name: 'Baltimore Public',
+      visibility: 'public',
+      cityKey: 'baltimore',
+      locationTag: {
+        label: 'Baltimore',
+        city: 'Baltimore',
+        cityKey: 'baltimore',
+        kind: 'earth'
+      }
+    })
+  );
   batch.set(doc(ownerDb, 'users', OWNER_UID), {
     roomCreateCount: 1,
     roomCreateLimit: 3,

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { ensureEntitlements, startTrialIfEligible } from '../../../js/entitlements.js?v=62';
+import { ensureEntitlements, startTrialIfEligible } from '../../../js/entitlements.js?v=64';
 import { createArtifact, listenArtifacts, removeArtifact } from './artifacts.js?v=55';
 import {
   clearMySharedBlocks,
@@ -30,7 +30,7 @@ import {
   normalizeCode,
   setHomeBase,
   updateRoomSettings
-} from './rooms.js?v=62';
+} from './rooms.js?v=63';
 import {
   listenPaintClaims,
   normalizeColorHex as normalizePaintColorHex,

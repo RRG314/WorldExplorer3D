@@ -105,6 +105,12 @@ function normalizeRoomCreateCount(raw) {
   return parsed == null ? 0 : parsed;
 }
 
+function waitMs(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, Math.max(0, Number(ms) || 0));
+  });
+}
+
 function formatRoomCreateDeniedMessage(err, context = {}) {
   const code = String(err?.code || 'unknown');
   const rawMessage = String(err?.message || '').trim();
@@ -524,6 +530,9 @@ async function createRoom(options = {}) {
         } catch (_) {
           // Keep prior snapshot and continue best effort retries.
         }
+        // Firestore updates from trial/plan transitions can arrive moments after auth state changes.
+        // Backoff avoids immediate repeat-denials during that propagation window.
+        await waitMs(120 + attempt * 80);
         continue;
       }
       if (options.code && errCode === 'permission-denied') {

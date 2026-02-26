@@ -1473,3 +1473,34 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `npm run test` passed (`36/36` Firestore security tests).
     - Direct Playwright DOM check passed for signed-out state (`adminCardHidden=true`, `adminBtnHidden=true`, no console errors).
     - Artifact: `output/playwright/account-admin-visibility/report.json` + `output/playwright/account-admin-visibility/account-signed-out.png`.
+
+- Multiplayer room creation hardening + cache invalidation pass (2026-02-25):
+  - Added backoff retry in room creation on permission/failed-precondition paths in:
+    - `app/js/multiplayer/rooms.js`
+    - `public/app/js/multiplayer/rooms.js`
+  - Normalized multiplayer module version chain to prevent mixed cached module instances:
+    - `manifest` cache bust -> `v=64`
+    - app bootstrap script tag -> `v=64`
+    - app entrypoint -> `ui-room.js?v=64`
+    - all multiplayer modules now import `rooms.js?v=63` (removed remaining `v=62` imports).
+  - Expanded Firestore security tests for room creation coverage across world modes and public-room requirements:
+    - moon room create
+    - space room create
+    - public city-tagged room create
+  - Validation:
+    - `npm run test` passed (`39/39` checks).
+    - Playwright local version-load check passed with no console errors and expected module URLs:
+      - `bootstrap.js?v=64`
+      - `app-entry.js?v=64`
+      - `ui-room.js?v=64`
+      - `rooms.js?v=63`
+
+- 2026-02-25 multiplayer stabilization pass:
+  - Root cause found for intermittent trial/admin room-create failures in browser: mixed immutable module cache versions (`entitlements.js?v=62` and `?v=63`) loaded in parallel.
+  - Normalized entitlements module version to `v=64` across app, account, root, and multiplayer UI imports.
+  - Kept prior room-create retry/backoff and mode-aware rules tests.
+  - Validation:
+    - `npm run test` => `39/39` Firestore security checks passed (includes trial/supporter/pro/admin room-create coverage).
+    - Playwright client run against live hosting URL captured healthy title screens with no runtime/module errors.
+  - Deploy:
+    - `firebase deploy --only firestore:rules,hosting --project worldexplorer3d-d9b83` succeeded.
