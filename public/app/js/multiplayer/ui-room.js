@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { ensureEntitlements, startTrialIfEligible } from '../../../js/entitlements.js?v=64';
+import { ensureEntitlements, startTrialIfEligible } from '../../../js/entitlements.js?v=70';
 import { createArtifact, listenArtifacts, removeArtifact } from './artifacts.js?v=55';
 import {
   clearMySharedBlocks,
@@ -13,7 +13,7 @@ import {
   bumpExplorerLeaderboard,
   listenExplorerLeaderboard
 } from './loop.js?v=55';
-import { listenPlayers, startPresence, stopPresence } from './presence.js?v=55';
+import { listenPlayers, startPresence, stopPresence } from './presence.js?v=58';
 import {
   createRoom,
   deleteOwnedRoom,
@@ -30,7 +30,7 @@ import {
   normalizeCode,
   setHomeBase,
   updateRoomSettings
-} from './rooms.js?v=63';
+} from './rooms.js?v=64';
 import {
   listenPaintClaims,
   normalizeColorHex as normalizePaintColorHex,
@@ -1554,9 +1554,13 @@ function initMultiplayerPlatform() {
       await refreshFeaturedRooms(true);
       const inviteLink = buildInviteLink(room.code);
       if (inviteLink) {
-        await copyText(inviteLink);
         const named = room.name ? `${room.name} (${room.code})` : room.code;
-        setStatus(`${visibility === 'public' ? 'Public' : 'Private'} room ${named} created. Invite link copied.`);
+        try {
+          await copyText(inviteLink);
+          setStatus(`${visibility === 'public' ? 'Public' : 'Private'} room ${named} created. Invite link copied.`);
+        } catch (_) {
+          setStatus(`${visibility === 'public' ? 'Public' : 'Private'} room ${named} created.`);
+        }
       }
     } catch (err) {
       console.error('[multiplayer][ui] create room failed:', err);
@@ -1906,14 +1910,39 @@ function initMultiplayerPlatform() {
       }
     });
 
-    const openTrialOrBilling = () => {
+    const openTrialOrBilling = async () => {
       if (!state.authUser) {
         const signInBtn = document.getElementById('appSignInBtn');
         if (signInBtn) signInBtn.click();
         setStatus('Sign in first, then start your trial from the app or landing page.');
         return;
       }
-      window.location.assign('../?startTrial=1');
+
+      if (canUseMultiplayer(state.entitlement)) {
+        window.location.assign('../account/');
+        return;
+      }
+
+      setStatus('Starting your 2-day trial...');
+      try {
+        const next = await startTrialIfEligible(state.authUser);
+        state.entitlement = {
+          ...state.entitlement,
+          ...next
+        };
+        applyEntitlementCopy();
+
+        if (canUseMultiplayer(state.entitlement)) {
+          setStatus('Trial activated. Multiplayer unlocked.');
+          await refreshFeaturedRooms(true);
+          return;
+        }
+
+        setStatus('Trial did not unlock multiplayer yet. Open Account to verify your plan.', true);
+      } catch (err) {
+        const message = err?.message || 'Could not start trial right now. Open Account to upgrade.';
+        setStatus(message, true);
+      }
     };
 
     refs.titleTrialBtn?.addEventListener('click', openTrialOrBilling);

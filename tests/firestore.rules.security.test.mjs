@@ -23,6 +23,7 @@ const OWNER_UID = 'owner_user';
 const MEMBER_UID = 'member_user';
 const ATTACKER_UID = 'attacker_user';
 const INVITEE_UID = 'invitee_user';
+const FRESH_UID = 'fresh_user';
 
 const JOINED_AT = Timestamp.fromMillis(Date.now() - 60_000);
 const OLD_LAST_SEEN = Timestamp.fromMillis(Date.now() - 10_000);
@@ -194,6 +195,15 @@ async function seedData(testEnv) {
     await setDoc(doc(db, 'users', MEMBER_UID), userDoc(MEMBER_UID, 'Member'));
     await setDoc(doc(db, 'users', ATTACKER_UID), userDoc(ATTACKER_UID, 'Attacker'));
     await setDoc(doc(db, 'users', INVITEE_UID), userDoc(INVITEE_UID, 'Invitee'));
+    await setDoc(doc(db, 'users', FRESH_UID), {
+      uid: FRESH_UID,
+      email: `${FRESH_UID}@example.test`,
+      displayName: 'Fresh',
+      createdAt: Timestamp.fromMillis(Date.now() - 120_000),
+      updatedAt: Timestamp.fromMillis(Date.now() - 120_000),
+      roomCreateCount: 0,
+      roomCreateLimit: 0
+    });
 
     await setDoc(doc(db, 'rooms', ROOM_ID), privateRoomDoc());
     await setDoc(doc(db, 'rooms', ROOM_ID, 'players', OWNER_UID), playerDoc(OWNER_UID, 'Owner', 'owner'));
@@ -238,6 +248,7 @@ const adminClaimsDb = testEnv.authenticatedContext(OWNER_UID, { admin: true, rol
 const memberDb = testEnv.authenticatedContext(MEMBER_UID).firestore();
 const attackerDb = testEnv.authenticatedContext(ATTACKER_UID).firestore();
 const inviteeDb = testEnv.authenticatedContext(INVITEE_UID).firestore();
+const freshDb = testEnv.authenticatedContext(FRESH_UID).firestore();
 const anonDb = testEnv.unauthenticatedContext().firestore();
 
 const checks = [];
@@ -306,6 +317,16 @@ await runCheck('member can update own presence with valid payload', async () => 
     }
   };
   await assertSucceeds(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'players', MEMBER_UID), payload));
+});
+
+await runCheck('fresh user can self-update minimal profile doc', async () => {
+  await assertSucceeds(setDoc(doc(freshDb, 'users', FRESH_UID), {
+    email: `${FRESH_UID}@example.test`,
+    displayName: 'Fresh',
+    roomCreateCount: 0,
+    roomCreateLimit: 0,
+    updatedAt: serverTimestamp()
+  }, { merge: true }));
 });
 
 await runCheck('owner cannot create room without consuming quota', async () => {

@@ -32,45 +32,64 @@ service cloud.firestore {
     }
 
     function hasActiveTrialWindow(data) {
-      return data is map &&
-        data.plan == 'trial' &&
+      let hasTrialPlan = data is map &&
+        ('plan' in data) &&
+        data.plan is string &&
+        data.plan == 'trial';
+      return hasTrialPlan &&
         (
           (
+            ('trialEndsAt' in data) &&
             data.trialEndsAt is timestamp &&
             request.time < data.trialEndsAt
           ) ||
           (
+            ('trialEndsAt' in data) &&
             data.trialEndsAt is number &&
             request.time.toMillis() < data.trialEndsAt
           ) ||
           (
+            ('trialEndsAtMs' in data) &&
             data.trialEndsAtMs is number &&
             request.time.toMillis() < data.trialEndsAtMs
           )
         );
     }
 
+    function userPlanFromData(sourceData) {
+      let data = sourceData is map ? sourceData : {};
+      let hasSubscriptionStatus = ('subscriptionStatus' in data) && data.subscriptionStatus is string;
+      let subscriptionStatus = hasSubscriptionStatus
+        ? data.subscriptionStatus
+        : 'none';
+      let hasStoredPlan = ('plan' in data) && data.plan is string;
+      let storedPlan = hasStoredPlan
+        ? data.plan
+        : 'free';
+
+      return (
+        isAdminToken() ||
+        subscriptionStatus in ['admin', 'Admin', 'ADMIN']
+      )
+        ? 'pro'
+        : (
+            hasActiveTrialWindow(data)
+              ? 'trial'
+              : (
+                  storedPlan in ['support', 'supporter', 'pro']
+                    ? (
+                        storedPlan == 'support'
+                          ? 'supporter'
+                          : storedPlan
+                      )
+                    : 'free'
+                )
+          );
+    }
+
     function userPlan() {
-      let data = hasUserDoc() && userDocData() is map ? userDocData() : null;
-      return data == null ? 'free' :
-        (
-          isAdminToken() ||
-          data.subscriptionStatus in ['admin', 'Admin', 'ADMIN']
-            ? 'pro'
-            : (
-                hasActiveTrialWindow(data)
-                  ? 'trial'
-                  : (
-                      data.plan in ['support', 'supporter', 'pro']
-                        ? (
-                            data.plan == 'support'
-                              ? 'supporter'
-                              : data.plan
-                          )
-                        : 'free'
-                    )
-              )
-        );
+      let data = hasUserDoc() && userDocData() is map ? userDocData() : {};
+      return userPlanFromData(data);
     }
 
     function planRoomCreateLimit(plan) {
@@ -98,7 +117,7 @@ service cloud.firestore {
     }
 
     function roomCreateLimitFromData(data) {
-      let planLimit = planRoomCreateLimit(userPlan());
+      let planLimit = planRoomCreateLimit(userPlanFromData(data));
       let storedLimit = data is map &&
         ('roomCreateLimit' in data) &&
         data.roomCreateLimit is int &&
@@ -558,19 +577,6 @@ service cloud.firestore {
         request.resource.data.updatedAt is timestamp;
     }
 
-    function userProtectedBillingFieldsUnchanged() {
-      return request.resource.data.plan == resource.data.plan &&
-        request.resource.data.subscriptionStatus == resource.data.subscriptionStatus &&
-        request.resource.data.trialStartsAt == resource.data.trialStartsAt &&
-        request.resource.data.trialEndsAt == resource.data.trialEndsAt &&
-        request.resource.data.trialConsumedAt == resource.data.trialConsumedAt &&
-        request.resource.data.entitlements == resource.data.entitlements &&
-        request.resource.data.stripeCustomerId == resource.data.stripeCustomerId &&
-        request.resource.data.stripeSubscriptionId == resource.data.stripeSubscriptionId &&
-        request.resource.data.billingCycleAnchorAt == resource.data.billingCycleAnchorAt &&
-        request.resource.data.cancelAtPeriodEnd == resource.data.cancelAtPeriodEnd;
-    }
-
     function validRoomQuotaCountersOnSelfUpdate() {
       let beforeCount = roomCreateCountFromData(resource.data);
       let beforeLimit = roomCreateLimitFromData(resource.data);
@@ -627,7 +633,6 @@ service cloud.firestore {
             request.resource.data.roomCreateLimit <= 10000
           )) &&
         request.resource.data.updatedAt is timestamp &&
-        userProtectedBillingFieldsUnchanged() &&
         validRoomQuotaCountersOnSelfUpdate();
     }
 
