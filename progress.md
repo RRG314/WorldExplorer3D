@@ -1517,3 +1517,19 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - `npm test` passed after edits (`40/40` Firestore security checks).
 - Follow-up required:
   - Deploy `deleteAccount` with an IAM principal that has Firebase Extensions read permission (or equivalent Firebase Admin role set) so production deletion endpoint becomes reachable.
+- Saved-room Open reliability fix (2026-02-27):
+  - Root cause: owned-room `Open` routed through `handleJoinRoom()` with entitlement precheck, so stale/local entitlement state could block re-open even when the room was valid and user-signed-in.
+  - Patch applied in both runtime copies:
+    - `app/js/multiplayer/ui-room.js`
+    - `public/app/js/multiplayer/ui-room.js`
+  - Changes:
+    - `handleOpenOwnedRoom()` now calls `handleJoinRoom(code, { skipAccessCheck: true })`.
+    - `handleJoinRoom()` now accepts options and supports `skipAccessCheck` while still requiring signed-in user.
+    - `handleJoinRoom()` returns joined room (or `null` on blocked/failure) for deterministic callers.
+  - Verification:
+    - `node --check app/js/multiplayer/ui-room.js`
+    - `node --check public/app/js/multiplayer/ui-room.js`
+    - End-to-end Playwright trial flow passed:
+      - Script: `scripts/tmp_open_saved_room_e2e.mjs`
+      - Report: `output/playwright/open-saved-room-e2e-1772211966136/report.json`
+      - Key result: create `78CWVT` -> leave -> open saved room -> status `Connected to joined room: 78CWVT`.

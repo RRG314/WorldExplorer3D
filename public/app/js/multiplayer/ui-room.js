@@ -1385,7 +1385,7 @@ function initMultiplayerPlatform() {
 
     setInputCode(refs, normalizedCode);
     setStatus(`Opening room ${normalizedCode}...`);
-    await handleJoinRoom(normalizedCode);
+    await handleJoinRoom(normalizedCode, { skipAccessCheck: true });
   }
 
   async function activateRoom(room, originLabel = 'room') {
@@ -1625,8 +1625,16 @@ function initMultiplayerPlatform() {
     }
   }
 
-  async function handleJoinRoom(codeOverride = '') {
-    if (!(await ensureAccessOrWarn('joining a room'))) return;
+  async function handleJoinRoom(codeOverride = '', options = {}) {
+    const skipAccessCheck = Boolean(options && options.skipAccessCheck);
+    if (skipAccessCheck) {
+      if (!state.authUser) {
+        setStatus('Sign in to join multiplayer rooms.', true);
+        return null;
+      }
+    } else if (!(await ensureAccessOrWarn('joining a room'))) {
+      return null;
+    }
 
     const code = normalizeCode(codeOverride || pullCodeFromInputs(refs));
     if (!code) {
@@ -1641,9 +1649,11 @@ function initMultiplayerPlatform() {
       await refreshFeaturedRooms(true);
       setStatus(`Joined room ${room.code}.`);
       closeRoomPanel();
+      return room;
     } catch (err) {
       console.error('[multiplayer][ui] join failed:', err);
       setStatus(err?.message || 'Could not join that room.', true);
+      return null;
     }
   }
 
