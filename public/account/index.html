@@ -1165,7 +1165,15 @@
         }, 1200);
       } catch (err) {
         console.error('[account] delete account failed:', err);
-        setStatus(err && err.message ? err.message : 'Could not delete account.', 'warn');
+        const rawMessage = err && err.message ? String(err.message) : '';
+        const lowered = rawMessage.toLowerCase();
+        if (lowered.includes('recent sign-in required')) {
+          setStatus('For security, sign out and sign in again, then retry Delete Account within 10 minutes.', 'warn');
+        } else if (lowered.includes('missing bearer token') || lowered.includes('invalid auth token')) {
+          setStatus('Your session expired. Sign out and sign in again, then retry Delete Account.', 'warn');
+        } else {
+          setStatus(rawMessage || 'Could not delete account.', 'warn');
+        }
       } finally {
         setBusy(false);
       }

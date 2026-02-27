@@ -138,7 +138,7 @@ async function postFunction(path, body = {}) {
       if (!responseRecorded) {
         attempts.push({ url, status: null });
       }
-      if (!isLast) continue;
+      if (!isLast && !responseRecorded) continue;
       throw err;
     }
   }
