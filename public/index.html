@@ -503,7 +503,7 @@
   <script type="module">
     import { hasFirebaseConfig } from './js/firebase-init.js?v=55';
     import { ensureSignedIn } from './js/auth-ui.js?v=55';
-    import { ensureEntitlements } from './js/entitlements.js?v=64';
+    import { startTrialIfEligible } from './js/entitlements.js?v=70';
 
     const startTrialBtn = document.getElementById('startTrialBtn');
     const statusEl = document.getElementById('startTrialStatus');
@@ -530,8 +530,13 @@
           return;
         }
 
-        await ensureEntitlements(user);
-        window.location.assign('./app/?startTrial=1');
+        const nextState = await startTrialIfEligible(user);
+        if (nextState.plan === 'trial' || nextState.plan === 'supporter' || nextState.plan === 'pro' || nextState.isAdmin === true) {
+          setStatus('Trial active. Opening multiplayer...');
+          window.location.assign('./app/?tab=multiplayer');
+          return;
+        }
+        setStatus('Trial was not activated. Open Account to verify plan.', true);
       } catch (err) {
         console.error('[landing] Trial start failed:', err);
         setStatus(err && err.message ? err.message : 'Could not start trial right now.', true);

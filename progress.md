@@ -1504,3 +1504,16 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - Playwright client run against live hosting URL captured healthy title screens with no runtime/module errors.
   - Deploy:
     - `firebase deploy --only firestore:rules,hosting --project worldexplorer3d-d9b83` succeeded.
+
+- Account/multiplayer hardening pass (2026-02-27):
+  - Verified `deleteAccount` Cloud Function exists in source (`functions/index.js`) but is missing from deployed function set in project `worldexplorer3d-d9b83` (remote endpoint returned 404 while sibling endpoints returned 401 as expected).
+  - Attempted deploy `firebase deploy --only functions:deleteAccount --project worldexplorer3d-d9b83`; blocked by IAM (`firebaseextensions.googleapis.com` list permission denied / 403).
+  - Hardened function caller in `js/billing.js` (+ mirrored `public/js/billing.js`): retry on additional transient/misrouted statuses (404/405/406/501/502/503/504) and emit actionable endpoint-unavailable error with attempted URLs.
+  - Hardened room creation entitlement/quota flow in `app/js/multiplayer/rooms.js` (+ mirrored public copy): before failing local plan/quota precheck, perform one `getDocFromServer` refresh to avoid stale trial/supporter/pro profile cache denials.
+  - Fixed module-version skew that could split multiplayer room state across duplicate `rooms.js` instances by normalizing all multiplayer imports to `rooms.js?v=65` and bumping `presence.js` import in `ui-room` to `v59`.
+  - Bumped account billing module import to `billing.js?v=57` in `account/index.html` and `public/account/index.html` so hardened endpoint behavior ships immediately.
+- Validation:
+  - `node --check` passed for updated billing/multiplayer files (app + public mirrors).
+  - `npm test` passed after edits (`40/40` Firestore security checks).
+- Follow-up required:
+  - Deploy `deleteAccount` with an IAM principal that has Firebase Extensions read permission (or equivalent Firebase Admin role set) so production deletion endpoint becomes reachable.

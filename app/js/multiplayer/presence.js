@@ -1,6 +1,8 @@
 import {
   collection,
   doc,
+  getDoc,
+  getDocFromServer,
   limit,
   onSnapshot,
   orderBy,
@@ -11,7 +13,7 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
-import { normalizeCode } from './rooms.js?v=63';
+import { normalizeCode } from './rooms.js?v=65';
 
 const ROOM_COLLECTION = 'rooms';
 const PLAYER_COLLECTION = 'players';
@@ -30,6 +32,10 @@ let lastWriteAt = 0;
 let lastSentPose = null;
 let inFlightWrite = false;
 let releaseVisibilityListener = null;
+let cachedRole = 'member';
+let cachedJoinedAt = null;
+let cachedIdentityRoomId = '';
+let cachedIdentityUid = '';
 
 function getServices() {
   const services = initFirebase();
@@ -112,6 +118,48 @@ function movedBeyondThreshold(prevPose, nextPose) {
   return yawDelta >= ROTATE_THRESHOLD_RAD || pitchDelta >= ROTATE_THRESHOLD_RAD;
 }
 
+function normalizeRole(rawRole) {
+  const role = String(rawRole || '').toLowerCase();
+  return role === 'owner' || role === 'mod' || role === 'member' ? role : 'member';
+}
+
+async function ensurePresenceIdentity(db, roomId, uid) {
+  if (
+    cachedIdentityRoomId === roomId &&
+    cachedIdentityUid === uid &&
+    cachedJoinedAt
+  ) {
+    return;
+  }
+
+  const playerRef = doc(db, ROOM_COLLECTION, roomId, PLAYER_COLLECTION, uid);
+  try {
+    let snap = await getDoc(playerRef);
+    if (!snap.exists()) {
+      try {
+        snap = await getDocFromServer(playerRef);
+      } catch (_) {
+        // Ignore and fall through to missing identity path.
+      }
+    }
+    if (!snap.exists()) {
+      return false;
+    }
+    const data = snap.data() || {};
+    cachedRole = normalizeRole(data.role);
+    cachedJoinedAt = data.joinedAt && typeof data.joinedAt.toMillis === 'function'
+      ? data.joinedAt
+      : null;
+    if (!cachedJoinedAt) return false;
+  } catch (_) {
+    return false;
+  }
+
+  cachedIdentityRoomId = roomId;
+  cachedIdentityUid = uid;
+  return true;
+}
+
 async function writePresence(force = false) {
   if (!activeRoomId || typeof getPose !== 'function' || inFlightWrite) return;
 
@@ -129,15 +177,20 @@ async function writePresence(force = false) {
   inFlightWrite = true;
   try {
     const { db } = getServices();
+    const hasIdentity = await ensurePresenceIdentity(db, activeRoomId, user.uid);
+    if (!hasIdentity) return;
     const playerRef = doc(db, ROOM_COLLECTION, activeRoomId, PLAYER_COLLECTION, user.uid);
     await setDoc(playerRef, {
       uid: user.uid,
       displayName: getDisplayName(user),
+      joinedAt: cachedJoinedAt || serverTimestamp(),
       lastSeenAt: serverTimestamp(),
       expiresAt: Timestamp.fromMillis(now + PRESENCE_TTL_MS),
+      role: cachedRole,
       mode: normalized.mode,
       frame: normalized.frame,
-      pose: normalized.pose
+      pose: normalized.pose,
+      joinCode: activeRoomId
     }, { merge: true });
 
     lastWriteAt = now;
@@ -167,6 +220,10 @@ async function stopPresence() {
   getPose = null;
   lastSentPose = null;
   lastWriteAt = 0;
+  cachedRole = 'member';
+  cachedJoinedAt = null;
+  cachedIdentityRoomId = '';
+  cachedIdentityUid = '';
 
   if (!roomId || !user || !user.uid) return;
 
@@ -222,7 +279,9 @@ function startPresence(roomId, getPoseFn) {
   }, HEARTBEAT_INTERVAL_MS);
 
   installVisibilityHooks();
-  writePresence(true);
+  // The room create/join flow already writes presence. Waiting for the first heartbeat
+  // avoids immediate server-side throttle denials on lastSeenAt.
+  lastWriteAt = Date.now();
 }
 
 function listenPlayers(roomId, callback) {

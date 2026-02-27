@@ -13,7 +13,7 @@ import {
   bumpExplorerLeaderboard,
   listenExplorerLeaderboard
 } from './loop.js?v=55';
-import { listenPlayers, startPresence, stopPresence } from './presence.js?v=58';
+import { listenPlayers, startPresence, stopPresence } from './presence.js?v=59';
 import {
   createRoom,
   deleteOwnedRoom,
@@ -30,7 +30,7 @@ import {
   normalizeCode,
   setHomeBase,
   updateRoomSettings
-} from './rooms.js?v=64';
+} from './rooms.js?v=65';
 import {
   listenPaintClaims,
   normalizeColorHex as normalizePaintColorHex,

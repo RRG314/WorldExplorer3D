@@ -2,6 +2,7 @@ import { getCurrentUserToken } from './auth-ui.js';
 import { readFirebaseConfig } from './firebase-init.js';
 
 const DEFAULT_FUNCTIONS_REGION = 'us-central1';
+const RETRYABLE_STATUS_CODES = new Set([404, 405, 406, 501, 502, 503, 504]);
 
 function normalizeBasePath(pathname = '/') {
   const path = String(pathname || '/');
@@ -63,14 +64,38 @@ function buildFunctionCandidates(path) {
   return [...new Set(candidates)];
 }
 
+function isRetryableFunctionStatus(status) {
+  return RETRYABLE_STATUS_CODES.has(Number(status));
+}
+
+function summarizeAttempt(attempt = {}) {
+  const url = String(attempt.url || '');
+  const status = Number(attempt.status);
+  const statusLabel = Number.isFinite(status) ? status : 'network';
+  return `${url || '<unknown>'} -> ${statusLabel}`;
+}
+
+function unavailableFunctionError(path, attempts = []) {
+  const endpoint = normalizeFunctionPath(path);
+  const summary = attempts.length
+    ? attempts.map((attempt) => summarizeAttempt(attempt)).join('; ')
+    : 'no endpoint responses';
+  return new Error(
+    `Account API endpoint unavailable for ${endpoint}. Tried ${summary}. ` +
+    'Deploy functions for this project, or set WORLD_EXPLORER_FUNCTIONS_ORIGIN to a valid HTTPS origin.'
+  );
+}
+
 async function postFunction(path, body = {}) {
   const token = await getCurrentUserToken(true);
   const candidates = buildFunctionCandidates(path);
   let lastError = null;
+  const attempts = [];
 
   for (let i = 0; i < candidates.length; i++) {
     const url = candidates[i];
     const isLast = i === candidates.length - 1;
+    let responseRecorded = false;
 
     try {
       const res = await fetch(url, {
@@ -82,18 +107,27 @@ async function postFunction(path, body = {}) {
         body: JSON.stringify(body)
       });
 
+      const rawText = await res.text();
       let payload = null;
-      try {
-        payload = await res.json();
-      } catch (_) {
-        payload = null;
+      if (rawText) {
+        try {
+          payload = JSON.parse(rawText);
+        } catch (_) {
+          payload = null;
+        }
       }
 
-      if ((res.status === 404 || res.status === 501) && !isLast) {
+      attempts.push({ url, status: res.status });
+      responseRecorded = true;
+
+      if (isRetryableFunctionStatus(res.status) && !isLast) {
         continue;
       }
 
       if (!res.ok) {
+        if (isRetryableFunctionStatus(res.status)) {
+          throw unavailableFunctionError(path, attempts);
+        }
         const message = payload && payload.error ? payload.error : `Request failed (${res.status})`;
         throw new Error(message);
       }
@@ -101,13 +135,16 @@ async function postFunction(path, body = {}) {
       return payload || {};
     } catch (err) {
       lastError = err;
+      if (!responseRecorded) {
+        attempts.push({ url, status: null });
+      }
       if (!isLast) continue;
       throw err;
     }
   }
 
   if (lastError) throw lastError;
-  throw new Error('Function endpoint unavailable.');
+  throw unavailableFunctionError(path, attempts);
 }
 
 export async function createCheckoutSession(plan) {

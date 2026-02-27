@@ -5,6 +5,7 @@ import {
   deleteField,
   doc,
   getDoc,
+  getDocFromServer,
   getDocs,
   limit,
   onSnapshot,
@@ -132,6 +133,8 @@ function formatRoomCreateDeniedMessage(err, context = {}) {
 
   const ctx = [
     `code=${code}`,
+    `attemptedCode=${String(context.attemptedCode || '')}`,
+    `attempt=${Number.isFinite(context.attempt) ? context.attempt : -1}`,
     `plan=${String(context.plan || 'free')}`,
     `subStatus=${String(context.subscriptionStatus || 'none')}`,
     `adminClaim=${context.hasAdminTokenClaim ? 'yes' : 'no'}`,
@@ -444,6 +447,22 @@ async function createRoom(options = {}) {
   }
 
   let profileSnap = await ensureUserProfile();
+  let didServerProfileRefresh = false;
+
+  async function refreshProfileFromServerOnce() {
+    if (didServerProfileRefresh) return false;
+    didServerProfileRefresh = true;
+    try {
+      const freshSnap = await getDocFromServer(userRef);
+      if (freshSnap.exists()) {
+        profileSnap = freshSnap;
+        return true;
+      }
+    } catch (_) {
+      // Keep prior profile snapshot when server refresh is unavailable.
+    }
+    return false;
+  }
 
   let createdCode = null;
   let lastDeniedErr = null;
@@ -472,8 +491,14 @@ async function createRoom(options = {}) {
       ? Math.max(roomCreateLimit, ROOM_CREATE_LIMITS_BY_PLAN.admin)
       : roomCreateLimit;
     const hasEntitlement = plan === 'trial' || plan === 'support' || plan === 'supporter' || plan === 'pro';
+    const localQuotaReached = roomCreateCount >= localRoomCreateLimit;
 
-    if (localRoomCreateLimit <= 0 || roomCreateCount >= localRoomCreateLimit) {
+    if (localRoomCreateLimit <= 0 || !hasEntitlement || localQuotaReached) {
+      const refreshed = await refreshProfileFromServerOnce();
+      if (refreshed) continue;
+      if (localRoomCreateLimit <= 0 || !hasEntitlement) {
+        throw new Error('Multiplayer room creation requires an active trial or paid plan (Supporter/Pro).');
+      }
       throw new Error('Room creation limit reached for your plan. Rename or reuse existing rooms, or upgrade for a higher limit.');
     }
 
@@ -515,6 +540,8 @@ async function createRoom(options = {}) {
         if (errCode === 'permission-denied') {
           lastDeniedErr = err;
           lastDeniedContext = {
+            attemptedCode: code,
+            attempt,
             plan,
             subscriptionStatus: String(profile.subscriptionStatus || 'none'),
             hasAdminTokenClaim,
