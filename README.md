@@ -150,7 +150,7 @@ GitHub Pages (branch root) and Firebase Hosting are both supported.
 
 GitHub Pages:
 
-- source branch: `main`
+- source branch: `steven/product`
 - folder: `/ (root)`
 
 Firebase:

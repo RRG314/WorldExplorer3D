@@ -1442,3 +1442,131 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Validation:
     - `node --check` passed for changed JS modules.
     - Playwright smoke: `output/playwright/ghost-proxy-smoke/report.json` reports `ok: true`, with car-like and walker-like mesh signatures and no console/page errors.
+
+- Trial-mode room create fix pass (2026-02-25):
+  - Root cause identified: Firestore rules required `users/{uid}.trialEndsAt` to be a timestamp for multiplayer entitlement; legacy docs with numeric millis looked trial-entitled in UI but failed room create writes.
+  - Rules hardening in `firestore.rules`:
+    - Added `hasActiveTrialWindow(data)` to accept active trial windows from timestamp or legacy numeric millis (`request.time.toMillis() < trialEndsAt`).
+    - Updated `userPlan()` to use normalized `data` map and the new trial-window helper.
+  - Cloud Function normalization in `functions/index.js` (`startTrial`):
+    - For already-active trial users, added legacy field normalization to rewrite `trialStartsAt`/`trialEndsAt`/`trialConsumedAt` as Firestore timestamps and refresh trial entitlements/quota fields.
+  - UI self-heal in `public/app/js/multiplayer/ui-room.js`:
+    - On trial-plan room-create permission denial, auto-runs trial sync (`startTrialIfEligible`) once and retries create.
+  - Added rules regression coverage in `tests/firestore.rules.security.test.mjs`:
+    - `trial` + timestamp `trialEndsAt` room create succeeds with quota increment.
+    - `trial` + legacy numeric `trialEndsAt` room create succeeds with quota increment.
+  - Validation:
+    - `npm run test:rules` passes (35/35).
+    - `node --check` passes for updated JS files.
+    - Ran develop-web-game Playwright client smoke (`output/web-game/trial-room-fix*`); capture remains black in this headless WebGL environment, with no new console/page error artifacts emitted.
+- Trial legacy-compat follow-up (2026-02-25):
+  - Extended trial entitlement compatibility to accept legacy `trialEndsAtMs` in Firestore rules.
+  - Updated `startTrial` Cloud Function to normalize from `trialEndsAtMs`/`trialConsumedAtMs` fallback fields.
+  - Updated entitlements parsing (`js/entitlements.js` + mirrored `public/js/entitlements.js`) to read `trialEndsAtMs` when `trialEndsAt` is absent.
+  - Added rules regression: trial user with only `trialEndsAtMs` can create a room with quota increment.
+  - Deployed `firestore:rules` and `functions:startTrial` to `worldexplorer3d-d9b83`.
+
+- Admin test visibility hardening pass (2026-02-25):
+  - Updated `/account/index.html` and `/public/account/index.html` so `Admin Access` card is hidden by default and shown only when `isAdmin` or `adminTesterEligible` is true.
+  - Added `syncAdminUiVisibility(isAdmin, adminTesterEligible)` helper to keep status card and `Enable Admin Test Access` button state consistent across overview, plan updates, and signed-out state.
+  - Regression checks:
+    - `npm run test` passed (`36/36` Firestore security tests).
+    - Direct Playwright DOM check passed for signed-out state (`adminCardHidden=true`, `adminBtnHidden=true`, no console errors).
+    - Artifact: `output/playwright/account-admin-visibility/report.json` + `output/playwright/account-admin-visibility/account-signed-out.png`.
+
+- Multiplayer room creation hardening + cache invalidation pass (2026-02-25):
+  - Added backoff retry in room creation on permission/failed-precondition paths in:
+    - `app/js/multiplayer/rooms.js`
+    - `public/app/js/multiplayer/rooms.js`
+  - Normalized multiplayer module version chain to prevent mixed cached module instances:
+    - `manifest` cache bust -> `v=64`
+    - app bootstrap script tag -> `v=64`
+    - app entrypoint -> `ui-room.js?v=64`
+    - all multiplayer modules now import `rooms.js?v=63` (removed remaining `v=62` imports).
+  - Expanded Firestore security tests for room creation coverage across world modes and public-room requirements:
+    - moon room create
+    - space room create
+    - public city-tagged room create
+  - Validation:
+    - `npm run test` passed (`39/39` checks).
+    - Playwright local version-load check passed with no console errors and expected module URLs:
+      - `bootstrap.js?v=64`
+      - `app-entry.js?v=64`
+      - `ui-room.js?v=64`
+      - `rooms.js?v=63`
+
+- 2026-02-25 multiplayer stabilization pass:
+  - Root cause found for intermittent trial/admin room-create failures in browser: mixed immutable module cache versions (`entitlements.js?v=62` and `?v=63`) loaded in parallel.
+  - Normalized entitlements module version to `v=64` across app, account, root, and multiplayer UI imports.
+  - Kept prior room-create retry/backoff and mode-aware rules tests.
+  - Validation:
+    - `npm run test` => `39/39` Firestore security checks passed (includes trial/supporter/pro/admin room-create coverage).
+    - Playwright client run against live hosting URL captured healthy title screens with no runtime/module errors.
+  - Deploy:
+    - `firebase deploy --only firestore:rules,hosting --project worldexplorer3d-d9b83` succeeded.
+
+- Account/multiplayer hardening pass (2026-02-27):
+  - Verified `deleteAccount` Cloud Function exists in source (`functions/index.js`) but is missing from deployed function set in project `worldexplorer3d-d9b83` (remote endpoint returned 404 while sibling endpoints returned 401 as expected).
+  - Attempted deploy `firebase deploy --only functions:deleteAccount --project worldexplorer3d-d9b83`; blocked by IAM (`firebaseextensions.googleapis.com` list permission denied / 403).
+  - Hardened function caller in `js/billing.js` (+ mirrored `public/js/billing.js`): retry on additional transient/misrouted statuses (404/405/406/501/502/503/504) and emit actionable endpoint-unavailable error with attempted URLs.
+  - Hardened room creation entitlement/quota flow in `app/js/multiplayer/rooms.js` (+ mirrored public copy): before failing local plan/quota precheck, perform one `getDocFromServer` refresh to avoid stale trial/supporter/pro profile cache denials.
+  - Fixed module-version skew that could split multiplayer room state across duplicate `rooms.js` instances by normalizing all multiplayer imports to `rooms.js?v=65` and bumping `presence.js` import in `ui-room` to `v59`.
+  - Bumped account billing module import to `billing.js?v=57` in `account/index.html` and `public/account/index.html` so hardened endpoint behavior ships immediately.
+- Validation:
+  - `node --check` passed for updated billing/multiplayer files (app + public mirrors).
+  - `npm test` passed after edits (`40/40` Firestore security checks).
+- Follow-up required:
+  - Deploy `deleteAccount` with an IAM principal that has Firebase Extensions read permission (or equivalent Firebase Admin role set) so production deletion endpoint becomes reachable.
+- Saved-room Open reliability fix (2026-02-27):
+  - Root cause: owned-room `Open` routed through `handleJoinRoom()` with entitlement precheck, so stale/local entitlement state could block re-open even when the room was valid and user-signed-in.
+  - Patch applied in both runtime copies:
+    - `app/js/multiplayer/ui-room.js`
+    - `public/app/js/multiplayer/ui-room.js`
+  - Changes:
+    - `handleOpenOwnedRoom()` now calls `handleJoinRoom(code, { skipAccessCheck: true })`.
+    - `handleJoinRoom()` now accepts options and supports `skipAccessCheck` while still requiring signed-in user.
+    - `handleJoinRoom()` returns joined room (or `null` on blocked/failure) for deterministic callers.
+  - Verification:
+    - `node --check app/js/multiplayer/ui-room.js`
+    - `node --check public/app/js/multiplayer/ui-room.js`
+    - End-to-end Playwright trial flow passed:
+      - Script: `scripts/tmp_open_saved_room_e2e.mjs`
+      - Report: `output/playwright/open-saved-room-e2e-1772211966136/report.json`
+      - Key result: create `78CWVT` -> leave -> open saved room -> status `Connected to joined room: 78CWVT`.
+- Monaco/steep-terrain building grounding pass (2026-02-28):
+  - Root issue: building bases were anchored to average footprint elevation and foundation skirts sampled only edge endpoints, leaving visible floating gaps on inclined terrain.
+  - Updated `createBuildingGroundPatch` (`app/js/engine.js`, `public/app/js/engine.js`, `js/engine.js`):
+    - foundation skirt now subdivides each footprint edge (`maxSkirtSegmentLength=2.0`) and samples terrain per segment for terrain-conforming skirts,
+    - increased adaptive embed depth on steep transitions to prevent terrain peeking.
+  - Updated building base placement (`app/js/world.js`, `public/app/js/world.js`, `js/world.js`):
+    - slope-aware base now anchors sloped buildings to `minElevation + 0.05` (instead of avg elevation),
+    - collider baseY and building-ground patch alignment updated to the same base elevation,
+    - retained `terrainAvgElevation` in userData for diagnostics.
+- Validation:
+  - `node --check` passed for updated engine/world files in app/public/root copies.
+  - Monaco screenshot probe refreshed: `output/playwright/monaco-grounding-probe/monaco-ingame.png` shows reduced floating-band artifact on hillside buildings.
+  - Skill client run completed (`output/playwright/building-grounding-client-v2/`) but still captures black canvas in this environment; direct Playwright full-page screenshot used for visual verification.
+
+- Donation-model + free multiplayer documentation alignment pass (2026-02-28):
+  - Runtime behavior updated to match user request:
+    - Signed-in free users can create/join multiplayer rooms.
+    - Optional monthly donations retained (`Supporter $1`, `Pro $5`).
+    - Pro keeps early-access positioning.
+  - Code updates:
+    - `js/entitlements.js` (+ mirrored `public/js/entitlements.js`): free quota raised to 3, cloud sync enabled, legacy trial start path made backward-compatible no-op.
+    - `app/js/multiplayer/rooms.js` (+ mirrored public copy): free room-create limit raised to 3, entitlement gating/messages updated.
+    - `app/js/multiplayer/ui-room.js` (+ mirrored public copy): removed trial activation flow from multiplayer UI; sign-in is now the multiplayer gate.
+    - `app/index.html` (+ mirrored public copy): removed trial activation messaging/logic; updated account/donation CTA copy.
+    - `account/index.html` (+ mirrored public copy): updated account page to donation language and multiplayer-available status.
+    - `firestore.rules`: multiplayer entitlement now sign-in based; free room plan limit set to 3.
+    - `functions/index.js`: free room limit set to 3; free entitlements include cloud sync.
+  - Cache-bust import alignment:
+    - bumped entitlements imports to `?v=71`.
+    - bumped multiplayer rooms module imports to `rooms.js?v=66`.
+    - bumped multiplayer UI entry import to `ui-room.js?v=72` via app-entry.
+  - Documentation refresh:
+    - rewrote `README.md`, `USER_GUIDE.md`, `QUICKSTART.md`, `ARCHITECTURE.md`, `TECHNICAL_DOCS.md`, `API_SETUP.md`, `SECURITY_STORAGE_NOTICE.md`, `DOCUMENTATION_INDEX.md`, and `CHANGELOG.md`.
+    - added new inventory report: `COMPLETE_INVENTORY_REPORT_2026-02-28.md`.
+  - Verification:
+    - `node --check` passed for changed JS files.
+    - `npm test` passed: `40/40` Firestore security checks.
