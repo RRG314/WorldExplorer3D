@@ -5,6 +5,7 @@ import {
   deleteField,
   doc,
   getDoc,
+  getDocFromServer,
   getDocs,
   limit,
   onSnapshot,
@@ -44,7 +45,7 @@ const DEFAULT_PAINT_TOWN_RULES = Object.freeze({
 });
 const VALID_PAINT_TOUCH_MODES = new Set(['off', 'roof', 'any']);
 const ROOM_CREATE_LIMITS_BY_PLAN = Object.freeze({
-  free: 0,
+  free: 3,
   trial: 3,
   support: 3,
   supporter: 3,
@@ -105,6 +106,12 @@ function normalizeRoomCreateCount(raw) {
   return parsed == null ? 0 : parsed;
 }
 
+function waitMs(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, Math.max(0, Number(ms) || 0));
+  });
+}
+
 function formatRoomCreateDeniedMessage(err, context = {}) {
   const code = String(err?.code || 'unknown');
   const rawMessage = String(err?.message || '').trim();
@@ -126,6 +133,8 @@ function formatRoomCreateDeniedMessage(err, context = {}) {
 
   const ctx = [
     `code=${code}`,
+    `attemptedCode=${String(context.attemptedCode || '')}`,
+    `attempt=${Number.isFinite(context.attempt) ? context.attempt : -1}`,
     `plan=${String(context.plan || 'free')}`,
     `subStatus=${String(context.subscriptionStatus || 'none')}`,
     `adminClaim=${context.hasAdminTokenClaim ? 'yes' : 'no'}`,
@@ -438,6 +447,22 @@ async function createRoom(options = {}) {
   }
 
   let profileSnap = await ensureUserProfile();
+  let didServerProfileRefresh = false;
+
+  async function refreshProfileFromServerOnce() {
+    if (didServerProfileRefresh) return false;
+    didServerProfileRefresh = true;
+    try {
+      const freshSnap = await getDocFromServer(userRef);
+      if (freshSnap.exists()) {
+        profileSnap = freshSnap;
+        return true;
+      }
+    } catch (_) {
+      // Keep prior profile snapshot when server refresh is unavailable.
+    }
+    return false;
+  }
 
   let createdCode = null;
   let lastDeniedErr = null;
@@ -465,10 +490,16 @@ async function createRoom(options = {}) {
     const localRoomCreateLimit = hasAdminTokenClaim
       ? Math.max(roomCreateLimit, ROOM_CREATE_LIMITS_BY_PLAN.admin)
       : roomCreateLimit;
-    const hasEntitlement = plan === 'trial' || plan === 'support' || plan === 'supporter' || plan === 'pro';
+    const hasEntitlement = plan === 'free' || plan === 'trial' || plan === 'support' || plan === 'supporter' || plan === 'pro';
+    const localQuotaReached = roomCreateCount >= localRoomCreateLimit;
 
-    if (localRoomCreateLimit <= 0 || roomCreateCount >= localRoomCreateLimit) {
-      throw new Error('Room creation limit reached for your plan. Rename or reuse existing rooms, or upgrade for a higher limit.');
+    if (localRoomCreateLimit <= 0 || !hasEntitlement || localQuotaReached) {
+      const refreshed = await refreshProfileFromServerOnce();
+      if (refreshed) continue;
+      if (localRoomCreateLimit <= 0 || !hasEntitlement) {
+        throw new Error('Multiplayer room creation requires sign-in and a valid account profile.');
+      }
+      throw new Error('Room creation limit reached for this account. Rename or reuse existing rooms, or use Account to adjust your donation plan.');
     }
 
     try {
@@ -509,6 +540,8 @@ async function createRoom(options = {}) {
         if (errCode === 'permission-denied') {
           lastDeniedErr = err;
           lastDeniedContext = {
+            attemptedCode: code,
+            attempt,
             plan,
             subscriptionStatus: String(profile.subscriptionStatus || 'none'),
             hasAdminTokenClaim,
@@ -524,6 +557,9 @@ async function createRoom(options = {}) {
         } catch (_) {
           // Keep prior snapshot and continue best effort retries.
         }
+        // Firestore profile updates can arrive moments after auth state changes.
+        // Backoff avoids immediate repeat-denials during that propagation window.
+        await waitMs(120 + attempt * 80);
         continue;
       }
       if (options.code && errCode === 'permission-denied') {
@@ -584,7 +620,7 @@ async function createRoom(options = {}) {
     }, { merge: true });
   } catch (err) {
     if (String(err?.code || '') === 'permission-denied') {
-      throw new Error('Room created, but owner presence could not be written. Check plan access and Firestore rules.');
+      throw new Error('Room created, but owner presence could not be written. Check sign-in state and Firestore rules.');
     }
     throw err;
   }

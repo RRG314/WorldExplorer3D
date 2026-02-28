@@ -1,17 +1,17 @@
 import {
   doc,
   getDoc,
+  getDocFromServer,
   onSnapshot,
   serverTimestamp,
   setDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { initFirebase } from './firebase-init.js';
-import { startTrial as requestTrialStart } from './billing.js';
 
 const USERS_COLLECTION = 'users';
 const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
 const ROOM_CREATE_LIMITS = Object.freeze({
-  free: 0,
+  free: 3,
   trial: 3,
   supporter: 3,
   pro: 10
@@ -20,7 +20,7 @@ const ADMIN_TEST_ROOM_CREATE_LIMIT = 10000;
 
 const FREE_ENTITLEMENTS = Object.freeze({
   fullAccess: true,
-  cloudSync: false,
+  cloudSync: true,
   proEarlyAccess: false,
   prioritySupport: false,
   featureConsideration: false,
@@ -124,6 +124,28 @@ function hasActiveSubscription(profile) {
   return ACTIVE_SUB_STATUSES.has(String(profile.subscriptionStatus || '').toLowerCase());
 }
 
+async function readUserSnapshot(ref, preferServer = false) {
+  if (preferServer) {
+    try {
+      return await getDocFromServer(ref);
+    } catch (err) {
+      const code = String(err && err.code ? err.code : '');
+      if (code !== 'unavailable' && code !== 'deadline-exceeded') {
+        throw err;
+      }
+    }
+  }
+  return getDoc(ref);
+}
+
+function hasActiveTrialWindowData(raw = {}, nowMs = Date.now()) {
+  const plan = normalizePlan(raw.plan);
+  if (plan !== 'trial') return false;
+  const trialEndsAtMs = timestampToMillis(raw.trialEndsAt) || timestampToMillis(raw.trialEndsAtMs);
+  if (!trialEndsAtMs) return false;
+  return trialEndsAtMs > nowMs;
+}
+
 function isTrialExpired(profile, nowMs = Date.now()) {
   if (profile.plan !== 'trial') return false;
   const trialEndsAtMs = timestampToMillis(profile.trialEndsAt);
@@ -148,7 +170,14 @@ function normalizeProfile(uid, raw = {}, options = {}) {
   const hasAdminStatus = String(raw.subscriptionStatus || '').toLowerCase() === 'admin';
   const hasAdminClaim = options && options.adminClaim === true;
   const isAdmin = hasAdminStatus || hasAdminClaim;
-  const plan = isAdmin ? 'pro' : basePlan;
+  const hasActiveTrialWindow = hasActiveTrialWindowData(raw);
+  const plan = isAdmin
+    ? 'pro'
+    : (
+        hasActiveTrialWindow
+          ? 'trial'
+          : (basePlan === 'supporter' || basePlan === 'pro' ? basePlan : 'free')
+      );
   const baseEntitlements = entitlementsForPlan(plan);
   const entitlements = raw.entitlements && typeof raw.entitlements === 'object'
     ? cloneEntitlements({ ...baseEntitlements, ...raw.entitlements })
@@ -170,7 +199,7 @@ function normalizeProfile(uid, raw = {}, options = {}) {
     stripeCustomerId: raw.stripeCustomerId || null,
     stripeSubscriptionId: raw.stripeSubscriptionId || null,
     trialEndsAt: raw.trialEndsAt || null,
-    trialEndsAtMs: timestampToMillis(raw.trialEndsAt),
+    trialEndsAtMs: timestampToMillis(raw.trialEndsAt) || timestampToMillis(raw.trialEndsAtMs),
     roomCreateCount,
     roomCreateLimit,
     entitlements,
@@ -218,12 +247,13 @@ function broadcastEntitlements(state, user = null) {
   return payload;
 }
 
-async function ensureUserDoc(user) {
+async function ensureUserDoc(user, options = {}) {
   const services = initFirebase();
   if (!services || !services.db || !user) return freeState();
 
   const ref = doc(services.db, USERS_COLLECTION, user.uid);
-  const snap = await getDoc(ref);
+  const preferServer = options && options.preferServer === true;
+  const snap = await readUserSnapshot(ref, preferServer);
   const initialAdminClaim = await hasAdminTokenClaim(user, false);
 
   if (snap.exists()) {
@@ -256,13 +286,25 @@ async function ensureUserDoc(user) {
     );
 
     if (needsPatch) {
-      await setDoc(ref, {
-        email: nextEmail,
-        displayName: nextDisplayName,
-        roomCreateCount: nextRoomCreateCount,
-        roomCreateLimit: nextRoomCreateLimit,
-        updatedAt: serverTimestamp()
-      }, { merge: true });
+      try {
+        await setDoc(ref, {
+          email: nextEmail,
+          displayName: nextDisplayName,
+          roomCreateCount: nextRoomCreateCount,
+          roomCreateLimit: nextRoomCreateLimit,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      } catch (err) {
+        const code = String(err && err.code ? err.code : '');
+        if (code !== 'permission-denied') throw err;
+
+        // Concurrent entitlement hydration can race on first sign-in. If another write
+        // won the create/update, re-read and continue with canonical data.
+        const retrySnap = await readUserSnapshot(ref, preferServer);
+        if (!retrySnap.exists()) throw err;
+        const retryData = retrySnap.data() || {};
+        return normalizeProfile(user.uid, retryData, { adminClaim: isAdminClaim });
+      }
     }
 
     return normalizeProfile(user.uid, {
@@ -284,21 +326,32 @@ async function ensureUserDoc(user) {
     updatedAt: serverTimestamp()
   };
 
-  await setDoc(ref, created, { merge: true });
-  return normalizeProfile(user.uid, created, { adminClaim: initialAdminClaim });
+  try {
+    await setDoc(ref, created, { merge: true });
+    return normalizeProfile(user.uid, created, { adminClaim: initialAdminClaim });
+  } catch (err) {
+    const code = String(err && err.code ? err.code : '');
+    if (code !== 'permission-denied') throw err;
+
+    // If another concurrent call already created the doc, read and continue.
+    const retrySnap = await readUserSnapshot(ref, preferServer);
+    if (!retrySnap.exists()) throw err;
+    return normalizeProfile(user.uid, retrySnap.data() || {}, { adminClaim: initialAdminClaim });
+  }
 }
 
 export async function startTrialIfEligible(user) {
   if (!user) {
-    throw new Error('Sign in to start your trial.');
+    throw new Error('Sign in to continue.');
   }
 
   const services = initFirebase();
   if (!services || !services.db) {
-    throw new Error('Firebase config is missing. Trial cannot start yet.');
+    throw new Error('Firebase config is missing. Account features are unavailable.');
   }
-  await requestTrialStart();
-  return ensureEntitlements(user);
+
+  // Backward-compatible no-op: multiplayer access is now available to any signed-in user.
+  return ensureEntitlements(user, { preferServer: true });
 }
 
 async function applyTrialDowngradeIfNeeded(profile) {
@@ -315,14 +368,14 @@ async function applyTrialDowngradeIfNeeded(profile) {
   };
 }
 
-export async function ensureEntitlements(user) {
+export async function ensureEntitlements(user, options = {}) {
   if (!user) {
     const state = freeState();
     broadcastEntitlements(state, null);
     return state;
   }
 
-  let profile = await ensureUserDoc(user);
+  let profile = await ensureUserDoc(user, options);
   profile = await applyTrialDowngradeIfNeeded(profile);
   const adminClaim = profile.isAdmin === true ? true : await hasAdminTokenClaim(user, false);
 
@@ -381,7 +434,7 @@ export function isProPlan(state) {
 }
 
 export function isSupporterOrTrial(state) {
-  return !!state && (state.plan === 'supporter' || state.plan === 'trial' || state.plan === 'pro' || state.isAdmin === true);
+  return !!state && (state.plan === 'free' || state.plan === 'supporter' || state.plan === 'trial' || state.plan === 'pro' || state.isAdmin === true);
 }
 
 export function formatRemainingTrial(state) {
