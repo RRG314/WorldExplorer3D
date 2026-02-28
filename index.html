@@ -218,12 +218,6 @@
       gap: 12px;
     }
 
-    .multiplayerGallery {
-      display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 12px;
-    }
-
     .gameplayCard {
       border: 1px solid var(--line);
       border-radius: 12px;
@@ -346,7 +340,6 @@
 
     @media (max-width: 980px) {
       .hero-grid { grid-template-columns: 1fr; }
-      .multiplayerGallery { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .gameplayGallery { grid-template-columns: 1fr; }
       .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .pricing { grid-template-columns: 1fr; }
@@ -356,7 +349,6 @@
     @media (max-width: 640px) {
       .shell { width: min(1120px, 94vw); }
       .hero-copy { padding: 22px; }
-      .multiplayerGallery { grid-template-columns: 1fr; }
       .gameplayGalleryWrap { max-height: min(76vh, 1020px); }
       .features { grid-template-columns: 1fr; }
       .btn { width: 100%; text-align: center; }
@@ -382,24 +374,6 @@
         <div class="hero-media" aria-hidden="true">
           <img class="hero-media-img" src="./assets/landing/hero.jpg" alt="">
         </div>
-      </div>
-    </section>
-
-    <section>
-      <h2>Multiplayer</h2>
-      <div class="multiplayerGallery">
-        <figure class="gameplayCard">
-          <img src="./assets/landing/multiplayer/drive-with-ghost.png" alt="Two players in the same room with one driving and one ghost avatar visible">
-          <figcaption class="gameplayMeta"><h3>Shared Driving Session</h3><p>Room members can see each other in real time while driving through the same city block.</p></figcaption>
-        </figure>
-        <figure class="gameplayCard">
-          <img src="./assets/landing/multiplayer/walk-with-ghost.png" alt="Walking mode with another room member visible as a ghost avatar">
-          <figcaption class="gameplayMeta"><h3>Live Player Presence</h3><p>Ghost presence shows teammate position, label, and mode so players can coordinate quickly.</p></figcaption>
-        </figure>
-        <figure class="gameplayCard">
-          <img src="./assets/landing/multiplayer/drone-with-ghost.png" alt="Drone mode in a multiplayer room with shared world visibility">
-          <figcaption class="gameplayMeta"><h3>Mode-Synced Multiplayer</h3><p>Players can switch between walking, driving, and drone while staying in the same room instance.</p></figcaption>
-        </figure>
       </div>
     </section>
 
