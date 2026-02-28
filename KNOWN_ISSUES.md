@@ -1,20 +1,12 @@
 # Known Issues
 
-Last reviewed: 2026-02-25
+Last reviewed: 2026-02-28
 
 Current risks and follow-up items for this branch.
 
 ## High Priority
 
-### 1. Runtime Config Migration (Firebase Functions)
-
-Functions still rely on `functions.config()` for Stripe values.
-
-Required:
-
-- migrate to Firebase Params/Secret Manager
-
-### 2. Node Runtime Upgrade
+### 1. Node Runtime Upgrade
 
 Cloud Functions are still on Node 20 in this repository.
 
@@ -23,7 +15,7 @@ Required:
 - upgrade to Node 22
 - re-test Stripe webhook and account endpoints
 
-### 3. Dual Runtime Maintenance
+### 2. Dual Runtime Maintenance
 
 Two runtime code paths are maintained (`public/app/js/*` and root `js/*`).
 
@@ -37,7 +29,7 @@ Mitigation:
 
 ## Medium Priority
 
-### 4. GitHub Pages Cache Drift
+### 3. GitHub Pages Cache Drift
 
 Users may retain stale module paths after deploys.
 
@@ -46,16 +38,16 @@ Mitigation:
 - hard refresh guidance in docs
 - keep compatibility checks in smoke test routine
 
-### 5. Stripe Mode Mismatch
+### 4. Stripe Mode Mismatch
 
 Test/live key or price mismatches can break checkout.
 
 Mitigation:
 
-- verify runtime config before deploy
+- verify Firebase params/env values before deploy (`WE3D_STRIPE_SECRET`, `WE3D_STRIPE_WEBHOOK_SECRET`, `WE3D_STRIPE_PRICE_SUPPORTER`, `WE3D_STRIPE_PRICE_PRO`)
 - inspect function logs after billing tests
 
-### 6. Firestore TTL Latency
+### 5. Firestore TTL Latency
 
 TTL cleanup is background and not immediate.
 
@@ -66,11 +58,11 @@ Mitigation:
 
 ## Low Priority
 
-### 7. UI polish backlog
+### 6. UI polish backlog
 
 - additional mobile layout polish for account/social panels
 - optional tooltips for room-rule editing and invite flows
 
-### 8. Ops automation
+### 7. Ops automation
 
 - add automated smoke checks for account + multiplayer flows after deploy

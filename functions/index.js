@@ -1,5 +1,6 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const { defineString } = require('firebase-functions/params');
 const Stripe = require('stripe');
 
 admin.initializeApp();
@@ -16,22 +17,38 @@ const ROOM_CREATE_LIMITS = Object.freeze({
   supporter: 3,
   pro: 10
 });
+const PARAM_STRIPE_SECRET = defineString('WE3D_STRIPE_SECRET', { default: '' });
+const PARAM_STRIPE_WEBHOOK = defineString('WE3D_STRIPE_WEBHOOK_SECRET', { default: '' });
+const PARAM_STRIPE_PRICE_SUPPORTER = defineString('WE3D_STRIPE_PRICE_SUPPORTER', { default: '' });
+const PARAM_STRIPE_PRICE_PRO = defineString('WE3D_STRIPE_PRICE_PRO', { default: '' });
+const PARAM_ADMIN_ALLOWED_EMAILS = defineString('WE3D_ADMIN_ALLOWED_EMAILS', { default: '' });
+const PARAM_ADMIN_ALLOWED_UIDS = defineString('WE3D_ADMIN_ALLOWED_UIDS', { default: '' });
+const PARAM_ALLOWED_ORIGINS = defineString('WE3D_ALLOWED_ORIGINS', { default: '' });
+
+function readParamString(paramRef, envFallback = '') {
+  try {
+    const value = typeof paramRef?.value === 'function' ? paramRef.value() : '';
+    const text = String(value || '').trim();
+    if (text) return text;
+  } catch (_) {
+    // Param resolution can be unavailable in some local tooling; env fallback still works.
+  }
+  return String(envFallback || '').trim();
+}
 
 function stripeConfig() {
-  const cfg = functions.config().stripe || {};
   return {
-    secret: cfg.secret || '',
-    webhook: cfg.webhook || '',
-    price_supporter: cfg.price_supporter || '',
-    price_pro: cfg.price_pro || ''
+    secret: readParamString(PARAM_STRIPE_SECRET, process.env.WE3D_STRIPE_SECRET || process.env.STRIPE_SECRET || ''),
+    webhook: readParamString(PARAM_STRIPE_WEBHOOK, process.env.WE3D_STRIPE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK || ''),
+    price_supporter: readParamString(PARAM_STRIPE_PRICE_SUPPORTER, process.env.WE3D_STRIPE_PRICE_SUPPORTER || process.env.STRIPE_PRICE_SUPPORTER || ''),
+    price_pro: readParamString(PARAM_STRIPE_PRICE_PRO, process.env.WE3D_STRIPE_PRICE_PRO || process.env.STRIPE_PRICE_PRO || '')
   };
 }
 
 function adminConfig() {
-  const cfg = functions.config().admin || {};
   return {
-    allowedEmails: cfg.allowed_emails || process.env.WE3D_ADMIN_EMAILS || '',
-    allowedUids: cfg.allowed_uids || process.env.WE3D_ADMIN_UIDS || ''
+    allowedEmails: readParamString(PARAM_ADMIN_ALLOWED_EMAILS, process.env.WE3D_ADMIN_EMAILS || ''),
+    allowedUids: readParamString(PARAM_ADMIN_ALLOWED_UIDS, process.env.WE3D_ADMIN_UIDS || '')
   };
 }
 
@@ -70,7 +87,7 @@ function isAllowlistedAdminCandidate(authUser, uid) {
 function getStripeClient() {
   const cfg = stripeConfig();
   if (!cfg.secret) {
-    throw new Error('Stripe secret is missing. Set functions config: stripe.secret');
+    throw new Error('Stripe secret is missing. Set WE3D_STRIPE_SECRET (Firebase param or env).');
   }
   return new Stripe(cfg.secret, { apiVersion: '2024-06-20' });
 }
@@ -150,8 +167,10 @@ function normalizeOrigin(value) {
 }
 
 function allowedOrigins() {
-  const cfg = functions.config().cors || {};
-  const configured = parseCsvSet(cfg.allowed_origins || process.env.WE3D_ALLOWED_ORIGINS || '', normalizeOrigin);
+  const configured = parseCsvSet(
+    readParamString(PARAM_ALLOWED_ORIGINS, process.env.WE3D_ALLOWED_ORIGINS || ''),
+    normalizeOrigin
+  );
   const projectId = String(process.env.GCLOUD_PROJECT || '').trim();
   const defaults = new Set([
     'https://rrg314.github.io'

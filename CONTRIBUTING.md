@@ -93,5 +93,5 @@ Include screenshots for UI changes and log snippets for backend fixes.
 
 Contributors touching backend config/runtime should be aware:
 
-- migrate off `functions.config()` to params/secrets before March 2026
+- keep backend runtime config on Firebase params/env keys (`WE3D_*`) and do not reintroduce `functions.config()`
 - upgrade functions runtime from Node 20 to Node 22

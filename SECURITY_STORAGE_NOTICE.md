@@ -59,7 +59,7 @@ Treat browser-stored user data as local-device data, not guaranteed cloud backup
 
 ## 6. Current Security Debt
 
-- Functions still use legacy runtime config (`functions.config`) and require migration to params/secrets.
+- Functions runtime config now uses Firebase params/env keys (`WE3D_*`) instead of legacy `functions.config()`.
 - Node 20 runtime deprecation requires scheduled upgrade.
 
 ## 7. User-Facing Disclosure Guidance
