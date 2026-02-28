@@ -1570,3 +1570,18 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Verification:
     - `node --check` passed for changed JS files.
     - `npm test` passed: `40/40` Firestore security checks.
+
+- Account/auth production hardening pass (2026-02-28):
+  - Updated `functions/index.js` CORS defaults to include custom domains:
+    - `https://worldexplorer.io`, `https://www.worldexplorer.io`, `https://worldexplorer3d.io`, `https://www.worldexplorer3d.io`
+    - kept Firebase hosting defaults and existing configurable `WE3D_ALLOWED_ORIGINS` param/env overlay.
+  - Updated shared billing API client (`js/billing.js` + `public/js/billing.js`):
+    - Prefer same-origin Hosting rewrites first, then direct Cloud Functions fallback.
+    - Added JSON-response guard to avoid false-success when same-origin is non-API HTML.
+  - Updated auth messaging (`js/auth-ui.js` + `public/js/auth-ui.js`) to explicitly surface `auth/unauthorized-domain` with Firebase console path.
+  - Validation:
+    - ESLint (legacy config mode) passed for touched files.
+    - `npm test` passed (Firestore rules suite: 40/40).
+    - `node tests/painttown.integration.test.mjs` passed.
+  - External follow-up (console):
+    - Ensure Firebase Auth -> Settings -> Authorized domains contains active production domains (`worldexplorer3d.io`, `www.worldexplorer3d.io`, and any other live hostnames like `worldexplorer.io`).

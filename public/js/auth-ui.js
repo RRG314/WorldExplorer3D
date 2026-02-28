@@ -40,6 +40,8 @@ function friendlyAuthMessage(err) {
       return 'Network error. Check your connection and try again.';
     case 'auth/operation-not-allowed':
       return 'Auth provider is disabled. Enable Google and/or Email/Password in Firebase Console -> Authentication -> Sign-in method.';
+    case 'auth/unauthorized-domain':
+      return 'This domain is not authorized for Google sign-in. In Firebase Console -> Authentication -> Settings -> Authorized domains, add this domain and retry.';
     default:
       return err && err.message ? err.message : 'Authentication failed.';
   }

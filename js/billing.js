@@ -25,10 +25,6 @@ function getReturnUrlBase() {
   return `${origin}${basePath}`;
 }
 
-function isFirebaseHostingDomain(hostname = '') {
-  return hostname.endsWith('.web.app') || hostname.endsWith('.firebaseapp.com');
-}
-
 function getDirectFunctionsOrigin() {
   const override = String(globalThis.WORLD_EXPLORER_FUNCTIONS_ORIGIN || '').trim();
   if (override) return override.replace(/\/$/, '');
@@ -49,23 +45,21 @@ function normalizeFunctionPath(path) {
 function buildFunctionCandidates(path) {
   const normalizedPath = normalizeFunctionPath(path);
   const directOrigin = getDirectFunctionsOrigin();
-  const hostname = String(globalThis.location && globalThis.location.hostname ? globalThis.location.hostname : '');
-  const onFirebaseHosting = isFirebaseHostingDomain(hostname);
-  const candidates = [];
-
-  if (onFirebaseHosting) {
-    candidates.push(normalizedPath);
-    if (directOrigin) candidates.push(`${directOrigin}${normalizedPath}`);
-  } else {
-    if (directOrigin) candidates.push(`${directOrigin}${normalizedPath}`);
-    candidates.push(normalizedPath);
-  }
+  const candidates = [normalizedPath];
+  if (directOrigin) candidates.push(`${directOrigin}${normalizedPath}`);
 
   return [...new Set(candidates)];
 }
 
 function isRetryableFunctionStatus(status) {
   return RETRYABLE_STATUS_CODES.has(Number(status));
+}
+
+function isJsonResponse(res, rawText = '') {
+  const contentType = String(res && res.headers ? res.headers.get('content-type') || '' : '').toLowerCase();
+  if (contentType.includes('application/json')) return true;
+  const trimmed = String(rawText || '').trim();
+  return trimmed.startsWith('{') || trimmed.startsWith('[');
 }
 
 function summarizeAttempt(attempt = {}) {
@@ -119,6 +113,13 @@ async function postFunction(path, body = {}) {
 
       attempts.push({ url, status: res.status });
       responseRecorded = true;
+
+      if (!isJsonResponse(res, rawText)) {
+        if (!isLast) {
+          continue;
+        }
+        throw unavailableFunctionError(path, attempts);
+      }
 
       if (isRetryableFunctionStatus(res.status) && !isLast) {
         continue;

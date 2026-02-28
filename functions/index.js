@@ -11,6 +11,13 @@ const ALLOWED_PLANS = new Set(['support', 'supporter', 'pro']);
 const TRIAL_DURATION_MS = 48 * 60 * 60 * 1000;
 const DELETE_ACCOUNT_MAX_AUTH_AGE_SECONDS = 10 * 60;
 const ADMIN_TEST_ROOM_CREATE_LIMIT = 10000;
+const DEFAULT_ALLOWED_ORIGINS = Object.freeze([
+  'https://rrg314.github.io',
+  'https://worldexplorer.io',
+  'https://www.worldexplorer.io',
+  'https://worldexplorer3d.io',
+  'https://www.worldexplorer3d.io'
+]);
 const ROOM_CREATE_LIMITS = Object.freeze({
   free: 3,
   trial: 3,
@@ -172,9 +179,7 @@ function allowedOrigins() {
     normalizeOrigin
   );
   const projectId = String(process.env.GCLOUD_PROJECT || '').trim();
-  const defaults = new Set([
-    'https://rrg314.github.io'
-  ]);
+  const defaults = new Set(DEFAULT_ALLOWED_ORIGINS);
 
   if (projectId) {
     defaults.add(`https://${projectId}.web.app`);
@@ -299,7 +304,7 @@ function isFailedPreconditionError(err) {
 
 async function deleteDocsByQuery(query, batchSize = 200, label = '') {
   const limit = Math.max(10, Math.min(500, Number(batchSize) || 200));
-  while (true) {
+  for (;;) {
     let snap;
     try {
       snap = await query.limit(limit).get();
