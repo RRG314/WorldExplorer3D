@@ -23,6 +23,8 @@ const ROTATE_THRESHOLD_RAD = 0.05;
 const STALE_LAST_SEEN_MS = 45 * 1000;
 const STALE_CLOCK_SKEW_TOLERANCE_MS = 2 * 60 * 1000;
 const MAX_PLAYER_DOCS_READ = 24;
+const LEAVE_TTL_MS = 1000;
+const ALLOWED_MODES = new Set(['drive', 'walk', 'drone', 'space', 'moon']);
 
 let activeRoomId = null;
 let getPose = null;
@@ -77,7 +79,7 @@ function normalizePosePayload(rawPose = {}) {
   const pose = rawPose.pose || {};
   const frame = normalizeFrame(rawPose.frame || {}, rawPose.mode === 'space' ? 'space' : rawPose.mode === 'moon' ? 'moon' : 'earth');
   const modeRaw = String(rawPose.mode || '').toLowerCase();
-  const mode = ['drive', 'walk', 'drone', 'space', 'moon'].includes(modeRaw) ? modeRaw : 'drive';
+  const mode = ALLOWED_MODES.has(modeRaw) ? modeRaw : 'drive';
 
   return {
     mode,
@@ -135,6 +137,50 @@ function angularDistance(a, b) {
   if (delta > Math.PI) return delta - Math.PI * 2;
   if (delta < -Math.PI) return delta + Math.PI * 2;
   return Math.abs(delta);
+}
+
+function toMillisOrNull(value) {
+  if (typeof value?.toMillis === 'function') return value.toMillis();
+  return null;
+}
+
+function isExpiredPresence(data, nowMs) {
+  const expiresAtMs = toMillisOrNull(data?.expiresAt);
+  if (!Number.isFinite(expiresAtMs)) return false;
+  return expiresAtMs < nowMs - STALE_CLOCK_SKEW_TOLERANCE_MS;
+}
+
+function isStalePresence(data, nowMs) {
+  const lastSeenAtMs = toMillisOrNull(data?.lastSeenAt);
+  if (!Number.isFinite(lastSeenAtMs)) return false;
+  return nowMs - lastSeenAtMs > STALE_LAST_SEEN_MS + STALE_CLOCK_SKEW_TOLERANCE_MS;
+}
+
+function toPlayerSnapshot(docSnap, data) {
+  return {
+    uid: String(data.uid || docSnap.id),
+    displayName: String(data.displayName || 'Explorer'),
+    role: String(data.role || 'member'),
+    mode: String(data.mode || 'drive'),
+    frame: {
+      kind: String(data.frame?.kind || 'earth'),
+      locLat: finiteNumber(data.frame?.locLat, 0),
+      locLon: finiteNumber(data.frame?.locLon, 0)
+    },
+    pose: {
+      x: finiteNumber(data.pose?.x, 0),
+      y: finiteNumber(data.pose?.y, 0),
+      z: finiteNumber(data.pose?.z, 0),
+      yaw: finiteNumber(data.pose?.yaw, 0),
+      pitch: finiteNumber(data.pose?.pitch, 0),
+      vx: finiteNumber(data.pose?.vx, 0),
+      vy: finiteNumber(data.pose?.vy, 0),
+      vz: finiteNumber(data.pose?.vz, 0)
+    },
+    joinedAt: data.joinedAt || null,
+    lastSeenAt: data.lastSeenAt || null,
+    expiresAt: data.expiresAt || null
+  };
 }
 
 function movedBeyondThreshold(prevPose, nextPose) {
@@ -218,7 +264,7 @@ async function stopPresence() {
     const { db } = getServices();
     const playerRef = doc(db, ROOM_COLLECTION, roomId, PLAYER_COLLECTION, user.uid);
     await setDoc(playerRef, {
-      expiresAt: Timestamp.fromMillis(Date.now() + 1000)
+      expiresAt: Timestamp.fromMillis(Date.now() + LEAVE_TTL_MS)
     }, { merge: true });
   } catch (_) {
     // Best effort only.
@@ -227,10 +273,6 @@ async function stopPresence() {
 
 function installVisibilityHooks() {
   const onVisibility = () => {
-    if (document.hidden) {
-      writePresence(true);
-      return;
-    }
     writePresence(true);
   };
 
@@ -298,48 +340,8 @@ function listenPlayers(roomId, callback) {
 
     snap.forEach((docSnap) => {
       const data = docSnap.data() || {};
-      const expiresAt = data.expiresAt;
-      const expiresAtMs = typeof expiresAt?.toMillis === 'function' ? expiresAt.toMillis() : null;
-      if (
-        Number.isFinite(expiresAtMs) &&
-        expiresAtMs < now - STALE_CLOCK_SKEW_TOLERANCE_MS
-      ) {
-        return;
-      }
-
-      const lastSeenAt = data.lastSeenAt;
-      const lastSeenAtMs = typeof lastSeenAt?.toMillis === 'function' ? lastSeenAt.toMillis() : null;
-      if (
-        Number.isFinite(lastSeenAtMs) &&
-        now - lastSeenAtMs > STALE_LAST_SEEN_MS + STALE_CLOCK_SKEW_TOLERANCE_MS
-      ) {
-        return;
-      }
-
-      players.push({
-        uid: String(data.uid || docSnap.id),
-        displayName: String(data.displayName || 'Explorer'),
-        role: String(data.role || 'member'),
-        mode: String(data.mode || 'drive'),
-        frame: {
-          kind: String(data.frame?.kind || 'earth'),
-          locLat: finiteNumber(data.frame?.locLat, 0),
-          locLon: finiteNumber(data.frame?.locLon, 0)
-        },
-        pose: {
-          x: finiteNumber(data.pose?.x, 0),
-          y: finiteNumber(data.pose?.y, 0),
-          z: finiteNumber(data.pose?.z, 0),
-          yaw: finiteNumber(data.pose?.yaw, 0),
-          pitch: finiteNumber(data.pose?.pitch, 0),
-          vx: finiteNumber(data.pose?.vx, 0),
-          vy: finiteNumber(data.pose?.vy, 0),
-          vz: finiteNumber(data.pose?.vz, 0)
-        },
-        joinedAt: data.joinedAt || null,
-        lastSeenAt: data.lastSeenAt || null,
-        expiresAt: data.expiresAt || null
-      });
+      if (isExpiredPresence(data, now) || isStalePresence(data, now)) return;
+      players.push(toPlayerSnapshot(docSnap, data));
     });
 
     players.sort((a, b) => a.displayName.localeCompare(b.displayName));

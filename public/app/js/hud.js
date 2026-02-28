@@ -2,6 +2,61 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 
+const COMPASS_DIRECTIONS = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
+const RAD_TO_DEG = 180 / Math.PI;
+const GEO_DECIMALS = 4;
+const CAR_BODY_HEIGHT_FROM_GROUND = 1.2;
+const CHASE_CAMERA_DISTANCE = 10;
+const CHASE_CAMERA_HEIGHT = 5;
+const CHASE_CAMERA_SMOOTH_FACTOR = 0.7;
+const HOOD_FORWARD_OFFSET = 1.2;
+const HOOD_LOOK_DISTANCE = 10;
+const HOOD_CAMERA_HEIGHT = 1.8;
+const OVERHEAD_CAMERA_HEIGHT = 50;
+const OVERHEAD_CAMERA_Z_OFFSET = 15;
+const WALK_ROAD_EDGE_MIN = 6;
+const WALK_ROAD_EDGE_SCALE = 0.75;
+
+function locationName() {
+  return appCtx.selLoc === 'custom' ? appCtx.customLoc?.name || 'Custom' : appCtx.LOCS[appCtx.selLoc].name;
+}
+
+function geoFromWorldXZ(worldX, worldZ) {
+  return {
+    lat: appCtx.LOC.lat - worldZ / appCtx.SCALE,
+    lon: appCtx.LOC.lon + worldX / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180))
+  };
+}
+
+function headingDegreesFromYaw(yawRad) {
+  let hdg = (-yawRad * RAD_TO_DEG + 90) % 360;
+  if (hdg < 0) hdg += 360;
+  return hdg;
+}
+
+function headingLabel(yawRad) {
+  const hdg = headingDegreesFromYaw(yawRad);
+  return `${COMPASS_DIRECTIONS[Math.round(hdg / 45) % 8]} ${Math.round(hdg)}°`;
+}
+
+function coordsHudText(worldX, worldZ, yawRad, pitchDeg = null) {
+  const geo = geoFromWorldXZ(worldX, worldZ);
+  const heading = headingLabel(yawRad);
+  if (pitchDeg == null) return `${geo.lat.toFixed(GEO_DECIMALS)}, ${geo.lon.toFixed(GEO_DECIMALS)} | ${heading}`;
+  return `${geo.lat.toFixed(GEO_DECIMALS)}, ${geo.lon.toFixed(GEO_DECIMALS)} | ${heading} | P:${pitchDeg}°`;
+}
+
+function updateBillboardMarkers() {
+  appCtx.propMarkers.forEach((marker) => {
+    if (marker.userData.isBillboard) marker.lookAt(appCtx.camera.position);
+  });
+}
+
+function updateCameraLinkedEffects() {
+  if (appCtx.starField) appCtx.starField.position.copy(appCtx.camera.position);
+  updateSkyPositions();
+}
+
 function updateSkyPositions() {
   if (!appCtx.camera) return;
 
@@ -73,13 +128,7 @@ function updateCamera() {
     appCtx.camera.rotation.x = appCtx.drone.pitch;
     appCtx.camera.rotation.z = appCtx.drone.roll;
 
-    // Update star field to follow camera
-    if (appCtx.starField) {
-      appCtx.starField.position.copy(appCtx.camera.position);
-    }
-
-    // Update sun/moon positions to be relative to camera
-    updateSkyPositions();
+    updateCameraLinkedEffects();
 
     return;
   }
@@ -88,28 +137,19 @@ function updateCamera() {
   if (appCtx.Walk) {
     const walkCameraApplied = appCtx.Walk.applyCameraIfWalking();
     if (walkCameraApplied) {
-      // Update billboards to face camera
-      appCtx.propMarkers.forEach((marker) => {
-        if (marker.userData.isBillboard) {
-          marker.lookAt(appCtx.camera.position);
-        }
-      });
-      // Update star field to follow camera
-      if (appCtx.starField) {
-        appCtx.starField.position.copy(appCtx.camera.position);
-      }
-      // Update sun/moon positions to be relative to camera
-      updateSkyPositions();
+      updateBillboardMarkers();
+      updateCameraLinkedEffects();
       return;
     }
   }
 
   // Normal car camera modes
   const lb = appCtx.keys.KeyV;
-  const d = 10,h = 5;
+  const d = CHASE_CAMERA_DISTANCE;
+  const h = CHASE_CAMERA_HEIGHT;
 
   // Get car's actual Y position (follows terrain)
-  const carGroundY = appCtx.carMesh.position.y - 1.2; // Car body is 1.2 above ground
+  const carGroundY = appCtx.carMesh.position.y - CAR_BODY_HEIGHT_FROM_GROUND;
 
   // Show car mesh for non-first-person modes
   if (appCtx.camMode !== 1 && appCtx.carMesh && !appCtx.carMesh.visible) {
@@ -129,7 +169,7 @@ function updateCamera() {
 
     // Smooth both camera position and lookAt target together
     // Higher factor = camera stays more rigidly fixed to car
-    const smoothFactor = 0.7;
+    const smoothFactor = CHASE_CAMERA_SMOOTH_FACTOR;
     appCtx.camera.position.x += (targetX - appCtx.camera.position.x) * smoothFactor;
     appCtx.camera.position.y += (targetY - appCtx.camera.position.y) * smoothFactor;
     appCtx.camera.position.z += (targetZ - appCtx.camera.position.z) * smoothFactor;
@@ -148,37 +188,25 @@ function updateCamera() {
   } else if (appCtx.camMode === 1) {
     // Hood camera - positioned at front of car looking forward over the hood
     // Move camera forward to the hood area (1.2 units ahead of car center)
-    const fwdX = Math.sin(appCtx.car.angle) * 1.2;
-    const fwdZ = Math.cos(appCtx.car.angle) * 1.2;
-    appCtx.camera.position.set(appCtx.car.x + fwdX, carGroundY + 1.8, appCtx.car.z + fwdZ);
+    const fwdX = Math.sin(appCtx.car.angle) * HOOD_FORWARD_OFFSET;
+    const fwdZ = Math.cos(appCtx.car.angle) * HOOD_FORWARD_OFFSET;
+    appCtx.camera.position.set(appCtx.car.x + fwdX, carGroundY + HOOD_CAMERA_HEIGHT, appCtx.car.z + fwdZ);
     const dir = lb ? -1 : 1;
     appCtx.camera.lookAt(
-      appCtx.car.x + Math.sin(appCtx.car.angle) * 10 * dir,
+      appCtx.car.x + Math.sin(appCtx.car.angle) * HOOD_LOOK_DISTANCE * dir,
       carGroundY + 1.6,
-      appCtx.car.z + Math.cos(appCtx.car.angle) * 10 * dir
+      appCtx.car.z + Math.cos(appCtx.car.angle) * HOOD_LOOK_DISTANCE * dir
     );
     // Hide car mesh in first-person so you don't see tires/body
     if (appCtx.carMesh) appCtx.carMesh.visible = false;
   } else {
     // Overhead camera - high above car
-    appCtx.camera.position.set(appCtx.car.x, carGroundY + 50, appCtx.car.z + 15);
+    appCtx.camera.position.set(appCtx.car.x, carGroundY + OVERHEAD_CAMERA_HEIGHT, appCtx.car.z + OVERHEAD_CAMERA_Z_OFFSET);
     appCtx.camera.lookAt(appCtx.car.x, carGroundY, appCtx.car.z);
   }
 
-  // Update billboards to face camera
-  appCtx.propMarkers.forEach((marker) => {
-    if (marker.userData.isBillboard) {
-      marker.lookAt(appCtx.camera.position);
-    }
-  });
-
-  // Update star field to follow camera (must be at end after camera position is set)
-  if (appCtx.starField) {
-    appCtx.starField.position.copy(appCtx.camera.position);
-  }
-
-  // Update sun/moon positions to be relative to camera
-  updateSkyPositions();
+  updateBillboardMarkers();
+  updateCameraLinkedEffects();
 }
 
 function updateHUD() {
@@ -191,7 +219,7 @@ function updateHUD() {
     if (appCtx.onMoon && appCtx.moonSurface) {
       const raycaster = appCtx._getPhysRaycaster();
       appCtx._physRayStart.set(appCtx.drone.x, 2000, appCtx.drone.z);
-      raycaster.set(appCtx._physRayStart, appCtx._physRayDir || new THREE.Vector3(0, -1, 0));
+      raycaster.set(appCtx._physRayStart, appCtx._physRayDir || new globalThis.THREE.Vector3(0, -1, 0));
       const hits = raycaster.intersectObject(appCtx.moonSurface, false);
       if (hits.length > 0) {
         groundY = hits[0].point.y;
@@ -200,15 +228,13 @@ function updateHUD() {
       groundY = appCtx.elevationWorldYAtWorldXZ(appCtx.drone.x, appCtx.drone.z);
     }
 
-    const altitudeAGL = Math.round(appCtx.drone.y - groundY); // AGL = Above Ground Level
-    const altitudeMSL = Math.round(appCtx.drone.y); // MSL = Mean Sea Level (absolute)
+    const altitudeAGL = Math.round(appCtx.drone.y - groundY);
 
     // Drone mode HUD
     document.getElementById('speed').textContent = altitudeAGL + 'm AGL';
     document.getElementById('speed').classList.remove('fast');
     document.getElementById('limit').textContent = '';
-    const locName = appCtx.selLoc === 'custom' ? appCtx.customLoc?.name || 'Custom' : appCtx.LOCS[appCtx.selLoc].name;
-    document.getElementById('street').textContent = '🚁 DRONE MODE • ' + locName;
+    document.getElementById('street').textContent = '🚁 DRONE MODE • ' + locationName();
     const bf = document.getElementById('boostFill');
     bf.style.width = '0%';
     bf.classList.remove('active');
@@ -218,11 +244,8 @@ function updateHUD() {
     document.getElementById('indDrift').textContent = 'DRONE';
     document.getElementById('indOff').classList.remove('on', 'warn');
     document.getElementById('offRoadWarn').classList.remove('active');
-    const geo = { lat: appCtx.LOC.lat - appCtx.drone.z / appCtx.SCALE, lon: appCtx.LOC.lon + appCtx.drone.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180)) };
-    let hdg = (-appCtx.drone.yaw * 180 / Math.PI + 90) % 360;if (hdg < 0) hdg += 360;
-    const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-    const pitch = Math.round(appCtx.drone.pitch * 180 / Math.PI);
-    document.getElementById('coords').textContent = geo.lat.toFixed(4) + ', ' + geo.lon.toFixed(4) + ' | ' + dirs[Math.round(hdg / 45) % 8] + ' ' + Math.round(hdg) + '° | P:' + pitch + '°';
+    const pitch = Math.round(appCtx.drone.pitch * RAD_TO_DEG);
+    document.getElementById('coords').textContent = coordsHudText(appCtx.drone.x, appCtx.drone.z, appCtx.drone.yaw, pitch);
 
     return;
   }
@@ -230,7 +253,7 @@ function updateHUD() {
   // Walking mode HUD - uses Walk module data
   if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
     const mph = Math.abs(Math.round(appCtx.Walk.state.walker.speedMph));
-    const locName = appCtx.selLoc === 'custom' ? appCtx.customLoc?.name || 'Custom' : appCtx.LOCS[appCtx.selLoc].name;
+    const locName = locationName();
     const running = appCtx.keys.ShiftLeft || appCtx.keys.ShiftRight;
 
     let walkRoad = null;
@@ -242,7 +265,7 @@ function updateHUD() {
         nearest = appCtx.findNearestRoad(appCtx.Walk.state.walker.x, appCtx.Walk.state.walker.z);
       }
       if (nearest && nearest.road) {
-        const edge = Math.max(6, (nearest.road.w || 10) * 0.75);
+        const edge = Math.max(WALK_ROAD_EDGE_MIN, (nearest.road.w || 10) * WALK_ROAD_EDGE_SCALE);
         if (nearest.dist < edge) walkRoad = nearest.road;
       }
     }
@@ -262,10 +285,11 @@ function updateHUD() {
     document.getElementById('offRoadWarn').classList.remove('active');
 
     // Use WALKER position for coordinates
-    const geo = { lat: appCtx.LOC.lat - appCtx.Walk.state.walker.z / appCtx.SCALE, lon: appCtx.LOC.lon + appCtx.Walk.state.walker.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180)) };
-    let hdg = (-appCtx.Walk.state.walker.angle * 180 / Math.PI + 90) % 360;if (hdg < 0) hdg += 360;
-    const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-    document.getElementById('coords').textContent = geo.lat.toFixed(4) + ', ' + geo.lon.toFixed(4) + ' | ' + dirs[Math.round(hdg / 45) % 8] + ' ' + Math.round(hdg) + '°';
+    document.getElementById('coords').textContent = coordsHudText(
+      appCtx.Walk.state.walker.x,
+      appCtx.Walk.state.walker.z,
+      appCtx.Walk.state.walker.angle
+    );
 
     return;
   }
@@ -273,7 +297,7 @@ function updateHUD() {
   // Normal car HUD
   const mph = Math.abs(Math.round(appCtx.car.speed * 0.5));
   const limit = appCtx.car.road?.limit || 25;
-  const locName = appCtx.selLoc === 'custom' ? appCtx.customLoc?.name || 'Custom' : appCtx.LOCS[appCtx.selLoc].name;
+  const locName = locationName();
   document.getElementById('speed').textContent = mph;
   document.getElementById('speed').classList.toggle('fast', mph > limit || appCtx.car.boost);
   document.getElementById('limit').textContent = limit;
@@ -290,10 +314,7 @@ function updateHUD() {
   document.getElementById('indOff').classList.toggle('on', appCtx.keys.ShiftLeft || appCtx.keys.ShiftRight);
   document.getElementById('indOff').classList.toggle('warn', !appCtx.car.onRoad && !(appCtx.keys.ShiftLeft || appCtx.keys.ShiftRight));
   document.getElementById('offRoadWarn').classList.toggle('active', !appCtx.car.onRoad && !(appCtx.keys.ShiftLeft || appCtx.keys.ShiftRight));
-  const geo = { lat: appCtx.LOC.lat - appCtx.car.z / appCtx.SCALE, lon: appCtx.LOC.lon + appCtx.car.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180)) };
-  let hdg = (-appCtx.car.angle * 180 / Math.PI + 90) % 360;if (hdg < 0) hdg += 360;
-  const dirs = ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW'];
-  document.getElementById('coords').textContent = geo.lat.toFixed(4) + ', ' + geo.lon.toFixed(4) + ' | ' + dirs[Math.round(hdg / 45) % 8] + ' ' + Math.round(hdg) + '°';
+  document.getElementById('coords').textContent = coordsHudText(appCtx.car.x, appCtx.car.z, appCtx.car.angle);
 
 }
 

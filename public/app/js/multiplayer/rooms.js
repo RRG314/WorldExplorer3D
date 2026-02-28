@@ -28,11 +28,15 @@ const MY_ROOMS_COLLECTION = 'myRooms';
 const ROOM_STATE_COLLECTION = 'state';
 const HOME_BASE_DOC = 'homeBase';
 const ROOM_PRESENCE_TTL_MS = 90 * 1000;
+const ROOM_PRESENCE_LEAVE_TTL_MS = 1000;
 const DEFAULT_MAX_PLAYERS = 12;
 const CITY_KEY_MAX_LEN = 48;
 const PUBLIC_ROOM_RESULT_LIMIT = 20;
 const OWNED_ROOM_RESULT_LIMIT = 40;
 const MY_ROOMS_RESULT_LIMIT = 80;
+const ROOM_CREATE_MAX_ATTEMPTS = 16;
+const ROOM_CREATE_RETRY_BASE_MS = 120;
+const ROOM_CREATE_RETRY_STEP_MS = 80;
 const PAINT_TOWN_MIN_TIME_LIMIT_SEC = 30;
 const PAINT_TOWN_MAX_TIME_LIMIT_SEC = 1800;
 const DEFAULT_PAINT_TOWN_RULES = Object.freeze({
@@ -52,6 +56,7 @@ const ROOM_CREATE_LIMITS_BY_PLAN = Object.freeze({
   pro: 10,
   admin: 10000
 });
+const ENTITLED_MULTIPLAYER_PLANS = new Set(['free', 'trial', 'support', 'supporter', 'pro']);
 
 let currentRoom = null;
 
@@ -152,6 +157,71 @@ function normalizePlayerRole(raw, fallback = 'member') {
   const role = String(raw || '').toLowerCase();
   if (role === 'owner' || role === 'mod' || role === 'member') return role;
   return fallback;
+}
+
+function modeForWorldKind(kind) {
+  if (kind === 'space') return 'space';
+  if (kind === 'moon') return 'moon';
+  return 'walk';
+}
+
+function buildDefaultPose() {
+  return {
+    x: 0,
+    y: 0,
+    z: 0,
+    yaw: 0,
+    pitch: 0,
+    vx: 0,
+    vy: 0,
+    vz: 0
+  };
+}
+
+function buildPlayerPresencePayload(options = {}) {
+  const world = normalizeWorld(options.world || {});
+  return {
+    uid: String(options.uid || ''),
+    displayName: String(options.displayName || '').slice(0, 60),
+    joinedAt: options.joinedAt || serverTimestamp(),
+    lastSeenAt: serverTimestamp(),
+    expiresAt: Timestamp.fromMillis(Date.now() + ROOM_PRESENCE_TTL_MS),
+    role: normalizePlayerRole(options.role, 'member'),
+    mode: modeForWorldKind(world.kind),
+    frame: {
+      kind: world.kind,
+      locLat: world.lat,
+      locLon: world.lon
+    },
+    pose: buildDefaultPose(),
+    joinCode: normalizeCode(options.joinCode || '')
+  };
+}
+
+function resolveRoomCreatePolicy(profile, hasAdminTokenClaim) {
+  const profileIndicatesAdmin = String(profile.subscriptionStatus || '').toLowerCase() === 'admin';
+  const plan = profileIndicatesAdmin || hasAdminTokenClaim
+    ? 'pro'
+    : normalizePlanForLimits(profile.plan || 'free');
+  const roomCreateCount = normalizeRoomCreateCount(profile.roomCreateCount);
+  const persistedLimit = firestoreRuleIntOrNull(profile.roomCreateLimit);
+  const planLimit = roomCreateLimitForPlan(plan);
+  const roomCreateLimit = Math.max(
+    planLimit,
+    persistedLimit == null ? planLimit : persistedLimit
+  );
+  const localRoomCreateLimit = hasAdminTokenClaim
+    ? Math.max(roomCreateLimit, ROOM_CREATE_LIMITS_BY_PLAN.admin)
+    : roomCreateLimit;
+  const hasEntitlement = ENTITLED_MULTIPLAYER_PLANS.has(plan);
+
+  return {
+    plan,
+    roomCreateCount,
+    roomCreateLimit,
+    localRoomCreateLimit,
+    hasEntitlement
+  };
 }
 
 function randomCode() {
@@ -468,7 +538,7 @@ async function createRoom(options = {}) {
   let lastDeniedErr = null;
   let lastDeniedContext = null;
 
-  for (let attempt = 0; attempt < 16; attempt++) {
+  for (let attempt = 0; attempt < ROOM_CREATE_MAX_ATTEMPTS; attempt++) {
     const code = normalizeCode(options.code || randomCode());
     if (code.length !== ROOM_CODE_LENGTH) {
       throw new Error('Room code generation failed. Try again.');
@@ -476,21 +546,13 @@ async function createRoom(options = {}) {
 
     const roomRef = doc(db, ROOM_COLLECTION, code);
     const profile = profileSnap.exists() ? (profileSnap.data() || {}) : {};
-    const profileIndicatesAdmin = String(profile.subscriptionStatus || '').toLowerCase() === 'admin';
-    const plan = profileIndicatesAdmin || hasAdminTokenClaim
-      ? 'pro'
-      : normalizePlanForLimits(profile.plan || 'free');
-    const roomCreateCount = normalizeRoomCreateCount(profile.roomCreateCount);
-    const persistedLimit = firestoreRuleIntOrNull(profile.roomCreateLimit);
-    const planLimit = roomCreateLimitForPlan(plan);
-    const roomCreateLimit = Math.max(
-      planLimit,
-      persistedLimit == null ? planLimit : persistedLimit
-    );
-    const localRoomCreateLimit = hasAdminTokenClaim
-      ? Math.max(roomCreateLimit, ROOM_CREATE_LIMITS_BY_PLAN.admin)
-      : roomCreateLimit;
-    const hasEntitlement = plan === 'free' || plan === 'trial' || plan === 'support' || plan === 'supporter' || plan === 'pro';
+    const {
+      plan,
+      roomCreateCount,
+      roomCreateLimit,
+      localRoomCreateLimit,
+      hasEntitlement
+    } = resolveRoomCreatePolicy(profile, hasAdminTokenClaim);
     const localQuotaReached = roomCreateCount >= localRoomCreateLimit;
 
     if (localRoomCreateLimit <= 0 || !hasEntitlement || localQuotaReached) {
@@ -559,7 +621,7 @@ async function createRoom(options = {}) {
         }
         // Firestore profile updates can arrive moments after auth state changes.
         // Backoff avoids immediate repeat-denials during that propagation window.
-        await waitMs(120 + attempt * 80);
+        await waitMs(ROOM_CREATE_RETRY_BASE_MS + attempt * ROOM_CREATE_RETRY_STEP_MS);
         continue;
       }
       if (options.code && errCode === 'permission-denied') {
@@ -593,31 +655,14 @@ async function createRoom(options = {}) {
   }
 
   try {
-    await setDoc(ownerPlayerRef, {
+    await setDoc(ownerPlayerRef, buildPlayerPresencePayload({
       uid: user.uid,
       displayName,
       joinedAt: ownerJoinedAt || serverTimestamp(),
-      lastSeenAt: serverTimestamp(),
-      expiresAt: Timestamp.fromMillis(Date.now() + ROOM_PRESENCE_TTL_MS),
       role: ownerRole,
-      mode: world.kind === 'space' ? 'space' : world.kind === 'moon' ? 'moon' : 'walk',
-      frame: {
-        kind: world.kind,
-        locLat: world.lat,
-        locLon: world.lon
-      },
-      pose: {
-        x: 0,
-        y: 0,
-        z: 0,
-        yaw: 0,
-        pitch: 0,
-        vx: 0,
-        vy: 0,
-        vz: 0
-      },
-      joinCode: createdCode
-    }, { merge: true });
+      joinCode: createdCode,
+      world
+    }), { merge: true });
   } catch (err) {
     if (String(err?.code || '') === 'permission-denied') {
       throw new Error('Room created, but owner presence could not be written. Check sign-in state and Firestore rules.');
@@ -669,31 +714,18 @@ async function joinRoomByCode(codeInput, options = {}) {
   }
 
   try {
-    await setDoc(playerRef, {
+    await setDoc(playerRef, buildPlayerPresencePayload({
       uid: user.uid,
       displayName,
       joinedAt: preservedJoinedAt || serverTimestamp(),
-      lastSeenAt: serverTimestamp(),
-      expiresAt: Timestamp.fromMillis(Date.now() + ROOM_PRESENCE_TTL_MS),
       role: preservedRole,
-      mode: 'walk',
-      frame: {
+      joinCode: code,
+      world: {
         kind: 'earth',
-        locLat: 0,
-        locLon: 0
-      },
-      pose: {
-        x: 0,
-        y: 0,
-        z: 0,
-        yaw: 0,
-        pitch: 0,
-        vx: 0,
-        vy: 0,
-        vz: 0
-      },
-      joinCode: code
-    }, { merge: true });
+        lat: 0,
+        lon: 0
+      }
+    }), { merge: true });
   } catch (err) {
     if (String(err?.code || '') === 'permission-denied') {
       throw new Error('Room join denied. Check room code and ensure your plan includes multiplayer.');
@@ -728,7 +760,7 @@ async function leaveRoom() {
     const { db } = getServices();
     const playerRef = doc(db, ROOM_COLLECTION, room.id, PLAYER_COLLECTION, user.uid);
     await setDoc(playerRef, {
-      expiresAt: Timestamp.fromMillis(Date.now() + 1000)
+      expiresAt: Timestamp.fromMillis(Date.now() + ROOM_PRESENCE_LEAVE_TTL_MS)
     }, { merge: true });
   } catch (_) {
     // Keep local state clean even if network write fails.

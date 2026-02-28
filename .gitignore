@@ -7,6 +7,14 @@ test-results/
 coverage/
 *.log
 
+# Local env/param files
+.env
+.env.*
+!.env.example
+functions/.env
+functions/.env.*
+!functions/.env.example
+
 # Local backup/reference snapshots not part of production repo
 WorldExplorer3D-rdt-engine/
 _style_reference_worldexplorer3d/
