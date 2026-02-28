@@ -11,16 +11,17 @@ import {
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
-import { normalizeCode } from './rooms.js?v=62';
+import { normalizeCode } from './rooms.js?v=66';
 
 const ROOM_COLLECTION = 'rooms';
 const PLAYER_COLLECTION = 'players';
 const PRESENCE_TTL_MS = 90 * 1000;
-const HEARTBEAT_INTERVAL_MS = 3000;
+const HEARTBEAT_INTERVAL_MS = 2000;
 const MIN_WRITE_INTERVAL_MS = 2000;
-const MOVE_THRESHOLD_METERS = 1.0;
-const ROTATE_THRESHOLD_RAD = 0.08;
-const STALE_LAST_SEEN_MS = 15 * 1000;
+const MOVE_THRESHOLD_METERS = 0.5;
+const ROTATE_THRESHOLD_RAD = 0.05;
+const STALE_LAST_SEEN_MS = 45 * 1000;
+const STALE_CLOCK_SKEW_TOLERANCE_MS = 2 * 60 * 1000;
 const MAX_PLAYER_DOCS_READ = 24;
 
 let activeRoomId = null;
@@ -28,6 +29,8 @@ let getPose = null;
 let heartbeatTimer = null;
 let lastWriteAt = 0;
 let lastSentPose = null;
+let lastSamplePose = null;
+let lastSampleAt = 0;
 let inFlightWrite = false;
 let releaseVisibilityListener = null;
 
@@ -92,6 +95,41 @@ function normalizePosePayload(rawPose = {}) {
   };
 }
 
+function clampVelocity(v, max = 120) {
+  const n = finiteNumber(v, 0);
+  if (n > max) return max;
+  if (n < -max) return -max;
+  return n;
+}
+
+function enrichPoseVelocity(normalizedPose, nowMs) {
+  if (!normalizedPose || !normalizedPose.pose) return normalizedPose;
+
+  const pose = normalizedPose.pose;
+  const incomingSpeed = Math.hypot(
+    finiteNumber(pose.vx, 0),
+    finiteNumber(pose.vy, 0),
+    finiteNumber(pose.vz, 0)
+  );
+
+  if (incomingSpeed < 0.01 && lastSamplePose && nowMs > lastSampleAt) {
+    const dt = (nowMs - lastSampleAt) / 1000;
+    if (dt > 0.016) {
+      pose.vx = clampVelocity((finiteNumber(pose.x, 0) - finiteNumber(lastSamplePose.x, 0)) / dt);
+      pose.vy = clampVelocity((finiteNumber(pose.y, 0) - finiteNumber(lastSamplePose.y, 0)) / dt);
+      pose.vz = clampVelocity((finiteNumber(pose.z, 0) - finiteNumber(lastSamplePose.z, 0)) / dt);
+    }
+  }
+
+  lastSamplePose = {
+    x: finiteNumber(pose.x, 0),
+    y: finiteNumber(pose.y, 0),
+    z: finiteNumber(pose.z, 0)
+  };
+  lastSampleAt = nowMs;
+  return normalizedPose;
+}
+
 function angularDistance(a, b) {
   const delta = (finiteNumber(a, 0) - finiteNumber(b, 0)) % (Math.PI * 2);
   if (delta > Math.PI) return delta - Math.PI * 2;
@@ -121,7 +159,10 @@ async function writePresence(force = false) {
   const now = Date.now();
   if (!force && now - lastWriteAt < MIN_WRITE_INTERVAL_MS) return;
 
-  const normalized = normalizePosePayload(getPose() || {});
+  const normalized = enrichPoseVelocity(
+    normalizePosePayload(getPose() || {}),
+    now
+  );
   const intervalReached = now - lastWriteAt >= HEARTBEAT_INTERVAL_MS;
   const movementReached = movedBeyondThreshold(lastSentPose?.pose, normalized.pose);
   if (!force && !intervalReached && !movementReached) return;
@@ -137,7 +178,8 @@ async function writePresence(force = false) {
       expiresAt: Timestamp.fromMillis(now + PRESENCE_TTL_MS),
       mode: normalized.mode,
       frame: normalized.frame,
-      pose: normalized.pose
+      pose: normalized.pose,
+      joinCode: activeRoomId
     }, { merge: true });
 
     lastWriteAt = now;
@@ -166,6 +208,8 @@ async function stopPresence() {
   activeRoomId = null;
   getPose = null;
   lastSentPose = null;
+  lastSamplePose = null;
+  lastSampleAt = 0;
   lastWriteAt = 0;
 
   if (!roomId || !user || !user.uid) return;
@@ -217,12 +261,16 @@ function startPresence(roomId, getPoseFn) {
 
   activeRoomId = normalizedRoomId;
   getPose = getPoseFn;
+  lastSamplePose = null;
+  lastSampleAt = 0;
   heartbeatTimer = setInterval(() => {
     writePresence(false);
   }, HEARTBEAT_INTERVAL_MS);
 
   installVisibilityHooks();
-  writePresence(true);
+  // The room create/join flow already writes presence. Waiting for the first heartbeat
+  // avoids immediate server-side throttle denials on lastSeenAt.
+  lastWriteAt = Date.now();
 }
 
 function listenPlayers(roomId, callback) {
@@ -252,11 +300,21 @@ function listenPlayers(roomId, callback) {
       const data = docSnap.data() || {};
       const expiresAt = data.expiresAt;
       const expiresAtMs = typeof expiresAt?.toMillis === 'function' ? expiresAt.toMillis() : null;
-      if (Number.isFinite(expiresAtMs) && expiresAtMs < now - 1000) return;
+      if (
+        Number.isFinite(expiresAtMs) &&
+        expiresAtMs < now - STALE_CLOCK_SKEW_TOLERANCE_MS
+      ) {
+        return;
+      }
 
       const lastSeenAt = data.lastSeenAt;
       const lastSeenAtMs = typeof lastSeenAt?.toMillis === 'function' ? lastSeenAt.toMillis() : null;
-      if (Number.isFinite(lastSeenAtMs) && now - lastSeenAtMs > STALE_LAST_SEEN_MS) return;
+      if (
+        Number.isFinite(lastSeenAtMs) &&
+        now - lastSeenAtMs > STALE_LAST_SEEN_MS + STALE_CLOCK_SKEW_TOLERANCE_MS
+      ) {
+        return;
+      }
 
       players.push({
         uid: String(data.uid || docSnap.id),

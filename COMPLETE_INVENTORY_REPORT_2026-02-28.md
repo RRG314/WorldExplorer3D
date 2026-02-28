@@ -1,8 +1,8 @@
 # Complete Feature and System Inventory Report
 
 Date: 2026-02-28  
-Repository: `WorldExplorer3D`  
-Branch inspected: `steven/free-multiplayer-donation-sync`  
+Repository: `WorldExplorer`  
+Branch inspected: `steven/product`  
 Project target: `worldexplorer3d-d9b83`
 
 This report inventories the current codebase behavior, active product features, and deployment-facing surfaces.

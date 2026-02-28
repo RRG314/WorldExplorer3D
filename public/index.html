@@ -299,6 +299,12 @@
       font-size: 14px;
     }
 
+    .price-card .donate-btn {
+      margin-top: auto;
+      width: 100%;
+      justify-content: center;
+    }
+
     .price-card.pro { border-color: rgba(255, 200, 87, 0.5); }
     .price-card.supporter { border-color: rgba(83, 196, 255, 0.45); }
 
@@ -364,11 +370,10 @@
           <p class="lead">Drive, walk, and fly any place in the world. Then launch to orbit and land on the Moon all without leaving your seat.</p>
           <div class="cta-row">
             <a class="btn btn-play" href="./app/">Play Now</a>
-            <a class="btn btn-ghost" href="./app/?tab=multiplayer">Multiplayer Rooms</a>
-            <button class="btn btn-trial" id="startTrialBtn" type="button">Start 2-Day Trial</button>
+            <button class="btn btn-trial" id="openMultiplayerBtn" type="button">Sign In for Multiplayer</button>
             <a class="btn btn-ghost" href="./account/">Account</a>
           </div>
-          <p id="startTrialStatus" class="status-note"></p>
+          <p id="multiplayerStatus" class="status-note"></p>
           <p class="perf-note">Performance note: Desktop recommended for best frame rate and rendering quality.</p>
         </div>
         <div class="hero-media" aria-hidden="true">
@@ -381,6 +386,18 @@
       <h2>Gameplay</h2>
       <div class="gameplayGalleryWrap">
         <div class="gameplayGallery">
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/baltimore-session-walk-guft.png" alt="Walking mode in a Baltimore alley session with GUFT teammate tag">
+            <figcaption class="gameplayMeta"><h3>Multiplayer Alley Walk</h3><p>On-foot exploration with live teammate presence, mode HUD, and build controls in-session.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/baltimore-session-drive-guft.png" alt="Driving mode in the same Baltimore session with obstacles and teammate ahead">
+            <figcaption class="gameplayMeta"><h3>Multiplayer Alley Drive</h3><p>Drive through obstacle-filled lanes while synced to the same room and player context.</p></figcaption>
+          </figure>
+          <figure class="gameplayCard">
+            <img src="./assets/landing/gameplay/baltimore-session-drone-guft.png" alt="Drone mode above the same alley showing 5 meter AGL HUD telemetry">
+            <figcaption class="gameplayMeta"><h3>Multiplayer Alley Drone</h3><p>Low-altitude drone camera with AGL telemetry for tactical aerial visibility during shared play.</p></figcaption>
+          </figure>
           <figure class="gameplayCard">
             <img src="./assets/landing/gameplay/drone-baltimore.png" alt="Drone view over Baltimore skyline">
             <figcaption class="gameplayMeta"><h3>Drone Recon: Baltimore</h3><p>High-altitude drone mode with full city coverage and live HUD telemetry.</p></figcaption>
@@ -441,41 +458,42 @@
         <article class="feature"><h3>Challenge Layer</h3><p>Timed red-flower challenge with leaderboard storage and repeatable starts.</p></article>
         <article class="feature"><h3>Memory Markers</h3><p>Drop location-based notes and flowers as part of your exploration trail.</p></article>
         <article class="feature"><h3>Mobile Controls</h3><p>Dual-pad touch controls for small screens with mode-specific action bindings.</p></article>
-        <article class="feature"><h3>Plan-Gated Perks</h3><p>Free core exploration plus optional Supporter/Pro features and billing controls.</p></article>
+        <article class="feature"><h3>Accessible For Everyone</h3><p>All core gameplay is free. Optional monthly donations help a solo developer keep shipping updates.</p></article>
       </div>
     </section>
 
     <section>
-      <h2>Pricing</h2>
+      <h2>Optional Donations</h2>
       <div class="pricing">
         <article class="price-card">
-          <strong>Free</strong>
+          <strong>Free Access</strong>
           <div>$0 / month</div>
           <ul>
             <li>Full core exploration loop</li>
-            <li>No multiplayer on free</li>
-            <li>Start 2-day trial to unlock multiplayer</li>
-            <li>Local-only saves</li>
-            <li>No Pro-only early demo access</li>
+            <li>Multiplayer for any signed-in account</li>
+            <li>No payment required to play</li>
+            <li>Open access for everyone</li>
           </ul>
         </article>
         <article class="price-card supporter">
-          <strong>Supporter</strong>
-          <div>$1 / month</div>
+          <strong>Supporter Donation</strong>
+          <div>$1 / month (optional)</div>
           <ul>
-            <li>Multiplayer access included</li>
-            <li>Cloud sync enabled</li>
-            <li>Supports ongoing development</li>
+            <li>Optional monthly contribution</li>
+            <li>Helps cover hosting and active development</li>
+            <li>Keeps the project open and accessible</li>
           </ul>
+          <button class="btn btn-play donate-btn" id="donateSupporterBtn" type="button">Donate $1 / month</button>
         </article>
         <article class="price-card pro">
-          <strong>Pro</strong>
-          <div>$5 / month</div>
+          <strong>Pro Donation</strong>
+          <div>$5 / month (optional)</div>
           <ul>
-            <li>Everything in Supporter</li>
-            <li>Exclusive early playable demos</li>
-            <li>Priority feedback channel + feature consideration</li>
+            <li>Everything in Supporter Donation</li>
+            <li>Early access to new playable demos</li>
+            <li>Bigger monthly support for the solo dev roadmap</li>
           </ul>
+          <button class="btn btn-trial donate-btn" id="donateProBtn" type="button">Donate $5 / month</button>
         </article>
       </div>
     </section>
@@ -485,7 +503,7 @@
       <div class="faq">
         <article class="qa"><h3>Does it run on mobile?</h3><p>Yes. The runtime includes mobile controls, but desktop is recommended for highest visual quality and smoother frame pacing.</p></article>
         <article class="qa"><h3>How demanding is it?</h3><p>The app adapts LOD dynamically. Larger cities and space transitions still perform best on modern desktop GPUs.</p></article>
-        <article class="qa"><h3>How do saves work?</h3><p>Free plan keeps local browser data. Supporter and Pro can use cloud-backed sync through Firestore.</p></article>
+        <article class="qa"><h3>Is multiplayer free?</h3><p>Yes. Multiplayer is free for any signed-in account. Donations are optional and only help sustain development.</p></article>
         <article class="qa"><h3>Where does map data come from?</h3><p>OpenStreetMap contributors (ODbL), with additional optional provider APIs configured by the user.</p></article>
       </div>
     </section>
@@ -503,42 +521,74 @@
   <script type="module">
     import { hasFirebaseConfig } from './js/firebase-init.js?v=55';
     import { ensureSignedIn } from './js/auth-ui.js?v=55';
-    import { ensureEntitlements } from './js/entitlements.js?v=62';
+    import { redirectToCheckout } from './js/billing.js?v=57';
 
-    const startTrialBtn = document.getElementById('startTrialBtn');
-    const statusEl = document.getElementById('startTrialStatus');
+    const openMultiplayerBtn = document.getElementById('openMultiplayerBtn');
+    const donateSupporterBtn = document.getElementById('donateSupporterBtn');
+    const donateProBtn = document.getElementById('donateProBtn');
+    const statusEl = document.getElementById('multiplayerStatus');
 
     function setStatus(message, isError = false) {
       statusEl.textContent = message || '';
       statusEl.style.color = isError ? 'var(--danger)' : 'var(--muted)';
     }
 
-    startTrialBtn.addEventListener('click', async () => {
-      startTrialBtn.disabled = true;
-      setStatus('Preparing trial...');
+    openMultiplayerBtn.addEventListener('click', async () => {
+      openMultiplayerBtn.disabled = true;
+      setStatus('Checking account...');
 
       try {
         if (!hasFirebaseConfig()) {
           setStatus('Firebase config not set yet. Opening app in free mode until config is provided.', true);
-          window.location.assign('./app/?startTrial=1');
+          window.location.assign('./app/?tab=multiplayer');
           return;
         }
 
         const user = await ensureSignedIn();
         if (!user) {
-          setStatus('Continue sign-in in the popup/redirect to activate your trial.');
+          setStatus('Continue sign-in in the popup/redirect to open multiplayer.');
           return;
         }
 
-        await ensureEntitlements(user);
-        window.location.assign('./app/?startTrial=1');
+        setStatus('Signed in. Opening multiplayer...');
+        window.location.assign('./app/?tab=multiplayer');
       } catch (err) {
-        console.error('[landing] Trial start failed:', err);
-        setStatus(err && err.message ? err.message : 'Could not start trial right now.', true);
+        console.error('[landing] Multiplayer sign-in failed:', err);
+        setStatus(err && err.message ? err.message : 'Could not open multiplayer right now.', true);
       } finally {
-        startTrialBtn.disabled = false;
+        openMultiplayerBtn.disabled = false;
       }
     });
+
+    async function startDonationCheckout(plan, button, planLabel) {
+      if (!button) return;
+      button.disabled = true;
+      setStatus(`Preparing ${planLabel} donation checkout...`);
+
+      try {
+        if (!hasFirebaseConfig()) {
+          setStatus('Firebase config not set yet. Open Account to complete donations.', true);
+          window.location.assign('./account/');
+          return;
+        }
+
+        const user = await ensureSignedIn();
+        if (!user) {
+          setStatus('Continue sign-in in the popup/redirect to continue donation checkout.');
+          return;
+        }
+
+        await redirectToCheckout(plan);
+      } catch (err) {
+        console.error('[landing] Donation checkout failed:', err);
+        setStatus(err && err.message ? err.message : 'Could not start donation checkout right now.', true);
+      } finally {
+        button.disabled = false;
+      }
+    }
+
+    donateSupporterBtn?.addEventListener('click', () => startDonationCheckout('supporter', donateSupporterBtn, 'Supporter'));
+    donateProBtn?.addEventListener('click', () => startDonationCheckout('pro', donateProBtn, 'Pro'));
   </script>
 </body>
 </html>

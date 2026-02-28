@@ -138,10 +138,10 @@ firebase deploy
 
 ### GitHub Pages (branch root)
 
-1. Push target branch (`main`).
+1. Push target branch (`steven/product`).
 2. GitHub -> Settings -> Pages.
 3. Source: Deploy from a branch.
-4. Branch: `main`.
+4. Branch: `steven/product`.
 5. Folder: `/ (root)`.
 
 ## 11. Troubleshooting

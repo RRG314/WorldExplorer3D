@@ -957,59 +957,68 @@ function createPavementRoughnessMap() {
   return texture;
 }
 
-// Create concrete ground patch around a building footprint
+// Create terrain-conforming building ground support meshes.
+// Returns either a single mesh or an array of meshes (apron + foundation skirt).
 function createBuildingGroundPatch(pts, avgElevation) {
   if (!pts || pts.length < 3) return null;
+  const footprint = pts.filter((p) => p && Number.isFinite(p.x) && Number.isFinite(p.z));
+  if (footprint.length < 3) return null;
 
-  // Expand the building footprint outward to create a sidewalk/pad
-  const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-  const cz = pts.reduce((s, p) => s + p.z, 0) / pts.length;
-  const expandFactor = 1.45; // wider apron to hide steep-slope foundation exposure
+  const baseElevation = Number.isFinite(avgElevation) ? avgElevation : 0;
 
-  const expandedPts = pts.map((p) => ({
+  const sampleTerrainY = (x, z) => {
+    const terrainY = typeof appCtx.terrainMeshHeightAt === 'function' ?
+    appCtx.terrainMeshHeightAt(x, z) :
+    appCtx.elevationWorldYAtWorldXZ(x, z);
+    const safeTerrainY = Number.isFinite(terrainY) ? terrainY : baseElevation;
+    return safeTerrainY === 0 && Math.abs(baseElevation) > 2 ? baseElevation : safeTerrainY;
+  };
+
+  const resultMeshes = [];
+
+  // Expand footprint to create a sidewalk-like terrain patch around the building.
+  const cx = footprint.reduce((s, p) => s + p.x, 0) / footprint.length;
+  const cz = footprint.reduce((s, p) => s + p.z, 0) / footprint.length;
+  const expandFactor = 1.45;
+  const expandedPts = footprint.map((p) => ({
     x: cx + (p.x - cx) * expandFactor,
     z: cz + (p.z - cz) * expandFactor
   }));
 
   const shape = new THREE.Shape();
-  expandedPts.forEach(function (p, i) {
+  expandedPts.forEach((p, i) => {
     if (i === 0) shape.moveTo(p.x, -p.z);else
     shape.lineTo(p.x, -p.z);
   });
   shape.closePath();
 
-  const geometry = new THREE.ShapeGeometry(shape, 1);
-  geometry.rotateX(-Math.PI / 2);
+  const apronGeometry = new THREE.ShapeGeometry(shape, 1);
+  apronGeometry.rotateX(-Math.PI / 2);
 
-  // Deform vertices to follow terrain
-  const positions = geometry.attributes.position;
-  for (let i = 0; i < positions.count; i++) {
-    const x = positions.getX(i);
-    const z = positions.getZ(i);
-    const terrainY = typeof appCtx.terrainMeshHeightAt === 'function' ?
-    appCtx.terrainMeshHeightAt(x, z) :
-    appCtx.elevationWorldYAtWorldXZ(x, z);
-    const useY = terrainY === 0 && Math.abs(avgElevation) > 2 ? avgElevation : terrainY;
-    positions.setY(i, useY - avgElevation + 0.05);
+  // Deform the apron to terrain.
+  const apronPositions = apronGeometry.attributes.position;
+  for (let i = 0; i < apronPositions.count; i++) {
+    const x = apronPositions.getX(i);
+    const z = apronPositions.getZ(i);
+    const useY = sampleTerrainY(x, z);
+    apronPositions.setY(i, useY - baseElevation + 0.05);
   }
-  positions.needsUpdate = true;
-  geometry.computeVertexNormals();
+  apronPositions.needsUpdate = true;
+  apronGeometry.computeVertexNormals();
 
-  // Compute UV-based tiling: tile every ~8 world units for concrete detail
-  const uvs = geometry.attributes.uv;
-  if (uvs) {
-    for (let i = 0; i < uvs.count; i++) {
-      const x = positions.getX(i);
-      const z = positions.getZ(i);
-      uvs.setXY(i, x / 8, z / 8);
+  const apronUvs = apronGeometry.attributes.uv;
+  if (apronUvs) {
+    for (let i = 0; i < apronUvs.count; i++) {
+      const x = apronPositions.getX(i);
+      const z = apronPositions.getZ(i);
+      apronUvs.setXY(i, x / 8, z / 8);
     }
-    uvs.needsUpdate = true;
+    apronUvs.needsUpdate = true;
   }
 
-  // Create material
-  let mat;
+  let apronMaterial;
   if (pbrTexturesLoaded.pavement && pavementDiffuse) {
-    mat = new THREE.MeshStandardMaterial({
+    apronMaterial = new THREE.MeshStandardMaterial({
       map: pavementDiffuse,
       normalMap: pavementNormal || undefined,
       normalScale: new THREE.Vector2(0.5, 0.5),
@@ -1021,7 +1030,7 @@ function createBuildingGroundPatch(pts, avgElevation) {
       polygonOffsetUnits: -1
     });
   } else {
-    mat = new THREE.MeshStandardMaterial({
+    apronMaterial = new THREE.MeshStandardMaterial({
       color: 0xa8a29e,
       roughness: 0.9,
       metalness: 0.0,
@@ -1031,14 +1040,120 @@ function createBuildingGroundPatch(pts, avgElevation) {
     });
   }
 
-  const mesh = new THREE.Mesh(geometry, mat);
-  mesh.position.y = avgElevation;
-  mesh.renderOrder = 1;
-  mesh.receiveShadow = true;
-  mesh.userData.buildingGround = true;
-  mesh.userData.alwaysVisible = true;
-  mesh.visible = true;
-  return mesh;
+  const apronMesh = new THREE.Mesh(apronGeometry, apronMaterial);
+  apronMesh.position.y = baseElevation;
+  apronMesh.renderOrder = 1;
+  apronMesh.receiveShadow = true;
+  apronMesh.userData.buildingGround = true;
+  apronMesh.userData.alwaysVisible = true;
+  apronMesh.visible = true;
+  resultMeshes.push(apronMesh);
+
+  // Build a vertical skirt at the real building footprint so sloped terrain
+  // cannot reveal floating building undersides.
+  const skirtPositions = [];
+  const skirtUvs = [];
+  const skirtIndices = [];
+  let skirtVertBase = 0;
+
+  const maxSkirtSegmentLength = 2.0;
+  const skirtTopY = 0.04;
+  const skirtBaseEmbedDepth = 0.8;
+
+  for (let i = 0; i < footprint.length; i++) {
+    const p0 = footprint[i];
+    const p1 = footprint[(i + 1) % footprint.length];
+    const edgeLength = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+    if (!Number.isFinite(edgeLength) || edgeLength < 0.05) continue;
+
+    const segments = Math.max(1, Math.ceil(edgeLength / maxSkirtSegmentLength));
+    let edgeU = 0;
+
+    for (let s = 0; s < segments; s++) {
+      const t0 = s / segments;
+      const t1 = (s + 1) / segments;
+      const q0 = {
+        x: p0.x + (p1.x - p0.x) * t0,
+        z: p0.z + (p1.z - p0.z) * t0
+      };
+      const q1 = {
+        x: p0.x + (p1.x - p0.x) * t1,
+        z: p0.z + (p1.z - p0.z) * t1
+      };
+      const segmentLength = Math.hypot(q1.x - q0.x, q1.z - q0.z);
+      if (!Number.isFinite(segmentLength) || segmentLength < 0.01) continue;
+
+      const localTerrain0 = sampleTerrainY(q0.x, q0.z) - baseElevation;
+      const localTerrain1 = sampleTerrainY(q1.x, q1.z) - baseElevation;
+      const embedDepth0 = skirtBaseEmbedDepth + Math.min(2.5, Math.abs(localTerrain0 - skirtTopY) * 0.15);
+      const embedDepth1 = skirtBaseEmbedDepth + Math.min(2.5, Math.abs(localTerrain1 - skirtTopY) * 0.15);
+      const bottomY0 = Math.min(localTerrain0, skirtTopY) - embedDepth0;
+      const bottomY1 = Math.min(localTerrain1, skirtTopY) - embedDepth1;
+      const u0 = edgeU;
+      const u1 = edgeU + segmentLength / 6;
+      edgeU = u1;
+
+      skirtPositions.push(
+        q0.x, skirtTopY, q0.z,
+        q1.x, skirtTopY, q1.z,
+        q0.x, bottomY0, q0.z,
+        q1.x, bottomY1, q1.z
+      );
+
+      skirtUvs.push(
+        u0, 1,
+        u1, 1,
+        u0, 0,
+        u1, 0
+      );
+
+      skirtIndices.push(
+        skirtVertBase, skirtVertBase + 2, skirtVertBase + 1,
+        skirtVertBase + 1, skirtVertBase + 2, skirtVertBase + 3
+      );
+      skirtVertBase += 4;
+    }
+  }
+
+  if (skirtVertBase >= 4) {
+    const skirtGeometry = new THREE.BufferGeometry();
+    skirtGeometry.setAttribute('position', new THREE.Float32BufferAttribute(skirtPositions, 3));
+    skirtGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(skirtUvs, 2));
+    skirtGeometry.setIndex(skirtIndices);
+    skirtGeometry.computeVertexNormals();
+
+    let skirtMaterial;
+    if (pbrTexturesLoaded.pavement && pavementDiffuse) {
+      skirtMaterial = new THREE.MeshStandardMaterial({
+        map: pavementDiffuse,
+        normalMap: pavementNormal || undefined,
+        normalScale: new THREE.Vector2(0.35, 0.35),
+        roughnessMap: pavementRoughness || undefined,
+        roughness: 0.94,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+      });
+    } else {
+      skirtMaterial = new THREE.MeshStandardMaterial({
+        color: 0x968f88,
+        roughness: 0.94,
+        metalness: 0.0,
+        side: THREE.DoubleSide
+      });
+    }
+
+    const skirtMesh = new THREE.Mesh(skirtGeometry, skirtMaterial);
+    skirtMesh.position.y = baseElevation;
+    skirtMesh.renderOrder = 0;
+    skirtMesh.receiveShadow = true;
+    skirtMesh.userData.buildingGround = true;
+    skirtMesh.userData.isFoundationSkirt = true;
+    skirtMesh.userData.alwaysVisible = true;
+    skirtMesh.visible = true;
+    resultMeshes.push(skirtMesh);
+  }
+
+  return resultMeshes.length === 1 ? resultMeshes[0] : resultMeshes;
 }
 
 // ===== PBR TEXTURE LOADER (Poly Haven CDN with procedural fallback) =====

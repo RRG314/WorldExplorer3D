@@ -63,7 +63,7 @@ async function selectPaintTownAndStart(page) {
 
 async function waitForPaintTownRuntime(page) {
   await page.waitForFunction(async () => {
-    const mod = await import('/app/js/shared-context.js?v=54');
+    const mod = await import('/app/js/shared-context.js?v=55');
     const ctx = mod && mod.ctx;
     if (!ctx || typeof ctx.paintTownDebugSnapshot !== 'function') return false;
     const snap = ctx.paintTownDebugSnapshot();
@@ -73,7 +73,7 @@ async function waitForPaintTownRuntime(page) {
 
 async function checkDeterministicSeed(page) {
   return page.evaluate(async () => {
-    const mod = await import('/app/js/multiplayer/rooms.js?v=54');
+    const mod = await import('/app/js/multiplayer/rooms.js?v=55');
     const derive = mod.deriveRoomDeterministicSeed;
     const baseRoom = {
       code: 'AB12CD',
@@ -99,7 +99,7 @@ async function checkDeterministicSeed(page) {
 
 async function runTouchPaintCheck(page) {
   return page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=54');
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
     const before = ctx.paintTownDebugSnapshot();
 
     const candidates = (() => {
@@ -154,7 +154,7 @@ async function runTouchPaintCheck(page) {
 
 async function runGunPhysicsCheck(page) {
   return page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=54');
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
     ctx.setPaintTownPlayerColor('#3b82f6');
 
     const targets = (() => {
