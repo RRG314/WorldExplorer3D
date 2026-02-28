@@ -49,6 +49,10 @@ import {
 } from './social.js?v=55';
 
 let singleton = null;
+const MAX_PLAN_DISPLAY_NAME_LEN = 48;
+const RELATIVE_MINUTE_MS = 60 * 1000;
+const RELATIVE_HOUR_MS = 60 * RELATIVE_MINUTE_MS;
+const RELATIVE_DAY_MS = 24 * RELATIVE_HOUR_MS;
 
 function finiteNumber(value, fallback = 0) {
   const n = Number(value);
@@ -110,10 +114,18 @@ function formatRelativeTime(value) {
   const ms = toMillis(value);
   if (!Number.isFinite(ms)) return 'just now';
   const delta = Date.now() - ms;
-  if (delta < 60 * 1000) return 'just now';
-  if (delta < 60 * 60 * 1000) return `${Math.max(1, Math.floor(delta / (60 * 1000)))}m ago`;
-  if (delta < 24 * 60 * 60 * 1000) return `${Math.max(1, Math.floor(delta / (60 * 60 * 1000)))}h ago`;
-  return `${Math.max(1, Math.floor(delta / (24 * 60 * 60 * 1000)))}d ago`;
+  if (delta < RELATIVE_MINUTE_MS) return 'just now';
+  if (delta < RELATIVE_HOUR_MS) return `${Math.max(1, Math.floor(delta / RELATIVE_MINUTE_MS))}m ago`;
+  if (delta < RELATIVE_DAY_MS) return `${Math.max(1, Math.floor(delta / RELATIVE_HOUR_MS))}h ago`;
+  return `${Math.max(1, Math.floor(delta / RELATIVE_DAY_MS))}d ago`;
+}
+
+function formatPlanLabel(plan, isAdmin, explicitLabel = '') {
+  const label = String(explicitLabel || '').trim();
+  if (label) return label;
+  if (isAdmin) return 'Admin';
+  if (!plan) return 'Free';
+  return plan[0].toUpperCase() + plan.slice(1);
 }
 
 function readPlanState() {
@@ -122,11 +134,11 @@ function readPlanState() {
   const isAdmin = globalState.isAdmin === true || String(globalState.role || '').toLowerCase() === 'admin';
   return {
     plan,
-    planLabel: String(globalState.planLabel || (isAdmin ? 'Admin' : (plan ? plan[0].toUpperCase() + plan.slice(1) : 'Free'))),
+    planLabel: formatPlanLabel(plan, isAdmin, globalState.planLabel),
     isAdmin,
     isAuthenticated: !!globalState.isAuthenticated,
     uid: String(globalState.uid || ''),
-    displayName: sanitizeText(globalState.displayName || '', 48)
+    displayName: sanitizeText(globalState.displayName || '', MAX_PLAN_DISPLAY_NAME_LEN)
   };
 }
 
@@ -234,9 +246,8 @@ function readWorldContext() {
   };
 }
 
-function readPoseSnapshot() {
-  const world = readWorldContext();
-  const base = {
+function createPoseSnapshotBase(world) {
+  return {
     mode: world.kind === 'space' ? 'space' : 'drive',
     frame: {
       kind: world.kind,
@@ -254,54 +265,83 @@ function readPoseSnapshot() {
       vz: 0
     }
   };
+}
 
-  if (appCtx.spaceFlight?.active && appCtx.spaceFlight.rocket) {
-    const rocket = appCtx.spaceFlight.rocket;
-    base.mode = 'space';
-    base.pose.x = finiteNumber(rocket.position?.x, 0);
-    base.pose.y = finiteNumber(rocket.position?.y, 0);
-    base.pose.z = finiteNumber(rocket.position?.z, 0);
-    base.pose.vx = finiteNumber(appCtx.spaceFlight.velocity?.x, 0);
-    base.pose.vy = finiteNumber(appCtx.spaceFlight.velocity?.y, 0);
-    base.pose.vz = finiteNumber(appCtx.spaceFlight.velocity?.z, 0);
+function applyPose(base, values = {}) {
+  if (!base || !base.pose || !values || typeof values !== 'object') return;
+  const pose = base.pose;
+  if (Object.prototype.hasOwnProperty.call(values, 'x')) pose.x = finiteNumber(values.x, pose.x);
+  if (Object.prototype.hasOwnProperty.call(values, 'y')) pose.y = finiteNumber(values.y, pose.y);
+  if (Object.prototype.hasOwnProperty.call(values, 'z')) pose.z = finiteNumber(values.z, pose.z);
+  if (Object.prototype.hasOwnProperty.call(values, 'yaw')) pose.yaw = finiteNumber(values.yaw, pose.yaw);
+  if (Object.prototype.hasOwnProperty.call(values, 'pitch')) pose.pitch = finiteNumber(values.pitch, pose.pitch);
+  if (Object.prototype.hasOwnProperty.call(values, 'vx')) pose.vx = finiteNumber(values.vx, pose.vx);
+  if (Object.prototype.hasOwnProperty.call(values, 'vy')) pose.vy = finiteNumber(values.vy, pose.vy);
+  if (Object.prototype.hasOwnProperty.call(values, 'vz')) pose.vz = finiteNumber(values.vz, pose.vz);
+}
 
-    if (globalThis.THREE && rocket.quaternion) {
-      const euler = new THREE.Euler().setFromQuaternion(rocket.quaternion, 'YXZ');
-      base.pose.yaw = finiteNumber(euler.y, 0);
-      base.pose.pitch = finiteNumber(euler.x, 0);
-    }
-    return base;
+function readSpacePose(base) {
+  const rocket = appCtx.spaceFlight?.rocket;
+  if (!rocket) return false;
+
+  base.mode = 'space';
+  applyPose(base, {
+    x: rocket.position?.x,
+    y: rocket.position?.y,
+    z: rocket.position?.z,
+    vx: appCtx.spaceFlight?.velocity?.x,
+    vy: appCtx.spaceFlight?.velocity?.y,
+    vz: appCtx.spaceFlight?.velocity?.z
+  });
+
+  if (globalThis.THREE && rocket.quaternion) {
+    const euler = new globalThis.THREE.Euler().setFromQuaternion(rocket.quaternion, 'YXZ');
+    applyPose(base, { yaw: euler.y, pitch: euler.x });
   }
+  return true;
+}
 
-  if (isDroneModeActive()) {
-    base.mode = 'drone';
-    base.pose.x = finiteNumber(appCtx.drone?.x, finiteNumber(appCtx.car?.x, 0));
-    base.pose.y = finiteNumber(appCtx.drone?.y, finiteNumber(appCtx.car?.y, 0));
-    base.pose.z = finiteNumber(appCtx.drone?.z, finiteNumber(appCtx.car?.z, 0));
-    base.pose.yaw = finiteNumber(appCtx.drone?.yaw, finiteNumber(appCtx.car?.angle, 0));
-    base.pose.pitch = finiteNumber(appCtx.drone?.pitch, 0);
-    return base;
-  }
+function readDronePose(base) {
+  if (!isDroneModeActive()) return false;
+  base.mode = 'drone';
+  base.pose.x = finiteNumber(appCtx.drone?.x, finiteNumber(appCtx.car?.x, 0));
+  base.pose.y = finiteNumber(appCtx.drone?.y, finiteNumber(appCtx.car?.y, 0));
+  base.pose.z = finiteNumber(appCtx.drone?.z, finiteNumber(appCtx.car?.z, 0));
+  base.pose.yaw = finiteNumber(appCtx.drone?.yaw, finiteNumber(appCtx.car?.angle, 0));
+  base.pose.pitch = finiteNumber(appCtx.drone?.pitch, 0);
+  return true;
+}
 
-  if (isWalkModeActive()) {
-    base.mode = 'walk';
-    base.pose.x = finiteNumber(appCtx.Walk.state.walker?.x, finiteNumber(appCtx.car?.x, 0));
-    base.pose.y = finiteNumber(appCtx.Walk.state.walker?.y, finiteNumber(appCtx.car?.y, 0));
-    base.pose.z = finiteNumber(appCtx.Walk.state.walker?.z, finiteNumber(appCtx.car?.z, 0));
-    base.pose.yaw = finiteNumber(appCtx.Walk.state.walker?.yaw, finiteNumber(appCtx.car?.angle, 0));
-    base.pose.pitch = finiteNumber(appCtx.Walk.state.walker?.pitch, 0);
-    base.pose.vy = finiteNumber(appCtx.Walk.state.walker?.vy, 0);
-    return base;
-  }
+function readWalkPose(base) {
+  if (!isWalkModeActive()) return false;
+  base.mode = 'walk';
+  base.pose.x = finiteNumber(appCtx.Walk?.state?.walker?.x, finiteNumber(appCtx.car?.x, 0));
+  base.pose.y = finiteNumber(appCtx.Walk?.state?.walker?.y, finiteNumber(appCtx.car?.y, 0));
+  base.pose.z = finiteNumber(appCtx.Walk?.state?.walker?.z, finiteNumber(appCtx.car?.z, 0));
+  base.pose.yaw = finiteNumber(appCtx.Walk?.state?.walker?.yaw, finiteNumber(appCtx.car?.angle, 0));
+  base.pose.pitch = finiteNumber(appCtx.Walk?.state?.walker?.pitch, 0);
+  base.pose.vy = finiteNumber(appCtx.Walk?.state?.walker?.vy, 0);
+  return true;
+}
+
+function readPoseSnapshot() {
+  const world = readWorldContext();
+  const base = createPoseSnapshotBase(world);
+
+  if (appCtx.spaceFlight?.active && readSpacePose(base)) return base;
+  if (readDronePose(base)) return base;
+  if (readWalkPose(base)) return base;
 
   base.mode = 'drive';
-  base.pose.x = finiteNumber(appCtx.car?.x, 0);
-  base.pose.y = finiteNumber(appCtx.car?.y, 0);
-  base.pose.z = finiteNumber(appCtx.car?.z, 0);
-  base.pose.yaw = finiteNumber(appCtx.car?.angle, 0);
-  base.pose.vx = finiteNumber(appCtx.car?.vx, 0);
-  base.pose.vy = finiteNumber(appCtx.car?.vy, 0);
-  base.pose.vz = finiteNumber(appCtx.car?.vz, 0);
+  applyPose(base, {
+    x: appCtx.car?.x,
+    y: appCtx.car?.y,
+    z: appCtx.car?.z,
+    yaw: appCtx.car?.angle,
+    vx: appCtx.car?.vx,
+    vy: appCtx.car?.vy,
+    vz: appCtx.car?.vz
+  });
   return base;
 }
 

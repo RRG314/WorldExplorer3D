@@ -2,6 +2,36 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
 
+const PROPERTY_MARKER_HIT_RADIUS = 10;
+const POI_MARKER_HIT_RADIUS = 8;
+const HISTORIC_MARKER_HIT_RADIUS = 8;
+
+function canvasPointerPoint(canvas, event) {
+  const rect = canvas.getBoundingClientRect();
+  return {
+    x: event.clientX - rect.left,
+    y: event.clientY - rect.top
+  };
+}
+
+function distance2D(ax, ay, bx, by) {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return Math.sqrt(dx * dx + dy * dy);
+}
+
+function findFirstMapHit(items = [], point = { x: 0, y: 0 }, radius = 8, project = null, isVisible = null) {
+  if (!Array.isArray(items) || typeof project !== 'function') return null;
+  for (const item of items) {
+    if (typeof isVisible === 'function' && !isVisible(item)) continue;
+    const projected = project(item);
+    if (!projected) continue;
+    const dist = distance2D(point.x, point.y, projected.x, projected.y);
+    if (dist < radius) return item;
+  }
+  return null;
+}
+
 function setupUI() {
   const bindTouchFriendlyPress = (el, handler) => {
     if (!el || typeof handler !== 'function') return;
@@ -111,44 +141,48 @@ function setupUI() {
     largeMapCanvas.addEventListener('click', (e) => {
       if (!appCtx.showLargeMap) return;
 
-      const rect = largeMapCanvas.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
+      const clickPoint = canvasPointerPoint(largeMapCanvas, e);
 
       // Check if click is on a property marker
       if (appCtx.mapLayers.properties && appCtx.realEstateMode) {
-        for (const prop of appCtx.properties) {
-          const screenPos = appCtx.worldToScreenLarge(prop.x, prop.z);
-          const dist = Math.sqrt((clickX - screenPos.x) ** 2 + (clickY - screenPos.y) ** 2);
-          if (dist < 10) {
-            appCtx.showMapInfo('property', prop);
-            return;
-          }
+        const propertyHit = findFirstMapHit(
+          appCtx.properties,
+          clickPoint,
+          PROPERTY_MARKER_HIT_RADIUS,
+          (prop) => appCtx.worldToScreenLarge(prop.x, prop.z)
+        );
+        if (propertyHit) {
+          appCtx.showMapInfo('property', propertyHit);
+          return;
         }
       }
 
       // Check if click is on a POI marker (based on legend layer filters)
       if (appCtx.pois.length > 0) {
-        for (const poi of appCtx.pois) {
-          if (!appCtx.isPOIVisible(poi.type)) continue;
-          const screenPos = appCtx.worldToScreenLarge(poi.x, poi.z);
-          const dist = Math.sqrt((clickX - screenPos.x) ** 2 + (clickY - screenPos.y) ** 2);
-          if (dist < 8) {
-            appCtx.showMapInfo('poi', poi);
-            return;
-          }
+        const poiHit = findFirstMapHit(
+          appCtx.pois,
+          clickPoint,
+          POI_MARKER_HIT_RADIUS,
+          (poi) => appCtx.worldToScreenLarge(poi.x, poi.z),
+          (poi) => appCtx.isPOIVisible(poi.type)
+        );
+        if (poiHit) {
+          appCtx.showMapInfo('poi', poiHit);
+          return;
         }
       }
 
       // Check if click is on a historic site
       if (appCtx.mapLayers.historic && appCtx.historicSites.length > 0) {
-        for (const site of appCtx.historicSites) {
-          const screenPos = appCtx.worldToScreenLarge(site.x, site.z);
-          const dist = Math.sqrt((clickX - screenPos.x) ** 2 + (clickY - screenPos.y) ** 2);
-          if (dist < 8) {
-            appCtx.showMapInfo('historic', site);
-            return;
-          }
+        const historicHit = findFirstMapHit(
+          appCtx.historicSites,
+          clickPoint,
+          HISTORIC_MARKER_HIT_RADIUS,
+          (site) => appCtx.worldToScreenLarge(site.x, site.z)
+        );
+        if (historicHit) {
+          appCtx.showMapInfo('historic', historicHit);
+          return;
         }
       }
     });
@@ -157,10 +191,8 @@ function setupUI() {
       e.preventDefault();
       if (!appCtx.showLargeMap) return;
 
-      const rect = largeMapCanvas.getBoundingClientRect();
-      const clickX = e.clientX - rect.left;
-      const clickY = e.clientY - rect.top;
-      const worldPos = appCtx.largeMapScreenToWorld(clickX, clickY);
+      const clickPoint = canvasPointerPoint(largeMapCanvas, e);
+      const worldPos = appCtx.largeMapScreenToWorld(clickPoint.x, clickPoint.y);
       appCtx.teleportToLocation(worldPos.x, worldPos.z);
     });
   }
@@ -1434,7 +1466,9 @@ function setupUI() {
       event.preventDefault();
       event.stopPropagation();
       if (typeof btn.setPointerCapture === 'function' && Number.isFinite(event.pointerId)) {
-        try {btn.setPointerCapture(event.pointerId);} catch (_) {}
+        try {btn.setPointerCapture(event.pointerId);} catch (_) {
+          // Pointer capture may fail on detached/disabled elements; hold flow still works.
+        }
       }
       const pointerId = Number.isFinite(event.pointerId) ? event.pointerId : 0;
       beginHold(`${btn.id}:p:${pointerId}`, channel, key);

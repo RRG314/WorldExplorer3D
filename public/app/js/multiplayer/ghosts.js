@@ -1,3 +1,42 @@
+const FULL_TURN_RAD = Math.PI * 2;
+const VALID_MODES = new Set(['drive', 'walk', 'drone', 'space', 'moon']);
+const GHOST_TICK_INTERVAL_MS = 1000 / 30;
+const MIN_DT_SECONDS = 0.001;
+const MAX_DT_SECONDS = 0.09;
+const MAX_EXTRAPOLATE_SECONDS = 3.5;
+const MAX_NETWORK_SPEED = 90;
+const MAX_NETWORK_SPEED_EPSILON = 0.001;
+const SERVER_TIME_PAST_WINDOW_MS = 12000;
+const SERVER_TIME_FUTURE_WINDOW_MS = 50;
+const WALK_MOVE_THRESHOLD = 0.35;
+const WALK_MAX_SWING_SPEED = 11;
+const WALK_SWING_BASE_SPEED = 4;
+const WALK_SWING_SPEED_SCALE = 0.75;
+const WALK_LEG_SWING = 0.48;
+const WALK_ARM_SWING = 0.36;
+const WALK_BOB_AMPLITUDE = 0.05;
+const WALK_IDLE_DECAY_RATE = 6;
+const CAR_WHEEL_SPIN_SCALE = 2.1;
+const DRONE_ROTOR_BASE_SPIN = 12;
+const DRONE_ROTOR_SPEED_SCALE = 0.6;
+const AUTO_FACING_SPEED_THRESHOLD = 0.2;
+const YAW_STIFFNESS = 12;
+const TELEPORT_DISTANCE_BY_PROXY = Object.freeze({
+  walker: 60,
+  car: 60,
+  drone: 120,
+  space: 220
+});
+const SMOOTHING_FAR_DISTANCE = 25;
+const SMOOTHING_MID_DISTANCE = 8;
+const SMOOTHING_NEAR_STIFFNESS = 8.2;
+const SMOOTHING_MID_STIFFNESS = 10.5;
+const SMOOTHING_FAR_STIFFNESS = 14;
+const POSITION_ALPHA_MIN = 0.06;
+const POSITION_ALPHA_MAX = 0.92;
+const YAW_ALPHA_MIN = 0.08;
+const YAW_ALPHA_MAX = 0.9;
+
 function finiteNumber(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -16,7 +55,7 @@ function toMillis(value, fallback = Date.now()) {
 }
 
 function shortestAngleDelta(target, current) {
-  let delta = (target - current) % (Math.PI * 2);
+  let delta = (target - current) % FULL_TURN_RAD;
   if (delta > Math.PI) delta -= Math.PI * 2;
   if (delta < -Math.PI) delta += Math.PI * 2;
   return delta;
@@ -24,10 +63,7 @@ function shortestAngleDelta(target, current) {
 
 function normalizeMode(rawMode) {
   const mode = String(rawMode || '').toLowerCase();
-  if (mode === 'drive' || mode === 'walk' || mode === 'drone' || mode === 'space' || mode === 'moon') {
-    return mode;
-  }
-  return 'walk';
+  return VALID_MODES.has(mode) ? mode : 'walk';
 }
 
 function drawRoundedRect(ctx, x, y, width, height, radius) {
@@ -92,9 +128,9 @@ function createNameTag(THREE, labelText) {
 function createWalkerProxy(THREE) {
   const group = new THREE.Group();
   const scale = 1.35;
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x7eb6f2, roughness: 0.7, metalness: 0.04 });
-  const headMat = new THREE.MeshStandardMaterial({ color: 0xf3dcc2, roughness: 0.58, metalness: 0.02 });
-  const legMat = new THREE.MeshStandardMaterial({ color: 0x6b7280, roughness: 0.8, metalness: 0.03 });
+  const bodyMat = new THREE.MeshBasicMaterial({ color: 0x7eb6f2 });
+  const headMat = new THREE.MeshBasicMaterial({ color: 0xf3dcc2 });
+  const legMat = new THREE.MeshBasicMaterial({ color: 0x6b7280 });
 
   const body = new THREE.Mesh(new THREE.BoxGeometry(0.42 * scale, 0.62 * scale, 0.28 * scale), bodyMat);
   body.position.y = 1.0 * scale;
@@ -150,9 +186,9 @@ function createWalkerProxy(THREE) {
 function createCarProxy(THREE) {
   const group = new THREE.Group();
 
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x247de8, roughness: 0.36, metalness: 0.6 });
-  const trimMat = new THREE.MeshStandardMaterial({ color: 0x0f172a, roughness: 0.4, metalness: 0.75 });
-  const glassMat = new THREE.MeshStandardMaterial({ color: 0x7ec8ff, roughness: 0.12, metalness: 0.2, transparent: true, opacity: 0.65 });
+  const bodyMat = new THREE.MeshBasicMaterial({ color: 0x247de8 });
+  const trimMat = new THREE.MeshBasicMaterial({ color: 0x0f172a });
+  const glassMat = new THREE.MeshBasicMaterial({ color: 0x7ec8ff, transparent: true, opacity: 0.65 });
 
   const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 3.4), bodyMat);
   body.position.y = 0.52;
@@ -197,8 +233,8 @@ function createCarProxy(THREE) {
 
 function createDroneProxy(THREE) {
   const group = new THREE.Group();
-  const shellMat = new THREE.MeshStandardMaterial({ color: 0x3ba7ff, roughness: 0.35, metalness: 0.5 });
-  const propMat = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3, metalness: 0.7 });
+  const shellMat = new THREE.MeshBasicMaterial({ color: 0x3ba7ff });
+  const propMat = new THREE.MeshBasicMaterial({ color: 0x1e293b });
 
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.36, 14, 12), shellMat);
   body.position.y = 0.5;
@@ -236,8 +272,8 @@ function createDroneProxy(THREE) {
 
 function createSpaceProxy(THREE) {
   const group = new THREE.Group();
-  const hullMat = new THREE.MeshStandardMaterial({ color: 0xcbd5e1, roughness: 0.3, metalness: 0.75 });
-  const accentMat = new THREE.MeshStandardMaterial({ color: 0x2563eb, roughness: 0.35, metalness: 0.4 });
+  const hullMat = new THREE.MeshBasicMaterial({ color: 0xcbd5e1 });
+  const accentMat = new THREE.MeshBasicMaterial({ color: 0x2563eb });
 
   const body = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.26, 1.1, 10), hullMat);
   body.position.y = 0.56;
@@ -283,6 +319,29 @@ function proxyTypeForPlayer(player) {
   if (mode === 'space') return 'space';
   if (mode === 'moon') return speed > 1.2 ? 'car' : 'walker';
   return 'walker';
+}
+
+function clampVelocityVector(vx, vy, vz, maxSpeed = MAX_NETWORK_SPEED) {
+  const speed = Math.hypot(vx, vy, vz);
+  if (speed > maxSpeed && speed > MAX_NETWORK_SPEED_EPSILON) {
+    const scale = maxSpeed / speed;
+    return {
+      x: vx * scale,
+      y: vy * scale,
+      z: vz * scale
+    };
+  }
+  return { x: vx, y: vy, z: vz };
+}
+
+function teleportDistanceForProxy(proxyType) {
+  return TELEPORT_DISTANCE_BY_PROXY[proxyType] || TELEPORT_DISTANCE_BY_PROXY.walker;
+}
+
+function stiffnessForDistance(distance) {
+  if (distance > SMOOTHING_FAR_DISTANCE) return SMOOTHING_FAR_STIFFNESS;
+  if (distance > SMOOTHING_MID_DISTANCE) return SMOOTHING_MID_STIFFNESS;
+  return SMOOTHING_NEAR_STIFFNESS;
 }
 
 function createProxyByType(THREE, proxyType) {
@@ -341,7 +400,7 @@ function createGhostManager(scene, options = {}) {
   const entries = new Map();
   let visible = true;
   let lastTickAt = 0;
-  const tickIntervalMs = 1000 / 30;
+  const tickIntervalMs = GHOST_TICK_INTERVAL_MS;
 
   function getSelfUid() {
     if (typeof options.getSelfUid === 'function') return String(options.getSelfUid() || '');
@@ -443,24 +502,20 @@ function createGhostManager(scene, options = {}) {
     const vx = finiteNumber(pose.vx, entry.velocity.x);
     const vy = finiteNumber(pose.vy, entry.velocity.y);
     const vz = finiteNumber(pose.vz, entry.velocity.z);
-    const maxSpeed = 90;
-    const speed = Math.hypot(vx, vy, vz);
-    if (speed > maxSpeed && speed > 0.001) {
-      const scale = maxSpeed / speed;
-      entry.velocity.x = vx * scale;
-      entry.velocity.y = vy * scale;
-      entry.velocity.z = vz * scale;
-    } else {
-      entry.velocity.x = vx;
-      entry.velocity.y = vy;
-      entry.velocity.z = vz;
-    }
+    const velocity = clampVelocityVector(vx, vy, vz);
+    entry.velocity.x = velocity.x;
+    entry.velocity.y = velocity.y;
+    entry.velocity.z = velocity.z;
 
     const yaw = finiteNumber(pose.yaw, entry.targetYaw);
     entry.targetYaw = yaw;
 
     const fromServerMs = toMillis(player.lastSeenAt, nowEpochMs);
-    entry.lastPoseAtMs = clamp(fromServerMs, nowEpochMs - 12000, nowEpochMs + 50);
+    entry.lastPoseAtMs = clamp(
+      fromServerMs,
+      nowEpochMs - SERVER_TIME_PAST_WINDOW_MS,
+      nowEpochMs + SERVER_TIME_FUTURE_WINDOW_MS
+    );
     entry.lastReceiveAtMs = nowEpochMs;
   }
 
@@ -479,20 +534,25 @@ function createGhostManager(scene, options = {}) {
       const limbs = entry.proxy?.userData?.limbs;
       if (!limbs) return;
 
-      const isMoving = planarSpeed > 0.35 || Math.hypot(entry.target.x - entry.current.x, entry.target.z - entry.current.z) > 0.35;
+      const isMoving =
+        planarSpeed > WALK_MOVE_THRESHOLD ||
+        Math.hypot(entry.target.x - entry.current.x, entry.target.z - entry.current.z) > WALK_MOVE_THRESHOLD;
       if (isMoving) {
-        entry.animTime += dtSeconds * Math.min(11, 4 + planarSpeed * 0.75);
+        entry.animTime += dtSeconds * Math.min(
+          WALK_MAX_SWING_SPEED,
+          WALK_SWING_BASE_SPEED + planarSpeed * WALK_SWING_SPEED_SCALE
+        );
         const t = entry.animTime;
-        const legSwing = Math.sin(t) * 0.48;
-        const armSwing = Math.sin(t) * 0.36;
+        const legSwing = Math.sin(t) * WALK_LEG_SWING;
+        const armSwing = Math.sin(t) * WALK_ARM_SWING;
 
         limbs.legLeftPivot.rotation.x = legSwing;
         limbs.legRightPivot.rotation.x = -legSwing;
         limbs.armLeftPivot.rotation.x = -armSwing;
         limbs.armRightPivot.rotation.x = armSwing;
-        limbs.body.position.y = 1.0 * limbs.scale + Math.abs(Math.sin(t * 2)) * 0.05 * limbs.scale;
+        limbs.body.position.y = 1.0 * limbs.scale + Math.abs(Math.sin(t * 2)) * WALK_BOB_AMPLITUDE * limbs.scale;
       } else {
-        const decay = clamp(dtSeconds * 6, 0, 1);
+        const decay = clamp(dtSeconds * WALK_IDLE_DECAY_RATE, 0, 1);
         limbs.legLeftPivot.rotation.x *= 1 - decay;
         limbs.legRightPivot.rotation.x *= 1 - decay;
         limbs.armLeftPivot.rotation.x *= 1 - decay;
@@ -505,7 +565,7 @@ function createGhostManager(scene, options = {}) {
     if (entry.proxyType === 'car') {
       const wheels = entry.proxy?.userData?.wheels;
       if (!Array.isArray(wheels) || !wheels.length) return;
-      const wheelSpin = planarSpeed * dtSeconds * 2.1;
+      const wheelSpin = planarSpeed * dtSeconds * CAR_WHEEL_SPIN_SCALE;
       for (const wheel of wheels) {
         if (wheel) wheel.rotation.x -= wheelSpin;
       }
@@ -515,7 +575,7 @@ function createGhostManager(scene, options = {}) {
     if (entry.proxyType === 'drone') {
       const rotors = entry.proxy?.userData?.rotors;
       if (!Array.isArray(rotors) || !rotors.length) return;
-      const spin = dtSeconds * (12 + planarSpeed * 0.6);
+      const spin = dtSeconds * (DRONE_ROTOR_BASE_SPIN + planarSpeed * DRONE_ROTOR_SPEED_SCALE);
       for (const rotor of rotors) {
         if (rotor) rotor.rotation.z += spin;
       }
@@ -551,13 +611,14 @@ function createGhostManager(scene, options = {}) {
     if (nowMs - lastTickAt < tickIntervalMs) return;
 
     const deltaMs = lastTickAt <= 0 ? tickIntervalMs : nowMs - lastTickAt;
-    const dtSeconds = clamp(deltaMs / 1000, 0.001, 0.09);
+    const dtSeconds = clamp(deltaMs / 1000, MIN_DT_SECONDS, MAX_DT_SECONDS);
     lastTickAt = nowMs;
 
     const nowEpochMs = Date.now();
 
     for (const entry of entries.values()) {
-      const extrapolateSec = clamp((nowEpochMs - entry.lastPoseAtMs) / 1000, 0, 3.5);
+      // Predict from the last network pose and smooth toward that target.
+      const extrapolateSec = clamp((nowEpochMs - entry.lastPoseAtMs) / 1000, 0, MAX_EXTRAPOLATE_SECONDS);
       const predictedX = entry.target.x + entry.velocity.x * extrapolateSec;
       const predictedY = entry.target.y + entry.velocity.y * extrapolateSec;
       const predictedZ = entry.target.z + entry.velocity.z * extrapolateSec;
@@ -567,15 +628,15 @@ function createGhostManager(scene, options = {}) {
       const dz = predictedZ - entry.current.z;
       const distSq = dx * dx + dy * dy + dz * dz;
 
-      const teleportDistance = entry.proxyType === 'space' ? 220 : (entry.proxyType === 'drone' ? 120 : 60);
+      const teleportDistance = teleportDistanceForProxy(entry.proxyType);
       if (distSq > teleportDistance * teleportDistance) {
         entry.current.x = predictedX;
         entry.current.y = predictedY;
         entry.current.z = predictedZ;
       } else {
         const distance = Math.sqrt(distSq);
-        const stiffness = distance > 25 ? 14 : (distance > 8 ? 10.5 : 8.2);
-        const alpha = clamp(1 - Math.exp(-dtSeconds * stiffness), 0.06, 0.92);
+        const stiffness = stiffnessForDistance(distance);
+        const alpha = clamp(1 - Math.exp(-dtSeconds * stiffness), POSITION_ALPHA_MIN, POSITION_ALPHA_MAX);
 
         entry.current.x += dx * alpha;
         entry.current.y += dy * alpha;
@@ -583,11 +644,14 @@ function createGhostManager(scene, options = {}) {
       }
 
       const planarSpeed = Math.hypot(entry.velocity.x, entry.velocity.z);
-      if (planarSpeed > 0.2 && (entry.proxyType === 'car' || entry.proxyType === 'drone' || entry.proxyType === 'walker')) {
+      if (
+        planarSpeed > AUTO_FACING_SPEED_THRESHOLD &&
+        (entry.proxyType === 'car' || entry.proxyType === 'drone' || entry.proxyType === 'walker')
+      ) {
         entry.targetYaw = Math.atan2(entry.velocity.x, entry.velocity.z);
       }
 
-      const yawAlpha = clamp(1 - Math.exp(-dtSeconds * 12), 0.08, 0.9);
+      const yawAlpha = clamp(1 - Math.exp(-dtSeconds * YAW_STIFFNESS), YAW_ALPHA_MIN, YAW_ALPHA_MAX);
       entry.currentYaw += shortestAngleDelta(entry.targetYaw, entry.currentYaw) * yawAlpha;
 
       animateProxy(entry, dtSeconds);
