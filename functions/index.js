@@ -11,7 +11,7 @@ const TRIAL_DURATION_MS = 48 * 60 * 60 * 1000;
 const DELETE_ACCOUNT_MAX_AUTH_AGE_SECONDS = 10 * 60;
 const ADMIN_TEST_ROOM_CREATE_LIMIT = 10000;
 const ROOM_CREATE_LIMITS = Object.freeze({
-  free: 0,
+  free: 3,
   trial: 3,
   supporter: 3,
   pro: 10
@@ -102,7 +102,7 @@ function planEntitlements(plan) {
 
   return {
     fullAccess: true,
-    cloudSync: false,
+    cloudSync: true,
     proEarlyAccess: false,
     prioritySupport: false,
     featureConsideration: false,
@@ -123,6 +123,12 @@ function roomCreateLimitForPlan(plan) {
 }
 
 function normalizeRoomCreateCount(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return 0;
+  return Math.max(0, Math.min(10000, Math.floor(n)));
+}
+
+function normalizeRoomCreateLimit(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return 0;
   return Math.max(0, Math.min(10000, Math.floor(n)));
@@ -266,10 +272,26 @@ function parsePositiveInt(value, fallback = 20, min = 1, max = 50) {
   return Math.max(min, Math.min(max, Math.floor(n)));
 }
 
-async function deleteDocsByQuery(query, batchSize = 200) {
+function isFailedPreconditionError(err) {
+  const code = err && err.code;
+  if (Number(code) === 9) return true;
+  return String(code || '').toLowerCase() === 'failed-precondition';
+}
+
+async function deleteDocsByQuery(query, batchSize = 200, label = '') {
   const limit = Math.max(10, Math.min(500, Number(batchSize) || 200));
   while (true) {
-    const snap = await query.limit(limit).get();
+    let snap;
+    try {
+      snap = await query.limit(limit).get();
+    } catch (err) {
+      if (isFailedPreconditionError(err)) {
+        const tag = label ? ` (${label})` : '';
+        console.warn(`[deleteAccount] Skipping query cleanup${tag}: Firestore failed precondition.`, err && err.message ? err.message : err);
+        return;
+      }
+      throw err;
+    }
     if (snap.empty) return;
     const batch = db.batch();
     snap.docs.forEach((doc) => batch.delete(doc.ref));
@@ -301,27 +323,27 @@ async function deleteUserData(uid) {
     await deleteRoomTree(roomDoc.ref);
   }
 
-  await deleteDocsByQuery(db.collectionGroup('players').where('uid', '==', uid));
-  await deleteDocsByQuery(db.collectionGroup('chatState').where('uid', '==', uid));
-  await deleteDocsByQuery(db.collectionGroup('friends').where('uid', '==', uid));
-  await deleteDocsByQuery(db.collectionGroup('recentPlayers').where('uid', '==', uid));
-  await deleteDocsByQuery(db.collectionGroup('incomingInvites').where('fromUid', '==', uid));
-  await deleteDocsByQuery(db.collectionGroup('artifacts').where('ownerUid', '==', uid));
-  await deleteDocsByQuery(db.collectionGroup('blocks').where('createdBy', '==', uid));
-  await deleteDocsByQuery(db.collectionGroup('paintClaims').where('uid', '==', uid));
+  await deleteDocsByQuery(db.collectionGroup('players').where('uid', '==', uid), 200, 'players(uid)');
+  await deleteDocsByQuery(db.collectionGroup('chatState').where('uid', '==', uid), 200, 'chatState(uid)');
+  await deleteDocsByQuery(db.collectionGroup('friends').where('uid', '==', uid), 200, 'friends(uid)');
+  await deleteDocsByQuery(db.collectionGroup('recentPlayers').where('uid', '==', uid), 200, 'recentPlayers(uid)');
+  await deleteDocsByQuery(db.collectionGroup('incomingInvites').where('fromUid', '==', uid), 200, 'incomingInvites(fromUid)');
+  await deleteDocsByQuery(db.collectionGroup('artifacts').where('ownerUid', '==', uid), 200, 'artifacts(ownerUid)');
+  await deleteDocsByQuery(db.collectionGroup('blocks').where('createdBy', '==', uid), 200, 'blocks(createdBy)');
+  await deleteDocsByQuery(db.collectionGroup('paintClaims').where('uid', '==', uid), 200, 'paintClaims(uid)');
 
-  await deleteDocsByQuery(db.collection('flowerLeaderboard').where('uid', '==', uid));
-  await deleteDocsByQuery(db.collection('paintTownLeaderboard').where('uid', '==', uid));
-  await deleteDocsByQuery(db.collection('activityFeed').where('uid', '==', uid));
+  await deleteDocsByQuery(db.collection('flowerLeaderboard').where('uid', '==', uid), 200, 'flowerLeaderboard(uid)');
+  await deleteDocsByQuery(db.collection('paintTownLeaderboard').where('uid', '==', uid), 200, 'paintTownLeaderboard(uid)');
+  await deleteDocsByQuery(db.collection('activityFeed').where('uid', '==', uid), 200, 'activityFeed(uid)');
   await db.collection('explorerLeaderboard').doc(uid).delete().catch(() => {});
 
   if (db && typeof db.recursiveDelete === 'function') {
     await db.recursiveDelete(userRef);
   } else {
-    await deleteDocsByQuery(userRef.collection('friends'));
-    await deleteDocsByQuery(userRef.collection('recentPlayers'));
-    await deleteDocsByQuery(userRef.collection('incomingInvites'));
-    await deleteDocsByQuery(userRef.collection('myRooms'));
+    await deleteDocsByQuery(userRef.collection('friends'), 200, 'users/{uid}/friends');
+    await deleteDocsByQuery(userRef.collection('recentPlayers'), 200, 'users/{uid}/recentPlayers');
+    await deleteDocsByQuery(userRef.collection('incomingInvites'), 200, 'users/{uid}/incomingInvites');
+    await deleteDocsByQuery(userRef.collection('myRooms'), 200, 'users/{uid}/myRooms');
     await userRef.delete().catch(() => {});
   }
 }
@@ -616,8 +638,8 @@ exports.startTrial = functions.region('us-central1').https.onRequest(async (req,
 
     const existingPlan = normalizePlan(existing.plan);
     const subscriptionStatus = String(existing.subscriptionStatus || 'none');
-    const trialEndsAtMs = timestampToMillis(existing.trialEndsAt);
-    const trialConsumedAtMs = timestampToMillis(existing.trialConsumedAt);
+    const trialEndsAtMs = timestampToMillis(existing.trialEndsAt) || timestampToMillis(existing.trialEndsAtMs);
+    const trialConsumedAtMs = timestampToMillis(existing.trialConsumedAt) || timestampToMillis(existing.trialConsumedAtMs);
 
     if (existingPlan === 'supporter' || existingPlan === 'pro' || hasActiveSubscription(subscriptionStatus)) {
       res.status(200).json({
@@ -629,6 +651,40 @@ exports.startTrial = functions.region('us-central1').https.onRequest(async (req,
     }
 
     if (existingPlan === 'trial' && trialEndsAtMs && trialEndsAtMs > nowMs) {
+      const trialEndsAtIsTimestamp = existing.trialEndsAt && typeof existing.trialEndsAt.toMillis === 'function';
+      const trialStartsAtIsTimestamp = existing.trialStartsAt && typeof existing.trialStartsAt.toMillis === 'function';
+      const trialConsumedAtIsTimestamp = existing.trialConsumedAt && typeof existing.trialConsumedAt.toMillis === 'function';
+
+      if (!trialEndsAtIsTimestamp || !trialStartsAtIsTimestamp || !trialConsumedAtIsTimestamp) {
+        const normalizedTrialEndsAt = admin.firestore.Timestamp.fromMillis(trialEndsAtMs);
+        const normalizedTrialStartMs = trialStartsAtIsTimestamp
+          ? existing.trialStartsAt.toMillis()
+          : Math.max(nowMs - TRIAL_DURATION_MS, trialEndsAtMs - TRIAL_DURATION_MS);
+        const normalizedTrialStartsAt = admin.firestore.Timestamp.fromMillis(normalizedTrialStartMs);
+        const normalizedTrialConsumedAt = trialConsumedAtIsTimestamp
+          ? existing.trialConsumedAt
+          : normalizedTrialStartsAt;
+        const roomCreateCount = normalizeRoomCreateCount(existing.roomCreateCount);
+        const roomCreateLimit = Math.max(
+          roomCreateLimitForPlan('trial'),
+          normalizeRoomCreateLimit(existing.roomCreateLimit)
+        );
+
+        await db.collection('users').doc(auth.uid).set(
+          {
+            plan: 'trial',
+            trialStartsAt: normalizedTrialStartsAt,
+            trialEndsAt: normalizedTrialEndsAt,
+            trialConsumedAt: normalizedTrialConsumedAt,
+            entitlements: planEntitlements('trial'),
+            roomCreateCount,
+            roomCreateLimit,
+            updatedAt: admin.firestore.FieldValue.serverTimestamp()
+          },
+          { merge: true }
+        );
+      }
+
       res.status(200).json({
         status: 'already-active',
         plan: 'trial',
