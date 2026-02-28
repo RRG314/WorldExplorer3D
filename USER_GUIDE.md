@@ -1,6 +1,6 @@
 # User Guide
 
-Last reviewed: 2026-02-25
+Last reviewed: 2026-02-28
 
 This guide explains current player-facing behavior across app, multiplayer, and account features.
 
@@ -14,30 +14,39 @@ Main routes:
 
 Use `Sign In / Sign Up` to authenticate with Email/Password or Google.
 
-## 2. Plans, Trial, and Multiplayer Access
+## 2. Multiplayer Access and Donations
 
-- `Free`: single-player only, multiplayer locked
-- `Trial` (2 days): multiplayer enabled temporarily, room limit `3`
-- `Supporter`: multiplayer enabled, room limit `3`
-- `Pro`: multiplayer enabled, room limit `10`
+- Multiplayer is available to all signed-in users.
+- No payment is required to create/join rooms.
+- Optional monthly donations:
+  - `Supporter`: $1/month
+  - `Pro`: $5/month (includes early demo access perks)
+
+Current room creation limits:
+
+- `Free`: 3
+- `Supporter`: 3
+- `Pro`: 10
+- Admin tester mode: allowlist-only elevated limit
 
 Invite flow behavior:
 
-- existing multiplayer-enabled users go straight to room join
-- free users can start trial from invite and then join
+- signed-in users can accept invite and join directly
+- signed-out users are prompted to sign in first
 
 ## 3. Account Page Features
 
 The account page includes:
 
-- plan and trial status
+- plan/donation status
+- multiplayer access status
 - room quota (`created / limit`)
-- extras card
+- extras card (Pro early-access messaging)
 - admin status (allowlisted accounts only)
 - username update
 - linked email + verification state
 - account UID + auth providers
-- billing portal and receipt list
+- donations portal and receipt list
 - friends list and incoming invites
 - close account (permanent delete with confirmation and recent-sign-in safety check)
 
@@ -148,7 +157,7 @@ Mobile and desktop share the same gameplay systems and multiplayer state.
 ## 11. Troubleshooting
 
 - If `Create`/`Join` does nothing, hard refresh and verify current user is signed in.
-- If room actions fail with permissions, confirm deployed Firestore rules and active plan/trial.
+- If room actions fail with permissions, confirm deployed Firestore rules and Firebase auth state.
 - If saved room `Open` fails, confirm the room code exists and owner has not deleted the room.
 - If invites fail, verify friend relationship exists first.
-- If billing/receipts are missing, refresh account data and inspect function logs.
+- If donation receipts are missing, refresh account data and inspect function logs.

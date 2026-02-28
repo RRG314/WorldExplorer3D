@@ -1,8 +1,8 @@
 # Architecture
 
-Last reviewed: 2026-02-25
+Last reviewed: 2026-02-28
 
-This document describes the current platform architecture for gameplay, multiplayer, account, billing, and security.
+This document describes the current platform architecture for gameplay, multiplayer, account, optional donations, and security.
 
 ## 1. System Topology
 
@@ -19,7 +19,7 @@ This document describes the current platform architecture for gameplay, multipla
 - Firebase Authentication
 - Cloud Firestore
 - Cloud Functions (`functions/index.js`)
-- Stripe Checkout/Billing Portal/Webhooks
+- Stripe Checkout/Donation Portal/Webhooks
 
 ## 2. Runtime Layers
 
@@ -90,7 +90,7 @@ Ghost rendering (`ghosts.js`):
 
 Rule domains enforce:
 
-- auth and entitlement requirements
+- authenticated access for multiplayer data
 - room visibility/member/owner/mod boundaries
 - room-create quota coupling with user counter writes
 - presence write ownership and throttling checks
@@ -99,13 +99,13 @@ Rule domains enforce:
 - saved-room ownership constraints (`myRooms`)
 - block/claim/artifact/homeBase validation by room permissions
 
-## 6. Billing and Account API Architecture
+## 6. Account and Donation API Architecture
 
 Functions API (`us-central1`):
 
 - `createCheckoutSession`
 - `createPortalSession`
-- `startTrial`
+- `startTrial` (legacy compatibility path)
 - `enableAdminTester`
 - `getAccountOverview`
 - `listBillingReceipts`
@@ -117,14 +117,14 @@ Account page merges:
 
 - Firebase Auth user state
 - Firestore user profile and social data
-- Cloud Function account/billing responses
+- Cloud Function account/donation responses
 
 ## 7. Deployment Architecture
 
 ### Firebase Hosting
 
 - hosting root: `public/`
-- function rewrites for account/billing APIs
+- function rewrites for account/donation APIs
 - legal page rewrites
 
 ### GitHub Pages

@@ -1,8 +1,8 @@
 # World Explorer
 
-Last reviewed: 2026-02-25
+Last reviewed: 2026-02-28
 
-World Explorer is a browser-native 3D exploration platform with real-location traversal, game modes, multiplayer rooms, account/billing, and Firebase-backed persistence.
+World Explorer is a browser-native 3D exploration platform with real-location traversal, game modes, multiplayer rooms, optional monthly donations, and Firebase-backed persistence.
 
 ## Runtime Surfaces
 
@@ -30,10 +30,10 @@ World Explorer is a browser-native 3D exploration platform with real-location tr
   - live presence, chat, friends, invites, recent players
   - shared blocks, paint claims, artifacts, home base
 - Account center:
-  - plan/trial state
+  - plan/donation status
   - room quota usage
   - username + linked email + providers
-  - Stripe billing portal + receipts
+  - Stripe donation portal + receipts
   - permanent account closure (self-serve delete flow)
 
 ## Multiplayer Rendering and Update Model
@@ -47,11 +47,14 @@ Current ghost rendering is no longer bubble-only:
 
 ## Access and Quotas
 
-- `Free`: multiplayer locked
-- `Trial` (2 days): multiplayer enabled, room create limit `3`
-- `Supporter`: multiplayer enabled, room create limit `3`
-- `Pro`: multiplayer enabled, room create limit `10`
-- Admin tester mode: allowlist-only, higher room limit
+- Multiplayer is available for all signed-in users.
+- Current room creation limits:
+  - `Free`: `3`
+  - `Supporter`: `3`
+  - `Pro`: `10`
+  - Admin tester mode: allowlist-only, higher room limit
+- Supporter/Pro are optional monthly donations.
+- Pro keeps early-demo and priority-contact style perks.
 
 ## Controls
 
@@ -147,7 +150,7 @@ GitHub Pages (branch root) and Firebase Hosting are both supported.
 
 GitHub Pages:
 
-- source branch: `steven/product`
+- source branch: `main`
 - folder: `/ (root)`
 
 Firebase:
@@ -169,4 +172,4 @@ firebase deploy
 - `KNOWN_ISSUES.md`
 - `CHANGELOG.md`
 - `DOCUMENTATION_INDEX.md`
-- `COMPLETE_INVENTORY_REPORT_2026-02-25.md`
+- `COMPLETE_INVENTORY_REPORT_2026-02-28.md`
