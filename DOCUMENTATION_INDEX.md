@@ -1,6 +1,6 @@
 # Documentation Index
 
-Last reviewed: 2026-02-25
+Last reviewed: 2026-02-28
 
 Current documentation set for this repository.
 
@@ -21,8 +21,9 @@ Current documentation set for this repository.
 | `CONTRIBUTING.md` | Contribution standards |
 | `SECURITY_STORAGE_NOTICE.md` | Security and storage notes |
 | `ACKNOWLEDGEMENTS.md` | Attribution and third-party acknowledgements |
-| `COMPLETE_INVENTORY_REPORT_2026-02-25.md` | Latest full inventory snapshot |
-| `COMPLETE_INVENTORY_REPORT_2026-02-22.md` | Previous inventory snapshot |
+| `COMPLETE_INVENTORY_REPORT_2026-02-28.md` | Latest full inventory snapshot |
+| `COMPLETE_INVENTORY_REPORT_2026-02-25.md` | Previous inventory snapshot |
+| `COMPLETE_INVENTORY_REPORT_2026-02-22.md` | Older inventory snapshot |
 | `progress.md` | Working session log |
 
 ## Recommended Reading Order

@@ -1,6 +1,6 @@
 # API and Service Setup Guide
 
-Last reviewed: 2026-02-25
+Last reviewed: 2026-02-28
 
 Setup checklist for Firebase, Firestore, and Stripe used by the current platform.
 
@@ -82,7 +82,7 @@ App Check is optional for this branch configuration.
 
 ## 4.1 CORS Allowlist (Functions)
 
-Functions now enforce a CORS origin allowlist.
+Functions enforce a CORS origin allowlist.
 
 Defaults allowed:
 
@@ -116,7 +116,7 @@ Local override key:
 
 - `worldExplorer3D.firebaseConfig`
 
-## 6. Stripe Setup
+## 6. Stripe Setup (Optional Donations)
 
 ### 6.1 Products/prices
 
@@ -162,7 +162,7 @@ Authenticated endpoints:
 
 - `POST /createCheckoutSession`
 - `POST /createPortalSession`
-- `POST /startTrial`
+- `POST /startTrial` (legacy compatibility endpoint; no longer required for multiplayer access)
 - `POST /enableAdminTester`
 - `POST /getAccountOverview`
 - `POST /listBillingReceipts`

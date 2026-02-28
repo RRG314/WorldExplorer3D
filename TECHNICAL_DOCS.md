@@ -1,6 +1,6 @@
 # Technical Documentation
 
-Last reviewed: 2026-02-25
+Last reviewed: 2026-02-28
 
 Engineering reference for runtime modules, multiplayer behavior, rules, and test flow.
 
@@ -90,7 +90,7 @@ Spam/safety controls:
 - multiplayer panel wiring
 - saved-room list rendering and open/delete handlers
 - chat drawer wiring
-- entitlement checks + invite trial path
+- access checks based on sign-in status
 
 ## 3. Paint the Town Runtime Notes
 
@@ -117,7 +117,7 @@ Physics/perf highlights:
 - splat lifetime cleanup
 - multiplayer claim publish hook
 
-## 4. Account and Billing Technical Notes
+## 4. Account and Donation Technical Notes
 
 Frontend modules:
 
@@ -138,7 +138,7 @@ Endpoints:
 
 - `createCheckoutSession`
 - `createPortalSession`
-- `startTrial`
+- `startTrial` (legacy compatibility path)
 - `enableAdminTester`
 - `getAccountOverview`
 - `listBillingReceipts`

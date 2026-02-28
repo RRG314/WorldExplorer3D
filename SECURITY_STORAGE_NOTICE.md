@@ -1,16 +1,16 @@
 # Security and Storage Notice
 
-Last reviewed: 2026-02-16
+Last reviewed: 2026-02-28
 
-This document summarizes current storage and security behavior for auth, billing, and user-generated data.
+This document summarizes current storage and security behavior for auth, optional donations, and user-generated data.
 
 ## 1. Auth and Identity
 
 - Authentication is handled by Firebase Auth.
 - Supported providers: Google and Email/Password.
-- ID tokens are used to authorize checkout/portal function calls.
+- ID tokens are used to authorize checkout/portal/function calls.
 
-## 2. Billing and Payment Data
+## 2. Donation and Payment Data
 
 - Stripe secret keys and webhook secrets are server-side only.
 - Frontend does not store Stripe secret credentials.
@@ -22,14 +22,15 @@ This document summarizes current storage and security behavior for auth, billing
 
 Stores:
 
-- plan state (`free|trial|supporter|pro`)
-- trial timing
-- subscription references (`stripeCustomerId`, `stripeSubscriptionId`)
+- plan state (`free|supporter|pro`, with optional legacy `trial` values)
+- donation references (`stripeCustomerId`, `stripeSubscriptionId`)
 - entitlement flags
+- room quota counters
 
 Rules:
 
 - user can read/write only their own document.
+- client cannot directly write protected billing/admin entitlement fields.
 
 ### `flowerLeaderboard/{entryId}`
 
@@ -65,4 +66,4 @@ Treat browser-stored user data as local-device data, not guaranteed cloud backup
 
 Suggested privacy copy:
 
-> World Explorer uses Firebase Authentication and Firestore for account, trial, and subscription state. Payments are processed by Stripe. Card details are handled by Stripe and are not stored by World Explorer.
+> World Explorer uses Firebase Authentication and Firestore for account and multiplayer state. Optional donations are processed by Stripe. Card details are handled by Stripe and are not stored by World Explorer.

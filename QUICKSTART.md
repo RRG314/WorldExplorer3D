@@ -1,6 +1,6 @@
 # Quick Start
 
-Last reviewed: 2026-02-25
+Last reviewed: 2026-02-28
 
 Fast path to run, test, and deploy the current World Explorer platform.
 
@@ -59,12 +59,12 @@ Open:
    - `T` toggles paint tool
    - right-click hold camera look works
    - double-left-click does not toggle camera
-3. Open Multiplayer tab:
+3. Open Multiplayer tab (signed in):
    - create room
    - join by code
    - verify saved room list has `Open` and (owner) `Delete`
 4. Open account page and verify:
-   - plan/trial/quota
+   - donation status + room quota
    - username
    - receipts
    - friends/invites
@@ -102,7 +102,7 @@ Enable auth providers in Firebase Console:
 - Email/Password
 - Google
 
-## 8. Stripe Setup (Paid Plans)
+## 8. Stripe Setup (Optional Donations)
 
 ```bash
 firebase experiments:enable legacyRuntimeConfigCommands
@@ -147,6 +147,6 @@ firebase deploy
 ## 11. Troubleshooting
 
 - Rules tests fail with Java errors -> verify `java -version`.
-- Multiplayer create/join denied -> redeploy Firestore rules and verify plan/trial state.
+- Multiplayer create/join denied -> redeploy Firestore rules and verify sign-in/auth state.
 - Saved room open fails -> verify room still exists and owner has not deleted it.
-- Billing errors -> verify Stripe config + function logs.
+- Donation errors -> verify Stripe config + function logs.

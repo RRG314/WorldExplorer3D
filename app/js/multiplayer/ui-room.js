@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { ensureEntitlements, startTrialIfEligible } from '../../../js/entitlements.js?v=70';
+import { ensureEntitlements } from '../../../js/entitlements.js?v=71';
 import { createArtifact, listenArtifacts, removeArtifact } from './artifacts.js?v=55';
 import {
   clearMySharedBlocks,
@@ -8,12 +8,12 @@ import {
   upsertSharedBlock
 } from './blocks.js?v=61';
 import { CHAT_MAX_LENGTH, listenChat, reportMessage, sendMessage } from './chat.js?v=55';
-import { createGhostManager } from './ghosts.js?v=56';
+import { createGhostManager } from './ghosts.js?v=57';
 import {
   bumpExplorerLeaderboard,
   listenExplorerLeaderboard
 } from './loop.js?v=55';
-import { listenPlayers, startPresence, stopPresence } from './presence.js?v=59';
+import { listenPlayers, startPresence, stopPresence } from './presence.js?v=60';
 import {
   createRoom,
   deleteOwnedRoom,
@@ -30,7 +30,7 @@ import {
   normalizeCode,
   setHomeBase,
   updateRoomSettings
-} from './rooms.js?v=65';
+} from './rooms.js?v=66';
 import {
   listenPaintClaims,
   normalizeColorHex as normalizePaintColorHex,
@@ -47,8 +47,6 @@ import {
   removeFriend,
   sendInviteToFriend
 } from './social.js?v=55';
-
-const ENABLED_PLANS = new Set(['trial', 'support', 'supporter', 'pro']);
 
 let singleton = null;
 
@@ -133,7 +131,9 @@ function readPlanState() {
 }
 
 function canUseMultiplayer(planState) {
-  return planState?.isAdmin === true || ENABLED_PLANS.has(String(planState?.plan || '').toLowerCase());
+  if (!planState) return false;
+  if (planState.isAdmin === true) return true;
+  return planState.isAuthenticated === true || !!String(planState.uid || '');
 }
 
 function copyText(text) {
@@ -207,6 +207,16 @@ function isWalkModeActive() {
   return !!(appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk');
 }
 
+function isDroneModeActive() {
+  if (appCtx.droneMode) return true;
+
+  const droneToggle = document.getElementById('fDrone');
+  if (droneToggle?.classList?.contains('on')) return true;
+
+  const modeLabel = String(document.getElementById('fMode')?.textContent || '').toLowerCase();
+  return modeLabel.includes('drone');
+}
+
 function readWorldContext() {
   const lat = finiteNumber(appCtx.LOC?.lat, finiteNumber(appCtx.customLoc?.lat, 0));
   const lon = finiteNumber(appCtx.LOC?.lon, finiteNumber(appCtx.customLoc?.lon, 0));
@@ -227,7 +237,7 @@ function readWorldContext() {
 function readPoseSnapshot() {
   const world = readWorldContext();
   const base = {
-    mode: world.kind === 'space' ? 'space' : world.kind === 'moon' ? 'moon' : 'drive',
+    mode: world.kind === 'space' ? 'space' : 'drive',
     frame: {
       kind: world.kind,
       locLat: world.lat,
@@ -263,8 +273,8 @@ function readPoseSnapshot() {
     return base;
   }
 
-  if (appCtx.droneMode) {
-    base.mode = appCtx.onMoon ? 'moon' : 'drone';
+  if (isDroneModeActive()) {
+    base.mode = 'drone';
     base.pose.x = finiteNumber(appCtx.drone?.x, finiteNumber(appCtx.car?.x, 0));
     base.pose.y = finiteNumber(appCtx.drone?.y, finiteNumber(appCtx.car?.y, 0));
     base.pose.z = finiteNumber(appCtx.drone?.z, finiteNumber(appCtx.car?.z, 0));
@@ -274,7 +284,7 @@ function readPoseSnapshot() {
   }
 
   if (isWalkModeActive()) {
-    base.mode = appCtx.onMoon ? 'moon' : 'walk';
+    base.mode = 'walk';
     base.pose.x = finiteNumber(appCtx.Walk.state.walker?.x, finiteNumber(appCtx.car?.x, 0));
     base.pose.y = finiteNumber(appCtx.Walk.state.walker?.y, finiteNumber(appCtx.car?.y, 0));
     base.pose.z = finiteNumber(appCtx.Walk.state.walker?.z, finiteNumber(appCtx.car?.z, 0));
@@ -284,7 +294,7 @@ function readPoseSnapshot() {
     return base;
   }
 
-  base.mode = appCtx.onMoon ? 'moon' : 'drive';
+  base.mode = 'drive';
   base.pose.x = finiteNumber(appCtx.car?.x, 0);
   base.pose.y = finiteNumber(appCtx.car?.y, 0);
   base.pose.z = finiteNumber(appCtx.car?.z, 0);
@@ -537,7 +547,7 @@ function initMultiplayerPlatform() {
     };
   }
 
-  async function syncRoomWorldContext(room, force = false) {
+  async function syncRoomWorldContext(room, force = false, respawn = false) {
     if (!room || !room.world) return;
 
     const signature = roomWorldSignature(room);
@@ -574,6 +584,9 @@ function initMultiplayerPlatform() {
       setStatus(`Syncing room world ${room.code} (seed ${roomSeed})...`);
       try {
         await appCtx.loadRoads();
+        if (respawn && typeof appCtx.spawnOnRoad === 'function') {
+          appCtx.spawnOnRoad();
+        }
       } catch (err) {
         console.warn('[multiplayer][ui] room world sync failed:', err);
       }
@@ -824,23 +837,17 @@ function initMultiplayerPlatform() {
       return;
     }
     if (plan === 'pro') {
-      refs.titlePlanState.textContent = 'Pro: Multiplayer + Early demos + direct feedback channel.';
+      refs.titlePlanState.textContent = 'Pro donation active: multiplayer is open, plus early demo access.';
       refs.titlePlanState.classList.remove('warn');
       return;
     }
     if (plan === 'supporter' || plan === 'support') {
-      refs.titlePlanState.textContent = 'Supporter: Multiplayer unlocked. Upgrade to Pro for early demos.';
+      refs.titlePlanState.textContent = 'Supporter donation active: multiplayer is fully open. Upgrade to Pro for early demos.';
       refs.titlePlanState.classList.remove('warn');
       return;
     }
-    if (plan === 'trial') {
-      refs.titlePlanState.textContent = 'Trial: Multiplayer unlocked for 2 days. Subscribe to keep access.';
-      refs.titlePlanState.classList.remove('warn');
-      return;
-    }
-
-    refs.titlePlanState.textContent = 'Free plan: Multiplayer is locked until you start trial or upgrade.';
-    refs.titlePlanState.classList.add('warn');
+    refs.titlePlanState.textContent = 'Signed-in explorers can create and join multiplayer rooms. Donations are optional.';
+    refs.titlePlanState.classList.remove('warn');
   }
 
   function updateToggleStates() {
@@ -1074,10 +1081,7 @@ function initMultiplayerPlatform() {
       }
     }
     if (!canUseMultiplayer(state.entitlement)) {
-      const plan = String(state.entitlement?.plan || 'free');
-      const subStatus = String(state.entitlement?.subscriptionStatus || 'none');
-      const admin = state.entitlement?.isAdmin === true ? 'yes' : 'no';
-      setStatus(`Multiplayer is locked on Free. Start your 2-day trial or upgrade to Supporter/Pro. (plan=${plan}, subStatus=${subStatus}, admin=${admin})`, true);
+      setStatus('Could not confirm multiplayer access for this account yet. Try refresh or sign in again.', true);
       return false;
     }
     return true;
@@ -1488,7 +1492,7 @@ function initMultiplayerPlatform() {
     });
 
     startPresence(room.id, readPoseSnapshot);
-    await syncRoomWorldContext(room, false);
+    await syncRoomWorldContext(room, false, true);
 
     const invite = buildInviteLink(room.code);
     if (invite) {
@@ -1522,32 +1526,7 @@ function initMultiplayerPlatform() {
         locationName: roomName || world.name,
         locationTag: effectiveLocationTag ? { label: effectiveLocationTag, city: effectiveLocationTag, kind: world.kind } : null
       };
-      const trialPlan = String(state.entitlement?.plan || '').toLowerCase() === 'trial';
-      let room = null;
-
-      try {
-        room = await createRoom(createPayload);
-      } catch (err) {
-        const errCode = String(err?.code || '').toLowerCase();
-        const errMessage = String(err?.message || '').toLowerCase();
-        const permissionDenied = errCode.includes('permission') ||
-          errMessage.includes('permission-denied') ||
-          errMessage.includes('missing or insufficient permissions') ||
-          errMessage.includes('insufficient permissions');
-
-        if (trialPlan && permissionDenied && state.authUser) {
-          setStatus('Trial access is syncing. Retrying room create...');
-          const next = await startTrialIfEligible(state.authUser);
-          state.entitlement = {
-            ...state.entitlement,
-            ...next
-          };
-          applyEntitlementCopy();
-          room = await createRoom(createPayload);
-        } else {
-          throw err;
-        }
-      }
+      const room = await createRoom(createPayload);
 
       await activateRoom(room, 'created room');
       await bumpExplorerLeaderboard({ roomsJoined: 1 });
@@ -1569,25 +1548,11 @@ function initMultiplayerPlatform() {
   }
 
   async function ensureInviteJoinAccess() {
-    if (canUseMultiplayer(state.entitlement)) return true;
     if (!state.authUser) {
       setStatus('Sign in to accept invites.', true);
       return false;
     }
-
-    try {
-      setStatus('Starting your 2-day trial so you can join this invite...');
-      const next = await startTrialIfEligible(state.authUser);
-      state.entitlement = {
-        ...state.entitlement,
-        ...next
-      };
-      applyEntitlementCopy();
-      return canUseMultiplayer(state.entitlement);
-    } catch (err) {
-      setStatus(err?.message || 'Invite requires trial or paid plan.', true);
-      return false;
-    }
+    return true;
   }
 
   async function handleBrowseRooms() {
@@ -1721,36 +1686,8 @@ function initMultiplayerPlatform() {
 
     state.pendingRoomInFlight = true;
     try {
-      if (canUseMultiplayer(state.entitlement)) {
-        state.pendingRoomPrompted = true;
-        setStatus(`Invite accepted. Joining room ${inviteCode}...`);
-        setInputCode(refs, inviteCode);
-        await handleJoinRoom(inviteCode);
-        return;
-      }
-
-      const shouldStartTrial = window.confirm(
-        `Invite to room ${inviteCode}. Multiplayer is locked on Free.\n\nStart your 2-day trial now to join?`
-      );
       state.pendingRoomPrompted = true;
-      if (!shouldStartTrial) {
-        setStatus('Invite requires trial or paid plan. Start your trial to continue.', true);
-        return;
-      }
-
-      setStatus('Starting your 2-day trial from invite...');
-      const next = await startTrialIfEligible(state.authUser);
-      state.entitlement = {
-        ...state.entitlement,
-        ...next
-      };
-      applyEntitlementCopy();
-
-      if (!canUseMultiplayer(state.entitlement)) {
-        setStatus('Trial start did not unlock multiplayer yet. Refresh and try again.', true);
-        return;
-      }
-
+      setStatus(`Invite accepted. Joining room ${inviteCode}...`);
       setInputCode(refs, inviteCode);
       await handleJoinRoom(inviteCode);
     } catch (err) {
@@ -1776,15 +1713,15 @@ function initMultiplayerPlatform() {
     }
 
     if (!allowed) {
-      setStatus('Free plan cannot access multiplayer. Start trial or upgrade to Supporter/Pro.', true);
-      setBrowseStatus('Browsing public rooms is available. Joining requires trial or paid plan.');
+      setStatus('Signed in, but multiplayer access is still syncing. Retry in a moment.', true);
+      setBrowseStatus('Access is syncing for this session. Try again shortly.');
       return;
     }
 
     if (state.currentRoom) {
       setStatus(`Multiplayer active in room ${state.currentRoom.code}.`);
     } else {
-      setStatus('Multiplayer unlocked. Create or join a room.');
+      setStatus('Multiplayer ready. Create or join a room.');
     }
 
     if (!state.browseRooms.length) {
@@ -1920,43 +1857,18 @@ function initMultiplayerPlatform() {
       }
     });
 
-    const openTrialOrBilling = async () => {
+    const openAccountCenter = async () => {
       if (!state.authUser) {
         const signInBtn = document.getElementById('appSignInBtn');
         if (signInBtn) signInBtn.click();
-        setStatus('Sign in first, then start your trial from the app or landing page.');
+        setStatus('Sign in first to use multiplayer rooms.');
         return;
       }
-
-      if (canUseMultiplayer(state.entitlement)) {
-        window.location.assign('../account/');
-        return;
-      }
-
-      setStatus('Starting your 2-day trial...');
-      try {
-        const next = await startTrialIfEligible(state.authUser);
-        state.entitlement = {
-          ...state.entitlement,
-          ...next
-        };
-        applyEntitlementCopy();
-
-        if (canUseMultiplayer(state.entitlement)) {
-          setStatus('Trial activated. Multiplayer unlocked.');
-          await refreshFeaturedRooms(true);
-          return;
-        }
-
-        setStatus('Trial did not unlock multiplayer yet. Open Account to verify your plan.', true);
-      } catch (err) {
-        const message = err?.message || 'Could not start trial right now. Open Account to upgrade.';
-        setStatus(message, true);
-      }
+      window.location.assign('../account/');
     };
 
-    refs.titleTrialBtn?.addEventListener('click', openTrialOrBilling);
-    refs.roomPanelTrialBtn?.addEventListener('click', openTrialOrBilling);
+    refs.titleTrialBtn?.addEventListener('click', openAccountCenter);
+    refs.roomPanelTrialBtn?.addEventListener('click', openAccountCenter);
 
     refs.titleBrowseBtn?.addEventListener('click', handleBrowseRooms);
     refs.titleFeaturedRefreshBtn?.addEventListener('click', () => refreshFeaturedRooms(false));
@@ -2138,7 +2050,7 @@ function initMultiplayerPlatform() {
         plan: String(detail.plan || state.entitlement.plan || 'free').toLowerCase(),
         planLabel: String(detail.planLabel || state.entitlement.planLabel || 'Free')
       };
-      if (!canUseMultiplayer(state.entitlement) && state.currentRoom) {
+      if (!state.authUser && state.currentRoom) {
         deactivateRoom(true);
       }
       applyEntitlementCopy();

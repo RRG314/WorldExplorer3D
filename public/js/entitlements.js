@@ -7,12 +7,11 @@ import {
   setDoc
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
 import { initFirebase } from './firebase-init.js';
-import { startTrial as requestTrialStart } from './billing.js';
 
 const USERS_COLLECTION = 'users';
 const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
 const ROOM_CREATE_LIMITS = Object.freeze({
-  free: 0,
+  free: 3,
   trial: 3,
   supporter: 3,
   pro: 10
@@ -21,7 +20,7 @@ const ADMIN_TEST_ROOM_CREATE_LIMIT = 10000;
 
 const FREE_ENTITLEMENTS = Object.freeze({
   fullAccess: true,
-  cloudSync: false,
+  cloudSync: true,
   proEarlyAccess: false,
   prioritySupport: false,
   featureConsideration: false,
@@ -343,22 +342,15 @@ async function ensureUserDoc(user, options = {}) {
 
 export async function startTrialIfEligible(user) {
   if (!user) {
-    throw new Error('Sign in to start your trial.');
+    throw new Error('Sign in to continue.');
   }
 
   const services = initFirebase();
   if (!services || !services.db) {
-    throw new Error('Firebase config is missing. Trial cannot start yet.');
+    throw new Error('Firebase config is missing. Account features are unavailable.');
   }
-  await requestTrialStart();
-  for (let attempt = 0; attempt < 6; attempt++) {
-    const state = await ensureEntitlements(user, { preferServer: true });
-    const plan = String(state && state.plan ? state.plan : 'free').toLowerCase();
-    if (state && (state.isAdmin === true || plan === 'trial' || plan === 'supporter' || plan === 'pro')) {
-      return state;
-    }
-    await new Promise((resolve) => setTimeout(resolve, 200 + (attempt * 120)));
-  }
+
+  // Backward-compatible no-op: multiplayer access is now available to any signed-in user.
   return ensureEntitlements(user, { preferServer: true });
 }
 
@@ -442,7 +434,7 @@ export function isProPlan(state) {
 }
 
 export function isSupporterOrTrial(state) {
-  return !!state && (state.plan === 'supporter' || state.plan === 'trial' || state.plan === 'pro' || state.isAdmin === true);
+  return !!state && (state.plan === 'free' || state.plan === 'supporter' || state.plan === 'trial' || state.plan === 'pro' || state.isAdmin === true);
 }
 
 export function formatRemainingTrial(state) {

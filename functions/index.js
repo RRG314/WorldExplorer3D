@@ -11,7 +11,7 @@ const TRIAL_DURATION_MS = 48 * 60 * 60 * 1000;
 const DELETE_ACCOUNT_MAX_AUTH_AGE_SECONDS = 10 * 60;
 const ADMIN_TEST_ROOM_CREATE_LIMIT = 10000;
 const ROOM_CREATE_LIMITS = Object.freeze({
-  free: 0,
+  free: 3,
   trial: 3,
   supporter: 3,
   pro: 10
@@ -102,7 +102,7 @@ function planEntitlements(plan) {
 
   return {
     fullAccess: true,
-    cloudSync: false,
+    cloudSync: true,
     proEarlyAccess: false,
     prioritySupport: false,
     featureConsideration: false,

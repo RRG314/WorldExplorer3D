@@ -370,10 +370,10 @@
       <h1>Account</h1>
       <a href="../app/">Back to App</a>
     </div>
-    <p class="sub">Manage plan status, upgrades, and billing portal access.</p>
+    <p class="sub">Manage your account, optional monthly donations, and multiplayer profile settings.</p>
 
     <section class="panel" id="authPrompt">
-      <p class="hint">Sign in to view and manage your trial or subscription.</p>
+      <p class="hint">Sign in to manage account details, optional donations, and multiplayer identity.</p>
       <div class="actions">
         <button id="signInBtn" class="btn-primary" type="button">Sign In</button>
       </div>
@@ -387,9 +387,9 @@
           <p id="planDetail" class="hint">Core exploration active.</p>
         </article>
         <article class="status-item">
-          <span class="label">Trial</span>
-          <p id="trialLabel" class="value">Not active</p>
-          <p id="trialDetail" class="hint">No trial is currently running.</p>
+          <span class="label">Multiplayer Access</span>
+          <p id="trialLabel" class="value">Sign in required</p>
+          <p id="trialDetail" class="hint">Create and join rooms after signing in.</p>
         </article>
         <article class="status-item">
           <span class="label">Room Quota</span>
@@ -409,10 +409,10 @@
       </div>
 
       <div class="actions">
-        <button id="upgradeSupporterBtn" class="btn-supporter" type="button">Upgrade to Supporter ($1/mo)</button>
-        <button id="upgradeProBtn" class="btn-pro" type="button">Upgrade to Pro ($5/mo)</button>
+        <button id="upgradeSupporterBtn" class="btn-supporter" type="button">Donate as Supporter ($1/mo)</button>
+        <button id="upgradeProBtn" class="btn-pro" type="button">Donate as Pro ($5/mo)</button>
         <button id="enableAdminBtn" class="btn-ghost" type="button">Enable Admin Test Access</button>
-        <button id="manageBillingBtn" class="btn-ghost" type="button">Manage Billing</button>
+        <button id="manageBillingBtn" class="btn-ghost" type="button">Manage Donations</button>
         <button id="refreshAccountBtn" class="btn-ghost" type="button">Refresh Account Data</button>
         <button id="signOutBtn" class="btn-ghost" type="button">Sign Out</button>
         <button id="deleteAccountBtn" class="btn-danger" type="button">Delete Account</button>
@@ -462,19 +462,19 @@
         </article>
         <article class="identity-card">
           <span class="label">Incoming Invites</span>
-          <p class="hint">Open invites in app. Free users can start their 2-day trial directly from an invite.</p>
+          <p class="hint">Open invites in app to jump into rooms. Multiplayer access is available to signed-in accounts.</p>
           <div id="invitesList" class="social-list">
             <div class="receipt-empty">No incoming invites.</div>
           </div>
         </article>
       </div>
 
-      <h2 class="section-title">Billing & Receipts</h2>
+      <h2 class="section-title">Donations & Receipts</h2>
       <div class="identity-grid">
         <article class="identity-card">
-          <span class="label">Subscription Status</span>
+          <span class="label">Donation Status</span>
           <p id="subscriptionStatusValue" class="mono">none</p>
-          <p id="nextBillingValue" class="hint">Next billing: not scheduled.</p>
+          <p id="nextBillingValue" class="hint">Next donation: not scheduled.</p>
           <p id="customerValue" class="hint">Customer: not linked.</p>
         </article>
         <article class="identity-card">
@@ -520,7 +520,7 @@
   <script type="module">
     import { hasFirebaseConfig } from '../js/firebase-init.js?v=55';
     import { ensureSignedIn, observeAuth, signOutUser } from '../js/auth-ui.js?v=55';
-    import { ensureEntitlements, formatRemainingTrial, startTrialIfEligible, subscribeEntitlements } from '../js/entitlements.js?v=70';
+    import { ensureEntitlements, subscribeEntitlements } from '../js/entitlements.js?v=71';
     import {
       enableAdminTester,
       getAccountOverview,
@@ -624,11 +624,6 @@
 
     function normalizeRoomCode(raw) {
       return String(raw || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6);
-    }
-
-    function canUseMultiplayerPlan(plan) {
-      const value = String(plan || '').toLowerCase();
-      return value === 'trial' || value === 'support' || value === 'supporter' || value === 'pro' || value === 'admin';
     }
 
     function inviteJoinUrl(code) {
@@ -788,16 +783,6 @@
         openBtn.dataset.roomCode = roomCode;
         actions.appendChild(openBtn);
 
-        if (!canUseMultiplayerPlan(currentEntitlementState?.plan)) {
-          const trialBtn = document.createElement('button');
-          trialBtn.type = 'button';
-          trialBtn.className = 'btn-primary';
-          trialBtn.textContent = 'Start Trial + Join';
-          trialBtn.dataset.trialInvite = String(invite.id || '');
-          trialBtn.dataset.roomCode = roomCode;
-          actions.appendChild(trialBtn);
-        }
-
         const dismissBtn = document.createElement('button');
         dismissBtn.type = 'button';
         dismissBtn.className = 'btn-ghost';
@@ -826,7 +811,7 @@
       uidValue.textContent = '-';
       providersValue.textContent = 'Sign-in providers: -';
       subscriptionStatusValue.textContent = 'none';
-      nextBillingValue.textContent = 'Next billing: not scheduled.';
+      nextBillingValue.textContent = 'Next donation: not scheduled.';
       customerValue.textContent = 'Customer: not linked.';
       roomQuotaLabel.textContent = '0 / 0';
       roomQuotaDetail.textContent = 'Rooms created from this account.';
@@ -879,7 +864,7 @@
         periodLine.className = 'receipt-meta';
         const start = formatDateTime(receipt.periodStartMs);
         const end = formatDateTime(receipt.periodEndMs);
-        periodLine.textContent = start && end ? `${start} to ${end}` : 'Billing period unavailable';
+        periodLine.textContent = start && end ? `${start} to ${end}` : 'Donation period unavailable';
         middle.appendChild(amountLine);
         middle.appendChild(periodLine);
 
@@ -937,12 +922,12 @@
       uidValue.textContent = String(overview?.uid || signedInUser?.uid || '-');
       providersValue.textContent = `Sign-in providers: ${providers}`;
       subscriptionStatusValue.textContent = status;
-      nextBillingValue.textContent = nextBilling ? `Next billing: ${nextBilling}.` : 'Next billing: not scheduled.';
+      nextBillingValue.textContent = nextBilling ? `Next donation: ${nextBilling}.` : 'Next donation: not scheduled.';
       customerValue.textContent = overview?.stripeCustomerId ? `Customer: ${overview.stripeCustomerId}` : 'Customer: not linked.';
       roomQuotaLabel.textContent = `${roomCreateCount} / ${roomCreateLimit}`;
       roomQuotaDetail.textContent = roomCreateLimit > 0
-        ? `You can create ${Math.max(0, roomCreateLimit - roomCreateCount)} more room${roomCreateLimit - roomCreateCount === 1 ? '' : 's'} on this plan.`
-        : 'Room creation requires multiplayer trial or paid plan.';
+        ? `You can create ${Math.max(0, roomCreateLimit - roomCreateCount)} more room${roomCreateLimit - roomCreateCount === 1 ? '' : 's'} on this account before limit reset or plan change.`
+        : 'Room creation limit is currently unavailable.';
       adminAccessLabel.textContent = isAdmin ? 'On' : 'Off';
       adminAccessDetail.textContent = isAdmin
         ? 'Admin test access is active on this account.'
@@ -958,11 +943,13 @@
 
       if (!hasFirebaseConfig()) {
         planLabel.textContent = 'Free';
-        planDetail.textContent = 'Firebase config is missing. Add config to enable trial and billing.';
+        planDetail.textContent = 'Firebase config is missing. Add config to enable account features.';
         trialLabel.textContent = 'Unavailable';
-        trialDetail.textContent = 'Set WORLD_EXPLORER_FIREBASE to enable account features.';
+        trialDetail.textContent = 'Set WORLD_EXPLORER_FIREBASE to enable account and multiplayer features.';
         setStatus('Missing Firebase config (WORLD_EXPLORER_FIREBASE).', 'warn');
       } else {
+        trialLabel.textContent = 'Sign in required';
+        trialDetail.textContent = 'Create and join multiplayer rooms after signing in.';
         setStatus('Sign in to manage your account.', 'neutral');
       }
       currentAdminTesterEligible = false;
@@ -976,13 +963,13 @@
       if (state.isAdmin === true || state.subscriptionStatus === 'admin') {
         planDetail.textContent = 'Admin test access active with full multiplayer and elevated room quota.';
       } else if (state.plan === 'pro') {
-        planDetail.textContent = 'Pro perks unlocked, including early demos and priority communication.';
+        planDetail.textContent = 'Pro donation active. Early demos and priority communication are enabled.';
       } else if (state.plan === 'supporter') {
-        planDetail.textContent = 'Supporter active with full access and cloud sync.';
+        planDetail.textContent = 'Supporter donation active. Full gameplay and multiplayer remain open to everyone.';
       } else if (state.plan === 'trial') {
-        planDetail.textContent = 'Trial active with full access (Pro-only perks disabled).';
+        planDetail.textContent = 'Legacy trial state detected. Multiplayer is open while signed in.';
       } else {
-        planDetail.textContent = 'Free plan: core exploration with local-only saves.';
+        planDetail.textContent = 'Free plan: full gameplay and multiplayer access while signed in. Donations are optional.';
       }
 
       if (state.isAdmin === true || state.subscriptionStatus === 'admin' || state.plan === 'pro') {
@@ -990,20 +977,14 @@
         extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover (Pro early access queue).';
       } else if (state.plan === 'supporter' || state.plan === 'trial') {
         extrasLabel.textContent = 'Preview';
-        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Upgrade to Pro for early access.';
+        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Upgrade to Pro donation for early access.';
       } else {
         extrasLabel.textContent = 'Locked';
-        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover.';
+        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Pro donation unlocks early access.';
       }
 
-      if (state.plan === 'trial') {
-        const remaining = formatRemainingTrial(state);
-        trialLabel.textContent = remaining === 'expired' ? 'Expired' : 'Active';
-        trialDetail.textContent = remaining && remaining !== 'expired' ? `${remaining}.` : 'Trial expired. Upgrade to keep premium perks.';
-      } else {
-        trialLabel.textContent = 'Not active';
-        trialDetail.textContent = 'No trial currently running.';
-      }
+      trialLabel.textContent = 'Available';
+      trialDetail.textContent = 'Signed-in account can create and join multiplayer rooms.';
 
       const adminMode = state.isAdmin === true || state.subscriptionStatus === 'admin';
       upgradeSupporterBtn.disabled = adminMode || state.plan === 'supporter' || state.plan === 'pro';
@@ -1319,22 +1300,6 @@
         return;
       }
 
-      const trialBtn = target.closest('button[data-trial-invite]');
-      if (trialBtn instanceof HTMLElement) {
-        const inviteId = String(trialBtn.dataset.trialInvite || '').trim();
-        const roomCode = normalizeRoomCode(trialBtn.dataset.roomCode || '');
-        if (!inviteId || !roomCode) return;
-        try {
-          await startTrialIfEligible(signedInUser);
-          await refreshAccountData({ silent: true });
-          await markInviteSeen(inviteId, true);
-          window.location.assign(inviteJoinUrl(roomCode));
-        } catch (err) {
-          setSocialStatus(err?.message || 'Could not start trial from invite.', 'warn');
-        }
-        return;
-      }
-
       const dismissBtn = target.closest('button[data-dismiss-invite]');
       if (dismissBtn instanceof HTMLElement) {
         const inviteId = String(dismissBtn.dataset.dismissInvite || '').trim();
@@ -1381,7 +1346,7 @@
     upgradeSupporterBtn.addEventListener('click', async () => {
       if (!signedInUser) return;
       setBusy(true);
-      setStatus('Opening Stripe Checkout for Supporter...');
+      setStatus('Opening Supporter donation checkout...');
       try {
         await redirectToCheckout('supporter');
       } catch (err) {
@@ -1394,7 +1359,7 @@
     upgradeProBtn.addEventListener('click', async () => {
       if (!signedInUser) return;
       setBusy(true);
-      setStatus('Opening Stripe Checkout for Pro...');
+      setStatus('Opening Pro donation checkout...');
       try {
         await redirectToCheckout('pro');
       } catch (err) {
@@ -1407,21 +1372,21 @@
     manageBillingBtn.addEventListener('click', async () => {
       if (!signedInUser) return;
       setBusy(true);
-      setStatus('Opening billing portal...');
+      setStatus('Opening donations portal...');
       try {
         await redirectToPortal();
       } catch (err) {
         console.error('[account] Portal failed:', err);
-        setStatus(err && err.message ? err.message : 'Could not open billing portal.', 'warn');
+        setStatus(err && err.message ? err.message : 'Could not open donations portal.', 'warn');
         setBusy(false);
       }
     });
 
     const checkoutStatus = new URLSearchParams(window.location.search).get('checkout');
     if (checkoutStatus === 'success') {
-      setStatus('Checkout complete. Plan updates can take a few seconds after webhook processing.', 'ok');
+      setStatus('Donation checkout complete. Account updates can take a few seconds after webhook processing.', 'ok');
     } else if (checkoutStatus === 'cancel') {
-      setStatus('Checkout canceled. No changes were made.', 'warn');
+      setStatus('Donation checkout canceled. No changes were made.', 'warn');
     }
 
     if (!hasFirebaseConfig()) {

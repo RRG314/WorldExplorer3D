@@ -1533,3 +1533,40 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
       - Script: `scripts/tmp_open_saved_room_e2e.mjs`
       - Report: `output/playwright/open-saved-room-e2e-1772211966136/report.json`
       - Key result: create `78CWVT` -> leave -> open saved room -> status `Connected to joined room: 78CWVT`.
+- Monaco/steep-terrain building grounding pass (2026-02-28):
+  - Root issue: building bases were anchored to average footprint elevation and foundation skirts sampled only edge endpoints, leaving visible floating gaps on inclined terrain.
+  - Updated `createBuildingGroundPatch` (`app/js/engine.js`, `public/app/js/engine.js`, `js/engine.js`):
+    - foundation skirt now subdivides each footprint edge (`maxSkirtSegmentLength=2.0`) and samples terrain per segment for terrain-conforming skirts,
+    - increased adaptive embed depth on steep transitions to prevent terrain peeking.
+  - Updated building base placement (`app/js/world.js`, `public/app/js/world.js`, `js/world.js`):
+    - slope-aware base now anchors sloped buildings to `minElevation + 0.05` (instead of avg elevation),
+    - collider baseY and building-ground patch alignment updated to the same base elevation,
+    - retained `terrainAvgElevation` in userData for diagnostics.
+- Validation:
+  - `node --check` passed for updated engine/world files in app/public/root copies.
+  - Monaco screenshot probe refreshed: `output/playwright/monaco-grounding-probe/monaco-ingame.png` shows reduced floating-band artifact on hillside buildings.
+  - Skill client run completed (`output/playwright/building-grounding-client-v2/`) but still captures black canvas in this environment; direct Playwright full-page screenshot used for visual verification.
+
+- Donation-model + free multiplayer documentation alignment pass (2026-02-28):
+  - Runtime behavior updated to match user request:
+    - Signed-in free users can create/join multiplayer rooms.
+    - Optional monthly donations retained (`Supporter $1`, `Pro $5`).
+    - Pro keeps early-access positioning.
+  - Code updates:
+    - `js/entitlements.js` (+ mirrored `public/js/entitlements.js`): free quota raised to 3, cloud sync enabled, legacy trial start path made backward-compatible no-op.
+    - `app/js/multiplayer/rooms.js` (+ mirrored public copy): free room-create limit raised to 3, entitlement gating/messages updated.
+    - `app/js/multiplayer/ui-room.js` (+ mirrored public copy): removed trial activation flow from multiplayer UI; sign-in is now the multiplayer gate.
+    - `app/index.html` (+ mirrored public copy): removed trial activation messaging/logic; updated account/donation CTA copy.
+    - `account/index.html` (+ mirrored public copy): updated account page to donation language and multiplayer-available status.
+    - `firestore.rules`: multiplayer entitlement now sign-in based; free room plan limit set to 3.
+    - `functions/index.js`: free room limit set to 3; free entitlements include cloud sync.
+  - Cache-bust import alignment:
+    - bumped entitlements imports to `?v=71`.
+    - bumped multiplayer rooms module imports to `rooms.js?v=66`.
+    - bumped multiplayer UI entry import to `ui-room.js?v=72` via app-entry.
+  - Documentation refresh:
+    - rewrote `README.md`, `USER_GUIDE.md`, `QUICKSTART.md`, `ARCHITECTURE.md`, `TECHNICAL_DOCS.md`, `API_SETUP.md`, `SECURITY_STORAGE_NOTICE.md`, `DOCUMENTATION_INDEX.md`, and `CHANGELOG.md`.
+    - added new inventory report: `COMPLETE_INVENTORY_REPORT_2026-02-28.md`.
+  - Verification:
+    - `node --check` passed for changed JS files.
+    - `npm test` passed: `40/40` Firestore security checks.

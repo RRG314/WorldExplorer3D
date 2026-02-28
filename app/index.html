@@ -774,7 +774,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
     <div id="proAccessState" class="pro-access-state">Upcoming</div>
   </div>
   <div class="pro-access-note">Upcoming demo soon available: Mars Rover.</div>
-  <button id="upgradeFromAppBtn" class="pro-access-btn" type="button">Upgrade to Pro in Account</button>
+  <button id="upgradeFromAppBtn" class="pro-access-btn" type="button">Open Account & Donations</button>
   <div id="proAccessStatus"></div>
 </aside>
 <div id="titleScreen">
@@ -888,7 +888,7 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <button id="mpTitleLeaveBtn" class="mp-btn secondary" type="button">Leave</button>
 </div>
 <div class="mp-row">
-<button id="mpTitleTrialBtn" class="mp-btn warn" type="button">Start Trial / Upgrade</button>
+<button id="mpTitleTrialBtn" class="mp-btn warn" type="button">Account / Donations</button>
 </div>
 <div id="mpTitleStatus" class="mp-status"></div>
 
@@ -1651,7 +1651,7 @@ Explore the area
       <div class="mp-row">
         <button id="roomPanelInviteBtn" class="mp-btn secondary" type="button">Invite Link</button>
         <button id="roomPanelLeaveBtn" class="mp-btn secondary" type="button">Leave Room</button>
-        <button id="roomPanelTrialBtn" class="mp-btn warn" type="button">Trial / Upgrade</button>
+        <button id="roomPanelTrialBtn" class="mp-btn warn" type="button">Account / Donations</button>
       </div>
       <div class="room-player-head">
         <span>Players Live</span>
@@ -1761,11 +1761,9 @@ import {
 } from '../js/auth-ui.js?v=55';
 import {
   ensureEntitlements,
-  formatRemainingTrial,
   getFreeEntitlementsState,
-  startTrialIfEligible,
   subscribeEntitlements
-} from '../js/entitlements.js?v=70';
+} from '../js/entitlements.js?v=71';
 
 const appSignInBtn = document.getElementById('appSignInBtn');
 const proAccessPanel = document.getElementById('proAccessPanel');
@@ -1791,11 +1789,6 @@ const authGoogleBtn = document.getElementById('authGoogleBtn');
 const authForgotBtn = document.getElementById('authForgotBtn');
 const authPanelStatus = document.getElementById('authPanelStatus');
 
-const urlParams = new URLSearchParams(window.location.search);
-const wantsTrial = urlParams.get('startTrial') === '1';
-
-let attemptedTrialSignIn = false;
-let attemptedTrialActivation = false;
 let unsubscribeEntitlements = null;
 let currentState = getFreeEntitlementsState();
 let authMode = 'signin';
@@ -1892,7 +1885,6 @@ function renderState(state, user) {
 
   const plan = currentState.plan || 'free';
   const adminMode = currentState.isAdmin === true || currentState.subscriptionStatus === 'admin';
-  const trialText = plan === 'trial' ? ` (${formatRemainingTrial(currentState) || 'active'})` : '';
 
   const signedIn = !!user;
   appSignInBtn.textContent = signedIn ? 'Account' : 'Sign In / Sign Up';
@@ -1900,24 +1892,24 @@ function renderState(state, user) {
   authSignedInBlock.hidden = !signedIn;
   if (signedIn) {
     const summaryName = user.displayName || user.email || 'Signed In';
-    authUserSummary.textContent = `${summaryName} • ${(currentState.planLabel || 'Free')}${trialText}`;
+    authUserSummary.textContent = `${summaryName} • ${(currentState.planLabel || 'Free')}`;
   } else {
     authUserSummary.textContent = '';
   }
 
   const isPro = adminMode || plan === 'pro';
   scheduleProPanelAutoHide();
-  proAccessState.textContent = isPro ? 'Pro Early Access' : 'Locked (Pro only)';
+  proAccessState.textContent = isPro ? 'Pro Early Access' : 'Optional Pro Donation';
   upgradeFromAppBtn.style.display = isPro ? 'none' : 'inline-flex';
 
   if (adminMode) {
     setProStatus('Admin test mode active. Upcoming demo soon available: Mars Rover.');
   } else if (isPro) {
     setProStatus('Pro access active. Upcoming demo soon available: Mars Rover.');
-  } else if (plan === 'supporter' || plan === 'trial') {
-    setProStatus('Full access active. Upgrade to Pro for upcoming early demo access (Mars Rover).');
+  } else if (plan === 'supporter') {
+    setProStatus('Supporter donation active. Multiplayer stays open for everyone; Pro adds early demo access.');
   } else {
-    setProStatus('Free plan active. Multiplayer is locked until trial or upgrade.');
+    setProStatus('All signed-in players can use multiplayer. Optional donations keep solo-dev updates shipping.');
   }
 
   updateAuthOverlayVisibility();
@@ -1933,9 +1925,6 @@ function clearEntitlementSubscription() {
 async function applySignedOutState() {
   clearEntitlementSubscription();
   renderState(getFreeEntitlementsState(), null);
-  if (wantsTrial && hasFirebaseConfig()) {
-    setProStatus('Sign in to activate your 2-day trial.');
-  }
 }
 
 async function applySignedInState(user) {
@@ -1945,28 +1934,6 @@ async function applySignedInState(user) {
   unsubscribeEntitlements = subscribeEntitlements(user, (nextState) => {
     renderState(nextState, user);
   });
-}
-
-async function activateTrialFromUrlIfNeeded(user) {
-  if (!wantsTrial || !user || attemptedTrialActivation) return;
-  attemptedTrialActivation = true;
-
-  try {
-    const nextState = await startTrialIfEligible(user);
-    renderState(nextState, user);
-    if (nextState.plan === 'trial') {
-      setAuthStatus('2-day trial activated. Multiplayer is now unlocked.');
-      setProStatus(`Trial active (${formatRemainingTrial(nextState) || 'active'}). Upgrade to keep multiplayer after trial.`);
-    } else if (nextState.plan === 'supporter' || nextState.plan === 'pro') {
-      setAuthStatus('Paid plan already active. Multiplayer is unlocked.');
-    } else {
-      setAuthStatus('Trial was not activated.', true);
-    }
-  } catch (err) {
-    const message = err && err.message ? err.message : 'Could not start trial right now.';
-    setAuthStatus(message, true);
-    setProStatus(message, true);
-  }
 }
 
 appSignInBtn.addEventListener('click', (event) => {
@@ -2084,26 +2051,20 @@ if (!hasFirebaseConfig()) {
   setAuthStatus('Missing Firebase config. Auth is disabled until config loads.', true);
 }
 
-if (wantsTrial) {
+if (new URLSearchParams(window.location.search).get('startTrial') === '1') {
   const cleanUrl = `${window.location.pathname}${window.location.hash || ''}`;
   window.history.replaceState({}, '', cleanUrl);
-  setAuthStatus('Use Sign In / Sign Up to activate your 2-day trial.');
+  setAuthStatus('Sign in to use multiplayer. Donations are optional in Account.');
 }
 
 observeAuth(async (user) => {
   if (!user) {
     await applySignedOutState();
-    if (wantsTrial && hasFirebaseConfig() && !attemptedTrialSignIn) {
-      attemptedTrialSignIn = true;
-      setAuthMode('signup');
-      setProStatus('Sign in or sign up from the top-left button to activate your 2-day trial.');
-    }
     return;
   }
 
   try {
     await applySignedInState(user);
-    await activateTrialFromUrlIfNeeded(user);
   } catch (err) {
     console.error('[app] failed to load entitlements:', err);
     setProStatus('Failed to load account plan. Using local free mode.', true);
@@ -2120,5 +2081,5 @@ if (titleScreenObserverTarget) {
   titleObserver.observe(titleScreenObserverTarget, { attributes: true, attributeFilter: ['class'] });
 }
 </script>
-<script type="module" src="js/bootstrap.js?v=70"></script>
+<script type="module" src="js/bootstrap.js?v=71"></script>
 </body></html>
