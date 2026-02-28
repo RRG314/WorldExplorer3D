@@ -1276,6 +1276,42 @@ function decimatePoints(pts, maxPoints, preserveClosedRing = false) {
   return out;
 }
 
+function isFiniteWorldPointXZ(point) {
+  return !!point &&
+  Number.isFinite(point.x) &&
+  Number.isFinite(point.z);
+}
+
+function sanitizeWorldFootprintPoints(pts, minArea = 1) {
+  if (!Array.isArray(pts) || pts.length < 3) return [];
+  const cleaned = [];
+
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    if (!isFiniteWorldPointXZ(p)) continue;
+
+    if (cleaned.length > 0) {
+      const prev = cleaned[cleaned.length - 1];
+      if (Math.hypot(p.x - prev.x, p.z - prev.z) <= 1e-4) {
+        continue;
+      }
+    }
+    cleaned.push({ x: p.x, z: p.z });
+  }
+
+  if (cleaned.length >= 2) {
+    const first = cleaned[0];
+    const last = cleaned[cleaned.length - 1];
+    if (Math.hypot(first.x - last.x, first.z - last.z) <= 1e-4) {
+      cleaned.pop();
+    }
+  }
+
+  if (cleaned.length < 3) return [];
+  if (Math.abs(signedPolygonAreaXZ(cleaned)) < minArea) return [];
+  return cleaned;
+}
+
 function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
   if (!Array.isArray(verts) || verts.length === 0) return;
   const baseVertex = targetVerts.length / 3;
@@ -1290,6 +1326,15 @@ function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
       targetIndices.push(baseVertex + i);
     }
   }
+}
+
+function geometryHasFinitePositions(geometry) {
+  const arr = geometry?.attributes?.position?.array;
+  if (!arr || !Number.isFinite(arr.length)) return false;
+  for (let i = 0; i < arr.length; i++) {
+    if (!Number.isFinite(arr[i])) return false;
+  }
+  return true;
 }
 
 function materialBatchKey(material) {
@@ -1327,24 +1372,45 @@ function appendGeometryWithTransform(batch, geometry, matrix) {
   const normAttr = geometry.attributes.normal;
   const uvAttr = geometry.attributes.uv;
   const baseVertex = batch.positions.length / 3;
+  const startPos = batch.positions.length;
+  const startNormals = batch.normals.length;
+  const startUvs = batch.uvs.length;
+  const startIdx = batch.indices.length;
 
   const normalMatrix = new THREE.Matrix3().getNormalMatrix(matrix);
   const v = new THREE.Vector3();
   const n = new THREE.Vector3();
 
+  const rollback = () => {
+    batch.positions.length = startPos;
+    batch.normals.length = startNormals;
+    batch.uvs.length = startUvs;
+    batch.indices.length = startIdx;
+  };
+
   for (let i = 0; i < posAttr.count; i++) {
     v.fromBufferAttribute(posAttr, i).applyMatrix4(matrix);
+    if (!Number.isFinite(v.x) || !Number.isFinite(v.y) || !Number.isFinite(v.z)) {
+      rollback();
+      return -1;
+    }
     batch.positions.push(v.x, v.y, v.z);
 
     if (normAttr) {
       n.fromBufferAttribute(normAttr, i).applyMatrix3(normalMatrix).normalize();
-      batch.normals.push(n.x, n.y, n.z);
+      if (Number.isFinite(n.x) && Number.isFinite(n.y) && Number.isFinite(n.z)) {
+        batch.normals.push(n.x, n.y, n.z);
+      } else {
+        batch.normals.push(0, 1, 0);
+      }
     } else {
       batch.normals.push(0, 1, 0);
     }
 
     if (uvAttr) {
-      batch.uvs.push(uvAttr.getX(i), uvAttr.getY(i));
+      const u = uvAttr.getX(i);
+      const vUv = uvAttr.getY(i);
+      batch.uvs.push(Number.isFinite(u) ? u : 0, Number.isFinite(vUv) ? vUv : 0);
     } else {
       batch.uvs.push(0, 0);
     }
@@ -1353,7 +1419,12 @@ function appendGeometryWithTransform(batch, geometry, matrix) {
   if (geometry.index) {
     const indexArr = geometry.index.array;
     for (let i = 0; i < indexArr.length; i++) {
-      batch.indices.push(indexArr[i] + baseVertex);
+      const idx = Number(indexArr[i]);
+      if (!Number.isFinite(idx) || idx < 0 || idx >= posAttr.count) {
+        rollback();
+        return -1;
+      }
+      batch.indices.push(idx + baseVertex);
     }
   } else {
     for (let i = 0; i < posAttr.count; i++) {
@@ -1366,13 +1437,30 @@ function appendGeometryWithTransform(batch, geometry, matrix) {
 
 function buildMergedGeometry(batch) {
   if (!batch.positions.length || !batch.indices.length) return null;
+  if (batch.positions.length % 3 !== 0 || batch.normals.length % 3 !== 0 || batch.uvs.length % 2 !== 0) return null;
+  if (batch.normals.length !== batch.positions.length) return null;
+  if (batch.uvs.length !== batch.positions.length / 3 * 2) return null;
+
+  for (let i = 0; i < batch.positions.length; i++) {
+    if (!Number.isFinite(batch.positions[i])) return null;
+  }
+  for (let i = 0; i < batch.normals.length; i++) {
+    if (!Number.isFinite(batch.normals[i])) return null;
+  }
+  for (let i = 0; i < batch.uvs.length; i++) {
+    if (!Number.isFinite(batch.uvs[i])) return null;
+  }
+  const vertexCount = batch.positions.length / 3;
+  for (let i = 0; i < batch.indices.length; i++) {
+    const idx = batch.indices[i];
+    if (!Number.isFinite(idx) || idx < 0 || idx >= vertexCount) return null;
+  }
 
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(batch.positions, 3));
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(batch.normals, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(batch.uvs, 2));
 
-  const vertexCount = batch.positions.length / 3;
   const indexArray = vertexCount > 65535 ? new Uint32Array(batch.indices) : new Uint16Array(batch.indices);
   geometry.setIndex(new THREE.BufferAttribute(indexArray, 1));
   geometry.computeBoundingSphere();
@@ -1433,12 +1521,18 @@ function batchNearLodBuildingMeshes() {
       }
 
       const batch = { positions: [], normals: [], uvs: [], indices: [] };
+      const sourceMeshes = [];
       xzPoints.length = 0;
 
       for (let i = 0; i < group.meshes.length; i++) {
         const mesh = group.meshes[i];
         mesh.updateMatrixWorld(true);
-        appendGeometryWithTransform(batch, mesh.geometry, mesh.matrixWorld);
+        const appendCount = appendGeometryWithTransform(batch, mesh.geometry, mesh.matrixWorld);
+        if (appendCount <= 0) {
+          keep.push(mesh);
+          continue;
+        }
+        sourceMeshes.push(mesh);
 
         let cx = Number.isFinite(mesh.position?.x) ? mesh.position.x : 0;
         let cz = Number.isFinite(mesh.position?.z) ? mesh.position.z : 0;
@@ -1463,9 +1557,14 @@ function batchNearLodBuildingMeshes() {
         xzPoints.push({ x: cx, z: cz });
       }
 
+      if (sourceMeshes.length < 2) {
+        keep.push(...sourceMeshes);
+        return;
+      }
+
       const geometry = buildMergedGeometry(batch);
       if (!geometry) {
-        keep.push(...group.meshes);
+        keep.push(...sourceMeshes);
         return;
       }
 
@@ -1495,7 +1594,7 @@ function batchNearLodBuildingMeshes() {
         lodTier: group.lodTier || 'near',
         isBuildingBatch: true,
         isNearBuildingBatch: true,
-        batchCount: group.meshes.length,
+        batchCount: sourceMeshes.length,
         lodCenter: { x: centerX, z: centerZ },
         lodRadius: maxRadius
       };
@@ -1503,13 +1602,13 @@ function batchNearLodBuildingMeshes() {
       appCtx.scene.add(mergedMesh);
       batchedMeshes.push(mergedMesh);
 
-      for (let i = 0; i < group.meshes.length; i++) {
-        const src = group.meshes[i];
+      for (let i = 0; i < sourceMeshes.length; i++) {
+        const src = sourceMeshes[i];
         appCtx.scene.remove(src);
         if (src.geometry) src.geometry.dispose();
         if (src.material) src.material.dispose();
       }
-      sourceMeshCount += group.meshes.length;
+      sourceMeshCount += sourceMeshes.length;
     });
 
     if (!batchedMeshes.length) {
@@ -2603,7 +2702,8 @@ async function loadRoads(retryPass = 0) {
       const lodMidDist = lodThresholds.mid;
 
       buildingWays.forEach((way) => {
-        const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
+        const rawPts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
+        const pts = sanitizeWorldFootprintPoints(rawPts, 1);
         if (pts.length < 3) return;
         if (!isBuildingNearLoadedRoad(pts)) return;
 
@@ -2646,18 +2746,9 @@ async function loadRoads(retryPass = 0) {
           height = 8 + br1 * 12;
         }
 
-        const colliderDetail = useRdtBudgeting && lodTier !== 'near' ? 'bbox' : 'full';
         const bt = way.tags.building || 'yes';
         const sourceBuildingId = way.id ? String(way.id) : `osm-${Math.round(centerX * 10)}-${Math.round(centerZ * 10)}`;
-        const colliderRef = registerBuildingCollision(pts, height, {
-          detail: colliderDetail,
-          centerX,
-          centerZ,
-          sourceBuildingId,
-          buildingType: bt
-        });
-        if (colliderDetail === 'full') loadMetrics.colliders.full += 1;else
-        loadMetrics.colliders.simplified += 1;
+        const colliderDetail = useRdtBudgeting && lodTier !== 'near' ? 'bbox' : 'full';
 
         // Calculate terrain stats for building footprint
         let avgElevation = 0;
@@ -2693,6 +2784,10 @@ async function loadRoads(retryPass = 0) {
         };
         const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
         geo.rotateX(-Math.PI / 2);
+        if (!geometryHasFinitePositions(geo)) {
+          geo.dispose();
+          return;
+        }
 
         const sideMaterial = typeof appCtx.getBuildingMaterial === 'function' ?
         appCtx.getBuildingMaterial(bt, bSeed, baseColor) :
@@ -2700,16 +2795,28 @@ async function loadRoads(retryPass = 0) {
         const roofMaterial = getBuildingRoofMaterial(bSeed, bt, isPhotorealBuildingsEnabled());
 
         const mesh = new THREE.Mesh(geo, [roofMaterial, sideMaterial]);
-        mesh.position.y = avgElevation;
+        const baseElevation = slopeRange >= 0.15 ? minElevation + 0.05 : avgElevation;
+        mesh.position.y = baseElevation;
         mesh.userData.buildingFootprint = pts;
-        mesh.userData.avgElevation = avgElevation;
+        mesh.userData.avgElevation = baseElevation;
+        mesh.userData.terrainAvgElevation = avgElevation;
         mesh.userData.lodTier = lodTier;
         mesh.userData.sourceBuildingId = sourceBuildingId;
         mesh.userData.buildingType = bt;
         mesh.castShadow = lodTier === 'near';
         mesh.receiveShadow = true;
+        const colliderRef = registerBuildingCollision(pts, height, {
+          detail: colliderDetail,
+          centerX,
+          centerZ,
+          sourceBuildingId,
+          buildingType: bt,
+          baseY: baseElevation
+        });
+        if (colliderDetail === 'full') loadMetrics.colliders.full += 1;else
+        loadMetrics.colliders.simplified += 1;
         if (colliderRef) {
-          colliderRef.baseY = avgElevation;
+          colliderRef.baseY = baseElevation;
         }
 
         appCtx.scene.add(mesh);
@@ -2721,19 +2828,21 @@ async function loadRoads(retryPass = 0) {
           addPhotorealBuildingDetailMeshes(mesh, bSeed, bt, lodTier);
         }
 
-        // On steep terrain, add a terrain-conforming apron to hide
-        // exposed flat foundation planes around the footprint.
-        if (lodTier === 'near' && typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.7) {
-          const groundPatch = appCtx.createBuildingGroundPatch(pts, avgElevation);
-          if (groundPatch) {
+        // On sloped terrain, add terrain-conforming ground support so building
+        // bases do not appear to float above hills/step terrain.
+        if (lodTier === 'near' && typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.15) {
+          const groundPatchesRaw = appCtx.createBuildingGroundPatch(pts, baseElevation);
+          const groundPatches = Array.isArray(groundPatchesRaw) ? groundPatchesRaw : groundPatchesRaw ? [groundPatchesRaw] : [];
+          groundPatches.forEach((groundPatch) => {
             groundPatch.userData.landuseFootprint = pts;
             groundPatch.userData.landuseType = 'buildingGround';
-            groundPatch.userData.avgElevation = avgElevation;
+            groundPatch.userData.avgElevation = baseElevation;
+            groundPatch.userData.terrainAvgElevation = avgElevation;
             groundPatch.userData.alwaysVisible = true;
             groundPatch.visible = true;
             appCtx.scene.add(groundPatch);
             appCtx.landuseMeshes.push(groundPatch);
-          }
+          });
         }
       });
       endLoadPhase('buildBuildingGeometry');
@@ -3332,12 +3441,14 @@ async function loadRoads(retryPass = 0) {
           const slopeRange = Number.isFinite(minElevation) && Number.isFinite(maxElevation) ?
           maxElevation - minElevation :
           0;
-          mesh.position.y = avgElevation;
+          const baseElevation = slopeRange >= 0.15 ? minElevation + 0.05 : avgElevation;
+          mesh.position.y = baseElevation;
           mesh.userData.buildingFootprint = pts; // Store for repositioning
-          mesh.userData.avgElevation = avgElevation;
+          mesh.userData.avgElevation = baseElevation;
+          mesh.userData.terrainAvgElevation = avgElevation;
           mesh.userData.sourceBuildingId = sourceBuildingId;
           mesh.userData.buildingType = 'fallback';
-          if (colliderRef) colliderRef.baseY = avgElevation;
+          if (colliderRef) colliderRef.baseY = baseElevation;
 
           mesh.castShadow = true;
           mesh.receiveShadow = true;
@@ -3346,17 +3457,19 @@ async function loadRoads(retryPass = 0) {
 
           addPhotorealBuildingDetailMeshes(mesh, detailSeed, 'fallback', 'near');
 
-          if (typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.7) {
-            const groundPatch = appCtx.createBuildingGroundPatch(pts, avgElevation);
-            if (groundPatch) {
+          if (typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.15) {
+            const groundPatchesRaw = appCtx.createBuildingGroundPatch(pts, baseElevation);
+            const groundPatches = Array.isArray(groundPatchesRaw) ? groundPatchesRaw : groundPatchesRaw ? [groundPatchesRaw] : [];
+            groundPatches.forEach((groundPatch) => {
               groundPatch.userData.landuseFootprint = pts;
               groundPatch.userData.landuseType = 'buildingGround';
-              groundPatch.userData.avgElevation = avgElevation;
+              groundPatch.userData.avgElevation = baseElevation;
+              groundPatch.userData.terrainAvgElevation = avgElevation;
               groundPatch.userData.alwaysVisible = true;
               groundPatch.visible = true;
               appCtx.scene.add(groundPatch);
               appCtx.landuseMeshes.push(groundPatch);
-            }
+            });
           }
         };
 
