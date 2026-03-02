@@ -1,68 +1,79 @@
 # Known Issues
 
-Last reviewed: 2026-02-28
+Last reviewed: 2026-03-02
 
 Current risks and follow-up items for this branch.
 
 ## High Priority
 
-### 1. Node Runtime Upgrade
+### 1. Cloud Functions Runtime Upgrade
 
-Cloud Functions are still on Node 20 in this repository.
+Functions are still configured for Node 20 in repo settings.
 
 Required:
 
-- upgrade to Node 22
-- re-test Stripe webhook and account endpoints
+- move to Node 22
+- revalidate billing and webhook paths
+- re-run rules/runtime/release checks after upgrade
 
-### 2. Dual Runtime Maintenance
+### 2. Mirror Drift Risk (`app` vs `public/app`)
 
-Two runtime code paths are maintained (`public/app/js/*` and root `js/*`).
+Canonical runtime is edited in `app/*` but deployment serves `public/*`.
 
 Risk:
 
-- future gameplay/input edits may drift between paths.
+- behavior mismatch if mirror sync is skipped
 
 Mitigation:
 
-- keep mirrored changes and run smoke tests on both hosting modes.
+- always run `npm run sync:public` and `npm run verify:mirror` before deploy
 
 ## Medium Priority
 
-### 3. GitHub Pages Cache Drift
+### 3. External Geocoding Dependence
 
-Users may retain stale module paths after deploys.
+Custom location reverse lookup depends on external providers.
 
-Mitigation:
+Risk:
 
-- hard refresh guidance in docs
-- keep compatibility checks in smoke test routine
-
-### 4. Stripe Mode Mismatch
-
-Test/live key or price mismatches can break checkout.
+- occasional timeout/rate-limit can degrade place naming quality
 
 Mitigation:
 
-- verify Firebase params/env values before deploy (`WE3D_STRIPE_SECRET`, `WE3D_STRIPE_WEBHOOK_SECRET`, `WE3D_STRIPE_PRICE_SUPPORTER`, `WE3D_STRIPE_PRICE_PRO`)
-- inspect function logs after billing tests
+- keep fallback naming path and local favorite-city fallback
+- monitor for repeated provider failures
 
-### 5. Firestore TTL Latency
+### 4. Local Firestore Offline Noise During Browser Automation
 
-TTL cleanup is background and not immediate.
+Some Playwright runs can surface Firestore offline warnings in local environments.
+
+Risk:
+
+- false-negative automation pass flags if logs are treated as strict failures
 
 Mitigation:
 
-- rely on client-side stale filtering for presence/chat UX
-- treat TTL as cost-control cleanup, not real-time state control
+- separate environment/network failures from functional assertions
+- keep targeted feature assertions in reports
+
+### 5. Stripe Environment Mismatch
+
+Incorrect price IDs or webhook/secret values break donation flows.
+
+Mitigation:
+
+- verify all `WE3D_STRIPE_*` variables before deploy
+- verify logs after checkout and webhook events
 
 ## Low Priority
 
-### 6. UI polish backlog
+### 6. Additional Mobile UX Polish
 
-- additional mobile layout polish for account/social panels
-- optional tooltips for room-rule editing and invite flows
+- tighter layout tuning in account/social cards for smaller screens
+- optional hint text for advanced room rules
 
-### 7. Ops automation
+### 7. Post-Deploy Automation Coverage Expansion
 
-- add automated smoke checks for account + multiplayer flows after deploy
+- add automated smoke for signup -> create room -> invite -> accept invite path
+- add automated verification of globe selector favorites delete behavior
+

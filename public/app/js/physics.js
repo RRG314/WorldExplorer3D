@@ -379,7 +379,7 @@ function update(dt) {
   if (braking && spd > 0.5 && canAccelerate) {
     if (earthDriftBrakeIntent) {
       // Handbrake-like brake response: keep momentum so brake+steer can initiate drift.
-      const driftBrakeRate = appCtx.car.onRoad ? 1.8 : 2.4;
+      const driftBrakeRate = appCtx.car.onRoad ? 0.72 : 1.1;
       appCtx.car.speed *= Math.exp(-driftBrakeRate * dt);
     } else {
       appCtx.car.speed *= 1 - appCtx.CFG.brakeForce * dt;
@@ -421,17 +421,17 @@ function update(dt) {
   const steerInput = (left ? 1 : 0) - (right ? 1 : 0);
   const throttleInput = gas && !reverse ? 1 : 0;
 
-  const steerSmooth = 1 - Math.exp(-dt * 10);
+  const steerSmooth = 1 - Math.exp(-dt * 14);
   const throttleSmooth = 1 - Math.exp(-dt * 6);
   appCtx.car.steerSm += (steerInput - appCtx.car.steerSm) * steerSmooth;
   appCtx.car.throttleSm += (throttleInput - appCtx.car.throttleSm) * throttleSmooth;
 
   const spdAbs = Math.abs(appCtx.car.speed);
 
-  const maxSteerLow = 0.65;
-  const maxSteerHigh = 0.16;
+  const maxSteerLow = 0.72;
+  const maxSteerHigh = 0.22;
   const steerFadeMin = 5;
-  const steerFadeMax = 80;
+  const steerFadeMax = 95;
 
   let steerAlpha = 0;
   if (spdAbs > steerFadeMin) {
@@ -439,23 +439,23 @@ function update(dt) {
   }
   const maxSteer = maxSteerLow + (maxSteerHigh - maxSteerLow) * steerAlpha;
 
-  // FIXED: Remove reverseDir inversion for more intuitive reverse steering
-  // In reverse, steering works the same direction (arcade-style, more realistic feel)
-  const steerAngle = appCtx.car.steerSm * maxSteer;
-
   const clamp01 = (n) => Math.max(0, Math.min(1, n));
   const steerMag = Math.abs(appCtx.car.steerSm);
   const speedNorm = clamp01((spdAbs - 8) / 70);
-  const driftStartSteer = 0.16;
-  const driftHoldSteer = 0.08;
-  const driftStartSpeed = appCtx.car.onRoad ? 11 : 13;
-  const driftHoldSpeed = appCtx.car.onRoad ? 6.5 : 8;
+  const handbrakeTurnIntent = !appCtx.onMoon && braking && steerMag >= 0.1 && spdAbs >= 16;
+  const handbrakeSteerBoost = handbrakeTurnIntent ? 1 + (0.20 + 0.35 * speedNorm) : 1;
+  // Reverse steering keeps the same direction (arcade style).
+  const steerAngle = appCtx.car.steerSm * Math.min(0.95, maxSteer * handbrakeSteerBoost);
+  const driftStartSteer = 0.12;
+  const driftHoldSteer = 0.05;
+  const driftStartSpeed = appCtx.car.onRoad ? 8.5 : 11;
+  const driftHoldSpeed = appCtx.car.onRoad ? 5.5 : 7.5;
   const driftStartIntent = !appCtx.onMoon && braking && steerMag >= driftStartSteer && spdAbs >= driftStartSpeed;
 
   if (appCtx.onMoon) {
     appCtx.car._driftHoldTimer = 0;
   } else if (driftStartIntent) {
-    appCtx.car._driftHoldTimer = 0.22;
+    appCtx.car._driftHoldTimer = 0.34;
   } else {
     appCtx.car._driftHoldTimer = Math.max(0, appCtx.car._driftHoldTimer - dt);
   }
@@ -478,7 +478,7 @@ function update(dt) {
   let driftGrip = gripBase;
   if (isDrifting) {
     const brakeGrip = Number(appCtx.CFG.gripBrake || 0.60);
-    const driftGripFloor = Number(appCtx.CFG.gripDrift || 0.45);
+    const driftGripFloor = Number(appCtx.CFG.gripDrift || 0.36);
     const blend = appCtx.car.onRoad ? 0.72 + 0.28 * speedNorm : 0.62 + 0.30 * speedNorm;
     driftGrip = Math.max(driftGripFloor, gripBase * (1 - blend) + brakeGrip * blend);
   }
@@ -497,9 +497,9 @@ function update(dt) {
     yawResponse = (appCtx.car.onRoad ? 4.4 : 2.1) * (0.64 + grip * 0.42);
 
     if (isDrifting) {
-      latDamp *= 0.34;
-      yawDamp *= 0.68;
-      yawResponse *= 1.4;
+      latDamp *= 0.28;
+      yawDamp *= 0.58;
+      yawResponse *= 1.78;
     } else {
       const driftRecovery = Math.max(0, Number(appCtx.CFG.driftRec || 6));
       latDamp += driftRecovery * (appCtx.car.onRoad ? 0.55 : 0.85);
@@ -509,7 +509,10 @@ function update(dt) {
 
   const wheelBase = 2.6;
   const v = appCtx.car.speed;
-  const steerAuthority = appCtx.car.onRoad ? 1.0 : 0.72;
+  let steerAuthority = appCtx.car.onRoad ? 1.02 : 0.76;
+  if (!appCtx.onMoon && (isDrifting || handbrakeTurnIntent)) {
+    steerAuthority *= appCtx.car.onRoad ? 1.22 : 1.1;
+  }
   const yawRateTarget = v / Math.max(1e-3, wheelBase) * Math.tan(steerAngle * steerAuthority);
 
   appCtx.car.yawRate += (yawRateTarget - appCtx.car.yawRate) * (1 - Math.exp(-dt * yawResponse));
@@ -535,9 +538,9 @@ function update(dt) {
   let rearGripDamp = (appCtx.car.onRoad ? 18 : 24) * (0.72 + grip * 0.52);
   if (!appCtx.onMoon) {
     if (isDrifting) {
-      frontGripDamp *= 0.62;
-      rearGripDamp *= 0.22;
-      rearLat += appCtx.car.steerSm * (appCtx.car.onRoad ? 1.6 : 1.1) * (0.5 + 0.5 * speedNorm);
+      frontGripDamp *= 0.90;
+      rearGripDamp *= 0.12;
+      rearLat += appCtx.car.steerSm * (appCtx.car.onRoad ? 2.35 : 1.45) * (0.5 + 0.5 * speedNorm);
     } else if (!appCtx.car.onRoad) {
       // Off-road should feel planted unless drift is explicitly initiated.
       frontGripDamp *= 1.4;
@@ -552,7 +555,7 @@ function update(dt) {
   let slipGain = 0.005 * steerMag * speedNorm;
   if (!appCtx.onMoon) {
     if (isDrifting) {
-      const driftSlip = appCtx.car.onRoad ? 0.042 : 0.03;
+      const driftSlip = appCtx.car.onRoad ? 0.064 : 0.042;
       slipGain = driftSlip * steerMag * (0.45 + 0.55 * speedNorm);
     } else if (appCtx.car.onRoad) {
       slipGain = 0.0012 * steerMag * speedNorm;
@@ -564,16 +567,16 @@ function update(dt) {
 
   if (!appCtx.onMoon && isDrifting) {
     const rearStep = rearLat - frontLat;
-    const rearSlipGain = appCtx.car.onRoad ? 1.05 : 0.68;
-    const steerSlipGain = appCtx.car.onRoad ? 0.74 : 0.46;
+    const rearSlipGain = appCtx.car.onRoad ? 1.38 : 0.88;
+    const steerSlipGain = appCtx.car.onRoad ? 1.05 : 0.62;
     appCtx.car.rearSlip += rearStep * dt * rearSlipGain;
     appCtx.car.rearSlip += appCtx.car.steerSm * dt * steerSlipGain;
-    const rearSlipLimit = appCtx.car.onRoad ? 1.25 : 0.9;
+    const rearSlipLimit = appCtx.car.onRoad ? 1.75 : 1.15;
     appCtx.car.rearSlip = Math.max(-rearSlipLimit, Math.min(rearSlipLimit, appCtx.car.rearSlip));
-    appCtx.car.rearSlip *= Math.exp(-dt * (appCtx.car.onRoad ? 3.8 : 4.8));
-    appCtx.car.yawRate += appCtx.car.rearSlip * (0.62 + 0.28 * speedNorm);
+    appCtx.car.rearSlip *= Math.exp(-dt * (appCtx.car.onRoad ? 3.1 : 4.0));
+    appCtx.car.yawRate += appCtx.car.rearSlip * (0.86 + 0.34 * speedNorm);
     // Keep front axle planted so drift pivots from the rear instead of full-body slide.
-    appCtx.car.vLat *= Math.exp(-dt * (appCtx.car.onRoad ? 3.1 : 4.4));
+    appCtx.car.vLat *= Math.exp(-dt * (appCtx.car.onRoad ? 4.3 : 5.2));
   } else {
     appCtx.car.rearSlip *= Math.exp(-dt * 9.5);
     if (!appCtx.onMoon && !appCtx.car.onRoad) {
@@ -583,14 +586,14 @@ function update(dt) {
   }
 
   if (isDrifting) {
-    const yawKick = appCtx.car.steerSm * (appCtx.car.onRoad ? 0.9 : 0.62) * (0.35 + 0.65 * speedNorm);
-    appCtx.car.yawRate += yawKick * dt * 3.8;
+    const yawKick = appCtx.car.steerSm * (appCtx.car.onRoad ? 1.28 : 0.82) * (0.35 + 0.65 * speedNorm);
+    appCtx.car.yawRate += yawKick * dt * 4.6;
   }
   appCtx.car.isDrifting = isDrifting;
 
   const sinA = Math.sin(appCtx.car.angle),cosA = Math.cos(appCtx.car.angle);
   const lateralVelForPosition = !appCtx.onMoon && isDrifting ?
-  appCtx.car.vLat * 0.28 :
+  appCtx.car.vLat * 0.34 :
   !appCtx.onMoon && !appCtx.car.onRoad ?
   appCtx.car.vLat * 0.58 :
   appCtx.car.vLat;

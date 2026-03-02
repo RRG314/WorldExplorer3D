@@ -137,6 +137,17 @@ async function main() {
     await page.click('.tab-btn[data-tab="games"]');
     await page.click('.mode[data-mode="free"]');
     await page.click('#startBtn', { force: true });
+    const globeVisible = await page.evaluate(() => {
+      const globe = document.getElementById('globeSelectorScreen');
+      return !!(globe && globe.classList.contains('show'));
+    });
+    if (globeVisible) {
+      // Keep runtime invariants stable by seeding the same city used in prior runs.
+      await page.fill('#globeLocationSearch', 'Baltimore, USA');
+      await page.fill('#globeCustomLat', '39.2904');
+      await page.fill('#globeCustomLon', '-76.6122');
+      await page.click('#globeSelectorStartBtn', { force: true });
+    }
     await page.waitForFunction(() => document.getElementById('titleScreen')?.classList.contains('hidden'), { timeout: 60000 });
     await page.click('#exploreBtn');
 

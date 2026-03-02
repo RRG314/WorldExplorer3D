@@ -7,6 +7,7 @@ const targetAppDir = path.join(rootDir, 'public', 'app');
 
 const sourceItems = [
   { rel: 'index.html', type: 'file' },
+  { rel: 'assets', type: 'dir' },
   { rel: 'js', type: 'dir' }
 ];
 

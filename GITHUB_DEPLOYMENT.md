@@ -1,79 +1,79 @@
 # GitHub Deployment Guide
 
-Last reviewed: 2026-02-25
+Last reviewed: 2026-03-02
 
-This guide covers publishing from repository root on GitHub Pages while still using Firebase Auth, Firestore, and Stripe backends.
+Guide for publishing the repository root to GitHub Pages while using Firebase Auth/Firestore/Functions backends.
 
-## 1. Recommended Mode: Branch Root
+## 1. Deployment Mode
 
-Use GitHub Pages with `Deploy from a branch` and `/ (root)`.
+Use GitHub Pages with:
 
-Steps:
+- Source: `Deploy from a branch`
+- Branch: target branch (for example `steven/product`)
+- Folder: `/ (root)`
 
-1. Push your target branch (for example `steven/product`).
-2. In GitHub: `Settings -> Pages`.
-3. `Source: Deploy from a branch`.
-4. Branch: target branch.
-5. Folder: `/ (root)`.
+## 2. Required Files for Pages
 
-Root runtime files used by Pages:
+Root runtime files:
 
 - `index.html`
 - `js/*`
 - `styles.css`
 
-App route files are still required for runtime:
+App/account routes still required in repo:
 
 - `app/index.html`
 - `app/js/*`
+- `account/index.html`
 
-## 2. Firebase Dependencies Still Required
+## 3. Important Mirror Note
 
-Even on GitHub Pages, these remain required:
+Production Firebase hosting serves `public/*`, but Pages serves branch root directly.
+
+Before publishing, ensure app mirror parity:
+
+```bash
+npm run sync:public
+npm run verify:mirror
+```
+
+## 4. Backend Dependencies Still Required
+
+GitHub Pages hosting does not replace Firebase backend services. These still must be live:
 
 - Firebase Auth
 - Firestore
 - Cloud Functions
-- Stripe webhook + prices
+- Stripe webhook integration (if donations enabled)
 
-Ensure Firebase Auth authorized domain includes:
+## 5. Deploy Steps (Typical)
 
-- `rrg314.github.io`
+1. Run release checks:
+   - `npm run release:verify`
+2. Commit and push target branch.
+3. Verify Pages build is published.
+4. Run manual smoke checks:
+   - app load
+   - signup/signin
+   - room create/join/invite
+   - account overview and controls
 
-## 3. Cloud Functions Deployment
+## 6. Firebase Backend Deploy Commands
 
-After backend changes:
+When backend changes are included:
 
 ```bash
-cd "/Users/stevenreid/Documents/New project"
 firebase use worldexplorer3d-d9b83
+firebase deploy --only firestore:rules
+firebase deploy --only firestore:indexes
 firebase deploy --only functions
 ```
 
-## 4. Firestore Deployment
+## 7. Cache Troubleshooting
 
-```bash
-firebase deploy --only firestore:rules
-firebase deploy --only firestore:indexes
-```
+If stale JS appears after deploy:
 
-## 5. Pages Validation Checklist
+1. hard refresh (`Cmd+Shift+R` / `Ctrl+F5`)
+2. clear site data for the Pages domain
+3. reopen page and retry
 
-After publish:
-
-1. Root page loads with no module 404s.
-2. App starts and game modes open.
-3. PaintTown controls:
-   - `Ctrl` fires paintball
-   - right-click camera hold works
-   - double-left-click does not toggle camera mode
-4. Multiplayer panel opens and room actions work.
-5. Account page loads and shows profile/plan/receipt/friends sections.
-
-## 6. Cache Troubleshooting
-
-If you see stale JS path errors:
-
-1. Hard refresh (`Ctrl+F5` or `Cmd+Shift+R`).
-2. Clear site data for the GitHub Pages domain.
-3. Re-open the page.

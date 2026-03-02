@@ -36,6 +36,19 @@ function clampStage(stage) {
   return STAGE_ORDER.includes(stage) ? stage : STAGES.AWAIT_GLOBE;
 }
 
+function normalizeShownStages(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  const out = [];
+  value.forEach((entry) => {
+    const stage = String(entry || '');
+    if (!STAGE_ORDER.includes(stage) || seen.has(stage)) return;
+    seen.add(stage);
+    out.push(stage);
+  });
+  return out;
+}
+
 function safeCall(fn, ...args) {
   if (typeof fn === 'function') {
     try {
@@ -63,7 +76,8 @@ const runtime = {
     selectedLocation: false,
     spawned: false,
     inSpace: false,
-    inMoon: false
+    inMoon: false,
+    shownStages: []
   },
   stageShown: new Set(),
   dismissTimer: 0,
@@ -111,7 +125,8 @@ function loadState() {
       selectedLocation: parsed.selectedLocation === true,
       spawned: parsed.spawned === true,
       inSpace: parsed.inSpace === true,
-      inMoon: parsed.inMoon === true
+      inMoon: parsed.inMoon === true,
+      shownStages: normalizeShownStages(parsed.shownStages)
     };
   } catch {
     return null;
@@ -271,10 +286,15 @@ function showPrompt(stage, config) {
     return;
   }
   if (!config || runtime.stageShown.has(stage)) return;
+  const shownStages = Array.isArray(runtime.state.shownStages) ? runtime.state.shownStages : [];
+  if (shownStages.includes(stage)) return;
   createCardIfNeeded();
   if (!runtime.card || !runtime.titleEl || !runtime.bodyEl || !runtime.actionBtn) return;
 
   runtime.stageShown.add(stage);
+  shownStages.push(stage);
+  runtime.state.shownStages = shownStages;
+  saveState();
   runtime.titleEl.textContent = String(config.title || 'Next Tip');
   runtime.bodyEl.textContent = String(config.body || '');
 
@@ -706,7 +726,8 @@ function restartTutorial() {
     selectedLocation: false,
     spawned: false,
     inSpace: false,
-    inMoon: false
+    inMoon: false,
+    shownStages: []
   };
   runtime.stageShown.clear();
   hidePrompt();

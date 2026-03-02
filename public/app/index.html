@@ -106,11 +106,15 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .globe-selector-city-tabs{display:flex;gap:8px}
 .globe-selector-city-tab{flex:1;border:2px solid #cbd5e1;background:#e2e8f0;color:#475569;border-radius:8px;padding:7px 8px;font-size:12px;font-weight:600;cursor:pointer}
 .globe-selector-city-tab.active{background:#0f3460;color:#ffffff;border-color:#0f3460}
-.globe-selector-city-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:140px;overflow:auto}
+.globe-selector-city-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:200px;overflow:auto}
+.globe-selector-city-section{font-size:10px;font-weight:700;letter-spacing:0.04em;text-transform:uppercase;color:#475569;padding:4px 2px 0}
 .globe-selector-city-item{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#ffffff;border:1px solid #dbe3ef;border-radius:8px;padding:7px 8px;cursor:pointer}
+.globe-selector-city-item-main{display:flex;flex-direction:column;align-items:flex-start;min-width:0;flex:1}
 .globe-selector-city-item:hover{border-color:#667eea;box-shadow:0 0 0 2px rgba(102,126,234,0.12)}
-.globe-selector-city-item-name{font-size:12px;font-weight:600;color:#1e293b}
+.globe-selector-city-item-name{font-size:12px;font-weight:600;color:#1e293b;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .globe-selector-city-item-meta{font-size:10px;color:#64748b}
+.globe-selector-city-delete{border:1px solid #fecaca;background:#fff1f2;color:#b91c1c;border-radius:6px;padding:4px 7px;font-size:10px;font-weight:600;cursor:pointer;flex:0 0 auto}
+.globe-selector-city-delete:hover{background:#ffe4e6}
 .globe-selector-city-empty{font-size:11px;color:#64748b;padding:8px 2px}
 .globe-selector-actions{margin-top:auto;display:flex;gap:8px}
 .globe-selector-action-btn{flex:1;border:none;border-radius:10px;padding:11px 12px;font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
@@ -1232,7 +1236,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fon
   <li class="globe-selector-city-empty">Pick a point on the globe to see nearby cities.</li>
 </ul>
 <div class="globe-selector-actions">
-<button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Back</button>
+<button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Main Menu</button>
 <button id="globeSelectorStartBtn" class="globe-selector-action-btn" type="button">Start Here</button>
 </div>
 </div>

@@ -48,6 +48,7 @@ import {
   removeFriend,
   sendInviteToFriend
 } from './social.js?v=55';
+import { getCurrentUser } from '../../../js/auth-ui.js';
 
 let singleton = null;
 const MAX_PLAN_DISPLAY_NAME_LEN = 48;
@@ -72,6 +73,17 @@ const WEEKLY_CITY_ROTATION = Object.freeze([
   'Las Vegas'
 ]);
 const WEEKLY_ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const BASE_ROOM_CAP_MOBILE = 8;
+const BASE_ROOM_CAP_DESKTOP = 10;
+const HIGH_END_ROOM_CAP_DESKTOP = 12;
+const ROOM_CAP_MIN = 6;
+const ROOM_CAP_MAX = 14;
+
+function emitTutorialEvent(eventName, payload = {}) {
+  if (typeof appCtx.tutorialOnEvent === 'function') {
+    appCtx.tutorialOnEvent(eventName, payload);
+  }
+}
 
 function finiteNumber(value, fallback = 0) {
   const n = Number(value);
@@ -198,6 +210,22 @@ function readPlanState() {
     uid: String(globalState.uid || ''),
     displayName: sanitizeText(globalState.displayName || '', MAX_PLAN_DISPLAY_NAME_LEN)
   };
+}
+
+function getRecommendedRoomCap() {
+  const coarsePointer = typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia('(pointer: coarse)').matches;
+  const mobileLike = coarsePointer || /Android|iPhone|iPad|iPod|Mobile/i.test(String(navigator?.userAgent || ''));
+  const hwThreads = finiteNumber(navigator?.hardwareConcurrency, 4);
+  const memGb = finiteNumber(navigator?.deviceMemory, mobileLike ? 4 : 6);
+  const perfMode = String(appCtx.perfMode || '').toLowerCase();
+
+  let cap = mobileLike ? BASE_ROOM_CAP_MOBILE : BASE_ROOM_CAP_DESKTOP;
+  if (!mobileLike && hwThreads >= 8 && memGb >= 8) cap = HIGH_END_ROOM_CAP_DESKTOP;
+  if (perfMode === 'eco') cap = Math.min(cap, 8);
+  if (perfMode === 'cinematic') cap = Math.min(cap, 10);
+  return Math.max(ROOM_CAP_MIN, Math.min(ROOM_CAP_MAX, Math.floor(cap)));
 }
 
 function canUseMultiplayer(planState) {
@@ -612,6 +640,7 @@ function initMultiplayerPlatform() {
   function openRoomPanel() {
     if (!refs.roomPanelModal) return;
     refs.roomPanelModal.classList.add('show');
+    emitTutorialEvent('opened_rooms_menu', { source: 'room_panel' });
   }
 
   function setChatStatus(message, warn = false) {
@@ -1124,9 +1153,10 @@ function initMultiplayerPlatform() {
       const worldName = sanitizeText(room.world?.kind || 'earth', 16).toUpperCase();
       const roomName = room.name ? sanitizeText(room.name, 80) : `${worldName} Session`;
       const locationLabel = sanitizeText(room.locationTag?.label || room.locationTag?.city || '', 80);
+      const capLabel = Math.max(2, Number(room.maxPlayers) || getRecommendedRoomCap());
       refs.roomPanelRoomName.textContent = locationLabel
-        ? `${roomName} (${room.visibility || 'private'}) • ${locationLabel}`
-        : `${roomName} (${room.visibility || 'private'})`;
+        ? `${roomName} (${room.visibility || 'private'}) • ${locationLabel} • cap ${capLabel}`
+        : `${roomName} (${room.visibility || 'private'}) • cap ${capLabel}`;
     }
     if (refs.roomPanelNameInput && document.activeElement !== refs.roomPanelNameInput) {
       refs.roomPanelNameInput.value = sanitizeText(room.name || '', 80);
@@ -1148,7 +1178,8 @@ function initMultiplayerPlatform() {
 
     if (!state.players.length) {
       refs.roomPanelPlayerList.innerHTML = '<li class="mpPlayerEmpty">Waiting for players...</li>';
-      if (refs.roomPanelPlayerCount) refs.roomPanelPlayerCount.textContent = '0';
+      const cap = Math.max(2, Number(state.currentRoom?.maxPlayers) || getRecommendedRoomCap());
+      if (refs.roomPanelPlayerCount) refs.roomPanelPlayerCount.textContent = `0 / ${cap}`;
       return;
     }
 
@@ -1160,7 +1191,8 @@ function initMultiplayerPlatform() {
       return `<li class="mpPlayerItem"><span class="mpPlayerName">${displayName}${selfTag}</span><span class="mpPlayerMeta">${role} • ${mode}</span></li>`;
     }).join('');
 
-    if (refs.roomPanelPlayerCount) refs.roomPanelPlayerCount.textContent = String(state.players.length);
+    const cap = Math.max(2, Number(state.currentRoom?.maxPlayers) || getRecommendedRoomCap());
+    if (refs.roomPanelPlayerCount) refs.roomPanelPlayerCount.textContent = `${state.players.length} / ${cap}`;
   }
 
   function renderChat() {
@@ -1476,6 +1508,10 @@ function initMultiplayerPlatform() {
       if (refs.roomArtifactTextInput) refs.roomArtifactTextInput.value = '';
 
       await bumpExplorerLeaderboard({ artifactsShared: 1 });
+      emitTutorialEvent('artifact_placed', {
+        source: 'multiplayer_artifact',
+        roomCode: normalizeCode(state.currentRoom?.code || '')
+      });
       setStatus('Artifact saved.');
     } catch (err) {
       setStatus(err?.message || 'Could not save artifact.', true);
@@ -1615,6 +1651,10 @@ function initMultiplayerPlatform() {
 
     clearSubscriptions();
     state.currentRoom = room;
+    emitTutorialEvent('room_created_or_toggled', {
+      roomCode: normalizeCode(room.code || room.id || ''),
+      origin: String(originLabel || 'room')
+    });
     upsertOwnedRoomLocal(room);
     if (typeof appCtx.configureSharedBuildSync === 'function') {
       appCtx.configureSharedBuildSync({
@@ -1733,11 +1773,12 @@ function initMultiplayerPlatform() {
       const effectiveLocationTag = visibility === 'public'
         ? (locationTagText || world.name)
         : locationTagText;
+      const cap = getRecommendedRoomCap();
       const createPayload = {
         name: roomName || `${world.name} Session`,
         visibility,
         featured: false,
-        maxPlayers: 12,
+        maxPlayers: cap,
         world,
         rules: paintRules,
         locationName: roomName || world.name,
@@ -1753,9 +1794,9 @@ function initMultiplayerPlatform() {
         const named = room.name ? `${room.name} (${room.code})` : room.code;
         try {
           await copyText(inviteLink);
-          setStatus(`${visibility === 'public' ? 'Public' : 'Private'} room ${named} created. Invite link copied.`);
+          setStatus(`${visibility === 'public' ? 'Public' : 'Private'} room ${named} created (cap ${cap}). Invite link copied.`);
         } catch (_) {
-          setStatus(`${visibility === 'public' ? 'Public' : 'Private'} room ${named} created.`);
+          setStatus(`${visibility === 'public' ? 'Public' : 'Private'} room ${named} created (cap ${cap}).`);
         }
       }
     } catch (err) {
@@ -1801,8 +1842,6 @@ function initMultiplayerPlatform() {
   }
 
   async function handleJoinWeeklyFeaturedRoom() {
-    if (!(await ensureAccessOrWarn('joining the weekly featured city room'))) return null;
-
     const weekly = getWeeklyCitySelection();
     const roomCode = buildWeeklyFeaturedRoomCode(weekly);
     const world = resolveWeeklyFeaturedWorld(weekly);
@@ -1821,6 +1860,10 @@ function initMultiplayerPlatform() {
 
     try {
       const existing = await joinRoomByCode(roomCode);
+      if (!state.authUser) {
+        const authed = getCurrentUser();
+        if (authed) setAuthUser(authed);
+      }
       return await finalizeJoin(existing, 'weekly featured room');
     } catch (joinErr) {
       const joinMessage = String(joinErr?.message || '');
@@ -1831,12 +1874,14 @@ function initMultiplayerPlatform() {
     }
 
     try {
+      if (!(await ensureAccessOrWarn('creating the weekly featured city room'))) return null;
+      const cap = getRecommendedRoomCap();
       const created = await createRoom({
         code: roomCode,
         name: roomName,
         visibility: 'public',
         featured: true,
-        maxPlayers: 12,
+        maxPlayers: cap,
         world,
         locationName: weekly.city,
         locationTag: { label: `Weekly City: ${weekly.city}`, city: weekly.city, kind: 'earth' }
@@ -1860,12 +1905,7 @@ function initMultiplayerPlatform() {
 
   async function handleJoinRoom(codeOverride = '', options = {}) {
     const skipAccessCheck = Boolean(options && options.skipAccessCheck);
-    if (skipAccessCheck) {
-      if (!state.authUser) {
-        setStatus('Sign in to join multiplayer rooms.', true);
-        return null;
-      }
-    } else if (!(await ensureAccessOrWarn('joining a room'))) {
+    if (!skipAccessCheck && state.authUser && !(await ensureAccessOrWarn('joining a room'))) {
       return null;
     }
 
@@ -1877,6 +1917,10 @@ function initMultiplayerPlatform() {
 
     try {
       const room = await joinRoomByCode(code);
+      if (!state.authUser) {
+        const authed = getCurrentUser();
+        if (authed) setAuthUser(authed);
+      }
       await activateRoom(room, 'joined room');
       await bumpExplorerLeaderboard({ roomsJoined: 1 });
       await refreshFeaturedRooms(true);

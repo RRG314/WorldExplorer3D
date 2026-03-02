@@ -1,8 +1,8 @@
 # API and Service Setup Guide
 
-Last reviewed: 2026-02-28
+Last reviewed: 2026-03-02
 
-Setup checklist for Firebase, Firestore, and Stripe used by the current platform.
+Setup checklist for Firebase Auth, Firestore, and Stripe integrations used by this branch.
 
 ## 1. Firebase Project
 
@@ -13,14 +13,22 @@ firebase use worldexplorer3d-d9b83
 
 ## 2. Authentication
 
-Enable providers in Firebase Console:
+Enable in Firebase Console:
 
 - Email/Password
 - Google
 
-For GitHub Pages testing, ensure authorized domain includes:
+Optional for guest join behavior in public rooms:
 
-- `rrg314.github.io`
+- Anonymous auth
+
+Authorized domains should include:
+
+- `worldexplorer3d.io`
+- `www.worldexplorer3d.io`
+- `worldexplorer3d-d9b83.web.app`
+- `worldexplorer3d-d9b83.firebaseapp.com`
+- `rrg314.github.io` (if using Pages)
 
 ## 3. Firestore
 
@@ -31,7 +39,7 @@ firebase deploy --only firestore:rules
 firebase deploy --only firestore:indexes
 ```
 
-### 3.2 Active collections
+### 3.2 Collection model
 
 Top-level:
 
@@ -61,7 +69,7 @@ User subcollections:
 
 ### 3.3 TTL policies
 
-Create TTL policies on `expiresAt` for collection groups:
+Set TTL on `expiresAt` for collection groups:
 
 - `players`
 - `chat`
@@ -71,98 +79,58 @@ Create TTL policies on `expiresAt` for collection groups:
 - `activityFeed`
 - `artifacts`
 
-TTL is asynchronous cleanup. Keep client-side stale filtering for real-time UX.
+## 4. Functions Environment
 
-## 4. App Check
+Functions read values from Firebase params or process env fallbacks using `WE3D_*` keys.
 
-App Check is optional for this branch configuration.
+Required for Stripe billing flow:
 
-- If Firestore App Check enforcement is enabled in your Firebase project, configure App Check for this app.
-- If you do not want App Check right now, keep Firestore App Check enforcement disabled.
+- `WE3D_STRIPE_SECRET`
+- `WE3D_STRIPE_WEBHOOK_SECRET`
+- `WE3D_STRIPE_PRICE_SUPPORTER`
+- `WE3D_STRIPE_PRICE_PRO`
 
-## 4.1 CORS Allowlist (Functions)
+Optional admin/testing keys:
 
-Functions enforce a CORS origin allowlist.
+- `WE3D_ADMIN_ALLOWED_EMAILS`
+- `WE3D_ADMIN_ALLOWED_UIDS`
+- `WE3D_ALLOWED_ORIGINS`
 
-Defaults allowed:
+Configure these in your functions runtime environment before deploy.
 
-- `https://rrg314.github.io`
-- `https://worldexplorer3d-d9b83.web.app`
-- `https://worldexplorer3d-d9b83.firebaseapp.com`
-- local dev origins (`http://localhost:*`, `http://127.0.0.1:*`)
+## 5. Stripe Setup
 
-Optional custom domains:
-
-```bash
-firebase functions:config:set cors.allowed_origins="https://yourdomain.com,https://staging.yourdomain.com"
-firebase deploy --only functions
-```
-
-## 5. Frontend Firebase Config
-
-Set web config in:
-
-- `public/js/firebase-project-config.js`
-
-Runtime expects:
-
-- `apiKey`
-- `authDomain`
-- `projectId`
-- `appId`
-- optional: `storageBucket`, `messagingSenderId`
-
-Local override key:
-
-- `worldExplorer3D.firebaseConfig`
-
-## 6. Stripe Setup (Optional Donations)
-
-### 6.1 Products/prices
+### 5.1 Products/prices
 
 Create recurring monthly prices:
 
-- Supporter (`$1`)
-- Pro (`$5`)
+- Supporter ($1)
+- Pro ($5)
 
-### 6.2 Webhook endpoint
+### 5.2 Webhook endpoint
 
 - `https://us-central1-worldexplorer3d-d9b83.cloudfunctions.net/stripeWebhook`
 
-Subscribe to:
+Subscribe webhook events:
 
 - `checkout.session.completed`
 - `customer.subscription.created`
 - `customer.subscription.updated`
 - `customer.subscription.deleted`
 
-### 6.3 Function runtime config
+### 5.3 Deploy functions
 
 ```bash
-firebase experiments:enable legacyRuntimeConfigCommands
-firebase functions:config:set \
-  stripe.secret="sk_live_or_test_..." \
-  stripe.webhook="whsec_..." \
-  stripe.price_supporter="price_..." \
-  stripe.price_pro="price_..."
 firebase deploy --only functions
 ```
 
-Optional admin allowlist config:
-
-```bash
-firebase functions:config:set \
-  admin.allowed_emails="you@example.com" \
-  admin.allowed_uids="your_uid"
-```
-
-## 7. Function Endpoints
+## 6. Functions Endpoints
 
 Authenticated endpoints:
 
 - `POST /createCheckoutSession`
 - `POST /createPortalSession`
-- `POST /startTrial` (legacy compatibility endpoint; no longer required for multiplayer access)
+- `POST /startTrial` (legacy compatibility endpoint)
 - `POST /enableAdminTester`
 - `POST /getAccountOverview`
 - `POST /listBillingReceipts`
@@ -173,17 +141,32 @@ Public endpoint:
 
 - `POST /stripeWebhook`
 
-## 8. Validation Commands
+## 7. Hosting Rewrites
 
-Rules tests:
+`firebase.json` routes these paths to functions:
+
+- `/createCheckoutSession`
+- `/createPortalSession`
+- `/getAccountOverview`
+- `/listBillingReceipts`
+- `/updateAccountProfile`
+- `/startTrial`
+- `/enableAdminTester`
+- `/deleteAccount`
+- `/stripeWebhook`
+
+## 8. Validation
 
 ```bash
-npm test
+npm run test:rules
+npm run release:verify
 ```
 
-Function logs:
+Useful logs:
 
 ```bash
 firebase functions:log --only createCheckoutSession -n 50
 firebase functions:log --only stripeWebhook -n 50
+firebase functions:log --only getAccountOverview -n 50
 ```
+

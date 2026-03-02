@@ -1,21 +1,21 @@
 # Controls Reference
 
-Last reviewed: 2026-02-25
+Last reviewed: 2026-03-02
 
-This file is the canonical control map for the current codebase.
+Canonical control map for current runtime behavior.
 
 ## Global Controls
 
 - `F`: toggle Walk/Drive mode
 - `6`: toggle Drone mode
-- `C`: cycle camera (car) or toggle walk view (third/first/overhead)
+- `C`: cycle camera mode
 - `M`: toggle large map
 - `N`: next city
 - `B`: toggle block build mode
 - `R`: record/stop track
 - `Shift+R`: road debug mode
-- `Esc`: close map (if open), otherwise toggle pause
-- `Backquote`/`~` or `F8`: debug overlay
+- `Esc`: close map or toggle pause
+- `` ` `` / `~` / `F8`: debug overlay
 
 ## Driving Mode
 
@@ -23,10 +23,14 @@ This file is the canonical control map for the current codebase.
 - `S` / `ArrowDown`: brake/reverse
 - `A` / `ArrowLeft`: steer left
 - `D` / `ArrowRight`: steer right
-- `Space`: handbrake
+- `Space`: handbrake / drift trigger at speed
 - `Ctrl`: boost
-- `Shift`: off-road mode modifier
+- `Shift`: off-road modifier
 - `V`: look back
+
+Handling note:
+
+- Earth driving includes rear-biased drift behavior when `Space` is used with steering at speed.
 
 ## Walking Mode
 
@@ -44,40 +48,32 @@ This file is the canonical control map for the current codebase.
 - `A` / `D`: strafe left/right
 - `Space`: ascend
 - `Shift` or `Ctrl`: descend
-- `ArrowUp` / `ArrowDown`: pitch up/down
-- `ArrowLeft` / `ArrowRight`: yaw left/right
-- mouse drag while look-hold is active: look around
+- `ArrowUp` / `ArrowDown`: pitch
+- `ArrowLeft` / `ArrowRight`: yaw
 
 ## Rocket/Space Flight Mode
 
 - `ArrowLeft` / `ArrowRight`: yaw
 - `ArrowUp` / `ArrowDown`: pitch
-- `Space`: thrust/accelerate
+- `Space`: thrust
 - `Shift`: brake/decelerate
 
 ## Camera and Mouse
 
-- right-click hold: camera look (gameplay)
-- middle-click hold: camera look (gameplay)
-- left click: gameplay interaction (mode-dependent)
-- right-click context menu: suppressed during gameplay where needed
+- right-click hold: camera look
+- middle-click hold: camera look
+- left click: gameplay interaction by mode
 - double-left-click camera toggle: disabled
 
 ## Paint the Town
 
-- `Ctrl` (`ControlLeft` / `ControlRight`): fire paintball from center aim
-- `G` or `P`: alternate paintball fire
+- `Ctrl`: fire paintball
+- `G` / `P`: alternate paintball fire
 - `1-6`: select paint color
-- `T`: toggle active tool (`touch` / `gun`)
+- `T`: toggle tool (`touch` / `gun`)
 - left click / tap:
-  - touch tool: paint touched building by rule
-  - gun tool: fire toward pointer
-
-Notes:
-
-- paintballs use gravity arc (aim higher for long distance)
-- paint splats auto-prune after short lifetime
-- collapsed HUD shows only time and painted count
+  - touch tool paints touched building
+  - gun tool fires toward pointer
 
 ## Build Mode
 
@@ -88,49 +84,24 @@ Notes:
 ## Map Interaction
 
 - `M`: open/close large map
-- left click on map: inspect property/POI
-- right click on map: teleport
-- minimap click: open/expand map panel behavior
+- left click map: inspect item
+- right click map: teleport
 
-## Multiplayer Panel and Room Actions
+## Multiplayer Actions (UI)
 
-- `Create`: create room with selected visibility/name/location tag
-- `Join`: join by room code
-- `Invite Link`: copy room invite URL
-- `Leave`: leave active room
-- `Open` on saved room: join saved room by code
-- `Delete` on owned room: permanently delete room
+- `Create`: create room
+- `Join`: join room by code
+- `Invite Link`: copy invite URL
+- `Leave`: leave current room
+- `Open`: open saved room
+- `Delete`: owner-only room delete
 
 ## Mobile Touch Controls
 
-Mobile controls inject virtual key holds and change by active mode.
+Virtual controls adapt by mode:
 
-### Driving profile
+- driving profile
+- walking profile
+- drone profile
+- rocket profile
 
-- move pad: `W`/`S`
-- look pad: `A`/`D`
-- action: `Space` (brake)
-
-### Walking profile
-
-- move pad: `ArrowUp/Down/Left/Right`
-- look pad: `W/A/S/D`
-- actions: `Space` (jump), `Shift` (run)
-
-### Drone profile
-
-- move pad: `W/A/S/D`
-- look pad: `ArrowUp/Down/Left/Right`
-- actions: `Space` (ascend), `Shift` (descend)
-
-### Rocket profile
-
-- look/steer pad: `spaceFlight.keys.arrow*`
-- actions: `spaceFlight.keys[' ']` (accelerate), `spaceFlight.keys['shift']` (decelerate)
-
-## Notes on Control Context
-
-- `Ctrl` is context-sensitive:
-  - driving: car boost
-  - Paint the Town active: paintball fire
-- Walk mode movement is arrow-key based; WASD is look in walk mode.

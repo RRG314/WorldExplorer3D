@@ -1,144 +1,250 @@
 # Technical Documentation
 
-Last reviewed: 2026-02-28
+Last reviewed: 2026-03-02
 
-Engineering reference for runtime modules, multiplayer behavior, rules, and test flow.
+Engineering reference for module contracts, data flow, storage keys, APIs, and validation workflows.
 
-## 1. Source-of-Truth Code Paths
+## 1. Source-of-Truth Paths
 
-Primary gameplay source:
+Canonical runtime:
 
 - `app/index.html`
 - `app/js/*`
 
-Compatibility/mirror paths:
+Hosted mirror:
 
-- root compatibility loader: `js/*`
-- Firebase hosting mirror: `public/*`
+- `public/app/index.html`
+- `public/app/js/*`
 
-When changing behavior, update `app/*` first and keep mirrored paths aligned.
+Mirror workflow:
 
-## 2. Module Contracts
+```bash
+npm run sync:public
+npm run verify:mirror
+```
 
-### 2.1 Boot and loading
+## 2. Boot and Runtime Contracts
 
-- `app/js/bootstrap.js` -> vendor loader + module entrypoint import
-- `app/js/modules/manifest.js` -> cache-bust and script manifest
-- `app/js/app-entry.js` -> boot contract, auth observer, multiplayer init
+### 2.1 Boot path
 
-### 2.2 Multiplayer contracts
+- `app/js/bootstrap.js`:
+  - loads vendor scripts
+  - imports app entrypoint
+  - starts optional post-processing bootstrap
+- `app/js/app-entry.js`:
+  - `bootApp()` initializes engine/UI/tutorial/multiplayer/auth observer
 
-`app/js/multiplayer/rooms.js`
+### 2.2 Render path
+
+`app/js/main.js`:
+
+- `renderLoop(t)`
+- `showLoad(text, options)`
+- `hideLoad()`
+- `showTransitionLoad(mode, durationMs)`
+- overlay positioning helpers
+
+## 3. UI Contracts
+
+### 3.1 Main UI (`app/js/ui.js`)
+
+Responsibilities:
+
+- title tabs and location/game mode selection
+- launch gating for custom location via globe selector
+- tutorial event emission bridge
+- mobile virtual control orchestration
+- in-game float menu wiring
+- return-to-main-menu flow reset
+
+Notable runtime flags:
+
+- `skipGlobeGateOnce`
+- `titleLaunchMode`
+- persisted last location state key (local storage)
+
+### 3.2 Globe selector (`app/js/ui/globe-selector.js`)
+
+Factory:
+
+- `createGlobeSelector(options)`
+
+Important behaviors:
+
+- `open()`, `close()`, `isOpen()`, `getSelection()`
+- `onStartHere(selection)` callback for spawn handoff
+- favorites storage key: `worldExplorer3D.globeSelector.savedFavorites`
+- max saved favorites: `10`
+- grouped list rendering:
+  - preset cities
+  - saved favorites (deletable)
+- reverse lookup with cache + fallback provider
+- zoom-aware marker scaling
+
+## 4. Tutorial Contracts (`app/js/tutorial/tutorial.js`)
+
+Storage key:
+
+- `worldExplorer3D.tutorialState.v1`
+
+Public API:
+
+- `initTutorial(appContext)`
+- `tutorialOnEvent(eventName, payload)`
+- `tutorialUpdate(dt)`
+- `setTutorialEnabled(enabled)`
+- `restartTutorial()`
+
+Completion semantics:
+
+- `completed` state suppresses future automatic prompts
+- shown stages tracked to avoid duplicate stage prompts
+
+## 5. Multiplayer Module Contracts
+
+### 5.1 Rooms (`app/js/multiplayer/rooms.js`)
+
+Exports:
 
 - `createRoom(options)`
-- `joinRoomByCode(code)`
+- `joinRoomByCode(code, options)`
 - `leaveRoom()`
 - `listenRoom(roomId, callback)`
-- `listenMyRooms(callback)`
-- `listenOwnedRooms(callback)`
+- `listenMyRooms(callback, options)`
+- `listenOwnedRooms(callback, options)`
+- `listOwnedRooms(options)`
+- `updateRoomSettings(roomId, updates)`
+- `setHomeBase(roomId, homeBase)`
+- `listenHomeBase(roomId, callback)`
 - `deleteOwnedRoom(roomCode)`
+- `findPublicRoomsByCity(cityInput, options)`
+- `findFeaturedPublicRooms(options)`
 - `deriveRoomDeterministicSeed(roomLike)`
+- `getCurrentRoom()`
 
-`app/js/multiplayer/presence.js`
+Notable constraints:
+
+- room code length: 6
+- room visibility: `private|public`
+- max players normalized to 2..32
+- room create policy tied to user quota fields
+
+### 5.2 Presence (`app/js/multiplayer/presence.js`)
+
+Exports:
 
 - `startPresence(roomId, getPoseFn)`
 - `stopPresence()`
 - `listenPlayers(roomId, callback)`
 
-Timing constants:
+Features:
 
-- heartbeat: `3000ms`
-- min write interval: `2000ms`
-- movement threshold: `1.0m`
-- rotation threshold: `0.08 rad`
+- stale/expired presence filtering
+- write-throttle and movement thresholds
+- normalized pose/frame payloads
 
-`app/js/multiplayer/ghosts.js`
+### 5.3 Ghosts (`app/js/multiplayer/ghosts.js`)
+
+Export:
 
 - `createGhostManager(scene, options)`
 
-Current behavior:
+Features:
 
-- mode-based remote proxies (character/car/drone/space)
-- velocity extrapolation
-- damped interpolation and yaw smoothing
-- teleport distance clamp
-- 30 FPS ghost tick budget
+- mode-specific proxy meshes
+- interpolation + extrapolation
+- teleport clamping and lifecycle cleanup
 
-`app/js/multiplayer/chat.js`
+### 5.4 Chat (`app/js/multiplayer/chat.js`)
+
+Exports:
 
 - `sendMessage(roomId, text)`
 - `listenChat(roomId, callback)`
 - `reportMessage(roomId, messageId, reason)`
+- `CHAT_MAX_LENGTH`
 
-Spam/safety controls:
+Policy:
 
-- max length: 500
-- client interval/burst/duplicate gates
-- server interval/burst gates via `chatState`
-- contact/link pattern blocking
-- profanity masking
+- max length 500
+- safety filters for links/contact patterns
+- client + server rate limiting
 
-`app/js/multiplayer/social.js`
+### 5.5 Social (`app/js/multiplayer/social.js`)
+
+Exports:
 
 - `addFriend`, `removeFriend`
 - `sendInviteToFriend`
 - `listenFriends`, `listenIncomingInvites`, `listenRecentPlayers`
 - `markInviteSeen`, `dismissInvite`
+- `recordRecentPlayers`
 
-`app/js/multiplayer/ui-room.js`
+### 5.6 Shared room state modules
 
-- multiplayer panel wiring
-- saved-room list rendering and open/delete handlers
-- chat drawer wiring
-- access checks based on sign-in status
+- Artifacts: `createArtifact`, `listenArtifacts`, `removeArtifact`
+- Shared blocks: `upsertSharedBlock`, `removeSharedBlock`, `clearMySharedBlocks`, `listenSharedBlocks`
+- Paint claims: `upsertPaintClaim`, `listenPaintClaims`
+- Loop utilities: weekly city/room helpers, activity feed, leaderboard
 
-## 3. Paint the Town Runtime Notes
+### 5.7 Multiplayer UI platform (`app/js/multiplayer/ui-room.js`)
 
-Main implementation: `app/js/game.js`.
+Export:
 
-State highlights:
+- `initMultiplayerPlatform(options)`
 
-- `paintballs[]`
-- `paintSplats[]`
-- `claimsByKey`
-- `colorCounts`
+Returned API:
 
-Input highlights:
+- `setAuthUser(user)`
+- `openRoomPanel()`
+- `closeRoomPanel()`
+- `joinRoomByCode(code)`
+- `createRoom()`
+- `leaveRoom()`
+- `getCurrentRoom()`
 
-- `Ctrl`/`G`/`P` fire paintball
-- `1-6` color select
-- `T` tool toggle
-- pointer/touch paint by active tool and room rule
+## 6. Account/Billing Contracts
 
-Physics/perf highlights:
+### 6.1 Auth (`js/auth-ui.js`)
 
-- projectile arc with gravity
-- max active paintballs cap
-- splat lifetime cleanup
-- multiplayer claim publish hook
+- `ensureSignedIn()`
+- `signInWithGoogle()`
+- `signInWithEmailPassword(email, password)`
+- `signUpWithEmailPassword(email, password, displayName)`
+- `signOutUser()`
+- `observeAuth(callback)`
+- `getCurrentUserToken(forceRefresh)`
 
-## 4. Account and Donation Technical Notes
+### 6.2 Entitlements (`js/entitlements.js`)
 
-Frontend modules:
+- `ensureEntitlements(user, options)`
+- `subscribeEntitlements(callback)`
+- normalizes plan, room quotas, admin claim status
 
-- `js/auth-ui.js`
-- `js/entitlements.js`
-- `js/billing.js`
-- `js/firebase-init.js`
+### 6.3 Billing client (`js/billing.js`)
 
-Account page:
+Function call wrappers:
 
-- `account/index.html` (module script section wires auth/entitlements/billing/social)
+- `createCheckoutSession(plan)`
+- `createPortalSession()`
+- `redirectToCheckout(plan)`
+- `redirectToPortal()`
+- `getAccountOverview()`
+- `listBillingReceipts(options)`
+- `updateAccountProfile(displayName)`
+- `startTrial()`
+- `enableAdminTester()`
+- `deleteAccount()`
 
-Functions backend:
+## 7. Cloud Functions API Contracts
 
-- `functions/index.js`
+File: `functions/index.js`
 
 Endpoints:
 
 - `createCheckoutSession`
 - `createPortalSession`
-- `startTrial` (legacy compatibility path)
+- `startTrial` (legacy)
 - `enableAdminTester`
 - `getAccountOverview`
 - `listBillingReceipts`
@@ -146,45 +252,52 @@ Endpoints:
 - `deleteAccount`
 - `stripeWebhook`
 
-## 5. Firestore Rules and Data Integrity
+Environment/param keys used by function logic:
+
+- `WE3D_STRIPE_SECRET`
+- `WE3D_STRIPE_WEBHOOK_SECRET`
+- `WE3D_STRIPE_PRICE_SUPPORTER`
+- `WE3D_STRIPE_PRICE_PRO`
+- `WE3D_ADMIN_ALLOWED_EMAILS`
+- `WE3D_ADMIN_ALLOWED_UIDS`
+- `WE3D_ALLOWED_ORIGINS`
+
+## 8. Firestore Data + Rules Contracts
 
 Rules file: `firestore.rules`
 
-Notable validation families:
+Validated domains:
 
-- room payload and update validators
-- user profile and quota validators
-- player/presence validators
-- chat/chatState validators
-- social and invite validators
-- blocks/claims/artifacts/homeBase validators
+- room creation quota coupling
+- room schema and update schema
+- player/presence schema + write throttle
+- chat schema + chatState transition rules
+- social/invite ownership rules
+- saved room schema
+- artifacts/blocks/claims/home base schema rules
 
-Indexes file: `firestore.indexes.json`
+Indexes file: `firestore.indexes.json` (city query and featured room query)
 
-- public city query index
-- featured room query index
+## 9. Test and Release Contracts
 
-## 6. Testing and Verification
-
-Rules test runner:
+### 9.1 Commands
 
 ```bash
-npm test
+npm run test:rules
+npm run test:runtime
+npm run verify:mirror
+npm run release:verify
 ```
 
-PaintTown integration:
+### 9.2 Scripts
 
-```bash
-node tests/painttown.integration.test.mjs
-```
+- `scripts/test-rules.mjs`
+- `scripts/test-runtime-invariants.mjs`
+- `scripts/verify-mirror.mjs`
+- `scripts/release-verify.mjs`
 
-Artifacts:
+### 9.3 Suites
 
-- rules logs via emulator output
-- Playwright screenshots/reports under `output/playwright/*`
+- `tests/firestore.rules.security.test.mjs`
+- `tests/painttown.integration.test.mjs`
 
-## 7. Control Reference
-
-Canonical control matrix is maintained in:
-
-- `CONTROLS_REFERENCE.md`

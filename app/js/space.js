@@ -3,6 +3,12 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 // Rocket flight in heliocentric solar system - fly to any planet
 // ============================================================================
 
+function emitTutorialEvent(eventName, payload = {}) {
+  if (typeof appCtx.tutorialOnEvent === 'function') {
+    appCtx.tutorialOnEvent(eventName, payload);
+  }
+}
+
 // Space flight state (global)
 appCtx.spaceFlight = {
   active: false,
@@ -161,6 +167,7 @@ function startSpaceFlightToMoon() {
   appCtx.spaceFlight.launchStartMs = Date.now();
   appCtx.spaceFlight._isThrusting = false;
   appCtx.switchEnv(appCtx.ENV.SPACE_FLIGHT);
+  emitTutorialEvent('entered_space', { destination: 'moon', source: 'space_flight' });
 
   // Show canvas and HUD
   appCtx.spaceFlight.canvas.style.display = 'block';
@@ -214,6 +221,7 @@ function startSpaceFlightToEarth() {
   appCtx.spaceFlight.launchStartMs = Date.now();
   appCtx.spaceFlight._isThrusting = false;
   appCtx.switchEnv(appCtx.ENV.SPACE_FLIGHT);
+  emitTutorialEvent('entered_space', { destination: 'earth', source: 'space_flight' });
 
   // Show canvas and HUD
   appCtx.spaceFlight.canvas.style.display = 'block';

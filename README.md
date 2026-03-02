@@ -2,126 +2,88 @@
 
 Last reviewed: 2026-03-02
 
-World Explorer is a browser-native 3D exploration platform with real-location traversal, game modes, multiplayer rooms, optional monthly donations, and Firebase-backed persistence.
+World Explorer is a browser-based 3D exploration platform with Earth/Moon/Space traversal, multiplayer room systems, social invites, and Firebase-backed account persistence.
 
 ## Runtime Surfaces
 
-- Root landing: `/index.html`
-- App runtime: `/app/index.html`
+- Landing: `/index.html`
+- Main app runtime: `/app/index.html`
 - Account center: `/account/index.html`
-- About page: `/about/index.html`
+- About: `/about/index.html`
 - Legal pages: `/legal/privacy`, `/legal/terms`
 
-## Core Product Features
+## Core Features
 
-- Earth, Moon, and Space traversal
-- Custom globe selector for Earth:
-  - click-to-pick latitude/longitude
-  - reverse city label lookup
-  - nearby menu-city suggestions
-  - favorites list seeded from prelisted menu cities
-  - Moon and Space shortcut buttons
-- Game modes:
-  - Free Roam
-  - Time Trial
-  - Checkpoints
-  - Paint the Town
-  - Police Chase
-  - Find the Flower
-- Multiplayer platform:
-  - private/public rooms
-  - weekly featured public city room
-  - public room browse visibility for signed-out users (view-only)
-  - room code + invite links
-  - saved rooms (open again later)
-  - owner delete for owned rooms
-  - live presence, chat, friends, invites, recent players
-  - shared blocks, paint claims, artifacts, home base
-  - minimap/large-map room markers:
-    - public rooms (visible to all)
-    - signed-in user rooms (owner/current)
-- Account center:
-  - plan/donation status
-  - room quota usage
-  - username + linked email + providers
-  - Stripe donation portal + receipts
-  - permanent account closure (self-serve delete flow)
+### Location and launch
 
-## Multiplayer Rendering and Update Model
+- Preset cities (Earth)
+- Custom globe selector with click-to-pick coordinates
+- Reverse place lookup and nearby city list
+- Favorites view with:
+  - `Preset Cities`
+  - `Your Saved Favorites` (with delete)
+- Earth, Moon, Space launch toggles
+- Continue Last Location support
 
-Current ghost rendering is no longer bubble-only:
+### Gameplay
 
-- walking players render as character proxies
-- driving players render as car proxies
-- drone/space modes render as dedicated lightweight proxies
-- remote motion uses interpolation + extrapolation + teleport clamping for smoother movement on 3s presence heartbeats
+- Free Roam
+- Time Trial
+- Checkpoints
+- Paint the Town
+- Police Chase
+- Find the Flower
 
-## Access and Quotas
+### Movement modes
 
-- Multiplayer is available for all signed-in users.
-- Current room creation limits:
-  - `Free`: `3`
-  - `Supporter`: `3`
-  - `Pro`: `10`
-  - Admin tester mode: allowlist-only, higher room limit
-- Supporter/Pro are optional monthly donations.
-- Pro keeps early-demo and priority-contact style perks.
+- Walking
+- Driving
+- Drone
+- Rocket/space flight
+- Moon traversal
 
-## Controls
+### Tutorial
 
-Full controls are documented in:
+- First-run guided walkthrough stored per browser
+- Shows once by default after completion
+- User can disable or restart manually from Settings
 
-- `CONTROLS_REFERENCE.md`
-- in-app `Controls` tab
+### Multiplayer
 
-Paint the Town key controls:
+- Public/private room creation and join by code
+- Saved room list with `Open` and owner `Delete`
+- Invite links and friend invite workflow
+- Live presence, chat, friends, incoming invites, recent players
+- Shared room data:
+  - blocks
+  - paint claims
+  - artifacts
+  - home base
+- Weekly featured city room
+- Public and owned/current room markers on minimap and large map
 
-- `Ctrl` (and `G` / `P`) fires paintball shots
-- `1-6` picks color
-- `T` toggles touch vs gun tool
-- right-click camera look is enabled
-- double-left-click camera toggle is disabled
+### Account and donations
 
-## Firestore Security and TTL
+- Email/password and Google sign-in
+- Account profile and room quota status
+- Optional monthly donations:
+  - Supporter: $1/month
+  - Pro: $5/month
+- Stripe checkout/portal integration
+- Billing receipt list
+- Permanent self-service account deletion flow
 
-Firestore rules enforce:
+## Architecture Summary
 
-- authenticated access for protected data
-- room membership and ownership boundaries
-- room quota write coupling
-- presence self-write and write throttling
-- chat validation and anti-spam state checks
-- friend/invite ownership constraints
+- Canonical gameplay source: `app/*`
+- Hosted mirror: `public/app/*`
+- Root compatibility/runtime modules: `js/*`
+- Backend: `functions/index.js`
+- Security: `firestore.rules`
 
-TTL `expiresAt` should be enabled for:
-
-- `players`
-- `chat`
-- `chatState`
-- `incomingInvites`
-- `recentPlayers`
-- `activityFeed`
-- `artifacts`
-
-## Repository Layout
-
-Active runtime and backend paths:
-
-- `app/` -> primary app surface (`/app`)
-- `js/` -> root compatibility/runtime glue and shared account/auth/billing modules
-- `public/` -> Firebase Hosting root mirror
-- `functions/` -> Cloud Functions API and Stripe webhook
-- `tests/` -> Firestore rules and PaintTown integration tests
-
-Reference/legacy folders not used by active app routing:
-
-- `WorldExplorer3D-rdt-engine/`
-- `_style_reference_worldexplorer3d/`
-- `world-explorer-esm/`
+Important: edit `app/*` first, then mirror to `public/app/*`.
 
 ## Local Development
-
-Install dependencies:
 
 ```bash
 cd "/Users/stevenreid/Documents/New project"
@@ -129,7 +91,7 @@ npm install
 cd functions && npm install && cd ..
 ```
 
-Run Firebase-style local static hosting (`public` root):
+Run hosting-style local server:
 
 ```bash
 python3 -m http.server --directory public 4173
@@ -141,52 +103,39 @@ Open:
 - `http://127.0.0.1:4173/app/`
 - `http://127.0.0.1:4173/account/`
 
-## Testing
-
-Rules/security test suite:
+## Validation Commands
 
 ```bash
-npm test
-```
-
-PaintTown deterministic seed + paintball flow test:
-
-```bash
-node tests/painttown.integration.test.mjs
-```
-
-Runtime + mirror + rules release gate:
-
-```bash
+npm run sync:public
+npm run verify:mirror
+npm run test
 npm run release:verify
 ```
 
 ## Deployment
 
-GitHub Pages (branch root) and Firebase Hosting are both supported.
-
-GitHub Pages:
-
-- source branch: `steven/product`
-- folder: `/ (root)`
-
-Firebase:
+### Firebase
 
 ```bash
 firebase use worldexplorer3d-d9b83
 firebase deploy
 ```
 
+### GitHub Pages
+
+Deploy from branch root (`/`) as configured in repo settings.
+
 ## Documentation
 
+- `COMPLETE_INVENTORY_REPORT_2026-03-02.md` (full inventory snapshot)
 - `QUICKSTART.md`
 - `USER_GUIDE.md`
 - `CONTROLS_REFERENCE.md`
 - `ARCHITECTURE.md`
 - `TECHNICAL_DOCS.md`
 - `API_SETUP.md`
-- `GITHUB_DEPLOYMENT.md`
+- `RELEASE_CHECKLIST.md`
 - `KNOWN_ISSUES.md`
 - `CHANGELOG.md`
 - `DOCUMENTATION_INDEX.md`
-- `COMPLETE_INVENTORY_REPORT_2026-02-28.md`
+

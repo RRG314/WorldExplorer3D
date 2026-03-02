@@ -1183,9 +1183,9 @@ const CFG = {
   // Grip settings - realistic car physics
   gripRoad: 0.88, // Normal road grip - realistic
   gripOff: 0.70, // Off-road grip
-  gripBrake: 0.60, // Grip while braking
-  gripDrift: 0.45, // Grip while drifting
-  driftRec: 6, // Car realignment speed
+  gripBrake: 0.56, // Grip while handbraking
+  gripDrift: 0.34, // Lower grip while drifting for rear-heavy slides
+  driftRec: 5, // Car realignment speed after releasing drift
   // Turn settings - realistic steering
   turnLow: 1.8, // Turn rate at low speed - more realistic
   turnHigh: 0.8, // Turn rate at high speed - realistic

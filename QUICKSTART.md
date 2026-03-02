@@ -1,24 +1,18 @@
 # Quick Start
 
-Last reviewed: 2026-02-28
+Last reviewed: 2026-03-02
 
-Fast path to run, test, and deploy the current World Explorer platform.
+Fast path to run, test, and validate the current World Explorer platform.
 
-## 1. Prerequisites (Free Tooling)
+## 1. Prerequisites
 
 - Node.js 20+
 - npm
 - Python 3
 - Firebase CLI (`npm i -g firebase-tools`)
-- Java 21 JRE/JDK (for Firestore emulator tests)
+- Java 21 (required for Firestore emulator tests)
 
-Java install examples:
-
-- macOS: `brew install openjdk@21`
-- Ubuntu/Debian: `sudo apt-get install -y openjdk-21-jre`
-- Windows: `winget install EclipseAdoptium.Temurin.21.JRE`
-
-## 2. Install Dependencies
+## 2. Install
 
 ```bash
 cd "/Users/stevenreid/Documents/New project"
@@ -28,7 +22,7 @@ cd functions && npm install && cd ..
 
 ## 3. Run Locally
 
-### Option A: Firebase-hosting style (`public` root)
+### Hosting-style (recommended)
 
 ```bash
 python3 -m http.server --directory public 4173
@@ -40,7 +34,7 @@ Open:
 - `http://127.0.0.1:4173/app/`
 - `http://127.0.0.1:4173/account/`
 
-### Option B: branch-root pages style (repository root)
+### Branch-root style (Pages compatibility)
 
 ```bash
 python3 -m http.server 4174
@@ -50,45 +44,62 @@ Open:
 
 - `http://127.0.0.1:4174/`
 
-## 4. Quick Functional Check
+## 4. Sync and Parity
 
-1. Open app -> `Games` -> choose `Paint the Town` -> `Explore`.
-2. Validate controls:
-   - `Ctrl` fires paintball
-   - `1-6` color select
-   - `T` toggles paint tool
-   - right-click hold camera look works
-   - double-left-click does not toggle camera
-3. Open Multiplayer tab (signed in):
+If you edited `app/*`, sync to hosting mirror and verify parity:
+
+```bash
+npm run sync:public
+npm run verify:mirror
+```
+
+## 5. Automated Validation
+
+### Full release gate
+
+```bash
+npm run release:verify
+```
+
+This runs:
+
+1. mirror parity check
+2. Firestore rules tests
+3. runtime invariant checks
+
+### Individual commands
+
+```bash
+npm run test:rules
+npm run test:runtime
+```
+
+## 6. Manual Smoke Checklist (Pre-Deploy)
+
+1. Location flow:
+   - open `Custom` -> globe selector
+   - pick a point and confirm place label updates
+   - verify `Favorites` shows preset + saved lists
+   - delete a saved favorite
+2. Launch flow:
+   - `Main Menu` from globe selector returns to title menu
+   - `Start Here` starts game from selected custom location
+3. Tutorial:
+   - first run shows walkthrough
+   - after completion, hints no longer auto-repeat unless restarted in Settings
+4. Driving handling:
+   - at speed, hold `Space` + steer on tight turns
+   - confirm tighter rear-biased drift behavior
+5. Multiplayer:
+   - sign in
    - create room
    - join by code
-   - verify saved room list has `Open` and (owner) `Delete`
-4. Open account page and verify:
-   - donation status + room quota
-   - username
-   - receipts
-   - friends/invites
-
-## 5. Firestore Rules/Security Test
-
-```bash
-npm test
-```
-
-Runs:
-
-- `scripts/test-rules.mjs`
-- `tests/firestore.rules.security.test.mjs`
-
-## 6. PaintTown Integration Test
-
-```bash
-node tests/painttown.integration.test.mjs
-```
-
-Report path:
-
-- `output/playwright/painttown-physics-check/report.json`
+   - invite friend and accept invite
+   - verify saved rooms `Open`/owner `Delete`
+6. Account:
+   - open `/account/`
+   - refresh overview and receipts
+   - validate profile update
 
 ## 7. Firebase Setup
 
@@ -97,38 +108,9 @@ firebase login
 firebase use worldexplorer3d-d9b83
 ```
 
-Enable auth providers in Firebase Console:
+Deploy rules/indexes/functions as needed.
 
-- Email/Password
-- Google
-
-## 8. Stripe Setup (Optional Donations)
-
-```bash
-firebase experiments:enable legacyRuntimeConfigCommands
-firebase functions:config:set \
-  stripe.secret="sk_live_or_test_..." \
-  stripe.webhook="whsec_..." \
-  stripe.price_supporter="price_..." \
-  stripe.price_pro="price_..."
-firebase deploy --only functions
-```
-
-## 9. Firestore TTL Setup
-
-Configure TTL in Firestore Console using `expiresAt` on these collection groups:
-
-- `players`
-- `chat`
-- `chatState`
-- `incomingInvites`
-- `recentPlayers`
-- `activityFeed`
-- `artifacts`
-
-TTL is background cleanup, not real-time state propagation.
-
-## 10. Deploy
+## 8. Deploy
 
 ### Firebase
 
@@ -136,17 +118,16 @@ TTL is background cleanup, not real-time state propagation.
 firebase deploy
 ```
 
-### GitHub Pages (branch root)
+### Preview channel
 
-1. Push target branch (`steven/product`).
-2. GitHub -> Settings -> Pages.
-3. Source: Deploy from a branch.
-4. Branch: `steven/product`.
-5. Folder: `/ (root)`.
+```bash
+firebase hosting:channel:deploy test --project worldexplorer3d-d9b83 --only worldexplorer3d-d9b83 --expires 30d
+```
 
-## 11. Troubleshooting
+## 9. Troubleshooting
 
-- Rules tests fail with Java errors -> verify `java -version`.
-- Multiplayer create/join denied -> redeploy Firestore rules and verify sign-in/auth state.
-- Saved room open fails -> verify room still exists and owner has not deleted it.
-- Donation errors -> verify Stripe config + function logs.
+- Rules tests fail immediately: verify Java 21 install and `java -version`.
+- Multiplayer create/join denied: verify auth, rules deployment, and user profile quota fields.
+- Billing actions fail: verify function env params and function logs.
+- UI change not visible: sync mirror and hard refresh browser cache.
+

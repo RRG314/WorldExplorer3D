@@ -39,6 +39,12 @@ const buildPlane = typeof THREE !== 'undefined' ? new THREE.Plane(new THREE.Vect
 const buildTempPoint = typeof THREE !== 'undefined' ? new THREE.Vector3() : null;
 const buildNormalMatrix = typeof THREE !== 'undefined' ? new THREE.Matrix3() : null;
 
+function emitTutorialEvent(eventName, payload = {}) {
+  if (typeof appCtx.tutorialOnEvent === 'function') {
+    appCtx.tutorialOnEvent(eventName, payload);
+  }
+}
+
 function isFiniteNumber(v) {
   return Number.isFinite(v);
 }
@@ -641,6 +647,7 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
       showBuildTransientMessage(`Limit reached (${BUILD_MAX_PER_LOCATION} blocks max). Remove some blocks to continue.`);
       return false;
     }
+    emitTutorialEvent('artifact_placed', { source: 'build_block', gx, gy, gz });
   }
   return true;
 }
@@ -762,12 +769,16 @@ function updateBuildModeUI() {
 }
 
 function setBuildModeEnabled(nextState) {
+  const wasEnabled = buildModeEnabled;
   buildModeEnabled = !!nextState;
   if (buildModeEnabled) {
     ensureBuildGroup();
     if (typeof appCtx.clearStarSelection === 'function') appCtx.clearStarSelection();
   }
   updateBuildModeUI();
+  if (!wasEnabled && buildModeEnabled) {
+    emitTutorialEvent('build_mode_entered', { source: 'build_mode_toggle' });
+  }
   return buildModeEnabled;
 }
 

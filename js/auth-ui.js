@@ -4,6 +4,7 @@ import {
   getRedirectResult,
   onAuthStateChanged,
   sendPasswordResetEmail,
+  signInAnonymously,
   signInWithEmailAndPassword,
   signInWithPopup,
   signInWithRedirect,
@@ -106,6 +107,24 @@ export async function ensureSignedIn() {
   if (redirectedUser) return redirectedUser;
 
   return signInWithGoogle();
+}
+
+export async function ensureGuestSession() {
+  const auth = getFirebaseAuth();
+  if (!auth) {
+    throw new Error('Missing Firebase config. Set WORLD_EXPLORER_FIREBASE first.');
+  }
+  if (auth.currentUser) return auth.currentUser;
+  try {
+    const result = await signInAnonymously(auth);
+    return result?.user || auth.currentUser;
+  } catch (err) {
+    const code = String(err && err.code ? err.code : '');
+    if (code === 'auth/operation-not-allowed') {
+      throw new Error('Guest multiplayer is currently unavailable. Enable Anonymous auth or sign in to continue.');
+    }
+    throw new Error(friendlyAuthMessage(err));
+  }
 }
 
 export async function signOutUser() {

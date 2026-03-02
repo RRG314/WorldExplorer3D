@@ -34,6 +34,7 @@ function findFirstMapHit(items = [], point = { x: 0, y: 0 }, radius = 8, project
 }
 
 function setupUI() {
+  const LAST_LOCATION_STORAGE_KEY = 'worldExplorer3D.lastLocation.v1';
   const bindTouchFriendlyPress = (el, handler) => {
     if (!el || typeof handler !== 'function') return;
     let suppressNextClick = false;
@@ -1086,6 +1087,12 @@ function setupUI() {
   };
   let titleLaunchMode = 'earth'; // earth | moon | space
   let globeSelector = null;
+  let skipGlobeGateOnce = false;
+  const emitTutorialEvent = (eventName, payload = {}) => {
+    if (typeof appCtx.tutorialOnEvent === 'function') {
+      appCtx.tutorialOnEvent(eventName, payload);
+    }
+  };
 
   const setLaunchMode = (mode) => {
     const nextMode = mode === 'moon' || mode === 'space' ? mode : 'earth';
@@ -1131,13 +1138,118 @@ function setupUI() {
     if (titleStartButton) titleStartButton.click();
   };
 
+  const readLastLocationSelection = () => {
+    try {
+      const raw = localStorage.getItem(LAST_LOCATION_STORAGE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (!parsed || typeof parsed !== 'object') return null;
+      return parsed;
+    } catch {
+      return null;
+    }
+  };
+
+  const persistLastLocationSelection = (launchMode = 'earth') => {
+    try {
+      const payload = {
+        selLoc: appCtx.selLoc === 'custom' ? 'custom' : String(appCtx.selLoc || 'baltimore'),
+        launchMode: launchMode === 'moon' || launchMode === 'space' ? launchMode : 'earth',
+        ts: Date.now()
+      };
+      if (payload.selLoc === 'custom') {
+        const lat = Number(appCtx.customLoc?.lat ?? document.getElementById('customLat')?.value);
+        const lon = Number(appCtx.customLoc?.lon ?? document.getElementById('customLon')?.value);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+        payload.customLoc = {
+          lat,
+          lon,
+          name: String(appCtx.customLoc?.name || 'Custom Location')
+        };
+      }
+      localStorage.setItem(LAST_LOCATION_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Storage is optional; ignore failures.
+    }
+  };
+
+  const applyLastLocationSelection = (record) => {
+    if (!record || typeof record !== 'object') return false;
+    const launch = record.launchMode === 'moon' || record.launchMode === 'space' ? record.launchMode : 'earth';
+    if (record.selLoc === 'custom' && record.customLoc) {
+      const lat = Number(record.customLoc.lat);
+      const lon = Number(record.customLoc.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) return false;
+      const customLatInput = document.getElementById('customLat');
+      const customLonInput = document.getElementById('customLon');
+      if (customLatInput) customLatInput.value = lat.toFixed(6);
+      if (customLonInput) customLonInput.value = lon.toFixed(6);
+      appCtx.customLoc = {
+        lat,
+        lon,
+        name: String(record.customLoc.name || 'Custom Location')
+      };
+      appCtx.selLoc = 'custom';
+      setTitleLocationMode('custom');
+      setLaunchMode(launch);
+      return true;
+    }
+
+    const locKey = String(record.selLoc || '');
+    if (!locKey || !appCtx.LOCS || !appCtx.LOCS[locKey]) return false;
+    const card = document.querySelector(`.loc[data-loc="${locKey}"]`);
+    if (card instanceof HTMLElement) {
+      document.querySelectorAll('.loc').forEach((e) => e.classList.remove('sel'));
+      card.classList.add('sel');
+    }
+    appCtx.selLoc = locKey;
+    setTitleLocationMode('suggested');
+    setLaunchMode(launch);
+    return true;
+  };
+
+  const startSection = document.querySelector('.start-section');
+  const startBtn = document.getElementById('startBtn');
+  const continueLastBtn = (() => {
+    if (!(startSection instanceof HTMLElement) || !(startBtn instanceof HTMLElement)) return null;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = 'continueLastLocationBtn';
+    btn.textContent = 'Continue Last Location';
+    btn.style.cssText = 'margin-top:8px;width:100%;background:#e2e8f0;border:none;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:600;color:#334155;cursor:pointer;display:none';
+    startSection.appendChild(btn);
+    return btn;
+  })();
+
+  const refreshContinueLastButton = () => {
+    if (!continueLastBtn) return;
+    const last = readLastLocationSelection();
+    continueLastBtn.style.display = last ? 'block' : 'none';
+  };
+
+  if (continueLastBtn) {
+    continueLastBtn.addEventListener('click', () => {
+      const last = readLastLocationSelection();
+      if (!last) return;
+      if (!applyLastLocationSelection(last)) return;
+      skipGlobeGateOnce = true;
+      triggerTitleStart();
+    });
+  }
+  refreshContinueLastButton();
+
   globeSelector = createGlobeSelector({
+    onOpen: () => {
+      emitTutorialEvent('opened_globe_selector');
+    },
     onBack: () => {
       if (customPanel) customPanel.classList.remove('show');
     },
-    onStartHere: () => {
+    onStartHere: (selection = null) => {
+      emitTutorialEvent('location_selected', selection || {});
       setTitleLocationMode('custom');
       if (!appCtx.gameStarted) {
+        skipGlobeGateOnce = true;
         triggerTitleStart();
       } else if (typeof appCtx.loadRoads === 'function') {
         appCtx.loadRoads().then(() => {
@@ -1148,6 +1260,7 @@ function setupUI() {
     onMoonShortcut: () => {
       if (!appCtx.gameStarted) {
         setLaunchMode('moon');
+        skipGlobeGateOnce = true;
         triggerTitleStart();
       } else if (!appCtx.onMoon && !appCtx.travelingToMoon && typeof appCtx.directTravelToMoon === 'function') {
         appCtx.directTravelToMoon();
@@ -1156,6 +1269,7 @@ function setupUI() {
     onSpaceShortcut: () => {
       if (!appCtx.gameStarted) {
         setLaunchMode('space');
+        skipGlobeGateOnce = true;
         triggerTitleStart();
       } else if (!appCtx.onMoon && !appCtx.travelingToMoon && typeof appCtx.travelToMoon === 'function') {
         appCtx.travelToMoon();
@@ -1166,6 +1280,7 @@ function setupUI() {
   appCtx.openGlobeSelector = () => {
     setTitleLocationMode('custom');
     globeSelector.open();
+    emitTutorialEvent('opened_globe_selector');
   };
   appCtx.closeGlobeSelector = () => {
     globeSelector.close();
@@ -1297,6 +1412,18 @@ function setupUI() {
   }));
   // Start
   document.getElementById('startBtn').addEventListener('click', async () => {
+    const shouldGateToGlobe =
+      !appCtx.gameStarted &&
+      !skipGlobeGateOnce &&
+      String(appCtx.selLoc || '') === 'custom';
+    if (shouldGateToGlobe) {
+      setTitleLocationMode('custom');
+      if (globeSelector && typeof globeSelector.open === 'function') globeSelector.open();
+      emitTutorialEvent('opened_globe_selector');
+      return;
+    }
+    if (skipGlobeGateOnce) skipGlobeGateOnce = false;
+
     if (globeSelector && typeof globeSelector.isOpen === 'function' && globeSelector.isOpen()) {
       globeSelector.close();
     }
@@ -1417,6 +1544,12 @@ function setupUI() {
     if (typeof appCtx.startMode === 'function') {
       appCtx.startMode();
     }
+    persistLastLocationSelection(launchMode);
+    refreshContinueLastButton();
+    emitTutorialEvent('spawned_in_world', {
+      location: appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOCS?.[appCtx.selLoc] || null,
+      launchMode
+    });
     if (pendingFlowerChallengeRequested && typeof appCtx.startFlowerChallenge === 'function') {
       let challengeStartAttempts = 0;
       const attemptStartChallenge = () => {
@@ -1839,6 +1972,7 @@ function setupUI() {
   appCtx.updateControlsModeUI = updateControlsModeUI;
   appCtx.updateMobileTouchControls = updateMobileTouchControls;
   function goToMainMenu() {
+    emitTutorialEvent('opened_main_menu', { source: 'main_menu_button' });
     appCtx.gameStarted = false;appCtx.paused = false;appCtx.clearObjectives();appCtx.clearPolice();appCtx.policeOn = false;appCtx.eraseTrack();appCtx.closePropertyPanel();appCtx.closeHistoricPanel();appCtx.clearPropertyMarkers();appCtx.realEstateMode = false;appCtx.historicMode = false;
     if (typeof appCtx.stopFlowerChallenge === 'function') appCtx.stopFlowerChallenge();
     if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
@@ -2014,6 +2148,7 @@ function setupUI() {
     document.getElementById('fDriving').classList.add('on');
     document.getElementById('fWalk').classList.remove('on');
     document.getElementById('fDrone').classList.remove('on');
+    emitTutorialEvent('mode_switched', { mode: 'drive', source: 'ui_button' });
     updateControlsModeUI();
     closeAllFloatMenus();
   });
@@ -2034,6 +2169,10 @@ function setupUI() {
       document.getElementById('fWalk').classList.add('on');
       document.getElementById('fDrone').classList.remove('on');
     }
+    emitTutorialEvent('mode_switched', {
+      mode: appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' ? 'walk' : 'drive',
+      source: 'ui_button'
+    });
     updateControlsModeUI();
     closeAllFloatMenus();
   });
@@ -2076,6 +2215,7 @@ function setupUI() {
     document.getElementById('fDriving').classList.remove('on');
     document.getElementById('fWalk').classList.remove('on');
     document.getElementById('fDrone').classList.add('on');
+    emitTutorialEvent('mode_switched', { mode: 'drone', source: 'ui_button' });
     updateControlsModeUI();
     closeAllFloatMenus();
   });

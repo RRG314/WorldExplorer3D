@@ -1,139 +1,150 @@
 # Architecture
 
-Last reviewed: 2026-02-28
+Last reviewed: 2026-03-02
 
-This document describes the current platform architecture for gameplay, multiplayer, account, optional donations, and security.
+System topology for gameplay runtime, multiplayer state, account/donations, and security boundaries.
 
 ## 1. System Topology
 
 ### Frontend surfaces
 
-- root landing/runtime compatibility: `index.html` + `js/*`
-- main app runtime: `app/index.html` + `app/js/*`
-- account center: `account/index.html`
-- about/legal content: `about/index.html`, `legal/*`
-- Firebase-hosted mirror under `public/*`
+- Landing: `index.html`
+- App runtime: `app/index.html` + `app/js/*`
+- Account center: `account/index.html`
+- Legal/content: `about/*`, `legal/*`
+- Hosting mirror: `public/*`
 
 ### Backend services
 
 - Firebase Authentication
 - Cloud Firestore
 - Cloud Functions (`functions/index.js`)
-- Stripe Checkout/Donation Portal/Webhooks
+- Stripe Checkout/Portal/Webhook
 
-## 2. Runtime Layers
+## 2. Runtime Layering
 
-### 2.1 App runtime
+### 2.1 Boot and load chain
 
-- bootstrap and module load: `app/js/bootstrap.js`, `app/js/modules/*`, `app/js/app-entry.js`
-- engine/state: `engine.js`, `state.js`, `shared-context.js`, `main.js`
-- world and rendering: `world.js`, `terrain.js`, `ground.js`, `map.js`, `sky.js`, `solar-system.js`, `space.js`
-- movement and controls: `input.js`, `physics.js`, `walking.js`, `hud.js`, `ui.js`
+- `app/js/bootstrap.js`
+- `app/js/modules/manifest.js`
+- `app/js/modules/script-loader.js`
+- `app/js/app-entry.js`
+
+Flow:
+
+1. load critical vendor scripts
+2. import app module entrypoint
+3. initialize engine/UI/tutorial/multiplayer
+4. start render loop
+
+### 2.2 Core app runtime
+
+- state/context: `shared-context.js`, `state.js`
+- world/render: `engine.js`, `world.js`, `terrain.js`, `sky.js`, `space.js`, `solar-system.js`
+- controls/physics: `input.js`, `physics.js`, `walking.js`, `hud.js`, `map.js`
 - gameplay systems: `game.js`, `flower-challenge.js`, `blocks.js`, `memory.js`, `real-estate.js`
+- UI orchestration: `ui.js`, `ui/globe-selector.js`, `tutorial/tutorial.js`
 
-### 2.2 Multiplayer runtime modules (`app/js/multiplayer`)
+## 3. Multiplayer Architecture
 
-- `rooms.js`: room lifecycle, settings, deterministic seed, saved room shortcuts, owner delete
-- `presence.js`: heartbeat and pose writes, stale filtering
-- `ghosts.js`: remote proxy rendering and smoothing
-- `chat.js`: chat send/listen/report and anti-spam controls
-- `social.js`: friends, invites, recent players
-- `artifacts.js`: shared artifacts and home base
-- `blocks.js`: shared block sync
+### 3.1 Module map (`app/js/multiplayer/*`)
+
+- `rooms.js`: room lifecycle, saved rooms, home base, room settings
+- `presence.js`: player heartbeat/pose writes and reads
+- `ghosts.js`: remote player proxy rendering + smoothing
+- `chat.js`: room chat and report/safety handling
+- `social.js`: friends/invites/recent players
+- `artifacts.js`: room artifacts CRUD/listen
+- `blocks.js`: shared block CRUD/listen
 - `painttown.js`: paint claim sync
-- `loop.js`: leaderboard and activity feed utilities
-- `ui-room.js`: multiplayer UI orchestration
+- `loop.js`: weekly room helpers, activity/leaderboard
+- `ui-room.js`: UI orchestration and cross-module wiring
 
-## 3. Multiplayer State Model
+### 3.2 Data ownership model
 
-### 3.1 Persistent room state
+- Room owner controls room updates/deletion.
+- Room members can participate in allowed room subcollections.
+- Saved room records are user-owned (`users/{uid}/myRooms`).
+- Public room read access is broader than private room access.
 
-Persistent unless owner deletes room:
+### 3.3 Presence/ghost model
 
-- `rooms/{roomId}`
-- `users/{uid}/myRooms/{roomCode}`
-- `rooms/{roomId}/blocks/*`
-- `rooms/{roomId}/paintClaims/*`
-- `rooms/{roomId}/state/homeBase`
+- Periodic presence writes with throttling.
+- Client stale filtering + expiresAt semantics.
+- Remote entities rendered as mode-specific proxies (walk/car/drone/space).
 
-### 3.2 Ephemeral state with TTL
+## 4. Location and Tutorial Architecture
 
-- `rooms/{roomId}/players/*`
-- `rooms/{roomId}/chat/*`
-- `rooms/{roomId}/chatState/*`
-- `users/{uid}/incomingInvites/*`
-- `users/{uid}/recentPlayers/*`
-- `activityFeed/*`
-- `rooms/{roomId}/artifacts/*`
+### 4.1 Globe selector
 
-Client-side stale filtering is still used for real-time UX.
+- Interactive Earth pick and search/coordinate fallback.
+- Reverse geocode pipeline with cache and fallback provider.
+- Favorites split into preset and user-saved groups.
+- Saved favorites persisted in browser local storage.
 
-## 4. Multiplayer Visual Sync Model
+### 4.2 Tutorial
 
-Presence cadence and filtering:
+- Stage machine persisted per browser.
+- Event-driven progression from runtime events (mode changes, room actions, build actions).
+- Completion state suppresses future automatic re-showing.
 
-- heartbeat interval: `3s`
-- min write interval: `2s`
-- movement threshold: `1.0m`
-- rotation threshold: `0.08 rad`
-- stale player hide threshold: `15s`
+## 5. Account and Billing Architecture
 
-Ghost rendering (`ghosts.js`):
+### 5.1 Client modules
 
-- mode-based proxies: `walker`, `car`, `drone`, `space`
-- prediction: velocity-based extrapolation from last server pose
-- smoothing: damped interpolation and yaw smoothing
-- jump protection: teleport clamp for large deltas
-- render cadence: internal tick capped to ~30 FPS
+- `js/auth-ui.js`: auth providers and auth token helpers
+- `js/entitlements.js`: user profile/plan normalization
+- `js/billing.js`: authenticated HTTPS function calls
+- `account/index.html`: account UI and social controls
 
-## 5. Security Architecture (Firestore Rules)
+### 5.2 Functions API
 
-Rule domains enforce:
+- callable over HTTPS with bearer auth
+- CORS allowlist enforcement
+- Stripe customer ownership verification
+- webhook-driven plan synchronization to Firestore
 
-- authenticated access for multiplayer data
-- room visibility/member/owner/mod boundaries
-- room-create quota coupling with user counter writes
-- presence write ownership and throttling checks
-- chat payload + chatState transition validation
-- friend/invite ownership constraints
-- saved-room ownership constraints (`myRooms`)
-- block/claim/artifact/homeBase validation by room permissions
+## 6. Firestore and Security Architecture
 
-## 6. Account and Donation API Architecture
+### 6.1 Primary collections
 
-Functions API (`us-central1`):
+- `users`
+- `rooms`
+- `flowerLeaderboard`
+- `paintTownLeaderboard`
+- `activityFeed`
+- `explorerLeaderboard`
 
-- `createCheckoutSession`
-- `createPortalSession`
-- `startTrial` (legacy compatibility path)
-- `enableAdminTester`
-- `getAccountOverview`
-- `listBillingReceipts`
-- `updateAccountProfile`
-- `deleteAccount`
-- `stripeWebhook`
+### 6.2 Key subcollections
 
-Account page merges:
+- user: `friends`, `recentPlayers`, `incomingInvites`, `myRooms`
+- room: `players`, `chat`, `chatState`, `artifacts`, `blocks`, `paintClaims`, `state`
 
-- Firebase Auth user state
-- Firestore user profile and social data
-- Cloud Function account/donation responses
+### 6.3 Rule domains
+
+- self-user document ownership
+- room visibility/member/owner/mod checks
+- room create quota coupling (`roomCreateCount`, `roomCreateLimit`)
+- strict schema validation for room/player/chat/social payloads
+- chat anti-spam transition validation
 
 ## 7. Deployment Architecture
 
 ### Firebase Hosting
 
-- hosting root: `public/`
-- function rewrites for account/donation APIs
-- legal page rewrites
+- root: `public`
+- rewrite forwarding to functions for account/billing routes
+- legal rewrites
 
-### GitHub Pages
+### GitHub Pages compatibility
 
-- branch-root deploy supported
-- root loader routes to `/app/` and uses app module entrypoints
+- branch-root serving supported for landing/app routes
+- still depends on Firebase backend services
 
 ## 8. Validation Architecture
 
-- Firestore rules tests: `tests/firestore.rules.security.test.mjs`
-- PaintTown integration test: `tests/painttown.integration.test.mjs`
-- rule-test launcher: `scripts/test-rules.mjs` (cross-platform Java detection)
+- mirror parity: `scripts/verify-mirror.mjs`
+- rules suite: `scripts/test-rules.mjs`, `tests/firestore.rules.security.test.mjs`
+- runtime invariants: `scripts/test-runtime-invariants.mjs`
+- release gate: `scripts/release-verify.mjs`
+

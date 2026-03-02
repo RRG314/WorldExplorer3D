@@ -93,6 +93,7 @@ function renderLoop(t = 0) {
   const dt = Math.min((t - appCtx.lastTime) / 1000, 0.1);
   appCtx.lastTime = t;
   if (typeof appCtx.recordPerfFrame === 'function') appCtx.recordPerfFrame(dt);
+  if (typeof appCtx.tutorialUpdate === 'function') appCtx.tutorialUpdate(dt);
   if (appCtx.renderer?.info?.autoReset === false && typeof appCtx.renderer.info.reset === 'function') {
     appCtx.renderer.info.reset();
   }

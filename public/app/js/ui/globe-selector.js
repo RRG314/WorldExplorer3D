@@ -53,6 +53,9 @@ function createGlobeSelector(options = {}) {
   let reverseLookupToken = 0;
   let activeCityTab = 'nearby';
   let nearbyCities = [];
+  let favoritePresetList = [];
+  let favoriteSavedList = [];
+  const reverseLookupCache = new Map();
 
   let scene = null;
   let camera = null;
@@ -67,23 +70,11 @@ function createGlobeSelector(options = {}) {
   let savedFavoriteMaterial = null;
   let favoriteMarkerNodes = [];
 
-  const menuFavoriteCities = Object.entries(appCtx.LOCS || {}).map(([key, entry]) => {
-    const lat = toFiniteNumber(entry?.lat);
-    const lon = toFiniteNumber(entry?.lon);
-    if (lat == null || lon == null) return null;
-    return {
-      key: String(key || ''),
-      name: String(entry?.name || key || 'City').trim(),
-      lat: Number(lat),
-      lon: Number(lon),
-      source: 'menu'
-    };
-  }).filter(Boolean);
   let savedFavoriteCities = [];
 
   let cameraDistance = 2.8;
-  const minDistance = 2.1;
-  const maxDistance = 3.8;
+  const minDistance = 1.35;
+  const maxDistance = 4.4;
 
   let pointerActive = false;
   let pointerDragDistance = 0;
@@ -92,6 +83,21 @@ function createGlobeSelector(options = {}) {
   let pointerDownTime = 0;
   let dragLastX = 0;
   let dragLastY = 0;
+
+  function getMenuFavoriteCities() {
+    return Object.entries(appCtx.LOCS || {}).map(([key, entry]) => {
+      const lat = toFiniteNumber(entry?.lat);
+      const lon = toFiniteNumber(entry?.lon);
+      if (lat == null || lon == null) return null;
+      return {
+        key: String(key || ''),
+        name: String(entry?.name || key || 'City').trim(),
+        lat: Number(lat),
+        lon: Number(lon),
+        source: 'menu'
+      };
+    }).filter(Boolean);
+  }
 
   function setBodyScrollLock(locked) {
     document.body?.classList.toggle('globe-selector-open', !!locked);
@@ -128,7 +134,7 @@ function createGlobeSelector(options = {}) {
   function buildFavoriteCities() {
     const out = [];
     const seen = new Set();
-    const merged = [...savedFavoriteCities, ...menuFavoriteCities];
+    const merged = [...savedFavoriteCities, ...getMenuFavoriteCities()];
     merged.forEach((city) => {
       const normalized = normalizeCityRecord(city, city?.source || 'menu');
       if (!normalized) return;
@@ -138,6 +144,52 @@ function createGlobeSelector(options = {}) {
       out.push(normalized);
     });
     return out;
+  }
+
+  function getFavoriteCityGroups() {
+    const presets = getMenuFavoriteCities().
+    map((city) => normalizeCityRecord(city, 'menu')).
+    filter(Boolean);
+    const saved = savedFavoriteCities.
+    map((city) => normalizeCityRecord(city, 'saved')).
+    filter(Boolean);
+
+    const dedupe = (list = []) => {
+      const out = [];
+      const seen = new Set();
+      list.forEach((city) => {
+        const key = cityDedupKey(city);
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        out.push(city);
+      });
+      return out;
+    };
+
+    return {
+      presets: dedupe(presets),
+      saved: dedupe(saved)
+    };
+  }
+
+  function findNearestKnownCity(lat, lon) {
+    const cities = buildFavoriteCities();
+    if (!cities.length || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    let best = null;
+    let bestDist = Infinity;
+    cities.forEach((city) => {
+      const d = distanceKmBetween(lat, lon, city.lat, city.lon);
+      if (d < bestDist) {
+        bestDist = d;
+        best = city;
+      }
+    });
+    return best;
+  }
+
+  function cityLocationLabel(city) {
+    if (!city) return '';
+    return `${Number(city.lat).toFixed(2)}, ${Number(city.lon).toFixed(2)}`;
   }
 
   function loadSavedFavoriteCities() {
@@ -216,8 +268,12 @@ function createGlobeSelector(options = {}) {
   }
 
   function buildNearbyCities(lat, lon) {
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
-    return buildFavoriteCities().
+    const favorites = buildFavoriteCities();
+    if (!favorites.length) return [];
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return favorites.slice(0, 6).map((city) => ({ ...city, distanceKm: NaN }));
+    }
+    return favorites.
     map((city) => ({
       ...city,
       distanceKm: distanceKmBetween(lat, lon, city.lat, city.lon)
@@ -227,7 +283,8 @@ function createGlobeSelector(options = {}) {
   }
 
   function getActiveCityList() {
-    return activeCityTab === 'favorites' ? buildFavoriteCities() : nearbyCities;
+    if (activeCityTab !== 'favorites') return nearbyCities;
+    return [...favoriteSavedList, ...favoritePresetList];
   }
 
   function setFavoriteMarkersVisible() {
@@ -243,18 +300,17 @@ function createGlobeSelector(options = {}) {
     favoriteMarkerNodes = [];
     const favorites = buildFavoriteCities();
     favorites.forEach((city) => {
-      const isSelected = cityMatchesSelection(city);
       const marker = new THREE.Mesh(
         favoriteMarkerGeometry,
         city.source === 'saved' ? savedFavoriteMaterial : menuFavoriteMaterial
       );
       const position = latLonToLocalPoint(city.lat, city.lon, 1.018);
       marker.position.set(position.x, position.y, position.z);
-      marker.scale.setScalar(isSelected ? 1.35 : 1.0);
       marker.userData.favoriteCity = city;
       favoriteMarkerGroup.add(marker);
       favoriteMarkerNodes.push({ city, mesh: marker });
     });
+    applyMarkerScales();
     setFavoriteMarkersVisible();
   }
 
@@ -264,7 +320,7 @@ function createGlobeSelector(options = {}) {
     favoritesTabBtn?.classList.toggle('active', activeCityTab === 'favorites');
     if (cityListHint) {
       cityListHint.textContent = activeCityTab === 'favorites' ?
-      'Favorites include prelisted cities and your saved custom picks. Click list or globe markers.' :
+      'Favorites list includes preset cities and your saved cities. Saved entries can be deleted.' :
       'Closest menu cities to your selected point.';
     }
     renderCityList();
@@ -273,21 +329,54 @@ function createGlobeSelector(options = {}) {
 
   function renderCityList() {
     if (!cityList) return;
-    const list = getActiveCityList();
-    if (!Array.isArray(list) || list.length === 0) {
-      cityList.innerHTML = activeCityTab === 'nearby' ?
-      '<li class="globe-selector-city-empty">Pick a point on the globe to see nearby cities.</li>' :
-      '<li class="globe-selector-city-empty">No favorites configured.</li>';
+    if (activeCityTab === 'nearby') {
+      const list = nearbyCities;
+      if (!Array.isArray(list) || list.length === 0) {
+        cityList.innerHTML = '<li class="globe-selector-city-empty">Pick a point on the globe to see nearby cities.</li>';
+        return;
+      }
+      cityList.innerHTML = list.map((city, index) => {
+        const selectedClass = cityMatchesSelection(city) ? ' style="border-color:#667eea;background:#eef2ff"' : '';
+        const meta = Number.isFinite(city.distanceKm) ?
+          `${city.distanceKm.toFixed(0)} km away` :
+          cityLocationLabel(city);
+        return `<li class="globe-selector-city-item" data-city-source="nearby" data-city-index="${index}"${selectedClass}><div class="globe-selector-city-item-main"><span class="globe-selector-city-item-name">${city.name}</span><span class="globe-selector-city-item-meta">${meta}</span></div></li>`;
+      }).join('');
       return;
     }
 
-    cityList.innerHTML = list.map((city, index) => {
-      const selectedClass = cityMatchesSelection(city) ? ' style="border-color:#667eea;background:#eef2ff"' : '';
-      const meta = activeCityTab === 'nearby' ?
-      `${city.distanceKm.toFixed(0)} km away` :
-      `${city.source === 'saved' ? 'Saved' : 'Menu'} • ${city.lat.toFixed(2)}, ${city.lon.toFixed(2)}`;
-      return `<li class="globe-selector-city-item" data-city-index="${index}" data-city-tab="${activeCityTab}"${selectedClass}><span class="globe-selector-city-item-name">${city.name}</span><span class="globe-selector-city-item-meta">${meta}</span></li>`;
-    }).join('');
+    const groups = getFavoriteCityGroups();
+    favoritePresetList = groups.presets;
+    favoriteSavedList = groups.saved;
+
+    if (!favoritePresetList.length && !favoriteSavedList.length) {
+      cityList.innerHTML = '<li class="globe-selector-city-empty">No favorite cities yet. Save one with Start Here.</li>';
+      return;
+    }
+
+    const html = [];
+    if (favoritePresetList.length) {
+      html.push('<li class="globe-selector-city-section">Preset Cities</li>');
+      favoritePresetList.forEach((city, index) => {
+        const selectedClass = cityMatchesSelection(city) ? ' style="border-color:#667eea;background:#eef2ff"' : '';
+        html.push(
+          `<li class="globe-selector-city-item" data-city-source="preset" data-city-index="${index}"${selectedClass}><div class="globe-selector-city-item-main"><span class="globe-selector-city-item-name">${city.name}</span><span class="globe-selector-city-item-meta">${cityLocationLabel(city)}</span></div></li>`
+        );
+      });
+    }
+
+    html.push('<li class="globe-selector-city-section">Your Saved Favorites</li>');
+    if (favoriteSavedList.length) {
+      favoriteSavedList.forEach((city, index) => {
+        const selectedClass = cityMatchesSelection(city) ? ' style="border-color:#667eea;background:#eef2ff"' : '';
+        html.push(
+          `<li class="globe-selector-city-item" data-city-source="saved" data-city-index="${index}"${selectedClass}><div class="globe-selector-city-item-main"><span class="globe-selector-city-item-name">${city.name}</span><span class="globe-selector-city-item-meta">${cityLocationLabel(city)}</span></div><button class="globe-selector-city-delete" type="button" data-delete-saved-index="${index}" aria-label="Delete saved favorite ${city.name}">Delete</button></li>`
+        );
+      });
+    } else {
+      html.push('<li class="globe-selector-city-empty">No saved favorites yet. Use Start Here to save this location.</li>');
+    }
+    cityList.innerHTML = html.join('');
   }
 
   function focusOnSelection(lat, lon) {
@@ -361,6 +450,7 @@ function createGlobeSelector(options = {}) {
       markerMesh.position.set(p.x, p.y, p.z);
       markerMesh.visible = true;
     }
+    applyMarkerScales();
     nearbyCities = buildNearbyCities(selected.lat, selected.lon);
     renderCityList();
     renderFavoriteMarkers();
@@ -379,42 +469,121 @@ function createGlobeSelector(options = {}) {
     renderSelection();
   }
 
-  async function reverseLookupPlace(lat, lon) {
-    const requestToken = ++reverseLookupToken;
-    let timeoutId = 0;
-    try {
-      const controller = new AbortController();
-      timeoutId = setTimeout(() => controller.abort(), 6000);
-      const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&addressdetails=1&lat=${encodeURIComponent(lat.toFixed(6))}&lon=${encodeURIComponent(lon.toFixed(6))}`;
-      const response = await fetch(url, { signal: controller.signal });
-      if (!response.ok) return;
-      const payload = await response.json();
-      if (!openState || requestToken !== reverseLookupToken || !selected) return;
-      if (Math.abs(selected.lat - lat) > 0.00001 || Math.abs(selected.lon - lon) > 0.00001) return;
+  function uniqueNonEmptyParts(parts = []) {
+    const out = [];
+    const seen = new Set();
+    parts.forEach((part) => {
+      const text = String(part || '').trim();
+      if (!text) return;
+      const key = text.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(text);
+    });
+    return out;
+  }
 
-      const addr = payload?.address || {};
-      const shortName =
+  function parseReverseAddress(payload = {}) {
+    const addr = payload?.address || {};
+    const adminRows = Array.isArray(payload?.localityInfo?.administrative) ? payload.localityInfo.administrative : [];
+    const countyFromBdc = adminRows.find((row) => Number(row?.adminLevel) === 6)?.name ||
+      adminRows.find((row) => /county/i.test(String(row?.description || '')))?.name ||
+      '';
+    const cleanCountry = (value) => String(value || '').replace(/\s*\(the\)\s*$/i, '').trim();
+    const city =
       addr.city ||
       addr.town ||
       addr.village ||
       addr.municipality ||
       addr.city_district ||
       addr.suburb ||
-      addr.county ||
-      payload?.name ||
+      addr.hamlet ||
+      payload?.city ||
+      payload?.locality ||
       '';
-      const country = addr.country || '';
-      const resolved = [shortName, country].filter(Boolean).join(', ') || (payload?.display_name || '').split(',').slice(0, 2).join(',').trim();
-      if (resolved) {
-        selected.name = resolved;
+    const county =
+      addr.county ||
+      addr.borough ||
+      addr.district ||
+      addr.state_district ||
+      countyFromBdc ||
+      '';
+    const region =
+      addr.state ||
+      addr.region ||
+      addr.province ||
+      addr.territory ||
+      payload?.principalSubdivision ||
+      '';
+    const country = cleanCountry(addr.country || payload?.countryName || '');
+    const parts = uniqueNonEmptyParts([city, county, region, country]);
+    const display =
+      parts.join(', ') ||
+      String(payload?.display_name || '').split(',').slice(0, 4).map((v) => String(v || '').trim()).filter(Boolean).join(', ');
+
+    return {
+      display,
+      queryLabel: city || county || region || country || '',
+      details: { city, county, region, country }
+    };
+  }
+
+  async function fetchJsonWithTimeout(url, timeoutMs = 6000) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const response = await fetch(url, { signal: controller.signal });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      return await response.json();
+    } finally {
+      clearTimeout(timeoutId);
+    }
+  }
+
+  async function fetchReversePayload(lat, lon) {
+    const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&addressdetails=1&lat=${encodeURIComponent(lat.toFixed(6))}&lon=${encodeURIComponent(lon.toFixed(6))}`;
+    try {
+      return await fetchJsonWithTimeout(nominatimUrl, 6000);
+    } catch {
+      const bdcUrl = `https://api-bdc.io/data/reverse-geocode-client?latitude=${encodeURIComponent(lat.toFixed(6))}&longitude=${encodeURIComponent(lon.toFixed(6))}&localityLanguage=en`;
+      return await fetchJsonWithTimeout(bdcUrl, 7000);
+    }
+  }
+
+  async function reverseLookupPlace(lat, lon) {
+    const requestToken = ++reverseLookupToken;
+    const cacheKey = `${Number(lat).toFixed(3)},${Number(lon).toFixed(3)}`;
+    const cached = reverseLookupCache.get(cacheKey);
+    if (cached && selected && Math.abs(selected.lat - lat) <= 0.00001 && Math.abs(selected.lon - lon) <= 0.00001) {
+      selected.name = cached.display;
+      selected.locationDetails = cached.details || null;
+      syncLegacyCustomState(selected);
+      renderSelection();
+      return;
+    }
+    try {
+      const payload = await fetchReversePayload(lat, lon);
+      if (!openState || requestToken !== reverseLookupToken || !selected) return;
+      if (Math.abs(selected.lat - lat) > 0.00001 || Math.abs(selected.lon - lon) > 0.00001) return;
+
+      const parsed = parseReverseAddress(payload);
+      if (parsed.display) {
+        reverseLookupCache.set(cacheKey, parsed);
+        selected.name = parsed.display;
+        selected.locationDetails = parsed.details;
         syncLegacyCustomState(selected);
         renderSelection();
-        if (searchInput && !searchInput.value.trim()) searchInput.value = shortName || resolved;
+        if (searchInput && !searchInput.value.trim()) searchInput.value = parsed.queryLabel || parsed.display;
       }
     } catch {
-      // Keep basic coordinate label on network failures.
-    } finally {
-      if (timeoutId) clearTimeout(timeoutId);
+      if (!openState || requestToken !== reverseLookupToken || !selected) return;
+      if (Math.abs(selected.lat - lat) > 0.00001 || Math.abs(selected.lon - lon) > 0.00001) return;
+      const fallbackCity = findNearestKnownCity(lat, lon);
+      if (fallbackCity) {
+        selected.name = fallbackCity.name;
+        syncLegacyCustomState(selected);
+        renderSelection();
+      }
     }
   }
 
@@ -452,6 +621,7 @@ function createGlobeSelector(options = {}) {
           name: appCtx.customLoc?.name || query,
           focus: true
         });
+        reverseLookupPlace(foundLat, foundLon);
       }
 
       if (searchStatus) {
@@ -479,10 +649,26 @@ function createGlobeSelector(options = {}) {
     renderer.setSize(width, height, false);
     camera.aspect = width / height;
     camera.updateProjectionMatrix();
+    applyMarkerScales();
+  }
+
+  function getMarkerScale() {
+    const zoomScale = cameraDistance / 2.8;
+    return Math.max(0.34, Math.min(1.0, zoomScale));
+  }
+
+  function applyMarkerScales() {
+    const zoomScale = getMarkerScale();
+    if (markerMesh) markerMesh.scale.setScalar(zoomScale);
+    favoriteMarkerNodes.forEach((entry) => {
+      const selectedScale = cityMatchesSelection(entry.city) ? 1.26 : 1.0;
+      entry.mesh.scale.setScalar(selectedScale * zoomScale);
+    });
   }
 
   function renderFrame() {
     if (!openState) return;
+    applyMarkerScales();
     if (renderer && scene && camera) renderer.render(scene, camera);
   }
 
@@ -535,8 +721,11 @@ function createGlobeSelector(options = {}) {
     const localPoint = hits[0].point.clone();
     earthMesh.worldToLocal(localPoint);
     const next = localPointToLatLon(localPoint);
-    setSelection(next.lat, next.lon, { name: 'Resolving city…' });
+    const nearestCity = findNearestKnownCity(next.lat, next.lon);
+    const fallbackName = nearestCity?.name || `Selected ${next.lat.toFixed(2)}, ${next.lon.toFixed(2)}`;
+    setSelection(next.lat, next.lon, { name: fallbackName });
     reverseLookupPlace(next.lat, next.lon);
+    if (searchInput) searchInput.value = fallbackName;
   }
 
   function initGlobeScene() {
@@ -601,14 +790,14 @@ function createGlobeSelector(options = {}) {
     globeRoot.add(earthMesh);
 
     markerMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.024, 16, 12),
+      new THREE.SphereGeometry(0.018, 14, 12),
       new THREE.MeshBasicMaterial({ color: 0xff3b30 })
     );
     markerMesh.visible = false;
     globeRoot.add(markerMesh);
 
     favoriteMarkerGroup = new THREE.Group();
-    favoriteMarkerGeometry = new THREE.SphereGeometry(0.014, 12, 10);
+    favoriteMarkerGeometry = new THREE.SphereGeometry(0.009, 10, 9);
     menuFavoriteMaterial = new THREE.MeshBasicMaterial({ color: 0x60a5fa });
     savedFavoriteMaterial = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
     globeRoot.add(favoriteMarkerGroup);
@@ -616,7 +805,7 @@ function createGlobeSelector(options = {}) {
     try {
       const loader = new THREE.TextureLoader();
       loader.load(
-        'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg',
+        '/app/assets/textures/earth_atmos_2048.jpg',
         (texture) => {
           texture.wrapS = THREE.RepeatWrapping;
           texture.wrapT = THREE.ClampToEdgeWrapping;
@@ -646,6 +835,7 @@ function createGlobeSelector(options = {}) {
     raycaster = new THREE.Raycaster();
     ensureRendererSize();
     renderFavoriteMarkers();
+    applyMarkerScales();
 
     canvas.addEventListener('pointerdown', (event) => {
       pointerActive = true;
@@ -703,6 +893,7 @@ function createGlobeSelector(options = {}) {
     const lon = toFiniteNumber(lonInput?.value);
     if (lat == null || lon == null) return false;
     setSelection(lat, lon, { name: selected?.name || appCtx.customLoc?.name || 'Manual Coordinates' });
+    reverseLookupPlace(lat, lon);
     return true;
   }
 
@@ -728,8 +919,21 @@ function createGlobeSelector(options = {}) {
     if (savedLat != null && savedLon != null) {
       setSelection(savedLat, savedLon, { name: appCtx.customLoc?.name || 'Custom Location', focus: true });
     } else {
-      selected = null;
-      renderSelection();
+      const selectedLoc = String(appCtx.selLoc || '').trim();
+      const preset = selectedLoc && selectedLoc !== 'custom' ? appCtx.LOCS?.[selectedLoc] : null;
+      const presetLat = toFiniteNumber(preset?.lat);
+      const presetLon = toFiniteNumber(preset?.lon);
+      if (presetLat != null && presetLon != null) {
+        setSelection(presetLat, presetLon, { name: String(preset?.name || selectedLoc || 'Custom Location'), focus: true });
+      } else {
+        const fallback = buildFavoriteCities()[0] || null;
+        if (fallback) {
+          setSelection(fallback.lat, fallback.lon, { name: fallback.name, focus: true });
+        } else {
+          selected = null;
+          renderSelection();
+        }
+      }
     }
 
     if (searchInput) searchInput.value = appCtx.customLoc?.name || '';
@@ -813,12 +1017,38 @@ function createGlobeSelector(options = {}) {
   }
   if (cityList) {
     cityList.addEventListener('click', (event) => {
-      const target = event.target instanceof Element ? event.target.closest('[data-city-index]') : null;
+      const deleteBtn = event.target instanceof Element ? event.target.closest('[data-delete-saved-index]') : null;
+      if (deleteBtn instanceof HTMLElement) {
+        event.preventDefault();
+        event.stopPropagation();
+        const deleteIndex = Number.parseInt(deleteBtn.dataset.deleteSavedIndex || '', 10);
+        if (!Number.isFinite(deleteIndex) || deleteIndex < 0 || deleteIndex >= favoriteSavedList.length) return;
+        const cityToDelete = favoriteSavedList[deleteIndex];
+        if (!cityToDelete) return;
+        savedFavoriteCities = savedFavoriteCities.
+        filter((city) => Math.abs(city.lat - cityToDelete.lat) > 0.0005 || Math.abs(city.lon - cityToDelete.lon) > 0.0005);
+        persistSavedFavoriteCities();
+        renderFavoriteMarkers();
+        renderCityList();
+        if (searchStatus) {
+          searchStatus.textContent = `Removed saved favorite: ${cityToDelete.name}`;
+          searchStatus.style.color = '#64748b';
+        }
+        return;
+      }
+
+      const target = event.target instanceof Element ? event.target.closest('[data-city-source][data-city-index]') : null;
       if (!(target instanceof HTMLElement)) return;
       const index = Number.parseInt(target.dataset.cityIndex || '', 10);
       if (!Number.isFinite(index) || index < 0) return;
-      const list = getActiveCityList();
-      const city = Array.isArray(list) ? list[index] : null;
+      const source = String(target.dataset.citySource || '');
+      const city = source === 'nearby' ?
+        nearbyCities[index] :
+        source === 'preset' ?
+          favoritePresetList[index] :
+          source === 'saved' ?
+            favoriteSavedList[index] :
+            null;
       if (!city) return;
       setSelection(city.lat, city.lon, {
         name: city.name,

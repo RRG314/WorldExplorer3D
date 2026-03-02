@@ -4,137 +4,77 @@
 
 ### Added
 
-- Globe selector enhancements for `Custom Location`:
-  - city/place readout after globe pick
-  - nearby city short list based on selected point
-  - favorites tab populated from prelisted menu cities
-- Multiplayer map room overlays:
-  - public room markers visible to all players
-  - signed-in user room markers (owned/current) on minimap and large map
-- Weekly featured city public-room callout and deterministic weekly room code flow.
+- New full code-first inventory snapshot:
+  - `COMPLETE_INVENTORY_REPORT_2026-03-02.md`
 
 ### Changed
 
-- Public room browsing now works for signed-out users in view-only mode.
-- Firestore room read rules now allow anonymous reads for public rooms while keeping private-room access member-only.
+- Documentation suite refreshed to reflect current branch behavior:
+  - `README.md`
+  - `QUICKSTART.md`
+  - `USER_GUIDE.md`
+  - `ARCHITECTURE.md`
+  - `TECHNICAL_DOCS.md`
+  - `API_SETUP.md`
+  - `DOCUMENTATION_INDEX.md`
+  - `RELEASE_CHECKLIST.md`
+  - `KNOWN_ISSUES.md`
+  - `SECURITY_STORAGE_NOTICE.md`
+  - `GITHUB_DEPLOYMENT.md`
+  - `CONTRIBUTING.md`
+- Globe selector docs now reflect:
+  - grouped favorites list (preset + saved)
+  - delete support for saved favorites
+  - zoom-scaled markers
+  - immediate place label fallback on globe picks
+- Tutorial docs now reflect one-time completion behavior with manual restart option.
 
 ### Validation
 
-- Cross-platform smoke checks run for:
-  - desktop mac profile
-  - desktop Windows profile
-  - iPhone 12 profile
-  - Pixel 5 profile
-- Runtime invariants, mirror parity, and Firestore rules checks pass in local release verification workflow.
+- Documentation consistency pass completed against current source modules:
+  - `app/js/ui/globe-selector.js`
+  - `app/js/tutorial/tutorial.js`
+  - `app/js/multiplayer/*`
+  - `functions/index.js`
+  - `firestore.rules`
 
 ## [2026-02-28]
 
 ### Changed
 
-- Switched multiplayer access policy to signed-in free access (no payment required to create/join rooms).
-- Updated room quota defaults to match new model:
+- Multiplayer access policy documented as signed-in free access (no payment required to create/join rooms).
+- Room quota defaults documented and aligned:
   - free: `3`
   - supporter: `3`
   - pro: `10`
-- Updated account/app/multiplayer UI copy from trial/paywall language to optional donation language.
-- Donation CTAs now consistently route users to Account/Donations surfaces.
-
-### Code Paths Updated
-
-- Entitlements and account status:
-  - `js/entitlements.js`
-  - `public/js/entitlements.js`
-  - `account/index.html`
-  - `public/account/index.html`
-- Multiplayer access and room creation flow:
-  - `app/js/multiplayer/ui-room.js`
-  - `public/app/js/multiplayer/ui-room.js`
-  - `app/js/multiplayer/rooms.js`
-  - `public/app/js/multiplayer/rooms.js`
-- App auth/pro panel messaging:
-  - `app/index.html`
-  - `public/app/index.html`
-- Rule/backend quota alignment:
-  - `firestore.rules`
-  - `functions/index.js`
+- Donation/account copy updated to optional-donation model.
 
 ### Documentation
 
-- Rewrote and revalidated docs for donation model and free multiplayer access:
-  - `README.md`
-  - `USER_GUIDE.md`
-  - `QUICKSTART.md`
-  - `ARCHITECTURE.md`
-  - `TECHNICAL_DOCS.md`
-  - `API_SETUP.md`
-  - `SECURITY_STORAGE_NOTICE.md`
-  - `DOCUMENTATION_INDEX.md`
-- Added new inventory snapshot: `COMPLETE_INVENTORY_REPORT_2026-02-28.md`.
+- Prior documentation refresh completed across README, user guide, architecture, technical docs, setup, and index docs.
 
 ## [2026-02-25]
 
 ### Changed
 
-- Added new full inventory snapshot: `COMPLETE_INVENTORY_REPORT_2026-02-25.md`.
-- Added canonical controls documentation: `CONTROLS_REFERENCE.md`.
-- Refreshed core docs to match current runtime behavior and persisted room flow:
-  - `README.md`
-  - `QUICKSTART.md`
-  - `USER_GUIDE.md`
-  - `ARCHITECTURE.md`
-  - `TECHNICAL_DOCS.md`
-  - `DOCUMENTATION_INDEX.md`
-
-### Notes
-
-- Multiplayer remote visuals now documented as mode-based proxies (character/car/drone/space) with smoothing and extrapolation.
-- Saved room behavior now explicitly documented (open/delete/persistence model).
+- Added full inventory snapshot and controls documentation updates.
 
 ## [2026-02-23]
 
 ### Changed
 
-- PaintTown fire key changed from `Shift` to `Ctrl` (`ControlLeft`/`ControlRight`).
-- PaintTown HUD helper text updated to match new `Ctrl` fire control.
-- Paint input no longer binds right-click as alternate paint fire.
-- Hidden overlay elements no longer block PaintTown key handling unexpectedly.
-
-### Fixed
-
-- Removed legacy double-left-click camera toggle in both runtime paths.
-- Camera look remains right-click/middle-click hold to avoid rapid-fire camera interference.
-- Root runtime (`js/*`) and public runtime (`public/app/js/*`) control behavior resynchronized.
-
-### Documentation
-
-- Rewrote core docs to match current gameplay, account, multiplayer, and deployment state:
-  - `README.md`
-  - `QUICKSTART.md`
-  - `USER_GUIDE.md`
-  - `ARCHITECTURE.md`
-  - `TECHNICAL_DOCS.md`
-  - `API_SETUP.md`
-  - `GITHUB_DEPLOYMENT.md`
-  - `KNOWN_ISSUES.md`
-  - `DOCUMENTATION_INDEX.md`
-- Removed outdated inventory documents:
-  - `COMPLETE_INVENTORY_REPORT_2026-02-17.md`
-  - `COMPLETE_INVENTORY_REPORT_2026-02-19.md`
-  - `SYSTEMS_INVENTORY_REPORT_2026-02-14.md`
+- PaintTown fire key moved to `Ctrl`.
+- Legacy double-left-click camera toggle removed.
 
 ## [2026-02-18]
 
 ### Gameplay Update
 
-- Added `Paint the Town`, `Police Chase`, and `Find the Flower` game modes.
-- Switched PaintTown score emphasis to painted building count over fixed timer.
-- Expanded challenge support for flower and paint tracks.
-- Improved build-mode collision behavior for vehicles and walking mode.
+- Added Paint the Town, Police Chase, and Find the Flower modes.
 
 ## [2026-02-16]
 
 ### Platform/Billing Update
 
-- Added Firebase/Stripe billing path (`checkout`, `portal`, `webhook`).
-- Added trial and entitlement flow in account systems.
-- Added Firebase-hosted app/account/legal route split.
+- Added Firebase/Stripe billing path and account flow integration.
+

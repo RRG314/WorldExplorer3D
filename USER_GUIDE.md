@@ -2,188 +2,151 @@
 
 Last reviewed: 2026-03-02
 
-This guide explains current player-facing behavior across app, multiplayer, and account features.
+Player-facing behavior across app, multiplayer, tutorial, and account systems.
 
-## 1. Sign In and Navigation
-
-Main routes:
+## 1. Sign In and Main Routes
 
 - App: `/app/`
 - Account: `/account/`
 - About: `/about/`
 
-Use `Sign In / Sign Up` to authenticate with Email/Password or Google.
+Sign in methods:
 
-## 2. Multiplayer Access and Donations
+- Email + password
+- Google
 
-- Multiplayer is available to all signed-in users.
-- No payment is required to create/join rooms.
-- Optional monthly donations:
-  - `Supporter`: $1/month
-  - `Pro`: $5/month (includes early demo access perks)
+## 2. Starting a Session
 
-Current room creation limits:
+1. Open `Location` tab.
+2. Choose a preset city or `Custom`.
+3. For custom, use globe selector (`Start Here`) to spawn from picked coordinates.
+4. Choose game mode in `Games` tab.
+5. Click `Explore`.
 
-- `Free`: 3
-- `Supporter`: 3
-- `Pro`: 10
-- Admin tester mode: allowlist-only elevated limit
+## 3. Globe Selector Behavior
 
-Invite flow behavior:
+Features:
 
-- signed-in users can accept invite and join directly
-- signed-out users are prompted to sign in first
+- interactive globe click-to-pick
+- coordinate and place readout
+- search and manual lat/lon support
+- city tabs:
+  - `Nearby`: nearest known menu cities to current pick
+  - `Favorites`: preset cities + your saved favorites
+- saved favorites can be deleted directly in list
+- top shortcut buttons for Moon and Space
+- bottom buttons: `Main Menu`, `Start Here`
 
-## 3. Account Page Features
+Notes:
 
-The account page includes:
+- Clicking globe sets an immediate place fallback and then refines with reverse lookup.
+- Saved favorites are browser-local.
 
-- plan/donation status
-- multiplayer access status
-- room quota (`created / limit`)
-- extras card (Pro early-access messaging)
-- admin status (allowlisted accounts only)
-- username update
-- linked email + verification state
-- account UID + auth providers
-- donations portal and receipt list
-- friends list and incoming invites
-- close account (permanent delete with confirmation and recent-sign-in safety check)
+## 4. Tutorial Behavior
 
-## 4. Friends and Invites
+- Tutorial is enabled by default for first-time use.
+- Hints progress through movement, mode switching, space, moon, build, rooms, invites.
+- After completion, it is marked complete and does not auto-repeat.
+- In Settings, users can:
+  - disable tutorial
+  - restart tutorial manually
 
-1. Add friend by UID.
-2. Enter room code and optional message.
-3. Send invite.
-4. Invitee opens join action and enters app multiplayer tab with room code prefilled.
+## 5. Movement and Modes
 
-You can remove friends and dismiss invites.
+Modes:
 
-## 5. Multiplayer Rooms
+- Walk
+- Drive
+- Drone
+- Rocket/space flight
+
+Current driving behavior includes tighter rear-biased drift when using `Space` at speed with steering input.
+
+Full controls: `CONTROLS_REFERENCE.md`.
+
+## 6. Multiplayer Rooms
 
 ### Create room
 
-In `Multiplayer` tab:
-
+- open `Multiplayer`
 - choose visibility (`Private` or `Public`)
-- optional room name
-- optional location tag
+- set optional room name/location tag
 - click `Create`
 
 ### Join room
 
-- enter 6-character code and click `Join`
-- or open invite link with `?room=AB12CD`
-- signed-out users can browse public rooms in view-only mode; sign-in is required to join
+- enter 6-character room code and click `Join`
+- or open invite link with query `?room=XXXXXX&invite=1`
 
-### Save/open/delete room
+### Saved rooms
 
-Saved room behavior:
-
-- rooms you create or join are saved under your account (`users/{uid}/myRooms/{roomCode}`)
-- use `Open` on saved room list to return to that room
-- if you are owner, `Delete` permanently removes the room document
-- room documents persist until owner deletion (TTL does not delete room docs)
+- rooms you own/join are saved in your account
+- `Open` rejoins saved room
+- owner sees `Delete` to permanently remove room
 
 ### Leave room
 
-- `Leave` exits active room and stops your presence heartbeat
+- `Leave` stops presence and exits active room
 
-## 6. Weekly Featured City Room
+## 7. Social and Invite Flow
 
-- In `Multiplayer`, use the weekly callout to join the rotating public city room.
-- The featured city changes on a weekly schedule.
-- The weekly room is public, and its room code is shown in the multiplayer panel.
+- Add friend by account UID.
+- Send invite to a room code.
+- Invitee can open from account page or app invite flow.
+- Incoming invites can be marked seen or dismissed.
 
-## 7. Globe Selector (Custom Location)
+## 8. Shared Room Data
 
-Open from `Location` -> `Custom`.
+Within a room, members can share:
 
-Features:
+- build blocks
+- paint claims (Paint the Town)
+- artifacts
+- room home base
 
-- interactive Earth globe pick for lat/lon
-- selected coordinates + city/place readout
-- `Nearby` tab listing closest prelisted menu cities to your current pick
-- `Favorites` tab listing prelisted menu cities
-- `Start Here` uses the same custom-location spawn path as search/manual custom input
-- Moon (top-left) and Space (top-right) shortcuts use existing launch flows
+## 9. Weekly Featured Room
 
-## 8. Multiplayer Room Markers on Map
+- Multiplayer panel includes weekly featured city room.
+- Room code is deterministic for that week/city.
+- Featured rooms are public.
 
-- Public room markers are visible to everyone on minimap and large map.
-- Signed-in users also see their owned/current room markers.
-- Weekly featured public room appears as a dedicated marker.
+## 10. Account Center
 
-## 9. Multiplayer Data Lifetime
+Account page includes:
+
+- plan and donation status
+- room quota usage
+- profile name and provider info
+- donation portal actions
+- receipts list
+- friends and invites management
+- account deletion action
+
+## 11. Data Lifetime
 
 Persistent until explicit delete:
 
 - room docs
-- saved room shortcuts (`myRooms`)
+- saved rooms (`myRooms`)
 - room settings
-- shared blocks
+- blocks
 - paint claims
-- home base state
+- home base
 
-TTL-managed cleanup:
+TTL cleanup (`expiresAt`) for ephemeral data:
 
-- `players`
-- `chat`
-- `chatState`
-- `incomingInvites`
-- `recentPlayers`
-- `activityFeed`
-- `artifacts`
+- players
+- chat
+- chatState
+- incomingInvites
+- recentPlayers
+- activityFeed
+- artifacts
 
-## 10. Chat and Safety
+## 12. Troubleshooting
 
-Chat protections:
+- Join/create fails: confirm sign-in and rules deployment.
+- Invite join fails: verify valid room code and account auth.
+- Tutorial repeats unexpectedly: check Settings tutorial toggle/restart state.
+- Receipts missing: refresh account data and check function logs.
 
-- max message length: 500
-- duplicate suppression window
-- client and server cooldown + burst limits
-- links/contact handles blocked
-- profanity masking
-- report action writes report flags
-
-## 11. Paint the Town
-
-Key behavior:
-
-- choose color, claim buildings by touch or paintball gun
-- paintballs follow projectile arc with gravity
-- paint splats auto-expire for performance
-- minimal HUD collapsed by default (`Time`, `Painted`) and expandable for details
-
-Controls:
-
-- fire paintball: `Ctrl` (also `G` / `P`)
-- choose color: `1-6`
-- toggle tool: `T`
-- left click/tap paints according to active tool and room rules
-
-## 12. Camera and Input Basics
-
-- right-click or middle-click hold: camera look
-- double-left-click camera toggle: disabled
-
-For full control mapping by mode, see `CONTROLS_REFERENCE.md`.
-
-## 13. Mobile Behavior
-
-Mobile controls provide virtual pads and action buttons for:
-
-- driving
-- walking
-- drone
-- rocket
-
-Mobile and desktop share the same gameplay systems and multiplayer state.
-
-## 14. Troubleshooting
-
-- If `Create`/`Join` does nothing, hard refresh and verify current user is signed in.
-- If room actions fail with permissions, confirm deployed Firestore rules and Firebase auth state.
-- If saved room `Open` fails, confirm the room code exists and owner has not deleted the room.
-- If invites fail, verify friend relationship exists first.
-- If donation receipts are missing, refresh account data and inspect function logs.

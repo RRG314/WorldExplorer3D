@@ -2057,3 +2057,132 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `npm run sync:public` ✅
     - `npm run verify:mirror` ✅
     - `npm run test:runtime` ✅ (`waterVisible=true`, `noConsoleErrors=true`, `blockedDriveRatePct=0`)
+- Tutorial walkthrough implementation (current task) — Batch 1:
+  - Added new module: `app/js/tutorial/tutorial.js`.
+  - Implemented a non-blocking tutorial state machine skeleton with persisted state (`localStorage`), dismissible/auto-hide hint card UI, event listener API (`tutorialOnEvent`), per-frame update (`tutorialUpdate`), enable/disable toggle, and restart control.
+  - Injected tutorial controls into Settings tab dynamically (no gameplay ownership; listener/UI-only behavior).
+  - Wired runtime init + update hooks:
+    - `app/js/app-entry.js`: calls `initTutorial(appCtx)` after UI setup.
+    - `app/js/main.js`: calls `appCtx.tutorialUpdate(dt)` each frame.
+- Validation (Batch 1):
+  - `node --check app/js/tutorial/tutorial.js` passed.
+  - `node --check app/js/app-entry.js` passed.
+  - `node --check app/js/main.js` passed.
+  - Ran `$WEB_GAME_CLIENT` against `http://127.0.0.1:4173/app/` with `#startBtn` click + action payload.
+  - Latest generated screenshot was black in this environment (`output/web-game/shot-0.png`), and console log captured one `504` resource timeout (`output/web-game/errors-0.json`).
+
+- Tutorial implementation pass (2026-03-02, local-only; no deploy):
+  - Added non-blocking guided walkthrough module and startup wiring:
+    - `app/js/tutorial/tutorial.js`
+    - `app/js/app-entry.js`
+    - `app/js/main.js`
+  - Play Now/Explore now gates to Globe Selector first (with Continue Last Location shortcut) and emits tutorial events:
+    - `app/js/ui.js`
+  - Added explicit tutorial event hooks for transitions/modes/build/rooms/artifacts:
+    - `app/js/space.js` (`entered_space`)
+    - `app/js/sky.js` (`entered_moon`, `returned_to_earth`)
+    - `app/js/ui.js` (`mode_switched`, `opened_main_menu`)
+    - `app/js/blocks.js` (`build_mode_entered`, `artifact_placed` for build blocks)
+    - `app/js/multiplayer/ui-room.js` (`opened_rooms_menu`, `room_created_or_toggled`, `artifact_placed` for room artifacts)
+  - Synced app->public mirror after edits (`public/app/*` now aligned).
+  - Updated runtime invariants harness for new globe-first flow so CI/local checks still validate correctly:
+    - `scripts/test-runtime-invariants.mjs`
+      - if globe selector is shown, seed Baltimore coordinates and confirm Start Here before invariants checks.
+
+- Validation runs:
+  - `node --check` passed for all touched runtime files.
+  - `npm run sync:public` passed.
+  - `npm run verify:mirror` passed.
+  - `npm run test:runtime` passed after harness update:
+    - roads: 3400
+    - buildings: 16646
+    - road center driveability: pass (0 blocked / 18 drive samples)
+    - water data/visibility: pass
+    - console errors: none
+  - Focused Playwright checks:
+    - Play Now opens Globe Selector screen (`output/playwright/tutorial-local-check/globe-after-play-now.png`).
+    - Tutorial hint appears on title when state reset (`output/playwright/tutorial-card-reset-check/title-with-tutorial.png`).
+    - Skill client still intermittently reports click timeout on `#startBtn` in this environment, but full-page screenshots and direct Playwright checks confirm UI is interactive.
+
+- Remaining follow-up TODOs (if desired next pass):
+  - Add an automated end-to-end tutorial completion script (spawn -> mode switch -> space -> moon -> build -> room) to assert every stage transition deterministically.
+  - Optionally suppress/relocate top promo popup when tutorial is active to reduce visual overlap on smaller screens.
+- Follow-up stabilization (2026-03-02):
+  - Globe selector earth texture now uses local asset path to avoid external network failures:
+    - `app/assets/textures/earth_atmos_2048.jpg`
+    - `app/js/ui/globe-selector.js` now loads `/app/assets/textures/earth_atmos_2048.jpg`
+  - Mirror tooling now includes `app/assets` so `public/app` receives textures/models consistently:
+    - `scripts/sync-public-app.mjs`
+    - `scripts/verify-mirror.mjs`
+  - Re-validated after mirror+runtime test updates:
+    - `npm run sync:public` -> ok (47 files)
+    - `npm run verify:mirror` -> ok (47 checked)
+    - `npm run test:runtime` -> pass, no console errors.
+- Globe selector + multiplayer stability pass (2026-03-02):
+  - `app/js/ui/globe-selector.js`:
+    - Favorites now derive dynamically from current `appCtx.LOCS` (not one-time snapshot), so Favorites/Nearby lists always populate.
+    - Nearby tab now always shows entries (falls back to preset coordinate metadata if no selected point yet).
+    - Opening selector now seeds selection from current preset city (or first favorite) when custom coords are empty.
+    - Increased globe zoom range (`minDistance` lowered to 1.35, `maxDistance` raised to 4.4).
+    - Reverse geocode upgraded to include city/county/region/country composition and added provider fallback (`api-bdc.io`) when Nominatim fails in-browser.
+    - Manual coordinate edits and search results now trigger reverse lookup refresh.
+  - `app/js/terrain.js`:
+    - Intersection caps now disabled for 3-way and smaller joints; only 4+ way intersections use caps.
+    - Cap radius reduced to remove oversized circular bulges at joints.
+  - `app/js/multiplayer/rooms.js`:
+    - Public room join now supports automatic guest auth fallback (`ensureGuestSession`) when user is signed out.
+    - Added active-player counting on join and enforced room cap before join write.
+    - Default normalized room cap lowered from 12 to 10 for performance stability.
+  - `app/js/multiplayer/ui-room.js`:
+    - Added device/perf-aware room-cap chooser for new rooms (mobile ~8, desktop ~10, high-end desktop ~12).
+    - Create-room and weekly-room creation now use recommended cap and surface cap in status text.
+    - Player count UI now shows `current / cap`.
+    - Joining no longer hard-blocks signed-out users up front; public joins flow through guest fallback.
+  - `js/auth-ui.js` (+ `public/js/auth-ui.js` mirror):
+    - Added `ensureGuestSession()` using Firebase anonymous auth with user-friendly fallback error.
+
+- Mirror + validation:
+  - `npm run sync:public` and `npm run verify:mirror` passed after patch.
+  - `npm test` passed (`test:rules` 41/41 + runtime invariants).
+  - Playwright regression script artifact: `output/playwright/globe-room-regression/report.json`
+    - `globeOpenedFromPlayNow=true`
+    - `nearbyListCount=6`, `favoritesListCount=15`
+    - reverse label resolved (`Washington, District of Columbia, United States`)
+    - console errors: none
+  - Ghost proxy micro-benchmark (same report) stayed very low frame cost up to 14 simulated players; cap policy kept conservative to protect weaker devices.
+- Menu/tour fix pass (2026-03-02):
+  - Fixed title `Explore` routing regression in `app/js/ui.js` so globe/custom selector gate only opens when `selLoc === 'custom'`; preset city selections now start exploration directly.
+  - Updated globe selector back button label text from `Back` to `Main Menu` in `app/index.html` (mirrored to `public/app/index.html`).
+  - Hardened tutorial one-time behavior in `app/js/tutorial/tutorial.js` by persisting `shownStages` in tutorial localStorage state and suppressing re-show of any stage already shown in prior sessions; restart button still resets flow.
+  - Synced app mirror: `npm run sync:public` and verified parity with `npm run verify:mirror`.
+- Validation artifacts (2026-03-02):
+  - Skill client run: `output/playwright/fix-check-start-preset/shot-0.png`.
+  - Targeted Playwright regression check: `output/playwright/menu-fix-validation/report.json`.
+  - Screens:
+    - `output/playwright/menu-fix-validation/globe-selector-label.png` (button label reads `Main Menu`).
+    - `output/playwright/menu-fix-validation/first-start.png` (preset city start enters game; globe selector not shown).
+    - `output/playwright/menu-fix-validation/second-start.png` (repeat start still enters game directly).
+  - JSON assertions from report:
+    - `firstStart.titleHidden=true`, `firstStart.globeOpen=false`.
+    - `secondStart.titleHidden=true`, `secondStart.globeOpen=false`.
+    - tutorial state persisted `shownStages: ["await_globe","move_hint"]` and second run did not re-show hint card.
+- Test-site deployment (2026-03-02):
+  - Deployed current branch build to Firebase Hosting preview channel `test` (project/site: `worldexplorer3d-d9b83`).
+  - Preview URL: `https://worldexplorer3d-d9b83--test-d4v4nllr.web.app` (expires 2026-04-01 18:05:53 local).
+  - Live URL was not modified; only preview channel release performed.
+- Driving responsiveness + drift tuning pass (2026-03-02):
+  - Updated car handling in `app/js/physics.js` for tighter steering response and stronger handbrake turn assist:
+    - steering input smoothing increased,
+    - high-speed max steering widened,
+    - handbrake turn boost added (`Space` + steer at speed),
+    - drift entry thresholds lowered and sustain window lengthened,
+    - rear-slip/yaw coupling increased for rear-heavy drift behavior,
+    - handbrake deceleration reduced so speed carries through tight turns.
+  - Updated baseline drift grip constants in `app/js/engine.js` (`gripBrake`, `gripDrift`, `driftRec`) to support stronger drift feel.
+  - Synced mirror and verified parity (`npm run sync:public`, `npm run verify:mirror`).
+- Drift responsiveness artifact:
+  - `output/playwright/drift-responsiveness-check/report.json`
+    - `handbrakeTurnRatio: 3.4197` (with-brake turning delta > no-brake turning delta)
+    - `withBrake.drifting: true` during scenario.
+- Preview channel refreshed with latest handling tune:
+  - `https://worldexplorer3d-d9b83--test-d4v4nllr.web.app` (expires 2026-04-01 18:18:13 local)

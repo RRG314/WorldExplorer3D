@@ -16,7 +16,7 @@ import {
   writeBatch,
   where
 } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
-import { getCurrentUser } from '../../../js/auth-ui.js';
+import { ensureGuestSession, getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
 
 const ROOM_CODE_LENGTH = 6;
@@ -29,7 +29,7 @@ const ROOM_STATE_COLLECTION = 'state';
 const HOME_BASE_DOC = 'homeBase';
 const ROOM_PRESENCE_TTL_MS = 90 * 1000;
 const ROOM_PRESENCE_LEAVE_TTL_MS = 1000;
-const DEFAULT_MAX_PLAYERS = 12;
+const DEFAULT_MAX_PLAYERS = 10;
 const CITY_KEY_MAX_LEN = 48;
 const PUBLIC_ROOM_RESULT_LIMIT = 20;
 const OWNED_ROOM_RESULT_LIMIT = 40;
@@ -79,6 +79,37 @@ function requireSignedInUser() {
     throw new Error('Sign in is required to use multiplayer.');
   }
   return user;
+}
+
+function timestampToMs(value, fallback = 0) {
+  if (!value) return fallback;
+  if (typeof value.toMillis === 'function') return value.toMillis();
+  if (typeof value.seconds === 'number') return value.seconds * 1000;
+  const parsed = Date.parse(String(value));
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function isPlayerPresenceActive(data, nowMs = Date.now()) {
+  if (!data || typeof data !== 'object') return false;
+  const expiresAtMs = timestampToMs(data.expiresAt, 0);
+  if (!Number.isFinite(expiresAtMs) || expiresAtMs <= 0) return true;
+  return expiresAtMs > nowMs - ROOM_PRESENCE_LEAVE_TTL_MS;
+}
+
+async function countActivePlayers(roomCode, maxPlayers) {
+  const { db } = getServices();
+  const code = normalizeCode(roomCode);
+  if (!code) return 0;
+  const limitSize = Math.max(4, Math.min(96, Math.floor(Number(maxPlayers) || DEFAULT_MAX_PLAYERS) + 12));
+  const playersRef = collection(db, ROOM_COLLECTION, code, PLAYER_COLLECTION);
+  const playersSnap = await getDocs(query(playersRef, limit(limitSize)));
+  const nowMs = Date.now();
+  let active = 0;
+  playersSnap.forEach((playerSnap) => {
+    const data = playerSnap.data() || {};
+    if (isPlayerPresenceActive(data, nowMs)) active += 1;
+  });
+  return active;
 }
 
 function normalizeCode(input) {
@@ -687,21 +718,43 @@ async function createRoom(options = {}) {
 
 async function joinRoomByCode(codeInput, options = {}) {
   const { db } = getServices();
-  const user = requireSignedInUser();
   const code = normalizeCode(codeInput);
   if (code.length !== ROOM_CODE_LENGTH) {
     throw new Error('Enter a valid 6-character room code.');
   }
 
-  const displayName = resolveDisplayName(user, options.displayName);
   const roomRef = doc(db, ROOM_COLLECTION, code);
+  const roomSnap = await getDoc(roomRef);
+  if (!roomSnap.exists()) {
+    throw new Error('Room not found. Check the invite code and try again.');
+  }
+
+  const room = toRoomObject(roomSnap);
+  if (!room) {
+    throw new Error('Could not read room details.');
+  }
+
+  let user = getCurrentUser();
+  if (!user || !user.uid) {
+    if (room.visibility !== 'public') {
+      throw new Error('Sign in is required to join private rooms.');
+    }
+    user = await ensureGuestSession();
+  }
+  if (!user || !user.uid) {
+    throw new Error('Sign in is required before joining this room.');
+  }
+
+  const displayName = resolveDisplayName(user, options.displayName);
   const playerRef = doc(db, ROOM_COLLECTION, code, PLAYER_COLLECTION, user.uid);
   let preservedJoinedAt = null;
   let preservedRole = 'member';
+  let hasExistingMembership = false;
 
   try {
     const existingPlayerSnap = await getDoc(playerRef);
     if (existingPlayerSnap.exists()) {
+      hasExistingMembership = true;
       const existingPlayer = existingPlayerSnap.data() || {};
       if (existingPlayer.joinedAt && typeof existingPlayer.joinedAt.toMillis === 'function') {
         preservedJoinedAt = existingPlayer.joinedAt;
@@ -711,6 +764,14 @@ async function joinRoomByCode(codeInput, options = {}) {
   } catch (err) {
     // If we cannot read an existing player doc yet, proceed with a create-style payload.
     if (String(err?.code || '') !== 'permission-denied') throw err;
+  }
+
+  if (!hasExistingMembership) {
+    const cap = normalizeMaxPlayers(room.maxPlayers);
+    const activePlayers = await countActivePlayers(code, cap);
+    if (activePlayers >= cap) {
+      throw new Error(`Room is full (${cap} players max for stable performance). Try another room or retry shortly.`);
+    }
   }
 
   try {
@@ -732,13 +793,6 @@ async function joinRoomByCode(codeInput, options = {}) {
     }
     throw err;
   }
-
-  const roomSnap = await getDoc(roomRef);
-  if (!roomSnap.exists()) {
-    throw new Error('Room not found. Check the invite code and try again.');
-  }
-
-  const room = toRoomObject(roomSnap);
   setCurrentRoom(room);
   try {
     const role = room && room.ownerUid === user.uid ? 'owner' : 'member';

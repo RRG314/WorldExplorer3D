@@ -1,9 +1,8 @@
 # Contributing to World Explorer
 
-Thanks for contributing.
+Last reviewed: 2026-03-02
 
-This repository is source-visible but proprietary (`LICENSE`).
-Contributions are accepted at maintainer discretion.
+Contribution workflow and minimum quality bars for this repository.
 
 ## 1. Repository and Branching
 
@@ -11,65 +10,63 @@ Canonical repository:
 
 - `https://github.com/RRG314/WorldExplorer.git`
 
-Preferred working branch pattern:
+Preferred branch naming:
 
-- `codex/<feature-or-fix-name>`
+- `steven/<feature-or-fix>`
+- `codex/<feature-or-fix>`
 
 ## 2. Local Setup
 
 ```bash
 git clone https://github.com/RRG314/WorldExplorer.git
 cd WorldExplorer
+npm install
 cd functions && npm install && cd ..
 python3 -m http.server --directory public 4173
 ```
 
-## 3. Active Source of Truth
+## 3. Source-of-Truth Rule
 
-Use these paths for production behavior:
+Canonical runtime source is `app/*`.
 
-- `public/` (all hosted pages/assets)
-- `functions/` (billing backend)
-- `firebase.json`, `.firebaserc`, `firestore.rules`
-
-Do not assume root legacy runtime files (`index.html`, `js/`) are the active deployed path.
-
-## 4. Required Validation Before PR
-
-At minimum:
-
-1. `/` loads
-2. `/app/` loads
-3. auth float opens/closes
-4. `/account/` loads
-5. no new console errors in core flows
-6. GitHub Pages mirror (`/WorldExplorer/` subpath) still loads key routes if frontend routing or paths changed
-
-If billing touched:
-
-1. checkout session creation tested
-2. webhook event handling validated in logs
-3. Firestore user plan updates confirmed
-4. `Secret Scan` GitHub Action passes (gitleaks)
-
-Useful commands:
+Required before merge/deploy:
 
 ```bash
-firebase functions:log --only createCheckoutSession -n 50
-firebase functions:log --only stripeWebhook -n 50
+npm run sync:public
+npm run verify:mirror
 ```
 
-## 5. Documentation Rule
+Do not merge gameplay/UI/runtime changes without mirror parity.
 
-Any behavior change must update docs in the same PR:
+## 4. Minimum Validation Before PR
+
+Required:
+
+1. `npm run release:verify` passes.
+2. Manual smoke for signup/signin, room create/join/invite, and key menu/button flows.
+3. No new blocking console/runtime errors in critical flows.
+
+If backend touched:
+
+1. rules/indexes/functions deployment paths verified
+2. relevant function logs reviewed
+3. no secrets committed
+
+## 5. Documentation Requirement
+
+Behavior changes must update docs in same PR.
+
+At minimum, update affected files from:
 
 - `README.md`
+- `COMPLETE_INVENTORY_REPORT_2026-03-02.md`
 - `QUICKSTART.md`
+- `USER_GUIDE.md`
 - `ARCHITECTURE.md`
 - `TECHNICAL_DOCS.md`
-- `USER_GUIDE.md`
+- `API_SETUP.md`
+- `RELEASE_CHECKLIST.md`
 - `CHANGELOG.md`
-- `GITHUB_DEPLOYMENT.md` (if deployment/routing/cache behavior is affected)
 
 ## 6. PR Format
 
@@ -79,19 +76,18 @@ Use this structure:
 2. Problem
 3. Fix
 4. Validation
-5. Risks / follow-ups
+5. Risks/follow-ups
 
-Include screenshots for UI changes and log snippets for backend fixes.
+Include screenshots for UI changes and logs for backend behavior changes.
 
 ## 7. Security and Secrets
 
-- Never commit secret keys.
-- Never include real `sk_live`, `whsec`, or private tokens in markdown/screenshots.
-- Use placeholders in docs and examples.
+- never commit real secrets (`sk_live`, `whsec`, tokens)
+- use placeholders in docs/examples
+- keep billing/env values in runtime env, not source files
 
-## 8. Current Mandatory Follow-up Work
+## 8. Open Engineering Debt to Respect
 
-Contributors touching backend config/runtime should be aware:
+- Node runtime upgrade for functions (target Node 22)
+- continued mirror discipline between `app/*` and `public/app/*`
 
-- keep backend runtime config on Firebase params/env keys (`WE3D_*`) and do not reintroduce `functions.config()`
-- upgrade functions runtime from Node 20 to Node 22

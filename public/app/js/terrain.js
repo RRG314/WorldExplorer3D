@@ -647,17 +647,9 @@ function detectRoadIntersections(roads) {
 
 function shouldBuildIntersectionCap(intersection) {
   if (!intersection || !Array.isArray(intersection.roads)) return false;
-  if (intersection.roads.length < 2) return false;
-  // For nearly straight 2-road joints, circular caps create visible bulges.
-  // Skip cap generation there and rely on road strip overlap instead.
-  if (intersection.roads.length === 2) {
-    const a = intersection.roads[0];
-    const b = intersection.roads[1];
-    if (a?.dir && b?.dir) {
-      const dot = a.dir.x * b.dir.x + a.dir.z * b.dir.z;
-      if (Math.abs(dot) > 0.94) return false;
-    }
-  }
+  // Caps are now only used for dense 4+ way intersections; lower branch joints
+  // stay clean and rely on strip overlap to avoid circular bulges.
+  if (intersection.roads.length < 4) return false;
   return true;
 }
 
@@ -669,11 +661,11 @@ function computeIntersectionCapRadius(intersection) {
   roads.reduce((sum, r) => sum + Number(r?.width || maxWidth), 0) / roads.length :
   maxWidth;
 
-  const halfWidth = Math.max(avgWidth * 0.5, maxWidth * 0.5);
-  const branchBoost = Math.min(0.24, Math.max(0, (branchCount - 2) * 0.12));
-  const unclamped = halfWidth * (1 + branchBoost) + 0.25;
-  const minRadius = maxWidth * 0.46;
-  const maxRadius = maxWidth * 0.68;
+  const halfWidth = Math.max(avgWidth * 0.46, maxWidth * 0.44);
+  const branchBoost = Math.min(0.08, Math.max(0, (branchCount - 4) * 0.04));
+  const unclamped = halfWidth * (1 + branchBoost);
+  const minRadius = maxWidth * 0.40;
+  const maxRadius = maxWidth * 0.52;
   return Math.max(minRadius, Math.min(maxRadius, unclamped));
 }
 

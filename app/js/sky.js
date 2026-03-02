@@ -2,6 +2,12 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 // sky.js - Time of day, starfield, constellations, moon system
 // ============================================================================
 
+function emitTutorialEvent(eventName, payload = {}) {
+  if (typeof appCtx.tutorialOnEvent === 'function') {
+    appCtx.tutorialOnEvent(eventName, payload);
+  }
+}
+
 function setTimeOfDay(time) {
   appCtx.timeOfDay = time;
 
@@ -701,6 +707,7 @@ function arriveAtMoon() {
   // Debug log removed
 
   appCtx.switchEnv(appCtx.ENV.MOON); // sets onMoon=true, travelingToMoon=false
+  emitTutorialEvent('entered_moon', { source: 'moon_arrival' });
 
   // IMMEDIATELY set black background and hide car to prevent earth ground flash
   appCtx.scene.background = new THREE.Color(0x000000);
@@ -1496,6 +1503,7 @@ function returnToEarth() {
 // Arrive back at Earth
 function arriveAtEarth() {
   appCtx.switchEnv(appCtx.ENV.EARTH); // sets onMoon=false, travelingToMoon=false
+  emitTutorialEvent('returned_to_earth', { source: 'earth_arrival' });
 
   // Update space menu button labels
   const directBtn = document.getElementById('fSpaceDirect');
