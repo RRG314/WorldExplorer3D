@@ -612,6 +612,73 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     }
   }
 
+  // Draw multiplayer room markers (public markers visible to all; user rooms when signed in).
+  const mpMapState = appCtx.multiplayerMapRooms;
+  const publicRooms = Array.isArray(mpMapState?.publicRooms) ? mpMapState.publicRooms : [];
+  const userRooms = mpMapState?.signedIn && Array.isArray(mpMapState?.userRooms) ? mpMapState.userRooms : [];
+  const activeRoomCode = String(mpMapState?.currentRoomCode || '');
+  if (publicRooms.length > 0 || userRooms.length > 0) {
+    const drawRoomMarker = (room, kind = 'public') => {
+      if (!room || !Number.isFinite(Number(room.lat)) || !Number.isFinite(Number(room.lon))) return;
+      const pos = latLonToScreen(Number(room.lat), Number(room.lon));
+      if (Math.abs(pos.x - mx) >= w / 2 || Math.abs(pos.y - my) >= h / 2) return;
+
+      const code = String(room.code || '').toUpperCase();
+      const isActive = code && code === activeRoomCode;
+      const baseRadius = isLarge ? 6 : 4;
+      const radius = isActive ? baseRadius + 2 : baseRadius;
+      let fill = '#f59e0b';
+      if (kind === 'user') fill = '#0ea5e9';
+      if (room.isWeekly) fill = '#8b5cf6';
+
+      ctx.save();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = isLarge ? 2 : 1.2;
+      ctx.fillStyle = fill;
+
+      if (kind === 'user') {
+        // User rooms are drawn as diamonds.
+        ctx.translate(pos.x, pos.y);
+        ctx.rotate(Math.PI / 4);
+        ctx.beginPath();
+        ctx.rect(-radius, -radius, radius * 2, radius * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.rotate(-Math.PI / 4);
+        if (isLarge) {
+          const label = String(room.name || room.locationLabel || code || 'My Room');
+          ctx.font = 'bold 10px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = '#e0f2fe';
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 3;
+          ctx.strokeText(label, 0, radius + 12);
+          ctx.fillText(label, 0, radius + 12);
+        }
+      } else {
+        // Public rooms are circles.
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        if (isLarge) {
+          const label = String(room.name || room.locationLabel || code || 'Public Room');
+          ctx.font = 'bold 10px Arial';
+          ctx.textAlign = 'center';
+          ctx.fillStyle = room.isWeekly ? '#e9d5ff' : '#fde68a';
+          ctx.strokeStyle = '#0f172a';
+          ctx.lineWidth = 3;
+          ctx.strokeText(label, pos.x, pos.y + radius + 12);
+          ctx.fillText(label, pos.x, pos.y + radius + 12);
+        }
+      }
+      ctx.restore();
+    };
+
+    publicRooms.forEach((room) => drawRoomMarker(room, 'public'));
+    userRooms.forEach((room) => drawRoomMarker(room, 'user'));
+  }
+
   // Draw properties on minimap
   if (appCtx.mapLayers.properties && appCtx.realEstateMode && appCtx.properties.length > 0) {
     appCtx.properties.forEach((prop) => {

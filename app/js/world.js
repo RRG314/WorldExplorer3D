@@ -24,6 +24,9 @@ const FEATURE_TILE_DEGREES = 0.002;
 const _rdtTileDepthCache = new Map();
 const _overpassMemoryCache = [];
 let _lastOverpassEndpoint = null;
+const ROAD_ENDPOINT_EXTENSION_SCALE = 0.5;
+const ROAD_ENDPOINT_EXTENSION_MIN = 0.35;
+const ROAD_ENDPOINT_EXTENSION_MAX = 2.0;
 
 function sameLocation(a, b) {
   return Math.abs((a?.lat || 0) - (b?.lat || 0)) <= OVERPASS_LOC_EPSILON &&
@@ -2157,12 +2160,20 @@ async function loadRoads(retryPass = 0) {
 
           const len = Math.sqrt(dx * dx + dz * dz) || 1;
           const nx = -dz / len,nz = dx / len; // Perpendicular (left direction)
+          const endpointExtend = Math.max(
+            ROAD_ENDPOINT_EXTENSION_MIN,
+            Math.min(ROAD_ENDPOINT_EXTENSION_MAX, hw * ROAD_ENDPOINT_EXTENSION_SCALE)
+          );
+          const isEndpoint = i === 0 || i === subdPts.length - 1;
+          const endpointDir = i === 0 ? -1 : 1;
+          const px = isEndpoint ? p.x + endpointDir * (dx / len) * endpointExtend : p.x;
+          const pz = isEndpoint ? p.z + endpointDir * (dz / len) * endpointExtend : p.z;
 
           // Calculate left and right edge positions
-          const leftX = p.x + nx * hw;
-          const leftZ = p.z + nz * hw;
-          const rightX = p.x - nx * hw;
-          const rightZ = p.z - nz * hw;
+          const leftX = px + nx * hw;
+          const leftZ = pz + nz * hw;
+          const rightX = px - nx * hw;
+          const rightZ = pz - nz * hw;
 
           // DIRECTLY snap BOTH edges to terrain
           let leftY = _tmh(leftX, leftZ);
@@ -2170,7 +2181,7 @@ async function loadRoads(retryPass = 0) {
 
           // Add vertical bias to prevent z-fighting and terrain peeking
           // Increased from 0.10 to 0.25 to handle steep slopes
-          const verticalBias = 0.25; // 25cm above terrain
+          const verticalBias = 0.42; // Keep roads slightly proud to prevent terrain seams
           leftY += verticalBias;
           rightY += verticalBias;
 
@@ -2195,7 +2206,7 @@ async function loadRoads(retryPass = 0) {
         // Build road skirts (edge curtains) to hide terrain peeking
         // Increased depth from 1.5 to 3.0 for better coverage on steep slopes
         if (typeof appCtx.buildRoadSkirts === 'function') {
-          const skirtData = appCtx.buildRoadSkirts(leftEdge, rightEdge, 3.0);
+            const skirtData = appCtx.buildRoadSkirts(leftEdge, rightEdge, 3.6);
           if (skirtData.verts.length > 0) {
             appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
             loadMetrics.roads.vertices += skirtData.verts.length / 3;
@@ -2217,7 +2228,7 @@ async function loadRoads(retryPass = 0) {
               if (Math.floor((dist + segDist) / (dashLen + gapLen)) % 2 === 0) {
                 const x = p1.x + dx * segDist,z = p1.z + dz * segDist;
                 const len = Math.min(dashLen, segLen - segDist);
-                const y = (typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ(x, z)) + 0.25; // Just above road surface
+                const y = (typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ(x, z)) + 0.35; // Just above road surface
                 const vi = markVerts.length / 3;
                 markVerts.push(
                   x + nx * mw, y, z + nz * mw,
@@ -2271,14 +2282,65 @@ async function loadRoads(retryPass = 0) {
       rdtLoadComplexity >= 6 ? 5 : 4 :
       3;
       const roadCoverageCells = new Set();
+      const roadCoreCellSize = 6;
+      const roadCoreCells = new Set();
+      const toRoadCoreCellKey = (x, z) => `${Math.floor(x / roadCoreCellSize)},${Math.floor(z / roadCoreCellSize)}`;
+      const markRoadCoreCell = (x, z, radiusCells) => {
+        const cx = Math.floor(x / roadCoreCellSize);
+        const cz = Math.floor(z / roadCoreCellSize);
+        const r = Math.max(0, radiusCells | 0);
+        for (let dx = -r; dx <= r; dx++) {
+          for (let dz = -r; dz <= r; dz++) {
+            roadCoreCells.add(`${cx + dx},${cz + dz}`);
+          }
+        }
+      };
+      const pointOnRoadCore = (x, z) => roadCoreCells.has(toRoadCoreCellKey(x, z));
+      const sampleFootprintRoadCore = (pts) => {
+        if (!pts || pts.length < 3) return { total: 0, inside: 0, centroidInside: false };
+        let sumX = 0,sumZ = 0;
+        const samples = [];
+        for (let i = 0; i < pts.length; i++) {
+          const p = pts[i];
+          sumX += p.x;
+          sumZ += p.z;
+          samples.push(p);
+          if (i % 2 === 0) {
+            const n = pts[(i + 1) % pts.length];
+            samples.push({ x: (p.x + n.x) * 0.5, z: (p.z + n.z) * 0.5 });
+          }
+        }
+        const centroid = { x: sumX / pts.length, z: sumZ / pts.length };
+        samples.push(centroid);
+
+        let inside = 0;
+        for (let i = 0; i < samples.length; i++) {
+          const s = samples[i];
+          if (pointOnRoadCore(s.x, s.z)) inside++;
+        }
+        return {
+          total: samples.length,
+          inside,
+          centroidInside: pointOnRoadCore(centroid.x, centroid.z)
+        };
+      };
+      const overlapsRoadCore = (stats) => {
+        if (!stats || stats.total <= 0) return false;
+        const overlapRatio = stats.inside / stats.total;
+        return stats.inside >= Math.max(4, Math.ceil(stats.total * 0.58)) && overlapRatio >= 0.55;
+      };
 
       appCtx.roads.forEach((rd) => {
         if (!rd || !rd.pts) return;
-        for (let i = 0; i < rd.pts.length; i += 2) {
+        const roadHalfWidth = Number.isFinite(rd.width) ? rd.width * 0.5 : 4;
+        const roadCoreRadius = Math.max(0.8, Math.max(0, roadHalfWidth * 0.32 - 0.25));
+        const roadCoreRadiusCells = Math.max(0, Math.floor((roadCoreRadius + 0.25) / roadCoreCellSize));
+        for (let i = 0; i < rd.pts.length; i++) {
           const p = rd.pts[i];
           const cx = Math.floor(p.x / roadBuildingCellSize);
           const cz = Math.floor(p.z / roadBuildingCellSize);
           roadCoverageCells.add(`${cx},${cz}`);
+          markRoadCoreCell(p.x, p.z, roadCoreRadiusCells);
         }
       });
 
@@ -2299,7 +2361,6 @@ async function loadRoads(retryPass = 0) {
         }
         return false;
       }
-
       const lodNearDist = lodThresholds.near;
       const lodMidDist = lodThresholds.mid;
 
@@ -2308,6 +2369,11 @@ async function loadRoads(retryPass = 0) {
         const pts = sanitizeWorldFootprintPoints(rawPts, 1);
         if (pts.length < 3) return;
         if (!isBuildingNearLoadedRoad(pts)) return;
+        const roadCoreStats = sampleFootprintRoadCore(pts);
+        if (overlapsRoadCore(roadCoreStats)) {
+          loadMetrics.buildingsSkippedRoadOverlap = (loadMetrics.buildingsSkippedRoadOverlap || 0) + 1;
+          return;
+        }
 
         let centerX = 0;
         let centerZ = 0;
@@ -2350,7 +2416,8 @@ async function loadRoads(retryPass = 0) {
 
         const bt = way.tags.building || 'yes';
         const sourceBuildingId = way.id ? String(way.id) : `osm-${Math.round(centerX * 10)}-${Math.round(centerZ * 10)}`;
-        const colliderDetail = useRdtBudgeting && lodTier !== 'near' ? 'bbox' : 'full';
+        const nearRoadCore = roadCoreStats.centroidInside || roadCoreStats.inside >= 2;
+        const colliderDetail = useRdtBudgeting && lodTier !== 'near' && !nearRoadCore ? 'bbox' : 'full';
 
         // Calculate terrain stats for building footprint
         let avgElevation = 0;
@@ -2390,7 +2457,7 @@ async function loadRoads(retryPass = 0) {
         new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.85, metalness: 0.05 });
 
         const mesh = new THREE.Mesh(geo, bldgMat);
-        const baseElevation = slopeRange >= 0.15 ? minElevation + 0.05 : avgElevation;
+        const baseElevation = slopeRange >= 0.06 ? minElevation + 0.03 : avgElevation;
         mesh.position.y = baseElevation;
         mesh.userData.buildingFootprint = pts;
         mesh.userData.avgElevation = baseElevation;

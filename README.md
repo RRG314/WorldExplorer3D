@@ -1,6 +1,6 @@
 # World Explorer
 
-Last reviewed: 2026-02-28
+Last reviewed: 2026-03-02
 
 World Explorer is a browser-native 3D exploration platform with real-location traversal, game modes, multiplayer rooms, optional monthly donations, and Firebase-backed persistence.
 
@@ -15,6 +15,12 @@ World Explorer is a browser-native 3D exploration platform with real-location tr
 ## Core Product Features
 
 - Earth, Moon, and Space traversal
+- Custom globe selector for Earth:
+  - click-to-pick latitude/longitude
+  - reverse city label lookup
+  - nearby menu-city suggestions
+  - favorites list seeded from prelisted menu cities
+  - Moon and Space shortcut buttons
 - Game modes:
   - Free Roam
   - Time Trial
@@ -24,11 +30,16 @@ World Explorer is a browser-native 3D exploration platform with real-location tr
   - Find the Flower
 - Multiplayer platform:
   - private/public rooms
+  - weekly featured public city room
+  - public room browse visibility for signed-out users (view-only)
   - room code + invite links
   - saved rooms (open again later)
   - owner delete for owned rooms
   - live presence, chat, friends, invites, recent players
   - shared blocks, paint claims, artifacts, home base
+  - minimap/large-map room markers:
+    - public rooms (visible to all)
+    - signed-in user rooms (owner/current)
 - Account center:
   - plan/donation status
   - room quota usage
@@ -142,6 +153,12 @@ PaintTown deterministic seed + paintball flow test:
 
 ```bash
 node tests/painttown.integration.test.mjs
+```
+
+Runtime + mirror + rules release gate:
+
+```bash
+npm run release:verify
 ```
 
 ## Deployment

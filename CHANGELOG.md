@@ -1,5 +1,32 @@
 # Changelog
 
+## [2026-03-02]
+
+### Added
+
+- Globe selector enhancements for `Custom Location`:
+  - city/place readout after globe pick
+  - nearby city short list based on selected point
+  - favorites tab populated from prelisted menu cities
+- Multiplayer map room overlays:
+  - public room markers visible to all players
+  - signed-in user room markers (owned/current) on minimap and large map
+- Weekly featured city public-room callout and deterministic weekly room code flow.
+
+### Changed
+
+- Public room browsing now works for signed-out users in view-only mode.
+- Firestore room read rules now allow anonymous reads for public rooms while keeping private-room access member-only.
+
+### Validation
+
+- Cross-platform smoke checks run for:
+  - desktop mac profile
+  - desktop Windows profile
+  - iPhone 12 profile
+  - Pixel 5 profile
+- Runtime invariants, mirror parity, and Firestore rules checks pass in local release verification workflow.
+
 ## [2026-02-28]
 
 ### Changed

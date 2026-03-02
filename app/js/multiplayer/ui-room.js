@@ -11,6 +11,7 @@ import { CHAT_MAX_LENGTH, listenChat, reportMessage, sendMessage } from './chat.
 import { createGhostManager } from './ghosts.js?v=57';
 import {
   bumpExplorerLeaderboard,
+  getWeeklyFeaturedCity,
   listenExplorerLeaderboard
 } from './loop.js?v=55';
 import { listenPlayers, startPresence, stopPresence } from './presence.js?v=60';
@@ -53,6 +54,24 @@ const MAX_PLAN_DISPLAY_NAME_LEN = 48;
 const RELATIVE_MINUTE_MS = 60 * 1000;
 const RELATIVE_HOUR_MS = 60 * RELATIVE_MINUTE_MS;
 const RELATIVE_DAY_MS = 24 * RELATIVE_HOUR_MS;
+const WEEKLY_CITY_ROTATION = Object.freeze([
+  'Tokyo',
+  'Paris',
+  'Baltimore',
+  'Monaco',
+  'New York',
+  'Miami',
+  'London',
+  'Dubai',
+  'San Francisco',
+  'Los Angeles',
+  'Chicago',
+  'Seattle',
+  'Hollywood',
+  'Nürburgring',
+  'Las Vegas'
+]);
+const WEEKLY_ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
 function finiteNumber(value, fallback = 0) {
   const n = Number(value);
@@ -108,6 +127,45 @@ function toMillis(value) {
   if (typeof value.seconds === 'number') return value.seconds * 1000;
   const parsed = Date.parse(String(value));
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function hashStringToUint32(input) {
+  const text = String(input || '');
+  let hash = 0x811c9dc5;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 0x01000193) >>> 0;
+  }
+  return hash >>> 0;
+}
+
+function getWeeklyCitySelection(date = new Date()) {
+  const weekly = getWeeklyFeaturedCity(date);
+  const week = Math.max(1, Math.floor(Number(weekly?.week || 1)));
+  const city = WEEKLY_CITY_ROTATION[week % WEEKLY_CITY_ROTATION.length] || WEEKLY_CITY_ROTATION[0];
+  return {
+    week,
+    city,
+    cityKey: normalizeCityKey(city),
+    kind: 'earth'
+  };
+}
+
+function buildWeeklyFeaturedRoomCode(selection) {
+  const week = Math.max(1, Math.floor(Number(selection?.week || 1)));
+  const cityKey = normalizeCityKey(selection?.cityKey || selection?.city || 'baltimore');
+  const seed = hashStringToUint32(`weekly-room-v1:${week}:${cityKey}`);
+  let value = seed || 1;
+  let code = 'W';
+  for (let i = 0; i < 5; i++) {
+    code += WEEKLY_ROOM_ALPHABET[value % WEEKLY_ROOM_ALPHABET.length];
+    value = Math.floor(value / WEEKLY_ROOM_ALPHABET.length);
+    if (value <= 0) {
+      value = ((seed >>> ((i + 1) * 3)) ^ (seed << ((i + 1) * 2))) >>> 0;
+      if (!value) value = i + 7;
+    }
+  }
+  return normalizeCode(code).slice(0, 6);
 }
 
 function formatRelativeTime(value) {
@@ -366,6 +424,8 @@ function initMultiplayerPlatform() {
     titleBrowseStatus: document.getElementById('mpBrowseStatus'),
     titleBrowseList: document.getElementById('mpBrowseList'),
     titleFeaturedRefreshBtn: document.getElementById('mpFeaturedRefreshBtn'),
+    titleFeaturedWeeklyBtn: document.getElementById('mpFeaturedWeeklyBtn'),
+    titleFeaturedWeeklyMeta: document.getElementById('mpFeaturedWeeklyMeta'),
     titleFeaturedList: document.getElementById('mpFeaturedList'),
     titleFriendsStatus: document.getElementById('mpFriendsStatus'),
     titleFriendUidInput: document.getElementById('mpFriendUidInput'),
@@ -464,6 +524,85 @@ function initMultiplayerPlatform() {
     unsubOwnedRooms: null,
     unsubLeaderboard: null
   };
+
+  function roomToMapMarker(room, type = 'public') {
+    if (!room || typeof room !== 'object') return null;
+    const code = normalizeCode(room.code || room.id || '');
+    const worldKind = sanitizeText(room.world?.kind || 'earth', 16).toLowerCase();
+    if (worldKind !== 'earth') return null;
+    const lat = Number(room.world?.lat);
+    const lon = Number(room.world?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+    const roomName = sanitizeText(room.name || room.locationTag?.label || code || 'Room', 80) || 'Room';
+    const locationLabel = sanitizeText(room.locationTag?.label || room.locationTag?.city || '', 80);
+    const visibility = String(room.visibility || 'private').toLowerCase() === 'public' ? 'public' : 'private';
+    return {
+      code: code || '',
+      lat,
+      lon,
+      name: roomName,
+      locationLabel,
+      type: type === 'user' ? 'user' : 'public',
+      visibility
+    };
+  }
+
+  function dedupeMarkers(markers = []) {
+    const out = [];
+    const seen = new Set();
+    markers.forEach((marker) => {
+      if (!marker) return;
+      const key = marker.code || `${marker.lat.toFixed(5)},${marker.lon.toFixed(5)},${marker.type}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      out.push(marker);
+    });
+    return out;
+  }
+
+  function buildWeeklyFeaturedMarker() {
+    const weekly = getWeeklyCitySelection();
+    const world = resolveWeeklyFeaturedWorld(weekly);
+    if (!Number.isFinite(world.lat) || !Number.isFinite(world.lon)) return null;
+    return {
+      code: buildWeeklyFeaturedRoomCode(weekly),
+      lat: world.lat,
+      lon: world.lon,
+      name: `Weekly City • ${weekly.city}`,
+      locationLabel: weekly.city,
+      type: 'public',
+      visibility: 'public',
+      isWeekly: true
+    };
+  }
+
+  function publishMapRoomsToContext() {
+    const signedIn = !!state.authUser;
+    const userRooms = signedIn ?
+    dedupeMarkers(
+      [
+      ...state.ownedRooms.map((room) => roomToMapMarker(room, 'user')),
+      roomToMapMarker(state.currentRoom, 'user')]
+      ) :
+    [];
+    const publicRooms = dedupeMarkers(
+      [
+      ...state.featuredRooms.map((room) => roomToMapMarker(room, 'public')),
+      ...state.browseRooms.map((room) => roomToMapMarker(room, 'public')),
+      roomToMapMarker(
+        state.currentRoom && String(state.currentRoom.visibility || '').toLowerCase() === 'public' ? state.currentRoom : null,
+        'public'
+      ),
+      buildWeeklyFeaturedMarker()]
+    );
+    appCtx.multiplayerMapRooms = {
+      signedIn,
+      currentRoomCode: normalizeCode(state.currentRoom?.code || ''),
+      userRooms,
+      publicRooms,
+      updatedAt: Date.now()
+    };
+  }
 
   function closeRoomPanel() {
     if (!refs.roomPanelModal) return;
@@ -655,17 +794,13 @@ function initMultiplayerPlatform() {
   function renderBrowseRooms() {
     if (!refs.titleBrowseList) return;
 
-    if (!state.authUser) {
-      refs.titleBrowseList.innerHTML = '<li class="mpRoomEmpty">Sign in to browse public rooms.</li>';
-      return;
-    }
-
     if (!state.browseRooms.length) {
       if (state.browseCityKey) {
         refs.titleBrowseList.innerHTML = '<li class="mpRoomEmpty">No public rooms found for that city tag.</li>';
       } else {
-        refs.titleBrowseList.innerHTML = '<li class="mpRoomEmpty">Search a city to find public rooms.</li>';
+        refs.titleBrowseList.innerHTML = '<li class="mpRoomEmpty">Search a city to find public rooms (view-only if signed out).</li>';
       }
+      publishMapRoomsToContext();
       return;
     }
 
@@ -674,26 +809,66 @@ function initMultiplayerPlatform() {
       const worldKind = sanitizeText(room.world?.kind || 'earth', 16).toUpperCase();
       const roomName = safeHtml(room.name || `${worldKind} Session`, 80);
       const locationLabel = safeHtml(room.locationTag?.label || room.locationTag?.city || 'Unknown location', 80);
-      return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${roomName}</div><div class="mpRoomMeta">${locationLabel} • ${escapeHtml(worldKind)} • ${escapeHtml(code)}</div></div><button class="mp-btn secondary mpRoomJoinBtn" data-room-code="${escapeHtml(code)}" type="button">Join</button></li>`;
+      const joinButton = state.authUser ?
+      `<button class="mp-btn secondary mpRoomJoinBtn" data-room-code="${escapeHtml(code)}" type="button">Join</button>` :
+      '<button class="mp-btn secondary mpRoomJoinBtn" type="button" disabled title="Sign in to join">View</button>';
+      return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${roomName}</div><div class="mpRoomMeta">${locationLabel} • ${escapeHtml(worldKind)} • ${escapeHtml(code)}</div></div>${joinButton}</li>`;
     }).join('');
+    publishMapRoomsToContext();
+  }
+
+  function resolveWeeklyFeaturedWorld(selection) {
+    const cityKey = normalizeCityKey(selection?.cityKey || selection?.city || '');
+    const locations = Object.values(appCtx.LOCS || {});
+    const match = locations.find((loc) => normalizeCityKey(loc?.name || '') === cityKey) || null;
+    const lat = finiteNumber(match?.lat, finiteNumber(appCtx.LOC?.lat, 0));
+    const lon = finiteNumber(match?.lon, finiteNumber(appCtx.LOC?.lon, 0));
+    return {
+      kind: 'earth',
+      lat,
+      lon,
+      seed: `latlon:${lat.toFixed(5)},${lon.toFixed(5)}`
+    };
+  }
+
+  function renderWeeklyFeaturedCallout() {
+    const weekly = getWeeklyCitySelection();
+    const roomCode = buildWeeklyFeaturedRoomCode(weekly);
+    const inWeeklyRoom = normalizeCode(state.currentRoom?.code || '') === roomCode;
+
+    if (refs.titleFeaturedWeeklyBtn) {
+      refs.titleFeaturedWeeklyBtn.disabled = !state.authUser;
+      refs.titleFeaturedWeeklyBtn.textContent = inWeeklyRoom
+        ? `In Weekly Room • ${weekly.city}`
+        : `Join Weekly City • ${weekly.city}`;
+    }
+
+    if (refs.titleFeaturedWeeklyMeta) {
+      refs.titleFeaturedWeeklyMeta.textContent = state.authUser
+        ? `Week ${weekly.week}: ${weekly.city}. Public room code ${roomCode}.`
+        : `Weekly city room rotates each week. Sign in to join.`;
+      refs.titleFeaturedWeeklyMeta.style.color = '#64748b';
+    }
   }
 
   function renderFeaturedRooms() {
+    renderWeeklyFeaturedCallout();
     if (!refs.titleFeaturedList) return;
-    if (!state.authUser) {
-      refs.titleFeaturedList.innerHTML = '<li class="mpRoomEmpty">Sign in to browse featured rooms.</li>';
-      return;
-    }
     if (!state.featuredRooms.length) {
       refs.titleFeaturedList.innerHTML = '<li class="mpRoomEmpty">No featured rooms yet.</li>';
+      publishMapRoomsToContext();
       return;
     }
     refs.titleFeaturedList.innerHTML = state.featuredRooms.map((room) => {
       const code = normalizeCode(room.code);
       const roomName = safeHtml(room.name || 'Untitled Room', 80);
       const locationLabel = safeHtml(room.locationTag?.label || room.locationTag?.city || 'Unknown location', 80);
-      return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${roomName}</div><div class="mpRoomMeta">${locationLabel} • ${escapeHtml(code)}</div></div><button class="mp-btn secondary mpRoomJoinBtn" data-room-code="${escapeHtml(code)}" type="button">Join</button></li>`;
+      const joinButton = state.authUser ?
+      `<button class="mp-btn secondary mpRoomJoinBtn" data-room-code="${escapeHtml(code)}" type="button">Join</button>` :
+      '<button class="mp-btn secondary mpRoomJoinBtn" type="button" disabled title="Sign in to join">View</button>';
+      return `<li class="mpRoomItem"><div class="mpRoomInfo"><div class="mpRoomName">${roomName}</div><div class="mpRoomMeta">${locationLabel} • ${escapeHtml(code)}</div></div>${joinButton}</li>`;
     }).join('');
+    publishMapRoomsToContext();
   }
 
   function renderFriends() {
@@ -763,6 +938,7 @@ function initMultiplayerPlatform() {
         refs.titleOwnedRoomsStatus.textContent = 'Sign in to access your saved rooms.';
         refs.titleOwnedRoomsStatus.style.color = '#64748b';
       }
+      publishMapRoomsToContext();
       return;
     }
 
@@ -772,6 +948,7 @@ function initMultiplayerPlatform() {
         refs.titleOwnedRoomsStatus.textContent = 'Create or join a room to save it here for quick return.';
         refs.titleOwnedRoomsStatus.style.color = '#64748b';
       }
+      publishMapRoomsToContext();
       return;
     }
 
@@ -793,6 +970,7 @@ function initMultiplayerPlatform() {
       refs.titleOwnedRoomsStatus.textContent = `${state.ownedRooms.length} saved room${state.ownedRooms.length === 1 ? '' : 's'}. Use Open to return anytime.`;
       refs.titleOwnedRoomsStatus.style.color = '#64748b';
     }
+    publishMapRoomsToContext();
   }
 
   function upsertOwnedRoomLocal(room) {
@@ -1079,6 +1257,7 @@ function initMultiplayerPlatform() {
     renderArtifacts();
     renderHomeBase();
     updateToggleStates();
+    publishMapRoomsToContext();
   }
 
   function ensureGhostManager() {
@@ -1128,11 +1307,6 @@ function initMultiplayerPlatform() {
   }
 
   async function refreshFeaturedRooms(silent = false) {
-    if (!state.authUser) {
-      state.featuredRooms = [];
-      renderFeaturedRooms();
-      return;
-    }
     try {
       const rooms = await findFeaturedPublicRooms({ resultLimit: 10 });
       state.featuredRooms = rooms;
@@ -1143,6 +1317,7 @@ function initMultiplayerPlatform() {
     } catch (err) {
       console.warn('[multiplayer][ui] refresh featured rooms failed:', err);
       if (!silent) setStatus(err?.message || 'Could not load featured rooms.', true);
+      publishMapRoomsToContext();
     }
   }
 
@@ -1486,6 +1661,7 @@ function initMultiplayerPlatform() {
       await syncRoomWorldContext(nextRoom, false);
       renderRoomMeta();
       updateToggleStates();
+      publishMapRoomsToContext();
     });
 
     state.unsubPlayers = listenPlayers(room.id, (players) => {
@@ -1542,6 +1718,7 @@ function initMultiplayerPlatform() {
     }
 
     setStatus(`Connected to ${originLabel}: ${room.code} (seed ${deriveRoomDeterministicSeed(room)}).`);
+    publishMapRoomsToContext();
   }
 
   async function handleCreateRoom() {
@@ -1596,13 +1773,6 @@ function initMultiplayerPlatform() {
   }
 
   async function handleBrowseRooms() {
-    if (!state.authUser) {
-      setBrowseStatus('Sign in to browse public rooms.', true);
-      state.browseRooms = [];
-      renderBrowseRooms();
-      return;
-    }
-
     const cityInput = sanitizeText(refs.titleBrowseCityInput?.value || '', 48);
     const cityKey = normalizeCityKey(cityInput);
     if (!cityKey) {
@@ -1627,6 +1797,64 @@ function initMultiplayerPlatform() {
     } catch (err) {
       console.error('[multiplayer][ui] browse rooms failed:', err);
       setBrowseStatus(err?.message || 'Could not browse public rooms right now.', true);
+    }
+  }
+
+  async function handleJoinWeeklyFeaturedRoom() {
+    if (!(await ensureAccessOrWarn('joining the weekly featured city room'))) return null;
+
+    const weekly = getWeeklyCitySelection();
+    const roomCode = buildWeeklyFeaturedRoomCode(weekly);
+    const world = resolveWeeklyFeaturedWorld(weekly);
+    const roomName = `Weekly City • ${weekly.city} (Week ${weekly.week})`;
+
+    async function finalizeJoin(room, originLabel) {
+      await activateRoom(room, originLabel);
+      await bumpExplorerLeaderboard({ roomsJoined: 1 });
+      await refreshFeaturedRooms(true);
+      renderFeaturedRooms();
+      closeRoomPanel();
+      setInputCode(refs, room.code);
+      setStatus(`Weekly featured room active: ${weekly.city} (${room.code}).`);
+      return room;
+    }
+
+    try {
+      const existing = await joinRoomByCode(roomCode);
+      return await finalizeJoin(existing, 'weekly featured room');
+    } catch (joinErr) {
+      const joinMessage = String(joinErr?.message || '');
+      if (!/Room not found/i.test(joinMessage)) {
+        setStatus(joinMessage || 'Could not join weekly featured room.', true);
+        return null;
+      }
+    }
+
+    try {
+      const created = await createRoom({
+        code: roomCode,
+        name: roomName,
+        visibility: 'public',
+        featured: true,
+        maxPlayers: 12,
+        world,
+        locationName: weekly.city,
+        locationTag: { label: `Weekly City: ${weekly.city}`, city: weekly.city, kind: 'earth' }
+      });
+      return await finalizeJoin(created, 'weekly featured room');
+    } catch (createErr) {
+      const createMessage = String(createErr?.message || '');
+      if (/unavailable|already|denied/i.test(createMessage)) {
+        try {
+          const raceWinner = await joinRoomByCode(roomCode);
+          return await finalizeJoin(raceWinner, 'weekly featured room');
+        } catch (retryErr) {
+          setStatus(String(retryErr?.message || retryErr || 'Could not join weekly featured room.'), true);
+          return null;
+        }
+      }
+      setStatus(createMessage || 'Could not open weekly featured room.', true);
+      return null;
     }
   }
 
@@ -1747,7 +1975,7 @@ function initMultiplayerPlatform() {
       } else {
         setStatus('Sign in to create or join multiplayer rooms.');
       }
-      setBrowseStatus('Sign in to browse public rooms.');
+      setBrowseStatus('Public rooms are viewable. Sign in to join or create rooms.');
       if (refs.titleFriendsStatus) refs.titleFriendsStatus.textContent = 'Sign in to build your social graph.';
       return;
     }
@@ -1912,6 +2140,7 @@ function initMultiplayerPlatform() {
 
     refs.titleBrowseBtn?.addEventListener('click', handleBrowseRooms);
     refs.titleFeaturedRefreshBtn?.addEventListener('click', () => refreshFeaturedRooms(false));
+    refs.titleFeaturedWeeklyBtn?.addEventListener('click', handleJoinWeeklyFeaturedRoom);
     refs.titleAddFriendBtn?.addEventListener('click', () => {
       handleManualAddFriend();
     });
@@ -2137,6 +2366,7 @@ function initMultiplayerPlatform() {
     renderInvites();
     renderOwnedRooms();
     renderLeaderboard();
+    publishMapRoomsToContext();
   }
 
   wireEvents();
@@ -2167,6 +2397,7 @@ function initMultiplayerPlatform() {
     renderLeaderboard();
     updateToggleStates();
     applyEntitlementCopy();
+    publishMapRoomsToContext();
   }
 
   singleton = {

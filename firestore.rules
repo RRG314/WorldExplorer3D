@@ -176,7 +176,7 @@ service cloud.firestore {
     }
 
     function canReadRoom(roomId) {
-      return isSignedIn() && roomExists(roomId) && (
+      return roomExists(roomId) && (
         roomData(roomId).visibility == 'public' ||
         isRoomMember(roomId)
       );

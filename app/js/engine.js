@@ -6,6 +6,56 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 let asphaltTex,asphaltNormal,asphaltRoughness,windowTextures = {};
 let buildingNormalMap = null,buildingRoughnessMap = null;
 let currentGpuTier = 'high';
+const RENDER_QUALITY_LOW = 'low';
+const RENDER_QUALITY_MED = 'med';
+const RENDER_QUALITY_HIGH = 'high';
+const RENDER_QUALITY_STORAGE_KEY = 'worldExplorerRenderQualityLevel';
+const SSAO_STORAGE_KEY = 'worldExplorerSsaoEnabled';
+let renderQualityLevel = RENDER_QUALITY_MED;
+let hdrEnvMap = null;
+let fallbackEnvMap = null;
+let hdrLoadRequested = false;
+let carPaintMaterial = null;
+let ssaoEnabled = false;
+const USE_HERO_CAR_ASSET = false;
+
+function readStorage(key) {
+  try {
+    return localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function writeStorage(key, value) {
+  try {
+    localStorage.setItem(key, value);
+  } catch {
+    // Ignore storage write failures.
+  }
+}
+
+function normalizeRenderQualityLevel(level) {
+  const raw = String(level || '').toLowerCase();
+  if (raw === RENDER_QUALITY_LOW || raw === 'performance') return RENDER_QUALITY_LOW;
+  if (raw === RENDER_QUALITY_HIGH || raw === 'quality') return RENDER_QUALITY_HIGH;
+  return RENDER_QUALITY_MED;
+}
+
+function isLikelyMobileDevice() {
+  try {
+    if (typeof navigator === 'undefined') return false;
+    const ua = String(navigator.userAgent || '').toLowerCase();
+    const touchPoints = Number(navigator.maxTouchPoints || 0);
+    return /android|iphone|ipad|mobile/.test(ua) || touchPoints >= 3;
+  } catch {
+    return false;
+  }
+}
+
+function getRenderQualityLevel() {
+  return renderQualityLevel;
+}
 
 function syncTextureGlobals() {
   appCtx.asphaltTex = asphaltTex;
@@ -1151,6 +1201,155 @@ const CFG = {
 // physics/game/hud reference CFG as a global symbol.
 Object.assign(appCtx, { CFG });
 
+function createProceduralEnvironmentMap(pmremGenerator) {
+  if (!pmremGenerator) return null;
+  try {
+    const envScene = new THREE.Scene();
+    const envGeo = new THREE.SphereGeometry(120, 8, 8);
+    const envMat = new THREE.MeshBasicMaterial({
+      color: 0x87ceeb,
+      side: THREE.BackSide
+    });
+    const envMesh = new THREE.Mesh(envGeo, envMat);
+    envScene.add(envMesh);
+    return pmremGenerator.fromScene(envScene, 0.04).texture;
+  } catch (err) {
+    console.warn('Procedural environment map generation failed:', err);
+    return null;
+  }
+}
+
+function getShadowMapResolution(level) {
+  const normalized = normalizeRenderQualityLevel(level);
+  if (normalized === RENDER_QUALITY_LOW) return 0;
+  if (currentGpuTier === 'low') return normalized === RENDER_QUALITY_HIGH ? 512 : 256;
+  if (currentGpuTier === 'mid') return normalized === RENDER_QUALITY_HIGH ? 1024 : 512;
+  return normalized === RENDER_QUALITY_HIGH ? 2048 : 1024;
+}
+
+function applyRenderQuality(level, options = {}) {
+  const normalized = normalizeRenderQualityLevel(level);
+  renderQualityLevel = normalized;
+  appCtx.renderQualityLevel = normalized;
+  if (options.persist !== false) writeStorage(RENDER_QUALITY_STORAGE_KEY, normalized);
+
+  if (appCtx.renderer) {
+    const enableShadows = normalized !== RENDER_QUALITY_LOW;
+    appCtx.renderer.shadowMap.enabled = enableShadows;
+    appCtx.renderer.shadowMap.type = normalized === RENDER_QUALITY_HIGH ?
+    THREE.PCFSoftShadowMap :
+    THREE.BasicShadowMap;
+    appCtx.renderer.toneMappingExposure = normalized === RENDER_QUALITY_HIGH ? 0.95 : normalized === RENDER_QUALITY_MED ? 0.9 : 0.85;
+  }
+
+  if (appCtx.sun) {
+    const shadowRes = getShadowMapResolution(normalized);
+    appCtx.sun.castShadow = shadowRes > 0;
+    appCtx.sun.shadow.mapSize.width = shadowRes || 1;
+    appCtx.sun.shadow.mapSize.height = shadowRes || 1;
+    appCtx.sun.shadow.radius = normalized === RENDER_QUALITY_HIGH ? 3 : 1;
+    appCtx.sun.shadow.needsUpdate = true;
+  }
+
+  if (normalized === RENDER_QUALITY_LOW) {
+    appCtx.scene.environment = fallbackEnvMap || null;
+  } else if (hdrEnvMap) {
+    appCtx.scene.environment = hdrEnvMap;
+  } else if (fallbackEnvMap) {
+    appCtx.scene.environment = fallbackEnvMap;
+  }
+
+  if (carPaintMaterial) {
+    const high = normalized === RENDER_QUALITY_HIGH;
+    carPaintMaterial.envMapIntensity = high ? 1.5 : normalized === RENDER_QUALITY_MED ? 1.2 : 0.65;
+    carPaintMaterial.roughness = high ? 0.14 : 0.2;
+    carPaintMaterial.metalness = high ? 0.95 : 0.88;
+    // Keep car finish simple and lightweight across tiers (no clearcoat layer).
+    if ('clearcoat' in carPaintMaterial) {
+      carPaintMaterial.clearcoat = 0.0;
+      carPaintMaterial.clearcoatRoughness = 1.0;
+    }
+    carPaintMaterial.needsUpdate = true;
+  }
+
+  if (appCtx.ssaoPass) {
+    appCtx.ssaoPass.enabled = ssaoEnabled && normalized === RENDER_QUALITY_HIGH;
+  }
+  if (appCtx.bloomPass) {
+    // Keep bloom for medium/high only; low quality runs without post-fx.
+    appCtx.bloomPass.enabled = normalized !== RENDER_QUALITY_LOW;
+  }
+  if (appCtx.smaaPass) {
+    appCtx.smaaPass.enabled = normalized !== RENDER_QUALITY_LOW;
+  }
+
+  if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
+  return normalized;
+}
+
+function ensureHdrEnvironment() {
+  if (hdrLoadRequested || !appCtx.renderer || typeof THREE.RGBELoader === 'undefined') return;
+  hdrLoadRequested = true;
+
+  const pmremGenerator = appCtx.pmremGenerator;
+  if (!pmremGenerator) return;
+
+  const rgbeLoader = new THREE.RGBELoader();
+  rgbeLoader.setDataType(THREE.UnsignedByteType);
+
+  const applyHdrTexture = (hdrTexture) => {
+    hdrTexture.mapping = THREE.EquirectangularReflectionMapping;
+    hdrEnvMap = pmremGenerator.fromEquirectangular(hdrTexture).texture;
+    hdrTexture.dispose();
+    if (renderQualityLevel !== RENDER_QUALITY_LOW) appCtx.scene.environment = hdrEnvMap;
+    if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
+  };
+
+  rgbeLoader.load(
+    'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloppenheim_06_1k.hdr',
+    applyHdrTexture,
+    undefined,
+    (err) => {
+      console.warn('HDR environment load failed; using fallback environment only.', err);
+    }
+  );
+}
+
+function setRenderQualityLevel(level, options = {}) {
+  const next = applyRenderQuality(level, options);
+  if (next !== RENDER_QUALITY_LOW) ensureHdrEnvironment();
+  return next;
+}
+
+function getHighQualityEnabled() {
+  return renderQualityLevel === RENDER_QUALITY_HIGH;
+}
+
+function setHighQualityEnabled(enabled, options = {}) {
+  if (enabled) return setRenderQualityLevel(RENDER_QUALITY_HIGH, options);
+  const fallbackLevel = normalizeRenderQualityLevel(options.fallbackLevel || RENDER_QUALITY_MED);
+  return setRenderQualityLevel(fallbackLevel, options);
+}
+
+function canUseSsao() {
+  return !isLikelyMobileDevice() && currentGpuTier !== 'low';
+}
+
+function getSsaoEnabled() {
+  return !!ssaoEnabled;
+}
+
+function setSsaoEnabled(enabled, options = {}) {
+  ssaoEnabled = !!enabled && canUseSsao();
+  appCtx.ssaoEnabled = ssaoEnabled;
+  if (options.persist !== false) writeStorage(SSAO_STORAGE_KEY, ssaoEnabled ? '1' : '0');
+  if (appCtx.ssaoPass) {
+    appCtx.ssaoPass.enabled = ssaoEnabled && renderQualityLevel === RENDER_QUALITY_HIGH;
+  }
+  if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
+  return ssaoEnabled;
+}
+
 function setupPostProcessingPipeline() {
   if (!appCtx.renderer || !appCtx.scene || !appCtx.camera) return false;
   if (currentGpuTier === 'low') return false;
@@ -1163,6 +1362,21 @@ function setupPostProcessingPipeline() {
     const renderPass = new THREE.RenderPass(appCtx.scene, appCtx.camera);
     appCtx.composer.addPass(renderPass);
 
+    appCtx.ssaoPass = null;
+    if (typeof THREE.SSAOPass !== 'undefined' && canUseSsao()) {
+      try {
+        appCtx.ssaoPass = new THREE.SSAOPass(appCtx.scene, appCtx.camera, innerWidth, innerHeight);
+        appCtx.ssaoPass.kernelRadius = 10;
+        appCtx.ssaoPass.minDistance = 0.001;
+        appCtx.ssaoPass.maxDistance = 0.06;
+        appCtx.ssaoPass.enabled = ssaoEnabled && renderQualityLevel === RENDER_QUALITY_HIGH;
+        appCtx.composer.addPass(appCtx.ssaoPass);
+      } catch (e) {
+        console.warn('SSAO not available:', e);
+        appCtx.ssaoPass = null;
+      }
+    }
+
     appCtx.bloomPass = null;
     if (typeof THREE.UnrealBloomPass !== 'undefined') {
       try {
@@ -1174,6 +1388,7 @@ function setupPostProcessingPipeline() {
           0.4, // radius
           0.85 // threshold - only bright things bloom
         );
+        appCtx.bloomPass.enabled = renderQualityLevel !== RENDER_QUALITY_LOW;
         appCtx.composer.addPass(appCtx.bloomPass);
       } catch (e) {
         console.warn('Bloom not available:', e);
@@ -1187,6 +1402,7 @@ function setupPostProcessingPipeline() {
           innerWidth * appCtx.renderer.getPixelRatio(),
           innerHeight * appCtx.renderer.getPixelRatio()
         );
+        appCtx.smaaPass.enabled = renderQualityLevel !== RENDER_QUALITY_LOW;
         appCtx.composer.addPass(appCtx.smaaPass);
       } catch (e) {
         console.warn('SMAA not available:', e);
@@ -1197,6 +1413,7 @@ function setupPostProcessingPipeline() {
   } catch (e) {
     console.warn('Post-processing not available:', e);
     appCtx.composer = null;
+    appCtx.ssaoPass = null;
     appCtx.bloomPass = null;
     appCtx.smaaPass = null;
     return false;
@@ -1210,6 +1427,209 @@ function tryEnablePostProcessing() {
     console.log('[engine] Post-processing enabled after deferred script load.');
   }
   return enabled;
+}
+
+function normalizeLoadedCarModel(root) {
+  if (!root) return;
+  root.updateMatrixWorld(true);
+  const box = new THREE.Box3().setFromObject(root);
+  const size = new THREE.Vector3();
+  box.getSize(size);
+
+  // Most DCC exports are X-forward. Rotate to Z-forward for this runtime.
+  if (size.x > size.z * 1.15) {
+    root.rotation.y = -Math.PI * 0.5;
+    root.updateMatrixWorld(true);
+    box.setFromObject(root);
+    box.getSize(size);
+  }
+
+  const targetLength = 3.6;
+  const sourceLength = Math.max(0.01, size.z);
+  const scale = targetLength / sourceLength;
+  root.scale.multiplyScalar(scale);
+  root.updateMatrixWorld(true);
+
+  box.setFromObject(root);
+  const center = new THREE.Vector3();
+  box.getCenter(center);
+  root.position.x -= center.x;
+  root.position.z -= center.z;
+  root.position.y -= box.min.y;
+  root.updateMatrixWorld(true);
+}
+
+function createHeroCarMaterialSet() {
+  const heroRed = 0xc31421;
+  const body = new THREE.MeshPhysicalMaterial({
+    color: heroRed,
+    metalness: 0.95,
+    roughness: 0.16,
+    clearcoat: 0.5,
+    clearcoatRoughness: 0.14,
+    envMapIntensity: 1.4
+  });
+  const glass = new THREE.MeshPhysicalMaterial({
+    color: 0x97b9d6,
+    metalness: 0,
+    roughness: 0.08,
+    transmission: 0.0,
+    transparent: true,
+    opacity: 0.34,
+    envMapIntensity: 0.9
+  });
+  const trim = new THREE.MeshStandardMaterial({
+    color: 0x1e2228,
+    roughness: 0.62,
+    metalness: 0.35
+  });
+  const light = new THREE.MeshStandardMaterial({
+    color: 0xfff1d8,
+    emissive: 0xfff1d8,
+    emissiveIntensity: 0.7,
+    roughness: 0.18,
+    metalness: 0.05
+  });
+
+  const bodyLow = new THREE.MeshStandardMaterial({
+    color: heroRed,
+    metalness: 0.72,
+    roughness: 0.3,
+    envMapIntensity: 0.4
+  });
+  const glassLow = new THREE.MeshStandardMaterial({
+    color: 0x8aa8be,
+    roughness: 0.2,
+    metalness: 0,
+    transparent: true,
+    opacity: 0.25
+  });
+  const trimLow = new THREE.MeshStandardMaterial({
+    color: 0x22272c,
+    roughness: 0.74,
+    metalness: 0.1
+  });
+  const lightLow = new THREE.MeshStandardMaterial({
+    color: 0xd8d0c4,
+    emissive: 0x8f8a80,
+    emissiveIntensity: 0.18,
+    roughness: 0.36,
+    metalness: 0
+  });
+
+  carPaintMaterial = body;
+  return {
+    high: { body, glass, trim, light },
+    low: { body: bodyLow, glass: glassLow, trim: trimLow, light: lightLow }
+  };
+}
+
+function heroCarBucketFromName(name = '') {
+  const id = String(name || '').toLowerCase();
+  if (id.includes('glass') || id.includes('window') || id.includes('windshield')) return 'glass';
+  if (id.includes('light') || id.includes('lamp') || id.includes('head') || id.includes('tail')) return 'light';
+  if (id.includes('wheel') || id.includes('tire') || id.includes('tyre') || id.includes('rim')) return 'trim';
+  return 'body';
+}
+
+function applyHeroCarMaterialBudget(root, materialSet, options = {}) {
+  const tier = options.tier === 'low' ? 'low' : 'high';
+  const mats = materialSet[tier];
+  const wheelMeshes = [];
+  root.traverse((obj) => {
+    if (!obj || !obj.isMesh) return;
+    const id = String(obj.name || '').toLowerCase();
+    const bucket = heroCarBucketFromName(id);
+    obj.material = mats[bucket] || mats.body;
+    // Keep hero-car shadows inexpensive: body/trim cast, glass/light meshes do not.
+    obj.castShadow = tier === 'high' && bucket !== 'glass' && bucket !== 'light' && !id.includes('interior');
+    obj.receiveShadow = false;
+    if (bucket === 'trim' && wheelMeshes.length < 6) wheelMeshes.push(obj);
+  });
+  return wheelMeshes;
+}
+
+function pruneHeroCarLod1(root) {
+  const hiddenNameParts = [
+  'interior',
+  'seat',
+  'mirror',
+  'logo',
+  'badge',
+  'license',
+  'wiper',
+  'exhaust',
+  'steering',
+  'dashboard'];
+  root.traverse((obj) => {
+    if (!obj || !obj.isMesh) return;
+    const id = String(obj.name || '').toLowerCase();
+    if (hiddenNameParts.some((part) => id.includes(part))) {
+      obj.visible = false;
+    }
+  });
+}
+
+function upgradeCarMeshWithHeroAsset(carGroup) {
+  if (!carGroup || typeof THREE.GLTFLoader === 'undefined') return;
+
+  const loader = new THREE.GLTFLoader();
+  if (typeof THREE.DRACOLoader !== 'undefined') {
+    try {
+      const draco = new THREE.DRACOLoader();
+      draco.setDecoderPath('https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/libs/draco/');
+      loader.setDRACOLoader(draco);
+    } catch (err) {
+      console.warn('Car DRACO loader unavailable:', err);
+    }
+  }
+
+  const onLoaded = (gltf) => {
+    const root = gltf?.scene || gltf?.scenes?.[0];
+    if (!root) return;
+
+    normalizeLoadedCarModel(root);
+    // Current hero model's local forward axis is flipped versus runtime forward (+Z).
+    // Rotate once so chase camera sees rear by default and forward driving is correct.
+    root.rotation.y += Math.PI;
+    root.updateMatrixWorld(true);
+    const materialSet = createHeroCarMaterialSet();
+    const lod0Wheels = applyHeroCarMaterialBudget(root, materialSet, { tier: 'high' });
+
+    const lod1 = root.clone(true);
+    pruneHeroCarLod1(lod1);
+    applyHeroCarMaterialBudget(lod1, materialSet, { tier: 'low' });
+
+    const lod = new THREE.LOD();
+    lod.addLevel(root, 0);
+    lod.addLevel(lod1, 58);
+    lod.position.y = -1.1;
+    lod.updateMatrixWorld(true);
+
+    while (carGroup.children.length) carGroup.remove(carGroup.children[0]);
+    carGroup.add(lod);
+    carGroup.castShadow = true;
+    carGroup.traverse((obj) => {
+      if (obj && obj.isMesh) {
+        obj.frustumCulled = true;
+      }
+    });
+    appCtx.wheelMeshes = lod0Wheels;
+    applyRenderQuality(renderQualityLevel, { persist: false });
+  };
+
+  const tryUrls = ['assets/models/bmw-e34.glb'];
+  const tryNext = (idx) => {
+    if (idx >= tryUrls.length) return;
+    loader.load(
+      tryUrls[idx],
+      onLoaded,
+      undefined,
+      () => tryNext(idx + 1)
+    );
+  };
+
+  tryNext(0);
 }
 
 function init() {
@@ -1392,6 +1812,15 @@ function init() {
   document.body.prepend(appCtx.renderer.domElement);
 
   currentGpuTier = gpuTier;
+  const savedRenderQuality = readStorage(RENDER_QUALITY_STORAGE_KEY);
+  const savedSsao = readStorage(SSAO_STORAGE_KEY);
+  const initialRenderQuality = savedRenderQuality ?
+  normalizeRenderQualityLevel(savedRenderQuality) :
+  isLikelyMobileDevice() || gpuTier === 'low' ? RENDER_QUALITY_LOW : RENDER_QUALITY_MED;
+  renderQualityLevel = initialRenderQuality;
+  appCtx.renderQualityLevel = initialRenderQuality;
+  setSsaoEnabled(savedSsao === '1', { persist: false });
+
   if (!setupPostProcessingPipeline()) {
     console.log('Post-processing skipped (GPU tier: ' + gpuTier + ')');
   }
@@ -1422,57 +1851,18 @@ function init() {
     // Textures will be null, code will use fallback solid colors
   }
 
-  // === REAL HDR ENVIRONMENT (Poly Haven - Free) ===
-  // Using a real HDR gives massively better reflections on car paint, glass, and buildings
+  // PMREM + fallback environment map used by quality tiers.
   try {
-    const pmremGenerator = new THREE.PMREMGenerator(appCtx.renderer);
-    pmremGenerator.compileEquirectangularShader();
-
-    // Try loading real HDR from Poly Haven (free CDN)
-    const rgbeLoader = new THREE.RGBELoader();
-    rgbeLoader.setDataType(THREE.UnsignedByteType);
-
-    // Using "kloppenheim_06" - a nice outdoor city HDR (1k resolution for performance)
-    // Free from: https://polyhaven.com/a/kloppenheim_06
-    rgbeLoader.load(
-      'https://dl.polyhaven.org/file/ph-assets/HDRIs/hdr/1k/kloppenheim_06_1k.hdr',
-      function (hdrTexture) {
-        hdrTexture.mapping = THREE.EquirectangularReflectionMapping;
-        const envMap = pmremGenerator.fromEquirectangular(hdrTexture).texture;
-        appCtx.scene.environment = envMap;
-        hdrTexture.dispose();
-        pmremGenerator.dispose();
-        // Debug log removed
-      },
-      undefined,
-      function (error) {
-        console.warn('HDR load failed, using fallback:', error);
-        // Fallback to procedural environment
-        createProceduralEnvironment(pmremGenerator);
-      }
-    );
-  } catch (e) {
-    console.warn('HDR environment failed (non-critical):', e);
-    // Game will work fine without reflections
-  }
-
-  function createProceduralEnvironment(pmremGenerator) {
-    try {
-      const envScene = new THREE.Scene();
-      const envGeo = new THREE.SphereGeometry(100, 8, 8);
-      const envMat = new THREE.MeshBasicMaterial({
-        color: 0x87ceeb,
-        side: THREE.BackSide
-      });
-      const envMesh = new THREE.Mesh(envGeo, envMat);
-      envScene.add(envMesh);
-      const envMap = pmremGenerator.fromScene(envScene, 0.04).texture;
-      appCtx.scene.environment = envMap;
-      pmremGenerator.dispose();
-      // Debug log removed
-    } catch (e) {
-      console.warn('Even procedural environment failed:', e);
+    appCtx.pmremGenerator = new THREE.PMREMGenerator(appCtx.renderer);
+    appCtx.pmremGenerator.compileEquirectangularShader();
+    fallbackEnvMap = createProceduralEnvironmentMap(appCtx.pmremGenerator);
+    if (renderQualityLevel === RENDER_QUALITY_LOW) {
+      appCtx.scene.environment = fallbackEnvMap || null;
+    } else {
+      ensureHdrEnvironment();
     }
+  } catch (e) {
+    console.warn('PMREM initialization failed (non-critical):', e);
   }
 
   // Advanced lighting - store references for day/night cycle
@@ -1502,6 +1892,9 @@ function init() {
 
   appCtx.ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
   appCtx.scene.add(appCtx.ambientLight);
+
+  // Apply initial quality now that lights/shadows exist.
+  setRenderQualityLevel(initialRenderQuality, { persist: false });
 
   // === ADD SUN VISUAL ===
   appCtx.sunSphere = new THREE.Mesh(
@@ -1639,14 +2032,15 @@ function init() {
 
     // === CAR PAINT (MeshStandardMaterial - good look, better perf) ===
     const bodyMat = new THREE.MeshStandardMaterial({
-      color: 0xff3366,
-      metalness: 0.9,
-      roughness: 0.15,
-      envMapIntensity: 1.2
+      color: 0xc31421,
+      metalness: 0.45,
+      roughness: 0.38,
+      envMapIntensity: 0.6
     });
+    carPaintMaterial = bodyMat;
 
     const body = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.5, 3.5), bodyMat);
-    body.position.y = 0.5;body.castShadow = true;body.receiveShadow = true;
+    body.position.y = 0.5;body.castShadow = true;body.receiveShadow = false;
     appCtx.carMesh.add(body);
     const roof = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.4, 1.5), bodyMat);
     roof.position.set(0, 0.95, -0.2);roof.castShadow = true;
@@ -1720,6 +2114,10 @@ function init() {
     return;
   }
 
+  if (USE_HERO_CAR_ASSET) {
+    upgradeCarMeshWithHeroAsset(appCtx.carMesh);
+  }
+
   // Initialize Walking Module
   try {
     appCtx.Walk = appCtx.createWalkingModule({
@@ -1754,6 +2152,9 @@ function init() {
     appCtx.camera.updateProjectionMatrix();
     appCtx.renderer.setSize(innerWidth, innerHeight);
     if (appCtx.composer) appCtx.composer.setSize(innerWidth, innerHeight);
+    if (appCtx.ssaoPass && typeof appCtx.ssaoPass.setSize === 'function') {
+      appCtx.ssaoPass.setSize(innerWidth, innerHeight);
+    }
     if (appCtx.smaaPass) appCtx.smaaPass.setSize(innerWidth * appCtx.renderer.getPixelRatio(), innerHeight * appCtx.renderer.getPixelRatio());
   });
   addEventListener('keydown', (e) => {appCtx.keys[e.code] = true;appCtx.onKey(e.code, e);});
@@ -1867,16 +2268,30 @@ function init() {
 }
 
 Object.assign(appCtx, {
+  canUseSsao,
   clearWindowTextureCache,
   createBuildingGroundPatch,
+  getHighQualityEnabled,
   getBuildingMaterial,
+  getRenderQualityLevel,
+  getSsaoEnabled,
   init,
+  setSsaoEnabled,
+  setHighQualityEnabled,
+  setRenderQualityLevel,
   tryEnablePostProcessing
 });
 
 export {
+  canUseSsao,
   clearWindowTextureCache,
   createBuildingGroundPatch,
+  getHighQualityEnabled,
   getBuildingMaterial,
+  getRenderQualityLevel,
+  getSsaoEnabled,
   init,
+  setSsaoEnabled,
+  setHighQualityEnabled,
+  setRenderQualityLevel,
   tryEnablePostProcessing };

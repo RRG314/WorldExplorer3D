@@ -3,9 +3,13 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 // ============================================================================
 
 function isDebugToggleKey(code, event) {
-  if (code === 'Backquote' || code === 'F8') return true;
+  if (code === 'Backquote') return true;
   const key = event?.key;
-  return key === '`' || key === '~';
+  return key === '`' || key === '~' || key === 'Dead';
+}
+
+function isPerfToggleKey(code) {
+  return code === 'F8';
 }
 
 function onKey(code, event) {
@@ -101,7 +105,26 @@ function onKey(code, event) {
     document.getElementById('fWalk').classList.remove('on');
     if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
   }
-  // Debug overlay toggle (Backtick key; F8 fallback for keyboard-layout variance)
+  // Performance overlay toggle (F8)
+  if (isPerfToggleKey(code)) {
+    if (event?.repeat) return;
+    const nextEnabled = !(typeof appCtx.getPerfOverlayEnabled === 'function' ?
+    appCtx.getPerfOverlayEnabled() :
+    !!appCtx.perfOverlayEnabled);
+    if (typeof appCtx.setPerfOverlayEnabled === 'function') {
+      appCtx.setPerfOverlayEnabled(nextEnabled);
+    } else {
+      appCtx.perfOverlayEnabled = nextEnabled;
+    }
+    if (nextEnabled && typeof appCtx.logBaselineSnapshot === 'function') {
+      appCtx.logBaselineSnapshot({ trigger: 'F8' });
+    }
+    if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
+    if (typeof appCtx.positionTopOverlays === 'function') appCtx.positionTopOverlays();
+    return;
+  }
+
+  // Debug overlay toggle (Backtick key)
   if (isDebugToggleKey(code, event)) {
     if (event?.repeat) return;
     window._debugMode = !window._debugMode;

@@ -22,6 +22,7 @@
   --perf-panel-z:145;
 }
 body{background:#f5f7fa;overflow:hidden;font-family:'Inter',sans-serif;-webkit-user-select:none;user-select:none;touch-action:pan-x pan-y;-webkit-tap-highlight-color:transparent}
+body.globe-selector-open{overflow:hidden;touch-action:none}
 button,input,select,textarea{-webkit-tap-highlight-color:transparent}
 button{touch-action:manipulation}
 input,textarea{-webkit-user-select:text;user-select:text}
@@ -83,6 +84,46 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .coords-row{display:flex;gap:12px}
 .coords-row input{flex:1;background:#ffffff;border:2px solid #e5e7eb;border-radius:8px;padding:12px;color:#1f2937;font-size:14px;font-family:'Inter',sans-serif}
 .coords-row input:focus{outline:none;border-color:#f59e0b;box-shadow:0 0 0 3px rgba(245,158,11,0.1)}
+
+/* Globe Selector Overlay */
+#globeSelectorScreen{position:fixed;inset:0;display:none;z-index:230;background:radial-gradient(circle at 50% 18%,rgba(52,72,120,0.35),rgba(7,11,21,0.92));backdrop-filter:blur(6px);padding:max(14px,calc(env(safe-area-inset-top) + 10px)) max(12px,calc(env(safe-area-inset-right) + 10px)) max(14px,calc(env(safe-area-inset-bottom) + 10px)) max(12px,calc(env(safe-area-inset-left) + 10px))}
+#globeSelectorScreen.show{display:flex;align-items:stretch;justify-content:center}
+.globe-selector-shell{width:min(1080px,100%);height:100%;background:rgba(255,255,255,0.92);border:2px solid rgba(148,163,184,0.35);border-radius:18px;box-shadow:0 24px 64px rgba(2,6,23,0.45);display:grid;grid-template-columns:minmax(280px,360px) 1fr;grid-template-rows:auto 1fr;gap:12px;padding:12px;position:relative}
+.globe-selector-shortcut{position:absolute;top:10px;width:46px;height:46px;border-radius:50%;border:2px solid rgba(148,163,184,0.35);background:#ffffff;color:#1e293b;font-size:20px;cursor:pointer;box-shadow:0 8px 18px rgba(15,23,42,0.18);z-index:3}
+#globeSelectorMoonBtn{left:10px}
+#globeSelectorSpaceBtn{right:10px}
+.globe-selector-top{grid-column:1/-1;display:flex;justify-content:center;align-items:center;gap:8px;padding-top:2px}
+.globe-selector-title{font-family:'Poppins',sans-serif;font-size:18px;font-weight:700;color:#1e293b}
+.globe-selector-subtitle{font-size:12px;color:#64748b}
+.globe-selector-side{background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;min-height:0}
+.globe-selector-stat{background:#ffffff;border:2px solid #e2e8f0;border-radius:10px;padding:8px 10px}
+.globe-selector-stat-label{font-size:11px;color:#64748b}
+.globe-selector-stat-value{font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;color:#1e293b}
+.globe-selector-row{display:flex;gap:8px}
+.globe-selector-row input{flex:1;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;color:#1e293b}
+.globe-selector-row input:focus{outline:none;border-color:#667eea;box-shadow:0 0 0 3px rgba(102,126,234,0.12)}
+.globe-selector-search-btn{background:#334155;border:none;border-radius:8px;padding:10px 14px;color:#ffffff;font-size:12px;font-weight:600;cursor:pointer}
+.globe-selector-city-tabs{display:flex;gap:8px}
+.globe-selector-city-tab{flex:1;border:2px solid #cbd5e1;background:#e2e8f0;color:#475569;border-radius:8px;padding:7px 8px;font-size:12px;font-weight:600;cursor:pointer}
+.globe-selector-city-tab.active{background:#0f3460;color:#ffffff;border-color:#0f3460}
+.globe-selector-city-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:140px;overflow:auto}
+.globe-selector-city-item{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#ffffff;border:1px solid #dbe3ef;border-radius:8px;padding:7px 8px;cursor:pointer}
+.globe-selector-city-item:hover{border-color:#667eea;box-shadow:0 0 0 2px rgba(102,126,234,0.12)}
+.globe-selector-city-item-name{font-size:12px;font-weight:600;color:#1e293b}
+.globe-selector-city-item-meta{font-size:10px;color:#64748b}
+.globe-selector-city-empty{font-size:11px;color:#64748b;padding:8px 2px}
+.globe-selector-actions{margin-top:auto;display:flex;gap:8px}
+.globe-selector-action-btn{flex:1;border:none;border-radius:10px;padding:11px 12px;font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
+#globeSelectorBackBtn{background:#e2e8f0;color:#334155}
+#globeSelectorStartBtn{background:linear-gradient(135deg,#0f3460 0%,#533483 100%);color:#ffffff}
+.globe-selector-stage{background:linear-gradient(180deg,#dbeafe,#bfdbfe);border:2px solid #cbd5e1;border-radius:12px;position:relative;overflow:hidden;min-height:360px}
+#globeSelectorCanvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.globe-selector-hint{position:absolute;left:10px;right:10px;bottom:10px;background:rgba(15,23,42,0.72);color:#e2e8f0;font-size:11px;border-radius:8px;padding:6px 9px;text-align:center;pointer-events:none}
+@media (max-width: 900px){
+  .globe-selector-shell{grid-template-columns:1fr;grid-template-rows:auto minmax(280px,46vh) auto}
+  .globe-selector-side{order:3}
+  .globe-selector-stage{order:2;min-height:300px}
+}
 
 /* Game Mode */
 .mode-grid{display:flex;flex-direction:column;gap:12px}
@@ -904,8 +945,10 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 
 <div class="mp-subtitle">Featured Public Rooms</div>
 <div class="mp-row">
+<button id="mpFeaturedWeeklyBtn" class="mp-btn primary mpSmallBtn" type="button">Join Weekly City</button>
 <button id="mpFeaturedRefreshBtn" class="mp-btn secondary mpSmallBtn" type="button">Refresh Featured</button>
 </div>
+<div id="mpFeaturedWeeklyMeta" class="mp-status">Weekly city room rotates each week.</div>
 <ul id="mpFeaturedList" class="mp-room-list">
 <li class="mpRoomEmpty">Featured rooms will appear here.</li>
 </ul>
@@ -953,6 +996,34 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <input type="checkbox" id="perfOverlayToggle" style="width:16px;height:16px;cursor:pointer">
 Show live benchmark overlay in-game
 </label>
+<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">Render Quality</label>
+<select id="renderQualitySelect" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;color:#1e293b;margin-bottom:10px">
+<option value="low">Low (mobile/performance)</option>
+<option value="med">Medium (balanced)</option>
+<option value="high">High (best visuals)</option>
+</select>
+<label style="display:flex;align-items:center;gap:10px;font-size:12px;color:#334155;margin-bottom:12px;cursor:pointer">
+<input type="checkbox" id="highQualityToggle" style="width:16px;height:16px;cursor:pointer">
+High Quality Boost (stronger shadows + car paint)
+</label>
+<label style="display:flex;align-items:center;gap:10px;font-size:12px;color:#334155;margin-bottom:12px;cursor:pointer">
+<input type="checkbox" id="ssaoToggle" style="width:16px;height:16px;cursor:pointer">
+High-only SSAO contact shadows
+</label>
+<label style="display:flex;align-items:center;gap:10px;font-size:12px;color:#334155;margin-bottom:10px;cursor:pointer">
+<input type="checkbox" id="rdtNoiseToggle" style="width:16px;height:16px;cursor:pointer">
+Enable RDT micro-detail for roads and land-use masks
+</label>
+<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">RDT Noise Variant</label>
+<select id="rdtNoiseVariantSelect" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;color:#1e293b;margin-bottom:8px">
+<option value="standard">Standard</option>
+<option value="double">Double</option>
+<option value="split">Split</option>
+<option value="harmonic">Harmonic</option>
+<option value="twisted">Twisted</option>
+<option value="resonant">Resonant</option>
+</select>
+<div id="rdtNoiseStatus" style="font-size:11px;color:#64748b;margin-bottom:12px">Active (standard)</div>
 <div style="display:flex;gap:8px;margin-bottom:8px">
 <button id="perfApplyReload" style="flex:1;background:#0ea5e9;border:none;border-radius:8px;padding:9px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:12px">Apply + Reload World</button>
 <button id="perfCopySnapshot" style="flex:1;background:#475569;border:none;border-radius:8px;padding:9px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:12px">Copy Snapshot</button>
@@ -1122,6 +1193,52 @@ Use this to compare RDT and baseline with real runtime data.
 <div id="shareExperienceStatus"></div>
 <div class="title-license">
 Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fonts under SIL OFL · API providers under their own terms · © 2026 Steven Reid. All Rights Reserved. · <a href="../about/" target="_blank">About</a> · <a href="../legal/terms" target="_blank">Terms</a> · <a href="../legal/privacy" target="_blank">Privacy</a>
+</div>
+</div>
+</div>
+<div id="globeSelectorScreen" aria-hidden="true">
+<div class="globe-selector-shell">
+<button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Go to Moon">🌙</button>
+<button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Go to Space">🪐</button>
+<div class="globe-selector-top">
+<div style="text-align:center">
+<div class="globe-selector-title">Globe Location Selector</div>
+<div class="globe-selector-subtitle">Pick a point on Earth or use manual search</div>
+</div>
+</div>
+<div class="globe-selector-side">
+<div class="globe-selector-stat">
+<div class="globe-selector-stat-label">Selected Coordinates</div>
+<div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>
+<div id="globeSelectorPlace" class="globe-selector-stat-label" style="margin-top:4px">Click the globe to choose a location.</div>
+</div>
+<div style="font-size:12px;font-weight:600;color:#1e293b">Search Location</div>
+<div class="globe-selector-row">
+<input id="globeLocationSearch" type="text" placeholder="Try: Seattle, Tokyo, Paris France">
+<button id="globeLocationSearchBtn" class="globe-selector-search-btn" type="button">Search</button>
+</div>
+<div id="globeLocationSearchStatus" style="font-size:11px;min-height:14px;color:#64748b">Uses the same search flow as Custom Location.</div>
+<div style="font-size:12px;font-weight:600;color:#1e293b">Manual Coordinates</div>
+<div class="globe-selector-row">
+<input id="globeCustomLat" type="number" step="0.0001" placeholder="Latitude">
+<input id="globeCustomLon" type="number" step="0.0001" placeholder="Longitude">
+</div>
+<div class="globe-selector-city-tabs" role="tablist" aria-label="City lists">
+<button id="globeNearbyTabBtn" class="globe-selector-city-tab active" type="button" data-city-tab="nearby">Nearby</button>
+<button id="globeFavoritesTabBtn" class="globe-selector-city-tab" type="button" data-city-tab="favorites">Favorites</button>
+</div>
+<div id="globeCityListHint" class="globe-selector-stat-label">Pick a point to see nearby cities.</div>
+<ul id="globeCityList" class="globe-selector-city-list">
+  <li class="globe-selector-city-empty">Pick a point on the globe to see nearby cities.</li>
+</ul>
+<div class="globe-selector-actions">
+<button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Back</button>
+<button id="globeSelectorStartBtn" class="globe-selector-action-btn" type="button">Start Here</button>
+</div>
+</div>
+<div class="globe-selector-stage">
+<canvas id="globeSelectorCanvas"></canvas>
+<div class="globe-selector-hint">Drag to rotate · Scroll to zoom · Tap/Click to pick</div>
 </div>
 </div>
 </div>
@@ -1370,6 +1487,7 @@ Explore the area
 <div class="floatItem" id="fSatellite">🛰️ Satellite</div>
 <div class="floatItem" id="fRoads">🛣️ Show Roads</div>
 <div class="floatItem" id="fLandUse">🗺️ Land Use</div>
+<div class="floatItem on" id="fRdtNoise">🧬 RDT Detail</div>
 <div class="floatItem" id="fTimeOfDay">☀️ Day/Night</div>
 <div class="floatItem" id="fClouds">☁️ Clouds</div>
 <div class="floatItem" id="fConstellations">✨ Constellations</div>

@@ -1585,3 +1585,433 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `node tests/painttown.integration.test.mjs` passed.
   - External follow-up (console):
     - Ensure Firebase Auth -> Settings -> Authorized domains contains active production domains (`worldexplorer3d.io`, `www.worldexplorer3d.io`, and any other live hostnames like `worldexplorer.io`).
+
+- RDT-noise integration pass (2026-02-28):
+  - Added deterministic RDT noise wiring into world road mesh generation (edge breakup) with per-road seeds and bounded offsets.
+  - Added road-aware landuse exclusion masking for grass-like landuse polygons to reduce road overpaint while keeping deterministic reproducibility.
+  - Mirrored the same edge/mask logic in terrain rebuild + landuse reprojection so updates stay consistent after terrain streaming.
+  - Added RDT noise controls in Settings (toggle + variant) and Environment float menu shortcut.
+  - Added perf overlay live stats for RDT noise status/variant and edge/mask metrics.
+  - Synced runtime mirror files under `public/app/*` with `app/*` for touched entrypoints.
+- Verification pass (2026-02-28):
+  - Syntax checks passed for all touched `app/js/*` and mirrored `public/app/js/*` files.
+  - ESLint run (legacy config via ESLint v8 + module parser override) passed clean for touched JS files after warning cleanup:
+    - `app/js/{rdt,world,terrain,perf,ui}.js`
+    - `public/app/js/{rdt,world,terrain,perf,ui}.js`
+  - Required tests passed:
+    - `npm test` (Firestore rules security suite): 40/40 passed.
+    - `node tests/painttown.integration.test.mjs`: exit code 0.
+  - Browser validation artifacts:
+    - `output/playwright/rdt-noise-integration-smoke/settings-rdt-noise-controls.png`
+    - `output/playwright/rdt-noise-integration-smoke/ingame-after-load.png`
+    - `output/playwright/rdt-noise-integration-smoke/ingame-perf-overlay-enabled.png`
+    - `output/playwright/rdt-noise-integration-smoke/settings-report.json`
+    - `output/playwright/rdt-noise-integration-smoke/perf-overlay-enabled-report.json`
+  - Notes: the skill client canvas capture still produced black `output/web-game/shot-*.png` in this environment; fallback direct Playwright full-page screenshots confirmed expected UI and runtime output with no console/page errors.
+- Terrain/collision regression triage pass (2026-03-01):
+  - Reproduced reported blue reflective off-road surfaces and verified they were terrain meshes (not water polygons / not landuse visibility bug) via Playwright scene-hit probes.
+  - Restored accidental water debug overrides in `app/js/world.js` (and mirror):
+    - re-enabled vector water layer names (`ocean`, `water_polygons`, `water_lines`)
+    - removed temporary coastline skip and max-area hard cut
+    - re-enabled building ground patches at original slope threshold (`>= 0.15`) where applicable.
+  - Stabilized terrain grass rendering in `app/js/engine.js` + `app/js/terrain.js` (and `public` mirror):
+    - added procedural-grass preference flag (`TERRAIN_GRASS_USE_PROCEDURAL = true`)
+    - reduced glossy look by disabling terrain roughness-map application for grass, lowering normal scale, and clamping terrain material roughness/metalness/envMapIntensity.
+  - Collision sanity checks:
+    - targeted street probe still shows no building/block collisions at reported coords while driving bursts.
+    - broad runtime/random-drive probes observed zero building/block collision events.
+  - Validation artifacts:
+    - `output/playwright/street-issue-probe/probe-ingame.png` (blue reflective terrain removed; grass visible)
+    - `output/playwright/street-issue-probe/report.json`
+    - `output/playwright/street-issue-probe/surface-owner-probe.json`
+  - Tests:
+    - `npm test` passed (Firestore rules security suite 40/40).
+    - `node tests/painttown.integration.test.mjs` currently fails (`gunCheck.hitClaim=false`), report at `output/playwright/painttown-physics-check/report.json`.
+    - develop-web-game client run completed, but continues to produce black frame artifact in this environment (`output/web-game/shot-1.png`).
+  - Lint note:
+    - repo currently uses `.eslintrc.cjs` with `sourceType: 'script'` and no local ESLint dependency; module files with global `THREE` are not lint-clean under current config/toolchain.
+- Street visibility + grass/render recovery pass (2026-03-01):
+  - Root visual issue reproduced: dark/near-black ground shoulders and dark circular road blotches in Earth city scenes.
+  - `app/js/world.js` (+ mirrored `public/app/js/world.js`):
+    - disabled OSM/Vector water overlays for now (`ENABLE_OSM_LANDUSE_WATER=false`, `ENABLE_VECTOR_WATER_FEATURES=false`) to avoid water-layer dark overdraw while debugging road/terrain readability.
+    - disabled road skirt overlays in world road builder (`ENABLE_ROAD_SKIRTS=false`).
+  - `app/js/terrain.js` (+ mirrored `public/app/js/terrain.js`):
+    - disabled terrain road skirt + intersection-cap overlay meshes (`ENABLE_ROAD_SKIRTS=false`, `ENABLE_ROAD_INTERSECTION_CAPS=false`) to remove dark blotch artifacts.
+    - tuned terrain material readability: broader grass texture tiling (`~65 world units/repeat`), stronger grass emissive, and terrain `receiveShadow=false`.
+  - `app/js/engine.js` (+ mirrored `public/app/js/engine.js`):
+    - synced grass tiling/emissive constants with terrain settings.
+    - ensured cloned grass/normal/roughness maps set `needsUpdate=true` during runtime re-application.
+- Validation artifacts:
+  - `output/playwright/street-issue-probe/probe-ingame.png` now shows visible grass + readable roads (no dark circle overlays).
+  - `output/playwright/street-issue-probe/report.json` shows `waterAreas: 0`, `waterways: 0`, `roadSkirt` mesh absent.
+  - `scripts/tmp_collision_road_audit.mjs`: center hit rate `0%` on sampled roads.
+  - `scripts/tmp_drive_collision_runtime.mjs`: `buildCollisions: 0`, `blockCollisions: 0`.
+  - First-load vs reload check outputs (`first-load.png`, `after-reload.png`) now visually consistent for terrain grass.
+
+- 2026-03-01 regression recovery pass (world/terrain):
+  - Rebased `app/js/world.js`, `app/js/terrain.js`, `app/js/engine.js` and `/public/app/js/*` mirrors to `origin/steven/product` to remove introduced rendering regressions (water disabled, dark terrain/road materials, aggressive road geometry edits).
+  - Re-applied only minimal safe fixes:
+    - Water sanity guards in `world.js`: cap oversized water polygons (`MAX_VECTOR_WATER_POLYGON_AREA`, `MAX_LANDUSE_WATER_POLYGON_AREA`) and restrict vector polygon layers to `water_polygons`.
+    - Small road endpoint extension in both `world.js` and `terrain.js` to reduce road seam cracks at way boundaries.
+    - `updateTerrainAround()` now honors `roadsNeedRebuild` even when tile center hasn't changed, so first-load terrain/road alignment rebuild is not skipped.
+  - Synced `public/app/js/world.js` and `public/app/js/terrain.js` from `/app` copies.
+  - Validation:
+    - `node --check` passed for modified runtime files (`app/js/world.js`, `app/js/terrain.js`, `public/app/js/world.js`, `public/app/js/terrain.js`).
+    - `node scripts/tmp_street_issue_probe.mjs` run: no console errors; drive sample had no block/building collisions.
+    - `node scripts/tmp_drive_collision_runtime.mjs` run: `buildCollisions: 0`, `blockCollisions: 0`.
+    - `npm test` passed (`40/40` Firestore security checks).
+    - `tests/painttown.integration.test.mjs` executes successfully in this environment (no stdout).
+  - Note: Monaco automation capture remains flaky because loading overlay timing can exceed scripted waits; manual in-browser validation still required there.
+- Road ghost-collision fix pass (2026-03-02):
+  - Updated driving collision gate in `public/app/js/physics.js` and mirrored `app/js/physics.js`.
+  - Added road-core ghost-hit suppression for world building collisions when driving on road centerline, targeting approximate bbox colliders and roof-like OSM building tags while preserving normal roadside and build-block collisions.
+  - No terrain/water pipeline changes.
+- Validation (local):
+  - `node --check public/app/js/physics.js` ✅
+  - `node --check app/js/physics.js` ✅
+  - `node scripts/tmp_collision_road_audit.mjs` (diagnostic helper; unchanged raw collider counts expected because it calls `checkBuildingCollision` directly, not the driving gate)
+  - Runtime probe: sampled road-center collision starts now accelerate and traverse normally in most cases (20/20 samples reached ~15-26 speed; 1/20 slow case was a `full` university collider, not bbox ghost case).
+  - Skill client run artifacts: `output/web-game/shot-0.png`, `output/web-game/shot-1.png`
+- Follow-up TODO for next agent:
+  - If user reports remaining road blockers, inspect remaining `full` collider overlaps (non-bbox) and decide whether to add a stricter road-center bypass for selected OSM building types.
+- Building-on-road exclusion hardening pass (2026-03-02):
+  - Updated `public/app/js/world.js` and mirrored `app/js/world.js`.
+  - Added strict footprint-vs-road rejection during building generation:
+    - `isBuildingFootprintOnRoad(...)` now rejects any building whose centroid/vertices/edge samples overlap road corridor (`road half-width + clearance`).
+    - Applied to both OSM building ways and fallback building generation path.
+  - Added bbox collider safety upgrade:
+    - New `bboxOverlapsRoadCorridor(...)` promotes simplified `bbox` colliders to `full` footprint colliders when bbox samples overlap road corridor.
+    - This removes phantom street collisions caused by coarse axis-aligned bbox colliders crossing roads.
+- Validation (local):
+  - `node --check public/app/js/world.js` ✅
+  - `node --check app/js/world.js` ✅
+  - `node scripts/tmp_collision_road_audit.mjs`:
+    - before pass: `centerHits=15`, `laneHits=70`
+    - after pass: `centerHits=0`, `laneHits=9`, `severeHits=0`
+  - `node scripts/tmp_drive_collision_runtime.mjs`: `buildCollisions=0`, `blockCollisions=0`.
+  - Skill client run completed but screenshot artifacts remained black in this environment (`output/web-game/shot-0.png`, `output/web-game/shot-1.png`), consistent with previous canvas-capture limitation.
+- Stability audit + release-hardening plan documented (2026-03-02):
+  - Added `STABILITY_AUDIT_AND_PLAN_2026-03-02.md` with:
+    - water status verification in live-served path (`public/app`),
+    - root-cause workflow risks,
+    - phased plan for production protection, mirror-sync guarantees, automated runtime invariants, and release checklist.
+- Stability tooling implementation pass (2026-03-02):
+  - Added mirror sync script: `scripts/sync-public-app.mjs` (`app` -> `public/app` for runtime files).
+  - Added mirror parity checker: `scripts/verify-mirror.mjs` (fails on any app/public drift).
+  - Added runtime invariant test: `scripts/test-runtime-invariants.mjs` (Playwright):
+    - checks road-center collisions (`centerHits === 0`),
+    - lane-edge collision rate threshold (`<= 2.0%`),
+    - water data + visibility present,
+    - no console/page errors.
+    - outputs: `output/playwright/runtime-invariants/report.json` + screenshot.
+  - Added release orchestrator: `scripts/release-verify.mjs` (mirror parity + rules tests + runtime invariants).
+  - Updated `package.json` scripts:
+    - `sync:public`, `verify:mirror`, `test:runtime`, `release:verify`.
+    - `test` now runs `test:rules` + `test:runtime`.
+  - Added CI workflow: `.github/workflows/runtime-verify.yml`.
+  - Added release ops doc: `RELEASE_CHECKLIST.md`.
+  - Added strategy doc: `STABILITY_AUDIT_AND_PLAN_2026-03-02.md`.
+- Validation (local):
+  - `npm run sync:public` ✅ (`copiedFiles=40`, `staleFilesRemoved=0`)
+  - `npm run verify:mirror` ✅ (`checkedFiles=40`, `mismatchCount=0`)
+  - `npm run test:rules` ✅ (`40/40` security checks)
+  - `npm run test:runtime` ✅
+    - `centerHits=0`, `laneHitRatePct=0.22`, `waterAreas=70`, `waterways=8`, `visibleWaterMeshes=2`, `consoleErrors=0`
+  - `npm run release:verify` ✅ all stages passed end-to-end.
+- Road/water stability recovery pass (2026-03-02):
+  - Root-cause confirmed against live `https://worldexplorer3d.io/app/` JS bundles: local `app/js/world.js` had diverged by dropping vector `ocean` water layer and adding large-water polygon caps, which reduced/removed water in some regions.
+  - Restored water/terrain behavior back to live baseline by removing local-only water caps + endpoint extension changes in:
+    - `app/js/world.js` (and mirrored `public/app/js/world.js`)
+    - `app/js/terrain.js` (and mirrored `public/app/js/terrain.js`)
+  - Kept road-collision fix isolated from water:
+    - `app/js/physics.js` retains road ghost-collision suppression for approximate (`bbox`) colliders in road center.
+  - Added targeted building placement guard (roads only) in `app/js/world.js`:
+    - new `buildingOverlapsRoadCorridor` check rejects building footprints that intersect road corridor samples (center/vertices/edge midpoints) with small clearance.
+    - this is intentionally isolated to building generation and does not modify water generation.
+  - Sync + validation:
+    - `npm run sync:public` passed.
+    - `npm run verify:mirror` passed.
+    - `npm run test:runtime` passed (`waterVisible: true`, `blockedDriveRatePct: 0`).
+    - `npm run release:verify` passed end-to-end.
+  - Additional diagnostics:
+    - direct sampler still finds some on-road *bbox* collider hits in raw collision queries; these are approximate collider artifacts and are now ignored by the physics road-center ghost filter so driving remains clear in runtime drive checks.
+- Follow-up regression fix pass (2026-03-02, user report: terrain seams + reduced buildings):
+  - Restored live-like building density by removing the temporary road-overlap building rejection in `app/js/world.js`.
+    - Runtime invariant count now back up (`buildings: 16652` on runtime test city) versus prior reduced counts.
+  - Kept road-clear driving behavior by retaining the physics-side road ghost-collision filter in `app/js/physics.js` (no water changes).
+  - Road seam/hill conformance hardening:
+    - Reintroduced road endpoint extension in both `app/js/world.js` and `app/js/terrain.js` to reduce visible splits at joins.
+    - Added `needsRoadRebuild` fallback in `updateTerrainAround()` so roads/buildings are rebuilt if terrain streams in after initial placement while player is stationary.
+    - Increased road surface vertical bias from `0.25` to `0.35` and kept skirts at `3.0` depth to reduce terrain peeking without oversized skirt artifacts.
+    - Increased intersection cap radius guard (`max(avg*0.5, maxWidth*0.62)`) in terrain rebuild path to better cover split joints.
+  - Building grounding tweak in `repositionBuildingsWithTerrain()`:
+    - added slope-aware lift from footprint min elevation (`reliefLift`) to reduce terrain piercing through bases on steep slopes.
+  - Validation after patch:
+    - `npm run sync:public` ✅
+    - `npm run verify:mirror` ✅
+    - `npm run test:runtime` ✅ (`waterVisible: true`, `blockedDriveRatePct: 0`, `buildings: 16652`)
+    - Monaco probe scripts/screenshots captured under:
+      - `output/playwright/monaco-seam-probe-after/`
+      - `output/playwright/monaco-angle-check/`
+- Adjustment to follow-up pass:
+  - Reverted broad slope-based ground patch expansion (which produced excessive patch geometry in steep Monaco zones).
+  - Ground patch creation remains near-LOD only (as baseline), while keeping slope-aware base-elevation lift in terrain repositioning to reduce clipping.
+  - Tuned road surface bias/skirt balance:
+    - road/cap vertical bias to `0.35`
+    - skirt depth back to `3.0`
+    - endpoint extension + intersection-cap radius guard kept.
+  - Revalidated:
+    - `npm run verify:mirror` ✅
+    - `npm run test:runtime` ✅ (`buildings: 16652`, `waterVisible: true`, `blockedDriveRatePct: 0`)
+    - `npm run release:verify` ✅
+- Earth drift-control handling pass (2026-03-01):
+  - Updated `app/js/physics.js` (and synced mirror to `public/app/js/physics.js`) to make drift intentional and brake-assisted on Earth:
+    - added Earth-only drift intent thresholds (`speed + steer + brake`) with short sustain timer (`_driftHoldTimer`) for natural handbrake drift continuity,
+    - increased Earth lateral/yaw damping recovery when not drifting (uses `CFG.driftRec`) to remove unwanted off-road slide,
+    - reduced baseline Earth slip injection (especially off-road) and moved larger slip/yaw kick into explicit drift state,
+    - retained dedicated moon handling path and moon-specific damping/slip behavior (no moon branch edits).
+  - Sync/validation:
+    - `npm run sync:public` ✅
+    - `npm run verify:mirror` ✅ (`mismatchCount=0`)
+    - `node --check app/js/physics.js` ✅
+    - `node --check public/app/js/physics.js` ✅
+    - `npm run test:runtime` ✅ (`waterVisible: true`, `blockedDriveRatePct: 0`, `buildings: 16652`, `noConsoleErrors: true`)
+  - Drift-focused probe artifacts:
+    - `output/playwright/drift-physics-probe/drift-probe-report.json`
+    - `output/playwright/drift-physics-probe/drift-probe-screen.png`
+    - Earth probe summary:
+      - `offroadCoastStable: true`
+      - `offroadSteerStableWithoutBrake: true`
+      - `brakeSteerDriftEngages: true` (peak drift angle ~39.9°, drift frames observed)
+  - Skill-client loop run:
+    - `output/web-game/shot-0.png`, `shot-1.png`, `shot-2.png`
+    - no `errors-*.json` emitted by client run.
+
+- 2026-03-02 Batch 1 (Phase 0 instrumentation):
+  - `app/js/input.js`:
+    - Rebound `F8` to toggle perf overlay (instead of debug overlay).
+    - On `F8` enable, now logs baseline line: `BASELINE: fps=..., calls=..., tris=..., textures=...`.
+    - Kept backtick (`) for debug overlay toggle.
+  - `app/js/perf.js`:
+    - Added `fpsCurrent` tracking alongside averaged FPS.
+    - Overlay now shows `CUR` and `AVG` FPS explicitly.
+    - Overlay quality line now presents `LOW/MED/HIGH` label mapping.
+    - Added `logBaselineSnapshot()` API and exported via `appCtx`.
+  - Mirror sync executed (`npm run sync:public`) and verified (`npm run verify:mirror`).
+  - Local perf metrics (same scripted scene): baseline -> batch1
+    - FPS: 48.00 -> 60.01
+    - Draw calls: 830 -> 807
+    - Triangles: 2,525,526 -> 2,524,726
+    - Textures: 67 -> 142 (existing runtime variance due asset cache/upload behavior)
+  - Skill client run (`web_game_playwright_client`) still captures black canvas in this environment (`output/playwright/skill-batch1/shot-0.png`), so scene verification remains via direct Playwright full-page/runtime snapshot checks.
+
+- Visual/perf + physics + road-clear pass (2026-03-02, continuation):
+  - Completed quality controls wiring in Settings:
+    - `renderQualitySelect` (Low/Med/High)
+    - `highQualityToggle`
+    - new `ssaoToggle` (High-only contact shadows)
+  - Engine quality pipeline finalized:
+    - persisted render quality + SSAO flags in localStorage
+    - HDR environment uses Poly Haven URL (removed missing local HDR path that was causing 404)
+    - SSAO pass toggles by quality (`High` only) and device capability
+    - resize now updates SSAO pass size
+    - exported `canUseSsao/getSsaoEnabled/setSsaoEnabled` on app context
+  - SSAO dependencies fixed in vendor optional manifest:
+    - added `SSAOShader.js`, `DepthLimitedBlurShader.js`, `SimplexNoise.js`
+  - Hero car loader cleanup:
+    - removed nonexistent `bmw-e34-lod0.glb` probe path to eliminate startup 404 noise
+  - Earth drift tuning update (moon unchanged):
+    - stronger off-road anti-drift recovery when not handbraking
+    - rear-slip response reduced/clamped for controlled rear breakaway
+    - drift uses front-pivot-biased integration so car rotates from rear slip instead of full-body side-slide
+    - brake+steer remains the explicit drift trigger
+  - Road/building conflict tuning to preserve density while keeping lanes clear:
+    - road-core overlap grid precision improved (`roadCoreCellSize` tightened)
+    - overlap threshold made stricter for skip decisions (fewer false-positive building removals)
+    - near-road buildings force full collider more reliably
+    - building base placement on slopes adjusted to reduce terrain poking through foundations
+
+- Validation runs (post-fix):
+  - `npm run sync:public` ✅
+  - `npm run verify:mirror` ✅ (40 files checked, 0 mismatches)
+  - `npm run test:runtime` ✅
+    - road center driveable: true
+    - lane edge reasonable: true
+    - water data present + visible: true
+    - no console errors: true
+    - report: `output/playwright/runtime-invariants/report.json`
+    - screenshot: `output/playwright/runtime-invariants/runtime-invariants.png`
+  - Manual smoke screenshot (in-game):
+    - `output/playwright/manual-smoke/ingame-after-batch3.png`
+    - console errors file: `output/playwright/manual-smoke/ingame-after-batch3-errors.json` (empty)
+
+- Perf captures:
+  - Baseline reference (existing): `output/playwright/perf-baseline-phase0.json`
+  - After this pass: `output/playwright/perf-after-batch3-final.json`
+    - `BASELINE: fps=10.0, calls=784, tris=2082392, textures=125`
+  - Locked quality probes:
+    - MED lock: `output/playwright/perf-after-batch3-med-lock.txt`
+      - `BASELINE: fps=13.1, calls=771, tris=2544440, textures=127`
+    - HIGH lock (SSAO off): `output/playwright/perf-after-batch3-high-lock.txt`
+      - `BASELINE: fps=11.3, calls=804, tris=2545976, textures=127`
+    - HIGH lock (SSAO requested): `output/playwright/perf-after-batch3-high-ssao-lock.txt`
+      - `BASELINE: fps=20.0, calls=787, tris=2545272, textures=127`
+
+- Notes:
+  - Headless SwiftShader env has low FPS and noisy frame timing; draw call deltas are the more stable signal.
+  - Local HTTP server remained active on port 5173 during this pass.
+- Globe Selector Batch 4 polish completed (app source + public mirror sync):
+  - `app/js/ui/globe-selector.js`: added body scroll lock while selector is open, tap-vs-drag thresholding for touch pointer input, reverse-geocode best-effort label updates for globe picks, renderer init fallback messaging, guarded search in-flight state, and ensured render loop starts only when globe scene is ready and stops on close.
+  - Kept existing spawn/navigation paths: Start Here still writes through existing custom-location fields/state and uses existing start flow; Moon/Space shortcuts still route to existing launch flow.
+- Validation (Playwright custom batch):
+  - Artifacts: `output/playwright/globe-selector-batch4/batch4-report.json` and screenshots `01`-`06`.
+  - Checks passed: custom pick + Start Here path (`selLoc=custom` and `LOC` matches selected lat/lon), Moon shortcut launch mode, Space shortcut launch mode, legacy search path still operational, no console/page errors in batch report.
+- Mirror + regression verification:
+  - Ran `npm run sync:public` then `npm run verify:mirror` (final result `ok: true`, checkedFiles: 41).
+  - Ran `npm run test:runtime` (result `ok: true`; includes water visible/present checks and no console errors).
+- Regression sweep before weekly-room feature:
+  - `npm run test:runtime` passed (`ok: true`, water present/visible true, no console errors).
+  - `npm run test:rules` passed (`40/40` security checks).
+- Added Weekly Featured City public-room flow in multiplayer tab:
+  - `app/index.html`: added `#mpFeaturedWeeklyBtn` and `#mpFeaturedWeeklyMeta` under Featured Public Rooms section.
+  - `app/js/multiplayer/ui-room.js`:
+    - Added weekly city rotation constants and deterministic weekly room code generation.
+    - Added weekly city UI render helper showing week/city + room code.
+    - Added `handleJoinWeeklyFeaturedRoom()` with join-first, create-if-missing, and race-safe rejoin fallback.
+    - Weekly room is public+featured and uses Earth world coordinates resolved from `appCtx.LOCS`.
+- Validation after implementation:
+  - Syntax checks: `node --check app/js/multiplayer/ui-room.js`, `node --check app/js/ui.js`, `node --check app/js/multiplayer/rooms.js` all passed.
+  - Multiplayer UI smoke: `output/playwright/weekly-room-smoke/weekly-room-ui-report.json` and screenshot `weekly-room-ui.png`.
+  - Mirror sync + verify: `npm run sync:public`, `npm run verify:mirror` => final `ok: true`.
+  - Post-change regressions: `npm run test:runtime` passed, `npm run test:rules` passed (40/40).
+
+- Globe selector longitude/brightness regression fix (2026-03-02, follow-up):
+  - Root cause isolated to `focusOnSelection()` yaw using a 180°-offset formula, causing search/manual coordinates to be correct while the opposite hemisphere was centered.
+  - Updated `app/js/ui/globe-selector.js`:
+    - `focusOnSelection()` now sets `globeRoot.rotation.y = -(lonRad + Math.PI * 0.5)` so selected longitude is centered on the front hemisphere.
+    - Kept existing click conversion (`localPointToLatLon`) and brighter globe lighting/material settings from previous pass.
+  - Validation (targeted Playwright repro):
+    - `output/playwright/globe-selector-debug-after/report.json`
+    - `output/playwright/globe-selector-debug-after/washington-before-click.png`
+    - `output/playwright/globe-selector-debug-after/washington-after-click.png`
+    - `output/playwright/globe-selector-debug-after/beijing-before-click.png`
+    - `output/playwright/globe-selector-debug-after/beijing-after-click.png`
+    - Checks: Washington stays west-longitude after center click; Beijing stays east-longitude after center click; no console/page errors.
+  - Skill loop run (develop-web-game client):
+    - `output/web-game/globe-fix/shot-0.png`, `output/web-game/globe-fix/shot-1.png`
+    - Note: this environment still intermittently captures black canvas in skill-client shots; functional verification used direct Playwright full-page captures above.
+  - Mirror/regression verification:
+    - `npm run sync:public` ✅
+    - `npm run verify:mirror` ✅ (`mismatchCount=0`)
+    - `npm run test:runtime` ✅ (`waterVisible=true`, `blockedDriveRatePct=0`, `noConsoleErrors=true`)
+
+- Car orientation/color + perf optimization pass (2026-03-02):
+  - `app/js/engine.js`:
+    - Hero car model now forced to runtime forward axis by applying a one-time `+Math.PI` yaw on loaded GLB root after normalization, so chase camera shows rear and forward driving aligns visually.
+    - Updated hero paint/fallback paint to a true red (`0xc31421`) to avoid pink/magenta appearance.
+    - Reduced unnecessary shadow work on hero submeshes: glass/light/interior meshes no longer cast shadows in high-tier material budget.
+    - Post-processing passes now quality-aware at runtime: bloom/SMAA disabled when render quality is `low`.
+  - `app/js/main.js`:
+    - Added `shouldUseComposer()` guard; in low quality with no enabled post-fx, render path now bypasses composer and calls direct renderer render for lower overhead.
+  - `app/js/terrain.js`:
+    - Added throttled road/building rebuild scheduler (`scheduleRoadAndBuildingRebuild`) to batch terrain-tile-triggered rebuild bursts and reduce frame hitches while streaming.
+    - Added shared road material cache (`getSharedRoadMaterials`) so rebuilds reuse asphalt/skirt/cap materials instead of recreating/disposing each rebuild.
+    - Road mesh cleanup now disposes geometry only for shared-material batches (avoids material churn stutter).
+
+- Validation and perf artifacts:
+  - Car visual verification (driving mode):
+    - `output/playwright/car-drive-after-fix/01-drive-view.png`
+    - `output/playwright/car-drive-after-fix/02-after-forward.png`
+    - rear of car is now visible in chase camera; color appears red.
+  - Perf baseline before this pass:
+    - `output/playwright/perf-car-baseline-before.json`
+    - `BASELINE: fps=13.1, calls=770, tris=2081952, textures=125`
+  - Perf after full pass:
+    - `output/playwright/perf-car-after-postfx-opt.json`
+    - `BASELINE: fps=15.9, calls=786, tris=2082568, textures=125`
+  - Runtime safety:
+    - `npm run sync:public` ✅
+    - `npm run verify:mirror` ✅ (`mismatchCount=0`)
+    - `npm run test:runtime` ✅ (`waterVisible=true`, `blockedDriveRatePct=0`, `noConsoleErrors=true`)
+
+- Note:
+  - Headless SwiftShader perf capture has variance, but draw calls remained within a small delta and average FPS improved in the same scripted environment.
+- Follow-up perf improvement (same pass):
+  - `app/js/engine.js` now disables bloom/SMAA when render quality is `low`.
+  - `app/js/main.js` now bypasses `EffectComposer` and uses direct `renderer.render` in low quality when no post passes are enabled.
+  - Updated perf capture after this change:
+    - `output/playwright/perf-car-after-postfx-opt.json`
+    - `BASELINE: fps=15.9, calls=786, tris=2082568, textures=125`
+- develop-web-game skill client loop executed:
+  - `output/web-game/car-perf-fix/shot-0.png`
+  - `output/web-game/car-perf-fix/shot-1.png`
+  - (known environment behavior: black canvas captures from this client path; functional validation relied on direct Playwright full-page captures.)
+
+- Lightweight avatar + car simplification pass (2026-03-02, user preference update):
+  - `app/js/walking.js`:
+    - Kept the default lightweight animated human as source-of-truth and removed automatic hero GLB override (`attachHeroCharacter(...)` no longer auto-runs).
+    - Updated fallback human visuals to a regular-person look (shirt/pants/shoes/hair + skin tone) while preserving built-in limb animation.
+    - Result: walking character always moves via existing procedural gait animation (no static astronaut/soldier dependency).
+  - `app/js/engine.js`:
+    - Added `USE_HERO_CAR_ASSET = false` so heavy BMW GLB path is disabled by default.
+    - Car remains lightweight procedural red car (no clearcoat layer, reduced env/fancy finish settings).
+    - Explicitly keeps clearcoat off in render-quality updates for any material exposing that property.
+  - Existing perf optimizations retained:
+    - Terrain road/building rebuild scheduling + shared road materials (`app/js/terrain.js`).
+    - Low-quality post-fx bypass (`app/js/main.js` + `app/js/engine.js`).
+
+- Validation artifacts (latest pass):
+  - Character/car visuals:
+    - `output/playwright/char-car-lite/01-walk-default.png`
+    - `output/playwright/char-car-lite/02-walk-after-move.png`
+    - `output/playwright/char-car-lite/03-drive-mode.png`
+  - Asset-load check confirms no heavy model downloads in this flow:
+    - `output/playwright/char-car-lite/report.json` (`modelHits: []`)
+  - Perf overlay capture (same `/app/` path):
+    - before: `output/playwright/perf-car-baseline-before.json`
+      - `BASELINE: fps=13.1, calls=770, tris=2081952, textures=125`
+    - after lightweight pass: `output/playwright/perf-car-lite-after.json`
+      - `BASELINE: fps=13.1, calls=768, tris=2071152, textures=125`
+  - Runtime regression checks:
+    - `npm run sync:public` ✅
+    - `npm run verify:mirror` ✅
+    - `npm run test:runtime` ✅ (`waterVisible=true`, `noConsoleErrors=true`, `blockedDriveRatePct=0`)
+
+- develop-web-game skill loop note:
+  - Skill client still intermittently captures black-canvas images in this environment; direct Playwright scenario runs were used as source-of-truth for functional validation.
+
+- Black-screen diagnostic follow-up (2026-03-02, no code changes):
+  - Reproduced pure-black frames specifically from the `develop-web-game` skill client canvas-capture path (`output/web-game/black-debug-pre/shot-0.png`, `shot-1.png`).
+  - Verified normal runtime rendering with direct Playwright full-page capture on the same local server:
+    - title: `output/playwright/black-debug-direct/full-0.png`
+    - in-game: `output/playwright/black-debug-direct/wait-5s.png`
+  - Confirmed gameplay boot and world data present (roads/buildings loaded) and no persistent load-stuck condition in timed check (`output/playwright/black-debug-direct/wait-report.json`).
+  - Ran runtime invariants: `npm run test:runtime` => `ok: true` (`waterVisible=true`, `roadCenterDriveable=true`, `blockedDriveRatePct=0`, `noConsoleErrors=true`).
+  - Conclusion: black images in this environment are capture-artifact from the skill client, not a new app rendering regression.
+
+- Globe selector + multiplayer map request validation pass (2026-03-02):
+  - Revalidated runtime invariants: `npm run test:runtime` => `ok: true` (`roadCenterDriveable=true`, `waterVisible=true`, `noConsoleErrors=true`).
+  - Revalidated Firestore security + public visibility: `npm run test:rules` => `41/41 passed`, including anon read of public room doc.
+  - Revalidated app/public mirror alignment: `npm run verify:mirror` => `ok: true`, `mismatchCount=0`.
+  - Direct Playwright verification for globe selector UX:
+    - artifact: `output/playwright/globe-citylist-verify/globe-citylist.png`
+    - report: `output/playwright/globe-citylist-verify/report.json`
+    - result snapshot: `placeText=Ndolou, Gabon`, `nearbyCount=6`, `favoritesCount=15`, no console errors.
+  - Confirms request behavior present in local build:
+    - city name readout from reverse lookup on globe click,
+    - nearby city short list on click,
+    - favorites tab backed by prelisted menu cities,
+    - public rooms readable without login (rules + room-query path).
+
+- Cross-platform readiness + release prep pass (2026-03-02):
+  - Added docs updates for new Globe Selector city UX + favorites + multiplayer map room markers + weekly featured room:
+    - `README.md`
+    - `USER_GUIDE.md`
+    - `CHANGELOG.md`
+  - Cross-platform smoke matrix (Playwright, Chromium profiles):
+    - `desktop-mac`, `desktop-win`, `mobile-iphone12`, `mobile-pixel5`
+    - Report: `output/playwright/cross-platform-smoke-v4/report.json`
+    - Result: `ok=true` for all profiles (custom->globe open, favorites list visible, in-game boot successful, no blocking console/page errors).
+  - Release verification:
+    - `npm run release:verify` passed end-to-end.
+    - Includes mirror parity, Firestore rules (`41/41`), and runtime invariants (`waterVisible=true`, `blockedDriveRatePct=0`, `noConsoleErrors=true`).

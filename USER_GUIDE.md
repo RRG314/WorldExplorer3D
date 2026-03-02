@@ -1,6 +1,6 @@
 # User Guide
 
-Last reviewed: 2026-02-28
+Last reviewed: 2026-03-02
 
 This guide explains current player-facing behavior across app, multiplayer, and account features.
 
@@ -74,6 +74,7 @@ In `Multiplayer` tab:
 
 - enter 6-character code and click `Join`
 - or open invite link with `?room=AB12CD`
+- signed-out users can browse public rooms in view-only mode; sign-in is required to join
 
 ### Save/open/delete room
 
@@ -88,7 +89,32 @@ Saved room behavior:
 
 - `Leave` exits active room and stops your presence heartbeat
 
-## 6. Multiplayer Data Lifetime
+## 6. Weekly Featured City Room
+
+- In `Multiplayer`, use the weekly callout to join the rotating public city room.
+- The featured city changes on a weekly schedule.
+- The weekly room is public, and its room code is shown in the multiplayer panel.
+
+## 7. Globe Selector (Custom Location)
+
+Open from `Location` -> `Custom`.
+
+Features:
+
+- interactive Earth globe pick for lat/lon
+- selected coordinates + city/place readout
+- `Nearby` tab listing closest prelisted menu cities to your current pick
+- `Favorites` tab listing prelisted menu cities
+- `Start Here` uses the same custom-location spawn path as search/manual custom input
+- Moon (top-left) and Space (top-right) shortcuts use existing launch flows
+
+## 8. Multiplayer Room Markers on Map
+
+- Public room markers are visible to everyone on minimap and large map.
+- Signed-in users also see their owned/current room markers.
+- Weekly featured public room appears as a dedicated marker.
+
+## 9. Multiplayer Data Lifetime
 
 Persistent until explicit delete:
 
@@ -109,7 +135,7 @@ TTL-managed cleanup:
 - `activityFeed`
 - `artifacts`
 
-## 7. Chat and Safety
+## 10. Chat and Safety
 
 Chat protections:
 
@@ -120,7 +146,7 @@ Chat protections:
 - profanity masking
 - report action writes report flags
 
-## 8. Paint the Town
+## 11. Paint the Town
 
 Key behavior:
 
@@ -136,14 +162,14 @@ Controls:
 - toggle tool: `T`
 - left click/tap paints according to active tool and room rules
 
-## 9. Camera and Input Basics
+## 12. Camera and Input Basics
 
 - right-click or middle-click hold: camera look
 - double-left-click camera toggle: disabled
 
 For full control mapping by mode, see `CONTROLS_REFERENCE.md`.
 
-## 10. Mobile Behavior
+## 13. Mobile Behavior
 
 Mobile controls provide virtual pads and action buttons for:
 
@@ -154,7 +180,7 @@ Mobile controls provide virtual pads and action buttons for:
 
 Mobile and desktop share the same gameplay systems and multiplayer state.
 
-## 11. Troubleshooting
+## 14. Troubleshooting
 
 - If `Create`/`Join` does nothing, hard refresh and verify current user is signed in.
 - If room actions fail with permissions, confirm deployed Firestore rules and Firebase auth state.

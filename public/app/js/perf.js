@@ -30,6 +30,7 @@ let perfAutoQualityEnabled = true;
 let perfAutoQualityTier = PERF_QUALITY_TIER_BALANCED;
 
 let _perfFps = 0;
+let _perfFpsCurrent = 0;
 let _perfFrameMs = 0;
 let _perfFrameAccum = 0;
 let _perfFrameCount = 0;
@@ -74,6 +75,17 @@ const perfStats = {
     terrainRing: typeof appCtx.TERRAIN_RING === 'number' ? appCtx.TERRAIN_RING : 0,
     lodVisible: { near: 0, mid: 0 },
     worldCounts: { roads: 0, buildings: 0, poiMeshes: 0, landuseMeshes: 0 },
+    rdtNoise: {
+      enabled: !!appCtx.rdtNoiseEnabled,
+      variant: appCtx.rdtNoiseVariant || 'standard',
+      chaos: Number.isFinite(Number(appCtx.rdtNoiseChaos)) ? Number(appCtx.rdtNoiseChaos) : 0,
+      edgeSamples: 0,
+      edgeAvgAbsOffset: 0,
+      terrainEdgeSamples: 0,
+      terrainEdgeAvgAbsOffset: 0,
+      landuseVertices: 0,
+      landuseMaskedPct: 0
+    },
     quality: {
       auto: true,
       tier: PERF_QUALITY_TIER_BALANCED,
@@ -463,6 +475,7 @@ function recordPerfFrame(dt) {
   if (!Number.isFinite(dt) || dt <= 0) return;
 
   const frameMs = dt * 1000;
+  _perfFpsCurrent = Math.max(0, Math.min(240, 1 / dt));
   _recordPerfSpikeFrame(frameMs);
   _perfFrameMs = _perfFrameMs <= 0 ? frameMs : _perfFrameMs * 0.9 + frameMs * 0.1;
 
@@ -475,6 +488,7 @@ function recordPerfFrame(dt) {
   }
 
   perfStats.live.fps = Number.isFinite(_perfFps) ? _perfFps : 0;
+  perfStats.live.fpsCurrent = Number.isFinite(_perfFpsCurrent) ? _perfFpsCurrent : 0;
   perfStats.live.frameMs = Number.isFinite(_perfFrameMs) ? _perfFrameMs : 0;
   perfStats.live.spikes = getPerfSpikeMetrics(false);
 
@@ -521,6 +535,19 @@ function recordPerfRendererInfo(rendererRef) {
     poiMeshes: typeof appCtx.poiMeshes !== 'undefined' && Array.isArray(appCtx.poiMeshes) ? appCtx.poiMeshes.length : 0,
     landuseMeshes: typeof appCtx.landuseMeshes !== 'undefined' && Array.isArray(appCtx.landuseMeshes) ? appCtx.landuseMeshes.length : 0
   };
+  const rdtNoiseConfig = typeof appCtx.getRdtNoiseConfig === 'function' ?
+  appCtx.getRdtNoiseConfig() :
+  {
+    enabled: !!appCtx.rdtNoiseEnabled,
+    variant: appCtx.rdtNoiseVariant || 'standard',
+    chaos: Number.isFinite(Number(appCtx.rdtNoiseChaos)) ? Number(appCtx.rdtNoiseChaos) : 0
+  };
+  perfStats.live.rdtNoise = {
+    ...(perfStats.live.rdtNoise || {}),
+    enabled: !!rdtNoiseConfig?.enabled,
+    variant: String(rdtNoiseConfig?.variant || 'standard'),
+    chaos: Number.isFinite(Number(rdtNoiseConfig?.chaos)) ? Number(rdtNoiseConfig.chaos) : 0
+  };
   perfStats.updatedAt = Date.now();
 }
 
@@ -529,6 +556,31 @@ function formatPerfNumber(n) {
   if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(2) + 'M';
   if (Math.abs(n) >= 1000) return (n / 1000).toFixed(1) + 'K';
   return String(Math.round(n));
+}
+
+function getRenderQualityLabel(liveQuality = null) {
+  const level = typeof appCtx.getRenderQualityLevel === 'function' ?
+  String(appCtx.getRenderQualityLevel() || '').toLowerCase() :
+  String(appCtx.renderQualityLevel || '').toLowerCase();
+  if (level === 'low') return 'LOW';
+  if (level === 'med' || level === 'medium') return 'MED';
+  if (level === 'high') return 'HIGH';
+
+  const tier = String(liveQuality?.tier || '').toLowerCase();
+  if (tier === PERF_QUALITY_TIER_PERFORMANCE) return 'LOW';
+  if (tier === PERF_QUALITY_TIER_QUALITY) return 'HIGH';
+  return 'MED';
+}
+
+function logBaselineSnapshot(extra = {}) {
+  const snapshot = capturePerfSnapshot(extra);
+  const fps = Number(snapshot?.fps || 0).toFixed(1);
+  const calls = Number(snapshot?.renderer?.calls || 0);
+  const tris = Number(snapshot?.renderer?.triangles || 0);
+  const textures = Number(snapshot?.renderer?.textures || 0);
+  const baselineLine = `BASELINE: fps=${fps}, calls=${calls}, tris=${tris}, textures=${textures}`;
+  console.log(baselineLine);
+  return { snapshot, baselineLine };
 }
 
 function capturePerfSnapshot(extra = {}) {
@@ -584,15 +636,28 @@ function updatePerfPanel(force = false) {
   const counts = live.worldCounts || {};
   const spikes = live.spikes || getPerfSpikeMetrics(false);
   const quality = live.quality || getDynamicBudgetState();
+  const qualityLabel = getRenderQualityLabel(quality);
+  const rdtNoise = live.rdtNoise || {};
+  const rdtNoiseEdgeSamples = Number.isFinite(rdtNoise.edgeSamples) ? rdtNoise.edgeSamples : 0;
+  const rdtNoiseTerrainEdgeSamples = Number.isFinite(rdtNoise.terrainEdgeSamples) ? rdtNoise.terrainEdgeSamples : 0;
+  const rdtNoiseLanduseVertices = Number.isFinite(rdtNoise.landuseVertices) ? rdtNoise.landuseVertices : 0;
+  const rdtNoiseLanduseMaskedPct = Number.isFinite(rdtNoise.landuseMaskedPct) ? rdtNoise.landuseMaskedPct : 0;
+  const rdtNoiseEdgeAvg = Number.isFinite(rdtNoise.edgeAvgAbsOffset) ? rdtNoise.edgeAvgAbsOffset : 0;
+  const rdtNoiseTerrainEdgeAvg = Number.isFinite(rdtNoise.terrainEdgeAvgAbsOffset) ? rdtNoise.terrainEdgeAvgAbsOffset : 0;
+  const rdtNoiseStatus = rdtNoise.enabled ?
+  `ON ${String(rdtNoise.variant || 'standard').toUpperCase()}` :
+  'OFF';
 
   const lines = [
   `MODE: ${String(perfMode).toUpperCase()}`,
-  `FPS: ${(live.fps || 0).toFixed(1)} | FRAME: ${(live.frameMs || 0).toFixed(1)} ms`,
-  `QUALITY: ${quality.auto ? 'AUTO' : 'LOCK'} ${String(quality.tier || 'balanced').toUpperCase()} | SCALE ${(quality.budgetScale || 1).toFixed(2)}`,
+  `FPS: ${(live.fpsCurrent || 0).toFixed(1)} CUR | ${(live.fps || 0).toFixed(1)} AVG | FRAME: ${(live.frameMs || 0).toFixed(1)} ms`,
+  `QUALITY: ${qualityLabel} (${quality.auto ? 'AUTO' : 'LOCK'} ${String(quality.tier || 'balanced').toUpperCase()})`,
   `DRAW: ${formatPerfNumber(r.calls)} | TRI: ${formatPerfNumber(r.triangles)}`,
   `GEO: ${formatPerfNumber(r.geometries)} | TEX: ${formatPerfNumber(r.textures)} | PROG: ${formatPerfNumber(r.programs)}`,
   `LOAD: ${Number.isFinite(lastLoad.loadMs) ? `${lastLoad.loadMs} ms` : '--'}`,
   `FEATURES: R${counts.roads || 0} B${counts.buildings || 0} P${counts.poiMeshes || 0} L${counts.landuseMeshes || 0}`,
+  `RDT-NOISE: ${rdtNoiseStatus} | EDGE ${rdtNoiseEdgeAvg.toFixed(2)}m/${rdtNoiseTerrainEdgeAvg.toFixed(2)}m`,
+  `ROAD MASK: ${rdtNoiseLanduseMaskedPct.toFixed(1)}% (${rdtNoiseLanduseVertices}) | SAMPLES ${rdtNoiseEdgeSamples + rdtNoiseTerrainEdgeSamples}`,
   `LOD: NEAR ${lod.near || 0} | MID ${lod.mid || 0}`,
   `SPIKES: >33 ${spikes.over33_3 || 0} | >50 ${spikes.over50 || 0} | MAX ${(spikes.maxFrameMs || 0).toFixed(1)} ms`,
   `TERRAIN RING: ${Number.isFinite(live.terrainRing) ? live.terrainRing : '--'} | SPEED ${Math.round(live.speedMph || 0)} mph`];
@@ -638,6 +703,7 @@ Object.assign(appCtx, {
   getPerfAutoQualityTier,
   getPerfSpikeMetrics,
   getPerfOverlayEnabled,
+  logBaselineSnapshot,
   mergePerfLiveStats,
   perfStats,
   recordPerfFrame,
@@ -666,6 +732,7 @@ export {
   getPerfAutoQualityTier,
   getPerfSpikeMetrics,
   getPerfOverlayEnabled,
+  logBaselineSnapshot,
   mergePerfLiveStats,
   perfAutoQualityEnabled,
   perfAutoQualityTier,

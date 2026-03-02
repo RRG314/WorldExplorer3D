@@ -867,7 +867,6 @@ function listenRoom(roomId, callback) {
 
 async function findPublicRoomsByCity(cityInput, options = {}) {
   const { db } = getServices();
-  requireSignedInUser();
 
   const cityKey = normalizeCityKey(cityInput);
   if (!cityKey) return [];
@@ -1028,7 +1027,6 @@ async function deleteOwnedRoom(roomCode) {
 
 async function findFeaturedPublicRooms(options = {}) {
   const { db } = getServices();
-  requireSignedInUser();
 
   const resultLimit = Math.max(1, Math.min(30, Math.floor(Number(options.resultLimit || 8))));
   const roomsRef = collection(db, ROOM_COLLECTION);

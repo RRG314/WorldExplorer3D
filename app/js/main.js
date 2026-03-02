@@ -74,6 +74,13 @@ function positionTopOverlays() {
   }
 }
 
+function shouldUseComposer() {
+  if (!appCtx.composer) return false;
+  const quality = String(appCtx.renderQualityLevel || '').toLowerCase();
+  if (quality !== 'low') return true;
+  return !!(appCtx.ssaoPass?.enabled || appCtx.bloomPass?.enabled || appCtx.smaaPass?.enabled);
+}
+
 function renderLoop(t = 0) {
   requestAnimationFrame(renderLoop);
 
@@ -206,7 +213,7 @@ function renderLoop(t = 0) {
     }
   }
 
-  if (appCtx.composer) {
+  if (shouldUseComposer()) {
     appCtx.composer.render();
   } else {
     appCtx.renderer.render(appCtx.scene, appCtx.camera);

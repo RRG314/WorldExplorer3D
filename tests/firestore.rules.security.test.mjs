@@ -19,6 +19,7 @@ import {
 } from 'firebase/firestore';
 
 const ROOM_ID = 'AB12CD';
+const PUBLIC_ROOM_ID = 'PB12CD';
 const OWNER_UID = 'owner_user';
 const MEMBER_UID = 'member_user';
 const ATTACKER_UID = 'attacker_user';
@@ -86,6 +87,21 @@ function privateRoomDoc() {
       paintTouchMode: 'any',
       allowPaintballGun: true,
       allowRoofAutoPaint: true
+    }
+  };
+}
+
+function publicRoomDoc() {
+  return {
+    ...privateRoomDoc(),
+    code: PUBLIC_ROOM_ID,
+    visibility: 'public',
+    cityKey: 'baltimore',
+    locationTag: {
+      label: 'Baltimore',
+      city: 'Baltimore',
+      cityKey: 'baltimore',
+      kind: 'earth'
     }
   };
 }
@@ -206,6 +222,7 @@ async function seedData(testEnv) {
     });
 
     await setDoc(doc(db, 'rooms', ROOM_ID), privateRoomDoc());
+    await setDoc(doc(db, 'rooms', PUBLIC_ROOM_ID), publicRoomDoc());
     await setDoc(doc(db, 'rooms', ROOM_ID, 'players', OWNER_UID), playerDoc(OWNER_UID, 'Owner', 'owner'));
     await setDoc(doc(db, 'rooms', ROOM_ID, 'players', MEMBER_UID), playerDoc(MEMBER_UID, 'Member', 'member'));
 
@@ -266,6 +283,10 @@ async function runCheck(name, fn) {
 
 await runCheck('anon cannot read private room doc', async () => {
   await assertFails(getDoc(doc(anonDb, 'rooms', ROOM_ID)));
+});
+
+await runCheck('anon can read public room doc', async () => {
+  await assertSucceeds(getDoc(doc(anonDb, 'rooms', PUBLIC_ROOM_ID)));
 });
 
 await runCheck('non-member cannot read private room doc', async () => {

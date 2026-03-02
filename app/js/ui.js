@@ -1,6 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
+import { createGlobeSelector } from "./ui/globe-selector.js?v=55";
 
 const PROPERTY_MARKER_HIT_RADIUS = 10;
 const POI_MARKER_HIT_RADIUS = 8;
@@ -206,9 +207,15 @@ function setupUI() {
   const toggleLabel = document.getElementById('realEstateToggleLabel');
   const perfModeSelect = document.getElementById('perfModeSelect');
   const perfOverlayToggle = document.getElementById('perfOverlayToggle');
+  const renderQualitySelect = document.getElementById('renderQualitySelect');
+  const highQualityToggle = document.getElementById('highQualityToggle');
+  const ssaoToggle = document.getElementById('ssaoToggle');
   const perfApplyReload = document.getElementById('perfApplyReload');
   const perfCopySnapshot = document.getElementById('perfCopySnapshot');
   const perfSettingsStatus = document.getElementById('perfSettingsStatus');
+  const rdtNoiseToggle = document.getElementById('rdtNoiseToggle');
+  const rdtNoiseVariantSelect = document.getElementById('rdtNoiseVariantSelect');
+  const rdtNoiseStatus = document.getElementById('rdtNoiseStatus');
   const shareExperienceBtn = document.getElementById('shareExperienceBtn');
   const shareExperienceStatus = document.getElementById('shareExperienceStatus');
   const titleShareNative = document.getElementById('titleShareNative');
@@ -352,6 +359,73 @@ function setupUI() {
     !!appCtx.perfOverlayEnabled;
     perfOverlayToggle.checked = overlayEnabled;
   }
+  const syncRenderQualityUi = () => {
+    const currentLevel = typeof appCtx.getRenderQualityLevel === 'function' ?
+    String(appCtx.getRenderQualityLevel() || 'med').toLowerCase() :
+    String(appCtx.renderQualityLevel || 'med').toLowerCase();
+    const normalizedLevel = currentLevel === 'low' || currentLevel === 'high' ? currentLevel : 'med';
+    if (renderQualitySelect) renderQualitySelect.value = normalizedLevel;
+    if (highQualityToggle) {
+      const highEnabled = typeof appCtx.getHighQualityEnabled === 'function' ?
+      !!appCtx.getHighQualityEnabled() :
+      normalizedLevel === 'high';
+      highQualityToggle.checked = highEnabled;
+    }
+    if (ssaoToggle) {
+      const ssaoEnabled = typeof appCtx.getSsaoEnabled === 'function' ?
+      !!appCtx.getSsaoEnabled() :
+      !!appCtx.ssaoEnabled;
+      ssaoToggle.checked = ssaoEnabled;
+      const ssaoSupported = typeof appCtx.canUseSsao === 'function' ? !!appCtx.canUseSsao() : true;
+      ssaoToggle.disabled = !ssaoSupported;
+      ssaoToggle.title = ssaoSupported ?
+      'Adds contact shadows when Render Quality is set to High.' :
+      'SSAO disabled on low-end/mobile devices.';
+    }
+  };
+  syncRenderQualityUi();
+  const getRdtNoiseConfig = () => {
+    if (typeof appCtx.getRdtNoiseConfig === 'function') return appCtx.getRdtNoiseConfig();
+    return {
+      enabled: !!appCtx.rdtNoiseEnabled,
+      variant: String(appCtx.rdtNoiseVariant || 'standard'),
+      chaos: Number.isFinite(Number(appCtx.rdtNoiseChaos)) ? Number(appCtx.rdtNoiseChaos) : 0
+    };
+  };
+  const syncRdtNoiseUi = () => {
+    const cfg = getRdtNoiseConfig();
+    if (rdtNoiseToggle) rdtNoiseToggle.checked = !!cfg.enabled;
+    if (rdtNoiseVariantSelect) rdtNoiseVariantSelect.value = String(cfg.variant || 'standard');
+    const rdtNoiseFloatItem = document.getElementById('fRdtNoise');
+    if (rdtNoiseFloatItem) rdtNoiseFloatItem.classList.toggle('on', !!cfg.enabled);
+    if (rdtNoiseStatus) {
+      rdtNoiseStatus.textContent = cfg.enabled ?
+      `Active (${String(cfg.variant || 'standard')})` :
+      'Disabled';
+    }
+  };
+  const applyRdtNoiseConfig = async ({ enabled = null, variant = null, source = 'settings' } = {}) => {
+    const initial = getRdtNoiseConfig();
+    const nextEnabled = enabled == null ? !!initial.enabled : !!enabled;
+    const nextVariant = variant == null ? String(initial.variant || 'standard') : String(variant || 'standard');
+    if (typeof appCtx.setRdtNoiseEnabled === 'function') appCtx.setRdtNoiseEnabled(nextEnabled);
+    if (typeof appCtx.setRdtNoiseVariant === 'function') appCtx.setRdtNoiseVariant(nextVariant);
+    syncRdtNoiseUi();
+    if (perfSettingsStatus) {
+      const sourceLabel = source === 'float' ? 'from Environment menu' : 'from Settings';
+      perfSettingsStatus.textContent = appCtx.gameStarted ?
+      `Applying RDT noise ${sourceLabel} and reloading world...` :
+      `Saved RDT noise ${sourceLabel}. It will apply when you start.`;
+    }
+    if (appCtx.gameStarted && typeof appCtx.loadRoads === 'function') {
+      await appCtx.loadRoads();
+      if (perfSettingsStatus) {
+        perfSettingsStatus.textContent = `RDT noise ${nextEnabled ? 'enabled' : 'disabled'} (${nextVariant}) and world reloaded.`;
+      }
+    }
+    if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
+  };
+  syncRdtNoiseUi();
 
   if (perfModeSelect) {
     perfModeSelect.addEventListener('change', (e) => {
@@ -366,6 +440,28 @@ function setupUI() {
     });
   }
 
+  if (rdtNoiseToggle) {
+    rdtNoiseToggle.addEventListener('change', async (e) => {
+      const cfg = getRdtNoiseConfig();
+      await applyRdtNoiseConfig({
+        enabled: !!e.target.checked,
+        variant: cfg.variant,
+        source: 'settings'
+      });
+    });
+  }
+
+  if (rdtNoiseVariantSelect) {
+    rdtNoiseVariantSelect.addEventListener('change', async (e) => {
+      const cfg = getRdtNoiseConfig();
+      await applyRdtNoiseConfig({
+        enabled: cfg.enabled,
+        variant: e.target.value,
+        source: 'settings'
+      });
+    });
+  }
+
   if (perfOverlayToggle) {
     perfOverlayToggle.addEventListener('change', (e) => {
       const enabled = !!e.target.checked;
@@ -374,6 +470,68 @@ function setupUI() {
         perfSettingsStatus.textContent = enabled ?
         'Live overlay enabled. Benchmark values will be shown during gameplay.' :
         'Live overlay disabled.';
+      }
+      if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
+    });
+  }
+
+  if (renderQualitySelect) {
+    renderQualitySelect.addEventListener('change', () => {
+      const selected = renderQualitySelect.value === 'low' || renderQualitySelect.value === 'high' ?
+      renderQualitySelect.value :
+      'med';
+      if (typeof appCtx.setRenderQualityLevel === 'function') appCtx.setRenderQualityLevel(selected);
+      syncRenderQualityUi();
+      if (perfSettingsStatus) {
+        perfSettingsStatus.textContent = `Render quality set to ${selected.toUpperCase()}.`;
+      }
+      if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
+    });
+  }
+
+  if (highQualityToggle) {
+    highQualityToggle.addEventListener('change', () => {
+      const enabled = !!highQualityToggle.checked;
+      if (typeof appCtx.setHighQualityEnabled === 'function') {
+        const current = renderQualitySelect?.value || 'med';
+        const fallbackLevel = current === 'high' ? 'med' : current;
+        appCtx.setHighQualityEnabled(enabled, { fallbackLevel });
+      } else if (typeof appCtx.setRenderQualityLevel === 'function') {
+        appCtx.setRenderQualityLevel(enabled ? 'high' : 'med');
+      }
+      syncRenderQualityUi();
+      if (perfSettingsStatus) {
+        perfSettingsStatus.textContent = enabled ?
+        'High Quality Boost enabled.' :
+        'High Quality Boost disabled.';
+      }
+      if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
+    });
+  }
+
+  if (ssaoToggle) {
+    ssaoToggle.addEventListener('change', () => {
+      const wanted = !!ssaoToggle.checked;
+      let enabled = wanted;
+      if (typeof appCtx.setSsaoEnabled === 'function') {
+        enabled = !!appCtx.setSsaoEnabled(wanted);
+      } else {
+        appCtx.ssaoEnabled = wanted;
+      }
+      syncRenderQualityUi();
+      if (perfSettingsStatus) {
+        if (wanted && !enabled) {
+          perfSettingsStatus.textContent = 'SSAO unavailable on this device quality tier.';
+        } else if (enabled) {
+          const quality = typeof appCtx.getRenderQualityLevel === 'function' ?
+          String(appCtx.getRenderQualityLevel() || 'med').toLowerCase() :
+          String(appCtx.renderQualityLevel || 'med').toLowerCase();
+          perfSettingsStatus.textContent = quality === 'high' ?
+          'SSAO enabled (High quality).' :
+          'SSAO armed and will apply on High quality.';
+        } else {
+          perfSettingsStatus.textContent = 'SSAO disabled.';
+        }
       }
       if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     });
@@ -927,6 +1085,7 @@ function setupUI() {
     space: spaceLaunchToggle
   };
   let titleLaunchMode = 'earth'; // earth | moon | space
+  let globeSelector = null;
 
   const setLaunchMode = (mode) => {
     const nextMode = mode === 'moon' || mode === 'space' ? mode : 'earth';
@@ -953,7 +1112,7 @@ function setupUI() {
         customCard.classList.add('sel');
       }
       appCtx.selLoc = 'custom';
-      if (customPanel) customPanel.classList.add('show');
+      if (customPanel) customPanel.classList.remove('show');
       return;
     }
 
@@ -967,14 +1126,61 @@ function setupUI() {
     if (customPanel) customPanel.classList.remove('show');
   };
 
+  const triggerTitleStart = () => {
+    const titleStartButton = document.getElementById('startBtn');
+    if (titleStartButton) titleStartButton.click();
+  };
+
+  globeSelector = createGlobeSelector({
+    onBack: () => {
+      if (customPanel) customPanel.classList.remove('show');
+    },
+    onStartHere: () => {
+      setTitleLocationMode('custom');
+      if (!appCtx.gameStarted) {
+        triggerTitleStart();
+      } else if (typeof appCtx.loadRoads === 'function') {
+        appCtx.loadRoads().then(() => {
+          if (typeof appCtx.spawnOnRoad === 'function') appCtx.spawnOnRoad();
+        });
+      }
+    },
+    onMoonShortcut: () => {
+      if (!appCtx.gameStarted) {
+        setLaunchMode('moon');
+        triggerTitleStart();
+      } else if (!appCtx.onMoon && !appCtx.travelingToMoon && typeof appCtx.directTravelToMoon === 'function') {
+        appCtx.directTravelToMoon();
+      }
+    },
+    onSpaceShortcut: () => {
+      if (!appCtx.gameStarted) {
+        setLaunchMode('space');
+        triggerTitleStart();
+      } else if (!appCtx.onMoon && !appCtx.travelingToMoon && typeof appCtx.travelToMoon === 'function') {
+        appCtx.travelToMoon();
+      }
+    }
+  });
+  appCtx.globeSelector = globeSelector;
+  appCtx.openGlobeSelector = () => {
+    setTitleLocationMode('custom');
+    globeSelector.open();
+  };
+  appCtx.closeGlobeSelector = () => {
+    globeSelector.close();
+  };
+
   document.querySelectorAll('.loc').forEach((el) => el.addEventListener('click', () => {
     document.querySelectorAll('.loc').forEach((e) => e.classList.remove('sel'));
     el.classList.add('sel');
     appCtx.selLoc = el.dataset.loc;
-    if (customPanel) customPanel.classList.toggle('show', appCtx.selLoc === 'custom');
     if (appCtx.selLoc === 'custom') {
       setTitleLocationMode('custom');
+      globeSelector.open();
     } else {
+      globeSelector.close();
+      if (customPanel) customPanel.classList.remove('show');
       setLaunchMode('earth');
     }
   }));
@@ -1091,6 +1297,9 @@ function setupUI() {
   }));
   // Start
   document.getElementById('startBtn').addEventListener('click', async () => {
+    if (globeSelector && typeof globeSelector.isOpen === 'function' && globeSelector.isOpen()) {
+      globeSelector.close();
+    }
     const pendingFlowerChallengeRequested = typeof appCtx.consumePendingFlowerChallengeStart === 'function' ?
     appCtx.consumePendingFlowerChallengeStart() :
     false;
@@ -1751,6 +1960,18 @@ function setupUI() {
     });
     closeAllFloatMenus();
   });
+  const rdtNoiseFloatItem = document.getElementById('fRdtNoise');
+  if (rdtNoiseFloatItem) {
+    rdtNoiseFloatItem.addEventListener('click', async () => {
+      const cfg = getRdtNoiseConfig();
+      await applyRdtNoiseConfig({
+        enabled: !cfg.enabled,
+        variant: cfg.variant,
+        source: 'float'
+      });
+      closeAllFloatMenus();
+    });
+  }
   document.getElementById('fTimeOfDay').addEventListener('click', () => {appCtx.cycleTimeOfDay();});
   document.getElementById('fPolice').addEventListener('click', () => {
     appCtx.policeOn = !appCtx.policeOn;

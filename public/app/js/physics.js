@@ -294,8 +294,11 @@ function update(dt) {
   if (appCtx.car.yawRate === undefined) appCtx.car.yawRate = 0;
   if (appCtx.car.vFwd === undefined) appCtx.car.vFwd = 0;
   if (appCtx.car.vLat === undefined) appCtx.car.vLat = 0;
+  if (appCtx.car.rearSlip === undefined) appCtx.car.rearSlip = 0;
   if (appCtx.car.steerSm === undefined) appCtx.car.steerSm = 0;
   if (appCtx.car.throttleSm === undefined) appCtx.car.throttleSm = 0;
+  if (appCtx.car.isDrifting === undefined) appCtx.car.isDrifting = false;
+  if (appCtx.car._driftHoldTimer === undefined) appCtx.car._driftHoldTimer = 0;
   if (appCtx.car.vy === undefined) appCtx.car.vy = 0;
   if (appCtx.car._lastSurfaceY === undefined) appCtx.car._lastSurfaceY = null;
   if (appCtx.car._terrainAirTimer === undefined) appCtx.car._terrainAirTimer = 0;
@@ -361,6 +364,8 @@ function update(dt) {
 
   const spd = Math.abs(appCtx.car.speed);
   const canAccelerate = !appCtx.car.isAirborne;
+  const driftBrakeSpeed = appCtx.car.onRoad ? 10 : 12;
+  const earthDriftBrakeIntent = !appCtx.onMoon && braking && (left || right) && spd > driftBrakeSpeed;
 
   if (gas && !braking && canAccelerate) {
     let throttleAccel = accel;
@@ -372,7 +377,13 @@ function update(dt) {
   }
 
   if (braking && spd > 0.5 && canAccelerate) {
-    appCtx.car.speed *= 1 - appCtx.CFG.brakeForce * dt;
+    if (earthDriftBrakeIntent) {
+      // Handbrake-like brake response: keep momentum so brake+steer can initiate drift.
+      const driftBrakeRate = appCtx.car.onRoad ? 1.8 : 2.4;
+      appCtx.car.speed *= Math.exp(-driftBrakeRate * dt);
+    } else {
+      appCtx.car.speed *= 1 - appCtx.CFG.brakeForce * dt;
+    }
     if (Math.abs(appCtx.car.speed) < 0.5) appCtx.car.speed = 0;
   }
 
@@ -409,7 +420,6 @@ function update(dt) {
 
   const steerInput = (left ? 1 : 0) - (right ? 1 : 0);
   const throttleInput = gas && !reverse ? 1 : 0;
-  const brakeInput = braking ? 1 : 0;
 
   const steerSmooth = 1 - Math.exp(-dt * 10);
   const throttleSmooth = 1 - Math.exp(-dt * 6);
@@ -433,23 +443,74 @@ function update(dt) {
   // In reverse, steering works the same direction (arcade-style, more realistic feel)
   const steerAngle = appCtx.car.steerSm * maxSteer;
 
-  // Surface grip baseline
-  let gripBase = appCtx.car.onRoad ? 1.0 : 0.65;
-  if (offMode) gripBase *= 0.75;
+  const clamp01 = (n) => Math.max(0, Math.min(1, n));
+  const steerMag = Math.abs(appCtx.car.steerSm);
+  const speedNorm = clamp01((spdAbs - 8) / 70);
+  const driftStartSteer = 0.16;
+  const driftHoldSteer = 0.08;
+  const driftStartSpeed = appCtx.car.onRoad ? 11 : 13;
+  const driftHoldSpeed = appCtx.car.onRoad ? 6.5 : 8;
+  const driftStartIntent = !appCtx.onMoon && braking && steerMag >= driftStartSteer && spdAbs >= driftStartSpeed;
 
-  // Moon: full grip — driving should feel the same as Earth
+  if (appCtx.onMoon) {
+    appCtx.car._driftHoldTimer = 0;
+  } else if (driftStartIntent) {
+    appCtx.car._driftHoldTimer = 0.22;
+  } else {
+    appCtx.car._driftHoldTimer = Math.max(0, appCtx.car._driftHoldTimer - dt);
+  }
+
+  const driftCanSustain = !appCtx.onMoon &&
+  (braking || appCtx.car._driftHoldTimer > 0) &&
+  steerMag >= driftHoldSteer &&
+  spdAbs >= driftHoldSpeed;
+  const isDrifting = driftStartIntent || !!appCtx.car.isDrifting && driftCanSustain;
+
+  // Surface grip baseline using existing runtime config values.
+  let gripBase = appCtx.car.onRoad ?
+  Number(appCtx.CFG.gripRoad || 0.88) :
+  Number(appCtx.CFG.gripOff || 0.70);
+  if (offMode) gripBase *= 0.82;
+
+  // Moon handling remains unchanged by drift tuning.
   if (appCtx.onMoon) gripBase = 1.0;
 
-  // Drift mechanic removed — spacebar is pure brake only
-  let isDrifting = false;
+  let driftGrip = gripBase;
+  if (isDrifting) {
+    const brakeGrip = Number(appCtx.CFG.gripBrake || 0.60);
+    const driftGripFloor = Number(appCtx.CFG.gripDrift || 0.45);
+    const blend = appCtx.car.onRoad ? 0.72 + 0.28 * speedNorm : 0.62 + 0.30 * speedNorm;
+    driftGrip = Math.max(driftGripFloor, gripBase * (1 - blend) + brakeGrip * blend);
+  }
+  const grip = Math.max(0.2, Math.min(1.2, driftGrip));
 
-  const latDamp = (appCtx.car.onRoad ? 10.5 : 6.5) * gripBase;
-  const yawDamp = (appCtx.car.onRoad ? 7.5 : 5.0) * gripBase;
-  const yawResponse = (appCtx.car.onRoad ? 3.5 : 2.2) * gripBase;
+  let latDamp, yawDamp, yawResponse;
+  if (appCtx.onMoon) {
+    // Preserve moon handling behavior exactly as before.
+    latDamp = (appCtx.car.onRoad ? 13.0 : 11.0) * (0.75 + grip * 0.55);
+    yawDamp = (appCtx.car.onRoad ? 8.3 : 8.8) * (0.7 + grip * 0.6);
+    yawResponse = (appCtx.car.onRoad ? 4.6 : 2.4) * (0.65 + grip * 0.45);
+  } else {
+    // Earth-only: stronger off-road lateral damping unless drift is explicitly requested.
+    latDamp = (appCtx.car.onRoad ? 15.5 : 19.0) * (0.72 + grip * 0.58);
+    yawDamp = (appCtx.car.onRoad ? 9.2 : 11.6) * (0.7 + grip * 0.6);
+    yawResponse = (appCtx.car.onRoad ? 4.4 : 2.1) * (0.64 + grip * 0.42);
+
+    if (isDrifting) {
+      latDamp *= 0.34;
+      yawDamp *= 0.68;
+      yawResponse *= 1.4;
+    } else {
+      const driftRecovery = Math.max(0, Number(appCtx.CFG.driftRec || 6));
+      latDamp += driftRecovery * (appCtx.car.onRoad ? 0.55 : 0.85);
+      yawDamp += driftRecovery * 0.32;
+    }
+  }
 
   const wheelBase = 2.6;
   const v = appCtx.car.speed;
-  const yawRateTarget = v / Math.max(1e-3, wheelBase) * Math.tan(steerAngle);
+  const steerAuthority = appCtx.car.onRoad ? 1.0 : 0.72;
+  const yawRateTarget = v / Math.max(1e-3, wheelBase) * Math.tan(steerAngle * steerAuthority);
 
   appCtx.car.yawRate += (yawRateTarget - appCtx.car.yawRate) * (1 - Math.exp(-dt * yawResponse));
   appCtx.car.yawRate *= Math.exp(-dt * yawDamp);
@@ -464,14 +525,77 @@ function update(dt) {
   appCtx.car.vFwd += (appCtx.car.speed - appCtx.car.vFwd) * (1 - Math.exp(-dt * 8));
   appCtx.car.vLat *= Math.exp(-dt * latDamp);
 
-  // Lateral slip injection from turning (more slip when less grip)
-  let slipGain = 0.12 * (1.0 - gripBase);
+  // Rear-biased slip model:
+  // front axle keeps more grip while handbrake drifting, rear axle breaks loose.
+  const halfWheelBase = wheelBase * 0.5;
+  let frontLat = appCtx.car.vLat + appCtx.car.yawRate * halfWheelBase;
+  let rearLat = appCtx.car.vLat - appCtx.car.yawRate * halfWheelBase;
 
+  let frontGripDamp = (appCtx.car.onRoad ? 22 : 26) * (0.7 + grip * 0.55);
+  let rearGripDamp = (appCtx.car.onRoad ? 18 : 24) * (0.72 + grip * 0.52);
+  if (!appCtx.onMoon) {
+    if (isDrifting) {
+      frontGripDamp *= 0.62;
+      rearGripDamp *= 0.22;
+      rearLat += appCtx.car.steerSm * (appCtx.car.onRoad ? 1.6 : 1.1) * (0.5 + 0.5 * speedNorm);
+    } else if (!appCtx.car.onRoad) {
+      // Off-road should feel planted unless drift is explicitly initiated.
+      frontGripDamp *= 1.4;
+      rearGripDamp *= 1.6;
+    }
+  }
+
+  frontLat *= Math.exp(-dt * frontGripDamp);
+  rearLat *= Math.exp(-dt * rearGripDamp);
+  appCtx.car.vLat = (frontLat + rearLat) * 0.5;
+
+  let slipGain = 0.005 * steerMag * speedNorm;
+  if (!appCtx.onMoon) {
+    if (isDrifting) {
+      const driftSlip = appCtx.car.onRoad ? 0.042 : 0.03;
+      slipGain = driftSlip * steerMag * (0.45 + 0.55 * speedNorm);
+    } else if (appCtx.car.onRoad) {
+      slipGain = 0.0012 * steerMag * speedNorm;
+    } else {
+      slipGain = 0.00022 * steerMag * speedNorm;
+    }
+  }
   appCtx.car.vLat += appCtx.car.yawRate * spdAbs * slipGain;
 
+  if (!appCtx.onMoon && isDrifting) {
+    const rearStep = rearLat - frontLat;
+    const rearSlipGain = appCtx.car.onRoad ? 1.05 : 0.68;
+    const steerSlipGain = appCtx.car.onRoad ? 0.74 : 0.46;
+    appCtx.car.rearSlip += rearStep * dt * rearSlipGain;
+    appCtx.car.rearSlip += appCtx.car.steerSm * dt * steerSlipGain;
+    const rearSlipLimit = appCtx.car.onRoad ? 1.25 : 0.9;
+    appCtx.car.rearSlip = Math.max(-rearSlipLimit, Math.min(rearSlipLimit, appCtx.car.rearSlip));
+    appCtx.car.rearSlip *= Math.exp(-dt * (appCtx.car.onRoad ? 3.8 : 4.8));
+    appCtx.car.yawRate += appCtx.car.rearSlip * (0.62 + 0.28 * speedNorm);
+    // Keep front axle planted so drift pivots from the rear instead of full-body slide.
+    appCtx.car.vLat *= Math.exp(-dt * (appCtx.car.onRoad ? 3.1 : 4.4));
+  } else {
+    appCtx.car.rearSlip *= Math.exp(-dt * 9.5);
+    if (!appCtx.onMoon && !appCtx.car.onRoad) {
+      // Kill residual drift when off-road and not braking into a drift.
+      appCtx.car.vLat *= Math.exp(-dt * 8.2);
+    }
+  }
+
+  if (isDrifting) {
+    const yawKick = appCtx.car.steerSm * (appCtx.car.onRoad ? 0.9 : 0.62) * (0.35 + 0.65 * speedNorm);
+    appCtx.car.yawRate += yawKick * dt * 3.8;
+  }
+  appCtx.car.isDrifting = isDrifting;
+
   const sinA = Math.sin(appCtx.car.angle),cosA = Math.cos(appCtx.car.angle);
-  appCtx.car.vx = sinA * appCtx.car.vFwd + cosA * appCtx.car.vLat;
-  appCtx.car.vz = cosA * appCtx.car.vFwd - sinA * appCtx.car.vLat;
+  const lateralVelForPosition = !appCtx.onMoon && isDrifting ?
+  appCtx.car.vLat * 0.28 :
+  !appCtx.onMoon && !appCtx.car.onRoad ?
+  appCtx.car.vLat * 0.58 :
+  appCtx.car.vLat;
+  appCtx.car.vx = sinA * appCtx.car.vFwd + cosA * lateralVelForPosition;
+  appCtx.car.vz = cosA * appCtx.car.vFwd - sinA * lateralVelForPosition;
 
   const velMag = Math.hypot(appCtx.car.vx, appCtx.car.vz);
   if (velMag > 5) {
@@ -484,15 +608,50 @@ function update(dt) {
     appCtx.car.driftAngle = 0;
   }
 
-  let nx = appCtx.car.x + appCtx.car.vx * dt;
-  let nz = appCtx.car.z + appCtx.car.vz * dt;
+  let nx;
+  let nz;
+  if (!appCtx.onMoon && isDrifting && spdAbs > 6) {
+    const frontPivotDist = wheelBase * 0.42;
+    const frontX = appCtx.car.x + sinA * frontPivotDist;
+    const frontZ = appCtx.car.z + cosA * frontPivotDist;
+    const frontVx = sinA * appCtx.car.vFwd + cosA * (lateralVelForPosition * 0.35);
+    const frontVz = cosA * appCtx.car.vFwd - sinA * (lateralVelForPosition * 0.35);
+    const nextFrontX = frontX + frontVx * dt;
+    const nextFrontZ = frontZ + frontVz * dt;
+    nx = nextFrontX - Math.sin(appCtx.car.angle) * frontPivotDist;
+    nz = nextFrontZ - Math.cos(appCtx.car.angle) * frontPivotDist;
+  } else {
+    nx = appCtx.car.x + appCtx.car.vx * dt;
+    nz = appCtx.car.z + appCtx.car.vz * dt;
+  }
 
   // Street boundaries removed — car can drive freely off-road.
   // Building collisions are still enforced below.
 
   if (!appCtx.onMoon) {
-    const buildingCheck = checkBuildingCollision(nx, nz, 2.5);
-    if (buildingCheck.collision) {
+    const buildingCheck = checkBuildingCollision(nx, nz, 2.0);
+    const nearestRoadForCollision = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(nx, nz) : null;
+    const roadDist = Number.isFinite(nearestRoadForCollision?.dist) ? nearestRoadForCollision.dist : Infinity;
+    const roadHalfWidth = nearestRoadForCollision?.road?.width ? nearestRoadForCollision.road.width * 0.5 : 0;
+    const onRoadCenter = roadHalfWidth > 0 &&
+    roadDist <= Math.max(2.2, roadHalfWidth - 0.35);
+    const onRoadCore = roadHalfWidth > 0 &&
+    roadDist <= Math.max(1.6, roadHalfWidth - 0.95);
+    const colliderDetail = buildingCheck?.building?.colliderDetail === 'bbox' ? 'bbox' : 'full';
+    const buildingType = String(buildingCheck?.building?.buildingType || '').toLowerCase();
+    const isApproxCollider = colliderDetail !== 'full';
+    const roofLikeCollider = buildingType === 'roof' || buildingType === 'canopy' || buildingType === 'carport';
+    const shallowRoadsideCollision = !!buildingCheck.collision &&
+    onRoadCenter &&
+    !buildingCheck.inside &&
+    Number.isFinite(buildingCheck.penetration) &&
+    buildingCheck.penetration < 1.25;
+    const likelyRoadGhostCollision = !!buildingCheck.collision &&
+    ((onRoadCenter && isApproxCollider) ||
+    (onRoadCore && buildingCheck.inside) ||
+    (onRoadCenter && roofLikeCollider));
+
+    if (buildingCheck.collision && !(shallowRoadsideCollision || likelyRoadGhostCollision)) {
       if (buildingCheck.inside) {
         if (buildingCheck.nearestPoint) {
           const pushDist = 3.0;
