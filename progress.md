@@ -2048,3 +2048,12 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Targeted Playwright validation:
     - `output/playwright/globe-favorites-toplist/report.json` ✅
     - confirms saved custom appears at top of Favorites, favorites item click updates selected place, nearby list remains populated/selectable.
+
+- Road intersection bulge fix (2026-03-02):
+  - Updated `app/js/terrain.js` intersection cap logic to reduce oversized circular joints.
+  - Added direction-aware skip for near-straight 2-road joints (`abs(dot) > 0.94`) to prevent unnecessary round blobs.
+  - Added bounded cap radius function (`computeIntersectionCapRadius`) with tighter min/max scaling.
+  - Validation:
+    - `npm run sync:public` ✅
+    - `npm run verify:mirror` ✅
+    - `npm run test:runtime` ✅ (`waterVisible=true`, `noConsoleErrors=true`, `blockedDriveRatePct=0`)

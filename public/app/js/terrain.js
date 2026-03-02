@@ -612,7 +612,23 @@ function detectRoadIntersections(roads) {
       if (!intersections.has(key)) {
         intersections.set(key, { x: pt.x, z: pt.z, roads: [] });
       }
-      intersections.get(key).roads.push({ roadIdx, ptIdx: idx, width: road.width || 8 });
+      let dirX = 0;
+      let dirZ = 0;
+      if (idx === 0) {
+        dirX = road.pts[1].x - road.pts[0].x;
+        dirZ = road.pts[1].z - road.pts[0].z;
+      } else {
+        const last = road.pts.length - 1;
+        dirX = road.pts[last - 1].x - road.pts[last].x;
+        dirZ = road.pts[last - 1].z - road.pts[last].z;
+      }
+      const dirLen = Math.hypot(dirX, dirZ) || 1;
+      intersections.get(key).roads.push({
+        roadIdx,
+        ptIdx: idx,
+        width: road.width || 8,
+        dir: { x: dirX / dirLen, z: dirZ / dirLen }
+      });
     });
   });
 
@@ -627,6 +643,38 @@ function detectRoadIntersections(roads) {
   });
 
   return result;
+}
+
+function shouldBuildIntersectionCap(intersection) {
+  if (!intersection || !Array.isArray(intersection.roads)) return false;
+  if (intersection.roads.length < 2) return false;
+  // For nearly straight 2-road joints, circular caps create visible bulges.
+  // Skip cap generation there and rely on road strip overlap instead.
+  if (intersection.roads.length === 2) {
+    const a = intersection.roads[0];
+    const b = intersection.roads[1];
+    if (a?.dir && b?.dir) {
+      const dot = a.dir.x * b.dir.x + a.dir.z * b.dir.z;
+      if (Math.abs(dot) > 0.94) return false;
+    }
+  }
+  return true;
+}
+
+function computeIntersectionCapRadius(intersection) {
+  const maxWidth = Number(intersection?.maxWidth || 8);
+  const roads = Array.isArray(intersection?.roads) ? intersection.roads : [];
+  const branchCount = Math.max(2, roads.length);
+  const avgWidth = roads.length > 0 ?
+  roads.reduce((sum, r) => sum + Number(r?.width || maxWidth), 0) / roads.length :
+  maxWidth;
+
+  const halfWidth = Math.max(avgWidth * 0.5, maxWidth * 0.5);
+  const branchBoost = Math.min(0.24, Math.max(0, (branchCount - 2) * 0.12));
+  const unclamped = halfWidth * (1 + branchBoost) + 0.25;
+  const minRadius = maxWidth * 0.46;
+  const maxRadius = maxWidth * 0.68;
+  return Math.max(minRadius, Math.min(maxRadius, unclamped));
 }
 
 function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
@@ -945,8 +993,8 @@ function rebuildRoadsWithTerrain() {
 
   // Build intersection cap patches
   intersections.forEach((intersection) => {
-    const avgWidth = intersection.roads.reduce((sum, r) => sum + r.width, 0) / intersection.roads.length;
-    const radius = Math.max(avgWidth * 0.56, intersection.maxWidth * 0.72);
+    if (!shouldBuildIntersectionCap(intersection)) return;
+    const radius = computeIntersectionCapRadius(intersection);
     const capData = buildIntersectionCap(intersection.x, intersection.z, radius, 24);
     appendIndexedGeometry(roadCapBatchVerts, roadCapBatchIdx, capData.verts, capData.indices);
   });
