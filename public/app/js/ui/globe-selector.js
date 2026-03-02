@@ -13,6 +13,9 @@ function clampLatLon(lat, lon) {
   return { lat: clampedLat, lon: clampedLon };
 }
 
+const FAVORITE_STORAGE_KEY = 'worldExplorer3D.globeSelector.savedFavorites';
+const MAX_SAVED_FAVORITES = 10;
+
 function createGlobeSelector(options = {}) {
   const root = document.getElementById('globeSelectorScreen');
   const stage = document.querySelector('.globe-selector-stage');
@@ -58,18 +61,25 @@ function createGlobeSelector(options = {}) {
   let earthMesh = null;
   let markerMesh = null;
   let raycaster = null;
+  let favoriteMarkerGroup = null;
+  let favoriteMarkerGeometry = null;
+  let menuFavoriteMaterial = null;
+  let savedFavoriteMaterial = null;
+  let favoriteMarkerNodes = [];
 
-  const favoriteCities = Object.entries(appCtx.LOCS || {}).map(([key, entry]) => {
+  const menuFavoriteCities = Object.entries(appCtx.LOCS || {}).map(([key, entry]) => {
     const lat = toFiniteNumber(entry?.lat);
     const lon = toFiniteNumber(entry?.lon);
     if (lat == null || lon == null) return null;
     return {
       key: String(key || ''),
       name: String(entry?.name || key || 'City').trim(),
-      lat,
-      lon
+      lat: Number(lat),
+      lon: Number(lon),
+      source: 'menu'
     };
   }).filter(Boolean);
+  let savedFavoriteCities = [];
 
   let cameraDistance = 2.8;
   const minDistance = 2.1;
@@ -85,6 +95,106 @@ function createGlobeSelector(options = {}) {
 
   function setBodyScrollLock(locked) {
     document.body?.classList.toggle('globe-selector-open', !!locked);
+  }
+
+  function normalizeCityName(name, lat, lon, fallbackPrefix = 'Custom Location') {
+    const trimmed = String(name || '').trim();
+    if (trimmed && !/^resolving city/i.test(trimmed)) return trimmed;
+    return `${fallbackPrefix} ${Number(lat).toFixed(3)}, ${Number(lon).toFixed(3)}`;
+  }
+
+  function normalizeCityRecord(raw, source = 'menu') {
+    if (!raw || typeof raw !== 'object') return null;
+    const lat = toFiniteNumber(raw.lat);
+    const lon = toFiniteNumber(raw.lon);
+    if (lat == null || lon == null) return null;
+    const clamped = clampLatLon(lat, lon);
+    const name = normalizeCityName(raw.name, clamped.lat, clamped.lon, source === 'saved' ? 'Saved Custom' : 'City');
+    return {
+      key: String(raw.key || ''),
+      name,
+      lat: Number(clamped.lat),
+      lon: Number(clamped.lon),
+      source: source === 'saved' ? 'saved' : 'menu',
+      savedAt: Number(raw.savedAt || 0)
+    };
+  }
+
+  function cityDedupKey(city) {
+    if (!city) return '';
+    return `${Number(city.lat).toFixed(4)},${Number(city.lon).toFixed(4)}`;
+  }
+
+  function buildFavoriteCities() {
+    const out = [];
+    const seen = new Set();
+    const merged = [...savedFavoriteCities, ...menuFavoriteCities];
+    merged.forEach((city) => {
+      const normalized = normalizeCityRecord(city, city?.source || 'menu');
+      if (!normalized) return;
+      const key = cityDedupKey(normalized);
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      out.push(normalized);
+    });
+    return out;
+  }
+
+  function loadSavedFavoriteCities() {
+    try {
+      const raw = localStorage.getItem(FAVORITE_STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed.
+      map((entry) => normalizeCityRecord(entry, 'saved')).
+      filter(Boolean).
+      sort((a, b) => Number(b.savedAt || 0) - Number(a.savedAt || 0)).
+      slice(0, MAX_SAVED_FAVORITES);
+    } catch {
+      return [];
+    }
+  }
+
+  function persistSavedFavoriteCities() {
+    try {
+      const payload = savedFavoriteCities.
+      map((city) => ({
+        key: String(city.key || ''),
+        name: String(city.name || ''),
+        lat: Number(city.lat),
+        lon: Number(city.lon),
+        savedAt: Number(city.savedAt || Date.now())
+      })).
+      slice(0, MAX_SAVED_FAVORITES);
+      localStorage.setItem(FAVORITE_STORAGE_KEY, JSON.stringify(payload));
+    } catch {
+      // Storage can fail in private mode; keep runtime-only list.
+    }
+  }
+
+  function saveSelectionAsFavorite(nextSelection) {
+    if (!nextSelection) return;
+    const lat = toFiniteNumber(nextSelection.lat);
+    const lon = toFiniteNumber(nextSelection.lon);
+    if (lat == null || lon == null) return;
+    const now = Date.now();
+    const normalized = normalizeCityRecord(
+      {
+        key: `saved-${now}`,
+        name: normalizeCityName(nextSelection.name, lat, lon, 'Saved Custom'),
+        lat,
+        lon,
+        savedAt: now
+      },
+      'saved'
+    );
+    if (!normalized) return;
+    savedFavoriteCities = savedFavoriteCities.
+    filter((city) => Math.abs(city.lat - normalized.lat) > 0.0005 || Math.abs(city.lon - normalized.lon) > 0.0005);
+    savedFavoriteCities.unshift(normalized);
+    savedFavoriteCities = savedFavoriteCities.slice(0, MAX_SAVED_FAVORITES);
+    persistSavedFavoriteCities();
   }
 
   function distanceKmBetween(latA, lonA, latB, lonB) {
@@ -107,7 +217,7 @@ function createGlobeSelector(options = {}) {
 
   function buildNearbyCities(lat, lon) {
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
-    return favoriteCities.
+    return buildFavoriteCities().
     map((city) => ({
       ...city,
       distanceKm: distanceKmBetween(lat, lon, city.lat, city.lon)
@@ -117,7 +227,35 @@ function createGlobeSelector(options = {}) {
   }
 
   function getActiveCityList() {
-    return activeCityTab === 'favorites' ? favoriteCities : nearbyCities;
+    return activeCityTab === 'favorites' ? buildFavoriteCities() : nearbyCities;
+  }
+
+  function setFavoriteMarkersVisible() {
+    if (!favoriteMarkerGroup) return;
+    favoriteMarkerGroup.visible = activeCityTab === 'favorites';
+  }
+
+  function renderFavoriteMarkers() {
+    if (!favoriteMarkerGroup || !favoriteMarkerGeometry || !menuFavoriteMaterial || !savedFavoriteMaterial) return;
+    while (favoriteMarkerGroup.children.length) {
+      favoriteMarkerGroup.remove(favoriteMarkerGroup.children[0]);
+    }
+    favoriteMarkerNodes = [];
+    const favorites = buildFavoriteCities();
+    favorites.forEach((city) => {
+      const isSelected = cityMatchesSelection(city);
+      const marker = new THREE.Mesh(
+        favoriteMarkerGeometry,
+        city.source === 'saved' ? savedFavoriteMaterial : menuFavoriteMaterial
+      );
+      const position = latLonToLocalPoint(city.lat, city.lon, 1.018);
+      marker.position.set(position.x, position.y, position.z);
+      marker.scale.setScalar(isSelected ? 1.35 : 1.0);
+      marker.userData.favoriteCity = city;
+      favoriteMarkerGroup.add(marker);
+      favoriteMarkerNodes.push({ city, mesh: marker });
+    });
+    setFavoriteMarkersVisible();
   }
 
   function setCityTab(nextTab) {
@@ -126,10 +264,11 @@ function createGlobeSelector(options = {}) {
     favoritesTabBtn?.classList.toggle('active', activeCityTab === 'favorites');
     if (cityListHint) {
       cityListHint.textContent = activeCityTab === 'favorites' ?
-      'Favorites are the same prelisted menu cities.' :
+      'Favorites include prelisted cities and your saved custom picks. Click list or globe markers.' :
       'Closest menu cities to your selected point.';
     }
     renderCityList();
+    setFavoriteMarkersVisible();
   }
 
   function renderCityList() {
@@ -146,7 +285,7 @@ function createGlobeSelector(options = {}) {
       const selectedClass = cityMatchesSelection(city) ? ' style="border-color:#667eea;background:#eef2ff"' : '';
       const meta = activeCityTab === 'nearby' ?
       `${city.distanceKm.toFixed(0)} km away` :
-      `${city.lat.toFixed(2)}, ${city.lon.toFixed(2)}`;
+      `${city.source === 'saved' ? 'Saved' : 'Menu'} • ${city.lat.toFixed(2)}, ${city.lon.toFixed(2)}`;
       return `<li class="globe-selector-city-item" data-city-index="${index}" data-city-tab="${activeCityTab}"${selectedClass}><span class="globe-selector-city-item-name">${city.name}</span><span class="globe-selector-city-item-meta">${meta}</span></li>`;
     }).join('');
   }
@@ -224,6 +363,7 @@ function createGlobeSelector(options = {}) {
     }
     nearbyCities = buildNearbyCities(selected.lat, selected.lon);
     renderCityList();
+    renderFavoriteMarkers();
   }
 
   function setSelection(lat, lon, meta = {}) {
@@ -376,6 +516,19 @@ function createGlobeSelector(options = {}) {
       y: -((clientY - rect.top) / rect.height) * 2 + 1
     };
     raycaster.setFromCamera(ndc, camera);
+    if (activeCityTab === 'favorites' && favoriteMarkerNodes.length > 0) {
+      const markerHits = raycaster.intersectObjects(favoriteMarkerNodes.map((entry) => entry.mesh), false);
+      const markerHit = markerHits && markerHits.length ? markerHits[0] : null;
+      const favoriteCity = markerHit?.object?.userData?.favoriteCity || null;
+      if (favoriteCity) {
+        setSelection(favoriteCity.lat, favoriteCity.lon, {
+          name: favoriteCity.name,
+          focus: true
+        });
+        if (searchInput) searchInput.value = favoriteCity.name;
+        return;
+      }
+    }
     const hits = raycaster.intersectObject(earthMesh, false);
     if (!hits || hits.length === 0) return;
 
@@ -454,6 +607,12 @@ function createGlobeSelector(options = {}) {
     markerMesh.visible = false;
     globeRoot.add(markerMesh);
 
+    favoriteMarkerGroup = new THREE.Group();
+    favoriteMarkerGeometry = new THREE.SphereGeometry(0.014, 12, 10);
+    menuFavoriteMaterial = new THREE.MeshBasicMaterial({ color: 0x60a5fa });
+    savedFavoriteMaterial = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+    globeRoot.add(favoriteMarkerGroup);
+
     try {
       const loader = new THREE.TextureLoader();
       loader.load(
@@ -486,6 +645,7 @@ function createGlobeSelector(options = {}) {
 
     raycaster = new THREE.Raycaster();
     ensureRendererSize();
+    renderFavoriteMarkers();
 
     canvas.addEventListener('pointerdown', (event) => {
       pointerActive = true;
@@ -560,6 +720,7 @@ function createGlobeSelector(options = {}) {
       searchStatus.textContent = 'Uses the same search flow as Custom Location.';
       searchStatus.style.color = '#64748b';
     }
+    savedFavoriteCities = loadSavedFavoriteCities();
     setCityTab(activeCityTab);
 
     const savedLat = toFiniteNumber(appCtx.customLoc?.lat ?? document.getElementById('customLat')?.value);
@@ -599,6 +760,9 @@ function createGlobeSelector(options = {}) {
       }
       return;
     }
+    saveSelectionAsFavorite(selected);
+    renderFavoriteMarkers();
+    renderCityList();
     syncLegacyCustomState(selected);
     if (typeof options.onStartHere === 'function') options.onStartHere({ ...selected });
   }

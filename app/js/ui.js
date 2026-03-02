@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
-import { createGlobeSelector } from "./ui/globe-selector.js?v=55";
+import { createGlobeSelector } from "./ui/globe-selector.js?v=56";
 
 const PROPERTY_MARKER_HIT_RADIUS = 10;
 const POI_MARKER_HIT_RADIUS = 8;

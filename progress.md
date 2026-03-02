@@ -2026,3 +2026,25 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Live post-deploy validation (desktop + iPhone on custom domain + web.app):
     - Report: `output/playwright/live-post-deploy-v2/report.json`
     - Result: `ok=true` across all checks (custom->globe open, favorites list count, in-game load).
+
+- Globe selector favorites/nearby enhancement pass (2026-03-02):
+  - Updated `app/js/ui/globe-selector.js` to support:
+    - favorites markers rendered on globe when Favorites tab is active,
+    - click-to-select favorites from list and globe markers,
+    - persistent saved custom favorites (`localStorage` key: `worldExplorer3D.globeSelector.savedFavorites`),
+    - saved custom favorites pinned at top of Favorites list,
+    - Nearby list populated from selected point and remains selectable.
+  - Cache-bust chain updated to force clients off stale immutable JS:
+    - `app/index.html` bootstrap `?v=72`
+    - `app/js/bootstrap.js` -> manifest `?v=72`
+    - `app/js/modules/manifest.js` CACHE_BUST `v=72`
+    - `app/js/app-entry.js` imports `ui.js?v=56`
+    - `app/js/ui.js` imports `ui/globe-selector.js?v=56`
+  - Mirror sync + verification:
+    - `npm run sync:public` ✅
+    - `npm run verify:mirror` ✅ (`mismatchCount=0`)
+  - Runtime invariants:
+    - `npm run test:runtime` ✅ (`noConsoleErrors=true`, `waterVisible=true`, `blockedDriveRatePct=0`)
+  - Targeted Playwright validation:
+    - `output/playwright/globe-favorites-toplist/report.json` ✅
+    - confirms saved custom appears at top of Favorites, favorites item click updates selected place, nearby list remains populated/selectable.
