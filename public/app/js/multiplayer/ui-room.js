@@ -236,11 +236,7 @@ function canUseMultiplayer(planState) {
 
 function copyText(text) {
   if (!text) return Promise.reject(new Error('Nothing to copy.'));
-  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-    return navigator.clipboard.writeText(text);
-  }
-
-  return new Promise((resolve, reject) => {
+  const fallbackCopy = () => new Promise((resolve, reject) => {
     const textarea = document.createElement('textarea');
     textarea.value = text;
     textarea.setAttribute('readonly', '');
@@ -259,6 +255,12 @@ function copyText(text) {
       reject(err);
     }
   });
+
+  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+    return navigator.clipboard.writeText(text).catch(() => fallbackCopy());
+  }
+
+  return fallbackCopy();
 }
 
 function buildInviteLink(code) {
@@ -1969,7 +1971,12 @@ function initMultiplayerPlatform() {
       await copyText(link);
       setStatus('Invite link copied.');
     } catch (err) {
-      setStatus(err?.message || 'Could not copy invite link.', true);
+      const message = String(err?.message || err || '');
+      if (/permission|denied|not allowed|copy command failed/i.test(message)) {
+        setStatus(`Clipboard blocked. Share this invite link: ${link}`);
+        return;
+      }
+      setStatus(`Could not copy invite link. Share this invite link: ${link}`, true);
     }
   }
 
