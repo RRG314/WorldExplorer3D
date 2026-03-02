@@ -2015,3 +2015,14 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Release verification:
     - `npm run release:verify` passed end-to-end.
     - Includes mirror parity, Firestore rules (`41/41`), and runtime invariants (`waterVisible=true`, `blockedDriveRatePct=0`, `noConsoleErrors=true`).
+- Repo push + live deployment pass (2026-03-02):
+  - Commit: `a47f6fa` on branch `steven/professional-audit-cleanup`.
+  - Pushed to `origin` (`RRG314/WorldExplorer`) successfully.
+  - Push to `worldexplorer3d` remote was blocked by repo protection rules (requires verified-signed commits and no merge commits in branch history).
+  - Deployed live updates with Firebase:
+    - `firebase deploy --only hosting,firestore:rules`
+    - Hosting URL: `https://worldexplorer3d-d9b83.web.app`
+    - Firestore rules released successfully.
+  - Live post-deploy validation (desktop + iPhone on custom domain + web.app):
+    - Report: `output/playwright/live-post-deploy-v2/report.json`
+    - Result: `ok=true` across all checks (custom->globe open, favorites list count, in-game load).
