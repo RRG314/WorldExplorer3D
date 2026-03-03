@@ -125,6 +125,23 @@ firebase deploy
 
 Deploy from branch root (`/`) as configured in repo settings.
 
+Pages backend notes:
+
+- Cloud Functions CORS allowlist must include the Pages origin (`https://rrg314.github.io`).
+- Firebase Auth authorized domains should include `rrg314.github.io` for Google sign-in flow.
+
+### itch.io Wrapper Build
+
+Build/update the redirect wrapper and zip:
+
+```bash
+bash scripts/make-itch-wrapper.sh
+```
+
+Output artifact:
+
+- `dist/worldexplorer3d-itch-wrapper.zip`
+
 ## Documentation
 
 - `COMPLETE_INVENTORY_REPORT_2026-03-02.md` (full inventory snapshot)
@@ -138,4 +155,3 @@ Deploy from branch root (`/`) as configured in repo settings.
 - `KNOWN_ISSUES.md`
 - `CHANGELOG.md`
 - `DOCUMENTATION_INDEX.md`
-

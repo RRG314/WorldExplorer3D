@@ -46,6 +46,12 @@ GitHub Pages hosting does not replace Firebase backend services. These still mus
 - Cloud Functions
 - Stripe webhook integration (if donations enabled)
 
+Pages origin requirements:
+
+- Cloud Functions CORS allowlist must include `https://rrg314.github.io`.
+- Firebase Auth authorized domains must include `rrg314.github.io` for Google sign-in.
+- Optional override for non-standard backend origin: set `WORLD_EXPLORER_FUNCTIONS_ORIGIN`.
+
 ## 5. Deploy Steps (Typical)
 
 1. Run release checks:
@@ -76,4 +82,3 @@ If stale JS appears after deploy:
 1. hard refresh (`Cmd+Shift+R` / `Ctrl+F5`)
 2. clear site data for the Pages domain
 3. reopen page and retry
-
