@@ -31,6 +31,7 @@ function createGlobeSelector(options = {}) {
   const moonBtn = document.getElementById('globeSelectorMoonBtn');
   const spaceBtn = document.getElementById('globeSelectorSpaceBtn');
   const searchBtn = document.getElementById('globeLocationSearchBtn');
+  const locateBtn = document.getElementById('globeSelectorLocateBtn');
   const nearbyTabBtn = document.getElementById('globeNearbyTabBtn');
   const favoritesTabBtn = document.getElementById('globeFavoritesTabBtn');
   const cityListHint = document.getElementById('globeCityListHint');
@@ -41,7 +42,10 @@ function createGlobeSelector(options = {}) {
       close() {},
       isOpen() { return false; },
       open() {},
-      setSelection() {}
+      setSelection() {},
+      setSearchStatus() {},
+      setLocateButtonBusy() {},
+      applySelectionAndResolve() {}
     };
   }
 
@@ -53,6 +57,7 @@ function createGlobeSelector(options = {}) {
   let reverseLookupToken = 0;
   let activeCityTab = 'nearby';
   let nearbyCities = [];
+  let liveNearbyCity = null;
   let favoritePresetList = [];
   let favoriteSavedList = [];
   const reverseLookupCache = new Map();
@@ -116,12 +121,13 @@ function createGlobeSelector(options = {}) {
     if (lat == null || lon == null) return null;
     const clamped = clampLatLon(lat, lon);
     const name = normalizeCityName(raw.name, clamped.lat, clamped.lon, source === 'saved' ? 'Saved Custom' : 'City');
+    const normalizedSource = source === 'saved' ? 'saved' : source === 'live' ? 'live' : 'menu';
     return {
       key: String(raw.key || ''),
       name,
       lat: Number(clamped.lat),
       lon: Number(clamped.lon),
-      source: source === 'saved' ? 'saved' : 'menu',
+      source: normalizedSource,
       savedAt: Number(raw.savedAt || 0)
     };
   }
@@ -170,21 +176,6 @@ function createGlobeSelector(options = {}) {
       presets: dedupe(presets),
       saved: dedupe(saved)
     };
-  }
-
-  function findNearestKnownCity(lat, lon) {
-    const cities = buildFavoriteCities();
-    if (!cities.length || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-    let best = null;
-    let bestDist = Infinity;
-    cities.forEach((city) => {
-      const d = distanceKmBetween(lat, lon, city.lat, city.lon);
-      if (d < bestDist) {
-        bestDist = d;
-        best = city;
-      }
-    });
-    return best;
   }
 
   function cityLocationLabel(city) {
@@ -268,18 +259,42 @@ function createGlobeSelector(options = {}) {
   }
 
   function buildNearbyCities(lat, lon) {
-    const favorites = buildFavoriteCities();
-    if (!favorites.length) return [];
-    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-      return favorites.slice(0, 6).map((city) => ({ ...city, distanceKm: NaN }));
-    }
-    return favorites.
-    map((city) => ({
-      ...city,
-      distanceKm: distanceKmBetween(lat, lon, city.lat, city.lon)
-    })).
-    sort((a, b) => a.distanceKm - b.distanceKm).
-    slice(0, 6);
+    const savedFavorites = savedFavoriteCities.
+    map((city) => normalizeCityRecord(city, 'saved')).
+    filter(Boolean);
+    const combined = [];
+    if (liveNearbyCity) combined.push(liveNearbyCity);
+    combined.push(...savedFavorites);
+    if (!combined.length) return [];
+
+    const seen = new Set();
+    const withDistance = combined.
+    map((city) => {
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+        return { ...city, distanceKm: NaN };
+      }
+      return {
+        ...city,
+        distanceKm: distanceKmBetween(lat, lon, city.lat, city.lon)
+      };
+    }).
+    filter((city) => {
+      const key = cityDedupKey(city);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    withDistance.sort((a, b) => {
+      const aDist = Number(a.distanceKm);
+      const bDist = Number(b.distanceKm);
+      if (Number.isFinite(aDist) && Number.isFinite(bDist)) return aDist - bDist;
+      if (Number.isFinite(aDist)) return -1;
+      if (Number.isFinite(bDist)) return 1;
+      return String(a.name || '').localeCompare(String(b.name || ''));
+    });
+
+    return withDistance.slice(0, 8);
   }
 
   function getActiveCityList() {
@@ -321,7 +336,7 @@ function createGlobeSelector(options = {}) {
     if (cityListHint) {
       cityListHint.textContent = activeCityTab === 'favorites' ?
       'Favorites list includes preset cities and your saved cities. Saved entries can be deleted.' :
-      'Closest menu cities to your selected point.';
+      'Nearest mapped place plus closest saved custom locations.';
     }
     renderCityList();
     setFavoriteMarkersVisible();
@@ -337,9 +352,10 @@ function createGlobeSelector(options = {}) {
       }
       cityList.innerHTML = list.map((city, index) => {
         const selectedClass = cityMatchesSelection(city) ? ' style="border-color:#667eea;background:#eef2ff"' : '';
+        const isLive = city.source === 'live';
         const meta = Number.isFinite(city.distanceKm) ?
-          `${city.distanceKm.toFixed(0)} km away` :
-          cityLocationLabel(city);
+          `${isLive ? 'Nearest mapped place • ' : ''}${city.distanceKm.toFixed(0)} km away` :
+          (isLive ? `Nearest mapped place • ${cityLocationLabel(city)}` : cityLocationLabel(city));
         return `<li class="globe-selector-city-item" data-city-source="nearby" data-city-index="${index}"${selectedClass}><div class="globe-selector-city-item-main"><span class="globe-selector-city-item-name">${city.name}</span><span class="globe-selector-city-item-meta">${meta}</span></div></li>`;
       }).join('');
       return;
@@ -400,6 +416,7 @@ function createGlobeSelector(options = {}) {
       lon: next.lon,
       name: next.name || appCtx.customLoc?.name || 'Custom Location'
     };
+    appCtx.customLocTransient = next.fromGeolocation === true;
     appCtx.selLoc = 'custom';
   }
 
@@ -456,17 +473,47 @@ function createGlobeSelector(options = {}) {
     renderFavoriteMarkers();
   }
 
+  function setLocateButtonBusy(isBusy) {
+    if (!locateBtn) return;
+    locateBtn.disabled = !!isBusy;
+    locateBtn.textContent = isBusy ? 'Locating…' : 'Use My Location';
+  }
+
   function setSelection(lat, lon, meta = {}) {
     const clamped = clampLatLon(lat, lon);
+    const coordsChanged = !selected ||
+      Math.abs(selected.lat - clamped.lat) > 0.00001 ||
+      Math.abs(selected.lon - clamped.lon) > 0.00001;
+    if (coordsChanged) liveNearbyCity = null;
     const named = typeof meta.name === 'string' ? meta.name.trim() : '';
     selected = {
       lat: clamped.lat,
       lon: clamped.lon,
-      name: named || selected?.name || appCtx.customLoc?.name || 'Custom Location'
+      name: named || selected?.name || appCtx.customLoc?.name || 'Custom Location',
+      skipAutoFavorite: !!meta.skipAutoFavorite,
+      fromGeolocation: !!meta.fromGeolocation
     };
     if (meta.focus) focusOnSelection(selected.lat, selected.lon);
     syncLegacyCustomState(selected);
     renderSelection();
+  }
+
+  function applySelectionAndResolve(lat, lon, meta = {}) {
+    setSelection(lat, lon, {
+      name: meta.name || selected?.name || appCtx.customLoc?.name || 'Custom Location',
+      focus: meta.focus !== false,
+      skipAutoFavorite: !!meta.skipAutoFavorite,
+      fromGeolocation: !!meta.fromGeolocation
+    });
+    if (Number.isFinite(meta.zoomDistance) && camera) {
+      cameraDistance = Math.max(minDistance, Math.min(maxDistance, Number(meta.zoomDistance)));
+      camera.position.z = cameraDistance;
+      camera.updateProjectionMatrix();
+    }
+    if (searchInput && typeof meta.searchLabel === 'string' && meta.searchLabel.trim()) {
+      searchInput.value = meta.searchLabel.trim();
+    }
+    if (selected) reverseLookupPlace(selected.lat, selected.lon);
   }
 
   function uniqueNonEmptyParts(parts = []) {
@@ -557,6 +604,12 @@ function createGlobeSelector(options = {}) {
     if (cached && selected && Math.abs(selected.lat - lat) <= 0.00001 && Math.abs(selected.lon - lon) <= 0.00001) {
       selected.name = cached.display;
       selected.locationDetails = cached.details || null;
+      liveNearbyCity = normalizeCityRecord({
+        key: 'live-nearby',
+        name: cached.queryLabel || cached.display,
+        lat,
+        lon
+      }, 'live');
       syncLegacyCustomState(selected);
       renderSelection();
       return;
@@ -569,6 +622,15 @@ function createGlobeSelector(options = {}) {
       const parsed = parseReverseAddress(payload);
       if (parsed.display) {
         reverseLookupCache.set(cacheKey, parsed);
+        const payloadLat = toFiniteNumber(payload?.lat ?? payload?.latitude);
+        const payloadLon = toFiniteNumber(payload?.lon ?? payload?.longitude);
+        const liveCandidate = normalizeCityRecord({
+          key: 'live-nearby',
+          name: parsed.queryLabel || parsed.display,
+          lat: payloadLat == null ? lat : payloadLat,
+          lon: payloadLon == null ? lon : payloadLon
+        }, 'live');
+        if (liveCandidate) liveNearbyCity = liveCandidate;
         selected.name = parsed.display;
         selected.locationDetails = parsed.details;
         syncLegacyCustomState(selected);
@@ -578,12 +640,21 @@ function createGlobeSelector(options = {}) {
     } catch {
       if (!openState || requestToken !== reverseLookupToken || !selected) return;
       if (Math.abs(selected.lat - lat) > 0.00001 || Math.abs(selected.lon - lon) > 0.00001) return;
-      const fallbackCity = findNearestKnownCity(lat, lon);
-      if (fallbackCity) {
-        selected.name = fallbackCity.name;
-        syncLegacyCustomState(selected);
-        renderSelection();
-      }
+      const previousName = String(selected.name || '').trim();
+      const preservePrevious =
+        previousName &&
+        !/^selected\s/i.test(previousName) &&
+        !/^custom location/i.test(previousName) &&
+        !/^current location/i.test(previousName);
+      selected.name = preservePrevious ? previousName : `Remote Region ${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+      liveNearbyCity = normalizeCityRecord({
+        key: 'live-nearby',
+        name: selected.name || 'Remote Region',
+        lat,
+        lon
+      }, 'live');
+      syncLegacyCustomState(selected);
+      renderSelection();
     }
   }
 
@@ -721,8 +792,7 @@ function createGlobeSelector(options = {}) {
     const localPoint = hits[0].point.clone();
     earthMesh.worldToLocal(localPoint);
     const next = localPointToLatLon(localPoint);
-    const nearestCity = findNearestKnownCity(next.lat, next.lon);
-    const fallbackName = nearestCity?.name || `Selected ${next.lat.toFixed(2)}, ${next.lon.toFixed(2)}`;
+    const fallbackName = `Selected ${next.lat.toFixed(2)}, ${next.lon.toFixed(2)}`;
     setSelection(next.lat, next.lon, { name: fallbackName });
     reverseLookupPlace(next.lat, next.lon);
     if (searchInput) searchInput.value = fallbackName;
@@ -911,6 +981,7 @@ function createGlobeSelector(options = {}) {
       searchStatus.textContent = 'Uses the same search flow as Custom Location.';
       searchStatus.style.color = '#64748b';
     }
+    setLocateButtonBusy(false);
     savedFavoriteCities = loadSavedFavoriteCities();
     setCityTab(activeCityTab);
 
@@ -952,6 +1023,7 @@ function createGlobeSelector(options = {}) {
     reverseLookupToken += 1;
     root.classList.remove('show');
     root.setAttribute('aria-hidden', 'true');
+    setLocateButtonBusy(false);
     stopRenderLoop();
     if (typeof options.onClose === 'function') options.onClose();
   }
@@ -964,7 +1036,9 @@ function createGlobeSelector(options = {}) {
       }
       return;
     }
-    saveSelectionAsFavorite(selected);
+    if (!selected?.skipAutoFavorite) {
+      saveSelectionAsFavorite(selected);
+    }
     renderFavoriteMarkers();
     renderCityList();
     syncLegacyCustomState(selected);
@@ -1007,6 +1081,11 @@ function createGlobeSelector(options = {}) {
   if (searchBtn) {
     searchBtn.addEventListener('click', () => {
       if (!searchInFlight) runSearchFromOverlay();
+    });
+  }
+  if (locateBtn) {
+    locateBtn.addEventListener('click', () => {
+      if (typeof options.onUseMyLocation === 'function') options.onUseMyLocation();
     });
   }
   if (nearbyTabBtn) {
@@ -1075,7 +1154,9 @@ function createGlobeSelector(options = {}) {
       return openState;
     },
     open,
+    applySelectionAndResolve,
     setSelection,
+    setLocateButtonBusy,
     setSearchStatus(message, color = null) {
       if (!searchStatus) return;
       searchStatus.textContent = message || '';

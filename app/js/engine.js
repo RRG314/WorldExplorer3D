@@ -1092,6 +1092,19 @@ function applyGrassToTerrain() {
     // Tile grass every ~25 world units (~28 meters) for visible detail
     const repeats = Math.max(10, Math.round(tileWidth / 25));
 
+    if (typeof appCtx.classifyTerrainVisualProfile === 'function' &&
+      typeof appCtx.applyTerrainVisualProfile === 'function')
+    {
+      const profile = appCtx.classifyTerrainVisualProfile(
+        bounds,
+        mesh.userData?.minElevationMeters,
+        mesh.userData?.maxElevationMeters,
+        mesh.userData?.elevationStatsMeters
+      );
+      appCtx.applyTerrainVisualProfile(mesh, profile, repeats);
+      return;
+    }
+
     mat.map = grassDiffuse.clone();
     mat.map.wrapS = mat.map.wrapT = THREE.RepeatWrapping;
     mat.map.repeat.set(repeats, repeats);

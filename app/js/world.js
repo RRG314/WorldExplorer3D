@@ -27,6 +27,16 @@ let _lastOverpassEndpoint = null;
 const ROAD_ENDPOINT_EXTENSION_SCALE = 0.5;
 const ROAD_ENDPOINT_EXTENSION_MIN = 0.35;
 const ROAD_ENDPOINT_EXTENSION_MAX = 2.0;
+const FEATURE_CLIP_RADIUS_SCALE = 1.75;
+const FEATURE_CLIP_RADIUS_MIN = 1900;
+const FEATURE_CLIP_RADIUS_MAX = 9000;
+const FEATURE_MAX_SEGMENT_SCALE = 0.48;
+const FEATURE_MAX_SEGMENT_MIN = 260;
+const FEATURE_MAX_SEGMENT_MAX = 1700;
+const FEATURE_MAX_SPAN_SCALE = 1.25;
+const FEATURE_MAX_AREA_SCALE = 1.0;
+const FEATURE_MIN_POLYGON_AREA = 8;
+const FEATURE_MIN_HOLE_AREA = 6;
 
 function sameLocation(a, b) {
   return Math.abs((a?.lat || 0) - (b?.lat || 0)) <= OVERPASS_LOC_EPSILON &&
@@ -813,7 +823,7 @@ async function fetchVectorTileWater(z, x, y) {
   }
 }
 
-function normalizeWorldRingFromLonLat(coords, maxPoints = 900) {
+function normalizeWorldRingFromLonLat(coords, maxPoints = 900, guardOptions = null) {
   if (!Array.isArray(coords) || coords.length < 3) return null;
   const pts = [];
   for (let i = 0; i < coords.length; i++) {
@@ -823,19 +833,15 @@ function normalizeWorldRingFromLonLat(coords, maxPoints = 900) {
     pts.push(p);
   }
   if (pts.length < 3) return null;
-
-  let ring = pts;
-  const first = ring[0];
-  const last = ring[ring.length - 1];
-  if (first && last && first.x === last.x && first.z === last.z) {
-    ring = ring.slice(0, -1);
-  }
-  if (ring.length < 3) return null;
-  if (Math.abs(signedPolygonAreaXZ(ring)) < 10) return null;
-  return decimatePoints(ring, maxPoints, false);
+  const ring = sanitizeWorldFootprintPoints(
+    decimatePoints(pts, maxPoints, false),
+    FEATURE_MIN_POLYGON_AREA,
+    guardOptions || undefined
+  );
+  return ring.length >= 3 ? ring : null;
 }
 
-function worldLinePointsFromLonLat(coords, maxPoints = 1000) {
+function worldLinePointsFromLonLat(coords, maxPoints = 1000, guardOptions = null) {
   if (!Array.isArray(coords) || coords.length < 2) return null;
   const pts = [];
   for (let i = 0; i < coords.length; i++) {
@@ -844,12 +850,18 @@ function worldLinePointsFromLonLat(coords, maxPoints = 1000) {
     pts.push(appCtx.geoToWorld(c[1], c[0]));
   }
   if (pts.length < 2) return null;
-  return decimatePoints(pts, maxPoints, false);
+  const cleaned = sanitizeWorldPathPoints(
+    decimatePoints(pts, maxPoints, false),
+    guardOptions || undefined
+  );
+  return cleaned.length >= 2 ? cleaned : null;
 }
 
 function classifyLanduseType(tags) {
   if (!tags) return null;
   if (tags.landuse && appCtx.LANDUSE_STYLES[tags.landuse]) return tags.landuse;
+  if (tags.landuse === 'reservoir' || tags.landuse === 'basin') return 'water';
+  if (tags.natural === 'water' || !!tags.water) return 'water';
   if (tags.natural === 'wood') return 'wood';
   if (tags.leisure === 'park') return 'park';
   return null;
@@ -887,19 +899,123 @@ function isFiniteWorldPointXZ(point) {
   Number.isFinite(point.z);
 }
 
-function sanitizeWorldFootprintPoints(pts, minArea = 1) {
-  if (!Array.isArray(pts) || pts.length < 3) return [];
+function buildFeatureGeometryGuards(featureRadiusDeg = 0.02) {
+  const radiusWorld = Math.abs(Number(featureRadiusDeg) || 0) * appCtx.SCALE;
+  const clipRadius = clampNumber(
+    radiusWorld * FEATURE_CLIP_RADIUS_SCALE,
+    FEATURE_CLIP_RADIUS_MIN,
+    FEATURE_CLIP_RADIUS_MAX,
+    FEATURE_CLIP_RADIUS_MIN
+  );
+  const maxSegmentLength = clampNumber(
+    clipRadius * FEATURE_MAX_SEGMENT_SCALE,
+    FEATURE_MAX_SEGMENT_MIN,
+    FEATURE_MAX_SEGMENT_MAX,
+    FEATURE_MAX_SEGMENT_MAX
+  );
+  const maxSpan = Math.max(FEATURE_CLIP_RADIUS_MIN, clipRadius * FEATURE_MAX_SPAN_SCALE);
+  const maxArea = Math.max(2500000, clipRadius * clipRadius * FEATURE_MAX_AREA_SCALE);
+  return {
+    maxArea,
+    maxDistanceFromOrigin: clipRadius,
+    maxSegmentLength,
+    maxSpan
+  };
+}
+
+function buildBuildingGeometryGuards(baseGuards) {
+  const guards = baseGuards && typeof baseGuards === 'object' ? baseGuards : buildFeatureGeometryGuards(0.02);
+  return {
+    ...guards,
+    maxArea: Math.min(guards.maxArea, 220000),
+    maxSegmentLength: Math.min(guards.maxSegmentLength, 650),
+    maxSpan: Math.min(guards.maxSpan, 950)
+  };
+}
+
+function buildLanduseGeometryGuards(baseGuards) {
+  const guards = baseGuards && typeof baseGuards === 'object' ? baseGuards : buildFeatureGeometryGuards(0.02);
+  const maxSpan = Math.min(guards.maxSpan, Math.max(1200, guards.maxDistanceFromOrigin * 1.05));
+  return {
+    ...guards,
+    maxArea: Math.min(guards.maxArea, maxSpan * maxSpan * 0.72),
+    maxSegmentLength: Math.min(guards.maxSegmentLength, 900),
+    maxSpan
+  };
+}
+
+function buildWaterGeometryGuards(baseGuards) {
+  const guards = baseGuards && typeof baseGuards === 'object' ? baseGuards : buildFeatureGeometryGuards(0.02);
+  const maxDistanceFromOrigin = Math.min(
+    Math.max(guards.maxDistanceFromOrigin * 1.75, 2600),
+    FEATURE_CLIP_RADIUS_MAX * 1.35
+  );
+  const maxSpan = Math.min(
+    Math.max(guards.maxSpan * 2.2, 3000),
+    Math.max(3600, maxDistanceFromOrigin * 1.15)
+  );
+  return {
+    ...guards,
+    maxDistanceFromOrigin,
+    maxArea: Math.min(Math.max(guards.maxArea * 3.2, 7000000), maxSpan * maxSpan * 1.1),
+    maxSegmentLength: Math.min(Math.max(guards.maxSegmentLength * 1.85, 1500), 2400),
+    maxSpan
+  };
+}
+
+function sanitizeWorldPathPoints(pts, options = {}) {
+  if (!Array.isArray(pts) || pts.length < 2) return [];
+  const maxDistanceFromOrigin = Number.isFinite(options.maxDistanceFromOrigin) ?
+  Math.max(32, options.maxDistanceFromOrigin) :
+  Infinity;
+  const maxSegmentLength = Number.isFinite(options.maxSegmentLength) ?
+  Math.max(12, options.maxSegmentLength) :
+  Infinity;
   const cleaned = [];
 
   for (let i = 0; i < pts.length; i++) {
     const p = pts[i];
     if (!isFiniteWorldPointXZ(p)) continue;
+    if (Math.hypot(p.x, p.z) > maxDistanceFromOrigin) continue;
 
     if (cleaned.length > 0) {
       const prev = cleaned[cleaned.length - 1];
-      if (Math.hypot(p.x - prev.x, p.z - prev.z) <= 1e-4) {
-        continue;
-      }
+      const segLen = Math.hypot(p.x - prev.x, p.z - prev.z);
+      if (segLen <= 1e-4) continue;
+      if (segLen > maxSegmentLength) return [];
+    }
+    cleaned.push({ x: p.x, z: p.z });
+  }
+
+  return cleaned.length >= 2 ? cleaned : [];
+}
+
+function sanitizeWorldFootprintPoints(pts, minArea = FEATURE_MIN_POLYGON_AREA, options = {}) {
+  if (!Array.isArray(pts) || pts.length < 3) return [];
+  const maxDistanceFromOrigin = Number.isFinite(options.maxDistanceFromOrigin) ?
+  Math.max(32, options.maxDistanceFromOrigin) :
+  Infinity;
+  const maxSegmentLength = Number.isFinite(options.maxSegmentLength) ?
+  Math.max(12, options.maxSegmentLength) :
+  Infinity;
+  const maxSpan = Number.isFinite(options.maxSpan) ?
+  Math.max(40, options.maxSpan) :
+  Infinity;
+  const maxArea = Number.isFinite(options.maxArea) ?
+  Math.max(200, options.maxArea) :
+  Infinity;
+  const cleaned = [];
+
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    if (!isFiniteWorldPointXZ(p)) continue;
+    if (Math.hypot(p.x, p.z) > maxDistanceFromOrigin) continue;
+
+    if (cleaned.length > 0) {
+      const prev = cleaned[cleaned.length - 1];
+      const segLen = Math.hypot(p.x - prev.x, p.z - prev.z);
+      if (segLen <= 1e-4) continue;
+      if (segLen > maxSegmentLength) return [];
     }
     cleaned.push({ x: p.x, z: p.z });
   }
@@ -907,13 +1023,32 @@ function sanitizeWorldFootprintPoints(pts, minArea = 1) {
   if (cleaned.length >= 2) {
     const first = cleaned[0];
     const last = cleaned[cleaned.length - 1];
-    if (Math.hypot(first.x - last.x, first.z - last.z) <= 1e-4) {
+    const closeLen = Math.hypot(first.x - last.x, first.z - last.z);
+    if (closeLen <= 1e-4) {
       cleaned.pop();
+    } else if (closeLen > maxSegmentLength * 1.35) {
+      return [];
     }
   }
 
   if (cleaned.length < 3) return [];
-  if (Math.abs(signedPolygonAreaXZ(cleaned)) < minArea) return [];
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (let i = 0; i < cleaned.length; i++) {
+    const p = cleaned[i];
+    if (p.x < minX) minX = p.x;
+    if (p.x > maxX) maxX = p.x;
+    if (p.z < minZ) minZ = p.z;
+    if (p.z > maxZ) maxZ = p.z;
+  }
+
+  if ((maxX - minX) > maxSpan || (maxZ - minZ) > maxSpan) return [];
+
+  const area = Math.abs(signedPolygonAreaXZ(cleaned));
+  if (area < minArea || area > maxArea) return [];
   return cleaned;
 }
 
@@ -1813,6 +1948,10 @@ async function loadRoads(retryPass = 0) {
   };
 
   let loaded = false;
+  const useSyntheticFallbackRoads =
+  appCtx.gameMode === 'trial' ||
+  appCtx.gameMode === 'checkpoint' ||
+  appCtx.gameMode === 'painttown';
 
   function registerBuildingCollision(pts, height, options = {}) {
     if (!Array.isArray(pts) || pts.length < 3) return null;
@@ -1900,6 +2039,176 @@ async function loadRoads(retryPass = 0) {
     if (appCtx.gameStarted) safeLoadCall('startMode', () => appCtx.startMode());
   }
 
+  function createSyntheticFallbackWorld() {
+    if (appCtx.roads.length > 0) return;
+    appCtx.showLoad('Creating default environment...');
+    const isPolarFallback = Math.abs(Number(appCtx.LOC?.lat) || 0) >= 66;
+    const enableFallbackBuildings = false;
+
+    const disposeMeshList = (arr) => {
+      if (!Array.isArray(arr)) return;
+      arr.forEach((mesh) => {
+        if (!mesh) return;
+        if (mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
+        if (mesh.geometry && typeof mesh.geometry.dispose === 'function') mesh.geometry.dispose();
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach((mat) => mat && typeof mat.dispose === 'function' && mat.dispose());
+          } else if (typeof mesh.material.dispose === 'function') {
+            mesh.material.dispose();
+          }
+        }
+      });
+    };
+
+    // Remove any partially generated geometry before building a deterministic fallback.
+    disposeMeshList(appCtx.roadMeshes);
+    disposeMeshList(appCtx.buildingMeshes);
+    disposeMeshList(appCtx.landuseMeshes);
+    disposeMeshList(appCtx.poiMeshes);
+    disposeMeshList(appCtx.streetFurnitureMeshes);
+    disposeMeshList(appCtx.historicMarkers);
+    appCtx.roadMeshes = [];
+    appCtx.buildingMeshes = [];
+    appCtx.landuseMeshes = [];
+    appCtx.poiMeshes = [];
+    appCtx.streetFurnitureMeshes = [];
+    appCtx.historicMarkers = [];
+    appCtx.roads = [];
+    appCtx.buildings = [];
+    appCtx.landuses = [];
+    appCtx.waterAreas = [];
+    appCtx.waterways = [];
+    appCtx.pois = [];
+    appCtx.historicSites = [];
+    clearBuildingSpatialIndex();
+
+    const makeRoad = (x1, z1, x2, z2, width = 10) => {
+      const pts = [{ x: x1, z: z1 }, { x: x2, z: z2 }];
+      appCtx.roads.push({
+        pts,
+        width,
+        limit: 35,
+        name: 'Main Street',
+        type: 'primary',
+        lodDepth: 0,
+        subdivideMaxDist: getRoadSubdivisionStep('primary', 0, perfModeNow)
+      });
+
+      const hw = width / 2;
+      const verts = [],indices = [];
+      for (let i = 0; i < pts.length; i++) {
+        const p = pts[i];
+        const dx = pts[1].x - pts[0].x,dz = pts[1].z - pts[0].z;
+        const len = Math.sqrt(dx * dx + dz * dz) || 1;
+        const nx = -dz / len,nz = dx / len;
+        const y1 = appCtx.elevationWorldYAtWorldXZ(p.x + nx * hw, p.z + nz * hw) + 0.3;
+        const y2 = appCtx.elevationWorldYAtWorldXZ(p.x - nx * hw, p.z - nz * hw) + 0.3;
+        verts.push(p.x + nx * hw, y1, p.z + nz * hw);
+        verts.push(p.x - nx * hw, y2, p.z - nz * hw);
+        if (i < pts.length - 1) {const vi = i * 2;indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);}
+      }
+      const geo = new THREE.BufferGeometry();
+      geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+      geo.setIndex(indices);
+      geo.computeVertexNormals();
+      const roadMat = new THREE.MeshStandardMaterial({
+        color: 0x333333,
+        roughness: 0.95,
+        metalness: 0.05,
+        polygonOffset: true,
+        polygonOffsetFactor: -2,
+        polygonOffsetUnits: -2
+      });
+      const mesh = new THREE.Mesh(geo, roadMat);
+      mesh.renderOrder = 2;
+      mesh.receiveShadow = true;
+      mesh.frustumCulled = false;
+      appCtx.scene.add(mesh);appCtx.roadMeshes.push(mesh);
+    };
+
+    makeRoad(-200, 0, 200, 0, 12);
+    makeRoad(0, -200, 0, 200, 12);
+    makeRoad(-150, -150, 150, 150, 10);
+    makeRoad(-150, 150, 150, -150, 10);
+
+    const makeBuilding = (x, z, w, d, h, idx = 0) => {
+      const pts = [
+      { x: x - w / 2, z: z - d / 2 },
+      { x: x + w / 2, z: z - d / 2 },
+      { x: x + w / 2, z: z + d / 2 },
+      { x: x - w / 2, z: z + d / 2 }];
+
+      const sourceBuildingId = `fallback-${idx}-${Math.round(x)}-${Math.round(z)}`;
+      const colliderRef = registerBuildingCollision(pts, h, {
+        sourceBuildingId,
+        buildingType: 'fallback'
+      });
+
+      const shape = new THREE.Shape();
+      shape.moveTo(pts[0].x, pts[0].z);
+      for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i].x, pts[i].z);
+      shape.lineTo(pts[0].x, pts[0].z);
+
+      const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
+      geo.rotateX(-Math.PI / 2);
+      const color = [0x8899aa, 0x887766, 0x7788aa, 0x887799][Math.floor(Math.random() * 4)];
+      const mat = new THREE.MeshLambertMaterial({ color });
+      const mesh = new THREE.Mesh(geo, mat);
+
+      let avgElevation = 0;
+      let minElevation = Infinity;
+      let maxElevation = -Infinity;
+      pts.forEach((p) => {
+        const hTerrain = appCtx.elevationWorldYAtWorldXZ(p.x, p.z);
+        avgElevation += hTerrain;
+        if (hTerrain < minElevation) minElevation = hTerrain;
+        if (hTerrain > maxElevation) maxElevation = hTerrain;
+      });
+      avgElevation /= pts.length;
+      const slopeRange = Number.isFinite(minElevation) && Number.isFinite(maxElevation) ?
+      maxElevation - minElevation :
+      0;
+      const baseElevation = slopeRange >= 0.15 ? minElevation + 0.05 : avgElevation;
+      mesh.position.y = baseElevation;
+      mesh.userData.buildingFootprint = pts;
+      mesh.userData.avgElevation = baseElevation;
+      mesh.userData.terrainAvgElevation = avgElevation;
+      mesh.userData.sourceBuildingId = sourceBuildingId;
+      mesh.userData.buildingType = 'fallback';
+      if (colliderRef) colliderRef.baseY = baseElevation;
+
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      appCtx.scene.add(mesh);
+      appCtx.buildingMeshes.push(mesh);
+
+      if (typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.15) {
+        const groundPatchesRaw = appCtx.createBuildingGroundPatch(pts, baseElevation);
+        const groundPatches = Array.isArray(groundPatchesRaw) ? groundPatchesRaw : groundPatchesRaw ? [groundPatchesRaw] : [];
+        groundPatches.forEach((groundPatch) => {
+          groundPatch.userData.landuseFootprint = pts;
+          groundPatch.userData.landuseType = 'buildingGround';
+          groundPatch.userData.avgElevation = baseElevation;
+          groundPatch.userData.terrainAvgElevation = avgElevation;
+          groundPatch.userData.alwaysVisible = true;
+          groundPatch.visible = true;
+          appCtx.scene.add(groundPatch);
+          appCtx.landuseMeshes.push(groundPatch);
+        });
+      }
+    };
+
+    if (enableFallbackBuildings && !isPolarFallback) {
+      makeBuilding(-80, -80, 40, 30, 15, 0);
+      makeBuilding(80, -80, 35, 40, 20, 1);
+      makeBuilding(-80, 80, 45, 35, 18, 2);
+      makeBuilding(80, 80, 30, 35, 12, 3);
+      makeBuilding(-50, 50, 25, 20, 10, 4);
+      makeBuilding(50, -50, 30, 25, 14, 5);
+    }
+  }
+
   for (const r of radii) {
     if (loaded) break;
     try {
@@ -1911,6 +2220,10 @@ async function loadRoads(retryPass = 0) {
       appCtx.showLoad('Loading map data...');
       const featureRadius = r * featureRadiusScale;
       const poiRadius = r * poiRadiusScale;
+      const geometryGuards = buildFeatureGeometryGuards(featureRadius);
+      const buildingGeometryGuards = buildBuildingGeometryGuards(geometryGuards);
+      const landuseGeometryGuards = buildLanduseGeometryGuards(geometryGuards);
+      const waterGeometryGuards = buildWaterGeometryGuards(geometryGuards);
       const overpassCacheMeta = {
         lat: appCtx.LOC.lat,
         lon: appCtx.LOC.lon,
@@ -1929,6 +2242,9 @@ async function loadRoads(retryPass = 0) {
                 way["building"]${featureBounds};
                 way["landuse"]${featureBounds};
                 way["natural"="wood"]${featureBounds};
+                way["natural"="water"]${featureBounds};
+                way["water"]${featureBounds};
+                way["waterway"~"^(river|stream|canal|drain|ditch)$"]${featureBounds};
                 way["leisure"="park"]${featureBounds};
                 node["amenity"~"school|hospital|police|fire_station|parking|fuel|restaurant|cafe|bank|pharmacy|post_office"]${poiBounds};
                 node["shop"]${poiBounds};
@@ -1958,6 +2274,7 @@ async function loadRoads(retryPass = 0) {
       }
       const nodes = {};
       data.elements.filter((e) => e.type === 'node').forEach((n) => nodes[n.id] = n);
+      const baselineFullWorld = perfModeNow === 'baseline';
 
       startLoadPhase('featureBudgeting');
       const allRoadWays = data.elements.filter((e) => e.type === 'way' && e.tags?.highway);
@@ -1971,7 +2288,9 @@ async function loadRoads(retryPass = 0) {
       });
 
       const allBuildingWays = data.elements.filter((e) => e.type === 'way' && e.tags?.building);
-      const buildingWays = limitWaysByTileBudget(allBuildingWays, nodes, {
+      const buildingWays = baselineFullWorld ?
+      allBuildingWays :
+      limitWaysByTileBudget(allBuildingWays, nodes, {
         globalCap: maxBuildingWays,
         basePerTile: tileBudgetCfg.buildingsPerTile,
         minPerTile: tileBudgetCfg.buildingsMinPerTile,
@@ -1987,6 +2306,8 @@ async function loadRoads(retryPass = 0) {
 
       !!e.tags.landuse ||
       e.tags.natural === 'wood' ||
+      e.tags.natural === 'water' ||
+      !!e.tags.water ||
       e.tags.leisure === 'park')
 
       );
@@ -1994,6 +2315,21 @@ async function loadRoads(retryPass = 0) {
         globalCap: maxLanduseWays,
         basePerTile: tileBudgetCfg.landusePerTile,
         minPerTile: tileBudgetCfg.landuseMinPerTile,
+        tileDegrees: tileBudgetCfg.tileDegrees,
+        useRdt: useRdtBudgeting
+      });
+
+      const allWaterwayWays = data.elements.filter((e) =>
+      e.type === 'way' &&
+      e.tags &&
+      !!e.tags.waterway
+      );
+      const waterwayWays = baselineFullWorld ?
+      allWaterwayWays :
+      limitWaysByTileBudget(allWaterwayWays, nodes, {
+        globalCap: Math.max(240, Math.floor(maxLanduseWays * 0.8)),
+        basePerTile: Math.max(20, Math.floor(tileBudgetCfg.landusePerTile * 0.7)),
+        minPerTile: Math.max(8, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.6)),
         tileDegrees: tileBudgetCfg.tileDegrees,
         useRdt: useRdtBudgeting
       });
@@ -2015,6 +2351,10 @@ async function loadRoads(retryPass = 0) {
       loadMetrics.landuse.selected = landuseWays.length;
       loadMetrics.pois.requested = allPoiNodes.length;
       loadMetrics.pois.selected = poiNodes.length;
+      loadMetrics.waterways = {
+        requested: allWaterwayWays.length,
+        selected: waterwayWays.length
+      };
       endLoadPhase('featureBudgeting');
 
       if (
@@ -2088,7 +2428,8 @@ async function loadRoads(retryPass = 0) {
       });
 
       roadWays.forEach((way) => {
-        const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
+        const rawPts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
+        const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
         if (pts.length < 2) return;
         const type = way.tags?.highway || 'residential';
         const width = type.includes('motorway') ? 16 : type.includes('trunk') ? 14 : type.includes('primary') ? 12 : type.includes('secondary') ? 10 : 8;
@@ -2103,6 +2444,7 @@ async function loadRoads(retryPass = 0) {
         0;
         const roadSubdivideStep = getRoadSubdivisionStep(type, roadTileDepth, perfModeNow);
         const decimatedRoadPts = decimateRoadCenterlineByDepth(pts, type, roadTileDepth, perfModeNow);
+        if (decimatedRoadPts.length < 2) return;
 
         appCtx.roads.push({
           pts: decimatedRoadPts,
@@ -2366,7 +2708,7 @@ async function loadRoads(retryPass = 0) {
 
       buildingWays.forEach((way) => {
         const rawPts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
-        const pts = sanitizeWorldFootprintPoints(rawPts, 1);
+        const pts = sanitizeWorldFootprintPoints(rawPts, FEATURE_MIN_POLYGON_AREA, buildingGeometryGuards);
         if (pts.length < 3) return;
         if (!isBuildingNearLoadedRoad(pts)) return;
         const roadCoreStats = sampleFootprintRoadCore(pts);
@@ -2514,19 +2856,23 @@ async function loadRoads(retryPass = 0) {
       }
       endLoadPhase('batchBuildingGeometry');
 
-      function addLandusePolygon(pts, landuseType, holeRings = []) {
+      function addLandusePolygon(pts, landuseType, holeRings = [], guardOptions = null) {
         if (!pts || pts.length < 3) return;
 
-        let ring = pts;
-        const first = pts[0];
-        const last = pts[pts.length - 1];
-        if (first.x === last.x && first.z === last.z) {
-          ring = pts.slice(0, -1);
-        }
+        let ring = sanitizeWorldFootprintPoints(
+          pts,
+          FEATURE_MIN_POLYGON_AREA,
+          guardOptions || undefined
+        );
         if (ring.length < 3) return;
-        if (Math.abs(signedPolygonAreaXZ(ring)) < 10) return;
-
-        ring = decimatePoints(ring, 900, false);
+        ring = sanitizeWorldFootprintPoints(
+          decimatePoints(ring, 900, false),
+          FEATURE_MIN_POLYGON_AREA,
+          guardOptions || undefined
+        );
+        if (ring.length < 3) return;
+        const outerArea = Math.abs(signedPolygonAreaXZ(ring));
+        if (!Number.isFinite(outerArea) || outerArea < FEATURE_MIN_POLYGON_AREA) return;
 
         let avgElevation = 0;
         ring.forEach((p) => {
@@ -2544,8 +2890,17 @@ async function loadRoads(retryPass = 0) {
         if (holeRings && holeRings.length > 0) {
           holeRings.forEach((holeRing) => {
             if (!holeRing || holeRing.length < 3) return;
+            const cleanedHole = sanitizeWorldFootprintPoints(
+              holeRing,
+              FEATURE_MIN_HOLE_AREA,
+              guardOptions || undefined
+            );
+            if (cleanedHole.length < 3) return;
+            const holeArea = Math.abs(signedPolygonAreaXZ(cleanedHole));
+            if (!Number.isFinite(holeArea) || holeArea < FEATURE_MIN_HOLE_AREA) return;
+            if (holeArea >= outerArea * 0.92) return;
             const path = new THREE.Path();
-            holeRing.forEach((p, i) => {
+            cleanedHole.forEach((p, i) => {
               if (i === 0) path.moveTo(p.x, -p.z);else
               path.lineTo(p.x, -p.z);
             });
@@ -2711,22 +3066,22 @@ async function loadRoads(retryPass = 0) {
         });
       }
 
-      function addWaterPolygonFromVectorCoords(polygonCoords, properties = {}) {
+      function addWaterPolygonFromVectorCoords(polygonCoords, properties = {}, guardOptions = null) {
         if (!Array.isArray(polygonCoords) || polygonCoords.length === 0) return false;
-        const outer = normalizeWorldRingFromLonLat(polygonCoords[0], 1000);
+        const outer = normalizeWorldRingFromLonLat(polygonCoords[0], 1000, guardOptions);
         if (!outer) return false;
 
         const holes = [];
         for (let i = 1; i < polygonCoords.length; i++) {
-          const hole = normalizeWorldRingFromLonLat(polygonCoords[i], 700);
-          if (hole && Math.abs(signedPolygonAreaXZ(hole)) > 12) holes.push(hole);
+          const hole = normalizeWorldRingFromLonLat(polygonCoords[i], 700, guardOptions);
+          if (hole && Math.abs(signedPolygonAreaXZ(hole)) > FEATURE_MIN_HOLE_AREA) holes.push(hole);
         }
 
-        addLandusePolygon(outer, 'water', holes);
+        addLandusePolygon(outer, 'water', holes, guardOptions);
         return true;
       }
 
-      function addVectorWaterGeoJSON(geojson) {
+      function addVectorWaterGeoJSON(geojson, guardOptions = null) {
         if (!geojson || !geojson.geometry) return { polygons: 0, lines: 0 };
         let polygons = 0;
         let lines = 0;
@@ -2734,17 +3089,17 @@ async function loadRoads(retryPass = 0) {
         const props = geojson.properties || {};
 
         if (geom.type === 'Polygon') {
-          if (addWaterPolygonFromVectorCoords(geom.coordinates, props)) polygons++;
+          if (addWaterPolygonFromVectorCoords(geom.coordinates, props, guardOptions)) polygons++;
           return { polygons, lines };
         }
         if (geom.type === 'MultiPolygon') {
           geom.coordinates.forEach((polyCoords) => {
-            if (addWaterPolygonFromVectorCoords(polyCoords, props)) polygons++;
+            if (addWaterPolygonFromVectorCoords(polyCoords, props, guardOptions)) polygons++;
           });
           return { polygons, lines };
         }
         if (geom.type === 'LineString') {
-          const pts = worldLinePointsFromLonLat(geom.coordinates, 1000);
+          const pts = worldLinePointsFromLonLat(geom.coordinates, 1000, guardOptions);
           if (pts && pts.length >= 2) {
             addWaterwayRibbon(pts, props);
             lines++;
@@ -2753,7 +3108,7 @@ async function loadRoads(retryPass = 0) {
         }
         if (geom.type === 'MultiLineString') {
           geom.coordinates.forEach((lineCoords) => {
-            const pts = worldLinePointsFromLonLat(lineCoords, 1000);
+            const pts = worldLinePointsFromLonLat(lineCoords, 1000, guardOptions);
             if (pts && pts.length >= 2) {
               addWaterwayRibbon(pts, props);
               lines++;
@@ -2763,7 +3118,28 @@ async function loadRoads(retryPass = 0) {
         return { polygons, lines };
       }
 
-      async function loadVectorTileWaterCoverage(latMin, lonMin, latMax, lonMax) {
+      function ensureWaterFallbackIfEmpty() {
+        const existingCount = (Array.isArray(appCtx.waterAreas) ? appCtx.waterAreas.length : 0) +
+          (Array.isArray(appCtx.waterways) ? appCtx.waterways.length : 0);
+        if (existingCount > 0) return false;
+
+        // Guarantee at least one visible water surface so sparse/remote loads
+        // never present a fully dry/broken world due upstream data outages.
+        const ringHalfWidth = Math.max(280, Math.min(820, appCtx.SCALE * featureRadius * 0.35));
+        const zNear = ringHalfWidth * 0.75;
+        const zFar = ringHalfWidth * 1.45;
+        const fallbackOuter = [
+          { x: -ringHalfWidth, z: zNear },
+          { x: ringHalfWidth, z: zNear },
+          { x: ringHalfWidth, z: zFar },
+          { x: -ringHalfWidth, z: zFar },
+          { x: -ringHalfWidth, z: zNear }
+        ];
+        addLandusePolygon(fallbackOuter, 'water', [], waterGeometryGuards);
+        return true;
+      }
+
+      async function loadVectorTileWaterCoverage(latMin, lonMin, latMax, lonMax, guardOptions = null) {
         const tr = vectorTileRangeForBounds(latMin, lonMin, latMax, lonMax, WATER_VECTOR_TILE_ZOOM);
         const tileJobs = [];
         for (let tx = tr.xMin; tx <= tr.xMax; tx++) {
@@ -2791,7 +3167,7 @@ async function loadRoads(retryPass = 0) {
             for (let i = 0; i < layer.length; i++) {
               const feature = layer.feature(i);
               if (!feature || typeof feature.toGeoJSON !== 'function') continue;
-              const out = addVectorWaterGeoJSON(feature.toGeoJSON(x, y, z));
+              const out = addVectorWaterGeoJSON(feature.toGeoJSON(x, y, z), guardOptions);
               polygons += out.polygons;
               lines += out.lines;
             }
@@ -2803,7 +3179,7 @@ async function loadRoads(retryPass = 0) {
             for (let i = 0; i < layer.length; i++) {
               const feature = layer.feature(i);
               if (!feature || typeof feature.toGeoJSON !== 'function') continue;
-              const out = addVectorWaterGeoJSON(feature.toGeoJSON(x, y, z));
+              const out = addVectorWaterGeoJSON(feature.toGeoJSON(x, y, z), guardOptions);
               polygons += out.polygons;
               lines += out.lines;
             }
@@ -2819,8 +3195,16 @@ async function loadRoads(retryPass = 0) {
         const landuseType = classifyLanduseType(way.tags);
         if (!landuseType) return;
         const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
-        addLandusePolygon(pts, landuseType);
+        const guard = landuseType === 'water' ? waterGeometryGuards : landuseGeometryGuards;
+        addLandusePolygon(pts, landuseType, [], guard);
       });
+
+      if (Array.isArray(waterwayWays) && waterwayWays.length > 0) {
+        waterwayWays.forEach((way) => {
+          const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
+          addWaterwayRibbon(pts, way.tags || {});
+        });
+      }
 
       appCtx.showLoad('Loading water...');
       try {
@@ -2828,13 +3212,17 @@ async function loadRoads(retryPass = 0) {
           appCtx.LOC.lat - featureRadius,
           appCtx.LOC.lon - featureRadius,
           appCtx.LOC.lat + featureRadius,
-          appCtx.LOC.lon + featureRadius
+          appCtx.LOC.lon + featureRadius,
+          waterGeometryGuards
         );
         if (waterSummary.polygons === 0 && waterSummary.lines === 0) {
           console.warn(`[Water] Vector tiles loaded but no water features in bounds (tiles ok ${waterSummary.okTiles}/${waterSummary.tiles}).`);
         }
       } catch (waterErr) {
         console.warn('[Water] Vector water load failed, continuing without vector water layer.', waterErr);
+      }
+      if (ensureWaterFallbackIfEmpty()) {
+        console.warn('[Water] No water features loaded; injected deterministic fallback water surface.');
       }
       endLoadPhase('buildLanduseGeometry');
       startLoadPhase('batchLanduseGeometry');
@@ -2994,146 +3382,29 @@ async function loadRoads(retryPass = 0) {
       }
 
       console.error('Road loading failed after all attempts:', e);
-      // If this is the last attempt and we still have no roads, create a default environment
       if (appCtx.roads.length === 0) {
-        // Debug log removed
-        appCtx.showLoad('Creating default environment...');
-
-        // Create a simple crossroad
-        const makeRoad = (x1, z1, x2, z2, width = 10) => {
-          const pts = [{ x: x1, z: z1 }, { x: x2, z: z2 }];
-          appCtx.roads.push({
-            pts,
-            width,
-            limit: 35,
-            name: 'Main Street',
-            type: 'primary',
-            lodDepth: 0,
-            subdivideMaxDist: getRoadSubdivisionStep('primary', 0, perfModeNow)
-          });
-
-          const hw = width / 2;
-          const verts = [],indices = [];
-          for (let i = 0; i < pts.length; i++) {
-            const p = pts[i];
-            const dx = pts[1].x - pts[0].x,dz = pts[1].z - pts[0].z;
-            const len = Math.sqrt(dx * dx + dz * dz) || 1;
-            const nx = -dz / len,nz = dx / len;
-            const y1 = appCtx.elevationWorldYAtWorldXZ(p.x + nx * hw, p.z + nz * hw) + 0.3;
-            const y2 = appCtx.elevationWorldYAtWorldXZ(p.x - nx * hw, p.z - nz * hw) + 0.3;
-            verts.push(p.x + nx * hw, y1, p.z + nz * hw);
-            verts.push(p.x - nx * hw, y2, p.z - nz * hw);
-            if (i < pts.length - 1) {const vi = i * 2;indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);}
-          }
-          const geo = new THREE.BufferGeometry();
-          geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-          geo.setIndex(indices);
-          geo.computeVertexNormals();
-          const roadMat = new THREE.MeshStandardMaterial({
-            color: 0x333333,
-            roughness: 0.95,
-            metalness: 0.05,
-            polygonOffset: true,
-            polygonOffsetFactor: -2,
-            polygonOffsetUnits: -2
-          });
-          const mesh = new THREE.Mesh(geo, roadMat);
-          mesh.renderOrder = 2;
-          mesh.receiveShadow = true;
-          mesh.frustumCulled = false;
-          appCtx.scene.add(mesh);appCtx.roadMeshes.push(mesh);
-        };
-
-        // Create roads in a cross pattern
-        makeRoad(-200, 0, 200, 0, 12); // Horizontal
-        makeRoad(0, -200, 0, 200, 12); // Vertical
-        makeRoad(-150, -150, 150, 150, 10); // Diagonal 1
-        makeRoad(-150, 150, 150, -150, 10); // Diagonal 2
-
-        // Create a few simple buildings
-        const makeBuilding = (x, z, w, d, h, idx = 0) => {
-          const pts = [
-          { x: x - w / 2, z: z - d / 2 },
-          { x: x + w / 2, z: z - d / 2 },
-          { x: x + w / 2, z: z + d / 2 },
-          { x: x - w / 2, z: z + d / 2 }];
-
-          const sourceBuildingId = `fallback-${idx}-${Math.round(x)}-${Math.round(z)}`;
-          const colliderRef = registerBuildingCollision(pts, h, {
-            sourceBuildingId,
-            buildingType: 'fallback'
-          });
-
-          const shape = new THREE.Shape();
-          shape.moveTo(pts[0].x, pts[0].z);
-          for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i].x, pts[i].z);
-          shape.lineTo(pts[0].x, pts[0].z);
-
-          const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
-          geo.rotateX(-Math.PI / 2);
-          const color = [0x8899aa, 0x887766, 0x7788aa, 0x887799][Math.floor(Math.random() * 4)];
-          const mat = new THREE.MeshLambertMaterial({ color });
-          const mesh = new THREE.Mesh(geo, mat);
-
-          // Calculate terrain stats for building
-          let avgElevation = 0;
-          let minElevation = Infinity;
-          let maxElevation = -Infinity;
-          pts.forEach((p) => {
-            const hTerrain = appCtx.elevationWorldYAtWorldXZ(p.x, p.z);
-            avgElevation += hTerrain;
-            if (hTerrain < minElevation) minElevation = hTerrain;
-            if (hTerrain > maxElevation) maxElevation = hTerrain;
-          });
-          avgElevation /= pts.length;
-          const slopeRange = Number.isFinite(minElevation) && Number.isFinite(maxElevation) ?
-          maxElevation - minElevation :
-          0;
-          const baseElevation = slopeRange >= 0.15 ? minElevation + 0.05 : avgElevation;
-          mesh.position.y = baseElevation;
-          mesh.userData.buildingFootprint = pts; // Store for repositioning
-          mesh.userData.avgElevation = baseElevation;
-          mesh.userData.terrainAvgElevation = avgElevation;
-          mesh.userData.sourceBuildingId = sourceBuildingId;
-          mesh.userData.buildingType = 'fallback';
-          if (colliderRef) colliderRef.baseY = baseElevation;
-
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-          appCtx.scene.add(mesh);
-          appCtx.buildingMeshes.push(mesh);
-
-          if (typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.15) {
-            const groundPatchesRaw = appCtx.createBuildingGroundPatch(pts, baseElevation);
-            const groundPatches = Array.isArray(groundPatchesRaw) ? groundPatchesRaw : groundPatchesRaw ? [groundPatchesRaw] : [];
-            groundPatches.forEach((groundPatch) => {
-              groundPatch.userData.landuseFootprint = pts;
-              groundPatch.userData.landuseType = 'buildingGround';
-              groundPatch.userData.avgElevation = baseElevation;
-              groundPatch.userData.terrainAvgElevation = avgElevation;
-              groundPatch.userData.alwaysVisible = true;
-              groundPatch.visible = true;
-              appCtx.scene.add(groundPatch);
-              appCtx.landuseMeshes.push(groundPatch);
-            });
-          }
-        };
-
-        // Add buildings around the crossroad
-        makeBuilding(-80, -80, 40, 30, 15, 0);
-        makeBuilding(80, -80, 35, 40, 20, 1);
-        makeBuilding(-80, 80, 45, 35, 18, 2);
-        makeBuilding(80, 80, 30, 35, 12, 3);
-        makeBuilding(-50, 50, 25, 20, 10, 4);
-        makeBuilding(50, -50, 30, 25, 14, 5);
-
-        finalizeLoadedWorld('synthetic_fallback');
+        if (useSyntheticFallbackRoads) {
+          createSyntheticFallbackWorld();
+          finalizeLoadedWorld('synthetic_fallback');
+        } else {
+          finalizeLoadedWorld('no_roads_sparse');
+        }
       }
     }
   }
   if (!loaded && appCtx.roads.length > 0) {
     console.warn('[WorldLoad] Completing with partially loaded roads.');
     finalizeLoadedWorld('post_loop_partial');
+  }
+  if (!loaded && appCtx.roads.length === 0) {
+    if (useSyntheticFallbackRoads) {
+      console.warn('[WorldLoad] No road data found for this location. Using synthetic fallback world.');
+      createSyntheticFallbackWorld();
+      finalizeLoadedWorld('synthetic_no_roads');
+    } else {
+      console.warn('[WorldLoad] No road data found for this location. Loading sparse terrain-only world.');
+      finalizeLoadedWorld('no_roads_sparse');
+    }
   }
   if (!loaded && retryPass < 1) {
     console.warn('[WorldLoad] Initial pass failed. Retrying once automatically...');
@@ -3176,7 +3447,37 @@ async function loadRoads(retryPass = 0) {
 }
 
 function spawnOnRoad() {
-  if (!appCtx.roads || appCtx.roads.length === 0) return;
+  if (!appCtx.roads || appCtx.roads.length === 0) {
+    appCtx.car.x = 0;
+    appCtx.car.z = 0;
+    appCtx.car.angle = 0;
+    appCtx.car.speed = 0;
+    appCtx.car.vx = 0;
+    appCtx.car.vz = 0;
+    const _fallbackH = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt : appCtx.elevationWorldYAtWorldXZ;
+    const fallbackY = typeof appCtx.GroundHeight !== 'undefined' && appCtx.GroundHeight && typeof appCtx.GroundHeight.carCenterY === 'function' ?
+    appCtx.GroundHeight.carCenterY(0, 0, false, 1.2) :
+    _fallbackH(0, 0) + 1.2;
+    appCtx.car.y = fallbackY;
+    if (appCtx.carMesh) {
+      appCtx.carMesh.position.set(0, fallbackY, 0);
+      appCtx.carMesh.rotation.y = 0;
+    }
+    if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker) {
+      const groundY = fallbackY - 1.2;
+      appCtx.Walk.state.walker.x = 0;
+      appCtx.Walk.state.walker.z = 0;
+      appCtx.Walk.state.walker.y = groundY + 1.7;
+      appCtx.Walk.state.walker.vy = 0;
+      appCtx.Walk.state.walker.angle = 0;
+      appCtx.Walk.state.walker.yaw = 0;
+      if (appCtx.Walk.state.characterMesh && appCtx.Walk.state.mode === 'walk') {
+        appCtx.Walk.state.characterMesh.position.set(0, groundY, 0);
+        appCtx.Walk.state.characterMesh.rotation.y = 0;
+      }
+    }
+    return;
+  }
 
   function spawnRoadPenalty(type) {
     if (!type) return 0;
@@ -3187,6 +3488,29 @@ function spawnOnRoad() {
     return 0;
   }
 
+  const terrainYAt = (x, z) => {
+    const sample = typeof appCtx.terrainMeshHeightAt === 'function' ?
+      appCtx.terrainMeshHeightAt(x, z) :
+      appCtx.elevationWorldYAtWorldXZ(x, z);
+    return Number.isFinite(sample) ? sample : 0;
+  };
+
+  const slopePenaltyAt = (x, z) => {
+    const step = 8;
+    const hL = terrainYAt(x - step, z);
+    const hR = terrainYAt(x + step, z);
+    const hU = terrainYAt(x, z - step);
+    const hD = terrainYAt(x, z + step);
+    const slopeX = (hR - hL) / (step * 2);
+    const slopeZ = (hD - hU) / (step * 2);
+    const gradient = Math.hypot(slopeX, slopeZ);
+    const slopeDeg = Math.atan(gradient) * 180 / Math.PI;
+    if (!Number.isFinite(slopeDeg)) return 0;
+    if (slopeDeg <= 16) return 0;
+    if (slopeDeg >= 55) return 1800;
+    return (slopeDeg - 16) * 42;
+  };
+
   // Pick the road point closest to the location center, with light penalties for
   // highway-like roads so initial spawn stays in the city core.
   let best = null;
@@ -3195,7 +3519,8 @@ function spawnOnRoad() {
     const penalty = spawnRoadPenalty(rd.type);
     for (let i = 0; i < rd.pts.length; i++) {
       const p = rd.pts[i];
-      const score = Math.hypot(p.x, p.z) + penalty;
+      const slopePenalty = slopePenaltyAt(p.x, p.z);
+      const score = Math.hypot(p.x, p.z) + penalty + slopePenalty;
       if (!best || score < best.score) {
         best = { road: rd, idx: i, score };
       }
@@ -3531,6 +3856,36 @@ function updateWorldLod(force = false) {
 
   let nearVisible = 0;
   let midVisible = 0;
+
+  if (mode === 'baseline') {
+    for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
+      const mesh = appCtx.buildingMeshes[i];
+      if (!mesh) continue;
+      mesh.visible = true;
+      const tier = mesh.userData?.lodTier || 'near';
+      const isBatch = !!mesh.userData?.isBuildingBatch;
+      const count = isBatch ? Math.max(1, mesh.userData?.batchCount || 1) : 1;
+      if (tier === 'mid') midVisible += count;else nearVisible += count;
+    }
+
+    for (let i = 0; i < appCtx.poiMeshes.length; i++) {
+      const mesh = appCtx.poiMeshes[i];
+      if (!mesh) continue;
+      mesh.visible = !!appCtx.poiMode;
+    }
+
+    for (let i = 0; i < appCtx.landuseMeshes.length; i++) {
+      const mesh = appCtx.landuseMeshes[i];
+      if (!mesh) continue;
+      const alwaysVisible = !!mesh.userData?.alwaysVisible;
+      mesh.visible = alwaysVisible || !!appCtx.landUseVisible;
+    }
+
+    if (typeof appCtx.setPerfLiveStat === 'function') {
+      appCtx.setPerfLiveStat('lodVisible', { near: nearVisible, mid: midVisible });
+    }
+    return;
+  }
 
   for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
     const mesh = appCtx.buildingMeshes[i];

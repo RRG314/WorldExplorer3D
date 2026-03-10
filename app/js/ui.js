@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
-import { createGlobeSelector } from "./ui/globe-selector.js?v=56";
+import { createGlobeSelector } from "./ui/globe-selector.js?v=57";
 
 const PROPERTY_MARKER_HIT_RADIUS = 10;
 const POI_MARKER_HIT_RADIUS = 8;
@@ -234,6 +234,8 @@ function setupUI() {
   const gameShareInstagram = document.getElementById('gameShareInstagram');
   const gameShareText = document.getElementById('gameShareText');
   const coordsReadout = document.getElementById('coords');
+  const hudBox = document.getElementById('hudBox');
+  const hudToggleBtn = document.getElementById('hudToggleBtn');
   const mobileTouchControls = document.getElementById('mobileTouchControls');
   const mobileMovePad = document.getElementById('mobileMovePad');
   const mobileLookPad = document.getElementById('mobileLookPad');
@@ -253,6 +255,26 @@ function setupUI() {
     'mobileActionPrimary',
     'mobileActionSecondary'
   ].map((id) => document.getElementById(id)).filter(Boolean);
+
+  const updateHudCompactState = (compact) => {
+    if (!(hudBox instanceof HTMLElement)) return;
+    const nextCompact = !!compact;
+    hudBox.classList.toggle('compact', nextCompact);
+    if (hudToggleBtn instanceof HTMLButtonElement) {
+      hudToggleBtn.textContent = nextCompact ? 'HUD' : '-';
+      hudToggleBtn.setAttribute('aria-expanded', nextCompact ? 'false' : 'true');
+      hudToggleBtn.setAttribute('aria-label', nextCompact ? 'Expand HUD' : 'Collapse HUD');
+    }
+  };
+
+  updateHudCompactState(false);
+  if (hudToggleBtn instanceof HTMLButtonElement) {
+    hudToggleBtn.addEventListener('click', (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      updateHudCompactState(!hudBox?.classList.contains('compact'));
+    });
+  }
 
   // Load saved API keys from localStorage
   const savedRentcast = localStorage.getItem('rentcastApiKey');
@@ -1138,6 +1160,14 @@ function setupUI() {
     if (titleStartButton) titleStartButton.click();
   };
 
+  appCtx.triggerTitleStart = (options = {}) => {
+    if (options && options.bypassCustomGate) {
+      skipGlobeGateOnce = true;
+      appCtx.pendingCustomLaunchBypass = true;
+    }
+    triggerTitleStart();
+  };
+
   const readLastLocationSelection = () => {
     try {
       const raw = localStorage.getItem(LAST_LOCATION_STORAGE_KEY);
@@ -1158,6 +1188,7 @@ function setupUI() {
         ts: Date.now()
       };
       if (payload.selLoc === 'custom') {
+        if (appCtx.customLocTransient === true) return;
         const lat = Number(appCtx.customLoc?.lat ?? document.getElementById('customLat')?.value);
         const lon = Number(appCtx.customLoc?.lon ?? document.getElementById('customLon')?.value);
         if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
@@ -1189,6 +1220,7 @@ function setupUI() {
         lon,
         name: String(record.customLoc.name || 'Custom Location')
       };
+      appCtx.customLocTransient = false;
       appCtx.selLoc = 'custom';
       setTitleLocationMode('custom');
       setLaunchMode(launch);
@@ -1208,39 +1240,134 @@ function setupUI() {
     return true;
   };
 
-  const startSection = document.querySelector('.start-section');
-  const startBtn = document.getElementById('startBtn');
-  const continueLastBtn = (() => {
-    if (!(startSection instanceof HTMLElement) || !(startBtn instanceof HTMLElement)) return null;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.id = 'continueLastLocationBtn';
-    btn.textContent = 'Continue Last Location';
-    btn.style.cssText = 'margin-top:8px;width:100%;background:#e2e8f0;border:none;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:600;color:#334155;cursor:pointer;display:none';
-    startSection.appendChild(btn);
-    return btn;
-  })();
+  const titleUseMyLocationBtn = document.getElementById('titleUseMyLocationBtn');
+  const titleUseMyLocationStatus = document.getElementById('titleUseMyLocationStatus');
+  const geolocationOptions = {
+    enableHighAccuracy: true,
+    timeout: 12000,
+    maximumAge: 120000
+  };
+  let geolocationBusy = false;
 
-  const refreshContinueLastButton = () => {
-    if (!continueLastBtn) return;
-    const last = readLastLocationSelection();
-    continueLastBtn.style.display = last ? 'block' : 'none';
+  const setTitleUseMyLocationStatus = (message = '', color = '#6b7280') => {
+    if (!(titleUseMyLocationStatus instanceof HTMLElement)) return;
+    titleUseMyLocationStatus.textContent = message || '';
+    titleUseMyLocationStatus.style.color = color || '#6b7280';
   };
 
-  if (continueLastBtn) {
-    continueLastBtn.addEventListener('click', () => {
-      const last = readLastLocationSelection();
-      if (!last) return;
-      if (!applyLastLocationSelection(last)) return;
-      skipGlobeGateOnce = true;
-      triggerTitleStart();
+  const setUseMyLocationBusy = (isBusy) => {
+    geolocationBusy = !!isBusy;
+    if (titleUseMyLocationBtn) {
+      titleUseMyLocationBtn.disabled = geolocationBusy;
+      titleUseMyLocationBtn.textContent = geolocationBusy ? 'Locating…' : 'Use My Location';
+    }
+    if (globeSelector && typeof globeSelector.setLocateButtonBusy === 'function') {
+      globeSelector.setLocateButtonBusy(geolocationBusy);
+    }
+  };
+
+  const geolocationErrorMessage = (error) => {
+    const code = Number(error?.code);
+    if (code === 1) return 'Location access denied. You can still pick a location manually.';
+    if (code === 2) return 'Could not determine your location. Try again or choose manually.';
+    if (code === 3) return 'Location request timed out. Try again or choose manually.';
+    return 'Could not determine your location. You can still choose manually.';
+  };
+
+  const requestCurrentPosition = () => new Promise((resolve, reject) => {
+    if (!navigator.geolocation || typeof navigator.geolocation.getCurrentPosition !== 'function') {
+      reject({ userMessage: 'Geolocation is not supported in this browser.' });
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const lat = Number(position?.coords?.latitude);
+        const lon = Number(position?.coords?.longitude);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+          reject({ userMessage: 'Could not determine your location. Try again or choose manually.' });
+          return;
+        }
+        resolve({ lat, lon });
+      },
+      (error) => {
+        reject({ ...error, userMessage: geolocationErrorMessage(error) });
+      },
+      geolocationOptions
+    );
+  });
+
+  const clampDetectedCoords = (lat, lon) => {
+    const safeLat = Math.max(-90, Math.min(90, Number(lat) || 0));
+    let safeLon = Number(lon) || 0;
+    while (safeLon > 180) safeLon -= 360;
+    while (safeLon < -180) safeLon += 360;
+    return { lat: safeLat, lon: safeLon };
+  };
+
+  const runUseMyLocation = async (source = 'menu') => {
+    if (geolocationBusy) return;
+
+    if (globeSelector && typeof globeSelector.isOpen === 'function' && !globeSelector.isOpen()) {
+      setTitleLocationMode('custom');
+      globeSelector.open();
+      emitTutorialEvent('opened_globe_selector');
+    }
+
+    setUseMyLocationBusy(true);
+    setTitleUseMyLocationStatus('Locating…', '#64748b');
+    if (globeSelector && typeof globeSelector.setSearchStatus === 'function') {
+      globeSelector.setSearchStatus('Locating…', '#64748b');
+    }
+
+    try {
+      const position = await requestCurrentPosition();
+      const coords = clampDetectedCoords(position.lat, position.lon);
+      const coordsName = `Current Location ${coords.lat.toFixed(3)}, ${coords.lon.toFixed(3)}`;
+      appCtx.customLocTransient = true;
+      if (globeSelector && typeof globeSelector.applySelectionAndResolve === 'function') {
+        globeSelector.applySelectionAndResolve(coords.lat, coords.lon, {
+          name: coordsName,
+          searchLabel: 'Current Location',
+          focus: true,
+          zoomDistance: 2.05,
+          fromGeolocation: true,
+          skipAutoFavorite: true
+        });
+      } else {
+        appCtx.customLoc = { lat: coords.lat, lon: coords.lon, name: coordsName };
+        appCtx.selLoc = 'custom';
+      }
+      const successMessage = 'Location found. Review it on the globe, then press Start Here.';
+      setTitleUseMyLocationStatus(successMessage, '#059669');
+      if (globeSelector && typeof globeSelector.setSearchStatus === 'function') {
+        globeSelector.setSearchStatus(successMessage, '#059669');
+      }
+    } catch (error) {
+      const failureMessage = error?.userMessage || geolocationErrorMessage(error);
+      setTitleUseMyLocationStatus(failureMessage, '#dc2626');
+      if (globeSelector && typeof globeSelector.setSearchStatus === 'function') {
+        globeSelector.setSearchStatus(failureMessage, '#dc2626');
+      }
+      if (source === 'menu') {
+        setTitleLocationMode('custom');
+      }
+    } finally {
+      setUseMyLocationBusy(false);
+    }
+  };
+
+  if (titleUseMyLocationBtn) {
+    titleUseMyLocationBtn.addEventListener('click', () => {
+      runUseMyLocation('menu');
     });
   }
-  refreshContinueLastButton();
 
   globeSelector = createGlobeSelector({
     onOpen: () => {
       emitTutorialEvent('opened_globe_selector');
+    },
+    onUseMyLocation: () => {
+      runUseMyLocation('globe');
     },
     onBack: () => {
       if (customPanel) customPanel.classList.remove('show');
@@ -1362,6 +1489,7 @@ function setupUI() {
         lon,
         name: sharedExperienceParams.name || appCtx.customLoc?.name || 'Shared Location'
       };
+      appCtx.customLocTransient = false;
       appCtx.selLoc = 'custom';
       setTitleLocationMode('custom');
     } else if (sharedExperienceParams.loc === 'custom' && !hasCustomCoords && perfSettingsStatus) {
@@ -1412,9 +1540,11 @@ function setupUI() {
   }));
   // Start
   document.getElementById('startBtn').addEventListener('click', async () => {
+    const externalBypassCustomGate = appCtx.pendingCustomLaunchBypass === true;
     const shouldGateToGlobe =
       !appCtx.gameStarted &&
       !skipGlobeGateOnce &&
+      !externalBypassCustomGate &&
       String(appCtx.selLoc || '') === 'custom';
     if (shouldGateToGlobe) {
       setTitleLocationMode('custom');
@@ -1423,6 +1553,7 @@ function setupUI() {
       return;
     }
     if (skipGlobeGateOnce) skipGlobeGateOnce = false;
+    if (externalBypassCustomGate) appCtx.pendingCustomLaunchBypass = false;
 
     if (globeSelector && typeof globeSelector.isOpen === 'function' && globeSelector.isOpen()) {
       globeSelector.close();
@@ -1545,7 +1676,6 @@ function setupUI() {
       appCtx.startMode();
     }
     persistLastLocationSelection(launchMode);
-    refreshContinueLastButton();
     emitTutorialEvent('spawned_in_world', {
       location: appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOCS?.[appCtx.selLoc] || null,
       launchMode
@@ -1648,16 +1778,16 @@ function setupUI() {
       moveLabel: 'Move',
       lookLabel: 'Look',
       move: {
-        up: { channel: 'earth', key: 'KeyW' },
-        down: { channel: 'earth', key: 'KeyS' },
-        left: { channel: 'earth', key: 'KeyA' },
-        right: { channel: 'earth', key: 'KeyD' }
-      },
-      look: {
         up: { channel: 'earth', key: 'ArrowUp' },
         down: { channel: 'earth', key: 'ArrowDown' },
         left: { channel: 'earth', key: 'ArrowLeft' },
         right: { channel: 'earth', key: 'ArrowRight' }
+      },
+      look: {
+        up: { channel: 'earth', key: 'KeyW' },
+        down: { channel: 'earth', key: 'KeyS' },
+        left: { channel: 'earth', key: 'KeyA' },
+        right: { channel: 'earth', key: 'KeyD' }
       },
       actions: [
         { label: 'Ascend', binding: { channel: 'earth', key: 'Space' } },

@@ -195,18 +195,20 @@ function updateDrone(dt) {
   const moveSpeed = appCtx.drone.speed * dt;
   const turnSpeed = 2.0 * dt;
 
-  if (appCtx.keys.ArrowUp) appCtx.drone.pitch += turnSpeed;
-  if (appCtx.keys.ArrowDown) appCtx.drone.pitch -= turnSpeed;
-  if (appCtx.keys.ArrowLeft) appCtx.drone.yaw += turnSpeed;
-  if (appCtx.keys.ArrowRight) appCtx.drone.yaw -= turnSpeed;
+  // Keep drone controls consistent with walking mode:
+  // arrows move, WASD controls camera look.
+  if (appCtx.keys.KeyW) appCtx.drone.pitch += turnSpeed;
+  if (appCtx.keys.KeyS) appCtx.drone.pitch -= turnSpeed;
+  if (appCtx.keys.KeyA) appCtx.drone.yaw += turnSpeed;
+  if (appCtx.keys.KeyD) appCtx.drone.yaw -= turnSpeed;
 
   appCtx.drone.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.drone.pitch));
   appCtx.drone.roll = 0;
 
-  const forward = appCtx.keys.KeyW ? 1 : 0;
-  const backward = appCtx.keys.KeyS ? 1 : 0;
-  const left = appCtx.keys.KeyA ? 1 : 0;
-  const right = appCtx.keys.KeyD ? 1 : 0;
+  const forward = appCtx.keys.ArrowUp ? 1 : 0;
+  const backward = appCtx.keys.ArrowDown ? 1 : 0;
+  const left = appCtx.keys.ArrowLeft ? 1 : 0;
+  const right = appCtx.keys.ArrowRight ? 1 : 0;
   const up = appCtx.keys.Space ? 1 : 0;
   const down = appCtx.keys.ControlLeft || appCtx.keys.ControlRight || appCtx.keys.ShiftLeft || appCtx.keys.ShiftRight ? 1 : 0;
 

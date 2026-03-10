@@ -21,6 +21,45 @@ function locationName() {
   return appCtx.selLoc === 'custom' ? appCtx.customLoc?.name || 'Custom' : appCtx.LOCS[appCtx.selLoc].name;
 }
 
+function clampText(value, maxLen = 64) {
+  const text = String(value || '').trim();
+  if (!text) return '';
+  return text.length > maxLen ? `${text.slice(0, Math.max(8, maxLen - 1)).trim()}…` : text;
+}
+
+function setHudUnitLabels(unitLabel, limitLabel) {
+  const speedUnitEl = document.getElementById('speedUnitLabel');
+  const limitLabelEl = document.getElementById('limitLabel');
+  if (speedUnitEl) speedUnitEl.textContent = unitLabel;
+  if (limitLabelEl) limitLabelEl.textContent = limitLabel;
+}
+
+function setStreetAndLocation(roadLabel, locationLabel) {
+  const streetEl = document.getElementById('street');
+  const locationEl = document.getElementById('locationLine');
+  const rawRoad = String(roadLabel || '').trim();
+  const rawLocation = String(locationLabel || '').trim();
+  let normalizedRoad = rawRoad;
+  let normalizedLocation = rawLocation;
+
+  // Older data can include "Road • Location" in one field; split to keep HUD compact.
+  if (rawRoad.includes('•')) {
+    const parts = rawRoad.split('•').map((part) => String(part || '').trim()).filter(Boolean);
+    if (parts.length) {
+      normalizedRoad = parts.shift() || '';
+      if (!normalizedLocation && parts.length) normalizedLocation = parts.join(', ');
+    }
+  }
+
+  if (!normalizedRoad) normalizedRoad = 'Off Road';
+
+  if (streetEl) streetEl.textContent = clampText(normalizedRoad, 32);
+  if (locationEl) {
+    locationEl.textContent = clampText(normalizedLocation, 52);
+    locationEl.style.display = normalizedLocation ? '' : 'none';
+  }
+}
+
 function geoFromWorldXZ(worldX, worldZ) {
   return {
     lat: appCtx.LOC.lat - worldZ / appCtx.SCALE,
@@ -228,13 +267,15 @@ function updateHUD() {
       groundY = appCtx.elevationWorldYAtWorldXZ(appCtx.drone.x, appCtx.drone.z);
     }
 
-    const altitudeAGL = Math.round(appCtx.drone.y - groundY);
+    const altitudeMeters = Math.max(0, Math.round(appCtx.drone.y - groundY));
+    const altitudeCap = appCtx.onMoon ? 2000 : 400;
 
-    // Drone mode HUD
-    document.getElementById('speed').textContent = altitudeAGL + 'm AGL';
+    // Drone mode HUD (everyday wording; avoid aviation jargon like AGL).
+    setHudUnitLabels('HEIGHT', 'CEILING');
+    document.getElementById('speed').textContent = `${altitudeMeters}`;
     document.getElementById('speed').classList.remove('fast');
-    document.getElementById('limit').textContent = '';
-    document.getElementById('street').textContent = '🚁 DRONE MODE • ' + locationName();
+    document.getElementById('limit').textContent = `${altitudeCap}`;
+    setStreetAndLocation('Drone View', locationName());
     const bf = document.getElementById('boostFill');
     bf.style.width = '0%';
     bf.classList.remove('active');
@@ -244,8 +285,7 @@ function updateHUD() {
     document.getElementById('indDrift').textContent = 'DRONE';
     document.getElementById('indOff').classList.remove('on', 'warn');
     document.getElementById('offRoadWarn').classList.remove('active');
-    const pitch = Math.round(appCtx.drone.pitch * RAD_TO_DEG);
-    document.getElementById('coords').textContent = coordsHudText(appCtx.drone.x, appCtx.drone.z, appCtx.drone.yaw, pitch);
+    document.getElementById('coords').textContent = coordsHudText(appCtx.drone.x, appCtx.drone.z, appCtx.drone.yaw);
 
     return;
   }
@@ -270,10 +310,11 @@ function updateHUD() {
       }
     }
 
+    setHudUnitLabels('MPH', 'LIMIT');
     document.getElementById('speed').textContent = mph;
     document.getElementById('speed').classList.remove('fast');
     document.getElementById('limit').textContent = walkRoad ? walkRoad.limit || 25 : '';
-    document.getElementById('street').textContent = (walkRoad?.name || 'Off Road') + ' • ' + locName;
+    setStreetAndLocation(walkRoad?.name || 'Off Road', locName);
     const bf = document.getElementById('boostFill');
     bf.style.width = '0%';
     bf.classList.remove('active');
@@ -298,10 +339,11 @@ function updateHUD() {
   const mph = Math.abs(Math.round(appCtx.car.speed * 0.5));
   const limit = appCtx.car.road?.limit || 25;
   const locName = locationName();
+  setHudUnitLabels('MPH', 'LIMIT');
   document.getElementById('speed').textContent = mph;
   document.getElementById('speed').classList.toggle('fast', mph > limit || appCtx.car.boost);
   document.getElementById('limit').textContent = limit;
-  document.getElementById('street').textContent = (appCtx.car.road?.name || 'Off Road') + ' • ' + locName;
+  setStreetAndLocation(appCtx.car.road?.name || 'Off Road', locName);
   const bf = document.getElementById('boostFill');
   bf.style.width = appCtx.car.boost ? appCtx.car.boostTime / appCtx.CFG.boostDur * 100 + '%' : appCtx.car.boostReady ? '100%' : '0%';
   bf.classList.toggle('active', appCtx.car.boost);

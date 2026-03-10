@@ -263,6 +263,17 @@ function copyText(text) {
   return fallbackCopy();
 }
 
+function isPermissionError(err) {
+  const code = String(err?.code || '').toLowerCase();
+  const message = String(err?.message || err || '').toLowerCase();
+  return code === 'permission-denied' ||
+    message.includes('permission') ||
+    message.includes('not authorized') ||
+    message.includes('unauthorized') ||
+    message.includes('forbidden') ||
+    message.includes('app check');
+}
+
 function buildInviteLink(code) {
   const normalized = normalizeCode(code);
   if (!normalized) return '';
@@ -541,6 +552,7 @@ function initMultiplayerPlatform() {
     pendingRoomPrompted: false,
     pendingRoomInFlight: false,
     activeRoomWorldSignature: '',
+    pendingRoomWorldRetryTimer: null,
     unsubRoom: null,
     unsubPlayers: null,
     unsubChat: null,
@@ -789,6 +801,34 @@ function initMultiplayerPlatform() {
     const customLonInput = document.getElementById('customLon');
     if (customLatInput) customLatInput.value = lat.toFixed(6);
     if (customLonInput) customLonInput.value = lon.toFixed(6);
+
+    if (!appCtx.gameStarted) {
+      setStatus(`Opening room ${room.code}...`);
+      appCtx.pendingCustomLaunchBypass = true;
+      if (typeof appCtx.triggerTitleStart === 'function') {
+        appCtx.triggerTitleStart({ bypassCustomGate: true });
+      } else {
+        const startBtn = document.getElementById('startBtn');
+        if (startBtn instanceof HTMLButtonElement) startBtn.click();
+      }
+      return;
+    }
+
+    if (appCtx.gameStarted && appCtx.worldLoading) {
+      if (state.pendingRoomWorldRetryTimer) {
+        clearTimeout(state.pendingRoomWorldRetryTimer);
+        state.pendingRoomWorldRetryTimer = null;
+      }
+      const roomId = String(room.id || '');
+      state.pendingRoomWorldRetryTimer = setTimeout(() => {
+        state.pendingRoomWorldRetryTimer = null;
+        if (!state.currentRoom || String(state.currentRoom.id || '') !== roomId) return;
+        syncRoomWorldContext(state.currentRoom, true, respawn).catch((err) => {
+          console.warn('[multiplayer][ui] delayed room world sync failed:', err);
+        });
+      }, 420);
+      return;
+    }
 
     if (appCtx.gameStarted && !appCtx.worldLoading && typeof appCtx.loadRoads === 'function') {
       setStatus(`Syncing room world ${room.code} (seed ${roomSeed})...`);
@@ -1260,6 +1300,10 @@ function initMultiplayerPlatform() {
 
   async function deactivateRoom(localOnly = false) {
     clearSubscriptions();
+    if (state.pendingRoomWorldRetryTimer) {
+      clearTimeout(state.pendingRoomWorldRetryTimer);
+      state.pendingRoomWorldRetryTimer = null;
+    }
     if (typeof appCtx.configureSharedBuildSync === 'function') {
       appCtx.configureSharedBuildSync({ enabled: false });
     }
@@ -1642,7 +1686,48 @@ function initMultiplayerPlatform() {
 
     setInputCode(refs, normalizedCode);
     setStatus(`Opening room ${normalizedCode}...`);
-    await handleJoinRoom(normalizedCode, { skipAccessCheck: true });
+    try {
+      const room = await handleJoinRoom(normalizedCode, {
+        skipAccessCheck: true,
+        suppressStatus: true,
+        throwOnError: true
+      });
+      if (!room) {
+        setStatus(`Could not open room ${normalizedCode}.`, true);
+        return;
+      }
+      await syncRoomWorldContext(room, true, true);
+      setStatus(`Opened room ${room.code}.`);
+    } catch (err) {
+      const savedRoom = state.ownedRooms.find((room) => normalizeCode(room.code || room.id || '') === normalizedCode) || null;
+      const worldKind = String(savedRoom?.world?.kind || '').toLowerCase();
+      const lat = finiteNumber(savedRoom?.world?.lat, null);
+      const lon = finiteNumber(savedRoom?.world?.lon, null);
+      const canFallbackToLocal = !!savedRoom && worldKind === 'earth' && Number.isFinite(lat) && Number.isFinite(lon);
+
+      if (isPermissionError(err) && canFallbackToLocal) {
+        await deactivateRoom(true);
+        const fallbackRoom = {
+          id: normalizedCode,
+          code: normalizedCode,
+          name: sanitizeText(savedRoom.name || savedRoom.locationTag?.label || `Room ${normalizedCode}`, 80),
+          visibility: String(savedRoom.visibility || 'private'),
+          world: {
+            kind: 'earth',
+            lat,
+            lon,
+            seed: String(savedRoom.world.seed || `latlon:${lat.toFixed(5)},${lon.toFixed(5)}`)
+          },
+          rules: savedRoom.rules || {}
+        };
+        await syncRoomWorldContext(fallbackRoom, true, true);
+        closeRoomPanel();
+        setStatus(`Opened ${normalizedCode} location, but live multiplayer sync is blocked by permissions.`, true);
+        return;
+      }
+
+      setStatus(err?.message || `Could not open room ${normalizedCode}.`, true);
+    }
   }
 
   async function activateRoom(room, originLabel = 'room') {
@@ -1907,6 +1992,8 @@ function initMultiplayerPlatform() {
 
   async function handleJoinRoom(codeOverride = '', options = {}) {
     const skipAccessCheck = Boolean(options && options.skipAccessCheck);
+    const suppressStatus = Boolean(options && options.suppressStatus);
+    const throwOnError = Boolean(options && options.throwOnError);
     if (!skipAccessCheck && state.authUser && !(await ensureAccessOrWarn('joining a room'))) {
       return null;
     }
@@ -1926,12 +2013,13 @@ function initMultiplayerPlatform() {
       await activateRoom(room, 'joined room');
       await bumpExplorerLeaderboard({ roomsJoined: 1 });
       await refreshFeaturedRooms(true);
-      setStatus(`Joined room ${room.code}.`);
+      if (!suppressStatus) setStatus(`Joined room ${room.code}.`);
       closeRoomPanel();
       return room;
     } catch (err) {
       console.error('[multiplayer][ui] join failed:', err);
-      setStatus(err?.message || 'Could not join that room.', true);
+      if (!suppressStatus) setStatus(err?.message || 'Could not join that room.', true);
+      if (throwOnError) throw err;
       return null;
     }
   }
