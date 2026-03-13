@@ -6,6 +6,7 @@ const rootDir = process.cwd();
 const pairs = [
   { a: 'app/index.html', b: 'public/app/index.html' },
   { a: 'app/assets', b: 'public/app/assets', dir: true },
+  { a: 'app/data', b: 'public/app/data', dir: true },
   { a: 'app/js', b: 'public/app/js', dir: true }
 ];
 

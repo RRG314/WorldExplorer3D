@@ -1,84 +1,67 @@
 # GitHub Deployment Guide
 
-Last reviewed: 2026-03-02
+Last reviewed: 2026-03-13
 
-Guide for publishing the repository root to GitHub Pages while using Firebase Auth/Firestore/Functions backends.
+Guide for publishing World Explorer 3D with GitHub Pages while keeping backend dependencies explicit.
 
-## 1. Deployment Mode
+## 1. Deployment Model
 
-Use GitHub Pages with:
+This repository uses GitHub Actions Pages deployment (`deploy-pages-public.yml`) and uploads `./public` as the published artifact.
 
-- Source: `Deploy from a branch`
-- Branch: target branch (for example `steven/product`)
-- Folder: `/ (root)`
+Default trigger target:
 
-## 2. Required Files for Pages
+- push to `main`
+- manual `workflow_dispatch`
 
-Root runtime files:
+## 2. What Gets Published
 
-- `index.html`
-- `js/*`
-- `styles.css`
+Pages artifact root is `public/`:
 
-App/account routes still required in repo:
+- landing page: `public/index.html`
+- app runtime: `public/app/index.html`
+- account: `public/account/index.html`
 
-- `app/index.html`
-- `app/js/*`
-- `account/index.html`
+## 3. Source/Mirror Rule
 
-## 3. Important Mirror Note
+Canonical app code lives in `app/*`.
 
-Production Firebase hosting serves `public/*`, but Pages serves branch root directly.
-
-Before publishing, ensure app mirror parity:
+Before release, mirror and verify:
 
 ```bash
 npm run sync:public
 npm run verify:mirror
+npm run release:verify
 ```
 
 ## 4. Backend Dependencies Still Required
 
-GitHub Pages hosting does not replace Firebase backend services. These still must be live:
+GitHub Pages only serves static assets. The following services still need to be deployed/configured where used:
 
 - Firebase Auth
 - Firestore
 - Cloud Functions
-- Stripe webhook integration (if donations enabled)
+- Stripe webhook/function path (if billing features enabled)
 
-Pages origin requirements:
+Pages-origin requirements:
 
-- Cloud Functions CORS allowlist must include `https://rrg314.github.io`.
-- Firebase Auth authorized domains must include `rrg314.github.io` for Google sign-in.
-- Optional override for non-standard backend origin: set `WORLD_EXPLORER_FUNCTIONS_ORIGIN`.
+- Cloud Functions CORS allowlist should include your Pages origin.
+- Firebase Auth authorized domains should include your Pages origin.
+- Optional override for non-standard backend origin: `WORLD_EXPLORER_FUNCTIONS_ORIGIN`.
 
-## 5. Deploy Steps (Typical)
+## 5. Typical Release Sequence
 
-1. Run release checks:
-   - `npm run release:verify`
-2. Commit and push target branch.
-3. Verify Pages build is published.
-4. Run manual smoke checks:
-   - app load
-   - signup/signin
-   - room create/join/invite
-   - account overview and controls
+1. Run local release checks.
+2. Push branch and open PR.
+3. Merge to `main`.
+4. Verify both workflows are green:
+   - `Runtime Verify`
+   - `Deploy GitHub Pages (public)`
+5. Smoke test published site.
 
-## 6. Firebase Backend Deploy Commands
+## 6. Cache Troubleshooting
 
-When backend changes are included:
-
-```bash
-firebase use worldexplorer3d-d9b83
-firebase deploy --only firestore:rules
-firebase deploy --only firestore:indexes
-firebase deploy --only functions
-```
-
-## 7. Cache Troubleshooting
-
-If stale JS appears after deploy:
+If stale JS/assets appear after deploy:
 
 1. hard refresh (`Cmd+Shift+R` / `Ctrl+F5`)
 2. clear site data for the Pages domain
-3. reopen page and retry
+3. reopen and retest

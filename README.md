@@ -1,99 +1,64 @@
-# World Explorer
+# World Explorer 3D
 
-Last reviewed: 2026-03-02
+[![Runtime Verify](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
+[![Deploy GitHub Pages (public)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml/badge.svg)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml)
+[![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
 
-World Explorer is a browser-based 3D exploration platform with Earth/Moon/Space traversal, multiplayer room systems, social invites, and Firebase-backed account persistence.
+World Explorer 3D is a browser-based 3D geospatial exploration application built around real-world map data, including OpenStreetMap-derived roads, buildings, land-use, water, and place context.
 
-## Runtime Surfaces
+It is an interactive exploration app, not a flat map viewer and not a routing/navigation replacement. The focus is immersive place exploration across Earth, Moon, Space, and Ocean destination modes.
 
-- Landing: `/index.html`
-- Main app runtime: `/app/index.html`
-- Account center: `/account/index.html`
-- About: `/about/index.html`
-- Legal pages: `/legal/privacy`, `/legal/terms`
+## Current Status
 
-## Core Features
+- Active and usable, with ongoing iteration.
+- Canonical runtime source: `app/*`.
+- Hosting/runtime mirror: `public/app/*`.
+- Includes geolocation launch flow and Ocean mode in the current branch.
 
-### Location and launch
+## What It Does
 
-- Preset cities (Earth)
-- Custom globe selector with click-to-pick coordinates
-- Reverse place lookup and nearby city list
-- Favorites view with:
-  - `Preset Cities`
-  - `Your Saved Favorites` (with delete)
-- Earth, Moon, Space launch toggles
-- Continue Last Location support
+- Launch from preset cities or custom coordinates.
+- Use geolocation (`Use My Location`) in title and globe selector flows.
+- Explore in 3D with driving, walking, drone, and rocket traversal.
+- Switch destinations (Earth, Moon, Space, Ocean) from title and in-game menus.
+- Render map-informed world context (roads/buildings/land-use/water) for Earth scenes.
+- Provide minimap/large-map overlays and runtime controls for exploration.
+- Support multiplayer/social/account features when backend services are configured.
 
-### Gameplay
+## Why Mapping/OSM Users May Care
 
-- Free Roam
-- Time Trial
-- Checkpoints
-- Paint the Town
-- Police Chase
-- Find the Flower
+- Uses OSM ecosystem data in a browser-native 3D interaction model.
+- Demonstrates one practical path from OSM feature data to interactive WebGL world exploration.
+- Keeps data attribution visible in both runtime UI and repository docs.
 
-### Movement modes
+## Screenshots
 
-- Walking
-- Driving
-- Drone
-- Rocket/space flight
-- Moon traversal
+![Earth city traversal](assets/landing/gameplay/drive-baltimore.png)
+![Space destination mode](assets/landing/gameplay/fly-in-space.png)
+![Ocean destination mode](assets/screenshots/ocean-mode-great-barrier-reef.png)
 
-### Tutorial
+## OpenStreetMap Data and Attribution
 
-- First-run guided walkthrough stored per browser
-- Shows once by default after completion
-- User can disable or restart manually from Settings
+This project uses OpenStreetMap data and services in multiple runtime paths. Attribution and data usage notes are documented here:
 
-### Multiplayer
+- [DATA_SOURCES.md](DATA_SOURCES.md)
+- [ATTRIBUTION.md](ATTRIBUTION.md)
+- [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)
 
-- Public/private room creation and join by code
-- Saved room list with `Open` and owner `Delete`
-- Invite links and friend invite workflow
-- Live presence, chat, friends, incoming invites, recent players
-- Shared room data:
-  - blocks
-  - paint claims
-  - artifacts
-  - home base
-- Weekly featured city room
-- Public and owned/current room markers on minimap and large map
+Required attribution string used by this project:
 
-### Account and donations
+- `© OpenStreetMap contributors`
 
-- Email/password and Google sign-in
-- Account profile and room quota status
-- Optional monthly donations:
-  - Supporter: $1/month
-  - Pro: $5/month
-- Stripe checkout/portal integration
-- Billing receipt list
-- Permanent self-service account deletion flow
+## Live and Local Usage
 
-## Architecture Summary
+- Primary site: [worldexplorer3d.io](https://worldexplorer3d.io)
+- Repository target: [RRG314/WorldExplorer3D](https://github.com/RRG314/WorldExplorer3D)
 
-- Canonical gameplay source: `app/*`
-- Hosted mirror: `public/app/*`
-- Root compatibility/runtime modules: `js/*`
-- Backend: `functions/index.js`
-- Security: `firestore.rules`
-
-Important: edit `app/*` first, then mirror to `public/app/*`.
-
-## Local Development
+Local run:
 
 ```bash
-cd "/Users/stevenreid/Documents/New project"
 npm install
 cd functions && npm install && cd ..
-```
-
-Run hosting-style local server:
-
-```bash
 python3 -m http.server --directory public 4173
 ```
 
@@ -101,9 +66,8 @@ Open:
 
 - `http://127.0.0.1:4173/`
 - `http://127.0.0.1:4173/app/`
-- `http://127.0.0.1:4173/account/`
 
-## Validation Commands
+## Test and Release Verification
 
 ```bash
 npm run sync:public
@@ -112,46 +76,49 @@ npm run test
 npm run release:verify
 ```
 
-## Deployment
-
-### Firebase
+Targeted feature smoke:
 
 ```bash
-firebase use worldexplorer3d-d9b83
-firebase deploy
+npm run test:osm-smoke
 ```
 
-### GitHub Pages
+## Repository Structure (Top-Level)
 
-Deploy from branch root (`/`) as configured in repo settings.
+- `app/` - Canonical browser runtime source (edit here first)
+- `public/` - Hosting output roots, including `public/app/` runtime mirror
+- `functions/` - Firebase backend functions (auth/social/billing/runtime support)
+- `scripts/` - Verification and release gate scripts
+- `tests/` - Rules/runtime tests
+- `assets/` - Landing and documentation media assets
+- `docs/` - Research and technical reference material
 
-Pages backend notes:
+## Documentation Map
 
-- Cloud Functions CORS allowlist must include the Pages origin (`https://rrg314.github.io`).
-- Firebase Auth authorized domains should include `rrg314.github.io` for Google sign-in flow.
+- [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)
+- [QUICKSTART.md](QUICKSTART.md)
+- [USER_GUIDE.md](USER_GUIDE.md)
+- [TECHNICAL_DOCS.md](TECHNICAL_DOCS.md)
+- [GITHUB_DEPLOYMENT.md](GITHUB_DEPLOYMENT.md)
+- [LIMITATIONS.md](LIMITATIONS.md)
 
-### itch.io Wrapper Build
+OSM ecosystem materials:
 
-Build/update the redirect wrapper and zip:
+- [OSM_ECOSYSTEM_METADATA.md](OSM_ECOSYSTEM_METADATA.md)
+- [OSM_WIKI_ENTRY_DRAFT.md](OSM_WIKI_ENTRY_DRAFT.md)
 
-```bash
-bash scripts/make-itch-wrapper.sh
-```
+## Limitations and Non-Goals
 
-Output artifact:
+See [LIMITATIONS.md](LIMITATIONS.md) for current caveats, including:
 
-- `dist/worldexplorer3d-itch-wrapper.zip`
+- upstream data/service variability (Overpass/geocoding/tile/network)
+- browser/device WebGL performance differences
+- experimental destination modes (especially Ocean)
+- backend-dependent features and deployment prerequisites
 
-## Documentation
+## License
 
-- `COMPLETE_INVENTORY_REPORT_2026-03-02.md` (full inventory snapshot)
-- `QUICKSTART.md`
-- `USER_GUIDE.md`
-- `CONTROLS_REFERENCE.md`
-- `ARCHITECTURE.md`
-- `TECHNICAL_DOCS.md`
-- `API_SETUP.md`
-- `RELEASE_CHECKLIST.md`
-- `KNOWN_ISSUES.md`
-- `CHANGELOG.md`
-- `DOCUMENTATION_INDEX.md`
+This repository is source-available under the custom terms in [LICENSE](LICENSE). It is not an OSI open-source license.
+
+## Contributing
+
+Contribution workflow and validation requirements are documented in [CONTRIBUTING.md](CONTRIBUTING.md).

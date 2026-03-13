@@ -1,5 +1,36 @@
 # Changelog
 
+## [2026-03-13]
+
+### Added
+
+- OSM-facing documentation package:
+  - `DATA_SOURCES.md`
+  - `ATTRIBUTION.md`
+  - `LIMITATIONS.md`
+  - `OSM_ECOSYSTEM_METADATA.md`
+  - `OSM_WIKI_ENTRY_DRAFT.md`
+- README screenshot section including Ocean mode example image.
+
+### Changed
+
+- `README.md` rewritten for public OSM/community discovery clarity:
+  - plain-language project framing
+  - feature and scope summary
+  - data/attribution links
+  - quick run/test commands
+  - limitations visibility
+- `DOCUMENTATION_INDEX.md` reorganized into public-facing and engineering groupings.
+- `QUICKSTART.md`, `CONTRIBUTING.md`, and `GITHUB_DEPLOYMENT.md` aligned to `WorldExplorer3D` repo flow.
+- package metadata (`package.json`) aligned to `WorldExplorer3D` identity and discoverability.
+- Pages workflow trigger aligned to `main` release flow.
+
+### Runtime / App Integration Included
+
+- Preserves current geolocation launch controls (`Use My Location`) in title + globe selector.
+- Preserves current Ocean destination mode and Earth/Ocean switching flow.
+- Preserves app/public mirror tooling with `app/data` parity checks.
+
 ## [2026-03-02]
 
 ### Added
@@ -77,4 +108,3 @@
 ### Platform/Billing Update
 
 - Added Firebase/Stripe billing path and account flow integration.
-

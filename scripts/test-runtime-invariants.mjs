@@ -6,7 +6,7 @@ import { chromium } from 'playwright';
 
 const rootDir = process.cwd();
 const host = '127.0.0.1';
-const preferredPort = 4173;
+const candidatePorts = [4173, 4174, 4175, 4176, 4177];
 const outputDir = path.join(rootDir, 'output', 'playwright', 'runtime-invariants');
 
 async function mkdirp(dir) {
@@ -86,13 +86,15 @@ async function serveStaticRoot(port) {
 }
 
 async function startServer() {
-  try {
-    const server = await serveStaticRoot(preferredPort);
-    return { server, port: preferredPort, owned: true };
-  } catch {
-    // Fallback: assume caller already runs local server.
-    return { server: null, port: preferredPort, owned: false };
+  for (const port of candidatePorts) {
+    try {
+      const server = await serveStaticRoot(port);
+      return { server, port, owned: true };
+    } catch {
+      // try next candidate
+    }
   }
+  throw new Error(`Unable to start local static server on ports: ${candidatePorts.join(', ')}`);
 }
 
 async function waitForRuntimeSnapshot(page, timeoutMs = 120000) {

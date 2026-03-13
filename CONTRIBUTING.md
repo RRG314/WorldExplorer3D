@@ -1,6 +1,6 @@
-# Contributing to World Explorer
+# Contributing to World Explorer 3D
 
-Last reviewed: 2026-03-02
+Last reviewed: 2026-03-13
 
 Contribution workflow and minimum quality bars for this repository.
 
@@ -8,7 +8,7 @@ Contribution workflow and minimum quality bars for this repository.
 
 Canonical repository:
 
-- `https://github.com/RRG314/WorldExplorer.git`
+- `https://github.com/RRG314/WorldExplorer3D`
 
 Preferred branch naming:
 
@@ -18,8 +18,8 @@ Preferred branch naming:
 ## 2. Local Setup
 
 ```bash
-git clone https://github.com/RRG314/WorldExplorer.git
-cd WorldExplorer
+git clone https://github.com/RRG314/WorldExplorer3D.git
+cd WorldExplorer3D
 npm install
 cd functions && npm install && cd ..
 python3 -m http.server --directory public 4173
@@ -43,7 +43,7 @@ Do not merge gameplay/UI/runtime changes without mirror parity.
 Required:
 
 1. `npm run release:verify` passes.
-2. Manual smoke for signup/signin, room create/join/invite, and key menu/button flows.
+2. Manual smoke for launch flows, geolocation path, and Earth/Ocean mode switching.
 3. No new blocking console/runtime errors in critical flows.
 
 If backend touched:
@@ -54,18 +54,16 @@ If backend touched:
 
 ## 5. Documentation Requirement
 
-Behavior changes must update docs in same PR.
+Behavior changes must update docs in the same PR.
 
-At minimum, update affected files from:
+At minimum, review/update affected files from:
 
 - `README.md`
-- `COMPLETE_INVENTORY_REPORT_2026-03-02.md`
 - `QUICKSTART.md`
-- `USER_GUIDE.md`
-- `ARCHITECTURE.md`
-- `TECHNICAL_DOCS.md`
-- `API_SETUP.md`
-- `RELEASE_CHECKLIST.md`
+- `DOCUMENTATION_INDEX.md`
+- `DATA_SOURCES.md`
+- `ATTRIBUTION.md`
+- `LIMITATIONS.md`
 - `CHANGELOG.md`
 
 ## 6. PR Format
@@ -86,8 +84,10 @@ Include screenshots for UI changes and logs for backend behavior changes.
 - use placeholders in docs/examples
 - keep billing/env values in runtime env, not source files
 
-## 8. Open Engineering Debt to Respect
+## 8. OSM-Facing Quality Bar
 
-- Node runtime upgrade for functions (target Node 22)
-- continued mirror discipline between `app/*` and `public/app/*`
+For map/data path changes:
 
+- keep OSM attribution visible and accurate
+- avoid exaggerated performance or coverage claims
+- document known tradeoffs/limitations explicitly

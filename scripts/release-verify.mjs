@@ -3,7 +3,8 @@ import { spawnSync } from 'node:child_process';
 const steps = [
   { name: 'Mirror parity', cmd: [process.execPath, 'scripts/verify-mirror.mjs'] },
   { name: 'Firestore rules', cmd: [process.execPath, 'scripts/test-rules.mjs'] },
-  { name: 'Runtime invariants', cmd: [process.execPath, 'scripts/test-runtime-invariants.mjs'] }
+  { name: 'Runtime invariants', cmd: [process.execPath, 'scripts/test-runtime-invariants.mjs'] },
+  { name: 'OSM smoke', cmd: [process.execPath, 'scripts/test-osm-smoke.mjs'] }
 ];
 
 for (const step of steps) {

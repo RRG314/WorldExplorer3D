@@ -1,28 +1,27 @@
 # Quick Start
 
-Last reviewed: 2026-03-02
+Last reviewed: 2026-03-13
 
-Fast path to run, test, and validate the current World Explorer platform.
+Fast path to run, test, and validate World Explorer 3D locally.
 
 ## 1. Prerequisites
 
 - Node.js 20+
 - npm
 - Python 3
-- Firebase CLI (`npm i -g firebase-tools`)
-- Java 21 (required for Firestore emulator tests)
+- Java 21 (required for Firestore rules tests)
+- Firebase CLI (`npm i -g firebase-tools`) for backend deploy steps
 
 ## 2. Install
 
 ```bash
-cd "/Users/stevenreid/Documents/New project"
+git clone https://github.com/RRG314/WorldExplorer3D.git
+cd WorldExplorer3D
 npm install
 cd functions && npm install && cd ..
 ```
 
-## 3. Run Locally
-
-### Hosting-style (recommended)
+## 3. Run Locally (Hosting-Style)
 
 ```bash
 python3 -m http.server --directory public 4173
@@ -34,100 +33,60 @@ Open:
 - `http://127.0.0.1:4173/app/`
 - `http://127.0.0.1:4173/account/`
 
-### Branch-root style (Pages compatibility)
+## 4. Mirror Discipline (`app` -> `public/app`)
 
-```bash
-python3 -m http.server 4174
-```
+Canonical runtime source is `app/*`.
 
-Open:
-
-- `http://127.0.0.1:4174/`
-
-## 4. Sync and Parity
-
-If you edited `app/*`, sync to hosting mirror and verify parity:
+Before tests/deploy:
 
 ```bash
 npm run sync:public
 npm run verify:mirror
 ```
 
-## 5. Automated Validation
-
-### Full release gate
+## 5. Validation Gates
 
 ```bash
+npm run test
 npm run release:verify
 ```
 
-This runs:
+Optional focused OSM feature smoke:
 
-1. mirror parity check
+```bash
+npm run test:osm-smoke
+```
+
+This checks:
+
+1. mirror parity
 2. Firestore rules tests
-3. runtime invariant checks
+3. runtime invariants via Playwright
 
-### Individual commands
+## 6. Manual Smoke Checklist (Release Candidate)
 
-```bash
-npm run test:rules
-npm run test:runtime
-```
+1. Title launch:
+   - verify Earth/Moon/Space/Ocean destination toggles
+   - verify `Use My Location` button in title flow
+2. Globe selector:
+   - verify `Use My Location`
+   - verify custom coordinate launch and place label update
+3. Runtime:
+   - launch Earth and verify world/map UI loads
+   - switch Earth <-> Ocean from in-game environment controls
+4. No new blocking console/runtime errors in primary flows
 
-## 6. Manual Smoke Checklist (Pre-Deploy)
+## 7. GitHub Pages Readiness
 
-1. Location flow:
-   - open `Custom` -> globe selector
-   - pick a point and confirm place label updates
-   - verify `Favorites` shows preset + saved lists
-   - delete a saved favorite
-2. Launch flow:
-   - `Main Menu` from globe selector returns to title menu
-   - `Start Here` starts game from selected custom location
-3. Tutorial:
-   - first run shows walkthrough
-   - after completion, hints no longer auto-repeat unless restarted in Settings
-4. Driving handling:
-   - at speed, hold `Space` + steer on tight turns
-   - confirm tighter rear-biased drift behavior
-5. Multiplayer:
-   - sign in
-   - create room
-   - join by code
-   - invite friend and accept invite
-   - verify saved rooms `Open`/owner `Delete`
-6. Account:
-   - open `/account/`
-   - refresh overview and receipts
-   - validate profile update
+- Ensure `public/*` has the release-ready build state.
+- Ensure runtime links/assets resolve under Pages hosting path.
+- Push branch and verify workflows in Actions tab.
 
-## 7. Firebase Setup
+## 8. Backend Deploy (If Needed)
 
 ```bash
-firebase login
 firebase use worldexplorer3d-d9b83
+firebase deploy --only firestore:rules
+firebase deploy --only firestore:indexes
+firebase deploy --only functions
 ```
-
-Deploy rules/indexes/functions as needed.
-
-## 8. Deploy
-
-### Firebase
-
-```bash
-firebase deploy
-```
-
-### Preview channel
-
-```bash
-firebase hosting:channel:deploy test --project worldexplorer3d-d9b83 --only worldexplorer3d-d9b83 --expires 30d
-```
-
-## 9. Troubleshooting
-
-- Rules tests fail immediately: verify Java 21 install and `java -version`.
-- Multiplayer create/join denied: verify auth, rules deployment, and user profile quota fields.
-- Billing actions fail: verify function env params and function logs.
-- UI change not visible: sync mirror and hard refresh browser cache.
-

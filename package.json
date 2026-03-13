@@ -1,27 +1,38 @@
 {
-  "name": "new-project",
+  "name": "worldexplorer3d",
   "version": "1.0.0",
-  "description": "World Explorer is a browser-based 3D exploration runtime with a production Firebase deployment stack:",
+  "description": "Browser-based 3D geospatial exploration app using OpenStreetMap-derived data for Earth and destination-mode exploration.",
   "main": "three.js",
   "scripts": {
-    "test": "npm run test:rules && npm run test:runtime",
+    "test": "npm run test:rules && npm run test:runtime && npm run test:osm-smoke",
     "test:rules": "node scripts/test-rules.mjs",
     "sync:public": "node scripts/sync-public-app.mjs",
     "verify:mirror": "node scripts/verify-mirror.mjs",
     "test:runtime": "node scripts/test-runtime-invariants.mjs",
+    "test:osm-smoke": "node scripts/test-osm-smoke.mjs",
     "release:verify": "node scripts/release-verify.mjs"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/RRG314/WorldExplorer.git"
+    "url": "git+https://github.com/RRG314/WorldExplorer3D.git"
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "keywords": [
+    "openstreetmap",
+    "osm",
+    "geospatial",
+    "mapping",
+    "3d",
+    "webgl",
+    "threejs",
+    "browser-app",
+    "world-exploration"
+  ],
+  "author": "Steven Reid",
+  "license": "SEE LICENSE IN LICENSE",
   "bugs": {
-    "url": "https://github.com/RRG314/WorldExplorer/issues"
+    "url": "https://github.com/RRG314/WorldExplorer3D/issues"
   },
-  "homepage": "https://github.com/RRG314/WorldExplorer#readme",
+  "homepage": "https://github.com/RRG314/WorldExplorer3D#readme",
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",
     "firebase": "^12.9.0"

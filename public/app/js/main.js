@@ -11,12 +11,14 @@ const OVERLAY_ANCHOR_GAP = 10;
 const DEFAULT_LOADING_BG = 'loading-bg.jpg';
 const TRANSITION_LOADING = {
   space: { background: 'space-transition.png', text: 'Preparing Space Flight...' },
-  moon: { background: 'moon-transition.png', text: 'Approaching The Moon...' }
+  moon: { background: 'moon-transition.png', text: 'Approaching The Moon...' },
+  ocean: { background: 'loading-bg.jpg', text: 'Diving Into Ocean Mode...' }
 };
 const LOADING_BG_BY_MODE = {
   earth: DEFAULT_LOADING_BG,
   moon: 'moon-transition.png',
-  space: 'space-transition.png'
+  space: 'space-transition.png',
+  ocean: DEFAULT_LOADING_BG
 };
 
 function _isVisibleRect(el) {
@@ -84,8 +86,12 @@ function shouldUseComposer() {
 function renderLoop(t = 0) {
   requestAnimationFrame(renderLoop);
 
-  // Skip main rendering entirely during space flight (huge perf save)
-  if (appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT) || appCtx.spaceFlight && appCtx.spaceFlight.active) {
+  // Skip main rendering entirely during destination modes with dedicated renderers.
+  if (
+    appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT) ||
+    appCtx.spaceFlight && appCtx.spaceFlight.active ||
+    appCtx.oceanMode && appCtx.oceanMode.active
+  ) {
     appCtx.lastTime = t;
     return;
   }

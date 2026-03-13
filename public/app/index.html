@@ -50,7 +50,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 /* Location Grid */
 .loc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .loc-grid.custom-centered{grid-template-columns:1fr;max-width:300px;margin:0 auto}
-.launch-switch-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:14px}
+.launch-switch-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
 .launch-switch-btn{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.9);border-radius:10px;padding:10px 12px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.2s;min-height:44px}
 .launch-switch-btn:hover{border-color:#cbd5e1;background:#f1f5f9}
 .launch-switch-btn.active{border-color:#667eea;background:#f0f4ff;color:#3b5bdb;box-shadow:0 4px 12px rgba(102,126,234,0.15)}
@@ -306,7 +306,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .flowerChallengePanel{top:max(58px,calc(env(safe-area-inset-top) + 54px));left:8px;right:8px;width:auto;max-height:52dvh;padding:10px}
   .flowerLeaderboard{max-height:110px}
   .loc-grid{grid-template-columns:1fr;gap:10px}
-  .launch-switch-row{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+  .launch-switch-row{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
   .tab-btn{font-size:12px;padding:12px 8px}
   #tab-multiplayer{padding-bottom:150px}
 
@@ -861,6 +861,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 <button class="launch-switch-btn active" id="earthLaunchToggle" data-launch="earth" type="button">🌍 Earth</button>
 <button class="launch-switch-btn" id="moonLaunchToggle" data-launch="moon" type="button">🌙 Moon</button>
 <button class="launch-switch-btn" id="spaceLaunchToggle" data-launch="space" type="button">🚀 Space</button>
+<button class="launch-switch-btn" id="oceanLaunchToggle" data-launch="ocean" type="button">🌊 Ocean</button>
 </div>
 <div class="loc-grid custom-centered">
 <div class="loc custom" data-loc="custom"><div class="loc-name">🌍 Custom</div><div class="loc-region">Any Location</div></div>
@@ -1508,10 +1509,10 @@ Explore the area
 <div class="floatItem" id="fDriving">🚗 Driving Mode</div>
 <div class="floatItem" id="fWalk">🚶 Walk Mode</div>
 <div class="floatItem" id="fDrone">🚁 Drone Mode</div>
+<div class="floatItem" id="fOceanMode">🌊 Ocean Mode</div>
+<div class="floatItem" id="fEarthMode">🌍 Earth Mode</div>
 <div class="floatItem" id="fSpaceDirect">🌙 Direct to Moon</div>
 <div class="floatItem" id="fSpaceRocket">🚀 Rocket to Moon</div>
-<div style="border-top:1px solid #e2e8f0;margin:6px 0"></div>
-<div class="floatItem" id="fNextCity">📍 New Location</div>
 </div>
 </div>
 
@@ -1521,7 +1522,6 @@ Explore the area
 <div class="floatItem" id="fSatellite">🛰️ Satellite</div>
 <div class="floatItem" id="fRoads">🛣️ Show Roads</div>
 <div class="floatItem" id="fLandUse">🗺️ Land Use</div>
-<div class="floatItem on" id="fRdtNoise">🧬 RDT Detail</div>
 <div class="floatItem" id="fTimeOfDay">☀️ Day/Night</div>
 <div class="floatItem" id="fClouds">☁️ Clouds</div>
 <div class="floatItem" id="fConstellations">✨ Constellations</div>
@@ -1668,6 +1668,15 @@ Explore the area
 • Space - Thrust / Boost<br>
 • Shift - Brake / Decelerate<br>
 • LAND ON ... Button - Land when in range
+</div>
+<div id="oceanControls" style="display:none">
+<b>🌊 Submarine Mode:</b><br>
+• W/S - Forward / Reverse thrust<br>
+• A/D - Turn left / right<br>
+• Space - Ascend<br>
+• Shift/Ctrl - Descend<br>
+• Arrow keys - Alternate steering controls<br>
+• Explore the reef shelf and open deep ocean
 </div>
 </div></div>
 <div id="mobileTouchControls" aria-label="Mobile navigation controls">
@@ -2233,5 +2242,5 @@ if (titleScreenObserverTarget) {
   titleObserver.observe(titleScreenObserverTarget, { attributes: true, attributeFilter: ['class'] });
 }
 </script>
-<script type="module" src="js/bootstrap.js?v=72"></script>
+<script type="module" src="js/bootstrap.js?v=73"></script>
 </body></html>

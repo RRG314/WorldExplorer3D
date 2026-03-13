@@ -9,11 +9,13 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 //   EARTH:        main renderLoop → update() → renderer.render(scene, camera)
 //   SPACE_FLIGHT: animateSpaceFlight() → spaceFlight.renderer.render(...)
 //   MOON:         main renderLoop → update() → renderer.render(scene, camera)
+//   OCEAN:        animateOceanMode() → oceanMode.renderer.render(...)
 
 const ENV = Object.freeze({
   EARTH: 'EARTH',
   SPACE_FLIGHT: 'SPACE_FLIGHT',
-  MOON: 'MOON'
+  MOON: 'MOON',
+  OCEAN: 'OCEAN'
 });
 
 let _activeEnv = null; // null until first switchEnv
@@ -22,10 +24,11 @@ let _envDebugEl = null; // debug HUD element
 
 // Valid transitions: which env can switch to which
 const _validTransitions = {
-  null: [ENV.EARTH],
-  EARTH: [ENV.SPACE_FLIGHT, ENV.MOON],
-  SPACE_FLIGHT: [ENV.EARTH, ENV.MOON],
-  MOON: [ENV.SPACE_FLIGHT, ENV.EARTH]
+  null: [ENV.EARTH, ENV.OCEAN],
+  EARTH: [ENV.SPACE_FLIGHT, ENV.MOON, ENV.OCEAN],
+  SPACE_FLIGHT: [ENV.EARTH, ENV.MOON, ENV.OCEAN],
+  MOON: [ENV.SPACE_FLIGHT, ENV.EARTH, ENV.OCEAN],
+  OCEAN: [ENV.EARTH, ENV.MOON, ENV.SPACE_FLIGHT]
 };
 
 function getEnv() {
@@ -65,8 +68,8 @@ function switchEnv(newEnv) {
   // Sync legacy state flags for backward compatibility
   _syncLegacyFlags(newEnv);
 
-  // Building blocks are an Earth/Moon interaction; disable during space flight.
-  if (newEnv === ENV.SPACE_FLIGHT && typeof appCtx.setBuildModeEnabled === 'function') {
+  // Building blocks are an Earth/Moon interaction; disable during non-terrain destination modes.
+  if ((newEnv === ENV.SPACE_FLIGHT || newEnv === ENV.OCEAN) && typeof appCtx.setBuildModeEnabled === 'function') {
     appCtx.setBuildModeEnabled(false);
   }
 
@@ -94,6 +97,10 @@ function _syncLegacyFlags(env) {
       break;
     case ENV.MOON:
       appCtx.onMoon = true;
+      appCtx.travelingToMoon = false;
+      break;
+    case ENV.OCEAN:
+      appCtx.onMoon = false;
       appCtx.travelingToMoon = false;
       break;
   }
