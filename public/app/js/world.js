@@ -3413,11 +3413,19 @@ async function loadRoads(retryPass = 0) {
     return loadRoads(retryPass + 1);
   }
   if (!loaded) {
-    appCtx.showLoad('Failed to load. Click to retry.');
-    document.getElementById('loading').onclick = () => {
-      document.getElementById('loading').onclick = null;
-      loadRoads();
-    };
+    // Final safety net for upstream outages: do not leave users blocked behind
+    // a manual retry screen; recover with whichever fallback mode is appropriate.
+    console.warn('[WorldLoad] Final load path failed. Entering fallback recovery mode.');
+    if (appCtx.roads.length === 0) {
+      if (useSyntheticFallbackRoads) {
+        createSyntheticFallbackWorld();
+        finalizeLoadedWorld('synthetic_final_recovery');
+      } else {
+        finalizeLoadedWorld('no_roads_final_recovery');
+      }
+    } else {
+      finalizeLoadedWorld('partial_final_recovery');
+    }
   }
   appCtx.worldLoading = false;
   if (typeof appCtx.setPerfLiveStat === 'function') {
