@@ -17,6 +17,8 @@ const INTERIOR_LEVEL_HEIGHT = 3.4;
 const INTERIOR_WALL_HEIGHT = 3.15;
 const INTERIOR_WALL_THICKNESS = 0.32;
 const INTERIOR_FLOOR_OFFSET = 0.03;
+const INTERIOR_FLOOR_CLEARANCE = 0.12;
+const INTERIOR_SHELL_CLEARANCE = INTERIOR_WALL_THICKNESS * 0.5 + 0.08;
 const INTERIOR_NOTICE_MS = 2600;
 const INTERIOR_INTERACTION_REFRESH_MS = 120;
 const INTERIOR_INTERACTION_MOVE_EPSILON = 0.75;
@@ -228,12 +230,35 @@ function polygonSamplePoints(points) {
   return samples;
 }
 
+function footprintInteriorSamplePoints(points, steps = 4) {
+  if (!Array.isArray(points) || points.length < 3) return [];
+  const bounds = footprintBounds(points);
+  const out = [];
+  for (let gx = 0; gx <= steps; gx++) {
+    for (let gz = 0; gz <= steps; gz++) {
+      const point = {
+        x: bounds.minX + bounds.width * (gx / Math.max(1, steps)),
+        z: bounds.minZ + bounds.depth * (gz / Math.max(1, steps))
+      };
+      if (pointInPolygonSafe(point.x, point.z, points)) {
+        out.push(point);
+      }
+    }
+  }
+  return out;
+}
+
 function estimateInteriorFloorBaseY(building, footprint, centroid, entrances = [], desiredPoint = null) {
   const surfaceSamples = [];
   const fallbackBase = finiteNumber(building?.baseY, 0);
   if (Number.isFinite(fallbackBase)) surfaceSamples.push(fallbackBase);
 
   polygonSamplePoints(footprint).forEach((point) => {
+    const y = sampleSurfaceY(point.x, point.z, fallbackBase);
+    if (Number.isFinite(y)) surfaceSamples.push(y);
+  });
+
+  footprintInteriorSamplePoints(footprint, 4).forEach((point) => {
     const y = sampleSurfaceY(point.x, point.z, fallbackBase);
     if (Number.isFinite(y)) surfaceSamples.push(y);
   });
@@ -253,11 +278,17 @@ function estimateInteriorFloorBaseY(building, footprint, centroid, entrances = [
     if (Number.isFinite(y)) surfaceSamples.push(y);
   }
 
-  const perimeterFloor = percentile(surfaceSamples, entrances.length > 0 ? 0.8 : 0.72);
-  if (Number.isFinite(perimeterFloor)) {
-    return Math.max(fallbackBase, perimeterFloor) - INTERIOR_FLOOR_OFFSET;
+  const perimeterFloor = percentile(surfaceSamples, entrances.length > 0 ? 0.88 : 0.82);
+  const maxSurface = surfaceSamples.reduce((best, value) => Number.isFinite(value) ? Math.max(best, value) : best, -Infinity);
+  const safeFloor = Math.max(
+    fallbackBase,
+    Number.isFinite(perimeterFloor) ? perimeterFloor : -Infinity,
+    Number.isFinite(maxSurface) ? maxSurface : -Infinity
+  );
+  if (Number.isFinite(safeFloor)) {
+    return safeFloor + INTERIOR_FLOOR_CLEARANCE - INTERIOR_FLOOR_OFFSET;
   }
-  return fallbackBase - INTERIOR_FLOOR_OFFSET;
+  return fallbackBase + INTERIOR_FLOOR_CLEARANCE - INTERIOR_FLOOR_OFFSET;
 }
 
 function pickInteriorLevel(features, entrances, building) {
@@ -448,6 +479,21 @@ function addWallMesh(group, p1, p2, y, material, height = INTERIOR_WALL_HEIGHT, 
   return mesh;
 }
 
+function addBackdropRoomMesh(group, bounds, floorY, material, height = INTERIOR_WALL_HEIGHT) {
+  if (!bounds || !(bounds.width > 1) || !(bounds.depth > 1)) return null;
+  const mesh = new THREE.Mesh(
+    new THREE.BoxGeometry(bounds.width + 0.18, height, bounds.depth + 0.18),
+    material
+  );
+  mesh.position.set(
+    (bounds.minX + bounds.maxX) * 0.5,
+    floorY + height * 0.5,
+    (bounds.minZ + bounds.maxZ) * 0.5
+  );
+  group.add(mesh);
+  return mesh;
+}
+
 function addFlatSurfaceMesh(group, points, y, material, tessellation = 8) {
   if (!Array.isArray(points) || points.length < 3) return null;
   const shape = createShapeFromPoints(points);
@@ -459,23 +505,134 @@ function addFlatSurfaceMesh(group, points, y, material, tessellation = 8) {
   return mesh;
 }
 
-function hideBuildingMeshes(building) {
-  const key = buildingKey(building);
-  const hidden = [];
-  if (!Array.isArray(appCtx.buildingMeshes)) return hidden;
-  for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
-    const mesh = appCtx.buildingMeshes[i];
-    if (!mesh || mesh.userData?.sourceBuildingId !== key) continue;
-    hidden.push(mesh);
-    mesh.visible = false;
-  }
-  return hidden;
+function snapshotMaterialState(material) {
+  if (!material) return null;
+  return {
+    material,
+    side: material.side,
+    transparent: material.transparent,
+    opacity: material.opacity,
+    depthWrite: material.depthWrite
+  };
 }
 
-function showHiddenMeshes(meshes) {
-  if (!Array.isArray(meshes)) return;
-  meshes.forEach((mesh) => {
-    if (mesh) mesh.visible = true;
+function eachMeshMaterial(mesh, callback) {
+  if (!mesh?.material || typeof callback !== 'function') return [];
+  if (Array.isArray(mesh.material)) {
+    return mesh.material.map((material) => callback(material)).filter(Boolean);
+  }
+  const result = callback(mesh.material);
+  return result ? [result] : [];
+}
+
+function prepareExteriorShellForInterior(building) {
+  const key = buildingKey(building);
+  const states = [];
+  if (!Array.isArray(appCtx.buildingMeshes)) return states;
+  for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
+    const mesh = appCtx.buildingMeshes[i];
+    const meshKey = mesh?.userData?.sourceBuildingId ? String(mesh.userData.sourceBuildingId) : '';
+    if (!mesh || meshKey !== key) continue;
+    const isPrimaryShell = Array.isArray(mesh.userData?.buildingFootprint) && mesh.userData.buildingFootprint.length >= 3;
+    states.push({
+      mesh,
+      visible: mesh.visible,
+      materialStates: eachMeshMaterial(mesh, snapshotMaterialState)
+    });
+    if (isPrimaryShell) {
+      mesh.visible = true;
+      eachMeshMaterial(mesh, (material) => {
+        material.side = THREE.DoubleSide;
+        material.transparent = false;
+        material.opacity = 1;
+        material.depthWrite = true;
+        return null;
+      });
+      continue;
+    }
+    mesh.visible = false;
+  }
+  return states;
+}
+
+function restoreExteriorShellState(states) {
+  if (!Array.isArray(states)) return;
+  states.forEach((state) => {
+    if (!state?.mesh) return;
+    state.mesh.visible = state.visible !== false;
+    if (!Array.isArray(state.materialStates)) return;
+    state.materialStates.forEach((materialState) => {
+      if (!materialState?.material) return;
+      materialState.material.side = materialState.side;
+      materialState.material.transparent = materialState.transparent;
+      materialState.material.opacity = materialState.opacity;
+      materialState.material.depthWrite = materialState.depthWrite;
+    });
+  });
+}
+
+function boundsOverlap(a, b, pad = 0) {
+  if (!a || !b) return false;
+  return !(
+    a.maxX < b.minX - pad ||
+    a.minX > b.maxX + pad ||
+    a.maxZ < b.minZ - pad ||
+    a.minZ > b.maxZ + pad
+  );
+}
+
+function meshWorldBounds2D(mesh) {
+  if (!mesh?.geometry) return null;
+  if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+  const bbox = mesh.geometry.boundingBox;
+  if (!bbox) return null;
+  mesh.updateMatrixWorld?.(true);
+  const min = bbox.min.clone().applyMatrix4(mesh.matrixWorld);
+  const max = bbox.max.clone().applyMatrix4(mesh.matrixWorld);
+  return {
+    minX: Math.min(min.x, max.x),
+    maxX: Math.max(min.x, max.x),
+    minZ: Math.min(min.z, max.z),
+    maxZ: Math.max(min.z, max.z)
+  };
+}
+
+function collectInteriorWorldSuppressionStates(footprint, center, radius = 42) {
+  const states = [];
+  if (!Array.isArray(footprint) || footprint.length < 3) return states;
+  const footprintBox = footprintBounds(footprint);
+  const refX = finiteNumber(center?.x, (footprintBox.minX + footprintBox.maxX) * 0.5);
+  const refZ = finiteNumber(center?.z, (footprintBox.minZ + footprintBox.maxZ) * 0.5);
+  const meshLists = [
+    appCtx.roadMeshes,
+    appCtx.landuseMeshes,
+    appCtx.vegetationMeshes,
+    appCtx.poiMeshes,
+    appCtx.streetFurnitureMeshes
+  ];
+
+  meshLists.forEach((list) => {
+    if (!Array.isArray(list)) return;
+    list.forEach((mesh) => {
+      if (!mesh || mesh.visible === false) return;
+      const bounds = meshWorldBounds2D(mesh);
+      if (!bounds || !boundsOverlap(bounds, footprintBox, 1.2)) return;
+      const cx = (bounds.minX + bounds.maxX) * 0.5;
+      const cz = (bounds.minZ + bounds.maxZ) * 0.5;
+      if (Math.hypot(cx - refX, cz - refZ) > radius) return;
+      states.push({ mesh, visible: mesh.visible !== false });
+      mesh.visible = false;
+    });
+  });
+
+  return states;
+}
+
+function restoreInteriorWorldSuppression(states) {
+  if (!Array.isArray(states)) return;
+  states.forEach((state) => {
+    if (!state?.mesh) return;
+    state.mesh.visible = state.visible !== false;
   });
 }
 
@@ -557,10 +714,130 @@ function createGeneratedInteriorDefinition(support, options = {}) {
   });
 }
 
+function polygonEdgeClearance(point, polygon) {
+  const hit = projectPointToPolygonRing(point, polygon);
+  return Number.isFinite(hit?.dist) ? hit.dist : 0;
+}
+
+function buildEdgeSamplePoints(points, samplesPerEdge = 3) {
+  if (!Array.isArray(points) || points.length < 2) return [];
+  const out = [];
+  for (let i = 0; i < points.length; i++) {
+    const a = points[i];
+    const b = points[(i + 1) % points.length];
+    if (!a || !b) continue;
+    out.push({ x: a.x, z: a.z });
+    for (let step = 1; step <= samplesPerEdge; step++) {
+      const t = step / (samplesPerEdge + 1);
+      out.push({
+        x: a.x + (b.x - a.x) * t,
+        z: a.z + (b.z - a.z) * t
+      });
+    }
+  }
+  return out;
+}
+
+function footprintFullyContained(inner, outer, minClearance = 0.05) {
+  if (!Array.isArray(inner) || inner.length < 3 || !Array.isArray(outer) || outer.length < 3) return false;
+  const samples = buildEdgeSamplePoints(inner, 3);
+  if (samples.length === 0) return false;
+  for (let i = 0; i < samples.length; i++) {
+    const point = samples[i];
+    if (!pointInPolygonSafe(point.x, point.z, outer)) return false;
+    if (polygonEdgeClearance(point, outer) < minClearance) return false;
+  }
+  return true;
+}
+
+function footprintMinimumClearance(inner, outer) {
+  if (!Array.isArray(inner) || inner.length < 3 || !Array.isArray(outer) || outer.length < 3) return 0;
+  const samples = buildEdgeSamplePoints(inner, 3);
+  if (samples.length === 0) return 0;
+  let minClearance = Infinity;
+  for (let i = 0; i < samples.length; i++) {
+    const point = samples[i];
+    if (!pointInPolygonSafe(point.x, point.z, outer)) return 0;
+    minClearance = Math.min(minClearance, polygonEdgeClearance(point, outer));
+  }
+  return Number.isFinite(minClearance) ? minClearance : 0;
+}
+
+function findInteriorAnchor(footprint) {
+  if (!Array.isArray(footprint) || footprint.length < 3) return null;
+  const bounds = footprintBounds(footprint);
+  const centroid = polygonCentroid(footprint);
+  const candidates = [];
+
+  if (centroid) candidates.push({ x: centroid.x, z: centroid.z });
+  candidates.push({
+    x: (bounds.minX + bounds.maxX) * 0.5,
+    z: (bounds.minZ + bounds.maxZ) * 0.5
+  });
+
+  polygonSamplePoints(footprint).forEach((point) => {
+    candidates.push({ x: point.x, z: point.z });
+  });
+
+  const steps = 5;
+  for (let gx = 0; gx <= steps; gx++) {
+    for (let gz = 0; gz <= steps; gz++) {
+      candidates.push({
+        x: bounds.minX + bounds.width * (gx / steps),
+        z: bounds.minZ + bounds.depth * (gz / steps)
+      });
+    }
+  }
+
+  let best = null;
+  for (let i = 0; i < candidates.length; i++) {
+    const point = candidates[i];
+    if (!pointInPolygonSafe(point.x, point.z, footprint)) continue;
+    const clearance = polygonEdgeClearance(point, footprint);
+    if (!best || clearance > best.clearance) {
+      best = { point, clearance };
+    }
+  }
+
+  return best?.point || centroid || {
+    x: (bounds.minX + bounds.maxX) * 0.5,
+    z: (bounds.minZ + bounds.maxZ) * 0.5
+  };
+}
+
+function buildContainedRectFootprint(footprint, center, minClearance = INTERIOR_SHELL_CLEARANCE) {
+  if (!Array.isArray(footprint) || footprint.length < 3 || !center) return [];
+  const bounds = footprintBounds(footprint);
+  const maxHalfWidth = Math.max(0, bounds.width * 0.5 - minClearance);
+  const maxHalfDepth = Math.max(0, bounds.depth * 0.5 - minClearance);
+  if (!(maxHalfWidth > 0.75) || !(maxHalfDepth > 0.75)) return [];
+
+  const baseHalfWidth = Math.min(Math.max(1.4, bounds.width * 0.42), maxHalfWidth);
+  const baseHalfDepth = Math.min(Math.max(1.4, bounds.depth * 0.42), maxHalfDepth);
+  const scales = [1, 0.94, 0.88, 0.82, 0.76, 0.7, 0.64, 0.58, 0.52, 0.46, 0.4, 0.34, 0.28, 0.22];
+
+  for (let i = 0; i < scales.length; i++) {
+    const scale = scales[i];
+    const halfWidth = Math.max(0.8, Math.min(baseHalfWidth * scale, maxHalfWidth));
+    const halfDepth = Math.max(0.8, Math.min(baseHalfDepth * scale, maxHalfDepth));
+    const rect = [
+      { x: center.x - halfWidth, z: center.z - halfDepth },
+      { x: center.x + halfWidth, z: center.z - halfDepth },
+      { x: center.x + halfWidth, z: center.z + halfDepth },
+      { x: center.x - halfWidth, z: center.z + halfDepth }
+    ];
+    if (footprintFullyContained(rect, footprint, minClearance) && ringAreaAbs(rect) >= 6) {
+      return rect;
+    }
+  }
+
+  return [];
+}
+
 function buildUsableFootprint(points) {
   const footprint = cleanRingPoints(points);
   if (footprint.length < 3) return [];
-  const centroid = polygonCentroid(footprint);
+  const centroid = findInteriorAnchor(footprint);
   if (!centroid) return footprint;
 
   const bounds = footprintBounds(footprint);
@@ -581,10 +858,20 @@ function buildUsableFootprint(points) {
   if (cleaned.length < 3) return footprint;
   const originalArea = ringAreaAbs(footprint);
   const nextArea = ringAreaAbs(cleaned);
-  if (!(nextArea > 10) || nextArea >= originalArea * 0.97) {
-    return footprint;
+  if (
+    nextArea > 10 &&
+    nextArea < originalArea * 0.97 &&
+    footprintFullyContained(cleaned, footprint, INTERIOR_SHELL_CLEARANCE)
+  ) {
+    return cleaned;
   }
-  return cleaned;
+
+  const rectFallback = buildContainedRectFootprint(footprint, centroid, INTERIOR_SHELL_CLEARANCE);
+  if (rectFallback.length >= 3) {
+    return rectFallback;
+  }
+
+  return footprint;
 }
 
 function constrainPointToFootprint(point, footprint, centroid, margin = 0.28) {
@@ -933,43 +1220,17 @@ function buildGeneratedPartitions(footprint, centroid) {
 }
 
 function createGeneratedInteriorPlan(definition, footprint, centroid) {
-  const bounds = footprintBounds(footprint);
-  const width = bounds.width;
-  const depth = bounds.depth;
-  const corridorWidth = Math.max(1.8, Math.min(3.2, Math.min(width, depth) * 0.28));
-  const features = [];
-
-  if (width >= depth) {
-    const mainLine = fitLineToFootprint([
-      { x: bounds.minX + 1.2, z: centroid.z },
-      { x: bounds.maxX - 1.2, z: centroid.z }
-    ], footprint, centroid);
-    const lobbyLine = fitLineToFootprint([
-      { x: centroid.x, z: bounds.minZ + 1.1 },
-      { x: centroid.x, z: bounds.maxZ - 1.1 }
-    ], footprint, centroid);
-    const corridor = makeLineFeature(mainLine, corridorWidth, 'corridor', `${definition.label} hall`);
-    const cross = makeLineFeature(lobbyLine, Math.max(1.4, corridorWidth * 0.72), 'lobby', 'Lobby');
-    if (corridor) features.push(corridor);
-    if (cross) features.push(cross);
-  } else {
-    const mainLine = fitLineToFootprint([
-      { x: centroid.x, z: bounds.minZ + 1.2 },
-      { x: centroid.x, z: bounds.maxZ - 1.2 }
-    ], footprint, centroid);
-    const lobbyLine = fitLineToFootprint([
-      { x: bounds.minX + 1.1, z: centroid.z },
-      { x: bounds.maxX - 1.1, z: centroid.z }
-    ], footprint, centroid);
-    const corridor = makeLineFeature(mainLine, corridorWidth, 'corridor', `${definition.label} hall`);
-    const cross = makeLineFeature(lobbyLine, Math.max(1.4, corridorWidth * 0.72), 'lobby', 'Lobby');
-    if (corridor) features.push(corridor);
-    if (cross) features.push(cross);
-  }
-
   return {
-    features,
-    partitions: buildGeneratedPartitions(footprint, centroid)
+    features: [
+      {
+        kind: 'polygon',
+        indoorKind: 'room',
+        level: finiteNumber(definition?.selectedLevel, 0),
+        name: definition.label || 'Interior',
+        pts: footprint
+      }
+    ],
+    partitions: []
   };
 }
 
@@ -1008,11 +1269,34 @@ function buildInteriorScene(definition) {
   const support = definition.support;
   const building = support?.building || definition.building;
   const exteriorFootprint = buildingFootprintPoints(building);
-  const shellFootprint = buildUsableFootprint(exteriorFootprint);
-  const centroid = polygonCentroid(shellFootprint) || polygonCentroid(exteriorFootprint) || {
+  const baseShellFootprint = buildUsableFootprint(exteriorFootprint);
+  const exteriorArea = ringAreaAbs(exteriorFootprint);
+  const baseCentroid = findInteriorAnchor(baseShellFootprint) || findInteriorAnchor(exteriorFootprint) || {
     x: finiteNumber(building?.centerX, 0),
     z: finiteNumber(building?.centerZ, 0)
   };
+  const generatedRoomFootprint = buildContainedRectFootprint(
+    exteriorFootprint,
+    baseCentroid,
+    INTERIOR_SHELL_CLEARANCE + 0.2
+  );
+  let shellFootprint = baseShellFootprint;
+  let centroid = baseCentroid;
+  let featurePlan = prepareInteriorFeaturePlan(definition, shellFootprint, centroid);
+  if (featurePlan.mode === 'generated' && generatedRoomFootprint.length >= 3) {
+    shellFootprint = generatedRoomFootprint;
+    centroid = findInteriorAnchor(shellFootprint) || centroid;
+    featurePlan = prepareInteriorFeaturePlan(definition, shellFootprint, centroid);
+  }
+
+  const shellArea = ringAreaAbs(shellFootprint);
+  const needsOuterEnvelope =
+    featurePlan.mode === 'mapped' &&
+    Array.isArray(exteriorFootprint) &&
+    exteriorFootprint.length >= 3 &&
+    shellArea > 0 &&
+    shellArea < exteriorArea * 0.97;
+  const shellClearanceMin = footprintMinimumClearance(shellFootprint, exteriorFootprint);
 
   let desiredEntry = support?.entryAnchor ? { ...support.entryAnchor } : centroid;
   const walker = appCtx.Walk?.state?.walker || null;
@@ -1051,6 +1335,11 @@ function buildInteriorScene(definition) {
     roughness: 0.84,
     metalness: 0.04
   });
+  const envelopeFloorMaterial = new THREE.MeshStandardMaterial({
+    color: 0x36403a,
+    roughness: 0.96,
+    metalness: 0.01
+  });
   const corridorMaterial = new THREE.MeshStandardMaterial({
     color: 0x434f5d,
     roughness: 0.88,
@@ -1072,6 +1361,12 @@ function buildInteriorScene(definition) {
     metalness: 0,
     side: THREE.DoubleSide
   });
+  const generatedShellMaterial = new THREE.MeshStandardMaterial({
+    color: 0xcfd6dd,
+    roughness: 0.97,
+    metalness: 0,
+    side: THREE.BackSide
+  });
   const entryMaterial = new THREE.MeshStandardMaterial({
     color: 0x4cc9b0,
     emissive: 0x21564d,
@@ -1092,7 +1387,25 @@ function buildInteriorScene(definition) {
   ceilingLight.position.set(centroid.x, floorY + INTERIOR_WALL_HEIGHT - 0.32, centroid.z);
   group.add(ceilingLight);
 
+  if (needsOuterEnvelope) {
+    const envelopeFloor = addFlatSurfaceMesh(group, exteriorFootprint, floorY + INTERIOR_FLOOR_OFFSET - 0.012, envelopeFloorMaterial, 10);
+    const envelopeCeiling = addFlatSurfaceMesh(group, exteriorFootprint, floorY + INTERIOR_WALL_HEIGHT, ceilingMaterial, 8);
+    if (envelopeFloor) envelopeFloor.renderOrder = -1;
+    if (envelopeCeiling) envelopeCeiling.renderOrder = 0;
+
+    for (let i = 0; i < exteriorFootprint.length; i++) {
+      const p1 = exteriorFootprint[i];
+      const p2 = exteriorFootprint[(i + 1) % exteriorFootprint.length];
+      addWallMesh(group, p1, p2, floorY + INTERIOR_FLOOR_OFFSET - 0.01, accentWallMaterial);
+    }
+  }
+
+  const effectiveMode = featurePlan.mode;
+
   if (Array.isArray(shellFootprint) && shellFootprint.length >= 3) {
+    if (effectiveMode === 'generated') {
+      addBackdropRoomMesh(group, footprintBounds(shellFootprint), floorY + INTERIOR_FLOOR_OFFSET, generatedShellMaterial);
+    }
     const slab = addFlatSurfaceMesh(group, shellFootprint, floorY + INTERIOR_FLOOR_OFFSET, slabMaterial, 12);
     const shellCeiling = addFlatSurfaceMesh(group, shellFootprint, floorY + INTERIOR_WALL_HEIGHT, ceilingMaterial, 8);
     if (slab) placementTargets.push(slab);
@@ -1112,9 +1425,6 @@ function buildInteriorScene(definition) {
       if (collider) dynamicColliders.push(collider);
     }
   }
-
-  const featurePlan = prepareInteriorFeaturePlan(definition, shellFootprint, centroid);
-  const effectiveMode = featurePlan.mode;
 
   for (let i = 0; i < featurePlan.features.length; i++) {
     const feature = featurePlan.features[i];
@@ -1180,7 +1490,11 @@ function buildInteriorScene(definition) {
     dynamicColliders,
     placementTargets,
     walkSurfaces,
+    exteriorFootprint,
     usableFootprint: shellFootprint,
+    center: { x: centroid.x, z: centroid.z },
+    shellClearanceMin,
+    requiredShellClearance: INTERIOR_WALL_THICKNESS * 0.5,
     entryPoint: {
       x: resolvedEntryPoint.x,
       z: resolvedEntryPoint.z,
@@ -1317,7 +1631,12 @@ async function enterInteriorForSupport(support) {
   appCtx.scene.add(sceneState.group);
   appCtx.dynamicBuildingColliders = sceneState.dynamicColliders.slice();
 
-  const hiddenMeshes = support.synthetic ? [] : hideBuildingMeshes(support.building);
+  const exteriorShellState = support.synthetic ? [] : prepareExteriorShellForInterior(support.building);
+  const suppressedWorldMeshes = collectInteriorWorldSuppressionStates(
+    sceneState.exteriorFootprint,
+    sceneState.center,
+    48
+  );
   if (support.building && !support.synthetic) {
     support.building.collisionDisabled = true;
   }
@@ -1341,9 +1660,9 @@ async function enterInteriorForSupport(support) {
   }
   const previousView = appCtx.Walk?.state?.view || 'third';
   if (appCtx.Walk?.state) {
-    appCtx.Walk.state.view = 'first';
+    appCtx.Walk.state.view = previousView === 'first' ? 'third' : previousView;
     if (appCtx.Walk.state.characterMesh) {
-      appCtx.Walk.state.characterMesh.visible = false;
+      appCtx.Walk.state.characterMesh.visible = appCtx.Walk.state.view !== 'first';
     }
   }
 
@@ -1355,10 +1674,13 @@ async function enterInteriorForSupport(support) {
     support,
     building: support.building,
     group: sceneState.group,
-    hiddenMeshes,
+    exteriorShellState,
+    suppressedWorldMeshes,
     walkSurfaces: sceneState.walkSurfaces,
     placementTargets: sceneState.placementTargets,
     usableFootprint: sceneState.usableFootprint,
+    shellClearanceMin: sceneState.shellClearanceMin,
+    requiredShellClearance: sceneState.requiredShellClearance,
     outsideState,
     previousView,
     entryPoint: { ...sceneState.entryPoint },
@@ -1413,7 +1735,8 @@ function clearActiveInterior(options = {}) {
   if (active.building && !active.support?.synthetic) {
     active.building.collisionDisabled = false;
   }
-  showHiddenMeshes(active.hiddenMeshes);
+  restoreExteriorShellState(active.exteriorShellState);
+  restoreInteriorWorldSuppression(active.suppressedWorldMeshes);
   appCtx.dynamicBuildingColliders = [];
   disposeObject3D(active.group);
   appCtx.activeInterior = null;

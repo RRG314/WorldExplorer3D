@@ -219,6 +219,22 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - exact custom/geolocation spawn target with nearest-safe fallback
   - separate non-driveable OSM linear features for railways / footways / cycleways
 
+- Interior second-pass containment follow-up (2026-03-14):
+  - Added shell-clearance enforcement in `app/js/interiors.js` so generated interior shells must stay farther inside the exterior footprint than half the wall thickness.
+  - Added runtime invariant coverage in `scripts/test-runtime-invariants.mjs` for `shellClearanceMin >= requiredShellClearance`.
+  - Investigated leaked/interior-open visuals and found exterior mesh lookup could miss due to sourceBuildingId type mismatch.
+  - Normalized mesh source id comparison and added a generated-interior outer envelope pass from the real exterior footprint so containment does not depend on a matching exterior mesh.
+  - Switched generated interiors to an open-plan fallback room model instead of corridor/partition layouts, and raised interior floor resolution to clear the highest sampled exterior surface within the footprint.
+  - Stopped forcing first-person on interior entry; interior walk camera now uses a short over-the-shoulder interior profile.
+  - Added lazy local suppression of overlapping road/landuse/vegetation/POI/street-furniture meshes while inside an interior.
+  - Added a generated-room backdrop shell so fallback interiors stay visually enclosed even when surrounding world meshes exist.
+  - Local validation after the second pass:
+    - `npm run sync:public`
+    - `npm run verify:mirror`
+    - `npm run test:runtime`
+    - direct Playwright capture artifacts under `output/playwright/interior-shell-second-pass/` and `output/playwright/interior-system-pass/`
+  - Current state: local only, not deployed. Needs manual user retest before any publish.
+
 - System-level stabilization pass (2026-03-14):
   - Added `app/js/travel-mode.js` so keyboard and UI mode switching share one controller instead of duplicating walk/drive/drone transition code.
   - Interior interaction now caches nearby building candidates and suppresses redundant prompt DOM writes to reduce per-frame jitter while walking near buildings.
@@ -2685,3 +2701,8 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `npm run test:runtime` ✅
     - `npm run test:osm-smoke` ✅
     - `npm run test:world-matrix` ✅
+
+- Second-pass interior shell containment pass (post-deploy baseline):
+  - identified centroid-scaling shell inset as the likely remaining leak source for concave/irregular footprints
+  - replaced it with contained-shell validation plus an inscribed rectangle fallback in app/js/interiors.js
+  - next: browser screenshot check of an entered interior on the mirrored build

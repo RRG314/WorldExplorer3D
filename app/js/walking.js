@@ -53,6 +53,61 @@ function createWalkingModule(opts) {
   let lastWalkTerrainX = NaN;
   let lastWalkTerrainZ = NaN;
 
+  function pointInPolygonSafe(x, z, polygon) {
+    if (!Array.isArray(polygon) || polygon.length < 3) return false;
+    if (typeof appCtx.pointInPolygon === 'function') {
+      return appCtx.pointInPolygon(x, z, polygon) === true;
+    }
+    let inside = false;
+    for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+      const xi = polygon[i].x;
+      const zi = polygon[i].z;
+      const xj = polygon[j].x;
+      const zj = polygon[j].z;
+      const intersect = zi > z !== zj > z && x < (xj - xi) * (z - zi) / (zj - zi) + xi;
+      if (intersect) inside = !inside;
+    }
+    return inside;
+  }
+
+  function pointToSegmentDistanceXZ(x, z, p1, p2) {
+    const dx = p2.x - p1.x;
+    const dz = p2.z - p1.z;
+    const len2 = dx * dx + dz * dz;
+    if (len2 <= 1e-9) {
+      return { dist: Math.hypot(x - p1.x, z - p1.z), x: p1.x, z: p1.z };
+    }
+    let t = ((x - p1.x) * dx + (z - p1.z) * dz) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const px = p1.x + dx * t;
+    const pz = p1.z + dz * t;
+    return { dist: Math.hypot(x - px, z - pz), x: px, z: pz };
+  }
+
+  function clampPointInsideFootprint(x, z, footprint, margin = 0.28) {
+    if (!Array.isArray(footprint) || footprint.length < 3) return { x, z };
+    if (pointInPolygonSafe(x, z, footprint)) return { x, z };
+
+    let best = null;
+    for (let i = 0; i < footprint.length; i++) {
+      const p1 = footprint[i];
+      const p2 = footprint[(i + 1) % footprint.length];
+      const hit = pointToSegmentDistanceXZ(x, z, p1, p2);
+      if (!best || hit.dist < best.dist) best = hit;
+    }
+    if (!best) return { x, z };
+
+    const cx = footprint.reduce((sum, point) => sum + point.x, 0) / footprint.length;
+    const cz = footprint.reduce((sum, point) => sum + point.z, 0) / footprint.length;
+    const inwardX = cx - best.x;
+    const inwardZ = cz - best.z;
+    const inwardLen = Math.hypot(inwardX, inwardZ) || 1;
+    return {
+      x: best.x + inwardX / inwardLen * margin,
+      z: best.z + inwardZ / inwardLen * margin
+    };
+  }
+
   function createCharacterMesh() {
     const grp = new THREE.Group();
     // Lightweight default: simple human look with built-in walk animation.
@@ -1045,19 +1100,30 @@ function createWalkingModule(opts) {
     }
 
     // Third person view - NOW WITH PITCH SUPPORT AND JUMP TRACKING
+    const activeInterior = appCtx.activeInterior || null;
+    const interiorFootprint = Array.isArray(activeInterior?.usableFootprint) ? activeInterior.usableFootprint : null;
+    const interiorCamera = !!(activeInterior && interiorFootprint && interiorFootprint.length >= 3);
     const baseY = state.walker.y; // Use actual walker Y (includes jumps)
-    const back = CFG.thirdPersonDist;
-    const up = CFG.thirdPersonHeight;
+    const back = interiorCamera ? Math.min(1.05, CFG.thirdPersonDist * 0.24) : CFG.thirdPersonDist;
+    const up = interiorCamera ? Math.min(0.78, CFG.thirdPersonHeight * 0.34) : CFG.thirdPersonHeight;
 
     // Position camera behind and above the character, accounting for pitch
     const camX = state.walker.x - Math.sin(state.walker.yaw) * Math.cos(state.walker.pitch) * back;
     const camZ = state.walker.z - Math.cos(state.walker.yaw) * Math.cos(state.walker.pitch) * back;
     const camY = baseY + up - Math.sin(state.walker.pitch) * back * 0.5; // Adjust height based on pitch
 
-    camera.position.set(camX, camY, camZ);
+    let resolvedCamX = camX;
+    let resolvedCamZ = camZ;
+    if (interiorCamera && !pointInPolygonSafe(camX, camZ, interiorFootprint)) {
+      const clamped = clampPointInsideFootprint(camX, camZ, interiorFootprint, 0.42);
+      resolvedCamX = clamped.x;
+      resolvedCamZ = clamped.z;
+    }
+
+    camera.position.set(resolvedCamX, camY, resolvedCamZ);
 
     // Look at point ahead of character, accounting for pitch
-    const lookAhead = CFG.thirdPersonLookAhead;
+    const lookAhead = interiorCamera ? Math.min(1.45, CFG.thirdPersonLookAhead * 0.24) : CFG.thirdPersonLookAhead;
     const lookX = state.walker.x + Math.sin(state.walker.yaw) * Math.cos(state.walker.pitch) * lookAhead;
     const lookY = baseY - CFG.eyeHeight + 1.2 + Math.sin(state.walker.pitch) * lookAhead * 0.5; // Adjust look height based on pitch
     const lookZ = state.walker.z + Math.cos(state.walker.yaw) * Math.cos(state.walker.pitch) * lookAhead;

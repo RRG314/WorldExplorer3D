@@ -641,7 +641,9 @@ async function main() {
               entered: !!entered && !!ctx.activeInterior,
               mode: ctx.activeInterior?.mode || null,
               placementTargets: Array.isArray(ctx.activeInterior?.placementTargets) ? ctx.activeInterior.placementTargets.length : 0,
-              containedColliders: Array.isArray(ctx.dynamicBuildingColliders) ? ctx.dynamicBuildingColliders.length : 0
+              containedColliders: Array.isArray(ctx.dynamicBuildingColliders) ? ctx.dynamicBuildingColliders.length : 0,
+              shellClearanceMin: Number(ctx.activeInterior?.shellClearanceMin || 0),
+              requiredShellClearance: Number(ctx.activeInterior?.requiredShellClearance || 0)
             };
             if (ctx.activeInterior && typeof ctx.clearActiveInterior === 'function') {
               ctx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
@@ -773,7 +775,8 @@ async function main() {
         (
           report.enteredInteriorReport.entered === true &&
           report.enteredInteriorReport.placementTargets > 0 &&
-          report.enteredInteriorReport.containedColliders > 0
+          report.enteredInteriorReport.containedColliders > 0 &&
+          report.enteredInteriorReport.shellClearanceMin >= report.enteredInteriorReport.requiredShellClearance
         ),
       walkingControlsUpdated:
         report.walkingControlsText.includes('WASD - Move') &&
@@ -845,7 +848,7 @@ async function main() {
     assert(checks.waterMaterialsSolid, 'Water meshes are still rendering with transparent materials.');
     assert(checks.vegetationIntegrated, `Vegetation layer did not initialize correctly: ${JSON.stringify({ vegetationFeatures: report.vegetationFeatures, vegetationMeshes: report.vegetationMeshes })}`);
     assert(checks.lazyInteriorIdle, `Interior system is not staying lazy by default: ${JSON.stringify({ buildingEntrySupportExposed: report.buildingEntrySupportExposed, activeInteriorByDefault: report.activeInteriorByDefault, dynamicInteriorCollidersIdle: report.dynamicInteriorCollidersIdle, interiorActionExposed: report.interiorActionExposed, interiorPromptPresent: report.interiorPromptPresent })}`);
-    assert(checks.sampledInteriorEnterable, `Sampled building entry did not produce a usable contained interior: ${JSON.stringify(report.enteredInteriorReport || null)}`);
+    assert(checks.sampledInteriorEnterable, `Sampled building entry did not produce a usable contained interior shell: ${JSON.stringify(report.enteredInteriorReport || null)}`);
     assert(checks.syntheticDestinationEntryReady, `Synthetic real-estate fallback entry is unavailable: ${JSON.stringify({ syntheticDestinationEntrySupported: report.syntheticDestinationEntrySupported })}`);
     assert(checks.walkingControlsUpdated, 'Walking controls help text is out of sync with WASD/Arrow behavior.');
     assert(checks.droneControlsUpdated, 'Drone controls help text is out of sync with WASD/Arrow behavior.');
