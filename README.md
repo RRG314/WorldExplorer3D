@@ -87,6 +87,8 @@ npm run test
 npm run release:verify
 ```
 
+`npm run sync:public` also mirrors the repository `CNAME` file into `public/CNAME`, so the published Pages artifact keeps the `worldexplorer3d.io` custom domain attached to the current build.
+
 Targeted feature smoke:
 
 ```bash

@@ -27,6 +27,8 @@ npm run sync:public
 npm run verify:mirror
 ```
 
+The sync step also mirrors the repository `CNAME` file into `public/CNAME`, so each Pages deployment carries the `worldexplorer3d.io` custom-domain binding alongside the mirrored runtime.
+
 ## 2. Boot and Runtime Contracts
 
 ### 2.1 Boot path

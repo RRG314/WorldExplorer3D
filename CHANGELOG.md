@@ -24,6 +24,7 @@
 - `QUICKSTART.md`, `CONTRIBUTING.md`, and `GITHUB_DEPLOYMENT.md` aligned to `WorldExplorer3D` repo flow.
 - package metadata (`package.json`) aligned to `WorldExplorer3D` identity and discoverability.
 - Pages workflow trigger aligned to `main` release flow.
+- Mirror tooling now publishes the repository `CNAME` into `public/CNAME`, so GitHub Pages deployments keep `worldexplorer3d.io` bound to the current mirrored build.
 - Earth runtime safety and controls update:
   - traversal switches now preserve valid positions and resolve invalid walk -> drive transitions to nearest safe road spawns
   - geolocation/custom-location launches validate spawn safety before placement

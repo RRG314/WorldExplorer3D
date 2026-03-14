@@ -3,6 +3,7 @@ import path from 'node:path';
 
 const rootDir = process.cwd();
 const syncEntries = [
+  { source: 'CNAME', target: 'public/CNAME', type: 'file' },
   { source: 'index.html', target: 'public/index.html', type: 'file' },
   { source: 'account/index.html', target: 'public/account/index.html', type: 'file' },
   { source: 'app/index.html', target: 'public/app/index.html', type: 'file' },
