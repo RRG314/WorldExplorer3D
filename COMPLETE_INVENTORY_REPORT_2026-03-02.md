@@ -5,6 +5,17 @@ Repository: `WorldExplorer`
 Branch inspected: `steven/professional-audit-cleanup`
 Project target: `worldexplorer3d-d9b83`
 
+Supplemental note added 2026-03-13:
+
+- Active repo/runtime target is `WorldExplorer3D` with canonical runtime source in `app/*` and hosted mirror in `public/app/*`.
+- Active landing/account canonical sources are `index.html` and `account/index.html`, mirrored to `public/index.html` and `public/account/index.html`.
+- Current Earth runtime adds shared safe spawn resolution for geolocation/custom launches and traversal switching.
+- Current control scheme uses `WASD` movement plus arrow-key directional look for walking/drone, `M` for the large map, and `F4` for debug overlay access.
+- Current OSM Earth layers include `railway`, `footway`, and `cycleway` surfaces in addition to roads/buildings/land-use/water, and those layers now participate in walk traversal/path routing.
+- Current Earth OSM vegetation coverage now includes woods/parks/green areas plus `natural=tree` / `natural=tree_row` inputs feeding a batched tree pass.
+- Current indoor support is selective and on-demand only: supported buildings can load a mapped floor on `E`, but interiors are not globally active by default.
+- Runtime/account donation messaging remains optional-support only; map/core gameplay are not paywalled.
+
 This report is a code-first inventory of runtime features, backend systems, storage model, security boundaries, and release operations for the current branch.
 
 ## 1. Scope and Method
@@ -39,7 +50,7 @@ This report is a code-first inventory of runtime features, backend systems, stor
 | `/legal/privacy` | `legal/privacy.html` | Privacy page |
 | `/legal/terms` | `legal/terms.html` | Terms page |
 
-Hosting mirror path is `public/*`; canonical app source is `app/*` with sync to `public/app/*`.
+Hosting mirror path is `public/*`; canonical app source is `app/*` with sync to `public/app/*`, and canonical landing/account roots sync to `public/index.html` and `public/account/index.html`.
 
 ## 3. Frontend Runtime Architecture
 
@@ -52,6 +63,7 @@ Hosting mirror path is `public/*`; canonical app source is `app/*` with sync to 
 ### Canonical source and mirroring
 
 - Canonical runtime edits should be made in `app/*`.
+- Canonical landing/account edits should be made in `index.html` and `account/index.html`.
 - Mirror sync command: `npm run sync:public`.
 - Mirror parity verification: `npm run verify:mirror`.
 
@@ -324,4 +336,3 @@ Primary docs synchronized with this report:
 - `SECURITY_STORAGE_NOTICE.md`
 - `CHANGELOG.md`
 - `DOCUMENTATION_INDEX.md`
-

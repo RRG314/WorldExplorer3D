@@ -249,6 +249,41 @@ function closeLegend() {
   document.getElementById('legendPanel').style.display = 'none';
 }
 
+function renderInteriorLegend() {
+  const statusEl = document.getElementById('enterableBuildingsStatus');
+  const listEl = document.getElementById('enterableBuildingsList');
+  if (!statusEl || !listEl) return;
+
+  const loading = !!appCtx.interiorLegendLoading;
+  const items = Array.isArray(appCtx.interiorLegendEntries) ? appCtx.interiorLegendEntries : [];
+  const message = String(appCtx.interiorLegendMessage || '').trim();
+
+  if (loading) {
+    statusEl.textContent = message || 'Scanning nearby mapped interiors...';
+  } else if (message) {
+    statusEl.textContent = message;
+  } else if (items.length > 0) {
+    statusEl.textContent = `Mapped interiors within range: ${items.length}`;
+  } else {
+    statusEl.textContent = 'No supported buildings identified nearby yet.';
+  }
+
+  if (items.length === 0) {
+    listEl.innerHTML = '<div style="opacity:0.75">No mapped interior buildings are cached nearby.</div>';
+    return;
+  }
+
+  listEl.innerHTML = items.map((item) => {
+    const distance = Number.isFinite(item.distance) ? `${Math.round(item.distance)}m` : '';
+    return `
+      <div style="display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border:1px solid rgba(0,255,255,0.28);border-radius:6px;background:rgba(0,255,255,0.06)">
+        <span style="color:#d9fdff">${escapeHtml(item.label || 'Building')}</span>
+        <span style="color:#8ef9ff;white-space:nowrap">${distance}</span>
+      </div>
+    `;
+  }).join('');
+}
+
 function updateMapLayers() {
   appCtx.mapLayers.properties = document.getElementById('filterProperties').checked;
   appCtx.mapLayers.navigation = document.getElementById('filterNavigation').checked;
@@ -272,6 +307,12 @@ function updateMapLayers() {
   appCtx.mapLayers.police = document.getElementById('filterPolice').checked;
   appCtx.mapLayers.memoryPins = document.getElementById('filterMemoryPins').checked;
   appCtx.mapLayers.memoryFlowers = document.getElementById('filterMemoryFlowers').checked;
+  appCtx.mapLayers.paths = document.getElementById('filterPaths').checked;
+  appCtx.mapLayers.interiors = document.getElementById('filterInteriors').checked;
+  appCtx.showPathOverlays = appCtx.mapLayers.paths;
+  if (typeof appCtx.syncLinearFeatureOverlayVisibility === 'function') {
+    appCtx.syncLinearFeatureOverlayVisibility();
+  }
 
   // Update parent checkboxes
   const allPOIs = appCtx.mapLayers.schools && appCtx.mapLayers.healthcare && appCtx.mapLayers.emergency &&
@@ -311,10 +352,19 @@ function toggleAllLayers(state) {
   document.getElementById('filterMemoryPins').checked = state;
   document.getElementById('filterMemoryFlowers').checked = state;
   document.getElementById('filterRoads').checked = state;
+  document.getElementById('filterPaths').checked = state;
+  document.getElementById('filterInteriors').checked = state;
   appCtx.showRoads = state;
+  appCtx.showPathOverlays = state;
   document.getElementById('mapRoadsToggle').classList.toggle('active', state);
+  document.getElementById('mapPathsToggle').classList.toggle('active', state);
   const floatRoads = document.getElementById('fRoads');
+  const floatPaths = document.getElementById('fPaths');
   if (floatRoads) floatRoads.classList.toggle('on', state);
+  if (floatPaths) floatPaths.classList.toggle('on', state);
+  if (typeof appCtx.syncLinearFeatureOverlayVisibility === 'function') {
+    appCtx.syncLinearFeatureOverlayVisibility();
+  }
   updateMapLayers();
 }
 
@@ -351,6 +401,17 @@ function toggleRoads() {
   document.getElementById('mapRoadsToggle').classList.toggle('active', appCtx.showRoads);
   const floatRoads = document.getElementById('fRoads');
   if (floatRoads) floatRoads.classList.toggle('on', appCtx.showRoads);
+}
+
+function togglePathOverlays() {
+  appCtx.showPathOverlays = document.getElementById('filterPaths').checked;
+  appCtx.mapLayers.paths = appCtx.showPathOverlays;
+  document.getElementById('mapPathsToggle').classList.toggle('active', appCtx.showPathOverlays);
+  const floatPaths = document.getElementById('fPaths');
+  if (floatPaths) floatPaths.classList.toggle('on', appCtx.showPathOverlays);
+  if (typeof appCtx.syncLinearFeatureOverlayVisibility === 'function') {
+    appCtx.syncLinearFeatureOverlayVisibility();
+  }
 }
 
 function closeMapInfo() {
@@ -856,7 +917,8 @@ function navigateToHistoric(siteName) {
   appCtx.selectedProperty = null; // Clear property navigation
   appCtx.showNavigation = true;
 
-  createNavigationRoute(appCtx.car.x, appCtx.car.z, site.x, site.z);
+  const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
+  createNavigationRoute(ref.x, ref.z, site.x, site.z, true);
   updateHistoricPanel();
   closeModal();
 
@@ -875,8 +937,8 @@ function navigateToProperty(propertyId) {
   appCtx.selectedProperty = prop;
   appCtx.showNavigation = true;
 
-  // Create navigation route - simple straight line for now
-  createNavigationRoute(appCtx.car.x, appCtx.car.z, prop.x, prop.z);
+  const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
+  createNavigationRoute(ref.x, ref.z, prop.x, prop.z, true);
 
   // Update UI
   updatePropertyPanel();
@@ -889,6 +951,9 @@ function clearNavigation() {
   appCtx.selectedProperty = null;
   appCtx.selectedHistoric = null;
   appCtx.showNavigation = false;
+  appCtx.navigationRoutePoints = [];
+  appCtx.navigationRouteDistance = 0;
+  appCtx._navigationRouteState = null;
 
   if (appCtx.navigationRoute) {
     appCtx.scene.remove(appCtx.navigationRoute);
@@ -908,7 +973,81 @@ function clearNavigation() {
   closeModal();
 }
 
-function createNavigationRoute(fromX, fromZ, toX, toZ) {
+function currentNavigationMode() {
+  if (appCtx.droneMode) return 'drone';
+  if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') return 'walk';
+  return 'drive';
+}
+
+function navigationRouteNeedsRebuild(fromX, fromZ, toX, toZ, mode) {
+  const previous = appCtx._navigationRouteState;
+  if (!previous) return true;
+  if (previous.mode !== mode) return true;
+  if (!Array.isArray(appCtx.navigationRoutePoints) || appCtx.navigationRoutePoints.length < 2) return true;
+  if (Math.hypot(previous.toX - toX, previous.toZ - toZ) > 4) return true;
+  const originThreshold = mode === 'walk' ? 10 : 18;
+  return Math.hypot(previous.fromX - fromX, previous.fromZ - fromZ) > originThreshold;
+}
+
+function navigationSurfaceY(x, z, mode = 'drive') {
+  if (mode === 'walk' && appCtx.GroundHeight && typeof appCtx.GroundHeight.walkSurfaceY === 'function') {
+    const walkY = appCtx.GroundHeight.walkSurfaceY(x, z);
+    if (Number.isFinite(walkY)) return walkY;
+  }
+  if (mode === 'drive' && appCtx.GroundHeight && typeof appCtx.GroundHeight.driveSurfaceY === 'function') {
+    const driveY = appCtx.GroundHeight.driveSurfaceY(x, z, true);
+    if (Number.isFinite(driveY)) return driveY;
+  }
+  if (typeof appCtx.terrainYAtWorld === 'function') {
+    const terrainY = appCtx.terrainYAtWorld(x, z);
+    if (Number.isFinite(terrainY)) return terrainY;
+  }
+  if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
+    const elevY = appCtx.elevationWorldYAtWorldXZ(x, z);
+    if (Number.isFinite(elevY)) return elevY;
+  }
+  return 0;
+}
+
+function routePointsToWorldVectors(points, mode = 'drive') {
+  return points.map((point) => {
+    const baseY = navigationSurfaceY(point.x, point.z, mode);
+    return new THREE.Vector3(point.x, baseY + 2.3, point.z);
+  });
+}
+
+function createNavigationRoute(fromX, fromZ, toX, toZ, forceRebuild = false) {
+  const navMode = currentNavigationMode();
+  const shouldRebuild = forceRebuild || navigationRouteNeedsRebuild(fromX, fromZ, toX, toZ, navMode);
+  if (!shouldRebuild) return;
+
+  let routeData = null;
+  if (navMode !== 'drone' && typeof appCtx.findTraversalRoute === 'function') {
+    routeData = appCtx.findTraversalRoute(fromX, fromZ, toX, toZ, {
+      mode: navMode
+    });
+  }
+  if (!routeData || !Array.isArray(routeData.points) || routeData.points.length < 2) {
+    routeData = {
+      mode: navMode,
+      points: [{ x: fromX, z: fromZ }, { x: toX, z: toZ }],
+      distance: Math.hypot(toX - fromX, toZ - fromZ)
+    };
+  }
+
+  appCtx.navigationRoutePoints = routeData.points;
+  appCtx.navigationRouteDistance = routeData.distance;
+  appCtx._navigationRouteState = {
+    mode: navMode,
+    fromX,
+    fromZ,
+    toX,
+    toZ
+  };
+
+  const worldPoints = routePointsToWorldVectors(routeData.points, navMode);
+  if (worldPoints.length < 2) return;
+
   // Remove old route and marker
   if (appCtx.navigationRoute) {
     appCtx.scene.remove(appCtx.navigationRoute);
@@ -917,23 +1056,9 @@ function createNavigationRoute(fromX, fromZ, toX, toZ) {
     appCtx.scene.remove(appCtx.navigationMarker);
   }
 
-  // Create glowing line from current position to destination
-  const points = [];
-  const numPoints = 50; // Smooth curve
-
-  for (let i = 0; i <= numPoints; i++) {
-    const t = i / numPoints;
-    const x = fromX + (toX - fromX) * t;
-    const z = fromZ + (toZ - fromZ) * t;
-
-    // Add some height for visibility
-    const height = Math.sin(t * Math.PI) * 5 + 2;
-
-    points.push(new THREE.Vector3(x, height, z));
-  }
-
-  const curve = new THREE.CatmullRomCurve3(points);
-  const tubeGeometry = new THREE.TubeGeometry(curve, 50, 0.3, 8, false);
+  const curve = new THREE.CatmullRomCurve3(worldPoints);
+  const tubularSegments = Math.max(24, (worldPoints.length - 1) * 10);
+  const tubeGeometry = new THREE.TubeGeometry(curve, tubularSegments, 0.3, 8, false);
   const tubeMaterial = new THREE.MeshBasicMaterial({
     color: 0x00ff88,
     emissive: 0x00ff88,
@@ -974,7 +1099,8 @@ function createNavigationRoute(fromX, fromZ, toX, toZ) {
   beam.position.y = 10;
   markerGroup.add(beam);
 
-  markerGroup.position.set(toX, 0, toZ);
+  const destinationY = navigationSurfaceY(toX, toZ, navMode);
+  markerGroup.position.set(toX, destinationY, toZ);
   appCtx.navigationMarker = markerGroup;
   appCtx.scene.add(appCtx.navigationMarker);
 
@@ -1018,12 +1144,16 @@ function updateNavigationRoute() {
 
       createNavigationRoute(currentX, currentZ, destination.x, destination.z);
 
-      // Calculate distance and direction
-      const dx = destination.x - currentX;
-      const dz = destination.z - currentZ;
-      const dist = Math.sqrt(dx * dx + dz * dz);
+      const routePoints = Array.isArray(appCtx.navigationRoutePoints) ? appCtx.navigationRoutePoints : [];
+      const guidancePoint = routePoints.length > 1 && typeof appCtx.pickNavigationTargetPoint === 'function' ?
+        appCtx.pickNavigationTargetPoint(currentX, currentZ, routePoints) :
+        destination;
+      const dx = (guidancePoint?.x ?? destination.x) - currentX;
+      const dz = (guidancePoint?.z ?? destination.z) - currentZ;
+      const dist = routePoints.length > 1 && typeof appCtx.measureRemainingPolylineDistance === 'function' ?
+        appCtx.measureRemainingPolylineDistance(currentX, currentZ, routePoints) :
+        Math.sqrt((destination.x - currentX) * (destination.x - currentX) + (destination.z - currentZ) * (destination.z - currentZ));
 
-      // Calculate angle to destination
       const angleToDestination = Math.atan2(dx, dz);
       const relativeAngle = angleToDestination - currentAngle;
 
@@ -2732,6 +2862,7 @@ Object.assign(appCtx, {
     };
   },
   pickRoadPt,
+  renderInteriorLegend,
   renderPropertyMarkers,
   showMapInfo,
   showResult,
@@ -2750,6 +2881,7 @@ Object.assign(appCtx, {
   togglePropertyFilters,
   toggleRealEstate,
   toggleRoads,
+  togglePathOverlays,
   updateHistoricPanel,
   updateMapLayers,
   updateMode,
@@ -2784,6 +2916,7 @@ export {
   navigateToProperty,
   openModalById,
   pickRoadPt,
+  renderInteriorLegend,
   renderPropertyMarkers,
   showMapInfo,
   showResult,
@@ -2802,6 +2935,7 @@ export {
   togglePropertyFilters,
   toggleRealEstate,
   toggleRoads,
+  togglePathOverlays,
   updateHistoricPanel,
   updateMapLayers,
   updateMode,

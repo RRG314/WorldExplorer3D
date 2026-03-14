@@ -19,6 +19,7 @@ const GroundHeight = {
   _roadRaycaster: null,
   _roadRayStart: null,
   _roadRayDir: null,
+  _walkFeatureCache: null,
 
   _ensureVectors() {
     if (!this._normal && typeof THREE !== 'undefined') {
@@ -69,6 +70,159 @@ const GroundHeight = {
     if (!hits || hits.length === 0) return null;
     const y = hits[0]?.point?.y;
     return Number.isFinite(y) ? y : null;
+  },
+
+  linearFeatureMeshY(x, z) {
+    if (typeof THREE === 'undefined') return null;
+    if (!Array.isArray(appCtx.linearFeatureMeshes) || appCtx.linearFeatureMeshes.length === 0) return null;
+
+    this._ensureVectors();
+    if (!this._roadRaycaster || !this._roadRayStart || !this._roadRayDir) return null;
+
+    this._roadRayStart.set(x, 1500, z);
+    this._roadRaycaster.set(this._roadRayStart, this._roadRayDir);
+    const hits = this._roadRaycaster.intersectObjects(appCtx.linearFeatureMeshes, false);
+    if (!hits || hits.length === 0) return null;
+    const y = hits[0]?.point?.y;
+    return Number.isFinite(y) ? y : null;
+  },
+
+  _projectPointToFeature(feature, x, z) {
+    if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2) return null;
+    let best = null;
+    for (let i = 0; i < feature.pts.length - 1; i++) {
+      const p1 = feature.pts[i];
+      const p2 = feature.pts[i + 1];
+      const dx = p2.x - p1.x;
+      const dz = p2.z - p1.z;
+      const len2 = dx * dx + dz * dz;
+      if (len2 <= 1e-9) continue;
+      let t = ((x - p1.x) * dx + (z - p1.z) * dz) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const px = p1.x + dx * t;
+      const pz = p1.z + dz * t;
+      const dist = Math.hypot(x - px, z - pz);
+      if (!best || dist < best.dist) {
+        best = {
+          dist,
+          pt: { x: px, z: pz },
+          segIndex: i
+        };
+      }
+    }
+    return best;
+  },
+
+  _nearestLinearWalkFeature(x, z) {
+    const cachedFeature = this._walkFeatureCache?.feature || null;
+    if (cachedFeature) {
+      const cachedProjection = this._projectPointToFeature(cachedFeature, x, z);
+      const reuseRadius = Math.max(4, (Number(cachedFeature.width) || 2) * 1.5 + 3);
+      if (cachedProjection && cachedProjection.dist <= reuseRadius) {
+        return {
+          feature: cachedFeature,
+          dist: cachedProjection.dist,
+          pt: cachedProjection.pt,
+          segIndex: cachedProjection.segIndex
+        };
+      }
+    }
+
+    if (typeof appCtx.findNearestTraversalFeature !== 'function') {
+      this._walkFeatureCache = null;
+      return null;
+    }
+
+    const nearest = appCtx.findNearestTraversalFeature(x, z, {
+      mode: 'walk',
+      maxDistance: 16
+    });
+    const feature = nearest?.feature || null;
+    const kind = String(feature?.kind || feature?.networkKind || '').toLowerCase();
+    if (!feature || kind === 'road') {
+      this._walkFeatureCache = null;
+      return null;
+    }
+
+    this._walkFeatureCache = { feature };
+    return nearest;
+  },
+
+  walkSurfaceInfo(x, z) {
+    const interiorSurface = typeof appCtx.sampleInteriorWalkSurface === 'function' ?
+      appCtx.sampleInteriorWalkSurface(x, z) :
+      null;
+    if (interiorSurface && Number.isFinite(interiorSurface.y)) {
+      return {
+        y: interiorSurface.y,
+        source: interiorSurface.source || 'interior',
+        feature: interiorSurface.feature || null,
+        dist: Number.isFinite(interiorSurface.dist) ? interiorSurface.dist : 0,
+        pt: interiorSurface.pt ? { x: interiorSurface.pt.x, z: interiorSurface.pt.z } : null
+      };
+    }
+
+    const terrainY = this.terrainY(x, z);
+    const nr = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z) : null;
+    const roadHW = nr?.road ? nr.road.width / 2 : 0;
+    const roadOnSurface = !!(nr?.road && Number.isFinite(nr.dist) && nr.dist <= roadHW + 1.25);
+
+    const linear = this._nearestLinearWalkFeature(x, z);
+    const featureWidth = Number(linear?.feature?.width) || 0;
+    const onLinear = !!(
+      linear &&
+      Number.isFinite(linear.dist) &&
+      linear.dist <= Math.max(0.9, featureWidth * 0.5 + 0.8)
+    );
+    const preferLinear = !!(
+      onLinear &&
+      (!roadOnSurface || linear.dist <= (Number.isFinite(nr?.dist) ? nr.dist + 0.15 : Infinity))
+    );
+
+    if (preferLinear) {
+      const feature = linear.feature;
+      const sampleX = Number.isFinite(linear?.pt?.x) ? linear.pt.x : x;
+      const sampleZ = Number.isFinite(linear?.pt?.z) ? linear.pt.z : z;
+      const featureBias = Number.isFinite(feature?.surfaceBias) ?
+        feature.surfaceBias :
+        Number.isFinite(feature?.bias) ?
+          feature.bias :
+          0.05;
+      const meshY = this.linearFeatureMeshY(sampleX, sampleZ);
+      const baseY = this.terrainY(sampleX, sampleZ);
+      return {
+        y: Number.isFinite(meshY) ? meshY : baseY + featureBias + 0.02,
+        source: String(feature?.kind || feature?.networkKind || 'path'),
+        feature,
+        dist: linear.dist,
+        pt: linear.pt ? { x: linear.pt.x, z: linear.pt.z } : null
+      };
+    }
+
+    if (roadOnSurface) {
+      const sampleX = Number.isFinite(nr?.pt?.x) ? nr.pt.x : x;
+      const sampleZ = Number.isFinite(nr?.pt?.z) ? nr.pt.z : z;
+      const roadY = this.roadMeshY(sampleX, sampleZ);
+      return {
+        y: Number.isFinite(roadY) ? roadY : this.roadSurfaceY(sampleX, sampleZ) + 0.05,
+        source: 'road',
+        feature: nr.road,
+        dist: nr.dist,
+        pt: nr.pt ? { x: nr.pt.x, z: nr.pt.z } : null
+      };
+    }
+
+    return {
+      y: terrainY,
+      source: 'terrain',
+      feature: null,
+      dist: Infinity,
+      pt: null
+    };
+  },
+
+  walkSurfaceY(x, z) {
+    return this.walkSurfaceInfo(x, z).y;
   },
 
   // Ground used for driving. Prefer exact road mesh height when available.
@@ -170,8 +324,7 @@ const GroundHeight = {
   // Invalidation (call when terrain tiles change)
   // -------------------------------------------------------------------------
   invalidate() {
-
-
+    this._walkFeatureCache = null;
     // Currently stateless per-call; placeholder for future caching.
   } };
 Object.assign(appCtx, { GroundHeight });

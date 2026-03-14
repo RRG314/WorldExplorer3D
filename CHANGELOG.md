@@ -24,12 +24,41 @@
 - `QUICKSTART.md`, `CONTRIBUTING.md`, and `GITHUB_DEPLOYMENT.md` aligned to `WorldExplorer3D` repo flow.
 - package metadata (`package.json`) aligned to `WorldExplorer3D` identity and discoverability.
 - Pages workflow trigger aligned to `main` release flow.
+- Earth runtime safety and controls update:
+  - traversal switches now preserve valid positions and resolve invalid walk -> drive transitions to nearest safe road spawns
+  - geolocation/custom-location launches validate spawn safety before placement
+  - walking/drone controls now use `WASD` for movement and arrow keys for directional look
+  - `M` remains the large-map key; `F4` is restored for debug overlay access
+- OSM Earth scene expansion:
+  - added separate runtime/map overlay support for `railway`, `footway`, and `cycleway` features
+  - added walkable traversal/path routing support so loaded roads, footways, cycleways, and rail corridors participate in walking navigation instead of render-only overlays
+  - expanded vegetation support so woods / parks / green landuse, `natural=tree`, and `natural=tree_row` feed a batched tree pass
+  - added a selective indoor subsystem that loads a mapped building floor only when the player deliberately enters it
+- Building presentation refresh:
+  - broader facade color variation
+  - rooftop HVAC/detail variation for appropriate near-LOD flat roofs without cap/parapet overlays
+- Water + path surface presentation refresh:
+  - water polygons/ribbons now render more reliably on steep/coastal terrain instead of fading out behind terrain
+  - footways / cycleways / rail corridors now render as solid terrain-following surfaces instead of translucent ribbons
+  - path overlay now starts hidden by default so the initial world view is cleaner while traversal/pathfinding still use the loaded path data
+- Interior containment + legend finder pass:
+  - enterable buildings now require full building footprints before indoor shells are generated, preventing oversized white-box walls from extending outside approximate bbox colliders
+  - temporary interior wall colliders now honor their own base elevation so walking inside a mapped room no longer leaks out through terrain-level collision checks
+  - large-map legend now includes a nearby enterable-buildings section with on-demand support scanning and cached building listing when indoor data is present
+- Walking terrain-follow pass:
+  - walk mode now resamples ground after horizontal movement on slopes so downhill travel no longer hops as sharply and the character mesh stays closer to the rendered ground
+- Runtime/account/landing copy updated so donations remain clearly optional and never imply map/core-play gating.
+- Mirror tooling now syncs and verifies landing/account roots alongside `app/*`, keeping `index.html`, `account/index.html`, and `app/*` aligned with `public/*`.
+- Earth startup path trimmed without removing gameplay systems:
+  - vendor boot now loads dependent Three.js loader scripts in parallel after the core script is ready
+  - core Earth load no longer blocks on the recently added `railway` / `footway` / `cycleway` OSM pass; those layers now load immediately after the base world is ready and then rebuild the walk traversal network
 
 ### Runtime / App Integration Included
 
 - Preserves current geolocation launch controls (`Use My Location`) in title + globe selector.
 - Preserves current Ocean destination mode and Earth/Ocean switching flow.
-- Preserves app/public mirror tooling with `app/data` parity checks.
+- Preserves public mirror tooling with app/data plus landing/account parity checks.
+- Runtime invariants now check spawn fallback safety, walkable traversal graph availability, linear-feature route support, `M` map behavior, `F4` debug behavior, updated controls text, and free-access copy across runtime/landing/account.
 
 ## [2026-03-02]
 

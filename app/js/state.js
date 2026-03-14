@@ -10,6 +10,8 @@ let realEstateMode = false;
 let propertyTypeFilter = 'all'; // all, sale, or rent
 let selectedProperty = null;
 let navigationRoute = null;
+let navigationRoutePoints = [];
+let navigationRouteDistance = 0;
 let navigationMarker = null;
 let showNavigation = false;
 let propertyRadius = 1; // Default 1km radius
@@ -51,6 +53,8 @@ let mapLayers = {
   police: true,
   // Roads
   roads: true,
+  paths: false,
+  interiors: true,
   // Memory markers
   memoryPins: true,
   memoryFlowers: true
@@ -68,9 +72,13 @@ const PropertyUI = {
 
 const car = { x: 0, z: 0, y: 0, angle: 0, speed: 0, vx: 0, vz: 0, vy: 0, grip: 1, onRoad: true, road: null, boost: false, boostTime: 0, boostReady: true, boostDecayTime: 0, driftAngle: 0 };
 const keys = {};
-let roads = [],roadMeshes = [],buildingMeshes = [],buildings = [],landuses = [],landuseMeshes = [],waterAreas = [],waterways = [],pois = [],poiMeshes = [],scene,camera,renderer,carMesh,wheelMeshes = [];
+let roads = [],roadMeshes = [],buildingMeshes = [],buildings = [],dynamicBuildingColliders = [],landuses = [],landuseMeshes = [],waterAreas = [],waterways = [],linearFeatures = [],linearFeatureMeshes = [],pois = [],poiMeshes = [],scene,camera,renderer,carMesh,wheelMeshes = [];
 let streetFurnitureMeshes = [];
+let vegetationFeatures = [],vegetationMeshes = [];
+let activeInterior = null;
+let interiorHint = null;
 let nearestPOI = null;
+let traversalNetworks = { walk: null, drive: null };
 let gameStarted = false,paused = false,gameMode = 'free',gameTimer = 0,camMode = 0,selLoc = 'baltimore'; // camMode: 0=chase/third-person, 1=hood, 2=overhead
 let onMoon = false; // Are we on the moon?
 let travelingToMoon = false; // Currently traveling animation
@@ -113,6 +121,7 @@ let largeMapZoom = 14;
 let satelliteView = false;
 let landUseVisible = false;
 let showRoads = true;
+let showPathOverlays = false;
 let worldLoading = false;
 // RA (Right Ascension) in hours (0-24), Dec (Declination) in degrees (-90 to 90)
 // Mag (Apparent magnitude) - lower is brighter. Naked eye limit ~6.0
@@ -647,6 +656,7 @@ Object.assign(appCtx, {
   bloomPass,
   buildingMeshes,
   buildings,
+  dynamicBuildingColliders,
   camMode,
   camera,
   car,
@@ -679,6 +689,10 @@ Object.assign(appCtx, {
   landUseVisible,
   landuseMeshes,
   landuses,
+  linearFeatureMeshes,
+  linearFeatures,
+  interiorHint,
+  activeInterior,
   waterAreas,
   waterways,
   largeMapZoom,
@@ -689,6 +703,8 @@ Object.assign(appCtx, {
   mouse,
   navigationMarker,
   navigationRoute,
+  navigationRouteDistance,
+  navigationRoutePoints,
   nearestPOI,
   onMoon,
   paused,
@@ -717,6 +733,7 @@ Object.assign(appCtx, {
   selLoc,
   showLargeMap,
   showNavigation,
+  showPathOverlays,
   showRoads,
   worldLoading,
   skyRaycaster,
@@ -724,10 +741,13 @@ Object.assign(appCtx, {
   ssaoPass,
   starField,
   streetFurnitureMeshes,
+  vegetationFeatures,
+  vegetationMeshes,
   sun,
   sunSphere,
   timeOfDay,
   trackMesh,
+  traversalNetworks,
   travelingToMoon,
   trialDone,
   wheelMeshes
@@ -743,6 +763,7 @@ export {
   bloomPass,
   buildingMeshes,
   buildings,
+  dynamicBuildingColliders,
   camMode,
   camera,
   car,
@@ -775,6 +796,10 @@ export {
   landUseVisible,
   landuseMeshes,
   landuses,
+  linearFeatureMeshes,
+  linearFeatures,
+  interiorHint,
+  activeInterior,
   waterAreas,
   waterways,
   largeMapZoom,
@@ -785,6 +810,8 @@ export {
   mouse,
   navigationMarker,
   navigationRoute,
+  navigationRouteDistance,
+  navigationRoutePoints,
   nearestPOI,
   onMoon,
   paused,
@@ -813,6 +840,7 @@ export {
   selLoc,
   showLargeMap,
   showNavigation,
+  showPathOverlays,
   showRoads,
   worldLoading,
   skyRaycaster,
@@ -820,10 +848,13 @@ export {
   ssaoPass,
   starField,
   streetFurnitureMeshes,
+  vegetationFeatures,
+  vegetationMeshes,
   sun,
   sunSphere,
   timeOfDay,
   trackMesh,
+  traversalNetworks,
   travelingToMoon,
   trialDone,
   wheelMeshes };

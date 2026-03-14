@@ -12,17 +12,27 @@ It is an interactive exploration app, not a flat map viewer and not a routing/na
 
 - Active and usable, with ongoing iteration.
 - Canonical runtime source: `app/*`.
-- Hosting/runtime mirror: `public/app/*`.
+- Canonical landing/account sources: `index.html`, `account/index.html`.
+- Hosting/runtime mirror: `public/*` (`public/app/*`, `public/index.html`, `public/account/index.html`).
 - Includes geolocation launch flow and Ocean mode in the current branch.
+- Core play, traversal modes, and the large map remain free; donations are optional recognition/support only.
 
 ## What It Does
 
 - Launch from preset cities or custom coordinates.
 - Use geolocation (`Use My Location`) in title and globe selector flows.
 - Explore in 3D with driving, walking, drone, and rocket traversal.
+- Keep traversal switches and custom/geolocation launches on safe ground: valid positions stay put, invalid positions resolve to the nearest safe road, walkable path, or ground spawn based on the active mode.
 - Switch destinations (Earth, Moon, Space, Ocean) from title and in-game menus.
-- Render map-informed world context (roads/buildings/land-use/water) for Earth scenes.
-- Provide minimap/large-map overlays and runtime controls for exploration.
+- Render map-informed world context (roads/buildings/land-use/water plus railways, footways, and cycleways) for Earth scenes.
+- Keep the core Earth load focused on roads/buildings/land-use/water first; walkable rail/foot/cycle overlays and routing links now load immediately after the core world is ready so recent OSM path expansion does not hold the first scene hostage.
+- Add OSM-driven vegetation so forests, woods, parks, tree rows, and individual mapped trees make Earth scenes feel less empty without turning every tile into high-detail foliage.
+- Use roads for drive routing and use a separate walkable traversal network so roads, footways, cycleways, and rail corridors participate in walking/navigation instead of render-only overlays.
+- Path overlays are available from the map/environment toggles, but now start hidden by default so the world opens on the core terrain/road view first.
+- Selectively support mapped building interiors when useful indoor OSM data exists, with entrance/exit interaction on `E` and no always-on global interior load.
+- Show an enterable-buildings section in the large-map legend; it scans nearby full-footprint buildings on demand and lists mapped interiors that can actually be entered.
+- Provide minimap/large-map overlays and runtime controls for exploration, with `M` for the large map.
+- Add performance-conscious rooftop HVAC/detail and broader building color variation so dense cities read less flat/repetitive.
 - Support multiplayer/social/account features when backend services are configured.
 
 ## Why Mapping/OSM Users May Care
@@ -59,6 +69,7 @@ Local run:
 ```bash
 npm install
 cd functions && npm install && cd ..
+npm run sync:public
 python3 -m http.server --directory public 4173
 ```
 

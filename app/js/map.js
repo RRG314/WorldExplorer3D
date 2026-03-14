@@ -433,6 +433,53 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     }
   }
 
+  if (appCtx.showPathOverlays && appCtx.linearFeatures.length > 0) {
+    ctx.save();
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+
+    appCtx.linearFeatures.forEach((feature) => {
+      if (!feature?.pts || feature.pts.length < 2) return;
+
+      let strokeStyle = 'rgba(200, 190, 170, 0.78)';
+      let lineWidth = isLarge ? 1.2 : 0.8;
+      let dash = [];
+
+      if (feature.kind === 'railway') {
+        strokeStyle = isLarge ? 'rgba(92, 101, 114, 0.95)' : 'rgba(92, 101, 114, 0.88)';
+        lineWidth = isLarge ? 2.1 : 1.2;
+        dash = isLarge ? [8, 5] : [5, 4];
+      } else if (feature.kind === 'cycleway') {
+        strokeStyle = isLarge ? 'rgba(86, 144, 116, 0.92)' : 'rgba(86, 144, 116, 0.86)';
+        lineWidth = isLarge ? 1.8 : 1.0;
+      } else if (feature.subtype === 'pedestrian') {
+        strokeStyle = isLarge ? 'rgba(214, 198, 171, 0.82)' : 'rgba(214, 198, 171, 0.74)';
+        lineWidth = isLarge ? 1.4 : 0.9;
+      }
+
+      ctx.strokeStyle = strokeStyle;
+      ctx.lineWidth = lineWidth;
+      ctx.setLineDash(dash);
+      ctx.beginPath();
+
+      let inView = false;
+      feature.pts.forEach((pt, i) => {
+        const pos = worldToScreen(pt.x, pt.z);
+        if (Math.abs(pos.x - mx) < w && Math.abs(pos.y - my) < h) {
+          inView = true;
+        }
+        if (i === 0) ctx.moveTo(pos.x, pos.y);else
+        ctx.lineTo(pos.x, pos.y);
+      });
+
+      if (!inView) return;
+      ctx.stroke();
+    });
+
+    ctx.setLineDash([]);
+    ctx.restore();
+  }
+
   // Draw road overlay (if enabled)
   if (appCtx.showRoads && appCtx.roads.length > 0) {
     appCtx.roads.forEach((road) => {
@@ -493,6 +540,40 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
       ctx.stroke();
       ctx.globalAlpha = 1.0;
     });
+  }
+
+  if (appCtx.mapLayers.interiors !== false && Array.isArray(appCtx.interiorLegendEntries) && appCtx.interiorLegendEntries.length > 0) {
+    ctx.save();
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+
+    appCtx.interiorLegendEntries.forEach((entry) => {
+      if (!entry || !Number.isFinite(entry.x) || !Number.isFinite(entry.z)) return;
+      const pos = worldToScreen(entry.x, entry.z);
+      if (Math.abs(pos.x - mx) >= w / 2 + 24 || Math.abs(pos.y - my) >= h / 2 + 24) return;
+
+      const size = isLarge ? 6 : 4;
+      ctx.fillStyle = 'rgba(0, 255, 255, 0.92)';
+      ctx.strokeStyle = '#062a33';
+      ctx.lineWidth = isLarge ? 2 : 1;
+      ctx.beginPath();
+      ctx.rect(pos.x - size, pos.y - size, size * 2, size * 2);
+      ctx.fill();
+      ctx.stroke();
+
+      if (isLarge) {
+        ctx.font = 'bold 10px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'bottom';
+        ctx.fillStyle = '#d9fdff';
+        ctx.strokeStyle = '#062a33';
+        ctx.lineWidth = 3;
+        const label = String(entry.label || 'Interior');
+        ctx.strokeText(label, pos.x, pos.y - size - 4);
+        ctx.fillText(label, pos.x, pos.y - size - 4);
+      }
+    });
+    ctx.restore();
   }
 
   // Draw game elements using proper coordinate conversion
@@ -720,15 +801,19 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     if (destination) {
       // Use Walk module to get proper player position
       const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
-      const playerPos = worldToScreen(ref.x, ref.z);
       const destPos = worldToScreen(destination.x, destination.z);
+      const routePoints = Array.isArray(appCtx.navigationRoutePoints) && appCtx.navigationRoutePoints.length >= 2 ?
+        appCtx.navigationRoutePoints :
+        [{ x: ref.x, z: ref.z }, { x: destination.x, z: destination.z }];
 
       ctx.strokeStyle = '#00ff88';
       ctx.lineWidth = isLarge ? 4 : 2;
       ctx.setLineDash([isLarge ? 10 : 5, isLarge ? 5 : 3]);
       ctx.beginPath();
-      ctx.moveTo(playerPos.x, playerPos.y);
-      ctx.lineTo(destPos.x, destPos.y);
+      routePoints.forEach((point, index) => {
+        const pos = worldToScreen(point.x, point.z);
+        if (index === 0) ctx.moveTo(pos.x, pos.y); else ctx.lineTo(pos.x, pos.y);
+      });
       ctx.stroke();
       ctx.setLineDash([]); // Reset dash
 
@@ -743,9 +828,9 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
 
       // Draw distance label on large map
       if (isLarge) {
-        const dx = destination.x - appCtx.car.x;
-        const dz = destination.z - appCtx.car.z;
-        const dist = Math.sqrt(dx * dx + dz * dz);
+        const dist = typeof appCtx.measureRemainingPolylineDistance === 'function' && routePoints.length > 1 ?
+          appCtx.measureRemainingPolylineDistance(ref.x, ref.z, routePoints) :
+          Math.sqrt((destination.x - ref.x) * (destination.x - ref.x) + (destination.z - ref.z) * (destination.z - ref.z));
         ctx.font = 'bold 12px Arial';
         ctx.textAlign = 'center';
         ctx.fillStyle = '#ffffff';

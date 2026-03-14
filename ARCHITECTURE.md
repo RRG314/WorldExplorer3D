@@ -1,6 +1,6 @@
 # Architecture
 
-Last reviewed: 2026-03-02
+Last reviewed: 2026-03-13
 
 System topology for gameplay runtime, multiplayer state, account/donations, and security boundaries.
 
@@ -45,6 +45,16 @@ Flow:
 - gameplay systems: `game.js`, `flower-challenge.js`, `blocks.js`, `memory.js`, `real-estate.js`
 - UI orchestration: `ui.js`, `ui/globe-selector.js`, `tutorial/tutorial.js`
 
+Current Earth runtime architecture details:
+
+- `world.js` owns safe spawn resolution for teleports, geolocation/custom launches, and traversal switching.
+- Canonical landing/account sources live at `index.html` and `account/index.html`; `npm run sync:public` mirrors those plus `app/*` into `public/*`.
+- `world.js` owns the Earth OSM pipeline for roads/buildings/land-use/water plus vegetation staging data (`natural=tree`, `natural=tree_row`, woods/parks/green areas).
+- Driveable roads stay isolated in `roads`; OSM transport ribbons flow through `linearFeatures` (`railway`, `footway`, `cycleway`).
+- `world.js` also builds `traversalNetworks` so walking/navigation can use roads + footways + cycleways + rail corridors without letting vehicles route onto non-road layers.
+- `terrain.js` reprojects roads, building bases, waterways, and linear feature ribbons back onto streamed terrain.
+- `interiors.js` is a dormant-on-boot subsystem: it only fetches/builds indoor geometry for the one building the player deliberately enters, then releases that state on exit.
+
 ## 3. Multiplayer Architecture
 
 ### 3.1 Module map (`app/js/multiplayer/*`)
@@ -81,6 +91,7 @@ Flow:
 - Reverse geocode pipeline with cache and fallback provider.
 - Favorites split into preset and user-saved groups.
 - Saved favorites persisted in browser local storage.
+- Final placement is validated through the shared safe spawn resolver before the player is committed to the world.
 
 ### 4.2 Tutorial
 
@@ -103,6 +114,7 @@ Flow:
 - CORS allowlist enforcement
 - Stripe customer ownership verification
 - webhook-driven plan synchronization to Firestore
+- donations/status surfaces are informational only for normal runtime access; map/core traversal are not entitlement-gated
 
 ## 6. Firestore and Security Architecture
 
@@ -147,4 +159,3 @@ Flow:
 - rules suite: `scripts/test-rules.mjs`, `tests/firestore.rules.security.test.mjs`
 - runtime invariants: `scripts/test-runtime-invariants.mjs`
 - release gate: `scripts/release-verify.mjs`
-

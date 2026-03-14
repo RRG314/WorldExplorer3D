@@ -221,7 +221,8 @@ function createBuildingRoughnessMap() {
 
 function createWindowTexture(baseColor, seed) {
   // Cache key includes location seed so textures are deterministic per city
-  const cacheKey = baseColor + '_' + (appCtx.rdtSeed || 0);
+  const variantBucket = ((seed || appCtx.rdtSeed || 42) >>> 0) % 4;
+  const cacheKey = `${baseColor}_${appCtx.rdtSeed || 0}_${variantBucket}`;
   if (windowTextures[cacheKey]) return windowTextures[cacheKey];
 
   const canvas = document.createElement('canvas');
@@ -1129,6 +1130,13 @@ function applyGrassToTerrain() {
 function getBuildingMaterial(buildingType, bSeed, baseColorHex) {
   const br1 = appCtx.rand01FromInt(bSeed);
   const br2 = appCtx.rand01FromInt(bSeed ^ 0x12345);
+  const tintHex = (() => {
+    const tint = new THREE.Color(0xffffff);
+    if (baseColorHex) {
+      tint.lerp(new THREE.Color(baseColorHex), 0.22);
+    }
+    return tint.getHex();
+  })();
 
   // Decide facade type based on building type and seed
   let facadeType = 'window'; // default: procedural windows
@@ -1149,6 +1157,7 @@ function getBuildingMaterial(buildingType, bSeed, baseColorHex) {
 
   if (facadeType === 'concrete' && pbrTexturesLoaded.concrete && concreteDiffuse) {
     const mat = new THREE.MeshStandardMaterial({
+      color: tintHex,
       map: concreteDiffuse,
       normalMap: concreteNormal,
       normalScale: new THREE.Vector2(0.5, 0.5),
@@ -1161,6 +1170,7 @@ function getBuildingMaterial(buildingType, bSeed, baseColorHex) {
 
   if (facadeType === 'brick' && pbrTexturesLoaded.brick && brickDiffuse) {
     const mat = new THREE.MeshStandardMaterial({
+      color: tintHex,
       map: brickDiffuse,
       normalMap: brickNormal,
       normalScale: new THREE.Vector2(0.6, 0.6),

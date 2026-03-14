@@ -1398,7 +1398,12 @@ function setupUI() {
         triggerTitleStart();
       } else if (typeof appCtx.loadRoads === 'function') {
         appCtx.loadRoads().then(() => {
-          if (typeof appCtx.spawnOnRoad === 'function') appCtx.spawnOnRoad();
+          const preferredMode = appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' ? 'walk' : 'drive';
+          if (typeof appCtx.applyCustomLocationSpawn === 'function') {
+            appCtx.applyCustomLocationSpawn(preferredMode, { source: 'custom_location' });
+          } else if (typeof appCtx.spawnOnRoad === 'function') {
+            appCtx.spawnOnRoad();
+          }
         });
       }
     },
@@ -1659,8 +1664,8 @@ function setupUI() {
     // Load visible terrain immediately so grass appears even while road APIs are pending.
     if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
       const startRef = appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker ?
-      appCtx.Walk.state.walker : appCtx.car;
-
+        appCtx.Walk.state.walker :
+        appCtx.car;
       appCtx.updateTerrainAround(startRef.x || 0, startRef.z || 0);
     }
 
@@ -1670,8 +1675,8 @@ function setupUI() {
     // Refresh terrain around final spawn/reference position after roads finish.
     if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
       const postLoadRef = appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker ?
-      appCtx.Walk.state.walker : appCtx.car;
-
+        appCtx.Walk.state.walker :
+        appCtx.car;
       appCtx.updateTerrainAround(postLoadRef.x || 0, postLoadRef.z || 0);
     }
 
@@ -1732,6 +1737,8 @@ function setupUI() {
 
     // Set initial map view button states
     document.getElementById('mapRoadsToggle').classList.add('active'); // Roads on by default
+    document.getElementById('mapPathsToggle').classList.remove('active');
+    document.getElementById('fPaths').classList.remove('on');
     // Land use OFF by default (user can toggle on if needed)
     document.getElementById('fLandUse').classList.remove('on');
     document.getElementById('fLandUseRE').classList.remove('on');
@@ -1799,16 +1806,16 @@ function setupUI() {
       moveLabel: 'Move',
       lookLabel: 'Look',
       move: {
-        up: { channel: 'earth', key: 'ArrowUp' },
-        down: { channel: 'earth', key: 'ArrowDown' },
-        left: { channel: 'earth', key: 'ArrowLeft' },
-        right: { channel: 'earth', key: 'ArrowRight' }
-      },
-      look: {
         up: { channel: 'earth', key: 'KeyW' },
         down: { channel: 'earth', key: 'KeyS' },
         left: { channel: 'earth', key: 'KeyA' },
         right: { channel: 'earth', key: 'KeyD' }
+      },
+      look: {
+        up: { channel: 'earth', key: 'ArrowUp' },
+        down: { channel: 'earth', key: 'ArrowDown' },
+        left: { channel: 'earth', key: 'ArrowLeft' },
+        right: { channel: 'earth', key: 'ArrowRight' }
       },
       actions: [
         { label: 'Jump', binding: { channel: 'earth', key: 'Space' } },
@@ -1819,16 +1826,16 @@ function setupUI() {
       moveLabel: 'Move',
       lookLabel: 'Look',
       move: {
-        up: { channel: 'earth', key: 'ArrowUp' },
-        down: { channel: 'earth', key: 'ArrowDown' },
-        left: { channel: 'earth', key: 'ArrowLeft' },
-        right: { channel: 'earth', key: 'ArrowRight' }
-      },
-      look: {
         up: { channel: 'earth', key: 'KeyW' },
         down: { channel: 'earth', key: 'KeyS' },
         left: { channel: 'earth', key: 'KeyA' },
         right: { channel: 'earth', key: 'KeyD' }
+      },
+      look: {
+        up: { channel: 'earth', key: 'ArrowUp' },
+        down: { channel: 'earth', key: 'ArrowDown' },
+        left: { channel: 'earth', key: 'ArrowLeft' },
+        right: { channel: 'earth', key: 'ArrowRight' }
       },
       actions: [
         { label: 'Ascend', binding: { channel: 'earth', key: 'Space' } },
@@ -2277,6 +2284,15 @@ function setupUI() {
     document.getElementById('mapRoadsToggle').classList.toggle('active', appCtx.showRoads);
     closeAllFloatMenus();
   });
+  document.getElementById('fPaths').addEventListener('click', () => {
+    appCtx.showPathOverlays = !appCtx.showPathOverlays;
+    document.getElementById('fPaths').classList.toggle('on', appCtx.showPathOverlays);
+    document.getElementById('mapPathsToggle').classList.toggle('active', appCtx.showPathOverlays);
+    if (typeof appCtx.syncLinearFeatureOverlayVisibility === 'function') {
+      appCtx.syncLinearFeatureOverlayVisibility();
+    }
+    closeAllFloatMenus();
+  });
   document.getElementById('fLandUse').addEventListener('click', () => {
     appCtx.landUseVisible = !appCtx.landUseVisible;
     document.getElementById('fLandUse').classList.toggle('on', appCtx.landUseVisible);
@@ -2515,32 +2531,7 @@ function setupUI() {
   });
   document.getElementById('fRespawn').addEventListener('click', () => {appCtx.spawnOnRoad();closeAllFloatMenus();});
   document.getElementById('fRespawnRand').addEventListener('click', () => {
-    if (appCtx.roads.length > 0) {
-      const rd = appCtx.roads[Math.floor(Math.random() * appCtx.roads.length)];
-      const idx = Math.floor(Math.random() * rd.pts.length);
-      appCtx.car.x = rd.pts[idx].x;appCtx.car.z = rd.pts[idx].z;
-      if (idx < rd.pts.length - 1) appCtx.car.angle = Math.atan2(rd.pts[idx + 1].x - rd.pts[idx].x, rd.pts[idx + 1].z - rd.pts[idx].z);
-      appCtx.car.speed = 0;appCtx.car.vx = 0;appCtx.car.vz = 0;
-      const _respawnH = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt : appCtx.elevationWorldYAtWorldXZ;
-      const spawnY = typeof appCtx.GroundHeight !== 'undefined' && appCtx.GroundHeight && typeof appCtx.GroundHeight.carCenterY === 'function' ?
-      appCtx.GroundHeight.carCenterY(appCtx.car.x, appCtx.car.z, true, 1.2) :
-      _respawnH(appCtx.car.x, appCtx.car.z) + 1.2;
-      appCtx.car.y = spawnY;
-      appCtx.carMesh.position.set(appCtx.car.x, spawnY, appCtx.car.z);appCtx.carMesh.rotation.y = appCtx.car.angle;
-      if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker) {
-        const groundY = spawnY - 1.2;
-        appCtx.Walk.state.walker.x = appCtx.car.x;
-        appCtx.Walk.state.walker.z = appCtx.car.z;
-        appCtx.Walk.state.walker.y = groundY + 1.7;
-        appCtx.Walk.state.walker.vy = 0;
-        appCtx.Walk.state.walker.angle = appCtx.car.angle;
-        appCtx.Walk.state.walker.yaw = appCtx.car.angle;
-        if (appCtx.Walk.state.characterMesh && appCtx.Walk.state.mode === 'walk') {
-          appCtx.Walk.state.characterMesh.position.set(appCtx.car.x, groundY, appCtx.car.z);
-          appCtx.Walk.state.characterMesh.rotation.y = appCtx.car.angle;
-        }
-      }
-    }
+    if (typeof appCtx.spawnOnRoad === 'function') appCtx.spawnOnRoad({ random: true });
     closeAllFloatMenus();
   });
   document.getElementById('fTrack').addEventListener('click', () => {appCtx.toggleTrackRecording();closeAllFloatMenus();});
@@ -2627,6 +2618,9 @@ function setupUI() {
   document.getElementById('minimap').addEventListener('click', () => {
     appCtx.showLargeMap = true;
     document.getElementById('largeMap').classList.add('show');
+    if (typeof appCtx.renderInteriorLegend === 'function') {
+      appCtx.renderInteriorLegend();
+    }
   });
   document.getElementById('minimap').addEventListener('contextmenu', (e) => {
     e.preventDefault();
@@ -2643,7 +2637,18 @@ function setupUI() {
   document.getElementById('mapLegend').addEventListener('click', (e) => {
     e.stopPropagation();
     const legend = document.getElementById('legendPanel');
-    legend.style.display = legend.style.display === 'none' ? 'block' : 'none';
+    const opening = legend.style.display === 'none';
+    legend.style.display = opening ? 'block' : 'none';
+    if (opening) {
+      if (typeof appCtx.renderInteriorLegend === 'function') {
+        appCtx.renderInteriorLegend();
+      }
+      if (typeof appCtx.scanNearbyInteriorSupport === 'function') {
+        appCtx.scanNearbyInteriorSupport().catch((error) => {
+          console.warn('[Interior] Nearby support scan failed from legend open.', error);
+        });
+      }
+    }
   });
   document.getElementById('largeMap').addEventListener('click', (e) => {
     if (e.target.id === 'largeMap') {
@@ -2662,6 +2667,15 @@ function setupUI() {
     appCtx.showRoads = !appCtx.showRoads;
     document.getElementById('mapRoadsToggle').classList.toggle('active', appCtx.showRoads);
     document.getElementById('fRoads').classList.toggle('on', appCtx.showRoads);
+  });
+  document.getElementById('mapPathsToggle').addEventListener('click', (e) => {
+    e.stopPropagation();
+    appCtx.showPathOverlays = !appCtx.showPathOverlays;
+    document.getElementById('mapPathsToggle').classList.toggle('active', appCtx.showPathOverlays);
+    document.getElementById('fPaths').classList.toggle('on', appCtx.showPathOverlays);
+    if (typeof appCtx.syncLinearFeatureOverlayVisibility === 'function') {
+      appCtx.syncLinearFeatureOverlayVisibility();
+    }
   });
   document.getElementById('mapZoomIn').addEventListener('click', (e) => {
     e.stopPropagation();

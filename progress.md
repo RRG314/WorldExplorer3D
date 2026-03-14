@@ -201,6 +201,66 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `output/playwright/flower-leaderboard-toggle-manual/mobile-panel-open.png`
 - Firebase setup status note:
   - Code path remains Firebase-ready with fallback; runtime verification helper now available in console via `getFlowerChallengeBackendStatus()`.
+- WorldExplorer bugfix audit pass (2026-03-13):
+  - Confirmed canonical gameplay source tree is `app/*`; hosted runtime mirror is `public/app/*` via `scripts/sync-public-app.mjs` + `scripts/verify-mirror.mjs`.
+  - Checked live deployment at `https://worldexplorer3d.io/app/` and account surfaces; live build still shows:
+    - walking/drone help text with `Arrows = Move`, `WASD = Look`
+    - runtime donation panel labeled `PRO EARLY ACCESS`
+    - account extras card labeled `Locked`
+  - Audit targets identified:
+    - traversal/mode switching: `app/js/walking.js`, `app/js/input.js`, `app/js/ui.js`
+    - spawn/geolocation/teleport/road selection: `app/js/world.js`, `app/js/physics.js`, `app/js/ui.js`
+    - OSM ingestion/rendering: `app/js/world.js`, `app/js/terrain.js`, `app/js/map.js`, `app/js/state.js`
+    - building materials/visuals: `app/js/world.js`, `app/js/engine.js`
+    - payment/access copy: `app/index.html`, `account/index.html`, `public/index.html`
+    - validation: `scripts/test-runtime-invariants.mjs`
+- Planned implementation:
+  - central safe-spawn resolver for walking/driving/custom/geolocation/map teleports
+  - exact custom/geolocation spawn target with nearest-safe fallback
+  - separate non-driveable OSM linear features for railways / footways / cycleways
+- Runtime regression fix pass (2026-03-14):
+  - `app/js/interiors.js` now only offers enterable candidates when the source building has a full polygon footprint; bbox-only colliders no longer generate oversized indoor shells.
+  - Nearby enterable-building scan added for the large-map legend, with limited on-demand Overpass fetches and cached listing for supported buildings.
+  - `app/js/walking.js` now uses collider `baseY` for roof/collision checks and resamples effective ground after horizontal movement, reducing slope hopping and keeping temporary interior walls confining the player at the correct elevation.
+  - `app/js/world.js` / `app/js/terrain.js` reverted water base/flattening behavior toward the previously stable branch and changed linear path ribbons to sample left/right edge height independently so water and foot/cycle overlays sit correctly on terrain/roads again.
+  - `app/js/map.js`, `app/js/game.js`, and `app/index.html` now expose the enterable-building legend section and markers; section moved near the top of the legend so it is visible without scrolling to the bottom.
+- Validation (2026-03-14):
+  - `node --check app/js/interiors.js app/js/walking.js app/js/world.js app/js/terrain.js app/js/game.js app/js/map.js app/js/ui.js app/js/state.js` passed.
+  - `npm run sync:public` passed.
+  - `npm run verify:mirror` passed with `mismatchCount: 0`.
+  - `npm run test:osm-smoke` passed:
+    - `monacoWaterPresent=true`
+    - `monacoWaterVisible=true`
+  - `npm run test:runtime` passed:
+    - water/path materials solid
+    - spawn + mode-switch safety checks true
+    - walk traversal graph active for roads/footways/cycleways/railways
+    - `M` map and `F4` debug checks true
+- Remaining follow-up note:
+  - The enterable-buildings legend scan is functioning, but whether it lists anything depends on nearby OSM indoor coverage. In the automated Baltimore scan, the legend reported `No mapped interiors found nearby yet.` even with a larger search radius, so empty-list cases are currently expected in areas without mapped indoor data.
+- Startup regression analysis + fix pass (2026-03-14):
+  - User reported current branch loading into flat/simple terrain after a startup optimization pass. Root cause was a broken deferred-start edit in `app/js/world.js` / `app/js/ui.js`; reverted those staged startup changes and kept only safe bootstrap script parallelization.
+  - Compared current repo against older local World Explorer repos (`../worldexplorer3d-sync-clean`, `../worldexplorer3d-live-main`, `../worldexplorer-main-fix`, `../New project/WorldExplorer3D-rdt-engine`).
+  - Main regression finding: older repos did not include `railway` / `footway` / `cycleway` OSM query lanes in the blocking Earth startup query. Current repo did, and also inherited an `allRoadWays = ... e.tags?.highway` filter that became wrong once pedestrian/cycle `highway=*` ways were present.
+  - Fixes now in canonical `app/js/world.js`:
+    - `allRoadWays` restricted to drivable road tags only.
+    - POI node pass filtered to actual POI tags instead of every tagged node.
+    - mid-LOD buildings now use the existing lightweight box path (`createMidLodBuildingMesh`) plus `batchMidLodBuildingMeshes()` instead of full extrusions.
+    - `railway` / `footway` / `cycleway` fetch moved out of the startup-critical Earth query into a deferred follow-up pass after core world readiness.
+    - deferred linear-feature pass now uses a smaller local radius and hard caps (`24 rail`, `80 foot`, `40 cycle`) so it stays useful without turning into another minute-long stall.
+  - Local profiling against mirrored build (`public/app`) for Baltimore:
+    - core Earth load observed around `22-29s` depending on Overpass/network timing
+    - deferred linear-feature pass observed ready around `43s` in successful run with `24 rail / 80 foot / 40 cycle`
+    - key phase costs from perf stats in one run: `fetchOverpass ~4.4s`, `buildLanduseGeometry ~4.0s`, `buildBuildingGeometry ~2.5s`
+  - Validation:
+    - `node --check app/js/world.js app/js/ui.js app/js/bootstrap.js app/js/modules/script-loader.js`
+    - `npm run sync:public`
+    - `npm run verify:mirror`
+    - `npm run test:rules`
+  - Current gap:
+    - `npm run test:runtime` still needs follow-up because its invariant script assumed linear features were part of the initial blocking load. Began updating it to wait for deferred linear features, but the automated run is still timing out intermittently.
+    - paywall-copy cleanup on live-adjacent UI/account surfaces
+    - control remap to `WASD = movement`, `Arrow keys = directional look/steer` where applicable
 - Firebase Hosting + billing rollout scaffold (2026-02-16):
   - Added new production-style structure:
     - `public/index.html` (marketing + pricing + trial CTA)
@@ -2186,3 +2246,384 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
     - `withBrake.drifting: true` during scenario.
 - Preview channel refreshed with latest handling tune:
   - `https://worldexplorer3d-d9b83--test-d4v4nllr.web.app` (expires 2026-04-01 18:18:13 local)
+- LocalHub3D input/scroll separation hardening (2026-03-04):
+  - Updated map runtime key guards in `export/LocalHub3D/localhub/js/hub-runtime.js`, `.../explore-runtime.js`, and `.../ecosystem-runtime.js` to capture arrow/page/space keys consistently, prevent parent scroll, stop propagation, and re-focus the map iframe.
+  - Closed header-role select edge case by preventing movement-key handling from staying bound to the select; key bursts now move focus to iframe instead of scrolling page.
+  - Strengthened engine-side guard in `export/LocalHub3D/localhub/engine-classic/js/engine.js` to support both `event.code` and `event.key` variants (`Space`/`Spacebar`/` `) with capture-phase prevention.
+  - Validation (Playwright headless): no `window.scrollY` changes across `hub.html`, `explore.html`, and `ecosystem.html` during arrow-key bursts from body/select/iframe focus states.
+- Follow-up input-focus hardening:
+  - Added `pointerdown` focus forwarding from runtime host containers to map iframe on hub/explore/ecosystem pages so movement keys immediately target the map engine.
+  - Re-ran Playwright scroll checks across the three map pages; `window.scrollY` remained unchanged during ArrowDown bursts and active element stayed `IFRAME`.
+- Polar/remote load reliability patch (in progress):
+  - Added world geometry guardrails to reject extreme outlier map features (oversized spans/segments) that were creating giant sliced polygons in Arctic/polar regions.
+  - Added guaranteed synthetic fallback when OSM returns no roads after all attempts, so remote areas still load instead of stalling/failing.
+  - Added terrain visual profile logic in `app/js/terrain.js` to render snow-covered ground in polar and high-elevation tiles (e.g., Antarctica/alpine zones), replacing grass appearance in those regions.
+  - Bumped app module cache tags for `terrain.js` and `world.js` in `app/js/app-entry.js`.
+- Follow-up hardening after first mirrored smoke run:
+  - Tightened feature geometry guard thresholds and split strictness by feature type (roads/buildings vs landuse/water) to suppress giant malformed polygons in remote/high-latitude datasets.
+  - `createSyntheticFallbackWorld()` now clears partially generated meshes/state before fallback generation, preventing mixed broken geometry artifacts.
+  - Polar fallback now avoids spawning a fake dense building cluster.
+  - Snow terrain style brightened (full white base + slight emissive tint) for clearer “snow-covered ground” appearance.
+- Final remote-region behavior tuning:
+  - Switched no-road handling in exploration mode to terrain-only spawn (no fake fallback roads/buildings), while keeping synthetic fallback available for road-dependent modes (`trial`, `checkpoint`, `painttown`).
+  - Verified long-running coordinate launches now clear loading for Arctic/Everest/Antarctica with no console errors in the final v4 run.
+- Validation artifacts:
+  - `output/playwright/polar-fix-v4/report.json`
+  - `output/playwright/polar-fix-v4/arctic.png`
+  - `output/playwright/polar-fix-v4/everest.png`
+  - `output/playwright/polar-fix-v4/antarctica.png`
+- Snow coverage and remote-load hardening follow-up (2026-03-10):
+  - Added robust elevation sampling clamps + percentile-based snow classification in `app/js/terrain.js` to prevent single bad elevation pixels from forcing snow in temperate cities.
+  - Exposed terrain style helpers via `appCtx` and updated `app/js/engine.js` `applyGrassToTerrain()` to reapply biome-aware terrain profile instead of blindly forcing grass textures.
+  - Updated module cache tags in `app/js/app-entry.js` (`terrain.js?v=57`, `engine.js?v=56`).
+  - Synced mirror (`npm run sync:public`) and verified parity (`npm run verify:mirror`).
+- Important local testing note:
+  - Existing server on port 4173 is a different/stale workspace process; accurate validation for this repo was run on port 4174.
+- Fresh validation artifacts on correct server (`http://127.0.0.1:4174/app/`):
+  - Polar/Everest load + snow persistence: `output/playwright/polar-fix-v8/report.json` (+ `arctic.png`, `everest.png`, `antarctica.png`).
+  - Baltimore temperate regression check (no false snow): `output/playwright/baltimore-regression-v6-4174/report.json` (+ `ingame.png`).
+- Gate checks after patch:
+  - `npm run test` passed.
+  - `npm run release:verify` passed.
+- Validation rerun on correct code path for gate scripts:
+  - Replaced stale 4173 listener and served this workspace `public/` on port 4173.
+  - Re-ran `npm run test` and `npm run release:verify` against current branch files; both passed.
+- Geolocation feature restoration (2026-03-10):
+  - Reintroduced `Use My Location` controls in title location flow and globe selector overlay.
+  - Implemented a single shared geolocation request path in `app/js/ui.js` using `navigator.geolocation.getCurrentPosition` with:
+    - `enableHighAccuracy: true`
+    - `timeout: 12000`
+    - `maximumAge: 120000`
+  - Shared flow now:
+    - opens globe selector when needed,
+    - sets custom lat/lon,
+    - updates marker and coordinate fields through selector selection path,
+    - triggers reverse lookup,
+    - leaves user ready for `Start Here`.
+  - Added friendly failure messages for unsupported / denied / unavailable / timeout states.
+  - Added selector API helpers in `app/js/ui/globe-selector.js` for external selection+lookup and locate-button busy state.
+  - Geolocation selections mark transient custom location and skip auto-favorite in Start Here path.
+  - Prevented transient geolocation coords from being persisted in `worldExplorer3D.lastLocation.v1`.
+  - Cache-bust updates:
+    - `app/js/ui.js` import of globe selector -> `?v=57`
+    - `app/js/app-entry.js` import of ui -> `?v=57`
+- Validation:
+  - Mirror: `npm run sync:public`, `npm run verify:mirror` passed.
+  - Geolocation smoke: `output/playwright/geolocation-rewire-check/report.json` (menu + globe button flow and denied path).
+  - Full gates: `npm run test` and `npm run release:verify` passed.
+- Geolocation availability verification (2026-03-10):
+  - Confirmed on `world-explorer` branch that `Use My Location` UI and geolocation logic exist in both `app/*` and mirrored `public/app/*`.
+  - Verified local runtime endpoint: `http://127.0.0.1:4173/app/` (not root `/`).
+  - Playwright smoke result (`output/playwright/geolocation-presence-check.json`):
+    - `#titleUseMyLocationBtn` visible with text `Use My Location`.
+    - Globe selector opens and `#globeSelectorLocateBtn` visible with text `Use My Location`.
+    - No console errors.
+  - Screenshot: `output/playwright/geolocation-presence-check.png`.
+
+- Local stability pass (2026-03-10, compacted-thread continuation):
+  - Multiplayer room-open reliability: `app/js/multiplayer/ui-room.js`
+    - added delayed room-world resync retry when `worldLoading` is in progress to prevent join/open flows from URL-changing without fully loading into room world.
+  - Globe selector nearby behavior: `app/js/ui/globe-selector.js`
+    - nearby list now prioritizes nearest mapped place + saved custom favorites (not preset city list), reducing false “nearest preset city” jumps in sparse regions.
+  - HUD readability + drone wording: `app/js/hud.js`, `app/index.html`, `app/js/ui.js`
+    - split accidental "Road • Location" one-line payloads into separate street/location lines.
+    - tighter truncation + two-line location wrapping to prevent HUD spillover.
+    - drone HUD uses plain wording (`HEIGHT` / `CEILING`, `Drone View`) and keeps compact-toggle behavior.
+    - compact HUD mode now collapses to a small `HUD` button instead of a large card.
+  - Water robustness: `app/js/world.js`
+    - expanded water geometry guard limits and added deterministic fallback water surface when upstream water data is unavailable.
+  - Test reliability hardening (local CI flake reduction only): `scripts/test-runtime-invariants.mjs`
+    - force click on `#exploreBtn` to avoid loading-overlay click interception.
+    - ignore transient external 429/5xx "Failed to load resource" console noise.
+    - replaced async `waitForFunction` polling with explicit snapshot polling for runtime readiness.
+    - kept driveability/lane/console assertions strict; water checks remain reported and logged.
+
+- Validation run after above patch set:
+  - `npm run sync:public` ✅
+  - `npm run verify:mirror` ✅
+  - `npm run test` ✅ (41/41 rules passed + runtime invariants passed)
+  - `npm run release:verify` ✅
+- 2026-03-10 hotfix pass (layout + multiplayer open fallback):
+  - Restored title menu vertical footprint by increasing `.menu-container` max-height breakpoints and tightening `.start-section` padding in `app/index.html`.
+  - Removed injected `Continue Last Location` secondary button from title launch footer (`app/js/ui.js`) so the bottom action area matches the prior single-primary-button layout.
+  - Fixed globe selector side overflow by making `.globe-selector-side` scroll-safe and keeping `.globe-selector-actions` visible/sticky; buttons no longer appear clipped at lower viewport heights.
+  - Hardened saved-room open flow in `app/js/multiplayer/ui-room.js`:
+    - `handleJoinRoom` now supports `suppressStatus` + `throwOnError` options.
+    - `handleOpenOwnedRoom` now force-syncs room world after join and, on permission-denied errors, falls back to opening the saved room location locally (with clear warning that live room sync is blocked).
+- Validation (2026-03-10):
+  - Playwright screenshots:
+    - `output/playwright/layout-fix-title/shot-0.png` (title menu height + bottom spacing)
+    - `output/playwright/layout-fix-globe/shot-0.png` (globe selector action buttons fully visible)
+  - `npm run sync:public` ✅
+  - `npm run verify:mirror` ✅
+  - `npm run test` ✅
+  - `npm run release:verify` ✅
+
+- Ocean Mode destination implementation completed in canonical `app/*` and mirrored to `public/app/*`.
+- Added new Ocean launch destination wiring:
+  - `app/js/env.js`: new `ENV.OCEAN` and transition support.
+  - `app/js/main.js`: skip Earth render loop while Ocean renderer is active; added Ocean loading theme mapping.
+  - `app/index.html`: added `#oceanLaunchToggle` and `#oceanControls` panel copy.
+  - `app/js/ui.js`: Ocean included in launch mode parsing, share-link mode mapping, Start flow routing, controls-mode detection/UI, mobile profile, and main-menu teardown (`stopOceanMode`).
+  - `app/js/app-entry.js`: imports `app/js/ocean.js`.
+  - `app/js/ocean.js` (new): dedicated underwater renderer/canvas/HUD, submarine traversal, reef/seabed generation, marine particles, fish schools, deep-ocean backdrop, mode lifecycle APIs (`startOceanMode`, `stopOceanMode`, `animateOceanMode`).
+- Ocean visual polish pass:
+  - Reduced submarine on-screen dominance (sub scale + follow camera constants).
+  - Shifted follow fish school ahead/right of sub to avoid camera clipping passes.
+  - Darkened/rebalanced seabed palette and fog for clearer foreground-vs-depth contrast.
+- Automated validation run artifacts:
+  - `output/playwright/ocean-mode-local/*`
+  - `output/playwright/ocean-mode-regression/*`
+  - `output/playwright/ocean-mode-regression-v2/*`
+- Validation commands run (all passing):
+  - `node --check app/js/ocean.js app/js/ui.js app/js/main.js app/js/env.js app/js/app-entry.js`
+  - `npm run sync:public`
+  - `npm run verify:mirror`
+  - `npm run test`
+  - `npm run release:verify`
+- Notes:
+  - `develop-web-game` Playwright client (`web_game_playwright_client.js`) can capture black frames in this app when it targets a hidden canvas; explicit Playwright scene captures in `output/playwright/ocean-mode-regression-v2` confirm Ocean rendering is active and stable.
+
+- Ocean mode stabilization + quality pass continuation (2026-03-11):
+  - Confirmed this workspace is the geolocation-enabled branch (`world-explorer`) and still includes:
+    - main menu `Use My Location` (`#titleUseMyLocationBtn`)
+    - globe selector `Use My Location` (`#globeSelectorLocateBtn`)
+    - Ocean destination toggle (`#oceanLaunchToggle`).
+  - `app/js/ocean.js` updates:
+    - corrected submarine vertical tilt logic so ascent pitches nose up and descent pitches nose down.
+    - expanded vertical range envelope (`SURFACE_Y` raised, deeper hard floor).
+    - improved bathymetry blending to avoid sea-level flattening from ~0m terrain samples:
+      - treat near-zero elevation as unknown (fallback to procedural reef profile)
+      - adjusted mapping curve for positive/negative sampled meters
+      - reduced real-depth blend weight in scenic reef core.
+    - added `startOceanMode()` fail-safe catch path to recover cleanly to Earth render if Ocean init throws.
+  - `app/js/main.js` update:
+    - main render-loop skip now keys off active dedicated renderer state (`oceanMode.active`) instead of raw `ENV:OCEAN`, preventing black/stale frames if Ocean init fails.
+  - Validation runs:
+    - `node --check app/js/ocean.js`
+    - `node --check app/js/main.js`
+    - `npm run sync:public`
+    - `npm run verify:mirror` → ok true, checkedFiles 48, mismatchCount 0
+    - `npm run test` → passed
+    - `npm run release:verify` → passed
+  - Playwright/manual smoke artifacts:
+    - `output/playwright/ocean-depth-validation-after-patch.png`
+    - `output/playwright/ocean-depth-range-after-forward.png`
+    - `output/playwright/ocean-controls-check.png`
+    - `output/playwright/globe-locate-button-confirm.png`
+    - `output/playwright/ocean-earth-switch-regression-check.png`
+  - Observed behavior checks:
+    - Ocean launch enters `ENV:OCEAN`, ocean canvas/hud shown.
+    - Main-menu return + Earth relaunch works (`ENV:EARTH`, ocean canvas hidden).
+    - Depth controls respond (Space ascends, Shift descends) and depth readout updates.
+    - No page/console errors in latest Ocean↔Earth regression check.
+
+- Ocean integration + control correction pass (2026-03-11):
+  - Confirmed this repo/branch is the one with geolocation + ocean destination wiring.
+  - `app/js/ocean.js`:
+    - fixed steering sign so `A` turns left and `D` turns right.
+    - fixed pitch sign so ascending tilts nose up and descending tilts nose down.
+    - kept wider traversal envelope (`WORLD_RADIUS=1200`, deeper floor clamp support).
+    - added read-only debug hook `getOceanModeDebugState()` (also exposed on `globalThis`) for deterministic automation checks.
+  - Upgraded measured bathymetry dataset for a recognizable site:
+    - `app/data/ocean-bathymetry-great-barrier-reef.json`
+    - regenerated from GEBCO 2020 (OpenTopodata) at `81x81` grid (6,561 samples) around the Great Barrier Reef launch area.
+    - stats now include shallower + deeper variation (`min -987m`, `max -93m`, mean `-771.61m`).
+  - Mirror tooling fix:
+    - `scripts/sync-public-app.mjs` now mirrors `app/data` -> `public/app/data`.
+    - `scripts/verify-mirror.mjs` now validates `app/data` parity too.
+  - Ocean/Earth UI flow verified end-to-end in browser automation:
+    - title shows both geolocation button and Ocean launch toggle.
+    - in-game `Exploration` menu can switch Earth -> Ocean -> Earth.
+    - direct title launch into Ocean mode works.
+- Validation artifacts:
+  - Skill client screenshots: `output/web-game-ocean-pass/shot-0.png`..`shot-2.png`
+  - UI flow report/screens:
+    - `output/playwright/ocean-ui-smoke/report.json`
+    - `output/playwright/ocean-ui-smoke/ocean-ui-flow.png`
+  - Steering/tilt report/screen:
+    - `output/playwright/ocean-steering-check/report.json`
+    - `output/playwright/ocean-steering-check/ocean-steering.png`
+- Command validation (all passing in this pass):
+  - `npm run sync:public`
+  - `npm run verify:mirror`
+  - `npm run test`
+  - `npm run release:verify`
+
+- Ocean/Earth control + HUD polish pass (2026-03-11):
+  - Fixed submarine yaw mapping so `ArrowLeft/A` turns left and `ArrowRight/D` turns right in Ocean mode.
+  - Fixed submarine pitch response so ascending pitches nose up and descending pitches nose down.
+  - Removed legacy standalone Ocean top-right HUD panel (`#oceanModeHUD`) and kept Ocean telemetry integrated in existing white HUD card.
+  - On Ocean exit, now reset white HUD action labels immediately back to Earth defaults (`BRK / BOOST / DRIFT / OFF`) to avoid stale `ASC / DSC / SONAR` labels.
+  - Confirmed exploration float no longer has `New Location` item and environment float no longer has `RDT Detail` item.
+  - Verified Ocean->Earth fallback behavior for Ocean-first session returns to Baltimore; Earth->Ocean->Earth returns to prior Earth world.
+
+- Validation artifacts for first prompt completion:
+  - `output/ocean-first-task-validation/result.json`
+  - `output/ocean-first-task-validation/earth-start.png`
+  - `output/ocean-first-task-validation/ocean-start.png`
+  - `output/ocean-first-task-validation/earth-after-ocean.png`
+  - Key assertions from result.json:
+    - `leftDelta < 0` (left turns left)
+    - `rightDeltaFromLeft > 0` (right turns right)
+    - `pitchAscendDelta > 0` (ascend pitches up)
+    - `hasNextCity=false`, `hasRdtNoise=false`
+    - Ocean active in Ocean mode and inactive after Earth return
+
+- Build/test gates run after patch:
+  - `npm run sync:public` ✅
+  - `npm run verify:mirror` ✅ (49/49 files, 0 mismatch)
+  - `npm run test` ✅
+  - `npm run release:verify` ✅
+
+- OSM/public-sharing preparation pass started (2026-03-13):
+  - Scope switched to World Explorer app repo (not RDT spatial index).
+  - Confirmed current workspace includes latest geolocation + Ocean mode + recent UI/runtime fixes in both `app/*` and mirrored `public/app/*`.
+  - Audit findings:
+    - README currently reads as internal runtime/deploy notes; not ideal as first-stop OSM-facing project page.
+    - OSM attribution exists in app footer and acknowledgements but data-source/licensing narrative is scattered.
+    - Pages deploy workflow still targets legacy branch `codex/github-pages-compat` instead of current mainline release flow.
+    - package metadata still uses placeholder `new-project` / WorldExplorer repo URLs.
+  - Next chunk: rewrite top-level README and add focused OSM-facing docs/metadata (attribution + data sources + wiki draft + discoverability guidance), then run release checks and browser smoke validation.
+- OSM/public-sharing preparation implementation completed (2026-03-13):
+  - Rewrote top-level `README.md` for OSM-facing discovery quality (overview, capabilities, OSM data relationship, run/test flow, limitations visibility, docs navigation).
+  - Added focused public docs:
+    - `DATA_SOURCES.md`
+    - `ATTRIBUTION.md`
+    - `LIMITATIONS.md`
+    - `OSM_ECOSYSTEM_METADATA.md`
+    - `OSM_WIKI_ENTRY_DRAFT.md`
+    - `CITATION.cff`
+  - Updated supporting docs:
+    - `DOCUMENTATION_INDEX.md`
+    - `QUICKSTART.md`
+    - `CONTRIBUTING.md`
+    - `GITHUB_DEPLOYMENT.md`
+    - `CHANGELOG.md`
+  - Updated package/repo metadata in `package.json` to WorldExplorer3D identity and OSM/geospatial discoverability terms.
+  - Updated Pages deploy workflow trigger to `main` (`.github/workflows/deploy-pages-public.yml`).
+  - Added targeted Playwright OSM smoke script: `scripts/test-osm-smoke.mjs`.
+    - validates geolocation controls presence
+    - validates Ocean runtime activation and Earth return path
+    - writes artifacts to `output/playwright/osm-smoke/`
+  - Hardened runtime/local-server reliability in Playwright scripts by selecting available ports from a candidate list instead of assuming a single preoccupied port:
+    - `scripts/test-runtime-invariants.mjs`
+    - `scripts/test-osm-smoke.mjs`
+  - Integrated OSM smoke into release gate:
+    - `scripts/release-verify.mjs`
+    - `package.json` scripts (`test` now includes `test:osm-smoke`).
+  - Added fresh Ocean screenshot asset for README:
+    - `assets/screenshots/ocean-mode-great-barrier-reef.png`
+    - mirrored to `public/assets/screenshots/ocean-mode-great-barrier-reef.png`.
+- Validation run results after patch set:
+  - `npm run sync:public` ✅
+  - `npm run verify:mirror` ✅ (49 files, 0 mismatches)
+  - `npm run test:osm-smoke` ✅
+  - `npm run release:verify` ✅ (Mirror parity + 41/41 Firestore rules + runtime invariants + OSM smoke)
+- Post-integration gate rerun (2026-03-13):
+  - `npm run test` ✅ (rules + runtime invariants + OSM smoke)
+  - confirms geolocation controls presence and Ocean<->Earth mode path in automated browser checks.
+- GitHub Pages load-failure hard-stop fix (2026-03-13):
+  - Replaced final `Failed to load. Click to retry.` dead-end in world loaders with non-blocking recovery finalization.
+  - Updated files:
+    - `app/js/world.js`
+    - `public/app/js/world.js`
+    - `js/world.js` (legacy/root runtime path)
+  - Recovery behavior now prefers: partial finalize if roads exist; synthetic finalize when no roads + synthetic fallback enabled; sparse finalize when no roads and synthetic fallback disabled.
+  - Validation:
+    - `node --check` passed for all touched world loaders.
+    - `npm run test` passed (`test:rules`, `test:runtime`, `test:osm-smoke`).
+    - Hosted page probe against `https://rrg314.github.io/WorldExplorer3D/app/` confirmed Earth world load with no console/page errors and visible in-game world after launch.
+- WorldExplorer live-alignment + Reddit bugfix pass (2026-03-13):
+  - Confirmed active workspace targets `WorldExplorer3D` and manually audited live `worldexplorer3d.io/app/` before patching.
+  - Canonical runtime updates landed in `app/*`:
+    - shared safe spawn resolution/export path for geolocation, custom-location launches, teleports, and walk/drive switching
+    - walk/drone controls flipped to `WASD = move`, `Arrow Keys = directional look`
+    - `F4` now toggles the large map alongside `M`
+    - in-game custom-location reloads now re-enter via safe spawn resolution instead of unchecked road placement
+  - Runtime/world generation additions:
+    - separate `linearFeatures` / `linearFeatureMeshes` lane added so railways, footways, and cycleways render without polluting driveable-road logic
+    - terrain reprojection + map overlay support added for those OSM feature classes
+    - building facade palette expanded; rooftop cap/parapet/HVAC-style detail added for appropriate near-LOD flat roofs
+  - Access-copy cleanup:
+    - removed runtime/account/landing copy that implied map/core-play gating behind Pro
+    - F4/map access is now explicitly described as free; donations are recognition/support only
+  - Validation scaffolding extended:
+    - `scripts/test-runtime-invariants.mjs` now checks F4 map toggling, spawn-resolver exposure, building-interior fallback safety, traversal switch safety, updated control text, free-access runtime copy, and presence of new linear OSM features.
+  - Validation rerun after implementation:
+    - `npm run sync:public` ✅
+    - `npm run verify:mirror` ✅
+    - `npm run test:runtime` ✅ (`output/playwright/runtime-invariants/report.json` now records passing spawn/F4/free-access/linear-feature checks)
+    - `npm run test:rules` ✅
+    - `npm run test:osm-smoke` ✅
+- Local pre-deploy traversal/mirror completion pass (2026-03-13):
+  - Added walkable traversal graphs in `app/js/world.js`:
+    - `traversalNetworks.walk` includes roads + footways + cycleways + rail corridors
+    - `traversalNetworks.drive` stays road-only
+    - exposed `findNearestTraversalFeature`, `findTraversalRoute`, `measureRemainingPolylineDistance`, `pickNavigationTargetPoint`, and `surfaceDisplayName`
+  - Updated blocked walk-spawn fallback so invalid walk placements prefer nearby walkable surfaces before generic ground fallback.
+  - Updated navigation/runtime surfaces:
+    - `app/js/game.js` now caches route rebuilds and uses traversal routing for walk/drive navigation
+    - `app/js/map.js` now draws routed polylines when route data exists
+    - `app/js/hud.js` and `app/js/main.js` now recognize footways/cycleways/rail corridors in walk/debug readouts
+  - Expanded mirror tooling:
+    - `scripts/sync-public-app.mjs` now syncs `index.html`, `account/index.html`, and `app/*` into `public/*`
+    - `scripts/verify-mirror.mjs` now verifies landing/account parity alongside runtime parity
+  - Expanded runtime invariants:
+    - checks walk traversal graph availability
+    - checks linear-feature routing activation
+    - checks landing/account free-access copy over the local server
+  - Documentation refresh extended to cover:
+    - full-site canonical/mirror rules (`index.html`, `account/index.html`, `app/*` -> `public/*`)
+    - walkable routing support for `railway`, `footway`, and `cycleway`
+    - local validation expectations before deploy
+  - Local validation completed:
+    - `npm run sync:public` ✅
+    - `npm run verify:mirror` ✅ (`checkedFiles: 51`)
+    - `npm run test:runtime` ✅
+    - `npm run test:rules` ✅ (`41/41`)
+    - `npm run test:osm-smoke` ✅
+    - `npm run release:verify` ✅
+    - `develop-web-game` client run against mirrored `http://127.0.0.1:4181/app/` saved screenshots in `output/playwright/public-web-game-client/`
+    - direct Playwright visual pass against mirrored `public/` saved screenshots in `output/playwright/public-local-verify/`
+  - Mirrored public-build visual notes:
+    - `F4` opened/closed the large map correctly
+    - walk-mode screenshots showed linear surfaces labeled in the HUD (`Footway`, `Baltimore Waterfront Promenade`)
+    - no console/page errors in `output/playwright/public-local-verify/report.json`
+- Local correction + path-surface pass (2026-03-13, follow-up):
+  - Reverted the earlier `F4` map remap. `F4` is back to debug overlay only; `M` remains the large-map toggle.
+  - Updated canonical runtime/account/docs copy so free access is explicit without repurposing the existing `F4` debug control.
+  - Tightened walk-surface sampling in `app/js/ground.js`:
+    - footways / cycleways / rail corridors now win when they are the closest valid walk surface, even when running beside roads
+    - walk height now raycasts actual `linearFeatureMeshes` before falling back to terrain+bias, so those surfaces behave like real walkable ribbons instead of route-only labels
+  - Updated `app/js/game.js` navigation route/marker height placement to use walk-surface height in walk mode.
+  - Next validation step after this entry: rerun `npm run sync:public`, `npm run verify:mirror`, and `npm run test:runtime` so the mirrored local browser build reflects the F4 correction and the path-surface changes.
+- Water/building/path visual correction pass (2026-03-14):
+  - Water:
+    - relaxed water geometry guards to stop steep/coastal polygons from being dropped too aggressively
+    - water polygons now use a flatter low-elevation base and solid materials so coastlines/rivers/ponds/lakes remain visible instead of fading into terrain
+    - water ribbons now render solid as well
+  - Rooftops:
+    - removed roof-cap / parapet / service-core overlays from `createRoofDetailMesh`
+    - kept only rooftop HVAC-style units
+    - constrained HVAC placement away from building edges to reduce visible overhang/alignment glitches
+  - Footways / cycleways / rail corridors:
+    - switched 3D ribbon materials from translucent to solid, terrain-following surfaces with full depth writing
+  - Next validation step after this entry: sync mirror, rerun runtime/release checks, and capture a Monaco/local screenshot probe if feasible.
+- Monaco water regression coverage pass (2026-03-14):
+  - Added a Monaco-specific water check to `scripts/test-osm-smoke.mjs`.
+    - smoke test now fails if Monaco loads with no water features or no visible water meshes
+    - smoke run saves a Monaco artifact at `output/playwright/osm-smoke/monaco-water.png`
+  - Local mirrored Monaco probe against `http://127.0.0.1:4181/app/?loc=monaco` confirmed:
+    - `roads=3400`
+    - `buildings=5670`
+    - `waterAreas=23`
+    - `waterways=4`
+    - `visibleWaterMeshes=27`
+  - Full validation rerun:
+    - `npm run sync:public` ✅
+    - `npm run release:verify` ✅
+
+- Interior entry stabilization pass (2026-03-14 00:07:15): snapped indoor spawn to generated walk surfaces, floor base now derives from perimeter/entrance samples, and indoor lighting was added to avoid under-map/outdoor feel. Next: sync mirror and run local browser probe.
+
+- Startup load audit pass (2026-03-14 00:38:36): identified blocking critical path in sequential vendor script loading, throwaway terrain priming, duplicate mode start, and optional POI/detail generation on the critical path. Patched canonical runtime to parallelize dependent loader scripts, skip redundant terrain prewarm, defer POI/street-furniture detail work until after the world is playable, and keep startMode single-pass on title launch.

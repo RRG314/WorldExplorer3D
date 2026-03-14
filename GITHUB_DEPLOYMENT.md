@@ -24,6 +24,7 @@ Pages artifact root is `public/`:
 ## 3. Source/Mirror Rule
 
 Canonical app code lives in `app/*`.
+Canonical landing/account code lives in `index.html` and `account/index.html`.
 
 Before release, mirror and verify:
 

@@ -1,6 +1,6 @@
 # Technical Documentation
 
-Last reviewed: 2026-03-02
+Last reviewed: 2026-03-13
 
 Engineering reference for module contracts, data flow, storage keys, APIs, and validation workflows.
 
@@ -8,11 +8,15 @@ Engineering reference for module contracts, data flow, storage keys, APIs, and v
 
 Canonical runtime:
 
+- `index.html`
+- `account/index.html`
 - `app/index.html`
 - `app/js/*`
 
 Hosted mirror:
 
+- `public/index.html`
+- `public/account/index.html`
 - `public/app/index.html`
 - `public/app/js/*`
 
@@ -28,11 +32,12 @@ npm run verify:mirror
 ### 2.1 Boot path
 
 - `app/js/bootstrap.js`:
-  - loads vendor scripts
+  - loads the core Three.js vendor script first, then parallel-loads dependent loader scripts
   - imports app entrypoint
-  - starts optional post-processing bootstrap
+  - starts optional post-processing bootstrap with optional scripts loaded off the critical path
 - `app/js/app-entry.js`:
   - `bootApp()` initializes engine/UI/tutorial/multiplayer/auth observer
+  - imports `interiors.js` so the lazy indoor subsystem is available before input/runtime updates
 
 ### 2.2 Render path
 
@@ -52,8 +57,10 @@ Responsibilities:
 
 - title tabs and location/game mode selection
 - launch gating for custom location via globe selector
+- shared safe spawn handoff for geolocation/custom launches and in-game custom-location reloads
 - tutorial event emission bridge
-- mobile virtual control orchestration
+- mobile virtual control orchestration (`WASD`-move / arrow-look for walk+drone)
+- keyboard routing keeps `M` as the large-map key and `F4` as a debug-overlay toggle
 - in-game float menu wiring
 - return-to-main-menu flow reset
 
@@ -80,6 +87,70 @@ Important behaviors:
   - saved favorites (deletable)
 - reverse lookup with cache + fallback provider
 - zoom-aware marker scaling
+
+## 3.3 World and spawn safety (`app/js/world.js`, `app/js/walking.js`)
+
+Key runtime contracts:
+
+- `resolveSafeWorldSpawn(x, z, options)`:
+  - validates direct walk/drive placement
+  - preserves valid positions during traversal switches
+  - falls back to nearest safe ground or road when the requested point is blocked
+- `applyResolvedWorldSpawn(spawn, options)`:
+  - synchronizes car/walker state from the resolved placement
+- `applyCustomLocationSpawn(mode, options)`:
+  - shared entry for globe selector, geolocation, and in-game custom-location reloads
+
+Data lanes kept separate on Earth scenes:
+
+- driveable road network: `roads`, `roadMeshes`
+- vegetation lane: `vegetationFeatures`, `vegetationMeshes`
+  - populated from OSM landuse/natural green areas plus `natural=tree` nodes and `natural=tree_row` ways
+  - batched into instanced tree meshes instead of per-tree scene groups
+- walk-traversable OSM linear ribbons: `linearFeatures`, `linearFeatureMeshes`
+  - `railway`
+  - `footway`
+  - `cycleway`
+  - rendered as solid terrain-following ribbons and reused by walk-surface sampling
+  - visual overlay starts disabled by default while traversal/pathfinding still use the loaded data
+  - fetched in a follow-up Earth pass after the core world is ready, so recent path-network expansion does not block the initial road/building/water load
+- traversal graphs: `traversalNetworks.drive` and `traversalNetworks.walk`
+  - drive graph stays road-only
+  - walk graph starts with roads, then expands once the deferred `railway` / `footway` / `cycleway` pass completes
+  - `findTraversalRoute()` consumes the active graph for navigation and map route drawing
+  - `GroundHeight.walkSurfaceY()` samples those path surfaces so walking, safe-spawn fallback, and walk navigation stay glued to the rendered ribbon instead of raw terrain when a path is present
+
+Traversal/spawn guarantees in current branch:
+
+- walk -> drive keeps the current position if it is already car-safe
+- invalid walk -> drive transitions resolve to the nearest safe road spawn
+- custom/geolocation launches validate placement before final spawn
+- blocked walk launches can resolve onto nearby walkable paths instead of only raw terrain
+- blocked spawn requests never intentionally place the player inside building/wall colliders
+
+Selective interior subsystem:
+
+- `app/js/interiors.js`
+  - runtime prompt + deliberate interaction path (`E`)
+  - on-demand Overpass indoor fetch for the targeted nearby building only
+  - supports way-based indoor rooms / corridors plus entrance / door nodes when mapped
+  - builds a single best-mapped floor lazily and tears it back down on exit
+  - nearby-support scan for the large-map legend is also on-demand, limited, and footprint-filtered so it does not become a global always-on interior loader
+- `app/js/ground.js`
+  - `GroundHeight.walkSurfaceInfo()` now checks `sampleInteriorWalkSurface()` first while an interior is active
+- `app/js/physics.js` / `app/js/walking.js`
+  - keep interior prompts idle until needed
+  - use collider `baseY` when evaluating temporary interior shell walls so the player stays inside the generated room volume instead of slipping out at terrain level
+  - dynamic interior shell colliders are local-only and cleared on exit
+
+Water / terrain-follow notes:
+
+- `app/js/world.js`
+  - water polygons/ribbons use the stable averaged surface base again so harbors/coastlines do not drop below exposed terrain after recent path/vegetation changes
+  - footway / cycleway ribbons sample each edge against terrain/road height instead of reusing a single centerline elevation, which keeps them flush with streets and steep ground
+- `app/js/terrain.js`
+  - landuse reprojection restores water flattening/offset behavior from the previously stable branch
+  - linear-feature reprojection now resamples left/right edges independently, reducing floating path strips on sloped roads
 
 ## 4. Tutorial Contracts (`app/js/tutorial/tutorial.js`)
 
@@ -220,6 +291,7 @@ Returned API:
 - `ensureEntitlements(user, options)`
 - `subscribeEntitlements(callback)`
 - normalizes plan, room quotas, admin claim status
+ - donations are recognition/status only for current core runtime access; map/gameplay are not gated
 
 ### 6.3 Billing client (`js/billing.js`)
 
@@ -300,4 +372,3 @@ npm run release:verify
 
 - `tests/firestore.rules.security.test.mjs`
 - `tests/painttown.integration.test.mjs`
-

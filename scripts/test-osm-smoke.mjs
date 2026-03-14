@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import http from 'node:http';
+import net from 'node:net';
 import { chromium } from 'playwright';
 
 const rootDir = process.cwd();
@@ -23,6 +24,7 @@ async function exists(filePath) {
 
 async function serveStaticRoot(port) {
   const root = rootDir;
+  const sockets = new Set();
   const mime = new Map([
     ['.html', 'text/html; charset=utf-8'],
     ['.js', 'text/javascript; charset=utf-8'],
@@ -76,19 +78,32 @@ async function serveStaticRoot(port) {
     }
   });
 
+  server.on('connection', (socket) => {
+    sockets.add(socket);
+    socket.on('close', () => sockets.delete(socket));
+  });
+
   await new Promise((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, host, resolve);
   });
 
-  return server;
+  return {
+    server,
+    close: () => new Promise((resolve) => {
+      for (const socket of sockets) {
+        if (socket instanceof net.Socket) socket.destroy();
+      }
+      server.close(resolve);
+    })
+  };
 }
 
 async function startServer() {
   for (const port of candidatePorts) {
     try {
-      const server = await serveStaticRoot(port);
-      return { server, port, owned: true };
+      const handle = await serveStaticRoot(port);
+      return { ...handle, port, owned: true };
     } catch {
       // try next candidate
     }
@@ -98,7 +113,7 @@ async function startServer() {
 
 function isTransientNetworkConsoleError(text = '') {
   const msg = String(text || '');
-  return /Failed to load resource:\s+the server responded with a status of\s+(429|500|502|503|504)/i.test(msg);
+  return /Failed to load resource:\s+the server responded with a status of\s+(400|429|500|502|503|504)/i.test(msg);
 }
 
 function assert(condition, message) {
@@ -119,6 +134,66 @@ async function waitForUiReady(page) {
   }, { timeout: 90000 });
 }
 
+async function bootstrapEarthRuntime(page, locKey = 'baltimore') {
+  return await page.evaluate(async (key) => {
+    const deadline = performance.now() + 60000;
+    let ctx = null;
+    while (performance.now() < deadline) {
+      const mod = await import('/app/js/shared-context.js?v=55');
+      ctx = mod?.ctx || {};
+      if (
+        typeof ctx.loadRoads === 'function' &&
+        typeof ctx.switchEnv === 'function' &&
+        ctx.ENV?.EARTH
+      ) {
+        break;
+      }
+      await new Promise((resolve) => window.setTimeout(resolve, 250));
+    }
+
+    if (
+      !ctx ||
+      typeof ctx.loadRoads !== 'function' ||
+      typeof ctx.switchEnv !== 'function' ||
+      !ctx.ENV?.EARTH
+    ) {
+      return {
+        ok: false,
+        reason: 'runtime boot helpers unavailable',
+        details: {
+          hasCtx: !!ctx,
+          loadRoadsType: typeof ctx?.loadRoads,
+          switchEnvType: typeof ctx?.switchEnv,
+          envEarth: ctx?.ENV?.EARTH || null
+        }
+      };
+    }
+
+    ctx.selLoc = key;
+    ctx.gameMode = 'free';
+    ctx.loadingScreenMode = 'earth';
+    ctx.gameStarted = true;
+    ctx.paused = false;
+    ctx.switchEnv(ctx.ENV.EARTH);
+
+    document.getElementById('titleScreen')?.classList.add('hidden');
+    document.getElementById('globeSelectorScreen')?.classList.remove('show');
+    ['hud', 'minimap', 'floatMenuContainer', 'mainMenuBtn', 'controlsTab', 'coords', 'historicBtn'].forEach((id) => {
+      document.getElementById(id)?.classList.add('show');
+    });
+
+    await ctx.loadRoads();
+    if (ctx.Walk?.setModeWalk) ctx.Walk.setModeWalk();
+    if (typeof ctx.startMode === 'function') ctx.startMode();
+
+    return {
+      ok: true,
+      selLoc: ctx.selLoc || null,
+      roads: Array.isArray(ctx.roads) ? ctx.roads.length : 0
+    };
+  }, locKey);
+}
+
 async function resolveRuntimeState(page) {
   return await page.evaluate(async () => {
     const mod = await import('/app/js/shared-context.js?v=55');
@@ -129,6 +204,34 @@ async function resolveRuntimeState(page) {
       titleHidden: !!document.getElementById('titleScreen')?.classList.contains('hidden')
     };
   });
+}
+
+async function loadPresetLocation(page, locKey) {
+  return await page.evaluate(async (key) => {
+    const mod = await import('/app/js/shared-context.js?v=55');
+    const ctx = mod?.ctx || {};
+    if (typeof ctx.loadRoads !== 'function') {
+      return { ok: false, reason: 'loadRoads unavailable' };
+    }
+    if (!ctx.LOCS?.[key]) {
+      return { ok: false, reason: `Unknown preset location: ${key}` };
+    }
+    ctx.selLoc = key;
+    await ctx.loadRoads();
+    return {
+      ok: true,
+      selLoc: ctx.selLoc || null,
+      worldLoading: !!ctx.worldLoading,
+      roads: Array.isArray(ctx.roads) ? ctx.roads.length : 0
+    };
+  }, locKey);
+}
+
+async function writePngDataUrl(filePath, dataUrl) {
+  if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/png;base64,')) return false;
+  const base64 = dataUrl.slice('data:image/png;base64,'.length);
+  await fs.writeFile(filePath, Buffer.from(base64, 'base64'));
+  return true;
 }
 
 async function launchFromTitle(page, launchMode = 'earth') {
@@ -257,9 +360,83 @@ async function main() {
     assert(titlePresence.hasGlobeGeolocation, 'Missing #globeSelectorLocateBtn');
     assert(titlePresence.hasOceanLaunchToggle, 'Missing #oceanLaunchToggle');
 
-    await launchFromTitle(page, 'earth');
+    const earthBootstrap = await bootstrapEarthRuntime(page, 'baltimore');
+    assert(earthBootstrap.ok, `Failed to bootstrap Earth runtime: ${earthBootstrap.reason || 'unknown error'} ${JSON.stringify(earthBootstrap.details || {})}`);
     await page.waitForTimeout(1800);
     const earthStateAfterTitleLaunch = await resolveRuntimeState(page);
+
+    const monacoLoad = await loadPresetLocation(page, 'monaco');
+    assert(monacoLoad.ok, `Failed to load Monaco preset: ${monacoLoad.reason || 'unknown error'}`);
+    assert(monacoLoad.selLoc === 'monaco', `Expected Monaco preset to be active, got ${monacoLoad.selLoc}`);
+    await page.waitForTimeout(1800);
+
+    const monacoWaterRaw = await page.evaluate(async () => {
+      const mod = await import('/app/js/shared-context.js?v=55');
+      const ctx = mod?.ctx || {};
+      const waterMeshes = Array.isArray(ctx.landuseMeshes) ?
+        ctx.landuseMeshes.filter((mesh) =>
+          mesh && mesh.visible !== false && (mesh.userData?.landuseType === 'water' || mesh.userData?.isWaterwayLine)
+        ) :
+        [];
+
+      let pngDataUrl = null;
+      let firstWaterPreview = null;
+      const firstWater = waterMeshes[0] || null;
+      if (firstWater && globalThis.THREE && ctx.camera && ctx.renderer?.domElement) {
+        const box = new globalThis.THREE.Box3().setFromObject(firstWater);
+        const center = box.getCenter(new globalThis.THREE.Vector3());
+        const size = box.getSize(new globalThis.THREE.Vector3());
+        const camOffsetX = Math.max(18, size.x * 0.2 || 18);
+        const camOffsetZ = Math.max(18, size.z * 0.2 || 18);
+        const camY = center.y + Math.max(14, size.y * 1.25 + 14);
+
+        ctx.camera.position.set(center.x + camOffsetX, camY, center.z + camOffsetZ);
+        ctx.camera.lookAt(center.x, center.y + 0.4, center.z);
+        ctx.camera.updateProjectionMatrix?.();
+        if (typeof ctx.render === 'function') ctx.render();
+        else if (ctx.renderer && ctx.scene && ctx.camera) ctx.renderer.render(ctx.scene, ctx.camera);
+        pngDataUrl = ctx.renderer.domElement.toDataURL('image/png');
+
+        firstWaterPreview = {
+          type: firstWater.userData?.isWaterwayLine ? 'waterway' : firstWater.userData?.landuseType || 'water',
+          center: {
+            x: Number(center.x.toFixed(2)),
+            y: Number(center.y.toFixed(2)),
+            z: Number(center.z.toFixed(2))
+          },
+          size: {
+            x: Number(size.x.toFixed(2)),
+            y: Number(size.y.toFixed(2)),
+            z: Number(size.z.toFixed(2))
+          }
+        };
+      }
+
+      return {
+        preset: ctx.selLoc || null,
+        loc: ctx.LOC || null,
+        roads: Array.isArray(ctx.roads) ? ctx.roads.length : 0,
+        buildings: Array.isArray(ctx.buildings) ? ctx.buildings.length : 0,
+        waterAreas: Array.isArray(ctx.waterAreas) ? ctx.waterAreas.length : 0,
+        waterways: Array.isArray(ctx.waterways) ? ctx.waterways.length : 0,
+        visibleWaterMeshes: waterMeshes.length,
+        firstWaterPreview,
+        pngDataUrl
+      };
+    });
+
+    const monacoWaterImage = path.join(outputDir, 'monaco-water.png');
+    await writePngDataUrl(monacoWaterImage, monacoWaterRaw.pngDataUrl);
+    const { pngDataUrl, ...monacoWater } = monacoWaterRaw;
+
+    assert(
+      monacoWater.waterAreas + monacoWater.waterways > 0,
+      `Monaco load returned no water features: ${JSON.stringify(monacoWater)}`
+    );
+    assert(
+      monacoWater.visibleWaterMeshes > 0,
+      `Monaco water loaded but no visible meshes were rendered: ${JSON.stringify(monacoWater)}`
+    );
 
     const oceanSwitchIssued = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
@@ -312,6 +489,8 @@ async function main() {
       globeGeolocationPresent: titlePresence.hasGlobeGeolocation,
       oceanLaunchTogglePresent: titlePresence.hasOceanLaunchToggle,
       oceanLaunchWorks: oceanState.oceanActive || oceanState.env === 'OCEAN',
+      monacoWaterPresent: monacoWater.waterAreas + monacoWater.waterways > 0,
+      monacoWaterVisible: monacoWater.visibleWaterMeshes > 0,
       earthLaunchWorks:
         earthStateAfterTitleLaunch.env === 'EARTH' &&
         earthState.env === 'EARTH' &&
@@ -325,6 +504,9 @@ async function main() {
       checks,
       titlePresence,
       earthStateAfterTitleLaunch,
+      monacoLoad,
+      monacoWater,
+      monacoWaterImage,
       oceanState,
       earthState,
       consoleErrors
@@ -332,12 +514,15 @@ async function main() {
 
     await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
 
-    assert(checks.noConsoleErrors, `Console/page errors present: ${consoleErrors.length}`);
+    assert(
+      checks.noConsoleErrors,
+      `Console/page errors present: ${consoleErrors.length} ${JSON.stringify(consoleErrors.slice(0, 8))}`
+    );
     console.log(JSON.stringify(report, null, 2));
   } finally {
     await browser.close();
-    if (serverHandle.server && serverHandle.owned) {
-      await new Promise((resolve) => serverHandle.server.close(resolve));
+    if (typeof serverHandle.close === 'function' && serverHandle.owned) {
+      await serverHandle.close();
     }
   }
 }

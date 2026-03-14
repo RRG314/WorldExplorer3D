@@ -171,11 +171,16 @@ function renderLoop(t = 0) {
         refY = Number.isFinite(appCtx.Walk.state.walker.y) ? appCtx.Walk.state.walker.y : refY;
       }
 
-      const nr = appCtx.findNearestRoad(refX, refZ);
-      const roadDist = Number.isFinite(nr?.dist) ? nr.dist : null;
+      const nearestSurface = modeLabel === 'drive' ?
+        appCtx.findNearestRoad(refX, refZ) :
+        typeof appCtx.findNearestTraversalFeature === 'function' ?
+          appCtx.findNearestTraversalFeature(refX, refZ, { mode: 'walk', maxDistance: 24 }) :
+          appCtx.findNearestRoad(refX, refZ);
+      const roadDist = Number.isFinite(nearestSurface?.dist) ? nearestSurface.dist : null;
       if (modeLabel !== 'drive') {
-        roadName = nr?.road?.name || roadName;
-        const halfWidth = nr?.road?.width ? nr.road.width * 0.5 : 5;
+        const feature = nearestSurface?.feature || nearestSurface?.road || null;
+        roadName = typeof appCtx.surfaceDisplayName === 'function' ? appCtx.surfaceDisplayName(feature) : feature?.name || roadName;
+        const halfWidth = feature?.width ? feature.width * 0.5 : 5;
         onRoadValue = Number.isFinite(roadDist) ? roadDist <= halfWidth + 3 : false;
       }
 
@@ -191,8 +196,8 @@ function renderLoop(t = 0) {
       overlay.textContent =
       `Mode: ${modeLabel.toUpperCase()}  Speed: ${speed} mph\n` +
       `Ref Y: ${refYVal}  Terrain Y: ${tY}\n` +
-      `On road: ${onRd}  dist: ${rdist}\n` +
-      `Road: ${roadName}`;
+      `On surface: ${onRd}  dist: ${rdist}\n` +
+      `Surface: ${roadName}`;
     }
     // Update debug marker position
     if (window._debugMarker) {
@@ -203,15 +208,21 @@ function renderLoop(t = 0) {
       if (appCtx.droneMode) {
         markerX = Number.isFinite(appCtx.drone?.x) ? appCtx.drone.x : markerX;
         markerZ = Number.isFinite(appCtx.drone?.z) ? appCtx.drone.z : markerZ;
-        const nr = appCtx.findNearestRoad(markerX, markerZ);
-        const halfWidth = nr?.road?.width ? nr.road.width * 0.5 : 5;
-        markerOnRoad = Number.isFinite(nr?.dist) ? nr.dist <= halfWidth + 3 : false;
+        const nearest = typeof appCtx.findNearestTraversalFeature === 'function' ?
+          appCtx.findNearestTraversalFeature(markerX, markerZ, { mode: 'walk', maxDistance: 24 }) :
+          appCtx.findNearestRoad(markerX, markerZ);
+        const feature = nearest?.feature || nearest?.road || null;
+        const halfWidth = feature?.width ? feature.width * 0.5 : 5;
+        markerOnRoad = Number.isFinite(nearest?.dist) ? nearest.dist <= halfWidth + 3 : false;
       } else if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker) {
         markerX = Number.isFinite(appCtx.Walk.state.walker.x) ? appCtx.Walk.state.walker.x : markerX;
         markerZ = Number.isFinite(appCtx.Walk.state.walker.z) ? appCtx.Walk.state.walker.z : markerZ;
-        const nr = appCtx.findNearestRoad(markerX, markerZ);
-        const halfWidth = nr?.road?.width ? nr.road.width * 0.5 : 5;
-        markerOnRoad = Number.isFinite(nr?.dist) ? nr.dist <= halfWidth + 3 : false;
+        const nearest = typeof appCtx.findNearestTraversalFeature === 'function' ?
+          appCtx.findNearestTraversalFeature(markerX, markerZ, { mode: 'walk', maxDistance: 24 }) :
+          appCtx.findNearestRoad(markerX, markerZ);
+        const feature = nearest?.feature || nearest?.road || null;
+        const halfWidth = feature?.width ? feature.width * 0.5 : 5;
+        markerOnRoad = Number.isFinite(nearest?.dist) ? nearest.dist <= halfWidth + 3 : false;
       }
 
       const debugY = appCtx.elevationWorldYAtWorldXZ(markerX, markerZ);

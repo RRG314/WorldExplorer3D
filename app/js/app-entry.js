@@ -11,6 +11,7 @@ import './real-estate.js?v=55';
 import './ground.js?v=55';
 import './terrain.js?v=57';
 import './world.js?v=56';
+import './interiors.js?v=1';
 import { init, tryEnablePostProcessing } from './engine.js?v=56';
 import './physics.js?v=55';
 import './walking.js?v=55';

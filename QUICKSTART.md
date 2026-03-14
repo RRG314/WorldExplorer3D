@@ -24,6 +24,7 @@ cd functions && npm install && cd ..
 ## 3. Run Locally (Hosting-Style)
 
 ```bash
+npm run sync:public
 python3 -m http.server --directory public 4173
 ```
 
@@ -33,9 +34,10 @@ Open:
 - `http://127.0.0.1:4173/app/`
 - `http://127.0.0.1:4173/account/`
 
-## 4. Mirror Discipline (`app` -> `public/app`)
+## 4. Mirror Discipline (Canonical -> `public/*`)
 
-Canonical runtime source is `app/*`.
+Canonical gameplay/runtime source is `app/*`.
+Canonical landing/account sources are `index.html` and `account/index.html`.
 
 Before tests/deploy:
 
@@ -73,8 +75,19 @@ This checks:
    - verify custom coordinate launch and place label update
 3. Runtime:
    - launch Earth and verify world/map UI loads
+   - verify `M` opens the large map
+   - verify `F4` still opens the debug overlay
+   - verify `Use My Location` / custom-location launch lands on safe ground, nearest walkable path, or nearest safe road when blocked
+   - switch Walk -> Drive from beside buildings and confirm the car is not trapped in geometry
+   - verify greenery appears in parks / woods / mapped tree areas without a large frame-time spike
+   - walk up to a mapped building prompt, press `E`, confirm the interior loads only on demand, then press `E` or `Esc` to exit cleanly
    - switch Earth <-> Ocean from in-game environment controls
-4. No new blocking console/runtime errors in primary flows
+   - verify railways / footways / cycleways appear in the loaded city and map overlay as solid terrain-following surfaces
+   - verify water remains visible where expected, including coastal water plus rivers / ponds / lakes
+   - verify walk navigation can follow footways / cycleways / rail corridors and drive navigation stays on roads
+4. Account / donation surfaces:
+   - verify landing/runtime/account copy does not imply payment is required for map or core play
+5. No new blocking console/runtime errors in primary flows
 
 ## 7. GitHub Pages Readiness
 

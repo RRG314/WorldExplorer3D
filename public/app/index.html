@@ -259,7 +259,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #largeMapCanvas{border:none;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
 #mapClose{position:absolute;top:30px;right:30px;background:#ffffff;border:none;color:#1e293b;font-family:'Inter',sans-serif;font-size:14px;font-weight:600;padding:12px 24px;cursor:pointer;border-radius:10px;transition:all 0.2s;z-index:200}
 #mapClose:hover{background:#f1f5f9;transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,0.1)}
-#mapSatelliteToggle.active,#mapRoadsToggle.active{background:#0fc !important;color:#000 !important}
+#mapSatelliteToggle.active,#mapRoadsToggle.active,#mapPathsToggle.active{background:#0fc !important;color:#000 !important}
 #police{position:fixed;top:20px;right:20px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;padding:10px 16px;color:#dc2626;font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;z-index:100;display:none;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 #police.show{display:block}
 /* Float Menus - Three separate menus in triangle formation */
@@ -546,6 +546,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #buildModeIndicator.show{display:block}
 #coords{position:fixed;bottom:200px;left:20px;background:rgba(255,255,255,0.95);border:none;border-radius:10px;padding:10px 14px;font-size:11px;color:#475569;z-index:100;display:none;box-shadow:0 4px 12px rgba(0,0,0,0.1);cursor:pointer}
 #coords.show{display:block}
+#interiorPrompt{position:fixed;left:50%;bottom:116px;transform:translateX(-50%);display:none;max-width:min(78vw,420px);padding:10px 14px;border-radius:999px;background:rgba(15,23,42,0.9);border:1px solid rgba(148,163,184,0.35);color:#f8fafc;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;letter-spacing:0.2px;z-index:140;box-shadow:0 12px 28px rgba(15,23,42,0.3);backdrop-filter:blur(8px);pointer-events:none}
+#interiorPrompt.show{display:block}
+#interiorPrompt[data-variant="supported"],#interiorPrompt[data-variant="active"]{border-color:rgba(52,211,153,0.65);color:#dcfce7}
+#interiorPrompt[data-variant="loading"]{border-color:rgba(96,165,250,0.65);color:#dbeafe}
+#interiorPrompt[data-variant="notice"]{border-color:rgba(248,113,113,0.65);color:#fee2e2}
 #flowerChallengeHud{position:fixed;top:88px;left:50%;transform:translateX(-50%);display:none;align-items:center;gap:10px;background:rgba(15,23,42,0.84);color:#f8fafc;border:1px solid rgba(248,113,113,0.65);border-radius:12px;padding:9px 14px;z-index:140;backdrop-filter:blur(8px);box-shadow:0 10px 26px rgba(15,23,42,0.35)}
 #flowerChallengeHud.show{display:flex}
 #flowerChallengeHudStatus{font-size:12px;font-weight:700;letter-spacing:0.3px}
@@ -836,11 +841,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
 </aside>
 <aside id="proAccessPanel" class="pro-access-panel" hidden>
   <div class="pro-access-head">
-    <div class="pro-access-title">PRO EARLY ACCESS</div>
-    <div id="proAccessState" class="pro-access-state">Upcoming</div>
+    <div class="pro-access-title">OPTIONAL DONATIONS</div>
+    <div id="proAccessState" class="pro-access-state">Open Access</div>
   </div>
-  <div class="pro-access-note">Upcoming demo soon available: Mars Rover.</div>
-  <button id="upgradeFromAppBtn" class="pro-access-btn" type="button">Open Account & Donations</button>
+  <div class="pro-access-note">Core play, map access, and signed-in multiplayer stay free. Donations only support development and account recognition.</div>
+  <button id="upgradeFromAppBtn" class="pro-access-btn" type="button">Account & Donations</button>
   <div id="proAccessStatus"></div>
 </aside>
 <div id="titleScreen">
@@ -1285,6 +1290,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fon
 </div>
 </div></div>
 <div id="coords">--</div>
+<div id="interiorPrompt" aria-live="polite"></div>
 <div id="flowerChallengeHud">
 <span id="flowerChallengeHudStatus"></span>
 <span id="flowerChallengeHudTimer"></span>
@@ -1327,6 +1333,18 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fon
     <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
       <div style="margin-bottom:3px"><span style="color:#00ff88">⋯⋯⋯</span> Active Route Line</div>
       <div style="margin-bottom:3px"><span style="color:#00ff88">◉</span> Destination Marker</div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:12px">
+    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="filterInteriors" checked style="cursor:pointer">
+      <label for="filterInteriors" style="cursor:pointer">ENTERABLE BUILDINGS</label>
+    </div>
+    <div style="font-size:10px;line-height:1.5;padding-left:24px;opacity:0.9">
+      <div id="enterableBuildingsStatus" style="margin-bottom:6px">Open the legend to scan nearby mapped interiors.</div>
+      <div style="margin-bottom:6px;color:#8ef9ff">Press <strong>E</strong> near a listed building to enter or exit.</div>
+      <div id="enterableBuildingsList" style="display:grid;gap:4px"></div>
     </div>
   </div>
 
@@ -1455,7 +1473,19 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fon
     </div>
     <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
       <div style="margin-bottom:3px">🛣️ Street Network</div>
-      <div style="margin-bottom:3px">Shows road details on map</div>
+      <div style="margin-bottom:3px">Shows the driveable street network</div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:12px">
+    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="filterPaths" style="cursor:pointer">
+      <label for="filterPaths" style="cursor:pointer">PATH OVERLAY</label>
+    </div>
+    <div style="font-size:10px;line-height:1.6;padding-left:24px;opacity:0.9">
+      <div style="margin-bottom:3px">🚶 Footways and cycleways</div>
+      <div style="margin-bottom:3px">🚆 Rail corridors</div>
+      <div style="margin-bottom:3px">Traversal stays active even when this overlay is hidden</div>
     </div>
   </div>
 
@@ -1478,6 +1508,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fon
 <div style="position:absolute;bottom:20px;right:20px;display:flex;flex-direction:column;gap:10px">
 <button id="mapSatelliteToggle" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🛰️</button>
 <button id="mapRoadsToggle" class="active" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🛣️</button>
+<button id="mapPathsToggle" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🚶</button>
 <div style="border-top:2px solid #0fc;margin:5px 0"></div>
 <button id="mapZoomIn" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:20px;padding:10px 20px;cursor:pointer;border-radius:6px;width:50px">+</button>
 <button id="mapZoomOut" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:20px;padding:10px 20px;cursor:pointer;border-radius:6px;width:50px">−</button>
@@ -1521,6 +1552,7 @@ Explore the area
 <div class="floatItems">
 <div class="floatItem" id="fSatellite">🛰️ Satellite</div>
 <div class="floatItem" id="fRoads">🛣️ Show Roads</div>
+<div class="floatItem" id="fPaths">🚶 Path Overlay</div>
 <div class="floatItem" id="fLandUse">🗺️ Land Use</div>
 <div class="floatItem" id="fTimeOfDay">☀️ Day/Night</div>
 <div class="floatItem" id="fClouds">☁️ Clouds</div>
@@ -1640,8 +1672,9 @@ Explore the area
 </div>
 <div id="walkingControls" style="display:none">
 <b>🚶 Walking Mode:</b><br>
-• Arrows - Move<br>
-• WASD - Look around<br>
+• WASD - Move<br>
+• Arrow Keys - Look around<br>
+• E - Enter/exit mapped interior<br>
 • Space - Jump<br>
 • Shift - Run (2x speed)<br>
 • Right Click + Drag - Mouse look<br>
@@ -1653,8 +1686,8 @@ Explore the area
 </div>
 <div id="droneControls" style="display:none">
 <b>🚁 Drone Mode:</b><br>
-• Arrows - Move<br>
-• WASD - Look around<br>
+• WASD - Move<br>
+• Arrow Keys - Look around<br>
 • Mouse - Look around<br>
 • Space - Fly up<br>
 • Shift/Ctrl - Fly down<br>
@@ -2060,17 +2093,17 @@ function renderState(state, user) {
 
   const isPro = adminMode || plan === 'pro';
   scheduleProPanelAutoHide();
-  proAccessState.textContent = isPro ? 'Pro Early Access' : 'Optional Pro Donation';
+  proAccessState.textContent = isPro ? 'Donation Recognition' : 'Open Access';
   upgradeFromAppBtn.style.display = isPro ? 'none' : 'inline-flex';
 
   if (adminMode) {
-    setProStatus('Admin test mode active. Upcoming demo soon available: Mars Rover.');
+    setProStatus('Admin test mode active. Core play, map access, and multiplayer remain open to everyone.');
   } else if (isPro) {
-    setProStatus('Pro access active. Upcoming demo soon available: Mars Rover.');
+    setProStatus('Pro donation recognition active. Core play, map access, and multiplayer remain open to everyone.');
   } else if (plan === 'supporter') {
-    setProStatus('Supporter donation active. Multiplayer stays open for everyone; Pro adds early demo access.');
+    setProStatus('Supporter donation recognition active. Core play, map access, and multiplayer remain open to everyone.');
   } else {
-    setProStatus('All signed-in players can use multiplayer. Optional donations keep solo-dev updates shipping.');
+    setProStatus('All core play, M map access, and signed-in multiplayer are free. Donations are optional.');
   }
 
   updateAuthOverlayVisibility();

@@ -2,14 +2,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 
 const rootDir = process.cwd();
-const sourceAppDir = path.join(rootDir, 'app');
-const targetAppDir = path.join(rootDir, 'public', 'app');
-
-const sourceItems = [
-  { rel: 'index.html', type: 'file' },
-  { rel: 'assets', type: 'dir' },
-  { rel: 'data', type: 'dir' },
-  { rel: 'js', type: 'dir' }
+const syncEntries = [
+  { source: 'index.html', target: 'public/index.html', type: 'file' },
+  { source: 'account/index.html', target: 'public/account/index.html', type: 'file' },
+  { source: 'app/index.html', target: 'public/app/index.html', type: 'file' },
+  { source: 'app/assets', target: 'public/app/assets', type: 'dir' },
+  { source: 'app/data', target: 'public/app/data', type: 'dir' },
+  { source: 'app/js', target: 'public/app/js', type: 'dir' }
 ];
 
 function normalizeRel(relPath) {
@@ -68,35 +67,23 @@ async function removeStaleFiles(targetDir, validFilesSet) {
 
 async function main() {
   const copied = [];
+  let staleRemoved = 0;
 
-  for (const item of sourceItems) {
-    const srcPath = path.join(sourceAppDir, item.rel);
-    const dstPath = path.join(targetAppDir, item.rel);
+  for (const entry of syncEntries) {
+    const srcPath = path.join(rootDir, entry.source);
+    const dstPath = path.join(rootDir, entry.target);
 
-    if (item.type === 'file') {
+    if (entry.type === 'file') {
       await copyFile(srcPath, dstPath);
-      copied.push(normalizeRel(item.rel));
+      copied.push(normalizeRel(entry.source));
       continue;
     }
 
-    if (item.type === 'dir') {
+    if (entry.type === 'dir') {
       const relFiles = await copyDirRecursive(srcPath, dstPath);
-      for (const rel of relFiles) copied.push(normalizeRel(path.join(item.rel, rel)));
+      for (const rel of relFiles) copied.push(normalizeRel(path.join(entry.source, rel)));
+      staleRemoved += await removeStaleFiles(dstPath, new Set(relFiles.map(normalizeRel)));
     }
-  }
-
-  const validInTarget = new Set(copied);
-  let staleRemoved = 0;
-
-  for (const item of sourceItems) {
-    if (item.type !== 'dir') continue;
-    const targetDir = path.join(targetAppDir, item.rel);
-    const subsetValid = new Set(
-      Array.from(validInTarget)
-      .filter((rel) => rel.startsWith(`${normalizeRel(item.rel)}/`))
-      .map((rel) => rel.slice(normalizeRel(item.rel).length + 1))
-    );
-    staleRemoved += await removeStaleFiles(targetDir, subsetValid);
   }
 
   console.log(
@@ -105,8 +92,11 @@ async function main() {
         ok: true,
         copiedFiles: copied.length,
         staleFilesRemoved: staleRemoved,
-        source: 'app',
-        target: 'public/app'
+        targets: syncEntries.map((entry) => ({
+          source: entry.source,
+          target: entry.target,
+          type: entry.type
+        }))
       },
       null,
       2

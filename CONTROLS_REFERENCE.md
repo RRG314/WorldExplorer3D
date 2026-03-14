@@ -1,6 +1,6 @@
 # Controls Reference
 
-Last reviewed: 2026-03-02
+Last reviewed: 2026-03-13
 
 Canonical control map for current runtime behavior.
 
@@ -15,7 +15,8 @@ Canonical control map for current runtime behavior.
 - `R`: record/stop track
 - `Shift+R`: road debug mode
 - `Esc`: close map or toggle pause
-- `` ` `` / `~` / `F8`: debug overlay
+- `F4` / `` ` `` / `~`: debug overlay
+- `F8`: performance overlay
 
 ## Driving Mode
 
@@ -34,13 +35,19 @@ Handling note:
 
 ## Walking Mode
 
-- `ArrowUp` / `ArrowDown`: move forward/back
-- `ArrowLeft` / `ArrowRight`: strafe left/right
-- `A` / `D`: look left/right
-- `W` / `S`: look up/down
+- `W` / `S`: move forward/back
+- `A` / `D`: strafe left/right
+- `ArrowLeft` / `ArrowRight`: look left/right
+- `ArrowUp` / `ArrowDown`: look up/down
+- `E`: enter/exit a mapped interior when the prompt is visible
 - `Space`: jump
 - `Shift`: run
 - `Right Click + Drag` or `Middle Click + Drag`: mouse look
+
+Walking/navigation note:
+
+- Walk routing can follow roads, footways, cycleways, and loaded rail corridors on Earth scenes.
+- Supported interiors only load when you deliberately interact; being near buildings does not auto-load indoor geometry.
 
 ## Drone Mode
 
@@ -86,6 +93,8 @@ Handling note:
 - `M`: open/close large map
 - left click map: inspect item
 - right click map: teleport
+- map legend: includes a nearby `Enterable Buildings` scan/list for mapped interiors
+- path overlay toggle: available in the environment menu and large map, starts off by default
 
 ## Multiplayer Actions (UI)
 
@@ -101,7 +110,6 @@ Handling note:
 Virtual controls adapt by mode:
 
 - driving profile
-- walking profile
-- drone profile
+- walking profile (`WASD` movement on left pad, arrows-style look on right pad)
+- drone profile (`WASD` movement on left pad, arrows-style look on right pad)
 - rocket profile
-

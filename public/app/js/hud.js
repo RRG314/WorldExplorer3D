@@ -295,26 +295,33 @@ function updateHUD() {
     const mph = Math.abs(Math.round(appCtx.Walk.state.walker.speedMph));
     const locName = locationName();
     const running = appCtx.keys.ShiftLeft || appCtx.keys.ShiftRight;
+    const activeInterior = appCtx.activeInterior || null;
 
-    let walkRoad = null;
-    if (!appCtx.onMoon && appCtx.roads && appCtx.roads.length > 0) {
-      let nearest = null;
-      if (typeof appCtx.getNearestRoadThrottled === 'function') {
-        nearest = appCtx.getNearestRoadThrottled(appCtx.Walk.state.walker.x, appCtx.Walk.state.walker.z, false);
-      } else if (typeof appCtx.findNearestRoad === 'function') {
-        nearest = appCtx.findNearestRoad(appCtx.Walk.state.walker.x, appCtx.Walk.state.walker.z);
-      }
-      if (nearest && nearest.road) {
-        const edge = Math.max(WALK_ROAD_EDGE_MIN, (nearest.road.w || 10) * WALK_ROAD_EDGE_SCALE);
-        if (nearest.dist < edge) walkRoad = nearest.road;
+    let walkSurface = null;
+    if (!activeInterior && !appCtx.onMoon && typeof appCtx.findNearestTraversalFeature === 'function') {
+      const nearest = appCtx.findNearestTraversalFeature(appCtx.Walk.state.walker.x, appCtx.Walk.state.walker.z, {
+        mode: 'walk',
+        maxDistance: 18
+      });
+      if (nearest?.feature) {
+        const featureWidth = Number.isFinite(nearest.feature.width) ? nearest.feature.width : 4;
+        const edge = Math.max(WALK_ROAD_EDGE_MIN, featureWidth * WALK_ROAD_EDGE_SCALE);
+        if (nearest.dist < edge) walkSurface = nearest.feature;
       }
     }
 
     setHudUnitLabels('MPH', 'LIMIT');
     document.getElementById('speed').textContent = mph;
     document.getElementById('speed').classList.remove('fast');
-    document.getElementById('limit').textContent = walkRoad ? walkRoad.limit || 25 : '';
-    setStreetAndLocation(walkRoad?.name || 'Off Road', locName);
+    document.getElementById('limit').textContent = activeInterior ? '' : (walkSurface?.limit ? walkSurface.limit || 25 : '');
+    setStreetAndLocation(
+      activeInterior ?
+        `${activeInterior.label || 'Interior'} Interior` :
+      walkSurface && typeof appCtx.surfaceDisplayName === 'function' ?
+        appCtx.surfaceDisplayName(walkSurface) :
+        walkSurface?.name || 'Off Road',
+      activeInterior ? `${locName} • On-demand` : locName
+    );
     const bf = document.getElementById('boostFill');
     bf.style.width = '0%';
     bf.classList.remove('active');

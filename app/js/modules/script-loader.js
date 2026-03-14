@@ -59,6 +59,10 @@ export function loadClassicScript(src, options = {}) {
 }
 
 export async function loadScriptList(sources, options = {}) {
+  if (options.parallel) {
+    await Promise.all(sources.map((src) => loadClassicScript(src, options)));
+    return;
+  }
   for (const src of sources) {
     await loadClassicScript(src, options);
   }

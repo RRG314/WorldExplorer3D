@@ -1,6 +1,6 @@
 # User Guide
 
-Last reviewed: 2026-03-02
+Last reviewed: 2026-03-13
 
 Player-facing behavior across app, multiplayer, tutorial, and account systems.
 
@@ -20,8 +20,9 @@ Sign in methods:
 1. Open `Location` tab.
 2. Choose a preset city or `Custom`.
 3. For custom, use globe selector (`Start Here`) to spawn from picked coordinates.
-4. Choose game mode in `Games` tab.
-5. Click `Explore`.
+4. If the picked/geolocated point is blocked, the runtime resolves to the nearest safe road, walkable path, or ground spawn instead of trapping the player in geometry.
+5. Choose game mode in `Games` tab.
+6. Click `Explore`.
 
 ## 3. Globe Selector Behavior
 
@@ -41,6 +42,7 @@ Notes:
 
 - Clicking globe sets an immediate place fallback and then refines with reverse lookup.
 - Saved favorites are browser-local.
+- `Use My Location` and custom-coordinate launches use the same safe spawn resolver as in-game teleports and mode switches.
 
 ## 4. Tutorial Behavior
 
@@ -61,6 +63,15 @@ Modes:
 - Rocket/space flight
 
 Current driving behavior includes tighter rear-biased drift when using `Space` at speed with steering input.
+Walk/drone controls now use `WASD` for movement and arrow keys for directional look.
+If a walk -> drive switch starts from an invalid spot (inside a building, on a rooftop, or inside blockers), the car snaps to the nearest safe road spawn instead of leaving the player stuck.
+Walk navigation now uses the Earth walkable network. Roads are available with the core Earth load, and nearby footways/cycleways/rail corridors are stitched in right after the core world is ready so the new path layers do not slow the first spawn as heavily.
+The visual path overlay starts off by default; you can enable it from the environment/map path toggle whenever you want to inspect those ribbons directly.
+Earth scenes now also use OSM vegetation layers so woods, parks, tree rows, and mapped tree nodes add greenery without enabling heavy foliage everywhere.
+Some buildings can now be entered when OSM indoor tags provide enough mapped room/corridor data. Walk up to a supported building and press `E` to load the mapped floor on demand; press `E` or `Esc` to leave.
+Indoor support is selective and data-driven. Unsupported buildings stay exterior-only, and interiors do not load globally in the background.
+The large-map legend now includes an `Enterable Buildings` section. Opening the legend triggers a nearby scan and lists cached supported buildings with distances when mapped indoor data exists in the current area.
+Large map access is free for all players and opens with `M`.
 
 Full controls: `CONTROLS_REFERENCE.md`.
 
@@ -117,7 +128,7 @@ Account page includes:
 - plan and donation status
 - room quota usage
 - profile name and provider info
-- donation portal actions
+- donation portal actions (optional support only; no core gameplay/map gating)
 - receipts list
 - friends and invites management
 - account deletion action
@@ -149,4 +160,3 @@ TTL cleanup (`expiresAt`) for ephemeral data:
 - Invite join fails: verify valid room code and account auth.
 - Tutorial repeats unexpectedly: check Settings tutorial toggle/restart state.
 - Receipts missing: refresh account data and check function logs.
-

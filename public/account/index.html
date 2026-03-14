@@ -397,9 +397,9 @@
           <p id="roomQuotaDetail" class="hint">Rooms created from this account.</p>
         </article>
         <article class="status-item">
-          <span class="label">Extras</span>
-          <p id="extrasLabel" class="value">Locked</p>
-          <p id="extrasDetail" class="hint">Upcoming demo: Mars Rover.</p>
+          <span class="label">Roadmap</span>
+          <p id="extrasLabel" class="value">Open</p>
+          <p id="extrasDetail" class="hint">Upcoming demo: Mars Rover. Core play and map access remain free for everyone.</p>
         </article>
         <article class="status-item" id="adminStatusCard" hidden>
           <span class="label">Admin Access</span>
@@ -963,24 +963,24 @@
       if (state.isAdmin === true || state.subscriptionStatus === 'admin') {
         planDetail.textContent = 'Admin test access active with full multiplayer and elevated room quota.';
       } else if (state.plan === 'pro') {
-        planDetail.textContent = 'Pro donation active. Early demos and priority communication are enabled.';
+        planDetail.textContent = 'Pro donation recognition active. Core gameplay, map access, and multiplayer remain open to everyone.';
       } else if (state.plan === 'supporter') {
-        planDetail.textContent = 'Supporter donation active. Full gameplay and multiplayer remain open to everyone.';
+        planDetail.textContent = 'Supporter donation recognition active. Core gameplay, map access, and multiplayer remain open to everyone.';
       } else if (state.plan === 'trial') {
         planDetail.textContent = 'Legacy trial state detected. Multiplayer is open while signed in.';
       } else {
-        planDetail.textContent = 'Free plan: full gameplay and multiplayer access while signed in. Donations are optional.';
+        planDetail.textContent = 'Free plan: full gameplay, M map access, and multiplayer access while signed in. Donations are optional.';
       }
 
       if (state.isAdmin === true || state.subscriptionStatus === 'admin' || state.plan === 'pro') {
-        extrasLabel.textContent = 'Mars Rover';
-        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover (Pro early access queue).';
+        extrasLabel.textContent = 'Roadmap';
+        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. This card is informational only and does not gate core features.';
       } else if (state.plan === 'supporter' || state.plan === 'trial') {
-        extrasLabel.textContent = 'Preview';
-        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Upgrade to Pro donation for early access.';
+        extrasLabel.textContent = 'Roadmap';
+        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Donations do not gate normal gameplay or map access.';
       } else {
-        extrasLabel.textContent = 'Locked';
-        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Pro donation unlocks early access.';
+        extrasLabel.textContent = 'Open';
+        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Core gameplay and map access are free for everyone.';
       }
 
       trialLabel.textContent = 'Available';

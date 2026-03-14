@@ -383,6 +383,31 @@ function createWalkingModule(opts) {
     return finiteOr(y, 1.2);
   }
 
+  function getWalkGroundY(x, z, fallbackY = 0) {
+    if (appCtx.onMoon && appCtx.moonSurface) {
+      const raycaster = appCtx._getPhysRaycaster();
+      appCtx._physRayStart.set(x, 1000, z);
+      raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
+      const hits = raycaster.intersectObject(appCtx.moonSurface, false);
+      return hits.length > 0 && Number.isFinite(hits[0]?.point?.y) ? hits[0].point.y : fallbackY;
+    }
+
+    if (appCtx.GroundHeight && typeof appCtx.GroundHeight.walkSurfaceY === 'function') {
+      const surfaceY = appCtx.GroundHeight.walkSurfaceY(x, z);
+      if (Number.isFinite(surfaceY)) return surfaceY;
+    }
+
+    if (typeof appCtx.terrainMeshHeightAt === 'function') {
+      const terrainY = appCtx.terrainMeshHeightAt(x, z);
+      if (Number.isFinite(terrainY)) return terrainY;
+    }
+    if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
+      const elevY = appCtx.elevationWorldYAtWorldXZ(x, z);
+      if (Number.isFinite(elevY)) return elevY;
+    }
+    return finiteOr(fallbackY, 0);
+  }
+
   function nowMs() {
     return typeof performance !== 'undefined' && typeof performance.now === 'function' ?
     performance.now() :
@@ -430,6 +455,22 @@ function createWalkingModule(opts) {
     // Debug log removed
 
     // Debug log removed
+    if (typeof appCtx.resolveSafeWorldSpawn === 'function' && typeof appCtx.applyResolvedWorldSpawn === 'function') {
+      const safeWalkSpawn = appCtx.resolveSafeWorldSpawn(
+        finiteOr(car.x, state.walker.x),
+        finiteOr(car.z, state.walker.z),
+        {
+          mode: 'walk',
+          angle: finiteOr(car.angle, state.walker.angle),
+          source: 'walk_mode_switch'
+        }
+      );
+      appCtx.applyResolvedWorldSpawn(safeWalkSpawn, {
+        mode: 'walk',
+        syncCar: true,
+        syncWalker: true
+      });
+    }
     syncWalkerFromCar();
     syncWalkTerrain(true);
     if (typeof appCtx.repositionBuildingsWithTerrain === 'function') appCtx.repositionBuildingsWithTerrain();
@@ -452,21 +493,7 @@ function createWalkingModule(opts) {
 
     if (state.characterMesh) {
       // Get terrain height at walker position (check moon first!)
-      let terrainY;
-      if (appCtx.onMoon && appCtx.moonSurface) {
-        // Ensure world matrix is current for raycasting
-        appCtx.moonSurface.updateMatrixWorld(true);
-        // Raycast against moon surface from well above
-        const raycaster = appCtx._getPhysRaycaster();
-        appCtx._physRayStart.set(state.walker.x, 1000, state.walker.z);
-        raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
-        const hits = raycaster.intersectObject(appCtx.moonSurface, false);
-        terrainY = hits.length > 0 ? hits[0].point.y : car.y - 1.7;
-      } else {
-        terrainY = typeof appCtx.terrainMeshHeightAt === 'function' ?
-        appCtx.terrainMeshHeightAt(state.walker.x, state.walker.z) :
-        appCtx.elevationWorldYAtWorldXZ(state.walker.x, state.walker.z);
-      }
+      const terrainY = getWalkGroundY(state.walker.x, state.walker.z, car.y - 1.7);
 
       // Set walker Y position to ground + eye height
       state.walker.y = terrainY + 1.7;
@@ -495,15 +522,36 @@ function createWalkingModule(opts) {
   function setModeDrive() {
     const wasWalk = state.mode === "walk";
     state.mode = "drive";
-    // If coming from walk, walker position is authoritative.
-    // If already in drive, keep walker synced from current car to avoid stale snaps.
-    if (wasWalk) syncCarFromWalker();else
-    syncWalkerFromCar();
+    let resolvedDriveSpawn = null;
+    if (typeof appCtx.resolveSafeWorldSpawn === 'function' && typeof appCtx.applyResolvedWorldSpawn === 'function') {
+      const targetX = wasWalk ? finiteOr(state.walker.x, car.x) : finiteOr(car.x, state.walker.x);
+      const targetZ = wasWalk ? finiteOr(state.walker.z, car.z) : finiteOr(car.z, state.walker.z);
+      const targetAngle = wasWalk ? finiteOr(state.walker.angle, car.angle) : finiteOr(car.angle, state.walker.angle);
+      const walkerFeetY = finiteOr(state.walker.y, 0) - CFG.eyeHeight;
+      resolvedDriveSpawn = appCtx.resolveSafeWorldSpawn(targetX, targetZ, {
+        mode: 'drive',
+        angle: targetAngle,
+        feetY: wasWalk ? walkerFeetY : finiteOr(car.y, 1.2) - 1.2,
+        source: 'drive_mode_switch'
+      });
+      appCtx.applyResolvedWorldSpawn(resolvedDriveSpawn, {
+        mode: 'drive',
+        syncCar: true,
+        syncWalker: true
+      });
+    } else if (wasWalk) {
+      syncCarFromWalker();
+    } else {
+      syncWalkerFromCar();
+    }
+
     car.x = finiteOr(car.x, finiteOr(state.walker.x, 0));
     car.z = finiteOr(car.z, finiteOr(state.walker.z, 0));
     car.angle = finiteOr(car.angle, finiteOr(state.walker.angle, 0));
     const fallbackY = finiteOr(car.y, 1.2);
-    const carY = getSafeDriveY(car.x, car.z, fallbackY);
+    const carY = resolvedDriveSpawn && Number.isFinite(resolvedDriveSpawn.carY) ?
+    resolvedDriveSpawn.carY :
+    getSafeDriveY(car.x, car.z, fallbackY);
     car.y = carY;
     if (carMesh) {
       carMesh.visible = true;
@@ -552,6 +600,7 @@ function createWalkingModule(opts) {
   }
 
   function isInsideBuilding(x, z, b) {
+    if (!b || b.collisionDisabled) return false;
     // Bounding box check
     if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) return false;
 
@@ -573,6 +622,18 @@ function createWalkingModule(opts) {
     return getBuildingsArray();
   }
 
+  function buildingBaseYAt(b, x, z) {
+    if (Number.isFinite(b?.baseY)) return b.baseY;
+    if (typeof appCtx.terrainMeshHeightAt === 'function') {
+      const terrainY = appCtx.terrainMeshHeightAt(x, z);
+      if (Number.isFinite(terrainY)) return terrainY;
+    } else if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
+      const terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
+      if (Number.isFinite(terrainY)) return terrainY;
+    }
+    return 0;
+  }
+
   // Find nearest building wall and return info for wall jumping
   function findNearestWall(x, z) {
     const allBuildings = queryBuildings(x, z, CFG.wallDetectRadius + 12);
@@ -583,6 +644,7 @@ function createWalkingModule(opts) {
 
     for (let i = 0; i < allBuildings.length; i++) {
       const b = allBuildings[i];
+      if (!b || b.collisionDisabled) continue;
       // Broad phase: skip buildings far away
       if (x < b.minX - CFG.wallDetectRadius || x > b.maxX + CFG.wallDetectRadius ||
       z < b.minZ - CFG.wallDetectRadius || z > b.maxZ + CFG.wallDetectRadius) continue;
@@ -632,17 +694,11 @@ function createWalkingModule(opts) {
 
     for (let i = 0; i < allBuildings.length; i++) {
       const b = allBuildings[i];
+      if (!b || b.collisionDisabled || b.isInteriorCollider) continue;
       // Broad phase
       if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) continue;
 
-      // Get terrain height at building position for absolute roof height
-      let terrainY = 0;
-      if (typeof appCtx.terrainMeshHeightAt === 'function') {
-        terrainY = appCtx.terrainMeshHeightAt(x, z);
-      } else if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
-        terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
-      }
-      const roofY = terrainY + b.height;
+      const roofY = buildingBaseYAt(b, x, z) + b.height;
 
       // Check if walker is above this roof or close to it (within 2 units below to allow landing)
       if (walkerY - CFG.eyeHeight >= roofY - 0.5) {
@@ -661,20 +717,57 @@ function createWalkingModule(opts) {
     return bestRoof;
   }
 
+  function resolveWalkGroundState(x, z, walkerY) {
+    let groundY;
+    if (appCtx.onMoon && appCtx.moonSurface) {
+      const raycaster = appCtx._getPhysRaycaster();
+      appCtx._physRayStart.set(x, 200, z);
+      raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
+      const hits = raycaster.intersectObject(appCtx.moonSurface, false);
+      groundY = hits.length > 0 ? hits[0].point.y : -100;
+    } else {
+      groundY = getWalkGroundY(x, z, -100);
+    }
+
+    let effectiveGroundY = groundY;
+    let onBuilding = false;
+
+    if (!appCtx.onMoon) {
+      const roofInfo = getBuildingRoofHeight(x, z, walkerY);
+      if (roofInfo && roofInfo.roofY > groundY) {
+        effectiveGroundY = roofInfo.roofY;
+        onBuilding = true;
+      }
+    }
+
+    if (typeof appCtx.getBuildTopSurfaceAtWorldXZ === 'function') {
+      const feetY = finiteOr(walkerY, 0) - CFG.eyeHeight;
+      const topY = appCtx.getBuildTopSurfaceAtWorldXZ(
+        x,
+        z,
+        feetY + CFG.blockStepHeight
+      );
+      if (Number.isFinite(topY) && topY > effectiveGroundY) {
+        effectiveGroundY = topY;
+      }
+    }
+
+    return { groundY, effectiveGroundY, onBuilding };
+  }
+
   function updateWalkPhysics(dt) {
     syncWalkTerrain(false);
 
-    // Arrow keys for MOVEMENT (forward/back/strafe)
-    const moveForward = keys.ArrowUp ? 1 : 0;
-    const moveBack = keys.ArrowDown ? 1 : 0;
-    const strafeLeft = keys.ArrowLeft ? 1 : 0;
-    const strafeRight = keys.ArrowRight ? 1 : 0;
+    // WASD for movement, arrow keys for directional look.
+    const moveForward = keys.KeyW ? 1 : 0;
+    const moveBack = keys.KeyS ? 1 : 0;
+    const strafeLeft = keys.KeyA ? 1 : 0;
+    const strafeRight = keys.KeyD ? 1 : 0;
 
-    // WASD for LOOKING (camera rotation)
-    const lookLeft = keys.KeyA ? 1 : 0;
-    const lookRight = keys.KeyD ? 1 : 0;
-    const lookUp = keys.KeyW ? 1 : 0;
-    const lookDown = keys.KeyS ? 1 : 0;
+    const lookLeft = keys.ArrowLeft ? 1 : 0;
+    const lookRight = keys.ArrowRight ? 1 : 0;
+    const lookUp = keys.ArrowUp ? 1 : 0;
+    const lookDown = keys.ArrowDown ? 1 : 0;
 
     // Movement speed
     const speed = keys.ShiftLeft || keys.ShiftRight ? CFG.runSpeed : CFG.walkSpeed;
@@ -708,50 +801,18 @@ function createWalkingModule(opts) {
     const MOON_GRAVITY = appCtx.onMoon ? -1.62 : -9.8; // Real moon gravity: 1.62 m/s²
     const JUMP_VELOCITY = appCtx.onMoon ? 3.0 : 5.0; // Higher jump on moon!
 
-    // Get ground height (moon surface or Earth terrain)
-    let groundY;
-    if (appCtx.onMoon && appCtx.moonSurface) {
-      // Raycast against moon surface
-      const raycaster = appCtx._getPhysRaycaster();
-      appCtx._physRayStart.set(state.walker.x, 200, state.walker.z);
-      raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
-      const hits = raycaster.intersectObject(appCtx.moonSurface, false);
-      groundY = hits.length > 0 ? hits[0].point.y : -100;
-    } else {
-      groundY = typeof appCtx.terrainMeshHeightAt === 'function' ?
-      appCtx.terrainMeshHeightAt(state.walker.x, state.walker.z) :
-      appCtx.elevationWorldYAtWorldXZ(state.walker.x, state.walker.z);
-    }
+    const initialGroundState = resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y);
+    let groundY = initialGroundState.groundY;
 
     // Initialize walker.y if not set
     if (state.walker.y === undefined || state.walker.y === 0) {
       state.walker.y = groundY + 1.7; // Start at ground + eye height
     }
 
-    // Check building roof under walker (can stand on roofs)
-    let effectiveGroundY = groundY;
-    state.walker.onBuilding = false;
-
-    if (!appCtx.onMoon) {
-      const roofInfo = getBuildingRoofHeight(state.walker.x, state.walker.z, state.walker.y);
-      if (roofInfo && roofInfo.roofY > groundY) {
-        effectiveGroundY = roofInfo.roofY;
-        state.walker.onBuilding = true;
-      }
-    }
-
-    // Stand on top of placed build blocks (persistent brick builder).
-    if (typeof appCtx.getBuildTopSurfaceAtWorldXZ === 'function') {
-      const feetY = state.walker.y - CFG.eyeHeight;
-      const topY = appCtx.getBuildTopSurfaceAtWorldXZ(
-        state.walker.x,
-        state.walker.z,
-        feetY + CFG.blockStepHeight
-      );
-      if (Number.isFinite(topY) && topY > effectiveGroundY) {
-        effectiveGroundY = topY;
-      }
-    }
+    const groundState = resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y);
+    groundY = groundState.groundY;
+    let effectiveGroundY = groundState.effectiveGroundY;
+    state.walker.onBuilding = groundState.onBuilding;
 
     // Check if on ground (with small tolerance)
     state.walker.onGround = Math.abs(state.walker.y - (effectiveGroundY + CFG.eyeHeight)) < 0.3;
@@ -833,15 +894,10 @@ function createWalkingModule(opts) {
             if (checkBuildings) {
               for (let i = 0; i < allBuildings.length; i++) {
                 const b = allBuildings[i];
+                if (!b || b.collisionDisabled) continue;
                 if (sx < b.minX || sx > b.maxX || sz < b.minZ || sz > b.maxZ) continue;
 
-                let bTerrainY = 0;
-                if (typeof appCtx.terrainMeshHeightAt === 'function') {
-                  bTerrainY = appCtx.terrainMeshHeightAt(sx, sz);
-                } else if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
-                  bTerrainY = appCtx.elevationWorldYAtWorldXZ(sx, sz);
-                }
-                const roofY = bTerrainY + b.height;
+                const roofY = buildingBaseYAt(b, sx, sz) + b.height;
 
                 // Allow if walker is at or above roof level (can walk on roof or land on it)
                 if (walkerFeetY >= roofY - 1.0) continue;
@@ -891,6 +947,26 @@ function createWalkingModule(opts) {
       state.walker.x = newX;
       state.walker.z = newZ;
 
+      const postGroundState = resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y);
+      const targetEyeY = postGroundState.effectiveGroundY + CFG.eyeHeight;
+      const snapDownDistance = Math.max(0.3, adjustedSpeed * dt * 0.95 + 0.22);
+      const snapUpDistance = CFG.blockStepHeight + 0.12;
+      const dropToGround = state.walker.y - targetEyeY;
+      const riseToGround = targetEyeY - state.walker.y;
+
+      if (state.walker.vy <= 0) {
+        if (dropToGround >= 0 && dropToGround <= snapDownDistance) {
+          state.walker.y = targetEyeY;
+          state.walker.vy = 0;
+          state.walker.onGround = true;
+        } else if (riseToGround >= 0 && riseToGround <= snapUpDistance) {
+          state.walker.y = targetEyeY;
+          state.walker.vy = 0;
+          state.walker.onGround = true;
+        }
+      }
+      state.walker.onBuilding = postGroundState.onBuilding;
+
       // Update speed display
       state.walker.speedMph = adjustedSpeed * 0.68; // Rough conversion to mph for display
     } else {
@@ -899,7 +975,11 @@ function createWalkingModule(opts) {
 
     // Update character mesh position and rotation (mesh is at feet, walker.y is at eye height)
     if (state.characterMesh && state.characterMesh.visible) {
-      state.characterMesh.position.set(state.walker.x, state.walker.y - CFG.eyeHeight, state.walker.z);
+      const meshGroundState = resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y);
+      const meshFeetY = state.walker.onGround ?
+        meshGroundState.effectiveGroundY + 0.04 :
+        Math.max(state.walker.y - CFG.eyeHeight, meshGroundState.effectiveGroundY + 0.02);
+      state.characterMesh.position.set(state.walker.x, meshFeetY, state.walker.z);
       state.characterMesh.rotation.y = state.walker.angle;
 
       // Animate walking when moving
@@ -932,9 +1012,7 @@ function createWalkingModule(opts) {
 
     if (state.view === "overhead") {
       // Overhead view like car mode - high up, looking down
-      const terrainY = typeof appCtx.terrainMeshHeightAt === 'function' ?
-      appCtx.terrainMeshHeightAt(state.walker.x, state.walker.z) :
-      appCtx.elevationWorldYAtWorldXZ(state.walker.x, state.walker.z);
+      const terrainY = getWalkGroundY(state.walker.x, state.walker.z, 0);
       const height = 45;
       const offsetBack = 8;
 

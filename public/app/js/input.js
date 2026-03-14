@@ -3,6 +3,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 // ============================================================================
 
 function isDebugToggleKey(code, event) {
+  if (code === 'F4') return true;
   if (code === 'Backquote') return true;
   const key = event?.key;
   return key === '`' || key === '~' || key === 'Dead';
@@ -12,11 +13,29 @@ function isPerfToggleKey(code) {
   return code === 'F8';
 }
 
+function toggleLargeMap() {
+  appCtx.showLargeMap = !appCtx.showLargeMap;
+  document.getElementById('largeMap').classList.toggle('show', appCtx.showLargeMap);
+}
+
 function onKey(code, event) {
   if (!appCtx.gameStarted) return;
 
+  if (code === 'KeyE') {
+    if (event?.repeat) return;
+    if (typeof appCtx.handleInteriorAction === 'function') {
+      Promise.resolve(appCtx.handleInteriorAction()).catch((err) => {
+        console.warn('[interior] Interaction failed:', err);
+      });
+      return;
+    }
+  }
+
   // Walking mode toggle (F key)
   if (code === 'KeyF') {
+    if (appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
+      appCtx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
+    }
     // Debug log removed
     if (appCtx.Walk) {
       // Debug log removed
@@ -68,6 +87,9 @@ function onKey(code, event) {
   }
 
   if (code === 'Digit6') {
+    if (appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
+      appCtx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
+    }
     appCtx.droneMode = !appCtx.droneMode;
 
     // Clear star selection when switching modes
@@ -160,8 +182,8 @@ function onKey(code, event) {
   }
   if (code === 'KeyN') nextCity();
   if (code === 'KeyM') {
-    appCtx.showLargeMap = !appCtx.showLargeMap;
-    document.getElementById('largeMap').classList.toggle('show', appCtx.showLargeMap);
+    if (event?.repeat) return;
+    toggleLargeMap();
   }
   if (appCtx.showLargeMap && (code === 'Equal' || code === 'NumpadAdd')) {
     if (appCtx.largeMapZoom < 18) {
@@ -176,6 +198,10 @@ function onKey(code, event) {
     }
   }
   if (code === 'Escape' && !document.getElementById('resultScreen').classList.contains('show') && !document.getElementById('caughtScreen').classList.contains('show')) {
+    if (appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
+      appCtx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
+      return;
+    }
     if (appCtx.showLargeMap) {
       appCtx.showLargeMap = false;
       document.getElementById('largeMap').classList.remove('show');
@@ -434,8 +460,16 @@ async function searchLocation() {
       await appCtx.loadRoads();
       // Debug log removed
 
-      // Keep the vehicle on a valid road spawn after reloading location data.
-      if (typeof appCtx.spawnOnRoad === 'function') appCtx.spawnOnRoad();
+      // Re-enter the world through the same safe custom-location resolver used by
+      // title-screen geolocation and globe launches.
+      const currentMode = appCtx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive';
+      if (typeof appCtx.applyCustomLocationSpawn === 'function') {
+        appCtx.applyCustomLocationSpawn(currentMode, {
+          source: 'search_location'
+        });
+      } else if (typeof appCtx.spawnOnRoad === 'function') {
+        appCtx.spawnOnRoad();
+      }
 
       // Debug log removed
     } else {

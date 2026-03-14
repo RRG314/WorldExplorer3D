@@ -1,6 +1,6 @@
 # Release Checklist
 
-Last reviewed: 2026-03-02
+Last reviewed: 2026-03-13
 
 Use this checklist before pushing a production deploy.
 
@@ -12,7 +12,7 @@ Use this checklist before pushing a production deploy.
 
 ## 2. Mirror Safety
 
-1. Sync canonical runtime to hosting mirror:
+1. Sync canonical landing/account/runtime sources to hosting mirror:
    - `npm run sync:public`
 2. Verify parity:
    - `npm run verify:mirror`
@@ -32,7 +32,8 @@ Use this checklist before pushing a production deploy.
 
 1. From title menu, choose preset city and start successfully.
 2. Choose custom location -> globe selector -> `Start Here` launches selected location.
-3. Globe selector `Main Menu` button returns correctly to title menu.
+3. Use `Use My Location` and confirm blocked/indoor points resolve to a safe spawn instead of trapping the player.
+4. Globe selector `Main Menu` button returns correctly to title menu.
 
 ### 4.2 Globe selector verification
 
@@ -53,8 +54,22 @@ Use this checklist before pushing a production deploy.
 
 1. Verify normal driving and walk/drone transitions.
 2. At speed, hold `Space` and steer through tight turns to confirm drift handling.
+3. Verify walking/drone controls are `WASD = move`, `Arrow Keys = look`.
+4. Verify `M` opens/closes the large map.
+5. Verify `F4` still toggles debug overlay.
+6. Force a walk -> drive switch near/inside building blockers and confirm the car resolves to a safe road spawn.
+7. Walk near a supported building prompt, press `E` to enter, then press `E` or `Esc` to exit back outside cleanly.
 
-### 4.5 Auth and multiplayer critical flows
+### 4.5 Earth scene data and visuals
+
+1. Verify railways, footways, and cycleways render in both 3D world and map overlay for the release city.
+2. Verify walking navigation/path routing can follow loaded footways / cycleways / rail corridors.
+3. Verify water remains visible in coastal/inland scenes where expected, including rivers, ponds, lakes, and steep coastline locations such as Monaco.
+4. Verify vegetation appears in woods / parks / mapped tree areas without obvious overdraw or runaway draw-call cost.
+5. Verify rooftop HVAC/detail and building color variation are present without roof-cap/parapet alignment glitches or obvious performance collapse.
+6. Confirm interiors are still lazy by default: no building interior is active until the player deliberately enters one.
+
+### 4.6 Auth and multiplayer critical flows
 
 1. Sign up / sign in works.
 2. Room create works.
@@ -64,12 +79,13 @@ Use this checklist before pushing a production deploy.
 6. Saved rooms `Open` works.
 7. Owner room `Delete` works.
 
-### 4.6 Account and billing surfaces
+### 4.7 Account and billing surfaces
 
 1. `/account/` loads current account overview.
 2. Username update works.
 3. Receipts refresh works (if Stripe data exists).
 4. Donation portal/checkout links open without endpoint errors.
+5. Runtime/account/landing copy makes it explicit that map access and core gameplay are free and donations are optional.
 
 ## 5. Artifacts to Keep
 
@@ -79,4 +95,3 @@ Use this checklist before pushing a production deploy.
 ## 6. Deploy Rules
 
 Do not deploy if any automated gate fails or any critical manual flow above fails.
-

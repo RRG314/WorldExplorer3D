@@ -16,9 +16,9 @@ Required:
 - revalidate billing and webhook paths
 - re-run rules/runtime/release checks after upgrade
 
-### 2. Mirror Drift Risk (`app` vs `public/app`)
+### 2. Mirror Drift Risk (`app`, landing/account roots vs `public/*`)
 
-Canonical runtime is edited in `app/*` but deployment serves `public/*`.
+Canonical runtime is edited in `app/*` and canonical landing/account roots live outside `public/*`, but deployment serves `public/*`.
 
 Risk:
 
@@ -76,4 +76,3 @@ Mitigation:
 
 - add automated smoke for signup -> create room -> invite -> accept invite path
 - add automated verification of globe selector favorites delete behavior
-

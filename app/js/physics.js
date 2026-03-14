@@ -72,6 +72,7 @@ function checkBuildingCollision(x, z, carRadius = 2) {
 
   for (let i = 0; i < candidateBuildings.length; i++) {
     const building = candidateBuildings[i];
+    if (!building || building.collisionDisabled) continue;
 
     // Use pre-computed bounding box for fast rejection
     if (x < building.minX - carRadius || x > building.maxX + carRadius ||
@@ -196,19 +197,19 @@ function updateDrone(dt) {
   const turnSpeed = 2.0 * dt;
 
   // Keep drone controls consistent with walking mode:
-  // arrows move, WASD controls camera look.
-  if (appCtx.keys.KeyW) appCtx.drone.pitch += turnSpeed;
-  if (appCtx.keys.KeyS) appCtx.drone.pitch -= turnSpeed;
-  if (appCtx.keys.KeyA) appCtx.drone.yaw += turnSpeed;
-  if (appCtx.keys.KeyD) appCtx.drone.yaw -= turnSpeed;
+  // WASD moves, arrow keys steer/look.
+  if (appCtx.keys.ArrowUp) appCtx.drone.pitch += turnSpeed;
+  if (appCtx.keys.ArrowDown) appCtx.drone.pitch -= turnSpeed;
+  if (appCtx.keys.ArrowLeft) appCtx.drone.yaw += turnSpeed;
+  if (appCtx.keys.ArrowRight) appCtx.drone.yaw -= turnSpeed;
 
   appCtx.drone.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.drone.pitch));
   appCtx.drone.roll = 0;
 
-  const forward = appCtx.keys.ArrowUp ? 1 : 0;
-  const backward = appCtx.keys.ArrowDown ? 1 : 0;
-  const left = appCtx.keys.ArrowLeft ? 1 : 0;
-  const right = appCtx.keys.ArrowRight ? 1 : 0;
+  const forward = appCtx.keys.KeyW ? 1 : 0;
+  const backward = appCtx.keys.KeyS ? 1 : 0;
+  const left = appCtx.keys.KeyA ? 1 : 0;
+  const right = appCtx.keys.KeyD ? 1 : 0;
   const up = appCtx.keys.Space ? 1 : 0;
   const down = appCtx.keys.ControlLeft || appCtx.keys.ControlRight || appCtx.keys.ShiftLeft || appCtx.keys.ShiftRight ? 1 : 0;
 
@@ -248,12 +249,16 @@ function updateDrone(dt) {
 }
 
 function update(dt) {
-  if (appCtx.paused || !appCtx.gameStarted) return;
+  if (appCtx.paused || !appCtx.gameStarted) {
+    if (typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
+    return;
+  }
   if (typeof appCtx.updateFlowerChallenge === 'function') appCtx.updateFlowerChallenge(dt);
 
   if (appCtx.droneMode) {
     updateDrone(dt);
     if (typeof appCtx.updateMode === 'function') appCtx.updateMode(dt);
+    if (typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
     if (!appCtx.onMoon && !appCtx.worldLoading) appCtx.updateTerrainAround(appCtx.drone.x, appCtx.drone.z);
     return;
   }
@@ -283,9 +288,12 @@ function update(dt) {
       });
 
       if (typeof appCtx.updateMode === 'function') appCtx.updateMode(dt);
+      if (typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
       return;
     }
   }
+
+  if (typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
 
   const left = appCtx.keys.KeyA || appCtx.keys.ArrowLeft,right = appCtx.keys.KeyD || appCtx.keys.ArrowRight;
   const gas = appCtx.keys.KeyW || appCtx.keys.ArrowUp,reverse = appCtx.keys.KeyS || appCtx.keys.ArrowDown;

@@ -28,6 +28,7 @@ python3 -m http.server --directory public 4173
 ## 3. Source-of-Truth Rule
 
 Canonical runtime source is `app/*`.
+Canonical landing/account sources are `index.html` and `account/index.html`.
 
 Required before merge/deploy:
 

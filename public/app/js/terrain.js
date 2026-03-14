@@ -1346,6 +1346,81 @@ function reprojectWaterwayMeshToTerrain(mesh) {
   return true;
 }
 
+function reprojectLinearFeatureMeshToTerrain(mesh) {
+  const centerline = mesh.userData?.linearFeatureCenterline;
+  if (!centerline || centerline.length < 2) return false;
+
+  const width = mesh.userData?.linearFeatureWidth || 2;
+  const halfWidth = width * 0.5;
+  const verticalBias = Number.isFinite(mesh.userData?.linearFeatureBias) ? mesh.userData.linearFeatureBias : 0.05;
+  const positions = mesh.geometry?.attributes?.position;
+  if (!positions || positions.count < centerline.length * 2) return false;
+
+  const resolveBaseY = (x, z, kind) => {
+    const terrainY = terrainMeshHeightAt(x, z);
+    const fallbackTerrain = Number.isFinite(terrainY) ? terrainY : 0;
+    const nearestRoad = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z) : null;
+    const roadHalfWidth = nearestRoad?.road ? Number(nearestRoad.road.width || 0) * 0.5 : 0;
+    const snapPadding =
+      kind === 'footway' ? 2.4 :
+      kind === 'cycleway' ? 2.0 :
+      1.0;
+    const shouldSnapToRoad = !!(
+      nearestRoad?.road &&
+      Number.isFinite(nearestRoad.dist) &&
+      nearestRoad.dist <= roadHalfWidth + snapPadding
+    );
+    if (shouldSnapToRoad) {
+      const roadSampleX = Number.isFinite(nearestRoad?.pt?.x) ? nearestRoad.pt.x : x;
+      const roadSampleZ = Number.isFinite(nearestRoad?.pt?.z) ? nearestRoad.pt.z : z;
+      const roadY =
+        appCtx.GroundHeight && typeof appCtx.GroundHeight.roadMeshY === 'function' ?
+          appCtx.GroundHeight.roadMeshY(roadSampleX, roadSampleZ) :
+          null;
+      if (Number.isFinite(roadY)) return roadY;
+      if (appCtx.GroundHeight && typeof appCtx.GroundHeight.roadSurfaceY === 'function') {
+        return appCtx.GroundHeight.roadSurfaceY(roadSampleX, roadSampleZ);
+      }
+      return fallbackTerrain + 0.2;
+    }
+    return fallbackTerrain;
+  };
+  const kind = String(mesh.userData?.linearFeatureKind || '').toLowerCase();
+
+  for (let i = 0; i < centerline.length; i++) {
+    const p = centerline[i];
+
+    let dx, dz;
+    if (i === 0) {
+      dx = centerline[1].x - p.x;
+      dz = centerline[1].z - p.z;
+    } else if (i === centerline.length - 1) {
+      dx = p.x - centerline[i - 1].x;
+      dz = p.z - centerline[i - 1].z;
+    } else {
+      dx = centerline[i + 1].x - centerline[i - 1].x;
+      dz = centerline[i + 1].z - centerline[i - 1].z;
+    }
+
+    const len = Math.hypot(dx, dz) || 1;
+    const nx = -dz / len;
+    const nz = dx / len;
+    const leftX = p.x + nx * halfWidth;
+    const leftZ = p.z + nz * halfWidth;
+    const rightX = p.x - nx * halfWidth;
+    const rightZ = p.z - nz * halfWidth;
+    const leftY = resolveBaseY(leftX, leftZ, kind) + verticalBias;
+    const rightY = resolveBaseY(rightX, rightZ, kind) + verticalBias;
+
+    positions.setXYZ(i * 2, leftX, leftY, leftZ);
+    positions.setXYZ(i * 2 + 1, rightX, rightY, rightZ);
+  }
+
+  positions.needsUpdate = true;
+  mesh.geometry.computeVertexNormals();
+  return true;
+}
+
 // Reposition buildings and landuse to follow terrain
 function repositionBuildingsWithTerrain() {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return;
@@ -1413,16 +1488,16 @@ function repositionBuildingsWithTerrain() {
     // Recalculate average elevation from terrain mesh
     let avgElevation = 0;
     pts.forEach((p) => {
-      avgElevation += terrainMeshHeightAt(p.x, p.z);
+      const h = terrainMeshHeightAt(p.x, p.z);
+      avgElevation += h;
     });
     avgElevation /= pts.length;
-
+    const isWaterPolygon = mesh.userData?.landuseType === 'water';
     mesh.position.y = avgElevation;
 
     // Deform each vertex to follow actual terrain mesh surface
     const positions = mesh.geometry.attributes.position;
     if (positions) {
-      const isWaterPolygon = mesh.userData?.landuseType === 'water';
       const flattenFactor = isWaterPolygon ?
       Number.isFinite(mesh.userData?.waterFlattenFactor) ? mesh.userData.waterFlattenFactor : 0.12 :
       1.0;
@@ -1435,8 +1510,13 @@ function repositionBuildingsWithTerrain() {
       }
       positions.needsUpdate = true;
       mesh.geometry.computeVertexNormals();
+      if (isWaterPolygon) mesh.userData.waterSurfaceBase = avgElevation;
       landuseRepositioned++;
     }
+  });
+
+  appCtx.linearFeatureMeshes.forEach((mesh) => {
+    if (reprojectLinearFeatureMeshToTerrain(mesh)) landuseRepositioned++;
   });
 
   // Reposition POI markers using terrain mesh surface

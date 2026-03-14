@@ -9,7 +9,13 @@ import { loadScriptList } from './modules/script-loader.js?v=56';
 
 async function boot() {
   try {
-    await loadScriptList(vendorScriptsCritical, { timeoutMs: 12000 });
+    const [coreThreeScript, ...dependentVendorScripts] = vendorScriptsCritical;
+    if (coreThreeScript) {
+      await loadScriptList([coreThreeScript], { timeoutMs: 12000 });
+    }
+    if (dependentVendorScripts.length > 0) {
+      await loadScriptList(dependentVendorScripts, { timeoutMs: 12000, parallel: true });
+    }
     const resolvedClassicScripts = classicScripts.map(
       (relativePath) => new URL(relativePath, import.meta.url).toString()
     );
@@ -23,7 +29,7 @@ async function boot() {
     console.log('[bootstrap] World Explorer loaded through ES module entrypoint:', entrypoint);
 
     if (vendorScriptsOptional.length > 0) {
-      loadScriptList(vendorScriptsOptional, { timeoutMs: 10000 })
+      loadScriptList(vendorScriptsOptional, { timeoutMs: 10000, parallel: true })
         .then(() => {
           if (typeof appApi?.tryEnablePostProcessing === 'function') {
             appApi.tryEnablePostProcessing();
