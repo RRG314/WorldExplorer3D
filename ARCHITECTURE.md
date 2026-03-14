@@ -40,20 +40,22 @@ Flow:
 ### 2.2 Core app runtime
 
 - state/context: `shared-context.js`, `state.js`
-- world/render: `engine.js`, `world.js`, `terrain.js`, `sky.js`, `space.js`, `solar-system.js`
-- controls/physics: `input.js`, `physics.js`, `walking.js`, `hud.js`, `map.js`
+- world/render: `engine.js`, `world.js`, `terrain.js`, `surface-rules.js`, `sky.js`, `space.js`, `solar-system.js`
+- controls/physics: `input.js`, `physics.js`, `walking.js`, `travel-mode.js`, `hud.js`, `map.js`
 - gameplay systems: `game.js`, `flower-challenge.js`, `blocks.js`, `memory.js`, `real-estate.js`
 - UI orchestration: `ui.js`, `ui/globe-selector.js`, `tutorial/tutorial.js`
 
 Current Earth runtime architecture details:
 
 - `world.js` owns safe spawn resolution for teleports, geolocation/custom launches, and traversal switching.
+- `travel-mode.js` owns high-level drive/walk/drone transitions so keyboard and float-menu mode switches follow the same runtime path.
 - Canonical landing/account sources live at `index.html` and `account/index.html`; `npm run sync:public` mirrors those plus `app/*` into `public/*`.
 - `world.js` owns the Earth OSM pipeline for roads/buildings/land-use/water plus vegetation staging data (`natural=tree`, `natural=tree_row`, woods/parks/green areas).
+- `surface-rules.js` owns shared climate/ground-cover classification so terrain, water, and OSM landuse rendering use the same snow/frozen-water/arid-sand rules.
 - Driveable roads stay isolated in `roads`; OSM transport ribbons flow through `linearFeatures` (`railway`, `footway`, `cycleway`).
-- `world.js` also builds `traversalNetworks` so walking/navigation can use roads + footways + cycleways + rail corridors without letting vehicles route onto non-road layers.
-- `terrain.js` reprojects roads, building bases, waterways, and linear feature ribbons back onto streamed terrain.
-- `interiors.js` is a dormant-on-boot subsystem: it only fetches/builds indoor geometry for the one building the player deliberately enters, then releases that state on exit.
+- `world.js` dedupes identical in-flight Earth loads and only rebuilds `traversalNetworks` after explicit invalidation, which prevents empty early graphs from sticking around after roads arrive.
+- `terrain.js` is the single owner for road/building terrain conformance through `requestWorldSurfaceSync()`, which schedules or forces rebuilds instead of letting other modules rebuild roads/buildings ad hoc.
+- `interiors.js` is a dormant-on-boot subsystem: it only fetches/builds indoor geometry for the one building the player deliberately enters, then releases that state on exit, and its prompt/candidate checks are throttled so walking near buildings does not trigger redundant scans every frame.
 
 ## 3. Multiplayer Architecture
 
@@ -158,4 +160,5 @@ Current Earth runtime architecture details:
 - mirror parity: `scripts/verify-mirror.mjs`
 - rules suite: `scripts/test-rules.mjs`, `tests/firestore.rules.security.test.mjs`
 - runtime invariants: `scripts/test-runtime-invariants.mjs`
+- broader world matrix: `scripts/test-world-matrix.mjs`, `scripts/world-test-locations.mjs`
 - release gate: `scripts/release-verify.mjs`

@@ -40,6 +40,8 @@ The sync step also mirrors the repository `CNAME` file into `public/CNAME`, so e
 - `app/js/app-entry.js`:
   - `bootApp()` initializes engine/UI/tutorial/multiplayer/auth observer
   - imports `interiors.js` so the lazy indoor subsystem is available before input/runtime updates
+  - imports `travel-mode.js` so drive/walk/drone transitions are centralized before keyboard/UI handlers bind
+  - `surface-rules.js` is consumed by `terrain.js` and `world.js` to keep climate/ground-cover rules shared instead of duplicating snow/water/desert logic
 
 ### 2.2 Render path
 
@@ -90,7 +92,7 @@ Important behaviors:
 - reverse lookup with cache + fallback provider
 - zoom-aware marker scaling
 
-## 3.3 World and spawn safety (`app/js/world.js`, `app/js/walking.js`)
+## 3.3 World and spawn safety (`app/js/world.js`, `app/js/walking.js`, `app/js/travel-mode.js`, `app/js/terrain.js`)
 
 Key runtime contracts:
 
@@ -102,6 +104,10 @@ Key runtime contracts:
   - synchronizes car/walker state from the resolved placement
 - `applyCustomLocationSpawn(mode, options)`:
   - shared entry for globe selector, geolocation, and in-game custom-location reloads
+- `loadRoads()`:
+  - dedupes identical in-flight Earth load requests so multiple UI/custom launch paths do not rebuild the same location at once
+- `requestWorldSurfaceSync(options)`:
+  - single owner for road/building terrain-follow rebuild scheduling and forced syncs
 
 Data lanes kept separate on Earth scenes:
 
@@ -109,26 +115,27 @@ Data lanes kept separate on Earth scenes:
 - vegetation lane: `vegetationFeatures`, `vegetationMeshes`
   - populated from OSM landuse/natural green areas plus `natural=tree` nodes and `natural=tree_row` ways
   - batched into instanced tree meshes instead of per-tree scene groups
-- walk-traversable OSM linear ribbons: `linearFeatures`, `linearFeatureMeshes`
+- deferred OSM linear path ribbons: `linearFeatures`, `linearFeatureMeshes`
   - `railway`
   - `footway`
   - `cycleway`
-  - rendered as solid terrain-following ribbons and reused by walk-surface sampling
-  - visual overlay starts disabled by default while traversal/pathfinding still use the loaded data
-  - fetched in a follow-up Earth pass after the core world is ready, so recent path-network expansion does not block the initial road/building/water load
+  - the subsystem remains in the codebase but is currently disabled in runtime while load, switching, and water regressions are being cleaned up
+  - arrays stay empty in the active build, and the map/environment path toggles are hidden
 - traversal graphs: `traversalNetworks.drive` and `traversalNetworks.walk`
   - drive graph stays road-only
-  - walk graph starts with roads, then expands once the deferred `railway` / `footway` / `cycleway` pass completes
+  - walk graph currently stays road-backed as well
+  - traversal graphs rebuild only after explicit invalidation, which keeps empty early graphs from persisting once roads are loaded
   - `findTraversalRoute()` consumes the active graph for navigation and map route drawing
-  - `GroundHeight.walkSurfaceY()` samples those path surfaces so walking, safe-spawn fallback, and walk navigation stay glued to the rendered ribbon instead of raw terrain when a path is present
+  - `GroundHeight.walkSurfaceY()` currently resolves against interiors, roads, and terrain only
 
 Traversal/spawn guarantees in current branch:
 
 - walk -> drive keeps the current position if it is already car-safe
 - invalid walk -> drive transitions resolve to the nearest safe road spawn
 - custom/geolocation launches validate placement before final spawn
-- blocked walk launches can resolve onto nearby walkable paths instead of only raw terrain
+- blocked walk launches resolve onto nearby safe road or terrain fallback instead of invalid blockers
 - blocked spawn requests never intentionally place the player inside building/wall colliders
+- non-road walk/drive spawn requests are rejected if they land inside mapped water polygons
 
 Selective interior subsystem:
 
@@ -142,17 +149,23 @@ Selective interior subsystem:
   - `GroundHeight.walkSurfaceInfo()` now checks `sampleInteriorWalkSurface()` first while an interior is active
 - `app/js/physics.js` / `app/js/walking.js`
   - keep interior prompts idle until needed
+  - rely on cached/throttled nearby-building checks instead of rescanning and rewriting prompt DOM every frame
   - use collider `baseY` when evaluating temporary interior shell walls so the player stays inside the generated room volume instead of slipping out at terrain level
   - dynamic interior shell colliders are local-only and cleared on exit
 
 Water / terrain-follow notes:
 
+- `app/js/surface-rules.js`
+  - centralizes OSM land-cover normalization and climate surface rules
+  - provides one shared world surface profile used by both terrain texturing and water rendering
+  - current shared rules convert high-latitude Earth scenes to snow/frozen-water presentation and arid low-latitude sparse scenes to sand presentation without city-specific hardcoding
 - `app/js/world.js`
   - water polygons/ribbons use the stable averaged surface base again so harbors/coastlines do not drop below exposed terrain after recent path/vegetation changes
-  - footway / cycleway ribbons sample each edge against terrain/road height instead of reusing a single centerline elevation, which keeps them flush with streets and steep ground
+  - computes `worldSurfaceProfile` from latitude plus selected OSM landuse/natural/waterway signals, then uses that to classify frozen water and arid land surfaces
 - `app/js/terrain.js`
   - landuse reprojection restores water flattening/offset behavior from the previously stable branch
-  - linear-feature reprojection now resamples left/right edges independently, reducing floating path strips on sloped roads
+  - `requestWorldSurfaceSync()` now owns road/building terrain conformance updates, replacing duplicate rebuild triggers from walking mode
+  - terrain tile texturing now follows the shared surface rules so snow/ice/desert visuals are driven by one climate-aware rule set instead of isolated terrain-only checks
 
 ## 4. Tutorial Contracts (`app/js/tutorial/tutorial.js`)
 
@@ -359,6 +372,7 @@ Indexes file: `firestore.indexes.json` (city query and featured room query)
 ```bash
 npm run test:rules
 npm run test:runtime
+npm run test:world-matrix
 npm run verify:mirror
 npm run release:verify
 ```
@@ -367,6 +381,8 @@ npm run release:verify
 
 - `scripts/test-rules.mjs`
 - `scripts/test-runtime-invariants.mjs`
+- `scripts/test-world-matrix.mjs`
+- `scripts/world-test-locations.mjs`
 - `scripts/verify-mirror.mjs`
 - `scripts/release-verify.mjs`
 
@@ -374,3 +390,5 @@ npm run release:verify
 
 - `tests/firestore.rules.security.test.mjs`
 - `tests/painttown.integration.test.mjs`
+- `scripts/test-runtime-invariants.mjs` validates spawn safety, lazy interiors, controls, water visibility, and donation/access behavior in the active Earth runtime
+- `scripts/test-world-matrix.mjs` validates those world rules across dense downtown, coastal, mixed-terrain, sparse rural, suburban custom, and rural custom locations

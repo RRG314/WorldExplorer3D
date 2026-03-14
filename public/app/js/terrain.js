@@ -1,4 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
+import {
+  classifyTerrainSurfaceProfile as classifySharedTerrainSurfaceProfile
+} from "./surface-rules.js?v=1";
 // terrain.js - Terrain elevation system (Terrarium tiles)
 // ============================================================================
 
@@ -27,16 +30,14 @@ const ROAD_ENDPOINT_EXTENSION_MIN = 0.35;
 const ROAD_ENDPOINT_EXTENSION_MAX = 2.0;
 const ROAD_REBUILD_DEBOUNCE_MS = 90;
 const ROAD_REBUILD_MIN_INTERVAL_MS = 420;
-const POLAR_SNOW_LAT_THRESHOLD = 66;
-const SUBPOLAR_SNOW_LAT_THRESHOLD = 58;
-const ALPINE_SNOWLINE_METERS = 3200;
-const SUBPOLAR_SNOWLINE_METERS = 1800;
 const SNOW_COLOR_HEX = 0xffffff;
 const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
+const SAND_COLOR_HEX = 0xd7c08a;
 const GRASS_COLOR_HEX = 0x6b8e4a;
 const GROUND_FALLBACK_GRASS_HEX = 0x4a7a2e;
 const GROUND_FALLBACK_SNOW_HEX = 0xd6e2ef;
 const GROUND_FALLBACK_ALPINE_HEX = 0xc6d0d8;
+const GROUND_FALLBACK_SAND_HEX = 0xc8aa70;
 const MIN_VALID_ELEVATION_METERS = -500;
 const MAX_VALID_ELEVATION_METERS = 9000;
 
@@ -156,6 +157,44 @@ function scheduleRoadAndBuildingRebuild() {
   }, waitMs);
 }
 
+function canRunRoadAndBuildingRebuildNow() {
+  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.roads.length === 0) return false;
+  let tilesLoaded = 0;
+  let tilesTotal = 0;
+  appCtx.terrainTileCache.forEach((tile) => {
+    tilesTotal++;
+    if (tile?.loaded) tilesLoaded++;
+  });
+  return tilesLoaded > 0 && tilesTotal > 0;
+}
+
+function requestWorldSurfaceSync(options = {}) {
+  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.roads.length === 0) return false;
+  appCtx.roadsNeedRebuild = true;
+
+  const force = options.force === true;
+  if (force && terrain._rebuildTimer) {
+    clearTimeout(terrain._rebuildTimer);
+    terrain._rebuildTimer = null;
+  }
+
+  if (!force || terrain._rebuildInFlight || !canRunRoadAndBuildingRebuildNow()) {
+    scheduleRoadAndBuildingRebuild();
+    return false;
+  }
+
+  terrain._rebuildInFlight = true;
+  try {
+    rebuildRoadsWithTerrain();
+    repositionBuildingsWithTerrain();
+    terrain._lastRoadRebuildAt = performance.now();
+    return true;
+  } finally {
+    terrain._rebuildInFlight = false;
+    if (appCtx.roadsNeedRebuild) scheduleRoadAndBuildingRebuild();
+  }
+}
+
 // =====================
 // TERRAIN MESH GRID SAMPLER
 // Reads vertex heights directly from terrain mesh geometry - O(1) per query.
@@ -255,7 +294,8 @@ function cloneTerrainTextureWithRepeat(sourceTexture, repeats) {
 
 const proceduralTerrainTextureBases = {
   snow: null,
-  snowRock: null
+  snowRock: null,
+  sand: null
 };
 
 function hashNoise2D(x, y, seed = 1) {
@@ -286,6 +326,7 @@ function makeProceduralTerrainTextureSet(mode = 'snow', size = 128) {
   const roughnessImage = roughnessCtx.createImageData(size, size);
 
   const isAlpine = mode === 'snowRock';
+  const isSand = mode === 'sand';
   const colorSeed = isAlpine ? 9 : 5;
   const normalSeed = isAlpine ? 12 : 7;
   const roughSeed = isAlpine ? 15 : 11;
@@ -295,31 +336,49 @@ function makeProceduralTerrainTextureSet(mode = 'snow', size = 128) {
       const idx = (y * size + x) * 4;
       const macro = hashNoise2D(x * 0.06, y * 0.06, colorSeed);
       const micro = hashNoise2D(x * 0.26, y * 0.26, colorSeed + 3);
-      const rockMaskRaw = isAlpine ? Math.max(0, macro * 1.25 - 0.55) : 0;
-      const rockMask = isAlpine ? Math.min(1, Math.max(0, rockMaskRaw * 1.8 + micro * 0.22)) : 0;
-      const snowTone = 232 + macro * 18 + micro * 10;
-      const rockTone = 122 + macro * 34 + micro * 26;
-      const tintBlue = isAlpine ? 2 : 6;
+      let r = 0;
+      let g = 0;
+      let b = 0;
+      if (isSand) {
+        const duneWave = Math.sin((x * 0.14 + y * 0.045) + macro * 5.2);
+        const duneRipple = Math.sin((x * 0.34 - y * 0.08) + micro * 4.6);
+        const duneBlend = Math.max(0, duneWave * 0.65 + duneRipple * 0.35);
+        const baseTone = 196 + macro * 22 + micro * 10;
+        const warmTone = 22 + duneBlend * 24;
+        r = baseTone + warmTone;
+        g = baseTone * 0.91 + duneBlend * 11;
+        b = baseTone * 0.72 + duneBlend * 6;
+      } else {
+        const rockMaskRaw = isAlpine ? Math.max(0, macro * 1.25 - 0.55) : 0;
+        const rockMask = isAlpine ? Math.min(1, Math.max(0, rockMaskRaw * 1.8 + micro * 0.22)) : 0;
+        const snowTone = 232 + macro * 18 + micro * 10;
+        const rockTone = 122 + macro * 34 + micro * 26;
+        const tintBlue = isAlpine ? 2 : 6;
 
-      const r = snowTone * (1 - rockMask) + rockTone * rockMask;
-      const g = (snowTone + 3) * (1 - rockMask) + (rockTone + 7) * rockMask;
-      const b = (snowTone + tintBlue) * (1 - rockMask) + (rockTone + 14) * rockMask;
+        r = snowTone * (1 - rockMask) + rockTone * rockMask;
+        g = (snowTone + 3) * (1 - rockMask) + (rockTone + 7) * rockMask;
+        b = (snowTone + tintBlue) * (1 - rockMask) + (rockTone + 14) * rockMask;
+      }
 
       colorImage.data[idx] = Math.max(0, Math.min(255, Math.round(r)));
       colorImage.data[idx + 1] = Math.max(0, Math.min(255, Math.round(g)));
       colorImage.data[idx + 2] = Math.max(0, Math.min(255, Math.round(b)));
       colorImage.data[idx + 3] = 255;
 
-      const nx = (hashNoise2D(x * 0.16, y * 0.16, normalSeed) - 0.5) * (isAlpine ? 54 : 34);
-      const ny = (hashNoise2D(x * 0.16 + 41, y * 0.16 - 29, normalSeed + 2) - 0.5) * (isAlpine ? 54 : 34);
+      const nx = isSand ?
+        Math.sin((x * 0.22 + y * 0.035) + macro * 4.1) * 46 + (hashNoise2D(x * 0.19, y * 0.19, normalSeed) - 0.5) * 10 :
+        (hashNoise2D(x * 0.16, y * 0.16, normalSeed) - 0.5) * (isAlpine ? 54 : 34);
+      const ny = isSand ?
+        Math.cos((x * 0.12 - y * 0.09) + micro * 3.8) * 28 + (hashNoise2D(x * 0.19 + 41, y * 0.19 - 29, normalSeed + 2) - 0.5) * 8 :
+        (hashNoise2D(x * 0.16 + 41, y * 0.16 - 29, normalSeed + 2) - 0.5) * (isAlpine ? 54 : 34);
       normalImage.data[idx] = Math.max(0, Math.min(255, Math.round(128 + nx)));
       normalImage.data[idx + 1] = Math.max(0, Math.min(255, Math.round(128 + ny)));
       normalImage.data[idx + 2] = 255;
       normalImage.data[idx + 3] = 255;
 
-      const roughBase = isAlpine ? 168 : 224;
-      const roughVar = hashNoise2D(x * 0.18, y * 0.18, roughSeed) * (isAlpine ? 64 : 28);
-      const roughMask = isAlpine ? rockMask * 18 : 0;
+      const roughBase = isSand ? 204 : isAlpine ? 168 : 224;
+      const roughVar = hashNoise2D(x * 0.18, y * 0.18, roughSeed) * (isSand ? 38 : isAlpine ? 64 : 28);
+      const roughMask = isSand ? 12 : isAlpine ? Math.max(0, macro * 18) : 0;
       const rough = Math.max(0, Math.min(255, Math.round(roughBase + roughVar + roughMask)));
       roughnessImage.data[idx] = rough;
       roughnessImage.data[idx + 1] = rough;
@@ -354,7 +413,7 @@ function makeProceduralTerrainTextureSet(mode = 'snow', size = 128) {
 }
 
 function getProceduralTerrainTextureBase(mode = 'snow') {
-  const key = mode === 'snowRock' ? 'snowRock' : 'snow';
+  const key = mode === 'snowRock' ? 'snowRock' : mode === 'sand' ? 'sand' : 'snow';
   if (!proceduralTerrainTextureBases[key]) {
     proceduralTerrainTextureBases[key] = makeProceduralTerrainTextureSet(key, 128);
   }
@@ -364,7 +423,7 @@ function getProceduralTerrainTextureBase(mode = 'snow') {
 function ensureTerrainTextureSet(mesh, repeats, mode = 'grass') {
   if (!mesh || !mesh.userData) return null;
   if (!mesh.userData.terrainTextureSetsByMode) mesh.userData.terrainTextureSetsByMode = {};
-  const modeKey = mode === 'snowRock' ? 'snowRock' : mode === 'snow' ? 'snow' : 'grass';
+  const modeKey = mode === 'snowRock' ? 'snowRock' : mode === 'snow' ? 'snow' : mode === 'sand' ? 'sand' : 'grass';
   const textureCacheKey = `${modeKey}:${Number(repeats) || 12}`;
   if (mesh.userData.terrainTextureSetsByMode[textureCacheKey]) {
     mesh.userData.terrainTextureSet = mesh.userData.terrainTextureSetsByMode[textureCacheKey];
@@ -410,14 +469,16 @@ function applyGroundFallbackProfile(profile = null) {
   const ground = getGroundFallbackMesh();
   const material = ground?.material;
   if (!ground || !material || Array.isArray(material)) return;
-  const mode = profile?.mode === 'snow' || profile?.mode === 'snowRock' ? profile.mode : 'grass';
+  const mode = profile?.mode === 'snow' || profile?.mode === 'snowRock' || profile?.mode === 'sand' ? profile.mode : 'grass';
   const colorHex = mode === 'snow' ?
     GROUND_FALLBACK_SNOW_HEX :
     mode === 'snowRock' ?
       GROUND_FALLBACK_ALPINE_HEX :
+      mode === 'sand' ?
+        GROUND_FALLBACK_SAND_HEX :
       GROUND_FALLBACK_GRASS_HEX;
   material.color.setHex(colorHex);
-  material.roughness = mode === 'grass' ? 0.95 : 0.86;
+  material.roughness = mode === 'grass' ? 0.95 : mode === 'sand' ? 0.92 : 0.86;
   material.metalness = mode === 'grass' ? 0 : 0.02;
   material.needsUpdate = true;
 }
@@ -441,28 +502,13 @@ function computeElevationStatsMeters(samplesMeters) {
 }
 
 function classifyTerrainVisualProfile(bounds, minElevationMeters = null, maxElevationMeters = null, elevationStats = null) {
-  const latMid = Number.isFinite(bounds?.latN) && Number.isFinite(bounds?.latS) ?
-  (bounds.latN + bounds.latS) * 0.5 :
-  appCtx.LOC?.lat || 0;
-  const absLat = Math.abs(latMid);
-  const maxMeters = Number.isFinite(maxElevationMeters) ? maxElevationMeters : 0;
-  const minMeters = Number.isFinite(minElevationMeters) ? minElevationMeters : 0;
-  const p75Meters = Number.isFinite(elevationStats?.p75) ? elevationStats.p75 : maxMeters;
-  const p90Meters = Number.isFinite(elevationStats?.p90) ? elevationStats.p90 : maxMeters;
-  const polar = absLat >= POLAR_SNOW_LAT_THRESHOLD;
-  // Use high-percentile terrain elevation so one bad pixel cannot force snow in temperate cities.
-  const alpine = p90Meters >= ALPINE_SNOWLINE_METERS ||
-  maxMeters >= ALPINE_SNOWLINE_METERS + 700 ||
-  maxMeters >= ALPINE_SNOWLINE_METERS && p75Meters >= ALPINE_SNOWLINE_METERS * 0.5;
-  const subpolarSnow = absLat >= SUBPOLAR_SNOW_LAT_THRESHOLD &&
-  (p90Meters >= SUBPOLAR_SNOWLINE_METERS || maxMeters >= SUBPOLAR_SNOWLINE_METERS + 500 || minMeters >= SUBPOLAR_SNOWLINE_METERS * 0.55);
-  const useSnow = polar || alpine || subpolarSnow;
-  const mode = !useSnow ? 'grass' : polar ? 'snow' : 'snowRock';
-  return {
-    mode,
-    reason: polar ? 'polar_latitude' : alpine ? 'high_elevation' : subpolarSnow ? 'cold_highland' : 'temperate',
-    absLat
-  };
+  return classifySharedTerrainSurfaceProfile({
+    bounds,
+    minElevationMeters,
+    maxElevationMeters,
+    elevationStats,
+    worldSurfaceProfile: appCtx.worldSurfaceProfile || null
+  });
 }
 
 function applyTerrainVisualProfile(mesh, profile, repeats = null) {
@@ -471,7 +517,7 @@ function applyTerrainVisualProfile(mesh, profile, repeats = null) {
   const mat = mesh.material;
   const tileBounds = mesh.userData.terrainTile?.bounds || null;
   const nextProfile = profile || classifyTerrainVisualProfile(tileBounds);
-  const nextMode = nextProfile.mode === 'snowRock' ? 'snowRock' : nextProfile.mode === 'snow' ? 'snow' : 'grass';
+  const nextMode = nextProfile.mode === 'snowRock' ? 'snowRock' : nextProfile.mode === 'snow' ? 'snow' : nextProfile.mode === 'sand' ? 'sand' : 'grass';
   const textureRepeats = Number.isFinite(repeats) && repeats > 0 ?
   repeats :
   Number(mesh.userData.terrainTextureRepeats) || 12;
@@ -488,6 +534,17 @@ function applyTerrainVisualProfile(mesh, profile, repeats = null) {
     mat.roughness = nextMode === 'snow' ? 0.94 : 0.86;
     mat.metalness = 0.01;
     mat.normalScale = nextMode === 'snow' ? new THREE.Vector2(0.2, 0.2) : new THREE.Vector2(0.45, 0.45);
+  } else if (nextMode === 'sand') {
+    const textures = ensureTerrainTextureSet(mesh, textureRepeats * 1.3, 'sand');
+    mat.map = textures?.map || null;
+    mat.normalMap = textures?.normalMap || null;
+    mat.roughnessMap = textures?.roughnessMap || null;
+    mat.color.setHex(mat.map ? 0xffffff : SAND_COLOR_HEX);
+    if (mat.emissive) mat.emissive.setHex(0x000000);
+    mat.emissiveIntensity = 0;
+    mat.roughness = 0.92;
+    mat.metalness = 0.0;
+    if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.78, 0.42);
   } else {
     const textures = ensureTerrainTextureSet(mesh, textureRepeats, 'grass');
     mat.map = textures?.map || null;
@@ -504,6 +561,35 @@ function applyTerrainVisualProfile(mesh, profile, repeats = null) {
   mesh.userData.terrainVisualProfile = nextProfile;
   applyGroundFallbackProfile(nextProfile);
   mat.needsUpdate = true;
+}
+
+function refreshTerrainSurfaceProfiles(profile = null) {
+  const nextProfile = profile || appCtx.worldSurfaceProfile || null;
+  if (appCtx.terrainGroup?.children?.length) {
+    appCtx.terrainGroup.children.forEach((mesh) => {
+      if (!mesh?.userData?.isTerrainMesh) return;
+      const bounds = mesh.userData?.terrainTile?.bounds || null;
+      const minMeters = Number(mesh.userData?.minElevationMeters);
+      const maxMeters = Number(mesh.userData?.maxElevationMeters);
+      const elevationStats = mesh.userData?.elevationStatsMeters || null;
+      applyTerrainVisualProfile(
+        mesh,
+        classifyTerrainVisualProfile(
+          bounds,
+          Number.isFinite(minMeters) ? minMeters : null,
+          Number.isFinite(maxMeters) ? maxMeters : null,
+          elevationStats
+        )
+      );
+    });
+    return;
+  }
+  applyGroundFallbackProfile(nextProfile);
+}
+
+function setWorldSurfaceProfile(profile = null) {
+  appCtx.worldSurfaceProfile = profile || null;
+  refreshTerrainSurfaceProfiles(profile || null);
 }
 
 // =====================
@@ -1094,10 +1180,10 @@ function updateTerrainAround(x, z) {
 
     // Only rebuild roads when terrain tiles actually change (not every frame)
     if (appCtx.roads.length > 0 && !appCtx.onMoon) {
-      scheduleRoadAndBuildingRebuild();
+      requestWorldSurfaceSync({ source: 'terrain_tiles_changed' });
     }
   } else if (needsRoadRebuild) {
-    scheduleRoadAndBuildingRebuild();
+    requestWorldSurfaceSync({ source: 'terrain_tiles_pending' });
   }
 }
 
@@ -1813,9 +1899,12 @@ Object.assign(appCtx, {
   getOrLoadTerrainTile,
   latLonToTileXY,
   rebuildRoadsWithTerrain,
+  requestWorldSurfaceSync,
   repositionBuildingsWithTerrain,
+  refreshTerrainSurfaceProfiles,
   resetTerrainStreamingState,
   sampleTileElevationMeters,
+  setWorldSurfaceProfile,
   subdivideRoadPoints,
   terrainMeshHeightAt,
   tileXYToLatLonBounds,
@@ -1842,9 +1931,12 @@ export {
   getOrLoadTerrainTile,
   latLonToTileXY,
   rebuildRoadsWithTerrain,
+  requestWorldSurfaceSync,
   repositionBuildingsWithTerrain,
+  refreshTerrainSurfaceProfiles,
   resetTerrainStreamingState,
   sampleTileElevationMeters,
+  setWorldSurfaceProfile,
   subdivideRoadPoints,
   terrainMeshHeightAt,
   tileXYToLatLonBounds,

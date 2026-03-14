@@ -227,6 +227,67 @@ async function loadPresetLocation(page, locKey) {
   }, locKey);
 }
 
+async function loadCustomLocation(page, locationSpec) {
+  return await page.evaluate(async (spec) => {
+    const mod = await import('/app/js/shared-context.js?v=55');
+    const ctx = mod?.ctx || {};
+    if (typeof ctx.loadRoads !== 'function') {
+      return { ok: false, reason: 'loadRoads unavailable' };
+    }
+    const lat = Number(spec?.lat);
+    const lon = Number(spec?.lon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+      return { ok: false, reason: 'invalid custom coordinates' };
+    }
+    const customLatInput = document.getElementById('customLat');
+    const customLonInput = document.getElementById('customLon');
+    if (customLatInput) customLatInput.value = String(lat);
+    if (customLonInput) customLonInput.value = String(lon);
+    ctx.customLoc = {
+      lat,
+      lon,
+      name: String(spec?.label || 'Custom Location')
+    };
+    ctx.customLocTransient = false;
+    ctx.selLoc = 'custom';
+    await ctx.loadRoads();
+    return {
+      ok: true,
+      selLoc: ctx.selLoc || null,
+      customLoc: ctx.customLoc || null,
+      worldLoading: !!ctx.worldLoading,
+      roads: Array.isArray(ctx.roads) ? ctx.roads.length : 0,
+      buildings: Array.isArray(ctx.buildings) ? ctx.buildings.length : 0
+    };
+  }, locationSpec);
+}
+
+async function inspectSurfaceModes(page) {
+  return await page.evaluate(async () => {
+    const mod = await import('/app/js/shared-context.js?v=55');
+    const ctx = mod?.ctx || {};
+    const terrainModes = {};
+    (ctx.terrainGroup?.children || []).forEach((mesh) => {
+      const mode = mesh?.userData?.terrainVisualProfile?.mode || 'unknown';
+      terrainModes[mode] = (terrainModes[mode] || 0) + 1;
+    });
+    let visibleWaterMeshes = 0;
+    let frozenWaterMeshes = 0;
+    (ctx.landuseMeshes || []).forEach((mesh) => {
+      const isWaterMesh = mesh?.visible !== false && (mesh?.userData?.landuseType === 'water' || mesh?.userData?.isWaterwayLine);
+      if (!isWaterMesh) return;
+      visibleWaterMeshes++;
+      if (mesh?.userData?.surfaceVariant === 'ice') frozenWaterMeshes++;
+    });
+    return {
+      terrainModes,
+      visibleWaterMeshes,
+      frozenWaterMeshes,
+      worldSurfaceProfile: ctx.worldSurfaceProfile || null
+    };
+  });
+}
+
 async function writePngDataUrl(filePath, dataUrl) {
   if (typeof dataUrl !== 'string' || !dataUrl.startsWith('data:image/png;base64,')) return false;
   const base64 = dataUrl.slice('data:image/png;base64,'.length);
@@ -438,6 +499,63 @@ async function main() {
       `Monaco water loaded but no visible meshes were rendered: ${JSON.stringify(monacoWater)}`
     );
 
+    const arcticLoad = await loadCustomLocation(page, {
+      lat: 78.2232,
+      lon: 15.6469,
+      label: 'Svalbard Arctic'
+    });
+    assert(arcticLoad.ok, `Failed to load Arctic custom location: ${arcticLoad.reason || 'unknown error'}`);
+    await page.waitForTimeout(1800);
+    const arcticSurface = await inspectSurfaceModes(page);
+    await page.screenshot({ path: path.join(outputDir, 'arctic-surface.png'), fullPage: true });
+    assert(
+      (arcticSurface.terrainModes.snow || 0) + (arcticSurface.terrainModes.snowRock || 0) > 0,
+      `Arctic terrain did not classify as snow: ${JSON.stringify(arcticSurface)}`
+    );
+    assert(
+      arcticSurface.worldSurfaceProfile?.waterModeHint === 'ice',
+      `Arctic water profile did not freeze: ${JSON.stringify(arcticSurface.worldSurfaceProfile || {})}`
+    );
+    if (arcticSurface.visibleWaterMeshes > 0) {
+      assert(
+        arcticSurface.frozenWaterMeshes > 0,
+        `Arctic visible water meshes were not rendered as ice: ${JSON.stringify(arcticSurface)}`
+      );
+    }
+
+    const antarcticaLoad = await loadCustomLocation(page, {
+      lat: -77.846,
+      lon: 166.668,
+      label: 'Antarctica'
+    });
+    assert(antarcticaLoad.ok, `Failed to load Antarctica custom location: ${antarcticaLoad.reason || 'unknown error'}`);
+    await page.waitForTimeout(1800);
+    const antarcticaSurface = await inspectSurfaceModes(page);
+    await page.screenshot({ path: path.join(outputDir, 'antarctica-surface.png'), fullPage: true });
+    assert(
+      (antarcticaSurface.terrainModes.snow || 0) + (antarcticaSurface.terrainModes.snowRock || 0) > 0,
+      `Antarctica terrain did not classify as snow: ${JSON.stringify(antarcticaSurface)}`
+    );
+    assert(
+      antarcticaSurface.worldSurfaceProfile?.waterModeHint === 'ice',
+      `Antarctica water profile did not freeze: ${JSON.stringify(antarcticaSurface.worldSurfaceProfile || {})}`
+    );
+
+    const desertLoad = await loadCustomLocation(page, {
+      lat: 24.9222,
+      lon: 55.7676,
+      label: 'Dubai Desert'
+    });
+    assert(desertLoad.ok, `Failed to load desert custom location: ${desertLoad.reason || 'unknown error'}`);
+    await page.waitForTimeout(1800);
+    const desertSurface = await inspectSurfaceModes(page);
+    await page.screenshot({ path: path.join(outputDir, 'desert-surface.png'), fullPage: true });
+    assert(
+      (desertSurface.terrainModes.sand || 0) > 0 ||
+      desertSurface.worldSurfaceProfile?.terrainModeHint === 'sand',
+      `Desert terrain did not classify as sand: ${JSON.stringify(desertSurface)}`
+    );
+
     const oceanSwitchIssued = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
       const ctx = mod?.ctx || {};
@@ -491,6 +609,15 @@ async function main() {
       oceanLaunchWorks: oceanState.oceanActive || oceanState.env === 'OCEAN',
       monacoWaterPresent: monacoWater.waterAreas + monacoWater.waterways > 0,
       monacoWaterVisible: monacoWater.visibleWaterMeshes > 0,
+      arcticFrozenSurface:
+        ((arcticSurface.terrainModes.snow || 0) + (arcticSurface.terrainModes.snowRock || 0) > 0) &&
+        arcticSurface.worldSurfaceProfile?.waterModeHint === 'ice',
+      antarcticaFrozenSurface:
+        ((antarcticaSurface.terrainModes.snow || 0) + (antarcticaSurface.terrainModes.snowRock || 0) > 0) &&
+        antarcticaSurface.worldSurfaceProfile?.waterModeHint === 'ice',
+      desertSurfaceSand:
+        (desertSurface.terrainModes.sand || 0) > 0 ||
+        desertSurface.worldSurfaceProfile?.terrainModeHint === 'sand',
       earthLaunchWorks:
         earthStateAfterTitleLaunch.env === 'EARTH' &&
         earthState.env === 'EARTH' &&
@@ -507,6 +634,12 @@ async function main() {
       monacoLoad,
       monacoWater,
       monacoWaterImage,
+      arcticLoad,
+      arcticSurface,
+      antarcticaLoad,
+      antarcticaSurface,
+      desertLoad,
+      desertSurface,
       oceanState,
       earthState,
       consoleErrors

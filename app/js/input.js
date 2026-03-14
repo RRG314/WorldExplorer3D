@@ -36,31 +36,11 @@ function onKey(code, event) {
     if (appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
       appCtx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
     }
-    // Debug log removed
-    if (appCtx.Walk) {
-      // Debug log removed
+    if (typeof appCtx.toggleWalkDriveMode === 'function') {
+      appCtx.toggleWalkDriveMode({ source: 'keyboard_f' });
+    } else if (appCtx.Walk) {
       appCtx.Walk.toggleWalk();
-
-      // Clear star selection when switching modes
-      appCtx.clearStarSelection();
-
-      // Disable drone mode if walking
-      if (appCtx.Walk.state.mode === 'walk') {
-        appCtx.droneMode = false;
-      }
-
-      // Update all travel mode button states
-      if (document.getElementById('fWalk')) {
-        const isWalking = appCtx.Walk.state.mode === 'walk';
-        document.getElementById('fWalk').classList.toggle('on', isWalking);
-        document.getElementById('fDriving').classList.toggle('on', !isWalking);
-        document.getElementById('fDrone').classList.remove('on');
-        if (!isWalking) {
-          appCtx.droneMode = false;
-          if (typeof appCtx.camMode !== 'undefined') appCtx.camMode = 0;
-          if (appCtx.carMesh) appCtx.carMesh.visible = true;
-        }
-      }
+      appCtx.droneMode = false;
     } else {
       console.error('Walk module does not exist!');
     }
@@ -90,41 +70,11 @@ function onKey(code, event) {
     if (appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
       appCtx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
     }
-    appCtx.droneMode = !appCtx.droneMode;
-
-    // Clear star selection when switching modes
-    appCtx.clearStarSelection();
-
-    if (appCtx.droneMode) {
-      // Disable walking mode if active
-      if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
-        appCtx.Walk.setModeDrive();
-      }
-      // Initialize drone position above current position
-      const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(false, null) : { x: appCtx.car.x, z: appCtx.car.z };
-      appCtx.drone.x = ref.x;
-      appCtx.drone.z = ref.z;
-      appCtx.drone.yaw = appCtx.car.angle;
-      appCtx.drone.roll = 0;
-
-      // On the moon, raycast to find actual ground height so drone spawns near surface
-      if (appCtx.onMoon && appCtx.moonSurface) {
-        const rc = appCtx._getPhysRaycaster();
-        appCtx._physRayStart.set(ref.x, 2000, ref.z);
-        rc.set(appCtx._physRayStart, appCtx._physRayDir);
-        const hits = rc.intersectObject(appCtx.moonSurface, false);
-        appCtx.drone.y = (hits.length > 0 ? hits[0].point.y : -100) + 10;
-        appCtx.drone.pitch = -0.2;
-      } else {
-        appCtx.drone.y = 50;
-        appCtx.drone.pitch = -0.3;
-      }
+    if (typeof appCtx.toggleDroneMode === 'function') {
+      appCtx.toggleDroneMode({ source: 'keyboard_digit6' });
+    } else {
+      appCtx.droneMode = !appCtx.droneMode;
     }
-
-    // Update all travel mode button states
-    document.getElementById('fDrone').classList.toggle('on', appCtx.droneMode);
-    document.getElementById('fDriving').classList.toggle('on', !appCtx.droneMode);
-    document.getElementById('fWalk').classList.remove('on');
     if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
   }
   // Performance overlay toggle (F8)

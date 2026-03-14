@@ -2157,6 +2157,7 @@ function setupUI() {
 
   function updateControlsModeUI() {
     const mode = detectControlsMode();
+    if (typeof appCtx.syncTravelModeButtons === 'function') appCtx.syncTravelModeButtons();
     if (drivingControls) drivingControls.style.display = mode === 'driving' ? 'block' : 'none';
     if (walkingControls) walkingControls.style.display = mode === 'walking' ? 'block' : 'none';
     if (droneControls) droneControls.style.display = mode === 'drone' ? 'block' : 'none';
@@ -2354,89 +2355,38 @@ function setupUI() {
   }
   // Travel mode switchers - mutually exclusive
   document.getElementById('fDriving').addEventListener('click', () => {
-    // Switch to driving mode
-    appCtx.droneMode = false;
-    if (appCtx.Walk) {
-      appCtx.Walk.setModeDrive();
+    if (typeof appCtx.setTravelMode === 'function') {
+      appCtx.setTravelMode('drive', { source: 'ui_button' });
+    } else {
+      appCtx.droneMode = false;
+      if (appCtx.Walk) appCtx.Walk.setModeDrive();
+      emitTutorialEvent('mode_switched', { mode: 'drive', source: 'ui_button' });
     }
-    if (typeof appCtx.camMode !== 'undefined') appCtx.camMode = 0;
-    if (appCtx.carMesh) appCtx.carMesh.visible = true;
-
-    // Clear star selection
-    appCtx.clearStarSelection();
-
-    // Update button states
-    document.getElementById('fDriving').classList.add('on');
-    document.getElementById('fWalk').classList.remove('on');
-    document.getElementById('fDrone').classList.remove('on');
-    emitTutorialEvent('mode_switched', { mode: 'drive', source: 'ui_button' });
     updateControlsModeUI();
     closeAllFloatMenus();
   });
 
   document.getElementById('fWalk').addEventListener('click', () => {
-    // Switch to walking mode
-    appCtx.droneMode = false;
-    if (appCtx.Walk) {
-      if (appCtx.Walk.state.mode !== 'walk') {
-        appCtx.Walk.toggleWalk();
-      }
-
-      // Clear star selection
-      appCtx.clearStarSelection();
-
-      // Update button states
-      document.getElementById('fDriving').classList.remove('on');
-      document.getElementById('fWalk').classList.add('on');
-      document.getElementById('fDrone').classList.remove('on');
+    if (typeof appCtx.setTravelMode === 'function') {
+      appCtx.setTravelMode('walk', { source: 'ui_button' });
+    } else if (appCtx.Walk) {
+      if (appCtx.Walk.state.mode !== 'walk') appCtx.Walk.toggleWalk();
+      emitTutorialEvent('mode_switched', {
+        mode: appCtx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive',
+        source: 'ui_button'
+      });
     }
-    emitTutorialEvent('mode_switched', {
-      mode: appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' ? 'walk' : 'drive',
-      source: 'ui_button'
-    });
     updateControlsModeUI();
     closeAllFloatMenus();
   });
 
   document.getElementById('fDrone').addEventListener('click', () => {
-    // Switch to drone mode
-    if (!appCtx.droneMode) {
+    if (typeof appCtx.setTravelMode === 'function') {
+      appCtx.setTravelMode('drone', { source: 'ui_button' });
+    } else {
       appCtx.droneMode = true;
-
-      // Disable walking mode if active
-      if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
-        appCtx.Walk.setModeDrive();
-      }
-
-      // Initialize drone position above current position
-      const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(false, null) : { x: appCtx.car.x, z: appCtx.car.z };
-      appCtx.drone.x = ref.x;
-      appCtx.drone.z = ref.z;
-      appCtx.drone.yaw = appCtx.car.angle;
-      appCtx.drone.roll = 0;
-
-      // On the moon, raycast to find actual ground height so drone spawns near surface
-      if (appCtx.onMoon && appCtx.moonSurface) {
-        const rc = appCtx._getPhysRaycaster();
-        appCtx._physRayStart.set(ref.x, 2000, ref.z);
-        rc.set(appCtx._physRayStart, appCtx._physRayDir);
-        const hits = rc.intersectObject(appCtx.moonSurface, false);
-        appCtx.drone.y = (hits.length > 0 ? hits[0].point.y : -100) + 10;
-        appCtx.drone.pitch = -0.2;
-      } else {
-        appCtx.drone.y = 50;
-        appCtx.drone.pitch = -0.3;
-      }
+      emitTutorialEvent('mode_switched', { mode: 'drone', source: 'ui_button' });
     }
-
-    // Clear star selection
-    appCtx.clearStarSelection();
-
-    // Update button states
-    document.getElementById('fDriving').classList.remove('on');
-    document.getElementById('fWalk').classList.remove('on');
-    document.getElementById('fDrone').classList.add('on');
-    emitTutorialEvent('mode_switched', { mode: 'drone', source: 'ui_button' });
     updateControlsModeUI();
     closeAllFloatMenus();
   });

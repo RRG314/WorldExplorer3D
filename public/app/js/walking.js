@@ -441,8 +441,12 @@ function createWalkingModule(opts) {
       const firstRebuild = lastWalkTerrainRebuildAt === 0;
       const rebuildInterval = firstRebuild ? 500 : 2000;
       if (t - lastWalkTerrainRebuildAt >= rebuildInterval) {
-        if (typeof appCtx.rebuildRoadsWithTerrain === 'function') appCtx.rebuildRoadsWithTerrain();
-        if (typeof appCtx.repositionBuildingsWithTerrain === 'function') appCtx.repositionBuildingsWithTerrain();
+        if (typeof appCtx.requestWorldSurfaceSync === 'function') {
+          appCtx.requestWorldSurfaceSync({ force: firstRebuild, source: 'walk_sync' });
+        } else {
+          if (typeof appCtx.rebuildRoadsWithTerrain === 'function') appCtx.rebuildRoadsWithTerrain();
+          if (typeof appCtx.repositionBuildingsWithTerrain === 'function') appCtx.repositionBuildingsWithTerrain();
+        }
         lastWalkTerrainRebuildAt = t;
       }
     }
@@ -473,7 +477,11 @@ function createWalkingModule(opts) {
     }
     syncWalkerFromCar();
     syncWalkTerrain(true);
-    if (typeof appCtx.repositionBuildingsWithTerrain === 'function') appCtx.repositionBuildingsWithTerrain();
+    if (typeof appCtx.requestWorldSurfaceSync === 'function') {
+      appCtx.requestWorldSurfaceSync({ force: true, source: 'set_mode_walk' });
+    } else if (typeof appCtx.repositionBuildingsWithTerrain === 'function') {
+      appCtx.repositionBuildingsWithTerrain();
+    }
     // Debug log removed
 
     // Debug log removed
@@ -510,7 +518,11 @@ function createWalkingModule(opts) {
       // Debug log removed
       // Debug log removed
       syncWalkTerrain(true);
-      if (typeof appCtx.repositionBuildingsWithTerrain === 'function') appCtx.repositionBuildingsWithTerrain();
+      if (typeof appCtx.requestWorldSurfaceSync === 'function') {
+        appCtx.requestWorldSurfaceSync({ force: true, source: 'set_mode_walk_character' });
+      } else if (typeof appCtx.repositionBuildingsWithTerrain === 'function') {
+        appCtx.repositionBuildingsWithTerrain();
+      }
     } else {
       console.error('ERROR: Character mesh is still null after creation!');
     }

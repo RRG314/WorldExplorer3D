@@ -1477,7 +1477,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fon
     </div>
   </div>
 
-  <div style="margin-bottom:12px">
+  <div style="margin-bottom:12px" hidden>
     <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
       <input type="checkbox" id="filterPaths" style="cursor:pointer">
       <label for="filterPaths" style="cursor:pointer">PATH OVERLAY</label>
@@ -1508,7 +1508,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fon
 <div style="position:absolute;bottom:20px;right:20px;display:flex;flex-direction:column;gap:10px">
 <button id="mapSatelliteToggle" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🛰️</button>
 <button id="mapRoadsToggle" class="active" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🛣️</button>
-<button id="mapPathsToggle" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🚶</button>
+<button id="mapPathsToggle" hidden style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:11px;padding:8px 12px;cursor:pointer;border-radius:6px;width:50px;font-weight:bold">🚶</button>
 <div style="border-top:2px solid #0fc;margin:5px 0"></div>
 <button id="mapZoomIn" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:20px;padding:10px 20px;cursor:pointer;border-radius:6px;width:50px">+</button>
 <button id="mapZoomOut" style="background:rgba(0,0,0,0.8);border:2px solid #0fc;color:#0fc;font-family:Orbitron;font-size:20px;padding:10px 20px;cursor:pointer;border-radius:6px;width:50px">−</button>
@@ -1552,7 +1552,7 @@ Explore the area
 <div class="floatItems">
 <div class="floatItem" id="fSatellite">🛰️ Satellite</div>
 <div class="floatItem" id="fRoads">🛣️ Show Roads</div>
-<div class="floatItem" id="fPaths">🚶 Path Overlay</div>
+<div class="floatItem" id="fPaths" hidden>🚶 Path Overlay</div>
 <div class="floatItem" id="fLandUse">🗺️ Land Use</div>
 <div class="floatItem" id="fTimeOfDay">☀️ Day/Night</div>
 <div class="floatItem" id="fClouds">☁️ Clouds</div>

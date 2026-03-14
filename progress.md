@@ -218,6 +218,42 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - central safe-spawn resolver for walking/driving/custom/geolocation/map teleports
   - exact custom/geolocation spawn target with nearest-safe fallback
   - separate non-driveable OSM linear features for railways / footways / cycleways
+
+- System-level stabilization pass (2026-03-14):
+  - Added `app/js/travel-mode.js` so keyboard and UI mode switching share one controller instead of duplicating walk/drive/drone transition code.
+  - Interior interaction now caches nearby building candidates and suppresses redundant prompt DOM writes to reduce per-frame jitter while walking near buildings.
+  - Terrain/road/building conformance now has a single request path in `terrain.js` (`requestWorldSurfaceSync`) instead of walking mode triggering direct rebuild/reposition passes on its own.
+  - `world.js` now dedupes identical in-flight `loadRoads()` requests and keeps traversal graph rebuilds behind an explicit invalidation flag.
+  - Added broader location validation scaffolding via `scripts/world-test-locations.mjs` + `scripts/test-world-matrix.mjs` to cover preset and custom locations across multiple environment classes.
+- Validation/results after stabilization pass:
+  - `npm run sync:public` passed and kept `public/app/*` aligned with canonical `app/*`.
+  - `npm run verify:mirror` passed with `mismatchCount: 0`.
+  - `npm run test:rules` passed (`41/41` checks).
+  - `npm run test:runtime` passed after fixing traversal graph invalidation reuse.
+  - `npm run test:osm-smoke` passed, including Monaco water presence/visibility.
+  - `npm run test:world-matrix` passed across six representative locations:
+    - Baltimore dense downtown / river
+    - Monaco coastal / water-heavy
+    - San Francisco mixed terrain / coastal
+    - Nurburgring sparse rural / unusual layout
+    - Towson custom suburban
+    - Eifel custom rural / mixed terrain
+- Path rollback pass (2026-03-14):
+  - user asked to take rail/foot/cycle path work back out for now because it was creating too many regressions.
+  - canonical runtime now hard-disables linear feature loading/traversal in `app/js/world.js`; walk traversal falls back to the core road-and-ground network.
+  - `app/js/ground.js` now clears cached path-surface picks when no linear features are loaded.
+  - path overlay UI remains in DOM for compatibility but is hidden in `app/index.html`, so the mirrored build no longer exposes the toggle.
+  - docs updated to describe the rollback instead of advertising active path traversal.
+  - runtime verification updated to expect `linearFeatures === 0` and road-only walk graphs for this branch state.
+- Validation after rollback:
+  - `node --check app/js/world.js app/js/ground.js scripts/test-runtime-invariants.mjs`
+  - `npm run sync:public`
+  - `npm run verify:mirror`
+  - `npm run test:runtime` passed with `linearFeaturesDisabled=true`, `walkGraphKinds={road:3400}`, `mapTogglesWithM=true`, `debugTogglesWithF4=true`, `waterVisible=true`
+  - `npm run test:rules` passed (`41/41`)
+  - runtime screenshot reviewed: `output/playwright/runtime-invariants/runtime-invariants.png`
+- Follow-up:
+  - path removal did not remove vegetation/interiors, so if loading and water regressions still persist the next pass should focus directly on the water/terrain load path rather than path traversal.
 - Runtime regression fix pass (2026-03-14):
   - `app/js/interiors.js` now only offers enterable candidates when the source building has a full polygon footprint; bbox-only colliders no longer generate oversized indoor shells.
   - Nearby enterable-building scan added for the large-map legend, with limited on-demand Overpass fetches and cached listing for supported buildings.
@@ -2633,3 +2669,19 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Added repository `CNAME` source (`worldexplorer3d.io`) and wired `scripts/sync-public-app.mjs` + `scripts/verify-mirror.mjs` to mirror and verify `public/CNAME`.
   - Updated `README.md`, `TECHNICAL_DOCS.md`, and `CHANGELOG.md` so the repo reflects the custom-domain publish path.
   - Next: run `npm run verify:mirror`, do a quick live-host comparison (`worldexplorer3d.io` vs `rrg314.github.io/WorldExplorer3D`), then push the revert + CNAME fix and confirm the next Pages deploy moves the custom domain to the current build.
+
+- Validation harness stabilization pass (2026-03-14 20:27:00):
+  - `scripts/test-world-matrix.mjs` now treats `Failed to load resource: net::ERR_CONNECTION_CLOSED` as transient network noise during multi-location runs, matching the existing intent to ignore provider-side fetch churn rather than fail the entire stabilization suite on a false negative.
+  - Next: rerun `npm run test:world-matrix`, then do one browser smoke pass against the mirrored local build before handing this version back for manual testing.
+
+- Surface-climate classification pass (2026-03-14 21:10:00):
+  - added `app/js/surface-rules.js` as the shared system-level owner for OSM land-cover normalization plus polar/arid surface classification.
+  - terrain tiles now use that shared profile to switch between grass, snow/snow-rock, and sand instead of only terrain-local snow heuristics.
+  - OSM land/water pipeline now recognizes `sand`, `beach`, `bare_rock`, `scree`, `shingle`, and `glacier`, and frozen-water visuals now persist through landuse batching.
+  - `scripts/test-osm-smoke.mjs` now checks Monaco water plus Arctic, Antarctica, and desert custom coordinates for the new universal surface rules.
+  - Validation after this pass:
+    - `npm run sync:public` ✅
+    - `npm run verify:mirror` ✅
+    - `npm run test:runtime` ✅
+    - `npm run test:osm-smoke` ✅
+    - `npm run test:world-matrix` ✅

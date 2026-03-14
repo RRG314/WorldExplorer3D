@@ -114,6 +114,11 @@ const GroundHeight = {
   },
 
   _nearestLinearWalkFeature(x, z) {
+    if (!Array.isArray(appCtx.linearFeatures) || appCtx.linearFeatures.length === 0) {
+      this._walkFeatureCache = null;
+      return null;
+    }
+
     const cachedFeature = this._walkFeatureCache?.feature || null;
     if (cachedFeature) {
       const cachedProjection = this._projectPointToFeature(cachedFeature, x, z);

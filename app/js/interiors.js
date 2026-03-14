@@ -8,9 +8,13 @@ const INTERIOR_WALL_HEIGHT = 3.15;
 const INTERIOR_WALL_THICKNESS = 0.32;
 const INTERIOR_FLOOR_OFFSET = 0.03;
 const INTERIOR_NOTICE_MS = 2600;
+const INTERIOR_INTERACTION_REFRESH_MS = 120;
+const INTERIOR_INTERACTION_MOVE_EPSILON = 0.75;
 
 const interiorCache = new Map();
 let transientHint = { text: '', until: 0 };
+let candidateCache = { at: 0, x: NaN, z: NaN, candidate: null };
+let lastPromptState = { text: '', variant: '' };
 
 function ensurePromptElement() {
   return document.getElementById('interiorPrompt');
@@ -20,6 +24,8 @@ function setPrompt(text, variant = 'inspect') {
   const el = ensurePromptElement();
   if (!el) return;
   const message = String(text || '').trim();
+  if (lastPromptState.text === message && lastPromptState.variant === variant) return;
+  lastPromptState = { text: message, variant };
   if (!message) {
     el.classList.remove('show');
     el.textContent = '';
@@ -210,9 +216,26 @@ function buildingFootprintPoints(building) {
   ];
 }
 
-function pickNearbyBuildingCandidate() {
+function resetInteriorInteractionCache() {
+  candidateCache = { at: 0, x: NaN, z: NaN, candidate: null };
+}
+
+function pickNearbyBuildingCandidate(force = false) {
   if (!isWalkModeActive()) return null;
   const walker = appCtx.Walk.state.walker;
+  const now = performance.now();
+  const movedDistance =
+    Number.isFinite(candidateCache.x) && Number.isFinite(candidateCache.z) ?
+      Math.hypot(walker.x - candidateCache.x, walker.z - candidateCache.z) :
+      Infinity;
+  if (
+    !force &&
+    now - candidateCache.at <= INTERIOR_INTERACTION_REFRESH_MS &&
+    movedDistance <= INTERIOR_INTERACTION_MOVE_EPSILON
+  ) {
+    return candidateCache.candidate;
+  }
+
   const nearby = typeof appCtx.getNearbyBuildings === 'function' ?
     appCtx.getNearbyBuildings(walker.x, walker.z, INTERIOR_ENTRY_RADIUS + 8) :
     (Array.isArray(appCtx.buildings) ? appCtx.buildings : []);
@@ -234,6 +257,12 @@ function pickNearbyBuildingCandidate() {
       };
     }
   }
+  candidateCache = {
+    at: now,
+    x: walker.x,
+    z: walker.z,
+    candidate: best
+  };
   return best;
 }
 
@@ -1165,6 +1194,7 @@ async function enterInteriorForBuilding(building) {
     label: definition.label,
     level: definition.selectedLevel
   };
+  resetInteriorInteractionCache();
   return true;
 }
 
@@ -1202,6 +1232,7 @@ function clearActiveInterior(options = {}) {
   disposeObject3D(active.group);
   appCtx.activeInterior = null;
   appCtx.interiorHint = null;
+  resetInteriorInteractionCache();
   if (!options.preservePrompt) clearPrompt();
   return true;
 }
@@ -1211,7 +1242,7 @@ async function handleInteriorAction() {
     clearActiveInterior({ restorePlayer: true, preserveCache: true });
     return true;
   }
-  const candidate = pickNearbyBuildingCandidate();
+  const candidate = pickNearbyBuildingCandidate(true);
   if (!candidate) return false;
   await enterInteriorForBuilding(candidate.building);
   return true;
@@ -1222,6 +1253,7 @@ function updateInteriorInteraction() {
 
   if (!isWalkModeActive()) {
     appCtx.interiorHint = null;
+    resetInteriorInteractionCache();
     if (transientHint.text && transientHint.until > now) {
       setPrompt(transientHint.text, 'notice');
       return;
@@ -1233,11 +1265,12 @@ function updateInteriorInteraction() {
   if (appCtx.activeInterior) {
     const label = appCtx.activeInterior.label || 'Interior';
     appCtx.interiorHint = { state: 'inside', label };
+    resetInteriorInteractionCache();
     setPrompt('E Exit interior', 'active');
     return;
   }
 
-  const candidate = pickNearbyBuildingCandidate();
+  const candidate = pickNearbyBuildingCandidate(false);
   if (candidate) {
     const key = buildingKey(candidate.building);
     const cached = interiorCache.get(key);

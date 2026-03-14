@@ -78,13 +78,13 @@ This checks:
    - verify `M` opens the large map
    - verify `F4` still opens the debug overlay
    - verify `Use My Location` / custom-location launch lands on safe ground, nearest walkable path, or nearest safe road when blocked
+   - run `npm run test:world-matrix` to validate the same rules across preset + custom locations
    - switch Walk -> Drive from beside buildings and confirm the car is not trapped in geometry
    - verify greenery appears in parks / woods / mapped tree areas without a large frame-time spike
    - walk up to a mapped building prompt, press `E`, confirm the interior loads only on demand, then press `E` or `Esc` to exit cleanly
    - switch Earth <-> Ocean from in-game environment controls
-   - verify railways / footways / cycleways appear in the loaded city and map overlay as solid terrain-following surfaces
    - verify water remains visible where expected, including coastal water plus rivers / ponds / lakes
-   - verify walk navigation can follow footways / cycleways / rail corridors and drive navigation stays on roads
+   - verify the current active build keeps path overlays hidden/disabled while walk/drive traversal remains stable on the road-and-ground network
 4. Account / donation surfaces:
    - verify landing/runtime/account copy does not imply payment is required for map or core play
 5. No new blocking console/runtime errors in primary flows

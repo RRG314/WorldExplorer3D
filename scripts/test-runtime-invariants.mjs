@@ -282,7 +282,7 @@ async function waitForRuntimeSnapshot(page, timeoutMs = 120000) {
   throw new Error(`Timed out waiting for runtime readiness. Last snapshot: ${JSON.stringify(last || {})}`);
 }
 
-async function waitForLinearFeatures(page, timeoutMs = 60000) {
+async function waitForTraversalNetworks(page, timeoutMs = 60000) {
   const deadline = Date.now() + timeoutMs;
   let last = null;
   while (Date.now() < deadline) {
@@ -299,12 +299,12 @@ async function waitForLinearFeatures(page, timeoutMs = 60000) {
         worldLoading: !!ctx?.worldLoading
       };
     });
-    if (last.linearFeatures > 0 && last.walkGraphSegmentCount > last.driveGraphSegmentCount) {
+    if (last.worldLoading === false && last.walkGraphSegmentCount > 0 && last.driveGraphSegmentCount > 0) {
       return last;
     }
     await page.waitForTimeout(1000);
   }
-  throw new Error(`Timed out waiting for deferred linear features. Last snapshot: ${JSON.stringify(last || {})}`);
+  throw new Error(`Timed out waiting for traversal networks. Last snapshot: ${JSON.stringify(last || {})}`);
 }
 
 function assert(condition, message) {
@@ -380,7 +380,7 @@ async function main() {
       debugToggleCheck.closedByF4 = await page.evaluate(() => document.getElementById('debugOverlay')?.style.display !== 'block');
     }
 
-    const linearFeatureSnapshot = await waitForLinearFeatures(page, 60000);
+    const traversalSnapshot = await waitForTraversalNetworks(page, 60000);
 
     const preWaterMetrics = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
@@ -694,7 +694,7 @@ async function main() {
       laneEdgeReasonable: report.laneHitRatePct <= 3.5,
       waterDataPresent: (report.waterAreas + report.waterways + preWaterMetrics.waterAreas + preWaterMetrics.waterways) > 0,
       waterVisible: report.visibleWaterMeshes > 0 || preWaterMetrics.visibleWaterMeshes > 0,
-      linearFeaturesPresent: (report.linearFeatures + preWaterMetrics.linearFeatures) > 0,
+      linearFeaturesDisabled: (report.linearFeatures + preWaterMetrics.linearFeatures) === 0,
       spawnResolverAvailable: report.resolveSpawnAvailable === true,
       driveSpawnFallbackSafe: report.buildingInteriorSamples === 0 || report.driveSpawnSafe === report.buildingInteriorSamples,
       walkSpawnFallbackSafe: report.buildingInteriorSamples === 0 || report.walkSpawnSafe === report.buildingInteriorSamples,
@@ -702,18 +702,7 @@ async function main() {
       modeSwitchSafe: report.buildingInteriorSamples === 0 || report.modeSwitchResult?.safe === true,
       walkTraversalNetworkReady:
         report.walkGraphNodeCount > 0 &&
-        report.walkGraphSegmentCount > report.driveGraphSegmentCount &&
-        (report.walkGraphKinds.footway || 0) + (report.walkGraphKinds.cycleway || 0) + (report.walkGraphKinds.railway || 0) > 0,
-      linearFeatureRoutingActive:
-        report.walkFeatureRoute?.ok === true &&
-        report.walkFeatureRoute?.pointCount >= 2,
-      walkSurfaceSamplerActive:
-        !!report.walkSurfaceSample &&
-        report.walkSurfaceSample.source !== 'terrain' &&
-        ['footway', 'cycleway', 'railway'].includes(report.walkSurfaceSample.source) &&
-        Number.isFinite(report.walkSurfaceSample.yDelta) &&
-        report.walkSurfaceSample.yDelta > 0.02,
-      linearFeatureMaterialsSolid: report.solidLinearMaterials === true,
+        report.walkGraphSegmentCount >= report.driveGraphSegmentCount,
       waterMaterialsSolid: report.solidWaterMeshes === true,
       vegetationIntegrated: report.vegetationFeatures > 0 && report.vegetationMeshes > 0,
       lazyInteriorIdle:
@@ -749,7 +738,7 @@ async function main() {
       checks,
       metrics: report,
       readySnapshot,
-      linearFeatureSnapshot,
+      traversalSnapshot,
       preWaterMetrics,
       mapToggleCheck,
       debugToggleCheck,
@@ -763,7 +752,7 @@ async function main() {
       `Road center driveability degraded: blocked ${report.blockedDriveSamples}/${report.driveSampleCount} (${report.blockedDriveRatePct}%)`
     );
     assert(checks.laneEdgeReasonable, `Lane-edge collision rate too high: ${report.laneHitRatePct}%`);
-    assert(checks.linearFeaturesPresent, `Expected OSM linear features to load, found ${report.linearFeatures}`);
+    assert(checks.linearFeaturesDisabled, `Expected path layers to stay disabled for this rollback, found ${report.linearFeatures}`);
     assert(checks.spawnResolverAvailable, 'Spawn resolver helpers are not exposed on runtime context.');
     assert(
       checks.driveSpawnFallbackSafe,
@@ -787,9 +776,6 @@ async function main() {
         walkGraphKinds: report.walkGraphKinds
       })}`
     );
-    assert(checks.linearFeatureRoutingActive, `Walk routing does not travel across linear features: ${JSON.stringify(report.walkFeatureRoute)}`);
-    assert(checks.walkSurfaceSamplerActive, `Walk surface sampler did not treat path layers as walkable surfaces: ${JSON.stringify(report.walkSurfaceSample)}`);
-    assert(checks.linearFeatureMaterialsSolid, 'Linear path surfaces are still rendering with transparent materials.');
     assert(checks.waterMaterialsSolid, 'Water meshes are still rendering with transparent materials.');
     assert(checks.vegetationIntegrated, `Vegetation layer did not initialize correctly: ${JSON.stringify({ vegetationFeatures: report.vegetationFeatures, vegetationMeshes: report.vegetationMeshes })}`);
     assert(checks.lazyInteriorIdle, `Interior system is not staying lazy by default: ${JSON.stringify({ activeInteriorByDefault: report.activeInteriorByDefault, dynamicInteriorCollidersIdle: report.dynamicInteriorCollidersIdle, interiorActionExposed: report.interiorActionExposed, interiorPromptPresent: report.interiorPromptPresent })}`);

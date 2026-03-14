@@ -1,4 +1,9 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
+import {
+  classifyWaterSurfaceProfile,
+  classifyWorldSurfaceProfile,
+  normalizeLanduseSurfaceType
+} from "./surface-rules.js?v=1";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
@@ -96,6 +101,7 @@ const WALK_SURFACE_COST = {
   cycleway: 0.96,
   railway: 1.35
 };
+const ENABLE_LINEAR_FEATURES = false;
 const VEGETATION_ELIGIBLE_TYPES = new Set([
   'forest',
   'wood',
@@ -127,6 +133,8 @@ const MAX_TREE_NODES = 320;
 const MAX_TREE_ROW_WAYS = 70;
 const MAX_GENERATED_TREE_INSTANCES = 950;
 const INTERIOR_LEVEL_HEIGHT = 3.4;
+let _activeWorldLoad = null;
+let _traversalNetworksDirty = true;
 
 function sameLocation(a, b) {
   return Math.abs((a?.lat || 0) - (b?.lat || 0)) <= OVERPASS_LOC_EPSILON &&
@@ -255,6 +263,7 @@ function isDriveableHighwayTag(highway = '') {
 }
 
 function classifyLinearFeatureTags(tags = {}) {
+  if (!ENABLE_LINEAR_FEATURES) return null;
   const highway = String(tags?.highway || '').toLowerCase();
   const railway = String(tags?.railway || '').toLowerCase();
   const bicycle = String(tags?.bicycle || '').toLowerCase();
@@ -1175,18 +1184,7 @@ function worldLinePointsFromLonLat(coords, maxPoints = 1000, guardOptions = null
 }
 
 function classifyLanduseType(tags) {
-  if (!tags) return null;
-  if (tags.landuse && appCtx.LANDUSE_STYLES[tags.landuse]) return tags.landuse;
-  if (tags.landuse === 'reservoir' || tags.landuse === 'basin') return 'water';
-  if (tags.natural === 'water' || !!tags.water) return 'water';
-  if (tags.natural === 'forest') return 'forest';
-  if (tags.natural === 'wood') return 'wood';
-  if (tags.natural === 'scrub' || tags.natural === 'grassland' || tags.natural === 'heath') return 'meadow';
-  if (tags.natural === 'wetland') return 'grass';
-  if (tags.leisure === 'park') return 'park';
-  if (tags.leisure === 'garden') return 'garden';
-  if (tags.leisure === 'nature_reserve') return 'forest';
-  return null;
+  return normalizeLanduseSurfaceType(tags);
 }
 
 function poiKeyFromTags(tags = {}) {
@@ -1307,6 +1305,31 @@ function waterSurfaceBaseElevation(heights) {
   return Math.min(finite[percentileIdx], min + 0.1);
 }
 
+function resolveWaterSurfaceVisualProfile(bounds = null) {
+  const surfaceProfile = classifyWaterSurfaceProfile({
+    bounds,
+    worldSurfaceProfile: appCtx.worldSurfaceProfile || null
+  });
+  if (surfaceProfile.mode === 'ice') {
+    return {
+      mode: 'ice',
+      color: appCtx.LANDUSE_STYLES?.glacier?.color || 0xdfe9f4,
+      emissive: 0x8fa6bd,
+      emissiveIntensity: 0.1,
+      roughness: 0.84,
+      metalness: 0.02
+    };
+  }
+  return {
+    mode: 'water',
+    color: appCtx.LANDUSE_STYLES?.water?.color || 0x4a90e2,
+    emissive: 0x0f355a,
+    emissiveIntensity: 0.24,
+    roughness: 0.18,
+    metalness: 0.05
+  };
+}
+
 function resolveLinearFeatureBaseY(x, z, kind = 'footway') {
   const terrainY = typeof appCtx.terrainMeshHeightAt === 'function' ?
     appCtx.terrainMeshHeightAt(x, z) :
@@ -1340,7 +1363,7 @@ function resolveLinearFeatureBaseY(x, z, kind = 'footway') {
 }
 
 function syncLinearFeatureOverlayVisibility() {
-  const visible = appCtx.showPathOverlays !== false;
+  const visible = ENABLE_LINEAR_FEATURES && appCtx.showPathOverlays !== false;
   if (!Array.isArray(appCtx.linearFeatureMeshes)) return;
   for (let i = 0; i < appCtx.linearFeatureMeshes.length; i++) {
     const mesh = appCtx.linearFeatureMeshes[i];
@@ -1810,6 +1833,7 @@ function batchLanduseMeshes() {
       }
       const type = mesh.userData?.landuseType || 'unknown';
       const isWaterwayLine = !!mesh.userData?.isWaterwayLine;
+      const surfaceVariant = mesh.userData?.surfaceVariant || type;
       const key = `${type}|${isWaterwayLine ? 1 : 0}|${mesh.renderOrder || 0}|${matKey}`;
 
       let group = groups.get(key);
@@ -1820,6 +1844,7 @@ function batchLanduseMeshes() {
           renderOrder: mesh.renderOrder || 0,
           landuseType: type,
           isWaterwayLine,
+          surfaceVariant,
           alwaysVisible: false,
           anyVisible: false
         };
@@ -1904,6 +1929,7 @@ function batchLanduseMeshes() {
       mergedMesh.userData = {
         landuseType: group.landuseType,
         isWaterwayLine: !!group.isWaterwayLine,
+        surfaceVariant: group.surfaceVariant,
         isLanduseBatch: true,
         alwaysVisible: group.alwaysVisible,
         batchCount: group.meshes.length,
@@ -2110,7 +2136,24 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheM
   }
 }
 
-async function loadRoads(retryPass = 0) {
+function getWorldLoadSignature() {
+  const selLoc = String(appCtx.selLoc || 'baltimore');
+  const perfMode = getPerfModeValue();
+  const customLat = selLoc === 'custom' ? Number(appCtx.customLoc?.lat) : null;
+  const customLon = selLoc === 'custom' ? Number(appCtx.customLoc?.lon) : null;
+  const customName = selLoc === 'custom' ? String(appCtx.customLoc?.name || 'Custom') : '';
+  return JSON.stringify({
+    selLoc,
+    customLat: Number.isFinite(customLat) ? Number(customLat.toFixed(6)) : null,
+    customLon: Number.isFinite(customLon) ? Number(customLon.toFixed(6)) : null,
+    customName,
+    gameMode: String(appCtx.gameMode || 'free'),
+    perfMode,
+    seedOverride: Number.isFinite(Number(appCtx.sharedSeedOverride)) ? Number(appCtx.sharedSeedOverride) : null
+  });
+}
+
+async function loadRoadsInternal(retryPass = 0) {
   const locName = appCtx.selLoc === 'custom' ? appCtx.customLoc?.name || 'Custom' : appCtx.LOCS[appCtx.selLoc].name;
   const perfModeNow = getPerfModeValue();
   const useRdtBudgeting = perfModeNow === 'rdt';
@@ -2215,7 +2258,7 @@ async function loadRoads(retryPass = 0) {
     }
   });
   appCtx.roadMeshes = [];appCtx.roads = [];
-  appCtx.traversalNetworks = { walk: null, drive: null };
+  invalidateTraversalNetworks('world_reload_reset');
   appCtx.navigationRoutePoints = [];
   appCtx.navigationRouteDistance = 0;
 
@@ -2246,6 +2289,11 @@ async function loadRoads(retryPass = 0) {
     }
   });
   appCtx.landuseMeshes = [];appCtx.landuses = [];appCtx.waterAreas = [];appCtx.waterways = [];
+  if (typeof appCtx.setWorldSurfaceProfile === 'function') {
+    appCtx.setWorldSurfaceProfile(null);
+  } else {
+    appCtx.worldSurfaceProfile = null;
+  }
   appCtx.linearFeatureMeshes.forEach((m) => {
     appCtx.scene.remove(m);
     if (m.geometry) m.geometry.dispose();
@@ -2569,7 +2617,7 @@ async function loadRoads(retryPass = 0) {
     appCtx.landuses = [];
     appCtx.waterAreas = [];
     appCtx.waterways = [];
-    appCtx.traversalNetworks = { walk: null, drive: null };
+    invalidateTraversalNetworks('fallback_world_reset');
     appCtx.navigationRoutePoints = [];
     appCtx.navigationRouteDistance = 0;
     appCtx.linearFeatures = [];
@@ -2742,6 +2790,7 @@ async function loadRoads(retryPass = 0) {
                 way["highway"~"^(cycleway|footway|pedestrian|path|steps)$"]${linearFeatureBounds};
             );out body;>;out skel qt;`;
       const scheduleDeferredLinearFeatureLoad = () => {
+        if (!ENABLE_LINEAR_FEATURES) return;
         window.setTimeout(async () => {
           if (!isActiveLoadContext()) return;
           try {
@@ -2819,6 +2868,7 @@ async function loadRoads(retryPass = 0) {
             }
 
             syncLinearFeatureOverlayVisibility();
+            invalidateTraversalNetworks('deferred_linear_features_ready');
             safeLoadCall('buildTraversalNetworksDeferred', () => buildTraversalNetworks());
             if (typeof updateWorldLod === 'function') {
               safeLoadCall('updateWorldLodDeferred', () => updateWorldLod(true));
@@ -2837,7 +2887,7 @@ async function loadRoads(retryPass = 0) {
                 way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street|service)$"]${roadsBounds};
                 way["building"]${featureBounds};
                 way["landuse"]${featureBounds};
-                way["natural"~"^(wood|forest|scrub|grassland|heath|wetland|tree_row)$"]${featureBounds};
+                way["natural"~"^(wood|forest|scrub|grassland|heath|wetland|tree_row|sand|beach|bare_rock|scree|shingle|glacier)$"]${featureBounds};
                 way["natural"="water"]${featureBounds};
                 way["water"]${featureBounds};
                 way["waterway"~"^(river|stream|canal|drain|ditch)$"]${featureBounds};
@@ -2912,6 +2962,12 @@ async function loadRoads(retryPass = 0) {
       e.tags.natural === 'grassland' ||
       e.tags.natural === 'heath' ||
       e.tags.natural === 'wetland' ||
+      e.tags.natural === 'sand' ||
+      e.tags.natural === 'beach' ||
+      e.tags.natural === 'bare_rock' ||
+      e.tags.natural === 'scree' ||
+      e.tags.natural === 'shingle' ||
+      e.tags.natural === 'glacier' ||
       e.tags.natural === 'water' ||
       !!e.tags.water ||
       e.tags.leisure === 'park' ||
@@ -2942,11 +2998,11 @@ async function loadRoads(retryPass = 0) {
         useRdt: useRdtBudgeting
       });
 
-      const allRailwayWays = data.elements.filter((e) =>
+      const allRailwayWays = ENABLE_LINEAR_FEATURES ? data.elements.filter((e) =>
       e.type === 'way' &&
       classifyLinearFeatureTags(e.tags)?.kind === 'railway'
-      );
-      const railwayWays = limitWaysByTileBudget(allRailwayWays, nodes, {
+      ) : [];
+      const railwayWays = ENABLE_LINEAR_FEATURES ? limitWaysByTileBudget(allRailwayWays, nodes, {
         globalCap: Math.max(80, Math.floor(maxRoadWays * 0.22)),
         basePerTile: Math.max(6, Math.floor(tileBudgetCfg.roadsPerTile * 0.22)),
         minPerTile: Math.max(2, Math.floor(tileBudgetCfg.roadsMinPerTile * 0.18)),
@@ -2955,13 +3011,13 @@ async function loadRoads(retryPass = 0) {
         compareFn: (a, b) =>
         linearFeaturePriority('railway', classifyLinearFeatureTags(b.tags)?.subtype) -
         linearFeaturePriority('railway', classifyLinearFeatureTags(a.tags)?.subtype)
-      });
+      }) : [];
 
-      const allFootwayWays = data.elements.filter((e) =>
+      const allFootwayWays = ENABLE_LINEAR_FEATURES ? data.elements.filter((e) =>
       e.type === 'way' &&
       classifyLinearFeatureTags(e.tags)?.kind === 'footway'
-      );
-      const footwayWays = limitWaysByTileBudget(allFootwayWays, nodes, {
+      ) : [];
+      const footwayWays = ENABLE_LINEAR_FEATURES ? limitWaysByTileBudget(allFootwayWays, nodes, {
         globalCap: Math.max(150, Math.floor(maxLanduseWays * 0.65)),
         basePerTile: Math.max(10, Math.floor(tileBudgetCfg.landusePerTile * 0.55)),
         minPerTile: Math.max(4, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.5)),
@@ -2972,13 +3028,13 @@ async function loadRoads(retryPass = 0) {
         compareFn: (a, b) =>
         linearFeaturePriority('footway', classifyLinearFeatureTags(b.tags)?.subtype) -
         linearFeaturePriority('footway', classifyLinearFeatureTags(a.tags)?.subtype)
-      });
+      }) : [];
 
-      const allCyclewayWays = data.elements.filter((e) =>
+      const allCyclewayWays = ENABLE_LINEAR_FEATURES ? data.elements.filter((e) =>
       e.type === 'way' &&
       classifyLinearFeatureTags(e.tags)?.kind === 'cycleway'
-      );
-      const cyclewayWays = limitWaysByTileBudget(allCyclewayWays, nodes, {
+      ) : [];
+      const cyclewayWays = ENABLE_LINEAR_FEATURES ? limitWaysByTileBudget(allCyclewayWays, nodes, {
         globalCap: Math.max(110, Math.floor(maxLanduseWays * 0.45)),
         basePerTile: Math.max(8, Math.floor(tileBudgetCfg.landusePerTile * 0.36)),
         minPerTile: Math.max(3, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.32)),
@@ -2989,7 +3045,7 @@ async function loadRoads(retryPass = 0) {
         compareFn: (a, b) =>
         linearFeaturePriority('cycleway', classifyLinearFeatureTags(b.tags)?.subtype) -
         linearFeaturePriority('cycleway', classifyLinearFeatureTags(a.tags)?.subtype)
-      });
+      }) : [];
 
       const allTreeNodes = data.elements.filter((e) =>
         e.type === 'node' &&
@@ -3051,6 +3107,23 @@ async function loadRoads(retryPass = 0) {
         requested: allWaterwayWays.length,
         selected: waterwayWays.length
       };
+      const worldSurfaceProfile = classifyWorldSurfaceProfile({
+        centerLat: appCtx.LOC?.lat,
+        landuseWays,
+        waterwayWays
+      });
+      loadMetrics.surfaceProfile = {
+        reason: worldSurfaceProfile.reason,
+        terrainModeHint: worldSurfaceProfile.terrainModeHint,
+        waterModeHint: worldSurfaceProfile.waterModeHint,
+        absLat: Number(worldSurfaceProfile.absLat?.toFixed?.(2) || worldSurfaceProfile.absLat || 0),
+        signals: worldSurfaceProfile.signals?.normalized || {}
+      };
+      if (typeof appCtx.setWorldSurfaceProfile === 'function') {
+        appCtx.setWorldSurfaceProfile(worldSurfaceProfile);
+      } else {
+        appCtx.worldSurfaceProfile = worldSurfaceProfile;
+      }
       appCtx.osmTreeNodes = treeNodes;
       appCtx.osmTreeRows = treeRowWays;
       endLoadPhase('featureBudgeting');
@@ -3641,6 +3714,7 @@ async function loadRoads(retryPass = 0) {
         geometry.rotateX(-Math.PI / 2);
 
         const isWater = landuseType === 'water';
+        const waterVisualProfile = isWater ? resolveWaterSurfaceVisualProfile() : null;
         const surfaceBaseElevation = isWater ?
           (Number.isFinite(avgElevation) ? avgElevation : waterSurfaceBaseElevation(sampledHeights)) :
           avgElevation;
@@ -3657,11 +3731,11 @@ async function loadRoads(retryPass = 0) {
         geometry.computeVertexNormals();
 
         const material = new THREE.MeshStandardMaterial(isWater ? {
-          color: appCtx.LANDUSE_STYLES.water.color,
-          emissive: 0x0f355a,
-          emissiveIntensity: 0.24,
-          roughness: 0.18,
-          metalness: 0.05,
+          color: waterVisualProfile?.color || appCtx.LANDUSE_STYLES.water.color,
+          emissive: waterVisualProfile?.emissive || 0x0f355a,
+          emissiveIntensity: waterVisualProfile?.emissiveIntensity ?? 0.24,
+          roughness: waterVisualProfile?.roughness ?? 0.18,
+          metalness: waterVisualProfile?.metalness ?? 0.05,
           transparent: false,
           opacity: 1,
           side: THREE.DoubleSide,
@@ -3689,6 +3763,7 @@ async function loadRoads(retryPass = 0) {
         mesh.userData.alwaysVisible = isWater;
         mesh.userData.landuseType = landuseType;
         mesh.userData.waterFlattenFactor = waterFlattenFactor;
+        mesh.userData.surfaceVariant = isWater ? waterVisualProfile?.mode || 'water' : landuseType;
         if (isWater) mesh.userData.waterSurfaceBase = surfaceBaseElevation;
         mesh.receiveShadow = false;
         mesh.visible = appCtx.landUseVisible || mesh.userData.alwaysVisible;
@@ -3718,6 +3793,7 @@ async function loadRoads(retryPass = 0) {
         if (centerline.length < 2) return;
 
         const width = waterwayWidthFromTags(tags);
+        const waterVisualProfile = resolveWaterSurfaceVisualProfile();
         const halfWidth = width * 0.5;
         const verticalBias = 0.14;
         const _h = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt : appCtx.elevationWorldYAtWorldXZ;
@@ -3766,11 +3842,11 @@ async function loadRoads(retryPass = 0) {
         geometry.computeVertexNormals();
 
         const material = new THREE.MeshStandardMaterial({
-          color: 0x3f87d6,
-          emissive: 0x0d2b4f,
-          emissiveIntensity: 0.18,
-          roughness: 0.26,
-          metalness: 0.03,
+          color: waterVisualProfile.color,
+          emissive: waterVisualProfile.mode === 'ice' ? 0x8fa6bd : 0x0d2b4f,
+          emissiveIntensity: waterVisualProfile.mode === 'ice' ? 0.08 : 0.18,
+          roughness: waterVisualProfile.mode === 'ice' ? 0.82 : 0.26,
+          metalness: waterVisualProfile.mode === 'ice' ? 0.02 : 0.03,
           transparent: false,
           opacity: 1,
           side: THREE.DoubleSide,
@@ -3788,6 +3864,7 @@ async function loadRoads(retryPass = 0) {
         mesh.userData.waterwayCenterline = centerline;
         mesh.userData.waterwayWidth = width;
         mesh.userData.waterwayBias = verticalBias;
+        mesh.userData.surfaceVariant = waterVisualProfile.mode;
         mesh.visible = true;
         appCtx.scene.add(mesh);
         appCtx.landuseMeshes.push(mesh);
@@ -3799,6 +3876,7 @@ async function loadRoads(retryPass = 0) {
       }
 
       function addLinearFeatureRibbon(pts, tags) {
+        if (!ENABLE_LINEAR_FEATURES) return false;
         if (!pts || pts.length < 2) return false;
         const classification = classifyLinearFeatureTags(tags);
         if (!classification) return false;
@@ -3891,22 +3969,22 @@ async function loadRoads(retryPass = 0) {
         return true;
       }
 
-      function addWaterPolygonFromVectorCoords(polygonCoords, properties = {}, guardOptions = null) {
+      function addWaterPolygonFromVectorCoords(polygonCoords, properties = {}) {
         if (!Array.isArray(polygonCoords) || polygonCoords.length === 0) return false;
-        const outer = normalizeWorldRingFromLonLat(polygonCoords[0], 1000, guardOptions);
+        const outer = normalizeWorldRingFromLonLat(polygonCoords[0], 1000);
         if (!outer) return false;
 
         const holes = [];
         for (let i = 1; i < polygonCoords.length; i++) {
-          const hole = normalizeWorldRingFromLonLat(polygonCoords[i], 700, guardOptions);
+          const hole = normalizeWorldRingFromLonLat(polygonCoords[i], 700);
           if (hole && Math.abs(signedPolygonAreaXZ(hole)) > FEATURE_MIN_HOLE_AREA) holes.push(hole);
         }
 
-        addLandusePolygon(outer, 'water', holes, guardOptions);
+        addLandusePolygon(outer, 'water', holes);
         return true;
       }
 
-      function addVectorWaterGeoJSON(geojson, guardOptions = null) {
+      function addVectorWaterGeoJSON(geojson) {
         if (!geojson || !geojson.geometry) return { polygons: 0, lines: 0 };
         let polygons = 0;
         let lines = 0;
@@ -3914,17 +3992,17 @@ async function loadRoads(retryPass = 0) {
         const props = geojson.properties || {};
 
         if (geom.type === 'Polygon') {
-          if (addWaterPolygonFromVectorCoords(geom.coordinates, props, guardOptions)) polygons++;
+          if (addWaterPolygonFromVectorCoords(geom.coordinates, props)) polygons++;
           return { polygons, lines };
         }
         if (geom.type === 'MultiPolygon') {
           geom.coordinates.forEach((polyCoords) => {
-            if (addWaterPolygonFromVectorCoords(polyCoords, props, guardOptions)) polygons++;
+            if (addWaterPolygonFromVectorCoords(polyCoords, props)) polygons++;
           });
           return { polygons, lines };
         }
         if (geom.type === 'LineString') {
-          const pts = worldLinePointsFromLonLat(geom.coordinates, 1000, guardOptions);
+          const pts = worldLinePointsFromLonLat(geom.coordinates, 1000);
           if (pts && pts.length >= 2) {
             addWaterwayRibbon(pts, props);
             lines++;
@@ -3933,7 +4011,7 @@ async function loadRoads(retryPass = 0) {
         }
         if (geom.type === 'MultiLineString') {
           geom.coordinates.forEach((lineCoords) => {
-            const pts = worldLinePointsFromLonLat(lineCoords, 1000, guardOptions);
+            const pts = worldLinePointsFromLonLat(lineCoords, 1000);
             if (pts && pts.length >= 2) {
               addWaterwayRibbon(pts, props);
               lines++;
@@ -3960,11 +4038,11 @@ async function loadRoads(retryPass = 0) {
           { x: -ringHalfWidth, z: zFar },
           { x: -ringHalfWidth, z: zNear }
         ];
-        addLandusePolygon(fallbackOuter, 'water', [], waterGeometryGuards);
+        addLandusePolygon(fallbackOuter, 'water', []);
         return true;
       }
 
-      async function loadVectorTileWaterCoverage(latMin, lonMin, latMax, lonMax, guardOptions = null) {
+      async function loadVectorTileWaterCoverage(latMin, lonMin, latMax, lonMax) {
         const tr = vectorTileRangeForBounds(latMin, lonMin, latMax, lonMax, WATER_VECTOR_TILE_ZOOM);
         const tileJobs = [];
         for (let tx = tr.xMin; tx <= tr.xMax; tx++) {
@@ -3987,27 +4065,27 @@ async function loadRoads(retryPass = 0) {
           const lineLayers = ['water_lines'];
 
           polygonLayers.forEach((layerName) => {
-            const layer = tile.layers[layerName];
-            if (!layer || !Number.isFinite(layer.length)) return;
-            for (let i = 0; i < layer.length; i++) {
-              const feature = layer.feature(i);
-              if (!feature || typeof feature.toGeoJSON !== 'function') continue;
-              const out = addVectorWaterGeoJSON(feature.toGeoJSON(x, y, z), guardOptions);
-              polygons += out.polygons;
-              lines += out.lines;
-            }
+              const layer = tile.layers[layerName];
+              if (!layer || !Number.isFinite(layer.length)) return;
+              for (let i = 0; i < layer.length; i++) {
+                const feature = layer.feature(i);
+                if (!feature || typeof feature.toGeoJSON !== 'function') continue;
+                const out = addVectorWaterGeoJSON(feature.toGeoJSON(x, y, z));
+                polygons += out.polygons;
+                lines += out.lines;
+              }
           });
 
           lineLayers.forEach((layerName) => {
-            const layer = tile.layers[layerName];
-            if (!layer || !Number.isFinite(layer.length)) return;
-            for (let i = 0; i < layer.length; i++) {
-              const feature = layer.feature(i);
-              if (!feature || typeof feature.toGeoJSON !== 'function') continue;
-              const out = addVectorWaterGeoJSON(feature.toGeoJSON(x, y, z), guardOptions);
-              polygons += out.polygons;
-              lines += out.lines;
-            }
+              const layer = tile.layers[layerName];
+              if (!layer || !Number.isFinite(layer.length)) return;
+              for (let i = 0; i < layer.length; i++) {
+                const feature = layer.feature(i);
+                if (!feature || typeof feature.toGeoJSON !== 'function') continue;
+                const out = addVectorWaterGeoJSON(feature.toGeoJSON(x, y, z));
+                polygons += out.polygons;
+                lines += out.lines;
+              }
           });
         });
 
@@ -4020,7 +4098,7 @@ async function loadRoads(retryPass = 0) {
         const landuseType = classifyLanduseType(way.tags);
         if (!landuseType) return;
         const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
-        const guard = landuseType === 'water' ? waterGeometryGuards : landuseGeometryGuards;
+        const guard = landuseType === 'water' ? null : landuseGeometryGuards;
         addLandusePolygon(pts, landuseType, [], guard);
       });
 
@@ -4033,13 +4111,11 @@ async function loadRoads(retryPass = 0) {
 
       appCtx.showLoad('Loading water...');
       try {
-        const waterRadius = featureRadius * 1.45;
         const waterSummary = await loadVectorTileWaterCoverage(
-          appCtx.LOC.lat - waterRadius,
-          appCtx.LOC.lon - waterRadius,
-          appCtx.LOC.lat + waterRadius,
-          appCtx.LOC.lon + waterRadius,
-          waterGeometryGuards
+          appCtx.LOC.lat - featureRadius,
+          appCtx.LOC.lon - featureRadius,
+          appCtx.LOC.lat + featureRadius,
+          appCtx.LOC.lon + featureRadius
         );
         if (waterSummary.polygons === 0 && waterSummary.lines === 0) {
           console.warn(`[Water] Vector tiles loaded but no water features in bounds (tiles ok ${waterSummary.okTiles}/${waterSummary.tiles}).`);
@@ -4238,7 +4314,7 @@ async function loadRoads(retryPass = 0) {
     console.warn('[WorldLoad] Initial pass failed. Retrying once automatically...');
     appCtx.showLoad('Retrying map data...');
     appCtx.worldLoading = false;
-    return loadRoads(retryPass + 1);
+    return loadRoadsInternal(retryPass + 1);
   }
   if (!loaded) {
     // Final safety net for upstream outages: do not leave users blocked behind
@@ -4282,6 +4358,24 @@ async function loadRoads(retryPass = 0) {
     poiMeshes: appCtx.poiMeshes.length,
     landuseMeshes: appCtx.landuseMeshes.length
   });
+}
+
+async function loadRoads(retryPass = 0) {
+  if (retryPass > 0) return loadRoadsInternal(retryPass);
+
+  const signature = getWorldLoadSignature();
+  if (_activeWorldLoad && _activeWorldLoad.signature === signature) {
+    return _activeWorldLoad.promise;
+  }
+
+  const promise = loadRoadsInternal(0).finally(() => {
+    if (_activeWorldLoad?.promise === promise) {
+      _activeWorldLoad = null;
+    }
+  });
+
+  _activeWorldLoad = { signature, promise };
+  return promise;
 }
 
 function finiteNumberOr(value, fallback = 0) {
@@ -4341,7 +4435,7 @@ function spawnSurfacePenalty(feature, mode = 'drive') {
   if (!feature) return 0;
   const kind = traversalFeatureKind(feature);
   if (kind === 'road') return spawnRoadPenalty(String(feature.type || ''));
-  if (mode === 'walk') {
+  if (ENABLE_LINEAR_FEATURES && mode === 'walk') {
     if (kind === 'footway') return 0;
     if (kind === 'cycleway') return 4;
     if (kind === 'railway') return 16;
@@ -4402,6 +4496,7 @@ function isWalkSurface(feature) {
   if (!feature) return false;
   if (feature.walkable === false) return false;
   const kind = traversalFeatureKind(feature);
+  if (!ENABLE_LINEAR_FEATURES) return kind === 'road';
   return kind === 'road' || kind === 'footway' || kind === 'cycleway' || kind === 'railway';
 }
 
@@ -4416,6 +4511,7 @@ function surfaceDisplayName(feature) {
   if (explicitName) return explicitName;
 
   const kind = traversalFeatureKind(feature);
+  if (!ENABLE_LINEAR_FEATURES) return 'Road';
   if (kind === 'footway') return 'Footpath';
   if (kind === 'cycleway') return 'Cycle Path';
   if (kind === 'railway') return 'Rail Corridor';
@@ -4433,7 +4529,7 @@ function traversableFeaturesForMode(mode = 'walk') {
     }
   }
 
-  if (!drive && Array.isArray(appCtx.linearFeatures)) {
+  if (!drive && ENABLE_LINEAR_FEATURES && Array.isArray(appCtx.linearFeatures)) {
     for (let i = 0; i < appCtx.linearFeatures.length; i++) {
       const feature = appCtx.linearFeatures[i];
       if (isWalkSurface(feature)) features.push(feature);
@@ -4441,6 +4537,12 @@ function traversableFeaturesForMode(mode = 'walk') {
   }
 
   return features;
+}
+
+function invalidateTraversalNetworks(reason = 'world_data_change') {
+  _traversalNetworksDirty = true;
+  appCtx.traversalNetworks = { walk: null, drive: null };
+  return reason;
 }
 
 function traversalNodeKey(x, z) {
@@ -4529,9 +4631,26 @@ function buildTraversalGraph(mode = 'walk') {
 }
 
 function buildTraversalNetworks() {
+  const walkFeatureCount = traversableFeaturesForMode('walk').length;
+  const driveFeatureCount = traversableFeaturesForMode('drive').length;
+  const existingWalk = appCtx.traversalNetworks?.walk || null;
+  const existingDrive = appCtx.traversalNetworks?.drive || null;
+  const walkReady = !!existingWalk && (
+    Number(existingWalk.featureCount || 0) > 0 ||
+    walkFeatureCount === 0
+  );
+  const driveReady = !!existingDrive && (
+    Number(existingDrive.featureCount || 0) > 0 ||
+    driveFeatureCount === 0
+  );
+
+  if (!_traversalNetworksDirty && walkReady && driveReady) {
+    return appCtx.traversalNetworks;
+  }
   const walk = buildTraversalGraph('walk');
   const drive = buildTraversalGraph('drive');
   appCtx.traversalNetworks = { walk, drive };
+  _traversalNetworksDirty = false;
   return appCtx.traversalNetworks;
 }
 
@@ -4936,6 +5055,16 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
   const terrainY = terrainYAtWorld(x, z);
   const walkBaseY = walkBaseYAtWorld(x, z);
   if (!Number.isFinite(terrainY)) return { valid: false, reason: 'terrain_missing' };
+  const nearestRoad = typeof findNearestRoad === 'function' ? findNearestRoad(x, z) : null;
+  const roadHalfWidth = Number.isFinite(nearestRoad?.road?.width) ? nearestRoad.road.width * 0.5 : 0;
+  const onRoadSurface = !!(
+    nearestRoad?.road &&
+    Number.isFinite(nearestRoad?.dist) &&
+    nearestRoad.dist <= Math.max(1.6, roadHalfWidth + 0.9)
+  );
+  if (isInsideWaterArea(x, z) && !onRoadSurface) {
+    return { valid: false, reason: 'inside_water', terrainY };
+  }
   if (buildingContainingPoint(x, z, 4)) return { valid: false, reason: 'inside_building', terrainY };
   if (walkBuildBlockCollision(x, z, terrainY)?.blocked) return { valid: false, reason: 'build_block', terrainY };
 
@@ -4968,6 +5097,9 @@ function evaluateDriveSpawnCandidate(x, z, options = {}) {
   const roadHalfWidth = Number.isFinite(road?.width) ? road.width * 0.5 : 0;
   const onRoad = !!(road && Number.isFinite(nearestRoad?.dist) &&
     nearestRoad.dist <= Math.max(2.2, roadHalfWidth - 0.35));
+  if (isInsideWaterArea(x, z) && !onRoad) {
+    return { valid: false, reason: 'inside_water', terrainY, onRoad, road };
+  }
 
   const desiredFeetY = Number.isFinite(options.feetY) ? options.feetY : NaN;
   if (Number.isFinite(desiredFeetY) && desiredFeetY > terrainY + 2.3) {
@@ -6175,6 +6307,7 @@ Object.assign(appCtx, {
   findNearestTraversalFeature,
   findTraversalRoute,
   getNearbyBuildings,
+  invalidateTraversalNetworks,
   largeMapScreenToWorld,
   loadRoads,
   measureRemainingPolylineDistance,
@@ -6200,6 +6333,7 @@ export {
   findNearestTraversalFeature,
   findTraversalRoute,
   getNearbyBuildings,
+  invalidateTraversalNetworks,
   largeMapScreenToWorld,
   loadRoads,
   measureRemainingPolylineDistance,

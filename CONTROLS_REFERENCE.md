@@ -46,7 +46,7 @@ Handling note:
 
 Walking/navigation note:
 
-- Walk routing can follow roads, footways, cycleways, and loaded rail corridors on Earth scenes.
+- Walk routing currently follows the core road-and-ground traversal network on Earth scenes.
 - Supported interiors only load when you deliberately interact; being near buildings does not auto-load indoor geometry.
 
 ## Drone Mode

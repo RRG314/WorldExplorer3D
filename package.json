@@ -9,6 +9,7 @@
     "sync:public": "node scripts/sync-public-app.mjs",
     "verify:mirror": "node scripts/verify-mirror.mjs",
     "test:runtime": "node scripts/test-runtime-invariants.mjs",
+    "test:world-matrix": "node scripts/test-world-matrix.mjs",
     "test:osm-smoke": "node scripts/test-osm-smoke.mjs",
     "release:verify": "node scripts/release-verify.mjs"
   },

@@ -65,8 +65,7 @@ Modes:
 Current driving behavior includes tighter rear-biased drift when using `Space` at speed with steering input.
 Walk/drone controls now use `WASD` for movement and arrow keys for directional look.
 If a walk -> drive switch starts from an invalid spot (inside a building, on a rooftop, or inside blockers), the car snaps to the nearest safe road spawn instead of leaving the player stuck.
-Walk navigation now uses the Earth walkable network. Roads are available with the core Earth load, and nearby footways/cycleways/rail corridors are stitched in right after the core world is ready so the new path layers do not slow the first spawn as heavily.
-The visual path overlay starts off by default; you can enable it from the environment/map path toggle whenever you want to inspect those ribbons directly.
+Walking currently stays on the core Earth road-and-ground traversal network while the separate footway/cycleway/rail expansion is paused for cleanup.
 Earth scenes now also use OSM vegetation layers so woods, parks, tree rows, and mapped tree nodes add greenery without enabling heavy foliage everywhere.
 Some buildings can now be entered when OSM indoor tags provide enough mapped room/corridor data. Walk up to a supported building and press `E` to load the mapped floor on demand; press `E` or `Esc` to leave.
 Indoor support is selective and data-driven. Unsupported buildings stay exterior-only, and interiors do not load globally in the background.

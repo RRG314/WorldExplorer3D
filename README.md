@@ -22,13 +22,13 @@ It is an interactive exploration app, not a flat map viewer and not a routing/na
 - Launch from preset cities or custom coordinates.
 - Use geolocation (`Use My Location`) in title and globe selector flows.
 - Explore in 3D with driving, walking, drone, and rocket traversal.
-- Keep traversal switches and custom/geolocation launches on safe ground: valid positions stay put, invalid positions resolve to the nearest safe road, walkable path, or ground spawn based on the active mode.
+- Route walk/drive/drone mode changes through one shared travel-mode controller so keyboard and UI transitions stay in sync.
+- Keep traversal switches and custom/geolocation launches on safe ground: valid positions stay put, invalid positions resolve to the nearest safe road or ground spawn based on the active mode.
 - Switch destinations (Earth, Moon, Space, Ocean) from title and in-game menus.
-- Render map-informed world context (roads/buildings/land-use/water plus railways, footways, and cycleways) for Earth scenes.
-- Keep the core Earth load focused on roads/buildings/land-use/water first; walkable rail/foot/cycle overlays and routing links now load immediately after the core world is ready so recent OSM path expansion does not hold the first scene hostage.
+- Render map-informed world context (roads/buildings/land-use/water) for Earth scenes.
+- Apply shared surface rules so polar regions resolve to snow/frozen water and arid regions resolve to sand terrain instead of defaulting everything to temperate grass.
 - Add OSM-driven vegetation so forests, woods, parks, tree rows, and individual mapped trees make Earth scenes feel less empty without turning every tile into high-detail foliage.
-- Use roads for drive routing and use a separate walkable traversal network so roads, footways, cycleways, and rail corridors participate in walking/navigation instead of render-only overlays.
-- Path overlays are available from the map/environment toggles, but now start hidden by default so the world opens on the core terrain/road view first.
+- Use roads for drive routing and keep walking/navigation aligned to the core road-and-ground traversal network while the separate foot/cycle/rail rollout is paused for cleanup.
 - Selectively support mapped building interiors when useful indoor OSM data exists, with entrance/exit interaction on `E` and no always-on global interior load.
 - Show an enterable-buildings section in the large-map legend; it scans nearby full-footprint buildings on demand and lists mapped interiors that can actually be entered.
 - Provide minimap/large-map overlays and runtime controls for exploration, with `M` for the large map.
@@ -84,6 +84,7 @@ Open:
 npm run sync:public
 npm run verify:mirror
 npm run test
+npm run test:world-matrix
 npm run release:verify
 ```
 
@@ -93,7 +94,10 @@ Targeted feature smoke:
 
 ```bash
 npm run test:osm-smoke
+npm run test:world-matrix
 ```
+
+`npm run test:osm-smoke` now also checks Monaco water visibility plus shared polar/desert surface behavior using Arctic, Antarctica, and desert custom coordinates.
 
 ## Repository Structure (Top-Level)
 
