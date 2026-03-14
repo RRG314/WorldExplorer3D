@@ -417,6 +417,12 @@ function getBuildReferencePosition() {
 }
 
 function getSurfaceYAt(x, z) {
+  if (appCtx.activeInterior && typeof appCtx.sampleInteriorWalkSurface === 'function') {
+    const interiorSurface = appCtx.sampleInteriorWalkSurface(x, z);
+    if (interiorSurface && Number.isFinite(interiorSurface.y)) {
+      return interiorSurface.y;
+    }
+  }
   if (appCtx.onMoon && appCtx.moonSurface && typeof appCtx._getPhysRaycaster === 'function' && appCtx._physRayStart && appCtx._physRayDir) {
     const raycaster = appCtx._getPhysRaycaster();
     appCtx._physRayStart.set(x, 2000, z);
@@ -829,6 +835,11 @@ function raycastBuildAction(event) {
   // Place on world surface if not targeting an existing block.
   let point = null;
   const worldTargets = [];
+  if (appCtx.activeInterior && Array.isArray(appCtx.activeInterior.placementTargets)) {
+    appCtx.activeInterior.placementTargets.forEach((mesh) => {
+      if (mesh && mesh.visible !== false) worldTargets.push(mesh);
+    });
+  }
   if (Array.isArray(appCtx.roadMeshes)) {
     appCtx.roadMeshes.forEach((mesh) => {
       if (mesh && mesh.visible) worldTargets.push(mesh);

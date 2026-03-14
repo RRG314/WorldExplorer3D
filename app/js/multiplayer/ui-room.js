@@ -1,6 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { ensureEntitlements } from '../../../js/entitlements.js?v=71';
-import { createArtifact, listenArtifacts, removeArtifact } from './artifacts.js?v=55';
+import { createArtifact, listenArtifacts, removeArtifact } from './artifacts.js?v=56';
 import {
   clearMySharedBlocks,
   listenSharedBlocks,
@@ -346,12 +346,16 @@ function readWorldContext() {
 }
 
 function createPoseSnapshotBase(world) {
+  const activeInterior = appCtx.activeInterior || null;
   return {
     mode: world.kind === 'space' ? 'space' : 'drive',
     frame: {
       kind: world.kind,
       locLat: world.lat,
-      locLon: world.lon
+      locLon: world.lon,
+      interiorKey: String(activeInterior?.key || '').trim(),
+      buildingKey: String(activeInterior?.support?.key || activeInterior?.building?.sourceBuildingId || '').trim(),
+      interiorLabel: String(activeInterior?.label || '').trim()
     },
     pose: {
       x: 0,
@@ -1512,7 +1516,10 @@ function initMultiplayerPlatform() {
           lon: finiteNumber(pose.frame.locLon, 0),
           x: finiteNumber(pose.pose.x, 0),
           y: finiteNumber(pose.pose.y, 0),
-          z: finiteNumber(pose.pose.z, 0)
+          z: finiteNumber(pose.pose.z, 0),
+          interiorKey: pose.frame.interiorKey || '',
+          buildingKey: pose.frame.buildingKey || '',
+          interiorLabel: pose.frame.interiorLabel || ''
         }
       });
       setStatus('Home base saved.');
@@ -1546,7 +1553,10 @@ function initMultiplayerPlatform() {
           lon: finiteNumber(pose.frame.locLon, 0),
           x: finiteNumber(pose.pose.x, 0),
           y: finiteNumber(pose.pose.y, 0),
-          z: finiteNumber(pose.pose.z, 0)
+          z: finiteNumber(pose.pose.z, 0),
+          interiorKey: pose.frame.interiorKey || '',
+          buildingKey: pose.frame.buildingKey || '',
+          interiorLabel: pose.frame.interiorLabel || ''
         }
       });
 

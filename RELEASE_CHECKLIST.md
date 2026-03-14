@@ -61,6 +61,7 @@ Use this checklist before pushing a production deploy.
 5. Verify `F4` still toggles debug overlay.
 6. Force a walk -> drive switch near/inside building blockers and confirm the car resolves to a safe road spawn.
 7. Walk near a supported building prompt, press `E` to enter, then press `E` or `Esc` to exit back outside cleanly.
+8. Select at least one real-estate or historic destination, navigate to its entry anchor, and confirm the same `E` building-entry flow works there.
 
 ### 4.5 Earth scene data and visuals
 
@@ -69,7 +70,8 @@ Use this checklist before pushing a production deploy.
 3. Verify vegetation appears in woods / parks / mapped tree areas without obvious overdraw or runaway draw-call cost.
 4. Verify rooftop HVAC/detail and building color variation are present without roof-cap/parapet alignment glitches or obvious performance collapse.
 5. Confirm interiors are still lazy by default: no building interior is active until the player deliberately enters one.
-6. Run the world matrix and review the generated report for at least one dense downtown, one coastal/water-heavy city, one mixed-terrain city, one sparse rural area, and custom-coordinate cases.
+6. Confirm sampled interiors expose temporary containment colliders and build-placement targets instead of behaving like a disconnected under-map room.
+7. Run the world matrix and review the generated report for at least one dense downtown, one coastal/water-heavy city, one mixed-terrain city, one sparse rural area, and custom-coordinate cases.
 
 ### 4.6 Auth and multiplayer critical flows
 

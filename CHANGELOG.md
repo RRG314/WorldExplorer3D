@@ -17,6 +17,12 @@
   - safe spawn validation now also rejects non-road placements inside mapped water polygons
 - Interior/runtime jitter reduction:
   - interior prompt updates now cache nearby building candidates and suppress redundant DOM writes instead of rescanning every walking frame
+- Unified building-entry / real-estate interior pass:
+  - added `app/js/building-entry.js` as the shared support resolver for regular exploration buildings plus real-estate/historic destinations
+  - `interiors.js` now uses one enterable-building model instead of a mapped-only path, so supported buildings can fall back to generated enclosed interiors when OSM indoor data is missing or slow
+  - property and historic navigation now route to the same building entry anchor used by the interior system
+  - large-map enterable-building scans now list mapped/generated/listing-backed supports instead of only mapped interiors
+  - active interiors now expose placement targets for build blocks and record interior context in multiplayer artifact/home-base anchors
 - Broader validation coverage:
   - added `scripts/world-test-locations.mjs`
   - added `scripts/test-world-matrix.mjs`

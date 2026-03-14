@@ -39,7 +39,7 @@ Handling note:
 - `A` / `D`: strafe left/right
 - `ArrowLeft` / `ArrowRight`: look left/right
 - `ArrowUp` / `ArrowDown`: look up/down
-- `E`: enter/exit a mapped interior when the prompt is visible
+- `E`: enter/exit a supported building interior when the prompt is visible
 - `Space`: jump
 - `Shift`: run
 - `Right Click + Drag` or `Middle Click + Drag`: mouse look
@@ -93,7 +93,7 @@ Walking/navigation note:
 - `M`: open/close large map
 - left click map: inspect item
 - right click map: teleport
-- map legend: includes a nearby `Enterable Buildings` scan/list for mapped interiors
+- map legend: includes a nearby `Enterable Buildings` scan/list for mapped, generated, and listing-backed interiors
 - path overlay toggle: available in the environment menu and large map, starts off by default
 
 ## Multiplayer Actions (UI)

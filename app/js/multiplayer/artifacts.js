@@ -54,7 +54,10 @@ function normalizeAnchor(anchor = {}) {
     lon: Number(anchor.lon || 0),
     x: Number(anchor.x || 0),
     y: Number(anchor.y || 0),
-    z: Number(anchor.z || 0)
+    z: Number(anchor.z || 0),
+    interiorKey: String(anchor.interiorKey || '').trim(),
+    buildingKey: String(anchor.buildingKey || '').trim(),
+    interiorLabel: String(anchor.interiorLabel || '').trim()
   };
 }
 

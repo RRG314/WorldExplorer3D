@@ -29,8 +29,8 @@ It is an interactive exploration app, not a flat map viewer and not a routing/na
 - Apply shared surface rules so polar regions resolve to snow/frozen water and arid regions resolve to sand terrain instead of defaulting everything to temperate grass.
 - Add OSM-driven vegetation so forests, woods, parks, tree rows, and individual mapped trees make Earth scenes feel less empty without turning every tile into high-detail foliage.
 - Use roads for drive routing and keep walking/navigation aligned to the core road-and-ground traversal network while the separate foot/cycle/rail rollout is paused for cleanup.
-- Selectively support mapped building interiors when useful indoor OSM data exists, with entrance/exit interaction on `E` and no always-on global interior load.
-- Show an enterable-buildings section in the large-map legend; it scans nearby full-footprint buildings on demand and lists mapped interiors that can actually be entered.
+- Use one shared building-entry system for exploration and real-estate destinations: `E` enters supported buildings on demand, OSM indoor data is used when available, and enclosed generated interiors are used as the fallback when it is not.
+- Show an enterable-buildings section in the large-map legend; it scans nearby supported buildings on demand and lists mapped/generated/listing-backed interiors that can actually be entered.
 - Provide minimap/large-map overlays and runtime controls for exploration, with `M` for the large map.
 - Add performance-conscious rooftop HVAC/detail and broader building color variation so dense cities read less flat/repetitive.
 - Support multiplayer/social/account features when backend services are configured.

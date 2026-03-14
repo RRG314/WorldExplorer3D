@@ -11,9 +11,9 @@ Supplemental note added 2026-03-13:
 - Active landing/account canonical sources are `index.html` and `account/index.html`, mirrored to `public/index.html` and `public/account/index.html`.
 - Current Earth runtime adds shared safe spawn resolution for geolocation/custom launches and traversal switching.
 - Current control scheme uses `WASD` movement plus arrow-key directional look for walking/drone, `M` for the large map, and `F4` for debug overlay access.
-- Current OSM Earth layers include `railway`, `footway`, and `cycleway` surfaces in addition to roads/buildings/land-use/water, and those layers now participate in walk traversal/path routing.
+- The earlier `railway` / `footway` / `cycleway` runtime rollout is currently paused in the active build while the core road-backed traversal path stays stable.
 - Current Earth OSM vegetation coverage now includes woods/parks/green areas plus `natural=tree` / `natural=tree_row` inputs feeding a batched tree pass.
-- Current indoor support is selective and on-demand only: supported buildings can load a mapped floor on `E`, but interiors are not globally active by default.
+- Current indoor support is selective and on-demand only: supported buildings can load either mapped indoor data or a generated footprint-aligned fallback interior on `E`, but interiors are not globally active by default.
 - Runtime/account donation messaging remains optional-support only; map/core gameplay are not paywalled.
 
 This report is a code-first inventory of runtime features, backend systems, storage model, security boundaries, and release operations for the current branch.

@@ -249,6 +249,41 @@ function closeLegend() {
   document.getElementById('legendPanel').style.display = 'none';
 }
 
+function resolveDestinationEntrySupport(destination) {
+  if (!destination || typeof appCtx.resolveBuildingEntrySupport !== 'function') return null;
+  try {
+    return appCtx.resolveBuildingEntrySupport(destination, { allowSynthetic: true });
+  } catch (error) {
+    console.warn('[Interiors] Failed to resolve destination entry support.', error);
+    return null;
+  }
+}
+
+function getNavigationTargetForDestination(destination) {
+  const support = resolveDestinationEntrySupport(destination);
+  if (support?.enterable && support.entryAnchor) {
+    return {
+      x: toFiniteNumber(support.entryAnchor.x, toFiniteNumber(destination?.x, 0)),
+      z: toFiniteNumber(support.entryAnchor.z, toFiniteNumber(destination?.z, 0)),
+      support
+    };
+  }
+  return {
+    x: toFiniteNumber(destination?.x, 0),
+    z: toFiniteNumber(destination?.z, 0),
+    support
+  };
+}
+
+function describeDestinationEntrySupport(destination) {
+  const support = resolveDestinationEntrySupport(destination);
+  if (!support?.enterable) return 'Exterior only';
+  if (typeof appCtx.summarizeBuildingEntrySupport === 'function') {
+    return appCtx.summarizeBuildingEntrySupport(support);
+  }
+  return 'Enterable';
+}
+
 function renderInteriorLegend() {
   const statusEl = document.getElementById('enterableBuildingsStatus');
   const listEl = document.getElementById('enterableBuildingsList');
@@ -259,25 +294,29 @@ function renderInteriorLegend() {
   const message = String(appCtx.interiorLegendMessage || '').trim();
 
   if (loading) {
-    statusEl.textContent = message || 'Scanning nearby mapped interiors...';
+    statusEl.textContent = message || 'Scanning nearby enterable buildings...';
   } else if (message) {
     statusEl.textContent = message;
   } else if (items.length > 0) {
-    statusEl.textContent = `Mapped interiors within range: ${items.length}`;
+    statusEl.textContent = `Enterable buildings within range: ${items.length}`;
   } else {
     statusEl.textContent = 'No supported buildings identified nearby yet.';
   }
 
   if (items.length === 0) {
-    listEl.innerHTML = '<div style="opacity:0.75">No mapped interior buildings are cached nearby.</div>';
+    listEl.innerHTML = '<div style="opacity:0.75">No enterable buildings are cached nearby.</div>';
     return;
   }
 
   listEl.innerHTML = items.map((item) => {
     const distance = Number.isFinite(item.distance) ? `${Math.round(item.distance)}m` : '';
+    const badge = escapeHtml(item.supportType || 'Enterable');
     return `
       <div style="display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border:1px solid rgba(0,255,255,0.28);border-radius:6px;background:rgba(0,255,255,0.06)">
-        <span style="color:#d9fdff">${escapeHtml(item.label || 'Building')}</span>
+        <div style="display:flex;flex-direction:column;gap:2px">
+          <span style="color:#d9fdff">${escapeHtml(item.label || 'Building')}</span>
+          <span style="color:#8ef9ff;font-size:9px;text-transform:uppercase;letter-spacing:0.08em">${badge}</span>
+        </div>
         <span style="color:#8ef9ff;white-space:nowrap">${distance}</span>
       </div>
     `;
@@ -427,6 +466,7 @@ function showMapInfo(type, data) {
 
   if (type === 'property') {
     title.textContent = '🏠 Property Details';
+    const entrySupportText = describeDestinationEntrySupport(data);
     const distance = Math.round(Math.sqrt((toFiniteNumber(data.x, 0) - appCtx.car.x) ** 2 + (toFiniteNumber(data.z, 0) - appCtx.car.z) ** 2));
     const distanceText = distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : distance + 'm';
     const safeId = escapeJsString(data.id);
@@ -456,6 +496,7 @@ function showMapInfo(type, data) {
       <div style="margin-bottom:12px;font-size:10px">
         <div style="opacity:0.8">📍 Distance: <strong>${escapeHtml(distanceText)}</strong></div>
         <div style="opacity:0.8">🏷️ Type: <strong>${safePropertyType}</strong></div>
+        <div style="opacity:0.8">🚪 Entry: <strong>${escapeHtml(entrySupportText)}</strong></div>
       </div>
       <button onclick="navigateToProperty('${safeId}'); closeMapInfo();" style="width:100%;background:#0fc;color:#000;border:none;border-radius:6px;padding:10px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:11px;margin-bottom:6px">🧭 NAVIGATE HERE</button>
       <button onclick="openModalById('${safeId}'); closeMapInfo();" style="width:100%;background:rgba(0,255,200,0.2);color:#0fc;border:1px solid #0fc;border-radius:6px;padding:8px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:10px">📋 FULL DETAILS</button>
@@ -482,6 +523,7 @@ function showMapInfo(type, data) {
     `;
   } else if (type === 'historic') {
     title.textContent = '⛩️ Historic Site';
+    const entrySupportText = describeDestinationEntrySupport(data);
     const safeName = escapeHtml(data.name || 'Historic Site');
     const safeCategory = escapeHtml(data.category || 'Historic');
     const safeNameJs = escapeJsString(data.name || 'Historic Site');
@@ -495,6 +537,7 @@ function showMapInfo(type, data) {
       </div>
       <div style="margin-bottom:12px;font-size:10px">
         <div style="opacity:0.8">📍 Distance: <strong>${escapeHtml(distanceText)}</strong></div>
+        <div style="opacity:0.8">🚪 Entry: <strong>${escapeHtml(entrySupportText)}</strong></div>
       </div>
       <button onclick="navigateToHistoric('${safeNameJs}'); closeMapInfo();" style="width:100%;background:#f59e0b;color:#000;border:none;border-radius:6px;padding:10px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:11px;margin-bottom:6px">🧭 NAVIGATE HERE</button>
       <button onclick="openHistoricModal('${safeNameJs}'); closeMapInfo();" style="width:100%;background:rgba(245,158,11,0.2);color:#f59e0b;border:1px solid #f59e0b;border-radius:6px;padding:8px;font-family:Orbitron;font-weight:bold;cursor:pointer;font-size:10px">📋 FULL DETAILS</button>
@@ -529,6 +572,7 @@ function openModalById(id) {
   const safeSourceUrl = sanitizeHttpUrl(p.sourceUrl);
   const safePhotoUrls = Array.isArray(p.photos) ? p.photos.map(sanitizeHttpUrl).filter(Boolean).slice(0, 3) : [];
   const safePrimaryPhoto = sanitizeHttpUrl(p.primaryPhoto);
+  const entrySupportText = describeDestinationEntrySupport(p);
 
   const photos = safePhotoUrls.length > 0 ?
   safePhotoUrls.
@@ -592,6 +636,10 @@ function openModalById(id) {
     <div class="prop-stat">
       <span class="prop-stat-label">Year Built</span>
       <span class="prop-stat-value">${safeYearBuilt}</span>
+    </div>
+    <div class="prop-stat">
+      <span class="prop-stat-label">Entry Support</span>
+      <span class="prop-stat-value">${escapeHtml(entrySupportText)}</span>
     </div>
     ${safeDaysOnMarket > 0 ? `<div class="prop-stat">
       <span class="prop-stat-label">Days on Market</span>
@@ -871,6 +919,7 @@ async function openHistoricModal(siteName) {
   const distanceText = distance > 1000 ? (distance / 1000).toFixed(1) + 'km' : distance + 'm';
   const isSelected = appCtx.selectedHistoric && appCtx.selectedHistoric.name === site.name;
   const safeFact = escapeHtml(fact);
+  const entrySupportText = describeDestinationEntrySupport(site);
   const wikiSlug = typeof site.wikipedia === 'string' ? site.wikipedia.trim().replace(/\s+/g, '_') : '';
   const wikiUrl = wikiSlug ? `https://wikipedia.org/wiki/${encodeURIComponent(wikiSlug)}` : '';
 
@@ -900,6 +949,10 @@ async function openHistoricModal(siteName) {
       <span class="prop-stat-value">${escapeHtml(distanceText)}</span>
     </div>
     <div class="prop-stat">
+      <span class="prop-stat-label">Entry Support</span>
+      <span class="prop-stat-value">${escapeHtml(entrySupportText)}</span>
+    </div>
+    <div class="prop-stat">
       <span class="prop-stat-label">Location</span>
       <span class="prop-stat-value">${safeLat}, ${safeLon}</span>
     </div>
@@ -918,7 +971,8 @@ function navigateToHistoric(siteName) {
   appCtx.showNavigation = true;
 
   const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
-  createNavigationRoute(ref.x, ref.z, site.x, site.z, true);
+  const target = getNavigationTargetForDestination(site);
+  createNavigationRoute(ref.x, ref.z, target.x, target.z, true);
   updateHistoricPanel();
   closeModal();
 
@@ -938,7 +992,8 @@ function navigateToProperty(propertyId) {
   appCtx.showNavigation = true;
 
   const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
-  createNavigationRoute(ref.x, ref.z, prop.x, prop.z, true);
+  const target = getNavigationTargetForDestination(prop);
+  createNavigationRoute(ref.x, ref.z, target.x, target.z, true);
 
   // Update UI
   updatePropertyPanel();

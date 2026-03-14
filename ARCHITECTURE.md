@@ -55,7 +55,8 @@ Current Earth runtime architecture details:
 - Driveable roads stay isolated in `roads`; OSM transport ribbons flow through `linearFeatures` (`railway`, `footway`, `cycleway`).
 - `world.js` dedupes identical in-flight Earth loads and only rebuilds `traversalNetworks` after explicit invalidation, which prevents empty early graphs from sticking around after roads arrive.
 - `terrain.js` is the single owner for road/building terrain conformance through `requestWorldSurfaceSync()`, which schedules or forces rebuilds instead of letting other modules rebuild roads/buildings ad hoc.
-- `interiors.js` is a dormant-on-boot subsystem: it only fetches/builds indoor geometry for the one building the player deliberately enters, then releases that state on exit, and its prompt/candidate checks are throttled so walking near buildings does not trigger redundant scans every frame.
+- `building-entry.js` is the shared support resolver for regular buildings plus real-estate/historic destinations; it normalizes exterior footprint, entry anchor, synthetic fallback support, and legend/navigation metadata into one model.
+- `interiors.js` is a dormant-on-boot subsystem: it only activates for the one supported building the player deliberately enters, prefers OSM indoor geometry when it is ready, falls back to a generated enclosed interior when it is not, and releases that state on exit. Prompt/candidate checks are throttled so walking near buildings does not trigger redundant scans every frame.
 
 ## 3. Multiplayer Architecture
 

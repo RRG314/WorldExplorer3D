@@ -139,12 +139,16 @@ Traversal/spawn guarantees in current branch:
 
 Selective interior subsystem:
 
+- `app/js/building-entry.js`
+  - shared enterable-building resolver used by both normal exploration and real-estate/historic destinations
+  - normalizes real building footprints, destination metadata, entry anchors, and synthetic fallback buildings into one support model
 - `app/js/interiors.js`
   - runtime prompt + deliberate interaction path (`E`)
-  - on-demand Overpass indoor fetch for the targeted nearby building only
-  - supports way-based indoor rooms / corridors plus entrance / door nodes when mapped
-  - builds a single best-mapped floor lazily and tears it back down on exit
+  - on-demand support resolution for the targeted nearby building only
+  - prefers way-based indoor rooms / corridors plus entrance / door nodes when mapped
+  - falls back to a generated enclosed interior from the exterior footprint when mapped indoor data is missing or slow
   - nearby-support scan for the large-map legend is also on-demand, limited, and footprint-filtered so it does not become a global always-on interior loader
+  - generated and mapped interiors both stay aligned to an inset building envelope, use temporary local colliders, and expose interior floor meshes as placement targets for build blocks
 - `app/js/ground.js`
   - `GroundHeight.walkSurfaceInfo()` now checks `sampleInteriorWalkSurface()` first while an interior is active
 - `app/js/physics.js` / `app/js/walking.js`
@@ -152,6 +156,7 @@ Selective interior subsystem:
   - rely on cached/throttled nearby-building checks instead of rescanning and rewriting prompt DOM every frame
   - use collider `baseY` when evaluating temporary interior shell walls so the player stays inside the generated room volume instead of slipping out at terrain level
   - dynamic interior shell colliders are local-only and cleared on exit
+  - active interiors also keep a last-valid indoor position so escape/leak cases get snapped back inside the interior envelope instead of wandering outside the shell
 
 Water / terrain-follow notes:
 

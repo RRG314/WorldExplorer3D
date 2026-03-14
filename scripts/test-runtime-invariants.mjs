@@ -512,6 +512,9 @@ async function main() {
         drivingControlsText,
         mapCloseLabel,
         proAccessText,
+        buildingEntrySupportExposed:
+          typeof ctx.resolveBuildingEntrySupport === 'function' &&
+          typeof ctx.summarizeBuildingEntrySupport === 'function',
         interiorActionExposed:
           typeof ctx.handleInteriorAction === 'function' &&
           typeof ctx.clearActiveInterior === 'function' &&
@@ -524,16 +527,29 @@ async function main() {
         interiorPromptPresent: !!document.getElementById('interiorPrompt')
       };
 
+      const syntheticDestinationSupport = ctx.resolveBuildingEntrySupport?.({
+        id: 'runtime-test-destination',
+        name: 'Runtime Test Listing',
+        propertyType: 'listing',
+        x: Number(ctx.car?.x || 0),
+        z: Number(ctx.car?.z || 0)
+      }, {
+        allowSynthetic: true
+      }) || null;
+      out.syntheticDestinationEntrySupported = !!syntheticDestinationSupport?.enterable;
+
       if (!resolveSpawnAvailable) return out;
 
       const colliders = Array.isArray(ctx.buildings) ? ctx.buildings : [];
       let sample = null;
+      let sampleBuilding = null;
       for (let i = 0; i < colliders.length; i++) {
         const building = colliders[i];
         if (!building || building.colliderDetail !== 'full') continue;
         if (!Number.isFinite(building.centerX) || !Number.isFinite(building.centerZ)) continue;
         const hit = ctx.checkBuildingCollision?.(building.centerX, building.centerZ, 1.5);
         if (!hit?.collision) continue;
+        sampleBuilding = building;
         sample = {
           x: building.centerX,
           z: building.centerZ,
@@ -600,6 +616,47 @@ async function main() {
           };
         } catch (err) {
           out.modeSwitchResult = { safe: false, error: String(err?.message || err) };
+        }
+      }
+
+      if (
+        sampleBuilding &&
+        typeof ctx.enterInteriorForSupport === 'function' &&
+        typeof ctx.resolveBuildingEntrySupport === 'function' &&
+        ctx.Walk?.setModeWalk
+      ) {
+        try {
+          const support = ctx.resolveBuildingEntrySupport(sampleBuilding, { allowSynthetic: true });
+          if (support?.enterable) {
+            ctx.Walk.setModeWalk();
+            const walker = ctx.Walk?.state?.walker;
+            if (walker) {
+              walker.x = Number.isFinite(support.entryAnchor?.x) ? support.entryAnchor.x : sample.x;
+              walker.z = Number.isFinite(support.entryAnchor?.z) ? support.entryAnchor.z : sample.z;
+              walker.y = sample.baseY + 1.7;
+              walker.vy = 0;
+            }
+            const entered = await ctx.enterInteriorForSupport(support);
+            out.enteredInteriorReport = {
+              entered: !!entered && !!ctx.activeInterior,
+              mode: ctx.activeInterior?.mode || null,
+              placementTargets: Array.isArray(ctx.activeInterior?.placementTargets) ? ctx.activeInterior.placementTargets.length : 0,
+              containedColliders: Array.isArray(ctx.dynamicBuildingColliders) ? ctx.dynamicBuildingColliders.length : 0
+            };
+            if (ctx.activeInterior && typeof ctx.clearActiveInterior === 'function') {
+              ctx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
+            }
+          } else {
+            out.enteredInteriorReport = {
+              entered: false,
+              reason: 'support_not_enterable'
+            };
+          }
+        } catch (err) {
+          out.enteredInteriorReport = {
+            entered: false,
+            error: String(err?.message || err)
+          };
         }
       }
 
@@ -706,14 +763,23 @@ async function main() {
       waterMaterialsSolid: report.solidWaterMeshes === true,
       vegetationIntegrated: report.vegetationFeatures > 0 && report.vegetationMeshes > 0,
       lazyInteriorIdle:
+        report.buildingEntrySupportExposed === true &&
         report.interiorActionExposed === true &&
         report.activeInteriorByDefault === true &&
         report.dynamicInteriorCollidersIdle === true &&
         report.interiorPromptPresent === true,
+      sampledInteriorEnterable:
+        !report.enteredInteriorReport ||
+        (
+          report.enteredInteriorReport.entered === true &&
+          report.enteredInteriorReport.placementTargets > 0 &&
+          report.enteredInteriorReport.containedColliders > 0
+        ),
       walkingControlsUpdated:
         report.walkingControlsText.includes('WASD - Move') &&
         report.walkingControlsText.includes('Arrow Keys - Look around') &&
-        report.walkingControlsText.includes('E - Enter/exit mapped interior'),
+        report.walkingControlsText.includes('E - Enter/exit building interior'),
+      syntheticDestinationEntryReady: report.syntheticDestinationEntrySupported === true,
       droneControlsUpdated:
         report.droneControlsText.includes('WASD - Move') &&
         report.droneControlsText.includes('Arrow Keys - Look around'),
@@ -778,7 +844,9 @@ async function main() {
     );
     assert(checks.waterMaterialsSolid, 'Water meshes are still rendering with transparent materials.');
     assert(checks.vegetationIntegrated, `Vegetation layer did not initialize correctly: ${JSON.stringify({ vegetationFeatures: report.vegetationFeatures, vegetationMeshes: report.vegetationMeshes })}`);
-    assert(checks.lazyInteriorIdle, `Interior system is not staying lazy by default: ${JSON.stringify({ activeInteriorByDefault: report.activeInteriorByDefault, dynamicInteriorCollidersIdle: report.dynamicInteriorCollidersIdle, interiorActionExposed: report.interiorActionExposed, interiorPromptPresent: report.interiorPromptPresent })}`);
+    assert(checks.lazyInteriorIdle, `Interior system is not staying lazy by default: ${JSON.stringify({ buildingEntrySupportExposed: report.buildingEntrySupportExposed, activeInteriorByDefault: report.activeInteriorByDefault, dynamicInteriorCollidersIdle: report.dynamicInteriorCollidersIdle, interiorActionExposed: report.interiorActionExposed, interiorPromptPresent: report.interiorPromptPresent })}`);
+    assert(checks.sampledInteriorEnterable, `Sampled building entry did not produce a usable contained interior: ${JSON.stringify(report.enteredInteriorReport || null)}`);
+    assert(checks.syntheticDestinationEntryReady, `Synthetic real-estate fallback entry is unavailable: ${JSON.stringify({ syntheticDestinationEntrySupported: report.syntheticDestinationEntrySupported })}`);
     assert(checks.walkingControlsUpdated, 'Walking controls help text is out of sync with WASD/Arrow behavior.');
     assert(checks.droneControlsUpdated, 'Drone controls help text is out of sync with WASD/Arrow behavior.');
     assert(checks.drivingMapHintUpdated, `Map key hints are out of sync: ${report.mapCloseLabel}`);

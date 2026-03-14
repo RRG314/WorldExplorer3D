@@ -81,7 +81,8 @@ This checks:
    - run `npm run test:world-matrix` to validate the same rules across preset + custom locations
    - switch Walk -> Drive from beside buildings and confirm the car is not trapped in geometry
    - verify greenery appears in parks / woods / mapped tree areas without a large frame-time spike
-   - walk up to a mapped building prompt, press `E`, confirm the interior loads only on demand, then press `E` or `Esc` to exit cleanly
+   - walk up to a supported building prompt, press `E`, confirm the interior loads only on demand, then press `E` or `Esc` to exit cleanly
+   - select a real-estate or historic destination, navigate to it, and confirm the same `E` prompt/entry flow works there too
    - switch Earth <-> Ocean from in-game environment controls
    - verify water remains visible where expected, including coastal water plus rivers / ponds / lakes
    - verify the current active build keeps path overlays hidden/disabled while walk/drive traversal remains stable on the road-and-ground network

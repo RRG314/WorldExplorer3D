@@ -67,9 +67,9 @@ Walk/drone controls now use `WASD` for movement and arrow keys for directional l
 If a walk -> drive switch starts from an invalid spot (inside a building, on a rooftop, or inside blockers), the car snaps to the nearest safe road spawn instead of leaving the player stuck.
 Walking currently stays on the core Earth road-and-ground traversal network while the separate footway/cycleway/rail expansion is paused for cleanup.
 Earth scenes now also use OSM vegetation layers so woods, parks, tree rows, and mapped tree nodes add greenery without enabling heavy foliage everywhere.
-Some buildings can now be entered when OSM indoor tags provide enough mapped room/corridor data. Walk up to a supported building and press `E` to load the mapped floor on demand; press `E` or `Esc` to leave.
-Indoor support is selective and data-driven. Unsupported buildings stay exterior-only, and interiors do not load globally in the background.
-The large-map legend now includes an `Enterable Buildings` section. Opening the legend triggers a nearby scan and lists cached supported buildings with distances when mapped indoor data exists in the current area.
+Supported buildings can now be entered through one shared interior system. Walk up to a supported building and press `E` to enter; press `E` or `Esc` to leave. If OSM indoor tags provide usable room/corridor data, that mapped floor is used. If not, the runtime generates a lightweight enclosed interior from the building footprint instead of teasing an unavailable load.
+Indoor support remains selective and on-demand. Unsupported buildings stay exterior-only, and interiors do not load globally in the background.
+The large-map legend now includes an `Enterable Buildings` section. Opening the legend triggers a nearby scan and lists cached supported buildings with distances plus whether they are mapped, generated, or tied to a listing/historic destination.
 Large map access is free for all players and opens with `M`.
 
 Full controls: `CONTROLS_REFERENCE.md`.
