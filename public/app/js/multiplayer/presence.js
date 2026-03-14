@@ -340,8 +340,53 @@ function listenPlayers(roomId, callback) {
 
     snap.forEach((docSnap) => {
       const data = docSnap.data() || {};
+<<<<<<< HEAD
       if (isExpiredPresence(data, now) || isStalePresence(data, now)) return;
       players.push(toPlayerSnapshot(docSnap, data));
+=======
+      const expiresAt = data.expiresAt;
+      const expiresAtMs = typeof expiresAt?.toMillis === 'function' ? expiresAt.toMillis() : null;
+      if (
+        Number.isFinite(expiresAtMs) &&
+        expiresAtMs < now - STALE_CLOCK_SKEW_TOLERANCE_MS
+      ) {
+        return;
+      }
+
+      const lastSeenAt = data.lastSeenAt;
+      const lastSeenAtMs = typeof lastSeenAt?.toMillis === 'function' ? lastSeenAt.toMillis() : null;
+      if (
+        Number.isFinite(lastSeenAtMs) &&
+        now - lastSeenAtMs > STALE_LAST_SEEN_MS + STALE_CLOCK_SKEW_TOLERANCE_MS
+      ) {
+        return;
+      }
+
+      players.push({
+        uid: String(data.uid || docSnap.id),
+        displayName: String(data.displayName || 'Explorer'),
+        role: String(data.role || 'member'),
+        mode: String(data.mode || 'drive'),
+        frame: {
+          kind: String(data.frame?.kind || 'earth'),
+          locLat: finiteNumber(data.frame?.locLat, 0),
+          locLon: finiteNumber(data.frame?.locLon, 0)
+        },
+        pose: {
+          x: finiteNumber(data.pose?.x, 0),
+          y: finiteNumber(data.pose?.y, 0),
+          z: finiteNumber(data.pose?.z, 0),
+          yaw: finiteNumber(data.pose?.yaw, 0),
+          pitch: finiteNumber(data.pose?.pitch, 0),
+          vx: finiteNumber(data.pose?.vx, 0),
+          vy: finiteNumber(data.pose?.vy, 0),
+          vz: finiteNumber(data.pose?.vz, 0)
+        },
+        joinedAt: data.joinedAt || null,
+        lastSeenAt: data.lastSeenAt || null,
+        expiresAt: data.expiresAt || null
+      });
+>>>>>>> worldexplorer3d/main
     });
 
     players.sort((a, b) => a.displayName.localeCompare(b.displayName));

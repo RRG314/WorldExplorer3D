@@ -1,16 +1,28 @@
 # Security and Storage Notice
 
+<<<<<<< HEAD
 Last reviewed: 2026-03-02
 
 Security and data-storage behavior for auth, multiplayer, and optional donation systems.
+=======
+Last reviewed: 2026-02-28
+
+This document summarizes current storage and security behavior for auth, optional donations, and user-generated data.
+>>>>>>> worldexplorer3d/main
 
 ## 1. Authentication and Identity
 
+<<<<<<< HEAD
 - Identity is managed by Firebase Authentication.
 - Supported providers: Email/Password and Google.
 - ID tokens authorize protected Cloud Functions API calls.
+=======
+- Authentication is handled by Firebase Auth.
+- Supported providers: Google and Email/Password.
+- ID tokens are used to authorize checkout/portal/function calls.
+>>>>>>> worldexplorer3d/main
 
-## 2. Billing and Payment Data
+## 2. Donation and Payment Data
 
 - Stripe card/payment data is handled by Stripe-hosted pages.
 - Card data is not stored in this repository or Firestore.
@@ -20,12 +32,26 @@ Security and data-storage behavior for auth, multiplayer, and optional donation 
 
 ### User data (`users/{uid}`)
 
+<<<<<<< HEAD
 Contains account profile, room quota counters, plan metadata, and optional Stripe references.
 
 Rules:
 
 - users can read/write their own user document and user-owned subcollections
 - protected billing/admin behavior is controlled by server + rules constraints
+=======
+Stores:
+
+- plan state (`free|supporter|pro`, with optional legacy `trial` values)
+- donation references (`stripeCustomerId`, `stripeSubscriptionId`)
+- entitlement flags
+- room quota counters
+
+Rules:
+
+- user can read/write only their own document.
+- client cannot directly write protected billing/admin entitlement fields.
+>>>>>>> worldexplorer3d/main
 
 ### Room data (`rooms/{roomId}`)
 
@@ -79,3 +105,7 @@ Suggested privacy text:
 
 > World Explorer uses Firebase Authentication and Firestore for account and multiplayer data. Optional donations are processed by Stripe. Card details are handled by Stripe and are not stored by World Explorer.
 
+<<<<<<< HEAD
+=======
+> World Explorer uses Firebase Authentication and Firestore for account and multiplayer state. Optional donations are processed by Stripe. Card details are handled by Stripe and are not stored by World Explorer.
+>>>>>>> worldexplorer3d/main

@@ -1,6 +1,10 @@
 # Technical Documentation
 
+<<<<<<< HEAD
 Last reviewed: 2026-03-13
+=======
+Last reviewed: 2026-02-28
+>>>>>>> worldexplorer3d/main
 
 Engineering reference for module contracts, data flow, storage keys, APIs, and validation workflows.
 
@@ -253,10 +257,17 @@ Exports:
 
 ### 5.6 Shared room state modules
 
+<<<<<<< HEAD
 - Artifacts: `createArtifact`, `listenArtifacts`, `removeArtifact`
 - Shared blocks: `upsertSharedBlock`, `removeSharedBlock`, `clearMySharedBlocks`, `listenSharedBlocks`
 - Paint claims: `upsertPaintClaim`, `listenPaintClaims`
 - Loop utilities: weekly city/room helpers, activity feed, leaderboard
+=======
+- multiplayer panel wiring
+- saved-room list rendering and open/delete handlers
+- chat drawer wiring
+- access checks based on sign-in status
+>>>>>>> worldexplorer3d/main
 
 ### 5.7 Multiplayer UI platform (`app/js/multiplayer/ui-room.js`)
 
@@ -286,7 +297,11 @@ Returned API:
 - `observeAuth(callback)`
 - `getCurrentUserToken(forceRefresh)`
 
+<<<<<<< HEAD
 ### 6.2 Entitlements (`js/entitlements.js`)
+=======
+## 4. Account and Donation Technical Notes
+>>>>>>> worldexplorer3d/main
 
 - `ensureEntitlements(user, options)`
 - `subscribeEntitlements(callback)`
@@ -316,7 +331,11 @@ Endpoints:
 
 - `createCheckoutSession`
 - `createPortalSession`
+<<<<<<< HEAD
 - `startTrial` (legacy)
+=======
+- `startTrial` (legacy compatibility path)
+>>>>>>> worldexplorer3d/main
 - `enableAdminTester`
 - `getAccountOverview`
 - `listBillingReceipts`

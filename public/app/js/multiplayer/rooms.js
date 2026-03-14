@@ -577,6 +577,7 @@ async function createRoom(options = {}) {
 
     const roomRef = doc(db, ROOM_COLLECTION, code);
     const profile = profileSnap.exists() ? (profileSnap.data() || {}) : {};
+<<<<<<< HEAD
     const {
       plan,
       roomCreateCount,
@@ -584,6 +585,23 @@ async function createRoom(options = {}) {
       localRoomCreateLimit,
       hasEntitlement
     } = resolveRoomCreatePolicy(profile, hasAdminTokenClaim);
+=======
+    const profileIndicatesAdmin = String(profile.subscriptionStatus || '').toLowerCase() === 'admin';
+    const plan = profileIndicatesAdmin || hasAdminTokenClaim
+      ? 'pro'
+      : normalizePlanForLimits(profile.plan || 'free');
+    const roomCreateCount = normalizeRoomCreateCount(profile.roomCreateCount);
+    const persistedLimit = firestoreRuleIntOrNull(profile.roomCreateLimit);
+    const planLimit = roomCreateLimitForPlan(plan);
+    const roomCreateLimit = Math.max(
+      planLimit,
+      persistedLimit == null ? planLimit : persistedLimit
+    );
+    const localRoomCreateLimit = hasAdminTokenClaim
+      ? Math.max(roomCreateLimit, ROOM_CREATE_LIMITS_BY_PLAN.admin)
+      : roomCreateLimit;
+    const hasEntitlement = plan === 'free' || plan === 'trial' || plan === 'support' || plan === 'supporter' || plan === 'pro';
+>>>>>>> worldexplorer3d/main
     const localQuotaReached = roomCreateCount >= localRoomCreateLimit;
 
     if (localRoomCreateLimit <= 0 || !hasEntitlement || localQuotaReached) {
@@ -652,7 +670,11 @@ async function createRoom(options = {}) {
         }
         // Firestore profile updates can arrive moments after auth state changes.
         // Backoff avoids immediate repeat-denials during that propagation window.
+<<<<<<< HEAD
         await waitMs(ROOM_CREATE_RETRY_BASE_MS + attempt * ROOM_CREATE_RETRY_STEP_MS);
+=======
+        await waitMs(120 + attempt * 80);
+>>>>>>> worldexplorer3d/main
         continue;
       }
       if (options.code && errCode === 'permission-denied') {

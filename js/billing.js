@@ -55,6 +55,7 @@ function isRetryableFunctionStatus(status) {
   return RETRYABLE_STATUS_CODES.has(Number(status));
 }
 
+<<<<<<< HEAD
 function isJsonResponse(res, rawText = '') {
   const contentType = String(res && res.headers ? res.headers.get('content-type') || '' : '').toLowerCase();
   if (contentType.includes('application/json')) return true;
@@ -62,6 +63,8 @@ function isJsonResponse(res, rawText = '') {
   return trimmed.startsWith('{') || trimmed.startsWith('[');
 }
 
+=======
+>>>>>>> worldexplorer3d/main
 function summarizeAttempt(attempt = {}) {
   const url = String(attempt.url || '');
   const status = Number(attempt.status);
@@ -114,6 +117,7 @@ async function postFunction(path, body = {}) {
       attempts.push({ url, status: res.status });
       responseRecorded = true;
 
+<<<<<<< HEAD
       if (!isJsonResponse(res, rawText)) {
         if (!isLast) {
           continue;
@@ -121,6 +125,8 @@ async function postFunction(path, body = {}) {
         throw unavailableFunctionError(path, attempts);
       }
 
+=======
+>>>>>>> worldexplorer3d/main
       if (isRetryableFunctionStatus(res.status) && !isLast) {
         continue;
       }

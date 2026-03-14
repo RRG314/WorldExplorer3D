@@ -48,7 +48,10 @@ import {
   removeFriend,
   sendInviteToFriend
 } from './social.js?v=55';
+<<<<<<< HEAD
 import { getCurrentUser } from '../../../js/auth-ui.js';
+=======
+>>>>>>> worldexplorer3d/main
 
 let singleton = null;
 const MAX_PLAN_DISPLAY_NAME_LEN = 48;
@@ -345,8 +348,14 @@ function readWorldContext() {
   };
 }
 
+<<<<<<< HEAD
 function createPoseSnapshotBase(world) {
   return {
+=======
+function readPoseSnapshot() {
+  const world = readWorldContext();
+  const base = {
+>>>>>>> worldexplorer3d/main
     mode: world.kind === 'space' ? 'space' : 'drive',
     frame: {
       kind: world.kind,
@@ -400,6 +409,7 @@ function readSpacePose(base) {
   return true;
 }
 
+<<<<<<< HEAD
 function readDronePose(base) {
   if (!isDroneModeActive()) return false;
   base.mode = 'drone';
@@ -441,6 +451,37 @@ function readPoseSnapshot() {
     vy: appCtx.car?.vy,
     vz: appCtx.car?.vz
   });
+=======
+  if (isDroneModeActive()) {
+    base.mode = 'drone';
+    base.pose.x = finiteNumber(appCtx.drone?.x, finiteNumber(appCtx.car?.x, 0));
+    base.pose.y = finiteNumber(appCtx.drone?.y, finiteNumber(appCtx.car?.y, 0));
+    base.pose.z = finiteNumber(appCtx.drone?.z, finiteNumber(appCtx.car?.z, 0));
+    base.pose.yaw = finiteNumber(appCtx.drone?.yaw, finiteNumber(appCtx.car?.angle, 0));
+    base.pose.pitch = finiteNumber(appCtx.drone?.pitch, 0);
+    return base;
+  }
+
+  if (isWalkModeActive()) {
+    base.mode = 'walk';
+    base.pose.x = finiteNumber(appCtx.Walk.state.walker?.x, finiteNumber(appCtx.car?.x, 0));
+    base.pose.y = finiteNumber(appCtx.Walk.state.walker?.y, finiteNumber(appCtx.car?.y, 0));
+    base.pose.z = finiteNumber(appCtx.Walk.state.walker?.z, finiteNumber(appCtx.car?.z, 0));
+    base.pose.yaw = finiteNumber(appCtx.Walk.state.walker?.yaw, finiteNumber(appCtx.car?.angle, 0));
+    base.pose.pitch = finiteNumber(appCtx.Walk.state.walker?.pitch, 0);
+    base.pose.vy = finiteNumber(appCtx.Walk.state.walker?.vy, 0);
+    return base;
+  }
+
+  base.mode = 'drive';
+  base.pose.x = finiteNumber(appCtx.car?.x, 0);
+  base.pose.y = finiteNumber(appCtx.car?.y, 0);
+  base.pose.z = finiteNumber(appCtx.car?.z, 0);
+  base.pose.yaw = finiteNumber(appCtx.car?.angle, 0);
+  base.pose.vx = finiteNumber(appCtx.car?.vx, 0);
+  base.pose.vy = finiteNumber(appCtx.car?.vy, 0);
+  base.pose.vz = finiteNumber(appCtx.car?.vz, 0);
+>>>>>>> worldexplorer3d/main
   return base;
 }
 
@@ -1686,6 +1727,7 @@ function initMultiplayerPlatform() {
 
     setInputCode(refs, normalizedCode);
     setStatus(`Opening room ${normalizedCode}...`);
+<<<<<<< HEAD
     try {
       const room = await handleJoinRoom(normalizedCode, {
         skipAccessCheck: true,
@@ -1728,6 +1770,9 @@ function initMultiplayerPlatform() {
 
       setStatus(err?.message || `Could not open room ${normalizedCode}.`, true);
     }
+=======
+    await handleJoinRoom(normalizedCode, { skipAccessCheck: true });
+>>>>>>> worldexplorer3d/main
   }
 
   async function activateRoom(room, originLabel = 'room') {
@@ -1860,7 +1905,10 @@ function initMultiplayerPlatform() {
       const effectiveLocationTag = visibility === 'public'
         ? (locationTagText || world.name)
         : locationTagText;
+<<<<<<< HEAD
       const cap = getRecommendedRoomCap();
+=======
+>>>>>>> worldexplorer3d/main
       const createPayload = {
         name: roomName || `${world.name} Session`,
         visibility,
@@ -1881,9 +1929,15 @@ function initMultiplayerPlatform() {
         const named = room.name ? `${room.name} (${room.code})` : room.code;
         try {
           await copyText(inviteLink);
+<<<<<<< HEAD
           setStatus(`${visibility === 'public' ? 'Public' : 'Private'} room ${named} created (cap ${cap}). Invite link copied.`);
         } catch (_) {
           setStatus(`${visibility === 'public' ? 'Public' : 'Private'} room ${named} created (cap ${cap}).`);
+=======
+          setStatus(`${visibility === 'public' ? 'Public' : 'Private'} room ${named} created. Invite link copied.`);
+        } catch (_) {
+          setStatus(`${visibility === 'public' ? 'Public' : 'Private'} room ${named} created.`);
+>>>>>>> worldexplorer3d/main
         }
       }
     } catch (err) {
@@ -1928,6 +1982,7 @@ function initMultiplayerPlatform() {
     }
   }
 
+<<<<<<< HEAD
   async function handleJoinWeeklyFeaturedRoom() {
     const weekly = getWeeklyCitySelection();
     const roomCode = buildWeeklyFeaturedRoomCode(weekly);
@@ -1995,6 +2050,16 @@ function initMultiplayerPlatform() {
     const suppressStatus = Boolean(options && options.suppressStatus);
     const throwOnError = Boolean(options && options.throwOnError);
     if (!skipAccessCheck && state.authUser && !(await ensureAccessOrWarn('joining a room'))) {
+=======
+  async function handleJoinRoom(codeOverride = '', options = {}) {
+    const skipAccessCheck = Boolean(options && options.skipAccessCheck);
+    if (skipAccessCheck) {
+      if (!state.authUser) {
+        setStatus('Sign in to join multiplayer rooms.', true);
+        return null;
+      }
+    } else if (!(await ensureAccessOrWarn('joining a room'))) {
+>>>>>>> worldexplorer3d/main
       return null;
     }
 
@@ -2018,8 +2083,12 @@ function initMultiplayerPlatform() {
       return room;
     } catch (err) {
       console.error('[multiplayer][ui] join failed:', err);
+<<<<<<< HEAD
       if (!suppressStatus) setStatus(err?.message || 'Could not join that room.', true);
       if (throwOnError) throw err;
+=======
+      setStatus(err?.message || 'Could not join that room.', true);
+>>>>>>> worldexplorer3d/main
       return null;
     }
   }

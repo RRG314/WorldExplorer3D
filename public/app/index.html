@@ -844,8 +844,13 @@ input,textarea{-webkit-user-select:text;user-select:text}
     <div class="pro-access-title">OPTIONAL DONATIONS</div>
     <div id="proAccessState" class="pro-access-state">Open Access</div>
   </div>
+<<<<<<< HEAD
   <div class="pro-access-note">Core play, map access, and signed-in multiplayer stay free. Donations only support development and account recognition.</div>
   <button id="upgradeFromAppBtn" class="pro-access-btn" type="button">Account & Donations</button>
+=======
+  <div class="pro-access-note">Upcoming demo soon available: Mars Rover.</div>
+  <button id="upgradeFromAppBtn" class="pro-access-btn" type="button">Open Account & Donations</button>
+>>>>>>> worldexplorer3d/main
   <div id="proAccessStatus"></div>
 </aside>
 <div id="titleScreen">
@@ -2093,17 +2098,29 @@ function renderState(state, user) {
 
   const isPro = adminMode || plan === 'pro';
   scheduleProPanelAutoHide();
+<<<<<<< HEAD
   proAccessState.textContent = isPro ? 'Donation Recognition' : 'Open Access';
+=======
+  proAccessState.textContent = isPro ? 'Pro Early Access' : 'Optional Pro Donation';
+>>>>>>> worldexplorer3d/main
   upgradeFromAppBtn.style.display = isPro ? 'none' : 'inline-flex';
 
   if (adminMode) {
     setProStatus('Admin test mode active. Core play, map access, and multiplayer remain open to everyone.');
   } else if (isPro) {
+<<<<<<< HEAD
     setProStatus('Pro donation recognition active. Core play, map access, and multiplayer remain open to everyone.');
   } else if (plan === 'supporter') {
     setProStatus('Supporter donation recognition active. Core play, map access, and multiplayer remain open to everyone.');
   } else {
     setProStatus('All core play, M map access, and signed-in multiplayer are free. Donations are optional.');
+=======
+    setProStatus('Pro access active. Upcoming demo soon available: Mars Rover.');
+  } else if (plan === 'supporter') {
+    setProStatus('Supporter donation active. Multiplayer stays open for everyone; Pro adds early demo access.');
+  } else {
+    setProStatus('All signed-in players can use multiplayer. Optional donations keep solo-dev updates shipping.');
+>>>>>>> worldexplorer3d/main
   }
 
   updateAuthOverlayVisibility();
@@ -2275,5 +2292,9 @@ if (titleScreenObserverTarget) {
   titleObserver.observe(titleScreenObserverTarget, { attributes: true, attributeFilter: ['class'] });
 }
 </script>
+<<<<<<< HEAD
 <script type="module" src="js/bootstrap.js?v=73"></script>
+=======
+<script type="module" src="js/bootstrap.js?v=71"></script>
+>>>>>>> worldexplorer3d/main
 </body></html>

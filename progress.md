@@ -1630,6 +1630,7 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Verification:
     - `node --check` passed for changed JS files.
     - `npm test` passed: `40/40` Firestore security checks.
+<<<<<<< HEAD
 
 - Account/auth production hardening pass (2026-02-28):
   - Updated `functions/index.js` CORS defaults to include custom domains:
@@ -2627,3 +2628,5 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
 - Interior entry stabilization pass (2026-03-14 00:07:15): snapped indoor spawn to generated walk surfaces, floor base now derives from perimeter/entrance samples, and indoor lighting was added to avoid under-map/outdoor feel. Next: sync mirror and run local browser probe.
 
 - Startup load audit pass (2026-03-14 00:38:36): identified blocking critical path in sequential vendor script loading, throwaway terrain priming, duplicate mode start, and optional POI/detail generation on the critical path. Patched canonical runtime to parallelize dependent loader scripts, skip redundant terrain prewarm, defer POI/street-furniture detail work until after the world is playable, and keep startMode single-pass on title launch.
+=======
+>>>>>>> worldexplorer3d/main

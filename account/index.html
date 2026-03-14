@@ -963,6 +963,7 @@
       if (state.isAdmin === true || state.subscriptionStatus === 'admin') {
         planDetail.textContent = 'Admin test access active with full multiplayer and elevated room quota.';
       } else if (state.plan === 'pro') {
+<<<<<<< HEAD
         planDetail.textContent = 'Pro donation recognition active. Core gameplay, map access, and multiplayer remain open to everyone.';
       } else if (state.plan === 'supporter') {
         planDetail.textContent = 'Supporter donation recognition active. Core gameplay, map access, and multiplayer remain open to everyone.';
@@ -970,17 +971,34 @@
         planDetail.textContent = 'Legacy trial state detected. Multiplayer is open while signed in.';
       } else {
         planDetail.textContent = 'Free plan: full gameplay, M map access, and multiplayer access while signed in. Donations are optional.';
+=======
+        planDetail.textContent = 'Pro donation active. Early demos and priority communication are enabled.';
+      } else if (state.plan === 'supporter') {
+        planDetail.textContent = 'Supporter donation active. Full gameplay and multiplayer remain open to everyone.';
+      } else if (state.plan === 'trial') {
+        planDetail.textContent = 'Legacy trial state detected. Multiplayer is open while signed in.';
+      } else {
+        planDetail.textContent = 'Free plan: full gameplay and multiplayer access while signed in. Donations are optional.';
+>>>>>>> worldexplorer3d/main
       }
 
       if (state.isAdmin === true || state.subscriptionStatus === 'admin' || state.plan === 'pro') {
         extrasLabel.textContent = 'Roadmap';
         extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. This card is informational only and does not gate core features.';
       } else if (state.plan === 'supporter' || state.plan === 'trial') {
+<<<<<<< HEAD
         extrasLabel.textContent = 'Roadmap';
         extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Donations do not gate normal gameplay or map access.';
       } else {
         extrasLabel.textContent = 'Open';
         extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Core gameplay and map access are free for everyone.';
+=======
+        extrasLabel.textContent = 'Preview';
+        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Upgrade to Pro donation for early access.';
+      } else {
+        extrasLabel.textContent = 'Locked';
+        extrasDetail.textContent = 'Upcoming demo coming soon: Mars Rover. Pro donation unlocks early access.';
+>>>>>>> worldexplorer3d/main
       }
 
       trialLabel.textContent = 'Available';
