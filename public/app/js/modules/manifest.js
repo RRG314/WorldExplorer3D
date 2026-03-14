@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 const CACHE_BUST = 'v=73';
-=======
-const CACHE_BUST = 'v=70';
->>>>>>> worldexplorer3d/main
 
 export const vendorScriptsCritical = [
   'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',

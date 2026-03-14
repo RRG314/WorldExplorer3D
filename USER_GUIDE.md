@@ -1,10 +1,6 @@
 # User Guide
 
-<<<<<<< HEAD
 Last reviewed: 2026-03-13
-=======
-Last reviewed: 2026-02-28
->>>>>>> worldexplorer3d/main
 
 Player-facing behavior across app, multiplayer, tutorial, and account systems.
 
@@ -16,27 +12,10 @@ Player-facing behavior across app, multiplayer, tutorial, and account systems.
 
 Sign in methods:
 
-<<<<<<< HEAD
 - Email + password
 - Google
 
 ## 2. Starting a Session
-=======
-## 2. Multiplayer Access and Donations
-
-- Multiplayer is available to all signed-in users.
-- No payment is required to create/join rooms.
-- Optional monthly donations:
-  - `Supporter`: $1/month
-  - `Pro`: $5/month (includes early demo access perks)
-
-Current room creation limits:
-
-- `Free`: 3
-- `Supporter`: 3
-- `Pro`: 10
-- Admin tester mode: allowlist-only elevated limit
->>>>>>> worldexplorer3d/main
 
 1. Open `Location` tab.
 2. Choose a preset city or `Custom`.
@@ -45,12 +24,7 @@ Current room creation limits:
 5. Choose game mode in `Games` tab.
 6. Click `Explore`.
 
-<<<<<<< HEAD
 ## 3. Globe Selector Behavior
-=======
-- signed-in users can accept invite and join directly
-- signed-out users are prompted to sign in first
->>>>>>> worldexplorer3d/main
 
 Features:
 
@@ -64,21 +38,7 @@ Features:
 - top shortcut buttons for Moon and Space
 - bottom buttons: `Main Menu`, `Start Here`
 
-<<<<<<< HEAD
 Notes:
-=======
-- plan/donation status
-- multiplayer access status
-- room quota (`created / limit`)
-- extras card (Pro early-access messaging)
-- admin status (allowlisted accounts only)
-- username update
-- linked email + verification state
-- account UID + auth providers
-- donations portal and receipt list
-- friends list and incoming invites
-- close account (permanent delete with confirmation and recent-sign-in safety check)
->>>>>>> worldexplorer3d/main
 
 - Clicking globe sets an immediate place fallback and then refines with reverse lookup.
 - Saved favorites are browser-local.
@@ -196,60 +156,7 @@ TTL cleanup (`expiresAt`) for ephemeral data:
 
 ## 12. Troubleshooting
 
-<<<<<<< HEAD
 - Join/create fails: confirm sign-in and rules deployment.
 - Invite join fails: verify valid room code and account auth.
 - Tutorial repeats unexpectedly: check Settings tutorial toggle/restart state.
 - Receipts missing: refresh account data and check function logs.
-=======
-Chat protections:
-
-- max message length: 500
-- duplicate suppression window
-- client and server cooldown + burst limits
-- links/contact handles blocked
-- profanity masking
-- report action writes report flags
-
-## 8. Paint the Town
-
-Key behavior:
-
-- choose color, claim buildings by touch or paintball gun
-- paintballs follow projectile arc with gravity
-- paint splats auto-expire for performance
-- minimal HUD collapsed by default (`Time`, `Painted`) and expandable for details
-
-Controls:
-
-- fire paintball: `Ctrl` (also `G` / `P`)
-- choose color: `1-6`
-- toggle tool: `T`
-- left click/tap paints according to active tool and room rules
-
-## 9. Camera and Input Basics
-
-- right-click or middle-click hold: camera look
-- double-left-click camera toggle: disabled
-
-For full control mapping by mode, see `CONTROLS_REFERENCE.md`.
-
-## 10. Mobile Behavior
-
-Mobile controls provide virtual pads and action buttons for:
-
-- driving
-- walking
-- drone
-- rocket
-
-Mobile and desktop share the same gameplay systems and multiplayer state.
-
-## 11. Troubleshooting
-
-- If `Create`/`Join` does nothing, hard refresh and verify current user is signed in.
-- If room actions fail with permissions, confirm deployed Firestore rules and Firebase auth state.
-- If saved room `Open` fails, confirm the room code exists and owner has not deleted the room.
-- If invites fail, verify friend relationship exists first.
-- If donation receipts are missing, refresh account data and inspect function logs.
->>>>>>> worldexplorer3d/main

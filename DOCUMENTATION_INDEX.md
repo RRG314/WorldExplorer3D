@@ -1,10 +1,6 @@
 # Documentation Index
 
-<<<<<<< HEAD
 Last reviewed: 2026-03-13
-=======
-Last reviewed: 2026-02-28
->>>>>>> worldexplorer3d/main
 
 Current documentation set for World Explorer 3D.
 
@@ -29,16 +25,6 @@ Current documentation set for World Explorer 3D.
 | `CONTRIBUTING.md` | Branching, validation, contribution standards |
 | `KNOWN_ISSUES.md` | Current risks and follow-up items |
 | `CHANGELOG.md` | Versioned change history |
-<<<<<<< HEAD
-=======
-| `CONTRIBUTING.md` | Contribution standards |
-| `SECURITY_STORAGE_NOTICE.md` | Security and storage notes |
-| `ACKNOWLEDGEMENTS.md` | Attribution and third-party acknowledgements |
-| `COMPLETE_INVENTORY_REPORT_2026-02-28.md` | Latest full inventory snapshot |
-| `COMPLETE_INVENTORY_REPORT_2026-02-25.md` | Previous inventory snapshot |
-| `COMPLETE_INVENTORY_REPORT_2026-02-22.md` | Older inventory snapshot |
-| `progress.md` | Working session log |
->>>>>>> worldexplorer3d/main
 
 ## Runtime/User/Architecture
 

@@ -4,13 +4,8 @@ import {
   moduleEntrypoint,
   vendorScriptsCritical,
   vendorScriptsOptional
-<<<<<<< HEAD
 } from './modules/manifest.js?v=73';
 import { loadScriptList } from './modules/script-loader.js?v=56';
-=======
-} from './modules/manifest.js?v=70';
-import { loadScriptList } from './modules/script-loader.js?v=55';
->>>>>>> worldexplorer3d/main
 
 async function boot() {
   try {

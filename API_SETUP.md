@@ -1,10 +1,6 @@
 # API and Service Setup Guide
 
-<<<<<<< HEAD
 Last reviewed: 2026-03-02
-=======
-Last reviewed: 2026-02-28
->>>>>>> worldexplorer3d/main
 
 Setup checklist for Firebase Auth, Firestore, and Stripe integrations used by this branch.
 
@@ -96,50 +92,15 @@ Required for Stripe billing flow:
 
 Optional admin/testing keys:
 
-<<<<<<< HEAD
 - `WE3D_ADMIN_ALLOWED_EMAILS`
 - `WE3D_ADMIN_ALLOWED_UIDS`
 - `WE3D_ALLOWED_ORIGINS`
-=======
-Functions enforce a CORS origin allowlist.
->>>>>>> worldexplorer3d/main
 
 Configure these in your functions runtime environment before deploy.
 
 ## 5. Stripe Setup
 
-<<<<<<< HEAD
 ### 5.1 Products/prices
-=======
-Optional custom domains:
-
-```bash
-firebase functions:config:set cors.allowed_origins="https://yourdomain.com,https://staging.yourdomain.com"
-firebase deploy --only functions
-```
-
-## 5. Frontend Firebase Config
-
-Set web config in:
-
-- `public/js/firebase-project-config.js`
-
-Runtime expects:
-
-- `apiKey`
-- `authDomain`
-- `projectId`
-- `appId`
-- optional: `storageBucket`, `messagingSenderId`
-
-Local override key:
-
-- `worldExplorer3D.firebaseConfig`
-
-## 6. Stripe Setup (Optional Donations)
-
-### 6.1 Products/prices
->>>>>>> worldexplorer3d/main
 
 Create recurring monthly prices:
 
@@ -169,11 +130,7 @@ Authenticated endpoints:
 
 - `POST /createCheckoutSession`
 - `POST /createPortalSession`
-<<<<<<< HEAD
 - `POST /startTrial` (legacy compatibility endpoint)
-=======
-- `POST /startTrial` (legacy compatibility endpoint; no longer required for multiplayer access)
->>>>>>> worldexplorer3d/main
 - `POST /enableAdminTester`
 - `POST /getAccountOverview`
 - `POST /listBillingReceipts`

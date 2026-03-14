@@ -1,14 +1,8 @@
 # Architecture
 
-<<<<<<< HEAD
 Last reviewed: 2026-03-13
 
 System topology for gameplay runtime, multiplayer state, account/donations, and security boundaries.
-=======
-Last reviewed: 2026-02-28
-
-This document describes the current platform architecture for gameplay, multiplayer, account, optional donations, and security.
->>>>>>> worldexplorer3d/main
 
 ## 1. System Topology
 
@@ -25,11 +19,7 @@ This document describes the current platform architecture for gameplay, multipla
 - Firebase Authentication
 - Cloud Firestore
 - Cloud Functions (`functions/index.js`)
-<<<<<<< HEAD
 - Stripe Checkout/Portal/Webhook
-=======
-- Stripe Checkout/Donation Portal/Webhooks
->>>>>>> worldexplorer3d/main
 
 ## 2. Runtime Layering
 
@@ -126,22 +116,9 @@ Current Earth runtime architecture details:
 - webhook-driven plan synchronization to Firestore
 - donations/status surfaces are informational only for normal runtime access; map/core traversal are not entitlement-gated
 
-<<<<<<< HEAD
 ## 6. Firestore and Security Architecture
 
 ### 6.1 Primary collections
-=======
-- authenticated access for multiplayer data
-- room visibility/member/owner/mod boundaries
-- room-create quota coupling with user counter writes
-- presence write ownership and throttling checks
-- chat payload + chatState transition validation
-- friend/invite ownership constraints
-- saved-room ownership constraints (`myRooms`)
-- block/claim/artifact/homeBase validation by room permissions
-
-## 6. Account and Donation API Architecture
->>>>>>> worldexplorer3d/main
 
 - `users`
 - `rooms`
@@ -150,24 +127,11 @@ Current Earth runtime architecture details:
 - `activityFeed`
 - `explorerLeaderboard`
 
-<<<<<<< HEAD
 ### 6.2 Key subcollections
-=======
-- `createCheckoutSession`
-- `createPortalSession`
-- `startTrial` (legacy compatibility path)
-- `enableAdminTester`
-- `getAccountOverview`
-- `listBillingReceipts`
-- `updateAccountProfile`
-- `deleteAccount`
-- `stripeWebhook`
->>>>>>> worldexplorer3d/main
 
 - user: `friends`, `recentPlayers`, `incomingInvites`, `myRooms`
 - room: `players`, `chat`, `chatState`, `artifacts`, `blocks`, `paintClaims`, `state`
 
-<<<<<<< HEAD
 ### 6.3 Rule domains
 
 - self-user document ownership
@@ -175,25 +139,14 @@ Current Earth runtime architecture details:
 - room create quota coupling (`roomCreateCount`, `roomCreateLimit`)
 - strict schema validation for room/player/chat/social payloads
 - chat anti-spam transition validation
-=======
-- Firebase Auth user state
-- Firestore user profile and social data
-- Cloud Function account/donation responses
->>>>>>> worldexplorer3d/main
 
 ## 7. Deployment Architecture
 
 ### Firebase Hosting
 
-<<<<<<< HEAD
 - root: `public`
 - rewrite forwarding to functions for account/billing routes
 - legal rewrites
-=======
-- hosting root: `public/`
-- function rewrites for account/donation APIs
-- legal page rewrites
->>>>>>> worldexplorer3d/main
 
 ### GitHub Pages compatibility
 

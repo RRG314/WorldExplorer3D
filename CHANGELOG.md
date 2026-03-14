@@ -1,6 +1,5 @@
 # Changelog
 
-<<<<<<< HEAD
 ## [2026-03-13]
 
 ### Added
@@ -12,53 +11,6 @@
   - `OSM_ECOSYSTEM_METADATA.md`
   - `OSM_WIKI_ENTRY_DRAFT.md`
 - README screenshot section including Ocean mode example image.
-=======
-## [2026-02-28]
-
-### Changed
-
-- Switched multiplayer access policy to signed-in free access (no payment required to create/join rooms).
-- Updated room quota defaults to match new model:
-  - free: `3`
-  - supporter: `3`
-  - pro: `10`
-- Updated account/app/multiplayer UI copy from trial/paywall language to optional donation language.
-- Donation CTAs now consistently route users to Account/Donations surfaces.
-
-### Code Paths Updated
-
-- Entitlements and account status:
-  - `js/entitlements.js`
-  - `public/js/entitlements.js`
-  - `account/index.html`
-  - `public/account/index.html`
-- Multiplayer access and room creation flow:
-  - `app/js/multiplayer/ui-room.js`
-  - `public/app/js/multiplayer/ui-room.js`
-  - `app/js/multiplayer/rooms.js`
-  - `public/app/js/multiplayer/rooms.js`
-- App auth/pro panel messaging:
-  - `app/index.html`
-  - `public/app/index.html`
-- Rule/backend quota alignment:
-  - `firestore.rules`
-  - `functions/index.js`
-
-### Documentation
-
-- Rewrote and revalidated docs for donation model and free multiplayer access:
-  - `README.md`
-  - `USER_GUIDE.md`
-  - `QUICKSTART.md`
-  - `ARCHITECTURE.md`
-  - `TECHNICAL_DOCS.md`
-  - `API_SETUP.md`
-  - `SECURITY_STORAGE_NOTICE.md`
-  - `DOCUMENTATION_INDEX.md`
-- Added new inventory snapshot: `COMPLETE_INVENTORY_REPORT_2026-02-28.md`.
-
-## [2026-02-25]
->>>>>>> worldexplorer3d/main
 
 ### Changed
 

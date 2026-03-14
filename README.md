@@ -1,16 +1,10 @@
 # World Explorer 3D
 
-<<<<<<< HEAD
 [![Runtime Verify](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
 [![Deploy GitHub Pages (public)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml/badge.svg)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml)
 [![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
 
 World Explorer 3D is a browser-based 3D geospatial exploration application built around real-world map data, including OpenStreetMap-derived roads, buildings, land-use, water, and place context.
-=======
-Last reviewed: 2026-02-28
-
-World Explorer is a browser-native 3D exploration platform with real-location traversal, game modes, multiplayer rooms, optional monthly donations, and Firebase-backed persistence.
->>>>>>> worldexplorer3d/main
 
 It is an interactive exploration app, not a flat map viewer and not a routing/navigation replacement. The focus is immersive place exploration across Earth, Moon, Space, and Ocean destination modes.
 
@@ -23,31 +17,7 @@ It is an interactive exploration app, not a flat map viewer and not a routing/na
 - Includes geolocation launch flow and Ocean mode in the current branch.
 - Core play, traversal modes, and the large map remain free; donations are optional recognition/support only.
 
-<<<<<<< HEAD
 ## What It Does
-=======
-- Earth, Moon, and Space traversal
-- Game modes:
-  - Free Roam
-  - Time Trial
-  - Checkpoints
-  - Paint the Town
-  - Police Chase
-  - Find the Flower
-- Multiplayer platform:
-  - private/public rooms
-  - room code + invite links
-  - saved rooms (open again later)
-  - owner delete for owned rooms
-  - live presence, chat, friends, invites, recent players
-  - shared blocks, paint claims, artifacts, home base
-- Account center:
-  - plan/donation status
-  - room quota usage
-  - username + linked email + providers
-  - Stripe donation portal + receipts
-  - permanent account closure (self-serve delete flow)
->>>>>>> worldexplorer3d/main
 
 - Launch from preset cities or custom coordinates.
 - Use geolocation (`Use My Location`) in title and globe selector flows.
@@ -73,20 +43,9 @@ It is an interactive exploration app, not a flat map viewer and not a routing/na
 
 ## Screenshots
 
-<<<<<<< HEAD
 ![Earth city traversal](assets/landing/gameplay/drive-baltimore.png)
 ![Space destination mode](assets/landing/gameplay/fly-in-space.png)
 ![Ocean destination mode](assets/screenshots/ocean-mode-great-barrier-reef.png)
-=======
-- Multiplayer is available for all signed-in users.
-- Current room creation limits:
-  - `Free`: `3`
-  - `Supporter`: `3`
-  - `Pro`: `10`
-  - Admin tester mode: allowlist-only, higher room limit
-- Supporter/Pro are optional monthly donations.
-- Pro keeps early-demo and priority-contact style perks.
->>>>>>> worldexplorer3d/main
 
 ## OpenStreetMap Data and Attribution
 
@@ -160,7 +119,6 @@ OSM ecosystem materials:
 
 ## Limitations and Non-Goals
 
-<<<<<<< HEAD
 See [LIMITATIONS.md](LIMITATIONS.md) for current caveats, including:
 
 - upstream data/service variability (Overpass/geocoding/tile/network)
@@ -175,16 +133,3 @@ This repository is source-available under the custom terms in [LICENSE](LICENSE)
 ## Contributing
 
 Contribution workflow and validation requirements are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
-=======
-- `QUICKSTART.md`
-- `USER_GUIDE.md`
-- `CONTROLS_REFERENCE.md`
-- `ARCHITECTURE.md`
-- `TECHNICAL_DOCS.md`
-- `API_SETUP.md`
-- `GITHUB_DEPLOYMENT.md`
-- `KNOWN_ISSUES.md`
-- `CHANGELOG.md`
-- `DOCUMENTATION_INDEX.md`
-- `COMPLETE_INVENTORY_REPORT_2026-02-28.md`
->>>>>>> worldexplorer3d/main

@@ -304,11 +304,7 @@ function isFailedPreconditionError(err) {
 
 async function deleteDocsByQuery(query, batchSize = 200, label = '') {
   const limit = Math.max(10, Math.min(500, Number(batchSize) || 200));
-<<<<<<< HEAD
   for (;;) {
-=======
-  while (true) {
->>>>>>> worldexplorer3d/main
     let snap;
     try {
       snap = await query.limit(limit).get();

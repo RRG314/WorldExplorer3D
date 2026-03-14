@@ -91,7 +91,6 @@ function privateRoomDoc() {
   };
 }
 
-<<<<<<< HEAD
 function publicRoomDoc() {
   return {
     ...privateRoomDoc(),
@@ -107,8 +106,6 @@ function publicRoomDoc() {
   };
 }
 
-=======
->>>>>>> worldexplorer3d/main
 function roomCreateDoc(roomCode, ownerUid, overrides = {}) {
   const base = {
     code: roomCode,

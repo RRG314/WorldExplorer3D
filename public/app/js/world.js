@@ -1233,7 +1233,6 @@ function isFiniteWorldPointXZ(point) {
   Number.isFinite(point.z);
 }
 
-<<<<<<< HEAD
 function buildFeatureGeometryGuards(featureRadiusDeg = 0.02) {
   const radiusWorld = Math.abs(Number(featureRadiusDeg) || 0) * appCtx.SCALE;
   const clipRadius = clampNumber(
@@ -1412,16 +1411,11 @@ function sanitizeWorldFootprintPoints(pts, minArea = FEATURE_MIN_POLYGON_AREA, o
   const maxArea = Number.isFinite(options.maxArea) ?
   Math.max(200, options.maxArea) :
   Infinity;
-=======
-function sanitizeWorldFootprintPoints(pts, minArea = 1) {
-  if (!Array.isArray(pts) || pts.length < 3) return [];
->>>>>>> worldexplorer3d/main
   const cleaned = [];
 
   for (let i = 0; i < pts.length; i++) {
     const p = pts[i];
     if (!isFiniteWorldPointXZ(p)) continue;
-<<<<<<< HEAD
     if (Math.hypot(p.x, p.z) > maxDistanceFromOrigin) continue;
 
     if (cleaned.length > 0) {
@@ -1429,14 +1423,6 @@ function sanitizeWorldFootprintPoints(pts, minArea = 1) {
       const segLen = Math.hypot(p.x - prev.x, p.z - prev.z);
       if (segLen <= 1e-4) continue;
       if (segLen > maxSegmentLength) return [];
-=======
-
-    if (cleaned.length > 0) {
-      const prev = cleaned[cleaned.length - 1];
-      if (Math.hypot(p.x - prev.x, p.z - prev.z) <= 1e-4) {
-        continue;
-      }
->>>>>>> worldexplorer3d/main
     }
     cleaned.push({ x: p.x, z: p.z });
   }
@@ -1444,21 +1430,15 @@ function sanitizeWorldFootprintPoints(pts, minArea = 1) {
   if (cleaned.length >= 2) {
     const first = cleaned[0];
     const last = cleaned[cleaned.length - 1];
-<<<<<<< HEAD
     const closeLen = Math.hypot(first.x - last.x, first.z - last.z);
     if (closeLen <= 1e-4) {
       cleaned.pop();
     } else if (closeLen > maxSegmentLength * 1.35) {
       return [];
-=======
-    if (Math.hypot(first.x - last.x, first.z - last.z) <= 1e-4) {
-      cleaned.pop();
->>>>>>> worldexplorer3d/main
     }
   }
 
   if (cleaned.length < 3) return [];
-<<<<<<< HEAD
 
   let minX = Infinity;
   let maxX = -Infinity;
@@ -1476,9 +1456,6 @@ function sanitizeWorldFootprintPoints(pts, minArea = 1) {
 
   const area = Math.abs(signedPolygonAreaXZ(cleaned));
   if (area < minArea || area > maxArea) return [];
-=======
-  if (Math.abs(signedPolygonAreaXZ(cleaned)) < minArea) return [];
->>>>>>> worldexplorer3d/main
   return cleaned;
 }
 
@@ -3432,11 +3409,7 @@ async function loadRoads(retryPass = 0) {
 
       buildingWays.forEach((way) => {
         const rawPts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
-<<<<<<< HEAD
         const pts = sanitizeWorldFootprintPoints(rawPts, FEATURE_MIN_POLYGON_AREA, buildingGeometryGuards);
-=======
-        const pts = sanitizeWorldFootprintPoints(rawPts, 1);
->>>>>>> worldexplorer3d/main
         if (pts.length < 3) return;
         if (!isBuildingNearLoadedRoad(pts)) return;
         const roadCoreStats = sampleFootprintRoadCore(pts);
@@ -3487,12 +3460,8 @@ async function loadRoads(retryPass = 0) {
         const bt = way.tags.building || 'yes';
         const buildingLevels = Number.parseFloat(way.tags['building:levels']);
         const sourceBuildingId = way.id ? String(way.id) : `osm-${Math.round(centerX * 10)}-${Math.round(centerZ * 10)}`;
-<<<<<<< HEAD
         const nearRoadCore = roadCoreStats.centroidInside || roadCoreStats.inside >= 2;
         const colliderDetail = useRdtBudgeting && lodTier !== 'near' && !nearRoadCore ? 'bbox' : 'full';
-=======
-        const colliderDetail = useRdtBudgeting && lodTier !== 'near' ? 'bbox' : 'full';
->>>>>>> worldexplorer3d/main
 
         // Calculate terrain stats for building footprint
         let avgElevation = 0;
@@ -3513,7 +3482,6 @@ async function loadRoads(retryPass = 0) {
         const baseColor = pickBuildingBaseColor(bt, bSeed ^ Math.floor(br2 * 0xffff));
         let mesh = null;
 
-<<<<<<< HEAD
         if (lodTier === 'mid') {
           mesh = createMidLodBuildingMesh(pts, height, baseElevation, baseColor);
         } else {
@@ -3523,15 +3491,6 @@ async function loadRoads(retryPass = 0) {
             shape.lineTo(p.x, -p.z);
           });
           shape.closePath();
-=======
-        const extrudeSettings = { depth: height, bevelEnabled: false };
-        const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-        geo.rotateX(-Math.PI / 2);
-        if (!geometryHasFinitePositions(geo)) {
-          geo.dispose();
-          return;
-        }
->>>>>>> worldexplorer3d/main
 
           const extrudeSettings = { depth: height, bevelEnabled: false };
           const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
@@ -3541,7 +3500,6 @@ async function loadRoads(retryPass = 0) {
             return;
           }
 
-<<<<<<< HEAD
           const bldgMat = typeof appCtx.getBuildingMaterial === 'function' ?
             appCtx.getBuildingMaterial(bt, bSeed, baseColor) :
             new THREE.MeshStandardMaterial({ color: baseColor, roughness: 0.85, metalness: 0.05 });
@@ -3555,35 +3513,19 @@ async function loadRoads(retryPass = 0) {
         }
 
         if (!mesh) return;
-=======
-        const mesh = new THREE.Mesh(geo, bldgMat);
-        const baseElevation = slopeRange >= 0.15 ? minElevation + 0.05 : avgElevation;
-        mesh.position.y = baseElevation;
-        mesh.userData.buildingFootprint = pts;
-        mesh.userData.avgElevation = baseElevation;
->>>>>>> worldexplorer3d/main
         mesh.userData.terrainAvgElevation = avgElevation;
         mesh.userData.lodTier = lodTier;
         mesh.userData.sourceBuildingId = sourceBuildingId;
         mesh.userData.buildingName = way.tags.name || '';
         mesh.userData.buildingType = bt;
-<<<<<<< HEAD
-=======
-        mesh.castShadow = lodTier === 'near';
-        mesh.receiveShadow = true;
->>>>>>> worldexplorer3d/main
         const colliderRef = registerBuildingCollision(pts, height, {
           detail: colliderDetail,
           centerX,
           centerZ,
           sourceBuildingId,
-<<<<<<< HEAD
           name: way.tags.name || '',
           buildingType: bt,
           levels: Number.isFinite(buildingLevels) ? buildingLevels : null,
-=======
-          buildingType: bt,
->>>>>>> worldexplorer3d/main
           baseY: baseElevation
         });
         if (colliderDetail === 'full') loadMetrics.colliders.full += 1;else
@@ -4269,147 +4211,12 @@ async function loadRoads(retryPass = 0) {
 
       console.error('Road loading failed after all attempts:', e);
       if (appCtx.roads.length === 0) {
-<<<<<<< HEAD
         if (useSyntheticFallbackRoads) {
           createSyntheticFallbackWorld();
           finalizeLoadedWorld('synthetic_fallback');
         } else {
           finalizeLoadedWorld('no_roads_sparse');
         }
-=======
-        // Debug log removed
-        appCtx.showLoad('Creating default environment...');
-
-        // Create a simple crossroad
-        const makeRoad = (x1, z1, x2, z2, width = 10) => {
-          const pts = [{ x: x1, z: z1 }, { x: x2, z: z2 }];
-          appCtx.roads.push({
-            pts,
-            width,
-            limit: 35,
-            name: 'Main Street',
-            type: 'primary',
-            lodDepth: 0,
-            subdivideMaxDist: getRoadSubdivisionStep('primary', 0, perfModeNow)
-          });
-
-          const hw = width / 2;
-          const verts = [],indices = [];
-          for (let i = 0; i < pts.length; i++) {
-            const p = pts[i];
-            const dx = pts[1].x - pts[0].x,dz = pts[1].z - pts[0].z;
-            const len = Math.sqrt(dx * dx + dz * dz) || 1;
-            const nx = -dz / len,nz = dx / len;
-            const y1 = appCtx.elevationWorldYAtWorldXZ(p.x + nx * hw, p.z + nz * hw) + 0.3;
-            const y2 = appCtx.elevationWorldYAtWorldXZ(p.x - nx * hw, p.z - nz * hw) + 0.3;
-            verts.push(p.x + nx * hw, y1, p.z + nz * hw);
-            verts.push(p.x - nx * hw, y2, p.z - nz * hw);
-            if (i < pts.length - 1) {const vi = i * 2;indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);}
-          }
-          const geo = new THREE.BufferGeometry();
-          geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-          geo.setIndex(indices);
-          geo.computeVertexNormals();
-          const roadMat = new THREE.MeshStandardMaterial({
-            color: 0x333333,
-            roughness: 0.95,
-            metalness: 0.05,
-            polygonOffset: true,
-            polygonOffsetFactor: -2,
-            polygonOffsetUnits: -2
-          });
-          const mesh = new THREE.Mesh(geo, roadMat);
-          mesh.renderOrder = 2;
-          mesh.receiveShadow = true;
-          mesh.frustumCulled = false;
-          appCtx.scene.add(mesh);appCtx.roadMeshes.push(mesh);
-        };
-
-        // Create roads in a cross pattern
-        makeRoad(-200, 0, 200, 0, 12); // Horizontal
-        makeRoad(0, -200, 0, 200, 12); // Vertical
-        makeRoad(-150, -150, 150, 150, 10); // Diagonal 1
-        makeRoad(-150, 150, 150, -150, 10); // Diagonal 2
-
-        // Create a few simple buildings
-        const makeBuilding = (x, z, w, d, h, idx = 0) => {
-          const pts = [
-          { x: x - w / 2, z: z - d / 2 },
-          { x: x + w / 2, z: z - d / 2 },
-          { x: x + w / 2, z: z + d / 2 },
-          { x: x - w / 2, z: z + d / 2 }];
-
-          const sourceBuildingId = `fallback-${idx}-${Math.round(x)}-${Math.round(z)}`;
-          const colliderRef = registerBuildingCollision(pts, h, {
-            sourceBuildingId,
-            buildingType: 'fallback'
-          });
-
-          const shape = new THREE.Shape();
-          shape.moveTo(pts[0].x, pts[0].z);
-          for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i].x, pts[i].z);
-          shape.lineTo(pts[0].x, pts[0].z);
-
-          const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
-          geo.rotateX(-Math.PI / 2);
-          const color = [0x8899aa, 0x887766, 0x7788aa, 0x887799][Math.floor(Math.random() * 4)];
-          const mat = new THREE.MeshLambertMaterial({ color });
-          const mesh = new THREE.Mesh(geo, mat);
-
-          // Calculate terrain stats for building
-          let avgElevation = 0;
-          let minElevation = Infinity;
-          let maxElevation = -Infinity;
-          pts.forEach((p) => {
-            const hTerrain = appCtx.elevationWorldYAtWorldXZ(p.x, p.z);
-            avgElevation += hTerrain;
-            if (hTerrain < minElevation) minElevation = hTerrain;
-            if (hTerrain > maxElevation) maxElevation = hTerrain;
-          });
-          avgElevation /= pts.length;
-          const slopeRange = Number.isFinite(minElevation) && Number.isFinite(maxElevation) ?
-          maxElevation - minElevation :
-          0;
-          const baseElevation = slopeRange >= 0.15 ? minElevation + 0.05 : avgElevation;
-          mesh.position.y = baseElevation;
-          mesh.userData.buildingFootprint = pts; // Store for repositioning
-          mesh.userData.avgElevation = baseElevation;
-          mesh.userData.terrainAvgElevation = avgElevation;
-          mesh.userData.sourceBuildingId = sourceBuildingId;
-          mesh.userData.buildingType = 'fallback';
-          if (colliderRef) colliderRef.baseY = baseElevation;
-
-          mesh.castShadow = true;
-          mesh.receiveShadow = true;
-          appCtx.scene.add(mesh);
-          appCtx.buildingMeshes.push(mesh);
-
-          if (typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.15) {
-            const groundPatchesRaw = appCtx.createBuildingGroundPatch(pts, baseElevation);
-            const groundPatches = Array.isArray(groundPatchesRaw) ? groundPatchesRaw : groundPatchesRaw ? [groundPatchesRaw] : [];
-            groundPatches.forEach((groundPatch) => {
-              groundPatch.userData.landuseFootprint = pts;
-              groundPatch.userData.landuseType = 'buildingGround';
-              groundPatch.userData.avgElevation = baseElevation;
-              groundPatch.userData.terrainAvgElevation = avgElevation;
-              groundPatch.userData.alwaysVisible = true;
-              groundPatch.visible = true;
-              appCtx.scene.add(groundPatch);
-              appCtx.landuseMeshes.push(groundPatch);
-            });
-          }
-        };
-
-        // Add buildings around the crossroad
-        makeBuilding(-80, -80, 40, 30, 15, 0);
-        makeBuilding(80, -80, 35, 40, 20, 1);
-        makeBuilding(-80, 80, 45, 35, 18, 2);
-        makeBuilding(80, 80, 30, 35, 12, 3);
-        makeBuilding(-50, 50, 25, 20, 10, 4);
-        makeBuilding(50, -50, 30, 25, 14, 5);
-
-        finalizeLoadedWorld('synthetic_fallback');
->>>>>>> worldexplorer3d/main
       }
     }
   }
