@@ -1,0 +1,229 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{hyperref}
+\geometry{margin=1in}
+
+\newtheorem{theorem}{Theorem}[section]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{corollary}[theorem]{Corollary}
+\newtheorem{remark}[theorem]{Remark}
+\newtheorem{definition}[theorem]{Definition}
+
+\title{Recursive Geometric Entropy (RGE): Corrected v3 Draft\\
+\large Status-Labeled Theorems, Proof Notes, and Reproducible Validation}
+\author{Steven Reid}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+This corrected v3 draft updates the RGE manuscript with explicit claim-status labels
+(\textbf{Proven}, \textbf{Verified}, \textbf{Conjecture}), aligned assumptions, and
+reproducible validation artifacts. The radial-shell slope theorem and closed-form
+shape offsets are retained and numerically confirmed. The independent-refinement
+additivity statement is retained under explicit product-partition assumptions and
+marked as non-general outside that model.
+\end{abstract}
+
+\section{Scope and Source Basis}
+This draft is based on the following sources and reproducibility outputs:
+\begin{itemize}
+    \item Zenodo 17882310: RGE paper and notebook
+    \item Zenodo 17862831: REC theory (corrected growth theorem dependencies)
+    \item Audit outputs:
+    \begin{itemize}
+        \item \texttt{results/rge\_math\_audit.json}
+        \item \texttt{results/rge\_counterexamples.json}
+        \item \texttt{results/rec\_rge\_corrected\_validation.json}
+    \end{itemize}
+\end{itemize}
+
+\section{Core Definitions}
+\begin{definition}[Recursive subdivision]
+Let $\Omega\subset\mathbb{R}^n$ be bounded. At depth $d$, a subdivision induces disjoint parts
+$\{P_{j,d}\}_{j=1}^{N_d}$ with $\cup_j P_{j,d}=\Omega$.
+\end{definition}
+
+\begin{definition}[Depth entropy]
+With probabilities
+\[
+p_j(d)=\frac{\mu(P_{j,d})}{\mu(\Omega)},
+\]
+define
+\[
+S(d):=-\sum_{j=1}^{N_d} p_j(d)\log_2 p_j(d).
+\]
+\end{definition}
+
+\begin{definition}[Asymptotic slope-offset form]
+When limits exist,
+\[
+S(d)=C\,d+h_\Omega+o(1),
+\]
+where $C$ is the growth slope and $h_\Omega$ is the shape-dependent offset.
+\end{definition}
+
+\section{Main Theorems and Status Labels}
+\begin{table}[h]
+\centering
+\caption{RGE theorem status matrix (v3)}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Item} & \textbf{Status} & \textbf{Notes} \\
+\midrule
+Main asymptotic law (density Riemann-sum form) & Proven & Standard midpoint/Riemann argument under stated assumptions \\
+Universal radial-shell slope $C=1$ & Proven & Follows from $N_d=2^d$ \\
+Disk/sphere/cone offsets & Proven + Verified & Closed-form integrals + numerical confirmation \\
+Congruent subdivision slope $C=\log_2 b$ & Proven & Follows from $N_d=b^d$ \\
+1.25 finite-depth crossing mechanism & Verified & Supported by formulas and depth-series values \\
+Independent-refinement additivity & Proven (model-specific) & Requires product-partition independence \\
+General additivity in arbitrary geometry & Conjecture & Not proven without independence structure \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Asymptotic Law for Depth Entropy}
+\begin{theorem}[Main asymptotic law]
+Assume:
+\begin{enumerate}
+    \item $\lim_{d\to\infty} (\log_2 N_d)/d = C$ exists,
+    \item for $m=1,\dots,N_d$, probabilities admit
+    \[
+    p_{m,d}=\frac{1}{N_d}f\!\left(\frac{m+1/2}{N_d}\right)+o\!\left(\frac{1}{N_d}\right),
+    \]
+    with bounded measurable $f\ge0$, $\int_0^1 f(x)dx=1$.
+\end{enumerate}
+Then
+\[
+S(d)=\log_2 N_d-\int_0^1 f(x)\log_2 f(x)\,dx + o(1)
+= C\,d + h_2(f) + o(1).
+\]
+\end{theorem}
+
+\begin{proof}[Proof sketch]
+Rewrite entropy as
+\[
+S(d)=\log_2 N_d - \sum_{m=1}^{N_d} p_{m,d}\log_2\big(p_{m,d}N_d\big).
+\]
+Under the density form, the second term is a Riemann sum converging to
+$\int_0^1 f\log_2 f$.
+\end{proof}
+
+\section{Radial Refinements and Closed-Form Offsets}
+\begin{theorem}[Universal radial-shell slope]
+For radial shells with $N_d=2^d$, the slope is
+\[
+C=1.
+\]
+\end{theorem}
+
+\begin{proof}
+Immediate from $\log_2 N_d=\log_2 2^d=d$.
+\end{proof}
+
+\begin{proposition}[Disk offset]
+For $f(r)=2r$ on $[0,1]$:
+\[
+h_{disk}=-\int_0^1 2r\log_2(2r)dr=-1+\frac{1}{2\ln2}\approx -0.2786524796.
+\]
+\end{proposition}
+
+\begin{proposition}[Sphere offset]
+For $f(r)=3r^2$ on $[0,1]$:
+\[
+h_{sphere}=-\int_0^1 3r^2\log_2(3r^2)dr=-\log_2 3+\frac{2}{3\ln2}\approx -0.6231658068.
+\]
+\end{proposition}
+
+\begin{proposition}[Cone offset]
+For $f(r)=6r(1-r)$ on $[0,1]$:
+\[
+h_{cone}=-\int_0^1 6r(1-r)\log_2\!\big(6r(1-r)\big)dr
+=-\log_2 6+\frac{5}{3\ln2}\approx -0.1804707659.
+\]
+\end{proposition}
+
+\section{Congruent Subdivision Slopes}
+\begin{theorem}
+If each part splits into $b$ congruent parts per depth, so $N_d=b^d$, then
+\[
+C=\log_2 b.
+\]
+\end{theorem}
+
+\begin{proof}
+$\log_2 N_d = \log_2 b^d = d\log_2 b$.
+\end{proof}
+
+\section{Finite-Depth Growth-Factor Phenomenon}
+For the radial asymptotic form $S(d)=d+h_\Omega+o(1)$,
+\[
+\tilde r(d):=\frac{S(d+1)}{S(d)}=\frac{d+1+h_\Omega}{d+h_\Omega}+o(1/d)
+=1+\frac{1}{d+h_\Omega}+o(1/d).
+\]
+Solving $\tilde r(d)=1.25$ gives
+\[
+d_{1.25}=4-h_\Omega.
+\]
+This is a finite-depth crossing law, not an asymptotic invariant.
+
+\section{Independent-Refinement Additivity (Restricted Theorem)}
+\begin{theorem}[Model-specific additivity]
+Assume independent orthogonal product refinement across $k$ axes, each with branching
+$b_i$ and no coupling in partition probabilities. Then
+\[
+C=\sum_{i=1}^{k}\log_2 b_i.
+\]
+\end{theorem}
+
+\begin{proof}
+Under product independence, total branching per depth is multiplicative:
+$N_d=(\prod_i b_i)^d$. Therefore
+\[
+\frac{\log_2 N_d}{d}=\log_2\Big(\prod_i b_i\Big)=\sum_i \log_2 b_i.
+\]
+\end{proof}
+
+\begin{remark}[General case]
+Without explicit independence/product structure, additivity remains a conjecture.
+\end{remark}
+
+\section{Validation Summary (Reproducible)}
+From the generated audit JSON:
+\begin{itemize}
+    \item Offset validation (analytic vs numeric):
+    \begin{itemize}
+        \item disk: $-0.2786524796$ vs $-0.2786524795$
+        \item sphere: $-0.6231658068$ vs $-0.6231658068$
+        \item cone: $-0.1804707659$ vs $-0.1804707658$
+    \end{itemize}
+    \item Fitted radial slopes (depth window 6--14):
+    \begin{itemize}
+        \item disk: $0.999984$
+        \item sphere: $0.999986$
+        \item cone: $0.999934$
+    \end{itemize}
+\end{itemize}
+
+\section{Honest Novelty Positioning}
+This corrected framing supports novelty in:
+\begin{itemize}
+    \item computable geometric invariants ($h_\Omega$) from recursive shape refinement,
+    \item an explicit slope-offset decomposition usable in geometry pipelines,
+    \item reproducible finite-depth behavior analysis (including 1.25 crossing interpretation).
+\end{itemize}
+It does not claim new universal entropy laws beyond assumptions explicitly stated.
+
+\section{Reproducibility Commands}
+\begin{verbatim}
+python3 /Users/stevenreid/Documents/New\ project/tools/rge_math_audit.py
+python3 /Users/stevenreid/Documents/New\ project/tools/rec_rge_corrected_validation.py
+\end{verbatim}
+
+\end{document}

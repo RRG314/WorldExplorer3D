@@ -17,41 +17,47 @@
 <body>
   <main>
     <h1>Privacy Policy</h1>
-    <p class="meta">Effective date: February 16, 2026</p>
-    <p>World Explorer collects account and billing data needed to provide subscriptions and trial access. This page summarizes what data is used and how.</p>
+    <p class="meta">Effective date: March 16, 2026</p>
+    <p>World Explorer uses account, multiplayer, contribution, support-plan, and location-linked service data to run the platform. This page explains what is collected, how it is used, and where open data providers may be involved.</p>
 
     <h2>Data We Store</h2>
     <ul>
       <li>Firebase Authentication identity (UID, email, provider metadata).</li>
-      <li>Plan state in Firestore, including trial end date, plan tier, and entitlement flags.</li>
-      <li>Stripe customer/subscription identifiers for billing management.</li>
-      <li>Optional in-app cloud data when enabled by plan (for example, synced challenge/saves).</li>
-      <li>Multiplayer metadata such as room membership, friend links, recent player records, invite records, and room chat content.</li>
+      <li>Account and support-plan state in Firestore, including plan tier, entitlement flags, and related account settings.</li>
+      <li>Stripe customer and subscription identifiers when recurring support is enabled.</li>
+      <li>Multiplayer and social data such as room membership, friends, invites, recent players, presence windows, and room chat content.</li>
+      <li>Contribution/editor submissions, moderation status, and related review notes for staged world edits.</li>
+      <li>Optional user-created world content such as memories, shared room state, or similar saved exploration data where those systems are active.</li>
+      <li>Basic service and abuse-prevention signals needed to keep the platform reliable and safe.</li>
     </ul>
 
     <h2>Billing Data</h2>
-    <p>Payments are processed by Stripe. Card details are handled by Stripe and are not stored by World Explorer servers.</p>
+    <p>Payments and recurring support are processed by Stripe. Card details are handled by Stripe and are not stored by World Explorer servers.</p>
+
+    <h2>Location and Live Earth Requests</h2>
+    <p>When you search places, use Live Earth layers, or load local weather and environmental context, your browser may request data from open providers such as OpenStreetMap/Nominatim, Open-Meteo, USGS, and CelesTrak. Those providers may receive your selected coordinates, IP address, and standard request metadata under their own terms. World Explorer uses those results to render the place you chose; it does not treat that as background location tracking of your real-world device position unless you intentionally use a locate feature.</p>
 
     <h2>How We Use Data</h2>
     <ul>
       <li>Authenticate users and keep sessions active.</li>
-      <li>Grant and enforce trial/subscription entitlements.</li>
-      <li>Provide customer billing portal access.</li>
+      <li>Provide optional recurring support and billing portal access.</li>
+      <li>Operate multiplayer rooms, shared social features, and contributor moderation workflows.</li>
+      <li>Render location-aware weather, local-world context, and Live Earth experiences for the places you choose.</li>
       <li>Operate and improve service reliability.</li>
-      <li>Moderate multiplayer abuse and enforce chat/social safety policies.</li>
+      <li>Moderate abuse and enforce safety policies across chat, contributions, and shared platform features.</li>
     </ul>
 
     <h2>Data Sharing</h2>
-    <p>Data is shared only with service providers required to operate the app (Firebase and Stripe) or where legally required.</p>
+    <p>Data is shared only with the service providers needed to operate World Explorer, such as Firebase, Stripe, and the open data services requested by the features you use, or where legally required.</p>
 
     <h2>Data Retention</h2>
-    <p>Account plan records are retained while your account remains active. Multiplayer data uses automatic expiration for short-lived records (presence, invites, and chat state windows), with additional cleanup policies for abuse prevention. You may request account deletion by contacting support.</p>
+    <p>Account and support-plan records are retained while your account remains active. Multiplayer data uses automatic expiration for short-lived records such as presence and invite windows. Contribution submissions and moderation records may be retained longer so review decisions and approved public world changes remain understandable. You may request account deletion or privacy review by contacting support.</p>
 
     <h2>Children's Privacy and Safety</h2>
     <p>Where required by law, child users should access the service only with parent or guardian permission. We apply safety controls to multiplayer chat, including anti-spam and contact-sharing restrictions, to reduce risk in child-accessible environments.</p>
 
     <h2>Contact</h2>
-    <p>For privacy requests, email <a href="mailto:hello@worldexplorer.app">hello@worldexplorer.app</a>.</p>
+    <p>For privacy requests, email <a href="mailto:mail@worldexplorer3d.io">mail@worldexplorer3d.io</a>.</p>
 
     <p><a href="../">Back to Home</a></p>
   </main>

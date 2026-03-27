@@ -4,9 +4,18 @@ import path from 'node:path';
 const rootDir = process.cwd();
 const syncEntries = [
   { source: 'CNAME', target: 'public/CNAME', type: 'file' },
+  { source: 'favicon.svg', target: 'public/favicon.svg', type: 'file' },
   { source: 'index.html', target: 'public/index.html', type: 'file' },
+  { source: 'about/index.html', target: 'public/about/index.html', type: 'file' },
   { source: 'account/index.html', target: 'public/account/index.html', type: 'file' },
+  { source: 'account/admin.html', target: 'public/account/admin.html', type: 'file' },
+  { source: 'account/moderation.html', target: 'public/account/moderation.html', type: 'file' },
+  { source: 'legal/privacy.html', target: 'public/legal/privacy.html', type: 'file' },
+  { source: 'legal/privacy/index.html', target: 'public/legal/privacy/index.html', type: 'file' },
+  { source: 'legal/terms.html', target: 'public/legal/terms.html', type: 'file' },
+  { source: 'legal/terms/index.html', target: 'public/legal/terms/index.html', type: 'file' },
   { source: 'app/index.html', target: 'public/app/index.html', type: 'file' },
+  { source: 'js', target: 'public/js', type: 'dir' },
   { source: 'app/assets', target: 'public/app/assets', type: 'dir' },
   { source: 'app/data', target: 'public/app/data', type: 'dir' },
   { source: 'app/js', target: 'public/app/js', type: 'dir' }

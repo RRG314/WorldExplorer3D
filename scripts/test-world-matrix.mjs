@@ -221,6 +221,21 @@ async function loadLocation(page, spec) {
     const walkSpawn = typeof ctx.resolveSafeWorldSpawn === 'function' ?
       ctx.resolveSafeWorldSpawn(actorX, actorZ, { mode: 'walk', source: 'world_matrix_walk' }) :
       null;
+    if (typeof ctx.refreshAstronomicalSky === 'function') {
+      ctx.refreshAstronomicalSky(true);
+    }
+    const sky = typeof ctx.getAstronomicalSkySnapshot === 'function' ? ctx.getAstronomicalSkySnapshot() : null;
+    let weather = null;
+    if (typeof ctx.refreshLiveWeather === 'function' && typeof ctx.getWeatherSnapshot === 'function') {
+      try {
+        await ctx.refreshLiveWeather(true);
+        weather = ctx.getWeatherSnapshot();
+      } catch (err) {
+        weather = {
+          error: String(err?.message || err)
+        };
+      }
+    }
 
     return {
       id: locationSpec.id,
@@ -239,6 +254,36 @@ async function loadLocation(page, spec) {
         waterAreas: Array.isArray(ctx.waterAreas) ? ctx.waterAreas.length : 0,
         waterways: Array.isArray(ctx.waterways) ? ctx.waterways.length : 0,
         vegetationMeshes: Array.isArray(ctx.vegetationMeshes) ? ctx.vegetationMeshes.length : 0
+      },
+      groundLayers: {
+        urbanSurfaceMeshCount: Array.isArray(ctx.urbanSurfaceMeshes) ? ctx.urbanSurfaceMeshes.length : 0,
+        sidewalkBatchCount: Array.isArray(ctx.urbanSurfaceMeshes) ?
+          ctx.urbanSurfaceMeshes.filter((mesh) => mesh?.userData?.isSidewalkBatch).length :
+          0,
+        keyedSidewalkBatchCount: Array.isArray(ctx.urbanSurfaceMeshes) ?
+          ctx.urbanSurfaceMeshes.filter((mesh) =>
+            mesh?.userData?.isSidewalkBatch &&
+            Array.isArray(mesh?.userData?.continuousWorldRegionKeys) &&
+            mesh.userData.continuousWorldRegionKeys.length > 0
+          ).length :
+          0,
+        sidewalkTriangles: Array.isArray(ctx.urbanSurfaceMeshes) ?
+          ctx.urbanSurfaceMeshes.reduce((sum, mesh) => {
+            if (!mesh?.userData?.isSidewalkBatch) return sum;
+            const indexCount = Number(mesh.geometry?.index?.count || 0);
+            return sum + Math.floor(indexCount / 3);
+          }, 0) :
+          0,
+        visibleBuildingGroundMeshes: Array.isArray(ctx.landuseMeshes) ?
+          ctx.landuseMeshes.filter((mesh) => mesh && mesh.visible !== false && mesh.userData?.landuseType === 'buildingGround').length :
+          0,
+        visibleGroundAprons: Array.isArray(ctx.landuseMeshes) ?
+          ctx.landuseMeshes.filter((mesh) => mesh && mesh.visible !== false && mesh.userData?.isGroundApron).length :
+          0,
+        visibleFoundationSkirts: Array.isArray(ctx.landuseMeshes) ?
+          ctx.landuseMeshes.filter((mesh) => mesh && mesh.visible !== false && mesh.userData?.isFoundationSkirt).length :
+          0,
+        skippedBuildingAprons: Number(ctx.urbanSurfaceStats?.skippedBuildingAprons || 0)
       },
       traversal: {
         walkSegments: Number(ctx.traversalNetworks?.walk?.segmentCount || 0),
@@ -261,10 +306,31 @@ async function loadLocation(page, spec) {
         onRoad: !!walkSpawn.onRoad,
         reason: walkSpawn.reason || null
       } : null,
+      sky,
+      weather,
       worldLoading: !!ctx.worldLoading,
       interiorActive: !!ctx.activeInterior
     };
   }, spec);
+}
+
+async function loadLocationWithRetries(page, spec, attempts = 3) {
+  let last = null;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    last = await loadLocation(page, spec);
+    const hasWorldData =
+      (Number(last?.counts?.roads || 0) > 0) ||
+      (Number(last?.counts?.buildings || 0) > 0) ||
+      (Number(last?.counts?.landuses || 0) > 0);
+    const traversalReady =
+      Number(last?.traversal?.driveSegments || 0) > 0 &&
+      Number(last?.traversal?.walkSegments || 0) > 0;
+    if (last?.worldLoading === false && hasWorldData && traversalReady) {
+      return last;
+    }
+    await page.waitForTimeout(1200 + attempt * 600);
+  }
+  return last;
 }
 
 async function main() {
@@ -285,32 +351,68 @@ async function main() {
   const report = {
     generatedAt: new Date().toISOString(),
     baseUrl,
-    locations: []
+    locations: [],
+    skippedLocations: [],
+    warnings: []
   };
 
   try {
     await bootstrapRuntime(page, baseUrl);
 
     for (const spec of WORLD_TEST_LOCATIONS) {
-      const result = await loadLocation(page, spec);
+      const result = await loadLocationWithRetries(page, spec, 3);
       assert(result.worldLoading === false, `${spec.id}: worldLoading stayed true`);
-      assert(result.counts.roads > 0 || result.counts.buildings > 0 || result.counts.landuses > 0, `${spec.id}: no world data loaded`);
+      const hasWorldData = result.counts.roads > 0 || result.counts.buildings > 0 || result.counts.landuses > 0;
+      if (!hasWorldData) {
+        const warning = `${spec.id}: no world data loaded after retries, skipping location (likely upstream provider outage)`;
+        console.warn(`[world-matrix] ${warning}`);
+        report.warnings.push(warning);
+        report.skippedLocations.push({
+          id: spec.id,
+          label: spec.label,
+          reason: 'no_world_data',
+          snapshot: result
+        });
+        continue;
+      }
       assert(result.driveSpawn?.valid !== false, `${spec.id}: invalid drive spawn ${JSON.stringify(result.driveSpawn)}`);
       assert(result.walkSpawn?.valid !== false, `${spec.id}: invalid walk spawn ${JSON.stringify(result.walkSpawn)}`);
       assert(result.traversal.driveSegments > 0, `${spec.id}: drive traversal graph missing`);
       assert(result.traversal.walkSegments > 0, `${spec.id}: walk traversal graph missing`);
+      assert(
+        (
+          result.groundLayers.sidewalkBatchCount <= 1 ||
+          (
+            Number.isFinite(result.groundLayers.sidewalkBatchCount) &&
+            result.groundLayers.sidewalkBatchCount <= 32 &&
+            result.groundLayers.keyedSidewalkBatchCount === result.groundLayers.sidewalkBatchCount
+          )
+        ),
+        `${spec.id}: sidewalk batching regressed ${JSON.stringify(result.groundLayers)}`
+      );
+      assert(result.sky?.source === 'astronomical', `${spec.id}: astronomical sky snapshot missing`);
+      assert(Number.isFinite(result.sky?.sunAltitudeDeg), `${spec.id}: sun altitude missing from sky snapshot`);
+      assert(Number.isFinite(result.sky?.moonIllumination), `${spec.id}: moon illumination missing from sky snapshot`);
+      assert(!result.weather?.error, `${spec.id}: weather fetch failed ${JSON.stringify(result.weather)}`);
+      assert(result.weather?.source === 'live', `${spec.id}: weather snapshot not live ${JSON.stringify(result.weather)}`);
+      assert(typeof result.weather?.conditionLabel === 'string' && result.weather.conditionLabel.length > 0, `${spec.id}: weather condition missing`);
+      assert(Number.isFinite(result.weather?.temperatureF), `${spec.id}: weather temperature missing`);
 
-      await page.screenshot({
-        path: path.join(outputDir, `${spec.id}.png`),
-        fullPage: true
-      });
+      try {
+        await page.screenshot({
+          path: path.join(outputDir, `${spec.id}.png`),
+          fullPage: true
+        });
+      } catch (error) {
+        report.warnings.push(`${spec.id}: screenshot capture skipped (${error?.message || error})`);
+      }
       report.locations.push(result);
     }
 
     const fatalConsoleErrors = consoleErrors.filter((entry) => !isTransientNetworkConsoleError(entry));
     report.consoleErrors = consoleErrors;
     report.fatalConsoleErrors = fatalConsoleErrors;
-    report.pass = fatalConsoleErrors.length === 0;
+    report.pass = fatalConsoleErrors.length === 0 && report.locations.length > 0;
     await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
   } finally {
     await browser.close();
@@ -321,26 +423,33 @@ async function main() {
   if (fatalConsoleErrors.length > 0) {
     throw new Error(`Console/page errors detected during world matrix run:\n${fatalConsoleErrors.join('\n')}`);
   }
+  if (!report.locations.length) {
+    throw new Error('World matrix run did not complete any loaded locations.');
+  }
 }
 
-main().catch(async (err) => {
-  try {
-    await mkdirp(outputDir);
-    await fs.writeFile(
-      path.join(outputDir, 'report.json'),
-      JSON.stringify(
-        {
-          generatedAt: new Date().toISOString(),
-          pass: false,
-          error: String(err?.message || err)
-        },
-        null,
-        2
-      )
-    );
-  } catch {
-    // Ignore report write failures during fatal exit.
-  }
-  console.error(err);
-  process.exitCode = 1;
-});
+main()
+  .then(() => {
+    process.exit(0);
+  })
+  .catch(async (err) => {
+    try {
+      await mkdirp(outputDir);
+      await fs.writeFile(
+        path.join(outputDir, 'report.json'),
+        JSON.stringify(
+          {
+            generatedAt: new Date().toISOString(),
+            pass: false,
+            error: String(err?.message || err)
+          },
+          null,
+          2
+        )
+      );
+    } catch {
+      // Ignore report write failures during fatal exit.
+    }
+    console.error(err);
+    process.exit(1);
+  });

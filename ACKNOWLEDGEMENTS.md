@@ -94,6 +94,20 @@ you may distribute the result only under the same license.
 OpenStreetMap is built by a community of mappers that contribute and maintain 
 data about roads, trails, cafés, railway stations, and much more, all over the world.
 
+### MapComplete (Reference Semantics)
+
+**Website**: https://mapcomplete.org/  
+**Repository**: https://github.com/pietervdvn/MapComplete
+
+**How World Explorer Uses It**:
+- as a reference source for public OSM-tag interpretation ideas
+- specifically for building-part and vertical-semantics concepts such as `height`, `min_height`, `building:levels`, `building:min_level`, `level`, and `building:part`
+
+**Important Notes**:
+- World Explorer does not bundle MapComplete code as part of this adaptation
+- World Explorer does not act as a direct OSM writing client
+- the reference was used to strengthen World Explorer-native runtime/editor semantics, not replace the moderated overlay workflow
+
 ### Rentcast API
 
 **Copyright**: © Rentcast  
@@ -456,7 +470,7 @@ This acknowledgements file is maintained to ensure proper credit is given to all
 **Version**: 1.0.0
 
 If you believe your work should be acknowledged and is not listed, please contact:
-hello@worldexplorer.app
+mail@worldexplorer3d.io
 
 ---
 
@@ -477,4 +491,4 @@ Thank you all for your contributions to the technologies and standards that make
 Proprietary Software - All Rights Reserved  
 © 2026
 
-For licensing inquiries: hello@worldexplorer.app
+For licensing inquiries: mail@worldexplorer3d.io

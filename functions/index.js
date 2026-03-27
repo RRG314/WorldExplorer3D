@@ -2,8 +2,20 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 const { defineString } = require('firebase-functions/params');
 const Stripe = require('stripe');
+const { ADMIN_ACTIVITY_COLLECTION, buildAdminDashboardExports } = require('./admin-dashboard');
+const {
+  CREATOR_PROFILES_COLLECTION,
+  ensureCreatorProfileDoc,
+  mergeCreatorProfile,
+  sanitizeAvatar,
+  sanitizeMultilineText: sanitizeCreatorProfileMultilineText,
+  sanitizeUsername
+} = require('./creator-profile');
+const { buildOverlayExports } = require('./overlay');
 
-admin.initializeApp();
+if (!admin.apps.length) {
+  admin.initializeApp();
+}
 const db = admin.firestore();
 
 const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
@@ -31,6 +43,63 @@ const PARAM_STRIPE_PRICE_PRO = defineString('WE3D_STRIPE_PRICE_PRO', { default: 
 const PARAM_ADMIN_ALLOWED_EMAILS = defineString('WE3D_ADMIN_ALLOWED_EMAILS', { default: '' });
 const PARAM_ADMIN_ALLOWED_UIDS = defineString('WE3D_ADMIN_ALLOWED_UIDS', { default: '' });
 const PARAM_ALLOWED_ORIGINS = defineString('WE3D_ALLOWED_ORIGINS', { default: '' });
+const PARAM_RESEND_API_KEY = defineString('WE3D_RESEND_API_KEY', { default: '' });
+const PARAM_EMAIL_FROM = defineString('WE3D_EMAIL_FROM', { default: '' });
+const PARAM_ADMIN_NOTIFICATION_EMAIL = defineString('WE3D_ADMIN_NOTIFICATION_EMAIL', { default: '' });
+const PARAM_MODERATION_PANEL_URL = defineString('WE3D_MODERATION_PANEL_URL', { default: 'https://worldexplorer3d.io/account/admin.html?view=moderation' });
+
+const CONTRIBUTION_EDIT_TYPE_CONFIG = Object.freeze({
+  place_info: Object.freeze({
+    id: 'place_info',
+    label: 'Place Info',
+    icon: '📍',
+    markerStyle: 'info-pin',
+    defaultCategory: 'place',
+    targetKinds: ['world', 'building', 'destination', 'interior'],
+    requiresScopedTarget: false
+  }),
+  artifact_marker: Object.freeze({
+    id: 'artifact_marker',
+    label: 'Artifact Marker',
+    icon: '🧿',
+    markerStyle: 'artifact-beacon',
+    defaultCategory: 'artifact',
+    targetKinds: ['world', 'building', 'destination', 'interior'],
+    requiresScopedTarget: false
+  }),
+  building_note: Object.freeze({
+    id: 'building_note',
+    label: 'Building Note',
+    icon: '🏢',
+    markerStyle: 'building-outline',
+    defaultCategory: 'building',
+    targetKinds: ['building', 'destination', 'interior'],
+    requiresScopedTarget: true
+  }),
+  interior_seed: Object.freeze({
+    id: 'interior_seed',
+    label: 'Interior Seed',
+    icon: '🚪',
+    markerStyle: 'interior-node',
+    defaultCategory: 'interior',
+    targetKinds: ['building', 'interior', 'destination'],
+    requiresScopedTarget: true
+  }),
+  photo_point: Object.freeze({
+    id: 'photo_point',
+    label: 'Photo Contribution',
+    icon: '📷',
+    markerStyle: 'photo-frame',
+    defaultCategory: 'photo',
+    targetKinds: ['world', 'building', 'destination', 'interior'],
+    requiresScopedTarget: false
+  })
+});
+const CONTRIBUTION_EDIT_TYPES = new Set(Object.keys(CONTRIBUTION_EDIT_TYPE_CONFIG));
+const CONTRIBUTION_STATUS_VALUES = new Set(['pending', 'approved', 'rejected']);
+const CONTRIBUTION_WORLD_KINDS = new Set(['earth', 'moon', 'space']);
+const CONTRIBUTION_MAX_RESULTS = 120;
+const CONTRIBUTION_AREA_CELL_DEGREES = 0.06;
 
 function readParamString(paramRef, envFallback = '') {
   try {
@@ -59,6 +128,18 @@ function adminConfig() {
   };
 }
 
+function contributionNotificationConfig() {
+  return {
+    resendApiKey: readParamString(PARAM_RESEND_API_KEY, process.env.WE3D_RESEND_API_KEY || ''),
+    emailFrom: readParamString(PARAM_EMAIL_FROM, process.env.WE3D_EMAIL_FROM || ''),
+    adminNotificationEmail: readParamString(PARAM_ADMIN_NOTIFICATION_EMAIL, process.env.WE3D_ADMIN_NOTIFICATION_EMAIL || ''),
+    moderationPanelUrl: readParamString(
+      PARAM_MODERATION_PANEL_URL,
+      process.env.WE3D_MODERATION_PANEL_URL || 'https://worldexplorer3d.io/account/admin.html?view=moderation'
+    )
+  };
+}
+
 function parseCsvSet(value, normalize = (item) => item) {
   return new Set(
     String(value || '')
@@ -70,6 +151,318 @@ function parseCsvSet(value, normalize = (item) => item) {
 
 function normalizeEmail(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+function sanitizeText(value, max = 120) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+function sanitizeMultilineText(value, max = 320) {
+  return String(value || '')
+    .replace(/\r\n?/g, '\n')
+    .replace(/[^\S\n]+/g, ' ')
+    .trim()
+    .slice(0, max);
+}
+
+function sanitizeHttpUrl(value, max = 320) {
+  const raw = String(value || '').trim().slice(0, max);
+  if (!raw) return '';
+  try {
+    const parsed = new URL(raw);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:' ? parsed.href.slice(0, max) : '';
+  } catch (_) {
+    return '';
+  }
+}
+
+function finiteNumber(value, fallback = 0) {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function clampLat(lat) {
+  return Math.max(-90, Math.min(90, finiteNumber(lat, 0)));
+}
+
+function wrapLon(lon) {
+  let next = finiteNumber(lon, 0);
+  while (next < -180) next += 360;
+  while (next > 180) next -= 360;
+  return next;
+}
+
+function sanitizeContributionEditType(value) {
+  const next = String(value || '').trim().toLowerCase();
+  return CONTRIBUTION_EDIT_TYPES.has(next) ? next : 'place_info';
+}
+
+function getContributionEditTypeConfig(editType) {
+  return CONTRIBUTION_EDIT_TYPE_CONFIG[sanitizeContributionEditType(editType)] || CONTRIBUTION_EDIT_TYPE_CONFIG.place_info;
+}
+
+function sanitizeContributionStatus(value) {
+  const next = String(value || '').trim().toLowerCase();
+  return CONTRIBUTION_STATUS_VALUES.has(next) ? next : 'pending';
+}
+
+function sanitizeWorldKind(value) {
+  const next = String(value || '').trim().toLowerCase();
+  return CONTRIBUTION_WORLD_KINDS.has(next) ? next : 'earth';
+}
+
+function computeContributionAreaKey(lat, lon, worldKind = 'earth') {
+  const safeWorldKind = sanitizeWorldKind(worldKind);
+  const safeLat = clampLat(lat);
+  const safeLon = wrapLon(lon);
+  const latBucket = Math.floor((safeLat + 90) / CONTRIBUTION_AREA_CELL_DEGREES);
+  const lonBucket = Math.floor((safeLon + 180) / CONTRIBUTION_AREA_CELL_DEGREES);
+  return `${safeWorldKind}:${latBucket}:${lonBucket}`;
+}
+
+function normalizeContributionTarget(raw = {}) {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const anchorKind = String(source.anchorKind || 'world').toLowerCase();
+  return {
+    anchorKind: anchorKind === 'building' || anchorKind === 'interior' || anchorKind === 'destination' ? anchorKind : 'world',
+    lat: clampLat(source.lat),
+    lon: wrapLon(source.lon),
+    x: finiteNumber(source.x, 0),
+    y: finiteNumber(source.y, 0),
+    z: finiteNumber(source.z, 0),
+    locationLabel: sanitizeText(source.locationLabel || 'Current Location', 120),
+    buildingKey: sanitizeText(source.buildingKey || '', 180),
+    buildingLabel: sanitizeText(source.buildingLabel || '', 120),
+    interiorKey: sanitizeText(source.interiorKey || '', 180),
+    destinationKey: sanitizeText(source.destinationKey || '', 180),
+    destinationLabel: sanitizeText(source.destinationLabel || '', 120)
+  };
+}
+
+function normalizeContributionPayload(raw = {}, editType = 'place_info') {
+  const source = raw && typeof raw === 'object' ? raw : {};
+  const cfg = getContributionEditTypeConfig(editType);
+  return {
+    title: sanitizeText(source.title || '', 80),
+    subtitle: sanitizeText(source.subtitle || '', 120),
+    note: sanitizeMultilineText(source.note || '', 320),
+    category: sanitizeText(source.category || cfg.defaultCategory, 40).toLowerCase(),
+    icon: sanitizeText(source.icon || cfg.icon, 8),
+    markerStyle: sanitizeText(source.markerStyle || cfg.markerStyle, 32).toLowerCase(),
+    tagsText: sanitizeText(source.tagsText || '', 160),
+    placeKind: sanitizeText(source.placeKind || '', 48).toLowerCase(),
+    website: sanitizeHttpUrl(source.website || '', 240),
+    phone: sanitizeText(source.phone || '', 40),
+    hours: sanitizeText(source.hours || '', 120),
+    accessNotes: sanitizeMultilineText(source.accessNotes || '', 180),
+    buildingUse: sanitizeText(source.buildingUse || '', 60),
+    entranceLabel: sanitizeText(source.entranceLabel || '', 60),
+    floorLabel: sanitizeText(source.floorLabel || '', 40),
+    roomLabel: sanitizeText(source.roomLabel || '', 80),
+    photoUrl: sanitizeHttpUrl(source.photoUrl || '', 320),
+    photoCaption: sanitizeText(source.photoCaption || '', 160),
+    photoAttribution: sanitizeText(source.photoAttribution || '', 120)
+  };
+}
+
+function contributionTargetValidForType(editType, target) {
+  const cfg = getContributionEditTypeConfig(editType);
+  const anchorKind = String(target?.anchorKind || 'world').toLowerCase();
+  return cfg.targetKinds.includes(anchorKind);
+}
+
+function previewLocationLabel(target = {}) {
+  return sanitizeText(
+    target.buildingLabel ||
+    target.destinationLabel ||
+    target.locationLabel ||
+    'Current Location',
+    120
+  );
+}
+
+function previewSummaryLine(payload = {}, target = {}) {
+  const parts = [
+    sanitizeText(payload?.title || '', 80),
+    sanitizeText(target?.buildingLabel || target?.destinationLabel || target?.locationLabel || '', 120),
+    `${clampLat(target?.lat).toFixed(5)}, ${wrapLon(target?.lon).toFixed(5)}`
+  ].filter(Boolean);
+  return parts.join(' • ');
+}
+
+function serializeContributionDoc(docLike = {}, options = {}) {
+  const data = typeof docLike.data === 'function' ? docLike.data() || {} : docLike || {};
+  const editType = sanitizeContributionEditType(data.editType);
+  const target = normalizeContributionTarget(data.target || {});
+  const payload = normalizeContributionPayload(data.payload || {}, editType);
+  const status = sanitizeContributionStatus(data.status);
+  const moderation = data.moderation && typeof data.moderation === 'object'
+    ? {
+        moderatedBy: sanitizeText(data.moderation.moderatedBy || '', 120),
+        moderatedByName: sanitizeText(data.moderation.moderatedByName || '', 60),
+        moderatedAtMs: timestampToMillis(data.moderation.moderatedAt),
+        decisionNote: sanitizeMultilineText(data.moderation.decisionNote || '', 200)
+      }
+    : null;
+
+  return {
+    id: sanitizeText(docLike.id || data.id || '', 180),
+    editType,
+    editTypeLabel: getContributionEditTypeConfig(editType).label,
+    status,
+    worldKind: sanitizeWorldKind(data.worldKind || 'earth'),
+    areaKey: sanitizeText(data.areaKey || computeContributionAreaKey(target.lat, target.lon, data.worldKind), 64),
+    source: sanitizeText(data.source || 'editor-v1', 48),
+    userId: sanitizeText(data.userId || '', 160),
+    userDisplayName: sanitizeText(data.userDisplayName || 'Explorer', 60),
+    target,
+    payload,
+    moderation,
+    createdAtMs: timestampToMillis(data.createdAt),
+    updatedAtMs: timestampToMillis(data.updatedAt),
+    preview: {
+      title: sanitizeText(payload.title || 'Untitled contribution', 80),
+      summary: previewSummaryLine(payload, target),
+      locationLabel: previewLocationLabel(target),
+      hasPhoto: !!payload.photoUrl,
+      buildingLabel: sanitizeText(target.buildingLabel || '', 120),
+      destinationLabel: sanitizeText(target.destinationLabel || '', 120)
+    },
+    reviewerOnly: options.reviewerOnly === true ? {
+      openStreetMapUrl: `https://www.openstreetmap.org/?mlat=${clampLat(target.lat).toFixed(6)}&mlon=${wrapLon(target.lon).toFixed(6)}#map=19/${clampLat(target.lat).toFixed(6)}/${wrapLon(target.lon).toFixed(6)}`
+    } : undefined
+  };
+}
+
+async function requireModerator(req, res) {
+  const auth = await verifyAuth(req, res);
+  if (!auth) return null;
+
+  try {
+    const authUser = await admin.auth().getUser(auth.uid);
+    const userSnap = await db.collection('users').doc(auth.uid).get();
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+    const claimAdmin = auth.admin === true || String(auth.role || '').toLowerCase() === 'admin';
+    const storedAdmin = String(userData.subscriptionStatus || '').toLowerCase() === 'admin';
+    const allowlisted = isAllowlistedAdminCandidate(authUser, auth.uid);
+    if (!claimAdmin && !storedAdmin && !allowlisted.allowed) {
+      res.status(403).json({ error: 'Admin access is required for moderation.' });
+      return null;
+    }
+    return {
+      auth,
+      authUser,
+      userData,
+      displayName: sanitizeText(authUser.displayName || authUser.email || userData.displayName || 'Admin', 60)
+    };
+  } catch (err) {
+    console.error('[moderation] moderator verification failed:', err);
+    res.status(500).json({ error: 'Unable to verify moderator access right now.' });
+    return null;
+  }
+}
+
+function contributionNotificationEnabled(cfg = contributionNotificationConfig()) {
+  return !!(cfg.resendApiKey && cfg.emailFrom && cfg.adminNotificationEmail);
+}
+
+async function logAdminActivity(entry = {}) {
+  const actorUid = sanitizeText(entry.actorUid || '', 160);
+  const actorName = sanitizeText(entry.actorName || '', 80);
+  const actionType = sanitizeText(entry.actionType || '', 80);
+  const targetType = sanitizeText(entry.targetType || '', 80);
+  const targetId = sanitizeText(entry.targetId || '', 180);
+  if (!actorUid || !actionType || !targetType || !targetId) return;
+
+  await db.collection(ADMIN_ACTIVITY_COLLECTION).add({
+    actorUid,
+    actorName,
+    actionType,
+    targetType,
+    targetId,
+    title: sanitizeText(entry.title || '', 140),
+    summary: sanitizeMultilineText(entry.summary || '', 320),
+    createdAt: admin.firestore.FieldValue.serverTimestamp(),
+    createdAtMs: Date.now()
+  });
+}
+
+async function sendContributionNotificationEmail(submission) {
+  const cfg = contributionNotificationConfig();
+  if (!contributionNotificationEnabled(cfg)) {
+    return { sent: false, reason: 'not-configured' };
+  }
+
+  const title = sanitizeText(submission?.payload?.title || 'Untitled contribution', 80);
+  const typeLabel = sanitizeText(submission?.editTypeLabel || 'Contribution', 60);
+  const locationLabel = previewLocationLabel(submission?.target || {});
+  const coords = `${clampLat(submission?.target?.lat).toFixed(5)}, ${wrapLon(submission?.target?.lon).toFixed(5)}`;
+  const reviewUrl = String(cfg.moderationPanelUrl || 'https://worldexplorer3d.io/account/admin.html?view=moderation').trim();
+  const subject = `World Explorer pending contribution: ${typeLabel} — ${title}`;
+  const text = [
+    'A new World Explorer contribution is waiting for review.',
+    '',
+    `Type: ${typeLabel}`,
+    `Title: ${title}`,
+    `Submitted by: ${sanitizeText(submission?.userDisplayName || 'Explorer', 60)} (${sanitizeText(submission?.userId || '', 160)})`,
+    `Location: ${locationLabel}`,
+    `Coordinates: ${coords}`,
+    `Review: ${reviewUrl}`,
+    '',
+    'This submission is pending and is not live yet.'
+  ].join('\n');
+
+  const response = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${cfg.resendApiKey}`,
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      'User-Agent': 'WorldExplorer3D-Functions/1.0'
+    },
+    body: JSON.stringify({
+      from: cfg.emailFrom,
+      to: [cfg.adminNotificationEmail],
+      subject,
+      text,
+      html: `
+        <div style="font-family:Arial,sans-serif;line-height:1.5;color:#102033">
+          <h2>New World Explorer contribution</h2>
+          <p>A new contribution is waiting for review.</p>
+          <ul>
+            <li><strong>Type:</strong> ${typeLabel}</li>
+            <li><strong>Title:</strong> ${title}</li>
+            <li><strong>Submitted by:</strong> ${sanitizeText(submission?.userDisplayName || 'Explorer', 60)}</li>
+            <li><strong>Location:</strong> ${locationLabel}</li>
+            <li><strong>Coordinates:</strong> ${coords}</li>
+          </ul>
+          <p><a href="${reviewUrl}">Open the moderation panel</a></p>
+          <p>This submission is pending and is not visible in the live world yet.</p>
+        </div>
+      `
+    })
+  });
+
+  if (!response.ok) {
+    const raw = await response.text();
+    throw new Error(`Email notification failed (${response.status}): ${raw.slice(0, 200)}`);
+  }
+
+  return { sent: true };
+}
+
+async function listContributionCounts() {
+  try {
+    const statuses = ['pending', 'approved', 'rejected'];
+    const entries = await Promise.all(statuses.map(async (status) => {
+      const snap = await db.collection('editorSubmissions').where('status', '==', status).count().get();
+      return [status, Number(snap.data()?.count || 0)];
+    }));
+    return Object.fromEntries(entries);
+  } catch (err) {
+    console.warn('[moderation] count query failed:', err?.message || err);
+    return {};
+  }
 }
 
 function isAllowlistedAdminCandidate(authUser, uid) {
@@ -341,6 +734,7 @@ async function deleteUserData(uid) {
   if (!uid) return;
 
   const userRef = db.collection('users').doc(uid);
+  const creatorProfileRef = db.collection(CREATOR_PROFILES_COLLECTION).doc(uid);
 
   const ownedRoomsSnap = await db.collection('rooms').where('ownerUid', '==', uid).get();
   for (const roomDoc of ownedRoomsSnap.docs) {
@@ -370,6 +764,7 @@ async function deleteUserData(uid) {
     await deleteDocsByQuery(userRef.collection('myRooms'), 200, 'users/{uid}/myRooms');
     await userRef.delete().catch(() => {});
   }
+  await creatorProfileRef.delete().catch(() => {});
 }
 
 function timestampToMillis(value) {
@@ -411,6 +806,7 @@ async function assertStripeCustomerOwnership(stripe, customerId, uid, expectedEm
 async function ensureUserDoc(uid, email, displayName) {
   const ref = db.collection('users').doc(uid);
   const snap = await ref.get();
+  const normalizedDisplayName = normalizeDisplayName(displayName);
 
   if (snap.exists) {
     const existing = snap.data() || {};
@@ -426,13 +822,16 @@ async function ensureUserDoc(uid, email, displayName) {
     await ref.set(
       {
         email: email || existing.email || '',
-        displayName: displayName || existing.displayName || '',
+        displayName: normalizedDisplayName || existing.displayName || 'Explorer',
         roomCreateCount,
         roomCreateLimit,
         updatedAt: admin.firestore.FieldValue.serverTimestamp()
       },
       { merge: true }
     );
+    await ensureCreatorProfileDoc(db, uid, {
+      username: normalizedDisplayName || existing.displayName || 'Explorer'
+    });
     return {
       ...existing,
       roomCreateCount,
@@ -444,7 +843,7 @@ async function ensureUserDoc(uid, email, displayName) {
   const created = {
     uid,
     email: email || '',
-    displayName: displayName || '',
+    displayName: normalizedDisplayName || 'Explorer',
     plan,
     trialEndsAt: null,
     subscriptionStatus: 'none',
@@ -456,6 +855,9 @@ async function ensureUserDoc(uid, email, displayName) {
   };
 
   await ref.set(created, { merge: true });
+  await ensureCreatorProfileDoc(db, uid, {
+    username: normalizedDisplayName || 'Explorer'
+  });
   return created;
 }
 
@@ -1000,6 +1402,8 @@ exports.updateAccountProfile = functions.region('us-central1').https.onRequest(a
 
   try {
     const displayName = normalizeDisplayName(req.body && req.body.displayName);
+    const bio = sanitizeCreatorProfileMultilineText(req.body && req.body.bio, 320);
+    const avatar = sanitizeAvatar(req.body && req.body.avatar);
     if (!displayName) {
       res.status(400).json({ error: 'Display name is required.' });
       return;
@@ -1010,8 +1414,16 @@ exports.updateAccountProfile = functions.region('us-central1').https.onRequest(a
       displayName,
       updatedAt: admin.firestore.FieldValue.serverTimestamp()
     }, { merge: true });
+    const creatorProfile = await mergeCreatorProfile(db, auth.uid, {
+      username: sanitizeUsername(displayName, 'Explorer'),
+      bio,
+      avatar
+    });
 
-    res.status(200).json({ displayName });
+    res.status(200).json({
+      displayName,
+      creatorProfile
+    });
   } catch (err) {
     console.error('[updateAccountProfile] failed:', err);
     res.status(500).json({ error: 'Unable to update account profile.' });
@@ -1085,6 +1497,251 @@ exports.deleteAccount = functions.region('us-central1').https.onRequest(async (r
   } catch (err) {
     console.error('[deleteAccount] failed:', err);
     res.status(500).json({ error: 'Unable to delete account right now.' });
+  }
+});
+
+exports.submitContribution = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const auth = await verifyAuth(req, res);
+  if (!auth) return;
+
+  try {
+    const authUser = await admin.auth().getUser(auth.uid);
+    await ensureUserDoc(auth.uid, authUser.email || '', authUser.displayName || '');
+
+    const editType = sanitizeContributionEditType(req.body && req.body.editType);
+    const worldKind = sanitizeWorldKind(req.body && req.body.worldKind);
+    const source = sanitizeText(req.body && req.body.source ? req.body.source : 'editor-v2', 48) || 'editor-v2';
+    const target = normalizeContributionTarget(req.body && req.body.target ? req.body.target : {});
+    const payload = normalizeContributionPayload(req.body && req.body.payload ? req.body.payload : {}, editType);
+    const areaKey = computeContributionAreaKey(target.lat, target.lon, worldKind);
+    const userDisplayName = sanitizeText(
+      req.body && req.body.userDisplayName ? req.body.userDisplayName : (authUser.displayName || authUser.email || 'Explorer'),
+      60
+    ) || 'Explorer';
+    const typeConfig = getContributionEditTypeConfig(editType);
+
+    if (!payload.title) {
+      res.status(400).json({ error: 'Add a short title before submitting.' });
+      return;
+    }
+    if (editType === 'photo_point' && !payload.photoUrl) {
+      res.status(400).json({ error: 'Add a photo URL before submitting a photo contribution.' });
+      return;
+    }
+    if (!contributionTargetValidForType(editType, target)) {
+      res.status(400).json({ error: 'This contribution type needs a valid world, building, destination, or interior target.' });
+      return;
+    }
+    if (typeConfig.requiresScopedTarget === true && target.anchorKind === 'world') {
+      res.status(400).json({ error: 'Capture a building, destination, or interior target before submitting this contribution type.' });
+      return;
+    }
+
+    const createdAt = admin.firestore.FieldValue.serverTimestamp();
+    const ref = await db.collection('editorSubmissions').add({
+      editType,
+      status: 'pending',
+      worldKind,
+      areaKey,
+      target,
+      payload,
+      userId: auth.uid,
+      userDisplayName,
+      source,
+      createdAt,
+      updatedAt: createdAt
+    });
+
+    const savedSnap = await ref.get();
+    const saved = serializeContributionDoc(savedSnap, { reviewerOnly: true });
+    let notification = { sent: false, reason: 'not-configured' };
+    try {
+      notification = await sendContributionNotificationEmail(saved);
+    } catch (err) {
+      notification = { sent: false, reason: 'send-failed' };
+      console.error('[submitContribution] notification failed:', err);
+    }
+
+    res.status(200).json({
+      id: ref.id,
+      status: 'pending',
+      notification
+    });
+  } catch (err) {
+    console.error('[submitContribution] failed:', err);
+    res.status(500).json({ error: 'Could not save this contribution right now.' });
+  }
+});
+
+exports.getContributionModerationOverview = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const moderator = await requireModerator(req, res);
+  if (!moderator) return;
+
+  try {
+    const counts = await listContributionCounts();
+    const notificationCfg = contributionNotificationConfig();
+    res.status(200).json({
+      reviewer: {
+        uid: moderator.auth.uid,
+        displayName: moderator.displayName,
+        email: sanitizeText(moderator.authUser.email || '', 120)
+      },
+      summary: counts,
+      notifications: {
+        configured: contributionNotificationEnabled(notificationCfg),
+        adminEmail: sanitizeText(notificationCfg.adminNotificationEmail || '', 160),
+        moderationPanelUrl: sanitizeText(notificationCfg.moderationPanelUrl || '', 320)
+      }
+    });
+  } catch (err) {
+    console.error('[getContributionModerationOverview] failed:', err);
+    res.status(500).json({ error: 'Unable to load moderation overview.' });
+  }
+});
+
+exports.listContributionSubmissions = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const moderator = await requireModerator(req, res);
+  if (!moderator) return;
+
+  try {
+    const rawStatus = sanitizeText(req.body && req.body.status ? req.body.status : 'pending', 20).toLowerCase();
+    const status = rawStatus === 'all' ? 'all' : sanitizeContributionStatus(rawStatus);
+    const editTypeFilter = sanitizeText(req.body && req.body.editType ? req.body.editType : 'all', 40).toLowerCase() || 'all';
+    const search = sanitizeText(req.body && req.body.search ? req.body.search : '', 80).toLowerCase();
+    const limitValue = parsePositiveInt(req.body && req.body.limit, 60, 1, CONTRIBUTION_MAX_RESULTS);
+
+    const baseRef = db.collection('editorSubmissions');
+    const queryRef = status !== 'all'
+      ? baseRef.where('status', '==', status).orderBy('createdAt', 'desc').limit(limitValue)
+      : baseRef.orderBy('createdAt', 'desc').limit(limitValue);
+
+    const snap = await queryRef.get();
+    let items = snap.docs.map((row) => serializeContributionDoc(row, { reviewerOnly: true }));
+
+    if (editTypeFilter !== 'all' && CONTRIBUTION_EDIT_TYPES.has(editTypeFilter)) {
+      items = items.filter((item) => item.editType === editTypeFilter);
+    }
+    if (search) {
+      items = items.filter((item) => {
+        const haystack = [
+          item.payload?.title,
+          item.payload?.subtitle,
+          item.payload?.note,
+          item.userDisplayName,
+          item.target?.locationLabel,
+          item.target?.buildingLabel,
+          item.target?.destinationLabel,
+          item.payload?.photoCaption,
+          item.payload?.buildingUse,
+          item.payload?.roomLabel
+        ].join(' ').toLowerCase();
+        return haystack.includes(search);
+      });
+    }
+
+    const counts = await listContributionCounts();
+    const notificationCfg = contributionNotificationConfig();
+    res.status(200).json({
+      items,
+      summary: counts,
+      reviewer: {
+        uid: moderator.auth.uid,
+        displayName: moderator.displayName,
+        email: sanitizeText(moderator.authUser.email || '', 120)
+      },
+      notifications: {
+        configured: contributionNotificationEnabled(notificationCfg),
+        adminEmail: sanitizeText(notificationCfg.adminNotificationEmail || '', 160),
+        moderationPanelUrl: sanitizeText(notificationCfg.moderationPanelUrl || '', 320)
+      }
+    });
+  } catch (err) {
+    console.error('[listContributionSubmissions] failed:', err);
+    res.status(500).json({ error: 'Unable to load contribution submissions.' });
+  }
+});
+
+exports.moderateContributionSubmission = functions.region('us-central1').https.onRequest(async (req, res) => {
+  if (setCors(req, res)) return;
+  if (req.method !== 'POST') {
+    res.status(405).json({ error: 'Method not allowed.' });
+    return;
+  }
+
+  const moderator = await requireModerator(req, res);
+  if (!moderator) return;
+
+  try {
+    const submissionId = sanitizeText(req.body && req.body.submissionId ? req.body.submissionId : '', 180);
+    const status = sanitizeContributionStatus(req.body && req.body.status ? req.body.status : 'pending');
+    const decisionNote = sanitizeMultilineText(req.body && req.body.decisionNote ? req.body.decisionNote : '', 200);
+    if (!submissionId) {
+      res.status(400).json({ error: 'Missing submission id.' });
+      return;
+    }
+    if (status !== 'approved' && status !== 'rejected') {
+      res.status(400).json({ error: 'Moderation status must be approved or rejected.' });
+      return;
+    }
+
+    const ref = db.collection('editorSubmissions').doc(submissionId);
+    const snap = await ref.get();
+    if (!snap.exists) {
+      res.status(404).json({ error: 'Contribution submission not found.' });
+      return;
+    }
+
+    const existing = snap.data() || {};
+    if (sanitizeContributionStatus(existing.status) !== 'pending') {
+      res.status(409).json({ error: 'This submission has already been reviewed.' });
+      return;
+    }
+
+    await ref.set({
+      status,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+      moderation: {
+        moderatedBy: moderator.auth.uid,
+        moderatedByName: moderator.displayName,
+        moderatedAt: admin.firestore.FieldValue.serverTimestamp(),
+        decisionNote
+      }
+    }, { merge: true });
+
+    const updatedSnap = await ref.get();
+    await logAdminActivity({
+      actorUid: moderator.auth.uid,
+      actorName: moderator.displayName,
+      actionType: status === 'approved' ? 'legacy_submission.approve' : 'legacy_submission.reject',
+      targetType: 'legacy_submission',
+      targetId: submissionId,
+      title: status === 'approved' ? 'Legacy contribution approved' : 'Legacy contribution rejected',
+      summary: `${sanitizeText(existing.payload?.title || existing.editType || submissionId, 120)} is now ${status}.`
+    });
+    res.status(200).json({
+      item: serializeContributionDoc(updatedSnap, { reviewerOnly: true })
+    });
+  } catch (err) {
+    console.error('[moderateContributionSubmission] failed:', err);
+    res.status(500).json({ error: 'Could not update moderation status right now.' });
   }
 });
 
@@ -1195,3 +1852,20 @@ exports.stripeWebhook = functions.region('us-central1').https.onRequest(async (r
     res.status(500).send('Webhook processing failed.');
   }
 });
+
+Object.assign(exports, buildOverlayExports({
+  setCors,
+  verifyAuth,
+  requireModerator,
+  logAdminActivity,
+  mergeCreatorProfile
+}));
+
+Object.assign(exports, buildAdminDashboardExports({
+  setCors,
+  requireModerator,
+  adminConfig,
+  contributionNotificationConfig,
+  contributionNotificationEnabled,
+  logAdminActivity
+}));

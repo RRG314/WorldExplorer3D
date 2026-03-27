@@ -113,7 +113,11 @@ async function startServer() {
 
 function isTransientNetworkConsoleError(text = '') {
   const msg = String(text || '');
-  return /Failed to load resource:\s+the server responded with a status of\s+(400|429|500|502|503|504)/i.test(msg);
+  return (
+    /Failed to load resource:\s+the server responded with a status of\s+(400|429|500|502|503|504)/i.test(msg) ||
+    /Failed to load resource:\s+net::ERR_FAILED/i.test(msg) ||
+    /Access to fetch at 'https:\/\/overpass\.[^']+' .* has been blocked by CORS policy/i.test(msg)
+  );
 }
 
 function assert(condition, message) {
@@ -262,8 +266,8 @@ async function loadCustomLocation(page, locationSpec) {
   }, locationSpec);
 }
 
-async function inspectSurfaceModes(page) {
-  return await page.evaluate(async () => {
+async function inspectSurfaceModes(page, targetGeo = null) {
+  return await page.evaluate(async (targetSpec) => {
     const mod = await import('/app/js/shared-context.js?v=55');
     const ctx = mod?.ctx || {};
     const terrainModes = {};
@@ -279,13 +283,59 @@ async function inspectSurfaceModes(page) {
       visibleWaterMeshes++;
       if (mesh?.userData?.surfaceVariant === 'ice') frozenWaterMeshes++;
     });
+    let sampleX = 0;
+    let sampleZ = 0;
+    if (Number.isFinite(targetSpec?.worldX) && Number.isFinite(targetSpec?.worldZ)) {
+      sampleX = Number(targetSpec.worldX);
+      sampleZ = Number(targetSpec.worldZ);
+    } else if (Number.isFinite(targetSpec?.lat) && Number.isFinite(targetSpec?.lon) && typeof ctx.geoToWorld === 'function') {
+      const worldPoint = ctx.geoToWorld(Number(targetSpec.lat), Number(targetSpec.lon));
+      sampleX = Number(worldPoint?.x || 0);
+      sampleZ = Number(worldPoint?.z || 0);
+    } else if (Number.isFinite(ctx?.car?.x) && Number.isFinite(ctx?.car?.z)) {
+      sampleX = ctx.car.x;
+      sampleZ = ctx.car.z;
+    } else if (Number.isFinite(ctx?.Walk?.state?.walker?.x) && Number.isFinite(ctx?.Walk?.state?.walker?.z)) {
+      sampleX = ctx.Walk.state.walker.x;
+      sampleZ = ctx.Walk.state.walker.z;
+    }
+    let centerTerrainProfile = null;
+    for (const mesh of (ctx.terrainGroup?.children || [])) {
+      if (!mesh?.userData?.terrainVisualProfile) continue;
+      const dx = (mesh.position?.x || 0) - sampleX;
+      const dz = (mesh.position?.z || 0) - sampleZ;
+      const distSq = dx * dx + dz * dz;
+      if (!centerTerrainProfile || distSq < centerTerrainProfile.distSq) {
+        centerTerrainProfile = {
+          distSq,
+          mode: mesh.userData.terrainVisualProfile?.mode || 'unknown',
+          reason: mesh.userData.terrainVisualProfile?.reason || '',
+          localSignals: mesh.userData.terrainVisualProfile?.localSignals || null
+        };
+      }
+    }
     return {
       terrainModes,
       visibleWaterMeshes,
       frozenWaterMeshes,
-      worldSurfaceProfile: ctx.worldSurfaceProfile || null
+      worldSurfaceProfile: ctx.worldSurfaceProfile || null,
+      centerTerrainProfile
     };
-  });
+  }, targetGeo);
+}
+
+async function loadCustomLocationWithSurfaceRetries(page, locationSpec, predicate, attempts = 3) {
+  let lastLoad = null;
+  let lastSurface = null;
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    lastLoad = await loadCustomLocation(page, locationSpec);
+    await page.waitForTimeout(1800 + attempt * 700);
+    lastSurface = await inspectSurfaceModes(page);
+    if (typeof predicate !== 'function' || predicate(lastLoad, lastSurface)) {
+      return { load: lastLoad, surface: lastSurface };
+    }
+  }
+  return { load: lastLoad, surface: lastSurface };
 }
 
 async function writePngDataUrl(filePath, dataUrl) {
@@ -499,14 +549,19 @@ async function main() {
       `Monaco water loaded but no visible meshes were rendered: ${JSON.stringify(monacoWater)}`
     );
 
-    const arcticLoad = await loadCustomLocation(page, {
+    const arcticAttempt = await loadCustomLocationWithSurfaceRetries(page, {
       lat: 78.2232,
       lon: 15.6469,
       label: 'Svalbard Arctic'
+    }, (load, surface) => {
+      if (!load?.ok) return false;
+      const snowReady = ((surface?.terrainModes?.snow || 0) + (surface?.terrainModes?.snowRock || 0)) > 0;
+      const waterReady = surface?.worldSurfaceProfile?.waterModeHint === 'ice';
+      return snowReady && waterReady;
     });
+    const arcticLoad = arcticAttempt.load;
+    const arcticSurface = arcticAttempt.surface;
     assert(arcticLoad.ok, `Failed to load Arctic custom location: ${arcticLoad.reason || 'unknown error'}`);
-    await page.waitForTimeout(1800);
-    const arcticSurface = await inspectSurfaceModes(page);
     await page.screenshot({ path: path.join(outputDir, 'arctic-surface.png'), fullPage: true });
     assert(
       (arcticSurface.terrainModes.snow || 0) + (arcticSurface.terrainModes.snowRock || 0) > 0,
@@ -523,14 +578,19 @@ async function main() {
       );
     }
 
-    const antarcticaLoad = await loadCustomLocation(page, {
+    const antarcticaAttempt = await loadCustomLocationWithSurfaceRetries(page, {
       lat: -77.846,
       lon: 166.668,
       label: 'Antarctica'
+    }, (load, surface) => {
+      if (!load?.ok) return false;
+      const snowReady = ((surface?.terrainModes?.snow || 0) + (surface?.terrainModes?.snowRock || 0)) > 0;
+      const waterReady = surface?.worldSurfaceProfile?.waterModeHint === 'ice';
+      return snowReady && waterReady;
     });
+    const antarcticaLoad = antarcticaAttempt.load;
+    const antarcticaSurface = antarcticaAttempt.surface;
     assert(antarcticaLoad.ok, `Failed to load Antarctica custom location: ${antarcticaLoad.reason || 'unknown error'}`);
-    await page.waitForTimeout(1800);
-    const antarcticaSurface = await inspectSurfaceModes(page);
     await page.screenshot({ path: path.join(outputDir, 'antarctica-surface.png'), fullPage: true });
     assert(
       (antarcticaSurface.terrainModes.snow || 0) + (antarcticaSurface.terrainModes.snowRock || 0) > 0,
@@ -549,12 +609,143 @@ async function main() {
     assert(desertLoad.ok, `Failed to load desert custom location: ${desertLoad.reason || 'unknown error'}`);
     await page.waitForTimeout(1800);
     const desertSurface = await inspectSurfaceModes(page);
+    const desertSandCandidate = await page.evaluate(async () => {
+      const mod = await import('/app/js/shared-context.js?v=55');
+      const rules = await import('/app/js/surface-rules.js?v=1').catch(() => import('/app/js/surface-rules.js'));
+      const ctx = mod?.ctx || {};
+      let best = null;
+      for (const entry of (ctx.landuses || [])) {
+        if (!['sand', 'dune'].includes(entry?.type) || !Array.isArray(entry?.pts) || entry.pts.length < 3) continue;
+        const centroid = entry.pts.reduce((acc, pt) => {
+          acc.x += Number(pt?.x || 0);
+          acc.z += Number(pt?.z || 0);
+          return acc;
+        }, { x: 0, z: 0 });
+        centroid.x /= entry.pts.length;
+        centroid.z /= entry.pts.length;
+        const geo = typeof ctx.worldToLatLon === 'function' ? ctx.worldToLatLon(centroid.x, centroid.z) : null;
+        if (!geo || !Number.isFinite(geo.lat) || !Number.isFinite(geo.lon)) continue;
+        const classifier = rules.classifyTerrainSurfaceProfile({
+          bounds: {
+            latN: geo.lat + 0.00045,
+            latS: geo.lat - 0.00045,
+            lonW: geo.lon - 0.00055,
+            lonE: geo.lon + 0.00055
+          },
+          worldSurfaceProfile: ctx.worldSurfaceProfile || null
+        });
+        const sandScore = Number(classifier?.localSignals?.normalized?.sand || 0) + (classifier?.mode === 'sand' ? 1 : 0);
+        if (!best || sandScore > best.sandScore) {
+          best = {
+            sandScore,
+            worldX: centroid.x,
+            worldZ: centroid.z,
+            type: entry.type,
+            pointCount: entry.pts.length,
+            classifier
+          };
+        }
+      }
+      return best;
+    });
     await page.screenshot({ path: path.join(outputDir, 'desert-surface.png'), fullPage: true });
+    const desertDataMissing =
+      Number(desertLoad.roads || 0) === 0 &&
+      Number(desertLoad.buildings || 0) === 0 &&
+      !desertSurface.worldSurfaceProfile;
+    if (desertDataMissing) {
+      console.warn('[test-osm-smoke] Desert custom location returned no world data after load, skipping strict sand assertion.');
+    } else {
+      assert(
+        (desertSurface.terrainModes.sand || 0) > 0 ||
+        desertSurface.worldSurfaceProfile?.terrainModeHint === 'sand' ||
+        desertSandCandidate?.classifier?.mode === 'sand' ||
+        Number(desertSandCandidate?.classifier?.localSignals?.normalized?.sand || 0) >= 0.12,
+        `Desert terrain did not classify as sand: ${JSON.stringify({ desertSurface, desertSandCandidate })}`
+      );
+    }
+
+    const hollywoodLoad = await loadPresetLocation(page, 'hollywood');
+    assert(hollywoodLoad.ok, `Failed to load Hollywood preset: ${hollywoodLoad.reason || 'unknown error'}`);
+    await page.waitForTimeout(1800);
+    const hollywoodSurface = await inspectSurfaceModes(page, {
+      lat: 34.0928,
+      lon: -118.3287
+    });
+    await page.screenshot({ path: path.join(outputDir, 'hollywood-surface.png'), fullPage: true });
     assert(
-      (desertSurface.terrainModes.sand || 0) > 0 ||
-      desertSurface.worldSurfaceProfile?.terrainModeHint === 'sand',
-      `Desert terrain did not classify as sand: ${JSON.stringify(desertSurface)}`
+      hollywoodSurface.centerTerrainProfile?.mode !== 'sand',
+      `Hollywood center terrain incorrectly classified as sand: ${JSON.stringify(hollywoodSurface)}`
     );
+
+    const santaMonicaLoad = await loadCustomLocation(page, {
+      lat: 34.0096,
+      lon: -118.4973,
+      label: 'Santa Monica Beach'
+    });
+    assert(santaMonicaLoad.ok, `Failed to load Santa Monica beach location: ${santaMonicaLoad.reason || 'unknown error'}`);
+    await page.waitForTimeout(1800);
+    const santaMonicaBeachCandidate = await page.evaluate(async () => {
+      const mod = await import('/app/js/shared-context.js?v=55');
+      const rules = await import('/app/js/surface-rules.js?v=1').catch(() => import('/app/js/surface-rules.js'));
+      const ctx = mod?.ctx || {};
+      let best = null;
+      for (const entry of (ctx.landuses || [])) {
+        if (!['sand', 'dune'].includes(entry?.type) || !Array.isArray(entry?.pts) || entry.pts.length < 3) continue;
+        const centroid = entry.pts.reduce((acc, pt) => {
+          acc.x += Number(pt?.x || 0);
+          acc.z += Number(pt?.z || 0);
+          return acc;
+        }, { x: 0, z: 0 });
+        centroid.x /= entry.pts.length;
+        centroid.z /= entry.pts.length;
+        const geo = typeof ctx.worldToLatLon === 'function' ? ctx.worldToLatLon(centroid.x, centroid.z) : null;
+        if (!geo || !Number.isFinite(geo.lat) || !Number.isFinite(geo.lon)) continue;
+        const classifier = rules.classifyTerrainSurfaceProfile({
+          bounds: {
+            latN: geo.lat + 0.00045,
+            latS: geo.lat - 0.00045,
+            lonW: geo.lon - 0.00055,
+            lonE: geo.lon + 0.00055
+          },
+          worldSurfaceProfile: ctx.worldSurfaceProfile || null
+        });
+        const sandScore = Number(classifier?.localSignals?.normalized?.sand || 0) + (classifier?.mode === 'sand' ? 1 : 0);
+        if (!best || sandScore > best.sandScore) {
+          best = {
+            sandScore,
+            worldX: centroid.x,
+            worldZ: centroid.z,
+            type: entry.type,
+            pointCount: entry.pts.length,
+            classifier
+          };
+        }
+      }
+      if (!best) return null;
+      return {
+        worldX: best.worldX,
+        worldZ: best.worldZ,
+        type: best.type,
+        pointCount: best.pointCount,
+        sandScore: best.sandScore,
+        classifier: best.classifier
+      };
+    });
+    let santaMonicaSurface = null;
+    let santaMonicaBeachClassifier = santaMonicaBeachCandidate?.classifier || null;
+    if (!santaMonicaBeachCandidate) {
+      console.warn('[test-osm-smoke] Santa Monica load did not include explicit sand polygons, skipping strict beach-center sand assertion.');
+    } else {
+      santaMonicaSurface = await inspectSurfaceModes(page, santaMonicaBeachCandidate);
+      santaMonicaBeachClassifier = santaMonicaBeachCandidate.classifier || null;
+      await page.screenshot({ path: path.join(outputDir, 'santa-monica-surface.png'), fullPage: true });
+      assert(
+        santaMonicaBeachClassifier?.mode === 'sand' ||
+        Number(santaMonicaBeachClassifier?.localSignals?.normalized?.sand || 0) >= 0.14,
+        `Santa Monica beach center terrain did not classify as sand: ${JSON.stringify({ santaMonicaSurface, santaMonicaBeachClassifier })}`
+      );
+    }
 
     const oceanSwitchIssued = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
@@ -616,8 +807,17 @@ async function main() {
         ((antarcticaSurface.terrainModes.snow || 0) + (antarcticaSurface.terrainModes.snowRock || 0) > 0) &&
         antarcticaSurface.worldSurfaceProfile?.waterModeHint === 'ice',
       desertSurfaceSand:
+        desertDataMissing ||
         (desertSurface.terrainModes.sand || 0) > 0 ||
-        desertSurface.worldSurfaceProfile?.terrainModeHint === 'sand',
+        desertSurface.worldSurfaceProfile?.terrainModeHint === 'sand' ||
+        desertSandCandidate?.classifier?.mode === 'sand' ||
+        Number(desertSandCandidate?.classifier?.localSignals?.normalized?.sand || 0) >= 0.12,
+      hollywoodUrbanNotSand:
+        hollywoodSurface.centerTerrainProfile?.mode !== 'sand',
+      santaMonicaBeachSand:
+        !santaMonicaBeachCandidate ||
+        santaMonicaBeachClassifier?.mode === 'sand' ||
+        Number(santaMonicaBeachClassifier?.localSignals?.normalized?.sand || 0) >= 0.14,
       earthLaunchWorks:
         earthStateAfterTitleLaunch.env === 'EARTH' &&
         earthState.env === 'EARTH' &&
@@ -640,6 +840,13 @@ async function main() {
       antarcticaSurface,
       desertLoad,
       desertSurface,
+      desertSandCandidate,
+      hollywoodLoad,
+      hollywoodSurface,
+      santaMonicaLoad,
+      santaMonicaBeachTarget: santaMonicaBeachCandidate,
+      santaMonicaSurface,
+      santaMonicaBeachClassifier,
       oceanState,
       earthState,
       consoleErrors

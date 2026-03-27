@@ -1,4 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
+import {
+  isRoadSurfaceReachable
+} from "./structure-semantics.js?v=26";
 // physics.js - Car physics, building collision, drone movement
 // ============================================================================
 
@@ -7,6 +10,20 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 let _rdtPhysFrame = 0;
 let _rdtRoadSkipInterval = 1; // 1 = check every frame, 2 = every other, etc.
 let _cachedNearRoad = null;
+let _poiUpdateTimer = 0;
+let _navigationUpdateTimer = 0;
+let _modeUpdateTimer = 0;
+let _policeUpdateTimer = 0;
+let _terrainUpdateTimer = 0;
+let _interiorUpdateTimer = 0;
+let _flowerChallengeTimer = 0;
+let _trackUpdateTimer = 0;
+let _walkPoliceCheckTimer = 0;
+let _pendingTerrainAround = null;
+const _terrainUpdateState = {
+  drive: { x: NaN, z: NaN },
+  drone: { x: NaN, z: NaN }
+};
 
 // Invalidate road cache - must be called on road reload, mode change, teleport
 function invalidateRoadCache() {
@@ -26,8 +43,209 @@ function _getPhysRaycaster() {
   return _physRaycaster;
 }
 
+function clampPhysValue(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function expPhysBlend(dt, rate, min = 0.04, max = 1) {
+  return clampPhysValue(1 - Math.exp(-Math.max(0, dt) * rate), min, max);
+}
+
+function normalizePhysAngle(angle = 0) {
+  let value = Number(angle) || 0;
+  while (value <= -Math.PI) value += Math.PI * 2;
+  while (value > Math.PI) value -= Math.PI * 2;
+  return value;
+}
+
+function lerpPhysAngle(from = 0, to = 0, alpha = 1) {
+  const safeAlpha = clampPhysValue(Number(alpha) || 0, 0, 1);
+  const delta = normalizePhysAngle((Number(to) || 0) - (Number(from) || 0));
+  return normalizePhysAngle((Number(from) || 0) + delta * safeAlpha);
+}
+
+function queuePendingTerrainAround(x, z, mode = 'drive') {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return;
+  _pendingTerrainAround = {
+    x,
+    z,
+    mode: String(mode || 'drive'),
+    requestedAt: performance.now()
+  };
+}
+
+function flushPendingTerrainAround() {
+  if (appCtx.onMoon || appCtx.worldLoading || typeof appCtx.updateTerrainAround !== 'function') return false;
+  if (!_pendingTerrainAround) return false;
+  const pending = _pendingTerrainAround;
+  _pendingTerrainAround = null;
+  appCtx.updateTerrainAround(pending.x, pending.z);
+  return true;
+}
+
+function getDriveRenderPose() {
+  const pose =
+    appCtx.car?._renderPose ||
+    appCtx.car?._currSimPose ||
+    null;
+  if (pose) return pose;
+  return {
+    x: Number(appCtx.car?.x || 0),
+    y:
+      Number.isFinite(appCtx.car?.y) ?
+        appCtx.car.y :
+      Number.isFinite(appCtx.carMesh?.position?.y) ?
+        appCtx.carMesh.position.y :
+        1.2,
+    z: Number(appCtx.car?.z || 0),
+    angle: Number(appCtx.car?.angle || 0)
+  };
+}
+
+function applyInterpolatedVehicleRenderState(alpha = 1) {
+  if (!appCtx.carMesh || appCtx.onMoon) return false;
+  if (appCtx.droneMode || appCtx.boatMode?.active || appCtx.Walk?.state?.mode === 'walk') return false;
+  const prevPose = appCtx.car?._prevSimPose || null;
+  const currPose = appCtx.car?._currSimPose || null;
+  if (!currPose) return false;
+  const safeAlpha = clampPhysValue(Number(alpha) || 0, 0, 1);
+  const pose =
+    prevPose ?
+      {
+        x: prevPose.x + (currPose.x - prevPose.x) * safeAlpha,
+        y: prevPose.y + (currPose.y - prevPose.y) * safeAlpha,
+        z: prevPose.z + (currPose.z - prevPose.z) * safeAlpha,
+        angle: lerpPhysAngle(prevPose.angle, currPose.angle, safeAlpha)
+      } :
+      currPose;
+  appCtx.car._renderPose = pose;
+  appCtx.carMesh.position.set(pose.x, pose.y, pose.z);
+  appCtx.carMesh.rotation.y = pose.angle;
+  return true;
+}
+
+function runModeUpdate(dt, interval = 1 / 30) {
+  if (typeof appCtx.updateMode !== 'function') return;
+  _modeUpdateTimer += Math.max(0, Number(dt) || 0);
+  if (_modeUpdateTimer < interval) return;
+  const elapsed = _modeUpdateTimer;
+  _modeUpdateTimer = 0;
+  appCtx.updateMode(elapsed);
+}
+
+function runPoliceUpdate(dt, interval = 1 / 20) {
+  if (typeof appCtx.updatePolice !== 'function') return;
+  _policeUpdateTimer += Math.max(0, Number(dt) || 0);
+  if (_policeUpdateTimer < interval) return;
+  const elapsed = _policeUpdateTimer;
+  _policeUpdateTimer = 0;
+  appCtx.updatePolice(elapsed);
+}
+
+function runFlowerChallengeUpdate(dt, interval = 1 / 20) {
+  if (typeof appCtx.updateFlowerChallenge !== 'function') return;
+  _flowerChallengeTimer += Math.max(0, Number(dt) || 0);
+  if (_flowerChallengeTimer < interval) return;
+  const elapsed = _flowerChallengeTimer;
+  _flowerChallengeTimer = 0;
+  appCtx.updateFlowerChallenge(elapsed);
+}
+
+function getInteriorInteractionInterval() {
+  if (appCtx.activeInterior) return 1 / 15;
+  if (appCtx.Walk?.state?.mode === 'walk') return 0.08;
+  if (appCtx.droneMode) return 0.2;
+  if (appCtx.boatMode?.active) return 0.25;
+  return 0.3;
+}
+
+function runInteriorInteractionUpdate(dt, force = false) {
+  if (typeof appCtx.updateInteriorInteraction !== 'function') return;
+  if (force) {
+    _interiorUpdateTimer = 0;
+    appCtx.updateInteriorInteraction();
+    return;
+  }
+  _interiorUpdateTimer += Math.max(0, Number(dt) || 0);
+  const interval = getInteriorInteractionInterval();
+  if (_interiorUpdateTimer < interval) return;
+  _interiorUpdateTimer = 0;
+  appCtx.updateInteriorInteraction();
+}
+
+function runTrackUpdate(dt, interval = 0.14) {
+  if (typeof appCtx.updateTrack !== 'function' || !appCtx.isRecording) return;
+  _trackUpdateTimer += Math.max(0, Number(dt) || 0);
+  if (_trackUpdateTimer < interval) return;
+  _trackUpdateTimer = 0;
+  appCtx.updateTrack();
+}
+
+function runWalkPoliceProximityCheck(dt, interval = 0.1) {
+  if (!Array.isArray(appCtx.police) || appCtx.police.length === 0) return;
+  const walker = appCtx.Walk?.state?.walker;
+  if (!walker) return;
+  _walkPoliceCheckTimer += Math.max(0, Number(dt) || 0);
+  if (_walkPoliceCheckTimer < interval) return;
+  _walkPoliceCheckTimer = 0;
+
+  for (let i = 0; i < appCtx.police.length; i++) {
+    const p = appCtx.police[i];
+    const dx = walker.x - p.x;
+    const dz = walker.z - p.z;
+    const d = Math.hypot(dx, dz);
+    if (d < 15 && !p.caught) {
+      p.caught = true;
+      appCtx.policeHits++;
+      const policeEl = document.getElementById('police');
+      if (policeEl) {
+        policeEl.textContent = '💔 ' + appCtx.policeHits + '/3';
+        policeEl.classList.add('warn');
+      }
+      if (appCtx.policeHits >= 3) {
+        appCtx.paused = true;
+        document.getElementById('caughtScreen')?.classList.add('show');
+      }
+      break;
+    }
+  }
+}
+
+function maybeUpdateTerrainAround(dt, x, z, mode = 'drive') {
+  if (appCtx.onMoon || appCtx.worldLoading || typeof appCtx.updateTerrainAround !== 'function') return;
+  const safeDt = Math.max(0, Number(dt) || 0);
+  _terrainUpdateTimer += safeDt;
+
+  const state = _terrainUpdateState[mode] || _terrainUpdateState.drive;
+  const lastX = Number(state.x);
+  const lastZ = Number(state.z);
+  const moved = Number.isFinite(lastX) && Number.isFinite(lastZ) ? Math.hypot(x - lastX, z - lastZ) : Infinity;
+
+  let speed = 0;
+  if (mode === 'drone') speed = Math.abs(Number(appCtx.drone?.speed || 0));
+  else speed = Math.abs(Number(appCtx.car?.speed || 0));
+
+  const interval =
+    mode === 'drone' ?
+      speed > 24 ? 0.16 : speed > 10 ? 0.12 : 0.1 :
+      speed > 26 ? 0.14 : speed > 14 ? 0.1 : 0.08;
+  const moveThreshold =
+    mode === 'drone' ?
+      speed > 24 ? 16 : speed > 10 ? 10 : 6 :
+      speed > 26 ? 12 : speed > 14 ? 8 : 4;
+  const catchupInterval = interval * 2.5;
+
+  if (_terrainUpdateTimer < interval) return;
+  if (moved < moveThreshold && _terrainUpdateTimer < catchupInterval) return;
+
+  _terrainUpdateTimer = 0;
+  state.x = x;
+  state.z = z;
+  queuePendingTerrainAround(x, z, mode);
+}
+
 // Throttled nearest-road helper (single place to control road querying)
-function getNearestRoadThrottled(x, z, forceCheck = false) {
+function getNearestRoadThrottled(x, z, forceCheck = false, currentY = NaN) {
   // If roads aren't available, return a safe null shape
   if (!appCtx.roads || appCtx.roads.length === 0 || typeof appCtx.findNearestRoad !== 'function') {
     return { road: null, dist: Infinity, pt: { x, z } };
@@ -42,15 +260,26 @@ function getNearestRoadThrottled(x, z, forceCheck = false) {
   const shouldCheck = forceCheck ||
   _rdtRoadSkipInterval <= 1 ||
   _rdtPhysFrame % _rdtRoadSkipInterval === 0 ||
-  !_cachedNearRoad;
+  !_cachedNearRoad ||
+  (Number.isFinite(currentY) && Number.isFinite(_cachedNearRoad?.y) && Math.abs(_cachedNearRoad.y - currentY) > 6);
 
   if (shouldCheck) {
-    nr = appCtx.findNearestRoad(x, z);
+    const preferredRoad = appCtx.car?.road || appCtx.car?._lastStableRoad || null;
+    nr = appCtx.findNearestRoad(x, z, {
+      y: Number.isFinite(currentY) ? currentY : NaN,
+      maxVerticalDelta: 18,
+      preferredRoad
+    });
     // Normalize cache shape so later code can treat it consistently
     _cachedNearRoad = {
       road: nr.road || null,
       dist: typeof nr.dist === 'number' ? nr.dist : Infinity,
-      pt: nr.pt ? { x: nr.pt.x, z: nr.pt.z } : { x, z }
+      pt: nr.pt ? { x: nr.pt.x, z: nr.pt.z } : { x, z },
+      y: Number.isFinite(nr?.y) ? nr.y : NaN,
+      verticalDelta: Number.isFinite(nr?.verticalDelta) ? nr.verticalDelta : Infinity,
+      distanceAlong: Number.isFinite(nr?.distanceAlong) ? nr.distanceAlong : NaN,
+      distanceToEndpoint: Number.isFinite(nr?.distanceToEndpoint) ? nr.distanceToEndpoint : Infinity,
+      distanceToTransitionZone: Number.isFinite(nr?.distanceToTransitionZone) ? nr.distanceToTransitionZone : Infinity
     };
   } else {
     nr = _cachedNearRoad;
@@ -61,9 +290,20 @@ function getNearestRoadThrottled(x, z, forceCheck = false) {
   return nr;
 }
 
-function checkBuildingCollision(x, z, carRadius = 2) {
+function buildingVerticalRangeOverlap(building, actorBaseY, actorHeight, tolerance = 0.45) {
+  if (!Number.isFinite(actorBaseY)) return true;
+  const actorTopY = actorBaseY + (Number.isFinite(actorHeight) ? Math.max(0.5, actorHeight) : 1.8);
+  const minY = Number.isFinite(building?.minY) ? building.minY : Number.isFinite(building?.baseY) ? building.baseY : NaN;
+  const maxY = Number.isFinite(building?.maxY) ? building.maxY : Number.isFinite(minY) && Number.isFinite(building?.height) ? minY + building.height : NaN;
+  if (!Number.isFinite(minY) || !Number.isFinite(maxY)) return true;
+  return !(actorTopY < minY - tolerance || actorBaseY > maxY + tolerance);
+}
+
+function checkBuildingCollision(x, z, carRadius = 2, options = {}) {
   // Early exit if no buildings loaded
   if (appCtx.buildings.length === 0) return { collision: false };
+  const actorBaseY = Number.isFinite(options?.actorBaseY) ? Number(options.actorBaseY) : NaN;
+  const actorHeight = Number.isFinite(options?.actorHeight) ? Number(options.actorHeight) : 1.9;
 
   const candidateBuildings = typeof appCtx.getNearbyBuildings === 'function' ?
   appCtx.getNearbyBuildings(x, z, carRadius + 8) : appCtx.buildings;
@@ -73,6 +313,7 @@ function checkBuildingCollision(x, z, carRadius = 2) {
   for (let i = 0; i < candidateBuildings.length; i++) {
     const building = candidateBuildings[i];
     if (!building || building.collisionDisabled) continue;
+    if (!buildingVerticalRangeOverlap(building, actorBaseY, actorHeight)) continue;
 
     // Use pre-computed bounding box for fast rejection
     if (x < building.minX - carRadius || x > building.maxX + carRadius ||
@@ -181,6 +422,7 @@ function checkBuildingCollision(x, z, carRadius = 2) {
       return {
         collision: true,
         building,
+        actorBaseY,
         inside: isInside,
         nearestPoint: nearestEdgeInfo ? { x: nearestEdgeInfo.nearestX, z: nearestEdgeInfo.nearestZ } : null,
         pushX: nearestEdgeInfo ? nearestEdgeInfo.pushX : 0,
@@ -250,16 +492,24 @@ function updateDrone(dt) {
 
 function update(dt) {
   if (appCtx.paused || !appCtx.gameStarted) {
-    if (typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
+    if (!appCtx.boatMode?.active) runInteriorInteractionUpdate(dt, true);
     return;
   }
-  if (typeof appCtx.updateFlowerChallenge === 'function') appCtx.updateFlowerChallenge(dt);
+  runFlowerChallengeUpdate(dt);
+
+  if (appCtx.boatMode?.active) {
+    if (typeof appCtx.updateBoatMode === 'function') {
+      appCtx.updateBoatMode(dt);
+    }
+    runModeUpdate(dt, 1 / 30);
+    return;
+  }
 
   if (appCtx.droneMode) {
     updateDrone(dt);
-    if (typeof appCtx.updateMode === 'function') appCtx.updateMode(dt);
-    if (typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
-    if (!appCtx.onMoon && !appCtx.worldLoading) appCtx.updateTerrainAround(appCtx.drone.x, appCtx.drone.z);
+    runModeUpdate(dt, 1 / 30);
+    runInteriorInteractionUpdate(dt);
+    maybeUpdateTerrainAround(dt, appCtx.drone.x, appCtx.drone.z, 'drone');
     return;
   }
 
@@ -274,26 +524,15 @@ function update(dt) {
         appCtx.customTrack.push({ x: appCtx.Walk.state.walker.x, z: appCtx.Walk.state.walker.z });
       }
 
-      appCtx.police.forEach((p) => {
-        const dx = appCtx.Walk.state.walker.x - p.x,dz = appCtx.Walk.state.walker.z - p.z,d = Math.hypot(dx, dz);
-        if (d < 15 && !p.caught) {
-          p.caught = true;appCtx.policeHits++;
-          document.getElementById('police').textContent = '💔 ' + appCtx.policeHits + '/3';
-          document.getElementById('police').classList.add('warn');
-          if (appCtx.policeHits >= 3) {
-            appCtx.paused = true;
-            document.getElementById('caughtScreen').classList.add('show');
-          }
-        }
-      });
+      runWalkPoliceProximityCheck(dt);
 
-      if (typeof appCtx.updateMode === 'function') appCtx.updateMode(dt);
-      if (typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
+      runModeUpdate(dt, 1 / 30);
+      runInteriorInteractionUpdate(dt);
       return;
     }
   }
 
-  if (typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
+  runInteriorInteractionUpdate(dt);
 
   const left = appCtx.keys.KeyA || appCtx.keys.ArrowLeft,right = appCtx.keys.KeyD || appCtx.keys.ArrowRight;
   const gas = appCtx.keys.KeyW || appCtx.keys.ArrowUp,reverse = appCtx.keys.KeyS || appCtx.keys.ArrowDown;
@@ -309,9 +548,23 @@ function update(dt) {
   if (appCtx.car.throttleSm === undefined) appCtx.car.throttleSm = 0;
   if (appCtx.car.isDrifting === undefined) appCtx.car.isDrifting = false;
   if (appCtx.car._driftHoldTimer === undefined) appCtx.car._driftHoldTimer = 0;
+  if (appCtx.car._roadContactGraceTimer === undefined) appCtx.car._roadContactGraceTimer = 0;
   if (appCtx.car.vy === undefined) appCtx.car.vy = 0;
   if (appCtx.car._lastSurfaceY === undefined) appCtx.car._lastSurfaceY = null;
+  if (appCtx.car._surfaceDeltaY === undefined) appCtx.car._surfaceDeltaY = 0;
+  if (appCtx.car._surfaceTargetY === undefined) appCtx.car._surfaceTargetY = null;
   if (appCtx.car._terrainAirTimer === undefined) appCtx.car._terrainAirTimer = 0;
+  const prevDrivePose = {
+    x: Number(appCtx.car.x || 0),
+    y:
+      Number.isFinite(appCtx.car.y) ?
+        appCtx.car.y :
+      Number.isFinite(appCtx.carMesh?.position?.y) ?
+        appCtx.carMesh.position.y :
+        1.2,
+    z: Number(appCtx.car.z || 0),
+    angle: Number(appCtx.car.angle || 0)
+  };
 
   if (boostKey && appCtx.car.boostReady && !appCtx.car.boost) {
     appCtx.car.boost = true;
@@ -340,6 +593,7 @@ function update(dt) {
 
   // We'll keep a single road query result for this frame (and optional precision check later)
   let nr = null;
+  let driveRoadState = null;
 
   if (appCtx.onMoon) {
     appCtx.car.onRoad = false;
@@ -358,13 +612,61 @@ function update(dt) {
     const isSteering = left || right;
     const isHighSpeed = Math.abs(appCtx.car.speed) > 40;
     const wasOffRoad = !appCtx.car.onRoad;
+    const previousOnRoad = !!appCtx.car.onRoad;
     const forceCheck = isHighSpeed || isSteering || wasOffRoad || !_cachedNearRoad;
+    const previousRoad = appCtx.car.road || appCtx.car._lastStableRoad || null;
+    const currentSurfaceY = Number.isFinite(appCtx.car.y) ? appCtx.car.y - 1.2 : NaN;
+    const nearestRoad = getNearestRoadThrottled(
+      appCtx.car.x,
+      appCtx.car.z,
+      forceCheck,
+      currentSurfaceY
+    );
+    driveRoadState =
+      typeof appCtx.GroundHeight?.resolveDriveRoadContact === 'function' ?
+        appCtx.GroundHeight.resolveDriveRoadContact(appCtx.car.x, appCtx.car.z, currentSurfaceY, {
+          preferredRoad: previousRoad,
+          nearestRoad
+        }) :
+        null;
 
-    nr = getNearestRoadThrottled(appCtx.car.x, appCtx.car.z, forceCheck);
-
-    const edge = nr.road ? nr.road.width / 2 + 10 : 20;
-    appCtx.car.onRoad = nr.dist < edge;
-    appCtx.car.road = nr.road;
+    nr = driveRoadState?.resolved || nearestRoad;
+    let resolvedOnRoad =
+      typeof driveRoadState?.onRoad === 'boolean' ?
+        driveRoadState.onRoad :
+        isRoadSurfaceReachable(nr, {
+          currentRoad: previousRoad,
+          extraVerticalAllowance: 0.7
+        });
+    let resolvedRoad = resolvedOnRoad ? (driveRoadState?.road || nr?.road || null) : null;
+    const roadHalfWidth = Number.isFinite(nr?.road?.width) ? Number(nr.road.width) * 0.5 : 0;
+    const nearPreviousRoad =
+      !!previousRoad &&
+      (
+        !!driveRoadState?.retained ||
+        (
+          nr?.road === previousRoad &&
+          Number.isFinite(nr?.dist) &&
+          nr.dist <= Math.max(5.2, roadHalfWidth + 1.9)
+        )
+      );
+    if (!resolvedOnRoad && previousOnRoad && previousRoad && nearPreviousRoad && Math.abs(Number(appCtx.car.speed || 0)) >= 6) {
+      appCtx.car._roadContactGraceTimer = Math.max(Number(appCtx.car._roadContactGraceTimer || 0), 0.32);
+    }
+    if (!resolvedOnRoad && previousRoad && nearPreviousRoad && Number(appCtx.car._roadContactGraceTimer || 0) > 0) {
+      resolvedOnRoad = true;
+      resolvedRoad = previousRoad;
+      appCtx.car._roadContactGraceTimer = Math.max(0, Number(appCtx.car._roadContactGraceTimer || 0) - dt);
+    } else if (resolvedOnRoad) {
+      appCtx.car._roadContactGraceTimer = 0.32;
+    } else {
+      appCtx.car._roadContactGraceTimer = 0;
+    }
+    appCtx.car.onRoad = resolvedOnRoad;
+    appCtx.car.road = appCtx.car.onRoad ? resolvedRoad : null;
+    if (appCtx.car.onRoad) {
+      appCtx.car._lastStableRoad = appCtx.car.road || previousRoad || null;
+    }
 
     const baseMax = appCtx.car.onRoad ? appCtx.CFG.maxSpd : appCtx.CFG.offMax;
     maxSpd = appCtx.car.boost ? appCtx.CFG.boostMax : baseMax;
@@ -379,11 +681,19 @@ function update(dt) {
 
   if (gas && !braking && canAccelerate) {
     let throttleAccel = accel;
+    const throttleDemand = Math.max(0, Math.min(1, Number(appCtx.car.throttleSm || 0)));
     if (appCtx.onMoon) {
       const lowSpeedBoost = Math.max(0, 1 - spd / 14);
       throttleAccel *= 1 + lowSpeedBoost * 0.75;
+    } else {
+      const launchBoost = appCtx.car.onRoad ? Math.max(0, 1 - spd / 15) : Math.max(0, 1 - spd / 10);
+      throttleAccel *= 1 + launchBoost * (appCtx.car.onRoad ? 0.38 : 0.22);
     }
-    appCtx.car.speed += throttleAccel * (1 - spd / maxSpd * 0.7) * dt;
+    const normalizedSpeed = Math.min(1, spd / Math.max(1, maxSpd));
+    const accelFloor = appCtx.onMoon ? 0.16 : appCtx.car.onRoad ? 0.06 : 0.1;
+    const accelCurve = appCtx.car.onRoad ? 1.95 : 1.5;
+    const accelFade = accelFloor + (1 - accelFloor) * Math.pow(1 - normalizedSpeed, accelCurve);
+    appCtx.car.speed += throttleAccel * throttleDemand * accelFade * dt;
   }
 
   if (braking && spd > 0.5 && canAccelerate) {
@@ -432,16 +742,16 @@ function update(dt) {
   const throttleInput = gas && !reverse ? 1 : 0;
 
   const steerSmooth = 1 - Math.exp(-dt * 14);
-  const throttleSmooth = 1 - Math.exp(-dt * 6);
+  const throttleSmooth = 1 - Math.exp(-dt * 9.6);
   appCtx.car.steerSm += (steerInput - appCtx.car.steerSm) * steerSmooth;
   appCtx.car.throttleSm += (throttleInput - appCtx.car.throttleSm) * throttleSmooth;
 
   const spdAbs = Math.abs(appCtx.car.speed);
 
-  const maxSteerLow = 0.72;
-  const maxSteerHigh = 0.22;
+  const maxSteerLow = 0.66;
+  const maxSteerHigh = 0.12;
   const steerFadeMin = 5;
-  const steerFadeMax = 95;
+  const steerFadeMax = 62;
 
   let steerAlpha = 0;
   if (spdAbs > steerFadeMin) {
@@ -452,10 +762,17 @@ function update(dt) {
   const clamp01 = (n) => Math.max(0, Math.min(1, n));
   const steerMag = Math.abs(appCtx.car.steerSm);
   const speedNorm = clamp01((spdAbs - 8) / 70);
+  const highSpeedTurnBlend = clamp01((spdAbs - 18) / 28);
+  const parkingTurnBlend = clamp01(1 - spdAbs / 14);
+  const reverseTurnBlend = appCtx.car.speed < -1 ? clamp01((Math.abs(appCtx.car.speed) - 1) / 12) : 0;
+  const lowSpeedTurnBoost = Math.max(parkingTurnBlend, reverseTurnBlend);
   const handbrakeTurnIntent = !appCtx.onMoon && braking && steerMag >= 0.1 && spdAbs >= 16;
   const handbrakeSteerBoost = handbrakeTurnIntent ? 1 + (0.20 + 0.35 * speedNorm) : 1;
   // Reverse steering keeps the same direction (arcade style).
-  const steerAngle = appCtx.car.steerSm * Math.min(0.95, maxSteer * handbrakeSteerBoost);
+  const steerAngle = appCtx.car.steerSm * Math.min(
+    1.08,
+    maxSteer * handbrakeSteerBoost * (1 + lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.12 : 0.08))
+  );
   const driftStartSteer = 0.12;
   const driftHoldSteer = 0.05;
   const driftStartSpeed = appCtx.car.onRoad ? 8.5 : 11;
@@ -504,7 +821,16 @@ function update(dt) {
     // Earth-only: stronger off-road lateral damping unless drift is explicitly requested.
     latDamp = (appCtx.car.onRoad ? 15.5 : 19.0) * (0.72 + grip * 0.58);
     yawDamp = (appCtx.car.onRoad ? 9.2 : 11.6) * (0.7 + grip * 0.6);
-    yawResponse = (appCtx.car.onRoad ? 4.4 : 2.1) * (0.64 + grip * 0.42);
+    yawResponse = (appCtx.car.onRoad ? 4.4 : 2.55) * (0.64 + grip * 0.42);
+    if (appCtx.car.onRoad && !isDrifting) {
+      latDamp *= 1.14;
+      yawDamp *= 1.08;
+      yawResponse *= 0.92;
+    }
+    if (lowSpeedTurnBoost > 0) {
+      yawResponse += lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.9 : 0.5);
+      yawDamp *= 1 - lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.08 : 0.05);
+    }
 
     if (isDrifting) {
       latDamp *= 0.28;
@@ -515,18 +841,36 @@ function update(dt) {
       latDamp += driftRecovery * (appCtx.car.onRoad ? 0.55 : 0.85);
       yawDamp += driftRecovery * 0.32;
     }
+    if (appCtx.car.onRoad && highSpeedTurnBlend > 0) {
+      yawDamp *= 1 + highSpeedTurnBlend * 0.34;
+      yawResponse *= 1 - highSpeedTurnBlend * 0.24;
+    }
   }
 
   const wheelBase = 2.6;
   const v = appCtx.car.speed;
-  let steerAuthority = appCtx.car.onRoad ? 1.02 : 0.76;
+  let steerAuthority = appCtx.car.onRoad ? 1.02 : 0.94;
+  if (!appCtx.onMoon && lowSpeedTurnBoost > 0) {
+    steerAuthority *= 1 + lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.14 : 0.08);
+  }
   if (!appCtx.onMoon && (isDrifting || handbrakeTurnIntent)) {
     steerAuthority *= appCtx.car.onRoad ? 1.22 : 1.1;
+  }
+  if (!appCtx.onMoon && appCtx.car.onRoad && highSpeedTurnBlend > 0) {
+    steerAuthority *= 1 - highSpeedTurnBlend * 0.24;
   }
   const yawRateTarget = v / Math.max(1e-3, wheelBase) * Math.tan(steerAngle * steerAuthority);
 
   appCtx.car.yawRate += (yawRateTarget - appCtx.car.yawRate) * (1 - Math.exp(-dt * yawResponse));
   appCtx.car.yawRate *= Math.exp(-dt * yawDamp);
+  const parkingPivotIntent = !appCtx.onMoon &&
+  steerMag >= 0.12 &&
+  spdAbs < (appCtx.car.onRoad ? 5.5 : 8.5) &&
+  (braking || reverse);
+  if (parkingPivotIntent) {
+    const pivotBlend = clamp01(1 - spdAbs / (appCtx.car.onRoad ? 9.5 : 14));
+    appCtx.car.yawRate += appCtx.car.steerSm * (appCtx.car.onRoad ? 1.3 : 1.45) * pivotBlend * dt * 2.2;
+  }
 
   if (canAccelerate) {
     appCtx.car.angle += appCtx.car.yawRate * dt;
@@ -535,7 +879,7 @@ function update(dt) {
     appCtx.car.angle += appCtx.car.yawRate * dt;
   }
 
-  appCtx.car.vFwd += (appCtx.car.speed - appCtx.car.vFwd) * (1 - Math.exp(-dt * 8));
+  appCtx.car.vFwd += (appCtx.car.speed - appCtx.car.vFwd) * (1 - Math.exp(-dt * 4.1));
   appCtx.car.vLat *= Math.exp(-dt * latDamp);
 
   // Rear-biased slip model:
@@ -551,10 +895,13 @@ function update(dt) {
       frontGripDamp *= 0.90;
       rearGripDamp *= 0.12;
       rearLat += appCtx.car.steerSm * (appCtx.car.onRoad ? 2.35 : 1.45) * (0.5 + 0.5 * speedNorm);
+    } else if (appCtx.car.onRoad) {
+      frontGripDamp *= 1.08;
+      rearGripDamp *= 1.16;
     } else if (!appCtx.car.onRoad) {
       // Off-road should feel planted unless drift is explicitly initiated.
-      frontGripDamp *= 1.4;
-      rearGripDamp *= 1.6;
+      frontGripDamp *= 1.18;
+      rearGripDamp *= 1.28;
     }
   }
 
@@ -568,7 +915,7 @@ function update(dt) {
       const driftSlip = appCtx.car.onRoad ? 0.064 : 0.042;
       slipGain = driftSlip * steerMag * (0.45 + 0.55 * speedNorm);
     } else if (appCtx.car.onRoad) {
-      slipGain = 0.0012 * steerMag * speedNorm;
+      slipGain = 0.00065 * steerMag * speedNorm;
     } else {
       slipGain = 0.00022 * steerMag * speedNorm;
     }
@@ -605,7 +952,7 @@ function update(dt) {
   const lateralVelForPosition = !appCtx.onMoon && isDrifting ?
   appCtx.car.vLat * 0.34 :
   !appCtx.onMoon && !appCtx.car.onRoad ?
-  appCtx.car.vLat * 0.58 :
+  appCtx.car.vLat * 0.72 :
   appCtx.car.vLat;
   appCtx.car.vx = sinA * appCtx.car.vFwd + cosA * lateralVelForPosition;
   appCtx.car.vz = cosA * appCtx.car.vFwd - sinA * lateralVelForPosition;
@@ -638,12 +985,23 @@ function update(dt) {
     nz = appCtx.car.z + appCtx.car.vz * dt;
   }
 
+  appCtx.car._roadCenterError = 0;
+  appCtx.car._roadCenterAssist = 0;
+
   // Street boundaries removed — car can drive freely off-road.
   // Building collisions are still enforced below.
 
   if (!appCtx.onMoon) {
-    const buildingCheck = checkBuildingCollision(nx, nz, 2.0);
-    const nearestRoadForCollision = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(nx, nz) : null;
+    const carFeetY = Number.isFinite(appCtx.car.y) ? appCtx.car.y - 1.2 : NaN;
+    const buildingCheck = checkBuildingCollision(nx, nz, 2.0, {
+      actorBaseY: carFeetY,
+      actorHeight: 1.9
+    });
+    const motionDelta = Math.hypot(nx - appCtx.car.x, nz - appCtx.car.z);
+    const nearestRoadForCollision =
+      motionDelta <= 3.5 && driveRoadState?.resolved ?
+        driveRoadState.resolved :
+      getNearestRoadThrottled(nx, nz, false, Number.isFinite(carFeetY) ? carFeetY + 1.2 : NaN);
     const roadDist = Number.isFinite(nearestRoadForCollision?.dist) ? nearestRoadForCollision.dist : Infinity;
     const roadHalfWidth = nearestRoadForCollision?.road?.width ? nearestRoadForCollision.road.width * 0.5 : 0;
     const onRoadCenter = roadHalfWidth > 0 &&
@@ -653,16 +1011,28 @@ function update(dt) {
     const colliderDetail = buildingCheck?.building?.colliderDetail === 'bbox' ? 'bbox' : 'full';
     const buildingType = String(buildingCheck?.building?.buildingType || '').toLowerCase();
     const isApproxCollider = colliderDetail !== 'full';
-    const roofLikeCollider = buildingType === 'roof' || buildingType === 'canopy' || buildingType === 'carport';
+  const partKind = String(buildingCheck?.building?.buildingPartKind || '').toLowerCase();
+  const roofLikeCollider =
+    buildingType === 'roof' ||
+    buildingType === 'canopy' ||
+    buildingType === 'carport' ||
+    partKind === 'roof' ||
+    partKind === 'balcony' ||
+    partKind === 'canopy' ||
+    buildingCheck?.building?.collisionKind === 'thin_part' ||
+    buildingCheck?.building?.allowsPassageBelow === true;
     const shallowRoadsideCollision = !!buildingCheck.collision &&
     onRoadCenter &&
     !buildingCheck.inside &&
     Number.isFinite(buildingCheck.penetration) &&
     buildingCheck.penetration < 1.25;
-    const likelyRoadGhostCollision = !!buildingCheck.collision &&
-    ((onRoadCenter && isApproxCollider) ||
-    (onRoadCore && buildingCheck.inside) ||
-    (onRoadCenter && roofLikeCollider));
+    const likelyRoadGhostCollision =
+      typeof appCtx.shouldIgnoreDriveCollision === 'function' ?
+        appCtx.shouldIgnoreDriveCollision(buildingCheck, nx, nz, nearestRoadForCollision) :
+        (!!buildingCheck.collision &&
+          ((onRoadCenter && isApproxCollider) ||
+          (onRoadCore && buildingCheck.inside) ||
+          (onRoadCenter && roofLikeCollider)));
 
     if (buildingCheck.collision && !(shallowRoadsideCollision || likelyRoadGhostCollision)) {
       if (buildingCheck.inside) {
@@ -709,32 +1079,10 @@ function update(dt) {
 
   if (typeof appCtx.getBuildCollisionAtWorldXZ === 'function') {
     const carFeetY = (Number.isFinite(appCtx.car.y) ? appCtx.car.y : 1.2) - 1.2;
-    const heading = appCtx.car.angle || 0;
-    const fwdX = Math.sin(heading);
-    const fwdZ = Math.cos(heading);
-    const rightX = Math.cos(heading);
-    const rightZ = -Math.sin(heading);
-    const radius = 2.2;
-
-    const samples = [
-      [0, 0],
-      [fwdX * radius, fwdZ * radius],
-      [-fwdX * radius, -fwdZ * radius],
-      [rightX * (radius * 0.72), rightZ * (radius * 0.72)],
-      [-rightX * (radius * 0.72), -rightZ * (radius * 0.72)]
-    ];
-
-    let blockedByBuildBlock = false;
-    for (let i = 0; i < samples.length; i++) {
-      const offset = samples[i];
-      const sampleX = nx + offset[0];
-      const sampleZ = nz + offset[1];
-      const hit = appCtx.getBuildCollisionAtWorldXZ(sampleX, sampleZ, carFeetY, 0.12);
-      if (hit && hit.blocked) {
-        blockedByBuildBlock = true;
-        break;
-      }
-    }
+    const blockedByBuildBlock =
+      typeof appCtx.driveBuildBlockCollision === 'function' ?
+        !!appCtx.driveBuildBlockCollision(nx, nz, carFeetY) :
+        false;
 
     if (blockedByBuildBlock) {
       nx = appCtx.car.x;
@@ -840,62 +1188,106 @@ function update(dt) {
       carY = appCtx.car.y;
     }
   } else if (appCtx.terrainEnabled) {
+    const preferRoadSurface = !!appCtx.car.onRoad || !!appCtx.car.road || !!appCtx.car._lastStableRoad;
+    const currentSurfaceY = Number.isFinite(appCtx.car.y) ? appCtx.car.y - 1.2 : NaN;
     const surfaceY = typeof appCtx.GroundHeight !== 'undefined' && appCtx.GroundHeight && typeof appCtx.GroundHeight.driveSurfaceY === 'function' ?
-    appCtx.GroundHeight.driveSurfaceY(appCtx.car.x, appCtx.car.z, !!appCtx.car.onRoad) :
+    appCtx.GroundHeight.driveSurfaceY(appCtx.car.x, appCtx.car.z, preferRoadSurface, currentSurfaceY, {
+      roadState: driveRoadState
+    }) :
     (typeof appCtx.terrainMeshHeightAt === 'function' ?
     appCtx.terrainMeshHeightAt(appCtx.car.x, appCtx.car.z) :
     appCtx.elevationWorldYAtWorldXZ(appCtx.car.x, appCtx.car.z)) + (appCtx.car.onRoad ? 0.2 : 0);
 
     const targetY = surfaceY + 1.2;
     const speedAbs = Math.abs(appCtx.car.speed || 0);
-    if (appCtx.car.y === undefined || appCtx.car.y === 0) {
+    const prevSurfaceY = Number.isFinite(appCtx.car._lastSurfaceY) ? appCtx.car._lastSurfaceY : targetY;
+    const rawSurfaceDelta = targetY - prevSurfaceY;
+    const currentY = Number.isFinite(appCtx.car.y) ? appCtx.car.y : targetY;
+    const diff = targetY - currentY;
+    appCtx.car._surfaceTargetY = targetY;
+    appCtx.car._surfaceDeltaY = rawSurfaceDelta;
+    if (!Number.isFinite(currentY) || Math.abs(diff) > 20) {
+      carY = targetY;
+    } else if (speedAbs < 0.5 && Math.abs(diff) < 0.03) {
+      carY = targetY;
+    } else if (Math.abs(diff) < 0.008) {
       carY = targetY;
     } else {
-      const diff = targetY - appCtx.car.y;
-      if (Math.abs(diff) > 20 || Math.abs(diff) < 0.01) {
-        carY = targetY;
-      } else {
-        const baseLerp = appCtx.car.onRoad ? 16 : 10;
-        const speedBoost = Math.min(8, speedAbs * 0.08);
-        const lerpRate = Math.min(1.0, dt * (baseLerp + speedBoost));
-        carY = appCtx.car.y + diff * lerpRate;
+      let followRate = appCtx.car.onRoad ? 18 : 11;
+      followRate += Math.min(appCtx.car.onRoad ? 4.5 : 3, speedAbs * (appCtx.car.onRoad ? 0.05 : 0.035));
+      if (Math.abs(diff) <= (appCtx.car.onRoad ? 0.16 : 0.08)) {
+        followRate += appCtx.car.onRoad ? 11 : 4;
       }
+      if (Math.abs(rawSurfaceDelta) > 0.08) {
+        followRate += Math.min(appCtx.car.onRoad ? 5 : 3, Math.abs(rawSurfaceDelta) * (appCtx.car.onRoad ? 6 : 3.5));
+      }
+      if (Math.abs(diff) > 1.25) followRate += appCtx.car.onRoad ? 3.5 : 2.5;
+      const followBlend = expPhysBlend(dt, followRate, appCtx.car.onRoad ? 0.12 : 0.07, appCtx.car.onRoad ? 0.92 : 0.78);
+      carY = currentY + diff * followBlend;
     }
+    if (appCtx.car.onRoad && Number.isFinite(targetY) && Math.abs(diff) <= 0.12) {
+      carY = targetY;
+    } else if (appCtx.car.onRoad && Number.isFinite(targetY) && carY < targetY - 0.03) {
+      carY = targetY - 0.03;
+    }
+    if (Math.abs(carY - targetY) < 0.015) carY = targetY;
     appCtx.car.y = carY;
     appCtx.car.vy = 0;
     appCtx.car.isAirborne = false;
     appCtx.car._terrainAirTimer = 0;
-    appCtx.car._lastSurfaceY = null;
+    appCtx.car._lastSurfaceY = targetY;
+  } else {
+    appCtx.car._surfaceTargetY = null;
+    appCtx.car._surfaceDeltaY = 0;
   }
 
   appCtx.carMesh.position.set(appCtx.car.x, carY, appCtx.car.z);
   appCtx.carMesh.rotation.y = appCtx.car.angle;
+  appCtx.car._prevSimPose = prevDrivePose;
+  appCtx.car._currSimPose = {
+    x: Number(appCtx.car.x || 0),
+    y: Number(carY || 0),
+    z: Number(appCtx.car.z || 0),
+    angle: Number(appCtx.car.angle || 0)
+  };
+  appCtx.car._renderPose = appCtx.car._currSimPose;
 
   const wheelRot = appCtx.car.speed * dt * 0.5;
   appCtx.wheelMeshes.forEach((w) => w.rotation.x += wheelRot);
 
-  appCtx.updateTrack();
-  appCtx.updatePolice(dt);
-  appCtx.updateMode(dt);
-  appCtx.updateNearbyPOI();
-  appCtx.updateNavigationRoute();
-
-  if (!appCtx.onMoon && !appCtx.worldLoading) {
-    appCtx.updateTerrainAround(appCtx.car.x, appCtx.car.z);
-
-    const now = performance.now();
-    const rebuildInterval = appCtx.lastRoadRebuildCheck === 0 ? 500 : 2000;
-    if (appCtx.roadsNeedRebuild && now - appCtx.lastRoadRebuildCheck > rebuildInterval) {
-      appCtx.lastRoadRebuildCheck = now;
-      appCtx.rebuildRoadsWithTerrain();
-      appCtx.repositionBuildingsWithTerrain();
-    }
+  runTrackUpdate(dt);
+  runPoliceUpdate(dt, 1 / 20);
+  runModeUpdate(dt, 1 / 30);
+  _poiUpdateTimer += dt;
+  _navigationUpdateTimer += dt;
+  const driveSpeedAbs = Math.abs(Number(appCtx.car?.speed) || 0);
+  const perfFrameMs = Number(appCtx.perfStats?.live?.frameMs) || 0;
+  const perfPressureMultiplier = perfFrameMs >= 45 ? 1.6 : perfFrameMs >= 35 ? 1.25 : 1;
+  const poiInterval =
+    appCtx.poiMode ?
+      (driveSpeedAbs >= 12 ? 0.24 : driveSpeedAbs >= 5 ? 0.18 : 0.12) * perfPressureMultiplier :
+      0.25;
+  const navigationInterval =
+    appCtx.showNavigation ?
+      (driveSpeedAbs >= 12 ? 0.18 : driveSpeedAbs >= 5 ? 0.14 : 0.1) * perfPressureMultiplier :
+      0.25;
+  if (_poiUpdateTimer >= poiInterval) {
+    _poiUpdateTimer = 0;
+    appCtx.updateNearbyPOI();
   }
+  if (_navigationUpdateTimer >= navigationInterval) {
+    _navigationUpdateTimer = 0;
+    appCtx.updateNavigationRoute();
+  }
+  maybeUpdateTerrainAround(dt, appCtx.car.x, appCtx.car.z, 'drive');
 }
 
 // Check for nearby POIs and display info
 
 Object.assign(appCtx, {
+  applyInterpolatedVehicleRenderState,
+  flushPendingTerrainAround,
+  getDriveRenderPose,
   _getPhysRaycaster,
   _physRayDir,
   _physRayStart,
@@ -907,6 +1299,9 @@ Object.assign(appCtx, {
 });
 
 export {
+  applyInterpolatedVehicleRenderState,
+  flushPendingTerrainAround,
+  getDriveRenderPose,
   _getPhysRaycaster,
   _physRayDir,
   _physRayStart,

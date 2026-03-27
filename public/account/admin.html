@@ -1,0 +1,1202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>World Explorer Admin Dashboard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
+  <script src="../js/firebase-project-config.js"></script>
+  <style>
+    :root {
+      --bg: #05101d;
+      --bg-2: #0c1c31;
+      --panel: rgba(8, 22, 40, 0.88);
+      --panel-2: rgba(10, 28, 49, 0.92);
+      --panel-3: rgba(4, 14, 27, 0.7);
+      --line: rgba(163, 197, 224, 0.18);
+      --line-strong: rgba(163, 197, 224, 0.34);
+      --ink: #edf6ff;
+      --muted: #9ab6cb;
+      --accent: #5ad0ff;
+      --accent-2: #ffc857;
+      --ok: #62dcaa;
+      --warn: #ffb35c;
+      --danger: #ff7c7c;
+      --shadow: 0 28px 52px rgba(0, 0, 0, 0.3);
+      --radius-xl: 26px;
+      --radius-lg: 18px;
+      --radius-md: 14px;
+      --sidebar-width: 286px;
+    }
+
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--ink);
+      font-family: 'Barlow', sans-serif;
+      background:
+        radial-gradient(circle at 16% 12%, rgba(90, 208, 255, 0.14), transparent 32%),
+        radial-gradient(circle at 82% 10%, rgba(255, 200, 87, 0.12), transparent 28%),
+        linear-gradient(180deg, #11233a, var(--bg));
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image:
+        linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+      background-size: 34px 34px;
+      mask-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.85), transparent 92%);
+      opacity: 0.38;
+    }
+
+    a { color: inherit; }
+
+    .shell {
+      display: grid;
+      grid-template-columns: var(--sidebar-width) minmax(0, 1fr);
+      min-height: 100vh;
+      gap: 20px;
+      padding: 18px;
+    }
+
+    .sidebar,
+    .topbar,
+    .gate-card,
+    .view-panel {
+      border: 1px solid var(--line);
+      background: var(--panel);
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(12px);
+    }
+
+    .sidebar {
+      border-radius: var(--radius-xl);
+      padding: 18px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      position: sticky;
+      top: 18px;
+      height: calc(100vh - 36px);
+      overflow: hidden;
+    }
+
+    .brand-block {
+      padding: 10px 8px 14px;
+      border-bottom: 1px solid rgba(163, 197, 224, 0.12);
+    }
+
+    .brand-eyebrow {
+      color: var(--accent);
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .brand-title {
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 28px;
+      line-height: 0.95;
+      margin: 0 0 8px;
+    }
+
+    .brand-copy {
+      margin: 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .nav-scroll {
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .nav-group {
+      margin-bottom: 18px;
+    }
+
+    .nav-label {
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.16em;
+      padding: 0 10px 10px;
+    }
+
+    .nav-btn {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-bottom: 8px;
+      border: 1px solid transparent;
+      background: rgba(9, 22, 41, 0.56);
+      color: var(--ink);
+      border-radius: 14px;
+      padding: 12px 12px;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    .nav-btn strong {
+      display: block;
+      font-size: 15px;
+    }
+
+    .nav-btn span {
+      display: block;
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 3px;
+    }
+
+    .nav-btn.active {
+      border-color: rgba(90, 208, 255, 0.55);
+      background: linear-gradient(180deg, rgba(21, 54, 88, 0.92), rgba(10, 24, 42, 0.82));
+      box-shadow: inset 0 0 0 1px rgba(90, 208, 255, 0.18);
+    }
+
+    .nav-badge {
+      min-width: 32px;
+      height: 32px;
+      border-radius: 999px;
+      border: 1px solid var(--line-strong);
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 10px;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(2, 12, 22, 0.75);
+      color: var(--ink);
+      flex-shrink: 0;
+    }
+
+    .sidebar-foot {
+      border-top: 1px solid rgba(163, 197, 224, 0.12);
+      padding-top: 12px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .main {
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .topbar {
+      border-radius: var(--radius-xl);
+      padding: 20px 24px;
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: flex-start;
+    }
+
+    .page-eyebrow {
+      color: var(--accent);
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+
+    .topbar h1 {
+      margin: 0;
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: clamp(28px, 4vw, 40px);
+      line-height: 1;
+    }
+
+    .topbar p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      max-width: 760px;
+      font-size: 15px;
+    }
+
+    .topbar-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+      gap: 10px;
+      min-width: 280px;
+    }
+
+    .identity-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--line-strong);
+      background: rgba(4, 16, 28, 0.72);
+      border-radius: 999px;
+      padding: 10px 14px;
+      font-weight: 700;
+      color: var(--accent);
+    }
+
+    .identity-pill::before {
+      content: "●";
+      color: var(--ok);
+      font-size: 10px;
+    }
+
+    button,
+    input,
+    select,
+    textarea,
+    a {
+      font: inherit;
+    }
+
+    button,
+    .primary-btn,
+    .secondary-btn,
+    .danger-btn,
+    .ghost-btn {
+      appearance: none;
+      border-radius: 999px;
+      padding: 11px 16px;
+      border: 1px solid transparent;
+      cursor: pointer;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      font-weight: 700;
+      transition: transform 0.16s ease, filter 0.16s ease;
+    }
+
+    button:hover,
+    .primary-btn:hover,
+    .secondary-btn:hover,
+    .danger-btn:hover,
+    .ghost-btn:hover {
+      transform: translateY(-1px);
+      filter: brightness(1.03);
+    }
+
+    button:disabled,
+    .primary-btn:disabled,
+    .secondary-btn:disabled,
+    .danger-btn:disabled {
+      opacity: 0.55;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .primary-btn {
+      background: linear-gradient(135deg, var(--accent), #7df0ff);
+      color: #032137;
+    }
+
+    .secondary-btn {
+      background: rgba(8, 24, 43, 0.82);
+      border-color: var(--line);
+      color: var(--ink);
+    }
+
+    .danger-btn {
+      background: rgba(145, 33, 45, 0.94);
+      border-color: rgba(255, 140, 149, 0.5);
+      color: #fff6f6;
+    }
+
+    .ghost-btn {
+      background: transparent;
+      border-color: var(--line);
+      color: var(--muted);
+      padding: 7px 12px;
+    }
+
+    .gate-card {
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .gate-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .gate-stat {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: var(--panel-3);
+      padding: 14px;
+    }
+
+    .gate-stat span,
+    .metric-label,
+    .detail-label {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 8px;
+    }
+
+    .gate-stat strong,
+    .metric-value {
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 26px;
+      line-height: 1;
+    }
+
+    .gate-stat p,
+    .metric-note {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.45;
+    }
+
+    .status-line {
+      min-height: 22px;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .status-line[data-tone="ok"] { color: var(--ok); }
+    .status-line[data-tone="warn"] { color: var(--danger); }
+
+    #adminWorkspace {
+      display: grid;
+      gap: 16px;
+    }
+
+    .view-panel {
+      border-radius: var(--radius-lg);
+      padding: 18px 20px;
+    }
+
+    .section-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .metric-card,
+    .alert-card,
+    .list-card,
+    .detail-card,
+    .notice-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(4, 16, 28, 0.68);
+      padding: 14px;
+    }
+
+    .metric-card[data-tone="ok"] { border-color: rgba(98, 220, 170, 0.34); }
+    .metric-card[data-tone="warning"] { border-color: rgba(255, 179, 92, 0.34); }
+
+    .alert-card[data-severity="success"] { border-color: rgba(98, 220, 170, 0.34); }
+    .alert-card[data-severity="warning"] { border-color: rgba(255, 179, 92, 0.34); }
+
+    .metric-note,
+    .alert-card p,
+    .list-card p,
+    .detail-card p,
+    .notice-card p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      line-height: 1.45;
+      font-size: 14px;
+    }
+
+    .list-card-top,
+    .queue-card-top,
+    .detail-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .list-card strong,
+    .queue-card strong,
+    .detail-card strong,
+    .timeline-card strong,
+    .detail-header h3 {
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 18px;
+      margin: 0;
+    }
+
+    .detail-header h3 {
+      font-size: 24px;
+      line-height: 1;
+      margin-bottom: 8px;
+    }
+
+    .detail-header p,
+    .queue-card p,
+    .queue-card-meta,
+    .queue-card-footer,
+    .list-card-meta {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .queue-card-footer,
+    .list-card-meta {
+      display: flex;
+      justify-content: space-between;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .mini-chip,
+    .status-pill,
+    .tag-chip {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      background: rgba(3, 13, 24, 0.76);
+    }
+
+    .status-pill[data-status="approved"],
+    .status-pill[data-status="published"] {
+      border-color: rgba(98, 220, 170, 0.38);
+      color: #baf1d8;
+    }
+
+    .status-pill[data-status="submitted"],
+    .status-pill[data-status="pending"] {
+      border-color: rgba(255, 200, 87, 0.38);
+      color: #ffe1a6;
+    }
+
+    .status-pill[data-status="rejected"] {
+      border-color: rgba(255, 124, 124, 0.4);
+      color: #ffcbcb;
+    }
+
+    .status-pill[data-status="needs_changes"] {
+      border-color: rgba(255, 179, 92, 0.36);
+      color: #ffd5a3;
+    }
+
+    .shortcut-row,
+    .stack-grid,
+    .detail-grid,
+    .detail-compare-grid,
+    .detail-split,
+    .workspace-grid,
+    .content-grid,
+    .ops-grid {
+      display: grid;
+      gap: 12px;
+    }
+
+    .shortcut-row { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .stack-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .detail-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .detail-compare-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .detail-split { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .workspace-grid { grid-template-columns: minmax(320px, 420px) minmax(0, 1fr); }
+    .content-grid { grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr); align-items: start; }
+    .ops-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .shortcut-card {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      padding: 14px;
+      background: linear-gradient(180deg, rgba(15, 38, 67, 0.88), rgba(7, 18, 33, 0.88));
+      color: var(--ink);
+      text-align: left;
+    }
+
+    .shortcut-card strong {
+      display: block;
+      font-size: 16px;
+      margin-bottom: 6px;
+    }
+
+    .shortcut-card span {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .filter-bar {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(0, 1fr));
+      gap: 12px;
+      margin: 12px 0;
+    }
+
+    .filter-bar label,
+    .form-grid label {
+      display: grid;
+      gap: 7px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .filter-wide,
+    .field-wide {
+      grid-column: span 2;
+    }
+
+    .filter-toggle {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      justify-content: flex-start;
+      padding-top: 28px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(3, 13, 24, 0.82);
+      color: var(--ink);
+      padding: 11px 12px;
+    }
+
+    textarea {
+      min-height: 112px;
+      resize: vertical;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      outline: none;
+      border-color: rgba(90, 208, 255, 0.66);
+      box-shadow: 0 0 0 3px rgba(90, 208, 255, 0.16);
+    }
+
+    .filter-actions {
+      display: flex;
+      align-items: flex-end;
+      justify-content: flex-start;
+      padding-top: 24px;
+    }
+
+    .queue-list,
+    .detail-column,
+    .site-preview,
+    .timeline-list {
+      display: grid;
+      gap: 12px;
+    }
+
+    .queue-list {
+      max-height: 70vh;
+      overflow: auto;
+      padding-right: 4px;
+    }
+
+    .queue-card {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(4, 16, 28, 0.62);
+      padding: 14px;
+      cursor: pointer;
+    }
+
+    .queue-card.selected {
+      border-color: rgba(90, 208, 255, 0.54);
+      box-shadow: inset 0 0 0 1px rgba(90, 208, 255, 0.18);
+      background: linear-gradient(180deg, rgba(14, 35, 60, 0.92), rgba(6, 18, 31, 0.88));
+    }
+
+    .detail-column {
+      min-width: 0;
+    }
+
+    .detail-section {
+      border: 1px solid var(--line);
+      border-radius: 16px;
+      background: rgba(3, 13, 24, 0.58);
+      padding: 14px;
+    }
+
+    .detail-section-title {
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 16px;
+      margin-bottom: 12px;
+    }
+
+    .detail-note {
+      color: var(--ink);
+      line-height: 1.55;
+      white-space: pre-wrap;
+      font-size: 14px;
+    }
+
+    .muted-inline {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .tag-row,
+    .action-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .action-row.compact {
+      gap: 8px;
+    }
+
+    .issue-list {
+      margin: 0;
+      padding-left: 18px;
+      color: var(--ink);
+      display: grid;
+      gap: 10px;
+    }
+
+    .issue-hint {
+      color: var(--muted);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .timeline-card {
+      border: 1px solid rgba(163, 197, 224, 0.14);
+      border-radius: 14px;
+      padding: 12px;
+      background: rgba(7, 20, 36, 0.74);
+    }
+
+    .timeline-card span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      margin-top: 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+    }
+
+    .timeline-card p {
+      margin: 8px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .empty-card {
+      border: 1px dashed rgba(163, 197, 224, 0.24);
+      border-radius: 16px;
+      padding: 20px;
+      color: var(--muted);
+      background: rgba(3, 13, 24, 0.44);
+    }
+
+    .form-section {
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 16px;
+      background: rgba(4, 16, 28, 0.6);
+    }
+
+    .form-section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .form-section-header h3 {
+      margin: 0;
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 18px;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .highlight-editor-list {
+      display: grid;
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .highlight-editor-card {
+      border: 1px solid rgba(163, 197, 224, 0.14);
+      border-radius: 16px;
+      padding: 14px;
+      background: rgba(7, 20, 36, 0.78);
+    }
+
+    .highlight-editor-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+    }
+
+    .highlight-editor-top strong {
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 16px;
+    }
+
+    .site-preview {
+      position: sticky;
+      top: 18px;
+    }
+
+    .site-preview-shell {
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      background:
+        radial-gradient(circle at 20% 18%, rgba(90, 208, 255, 0.12), transparent 30%),
+        radial-gradient(circle at 82% 12%, rgba(255, 200, 87, 0.1), transparent 28%),
+        linear-gradient(180deg, rgba(8, 19, 34, 0.98), rgba(6, 16, 29, 0.98));
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .site-preview-announcement,
+    .site-preview-hero,
+    .site-preview-card {
+      border: 1px solid rgba(163, 197, 224, 0.18);
+      border-radius: 16px;
+      background: rgba(3, 13, 24, 0.62);
+      padding: 14px;
+    }
+
+    .site-preview-announcement[data-tone="success"] { border-color: rgba(98, 220, 170, 0.34); }
+    .site-preview-announcement[data-tone="warning"] { border-color: rgba(255, 179, 92, 0.34); }
+
+    .site-preview-eyebrow,
+    .site-preview-section-label,
+    .site-preview-brand {
+      color: var(--accent);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.14em;
+      margin-bottom: 8px;
+    }
+
+    .site-preview-announcement h4,
+    .site-preview-hero h3 {
+      margin: 0 0 8px;
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 24px;
+      line-height: 1.05;
+    }
+
+    .site-preview-announcement p,
+    .site-preview-hero p,
+    .site-preview-card p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.5;
+      font-size: 14px;
+    }
+
+    .site-preview-cta-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .site-preview-cta-row span,
+    .site-preview-announcement a {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 8px 12px;
+      background: rgba(8, 24, 43, 0.82);
+      border: 1px solid var(--line);
+      color: var(--ink);
+      font-size: 13px;
+      text-decoration: none;
+    }
+
+    .site-preview-note {
+      margin-top: 12px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .site-preview-grid {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      margin-top: 12px;
+    }
+
+    .site-preview-card strong {
+      display: block;
+      margin-bottom: 8px;
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 16px;
+    }
+
+    .view-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 14px;
+    }
+
+    .view-head h2 {
+      margin: 0;
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: 20px;
+    }
+
+    .view-head p {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    @media (max-width: 1320px) {
+      .section-grid,
+      .ops-grid,
+      .detail-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .shortcut-row {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+    }
+
+    @media (max-width: 1100px) {
+      .shell {
+        grid-template-columns: 1fr;
+      }
+
+      .sidebar {
+        position: static;
+        height: auto;
+      }
+
+      .content-grid,
+      .workspace-grid,
+      .detail-split {
+        grid-template-columns: 1fr;
+      }
+
+      .site-preview {
+        position: static;
+      }
+    }
+
+    @media (max-width: 720px) {
+      .shell {
+        padding: 12px;
+        gap: 12px;
+      }
+
+      .topbar,
+      .gate-card,
+      .view-panel,
+      .sidebar {
+        border-radius: 18px;
+      }
+
+      .topbar {
+        padding: 16px;
+      }
+
+      .gate-grid,
+      .form-grid,
+      .stack-grid,
+      .section-grid,
+      .ops-grid,
+      .detail-grid,
+      .detail-compare-grid,
+      .shortcut-row,
+      .site-preview-grid,
+      .filter-bar {
+        grid-template-columns: 1fr;
+      }
+
+      .field-wide,
+      .filter-wide {
+        grid-column: auto;
+      }
+
+      .topbar-actions,
+      .form-section-header,
+      .view-head {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand-block">
+        <div class="brand-eyebrow">World Explorer</div>
+        <h1 class="brand-title">Admin<br>Dashboard</h1>
+        <p class="brand-copy">A dedicated moderation and operations console for editor workflows, rooms, users, and public platform messaging.</p>
+      </div>
+
+      <div class="nav-scroll">
+        <section class="nav-group">
+          <div class="nav-label">Overview</div>
+          <button type="button" class="nav-btn" data-view="overview">
+            <div><strong>Dashboard</strong><span>Summary, alerts, and shortcuts</span></div>
+            <span class="nav-badge">Home</span>
+          </button>
+        </section>
+
+        <section class="nav-group">
+          <div class="nav-label">Content & Review</div>
+          <button type="button" class="nav-btn" data-view="moderation">
+            <div><strong>Editor Moderation</strong><span>Overlay and legacy review queues</span></div>
+            <span class="nav-badge" id="navModerationBadge">0</span>
+          </button>
+          <button type="button" class="nav-btn" data-view="content">
+            <div><strong>Site Content</strong><span>Landing-page draft and publish flow</span></div>
+            <span class="nav-badge" id="navContentBadge">Draft</span>
+          </button>
+        </section>
+
+        <section class="nav-group">
+          <div class="nav-label">Community</div>
+          <button type="button" class="nav-btn" data-view="users">
+            <div><strong>Users</strong><span>Accounts, roles, and submissions</span></div>
+            <span class="nav-badge" id="navUsersBadge">0</span>
+          </button>
+          <button type="button" class="nav-btn" data-view="multiplayer">
+            <div><strong>Multiplayer</strong><span>Rooms, occupancy, and featured state</span></div>
+            <span class="nav-badge" id="navRoomsBadge">0</span>
+          </button>
+        </section>
+
+        <section class="nav-group">
+          <div class="nav-label">Platform</div>
+          <button type="button" class="nav-btn" data-view="diagnostics">
+            <div><strong>Diagnostics</strong><span>Live layer and readiness indicators</span></div>
+            <span class="nav-badge">Ops</span>
+          </button>
+          <button type="button" class="nav-btn" data-view="operations">
+            <div><strong>Operations</strong><span>Settings and safe platform controls</span></div>
+            <span class="nav-badge">Cfg</span>
+          </button>
+          <button type="button" class="nav-btn" data-view="activity">
+            <div><strong>Activity</strong><span>Audit trail and admin action history</span></div>
+            <span class="nav-badge" id="navActivityBadge">0</span>
+          </button>
+        </section>
+      </div>
+
+      <div class="sidebar-foot">
+        Admin tools are separated from the normal account page to keep review, operations, and multiplayer management cleanly scoped.
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="page-eyebrow">Moderator Console</div>
+          <h1 id="pageTitle">Operations Overview</h1>
+          <p id="pageSubtitle">Platform health, pending review workload, active rooms, and recent admin actions in one place.</p>
+        </div>
+        <div class="topbar-actions">
+          <span id="adminIdentityPill" class="identity-pill">Guest</span>
+          <a class="secondary-btn" href="../app/">Open App</a>
+          <a class="secondary-btn" href="./">Account</a>
+          <button id="refreshViewBtn" type="button" class="primary-btn">Refresh</button>
+        </div>
+      </header>
+
+      <section id="authGate" class="gate-card">
+        <div class="gate-grid">
+          <article class="gate-stat">
+            <span>Signed In As</span>
+            <strong id="accessIdentity">No account session</strong>
+            <p>Use an authorized World Explorer account for moderator and admin access.</p>
+          </article>
+          <article class="gate-stat">
+            <span>Admin Access</span>
+            <strong id="accessState">Sign In Required</strong>
+            <p id="accessHint">Use an authorized World Explorer admin account to open the dashboard.</p>
+          </article>
+        </div>
+        <div class="action-row">
+          <button id="signInBtn" type="button" class="primary-btn">Sign In</button>
+          <button id="enableAdminBtn" type="button" class="secondary-btn" hidden>Enable Admin Access</button>
+          <button id="signOutBtn" type="button" class="secondary-btn" hidden>Sign Out</button>
+        </div>
+        <div id="globalStatus" class="status-line"></div>
+      </section>
+
+      <div id="adminWorkspace" hidden>
+        <section class="view-panel" data-view-panel="overview">
+          <div class="view-head">
+            <div>
+              <h2>Platform Snapshot</h2>
+              <p>Pending review, moderation alerts, recent admin actions, and room activity.</p>
+            </div>
+          </div>
+          <div id="overviewStats" class="section-grid"></div>
+          <div class="stack-grid" style="margin-top:12px">
+            <div>
+              <div class="view-head"><div><h2>Alerts</h2><p>Operational warnings and moderation attention items.</p></div></div>
+              <div id="overviewAlerts" class="timeline-list"></div>
+            </div>
+            <div>
+              <div class="view-head"><div><h2>Recent Admin Activity</h2><p>Latest moderator and admin actions.</p></div></div>
+              <div id="overviewActivity" class="timeline-list"></div>
+            </div>
+          </div>
+          <div class="stack-grid" style="margin-top:12px">
+            <div>
+              <div class="view-head"><div><h2>Recent Rooms</h2><p>Newest or most recently updated multiplayer rooms.</p></div></div>
+              <div id="overviewRooms" class="timeline-list"></div>
+            </div>
+            <div>
+              <div class="view-head"><div><h2>Shortcuts</h2><p>Jump directly into the busiest admin workflows.</p></div></div>
+              <div id="overviewShortcuts" class="shortcut-row"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="view-panel" data-view-panel="moderation" hidden>
+          <div class="view-head">
+            <div>
+              <h2>Moderation Workspace</h2>
+              <p>Review overlay submissions and legacy contributions in separate queues.</p>
+            </div>
+            <div id="moderationModeTabs" class="action-row">
+              <button type="button" class="secondary-btn active" data-moderation-mode="overlay">Overlay Editor Queue</button>
+              <button type="button" class="secondary-btn" data-moderation-mode="legacy">Legacy Contributions</button>
+            </div>
+          </div>
+          <div id="moderationSummary" class="section-grid"></div>
+          <div id="moderationFilters" class="filter-bar"></div>
+          <div class="workspace-grid">
+            <div class="queue-list" id="moderationList"></div>
+            <div class="detail-column" id="moderationDetail"></div>
+          </div>
+        </section>
+
+        <section class="view-panel" data-view-panel="users" hidden>
+          <div class="view-head">
+            <div>
+              <h2>User and Contributor Management</h2>
+              <p>Inspect account state, submission history, and room ownership.</p>
+            </div>
+          </div>
+          <div id="usersFilters" class="filter-bar"></div>
+          <div class="workspace-grid">
+            <div class="queue-list" id="usersList"></div>
+            <div class="detail-column" id="usersDetail"></div>
+          </div>
+        </section>
+
+        <section class="view-panel" data-view-panel="multiplayer" hidden>
+          <div class="view-head">
+            <div>
+              <h2>Multiplayer Room Administration</h2>
+              <p>Manage featured status, inspect occupancy, and keep room administration separate from content moderation.</p>
+            </div>
+          </div>
+          <div id="roomsFilters" class="filter-bar"></div>
+          <div class="workspace-grid">
+            <div class="queue-list" id="roomsList"></div>
+            <div class="detail-column" id="roomsDetail"></div>
+          </div>
+        </section>
+
+        <section class="view-panel" data-view-panel="content" hidden>
+          <div class="view-head">
+            <div>
+              <h2>Site Content Administration</h2>
+              <p>Edit landing-page copy with structured draft and publish flow instead of changing file copy directly.</p>
+            </div>
+          </div>
+          <div id="siteContentMeta" class="section-grid"></div>
+          <div class="content-grid" style="margin-top:12px">
+            <div id="siteContentForm" class="detail-column"></div>
+            <div class="site-preview">
+              <div class="view-head"><div><h2>Preview</h2><p>Live preview of the landing-page messaging currently in the draft editor.</p></div></div>
+              <div id="siteContentPreview"></div>
+            </div>
+          </div>
+        </section>
+
+        <section class="view-panel" data-view-panel="diagnostics" hidden>
+          <div class="view-head">
+            <div>
+              <h2>Layer and Readiness Diagnostics</h2>
+              <p>Operational indicators only. No unsupported live toggles are exposed here.</p>
+            </div>
+          </div>
+          <div id="diagnosticsGrid" class="ops-grid"></div>
+        </section>
+
+        <section class="view-panel" data-view-panel="operations" hidden>
+          <div class="view-head">
+            <div>
+              <h2>Operations Settings</h2>
+              <p>Review moderation infrastructure state, safe admin boundaries, and published content readiness.</p>
+            </div>
+          </div>
+          <div id="operationsGrid" class="ops-grid"></div>
+        </section>
+
+        <section class="view-panel" data-view-panel="activity" hidden>
+          <div class="view-head">
+            <div>
+              <h2>Admin Activity Log</h2>
+              <p>Readable audit trail for moderation decisions, site-content changes, and room administration.</p>
+            </div>
+          </div>
+          <div id="activityFilters" class="filter-bar"></div>
+          <div id="activityList" class="timeline-list"></div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="../js/admin-dashboard.js?v=1"></script>
+</body>
+</html>

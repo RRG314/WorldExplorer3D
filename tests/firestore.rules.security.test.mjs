@@ -13,8 +13,14 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocs,
+  limit,
+  orderBy,
+  query,
   serverTimestamp,
   setDoc,
+  updateDoc,
+  where,
   writeBatch
 } from 'firebase/firestore';
 
@@ -177,6 +183,37 @@ function userDoc(uid, displayName) {
   };
 }
 
+function creatorProfileDoc(uid, username = 'Explorer', overrides = {}) {
+  const ts = Timestamp.fromMillis(Date.now() - 120_000);
+  const base = {
+    userId: uid,
+    username,
+    bio: '',
+    avatar: '🌍',
+    discoverable: true,
+    stats: {
+      activitiesCreated: 0,
+      activitiesPublished: 0,
+      totalPlays: 0,
+      contributionsCount: 0,
+      publishedContributions: 0
+    },
+    spaces: {
+      primaryRoomCode: '',
+      hubActivityId: '',
+      hubLabel: ''
+    },
+    createdAt: ts,
+    createdAtMs: ts.toMillis(),
+    updatedAt: ts,
+    updatedAtMs: ts.toMillis()
+  };
+  const next = { ...base, ...overrides };
+  if (overrides.stats) next.stats = { ...base.stats, ...overrides.stats };
+  if (overrides.spaces) next.spaces = { ...base.spaces, ...overrides.spaces };
+  return next;
+}
+
 function savedRoomDoc(roomCode, ownerUid, role = 'owner') {
   const ts = Timestamp.fromMillis(Date.now() - 30_000);
   return {
@@ -201,6 +238,324 @@ function savedRoomDoc(roomCode, ownerUid, role = 'owner') {
     updatedAt: ts,
     lastJoinedAt: ts
   };
+}
+
+function roomActivityDocData(roomCode = ROOM_ID, creatorUid = OWNER_UID, overrides = {}) {
+  const ts = Timestamp.fromMillis(Date.now() - 30_000);
+  const base = {
+    id: 'room_drive_loop',
+    roomCode,
+    title: 'Harbor Sprint',
+    description: 'A shared room race.',
+    templateId: 'driving_route',
+    traversalMode: 'drive',
+    preferredSurface: 'road',
+    creatorId: creatorUid,
+    creatorName: creatorUid === OWNER_UID ? 'Owner' : 'Explorer',
+    creatorAvatar: '🏁',
+    visibility: 'room',
+    status: 'published',
+    playerMode: 'multiplayer',
+    multiplayerEnabled: true,
+    estimatedMinutes: 6,
+    difficulty: 'Moderate',
+    locationLabel: 'Baltimore',
+    anchors: [
+      { id: 'start_a', typeId: 'start', label: 'Start', x: 0, y: 0, z: 0 },
+      { id: 'finish_a', typeId: 'finish', label: 'Finish', x: 20, y: 0, z: 20 }
+    ],
+    startPoint: { x: 0, y: 0, z: 0 },
+    center: { x: 10, y: 0, z: 10 },
+    createdAt: ts,
+    createdAtMs: ts.toMillis(),
+    updatedAt: ts,
+    updatedAtMs: ts.toMillis()
+  };
+  return {
+    ...base,
+    ...overrides
+  };
+}
+
+function roomActivityStateDocData(roomCode = ROOM_ID, actorUid = OWNER_UID, overrides = {}) {
+  const ts = Timestamp.fromMillis(Date.now() - 15_000);
+  const base = {
+    roomCode,
+    activityId: 'room_drive_loop',
+    title: 'Harbor Sprint',
+    templateId: 'driving_route',
+    status: 'running',
+    startedByUid: actorUid,
+    startedByName: actorUid === OWNER_UID ? 'Owner' : 'Explorer',
+    replayCount: 1,
+    startedAt: ts,
+    startedAtMs: ts.toMillis(),
+    updatedAt: ts,
+    updatedAtMs: ts.toMillis()
+  };
+  return {
+    ...base,
+    ...overrides
+  };
+}
+
+function editorSubmissionDoc(ownerUid, overrides = {}) {
+  const ts = Timestamp.fromMillis(Date.now() - 45_000);
+  const target = {
+    anchorKind: 'building',
+    lat: 39.2904,
+    lon: -76.6122,
+    x: 12.5,
+    y: 1.7,
+    z: -8.25,
+    locationLabel: 'Baltimore',
+    buildingKey: 'building:123',
+    buildingLabel: 'Sample Building',
+    destinationKey: '',
+    destinationLabel: ''
+  };
+  const payload = {
+    title: 'Add place info',
+    subtitle: '',
+    note: 'Contributor note',
+    category: 'place',
+    icon: '📍',
+    markerStyle: 'info-pin',
+    tagsText: '',
+    placeKind: '',
+    website: '',
+    phone: '',
+    hours: '',
+    accessNotes: '',
+    buildingUse: '',
+    entranceLabel: '',
+    floorLabel: '',
+    roomLabel: '',
+    photoUrl: '',
+    photoCaption: '',
+    photoAttribution: ''
+  };
+  const moderation = {
+    moderatedBy: OWNER_UID,
+    moderatedByName: 'Owner',
+    moderatedAt: ts,
+    decisionNote: 'Looks good'
+  };
+  const base = {
+    editType: 'place_info',
+    status: 'pending',
+    worldKind: 'earth',
+    areaKey: 'earth:2154:1723',
+    userId: ownerUid,
+    userDisplayName: ownerUid === OWNER_UID ? 'Owner' : 'Member',
+    source: 'editor-v1',
+    target,
+    payload,
+    createdAt: ts,
+    updatedAt: ts
+  };
+  const next = { ...base, ...overrides };
+  if (overrides.target) next.target = { ...target, ...overrides.target };
+  if (overrides.payload) next.payload = { ...payload, ...overrides.payload };
+  if (overrides.moderation) next.moderation = { ...moderation, ...overrides.moderation };
+  return next;
+}
+
+function overlayFeatureDoc(ownerUid = OWNER_UID, overrides = {}) {
+  const ts = Timestamp.fromMillis(Date.now() - 45_000);
+  const outerRing = [
+    { lat: 39.2904, lon: -76.6122 },
+    { lat: 39.2907, lon: -76.6119 },
+    { lat: 39.2905, lon: -76.6115 },
+    { lat: 39.2904, lon: -76.6122 }
+  ];
+  const geometry = {
+    type: 'Polygon',
+    coordinates: outerRing,
+    rings: [
+      {
+        role: 'outer',
+        points: outerRing
+      }
+    ]
+  };
+  const baseFeatureRef = {
+    source: 'osm',
+    featureType: 'building',
+    featureId: 'way/12345',
+    areaKey: 'earth:2154:1723',
+    displayName: 'Seed Building'
+  };
+  const threeD = {
+    height: 24,
+    buildingLevels: 6,
+    minHeight: 0,
+    roofShape: 'flat',
+    layer: 0,
+    bridge: false,
+    tunnel: false,
+    surface: '',
+    entrances: [
+      {
+        lat: 39.2904,
+        lon: -76.6122,
+        label: 'Main entrance',
+        kind: 'main'
+      }
+    ],
+    stairs: [],
+    elevators: []
+  };
+  const relations = {
+    level: '',
+    buildingRef: '',
+    parentFeatureId: '',
+    indoorShell: {
+      enabled: true,
+      levels: [
+        { level: '0', label: 'Ground' },
+        { level: '1', label: 'Level 1' }
+      ]
+    }
+  };
+  const validation = {
+    severity: 'ok',
+    issues: []
+  };
+  const moderation = {
+    note: '',
+    actorUid: '',
+    actorName: ''
+  };
+  const base = {
+    featureId: 'overlay_seed_feature',
+    worldKind: 'earth',
+    areaKey: 'earth:2154:1723',
+    presetId: 'building',
+    featureClass: 'building',
+    sourceType: 'base_patch',
+    mergeMode: 'local_replace',
+    baseFeatureRef,
+    geometryType: 'Polygon',
+    geometry,
+    tags: {
+      building: 'yes',
+      name: 'Overlay Building'
+    },
+    threeD,
+    relations,
+    level: '',
+    buildingRef: '',
+    reviewState: 'draft',
+    publicationState: 'unpublished',
+    validation,
+    moderation,
+    summary: 'Overlay Building',
+    searchText: 'overlay building building yes',
+    bbox: {
+      minLat: 39.2904,
+      minLon: -76.6122,
+      maxLat: 39.2907,
+      maxLon: -76.6115
+    },
+    center: {
+      lat: 39.2905,
+      lon: -76.6119
+    },
+    version: 1,
+    headRevisionId: 'rev_initial',
+    createdBy: ownerUid,
+    updatedBy: ownerUid,
+    createdAt: ts,
+    createdAtMs: ts.toMillis(),
+    updatedAt: ts,
+    updatedAtMs: ts.toMillis(),
+    submittedAtMs: 0,
+    approvedAtMs: 0,
+    publishedAtMs: 0,
+    supersedes: '',
+    supersededBy: ''
+  };
+  const next = { ...base, ...overrides };
+  if (overrides.baseFeatureRef) next.baseFeatureRef = { ...baseFeatureRef, ...overrides.baseFeatureRef };
+  if (overrides.geometry) next.geometry = overrides.geometry;
+  if (overrides.tags) next.tags = { ...base.tags, ...overrides.tags };
+  if (overrides.threeD) next.threeD = { ...threeD, ...overrides.threeD };
+  if (overrides.relations) {
+    const relationOverrides = overrides.relations;
+    next.relations = {
+      ...relations,
+      ...relationOverrides,
+      indoorShell: {
+        ...relations.indoorShell,
+        ...(relationOverrides.indoorShell || {})
+      }
+    };
+  }
+  if (overrides.validation) next.validation = { ...validation, ...overrides.validation };
+  if (overrides.moderation) next.moderation = { ...moderation, ...overrides.moderation };
+  if (overrides.bbox) next.bbox = { ...base.bbox, ...overrides.bbox };
+  if (overrides.center) next.center = { ...base.center, ...overrides.center };
+  return next;
+}
+
+function overlayRevisionDoc(ownerUid = OWNER_UID, featureId = 'overlay_seed_feature', overrides = {}) {
+  const ts = Timestamp.fromMillis(Date.now() - 30_000);
+  const base = {
+    featureId,
+    revisionId: 'rev_initial',
+    version: 1,
+    createdBy: ownerUid,
+    createdAt: ts,
+    createdAtMs: ts.toMillis(),
+    reviewState: 'draft',
+    changeSummary: 'Initial draft',
+    snapshot: overlayFeatureDoc(ownerUid, {
+      featureId,
+      headRevisionId: 'rev_initial'
+    })
+  };
+  const next = { ...base, ...overrides };
+  if (overrides.snapshot) next.snapshot = { ...base.snapshot, ...overrides.snapshot };
+  return next;
+}
+
+function overlayModerationEventDoc(ownerUid = OWNER_UID, featureId = 'overlay_seed_feature', overrides = {}) {
+  const ts = Timestamp.fromMillis(Date.now() - 15_000);
+  const actorUid = overrides.actorUid || OWNER_UID;
+  const base = {
+    featureId,
+    action: 'submit',
+    fromState: 'draft',
+    toState: 'submitted',
+    note: 'Ready for review',
+    actorUid,
+    actorName: actorUid === OWNER_UID ? 'Owner' : 'Moderator',
+    createdAt: ts,
+    createdAtMs: ts.toMillis(),
+    ownerUid
+  };
+  return { ...base, ...overrides };
+}
+
+function overlayPublishedDoc(ownerUid = OWNER_UID, overrides = {}) {
+  const ts = Timestamp.fromMillis(Date.now() - 10_000);
+  const base = overlayFeatureDoc(ownerUid, {
+    reviewState: 'approved',
+    publicationState: 'published',
+    version: 2,
+    headRevisionId: 'rev_approved',
+    approvedAt: ts,
+    approvedAtMs: ts.toMillis(),
+    publishedAt: ts,
+    publishedAtMs: ts.toMillis(),
+    moderation: {
+      note: 'Approved for runtime merge',
+      actorUid: OWNER_UID,
+      actorName: 'Owner'
+    }
+  });
+  return { ...base, ...overrides };
 }
 
 async function seedData(testEnv) {
@@ -289,6 +644,17 @@ await runCheck('anon can read public room doc', async () => {
   await assertSucceeds(getDoc(doc(anonDb, 'rooms', PUBLIC_ROOM_ID)));
 });
 
+await runCheck('anon can query featured public rooms', async () => {
+  const q = query(
+    collection(anonDb, 'rooms'),
+    where('visibility', '==', 'public'),
+    where('featured', '==', true),
+    orderBy('createdAt', 'desc'),
+    limit(10)
+  );
+  await assertSucceeds(getDocs(q));
+});
+
 await runCheck('non-member cannot read private room doc', async () => {
   await assertFails(getDoc(doc(attackerDb, 'rooms', ROOM_ID)));
 });
@@ -340,6 +706,64 @@ await runCheck('member can update own presence with valid payload', async () => 
   await assertSucceeds(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'players', MEMBER_UID), payload));
 });
 
+await runCheck('room owner can create room activity', async () => {
+  await assertSucceeds(setDoc(doc(ownerDb, 'rooms', ROOM_ID, 'activities', 'room_drive_loop'), {
+    ...roomActivityDocData(),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('room member can read room activity', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'rooms', ROOM_ID, 'activities', 'member_read_test'), roomActivityDocData(ROOM_ID, OWNER_UID, {
+      id: 'member_read_test'
+    }));
+  });
+  await assertSucceeds(getDoc(doc(memberDb, 'rooms', ROOM_ID, 'activities', 'member_read_test')));
+});
+
+await runCheck('attacker cannot create room activity in private room', async () => {
+  await assertFails(setDoc(doc(attackerDb, 'rooms', ROOM_ID, 'activities', 'attack_activity'), {
+    ...roomActivityDocData(ROOM_ID, ATTACKER_UID, { id: 'attack_activity' }),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('room member cannot publish room activity without manager rights', async () => {
+  await assertFails(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'activities', 'member_activity'), {
+    ...roomActivityDocData(ROOM_ID, MEMBER_UID, { id: 'member_activity' }),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('room owner can start shared room activity state', async () => {
+  await assertSucceeds(setDoc(doc(ownerDb, 'rooms', ROOM_ID, 'activityState', 'active'), {
+    ...roomActivityStateDocData(),
+    startedAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('room member can read shared room activity state', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'rooms', ROOM_ID, 'activityState', 'active'), roomActivityStateDocData());
+  });
+  await assertSucceeds(getDoc(doc(memberDb, 'rooms', ROOM_ID, 'activityState', 'active')));
+});
+
+await runCheck('room member cannot start shared room activity state', async () => {
+  await assertFails(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'activityState', 'active'), {
+    ...roomActivityStateDocData(ROOM_ID, MEMBER_UID),
+    startedAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
 await runCheck('fresh user can self-update minimal profile doc', async () => {
   await assertSucceeds(setDoc(doc(freshDb, 'users', FRESH_UID), {
     email: `${FRESH_UID}@example.test`,
@@ -348,6 +772,61 @@ await runCheck('fresh user can self-update minimal profile doc', async () => {
     roomCreateLimit: 0,
     updatedAt: serverTimestamp()
   }, { merge: true }));
+});
+
+await runCheck('anon can read public creator profile', async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await setDoc(doc(db, 'creatorProfiles', OWNER_UID), creatorProfileDoc(OWNER_UID, 'Owner'));
+  });
+  await assertSucceeds(getDoc(doc(anonDb, 'creatorProfiles', OWNER_UID)));
+});
+
+await runCheck('fresh user can create and update own creator profile', async () => {
+  const ref = doc(freshDb, 'creatorProfiles', FRESH_UID);
+  await assertSucceeds(setDoc(ref, {
+    userId: FRESH_UID,
+    username: 'Fresh Creator',
+    bio: 'Builds routes and scenic challenges.',
+    avatar: '🏁',
+    discoverable: true,
+    stats: {
+      activitiesCreated: 1,
+      activitiesPublished: 0,
+      totalPlays: 0,
+      contributionsCount: 0,
+      publishedContributions: 0
+    },
+    spaces: {
+      primaryRoomCode: '',
+      hubActivityId: '',
+      hubLabel: ''
+    },
+    createdAt: serverTimestamp(),
+    createdAtMs: Date.now(),
+    updatedAt: serverTimestamp(),
+    updatedAtMs: Date.now()
+  }));
+  await assertSucceeds(updateDoc(ref, {
+    bio: 'Builds routes, scenic challenges, and rooftop runs.',
+    updatedAt: serverTimestamp(),
+    updatedAtMs: Date.now(),
+    stats: {
+      activitiesCreated: 2,
+      activitiesPublished: 1,
+      totalPlays: 0,
+      contributionsCount: 0,
+      publishedContributions: 0
+    }
+  }));
+});
+
+await runCheck('attacker cannot modify another creator profile', async () => {
+  await assertFails(updateDoc(doc(attackerDb, 'creatorProfiles', OWNER_UID), {
+    bio: 'Hijacked bio',
+    updatedAt: serverTimestamp(),
+    updatedAtMs: Date.now()
+  }));
 });
 
 await runCheck('owner cannot create room without consuming quota', async () => {
@@ -1072,6 +1551,286 @@ await runCheck('room owner can delete their room even without active multiplayer
   });
 
   await assertSucceeds(deleteDoc(doc(ownerDb, 'rooms', roomCode)));
+});
+
+await runCheck('signed-in user cannot create pending editor submission directly', async () => {
+  const submissionRef = doc(collection(ownerDb, 'editorSubmissions'));
+  await assertFails(setDoc(submissionRef, {
+    ...editorSubmissionDoc(OWNER_UID),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('signed-in user cannot create building and photo editor submissions directly', async () => {
+  const buildingRef = doc(collection(ownerDb, 'editorSubmissions'));
+  await assertFails(setDoc(buildingRef, {
+    ...editorSubmissionDoc(OWNER_UID, {
+      editType: 'building_note',
+      target: {
+        anchorKind: 'building',
+        lat: 39.2904,
+        lon: -76.6122,
+        x: 12.5,
+        y: 1.7,
+        z: -8.25,
+        locationLabel: 'Baltimore',
+        buildingKey: 'building:123',
+        buildingLabel: 'Sample Building',
+        interiorKey: '',
+        destinationKey: '',
+        destinationLabel: ''
+      },
+      payload: {
+        title: 'Lobby access update',
+        subtitle: 'Main tower',
+        note: 'Front lobby is public during business hours.',
+        category: 'building',
+        icon: '🏢',
+        markerStyle: 'building-outline',
+        tagsText: 'lobby,access',
+        placeKind: '',
+        website: 'https://example.test/building',
+        phone: '',
+        hours: 'Mon-Fri 8am-6pm',
+        accessNotes: 'Badge required after hours.',
+        buildingUse: 'office',
+        entranceLabel: 'Main entrance',
+        floorLabel: '',
+        roomLabel: '',
+        photoUrl: '',
+        photoCaption: '',
+        photoAttribution: ''
+      }
+    }),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+
+  const photoRef = doc(collection(ownerDb, 'editorSubmissions'));
+  await assertFails(setDoc(photoRef, {
+    ...editorSubmissionDoc(OWNER_UID, {
+      editType: 'photo_point',
+      payload: {
+        title: 'Harbor frontage photo',
+        subtitle: '',
+        note: 'Use this as the waterfront reference image.',
+        category: 'photo',
+        icon: '📷',
+        markerStyle: 'photo-frame',
+        tagsText: 'waterfront,reference',
+        placeKind: 'viewpoint',
+        website: '',
+        phone: '',
+        hours: '',
+        accessNotes: '',
+        buildingUse: '',
+        entranceLabel: '',
+        floorLabel: '',
+        roomLabel: '',
+        photoUrl: 'https://example.test/photo.jpg',
+        photoCaption: 'Street-facing harbor frontage',
+        photoAttribution: 'Owner'
+      }
+    }),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('user cannot spoof another owner on editor submission create', async () => {
+  const submissionRef = doc(collection(attackerDb, 'editorSubmissions'));
+  await assertFails(setDoc(submissionRef, {
+    ...editorSubmissionDoc(OWNER_UID),
+    userId: OWNER_UID,
+    userDisplayName: 'Owner',
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('user cannot create approved editor submission directly', async () => {
+  const submissionRef = doc(collection(ownerDb, 'editorSubmissions'));
+  await assertFails(setDoc(submissionRef, {
+    ...editorSubmissionDoc(OWNER_UID, {
+      status: 'approved'
+    }),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'editorSubmissions', 'pending_editor_seed'), editorSubmissionDoc(OWNER_UID));
+  await setDoc(doc(db, 'editorSubmissions', 'approved_editor_seed'), editorSubmissionDoc(OWNER_UID, {
+    status: 'approved',
+    moderation: {
+      moderatedBy: OWNER_UID,
+      moderatedByName: 'Owner',
+      moderatedAt: Timestamp.fromMillis(Date.now() - 30_000),
+      decisionNote: 'Approved'
+    }
+  }));
+});
+
+await runCheck('submission owner can read own pending editor submission', async () => {
+  await assertSucceeds(getDoc(doc(ownerDb, 'editorSubmissions', 'pending_editor_seed')));
+});
+
+await runCheck('other signed-in user cannot read someone else pending editor submission', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'editorSubmissions', 'pending_editor_seed')));
+});
+
+await runCheck('admin cannot approve pending editor submission directly', async () => {
+  await assertFails(updateDoc(doc(adminClaimsDb, 'editorSubmissions', 'pending_editor_seed'), {
+    status: 'approved',
+    updatedAt: serverTimestamp(),
+    moderation: {
+      moderatedBy: OWNER_UID,
+      moderatedByName: 'Owner',
+      moderatedAt: serverTimestamp(),
+      decisionNote: 'Approved'
+    }
+  }));
+});
+
+await runCheck('admin can read pending editor submission', async () => {
+  await assertSucceeds(getDoc(doc(adminClaimsDb, 'editorSubmissions', 'pending_editor_seed')));
+});
+
+await runCheck('anon can read approved editor submission', async () => {
+  await assertSucceeds(getDoc(doc(anonDb, 'editorSubmissions', 'approved_editor_seed')));
+});
+
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'editorSubmissions', 'pending_editor_seed_user'), editorSubmissionDoc(OWNER_UID));
+});
+
+await runCheck('non-admin cannot approve pending editor submission', async () => {
+  await assertFails(updateDoc(doc(ownerDb, 'editorSubmissions', 'pending_editor_seed_user'), {
+    status: 'approved',
+    updatedAt: serverTimestamp(),
+    moderation: {
+      moderatedBy: OWNER_UID,
+      moderatedByName: 'Owner',
+      moderatedAt: serverTimestamp(),
+      decisionNote: 'Nope'
+    }
+  }));
+});
+
+await runCheck('signed-in user cannot create overlay feature head directly', async () => {
+  const featureRef = doc(collection(ownerDb, 'overlayFeatures'));
+  await assertFails(setDoc(featureRef, {
+    ...overlayFeatureDoc(OWNER_UID, {
+      featureId: featureRef.id
+    }),
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('signed-in user cannot create published overlay directly', async () => {
+  const publishedRef = doc(collection(ownerDb, 'overlayPublished'));
+  await assertFails(setDoc(publishedRef, {
+    ...overlayPublishedDoc(OWNER_UID, {
+      featureId: publishedRef.id
+    }),
+    publishedAt: serverTimestamp()
+  }));
+});
+
+await testEnv.withSecurityRulesDisabled(async (ctx) => {
+  const db = ctx.firestore();
+  await setDoc(doc(db, 'overlayFeatures', 'overlay_draft_seed'), overlayFeatureDoc(OWNER_UID, {
+    featureId: 'overlay_draft_seed',
+    headRevisionId: 'rev_seed',
+    reviewState: 'draft'
+  }));
+  await setDoc(doc(db, 'overlayFeatures', 'overlay_draft_seed', 'revisions', 'rev_seed'), overlayRevisionDoc(OWNER_UID, 'overlay_draft_seed', {
+    revisionId: 'rev_seed'
+  }));
+  await setDoc(doc(db, 'overlayFeatures', 'overlay_draft_seed', 'moderation', 'event_submit'), overlayModerationEventDoc(OWNER_UID, 'overlay_draft_seed'));
+  await setDoc(doc(db, 'overlayPublished', 'overlay_published_seed'), overlayPublishedDoc(OWNER_UID, {
+    featureId: 'overlay_published_seed',
+    headRevisionId: 'rev_published',
+    areaKey: 'earth:2154:1723'
+  }));
+  await setDoc(doc(db, 'siteContentPublished', 'landingPage'), {
+    entryId: 'landingPage',
+    content: {
+      hero: {
+        headline: 'Published by admin'
+      }
+    },
+    publishedAt: Timestamp.fromMillis(Date.now() - 5_000)
+  });
+  await setDoc(doc(db, 'adminActivity', 'seed_action'), {
+    actorUid: OWNER_UID,
+    actionType: 'overlay.approve',
+    targetType: 'overlay_feature',
+    targetId: 'overlay_published_seed',
+    title: 'Seed admin action',
+    summary: 'Seed moderation log',
+    createdAt: Timestamp.fromMillis(Date.now() - 5_000),
+    createdAtMs: Date.now() - 5_000
+  });
+});
+
+await runCheck('overlay owner can read own overlay draft head', async () => {
+  await assertSucceeds(getDoc(doc(ownerDb, 'overlayFeatures', 'overlay_draft_seed')));
+});
+
+await runCheck('other signed-in user cannot read another owner overlay draft head', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'overlayFeatures', 'overlay_draft_seed')));
+});
+
+await runCheck('admin can read overlay draft head', async () => {
+  await assertSucceeds(getDoc(doc(adminClaimsDb, 'overlayFeatures', 'overlay_draft_seed')));
+});
+
+await runCheck('overlay owner can read own revision history', async () => {
+  await assertSucceeds(getDoc(doc(ownerDb, 'overlayFeatures', 'overlay_draft_seed', 'revisions', 'rev_seed')));
+});
+
+await runCheck('other signed-in user cannot read another owner overlay revision history', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'overlayFeatures', 'overlay_draft_seed', 'revisions', 'rev_seed')));
+});
+
+await runCheck('overlay owner can read own moderation history', async () => {
+  await assertSucceeds(getDoc(doc(ownerDb, 'overlayFeatures', 'overlay_draft_seed', 'moderation', 'event_submit')));
+});
+
+await runCheck('other signed-in user cannot read another owner overlay moderation history', async () => {
+  await assertFails(getDoc(doc(attackerDb, 'overlayFeatures', 'overlay_draft_seed', 'moderation', 'event_submit')));
+});
+
+await runCheck('anon can read published overlay feature', async () => {
+  await assertSucceeds(getDoc(doc(anonDb, 'overlayPublished', 'overlay_published_seed')));
+});
+
+await runCheck('anon can read published landing page content', async () => {
+  await assertSucceeds(getDoc(doc(anonDb, 'siteContentPublished', 'landingPage')));
+});
+
+await runCheck('signed-in user cannot write site content draft directly', async () => {
+  await assertFails(setDoc(doc(ownerDb, 'siteContent', 'landingPage'), {
+    draft: {
+      hero: {
+        headline: 'Bad direct write'
+      }
+    }
+  }));
+});
+
+await runCheck('signed-in user cannot read admin activity directly', async () => {
+  await assertFails(getDoc(doc(ownerDb, 'adminActivity', 'seed_action')));
+});
+
+await runCheck('signed-in user cannot delete overlay draft head directly', async () => {
+  await assertFails(deleteDoc(doc(ownerDb, 'overlayFeatures', 'overlay_draft_seed')));
 });
 
 const failed = checks.filter((c) => !c.ok);

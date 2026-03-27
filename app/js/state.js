@@ -48,13 +48,15 @@ let mapLayers = {
   // Game elements
   checkpoints: true,
   destination: true,
-  customTrack: true,
+  customTrack: false,
+  activities: true,
   // Police
   police: true,
   // Roads
   roads: true,
   paths: false,
   interiors: true,
+  contributions: true,
   // Memory markers
   memoryPins: true,
   memoryFlowers: true
@@ -71,10 +73,72 @@ const PropertyUI = {
 };
 
 const car = { x: 0, z: 0, y: 0, angle: 0, speed: 0, vx: 0, vz: 0, vy: 0, grip: 1, onRoad: true, road: null, boost: false, boostTime: 0, boostReady: true, boostDecayTime: 0, driftAngle: 0 };
+const boat = {
+  x: 0,
+  z: 0,
+  y: 0,
+  angle: 0,
+  speed: 0,
+  turnRate: 0,
+  pitch: 0,
+  roll: 0,
+  heave: 0,
+  vx: 0,
+  vz: 0,
+  throttle: 0,
+  forwardSpeed: 0,
+  lateralSpeed: 0,
+  verticalVelocity: 0,
+  bowLift: 0,
+  heaveVelocity: 0,
+  pitchVelocity: 0,
+  rollVelocity: 0,
+  surfaceSteepness: 0
+};
+let boatMode = {
+  active: false,
+  available: false,
+  seaState: 'moderate',
+  waveIntensity: 0.46,
+  waterKind: null,
+  promptLabel: '',
+  promptMessage: '',
+  offshoreDistance: 0,
+  shorelineDistance: 0,
+  detailBias: 1,
+  waveDirectionX: 0,
+  waveDirectionZ: 1,
+  currentWater: null,
+  lastEntryMode: 'walk',
+  candidate: null,
+  mesh: null,
+  waterPatch: null,
+  wakeStrength: 0,
+  wakeSpread: 0,
+  bowWaveStrength: 0,
+  bowSplashStrength: 0,
+  sternFoamStrength: 0,
+  slamStrength: 0,
+  manualExitPending: false
+};
 const keys = {};
-let roads = [],roadMeshes = [],buildingMeshes = [],buildings = [],dynamicBuildingColliders = [],landuses = [],landuseMeshes = [],waterAreas = [],waterways = [],linearFeatures = [],linearFeatureMeshes = [],pois = [],poiMeshes = [],scene,camera,renderer,carMesh,wheelMeshes = [];
+let roads = [],roadMeshes = [],urbanSurfaceMeshes = [],buildingMeshes = [],buildings = [],dynamicBuildingColliders = [],landuses = [],surfaceFeatureHints = [],landuseMeshes = [],waterAreas = [],waterways = [],linearFeatures = [],linearFeatureMeshes = [],structureVisualMeshes = [],pois = [],poiMeshes = [],scene,camera,renderer,carMesh,wheelMeshes = [];
+let urbanSurfaceStats = {
+  sidewalkBatchCount: 0,
+  sidewalkVertices: 0,
+  sidewalkTriangles: 0,
+  skippedBuildingAprons: 0
+};
+let waterWaveVisuals = [];
 let streetFurnitureMeshes = [];
 let vegetationFeatures = [],vegetationMeshes = [];
+let activityDiscoveryCatalog = [], activityDiscoveryMapMarkers = [];
+let editorApprovedSubmissions = [], editorApprovedMeshes = [];
+let overlayPublishedFeatures = [], overlayDraftPreviewFeatures = [], overlayRuntimeRoads = [], overlayRuntimeLinearFeatures = [], overlayRuntimePois = [], overlayRuntimeBuildingColliders = [];
+let overlaySuppression = {
+  roadIds: new Set(),
+  buildingIds: new Set()
+};
 let activeInterior = null;
 let interiorHint = null;
 let nearestPOI = null;
@@ -96,7 +160,12 @@ const drone = { x: 0, y: 50, z: 0, pitch: 0, yaw: 0, roll: 0, speed: 30 };
 let Walk = null;
 
 // Time of day system
-let timeOfDay = 'day'; // 'day', 'sunset', 'night', 'sunrise'
+let skyMode = 'live'; // 'live', 'day', 'sunset', 'night', 'sunrise'
+let timeOfDay = 'day'; // current visible phase: 'day', 'sunset', 'night', 'sunrise'
+let skyState = null;
+let weatherMode = 'live'; // 'live', 'clear', 'cloudy', 'overcast', 'rain', 'snow', 'fog', 'storm'
+let liveWeatherState = null;
+let weatherState = null;
 let sun, hemiLight, fillLight, ambientLight, sunSphere, moonSphere;
 
 // Star field and sky interaction
@@ -118,6 +187,7 @@ let composer = null,ssaoPass = null,bloomPass = null,smaaPass = null;
 // Map / minimap state
 let showLargeMap = false;
 let largeMapZoom = 14;
+let minimapZoom = 15;
 let satelliteView = false;
 let landUseVisible = false;
 let showRoads = true;
@@ -657,10 +727,23 @@ Object.assign(appCtx, {
   buildingMeshes,
   buildings,
   dynamicBuildingColliders,
+  editorApprovedMeshes,
+  editorApprovedSubmissions,
+  activityDiscoveryCatalog,
+  activityDiscoveryMapMarkers,
+  overlayDraftPreviewFeatures,
+  overlayPublishedFeatures,
+  overlayRuntimeLinearFeatures,
+  overlayRuntimeBuildingColliders,
+  overlayRuntimePois,
+  overlayRuntimeRoads,
+  overlaySuppression,
   camMode,
   camera,
   car,
   carMesh,
+  boat,
+  boatMode,
   checkpoints,
   cloudGroup,
   cloudsVisible,
@@ -691,11 +774,13 @@ Object.assign(appCtx, {
   landuses,
   linearFeatureMeshes,
   linearFeatures,
+  structureVisualMeshes,
   interiorHint,
   activeInterior,
   waterAreas,
   waterways,
   largeMapZoom,
+  minimapZoom,
   lastTime,
   mapLayers,
   moonSphere,
@@ -725,6 +810,9 @@ Object.assign(appCtx, {
   renderer,
   roadMeshes,
   roads,
+  urbanSurfaceMeshes,
+  urbanSurfaceStats,
+  waterWaveVisuals,
   satelliteView,
   scene,
   selectedHistoric,
@@ -736,13 +824,19 @@ Object.assign(appCtx, {
   showPathOverlays,
   showRoads,
   worldLoading,
+  weatherMode,
+  liveWeatherState,
+  weatherState,
   skyRaycaster,
+  skyMode,
   smaaPass,
   ssaoPass,
   starField,
   streetFurnitureMeshes,
+  surfaceFeatureHints,
   vegetationFeatures,
   vegetationMeshes,
+  skyState,
   sun,
   sunSphere,
   timeOfDay,
@@ -764,10 +858,23 @@ export {
   buildingMeshes,
   buildings,
   dynamicBuildingColliders,
+  editorApprovedMeshes,
+  editorApprovedSubmissions,
+  activityDiscoveryCatalog,
+  activityDiscoveryMapMarkers,
+  overlayDraftPreviewFeatures,
+  overlayPublishedFeatures,
+  overlayRuntimeLinearFeatures,
+  overlayRuntimeBuildingColliders,
+  overlayRuntimePois,
+  overlayRuntimeRoads,
+  overlaySuppression,
   camMode,
   camera,
   car,
   carMesh,
+  boat,
+  boatMode,
   checkpoints,
   cloudGroup,
   cloudsVisible,
@@ -798,11 +905,13 @@ export {
   landuses,
   linearFeatureMeshes,
   linearFeatures,
+  structureVisualMeshes,
   interiorHint,
   activeInterior,
   waterAreas,
   waterways,
   largeMapZoom,
+  minimapZoom,
   lastTime,
   mapLayers,
   moonSphere,
@@ -832,6 +941,9 @@ export {
   renderer,
   roadMeshes,
   roads,
+  urbanSurfaceMeshes,
+  urbanSurfaceStats,
+  waterWaveVisuals,
   satelliteView,
   scene,
   selectedHistoric,
@@ -843,13 +955,19 @@ export {
   showPathOverlays,
   showRoads,
   worldLoading,
+  weatherMode,
+  liveWeatherState,
+  weatherState,
   skyRaycaster,
+  skyMode,
   smaaPass,
   ssaoPass,
   starField,
   streetFurnitureMeshes,
+  surfaceFeatureHints,
   vegetationFeatures,
   vegetationMeshes,
+  skyState,
   sun,
   sunSphere,
   timeOfDay,

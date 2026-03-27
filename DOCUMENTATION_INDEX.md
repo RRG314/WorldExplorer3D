@@ -1,8 +1,18 @@
 # Documentation Index
 
-Last reviewed: 2026-03-13
+Last reviewed: 2026-03-27
 
 Current documentation set for World Explorer 3D.
+
+## Start Here By Audience
+
+| Audience | Start with |
+| --- | --- |
+| New visitor | `README.md` |
+| Player / tester | `USER_GUIDE.md` |
+| Contributor (non-dev) | `CONTRIBUTING.md` |
+| Contributor (dev) | `QUICKSTART.md`, `ARCHITECTURE.md`, `TECHNICAL_DOCS.md` |
+| Release / QA reviewer | `RELEASE_CHECKLIST.md`, `KNOWN_ISSUES.md`, `CHANGELOG.md` |
 
 ## Public-Facing Core
 
@@ -34,6 +44,7 @@ Current documentation set for World Explorer 3D.
 | `CONTROLS_REFERENCE.md` | Control mapping reference |
 | `ARCHITECTURE.md` | System topology and module layering |
 | `TECHNICAL_DOCS.md` | Engineering contracts and module APIs |
+| `docs/MAPCOMPLETE_ADAPTATION_REPORT.md` | Building-semantics adaptation notes from the MapComplete-style reference audit |
 | `API_SETUP.md` | Firebase/Firestore/Stripe setup checklist |
 
 ## Attribution and Legal

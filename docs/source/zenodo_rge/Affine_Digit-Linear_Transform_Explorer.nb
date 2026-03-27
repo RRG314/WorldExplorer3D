@@ -1,0 +1,325 @@
+Notebook[{Cell[
+BoxData[RowBox[{"(*"," ",RowBox[{"==="," ",RowBox[{RowBox[{"Affine"," ","Digit"}],"-",RowBox[
+{"Linear"," ","Transform"," ","Explorer"}]}]," ","==="}]," ","*)"}]],"Input",CellLabel -> "In[162]:= ",
+ExpressionUUID -> "0f4c4834-56cb-4a8e-af31-c7f54a88165b"],Cell[
+BoxData[{RowBox[{RowBox[
+{"(*"," ",RowBox[{"==="," ","PARAMETERS"," ","==="}]," ","*)"}],"\n",RowBox[{RowBox[
+{"b"," ","="," ","10"}],";"}],"                    ",RowBox[{"(*"," ","Base"," ","*)"}]}],"\n",RowBox[
+{RowBox[{RowBox[{"k"," ","="," ","3"}],";"}],"                     ",RowBox[{"(*"," ",RowBox[
+{"Digit"," ","count"}]," ","*)"}]}],"\n",RowBox[{RowBox[{RowBox[{"a"," ","="," ",RowBox[
+{"{",RowBox[{"1",","," ","1",","," ","1"}],"}"}]}],";"}],"             ",RowBox[{"(*"," ",RowBox[
+{"Digit"," ","slopes"}]," ","*)"}]}],"\n",RowBox[{RowBox[{RowBox[{"alpha"," ","="," ",RowBox[
+{"{",RowBox[{"0",","," ",RowBox[{"-","1"}],","," ","3"}],"}"}]}],";"}],"        ",RowBox[
+{"(*"," ",RowBox[{"Digit"," ","offsets"}]," ","*)"}]}],"\n",RowBox[{RowBox[{RowBox[
+{"modulus"," ","="," ","256"}],";"}],"            ",RowBox[{"(*"," ",RowBox[{RowBox[
+{"For"," ","mod"}],"-",RowBox[{"m"," ","analysis"}]}]," ","*)"}]}],"\n",RowBox[{RowBox[
+{RowBox[{"maxIter"," ","="," ","10"}],";"}],"             ",RowBox[{"(*"," ",RowBox[
+{"Max"," ","iterations"," ","for"," ",RowBox[{"T","^","t"}],RowBox[{"(","n",")"}]}]," ","*)"}]}],"\n",RowBox[
+{RowBox[{"exportFile"," ","="," ","\"AffineTransformOutput.csv\""}],";"}]}],"Input",
+CellLabel -> "In[163]:= ",ExpressionUUID -> "14e892e4-8957-46ce-9507-92d6ab4c8e78"],Cell[
+BoxData[
+{RowBox[{RowBox[{"(*"," ",RowBox[{"==="," ",RowBox[{"TRANSFORM"," ","DEFINITION"}]," ","==="}]," ","*)"}],"\n",RowBox[
+{RowBox[{"A"," ","="," ",RowBox[{"Sum","[",RowBox[{RowBox[{RowBox[{"a","[",RowBox[
+{"[","i","]"}],"]"}],"*",RowBox[{"b","^",RowBox[{"(",RowBox[{"k"," ","-"," ","i"}],")"}]}]}],","," ",RowBox[
+{"{",RowBox[{"i",","," ","1",","," ","k"}],"}"}]}],"]"}]}],";"}]}],"\n",RowBox[{RowBox[
+{"c"," ","="," ",RowBox[{"Sum","[",RowBox[{RowBox[{RowBox[{"alpha","[",RowBox[{"[","i","]"}],"]"}],"*",RowBox[
+{"b","^",RowBox[{"(",RowBox[{"k"," ","-"," ","i"}],")"}]}]}],","," ",RowBox[{"{",RowBox[
+{"i",","," ","1",","," ","k"}],"}"}]}],"]"}]}],";"}],"\n",RowBox[{RowBox[{RowBox[
+{"T","[","n_","]"}]," ",":="," ",RowBox[{RowBox[{"A","*","n"}]," ","+"," ","c"}]}],";"}],"\n",RowBox[
+{RowBox[{RowBox[{RowBox[{"d","[","i_","]"}],"[","n_","]"}]," ",":="," ",RowBox[{RowBox[
+{RowBox[{"a","[",RowBox[{"[","i","]"}],"]"}],"*","n"}]," ","+"," ",RowBox[{"alpha","[",RowBox[
+{"[","i","]"}],"]"}]}]}],";"}]}],"Input",CellLabel -> "In[170]:= ",ExpressionUUID -> "4c0a2b05-83d5-4e7f-aa0d-5895d4223640"],Cell[
+BoxData[
+RowBox[{RowBox[{"(*"," ",RowBox[{"==="," ",RowBox[{"VALID"," ","DOMAIN"}]," ","==="}]," ","*)"}],"\n",RowBox[
+{RowBox[{"domain"," ","="," ",RowBox[{"Select","[","\n","  ",RowBox[{RowBox[{"Range","[",RowBox[
+{RowBox[{"-","100"}],","," ","100"}],"]"}],",","\n","  ",RowBox[{"Function","[",RowBox[
+{"n",",","\n","    ",RowBox[{RowBox[{"AllTrue","[",RowBox[{RowBox[{"Range","[","k","]"}],","," ",RowBox[
+{"Function","[",RowBox[{"i",","," ",RowBox[{"0"," ","<="," ",RowBox[{RowBox[{"d","[","i","]"}],"[","n","]"}]," ","<="," ",RowBox[
+{"b"," ","-"," ","1"}]}]}],"]"}]}],"]"}]," ","&&"," ",RowBox[{RowBox[{RowBox[{"d","[","1","]"}],"[","n","]"}]," ","!="," ","0"}]}]}],"\n","  ","]"}]}],"\n","]"}]}],";"}]}]],
+"Input",CellLabel -> "In[174]:= ",ExpressionUUID -> "cc8cb96c-9718-4728-9f70-558c0c482a8a"],Cell[
+CellGroupData[
+{Cell[
+BoxData[{RowBox[{RowBox[{"Print","[","\"\[FilledRightTriangle]\:fe0f Affine Digit-Linear Transform Explorer\"","]"}],";"}],"\n",RowBox[
+{RowBox[{"Print","[",RowBox[{"\"Base: \"",","," ","b",","," ","\", Digits: \"",","," ","k",","," ","\", Modulus: \"",","," ","modulus"}],"]"}],";"}],"\n",RowBox[
+{RowBox[{"Print","[",RowBox[{"\"A = \"",","," ","A",","," ","\", c = \"",","," ","c"}],"]"}],";"}],"\n",RowBox[
+{RowBox[{"Print","[",RowBox[{"\"T(n) = \"",","," ","A",","," ","\"*n + \"",","," ","c"}],"]"}],";"}],"\n",RowBox[
+{RowBox[{"Print","[",RowBox[{"\"Valid n \[Element] D: \"",","," ","domain"}],"]"}],";"}]}],
+"Input",CellLabel -> "In[175]:= ",ExpressionUUID -> "50d2e870-52aa-4a1b-98ea-aef43d0dc89a"],Cell[
+BoxData[
+"\"\[FilledRightTriangle]\:fe0f Affine Digit-Linear Transform Explorer\"",StandardForm],
+"Print",ExpressionUUID -> "034fd20f-66f9-4bc4-b515-9b6cbff3fa1b"],Cell[
+BoxData[InterpretationBox[
+RowBox[{"\"Base: \"","\[InvisibleSpace]","10","\[InvisibleSpace]","\", Digits: \"","\[InvisibleSpace]","3","\[InvisibleSpace]","\", Modulus: \"","\[InvisibleSpace]","256"}],
+SequenceForm["Base: ",10,", Digits: ",3,", Modulus: ",256],Editable -> False],StandardForm],
+"Print",ExpressionUUID -> "151e68b6-72b9-4402-a3c3-e5db4dac6f08"],Cell[
+BoxData[InterpretationBox[
+RowBox[{"\"A = \"","\[InvisibleSpace]","111","\[InvisibleSpace]","\", c = \"","\[InvisibleSpace]",RowBox[
+{"-","7"}]}],SequenceForm["A = ",111,", c = ",-7],Editable -> False],StandardForm],
+"Print",ExpressionUUID -> "1b5e1db2-0c50-4368-8d17-217a2d5991ab"],Cell[
+BoxData[InterpretationBox[
+RowBox[{"\"T(n) = \"","\[InvisibleSpace]","111","\[InvisibleSpace]","\"*n + \"","\[InvisibleSpace]",RowBox[
+{"-","7"}]}],SequenceForm["T(n) = ",111,"*n + ",-7],Editable -> False],StandardForm],
+"Print",ExpressionUUID -> "1f73e4d8-767d-43c6-b947-26bb505df9d4"],Cell[
+BoxData[InterpretationBox[
+RowBox[{"\"Valid n \[Element] D: \"","\[InvisibleSpace]",RowBox[{"{",RowBox[{"1",",","2",",","3",",","4",",","5",",","6"}],"}"}]}],
+SequenceForm["Valid n \[Element] D: ",{1,2,3,4,5,6}],Editable -> False],StandardForm],
+"Print",ExpressionUUID -> "34d47fb5-971b-4c96-96dd-0e60af4b1065"]},Open],ExpressionUUID -> "62c85084-e555-40a4-baf9-0ff61593d280"],Cell[
+BoxData[
+{RowBox[{RowBox[{"(*"," ",RowBox[{"==="," ",RowBox[{"EVALUATE"," ","T",RowBox[{"(","n",")"}]}]," ","==="}]," ","*)"}],"\n",RowBox[
+{RowBox[{"values"," ","="," ",RowBox[{"Table","[",RowBox[{RowBox[{"{",RowBox[{"n",","," ",RowBox[
+{"T","[","n","]"}]}],"}"}],","," ",RowBox[{"{",RowBox[{"n",","," ","domain"}],"}"}]}],"]"}]}],";"}]}],"\n",RowBox[
+{RowBox[{"modValues"," ","="," ",RowBox[{"Table","[",RowBox[{RowBox[{"{",RowBox[{"n",","," ",RowBox[
+{"Mod","[",RowBox[{RowBox[{"T","[","n","]"}],","," ","modulus"}],"]"}]}],"}"}],","," ",RowBox[
+{"{",RowBox[{"n",","," ","domain"}],"}"}]}],"]"}]}],";"}],"\n",RowBox[{RowBox[{"digitVectors"," ","="," ",RowBox[
+{"Table","[",RowBox[{RowBox[{"{",RowBox[{"n",","," ",RowBox[{"Table","[",RowBox[{RowBox[
+{RowBox[{"d","[","i","]"}],"[","n","]"}],","," ",RowBox[{"{",RowBox[{"i",","," ","1",","," ","k"}],"}"}]}],"]"}]}],"}"}],","," ",RowBox[
+{"{",RowBox[{"n",","," ","domain"}],"}"}]}],"]"}]}],";"}]}],"Input",CellLabel -> "In[180]:= ",
+ExpressionUUID -> "3383d348-7b8a-46a8-80a8-c55d565174b2"],Cell[
+BoxData[{RowBox[{RowBox[
+{"(*"," ",RowBox[{"==="," ","ITERATIONS"," ","==="}]," ","*)"}],"\n",RowBox[{RowBox[
+{RowBox[{"Titer","[",RowBox[{"n_",","," ","t_"}],"]"}]," ",":="," ",RowBox[{"If","[",RowBox[
+{RowBox[{"A"," ","=="," ","1"}],","," ",RowBox[{"n"," ","+"," ",RowBox[{"t","*","c"}]}],","," ",RowBox[
+{RowBox[{RowBox[{"A","^","t"}],"*","n"}]," ","+"," ",RowBox[{"c","*",RowBox[{RowBox[
+{"(",RowBox[{RowBox[{"A","^","t"}]," ","-"," ","1"}],")"}],"/",RowBox[{"(",RowBox[
+{"A"," ","-"," ","1"}],")"}]}]}]}]}],"]"}]}],";"}]}],"\n",RowBox[{RowBox[{"iterValues"," ","="," ",RowBox[
+{"Table","[",RowBox[{RowBox[{"{",RowBox[{"n",","," ",RowBox[{"Table","[",RowBox[{RowBox[
+{"Mod","[",RowBox[{RowBox[{"Titer","[",RowBox[{"n",","," ","t"}],"]"}],","," ","modulus"}],"]"}],","," ",RowBox[
+{"{",RowBox[{"t",","," ","0",","," ","maxIter"}],"}"}]}],"]"}]}],"}"}],","," ",RowBox[
+{"{",RowBox[{"n",","," ","domain"}],"}"}]}],"]"}]}],";"}]}],"Input",CellLabel -> "In[183]:= ",
+ExpressionUUID -> "c0e9aa42-7ffb-40c2-9974-144114b0405b"],Cell[
+BoxData[RowBox[{RowBox[
+{"(*"," ",RowBox[{"==="," ",RowBox[{"CYCLE"," ","DETECTION"}]," ","==="}]," ","*)"}],"\n",RowBox[
+{RowBox[{"cycleInfo"," ","="," ",RowBox[{RowBox[{"Reap","[","\n","  ",RowBox[{"Do","[","\n","    ",RowBox[
+{RowBox[{RowBox[{"found"," ","="," ","False"}],";","\n","    ",RowBox[{"hist"," ","="," ",RowBox[
+{"{","}"}]}],";","\n","    ",RowBox[{"x"," ","="," ","n"}],";","\n","    ",RowBox[
+{"For","[",RowBox[{RowBox[{"t"," ","="," ","1"}],","," ",RowBox[{"t"," ","<="," ","modulus"}],","," ",RowBox[
+{"t","++"}],",","\n","      ",RowBox[{RowBox[{"x"," ","="," ",RowBox[{"Mod","[",RowBox[
+{RowBox[{"T","[","x","]"}],","," ","modulus"}],"]"}]}],";","\n","      ",RowBox[{"If","[",RowBox[
+{RowBox[{"MemberQ","[",RowBox[{"hist",","," ","x"}],"]"}],",","\n","        ",RowBox[
+{RowBox[{"Sow","[",RowBox[{"{",RowBox[{"n",","," ","\"Cycle detected length \[LessEqual] \"",","," ","t"}],"}"}],"]"}],";","\n","        ",RowBox[
+{"found"," ","="," ","True"}],";","\n","        ",RowBox[{"Break","[","]"}],";"}]}],"\n","      ","]"}],";","\n","      ",RowBox[
+{"AppendTo","[",RowBox[{"hist",","," ","x"}],"]"}],";"}]}],"\n","    ","]"}],";","\n","    ",RowBox[
+{"If","[",RowBox[{RowBox[{"!","found"}],","," ",RowBox[{"Sow","[",RowBox[{"{",RowBox[
+{"n",","," ","\"No cycle in \"",","," ","modulus",","," ","\" steps\""}],"}"}],"]"}]}],"]"}],";"}],"\n","  ",","," ",RowBox[
+{"{",RowBox[{"n",","," ","domain"}],"}"}]}],"]"}],"\n","]"}],"[",RowBox[{"[",RowBox[
+{"2",","," ","1"}],"]"}],"]"}]}],";"}]}]],"Input",CellLabel -> "In[185]:= ",ExpressionUUID -> "9c4f071a-eb5c-47fe-9d99-7d09e719b8dd"],Cell[
+CellGroupData[
+{Cell[
+BoxData[{RowBox[{RowBox[{"(*"," ",RowBox[{"==="," ","PLOT"," ","==="}]," ","*)"}],"\n",RowBox[
+{RowBox[{"Print","[","\"\|01f4c8 Plot of T(n) over domain\"","]"}],";"}]}],"\n",RowBox[
+{RowBox[{"Print","[",RowBox[{"ListLinePlot","[",RowBox[{"values",","," ",RowBox[{"PlotMarkers"," ","->"," ","Automatic"}],","," ",RowBox[
+{"AxesLabel"," ","->"," ",RowBox[{"{",RowBox[{"\"n\"",","," ","\"T(n)\""}],"}"}]}],","," ",RowBox[
+{"ImageSize"," ","->"," ","Medium"}]}],"]"}],"]"}],";"}]}],"Input",CellLabel -> "In[186]:= ",
+ExpressionUUID -> "27b70720-656e-45d4-9c3c-a3a5ced0e459"],Cell[
+BoxData["\"\|01f4c8 Plot of T(n) over domain\"",
+StandardForm],"Print",ExpressionUUID -> "2007422d-d5f6-4f85-8869-b9dff3c9d783"],Cell[
+BoxData[
+GraphicsBox[{{},{{{},{},TagBox[{Hue[0.67`,0.6`,0.6`],Directive[PointSize[NCache[Rational[
+7,360],0.019444444444444445`]],RGBColor[0.24`,0.6`,0.8`],AbsoluteThickness[2]],LineBox[
+{{1.`,104.`},{2.`,215.`},{3.`,326.`},{4.`,437.`},{5.`,548.`},{6.`,659.`}}]},Function[
+Annotation[Slot[1],"Charting`Private`Tag#1"]]]},{TagBox[{Directive[PointSize[NCache[
+Rational[7,360],0.019444444444444445`]],RGBColor[0.24`,0.6`,0.8`],AbsoluteThickness[
+2]],GeometricTransformationBox[InsetBox[BoxData[FormBox[StyleBox[GraphicsBox[{EdgeForm[],DiskBox[
+{0,0}]},PlotRangePadding -> Scaled[0.15`],ExpressionUUID -> "89595907-df6c-487f-8660-cc03881a4ffd"],
+GraphicsBoxOptions -> {DefaultBaseStyle -> Directive[PointSize[Rational[7,360]],RGBColor[
+0.24`,0.6`,0.8`],AbsoluteThickness[2]]},StripOnInput -> False],TraditionalForm]],
+{0.`,0.`},Automatic,Offset[10.976`]],{{{1.`,104.`}},{{2.`,215.`}},{{3.`,326.`}},{{4.`,437.`}},{{5.`,548.`}},{{6.`,659.`}}}]},
+Function[Annotation[Slot[1],"Charting`Private`Tag#1"]]]}},{{},{}}},{DisplayFunction -> Identity,DisplayFunction -> Identity,RuleDelayed[
+PlotInteractivity,True],DefaultBaseStyle -> {"PlotGraphics","Graphics"},AspectRatio -> NCache[
+Power[GoldenRatio,-1],0.6180339887498948`],Axes -> {True,True},AxesLabel -> {FormBox[
+TagBox["\"n\"",HoldForm],TraditionalForm],FormBox[TagBox["\"T(n)\"",HoldForm],TraditionalForm]},AxesOrigin -> {0,0},RuleDelayed[
+DisplayFunction,Identity],Frame -> {{False,False},{False,False}},FrameLabel -> {{None,None},{None,None}},FrameTicks -> {{Automatic,Automatic},{Automatic,Automatic}},GridLines -> {None,None},GridLinesStyle -> Directive[
+GrayLevel[0.5`,0.4`]],ImageSize -> Medium,Method -> {"AxisPadding" -> Scaled[0.02`],"DefaultBoundaryStyle" -> Automatic,"DefaultGraphicsInteraction" -> {"Version" -> 1.2`,"TrackMousePosition" -> {True,False},"Effects" -> {"Highlight" -> {"ratio" -> 2},"HighlightPoint" -> {"ratio" -> 2},"Droplines" -> {"freeformCursorMode" -> True,"placement" -> {"x" -> "All","y" -> "None"}}}},"DefaultMeshStyle" -> AbsolutePointSize[
+6],"DefaultPlotStyle" -> {Directive[RGBColor[0.24`,0.6`,0.8`],AbsoluteThickness[2]],Directive[
+RGBColor[0.95`,0.627`,0.1425`],AbsoluteThickness[2]],Directive[RGBColor[0.455`,0.7`,
+0.21`],AbsoluteThickness[2]],Directive[RGBColor[0.922526`,0.385626`,0.209179`],AbsoluteThickness[
+2]],Directive[RGBColor[0.578`,0.51`,0.85`],AbsoluteThickness[2]],Directive[RGBColor[
+0.772079`,0.431554`,0.102387`],AbsoluteThickness[2]],Directive[RGBColor[0.4`,0.64`,
+1.`],AbsoluteThickness[2]],Directive[RGBColor[1.`,0.75`,0.`],AbsoluteThickness[2]],Directive[
+RGBColor[0.8`,0.4`,0.76`],AbsoluteThickness[2]],Directive[RGBColor[0.637`,0.65`,0.`],
+AbsoluteThickness[2]],Directive[RGBColor[0.915`,0.3325`,0.2125`],AbsoluteThickness[
+2]],Directive[RGBColor[0.40082222609352647`,0.5220066643438841`,0.85`],AbsoluteThickness[
+2]],Directive[RGBColor[0.9728288904374106`,0.621644452187053`,0.07336199581899142`],
+AbsoluteThickness[2]],Directive[RGBColor[0.736782672705901`,0.358`,0.5030266573755369`],
+AbsoluteThickness[2]],Directive[RGBColor[0.28026441037696703`,0.715`,0.4292089322474965`],
+AbsoluteThickness[2]]},"DomainPadding" -> Scaled[0.02`],"RangePadding" -> Scaled[
+0.05`],"OptimizePlotMarkers" -> True,"IncludeHighlighting" -> Automatic,"HighlightStyle" -> Automatic,"OptimizePlotMarkers" -> True,"IncludeHighlighting" -> "CurrentSet","HighlightStyle" -> Automatic,"OptimizePlotMarkers" -> True,"CoordinatesToolOptions" -> {"DisplayFunction" -> Function[
+{Function[Identity[Slot[1]]][Part[Slot[1],1]],Function[Identity[Slot[1]]][Part[Slot[
+1],2]]}],"CopiedValueFunction" -> Function[{Function[Identity[Slot[1]]][Part[Slot[
+1],1]],Function[Identity[Slot[1]]][Part[Slot[1],2]]}]}},RuleDelayed[PlotInteractivity,
+True],PlotRange -> {{0,6.`},{0,659.`}},PlotRangeClipping -> True,PlotRangePadding -> {{Scaled[
+0.02`],Scaled[0.02`]},{Scaled[0.02`],Scaled[0.05`]}},Ticks -> {Automatic,Automatic},RuleDelayed[
+PlotInteractivity,True]},ExpressionUUID -> "cb8f62be-46cf-4363-bf83-5b2d49605fae"],
+StandardForm],"Print",ExpressionUUID -> "cb0ceeb1-bdb2-4870-b0ab-c5f1f2f8fd28"]},
+Open],ExpressionUUID -> "17f373b9-5598-45bc-ada0-1b91edb2497f"],Cell[
+CellGroupData[
+{Cell[
+BoxData[{RowBox[{RowBox[{"Print","[",RowBox[{"\"\|01f4c8 Plot of T(n) mod \"",","," ","modulus"}],"]"}],";"}],"\n",RowBox[
+{RowBox[{"Print","[",RowBox[{"ListLinePlot","[",RowBox[{"modValues",","," ",RowBox[
+{"PlotStyle"," ","->"," ","Blue"}],","," ",RowBox[{"PlotMarkers"," ","->"," ","Automatic"}],","," ",RowBox[
+{"AxesLabel"," ","->"," ",RowBox[{"{",RowBox[{"\"n\"",","," ",RowBox[{"\"T(n) mod \""," ","<>"," ",RowBox[
+{"ToString","[","modulus","]"}]}]}],"}"}]}],","," ",RowBox[{"ImageSize"," ","->"," ","Medium"}]}],"]"}],"]"}],";"}]}],
+"Input",CellLabel -> "In[188]:= ",ExpressionUUID -> "ea9f71c3-906f-4d23-aa08-602cd74c940f"],Cell[
+BoxData[
+InterpretationBox[RowBox[{"\"\|01f4c8 Plot of T(n) mod \"","\[InvisibleSpace]","256"}],
+SequenceForm["\|01f4c8 Plot of T(n) mod ",256],Editable -> False],StandardForm],"Print",
+ExpressionUUID -> "9d6f90bc-f359-43ea-a97f-52acdcfdd3b3"],Cell[
+BoxData[GraphicsBox[
+{{},{{{},{},TagBox[{Hue[0.67`,0.6`,0.6`],Directive[PointSize[NCache[Rational[7,360],
+0.019444444444444445`]],AbsoluteThickness[2],RGBColor[0,0,1]],LineBox[{{1.`,104.`},{2.`,215.`},{3.`,70.`},{4.`,181.`},{5.`,36.`},{6.`,147.`}}]},
+Function[Annotation[Slot[1],"Charting`Private`Tag#1"]]]},{TagBox[{Directive[PointSize[
+NCache[Rational[7,360],0.019444444444444445`]],AbsoluteThickness[2],RGBColor[0,0,
+1]],GeometricTransformationBox[InsetBox[BoxData[FormBox[StyleBox[GraphicsBox[{EdgeForm[],DiskBox[
+{0,0}]},PlotRangePadding -> Scaled[0.15`],ExpressionUUID -> "a8f84652-0357-4b3c-b626-e950d83e76ee"],
+GraphicsBoxOptions -> {DefaultBaseStyle -> Directive[PointSize[Rational[7,360]],AbsoluteThickness[
+2],RGBColor[0,0,1]]},StripOnInput -> False],TraditionalForm]],{0.`,0.`},Automatic,
+Offset[10.976`]],{{{1.`,104.`}},{{2.`,215.`}},{{3.`,70.`}},{{4.`,181.`}},{{5.`,36.`}},{{6.`,147.`}}}]},
+Function[Annotation[Slot[1],"Charting`Private`Tag#1"]]]}},{{},{}}},{DisplayFunction -> Identity,DisplayFunction -> Identity,RuleDelayed[
+PlotInteractivity,True],DefaultBaseStyle -> {"PlotGraphics","Graphics"},AspectRatio -> NCache[
+Power[GoldenRatio,-1],0.6180339887498948`],Axes -> {True,True},AxesLabel -> {FormBox[
+TagBox["\"n\"",HoldForm],TraditionalForm],FormBox[TagBox["\"T(n) mod 256\"",HoldForm],
+TraditionalForm]},AxesOrigin -> {0,0},RuleDelayed[DisplayFunction,Identity],Frame -> {{False,False},{False,False}},FrameLabel -> {{None,None},{None,None}},FrameTicks -> {{Automatic,Automatic},{Automatic,Automatic}},GridLines -> {None,None},GridLinesStyle -> Directive[
+GrayLevel[0.5`,0.4`]],ImageSize -> Medium,Method -> {"AxisPadding" -> Scaled[0.02`],"DefaultBoundaryStyle" -> Automatic,"DefaultGraphicsInteraction" -> {"Version" -> 1.2`,"TrackMousePosition" -> {True,False},"Effects" -> {"Highlight" -> {"ratio" -> 2},"HighlightPoint" -> {"ratio" -> 2},"Droplines" -> {"freeformCursorMode" -> True,"placement" -> {"x" -> "All","y" -> "None"}}}},"DefaultMeshStyle" -> AbsolutePointSize[
+6],"DefaultPlotStyle" -> {Directive[RGBColor[0.24`,0.6`,0.8`],AbsoluteThickness[2]],Directive[
+RGBColor[0.95`,0.627`,0.1425`],AbsoluteThickness[2]],Directive[RGBColor[0.455`,0.7`,
+0.21`],AbsoluteThickness[2]],Directive[RGBColor[0.922526`,0.385626`,0.209179`],AbsoluteThickness[
+2]],Directive[RGBColor[0.578`,0.51`,0.85`],AbsoluteThickness[2]],Directive[RGBColor[
+0.772079`,0.431554`,0.102387`],AbsoluteThickness[2]],Directive[RGBColor[0.4`,0.64`,
+1.`],AbsoluteThickness[2]],Directive[RGBColor[1.`,0.75`,0.`],AbsoluteThickness[2]],Directive[
+RGBColor[0.8`,0.4`,0.76`],AbsoluteThickness[2]],Directive[RGBColor[0.637`,0.65`,0.`],
+AbsoluteThickness[2]],Directive[RGBColor[0.915`,0.3325`,0.2125`],AbsoluteThickness[
+2]],Directive[RGBColor[0.40082222609352647`,0.5220066643438841`,0.85`],AbsoluteThickness[
+2]],Directive[RGBColor[0.9728288904374106`,0.621644452187053`,0.07336199581899142`],
+AbsoluteThickness[2]],Directive[RGBColor[0.736782672705901`,0.358`,0.5030266573755369`],
+AbsoluteThickness[2]],Directive[RGBColor[0.28026441037696703`,0.715`,0.4292089322474965`],
+AbsoluteThickness[2]]},"DomainPadding" -> Scaled[0.02`],"RangePadding" -> Scaled[
+0.05`],"OptimizePlotMarkers" -> True,"IncludeHighlighting" -> Automatic,"HighlightStyle" -> Automatic,"OptimizePlotMarkers" -> True,"IncludeHighlighting" -> "CurrentSet","HighlightStyle" -> Automatic,"OptimizePlotMarkers" -> True,"CoordinatesToolOptions" -> {"DisplayFunction" -> Function[
+{Function[Identity[Slot[1]]][Part[Slot[1],1]],Function[Identity[Slot[1]]][Part[Slot[
+1],2]]}],"CopiedValueFunction" -> Function[{Function[Identity[Slot[1]]][Part[Slot[
+1],1]],Function[Identity[Slot[1]]][Part[Slot[1],2]]}]}},RuleDelayed[PlotInteractivity,
+True],PlotRange -> {{0,6.`},{0,215.`}},PlotRangeClipping -> True,PlotRangePadding -> {{Scaled[
+0.02`],Scaled[0.02`]},{Scaled[0.02`],Scaled[0.05`]}},Ticks -> {Automatic,Automatic},RuleDelayed[
+PlotInteractivity,True]},ExpressionUUID -> "c1323110-2a40-4a2b-98e0-f6d00096cbd5"],
+StandardForm],"Print",ExpressionUUID -> "71985d8b-a329-4f1b-8913-3a5d17b77972"]},
+Open],ExpressionUUID -> "71d48ae2-3634-4803-8ab5-73f4142d073e"],Cell[
+CellGroupData[
+{Cell[
+BoxData[{RowBox[{RowBox[{"Print","[",RowBox[{"\"\|01f4c9 Iterates T^t(n) mod \"",","," ","modulus"}],"]"}],";"}],"\n",RowBox[
+{RowBox[{"Print","[","\n"," ",RowBox[{"ListLinePlot","[","\n","   ",RowBox[{RowBox[
+{"Table","[",RowBox[{RowBox[{"Transpose","[",RowBox[{"{",RowBox[{RowBox[{"Range","[",RowBox[
+{"0",","," ","maxIter"}],"]"}],","," ",RowBox[{"row","[",RowBox[{"[","2","]"}],"]"}]}],"}"}],"]"}],","," ",RowBox[
+{"{",RowBox[{"row",","," ","iterValues"}],"}"}]}],"]"}],",","\n","   ",RowBox[{"PlotRange"," ","->"," ","All"}],",","\n","   ",RowBox[
+{"PlotStyle"," ","->"," ",RowBox[{RowBox[{"ColorData","[","97","]"}]," ","/@"," ",RowBox[
+{"Range","[",RowBox[{"Length","[","domain","]"}],"]"}]}]}],",","\n","   ",RowBox[
+{"PlotLabel"," ","->"," ",RowBox[{"\"Iterates of T^t(n) mod \""," ","<>"," ",RowBox[
+{"ToString","[","modulus","]"}]}]}],",","\n","   ",RowBox[{"AxesLabel"," ","->"," ",RowBox[
+{"{",RowBox[{"\"t\"",","," ",RowBox[{"\"T^t(n) mod \""," ","<>"," ",RowBox[{"ToString","[","modulus","]"}]}]}],"}"}]}],",","\n","   ",RowBox[
+{"ImageSize"," ","->"," ","Large"}]}],"\n"," ","]"}],"\n","]"}],";"}]}],"Input",CellLabel -> "In[190]:= ",
+ExpressionUUID -> "0e911464-c6f8-4aaf-933e-dd51f537ba73"],Cell[
+BoxData[InterpretationBox[
+RowBox[{"\"\|01f4c9 Iterates T^t(n) mod \"","\[InvisibleSpace]","256"}],SequenceForm[
+"\|01f4c9 Iterates T^t(n) mod ",256],Editable -> False],StandardForm],"Print",ExpressionUUID -> "2a93cbbf-5c86-4f4c-a5e6-550aae7dbe2f"],Cell[
+BoxData[
+GraphicsBox[{{},{{{},{},TagBox[{Hue[0.67`,0.6`,0.6`],Directive[PointSize[NCache[Rational[
+1,60],0.016666666666666666`]],AbsoluteThickness[2],RGBColor[0.368417`,0.506779`,0.709798`]],LineBox[
+{{0.`,1.`},{1.`,104.`},{2.`,17.`},{3.`,88.`},{4.`,33.`},{5.`,72.`},{6.`,49.`},{7.`,56.`},{8.`,65.`},{9.`,40.`},{10.`,81.`}}]},
+Function[Annotation[Slot[1],"Charting`Private`Tag#1"]]],TagBox[{Hue[0.9060679774997897`,
+0.6`,0.6`],Directive[PointSize[NCache[Rational[1,60],0.016666666666666666`]],AbsoluteThickness[
+2],RGBColor[0.880722`,0.611041`,0.142051`]],LineBox[{{0.`,2.`},{1.`,215.`},{2.`,50.`},{3.`,167.`},{4.`,98.`},{5.`,119.`},{6.`,146.`},{7.`,71.`},{8.`,194.`},{9.`,23.`},{10.`,242.`}}]},
+Function[Annotation[Slot[1],"Charting`Private`Tag#2"]]],TagBox[{Hue[0.1421359549995791`,
+0.6`,0.6`],Directive[PointSize[NCache[Rational[1,60],0.016666666666666666`]],AbsoluteThickness[
+2],RGBColor[0.560181`,0.691569`,0.194885`]],LineBox[{{0.`,3.`},{1.`,70.`},{2.`,83.`},{3.`,246.`},{4.`,163.`},{5.`,166.`},{6.`,243.`},{7.`,86.`},{8.`,67.`},{9.`,6.`},{10.`,147.`}}]},
+Function[Annotation[Slot[1],"Charting`Private`Tag#3"]]],TagBox[{Hue[0.37820393249936934`,
+0.6`,0.6`],Directive[PointSize[NCache[Rational[1,60],0.016666666666666666`]],AbsoluteThickness[
+2],RGBColor[0.922526`,0.385626`,0.209179`]],LineBox[{{0.`,4.`},{1.`,181.`},{2.`,116.`},{3.`,69.`},{4.`,228.`},{5.`,213.`},{6.`,84.`},{7.`,101.`},{8.`,196.`},{9.`,245.`},{10.`,52.`}}]},
+Function[Annotation[Slot[1],"Charting`Private`Tag#4"]]],TagBox[{Hue[0.6142719099991583`,
+0.6`,0.6`],Directive[PointSize[NCache[Rational[1,60],0.016666666666666666`]],AbsoluteThickness[
+2],RGBColor[0.528488`,0.470624`,0.701351`]],LineBox[{{0.`,5.`},{1.`,36.`},{2.`,149.`},{3.`,148.`},{4.`,37.`},{5.`,4.`},{6.`,181.`},{7.`,116.`},{8.`,69.`},{9.`,228.`},{10.`,213.`}}]},
+Function[Annotation[Slot[1],"Charting`Private`Tag#5"]]],TagBox[{Hue[0.8503398874989481`,
+0.6`,0.6`],Directive[PointSize[NCache[Rational[1,60],0.016666666666666666`]],AbsoluteThickness[
+2],RGBColor[0.772079`,0.431554`,0.102387`]],LineBox[{{0.`,6.`},{1.`,147.`},{2.`,182.`},{3.`,227.`},{4.`,102.`},{5.`,51.`},{6.`,22.`},{7.`,131.`},{8.`,198.`},{9.`,211.`},{10.`,118.`}}]},
+Function[Annotation[Slot[1],"Charting`Private`Tag#6"]]]}},{{},{}}},{DisplayFunction -> Identity,AspectRatio -> NCache[
+Power[GoldenRatio,-1],0.6180339887498948`],Axes -> {True,True},AxesLabel -> {FormBox[
+TagBox["\"t\"",HoldForm],TraditionalForm],FormBox[TagBox["\"T^t(n) mod 256\"",HoldForm],
+TraditionalForm]},AxesOrigin -> {0,0},RuleDelayed[DisplayFunction,Identity],Frame -> {{False,False},{False,False}},FrameLabel -> {{None,None},{None,None}},FrameTicks -> {{Automatic,Automatic},{Automatic,Automatic}},GridLines -> {None,None},GridLinesStyle -> Directive[
+GrayLevel[0.5`,0.4`]],ImageSize -> Large,Method -> {"AxisPadding" -> Scaled[0.02`],"DefaultBoundaryStyle" -> Automatic,"DefaultGraphicsInteraction" -> {"Version" -> 1.2`,"TrackMousePosition" -> {True,False},"Effects" -> {"Highlight" -> {"ratio" -> 2},"HighlightPoint" -> {"ratio" -> 2},"Droplines" -> {"freeformCursorMode" -> True,"placement" -> {"x" -> "All","y" -> "None"}}}},"DefaultMeshStyle" -> AbsolutePointSize[
+6],"DefaultPlotStyle" -> {Directive[RGBColor[0.24`,0.6`,0.8`],AbsoluteThickness[2]],Directive[
+RGBColor[0.95`,0.627`,0.1425`],AbsoluteThickness[2]],Directive[RGBColor[0.455`,0.7`,
+0.21`],AbsoluteThickness[2]],Directive[RGBColor[0.922526`,0.385626`,0.209179`],AbsoluteThickness[
+2]],Directive[RGBColor[0.578`,0.51`,0.85`],AbsoluteThickness[2]],Directive[RGBColor[
+0.772079`,0.431554`,0.102387`],AbsoluteThickness[2]],Directive[RGBColor[0.4`,0.64`,
+1.`],AbsoluteThickness[2]],Directive[RGBColor[1.`,0.75`,0.`],AbsoluteThickness[2]],Directive[
+RGBColor[0.8`,0.4`,0.76`],AbsoluteThickness[2]],Directive[RGBColor[0.637`,0.65`,0.`],
+AbsoluteThickness[2]],Directive[RGBColor[0.915`,0.3325`,0.2125`],AbsoluteThickness[
+2]],Directive[RGBColor[0.40082222609352647`,0.5220066643438841`,0.85`],AbsoluteThickness[
+2]],Directive[RGBColor[0.9728288904374106`,0.621644452187053`,0.07336199581899142`],
+AbsoluteThickness[2]],Directive[RGBColor[0.736782672705901`,0.358`,0.5030266573755369`],
+AbsoluteThickness[2]],Directive[RGBColor[0.28026441037696703`,0.715`,0.4292089322474965`],
+AbsoluteThickness[2]]},"DomainPadding" -> Scaled[0.02`],"RangePadding" -> Scaled[
+0.05`],"OptimizePlotMarkers" -> True,"IncludeHighlighting" -> Automatic,"HighlightStyle" -> Automatic,"OptimizePlotMarkers" -> True,"IncludeHighlighting" -> "CurrentSet","HighlightStyle" -> Automatic,"OptimizePlotMarkers" -> True,"CoordinatesToolOptions" -> {"DisplayFunction" -> Function[
+{Function[Identity[Slot[1]]][Part[Slot[1],1]],Function[Identity[Slot[1]]][Part[Slot[
+1],2]]}],"CopiedValueFunction" -> Function[{Function[Identity[Slot[1]]][Part[Slot[
+1],1]],Function[Identity[Slot[1]]][Part[Slot[1],2]]}]}},RuleDelayed[PlotInteractivity,
+True],PlotLabel -> FormBox["\"Iterates of T^t(n) mod 256\"",TraditionalForm],PlotRange -> {{0,10.`},{0,246.`}},PlotRangeClipping -> True,PlotRangePadding -> {{Scaled[
+0.02`],Scaled[0.02`]},{Scaled[0.02`],Scaled[0.05`]}},Ticks -> {Automatic,Automatic},RuleDelayed[
+PlotInteractivity,True]},ExpressionUUID -> "06384025-0832-463e-b8ac-95c09b0b943c"],
+StandardForm],"Print",ExpressionUUID -> "19ee3a7e-5c8b-4f2f-a545-e353e95bac7c"]},
+Open],ExpressionUUID -> "ebbfd431-7999-463d-9041-3d93371b70c8"],Cell[
+CellGroupData[
+{Cell[
+BoxData[{RowBox[{RowBox[{"(*"," ",RowBox[{"==="," ",RowBox[{"DIGIT"," ","VECTORS"}]," ","==="}]," ","*)"}],"\n",RowBox[
+{RowBox[{"Print","[","\"\|01f522 Digit vectors (d\:2081(n), ..., d\:2096(n))\"","]"}],";"}]}],"\n",RowBox[
+{"Grid","[",RowBox[{RowBox[{"Prepend","[",RowBox[{"digitVectors",","," ",RowBox[{"{",RowBox[
+{"\"n\"",","," ","\"Digits\""}],"}"}]}],"]"}],","," ",RowBox[{"Frame"," ","->"," ","All"}]}],"]"}]}],
+"Input",CellLabel -> "In[192]:= ",ExpressionUUID -> "296ecd9e-9e8d-4383-8887-aeb2743862fd"],Cell[
+BoxData[
+"\"\|01f522 Digit vectors (d\:2081(n), ..., d\:2096(n))\"",StandardForm],"Print",
+ExpressionUUID -> "efdd27a8-fb09-437c-929b-726f718b4256"],Cell[
+BoxData[TagBox[GridBox[
+{{"\"n\"","\"Digits\""},{"1",RowBox[{"{",RowBox[{"1",",","0",",","4"}],"}"}]},{"2",RowBox[
+{"{",RowBox[{"2",",","1",",","5"}],"}"}]},{"3",RowBox[{"{",RowBox[{"3",",","2",",","6"}],"}"}]},{"4",RowBox[
+{"{",RowBox[{"4",",","3",",","7"}],"}"}]},{"5",RowBox[{"{",RowBox[{"5",",","4",",","8"}],"}"}]},{"6",RowBox[
+{"{",RowBox[{"6",",","5",",","9"}],"}"}]}},AutoDelete -> False,GridBoxFrame -> {"Columns" -> {{True}},"Rows" -> {{True}}},
+GridBoxItemSize -> {"Columns" -> {{Automatic}},"Rows" -> {{Automatic}}}],"Grid"],
+StandardForm],"Output",CellLabel -> "Out[193]= ",ExpressionUUID -> "a8402ce1-5c67-45e3-82e5-87d2b25b5893"]},
+Open],ExpressionUUID -> "d3064a2a-b01a-4c3e-a223-5386994a3ffc"],Cell[
+CellGroupData[
+{Cell[
+BoxData[{RowBox[{RowBox[{"(*"," ",RowBox[{"==="," ",RowBox[{"CYCLE"," ","INFO"}]," ","==="}]," ","*)"}],"\n",RowBox[
+{RowBox[{"Print","[",RowBox[{"\"\|01f501 Cycle detection mod \"",","," ","modulus"}],"]"}],";"}]}],"\n",RowBox[
+{"Grid","[",RowBox[{RowBox[{"Prepend","[",RowBox[{"cycleInfo",","," ",RowBox[{"{",RowBox[
+{"\"n\"",","," ","\"Cycle Info\""}],"}"}]}],"]"}],","," ",RowBox[{"Frame"," ","->"," ","All"}]}],"]"}]}],
+"Input",CellLabel -> "In[194]:= ",ExpressionUUID -> "c824a8f4-00b8-45ec-8dff-781bf0d34791"],Cell[
+BoxData[
+InterpretationBox[RowBox[{"\"\|01f501 Cycle detection mod \"","\[InvisibleSpace]","256"}],
+SequenceForm["\|01f501 Cycle detection mod ",256],Editable -> False],StandardForm],
+"Print",ExpressionUUID -> "22141fde-561a-481f-8b75-277142d9b14b"],Cell[
+BoxData[TagBox[
+GridBox[{{"\"n\"","\"Cycle Info\"",""},{"1","\"Cycle detected length \[LessEqual] \"","33"},{"2","\"Cycle detected length \[LessEqual] \"","33"},{"3","\"Cycle detected length \[LessEqual] \"","33"},{"4","\"Cycle detected length \[LessEqual] \"","33"},{"5","\"Cycle detected length \[LessEqual] \"","33"},{"6","\"Cycle detected length \[LessEqual] \"","33"}},
+AutoDelete -> False,GridBoxFrame -> {"Columns" -> {{True}},"Rows" -> {{True}}},GridBoxItemSize -> {"Columns" -> {{Automatic}},"Rows" -> {{Automatic}}}],
+"Grid"],StandardForm],"Output",CellLabel -> "Out[195]= ",ExpressionUUID -> "c60cb7e7-c8c9-4fcf-80d4-8016b50ab805"]},
+Open],ExpressionUUID -> "e22366d6-adb8-4809-9138-87cbbea4571e"],Cell[
+BoxData[RowBox[
+{RowBox[{"(*"," ",RowBox[{"==="," ",RowBox[{"EXPORT"," ","TO"," ","CSV"}]," ","==="}]," ","*)"}],"\n",RowBox[
+{RowBox[{"csvRows"," ","="," ",RowBox[{"Prepend","[","\n","  ",RowBox[{RowBox[{"Table","[","\n","    ",RowBox[
+{RowBox[{"Join","[",RowBox[{RowBox[{"{",RowBox[{"n",","," ",RowBox[{"T","[","n","]"}],","," ",RowBox[
+{"Mod","[",RowBox[{RowBox[{"T","[","n","]"}],","," ","modulus"}],"]"}]}],"}"}],","," ",RowBox[
+{"Table","[",RowBox[{RowBox[{RowBox[{"d","[","i","]"}],"[","n","]"}],","," ",RowBox[
+{"{",RowBox[{"i",","," ","1",","," ","k"}],"}"}]}],"]"}]}],"]"}],",","\n","    ",RowBox[
+{"{",RowBox[{"n",","," ","domain"}],"}"}]}],"\n","  ","]"}],",","\n","  ",RowBox[
+{"Join","[",RowBox[{RowBox[{"{",RowBox[{"\"n\"",","," ","\"T(n)\"",","," ",RowBox[
+{"\"T(n) mod \""," ","<>"," ",RowBox[{"ToString","[","modulus","]"}]}]}],"}"}],","," ",RowBox[
+{"Table","[",RowBox[{RowBox[{"\"d\""," ","<>"," ",RowBox[{"ToString","[","i","]"}]}],","," ",RowBox[
+{"{",RowBox[{"i",","," ","1",","," ","k"}],"}"}]}],"]"}]}],"]"}]}],"\n","]"}]}],";"}]}]],
+"Input",CellLabel -> "In[196]:= ",ExpressionUUID -> "32a088d0-a4ae-46f6-898b-08e337695148"],Cell[
+CellGroupData[
+{Cell[
+BoxData[{RowBox[{RowBox[{"Export","[",RowBox[{"exportFile",","," ","csvRows"}],"]"}],";"}],"\n",RowBox[
+{RowBox[{RowBox[{"Print","[",RowBox[{"\"\:2705 Exported data to: \"",","," ","exportFile"}],"]"}],";"}],"\n"}]}],
+"Input",CellLabel -> "In[197]:= ",ExpressionUUID -> "dcecefcf-9cd6-44bb-93c4-b768508f8ba9"],Cell[
+BoxData[
+InterpretationBox[RowBox[{"\"\:2705 Exported data to: \"","\[InvisibleSpace]","\"AffineTransformOutput.csv\""}],
+SequenceForm["\:2705 Exported data to: ","AffineTransformOutput.csv"],Editable -> False],
+StandardForm],"Print",ExpressionUUID -> "50ea0957-2f11-4c51-8743-09511fedf350"]},
+Open],ExpressionUUID -> "f9e5d75d-ccb2-4bdb-96cd-1cc91166fca6"]},StyleDefinitions -> "Default.nb",
+FrontEndVersion -> "14.3 for Wolfram Cloud 1.75 (November 15, 2025)"]

@@ -49,7 +49,6 @@ const terrainTileCache = new Map(); // key: `${z}/${x}/${y}` => {loaded, elev, w
 let terrainGroup = null; // THREE.Group holding terrain meshes
 let terrainEnabled = true; // toggle for terrain system
 let roadsNeedRebuild = true; // rebuild roads after terrain loads
-let lastRoadRebuildCheck = 0; // throttle rebuild checks
 
 // Land use styles for massive visual realism - ground truth rendering
 const LANDUSE_STYLES = {
@@ -63,6 +62,9 @@ const LANDUSE_STYLES = {
   meadow: { color: 0x8bc34a, name: 'Meadow' },
   scrub: { color: 0x8d8d4f, name: 'Scrub' },
   orchard: { color: 0x689f38, name: 'Orchard' },
+  plant_nursery: { color: 0x79b36b, name: 'Plant Nursery' },
+  greenhouse_horticulture: { color: 0xa5d6a7, name: 'Greenhouse' },
+  farmyard: { color: 0xa1887f, name: 'Farmyard' },
   vineyard: { color: 0x7cb342, name: 'Vineyard' },
   sand: { color: 0xd7c08a, name: 'Sand' },
   dune: { color: 0xcfa56d, name: 'Dunes' },
@@ -126,7 +128,6 @@ exposeMutableGlobal('customLoc', () => customLoc, (v) => {customLoc = v;});
 exposeMutableGlobal('terrainGroup', () => terrainGroup, (v) => {terrainGroup = v;});
 exposeMutableGlobal('terrainEnabled', () => terrainEnabled, (v) => {terrainEnabled = v;});
 exposeMutableGlobal('roadsNeedRebuild', () => roadsNeedRebuild, (v) => {roadsNeedRebuild = v;});
-exposeMutableGlobal('lastRoadRebuildCheck', () => lastRoadRebuildCheck, (v) => {lastRoadRebuildCheck = v;});
 
 Object.assign(appCtx, {
   LANDUSE_STYLES,
@@ -160,7 +161,6 @@ export {
   WORLD_UNITS_PER_METER,
   customLoc,
   geoToWorld,
-  lastRoadRebuildCheck,
   locKeys,
   roadsNeedRebuild,
   terrainEnabled,

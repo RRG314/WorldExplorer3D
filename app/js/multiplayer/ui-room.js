@@ -33,6 +33,14 @@ import {
   updateRoomSettings
 } from './rooms.js?v=66';
 import {
+  deleteRoomActivity,
+  listenRoomActivities,
+  listenRoomActivityState,
+  saveRoomActivity,
+  startRoomActivitySession,
+  stopRoomActivitySession
+} from './room-activities.js?v=1';
+import {
   listenPaintClaims,
   normalizeColorHex as normalizePaintColorHex,
   upsertPaintClaim
@@ -49,6 +57,7 @@ import {
   sendInviteToFriend
 } from './social.js?v=55';
 import { getCurrentUser } from '../../../js/auth-ui.js';
+import { currentMapReferenceGeoPosition } from '../map-coordinates.js?v=2';
 
 let singleton = null;
 const MAX_PLAN_DISPLAY_NAME_LEN = 48;
@@ -329,8 +338,9 @@ function isDroneModeActive() {
 }
 
 function readWorldContext() {
-  const lat = finiteNumber(appCtx.LOC?.lat, finiteNumber(appCtx.customLoc?.lat, 0));
-  const lon = finiteNumber(appCtx.LOC?.lon, finiteNumber(appCtx.customLoc?.lon, 0));
+  const refGeo = currentMapReferenceGeoPosition();
+  const lat = finiteNumber(refGeo?.lat, finiteNumber(appCtx.LOC?.lat, finiteNumber(appCtx.customLoc?.lat, 0)));
+  const lon = finiteNumber(refGeo?.lon, finiteNumber(appCtx.LOC?.lon, finiteNumber(appCtx.customLoc?.lon, 0)));
   const locName = appCtx.selLoc === 'custom'
     ? sanitizeText(appCtx.customLoc?.name || 'Custom', 80)
     : sanitizeText(appCtx.LOCS?.[appCtx.selLoc]?.name || appCtx.selLoc || 'Custom', 80);
@@ -515,6 +525,8 @@ function initMultiplayerPlatform() {
     roomArtifactTextInput: document.getElementById('roomArtifactTextInput'),
     roomArtifactCreateBtn: document.getElementById('roomArtifactCreateBtn'),
     roomArtifactList: document.getElementById('roomArtifactList'),
+    roomActivityList: document.getElementById('roomActivityList'),
+    roomActivityOpenBtn: document.getElementById('roomActivityOpenBtn'),
 
     floatCreate: document.getElementById('fMpCreate'),
     floatJoin: document.getElementById('fMpJoin'),
@@ -551,6 +563,8 @@ function initMultiplayerPlatform() {
     ownedRooms: [],
     leaderboard: [],
     artifacts: [],
+    roomActivities: [],
+    activeRoomActivity: null,
     homeBase: null,
     pendingRoomCode: normalizeCode(new URLSearchParams(window.location.search).get('room')),
     pendingRoomPrompted: false,
@@ -564,6 +578,8 @@ function initMultiplayerPlatform() {
     unsubSharedBlocks: null,
     unsubHomeBase: null,
     unsubPaintClaims: null,
+    unsubRoomActivities: null,
+    unsubRoomActivityState: null,
     unsubFriends: null,
     unsubRecentPlayers: null,
     unsubInvites: null,
@@ -588,6 +604,8 @@ function initMultiplayerPlatform() {
       lon,
       name: roomName,
       locationLabel,
+      ownerUid: sanitizeText(room.ownerUid || room.createdBy || '', 160),
+      createdBy: sanitizeText(room.createdBy || room.ownerUid || '', 160),
       type: type === 'user' ? 'user' : 'public',
       visibility
     };
@@ -648,6 +666,12 @@ function initMultiplayerPlatform() {
       publicRooms,
       updatedAt: Date.now()
     };
+    appCtx.multiplayerRoomActivities = state.roomActivities.slice();
+    appCtx.multiplayerActiveRoomActivity = state.activeRoomActivity ? { ...state.activeRoomActivity } : null;
+  }
+
+  function canManageCurrentRoomActivities() {
+    return !!(state.currentRoom && state.authUser && String(state.currentRoom.ownerUid || '') === String(state.authUser.uid || ''));
   }
 
   function closeRoomPanel() {
@@ -896,8 +920,9 @@ function initMultiplayerPlatform() {
     const cityKey = normalizeCityKey(selection?.cityKey || selection?.city || '');
     const locations = Object.values(appCtx.LOCS || {});
     const match = locations.find((loc) => normalizeCityKey(loc?.name || '') === cityKey) || null;
-    const lat = finiteNumber(match?.lat, finiteNumber(appCtx.LOC?.lat, 0));
-    const lon = finiteNumber(match?.lon, finiteNumber(appCtx.LOC?.lon, 0));
+    const refGeo = currentMapReferenceGeoPosition();
+    const lat = finiteNumber(match?.lat, finiteNumber(refGeo?.lat, finiteNumber(appCtx.LOC?.lat, 0)));
+    const lon = finiteNumber(match?.lon, finiteNumber(refGeo?.lon, finiteNumber(appCtx.LOC?.lon, 0)));
     return {
       kind: 'earth',
       lat,
@@ -1100,6 +1125,43 @@ function initMultiplayerPlatform() {
     }).join('');
   }
 
+  function renderRoomActivities() {
+    if (!refs.roomActivityList) return;
+    if (!state.currentRoom) {
+      refs.roomActivityList.innerHTML = '<li class="mpRoomEmpty">Join a room to browse room games.</li>';
+      return;
+    }
+    if (!state.roomActivities.length) {
+      refs.roomActivityList.innerHTML = '<li class="mpRoomEmpty">No room games yet. Open Create Game to add one for this room.</li>';
+      return;
+    }
+    const activeId = sanitizeText(state.activeRoomActivity?.activityId || '', 120).toLowerCase();
+    refs.roomActivityList.innerHTML = state.roomActivities.map((activity) => {
+      const active = sanitizeText(activity.id || '', 120).toLowerCase() === activeId;
+      const title = safeHtml(activity.title || 'Room Game', 80);
+      const meta = `${safeHtml(activity.templateId.replace(/_/g, ' ') || 'activity', 40)} • ${safeHtml(activity.traversalMode || 'walk', 24)} • by ${safeHtml(activity.creatorName || 'Explorer', 48)}`;
+      const actionLabel = active ? 'Running' : 'Open';
+      const stopBtn = active && canManageCurrentRoomActivities()
+        ? `<button class="mp-btn secondary mpSmallBtn" data-stop-room-activity="${escapeHtml(String(activity.id || ''))}" type="button">Stop</button>`
+        : '';
+      const deleteBtn = canManageCurrentRoomActivities()
+        ? `<button class="mp-btn secondary mpSmallBtn" data-remove-room-activity="${escapeHtml(String(activity.id || ''))}" type="button">Delete</button>`
+        : '';
+      return `<li class="mpRoomItem ${active ? 'active' : ''}" data-room-activity-id="${escapeHtml(String(activity.id || ''))}">
+        <div class="mpArtifactInfo">
+          <div class="mpArtifactTitle">${title}</div>
+          <div class="mpArtifactMeta">${meta}</div>
+          <div class="mpArtifactMeta">${safeHtml(activity.description || 'Shared room game.', 220)}</div>
+        </div>
+        <div class="mp-row">
+          <button class="mp-btn secondary mpSmallBtn" data-open-room-activity="${escapeHtml(String(activity.id || ''))}" type="button">${actionLabel}</button>
+          ${stopBtn}
+          ${deleteBtn}
+        </div>
+      </li>`;
+    }).join('');
+  }
+
   function renderHomeBase() {
     if (!refs.roomHomeBaseCurrent) return;
     if (!state.currentRoom) {
@@ -1177,6 +1239,7 @@ function initMultiplayerPlatform() {
     if (refs.roomArtifactTypeSelect) refs.roomArtifactTypeSelect.disabled = !hasRoom;
     if (refs.roomArtifactTitleInput) refs.roomArtifactTitleInput.disabled = !hasRoom;
     if (refs.roomArtifactTextInput) refs.roomArtifactTextInput.disabled = !hasRoom;
+    if (refs.roomActivityOpenBtn) refs.roomActivityOpenBtn.disabled = !hasRoom;
     const signedIn = !!state.authUser;
     if (refs.titleAddFriendBtn) refs.titleAddFriendBtn.disabled = !signedIn;
     if (refs.titleFriendUidInput) refs.titleFriendUidInput.disabled = !signedIn;
@@ -1277,6 +1340,8 @@ function initMultiplayerPlatform() {
     if (typeof state.unsubPlayers === 'function') state.unsubPlayers();
     if (typeof state.unsubChat === 'function') state.unsubChat();
     if (typeof state.unsubArtifacts === 'function') state.unsubArtifacts();
+    if (typeof state.unsubRoomActivities === 'function') state.unsubRoomActivities();
+    if (typeof state.unsubRoomActivityState === 'function') state.unsubRoomActivityState();
     if (typeof state.unsubSharedBlocks === 'function') state.unsubSharedBlocks();
     if (typeof state.unsubHomeBase === 'function') state.unsubHomeBase();
     if (typeof state.unsubPaintClaims === 'function') state.unsubPaintClaims();
@@ -1284,6 +1349,8 @@ function initMultiplayerPlatform() {
     state.unsubPlayers = null;
     state.unsubChat = null;
     state.unsubArtifacts = null;
+    state.unsubRoomActivities = null;
+    state.unsubRoomActivityState = null;
     state.unsubSharedBlocks = null;
     state.unsubHomeBase = null;
     state.unsubPaintClaims = null;
@@ -1324,6 +1391,8 @@ function initMultiplayerPlatform() {
     state.players = [];
     state.messages = [];
     state.artifacts = [];
+    state.roomActivities = [];
+    state.activeRoomActivity = null;
     state.homeBase = null;
     if (typeof appCtx.clearPaintTownMultiplayerConfig === 'function') {
       appCtx.clearPaintTownMultiplayerConfig();
@@ -1337,6 +1406,7 @@ function initMultiplayerPlatform() {
     renderPlayerList();
     renderChat();
     renderArtifacts();
+    renderRoomActivities();
     renderHomeBase();
     updateToggleStates();
     publishMapRoomsToContext();
@@ -1584,6 +1654,98 @@ function initMultiplayerPlatform() {
     }
   }
 
+  async function handleOpenRoomActivity(activityId) {
+    if (!state.currentRoom) {
+      setStatus('Join a room first.', true);
+      return;
+    }
+    const activity = state.roomActivities.find((entry) => sanitizeText(entry.id || '', 120).toLowerCase() === sanitizeText(activityId || '', 120).toLowerCase());
+    if (!activity) {
+      setStatus('That room game could not be found.', true);
+      return;
+    }
+    if (typeof appCtx.openActivityBrowser === 'function') {
+      await appCtx.openActivityBrowser({
+        activityId: activity.id,
+        scope: 'rooms'
+      });
+    }
+    setStatus(`Opened ${activity.title}.`);
+  }
+
+  async function handleDeleteRoomActivity(activityId) {
+    if (!state.currentRoom) {
+      setStatus('Join a room first.', true);
+      return;
+    }
+    if (!canManageCurrentRoomActivities()) {
+      setStatus('Only the room owner can remove room games.', true);
+      return;
+    }
+    try {
+      await deleteRoomActivity(state.currentRoom.code, activityId);
+      if (sanitizeText(state.activeRoomActivity?.activityId || '', 120).toLowerCase() === sanitizeText(activityId || '', 120).toLowerCase()) {
+        await stopRoomActivitySession(state.currentRoom.code, {
+          uid: state.authUser?.uid || '',
+          displayName: state.authUser?.displayName || state.authUser?.email || 'Explorer'
+        });
+      }
+      setStatus('Room game removed.');
+    } catch (err) {
+      setStatus(err?.message || 'Could not remove that room game.', true);
+    }
+  }
+
+  async function handleStopRoomActivity(activityId = '') {
+    if (!state.currentRoom) {
+      setStatus('Join a room first.', true);
+      return;
+    }
+    if (!canManageCurrentRoomActivities()) {
+      setStatus('Only the room owner can stop a shared room game.', true);
+      return;
+    }
+    const activeId = sanitizeText(state.activeRoomActivity?.activityId || '', 120).toLowerCase();
+    if (activityId && sanitizeText(activityId, 120).toLowerCase() !== activeId) return;
+    try {
+      await stopRoomActivitySession(state.currentRoom.code, {
+        uid: state.authUser?.uid || '',
+        displayName: state.authUser?.displayName || state.authUser?.email || 'Explorer'
+      });
+      if (typeof appCtx.stopSharedRoomActivityRuntime === 'function') {
+        appCtx.stopSharedRoomActivityRuntime({ source: 'room_activity_stop' });
+      }
+      setStatus('Room game stopped.');
+    } catch (err) {
+      setStatus(err?.message || 'Could not stop the room game.', true);
+    }
+  }
+
+  async function launchRoomActivity(activity = {}) {
+    if (!state.currentRoom) throw new Error('Join a room first.');
+    const selected = state.roomActivities.find((entry) => sanitizeText(entry.id || '', 120).toLowerCase() === sanitizeText(activity.id || '', 120).toLowerCase()) || activity;
+    if (!selected?.id) throw new Error('Select a valid room game first.');
+    const activeId = sanitizeText(state.activeRoomActivity?.activityId || '', 120).toLowerCase();
+    if (canManageCurrentRoomActivities()) {
+      await startRoomActivitySession(state.currentRoom.code, selected, {
+        uid: state.authUser?.uid || '',
+        displayName: state.authUser?.displayName || state.authUser?.email || 'Explorer'
+      });
+      return { mode: 'started' };
+    }
+    if (activeId === sanitizeText(selected.id || '', 120).toLowerCase()) {
+      if (typeof appCtx.startSharedRoomActivityRuntime === 'function') {
+        await appCtx.startSharedRoomActivityRuntime({
+          ...selected,
+          sourceType: 'room_activity',
+          requiresNearbyStart: false
+        });
+      }
+      return { mode: 'joined' };
+    }
+    throw new Error('The room owner needs to start this room game first.');
+  }
+
   async function handleAddFriend(friendUid, displayName, source = 'manual') {
     if (!state.authUser) {
       setStatus('Sign in to add friends.', true);
@@ -1763,6 +1925,8 @@ function initMultiplayerPlatform() {
       });
     }
     state.artifacts = [];
+    state.roomActivities = [];
+    state.activeRoomActivity = null;
     state.homeBase = null;
     applyRoomPaintMultiplayerConfig(room);
     installPaintClaimPublisher();
@@ -1784,6 +1948,7 @@ function initMultiplayerPlatform() {
     renderPlayerList();
     renderChat();
     renderArtifacts();
+    renderRoomActivities();
     renderHomeBase();
     updateToggleStates();
 
@@ -1822,6 +1987,32 @@ function initMultiplayerPlatform() {
     state.unsubArtifacts = listenArtifacts(room.id, (artifacts) => {
       state.artifacts = artifacts;
       renderArtifacts();
+    });
+
+    state.unsubRoomActivities = listenRoomActivities(room.id, (activities) => {
+      state.roomActivities = Array.isArray(activities) ? activities : [];
+      renderRoomActivities();
+      publishMapRoomsToContext();
+    });
+
+    state.unsubRoomActivityState = listenRoomActivityState(room.id, async (activityState) => {
+      state.activeRoomActivity = activityState;
+      renderRoomActivities();
+      publishMapRoomsToContext();
+      const activeId = sanitizeText(activityState?.activityId || '', 120).toLowerCase();
+      if (activityState?.status === 'running' && activeId) {
+        const activity = state.roomActivities.find((entry) => sanitizeText(entry.id || '', 120).toLowerCase() === activeId) || null;
+        if (activity && typeof appCtx.startSharedRoomActivityRuntime === 'function') {
+          await appCtx.startSharedRoomActivityRuntime({
+            ...activity,
+            sourceType: 'room_activity',
+            roomCode: normalizeCode(room.code || room.id || ''),
+            requiresNearbyStart: false
+          });
+        }
+      } else if (typeof appCtx.stopSharedRoomActivityRuntime === 'function') {
+        appCtx.stopSharedRoomActivityRuntime({ source: 'room_activity_stop' });
+      }
     });
 
     state.unsubSharedBlocks = listenSharedBlocks(room.id, (blocks) => {
@@ -2296,6 +2487,12 @@ function initMultiplayerPlatform() {
     refs.roomPanelSaveSettingsBtn?.addEventListener('click', handleSaveRoomSettings);
     refs.roomHomeBaseSaveBtn?.addEventListener('click', handleSaveHomeBase);
     refs.roomArtifactCreateBtn?.addEventListener('click', handleCreateArtifact);
+    refs.roomActivityOpenBtn?.addEventListener('click', async () => {
+      if (typeof appCtx.openActivityBrowser === 'function') {
+        await appCtx.openActivityBrowser({ scope: 'rooms' });
+      }
+      closeRoomPanel();
+    });
     refs.titleBrowseCityInput?.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
         event.preventDefault();
@@ -2460,6 +2657,28 @@ function initMultiplayerPlatform() {
       handleRemoveArtifact(artifactId);
     });
 
+    refs.roomActivityList?.addEventListener('click', async (event) => {
+      const target = event.target;
+      if (!(target instanceof HTMLElement)) return;
+      const openBtn = target.closest('button[data-open-room-activity]');
+      if (openBtn instanceof HTMLElement) {
+        const activityId = sanitizeText(openBtn.dataset.openRoomActivity || '', 120);
+        if (activityId) await handleOpenRoomActivity(activityId);
+        return;
+      }
+      const stopBtn = target.closest('button[data-stop-room-activity]');
+      if (stopBtn instanceof HTMLElement) {
+        const activityId = sanitizeText(stopBtn.dataset.stopRoomActivity || '', 120);
+        if (activityId) await handleStopRoomActivity(activityId);
+        return;
+      }
+      const removeBtn = target.closest('button[data-remove-room-activity]');
+      if (removeBtn instanceof HTMLElement) {
+        const activityId = sanitizeText(removeBtn.dataset.removeRoomActivity || '', 120);
+        if (activityId) await handleDeleteRoomActivity(activityId);
+      }
+    });
+
     window.addEventListener('we3d-entitlements-changed', (event) => {
       const detail = event?.detail || {};
       state.entitlement = {
@@ -2536,6 +2755,7 @@ function initMultiplayerPlatform() {
     renderPlayerList();
     renderChat();
     renderArtifacts();
+    renderRoomActivities();
     renderHomeBase();
     renderBrowseRooms();
     renderFeaturedRooms();
@@ -2556,7 +2776,21 @@ function initMultiplayerPlatform() {
     joinRoomByCode: (code) => handleJoinRoom(code),
     createRoom: handleCreateRoom,
     leaveRoom: handleLeaveRoom,
-    getCurrentRoom: () => state.currentRoom
+    getWorldContextSnapshot: () => ({ ...readWorldContext() }),
+    getWeeklyFeaturedWorldSnapshot: (selection) => ({ ...resolveWeeklyFeaturedWorld(selection || getWeeklyCitySelection()) }),
+    getCurrentRoom: () => state.currentRoom,
+    canManageCurrentRoomActivities,
+    saveRoomActivity: async (activity) => {
+      if (!state.currentRoom) throw new Error('Join a room first.');
+      if (!canManageCurrentRoomActivities()) throw new Error('Only the room owner can save room games.');
+      const saved = await saveRoomActivity(state.currentRoom.code, activity);
+      setStatus(`Saved ${saved.title} to this room.`);
+      return saved;
+    },
+    launchRoomActivity,
+    stopRoomActivity: () => handleStopRoomActivity(),
+    getCurrentRoomActivities: () => state.roomActivities.slice(),
+    getActiveRoomActivity: () => state.activeRoomActivity ? { ...state.activeRoomActivity } : null
   };
 
   return singleton;

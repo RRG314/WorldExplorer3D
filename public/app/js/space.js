@@ -34,8 +34,12 @@ appCtx.spaceFlight = {
   gravityVelocity: null,
   launchStartMs: 0,
   _launchSource: null,
-  _isThrusting: false
+  _isThrusting: false,
+  lastFrameMs: 0,
+  simAccumulator: 0
 };
+const SPACE_FIXED_STEP_MS = 1000 / 60;
+const SPACE_MAX_SUBSTEPS = 6;
 
 // Constants - scaled for real proportional AU distances
 const SPACE_CONSTANTS = {
@@ -256,7 +260,7 @@ function startSpaceFlightToEarth() {
 }
 
 function hideGameUI() {
-  const elementsToHide = ['hud', 'minimap', 'coords', 'floatMenuContainer', 'controlsTab', 'police', 'navigationHud'];
+  const elementsToHide = ['hud', 'minimap', 'minimapZoomControls', 'coords', 'floatMenuContainer', 'controlsTab', 'police', 'navigationHud'];
   elementsToHide.forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.style.display = 'none';
@@ -264,7 +268,7 @@ function hideGameUI() {
 }
 
 function showGameUI() {
-  const elementsToShow = ['hud', 'minimap', 'coords', 'floatMenuContainer', 'controlsTab'];
+  const elementsToShow = ['hud', 'minimap', 'minimapZoomControls', 'coords', 'floatMenuContainer', 'controlsTab'];
   elementsToShow.forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.style.display = '';
@@ -1221,6 +1225,25 @@ function animateSpaceFlight() {
 
   appCtx.spaceFlight.animationId = requestAnimationFrame(animateSpaceFlight);
 
+  const nowMs = performance.now();
+  if (!appCtx.spaceFlight.lastFrameMs) appCtx.spaceFlight.lastFrameMs = nowMs;
+  const frameMs = Math.min(100, Math.max(1, nowMs - appCtx.spaceFlight.lastFrameMs));
+  appCtx.spaceFlight.lastFrameMs = nowMs;
+  appCtx.spaceFlight.simAccumulator = Math.min(
+    SPACE_FIXED_STEP_MS * SPACE_MAX_SUBSTEPS,
+    Math.max(0, Number(appCtx.spaceFlight.simAccumulator || 0) + frameMs)
+  );
+
+  let steps = 0;
+  while (appCtx.spaceFlight.simAccumulator >= SPACE_FIXED_STEP_MS && steps < SPACE_MAX_SUBSTEPS) {
+    updateSpaceFlightPhysics();
+    appCtx.spaceFlight.simAccumulator -= SPACE_FIXED_STEP_MS;
+    steps += 1;
+  }
+  if (appCtx.spaceFlight.simAccumulator >= SPACE_FIXED_STEP_MS) {
+    appCtx.spaceFlight.simAccumulator = Math.min(appCtx.spaceFlight.simAccumulator, SPACE_FIXED_STEP_MS * 2);
+  }
+
   // Rotate planets slowly
   if (appCtx.spaceFlight.earth) appCtx.spaceFlight.earth.rotation.y += 0.0005;
   if (appCtx.spaceFlight.moon) appCtx.spaceFlight.moon.rotation.y += 0.0002;
@@ -1254,8 +1277,7 @@ function animateSpaceFlight() {
     appCtx.updateSolarSystem();
   }
 
-  // Update physics and camera
-  updateSpaceFlightPhysics();
+  // Update camera after fixed-step simulation catches up.
   updateSpaceFlightCamera();
 
   // Render
@@ -1361,6 +1383,8 @@ function exitSpaceFlight() {
   appCtx.spaceFlight._launchSource = null;
   appCtx.spaceFlight.launchStartMs = 0;
   appCtx.spaceFlight._isThrusting = false;
+  appCtx.spaceFlight.lastFrameMs = 0;
+  appCtx.spaceFlight.simAccumulator = 0;
   if (appCtx.spaceFlight.gravityVelocity) appCtx.spaceFlight.gravityVelocity.set(0, 0, 0);
   if (appCtx.spaceFlight._gravityVec) appCtx.spaceFlight._gravityVec.set(0, 0, 0);
 }

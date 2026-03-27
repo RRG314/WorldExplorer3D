@@ -255,6 +255,203 @@ service cloud.firestore {
         anchor.z is number;
     }
 
+    function validEditorEditType(value) {
+      return value in [
+        'place_info',
+        'artifact_marker',
+        'building_note',
+        'interior_seed',
+        'photo_point'
+      ];
+    }
+
+    function validEditorStatus(value) {
+      return value in ['pending', 'approved', 'rejected'];
+    }
+
+    function validEditorAnchorKind(value) {
+      return value in ['world', 'building', 'interior', 'destination'];
+    }
+
+    function validEditorAreaKey(value, worldKind) {
+      return value is string &&
+        value.size() > 0 &&
+        value.size() <= 64 &&
+        value.matches('^' + worldKind + ':-?[0-9]+:-?[0-9]+$');
+    }
+
+    function optionalEditorString(target, key, maxLen) {
+      return !((key in target)) ||
+        (
+          target[key] is string &&
+          target[key].size() <= maxLen
+        );
+    }
+
+    function validEditorTarget(target) {
+      return target is map &&
+        target.keys().hasOnly([
+          'anchorKind',
+          'lat',
+          'lon',
+          'x',
+          'y',
+          'z',
+          'locationLabel',
+          'buildingKey',
+          'buildingLabel',
+          'interiorKey',
+          'destinationKey',
+          'destinationLabel'
+        ]) &&
+        target.anchorKind is string &&
+        validEditorAnchorKind(target.anchorKind) &&
+        target.lat is number &&
+        target.lat >= -90 &&
+        target.lat <= 90 &&
+        target.lon is number &&
+        target.lon >= -180 &&
+        target.lon <= 180 &&
+        target.x is number &&
+        target.y is number &&
+        target.z is number &&
+        target.locationLabel is string &&
+        target.locationLabel.size() > 0 &&
+        target.locationLabel.size() <= 120 &&
+        optionalEditorString(target, 'buildingKey', 180) &&
+        optionalEditorString(target, 'buildingLabel', 120) &&
+        optionalEditorString(target, 'interiorKey', 180) &&
+        optionalEditorString(target, 'destinationKey', 180) &&
+        optionalEditorString(target, 'destinationLabel', 120);
+    }
+
+    function validEditorPayload(payload) {
+      return payload is map &&
+        payload.keys().hasOnly([
+          'title',
+          'subtitle',
+          'note',
+          'category',
+          'icon',
+          'markerStyle',
+          'tagsText',
+          'placeKind',
+          'website',
+          'phone',
+          'hours',
+          'accessNotes',
+          'buildingUse',
+          'entranceLabel',
+          'floorLabel',
+          'roomLabel',
+          'photoUrl',
+          'photoCaption',
+          'photoAttribution'
+        ]) &&
+        payload.title is string &&
+        payload.title.size() > 0 &&
+        payload.title.size() <= 80 &&
+        (!('subtitle' in payload) || (payload.subtitle is string && payload.subtitle.size() <= 120)) &&
+        payload.note is string &&
+        payload.note.size() <= 320 &&
+        payload.category is string &&
+        payload.category.size() > 0 &&
+        payload.category.size() <= 40 &&
+        payload.icon is string &&
+        payload.icon.size() > 0 &&
+        payload.icon.size() <= 8 &&
+        payload.markerStyle in ['info-pin', 'artifact-beacon', 'building-outline', 'interior-node', 'photo-frame'] &&
+        (!('tagsText' in payload) || (payload.tagsText is string && payload.tagsText.size() <= 160)) &&
+        (!('placeKind' in payload) || (payload.placeKind is string && payload.placeKind.size() <= 48)) &&
+        (!('website' in payload) || (payload.website is string && payload.website.size() <= 240)) &&
+        (!('phone' in payload) || (payload.phone is string && payload.phone.size() <= 40)) &&
+        (!('hours' in payload) || (payload.hours is string && payload.hours.size() <= 120)) &&
+        (!('accessNotes' in payload) || (payload.accessNotes is string && payload.accessNotes.size() <= 180)) &&
+        (!('buildingUse' in payload) || (payload.buildingUse is string && payload.buildingUse.size() <= 60)) &&
+        (!('entranceLabel' in payload) || (payload.entranceLabel is string && payload.entranceLabel.size() <= 60)) &&
+        (!('floorLabel' in payload) || (payload.floorLabel is string && payload.floorLabel.size() <= 40)) &&
+        (!('roomLabel' in payload) || (payload.roomLabel is string && payload.roomLabel.size() <= 80)) &&
+        (!('photoUrl' in payload) || (payload.photoUrl is string && payload.photoUrl.size() <= 320)) &&
+        (!('photoCaption' in payload) || (payload.photoCaption is string && payload.photoCaption.size() <= 160)) &&
+        (!('photoAttribution' in payload) || (payload.photoAttribution is string && payload.photoAttribution.size() <= 120));
+    }
+
+    function validEditorModeration(moderation) {
+      return moderation is map &&
+        moderation.keys().hasOnly(['moderatedBy', 'moderatedByName', 'moderatedAt', 'decisionNote']) &&
+        moderation.moderatedBy is string &&
+        moderation.moderatedBy == request.auth.uid &&
+        moderation.moderatedByName is string &&
+        moderation.moderatedByName.size() <= 60 &&
+        moderation.moderatedAt is timestamp &&
+        moderation.decisionNote is string &&
+        moderation.decisionNote.size() <= 200;
+    }
+
+    function validEditorSubmissionCreate() {
+      return isSignedIn() &&
+        request.resource.data.keys().hasOnly([
+          'editType',
+          'status',
+          'worldKind',
+          'areaKey',
+          'target',
+          'payload',
+          'userId',
+          'userDisplayName',
+          'source',
+          'createdAt',
+          'updatedAt'
+        ]) &&
+        request.resource.data.editType is string &&
+        validEditorEditType(request.resource.data.editType) &&
+        request.resource.data.status == 'pending' &&
+        request.resource.data.worldKind in ['earth', 'moon', 'space'] &&
+        validEditorAreaKey(request.resource.data.areaKey, request.resource.data.worldKind) &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.userDisplayName is string &&
+        request.resource.data.userDisplayName.size() > 0 &&
+        request.resource.data.userDisplayName.size() <= 60 &&
+        request.resource.data.source is string &&
+        request.resource.data.source.size() > 0 &&
+        request.resource.data.source.size() <= 48 &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.updatedAt is timestamp &&
+        validEditorTarget(request.resource.data.target) &&
+        validEditorPayload(request.resource.data.payload);
+    }
+
+    function validEditorSubmissionModerationUpdate() {
+      return isAdminToken() &&
+        resource.data.status == 'pending' &&
+        request.resource.data.keys().hasOnly([
+          'editType',
+          'status',
+          'worldKind',
+          'areaKey',
+          'target',
+          'payload',
+          'userId',
+          'userDisplayName',
+          'source',
+          'createdAt',
+          'updatedAt',
+          'moderation'
+        ]) &&
+        request.resource.data.editType == resource.data.editType &&
+        request.resource.data.worldKind == resource.data.worldKind &&
+        request.resource.data.areaKey == resource.data.areaKey &&
+        request.resource.data.target == resource.data.target &&
+        request.resource.data.payload == resource.data.payload &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.userDisplayName == resource.data.userDisplayName &&
+        request.resource.data.source == resource.data.source &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.status in ['approved', 'rejected'] &&
+        validEditorModeration(request.resource.data.moderation);
+    }
+
     function validRoomCore(roomId) {
       return canConsumeRoomCreateQuota() &&
         request.resource.data.keys().hasOnly([
@@ -636,6 +833,105 @@ service cloud.firestore {
         validRoomQuotaCountersOnSelfUpdate();
     }
 
+    function validCreatorStats(stats) {
+      return stats is map &&
+        stats.keys().hasOnly([
+          'activitiesCreated',
+          'activitiesPublished',
+          'totalPlays',
+          'contributionsCount',
+          'publishedContributions'
+        ]) &&
+        stats.activitiesCreated is int &&
+        stats.activitiesCreated >= 0 &&
+        stats.activitiesCreated <= 1000000 &&
+        stats.activitiesPublished is int &&
+        stats.activitiesPublished >= 0 &&
+        stats.activitiesPublished <= 1000000 &&
+        stats.totalPlays is int &&
+        stats.totalPlays >= 0 &&
+        stats.totalPlays <= 1000000 &&
+        stats.contributionsCount is int &&
+        stats.contributionsCount >= 0 &&
+        stats.contributionsCount <= 1000000 &&
+        stats.publishedContributions is int &&
+        stats.publishedContributions >= 0 &&
+        stats.publishedContributions <= 1000000;
+    }
+
+    function validCreatorSpaces(spaces) {
+      return spaces is map &&
+        spaces.keys().hasOnly([
+          'primaryRoomCode',
+          'hubActivityId',
+          'hubLabel'
+        ]) &&
+        spaces.primaryRoomCode is string &&
+        spaces.primaryRoomCode.size() <= 16 &&
+        spaces.hubActivityId is string &&
+        spaces.hubActivityId.size() <= 120 &&
+        spaces.hubLabel is string &&
+        spaces.hubLabel.size() <= 80;
+    }
+
+    function validCreatorProfileData(userId) {
+      return request.resource.data.keys().hasOnly([
+          'userId',
+          'username',
+          'bio',
+          'avatar',
+          'discoverable',
+          'stats',
+          'spaces',
+          'createdAt',
+          'createdAtMs',
+          'updatedAt',
+          'updatedAtMs'
+        ]) &&
+        request.resource.data.userId == userId &&
+        request.resource.data.username is string &&
+        request.resource.data.username.size() > 0 &&
+        request.resource.data.username.size() <= 60 &&
+        request.resource.data.bio is string &&
+        request.resource.data.bio.size() <= 320 &&
+        request.resource.data.avatar is string &&
+        request.resource.data.avatar.size() <= 12 &&
+        request.resource.data.discoverable is bool &&
+        validCreatorStats(request.resource.data.stats) &&
+        validCreatorSpaces(request.resource.data.spaces) &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.createdAtMs is number &&
+        request.resource.data.createdAtMs >= 0 &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.updatedAtMs is number &&
+        request.resource.data.updatedAtMs >= request.resource.data.createdAtMs;
+    }
+
+    function validCreatorProfileCreate(userId) {
+      return isSelf(userId) && validCreatorProfileData(userId);
+    }
+
+    function validCreatorProfileUpdate(userId) {
+      let changedKeys = request.resource.data.diff(resource.data).affectedKeys();
+
+      return isSelf(userId) &&
+        changedKeys.hasOnly([
+          'userId',
+          'username',
+          'bio',
+          'avatar',
+          'discoverable',
+          'stats',
+          'spaces',
+          'updatedAt',
+          'updatedAtMs'
+        ]) &&
+        validCreatorProfileData(userId) &&
+        request.resource.data.userId == resource.data.userId &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.createdAtMs == resource.data.createdAtMs;
+    }
+
     function validFriendData(friendUid) {
       return request.resource.data.keys().hasOnly([
           'uid',
@@ -1007,6 +1303,156 @@ service cloud.firestore {
         request.resource.data.createdAt == resource.data.createdAt;
     }
 
+    function validRoomActivityPoint(point) {
+      return point is map &&
+        point.keys().hasOnly(['x', 'y', 'z']) &&
+        point.x is number &&
+        point.y is number &&
+        point.z is number;
+    }
+
+    function validRoomActivityBase(roomId) {
+      return request.resource.data.keys().hasOnly([
+          'id',
+          'roomCode',
+          'title',
+          'description',
+          'templateId',
+          'traversalMode',
+          'preferredSurface',
+          'creatorId',
+          'creatorName',
+          'creatorAvatar',
+          'visibility',
+          'status',
+          'playerMode',
+          'multiplayerEnabled',
+          'estimatedMinutes',
+          'difficulty',
+          'locationLabel',
+          'anchors',
+          'startPoint',
+          'center',
+          'createdAt',
+          'createdAtMs',
+          'updatedAt',
+          'updatedAtMs'
+        ]) &&
+        request.resource.data.id is string &&
+        request.resource.data.id.size() > 0 &&
+        request.resource.data.id.size() <= 120 &&
+        request.resource.data.roomCode is string &&
+        request.resource.data.roomCode == roomId &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() > 0 &&
+        request.resource.data.title.size() <= 120 &&
+        request.resource.data.description is string &&
+        request.resource.data.description.size() <= 220 &&
+        request.resource.data.templateId is string &&
+        request.resource.data.templateId.size() > 0 &&
+        request.resource.data.templateId.size() <= 80 &&
+        request.resource.data.traversalMode is string &&
+        request.resource.data.traversalMode.size() > 0 &&
+        request.resource.data.traversalMode.size() <= 32 &&
+        request.resource.data.preferredSurface is string &&
+        request.resource.data.preferredSurface.size() <= 48 &&
+        request.resource.data.creatorId is string &&
+        request.resource.data.creatorId.size() > 0 &&
+        request.resource.data.creatorId.size() <= 160 &&
+        request.resource.data.creatorName is string &&
+        request.resource.data.creatorName.size() > 0 &&
+        request.resource.data.creatorName.size() <= 80 &&
+        request.resource.data.creatorAvatar is string &&
+        request.resource.data.creatorAvatar.size() > 0 &&
+        request.resource.data.creatorAvatar.size() <= 12 &&
+        request.resource.data.visibility in ['room', 'public'] &&
+        request.resource.data.status in ['published', 'draft'] &&
+        request.resource.data.playerMode == 'multiplayer' &&
+        request.resource.data.multiplayerEnabled == true &&
+        request.resource.data.estimatedMinutes is number &&
+        request.resource.data.estimatedMinutes >= 1 &&
+        request.resource.data.estimatedMinutes <= 60 &&
+        request.resource.data.difficulty is string &&
+        request.resource.data.difficulty.size() > 0 &&
+        request.resource.data.difficulty.size() <= 24 &&
+        request.resource.data.locationLabel is string &&
+        request.resource.data.locationLabel.size() <= 120 &&
+        request.resource.data.anchors is list &&
+        request.resource.data.anchors.size() > 0 &&
+        request.resource.data.anchors.size() <= 80 &&
+        validRoomActivityPoint(request.resource.data.startPoint) &&
+        validRoomActivityPoint(request.resource.data.center) &&
+        request.resource.data.createdAt is timestamp &&
+        request.resource.data.createdAtMs is number &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.updatedAtMs is number;
+    }
+
+    function validRoomActivityCreate(roomId) {
+      return validRoomActivityBase(roomId) &&
+        request.resource.data.creatorId == request.auth.uid;
+    }
+
+    function validRoomActivityUpdate(roomId) {
+      return validRoomActivityBase(roomId) &&
+        request.resource.data.id == resource.data.id &&
+        request.resource.data.roomCode == resource.data.roomCode &&
+        request.resource.data.createdAt == resource.data.createdAt &&
+        request.resource.data.createdAtMs == resource.data.createdAtMs &&
+        request.resource.data.creatorId == resource.data.creatorId &&
+        request.resource.data.creatorName == resource.data.creatorName &&
+        request.resource.data.creatorAvatar == resource.data.creatorAvatar &&
+        (
+          request.auth.uid == resource.data.creatorId ||
+          isRoomOwner(roomId)
+        );
+    }
+
+    function validRoomActivityState() {
+      return request.resource.data.keys().hasOnly([
+          'roomCode',
+          'activityId',
+          'title',
+          'templateId',
+          'status',
+          'startedByUid',
+          'startedByName',
+          'replayCount',
+          'startedAt',
+          'startedAtMs',
+          'updatedAt',
+          'updatedAtMs'
+        ]) &&
+        request.resource.data.roomCode is string &&
+        request.resource.data.activityId is string &&
+        request.resource.data.activityId.size() <= 120 &&
+        request.resource.data.title is string &&
+        request.resource.data.title.size() <= 120 &&
+        request.resource.data.templateId is string &&
+        request.resource.data.templateId.size() <= 80 &&
+        request.resource.data.status in ['idle', 'running'] &&
+        request.resource.data.startedByUid == request.auth.uid &&
+        request.resource.data.startedByName is string &&
+        request.resource.data.startedByName.size() > 0 &&
+        request.resource.data.startedByName.size() <= 80 &&
+        request.resource.data.replayCount is int &&
+        request.resource.data.replayCount >= 0 &&
+        request.resource.data.replayCount <= 10000 &&
+        request.resource.data.startedAt is timestamp &&
+        request.resource.data.startedAtMs is number &&
+        request.resource.data.updatedAt is timestamp &&
+        request.resource.data.updatedAtMs is number &&
+        (
+          request.resource.data.status == 'idle'
+            ? request.resource.data.activityId == '' &&
+              request.resource.data.title == '' &&
+              request.resource.data.templateId == ''
+            : request.resource.data.activityId.size() > 0 &&
+              request.resource.data.title.size() > 0 &&
+              request.resource.data.templateId.size() > 0
+        );
+    }
+
     function validActivityEntry() {
       return request.resource.data.keys().hasOnly([
           'uid',
@@ -1140,6 +1586,72 @@ service cloud.firestore {
       }
     }
 
+    match /creatorProfiles/{userId} {
+      allow read: if true;
+      allow create: if validCreatorProfileCreate(userId);
+      allow update: if validCreatorProfileUpdate(userId);
+      allow delete: if false;
+    }
+
+    match /editorSubmissions/{submissionId} {
+      allow read: if isAdminToken() ||
+        resource.data.status == 'approved' ||
+        (isSignedIn() && resource.data.userId == request.auth.uid);
+      allow create: if false;
+      allow update: if false;
+      allow delete: if isAdminToken() ||
+        (
+          isSignedIn() &&
+          resource.data.userId == request.auth.uid &&
+          resource.data.status == 'pending'
+        );
+    }
+
+    match /overlayFeatures/{featureId} {
+      allow read: if isAdminToken() ||
+        (
+          isSignedIn() &&
+          resource.data.createdBy == request.auth.uid
+        );
+      allow create, update, delete: if false;
+
+      match /revisions/{revisionId} {
+        allow read: if isAdminToken() ||
+          (
+            isSignedIn() &&
+            get(/databases/$(database)/documents/overlayFeatures/$(featureId)).data.createdBy == request.auth.uid
+          );
+        allow create, update, delete: if false;
+      }
+
+      match /moderation/{eventId} {
+        allow read: if isAdminToken() ||
+          (
+            isSignedIn() &&
+            get(/databases/$(database)/documents/overlayFeatures/$(featureId)).data.createdBy == request.auth.uid
+          );
+        allow create, update, delete: if false;
+      }
+    }
+
+    match /overlayPublished/{featureId} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+
+    match /siteContent/{entryId} {
+      allow read, create, update, delete: if false;
+    }
+
+    match /siteContentPublished/{entryId} {
+      allow read: if true;
+      allow create, update, delete: if false;
+    }
+
+    match /adminActivity/{entryId} {
+      allow read, create, update, delete: if false;
+    }
+
     match /flowerLeaderboard/{entryId} {
       allow read: if true;
       allow create: if isSignedIn();
@@ -1166,7 +1678,10 @@ service cloud.firestore {
     }
 
     match /rooms/{roomId} {
-      allow read: if canReadRoom(roomId);
+      allow read: if (
+        resource.data.visibility == 'public' ||
+        isRoomMember(roomId)
+      );
       allow create: if isMultiplayerEntitled() && validRoomCore(roomId);
       allow update: if isMultiplayerEntitled() && isRoomOwner(roomId) && validRoomUpdate(roomId);
       allow delete: if isSignedIn() && isRoomOwner(roomId);
@@ -1205,6 +1720,33 @@ service cloud.firestore {
         allow delete: if isMultiplayerEntitled() &&
           isRoomMember(roomId) &&
           (request.auth.uid == resource.data.ownerUid || canManageRoom(roomId));
+      }
+
+      match /activities/{activityId} {
+        allow read: if canReadRoom(roomId);
+        allow create: if isMultiplayerEntitled() &&
+          canManageRoom(roomId) &&
+          validRoomActivityCreate(roomId);
+        allow update: if isMultiplayerEntitled() &&
+          canManageRoom(roomId) &&
+          validRoomActivityUpdate(roomId);
+        allow delete: if isMultiplayerEntitled() &&
+          canManageRoom(roomId);
+      }
+
+      match /activityState/{stateId} {
+        allow read: if canReadRoom(roomId);
+        allow create: if isMultiplayerEntitled() &&
+          stateId == 'active' &&
+          canManageRoom(roomId) &&
+          request.resource.data.roomCode == roomId &&
+          validRoomActivityState();
+        allow update: if isMultiplayerEntitled() &&
+          stateId == 'active' &&
+          canManageRoom(roomId) &&
+          request.resource.data.roomCode == roomId &&
+          validRoomActivityState();
+        allow delete: if false;
       }
 
       match /blocks/{blockId} {

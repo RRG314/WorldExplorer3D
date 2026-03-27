@@ -1,17 +1,20 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
-import { createGlobeSelector } from "./ui/globe-selector.js?v=57";
+import { createGlobeSelector } from "./ui/globe-selector.js?v=58";
 
 const PROPERTY_MARKER_HIT_RADIUS = 10;
 const POI_MARKER_HIT_RADIUS = 8;
 const HISTORIC_MARKER_HIT_RADIUS = 8;
+const ACTIVITY_MARKER_HIT_RADIUS = 10;
 
 function canvasPointerPoint(canvas, event) {
   const rect = canvas.getBoundingClientRect();
+  const scaleX = rect.width > 0 ? canvas.width / rect.width : 1;
+  const scaleY = rect.height > 0 ? canvas.height / rect.height : 1;
   return {
-    x: event.clientX - rect.left,
-    y: event.clientY - rect.top
+    x: (event.clientX - rect.left) * scaleX,
+    y: (event.clientY - rect.top) * scaleY
   };
 }
 
@@ -146,6 +149,22 @@ function setupUI() {
       const clickPoint = canvasPointerPoint(largeMapCanvas, e);
 
       // Check if click is on a property marker
+      if (appCtx.mapLayers.activities !== false && Array.isArray(appCtx.activityDiscoveryMapMarkers) && appCtx.activityDiscoveryMapMarkers.length > 0) {
+        const activityHit = findFirstMapHit(
+          appCtx.activityDiscoveryMapMarkers,
+          clickPoint,
+          ACTIVITY_MARKER_HIT_RADIUS,
+          (activity) => appCtx.worldToScreenLarge(activity.x, activity.z)
+        );
+        if (activityHit) {
+          if (typeof appCtx.openActivityBrowser === 'function') {
+            appCtx.openActivityBrowser({ activityId: activityHit.id });
+          }
+          return;
+        }
+      }
+
+      // Check if click is on a property marker
       if (appCtx.mapLayers.properties && appCtx.realEstateMode) {
         const propertyHit = findFirstMapHit(
           appCtx.properties,
@@ -195,7 +214,10 @@ function setupUI() {
 
       const clickPoint = canvasPointerPoint(largeMapCanvas, e);
       const worldPos = appCtx.largeMapScreenToWorld(clickPoint.x, clickPoint.y);
-      appCtx.teleportToLocation(worldPos.x, worldPos.z);
+      appCtx.teleportToLocation(worldPos.x, worldPos.z, {
+        source: 'large_map_context',
+        preferBoatIfWater: true
+      });
     });
   }
 
@@ -624,7 +646,7 @@ function setupUI() {
       return value === 'free' ? 'free' : null;
     };
     const normalizeTravelMode = (value) => {
-      if (value === 'driving' || value === 'walking' || value === 'drone' || value === 'rocket' || value === 'submarine') return value;
+      if (value === 'driving' || value === 'walking' || value === 'drone' || value === 'boat' || value === 'rocket' || value === 'submarine') return value;
       return null;
     };
 
@@ -687,7 +709,6 @@ function setupUI() {
       if (fWalk) fWalk.classList.remove('on');
       if (fDrone) fDrone.classList.add('on');
     };
-
     const mode = pending.travelMode || getCurrentTravelMode();
     if (pending.travelMode === 'walking') setWalkMode();else
     if (pending.travelMode === 'drone') setDroneMode();else
@@ -727,6 +748,19 @@ function setupUI() {
       appCtx.car.x = walker.x;
       appCtx.car.z = walker.z;
       appCtx.car.angle = Number.isFinite(yaw) ? yaw : appCtx.car.angle;
+    } else if (mode === 'boat') {
+      if (Number.isFinite(x)) appCtx.boat.x = x;
+      if (Number.isFinite(z)) appCtx.boat.z = z;
+      if (Number.isFinite(y)) appCtx.boat.y = y;
+      if (Number.isFinite(yaw)) appCtx.boat.angle = yaw;
+      if (typeof appCtx.startBoatMode === 'function') {
+        appCtx.startBoatMode({
+          source: 'shared_state',
+          spawnX: Number.isFinite(x) ? x : undefined,
+          spawnZ: Number.isFinite(z) ? z : undefined,
+          yaw: Number.isFinite(yaw) ? yaw : undefined
+        });
+      }
     } else {
       if (Number.isFinite(x)) appCtx.car.x = x;
       if (Number.isFinite(z)) appCtx.car.z = z;
@@ -757,6 +791,7 @@ function setupUI() {
       return 'submarine';
     }
     if (typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return 'rocket';
+    if (appCtx.boatMode && appCtx.boatMode.active) return 'boat';
     if (appCtx.droneMode) return 'drone';
     if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk') return 'walking';
     return 'driving';
@@ -993,7 +1028,6 @@ function setupUI() {
   if (gameShareNative && !(navigator.share && typeof navigator.share === 'function')) {
     gameShareNative.style.display = 'none';
   }
-
   if (gameShareCopy) {
     gameShareCopy.addEventListener('click', async (event) => {
       event.stopPropagation();
@@ -1097,12 +1131,20 @@ function setupUI() {
     });
   }
 
+  const primeMultiplayerUi = () => {
+    if (typeof appCtx.ensureMultiplayerPlatformReady !== 'function') return;
+    void appCtx.ensureMultiplayerPlatformReady().catch((error) => {
+      console.warn('[ui] Multiplayer platform warmup failed.', error);
+    });
+  };
+
   // Tabs
   document.querySelectorAll('.tab-btn').forEach((btn) => btn.addEventListener('click', () => {
     document.querySelectorAll('.tab-btn').forEach((b) => b.classList.remove('active'));
     document.querySelectorAll('.tab-content').forEach((c) => c.classList.remove('active'));
     btn.classList.add('active');
     document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    if (btn.dataset.tab === 'multiplayer') primeMultiplayerUi();
   }));
   // Locations (main-branch behavior with Moon/Space launch buttons)
   const customPanel = document.getElementById('customPanel');
@@ -1171,6 +1213,47 @@ function setupUI() {
       appCtx.selLoc = selectedSuggested.dataset.loc;
     }
     if (customPanel) customPanel.classList.remove('show');
+  };
+
+  const selectedLocationDiffersFromLoadedWorld = () => {
+    const selectedLocKey = String(appCtx.selLoc || 'baltimore');
+    let targetLat = null;
+    let targetLon = null;
+    if (selectedLocKey === 'custom') {
+      targetLat = Number(appCtx.customLoc?.lat);
+      targetLon = Number(appCtx.customLoc?.lon);
+    } else if (appCtx.LOCS?.[selectedLocKey]) {
+      targetLat = Number(appCtx.LOCS[selectedLocKey].lat);
+      targetLon = Number(appCtx.LOCS[selectedLocKey].lon);
+    }
+    const currentLat = Number(appCtx.LOC?.lat);
+    const currentLon = Number(appCtx.LOC?.lon);
+    if (!Number.isFinite(targetLat) || !Number.isFinite(targetLon) || !Number.isFinite(currentLat) || !Number.isFinite(currentLon)) {
+      return false;
+    }
+    return Math.abs(targetLat - currentLat) > 0.000001 || Math.abs(targetLon - currentLon) > 0.000001;
+  };
+
+  const waitForPlayableEarthShell = async (source = 'ui_location_start', options = {}) => {
+    if (typeof appCtx.awaitPlayableWorldShell !== 'function') return { ready: true, reason: 'unavailable' };
+    const result = await appCtx.awaitPlayableWorldShell({
+      source,
+      timeoutMs: Number.isFinite(options.timeoutMs) ? Number(options.timeoutMs) : 9000,
+      minVisibleRoads: Number.isFinite(options.minVisibleRoads) ? Number(options.minVisibleRoads) : undefined,
+      minRoadFeatures: Number.isFinite(options.minRoadFeatures) ? Number(options.minRoadFeatures) : undefined,
+      minVisibleBuildings: Number.isFinite(options.minVisibleBuildings) ? Number(options.minVisibleBuildings) : undefined,
+      showLoad: options.showLoad !== false,
+      loadingText: options.loadingText || 'Finalizing location...'
+    });
+    if (!result?.ready) {
+      console.warn(`[UI] Playable earth shell was not ready after ${source}`, result);
+    }
+    return result;
+  };
+
+  const reloadEarthWorldForUi = async (source = 'ui_world_reload', options = {}) => {
+    await appCtx.loadRoads();
+    return await waitForPlayableEarthShell(source, options);
   };
 
   const triggerTitleStart = () => {
@@ -1397,10 +1480,13 @@ function setupUI() {
         skipGlobeGateOnce = true;
         triggerTitleStart();
       } else if (typeof appCtx.loadRoads === 'function') {
-        appCtx.loadRoads().then(() => {
+        reloadEarthWorldForUi('globe_selector_start_here').then(() => {
           const preferredMode = appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' ? 'walk' : 'drive';
           if (typeof appCtx.applyCustomLocationSpawn === 'function') {
-            appCtx.applyCustomLocationSpawn(preferredMode, { source: 'custom_location' });
+            appCtx.applyCustomLocationSpawn(preferredMode, {
+              source: 'custom_location',
+              preferBoatIfWater: true
+            });
           } else if (typeof appCtx.spawnOnRoad === 'function') {
             appCtx.spawnOnRoad();
           }
@@ -1443,6 +1529,7 @@ function setupUI() {
     if (appCtx.selLoc === 'custom') {
       setTitleLocationMode('custom');
       globeSelector.open();
+      void runUseMyLocation('menu');
     } else {
       globeSelector.close();
       if (customPanel) customPanel.classList.remove('show');
@@ -1596,6 +1683,7 @@ function setupUI() {
     document.getElementById('titleScreen').classList.add('hidden');
     document.getElementById('hud').classList.add('show');
     document.getElementById('minimap').classList.add('show');
+    document.getElementById('minimapZoomControls')?.classList.add('show');
     document.getElementById('floatMenuContainer').classList.add('show');
     document.getElementById('mainMenuBtn').classList.add('show');
     document.getElementById('controlsTab').classList.add('show');
@@ -1662,7 +1750,12 @@ function setupUI() {
     }
 
     // Load visible terrain immediately so grass appears even while road APIs are pending.
-    if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
+    if (
+      typeof appCtx.updateTerrainAround === 'function' &&
+      appCtx.terrainEnabled &&
+      !appCtx.onMoon &&
+      !selectedLocationDiffersFromLoadedWorld()
+    ) {
       const startRef = appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.walker ?
         appCtx.Walk.state.walker :
         appCtx.car;
@@ -1670,7 +1763,9 @@ function setupUI() {
     }
 
     // Load roads and world data (may take longer if Overpass endpoints are slow).
-    await appCtx.loadRoads();
+    await reloadEarthWorldForUi('title_start', {
+      minVisibleBuildings: appCtx.selLoc === 'custom' ? 0 : 6
+    });
 
     // Refresh terrain around final spawn/reference position after roads finish.
     if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
@@ -1680,8 +1775,19 @@ function setupUI() {
       appCtx.updateTerrainAround(postLoadRef.x || 0, postLoadRef.z || 0);
     }
 
-    // Start in WALKING mode with third-person camera
-    if (appCtx.Walk) {
+    if (appCtx.selLoc === 'custom' && typeof appCtx.applyCustomLocationSpawn === 'function') {
+      appCtx.applyCustomLocationSpawn('walk', {
+        source: 'title_custom_start',
+        preferBoatIfWater: true
+      });
+    }
+
+    // Start in WALKING mode with third-person camera unless boat auto-entry already took over.
+    if (appCtx.boatMode?.active) {
+      if (appCtx.carMesh) appCtx.carMesh.visible = false;
+      if (appCtx.Walk?.state?.characterMesh) appCtx.Walk.state.characterMesh.visible = false;
+      if (typeof appCtx.syncTravelModeButtons === 'function') appCtx.syncTravelModeButtons();
+    } else if (appCtx.Walk) {
       appCtx.Walk.setModeWalk();
       appCtx.Walk.state.view = 'third'; // Ensure third-person view
       if (appCtx.carMesh) appCtx.carMesh.visible = false;
@@ -1766,6 +1872,7 @@ function setupUI() {
   const ctrlHeader = document.getElementById('ctrlHeader');
   const ctrlContent = document.getElementById('ctrlContent');
   const drivingControls = document.getElementById('drivingControls');
+  const boatControls = document.getElementById('boatControls');
   const walkingControls = document.getElementById('walkingControls');
   const droneControls = document.getElementById('droneControls');
   const rocketControls = document.getElementById('rocketControls');
@@ -1802,14 +1909,33 @@ function setupUI() {
         { label: 'Brake', binding: { channel: 'earth', key: 'Space' } }
       ]
     },
+    boat: {
+      moveLabel: 'Throttle',
+      lookLabel: 'Steer',
+      move: {
+        up: { channel: 'earth', key: 'KeyW' },
+        down: { channel: 'earth', key: 'KeyS' },
+        left: null,
+        right: null
+      },
+      look: {
+        up: null,
+        down: null,
+        left: { channel: 'earth', key: 'KeyA' },
+        right: { channel: 'earth', key: 'KeyD' }
+      },
+      actions: [
+        { label: 'Brake', binding: { channel: 'earth', key: 'Space' } }
+      ]
+    },
     walking: {
       moveLabel: 'Move',
       lookLabel: 'Look',
       move: {
         up: { channel: 'earth', key: 'KeyW' },
         down: { channel: 'earth', key: 'KeyS' },
-        left: { channel: 'earth', key: 'KeyA' },
-        right: { channel: 'earth', key: 'KeyD' }
+        left: null,
+        right: null
       },
       look: {
         up: { channel: 'earth', key: 'ArrowUp' },
@@ -2073,6 +2199,7 @@ function setupUI() {
     {
       return 'rocket';
     }
+    if (appCtx.boatMode && appCtx.boatMode.active) return 'boat';
     if (appCtx.droneMode) return 'drone';
     if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk') return 'walking';
     return 'driving';
@@ -2104,7 +2231,7 @@ function setupUI() {
       mobileTouchControls.dataset.mode = mode;
     }
 
-    mobileTouchControls.classList.remove('mode-driving', 'mode-walking', 'mode-drone', 'mode-rocket', 'mode-ocean');
+    mobileTouchControls.classList.remove('mode-driving', 'mode-boat', 'mode-walking', 'mode-drone', 'mode-rocket', 'mode-ocean');
     mobileTouchControls.classList.add(`mode-${mode}`);
 
     mobileTouchControls.style.zIndex = inSpaceFlight ? '10002' : '106';
@@ -2159,6 +2286,7 @@ function setupUI() {
     const mode = detectControlsMode();
     if (typeof appCtx.syncTravelModeButtons === 'function') appCtx.syncTravelModeButtons();
     if (drivingControls) drivingControls.style.display = mode === 'driving' ? 'block' : 'none';
+    if (boatControls) boatControls.style.display = mode === 'boat' ? 'block' : 'none';
     if (walkingControls) walkingControls.style.display = mode === 'walking' ? 'block' : 'none';
     if (droneControls) droneControls.style.display = mode === 'drone' ? 'block' : 'none';
     if (rocketControls) rocketControls.style.display = mode === 'rocket' ? 'block' : 'none';
@@ -2171,6 +2299,7 @@ function setupUI() {
     }
     if (ctrlHeader) {
       const modeLabel =
+      mode === 'boat' ? 'Boat Mode' :
       mode === 'walking' ? 'Walking Mode' :
       mode === 'drone' ? 'Drone Mode' :
       mode === 'rocket' ? 'Rocket Mode' :
@@ -2187,18 +2316,23 @@ function setupUI() {
   function goToMainMenu() {
     emitTutorialEvent('opened_main_menu', { source: 'main_menu_button' });
     appCtx.gameStarted = false;appCtx.paused = false;appCtx.clearObjectives();appCtx.clearPolice();appCtx.policeOn = false;appCtx.eraseTrack();appCtx.closePropertyPanel();appCtx.closeHistoricPanel();appCtx.clearPropertyMarkers();appCtx.realEstateMode = false;appCtx.historicMode = false;
+    if (typeof appCtx.cancelWorldLoad === 'function') appCtx.cancelWorldLoad();
+    if (typeof appCtx.cancelRoadAndBuildingRebuild === 'function') appCtx.cancelRoadAndBuildingRebuild();
+    if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
+    if (typeof appCtx.stopBoatMode === 'function' && appCtx.boatMode?.active) appCtx.stopBoatMode({ targetMode: 'walk' });
     if (typeof appCtx.stopOceanMode === 'function' && appCtx.oceanMode && appCtx.oceanMode.active) appCtx.stopOceanMode();
     if (typeof appCtx.stopFlowerChallenge === 'function') appCtx.stopFlowerChallenge();
     if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
     document.getElementById('titleScreen').classList.remove('hidden');
     if (typeof appCtx.closeFlowerChallengeTitlePanel === 'function') appCtx.closeFlowerChallengeTitlePanel();
-    ['hud', 'minimap', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'flowerChallengeHud', 'paintTownHud', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
+    ['hud', 'minimap', 'minimapZoomControls', 'police', 'floatMenuContainer', 'mainMenuBtn', 'pauseScreen', 'resultScreen', 'caughtScreen', 'controlsTab', 'coords', 'flowerChallengeHud', 'paintTownHud', 'realEstateBtn', 'historicBtn', 'memoryFlowerFloatBtn', 'gameShareFloatBtn', 'gameShareMenu', 'mobileTouchControls'].forEach((id) => {
       const el = document.getElementById(id);
       if (el) el.classList.remove('show');
     });
     const flowerActionMenu = document.getElementById('flowerActionMenu');
     if (flowerActionMenu) flowerActionMenu.classList.remove('open');
+    document.getElementById('boatPrompt')?.classList.remove('show');
     clearVirtualHeldInputs();
     if (ctrlContent) ctrlContent.classList.add('hidden');
     if (typeof appCtx.closeMemoryComposer === 'function') appCtx.closeMemoryComposer();
@@ -2259,11 +2393,55 @@ function setupUI() {
   document.getElementById('gameBtn').addEventListener('click', () => toggleFloatMenuByButton('gameBtn'));
   const multiplayerBtn = document.getElementById('multiplayerBtn');
   if (multiplayerBtn) {
-    multiplayerBtn.addEventListener('click', () => toggleFloatMenuByButton('multiplayerBtn'));
+    multiplayerBtn.addEventListener('click', () => {
+      primeMultiplayerUi();
+      toggleFloatMenuByButton('multiplayerBtn');
+    });
   }
 
   const homeMenuItem = document.getElementById('fHome');
   if (homeMenuItem) homeMenuItem.addEventListener('click', goToMainMenu);
+  document.getElementById('fEditorMode')?.addEventListener('click', async () => {
+    if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
+    const snapshot = typeof appCtx.getEditorSnapshot === 'function' ? appCtx.getEditorSnapshot() : { active: false };
+    if (snapshot?.active && typeof appCtx.closeEditorSession === 'function') {
+      appCtx.closeEditorSession();
+    } else if (typeof appCtx.openEditorSession === 'function') {
+      appCtx.openEditorSession({
+        initialTab: 'workspace',
+        captureWorkspace: true,
+        initialView: '2d',
+        skipTutorial: true
+      });
+    } else if (typeof appCtx.toggleEditorSession === 'function') {
+      appCtx.toggleEditorSession();
+    }
+    closeAllFloatMenus();
+  });
+  document.getElementById('fEditorMine')?.addEventListener('click', () => {
+    if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
+    if (typeof appCtx.openEditorSession === 'function') {
+      appCtx.openEditorSession({ initialTab: 'mine', skipTutorial: true });
+    } else if (typeof appCtx.toggleEditorSession === 'function') {
+      appCtx.toggleEditorSession();
+    }
+    closeAllFloatMenus();
+  });
+  document.getElementById('fModerationPanel')?.addEventListener('click', () => {
+    if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
+    if (typeof appCtx.openEditorSession === 'function') {
+      appCtx.openEditorSession({ initialTab: 'moderation', skipTutorial: true });
+    }
+    closeAllFloatMenus();
+  });
+  document.getElementById('fActivities')?.addEventListener('click', () => {
+    if (typeof appCtx.openActivityBrowser === 'function') {
+      appCtx.openActivityBrowser({ scope: 'all' });
+    } else if (typeof appCtx.toggleActivityBrowser === 'function') {
+      appCtx.toggleActivityBrowser({ scope: 'all' });
+    }
+    closeAllFloatMenus();
+  });
   const memoryFlowerFloatBtn = document.getElementById('memoryFlowerFloatBtn');
   if (memoryFlowerFloatBtn) {
     bindTouchFriendlyPress(memoryFlowerFloatBtn, () => {
@@ -2328,14 +2506,24 @@ function setupUI() {
       closeAllFloatMenus();
     });
   }
-  document.getElementById('fTimeOfDay').addEventListener('click', () => {appCtx.cycleTimeOfDay();});
-  document.getElementById('fPolice').addEventListener('click', () => {
-    appCtx.policeOn = !appCtx.policeOn;
-    document.getElementById('fPolice').classList.toggle('on', appCtx.policeOn);
-    document.getElementById('police').classList.toggle('show', appCtx.policeOn);
-    if (appCtx.policeOn) appCtx.spawnPolice();else appCtx.clearPolice();
+  document.getElementById('fTimeOfDay').addEventListener('click', () => {
+    if (typeof appCtx.cycleTimeOfDay === 'function') appCtx.cycleTimeOfDay();
     closeAllFloatMenus();
   });
+  const weatherModeItem = document.getElementById('fWeatherMode');
+  if (weatherModeItem) {
+    weatherModeItem.addEventListener('click', () => {
+      if (typeof appCtx.cycleWeatherMode === 'function') appCtx.cycleWeatherMode();
+      closeAllFloatMenus();
+    });
+  }
+  const seaStateItem = document.getElementById('fSeaState');
+  if (seaStateItem) {
+    seaStateItem.addEventListener('click', () => {
+      if (typeof appCtx.cycleBoatSeaState === 'function') appCtx.cycleBoatSeaState();
+      closeAllFloatMenus();
+    });
+  }
   const buildModeItem = document.getElementById('fBlockBuild');
   if (buildModeItem) {
     buildModeItem.addEventListener('click', () => {
@@ -2391,11 +2579,24 @@ function setupUI() {
     closeAllFloatMenus();
   });
 
+  document.getElementById('fBoat')?.addEventListener('click', () => {
+    if (typeof appCtx.handleBoatAction === 'function') {
+      appCtx.handleBoatAction();
+    } else if (typeof appCtx.toggleBoatMode === 'function') {
+      appCtx.toggleBoatMode({ source: 'ui_button' });
+    }
+    updateControlsModeUI();
+    closeAllFloatMenus();
+  });
+
   const switchToOceanMode = async () => {
     if (appCtx.oceanMode && appCtx.oceanMode.active) return;
     if (appCtx.onMoon || (appCtx.spaceFlight && appCtx.spaceFlight.active) || appCtx.travelingToMoon) {
       closeAllFloatMenus();
       return;
+    }
+    if (typeof appCtx.stopBoatMode === 'function' && appCtx.boatMode?.active) {
+      appCtx.stopBoatMode({ targetMode: 'walk' });
     }
     oceanEntryHadEarthWorld = hasLoadedEarthWorld();
     if (typeof appCtx.showTransitionLoad === 'function') {
@@ -2421,7 +2622,7 @@ function setupUI() {
       if (typeof appCtx.showTransitionLoad === 'function') {
         await appCtx.showTransitionLoad('earth', 700);
       }
-      await appCtx.loadRoads();
+      await reloadEarthWorldForUi('switch_to_earth_mode');
       oceanEntryHadEarthWorld = hasLoadedEarthWorld();
     }
 
@@ -2490,6 +2691,7 @@ function setupUI() {
     appCtx.cloudsVisible = !appCtx.cloudsVisible;
     if (appCtx.cloudGroup) appCtx.cloudGroup.visible = appCtx.cloudsVisible;
     document.getElementById('fClouds').classList.toggle('on', !appCtx.cloudsVisible);
+    if (typeof appCtx.applyWeatherPresentation === 'function') appCtx.applyWeatherPresentation();
     closeAllFloatMenus();
   });
   document.getElementById('fConstellations').addEventListener('click', () => {
@@ -2565,21 +2767,65 @@ function setupUI() {
   document.getElementById('resMenuBtn').addEventListener('click', () => {appCtx.hideResult();goToMainMenu();});
 
   // Map controls
-  document.getElementById('minimap').addEventListener('click', () => {
+  const MINIMAP_ZOOM_MIN = 12;
+  const MINIMAP_ZOOM_MAX = 18;
+  const minimapCanvas = document.getElementById('minimap');
+  const minimapZoomLevel = document.getElementById('minimapZoomLevel');
+  const minimapZoomInBtn = document.getElementById('minimapZoomIn');
+  const minimapZoomOutBtn = document.getElementById('minimapZoomOut');
+  const syncMinimapZoomUi = () => {
+    const zoom = Math.max(MINIMAP_ZOOM_MIN, Math.min(MINIMAP_ZOOM_MAX, Math.round(Number(appCtx.minimapZoom) || 15)));
+    appCtx.minimapZoom = zoom;
+    if (minimapZoomLevel) minimapZoomLevel.textContent = `Z ${zoom}`;
+    if (minimapZoomInBtn) minimapZoomInBtn.disabled = zoom >= MINIMAP_ZOOM_MAX;
+    if (minimapZoomOutBtn) minimapZoomOutBtn.disabled = zoom <= MINIMAP_ZOOM_MIN;
+  };
+  const adjustMinimapZoom = (delta = 0) => {
+    const nextZoom = Math.max(
+      MINIMAP_ZOOM_MIN,
+      Math.min(MINIMAP_ZOOM_MAX, Math.round((Number(appCtx.minimapZoom) || 15) + delta))
+    );
+    if (nextZoom === appCtx.minimapZoom) return;
+    appCtx.minimapZoom = nextZoom;
+    syncMinimapZoomUi();
+  };
+
+  syncMinimapZoomUi();
+
+  minimapCanvas.addEventListener('click', () => {
     appCtx.showLargeMap = true;
     document.getElementById('largeMap').classList.add('show');
     if (typeof appCtx.renderInteriorLegend === 'function') {
       appCtx.renderInteriorLegend();
     }
   });
-  document.getElementById('minimap').addEventListener('contextmenu', (e) => {
+  minimapCanvas.addEventListener('contextmenu', (e) => {
     e.preventDefault();
-    const rect = e.target.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
+    const point = canvasPointerPoint(minimapCanvas, e);
+    const x = point.x;
+    const y = point.y;
     const worldPos = appCtx.minimapScreenToWorld(x, y);
-    appCtx.teleportToLocation(worldPos.x, worldPos.z);
+    appCtx.teleportToLocation(worldPos.x, worldPos.z, {
+      source: 'minimap_context',
+      preferBoatIfWater: true
+    });
   });
+  minimapCanvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    adjustMinimapZoom(e.deltaY < 0 ? 1 : -1);
+  }, { passive: false });
+  if (minimapZoomInBtn) {
+    minimapZoomInBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      adjustMinimapZoom(1);
+    });
+  }
+  if (minimapZoomOutBtn) {
+    minimapZoomOutBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      adjustMinimapZoom(-1);
+    });
+  }
   document.getElementById('mapClose').addEventListener('click', () => {
     appCtx.showLargeMap = false;
     document.getElementById('largeMap').classList.remove('show');

@@ -21,6 +21,48 @@ export const WORLD_TEST_LOCATIONS = [
     category: 'mixed_terrain_coastal'
   },
   {
+    id: 'hollywood',
+    kind: 'preset',
+    key: 'hollywood',
+    label: 'Hollywood, California',
+    category: 'inland_urban_arid_edge'
+  },
+  {
+    id: 'newyork',
+    kind: 'preset',
+    key: 'newyork',
+    label: 'New York, New York',
+    category: 'dense_manhattan_waterfront'
+  },
+  {
+    id: 'miami',
+    kind: 'preset',
+    key: 'miami',
+    label: 'Miami, Florida',
+    category: 'coastal_highrise_waterfront'
+  },
+  {
+    id: 'lasvegas',
+    kind: 'preset',
+    key: 'lasvegas',
+    label: 'Las Vegas, Nevada',
+    category: 'desert_urban'
+  },
+  {
+    id: 'london',
+    kind: 'preset',
+    key: 'london',
+    label: 'London, United Kingdom',
+    category: 'cloudy_temperate'
+  },
+  {
+    id: 'tokyo',
+    kind: 'preset',
+    key: 'tokyo',
+    label: 'Tokyo, Japan',
+    category: 'dense_east_asia'
+  },
+  {
     id: 'nurburgring',
     kind: 'preset',
     key: 'nurburgring',

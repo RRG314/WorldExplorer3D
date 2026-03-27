@@ -39,6 +39,24 @@ function isEnv(env) {
   return _activeEnv === env;
 }
 
+function _envDebugRequested() {
+  try {
+    const params = new URLSearchParams(globalThis.location?.search || '');
+    if (params.get('debug') === '1' || params.get('envDebug') === '1') return true;
+  } catch {
+    // Ignore URL parse issues.
+  }
+  try {
+    if (globalThis.localStorage?.getItem('we:envDebug') === '1') return true;
+  } catch {
+    // Ignore storage access issues.
+  }
+  if (globalThis._debugMode === true) return true;
+  if (typeof appCtx.isRoadDebugModeEnabled === 'function' && appCtx.isRoadDebugModeEnabled()) return true;
+  if (typeof appCtx.getPerfOverlayEnabled === 'function') return appCtx.getPerfOverlayEnabled() === true;
+  return !!appCtx.perfOverlayEnabled;
+}
+
 function switchEnv(newEnv) {
   // Guard: no re-entrant transitions
   if (_transitioning) {
@@ -108,6 +126,10 @@ function _syncLegacyFlags(env) {
 
 // Lightweight debug overlay (top-left, unobtrusive)
 function _updateEnvDebug() {
+  if (!_envDebugRequested()) {
+    if (_envDebugEl) _envDebugEl.style.display = 'none';
+    return;
+  }
   if (!_envDebugEl) {
     _envDebugEl = document.getElementById('envDebug');
     if (!_envDebugEl) {
@@ -120,9 +142,10 @@ function _updateEnvDebug() {
       document.body.appendChild(_envDebugEl);
     }
   }
+  _envDebugEl.style.display = 'block';
   _envDebugEl.textContent = 'ENV:' + (_activeEnv || 'INIT');
 }
 
-Object.assign(appCtx, { ENV, getEnv, isEnv, switchEnv });
+Object.assign(appCtx, { ENV, getEnv, isEnv, switchEnv, updateEnvDebug: _updateEnvDebug });
 
-export { ENV, getEnv, isEnv, switchEnv };
+export { ENV, getEnv, isEnv, switchEnv, _updateEnvDebug as updateEnvDebug };

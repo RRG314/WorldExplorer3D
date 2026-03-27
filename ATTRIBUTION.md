@@ -30,6 +30,10 @@ Attribution is surfaced in visible app UI areas, including:
 
 The app may also use optional third-party providers (for example, property-data APIs) configured by the deployer. Those services remain under their own terms.
 
+## OSM Ecosystem Reference Materials
+
+World Explorer also uses public OSM ecosystem reference materials to improve internal interpretation rules where useful. That currently includes MapComplete-style building-semantics guidance for vertical building parts. This is a World Explorer-native rules adaptation, not direct OSM editing behavior and not a bundled MapComplete runtime dependency.
+
 ## Notes
 
 - This file is informational and not legal advice.

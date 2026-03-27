@@ -1,9 +1,49 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import {
+  appendIndexedGeometryToGroupedBatch,
+  buildGroupedIndexedBatchMeshes,
+  createRoadSurfaceMaterials
+} from "./road-render.js?v=3";
+import {
   classifyWaterSurfaceProfile,
   classifyWorldSurfaceProfile,
   normalizeLanduseSurfaceType
-} from "./surface-rules.js?v=1";
+} from "./surface-rules.js?v=3";
+import {
+  buildWaterShaderLibrary,
+  inferWaterRenderContext
+} from "./water-dynamics.js?v=2";
+import {
+  areRoadsConnected,
+  assignFeatureConnections,
+  buildFeatureRibbonEdges,
+  buildFeatureStations,
+  buildFeatureTransitionAnchors,
+  classifyStructureSemantics,
+  featureTraversalKey,
+  isRoadSurfaceReachable,
+  projectPointToFeature,
+  roadBehavesGradeSeparated,
+  roadSurfaceAttachmentThreshold,
+  roadSurfaceLateralThreshold,
+  sampleProfileAtDistance,
+  sampleFeatureSurfaceY,
+  shouldRenderRoadSkirts,
+  updateFeatureSurfaceProfile
+} from "./structure-semantics.js?v=26";
+import {
+  interpretBuildingSemantics
+} from "./building-semantics.js?v=2";
+import {
+  assignContinuousWorldRegionKeysToTarget,
+  buildContinuousWorldRegionKeysFromPoints,
+  mergeContinuousWorldRegionKeysFromTargets,
+  targetIntersectsContinuousWorldTrackedRegions
+} from "./continuous-world-feature-manager.js?v=2";
+import {
+  currentMapReferenceGeoPosition,
+  geoPointToWorld
+} from "./map-coordinates.js?v=1";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
@@ -11,12 +51,21 @@ const OVERPASS_ENDPOINTS = [
 'https://overpass-api.de/api/interpreter',
 'https://lz4.overpass-api.de/api/interpreter',
 'https://overpass.kumi.systems/api/interpreter'];
+const LOCAL_BROWSER_OVERPASS_ENDPOINTS = [
+'https://lz4.overpass-api.de/api/interpreter',
+'https://overpass-api.de/api/interpreter'];
+const LOCAL_OVERPASS_PROXY_PATH = '/api/overpass';
 
 
 const OVERPASS_STAGGER_MS = 220;
 const OVERPASS_MIN_TIMEOUT_MS = 5000;
 const OVERPASS_MEMORY_CACHE_TTL_MS = 6 * 60 * 1000;
 const OVERPASS_MEMORY_CACHE_MAX = 6;
+const OVERPASS_PERSISTENT_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const OVERPASS_PERSISTENT_CACHE_STALE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const OVERPASS_PERSISTENT_CACHE_MAX = 18;
+const OVERPASS_PERSISTENT_CACHE_DB = 'worldExplorer3D.overpassCache.v1';
+const OVERPASS_PERSISTENT_CACHE_STORE = 'responses';
 const OVERPASS_LOC_EPSILON = 1e-7;
 const WATER_VECTOR_TILE_ZOOM = 13;
 const WATER_VECTOR_TILE_FETCH_TIMEOUT_MS = 8000;
@@ -24,11 +73,21 @@ const WATER_VECTOR_TILE_ENDPOINT = (z, x, y) =>
 `https://vector.openstreetmap.org/shortbread_v1/${z}/${x}/${y}.mvt`;
 let _vectorTileLibPromise = null;
 const BUILDING_INDEX_CELL_SIZE = 120;
+const LANDUSE_INDEX_CELL_SIZE = 180;
+const ROAD_MESH_INDEX_CELL_SIZE = 320;
 let buildingSpatialIndex = new Map();
+let landuseSpatialIndex = new Map();
+let roadMeshSpatialIndex = new Map();
+let roadMeshSpatialIndexDirty = true;
+let roadMeshSpatialIndexMembers = new Set();
+let roadMeshLodVisibleSet = new Set();
+let lastRoadMeshLodCandidateCount = 0;
 const FEATURE_TILE_DEGREES = 0.002;
 const _rdtTileDepthCache = new Map();
 const _overpassMemoryCache = [];
+let _overpassPersistentCacheDbPromise = null;
 let _lastOverpassEndpoint = null;
+let _localOverpassProxyUnavailable = false;
 const ROAD_ENDPOINT_EXTENSION_SCALE = 0.5;
 const ROAD_ENDPOINT_EXTENSION_MIN = 0.35;
 const ROAD_ENDPOINT_EXTENSION_MAX = 2.0;
@@ -42,6 +101,28 @@ const FEATURE_MAX_SPAN_SCALE = 1.25;
 const FEATURE_MAX_AREA_SCALE = 1.0;
 const FEATURE_MIN_POLYGON_AREA = 8;
 const FEATURE_MIN_HOLE_AREA = 6;
+const CONTINUOUS_WORLD_INTERACTIVE_STREAM_MIN_INTERVAL_MS = 900;
+const CONTINUOUS_WORLD_INTERACTIVE_STREAM_FAST_INTERVAL_MS = 260;
+const CONTINUOUS_WORLD_INTERACTIVE_STREAM_MAX_COVERAGE = 10;
+const CONTINUOUS_WORLD_INTERACTIVE_STREAM_RECENT_RETAIN_COUNT = 2;
+const CONTINUOUS_WORLD_INTERACTIVE_STREAM_ROAD_RECENT_RETAIN_COUNT = 6;
+const CONTINUOUS_WORLD_INTERACTIVE_STREAM_ROAD_RADIUS_MIN = 0.012;
+const CONTINUOUS_WORLD_INTERACTIVE_STREAM_ROAD_RADIUS_MAX = 0.034;
+const CONTINUOUS_WORLD_INTERACTIVE_STREAM_FEATURE_RADIUS_MIN = 0.016;
+const CONTINUOUS_WORLD_INTERACTIVE_STREAM_FEATURE_RADIUS_MAX = 0.026;
+const CONTINUOUS_WORLD_INTERACTIVE_STREAM_COLLIDER_RADIUS = 180;
+const CONTINUOUS_WORLD_INTERACTIVE_STREAM_WALK_COLLIDER_RADIUS = 180;
+const CONTINUOUS_WORLD_INTERACTIVE_STREAM_STARTUP_BUILDING_RADIUS_SCALE = 0.52;
+const CONTINUOUS_WORLD_INTERACTIVE_STREAM_STARTUP_BUILDING_RADIUS_MIN = 0.010;
+const CONTINUOUS_WORLD_BASE_EVICTION_MIN_DISTANCE = 900;
+const CONTINUOUS_WORLD_BASE_EVICTION_MIN_INTERVAL_MS = 1800;
+const CONTINUOUS_WORLD_BASE_EVICTION_SYNC_INTERVAL_MS = 650;
+const CONTINUOUS_WORLD_BASE_EVICTION_MIN_BUILDING_MESHES = 420;
+const CONTINUOUS_WORLD_BASE_EVICTION_MIN_MISC_MESHES = 180;
+const CONTINUOUS_WORLD_BASE_EVICTION_MIN_ROAD_MESHES = 220;
+const CONTINUOUS_WORLD_BASE_EVICTION_MIN_SURFACE_MESHES = 140;
+const CONTINUOUS_WORLD_BASE_EVICTION_FAR_DISTANCE = 2200;
+const CONTINUOUS_WORLD_BASE_EVICTION_ULTRA_DISTANCE = 4200;
 const DRIVEABLE_HIGHWAY_TYPES = new Set([
   'motorway',
   'motorway_link',
@@ -90,6 +171,171 @@ const LINEAR_FEATURE_STYLE_PRESETS = {
     opacity: 1
   }
 };
+const _continuousWorldInteractiveStreamState = {
+  enabled: true,
+  autoKickEnabled: true,
+  seededSignature: '',
+  pending: false,
+  pendingStartedAt: 0,
+  pendingQueryLat: NaN,
+  pendingQueryLon: NaN,
+  pendingRegionKey: null,
+  activeRequestId: 0,
+  abortController: null,
+  recoveryTimerId: null,
+  recoveryShellTimerId: null,
+  hardRecoveryTimerId: null,
+  hardRecoveryInFlight: false,
+  lastHardRecoveryAt: 0,
+  lastKickAt: 0,
+  lastLoadAt: 0,
+  lastLoadReason: null,
+  lastError: null,
+  coverage: [],
+  loadedRoadIds: new Set(),
+  loadedBuildingIds: new Set(),
+  loadedLanduseIds: new Set(),
+  loadedWaterwayIds: new Set(),
+  totalAddedRoads: 0,
+  totalAddedBuildings: 0,
+  totalAddedLanduseMeshes: 0,
+  totalAddedWaterAreas: 0,
+  totalAddedWaterways: 0,
+  totalLoads: 0,
+  forcedSurfaceSyncLoads: 0,
+  deferredSurfaceSyncLoads: 0,
+  skippedSurfaceSyncLoads: 0,
+  lastSurfaceSyncPolicy: null,
+  activeInteractiveRoads: 0,
+  activeInteractiveBuildings: 0,
+  activeInteractiveLanduse: 0,
+  activeInteractiveWaterways: 0,
+  evictedRoads: 0,
+  evictedBuildings: 0,
+  evictedLanduse: 0,
+  evictedWaterways: 0,
+  evictedMeshes: 0
+};
+const _replacedBaseBuildingSourceIds = new Set();
+let _lastBaseWorldEvictionAt = 0;
+const PLAYABLE_CORE_RESIDENCY_CONFIG = {
+  driveRadius: 1800,
+  walkRadius: 950,
+  droneRadius: 2400,
+  boatRadius: 1700,
+  oceanRadius: 2200,
+  structureRadiusScale: 1.2,
+  recenterRatio: 0.34,
+  minRecenterDistance: 180,
+  terrainNearLoadRatio: 0.66,
+  terrainFocusLoadRatio: 1.0,
+  minRoadMeshesReady: {
+    drive: 18,
+    walk: 8,
+    drone: 10,
+    boat: 6,
+    ocean: 6
+  },
+  minVisibleRoadMeshesReady: {
+    drive: 16,
+    walk: 4,
+    drone: 4,
+    boat: 4,
+    ocean: 4
+  }
+};
+const ACTOR_BUILDING_SHELL_CONFIG = {
+  drive: {
+    visibleRadius: 420,
+    minVisibleBuildings: 28,
+    minVisibleRoads: 16,
+    minRoadFeatures: 14
+  },
+  walk: {
+    visibleRadius: 260,
+    minVisibleBuildings: 12,
+    minVisibleRoads: 3,
+    minRoadFeatures: 4
+  },
+  drone: {
+    visibleRadius: 620,
+    minVisibleBuildings: 24,
+    minVisibleRoads: 3,
+    minRoadFeatures: 8
+  }
+};
+const ACTOR_ROAD_SHELL_CONFIG = {
+  drive: {
+    visibleRadius: 320,
+    minVisibleRoads: 16,
+    minRoadFeatures: 24
+  },
+  walk: {
+    visibleRadius: 220,
+    minVisibleRoads: 4,
+    minRoadFeatures: 8
+  },
+  drone: {
+    visibleRadius: 420,
+    minVisibleRoads: 4,
+    minRoadFeatures: 14
+  }
+};
+const STARTUP_WORLD_BUILD_CONFIG = {
+  coreRoadRadiusScale: 1.08,
+  coreRoadRadiusMinDegrees: 0.0054,
+  coreRoadBudgetScale: 0.96,
+  coreRoadBasePerTileScale: 0.88,
+  coreRoadMinPerTileScale: 1.0,
+  coreQueryTimeoutMs: 6200,
+  coreQueryDeadlineMs: 9200,
+  localRoadRadiusScale: 1.38,
+  localRoadQueryTimeoutMs: 3600,
+  localRoadQueryDeadlineMs: 5000,
+  localRoadBudgetScale: 1.08,
+  localRoadBasePerTileScale: 0.96,
+  localRoadMinPerTileScale: 1.0,
+  shellRadiusScale: 0.9,
+  shellRadiusMinDegrees: 0.0042,
+  shellQueryTimeoutMs: 3200,
+  shellQueryDeadlineMs: 4600,
+  shellMaxBuildings: 220,
+  shellDenseCellSize: 72,
+  shellDenseCellCap: 10,
+  placeholderShellEnabled: false
+};
+
+function continuousWorldStartupLocalShellEnabled() {
+  return STARTUP_WORLD_BUILD_CONFIG.placeholderShellEnabled === true;
+}
+
+const BUILDING_GROUND_PATCH_CONFIG = {
+  enabled: false,
+  slopeThreshold: 0.28,
+  untexturedSlopeThreshold: 0.42
+};
+const _playableCoreResidencyState = {
+  ready: false,
+  mode: 'drive',
+  centerX: 0,
+  centerZ: 0,
+  radius: PLAYABLE_CORE_RESIDENCY_CONFIG.driveRadius,
+  structureRadius: Math.round(PLAYABLE_CORE_RESIDENCY_CONFIG.driveRadius * PLAYABLE_CORE_RESIDENCY_CONFIG.structureRadiusScale),
+  bounds: null,
+  structureBounds: null,
+  regionKeys: [],
+  terrainReady: false,
+  roadMeshCount: 0,
+  urbanSurfaceCount: 0,
+  structureMeshCount: 0,
+  reason: 'init',
+  lastUpdatedAt: 0
+};
+const CONTINUOUS_WORLD_INTERACTIVE_LOAD_LEVELS = {
+  roads_only: 1,
+  reduced: 2,
+  full: 3
+};
 const TRAVERSAL_NODE_GRID = 2.5;
 const TRAVERSAL_MAX_ANCHOR_DISTANCE = {
   drive: 260,
@@ -105,6 +351,7 @@ const ENABLE_LINEAR_FEATURES = false;
 const VEGETATION_ELIGIBLE_TYPES = new Set([
   'forest',
   'wood',
+  'scrub',
   'park',
   'garden',
   'grass',
@@ -118,6 +365,7 @@ const VEGETATION_ELIGIBLE_TYPES = new Set([
 const TREE_DENSITY_BY_LANDUSE = {
   forest: { spacing: 18, maxPerPolygon: 180, weight: 1.15 },
   wood: { spacing: 20, maxPerPolygon: 150, weight: 1.08 },
+  scrub: { spacing: 24, maxPerPolygon: 92, weight: 0.88 },
   orchard: { spacing: 14, maxPerPolygon: 120, weight: 0.95 },
   park: { spacing: 28, maxPerPolygon: 36, weight: 0.72 },
   garden: { spacing: 22, maxPerPolygon: 28, weight: 0.78 },
@@ -133,12 +381,809 @@ const MAX_TREE_NODES = 320;
 const MAX_TREE_ROW_WAYS = 70;
 const MAX_GENERATED_TREE_INSTANCES = 950;
 const INTERIOR_LEVEL_HEIGHT = 3.4;
+const CONTINUOUS_WORLD_VISIBLE_LOAD_MAX_ROAD_RADIUS = 0.04;
+const CONTINUOUS_WORLD_VISIBLE_LOAD_MAX_FEATURE_RADIUS = 0.055;
+const CONTINUOUS_WORLD_VISIBLE_LOAD_MAX_POI_RADIUS = 0.03;
+const CONTINUOUS_WORLD_VISIBLE_LOAD_MAX_LINEAR_RADIUS = 0.04;
+const CONTINUOUS_WORLD_VISIBLE_LOAD_MAX_BUDGET_SCALE = 1.72;
 let _activeWorldLoad = null;
 let _traversalNetworksDirty = true;
+let _traversalRebuildTimer = null;
+
+function vegetationWorldDensityScale() {
+  const profile = appCtx.worldSurfaceProfile || null;
+  if (!profile) return 1;
+  const norm = profile?.signals?.normalized || {};
+  let scale = 1;
+  if (profile.terrainModeHint === 'snow' || profile.reason === 'polar_latitude') {
+    scale *= 0.42;
+  } else if (profile.reason === 'arid_surface') {
+    scale *= 0.64;
+  } else if ((Number(profile.absLat) || 0) <= 24 && (Number(norm.vegetated) || 0) >= 0.18) {
+    scale *= 1.22;
+  } else if ((Number(profile.absLat) || 0) <= 38 && (Number(norm.vegetated) || 0) >= 0.24) {
+    scale *= 1.1;
+  }
+  if ((Number(norm.scrub) || 0) >= 0.1) scale *= 1.04;
+  if ((Number(norm.water) || 0) >= 0.18 && (Number(norm.vegetated) || 0) >= 0.22) scale *= 1.06;
+  return Math.max(0.38, Math.min(1.32, scale));
+}
+
+function vegetationLanduseDensityScale(landuseType = '') {
+  const worldScale = vegetationWorldDensityScale();
+  if (landuseType === 'forest' || landuseType === 'wood') return Math.min(1.4, worldScale * 1.08);
+  if (landuseType === 'scrub') return Math.min(1.28, worldScale * 1.04);
+  if (landuseType === 'park' || landuseType === 'garden' || landuseType === 'meadow') return Math.min(1.22, worldScale);
+  return worldScale;
+}
 
 function sameLocation(a, b) {
   return Math.abs((a?.lat || 0) - (b?.lat || 0)) <= OVERPASS_LOC_EPSILON &&
   Math.abs((a?.lon || 0) - (b?.lon || 0)) <= OVERPASS_LOC_EPSILON;
+}
+
+function sameOverpassCacheScope(a, b) {
+  if (!sameLocation(a, b)) return false;
+  return String(a?.queryKind || 'legacy') === String(b?.queryKind || 'legacy');
+}
+
+function overpassQueryCapabilityTier(queryKind = 'legacy') {
+  const kind = String(queryKind || 'legacy').trim();
+  if (!kind || kind === 'legacy' || kind === 'full') return 4;
+  if (kind === 'startup_playable_core') return 3;
+  if (kind === 'startup_roads') return 1;
+  if (kind.startsWith('interactive:prefetch:')) {
+    const loadLevel = kind.split(':').pop();
+    if (loadLevel === 'full') return 4;
+    if (loadLevel === 'reduced') return 3;
+    return 1;
+  }
+  if (kind.startsWith('interactive:')) {
+    if (
+      kind === 'interactive:actor_visible_road_gap_fast' ||
+      kind === 'interactive:actor_visible_road_gap' ||
+      kind === 'interactive:roads_only'
+    ) {
+      return 1;
+    }
+    if (
+      kind === 'interactive:actor_building_gap' ||
+      kind === 'interactive:building_continuity' ||
+      kind === 'interactive:road_recovery_shell' ||
+      kind === 'interactive:startup_local_shell' ||
+      kind === 'interactive:fast_local_shell' ||
+      kind === 'interactive:reduced'
+    ) {
+      return 3;
+    }
+    if (kind === 'interactive:full') return 4;
+  }
+  if (kind === 'reduced') return 3;
+  if (kind === 'roads_only') return 1;
+  return 2;
+}
+
+function overpassStoredQueryCanSatisfyRequest(storedQueryKind = 'legacy', requestQueryKind = 'legacy') {
+  const stored = String(storedQueryKind || 'legacy').trim();
+  const request = String(requestQueryKind || 'legacy').trim();
+  if (stored === request) return true;
+  if (stored === 'legacy' || stored === 'full') return true;
+  return overpassQueryCapabilityTier(stored) >= overpassQueryCapabilityTier(request);
+}
+
+function overpassRadiusCanCoverRequest(storedCenter, requestCenter, storedRadius, requestRadius) {
+  const stored = Math.max(0, Number(storedRadius) || 0);
+  const request = Math.max(0, Number(requestRadius) || 0);
+  const delta = Math.abs(Number(storedCenter) - Number(requestCenter));
+  if (!(stored > 0) && !(request > 0)) return delta <= OVERPASS_LOC_EPSILON;
+  if (!(stored > 0)) return false;
+  return delta <= Math.max(OVERPASS_LOC_EPSILON, stored - request + OVERPASS_LOC_EPSILON);
+}
+
+function normalizeOverpassBounds(bounds = null) {
+  if (!bounds || typeof bounds !== 'object') return null;
+  const minLat = Number(bounds.minLat);
+  const minLon = Number(bounds.minLon);
+  const maxLat = Number(bounds.maxLat);
+  const maxLon = Number(bounds.maxLon);
+  if (
+    !Number.isFinite(minLat) ||
+    !Number.isFinite(minLon) ||
+    !Number.isFinite(maxLat) ||
+    !Number.isFinite(maxLon)
+  ) {
+    return null;
+  }
+  return {
+    minLat: Number(Math.min(minLat, maxLat).toFixed(6)),
+    minLon: Number(Math.min(minLon, maxLon).toFixed(6)),
+    maxLat: Number(Math.max(minLat, maxLat).toFixed(6)),
+    maxLon: Number(Math.max(minLon, maxLon).toFixed(6))
+  };
+}
+
+function overpassBoundsCanCoverRequest(storedBounds, requestBounds) {
+  const stored = normalizeOverpassBounds(storedBounds);
+  const request = normalizeOverpassBounds(requestBounds);
+  if (!stored || !request) return false;
+  return (
+    stored.minLat <= request.minLat + OVERPASS_LOC_EPSILON &&
+    stored.minLon <= request.minLon + OVERPASS_LOC_EPSILON &&
+    stored.maxLat >= request.maxLat - OVERPASS_LOC_EPSILON &&
+    stored.maxLon >= request.maxLon - OVERPASS_LOC_EPSILON
+  );
+}
+
+function overpassBoundsOverlap(storedBounds, requestBounds, extraAllowance = 0) {
+  const stored = normalizeOverpassBounds(storedBounds);
+  const request = normalizeOverpassBounds(requestBounds);
+  if (!stored || !request) return false;
+  const allowance = Math.max(0, Number(extraAllowance) || 0);
+  return !(
+    stored.maxLat < request.minLat - allowance ||
+    stored.minLat > request.maxLat + allowance ||
+    stored.maxLon < request.minLon - allowance ||
+    stored.minLon > request.maxLon + allowance
+  );
+}
+
+function overpassBoundsScore(storedBounds, requestBounds) {
+  const stored = normalizeOverpassBounds(storedBounds);
+  const request = normalizeOverpassBounds(requestBounds);
+  if (!stored || !request) return Infinity;
+  const latMiss =
+    Math.max(0, request.minLat - stored.minLat) +
+    Math.max(0, stored.maxLat - request.maxLat);
+  const lonMiss =
+    Math.max(0, request.minLon - stored.minLon) +
+    Math.max(0, stored.maxLon - request.maxLon);
+  return latMiss + lonMiss;
+}
+
+function overpassCacheEntryCanSatisfyRequest(storedMeta, requestMeta) {
+  if (!storedMeta || !requestMeta) return false;
+  if (!overpassStoredQueryCanSatisfyRequest(storedMeta.queryKind, requestMeta.queryKind)) return false;
+  const storedRoadsBounds = normalizeOverpassBounds(storedMeta.roadsBounds);
+  const requestRoadsBounds = normalizeOverpassBounds(requestMeta.roadsBounds);
+  const storedFeatureBounds = normalizeOverpassBounds(storedMeta.featureBounds);
+  const requestFeatureBounds = normalizeOverpassBounds(requestMeta.featureBounds);
+  const storedPoiBounds = normalizeOverpassBounds(storedMeta.poiBounds);
+  const requestPoiBounds = normalizeOverpassBounds(requestMeta.poiBounds);
+  return (
+    (
+      (storedRoadsBounds && requestRoadsBounds && overpassBoundsCanCoverRequest(storedRoadsBounds, requestRoadsBounds)) ||
+      (
+        overpassRadiusCanCoverRequest(storedMeta.lat, requestMeta.lat, storedMeta.roadsRadius, requestMeta.roadsRadius) &&
+        overpassRadiusCanCoverRequest(storedMeta.lon, requestMeta.lon, storedMeta.roadsRadius, requestMeta.roadsRadius)
+      )
+    ) &&
+    (
+      (storedFeatureBounds && requestFeatureBounds && overpassBoundsCanCoverRequest(storedFeatureBounds, requestFeatureBounds)) ||
+      (
+        overpassRadiusCanCoverRequest(storedMeta.lat, requestMeta.lat, storedMeta.featureRadius, requestMeta.featureRadius) &&
+        overpassRadiusCanCoverRequest(storedMeta.lon, requestMeta.lon, storedMeta.featureRadius, requestMeta.featureRadius)
+      )
+    ) &&
+    (
+      (storedPoiBounds && requestPoiBounds && overpassBoundsCanCoverRequest(storedPoiBounds, requestPoiBounds)) ||
+      (
+        overpassRadiusCanCoverRequest(storedMeta.lat, requestMeta.lat, storedMeta.poiRadius, requestMeta.poiRadius) &&
+        overpassRadiusCanCoverRequest(storedMeta.lon, requestMeta.lon, storedMeta.poiRadius, requestMeta.poiRadius)
+      )
+    )
+  );
+}
+
+function overpassNearbyCacheEntryScore(storedMeta, requestMeta) {
+  if (!storedMeta || !requestMeta) return Infinity;
+  const boundsScore = Math.min(
+    overpassBoundsScore(storedMeta.roadsBounds, requestMeta.roadsBounds),
+    overpassBoundsScore(storedMeta.featureBounds, requestMeta.featureBounds),
+    overpassBoundsScore(storedMeta.poiBounds, requestMeta.poiBounds)
+  );
+  if (Number.isFinite(boundsScore)) return boundsScore;
+  const latDelta = Math.abs(Number(storedMeta.lat) - Number(requestMeta.lat));
+  const lonDelta = Math.abs(Number(storedMeta.lon) - Number(requestMeta.lon));
+  return latDelta + lonDelta;
+}
+
+function overpassNearbyCacheEntryCanHelp(storedMeta, requestMeta, options = {}) {
+  if (!storedMeta || !requestMeta) return false;
+  if (!overpassStoredQueryCanSatisfyRequest(storedMeta.queryKind, requestMeta.queryKind)) return false;
+  const extraAllowance = Math.max(0.0025, Number(options.extraAllowance || 0));
+  if (
+    overpassBoundsOverlap(storedMeta.roadsBounds, requestMeta.roadsBounds, extraAllowance) ||
+    overpassBoundsOverlap(storedMeta.featureBounds, requestMeta.featureBounds, extraAllowance) ||
+    overpassBoundsOverlap(storedMeta.poiBounds, requestMeta.poiBounds, extraAllowance)
+  ) {
+    return true;
+  }
+  const roadsRadius = Math.max(0, Number(storedMeta.roadsRadius) || 0);
+  const featureRadius = Math.max(0, Number(storedMeta.featureRadius) || 0);
+  const requestRoadsRadius = Math.max(0, Number(requestMeta.roadsRadius) || 0);
+  const requestFeatureRadius = Math.max(0, Number(requestMeta.featureRadius) || 0);
+  const supportRadius = Math.max(
+    roadsRadius,
+    featureRadius,
+    requestRoadsRadius,
+    requestFeatureRadius
+  );
+  if (!(supportRadius > 0)) return false;
+  const maxDelta = supportRadius + extraAllowance;
+  const latDelta = Math.abs(Number(storedMeta.lat) - Number(requestMeta.lat));
+  const lonDelta = Math.abs(Number(storedMeta.lon) - Number(requestMeta.lon));
+  return latDelta <= maxDelta && lonDelta <= maxDelta;
+}
+
+function overpassBoundsFromCenterRadius(lat, lon, radius) {
+  const centerLat = Number(lat);
+  const centerLon = Number(lon);
+  const degRadius = Math.max(0, Number(radius) || 0);
+  if (!Number.isFinite(centerLat) || !Number.isFinite(centerLon) || !(degRadius > 0)) return null;
+  return normalizeOverpassBounds({
+    minLat: centerLat - degRadius,
+    minLon: centerLon - degRadius,
+    maxLat: centerLat + degRadius,
+    maxLon: centerLon + degRadius
+  });
+}
+
+function worldUnitsToLatDegrees(worldUnits = 0) {
+  const scale = Math.max(1, Number(appCtx.SCALE) || 1);
+  const units = Math.max(0, Number(worldUnits) || 0);
+  return units / scale;
+}
+
+function playableCoreRadiusForMode(mode = 'drive') {
+  switch (String(mode || 'drive')) {
+  case 'walk':
+    return PLAYABLE_CORE_RESIDENCY_CONFIG.walkRadius;
+  case 'drone':
+    return PLAYABLE_CORE_RESIDENCY_CONFIG.droneRadius;
+  case 'boat':
+    return PLAYABLE_CORE_RESIDENCY_CONFIG.boatRadius;
+  case 'ocean':
+    return PLAYABLE_CORE_RESIDENCY_CONFIG.oceanRadius;
+  default:
+    return PLAYABLE_CORE_RESIDENCY_CONFIG.driveRadius;
+  }
+}
+
+function playableCoreBoundsFromCenter(centerX, centerZ, radius) {
+  const r = Math.max(80, Number(radius) || PLAYABLE_CORE_RESIDENCY_CONFIG.driveRadius);
+  return {
+    minX: centerX - r,
+    maxX: centerX + r,
+    minZ: centerZ - r,
+    maxZ: centerZ + r
+  };
+}
+
+function boundsContainPoint(bounds, x, z, padding = 0) {
+  if (!bounds || !Number.isFinite(x) || !Number.isFinite(z)) return false;
+  return (
+    x >= Number(bounds.minX) - padding &&
+    x <= Number(bounds.maxX) + padding &&
+    z >= Number(bounds.minZ) - padding &&
+    z <= Number(bounds.maxZ) + padding
+  );
+}
+
+function boundsIntersect(a, b, padding = 0) {
+  if (!a || !b) return false;
+  return !(
+    Number(a.maxX) < Number(b.minX) - padding ||
+    Number(a.minX) > Number(b.maxX) + padding ||
+    Number(a.maxZ) < Number(b.minZ) - padding ||
+    Number(a.minZ) > Number(b.maxZ) + padding
+  );
+}
+
+function playableCoreTargetBounds(target) {
+  const slot = target?.userData && typeof target.userData === 'object' ? target.userData : target;
+  const localBounds = slot?.localBounds;
+  if (
+    Number.isFinite(localBounds?.minX) &&
+    Number.isFinite(localBounds?.maxX) &&
+    Number.isFinite(localBounds?.minZ) &&
+    Number.isFinite(localBounds?.maxZ)
+  ) {
+    return localBounds;
+  }
+  const center = slot?.lodCenter || slot?.poiPosition || null;
+  const radius = Math.max(0, Number(slot?.lodRadius) || 0);
+  if (center && Number.isFinite(center.x) && Number.isFinite(center.z)) {
+    return playableCoreBoundsFromCenter(center.x, center.z, Math.max(16, radius));
+  }
+  const position = target?.position;
+  if (Number.isFinite(position?.x) && Number.isFinite(position?.z)) {
+    return playableCoreBoundsFromCenter(position.x, position.z, Math.max(16, radius));
+  }
+  return null;
+}
+
+function clearRoadMeshSpatialIndex() {
+  roadMeshSpatialIndex = new Map();
+  roadMeshSpatialIndexDirty = true;
+  roadMeshSpatialIndexMembers = new Set();
+  roadMeshLodVisibleSet = new Set();
+  lastRoadMeshLodCandidateCount = 0;
+}
+
+function markRoadMeshSpatialIndexDirty() {
+  roadMeshSpatialIndexDirty = true;
+}
+
+function roadMeshIndexCellKey(cellX, cellZ) {
+  return `${cellX},${cellZ}`;
+}
+
+function addRoadMeshToSpatialIndex(mesh) {
+  const bounds = playableCoreTargetBounds(mesh);
+  if (!bounds) return;
+  const minCellX = Math.floor(bounds.minX / ROAD_MESH_INDEX_CELL_SIZE);
+  const maxCellX = Math.floor(bounds.maxX / ROAD_MESH_INDEX_CELL_SIZE);
+  const minCellZ = Math.floor(bounds.minZ / ROAD_MESH_INDEX_CELL_SIZE);
+  const maxCellZ = Math.floor(bounds.maxZ / ROAD_MESH_INDEX_CELL_SIZE);
+  for (let cx = minCellX; cx <= maxCellX; cx++) {
+    for (let cz = minCellZ; cz <= maxCellZ; cz++) {
+      const key = roadMeshIndexCellKey(cx, cz);
+      let bucket = roadMeshSpatialIndex.get(key);
+      if (!bucket) {
+        bucket = [];
+        roadMeshSpatialIndex.set(key, bucket);
+      }
+      bucket.push(mesh);
+    }
+  }
+}
+
+function rebuildRoadMeshSpatialIndexFromLoadedRoadMeshes() {
+  roadMeshSpatialIndex = new Map();
+  roadMeshSpatialIndexMembers = new Set();
+  const roadMeshes = Array.isArray(appCtx.roadMeshes) ? appCtx.roadMeshes : [];
+  for (let i = 0; i < roadMeshes.length; i++) {
+    const mesh = roadMeshes[i];
+    if (!mesh) continue;
+    roadMeshSpatialIndexMembers.add(mesh);
+    addRoadMeshToSpatialIndex(mesh);
+  }
+  roadMeshSpatialIndexDirty = false;
+  return roadMeshSpatialIndex;
+}
+
+function ensureRoadMeshSpatialIndex() {
+  if (!roadMeshSpatialIndexDirty) return roadMeshSpatialIndex;
+  return rebuildRoadMeshSpatialIndexFromLoadedRoadMeshes();
+}
+
+function mergeWorldBounds(base, next) {
+  if (!base) return next ? { ...next } : null;
+  if (!next) return { ...base };
+  return {
+    minX: Math.min(Number(base.minX), Number(next.minX)),
+    maxX: Math.max(Number(base.maxX), Number(next.maxX)),
+    minZ: Math.min(Number(base.minZ), Number(next.minZ)),
+    maxZ: Math.max(Number(base.maxZ), Number(next.maxZ))
+  };
+}
+
+function expandWorldBounds(bounds, padding = 0) {
+  if (!bounds) return null;
+  const pad = Math.max(0, Number(padding) || 0);
+  return {
+    minX: Number(bounds.minX) - pad,
+    maxX: Number(bounds.maxX) + pad,
+    minZ: Number(bounds.minZ) - pad,
+    maxZ: Number(bounds.maxZ) + pad
+  };
+}
+
+function worldBoundsFromContinuousWorldRegionKey(regionKey, runtimeSnapshot = null) {
+  const parts = String(regionKey || '').split(':');
+  if (parts.length !== 2) return null;
+  const latIndex = Number(parts[0]);
+  const lonIndex = Number(parts[1]);
+  const sizeDegrees = Math.max(0.0001, Number(runtimeSnapshot?.regionConfig?.degrees) || 0.02);
+  if (!Number.isFinite(latIndex) || !Number.isFinite(lonIndex) || typeof appCtx.geoToWorld !== 'function') return null;
+  const lat0 = latIndex * sizeDegrees;
+  const lon0 = lonIndex * sizeDegrees;
+  const lat1 = lat0 + sizeDegrees;
+  const lon1 = lon0 + sizeDegrees;
+  const corners = [
+    appCtx.geoToWorld(lat0, lon0),
+    appCtx.geoToWorld(lat0, lon1),
+    appCtx.geoToWorld(lat1, lon0),
+    appCtx.geoToWorld(lat1, lon1)
+  ].filter((point) => Number.isFinite(point?.x) && Number.isFinite(point?.z));
+  if (corners.length === 0) return null;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (let i = 0; i < corners.length; i++) {
+    const point = corners[i];
+    minX = Math.min(minX, point.x);
+    maxX = Math.max(maxX, point.x);
+    minZ = Math.min(minZ, point.z);
+    maxZ = Math.max(maxZ, point.z);
+  }
+  return { minX, maxX, minZ, maxZ };
+}
+
+function roadMeshQueryBoundsFromRetainKeys(retainKeys, runtimeSnapshot = null, playableCoreState = null) {
+  let bounds = playableCoreState?.bounds ? expandWorldBounds(playableCoreState.bounds, 64) : null;
+  if (retainKeys instanceof Set && retainKeys.size > 0) {
+    retainKeys.forEach((key) => {
+      bounds = mergeWorldBounds(bounds, worldBoundsFromContinuousWorldRegionKey(key, runtimeSnapshot));
+    });
+  }
+  return bounds ? expandWorldBounds(bounds, 96) : null;
+}
+
+function getRoadMeshesIntersectingBounds(bounds, padding = 0) {
+  const roadMeshes = Array.isArray(appCtx.roadMeshes) ? appCtx.roadMeshes : [];
+  if (roadMeshes.length === 0) return [];
+  if (!bounds) return roadMeshes.slice();
+  ensureRoadMeshSpatialIndex();
+  const queryBounds = expandWorldBounds(bounds, padding);
+  const minCellX = Math.floor(queryBounds.minX / ROAD_MESH_INDEX_CELL_SIZE);
+  const maxCellX = Math.floor(queryBounds.maxX / ROAD_MESH_INDEX_CELL_SIZE);
+  const minCellZ = Math.floor(queryBounds.minZ / ROAD_MESH_INDEX_CELL_SIZE);
+  const maxCellZ = Math.floor(queryBounds.maxZ / ROAD_MESH_INDEX_CELL_SIZE);
+  const out = [];
+  const seen = new Set();
+  for (let cx = minCellX; cx <= maxCellX; cx++) {
+    for (let cz = minCellZ; cz <= maxCellZ; cz++) {
+      const bucket = roadMeshSpatialIndex.get(roadMeshIndexCellKey(cx, cz));
+      if (!bucket) continue;
+      for (let i = 0; i < bucket.length; i++) {
+        const mesh = bucket[i];
+        if (!mesh || seen.has(mesh)) continue;
+        const meshBounds = playableCoreTargetBounds(mesh);
+        if (!meshBounds || !boundsIntersect(meshBounds, queryBounds, 0)) continue;
+        seen.add(mesh);
+        out.push(mesh);
+      }
+    }
+  }
+  return out;
+}
+
+function countRoadMeshesIntersectingPlayableCore(coreState = _playableCoreResidencyState) {
+  if (!coreState?.bounds) return 0;
+  const candidates = getRoadMeshesIntersectingBounds(coreState.bounds, 32);
+  let count = 0;
+  for (let i = 0; i < candidates.length; i++) {
+    if (playableCoreIntersectsTarget(candidates[i], coreState, { structure: false })) count += 1;
+  }
+  return count;
+}
+
+function getRoadMeshSpatialIndexSnapshot() {
+  return {
+    dirty: roadMeshSpatialIndexDirty,
+    cellCount: roadMeshSpatialIndex.size,
+    meshCount: roadMeshSpatialIndexMembers.size,
+    visibleCount: roadMeshLodVisibleSet.size,
+    lastCandidateCount: lastRoadMeshLodCandidateCount
+  };
+}
+
+function playableCoreIntersectsTarget(target, coreState = _playableCoreResidencyState, options = {}) {
+  if (!coreState?.bounds) return false;
+  const useStructureBounds = options.structure === true && coreState.structureBounds;
+  const bounds = useStructureBounds ? coreState.structureBounds : coreState.bounds;
+  const padding = Number.isFinite(options.padding) ? Math.max(0, options.padding) : 0;
+  const targetBounds = playableCoreTargetBounds(target);
+  if (targetBounds) return boundsIntersect(targetBounds, bounds, padding);
+  return false;
+}
+
+function playableCoreRegionKeysForBounds(bounds, runtimeSnapshot = null, mode = 'drive') {
+  const keys = new Set();
+  const snapshot = runtimeSnapshot || appCtx.getContinuousWorldRuntimeSnapshot?.();
+  if (snapshot?.activeRegion?.key) keys.add(String(snapshot.activeRegion.key));
+  const addBand = (cells) => {
+    (Array.isArray(cells) ? cells : []).forEach((cell) => {
+      const key = String(cell?.key || '').trim();
+      if (key) keys.add(key);
+    });
+  };
+  addBand(snapshot?.activeRegionRings?.near);
+  addBand(snapshot?.activeRegionRings?.mid);
+  if (String(mode || 'drive') === 'drone') addBand(snapshot?.activeRegionRings?.far);
+  if (bounds) {
+    const samplePoints = [
+      { x: bounds.minX, z: bounds.minZ },
+      { x: bounds.maxX, z: bounds.minZ },
+      { x: bounds.maxX, z: bounds.maxZ },
+      { x: bounds.minX, z: bounds.maxZ },
+      { x: (bounds.minX + bounds.maxX) * 0.5, z: (bounds.minZ + bounds.maxZ) * 0.5 },
+      { x: bounds.minX, z: (bounds.minZ + bounds.maxZ) * 0.5 },
+      { x: bounds.maxX, z: (bounds.minZ + bounds.maxZ) * 0.5 },
+      { x: (bounds.minX + bounds.maxX) * 0.5, z: bounds.minZ },
+      { x: (bounds.minX + bounds.maxX) * 0.5, z: bounds.maxZ }
+    ];
+    const pointKeys = buildContinuousWorldRegionKeysFromPoints(samplePoints, snapshot, bounds);
+    for (let i = 0; i < pointKeys.length; i++) keys.add(pointKeys[i]);
+  }
+  return Array.from(keys).sort();
+}
+
+function continuousWorldForwardRoadCorridorState(actorState = null, runtimeSnapshot = null) {
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  if (mode !== 'drive' && mode !== 'drone') return null;
+  const actorX = Number(actor?.x);
+  const actorZ = Number(actor?.z);
+  if (!Number.isFinite(actorX) || !Number.isFinite(actorZ)) return null;
+  const speed = Math.abs(Number(actor?.speed || 0));
+  const yaw = Number.isFinite(actor?.yaw) ? actor.yaw : 0;
+  const headingX = Math.sin(yaw);
+  const headingZ = Math.cos(yaw);
+  if (!Number.isFinite(headingX) || !Number.isFinite(headingZ)) return null;
+  const baseRadius = playableCoreRadiusForMode(mode);
+  const length =
+    mode === 'drone' ?
+      clampNumber(
+        Math.max(baseRadius * 0.42, speed >= 12 ? 1800 : speed >= 6 ? 1400 : 960),
+        720,
+        2200,
+        1200
+      ) :
+      clampNumber(
+        Math.max(baseRadius * 0.52, speed >= 12 ? 1600 : speed >= 8 ? 1280 : speed >= 4 ? 980 : 760),
+        640,
+        1800,
+        960
+      );
+  const halfWidth =
+    mode === 'drone' ?
+      320 :
+    speed >= 8 ?
+      260 :
+      220;
+  const endX = actorX + headingX * length;
+  const endZ = actorZ + headingZ * length;
+  const perpX = -headingZ;
+  const perpZ = headingX;
+  const points = [
+    { x: actorX + perpX * halfWidth, z: actorZ + perpZ * halfWidth },
+    { x: actorX - perpX * halfWidth, z: actorZ - perpZ * halfWidth },
+    { x: endX + perpX * halfWidth, z: endZ + perpZ * halfWidth },
+    { x: endX - perpX * halfWidth, z: endZ - perpZ * halfWidth },
+    { x: endX, z: endZ }
+  ];
+  const bounds = {
+    minX: Math.min(...points.map((point) => point.x)),
+    maxX: Math.max(...points.map((point) => point.x)),
+    minZ: Math.min(...points.map((point) => point.z)),
+    maxZ: Math.max(...points.map((point) => point.z))
+  };
+  return {
+    mode,
+    length,
+    halfWidth,
+    bounds,
+    regionKeys: playableCoreRegionKeysForBounds(bounds, runtimeSnapshot, mode)
+  };
+}
+
+function continuousWorldForwardRoadCorridorCoverageState(actorState = null, runtimeSnapshot = null) {
+  const corridor = continuousWorldForwardRoadCorridorState(actorState, runtimeSnapshot);
+  const keys = Array.isArray(corridor?.regionKeys) ? corridor.regionKeys.filter(Boolean) : [];
+  if (keys.length <= 0) {
+    return {
+      corridor,
+      totalKeys: 0,
+      coveredKeys: 0,
+      strongCoveredKeys: 0,
+      minCoveredKeys: 0,
+      missingKeys: []
+    };
+  }
+  const uniqueKeys = Array.from(new Set(keys));
+  let coveredKeys = 0;
+  let strongCoveredKeys = 0;
+  const missingKeys = [];
+  for (let i = 0; i < uniqueKeys.length; i++) {
+    const key = uniqueKeys[i];
+    const rank = continuousWorldInteractiveCoverageLevelForRegion(key, {
+      includeSeeded: false
+    });
+    if (rank >= CONTINUOUS_WORLD_INTERACTIVE_LOAD_LEVELS.roads_only) coveredKeys += 1;
+    if (rank >= CONTINUOUS_WORLD_INTERACTIVE_LOAD_LEVELS.reduced) strongCoveredKeys += 1;
+    if (rank < CONTINUOUS_WORLD_INTERACTIVE_LOAD_LEVELS.roads_only) missingKeys.push(key);
+  }
+  const minCoveredKeys =
+    corridor?.mode === 'drone' ?
+      Math.min(uniqueKeys.length, Math.max(2, Math.ceil(uniqueKeys.length * 0.42))) :
+      Math.min(uniqueKeys.length, Math.max(2, Math.ceil(uniqueKeys.length * 0.55)));
+  return {
+    corridor,
+    totalKeys: uniqueKeys.length,
+    coveredKeys,
+    strongCoveredKeys,
+    minCoveredKeys,
+    missingKeys
+  };
+}
+
+function continuousWorldGeoBoundsForRegionKeys(regionKeys, runtimeSnapshot = null) {
+  const snapshot = runtimeSnapshot || appCtx.getContinuousWorldRuntimeSnapshot?.();
+  const sizeDegrees = continuousWorldInteractiveRegionDegrees(snapshot);
+  const keys = Array.isArray(regionKeys) ? regionKeys.map((key) => String(key || '').trim()).filter(Boolean) : [];
+  if (keys.length <= 0) return null;
+  let minLat = Infinity;
+  let maxLat = -Infinity;
+  let minLon = Infinity;
+  let maxLon = -Infinity;
+  for (let i = 0; i < keys.length; i++) {
+    const parts = keys[i].split(':');
+    if (parts.length !== 2) continue;
+    const latIndex = Number(parts[0]);
+    const lonIndex = Number(parts[1]);
+    if (!Number.isFinite(latIndex) || !Number.isFinite(lonIndex)) continue;
+    const lat0 = latIndex * sizeDegrees;
+    const lon0 = lonIndex * sizeDegrees;
+    const lat1 = lat0 + sizeDegrees;
+    const lon1 = lon0 + sizeDegrees;
+    minLat = Math.min(minLat, lat0);
+    maxLat = Math.max(maxLat, lat1);
+    minLon = Math.min(minLon, lon0);
+    maxLon = Math.max(maxLon, lon1);
+  }
+  if (!Number.isFinite(minLat) || !Number.isFinite(maxLat) || !Number.isFinite(minLon) || !Number.isFinite(maxLon)) {
+    return null;
+  }
+  return { minLat, maxLat, minLon, maxLon };
+}
+
+function expandContinuousWorldGeoBounds(bounds, paddingDegrees = 0) {
+  if (!bounds) return null;
+  const pad = Math.max(0, Number(paddingDegrees) || 0);
+  return {
+    minLat: Number(bounds.minLat) - pad,
+    maxLat: Number(bounds.maxLat) + pad,
+    minLon: Number(bounds.minLon) - pad,
+    maxLon: Number(bounds.maxLon) + pad
+  };
+}
+
+function continuousWorldForwardRoadCorridorQueryPlan(actorState = null, runtimeSnapshot = null, reason = 'forward_road_corridor') {
+  const snapshot = runtimeSnapshot || appCtx.getContinuousWorldRuntimeSnapshot?.();
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const coverage = continuousWorldForwardRoadCorridorCoverageState(actor, snapshot);
+  const corridor = coverage?.corridor;
+  const allRegionKeys = Array.isArray(corridor?.regionKeys) ? corridor.regionKeys.map((key) => String(key || '').trim()).filter(Boolean) : [];
+  if (allRegionKeys.length <= 0) return null;
+  const targetRegionKey = continuousWorldInteractiveReasonTargetRegionKey(reason);
+
+  const actorX = Number(actor?.x);
+  const actorZ = Number(actor?.z);
+  const yaw = Number.isFinite(actor?.yaw) ? actor.yaw : 0;
+  const headingX = Math.sin(yaw);
+  const headingZ = Math.cos(yaw);
+  const speed = Math.abs(Number(actor?.speed || 0));
+  const preferredKeys = Array.isArray(coverage?.missingKeys) && coverage.missingKeys.length > 0 ? coverage.missingKeys : allRegionKeys;
+  const candidates = preferredKeys
+    .map((key) => {
+      const center = continuousWorldInteractiveRegionCellCenter({
+        key,
+        latIndex: Number(String(key).split(':')[0]),
+        lonIndex: Number(String(key).split(':')[1])
+      }, snapshot);
+      if (!center) return null;
+      const centerWorld = geoPointToWorld(center.lat, center.lon);
+      const dx = Number(centerWorld?.x) - actorX;
+      const dz = Number(centerWorld?.z) - actorZ;
+      const distance = Math.hypot(dx, dz);
+      const projection = dx * headingX + dz * headingZ;
+      const lateral = Math.abs(dx * (-headingZ) + dz * headingX);
+      return {
+        key,
+        center,
+        centerWorld,
+        distance,
+        projection,
+        lateral
+      };
+    })
+    .filter(Boolean);
+  if (candidates.length <= 0) return null;
+
+  const aheadCandidates = candidates.filter((candidate) => candidate.projection >= -120);
+  const working = aheadCandidates.length > 0 ? aheadCandidates : candidates;
+  const anchorCandidate =
+    (targetRegionKey ? working.find((candidate) => candidate.key === targetRegionKey) : null) ||
+    (targetRegionKey ? candidates.find((candidate) => candidate.key === targetRegionKey) : null) ||
+    null;
+  working.sort((a, b) => {
+    if (anchorCandidate) {
+      const aAnchorDistance = Math.hypot(
+        Number(a.centerWorld?.x || 0) - Number(anchorCandidate.centerWorld?.x || 0),
+        Number(a.centerWorld?.z || 0) - Number(anchorCandidate.centerWorld?.z || 0)
+      );
+      const bAnchorDistance = Math.hypot(
+        Number(b.centerWorld?.x || 0) - Number(anchorCandidate.centerWorld?.x || 0),
+        Number(b.centerWorld?.z || 0) - Number(anchorCandidate.centerWorld?.z || 0)
+      );
+      const aBehindAnchor = a.projection < anchorCandidate.projection - 160;
+      const bBehindAnchor = b.projection < anchorCandidate.projection - 160;
+      if (aBehindAnchor !== bBehindAnchor) return aBehindAnchor ? 1 : -1;
+      if (Math.abs(aAnchorDistance - bAnchorDistance) > 60) return aAnchorDistance - bAnchorDistance;
+      if (Math.abs(a.projection - b.projection) > 60) return a.projection - b.projection;
+      return a.lateral - b.lateral;
+    }
+    const aBehind = a.projection < 0;
+    const bBehind = b.projection < 0;
+    if (aBehind !== bBehind) return aBehind ? 1 : -1;
+    if (Math.abs(a.projection - b.projection) > 60) return a.projection - b.projection;
+    if (Math.abs(a.lateral - b.lateral) > 40) return a.lateral - b.lateral;
+    return a.distance - b.distance;
+  });
+
+  const maxKeys =
+    corridor?.mode === 'drone' ? 4 :
+    speed >= 10 ? 4 :
+    3;
+  const selected = working.slice(0, Math.max(2, Math.min(maxKeys, working.length)));
+  const selectedKeys = Array.from(new Set([
+    ...(anchorCandidate ? [anchorCandidate.key] : []),
+    ...selected.map((candidate) => candidate.key)
+  ]));
+  const sizeDegrees = continuousWorldInteractiveRegionDegrees(snapshot);
+  const baseBounds = continuousWorldGeoBoundsForRegionKeys(selectedKeys, snapshot);
+  const paddedBounds = expandContinuousWorldGeoBounds(baseBounds, sizeDegrees * 0.08);
+  if (!paddedBounds) return null;
+  const centerLat = (paddedBounds.minLat + paddedBounds.maxLat) * 0.5;
+  const centerLon = (paddedBounds.minLon + paddedBounds.maxLon) * 0.5;
+  const roadRadius = Math.max(
+    sizeDegrees * 0.6,
+    (paddedBounds.maxLat - paddedBounds.minLat) * 0.5,
+    (paddedBounds.maxLon - paddedBounds.minLon) * 0.5
+  );
+  return {
+    regionKeys: selectedKeys,
+    primaryRegionKey: anchorCandidate?.key || selectedKeys[0] || null,
+    centerLat,
+    centerLon,
+    bounds: paddedBounds,
+    roadRadius
+  };
+}
+
+function continuousWorldInteractiveCoverageRegionKeysForGeoQuery(centerLat, centerLon, radiusDegrees, runtimeSnapshot = null) {
+  const radius = Math.max(0, Number(radiusDegrees) || 0);
+  if (!Number.isFinite(centerLat) || !Number.isFinite(centerLon) || !(radius > 0) || typeof appCtx.geoToWorld !== 'function') {
+    return [];
+  }
+  const points = [
+    appCtx.geoToWorld(centerLat - radius, centerLon - radius),
+    appCtx.geoToWorld(centerLat - radius, centerLon + radius),
+    appCtx.geoToWorld(centerLat + radius, centerLon + radius),
+    appCtx.geoToWorld(centerLat + radius, centerLon - radius),
+    appCtx.geoToWorld(centerLat, centerLon)
+  ];
+  return buildContinuousWorldRegionKeysFromPoints(points, runtimeSnapshot, null)
+    .map((key) => String(key || '').trim())
+    .filter(Boolean);
+}
+
+function startupPlayableCoreRoadRadiusDegrees(roadsQueryRadius = 0, mode = 'drive') {
+  const queryRadius = Math.max(0, Number(roadsQueryRadius) || 0);
+  if (!(queryRadius > 0)) return STARTUP_WORLD_BUILD_CONFIG.coreRoadRadiusMinDegrees;
+  const playableCoreDegrees = worldUnitsToLatDegrees(playableCoreRadiusForMode(mode));
+  return clampNumber(
+    Math.max(
+      STARTUP_WORLD_BUILD_CONFIG.coreRoadRadiusMinDegrees,
+      playableCoreDegrees * STARTUP_WORLD_BUILD_CONFIG.coreRoadRadiusScale
+    ),
+    STARTUP_WORLD_BUILD_CONFIG.coreRoadRadiusMinDegrees,
+    queryRadius,
+    Math.min(queryRadius, playableCoreDegrees)
+  );
 }
 
 function pruneOverpassMemoryCache(nowMs = Date.now()) {
@@ -146,6 +1191,227 @@ function pruneOverpassMemoryCache(nowMs = Date.now()) {
     if (nowMs - _overpassMemoryCache[i].savedAt > OVERPASS_MEMORY_CACHE_TTL_MS) {
       _overpassMemoryCache.splice(i, 1);
     }
+  }
+}
+
+function overpassPersistentCacheAvailable() {
+  return typeof indexedDB !== 'undefined';
+}
+
+function normalizeOverpassCacheMeta(meta) {
+  if (!meta) return null;
+  const lat = Number(meta.lat);
+  const lon = Number(meta.lon);
+  const roadsRadius = Number(meta.roadsRadius);
+  const featureRadius = Number(meta.featureRadius);
+  const poiRadius = Number(meta.poiRadius);
+  const queryKind = String(
+    meta.queryKind ||
+    (meta.startupRoadPreload ? 'startup_roads' :
+    meta.continuousWorldInteractive ? `interactive:${String(meta.loadLevel || 'full')}` :
+    'full')
+  ).trim();
+  if (
+    !Number.isFinite(lat) ||
+    !Number.isFinite(lon) ||
+    !Number.isFinite(roadsRadius) ||
+    !Number.isFinite(featureRadius) ||
+    !Number.isFinite(poiRadius) ||
+    !queryKind
+  ) {
+    return null;
+  }
+  return {
+    lat: Number(lat.toFixed(6)),
+    lon: Number(lon.toFixed(6)),
+    roadsRadius: Number(roadsRadius.toFixed(5)),
+    featureRadius: Number(featureRadius.toFixed(5)),
+    poiRadius: Number(poiRadius.toFixed(5)),
+    queryKind,
+    roadsBounds: normalizeOverpassBounds(meta.roadsBounds),
+    featureBounds: normalizeOverpassBounds(meta.featureBounds),
+    poiBounds: normalizeOverpassBounds(meta.poiBounds)
+  };
+}
+
+function overpassPersistentCacheKey(meta) {
+  const normalized = normalizeOverpassCacheMeta(meta);
+  if (!normalized) return null;
+  return [
+    normalized.lat.toFixed(6),
+    normalized.lon.toFixed(6),
+    normalized.roadsRadius.toFixed(5),
+    normalized.featureRadius.toFixed(5),
+    normalized.poiRadius.toFixed(5),
+    normalized.queryKind,
+    normalized.roadsBounds ? `${normalized.roadsBounds.minLat}:${normalized.roadsBounds.minLon}:${normalized.roadsBounds.maxLat}:${normalized.roadsBounds.maxLon}` : 'no-roads-bounds',
+    normalized.featureBounds ? `${normalized.featureBounds.minLat}:${normalized.featureBounds.minLon}:${normalized.featureBounds.maxLat}:${normalized.featureBounds.maxLon}` : 'no-feature-bounds',
+    normalized.poiBounds ? `${normalized.poiBounds.minLat}:${normalized.poiBounds.minLon}:${normalized.poiBounds.maxLat}:${normalized.poiBounds.maxLon}` : 'no-poi-bounds'
+  ].join(':');
+}
+
+function overpassRequestToPromise(request) {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result);
+    request.onerror = () => reject(request.error || new Error('IndexedDB request failed'));
+  });
+}
+
+function openOverpassPersistentCacheDb() {
+  if (!overpassPersistentCacheAvailable()) return Promise.resolve(null);
+  if (_overpassPersistentCacheDbPromise) return _overpassPersistentCacheDbPromise;
+  _overpassPersistentCacheDbPromise = new Promise((resolve) => {
+    try {
+      const request = indexedDB.open(OVERPASS_PERSISTENT_CACHE_DB, 1);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(OVERPASS_PERSISTENT_CACHE_STORE)) {
+          const store = db.createObjectStore(OVERPASS_PERSISTENT_CACHE_STORE, { keyPath: 'key' });
+          store.createIndex('savedAt', 'savedAt', { unique: false });
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => {
+        console.warn('[WorldLoad] Overpass persistent cache unavailable:', request.error || 'unknown IndexedDB error');
+        resolve(null);
+      };
+    } catch (error) {
+      console.warn('[WorldLoad] Overpass persistent cache init failed:', error);
+      resolve(null);
+    }
+  });
+  return _overpassPersistentCacheDbPromise;
+}
+
+async function pruneOverpassPersistentCache(db, nowMs = Date.now()) {
+  if (!db) return;
+  try {
+    const tx = db.transaction(OVERPASS_PERSISTENT_CACHE_STORE, 'readwrite');
+    const store = tx.objectStore(OVERPASS_PERSISTENT_CACHE_STORE);
+    const entries = await overpassRequestToPromise(store.getAll());
+    const staleBefore = nowMs - OVERPASS_PERSISTENT_CACHE_STALE_TTL_MS;
+    const survivors = [];
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      if (!entry || !Number.isFinite(entry.savedAt) || entry.savedAt < staleBefore) {
+        if (entry?.key) store.delete(entry.key);
+        continue;
+      }
+      survivors.push(entry);
+    }
+    survivors.sort((a, b) => (b.savedAt || 0) - (a.savedAt || 0));
+    for (let i = OVERPASS_PERSISTENT_CACHE_MAX; i < survivors.length; i++) {
+      if (survivors[i]?.key) store.delete(survivors[i].key);
+    }
+    await new Promise((resolve) => {
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => resolve();
+      tx.onerror = () => resolve();
+    });
+  } catch (error) {
+    console.warn('[WorldLoad] Overpass persistent cache prune failed:', error);
+  }
+}
+
+async function findOverpassPersistentCache(meta, { allowStale = false } = {}) {
+  const normalized = normalizeOverpassCacheMeta(meta);
+  if (!normalized) return null;
+  const db = await openOverpassPersistentCacheDb();
+  if (!db) return null;
+  const nowMs = Date.now();
+  try {
+    const tx = db.transaction(OVERPASS_PERSISTENT_CACHE_STORE, 'readonly');
+    const store = tx.objectStore(OVERPASS_PERSISTENT_CACHE_STORE);
+    const entries = await overpassRequestToPromise(store.getAll());
+    const maxAge = allowStale ? OVERPASS_PERSISTENT_CACHE_STALE_TTL_MS : OVERPASS_PERSISTENT_CACHE_TTL_MS;
+    let best = null;
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      if (!entry?.meta || !entry?.data?.elements) continue;
+      if (!overpassCacheEntryCanSatisfyRequest(entry.meta, normalized)) continue;
+      const ageMs = nowMs - Number(entry.savedAt || 0);
+      if (!(ageMs >= 0 && ageMs <= maxAge)) continue;
+      if (!best || Number(entry.savedAt || 0) > Number(best.savedAt || 0)) {
+        best = entry;
+      }
+    }
+    if (!best) return null;
+    return {
+      ...best,
+      ageMs: Math.max(0, nowMs - Number(best.savedAt || nowMs)),
+      stale: nowMs - Number(best.savedAt || 0) > OVERPASS_PERSISTENT_CACHE_TTL_MS
+    };
+  } catch (error) {
+    console.warn('[WorldLoad] Overpass persistent cache read failed:', error);
+    return null;
+  }
+}
+
+async function findNearbyOverpassPersistentCache(meta, { allowStale = false, extraAllowance = 0.0035 } = {}) {
+  const normalized = normalizeOverpassCacheMeta(meta);
+  if (!normalized) return null;
+  const db = await openOverpassPersistentCacheDb();
+  if (!db) return null;
+  const nowMs = Date.now();
+  try {
+    const tx = db.transaction(OVERPASS_PERSISTENT_CACHE_STORE, 'readonly');
+    const store = tx.objectStore(OVERPASS_PERSISTENT_CACHE_STORE);
+    const entries = await overpassRequestToPromise(store.getAll());
+    const maxAge = allowStale ? OVERPASS_PERSISTENT_CACHE_STALE_TTL_MS : OVERPASS_PERSISTENT_CACHE_TTL_MS;
+    let best = null;
+    let bestScore = Infinity;
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      if (!entry?.meta || !entry?.data?.elements) continue;
+      const ageMs = nowMs - Number(entry.savedAt || 0);
+      if (!(ageMs >= 0 && ageMs <= maxAge)) continue;
+      if (!overpassNearbyCacheEntryCanHelp(entry.meta, normalized, { extraAllowance })) continue;
+      const score = overpassNearbyCacheEntryScore(entry.meta, normalized);
+      if (
+        score < bestScore ||
+        (Math.abs(score - bestScore) < 1e-9 && Number(entry.savedAt || 0) > Number(best?.savedAt || 0))
+      ) {
+        best = entry;
+        bestScore = score;
+      }
+    }
+    if (!best) return null;
+    return {
+      ...best,
+      ageMs: Math.max(0, nowMs - Number(best.savedAt || nowMs)),
+      stale: nowMs - Number(best.savedAt || 0) > OVERPASS_PERSISTENT_CACHE_TTL_MS
+    };
+  } catch (error) {
+    console.warn('[WorldLoad] Nearby Overpass persistent cache read failed:', error);
+    return null;
+  }
+}
+
+async function storeOverpassPersistentCache(meta, data, endpoint) {
+  const normalized = normalizeOverpassCacheMeta(meta);
+  if (!normalized || !data || !Array.isArray(data.elements)) return;
+  const db = await openOverpassPersistentCacheDb();
+  if (!db) return;
+  const key = overpassPersistentCacheKey(normalized);
+  if (!key) return;
+  try {
+    const tx = db.transaction(OVERPASS_PERSISTENT_CACHE_STORE, 'readwrite');
+    const store = tx.objectStore(OVERPASS_PERSISTENT_CACHE_STORE);
+    store.put({
+      key,
+      meta: normalized,
+      data,
+      endpoint: endpoint || null,
+      savedAt: Date.now()
+    });
+    await new Promise((resolve) => {
+      tx.oncomplete = () => resolve();
+      tx.onabort = () => resolve();
+      tx.onerror = () => resolve();
+    });
+    void pruneOverpassPersistentCache(db);
+  } catch (error) {
+    console.warn('[WorldLoad] Overpass persistent cache write failed:', error);
   }
 }
 
@@ -157,12 +1423,34 @@ function findOverpassMemoryCache(meta) {
   let best = null;
   for (let i = 0; i < _overpassMemoryCache.length; i++) {
     const entry = _overpassMemoryCache[i];
-    if (!sameLocation(entry.meta, meta)) continue;
-    if (entry.meta.roadsRadius + 1e-9 < meta.roadsRadius) continue;
-    if (entry.meta.featureRadius + 1e-9 < meta.featureRadius) continue;
-    if (entry.meta.poiRadius + 1e-9 < meta.poiRadius) continue;
+    if (!overpassCacheEntryCanSatisfyRequest(entry.meta, meta)) continue;
 
     if (!best || entry.savedAt > best.savedAt) best = entry;
+  }
+  if (!best) return null;
+
+  best.lastHitAt = nowMs;
+  return best;
+}
+
+function findNearbyOverpassMemoryCache(meta, { extraAllowance = 0.0035 } = {}) {
+  if (!meta) return null;
+  const nowMs = Date.now();
+  pruneOverpassMemoryCache(nowMs);
+
+  let best = null;
+  let bestScore = Infinity;
+  for (let i = 0; i < _overpassMemoryCache.length; i++) {
+    const entry = _overpassMemoryCache[i];
+    if (!overpassNearbyCacheEntryCanHelp(entry.meta, meta, { extraAllowance })) continue;
+    const score = overpassNearbyCacheEntryScore(entry.meta, meta);
+    if (
+      score < bestScore ||
+      (Math.abs(score - bestScore) < 1e-9 && entry.savedAt > Number(best?.savedAt || 0))
+    ) {
+      best = entry;
+      bestScore = score;
+    }
   }
   if (!best) return null;
 
@@ -177,20 +1465,24 @@ function storeOverpassMemoryCache(meta, data, endpoint) {
   pruneOverpassMemoryCache(nowMs);
 
   const existingIdx = _overpassMemoryCache.findIndex((entry) =>
-  sameLocation(entry.meta, meta) &&
+  sameOverpassCacheScope(entry.meta, meta) &&
   Math.abs(entry.meta.roadsRadius - meta.roadsRadius) < 1e-9 &&
   Math.abs(entry.meta.featureRadius - meta.featureRadius) < 1e-9 &&
   Math.abs(entry.meta.poiRadius - meta.poiRadius) < 1e-9
   );
 
   const record = {
-    meta: {
-      lat: meta.lat,
-      lon: meta.lon,
-      roadsRadius: meta.roadsRadius,
-      featureRadius: meta.featureRadius,
-      poiRadius: meta.poiRadius
-    },
+      meta: {
+        lat: meta.lat,
+        lon: meta.lon,
+        roadsRadius: meta.roadsRadius,
+        featureRadius: meta.featureRadius,
+        poiRadius: meta.poiRadius,
+        roadsBounds: normalizeOverpassBounds(meta.roadsBounds),
+        featureBounds: normalizeOverpassBounds(meta.featureBounds),
+        poiBounds: normalizeOverpassBounds(meta.poiBounds),
+        queryKind: String(meta.queryKind || 'full')
+      },
     data,
     endpoint: endpoint || null,
     savedAt: nowMs,
@@ -206,11 +1498,23 @@ function storeOverpassMemoryCache(meta, data, endpoint) {
 }
 
 function orderedOverpassEndpoints() {
-  if (!_lastOverpassEndpoint || !OVERPASS_ENDPOINTS.includes(_lastOverpassEndpoint)) {
-    return OVERPASS_ENDPOINTS.slice();
-  }
-  const rest = OVERPASS_ENDPOINTS.filter((ep) => ep !== _lastOverpassEndpoint);
-  return [_lastOverpassEndpoint, ...rest];
+  const baseEndpoints = !_lastOverpassEndpoint || !OVERPASS_ENDPOINTS.includes(_lastOverpassEndpoint) ?
+    OVERPASS_ENDPOINTS.slice() :
+    [_lastOverpassEndpoint, ...OVERPASS_ENDPOINTS.filter((ep) => ep !== _lastOverpassEndpoint)];
+  try {
+    const origin = String(window?.location?.origin || '').trim();
+    const host = String(window?.location?.hostname || '').trim().toLowerCase();
+    const localHost =
+      host === '127.0.0.1' ||
+      host === 'localhost' ||
+      host === '[::1]';
+    if (localHost && origin) {
+      const proxyEndpoint = new URL(LOCAL_OVERPASS_PROXY_PATH, origin).href;
+      const localBrowserEndpoints = LOCAL_BROWSER_OVERPASS_ENDPOINTS.slice();
+      return _localOverpassProxyUnavailable ? localBrowserEndpoints : [proxyEndpoint, ...localBrowserEndpoints];
+    }
+  } catch {}
+  return baseEndpoints;
 }
 
 async function getVectorTileLib() {
@@ -230,6 +1534,12 @@ async function getVectorTileLib() {
 
 function delayMs(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function createAbortError(message = 'aborted') {
+  const error = new Error(message);
+  error.name = 'AbortError';
+  return error;
 }
 
 function firstSuccessful(promises) {
@@ -262,8 +1572,8 @@ function isDriveableHighwayTag(highway = '') {
   return DRIVEABLE_HIGHWAY_TYPES.has(String(highway || '').toLowerCase());
 }
 
-function classifyLinearFeatureTags(tags = {}) {
-  if (!ENABLE_LINEAR_FEATURES) return null;
+function classifyLinearFeatureTags(tags = {}, options = {}) {
+  if (!ENABLE_LINEAR_FEATURES && options.force !== true) return null;
   const highway = String(tags?.highway || '').toLowerCase();
   const railway = String(tags?.railway || '').toLowerCase();
   const bicycle = String(tags?.bicycle || '').toLowerCase();
@@ -654,7 +1964,7 @@ function limitNodesByTileBudget(nodes, options = {}) {
 function getRoadSubdivisionStep(roadType, tileDepth, mode = getPerfModeValue()) {
   let maxDist = 3.5;
 
-  if (mode === 'baseline') {
+  if (mode === 'baseline' && !appCtx.boatMode?.active) {
     maxDist = 3.6;
   } else if (tileDepth >= 6) {
     maxDist = 6.0;
@@ -828,6 +2138,2633 @@ function getAdaptiveLoadProfile(loadDepth, mode = getPerfModeValue(), budgetScal
   };
 }
 
+function getContinuousWorldVisibleLoadPlan({
+  roadRadius = 0,
+  featureRadius = 0,
+  poiRadius = 0,
+  linearFeatureRadius = 0,
+  maxRoadWays = 0,
+  maxBuildingWays = 0,
+  maxLanduseWays = 0,
+  maxPoiNodes = 0
+} = {}) {
+  const snapshot = typeof appCtx.getContinuousWorldRuntimeSnapshot === 'function' ?
+    appCtx.getContinuousWorldRuntimeSnapshot() :
+    null;
+  if (!snapshot?.enabled) return null;
+
+  const regionDegrees = Number(snapshot?.regionConfig?.degrees || 0);
+  const farRadius = Number(snapshot?.regionConfig?.farRadius || 0);
+  const midRadius = Number(snapshot?.regionConfig?.midRadius || 0);
+  if (!(regionDegrees > 0 && farRadius >= 1)) return null;
+
+  const farEnvelopeHalfDegrees = regionDegrees * (farRadius + 1);
+  const startupPhase = !appCtx.gameStarted || !!appCtx.worldLoading;
+  const startupEnvelopeHalfDegrees = regionDegrees * (Math.max(1, midRadius) + 0.75);
+  const effectiveEnvelopeHalfDegrees = startupPhase ? startupEnvelopeHalfDegrees : farEnvelopeHalfDegrees;
+  if (!(effectiveEnvelopeHalfDegrees > featureRadius * 1.1)) return null;
+
+  const expandedRoadRadius = clampNumber(
+    Math.max(roadRadius * (startupPhase ? 1.08 : 1.72), effectiveEnvelopeHalfDegrees * (startupPhase ? 0.44 : 0.7)),
+    Math.max(roadRadius, 0.006),
+    CONTINUOUS_WORLD_VISIBLE_LOAD_MAX_ROAD_RADIUS,
+    roadRadius
+  );
+  const expandedFeatureRadius = clampNumber(
+    Math.max(featureRadius * (startupPhase ? 1.1 : 1.95), effectiveEnvelopeHalfDegrees * (startupPhase ? 0.56 : 0.94)),
+    Math.max(featureRadius, 0.008),
+    CONTINUOUS_WORLD_VISIBLE_LOAD_MAX_FEATURE_RADIUS,
+    featureRadius
+  );
+  const expandedPoiRadius = clampNumber(
+    Math.max(poiRadius * (startupPhase ? 1.0 : 1.35), effectiveEnvelopeHalfDegrees * (startupPhase ? 0.24 : 0.52)),
+    Math.max(poiRadius, 0.006),
+    CONTINUOUS_WORLD_VISIBLE_LOAD_MAX_POI_RADIUS,
+    poiRadius
+  );
+  const expandedLinearRadius = clampNumber(
+    Math.max(linearFeatureRadius * (startupPhase ? 1.02 : 1.45), effectiveEnvelopeHalfDegrees * (startupPhase ? 0.32 : 0.62)),
+    Math.max(linearFeatureRadius, 0.006),
+    CONTINUOUS_WORLD_VISIBLE_LOAD_MAX_LINEAR_RADIUS,
+    linearFeatureRadius
+  );
+  const expansionRatio = expandedFeatureRadius / Math.max(featureRadius, 1e-6);
+  const budgetScale = clampNumber(
+    1 + (expansionRatio - 1) * 0.58,
+    1,
+    startupPhase ? 1.08 : CONTINUOUS_WORLD_VISIBLE_LOAD_MAX_BUDGET_SCALE,
+    1
+  );
+  const roadBudgetScale = startupPhase ? 0.82 : budgetScale;
+  const buildingBudgetScale = startupPhase ? 0.58 : budgetScale;
+  const landuseBudgetScale = startupPhase ? 0.72 : budgetScale;
+  const poiBudgetScale = startupPhase ? 0.74 : budgetScale;
+  const worldScale = Math.max(1, Number(appCtx.SCALE) || 1);
+  const buildingFarLoadDistance = Math.round(clampNumber(
+    worldScale * expandedFeatureRadius * (startupPhase ? 0.56 : 0.9),
+    Math.max(1800, worldScale * featureRadius * 0.72),
+    startupPhase ? 3000 : 9000,
+    Math.max(1800, worldScale * featureRadius * 0.72)
+  ));
+
+  return {
+    enabled: true,
+    regionDegrees,
+    farRadius,
+    farEnvelopeHalfDegrees,
+    startupPhase,
+    effectiveEnvelopeHalfDegrees,
+    expansionRatio,
+    budgetScale,
+    roadRadius: expandedRoadRadius,
+    featureRadius: expandedFeatureRadius,
+    poiRadius: expandedPoiRadius,
+    linearFeatureRadius: expandedLinearRadius,
+    maxRoadWays: scaledInt(maxRoadWays, roadBudgetScale, Math.max(900, Math.floor(maxRoadWays * 0.6))),
+    maxBuildingWays: scaledInt(maxBuildingWays, buildingBudgetScale, Math.max(1400, Math.floor(maxBuildingWays * 0.28))),
+    maxLanduseWays: scaledInt(maxLanduseWays, landuseBudgetScale, Math.max(600, Math.floor(maxLanduseWays * 0.55))),
+    maxPoiNodes: scaledInt(maxPoiNodes, poiBudgetScale, Math.max(180, Math.floor(maxPoiNodes * 0.55))),
+    buildingFarLoadDistance
+  };
+}
+
+function continuousWorldGeoDistanceWorldUnits(latA, lonA, latB, lonB) {
+  const scale = Math.max(1, Number(appCtx.SCALE) || 1);
+  const midLat = (Number(latA || 0) + Number(latB || 0)) * 0.5;
+  const cosLat = Math.cos(midLat * Math.PI / 180) || 1;
+  const dx = (Number(lonB || 0) - Number(lonA || 0)) * scale * cosLat;
+  const dz = -(Number(latB || 0) - Number(latA || 0)) * scale;
+  return Math.hypot(dx, dz);
+}
+
+function resetContinuousWorldInteractiveStreamState(reason = 'world_load_reset') {
+  if (_traversalRebuildTimer) {
+    clearTimeout(_traversalRebuildTimer);
+    _traversalRebuildTimer = null;
+  }
+  if (_continuousWorldInteractiveStreamState.recoveryTimerId) {
+    clearTimeout(_continuousWorldInteractiveStreamState.recoveryTimerId);
+    _continuousWorldInteractiveStreamState.recoveryTimerId = null;
+  }
+  if (_continuousWorldInteractiveStreamState.recoveryShellTimerId) {
+    clearTimeout(_continuousWorldInteractiveStreamState.recoveryShellTimerId);
+    _continuousWorldInteractiveStreamState.recoveryShellTimerId = null;
+  }
+  if (_continuousWorldInteractiveStreamState.abortController) {
+    try {
+      _continuousWorldInteractiveStreamState.abortController.abort();
+    } catch {}
+    _continuousWorldInteractiveStreamState.abortController = null;
+  }
+  _continuousWorldInteractiveStreamState.pending = false;
+  _continuousWorldInteractiveStreamState.lastKickAt = 0;
+  _continuousWorldInteractiveStreamState.lastLoadAt = 0;
+  _continuousWorldInteractiveStreamState.lastLoadReason = reason;
+  _continuousWorldInteractiveStreamState.lastError = null;
+  _continuousWorldInteractiveStreamState.coverage = [];
+  _continuousWorldInteractiveStreamState.loadedRoadIds = new Set();
+  _continuousWorldInteractiveStreamState.loadedBuildingIds = new Set();
+  _continuousWorldInteractiveStreamState.loadedLanduseIds = new Set();
+  _continuousWorldInteractiveStreamState.loadedWaterwayIds = new Set();
+  _continuousWorldInteractiveStreamState.totalAddedRoads = 0;
+  _continuousWorldInteractiveStreamState.totalAddedBuildings = 0;
+  _continuousWorldInteractiveStreamState.totalAddedLanduseMeshes = 0;
+  _continuousWorldInteractiveStreamState.totalAddedWaterAreas = 0;
+  _continuousWorldInteractiveStreamState.totalAddedWaterways = 0;
+  _continuousWorldInteractiveStreamState.totalLoads = 0;
+  _continuousWorldInteractiveStreamState.forcedSurfaceSyncLoads = 0;
+  _continuousWorldInteractiveStreamState.deferredSurfaceSyncLoads = 0;
+  _continuousWorldInteractiveStreamState.skippedSurfaceSyncLoads = 0;
+  _continuousWorldInteractiveStreamState.lastSurfaceSyncPolicy = null;
+  _continuousWorldInteractiveStreamState.activeInteractiveRoads = 0;
+  _continuousWorldInteractiveStreamState.activeInteractiveBuildings = 0;
+  _continuousWorldInteractiveStreamState.activeInteractiveLanduse = 0;
+  _continuousWorldInteractiveStreamState.activeInteractiveWaterways = 0;
+  _continuousWorldInteractiveStreamState.evictedRoads = 0;
+  _continuousWorldInteractiveStreamState.evictedBuildings = 0;
+  _continuousWorldInteractiveStreamState.evictedLanduse = 0;
+  _continuousWorldInteractiveStreamState.evictedWaterways = 0;
+  _continuousWorldInteractiveStreamState.evictedMeshes = 0;
+  _continuousWorldInteractiveStreamState.seededSignature = '';
+  _continuousWorldInteractiveStreamState.pending = false;
+  _continuousWorldInteractiveStreamState.pendingStartedAt = 0;
+  _continuousWorldInteractiveStreamState.pendingQueryLat = NaN;
+  _continuousWorldInteractiveStreamState.pendingQueryLon = NaN;
+  _continuousWorldInteractiveStreamState.pendingRegionKey = null;
+  _continuousWorldInteractiveStreamState.activeRequestId = 0;
+  _lastBaseWorldEvictionAt = 0;
+}
+
+function seedContinuousWorldInteractiveStreamState() {
+  const loadConfig = appCtx._continuousWorldVisibleLoadConfig;
+  const baseLat = Number(loadConfig?.location?.lat ?? appCtx.LOC?.lat);
+  const baseLon = Number(loadConfig?.location?.lon ?? appCtx.LOC?.lon);
+  if (!loadConfig?.enabled || !Number.isFinite(baseLat) || !Number.isFinite(baseLon)) return null;
+  const runtimeSnapshot = appCtx.getContinuousWorldRuntimeSnapshot?.();
+  const seedRegionKey = continuousWorldInteractiveRegionKeyFromLatLon(baseLat, baseLon, runtimeSnapshot);
+
+  const signature = [
+    baseLat.toFixed(6),
+    baseLon.toFixed(6),
+    Number(loadConfig.roadRadius || 0).toFixed(5),
+    Number(loadConfig.featureRadius || 0).toFixed(5)
+  ].join(':');
+  if (_continuousWorldInteractiveStreamState.seededSignature === signature) {
+    return getContinuousWorldInteractiveStreamSnapshot();
+  }
+
+  resetContinuousWorldInteractiveStreamState('seed_from_visible_load');
+  _continuousWorldInteractiveStreamState.seededSignature = signature;
+  const startupRoadCount = Array.isArray(appCtx.roads) ? appCtx.roads.length : 0;
+  const startupBuildingCount = Array.isArray(appCtx.buildings) ? appCtx.buildings.length : 0;
+  const startupLanduseCount = Array.isArray(appCtx.landuseMeshes) ? appCtx.landuseMeshes.length : 0;
+  const startupSeedLoadLevel =
+    startupBuildingCount > 0 || startupLanduseCount > 0 ? 'reduced' :
+    startupRoadCount > 0 ? 'roads_only' :
+    'roads_only';
+  _continuousWorldInteractiveStreamState.coverage.push({
+    key: `seed:${signature}`,
+    lat: baseLat,
+    lon: baseLon,
+    regionKey: seedRegionKey,
+    roadRadius: Number(loadConfig.roadRadius || 0),
+    featureRadius: Number(loadConfig.featureRadius || 0),
+    loadLevel: startupSeedLoadLevel,
+    seeded: true,
+    addedRoads: startupRoadCount,
+    addedBuildings: startupBuildingCount,
+    addedLanduseMeshes: startupLanduseCount,
+    reason: 'initial_visible_load',
+    at: Date.now()
+  });
+
+  const regionStats = new Map();
+  const touchRegionStat = (regionKey, family = 'roads') => {
+    const key = String(regionKey || '').trim();
+    if (!key || key === seedRegionKey) return;
+    let stat = regionStats.get(key);
+    if (!stat) {
+      stat = {
+        roads: 0,
+        buildings: 0,
+        landuse: 0
+      };
+      regionStats.set(key, stat);
+    }
+    if (family === 'buildings') stat.buildings += 1;
+    else if (family === 'landuse') stat.landuse += 1;
+    else stat.roads += 1;
+  };
+  const collectRegionKeys = (list, family = 'roads', keyField = 'continuousWorldRegionKeys') => {
+    (Array.isArray(list) ? list : []).forEach((item) => {
+      const keys = Array.isArray(item?.[keyField]) ? item[keyField] : Array.isArray(item?.userData?.[keyField]) ? item.userData[keyField] : [];
+      keys.forEach((key) => {
+        touchRegionStat(key, family);
+      });
+    });
+  };
+  collectRegionKeys(appCtx.roads, 'roads');
+  collectRegionKeys(appCtx.buildings, 'buildings');
+  collectRegionKeys(appCtx.roadMeshes, 'roads');
+  collectRegionKeys(appCtx.buildingMeshes, 'buildings');
+  collectRegionKeys(appCtx.landuseMeshes, 'landuse');
+  const extraRegions = Array.from(regionStats.entries())
+    .sort((a, b) => (b[1].roads + b[1].buildings + b[1].landuse) - (a[1].roads + a[1].buildings + a[1].landuse))
+    .slice(0, Math.max(0, CONTINUOUS_WORLD_INTERACTIVE_STREAM_MAX_COVERAGE - 1));
+  extraRegions.forEach(([regionKey, stat]) => {
+    const [latIndexRaw, lonIndexRaw] = String(regionKey).split(':');
+    const latIndex = Number(latIndexRaw);
+    const lonIndex = Number(lonIndexRaw);
+    const center = continuousWorldInteractiveRegionCellCenter({ latIndex, lonIndex, key: regionKey }, runtimeSnapshot);
+    if (!center) return;
+    const seededLoadLevel =
+      Number(stat?.buildings || 0) > 0 || Number(stat?.landuse || 0) > 0 ? 'reduced' :
+      Number(stat?.roads || 0) > 0 ? 'roads_only' :
+      'roads_only';
+    _continuousWorldInteractiveStreamState.coverage.push({
+      key: `seed-region:${regionKey}`,
+      lat: center.lat,
+      lon: center.lon,
+      regionKey,
+      roadRadius: Number(loadConfig.roadRadius || 0),
+      featureRadius: Number(loadConfig.featureRadius || 0),
+      loadLevel: seededLoadLevel,
+      seeded: true,
+      addedRoads: Number(stat?.roads || 0),
+      addedBuildings: Number(stat?.buildings || 0),
+      addedLanduseMeshes: Number(stat?.landuse || 0),
+      reason: 'initial_visible_regions',
+      at: Date.now()
+    });
+  });
+
+  (Array.isArray(appCtx.roads) ? appCtx.roads : []).forEach((road) => {
+    const id = String(road?.sourceFeatureId || '').trim();
+    if (id) _continuousWorldInteractiveStreamState.loadedRoadIds.add(id);
+  });
+  const baseDetailedBuildingIds = collectBaseDetailedBuildingSourceIds();
+  (Array.isArray(appCtx.buildings) ? appCtx.buildings : []).forEach((building) => {
+    const id = String(building?.sourceBuildingId || '').trim();
+    if (id && baseDetailedBuildingIds.has(id)) _continuousWorldInteractiveStreamState.loadedBuildingIds.add(id);
+  });
+
+  refreshContinuousWorldInteractiveActiveCounts();
+
+  return getContinuousWorldInteractiveStreamSnapshot();
+}
+
+function continuousWorldInteractiveChunkPlan() {
+  const base = appCtx._continuousWorldVisibleLoadConfig;
+  if (!base?.enabled) return null;
+  const actor = continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  const speed = Math.abs(Number(actor?.speed || 0));
+  const visibleRoadMeshesNearActor =
+    mode === 'drive' ?
+      countVisibleRoadMeshesNearWorldPoint(actor?.x, actor?.z, speed >= 8 ? 320 : 240) :
+      0;
+  const offRoadRecovery =
+    mode === 'drive' &&
+    (
+      actor?.onRoad === false ||
+      visibleRoadMeshesNearActor < (
+        PLAYABLE_CORE_RESIDENCY_CONFIG.minVisibleRoadMeshesReady?.drive ||
+        12
+      )
+    );
+  const fastDrive = mode === 'drive' && speed >= 14;
+  const waterTravel = mode === 'boat' || mode === 'ocean';
+  const roadRadiusScale =
+    mode === 'walk' ? 0.9 :
+    waterTravel ? 0.76 :
+    mode === 'drone' ? 1.26 :
+    offRoadRecovery ? 2.18 :
+    fastDrive ? 1.92 :
+    1.52;
+  const featureRadiusScale =
+    mode === 'walk' ? 0.9 :
+    waterTravel ? 0.62 :
+    mode === 'drone' ? 0.5 :
+    offRoadRecovery ? 0.42 :
+    fastDrive ? 0.54 :
+    0.68;
+  const roadBudgetScale =
+    waterTravel ? 0.82 :
+    mode === 'drone' ? 1.28 :
+    offRoadRecovery ? 2.52 :
+    fastDrive ? 2.18 :
+    1.64;
+  const buildingBudgetScale =
+    mode === 'walk' ? 0.7 :
+    waterTravel ? 0.08 :
+    mode === 'drone' ? 0.1 :
+    offRoadRecovery ? 0.08 :
+    fastDrive ? 0.14 :
+    0.28;
+  const landuseBudgetScale =
+    waterTravel ? 0.42 :
+    mode === 'drone' ? 0.42 :
+    offRoadRecovery ? 0.18 :
+    fastDrive ? 0.24 :
+    0.42;
+  const waterwayBudgetScale =
+    waterTravel ? 1.45 :
+    mode === 'drone' ? 0.6 :
+    0.9;
+  const overpassTimeoutMs =
+    offRoadRecovery ? 4200 :
+    mode === 'drive' && speed >= 10 ? 6200 :
+    mode === 'drive' && speed >= 2 ? 7600 :
+    16000;
+  const maxTotalLoadMs =
+    offRoadRecovery ? 6200 :
+    mode === 'drive' && speed >= 10 ? 8200 :
+    mode === 'drive' && speed >= 2 ? 9800 :
+    22000;
+  return {
+    roadRadius: clampNumber(
+      Math.max(Number(base.roadRadius || 0) * 0.3 * roadRadiusScale, CONTINUOUS_WORLD_INTERACTIVE_STREAM_ROAD_RADIUS_MIN),
+      CONTINUOUS_WORLD_INTERACTIVE_STREAM_ROAD_RADIUS_MIN,
+      CONTINUOUS_WORLD_INTERACTIVE_STREAM_ROAD_RADIUS_MAX,
+      CONTINUOUS_WORLD_INTERACTIVE_STREAM_ROAD_RADIUS_MIN
+    ),
+    featureRadius: clampNumber(
+      Math.max(Number(base.featureRadius || 0) * 0.3 * featureRadiusScale, CONTINUOUS_WORLD_INTERACTIVE_STREAM_FEATURE_RADIUS_MIN),
+      CONTINUOUS_WORLD_INTERACTIVE_STREAM_FEATURE_RADIUS_MIN,
+      CONTINUOUS_WORLD_INTERACTIVE_STREAM_FEATURE_RADIUS_MAX,
+      CONTINUOUS_WORLD_INTERACTIVE_STREAM_FEATURE_RADIUS_MIN
+    ),
+    maxRoadWays: clampNumber(Math.round(Math.max(600, Number(base.maxRoadWays || 0)) * 0.16 * roadBudgetScale), 520, 2200, 980),
+    maxBuildingWays: clampNumber(Math.round(Math.max(1800, Number(base.maxBuildingWays || 0)) * 0.05 * buildingBudgetScale), 0, 1800, 720),
+    maxLanduseWays: clampNumber(Math.round(Math.max(900, Number(base.maxLanduseWays || 0)) * 0.08 * landuseBudgetScale), 0, 840, 320),
+    maxWaterwayWays: clampNumber(Math.round(Math.max(180, Number(base.maxLanduseWays || 0) * 0.25) * 0.4 * waterwayBudgetScale), 0, 260, 96),
+    maxTotalLoadMs,
+    overpassTimeoutMs
+  };
+}
+
+function continuousWorldInteractiveLoadLevelRank(level = 'full') {
+  return CONTINUOUS_WORLD_INTERACTIVE_LOAD_LEVELS[String(level || 'full')] || CONTINUOUS_WORLD_INTERACTIVE_LOAD_LEVELS.full;
+}
+
+function continuousWorldInteractiveCoverageLevelForRegion(regionKey = null, options = {}) {
+  const key = String(regionKey || '').trim();
+  if (!key) return 0;
+  const includeSeeded = options?.includeSeeded !== false;
+  let bestRank = 0;
+  for (let i = 0; i < _continuousWorldInteractiveStreamState.coverage.length; i++) {
+    const entry = _continuousWorldInteractiveStreamState.coverage[i];
+    const regionKeys = Array.isArray(entry?.regionKeys) ?
+      entry.regionKeys.map((entryKey) => String(entryKey || '').trim()).filter(Boolean) :
+      null;
+    const matchesRegion =
+      regionKeys?.length ?
+        regionKeys.includes(key) :
+        String(entry?.regionKey || '').trim() === key;
+    if (!matchesRegion) continue;
+    if (!includeSeeded && entry?.seeded === true) continue;
+    const addedRoads = Number(entry?.addedRoads || 0);
+    const addedBuildings = Number(entry?.addedBuildings || 0);
+    const addedLanduseMeshes = Number(entry?.addedLanduseMeshes || 0);
+    if (entry?.seeded === true && addedRoads <= 0 && addedBuildings <= 0 && addedLanduseMeshes <= 0) continue;
+    const rank = continuousWorldInteractiveLoadLevelRank(entry?.loadLevel || 'full');
+    if (rank > bestRank) bestRank = rank;
+  }
+  return bestRank;
+}
+
+function continuousWorldInteractiveRegionDegrees(runtimeSnapshot = null) {
+  return Math.max(
+    0.0001,
+    Number(
+      runtimeSnapshot?.regionConfig?.degrees ||
+      appCtx.getContinuousWorldRuntimeSnapshot?.()?.regionConfig?.degrees
+    ) || 0.02
+  );
+}
+
+function continuousWorldInteractiveRegionKeyFromLatLon(lat, lon, runtimeSnapshot = null) {
+  const size = continuousWorldInteractiveRegionDegrees(runtimeSnapshot);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return `${Math.floor(lat / size)}:${Math.floor(lon / size)}`;
+}
+
+function continuousWorldInteractiveCoverageRegionKeys(runtimeSnapshot = null) {
+  const keys = new Set();
+  _continuousWorldInteractiveStreamState.coverage.forEach((entry) => {
+    if (Array.isArray(entry?.regionKeys) && entry.regionKeys.length > 0) {
+      entry.regionKeys.forEach((entryKey) => {
+        const key = String(entryKey || '').trim();
+        if (key) keys.add(key);
+      });
+      return;
+    }
+    const key =
+      String(entry?.regionKey || '').trim() ||
+      continuousWorldInteractiveRegionKeyFromLatLon(entry?.lat, entry?.lon, runtimeSnapshot);
+    if (key) keys.add(key);
+  });
+  return keys;
+}
+
+function continuousWorldInteractiveRegionCellCenter(cell, runtimeSnapshot = null) {
+  const size = continuousWorldInteractiveRegionDegrees(runtimeSnapshot);
+  const latIndex = Number(cell?.latIndex);
+  const lonIndex = Number(cell?.lonIndex);
+  if (!Number.isFinite(latIndex) || !Number.isFinite(lonIndex)) return null;
+  return {
+    key: String(cell?.key || `${latIndex}:${lonIndex}`),
+    lat: (latIndex + 0.5) * size,
+    lon: (lonIndex + 0.5) * size
+  };
+}
+
+function continuousWorldInteractiveReasonIsActorCritical(reason = 'actor_drift') {
+  const reasonText = String(reason || 'actor_drift');
+  return (
+    reasonText === 'main_loop' ||
+    reasonText === 'actor_drift' ||
+    reasonText === 'actor_visible_road_gap' ||
+    reasonText === 'actor_building_gap' ||
+    reasonText === 'forward_road_corridor' ||
+    reasonText.startsWith('forward_road_corridor:') ||
+    reasonText === 'road_recovery_shell' ||
+    reasonText.startsWith('building_continuity_')
+  );
+}
+
+function continuousWorldInteractiveReasonIsForwardRoadCorridor(reason = 'actor_drift') {
+  const reasonText = String(reason || 'actor_drift');
+  return (
+    reasonText === 'forward_road_corridor' ||
+    reasonText.startsWith('forward_road_corridor:')
+  );
+}
+
+function continuousWorldInteractiveReasonTargetRegionKey(reason = 'actor_drift') {
+  const reasonText = String(reason || 'actor_drift');
+  const match = reasonText.match(/^(?:forward_road_corridor|region_prefetch):[^:]+:(-?\d+:-?\d+)$/);
+  return match?.[1] ? String(match[1]) : null;
+}
+
+function continuousWorldInteractiveReasonNeedsLocalShell(reason = 'actor_drift') {
+  const reasonText = String(reason || 'actor_drift');
+  return (
+    reasonText === 'startup_local_shell' ||
+    reasonText === 'road_recovery_shell' ||
+    reasonText === 'actor_building_gap' ||
+    reasonText.startsWith('building_continuity_')
+  );
+}
+
+function continuousWorldInteractiveBackgroundFullLoadActive() {
+  if (!_activeWorldLoad) return false;
+  const stage = String(appCtx.worldBuildStage || '');
+  return stage === 'playable_core_ready' || stage === 'partial_world_ready' || stage === 'full_world_ready';
+}
+
+function continuousWorldInteractiveStartupLockActive() {
+  if (!_activeWorldLoad) return false;
+  const stage = String(appCtx.worldBuildStage || '');
+  return stage === 'playable_core_loading' || stage === 'playable_core_ready';
+}
+
+function continuousWorldInteractiveStartupLocalShellCovered(actorState = null) {
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  if (!Number.isFinite(actor?.x) || !Number.isFinite(actor?.z)) return false;
+  const cfg =
+    ACTOR_BUILDING_SHELL_CONFIG[String(actor?.mode || 'drive')] ||
+    ACTOR_BUILDING_SHELL_CONFIG.drive;
+  const visibleRadius = Math.max(260, Number(cfg?.visibleRadius || 320));
+  const visibleBuildings = countVisibleDetailedBuildingMeshesNearWorldPoint(actor.x, actor.z, visibleRadius);
+  const visibleRoads = countVisibleRoadMeshesNearWorldPoint(actor.x, actor.z, Math.max(220, visibleRadius * 0.8));
+  const roadFeatures = countDriveableRoadFeaturesNearWorldPoint(actor.x, actor.z, Math.max(240, visibleRadius));
+  return (
+    visibleBuildings >= Math.max(22, Number(cfg?.minVisibleBuildings || 18)) &&
+    (
+      visibleRoads >= Math.max(12, Number(cfg?.minVisibleRoads || 8)) ||
+      roadFeatures >= Math.max(16, Number(cfg?.minRoadFeatures || 10))
+    )
+  );
+}
+
+function continuousWorldInteractiveActorMotionState() {
+  if (appCtx.oceanMode?.active) {
+    const ocean = typeof appCtx.getOceanModeDebugState === 'function' ? appCtx.getOceanModeDebugState() : null;
+    return {
+      mode: 'ocean',
+      x: Number(ocean?.position?.x || 0),
+      z: Number(ocean?.position?.z || 0),
+      yaw: Number(ocean?.yaw || 0),
+      speed: Math.abs(Number(ocean?.speed || 0))
+    };
+  }
+  if (appCtx.boatMode?.active) {
+    return {
+      mode: 'boat',
+      x: Number(appCtx.boat?.x || 0),
+      z: Number(appCtx.boat?.z || 0),
+      yaw: Number(appCtx.boat?.angle || 0),
+      speed: Math.abs(Number(appCtx.boat?.speed || 0))
+    };
+  }
+  if (appCtx.droneMode) {
+    return {
+      mode: 'drone',
+      x: Number(appCtx.drone?.x || 0),
+      z: Number(appCtx.drone?.z || 0),
+      yaw: Number(appCtx.drone?.yaw || 0),
+      speed: Math.abs(Number(appCtx.drone?.speed || 0))
+    };
+  }
+  if (appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk?.state?.walker) {
+    return {
+      mode: 'walk',
+      x: Number(appCtx.Walk.state.walker.x || 0),
+      z: Number(appCtx.Walk.state.walker.z || 0),
+      yaw: Number(appCtx.Walk.state.walker.angle || appCtx.Walk.state.walker.yaw || 0),
+      speed: Math.abs(Number(appCtx.Walk.state.walker.speedMph || 0))
+    };
+  }
+  return {
+    mode: 'drive',
+    x: Number(appCtx.car?.x || 0),
+    z: Number(appCtx.car?.z || 0),
+    yaw: Number(appCtx.car?.angle || 0),
+    speed: Math.abs(Number(appCtx.car?.speed || 0)),
+    onRoad: !!appCtx.car?.onRoad
+  };
+}
+
+function continuousWorldInteractiveActorMostlyIdle(actorState = null) {
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  const speed = Math.abs(Number(actor?.speed || 0));
+  if (mode === 'walk') return speed < 0.35;
+  if (mode === 'drone') return speed < 1.5;
+  if (mode === 'boat' || mode === 'ocean') return speed < 1.5;
+  return speed < 1.2;
+}
+
+function continuousWorldInteractiveShouldDeferDriveBuildingShell(actorState = null, reason = 'actor_drift') {
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  if (String(actor?.mode || 'drive') !== 'drive') return false;
+  if (actor?.onRoad === false) return false;
+  const speed = Math.abs(Number(actor?.speed || 0));
+  if (speed < 8) return false;
+  const actorX = Number(actor?.x);
+  const actorZ = Number(actor?.z);
+  if (
+    Number.isFinite(actorX) &&
+    Number.isFinite(actorZ) &&
+    recentExplicitTeleportTargetState(actorX, actorZ, { radius: 260 }).active
+  ) {
+    return false;
+  }
+  const reasonText = String(reason || 'actor_drift');
+  if (reasonText === 'actor_visible_road_gap' || reasonText === 'road_recovery_shell') return false;
+  return true;
+}
+
+function continuousWorldInteractiveDesiredLoadLevel(actorState = null, reason = 'actor_drift') {
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  const speed = Math.abs(Number(actor?.speed || 0));
+  const reasonText = String(reason || 'actor_drift');
+  const forwardRoadCorridorPrefetch = continuousWorldInteractiveReasonIsForwardRoadCorridor(reasonText);
+  const explicitTeleportContinuity =
+    mode === 'drive' &&
+    recentExplicitTeleportTargetState(actor?.x, actor?.z, { radius: 260 }).active;
+  const actorPrimaryReason =
+    reasonText === 'main_loop' ||
+    reasonText === 'actor_drift' ||
+    reasonText.startsWith('building_continuity_');
+  const backgroundFullLoadActive = continuousWorldInteractiveBackgroundFullLoadActive();
+  const roadShellGap = continuousWorldInteractiveNeedsRoadShellRecovery(actor);
+  const actorNearbyRoadFeatures =
+    Number.isFinite(actor?.x) && Number.isFinite(actor?.z) ?
+      countDriveableRoadFeaturesNearWorldPoint(actor.x, actor.z, Math.max(240, speed >= 8 ? 360 : 280)) :
+      0;
+  const lowVisibleRoadState =
+    mode === 'drive' &&
+    countVisibleRoadMeshesNearWorldPoint(actor?.x, actor?.z, speed >= 8 ? 320 : 240) <
+      (PLAYABLE_CORE_RESIDENCY_CONFIG.minVisibleRoadMeshesReady?.drive || 12);
+  const buildingShellGap = continuousWorldInteractiveNeedsBuildingShellRecovery(actor);
+  const deferDriveBuildingShell = continuousWorldInteractiveShouldDeferDriveBuildingShell(actor, reasonText);
+  const actorMostlyIdle = continuousWorldInteractiveActorMostlyIdle(actor);
+  const fastDriveRoadPriority =
+    mode === 'drive' &&
+    actor?.onRoad !== false &&
+    speed >= 6 &&
+    !roadShellGap &&
+    !buildingShellGap &&
+    !lowVisibleRoadState;
+  const nearPrefetch = reasonText.startsWith('region_prefetch:near');
+  const midPrefetch = reasonText.startsWith('region_prefetch:mid');
+  const farPrefetch = reasonText.startsWith('region_prefetch:far');
+  const activeMovementMainLoop =
+    !actorMostlyIdle &&
+    (
+      reasonText === 'main_loop' ||
+      reasonText === 'actor_drift'
+    );
+
+  if (backgroundFullLoadActive) {
+    if (activeMovementMainLoop) {
+      if (mode === 'drive') return 'roads_only';
+      if (mode === 'drone') return 'reduced';
+      if (mode === 'boat' || mode === 'ocean') return 'roads_only';
+      if (mode === 'walk') return 'reduced';
+    }
+    if (forwardRoadCorridorPrefetch) return 'roads_only';
+    if (nearPrefetch) {
+      if (mode === 'walk') return 'full';
+      if (mode === 'drone') return 'reduced';
+      if (mode === 'drive') return 'roads_only';
+      return 'roads_only';
+    }
+    if (midPrefetch) {
+      if (mode === 'drone') return 'reduced';
+      if (mode === 'drive') return 'reduced';
+      if (mode === 'walk') return 'reduced';
+      return 'roads_only';
+    }
+    if (farPrefetch) {
+      if (mode === 'drone') return 'reduced';
+      return 'roads_only';
+    }
+    if (reasonText === 'startup_local_shell') return 'reduced';
+    if (reasonText === 'road_recovery_shell') {
+      if (mode === 'drive') return 'roads_only';
+      return 'reduced';
+    }
+    if (reasonText === 'actor_visible_road_gap') {
+      if (mode === 'drive' && explicitTeleportContinuity) return 'full';
+      if (mode === 'drive') return 'roads_only';
+      return mode === 'walk' ? 'full' : 'reduced';
+    }
+    if (reasonText.startsWith('building_continuity_') && mode === 'drive' && explicitTeleportContinuity) return 'full';
+    if (reasonText === 'actor_building_gap') {
+      if (mode === 'drive' && deferDriveBuildingShell) return 'roads_only';
+      return mode === 'walk' ? 'full' : 'reduced';
+    }
+    if (mode === 'walk') return 'full';
+    if (mode === 'drone') return 'reduced';
+    if (fastDriveRoadPriority && actorPrimaryReason) return 'roads_only';
+    if (mode === 'drive' && actor?.onRoad === false && lowVisibleRoadState && !roadShellGap && !buildingShellGap) return 'roads_only';
+    if (roadShellGap) return 'reduced';
+    if (mode === 'drive' && buildingShellGap && deferDriveBuildingShell) return 'roads_only';
+    if (buildingShellGap) return 'reduced';
+    return 'reduced';
+  }
+
+  if (activeMovementMainLoop) {
+    if (mode === 'drive') return 'roads_only';
+    if (mode === 'drone') return 'reduced';
+    if (mode === 'boat' || mode === 'ocean') return 'roads_only';
+    if (mode === 'walk') return 'reduced';
+  }
+  if (mode === 'boat' || mode === 'ocean') return speed >= 4 ? 'roads_only' : 'reduced';
+  if (forwardRoadCorridorPrefetch) return 'roads_only';
+  if (reasonText === 'actor_visible_road_gap') {
+    if (mode === 'drive' && explicitTeleportContinuity) return 'full';
+    if (mode === 'drive') return 'roads_only';
+    return mode === 'walk' ? 'full' : 'reduced';
+  }
+  if (reasonText.startsWith('building_continuity_') && mode === 'drive' && explicitTeleportContinuity) return 'full';
+  if (reasonText === 'actor_building_gap') {
+    if (mode === 'drive' && deferDriveBuildingShell) return 'roads_only';
+    return mode === 'walk' ? 'full' : 'reduced';
+  }
+  if (mode === 'drone') return 'reduced';
+  if (mode === 'walk') return 'full';
+  if (reasonText === 'road_recovery_shell') {
+    if (mode === 'drive') return 'roads_only';
+    return 'reduced';
+  }
+  if (nearPrefetch) {
+    if (mode === 'walk') return 'full';
+    if (mode === 'drone') return 'reduced';
+    if (mode === 'drive') return 'roads_only';
+    return 'roads_only';
+  }
+  if (midPrefetch) {
+    if (mode === 'drone') return 'reduced';
+    if (mode === 'drive') return 'reduced';
+    if (mode === 'walk') return 'reduced';
+    return 'roads_only';
+  }
+  if (farPrefetch) {
+    if (mode === 'drone') return 'reduced';
+    return 'roads_only';
+  }
+  if (reasonText.startsWith('region_prefetch:')) return 'roads_only';
+  if (mode === 'drive' && actorPrimaryReason) return fastDriveRoadPriority ? 'roads_only' : 'reduced';
+  if (mode === 'drive' && actor?.onRoad === false && !roadShellGap && !buildingShellGap) return 'roads_only';
+  if (mode === 'drive' && buildingShellGap && deferDriveBuildingShell) return 'roads_only';
+  if (mode === 'drive' && lowVisibleRoadState && !roadShellGap && !buildingShellGap) return 'reduced';
+  if (mode === 'drive') return 'reduced';
+  return 'full';
+}
+
+function waterFeatureBounds(feature = null) {
+  if (!feature) return null;
+  if (feature.bounds) return feature.bounds;
+  if (Array.isArray(feature.pts) && feature.pts.length >= 2) {
+    if (feature.type === 'waterway' || Number.isFinite(feature.width)) {
+      const width = Math.max(6, Number(feature.width) || 8);
+      feature.bounds = polylineBounds(feature.pts, width * 0.5 + 18);
+    } else {
+      feature.bounds = polygonBoundsXZ(feature.pts);
+    }
+  }
+  return feature.bounds || null;
+}
+
+function boundsDistanceSqToWorldPoint(bounds, x, z) {
+  if (!bounds || !Number.isFinite(x) || !Number.isFinite(z)) return Infinity;
+  const dx =
+    x < bounds.minX ? bounds.minX - x :
+    x > bounds.maxX ? x - bounds.maxX :
+      0;
+  const dz =
+    z < bounds.minZ ? bounds.minZ - z :
+    z > bounds.maxZ ? z - bounds.maxZ :
+      0;
+  return dx * dx + dz * dz;
+}
+
+function hasWaterFeaturesNearWorldPoint(x, z, radius = 260) {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return false;
+  const paddedRadiusSq = Math.max(0, Number(radius) || 0) ** 2;
+  const areas = Array.isArray(appCtx.waterAreas) ? appCtx.waterAreas : [];
+  for (let i = 0; i < areas.length; i++) {
+    const bounds = waterFeatureBounds(areas[i]);
+    if (boundsDistanceSqToWorldPoint(bounds, x, z) <= paddedRadiusSq) return true;
+  }
+  const waterways = Array.isArray(appCtx.waterways) ? appCtx.waterways : [];
+  for (let i = 0; i < waterways.length; i++) {
+    const bounds = waterFeatureBounds(waterways[i]);
+    if (boundsDistanceSqToWorldPoint(bounds, x, z) <= paddedRadiusSq) return true;
+  }
+  return false;
+}
+
+function continuousWorldInteractiveWaterRelevant(actorState = null, reason = 'actor_drift') {
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  if (mode === 'boat' || mode === 'ocean' || appCtx.boatMode?.active === true || appCtx.oceanMode?.active === true) {
+    return true;
+  }
+
+  const waterSignals = appCtx.worldSurfaceProfile?.signals?.normalized || {};
+  const likelyWaterByProfile =
+    Number(waterSignals.water || 0) >= 0.06 ||
+    Number(waterSignals.explicitBlue || 0) >= 0.045;
+
+  const searchRadius =
+    mode === 'drone' ? 540 :
+    mode === 'walk' ? 240 :
+    360;
+  const nearbyLoadedWater =
+    Number.isFinite(actor?.x) &&
+    Number.isFinite(actor?.z) &&
+    hasWaterFeaturesNearWorldPoint(actor.x, actor.z, searchRadius);
+
+  if (nearbyLoadedWater) return true;
+  if (!likelyWaterByProfile) return false;
+
+  const reasonText = String(reason || '');
+  return (
+    reasonText === 'startup_local_shell' ||
+    reasonText.startsWith('region_prefetch:near') ||
+    reasonText.startsWith('building_continuity_') ||
+    reasonText === 'actor_building_gap'
+  );
+}
+
+function continuousWorldInteractiveContentPlan(actorState = null, chunkPlan = null, reason = 'actor_drift') {
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const plan = chunkPlan || continuousWorldInteractiveChunkPlan();
+  const reasonText = String(reason || 'actor_drift');
+  const forwardRoadCorridorPrefetch = continuousWorldInteractiveReasonIsForwardRoadCorridor(reasonText);
+  const startupLocalShell = reasonText === 'startup_local_shell';
+  const roadShellRecovery = reasonText === 'actor_visible_road_gap';
+  const buildingGapRecovery = reasonText === 'actor_building_gap';
+  const localShellPriority = continuousWorldInteractiveReasonNeedsLocalShell(reasonText);
+  const buildingContinuityRecovery = reasonText.startsWith('building_continuity_');
+  const loadLevel = continuousWorldInteractiveDesiredLoadLevel(actor, reason);
+  const rank = continuousWorldInteractiveLoadLevelRank(loadLevel);
+  const reduced = rank <= CONTINUOUS_WORLD_INTERACTIVE_LOAD_LEVELS.reduced;
+  const roadsOnly = rank <= CONTINUOUS_WORLD_INTERACTIVE_LOAD_LEVELS.roads_only;
+  const actorMode = String(actor?.mode || 'drive');
+  const isWaterTravel = actorMode === 'boat' || actorMode === 'ocean';
+  const waterRelevant = continuousWorldInteractiveWaterRelevant(actor, reasonText);
+  const landuseRelevant = isWaterTravel || appCtx.landUseVisible === true || waterRelevant;
+  const waterwayRelevant = isWaterTravel || waterRelevant;
+  const driveRoadsOnly = roadsOnly && actorMode === 'drive';
+  const strictDriveRoadsOnly = driveRoadsOnly && !isWaterTravel;
+  const corridorRoadPriority = forwardRoadCorridorPrefetch && actorMode === 'drive';
+  const aggressiveRoadRecovery = driveRoadsOnly && actor?.onRoad === false;
+  const roadRecoveryMode =
+    driveRoadsOnly &&
+    !startupLocalShell &&
+    (aggressiveRoadRecovery || reasonText === 'actor_drift' || reasonText === 'main_loop');
+  const includeLandmarkBuildings = driveRoadsOnly && !roadRecoveryMode;
+  const featureRadius = Number(plan?.featureRadius || 0);
+  const waterFeatureRadius =
+    strictDriveRoadsOnly ?
+      0 :
+    waterwayRelevant ?
+      isWaterTravel ?
+        clampNumber(featureRadius * (roadsOnly ? 0.72 : 0.82), 0.006, featureRadius, featureRadius) :
+        featureRadius :
+      0;
+  const buildingRadius =
+    strictDriveRoadsOnly || corridorRoadPriority ?
+      0 :
+    startupLocalShell ?
+      clampNumber(featureRadius * 0.24, 0.0042, featureRadius, featureRadius) :
+    buildingContinuityRecovery ?
+      clampNumber(featureRadius * (actorMode === 'drone' ? 0.84 : actorMode === 'walk' ? 0.8 : 0.78), 0.0072, featureRadius, featureRadius) :
+    roadShellRecovery ?
+      clampNumber(featureRadius * (actorMode === 'drone' ? 0.56 : actorMode === 'walk' ? 0.62 : 0.48), 0.0058, featureRadius, featureRadius) :
+    buildingGapRecovery ?
+      clampNumber(featureRadius * (actorMode === 'drone' ? 0.8 : actorMode === 'walk' ? 0.76 : 0.74), 0.0068, featureRadius, featureRadius) :
+    aggressiveRoadRecovery ?
+      clampNumber(featureRadius * 0.1, 0.0032, featureRadius, featureRadius) :
+    driveRoadsOnly ?
+      clampNumber(featureRadius * 0.14, 0.0038, featureRadius, featureRadius) :
+    roadsOnly ?
+      clampNumber(featureRadius * 0.26, 0.0045, featureRadius, featureRadius) :
+    reduced ?
+      clampNumber(featureRadius * ((actorMode === 'drive' || actorMode === 'drone') ? 0.58 : 0.48), 0.0055, featureRadius, featureRadius) :
+      featureRadius;
+  const landuseRadius =
+    strictDriveRoadsOnly || !landuseRelevant ?
+      0 :
+    corridorRoadPriority ?
+      0 :
+    startupLocalShell ?
+      clampNumber(featureRadius * 0.22, 0.0048, featureRadius, featureRadius) :
+    buildingContinuityRecovery ?
+      clampNumber(featureRadius * 0.62, 0.0058, featureRadius, featureRadius) :
+    roadShellRecovery ?
+      clampNumber(featureRadius * 0.34, 0.005, featureRadius, featureRadius) :
+    buildingGapRecovery ?
+      clampNumber(featureRadius * 0.52, 0.0052, featureRadius, featureRadius) :
+    roadsOnly && !isWaterTravel ?
+      0 :
+    reduced ?
+      clampNumber(featureRadius * 0.56, 0.0055, featureRadius, featureRadius) :
+      featureRadius;
+  return {
+    loadLevel,
+    roadsOnly,
+    reduced,
+    includeBuildings:
+      strictDriveRoadsOnly || corridorRoadPriority ?
+        false :
+        (!roadsOnly || isWaterTravel || (driveRoadsOnly && !roadRecoveryMode)),
+    includeLandmarkBuildings:
+      strictDriveRoadsOnly || corridorRoadPriority ?
+        false :
+        includeLandmarkBuildings,
+    includeBuildingParts: !reduced && !roadsOnly,
+    includeLanduse:
+      strictDriveRoadsOnly || corridorRoadPriority ?
+        false :
+        (landuseRelevant && (!roadsOnly || isWaterTravel)),
+    includeWaterways:
+      strictDriveRoadsOnly || corridorRoadPriority ?
+        false :
+        (waterwayRelevant && (!roadsOnly || isWaterTravel)),
+    buildingRadius,
+    landuseRadius,
+    waterFeatureRadius,
+    maxRoadWays:
+      corridorRoadPriority ?
+        Math.max(720, Math.floor(Number(plan?.maxRoadWays || 0) * 0.82)) :
+        Number(plan?.maxRoadWays || 0),
+    maxBuildingWays:
+      strictDriveRoadsOnly || corridorRoadPriority ?
+        0 :
+      startupLocalShell ?
+        Math.max(180, Math.floor(Number(plan?.maxBuildingWays || 0) * 0.16)) :
+      buildingContinuityRecovery ?
+        Math.max(actorMode === 'drone' ? 320 : 520, Math.floor(Number(plan?.maxBuildingWays || 0) * 0.78)) :
+      roadShellRecovery ?
+        Math.max(actorMode === 'drone' ? 140 : 220, Math.floor(Number(plan?.maxBuildingWays || 0) * 0.3)) :
+      buildingGapRecovery ?
+        Math.max(actorMode === 'drone' ? 280 : 420, Math.floor(Number(plan?.maxBuildingWays || 0) * 0.62)) :
+      aggressiveRoadRecovery ?
+        Math.max(18, Math.floor(Number(plan?.maxBuildingWays || 0) * 0.03)) :
+      driveRoadsOnly ?
+        Math.max(56, Math.floor(Number(plan?.maxBuildingWays || 0) * 0.06)) :
+      roadsOnly ?
+        (isWaterTravel ? Math.max(120, Math.floor(Number(plan?.maxBuildingWays || 0) * 0.12)) : 0) :
+      reduced ?
+        Math.max(actorMode === 'drive' || actorMode === 'drone' ? 240 : 180, Math.floor(Number(plan?.maxBuildingWays || 0) * 0.42)) :
+        Number(plan?.maxBuildingWays || 0),
+    maxLanduseWays:
+      strictDriveRoadsOnly || !landuseRelevant || corridorRoadPriority ?
+        0 :
+      startupLocalShell ?
+        Math.max(48, Math.floor(Number(plan?.maxLanduseWays || 0) * 0.18)) :
+      localShellPriority && !isWaterTravel ?
+        Math.max(120, Math.floor(Number(plan?.maxLanduseWays || 0) * 0.52)) :
+      roadsOnly && !isWaterTravel ? 0 :
+      reduced ?
+        Math.max(80, Math.floor(Number(plan?.maxLanduseWays || 0) * 0.45)) :
+        Number(plan?.maxLanduseWays || 0),
+    maxWaterwayWays:
+      strictDriveRoadsOnly || !waterwayRelevant || corridorRoadPriority ?
+        0 :
+      roadsOnly && !isWaterTravel ? 0 :
+      reduced ?
+        Math.max(24, Math.floor(Number(plan?.maxWaterwayWays || 0) * 0.6)) :
+        Number(plan?.maxWaterwayWays || 0)
+  };
+}
+
+function continuousWorldInteractiveStreamIntervalMs(actorState = null) {
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  if (!actor) return CONTINUOUS_WORLD_INTERACTIVE_STREAM_MIN_INTERVAL_MS;
+  if (continuousWorldInteractiveBackgroundFullLoadActive()) {
+    if (actor.mode === 'drive' && actor?.onRoad === false) return 120;
+    if (actor.mode === 'drive') return 150;
+    if (actor.mode === 'walk') return 420;
+    if (actor.mode === 'drone') return 240;
+    if (actor.mode === 'boat' || actor.mode === 'ocean') return 320;
+  }
+  const speed = Math.abs(Number(actor.speed || 0));
+  if (actor.mode === 'drive' && actor?.onRoad === false) return 150;
+  if (actor.mode === 'drive' && speed >= 18) return 180;
+  if (actor.mode === 'drive' && speed >= 8) return 210;
+  if (actor.mode === 'drive' && speed >= 4) return 240;
+  if ((actor.mode === 'boat' || actor.mode === 'ocean') && speed >= 5) return 420;
+  if (actor.mode === 'drone' && speed >= 8) return 320;
+  if (actor.mode === 'walk' && speed >= 4) return 800;
+  return CONTINUOUS_WORLD_INTERACTIVE_STREAM_MIN_INTERVAL_MS;
+}
+
+function continuousWorldInteractiveSurfaceSyncPolicy(actorState = null, regionKey = null, runtimeSnapshot = null, reason = 'actor_drift') {
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  const reasonText = String(reason || 'actor_drift');
+  const nearKeys = new Set(
+    Array.isArray(runtimeSnapshot?.activeRegionRings?.near) ?
+      runtimeSnapshot.activeRegionRings.near
+        .map((cell) => String(cell?.key || '').trim())
+        .filter(Boolean) :
+      []
+  );
+  const activeKeys = new Set(
+    Array.isArray(runtimeSnapshot?.regionManager?.activeKeys) ?
+      runtimeSnapshot.regionManager.activeKeys
+        .map((key) => String(key || '').trim())
+        .filter(Boolean) :
+      []
+  );
+  const nearActorRegion = !!regionKey && (nearKeys.has(regionKey) || activeKeys.has(regionKey));
+  const roadGapReason =
+    reasonText === 'actor_visible_road_gap' ||
+    reasonText === 'road_recovery_shell';
+  const buildingGapReason =
+    reasonText === 'actor_building_gap' ||
+    reasonText.startsWith('building_continuity_');
+  const prefetchReason =
+    reasonText.startsWith('region_prefetch:near') ||
+    reasonText.startsWith('region_prefetch:mid');
+  const generalActorReason =
+    reasonText === 'actor_drift' ||
+    reasonText === 'main_loop';
+  const actorDrivenReason =
+    generalActorReason ||
+    roadGapReason ||
+    buildingGapReason ||
+    prefetchReason;
+  const visibleRoads =
+    mode === 'drive' && Number.isFinite(actor?.x) && Number.isFinite(actor?.z) &&
+    typeof countVisibleRoadMeshesNearWorldPoint === 'function' ?
+      Number(countVisibleRoadMeshesNearWorldPoint(actor.x, actor.z, 280)) || 0 :
+      Infinity;
+  const roadFeatures =
+    mode === 'drive' && Number.isFinite(actor?.x) && Number.isFinite(actor?.z) &&
+    typeof countDriveableRoadFeaturesNearWorldPoint === 'function' ?
+      Number(countDriveableRoadFeaturesNearWorldPoint(actor.x, actor.z, 300)) || 0 :
+      Infinity;
+  const localRoadGap =
+    mode === 'drive' &&
+    (
+      visibleRoads < 18 ||
+      (visibleRoads < 24 && roadFeatures < 120)
+    );
+  const severeLocalRoadGap =
+    mode === 'drive' &&
+    (
+      visibleRoads < 12 ||
+      (visibleRoads < 16 && roadFeatures < 80)
+    );
+
+  if (mode === 'drone') {
+    return { request: false, force: false, policy: 'drone_skip_surface_sync', source: 'continuous_world_stream_followup' };
+  }
+  if (mode === 'boat' || mode === 'ocean') {
+    return { request: false, force: false, policy: `${mode}_skip_surface_sync`, source: 'continuous_world_stream_followup' };
+  }
+  if (mode === 'walk') {
+    return {
+      request: nearActorRegion || actorDrivenReason,
+      force: false,
+      policy: nearActorRegion || actorDrivenReason ? 'walk_deferred_surface_sync' : 'walk_skip_surface_sync',
+      source: 'continuous_world_stream_followup'
+    };
+  }
+  if (mode === 'drive' && actor?.onRoad === false && actorDrivenReason) {
+    return {
+      request: true,
+      force: true,
+      policy: 'drive_offroad_forced_surface_sync',
+      source: 'continuous_world_stream_recovery'
+    };
+  }
+  if (nearActorRegion && (roadGapReason || (generalActorReason && severeLocalRoadGap))) {
+    return {
+      request: true,
+      force: true,
+      policy: 'drive_forced_surface_sync',
+      source: 'continuous_world_stream_recovery'
+    };
+  }
+  if (nearActorRegion || actorDrivenReason) {
+    return {
+      request: true,
+      force: false,
+      policy: 'drive_deferred_surface_sync',
+      source: 'continuous_world_stream_followup'
+    };
+  }
+  return {
+    request: false,
+    force: false,
+    policy: 'drive_prefetch_skip_surface_sync',
+    source: 'continuous_world_stream_followup'
+  };
+}
+
+function continuousWorldInteractiveSelectPrefetchTarget(actorGeo = null, runtimeSnapshot = null, actorState = null) {
+  const snapshot = runtimeSnapshot || appCtx.getContinuousWorldRuntimeSnapshot?.();
+  if (!snapshot?.activeRegionRings) return null;
+  const coveredKeys = continuousWorldInteractiveCoverageRegionKeys(snapshot);
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const actorX = Number(actor?.x);
+  const actorZ = Number(actor?.z);
+  const actorSpeed = Math.abs(Number(actor?.speed || 0));
+  const headingX = Number.isFinite(actor?.yaw) ? Math.sin(actor.yaw) : 0;
+  const headingZ = Number.isFinite(actor?.yaw) ? Math.cos(actor.yaw) : 0;
+  const useHeadingBias = actorSpeed >= (actor?.mode === 'walk' ? 3 : 6) && (Math.abs(headingX) + Math.abs(headingZ)) > 0.2;
+  const driveLookahead = actor?.mode === 'drive' && actorSpeed >= 6;
+  const forwardCorridor = continuousWorldForwardRoadCorridorState(actor, snapshot);
+  const forwardCorridorKeys = new Set(Array.isArray(forwardCorridor?.regionKeys) ? forwardCorridor.regionKeys : []);
+  const candidates = [];
+  const addBand = (band, cells, priority) => {
+    (Array.isArray(cells) ? cells : []).forEach((cell) => {
+      const center = continuousWorldInteractiveRegionCellCenter(cell, snapshot);
+      if (!center?.key || coveredKeys.has(center.key)) return;
+      const centerWorld = geoPointToWorld(center.lat, center.lon);
+      const dx = Number(centerWorld?.x) - actorX;
+      const dz = Number(centerWorld?.z) - actorZ;
+      const vectorLength = Math.hypot(dx, dz);
+      const headingAlignment =
+        useHeadingBias && vectorLength > 1 ?
+          ((dx / vectorLength) * headingX + (dz / vectorLength) * headingZ) :
+          0;
+      const inForwardCorridor = forwardCorridorKeys.has(center.key);
+      const corridorRoadPriority =
+        actor?.mode === 'drive' &&
+        actorSpeed >= 4 &&
+        inForwardCorridor &&
+        (band === 'mid' || band === 'far');
+      const adjustedPriority =
+        corridorRoadPriority && band === 'far' ? priority - 3 :
+        corridorRoadPriority && band === 'mid' ? priority - 2 :
+        driveLookahead && band === 'far' && inForwardCorridor ? priority - 2 :
+        driveLookahead && band === 'mid' && inForwardCorridor ? priority - 1 :
+        driveLookahead && band === 'near' && !inForwardCorridor ? priority + 2 :
+        priority;
+      candidates.push({
+        ...center,
+        band,
+        priority: adjustedPriority,
+        corridorRoadPriority,
+        inForwardCorridor,
+        headingAlignment,
+        distance: actorGeo ?
+          continuousWorldGeoDistanceWorldUnits(actorGeo.lat, actorGeo.lon, center.lat, center.lon) :
+          Infinity
+      });
+    });
+  };
+  addBand('near', snapshot.activeRegionRings.near, 0);
+  addBand('mid', snapshot.activeRegionRings.mid, 1);
+  if ((actor?.mode === 'drive' && actorSpeed >= 8) || actor?.mode === 'drone') {
+    addBand('far', snapshot.activeRegionRings.far, 2);
+  }
+  if (!candidates.length) return null;
+  candidates.sort((a, b) => {
+    if (a.priority !== b.priority) return a.priority - b.priority;
+    if (a.corridorRoadPriority !== b.corridorRoadPriority) return a.corridorRoadPriority ? -1 : 1;
+    if (a.inForwardCorridor !== b.inForwardCorridor) return a.inForwardCorridor ? -1 : 1;
+    if (useHeadingBias && Math.abs(a.headingAlignment - b.headingAlignment) > 0.08) {
+      return b.headingAlignment - a.headingAlignment;
+    }
+    return a.distance - b.distance;
+  });
+  const target = candidates[0];
+  return {
+    ...target,
+    loadReason:
+      target.corridorRoadPriority ?
+        `forward_road_corridor:${target.band}:${target.key}` :
+        `region_prefetch:${target.band}:${target.key}`
+  };
+}
+
+function getContinuousWorldInteractiveStreamSnapshot() {
+  const runtimeSnapshot = appCtx.getContinuousWorldRuntimeSnapshot?.();
+  const coveredRegionKeys = Array.from(continuousWorldInteractiveCoverageRegionKeys(runtimeSnapshot));
+  return {
+    enabled: !!_continuousWorldInteractiveStreamState.enabled,
+    autoKickEnabled: !!_continuousWorldInteractiveStreamState.autoKickEnabled,
+    seeded: _continuousWorldInteractiveStreamState.coverage.length > 0,
+    pending: !!_continuousWorldInteractiveStreamState.pending,
+    pendingStartedAt: _continuousWorldInteractiveStreamState.pendingStartedAt || 0,
+    pendingQueryLat: Number.isFinite(_continuousWorldInteractiveStreamState.pendingQueryLat) ? _continuousWorldInteractiveStreamState.pendingQueryLat : null,
+    pendingQueryLon: Number.isFinite(_continuousWorldInteractiveStreamState.pendingQueryLon) ? _continuousWorldInteractiveStreamState.pendingQueryLon : null,
+    pendingRegionKey: _continuousWorldInteractiveStreamState.pendingRegionKey || null,
+    pendingAgeMs:
+      _continuousWorldInteractiveStreamState.pending && Number(_continuousWorldInteractiveStreamState.pendingStartedAt) > 0 ?
+        Math.max(0, Math.round(Date.now() - Number(_continuousWorldInteractiveStreamState.pendingStartedAt))) :
+        0,
+    lastKickAt: _continuousWorldInteractiveStreamState.lastKickAt || 0,
+    lastLoadAt: _continuousWorldInteractiveStreamState.lastLoadAt || 0,
+    lastLoadReason: _continuousWorldInteractiveStreamState.lastLoadReason || null,
+    lastError: _continuousWorldInteractiveStreamState.lastError || null,
+    coverageCount: _continuousWorldInteractiveStreamState.coverage.length,
+    totalLoads: _continuousWorldInteractiveStreamState.totalLoads,
+    totalAddedRoads: _continuousWorldInteractiveStreamState.totalAddedRoads,
+    totalAddedBuildings: _continuousWorldInteractiveStreamState.totalAddedBuildings,
+    totalAddedLanduseMeshes: _continuousWorldInteractiveStreamState.totalAddedLanduseMeshes,
+    totalAddedWaterAreas: _continuousWorldInteractiveStreamState.totalAddedWaterAreas,
+    totalAddedWaterways: _continuousWorldInteractiveStreamState.totalAddedWaterways,
+    forcedSurfaceSyncLoads: _continuousWorldInteractiveStreamState.forcedSurfaceSyncLoads,
+    deferredSurfaceSyncLoads: _continuousWorldInteractiveStreamState.deferredSurfaceSyncLoads,
+    skippedSurfaceSyncLoads: _continuousWorldInteractiveStreamState.skippedSurfaceSyncLoads,
+    lastSurfaceSyncPolicy: _continuousWorldInteractiveStreamState.lastSurfaceSyncPolicy || null,
+    activeInteractiveRoads: _continuousWorldInteractiveStreamState.activeInteractiveRoads || 0,
+    activeInteractiveBuildings: _continuousWorldInteractiveStreamState.activeInteractiveBuildings || 0,
+    activeInteractiveLanduse: _continuousWorldInteractiveStreamState.activeInteractiveLanduse || 0,
+    activeInteractiveWaterways: _continuousWorldInteractiveStreamState.activeInteractiveWaterways || 0,
+    evictedRoads: _continuousWorldInteractiveStreamState.evictedRoads || 0,
+    evictedBuildings: _continuousWorldInteractiveStreamState.evictedBuildings || 0,
+    evictedLanduse: _continuousWorldInteractiveStreamState.evictedLanduse || 0,
+    evictedWaterways: _continuousWorldInteractiveStreamState.evictedWaterways || 0,
+    evictedMeshes: _continuousWorldInteractiveStreamState.evictedMeshes || 0,
+    coveredRegionCount: coveredRegionKeys.length,
+    coveredRegionKeys: coveredRegionKeys.slice(0, 8),
+    coverage: _continuousWorldInteractiveStreamState.coverage.slice(-4).map((entry) => ({
+      key: entry.key,
+      regionKey: entry.regionKey || null,
+      lat: Number(entry.lat.toFixed(6)),
+      lon: Number(entry.lon.toFixed(6)),
+      roadRadius: Number(entry.roadRadius.toFixed(5)),
+      featureRadius: Number(entry.featureRadius.toFixed(5)),
+      loadLevel: entry.loadLevel || 'full',
+      addedRoads: entry.addedRoads,
+      addedBuildings: entry.addedBuildings,
+      addedLanduseMeshes: entry.addedLanduseMeshes || 0,
+      addedWaterAreas: entry.addedWaterAreas || 0,
+      addedWaterways: entry.addedWaterways || 0,
+      reason: entry.reason,
+      at: entry.at
+    }))
+  };
+}
+
+function scheduleContinuousWorldInteractiveRecoveryShell(delayMs = 220) {
+  if (_continuousWorldInteractiveStreamState.recoveryShellTimerId) {
+    clearTimeout(_continuousWorldInteractiveStreamState.recoveryShellTimerId);
+    _continuousWorldInteractiveStreamState.recoveryShellTimerId = null;
+  }
+  _continuousWorldInteractiveStreamState.recoveryShellTimerId = window.setTimeout(() => {
+    _continuousWorldInteractiveStreamState.recoveryShellTimerId = null;
+    if (!continuousWorldInteractiveCanStream()) return;
+    kickContinuousWorldInteractiveStreaming('road_recovery_shell');
+  }, Math.max(80, Number(delayMs) || 0));
+}
+
+async function attemptContinuousWorldActorAreaSoftRecovery(geo, mode = 'drive', targetX = NaN, targetZ = NaN, source = 'soft_recovery') {
+  if (
+    !Number.isFinite(geo?.lat) ||
+    !Number.isFinite(geo?.lon) ||
+    typeof loadContinuousWorldInteractiveChunk !== 'function'
+  ) {
+    return { recovered: false, reason: 'interactive_loader_unavailable' };
+  }
+
+  const roadRadius = mode === 'drone' ? 420 : mode === 'walk' ? 220 : 320;
+  const buildingRadius = mode === 'drone' ? 560 : mode === 'walk' ? 260 : 360;
+  const featureRadius = mode === 'drone' ? 520 : mode === 'walk' ? 240 : 360;
+  const buildingReason =
+    mode === 'drive' ? 'building_continuity_drive' :
+    mode === 'walk' ? 'building_continuity_walk' :
+    mode === 'drone' ? 'building_continuity_drone' :
+    'actor_building_gap';
+  const countShell = () => ({
+    visibleRoads: countVisibleRoadMeshesNearWorldPoint(targetX, targetZ, roadRadius),
+    visibleBuildings: countVisibleBuildingMeshesNearWorldPoint(targetX, targetZ, buildingRadius),
+    roadFeatures: countDriveableRoadFeaturesNearWorldPoint(targetX, targetZ, featureRadius)
+  });
+
+  let before = countShell();
+  if (before.roadFeatures <= 0 || before.visibleRoads <= 0) {
+    await loadContinuousWorldInteractiveChunk(geo.lat, geo.lon, 'actor_visible_road_gap');
+    before = countShell();
+  }
+  if (
+    (before.roadFeatures > 0 || before.visibleRoads > 0) &&
+    before.visibleBuildings < (mode === 'drive' ? 14 : 10)
+  ) {
+    await loadContinuousWorldInteractiveChunk(geo.lat, geo.lon, buildingReason);
+    before = countShell();
+  }
+  if (
+    before.roadFeatures <= 0 &&
+    before.visibleRoads <= 0 &&
+    before.visibleBuildings <= 0
+  ) {
+    await loadContinuousWorldInteractiveChunk(geo.lat, geo.lon, buildingReason);
+    before = countShell();
+  }
+  if (
+    before.roadFeatures <= 0 &&
+    before.visibleRoads <= 0 &&
+    before.visibleBuildings <= 0
+  ) {
+    return { recovered: false, reason: `${source}_no_local_shell` };
+  }
+
+  return {
+    recovered: true,
+    reason: source,
+    shell: before
+  };
+}
+
+function scheduleContinuousWorldActorAreaHardRecovery(options = {}) {
+  if (_continuousWorldInteractiveStreamState.hardRecoveryTimerId) {
+    clearTimeout(_continuousWorldInteractiveStreamState.hardRecoveryTimerId);
+    _continuousWorldInteractiveStreamState.hardRecoveryTimerId = null;
+  }
+  const delayMs = Math.max(600, Number(options.delayMs || 0) || 2200);
+  _continuousWorldInteractiveStreamState.hardRecoveryTimerId = window.setTimeout(async () => {
+    _continuousWorldInteractiveStreamState.hardRecoveryTimerId = null;
+    if (_continuousWorldInteractiveStreamState.hardRecoveryInFlight) return;
+    if (Date.now() - Number(_continuousWorldInteractiveStreamState.lastHardRecoveryAt || 0) < 15000) return;
+    if (typeof appCtx.loadRoads !== 'function' || typeof appCtx.worldToLatLon !== 'function') return;
+
+    const mode = String(options.mode || appCtx.getCurrentTravelMode?.() || 'drive');
+    const actor = continuousWorldInteractiveActorMotionState();
+    const targetX = finiteNumberOr(options.targetX, actor?.x);
+    const targetZ = finiteNumberOr(options.targetZ, actor?.z);
+    if (!Number.isFinite(targetX) || !Number.isFinite(targetZ)) return;
+
+    const explicitTarget = recentExplicitTeleportTargetState(targetX, targetZ, { radius: 280 });
+    if (!explicitTarget.active && mode === 'drive') return;
+
+    const visibleRoads = countVisibleRoadMeshesNearWorldPoint(targetX, targetZ, mode === 'drone' ? 420 : mode === 'walk' ? 220 : 320);
+    const visibleBuildings = countVisibleBuildingMeshesNearWorldPoint(targetX, targetZ, mode === 'drone' ? 560 : mode === 'walk' ? 260 : 360);
+    const roadFeatures = countDriveableRoadFeaturesNearWorldPoint(targetX, targetZ, mode === 'drone' ? 520 : mode === 'walk' ? 240 : 360);
+    if (visibleRoads > 0 || visibleBuildings > 0 || roadFeatures > 0) {
+      if (explicitTarget.active) clearRecentExplicitTeleportTarget('teleport_shell_ready');
+      return;
+    }
+
+    const geo = appCtx.worldToLatLon(targetX, targetZ);
+    if (!Number.isFinite(geo?.lat) || !Number.isFinite(geo?.lon)) return;
+
+    _continuousWorldInteractiveStreamState.hardRecoveryInFlight = true;
+    _continuousWorldInteractiveStreamState.lastHardRecoveryAt = Date.now();
+    _continuousWorldInteractiveStreamState.lastError = String(options.source || 'hard_recovery');
+
+    try {
+      if (_continuousWorldInteractiveStreamState.pending) {
+        if (_continuousWorldInteractiveStreamState.abortController) {
+          try {
+            _continuousWorldInteractiveStreamState.abortController.abort();
+          } catch {}
+        }
+        _continuousWorldInteractiveStreamState.pending = false;
+        _continuousWorldInteractiveStreamState.pendingStartedAt = 0;
+        _continuousWorldInteractiveStreamState.pendingQueryLat = NaN;
+        _continuousWorldInteractiveStreamState.pendingQueryLon = NaN;
+        _continuousWorldInteractiveStreamState.pendingRegionKey = null;
+        _continuousWorldInteractiveStreamState.abortController = null;
+        _continuousWorldInteractiveStreamState.activeRequestId =
+          Number(_continuousWorldInteractiveStreamState.activeRequestId || 0) + 1;
+      }
+      const softRecovery = await attemptContinuousWorldActorAreaSoftRecovery(
+        geo,
+        mode,
+        targetX,
+        targetZ,
+        options.source || 'hard_recovery_soft'
+      );
+      if (softRecovery?.recovered) {
+        clearRecentExplicitTeleportTarget('teleport_soft_recovered');
+        if (typeof appCtx.setTravelMode === 'function') {
+          appCtx.setTravelMode(mode, { source: options.source || 'hard_recovery_soft', force: true, emitTutorial: false });
+        }
+        if (mode === 'drive') {
+          const resolved = resolveSafeWorldSpawn(targetX, targetZ, {
+            mode: 'drive',
+            angle: finiteNumberOr(appCtx.car?.angle, 0),
+            maxRoadDistance: 320,
+            strictMaxDistance: true,
+            preferVisibleShell: false,
+            source: options.source || 'hard_recovery_soft'
+          });
+          if (resolved?.valid) {
+            applyResolvedWorldSpawn(resolved, { mode: 'drive', syncCar: true, syncWalker: true });
+          }
+        } else if (mode === 'walk') {
+          applySpawnTarget(targetX, targetZ, {
+            mode: 'walk',
+            strictMaxDistance: true,
+            source: options.source || 'hard_recovery_soft'
+          });
+        } else if (mode === 'drone' && appCtx.drone) {
+          appCtx.drone.x = targetX;
+          appCtx.drone.z = targetZ;
+          appCtx.drone.y = Math.max(Number(appCtx.drone.y || 0), 160);
+        }
+        _continuousWorldInteractiveStreamState.lastError = null;
+        return;
+      }
+      clearRecentExplicitTeleportTarget('teleport_local_recovery_failed');
+      _continuousWorldInteractiveStreamState.lastError = `${options.source || 'hard_recovery'}_local_shell_unavailable`;
+      if (typeof appCtx.requestWorldSurfaceSync === 'function') {
+        try {
+          appCtx.requestWorldSurfaceSync({
+            force: true,
+            source: options.source || 'hard_recovery_local_only'
+          });
+        } catch {}
+      }
+      if (typeof appCtx.updateTerrainAround === 'function') {
+        try {
+          appCtx.updateTerrainAround(targetX, targetZ);
+        } catch {}
+      }
+      scheduleContinuousWorldInteractiveRecoveryShell(120);
+      return;
+    } catch (error) {
+      _continuousWorldInteractiveStreamState.lastError = `hard_recovery_failed:${error?.message || String(error)}`;
+    } finally {
+      _continuousWorldInteractiveStreamState.hardRecoveryInFlight = false;
+    }
+  }, delayMs);
+}
+
+function scheduleContinuousWorldInteractiveDriveRecovery(options = {}) {
+  if (_continuousWorldInteractiveStreamState.recoveryTimerId) {
+    clearTimeout(_continuousWorldInteractiveStreamState.recoveryTimerId);
+    _continuousWorldInteractiveStreamState.recoveryTimerId = null;
+  }
+  const attemptsRemaining = Math.max(1, Number(options.attempts || 5));
+  const delayMs = Math.max(120, Number(options.delayMs || 260));
+  const shellAfterRecovery = options.shellAfterRecovery !== false;
+  _continuousWorldInteractiveStreamState.recoveryTimerId = window.setTimeout(() => {
+    _continuousWorldInteractiveStreamState.recoveryTimerId = null;
+    const actorState = continuousWorldInteractiveActorMotionState();
+    if (String(actorState?.mode || 'drive') !== 'drive') return;
+    const actor = currentMapReferenceGeoPosition();
+    const spawn = resolveSafeWorldSpawn(actor.x, actor.z, {
+      mode: 'drive',
+      angle: finiteNumberOr(appCtx.car?.angle, 0),
+      preferredRoad: appCtx.car?.road || appCtx.car?._lastStableRoad || null,
+      maxRoadDistance: Math.max(220, Number(options.maxRoadDistance || 0)),
+      strictMaxDistance: true,
+      source: options.source || 'continuous_world_stream_recovery'
+    });
+    const recoveredOnRoad = !!(spawn?.valid && spawn?.onRoad);
+    if (recoveredOnRoad && !appCtx.car?.onRoad) {
+      applyResolvedWorldSpawn(spawn, { mode: 'drive', syncCar: true, syncWalker: false });
+    }
+    if (recoveredOnRoad || appCtx.car?.onRoad) {
+      if (shellAfterRecovery) scheduleContinuousWorldInteractiveRecoveryShell(140);
+      return;
+    }
+    if (attemptsRemaining > 1) {
+      scheduleContinuousWorldInteractiveDriveRecovery({
+        attempts: attemptsRemaining - 1,
+        delayMs: Math.min(520, delayMs + 80),
+        shellAfterRecovery,
+        maxRoadDistance: Math.max(220, Number(options.maxRoadDistance || 0)),
+        source: options.source || 'continuous_world_stream_recovery'
+      });
+      return;
+    }
+    if (shellAfterRecovery) scheduleContinuousWorldInteractiveRecoveryShell(220);
+  }, delayMs);
+}
+
+function updatePlayableCoreResidency(force = false, options = {}) {
+  const actor = options.actorState || continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  const actorX = Number(actor?.x || 0);
+  const actorZ = Number(actor?.z || 0);
+  const radius = playableCoreRadiusForMode(mode);
+  const structureRadius = Math.round(radius * PLAYABLE_CORE_RESIDENCY_CONFIG.structureRadiusScale);
+  const minRoadMeshesReady =
+    Number(
+      PLAYABLE_CORE_RESIDENCY_CONFIG.minRoadMeshesReady?.[mode] ??
+      PLAYABLE_CORE_RESIDENCY_CONFIG.minRoadMeshesReady?.drive ??
+      1
+    ) || 1;
+  const minVisibleRoadMeshesReady =
+    Number(
+      PLAYABLE_CORE_RESIDENCY_CONFIG.minVisibleRoadMeshesReady?.[mode] ??
+      PLAYABLE_CORE_RESIDENCY_CONFIG.minVisibleRoadMeshesReady?.drive ??
+      1
+    ) || 1;
+  const recenterThreshold = Math.max(
+    PLAYABLE_CORE_RESIDENCY_CONFIG.minRecenterDistance,
+    radius * PLAYABLE_CORE_RESIDENCY_CONFIG.recenterRatio
+  );
+  const centerDistance = Math.hypot(
+    actorX - Number(_playableCoreResidencyState.centerX || 0),
+    actorZ - Number(_playableCoreResidencyState.centerZ || 0)
+  );
+  const shouldRecenter =
+    force ||
+    !_playableCoreResidencyState.bounds ||
+    _playableCoreResidencyState.mode !== mode ||
+    centerDistance >= recenterThreshold;
+
+  if (shouldRecenter) {
+    const nextBounds = playableCoreBoundsFromCenter(actorX, actorZ, radius);
+    const nextStructureBounds = playableCoreBoundsFromCenter(actorX, actorZ, structureRadius);
+    const nextState = {
+      ..._playableCoreResidencyState,
+      centerX: actorX,
+      centerZ: actorZ,
+      radius,
+      structureRadius,
+      bounds: nextBounds,
+      structureBounds: nextStructureBounds,
+      mode
+    };
+    const nextRoadMeshCount = countRoadMeshesIntersectingPlayableCore(nextState);
+    const nextVisibleRoadMeshesNearActor =
+      mode === 'drive' ?
+        countVisibleRoadMeshesNearWorldPoint(actorX, actorZ, 240) :
+        nextRoadMeshCount;
+    const preserveLoadedCoreForShortMove =
+      !!_playableCoreResidencyState.bounds &&
+      !!_playableCoreResidencyState.ready &&
+      _playableCoreResidencyState.mode === mode &&
+      centerDistance < radius * 0.55 &&
+      (
+        nextRoadMeshCount < minRoadMeshesReady ||
+        nextVisibleRoadMeshesNearActor < minVisibleRoadMeshesReady
+      );
+    if (!preserveLoadedCoreForShortMove) {
+      _playableCoreResidencyState.centerX = actorX;
+      _playableCoreResidencyState.centerZ = actorZ;
+      _playableCoreResidencyState.radius = radius;
+      _playableCoreResidencyState.structureRadius = structureRadius;
+      _playableCoreResidencyState.bounds = nextBounds;
+      _playableCoreResidencyState.structureBounds = nextStructureBounds;
+      _playableCoreResidencyState.mode = mode;
+    }
+  }
+
+  const runtimeSnapshot =
+    options.runtimeSnapshot ||
+    (typeof appCtx.getContinuousWorldRuntimeSnapshot === 'function' ? appCtx.getContinuousWorldRuntimeSnapshot() : null);
+  _playableCoreResidencyState.regionKeys = playableCoreRegionKeysForBounds(
+    _playableCoreResidencyState.bounds,
+    runtimeSnapshot,
+    mode
+  );
+
+  let roadMeshCount = 0;
+  let urbanSurfaceCount = 0;
+  let structureMeshCount = 0;
+  const countIntersecting = (list, structure = false) => {
+    let count = 0;
+    if (!Array.isArray(list)) return count;
+    for (let i = 0; i < list.length; i++) {
+      const target = list[i];
+      if (!target) continue;
+      if (playableCoreIntersectsTarget(target, _playableCoreResidencyState, { structure })) count += 1;
+    }
+    return count;
+  };
+  roadMeshCount = countRoadMeshesIntersectingPlayableCore(_playableCoreResidencyState);
+  urbanSurfaceCount = countIntersecting(appCtx.urbanSurfaceMeshes, false);
+  structureMeshCount = countIntersecting(appCtx.structureVisualMeshes, true);
+
+  const terrainSnapshot =
+    options.terrainSnapshot ||
+    (typeof appCtx.getTerrainStreamingSnapshot === 'function' ? appCtx.getTerrainStreamingSnapshot() : null);
+  const nearTileCount = Number(terrainSnapshot?.activeNearTileCount || 0);
+  const nearLoaded = Number(terrainSnapshot?.activeNearTilesLoaded || 0);
+  const focusTileCount = Number(terrainSnapshot?.activeFocusTileCount || 0);
+  const focusLoaded = Number(terrainSnapshot?.activeFocusTilesLoaded || 0);
+  const nearRatio = nearTileCount > 0 ? nearLoaded / nearTileCount : 1;
+  const focusRatio = focusTileCount > 0 ? focusLoaded / focusTileCount : 1;
+  const terrainReady =
+    !!terrainSnapshot?.activeCenterLoaded &&
+    nearRatio >= PLAYABLE_CORE_RESIDENCY_CONFIG.terrainNearLoadRatio &&
+    focusRatio >= PLAYABLE_CORE_RESIDENCY_CONFIG.terrainFocusLoadRatio;
+
+  _playableCoreResidencyState.terrainReady = terrainReady;
+  _playableCoreResidencyState.roadMeshCount = roadMeshCount;
+  _playableCoreResidencyState.urbanSurfaceCount = urbanSurfaceCount;
+  _playableCoreResidencyState.structureMeshCount = structureMeshCount;
+  const visibleRoadMeshesNearActor =
+    mode === 'drive' ?
+      countVisibleRoadMeshesNearWorldPoint(actorX, actorZ, 240) :
+      roadMeshCount;
+  _playableCoreResidencyState.ready =
+    terrainReady &&
+    (
+      roadMeshCount >= minRoadMeshesReady ||
+      visibleRoadMeshesNearActor >= minVisibleRoadMeshesReady
+    );
+  _playableCoreResidencyState.reason = String(options.reason || (shouldRecenter ? 'recenter' : 'refresh'));
+  _playableCoreResidencyState.lastUpdatedAt = performance.now();
+  return _playableCoreResidencyState;
+}
+
+function getPlayableCoreResidencySnapshot() {
+  const state = updatePlayableCoreResidency(false, { reason: 'snapshot' });
+  return {
+    ready: !!state.ready,
+    mode: state.mode,
+    center: {
+      x: Number((state.centerX || 0).toFixed(2)),
+      z: Number((state.centerZ || 0).toFixed(2))
+    },
+    bounds: state.bounds ? {
+      minX: Number(state.bounds.minX.toFixed(2)),
+      maxX: Number(state.bounds.maxX.toFixed(2)),
+      minZ: Number(state.bounds.minZ.toFixed(2)),
+      maxZ: Number(state.bounds.maxZ.toFixed(2))
+    } : null,
+    structureBounds: state.structureBounds ? {
+      minX: Number(state.structureBounds.minX.toFixed(2)),
+      maxX: Number(state.structureBounds.maxX.toFixed(2)),
+      minZ: Number(state.structureBounds.minZ.toFixed(2)),
+      maxZ: Number(state.structureBounds.maxZ.toFixed(2))
+    } : null,
+    radius: Number(state.radius || 0),
+    structureRadius: Number(state.structureRadius || 0),
+    regionKeys: Array.isArray(state.regionKeys) ? state.regionKeys.slice(0, 16) : [],
+    regionKeyCount: Array.isArray(state.regionKeys) ? state.regionKeys.length : 0,
+    terrainReady: !!state.terrainReady,
+    roadMeshCount: Number(state.roadMeshCount || 0),
+    urbanSurfaceCount: Number(state.urbanSurfaceCount || 0),
+    structureMeshCount: Number(state.structureMeshCount || 0),
+    reason: state.reason || null,
+    lastUpdatedAt: Number.isFinite(state.lastUpdatedAt) ? Number(state.lastUpdatedAt.toFixed(1)) : 0
+  };
+}
+
+function continuousWorldInteractiveRetainRegionKeys(runtimeSnapshot = null, focusRegionKey = null, actorState = null) {
+  const retain = new Set();
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  const speed = Math.abs(Number(actor?.speed || 0));
+  const worldBuildStage = String(appCtx.worldBuildStage || '');
+  const strictRegionScope = continuousWorldRuntimeUsesStrictRegionScope(runtimeSnapshot);
+  const keepMidBand =
+    mode === 'walk' ||
+    (mode === 'drive' && speed < 6);
+  const addBand = (cells) => {
+    (Array.isArray(cells) ? cells : []).forEach((cell) => {
+      const key = String(cell?.key || '').trim();
+      if (key) retain.add(key);
+    });
+  };
+  const snapshot = runtimeSnapshot || appCtx.getContinuousWorldRuntimeSnapshot?.();
+  if (snapshot?.activeRegion?.key) retain.add(String(snapshot.activeRegion.key));
+  addBand(snapshot?.activeRegionRings?.near);
+  if (keepMidBand) addBand(snapshot?.activeRegionRings?.mid);
+  if (focusRegionKey) retain.add(String(focusRegionKey));
+  if (!strictRegionScope && _continuousWorldInteractiveStreamState.pendingRegionKey) {
+    retain.add(String(_continuousWorldInteractiveStreamState.pendingRegionKey));
+  }
+  const recentCoverageCount =
+    strictRegionScope ? 0 : CONTINUOUS_WORLD_INTERACTIVE_STREAM_RECENT_RETAIN_COUNT;
+  const recentCoverage = Array.isArray(_continuousWorldInteractiveStreamState.coverage) ?
+    _continuousWorldInteractiveStreamState.coverage.slice(-recentCoverageCount) :
+    [];
+  recentCoverage.forEach((entry) => {
+    const key = String(entry?.regionKey || '').trim();
+    if (key) retain.add(key);
+  });
+  const keepPlayableCoreRegions =
+    !strictRegionScope &&
+    (
+      worldBuildStage !== 'full_world_ready' ||
+      mode === 'walk'
+    );
+  if (keepPlayableCoreRegions) {
+    const playableCore = updatePlayableCoreResidency(false, {
+      actorState: actor,
+      runtimeSnapshot: snapshot,
+      reason: 'retain_regions'
+    });
+    if (Array.isArray(playableCore?.regionKeys)) {
+      for (let i = 0; i < playableCore.regionKeys.length; i++) {
+        retain.add(playableCore.regionKeys[i]);
+      }
+    }
+  }
+  return retain;
+}
+
+function continuousWorldRuntimeUsesStrictRegionScope(runtimeSnapshot = null) {
+  const snapshot = runtimeSnapshot || appCtx.getContinuousWorldRuntimeSnapshot?.();
+  const nearRadius = Number(snapshot?.regionConfig?.nearRadius || 0);
+  const midRadius = Number(snapshot?.regionConfig?.midRadius || 0);
+  const farRadius = Number(snapshot?.regionConfig?.farRadius || 0);
+  return nearRadius <= 0 && midRadius <= 0 && farRadius <= 0;
+}
+
+function continuousWorldRoadRetainPlayableRegionKeys(actorState = null, runtimeSnapshot = null) {
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  const snapshot = runtimeSnapshot || appCtx.getContinuousWorldRuntimeSnapshot?.();
+  const worldBuildStage = String(appCtx.worldBuildStage || '');
+  if (continuousWorldRuntimeUsesStrictRegionScope(snapshot)) return [];
+  const playableCore = updatePlayableCoreResidency(false, {
+    actorState: actor,
+    runtimeSnapshot: snapshot,
+    reason: 'road_retain_regions'
+  });
+  if (!Array.isArray(playableCore?.regionKeys) || playableCore.regionKeys.length === 0) return [];
+  if (worldBuildStage !== 'full_world_ready' || mode === 'walk') {
+    return playableCore.regionKeys.slice();
+  }
+  if (!Number.isFinite(actor?.x) || !Number.isFinite(actor?.z)) {
+    return playableCore.regionKeys.slice();
+  }
+  if (mode === 'drive' || mode === 'drone') {
+    const roadCfg = ACTOR_ROAD_SHELL_CONFIG[mode] || ACTOR_ROAD_SHELL_CONFIG.drive;
+    const speed = Math.abs(Number(actor?.speed || 0));
+    const radius =
+      mode === 'drone' ?
+        Math.max(roadCfg.visibleRadius || 420, 520) :
+        Math.max(
+          roadCfg.visibleRadius || 320,
+          speed >= 8 ? 340 : 260
+        );
+    const actorBounds = playableCoreBoundsFromCenter(actor.x, actor.z, radius);
+    return playableCoreRegionKeysForBounds(actorBounds, snapshot, mode);
+  }
+  return playableCore.regionKeys.slice();
+}
+
+function continuousWorldInteractiveRoadRetainRegionKeys(runtimeSnapshot = null, focusRegionKey = null, actorState = null) {
+  const retain = continuousWorldInteractiveRetainRegionKeys(runtimeSnapshot, focusRegionKey, actorState);
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  const speed = Math.abs(Number(actor?.speed || 0));
+  const snapshot = runtimeSnapshot || appCtx.getContinuousWorldRuntimeSnapshot?.();
+  const worldBuildStage = String(appCtx.worldBuildStage || '');
+  const strictRegionScope = continuousWorldRuntimeUsesStrictRegionScope(snapshot);
+  const forwardCorridor = continuousWorldForwardRoadCorridorState(actor, snapshot);
+  const addBand = (cells) => {
+    (Array.isArray(cells) ? cells : []).forEach((cell) => {
+      const key = String(cell?.key || '').trim();
+      if (key) retain.add(key);
+    });
+  };
+  if (mode === 'drive' || mode === 'drone') {
+    addBand(snapshot?.activeRegionRings?.mid);
+  }
+  if (mode === 'drive' && speed >= 8) {
+    addBand(snapshot?.activeRegionRings?.far);
+  }
+  const recentCoverageCount =
+    strictRegionScope ? 0 :
+    worldBuildStage !== 'full_world_ready' ? CONTINUOUS_WORLD_INTERACTIVE_STREAM_ROAD_RECENT_RETAIN_COUNT :
+    mode === 'drive' ? 2 :
+    mode === 'drone' ? 3 :
+    CONTINUOUS_WORLD_INTERACTIVE_STREAM_ROAD_RECENT_RETAIN_COUNT;
+  const recentCoverage = Array.isArray(_continuousWorldInteractiveStreamState.coverage) ?
+    _continuousWorldInteractiveStreamState.coverage.slice(-recentCoverageCount) :
+    [];
+  recentCoverage.forEach((entry) => {
+    const key = String(entry?.regionKey || '').trim();
+    if (key) retain.add(key);
+  });
+  const forwardCorridorCoverage = Array.isArray(_continuousWorldInteractiveStreamState.coverage) ?
+    _continuousWorldInteractiveStreamState.coverage
+      .filter((entry) => continuousWorldInteractiveReasonIsForwardRoadCorridor(entry?.reason))
+      .slice(-4) :
+    [];
+  forwardCorridorCoverage.forEach((entry) => {
+    const key = String(entry?.regionKey || '').trim();
+    if (key) retain.add(key);
+  });
+  if (!strictRegionScope && _continuousWorldInteractiveStreamState.pendingRegionKey) {
+    retain.add(String(_continuousWorldInteractiveStreamState.pendingRegionKey));
+  }
+  const playableRoadKeys = continuousWorldRoadRetainPlayableRegionKeys(actor, snapshot);
+  for (let i = 0; i < playableRoadKeys.length; i++) {
+    retain.add(playableRoadKeys[i]);
+  }
+  if (Array.isArray(forwardCorridor?.regionKeys)) {
+    for (let i = 0; i < forwardCorridor.regionKeys.length; i++) {
+      retain.add(forwardCorridor.regionKeys[i]);
+    }
+  }
+  return retain;
+}
+
+function continuousWorldBaseRetainRegionKeys(runtimeSnapshot = null, focusRegionKey = null, actorState = null, options = {}) {
+  const retain = new Set();
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  const speed = Math.abs(Number(actor?.speed || 0));
+  const snapshot = runtimeSnapshot || appCtx.getContinuousWorldRuntimeSnapshot?.();
+  const actorDistance = Math.hypot(Number(actor?.x || 0), Number(actor?.z || 0));
+  const farTravel = actorDistance >= CONTINUOUS_WORLD_BASE_EVICTION_FAR_DISTANCE;
+  const forwardCorridor = options.roads === true ? continuousWorldForwardRoadCorridorState(actor, snapshot) : null;
+  const keepMidBand =
+    mode === 'walk' ||
+    (mode === 'drive' && speed < 6 && !farTravel) ||
+    options.roads === true;
+  const addBand = (cells) => {
+    (Array.isArray(cells) ? cells : []).forEach((cell) => {
+      const key = String(cell?.key || '').trim();
+      if (key) retain.add(key);
+    });
+  };
+  if (snapshot?.activeRegion?.key) retain.add(String(snapshot.activeRegion.key));
+  addBand(snapshot?.activeRegionRings?.near);
+  if (keepMidBand) addBand(snapshot?.activeRegionRings?.mid);
+  if (options.roads === true && (mode === 'drive' || mode === 'drone')) {
+    addBand(snapshot?.activeRegionRings?.mid);
+    if (mode === 'drive' && speed >= 8) addBand(snapshot?.activeRegionRings?.far);
+  }
+  if (focusRegionKey) retain.add(String(focusRegionKey));
+  if (_continuousWorldInteractiveStreamState.pendingRegionKey) {
+    retain.add(String(_continuousWorldInteractiveStreamState.pendingRegionKey));
+  }
+  if (options.roads === true) {
+    const forwardCorridorCoverage = Array.isArray(_continuousWorldInteractiveStreamState.coverage) ?
+      _continuousWorldInteractiveStreamState.coverage
+        .filter((entry) => continuousWorldInteractiveReasonIsForwardRoadCorridor(entry?.reason))
+        .slice(-4) :
+      [];
+    forwardCorridorCoverage.forEach((entry) => {
+      const key = String(entry?.regionKey || '').trim();
+      if (key) retain.add(key);
+    });
+  }
+  const includePlayableCore =
+    (options.roads === true && !continuousWorldRuntimeUsesStrictRegionScope(snapshot)) ||
+    mode === 'walk' ||
+    (mode === 'drive' && speed < 4 && !farTravel);
+  if (includePlayableCore) {
+    const playableKeys =
+      options.roads === true ?
+        continuousWorldRoadRetainPlayableRegionKeys(actor, snapshot) :
+        (() => {
+          const playableCore = updatePlayableCoreResidency(false, {
+            actorState: actor,
+            runtimeSnapshot: snapshot,
+            reason: options.roads === true ? 'base_road_retain_regions' : 'base_retain_regions'
+          });
+          return Array.isArray(playableCore?.regionKeys) ? playableCore.regionKeys : [];
+        })();
+    for (let i = 0; i < playableKeys.length; i++) {
+      retain.add(playableKeys[i]);
+    }
+  }
+  if (Array.isArray(forwardCorridor?.regionKeys)) {
+    for (let i = 0; i < forwardCorridor.regionKeys.length; i++) {
+      retain.add(forwardCorridor.regionKeys[i]);
+    }
+  }
+  return retain;
+}
+
+function shouldDeferInteractiveRoadEviction(actorState = null) {
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  if (mode !== 'drive') return false;
+  const speed = Math.abs(Number(actor?.speed || 0));
+  const visibleRoadsNearActor = countVisibleRoadMeshesNearWorldPoint(actor?.x, actor?.z, speed >= 8 ? 320 : 240);
+  const lowVisibleRoadState =
+    visibleRoadsNearActor < (PLAYABLE_CORE_RESIDENCY_CONFIG.minVisibleRoadMeshesReady?.drive || 12);
+  const pendingActorScoped =
+    !!_continuousWorldInteractiveStreamState.pending &&
+    (
+      ['main_loop', 'actor_drift', 'startup_roads_ready', 'road_recovery_shell'].includes(
+        String(_continuousWorldInteractiveStreamState.lastLoadReason || '')
+      ) ||
+      continuousWorldInteractiveReasonIsForwardRoadCorridor(_continuousWorldInteractiveStreamState.lastLoadReason || '')
+    );
+  return pendingActorScoped || speed >= 0.5 || lowVisibleRoadState;
+}
+
+function deriveContinuousWorldRegionKeysForFeature(feature) {
+  if (!feature || typeof feature !== 'object') return [];
+  const directKeys = Array.isArray(feature?.continuousWorldRegionKeys) ? feature.continuousWorldRegionKeys.filter((key) => typeof key === 'string' && key) : [];
+  if (directKeys.length > 0) return directKeys;
+
+  const userDataKeys = Array.isArray(feature?.userData?.continuousWorldRegionKeys) ?
+    feature.userData.continuousWorldRegionKeys.filter((key) => typeof key === 'string' && key) :
+    [];
+  if (userDataKeys.length > 0) return userDataKeys;
+
+  const explicitBounds =
+    Number.isFinite(feature?.bounds?.minX) &&
+    Number.isFinite(feature?.bounds?.maxX) &&
+    Number.isFinite(feature?.bounds?.minZ) &&
+    Number.isFinite(feature?.bounds?.maxZ) ?
+      feature.bounds :
+      Number.isFinite(feature?.minX) &&
+        Number.isFinite(feature?.maxX) &&
+        Number.isFinite(feature?.minZ) &&
+        Number.isFinite(feature?.maxZ) ?
+          {
+            minX: feature.minX,
+            maxX: feature.maxX,
+            minZ: feature.minZ,
+            maxZ: feature.maxZ
+          } :
+          Number.isFinite(feature?.x) && Number.isFinite(feature?.z) ?
+            {
+              minX: feature.x,
+              maxX: feature.x,
+              minZ: feature.z,
+              maxZ: feature.z
+            } :
+            null;
+  const points = Array.isArray(feature?.pts) && feature.pts.length > 0 ?
+    feature.pts :
+    explicitBounds ? [
+      { x: explicitBounds.minX, z: explicitBounds.minZ },
+      { x: explicitBounds.minX, z: explicitBounds.maxZ },
+      { x: explicitBounds.maxX, z: explicitBounds.maxZ },
+      { x: explicitBounds.maxX, z: explicitBounds.minZ }
+    ] :
+    null;
+  if (!points || points.length === 0) return [];
+  const derivedKeys = buildContinuousWorldRegionKeysFromPoints(points, null, explicitBounds || null)
+    .filter((key) => typeof key === 'string' && key);
+  if (derivedKeys.length > 0 && feature && typeof feature === 'object') {
+    feature.continuousWorldRegionKeys = derivedKeys.slice();
+  }
+  return derivedKeys;
+}
+
+function continuousWorldInteractiveFeatureIntersectsRetainedRegions(feature, retainKeys) {
+  if (!(retainKeys instanceof Set) || retainKeys.size === 0) return true;
+  const featureKeys = deriveContinuousWorldRegionKeysForFeature(feature);
+  if (featureKeys.length === 0) return true;
+  for (let i = 0; i < featureKeys.length; i++) {
+    if (retainKeys.has(featureKeys[i])) return true;
+  }
+  return false;
+}
+
+const RUNTIME_CONTENT_TRACKED_ARRAYS = Object.freeze([
+  ['roadMeshes', 'road_mesh'],
+  ['urbanSurfaceMeshes', 'urban_surface_mesh'],
+  ['structureVisualMeshes', 'structure_visual_mesh'],
+  ['buildingMeshes', 'building_mesh'],
+  ['landuseMeshes', 'landuse_mesh'],
+  ['linearFeatureMeshes', 'linear_feature_mesh'],
+  ['poiMeshes', 'poi_mesh'],
+  ['streetFurnitureMeshes', 'street_furniture_mesh'],
+  ['vegetationMeshes', 'vegetation_mesh'],
+  ['historicMarkers', 'historic_marker_mesh']
+]);
+
+const runtimeContentInventory = {
+  active: new Map(),
+  totalRegistered: 0,
+  totalRetired: 0,
+  untrackedRetirements: 0,
+  missingWithoutRetire: 0,
+  retiredByReason: Object.create(null),
+  lastSyncAt: 0,
+  lastSyncReason: null,
+  lastRetireAt: 0,
+  lastRetireReason: null
+};
+
+function recordRuntimeContentReason(reason = 'unknown') {
+  const key = String(reason || 'unknown').trim() || 'unknown';
+  runtimeContentInventory.retiredByReason[key] =
+    Number(runtimeContentInventory.retiredByReason[key] || 0) + 1;
+}
+
+function runtimeContentKindForTarget(target, arrayKey = '') {
+  if (arrayKey === 'overlayPublishedGroup') {
+    const overlayClass = String(target?.userData?.overlayFeatureClass || '').trim().toLowerCase();
+    return overlayClass ? `overlay_${overlayClass}` : 'overlay_mesh';
+  }
+  if (arrayKey === 'terrainGroup') return 'terrain_tile_mesh';
+  return arrayKey ? String(arrayKey).replace(/Meshes$/, '').replace(/Markers$/, '_marker') : 'mesh';
+}
+
+function runtimeContentSourceForTarget(target, arrayKey = '') {
+  const userData = target?.userData || {};
+  const sourceId =
+    String(userData?.sourceFeatureId || userData?.sourceBuildingId || userData?.overlayFeatureId || '').trim();
+  if (
+    arrayKey === 'overlayPublishedGroup' ||
+    sourceId.startsWith('overlay:') ||
+    !!userData?.overlayFeatureId ||
+    !!userData?.overlayFeatureClass
+  ) {
+    return 'overlay';
+  }
+  if (userData?.continuousWorldInteractiveChunk === true || target?.continuousWorldInteractiveChunk === true) {
+    return 'interactive';
+  }
+  if (userData?.syntheticFallbackWorld === true || target?.syntheticFallbackWorld === true) {
+    return 'synthetic';
+  }
+  return 'base';
+}
+
+function upsertRuntimeContentInventoryEntry(target, arrayKey = '') {
+  const id = String(target?.uuid || '').trim();
+  if (!id) return '';
+  const existing = runtimeContentInventory.active.get(id);
+  const regionKeys = deriveContinuousWorldRegionKeysForFeature(target?.userData || target);
+  const localBounds = target?.userData?.localBounds || target?.localBounds || null;
+  const entry = {
+    id,
+    kind: runtimeContentKindForTarget(target, arrayKey),
+    arrayKey: arrayKey || existing?.arrayKey || 'unknown',
+    source: runtimeContentSourceForTarget(target, arrayKey),
+    objectType: String(target?.type || existing?.objectType || 'Object3D'),
+    sceneAttached: !!target?.parent,
+    regionKeyCount: Array.isArray(regionKeys) ? regionKeys.length : 0,
+    hasBounds: !!localBounds,
+    childMeshCount: Number(target?.userData?.runtimeChildMeshCount || 0),
+    registeredAt: Number(existing?.registeredAt || Date.now()),
+    lastSeenAt: Date.now(),
+    retiredAt: 0,
+    retireReason: null
+  };
+  if (!existing) {
+    runtimeContentInventory.totalRegistered += 1;
+  }
+  runtimeContentInventory.active.set(id, entry);
+  return id;
+}
+
+function recordRuntimeContentRetired(target, reason = 'removed') {
+  const id = String(target?.uuid || '').trim();
+  const retireReason = String(reason || 'removed').trim() || 'removed';
+  if (!id) {
+    runtimeContentInventory.untrackedRetirements += 1;
+    recordRuntimeContentReason(`untracked:${retireReason}`);
+    runtimeContentInventory.lastRetireAt = Date.now();
+    runtimeContentInventory.lastRetireReason = retireReason;
+    return;
+  }
+  const existing = runtimeContentInventory.active.get(id);
+  if (!existing) {
+    runtimeContentInventory.untrackedRetirements += 1;
+    recordRuntimeContentReason(`untracked:${retireReason}`);
+    runtimeContentInventory.lastRetireAt = Date.now();
+    runtimeContentInventory.lastRetireReason = retireReason;
+    return;
+  }
+  if (!existing.retiredAt) {
+    runtimeContentInventory.totalRetired += 1;
+    recordRuntimeContentReason(retireReason);
+  }
+  existing.retiredAt = Date.now();
+  existing.retireReason = retireReason;
+  existing.sceneAttached = !!target?.parent;
+  existing.lastSeenAt = Date.now();
+  runtimeContentInventory.active.set(id, existing);
+  runtimeContentInventory.lastRetireAt = existing.retiredAt;
+  runtimeContentInventory.lastRetireReason = retireReason;
+}
+
+function trackedRuntimeContentCollections() {
+  const collections = [];
+  for (let i = 0; i < RUNTIME_CONTENT_TRACKED_ARRAYS.length; i++) {
+    const [arrayKey, kind] = RUNTIME_CONTENT_TRACKED_ARRAYS[i];
+    const source = appCtx[arrayKey];
+    if (Array.isArray(source) && source.length > 0) {
+      collections.push({ arrayKey, kind, items: source });
+    }
+  }
+  const overlayGroup =
+    appCtx.overlayPublishedGroup ||
+    (typeof appCtx.scene?.getObjectByName === 'function' ? appCtx.scene.getObjectByName('overlayPublishedGroup') : null);
+  if (Array.isArray(overlayGroup?.children) && overlayGroup.children.length > 0) {
+    collections.push({ arrayKey: 'overlayPublishedGroup', kind: 'overlay_mesh', items: overlayGroup.children });
+  }
+  if (Array.isArray(appCtx.terrainGroup?.children) && appCtx.terrainGroup.children.length > 0) {
+    collections.push({ arrayKey: 'terrainGroup', kind: 'terrain_tile_mesh', items: appCtx.terrainGroup.children });
+  }
+  return collections;
+}
+
+function syncRuntimeContentInventory(reason = 'manual') {
+  const seen = new Set();
+  const collections = trackedRuntimeContentCollections();
+  for (let i = 0; i < collections.length; i++) {
+    const collection = collections[i];
+    const items = collection.items;
+    for (let j = 0; j < items.length; j++) {
+      const target = items[j];
+      if (!target) continue;
+      const id = upsertRuntimeContentInventoryEntry(target, collection.arrayKey);
+      if (id) seen.add(id);
+    }
+  }
+
+  for (const [id, entry] of runtimeContentInventory.active.entries()) {
+    if (seen.has(id)) continue;
+    if (!entry.retiredAt) {
+      runtimeContentInventory.missingWithoutRetire += 1;
+      recordRuntimeContentReason('missing_without_retire');
+    }
+    runtimeContentInventory.active.delete(id);
+  }
+
+  runtimeContentInventory.lastSyncAt = Date.now();
+  runtimeContentInventory.lastSyncReason = String(reason || 'manual');
+  return getRuntimeContentInventorySnapshot();
+}
+
+function getRuntimeContentInventorySnapshot() {
+  const bySource = {};
+  const byKind = {};
+  const byArrayKey = {};
+  runtimeContentInventory.active.forEach((entry) => {
+    bySource[entry.source] = (bySource[entry.source] || 0) + 1;
+    byKind[entry.kind] = (byKind[entry.kind] || 0) + 1;
+    byArrayKey[entry.arrayKey] = (byArrayKey[entry.arrayKey] || 0) + 1;
+  });
+  return {
+    activeCount: runtimeContentInventory.active.size,
+    totalRegistered: runtimeContentInventory.totalRegistered,
+    totalRetired: runtimeContentInventory.totalRetired,
+    untrackedRetirements: runtimeContentInventory.untrackedRetirements,
+    missingWithoutRetire: runtimeContentInventory.missingWithoutRetire,
+    lastSyncAt: runtimeContentInventory.lastSyncAt || 0,
+    lastSyncReason: runtimeContentInventory.lastSyncReason || null,
+    lastRetireAt: runtimeContentInventory.lastRetireAt || 0,
+    lastRetireReason: runtimeContentInventory.lastRetireReason || null,
+    bySource,
+    byKind,
+    byArrayKey,
+    retiredByReason: { ...runtimeContentInventory.retiredByReason }
+  };
+}
+
+function getRuntimeContentInventorySourceStats(source = 'base') {
+  const normalizedSource = String(source || 'base').trim() || 'base';
+  const stats = {
+    activeCount: 0,
+    sceneAttachedCount: 0,
+    byKind: {},
+    byArrayKey: {}
+  };
+  runtimeContentInventory.active.forEach((entry) => {
+    if (entry?.source !== normalizedSource) return;
+    stats.activeCount += 1;
+    if (entry?.sceneAttached) stats.sceneAttachedCount += 1;
+    const kind = String(entry?.kind || 'unknown');
+    const arrayKey = String(entry?.arrayKey || 'unknown');
+    stats.byKind[kind] = (stats.byKind[kind] || 0) + 1;
+    stats.byArrayKey[arrayKey] = (stats.byArrayKey[arrayKey] || 0) + 1;
+  });
+  return stats;
+}
+
+function disposeMeshForContinuousWorldEviction(mesh, reason = 'eviction') {
+  if (!mesh) return;
+  recordRuntimeContentRetired(mesh, reason);
+  if (mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
+  const disposedGeometries = new Set();
+  const disposedMaterials = new Set();
+  const disposedTextures = new Set();
+  const sharedFurnitureMaterial =
+    mesh?.material === _matPole ||
+    mesh?.material === _matSignBg ||
+    mesh?.material === _matTrunk ||
+    mesh?.material === _matLampHead ||
+    mesh?.material === _matTrashBody ||
+    mesh?.material === _matTrashLid ||
+    (Array.isArray(_matTreeShades) && _matTreeShades.includes(mesh?.material));
+  const sharedFurnitureGeometry =
+    mesh?.geometry === _geoSignPole ||
+    mesh?.geometry === _geoSignBoard ||
+    mesh?.geometry === _geoTreeCanopy ||
+    mesh?.geometry === _geoTreeTrunk ||
+    mesh?.geometry === _geoLampPole ||
+    mesh?.geometry === _geoLampHead ||
+    mesh?.geometry === _geoTrashBody ||
+    mesh?.geometry === _geoTrashLid;
+  const disposeMaterialTextures = (material) => {
+    if (!material || disposedMaterials.has(material)) return;
+    disposedMaterials.add(material);
+    const sharedMaterial =
+      !!material.userData?.sharedRoadMaterial ||
+      !!material.userData?.sharedUrbanSurfaceMaterial ||
+      !!material.userData?.sharedStreetSignMaterial ||
+      !!material.userData?.sharedContinuousWorldMaterial ||
+      material === _matPole ||
+      material === _matSignBg ||
+      material === _matTrunk ||
+      material === _matLampHead ||
+      material === _matTrashBody ||
+      material === _matTrashLid ||
+      (Array.isArray(_matTreeShades) && _matTreeShades.includes(material));
+    if (sharedMaterial) return;
+    [
+      'map',
+      'normalMap',
+      'roughnessMap',
+      'metalnessMap',
+      'emissiveMap',
+      'alphaMap',
+      'aoMap',
+      'bumpMap',
+      'displacementMap',
+      'lightMap',
+      'specularMap',
+      'gradientMap'
+    ].forEach((key) => {
+      const texture = material[key];
+      if (
+        texture &&
+        !disposedTextures.has(texture) &&
+        typeof texture.dispose === 'function' &&
+        !texture.userData?.sharedStreetSignTexture &&
+        !texture.userData?.sharedOceanTexture &&
+        !texture.userData?.sharedContinuousWorldTexture
+      ) {
+        disposedTextures.add(texture);
+        texture.dispose();
+      }
+    });
+    if (typeof material.dispose === 'function') {
+      material.dispose();
+    }
+  };
+  const disposeObject = (obj) => {
+    if (!obj) return;
+    const geometry = obj.geometry;
+    if (
+      geometry &&
+      !disposedGeometries.has(geometry) &&
+      typeof geometry.dispose === 'function' &&
+      geometry !== _geoSignPole &&
+      geometry !== _geoSignBoard &&
+      geometry !== _geoTreeCanopy &&
+      geometry !== _geoTreeTrunk &&
+      geometry !== _geoLampPole &&
+      geometry !== _geoLampHead &&
+      geometry !== _geoTrashBody &&
+      geometry !== _geoTrashLid
+    ) {
+      disposedGeometries.add(geometry);
+      geometry.dispose();
+    }
+    const material = obj.material;
+    if (Array.isArray(material)) {
+      material.forEach(disposeMaterialTextures);
+    } else {
+      disposeMaterialTextures(material);
+    }
+  };
+  if (typeof mesh.traverse === 'function') {
+    mesh.traverse(disposeObject);
+    return;
+  }
+  if (mesh.geometry && typeof mesh.geometry.dispose === 'function' && !sharedFurnitureGeometry) {
+    mesh.geometry.dispose();
+  }
+  const material = mesh.material;
+  const ownsRoadMaterial = !!mesh.userData?.sharedRoadMaterial;
+  const ownsUrbanMaterial = !!mesh.userData?.sharedUrbanSurfaceMaterial;
+  if (material && !ownsRoadMaterial && !ownsUrbanMaterial && !sharedFurnitureMaterial) {
+    if (Array.isArray(material)) {
+      material.forEach(disposeMaterialTextures);
+    } else {
+      disposeMaterialTextures(material);
+    }
+  }
+}
+
+function disposeTrackedMeshList(targetList, reason = 'dispose_list') {
+  if (!Array.isArray(targetList) || targetList.length === 0) return;
+  for (let i = 0; i < targetList.length; i++) {
+    disposeMeshForContinuousWorldEviction(targetList[i], reason);
+  }
+  targetList.length = 0;
+}
+
+function mergeRoadMutationBounds(targetBounds, nextBounds) {
+  if (!nextBounds) return targetBounds || null;
+  if (!targetBounds) return { ...nextBounds };
+  return {
+    minX: Math.min(targetBounds.minX, nextBounds.minX),
+    maxX: Math.max(targetBounds.maxX, nextBounds.maxX),
+    minZ: Math.min(targetBounds.minZ, nextBounds.minZ),
+    maxZ: Math.max(targetBounds.maxZ, nextBounds.maxZ)
+  };
+}
+
+function recordRoadMutationFeature(collector, feature) {
+  if (!collector || !feature) return;
+  collector.bounds = mergeRoadMutationBounds(
+    collector.bounds || null,
+    feature?.bounds || (Array.isArray(feature?.pts) ? polylineBounds(feature.pts, (Number(feature?.width) || 4) * 0.5 + 18) : null)
+  );
+  const keys = Array.isArray(feature?.continuousWorldRegionKeys) ? feature.continuousWorldRegionKeys : [];
+  if (!(collector.regionKeys instanceof Set)) collector.regionKeys = new Set();
+  for (let i = 0; i < keys.length; i++) {
+    if (typeof keys[i] === 'string' && keys[i]) collector.regionKeys.add(keys[i]);
+  }
+}
+
+function removeInteractiveFeaturesByRegion(source, retainKeys, countsKey, idSet = null, idField = '', collector = null) {
+  if (!Array.isArray(source) || source.length === 0) return;
+  const kept = [];
+  let removed = 0;
+  for (let i = 0; i < source.length; i++) {
+    const feature = source[i];
+    const isInteractive = feature?.continuousWorldInteractiveChunk === true;
+    if (
+      isInteractive &&
+      !continuousWorldInteractiveFeatureIntersectsRetainedRegions(feature, retainKeys)
+    ) {
+      removed += 1;
+      recordRoadMutationFeature(collector, feature);
+      const sourceId = String(feature?.[idField] || '').trim();
+      if (sourceId && idSet instanceof Set) idSet.delete(sourceId);
+      continue;
+    }
+    kept.push(feature);
+  }
+  source.length = 0;
+  for (let i = 0; i < kept.length; i++) source.push(kept[i]);
+  _continuousWorldInteractiveStreamState[countsKey] =
+    Number(_continuousWorldInteractiveStreamState[countsKey] || 0) + removed;
+}
+
+function removeInteractiveMeshesByRegion(targetList, retainKeys) {
+  if (!Array.isArray(targetList) || targetList.length === 0) return 0;
+  const kept = [];
+  let removed = 0;
+  for (let i = 0; i < targetList.length; i++) {
+    const mesh = targetList[i];
+    const isInteractive = mesh?.userData?.continuousWorldInteractiveChunk === true;
+    if (
+      isInteractive &&
+      !continuousWorldInteractiveFeatureIntersectsRetainedRegions(mesh?.userData, retainKeys)
+    ) {
+      disposeMeshForContinuousWorldEviction(mesh, 'interactive_eviction');
+      removed += 1;
+      continue;
+    }
+    kept.push(mesh);
+  }
+  targetList.length = 0;
+  for (let i = 0; i < kept.length; i++) targetList.push(kept[i]);
+  if (removed > 0 && targetList === appCtx.roadMeshes) {
+    markRoadMeshSpatialIndexDirty();
+  }
+  return removed;
+}
+
+function removeBaseFeaturesByRegion(source, retainKeys) {
+  if (!Array.isArray(source) || source.length === 0) return 0;
+  const kept = [];
+  let removed = 0;
+  for (let i = 0; i < source.length; i++) {
+    const feature = source[i];
+    const isInteractive = feature?.continuousWorldInteractiveChunk === true;
+    if (!isInteractive && !continuousWorldInteractiveFeatureIntersectsRetainedRegions(feature, retainKeys)) {
+      removed += 1;
+      continue;
+    }
+    kept.push(feature);
+  }
+  source.length = 0;
+  for (let i = 0; i < kept.length; i++) source.push(kept[i]);
+  return removed;
+}
+
+function removeBaseMeshesByRegion(targetList, retainKeys) {
+  if (!Array.isArray(targetList) || targetList.length === 0) return 0;
+  const kept = [];
+  let removed = 0;
+  for (let i = 0; i < targetList.length; i++) {
+    const mesh = targetList[i];
+    const isInteractive = mesh?.userData?.continuousWorldInteractiveChunk === true;
+    if (!isInteractive && !continuousWorldInteractiveFeatureIntersectsRetainedRegions(mesh?.userData || mesh, retainKeys)) {
+      disposeMeshForContinuousWorldEviction(mesh, 'base_eviction');
+      removed += 1;
+      continue;
+    }
+    kept.push(mesh);
+  }
+  targetList.length = 0;
+  for (let i = 0; i < kept.length; i++) targetList.push(kept[i]);
+  return removed;
+}
+
+function refreshContinuousWorldInteractiveActiveCounts() {
+  _continuousWorldInteractiveStreamState.activeInteractiveRoads = (Array.isArray(appCtx.roads) ? appCtx.roads : [])
+    .filter((road) => road?.continuousWorldInteractiveChunk === true).length;
+  _continuousWorldInteractiveStreamState.activeInteractiveBuildings = (Array.isArray(appCtx.buildings) ? appCtx.buildings : [])
+    .filter((building) => building?.continuousWorldInteractiveChunk === true).length;
+  _continuousWorldInteractiveStreamState.activeInteractiveLanduse = (Array.isArray(appCtx.landuses) ? appCtx.landuses : [])
+    .filter((feature) => feature?.continuousWorldInteractiveChunk === true).length;
+  _continuousWorldInteractiveStreamState.activeInteractiveWaterways = (Array.isArray(appCtx.waterways) ? appCtx.waterways : [])
+    .filter((feature) => feature?.continuousWorldInteractiveChunk === true).length;
+}
+
+function countBaseContentMeshes(targetList) {
+  if (!Array.isArray(targetList) || targetList.length === 0) return 0;
+  let count = 0;
+  for (let i = 0; i < targetList.length; i++) {
+    if (targetList[i]?.userData?.continuousWorldInteractiveChunk === true) continue;
+    count += 1;
+  }
+  return count;
+}
+
+function shouldEvictBaseWorldContent(retainKeys, actorState = null) {
+  if (!(retainKeys instanceof Set) || retainKeys.size === 0) return false;
+  if (appCtx.worldLoading || appCtx.onMoon) return false;
+  if (Date.now() - _lastBaseWorldEvictionAt < CONTINUOUS_WORLD_BASE_EVICTION_MIN_INTERVAL_MS) return false;
+  if (Date.now() - Number(runtimeContentInventory.lastSyncAt || 0) >= CONTINUOUS_WORLD_BASE_EVICTION_SYNC_INTERVAL_MS) {
+    syncRuntimeContentInventory('base_eviction_check');
+  }
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  if (!Number.isFinite(actor?.x) || !Number.isFinite(actor?.z)) return false;
+  const actorDistance = Math.hypot(actor.x, actor.z);
+  if (actorDistance < CONTINUOUS_WORLD_BASE_EVICTION_MIN_DISTANCE) return false;
+  if (!!_continuousWorldInteractiveStreamState.pending && String(_continuousWorldInteractiveStreamState.lastLoadReason || '').includes('actor_')) {
+    const mode = String(actor?.mode || 'drive');
+    const roadCfg = ACTOR_ROAD_SHELL_CONFIG[mode] || ACTOR_ROAD_SHELL_CONFIG.drive;
+    const buildingCfg = ACTOR_BUILDING_SHELL_CONFIG[mode] || ACTOR_BUILDING_SHELL_CONFIG.drive;
+    const visibleRoads = countVisibleRoadMeshesNearWorldPoint(actor.x, actor.z, Math.max(roadCfg.visibleRadius || 240, 240));
+    const roadFeatures = countDriveableRoadFeaturesNearWorldPoint(actor.x, actor.z, Math.max(roadCfg.visibleRadius || 240, 260));
+    const visibleBuildings = countVisibleDetailedBuildingMeshesNearWorldPoint(actor.x, actor.z, Math.max(buildingCfg.visibleRadius || 320, 260));
+    const localRoadReady =
+      visibleRoads >= Number(roadCfg.minVisibleRoads || 0) ||
+      roadFeatures >= Number(roadCfg.minRoadFeatures || 0);
+    const localBuildingReady =
+      visibleBuildings >= Math.max(
+        10,
+        Math.floor(Number(buildingCfg.minVisibleBuildings || 0) * (mode === 'drive' ? 0.5 : 0.75))
+      );
+    if (!(localRoadReady && (mode === 'drive' ? localBuildingReady : true))) {
+      return false;
+    }
+  }
+
+  const baseBuildingMeshes = countBaseContentMeshes(appCtx.buildingMeshes);
+  const baseRoadMeshes = countBaseContentMeshes(appCtx.roadMeshes);
+  const baseSurfaceMeshes =
+    countBaseContentMeshes(appCtx.urbanSurfaceMeshes) +
+    countBaseContentMeshes(appCtx.structureVisualMeshes) +
+    countBaseContentMeshes(appCtx.linearFeatureMeshes);
+  const baseMiscMeshes =
+    countBaseContentMeshes(appCtx.landuseMeshes) +
+    countBaseContentMeshes(appCtx.poiMeshes) +
+    countBaseContentMeshes(appCtx.streetFurnitureMeshes) +
+    countBaseContentMeshes(appCtx.vegetationMeshes) +
+    countBaseContentMeshes(appCtx.historicMarkers);
+  const inventoryBase = getRuntimeContentInventorySourceStats('base');
+  const farTravel = actorDistance >= CONTINUOUS_WORLD_BASE_EVICTION_FAR_DISTANCE;
+  const ultraTravel = actorDistance >= CONTINUOUS_WORLD_BASE_EVICTION_ULTRA_DISTANCE;
+  const buildingThreshold =
+    ultraTravel ? Math.max(100, Math.floor(CONTINUOUS_WORLD_BASE_EVICTION_MIN_BUILDING_MESHES * 0.35)) :
+    farTravel ? Math.max(160, Math.floor(CONTINUOUS_WORLD_BASE_EVICTION_MIN_BUILDING_MESHES * 0.55)) :
+    CONTINUOUS_WORLD_BASE_EVICTION_MIN_BUILDING_MESHES;
+  const miscThreshold =
+    ultraTravel ? Math.max(60, Math.floor(CONTINUOUS_WORLD_BASE_EVICTION_MIN_MISC_MESHES * 0.35)) :
+    farTravel ? Math.max(90, Math.floor(CONTINUOUS_WORLD_BASE_EVICTION_MIN_MISC_MESHES * 0.55)) :
+    CONTINUOUS_WORLD_BASE_EVICTION_MIN_MISC_MESHES;
+  const roadThreshold =
+    ultraTravel ? Math.max(90, Math.floor(CONTINUOUS_WORLD_BASE_EVICTION_MIN_ROAD_MESHES * 0.45)) :
+    farTravel ? Math.max(130, Math.floor(CONTINUOUS_WORLD_BASE_EVICTION_MIN_ROAD_MESHES * 0.65)) :
+    CONTINUOUS_WORLD_BASE_EVICTION_MIN_ROAD_MESHES;
+  const surfaceThreshold =
+    ultraTravel ? Math.max(50, Math.floor(CONTINUOUS_WORLD_BASE_EVICTION_MIN_SURFACE_MESHES * 0.4)) :
+    farTravel ? Math.max(80, Math.floor(CONTINUOUS_WORLD_BASE_EVICTION_MIN_SURFACE_MESHES * 0.6)) :
+    CONTINUOUS_WORLD_BASE_EVICTION_MIN_SURFACE_MESHES;
+
+  return (
+    baseRoadMeshes >= roadThreshold ||
+    baseSurfaceMeshes >= surfaceThreshold ||
+    baseBuildingMeshes >= buildingThreshold ||
+    baseMiscMeshes >= miscThreshold ||
+    inventoryBase.activeCount >= (ultraTravel ? 420 : farTravel ? 620 : 980) ||
+    inventoryBase.sceneAttachedCount >= (ultraTravel ? 300 : farTravel ? 460 : 760)
+  );
+}
+
+function evictContinuousWorldBaseContent(retainKeys, roadRetainKeys = null, actorState = null) {
+  const safeRoadRetainKeys =
+    roadRetainKeys instanceof Set && roadRetainKeys.size > 0 ?
+      roadRetainKeys :
+      retainKeys;
+  if (!shouldEvictBaseWorldContent(safeRoadRetainKeys, actorState)) {
+    return { removedMeshes: 0, removedRoads: 0 };
+  }
+
+  const removedRoads = removeBaseFeaturesByRegion(appCtx.roads, safeRoadRetainKeys);
+  removeBaseFeaturesByRegion(appCtx.buildings, retainKeys);
+  removeBaseFeaturesByRegion(appCtx.landuses, retainKeys);
+  removeBaseFeaturesByRegion(appCtx.surfaceFeatureHints, retainKeys);
+  removeBaseFeaturesByRegion(appCtx.waterAreas, retainKeys);
+  removeBaseFeaturesByRegion(appCtx.waterways, retainKeys);
+  removeBaseFeaturesByRegion(appCtx.pois, retainKeys);
+  removeBaseFeaturesByRegion(appCtx.linearFeatures, retainKeys);
+  removeBaseFeaturesByRegion(appCtx.historicSites, retainKeys);
+
+  const removedMeshes =
+    removeBaseMeshesByRegion(appCtx.roadMeshes, safeRoadRetainKeys) +
+    removeBaseMeshesByRegion(appCtx.urbanSurfaceMeshes, safeRoadRetainKeys) +
+    removeBaseMeshesByRegion(appCtx.structureVisualMeshes, safeRoadRetainKeys) +
+    removeBaseMeshesByRegion(appCtx.buildingMeshes, retainKeys) +
+    removeBaseMeshesByRegion(appCtx.landuseMeshes, retainKeys) +
+    removeBaseMeshesByRegion(appCtx.linearFeatureMeshes, retainKeys) +
+    removeBaseMeshesByRegion(appCtx.poiMeshes, retainKeys) +
+    removeBaseMeshesByRegion(appCtx.streetFurnitureMeshes, retainKeys) +
+    removeBaseMeshesByRegion(appCtx.vegetationMeshes, retainKeys) +
+    removeBaseMeshesByRegion(appCtx.historicMarkers, retainKeys);
+
+  if (removedMeshes > 0 || removedRoads > 0) {
+    _lastBaseWorldEvictionAt = Date.now();
+    rebuildBuildingSpatialIndexFromLoadedBuildings();
+    rebuildLanduseSpatialIndexFromLoadedLanduses();
+    if (typeof appCtx.invalidateRoadCache === 'function') {
+      appCtx.invalidateRoadCache();
+    }
+    scheduleTraversalNetworksRebuild('base_eviction', 240);
+    markWorldLodDirty('base_eviction');
+    syncRuntimeContentInventory('base_eviction');
+  }
+  return { removedMeshes, removedRoads };
+}
+
+function evictContinuousWorldInteractiveContent(runtimeSnapshot = null, focusRegionKey = null, actorState = null) {
+  const retainKeys = continuousWorldInteractiveRetainRegionKeys(runtimeSnapshot, focusRegionKey, actorState);
+  const roadRetainKeys = continuousWorldInteractiveRoadRetainRegionKeys(runtimeSnapshot, focusRegionKey, actorState);
+  const baseRetainKeys = continuousWorldBaseRetainRegionKeys(runtimeSnapshot, focusRegionKey, actorState, { roads: false });
+  const baseRoadRetainKeys = continuousWorldBaseRetainRegionKeys(runtimeSnapshot, focusRegionKey, actorState, { roads: true });
+  if (!(retainKeys instanceof Set) || retainKeys.size === 0) return { removedMeshes: 0 };
+  if (!(roadRetainKeys instanceof Set) || roadRetainKeys.size === 0) return { removedMeshes: 0 };
+  if (!(baseRetainKeys instanceof Set) || baseRetainKeys.size === 0) return { removedMeshes: 0 };
+  if (!(baseRoadRetainKeys instanceof Set) || baseRoadRetainKeys.size === 0) return { removedMeshes: 0 };
+  const deferRoadEviction = shouldDeferInteractiveRoadEviction(actorState);
+
+  const removedRoadMutation = { bounds: null, regionKeys: new Set() };
+  if (!deferRoadEviction) {
+    removeInteractiveFeaturesByRegion(
+      appCtx.roads,
+      roadRetainKeys,
+      'evictedRoads',
+      _continuousWorldInteractiveStreamState.loadedRoadIds,
+      'sourceFeatureId',
+      removedRoadMutation
+    );
+  }
+  removeInteractiveFeaturesByRegion(
+    appCtx.buildings,
+    retainKeys,
+    'evictedBuildings',
+    _continuousWorldInteractiveStreamState.loadedBuildingIds,
+    'sourceBuildingId'
+  );
+  removeInteractiveFeaturesByRegion(
+    appCtx.landuses,
+    retainKeys,
+    'evictedLanduse',
+    _continuousWorldInteractiveStreamState.loadedLanduseIds,
+    'sourceFeatureId'
+  );
+  removeInteractiveFeaturesByRegion(
+    appCtx.waterAreas,
+    retainKeys,
+    'evictedLanduse',
+    _continuousWorldInteractiveStreamState.loadedLanduseIds,
+    'sourceFeatureId'
+  );
+  removeInteractiveFeaturesByRegion(
+    appCtx.waterways,
+    retainKeys,
+    'evictedWaterways',
+    _continuousWorldInteractiveStreamState.loadedWaterwayIds,
+    'sourceFeatureId'
+  );
+  removeInteractiveFeaturesByRegion(
+    appCtx.linearFeatures,
+    retainKeys,
+    'evictedLanduse',
+    null,
+    'sourceFeatureId'
+  );
+  removeInteractiveFeaturesByRegion(
+    appCtx.historicSites,
+    retainKeys,
+    'evictedLanduse',
+    null,
+    'sourceHistoricId'
+  );
+
+  const removedMeshes =
+    (deferRoadEviction ? 0 : removeInteractiveMeshesByRegion(appCtx.roadMeshes, roadRetainKeys)) +
+    removeInteractiveMeshesByRegion(appCtx.buildingMeshes, retainKeys) +
+    removeInteractiveMeshesByRegion(appCtx.landuseMeshes, retainKeys) +
+    (deferRoadEviction ? 0 : removeInteractiveMeshesByRegion(appCtx.urbanSurfaceMeshes, roadRetainKeys)) +
+    removeInteractiveMeshesByRegion(appCtx.linearFeatureMeshes, retainKeys) +
+    removeInteractiveMeshesByRegion(appCtx.poiMeshes, retainKeys) +
+    removeInteractiveMeshesByRegion(appCtx.streetFurnitureMeshes, retainKeys) +
+    removeInteractiveMeshesByRegion(appCtx.vegetationMeshes, retainKeys) +
+    removeInteractiveMeshesByRegion(appCtx.historicMarkers, retainKeys);
+
+  _continuousWorldInteractiveStreamState.evictedMeshes =
+    Number(_continuousWorldInteractiveStreamState.evictedMeshes || 0) + removedMeshes;
+  if (removedMeshes > 0) markWorldLodDirty('interactive_eviction');
+
+  _continuousWorldInteractiveStreamState.coverage = _continuousWorldInteractiveStreamState.coverage.filter((entry) => {
+    const key = String(entry?.regionKey || '').trim();
+    return !key || retainKeys.has(key);
+  });
+
+  const baseEviction = evictContinuousWorldBaseContent(baseRetainKeys, baseRoadRetainKeys, actorState);
+  rebuildBuildingSpatialIndexFromLoadedBuildings();
+  rebuildLanduseSpatialIndexFromLoadedLanduses();
+  refreshReplacedBaseBuildingSources();
+  if (removedMeshes > 0 || Number(baseEviction?.removedMeshes || 0) > 0 || Number(baseEviction?.removedRoads || 0) > 0) {
+    syncRuntimeContentInventory('interactive_eviction');
+  }
+  if (typeof appCtx.primeRoadSurfaceSyncState === 'function') {
+    appCtx.primeRoadSurfaceSyncState({
+      clearHeightCache: false,
+      preserveActiveTask: true,
+      mutationType: 'evict',
+      source: 'interactive_eviction',
+      bounds: removedRoadMutation.bounds,
+      regionKeys: Array.from(removedRoadMutation.regionKeys || [])
+    });
+  }
+  if (typeof appCtx.invalidateRoadCache === 'function') {
+    appCtx.invalidateRoadCache();
+  }
+  if (removedMeshes > 0 || Number(baseEviction?.removedRoads || 0) > 0) {
+    scheduleTraversalNetworksRebuild('continuous_world_eviction', 280);
+  }
+  refreshContinuousWorldInteractiveActiveCounts();
+  return {
+    removedMeshes: removedMeshes + Number(baseEviction?.removedMeshes || 0),
+    removedBaseMeshes: Number(baseEviction?.removedMeshes || 0),
+    removedBaseRoads: Number(baseEviction?.removedRoads || 0)
+  };
+}
+
+function configureContinuousWorldInteractiveStreaming(config = {}) {
+  if (!config || typeof config !== 'object') return getContinuousWorldInteractiveStreamSnapshot();
+  if (typeof config.enabled === 'boolean') {
+    _continuousWorldInteractiveStreamState.enabled = config.enabled;
+  }
+  if (typeof config.autoKickEnabled === 'boolean') {
+    _continuousWorldInteractiveStreamState.autoKickEnabled = config.autoKickEnabled;
+  }
+  return getContinuousWorldInteractiveStreamSnapshot();
+}
+
 function decimateRoadCenterlineByDepth(pts, roadType, tileDepth, mode = getPerfModeValue()) {
   if (!Array.isArray(pts) || pts.length < 3) return pts;
   if (mode === 'baseline') return pts;
@@ -885,7 +4822,16 @@ function decimateRoadCenterlineByDepth(pts, roadType, tileDepth, mode = getPerfM
   return out;
 }
 
-function createMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8ca0') {
+function createMidLodBuildingMesh(
+  pts,
+  height,
+  avgElevation,
+  colorHex = '#7f8ca0',
+  {
+    buildingType = 'yes',
+    buildingSeed = 0
+  } = {}
+) {
   if (!pts || pts.length < 3) return null;
 
   let minX = Infinity,maxX = -Infinity,minZ = Infinity,maxZ = -Infinity;
@@ -900,131 +4846,105 @@ function createMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8ca0
   const d = Math.max(4, maxZ - minZ);
   const h = Math.max(6, Number.isFinite(height) ? height : 10);
 
-  const geo = new THREE.BoxGeometry(w, h, d);
+  const footprintPoints =
+    pts.length > 18 ?
+      decimatePoints(pts, 18, false) :
+      pts;
+  const shape = new THREE.Shape();
+  footprintPoints.forEach((p, i) => {
+    if (i === 0) shape.moveTo(p.x, -p.z);
+    else shape.lineTo(p.x, -p.z);
+  });
+  shape.closePath();
+
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: h,
+    bevelEnabled: false,
+    curveSegments: 1,
+    steps: 1
+  });
+  geo.rotateX(-Math.PI / 2);
+  if (!geometryHasFinitePositions(geo)) {
+    geo.dispose();
+    return null;
+  }
   const mat = new THREE.MeshStandardMaterial({
     color: colorHex,
     roughness: 0.92,
     metalness: 0.02
   });
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set((minX + maxX) * 0.5, avgElevation + h * 0.5, (minZ + maxZ) * 0.5);
+  mesh.position.set(0, avgElevation, 0);
   mesh.userData.buildingFootprint = pts;
-  mesh.userData.midLodHalfHeight = h * 0.5;
+  mesh.userData.localBounds = { minX, maxX, minZ, maxZ };
+  mesh.userData.buildingFootprintBounds = mesh.userData.localBounds;
+  mesh.userData.midLodHalfHeight = 0;
   mesh.userData.midLodDims = { w, h, d };
   mesh.userData.midLodColor = colorHex;
   mesh.userData.avgElevation = avgElevation;
   mesh.userData.lodTier = 'mid';
+  mesh.userData.isBuildingProxy = true;
+  mesh.userData.midLodUsesFootprintGeometry = true;
+  mesh.userData.midLodBoxProxy = false;
   mesh.castShadow = false;
   mesh.receiveShadow = true;
   return mesh;
 }
 
-function createRoofDetailMesh(pts, height, baseElevation, bSeed, buildingType = 'yes', lodTier = 'near') {
-  if (!pts || pts.length < 3 || lodTier !== 'near') return null;
+function createDetailedBuildingMesh(
+  pts,
+  height,
+  baseElevation,
+  {
+    buildingType = 'yes',
+    buildingSeed = 0,
+    baseColor = '#9fa7b2',
+    buildingSemantics = null,
+    structureSemantics = null
+  } = {}
+) {
+  if (!pts || pts.length < 3) return null;
 
   let minX = Infinity,maxX = -Infinity,minZ = Infinity,maxZ = -Infinity;
-  for (let i = 0; i < pts.length; i++) {
-    const p = pts[i];
+  pts.forEach((p) => {
     minX = Math.min(minX, p.x);
     maxX = Math.max(maxX, p.x);
     minZ = Math.min(minZ, p.z);
     maxZ = Math.max(maxZ, p.z);
-  }
-
-  const width = Math.max(0, maxX - minX);
-  const depth = Math.max(0, maxZ - minZ);
-  const area = Math.abs(signedPolygonAreaXZ(pts));
-  const minSpan = Math.min(width, depth);
-  const flatRoofType = ['apartments', 'commercial', 'office', 'industrial', 'warehouse', 'retail', 'supermarket', 'hospital', 'school'].includes(buildingType);
-  const flatRoofLikely = flatRoofType || height >= 18;
-  const detailGate = flatRoofType ? 0.0 : 0.64;
-  if (!flatRoofLikely || appCtx.rand01FromInt(bSeed ^ 0x5f356495) < detailGate) return null;
-  if (area < 90 || minSpan < 7 || height < 10) return null;
-
-  const placementMargin = Math.min(1.8, Math.max(0.8, minSpan * 0.09));
-  const roofW = Math.max(1.4, width - placementMargin * 2);
-  const roofD = Math.max(1.4, depth - placementMargin * 2);
-  if (roofW < 1.4 || roofD < 1.4) return null;
-
-  const batch = { positions: [], normals: [], uvs: [], indices: [] };
-  const matrix = new THREE.Matrix4();
-  const addBox = (w, h, d, x, y, z) => {
-    if (!(w > 0.05 && h > 0.05 && d > 0.05)) return false;
-    const geo = new THREE.BoxGeometry(w, h, d);
-    matrix.makeTranslation(x, y, z);
-    const appended = appendGeometryWithTransform(batch, geo, matrix);
-    geo.dispose();
-    return appended > 0;
-  };
-
-  let unitCount = 0;
-  if (buildingType === 'industrial' || buildingType === 'warehouse') {
-    unitCount = area > 220 || height > 22 ? 2 : 1;
-  } else if (buildingType === 'commercial' || buildingType === 'office' || buildingType === 'hospital' || buildingType === 'school' || buildingType === 'retail' || buildingType === 'supermarket') {
-    unitCount = area > 260 || height > 30 ? 2 : area > 120 || height > 16 ? 1 : 0;
-  } else if (buildingType === 'apartments') {
-    unitCount = area > 190 || height > 26 ? 1 : 0;
-  }
-
-  const placedUnits = [];
-  const tryPlaceUnit = (seed, unitW, unitD) => {
-    const minEdgeClearance = Math.max(0.75, Math.hypot(unitW, unitD) * 0.42);
-    const minSpacing = Math.max(unitW, unitD) + 0.7;
-    const minXPos = minX + placementMargin;
-    const maxXPos = maxX - placementMargin;
-    const minZPos = minZ + placementMargin;
-    const maxZPos = maxZ - placementMargin;
-    if (!(maxXPos > minXPos && maxZPos > minZPos)) return null;
-
-    for (let attempt = 0; attempt < 16; attempt++) {
-      const attemptSeed = seed ^ ((attempt + 1) * 0x27d4eb2d);
-      const x = minXPos + appCtx.rand01FromInt(attemptSeed ^ 0x9e3779b9) * (maxXPos - minXPos);
-      const z = minZPos + appCtx.rand01FromInt(attemptSeed ^ 0x85ebca6b) * (maxZPos - minZPos);
-      if (!pointInPolygon(x, z, pts)) continue;
-      if (distanceToPolygonEdgeXZ(x, z, pts) < minEdgeClearance) continue;
-      let overlaps = false;
-      for (let j = 0; j < placedUnits.length; j++) {
-        const placed = placedUnits[j];
-        if (Math.hypot(placed.x - x, placed.z - z) < minSpacing) {
-          overlaps = true;
-          break;
-        }
-      }
-      if (!overlaps) return { x, z };
-    }
-    return null;
-  };
-
-  for (let i = 0; i < unitCount; i++) {
-    const seed = bSeed ^ ((i + 1) * 0x45d9f3b);
-    const unitW = 1.1 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * Math.min(2.4, roofW * 0.14);
-    const unitD = 0.95 + appCtx.rand01FromInt(seed ^ 0x165667b1) * Math.min(2.0, roofD * 0.14);
-    const unitH = 0.6 + appCtx.rand01FromInt(seed ^ 0xd3a2646c) * 0.95;
-    const unitPos = tryPlaceUnit(seed, unitW, unitD);
-    if (!unitPos) continue;
-    const plinthH = Math.min(0.16, Math.max(0.08, unitH * 0.18));
-    addBox(unitW + 0.18, plinthH, unitD + 0.18, unitPos.x, height + plinthH * 0.5 + 0.06, unitPos.z);
-    addBox(unitW, unitH, unitD, unitPos.x, height + unitH * 0.5 + plinthH + 0.06, unitPos.z);
-    placedUnits.push(unitPos);
-  }
-
-  const geometry = buildMergedGeometry(batch);
-  if (!geometry) return null;
-
-  const material = new THREE.MeshStandardMaterial({
-    color: pickRoofColor(bSeed),
-    roughness: 0.96,
-    metalness: 0.03,
-    emissive: 0x0f1114,
-    emissiveIntensity: 0.05
   });
+
+  const shape = new THREE.Shape();
+  pts.forEach((p, i) => {
+    if (i === 0) shape.moveTo(p.x, -p.z);
+    else shape.lineTo(p.x, -p.z);
+  });
+  shape.closePath();
+
+  const geometry = new THREE.ExtrudeGeometry(shape, { depth: height, bevelEnabled: false });
+  geometry.rotateX(-Math.PI / 2);
+  if (!geometryHasFinitePositions(geometry)) {
+    geometry.dispose();
+    return null;
+  }
+
+  const material = typeof appCtx.getBuildingMaterial === 'function' ?
+    appCtx.getBuildingMaterial(buildingType, buildingSeed >>> 0, baseColor) :
+    new THREE.MeshStandardMaterial({
+      color: baseColor,
+      roughness: 0.85,
+      metalness: 0.05
+    });
+
   const mesh = new THREE.Mesh(geometry, material);
   mesh.position.y = baseElevation;
   mesh.userData.buildingFootprint = pts;
+  mesh.userData.localBounds = { minX, maxX, minZ, maxZ };
+  mesh.userData.buildingFootprintBounds = mesh.userData.localBounds;
   mesh.userData.avgElevation = baseElevation;
-  mesh.userData.lodTier = lodTier;
-  mesh.userData.isRoofDetail = true;
-  mesh.userData.buildingType = buildingType;
+  mesh.userData.buildingSemantics = buildingSemantics;
+  mesh.userData.structureSemantics = structureSemantics;
+  mesh.userData.lodTier = 'near';
+  mesh.userData.isDetailedBuilding = true;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   return mesh;
@@ -1037,7 +4957,11 @@ function batchMidLodBuildingMeshes() {
   const keep = [];
   for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
     const mesh = appCtx.buildingMeshes[i];
-    if (mesh?.userData?.lodTier === 'mid' && !mesh.userData?.isBuildingBatch) {
+    if (
+      mesh?.userData?.lodTier === 'mid' &&
+      !mesh.userData?.isBuildingBatch &&
+      mesh.userData?.midLodBoxProxy === true
+    ) {
       mids.push(mesh);
     } else {
       keep.push(mesh);
@@ -1105,6 +5029,9 @@ function batchMidLodBuildingMeshes() {
   }
   instanced.userData.lodCenter = { x: centerX, z: centerZ };
   instanced.userData.lodRadius = maxRadius;
+  instanced.userData.continuousWorldRegionKeys = mergeContinuousWorldRegionKeysFromTargets(mids);
+  instanced.userData.continuousWorldRegionCount = instanced.userData.continuousWorldRegionKeys.length;
+  instanced.userData.continuousWorldFeatureFamily = 'buildings';
 
   instanced.instanceMatrix.needsUpdate = true;
   if (instanced.instanceColor) instanced.instanceColor.needsUpdate = true;
@@ -1185,6 +5112,155 @@ function worldLinePointsFromLonLat(coords, maxPoints = 1000, guardOptions = null
 
 function classifyLanduseType(tags) {
   return normalizeLanduseSurfaceType(tags);
+}
+
+const NON_RENDERED_URBAN_LANDUSE_TYPES = new Set([
+  'residential',
+  'commercial',
+  'industrial',
+  'retail',
+  'construction',
+  'brownfield',
+  'greenfield'
+]);
+
+function shouldRenderLanduseSurfaceMesh(landuseType = '') {
+  const normalized = String(landuseType || '').trim().toLowerCase();
+  if (!normalized) return false;
+  return !NON_RENDERED_URBAN_LANDUSE_TYPES.has(normalized);
+}
+
+function polygonBoundsXZ(pts) {
+  if (!Array.isArray(pts) || pts.length < 3) return null;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (let i = 0; i < pts.length; i++) {
+    const point = pts[i];
+    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) continue;
+    minX = Math.min(minX, point.x);
+    maxX = Math.max(maxX, point.x);
+    minZ = Math.min(minZ, point.z);
+    maxZ = Math.max(maxZ, point.z);
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minZ) || !Number.isFinite(maxZ)) {
+    return null;
+  }
+  return { minX, maxX, minZ, maxZ };
+}
+
+function boundsOverlapXZ(a, b, padding = 0) {
+  if (!a || !b) return false;
+  const pad = Number.isFinite(padding) ? padding : 0;
+  return !(
+    a.maxX < b.minX - pad ||
+    a.minX > b.maxX + pad ||
+    a.maxZ < b.minZ - pad ||
+    a.minZ > b.maxZ + pad
+  );
+}
+
+function buildSuppressedParentBuildingIdSet(buildingWays = [], nodes = {}, geometryGuards = null) {
+  if (!Array.isArray(buildingWays) || buildingWays.length < 2) return new Set();
+
+  const parentEntries = [];
+  const partEntries = [];
+
+  for (let i = 0; i < buildingWays.length; i++) {
+    const way = buildingWays[i];
+    const sourceId = String(way?.id || '').trim();
+    if (!sourceId) continue;
+    const isPart = !!way?.tags?.['building:part'];
+    const isParent = !!way?.tags?.building && !isPart;
+    if (!isPart && !isParent) continue;
+
+    const rawPts = Array.isArray(way?.nodes) ?
+      way.nodes.map((id) => nodes[id]).filter(Boolean).map((node) => appCtx.geoToWorld(node.lat, node.lon)) :
+      [];
+    const pts = sanitizeWorldFootprintPoints(rawPts, FEATURE_MIN_POLYGON_AREA, geometryGuards || undefined);
+    if (pts.length < 3) continue;
+
+    const area = Math.abs(signedPolygonAreaXZ(pts));
+    if (!Number.isFinite(area) || area < FEATURE_MIN_POLYGON_AREA) continue;
+
+    let centerX = 0;
+    let centerZ = 0;
+    for (let p = 0; p < pts.length; p++) {
+      centerX += pts[p].x;
+      centerZ += pts[p].z;
+    }
+    centerX /= pts.length;
+    centerZ /= pts.length;
+
+    const bounds = polygonBoundsXZ(pts);
+    if (!bounds) continue;
+
+    const entry = {
+      id: sourceId,
+      pts,
+      area,
+      centerX,
+      centerZ,
+      bounds
+    };
+
+    if (isPart) partEntries.push(entry);
+    else parentEntries.push(entry);
+  }
+
+  if (!parentEntries.length || !partEntries.length) return new Set();
+
+  const suppressed = new Set();
+  for (let i = 0; i < parentEntries.length; i++) {
+    const parent = parentEntries[i];
+    let containedPartCount = 0;
+    let coveredArea = 0;
+
+    for (let j = 0; j < partEntries.length; j++) {
+      const part = partEntries[j];
+      if (!boundsOverlapXZ(parent.bounds, part.bounds, 0.5)) continue;
+      if (!pointInPolygon(part.centerX, part.centerZ, parent.pts)) continue;
+      containedPartCount += 1;
+      coveredArea += Math.min(part.area, parent.area);
+    }
+
+    const coverageRatio = parent.area > 0 ? coveredArea / parent.area : 0;
+    if (
+      containedPartCount >= 2 ||
+      (containedPartCount >= 1 && coverageRatio >= 0.4)
+    ) {
+      suppressed.add(parent.id);
+    }
+  }
+
+  return suppressed;
+}
+
+function polylineBounds(pts, padding = 0) {
+  if (!Array.isArray(pts) || pts.length === 0) return null;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (let i = 0; i < pts.length; i++) {
+    const p = pts[i];
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) continue;
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minZ = Math.min(minZ, p.z);
+    maxZ = Math.max(maxZ, p.z);
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minZ) || !Number.isFinite(maxZ)) {
+    return null;
+  }
+  const pad = Number.isFinite(padding) ? Math.max(0, padding) : 0;
+  return {
+    minX: minX - pad,
+    maxX: maxX + pad,
+    minZ: minZ - pad,
+    maxZ: maxZ + pad
+  };
 }
 
 function poiKeyFromTags(tags = {}) {
@@ -1323,43 +5399,1082 @@ function resolveWaterSurfaceVisualProfile(bounds = null) {
   return {
     mode: 'water',
     color: appCtx.LANDUSE_STYLES?.water?.color || 0x4a90e2,
-    emissive: 0x0f355a,
-    emissiveIntensity: 0.24,
-    roughness: 0.18,
-    metalness: 0.05
+    emissive: 0x0a2542,
+    emissiveIntensity: 0.14,
+    roughness: 0.44,
+    metalness: 0.02
   };
 }
 
+function registerWaterWaveMaterial(material, options = {}) {
+  if (!material || material.userData?.weWaterWavePatched || typeof THREE === 'undefined') return material;
+  const waveScale = Number.isFinite(options.waveScale) ? options.waveScale : 1;
+  const waveBase = Number.isFinite(options.waveBase) ? options.waveBase : 1;
+  const visualBase = Number.isFinite(options.visualBase) ? options.visualBase : 1;
+  const foamBase = Number.isFinite(options.foamBase) ? options.foamBase : 1;
+  const edgeFade = Number.isFinite(options.edgeFade) ? options.edgeFade : 0;
+  const shaderKey = String(options.shaderKey || 'base');
+  const shaderHook = typeof options.shaderHook === 'function' ? options.shaderHook : null;
+  const waterKind = inferWaterRenderContext({
+    kindHint: options.waterKind,
+    area: options.area,
+    span: options.span,
+    width: options.width
+  });
+  const shaderLibrary = buildWaterShaderLibrary();
+  material.userData.weWaterWavePatched = true;
+  material.userData.weWaterWaveConfig = {
+    waveScale,
+    waveBase,
+    visualBase,
+    foamBase,
+    edgeFade,
+    waterKind,
+    energyBase: Number.isFinite(options.energyBase) ? options.energyBase : 1,
+    shorelineDistance: Number.isFinite(options.shorelineDistance) ? options.shorelineDistance : null,
+    localPatch: options.localPatch === true,
+    useRuntimeKind: options.useRuntimeKind === true
+  };
+
+  const previousOnBeforeCompile = material.onBeforeCompile;
+  material.customProgramCacheKey = () =>
+    `we3d-water-wave-${waveScale.toFixed(3)}-${waveBase.toFixed(3)}-${edgeFade.toFixed(3)}-${waterKind}-${shaderKey}`;
+  material.onBeforeCompile = (shader, renderer) => {
+    if (typeof previousOnBeforeCompile === 'function') previousOnBeforeCompile(shader, renderer);
+    shader.uniforms.weWaveTime = { value: 0 };
+    shader.uniforms.weWaveAmplitude = { value: 0 };
+    shader.uniforms.weWaveSecondaryAmplitude = { value: 0 };
+    shader.uniforms.weWaveSwellAmplitude = { value: 0 };
+    shader.uniforms.weWaveRippleAmplitude = { value: 0 };
+    shader.uniforms.weWaveScale = { value: waveScale };
+    shader.uniforms.weWaveSpeed = { value: 0.52 };
+    shader.uniforms.weWaveVisualStrength = { value: 0.16 };
+    shader.uniforms.weWaveFoamStrength = { value: 0.08 };
+    shader.uniforms.weWaveEdgeFade = { value: edgeFade };
+    material.userData.weWaterWaveShader = shader;
+
+    shader.vertexShader = shader.vertexShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+${shaderLibrary}`
+      )
+      .replace(
+        '#include <begin_vertex>',
+        `vec3 transformed = vec3(position);
+vec4 weWorldPos = modelMatrix * vec4(transformed, 1.0);
+vWeWaveWorldXZ = weWorldPos.xz;
+#ifdef USE_UV
+vWePatchUv = uv;
+#else
+vWePatchUv = vec2(0.5);
+#endif
+transformed.y += weWaveField(weWorldPos.xz);`
+      );
+
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+${shaderLibrary}`
+      )
+      .replace(
+        'vec4 diffuseColor = vec4( diffuse, opacity );',
+        `vec4 diffuseColor = vec4( diffuse, opacity );
+float weWaveHeight = weWaveField(vWeWaveWorldXZ);
+float weWaveCrestValue = weWaveCrest(vWeWaveWorldXZ);
+float weWaveGlint = clamp(0.44 + weWaveHeight * 0.22 + weWaveCrestValue * 0.14, 0.0, 1.0);
+float weFoamBands = smoothstep(0.42, 0.94, weWaveCrestValue) * clamp(weWaveFoamStrength, 0.0, 1.8);
+float weWhitecapBands = smoothstep(0.72, 1.28, weWaveCrestValue) * clamp(weWaveFoamStrength * 0.62, 0.0, 1.4);
+float weSurfaceGrain = 0.5 + 0.5 * sin(vWeWaveWorldXZ.x * 0.085 + weWaveTime * 1.24) * sin(vWeWaveWorldXZ.y * 0.073 - weWaveTime * 1.08);
+vec3 weWaveTint = mix(vec3(0.72, 0.79, 0.88), vec3(0.92, 0.98, 1.04), weWaveGlint);
+diffuseColor.rgb *= mix(vec3(0.9), weWaveTint, clamp(weWaveVisualStrength * 0.64, 0.0, 1.0));
+diffuseColor.rgb *= mix(vec3(0.97), vec3(1.03), weSurfaceGrain * clamp(weWaveVisualStrength * 0.18, 0.0, 0.14));
+diffuseColor.rgb += vec3(0.05, 0.07, 0.09) * (weFoamBands * 0.44 + weWhitecapBands * 0.5);
+diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.88, 0.93, 0.98), clamp(weWhitecapBands * 0.18, 0.0, 0.22));
+if (weWaveEdgeFade > 0.0) {
+  float weEdge = min(min(vWePatchUv.x, 1.0 - vWePatchUv.x), min(vWePatchUv.y, 1.0 - vWePatchUv.y));
+  float wePatchMask = smoothstep(0.0, weWaveEdgeFade, weEdge);
+  diffuseColor.a *= wePatchMask;
+}`
+      )
+      .replace(
+        '#include <emissivemap_fragment>',
+        `#include <emissivemap_fragment>
+totalEmissiveRadiance += vec3(0.024, 0.038, 0.054) * max(0.0, weWaveGlint - 0.5) * (weWaveVisualStrength * 1.4);
+totalEmissiveRadiance += vec3(0.036, 0.052, 0.072) * (weFoamBands * 0.44 + weWhitecapBands * 0.28) * (weWaveVisualStrength * 0.52);`
+      );
+    if (shaderHook) shaderHook(shader, { material, waterKind });
+  };
+
+  if (Array.isArray(appCtx.waterWaveVisuals)) {
+    appCtx.waterWaveVisuals.push(material);
+  } else {
+    appCtx.waterWaveVisuals = [material];
+  }
+  material.needsUpdate = true;
+  return material;
+}
+
+function cacheContinuousWorldSurfaceFeatureHint(pts, landuseType, guardOptions = null, sourceFeatureId = '') {
+  if (!pts || pts.length < 3 || !landuseType) return false;
+  let ring = sanitizeWorldFootprintPoints(
+    pts,
+    FEATURE_MIN_POLYGON_AREA,
+    guardOptions || undefined
+  );
+  if (ring.length < 3) return false;
+  ring = sanitizeWorldFootprintPoints(
+    decimatePoints(ring, 140, false),
+    FEATURE_MIN_POLYGON_AREA,
+    guardOptions || undefined
+  );
+  if (ring.length < 3) return false;
+  const area = Math.abs(signedPolygonAreaXZ(ring));
+  if (!Number.isFinite(area) || area < FEATURE_MIN_POLYGON_AREA) return false;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  ring.forEach((p) => {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minZ = Math.min(minZ, p.z);
+    maxZ = Math.max(maxZ, p.z);
+  });
+  appCtx.surfaceFeatureHints.push({
+    type: landuseType,
+    pts: ring,
+    bounds: { minX, maxX, minZ, maxZ },
+    sourceFeatureId: sourceFeatureId || null
+  });
+  return true;
+}
+
+function continuousWorldInteractiveWaterwayWidthFromTags(tags) {
+  const kind = (tags?.kind || tags?.waterway || '').toString();
+  if (kind.includes('ocean') || kind.includes('coast')) return 220;
+  if (kind.includes('river')) return 18;
+  if (kind.includes('canal')) return 12;
+  if (kind.includes('drain')) return 4;
+  if (kind.includes('ditch')) return 3;
+  if (kind.includes('stream')) return 6;
+  return 8;
+}
+
+function addContinuousWorldInteractiveLandusePolygon(pts, landuseType, sourceFeatureId = '', holeRings = [], guardOptions = null) {
+  if (!pts || pts.length < 3) return { addedMesh: false, addedWater: false };
+
+  let ring = sanitizeWorldFootprintPoints(
+    pts,
+    FEATURE_MIN_POLYGON_AREA,
+    guardOptions || undefined
+  );
+  if (ring.length < 3) return { addedMesh: false, addedWater: false };
+  ring = sanitizeWorldFootprintPoints(
+    decimatePoints(ring, 900, false),
+    FEATURE_MIN_POLYGON_AREA,
+    guardOptions || undefined
+  );
+  if (ring.length < 3) return { addedMesh: false, addedWater: false };
+
+  const outerArea = Math.abs(signedPolygonAreaXZ(ring));
+  if (!Number.isFinite(outerArea) || outerArea < FEATURE_MIN_POLYGON_AREA) {
+    return { addedMesh: false, addedWater: false };
+  }
+
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  ring.forEach((p) => {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minZ = Math.min(minZ, p.z);
+    maxZ = Math.max(maxZ, p.z);
+  });
+
+  const sampledHeights = [];
+  let avgElevation = 0;
+  ring.forEach((p) => {
+    const sample = appCtx.elevationWorldYAtWorldXZ(p.x, p.z);
+    sampledHeights.push(sample);
+    avgElevation += sample;
+  });
+  avgElevation /= ring.length;
+
+  const shape = new THREE.Shape();
+  ring.forEach((p, i) => {
+    if (i === 0) shape.moveTo(p.x, -p.z);
+    else shape.lineTo(p.x, -p.z);
+  });
+  shape.closePath();
+
+  if (holeRings && holeRings.length > 0) {
+    holeRings.forEach((holeRing) => {
+      if (!holeRing || holeRing.length < 3) return;
+      const cleanedHole = sanitizeWorldFootprintPoints(
+        holeRing,
+        FEATURE_MIN_HOLE_AREA,
+        guardOptions || undefined
+      );
+      if (cleanedHole.length < 3) return;
+      const holeArea = Math.abs(signedPolygonAreaXZ(cleanedHole));
+      if (!Number.isFinite(holeArea) || holeArea < FEATURE_MIN_HOLE_AREA) return;
+      if (holeArea >= outerArea * 0.92) return;
+      const path = new THREE.Path();
+      cleanedHole.forEach((p, i) => {
+        if (i === 0) path.moveTo(p.x, -p.z);
+        else path.lineTo(p.x, -p.z);
+      });
+      path.closePath();
+      shape.holes.push(path);
+    });
+  }
+
+  const geometry = new THREE.ShapeGeometry(shape, 20);
+  geometry.rotateX(-Math.PI / 2);
+
+  const isWater = landuseType === 'water';
+  const renderSurfaceMesh = shouldRenderLanduseSurfaceMesh(landuseType) || isWater;
+  const waterVisualProfile = isWater ? resolveWaterSurfaceVisualProfile() : null;
+  const surfaceBaseElevation = isWater ?
+    (Number.isFinite(avgElevation) ? avgElevation : waterSurfaceBaseElevation(sampledHeights)) :
+    avgElevation;
+  const regionKeys = buildContinuousWorldRegionKeysFromPoints(ring, null, {
+    minX,
+    maxX,
+    minZ,
+    maxZ
+  });
+  let mesh = null;
+  if (renderSurfaceMesh) {
+    const waterFlattenFactor = isWater ? 0.12 : 1.0;
+    const positions = geometry.attributes.position;
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i);
+      const z = positions.getZ(i);
+      const terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
+      const useY = terrainY === 0 && Math.abs(surfaceBaseElevation) > 2 ? surfaceBaseElevation : terrainY;
+      positions.setY(i, (useY - surfaceBaseElevation) * waterFlattenFactor + (isWater ? 0.08 : 0.02));
+    }
+    positions.needsUpdate = true;
+    geometry.computeVertexNormals();
+
+    const landuseStyle = appCtx.LANDUSE_STYLES?.[landuseType] || appCtx.LANDUSE_STYLES?.grass || { color: 0x7cb342 };
+    const material = new THREE.MeshStandardMaterial(isWater ? {
+      color: waterVisualProfile?.color || appCtx.LANDUSE_STYLES.water.color,
+      emissive: waterVisualProfile?.emissive || 0x0f355a,
+      emissiveIntensity: waterVisualProfile?.emissiveIntensity ?? 0.18,
+      roughness: waterVisualProfile?.roughness ?? 0.34,
+      metalness: waterVisualProfile?.metalness ?? 0.02,
+      transparent: false,
+      opacity: 1,
+      side: THREE.DoubleSide,
+      depthWrite: true,
+      polygonOffset: true,
+      polygonOffsetFactor: -6,
+      polygonOffsetUnits: -6
+    } : {
+      color: landuseStyle.color,
+      roughness: 0.95,
+      metalness: 0.0,
+      transparent: true,
+      opacity: 0.85,
+      depthWrite: true,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2
+    });
+    if (isWater) {
+      registerWaterWaveMaterial(material, {
+        waveScale: 1.0,
+        waveBase: 1.0,
+        area: outerArea,
+        span: Math.max(maxX - minX, maxZ - minZ),
+        waterKind: inferWaterRenderContext({
+          area: outerArea,
+          span: Math.max(maxX - minX, maxZ - minZ)
+        })
+      });
+    }
+
+    mesh = new THREE.Mesh(geometry, material);
+    mesh.renderOrder = 1;
+    mesh.position.y = surfaceBaseElevation;
+    mesh.userData.landuseFootprint = ring;
+    mesh.userData.avgElevation = surfaceBaseElevation;
+    mesh.userData.alwaysVisible = isWater;
+    mesh.userData.landuseType = landuseType;
+    mesh.userData.waterFlattenFactor = waterFlattenFactor;
+    mesh.userData.surfaceVariant = isWater ? waterVisualProfile?.mode || 'water' : landuseType;
+    mesh.userData.sourceFeatureId = sourceFeatureId || null;
+    mesh.userData.continuousWorldInteractiveChunk = true;
+    if (isWater) mesh.userData.waterSurfaceBase = surfaceBaseElevation;
+    assignContinuousWorldRegionKeysToTarget(mesh, {
+      points: ring,
+      family: isWater ? 'water' : 'landuse'
+    });
+    mesh.receiveShadow = false;
+    mesh.visible = appCtx.landUseVisible || mesh.userData.alwaysVisible;
+    appCtx.scene.add(mesh);
+    appCtx.landuseMeshes.push(mesh);
+  } else {
+    geometry.dispose();
+  }
+
+  appCtx.landuses.push({
+    type: landuseType,
+    pts: ring,
+    bounds: {
+      minX,
+      maxX,
+      minZ,
+      maxZ
+    },
+    sourceFeatureId: sourceFeatureId || null,
+    continuousWorldRegionKeys: regionKeys.slice(),
+    continuousWorldInteractiveChunk: true
+  });
+  addLanduseToSpatialIndex(appCtx.landuses[appCtx.landuses.length - 1]);
+
+  if (!isWater) return { addedMesh: true, addedWater: false };
+
+  const centroid = ring.reduce((acc, p) => {
+    acc.x += p.x;
+    acc.z += p.z;
+    return acc;
+  }, { x: 0, z: 0 });
+  appCtx.waterAreas.push({
+    type: 'water',
+    pts: ring,
+    area: outerArea,
+    centerX: centroid.x / ring.length,
+    centerZ: centroid.z / ring.length,
+    surfaceY: surfaceBaseElevation + 0.08,
+    bounds: {
+      minX,
+      maxX,
+      minZ,
+      maxZ
+    },
+    sourceFeatureId: sourceFeatureId || null,
+    continuousWorldRegionKeys: Array.isArray(mesh.userData?.continuousWorldRegionKeys) ? mesh.userData.continuousWorldRegionKeys.slice() : [],
+    continuousWorldInteractiveChunk: true
+  });
+  return { addedMesh: true, addedWater: true };
+}
+
+function addContinuousWorldInteractiveWaterwayRibbon(pts, tags = {}) {
+  if (!pts || pts.length < 2) return false;
+  const centerline = decimatePoints(pts, 1000, false);
+  if (centerline.length < 2) return false;
+
+  const width = continuousWorldInteractiveWaterwayWidthFromTags(tags);
+  const waterwayBounds = polylineBounds(centerline, Math.max(14, width * 0.5 + 18));
+  const waterVisualProfile = resolveWaterSurfaceVisualProfile();
+  const halfWidth = width * 0.5;
+  const verticalBias = 0.14;
+  const _h = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt : appCtx.elevationWorldYAtWorldXZ;
+  const verts = [];
+  const indices = [];
+
+  for (let i = 0; i < centerline.length; i++) {
+    const p = centerline[i];
+
+    let dx;
+    let dz;
+    if (i === 0) {
+      dx = centerline[1].x - p.x;
+      dz = centerline[1].z - p.z;
+    } else if (i === centerline.length - 1) {
+      dx = p.x - centerline[i - 1].x;
+      dz = p.z - centerline[i - 1].z;
+    } else {
+      dx = centerline[i + 1].x - centerline[i - 1].x;
+      dz = centerline[i + 1].z - centerline[i - 1].z;
+    }
+
+    const len = Math.hypot(dx, dz) || 1;
+    const nx = -dz / len;
+    const nz = dx / len;
+    const leftX = p.x + nx * halfWidth;
+    const leftZ = p.z + nz * halfWidth;
+    const rightX = p.x - nx * halfWidth;
+    const rightZ = p.z - nz * halfWidth;
+    const leftY = _h(leftX, leftZ) + verticalBias;
+    const rightY = _h(rightX, rightZ) + verticalBias;
+
+    verts.push(leftX, leftY, leftZ);
+    verts.push(rightX, rightY, rightZ);
+
+    if (i < centerline.length - 1) {
+      const vi = i * 2;
+      indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
+    }
+  }
+
+  if (verts.length < 12 || indices.length < 6) return false;
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+
+  const material = new THREE.MeshStandardMaterial({
+    color: waterVisualProfile.color,
+    emissive: waterVisualProfile.mode === 'ice' ? 0x8fa6bd : 0x0d2b4f,
+    emissiveIntensity: waterVisualProfile.mode === 'ice' ? 0.08 : 0.14,
+    roughness: waterVisualProfile.mode === 'ice' ? 0.82 : 0.38,
+    metalness: waterVisualProfile.mode === 'ice' ? 0.02 : 0.02,
+    transparent: false,
+    opacity: 1,
+    side: THREE.DoubleSide,
+    depthWrite: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -4,
+    polygonOffsetUnits: -4
+  });
+  registerWaterWaveMaterial(material, {
+    waveScale: clampNumber(width / 42, 0.55, 1.1, 0.7),
+    waveBase: clampNumber(width / 60, 0.4, 0.85, 0.55),
+    width,
+    waterKind: inferWaterRenderContext({ width })
+  });
+
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.renderOrder = 1;
+  mesh.receiveShadow = false;
+  mesh.userData.isWaterwayLine = true;
+  mesh.userData.alwaysVisible = true;
+  mesh.userData.waterwayCenterline = centerline;
+  mesh.userData.waterwayWidth = width;
+  mesh.userData.waterwayBias = verticalBias;
+  mesh.userData.waterwayBounds = waterwayBounds;
+  mesh.userData.surfaceVariant = waterVisualProfile.mode;
+  mesh.userData.sourceFeatureId = tags?.sourceFeatureId ? String(tags.sourceFeatureId) : null;
+  mesh.userData.continuousWorldInteractiveChunk = true;
+  assignContinuousWorldRegionKeysToTarget(mesh, {
+    points: centerline,
+    family: 'water'
+  });
+  mesh.visible = true;
+  appCtx.scene.add(mesh);
+  appCtx.landuseMeshes.push(mesh);
+  appCtx.waterways.push({
+    type: tags?.kind || tags?.waterway || 'waterway',
+    width,
+    surfaceY: verticalBias,
+    pts: centerline,
+    bounds: waterwayBounds,
+    sourceFeatureId: tags?.sourceFeatureId ? String(tags.sourceFeatureId) : null,
+    continuousWorldRegionKeys: Array.isArray(mesh.userData?.continuousWorldRegionKeys) ? mesh.userData.continuousWorldRegionKeys.slice() : [],
+    continuousWorldInteractiveChunk: true
+  });
+  return true;
+}
+
 function resolveLinearFeatureBaseY(x, z, kind = 'footway') {
-  const terrainY = typeof appCtx.terrainMeshHeightAt === 'function' ?
-    appCtx.terrainMeshHeightAt(x, z) :
+  const terrainY = typeof appCtx.baseTerrainHeightAt === 'function' ?
+    appCtx.baseTerrainHeightAt(x, z) :
+    typeof appCtx.terrainMeshHeightAt === 'function' ?
+      appCtx.terrainMeshHeightAt(x, z) :
     appCtx.elevationWorldYAtWorldXZ(x, z);
   const fallbackTerrain = Number.isFinite(terrainY) ? terrainY : 0;
-  const nearestRoad = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z) : null;
-  const roadHalfWidth = nearestRoad?.road ? Number(nearestRoad.road.width || 0) * 0.5 : 0;
+  const nearestRoad = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z, {
+    y: fallbackTerrain + 1.2,
+    maxVerticalDelta: 6
+  }) : null;
   const snapPadding =
     kind === 'footway' ? 2.4 :
     kind === 'cycleway' ? 2.0 :
     1.0;
-  const shouldSnapToRoad = !!(
-    nearestRoad?.road &&
-    Number.isFinite(nearestRoad.dist) &&
-    nearestRoad.dist <= roadHalfWidth + snapPadding
-  );
+  const shouldSnapToRoad = isRoadSurfaceReachable(nearestRoad, {
+    extraLateralPadding: snapPadding - 1.35
+  });
   if (shouldSnapToRoad) {
-    const roadSampleX = Number.isFinite(nearestRoad?.pt?.x) ? nearestRoad.pt.x : x;
-    const roadSampleZ = Number.isFinite(nearestRoad?.pt?.z) ? nearestRoad.pt.z : z;
-    const roadY =
-      appCtx.GroundHeight && typeof appCtx.GroundHeight.roadMeshY === 'function' ?
-        appCtx.GroundHeight.roadMeshY(roadSampleX, roadSampleZ) :
-        null;
+    const roadY = sampleFeatureSurfaceY(nearestRoad.road, x, z, nearestRoad);
     if (Number.isFinite(roadY)) return roadY;
-    if (appCtx.GroundHeight && typeof appCtx.GroundHeight.roadSurfaceY === 'function') {
-      return appCtx.GroundHeight.roadSurfaceY(roadSampleX, roadSampleZ);
-    }
     return fallbackTerrain + 0.2;
   }
   return fallbackTerrain;
+}
+
+function worldBaseTerrainY(x, z) {
+  if (typeof appCtx.baseTerrainHeightAt === 'function') {
+    return appCtx.baseTerrainHeightAt(x, z);
+  }
+  if (typeof appCtx.terrainMeshHeightAt === 'function') {
+    return appCtx.terrainMeshHeightAt(x, z);
+  }
+  return appCtx.elevationWorldYAtWorldXZ(x, z);
+}
+
+function structureAwareLinearFeatures() {
+  if (!Array.isArray(appCtx.linearFeatures)) return [];
+  return appCtx.linearFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
+}
+
+function smoothstep01Local(value) {
+  const t = Math.max(0, Math.min(1, Number(value) || 0));
+  return t * t * (3 - 2 * t);
+}
+
+function cloneStructureSemantics(semantics) {
+  return semantics ? { ...semantics } : null;
+}
+
+function featureBuildingContainmentStats(feature) {
+  const points = Array.isArray(feature?.pts) ? feature.pts : null;
+  if (!points || points.length < 2 || typeof getNearbyBuildings !== 'function') {
+    return {
+      total: 0,
+      inside: 0,
+      near: 0,
+      endpointInside: 0,
+      insideRatio: 0,
+      nearRatio: 0
+    };
+  }
+
+  const sampleIndices = new Set([
+    0,
+    points.length - 1,
+    Math.floor((points.length - 1) * 0.25),
+    Math.floor((points.length - 1) * 0.5),
+    Math.floor((points.length - 1) * 0.75)
+  ]);
+
+  let total = 0;
+  let inside = 0;
+  let near = 0;
+  let endpointInside = 0;
+  for (const index of sampleIndices) {
+    const point = points[index];
+    if (!point) continue;
+    const candidates = getNearbyBuildings(point.x, point.z, 16);
+    if (!Array.isArray(candidates) || candidates.length === 0) {
+      total += 1;
+      continue;
+    }
+
+    let insideBuilding = false;
+    let nearBuilding = false;
+    for (let i = 0; i < candidates.length; i++) {
+      const building = candidates[i];
+      if (!building) continue;
+      const withinBounds =
+        point.x >= (Number(building.minX) || 0) - 2.4 &&
+        point.x <= (Number(building.maxX) || 0) + 2.4 &&
+        point.z >= (Number(building.minZ) || 0) - 2.4 &&
+        point.z <= (Number(building.maxZ) || 0) + 2.4;
+      if (!withinBounds) continue;
+      if (Array.isArray(building.pts) && building.pts.length >= 3 && pointInPolygon(point.x, point.z, building.pts)) {
+        insideBuilding = true;
+        break;
+      }
+      nearBuilding = true;
+    }
+
+    total += 1;
+    if (insideBuilding) {
+      inside += 1;
+      if (index === 0 || index === points.length - 1) endpointInside += 1;
+    } else if (nearBuilding) {
+      near += 1;
+    }
+  }
+
+  return {
+    total,
+    inside,
+    near,
+    endpointInside,
+    insideRatio: total > 0 ? inside / total : 0,
+    nearRatio: total > 0 ? near / total : 0
+  };
+}
+
+function applyBuildingContextSemanticsToFeature(feature) {
+  if (!feature) return;
+  if (!feature.baseStructureSemantics) {
+    feature.baseStructureSemantics = cloneStructureSemantics(feature.structureSemantics);
+  }
+
+  const baseSemantics = feature.baseStructureSemantics || feature.structureSemantics || null;
+  if (!baseSemantics) return;
+
+  const stats = featureBuildingContainmentStats(feature);
+  const embeddedInBuilding =
+    baseSemantics.terrainMode === 'elevated' &&
+    !baseSemantics.isBridge &&
+    stats.total > 0 &&
+    (
+      stats.insideRatio >= 0.62 ||
+      (
+        stats.endpointInside >= 1 &&
+        (stats.inside + stats.near) >= Math.max(3, Math.ceil(stats.total * 0.72))
+      )
+    );
+
+  if (!embeddedInBuilding) {
+    feature.structureSemantics = {
+      ...cloneStructureSemantics(baseSemantics),
+      embeddedInBuilding: false
+    };
+    if (feature.isStructureConnector === true) {
+      feature.isStructureConnector = feature.structureSemantics.gradeSeparated || feature.structureSemantics.skywalk === true;
+    }
+    return;
+  }
+
+  const coveredLike = baseSemantics.covered || baseSemantics.indoor;
+  feature.structureSemantics = {
+    ...cloneStructureSemantics(baseSemantics),
+    structureKind: coveredLike ? 'covered' : 'at_grade',
+    terrainMode: 'at_grade',
+    gradeSeparated: false,
+    skywalk: false,
+    verticalOrder: 0,
+    deckClearance: 0,
+    cutDepth: 0,
+    embeddedInBuilding: true,
+    verticalGroup: `at_grade:0:${coveredLike ? 'covered' : 'at_grade'}`
+  };
+  if (feature.isStructureConnector === true) feature.isStructureConnector = false;
+}
+
+function normalizeStructureEndpointHeights(structureFeatures) {
+  if (!Array.isArray(structureFeatures) || structureFeatures.length === 0) return;
+
+  const normalizedRoadString = (value = '') => String(value || '').trim().toLowerCase();
+  const featureTypeFamilyLocal = (feature) => normalizedRoadString(feature?.type || feature?.subtype || feature?.structureTags?.highway || '').replace(/_link$/i, '');
+  const featureNameKeyLocal = (feature) => normalizedRoadString(feature?.name || feature?.structureTags?.name || '');
+  const endpointGroupKey = (feature, endpointIndex, point, semantics) => {
+    let groupKey = semantics?.verticalGroup || semantics?.terrainMode || 'structure';
+    const hasTransitionAnchors = Array.isArray(feature?.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0;
+    const eligibleApproach =
+      !semantics?.gradeSeparated &&
+      !roadBehavesGradeSeparated(feature) &&
+      hasTransitionAnchors;
+    if (eligibleApproach) {
+      const links =
+        endpointIndex === 0 ?
+          (Array.isArray(feature?.connectedFeatures?.start) ? feature.connectedFeatures.start : []) :
+          (Array.isArray(feature?.connectedFeatures?.end) ? feature.connectedFeatures.end : []);
+      for (let i = 0; i < links.length; i++) {
+        const other = links[i]?.feature || null;
+        const otherSemantics = other?.structureSemantics || null;
+        if (!other || !otherSemantics) continue;
+        if (!(otherSemantics.gradeSeparated || roadBehavesGradeSeparated(other))) continue;
+        const sameName = featureNameKeyLocal(feature) && featureNameKeyLocal(feature) === featureNameKeyLocal(other);
+        const sameFamily = featureTypeFamilyLocal(feature) && featureTypeFamilyLocal(feature) === featureTypeFamilyLocal(other);
+        const alignment = roadConnectionAlignment(feature, endpointIndex === 0 ? 'start' : 'end', other, Number(links[i]?.endpointIndex) || 0);
+        const otherLinkLike =
+          otherSemantics?.rampCandidate === true ||
+          /_link$/i.test(String(other?.type || '')) ||
+          normalizedRoadString(otherSemantics?.placement) === 'transition';
+        const alignedRampApproach = otherLinkLike && links.length <= 3 && alignment >= 0.68;
+        if (!sameName && !sameFamily && !alignedRampApproach) continue;
+        groupKey = otherSemantics.verticalGroup || otherSemantics.terrainMode || groupKey;
+        break;
+      }
+    }
+    return `${Math.round(point.x * 10)},${Math.round(point.z * 10)}:${groupKey}`;
+  };
+
+  const endpointGroups = new Map();
+  for (let i = 0; i < structureFeatures.length; i++) {
+    const feature = structureFeatures[i];
+    const semantics = feature?.structureSemantics;
+    const points = Array.isArray(feature?.pts) ? feature.pts : null;
+    const heights = feature?.surfaceHeights;
+    const distances = feature?.surfaceDistances;
+    const hasTransitionAnchors = Array.isArray(feature?.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0;
+    const weldEligible = semantics?.gradeSeparated || roadBehavesGradeSeparated(feature) || hasTransitionAnchors;
+    if (!weldEligible || !points || points.length < 2 || !(heights instanceof Float32Array) || !(distances instanceof Float32Array)) continue;
+    const entries = [
+      { index: 0, point: points[0] },
+      { index: points.length - 1, point: points[points.length - 1] }
+    ];
+    for (let e = 0; e < entries.length; e++) {
+      const entry = entries[e];
+      const point = entry.point;
+      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) continue;
+      const key = endpointGroupKey(feature, entry.index, point, semantics);
+      let group = endpointGroups.get(key);
+      if (!group) {
+        group = [];
+        endpointGroups.set(key, group);
+      }
+      group.push({ feature, endpointIndex: entry.index, y: Number(heights[entry.index]) || 0 });
+    }
+  }
+
+  endpointGroups.forEach((entries) => {
+    if (!Array.isArray(entries) || entries.length < 2) return;
+    const averageY = entries.reduce((sum, entry) => sum + entry.y, 0) / entries.length;
+    let averageWidth = 0;
+    let rampLikeGroup = false;
+    let anchoredGroup = false;
+    const nameCounts = new Map();
+    const familyCounts = new Map();
+    for (let i = 0; i < entries.length; i++) {
+      const feature = entries[i]?.feature || null;
+      averageWidth += Math.max(4, Number(feature?.width) || 6);
+      if (roadBehavesGradeSeparated(feature)) rampLikeGroup = true;
+      if (Array.isArray(feature?.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0) anchoredGroup = true;
+      const nameKey = featureNameKeyLocal(feature);
+      const familyKey = featureTypeFamilyLocal(feature);
+      if (nameKey) nameCounts.set(nameKey, (nameCounts.get(nameKey) || 0) + 1);
+      if (familyKey) familyCounts.set(familyKey, (familyCounts.get(familyKey) || 0) + 1);
+    }
+    averageWidth /= Math.max(1, entries.length);
+    const namedContinuationGroup =
+      [...nameCounts.values()].some((count) => count > 1) ||
+      [...familyCounts.values()].some((count) => count > 1);
+    for (let i = 0; i < entries.length; i++) {
+      const { feature, endpointIndex } = entries[i];
+      const heights = feature?.surfaceHeights;
+      const distances = feature?.surfaceDistances;
+      if (!(heights instanceof Float32Array) || !(distances instanceof Float32Array) || heights.length !== distances.length) continue;
+      const lastIndex = heights.length - 1;
+      const anchorIndex = endpointIndex === 0 ? 0 : lastIndex;
+      const delta = averageY - (Number(heights[anchorIndex]) || 0);
+      if (Math.abs(delta) < 0.01) continue;
+      const blendDistance =
+        rampLikeGroup ?
+          Math.max(22, Math.min(72, averageWidth * 4.6)) :
+        anchoredGroup && namedContinuationGroup ?
+          Math.max(24, Math.min(56, averageWidth * 4.2)) :
+        anchoredGroup ?
+          Math.max(18, Math.min(42, averageWidth * 3.5)) :
+          Math.max(12, Math.min(28, (Number(feature.width) || 6) * 2.6));
+      const totalDistance = Number(distances[lastIndex]) || 0;
+      for (let h = 0; h < heights.length; h++) {
+        const distanceFromEndpoint = endpointIndex === 0 ?
+          (Number(distances[h]) || 0) :
+          Math.max(0, totalDistance - (Number(distances[h]) || 0));
+        if (distanceFromEndpoint > blendDistance) continue;
+        const weight = 1 - smoothstep01Local(distanceFromEndpoint / Math.max(1, blendDistance));
+        heights[h] += delta * weight;
+      }
+      feature.structureSurfaceMinY = heights.reduce((best, value) => Math.min(best, value), Infinity);
+      feature.structureSurfaceMaxY = heights.reduce((best, value) => Math.max(best, value), -Infinity);
+    }
+  });
+}
+
+function weldStructureEndpointProfiles(structureFeatures) {
+  if (!Array.isArray(structureFeatures) || structureFeatures.length === 0) return;
+
+  const normalizedRoadString = (value = '') => String(value || '').trim().toLowerCase();
+  const featureTypeFamilyLocal = (feature) => normalizedRoadString(feature?.type || feature?.subtype || feature?.structureTags?.highway || '').replace(/_link$/i, '');
+  const featureNameKeyLocal = (feature) => normalizedRoadString(feature?.name || feature?.structureTags?.name || '');
+  const endpointWeldGroupKey = (feature, endpointIndex, point, semantics) => {
+    let groupKey = semantics?.verticalGroup || semantics?.terrainMode || 'structure';
+    const hasTransitionAnchors = Array.isArray(feature?.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0;
+    const eligibleApproach =
+      !semantics?.gradeSeparated &&
+      !roadBehavesGradeSeparated(feature) &&
+      hasTransitionAnchors;
+    if (eligibleApproach) {
+      const links =
+        endpointIndex === 0 ?
+          (Array.isArray(feature?.connectedFeatures?.start) ? feature.connectedFeatures.start : []) :
+          (Array.isArray(feature?.connectedFeatures?.end) ? feature.connectedFeatures.end : []);
+      for (let i = 0; i < links.length; i++) {
+        const other = links[i]?.feature || null;
+        const otherSemantics = other?.structureSemantics || null;
+        if (!other || !otherSemantics) continue;
+        if (!(otherSemantics.gradeSeparated || roadBehavesGradeSeparated(other))) continue;
+        const sameName = featureNameKeyLocal(feature) && featureNameKeyLocal(feature) === featureNameKeyLocal(other);
+        const sameFamily = featureTypeFamilyLocal(feature) && featureTypeFamilyLocal(feature) === featureTypeFamilyLocal(other);
+        const alignment = roadConnectionAlignment(feature, endpointIndex === 0 ? 'start' : 'end', other, Number(links[i]?.endpointIndex) || 0);
+        const otherLinkLike =
+          otherSemantics?.rampCandidate === true ||
+          /_link$/i.test(String(other?.type || '')) ||
+          normalizedRoadString(otherSemantics?.placement) === 'transition';
+        const alignedRampApproach = otherLinkLike && links.length <= 3 && alignment >= 0.68;
+        if (!sameName && !sameFamily && !alignedRampApproach) continue;
+        groupKey = otherSemantics.verticalGroup || otherSemantics.terrainMode || groupKey;
+        break;
+      }
+    }
+    return `${Math.round(point.x * 10)},${Math.round(point.z * 10)}:${groupKey}`;
+  };
+
+  const endpointGroups = new Map();
+  for (let i = 0; i < structureFeatures.length; i++) {
+    const feature = structureFeatures[i];
+    const semantics = feature?.structureSemantics;
+    const points = Array.isArray(feature?.pts) ? feature.pts : null;
+    const heights = feature?.surfaceHeights;
+    const distances = feature?.surfaceDistances;
+    const hasTransitionAnchors = Array.isArray(feature?.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0;
+    const weldEligible = semantics?.gradeSeparated || roadBehavesGradeSeparated(feature) || hasTransitionAnchors;
+    if (!weldEligible || !points || points.length < 2 || !(heights instanceof Float32Array) || !(distances instanceof Float32Array)) continue;
+    const entries = [
+      { endpointIndex: 0, point: points[0] },
+      { endpointIndex: points.length - 1, point: points[points.length - 1] }
+    ];
+    for (let e = 0; e < entries.length; e++) {
+      const entry = entries[e];
+      const point = entry.point;
+      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) continue;
+      const key = endpointWeldGroupKey(feature, entry.endpointIndex, point, semantics);
+      let group = endpointGroups.get(key);
+      if (!group) {
+        group = [];
+        endpointGroups.set(key, group);
+      }
+      group.push({
+        feature,
+        endpointIndex: entry.endpointIndex
+      });
+    }
+  }
+
+  const sampleHeightIntoFeature = (feature, endpointIndex, offsetDistance) => {
+    const distances = feature?.surfaceDistances;
+    const heights = feature?.surfaceHeights;
+    if (!(distances instanceof Float32Array) || !(heights instanceof Float32Array) || distances.length !== heights.length || distances.length === 0) {
+      return NaN;
+    }
+    const totalDistance = Number(distances[distances.length - 1]) || 0;
+    const sampleDistance = endpointIndex === 0 ?
+      Math.max(0, Math.min(totalDistance, offsetDistance)) :
+      Math.max(0, totalDistance - Math.max(0, Math.min(totalDistance, offsetDistance)));
+    return sampleProfileAtDistance(distances, heights, sampleDistance);
+  };
+
+  endpointGroups.forEach((entries) => {
+    if (!Array.isArray(entries) || entries.length < 2) return;
+    let averageWidth = 0;
+    let rampLikeGroup = false;
+    let anchoredGroup = false;
+    const nameCounts = new Map();
+    const familyCounts = new Map();
+    for (let i = 0; i < entries.length; i++) {
+      const feature = entries[i]?.feature || null;
+      averageWidth += Math.max(4, Number(feature?.width) || 6);
+      if (roadBehavesGradeSeparated(feature)) rampLikeGroup = true;
+      if (Array.isArray(feature?.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0) anchoredGroup = true;
+      const nameKey = featureNameKeyLocal(feature);
+      const familyKey = featureTypeFamilyLocal(feature);
+      if (nameKey) nameCounts.set(nameKey, (nameCounts.get(nameKey) || 0) + 1);
+      if (familyKey) familyCounts.set(familyKey, (familyCounts.get(familyKey) || 0) + 1);
+    }
+    averageWidth /= Math.max(1, entries.length);
+    const namedContinuationGroup =
+      [...nameCounts.values()].some((count) => count > 1) ||
+      [...familyCounts.values()].some((count) => count > 1);
+    const blendDistance =
+      rampLikeGroup ?
+        Math.max(34, Math.min(96, averageWidth * 5.2)) :
+      anchoredGroup && namedContinuationGroup ?
+        Math.max(34, Math.min(84, averageWidth * 4.8)) :
+      anchoredGroup ?
+        Math.max(28, Math.min(68, averageWidth * 4.1)) :
+        Math.max(22, Math.min(58, averageWidth * 3.9));
+
+    for (let i = 0; i < entries.length; i++) {
+      const entry = entries[i];
+      const feature = entry.feature;
+      const heights = feature?.surfaceHeights;
+      const distances = feature?.surfaceDistances;
+      if (!(heights instanceof Float32Array) || !(distances instanceof Float32Array) || heights.length !== distances.length || heights.length < 2) continue;
+      const lastIndex = heights.length - 1;
+      const totalDistance = Number(distances[lastIndex]) || 0;
+      for (let h = 0; h < heights.length; h++) {
+        const distanceFromEndpoint = entry.endpointIndex === 0 ?
+          (Number(distances[h]) || 0) :
+          Math.max(0, totalDistance - (Number(distances[h]) || 0));
+        if (distanceFromEndpoint > blendDistance) continue;
+        let targetSum = 0;
+        let targetCount = 0;
+        for (let j = 0; j < entries.length; j++) {
+          const targetHeight = sampleHeightIntoFeature(entries[j].feature, entries[j].endpointIndex, distanceFromEndpoint);
+          if (!Number.isFinite(targetHeight)) continue;
+          targetSum += targetHeight;
+          targetCount += 1;
+        }
+        if (targetCount < 2) continue;
+        const averageHeight = targetSum / targetCount;
+        const weight = 1 - smoothstep01Local(distanceFromEndpoint / Math.max(1, blendDistance));
+        heights[h] = heights[h] * (1 - weight) + averageHeight * weight;
+      }
+      feature.structureSurfaceMinY = heights.reduce((best, value) => Math.min(best, value), Infinity);
+      feature.structureSurfaceMaxY = heights.reduce((best, value) => Math.max(best, value), -Infinity);
+    }
+  });
+}
+
+function smoothStructureSurfaceProfiles(structureFeatures) {
+  if (!Array.isArray(structureFeatures) || structureFeatures.length === 0) return;
+
+  for (let i = 0; i < structureFeatures.length; i++) {
+    const feature = structureFeatures[i];
+    const semantics = feature?.structureSemantics;
+    const heights = feature?.surfaceHeights;
+    const distances = feature?.surfaceDistances;
+    const hasTransitionAnchors = Array.isArray(feature?.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0;
+    const rampProfile = hasTransitionAnchors && (semantics?.rampCandidate || roadBehavesGradeSeparated(feature));
+    if ((!semantics?.gradeSeparated && !hasTransitionAnchors) || !(heights instanceof Float32Array) || !(distances instanceof Float32Array) || heights.length < 4) continue;
+
+    const smoothed = new Float32Array(heights);
+    const passes =
+      semantics.terrainMode === 'elevated' ?
+        (rampProfile ? 7 : 3) :
+      semantics.terrainMode === 'subgrade' ?
+        (rampProfile ? 4 : 2) :
+      rampProfile ?
+        5 :
+      hasTransitionAnchors ?
+        2 :
+        1;
+    const transitionAnchors = Array.isArray(feature?.structureTransitionAnchors) ? feature.structureTransitionAnchors : [];
+    for (let pass = 0; pass < passes; pass++) {
+      const next = new Float32Array(smoothed);
+      const lastIndex = smoothed.length - 1;
+      for (let h = 1; h < lastIndex; h++) {
+        const current = smoothed[h];
+        const neighborAverage = (smoothed[h - 1] + smoothed[h + 1]) * 0.5;
+        let blend =
+          semantics?.terrainMode === 'elevated' ? (rampProfile ? 0.42 : 0.46) :
+          semantics?.terrainMode === 'subgrade' ? (rampProfile ? 0.38 : 0.4) :
+          hasTransitionAnchors ? (rampProfile ? 0.32 : 0.26) :
+          0.42;
+        if (Array.isArray(feature.structureStations) && feature.structureStations.length > 0) {
+          const distance = Number(distances[h]) || 0;
+          let nearestWeight = Infinity;
+          for (let s = 0; s < feature.structureStations.length; s++) {
+            const station = feature.structureStations[s];
+            const stationSpan = Math.max(1, Number(station?.span) || 1);
+            const normalizedDistance = Math.abs(distance - (Number(station?.distance) || 0)) / stationSpan;
+            nearestWeight = Math.min(nearestWeight, normalizedDistance);
+          }
+          if (nearestWeight < 0.35) blend = semantics?.terrainMode === 'elevated' ? 0.16 : 0.18;
+          else if (nearestWeight < 0.7) blend = semantics?.terrainMode === 'elevated' ? 0.24 : 0.28;
+        }
+        if (transitionAnchors.length > 0 && rampProfile) {
+          const distance = Number(distances[h]) || 0;
+          let nearestTransition = Infinity;
+          for (let t = 0; t < transitionAnchors.length; t++) {
+            const anchorDistance = Number(transitionAnchors[t]?.distance);
+            const anchorSpan = Math.max(1, Number(transitionAnchors[t]?.span) || 1);
+            if (!Number.isFinite(anchorDistance)) continue;
+            nearestTransition = Math.min(nearestTransition, Math.abs(distance - anchorDistance) / anchorSpan);
+          }
+          if (nearestTransition < 0.35) blend = Math.max(blend, semantics?.terrainMode === 'subgrade' ? 0.54 : 0.62);
+          else if (nearestTransition < 0.7) blend = Math.max(blend, semantics?.terrainMode === 'subgrade' ? 0.46 : 0.54);
+        }
+        next[h] = current * (1 - blend) + neighborAverage * blend;
+      }
+      smoothed.set(next);
+    }
+    heights.set(smoothed);
+    feature.structureSurfaceMinY = heights.reduce((best, value) => Math.min(best, value), Infinity);
+    feature.structureSurfaceMaxY = heights.reduce((best, value) => Math.max(best, value), -Infinity);
+  }
+}
+
+function refreshStructureAwareFeatureProfiles() {
+  const roadFeatures = Array.isArray(appCtx.roads) ? appCtx.roads : [];
+  const connectorFeatures = structureAwareLinearFeatures();
+  const transportFeatures = roadFeatures.concat(connectorFeatures);
+
+  for (let i = 0; i < transportFeatures.length; i++) {
+    applyBuildingContextSemanticsToFeature(transportFeatures[i]);
+  }
+
+  if (Array.isArray(appCtx.linearFeatureMeshes)) {
+    for (let i = 0; i < appCtx.linearFeatureMeshes.length; i++) {
+      const mesh = appCtx.linearFeatureMeshes[i];
+      const feature = mesh?.userData?.linearFeatureRef || null;
+      if (!mesh || !feature) continue;
+      mesh.userData.structureConnector = feature.isStructureConnector === true;
+      mesh.userData.structureSemantics = feature.structureSemantics || null;
+    }
+  }
+
+  const structureFeatures = transportFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
+
+  assignFeatureConnections(transportFeatures);
+
+  for (let i = 0; i < structureFeatures.length; i++) {
+    const feature = structureFeatures[i];
+    if (!feature?.structureSemantics?.gradeSeparated) continue;
+    feature.structureStations = buildFeatureStations(feature, {
+      features: structureFeatures,
+      waterAreas: appCtx.waterAreas
+    });
+  }
+
+  for (let i = 0; i < structureFeatures.length; i++) {
+    const feature = structureFeatures[i];
+    if (!feature) continue;
+    updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
+      surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.42
+    });
+  }
+
+  for (let i = 0; i < transportFeatures.length; i++) {
+    const feature = transportFeatures[i];
+    if (!feature) continue;
+    buildFeatureTransitionAnchors(feature, worldBaseTerrainY);
+  }
+
+  for (let i = 0; i < transportFeatures.length; i++) {
+    const feature = transportFeatures[i];
+    if (!feature) continue;
+    const hasTransitionAnchors = Array.isArray(feature.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0;
+    if (!feature?.structureSemantics?.gradeSeparated && !hasTransitionAnchors) continue;
+    updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
+      surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.42
+    });
+  }
+
+  // Run one extra anchor/profile pass so newly anchored at-grade approach roads
+  // can feed their updated endpoint heights back into adjacent elevated segments.
+  for (let i = 0; i < transportFeatures.length; i++) {
+    const feature = transportFeatures[i];
+    if (!feature) continue;
+    buildFeatureTransitionAnchors(feature, worldBaseTerrainY);
+  }
+
+  const settledProfiledFeatures = [];
+  for (let i = 0; i < transportFeatures.length; i++) {
+    const feature = transportFeatures[i];
+    if (!feature) continue;
+    const hasTransitionAnchors = Array.isArray(feature.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0;
+    if (!feature?.structureSemantics?.gradeSeparated && !hasTransitionAnchors) continue;
+    updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
+      surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.42
+    });
+    settledProfiledFeatures.push(feature);
+  }
+
+  normalizeStructureEndpointHeights(settledProfiledFeatures);
+  smoothStructureSurfaceProfiles(settledProfiledFeatures);
+  weldStructureEndpointProfiles(settledProfiledFeatures);
+  smoothStructureSurfaceProfiles(settledProfiledFeatures);
+  normalizeStructureEndpointHeights(settledProfiledFeatures);
+
+  if (structureFeatures.length > 0) {
+    appCtx.structureTerrainCuts = structureFeatures
+      .filter((feature) => feature?.structureSemantics?.terrainMode === 'subgrade')
+      .map((feature) => ({
+        feature,
+        pts: feature.pts,
+        width: Math.max(7.2, (Number(feature.width) || 6) + 5.0),
+        clearance: Math.max(4.2, Number(feature?.structureSemantics?.cutDepth) ? 3.7 + Math.min(4.1, Number(feature.structureSemantics.cutDepth) * 0.56) : 4.2),
+        portalLength: Math.max(22, Math.min(60, (Number(feature.width) || 6) * 3.5)),
+        bounds: feature.bounds
+      }));
+  } else {
+    appCtx.structureTerrainCuts = [];
+  }
 }
 
 function syncLinearFeatureOverlayVisibility() {
@@ -1367,7 +6482,10 @@ function syncLinearFeatureOverlayVisibility() {
   if (!Array.isArray(appCtx.linearFeatureMeshes)) return;
   for (let i = 0; i < appCtx.linearFeatureMeshes.length; i++) {
     const mesh = appCtx.linearFeatureMeshes[i];
-    if (mesh) mesh.visible = visible;
+    if (mesh) {
+      const alwaysVisible = mesh.userData?.structureConnector === true;
+      mesh.visible = !mesh.userData?.boatSuppressed && (alwaysVisible || visible);
+    }
   }
 }
 
@@ -1638,6 +6756,33 @@ function buildMergedGeometry(batch) {
   return geometry;
 }
 
+function runtimeMeshLifecycleKey(mesh) {
+  if (mesh?.userData?.overlayFeatureId || mesh?.userData?.overlayFeatureClass) return 'overlay';
+  if (mesh?.userData?.syntheticFallbackWorld === true || mesh?.syntheticFallbackWorld === true) return 'synthetic';
+  if (mesh?.userData?.continuousWorldInteractiveChunk === true || mesh?.continuousWorldInteractiveChunk === true) return 'interactive';
+  return 'base';
+}
+
+function applyMergedRuntimeLifecycleMetadata(target, sourceMeshes = []) {
+  if (!target || !Array.isArray(sourceMeshes) || sourceMeshes.length === 0) return;
+  const lifecycle = runtimeMeshLifecycleKey(sourceMeshes[0]);
+  if (lifecycle === 'interactive') {
+    target.userData.continuousWorldInteractiveChunk = true;
+    target.continuousWorldInteractiveChunk = true;
+    return;
+  }
+  if (lifecycle === 'synthetic') {
+    target.userData.syntheticFallbackWorld = true;
+    target.syntheticFallbackWorld = true;
+    return;
+  }
+  if (lifecycle === 'overlay') {
+    const sourceOverlay = sourceMeshes.find((mesh) => mesh?.userData?.overlayFeatureId || mesh?.userData?.overlayFeatureClass) || null;
+    if (sourceOverlay?.userData?.overlayFeatureId) target.userData.overlayFeatureId = sourceOverlay.userData.overlayFeatureId;
+    if (sourceOverlay?.userData?.overlayFeatureClass) target.userData.overlayFeatureClass = sourceOverlay.userData.overlayFeatureClass;
+  }
+}
+
 function batchNearLodBuildingMeshes() {
   try {
     if (!Array.isArray(appCtx.buildingMeshes) || appCtx.buildingMeshes.length < 2) return 0;
@@ -1663,7 +6808,8 @@ function batchNearLodBuildingMeshes() {
         keep.push(mesh);
         continue;
       }
-      const key = `${tier}|${matKey}`;
+      const lifecycle = runtimeMeshLifecycleKey(mesh);
+      const key = `${lifecycle}|${tier}|${matKey}`;
 
       let group = groups.get(key);
       if (!group) {
@@ -1671,7 +6817,8 @@ function batchNearLodBuildingMeshes() {
           meshes: [],
           material: mesh.material,
           renderOrder: mesh.renderOrder || 0,
-          lodTier: tier
+          lodTier: tier,
+          lifecycle
         };
         groups.set(key, group);
       }
@@ -1768,6 +6915,10 @@ function batchNearLodBuildingMeshes() {
         lodCenter: { x: centerX, z: centerZ },
         lodRadius: maxRadius
       };
+      mergedMesh.userData.continuousWorldRegionKeys = mergeContinuousWorldRegionKeysFromTargets(sourceMeshes);
+      mergedMesh.userData.continuousWorldRegionCount = mergedMesh.userData.continuousWorldRegionKeys.length;
+      mergedMesh.userData.continuousWorldFeatureFamily = 'buildings';
+      applyMergedRuntimeLifecycleMetadata(mergedMesh, sourceMeshes);
 
       appCtx.scene.add(mergedMesh);
       batchedMeshes.push(mergedMesh);
@@ -1834,7 +6985,8 @@ function batchLanduseMeshes() {
       const type = mesh.userData?.landuseType || 'unknown';
       const isWaterwayLine = !!mesh.userData?.isWaterwayLine;
       const surfaceVariant = mesh.userData?.surfaceVariant || type;
-      const key = `${type}|${isWaterwayLine ? 1 : 0}|${mesh.renderOrder || 0}|${matKey}`;
+      const lifecycle = runtimeMeshLifecycleKey(mesh);
+      const key = `${lifecycle}|${type}|${isWaterwayLine ? 1 : 0}|${mesh.renderOrder || 0}|${matKey}`;
 
       let group = groups.get(key);
       if (!group) {
@@ -1845,6 +6997,7 @@ function batchLanduseMeshes() {
           landuseType: type,
           isWaterwayLine,
           surfaceVariant,
+          lifecycle,
           alwaysVisible: false,
           anyVisible: false
         };
@@ -1936,6 +7089,10 @@ function batchLanduseMeshes() {
         lodCenter: { x: centerX, z: centerZ },
         lodRadius: maxRadius
       };
+      mergedMesh.userData.continuousWorldRegionKeys = mergeContinuousWorldRegionKeysFromTargets(group.meshes);
+      mergedMesh.userData.continuousWorldRegionCount = mergedMesh.userData.continuousWorldRegionKeys.length;
+      mergedMesh.userData.continuousWorldFeatureFamily = group.landuseType === 'water' || group.isWaterwayLine ? 'water' : 'landuse';
+      applyMergedRuntimeLifecycleMetadata(mergedMesh, group.meshes);
       mergedMesh.visible = group.anyVisible || group.alwaysVisible;
 
       appCtx.scene.add(mergedMesh);
@@ -1981,6 +7138,247 @@ function clearBuildingSpatialIndex() {
   buildingSpatialIndex = new Map();
 }
 
+function clearLanduseSpatialIndex() {
+  landuseSpatialIndex = new Map();
+}
+
+function rebuildBuildingSpatialIndexFromLoadedBuildings() {
+  clearBuildingSpatialIndex();
+  const buildings = Array.isArray(appCtx.buildings) ? appCtx.buildings : [];
+  for (let i = 0; i < buildings.length; i++) {
+    const building = buildings[i];
+    if (!building || building.collisionDisabled) continue;
+    addBuildingToSpatialIndex(building);
+  }
+}
+
+function rebuildLanduseSpatialIndexFromLoadedLanduses() {
+  clearLanduseSpatialIndex();
+  const landuses = Array.isArray(appCtx.landuses) ? appCtx.landuses : [];
+  for (let i = 0; i < landuses.length; i++) {
+    addLanduseToSpatialIndex(landuses[i]);
+  }
+}
+
+const CONTINUOUS_WORLD_REBASE_FEATURE_ARRAY_KEYS = Object.freeze([
+  'roads',
+  'buildings',
+  'dynamicBuildingColliders',
+  'landuses',
+  'surfaceFeatureHints',
+  'waterAreas',
+  'waterways',
+  'linearFeatures',
+  'pois',
+  'historicSites',
+  'vegetationFeatures',
+  'overlayRuntimeRoads',
+  'overlayRuntimeLinearFeatures',
+  'overlayRuntimePois',
+  'overlayRuntimeBuildingColliders',
+  'navigationRoutePoints'
+]);
+
+const CONTINUOUS_WORLD_REBASE_MESH_ARRAY_KEYS = Object.freeze([
+  'roadMeshes',
+  'urbanSurfaceMeshes',
+  'structureVisualMeshes',
+  'buildingMeshes',
+  'startupShellBuildingMeshes',
+  'landuseMeshes',
+  'linearFeatureMeshes',
+  'poiMeshes',
+  'streetFurnitureMeshes',
+  'vegetationMeshes',
+  'historicMarkers'
+]);
+
+const CONTINUOUS_WORLD_REBASE_BOUNDS_KEYS = Object.freeze([
+  'bounds',
+  'localBounds',
+  'cachedLocalBounds',
+  'waterwayBounds',
+  'structureBounds'
+]);
+
+const CONTINUOUS_WORLD_REBASE_POINT_OBJECT_KEYS = Object.freeze([
+  'lodCenter',
+  'poiPosition',
+  'center',
+  'pos',
+  'look',
+  'lookTarget',
+  'target'
+]);
+
+const CONTINUOUS_WORLD_REBASE_POINT_ARRAY_KEYS = Object.freeze([
+  'pts',
+  'buildingFootprint',
+  'landuseFootprint',
+  'waterwayCenterline'
+]);
+
+function shiftRuntimeBoundsInPlace(bounds, deltaX = 0, deltaZ = 0) {
+  if (
+    !bounds ||
+    !Number.isFinite(bounds.minX) ||
+    !Number.isFinite(bounds.maxX) ||
+    !Number.isFinite(bounds.minZ) ||
+    !Number.isFinite(bounds.maxZ)
+  ) {
+    return false;
+  }
+  bounds.minX += deltaX;
+  bounds.maxX += deltaX;
+  bounds.minZ += deltaZ;
+  bounds.maxZ += deltaZ;
+  return true;
+}
+
+function shiftRuntimePointXZ(target, deltaX = 0, deltaZ = 0, xKey = 'x', zKey = 'z') {
+  if (!target || typeof target !== 'object') return false;
+  if (!Number.isFinite(target[xKey]) || !Number.isFinite(target[zKey])) return false;
+  target[xKey] += deltaX;
+  target[zKey] += deltaZ;
+  return true;
+}
+
+function shiftRuntimeWorldValue(value, deltaX = 0, deltaZ = 0, seen = new WeakSet()) {
+  if (!value || typeof value !== 'object') return;
+  if (seen.has(value)) return;
+  seen.add(value);
+
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      shiftRuntimeWorldValue(value[i], deltaX, deltaZ, seen);
+    }
+    return;
+  }
+
+  const position = value.position;
+  if (position && typeof position === 'object') {
+    shiftRuntimePointXZ(position, deltaX, deltaZ);
+  }
+  shiftRuntimePointXZ(value, deltaX, deltaZ);
+  shiftRuntimePointXZ(value, deltaX, deltaZ, 'centerX', 'centerZ');
+  shiftRuntimeBoundsInPlace(value, deltaX, deltaZ);
+
+  for (let i = 0; i < CONTINUOUS_WORLD_REBASE_BOUNDS_KEYS.length; i++) {
+    shiftRuntimeBoundsInPlace(value[CONTINUOUS_WORLD_REBASE_BOUNDS_KEYS[i]], deltaX, deltaZ);
+  }
+  for (let i = 0; i < CONTINUOUS_WORLD_REBASE_POINT_OBJECT_KEYS.length; i++) {
+    shiftRuntimeWorldValue(value[CONTINUOUS_WORLD_REBASE_POINT_OBJECT_KEYS[i]], deltaX, deltaZ, seen);
+  }
+  for (let i = 0; i < CONTINUOUS_WORLD_REBASE_POINT_ARRAY_KEYS.length; i++) {
+    shiftRuntimeWorldValue(value[CONTINUOUS_WORLD_REBASE_POINT_ARRAY_KEYS[i]], deltaX, deltaZ, seen);
+  }
+  if (value.userData && typeof value.userData === 'object') {
+    shiftRuntimeWorldValue(value.userData, deltaX, deltaZ, seen);
+  }
+  if (typeof value.updateMatrixWorld === 'function') {
+    value.updateMatrixWorld(true);
+  }
+}
+
+function shiftRuntimeWorldArray(list, deltaX = 0, deltaZ = 0, seen = new WeakSet()) {
+  if (!Array.isArray(list) || list.length === 0) return;
+  for (let i = 0; i < list.length; i++) {
+    shiftRuntimeWorldValue(list[i], deltaX, deltaZ, seen);
+  }
+}
+
+function shiftActorStateForContinuousWorldRebase(deltaX = 0, deltaZ = 0) {
+  if (appCtx.car && typeof appCtx.car === 'object') {
+    if (Number.isFinite(appCtx.car.x)) appCtx.car.x += deltaX;
+    if (Number.isFinite(appCtx.car.z)) appCtx.car.z += deltaZ;
+  }
+  if (appCtx.drone && typeof appCtx.drone === 'object') {
+    if (Number.isFinite(appCtx.drone.x)) appCtx.drone.x += deltaX;
+    if (Number.isFinite(appCtx.drone.z)) appCtx.drone.z += deltaZ;
+  }
+  if (appCtx.boat && typeof appCtx.boat === 'object') {
+    if (Number.isFinite(appCtx.boat.x)) appCtx.boat.x += deltaX;
+    if (Number.isFinite(appCtx.boat.z)) appCtx.boat.z += deltaZ;
+  }
+  const walker = appCtx.Walk?.state?.walker;
+  if (walker && typeof walker === 'object') {
+    if (Number.isFinite(walker.x)) walker.x += deltaX;
+    if (Number.isFinite(walker.z)) walker.z += deltaZ;
+  }
+  if (appCtx.carMesh?.position) {
+    shiftRuntimePointXZ(appCtx.carMesh.position, deltaX, deltaZ);
+  }
+  if (Array.isArray(appCtx.wheelMeshes)) {
+    for (let i = 0; i < appCtx.wheelMeshes.length; i++) {
+      shiftRuntimePointXZ(appCtx.wheelMeshes[i]?.position, deltaX, deltaZ);
+    }
+  }
+  if (appCtx.boatMode?.mesh?.position) {
+    shiftRuntimePointXZ(appCtx.boatMode.mesh.position, deltaX, deltaZ);
+  }
+  if (appCtx.camera?.position) {
+    shiftRuntimePointXZ(appCtx.camera.position, deltaX, deltaZ);
+  }
+  if (appCtx.camera?.userData?.carrig) {
+    shiftRuntimeWorldValue(appCtx.camera.userData.carrig, deltaX, deltaZ);
+  }
+  if (appCtx.camera?.userData?.boatrig) {
+    shiftRuntimeWorldValue(appCtx.camera.userData.boatrig, deltaX, deltaZ);
+  }
+}
+
+function applyContinuousWorldRebase(targetGeo = null, options = {}) {
+  const lat = Number(targetGeo?.lat);
+  const lon = Number(targetGeo?.lon);
+  const deltaX = -Number(options?.actorX);
+  const deltaZ = -Number(options?.actorZ);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
+    return { applied: false, reason: 'invalid_target_geo' };
+  }
+  if (!Number.isFinite(deltaX) || !Number.isFinite(deltaZ)) {
+    return { applied: false, reason: 'invalid_actor_offset' };
+  }
+  if (Math.hypot(deltaX, deltaZ) < 0.5) {
+    return { applied: false, reason: 'actor_already_local' };
+  }
+  if (appCtx.worldLoading || appCtx.onMoon || appCtx.oceanMode?.active === true) {
+    return { applied: false, reason: 'blocked_runtime_state' };
+  }
+
+  const seen = new WeakSet();
+  shiftActorStateForContinuousWorldRebase(deltaX, deltaZ);
+  for (let i = 0; i < CONTINUOUS_WORLD_REBASE_FEATURE_ARRAY_KEYS.length; i++) {
+    shiftRuntimeWorldArray(appCtx[CONTINUOUS_WORLD_REBASE_FEATURE_ARRAY_KEYS[i]], deltaX, deltaZ, seen);
+  }
+  for (let i = 0; i < CONTINUOUS_WORLD_REBASE_MESH_ARRAY_KEYS.length; i++) {
+    shiftRuntimeWorldArray(appCtx[CONTINUOUS_WORLD_REBASE_MESH_ARRAY_KEYS[i]], deltaX, deltaZ, seen);
+  }
+  shiftRuntimeWorldArray(appCtx.overlayPublishedGroup?.children, deltaX, deltaZ, seen);
+  if (typeof appCtx.handleContinuousWorldRebase === 'function') {
+    appCtx.handleContinuousWorldRebase(deltaX, deltaZ);
+  }
+
+  appCtx.LOC = { lat, lon };
+  clearRoadMeshSpatialIndex();
+  rebuildBuildingSpatialIndexFromLoadedBuildings();
+  rebuildLanduseSpatialIndexFromLoadedLanduses();
+  if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
+  if (typeof appCtx.updatePlayableCoreResidency === 'function') {
+    appCtx.updatePlayableCoreResidency(true, { reason: 'runtime_rebase' });
+  }
+  if (typeof appCtx.syncRuntimeContentInventory === 'function') {
+    appCtx.syncRuntimeContentInventory('runtime_rebase');
+  }
+  markWorldLodDirty('runtime_rebase');
+  return {
+    applied: true,
+    deltaX,
+    deltaZ,
+    lat,
+    lon
+  };
+}
+
 function addBuildingToSpatialIndex(building) {
   if (!building) return;
   const minCellX = Math.floor(building.minX / BUILDING_INDEX_CELL_SIZE);
@@ -2001,12 +7399,116 @@ function addBuildingToSpatialIndex(building) {
   }
 }
 
+function addLanduseToSpatialIndex(landuse) {
+  const bounds = landuse?.bounds;
+  const minX = Number(bounds?.minX);
+  const maxX = Number(bounds?.maxX);
+  const minZ = Number(bounds?.minZ);
+  const maxZ = Number(bounds?.maxZ);
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minZ) || !Number.isFinite(maxZ)) return;
+
+  const minCellX = Math.floor(minX / LANDUSE_INDEX_CELL_SIZE);
+  const maxCellX = Math.floor(maxX / LANDUSE_INDEX_CELL_SIZE);
+  const minCellZ = Math.floor(minZ / LANDUSE_INDEX_CELL_SIZE);
+  const maxCellZ = Math.floor(maxZ / LANDUSE_INDEX_CELL_SIZE);
+
+  for (let cx = minCellX; cx <= maxCellX; cx++) {
+    for (let cz = minCellZ; cz <= maxCellZ; cz++) {
+      const key = `${cx},${cz}`;
+      let bucket = landuseSpatialIndex.get(key);
+      if (!bucket) {
+        bucket = [];
+        landuseSpatialIndex.set(key, bucket);
+      }
+      bucket.push(landuse);
+    }
+  }
+}
+
+function registerBuildingCollision(pts, height, options = {}) {
+  if (!Array.isArray(pts) || pts.length < 3) return null;
+  const detail = options.detail === 'bbox' ? 'bbox' : 'full';
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  let sumX = 0;
+  let sumZ = 0;
+  pts.forEach((p) => {
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minZ = Math.min(minZ, p.z);
+    maxZ = Math.max(maxZ, p.z);
+    sumX += p.x;
+    sumZ += p.z;
+  });
+  const centerX = Number.isFinite(options.centerX) ? options.centerX : sumX / pts.length;
+  const centerZ = Number.isFinite(options.centerZ) ? options.centerZ : sumZ / pts.length;
+  const baseY = Number.isFinite(options.baseY) ? options.baseY : null;
+  const regionKeys = Array.isArray(options.continuousWorldRegionKeys) && options.continuousWorldRegionKeys.length > 0 ?
+    options.continuousWorldRegionKeys.slice() :
+    buildContinuousWorldRegionKeysFromPoints(pts, 'buildings', { minX, maxX, minZ, maxZ });
+  const building = {
+    pts: detail === 'full' ? pts : null,
+    minX,
+    maxX,
+    minZ,
+    maxZ,
+    height,
+    centerX,
+    centerZ,
+    colliderDetail: detail,
+    sourceBuildingId: options.sourceBuildingId || null,
+    name: String(options.name || '').trim(),
+    buildingType: options.buildingType || 'yes',
+    buildingPartKind: options.buildingPartKind || 'full',
+    collisionKind: options.collisionKind || 'solid',
+    allowsPassageBelow: options.allowsPassageBelow === true,
+    levels: Number.isFinite(options.levels) ? options.levels : null,
+    minLevels: Number.isFinite(options.minLevels) ? options.minLevels : null,
+    baseY,
+    minY: baseY,
+    maxY: Number.isFinite(baseY) ? baseY + height : null,
+    buildingSemantics: options.buildingSemantics || null,
+    structureSemantics: options.structureSemantics || null,
+    continuousWorldRegionKeys: regionKeys,
+    continuousWorldInteractiveChunk: options.continuousWorldInteractiveChunk === true
+  };
+  appCtx.buildings.push(building);
+  addBuildingToSpatialIndex(building);
+  return building;
+}
+
+function clearStartupShellBuildingMeshes() {
+  const list = Array.isArray(appCtx.startupShellBuildingMeshes) ? appCtx.startupShellBuildingMeshes : [];
+  if (!list.length) return 0;
+  const removeSet = new Set(list);
+  let removed = 0;
+  appCtx.startupShellBuildingMeshes = [];
+  if (Array.isArray(appCtx.buildingMeshes) && appCtx.buildingMeshes.length > 0) {
+    appCtx.buildingMeshes = appCtx.buildingMeshes.filter((mesh) => {
+      if (!mesh) return false;
+      if (!removeSet.has(mesh)) return true;
+      removed += 1;
+      if (mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
+      if (mesh.geometry && typeof mesh.geometry.dispose === 'function') mesh.geometry.dispose();
+      const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      mats.forEach((mat) => {
+        if (mat && typeof mat.dispose === 'function') mat.dispose();
+      });
+      return false;
+    });
+  }
+  return removed;
+}
+
 function getNearbyBuildings(x, z, radius = 80) {
+  const overlayColliders = Array.isArray(appCtx.overlayRuntimeBuildingColliders) ? appCtx.overlayRuntimeBuildingColliders : [];
   if (!Number.isFinite(x) || !Number.isFinite(z)) {
-    return (appCtx.buildings || []).concat(appCtx.dynamicBuildingColliders || []);
+    return (appCtx.buildings || []).filter((building) => !isSuppressedBaseBuilding(building)).concat(appCtx.dynamicBuildingColliders || [], overlayColliders);
   }
   if (!buildingSpatialIndex || buildingSpatialIndex.size === 0) {
-    return (appCtx.buildings || []).concat(appCtx.dynamicBuildingColliders || []);
+    return (appCtx.buildings || []).filter((building) => !isSuppressedBaseBuilding(building)).concat(appCtx.dynamicBuildingColliders || [], overlayColliders);
   }
 
   const queryRadius = Math.max(20, radius);
@@ -2025,6 +7527,7 @@ function getNearbyBuildings(x, z, radius = 80) {
       for (let i = 0; i < bucket.length; i++) {
         const b = bucket[i];
         if (seen.has(b)) continue;
+        if (isSuppressedBaseBuilding(b)) continue;
         seen.add(b);
         out.push(b);
       }
@@ -2048,10 +7551,143 @@ function getNearbyBuildings(x, z, radius = 80) {
     }
   }
 
+  if (overlayColliders.length > 0) {
+    for (let i = 0; i < overlayColliders.length; i++) {
+      const b = overlayColliders[i];
+      if (!b || seen.has(b)) continue;
+      if (
+        x < b.minX - queryRadius ||
+        x > b.maxX + queryRadius ||
+        z < b.minZ - queryRadius ||
+        z > b.maxZ + queryRadius
+      ) {
+        continue;
+      }
+      seen.add(b);
+      out.push(b);
+    }
+  }
+
   return out;
 }
 
-async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheMeta = null) {
+function getBuildingsIntersectingBounds(bounds, padding = 0) {
+  const overlayColliders = Array.isArray(appCtx.overlayRuntimeBuildingColliders) ? appCtx.overlayRuntimeBuildingColliders : [];
+  const dynamicColliders = Array.isArray(appCtx.dynamicBuildingColliders) ? appCtx.dynamicBuildingColliders : [];
+  const minX = Number(bounds?.minX);
+  const maxX = Number(bounds?.maxX);
+  const minZ = Number(bounds?.minZ);
+  const maxZ = Number(bounds?.maxZ);
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minZ) || !Number.isFinite(maxZ)) {
+    return (appCtx.buildings || []).filter((building) => !isSuppressedBaseBuilding(building))
+      .concat(dynamicColliders, overlayColliders);
+  }
+
+  const queryMinX = minX - padding;
+  const queryMaxX = maxX + padding;
+  const queryMinZ = minZ - padding;
+  const queryMaxZ = maxZ + padding;
+
+  const pushIfIntersecting = (target, seen, out) => {
+    if (!target || seen.has(target)) return;
+    if (
+      queryMaxX < target.minX ||
+      queryMinX > target.maxX ||
+      queryMaxZ < target.minZ ||
+      queryMinZ > target.maxZ
+    ) {
+      return;
+    }
+    seen.add(target);
+    out.push(target);
+  };
+
+  const out = [];
+  const seen = new Set();
+  if (!buildingSpatialIndex || buildingSpatialIndex.size === 0) {
+    (appCtx.buildings || []).forEach((building) => {
+      if (!isSuppressedBaseBuilding(building)) pushIfIntersecting(building, seen, out);
+    });
+  } else {
+    const minCellX = Math.floor(queryMinX / BUILDING_INDEX_CELL_SIZE);
+    const maxCellX = Math.floor(queryMaxX / BUILDING_INDEX_CELL_SIZE);
+    const minCellZ = Math.floor(queryMinZ / BUILDING_INDEX_CELL_SIZE);
+    const maxCellZ = Math.floor(queryMaxZ / BUILDING_INDEX_CELL_SIZE);
+    for (let cx = minCellX; cx <= maxCellX; cx++) {
+      for (let cz = minCellZ; cz <= maxCellZ; cz++) {
+        const bucket = buildingSpatialIndex.get(`${cx},${cz}`);
+        if (!bucket) continue;
+        for (let i = 0; i < bucket.length; i++) {
+          const building = bucket[i];
+          if (isSuppressedBaseBuilding(building)) continue;
+          pushIfIntersecting(building, seen, out);
+        }
+      }
+    }
+  }
+
+  dynamicColliders.forEach((building) => pushIfIntersecting(building, seen, out));
+  overlayColliders.forEach((building) => pushIfIntersecting(building, seen, out));
+  return out;
+}
+
+function getLandusesIntersectingBounds(bounds, padding = 0) {
+  const minX = Number(bounds?.minX);
+  const maxX = Number(bounds?.maxX);
+  const minZ = Number(bounds?.minZ);
+  const maxZ = Number(bounds?.maxZ);
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minZ) || !Number.isFinite(maxZ)) {
+    return Array.isArray(appCtx.landuses) ? appCtx.landuses.slice() : [];
+  }
+
+  const queryMinX = minX - padding;
+  const queryMaxX = maxX + padding;
+  const queryMinZ = minZ - padding;
+  const queryMaxZ = maxZ + padding;
+  const out = [];
+  const seen = new Set();
+
+  const pushIfIntersecting = (landuse) => {
+    if (!landuse || seen.has(landuse)) return;
+    const targetBounds = landuse.bounds || pointsBoundsLocal(landuse.pts || []);
+    if (!targetBounds) return;
+    if (
+      queryMaxX < targetBounds.minX ||
+      queryMinX > targetBounds.maxX ||
+      queryMaxZ < targetBounds.minZ ||
+      queryMinZ > targetBounds.maxZ
+    ) {
+      return;
+    }
+    seen.add(landuse);
+    out.push(landuse);
+  };
+
+  if (!landuseSpatialIndex || landuseSpatialIndex.size === 0) {
+    (appCtx.landuses || []).forEach((landuse) => pushIfIntersecting(landuse));
+    return out;
+  }
+
+  const minCellX = Math.floor(queryMinX / LANDUSE_INDEX_CELL_SIZE);
+  const maxCellX = Math.floor(queryMaxX / LANDUSE_INDEX_CELL_SIZE);
+  const minCellZ = Math.floor(queryMinZ / LANDUSE_INDEX_CELL_SIZE);
+  const maxCellZ = Math.floor(queryMaxZ / LANDUSE_INDEX_CELL_SIZE);
+
+  for (let cx = minCellX; cx <= maxCellX; cx++) {
+    for (let cz = minCellZ; cz <= maxCellZ; cz++) {
+      const bucket = landuseSpatialIndex.get(`${cx},${cz}`);
+      if (!bucket) continue;
+      for (let i = 0; i < bucket.length; i++) {
+        pushIfIntersecting(bucket[i]);
+      }
+    }
+  }
+
+  return out;
+}
+
+async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheMeta = null, requestOptions = null) {
+  const forwardRoadCorridorQuery = String(requestOptions?.reason || '').startsWith('forward_road_corridor');
   const cached = findOverpassMemoryCache(cacheMeta);
   if (cached?.data?.elements) {
     cached.data._overpassEndpoint = cached.endpoint ? `${cached.endpoint} (memory-cache)` : 'memory-cache';
@@ -2060,11 +7696,74 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheM
     return cached.data;
   }
 
+  if (forwardRoadCorridorQuery) {
+    const nearbyCached = findNearbyOverpassMemoryCache(cacheMeta, { extraAllowance: 0.0045 });
+    if (nearbyCached?.data?.elements) {
+      nearbyCached.data._overpassEndpoint = nearbyCached.endpoint ? `${nearbyCached.endpoint} (memory-cache-nearby)` : 'memory-cache-nearby';
+      nearbyCached.data._overpassSource = 'memory-cache-nearby';
+      nearbyCached.data._overpassCacheAgeMs = Math.max(0, Date.now() - nearbyCached.savedAt);
+      return nearbyCached.data;
+    }
+  }
+
+  const persistentCached = await findOverpassPersistentCache(cacheMeta);
+  if (persistentCached?.data?.elements) {
+    persistentCached.data._overpassEndpoint = persistentCached.endpoint ? `${persistentCached.endpoint} (persistent-cache)` : 'persistent-cache';
+    persistentCached.data._overpassSource = persistentCached.stale ? 'persistent-cache-stale' : 'persistent-cache';
+    persistentCached.data._overpassCacheAgeMs = Math.max(0, persistentCached.ageMs || 0);
+    storeOverpassMemoryCache(cacheMeta, persistentCached.data, persistentCached.endpoint);
+    return persistentCached.data;
+  }
+
+  if (forwardRoadCorridorQuery) {
+    const nearbyPersistentCached = await findNearbyOverpassPersistentCache(cacheMeta, {
+      allowStale: true,
+      extraAllowance: 0.0045
+    });
+    if (nearbyPersistentCached?.data?.elements) {
+      nearbyPersistentCached.data._overpassEndpoint = nearbyPersistentCached.endpoint ? `${nearbyPersistentCached.endpoint} (persistent-cache-nearby)` : 'persistent-cache-nearby';
+      nearbyPersistentCached.data._overpassSource = nearbyPersistentCached.stale ? 'persistent-cache-nearby-stale' : 'persistent-cache-nearby';
+      nearbyPersistentCached.data._overpassCacheAgeMs = Math.max(0, nearbyPersistentCached.ageMs || 0);
+      storeOverpassMemoryCache(cacheMeta, nearbyPersistentCached.data, nearbyPersistentCached.endpoint);
+      return nearbyPersistentCached.data;
+    }
+  }
+
+  const requestSignal = requestOptions?.signal || null;
+  if (requestSignal?.aborted) {
+    throw createAbortError('request aborted before fetch');
+  }
   const controllers = [];
   const errors = [];
   const endpoints = orderedOverpassEndpoints();
+  const interactiveQuery = !!cacheMeta?.continuousWorldInteractive;
+  const startupPlayableCoreQuery = String(cacheMeta?.queryKind || '') === 'startup_playable_core';
+  const fastRoadsOnlyQuery = interactiveQuery && String(cacheMeta?.loadLevel || '') === 'roads_only';
+  const minTimeoutMs =
+    forwardRoadCorridorQuery ? 1800 :
+    fastRoadsOnlyQuery ? 2400 :
+    startupPlayableCoreQuery ? 3600 :
+    interactiveQuery ? 3200 :
+    OVERPASS_MIN_TIMEOUT_MS;
+  const staggerMsBase =
+    forwardRoadCorridorQuery ? 40 :
+    fastRoadsOnlyQuery ? 90 :
+    startupPlayableCoreQuery ? 90 :
+    interactiveQuery ? 120 :
+    OVERPASS_STAGGER_MS;
+  const abortAllControllers = () => {
+    controllers.forEach((controller) => {
+      try {
+        controller.abort();
+      } catch {}
+    });
+  };
+  const abortListener = requestSignal ? () => abortAllControllers() : null;
+  if (requestSignal && abortListener) {
+    requestSignal.addEventListener('abort', abortListener, { once: true });
+  }
   const attempts = endpoints.map((endpoint, idx) => (async () => {
-    const staggerMs = idx * OVERPASS_STAGGER_MS;
+    const staggerMs = idx * staggerMsBase;
     if (staggerMs > 0) await delayMs(staggerMs);
 
     const now = performance.now();
@@ -2073,13 +7772,36 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheM
     }
 
     const timeLeftMs = deadlineMs - now;
-    const timeoutForEndpointMs = Math.max(
-      3500,
-      Math.min(
-        Math.max(OVERPASS_MIN_TIMEOUT_MS, timeoutMs - idx * 1200),
-        timeLeftMs - 250
-      )
-    );
+    const localProxyEndpoint = endpoint.endsWith(LOCAL_OVERPASS_PROXY_PATH);
+    const timeoutForEndpointMs = localProxyEndpoint ?
+      Math.max(
+        forwardRoadCorridorQuery ? 3200 :
+        fastRoadsOnlyQuery ? 8200 :
+        startupPlayableCoreQuery ? 9200 :
+        interactiveQuery ? 9800 :
+        11000,
+        Math.min(
+          Math.max(
+            forwardRoadCorridorQuery ? 3200 :
+            fastRoadsOnlyQuery ? 8200 :
+            startupPlayableCoreQuery ? 9200 :
+            interactiveQuery ? 9800 :
+            11000,
+            timeoutMs
+          ),
+          timeLeftMs - 250
+        )
+      ) :
+      Math.max(
+        fastRoadsOnlyQuery ? 2400 : startupPlayableCoreQuery ? 3200 : 3500,
+        Math.min(
+          Math.max(
+            minTimeoutMs,
+            timeoutMs - idx * (interactiveQuery || startupPlayableCoreQuery ? 700 : 1200)
+          ),
+          timeLeftMs - 250
+        )
+      );
 
     const controller = new AbortController();
     controllers.push(controller);
@@ -2094,7 +7816,24 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheM
       });
 
       if (!res.ok) {
-        throw new Error(`HTTP ${res.status}`);
+        const responseText = await res.text().catch(() => '');
+        let responseDetail = '';
+        try {
+          const payload = JSON.parse(responseText);
+          if (Array.isArray(payload?.failures) && payload.failures.length > 0) {
+            responseDetail = payload.failures.join(' | ');
+          } else if (payload?.error) {
+            responseDetail = String(payload.error);
+          }
+        } catch {}
+        if (localProxyEndpoint && (res.status === 404 || res.status === 405 || res.status === 501)) {
+          _localOverpassProxyUnavailable = true;
+        }
+        throw new Error(
+          responseDetail ?
+            `HTTP ${res.status}: ${responseDetail}` :
+            `HTTP ${res.status}`
+        );
       }
 
       const text = await res.text();
@@ -2114,8 +7853,12 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheM
       data._overpassCacheAgeMs = 0;
       _lastOverpassEndpoint = endpoint;
       storeOverpassMemoryCache(cacheMeta, data, endpoint);
+      void storeOverpassPersistentCache(cacheMeta, data, endpoint);
       return data;
     } catch (err) {
+      if (localProxyEndpoint && err?.name !== 'AbortError') {
+        _localOverpassProxyUnavailable = true;
+      }
       const reason = err?.name === 'AbortError' ?
       `timeout after ${Math.floor(timeoutForEndpointMs)}ms` :
       err?.message || String(err);
@@ -2129,10 +7872,26 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheM
 
   try {
     const data = await firstSuccessful(attempts);
-    controllers.forEach((c) => c.abort());
+    abortAllControllers();
     return data;
-  } catch {
+  } catch (error) {
+    if (requestSignal?.aborted) {
+      throw createAbortError('request aborted during fetch');
+    }
+    const staleCached = await findOverpassPersistentCache(cacheMeta, { allowStale: true });
+    if (staleCached?.data?.elements) {
+      staleCached.data._overpassEndpoint = staleCached.endpoint ? `${staleCached.endpoint} (persistent-cache-stale)` : 'persistent-cache-stale';
+      staleCached.data._overpassSource = 'persistent-cache-stale';
+      staleCached.data._overpassCacheAgeMs = Math.max(0, staleCached.ageMs || 0);
+      storeOverpassMemoryCache(cacheMeta, staleCached.data, staleCached.endpoint);
+      return staleCached.data;
+    }
+    if (error?.name === 'AbortError') throw error;
     throw new Error(`All Overpass endpoints failed: ${errors.join(' | ')}`);
+  } finally {
+    if (requestSignal && abortListener) {
+      requestSignal.removeEventListener('abort', abortListener);
+    }
   }
 }
 
@@ -2151,6 +7910,206 @@ function getWorldLoadSignature() {
     perfMode,
     seedOverride: Number.isFinite(Number(appCtx.sharedSeedOverride)) ? Number(appCtx.sharedSeedOverride) : null
   });
+}
+
+function cancelWorldLoad(options = {}) {
+  const hideOverlay = options.hideOverlay !== false;
+  resetContinuousWorldInteractiveStreamState('cancel_world_load');
+  _activeWorldLoad = null;
+  appCtx._worldLoadSequence = (appCtx._worldLoadSequence || 0) + 1;
+  appCtx.worldLoading = false;
+  appCtx.worldBuildStage = 'idle';
+  appCtx.worldBuildReadyReason = null;
+  if (hideOverlay && typeof appCtx.hideLoad === 'function') {
+    appCtx.hideLoad();
+  }
+}
+
+async function awaitPlayableWorldShell(options = {}) {
+  if (appCtx.onMoon || appCtx.travelingToMoon) {
+    return { ready: true, reason: 'non_earth' };
+  }
+  if (typeof appCtx.isEnv === 'function' && appCtx.ENV && !appCtx.isEnv(appCtx.ENV.EARTH)) {
+    return { ready: true, reason: 'non_earth' };
+  }
+  const source = String(options.source || 'world_shell_gate');
+  const timeoutMs = clampNumber(Number(options.timeoutMs), 1200, 12000, 7000);
+  const loadSignature = String(options.loadSignature || getWorldLoadSignature());
+  const showLoad = options.showLoad !== false;
+  const loadingText = String(options.loadingText || 'Finalizing location...');
+  const deadline = performance.now() + timeoutMs;
+  let forcedSurfaceSync = false;
+  let showedOverlay = false;
+  let lastInteractiveRecoveryAt = 0;
+  let lastSnapshot = {
+    ready: false,
+    reason: 'pending',
+    visibleRoads: 0,
+    roadFeatures: 0,
+    visibleBuildings: 0,
+    terrainReady: false
+  };
+
+  while (performance.now() < deadline) {
+    if (loadSignature !== getWorldLoadSignature()) {
+      return {
+        ...lastSnapshot,
+        ready: false,
+        reason: 'location_changed'
+      };
+    }
+
+    const actorState = continuousWorldInteractiveActorMotionState();
+    const mode = String(options.mode || actorState?.mode || 'drive');
+    const actorX = Number.isFinite(Number(actorState?.x)) ? Number(actorState.x) : Number(appCtx.car?.x || 0);
+    const actorZ = Number.isFinite(Number(actorState?.z)) ? Number(actorState.z) : Number(appCtx.car?.z || 0);
+    const roadRadius =
+      mode === 'drone' ? 420 :
+      mode === 'walk' ? 220 :
+      320;
+    const buildingRadius =
+      mode === 'drone' ? 560 :
+      mode === 'walk' ? 320 :
+      440;
+    const minVisibleRoads =
+      Number.isFinite(options.minVisibleRoads) ?
+        Math.max(1, Number(options.minVisibleRoads)) :
+      mode === 'drive' ?
+        10 :
+      mode === 'drone' ?
+        6 :
+        5;
+    const minRoadFeatures =
+      Number.isFinite(options.minRoadFeatures) ?
+        Math.max(1, Number(options.minRoadFeatures)) :
+        Math.max(8, minVisibleRoads);
+    const minVisibleBuildings =
+      Number.isFinite(options.minVisibleBuildings) ?
+        Math.max(0, Number(options.minVisibleBuildings)) :
+      mode === 'drive' ?
+        0 :
+      mode === 'drone' ?
+        0 :
+        0;
+
+    const terrainSnapshot =
+      typeof appCtx.getTerrainStreamingSnapshot === 'function' ?
+        appCtx.getTerrainStreamingSnapshot() :
+        null;
+    const terrainReady =
+      appCtx.onMoon ||
+      !appCtx.terrainEnabled ||
+      !!terrainSnapshot?.activeCenterLoaded;
+    const playableCore = updatePlayableCoreResidency(true, {
+      reason: `${source}_await_shell`
+    });
+    const visibleRoads = countVisibleRoadMeshesNearWorldPoint(actorX, actorZ, roadRadius);
+    const roadFeatures = countDriveableRoadFeaturesNearWorldPoint(actorX, actorZ, roadRadius);
+    const visibleBuildings = countVisibleDetailedBuildingMeshesNearWorldPoint(actorX, actorZ, buildingRadius);
+    const buildingRequirementMet =
+      minVisibleBuildings <= 0 ||
+      visibleBuildings >= minVisibleBuildings;
+    const ready =
+      !!playableCore?.ready &&
+      terrainReady &&
+      (visibleRoads >= minVisibleRoads || roadFeatures >= minRoadFeatures) &&
+      buildingRequirementMet;
+
+    lastSnapshot = {
+      ready,
+      reason: ready ? 'ready' : 'waiting',
+      mode,
+      visibleRoads,
+      roadFeatures,
+      visibleBuildings,
+      terrainReady,
+      playableCoreReady: !!playableCore?.ready,
+      pendingSurfaceSyncRoads: Number(terrainSnapshot?.pendingSurfaceSyncRoads || 0),
+      roadsNeedRebuild: !!terrainSnapshot?.roadsNeedRebuild
+    };
+
+    if (ready) {
+      if (visibleBuildings < minVisibleBuildings) {
+        kickContinuousWorldInteractiveStreaming(
+          mode === 'drive' ? 'building_continuity_drive' :
+          mode === 'walk' ? 'building_continuity_walk' :
+          mode === 'drone' ? 'building_continuity_drone' :
+          'actor_building_gap'
+        );
+      }
+      if (showedOverlay && typeof appCtx.hideLoad === 'function') {
+        appCtx.hideLoad();
+      }
+      return lastSnapshot;
+    }
+
+    if (!showedOverlay && showLoad && typeof appCtx.showLoad === 'function') {
+      appCtx.showLoad(loadingText);
+      showedOverlay = true;
+    }
+
+    if (!terrainReady && typeof appCtx.updateTerrainAround === 'function') {
+      try {
+        appCtx.updateTerrainAround(actorX, actorZ);
+      } catch {}
+    }
+
+    if (
+      typeof appCtx.requestWorldSurfaceSync === 'function' &&
+      (
+        terrainSnapshot?.roadsNeedRebuild ||
+        visibleRoads < minVisibleRoads ||
+        Number(terrainSnapshot?.pendingSurfaceSyncRoads || 0) > 0
+      )
+    ) {
+      try {
+        appCtx.requestWorldSurfaceSync({
+          force: !forcedSurfaceSync,
+          deferOnly: forcedSurfaceSync,
+          source: `${source}_await_shell`
+        });
+        forcedSurfaceSync = true;
+      } catch {}
+    }
+
+    const shouldRecoverRoadGap = roadFeatures <= 0 || visibleRoads <= 0;
+    const shouldRecoverBuildingGap = !buildingRequirementMet;
+    const recoveryReason =
+      shouldRecoverRoadGap ?
+        'actor_visible_road_gap' :
+      shouldRecoverBuildingGap ?
+        (mode === 'drive' ? 'building_continuity_drive' :
+        mode === 'walk' ? 'building_continuity_walk' :
+        mode === 'drone' ? 'building_continuity_drone' :
+        'actor_building_gap') :
+        '';
+    const now = performance.now();
+    if (recoveryReason && (now - lastInteractiveRecoveryAt) >= 360) {
+      try {
+        const actorGeo = currentMapReferenceGeoPosition();
+        if (Number.isFinite(actorGeo?.lat) && Number.isFinite(actorGeo?.lon)) {
+          void loadContinuousWorldInteractiveChunk(actorGeo.lat, actorGeo.lon, recoveryReason);
+          lastInteractiveRecoveryAt = now;
+        }
+      } catch {}
+    }
+    if (shouldRecoverRoadGap) {
+      kickContinuousWorldInteractiveStreaming('actor_visible_road_gap');
+    } else if (shouldRecoverBuildingGap) {
+      kickContinuousWorldInteractiveStreaming(recoveryReason);
+    }
+
+    await delayMs(120);
+  }
+
+  if (showedOverlay && typeof appCtx.hideLoad === 'function') {
+    appCtx.hideLoad();
+  }
+  return {
+    ...lastSnapshot,
+    ready: false,
+    reason: 'timeout'
+  };
 }
 
 async function loadRoadsInternal(retryPass = 0) {
@@ -2182,8 +8141,11 @@ async function loadRoadsInternal(retryPass = 0) {
     pois: { requested: 0, selected: 0, near: 0, mid: 0, far: 0 },
     phases: {}
   };
+  let runCriticalWaterCoverage = async () => false;
   appCtx._lastBuildingBatchStats = null;
   appCtx._lastLanduseBatchStats = null;
+  appCtx._continuousWorldVisibleLoadConfig = null;
+  resetContinuousWorldInteractiveStreamState('full_world_load');
   if (typeof appCtx.startPerfLoad === 'function') {
     appCtx.startPerfLoad('world-load', { mode: perfModeNow, location: locName });
   }
@@ -2211,11 +8173,12 @@ async function loadRoadsInternal(retryPass = 0) {
     delete _phaseStartedAt[name];
   };
   const earthSceneSuppressed = () => {
+    const titleVisible = !!document.getElementById('titleScreen') && !document.getElementById('titleScreen').classList.contains('hidden');
     if (appCtx.onMoon || appCtx.travelingToMoon) return true;
     if (typeof appCtx.isEnv === 'function' && appCtx.ENV) {
-      return !appCtx.isEnv(appCtx.ENV.EARTH);
+      if (!appCtx.isEnv(appCtx.ENV.EARTH)) return true;
     }
-    return false;
+    return titleVisible || appCtx.gameStarted === false;
   };
   const hideEarthSceneMeshes = () => {
     const hideList = (arr) => {
@@ -2227,6 +8190,8 @@ async function loadRoadsInternal(retryPass = 0) {
       });
     };
     hideList(appCtx.roadMeshes);
+    hideList(appCtx.urbanSurfaceMeshes);
+    hideList(appCtx.structureVisualMeshes);
     hideList(appCtx.buildingMeshes);
     hideList(appCtx.landuseMeshes);
     hideList(appCtx.poiMeshes);
@@ -2236,6 +8201,16 @@ async function loadRoadsInternal(retryPass = 0) {
 
   appCtx.showLoad('Loading ' + locName + '...');
   appCtx.worldLoading = true;
+  appCtx.worldBuildStage = 'seed';
+  if (typeof appCtx.cancelRoadAndBuildingRebuild === 'function') {
+    appCtx.cancelRoadAndBuildingRebuild();
+  }
+  appCtx.urbanSurfaceStats = {
+    sidewalkBatchCount: 0,
+    sidewalkVertices: 0,
+    sidewalkTriangles: 0,
+    skippedBuildingAprons: 0
+  };
   if (typeof appCtx.clearMemoryMarkersForWorldReload === 'function') {
     appCtx.clearMemoryMarkersForWorldReload();
   }
@@ -2246,118 +8221,45 @@ async function loadRoadsInternal(retryPass = 0) {
     appCtx.clearActiveInterior({ restorePlayer: false, preserveCache: true });
   }
   // Properly dispose of all meshes to prevent memory leaks
-  appCtx.roadMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose());
-      } else {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.roadMeshes = [];appCtx.roads = [];
+  disposeTrackedMeshList(appCtx.roadMeshes, 'world_reload_reset');
+  appCtx.roads = [];
+  clearRoadMeshSpatialIndex();
+  if (typeof appCtx.clearStructureVisualMeshes === 'function') {
+    appCtx.clearStructureVisualMeshes();
+  } else {
+    appCtx.structureVisualMeshes = [];
+  }
+  disposeTrackedMeshList(appCtx.urbanSurfaceMeshes, 'world_reload_reset');
   invalidateTraversalNetworks('world_reload_reset');
   appCtx.navigationRoutePoints = [];
   appCtx.navigationRouteDistance = 0;
 
-  appCtx.buildingMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose());
-      } else {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.buildingMeshes = [];appCtx.buildings = [];
+  disposeTrackedMeshList(appCtx.buildingMeshes, 'world_reload_reset');
+  appCtx.buildings = [];
   appCtx.dynamicBuildingColliders = [];
   clearBuildingSpatialIndex();
+  clearLanduseSpatialIndex();
 
-  appCtx.landuseMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose());
-      } else {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.landuseMeshes = [];appCtx.landuses = [];appCtx.waterAreas = [];appCtx.waterways = [];
+  disposeTrackedMeshList(appCtx.landuseMeshes, 'world_reload_reset');
+  appCtx.landuses = [];appCtx.surfaceFeatureHints = [];appCtx.waterAreas = [];appCtx.waterways = [];appCtx.waterWaveVisuals = [];
   if (typeof appCtx.setWorldSurfaceProfile === 'function') {
     appCtx.setWorldSurfaceProfile(null);
   } else {
     appCtx.worldSurfaceProfile = null;
   }
-  appCtx.linearFeatureMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose());
-      } else {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.linearFeatureMeshes = [];appCtx.linearFeatures = [];
+  disposeTrackedMeshList(appCtx.linearFeatureMeshes, 'world_reload_reset');
+  appCtx.linearFeatures = [];
 
-  appCtx.poiMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose());
-      } else {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.poiMeshes = [];appCtx.pois = [];
+  disposeTrackedMeshList(appCtx.poiMeshes, 'world_reload_reset');
+  appCtx.pois = [];
 
-  appCtx.historicMarkers.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose());
-      } else {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.historicMarkers = [];appCtx.historicSites = [];
+  disposeTrackedMeshList(appCtx.historicMarkers, 'world_reload_reset');
+  appCtx.historicSites = [];
 
-  appCtx.streetFurnitureMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose());
-      } else {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.streetFurnitureMeshes = [];
-  appCtx.vegetationMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose && mat.dispose());
-      } else if (m.material.dispose) {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.vegetationMeshes = [];
+  disposeTrackedMeshList(appCtx.streetFurnitureMeshes, 'world_reload_reset');
+  disposeTrackedMeshList(appCtx.vegetationMeshes, 'world_reload_reset');
   appCtx.vegetationFeatures = [];
+  syncRuntimeContentInventory('world_reload_reset');
   appCtx.osmTreeNodes = [];
   appCtx.osmTreeRows = [];
   appCtx._worldLoadNodes = null;
@@ -2373,8 +8275,10 @@ async function loadRoadsInternal(retryPass = 0) {
   appCtx.roadsNeedRebuild = true;
 
   if (appCtx.selLoc === 'custom') {
-    const lat = parseFloat(document.getElementById('customLat').value);
-    const lon = parseFloat(document.getElementById('customLon').value);
+    const latField = document.getElementById('customLat');
+    const lonField = document.getElementById('customLon');
+    const lat = parseFloat(latField?.value ?? appCtx.customLoc?.lat);
+    const lon = parseFloat(lonField?.value ?? appCtx.customLoc?.lon);
     if (isNaN(lat) || isNaN(lon)) {
       appCtx.showLoad('Enter valid coordinates');
       appCtx.worldLoading = false;
@@ -2387,6 +8291,9 @@ async function loadRoadsInternal(retryPass = 0) {
     appCtx.LOC = { lat: appCtx.LOCS[appCtx.selLoc].lat, lon: appCtx.LOCS[appCtx.selLoc].lon };
   }
   const loadLocation = { lat: appCtx.LOC.lat, lon: appCtx.LOC.lon };
+  if (typeof appCtx.resetContinuousWorldSession === 'function') {
+    appCtx.resetContinuousWorldSession(loadLocation, 'location_load');
+  }
   const loadSequence = appCtx._worldLoadSequence = (appCtx._worldLoadSequence || 0) + 1;
   const isActiveLoadContext = () =>
     appCtx._worldLoadSequence === loadSequence &&
@@ -2411,6 +8318,7 @@ async function loadRoadsInternal(retryPass = 0) {
   // Reset terrain streaming state when location origin changes so stale tiles
   // from the previous city cannot remain at mismatched world coordinates.
   if (appCtx.terrainEnabled && !appCtx.onMoon) {
+    if (typeof appCtx.clearTerrainTileCache === 'function') appCtx.clearTerrainTileCache();
     if (typeof appCtx.resetTerrainStreamingState === 'function') appCtx.resetTerrainStreamingState();
     if (typeof appCtx.clearTerrainMeshes === 'function') appCtx.clearTerrainMeshes();
     if (typeof appCtx.updateTerrainAround === 'function') appCtx.updateTerrainAround(0, 0);
@@ -2482,42 +8390,6 @@ async function loadRoadsInternal(retryPass = 0) {
   appCtx.gameMode === 'checkpoint' ||
   appCtx.gameMode === 'painttown';
 
-  function registerBuildingCollision(pts, height, options = {}) {
-    if (!Array.isArray(pts) || pts.length < 3) return null;
-    const detail = options.detail === 'bbox' ? 'bbox' : 'full';
-    let minX = Infinity,maxX = -Infinity,minZ = Infinity,maxZ = -Infinity;
-    let sumX = 0,sumZ = 0;
-    pts.forEach((p) => {
-      minX = Math.min(minX, p.x);
-      maxX = Math.max(maxX, p.x);
-      minZ = Math.min(minZ, p.z);
-      maxZ = Math.max(maxZ, p.z);
-      sumX += p.x;
-      sumZ += p.z;
-    });
-    const centerX = Number.isFinite(options.centerX) ? options.centerX : sumX / pts.length;
-    const centerZ = Number.isFinite(options.centerZ) ? options.centerZ : sumZ / pts.length;
-    const building = {
-      pts: detail === 'full' ? pts : null,
-      minX,
-      maxX,
-      minZ,
-      maxZ,
-      height,
-      centerX,
-      centerZ,
-      colliderDetail: detail,
-      sourceBuildingId: options.sourceBuildingId || null,
-      name: String(options.name || '').trim(),
-      buildingType: options.buildingType || 'yes',
-      levels: Number.isFinite(options.levels) ? options.levels : null,
-      baseY: Number.isFinite(options.baseY) ? options.baseY : null
-    };
-    appCtx.buildings.push(building);
-    addBuildingToSpatialIndex(building);
-    return building;
-  }
-
   function recordLoadWarning(label, err) {
     const message = `${label}: ${err?.message || err}`;
     if (!Array.isArray(loadMetrics.warnings)) loadMetrics.warnings = [];
@@ -2534,13 +8406,758 @@ async function loadRoadsInternal(retryPass = 0) {
     }
   }
 
-  function finalizeLoadedWorld(reason = 'primary') {
+  let startupRoadsReadyPromoted = false;
+  let startupLocalRoadBoostPromise = null;
+  let startupShellPromise = null;
+  let startupPromotionCheckTimer = null;
+  let startupShellPhaseOpen = true;
+  let startupLoadPhase = false;
+  let startupCoreRoadRadius = 0;
+  let startupQueryRoadRadius = 0;
+  let startupShellRadius = 0;
+  let startupRoadsBounds = '';
+  let startupShellBounds = '';
+  let maxRoadWaysForPass = maxRoadWays;
+  let maxBuildingWaysForPass = maxBuildingWays;
+  let maxLanduseWaysForPass = maxLanduseWays;
+  let maxPoiNodesForPass = maxPoiNodes;
+  let overpassCacheMeta = null;
+  let geometryGuards = null;
+  const preloadedRoadIds = new Set();
+  appCtx.startupShellBuildingMeshes = Array.isArray(appCtx.startupShellBuildingMeshes) ? appCtx.startupShellBuildingMeshes : [];
+  const canShowBlockingWorldLoadProgress = () =>
+    startupLoadPhase &&
+    !!appCtx.worldLoading &&
+    !startupRoadsReadyPromoted &&
+    isActiveLoadContext() &&
+    !earthSceneSuppressed();
+  const showWorldLoadProgress = (text) => {
+    if (canShowBlockingWorldLoadProgress()) appCtx.showLoad(text);
+  };
+
+  const scheduleStartupPromotionCheck = (delayMs = 140) => {
+    if (startupRoadsReadyPromoted || !startupLoadPhase || earthSceneSuppressed() || !isActiveLoadContext()) return;
+    if (startupPromotionCheckTimer) return;
+    startupPromotionCheckTimer = window.setTimeout(async () => {
+      startupPromotionCheckTimer = null;
+      if (startupRoadsReadyPromoted || !startupLoadPhase || earthSceneSuppressed() || !isActiveLoadContext()) return;
+      await promoteRoadsReadyWorld('startup_recheck');
+      if (!startupRoadsReadyPromoted && startupShellPhaseOpen) {
+        scheduleStartupPromotionCheck(180);
+      }
+    }, Math.max(0, delayMs));
+  };
+
+  const appendRoadWaysToWorld = (
+    roadWays,
+    nodes,
+    geometryGuards,
+    {
+      roadMainBatchGroups,
+      roadSkirtBatchGroups,
+      roadMarkBatchGroups = null,
+      includeMarkings = true,
+      roadMainMaterial,
+      roadSkirtMaterial,
+      roadMarkMaterial = null,
+      registerPreloaded = false,
+      roadMutationCollector = null
+    } = {}
+  ) => {
+    let addedRoads = 0;
+    roadWays.forEach((way) => {
+      const sourceFeatureId = way.id ? String(way.id) : '';
+      const seededRoadIds =
+        startupRoadsReadyPromoted && _continuousWorldInteractiveStreamState.loadedRoadIds instanceof Set ?
+          _continuousWorldInteractiveStreamState.loadedRoadIds :
+          null;
+      if (sourceFeatureId && (preloadedRoadIds.has(sourceFeatureId) || seededRoadIds?.has(sourceFeatureId))) return;
+      const rawPts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
+      const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
+      if (pts.length < 2) return;
+      const type = way.tags?.highway || 'residential';
+      const structureSemantics = classifyStructureSemantics(way.tags || {}, {
+        featureKind: 'road',
+        subtype: type
+      });
+      const width = type.includes('motorway') ? 16 : type.includes('trunk') ? 14 : type.includes('primary') ? 12 : type.includes('secondary') ? 10 : 8;
+      const limit = type.includes('motorway') ? 65 : type.includes('trunk') ? 55 : type.includes('primary') ? 40 : type.includes('secondary') ? 35 : 25;
+      const name = way.tags?.name || type.charAt(0).toUpperCase() + type.slice(1);
+      const centerLatLon = wayCenterLatLon(way, nodes);
+      const roadTileKey = centerLatLon ?
+        featureTileKeyForLatLon(centerLatLon.lat, centerLatLon.lon, tileBudgetCfg.tileDegrees) :
+        null;
+      const roadTileDepth = useRdtBudgeting && roadTileKey ?
+        rdtDepthForFeatureTile(roadTileKey, tileBudgetCfg.tileDegrees) :
+        0;
+      const roadSubdivideStepBase = getRoadSubdivisionStep(type, roadTileDepth, perfModeNow);
+      const roadSubdivideStep =
+        structureSemantics?.terrainMode && structureSemantics.terrainMode !== 'at_grade' ?
+          Math.min(roadSubdivideStepBase, 0.55) :
+        structureSemantics?.rampCandidate ?
+          Math.min(roadSubdivideStepBase, 0.65) :
+          roadSubdivideStepBase;
+      const decimatedRoadPts = decimateRoadCenterlineByDepth(pts, type, roadTileDepth, perfModeNow);
+      if (decimatedRoadPts.length < 2) return;
+
+      const roadFeature = {
+        pts: decimatedRoadPts,
+        width,
+        limit,
+        name,
+        sourceFeatureId,
+        type,
+        sidewalkHint: String(way.tags?.sidewalk || '').toLowerCase(),
+        networkKind: 'road',
+        walkable: true,
+        driveable: true,
+        structureTags: {
+          bridge: way.tags?.bridge || '',
+          tunnel: way.tags?.tunnel || '',
+          layer: way.tags?.layer || '',
+          level: way.tags?.level || '',
+          placement: way.tags?.placement || '',
+          ramp: way.tags?.ramp || '',
+          covered: way.tags?.covered || '',
+          indoor: way.tags?.indoor || '',
+          location: way.tags?.location || '',
+          min_height: way.tags?.min_height || '',
+          man_made: way.tags?.man_made || ''
+        },
+        structureSemantics,
+        baseStructureSemantics: cloneStructureSemantics(structureSemantics),
+        surfaceBias: 0.42,
+        lodDepth: roadTileDepth,
+        subdivideMaxDist: roadSubdivideStep,
+        bounds: polylineBounds(decimatedRoadPts, width * 0.5 + 18)
+      };
+      roadFeature.continuousWorldRegionKeys = buildContinuousWorldRegionKeysFromPoints(
+        roadFeature.pts,
+        null,
+        roadFeature.bounds
+      );
+      recordRoadMutationFeature(roadMutationCollector, roadFeature);
+      appCtx.roads.push(roadFeature);
+      updateFeatureSurfaceProfile(roadFeature, worldBaseTerrainY, { surfaceBias: 0.42 });
+      const hw = width / 2;
+
+      const subdPts = typeof appCtx.subdivideRoadPoints === 'function' ?
+        appCtx.subdivideRoadPoints(decimatedRoadPts, roadSubdivideStep) :
+        decimatedRoadPts;
+      loadMetrics.roads.sourcePoints += pts.length;
+      loadMetrics.roads.decimatedPoints += decimatedRoadPts.length;
+      loadMetrics.roads.subdividedPoints += subdPts.length;
+
+      const verts = [];
+      const indices = [];
+      const { leftEdge, rightEdge } = buildFeatureRibbonEdges(roadFeature, subdPts, hw, worldBaseTerrainY, {
+        surfaceBias: 0.42
+      });
+      for (let i = 0; i < leftEdge.length; i++) {
+        verts.push(leftEdge[i].x, leftEdge[i].y, leftEdge[i].z);
+        verts.push(rightEdge[i].x, rightEdge[i].y, rightEdge[i].z);
+        if (i < leftEdge.length - 1) {
+          const vi = i * 2;
+          indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
+        }
+      }
+
+      appendIndexedGeometryToGroupedBatch(
+        roadMainBatchGroups,
+        roadFeature.continuousWorldRegionKeys,
+        verts,
+        indices
+      );
+      loadMetrics.roads.vertices += verts.length / 3;
+
+      if (typeof appCtx.buildRoadSkirts === 'function' && shouldRenderRoadSkirts(roadFeature)) {
+        const skirtDepth =
+          roadFeature.structureSemantics?.terrainMode === 'subgrade' ? 0.3 :
+          3.6;
+        const skirtData = appCtx.buildRoadSkirts(leftEdge, rightEdge, skirtDepth);
+        if (skirtData.verts.length > 0) {
+          appendIndexedGeometryToGroupedBatch(
+            roadSkirtBatchGroups,
+            roadFeature.continuousWorldRegionKeys,
+            skirtData.verts,
+            skirtData.indices
+          );
+          loadMetrics.roads.vertices += skirtData.verts.length / 3;
+        }
+      }
+
+      if (
+        includeMarkings &&
+        roadMarkBatchGroups &&
+        roadMarkMaterial &&
+        roadFeature.structureSemantics?.terrainMode === 'at_grade' &&
+        width >= 12 &&
+        (type.includes('motorway') || type.includes('trunk') || type.includes('primary'))
+      ) {
+        const markVerts = [];
+        const markIdx = [];
+        const mw = 0.15;
+        const dashLen = 6;
+        const gapLen = 6;
+        let dist = 0;
+        for (let i = 0; i < decimatedRoadPts.length - 1; i++) {
+          const p1 = decimatedRoadPts[i], p2 = decimatedRoadPts[i + 1];
+          const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
+          const dx = (p2.x - p1.x) / segLen, dz = (p2.z - p1.z) / segLen;
+          const nx = -dz, nz = dx;
+          let segDist = 0;
+          while (segDist < segLen) {
+            if (Math.floor((dist + segDist) / (dashLen + gapLen)) % 2 === 0) {
+              const x = p1.x + dx * segDist, z = p1.z + dz * segDist;
+              const len = Math.min(dashLen, segLen - segDist);
+              const y = (typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ(x, z)) + 0.35;
+              const vi = markVerts.length / 3;
+              markVerts.push(
+                x + nx * mw, y, z + nz * mw,
+                x - nx * mw, y, z - nz * mw,
+                x + dx * len + nx * mw, y, z + dz * len + nz * mw,
+                x + dx * len - nx * mw, y, z + dz * len - nz * mw
+              );
+              markIdx.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
+            }
+            segDist += dashLen + gapLen;
+          }
+          dist += segLen;
+        }
+        if (markVerts.length > 0) {
+          appendIndexedGeometryToGroupedBatch(
+            roadMarkBatchGroups,
+            roadFeature.continuousWorldRegionKeys,
+            markVerts,
+            markIdx
+          );
+          loadMetrics.roads.vertices += markVerts.length / 3;
+        }
+      }
+
+      if (sourceFeatureId) {
+        if (registerPreloaded) preloadedRoadIds.add(sourceFeatureId);
+        if (seededRoadIds) seededRoadIds.add(sourceFeatureId);
+      }
+      addedRoads += 1;
+    });
+
+    buildGroupedIndexedBatchMeshes({
+      scene: appCtx.scene,
+      targetList: appCtx.roadMeshes,
+      groups: roadMainBatchGroups,
+      material: roadMainMaterial,
+      renderOrder: 2,
+      userData: {
+        isRoadBatch: true,
+        sharedRoadMaterial: true,
+        continuousWorldFeatureFamily: 'roads'
+      }
+    });
+    buildGroupedIndexedBatchMeshes({
+      scene: appCtx.scene,
+      targetList: appCtx.roadMeshes,
+      groups: roadSkirtBatchGroups,
+      material: roadSkirtMaterial,
+      renderOrder: 1,
+      userData: {
+        isRoadBatch: true,
+        isRoadSkirt: true,
+        sharedRoadMaterial: true,
+        continuousWorldFeatureFamily: 'roads'
+      }
+    });
+    if (includeMarkings && roadMarkBatchGroups && roadMarkMaterial) {
+      buildGroupedIndexedBatchMeshes({
+        scene: appCtx.scene,
+        targetList: appCtx.roadMeshes,
+        groups: roadMarkBatchGroups,
+        material: roadMarkMaterial,
+        renderOrder: 3,
+        userData: {
+          isRoadBatch: true,
+          isRoadMarking: true,
+          sharedRoadMaterial: true,
+          continuousWorldFeatureFamily: 'roads'
+        }
+      });
+    }
+    markRoadMeshSpatialIndexDirty();
+    return addedRoads;
+  };
+
+  const appendStartupShellBuildingsToWorld = (buildingWays, nodes, geometryGuards) => {
+    if (!startupShellPhaseOpen) return 0;
+    if (!Array.isArray(buildingWays) || buildingWays.length === 0) return 0;
+    const denseCellSize = STARTUP_WORLD_BUILD_CONFIG.shellDenseCellSize;
+    const denseCellCap = STARTUP_WORLD_BUILD_CONFIG.shellDenseCellCap;
+    const acceptedByCell = new Map();
+    let added = 0;
+    for (let i = 0; i < buildingWays.length; i++) {
+      const way = buildingWays[i];
+      const rawPts = way.nodes.map((id) => nodes[id]).filter(Boolean).map((node) => appCtx.geoToWorld(node.lat, node.lon));
+      const pts = sanitizeWorldFootprintPoints(rawPts, FEATURE_MIN_POLYGON_AREA, geometryGuards);
+      if (pts.length < 3) continue;
+
+      let centerX = 0;
+      let centerZ = 0;
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+      for (let j = 0; j < pts.length; j++) {
+        const point = pts[j];
+        centerX += point.x;
+        centerZ += point.z;
+        minX = Math.min(minX, point.x);
+        maxX = Math.max(maxX, point.x);
+        minZ = Math.min(minZ, point.z);
+        maxZ = Math.max(maxZ, point.z);
+      }
+      centerX /= pts.length;
+      centerZ /= pts.length;
+      const sourceBuildingId = way.id ? String(way.id) : `startup-shell-${Math.round(centerX * 10)}-${Math.round(centerZ * 10)}`;
+      const cellKey = `${Math.floor(centerX / denseCellSize)},${Math.floor(centerZ / denseCellSize)}`;
+      const accepted = acceptedByCell.get(cellKey) || 0;
+      const buildingType = way.tags?.building || 'yes';
+      const footprintArea = Math.abs(signedPolygonAreaXZ(pts));
+      const structureSemantics = classifyStructureSemantics(way.tags || {}, {
+        featureKind: 'building',
+        subtype: buildingType
+      });
+      const buildingSemantics = interpretBuildingSemantics(way.tags || {}, {
+        fallbackHeight: 10,
+        fallbackPartHeight: 3.8,
+        footprintArea,
+        footprintWidth: Math.max(0, maxX - minX),
+        footprintDepth: Math.max(0, maxZ - minZ)
+      });
+      const height = buildingSemantics.heightMeters;
+      const isImportantBuilding =
+        !!String(way.tags?.name || '').trim() ||
+        height >= 28 ||
+        footprintArea >= 1600 ||
+        Number.isFinite(buildingSemantics?.levels) && buildingSemantics.levels >= 8;
+      if (accepted >= denseCellCap && !isImportantBuilding) continue;
+      acceptedByCell.set(cellKey, accepted + 1);
+
+      let avgElevation = 0;
+      let minElevation = Infinity;
+      let maxElevation = -Infinity;
+      for (let j = 0; j < pts.length; j++) {
+        const terrainY = appCtx.elevationWorldYAtWorldXZ(pts[j].x, pts[j].z);
+        avgElevation += terrainY;
+        minElevation = Math.min(minElevation, terrainY);
+        maxElevation = Math.max(maxElevation, terrainY);
+      }
+      avgElevation /= pts.length;
+      const slopeRange =
+        Number.isFinite(minElevation) && Number.isFinite(maxElevation) ?
+          maxElevation - minElevation :
+          0;
+      const baseElevation = slopeRange >= 0.08 ? minElevation + 0.03 : avgElevation;
+      const colorSeed = (appCtx.rdtSeed ^ (Number(way.id) >>> 0) ^ (accepted * 2654435761 >>> 0)) >>> 0;
+      const color = pickBuildingBaseColor(buildingType, colorSeed);
+      const mesh = createMidLodBuildingMesh(pts, height, baseElevation, color, {
+        buildingType,
+        buildingSeed: colorSeed
+      });
+      if (!mesh) continue;
+      mesh.userData.sourceBuildingId = sourceBuildingId;
+      mesh.userData.buildingType = buildingType;
+      mesh.userData.buildingName = way.tags?.name || '';
+      mesh.userData.structureSemantics = structureSemantics;
+      mesh.userData.buildingSemantics = buildingSemantics;
+      mesh.userData.startupShellPlaceholder = true;
+      mesh.userData.alwaysVisible = true;
+      assignContinuousWorldRegionKeysToTarget(mesh, {
+        points: pts,
+        family: 'buildings'
+      });
+      appCtx.scene.add(mesh);
+      appCtx.buildingMeshes.push(mesh);
+      appCtx.startupShellBuildingMeshes.push(mesh);
+      added += 1;
+    }
+    return added;
+  };
+
+  const startStartupShellLoad = () => {
+    if (startupShellPromise || !startupLoadPhase || earthSceneSuppressed() || !isActiveLoadContext()) {
+      return startupShellPromise;
+    }
+    if (STARTUP_WORLD_BUILD_CONFIG.placeholderShellEnabled !== true) {
+      startupShellPromise = Promise.resolve(0);
+      loadMetrics.startupLocalShell = {
+        disabled: true,
+        reason: 'placeholder_shell_disabled'
+      };
+      return startupShellPromise;
+    }
+      startupShellPromise = (async () => {
+      startLoadPhase('fetchOverpassStartupShell');
+      try {
+        const shellTimeoutMs = Math.min(overpassTimeoutMs, STARTUP_WORLD_BUILD_CONFIG.shellQueryTimeoutMs);
+        const shellDeadline = performance.now() + STARTUP_WORLD_BUILD_CONFIG.shellQueryDeadlineMs;
+        const startupShellQuery = `[out:json][timeout:${Math.max(4, Math.floor(shellTimeoutMs / 1000))}];(
+          way["building"]${startupShellBounds};
+        );out body;>;out skel qt;`;
+        const shellData = await fetchOverpassJSON(startupShellQuery, shellTimeoutMs, shellDeadline, {
+          ...overpassCacheMeta,
+          roadsRadius: startupCoreRoadRadius,
+          featureRadius: startupShellRadius,
+          queryKind: 'startup_local_shell',
+          startupLocalShell: true
+        });
+        if (earthSceneSuppressed() || !isActiveLoadContext() || !startupShellPhaseOpen) return 0;
+        const shellNodes = {};
+        shellData.elements.filter((e) => e.type === 'node').forEach((n) => shellNodes[n.id] = n);
+        const allShellBuildings = shellData.elements.filter((e) => e.type === 'way' && !!e.tags?.building);
+        const shellBuildings = limitWaysByTileBudget(allShellBuildings, shellNodes, {
+          globalCap: STARTUP_WORLD_BUILD_CONFIG.shellMaxBuildings,
+          basePerTile: 40,
+          minPerTile: 16,
+          tileDegrees: FEATURE_TILE_DEGREES,
+          useRdt: false,
+          spreadAcrossArea: true,
+          coreRatio: 0.72
+        });
+        const addedShellBuildings = appendStartupShellBuildingsToWorld(
+          shellBuildings,
+          shellNodes,
+          buildBuildingGeometryGuards(geometryGuards)
+        );
+        if (addedShellBuildings > 0 && typeof updateWorldLod === 'function') {
+          safeLoadCall('updateWorldLod_startup_shell', () => updateWorldLod(true));
+        }
+        if (addedShellBuildings > 0) {
+          await promoteRoadsReadyWorld('startup_local_shell');
+          scheduleStartupPromotionCheck(150);
+        }
+        loadMetrics.startupLocalShell = {
+          requested: allShellBuildings.length,
+          selected: shellBuildings.length,
+          added: addedShellBuildings,
+          overpassSource: shellData?._overpassSource || 'unknown',
+          overpassEndpoint: shellData?._overpassEndpoint || null
+        };
+        return addedShellBuildings;
+      } catch (err) {
+        recordLoadWarning('fetchOverpassStartupShell', err);
+        return 0;
+      } finally {
+        endLoadPhase('fetchOverpassStartupShell');
+      }
+    })();
+    return startupShellPromise;
+  };
+
+  const startStartupLocalRoadBoost = (centerLat, centerLon) => {
+    if (
+      startupLocalRoadBoostPromise ||
+      !startupLoadPhase ||
+      earthSceneSuppressed() ||
+      !isActiveLoadContext() ||
+      !Number.isFinite(centerLat) ||
+      !Number.isFinite(centerLon)
+    ) {
+      return startupLocalRoadBoostPromise;
+    }
+    startupLocalRoadBoostPromise = (async () => {
+      startLoadPhase('fetchOverpassStartupLocalRoads');
+      try {
+        const localRoadRadius = clampNumber(
+          Math.max(
+            STARTUP_WORLD_BUILD_CONFIG.coreRoadRadiusMinDegrees,
+            startupCoreRoadRadius * STARTUP_WORLD_BUILD_CONFIG.localRoadRadiusScale
+          ),
+          STARTUP_WORLD_BUILD_CONFIG.coreRoadRadiusMinDegrees,
+          Math.max(startupQueryRoadRadius, STARTUP_WORLD_BUILD_CONFIG.coreRoadRadiusMinDegrees),
+          startupCoreRoadRadius
+        );
+        const localRoadBounds = `(${centerLat - localRoadRadius},${centerLon - localRoadRadius},${centerLat + localRoadRadius},${centerLon + localRoadRadius})`;
+        const localRoadTimeoutMs = Math.min(overpassTimeoutMs, STARTUP_WORLD_BUILD_CONFIG.localRoadQueryTimeoutMs);
+        const localRoadDeadline = performance.now() + STARTUP_WORLD_BUILD_CONFIG.localRoadQueryDeadlineMs;
+        const localRoadQuery = `[out:json][timeout:${Math.max(4, Math.floor(localRoadTimeoutMs / 1000))}];(
+          way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street|service)$"]${localRoadBounds};
+        );out body;>;out skel qt;`;
+        const localRoadData = await fetchOverpassJSON(localRoadQuery, localRoadTimeoutMs, localRoadDeadline, {
+          ...overpassCacheMeta,
+          lat: Number(centerLat.toFixed(5)),
+          lon: Number(centerLon.toFixed(5)),
+          roadsRadius: localRoadRadius,
+          featureRadius: localRoadRadius,
+          queryKind: 'startup_local_roads',
+          startupLocalRoadBoost: true
+        });
+        if (earthSceneSuppressed() || !isActiveLoadContext()) return 0;
+        const localRoadNodes = {};
+        localRoadData.elements.filter((e) => e.type === 'node').forEach((n) => localRoadNodes[n.id] = n);
+        const allLocalRoadWays = localRoadData.elements.filter((e) =>
+          e.type === 'way' &&
+          isDriveableHighwayTag(e.tags?.highway)
+        );
+        const localRoadWays = limitWaysByTileBudget(allLocalRoadWays, localRoadNodes, {
+          globalCap: Math.max(480, Math.floor(maxRoadWaysForPass * STARTUP_WORLD_BUILD_CONFIG.localRoadBudgetScale)),
+          basePerTile: Math.max(42, Math.floor(tileBudgetCfg.roadsPerTile * STARTUP_WORLD_BUILD_CONFIG.localRoadBasePerTileScale)),
+          minPerTile: Math.max(22, Math.floor(tileBudgetCfg.roadsMinPerTile * STARTUP_WORLD_BUILD_CONFIG.localRoadMinPerTileScale)),
+          tileDegrees: tileBudgetCfg.tileDegrees,
+          useRdt: false,
+          compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
+        });
+        const localRoadMainBatchGroups = new Map();
+        const localRoadSkirtBatchGroups = new Map();
+        const {
+          roadMainMaterial: localRoadMainMaterial,
+          roadSkirtMaterial: localRoadSkirtMaterial
+        } = createRoadSurfaceMaterials({
+          asphaltTex: appCtx.asphaltTex,
+          asphaltNormal: appCtx.asphaltNormal,
+          asphaltRoughness: appCtx.asphaltRoughness,
+          includeMarkings: false
+        });
+        const startupRoadMutation = { bounds: null, regionKeys: new Set() };
+        const addedLocalRoads = appendRoadWaysToWorld(localRoadWays, localRoadNodes, geometryGuards, {
+          roadMainBatchGroups: localRoadMainBatchGroups,
+          roadSkirtBatchGroups: localRoadSkirtBatchGroups,
+          includeMarkings: false,
+          roadMainMaterial: localRoadMainMaterial,
+          roadSkirtMaterial: localRoadSkirtMaterial,
+          registerPreloaded: true,
+          roadMutationCollector: startupRoadMutation
+        });
+        if (addedLocalRoads > 0) {
+          if (typeof appCtx.primeRoadSurfaceSyncState === 'function') {
+            appCtx.primeRoadSurfaceSyncState({
+              clearHeightCache: false,
+              preserveActiveTask: true,
+              mutationType: 'append',
+              source: 'startup_local_roads',
+              bounds: startupRoadMutation.bounds,
+              regionKeys: Array.from(startupRoadMutation.regionKeys || [])
+            });
+          }
+          const playableCore = updatePlayableCoreResidency(true, { reason: 'startup_local_roads' });
+          if (typeof updateWorldLod === 'function') {
+            safeLoadCall('updateWorldLod_startup_local_roads', () => updateWorldLod(true));
+          }
+          loadMetrics.startupLocalRoadBoost = {
+            requested: allLocalRoadWays.length,
+            selected: localRoadWays.length,
+            added: addedLocalRoads,
+            roadMeshCount: Number(playableCore?.roadMeshCount || 0),
+            overpassSource: localRoadData?._overpassSource || 'unknown',
+            overpassEndpoint: localRoadData?._overpassEndpoint || null
+          };
+          await promoteRoadsReadyWorld('startup_local_roads');
+          scheduleStartupPromotionCheck(140);
+        }
+        return addedLocalRoads;
+      } catch (err) {
+        recordLoadWarning('fetchOverpassStartupLocalRoads', err);
+        return 0;
+      } finally {
+        endLoadPhase('fetchOverpassStartupLocalRoads');
+      }
+    })();
+    return startupLocalRoadBoostPromise;
+  };
+
+  const promoteRoadsReadyWorld = async (reason = 'startup_roads_ready') => {
+    if (startupRoadsReadyPromoted || earthSceneSuppressed() || !isActiveLoadContext()) return false;
+    const playableCore = updatePlayableCoreResidency(true, { reason });
+    if (typeof updateWorldLod === 'function') {
+      safeLoadCall('updateWorldLod_roads_ready_gate', () => updateWorldLod(true));
+    }
+    if (!playableCore?.ready) return false;
+    const actorState = continuousWorldInteractiveActorMotionState();
+    const minVisibleRoadMeshesReady =
+      Number(
+        PLAYABLE_CORE_RESIDENCY_CONFIG.minVisibleRoadMeshesReady?.[String(actorState?.mode || 'drive')] ??
+        PLAYABLE_CORE_RESIDENCY_CONFIG.minVisibleRoadMeshesReady?.drive ??
+        1
+      ) || 1;
+    const visibleRoadMeshesNearActor = countVisibleRoadMeshesNearWorldPoint(
+      Number(actorState?.x || 0),
+      Number(actorState?.z || 0),
+      String(actorState?.mode || 'drive') === 'drive' ? 240 : 180
+    );
+    const nearbyDriveableRoadFeatures = countDriveableRoadFeaturesNearWorldPoint(
+      Number(actorState?.x || 0),
+      Number(actorState?.z || 0),
+      String(actorState?.mode || 'drive') === 'drive' ? 260 : 180
+    );
+    if (visibleRoadMeshesNearActor < minVisibleRoadMeshesReady) {
+      if (
+        nearbyDriveableRoadFeatures >= Math.max(8, minVisibleRoadMeshesReady) &&
+        typeof appCtx.requestWorldSurfaceSync === 'function'
+      ) {
+        safeLoadCall(
+          'requestWorldSurfaceSync_startup_visible_road_shell',
+          () => appCtx.requestWorldSurfaceSync({ force: true, source: 'startup_visible_road_shell' })
+        );
+      }
+      const actorGeo = currentMapReferenceGeoPosition();
+      if (startupLoadPhase) {
+        safeLoadCall(
+          'startStartupLocalRoadBoost_roads_gate',
+          () => startStartupLocalRoadBoost(actorGeo.lat, actorGeo.lon)
+        );
+      }
+      scheduleStartupPromotionCheck(160);
+      return false;
+    }
+    startupRoadsReadyPromoted = true;
+    if (startupPromotionCheckTimer) {
+      clearTimeout(startupPromotionCheckTimer);
+      startupPromotionCheckTimer = null;
+    }
+    appCtx.worldLoading = false;
+    appCtx.worldBuildStage = 'playable_core_ready';
+    safeLoadCall('buildTraversalNetworks_roads_ready', () => buildTraversalNetworks());
+    if (!shouldPreserveExplicitPlayerTarget(0, 0)) {
+      safeLoadCall('spawnOnRoad_roads_ready', () => spawnOnRoad());
+    }
+    if (typeof appCtx.primeRoadSurfaceSyncState === 'function') {
+      safeLoadCall('primeRoadSurfaceSyncState_roads_ready', () => appCtx.primeRoadSurfaceSyncState());
+    }
+    if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.updateTerrainAround === 'function') {
+      safeLoadCall('updateTerrainAround_roads_ready', () => appCtx.updateTerrainAround(appCtx.car.x, appCtx.car.z));
+    }
+    if (typeof updateWorldLod === 'function') {
+      safeLoadCall('updateWorldLod_roads_ready', () => updateWorldLod(true));
+    }
+    safeLoadCall('seedContinuousWorldInteractiveStreamState_roads_ready', () => seedContinuousWorldInteractiveStreamState());
+    const actorGeo = safeLoadCall('currentMapReferenceGeoPosition_roads_ready', () => currentMapReferenceGeoPosition());
+    if (Number.isFinite(actorGeo?.lat) && Number.isFinite(actorGeo?.lon)) {
+      safeLoadCall(
+        'startStartupLocalRoadBoost_roads_ready',
+        () => startStartupLocalRoadBoost(actorGeo.lat, actorGeo.lon)
+      );
+      if (continuousWorldStartupLocalShellEnabled()) {
+        safeLoadCall(
+          'loadContinuousWorldInteractiveChunk_startup_local_shell',
+          () => void loadContinuousWorldInteractiveChunk(actorGeo.lat, actorGeo.lon, 'startup_local_shell')
+        );
+      }
+    }
+    appCtx.hideLoad();
+    if (typeof appCtx.markPerfMilestone === 'function') {
+      appCtx.markPerfMilestone('world:roads_ready', {
+        reason,
+        roads: Array.isArray(appCtx.roads) ? appCtx.roads.length : 0,
+        buildingMeshes: Array.isArray(appCtx.buildingMeshes) ? appCtx.buildingMeshes.length : 0
+      });
+    }
+    if (appCtx.gameStarted) {
+      safeLoadCall('startMode_roads_ready', () => appCtx.startMode());
+    }
+    return true;
+  };
+
+  const settleLoadedWorldSurface = async (originX = 0, originZ = 0, options = {}) => {
+    if (!isActiveLoadContext()) return null;
+    if (appCtx.onMoon || !appCtx.terrainEnabled || typeof appCtx.updateTerrainAround !== 'function') return null;
+
+    const background = options.background === true;
+    const deadline = performance.now() + (background ? 2200 : 4500);
+    let settled = null;
+    let lastSurfaceRequestAt = 0;
+    let forcedLocalSyncIssued = false;
+    while (performance.now() < deadline) {
+      if (!isActiveLoadContext()) return settled;
+
+      appCtx.updateTerrainAround(appCtx.car.x, appCtx.car.z);
+      let surfaceApplied = false;
+      if (typeof appCtx.requestWorldSurfaceSync === 'function') {
+        const terrainSnapshot =
+          typeof appCtx.getTerrainStreamingSnapshot === 'function' ?
+            appCtx.getTerrainStreamingSnapshot() :
+            null;
+        const pendingSurfaceSyncRoads = Number(terrainSnapshot?.pendingSurfaceSyncRoads || 0);
+        const rebuildInFlight = !!terrainSnapshot?.rebuildInFlight;
+        const roadsNeedRebuild = terrainSnapshot ? !!terrainSnapshot.roadsNeedRebuild : !!appCtx.roadsNeedRebuild;
+        const requestCooldownMs = background ? 320 : 180;
+        const requestReady =
+          roadsNeedRebuild &&
+          !rebuildInFlight &&
+          pendingSurfaceSyncRoads <= 0 &&
+          (performance.now() - lastSurfaceRequestAt) >= requestCooldownMs;
+        if (requestReady) {
+          const requestForce = !background && !forcedLocalSyncIssued;
+          surfaceApplied = !!appCtx.requestWorldSurfaceSync({
+            force: requestForce,
+            deferOnly: !requestForce,
+            source: background ? 'load_surface_settle_bg' : 'load_surface_settle'
+          });
+          lastSurfaceRequestAt = performance.now();
+          if (requestForce) forcedLocalSyncIssued = true;
+        }
+      } else if (typeof appCtx.rebuildRoadsWithTerrain === 'function') {
+        appCtx.rebuildRoadsWithTerrain();
+        if (typeof appCtx.repositionBuildingsWithTerrain === 'function') {
+          appCtx.repositionBuildingsWithTerrain();
+        }
+        surfaceApplied = true;
+      }
+
+      const currentRoad = appCtx.car?.road || appCtx.car?._lastStableRoad || null;
+      const currentFeetY = finiteNumberOr(appCtx.car?.y, 1.2) - 1.2;
+      const currentConflict = !!findSpawnOverheadConflict(
+        currentRoad,
+        finiteNumberOr(appCtx.car?.x, 0),
+        finiteNumberOr(appCtx.car?.z, 0),
+        currentFeetY
+      );
+
+      let nextSpawn = null;
+      if (currentConflict || !appCtx.car?.onRoad || !currentRoad) {
+        nextSpawn = searchNearestSafeRoadSpawn(originX, originZ, {
+          mode: 'drive',
+          angle: finiteNumberOr(appCtx.car?.angle, 0),
+          feetY: currentFeetY,
+          maxDistance: 360,
+          avoidOverhead: true,
+          strictMaxDistance: true
+        });
+      } else {
+        nextSpawn = resolveSafeWorldSpawn(appCtx.car.x, appCtx.car.z, {
+          mode: 'drive',
+          angle: finiteNumberOr(appCtx.car?.angle, 0),
+          feetY: currentFeetY,
+          maxRoadDistance: 120,
+          strictMaxDistance: true,
+          source: 'load_surface_settle'
+        });
+      }
+
+      if (nextSpawn?.valid) {
+        settled = applyResolvedWorldSpawn(nextSpawn, {
+          mode: 'drive',
+          syncCar: true,
+          syncWalker: true
+        });
+      }
+
+      if (!appCtx.roadsNeedRebuild && settled) return settled;
+      await delayMs(surfaceApplied ? 80 : (background ? 120 : 140));
+    }
+
+    return settled;
+  };
+
+  async function finalizeLoadedWorld(reason = 'primary') {
+    if (startupPromotionCheckTimer) {
+      clearTimeout(startupPromotionCheckTimer);
+      startupPromotionCheckTimer = null;
+    }
     if (earthSceneSuppressed()) {
       loaded = true;
       loadMetrics.recoveryReason = 'env_changed_during_load';
       loadMetrics.partialRecovery = true;
       hideEarthSceneMeshes();
       appCtx.hideLoad();
+      appCtx.worldBuildStage = 'suppressed';
       return;
     }
 
@@ -2549,11 +9166,35 @@ async function loadRoadsInternal(retryPass = 0) {
       loadMetrics.recoveryReason = reason;
       loadMetrics.partialRecovery = true;
     }
+    const partialRecovery = !!(reason && reason !== 'primary');
+
+    const preservePlayerState = startupRoadsReadyPromoted || shouldPreserveExplicitPlayerTarget(0, 0);
 
     safeLoadCall('buildTraversalNetworks', () => buildTraversalNetworks());
-    safeLoadCall('spawnOnRoad', () => spawnOnRoad());
+    if (!preservePlayerState) {
+      safeLoadCall('spawnOnRoad', () => spawnOnRoad());
+    }
+    if (typeof appCtx.primeRoadSurfaceSyncState === 'function') {
+      safeLoadCall('primeRoadSurfaceSyncState', () => appCtx.primeRoadSurfaceSyncState());
+    }
+    let backgroundSurfaceSettle = false;
     if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.updateTerrainAround === 'function') {
       safeLoadCall('updateTerrainAround', () => appCtx.updateTerrainAround(appCtx.car.x, appCtx.car.z));
+      const needsCriticalSurfaceSettle = !startupRoadsReadyPromoted && !appCtx.car?.onRoad;
+      if (needsCriticalSurfaceSettle) {
+        await settleLoadedWorldSurface(0, 0);
+      } else if (!startupRoadsReadyPromoted && appCtx.roadsNeedRebuild && typeof appCtx.requestWorldSurfaceSync === 'function') {
+        safeLoadCall(
+          'requestWorldSurfaceSync_local',
+          () => appCtx.requestWorldSurfaceSync({
+            deferOnly: true,
+            source: startupRoadsReadyPromoted ? 'load_surface_settle_bg' : 'load_surface_settle'
+          })
+        );
+        backgroundSurfaceSettle = !startupRoadsReadyPromoted;
+      } else if (!startupRoadsReadyPromoted) {
+        backgroundSurfaceSettle = !startupRoadsReadyPromoted;
+      }
     }
     if (typeof appCtx.refreshMemoryMarkersForCurrentLocation === 'function') {
       safeLoadCall('refreshMemoryMarkersForCurrentLocation', () => appCtx.refreshMemoryMarkersForCurrentLocation());
@@ -2564,12 +9205,117 @@ async function loadRoadsInternal(retryPass = 0) {
     if (typeof updateWorldLod === 'function') {
       safeLoadCall('updateWorldLod', () => updateWorldLod(true));
     }
-    appCtx.hideLoad();
-    if (typeof appCtx.alignStarFieldToLocation === 'function') {
+    const validatedSpawn = preservePlayerState ?
+      null :
+      safeLoadCall(
+        'validateActiveDriveSpawnAfterWorldBuild',
+        () => validateActiveDriveSpawnAfterWorldBuild({
+          source: `finalize_loaded_world:${reason}`,
+          maxRoadDistance: preservePlayerState ? 360 : 280
+        })
+      );
+    if (validatedSpawn) {
+      loadMetrics.postBuildSpawnValidation = {
+        corrected: true,
+        source: validatedSpawn.source || null,
+        mode: validatedSpawn.mode || 'drive',
+        x: Number(validatedSpawn.x || 0),
+        z: Number(validatedSpawn.z || 0)
+      };
+      if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.updateTerrainAround === 'function') {
+        safeLoadCall('updateTerrainAround_postBuildSpawnValidation', () => appCtx.updateTerrainAround(appCtx.car.x, appCtx.car.z));
+      }
+      if (typeof updateWorldLod === 'function') {
+        safeLoadCall('updateWorldLod_postBuildSpawnValidation', () => updateWorldLod(true));
+      }
+      if (typeof appCtx.requestWorldSurfaceSync === 'function') {
+        safeLoadCall(
+          'requestWorldSurfaceSync_postBuildSpawnValidation',
+          () => appCtx.requestWorldSurfaceSync({
+            deferOnly: true,
+            source: 'post_build_spawn_validation'
+          })
+        );
+      }
+    } else {
+      loadMetrics.postBuildSpawnValidation = {
+        corrected: false
+      };
+    }
+    safeLoadCall('seedContinuousWorldInteractiveStreamState', () => seedContinuousWorldInteractiveStreamState());
+    if (!preservePlayerState) appCtx.hideLoad();
+    appCtx.worldBuildStage = partialRecovery ? 'partial_world_ready' : 'full_world_ready';
+    appCtx.worldBuildReadyReason = reason || 'primary';
+    syncRuntimeContentInventory('world_ready');
+    if (typeof appCtx.markPerfMilestone === 'function') {
+      appCtx.markPerfMilestone('world:ready', {
+        reason,
+        roads: Array.isArray(appCtx.roads) ? appCtx.roads.length : 0,
+        buildingMeshes: Array.isArray(appCtx.buildingMeshes) ? appCtx.buildingMeshes.length : 0,
+        landuseMeshes: Array.isArray(appCtx.landuseMeshes) ? appCtx.landuseMeshes.length : 0
+      });
+    }
+    if (
+      Array.isArray(appCtx.vegetationMeshes) &&
+      appCtx.vegetationMeshes.length === 0 &&
+      (
+        (Array.isArray(appCtx.landuses) && appCtx.landuses.length > 0) ||
+        (Array.isArray(appCtx.osmTreeNodes) && appCtx.osmTreeNodes.length > 0) ||
+        (Array.isArray(appCtx.osmTreeRows) && appCtx.osmTreeRows.length > 0)
+      )
+    ) {
+      safeLoadCall('generateStreetFurniture_recovery', () => generateStreetFurniture());
+    }
+    if (typeof appCtx.refreshAstronomicalSky === 'function') {
+      safeLoadCall('refreshAstronomicalSky', () => appCtx.refreshAstronomicalSky(true));
+    } else if (typeof appCtx.alignStarFieldToLocation === 'function') {
       safeLoadCall('alignStarFieldToLocation', () => appCtx.alignStarFieldToLocation(appCtx.LOC.lat, appCtx.LOC.lon));
     }
-    if (appCtx.gameStarted) {
+    if (typeof appCtx.refreshLiveWeather === 'function') {
+      safeLoadCall('refreshLiveWeather', () => appCtx.refreshLiveWeather(true));
+    }
+    if (appCtx.gameStarted && !preservePlayerState) {
       safeLoadCall('startMode', () => appCtx.startMode());
+    }
+    if (partialRecovery) {
+      window.setTimeout(() => {
+        if (!isActiveLoadContext()) return;
+        try {
+          const actorState = continuousWorldInteractiveActorMotionState();
+          const nearbyVisibleRoads = countVisibleRoadMeshesNearWorldPoint(
+            Number(actorState?.x || 0),
+            Number(actorState?.z || 0),
+            320
+          );
+          const nearbyRoadFeatures = countDriveableRoadFeaturesNearWorldPoint(
+            Number(actorState?.x || 0),
+            Number(actorState?.z || 0),
+            320
+          );
+          const nearbyVisibleBuildings = countVisibleBuildingMeshesNearWorldPoint(
+            Number(actorState?.x || 0),
+            Number(actorState?.z || 0),
+            420
+          );
+          if (nearbyVisibleRoads <= 4 || nearbyRoadFeatures <= 8) {
+            kickContinuousWorldInteractiveStreaming('actor_visible_road_gap');
+            return;
+          }
+          if (nearbyVisibleBuildings < 24) {
+            kickContinuousWorldInteractiveStreaming(
+              actorState?.mode === 'drive' ? 'building_continuity_drive' : 'actor_building_gap'
+            );
+          }
+        } catch (err) {
+          recordLoadWarning('partial_world_recovery_kick', err);
+        }
+      }, 120);
+    }
+    if (backgroundSurfaceSettle) {
+      window.setTimeout(() => {
+        if (!isActiveLoadContext()) return;
+        void settleLoadedWorldSurface(0, 0, { background: true });
+      }, 160);
     }
   }
 
@@ -2579,44 +9325,26 @@ async function loadRoadsInternal(retryPass = 0) {
     const isPolarFallback = Math.abs(Number(appCtx.LOC?.lat) || 0) >= 66;
     const enableFallbackBuildings = false;
 
-    const disposeMeshList = (arr) => {
-      if (!Array.isArray(arr)) return;
-      arr.forEach((mesh) => {
-        if (!mesh) return;
-        if (mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
-        if (mesh.geometry && typeof mesh.geometry.dispose === 'function') mesh.geometry.dispose();
-        if (mesh.material) {
-          if (Array.isArray(mesh.material)) {
-            mesh.material.forEach((mat) => mat && typeof mat.dispose === 'function' && mat.dispose());
-          } else if (typeof mesh.material.dispose === 'function') {
-            mesh.material.dispose();
-          }
-        }
-      });
-    };
-
     // Remove any partially generated geometry before building a deterministic fallback.
-    disposeMeshList(appCtx.roadMeshes);
-    disposeMeshList(appCtx.buildingMeshes);
-    disposeMeshList(appCtx.landuseMeshes);
-    disposeMeshList(appCtx.linearFeatureMeshes);
-    disposeMeshList(appCtx.poiMeshes);
-    disposeMeshList(appCtx.streetFurnitureMeshes);
-    disposeMeshList(appCtx.vegetationMeshes);
-    disposeMeshList(appCtx.historicMarkers);
-    appCtx.roadMeshes = [];
-    appCtx.buildingMeshes = [];
-    appCtx.landuseMeshes = [];
-    appCtx.poiMeshes = [];
-    appCtx.streetFurnitureMeshes = [];
-    appCtx.vegetationMeshes = [];
+    disposeTrackedMeshList(appCtx.roadMeshes, 'fallback_world_reset');
+    disposeTrackedMeshList(appCtx.urbanSurfaceMeshes, 'fallback_world_reset');
+    disposeTrackedMeshList(appCtx.structureVisualMeshes, 'fallback_world_reset');
+    disposeTrackedMeshList(appCtx.buildingMeshes, 'fallback_world_reset');
+    disposeTrackedMeshList(appCtx.landuseMeshes, 'fallback_world_reset');
+    disposeTrackedMeshList(appCtx.linearFeatureMeshes, 'fallback_world_reset');
+    disposeTrackedMeshList(appCtx.poiMeshes, 'fallback_world_reset');
+    disposeTrackedMeshList(appCtx.streetFurnitureMeshes, 'fallback_world_reset');
+    disposeTrackedMeshList(appCtx.vegetationMeshes, 'fallback_world_reset');
+    disposeTrackedMeshList(appCtx.historicMarkers, 'fallback_world_reset');
+    clearRoadMeshSpatialIndex();
     appCtx.vegetationFeatures = [];
-    appCtx.historicMarkers = [];
     appCtx.roads = [];
     appCtx.buildings = [];
     appCtx.landuses = [];
+    appCtx.surfaceFeatureHints = [];
     appCtx.waterAreas = [];
     appCtx.waterways = [];
+    appCtx.waterWaveVisuals = [];
     invalidateTraversalNetworks('fallback_world_reset');
     appCtx.navigationRoutePoints = [];
     appCtx.navigationRouteDistance = 0;
@@ -2625,7 +9353,15 @@ async function loadRoadsInternal(retryPass = 0) {
     appCtx.dynamicBuildingColliders = [];
     appCtx.pois = [];
     appCtx.historicSites = [];
+    appCtx.urbanSurfaceStats = {
+      sidewalkBatchCount: 0,
+      sidewalkVertices: 0,
+      sidewalkTriangles: 0,
+      skippedBuildingAprons: 0
+    };
+    syncRuntimeContentInventory('fallback_world_reset');
     clearBuildingSpatialIndex();
+    clearLanduseSpatialIndex();
 
     const makeRoad = (x1, z1, x2, z2, width = 10) => {
       const pts = [{ x: x1, z: z1 }, { x: x2, z: z2 }];
@@ -2634,12 +9370,15 @@ async function loadRoadsInternal(retryPass = 0) {
         width,
         limit: 35,
         name: 'Main Street',
+        sourceFeatureId: `fallback-road:${x1}:${z1}:${x2}:${z2}`,
         type: 'primary',
+        sidewalkHint: 'both',
         networkKind: 'road',
         walkable: true,
         driveable: true,
         lodDepth: 0,
-        subdivideMaxDist: getRoadSubdivisionStep('primary', 0, perfModeNow)
+        subdivideMaxDist: getRoadSubdivisionStep('primary', 0, perfModeNow),
+        bounds: polylineBounds(pts, width * 0.5 + 18)
       });
 
       const hw = width / 2;
@@ -2678,6 +9417,7 @@ async function loadRoadsInternal(retryPass = 0) {
     makeRoad(0, -200, 0, 200, 12);
     makeRoad(-150, -150, 150, 150, 10);
     makeRoad(-150, 150, 150, -150, 10);
+    markRoadMeshSpatialIndexDirty();
 
     const makeBuilding = (x, z, w, d, h, idx = 0) => {
       const pts = [
@@ -2724,15 +9464,34 @@ async function loadRoadsInternal(retryPass = 0) {
       mesh.userData.terrainAvgElevation = avgElevation;
       mesh.userData.sourceBuildingId = sourceBuildingId;
       mesh.userData.buildingType = 'fallback';
-      if (colliderRef) colliderRef.baseY = baseElevation;
+      assignContinuousWorldRegionKeysToTarget(mesh, {
+        points: pts,
+        family: 'buildings'
+      });
+      if (colliderRef) {
+        colliderRef.baseY = baseElevation;
+        colliderRef.minY = baseElevation;
+        colliderRef.maxY = baseElevation + h;
+      }
 
       mesh.castShadow = true;
       mesh.receiveShadow = true;
       appCtx.scene.add(mesh);
       appCtx.buildingMeshes.push(mesh);
 
-      if (typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.15) {
-        const groundPatchesRaw = appCtx.createBuildingGroundPatch(pts, baseElevation);
+      const fallbackGroundPatchThreshold =
+        appCtx.pavementDiffuse ?
+          BUILDING_GROUND_PATCH_CONFIG.slopeThreshold :
+          BUILDING_GROUND_PATCH_CONFIG.untexturedSlopeThreshold;
+      if (
+        BUILDING_GROUND_PATCH_CONFIG.enabled === true &&
+        typeof appCtx.createBuildingGroundPatch === 'function' &&
+        slopeRange >= fallbackGroundPatchThreshold
+      ) {
+        const groundPatchesRaw = appCtx.createBuildingGroundPatch(pts, baseElevation, {
+          includeApron: false,
+          includeFoundationSkirt: false
+        });
         const groundPatches = Array.isArray(groundPatchesRaw) ? groundPatchesRaw : groundPatchesRaw ? [groundPatchesRaw] : [];
         groundPatches.forEach((groundPatch) => {
           groundPatch.userData.landuseFootprint = pts;
@@ -2741,6 +9500,10 @@ async function loadRoadsInternal(retryPass = 0) {
           groundPatch.userData.terrainAvgElevation = avgElevation;
           groundPatch.userData.alwaysVisible = true;
           groundPatch.visible = true;
+          assignContinuousWorldRegionKeysToTarget(groundPatch, {
+            points: pts,
+            family: 'landuse'
+          });
           appCtx.scene.add(groundPatch);
           appCtx.landuseMeshes.push(groundPatch);
         });
@@ -2759,31 +9522,102 @@ async function loadRoadsInternal(retryPass = 0) {
 
   for (const r of radii) {
     if (loaded) break;
+    let waterCoveragePriority = false;
     try {
       if (performance.now() - loadStartedAt > maxTotalLoadMs) {
         console.warn('[Overpass] Max load budget reached, switching to fallback world.');
         break;
       }
 
-      appCtx.showLoad('Loading map data...');
-      const featureRadius = r * featureRadiusScale;
-      const poiRadius = r * poiRadiusScale;
-      const geometryGuards = buildFeatureGeometryGuards(featureRadius);
+      showWorldLoadProgress('Loading map data...');
+      const defaultFeatureRadius = r * featureRadiusScale;
+      const defaultPoiRadius = r * poiRadiusScale;
+      const defaultLinearFeatureRadius = Math.min(defaultFeatureRadius, Math.max(r * 0.6, 0.008));
+      const continuousWorldVisibleLoadPlan = getContinuousWorldVisibleLoadPlan({
+        roadRadius: r,
+        featureRadius: defaultFeatureRadius,
+        poiRadius: defaultPoiRadius,
+        linearFeatureRadius: defaultLinearFeatureRadius,
+        maxRoadWays,
+        maxBuildingWays,
+        maxLanduseWays,
+        maxPoiNodes
+      });
+      const roadsQueryRadius = continuousWorldVisibleLoadPlan?.roadRadius || r;
+      const featureRadius = continuousWorldVisibleLoadPlan?.featureRadius || defaultFeatureRadius;
+      const poiRadius = continuousWorldVisibleLoadPlan?.poiRadius || defaultPoiRadius;
+      const linearFeatureRadius = continuousWorldVisibleLoadPlan?.linearFeatureRadius || defaultLinearFeatureRadius;
+      maxRoadWaysForPass = continuousWorldVisibleLoadPlan?.maxRoadWays || maxRoadWays;
+      maxBuildingWaysForPass = continuousWorldVisibleLoadPlan?.maxBuildingWays || maxBuildingWays;
+      maxLanduseWaysForPass = continuousWorldVisibleLoadPlan?.maxLanduseWays || maxLanduseWays;
+      maxPoiNodesForPass = continuousWorldVisibleLoadPlan?.maxPoiNodes || maxPoiNodes;
+      appCtx._continuousWorldVisibleLoadConfig = continuousWorldVisibleLoadPlan ? {
+        ...continuousWorldVisibleLoadPlan,
+        location: {
+          lat: Number(appCtx.LOC?.lat || 0),
+          lon: Number(appCtx.LOC?.lon || 0)
+        }
+      } : null;
+      loadMetrics.continuousWorldVisibleLoad = continuousWorldVisibleLoadPlan ? {
+        enabled: true,
+        roadRadius: Number(roadsQueryRadius.toFixed(5)),
+        featureRadius: Number(featureRadius.toFixed(5)),
+        poiRadius: Number(poiRadius.toFixed(5)),
+        linearFeatureRadius: Number(linearFeatureRadius.toFixed(5)),
+        budgetScale: Number(continuousWorldVisibleLoadPlan.budgetScale.toFixed(2)),
+        buildingFarLoadDistance: continuousWorldVisibleLoadPlan.buildingFarLoadDistance
+      } : { enabled: false };
+      geometryGuards = buildFeatureGeometryGuards(featureRadius);
       const buildingGeometryGuards = buildBuildingGeometryGuards(geometryGuards);
       const landuseGeometryGuards = buildLanduseGeometryGuards(geometryGuards);
       const waterGeometryGuards = buildWaterGeometryGuards(geometryGuards);
-      const overpassCacheMeta = {
+      startupLoadPhase = !!continuousWorldVisibleLoadPlan?.startupPhase;
+      if (startupLoadPhase) appCtx.worldBuildStage = 'playable_core_loading';
+      startupCoreRoadRadius = startupLoadPhase ?
+        startupPlayableCoreRoadRadiusDegrees(roadsQueryRadius, 'drive') :
+        roadsQueryRadius;
+      startupQueryRoadRadius = roadsQueryRadius;
+      const genericBuildingRadius = startupLoadPhase ?
+        clampNumber(
+          Math.max(featureRadius * CONTINUOUS_WORLD_INTERACTIVE_STREAM_STARTUP_BUILDING_RADIUS_SCALE, roadsQueryRadius * 0.92),
+          CONTINUOUS_WORLD_INTERACTIVE_STREAM_STARTUP_BUILDING_RADIUS_MIN,
+          featureRadius,
+          featureRadius
+        ) :
+        featureRadius;
+      startupShellRadius = startupLoadPhase ?
+        Math.max(
+          STARTUP_WORLD_BUILD_CONFIG.shellRadiusMinDegrees,
+          genericBuildingRadius * STARTUP_WORLD_BUILD_CONFIG.shellRadiusScale
+        ) :
+        genericBuildingRadius;
+      const broaderFeatureRadius = startupLoadPhase ?
+        clampNumber(Math.max(featureRadius * 0.82, genericBuildingRadius), genericBuildingRadius, featureRadius, featureRadius) :
+        featureRadius;
+      const poiQueryRadius = startupLoadPhase ? clampNumber(Math.max(poiRadius * 0.84, roadsQueryRadius * 0.44), 0.004, poiRadius, poiRadius) : poiRadius;
+      overpassCacheMeta = {
         lat: appCtx.LOC.lat,
         lon: appCtx.LOC.lon,
-        roadsRadius: r,
-        featureRadius,
-        poiRadius
+        roadsRadius: roadsQueryRadius,
+        featureRadius: startupLoadPhase ? broaderFeatureRadius : featureRadius,
+        poiRadius: poiQueryRadius,
+        roadsBounds: overpassBoundsFromCenterRadius(appCtx.LOC.lat, appCtx.LOC.lon, roadsQueryRadius),
+        featureBounds: overpassBoundsFromCenterRadius(
+          appCtx.LOC.lat,
+          appCtx.LOC.lon,
+          startupLoadPhase ? broaderFeatureRadius : featureRadius
+        ),
+        poiBounds: overpassBoundsFromCenterRadius(appCtx.LOC.lat, appCtx.LOC.lon, poiQueryRadius),
+        startupPhase: startupLoadPhase
       };
 
-      const roadsBounds = `(${appCtx.LOC.lat - r},${appCtx.LOC.lon - r},${appCtx.LOC.lat + r},${appCtx.LOC.lon + r})`;
-      const featureBounds = `(${appCtx.LOC.lat - featureRadius},${appCtx.LOC.lon - featureRadius},${appCtx.LOC.lat + featureRadius},${appCtx.LOC.lon + featureRadius})`;
-      const poiBounds = `(${appCtx.LOC.lat - poiRadius},${appCtx.LOC.lon - poiRadius},${appCtx.LOC.lat + poiRadius},${appCtx.LOC.lon + poiRadius})`;
-      const linearFeatureRadius = Math.min(featureRadius, Math.max(r * 0.6, 0.008));
+      const roadsBounds = `(${appCtx.LOC.lat - roadsQueryRadius},${appCtx.LOC.lon - roadsQueryRadius},${appCtx.LOC.lat + roadsQueryRadius},${appCtx.LOC.lon + roadsQueryRadius})`;
+      startupRoadsBounds = `(${appCtx.LOC.lat - startupCoreRoadRadius},${appCtx.LOC.lon - startupCoreRoadRadius},${appCtx.LOC.lat + startupCoreRoadRadius},${appCtx.LOC.lon + startupCoreRoadRadius})`;
+      startupShellBounds = `(${appCtx.LOC.lat - startupShellRadius},${appCtx.LOC.lon - startupShellRadius},${appCtx.LOC.lat + startupShellRadius},${appCtx.LOC.lon + startupShellRadius})`;
+      const buildingBounds = `(${appCtx.LOC.lat - genericBuildingRadius},${appCtx.LOC.lon - genericBuildingRadius},${appCtx.LOC.lat + genericBuildingRadius},${appCtx.LOC.lon + genericBuildingRadius})`;
+      const broaderFeatureBounds = `(${appCtx.LOC.lat - broaderFeatureRadius},${appCtx.LOC.lon - broaderFeatureRadius},${appCtx.LOC.lat + broaderFeatureRadius},${appCtx.LOC.lon + broaderFeatureRadius})`;
+      const fullFeatureBounds = `(${appCtx.LOC.lat - featureRadius},${appCtx.LOC.lon - featureRadius},${appCtx.LOC.lat + featureRadius},${appCtx.LOC.lon + featureRadius})`;
+      const poiBounds = `(${appCtx.LOC.lat - poiQueryRadius},${appCtx.LOC.lon - poiQueryRadius},${appCtx.LOC.lat + poiQueryRadius},${appCtx.LOC.lon + poiQueryRadius})`;
       const linearFeatureBounds = `(${appCtx.LOC.lat - linearFeatureRadius},${appCtx.LOC.lon - linearFeatureRadius},${appCtx.LOC.lat + linearFeatureRadius},${appCtx.LOC.lon + linearFeatureRadius})`;
       const deferredLinearFeatureQuery = `[out:json][timeout:${Math.max(8, Math.floor(Math.min(overpassTimeoutMs, 18000) / 1000))}];(
                 way["railway"~"^(rail|light_rail|tram|subway|narrow_gauge)$"]${linearFeatureBounds};
@@ -2860,7 +9694,7 @@ async function loadRoadsInternal(retryPass = 0) {
                   const rawPts = way.nodes.map((id) => linearNodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
                   const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
                   if (pts.length < 2) return;
-                  addLinearFeatureRibbon(pts, way.tags);
+                  addLinearFeatureRibbon(pts, { ...(way.tags || {}), sourceFeatureId: way.id ? String(way.id) : '' });
                 });
               });
             } finally {
@@ -2868,6 +9702,9 @@ async function loadRoadsInternal(retryPass = 0) {
             }
 
             syncLinearFeatureOverlayVisibility();
+            if (typeof appCtx.rebuildStructureVisualMeshes === 'function') {
+              appCtx.rebuildStructureVisualMeshes();
+            }
             invalidateTraversalNetworks('deferred_linear_features_ready');
             safeLoadCall('buildTraversalNetworksDeferred', () => buildTraversalNetworks());
             if (typeof updateWorldLod === 'function') {
@@ -2882,17 +9719,34 @@ async function loadRoadsInternal(retryPass = 0) {
         }, 0);
       };
 
+      if (startupLoadPhase) {
+        safeLoadCall(
+          'startStartupLocalRoadBoost_initial',
+          () => startStartupLocalRoadBoost(appCtx.LOC.lat, appCtx.LOC.lon)
+        );
+      }
+
       // Load roads, buildings, landuse, and POIs in one comprehensive query.
       const q = `[out:json][timeout:${Math.max(8, Math.floor(overpassTimeoutMs / 1000))}];(
                 way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street|service)$"]${roadsBounds};
-                way["building"]${featureBounds};
-                way["landuse"]${featureBounds};
-                way["natural"~"^(wood|forest|scrub|grassland|heath|wetland|tree_row|sand|beach|bare_rock|scree|shingle|glacier)$"]${featureBounds};
-                way["natural"="water"]${featureBounds};
-                way["water"]${featureBounds};
-                way["waterway"~"^(river|stream|canal|drain|ditch)$"]${featureBounds};
-                way["leisure"~"^(park|garden|nature_reserve)$"]${featureBounds};
-                node["natural"="tree"]${featureBounds};
+                way["building"]${buildingBounds};
+                way["building:part"]${buildingBounds};
+                way["building"]["name"]${fullFeatureBounds};
+                way["building"]["height"]${broaderFeatureBounds};
+                way["building"]["building:levels"]${broaderFeatureBounds};
+                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["bridge"]${broaderFeatureBounds};
+                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["layer"]${broaderFeatureBounds};
+                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["level"]${broaderFeatureBounds};
+                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["covered"]${broaderFeatureBounds};
+                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["indoor"]${broaderFeatureBounds};
+                way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["min_height"]${broaderFeatureBounds};
+                way["landuse"]${broaderFeatureBounds};
+                way["natural"~"^(wood|forest|scrub|grassland|heath|wetland|tree_row|sand|beach|bare_rock|scree|shingle|glacier)$"]${broaderFeatureBounds};
+                way["natural"="water"]${broaderFeatureBounds};
+                way["water"]${broaderFeatureBounds};
+                way["waterway"~"^(river|stream|canal|drain|ditch)$"]${broaderFeatureBounds};
+                way["leisure"~"^(park|garden|nature_reserve)$"]${broaderFeatureBounds};
+                node["natural"="tree"]${broaderFeatureBounds};
                 node["amenity"~"school|hospital|police|fire_station|parking|fuel|restaurant|cafe|bank|pharmacy|post_office"]${poiBounds};
                 node["shop"]${poiBounds};
                 node["tourism"]${poiBounds};
@@ -2900,12 +9754,118 @@ async function loadRoadsInternal(retryPass = 0) {
                 node["leisure"~"park|stadium|sports_centre|playground"]${poiBounds};
             );out body;>;out skel qt;`;
       const loadDeadline = loadStartedAt + maxTotalLoadMs;
-      startLoadPhase('fetchOverpass');
+      const fullDataPromise = startupLoadPhase ? (async () => {
+        startLoadPhase('fetchOverpass');
+        try {
+          return await fetchOverpassJSON(q, overpassTimeoutMs, loadDeadline, overpassCacheMeta);
+        } finally {
+          endLoadPhase('fetchOverpass');
+        }
+      })() : null;
+      if (startupLoadPhase) {
+        const coreRoadTimeoutMs = Math.min(overpassTimeoutMs, STARTUP_WORLD_BUILD_CONFIG.coreQueryTimeoutMs);
+      const startupRoadsQuery = `[out:json][timeout:${Math.max(4, Math.floor(coreRoadTimeoutMs / 1000))}];(
+                way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street|service)$"]${startupRoadsBounds};
+            );out body;>;out skel qt;`;
+        startLoadPhase('fetchOverpassRoadPreload');
+        try {
+          const preloadDeadline = performance.now() + Math.min(maxTotalLoadMs * 0.34, STARTUP_WORLD_BUILD_CONFIG.coreQueryDeadlineMs);
+          const roadPreloadData = await fetchOverpassJSON(startupRoadsQuery, coreRoadTimeoutMs, preloadDeadline, {
+            ...overpassCacheMeta,
+            roadsRadius: startupCoreRoadRadius,
+            featureRadius: startupCoreRoadRadius,
+            roadsBounds: overpassBoundsFromCenterRadius(appCtx.LOC.lat, appCtx.LOC.lon, startupCoreRoadRadius),
+            featureBounds: overpassBoundsFromCenterRadius(appCtx.LOC.lat, appCtx.LOC.lon, startupCoreRoadRadius),
+            poiBounds: null,
+            queryKind: 'startup_playable_core',
+            startupRoadPreload: true
+          });
+          loadMetrics.startupRoadPreload = {
+            radius: Number(startupCoreRoadRadius.toFixed(5)),
+            overpassSource: roadPreloadData?._overpassSource || 'unknown',
+            overpassEndpoint: roadPreloadData?._overpassEndpoint || null
+          };
+          if (!earthSceneSuppressed()) {
+            const preloadNodes = {};
+            roadPreloadData.elements.filter((e) => e.type === 'node').forEach((n) => preloadNodes[n.id] = n);
+            const allPreloadRoadWays = roadPreloadData.elements.filter((e) =>
+              e.type === 'way' &&
+              isDriveableHighwayTag(e.tags?.highway)
+            );
+            const preloadRoadWays = limitWaysByTileBudget(allPreloadRoadWays, preloadNodes, {
+              globalCap: Math.max(420, Math.floor(maxRoadWaysForPass * STARTUP_WORLD_BUILD_CONFIG.coreRoadBudgetScale)),
+              basePerTile: Math.max(32, Math.floor(tileBudgetCfg.roadsPerTile * STARTUP_WORLD_BUILD_CONFIG.coreRoadBasePerTileScale)),
+              minPerTile: Math.max(18, Math.floor(tileBudgetCfg.roadsMinPerTile * STARTUP_WORLD_BUILD_CONFIG.coreRoadMinPerTileScale)),
+              tileDegrees: tileBudgetCfg.tileDegrees,
+              useRdt: false,
+              compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
+            });
+            loadMetrics.startupRoadPreload.requested = allPreloadRoadWays.length;
+            loadMetrics.startupRoadPreload.selected = preloadRoadWays.length;
+
+            startLoadPhase('buildRoadGeometryPreload');
+            const preloadRoadMainBatchGroups = new Map();
+            const preloadRoadSkirtBatchGroups = new Map();
+            const startupPreloadRoadMutation = { bounds: null, regionKeys: new Set() };
+            const {
+              roadMainMaterial: preloadRoadMainMaterial,
+              roadSkirtMaterial: preloadRoadSkirtMaterial
+            } = createRoadSurfaceMaterials({
+              asphaltTex: appCtx.asphaltTex,
+              asphaltNormal: appCtx.asphaltNormal,
+              asphaltRoughness: appCtx.asphaltRoughness,
+              includeMarkings: false
+            });
+            const addedPreloadRoads = appendRoadWaysToWorld(preloadRoadWays, preloadNodes, geometryGuards, {
+              roadMainBatchGroups: preloadRoadMainBatchGroups,
+              roadSkirtBatchGroups: preloadRoadSkirtBatchGroups,
+              includeMarkings: false,
+              roadMainMaterial: preloadRoadMainMaterial,
+              roadSkirtMaterial: preloadRoadSkirtMaterial,
+              registerPreloaded: true,
+              roadMutationCollector: startupPreloadRoadMutation
+            });
+            endLoadPhase('buildRoadGeometryPreload');
+            loadMetrics.startupRoadPreload.added = addedPreloadRoads;
+            if (addedPreloadRoads > 0) {
+              if (typeof appCtx.primeRoadSurfaceSyncState === 'function') {
+                appCtx.primeRoadSurfaceSyncState({
+                  clearHeightCache: false,
+                  preserveActiveTask: true,
+                  mutationType: 'append',
+                  source: 'startup_road_preload',
+                  bounds: startupPreloadRoadMutation.bounds,
+                  regionKeys: Array.from(startupPreloadRoadMutation.regionKeys || [])
+                });
+              }
+              if (typeof appCtx.requestWorldSurfaceSync === 'function') {
+                safeLoadCall(
+                  'requestWorldSurfaceSync_startup_road_preload',
+                  () => appCtx.requestWorldSurfaceSync({ force: true, source: 'startup_road_preload' })
+                );
+              }
+              await promoteRoadsReadyWorld('startup_roads_ready');
+              scheduleStartupPromotionCheck(140);
+              startStartupShellLoad();
+            }
+          }
+        } catch (err) {
+          recordLoadWarning('fetchOverpassRoadPreload', err);
+        } finally {
+          endLoadPhase('fetchOverpassRoadPreload');
+        }
+      }
+
       let data;
-      try {
-        data = await fetchOverpassJSON(q, overpassTimeoutMs, loadDeadline, overpassCacheMeta);
-      } finally {
-        endLoadPhase('fetchOverpass');
+      if (fullDataPromise) {
+        data = await fullDataPromise;
+      } else {
+        startLoadPhase('fetchOverpass');
+        try {
+          data = await fetchOverpassJSON(q, overpassTimeoutMs, loadDeadline, overpassCacheMeta);
+        } finally {
+          endLoadPhase('fetchOverpass');
+        }
       }
       if (data?._overpassSource) loadMetrics.overpassSource = data._overpassSource;
       if (data?._overpassEndpoint) loadMetrics.overpassEndpoint = data._overpassEndpoint;
@@ -2930,7 +9890,7 @@ async function loadRoadsInternal(retryPass = 0) {
         isDriveableHighwayTag(e.tags?.highway)
       );
       const roadWays = limitWaysByTileBudget(allRoadWays, nodes, {
-        globalCap: maxRoadWays,
+        globalCap: maxRoadWaysForPass,
         basePerTile: tileBudgetCfg.roadsPerTile,
         minPerTile: tileBudgetCfg.roadsMinPerTile,
         tileDegrees: tileBudgetCfg.tileDegrees,
@@ -2938,14 +9898,19 @@ async function loadRoadsInternal(retryPass = 0) {
         compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
       });
 
-      const allBuildingWays = data.elements.filter((e) => e.type === 'way' && e.tags?.building);
+      const allBuildingWays = data.elements.filter((e) => e.type === 'way' && (e.tags?.building || e.tags?.['building:part']));
+      const buildingBudgetCfg = continuousWorldVisibleLoadPlan?.startupPhase ? {
+        ...tileBudgetCfg,
+        buildingsPerTile: Math.max(18, Math.floor(tileBudgetCfg.buildingsPerTile * 0.46)),
+        buildingsMinPerTile: Math.max(6, Math.floor(tileBudgetCfg.buildingsMinPerTile * 0.4))
+      } : tileBudgetCfg;
       const buildingWays = baselineFullWorld ?
       allBuildingWays :
       limitWaysByTileBudget(allBuildingWays, nodes, {
-        globalCap: maxBuildingWays,
-        basePerTile: tileBudgetCfg.buildingsPerTile,
-        minPerTile: tileBudgetCfg.buildingsMinPerTile,
-        tileDegrees: tileBudgetCfg.tileDegrees,
+        globalCap: maxBuildingWaysForPass,
+        basePerTile: buildingBudgetCfg.buildingsPerTile,
+        minPerTile: buildingBudgetCfg.buildingsMinPerTile,
+        tileDegrees: buildingBudgetCfg.tileDegrees,
         useRdt: useRdtBudgeting,
         spreadAcrossArea: true,
         coreRatio: useRdtBudgeting ? 0.35 : 0.45
@@ -2976,7 +9941,7 @@ async function loadRoadsInternal(retryPass = 0) {
 
       );
       const landuseWays = limitWaysByTileBudget(allLanduseWays, nodes, {
-        globalCap: maxLanduseWays,
+        globalCap: maxLanduseWaysForPass,
         basePerTile: tileBudgetCfg.landusePerTile,
         minPerTile: tileBudgetCfg.landuseMinPerTile,
         tileDegrees: tileBudgetCfg.tileDegrees,
@@ -3047,6 +10012,31 @@ async function loadRoadsInternal(retryPass = 0) {
         linearFeaturePriority('cycleway', classifyLinearFeatureTags(a.tags)?.subtype)
       }) : [];
 
+      const allStructureConnectorWays = data.elements.filter((e) => {
+        if (e.type !== 'way') return false;
+        const classification = classifyLinearFeatureTags(e.tags, { force: true });
+        if (!classification || classification.kind !== 'footway') return false;
+        const semantics = classifyStructureSemantics(e.tags || {}, {
+          featureKind: classification.kind,
+          subtype: classification.subtype
+        });
+        return semantics.gradeSeparated || semantics.skywalk;
+      });
+      const structureConnectorWays = limitWaysByTileBudget(allStructureConnectorWays, nodes, {
+        globalCap: Math.max(36, Math.floor(tileBudgetCfg.landusePerTile * 1.4)),
+        basePerTile: Math.max(3, Math.floor(tileBudgetCfg.landusePerTile * 0.16)),
+        minPerTile: 1,
+        tileDegrees: tileBudgetCfg.tileDegrees,
+        useRdt: useRdtBudgeting,
+        compareFn: (a, b) => {
+          const aSemantics = classifyStructureSemantics(a.tags || {}, { featureKind: 'footway', subtype: a.tags?.highway || '' });
+          const bSemantics = classifyStructureSemantics(b.tags || {}, { featureKind: 'footway', subtype: b.tags?.highway || '' });
+          const aScore = (aSemantics.skywalk ? 4 : aSemantics.gradeSeparated ? 3 : 1);
+          const bScore = (bSemantics.skywalk ? 4 : bSemantics.gradeSeparated ? 3 : 1);
+          return bScore - aScore;
+        }
+      });
+
       const allTreeNodes = data.elements.filter((e) =>
         e.type === 'node' &&
         e.tags?.natural === 'tree'
@@ -3078,7 +10068,7 @@ async function loadRoadsInternal(retryPass = 0) {
         !!poiKeyFromTags(e.tags)
       );
       const poiNodes = limitNodesByTileBudget(allPoiNodes, {
-        globalCap: maxPoiNodes,
+        globalCap: maxPoiNodesForPass,
         basePerTile: tileBudgetCfg.poiPerTile,
         minPerTile: tileBudgetCfg.poiMinPerTile,
         tileDegrees: tileBudgetCfg.tileDegrees,
@@ -3144,254 +10134,43 @@ async function loadRoadsInternal(retryPass = 0) {
       }
 
       // Process roads
-      appCtx.showLoad(`Loading roads... (${roadWays.length})`);
+      showWorldLoadProgress(`Loading roads... (${roadWays.length})`);
       startLoadPhase('buildRoadGeometry');
-      const roadMainBatchVerts = [];
-      const roadMainBatchIdx = [];
-      const roadSkirtBatchVerts = [];
-      const roadSkirtBatchIdx = [];
-      const roadMarkBatchVerts = [];
-      const roadMarkBatchIdx = [];
+      const roadMainBatchGroups = new Map();
+      const roadSkirtBatchGroups = new Map();
+      const roadMarkBatchGroups = new Map();
 
-      const roadMainMaterial = appCtx.asphaltTex ? new THREE.MeshStandardMaterial({
-        map: appCtx.asphaltTex,
-        normalMap: appCtx.asphaltNormal,
-        normalScale: new THREE.Vector2(0.8, 0.8),
-        roughnessMap: appCtx.asphaltRoughness,
-        roughness: 0.95,
-        metalness: 0.05,
-        side: THREE.DoubleSide,
-        polygonOffset: true,
-        polygonOffsetFactor: -2,
-        polygonOffsetUnits: -2,
-        depthWrite: true,
-        depthTest: true
-      }) : new THREE.MeshStandardMaterial({
-        color: 0x333333,
-        roughness: 0.95,
-        metalness: 0.05,
-        side: THREE.DoubleSide,
-        polygonOffset: true,
-        polygonOffsetFactor: -2,
-        polygonOffsetUnits: -2,
-        depthWrite: true,
-        depthTest: true
+      const {
+        roadMainMaterial,
+        roadSkirtMaterial,
+        roadMarkMaterial
+      } = createRoadSurfaceMaterials({
+        asphaltTex: appCtx.asphaltTex,
+        asphaltNormal: appCtx.asphaltNormal,
+        asphaltRoughness: appCtx.asphaltRoughness,
+        includeMarkings: true
       });
-
-      const roadSkirtMaterial = new THREE.MeshStandardMaterial({
-        color: 0x222222,
-        roughness: 0.95,
-        metalness: 0.05,
-        side: THREE.DoubleSide,
-        polygonOffset: true,
-        polygonOffsetFactor: -1,
-        polygonOffsetUnits: -1
+      appendRoadWaysToWorld(roadWays, nodes, geometryGuards, {
+        roadMainBatchGroups,
+        roadSkirtBatchGroups,
+        roadMarkBatchGroups,
+        includeMarkings: true,
+        roadMainMaterial,
+        roadSkirtMaterial,
+        roadMarkMaterial
       });
-
-      const roadMarkMaterial = new THREE.MeshStandardMaterial({
-        color: 0xffffee,
-        emissive: 0x444444,
-        emissiveIntensity: 0.3,
-        roughness: 0.8,
-        polygonOffset: true,
-        polygonOffsetFactor: -6,
-        polygonOffsetUnits: -6
-      });
-
-      roadWays.forEach((way) => {
-        const rawPts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
-        const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
-        if (pts.length < 2) return;
-        const type = way.tags?.highway || 'residential';
-        const width = type.includes('motorway') ? 16 : type.includes('trunk') ? 14 : type.includes('primary') ? 12 : type.includes('secondary') ? 10 : 8;
-        const limit = type.includes('motorway') ? 65 : type.includes('trunk') ? 55 : type.includes('primary') ? 40 : type.includes('secondary') ? 35 : 25;
-        const name = way.tags?.name || type.charAt(0).toUpperCase() + type.slice(1);
-        const centerLatLon = wayCenterLatLon(way, nodes);
-        const roadTileKey = centerLatLon ?
-        featureTileKeyForLatLon(centerLatLon.lat, centerLatLon.lon, tileBudgetCfg.tileDegrees) :
-        null;
-        const roadTileDepth = useRdtBudgeting && roadTileKey ?
-        rdtDepthForFeatureTile(roadTileKey, tileBudgetCfg.tileDegrees) :
-        0;
-        const roadSubdivideStep = getRoadSubdivisionStep(type, roadTileDepth, perfModeNow);
-        const decimatedRoadPts = decimateRoadCenterlineByDepth(pts, type, roadTileDepth, perfModeNow);
-        if (decimatedRoadPts.length < 2) return;
-
-        appCtx.roads.push({
-          pts: decimatedRoadPts,
-          width,
-          limit,
-          name,
-          type,
-          networkKind: 'road',
-          walkable: true,
-          driveable: true,
-          lodDepth: roadTileDepth,
-          subdivideMaxDist: roadSubdivideStep
-        });
-        const hw = width / 2;
-
-        // Curvature-aware subdivision: straight = 2-5m, curves = 0.5-2m
-        const subdPts = typeof appCtx.subdivideRoadPoints === 'function' ?
-        appCtx.subdivideRoadPoints(decimatedRoadPts, roadSubdivideStep) :
-        decimatedRoadPts;
-        loadMetrics.roads.sourcePoints += pts.length;
-        loadMetrics.roads.decimatedPoints += decimatedRoadPts.length;
-        loadMetrics.roads.subdividedPoints += subdPts.length;
-
-        // Use cached height function if available
-        const _tmh = typeof appCtx.cachedTerrainHeight === 'function' ? appCtx.cachedTerrainHeight :
-        typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt : appCtx.elevationWorldYAtWorldXZ;
-
-        // Sample center heights and smooth them
-        const cHeights = new Float64Array(subdPts.length);
-        for (let ci = 0; ci < subdPts.length; ci++) {
-          cHeights[ci] = _tmh(subdPts[ci].x, subdPts[ci].z);
-        }
-        for (let sp = 0; sp < 3; sp++) {
-          for (let si = 1; si < subdPts.length - 1; si++) {
-            cHeights[si] = cHeights[si] * 0.6 + (cHeights[si - 1] + cHeights[si + 1]) * 0.2;
-          }
-        }
-
-        const verts = [],indices = [];
-        const leftEdge = [],rightEdge = [];
-
-        // Build road strip with DIRECT edge snapping
-        for (let i = 0; i < subdPts.length; i++) {
-          const p = subdPts[i];
-
-          // Calculate tangent direction
-          let dx, dz;
-          if (i === 0) {
-            dx = subdPts[1].x - p.x;
-            dz = subdPts[1].z - p.z;
-          } else if (i === subdPts.length - 1) {
-            dx = p.x - subdPts[i - 1].x;
-            dz = p.z - subdPts[i - 1].z;
-          } else {
-            dx = subdPts[i + 1].x - subdPts[i - 1].x;
-            dz = subdPts[i + 1].z - subdPts[i - 1].z;
-          }
-
-          const len = Math.sqrt(dx * dx + dz * dz) || 1;
-          const nx = -dz / len,nz = dx / len; // Perpendicular (left direction)
-          const endpointExtend = Math.max(
-            ROAD_ENDPOINT_EXTENSION_MIN,
-            Math.min(ROAD_ENDPOINT_EXTENSION_MAX, hw * ROAD_ENDPOINT_EXTENSION_SCALE)
-          );
-          const isEndpoint = i === 0 || i === subdPts.length - 1;
-          const endpointDir = i === 0 ? -1 : 1;
-          const px = isEndpoint ? p.x + endpointDir * (dx / len) * endpointExtend : p.x;
-          const pz = isEndpoint ? p.z + endpointDir * (dz / len) * endpointExtend : p.z;
-
-          // Calculate left and right edge positions
-          const leftX = px + nx * hw;
-          const leftZ = pz + nz * hw;
-          const rightX = px - nx * hw;
-          const rightZ = pz - nz * hw;
-
-          // DIRECTLY snap BOTH edges to terrain
-          let leftY = _tmh(leftX, leftZ);
-          let rightY = _tmh(rightX, rightZ);
-
-          // Add vertical bias to prevent z-fighting and terrain peeking
-          // Increased from 0.10 to 0.25 to handle steep slopes
-          const verticalBias = 0.42; // Keep roads slightly proud to prevent terrain seams
-          leftY += verticalBias;
-          rightY += verticalBias;
-
-          // Store edge vertices for skirt generation
-          leftEdge.push({ x: leftX, y: leftY, z: leftZ });
-          rightEdge.push({ x: rightX, y: rightY, z: rightZ });
-
-          // Push vertices
-          verts.push(leftX, leftY, leftZ);
-          verts.push(rightX, rightY, rightZ);
-
-          // Create quad indices
-          if (i < subdPts.length - 1) {
-            const vi = i * 2;
-            indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
-          }
-        }
-
-        appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
-        loadMetrics.roads.vertices += verts.length / 3;
-
-        // Build road skirts (edge curtains) to hide terrain peeking
-        // Increased depth from 1.5 to 3.0 for better coverage on steep slopes
-        if (typeof appCtx.buildRoadSkirts === 'function') {
-            const skirtData = appCtx.buildRoadSkirts(leftEdge, rightEdge, 3.6);
-          if (skirtData.verts.length > 0) {
-            appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
-            loadMetrics.roads.vertices += skirtData.verts.length / 3;
-          }
-        }
-
-        // Add lane markings only for major roads (performance optimization)
-        if (width >= 12 && (type.includes('motorway') || type.includes('trunk') || type.includes('primary'))) {
-          const markVerts = [],markIdx = [];
-          const mw = 0.15,dashLen = 6,gapLen = 6; // Increased gap for performance
-          let dist = 0;
-          for (let i = 0; i < decimatedRoadPts.length - 1; i++) {
-            const p1 = decimatedRoadPts[i],p2 = decimatedRoadPts[i + 1];
-            const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
-            const dx = (p2.x - p1.x) / segLen,dz = (p2.z - p1.z) / segLen;
-            const nx = -dz,nz = dx;
-            let segDist = 0;
-            while (segDist < segLen) {
-              if (Math.floor((dist + segDist) / (dashLen + gapLen)) % 2 === 0) {
-                const x = p1.x + dx * segDist,z = p1.z + dz * segDist;
-                const len = Math.min(dashLen, segLen - segDist);
-                const y = (typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ(x, z)) + 0.35; // Just above road surface
-                const vi = markVerts.length / 3;
-                markVerts.push(
-                  x + nx * mw, y, z + nz * mw,
-                  x - nx * mw, y, z - nz * mw,
-                  x + dx * len + nx * mw, y, z + dz * len + nz * mw,
-                  x + dx * len - nx * mw, y, z + dz * len - nz * mw
-                );
-                markIdx.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
-              }
-              segDist += dashLen + gapLen;
-            }
-            dist += segLen;
-          }
-          if (markVerts.length > 0) {
-            appendIndexedGeometry(roadMarkBatchVerts, roadMarkBatchIdx, markVerts, markIdx);
-            loadMetrics.roads.vertices += markVerts.length / 3;
-          }
-        }
-      });
-
-      const buildRoadBatchMesh = (verts, indices, material, renderOrder, userData = null) => {
-        if (!verts.length || !indices.length) return null;
-        const geo = new THREE.BufferGeometry();
-        geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-        const vertexCount = verts.length / 3;
-        const indexArray = vertexCount > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
-        geo.setIndex(new THREE.BufferAttribute(indexArray, 1));
-        geo.computeVertexNormals();
-        const mesh = new THREE.Mesh(geo, material);
-        mesh.renderOrder = renderOrder;
-        mesh.receiveShadow = true;
-        mesh.frustumCulled = false;
-        if (userData && typeof userData === 'object') {
-          Object.assign(mesh.userData, userData);
-        }
-        appCtx.scene.add(mesh);
-        appCtx.roadMeshes.push(mesh);
-        return mesh;
-      };
-
-      buildRoadBatchMesh(roadMainBatchVerts, roadMainBatchIdx, roadMainMaterial, 2, { isRoadBatch: true });
-      buildRoadBatchMesh(roadSkirtBatchVerts, roadSkirtBatchIdx, roadSkirtMaterial, 1, { isRoadBatch: true, isRoadSkirt: true });
-      buildRoadBatchMesh(roadMarkBatchVerts, roadMarkBatchIdx, roadMarkMaterial, 3, { isRoadBatch: true, isRoadMarking: true });
       endLoadPhase('buildRoadGeometry');
+      if (!startupRoadsReadyPromoted && roadWays.length > 0) {
+        await promoteRoadsReadyWorld('full_query_roads_ready');
+      }
 
       // Process buildings
-      appCtx.showLoad(`Loading buildings... (${buildingWays.length})`);
+      startupShellPhaseOpen = false;
+      const clearedStartupShellMeshes = clearStartupShellBuildingMeshes();
+      if (loadMetrics.startupLocalShell && clearedStartupShellMeshes > 0) {
+        loadMetrics.startupLocalShell.cleared = clearedStartupShellMeshes;
+      }
+      showWorldLoadProgress(`Loading buildings... (${buildingWays.length})`);
       startLoadPhase('buildBuildingGeometry');
       const roadBuildingCellSize = 120;
       const buildingRoadRadiusCells = useRdtBudgeting ?
@@ -3400,7 +10179,10 @@ async function loadRoadsInternal(retryPass = 0) {
       const roadCoverageCells = new Set();
       const roadCoreCellSize = 6;
       const roadCoreCells = new Set();
+      const roadCorridorCellSize = 4;
+      const roadCorridorCells = new Set();
       const toRoadCoreCellKey = (x, z) => `${Math.floor(x / roadCoreCellSize)},${Math.floor(z / roadCoreCellSize)}`;
+      const toRoadCorridorCellKey = (x, z) => `${Math.floor(x / roadCorridorCellSize)},${Math.floor(z / roadCorridorCellSize)}`;
       const markRoadCoreCell = (x, z, radiusCells) => {
         const cx = Math.floor(x / roadCoreCellSize);
         const cz = Math.floor(z / roadCoreCellSize);
@@ -3411,39 +10193,98 @@ async function loadRoadsInternal(retryPass = 0) {
           }
         }
       };
+      const markRoadCorridorCell = (x, z, radiusCells) => {
+        const cx = Math.floor(x / roadCorridorCellSize);
+        const cz = Math.floor(z / roadCorridorCellSize);
+        const r = Math.max(0, radiusCells | 0);
+        for (let dx = -r; dx <= r; dx++) {
+          for (let dz = -r; dz <= r; dz++) {
+            roadCorridorCells.add(`${cx + dx},${cz + dz}`);
+          }
+        }
+      };
+      const markRoadCorridorSegment = (p0, p1, radiusCells) => {
+        if (!p0 || !p1) return;
+        const segLen = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+        const steps = Math.max(1, Math.ceil(segLen / Math.max(1.75, roadCorridorCellSize * 0.75)));
+        for (let step = 0; step <= steps; step++) {
+          const t = step / steps;
+          markRoadCorridorCell(
+            p0.x + (p1.x - p0.x) * t,
+            p0.z + (p1.z - p0.z) * t,
+            radiusCells
+          );
+        }
+      };
       const pointOnRoadCore = (x, z) => roadCoreCells.has(toRoadCoreCellKey(x, z));
-      const sampleFootprintRoadCore = (pts) => {
-        if (!pts || pts.length < 3) return { total: 0, inside: 0, centroidInside: false };
-        let sumX = 0,sumZ = 0;
+      const pointOnRoadCorridor = (x, z) => roadCorridorCells.has(toRoadCorridorCellKey(x, z));
+      const expandFootprintForGroundApron = (pts) => {
+        if (!pts || pts.length < 3) return pts || [];
+        let sumX = 0;
+        let sumZ = 0;
+        for (let i = 0; i < pts.length; i++) {
+          sumX += pts[i].x;
+          sumZ += pts[i].z;
+        }
+        const cx = sumX / pts.length;
+        const cz = sumZ / pts.length;
+        const maxRadius = pts.reduce((best, p) => Math.max(best, Math.hypot(p.x - cx, p.z - cz)), 0);
+        const apronOutset = Math.min(1.5, Math.max(0.65, maxRadius * 0.08));
+        return pts.map((p) => {
+          const dx = p.x - cx;
+          const dz = p.z - cz;
+          const len = Math.hypot(dx, dz);
+          if (!(len > 1e-4)) return { x: p.x, z: p.z };
+          return {
+            x: p.x + dx / len * apronOutset,
+            z: p.z + dz / len * apronOutset
+          };
+        });
+      };
+      const sampleFootprintCoverage = (pts, tester) => {
+        if (!pts || pts.length < 3 || typeof tester !== 'function') {
+          return { total: 0, inside: 0, centroidInside: false };
+        }
+        let sumX = 0, sumZ = 0;
         const samples = [];
         for (let i = 0; i < pts.length; i++) {
           const p = pts[i];
+          const n = pts[(i + 1) % pts.length];
           sumX += p.x;
           sumZ += p.z;
           samples.push(p);
-          if (i % 2 === 0) {
-            const n = pts[(i + 1) % pts.length];
-            samples.push({ x: (p.x + n.x) * 0.5, z: (p.z + n.z) * 0.5 });
-          }
+          samples.push({ x: (p.x + n.x) * 0.5, z: (p.z + n.z) * 0.5 });
+          samples.push({ x: p.x + (n.x - p.x) * 0.25, z: p.z + (n.z - p.z) * 0.25 });
+          samples.push({ x: p.x + (n.x - p.x) * 0.75, z: p.z + (n.z - p.z) * 0.75 });
         }
         const centroid = { x: sumX / pts.length, z: sumZ / pts.length };
         samples.push(centroid);
 
         let inside = 0;
         for (let i = 0; i < samples.length; i++) {
-          const s = samples[i];
-          if (pointOnRoadCore(s.x, s.z)) inside++;
+          if (tester(samples[i].x, samples[i].z)) inside += 1;
         }
         return {
           total: samples.length,
           inside,
-          centroidInside: pointOnRoadCore(centroid.x, centroid.z)
+          centroidInside: tester(centroid.x, centroid.z)
         };
+      };
+      const sampleFootprintRoadCore = (pts) => {
+        return sampleFootprintCoverage(pts, pointOnRoadCore);
+      };
+      const sampleFootprintRoadCorridor = (pts) => {
+        return sampleFootprintCoverage(pts, pointOnRoadCorridor);
       };
       const overlapsRoadCore = (stats) => {
         if (!stats || stats.total <= 0) return false;
         const overlapRatio = stats.inside / stats.total;
         return stats.inside >= Math.max(4, Math.ceil(stats.total * 0.58)) && overlapRatio >= 0.55;
+      };
+      const overlapsRoadCorridor = (stats) => {
+        if (!stats || stats.total <= 0) return false;
+        const overlapRatio = stats.inside / stats.total;
+        return stats.centroidInside || (stats.inside >= Math.max(3, Math.ceil(stats.total * 0.24)) && overlapRatio >= 0.18);
       };
 
       appCtx.roads.forEach((rd) => {
@@ -3451,12 +10292,18 @@ async function loadRoadsInternal(retryPass = 0) {
         const roadHalfWidth = Number.isFinite(rd.width) ? rd.width * 0.5 : 4;
         const roadCoreRadius = Math.max(0.8, Math.max(0, roadHalfWidth * 0.32 - 0.25));
         const roadCoreRadiusCells = Math.max(0, Math.floor((roadCoreRadius + 0.25) / roadCoreCellSize));
+        const corridorRadius = Math.max(1.6, roadHalfWidth + 2.4);
+        const corridorRadiusCells = Math.max(0, Math.ceil((corridorRadius + 0.25) / roadCorridorCellSize));
         for (let i = 0; i < rd.pts.length; i++) {
           const p = rd.pts[i];
           const cx = Math.floor(p.x / roadBuildingCellSize);
           const cz = Math.floor(p.z / roadBuildingCellSize);
           roadCoverageCells.add(`${cx},${cz}`);
           markRoadCoreCell(p.x, p.z, roadCoreRadiusCells);
+          markRoadCorridorCell(p.x, p.z, corridorRadiusCells);
+          if (i < rd.pts.length - 1) {
+            markRoadCorridorSegment(p, rd.pts[i + 1], corridorRadiusCells);
+          }
         }
       });
 
@@ -3479,8 +10326,24 @@ async function loadRoadsInternal(retryPass = 0) {
       }
       const lodNearDist = lodThresholds.near;
       const lodMidDist = lodThresholds.mid;
+      const buildingFarLoadDistance =
+        continuousWorldVisibleLoadPlan?.buildingFarLoadDistance || lodThresholds.farVisible;
+      const startupPhase = !!continuousWorldVisibleLoadPlan?.startupPhase;
+      const acceptedBuildingsByCell = new Map();
+      const suppressedParentBuildingIds = buildSuppressedParentBuildingIdSet(
+        buildingWays,
+        nodes,
+        buildingGeometryGuards
+      );
+      const denseBuildingCellSize = startupPhase ? 84 : 72;
+      const importantBuildingTypes = new Set(['hospital', 'school', 'university', 'station', 'transportation', 'civic', 'government', 'cathedral', 'church', 'museum', 'stadium', 'terminal']);
 
       buildingWays.forEach((way) => {
+        const waySourceBuildingId = way.id ? String(way.id) : '';
+        if (!way.tags?.['building:part'] && waySourceBuildingId && suppressedParentBuildingIds.has(waySourceBuildingId)) {
+          loadMetrics.buildingsSkippedParentShell = (loadMetrics.buildingsSkippedParentShell || 0) + 1;
+          return;
+        }
         const rawPts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
         const pts = sanitizeWorldFootprintPoints(rawPts, FEATURE_MIN_POLYGON_AREA, buildingGeometryGuards);
         if (pts.length < 3) return;
@@ -3493,16 +10356,27 @@ async function loadRoadsInternal(retryPass = 0) {
 
         let centerX = 0;
         let centerZ = 0;
+        let minFootprintX = Infinity;
+        let maxFootprintX = -Infinity;
+        let minFootprintZ = Infinity;
+        let maxFootprintZ = -Infinity;
         for (let i = 0; i < pts.length; i++) {
           centerX += pts[i].x;
           centerZ += pts[i].z;
+          minFootprintX = Math.min(minFootprintX, pts[i].x);
+          maxFootprintX = Math.max(maxFootprintX, pts[i].x);
+          minFootprintZ = Math.min(minFootprintZ, pts[i].z);
+          maxFootprintZ = Math.max(maxFootprintZ, pts[i].z);
         }
         centerX /= pts.length;
         centerZ /= pts.length;
+        const footprintWidth = Math.max(0, maxFootprintX - minFootprintX);
+        const footprintDepth = Math.max(0, maxFootprintZ - minFootprintZ);
+        const footprintArea = Math.abs(signedPolygonAreaXZ(pts));
         const centerDist = Math.hypot(centerX, centerZ);
         const lodTier = centerDist <= lodNearDist ?
         'near' :
-        centerDist <= lodThresholds.farVisible ? 'mid' : 'far';
+        centerDist <= buildingFarLoadDistance ? 'mid' : 'far';
         if (lodTier === 'far') {
           loadMetrics.lod.farSkipped += 1;
           return;
@@ -3513,28 +10387,79 @@ async function loadRoadsInternal(retryPass = 0) {
         const br1 = appCtx.rand01FromInt(bSeed);
         const br2 = appCtx.rand01FromInt(bSeed ^ 0x9e3779b9);
 
-        // Get building height from tags or estimate
-        let height = 10; // default
-        if (way.tags['building:levels']) {
-          height = parseFloat(way.tags['building:levels']) * 3.5;
-        } else if (way.tags.height) {
-          height = parseFloat(way.tags.height) || 10;
-        } else {
-          // Deterministic height based on building type (seeded by location + building id)
-          const bt = way.tags.building;
-          if (bt === 'house' || bt === 'residential' || bt === 'detached') height = 6 + br1 * 4;else
-          if (bt === 'apartments' || bt === 'commercial') height = 12 + br1 * 20;else
-          if (bt === 'industrial' || bt === 'warehouse') height = 8 + br1 * 6;else
-          if (bt === 'church' || bt === 'cathedral') height = 15 + br1 * 15;else
-          if (bt === 'skyscraper' || bt === 'office') height = 30 + br1 * 50;else
-          height = 8 + br1 * 12;
+        const bt = way.tags.building || way.tags['building:part'] || 'yes';
+        let fallbackHeight = 10;
+        if (!way.tags['building:part']) {
+          if (bt === 'house' || bt === 'residential' || bt === 'detached') fallbackHeight = 6 + br1 * 4;else
+          if (bt === 'apartments' || bt === 'commercial') fallbackHeight = 12 + br1 * 20;else
+          if (bt === 'industrial' || bt === 'warehouse') fallbackHeight = 8 + br1 * 6;else
+          if (bt === 'church' || bt === 'cathedral') fallbackHeight = 15 + br1 * 15;else
+          if (bt === 'skyscraper' || bt === 'office') fallbackHeight = 30 + br1 * 50;else
+          fallbackHeight = 8 + br1 * 12;
         }
-
-        const bt = way.tags.building || 'yes';
+        const structureSemantics = classifyStructureSemantics(way.tags || {}, {
+          featureKind: 'building',
+          subtype: bt
+        });
+        const buildingSemantics = interpretBuildingSemantics(way.tags || {}, {
+          fallbackHeight,
+          fallbackPartHeight: 3.4 + br1 * 1.6,
+          footprintArea,
+          footprintWidth,
+          footprintDepth
+        });
+        const height = buildingSemantics.heightMeters;
         const buildingLevels = Number.parseFloat(way.tags['building:levels']);
-        const sourceBuildingId = way.id ? String(way.id) : `osm-${Math.round(centerX * 10)}-${Math.round(centerZ * 10)}`;
+        const sourceBuildingId = waySourceBuildingId || `osm-${Math.round(centerX * 10)}-${Math.round(centerZ * 10)}`;
         const nearRoadCore = roadCoreStats.centroidInside || roadCoreStats.inside >= 2;
-        const colliderDetail = useRdtBudgeting && lodTier !== 'near' && !nearRoadCore ? 'bbox' : 'full';
+        const apronFootprint = expandFootprintForGroundApron(pts);
+        const roadCorridorStats = sampleFootprintRoadCorridor(apronFootprint);
+        const severeRoadCorridorOverlap =
+          roadCorridorStats.total > 0 &&
+          roadCorridorStats.inside >= Math.max(5, Math.ceil(roadCorridorStats.total * 0.42));
+        const isImportantBuilding =
+          !!String(way.tags.name || '').trim() ||
+          importantBuildingTypes.has(String(bt || '').toLowerCase()) ||
+          footprintArea >= 1200 ||
+          height >= 38 ||
+          (Number.isFinite(buildingLevels) && buildingLevels >= 10);
+        if (severeRoadCorridorOverlap && !isImportantBuilding) {
+          loadMetrics.buildingsSkippedRoadOverlap = (loadMetrics.buildingsSkippedRoadOverlap || 0) + 1;
+          return;
+        }
+        const cellKey = `${Math.floor(centerX / denseBuildingCellSize)},${Math.floor(centerZ / denseBuildingCellSize)}`;
+        const acceptedInCell = acceptedBuildingsByCell.get(cellKey) || 0;
+        const denseCellCap = startupPhase ?
+          (lodTier === 'near' ? 12 : 5) :
+          (lodTier === 'near' ? 28 : 12);
+        const denseOverflow = acceptedInCell - denseCellCap;
+        if (denseOverflow >= 0 && !isImportantBuilding) {
+          const keepChance =
+            lodTier === 'near' ?
+              Math.max(0.1, 0.36 - denseOverflow * 0.05) :
+              Math.max(0.05, 0.18 - denseOverflow * 0.03);
+          if (br2 > keepChance) {
+            loadMetrics.buildingsSkippedDense = (loadMetrics.buildingsSkippedDense || 0) + 1;
+            return;
+          }
+        }
+        acceptedBuildingsByCell.set(cellKey, acceptedInCell + 1);
+        const suppressGroundApron =
+          nearRoadCore ||
+          overlapsRoadCorridor(roadCorridorStats) ||
+          structureSemantics.terrainMode === 'elevated' ||
+          (
+            roadCoreStats.total > 0 &&
+            roadCoreStats.inside >= Math.max(1, Math.ceil(roadCoreStats.total * 0.18))
+          );
+        const interactiveColliderRadius = startupPhase ? 160 : 280;
+        const needsInteractiveCollider = centerDist <= interactiveColliderRadius || isImportantBuilding;
+        const denseColliderPressure = acceptedInCell >= Math.max(4, Math.floor(denseCellCap * 0.7));
+        const colliderDetail =
+          ((useRdtBudgeting && lodTier !== 'near' && !nearRoadCore) ||
+          (!needsInteractiveCollider && !nearRoadCore && (startupPhase || denseColliderPressure))) ?
+            'bbox' :
+            'full';
 
         // Calculate terrain stats for building footprint
         let avgElevation = 0;
@@ -3551,12 +10476,23 @@ async function loadRoadsInternal(retryPass = 0) {
         maxElevation - minElevation :
         0;
 
-        const baseElevation = slopeRange >= 0.06 ? minElevation + 0.03 : avgElevation;
+        const baseElevationRaw = slopeRange >= 0.06 ? minElevation + 0.03 : avgElevation;
+        const structureBaseOffset = Number.isFinite(buildingSemantics.baseOffsetMeters) ?
+          buildingSemantics.baseOffsetMeters :
+          0;
+        const baseElevation = baseElevationRaw + structureBaseOffset;
+        if (buildingSemantics.roofLike === true && buildingSemantics.intentionalVerticalStructure !== true) {
+          return;
+        }
+
         const baseColor = pickBuildingBaseColor(bt, bSeed ^ Math.floor(br2 * 0xffff));
         let mesh = null;
 
         if (lodTier === 'mid') {
-          mesh = createMidLodBuildingMesh(pts, height, baseElevation, baseColor);
+          mesh = createMidLodBuildingMesh(pts, height, baseElevation, baseColor, {
+            buildingType: bt,
+            buildingSeed: bSeed
+          });
         } else {
           const shape = new THREE.Shape();
           pts.forEach((p, i) => {
@@ -3581,6 +10517,9 @@ async function loadRoadsInternal(retryPass = 0) {
           mesh.position.y = baseElevation;
           mesh.userData.buildingFootprint = pts;
           mesh.userData.avgElevation = baseElevation;
+          mesh.userData.structureBaseOffset = structureBaseOffset;
+          mesh.userData.structureSemantics = structureSemantics;
+          mesh.userData.buildingSemantics = buildingSemantics;
           mesh.castShadow = true;
           mesh.receiveShadow = true;
         }
@@ -3591,6 +10530,12 @@ async function loadRoadsInternal(retryPass = 0) {
         mesh.userData.sourceBuildingId = sourceBuildingId;
         mesh.userData.buildingName = way.tags.name || '';
         mesh.userData.buildingType = bt;
+        mesh.userData.buildingPartKind = buildingSemantics.partKind;
+        mesh.userData.collisionKind = buildingSemantics.collisionKind;
+        mesh.userData.allowsPassageBelow = buildingSemantics.allowsPassageBelow;
+        mesh.userData.buildingSemantics = buildingSemantics;
+        mesh.userData.structureBaseOffset = structureBaseOffset;
+        mesh.userData.structureSemantics = structureSemantics;
         const colliderRef = registerBuildingCollision(pts, height, {
           detail: colliderDetail,
           centerX,
@@ -3598,39 +10543,65 @@ async function loadRoadsInternal(retryPass = 0) {
           sourceBuildingId,
           name: way.tags.name || '',
           buildingType: bt,
+          buildingPartKind: buildingSemantics.partKind,
+          collisionKind: buildingSemantics.collisionKind,
+          allowsPassageBelow: buildingSemantics.allowsPassageBelow,
           levels: Number.isFinite(buildingLevels) ? buildingLevels : null,
-          baseY: baseElevation
+          minLevels: Number.isFinite(buildingSemantics.buildingMinLevel) ? buildingSemantics.buildingMinLevel : null,
+          baseY: baseElevation,
+          buildingSemantics,
+          structureSemantics
         });
         if (colliderDetail === 'full') loadMetrics.colliders.full += 1;else
         loadMetrics.colliders.simplified += 1;
         if (colliderRef) {
           colliderRef.baseY = baseElevation;
+          colliderRef.minY = baseElevation;
+          colliderRef.maxY = baseElevation + height;
         }
 
+        assignContinuousWorldRegionKeysToTarget(mesh, {
+          points: pts,
+          family: 'buildings'
+        });
         appCtx.scene.add(mesh);
         appCtx.buildingMeshes.push(mesh);
-        const roofDetailMesh = createRoofDetailMesh(pts, height, baseElevation, bSeed, bt, lodTier);
-        if (roofDetailMesh) {
-          roofDetailMesh.userData.sourceBuildingId = sourceBuildingId;
-          roofDetailMesh.userData.terrainAvgElevation = avgElevation;
-          appCtx.scene.add(roofDetailMesh);
-          appCtx.buildingMeshes.push(roofDetailMesh);
-        }
         if (lodTier === 'near') loadMetrics.lod.near += 1;else
         loadMetrics.lod.mid += 1;
 
         // On sloped terrain, add terrain-conforming ground support so building
         // bases do not appear to float above hills/step terrain.
-        if (lodTier === 'near' && typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.15) {
-          const groundPatchesRaw = appCtx.createBuildingGroundPatch(pts, baseElevation);
+        const buildingGroundPatchThreshold =
+          startupPhase || !appCtx.pavementDiffuse ?
+            BUILDING_GROUND_PATCH_CONFIG.untexturedSlopeThreshold :
+            BUILDING_GROUND_PATCH_CONFIG.slopeThreshold;
+        if (
+          BUILDING_GROUND_PATCH_CONFIG.enabled === true &&
+          lodTier === 'near' &&
+          buildingSemantics.shouldCreateGroundPatch &&
+          typeof appCtx.createBuildingGroundPatch === 'function' &&
+          slopeRange >= buildingGroundPatchThreshold
+        ) {
+          const groundPatchesRaw = appCtx.createBuildingGroundPatch(pts, baseElevation, {
+            includeApron: false,
+            includeFoundationSkirt: false
+          });
           const groundPatches = Array.isArray(groundPatchesRaw) ? groundPatchesRaw : groundPatchesRaw ? [groundPatchesRaw] : [];
           groundPatches.forEach((groundPatch) => {
+            if (groundPatch.userData?.isGroundApron && suppressGroundApron) {
+              appCtx.urbanSurfaceStats.skippedBuildingAprons += 1;
+              return;
+            }
             groundPatch.userData.landuseFootprint = pts;
             groundPatch.userData.landuseType = 'buildingGround';
             groundPatch.userData.avgElevation = baseElevation;
             groundPatch.userData.terrainAvgElevation = avgElevation;
             groundPatch.userData.alwaysVisible = true;
             groundPatch.visible = true;
+            assignContinuousWorldRegionKeysToTarget(groundPatch, {
+              points: pts,
+              family: 'landuse'
+            });
             appCtx.scene.add(groundPatch);
             appCtx.landuseMeshes.push(groundPatch);
           });
@@ -3650,6 +10621,12 @@ async function loadRoadsInternal(retryPass = 0) {
         loadMetrics.buildingBatching = { ...appCtx._lastBuildingBatchStats };
       }
       endLoadPhase('batchBuildingGeometry');
+      const deferNonCriticalStartupEnrichment =
+        startupLoadPhase &&
+        !baselineFullWorld &&
+        !!appCtx._continuousWorldVisibleLoadConfig?.enabled;
+      let deferredStartupEnrichmentTimer = null;
+      let deferredStartupEnrichmentRunning = false;
 
       function addLandusePolygon(pts, landuseType, holeRings = [], guardOptions = null) {
         if (!pts || pts.length < 3) return;
@@ -3668,6 +10645,13 @@ async function loadRoadsInternal(retryPass = 0) {
         if (ring.length < 3) return;
         const outerArea = Math.abs(signedPolygonAreaXZ(ring));
         if (!Number.isFinite(outerArea) || outerArea < FEATURE_MIN_POLYGON_AREA) return;
+        let minX = Infinity,maxX = -Infinity,minZ = Infinity,maxZ = -Infinity;
+        ring.forEach((p) => {
+          minX = Math.min(minX, p.x);
+          maxX = Math.max(maxX, p.x);
+          minZ = Math.min(minZ, p.z);
+          maxZ = Math.max(maxZ, p.z);
+        });
 
         const sampledHeights = [];
         let avgElevation = 0;
@@ -3714,66 +10698,147 @@ async function loadRoadsInternal(retryPass = 0) {
         geometry.rotateX(-Math.PI / 2);
 
         const isWater = landuseType === 'water';
+        const renderSurfaceMesh = shouldRenderLanduseSurfaceMesh(landuseType) || isWater;
         const waterVisualProfile = isWater ? resolveWaterSurfaceVisualProfile() : null;
         const surfaceBaseElevation = isWater ?
           (Number.isFinite(avgElevation) ? avgElevation : waterSurfaceBaseElevation(sampledHeights)) :
           avgElevation;
-        const waterFlattenFactor = isWater ? 0.12 : 1.0;
-        const positions = geometry.attributes.position;
-        for (let i = 0; i < positions.count; i++) {
-          const x = positions.getX(i);
-          const z = positions.getZ(i);
-          const terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
-          const useY = terrainY === 0 && Math.abs(surfaceBaseElevation) > 2 ? surfaceBaseElevation : terrainY;
-          positions.setY(i, (useY - surfaceBaseElevation) * waterFlattenFactor + (isWater ? 0.08 : 0.02));
+
+        if (renderSurfaceMesh) {
+          const waterFlattenFactor = isWater ? 0.12 : 1.0;
+          const positions = geometry.attributes.position;
+          for (let i = 0; i < positions.count; i++) {
+            const x = positions.getX(i);
+            const z = positions.getZ(i);
+            const terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
+            const useY = terrainY === 0 && Math.abs(surfaceBaseElevation) > 2 ? surfaceBaseElevation : terrainY;
+            positions.setY(i, (useY - surfaceBaseElevation) * waterFlattenFactor + (isWater ? 0.08 : 0.02));
+          }
+          positions.needsUpdate = true;
+          geometry.computeVertexNormals();
+
+          const landuseStyle = appCtx.LANDUSE_STYLES?.[landuseType] || appCtx.LANDUSE_STYLES?.grass || { color: 0x7cb342 };
+          const material = new THREE.MeshStandardMaterial(isWater ? {
+            color: waterVisualProfile?.color || appCtx.LANDUSE_STYLES.water.color,
+            emissive: waterVisualProfile?.emissive || 0x0f355a,
+            emissiveIntensity: waterVisualProfile?.emissiveIntensity ?? 0.18,
+            roughness: waterVisualProfile?.roughness ?? 0.34,
+            metalness: waterVisualProfile?.metalness ?? 0.02,
+            transparent: false,
+            opacity: 1,
+            side: THREE.DoubleSide,
+            depthWrite: true,
+            polygonOffset: true,
+            polygonOffsetFactor: -6,
+            polygonOffsetUnits: -6
+          } : {
+            color: landuseStyle.color,
+            roughness: 0.95,
+            metalness: 0.0,
+            transparent: true,
+            opacity: 0.85,
+            depthWrite: true,
+            polygonOffset: true,
+            polygonOffsetFactor: -2,
+            polygonOffsetUnits: -2
+          });
+          if (isWater) {
+            registerWaterWaveMaterial(material, {
+              waveScale: 1.0,
+              waveBase: 1.0,
+              area: outerArea,
+              span: Math.max(maxX - minX, maxZ - minZ),
+              waterKind: inferWaterRenderContext({
+                area: outerArea,
+                span: Math.max(maxX - minX, maxZ - minZ)
+              })
+            });
+          }
+
+          const mesh = new THREE.Mesh(geometry, material);
+          mesh.renderOrder = 1;
+          mesh.position.y = surfaceBaseElevation;
+          mesh.userData.landuseFootprint = ring;
+          mesh.userData.avgElevation = surfaceBaseElevation;
+          mesh.userData.alwaysVisible = isWater;
+          mesh.userData.landuseType = landuseType;
+          mesh.userData.waterFlattenFactor = waterFlattenFactor;
+          mesh.userData.surfaceVariant = isWater ? waterVisualProfile?.mode || 'water' : landuseType;
+          if (isWater) mesh.userData.waterSurfaceBase = surfaceBaseElevation;
+          assignContinuousWorldRegionKeysToTarget(mesh, {
+            points: ring,
+            family: isWater ? 'water' : 'landuse'
+          });
+          mesh.receiveShadow = false;
+          mesh.visible = appCtx.landUseVisible || mesh.userData.alwaysVisible;
+          appCtx.scene.add(mesh);
+          appCtx.landuseMeshes.push(mesh);
+        } else {
+          geometry.dispose();
         }
-        positions.needsUpdate = true;
-        geometry.computeVertexNormals();
-
-        const material = new THREE.MeshStandardMaterial(isWater ? {
-          color: waterVisualProfile?.color || appCtx.LANDUSE_STYLES.water.color,
-          emissive: waterVisualProfile?.emissive || 0x0f355a,
-          emissiveIntensity: waterVisualProfile?.emissiveIntensity ?? 0.24,
-          roughness: waterVisualProfile?.roughness ?? 0.18,
-          metalness: waterVisualProfile?.metalness ?? 0.05,
-          transparent: false,
-          opacity: 1,
-          side: THREE.DoubleSide,
-          depthWrite: true,
-          polygonOffset: true,
-          polygonOffsetFactor: -6,
-          polygonOffsetUnits: -6
-        } : {
-          color: appCtx.LANDUSE_STYLES[landuseType].color,
-          roughness: 0.95,
-          metalness: 0.0,
-          transparent: true,
-          opacity: 0.85,
-          depthWrite: true,
-          polygonOffset: true,
-          polygonOffsetFactor: -2,
-          polygonOffsetUnits: -2
+        appCtx.landuses.push({
+          type: landuseType,
+          pts: ring,
+          bounds: {
+            minX,
+            maxX,
+            minZ,
+            maxZ
+          }
         });
-
-        const mesh = new THREE.Mesh(geometry, material);
-        mesh.renderOrder = 1;
-        mesh.position.y = surfaceBaseElevation;
-        mesh.userData.landuseFootprint = ring;
-        mesh.userData.avgElevation = surfaceBaseElevation;
-        mesh.userData.alwaysVisible = isWater;
-        mesh.userData.landuseType = landuseType;
-        mesh.userData.waterFlattenFactor = waterFlattenFactor;
-        mesh.userData.surfaceVariant = isWater ? waterVisualProfile?.mode || 'water' : landuseType;
-        if (isWater) mesh.userData.waterSurfaceBase = surfaceBaseElevation;
-        mesh.receiveShadow = false;
-        mesh.visible = appCtx.landUseVisible || mesh.userData.alwaysVisible;
-        appCtx.scene.add(mesh);
-        appCtx.landuseMeshes.push(mesh);
-        appCtx.landuses.push({ type: landuseType, pts: ring });
+        addLanduseToSpatialIndex(appCtx.landuses[appCtx.landuses.length - 1]);
 
         if (isWater) {
-          appCtx.waterAreas.push({ type: 'water', pts: ring });
+          const centroid = ring.reduce((acc, p) => {
+            acc.x += p.x;
+            acc.z += p.z;
+            return acc;
+          }, { x: 0, z: 0 });
+          appCtx.waterAreas.push({
+            type: 'water',
+            pts: ring,
+            area: outerArea,
+            centerX: centroid.x / ring.length,
+            centerZ: centroid.z / ring.length,
+            surfaceY: surfaceBaseElevation + 0.08,
+            bounds: {
+              minX,
+              maxX,
+              minZ,
+              maxZ
+            }
+          });
         }
+      }
+
+      function cacheSurfaceFeatureHint(pts, landuseType, guardOptions = null) {
+        if (!pts || pts.length < 3 || !landuseType) return;
+        let ring = sanitizeWorldFootprintPoints(
+          pts,
+          FEATURE_MIN_POLYGON_AREA,
+          guardOptions || undefined
+        );
+        if (ring.length < 3) return;
+        ring = sanitizeWorldFootprintPoints(
+          decimatePoints(ring, 140, false),
+          FEATURE_MIN_POLYGON_AREA,
+          guardOptions || undefined
+        );
+        if (ring.length < 3) return;
+        const area = Math.abs(signedPolygonAreaXZ(ring));
+        if (!Number.isFinite(area) || area < FEATURE_MIN_POLYGON_AREA) return;
+        let minX = Infinity,maxX = -Infinity,minZ = Infinity,maxZ = -Infinity;
+        ring.forEach((p) => {
+          minX = Math.min(minX, p.x);
+          maxX = Math.max(maxX, p.x);
+          minZ = Math.min(minZ, p.z);
+          maxZ = Math.max(maxZ, p.z);
+        });
+        appCtx.surfaceFeatureHints.push({
+          type: landuseType,
+          pts: ring,
+          bounds: { minX, maxX, minZ, maxZ }
+        });
       }
 
       function waterwayWidthFromTags(tags) {
@@ -3844,9 +10909,9 @@ async function loadRoadsInternal(retryPass = 0) {
         const material = new THREE.MeshStandardMaterial({
           color: waterVisualProfile.color,
           emissive: waterVisualProfile.mode === 'ice' ? 0x8fa6bd : 0x0d2b4f,
-          emissiveIntensity: waterVisualProfile.mode === 'ice' ? 0.08 : 0.18,
-          roughness: waterVisualProfile.mode === 'ice' ? 0.82 : 0.26,
-          metalness: waterVisualProfile.mode === 'ice' ? 0.02 : 0.03,
+          emissiveIntensity: waterVisualProfile.mode === 'ice' ? 0.08 : 0.14,
+          roughness: waterVisualProfile.mode === 'ice' ? 0.82 : 0.38,
+          metalness: waterVisualProfile.mode === 'ice' ? 0.02 : 0.02,
           transparent: false,
           opacity: 1,
           side: THREE.DoubleSide,
@@ -3854,6 +10919,12 @@ async function loadRoadsInternal(retryPass = 0) {
           polygonOffset: true,
           polygonOffsetFactor: -4,
           polygonOffsetUnits: -4
+        });
+        registerWaterWaveMaterial(material, {
+          waveScale: clampNumber(width / 42, 0.55, 1.1, 0.7),
+          waveBase: clampNumber(width / 60, 0.4, 0.85, 0.55),
+          width,
+          waterKind: inferWaterRenderContext({ width })
         });
 
         const mesh = new THREE.Mesh(geometry, material);
@@ -3865,20 +10936,25 @@ async function loadRoadsInternal(retryPass = 0) {
         mesh.userData.waterwayWidth = width;
         mesh.userData.waterwayBias = verticalBias;
         mesh.userData.surfaceVariant = waterVisualProfile.mode;
+        assignContinuousWorldRegionKeysToTarget(mesh, {
+          points: centerline,
+          family: 'water'
+        });
         mesh.visible = true;
         appCtx.scene.add(mesh);
         appCtx.landuseMeshes.push(mesh);
         appCtx.waterways.push({
           type: tags?.kind || tags?.waterway || 'waterway',
           width,
+          surfaceY: verticalBias,
           pts: centerline
         });
       }
 
-      function addLinearFeatureRibbon(pts, tags) {
-        if (!ENABLE_LINEAR_FEATURES) return false;
+      function addLinearFeatureRibbon(pts, tags, options = {}) {
+        if (!ENABLE_LINEAR_FEATURES && options.force !== true) return false;
         if (!pts || pts.length < 2) return false;
-        const classification = classifyLinearFeatureTags(tags);
+        const classification = classifyLinearFeatureTags(tags, options);
         if (!classification) return false;
         const centerline = decimatePoints(pts, classification.kind === 'railway' ? 900 : 700, false);
         if (centerline.length < 2) return false;
@@ -3887,34 +10963,56 @@ async function loadRoadsInternal(retryPass = 0) {
         const halfWidth = spec.width * 0.5;
         const verts = [];
         const indices = [];
+        const structureSemantics = classifyStructureSemantics(tags || {}, {
+          featureKind: classification.kind,
+          subtype: classification.subtype
+        });
+        const feature = {
+          kind: classification.kind,
+          subtype: classification.subtype,
+          networkKind: classification.kind,
+          name: String(tags?.name || '').trim(),
+          sourceFeatureId: tags?.sourceFeatureId ? String(tags.sourceFeatureId) : '',
+          width: spec.width,
+          bias: spec.bias,
+          surfaceBias: spec.bias,
+          pts: centerline,
+          walkable: true,
+          driveable: false,
+          structureSemantics,
+          baseStructureSemantics: cloneStructureSemantics(structureSemantics),
+          structureTags: {
+            bridge: tags?.bridge || '',
+            tunnel: tags?.tunnel || '',
+            layer: tags?.layer || '',
+            level: tags?.level || '',
+            placement: tags?.placement || '',
+            ramp: tags?.ramp || '',
+            covered: tags?.covered || '',
+            indoor: tags?.indoor || '',
+            location: tags?.location || '',
+            min_height: tags?.min_height || '',
+            man_made: tags?.man_made || ''
+          },
+          bounds: polylineBounds(centerline, spec.width * 0.5 + 12),
+          isStructureConnector: options.force === true
+        };
+        applyBuildingContextSemanticsToFeature(feature);
+        feature.isStructureConnector =
+          options.force === true &&
+          (feature?.structureSemantics?.gradeSeparated || feature?.structureSemantics?.skywalk === true);
+        if (options.force === true && !feature.isStructureConnector) return false;
+        updateFeatureSurfaceProfile(feature, worldBaseTerrainY, { surfaceBias: spec.bias });
+        const ribbonEdges = buildFeatureRibbonEdges(feature, centerline, halfWidth, worldBaseTerrainY, {
+          surfaceBias: spec.bias
+        });
 
-        for (let i = 0; i < centerline.length; i++) {
-          const p = centerline[i];
-          let dx, dz;
-          if (i === 0) {
-            dx = centerline[1].x - p.x;
-            dz = centerline[1].z - p.z;
-          } else if (i === centerline.length - 1) {
-            dx = p.x - centerline[i - 1].x;
-            dz = p.z - centerline[i - 1].z;
-          } else {
-            dx = centerline[i + 1].x - centerline[i - 1].x;
-            dz = centerline[i + 1].z - centerline[i - 1].z;
-          }
-
-          const len = Math.hypot(dx, dz) || 1;
-          const nx = -dz / len;
-          const nz = dx / len;
-          const leftX = p.x + nx * halfWidth;
-          const leftZ = p.z + nz * halfWidth;
-          const rightX = p.x - nx * halfWidth;
-          const rightZ = p.z - nz * halfWidth;
-          const leftY = resolveLinearFeatureBaseY(leftX, leftZ, classification.kind) + spec.bias;
-          const rightY = resolveLinearFeatureBaseY(rightX, rightZ, classification.kind) + spec.bias;
-
-          verts.push(leftX, leftY, leftZ);
-          verts.push(rightX, rightY, rightZ);
-          if (i < centerline.length - 1) {
+        for (let i = 0; i < ribbonEdges.leftEdge.length; i++) {
+          const leftEdge = ribbonEdges.leftEdge[i];
+          const rightEdge = ribbonEdges.rightEdge[i];
+          verts.push(leftEdge.x, leftEdge.y, leftEdge.z);
+          verts.push(rightEdge.x, rightEdge.y, rightEdge.z);
+          if (i < ribbonEdges.leftEdge.length - 1) {
             const vi = i * 2;
             indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
           }
@@ -3951,21 +11049,13 @@ async function loadRoadsInternal(retryPass = 0) {
         mesh.userData.linearFeatureSubtype = classification.subtype;
         mesh.userData.linearFeatureWidth = spec.width;
         mesh.userData.linearFeatureBias = spec.bias;
-        mesh.visible = appCtx.showPathOverlays !== false;
+        mesh.userData.linearFeatureRef = feature;
+        mesh.userData.structureSemantics = structureSemantics;
+        mesh.userData.structureConnector = options.force === true;
+        mesh.visible = options.alwaysVisible === true ? true : appCtx.showPathOverlays !== false;
         appCtx.scene.add(mesh);
         appCtx.linearFeatureMeshes.push(mesh);
-        appCtx.linearFeatures.push({
-          kind: classification.kind,
-          subtype: classification.subtype,
-          networkKind: classification.kind,
-          name: String(tags?.name || '').trim(),
-          width: spec.width,
-          bias: spec.bias,
-          surfaceBias: spec.bias,
-          pts: centerline,
-          walkable: true,
-          driveable: false
-        });
+        appCtx.linearFeatures.push(feature);
         return true;
       }
 
@@ -4092,64 +11182,133 @@ async function loadRoadsInternal(retryPass = 0) {
         return { polygons, lines, tiles: tileJobs.length, okTiles };
       }
 
-      appCtx.showLoad(`Loading land use... (${landuseWays.length})`);
-      startLoadPhase('buildLanduseGeometry');
-      landuseWays.forEach((way) => {
-        const landuseType = classifyLanduseType(way.tags);
-        if (!landuseType) return;
-        const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
-        const guard = landuseType === 'water' ? null : landuseGeometryGuards;
-        addLandusePolygon(pts, landuseType, [], guard);
-      });
+      const currentWaterFeatureCount = () =>
+        (Array.isArray(appCtx.waterAreas) ? appCtx.waterAreas.length : 0) +
+        (Array.isArray(appCtx.waterways) ? appCtx.waterways.length : 0);
 
-      if (Array.isArray(waterwayWays) && waterwayWays.length > 0) {
-        waterwayWays.forEach((way) => {
-          const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
-          addWaterwayRibbon(pts, way.tags || {});
-        });
-      }
+      const loadSignature = `${Number(appCtx.LOC?.lat || 0).toFixed(6)}:${Number(appCtx.LOC?.lon || 0).toFixed(6)}:${Number(featureRadius || 0).toFixed(6)}`;
+      const waterSignals = worldSurfaceProfile?.signals?.normalized || {};
+      const likelyWaterNearby =
+        currentWaterFeatureCount() > 0 ||
+        Number(waterSignals.water || 0) >= 0.05 ||
+        Number(waterSignals.explicitBlue || 0) >= 0.04 ||
+        appCtx.boatMode?.active === true ||
+        appCtx.oceanMode?.active === true;
+      waterCoveragePriority =
+        currentWaterFeatureCount() > 0 ||
+        likelyWaterNearby ||
+        Number(waterSignals.water || 0) >= 0.02 ||
+        Number(waterSignals.explicitBlue || 0) >= 0.015;
+      let waterCoveragePhaseRan = false;
+      let waterCoveragePromise = null;
+      runCriticalWaterCoverage = async () => currentWaterFeatureCount() > 0;
 
-      appCtx.showLoad('Loading water...');
-      try {
-        const waterSummary = await loadVectorTileWaterCoverage(
-          appCtx.LOC.lat - featureRadius,
-          appCtx.LOC.lon - featureRadius,
-          appCtx.LOC.lat + featureRadius,
-          appCtx.LOC.lon + featureRadius
-        );
-        if (waterSummary.polygons === 0 && waterSummary.lines === 0) {
-          console.warn(`[Water] Vector tiles loaded but no water features in bounds (tiles ok ${waterSummary.okTiles}/${waterSummary.tiles}).`);
+      async function runVectorWaterCoverage(options = {}) {
+        const showStatus = options.showStatus === true;
+        const injectFallback = options.injectFallback === true;
+        const currentSignature = `${Number(appCtx.LOC?.lat || 0).toFixed(6)}:${Number(appCtx.LOC?.lon || 0).toFixed(6)}:${Number(featureRadius || 0).toFixed(6)}`;
+        if (currentSignature !== loadSignature) return null;
+        if (showStatus) {
+          showWorldLoadProgress('Loading water...');
         }
-      } catch (waterErr) {
-        console.warn('[Water] Vector water load failed, continuing without vector water layer.', waterErr);
+        try {
+          const waterSummary = await loadVectorTileWaterCoverage(
+            appCtx.LOC.lat - featureRadius,
+            appCtx.LOC.lon - featureRadius,
+            appCtx.LOC.lat + featureRadius,
+            appCtx.LOC.lon + featureRadius
+          );
+          if (waterSummary.polygons === 0 && waterSummary.lines === 0 && showStatus) {
+            console.warn(`[Water] Vector tiles loaded but no water features in bounds (tiles ok ${waterSummary.okTiles}/${waterSummary.tiles}).`);
+          }
+        } catch (waterErr) {
+          console.warn('[Water] Vector water load failed, continuing without vector water layer.', waterErr);
+        }
+        if (injectFallback && ensureWaterFallbackIfEmpty()) {
+          console.warn('[Water] No water features loaded; injected deterministic fallback water surface.');
+        }
+        return true;
       }
-      if (ensureWaterFallbackIfEmpty()) {
-        console.warn('[Water] No water features loaded; injected deterministic fallback water surface.');
-      }
-      endLoadPhase('buildLanduseGeometry');
-      startLoadPhase('batchLanduseGeometry');
-      const batchedLanduseCount = batchLanduseMeshes();
-      if (batchedLanduseCount > 0) {
-        loadMetrics.lod.landuseBatched = batchedLanduseCount;
-      }
-      if (appCtx._lastLanduseBatchStats) {
-        loadMetrics.landuseBatching = { ...appCtx._lastLanduseBatchStats };
-      }
-      endLoadPhase('batchLanduseGeometry');
 
-      startLoadPhase('buildLinearFeatureGeometry');
-      const linearFeatureGroups = [railwayWays, cyclewayWays, footwayWays];
-      linearFeatureGroups.forEach((featureWays) => {
-        if (!Array.isArray(featureWays) || featureWays.length === 0) return;
-        featureWays.forEach((way) => {
-          const rawPts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
-          const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
-          if (pts.length < 2) return;
-          addLinearFeatureRibbon(pts, way.tags);
+      runCriticalWaterCoverage = async (options = {}) => {
+        const force = options.force === true;
+        const allowAfterLoad = options.allowAfterLoad === true;
+        const showStatus = options.showStatus === true;
+        const injectFallback = options.injectFallback === true;
+        const updateLodAfter = options.updateLod !== false;
+        const inventoryReason = String(options.inventoryReason || 'startup_water_coverage');
+        const currentSignature = `${Number(appCtx.LOC?.lat || 0).toFixed(6)}:${Number(appCtx.LOC?.lon || 0).toFixed(6)}:${Number(featureRadius || 0).toFixed(6)}`;
+        if (currentSignature !== loadSignature) return false;
+        if (!force && waterCoveragePhaseRan) return currentWaterFeatureCount() > 0;
+        if (!allowAfterLoad && (!isActiveLoadContext() || earthSceneSuppressed())) return false;
+        if (allowAfterLoad && earthSceneSuppressed()) return false;
+        if (waterCoveragePromise) return waterCoveragePromise;
+
+        waterCoveragePromise = (async () => {
+          waterCoveragePhaseRan = true;
+          startLoadPhase('buildWaterGeometry');
+          try {
+            if (showStatus) showWorldLoadProgress('Loading water...');
+            landuseWays.forEach((way) => {
+              const landuseType = classifyLanduseType(way.tags);
+              if (landuseType !== 'water') return;
+              const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
+              cacheSurfaceFeatureHint(pts, landuseType, waterGeometryGuards);
+              addLandusePolygon(pts, landuseType, [], waterGeometryGuards);
+            });
+
+            if (Array.isArray(waterwayWays) && waterwayWays.length > 0) {
+              waterwayWays.forEach((way) => {
+                const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
+                addWaterwayRibbon(pts, way.tags || {});
+              });
+            }
+
+            await runVectorWaterCoverage({
+              showStatus: false,
+              injectFallback
+            });
+          } finally {
+            endLoadPhase('buildWaterGeometry');
+          }
+
+          startLoadPhase('batchWaterGeometry');
+          try {
+            const batchedLanduseCount = batchLanduseMeshes();
+            if (batchedLanduseCount > 0) {
+              loadMetrics.lod.landuseBatched = batchedLanduseCount;
+            }
+            if (appCtx._lastLanduseBatchStats) {
+              loadMetrics.landuseBatching = { ...appCtx._lastLanduseBatchStats };
+            }
+          } finally {
+            endLoadPhase('batchWaterGeometry');
+          }
+
+          syncRuntimeContentInventory(inventoryReason);
+          if (updateLodAfter && typeof updateWorldLod === 'function') {
+            safeLoadCall(
+              `updateWorldLod_${inventoryReason}`,
+              () => updateWorldLod(true)
+            );
+          }
+          return currentWaterFeatureCount() > 0;
+        })().finally(() => {
+          waterCoveragePromise = null;
         });
-      });
-      syncLinearFeatureOverlayVisibility();
-      endLoadPhase('buildLinearFeatureGeometry');
+
+        return waterCoveragePromise;
+      };
+
+      appCtx.ensureWaterRuntimeCoverage = (options = {}) =>
+        runCriticalWaterCoverage({
+          force: options.force === true,
+          allowAfterLoad: true,
+          showStatus: options.showStatus === true,
+          injectFallback: options.injectFallback === true,
+          updateLod: options.updateLod !== false,
+          inventoryReason: String(options.reason || 'runtime_water_coverage')
+        });
 
       const buildPoiGeometryPass = (phaseName = 'buildPoiGeometry') => {
         startLoadPhase(phaseName);
@@ -4218,6 +11377,7 @@ async function loadRoadsInternal(retryPass = 0) {
             appCtx.pois.push({
               x: pos.x,
               z: pos.z,
+              sourceFeatureId: node.id ? String(node.id) : '',
               type: poiKey,
               name: tags.name || poiData.category,
               lodTier: poiTier,
@@ -4258,30 +11418,140 @@ async function loadRoadsInternal(retryPass = 0) {
         }
       };
 
-      if (appCtx.roads.length > 0) {
-        appCtx.showLoad(`Loading POIs... (${poiNodes.length})`);
-        buildPoiGeometryPass('buildPoiGeometry');
-        appCtx.showLoad('Adding details...');
-        buildStreetFurniturePass('buildStreetFurniture');
+      const runNonCriticalWorldEnrichment = async ({ deferred = false } = {}) => {
+        if (!isActiveLoadContext() || earthSceneSuppressed()) return false;
+        if (!deferred) {
+          showWorldLoadProgress(`Loading land use... (${landuseWays.length})`);
+        }
+        startLoadPhase('buildLanduseGeometry');
+        landuseWays.forEach((way) => {
+          const landuseType = classifyLanduseType(way.tags);
+          if (!landuseType || landuseType === 'water') return;
+          const pts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
+          cacheSurfaceFeatureHint(pts, landuseType, landuseGeometryGuards);
+          addLandusePolygon(pts, landuseType, [], landuseGeometryGuards);
+        });
+        endLoadPhase('buildLanduseGeometry');
+        startLoadPhase('batchLanduseGeometry');
+        const batchedLanduseCount = batchLanduseMeshes();
+        if (batchedLanduseCount > 0) {
+          loadMetrics.lod.landuseBatched = batchedLanduseCount;
+        }
+        if (appCtx._lastLanduseBatchStats) {
+          loadMetrics.landuseBatching = { ...appCtx._lastLanduseBatchStats };
+        }
+        endLoadPhase('batchLanduseGeometry');
 
-        finalizeLoadedWorld('primary');
+        refreshStructureAwareFeatureProfiles();
+        startLoadPhase('buildLinearFeatureGeometry');
+        const linearFeatureGroups = [
+          { ways: railwayWays, force: false, alwaysVisible: false },
+          { ways: cyclewayWays, force: false, alwaysVisible: false },
+          { ways: footwayWays, force: false, alwaysVisible: false },
+          { ways: structureConnectorWays, force: true, alwaysVisible: true }
+        ];
+        linearFeatureGroups.forEach((group) => {
+          const featureWays = group.ways;
+          if (!Array.isArray(featureWays) || featureWays.length === 0) return;
+          featureWays.forEach((way) => {
+            const rawPts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
+            const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
+            if (pts.length < 2) return;
+            addLinearFeatureRibbon(pts, { ...(way.tags || {}), sourceFeatureId: way.id ? String(way.id) : '' }, {
+              force: group.force === true,
+              alwaysVisible: group.alwaysVisible === true
+            });
+          });
+        });
+        refreshStructureAwareFeatureProfiles();
+        syncLinearFeatureOverlayVisibility();
+        if (typeof appCtx.rebuildStructureVisualMeshes === 'function') {
+          appCtx.rebuildStructureVisualMeshes();
+        }
+        endLoadPhase('buildLinearFeatureGeometry');
+
+        buildPoiGeometryPass('buildPoiGeometry');
+        buildStreetFurniturePass('buildStreetFurniture');
         scheduleDeferredLinearFeatureLoad();
-      } else
-      {
+        syncRuntimeContentInventory(deferred ? 'startup_deferred_enrichment' : 'startup_enrichment');
+        if (typeof updateWorldLod === 'function') {
+          safeLoadCall(
+            deferred ? 'updateWorldLod_startup_deferred_enrichment' : 'updateWorldLod_startup_enrichment',
+            () => updateWorldLod(true)
+          );
+        }
+        return true;
+      };
+
+      const scheduleDeferredStartupEnrichment = (delayMs = 6500) => {
+        if (!deferNonCriticalStartupEnrichment || deferredStartupEnrichmentRunning) return;
+        if (deferredStartupEnrichmentTimer) return;
+        deferredStartupEnrichmentTimer = window.setTimeout(async () => {
+          deferredStartupEnrichmentTimer = null;
+          if (!isActiveLoadContext() || earthSceneSuppressed()) return;
+          const actorState = continuousWorldInteractiveActorMotionState();
+          const movementSpeed = Math.abs(Number(actorState?.speed || 0));
+          const moving =
+            actorState?.mode === 'walk' ?
+              movementSpeed >= 0.6 :
+              movementSpeed >= 2.5;
+          const streamState = appCtx.getContinuousWorldInteractiveStreamSnapshot?.();
+          const streamBusy =
+            !!streamState?.pending ||
+            (Date.now() - Number(streamState?.lastLoadAt || 0)) < 2200;
+          const perfTierNow = String(appCtx.getPerfAutoQualityTier?.() || appCtx.perfAutoQualityTier || 'balanced');
+          const frameMsNow = Number(appCtx.perfStats?.live?.frameMs || 0);
+          const underPressure = frameMsNow >= (perfTierNow === 'performance' ? 34 : 48);
+          if (moving || streamBusy || underPressure) {
+            scheduleDeferredStartupEnrichment(2200);
+            return;
+          }
+          deferredStartupEnrichmentRunning = true;
+          try {
+            await runNonCriticalWorldEnrichment({ deferred: true });
+          } finally {
+            deferredStartupEnrichmentRunning = false;
+          }
+        }, Math.max(0, delayMs));
+      };
+
+      if (appCtx.roads.length > 0) {
+        await runCriticalWaterCoverage({
+          force: true,
+          showStatus: waterCoveragePriority,
+          injectFallback: waterCoveragePriority,
+          updateLod: false,
+          inventoryReason: 'startup_water_coverage'
+        });
+        if (deferNonCriticalStartupEnrichment) {
+          scheduleDeferredStartupEnrichment();
+          await finalizeLoadedWorld('primary');
+        } else {
+          await runNonCriticalWorldEnrichment({ deferred: false });
+          await finalizeLoadedWorld('primary');
+        }
+      } else {
         console.warn('No roads found in data, trying larger area...');
-        appCtx.showLoad('No roads found, trying larger area...');
+        showWorldLoadProgress('No roads found, trying larger area...');
       }
     } catch (e) {
       const isLastAttempt = r === radii[radii.length - 1];
       if (appCtx.roads.length > 0) {
         console.warn('[WorldLoad] Recovering with partially loaded world data.');
         loadMetrics.error = e?.message || String(e);
-        finalizeLoadedWorld('partial_after_error');
+        await runCriticalWaterCoverage({
+          force: true,
+          showStatus: false,
+          injectFallback: waterCoveragePriority,
+          updateLod: false,
+          inventoryReason: 'partial_error_water_coverage'
+        });
+        await finalizeLoadedWorld('partial_after_error');
         break;
       }
       if (!isLastAttempt) {
         console.warn('Road loading attempt failed, retrying with larger area...', e);
-        appCtx.showLoad('Retrying map data...');
+        showWorldLoadProgress('Retrying map data...');
         continue;
       }
 
@@ -4289,30 +11559,36 @@ async function loadRoadsInternal(retryPass = 0) {
       if (appCtx.roads.length === 0) {
         if (useSyntheticFallbackRoads) {
           createSyntheticFallbackWorld();
-          finalizeLoadedWorld('synthetic_fallback');
+          await finalizeLoadedWorld('synthetic_fallback');
         } else {
-          finalizeLoadedWorld('no_roads_sparse');
+          await finalizeLoadedWorld('no_roads_sparse');
         }
       }
     }
   }
   if (!loaded && appCtx.roads.length > 0) {
     console.warn('[WorldLoad] Completing with partially loaded roads.');
-    finalizeLoadedWorld('post_loop_partial');
+    await appCtx.ensureWaterRuntimeCoverage?.({
+      force: true,
+      injectFallback: waterCoveragePriority,
+      updateLod: false,
+      reason: 'post_loop_partial_water_coverage'
+    });
+    await finalizeLoadedWorld('post_loop_partial');
   }
   if (!loaded && appCtx.roads.length === 0) {
     if (useSyntheticFallbackRoads) {
       console.warn('[WorldLoad] No road data found for this location. Using synthetic fallback world.');
       createSyntheticFallbackWorld();
-      finalizeLoadedWorld('synthetic_no_roads');
+      await finalizeLoadedWorld('synthetic_no_roads');
     } else {
       console.warn('[WorldLoad] No road data found for this location. Loading sparse terrain-only world.');
-      finalizeLoadedWorld('no_roads_sparse');
+      await finalizeLoadedWorld('no_roads_sparse');
     }
   }
   if (!loaded && retryPass < 1) {
     console.warn('[WorldLoad] Initial pass failed. Retrying once automatically...');
-    appCtx.showLoad('Retrying map data...');
+    showWorldLoadProgress('Retrying map data...');
     appCtx.worldLoading = false;
     return loadRoadsInternal(retryPass + 1);
   }
@@ -4323,12 +11599,18 @@ async function loadRoadsInternal(retryPass = 0) {
     if (appCtx.roads.length === 0) {
       if (useSyntheticFallbackRoads) {
         createSyntheticFallbackWorld();
-        finalizeLoadedWorld('synthetic_final_recovery');
+        await finalizeLoadedWorld('synthetic_final_recovery');
       } else {
-        finalizeLoadedWorld('no_roads_final_recovery');
+        await finalizeLoadedWorld('no_roads_final_recovery');
       }
     } else {
-      finalizeLoadedWorld('partial_final_recovery');
+      await appCtx.ensureWaterRuntimeCoverage?.({
+        force: true,
+        injectFallback: waterCoveragePriority,
+        updateLod: false,
+        reason: 'partial_final_recovery_water_coverage'
+      });
+      await finalizeLoadedWorld('partial_final_recovery');
     }
   }
   appCtx.worldLoading = false;
@@ -4363,6 +11645,10 @@ async function loadRoadsInternal(retryPass = 0) {
 async function loadRoads(retryPass = 0) {
   if (retryPass > 0) return loadRoadsInternal(retryPass);
 
+  if (appCtx.boatMode?.active && typeof appCtx.stopBoatMode === 'function') {
+    appCtx.stopBoatMode({ targetMode: 'walk' });
+  }
+
   const signature = getWorldLoadSignature();
   if (_activeWorldLoad && _activeWorldLoad.signature === signature) {
     return _activeWorldLoad.promise;
@@ -4376,6 +11662,1308 @@ async function loadRoads(retryPass = 0) {
 
   _activeWorldLoad = { signature, promise };
   return promise;
+}
+
+function continuousWorldInteractiveCanStream(reason = 'actor_drift') {
+  if (!_continuousWorldInteractiveStreamState.enabled) return false;
+  const backgroundFullLoadActive = continuousWorldInteractiveBackgroundFullLoadActive();
+  const actorCriticalReason = continuousWorldInteractiveReasonIsActorCritical(reason);
+  const startupLockActive = continuousWorldInteractiveStartupLockActive();
+  const reasonText = String(reason || 'actor_drift');
+  const startupReason =
+    reasonText === 'startup_local_shell' ||
+    reasonText === 'startup_local_roads' ||
+    reasonText === 'startup_roads_ready';
+  if (_continuousWorldInteractiveStreamState.hardRecoveryInFlight) return false;
+  if ((appCtx.worldLoading || _activeWorldLoad) && !backgroundFullLoadActive && !actorCriticalReason) return false;
+  if (startupLockActive && !startupReason) return false;
+  if (appCtx.onMoon || appCtx.travelingToMoon) return false;
+  if (typeof appCtx.isEnv === 'function' && appCtx.ENV && !appCtx.isEnv(appCtx.ENV.EARTH)) return false;
+  if (!appCtx.gameStarted) return false;
+  if (!appCtx._continuousWorldVisibleLoadConfig?.enabled) return false;
+  return true;
+}
+
+function continuousWorldInteractiveNeedsLoad(actorGeo, chunkPlan, desiredLoadLevel = 'full', runtimeSnapshot = null, reason = 'actor_drift') {
+  if (!actorGeo || !chunkPlan) return false;
+  const regionKey = continuousWorldInteractiveRegionKeyFromLatLon(actorGeo.lat, actorGeo.lon, runtimeSnapshot);
+  const desiredRank = continuousWorldInteractiveLoadLevelRank(desiredLoadLevel);
+  const actor = continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  const speed = Math.abs(Number(actor?.speed || 0));
+  const reasonText = String(reason || 'actor_drift');
+  const actorPrimaryReason =
+    reasonText === 'main_loop' ||
+    reasonText === 'actor_drift' ||
+    reasonText === 'actor_visible_road_gap' ||
+    reasonText === 'actor_building_gap' ||
+    reasonText.startsWith('building_continuity_');
+  const coverageRank = continuousWorldInteractiveCoverageLevelForRegion(regionKey, {
+    includeSeeded: !actorPrimaryReason
+  });
+  if (desiredRank > 0 && coverageRank < desiredRank) {
+    return true;
+  }
+  if (_continuousWorldInteractiveStreamState.coverage.length === 0) return true;
+  let nearestDistance = Infinity;
+  for (let i = 0; i < _continuousWorldInteractiveStreamState.coverage.length; i++) {
+    const coverage = _continuousWorldInteractiveStreamState.coverage[i];
+    const dist = continuousWorldGeoDistanceWorldUnits(coverage.lat, coverage.lon, actorGeo.lat, actorGeo.lon);
+    nearestDistance = Math.min(nearestDistance, dist);
+  }
+  const worldRadius = Math.max(1200, Number(chunkPlan.featureRadius || 0) * Math.max(1, Number(appCtx.SCALE) || 1));
+  const thresholdScale =
+    mode === 'drive' && actor?.onRoad === false ? 0.1 :
+    mode === 'drive' && speed >= 18 ? 0.14 :
+    mode === 'drive' && speed >= 8 ? 0.2 :
+    mode === 'drive' && speed >= 4 ? 0.24 :
+    mode === 'drone' ? 0.24 :
+    (mode === 'boat' || mode === 'ocean') ? 0.36 :
+    0.48;
+  return nearestDistance >= worldRadius * thresholdScale;
+}
+
+function continuousWorldInteractiveBuildingColor(buildingType = 'yes') {
+  const type = String(buildingType || '').toLowerCase();
+  if (type === 'house' || type === 'residential' || type === 'detached') return '#b89f8f';
+  if (type === 'apartments' || type === 'commercial') return '#9aa4af';
+  if (type === 'industrial' || type === 'warehouse') return '#8d8479';
+  if (type === 'office' || type === 'retail' || type === 'supermarket') return '#a7adb7';
+  if (type === 'church' || type === 'cathedral') return '#b6a58e';
+  return '#9fa7b2';
+}
+
+function continuousWorldInteractiveBuildingIsImportant(tags = {}, semantics = null, footprintArea = 0, height = 0) {
+  const name = String(tags?.name || '').trim();
+  const buildingType = String(tags?.building || tags?.['building:part'] || '').toLowerCase();
+  if (name) return true;
+  if (Number.isFinite(height) && height >= 28) return true;
+  if (Number.isFinite(footprintArea) && footprintArea >= 1800) return true;
+  if (Number.isFinite(semantics?.levels) && semantics.levels >= 8) return true;
+  return (
+    buildingType === 'hospital' ||
+    buildingType === 'school' ||
+    buildingType === 'university' ||
+    buildingType === 'station' ||
+    buildingType === 'transportation' ||
+    buildingType === 'government' ||
+    buildingType === 'civic' ||
+    buildingType === 'stadium' ||
+    buildingType === 'terminal' ||
+    buildingType === 'museum' ||
+    buildingType === 'cathedral' ||
+    buildingType === 'church'
+  );
+}
+
+async function loadContinuousWorldInteractiveChunk(centerLat, centerLon, reason = 'actor_drift') {
+  if (!continuousWorldInteractiveCanStream(reason)) return getContinuousWorldInteractiveStreamSnapshot();
+  if (String(reason || 'actor_drift') === 'startup_local_shell' && !continuousWorldStartupLocalShellEnabled()) {
+    return getContinuousWorldInteractiveStreamSnapshot();
+  }
+
+  const chunkPlan = continuousWorldInteractiveChunkPlan();
+  if (!chunkPlan) return getContinuousWorldInteractiveStreamSnapshot();
+  const actorState = continuousWorldInteractiveActorMotionState();
+  const contentPlan = continuousWorldInteractiveContentPlan(actorState, chunkPlan, reason);
+  const runtimeSnapshot = appCtx.getContinuousWorldRuntimeSnapshot?.();
+  const actorCriticalReason = continuousWorldInteractiveReasonIsActorCritical(reason);
+  const reasonText = String(reason || 'actor_drift');
+  const forwardRoadCorridorPrefetch = continuousWorldInteractiveReasonIsForwardRoadCorridor(reasonText);
+  const forwardRoadCorridorPlan =
+    forwardRoadCorridorPrefetch ?
+      continuousWorldForwardRoadCorridorQueryPlan(actorState, runtimeSnapshot) :
+      null;
+  const resolvedCenterLat =
+    forwardRoadCorridorPlan && Number.isFinite(forwardRoadCorridorPlan.centerLat) ?
+      forwardRoadCorridorPlan.centerLat :
+      centerLat;
+  const resolvedCenterLon =
+    forwardRoadCorridorPlan && Number.isFinite(forwardRoadCorridorPlan.centerLon) ?
+      forwardRoadCorridorPlan.centerLon :
+      centerLon;
+  const regionKey =
+    String(forwardRoadCorridorPlan?.primaryRegionKey || '').trim() ||
+    continuousWorldInteractiveRegionKeyFromLatLon(resolvedCenterLat, resolvedCenterLon, runtimeSnapshot);
+  if (_continuousWorldInteractiveStreamState.pending) {
+    const pendingAgeMs = Date.now() - Number(_continuousWorldInteractiveStreamState.pendingStartedAt || 0);
+    const pendingReason = String(_continuousWorldInteractiveStreamState.lastLoadReason || '');
+    const pendingForwardRoadCorridor = continuousWorldInteractiveReasonIsForwardRoadCorridor(pendingReason);
+    const pendingRegionKey = String(_continuousWorldInteractiveStreamState.pendingRegionKey || '');
+    const pendingQueryLat = Number(_continuousWorldInteractiveStreamState.pendingQueryLat);
+    const pendingQueryLon = Number(_continuousWorldInteractiveStreamState.pendingQueryLon);
+    const sameRegion = regionKey && pendingRegionKey && regionKey === pendingRegionKey;
+    const pendingActorCritical = continuousWorldInteractiveReasonIsActorCritical(pendingReason);
+    const actorGapReason =
+      reasonText === 'actor_visible_road_gap' ||
+      reasonText === 'actor_building_gap' ||
+      reasonText.startsWith('building_continuity_');
+    const pendingCriticalWithoutRegion = pendingActorCritical && !pendingRegionKey;
+    const pendingQueryDistanceWorldUnits =
+      Number.isFinite(resolvedCenterLat) &&
+      Number.isFinite(resolvedCenterLon) &&
+      Number.isFinite(pendingQueryLat) &&
+      Number.isFinite(pendingQueryLon) ?
+        continuousWorldGeoDistanceWorldUnits(resolvedCenterLat, resolvedCenterLon, pendingQueryLat, pendingQueryLon) :
+        NaN;
+    const pendingDriftThresholdWorldUnits =
+      pendingForwardRoadCorridor ?
+        520 :
+      actorState?.mode === 'drive' ?
+        (actorGapReason ? 150 : 220) :
+      actorState?.mode === 'drone' ?
+        260 :
+      actorState?.mode === 'walk' ?
+        120 :
+        180;
+    const pendingMovedBeyondQueryCenter =
+      pendingActorCritical &&
+      Number.isFinite(pendingQueryDistanceWorldUnits) &&
+      pendingQueryDistanceWorldUnits >= pendingDriftThresholdWorldUnits;
+    const shouldPreemptPending =
+      actorCriticalReason &&
+      (
+        (!pendingActorCritical && pendingAgeMs >= 450) ||
+        (pendingForwardRoadCorridor && reasonText === 'actor_visible_road_gap' && pendingAgeMs >= 700) ||
+        (!pendingForwardRoadCorridor && regionKey && pendingRegionKey && !sameRegion && pendingAgeMs >= 650) ||
+        (!pendingForwardRoadCorridor && pendingMovedBeyondQueryCenter && pendingAgeMs >= 700) ||
+        (actorGapReason && pendingCriticalWithoutRegion && pendingAgeMs >= 700) ||
+        (!pendingForwardRoadCorridor && pendingActorCritical && !sameRegion && pendingAgeMs >= 900) ||
+        (!pendingForwardRoadCorridor && !sameRegion && pendingAgeMs >= 1800) ||
+        pendingAgeMs >= 9000
+      );
+    if (shouldPreemptPending) {
+      if (_continuousWorldInteractiveStreamState.abortController) {
+        try {
+          _continuousWorldInteractiveStreamState.abortController.abort();
+        } catch {}
+      }
+      _continuousWorldInteractiveStreamState.pending = false;
+      _continuousWorldInteractiveStreamState.pendingStartedAt = 0;
+      _continuousWorldInteractiveStreamState.pendingQueryLat = NaN;
+      _continuousWorldInteractiveStreamState.pendingQueryLon = NaN;
+      _continuousWorldInteractiveStreamState.pendingRegionKey = null;
+      _continuousWorldInteractiveStreamState.abortController = null;
+      _continuousWorldInteractiveStreamState.activeRequestId =
+        Number(_continuousWorldInteractiveStreamState.activeRequestId || 0) + 1;
+      _continuousWorldInteractiveStreamState.lastError = `preempted_pending:${pendingReason || 'unknown'}`;
+    } else {
+      return getContinuousWorldInteractiveStreamSnapshot();
+    }
+  }
+  const regionCellCenter = regionKey ? continuousWorldInteractiveRegionCellCenter({
+    key: regionKey,
+    latIndex: Number(String(regionKey).split(':')[0]),
+    lonIndex: Number(String(regionKey).split(':')[1])
+  }, runtimeSnapshot) : null;
+  const offRoadRecoveryQuery =
+    String(actorState?.mode || 'drive') === 'drive' &&
+    actorState?.onRoad === false &&
+    (reasonText === 'actor_drift' || reasonText === 'main_loop');
+  const actorDrivenPrimaryQuery =
+    (String(actorState?.mode || 'drive') === 'drive' || String(actorState?.mode || 'drive') === 'walk') &&
+    (
+      reasonText === 'actor_drift' ||
+      reasonText === 'main_loop' ||
+      reasonText === 'actor_visible_road_gap' ||
+      reasonText === 'actor_building_gap' ||
+      reasonText === 'road_recovery_shell' ||
+      reasonText.startsWith('building_continuity_')
+    );
+  const localShellPriorityQuery = continuousWorldInteractiveReasonNeedsLocalShell(reasonText);
+  const buildingContinuityRecovery = reasonText.startsWith('building_continuity_');
+  const fastActorLocalShellQuery =
+    localShellPriorityQuery &&
+    !buildingContinuityRecovery &&
+    String(actorState?.mode || 'drive') === 'drive' &&
+    (
+      actorState?.onRoad === false ||
+      countDriveableRoadFeaturesNearWorldPoint(actorState?.x, actorState?.z, 260) <= 0
+    );
+  const fastActorRoadShellQuery =
+    reasonText === 'actor_visible_road_gap' &&
+    String(actorState?.mode || 'drive') === 'drive' &&
+    countDriveableRoadFeaturesNearWorldPoint(actorState?.x, actorState?.z, 280) <= 0;
+  const fastActorBuildingShellQuery =
+    reasonText === 'actor_building_gap' &&
+    String(actorState?.mode || 'drive') === 'drive' &&
+    countDriveableRoadFeaturesNearWorldPoint(actorState?.x, actorState?.z, 280) > 0;
+  const useRegionCenteredQuery =
+    reasonText !== 'startup_local_shell' &&
+    reasonText !== 'road_recovery_shell' &&
+    !forwardRoadCorridorPrefetch &&
+    !fastActorRoadShellQuery &&
+    !fastActorBuildingShellQuery &&
+    !fastActorLocalShellQuery;
+  const queryLat = Number(
+    forwardRoadCorridorPlan?.centerLat ??
+    regionCellCenter?.lat ??
+    resolvedCenterLat
+  );
+  const queryLon = Number(
+    forwardRoadCorridorPlan?.centerLon ??
+    regionCellCenter?.lon ??
+    resolvedCenterLon
+  );
+  const requestAbortController = new AbortController();
+
+  _continuousWorldInteractiveStreamState.pending = true;
+  _continuousWorldInteractiveStreamState.pendingStartedAt = Date.now();
+  _continuousWorldInteractiveStreamState.pendingQueryLat = queryLat;
+  _continuousWorldInteractiveStreamState.pendingQueryLon = queryLon;
+  _continuousWorldInteractiveStreamState.pendingRegionKey = regionKey || null;
+  const requestId = Number(_continuousWorldInteractiveStreamState.activeRequestId || 0) + 1;
+  _continuousWorldInteractiveStreamState.activeRequestId = requestId;
+  _continuousWorldInteractiveStreamState.abortController = requestAbortController;
+  _continuousWorldInteractiveStreamState.lastError = null;
+  _continuousWorldInteractiveStreamState.lastLoadReason = reason;
+  const loadStartedAt = performance.now();
+
+  try {
+  const queryKind =
+      fastActorRoadShellQuery ? 'interactive:actor_visible_road_gap_fast' :
+      fastActorBuildingShellQuery ? 'interactive:actor_building_gap' :
+      fastActorLocalShellQuery ? 'interactive:fast_local_shell' :
+      forwardRoadCorridorPrefetch ? 'interactive:forward_road_corridor' :
+      reasonText === 'actor_visible_road_gap' ? 'interactive:actor_visible_road_gap' :
+      reasonText === 'actor_building_gap' ? 'interactive:actor_building_gap' :
+      reasonText === 'road_recovery_shell' ? 'interactive:road_recovery_shell' :
+      reasonText === 'startup_local_shell' ? 'interactive:startup_local_shell' :
+      buildingContinuityRecovery ? 'interactive:building_continuity' :
+      reasonText.startsWith('region_prefetch:') ? `interactive:prefetch:${contentPlan.loadLevel}` :
+      `interactive:${String(contentPlan.loadLevel || 'full')}`;
+    const queryTimeoutSeconds =
+      (fastActorRoadShellQuery || fastActorLocalShellQuery) ?
+        5 :
+      forwardRoadCorridorPrefetch ?
+        5 :
+        Math.max(contentPlan.roadsOnly ? 5 : 8, Math.floor(chunkPlan.overpassTimeoutMs / 1000));
+    const queryRoadRadius =
+      fastActorRoadShellQuery ?
+        clampNumber(Math.min(Number(chunkPlan.roadRadius || 0), 0.0138), 0.0072, Math.max(Number(chunkPlan.roadRadius || 0), 0.0138), 0.0108) :
+      forwardRoadCorridorPrefetch ?
+        clampNumber(
+          Math.max(
+            Number(forwardRoadCorridorPlan?.roadRadius || 0),
+            Math.min(Math.max(Number(chunkPlan.roadRadius || 0), 0.0128), 0.0146)
+          ),
+          0.0098,
+          0.024,
+          0.0128
+        ) :
+      fastActorBuildingShellQuery ?
+        0 :
+      fastActorLocalShellQuery ?
+        clampNumber(Math.min(Number(chunkPlan.roadRadius || 0), 0.0124), 0.0068, Math.max(Number(chunkPlan.roadRadius || 0), 0.0124), 0.0096) :
+        Number(chunkPlan.roadRadius || 0);
+    const queryBuildingRadius =
+      fastActorRoadShellQuery ?
+        0 :
+      fastActorBuildingShellQuery ?
+        clampNumber(Math.min(Number(contentPlan.buildingRadius || 0), 0.0116), 0.0074, Math.max(Number(contentPlan.buildingRadius || 0), 0.0116), 0.0102) :
+      fastActorLocalShellQuery ?
+        clampNumber(Math.min(Number(contentPlan.buildingRadius || 0), 0.0072), 0.0048, Math.max(Number(contentPlan.buildingRadius || 0), 0.0072), 0.0062) :
+        Number(contentPlan.buildingRadius || 0);
+    const queryLanduseRadius = (fastActorRoadShellQuery || fastActorLocalShellQuery || fastActorBuildingShellQuery) ? 0 : Number(contentPlan.landuseRadius || 0);
+    const queryWaterRadius = (fastActorRoadShellQuery || fastActorLocalShellQuery || fastActorBuildingShellQuery) ? 0 : Number(contentPlan.waterFeatureRadius || 0);
+    const queryMaxRoadWays =
+      fastActorRoadShellQuery ? Math.min(Math.max(Number(chunkPlan.maxRoadWays || 0), 420), 560) :
+      forwardRoadCorridorPrefetch ?
+        Math.min(
+          Math.max(
+            Number(contentPlan.maxRoadWays || 0),
+            640 + Math.max(0, ((forwardRoadCorridorPlan?.regionKeys?.length || 0) - 2) * 110)
+          ),
+          1080
+        ) :
+      fastActorBuildingShellQuery ? 0 :
+      fastActorLocalShellQuery ? Math.min(Number(chunkPlan.maxRoadWays || 0), 320) :
+      Number(chunkPlan.maxRoadWays || 0);
+    const queryMaxBuildingWays =
+      fastActorRoadShellQuery ? 0 :
+      fastActorBuildingShellQuery ? Math.min(Math.max(Number(contentPlan.maxBuildingWays || 0), 360), 520) :
+      fastActorLocalShellQuery ? Math.min(Number(contentPlan.maxBuildingWays || 0), 140) :
+      Number(contentPlan.maxBuildingWays || 0);
+    const queryMaxLanduseWays = (fastActorRoadShellQuery || fastActorLocalShellQuery || fastActorBuildingShellQuery) ? 0 : Number(contentPlan.maxLanduseWays || 0);
+    const queryMaxWaterwayWays = (fastActorRoadShellQuery || fastActorLocalShellQuery || fastActorBuildingShellQuery) ? 0 : Number(contentPlan.maxWaterwayWays || 0);
+    const includeFastLocalBuildings = fastActorLocalShellQuery || contentPlan.includeBuildings || contentPlan.includeLandmarkBuildings;
+    const includeLandmarkOnlyBuildings = !includeFastLocalBuildings && contentPlan.includeLandmarkBuildings;
+    const roadsBounds =
+      forwardRoadCorridorPlan?.bounds ?
+        `(${forwardRoadCorridorPlan.bounds.minLat},${forwardRoadCorridorPlan.bounds.minLon},${forwardRoadCorridorPlan.bounds.maxLat},${forwardRoadCorridorPlan.bounds.maxLon})` :
+        `(${queryLat - queryRoadRadius},${queryLon - queryRoadRadius},${queryLat + queryRoadRadius},${queryLon + queryRoadRadius})`;
+    const buildingBounds =
+      `(${queryLat - queryBuildingRadius},${queryLon - queryBuildingRadius},${queryLat + queryBuildingRadius},${queryLon + queryBuildingRadius})`;
+    const landuseBounds =
+      `(${queryLat - queryLanduseRadius},${queryLon - queryLanduseRadius},${queryLat + queryLanduseRadius},${queryLon + queryLanduseRadius})`;
+    const waterBounds =
+      `(${queryLat - queryWaterRadius},${queryLon - queryWaterRadius},${queryLat + queryWaterRadius},${queryLon + queryWaterRadius})`;
+    const query = `[out:json][timeout:${queryTimeoutSeconds}];(
+      ${queryMaxRoadWays > 0 ? `way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street|service)$"]${roadsBounds};` : ''}
+      ${includeFastLocalBuildings ? `way["building"]${buildingBounds};` : ''}
+      ${contentPlan.includeBuildingParts && !fastActorLocalShellQuery ? `way["building:part"]${buildingBounds};` : ''}
+      ${includeLandmarkOnlyBuildings ? `way["building"]["name"]${buildingBounds};` : ''}
+      ${includeLandmarkOnlyBuildings ? `way["building"]["height"]${buildingBounds};` : ''}
+      ${includeLandmarkOnlyBuildings ? `way["building"]["building:levels"]${buildingBounds};` : ''}
+      ${queryMaxLanduseWays > 0 ? `way["landuse"]${landuseBounds};` : ''}
+      ${queryMaxLanduseWays > 0 ? `way["natural"~"^(wood|forest|scrub|grassland|heath|wetland|sand|beach|bare_rock|scree|shingle|glacier)$"]${landuseBounds};` : ''}
+      ${queryMaxLanduseWays > 0 ? `way["leisure"~"^(park|garden|nature_reserve)$"]${landuseBounds};` : ''}
+      ${(queryMaxLanduseWays > 0 || queryMaxWaterwayWays > 0) ? `way["natural"="water"]${waterBounds};` : ''}
+      ${(queryMaxLanduseWays > 0 || queryMaxWaterwayWays > 0) ? `way["water"]${waterBounds};` : ''}
+      ${queryMaxWaterwayWays > 0 ? `way["waterway"~"^(river|stream|canal|drain|ditch)$"]${waterBounds};` : ''}
+    );out body;>;out skel qt;`;
+
+    const cacheMeta = {
+      lat: Number(queryLat.toFixed(5)),
+      lon: Number(queryLon.toFixed(5)),
+      roadsRadius: Number((forwardRoadCorridorPlan?.roadRadius || queryRoadRadius).toFixed(5)),
+      featureRadius: Math.max(queryBuildingRadius, queryLanduseRadius, queryWaterRadius),
+      poiRadius: 0,
+      roadsBounds:
+        forwardRoadCorridorPlan?.bounds ?
+          normalizeOverpassBounds(forwardRoadCorridorPlan.bounds) :
+          overpassBoundsFromCenterRadius(queryLat, queryLon, queryRoadRadius),
+      featureBounds: overpassBoundsFromCenterRadius(
+        queryLat,
+        queryLon,
+        Math.max(queryBuildingRadius, queryLanduseRadius, queryWaterRadius)
+      ),
+      poiBounds: null,
+      loadLevel: contentPlan.loadLevel,
+      continuousWorldInteractive: true,
+      queryKind
+    };
+    const requestTimeoutMs =
+      fastActorRoadShellQuery ?
+        3400 :
+      forwardRoadCorridorPrefetch ?
+        3600 :
+      fastActorBuildingShellQuery ?
+        5400 :
+      fastActorLocalShellQuery ?
+        3800 :
+      localShellPriorityQuery && !buildingContinuityRecovery && String(actorState?.mode || 'drive') === 'drive' ?
+        Math.max(chunkPlan.overpassTimeoutMs, actorState?.onRoad === false ? 9000 : 8200) :
+        chunkPlan.overpassTimeoutMs;
+    const requestMaxTotalLoadMs =
+      fastActorRoadShellQuery ?
+        4600 :
+      forwardRoadCorridorPrefetch ?
+        4800 :
+      fastActorBuildingShellQuery ?
+        7600 :
+      fastActorLocalShellQuery ?
+        4600 :
+      localShellPriorityQuery && !buildingContinuityRecovery && String(actorState?.mode || 'drive') === 'drive' ?
+        Math.max(chunkPlan.maxTotalLoadMs, actorState?.onRoad === false ? 12500 : 11000) :
+        chunkPlan.maxTotalLoadMs;
+    const deadline = performance.now() + requestMaxTotalLoadMs;
+    const data = await fetchOverpassJSON(
+      query,
+      requestTimeoutMs,
+      deadline,
+      cacheMeta,
+      {
+        signal: requestAbortController.signal,
+        reason: reasonText
+      }
+    );
+    if (requestId !== _continuousWorldInteractiveStreamState.activeRequestId) {
+      return getContinuousWorldInteractiveStreamSnapshot();
+    }
+    if (!continuousWorldInteractiveCanStream()) return getContinuousWorldInteractiveStreamSnapshot();
+
+    const nodes = {};
+    data.elements.filter((e) => e.type === 'node').forEach((node) => {
+      nodes[node.id] = node;
+    });
+    const chunkCenterWorld = appCtx.geoToWorld(centerLat, centerLon);
+    const chunkCenterDistance = Math.hypot(Number(chunkCenterWorld?.x || 0), Number(chunkCenterWorld?.z || 0));
+    const baseGeometryGuards = buildFeatureGeometryGuards(chunkPlan.featureRadius);
+    baseGeometryGuards.maxDistanceFromOrigin = Math.max(
+      baseGeometryGuards.maxDistanceFromOrigin,
+      chunkCenterDistance + Math.max(900, baseGeometryGuards.maxDistanceFromOrigin * 0.8)
+    );
+    const buildingGeometryGuards = buildBuildingGeometryGuards(baseGeometryGuards);
+    const landuseGeometryGuards = buildLanduseGeometryGuards(baseGeometryGuards);
+    const waterGeometryGuards = buildWaterGeometryGuards(baseGeometryGuards);
+
+    const allRoadWays = data.elements.filter((e) =>
+      e.type === 'way' &&
+      DRIVEABLE_HIGHWAY_TYPES.has(String(e.tags?.highway || '').toLowerCase())
+    );
+    const roadWays = limitWaysByTileBudget(allRoadWays, nodes, {
+      globalCap: queryMaxRoadWays,
+      basePerTile: 120,
+      minPerTile: 40,
+      tileDegrees: FEATURE_TILE_DEGREES,
+      useRdt: false
+    });
+    const allBuildingWays = data.elements.filter((e) => e.type === 'way' && (!!e.tags?.building || !!e.tags?.['building:part']));
+    const buildingWays = limitWaysByTileBudget(allBuildingWays, nodes, {
+      globalCap: queryMaxBuildingWays,
+      basePerTile: 260,
+      minPerTile: 80,
+      tileDegrees: FEATURE_TILE_DEGREES,
+      useRdt: false,
+      spreadAcrossArea: true,
+      coreRatio: 0.5
+    });
+    const allLanduseWays = data.elements.filter((e) =>
+      e.type === 'way' &&
+      e.tags && (
+        !!e.tags.landuse ||
+        e.tags.natural === 'wood' ||
+        e.tags.natural === 'forest' ||
+        e.tags.natural === 'scrub' ||
+        e.tags.natural === 'grassland' ||
+        e.tags.natural === 'heath' ||
+        e.tags.natural === 'wetland' ||
+        e.tags.natural === 'sand' ||
+        e.tags.natural === 'beach' ||
+        e.tags.natural === 'bare_rock' ||
+        e.tags.natural === 'scree' ||
+        e.tags.natural === 'shingle' ||
+        e.tags.natural === 'glacier' ||
+        e.tags.natural === 'water' ||
+        !!e.tags.water ||
+        e.tags.leisure === 'park' ||
+        e.tags.leisure === 'garden' ||
+        e.tags.leisure === 'nature_reserve'
+      )
+    );
+    const landuseWays = limitWaysByTileBudget(allLanduseWays, nodes, {
+      globalCap: queryMaxLanduseWays,
+      basePerTile: 72,
+      minPerTile: 18,
+      tileDegrees: FEATURE_TILE_DEGREES,
+      useRdt: false
+    });
+    const allWaterwayWays = data.elements.filter((e) =>
+      e.type === 'way' &&
+      e.tags &&
+      !!e.tags.waterway
+    );
+    const waterwayWays = limitWaysByTileBudget(allWaterwayWays, nodes, {
+      globalCap: queryMaxWaterwayWays,
+      basePerTile: 26,
+      minPerTile: 8,
+      tileDegrees: FEATURE_TILE_DEGREES,
+      useRdt: false
+    });
+
+    const roadMainBatchGroups = new Map();
+    const roadSkirtBatchGroups = new Map();
+    const { roadMainMaterial, roadSkirtMaterial } = createRoadSurfaceMaterials({
+      asphaltTex: appCtx.asphaltTex,
+      asphaltNormal: appCtx.asphaltNormal,
+      asphaltRoughness: appCtx.asphaltRoughness,
+      includeMarkings: false
+    });
+    const interactiveRoadMutation = {
+      bounds: null,
+      regionKeys: new Set()
+    };
+
+    let addedRoads = 0;
+    let addedBuildings = 0;
+    let addedLanduseMeshes = 0;
+    let addedWaterAreas = 0;
+    let addedWaterways = 0;
+
+    roadWays.forEach((way) => {
+      const sourceFeatureId = way.id ? String(way.id) : '';
+      if (sourceFeatureId && _continuousWorldInteractiveStreamState.loadedRoadIds.has(sourceFeatureId)) return;
+      const rawPts = way.nodes.map((id) => nodes[id]).filter(Boolean).map((node) => appCtx.geoToWorld(node.lat, node.lon));
+      const pts = sanitizeWorldPathPoints(rawPts, baseGeometryGuards);
+      if (pts.length < 2) return;
+
+      const type = way.tags?.highway || 'residential';
+      const structureSemantics = classifyStructureSemantics(way.tags || {}, {
+        featureKind: 'road',
+        subtype: type
+      });
+      const width =
+        type.includes('motorway') ? 16 :
+        type.includes('trunk') ? 14 :
+        type.includes('primary') ? 12 :
+        type.includes('secondary') ? 10 :
+        8;
+      const limit =
+        type.includes('motorway') ? 65 :
+        type.includes('trunk') ? 55 :
+        type.includes('primary') ? 40 :
+        type.includes('secondary') ? 35 :
+        25;
+      const roadFeature = {
+        pts,
+        width,
+        limit,
+        name: way.tags?.name || type.charAt(0).toUpperCase() + type.slice(1),
+        sourceFeatureId,
+        type,
+        sidewalkHint: 'none',
+        networkKind: 'road',
+        walkable: true,
+        driveable: true,
+        structureTags: {
+          bridge: way.tags?.bridge || '',
+          tunnel: way.tags?.tunnel || '',
+          layer: way.tags?.layer || '',
+          level: way.tags?.level || '',
+          placement: way.tags?.placement || '',
+          ramp: way.tags?.ramp || '',
+          covered: way.tags?.covered || '',
+          indoor: way.tags?.indoor || '',
+          location: way.tags?.location || '',
+          min_height: way.tags?.min_height || '',
+          man_made: way.tags?.man_made || ''
+        },
+        structureSemantics,
+        baseStructureSemantics: cloneStructureSemantics(structureSemantics),
+        surfaceBias: 0.42,
+        lodDepth: 0,
+        subdivideMaxDist: getRoadSubdivisionStep(type, 0, getPerfModeValue()),
+        bounds: polylineBounds(pts, width * 0.5 + 18),
+        continuousWorldInteractiveChunk: true
+      };
+      roadFeature.continuousWorldRegionKeys = buildContinuousWorldRegionKeysFromPoints(
+        roadFeature.pts,
+        null,
+        roadFeature.bounds
+      );
+      recordRoadMutationFeature(interactiveRoadMutation, roadFeature);
+      appCtx.roads.push(roadFeature);
+      updateFeatureSurfaceProfile(roadFeature, terrainYAtWorld, { surfaceBias: 0.42 });
+
+      const hw = width / 2;
+      const verts = [];
+      const indices = [];
+      const { leftEdge, rightEdge } = buildFeatureRibbonEdges(roadFeature, pts, hw, 0, {
+        surfaceBias: 0.42
+      });
+      for (let i = 0; i < leftEdge.length; i++) {
+        verts.push(leftEdge[i].x, leftEdge[i].y, leftEdge[i].z);
+        verts.push(rightEdge[i].x, rightEdge[i].y, rightEdge[i].z);
+        if (i < leftEdge.length - 1) {
+          const vi = i * 2;
+          indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
+        }
+      }
+      appendIndexedGeometryToGroupedBatch(
+        roadMainBatchGroups,
+        roadFeature.continuousWorldRegionKeys,
+        verts,
+        indices
+      );
+      if (typeof appCtx.buildRoadSkirts === 'function' && shouldRenderRoadSkirts(roadFeature)) {
+        const skirtData = appCtx.buildRoadSkirts(leftEdge, rightEdge, 3.4);
+        if (skirtData?.verts?.length) {
+          appendIndexedGeometryToGroupedBatch(
+            roadSkirtBatchGroups,
+            roadFeature.continuousWorldRegionKeys,
+            skirtData.verts,
+            skirtData.indices
+          );
+        }
+      }
+      if (sourceFeatureId) _continuousWorldInteractiveStreamState.loadedRoadIds.add(sourceFeatureId);
+      addedRoads += 1;
+    });
+
+    buildGroupedIndexedBatchMeshes({
+      scene: appCtx.scene,
+      targetList: appCtx.roadMeshes,
+      groups: roadMainBatchGroups,
+      material: roadMainMaterial,
+      renderOrder: 2,
+      userData: {
+        isRoadBatch: true,
+        sharedRoadMaterial: true,
+        continuousWorldFeatureFamily: 'roads',
+        continuousWorldInteractiveChunk: true
+      }
+    });
+    buildGroupedIndexedBatchMeshes({
+      scene: appCtx.scene,
+      targetList: appCtx.roadMeshes,
+      groups: roadSkirtBatchGroups,
+      material: roadSkirtMaterial,
+      renderOrder: 1,
+      userData: {
+        isRoadBatch: true,
+        isRoadSkirt: true,
+        sharedRoadMaterial: true,
+        continuousWorldFeatureFamily: 'roads',
+        continuousWorldInteractiveChunk: true
+      }
+    });
+    markRoadMeshSpatialIndexDirty();
+
+    const acceptedInteractiveBuildingsByCell = new Map();
+    const suppressedInteractiveParentBuildingIds = buildSuppressedParentBuildingIdSet(
+      buildingWays,
+      nodes,
+      buildingGeometryGuards
+    );
+    buildingWays.forEach((way) => {
+      const sourceBuildingId = way.id ? String(way.id) : '';
+      if (sourceBuildingId && _continuousWorldInteractiveStreamState.loadedBuildingIds.has(sourceBuildingId)) return;
+      if (!way.tags?.['building:part'] && sourceBuildingId && suppressedInteractiveParentBuildingIds.has(sourceBuildingId)) {
+        _continuousWorldInteractiveStreamState.loadedBuildingIds.add(sourceBuildingId);
+        return;
+      }
+      const rawPts = way.nodes.map((id) => nodes[id]).filter(Boolean).map((node) => appCtx.geoToWorld(node.lat, node.lon));
+      const pts = sanitizeWorldFootprintPoints(rawPts, FEATURE_MIN_POLYGON_AREA, buildingGeometryGuards);
+      if (pts.length < 3) return;
+
+      let centerX = 0;
+      let centerZ = 0;
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minZ = Infinity;
+      let maxZ = -Infinity;
+      let avgElevation = 0;
+      pts.forEach((point) => {
+        centerX += point.x;
+        centerZ += point.z;
+        minX = Math.min(minX, point.x);
+        maxX = Math.max(maxX, point.x);
+        minZ = Math.min(minZ, point.z);
+        maxZ = Math.max(maxZ, point.z);
+        avgElevation += appCtx.elevationWorldYAtWorldXZ(point.x, point.z);
+      });
+      centerX /= pts.length;
+      centerZ /= pts.length;
+      avgElevation /= pts.length;
+
+      const buildingType = way.tags?.building || 'yes';
+      const footprintArea = Math.abs(signedPolygonAreaXZ(pts));
+      const buildingSemantics = interpretBuildingSemantics(way.tags || {}, {
+        fallbackHeight: 9.5,
+        fallbackPartHeight: 4,
+        footprintArea,
+        footprintWidth: Math.max(0, maxX - minX),
+        footprintDepth: Math.max(0, maxZ - minZ)
+      });
+      const height = buildingSemantics.heightMeters;
+      const structureSemantics = classifyStructureSemantics(way.tags || {}, {
+        featureKind: 'building',
+        subtype: buildingType
+      });
+      const regionKeys = buildContinuousWorldRegionKeysFromPoints(pts, null, {
+        minX,
+        maxX,
+        minZ,
+        maxZ
+      });
+      const isImportantBuilding = continuousWorldInteractiveBuildingIsImportant(way.tags || {}, buildingSemantics, footprintArea, height);
+      const denseCellKey = `${Math.floor(centerX / 72)},${Math.floor(centerZ / 72)}`;
+      const acceptedInCell = acceptedInteractiveBuildingsByCell.get(denseCellKey) || 0;
+      const boostedDenseBuildingShell =
+        fastActorBuildingShellQuery ||
+        reasonText === 'actor_building_gap' ||
+        reasonText.startsWith('building_continuity_');
+      const denseCellCap =
+        actorState?.mode === 'walk' ? (boostedDenseBuildingShell ? 28 : 22) :
+        actorState?.mode === 'drive' ? (boostedDenseBuildingShell ? 26 : 16) :
+        actorState?.mode === 'drone' ? (boostedDenseBuildingShell ? 14 : 8) :
+        5;
+      if (acceptedInCell >= denseCellCap && !isImportantBuilding) return;
+      const corridorNearest =
+        typeof appCtx.findNearestRoad === 'function' ?
+          appCtx.findNearestRoad(centerX, centerZ, { maxVerticalDelta: 60 }) :
+          null;
+      const corridorHalfWidth = corridorNearest?.road?.width ? corridorNearest.road.width * 0.5 : 0;
+      const roadProjectionInsideFootprint =
+        corridorNearest?.pt &&
+        Number.isFinite(corridorNearest.pt.x) &&
+        Number.isFinite(corridorNearest.pt.z) &&
+        pointInPolygon(corridorNearest.pt.x, corridorNearest.pt.z, pts);
+      if (
+        !isImportantBuilding &&
+        corridorHalfWidth > 0 &&
+        Number.isFinite(corridorNearest?.dist) &&
+        corridorNearest.dist <= Math.max(3.5, corridorHalfWidth + 1.25) &&
+        roadProjectionInsideFootprint
+      ) {
+        return;
+      }
+      acceptedInteractiveBuildingsByCell.set(denseCellKey, acceptedInCell + 1);
+      const actorX = Number(actorState?.x || centerX);
+      const actorZ = Number(actorState?.z || centerZ);
+      const actorDistance = Math.hypot(centerX - actorX, centerZ - actorZ);
+      const colliderRadius =
+        actorState?.mode === 'boat' || actorState?.mode === 'ocean' || actorState?.mode === 'drone' ?
+          0 :
+        actorState?.mode === 'walk' ?
+          CONTINUOUS_WORLD_INTERACTIVE_STREAM_WALK_COLLIDER_RADIUS :
+          CONTINUOUS_WORLD_INTERACTIVE_STREAM_COLLIDER_RADIUS;
+      const detailRadius =
+        actorState?.mode === 'drone' ?
+          (boostedDenseBuildingShell ? 460 : 340) :
+        actorState?.mode === 'walk' ?
+          (boostedDenseBuildingShell ? 320 : 240) :
+        actorState?.mode === 'drive' ?
+          (boostedDenseBuildingShell ? 280 : 220) :
+          180;
+      const preferDetailedInteractiveBuildings =
+        !!appCtx.customLocTransient ||
+        fastActorBuildingShellQuery ||
+        reasonText === 'actor_building_gap' ||
+        reasonText.startsWith('building_continuity_');
+      const renderDetailedBuilding =
+        isImportantBuilding ||
+        (preferDetailedInteractiveBuildings && actorDistance <= detailRadius);
+      if (sourceBuildingId && renderDetailedBuilding) {
+        pruneBaseProxyBuildingShells(sourceBuildingId, 'interactive_building_detail_upgrade');
+      }
+      if (isImportantBuilding || Math.hypot(centerX - actorX, centerZ - actorZ) <= colliderRadius) {
+        registerBuildingCollision(pts, height, {
+          detail: isImportantBuilding ? 'full' : 'bbox',
+          centerX,
+          centerZ,
+          sourceBuildingId,
+          name: way.tags?.name || '',
+          buildingType,
+          buildingPartKind: buildingSemantics.partKind || 'full',
+          collisionKind: buildingSemantics.collisionKind || 'solid',
+          allowsPassageBelow: buildingSemantics.allowsPassageBelow === true,
+          levels: Number.isFinite(Number.parseFloat(way.tags?.['building:levels'])) ? Number.parseFloat(way.tags['building:levels']) : null,
+          minLevels: Number.isFinite(Number.parseFloat(way.tags?.['building:min_level'])) ? Number.parseFloat(way.tags['building:min_level']) : null,
+          baseY: avgElevation,
+          buildingSemantics,
+          structureSemantics,
+          continuousWorldRegionKeys: regionKeys,
+          continuousWorldInteractiveChunk: true
+        });
+      }
+
+      if (buildingSemantics?.roofLike === true && buildingSemantics?.intentionalVerticalStructure !== true) {
+        return;
+      }
+
+      const structureBaseOffset = Number.isFinite(buildingSemantics?.baseOffsetMeters) ?
+        buildingSemantics.baseOffsetMeters :
+        0;
+      const baseElevation = avgElevation + structureBaseOffset;
+      const buildingSeed =
+        Number.isFinite(Number(way.id)) ?
+          (Number(way.id) >>> 0) :
+          ((Math.round(centerX * 31) ^ Math.round(centerZ * 17)) >>> 0);
+      const mesh = renderDetailedBuilding ?
+        createDetailedBuildingMesh(
+          pts,
+          height,
+          baseElevation,
+          {
+            buildingType,
+            buildingSeed,
+            baseColor: continuousWorldInteractiveBuildingColor(buildingType),
+            buildingSemantics,
+            structureSemantics
+          }
+        ) :
+        createMidLodBuildingMesh(
+          pts,
+          height,
+          baseElevation,
+          continuousWorldInteractiveBuildingColor(buildingType),
+          {
+            buildingType,
+            buildingSeed
+          }
+        );
+      if (mesh) {
+        mesh.userData.sourceBuildingId = sourceBuildingId;
+        mesh.userData.buildingType = buildingType;
+        mesh.userData.continuousWorldInteractiveChunk = true;
+        mesh.userData.continuousWorldRegionKeys = regionKeys.slice();
+        mesh.userData.continuousWorldRegionCount = regionKeys.length;
+        mesh.userData.continuousWorldPrimaryRegionKey = String(regionKeys[0] || regionKey || '');
+        mesh.userData.buildingSemantics = buildingSemantics;
+        mesh.userData.structureSemantics = structureSemantics;
+        appCtx.scene.add(mesh);
+        appCtx.buildingMeshes.push(mesh);
+
+      }
+
+      if (sourceBuildingId) _continuousWorldInteractiveStreamState.loadedBuildingIds.add(sourceBuildingId);
+      addedBuildings += 1;
+    });
+
+    landuseWays.forEach((way) => {
+      const sourceFeatureId = way.id ? String(way.id) : '';
+      if (sourceFeatureId && _continuousWorldInteractiveStreamState.loadedLanduseIds.has(sourceFeatureId)) return;
+      const landuseType = classifyLanduseType(way.tags);
+      if (!landuseType) return;
+      const rawPts = way.nodes.map((id) => nodes[id]).filter(Boolean).map((node) => appCtx.geoToWorld(node.lat, node.lon));
+      const guard = landuseType === 'water' ? waterGeometryGuards : landuseGeometryGuards;
+      cacheContinuousWorldSurfaceFeatureHint(rawPts, landuseType, guard, sourceFeatureId);
+      const addResult = addContinuousWorldInteractiveLandusePolygon(
+        rawPts,
+        landuseType,
+        sourceFeatureId,
+        [],
+        guard
+      );
+      if (!addResult?.addedMesh) return;
+      if (sourceFeatureId) _continuousWorldInteractiveStreamState.loadedLanduseIds.add(sourceFeatureId);
+      addedLanduseMeshes += 1;
+      if (addResult.addedWater) addedWaterAreas += 1;
+    });
+
+    waterwayWays.forEach((way) => {
+      const sourceFeatureId = way.id ? String(way.id) : '';
+      if (sourceFeatureId && _continuousWorldInteractiveStreamState.loadedWaterwayIds.has(sourceFeatureId)) return;
+      const rawPts = way.nodes.map((id) => nodes[id]).filter(Boolean).map((node) => appCtx.geoToWorld(node.lat, node.lon));
+      const pts = sanitizeWorldPathPoints(rawPts, waterGeometryGuards);
+      if (pts.length < 2) return;
+      const added = addContinuousWorldInteractiveWaterwayRibbon(pts, {
+        ...(way.tags || {}),
+        sourceFeatureId
+      });
+      if (!added) return;
+      if (sourceFeatureId) _continuousWorldInteractiveStreamState.loadedWaterwayIds.add(sourceFeatureId);
+      addedWaterways += 1;
+    });
+
+    if (addedLanduseMeshes > 0 || addedWaterways > 0) {
+      batchLanduseMeshes();
+    }
+
+    const coverageKey = [
+      Number(useRegionCenteredQuery ? queryLat : centerLat).toFixed(5),
+      Number(useRegionCenteredQuery ? queryLon : centerLon).toFixed(5),
+      Number(chunkPlan.featureRadius).toFixed(5)
+    ].join(':');
+    const coverageRegionKeys = continuousWorldInteractiveCoverageRegionKeysForGeoQuery(
+      useRegionCenteredQuery ? queryLat : resolvedCenterLat,
+      useRegionCenteredQuery ? queryLon : resolvedCenterLon,
+      Math.max(queryRoadRadius, queryBuildingRadius, queryLanduseRadius, queryWaterRadius),
+      runtimeSnapshot
+    );
+    const effectiveCoverageRegionKeys =
+      forwardRoadCorridorPlan?.regionKeys?.length ?
+        forwardRoadCorridorPlan.regionKeys.slice() :
+        coverageRegionKeys;
+    _continuousWorldInteractiveStreamState.coverage.push({
+      key: coverageKey,
+      regionKey,
+      regionKeys: effectiveCoverageRegionKeys,
+      lat: useRegionCenteredQuery ? queryLat : resolvedCenterLat,
+      lon: useRegionCenteredQuery ? queryLon : resolvedCenterLon,
+      roadRadius: queryRoadRadius,
+      featureRadius: Math.max(queryBuildingRadius, queryLanduseRadius, queryWaterRadius),
+      addedRoads,
+      addedBuildings,
+      addedLanduseMeshes,
+      addedWaterAreas,
+      addedWaterways,
+      loadLevel: contentPlan.loadLevel,
+      reason,
+      at: Date.now()
+    });
+    if (_continuousWorldInteractiveStreamState.coverage.length > CONTINUOUS_WORLD_INTERACTIVE_STREAM_MAX_COVERAGE) {
+      _continuousWorldInteractiveStreamState.coverage.splice(
+        0,
+        _continuousWorldInteractiveStreamState.coverage.length - CONTINUOUS_WORLD_INTERACTIVE_STREAM_MAX_COVERAGE
+      );
+    }
+    _continuousWorldInteractiveStreamState.totalAddedRoads += addedRoads;
+    _continuousWorldInteractiveStreamState.totalAddedBuildings += addedBuildings;
+    _continuousWorldInteractiveStreamState.totalAddedLanduseMeshes += addedLanduseMeshes;
+    _continuousWorldInteractiveStreamState.totalAddedWaterAreas += addedWaterAreas;
+    _continuousWorldInteractiveStreamState.totalAddedWaterways += addedWaterways;
+    _continuousWorldInteractiveStreamState.totalLoads += 1;
+    _continuousWorldInteractiveStreamState.lastLoadAt = Date.now();
+    _continuousWorldInteractiveStreamState.lastLoadReason = reason;
+    markWorldLodDirty(`interactive_load:${reason}`);
+    const surfaceSyncPolicy = continuousWorldInteractiveSurfaceSyncPolicy(actorState, regionKey, runtimeSnapshot, reason);
+    _continuousWorldInteractiveStreamState.lastSurfaceSyncPolicy = surfaceSyncPolicy.policy;
+
+    const eviction = evictContinuousWorldInteractiveContent(runtimeSnapshot, regionKey, actorState);
+    if (addedRoads > 0) {
+      scheduleTraversalNetworksRebuild('continuous_world_stream', 520);
+      const surfaceSyncSource = String(surfaceSyncPolicy.source || 'continuous_world_stream_followup');
+      if (typeof appCtx.primeRoadSurfaceSyncState === 'function') {
+        appCtx.primeRoadSurfaceSyncState({
+          clearHeightCache: false,
+          preserveActiveTask: true,
+          mutationType: 'append',
+          source: surfaceSyncSource,
+          bounds: interactiveRoadMutation.bounds,
+          regionKeys: Array.from(interactiveRoadMutation.regionKeys || [])
+        });
+      }
+      if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
+      if (typeof appCtx.requestWorldSurfaceSync === 'function' && surfaceSyncPolicy.request) {
+        appCtx.requestWorldSurfaceSync(
+          surfaceSyncPolicy.force ?
+            { force: true, source: surfaceSyncSource } :
+            { deferOnly: true, source: surfaceSyncSource }
+        );
+        if (surfaceSyncPolicy.force) _continuousWorldInteractiveStreamState.forcedSurfaceSyncLoads += 1;
+        else _continuousWorldInteractiveStreamState.deferredSurfaceSyncLoads += 1;
+      } else if (addedRoads > 0) {
+        _continuousWorldInteractiveStreamState.skippedSurfaceSyncLoads += 1;
+      }
+      if (actorState.mode === 'drive' && typeof appCtx.resolveSafeWorldSpawn === 'function') {
+        const actor = currentMapReferenceGeoPosition();
+        const spawn = resolveSafeWorldSpawn(actor.x, actor.z, {
+          mode: 'drive',
+          angle: finiteNumberOr(appCtx.car?.angle, 0),
+          maxRoadDistance: 220,
+          strictMaxDistance: true,
+          source: String(surfaceSyncPolicy?.source || 'continuous_world_stream_followup')
+        });
+        if (spawn?.valid && !appCtx.car?.onRoad) {
+          applyResolvedWorldSpawn(spawn, { mode: 'drive', syncCar: true, syncWalker: false });
+        }
+        const roadRecoveryShell =
+          actorState?.onRoad === false &&
+          addedBuildings <= 0 &&
+          (reason === 'actor_drift' || reason === 'main_loop');
+        scheduleContinuousWorldInteractiveDriveRecovery({
+          attempts: roadRecoveryShell ? 6 : 4,
+          delayMs: surfaceSyncPolicy.force ? 180 : 280,
+          maxRoadDistance: roadRecoveryShell ? 320 : 240,
+          shellAfterRecovery: roadRecoveryShell,
+          source: 'continuous_world_stream_followup'
+        });
+      }
+    }
+    if (
+      actorState.mode === 'drive' &&
+      addedRoads > 0 &&
+      !fastActorBuildingShellQuery &&
+      !continuousWorldInteractiveShouldDeferDriveBuildingShell(actorState, reasonText) &&
+      Number.isFinite(actorState?.x) &&
+      Number.isFinite(actorState?.z)
+    ) {
+      const driveBuildingCfg = ACTOR_BUILDING_SHELL_CONFIG.drive;
+      const nearbyVisibleBuildings = countVisibleDetailedBuildingMeshesNearWorldPoint(
+        actorState.x,
+        actorState.z,
+        driveBuildingCfg?.visibleRadius || 360
+      );
+      const nearbyRoadFeatures = countDriveableRoadFeaturesNearWorldPoint(
+        actorState.x,
+        actorState.z,
+        Math.max(260, driveBuildingCfg?.visibleRadius || 360)
+      );
+      if (
+        nearbyRoadFeatures >= (driveBuildingCfg?.minRoadFeatures || 10) &&
+        nearbyVisibleBuildings < (driveBuildingCfg?.minVisibleBuildings || 18)
+      ) {
+        const severeBuildingShellGap =
+          nearbyVisibleBuildings < (driveBuildingCfg?.minVisibleBuildings || 18);
+        const followupReason =
+          severeBuildingShellGap || reasonText === 'actor_visible_road_gap' ?
+            'building_continuity_drive' :
+            'actor_building_gap';
+        window.setTimeout(() => {
+          if (!continuousWorldInteractiveCanStream(followupReason)) return;
+          const actorGeoPosition = currentMapReferenceGeoPosition();
+          if (!Number.isFinite(actorGeoPosition?.lat) || !Number.isFinite(actorGeoPosition?.lon)) return;
+          void loadContinuousWorldInteractiveChunk(actorGeoPosition.lat, actorGeoPosition.lon, followupReason);
+        }, 140);
+      }
+    }
+    if (typeof updateWorldLod === 'function') updateWorldLod(true);
+    appCtx.setPerfLiveStat?.('continuousWorldInteractiveStream', {
+      loads: _continuousWorldInteractiveStreamState.totalLoads,
+      roads: _continuousWorldInteractiveStreamState.totalAddedRoads,
+      buildings: _continuousWorldInteractiveStreamState.totalAddedBuildings,
+      landuse: _continuousWorldInteractiveStreamState.totalAddedLanduseMeshes,
+      waterways: _continuousWorldInteractiveStreamState.totalAddedWaterways,
+      loadMs: Math.round(performance.now() - loadStartedAt),
+      loadLevel: contentPlan.loadLevel,
+      surfaceSyncPolicy: _continuousWorldInteractiveStreamState.lastSurfaceSyncPolicy,
+      forcedSurfaceSyncLoads: _continuousWorldInteractiveStreamState.forcedSurfaceSyncLoads,
+      deferredSurfaceSyncLoads: _continuousWorldInteractiveStreamState.deferredSurfaceSyncLoads,
+      skippedSurfaceSyncLoads: _continuousWorldInteractiveStreamState.skippedSurfaceSyncLoads,
+      evictedMeshes: Number(eviction?.removedMeshes || 0)
+    });
+  } catch (error) {
+    if (requestId === _continuousWorldInteractiveStreamState.activeRequestId) {
+      _continuousWorldInteractiveStreamState.lastError = error?.message || String(error);
+    }
+  } finally {
+    if (requestId === _continuousWorldInteractiveStreamState.activeRequestId) {
+      _continuousWorldInteractiveStreamState.pending = false;
+      _continuousWorldInteractiveStreamState.pendingStartedAt = 0;
+      _continuousWorldInteractiveStreamState.pendingQueryLat = NaN;
+      _continuousWorldInteractiveStreamState.pendingQueryLon = NaN;
+      _continuousWorldInteractiveStreamState.pendingRegionKey = null;
+      _continuousWorldInteractiveStreamState.abortController = null;
+    } else if (_continuousWorldInteractiveStreamState.abortController === requestAbortController) {
+      _continuousWorldInteractiveStreamState.abortController = null;
+    }
+  }
+  return getContinuousWorldInteractiveStreamSnapshot();
+}
+
+function kickContinuousWorldInteractiveStreaming(reason = 'runtime_tick') {
+  if (!continuousWorldInteractiveCanStream(reason)) return getContinuousWorldInteractiveStreamSnapshot();
+  if (!_continuousWorldInteractiveStreamState.autoKickEnabled) return getContinuousWorldInteractiveStreamSnapshot();
+  const actorState = continuousWorldInteractiveActorMotionState();
+  if (continuousWorldInteractiveStartupLockActive()) {
+    if (
+      continuousWorldStartupLocalShellEnabled() &&
+      !_continuousWorldInteractiveStreamState.pending &&
+      !continuousWorldInteractiveStartupLocalShellCovered(actorState)
+    ) {
+      const actorGeo = currentMapReferenceGeoPosition();
+      if (Number.isFinite(actorGeo?.lat) && Number.isFinite(actorGeo?.lon)) {
+        void loadContinuousWorldInteractiveChunk(actorGeo.lat, actorGeo.lon, 'startup_local_shell');
+      }
+    }
+    return getContinuousWorldInteractiveStreamSnapshot();
+  }
+  const roadShellGap = continuousWorldInteractiveNeedsRoadShellRecovery(actorState);
+  const buildingShellGap = continuousWorldInteractiveNeedsBuildingShellRecovery(actorState);
+  const actorGeo = currentMapReferenceGeoPosition();
+  const actorRegionKey =
+    Number.isFinite(actorGeo?.lat) && Number.isFinite(actorGeo?.lon) ?
+      continuousWorldInteractiveRegionKeyFromLatLon(actorGeo.lat, actorGeo.lon, null) :
+      null;
+  if (_continuousWorldInteractiveStreamState.pending) {
+    const pendingAgeMs = Date.now() - Number(_continuousWorldInteractiveStreamState.pendingStartedAt || 0);
+    if (
+      pendingAgeMs < 420 &&
+      !roadShellGap &&
+      !buildingShellGap &&
+      !continuousWorldInteractiveReasonIsForwardRoadCorridor(reason)
+    ) {
+      return getContinuousWorldInteractiveStreamSnapshot();
+    }
+    const pendingReason = String(_continuousWorldInteractiveStreamState.lastLoadReason || '');
+    const reasonText = String(reason || 'runtime_tick');
+    const pendingForwardRoadCorridor = continuousWorldInteractiveReasonIsForwardRoadCorridor(pendingReason);
+    const pendingQueryLat = Number(_continuousWorldInteractiveStreamState.pendingQueryLat);
+    const pendingQueryLon = Number(_continuousWorldInteractiveStreamState.pendingQueryLon);
+    const pendingStartupLocalShell = pendingReason === 'startup_local_shell';
+    const pendingPrefetch = pendingReason.startsWith('region_prefetch:');
+    const pendingActorScoped =
+      pendingReason === 'main_loop' ||
+      pendingReason === 'actor_drift' ||
+      pendingReason === 'startup_roads_ready' ||
+      pendingReason === 'actor_visible_road_gap' ||
+      pendingReason === 'actor_building_gap' ||
+      continuousWorldInteractiveReasonIsForwardRoadCorridor(pendingReason) ||
+      pendingReason.startsWith('building_continuity_');
+    const pendingSameActorRegion =
+      pendingActorScoped &&
+      actorRegionKey &&
+      _continuousWorldInteractiveStreamState.pendingRegionKey &&
+      actorRegionKey === _continuousWorldInteractiveStreamState.pendingRegionKey;
+    const pendingCriticalWithoutRegion =
+      pendingActorScoped &&
+      !_continuousWorldInteractiveStreamState.pendingRegionKey;
+    const actorPriorityKick = !reasonText.startsWith('region_prefetch:') && reasonText !== 'startup_local_shell';
+    const pendingMovedOffRegion =
+      pendingActorScoped &&
+      !pendingForwardRoadCorridor &&
+      actorRegionKey &&
+      _continuousWorldInteractiveStreamState.pendingRegionKey &&
+      actorRegionKey !== _continuousWorldInteractiveStreamState.pendingRegionKey;
+    const pendingActorDistanceWorldUnits =
+      Number.isFinite(actorGeo?.lat) &&
+      Number.isFinite(actorGeo?.lon) &&
+      Number.isFinite(pendingQueryLat) &&
+      Number.isFinite(pendingQueryLon) ?
+        continuousWorldGeoDistanceWorldUnits(actorGeo.lat, actorGeo.lon, pendingQueryLat, pendingQueryLon) :
+        NaN;
+    const pendingDriftThresholdWorldUnits =
+      pendingForwardRoadCorridor ?
+        520 :
+      actorState?.mode === 'drive' ?
+        (roadShellGap ? 150 : buildingShellGap ? 180 : 220) :
+      actorState?.mode === 'drone' ?
+        260 :
+      actorState?.mode === 'walk' ?
+        120 :
+        180;
+    const pendingMovedBeyondQueryCenter =
+      pendingActorScoped &&
+      Number.isFinite(pendingActorDistanceWorldUnits) &&
+      pendingActorDistanceWorldUnits >= pendingDriftThresholdWorldUnits;
+    const stalePendingThresholdMs =
+      actorState?.mode === 'drive' && actorState?.onRoad === false ? 5200 :
+      actorState?.mode === 'drive' ? 7600 :
+      actorState?.mode === 'walk' ? 9000 :
+      8200;
+    const priorityPreemptThresholdMs =
+      pendingForwardRoadCorridor ?
+        2600 :
+      actorState?.mode === 'drive' && actorState?.onRoad === false ? 900 :
+      actorState?.mode === 'drive' ? 1200 :
+      actorState?.mode === 'walk' ? 1500 :
+      1400;
+    const actorGapPriority = roadShellGap || buildingShellGap;
+    const shouldResetPending =
+      (pendingStartupLocalShell && !continuousWorldStartupLocalShellEnabled()) ||
+      (!pendingSameActorRegion && pendingAgeMs >= stalePendingThresholdMs) ||
+      (pendingSameActorRegion && pendingAgeMs >= 15000) ||
+      (pendingForwardRoadCorridor && roadShellGap && pendingAgeMs >= 700) ||
+      (roadShellGap && pendingSameActorRegion && pendingReason === 'actor_visible_road_gap' && pendingAgeMs >= 2400) ||
+      (actorGapPriority && pendingCriticalWithoutRegion && pendingAgeMs >= 700) ||
+      (pendingMovedOffRegion && pendingAgeMs >= 700) ||
+      (!pendingForwardRoadCorridor && pendingMovedBeyondQueryCenter && pendingAgeMs >= priorityPreemptThresholdMs) ||
+      (
+        actorGapPriority &&
+        (pendingPrefetch || (continuousWorldInteractiveReasonIsForwardRoadCorridor(pendingReason) && !pendingForwardRoadCorridor)) &&
+        pendingAgeMs >= 350
+      ) ||
+      (
+        actorGapPriority &&
+        pendingActorScoped &&
+        pendingReason !== 'actor_visible_road_gap' &&
+        pendingReason !== 'actor_building_gap' &&
+        !pendingForwardRoadCorridor &&
+        !pendingReason.startsWith('building_continuity_') &&
+        pendingAgeMs >= 900
+      ) ||
+      (actorPriorityKick && (pendingStartupLocalShell || pendingPrefetch) && pendingAgeMs >= priorityPreemptThresholdMs);
+    if (shouldResetPending) {
+      if (_continuousWorldInteractiveStreamState.abortController) {
+        try {
+          _continuousWorldInteractiveStreamState.abortController.abort();
+        } catch {}
+        _continuousWorldInteractiveStreamState.abortController = null;
+      }
+      _continuousWorldInteractiveStreamState.pending = false;
+      _continuousWorldInteractiveStreamState.pendingStartedAt = 0;
+      _continuousWorldInteractiveStreamState.pendingQueryLat = NaN;
+      _continuousWorldInteractiveStreamState.pendingQueryLon = NaN;
+      _continuousWorldInteractiveStreamState.pendingRegionKey = null;
+      _continuousWorldInteractiveStreamState.activeRequestId =
+        Number(_continuousWorldInteractiveStreamState.activeRequestId || 0) + 1;
+      _continuousWorldInteractiveStreamState.lastError = `stale_pending_reset:${_continuousWorldInteractiveStreamState.lastLoadReason || 'unknown'}`;
+    }
+  }
+  const runtimeSnapshot = appCtx.getContinuousWorldRuntimeSnapshot?.();
+  const forwardCorridorCoverage = continuousWorldForwardRoadCorridorCoverageState(actorState, runtimeSnapshot);
+  const prefetchTarget = continuousWorldInteractiveSelectPrefetchTarget(actorGeo, runtimeSnapshot, actorState);
+  const corridorPrefetchTarget = prefetchTarget?.corridorRoadPriority ? prefetchTarget : null;
+  const actorMostlyIdle = continuousWorldInteractiveActorMostlyIdle(actorState);
+  const deferDriveBuildingShell = continuousWorldInteractiveShouldDeferDriveBuildingShell(actorState, reason);
+  const forwardCorridorNeedsRoads =
+    actorState?.mode === 'drive' &&
+    Math.abs(Number(actorState?.speed || 0)) >= 4 &&
+    forwardCorridorCoverage.totalKeys > 0 &&
+    forwardCorridorCoverage.coveredKeys < forwardCorridorCoverage.minCoveredKeys;
+  const now = performance.now();
+  if (now - _continuousWorldInteractiveStreamState.lastKickAt < continuousWorldInteractiveStreamIntervalMs(actorState)) {
+    return getContinuousWorldInteractiveStreamSnapshot();
+  }
+  _continuousWorldInteractiveStreamState.lastKickAt = now;
+
+  if (!_continuousWorldInteractiveStreamState.seededSignature || _continuousWorldInteractiveStreamState.coverage.length === 0) {
+    seedContinuousWorldInteractiveStreamState();
+  }
+
+  const chunkPlan = continuousWorldInteractiveChunkPlan();
+  if (!Number.isFinite(actorGeo?.lat) || !Number.isFinite(actorGeo?.lon) || !chunkPlan) {
+    return getContinuousWorldInteractiveStreamSnapshot();
+  }
+  const effectiveReason =
+    roadShellGap ?
+      'actor_visible_road_gap' :
+    buildingShellGap ?
+      (
+        actorState?.mode === 'drive' && deferDriveBuildingShell ?
+          reason :
+        actorState?.mode === 'drive' ?
+          'building_continuity_drive' :
+          'actor_building_gap'
+      ) :
+    reason;
+  const desiredLoadLevel = continuousWorldInteractiveDesiredLoadLevel(actorState, effectiveReason);
+  if (
+    roadShellGap &&
+    actorRegionKey &&
+    (
+      actorRegionKey !== _lastActorVisibleRoadGapRegionKey ||
+      Date.now() - _lastActorVisibleRoadGapLoadAt >= 2500
+    )
+  ) {
+    _lastActorVisibleRoadGapRegionKey = actorRegionKey;
+    _lastActorVisibleRoadGapLoadAt = Date.now();
+    void loadContinuousWorldInteractiveChunk(
+      actorGeo.lat,
+      actorGeo.lon,
+      'actor_visible_road_gap'
+    );
+    return getContinuousWorldInteractiveStreamSnapshot();
+  }
+  if (forwardCorridorNeedsRoads && corridorPrefetchTarget) {
+    void loadContinuousWorldInteractiveChunk(
+      corridorPrefetchTarget.lat,
+      corridorPrefetchTarget.lon,
+      corridorPrefetchTarget.loadReason || 'forward_road_corridor'
+    );
+    return getContinuousWorldInteractiveStreamSnapshot();
+  }
+  if (
+    buildingShellGap &&
+    !deferDriveBuildingShell &&
+    !forwardCorridorNeedsRoads &&
+    actorRegionKey &&
+    (
+      actorRegionKey !== _lastActorBuildingGapRegionKey ||
+      Date.now() - _lastActorBuildingGapLoadAt >= 1800
+    )
+  ) {
+    _lastActorBuildingGapRegionKey = actorRegionKey;
+    _lastActorBuildingGapLoadAt = Date.now();
+    const nearbyRoadFeatures = countDriveableRoadFeaturesNearWorldPoint(
+      actorState?.x,
+      actorState?.z,
+      Math.max(260, ACTOR_BUILDING_SHELL_CONFIG.drive?.visibleRadius || 360)
+    );
+    const nearbyVisibleBuildings = countVisibleBuildingMeshesNearWorldPoint(
+      actorState?.x,
+      actorState?.z,
+      ACTOR_BUILDING_SHELL_CONFIG.drive?.visibleRadius || 360
+    );
+    const strongerDriveContinuityReason =
+      actorState?.mode === 'drive' &&
+      nearbyRoadFeatures >= (ACTOR_BUILDING_SHELL_CONFIG.drive?.minRoadFeatures || 10) &&
+      nearbyVisibleBuildings < (ACTOR_BUILDING_SHELL_CONFIG.drive?.minVisibleBuildings || 18);
+    void loadContinuousWorldInteractiveChunk(
+      actorGeo.lat,
+      actorGeo.lon,
+      strongerDriveContinuityReason ? 'building_continuity_drive' : 'actor_building_gap'
+    );
+    return getContinuousWorldInteractiveStreamSnapshot();
+  }
+  if (continuousWorldInteractiveNeedsLoad(actorGeo, chunkPlan, desiredLoadLevel, runtimeSnapshot, effectiveReason)) {
+    void loadContinuousWorldInteractiveChunk(actorGeo.lat, actorGeo.lon, effectiveReason);
+    return getContinuousWorldInteractiveStreamSnapshot();
+  }
+  if (_continuousWorldInteractiveStreamState.totalLoads === 0 && _continuousWorldInteractiveStreamState.coverage.length <= 1) {
+    return getContinuousWorldInteractiveStreamSnapshot();
+  }
+  if (prefetchTarget) {
+    const suppressIdlePrefetch =
+      actorMostlyIdle &&
+      !roadShellGap &&
+      !buildingShellGap &&
+      !forwardCorridorNeedsRoads &&
+      _continuousWorldInteractiveStreamState.totalLoads > 0;
+    if (suppressIdlePrefetch) {
+      return getContinuousWorldInteractiveStreamSnapshot();
+    }
+    void loadContinuousWorldInteractiveChunk(
+      prefetchTarget.lat,
+      prefetchTarget.lon,
+      prefetchTarget.loadReason || `region_prefetch:${prefetchTarget.band}:${prefetchTarget.key}`
+    );
+    return getContinuousWorldInteractiveStreamSnapshot();
+  }
+  return getContinuousWorldInteractiveStreamSnapshot();
 }
 
 function finiteNumberOr(value, fallback = 0) {
@@ -4443,6 +13031,106 @@ function spawnSurfacePenalty(feature, mode = 'drive') {
   return 10;
 }
 
+function findSpawnOverheadConflict(feature, x, z, actorFeetY = NaN) {
+  if (!feature || !Number.isFinite(x) || !Number.isFinite(z) || !Number.isFinite(actorFeetY)) return null;
+  const focusSemantics = feature?.structureSemantics || null;
+  if (focusSemantics?.terrainMode === 'elevated') return null;
+
+  const roadFeatures = runtimeRoadFeatures();
+  let best = null;
+  for (let i = 0; i < roadFeatures.length; i++) {
+    const other = roadFeatures[i];
+    if (!other || other === feature) continue;
+    const semantics = other.structureSemantics || null;
+    if (!semantics?.gradeSeparated || semantics.terrainMode !== 'elevated') continue;
+    if (areRoadsConnected(feature, other)) continue;
+
+    const projection = projectPointToFeature(other, x, z);
+    if (!projection) continue;
+
+    const halfWidth = Number.isFinite(other?.width) ? other.width * 0.5 : 4;
+    const lateralLimit = Math.max(4.5, halfWidth + 1.35);
+    if (!Number.isFinite(projection.dist) || projection.dist > lateralLimit) continue;
+
+    const surfaceY = sampleFeatureSurfaceY(other, x, z, projection);
+    if (!Number.isFinite(surfaceY)) continue;
+
+    const clearance = surfaceY - actorFeetY;
+    if (!Number.isFinite(clearance) || clearance <= 2.6) continue;
+
+    if (!best || clearance < best.clearance) {
+      best = {
+        road: other,
+        y: surfaceY,
+        dist: projection.dist,
+        clearance
+      };
+    }
+  }
+  return best;
+}
+
+function spawnStructurePenalty(feature, evaluated, mode = 'drive', options = {}) {
+  if (!feature || !evaluated?.valid) return 0;
+
+  let penalty = 0;
+  const semantics = feature.structureSemantics || null;
+  const type = String(feature.type || '').toLowerCase();
+  const actorFeetY =
+    mode === 'drive' ?
+      Number(evaluated.carY) - 1.2 :
+      Number(evaluated.walkY) - 1.7;
+
+  if (semantics?.gradeSeparated) {
+    penalty += semantics.terrainMode === 'elevated' ? 60 : 46;
+  }
+  if (semantics?.rampCandidate) penalty += 22;
+  if (/_link$/.test(type)) penalty += 46;
+  if (type.includes('service')) penalty += 24;
+
+  if (options.avoidOverhead === true && Number.isFinite(actorFeetY)) {
+    const overhead = findSpawnOverheadConflict(feature, evaluated.x, evaluated.z, actorFeetY);
+    if (overhead) {
+      penalty += 140 + Math.max(0, 14 - overhead.clearance) * 9;
+    }
+  }
+
+  return penalty;
+}
+
+function spawnCorridorPenalty(feature, evaluated, mode = 'drive', options = {}) {
+  if (mode !== 'drive' || !feature || !evaluated?.valid) return 0;
+
+  let penalty = 0;
+  const type = String(feature?.type || '').toLowerCase();
+  const width = Math.max(0, Number(feature?.width || 0));
+
+  if (width > 0) penalty -= Math.min(18, width * 1.15);
+  penalty -= Math.min(14, roadTypePriority(type) * 0.09);
+
+  if (options.preferVisibleShell !== false) {
+    const visibleRoadShell = countVisibleRoadMeshesNearWorldPoint(evaluated.x, evaluated.z, 180);
+    penalty += Math.max(0, 6 - visibleRoadShell) * 12;
+  }
+
+  if (typeof appCtx.getNearbyBuildings === 'function') {
+    const nearbyBuildings = appCtx.getNearbyBuildings(evaluated.x, evaluated.z, 20);
+    if (Array.isArray(nearbyBuildings) && nearbyBuildings.length > 0) {
+      let blockingBuildings = 0;
+      for (let i = 0; i < nearbyBuildings.length; i++) {
+        const building = nearbyBuildings[i];
+        if (!building) continue;
+        if (building.allowsPassageBelow === true) continue;
+        if (building.collisionKind === 'thin_part') continue;
+        blockingBuildings += 1;
+      }
+      penalty += Math.max(0, blockingBuildings - 1) * 7;
+    }
+  }
+
+  return penalty;
+}
+
 function slopePenaltyAt(x, z) {
   const step = 8;
   const hL = terrainYAtWorld(x - step, z);
@@ -4488,6 +13176,145 @@ function isVehicleRoad(road) {
   return !road.networkKind || road.networkKind === 'road';
 }
 
+function overlaySuppressionSet(key = 'roadIds') {
+  const source = appCtx.overlaySuppression?.[key];
+  if (source instanceof Set) return source;
+  if (Array.isArray(source)) return new Set(source);
+  return new Set();
+}
+
+function isSuppressedBaseRoad(road) {
+  if (!road || String(road?.sourceFeatureId || '').startsWith('overlay:')) return false;
+  const sourceId = String(road?.sourceFeatureId || '');
+  return !!(sourceId && overlaySuppressionSet('roadIds').has(sourceId));
+}
+
+function isSuppressedBaseBuilding(building) {
+  if (!building || String(building?.sourceBuildingId || '').startsWith('overlay:')) return false;
+  const sourceId = String(building?.sourceBuildingId || '');
+  return !!(
+    building?.continuousWorldReplaced === true ||
+    (sourceId && overlaySuppressionSet('buildingIds').has(sourceId)) ||
+    (sourceId && _replacedBaseBuildingSourceIds.has(sourceId))
+  );
+}
+
+function isDetailedBuildingRenderable(mesh) {
+  if (!mesh) return false;
+  if (mesh?.userData?.isBuildingProxy) return false;
+  if (String(mesh?.userData?.lodTier || '') === 'mid') return false;
+  return true;
+}
+
+function collectBaseDetailedBuildingSourceIds() {
+  const ids = new Set();
+  const buildingMeshes = Array.isArray(appCtx.buildingMeshes) ? appCtx.buildingMeshes : [];
+  for (let i = 0; i < buildingMeshes.length; i++) {
+    const mesh = buildingMeshes[i];
+    const sourceBuildingId = String(mesh?.userData?.sourceBuildingId || '').trim();
+    if (!sourceBuildingId) continue;
+    if (mesh?.userData?.continuousWorldInteractiveChunk === true) continue;
+    if (!isDetailedBuildingRenderable(mesh)) continue;
+    ids.add(sourceBuildingId);
+  }
+  return ids;
+}
+
+function pruneBaseProxyBuildingShells(sourceBuildingId, reason = 'building_detail_upgrade') {
+  const sourceId = String(sourceBuildingId || '').trim();
+  if (!sourceId) return false;
+
+  let removedProxyMesh = false;
+  const buildingMeshes = Array.isArray(appCtx.buildingMeshes) ? appCtx.buildingMeshes : [];
+  for (let i = buildingMeshes.length - 1; i >= 0; i--) {
+    const mesh = buildingMeshes[i];
+    if (!mesh) continue;
+    if (mesh?.userData?.continuousWorldInteractiveChunk === true) continue;
+    if (String(mesh?.userData?.sourceBuildingId || '').trim() !== sourceId) continue;
+    if (isDetailedBuildingRenderable(mesh)) continue;
+    disposeMeshForContinuousWorldEviction(mesh, reason);
+    buildingMeshes.splice(i, 1);
+    removedProxyMesh = true;
+  }
+
+  let suppressedBaseCollider = false;
+  const buildings = Array.isArray(appCtx.buildings) ? appCtx.buildings : [];
+  for (let i = 0; i < buildings.length; i++) {
+    const building = buildings[i];
+    if (!building || building?.continuousWorldInteractiveChunk === true) continue;
+    if (String(building?.sourceBuildingId || '').trim() !== sourceId) continue;
+    if (building.continuousWorldReplaced === true) continue;
+    building.continuousWorldReplaced = true;
+    suppressedBaseCollider = true;
+  }
+
+  if (removedProxyMesh || suppressedBaseCollider) {
+    _replacedBaseBuildingSourceIds.add(sourceId);
+    rebuildBuildingSpatialIndexFromLoadedBuildings();
+    rebuildLanduseSpatialIndexFromLoadedLanduses();
+    markWorldLodDirty(reason);
+    syncRuntimeContentInventory(reason);
+  }
+  return removedProxyMesh || suppressedBaseCollider;
+}
+
+function refreshReplacedBaseBuildingSources() {
+  if (_replacedBaseBuildingSourceIds.size === 0) return;
+
+  const activeInteractiveSourceIds = new Set();
+  const buildingMeshes = Array.isArray(appCtx.buildingMeshes) ? appCtx.buildingMeshes : [];
+  const buildings = Array.isArray(appCtx.buildings) ? appCtx.buildings : [];
+
+  for (let i = 0; i < buildingMeshes.length; i++) {
+    const mesh = buildingMeshes[i];
+    if (mesh?.userData?.continuousWorldInteractiveChunk !== true) continue;
+    const sourceBuildingId = String(mesh?.userData?.sourceBuildingId || '').trim();
+    if (sourceBuildingId) activeInteractiveSourceIds.add(sourceBuildingId);
+  }
+  for (let i = 0; i < buildings.length; i++) {
+    const building = buildings[i];
+    if (building?.continuousWorldInteractiveChunk !== true) continue;
+    const sourceBuildingId = String(building?.sourceBuildingId || '').trim();
+    if (sourceBuildingId) activeInteractiveSourceIds.add(sourceBuildingId);
+  }
+
+  let restoredBaseBuilding = false;
+  for (const sourceId of Array.from(_replacedBaseBuildingSourceIds)) {
+    if (activeInteractiveSourceIds.has(sourceId)) continue;
+    _replacedBaseBuildingSourceIds.delete(sourceId);
+    for (let i = 0; i < buildings.length; i++) {
+      const building = buildings[i];
+      if (!building || building?.continuousWorldInteractiveChunk === true) continue;
+      if (String(building?.sourceBuildingId || '').trim() !== sourceId) continue;
+      if (building.continuousWorldReplaced !== true) continue;
+      building.continuousWorldReplaced = false;
+      restoredBaseBuilding = true;
+    }
+  }
+
+  if (restoredBaseBuilding) {
+    rebuildBuildingSpatialIndexFromLoadedBuildings();
+    rebuildLanduseSpatialIndexFromLoadedLanduses();
+    markWorldLodDirty('building_detail_restore');
+  }
+}
+
+function runtimeRoadFeatures() {
+  const features = [];
+  if (Array.isArray(appCtx.roads)) {
+    for (let i = 0; i < appCtx.roads.length; i++) {
+      const road = appCtx.roads[i];
+      if (!isSuppressedBaseRoad(road)) features.push(road);
+    }
+  }
+  if (Array.isArray(appCtx.overlayRuntimeRoads)) {
+    for (let i = 0; i < appCtx.overlayRuntimeRoads.length; i++) {
+      features.push(appCtx.overlayRuntimeRoads[i]);
+    }
+  }
+  return features;
+}
+
 function traversalFeatureKind(feature) {
   return String(feature?.networkKind || feature?.kind || 'road').toLowerCase();
 }
@@ -4496,7 +13323,7 @@ function isWalkSurface(feature) {
   if (!feature) return false;
   if (feature.walkable === false) return false;
   const kind = traversalFeatureKind(feature);
-  if (!ENABLE_LINEAR_FEATURES) return kind === 'road';
+  if (!ENABLE_LINEAR_FEATURES) return kind === 'road' || feature?.isStructureConnector === true;
   return kind === 'road' || kind === 'footway' || kind === 'cycleway' || kind === 'railway';
 }
 
@@ -4511,7 +13338,8 @@ function surfaceDisplayName(feature) {
   if (explicitName) return explicitName;
 
   const kind = traversalFeatureKind(feature);
-  if (!ENABLE_LINEAR_FEATURES) return 'Road';
+  const overlayFeature = String(feature?.sourceFeatureId || '').startsWith('overlay:') || !!feature?.overlayFeatureId;
+  if (!ENABLE_LINEAR_FEATURES && !overlayFeature && kind === 'road') return 'Road';
   if (kind === 'footway') return 'Footpath';
   if (kind === 'cycleway') return 'Cycle Path';
   if (kind === 'railway') return 'Rail Corridor';
@@ -4522,16 +13350,24 @@ function traversableFeaturesForMode(mode = 'walk') {
   const drive = mode === 'drive';
   const features = [];
 
-  if (Array.isArray(appCtx.roads)) {
-    for (let i = 0; i < appCtx.roads.length; i++) {
-      const road = appCtx.roads[i];
+  const runtimeRoads = runtimeRoadFeatures();
+  if (Array.isArray(runtimeRoads)) {
+    for (let i = 0; i < runtimeRoads.length; i++) {
+      const road = runtimeRoads[i];
       if (drive ? isVehicleRoad(road) : isWalkSurface(road)) features.push(road);
     }
   }
 
-  if (!drive && ENABLE_LINEAR_FEATURES && Array.isArray(appCtx.linearFeatures)) {
+  if (!drive && Array.isArray(appCtx.linearFeatures)) {
     for (let i = 0; i < appCtx.linearFeatures.length; i++) {
       const feature = appCtx.linearFeatures[i];
+      if ((ENABLE_LINEAR_FEATURES || feature?.isStructureConnector === true) && isWalkSurface(feature)) features.push(feature);
+    }
+  }
+
+  if (!drive && Array.isArray(appCtx.overlayRuntimeLinearFeatures)) {
+    for (let i = 0; i < appCtx.overlayRuntimeLinearFeatures.length; i++) {
+      const feature = appCtx.overlayRuntimeLinearFeatures[i];
       if (isWalkSurface(feature)) features.push(feature);
     }
   }
@@ -4545,8 +13381,23 @@ function invalidateTraversalNetworks(reason = 'world_data_change') {
   return reason;
 }
 
-function traversalNodeKey(x, z) {
-  return `${Math.round(x / TRAVERSAL_NODE_GRID)},${Math.round(z / TRAVERSAL_NODE_GRID)}`;
+function scheduleTraversalNetworksRebuild(reason = 'world_data_change', delayMs = 420) {
+  invalidateTraversalNetworks(reason);
+  if (_traversalRebuildTimer) {
+    clearTimeout(_traversalRebuildTimer);
+  }
+  _traversalRebuildTimer = window.setTimeout(() => {
+    _traversalRebuildTimer = null;
+    try {
+      buildTraversalNetworks();
+    } catch (error) {
+      console.warn('[Traversal] deferred rebuild failed:', error);
+    }
+  }, Math.max(0, Number(delayMs) || 0));
+}
+
+function traversalNodeKey(x, z, feature = null) {
+  return `${Math.round(x / TRAVERSAL_NODE_GRID)},${Math.round(z / TRAVERSAL_NODE_GRID)}:${featureTraversalKey(feature)}`;
 }
 
 function buildTraversalGraph(mode = 'walk') {
@@ -4557,8 +13408,8 @@ function buildTraversalGraph(mode = 'walk') {
   const nodesByKey = new Map();
   const featureKinds = {};
 
-  const upsertNode = (point) => {
-    const key = traversalNodeKey(point.x, point.z);
+  const upsertNode = (point, feature) => {
+    const key = traversalNodeKey(point.x, point.z, feature);
     const existingId = nodesByKey.get(key);
     if (existingId !== undefined) {
       const existing = nodes[existingId];
@@ -4589,7 +13440,7 @@ function buildTraversalGraph(mode = 'walk') {
 
     const kind = traversalFeatureKind(feature);
     featureKinds[kind] = (featureKinds[kind] || 0) + 1;
-    const nodeIds = feature.pts.map((point) => upsertNode(point));
+    const nodeIds = feature.pts.map((point) => upsertNode(point, feature));
     const segmentPenalty = mode === 'drive' ? 1 : walkSurfacePenalty(feature);
 
     for (let i = 0; i < feature.pts.length - 1; i++) {
@@ -4982,16 +13833,28 @@ function pickNavigationTargetPoint(currentX, currentZ, routePoints) {
   return routePoints[nextIndex];
 }
 
-function buildingContainingPoint(x, z, radius = 6) {
+function buildingContainingPoint(x, z, radius = 6, options = {}) {
   const candidateBuildings = typeof appCtx.getNearbyBuildings === 'function' ?
     appCtx.getNearbyBuildings(x, z, radius + 12) :
     appCtx.buildings;
+  const actorBaseY = Number.isFinite(options?.y) ? Number(options.y) : NaN;
+  const actorHeight = Number.isFinite(options?.actorHeight) ? Math.max(0.5, Number(options.actorHeight)) : NaN;
+  const actorTopY = Number.isFinite(actorBaseY) && Number.isFinite(actorHeight) ? actorBaseY + actorHeight : NaN;
+  const verticalTolerance = Number.isFinite(options?.tolerance) ? Math.max(0, Number(options.tolerance)) : 0.35;
   if (!Array.isArray(candidateBuildings) || candidateBuildings.length === 0) return null;
 
   for (let i = 0; i < candidateBuildings.length; i++) {
     const building = candidateBuildings[i];
     if (!building) continue;
     if (x < building.minX || x > building.maxX || z < building.minZ || z > building.maxZ) continue;
+    if (Number.isFinite(actorBaseY) && Number.isFinite(actorTopY)) {
+      const minY = Number.isFinite(building.minY) ? building.minY : Number.isFinite(building.baseY) ? building.baseY : NaN;
+      const maxY = Number.isFinite(building.maxY) ? building.maxY : Number.isFinite(minY) && Number.isFinite(building.height) ? minY + building.height : NaN;
+      if (Number.isFinite(minY) && Number.isFinite(maxY) &&
+          (actorTopY < minY - verticalTolerance || actorBaseY > maxY + verticalTolerance)) {
+        continue;
+      }
+    }
 
     const inside = Array.isArray(building.pts) && building.pts.length >= 3 ?
       pointInPolygon(x, z, building.pts) :
@@ -5023,20 +13886,37 @@ function walkBuildBlockCollision(x, z, terrainY) {
   return appCtx.getBuildCollisionAtWorldXZ(x, z, terrainY, 0.65, 1.7 * 0.95);
 }
 
-function shouldIgnoreDriveCollision(buildingCheck, x, z) {
-  if (!buildingCheck?.collision || typeof findNearestRoad !== 'function') return false;
-  const nearestRoad = findNearestRoad(x, z);
+function shouldIgnoreDriveCollision(buildingCheck, x, z, nearestRoadOverride = null) {
+  if (!buildingCheck?.collision) return false;
+  const actorBaseY = Number.isFinite(buildingCheck?.actorBaseY) ? buildingCheck.actorBaseY : NaN;
+  const nearestRoad =
+    nearestRoadOverride ||
+    (typeof findNearestRoad === 'function' ? findNearestRoad(x, z, {
+      y: Number.isFinite(actorBaseY) ? actorBaseY + 1.2 : NaN,
+      maxVerticalDelta: 14
+    }) : null);
   const road = nearestRoad?.road;
   if (!isVehicleRoad(road)) return false;
-  const roadHalfWidth = Number.isFinite(road?.width) ? road.width * 0.5 : 0;
-  if (!(roadHalfWidth > 0 && Number.isFinite(nearestRoad?.dist))) return false;
+  if (!isRoadSurfaceReachable(nearestRoad, {
+    extraVerticalAllowance: 0.4
+  })) return false;
 
+  const roadHalfWidth = Number.isFinite(road?.width) ? road.width * 0.5 : 0;
   const onRoadCenter = nearestRoad.dist <= Math.max(2.2, roadHalfWidth - 0.35);
   const onRoadCore = nearestRoad.dist <= Math.max(1.6, roadHalfWidth - 0.95);
   const colliderDetail = buildingCheck?.building?.colliderDetail === 'bbox' ? 'bbox' : 'full';
   const buildingType = String(buildingCheck?.building?.buildingType || '').toLowerCase();
   const isApproxCollider = colliderDetail !== 'full';
-  const roofLikeCollider = buildingType === 'roof' || buildingType === 'canopy' || buildingType === 'carport';
+  const partKind = String(buildingCheck?.building?.buildingPartKind || '').toLowerCase();
+  const roofLikeCollider =
+    buildingType === 'roof' ||
+    buildingType === 'canopy' ||
+    buildingType === 'carport' ||
+    partKind === 'roof' ||
+    partKind === 'balcony' ||
+    partKind === 'canopy' ||
+    buildingCheck?.building?.collisionKind === 'thin_part' ||
+    buildingCheck?.building?.allowsPassageBelow === true;
   const shallowRoadsideCollision = !!buildingCheck.collision &&
     onRoadCenter &&
     !buildingCheck.inside &&
@@ -5053,19 +13933,35 @@ function shouldIgnoreDriveCollision(buildingCheck, x, z) {
 function evaluateWalkSpawnCandidate(x, z, options = {}) {
   const angle = finiteNumberOr(options.angle, finiteNumberOr(appCtx.car?.angle, 0));
   const terrainY = terrainYAtWorld(x, z);
-  const walkBaseY = walkBaseYAtWorld(x, z);
   if (!Number.isFinite(terrainY)) return { valid: false, reason: 'terrain_missing' };
-  const nearestRoad = typeof findNearestRoad === 'function' ? findNearestRoad(x, z) : null;
-  const roadHalfWidth = Number.isFinite(nearestRoad?.road?.width) ? nearestRoad.road.width * 0.5 : 0;
-  const onRoadSurface = !!(
-    nearestRoad?.road &&
-    Number.isFinite(nearestRoad?.dist) &&
-    nearestRoad.dist <= Math.max(1.6, roadHalfWidth + 0.9)
-  );
+  const desiredFeetY = Number.isFinite(options.feetY) ? options.feetY : NaN;
+  const actorFeetY = Number.isFinite(desiredFeetY) ? desiredFeetY : terrainY;
+  const preferredRoad = options.preferredRoad || appCtx.car?.road || appCtx.car?._lastStableRoad || null;
+  const nearestRoad = typeof findNearestRoad === 'function' ? findNearestRoad(x, z, {
+    y: actorFeetY + 1.2,
+    maxVerticalDelta: 12,
+    preferredRoad
+  }) : null;
+  const walkSurfaceInfo =
+    appCtx.GroundHeight && typeof appCtx.GroundHeight.walkSurfaceInfo === 'function' ?
+      appCtx.GroundHeight.walkSurfaceInfo(x, z, actorFeetY) :
+      null;
+  const walkBaseY =
+    Number.isFinite(walkSurfaceInfo?.y) ?
+      walkSurfaceInfo.y :
+      walkBaseYAtWorld(x, z);
+  const onRoadSurface = isRoadSurfaceReachable(nearestRoad, {
+    currentRoad: preferredRoad,
+    extraLateralPadding: 0.25
+  });
   if (isInsideWaterArea(x, z) && !onRoadSurface) {
     return { valid: false, reason: 'inside_water', terrainY };
   }
-  if (buildingContainingPoint(x, z, 4)) return { valid: false, reason: 'inside_building', terrainY };
+  if (buildingContainingPoint(x, z, 4, {
+    y: actorFeetY,
+    actorHeight: 1.9,
+    tolerance: 0.45
+  })) return { valid: false, reason: 'inside_building', terrainY };
   if (walkBuildBlockCollision(x, z, terrainY)?.blocked) return { valid: false, reason: 'build_block', terrainY };
 
   const slopeDeg = slopeDegreesAt(x, z);
@@ -5077,11 +13973,11 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
     x,
     z,
     angle,
-    road: null,
-    onRoad: false,
+    road: onRoadSurface ? nearestRoad?.road || preferredRoad || null : null,
+    onRoad: !!onRoadSurface,
     terrainY,
     walkY: walkBaseY + 1.7,
-    carY: driveCenterYAtWorld(x, z, false),
+    carY: driveCenterYAtWorld(x, z, !!onRoadSurface),
     slopeDeg,
     source: options.source || 'direct'
   };
@@ -5092,25 +13988,46 @@ function evaluateDriveSpawnCandidate(x, z, options = {}) {
   const terrainY = terrainYAtWorld(x, z);
   if (!Number.isFinite(terrainY)) return { valid: false, reason: 'terrain_missing' };
 
-  const nearestRoad = typeof findNearestRoad === 'function' ? findNearestRoad(x, z) : null;
+  const preferredRoad = options.preferredRoad || appCtx.car?.road || appCtx.car?._lastStableRoad || null;
+  const preferredProjection = preferredRoad ? projectPointToFeature(preferredRoad, x, z) : null;
+  const preferredRoadY =
+    preferredRoad &&
+    preferredProjection &&
+    Number.isFinite(preferredProjection.dist) &&
+    preferredProjection.dist <= roadSurfaceLateralThreshold(preferredRoad, { extraLateralPadding: 1.05 }) ?
+      sampleFeatureSurfaceY(preferredRoad, x, z, preferredProjection) :
+      NaN;
+  const desiredFeetY = Number.isFinite(options.feetY) ? options.feetY : NaN;
+  const actorFeetY =
+    Number.isFinite(desiredFeetY) ? desiredFeetY :
+    Number.isFinite(preferredRoadY) ? preferredRoadY :
+    terrainY;
+  const nearestRoad = typeof findNearestRoad === 'function' ? findNearestRoad(x, z, {
+    y: actorFeetY + 1.2,
+    maxVerticalDelta: 18,
+    preferredRoad
+  }) : null;
   const road = isVehicleRoad(nearestRoad?.road) ? nearestRoad.road : null;
-  const roadHalfWidth = Number.isFinite(road?.width) ? road.width * 0.5 : 0;
-  const onRoad = !!(road && Number.isFinite(nearestRoad?.dist) &&
-    nearestRoad.dist <= Math.max(2.2, roadHalfWidth - 0.35));
+  const onRoad = isRoadSurfaceReachable(nearestRoad, {
+    currentRoad: preferredRoad,
+    extraVerticalAllowance: 0.5
+  }) && !!road;
   if (isInsideWaterArea(x, z) && !onRoad) {
     return { valid: false, reason: 'inside_water', terrainY, onRoad, road };
   }
 
-  const desiredFeetY = Number.isFinite(options.feetY) ? options.feetY : NaN;
-  if (Number.isFinite(desiredFeetY) && desiredFeetY > terrainY + 2.3) {
+  if (Number.isFinite(desiredFeetY) && desiredFeetY > terrainY + 2.8 && !onRoad) {
     return { valid: false, reason: 'elevated_surface', terrainY, onRoad, road };
   }
-  if (driveBuildBlockCollision(x, z, terrainY)) {
+  if (driveBuildBlockCollision(x, z, actorFeetY)) {
     return { valid: false, reason: 'build_block', terrainY, onRoad, road };
   }
 
   const buildingCheck = typeof appCtx.checkBuildingCollision === 'function' ?
-    appCtx.checkBuildingCollision(x, z, 2.0) :
+    appCtx.checkBuildingCollision(x, z, 2.0, {
+      actorBaseY: actorFeetY,
+      actorHeight: 1.9
+    }) :
     { collision: false };
   if (buildingCheck?.collision && !shouldIgnoreDriveCollision(buildingCheck, x, z)) {
     return { valid: false, reason: 'building_collision', terrainY, onRoad, road, buildingCheck };
@@ -5134,7 +14051,7 @@ function evaluateDriveSpawnCandidate(x, z, options = {}) {
     onRoad,
     terrainY,
     walkY: terrainY + 1.7,
-    carY: driveCenterYAtWorld(x, z, !!road),
+    carY: Number.isFinite(nearestRoad?.y) ? nearestRoad.y + 1.2 : driveCenterYAtWorld(x, z, !!road),
     slopeDeg,
     source: options.source || 'direct'
   };
@@ -5170,7 +14087,7 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
   const traversableFeatures = traversableFeaturesForMode(requestedMode);
   if (!Array.isArray(traversableFeatures) || traversableFeatures.length === 0) return null;
   const maxDistance = Number.isFinite(options.maxDistance) ? Math.max(32, options.maxDistance) : 220;
-  const limits = [maxDistance, Infinity];
+  const limits = options.strictMaxDistance === true ? [maxDistance] : [maxDistance, Infinity];
 
   for (let pass = 0; pass < limits.length; pass++) {
     const limit = limits[pass];
@@ -5201,21 +14118,29 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
             evaluateDriveSpawnCandidate(candidate.x, candidate.z, {
               angle,
               feetY: options.feetY,
+              preferredRoad: options.preferredRoad,
               requireRoad: true,
               source: 'road_search'
             }) :
             evaluateWalkSpawnCandidate(candidate.x, candidate.z, {
               angle,
+              feetY: options.feetY,
+              preferredRoad: options.preferredRoad,
               source: 'walk_surface_search'
             });
           if (!evaluated.valid) continue;
 
-          const score = dist + spawnSurfacePenalty(feature, requestedMode) + slopePenaltyAt(candidate.x, candidate.z);
+          const score =
+            dist +
+            spawnSurfacePenalty(feature, requestedMode) +
+            spawnStructurePenalty(feature, evaluated, requestedMode, options) +
+            spawnCorridorPenalty(feature, evaluated, requestedMode, options) +
+            slopePenaltyAt(candidate.x, candidate.z);
           if (!best || score < best.score) {
-            const nextResult = { ...evaluated, score };
+            const nextResult = { ...evaluated, score, targetDistance: dist };
             if (requestedMode === 'walk' && isVehicleRoad(feature)) {
               nextResult.road = feature;
-              nextResult.onRoad = true;
+              nextResult.onRoad = nextResult.onRoad || true;
             }
             best = nextResult;
           }
@@ -5254,10 +14179,13 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
   const x = finiteNumberOr(targetX, 0);
   const z = finiteNumberOr(targetZ, 0);
   const angle = finiteNumberOr(options.angle, finiteNumberOr(appCtx.car?.angle, 0));
+  const strictMaxDistance = options.strictMaxDistance === true;
 
   if (mode === 'walk') {
     const direct = evaluateWalkSpawnCandidate(x, z, {
       angle,
+      feetY: options.feetY,
+      preferredRoad: options.preferredRoad,
       source: options.source || 'direct'
     });
     if (direct.valid) return direct;
@@ -5265,7 +14193,10 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     const surfaceFallback = searchNearestSafeRoadSpawn(x, z, {
       mode: 'walk',
       angle,
-      maxDistance: options.maxRoadDistance
+      feetY: options.feetY,
+      preferredRoad: options.preferredRoad,
+      maxDistance: options.maxRoadDistance,
+      strictMaxDistance
     });
     if (surfaceFallback) return surfaceFallback;
 
@@ -5281,6 +14212,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
   const direct = evaluateDriveSpawnCandidate(x, z, {
     angle,
     feetY: options.feetY,
+    preferredRoad: options.preferredRoad,
     source: options.source || 'direct'
   });
   if (direct.valid) return direct;
@@ -5289,7 +14221,10 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     mode: 'drive',
     angle,
     feetY: options.feetY,
-    maxDistance: options.maxRoadDistance
+    preferredRoad: options.preferredRoad,
+    maxDistance: options.maxRoadDistance,
+    preferVisibleShell: options.preferVisibleShell !== false,
+    strictMaxDistance
   });
   if (roadFallback) return roadFallback;
 
@@ -5328,6 +14263,7 @@ function applyResolvedWorldSpawn(spawn, options = {}) {
     appCtx.car.isAirborne = false;
     appCtx.car.onRoad = !!resolved.onRoad;
     appCtx.car.road = resolved.road || null;
+    appCtx.car._lastStableRoad = resolved.road || null;
     if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
     if (appCtx.carMesh) {
       appCtx.carMesh.position.set(resolved.x, resolved.carY, resolved.z);
@@ -5355,12 +14291,219 @@ function applyResolvedWorldSpawn(spawn, options = {}) {
   return resolved;
 }
 
+function shouldPreserveExplicitPlayerTarget(originX = 0, originZ = 0) {
+  const lastTeleport = appCtx.lastExplicitTeleport;
+  if (!lastTeleport || typeof lastTeleport !== 'object') return false;
+  const teleportAt = Number(lastTeleport.at || 0);
+  if (!Number.isFinite(teleportAt) || Date.now() - teleportAt > 30000) return false;
+  const targetX = finiteNumberOr(lastTeleport.x, NaN);
+  const targetZ = finiteNumberOr(lastTeleport.z, NaN);
+  if (!Number.isFinite(targetX) || !Number.isFinite(targetZ)) return false;
+  const actor = currentMapReferenceGeoPosition();
+  const actorNearExplicitTarget =
+    Number.isFinite(actor?.x) &&
+    Number.isFinite(actor?.z) &&
+    Math.hypot(actor.x - targetX, actor.z - targetZ) <= 220;
+  if (!actorNearExplicitTarget) return false;
+  return Math.hypot(targetX - finiteNumberOr(originX, 0), targetZ - finiteNumberOr(originZ, 0)) >= 520;
+}
+
+function clearRecentExplicitTeleportTarget(reason = '') {
+  if (!appCtx.lastExplicitTeleport || typeof appCtx.lastExplicitTeleport !== 'object') return;
+  appCtx.lastExplicitTeleport = null;
+  if (reason) {
+    _continuousWorldInteractiveStreamState.lastError = String(reason);
+  }
+}
+
+function recentExplicitTeleportTargetState(actorX = NaN, actorZ = NaN, options = {}) {
+  const lastTeleport = appCtx.lastExplicitTeleport;
+  if (!lastTeleport || typeof lastTeleport !== 'object') return { active: false };
+  const teleportAt = Number(lastTeleport.at || 0);
+  const storedMaxAgeMs = Number(lastTeleport.maxAgeMs);
+  const maxAgeMs =
+    Number.isFinite(options.maxAgeMs) ? Math.max(0, options.maxAgeMs) :
+    Number.isFinite(storedMaxAgeMs) ? Math.max(0, storedMaxAgeMs) :
+      12000;
+  if (!Number.isFinite(teleportAt) || Date.now() - teleportAt > maxAgeMs) return { active: false };
+  const targetX = finiteNumberOr(lastTeleport.x, NaN);
+  const targetZ = finiteNumberOr(lastTeleport.z, NaN);
+  if (!Number.isFinite(targetX) || !Number.isFinite(targetZ)) return { active: false };
+  const radius = Number.isFinite(options.radius) ? Math.max(0, options.radius) : 240;
+  const actorNearTarget =
+    Number.isFinite(actorX) &&
+    Number.isFinite(actorZ) &&
+    Math.hypot(actorX - targetX, actorZ - targetZ) <= radius;
+  return {
+    active: actorNearTarget,
+    x: targetX,
+    z: targetZ,
+    source: String(lastTeleport.source || '')
+  };
+}
+
+function validateActiveDriveSpawnAfterWorldBuild(options = {}) {
+  if (!appCtx.car || typeof appCtx.resolveSafeWorldSpawn !== 'function') return null;
+  const carX = finiteNumberOr(appCtx.car.x, 0);
+  const carZ = finiteNumberOr(appCtx.car.z, 0);
+  const actorFeetY = finiteNumberOr(appCtx.car.y, 1.2) - 1.2;
+  const preferredRoad = appCtx.car.road || appCtx.car._lastStableRoad || null;
+  const nearestRoad = typeof findNearestRoad === 'function' ?
+    findNearestRoad(carX, carZ, {
+      y: actorFeetY + 1.2,
+      maxVerticalDelta: 18,
+      preferredRoad
+    }) :
+    null;
+  const onRoad = isRoadSurfaceReachable(nearestRoad, {
+    currentRoad: preferredRoad,
+    extraVerticalAllowance: 0.5
+  }) && !!nearestRoad?.road;
+  const roadHalfWidth = Math.max(0, Number(nearestRoad?.road?.width || 0) * 0.5);
+  const closeRoadContact =
+    !!nearestRoad?.road &&
+    Number.isFinite(nearestRoad?.dist) &&
+    nearestRoad.dist <= Math.max(4.5, roadHalfWidth + 1.8);
+  const visibleRoadMeshesNearActor = countVisibleRoadMeshesNearWorldPoint(carX, carZ, 220);
+  const nearbyDriveableRoadFeatures = countDriveableRoadFeaturesNearWorldPoint(carX, carZ, 240);
+  const minVisibleSpawnRoadShell = 4;
+  const buildingCheck = typeof appCtx.checkBuildingCollision === 'function' ?
+    appCtx.checkBuildingCollision(carX, carZ, 2.0, {
+      actorBaseY: actorFeetY,
+      actorHeight: 1.9
+    }) :
+    { collision: false };
+  const blockedByBuilding = !!(buildingCheck?.collision && !shouldIgnoreDriveCollision(buildingCheck, carX, carZ));
+  if (
+    !blockedByBuilding &&
+    onRoad &&
+    closeRoadContact &&
+    visibleRoadMeshesNearActor >= minVisibleSpawnRoadShell
+  ) {
+    return null;
+  }
+
+  if (
+    nearbyDriveableRoadFeatures >= 8 &&
+    typeof appCtx.requestWorldSurfaceSync === 'function'
+  ) {
+    appCtx.requestWorldSurfaceSync({ force: true, source: 'post_build_spawn_visible_shell' });
+  }
+
+  const resolved = resolveSafeWorldSpawn(carX, carZ, {
+    mode: 'drive',
+    angle: finiteNumberOr(appCtx.car?.angle, 0),
+    feetY: actorFeetY,
+    preferredRoad,
+    maxRoadDistance: Number.isFinite(options.maxRoadDistance) ? options.maxRoadDistance : 420,
+    strictMaxDistance: true,
+    preferVisibleShell: true,
+    source: options.source || 'post_build_spawn_validation'
+  });
+  if (!resolved?.valid) return null;
+  return applyResolvedWorldSpawn(resolved, {
+    mode: 'drive',
+    syncCar: true,
+    syncWalker: true
+  });
+}
+
 function applySpawnTarget(worldX, worldZ, options = {}) {
   const resolved = resolveSafeWorldSpawn(worldX, worldZ, options);
   return applyResolvedWorldSpawn(resolved, options);
 }
 
+function tryAutoEnterBoatAt(worldX, worldZ, options = {}) {
+  if (!options?.preferBoatIfWater) return null;
+  if (typeof appCtx.setTravelMode !== 'function' && typeof appCtx.enterBoatAtWorldPoint !== 'function') return null;
+  const entryMode = options.mode === 'walk' ? 'walk' : 'drive';
+  const maxWaterDistance = Number.isFinite(options.maxWaterDistance) ? Number(options.maxWaterDistance) : 140;
+  const allowSynthetic = !!(
+    options.allowSyntheticWater ||
+    (
+      appCtx.selLoc === 'custom' &&
+      (!Array.isArray(appCtx.roads) || appCtx.roads.length === 0) &&
+      (!Array.isArray(appCtx.waterAreas) || appCtx.waterAreas.length === 0) &&
+      (!Array.isArray(appCtx.waterways) || appCtx.waterways.length === 0)
+    )
+  );
+  const candidate =
+    options.candidate ||
+    (
+      typeof appCtx.inspectBoatCandidate === 'function' ?
+        appCtx.inspectBoatCandidate(worldX, worldZ, maxWaterDistance) :
+        null
+    );
+  if (!candidate) {
+    if (typeof appCtx.ensureWaterRuntimeCoverage === 'function') {
+      void appCtx.ensureWaterRuntimeCoverage({
+        force: false,
+        showStatus: false,
+        updateLod: false,
+        reason: 'teleport_water_candidate'
+      });
+    }
+    return null;
+  }
+  const started =
+    typeof appCtx.startBoatMode === 'function' ?
+      !!appCtx.startBoatMode({
+        source: options.source || 'water_target',
+        force: true,
+        emitTutorial: options.emitTutorial !== false,
+        candidate,
+        spawnX: Number.isFinite(candidate.spawnX) ? candidate.spawnX : undefined,
+        spawnZ: Number.isFinite(candidate.spawnZ) ? candidate.spawnZ : undefined,
+        entryMode,
+        waterKind: candidate.waterKind || options.waterKind || 'open_ocean'
+      }) :
+    typeof appCtx.setTravelMode === 'function' ?
+      appCtx.setTravelMode('boat', {
+        source: options.source || 'water_target',
+        force: true,
+        emitTutorial: options.emitTutorial !== false,
+        candidate,
+        spawnX: Number.isFinite(candidate.spawnX) ? candidate.spawnX : undefined,
+        spawnZ: Number.isFinite(candidate.spawnZ) ? candidate.spawnZ : undefined,
+        entryMode,
+        allowSynthetic,
+        waterKind: candidate.waterKind || options.waterKind || 'open_ocean'
+      }) === 'boat' :
+      appCtx.enterBoatAtWorldPoint(worldX, worldZ, {
+        source: options.source || 'water_target',
+        entryMode,
+        emitTutorial: options.emitTutorial !== false,
+        maxDistance: maxWaterDistance,
+        allowSynthetic,
+        waterKind: options.waterKind || 'open_ocean',
+        candidate
+      });
+  if (!started) return null;
+  if (typeof appCtx.syncTravelModeButtons === 'function') {
+    appCtx.syncTravelModeButtons();
+  }
+  if (typeof appCtx.updateControlsModeUI === 'function') {
+    appCtx.updateControlsModeUI();
+  }
+  return {
+    valid: true,
+    mode: 'boat',
+    x: Number(appCtx.boat?.x || worldX),
+    z: Number(appCtx.boat?.z || worldZ),
+    y: Number(appCtx.boat?.y || 0),
+    angle: Number(appCtx.boat?.angle || 0),
+    onRoad: false,
+    source: options.source || 'water_target'
+  };
+}
+
 function applyCustomLocationSpawn(mode = 'walk', options = {}) {
+  const boatSpawn = tryAutoEnterBoatAt(0, 0, {
+    ...options,
+    mode,
+    source: options.source || 'custom_location'
+  });
+  if (boatSpawn) return boatSpawn;
   return applySpawnTarget(0, 0, {
     ...options,
     mode
@@ -5384,7 +14527,9 @@ function spawnOnRoad(options = {}) {
       const randomSpawn = searchNearestSafeRoadSpawn(point.x, point.z, {
         mode: 'drive',
         angle: appCtx.car?.angle,
-        maxDistance: 180
+        maxDistance: 180,
+        avoidOverhead: true,
+        preferVisibleShell: true
       });
       if (randomSpawn) return applyResolvedWorldSpawn(randomSpawn, { mode: 'drive' });
     }
@@ -5395,7 +14540,9 @@ function spawnOnRoad(options = {}) {
   const bestRoadSpawn = searchNearestSafeRoadSpawn(originX, originZ, {
     mode: 'drive',
     angle: appCtx.car?.angle,
-    maxDistance: 320
+    maxDistance: 420,
+    avoidOverhead: true,
+    preferVisibleShell: true
   });
   if (bestRoadSpawn) return applyResolvedWorldSpawn(bestRoadSpawn, { mode: 'drive' });
 
@@ -5405,7 +14552,7 @@ function spawnOnRoad(options = {}) {
   });
 }
 
-function teleportToLocation(worldX, worldZ) {
+function teleportToLocation(worldX, worldZ, options = {}) {
   const walkModeActive = !!(appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk');
   const mode = walkModeActive ? 'walk' : 'drive';
   const currentAngle = walkModeActive ?
@@ -5414,12 +14561,46 @@ function teleportToLocation(worldX, worldZ) {
   const currentFeetY = walkModeActive ?
     finiteNumberOr(appCtx.Walk?.state?.walker?.y, 0) - 1.7 :
     NaN;
+  const currentX = walkModeActive ?
+    finiteNumberOr(appCtx.Walk?.state?.walker?.x, appCtx.car?.x) :
+    finiteNumberOr(appCtx.car?.x, 0);
+  const currentZ = walkModeActive ?
+    finiteNumberOr(appCtx.Walk?.state?.walker?.z, appCtx.car?.z) :
+    finiteNumberOr(appCtx.car?.z, 0);
+  const targetDistance = Math.hypot(finiteNumberOr(worldX, 0) - currentX, finiteNumberOr(worldZ, 0) - currentZ);
+  const strictTargetTeleport =
+    options.strictMaxDistance === true ||
+    (
+      mode === 'drive' &&
+      targetDistance >= 640 &&
+      (
+        !!options.preferredRoad ||
+        /(?:^|_)(teleport|map|continuity|streaming|feature|overlay|regions)(?:_|$)/i.test(String(options.source || ''))
+      )
+    );
+
+  const boatSpawn = tryAutoEnterBoatAt(worldX, worldZ, {
+    ...options,
+    mode,
+    source: options.source || 'teleport'
+  });
+  if (boatSpawn) {
+    if (appCtx.droneMode) {
+      appCtx.drone.x = boatSpawn.x;
+      appCtx.drone.z = boatSpawn.z;
+      appCtx.drone.yaw = boatSpawn.angle;
+    }
+    return boatSpawn;
+  }
 
   const resolved = applySpawnTarget(worldX, worldZ, {
+    ...options,
     mode,
     angle: currentAngle,
     feetY: currentFeetY,
-    source: 'teleport'
+    preferredRoad: options.preferredRoad || appCtx.car?.road || appCtx.car?._lastStableRoad || null,
+    strictMaxDistance: strictTargetTeleport,
+    source: options.source || 'teleport'
   });
 
   if (appCtx.droneMode && resolved) {
@@ -5427,15 +14608,79 @@ function teleportToLocation(worldX, worldZ) {
     appCtx.drone.z = resolved.z;
     appCtx.drone.yaw = resolved.angle;
   }
+  if (resolved?.valid) {
+    appCtx.lastExplicitTeleport = {
+      x: Number(resolved.x || 0),
+      z: Number(resolved.z || 0),
+      at: Date.now(),
+      maxAgeMs: strictTargetTeleport ? 12000 : 6000,
+      source: String(options.source || 'teleport')
+    };
+    if (strictTargetTeleport) {
+      if (_continuousWorldInteractiveStreamState.pending) {
+        if (_continuousWorldInteractiveStreamState.abortController) {
+          try {
+            _continuousWorldInteractiveStreamState.abortController.abort();
+          } catch {}
+        }
+        _continuousWorldInteractiveStreamState.pending = false;
+        _continuousWorldInteractiveStreamState.pendingStartedAt = 0;
+        _continuousWorldInteractiveStreamState.pendingQueryLat = NaN;
+        _continuousWorldInteractiveStreamState.pendingQueryLon = NaN;
+        _continuousWorldInteractiveStreamState.pendingRegionKey = null;
+        _continuousWorldInteractiveStreamState.abortController = null;
+        _continuousWorldInteractiveStreamState.activeRequestId =
+          Number(_continuousWorldInteractiveStreamState.activeRequestId || 0) + 1;
+        _continuousWorldInteractiveStreamState.lastError = 'teleport_preempt_pending';
+      }
+      _continuousWorldInteractiveStreamState.lastKickAt = 0;
+      const visibleRoadsNearTarget = countVisibleRoadMeshesNearWorldPoint(resolved.x, resolved.z, mode === 'drone' ? 420 : mode === 'walk' ? 220 : 320);
+      const visibleBuildingsNearTarget = countVisibleBuildingMeshesNearWorldPoint(resolved.x, resolved.z, mode === 'drone' ? 560 : mode === 'walk' ? 260 : 360);
+      const roadFeaturesNearTarget = countDriveableRoadFeaturesNearWorldPoint(resolved.x, resolved.z, mode === 'drone' ? 520 : mode === 'walk' ? 240 : 360);
+      const teleportFollowupReason =
+        mode === 'drive' ?
+          (
+            roadFeaturesNearTarget <= 0 || visibleRoadsNearTarget <= 0 ?
+              'actor_visible_road_gap' :
+            visibleBuildingsNearTarget < Math.max(10, Number(ACTOR_BUILDING_SHELL_CONFIG.drive?.minVisibleBuildings || 0)) ?
+              'building_continuity_drive' :
+              null
+          ) :
+        roadFeaturesNearTarget <= 0 || visibleRoadsNearTarget <= 0 ?
+          'actor_visible_road_gap' :
+        mode === 'walk' && visibleBuildingsNearTarget < 10 ?
+          'building_continuity_walk' :
+        mode === 'drone' && visibleBuildingsNearTarget < 10 ?
+          'building_continuity_drone' :
+          null;
+      if (teleportFollowupReason) {
+        window.setTimeout(() => {
+          const targetGeo = typeof appCtx.worldToLatLon === 'function' ? appCtx.worldToLatLon(resolved.x, resolved.z) : null;
+          if (!Number.isFinite(targetGeo?.lat) || !Number.isFinite(targetGeo?.lon)) return;
+          if (typeof loadContinuousWorldInteractiveChunk === 'function') {
+            void loadContinuousWorldInteractiveChunk(targetGeo.lat, targetGeo.lon, teleportFollowupReason);
+          }
+        }, 0);
+      }
+      scheduleContinuousWorldActorAreaHardRecovery({
+        targetX: resolved.x,
+        targetZ: resolved.z,
+        mode,
+        delayMs: 2600,
+        source: 'teleport_hard_recovery'
+      });
+    }
+  }
+  return resolved;
 }
 
 // Convert minimap screen coordinates to world coordinates
 function minimapScreenToWorld(screenX, screenY) {
-  const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
-  const refLat = appCtx.LOC.lat - ref.z / appCtx.SCALE;
-  const refLon = appCtx.LOC.lon + ref.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
+  const refGeo = currentMapReferenceGeoPosition();
+  const refLat = Number(refGeo?.lat);
+  const refLon = Number(refGeo?.lon);
 
-  const zoom = 17; // Minimap zoom level
+  const zoom = Number.isFinite(appCtx.minimapZoom) ? appCtx.minimapZoom : 15;
   const n = Math.pow(2, zoom);
   const xtile_float = (refLon + 180) / 360 * n;
   const ytile_float = (1 - Math.log(Math.tan(refLat * Math.PI / 180) + 1 / Math.cos(refLat * Math.PI / 180)) / Math.PI) / 2 * n;
@@ -5458,18 +14703,14 @@ function minimapScreenToWorld(screenX, screenY) {
   const lat_rad = Math.atan(Math.sinh(Math.PI * (1 - 2 * yt / n)));
   const lat = lat_rad * 180 / Math.PI;
 
-  // Convert lat/lon to world coords
-  const worldX = (lon - appCtx.LOC.lon) * appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180);
-  const worldZ = -(lat - appCtx.LOC.lat) * appCtx.SCALE;
-
-  return { x: worldX, z: worldZ };
+  return geoPointToWorld(lat, lon);
 }
 
 // Convert large map screen coordinates to world coordinates
 function largeMapScreenToWorld(screenX, screenY) {
-  const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
-  const refLat = appCtx.LOC.lat - ref.z / appCtx.SCALE;
-  const refLon = appCtx.LOC.lon + ref.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
+  const refGeo = currentMapReferenceGeoPosition();
+  const refLat = Number(refGeo?.lat);
+  const refLon = Number(refGeo?.lon);
 
   const zoom = appCtx.largeMapZoom;
   const n = Math.pow(2, zoom);
@@ -5494,44 +14735,452 @@ function largeMapScreenToWorld(screenX, screenY) {
   const lat_rad = Math.atan(Math.sinh(Math.PI * (1 - 2 * yt / n)));
   const lat = lat_rad * 180 / Math.PI;
 
-  // Convert lat/lon to world coords
-  const worldX = (lon - appCtx.LOC.lon) * appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180);
-  const worldZ = -(lat - appCtx.LOC.lat) * appCtx.SCALE;
-
-  return { x: worldX, z: worldZ };
+  return geoPointToWorld(lat, lon);
 }
 
 // Reuse result object to avoid GC
-const _nearRoadResult = { road: null, dist: Infinity, pt: { x: 0, z: 0 } };
+const _nearRoadResult = {
+  road: null,
+  dist: Infinity,
+  pt: { x: 0, z: 0 },
+  y: NaN,
+  verticalDelta: Infinity,
+  distanceAlong: NaN,
+  distanceToEndpoint: Infinity,
+  distanceToTransitionZone: Infinity
+};
 
-function findNearestRoad(x, z) {
+function roadContinuityCandidates(preferredRoad) {
+  if (!preferredRoad) return [];
+  const candidates = [preferredRoad];
+  const seen = new Set([preferredRoad]);
+  const strongCorridorSeeds = [];
+  const endpoints = ['start', 'end'];
+  for (let i = 0; i < endpoints.length; i++) {
+    const linked = Array.isArray(preferredRoad?.connectedFeatures?.[endpoints[i]]) ? preferredRoad.connectedFeatures[endpoints[i]] : [];
+    for (let j = 0; j < linked.length; j++) {
+      const feature = linked[j]?.feature || null;
+      if (!feature || seen.has(feature)) continue;
+      seen.add(feature);
+      candidates.push(feature);
+      if (roadContinuityStrength(preferredRoad, feature) >= 1.5) {
+        strongCorridorSeeds.push(feature);
+      }
+    }
+  }
+  for (let i = 0; i < strongCorridorSeeds.length; i++) {
+    const road = strongCorridorSeeds[i];
+    for (let j = 0; j < endpoints.length; j++) {
+      const linked = Array.isArray(road?.connectedFeatures?.[endpoints[j]]) ? road.connectedFeatures[endpoints[j]] : [];
+      for (let k = 0; k < linked.length; k++) {
+        const feature = linked[k]?.feature || null;
+        if (!feature || seen.has(feature)) continue;
+        if (roadContinuityStrength(road, feature) < 1.35) continue;
+        seen.add(feature);
+        candidates.push(feature);
+      }
+    }
+  }
+  return candidates;
+}
+
+function normalizedRoadNameKey(road) {
+  const value = road?.name || road?.structureTags?.name || '';
+  return String(value).trim().toLowerCase();
+}
+
+function normalizedRoadTypeFamily(road) {
+  const value = road?.type || road?.subtype || road?.structureTags?.highway || '';
+  return String(value).trim().toLowerCase().replace(/_link$/i, '');
+}
+
+function roadLinkLike(road) {
+  if (!road) return false;
+  const type = String(road?.type || road?.subtype || road?.structureTags?.highway || '');
+  return /_link$/i.test(type) || road?.structureSemantics?.rampCandidate === true;
+}
+
+function roadEndpointDirection(road, endpointName) {
+  const points = Array.isArray(road?.pts) ? road.pts : null;
+  if (!points || points.length < 2) return null;
+  const from = endpointName === 'start' ? points[0] : points[points.length - 1];
+  const toward = endpointName === 'start' ? points[1] : points[points.length - 2];
+  if (!from || !toward) return null;
+  const dx = toward.x - from.x;
+  const dz = toward.z - from.z;
+  const length = Math.hypot(dx, dz);
+  if (!(length > 1e-5)) return null;
+  return { x: dx / length, z: dz / length };
+}
+
+function roadConnectionAlignment(road, endpointName, other, otherEndpointIndex) {
+  const a = roadEndpointDirection(road, endpointName);
+  const b = roadEndpointDirection(other, otherEndpointIndex <= 0 ? 'start' : 'end');
+  if (!a || !b) return -1;
+  return Math.abs(Math.max(-1, Math.min(1, a.x * b.x + a.z * b.z)));
+}
+
+function directRoadContinuityStrength(preferredRoad, road) {
+  if (!preferredRoad || !road || preferredRoad === road) return preferredRoad === road ? 3 : 0;
+  const preferredName = normalizedRoadNameKey(preferredRoad);
+  const roadName = normalizedRoadNameKey(road);
+  const preferredFamily = normalizedRoadTypeFamily(preferredRoad);
+  const roadFamily = normalizedRoadTypeFamily(road);
+  const sameName = !!preferredName && preferredName === roadName;
+  const sameFamily = !!preferredFamily && preferredFamily === roadFamily;
+  const preferredLinkLike = roadLinkLike(preferredRoad);
+  const roadIsLinkLike = roadLinkLike(road);
+  let best = 0;
+  const endpoints = ['start', 'end'];
+  for (let i = 0; i < endpoints.length; i++) {
+    const endpointName = endpoints[i];
+    const linked = Array.isArray(preferredRoad?.connectedFeatures?.[endpointName]) ? preferredRoad.connectedFeatures[endpointName] : [];
+    for (let j = 0; j < linked.length; j++) {
+      const entry = linked[j];
+      if (entry?.feature !== road) continue;
+      const alignment = roadConnectionAlignment(preferredRoad, endpointName, road, Number(entry?.endpointIndex) || 0);
+      let strength = 0;
+      if (sameName && alignment >= 0.48) {
+        strength = preferredLinkLike || roadIsLinkLike ? 2.35 : 2.7;
+      } else if (!preferredLinkLike && !roadIsLinkLike && sameFamily && alignment >= 0.78) {
+        strength = 2.1;
+      } else if ((preferredLinkLike || roadIsLinkLike) && (sameName || sameFamily) && alignment >= 0.8) {
+        strength = 1.65;
+      } else if (!preferredLinkLike && !roadIsLinkLike && sameFamily && alignment >= 0.92) {
+        strength = 1.15;
+      } else if (!preferredLinkLike && !roadIsLinkLike && alignment >= 0.985) {
+        strength = 0.7;
+      }
+      if (strength > best) best = strength;
+    }
+  }
+  return best;
+}
+
+function roadContinuityStrength(preferredRoad, road) {
+  if (!preferredRoad || !road) return 0;
+  if (preferredRoad === road) return 3;
+  const direct = directRoadContinuityStrength(preferredRoad, road);
+  if (direct > 0) return direct;
+
+  const endpoints = ['start', 'end'];
+  let best = 0;
+  for (let i = 0; i < endpoints.length; i++) {
+    const linked = Array.isArray(preferredRoad?.connectedFeatures?.[endpoints[i]]) ? preferredRoad.connectedFeatures[endpoints[i]] : [];
+    for (let j = 0; j < linked.length; j++) {
+      const middleRoad = linked[j]?.feature || null;
+      if (!middleRoad || middleRoad === road) continue;
+      const firstHop = directRoadContinuityStrength(preferredRoad, middleRoad);
+      if (firstHop < 1.5) continue;
+      const secondHop = directRoadContinuityStrength(middleRoad, road);
+      if (secondHop < 1.35) continue;
+      const strength = Math.min(firstHop, secondHop) - 0.35;
+      if (strength > best) best = strength;
+    }
+  }
+  return best;
+}
+
+function preferredRoadHardLockSatisfied(hit, preferredRoad) {
+  if (!hit || !preferredRoad || hit.road !== preferredRoad) return false;
+  const maxDist = roadSurfaceLateralThreshold(preferredRoad, { extraLateralPadding: 0.95 });
+  if (!Number.isFinite(hit.dist) || hit.dist > maxDist) return false;
+  if (Number.isFinite(hit.verticalDelta)) {
+    const maxVertical = roadSurfaceAttachmentThreshold(preferredRoad, { extraVerticalAllowance: 1.45 });
+    if (hit.verticalDelta > maxVertical) return false;
+  }
+  return true;
+}
+
+function preferredRoadNeedsJoinRelease(hit, preferredRoad) {
+  if (!hit || !preferredRoad || hit.road !== preferredRoad) return false;
+  const semantics = preferredRoad?.structureSemantics || null;
+  if (semantics?.gradeSeparated || roadBehavesGradeSeparated(preferredRoad)) return false;
+  if (!Number.isFinite(hit.distanceAlong) || !Number.isFinite(hit.distanceToEndpoint)) return false;
+  if (hit.distanceToEndpoint > 12) return false;
+
+  const profileDistances = preferredRoad?.surfaceDistances instanceof Float32Array ? preferredRoad.surfaceDistances : null;
+  const totalDistance =
+    profileDistances && profileDistances.length > 0 ?
+      Number(profileDistances[profileDistances.length - 1]) || 0 :
+      0;
+  const nearStart = hit.distanceAlong <= 12;
+  const nearEnd = totalDistance > 0 ? (totalDistance - hit.distanceAlong) <= 12 : hit.distanceToEndpoint <= 12;
+  const endpointLinks = [];
+  if (nearStart) endpointLinks.push(...(Array.isArray(preferredRoad?.connectedFeatures?.start) ? preferredRoad.connectedFeatures.start : []));
+  if (nearEnd) endpointLinks.push(...(Array.isArray(preferredRoad?.connectedFeatures?.end) ? preferredRoad.connectedFeatures.end : []));
+
+  return endpointLinks.some((entry) => {
+    const feature = entry?.feature || null;
+    if (!feature) return false;
+    return feature?.structureSemantics?.gradeSeparated || roadBehavesGradeSeparated(feature);
+  });
+}
+
+function preferredRoadRelevantAtPoint(preferredRoad, x, z, targetY, maxVerticalDelta) {
+  if (!preferredRoad || !Array.isArray(preferredRoad?.pts) || preferredRoad.pts.length < 2) return false;
+  const projection = projectPointToFeature(preferredRoad, x, z);
+  if (!projection || !Number.isFinite(projection.dist)) return false;
+  const maxDist = roadSurfaceLateralThreshold(preferredRoad, { extraLateralPadding: 1.2 });
+  if (projection.dist > maxDist) return false;
+  if (Number.isFinite(targetY)) {
+    const preferredY = sampleFeatureSurfaceY(preferredRoad, x, z, projection);
+    if (Number.isFinite(preferredY)) {
+      const maxVertical = Math.max(
+        maxVerticalDelta,
+        roadSurfaceAttachmentThreshold(preferredRoad, { extraVerticalAllowance: 1.6 }) + 3
+      );
+      if (Math.abs(preferredY - targetY) > maxVertical) return false;
+    }
+  }
+  return true;
+}
+
+function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, preferredRoad, terrainYAtPoint = NaN) {
+  const pts = Array.isArray(road?.pts) ? road.pts : null;
+  if (!pts || pts.length < 2) return null;
+  const semantics = road?.structureSemantics || null;
+  const gradeSeparatedLike = semantics?.gradeSeparated || roadBehavesGradeSeparated(road);
+  const transitionRampLike =
+    semantics?.rampCandidate === true &&
+    gradeSeparatedLike &&
+    semantics?.terrainMode !== 'elevated' &&
+    semantics?.terrainMode !== 'subgrade';
+  const queryWithoutHeight = !Number.isFinite(targetY);
+  const profileDistances = road?.surfaceDistances instanceof Float32Array ? road.surfaceDistances : null;
+  const transitionAnchors = Array.isArray(road?.structureTransitionAnchors) ? road.structureTransitionAnchors : [];
+  let totalDistance = Number.isFinite(profileDistances?.[profileDistances.length - 1]) ? Number(profileDistances[profileDistances.length - 1]) : NaN;
+  if (!Number.isFinite(totalDistance) || totalDistance <= 0) {
+    totalDistance = 0;
+    for (let i = 0; i < pts.length - 1; i++) {
+      totalDistance += Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].z - pts[i].z);
+    }
+  }
+  let best = null;
+  let cumulativeDistance = 0;
+  for (let i = 0; i < pts.length - 1; i++) {
+    const p1 = pts[i];
+    const p2 = pts[i + 1];
+    const dx = p2.x - p1.x;
+    const dz = p2.z - p1.z;
+    const len2 = dx * dx + dz * dz;
+    if (len2 === 0) continue;
+    const segLen = Math.sqrt(len2);
+    let t = ((x - p1.x) * dx + (z - p1.z) * dz) / len2;
+    t = Math.max(0, Math.min(1, t));
+    const nx = p1.x + t * dx;
+    const nz = p1.z + t * dz;
+    const d = Math.hypot(x - nx, z - nz);
+    const projected = { x: nx, z: nz, dist: d, segIndex: i, t };
+    const roadY = sampleFeatureSurfaceY(road, x, z, projected);
+    const verticalDelta = Number.isFinite(targetY) && Number.isFinite(roadY) ? Math.abs(roadY - targetY) : 0;
+    const distanceAlong =
+      profileDistances && profileDistances.length > i ?
+        Number(profileDistances[i]) + segLen * t :
+        cumulativeDistance + segLen * t;
+    const distanceToEndpoint = Math.min(distanceAlong, Math.max(0, totalDistance - distanceAlong));
+    let distanceToTransitionZone = Infinity;
+    for (let j = 0; j < transitionAnchors.length; j++) {
+      const anchor = transitionAnchors[j];
+      const anchorDistance = Number(anchor?.distance);
+      if (!Number.isFinite(anchorDistance)) continue;
+      const span = Math.max(0, Number(anchor?.span) || 0);
+      const zoneDistance = Math.max(0, Math.abs(distanceAlong - anchorDistance) - span);
+      if (zoneDistance < distanceToTransitionZone) distanceToTransitionZone = zoneDistance;
+    }
+    if (verticalDelta > maxVerticalDelta) {
+      cumulativeDistance += segLen;
+      continue;
+    }
+    const elevatedLike = semantics?.terrainMode === 'elevated' || (gradeSeparatedLike && !transitionRampLike);
+    let verticalWeight =
+      transitionRampLike ? 0.62 :
+      elevatedLike ? 0.82 :
+      semantics?.terrainMode === 'subgrade' ? 0.72 :
+      0.38;
+    let weightedDist = d + (Number.isFinite(targetY) && Number.isFinite(roadY) ? verticalDelta * verticalWeight : 0);
+    if (preferredRoad) {
+      const sameRoad = road === preferredRoad;
+      const connectedRoad = !sameRoad && (
+        Array.isArray(preferredRoad?.connectedFeatures?.start) && preferredRoad.connectedFeatures.start.some((entry) => entry?.feature === road) ||
+        Array.isArray(preferredRoad?.connectedFeatures?.end) && preferredRoad.connectedFeatures.end.some((entry) => entry?.feature === road)
+      );
+      const continuityStrength = sameRoad ? 3 : roadContinuityStrength(preferredRoad, road);
+      const sameVerticalGroup =
+        preferredRoad?.structureSemantics?.verticalGroup &&
+        road?.structureSemantics?.verticalGroup === preferredRoad.structureSemantics.verticalGroup;
+      if (sameRoad) {
+        weightedDist = d + verticalDelta * 0.12;
+      } else if (continuityStrength >= 2.2) {
+        weightedDist = d + verticalDelta * 0.13;
+      } else if (continuityStrength >= 1.45) {
+        weightedDist = d + verticalDelta * 0.17;
+      } else if (connectedRoad) {
+        weightedDist = d + verticalDelta * 0.24;
+      } else if (sameVerticalGroup) {
+        weightedDist = d + verticalDelta * 0.32;
+      }
+      if (sameRoad) weightedDist -= 3.4;
+      else if (continuityStrength >= 2.2) weightedDist -= 2.75;
+      else if (continuityStrength >= 1.45) weightedDist -= 1.95;
+      else if (connectedRoad) weightedDist -= 0.7;
+      else if (sameVerticalGroup) weightedDist -= 0.7;
+      if ((sameRoad || continuityStrength >= 1.45) && (t < 0.08 || t > 0.92)) weightedDist -= 0.55;
+      if (
+        !roadBehavesGradeSeparated(preferredRoad) &&
+        !roadBehavesGradeSeparated(road) &&
+        connectedRoad &&
+        continuityStrength < 1.0 &&
+        Number.isFinite(distanceToEndpoint) &&
+        distanceToEndpoint <= 18
+      ) {
+        weightedDist += 1.4;
+      }
+    }
+    const continuityAccess =
+      !!preferredRoad && (
+        road === preferredRoad ||
+        roadContinuityStrength(preferredRoad, road) >= 1.0 ||
+        areRoadsConnected(preferredRoad, road) ||
+        (
+          preferredRoad?.structureSemantics?.verticalGroup &&
+          road?.structureSemantics?.verticalGroup === preferredRoad.structureSemantics.verticalGroup
+        )
+      );
+    const roadHeightAboveTerrain =
+      Number.isFinite(terrainYAtPoint) && Number.isFinite(roadY) ?
+        roadY - terrainYAtPoint :
+        NaN;
+    if (queryWithoutHeight && Number.isFinite(d) && d <= 0.85) {
+      const exactProjectionWeight = d <= 0.35 ? 22 : 22 * Math.max(0, 1 - ((d - 0.35) / 0.5));
+      weightedDist -= exactProjectionWeight;
+      if (Number.isFinite(roadHeightAboveTerrain)) {
+        if (transitionRampLike) {
+          weightedDist -= Math.min(2.2, Math.max(0, 6.5 - roadHeightAboveTerrain) * 0.32);
+        } else if (roadHeightAboveTerrain > 5.5) {
+          weightedDist += Math.min(14, (roadHeightAboveTerrain - 5.5) * 1.3);
+        }
+      }
+    }
+    const surfaceReferenceY = Number.isFinite(targetY) ? targetY : terrainYAtPoint;
+    const surfaceNearTerrain =
+      Number.isFinite(surfaceReferenceY) &&
+      Number.isFinite(terrainYAtPoint) &&
+      Math.abs(surfaceReferenceY - terrainYAtPoint) <= 2.4;
+    if (
+      elevatedLike &&
+      !continuityAccess &&
+      surfaceNearTerrain &&
+      Number.isFinite(roadHeightAboveTerrain) &&
+      roadHeightAboveTerrain > 8
+    ) {
+      weightedDist += 9 + Math.min(24, (roadHeightAboveTerrain - 8) * 1.35);
+    }
+    if (
+      preferredRoad &&
+      !roadBehavesGradeSeparated(preferredRoad) &&
+      elevatedLike &&
+      !continuityAccess &&
+      Number.isFinite(roadHeightAboveTerrain) &&
+      roadHeightAboveTerrain > 5.5
+    ) {
+      weightedDist += 4.5 + Math.min(18, (roadHeightAboveTerrain - 5.5) * 1.2);
+    }
+    if (gradeSeparatedLike && !continuityAccess && Number.isFinite(verticalDelta)) {
+      const directLockThreshold = elevatedLike ? 1.25 : 1.35;
+      const transitionLockThreshold = elevatedLike ? 1.65 : 1.85;
+      const nearTransition = Number.isFinite(distanceToTransitionZone) && distanceToTransitionZone <= 1.2;
+      const attachable =
+        verticalDelta <= directLockThreshold ||
+        (nearTransition && verticalDelta <= transitionLockThreshold);
+      if (!attachable) {
+        weightedDist += 5.5 + Math.min(10, verticalDelta * 1.8);
+      }
+    }
+    if (!best || weightedDist < best.weightedDist) {
+      best = {
+        road,
+        dist: d,
+        pt: { x: nx, z: nz },
+        y: roadY,
+        verticalDelta,
+        weightedDist,
+        distanceAlong,
+        distanceToEndpoint,
+        distanceToTransitionZone
+      };
+    }
+    cumulativeDistance += segLen;
+  }
+  return best;
+}
+
+function findNearestRoad(x, z, options = {}) {
   _nearRoadResult.road = null;
   _nearRoadResult.dist = Infinity;
+  _nearRoadResult.y = NaN;
+  _nearRoadResult.verticalDelta = Infinity;
+  _nearRoadResult.distanceAlong = NaN;
+  _nearRoadResult.distanceToEndpoint = Infinity;
+  _nearRoadResult.distanceToTransitionZone = Infinity;
+  const targetY = Number.isFinite(options?.y) ? Number(options.y) : NaN;
+  const maxVerticalDelta = Number.isFinite(options?.maxVerticalDelta) ? Math.max(0.5, Number(options.maxVerticalDelta)) : Infinity;
+  const requestedPreferredRoad = options?.preferredRoad || null;
+  const preferredRoad = preferredRoadRelevantAtPoint(requestedPreferredRoad, x, z, targetY, maxVerticalDelta) ? requestedPreferredRoad : null;
+  const terrainYAtPoint =
+    typeof appCtx.GroundHeight?.terrainY === 'function' ?
+      Number(appCtx.GroundHeight.terrainY(x, z)) :
+    typeof appCtx.terrainMeshHeightAt === 'function' ?
+      Number(appCtx.terrainMeshHeightAt(x, z)) :
+    typeof appCtx.elevationWorldYAtWorldXZ === 'function' ?
+      Number(appCtx.elevationWorldYAtWorldXZ(x, z)) :
+      NaN;
+  let bestWeighted = Infinity;
 
-  for (let r = 0; r < appCtx.roads.length; r++) {
-    const road = appCtx.roads[r];
+  const roads = runtimeRoadFeatures();
+  if (preferredRoad) {
+    const preferredCandidates = roadContinuityCandidates(preferredRoad);
+    for (let i = 0; i < preferredCandidates.length; i++) {
+      const preferredHit = evaluateNearestRoadCandidate(preferredCandidates[i], x, z, targetY, maxVerticalDelta, preferredRoad, terrainYAtPoint);
+      if (!preferredHit) continue;
+      if (preferredHit.weightedDist < bestWeighted) {
+        bestWeighted = preferredHit.weightedDist;
+        _nearRoadResult.road = preferredHit.road;
+        _nearRoadResult.dist = preferredHit.dist;
+        _nearRoadResult.pt.x = preferredHit.pt.x;
+        _nearRoadResult.pt.z = preferredHit.pt.z;
+        _nearRoadResult.y = preferredHit.y;
+        _nearRoadResult.verticalDelta = preferredHit.verticalDelta;
+        _nearRoadResult.distanceAlong = preferredHit.distanceAlong;
+        _nearRoadResult.distanceToEndpoint = preferredHit.distanceToEndpoint;
+        _nearRoadResult.distanceToTransitionZone = preferredHit.distanceToTransitionZone;
+      }
+      if (preferredRoadHardLockSatisfied(preferredHit, preferredRoad) && !preferredRoadNeedsJoinRelease(preferredHit, preferredRoad)) {
+        return _nearRoadResult;
+      }
+    }
+  }
+
+  for (let r = 0; r < roads.length; r++) {
+    const road = roads[r];
+    if (preferredRoad && road === preferredRoad) continue;
     const pts = road.pts;
     // Quick bounding box skip: check if first point is way too far
     const fp = pts[0];
     const roughDist = Math.abs(x - fp.x) + Math.abs(z - fp.z);
     if (roughDist > _nearRoadResult.dist + 500) continue;
-
-    for (let i = 0; i < pts.length - 1; i++) {
-      const p1 = pts[i],p2 = pts[i + 1];
-      const dx = p2.x - p1.x,dz = p2.z - p1.z,len2 = dx * dx + dz * dz;
-      if (len2 === 0) continue;
-      let t = ((x - p1.x) * dx + (z - p1.z) * dz) / len2;
-      t = Math.max(0, Math.min(1, t));
-      const nx = p1.x + t * dx,nz = p1.z + t * dz;
-      const ddx = x - nx,ddz = z - nz;
-      const d = Math.sqrt(ddx * ddx + ddz * ddz);
-      if (d < _nearRoadResult.dist) {
-        _nearRoadResult.road = road;
-        _nearRoadResult.dist = d;
-        _nearRoadResult.pt.x = nx;
-        _nearRoadResult.pt.z = nz;
-      }
-    }
+    const hit = evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, preferredRoad, terrainYAtPoint);
+    if (!hit || hit.weightedDist >= bestWeighted) continue;
+    bestWeighted = hit.weightedDist;
+    _nearRoadResult.road = hit.road;
+    _nearRoadResult.dist = hit.dist;
+    _nearRoadResult.pt.x = hit.pt.x;
+    _nearRoadResult.pt.z = hit.pt.z;
+    _nearRoadResult.y = hit.y;
+    _nearRoadResult.verticalDelta = hit.verticalDelta;
+    _nearRoadResult.distanceAlong = hit.distanceAlong;
+    _nearRoadResult.distanceToEndpoint = hit.distanceToEndpoint;
+    _nearRoadResult.distanceToTransitionZone = hit.distanceToTransitionZone;
   }
   return _nearRoadResult;
 }
@@ -5589,9 +15238,272 @@ function getMeshLodCenter(mesh) {
   return null;
 }
 
+function countVisibleRoadMeshesNearWorldPoint(x, z, maxDistance = 220) {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return 0;
+  let count = 0;
+  const roadMeshes = Array.isArray(appCtx.roadMeshes) ? appCtx.roadMeshes : [];
+  const limit = Math.max(48, Number(maxDistance) || 0);
+  const actorBounds = playableCoreBoundsFromCenter(x, z, limit);
+  for (let i = 0; i < roadMeshes.length; i++) {
+    const mesh = roadMeshes[i];
+    if (!mesh?.visible) continue;
+    const bounds = playableCoreTargetBounds(mesh);
+    if (bounds) {
+      if (boundsIntersect(bounds, actorBounds, 24)) count += 1;
+      continue;
+    }
+    const center = getMeshLodCenter(mesh) || mesh.position;
+    if (center && Math.hypot(Number(center.x || 0) - x, Number(center.z || 0) - z) <= limit) count += 1;
+  }
+  return count;
+}
+
+function countVisibleBuildingMeshesNearWorldPoint(x, z, maxDistance = 320) {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return 0;
+  const buildingMeshes = Array.isArray(appCtx.buildingMeshes) ? appCtx.buildingMeshes : [];
+  const limit = Math.max(64, Number(maxDistance) || 0);
+  const seen = new Set();
+  let count = 0;
+  for (let i = 0; i < buildingMeshes.length; i++) {
+    const mesh = buildingMeshes[i];
+    if (!mesh?.visible) continue;
+    const center = getMeshLodCenter(mesh);
+    if (!center) continue;
+    if (Math.hypot(Number(center.x || 0) - x, Number(center.z || 0) - z) > limit) continue;
+    const sourceBuildingId = String(mesh?.userData?.sourceBuildingId || '').trim();
+    if (sourceBuildingId) {
+      if (seen.has(sourceBuildingId)) continue;
+      seen.add(sourceBuildingId);
+      count += 1;
+      continue;
+    }
+    if (mesh?.userData?.isBuildingBatch) {
+      count += Math.max(1, Number(mesh.userData?.batchCount || 1));
+      continue;
+    }
+    count += 1;
+  }
+
+  const overlayGroup =
+    appCtx.overlayPublishedGroup ||
+    (typeof appCtx.scene?.getObjectByName === 'function' ? appCtx.scene.getObjectByName('overlayPublishedGroup') : null);
+  const overlayChildren = Array.isArray(overlayGroup?.children) ? overlayGroup.children : [];
+  if (overlayGroup?.visible !== false && overlayChildren.length > 0) {
+    for (let i = 0; i < overlayChildren.length; i++) {
+      const object = overlayChildren[i];
+      if (!object?.visible) continue;
+      if (String(object?.userData?.overlayFeatureClass || '').toLowerCase() !== 'building') continue;
+      const center = getMeshLodCenter(object);
+      if (!center) continue;
+      if (Math.hypot(Number(center.x || 0) - x, Number(center.z || 0) - z) > limit) continue;
+      const sourceBuildingId = String(object?.userData?.sourceBuildingId || object?.userData?.overlayFeatureId || '').trim();
+      if (sourceBuildingId) {
+        if (seen.has(sourceBuildingId)) continue;
+        seen.add(sourceBuildingId);
+        count += 1;
+        continue;
+      }
+      count += 1;
+    }
+  }
+  return count;
+}
+
+function countVisibleDetailedBuildingMeshesNearWorldPoint(x, z, maxDistance = 320) {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return 0;
+  const buildingMeshes = Array.isArray(appCtx.buildingMeshes) ? appCtx.buildingMeshes : [];
+  const limit = Math.max(64, Number(maxDistance) || 0);
+  const seen = new Set();
+  let count = 0;
+  for (let i = 0; i < buildingMeshes.length; i++) {
+    const mesh = buildingMeshes[i];
+    if (!mesh?.visible) continue;
+    if (mesh?.userData?.isBuildingProxy || String(mesh?.userData?.lodTier || 'near') === 'mid') continue;
+    const center = getMeshLodCenter(mesh);
+    if (!center) continue;
+    if (Math.hypot(Number(center.x || 0) - x, Number(center.z || 0) - z) > limit) continue;
+    const sourceBuildingId = String(mesh?.userData?.sourceBuildingId || '').trim();
+    if (sourceBuildingId) {
+      if (seen.has(sourceBuildingId)) continue;
+      seen.add(sourceBuildingId);
+      count += 1;
+      continue;
+    }
+    if (mesh?.userData?.isBuildingBatch) {
+      count += Math.max(1, Number(mesh.userData?.batchCount || 1));
+      continue;
+    }
+    count += 1;
+  }
+
+  const overlayGroup =
+    appCtx.overlayPublishedGroup ||
+    (typeof appCtx.scene?.getObjectByName === 'function' ? appCtx.scene.getObjectByName('overlayPublishedGroup') : null);
+  const overlayChildren = Array.isArray(overlayGroup?.children) ? overlayGroup.children : [];
+  if (overlayGroup?.visible !== false && overlayChildren.length > 0) {
+    for (let i = 0; i < overlayChildren.length; i++) {
+      const object = overlayChildren[i];
+      if (!object?.visible) continue;
+      if (String(object?.userData?.overlayFeatureClass || '').toLowerCase() !== 'building') continue;
+      const center = getMeshLodCenter(object);
+      if (!center) continue;
+      if (Math.hypot(Number(center.x || 0) - x, Number(center.z || 0) - z) > limit) continue;
+      const sourceBuildingId = String(object?.userData?.sourceBuildingId || object?.userData?.overlayFeatureId || '').trim();
+      if (sourceBuildingId) {
+        if (seen.has(sourceBuildingId)) continue;
+        seen.add(sourceBuildingId);
+        count += 1;
+        continue;
+      }
+      count += 1;
+    }
+  }
+  return count;
+}
+
 let _lastLodRefX = 0;
 let _lastLodRefZ = 0;
 let _lastLodReady = false;
+let _lastLodActorRegionKey = '';
+let _lastLodMode = '';
+let _worldLodDirtyReason = '';
+let _lastActorVisibleRoadGapSyncAt = 0;
+let _lastActorVisibleRoadGapLoadAt = 0;
+let _lastActorVisibleRoadGapRegionKey = '';
+let _lastActorBuildingGapLoadAt = 0;
+let _lastActorBuildingGapRegionKey = '';
+
+function driveableRoadFeatureBounds(road) {
+  if (!road) return null;
+  if (
+    Number.isFinite(road?.bounds?.minX) &&
+    Number.isFinite(road?.bounds?.maxX) &&
+    Number.isFinite(road?.bounds?.minZ) &&
+    Number.isFinite(road?.bounds?.maxZ)
+  ) {
+    return road.bounds;
+  }
+  const points = Array.isArray(road?.pts) ? road.pts : null;
+  if (!points || points.length < 2) return null;
+  return polylineBounds(points, Math.max(6, Number(road?.width || 6)));
+}
+
+function countDriveableRoadFeaturesNearWorldPoint(x, z, maxDistance = 220) {
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return 0;
+  const queryBounds = playableCoreBoundsFromCenter(x, z, Math.max(48, Number(maxDistance) || 0));
+  const roads = runtimeRoadFeatures();
+  let count = 0;
+  for (let i = 0; i < roads.length; i++) {
+    const road = roads[i];
+    if (!isVehicleRoad(road)) continue;
+    const bounds = driveableRoadFeatureBounds(road);
+    if (!boundsIntersect(bounds, queryBounds, 12)) continue;
+    count += 1;
+  }
+  return count;
+}
+
+function continuousWorldInteractiveNeedsRoadShellRecovery(actorState = null) {
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  const cfg = ACTOR_ROAD_SHELL_CONFIG[mode];
+  if (!cfg) return false;
+  if (!Number.isFinite(actor?.x) || !Number.isFinite(actor?.z)) return false;
+  const visibleRoads = countVisibleRoadMeshesNearWorldPoint(actor.x, actor.z, cfg.visibleRadius);
+  const roadFeatures = countDriveableRoadFeaturesNearWorldPoint(actor.x, actor.z, Math.max(cfg.visibleRadius + 40, cfg.visibleRadius));
+  const startupPhase = !!appCtx._continuousWorldVisibleLoadConfig?.startupPhase;
+  const worldBuildStage = String(appCtx.worldBuildStage || '');
+  const startupProtectedRoadShell =
+    startupPhase &&
+    (
+      worldBuildStage === 'playable_core_ready' ||
+      worldBuildStage === 'partial_world_ready' ||
+      worldBuildStage === 'full_world_ready'
+    ) &&
+    Math.hypot(actor.x, actor.z) <= Math.max(260, Number(cfg.visibleRadius || 320) * 0.75) &&
+    Math.abs(Number(actor?.speed || 0)) < 6;
+  const explicitTeleportContinuity =
+    mode === 'drive' &&
+    recentExplicitTeleportTargetState(actor.x, actor.z, { radius: 260 }).active;
+  if (
+    startupProtectedRoadShell &&
+    roadFeatures >= Math.max(8, Math.floor(Number(cfg.minRoadFeatures || 0) * 0.5)) &&
+    visibleRoads >= Math.max(6, Number(cfg.minVisibleRoads || 0) - 4)
+  ) {
+    return false;
+  }
+  if (
+    mode === 'drive' &&
+    visibleRoads <= 0 &&
+    roadFeatures <= 0 &&
+    (actor?.onRoad === false || explicitTeleportContinuity)
+  ) {
+    return true;
+  }
+  const minRoadFeaturesForRecovery =
+    mode === 'drive' ?
+      Math.max(cfg.minVisibleRoads, Math.floor(Number(cfg.minRoadFeatures || 0) * 0.5)) :
+      Number(cfg.minRoadFeatures || 0);
+  return roadFeatures >= minRoadFeaturesForRecovery && visibleRoads < cfg.minVisibleRoads;
+}
+
+function continuousWorldInteractiveNeedsBuildingShellRecovery(actorState = null) {
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  const cfg = ACTOR_BUILDING_SHELL_CONFIG[mode];
+  if (!cfg) return false;
+  if (!Number.isFinite(actor?.x) || !Number.isFinite(actor?.z)) return false;
+  const runtimeSnapshot =
+    typeof appCtx.getContinuousWorldRuntimeSnapshot === 'function' ?
+      appCtx.getContinuousWorldRuntimeSnapshot() :
+      null;
+  const actorRegionKey = String(runtimeSnapshot?.activeRegion?.key || '').trim();
+  const startupPhase = !!appCtx._continuousWorldVisibleLoadConfig?.startupPhase;
+  const worldBuildStage = String(appCtx.worldBuildStage || '');
+  const activeRegionBuildingCount = Number(runtimeSnapshot?.featureRegions?.activeRegion?.buildings?.count || 0);
+  const startupProtectedShell =
+    startupPhase &&
+    (
+      worldBuildStage === 'playable_core_ready' ||
+      worldBuildStage === 'partial_world_ready' ||
+      worldBuildStage === 'full_world_ready'
+    ) &&
+    Math.hypot(actor.x, actor.z) <= Math.max(260, Number(cfg.visibleRadius || 320) * 0.75) &&
+    (
+      activeRegionBuildingCount >= 160 ||
+      Number(Array.isArray(appCtx.buildingMeshes) ? appCtx.buildingMeshes.length : 0) >= 220 ||
+      Number(Array.isArray(appCtx.startupShellBuildingMeshes) ? appCtx.startupShellBuildingMeshes.length : 0) >= 80
+    );
+  const recentZeroResultGapCount =
+    actorRegionKey ?
+      _continuousWorldInteractiveStreamState.coverage.reduce((count, entry) => {
+        if (!entry) return count;
+        if (String(entry.regionKey || '').trim() !== actorRegionKey) return count;
+        const reason = String(entry.reason || '');
+        if (reason !== 'actor_building_gap' && !reason.startsWith('building_continuity_')) return count;
+        if (Number(entry.addedBuildings || 0) > 0) return count;
+        const ageMs = Date.now() - Number(entry.at || 0);
+        if (!Number.isFinite(ageMs) || ageMs > 9000) return count;
+        return count + 1;
+      }, 0) :
+      0;
+  const visibleBuildings = countVisibleDetailedBuildingMeshesNearWorldPoint(actor.x, actor.z, cfg.visibleRadius);
+  const visibleRoads = countVisibleRoadMeshesNearWorldPoint(actor.x, actor.z, Math.max(220, cfg.visibleRadius * 0.8));
+  const roadFeatures = countDriveableRoadFeaturesNearWorldPoint(actor.x, actor.z, Math.max(240, cfg.visibleRadius));
+  const roadCorridorReady =
+    visibleRoads >= cfg.minVisibleRoads ||
+    roadFeatures >= cfg.minRoadFeatures;
+  if (startupProtectedShell && roadCorridorReady) return false;
+  if (recentZeroResultGapCount >= 2 && roadCorridorReady) return false;
+  return (
+    visibleBuildings < cfg.minVisibleBuildings &&
+    roadCorridorReady
+  );
+}
+
+function markWorldLodDirty(reason = 'runtime_change') {
+  _worldLodDirtyReason = String(reason || 'runtime_change');
+}
 
 function updateWorldLod(force = false) {
   if (appCtx.onMoon || appCtx.travelingToMoon || (typeof appCtx.isEnv === 'function' && appCtx.ENV && !appCtx.isEnv(appCtx.ENV.EARTH))) {
@@ -5605,6 +15517,8 @@ function updateWorldLod(force = false) {
       }
     };
     hideList(appCtx.roadMeshes);
+    roadMeshLodVisibleSet.clear();
+    hideList(appCtx.urbanSurfaceMeshes);
     hideList(appCtx.buildingMeshes);
     hideList(appCtx.landuseMeshes);
     hideList(appCtx.poiMeshes);
@@ -5615,34 +15529,240 @@ function updateWorldLod(force = false) {
     return;
   }
 
-  if ((!appCtx.buildingMeshes || appCtx.buildingMeshes.length === 0) && (
-  !appCtx.poiMeshes || appCtx.poiMeshes.length === 0) && (
-  !appCtx.landuseMeshes || appCtx.landuseMeshes.length === 0)) {
+  const hasRoadManagedContent =
+    (Array.isArray(appCtx.roadMeshes) && appCtx.roadMeshes.length > 0) ||
+    (Array.isArray(appCtx.urbanSurfaceMeshes) && appCtx.urbanSurfaceMeshes.length > 0) ||
+    (Array.isArray(appCtx.structureVisualMeshes) && appCtx.structureVisualMeshes.length > 0);
+  const hasFeatureManagedContent =
+    (Array.isArray(appCtx.buildingMeshes) && appCtx.buildingMeshes.length > 0) ||
+    (Array.isArray(appCtx.poiMeshes) && appCtx.poiMeshes.length > 0) ||
+    (Array.isArray(appCtx.landuseMeshes) && appCtx.landuseMeshes.length > 0) ||
+    (Array.isArray(appCtx.streetFurnitureMeshes) && appCtx.streetFurnitureMeshes.length > 0);
+  if (!hasRoadManagedContent && !hasFeatureManagedContent) {
     return;
   }
 
-  const ref = appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker ?
+  const ref = appCtx.boatMode?.active && appCtx.boat ?
+  appCtx.boat :
+  appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker ?
   appCtx.Walk.state.walker :
   appCtx.droneMode ? appCtx.drone : appCtx.car;
   const refX = Number.isFinite(ref?.x) ? ref.x : 0;
   const refZ = Number.isFinite(ref?.z) ? ref.z : 0;
+  const continuousWorldSnapshot =
+    typeof appCtx.getContinuousWorldRuntimeSnapshot === 'function' ?
+      appCtx.getContinuousWorldRuntimeSnapshot() :
+      null;
+  const actorRegionKey = String(continuousWorldSnapshot?.activeRegion?.key || '');
+  const actorMode = appCtx.boatMode?.active ? 'boat' :
+    appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' ? 'walk' :
+    appCtx.droneMode ? 'drone' :
+    appCtx.oceanMode?.active ? 'ocean' :
+    'drive';
+  const mustRefreshForRuntimeMutation =
+    !!_worldLodDirtyReason ||
+    actorRegionKey !== _lastLodActorRegionKey ||
+    actorMode !== _lastLodMode;
 
-  if (!force && _lastLodReady) {
+  if (!force && _lastLodReady && !mustRefreshForRuntimeMutation) {
     const moved = Math.hypot(refX - _lastLodRefX, refZ - _lastLodRefZ);
-    const minMoveForLodUpdate = appCtx.droneMode ? 4 : 8;
+    const minMoveForLodUpdate = appCtx.droneMode ? 4 : appCtx.boatMode?.active ? 14 : 8;
     if (moved < minMoveForLodUpdate) return;
   }
   _lastLodRefX = refX;
   _lastLodRefZ = refZ;
   _lastLodReady = true;
+  _lastLodActorRegionKey = actorRegionKey;
+  _lastLodMode = actorMode;
+  _worldLodDirtyReason = '';
 
   const mode = getPerfModeValue();
   const dynamicBudgetState = getRuntimeDynamicBudget(mode);
   const depthForLod = typeof appCtx.rdtLoadComplexity === 'number' ? appCtx.rdtLoadComplexity :
 
   typeof appCtx.rdtComplexity === 'number' ? appCtx.rdtComplexity : 0;
-  const lodThresholds = getWorldLodThresholds(depthForLod, mode, dynamicBudgetState.lodScale);
+  const boatLodScale = appCtx.boatMode?.active ? Math.max(0.34, Math.min(1, Number(appCtx.boatMode.detailBias) || 1)) : 1;
+  const lodThresholds = getWorldLodThresholds(depthForLod, mode, dynamicBudgetState.lodScale * boatLodScale);
   const poiMidSq = lodThresholds.mid * lodThresholds.mid;
+  const actorState = continuousWorldInteractiveActorMotionState();
+  const playableCoreState = updatePlayableCoreResidency(force, {
+    actorState,
+    runtimeSnapshot: continuousWorldSnapshot,
+    reason: 'update_world_lod'
+  });
+  const roadVisibleRegionKeys = continuousWorldInteractiveRoadRetainRegionKeys(continuousWorldSnapshot, null, actorState);
+  const withinActiveFeatureRegions = (mesh) =>
+    targetIntersectsContinuousWorldTrackedRegions(mesh, continuousWorldSnapshot);
+  const withinRoadFeatureRegions = (mesh) =>
+    continuousWorldInteractiveFeatureIntersectsRetainedRegions(mesh?.userData || mesh, roadVisibleRegionKeys);
+  const withinPlayableRoadCore = (mesh) =>
+    playableCoreIntersectsTarget(mesh, playableCoreState, { structure: false, padding: 32 });
+  const withinPlayableStructureCore = (mesh) =>
+    playableCoreIntersectsTarget(mesh, playableCoreState, { structure: true, padding: 48 });
+  const minVisibleRoadMeshesReady =
+    Number(
+      PLAYABLE_CORE_RESIDENCY_CONFIG.minVisibleRoadMeshesReady?.[actorMode] ??
+      PLAYABLE_CORE_RESIDENCY_CONFIG.minVisibleRoadMeshesReady?.drive ??
+      1
+    ) || 1;
+  const strictRoadRegionScope = continuousWorldRuntimeUsesStrictRegionScope(continuousWorldSnapshot);
+  const usePlayableCoreRoadVisibility =
+    !strictRoadRegionScope &&
+    (
+      actorMode !== 'drive' ||
+      appCtx.worldLoading ||
+      String(appCtx.worldBuildStage || '') !== 'full_world_ready'
+    );
+  const actorRoadKeepRadius =
+    actorMode === 'drive' ?
+      Math.max(260, Math.min(playableCoreState.radius * 0.22, Math.abs(Number(actorState?.speed || 0)) >= 8 ? 360 : 300)) :
+      0;
+  const actorRoadKeepBounds =
+    actorRoadKeepRadius > 0 ?
+      playableCoreBoundsFromCenter(refX, refZ, actorRoadKeepRadius) :
+      null;
+  const forwardRoadCorridor = continuousWorldForwardRoadCorridorState(actorState, continuousWorldSnapshot);
+  const roadPriorityBounds = mergeWorldBounds(actorRoadKeepBounds, forwardRoadCorridor?.bounds || null);
+
+  if (Array.isArray(appCtx.roadMeshes) && appCtx.roadMeshes.length > 0) {
+    if (appCtx.showRoads === false) {
+      const hiddenSet = new Set();
+      for (let i = 0; i < appCtx.roadMeshes.length; i++) {
+        const mesh = appCtx.roadMeshes[i];
+        if (!mesh) continue;
+        mesh.visible = false;
+        hiddenSet.add(mesh);
+      }
+      roadMeshLodVisibleSet = hiddenSet;
+    } else {
+    const roadCandidateBounds = roadMeshQueryBoundsFromRetainKeys(
+      roadVisibleRegionKeys,
+      continuousWorldSnapshot,
+      usePlayableCoreRoadVisibility ? playableCoreState : null
+    );
+    const roadCandidates = getRoadMeshesIntersectingBounds(roadCandidateBounds, 64);
+    lastRoadMeshLodCandidateCount = roadCandidates.length;
+    const deferRoadHide = shouldDeferInteractiveRoadEviction(actorState);
+    const nextRoadVisibleSet = new Set();
+    for (let i = 0; i < appCtx.roadMeshes.length; i++) {
+      const mesh = appCtx.roadMeshes[i];
+      if (!mesh) continue;
+      mesh.visible = false;
+    }
+    const keepActorLocalRoads =
+      !strictRoadRegionScope &&
+      !!actorRoadKeepBounds &&
+      (deferRoadHide || countVisibleRoadMeshesNearWorldPoint(refX, refZ, actorRoadKeepRadius * 0.85) < minVisibleRoadMeshesReady);
+    ensureRoadMeshSpatialIndex();
+    for (let i = 0; i < roadCandidates.length; i++) {
+      const mesh = roadCandidates[i];
+      if (!mesh) continue;
+      const visible =
+        withinRoadFeatureRegions(mesh) ||
+        (usePlayableCoreRoadVisibility && withinPlayableRoadCore(mesh)) ||
+        (forwardRoadCorridor?.bounds && boundsIntersect(playableCoreTargetBounds(mesh), forwardRoadCorridor.bounds, 40));
+      mesh.visible = visible;
+      if (visible) nextRoadVisibleSet.add(mesh);
+    }
+    if (keepActorLocalRoads) {
+      const actorRoadCandidates = getRoadMeshesIntersectingBounds(roadPriorityBounds, 48);
+      for (let i = 0; i < actorRoadCandidates.length; i++) {
+        const mesh = actorRoadCandidates[i];
+        if (!mesh) continue;
+        mesh.visible = true;
+        nextRoadVisibleSet.add(mesh);
+      }
+    }
+    if (
+      !strictRoadRegionScope &&
+      actorMode === 'drive' &&
+      roadPriorityBounds &&
+      nextRoadVisibleSet.size < minVisibleRoadMeshesReady
+    ) {
+      for (let i = 0; i < appCtx.roadMeshes.length; i++) {
+        const mesh = appCtx.roadMeshes[i];
+        if (!mesh) continue;
+        const bounds = playableCoreTargetBounds(mesh);
+        if (!boundsIntersect(bounds, roadPriorityBounds, 48)) continue;
+        mesh.visible = true;
+        nextRoadVisibleSet.add(mesh);
+      }
+    }
+    roadMeshLodVisibleSet.forEach((mesh) => {
+      if (!mesh || nextRoadVisibleSet.has(mesh)) return;
+      if (roadMeshSpatialIndexMembers.size > 0 && !roadMeshSpatialIndexMembers.has(mesh)) return;
+      if (deferRoadHide) {
+        mesh.visible = true;
+        nextRoadVisibleSet.add(mesh);
+        return;
+      }
+      mesh.visible = false;
+    });
+    roadMeshLodVisibleSet = nextRoadVisibleSet;
+    }
+  } else {
+    clearRoadMeshSpatialIndex();
+  }
+
+  const actorVisibleRoadCount =
+    actorMode === 'drive' ?
+      countVisibleRoadMeshesNearWorldPoint(refX, refZ, Math.max(220, actorRoadKeepRadius || 220)) :
+      0;
+  const actorNearbyDriveableRoadFeatures =
+    actorMode === 'drive' ?
+      countDriveableRoadFeaturesNearWorldPoint(refX, refZ, Math.max(240, actorRoadKeepRadius || 240)) :
+      0;
+  if (
+    actorMode === 'drive' &&
+    actorNearbyDriveableRoadFeatures > 0 &&
+    actorVisibleRoadCount < minVisibleRoadMeshesReady &&
+    typeof appCtx.requestWorldSurfaceSync === 'function' &&
+    !appCtx.worldLoading &&
+    !continuousWorldInteractiveStartupLockActive()
+  ) {
+    const now = performance.now();
+    if (now - _lastActorVisibleRoadGapSyncAt > 320) {
+      _lastActorVisibleRoadGapSyncAt = now;
+      appCtx.requestWorldSurfaceSync({ force: true, source: 'actor_visible_road_gap' });
+    }
+  }
+
+  if (Array.isArray(appCtx.urbanSurfaceMeshes) && appCtx.urbanSurfaceMeshes.length > 0) {
+    if (appCtx.showRoads === false) {
+      for (let i = 0; i < appCtx.urbanSurfaceMeshes.length; i++) {
+        const mesh = appCtx.urbanSurfaceMeshes[i];
+        if (mesh) mesh.visible = false;
+      }
+    } else {
+    const keepActorLocalUrban = !strictRoadRegionScope && !!actorRoadKeepBounds && actorMode === 'drive';
+    const deferUrbanHide = actorMode === 'drive' && shouldDeferInteractiveRoadEviction(actorState);
+    for (let i = 0; i < appCtx.urbanSurfaceMeshes.length; i++) {
+      const mesh = appCtx.urbanSurfaceMeshes[i];
+      if (!mesh) continue;
+      const wasVisible = !!mesh.visible;
+      if (deferUrbanHide && wasVisible) {
+        mesh.visible = true;
+        continue;
+      }
+      mesh.visible =
+        withinRoadFeatureRegions(mesh) ||
+        (usePlayableCoreRoadVisibility && withinPlayableRoadCore(mesh)) ||
+        (keepActorLocalUrban && boundsIntersect(playableCoreTargetBounds(mesh), actorRoadKeepBounds, 24));
+    }
+    if (
+      !strictRoadRegionScope &&
+      actorMode === 'drive' &&
+      actorRoadKeepBounds &&
+      countVisibleRoadMeshesNearWorldPoint(refX, refZ, Math.max(220, actorRoadKeepRadius || 220)) < minVisibleRoadMeshesReady
+    ) {
+      for (let i = 0; i < appCtx.urbanSurfaceMeshes.length; i++) {
+        const mesh = appCtx.urbanSurfaceMeshes[i];
+        if (!mesh) continue;
+        if (boundsIntersect(playableCoreTargetBounds(mesh), actorRoadKeepBounds, 24)) mesh.visible = true;
+      }
+    }
+    }
+  }
 
   let nearVisible = 0;
   let midVisible = 0;
@@ -5651,6 +15771,10 @@ function updateWorldLod(force = false) {
     for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
       const mesh = appCtx.buildingMeshes[i];
       if (!mesh) continue;
+      if (!withinActiveFeatureRegions(mesh)) {
+        mesh.visible = false;
+        continue;
+      }
       mesh.visible = true;
       const tier = mesh.userData?.lodTier || 'near';
       const isBatch = !!mesh.userData?.isBuildingBatch;
@@ -5667,8 +15791,24 @@ function updateWorldLod(force = false) {
     for (let i = 0; i < appCtx.landuseMeshes.length; i++) {
       const mesh = appCtx.landuseMeshes[i];
       if (!mesh) continue;
+      if (!withinActiveFeatureRegions(mesh)) {
+        mesh.visible = false;
+        continue;
+      }
+      if (mesh.userData?.boatSuppressed) {
+        mesh.visible = false;
+        continue;
+      }
       const alwaysVisible = !!mesh.userData?.alwaysVisible;
       mesh.visible = alwaysVisible || !!appCtx.landUseVisible;
+    }
+
+    if (Array.isArray(appCtx.structureVisualMeshes)) {
+      for (let i = 0; i < appCtx.structureVisualMeshes.length; i++) {
+        const mesh = appCtx.structureVisualMeshes[i];
+        if (!mesh) continue;
+        mesh.visible = withinActiveFeatureRegions(mesh) || withinPlayableStructureCore(mesh);
+      }
     }
 
     if (typeof appCtx.setPerfLiveStat === 'function') {
@@ -5680,6 +15820,10 @@ function updateWorldLod(force = false) {
   for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
     const mesh = appCtx.buildingMeshes[i];
     if (!mesh) continue;
+    if (!withinActiveFeatureRegions(mesh)) {
+      mesh.visible = false;
+      continue;
+    }
 
     const center = getMeshLodCenter(mesh);
     if (!center) continue;
@@ -5732,6 +15876,14 @@ function updateWorldLod(force = false) {
   for (let i = 0; i < appCtx.landuseMeshes.length; i++) {
     const mesh = appCtx.landuseMeshes[i];
     if (!mesh) continue;
+    if (!withinActiveFeatureRegions(mesh)) {
+      mesh.visible = false;
+      continue;
+    }
+    if (mesh.userData?.boatSuppressed) {
+      mesh.visible = false;
+      continue;
+    }
 
     const alwaysVisible = !!mesh.userData?.alwaysVisible;
     if (!appCtx.landUseVisible && !alwaysVisible) {
@@ -5760,8 +15912,69 @@ function updateWorldLod(force = false) {
     mesh.visible = distSq <= landuseSq;
   }
 
+  if (Array.isArray(appCtx.structureVisualMeshes) && appCtx.structureVisualMeshes.length > 0) {
+    const structureBaseDist = lodThresholds.farVisible + 220;
+    for (let i = 0; i < appCtx.structureVisualMeshes.length; i++) {
+      const mesh = appCtx.structureVisualMeshes[i];
+      if (!mesh) continue;
+      if (withinPlayableStructureCore(mesh)) {
+        mesh.visible = true;
+        continue;
+      }
+      if (!withinActiveFeatureRegions(mesh)) {
+        mesh.visible = false;
+        continue;
+      }
+      const center = getMeshLodCenter(mesh);
+      if (!center) {
+        mesh.visible = true;
+        continue;
+      }
+      const radius = Number.isFinite(mesh.userData?.lodRadius) ? mesh.userData.lodRadius : 0;
+      const visibleDist = structureBaseDist + Math.min(700, radius);
+      const hysteresis = appCtx.droneMode ? 260 : 180;
+      const limitDist = mesh.visible ? visibleDist + hysteresis : visibleDist;
+      const dx = center.x - refX;
+      const dz = center.z - refZ;
+      mesh.visible = dx * dx + dz * dz <= limitDist * limitDist;
+    }
+  }
+
   if (typeof appCtx.setPerfLiveStat === 'function') {
     appCtx.setPerfLiveStat('lodVisible', { near: nearVisible, mid: midVisible });
+  }
+
+  if (Array.isArray(appCtx.streetFurnitureMeshes) && appCtx.streetFurnitureMeshes.length > 0) {
+    const perfTier = String(appCtx.getPerfAutoQualityTier?.() || appCtx.perfAutoQualityTier || 'balanced');
+    const performanceTier = perfTier === 'performance';
+    const driveFast = actorMode === 'drive' && Math.abs(Number(appCtx.car?.speed) || 0) > 10;
+    const droneActive = !!appCtx.droneMode;
+    if (performanceTier) {
+      for (let i = 0; i < appCtx.streetFurnitureMeshes.length; i++) {
+        const mesh = appCtx.streetFurnitureMeshes[i];
+        if (mesh) mesh.visible = false;
+      }
+      return;
+    }
+    const furnitureDist =
+      appCtx.boatMode?.active ? 160 :
+      droneActive ? (performanceTier ? 140 : 180) :
+      driveFast ? (performanceTier ? 150 : 210) :
+      performanceTier ? 220 : (lodThresholds.mid * 0.45) + 60;
+    const furnitureSq = furnitureDist * furnitureDist;
+    for (let i = 0; i < appCtx.streetFurnitureMeshes.length; i++) {
+      const mesh = appCtx.streetFurnitureMeshes[i];
+      if (!mesh) continue;
+      if (mesh.userData?.boatSuppressed) {
+        mesh.visible = false;
+        continue;
+      }
+      const center = getMeshLodCenter(mesh) || mesh.userData?.furniturePos || mesh.position;
+      if (!center) continue;
+      const dx = center.x - refX;
+      const dz = center.z - refZ;
+      mesh.visible = dx * dx + dz * dz <= furnitureSq;
+    }
   }
 }
 
@@ -5789,6 +16002,18 @@ function _initFurnitureMaterials() {
   _matLampHead = new THREE.MeshLambertMaterial({ color: 0xdddddd, emissive: 0xffffaa, emissiveIntensity: 0.5 });
   _matTrashBody = new THREE.MeshLambertMaterial({ color: 0x3a5a3a });
   _matTrashLid = new THREE.MeshLambertMaterial({ color: 0x4a4a4a });
+  [
+    _matPole,
+    _matSignBg,
+    _matTrunk,
+    _matLampHead,
+    _matTrashBody,
+    _matTrashLid,
+    ...(_matTreeShades || [])
+  ].forEach((mat) => {
+    if (!mat) return;
+    mat.userData = { ...(mat.userData || {}), sharedContinuousWorldMaterial: true };
+  });
   _furnitureMatsReady = true;
 }
 
@@ -5834,6 +16059,8 @@ function _getSignMaterial(name) {
 
   const texture = new THREE.CanvasTexture(canvas);
   const mat = new THREE.MeshBasicMaterial({ map: texture });
+  texture.userData = { ...(texture.userData || {}), sharedStreetSignTexture: true };
+  mat.userData = { ...(mat.userData || {}), sharedStreetSignMaterial: true };
   _signTextureCache.set(name, mat);
   return mat;
 }
@@ -5935,9 +16162,20 @@ function isInsideWaterArea(x, z) {
 function isVegetationPlacementBlocked(x, z, options = {}) {
   const roadPadding = Number.isFinite(options.roadPadding) ? options.roadPadding : 4.5;
   const buildingPadding = Number.isFinite(options.buildingPadding) ? options.buildingPadding : 1.8;
+  const terrainY = typeof appCtx.baseTerrainHeightAt === 'function' ?
+    appCtx.baseTerrainHeightAt(x, z) :
+    typeof appCtx.terrainMeshHeightAt === 'function' ?
+      appCtx.terrainMeshHeightAt(x, z) :
+      appCtx.elevationWorldYAtWorldXZ(x, z);
 
-  const nr = typeof findNearestRoad === 'function' ? findNearestRoad(x, z) : { road: null, dist: Infinity };
-  if (nr?.road && Number.isFinite(nr.dist) && nr.dist <= nr.road.width * 0.5 + roadPadding) {
+  const nr = typeof findNearestRoad === 'function' ? findNearestRoad(x, z, {
+    y: Number.isFinite(terrainY) ? terrainY + 0.4 : NaN,
+    maxVerticalDelta: 4.5
+  }) : { road: null, dist: Infinity };
+  if (isRoadSurfaceReachable(nr, {
+    extraLateralPadding: roadPadding - 1.35,
+    extraVerticalAllowance: 0.2
+  })) {
     return true;
   }
 
@@ -5966,11 +16204,12 @@ function collectVegetationPlacements() {
   const placements = [];
   const treeNodes = Array.isArray(appCtx.osmTreeNodes) ? appCtx.osmTreeNodes : [];
   const treeRows = Array.isArray(appCtx.osmTreeRows) ? appCtx.osmTreeRows : [];
+  const worldDensityScale = vegetationWorldDensityScale();
   const budgetScale =
     appCtx.rdtComplexity >= 6 ? 0.55 :
     appCtx.rdtComplexity >= 4 ? 0.72 :
     appCtx.rdtComplexity >= 2 ? 0.88 : 1;
-  const maxTrees = Math.max(120, Math.floor(MAX_GENERATED_TREE_INSTANCES * budgetScale));
+  const maxTrees = Math.max(120, Math.floor(MAX_GENERATED_TREE_INSTANCES * budgetScale * worldDensityScale));
   const pushPlacement = (placement) => {
     if (!placement || placements.length >= maxTrees) return false;
     if (!Number.isFinite(placement.x) || !Number.isFinite(placement.z)) return false;
@@ -6028,6 +16267,7 @@ function collectVegetationPlacements() {
     const lu = appCtx.landuses[i];
     if (!lu || !VEGETATION_ELIGIBLE_TYPES.has(lu.type) || !Array.isArray(lu.pts) || lu.pts.length < 3) continue;
     const cfg = TREE_DENSITY_BY_LANDUSE[lu.type] || TREE_DENSITY_BY_LANDUSE.park;
+    const densityScale = vegetationLanduseDensityScale(lu.type);
     const area = Math.abs(signedPolygonAreaXZ(lu.pts));
     if (!(area > 24)) continue;
     let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -6043,8 +16283,8 @@ function collectVegetationPlacements() {
     if (!(width > 2) || !(depth > 2)) continue;
 
     const desired = Math.min(
-      Math.max(2, Math.floor(area / Math.max(60, cfg.spacing * cfg.spacing * cfg.weight))),
-      Math.max(4, Math.floor(cfg.maxPerPolygon * budgetScale))
+      Math.max(2, Math.floor(area / Math.max(60, cfg.spacing * cfg.spacing * cfg.weight / Math.max(0.42, densityScale)))),
+      Math.max(4, Math.floor(cfg.maxPerPolygon * budgetScale * densityScale))
     );
     const polySeed = vegetationSeed((appCtx.rdtSeed ^ (i + 1) ^ Math.floor(area * 10)) >>> 0);
     for (let attempt = 0; attempt < desired * 8 && placements.length < maxTrees; attempt++) {
@@ -6055,24 +16295,27 @@ function collectVegetationPlacements() {
       pushPlacement({
         x: tx,
         z: tz,
-        scale: 0.78 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * (lu.type === 'forest' || lu.type === 'wood' ? 0.92 : 0.68),
+        scale: 0.78 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * (lu.type === 'forest' || lu.type === 'wood' ? 0.92 : lu.type === 'scrub' ? 0.58 : 0.68),
         canopyStretch: 0.84 + appCtx.rand01FromInt(seed ^ 0x9e3779b9) * 0.38,
         rotation: appCtx.rand01FromInt(seed ^ 0x85ebca6b) * Math.PI * 2,
         color: (
           lu.type === 'forest' || lu.type === 'wood' ?
             [0x1d5620, 0x275f22, 0x2f6c27, 0x3d7a31] :
+            lu.type === 'scrub' ?
+              [0x607d3b, 0x6f8a41, 0x7d9550] :
             lu.type === 'orchard' ?
               [0x356f2d, 0x4b8a3a, 0x5d9441] :
               [0x2f7329, 0x417f34, 0x4e8c41]
-        )[Math.floor(appCtx.rand01FromInt(seed ^ 0xd3a2646c) * 4) % (lu.type === 'orchard' ? 3 : 4)],
+        )[Math.floor(appCtx.rand01FromInt(seed ^ 0xd3a2646c) * 4) % (lu.type === 'orchard' || lu.type === 'scrub' ? 3 : 4)],
         source: 'polygon',
         landuseType: lu.type,
         options: {
           roadPadding:
             lu.type === 'forest' || lu.type === 'wood' ? 2.2 :
+            lu.type === 'scrub' ? 1.85 :
             lu.type === 'orchard' ? 2.0 :
             1.45,
-          buildingPadding: lu.type === 'forest' || lu.type === 'wood' ? 1.1 : 0.9
+          buildingPadding: lu.type === 'forest' || lu.type === 'wood' ? 1.1 : lu.type === 'scrub' ? 1.0 : 0.9
         }
       });
     }
@@ -6094,6 +16337,47 @@ function collectVegetationPlacements() {
         source: 'fallback_polygon',
         landuseType: lu.type,
         options: { roadPadding: 0.8, buildingPadding: 0.6 }
+      });
+    }
+  }
+
+  if (placements.length === 0 && treeNodes.length > 0) {
+    for (let i = 0; i < treeNodes.length && placements.length < 16; i++) {
+      const node = treeNodes[i];
+      if (!node || !Number.isFinite(node.lat) || !Number.isFinite(node.lon)) continue;
+      const pos = appCtx.geoToWorld(node.lat, node.lon);
+      if (isVegetationPlacementBlocked(pos.x, pos.z, { roadPadding: 0.45, buildingPadding: 0.3 })) continue;
+      const seed = vegetationSeed((appCtx.rdtSeed ^ Number(node.id || i + 1) ^ 0x6a09e667) >>> 0);
+      placements.push({
+        x: pos.x,
+        z: pos.z,
+        scale: 0.84 + appCtx.rand01FromInt(seed ^ 0x7f4a7c15) * 0.42,
+        canopyStretch: 0.9 + appCtx.rand01FromInt(seed ^ 0x165667b1) * 0.2,
+        rotation: appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * Math.PI * 2,
+        color: [0x2c6726, 0x356f2d, 0x3d7a31][Math.floor(appCtx.rand01FromInt(seed ^ 0x85ebca6b) * 3) % 3],
+        source: 'fallback_tree_node',
+        landuseType: 'tree',
+        options: { roadPadding: 0.45, buildingPadding: 0.3 }
+      });
+    }
+  }
+
+  if (placements.length === 0 && treeNodes.length > 0) {
+    for (let i = 0; i < treeNodes.length && placements.length < 8; i++) {
+      const node = treeNodes[i];
+      if (!node || !Number.isFinite(node.lat) || !Number.isFinite(node.lon)) continue;
+      const pos = appCtx.geoToWorld(node.lat, node.lon);
+      const seed = vegetationSeed((appCtx.rdtSeed ^ Number(node.id || i + 1) ^ 0x510e527f) >>> 0);
+      placements.push({
+        x: pos.x,
+        z: pos.z,
+        scale: 0.82 + appCtx.rand01FromInt(seed ^ 0x7f4a7c15) * 0.28,
+        canopyStretch: 0.94 + appCtx.rand01FromInt(seed ^ 0x165667b1) * 0.16,
+        rotation: appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * Math.PI * 2,
+        color: [0x2c6726, 0x356f2d, 0x3d7a31][Math.floor(appCtx.rand01FromInt(seed ^ 0x85ebca6b) * 3) % 3],
+        source: 'fallback_tree_node_unblocked',
+        landuseType: 'tree',
+        options: { roadPadding: 0, buildingPadding: 0 }
       });
     }
   }
@@ -6229,18 +16513,41 @@ function createTrashCan(x, z) {
 function generateStreetFurniture() {
   _initFurnitureMaterials();
   _initFurnitureGeometries();
+  const perfTier = String(appCtx.getPerfAutoQualityTier?.() || appCtx.perfAutoQualityTier || 'balanced');
+  const performanceTier = perfTier === 'performance';
+  if (performanceTier) {
+    buildVegetationInstancing(collectVegetationPlacements());
+    return;
+  }
+  const signSpacing = performanceTier ? 220 : 120;
+  const maxSignsPerRoad = performanceTier ? 1 : 2;
+  const lampSpacing = performanceTier ? 150 : 80;
+  const trashCanStep = performanceTier ? 14 : 5;
+  const allowRoadFurniture = (road) => {
+    if (!road) return false;
+    if (!performanceTier) return true;
+    const type = String(road.type || '');
+    return (
+      Number(road.width || 0) >= 14 ||
+      type === 'motorway' ||
+      type === 'trunk' ||
+      type === 'primary' ||
+      type === 'secondary' ||
+      type === 'tertiary'
+    );
+  };
 
   // --- STREET SIGNS: place at intervals along named roads ---
-  const signSpacing = 120; // One sign every ~120 world units
   const signedRoads = new Set();
   appCtx.roads.forEach((road) => {
+    if (!allowRoadFurniture(road)) return;
     if (!road.name || road.name === road.type.charAt(0).toUpperCase() + road.type.slice(1)) return;
     if (signedRoads.has(road.name)) return;
     signedRoads.add(road.name);
 
     let distAccum = 0;
     let signsPlaced = 0;
-    for (let i = 0; i < road.pts.length - 1 && signsPlaced < 2; i++) {
+    for (let i = 0; i < road.pts.length - 1 && signsPlaced < maxSignsPerRoad; i++) {
       const p1 = road.pts[i],p2 = road.pts[i + 1];
       const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
       distAccum += segLen;
@@ -6268,9 +16575,9 @@ function generateStreetFurniture() {
   buildVegetationInstancing(collectVegetationPlacements());
 
   // --- LIGHT POSTS: along major roads at intervals ---
-  const lampSpacing = 80;
   appCtx.roads.forEach((road) => {
-    if (road.width < 12) return; // Only major roads
+    if (!allowRoadFurniture(road)) return;
+    if (road.width < (performanceTier ? 14 : 12)) return; // Only major roads
     let distAccum = 0;
     for (let i = 0; i < road.pts.length - 1; i++) {
       const p1 = road.pts[i],p2 = road.pts[i + 1];
@@ -6290,7 +16597,7 @@ function generateStreetFurniture() {
 
   // --- TRASH CANS: near some POIs ---
   appCtx.pois.forEach((poi, i) => {
-    if (i % 5 !== 0) return; // Every 5th POI
+    if (i % trashCanStep !== 0) return;
     const offset = 3 + Math.random() * 2;
     const angle = Math.random() * Math.PI * 2;
     createTrashCan(poi.x + Math.cos(angle) * offset, poi.z + Math.sin(angle) * offset);
@@ -6298,52 +16605,106 @@ function generateStreetFurniture() {
 }
 
 Object.assign(appCtx, {
+  awaitPlayableWorldShell,
+  countVisibleBuildingMeshesNearWorldPoint,
+  countVisibleDetailedBuildingMeshesNearWorldPoint,
+  countVisibleRoadMeshesNearWorldPoint,
+  applyContinuousWorldRebase,
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
   applySpawnTarget,
   buildTraversalNetworks,
+  cancelWorldLoad,
+  configureContinuousWorldInteractiveStreaming,
+  countDriveableRoadFeaturesNearWorldPoint,
   fetchOverpassJSON,
   findNearestRoad,
   findNearestTraversalFeature,
   findTraversalRoute,
+  getContinuousWorldInteractiveStreamSnapshot,
+  getPlayableCoreResidencySnapshot,
+  getBuildingsIntersectingBounds,
+  getLandusesIntersectingBounds,
   getNearbyBuildings,
+  getRoadMeshSpatialIndexSnapshot,
   invalidateTraversalNetworks,
+  kickContinuousWorldInteractiveStreaming,
+  loadContinuousWorldInteractiveChunk,
   largeMapScreenToWorld,
   loadRoads,
   measureRemainingPolylineDistance,
+  markRoadMeshSpatialIndexDirty,
   minimapScreenToWorld,
+  getRuntimeContentInventorySnapshot,
   pickNavigationTargetPoint,
   pointInPolygon,
+  recordRuntimeContentRetired,
+  registerWaterWaveMaterial,
+  resetContinuousWorldInteractiveStreamState,
+  refreshStructureAwareFeatureProfiles,
   resolveSafeWorldSpawn,
+  sampleFeatureSurfaceY,
+  seedContinuousWorldInteractiveStreamState,
+  driveBuildBlockCollision,
+  shouldIgnoreDriveCollision,
+  syncRuntimeContentInventory,
   syncLinearFeatureOverlayVisibility,
   surfaceDisplayName,
   spawnOnRoad,
   terrainYAtWorld,
   teleportToLocation,
+  updatePlayableCoreResidency,
   updateWorldLod
 });
 
 export {
+  awaitPlayableWorldShell,
+  countVisibleBuildingMeshesNearWorldPoint,
+  countVisibleDetailedBuildingMeshesNearWorldPoint,
+  countVisibleRoadMeshesNearWorldPoint,
+  applyContinuousWorldRebase,
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
   applySpawnTarget,
   buildTraversalNetworks,
+  cancelWorldLoad,
+  configureContinuousWorldInteractiveStreaming,
+  countDriveableRoadFeaturesNearWorldPoint,
   fetchOverpassJSON,
   findNearestRoad,
   findNearestTraversalFeature,
   findTraversalRoute,
+  getContinuousWorldInteractiveStreamSnapshot,
+  getPlayableCoreResidencySnapshot,
+  getBuildingsIntersectingBounds,
+  getLandusesIntersectingBounds,
   getNearbyBuildings,
+  getRoadMeshSpatialIndexSnapshot,
   invalidateTraversalNetworks,
+  kickContinuousWorldInteractiveStreaming,
+  loadContinuousWorldInteractiveChunk,
   largeMapScreenToWorld,
   loadRoads,
   measureRemainingPolylineDistance,
+  markRoadMeshSpatialIndexDirty,
   minimapScreenToWorld,
+  getRuntimeContentInventorySnapshot,
   pickNavigationTargetPoint,
   pointInPolygon,
+  recordRuntimeContentRetired,
+  registerWaterWaveMaterial,
+  resetContinuousWorldInteractiveStreamState,
+  refreshStructureAwareFeatureProfiles,
   resolveSafeWorldSpawn,
+  sampleFeatureSurfaceY,
+  seedContinuousWorldInteractiveStreamState,
+  driveBuildBlockCollision,
+  shouldIgnoreDriveCollision,
+  syncRuntimeContentInventory,
   syncLinearFeatureOverlayVisibility,
   surfaceDisplayName,
   spawnOnRoad,
   terrainYAtWorld,
   teleportToLocation,
+  updatePlayableCoreResidency,
   updateWorldLod };

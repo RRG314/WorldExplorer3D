@@ -15,19 +15,21 @@ const PERF_SPIKE_16_7_MS = 16.7;
 const PERF_SPIKE_33_3_MS = 33.3;
 const PERF_SPIKE_50_MS = 50;
 const PERF_SPIKE_100_MS = 100;
+const PERF_MILESTONE_LIMIT = 40;
+const PERF_MEMORY_SAMPLE_INTERVAL_S = 1.0;
 const AUTO_QUALITY_EVAL_INTERVAL_S = 2.0;
 const AUTO_QUALITY_DEGRADE_FPS = 50;
-const AUTO_QUALITY_RECOVER_FPS = 57;
+const AUTO_QUALITY_RECOVER_FPS = 59;
 const AUTO_QUALITY_DEGRADE_FRAME_MS = 23.0;
-const AUTO_QUALITY_RECOVER_FRAME_MS = 18.2;
+const AUTO_QUALITY_RECOVER_FRAME_MS = 16.8;
 const AUTO_QUALITY_DEGRADE_STREAK = 3;
-const AUTO_QUALITY_RECOVER_STREAK = 6;
+const AUTO_QUALITY_RECOVER_STREAK = 12;
 const AUTO_QUALITY_COOLDOWN_S = 12;
 
 let perfMode = PERF_MODE_RDT;
 let perfOverlayEnabled = false;
 let perfAutoQualityEnabled = true;
-let perfAutoQualityTier = PERF_QUALITY_TIER_BALANCED;
+let perfAutoQualityTier = PERF_QUALITY_TIER_PERFORMANCE;
 
 let _perfFps = 0;
 let _perfFpsCurrent = 0;
@@ -57,6 +59,7 @@ let _perfAutoQualityLowStreak = 0;
 let _perfAutoQualityHighStreak = 0;
 let _perfAutoQualityLastChangeAt = 0;
 let _perfAutoQualityLastReason = 'init';
+let _perfMemorySampleClock = PERF_MEMORY_SAMPLE_INTERVAL_S;
 
 const perfStats = {
   mode: PERF_MODE_RDT,
@@ -70,6 +73,13 @@ const perfStats = {
     textures: 0,
     programs: 0
   },
+  memory: {
+    jsHeapUsedMB: null,
+    jsHeapTotalMB: null,
+    jsHeapLimitMB: null,
+    deviceMemoryGB: Number.isFinite(Number(globalThis.navigator?.deviceMemory)) ? Number(globalThis.navigator.deviceMemory) : null
+  },
+  milestones: [],
   live: {
     speedMph: 0,
     terrainRing: typeof appCtx.TERRAIN_RING === 'number' ? appCtx.TERRAIN_RING : 0,
@@ -101,7 +111,8 @@ const perfStats = {
       over50: 0,
       over100: 0,
       maxFrameMs: 0
-    }
+    },
+    runtimeSections: {}
   },
   updatedAt: Date.now()
 };
@@ -229,6 +240,48 @@ function exposeMutableGlobal(name, getter, setter) {
   });
 }
 
+function readJsMemoryStats() {
+  const mem = globalThis.performance?.memory;
+  if (!mem) {
+    return {
+      jsHeapUsedMB: null,
+      jsHeapTotalMB: null,
+      jsHeapLimitMB: null,
+      deviceMemoryGB: Number.isFinite(Number(globalThis.navigator?.deviceMemory)) ? Number(globalThis.navigator.deviceMemory) : null
+    };
+  }
+  const toMb = (value) => Number.isFinite(Number(value)) ? Number((Number(value) / (1024 * 1024)).toFixed(1)) : null;
+  return {
+    jsHeapUsedMB: toMb(mem.usedJSHeapSize),
+    jsHeapTotalMB: toMb(mem.totalJSHeapSize),
+    jsHeapLimitMB: toMb(mem.jsHeapSizeLimit),
+    deviceMemoryGB: Number.isFinite(Number(globalThis.navigator?.deviceMemory)) ? Number(globalThis.navigator.deviceMemory) : null
+  };
+}
+
+function samplePerfMemory() {
+  perfStats.memory = readJsMemoryStats();
+  perfStats.updatedAt = Date.now();
+  return perfStats.memory;
+}
+
+function markPerfMilestone(name, detail = {}) {
+  const label = String(name || '').trim();
+  if (!label) return null;
+  const entry = {
+    name: label,
+    atMs: Math.round(performance.now()),
+    timestamp: new Date().toISOString(),
+    ...(detail && typeof detail === 'object' ? detail : {})
+  };
+  perfStats.milestones.push(entry);
+  if (perfStats.milestones.length > PERF_MILESTONE_LIMIT) {
+    perfStats.milestones.splice(0, perfStats.milestones.length - PERF_MILESTONE_LIMIT);
+  }
+  perfStats.updatedAt = Date.now();
+  return entry;
+}
+
 function readStorage(key) {
   try {
     return localStorage.getItem(key);
@@ -354,6 +407,23 @@ function _stepPerfAutoQuality(dt, fps, frameMs) {
   const spikeMetrics = getPerfSpikeMetrics(false);
   const windowFrames = Math.max(1, spikeMetrics.windowFrames || 0);
   const over33Ratio = (spikeMetrics.over33_3 || 0) / windowFrames;
+  const interactiveStreamState =
+    typeof appCtx.getContinuousWorldInteractiveStreamSnapshot === 'function' ?
+      appCtx.getContinuousWorldInteractiveStreamSnapshot() :
+      null;
+  const terrainSnapshot =
+    typeof appCtx.getTerrainStreamingSnapshot === 'function' ?
+      appCtx.getTerrainStreamingSnapshot() :
+      null;
+  const activeStreaming =
+    !!interactiveStreamState?.pending ||
+    ((Date.now() - Number(interactiveStreamState?.lastLoadAt || 0)) < 1800);
+  const terrainBusy =
+    !!appCtx.worldLoading ||
+    !!terrainSnapshot?.roadsNeedRebuild ||
+    !!terrainSnapshot?.rebuildInFlight ||
+    Number(terrainSnapshot?.pendingSurfaceSyncRoads || 0) > 0 ||
+    Number(terrainSnapshot?.lastSurfaceSyncDurationMs || 0) > 60;
   const lowPressure =
   Number.isFinite(fps) && fps > 0 && fps < AUTO_QUALITY_DEGRADE_FPS ||
   Number.isFinite(frameMs) && frameMs > AUTO_QUALITY_DEGRADE_FRAME_MS ||
@@ -362,7 +432,9 @@ function _stepPerfAutoQuality(dt, fps, frameMs) {
   const highHeadroom =
   Number.isFinite(fps) && fps >= AUTO_QUALITY_RECOVER_FPS &&
   Number.isFinite(frameMs) && frameMs <= AUTO_QUALITY_RECOVER_FRAME_MS &&
-  over33Ratio < 0.05;
+  over33Ratio < 0.05 &&
+  !activeStreaming &&
+  !terrainBusy;
 
   if (lowPressure) {
     _perfAutoQualityLowStreak += 1;
@@ -422,7 +494,21 @@ function mergePerfLiveStats(values = {}) {
   });
 }
 
+function recordPerfRuntimeSection(key, value) {
+  if (!key) return;
+  const nextValue = Number(value);
+  if (!Number.isFinite(nextValue) || nextValue < 0) return;
+  const runtimeSections = perfStats.live.runtimeSections || (perfStats.live.runtimeSections = {});
+  const current = runtimeSections[key];
+  runtimeSections[key] = {
+    ms: Number.isFinite(current?.ms) ? current.ms * 0.82 + nextValue * 0.18 : nextValue,
+    lastMs: nextValue,
+    maxMs: Math.max(Number(current?.maxMs || 0), nextValue)
+  };
+}
+
 function startPerfLoad(label, meta = {}) {
+  markPerfMilestone(`${label || 'world-load'}:start`, meta);
   _perfLoadStart = {
     label: label || 'world-load',
     mode: perfMode,
@@ -466,6 +552,10 @@ function finishPerfLoad(summary = {}) {
     ...(loadSpikes ? { spikes: loadSpikes } : {}),
     ...(typeof summary === 'object' ? summary : {})
   };
+  markPerfMilestone(`${perfStats.lastLoad.label || 'world-load'}:finish`, {
+    loadMs: perfStats.lastLoad.loadMs,
+    success: perfStats.lastLoad.success !== false
+  });
   _perfLoadStart = null;
   _perfLoadSpikeState = null;
   perfStats.updatedAt = Date.now();
@@ -491,6 +581,11 @@ function recordPerfFrame(dt) {
   perfStats.live.fpsCurrent = Number.isFinite(_perfFpsCurrent) ? _perfFpsCurrent : 0;
   perfStats.live.frameMs = Number.isFinite(_perfFrameMs) ? _perfFrameMs : 0;
   perfStats.live.spikes = getPerfSpikeMetrics(false);
+  _perfMemorySampleClock += dt;
+  if (_perfMemorySampleClock >= PERF_MEMORY_SAMPLE_INTERVAL_S) {
+    _perfMemorySampleClock = 0;
+    samplePerfMemory();
+  }
 
   const currentSpeedMph = (() => {
     if (typeof appCtx.droneMode !== 'undefined' && appCtx.droneMode && typeof appCtx.drone !== 'undefined') {
@@ -600,6 +695,8 @@ function capturePerfSnapshot(extra = {}) {
     frameMs: Number((perfStats.live.frameMs || 0).toFixed(2)),
     dynamicBudget: getDynamicBudgetState(),
     renderer: { ...perfStats.renderer },
+    memory: { ...perfStats.memory },
+    milestones: perfStats.milestones.slice(-20),
     live: { ...perfStats.live },
     spikes: spikeMetrics,
     lastLoad: perfStats.lastLoad ? { ...perfStats.lastLoad } : null,
@@ -654,6 +751,7 @@ function updatePerfPanel(force = false) {
   `QUALITY: ${qualityLabel} (${quality.auto ? 'AUTO' : 'LOCK'} ${String(quality.tier || 'balanced').toUpperCase()})`,
   `DRAW: ${formatPerfNumber(r.calls)} | TRI: ${formatPerfNumber(r.triangles)}`,
   `GEO: ${formatPerfNumber(r.geometries)} | TEX: ${formatPerfNumber(r.textures)} | PROG: ${formatPerfNumber(r.programs)}`,
+  `MEM: ${Number.isFinite(perfStats.memory?.jsHeapUsedMB) ? `${perfStats.memory.jsHeapUsedMB} / ${perfStats.memory.jsHeapTotalMB || '--'} MB` : 'n/a'}`,
   `LOAD: ${Number.isFinite(lastLoad.loadMs) ? `${lastLoad.loadMs} ms` : '--'}`,
   `FEATURES: R${counts.roads || 0} B${counts.buildings || 0} P${counts.poiMeshes || 0} L${counts.landuseMeshes || 0}`,
   `RDT-NOISE: ${rdtNoiseStatus} | EDGE ${rdtNoiseEdgeAvg.toFixed(2)}m/${rdtNoiseTerrainEdgeAvg.toFixed(2)}m`,
@@ -705,8 +803,10 @@ Object.assign(appCtx, {
   getPerfOverlayEnabled,
   logBaselineSnapshot,
   mergePerfLiveStats,
+  markPerfMilestone,
   perfStats,
   recordPerfFrame,
+  recordPerfRuntimeSection,
   recordPerfRendererInfo,
   setPerfAutoQualityEnabled,
   setPerfAutoQualityTier,
@@ -734,12 +834,14 @@ export {
   getPerfOverlayEnabled,
   logBaselineSnapshot,
   mergePerfLiveStats,
+  markPerfMilestone,
   perfAutoQualityEnabled,
   perfAutoQualityTier,
   perfMode,
   perfOverlayEnabled,
   perfStats,
   recordPerfFrame,
+  recordPerfRuntimeSection,
   recordPerfRendererInfo,
   setPerfAutoQualityEnabled,
   setPerfAutoQualityTier,

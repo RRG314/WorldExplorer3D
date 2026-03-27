@@ -1,8 +1,13 @@
 # Quick Start
 
-Last reviewed: 2026-03-13
+Last reviewed: 2026-03-27
 
 Fast path to run, test, and validate World Explorer 3D locally.
+
+This file is written for both developers and non-developers.
+
+If you only want to run the project and test gameplay, focus on Sections 1 to 4.
+If you are changing code, also follow Sections 5 to 8.
 
 ## 1. Prerequisites
 
@@ -11,6 +16,8 @@ Fast path to run, test, and validate World Explorer 3D locally.
 - Python 3
 - Java 21 (required for Firestore rules tests)
 - Firebase CLI (`npm i -g firebase-tools`) for backend deploy steps
+
+If you are only trying the local build, Python, Node.js, and npm are the important parts.
 
 ## 2. Install
 
@@ -33,6 +40,8 @@ Open:
 - `http://127.0.0.1:4173/`
 - `http://127.0.0.1:4173/app/`
 - `http://127.0.0.1:4173/account/`
+
+If something looks wrong, always refresh once after `npm run sync:public` so the browser picks up the newest runtime files.
 
 ## 4. Mirror Discipline (Canonical -> `public/*`)
 
@@ -65,6 +74,8 @@ This checks:
 2. Firestore rules tests
 3. runtime invariants via Playwright
 
+If you are not changing backend or deployment behavior, you usually do not need every backend step before basic local testing.
+
 ## 6. Manual Smoke Checklist (Release Candidate)
 
 1. Title launch:
@@ -83,6 +94,10 @@ This checks:
    - verify greenery appears in parks / woods / mapped tree areas without a large frame-time spike
    - walk up to a supported building prompt, press `E`, confirm the interior loads only on demand, then press `E` or `Esc` to exit cleanly
    - select a real-estate or historic destination, navigate to it, and confirm the same `E` prompt/entry flow works there too
+   - open `Contributor Editor`, capture `Current Building`, switch to `Building Note`, preview it, and confirm the live world stayed unchanged
+   - switch to `Photo Contribution`, add a test photo URL, preview it, and confirm the building-specific fields swap to photo fields
+   - if signed in with Firebase configured, submit a test contribution and confirm it appears in `My Submissions` as `pending`
+   - if signed in as admin/allowlisted owner, open `/account/moderation.html`, confirm the queue loads, and verify approve/reject actions work there
    - switch Earth <-> Ocean from in-game environment controls
    - verify water remains visible where expected, including coastal water plus rivers / ponds / lakes
    - verify the current active build keeps path overlays hidden/disabled while walk/drive traversal remains stable on the road-and-ground network

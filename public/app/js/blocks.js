@@ -9,6 +9,10 @@ const BUILD_BLOCK_COLORS = [0xb55239, 0xa74631, 0x9a3d2b, 0xc16345];
 
 const BUILD_STORAGE_KEY = 'worldExplorer3D.buildBlocks.v1';
 const BUILD_STORAGE_TEST_KEY = 'worldExplorer3D.buildBlocks.test';
+const BUILD_STORAGE_MIGRATION_KEY = 'worldExplorer3D.buildBlocks.migrated.v2';
+const LEGACY_BUILD_STORAGE_KEYS = Object.freeze([
+  BUILD_STORAGE_KEY
+]);
 const BUILD_LOCATION_PRECISION = 5;
 const BUILD_MAX_PER_LOCATION = 100;
 const BUILD_MAX_TOTAL = 100;
@@ -109,6 +113,24 @@ function detectBuildStorage() {
     return { enabled: true, detail: 'Storage round-trip check passed.' };
   } catch (err) {
     return { enabled: false, detail: `Storage access blocked: ${err && err.message ? err.message : String(err)}` };
+  }
+}
+
+function clearLegacyBuildStorage() {
+  if (!buildPersistenceEnabled || !globalThis.localStorage) return;
+  try {
+    if (localStorage.getItem(BUILD_STORAGE_MIGRATION_KEY) === 'done') return;
+    LEGACY_BUILD_STORAGE_KEYS.forEach((key) => {
+      try {
+        localStorage.removeItem(key);
+      } catch (err) {
+        console.warn('[blocks] Failed to clear legacy build storage key:', key, err);
+      }
+    });
+    localStorage.setItem(BUILD_STORAGE_MIGRATION_KEY, 'done');
+    buildPersistenceDetail = 'Legacy local build persistence disabled; blocks are session-only unless shared in a room.';
+  } catch (err) {
+    console.warn('[blocks] Failed to clear legacy build storage:', err);
   }
 }
 
@@ -271,32 +293,11 @@ function normalizeBuildEntry(raw) {
 }
 
 function loadBuildEntriesFromStorage() {
-  if (!buildPersistenceEnabled) return [];
-  try {
-    const raw = localStorage.getItem(BUILD_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    const normalized = parsed.map(normalizeBuildEntry).filter(Boolean);
-    if (normalized.length <= BUILD_MAX_TOTAL) return normalized;
-    return normalized.slice(normalized.length - BUILD_MAX_TOTAL);
-  } catch (err) {
-    console.warn('[blocks] Failed to read storage:', err);
-    return [];
-  }
+  return [];
 }
 
 function saveBuildEntriesToStorage() {
-  if (!buildPersistenceEnabled) return false;
-  try {
-    localStorage.setItem(BUILD_STORAGE_KEY, JSON.stringify(buildEntries));
-    return true;
-  } catch (err) {
-    buildPersistenceEnabled = false;
-    buildPersistenceDetail = `Storage write failed: ${err && err.message ? err.message : String(err)}`;
-    console.warn('[blocks] Failed to save storage:', err);
-    return false;
-  }
+  return true;
 }
 
 function getBuildEntriesForCurrentLocation() {
@@ -955,6 +956,7 @@ function refreshBlockBuilderForCurrentLocation() {
   const storageState = detectBuildStorage();
   buildPersistenceEnabled = storageState.enabled;
   buildPersistenceDetail = storageState.detail;
+  clearLegacyBuildStorage();
 }
 buildEntries = loadBuildEntriesFromStorage();
 

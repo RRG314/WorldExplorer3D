@@ -6,8 +6,16 @@ const rootDir = process.cwd();
 const pairs = [
   { a: 'CNAME', b: 'public/CNAME' },
   { a: 'index.html', b: 'public/index.html' },
+  { a: 'about/index.html', b: 'public/about/index.html' },
   { a: 'account/index.html', b: 'public/account/index.html' },
+  { a: 'account/admin.html', b: 'public/account/admin.html' },
+  { a: 'account/moderation.html', b: 'public/account/moderation.html' },
+  { a: 'legal/privacy.html', b: 'public/legal/privacy.html' },
+  { a: 'legal/privacy/index.html', b: 'public/legal/privacy/index.html' },
+  { a: 'legal/terms.html', b: 'public/legal/terms.html' },
+  { a: 'legal/terms/index.html', b: 'public/legal/terms/index.html' },
   { a: 'app/index.html', b: 'public/app/index.html' },
+  { a: 'js', b: 'public/js', dir: true },
   { a: 'app/assets', b: 'public/app/assets', dir: true },
   { a: 'app/data', b: 'public/app/data', dir: true },
   { a: 'app/js', b: 'public/app/js', dir: true }

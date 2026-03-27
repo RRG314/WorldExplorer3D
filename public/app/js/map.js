@@ -1,4 +1,9 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
+import {
+  currentMapReferenceGeoPosition,
+  currentMapReferenceWorldPosition,
+  worldPointToGeo
+} from "./map-coordinates.js?v=1";
 // map.js - Minimap and large map rendering
 // ============================================================================
 
@@ -6,6 +11,75 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 const mctx = document.getElementById('minimap').getContext('2d');
 const largeMapCtx = document.getElementById('largeMapCanvas').getContext('2d');
 const tileCache = new Map();
+const mapLayerCaches = {
+  minimap: createMapLayerCache(),
+  large: createMapLayerCache()
+};
+const moonMapSampleCaches = {
+  minimap: { key: '', samples: [] },
+  large: { key: '', samples: [] }
+};
+
+function createMapLayerCache() {
+  return {
+    canvas: typeof document !== 'undefined' ? document.createElement('canvas') : null,
+    ctx: null,
+    width: 0,
+    height: 0,
+    margin: 0,
+    key: '',
+    centerXT: 0,
+    centerYT: 0,
+    lastRenderAt: 0,
+    incomplete: true
+  };
+}
+
+function normalizeOverlayPoint(point = {}) {
+  return {
+    lat: Number(point?.lat),
+    lon: Number(point?.lon)
+  };
+}
+
+function overlayGeometryPolygonRings(input = {}) {
+  const source = input && typeof input === 'object' ? input : {};
+  if (Array.isArray(source.rings)) {
+    return source.rings
+      .map((ring) => {
+        if (Array.isArray(ring?.points)) return ring.points;
+        if (Array.isArray(ring?.coordinates)) return ring.coordinates;
+        return Array.isArray(ring) ? ring : [];
+      })
+      .map((ring) => ring.map((point) => normalizeOverlayPoint(point)))
+      .filter((ring) => ring.length > 0);
+  }
+  if (Array.isArray(source.coordinates)) {
+    if (source.coordinates.length && Array.isArray(source.coordinates[0])) {
+      return source.coordinates
+        .map((ring) => Array.isArray(ring) ? ring.map((point) => normalizeOverlayPoint(point)) : [])
+        .filter((ring) => ring.length > 0);
+    }
+    return [
+      source.coordinates.map((point) => normalizeOverlayPoint(point))
+    ].filter((ring) => ring.length > 0);
+  }
+  return [];
+}
+
+function overlayMapFeatureColor(feature = {}) {
+  const featureClass = String(feature?.featureClass || '').toLowerCase();
+  const presetId = String(feature?.presetId || '').toLowerCase();
+  if (featureClass === 'building' || presetId.includes('building')) return '#f97316';
+  if (featureClass === 'road' || presetId.includes('road')) return '#38bdf8';
+  if (featureClass === 'railway' || presetId.includes('rail')) return '#a78bfa';
+  if (presetId.includes('entrance') || presetId.includes('interior')) return '#14b8a6';
+  return '#f59e0b';
+}
+
+function overlayMapFeatureLabel(feature = {}) {
+  return String(feature?.tags?.name || feature?.summary || feature?.presetId || 'Overlay').trim() || 'Overlay';
+}
 
 function latLonToTile(lat, lon, zoom) {
   const n = Math.pow(2, zoom);
@@ -46,6 +120,124 @@ function loadTile(x, y, zoom) {
   return tileData;
 }
 
+function ensureMapLayerCacheCanvas(cache, width, height) {
+  if (!cache.canvas) return null;
+  if (cache.width !== width || cache.height !== height) {
+    cache.width = width;
+    cache.height = height;
+    cache.canvas.width = width;
+    cache.canvas.height = height;
+    cache.ctx = cache.canvas.getContext('2d');
+    cache.incomplete = true;
+  } else if (!cache.ctx) {
+    cache.ctx = cache.canvas.getContext('2d');
+  }
+  return cache.ctx;
+}
+
+function renderEarthTileCache(cache, width, height, zoom, centerXT, centerYT) {
+  const cacheCtx = ensureMapLayerCacheCanvas(cache, width, height);
+  if (!cacheCtx) return false;
+
+  const centerTileX = Math.floor(centerXT);
+  const centerTileY = Math.floor(centerYT);
+  const pixelOffsetX = (centerXT - centerTileX) * 256;
+  const pixelOffsetY = (centerYT - centerTileY) * 256;
+  const tilesWide = Math.ceil(width / 256) + 1;
+  const tilesHigh = Math.ceil(height / 256) + 1;
+  const startX = width / 2 - pixelOffsetX;
+  const startY = height / 2 - pixelOffsetY;
+  let missingTiles = 0;
+
+  cacheCtx.fillStyle = '#1a1a1a';
+  cacheCtx.fillRect(0, 0, width, height);
+
+  for (let dx = -Math.ceil(tilesWide / 2); dx <= Math.ceil(tilesWide / 2); dx++) {
+    for (let dy = -Math.ceil(tilesHigh / 2); dy <= Math.ceil(tilesHigh / 2); dy++) {
+      const tx = centerTileX + dx;
+      const ty = centerTileY + dy;
+      const maxTile = Math.pow(2, zoom) - 1;
+      if (tx < 0 || tx > maxTile || ty < 0 || ty > maxTile) continue;
+
+      const tile = loadTile(tx, ty, zoom);
+      if (!tile.loaded) {
+        missingTiles += 1;
+        continue;
+      }
+      const screenX = startX + dx * 256;
+      const screenY = startY + dy * 256;
+      cacheCtx.drawImage(tile.img, screenX, screenY, 256, 256);
+    }
+  }
+
+  cache.centerXT = centerXT;
+  cache.centerYT = centerYT;
+  cache.lastRenderAt = performance.now();
+  cache.incomplete = missingTiles > 0;
+  return true;
+}
+
+function drawEarthTileLayer(ctx, w, h, isLarge, zoom, centerXT, centerYT) {
+  const cache = isLarge ? mapLayerCaches.large : mapLayerCaches.minimap;
+  const margin = isLarge ? 256 : 128;
+  const cacheKey = `${appCtx.satelliteView ? 'sat' : 'osm'}:${zoom}:${isLarge ? 'large' : 'mini'}`;
+  const cacheWidth = w + margin * 2;
+  const cacheHeight = h + margin * 2;
+  const shiftXPx = (centerXT - cache.centerXT) * 256;
+  const shiftYPx = (centerYT - cache.centerYT) * 256;
+  const tooFarFromCachedCenter = Math.abs(shiftXPx) > margin * 0.6 || Math.abs(shiftYPx) > margin * 0.6;
+  const needsRender =
+    cache.key !== cacheKey ||
+    cache.width !== cacheWidth ||
+    cache.height !== cacheHeight ||
+    tooFarFromCachedCenter ||
+    (cache.incomplete && performance.now() - cache.lastRenderAt > 180);
+
+  cache.margin = margin;
+  if (needsRender) {
+    cache.key = cacheKey;
+    renderEarthTileCache(cache, cacheWidth, cacheHeight, zoom, centerXT, centerYT);
+  }
+
+  if (!cache.canvas) {
+    ctx.fillStyle = '#1a1a1a';
+    ctx.fillRect(0, 0, w, h);
+    return;
+  }
+
+  const srcX = margin + (centerXT - cache.centerXT) * 256;
+  const srcY = margin + (centerYT - cache.centerYT) * 256;
+  ctx.drawImage(cache.canvas, srcX, srcY, w, h, 0, 0, w, h);
+}
+
+function getMoonMapSamples(isLarge) {
+  const surface = appCtx.moonSurface;
+  const geometry = surface?.geometry;
+  const positions = geometry?.attributes?.position;
+  const colors = geometry?.attributes?.color;
+  if (!positions || !colors) return [];
+
+  const cache = isLarge ? moonMapSampleCaches.large : moonMapSampleCaches.minimap;
+  const budget = isLarge ? 14000 : 5000;
+  const key = `${geometry.uuid}:${positions.count}:${isLarge ? 'large' : 'mini'}`;
+  if (cache.key === key && Array.isArray(cache.samples) && cache.samples.length > 0) {
+    return cache.samples;
+  }
+
+  const stride = Math.max(1, Math.floor(positions.count / budget));
+  const samples = [];
+  for (let i = 0; i < positions.count; i += stride) {
+    samples.push({
+      x: positions.getX(i),
+      z: positions.getZ(i),
+      color: `rgb(${Math.floor(colors.getX(i) * 255)},${Math.floor(colors.getY(i) * 255)},${Math.floor(colors.getZ(i) * 255)})`
+    });
+  }
+  cache.key = key;
+  cache.samples = samples;
+  return samples;
+}
+
 function drawMinimap() {
   drawMapOnCanvas(mctx, 150, 150, false);
 }
@@ -55,14 +247,12 @@ function drawLargeMap() {
 }
 
 function worldToScreenLarge(worldX, worldZ) {
-  // Convert world coords to lat/lon
-  const lat = appCtx.LOC.lat - worldZ / appCtx.SCALE;
-  const lon = appCtx.LOC.lon + worldX / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
-
-  // Use Walk module for proper reference position
-  const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
-  const refLat = appCtx.LOC.lat - ref.z / appCtx.SCALE;
-  const refLon = appCtx.LOC.lon + ref.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
+  const geo = worldPointToGeo(worldX, worldZ);
+  const refGeo = currentMapReferenceGeoPosition();
+  const lat = Number(geo?.lat);
+  const lon = Number(geo?.lon);
+  const refLat = Number(refGeo?.lat);
+  const refLon = Number(refGeo?.lon);
 
   const zoom = appCtx.largeMapZoom;
   const n = Math.pow(2, zoom);
@@ -98,17 +288,14 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     const mapRange = isLarge ? 2000 : 500; // meters to show
 
     // Sample moon surface geometry for minimap
-    const geometry = appCtx.moonSurface.geometry;
-    const positions = geometry.attributes.position;
-    const colors = geometry.attributes.color;
-
     // Draw terrain as top-down view (DOTS)
     const pixelSize = w / (mapRange * 2);
+    const moonSamples = getMoonMapSamples(isLarge);
 
-    for (let i = 0; i < positions.count; i++) {
-      const x = positions.getX(i);
-      const z = positions.getZ(i);
-      const y = positions.getY(i);
+    for (let i = 0; i < moonSamples.length; i++) {
+      const sample = moonSamples[i];
+      const x = sample.x;
+      const z = sample.z;
 
       // Check if this vertex is in view range
       const dx = x - centerX;
@@ -119,12 +306,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
         const screenX = dx / mapRange * (w / 2) + w / 2;
         const screenZ = dz / mapRange * (h / 2) + h / 2;
 
-        // Get color from vertex colors
-        const r = Math.floor(colors.getX(i) * 255);
-        const g = Math.floor(colors.getY(i) * 255);
-        const b = Math.floor(colors.getZ(i) * 255);
-
-        ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+        ctx.fillStyle = sample.color;
         ctx.fillRect(screenX, screenZ, Math.max(2, pixelSize), Math.max(2, pixelSize));
       }
     }
@@ -290,14 +472,33 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   }
 
   // Use Walk module for proper reference position
-  const ref = appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
-
-  // Convert world coords back to lat/lon
-  const refLat = appCtx.LOC.lat - ref.z / appCtx.SCALE;
-  const refLon = appCtx.LOC.lon + ref.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
+  const ref = currentMapReferenceWorldPosition();
+  const refGeo = currentMapReferenceGeoPosition();
+  const refLat = Number(refGeo?.lat);
+  const refLon = Number(refGeo?.lon);
+  const reducedRuntimeDetail = !isLarge && String(appCtx.minimapPerfMode || 'full') === 'reduced';
+  const lightweightMinimap = !isLarge;
+  const drawRuntimeBaseOverlay = isLarge || !!appCtx.satelliteView;
+  const drawRuntimeContextOverlays = !lightweightMinimap && !reducedRuntimeDetail;
+  const worldViewRadius = isLarge ? null : (reducedRuntimeDetail ? 760 : 1120);
+  const worldViewBounds = Number.isFinite(ref?.x) && Number.isFinite(ref?.z) && Number.isFinite(worldViewRadius) ? {
+    minX: ref.x - worldViewRadius,
+    maxX: ref.x + worldViewRadius,
+    minZ: ref.z - worldViewRadius,
+    maxZ: ref.z + worldViewRadius
+  } : null;
+  const boundsLikelyVisible = (bounds, pad = 120) => {
+    if (!worldViewBounds || !bounds) return true;
+    return !(
+      Number(bounds.maxX) < worldViewBounds.minX - pad ||
+      Number(bounds.minX) > worldViewBounds.maxX + pad ||
+      Number(bounds.maxZ) < worldViewBounds.minZ - pad ||
+      Number(bounds.minZ) > worldViewBounds.maxZ + pad
+    );
+  };
 
   // Zoom level based on map size
-  const zoom = isLarge ? appCtx.largeMapZoom : 17;
+  const zoom = isLarge ? appCtx.largeMapZoom : appCtx.minimapZoom;
 
   // Get tile coordinates and pixel position within tile
   const n = Math.pow(2, zoom);
@@ -311,35 +512,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   const pixelOffsetX = (xtile_float - centerTileX) * 256;
   const pixelOffsetY = (ytile_float - centerTileY) * 256;
 
-  ctx.fillStyle = '#1a1a1a';
-  ctx.fillRect(0, 0, w, h);
-
-  // Draw OSM tiles at 1:1 scale (256px tiles)
-  // Calculate which tiles are visible
-  const tilesWide = Math.ceil(w / 256) + 1;
-  const tilesHigh = Math.ceil(h / 256) + 1;
-
-  // Calculate the top-left corner position
-  const startX = w / 2 - pixelOffsetX;
-  const startY = h / 2 - pixelOffsetY;
-
-  for (let dx = -Math.ceil(tilesWide / 2); dx <= Math.ceil(tilesWide / 2); dx++) {
-    for (let dy = -Math.ceil(tilesHigh / 2); dy <= Math.ceil(tilesHigh / 2); dy++) {
-      const tx = centerTileX + dx;
-      const ty = centerTileY + dy;
-
-      // Clamp tile coordinates
-      const maxTile = Math.pow(2, zoom) - 1;
-      if (tx < 0 || tx > maxTile || ty < 0 || ty > maxTile) continue;
-
-      const tile = loadTile(tx, ty, zoom);
-      if (tile.loaded) {
-        const screenX = startX + dx * 256;
-        const screenY = startY + dy * 256;
-        ctx.drawImage(tile.img, screenX, screenY, 256, 256);
-      }
-    }
-  }
+  drawEarthTileLayer(ctx, w, h, isLarge, zoom, xtile_float, ytile_float);
 
   // Center point for drawing indicators (vehicle is always at center)
   const mx = w / 2;
@@ -347,8 +520,9 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
 
   // Helper function to convert world coords to screen position
   const worldToScreen = (worldX, worldZ) => {
-    const lat = appCtx.LOC.lat - worldZ / appCtx.SCALE;
-    const lon = appCtx.LOC.lon + worldX / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
+    const geo = worldPointToGeo(worldX, worldZ);
+    const lat = Number(geo?.lat);
+    const lon = Number(geo?.lon);
 
     const n = Math.pow(2, zoom);
     const xt = (lon + 180) / 360 * n;
@@ -370,7 +544,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
 
   // Draw explicit OSM-derived water overlays (harbors/lakes/rivers/canals)
   // so water stays readable even where custom vector layers dominate the view.
-  if (appCtx.waterAreas.length > 0 || appCtx.waterways.length > 0) {
+  if (drawRuntimeBaseOverlay && !reducedRuntimeDetail && (appCtx.waterAreas.length > 0 || appCtx.waterways.length > 0)) {
     const viewPad = isLarge ? 100 : 45;
 
     if (appCtx.waterAreas.length > 0) {
@@ -383,6 +557,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
 
       appCtx.waterAreas.forEach((area) => {
         if (!area?.pts || area.pts.length < 3) return;
+        if (!boundsLikelyVisible(area?.bounds, 180)) return;
 
         let inView = false;
         ctx.beginPath();
@@ -433,13 +608,14 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     }
   }
 
-  if (appCtx.showPathOverlays && appCtx.linearFeatures.length > 0) {
+  if (drawRuntimeBaseOverlay && appCtx.showPathOverlays && appCtx.linearFeatures.length > 0) {
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
 
     appCtx.linearFeatures.forEach((feature) => {
       if (!feature?.pts || feature.pts.length < 2) return;
+      if (!boundsLikelyVisible(feature?.bounds, 180)) return;
 
       let strokeStyle = 'rgba(200, 190, 170, 0.78)';
       let lineWidth = isLarge ? 1.2 : 0.8;
@@ -481,9 +657,10 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   }
 
   // Draw road overlay (if enabled)
-  if (appCtx.showRoads && appCtx.roads.length > 0) {
+  if (drawRuntimeBaseOverlay && appCtx.showRoads && appCtx.roads.length > 0) {
     appCtx.roads.forEach((road) => {
       if (!road.pts || road.pts.length < 2) return;
+      if (!boundsLikelyVisible(road?.bounds, 180)) return;
 
       // Determine road color and width based on type
       let roadColor, roadWidth, outlineColor;
@@ -542,7 +719,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     });
   }
 
-  if (appCtx.mapLayers.interiors !== false && Array.isArray(appCtx.interiorLegendEntries) && appCtx.interiorLegendEntries.length > 0) {
+  if (drawRuntimeContextOverlays && appCtx.mapLayers.interiors !== false && Array.isArray(appCtx.interiorLegendEntries) && appCtx.interiorLegendEntries.length > 0) {
     ctx.save();
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
@@ -576,8 +753,83 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     ctx.restore();
   }
 
+  if (drawRuntimeContextOverlays && appCtx.mapLayers.contributions !== false) {
+    const overlayMapFeatures = [];
+    if (Array.isArray(appCtx.overlayPublishedFeatures)) {
+      appCtx.overlayPublishedFeatures.forEach((feature) => overlayMapFeatures.push({ feature, draft: false }));
+    }
+    if (Array.isArray(appCtx.overlayDraftPreviewFeatures)) {
+      appCtx.overlayDraftPreviewFeatures.forEach((feature) => overlayMapFeatures.push({ feature, draft: true }));
+    }
+    if (overlayMapFeatures.length > 0) {
+    ctx.save();
+    overlayMapFeatures.forEach(({ feature, draft }) => {
+      if (!feature || feature.worldKind !== 'earth') return;
+      const featureColor = overlayMapFeatureColor(feature);
+      const stroke = draft ? '#fde047' : featureColor;
+      const fill = draft ? 'rgba(253,224,71,0.22)' : `${featureColor}33`;
+      ctx.lineWidth = isLarge ? 2 : 1.3;
+      ctx.strokeStyle = stroke;
+      ctx.fillStyle = fill;
+
+      if (feature.geometryType === 'Point') {
+        const lat = Number(feature.geometry?.coordinates?.lat);
+        const lon = Number(feature.geometry?.coordinates?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+        const pos = latLonToScreen(lat, lon);
+        if (Math.abs(pos.x - mx) >= w / 2 || Math.abs(pos.y - my) >= h / 2) return;
+        const radius = isLarge ? 6 : 4;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        if (isLarge) {
+          const label = overlayMapFeatureLabel(feature);
+          ctx.font = 'bold 10px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.strokeStyle = '#082032';
+          ctx.lineWidth = 3;
+          ctx.strokeText(label.slice(0, 32), pos.x, pos.y - radius - 4);
+          ctx.fillStyle = draft ? '#fef3c7' : '#e0f2fe';
+          ctx.fillText(label.slice(0, 32), pos.x, pos.y - radius - 4);
+        }
+        return;
+      }
+
+      if (feature.geometryType === 'LineString') {
+        const coords = Array.isArray(feature.geometry?.coordinates) ? feature.geometry.coordinates : [];
+        if (coords.length < 2) return;
+        ctx.beginPath();
+        coords.forEach((point, index) => {
+          const pos = latLonToScreen(Number(point.lat), Number(point.lon));
+          if (index === 0) ctx.moveTo(pos.x, pos.y);
+          else ctx.lineTo(pos.x, pos.y);
+        });
+        ctx.stroke();
+        return;
+      }
+
+      if (feature.geometryType === 'Polygon') {
+        const ring = overlayGeometryPolygonRings(feature.geometry || {})[0] || [];
+        if (ring.length < 3) return;
+        ctx.beginPath();
+        ring.forEach((point, index) => {
+          const pos = latLonToScreen(Number(point.lat), Number(point.lon));
+          if (index === 0) ctx.moveTo(pos.x, pos.y);
+          else ctx.lineTo(pos.x, pos.y);
+        });
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    });
+    ctx.restore();
+    }
+  }
+
   // Draw game elements using proper coordinate conversion
-  if (appCtx.mapLayers.checkpoints && appCtx.gameMode === 'checkpoint') {
+  if (!lightweightMinimap && appCtx.mapLayers.checkpoints && appCtx.gameMode === 'checkpoint') {
     appCtx.checkpoints.forEach((cp) => {
       if (cp.collected) return;
       const pos = worldToScreen(cp.x, cp.z);
@@ -590,7 +842,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     });
   }
 
-  if (appCtx.mapLayers.destination && appCtx.gameMode === 'trial' && appCtx.destination) {
+  if (!lightweightMinimap && appCtx.mapLayers.destination && appCtx.gameMode === 'trial' && appCtx.destination) {
     const pos = worldToScreen(appCtx.destination.x, appCtx.destination.z);
     ctx.fillStyle = appCtx.trialDone ? '#0f8' : '#fc0';
     ctx.beginPath();
@@ -598,7 +850,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     ctx.fill();
   }
 
-  if (appCtx.mapLayers.police && appCtx.policeOn) {
+  if (!lightweightMinimap && appCtx.mapLayers.police && appCtx.policeOn) {
     appCtx.police.forEach((cop) => {
       const pos = worldToScreen(cop.x, cop.z);
       if (Math.abs(pos.x - mx) < w / 2 && Math.abs(pos.y - my) < h / 2) {
@@ -611,7 +863,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   }
 
   // Draw POIs on minimap and large map based on legend layer filters
-  if (appCtx.pois.length > 0) {
+  if (drawRuntimeContextOverlays && appCtx.pois.length > 0) {
     appCtx.pois.forEach((poi) => {
       // Check if this POI category is visible
       if (!appCtx.isPOIVisible(poi.type)) return;
@@ -643,10 +895,10 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   }
 
   // Draw memory pins/flowers on both minimap and large map
-  if (typeof appCtx.getMemoryEntriesForCurrentLocation === 'function') {
+  if (drawRuntimeContextOverlays && typeof appCtx.getMemoryEntriesForCurrentLocation === 'function') {
     const showPins = appCtx.mapLayers.memoryPins !== false;
     const showFlowers = appCtx.mapLayers.memoryFlowers !== false;
-    if (showPins || showFlowers) {
+    if ((showPins || showFlowers) && !reducedRuntimeDetail) {
       const memoryEntries = appCtx.getMemoryEntriesForCurrentLocation();
       if (Array.isArray(memoryEntries) && memoryEntries.length > 0) {
         memoryEntries.forEach((entry) => {
@@ -698,7 +950,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   const publicRooms = Array.isArray(mpMapState?.publicRooms) ? mpMapState.publicRooms : [];
   const userRooms = mpMapState?.signedIn && Array.isArray(mpMapState?.userRooms) ? mpMapState.userRooms : [];
   const activeRoomCode = String(mpMapState?.currentRoomCode || '');
-  if (publicRooms.length > 0 || userRooms.length > 0) {
+  if (drawRuntimeContextOverlays && (publicRooms.length > 0 || userRooms.length > 0)) {
     const drawRoomMarker = (room, kind = 'public') => {
       if (!room || !Number.isFinite(Number(room.lat)) || !Number.isFinite(Number(room.lon))) return;
       const pos = latLonToScreen(Number(room.lat), Number(room.lon));
@@ -760,8 +1012,74 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     userRooms.forEach((room) => drawRoomMarker(room, 'user'));
   }
 
+  const activityMarkers = drawRuntimeContextOverlays && appCtx.mapLayers.activities !== false && Array.isArray(appCtx.activityDiscoveryMapMarkers)
+    ? appCtx.activityDiscoveryMapMarkers
+    : [];
+  if (activityMarkers.length > 0) {
+    activityMarkers.forEach((activity) => {
+      if (!activity || !Number.isFinite(activity.x) || !Number.isFinite(activity.z)) return;
+      const pos = worldToScreen(activity.x, activity.z);
+      if (Math.abs(pos.x - mx) >= w / 2 || Math.abs(pos.y - my) >= h / 2) return;
+      const color = String(activity.color || '#fbbf24');
+      const radius = isLarge ? (activity.featured ? 7 : 5) : (activity.featured ? 5 : 4);
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = isLarge ? 2 : 1.25;
+      if (activity.categoryId === 'room') {
+        ctx.translate(pos.x, pos.y);
+        ctx.rotate(Math.PI / 4);
+        ctx.beginPath();
+        ctx.rect(-radius, -radius, radius * 2, radius * 2);
+        ctx.fill();
+        ctx.stroke();
+      } else if (activity.categoryId === 'boat' || activity.categoryId === 'fishing') {
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, Math.max(1, radius * 0.42), 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(15,23,42,0.88)';
+        ctx.fill();
+      } else if (activity.categoryId === 'drone') {
+        ctx.translate(pos.x, pos.y);
+        ctx.beginPath();
+        for (let i = 0; i < 6; i += 1) {
+          const angle = Math.PI / 6 + i * Math.PI / 3;
+          const px = Math.cos(angle) * radius;
+          const py = Math.sin(angle) * radius;
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y - radius - 2);
+        ctx.lineTo(pos.x - radius * 0.8, pos.y + radius);
+        ctx.lineTo(pos.x + radius * 0.8, pos.y + radius);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      if (isLarge) {
+        const label = String(activity.title || 'Activity');
+        ctx.font = 'bold 10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 3;
+        ctx.strokeText(label, pos.x, pos.y + radius + 13);
+        ctx.fillText(label, pos.x, pos.y + radius + 13);
+      }
+    });
+  }
+
   // Draw properties on minimap
-  if (appCtx.mapLayers.properties && appCtx.realEstateMode && appCtx.properties.length > 0) {
+  if (drawRuntimeContextOverlays && appCtx.mapLayers.properties && appCtx.realEstateMode && appCtx.properties.length > 0) {
     appCtx.properties.forEach((prop) => {
       const pos = worldToScreen(prop.x, prop.z);
 
@@ -795,8 +1113,9 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     });
   }
 
-  // Draw navigation route if active
-  if (appCtx.mapLayers.navigation && appCtx.showNavigation) {
+  // Keep the minimap cheap and uncluttered while driving.
+  // Route overlays remain available on the large map only.
+  if (isLarge && appCtx.mapLayers.navigation && appCtx.showNavigation) {
     const destination = appCtx.selectedProperty || appCtx.selectedHistoric;
     if (destination) {
       // Use Walk module to get proper player position
@@ -841,18 +1160,6 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
         ctx.fillText(distText, destPos.x, destPos.y - 15);
       }
     }
-  }
-
-  if (appCtx.mapLayers.customTrack && appCtx.customTrack.length >= 2) {
-    ctx.strokeStyle = appCtx.isRecording ? '#f64' : '#fa0';
-    ctx.lineWidth = isLarge ? 5 : 3;
-    ctx.beginPath();
-    appCtx.customTrack.forEach((p, i) => {
-      const pos = worldToScreen(p.x, p.z);
-      if (i === 0) ctx.moveTo(pos.x, pos.y);else
-      ctx.lineTo(pos.x, pos.y);
-    });
-    ctx.stroke();
   }
 
   // Draw vehicle icons

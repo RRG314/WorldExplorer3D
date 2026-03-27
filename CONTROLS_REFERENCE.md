@@ -1,6 +1,6 @@
 # Controls Reference
 
-Last reviewed: 2026-03-13
+Last reviewed: 2026-03-14
 
 Canonical control map for current runtime behavior.
 
@@ -17,6 +17,16 @@ Canonical control map for current runtime behavior.
 - `Esc`: close map or toggle pause
 - `F4` / `` ` `` / `~`: debug overlay
 - `F8`: performance overlay
+- In editor mode:
+  - `Capture Here`, `Current Building`, `Selected Destination`: set the staged target
+  - `Preview`: show a private contribution preview in your editor session only
+  - `Submit`: send a staged submission into the moderation queue
+  - `My Submissions`: review your pending/approved/rejected submissions
+  - `Moderation` (admin only): filter, inspect, preview, approve, or reject staged contributions
+- Account moderation page:
+  - `Account -> Open Moderation Panel`: open the private admin review page
+  - `Open In World`: jump to the contribution location in the app
+  - `Approve` / `Reject`: change moderation status without directly editing the live world
 
 ## Driving Mode
 
@@ -32,6 +42,22 @@ Canonical control map for current runtime behavior.
 Handling note:
 
 - Earth driving includes rear-biased drift behavior when `Space` is used with steering at speed.
+
+## Boat Mode
+
+- `G`: enter boat mode when the water-travel prompt is visible, or exit boat mode to dock
+- `W` / `ArrowUp`: throttle forward
+- `S` / `ArrowDown`: reverse / slow
+- `A` / `ArrowLeft`: steer left
+- `D` / `ArrowRight`: steer right
+- `Space`: brake / hold speed down
+- `Environment -> Sea State`: cycle `Calm`, `Moderate`, `Rough`
+
+Boat note:
+
+- Boat mode only appears near valid larger water bodies.
+- Right-clicking a valid larger water target on the minimap or large map also enters boat mode automatically.
+- Near shore it preserves coastal/city context and docks you back toward a nearby shoreline exit; farther offshore it reduces unnecessary land detail more aggressively.
 
 ## Walking Mode
 
@@ -94,6 +120,7 @@ Walking/navigation note:
 - left click map: inspect item
 - right click map: teleport
 - map legend: includes a nearby `Enterable Buildings` scan/list for mapped, generated, and listing-backed interiors
+- map legend: includes an `Approved Contributions` layer toggle for publicly approved community submissions
 - path overlay toggle: available in the environment menu and large map, starts off by default
 
 ## Multiplayer Actions (UI)

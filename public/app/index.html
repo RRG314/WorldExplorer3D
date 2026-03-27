@@ -7,6 +7,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a2e">
 <title>World Explorer 3D</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
 <style>
@@ -20,6 +21,8 @@
   --perf-panel-min-width:260px;
   --perf-panel-max-width:320px;
   --perf-panel-z:145;
+  --minimap-edge:20px;
+  --minimap-size:160px;
 }
 body{background:#f5f7fa;overflow:hidden;font-family:'Inter',sans-serif;-webkit-user-select:none;user-select:none;touch-action:pan-x pan-y;-webkit-tap-highlight-color:transparent}
 body.globe-selector-open{overflow:hidden;touch-action:none}
@@ -100,10 +103,15 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .globe-selector-top{grid-column:1/-1;display:flex;justify-content:center;align-items:center;gap:8px;padding-top:2px}
 .globe-selector-title{font-family:'Poppins',sans-serif;font-size:18px;font-weight:700;color:#1e293b}
 .globe-selector-subtitle{font-size:12px;color:#64748b}
-.globe-selector-side{background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;min-height:0;overflow-y:auto}
+.globe-selector-side{background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:10px;min-height:0;overflow:hidden}
 .globe-selector-stat{background:#ffffff;border:2px solid #e2e8f0;border-radius:10px;padding:8px 10px}
 .globe-selector-stat-label{font-size:11px;color:#64748b}
 .globe-selector-stat-value{font-family:'Poppins',sans-serif;font-size:14px;font-weight:600;color:#1e293b}
+.globe-selector-mode-tabs{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.globe-selector-mode-tab{border:2px solid #cbd5e1;background:#e2e8f0;color:#475569;border-radius:10px;padding:9px 10px;font-size:12px;font-weight:700;cursor:pointer}
+.globe-selector-mode-tab.active{background:#0f3460;color:#ffffff;border-color:#0f3460}
+.globe-selector-mode-panel{display:none;flex-direction:column;gap:10px;min-height:0;flex:1 1 auto;overflow-y:auto;padding-right:4px;padding-bottom:8px}
+.globe-selector-mode-panel.active{display:flex}
 .globe-selector-row{display:flex;gap:8px}
 .globe-selector-row input{flex:1;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;color:#1e293b}
 .globe-selector-row input:focus{outline:none;border-color:#667eea;box-shadow:0 0 0 3px rgba(102,126,234,0.12)}
@@ -123,13 +131,47 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .globe-selector-city-delete{border:1px solid #fecaca;background:#fff1f2;color:#b91c1c;border-radius:6px;padding:4px 7px;font-size:10px;font-weight:600;cursor:pointer;flex:0 0 auto}
 .globe-selector-city-delete:hover{background:#ffe4e6}
 .globe-selector-city-empty{font-size:11px;color:#64748b;padding:8px 2px}
-.globe-selector-actions{margin-top:6px;display:flex;gap:8px;position:sticky;bottom:0;background:#f8fafc;padding-top:6px}
+.globe-selector-actions{margin-top:auto;display:flex;gap:8px;position:relative;bottom:auto;background:#f8fafc;padding-top:6px;flex:0 0 auto}
 .globe-selector-action-btn{flex:1;border:none;border-radius:10px;padding:11px 12px;font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
 #globeSelectorBackBtn{background:#e2e8f0;color:#334155}
 #globeSelectorStartBtn{background:linear-gradient(135deg,#0f3460 0%,#533483 100%);color:#ffffff}
 .globe-selector-stage{background:linear-gradient(180deg,#dbeafe,#bfdbfe);border:2px solid #cbd5e1;border-radius:12px;position:relative;overflow:hidden;min-height:360px}
 #globeSelectorCanvas{position:absolute;inset:0;width:100%;height:100%;display:block}
 .globe-selector-hint{position:absolute;left:10px;right:10px;bottom:10px;background:rgba(15,23,42,0.72);color:#e2e8f0;font-size:11px;border-radius:8px;padding:6px 9px;text-align:center;pointer-events:none}
+.globe-selector-live-header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.globe-selector-live-title{font-family:'Poppins',sans-serif;font-size:13px;font-weight:700;color:#0f172a}
+.globe-selector-live-refresh{border:none;border-radius:8px;background:#e2e8f0;color:#334155;padding:8px 10px;font-size:11px;font-weight:700;cursor:pointer}
+.globe-selector-live-status{font-size:11px;color:#64748b;line-height:1.35}
+.globe-selector-live-chips{display:flex;flex-wrap:wrap;gap:6px}
+.globe-selector-live-chip{border:1px solid #cbd5e1;background:#ffffff;color:#334155;border-radius:999px;padding:6px 10px;font-size:11px;font-weight:700;cursor:pointer}
+.globe-selector-live-chip.active{background:#0f3460;color:#ffffff;border-color:#0f3460}
+.globe-selector-live-layer-list{display:flex;flex-direction:column;gap:8px;max-height:min(250px,30vh);overflow-y:auto;flex:0 0 auto;padding-right:2px}
+.globe-selector-live-layer{display:flex;flex-direction:column;align-items:flex-start;gap:4px;background:#ffffff;border:1px solid #dbe3ef;border-radius:10px;padding:10px;cursor:pointer;text-align:left}
+.globe-selector-live-layer.active{border-color:#667eea;box-shadow:0 0 0 2px rgba(102,126,234,0.12)}
+.globe-selector-live-layer-label{font-size:12px;font-weight:700;color:#0f172a}
+.globe-selector-live-layer-status{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em}
+.globe-selector-live-layer-status.implemented{color:#0f766e}
+.globe-selector-live-layer-status.planned{color:#64748b}
+.globe-selector-live-layer small{font-size:11px;color:#64748b;line-height:1.35}
+.globe-selector-live-details{background:#ffffff;border:1px solid #dbe3ef;border-radius:12px;padding:12px;flex:1 1 260px;min-height:240px;overflow:auto}
+.globe-selector-live-placeholder{font-size:12px;color:#64748b;line-height:1.45}
+.globe-selector-live-detail-card{display:flex;flex-direction:column;gap:8px}
+.globe-selector-live-detail-heading{font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;color:#0f172a}
+.globe-selector-live-detail-copy{font-size:12px;color:#334155;line-height:1.45}
+.globe-selector-live-detail-meta{font-size:11px;color:#64748b;line-height:1.35}
+.globe-selector-live-planned{font-size:11px;color:#64748b;line-height:1.4;padding:8px 10px;background:#f8fafc;border-radius:10px}
+.globe-selector-live-detail-actions{display:flex;flex-wrap:wrap;gap:8px}
+.globe-selector-live-action-btn{border:none;border-radius:9px;background:#0f3460;color:#ffffff;padding:9px 12px;font-size:11px;font-weight:700;cursor:pointer}
+.globe-selector-live-action-btn.secondary{background:#e2e8f0;color:#334155}
+.globe-selector-live-action-btn:disabled{opacity:0.5;cursor:default}
+.globe-selector-live-filter-row{display:flex;flex-wrap:wrap;gap:6px}
+.globe-selector-live-filter{border:1px solid #cbd5e1;background:#f8fafc;color:#334155;border-radius:999px;padding:6px 10px;font-size:10px;font-weight:700;cursor:pointer}
+.globe-selector-live-filter.active{background:#0f3460;color:#ffffff;border-color:#0f3460}
+.globe-selector-live-list{display:flex;flex-direction:column;gap:8px;max-height:min(320px,40vh);overflow:auto}
+.globe-selector-live-list-item{display:flex;flex-direction:column;align-items:flex-start;gap:4px;background:#f8fafc;border:1px solid #dbe3ef;border-radius:10px;padding:10px 12px;color:#0f172a;cursor:pointer;text-align:left}
+.globe-selector-live-list-item.active{border-color:#667eea;background:#eef2ff}
+.globe-selector-live-list-item span{font-size:11px;font-weight:700;line-height:1.35}
+.globe-selector-live-list-item small{font-size:10px;color:#64748b;line-height:1.35}
 @media (max-width: 900px){
   .globe-selector-shell{grid-template-columns:1fr;grid-template-rows:auto minmax(280px,46vh) auto}
   .globe-selector-side{order:3}
@@ -230,18 +272,25 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #hud.show{display:block}
 .hud-box{position:relative;background:rgba(255,255,255,0.95);border:none;border-radius:16px;padding:20px;min-width:160px;max-width:320px;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 .hud-box.compact{min-width:0;padding:8px 10px;max-width:72px;display:flex;align-items:center;justify-content:center}
-.hud-box.compact #speed,.hud-box.compact .hud-label{display:none}
+.hud-box.compact #hudHeader{display:none}
 .hud-box.compact #hudToggleBtn{position:static;padding:7px 11px;font-size:11px}
 #hudToggleBtn{position:absolute;top:8px;right:8px;border:none;background:#e2e8f0;color:#334155;border-radius:999px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;line-height:1}
 #hudToggleBtn:hover{background:#cbd5e1}
 #hudDetails{display:block}
 .hud-box.compact #hudDetails{display:none}
+#hudHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:14px;padding-right:26px}
+#hudSpeedBlock{min-width:92px;flex:0 0 auto}
 #speed{font-family:'Poppins',sans-serif;font-size:42px;font-weight:700;color:#1e293b}
 #speed.fast{color:#dc2626}
 .hud-label{font-size:11px;color:#64748b;font-weight:500;text-transform:uppercase;letter-spacing:0.5px}
-#street{font-family:'Inter',sans-serif;font-size:12px;color:#334155;margin-top:12px;border-top:2px solid #f1f5f9;padding-top:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#hudClockDisplay{position:absolute;left:50%;top:76px;transform:translateX(-50%);width:calc(100% - 72px);font-family:'Inter',sans-serif;font-size:15px;color:#334155;line-height:1.1;font-weight:700;letter-spacing:0.01em;text-align:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;pointer-events:none;display:none}
+#street{font-family:'Inter',sans-serif;font-size:12px;color:#334155;margin-top:10px;border-top:2px solid #f1f5f9;padding-top:10px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #locationLine{font-family:'Inter',sans-serif;font-size:11px;color:#64748b;line-height:1.3;white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-top:2px;max-height:2.7em}
-#boostBar{width:100%;height:6px;background:#f1f5f9;border-radius:3px;margin-top:10px;overflow:hidden}
+#weatherPanel{display:none;flex:1;min-width:0;padding-top:2px}
+#weatherLine{font-family:'Inter',sans-serif;font-size:12px;color:#0f172a;line-height:1.24;font-weight:700;white-space:normal;overflow:hidden;display:block;text-align:right}
+#weatherTimeLine{display:none}
+#weatherMetaLine{font-family:'Inter',sans-serif;font-size:11px;color:#64748b;line-height:1.22;margin-top:4px;text-align:right;display:block;white-space:normal;overflow:hidden}
+#boostBar{width:100%;height:6px;background:#f1f5f9;border-radius:3px;margin-top:8px;overflow:hidden}
 #boostFill{height:100%;width:100%;background:linear-gradient(90deg,#667eea,#764ba2);transition:width 0.1s;border-radius:3px}
 #boostFill.active{background:linear-gradient(90deg,#f59e0b,#d97706)}
 .indicators{display:flex;gap:10px;margin-top:10px;font-size:10px}
@@ -251,9 +300,23 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #offRoadWarn{position:fixed;inset:0;pointer-events:none;border:4px solid transparent;z-index:50;transition:border-color 0.2s}
 #offRoadWarn.active{border-color:rgba(239,68,68,0.6);animation:pulse 0.5s infinite}
 @keyframes pulse{0%,100%{border-color:rgba(239,68,68,0.6)}50%{border-color:rgba(239,68,68,0.2)}}
-#minimap{position:fixed;bottom:20px;left:20px;width:160px;height:160px;background:rgba(255,255,255,0.95);border:none;border-radius:16px;z-index:100;display:none;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
+#liveEarthLocalPanel{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:141;display:none;min-width:min(360px,calc(100vw - 40px));max-width:min(440px,calc(100vw - 28px));background:rgba(255,255,255,0.96);border:1px solid rgba(148,163,184,0.35);border-radius:14px;box-shadow:0 14px 32px rgba(2,6,23,0.18);padding:12px 14px}
+#liveEarthLocalPanel.show{display:block}
+.live-earth-local-title{font-family:'Poppins',sans-serif;font-size:14px;font-weight:700;color:#0f172a}
+.live-earth-local-meta{margin-top:3px;font-size:12px;color:#475569;line-height:1.4}
+.live-earth-local-actions{margin-top:10px;display:flex;gap:8px;justify-content:flex-end}
+.live-earth-local-btn{border:none;border-radius:10px;padding:8px 12px;font-size:11px;font-weight:700;cursor:pointer}
+.live-earth-local-btn.primary{background:#0f3460;color:#ffffff}
+.live-earth-local-btn.secondary{background:#e2e8f0;color:#334155}
+#minimap{position:fixed;bottom:var(--minimap-edge);left:var(--minimap-edge);width:var(--minimap-size);height:var(--minimap-size);background:rgba(255,255,255,0.95);border:none;border-radius:16px;z-index:100;display:none;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 #minimap.show{display:block}
 #minimap:hover{box-shadow:0 12px 32px rgba(0,0,0,0.15)}
+#minimapZoomControls{position:fixed;left:calc(var(--minimap-edge) + var(--minimap-size) - 42px);bottom:calc(var(--minimap-edge) + 10px);display:none;flex-direction:column;align-items:center;gap:6px;z-index:101}
+#minimapZoomControls.show{display:flex}
+.minimapZoomBtn{width:32px;height:32px;border:none;border-radius:10px;background:rgba(255,255,255,0.95);color:#0f172a;font-family:'Orbitron',sans-serif;font-size:18px;font-weight:700;cursor:pointer;box-shadow:0 8px 20px rgba(15,23,42,0.18);transition:transform 0.16s ease,opacity 0.16s ease}
+.minimapZoomBtn:hover{transform:translateY(-1px)}
+.minimapZoomBtn:disabled{opacity:0.45;cursor:default;transform:none}
+#minimapZoomLevel{min-width:40px;padding:5px 6px;border-radius:10px;background:rgba(15,23,42,0.84);color:#e2e8f0;font-family:'Orbitron',sans-serif;font-size:10px;font-weight:700;text-align:center;box-shadow:0 8px 20px rgba(15,23,42,0.18)}
 #largeMap{position:fixed;inset:0;background:rgba(0,0,0,0.8);z-index:220;display:none;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
 #largeMap.show{display:flex}
 #largeMapCanvas{border:none;border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}
@@ -263,20 +326,21 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #police{position:fixed;top:20px;right:20px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;padding:10px 16px;color:#dc2626;font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;z-index:100;display:none;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 #police.show{display:block}
 /* Float Menus - Three separate menus in triangle formation */
-.floatMenuContainer{position:fixed;bottom:20px;right:20px;z-index:118;display:none;flex-direction:column;align-items:center;gap:12px}
+.floatMenuContainer{position:fixed;bottom:10px;right:20px;z-index:118;display:none;flex-direction:column;align-items:stretch;gap:12px;width:min(340px,calc(100vw - 40px))}
 .floatMenuContainer.show{display:flex}
-.floatMenu{display:flex;flex-direction:column;align-items:center;position:relative}
-.floatMenuRow{display:flex;gap:12px;justify-content:center}
-.floatBtn{width:auto;min-width:120px;height:50px;padding:0 16px;border-radius:25px;background:#ffffff;border:none;font-size:14px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.15);transition:all 0.2s;position:relative;z-index:101;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:600}
+.floatMenu{display:flex;flex-direction:column;align-items:stretch;position:relative;min-width:0}
+.floatMenuRow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;justify-content:stretch;width:100%}
+.floatMenuRow:last-of-type{grid-template-columns:1fr}
+.floatBtn{width:100%;min-width:0;height:50px;padding:0 18px;border-radius:25px;background:#ffffff;border:none;font-size:14px;cursor:pointer;box-shadow:0 8px 24px rgba(0,0,0,0.15);transition:all 0.2s;position:relative;z-index:101;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;justify-content:center;gap:0;font-weight:600;text-align:center}
 .floatBtn:active{transform:scale(0.95)}
 .floatBtn:hover{transform:scale(1.05);box-shadow:0 12px 32px rgba(0,0,0,0.2)}
 .floatBtn.travel{color:#10b981}
 .floatBtn.realEstate{color:#3b82f6}
 .floatBtn.explore{color:#f59e0b}
 .floatBtn.game{color:#a855f7}
-.btnIcon{font-size:20px;line-height:1}
-.btnText{font-size:14px;font-weight:600;white-space:nowrap}
-.floatItems{position:fixed;bottom:140px;right:20px;display:none;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto;min-width:160px;max-width:200px;z-index:120}
+.btnIcon{display:none}
+.btnText{font-size:14px;font-weight:600;white-space:nowrap;text-align:center}
+.floatItems{position:fixed;bottom:130px;right:20px;display:none;flex-direction:column;gap:6px;max-height:60vh;overflow-y:auto;min-width:160px;max-width:200px;z-index:120}
 .floatMenu.open .floatItems{display:flex}
 .floatItem{background:#ffffff;border:none;border-radius:10px;padding:10px 16px;color:#475569;font-size:12px;font-weight:500;cursor:pointer;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,0.1);transition:all 0.2s;overflow:hidden;text-overflow:ellipsis;max-width:100%}
 .floatItem:hover{background:#f8fafc;transform:translateX(-4px);box-shadow:0 6px 16px rgba(0,0,0,0.15)}
@@ -290,12 +354,11 @@ input,textarea{-webkit-user-select:text;user-select:text}
 
 /* Responsive adjustments for float menus */
 @media (max-width: 768px) {
-  .floatMenuContainer{bottom:10px;right:10px}
+  .floatMenuContainer{bottom:6px;right:10px;width:min(320px,calc(100vw - 20px))}
   .floatMenuRow{gap:8px}
-  .floatBtn{width:48px;min-width:48px;height:48px;padding:0;border-radius:50%;font-size:13px;gap:0}
-  .btnIcon{font-size:18px}
-  .btnText{display:none}
-  .floatItems{min-width:140px;max-width:160px;font-size:11px}
+  .floatBtn{width:100%;min-width:0;height:48px;padding:0 12px;border-radius:24px;font-size:13px;gap:0}
+  .btnText{display:block;font-size:12px}
+  .floatItems{bottom:122px;min-width:140px;max-width:160px;font-size:11px}
   .floatItem{padding:8px 12px}
 
   /* Title screen mobile adjustments */
@@ -312,10 +375,15 @@ input,textarea{-webkit-user-select:text;user-select:text}
 
   /* HUD elements */
   #hud{top:10px;left:10px;font-size:11px}
-  .hud-box{max-width:min(220px,calc(100vw - 20px));padding:14px}
+  .hud-box{max-width:min(250px,calc(100vw - 20px));padding:14px}
+  #hudHeader{gap:10px;padding-right:20px}
+  #hudSpeedBlock{min-width:78px}
   #speed{font-size:30px}
   #hudToggleBtn{top:6px;right:6px}
-  #minimap{width:120px;height:120px}
+  #hudClockDisplay{top:64px;width:calc(100% - 56px);font-size:13px}
+  #weatherLine{font-size:11px}
+  #weatherMetaLine{font-size:10px}
+  :root{--minimap-size:120px}
   #coords{bottom:158px!important;left:10px!important;font-size:10px;padding:8px 12px}
   #controlsTab{left:50%!important;transform:translateX(-50%)!important;width:min(280px,calc(100vw - 20px))!important;max-width:none!important;font-size:11px;bottom:106px!important;max-height:56vh!important}
   #controlsTab.compact{width:auto!important;max-width:max-content!important;left:62%!important;transform:translateX(-50%)!important}
@@ -398,9 +466,16 @@ input,textarea{-webkit-user-select:text;user-select:text}
 
   /* HUD elements for phones */
   #hud{top:5px;left:5px;font-size:10px}
-  .hud-box{max-width:min(208px,calc(100vw - 14px));padding:12px}
+  .hud-box{max-width:min(232px,calc(100vw - 14px));padding:12px}
+  #hudHeader{gap:8px;padding-right:18px}
+  #hudSpeedBlock{min-width:70px}
   #speed{font-size:26px}
-  #minimap{width:100px;height:100px}
+  #hudClockDisplay{top:58px;width:calc(100% - 44px);font-size:12px}
+  #weatherLine{font-size:10px}
+  #weatherMetaLine{font-size:9px}
+  :root{--minimap-size:100px;--minimap-edge:12px}
+  .minimapZoomBtn{width:28px;height:28px;font-size:16px}
+  #minimapZoomLevel{min-width:34px;font-size:9px;padding:4px 5px}
   #coords{bottom:144px!important;left:5px!important;font-size:9px;padding:6px 10px}
   #controlsTab{left:50%!important;transform:translateX(-50%)!important;width:min(270px,calc(100vw - 16px))!important;max-width:none!important;font-size:10px;bottom:100px!important;max-height:52vh!important}
   #controlsTab.compact{width:auto!important;max-width:max-content!important;left:64%!important;transform:translateX(-50%)!important}
@@ -551,6 +626,20 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #interiorPrompt[data-variant="supported"],#interiorPrompt[data-variant="active"]{border-color:rgba(52,211,153,0.65);color:#dcfce7}
 #interiorPrompt[data-variant="loading"]{border-color:rgba(96,165,250,0.65);color:#dbeafe}
 #interiorPrompt[data-variant="notice"]{border-color:rgba(248,113,113,0.65);color:#fee2e2}
+#boatPrompt{position:fixed;left:50%;bottom:76px;transform:translateX(-50%);display:none;max-width:min(82vw,480px);padding:10px 14px;border-radius:999px;background:rgba(8,47,73,0.92);border:1px solid rgba(125,211,252,0.5);color:#e0f2fe;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;letter-spacing:0.2px;z-index:141;box-shadow:0 12px 28px rgba(8,47,73,0.28);backdrop-filter:blur(8px);pointer-events:none}
+#boatPrompt.show{display:block}
+#boatPrompt[data-variant="supported"],#boatPrompt[data-variant="active"]{border-color:rgba(56,189,248,0.78);color:#e0f2fe}
+#boatPrompt[data-variant="notice"]{border-color:rgba(248,113,113,0.65);color:#fee2e2}
+#boatWaveDock{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);display:none;align-items:center;gap:12px;min-width:min(88vw,380px);padding:10px 14px;border-radius:999px;background:rgba(6,24,40,0.9);border:1px solid rgba(125,211,252,0.36);color:#e0f2fe;font-family:'Poppins',sans-serif;z-index:142;box-shadow:0 14px 34px rgba(2,12,27,0.34);backdrop-filter:blur(10px)}
+#boatWaveDock.show{display:flex}
+.boatWaveMeta{display:flex;flex-direction:column;gap:2px;min-width:90px}
+#boatWaveLabel{font-size:12px;font-weight:700;letter-spacing:0.2px}
+#boatWaveHint{font-size:10px;color:rgba(191,219,254,0.78)}
+#boatWaveValue{min-width:42px;text-align:right;font-size:12px;font-weight:700;color:#bae6fd}
+#boatWaveSlider{flex:1;min-width:120px;-webkit-appearance:none;appearance:none;height:6px;border-radius:999px;background:linear-gradient(90deg,rgba(125,211,252,0.28),rgba(56,189,248,0.62));outline:none}
+#boatWaveSlider::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:16px;height:16px;border-radius:50%;background:#f8fafc;border:2px solid #38bdf8;box-shadow:0 2px 10px rgba(14,165,233,0.35);cursor:pointer}
+#boatWaveSlider::-moz-range-thumb{width:16px;height:16px;border-radius:50%;background:#f8fafc;border:2px solid #38bdf8;box-shadow:0 2px 10px rgba(14,165,233,0.35);cursor:pointer}
+#boatWaveSlider::-moz-range-track{height:6px;border-radius:999px;background:linear-gradient(90deg,rgba(125,211,252,0.28),rgba(56,189,248,0.62))}
 #flowerChallengeHud{position:fixed;top:88px;left:50%;transform:translateX(-50%);display:none;align-items:center;gap:10px;background:rgba(15,23,42,0.84);color:#f8fafc;border:1px solid rgba(248,113,113,0.65);border-radius:12px;padding:9px 14px;z-index:140;backdrop-filter:blur(8px);box-shadow:0 10px 26px rgba(15,23,42,0.35)}
 #flowerChallengeHud.show{display:flex}
 #flowerChallengeHudStatus{font-size:12px;font-weight:700;letter-spacing:0.3px}
@@ -651,6 +740,556 @@ input,textarea{-webkit-user-select:text;user-select:text}
 #memoryInfoCloseBtn{background:#1e293b;color:#e2e8f0}
 #memoryDeleteBtn{background:#b91c1c;color:#ffffff}
 
+#editorPanel{position:fixed;top:88px;right:20px;width:min(380px,calc(100vw - 28px));max-height:calc(100dvh - 112px);background:rgba(11,19,32,0.94);color:#e2e8f0;border:1px solid rgba(94,234,212,0.28);border-radius:16px;box-shadow:0 24px 54px rgba(2,6,23,0.42);backdrop-filter:blur(14px);display:none;flex-direction:column;overflow:hidden;z-index:140}
+#editorPanel.show{display:flex}
+.editorPanelHeader{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:14px 16px 10px;border-bottom:1px solid rgba(148,163,184,0.16)}
+.editorPanelTitleWrap{display:flex;flex-direction:column;gap:4px;min-width:0}
+#editorPanelTitle{font-family:'Orbitron',sans-serif;font-size:14px;letter-spacing:0.04em;color:#ccfbf1}
+#editorPanelSubline{font-size:11px;line-height:1.4;color:#cbd5e1}
+#editorAuthBadge{display:inline-flex;align-items:center;gap:6px;max-width:100%;padding:5px 9px;border-radius:999px;background:rgba(15,23,42,0.72);border:1px solid rgba(148,163,184,0.24);font-size:10px;color:#bfdbfe}
+.editorHeaderActions{display:flex;align-items:center;gap:8px}
+#editorHelpBtn,#editorViewModeBtn,#editorPeekBtn,#editorCloseBtn{border:none;background:rgba(15,23,42,0.92);color:#e2e8f0;border-radius:999px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer}
+#editorHelpBtn:hover,#editorViewModeBtn:hover,#editorPeekBtn:hover,#editorCloseBtn:hover{background:rgba(30,41,59,0.96)}
+#editorStatus{min-height:18px;padding:0 16px 10px;font-size:11px;color:#bfdbfe}
+#editorStatus[data-tone="ok"]{color:#86efac}
+#editorStatus[data-tone="error"]{color:#fca5a5}
+.editorTabRow{display:flex;gap:8px;padding:0 16px 12px}
+.editorTabBtn{flex:1;border:1px solid rgba(148,163,184,0.26);background:rgba(15,23,42,0.72);color:#cbd5e1;border-radius:10px;padding:8px 10px;font-size:11px;font-weight:700;cursor:pointer}
+.editorTabBtn.active{background:rgba(20,184,166,0.18);border-color:rgba(94,234,212,0.42);color:#ecfeff}
+.editorPanelBody{padding:0 16px 16px;overflow:auto;display:flex;flex-direction:column;gap:12px}
+.editorPane{display:none;flex-direction:column;gap:12px}
+.editorPane.active{display:flex}
+.editorHintCard{background:rgba(15,23,42,0.72);border:1px solid rgba(148,163,184,0.18);border-radius:12px;padding:10px 12px;font-size:11px;line-height:1.45;color:#dbeafe}
+.editorTargetCard{background:rgba(8,30,37,0.84);border:1px solid rgba(45,212,191,0.24);border-radius:12px;padding:11px 12px;font-size:11px;line-height:1.45;color:#ccfbf1;display:flex;flex-direction:column;gap:4px}
+.editorCaptureRow{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.editorSmallBtn{border:none;border-radius:10px;padding:9px 10px;font-size:11px;font-weight:700;cursor:pointer;background:#164e63;color:#ecfeff}
+.editorSmallBtn.alt{background:#1e293b;color:#e2e8f0}
+.editorSmallBtn.warn{background:#7c2d12;color:#ffedd5}
+.editorField{display:flex;flex-direction:column;gap:6px}
+.editorFieldLabel{font-size:10px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase;color:#94a3b8}
+.editorFieldLead{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.editorFieldHelp{font-size:11px;line-height:1.45;color:#cbd5e1}
+.editorFieldExample{font-size:10px;color:#7dd3fc}
+.editorFieldHelpBtn{border:none;border-radius:999px;padding:4px 8px;background:rgba(15,23,42,0.92);color:#cbd5e1;font-size:10px;font-weight:700;cursor:pointer}
+.editorField input,.editorField select,.editorField textarea{width:100%;border:1px solid rgba(148,163,184,0.28);border-radius:10px;padding:10px 12px;background:rgba(15,23,42,0.74);color:#f8fafc;font-size:12px;font-family:'Inter',sans-serif}
+.editorField textarea{min-height:94px;max-height:200px;resize:vertical}
+.editorField input:focus,.editorField select:focus,.editorField textarea:focus{outline:none;border-color:rgba(94,234,212,0.58);box-shadow:0 0 0 2px rgba(45,212,191,0.18)}
+.editorActionRow{display:flex;gap:8px}
+.editorActionBtn{flex:1;border:none;border-radius:10px;padding:10px 12px;font-size:12px;font-weight:700;cursor:pointer}
+#editorPreviewBtn{background:#0f766e;color:#ecfeff}
+#editorSubmitBtn{background:#1d4ed8;color:#eff6ff}
+#editorCancelBtn{background:#334155;color:#e2e8f0}
+.editorFieldGroup{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.editorFieldGroup[hidden]{display:none!important}
+.editorField.wide{grid-column:1 / -1}
+.editorSubmissionList{display:flex;flex-direction:column;gap:10px}
+.editorSubmissionCard{background:rgba(15,23,42,0.72);border:1px solid rgba(148,163,184,0.2);border-radius:12px;padding:10px 12px;display:flex;flex-direction:column;gap:6px}
+.editorSubmissionCard.selected{border-color:rgba(94,234,212,0.56);box-shadow:0 0 0 1px rgba(94,234,212,0.24)}
+.editorSubmissionTop{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.editorSubmissionTop strong{color:#f8fafc;font-size:12px}
+.editorSubmissionSubtitle{font-size:11px;color:#cbd5e1;line-height:1.4}
+.editorSubmissionChipRow{display:flex;flex-wrap:wrap;gap:6px}
+.editorSubmissionChipRow span{display:inline-flex;align-items:center;padding:3px 7px;border-radius:999px;background:rgba(15,23,42,0.9);border:1px solid rgba(148,163,184,0.24);font-size:10px;color:#bfdbfe;text-transform:capitalize}
+.editorSubmissionStatus{display:inline-flex;align-items:center;justify-content:center;padding:3px 8px;border-radius:999px;background:rgba(59,130,246,0.18);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;color:#bfdbfe}
+.editorSubmissionStatus[data-status="approved"]{background:rgba(34,197,94,0.18);color:#bbf7d0}
+.editorSubmissionStatus[data-status="rejected"]{background:rgba(239,68,68,0.18);color:#fecaca}
+.editorSubmissionMeta{font-size:10px;color:#94a3b8}
+.editorSubmissionNote{font-size:11px;line-height:1.45;color:#dbeafe}
+.editorSubmissionActions{display:flex;gap:6px;flex-wrap:wrap}
+.editorSubmissionActions button{border:none;border-radius:8px;padding:7px 9px;font-size:10px;font-weight:700;cursor:pointer;background:#1e293b;color:#e2e8f0}
+.editorSubmissionActions button[data-editor-action="approve"]{background:#166534;color:#dcfce7}
+.editorSubmissionActions button[data-editor-action="reject"]{background:#7f1d1d;color:#fee2e2}
+.editorSubmissionActions button[data-editor-action="focus"]{background:#1d4ed8;color:#eff6ff}
+.editorEmptyState{background:rgba(15,23,42,0.5);border:1px dashed rgba(148,163,184,0.24);border-radius:12px;padding:14px;font-size:11px;color:#cbd5e1;text-align:center}
+.editorModerationControls{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.editorModerationControls .editorField.wide{grid-column:1 / -1}
+.editorModerationDetail{background:rgba(15,23,42,0.78);border:1px solid rgba(148,163,184,0.24);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px}
+.editorModerationDetailHead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}
+.editorModerationDetailTitle{font-size:13px;font-weight:700;color:#f8fafc}
+.editorModerationDetailGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.editorModerationCell{background:rgba(2,6,23,0.34);border:1px solid rgba(148,163,184,0.16);border-radius:10px;padding:8px}
+.editorModerationCellLabel{font-size:10px;text-transform:uppercase;letter-spacing:0.05em;color:#94a3b8;margin-bottom:4px}
+.editorModerationCellValue{font-size:11px;line-height:1.4;color:#e2e8f0;word-break:break-word}
+.editorPhotoPreview{width:100%;max-width:320px;max-height:220px;object-fit:cover;border-radius:12px;border:1px solid rgba(148,163,184,0.22);background:#0f172a}
+.editorDetailLink{font-size:11px;font-weight:700;color:#67e8f9;text-decoration:none}
+.editorDetailLink:hover{text-decoration:underline}
+#editorTutorialModal{position:fixed;inset:0;background:rgba(2,6,23,0.64);backdrop-filter:blur(6px);z-index:190;display:none;align-items:center;justify-content:center;padding:18px}
+#editorTutorialModal.show{display:flex}
+.editorTutorialCard{width:min(420px,100%);background:#0f172a;border:1px solid rgba(94,234,212,0.28);border-radius:18px;box-shadow:0 24px 64px rgba(2,6,23,0.48);padding:18px 18px 16px;color:#e2e8f0;display:flex;flex-direction:column;gap:12px}
+.editorTutorialTitle{font-family:'Orbitron',sans-serif;font-size:16px;color:#ccfbf1}
+.editorTutorialText{font-size:12px;line-height:1.55;color:#cbd5e1}
+.editorTutorialList{display:flex;flex-direction:column;gap:8px;font-size:12px;color:#dbeafe}
+.editorTutorialList div{padding:9px 10px;border-radius:10px;background:rgba(15,23,42,0.82);border:1px solid rgba(148,163,184,0.18)}
+.editorTutorialActions{display:flex;gap:8px}
+.editorTutorialActions button{flex:1;border:none;border-radius:10px;padding:11px 12px;font-size:12px;font-weight:700;cursor:pointer}
+body.activity-creator-open #hud,
+body.activity-creator-open #minimap,
+body.activity-creator-open #minimapZoomControls,
+body.activity-creator-open #coords,
+body.activity-creator-open #controlsTab,
+body.activity-creator-open #floatMenuContainer,
+body.activity-creator-open #mainMenuBtn,
+body.activity-creator-open #memoryFlowerFloatBtn,
+body.activity-creator-open #gameShareFloatBtn,
+body.activity-creator-open #gameShareMenu,
+body.activity-creator-open #flowerActionMenu,
+body.activity-creator-open #realEstateBtn,
+body.activity-creator-open #historicBtn,
+body.activity-creator-open #memoryComposer,
+body.activity-creator-open #memoryInfoPanel,
+body.activity-creator-open #largeMap,
+body.activity-creator-open #legendPanel,
+body.activity-creator-open #mapInfoPanel,
+body.activity-creator-open #propertyPanel,
+body.activity-creator-open #propertyModal,
+body.activity-creator-open #historicPanel,
+body.activity-creator-open #roomPanelModal,
+body.activity-creator-open #navigationHud,
+body.activity-creator-open #paintTownHud,
+body.activity-creator-open #flowerChallengeHud,
+body.activity-creator-open #boatPrompt,
+body.activity-creator-open #boatWaveDock,
+body.activity-creator-open #activityDiscoveryPanel,
+body.activity-creator-open #activityDiscoveryPrompt,
+body.activity-creator-open #activityRunHud,
+body.activity-creator-open #creatorProfilePanel,
+body.activity-creator-open #liveEarthLocalPanel,
+body.activity-creator-open #tutorialHintCard,
+body.activity-creator-open .auth-float-toggle,
+body.activity-creator-open .auth-float-panel,
+body.activity-creator-open .pro-access-panel{
+  display:none!important;
+}
+body.activity-browser-open #tutorialHintCard,
+body.activity-running #tutorialHintCard{
+  display:none!important;
+}
+#activityCreatorPanel{position:fixed;inset:0;display:none;padding:18px;pointer-events:none;z-index:245;color:#e2e8f0}
+#activityCreatorPanel.show{display:block}
+.activityCreatorTopBar,.activityCreatorSidePanel,.activityCreatorToolDock,.activityCreatorTestBar,#activityCreatorStatus{pointer-events:auto}
+.activityCreatorTopBar{position:absolute;top:18px;left:18px;right:18px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:14px 16px;border-radius:18px;background:rgba(8,15,28,0.9);border:1px solid rgba(94,234,212,0.22);box-shadow:0 18px 48px rgba(2,6,23,0.34);backdrop-filter:blur(14px)}
+.activityCreatorTitleWrap{display:flex;flex-direction:column;gap:4px;max-width:640px}
+#activityCreatorTitle{font-family:'Orbitron',sans-serif;font-size:16px;color:#ccfbf1}
+#activityCreatorSubline{font-size:12px;line-height:1.5;color:#cbd5e1}
+.activityCreatorHeaderActions{display:flex;align-items:center;gap:8px}
+.activityCreatorHeaderActions button,.activityCreatorToolDock button,.activityCreatorMiniRow button,.activityCreatorRowActions button,#activityCreatorStopTestBtn{border:none;border-radius:10px;padding:9px 12px;background:rgba(15,23,42,0.92);color:#e2e8f0;font-size:11px;font-weight:700;cursor:pointer}
+.activityCreatorHeaderActions button:hover,.activityCreatorToolDock button:hover,.activityCreatorMiniRow button:hover,.activityCreatorRowActions button:hover,#activityCreatorStopTestBtn:hover{background:rgba(30,41,59,0.96)}
+#activityCreatorStatus{position:absolute;top:100px;left:18px;max-width:min(360px,calc(100vw - 36px));padding:8px 12px;border-radius:14px;background:rgba(8,15,28,0.86);border:1px solid rgba(125,211,252,0.18);box-shadow:0 12px 28px rgba(2,6,23,0.22);backdrop-filter:blur(12px);font-size:11px}
+#activityCreatorStatus[data-tone="ok"]{color:#86efac}
+#activityCreatorStatus[data-tone="warning"]{color:#fde68a}
+#activityCreatorStatus[data-tone="error"]{color:#fca5a5}
+.activityCreatorWorkspaceShell{position:absolute;inset:0}
+.activityCreatorSidePanel{position:absolute;top:146px;bottom:94px;display:flex;flex-direction:column;gap:12px;padding:14px;background:rgba(8,15,28,0.88);border:1px solid rgba(148,163,184,0.18);border-radius:16px;box-shadow:0 18px 40px rgba(2,6,23,0.28);backdrop-filter:blur(14px);overflow:auto}
+.activityCreatorLeftPanel{left:18px;width:min(330px,calc(100vw - 36px))}
+.activityCreatorRightPanel{right:18px;width:min(340px,calc(100vw - 36px))}
+.activityCreatorViewportPanel{position:absolute;inset:0;background:transparent}
+.activityCreatorToolDock{position:absolute;left:18px;bottom:18px;display:flex;flex-wrap:wrap;gap:8px;width:min(452px,calc(100vw - 36px));padding:10px 12px;background:rgba(8,15,28,0.82);border:1px solid rgba(148,163,184,0.18);border-radius:14px;box-shadow:0 14px 34px rgba(2,6,23,0.26);backdrop-filter:blur(12px)}
+.activityCreatorToolDock button.active{background:rgba(56,189,248,0.18);border:1px solid rgba(125,211,252,0.5);color:#e0f2fe}
+.activityCreatorTestBar{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:flex;align-items:center;justify-content:space-between;gap:12px;width:min(560px,calc(100vw - 36px));padding:12px 14px;border-radius:16px;background:rgba(8,15,28,0.92);border:1px solid rgba(34,197,94,0.28);box-shadow:0 18px 40px rgba(2,6,23,0.32);backdrop-filter:blur(14px);pointer-events:auto}
+.activityCreatorTestBar[hidden]{display:none!important}
+#activityCreatorTestSummary{font-size:12px;line-height:1.5;color:#dcfce7}
+#activityCreatorPanel.activityCreatorTesting .activityCreatorSidePanel,
+#activityCreatorPanel.activityCreatorTesting .activityCreatorToolDock,
+#activityCreatorPanel.activityCreatorTesting .activityCreatorTopBar,
+#activityCreatorPanel.activityCreatorTesting #activityCreatorStatus{display:none}
+.activityCreatorSectionTitle{font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#7dd3fc}
+.activityCreatorFieldStack,.activityCreatorChecklist,.activityCreatorValidation,.activityCreatorAnchorPalette,.activityCreatorAnchorList{display:flex;flex-direction:column;gap:10px}
+.activityCreatorFieldGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.activityCreatorField{display:flex;flex-direction:column;gap:6px}
+.activityCreatorField span{font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#94a3b8}
+.activityCreatorField input,.activityCreatorField select,.activityCreatorField textarea{width:100%;border:1px solid rgba(148,163,184,0.28);border-radius:10px;padding:10px 12px;background:rgba(15,23,42,0.74);color:#f8fafc;font-size:12px;font-family:'Inter',sans-serif}
+.activityCreatorField textarea{min-height:84px;resize:vertical}
+.activityCreatorField input:focus,.activityCreatorField select:focus,.activityCreatorField textarea:focus{outline:none;border-color:rgba(94,234,212,0.58);box-shadow:0 0 0 2px rgba(45,212,191,0.18)}
+.activityCreatorToggle{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:rgba(15,23,42,0.72);border:1px solid rgba(148,163,184,0.18);font-size:11px;font-weight:700;color:#e2e8f0}
+.activityCreatorSummaryCard,.activityCreatorHelpCard,.activityCreatorMetaCard{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:14px;background:rgba(15,23,42,0.72);border:1px solid rgba(148,163,184,0.18)}
+.activityCreatorSummaryTitle,.activityCreatorInspectorTitle{font-family:'Orbitron',sans-serif;font-size:14px;color:#f8fafc}
+.activityCreatorSummaryMeta{font-size:10px;color:#7dd3fc;text-transform:uppercase;letter-spacing:0.06em}
+.activityCreatorSummaryText,.activityCreatorHelpCard,.activityCreatorInspectorMeta,.activityCreatorMetaCard{font-size:12px;line-height:1.5;color:#dbeafe}
+.activityCreatorGuideCard{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:14px;background:linear-gradient(180deg, rgba(8,47,73,0.72), rgba(15,23,42,0.74));border:1px solid rgba(103,232,249,0.22)}
+.activityCreatorGuideCard[hidden]{display:none!important}
+.activityCreatorGuideHead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.activityCreatorGuideProgress{font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#a5f3fc}
+.activityCreatorGuideTitle{font-family:'Orbitron',sans-serif;font-size:14px;color:#f0fdfa}
+.activityCreatorGuideBody{font-size:12px;line-height:1.6;color:#dbeafe}
+.activityCreatorGuideHead button{border:none;border-radius:10px;padding:8px 10px;background:rgba(2,6,23,0.34);border:1px solid rgba(148,163,184,0.16);color:#e2e8f0;font-size:10px;font-weight:700;cursor:pointer}
+.activityCreatorGuideActions{display:flex;flex-wrap:wrap;gap:8px}
+.activityCreatorGuideActions button{border:none;border-radius:10px;padding:9px 12px;background:rgba(2,6,23,0.5);border:1px solid rgba(148,163,184,0.16);color:#e2e8f0;font-size:11px;font-weight:700;cursor:pointer}
+.activityCreatorGuideActions button.primary{background:rgba(45,212,191,0.14);border-color:rgba(94,234,212,0.34);color:#ecfeff}
+.activityCreatorChecklistItem,.activityCreatorIssue,.activityCreatorAnchorRow{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:12px;background:rgba(2,6,23,0.34);border:1px solid rgba(148,163,184,0.16)}
+.activityCreatorChecklistItem.ok{border-color:rgba(34,197,94,0.32);color:#dcfce7}
+.activityCreatorChecklistItem.warn{border-color:rgba(250,204,21,0.28);color:#fef3c7}
+.activityCreatorIssue{display:flex;flex-direction:column;align-items:flex-start}
+.activityCreatorIssue.ok{border-color:rgba(34,197,94,0.3);color:#dcfce7}
+.activityCreatorIssue.warning{border-color:rgba(250,204,21,0.28);color:#fef3c7}
+.activityCreatorIssue.error{border-color:rgba(248,113,113,0.28);color:#fee2e2}
+.activityCreatorIssue span{font-size:11px;line-height:1.45;color:#cbd5e1}
+.activityCreatorAnchorBtn{display:flex;flex-direction:column;align-items:flex-start;gap:4px;padding:11px 12px;border-radius:12px;border:1px solid rgba(148,163,184,0.18);background:rgba(2,6,23,0.34);color:#e2e8f0;cursor:pointer;text-align:left}
+.activityCreatorAnchorBtn strong{font-size:12px}
+.activityCreatorAnchorBtn small{font-size:10px;line-height:1.35;color:#94a3b8}
+.activityCreatorAnchorBtn.active{border-color:rgba(125,211,252,0.58);box-shadow:0 0 0 1px rgba(125,211,252,0.22)}
+.activityCreatorAnchorRow{cursor:pointer}
+.activityCreatorAnchorRow.selected{border-color:rgba(125,211,252,0.58);box-shadow:0 0 0 1px rgba(125,211,252,0.22)}
+.activityCreatorAnchorRow strong{font-size:12px;color:#f8fafc}
+.activityCreatorAnchorRow span{display:block;font-size:10px;color:#94a3b8;text-transform:capitalize;line-height:1.4}
+.activityCreatorRowActions,.activityCreatorMiniRow{display:flex;gap:6px;flex-wrap:wrap}
+.activityCreatorInspectorBody{display:flex;flex-direction:column;gap:12px}
+.activityCreatorMetaCard.invalid{border-color:rgba(248,113,113,0.34);color:#fee2e2}
+.activityCreatorEmptyState{padding:14px;border-radius:14px;border:1px dashed rgba(148,163,184,0.24);background:rgba(15,23,42,0.42);font-size:12px;line-height:1.55;color:#cbd5e1;text-align:center}
+body.activity-browser-open #floatMenuContainer,
+body.activity-browser-open #mainMenuBtn,
+body.activity-browser-open #memoryFlowerFloatBtn,
+body.activity-browser-open #gameShareFloatBtn,
+body.activity-browser-open #gameShareMenu,
+body.activity-browser-open #flowerActionMenu,
+body.activity-browser-open #propertyPanel,
+body.activity-browser-open #historicPanel,
+body.activity-browser-open #memoryComposer,
+body.activity-browser-open #memoryInfoPanel,
+body.activity-browser-open #roomPanelModal{
+  display:none!important;
+}
+body.creator-profile-open #tutorialHintCard{
+  display:none!important;
+}
+#activityDiscoveryPanel{position:fixed;inset:0;display:none;padding:18px;pointer-events:none;z-index:243;color:#e2e8f0}
+#activityDiscoveryPanel.show{display:block}
+.activityDiscoveryTopBar,.activityDiscoveryPanelCol,.activityDiscoveryPrompt,.activityRunHud{pointer-events:auto}
+.activityDiscoveryTopBar{position:absolute;top:18px;left:18px;right:18px;display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:14px 16px;border-radius:18px;background:rgba(8,15,28,0.9);border:1px solid rgba(125,211,252,0.22);box-shadow:0 18px 48px rgba(2,6,23,0.34);backdrop-filter:blur(14px)}
+.activityDiscoveryTitleWrap{display:flex;flex-direction:column;gap:4px;max-width:620px}
+#activityDiscoveryTitle{font-family:'Orbitron',sans-serif;font-size:16px;color:#e0f2fe}
+#activityDiscoverySubline{font-size:12px;line-height:1.5;color:#cbd5e1}
+.activityDiscoveryHeaderActions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.activityDiscoveryHeaderActions button,.activityDiscoveryDetailActions button,.activityDiscoveryPromptActions button,.activityRunHud button{border:none;border-radius:10px;padding:9px 12px;background:rgba(15,23,42,0.92);color:#e2e8f0;font-size:11px;font-weight:700;cursor:pointer}
+.activityDiscoveryHeaderActions button:hover,.activityDiscoveryDetailActions button:hover,.activityDiscoveryPromptActions button:hover,.activityRunHud button:hover{background:rgba(30,41,59,0.96)}
+#activityDiscoveryStatus{position:absolute;top:98px;left:18px;max-width:min(380px,calc(100vw - 36px));padding:8px 12px;border-radius:14px;background:rgba(8,15,28,0.86);border:1px solid rgba(125,211,252,0.18);box-shadow:0 12px 28px rgba(2,6,23,0.22);backdrop-filter:blur(12px);font-size:11px;color:#bfdbfe}
+.activityDiscoveryPanelCol{position:absolute;top:146px;bottom:18px;display:flex;flex-direction:column;gap:12px;padding:14px;background:rgba(8,15,28,0.88);border:1px solid rgba(148,163,184,0.18);border-radius:16px;box-shadow:0 18px 40px rgba(2,6,23,0.28);backdrop-filter:blur(14px);overflow:auto}
+.activityDiscoveryBrowseCol{left:18px;width:min(400px,calc(100vw - 420px))}
+.activityDiscoveryDetailCol{right:18px;width:min(360px,calc(100vw - 36px))}
+.activityDiscoverySectionTitle{font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#7dd3fc}
+.activityDiscoverySearchRow{display:flex;gap:10px}
+.activityDiscoverySearchRow input,.activityDiscoverySearchRow select{width:100%;border:1px solid rgba(148,163,184,0.28);border-radius:10px;padding:10px 12px;background:rgba(15,23,42,0.74);color:#f8fafc;font-size:12px;font-family:'Inter',sans-serif}
+.activityDiscoveryChipRow{display:flex;gap:8px;flex-wrap:wrap}
+.activityDiscoveryChipRow button{border:1px solid rgba(148,163,184,0.22);border-radius:999px;padding:8px 12px;background:rgba(15,23,42,0.58);color:#cbd5e1;font-size:11px;font-weight:700;cursor:pointer}
+.activityDiscoveryChipRow button.active{background:rgba(14,165,233,0.16);border-color:rgba(125,211,252,0.45);color:#ecfeff}
+.activityDiscoveryFeaturedStrip,.activityDiscoveryCardList,.activityDiscoveryRouteList{display:flex;flex-direction:column;gap:10px}
+.activityDiscoveryFeaturedCard,.activityDiscoveryCard{border:none;border-radius:14px;padding:12px;background:rgba(15,23,42,0.76);border:1px solid rgba(148,163,184,0.18);color:#e2e8f0;cursor:pointer;text-align:left}
+.activityDiscoveryFeaturedCard:hover,.activityDiscoveryCard:hover{border-color:rgba(125,211,252,0.38);transform:translateY(-1px)}
+.activityDiscoveryFeaturedCard strong,.activityDiscoveryCardTitle{display:block;font-family:'Orbitron',sans-serif;font-size:13px;color:#f8fafc}
+.activityDiscoveryFeaturedCard em,.activityDiscoveryCardText,.activityDiscoveryDetailText,.activityDiscoveryCompletionText{display:block;font-size:12px;line-height:1.5;color:#cbd5e1;font-style:normal}
+.activityDiscoveryCard.selected{border-color:rgba(125,211,252,0.56);box-shadow:0 0 0 1px rgba(125,211,252,0.22)}
+.activityDiscoveryCardHead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:8px}
+.activityDiscoveryCardBadge,.activityDiscoveryDetailBadge{display:inline-flex;align-items:center;padding:5px 8px;border-radius:999px;border:1px solid rgba(125,211,252,0.3);font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase}
+.activityDiscoveryCardDistance{font-size:11px;color:#94a3b8}
+.activityDiscoveryCardMeta,.activityDiscoveryDetailMeta{font-size:11px;color:#7dd3fc;line-height:1.5;text-transform:capitalize}
+.activityDiscoveryDetailHead{display:flex;flex-direction:column;gap:8px}
+.activityDiscoveryDetailTitle{font-family:'Orbitron',sans-serif;font-size:18px;color:#f8fafc}
+.activityDiscoveryStatGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.activityDiscoveryStatGrid div{display:flex;flex-direction:column;gap:4px;padding:10px 12px;border-radius:12px;background:rgba(2,6,23,0.34);border:1px solid rgba(148,163,184,0.16)}
+.activityDiscoveryStatGrid span{font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#94a3b8}
+.activityDiscoveryStatGrid strong{font-size:12px;color:#f8fafc}
+.activityDiscoveryCreatorLink{display:inline-flex;align-items:center;gap:6px;border:1px solid rgba(125,211,252,0.24);background:rgba(2,6,23,0.34);padding:6px 10px;border-radius:999px;color:#bfdbfe;font:700 12px/1.4 Inter,sans-serif;cursor:pointer;text-align:left}
+.activityDiscoveryCreatorLink:hover{border-color:rgba(125,211,252,0.46);background:rgba(14,165,233,0.1)}
+.activityDiscoveryDetailActions{display:flex;flex-wrap:wrap;gap:8px}
+.activityDiscoveryDetailActions .primary,.activityDiscoveryPromptActions .primary,.activityRunHud .primary{background:#0369a1;color:#eff6ff}
+.activityDiscoveryDetailSection{display:flex;flex-direction:column;gap:10px}
+.activityDiscoveryDetailSectionTitle{font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#7dd3fc}
+.activityDiscoveryRouteRow{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-radius:12px;background:rgba(2,6,23,0.34);border:1px solid rgba(148,163,184,0.16)}
+.activityDiscoveryRouteRow span{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:999px;background:rgba(14,165,233,0.16);color:#bae6fd;font-size:11px;font-weight:800}
+.activityDiscoveryRouteRow strong{font-size:12px;color:#f8fafc}
+.activityDiscoveryRouteRow em{font-size:10px;color:#94a3b8;font-style:normal;text-transform:capitalize}
+.activityDiscoveryEmptyState,.activityDiscoveryEmptyDetail{padding:14px;border-radius:14px;border:1px dashed rgba(148,163,184,0.24);background:rgba(15,23,42,0.42);font-size:12px;line-height:1.55;color:#cbd5e1;text-align:center}
+.activityDiscoveryPrompt{position:absolute;left:50%;bottom:18px;transform:translateX(-50%);display:none;align-items:center;gap:14px;min-width:min(520px,calc(100vw - 36px));max-width:min(620px,calc(100vw - 36px));padding:12px 14px;border-radius:16px;background:rgba(8,15,28,0.92);border:1px solid rgba(56,189,248,0.28);box-shadow:0 18px 40px rgba(2,6,23,0.32);backdrop-filter:blur(14px)}
+.activityDiscoveryPrompt.show{display:flex}
+.activityDiscoveryPromptCopy{display:flex;flex-direction:column;gap:4px;min-width:0}
+.activityDiscoveryPromptTitle{font-family:'Orbitron',sans-serif;font-size:13px;color:#f8fafc}
+.activityDiscoveryPromptMeta{font-size:11px;color:#cbd5e1;line-height:1.5}
+.activityDiscoveryPromptActions{display:flex;gap:8px;margin-left:auto}
+.activityRunHud{position:absolute;right:18px;bottom:178px;display:none;align-items:center;gap:12px;min-width:min(460px,calc(100vw - 36px));max-width:min(540px,calc(100vw - 36px));padding:12px 14px;border-radius:16px;background:rgba(8,15,28,0.92);border:1px solid rgba(34,197,94,0.28);box-shadow:0 18px 40px rgba(2,6,23,0.32);backdrop-filter:blur(14px)}
+.activityRunHud.show{display:flex}
+.activityRunHudCopy{display:flex;flex-direction:column;gap:4px;min-width:0}
+#activityRunTitle{font-family:'Orbitron',sans-serif;font-size:13px;color:#f8fafc}
+#activityRunStatus{font-size:11px;color:#dcfce7;line-height:1.5}
+#activityRunProgress{font-size:10px;color:#86efac;text-transform:uppercase;letter-spacing:0.08em}
+.creatorProfilePanel{position:fixed;top:18px;right:18px;bottom:18px;width:min(420px,calc(100vw - 36px));display:none;pointer-events:none;z-index:244;color:#e2e8f0}
+.creatorProfilePanel.show{display:block}
+.creatorProfileShell{height:100%;display:flex;flex-direction:column;gap:12px;padding:16px;background:
+  radial-gradient(circle at top left, rgba(14,165,233,0.12), transparent 34%),
+  radial-gradient(circle at top right, rgba(59,130,246,0.1), transparent 36%),
+  rgba(8,15,28,0.94);border:1px solid rgba(148,163,184,0.18);border-radius:18px;box-shadow:0 24px 52px rgba(2,6,23,0.4);backdrop-filter:blur(16px);pointer-events:auto;overflow:hidden}
+.creatorProfileTopBar{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+.creatorProfileTitleWrap{display:flex;flex-direction:column;gap:4px}
+#creatorProfileTitle{font-family:'Orbitron',sans-serif;font-size:16px;color:#e0f2fe}
+#creatorProfileSubline{font-size:12px;line-height:1.5;color:#cbd5e1}
+.creatorProfileTopBar button,.creatorProfileSectionHead button,.creatorProfileListActions button{border:none;border-radius:10px;padding:9px 12px;background:rgba(15,23,42,0.92);color:#e2e8f0;font-size:11px;font-weight:700;cursor:pointer}
+#creatorProfileStatus{min-height:18px;font-size:11px;color:#bfdbfe}
+#creatorProfileBody{overflow:auto;display:flex;flex-direction:column;gap:14px;padding-right:2px}
+.creatorProfileHero{display:grid;grid-template-columns:auto 1fr;gap:14px;padding:16px;border-radius:18px;background:linear-gradient(180deg, rgba(15,23,42,0.86), rgba(15,23,42,0.68));border:1px solid rgba(148,163,184,0.16)}
+.creatorProfileAvatar{width:68px;height:68px;border-radius:20px;display:grid;place-items:center;background:linear-gradient(180deg, rgba(30,41,59,0.92), rgba(15,23,42,0.88));border:1px solid rgba(96,165,250,0.26);font-size:32px;box-shadow:inset 0 1px 0 rgba(255,255,255,0.04)}
+.creatorProfileHeroCopy{display:flex;flex-direction:column;gap:8px}
+.creatorProfileHeroLead{font-size:10px;font-weight:800;letter-spacing:0.1em;text-transform:uppercase;color:#7dd3fc}
+.creatorProfileNameRow{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.creatorProfileNameRow h2{margin:0;font-family:'Orbitron',sans-serif;font-size:20px;color:#f8fafc}
+.creatorProfileSelfTag{padding:4px 9px;border-radius:999px;background:rgba(59,130,246,0.18);border:1px solid rgba(96,165,250,0.32);color:#bfdbfe;font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase}
+.creatorProfileMeta{font-size:11px;color:#94a3b8;line-height:1.5}
+.creatorProfileBio{font-size:12px;color:#dbeafe;line-height:1.55}
+.creatorProfileHeroSummary{font-size:12px;line-height:1.6;color:#dbeafe}
+.creatorProfileBadgeRow{display:flex;flex-wrap:wrap;gap:8px}
+.creatorProfileBadge{display:inline-flex;align-items:center;gap:6px;padding:5px 9px;border-radius:999px;background:rgba(14,165,233,0.1);border:1px solid rgba(125,211,252,0.24);font-size:10px;font-weight:800;letter-spacing:0.07em;text-transform:uppercase;color:#d8f3ff}
+.creatorProfileHeroActions{display:flex;flex-wrap:wrap;gap:8px}
+.creatorProfileHeroActions button{border:none;border-radius:10px;padding:9px 12px;background:rgba(2,6,23,0.5);border:1px solid rgba(148,163,184,0.16);color:#e2e8f0;font-size:11px;font-weight:700;cursor:pointer}
+.creatorProfileStats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.creatorProfileStat{padding:10px 12px;border-radius:12px;background:rgba(2,6,23,0.34);border:1px solid rgba(148,163,184,0.16);display:flex;flex-direction:column;gap:6px}
+.creatorProfileStat span{font-size:10px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#94a3b8}
+.creatorProfileStat strong{font-family:'Orbitron',sans-serif;font-size:15px;color:#f8fafc}
+.creatorProfileSection{display:flex;flex-direction:column;gap:10px}
+.creatorProfileSectionHead{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.creatorProfileSectionHead h3{margin:0;font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#7dd3fc}
+.creatorProfileSectionTitleRow{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.creatorProfileSectionCount{display:inline-flex;align-items:center;justify-content:center;min-width:22px;height:22px;padding:0 8px;border-radius:999px;background:rgba(30,41,59,0.9);border:1px solid rgba(148,163,184,0.16);font-size:10px;font-weight:800;color:#e2e8f0}
+.creatorProfileList{display:flex;flex-direction:column;gap:10px}
+.creatorProfileListItem,.creatorProfileSpaceCard{padding:12px;border-radius:14px;background:rgba(15,23,42,0.72);border:1px solid rgba(148,163,184,0.14);display:flex;flex-direction:column;gap:7px}
+.creatorProfileListHead{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.creatorProfileListHead strong{font-size:13px;color:#f8fafc}
+.creatorProfileListHead span{font-size:10px;color:#93c5fd;font-weight:800;letter-spacing:0.08em;text-transform:uppercase}
+.creatorProfileListMeta{font-size:11px;color:#94a3b8;line-height:1.5}
+.creatorProfileMetaRow{display:flex;flex-wrap:wrap;gap:8px}
+.creatorProfileMetaBadge{display:inline-flex;align-items:center;padding:4px 8px;border-radius:999px;background:rgba(2,6,23,0.34);border:1px solid rgba(148,163,184,0.16);font-size:10px;font-weight:700;color:#cbd5e1;text-transform:capitalize}
+.creatorProfileListText,.creatorProfileSpaceCard{font-size:12px;color:#dbeafe;line-height:1.55}
+.creatorProfileListActions{display:flex;justify-content:flex-start}
+.creatorProfileEmpty{padding:14px;border-radius:14px;border:1px dashed rgba(148,163,184,0.24);background:rgba(15,23,42,0.42);font-size:12px;line-height:1.6;color:#cbd5e1;text-align:center}
+@media (max-width:1100px){
+  .activityDiscoveryBrowseCol{width:min(360px,calc(100vw - 36px))}
+}
+@media (max-width:860px){
+  #activityDiscoveryPanel{padding:12px}
+  .activityDiscoveryTopBar{top:12px;left:12px;right:12px;flex-direction:column;align-items:flex-start}
+  #activityDiscoveryStatus{top:128px;left:12px;right:12px;max-width:none}
+  .activityDiscoveryPanelCol{position:relative;top:auto;left:auto;right:auto;bottom:auto;width:auto}
+  .activityDiscoveryBrowseCol{margin-top:148px;min-height:40vh}
+  .activityDiscoveryDetailCol{margin-top:12px;margin-bottom:92px}
+  .activityDiscoveryPrompt{left:12px;right:12px;bottom:12px;transform:none;min-width:0;max-width:none;flex-direction:column;align-items:flex-start}
+  .activityDiscoveryPromptActions{margin-left:0}
+  .activityRunHud{left:12px;right:12px;bottom:128px;min-width:0;max-width:none}
+  .creatorProfilePanel{top:12px;left:12px;right:12px;bottom:12px;width:auto}
+  .creatorProfileStats{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width:1100px){
+  .activityCreatorLeftPanel,.activityCreatorRightPanel{width:min(300px,calc(100vw - 36px))}
+  .activityCreatorTopBar{flex-direction:column;align-items:flex-start}
+}
+@media (max-width:860px){
+  #activityCreatorPanel{padding:12px}
+  .activityCreatorTopBar{top:12px;left:12px;right:12px}
+  #activityCreatorStatus{top:120px;left:12px}
+  .activityCreatorSidePanel{left:12px;right:12px;top:auto;bottom:auto;width:auto;position:relative}
+  .activityCreatorWorkspaceShell{position:absolute;inset:148px 0 88px 0;padding:0 12px;display:flex;flex-direction:column;gap:12px;overflow:auto}
+  .activityCreatorLeftPanel,.activityCreatorRightPanel{position:relative;bottom:auto}
+  .activityCreatorToolDock{left:12px;right:12px;bottom:12px;width:auto}
+  .activityCreatorTestBar{left:12px;right:12px;bottom:12px;transform:none;width:auto}
+}
+body.editor-workspace-open #hud,
+body.editor-workspace-open #minimap,
+body.editor-workspace-open #minimapZoomControls,
+body.editor-workspace-open #coords,
+body.editor-workspace-open #controlsTab,
+body.editor-workspace-open #floatMenuContainer,
+body.editor-workspace-open #mainMenuBtn,
+body.editor-workspace-open #memoryFlowerFloatBtn,
+body.editor-workspace-open #gameShareFloatBtn,
+body.editor-workspace-open #gameShareMenu,
+body.editor-workspace-open #flowerActionMenu,
+body.editor-workspace-open #realEstateBtn,
+body.editor-workspace-open #historicBtn,
+body.editor-workspace-open #memoryComposer,
+body.editor-workspace-open #memoryInfoPanel,
+body.editor-workspace-open #largeMap,
+body.editor-workspace-open #legendPanel,
+body.editor-workspace-open #mapInfoPanel,
+body.editor-workspace-open #propertyPanel,
+body.editor-workspace-open #propertyModal,
+body.editor-workspace-open #historicPanel,
+body.editor-workspace-open #roomPanelModal,
+body.editor-workspace-open #navigationHud,
+body.editor-workspace-open #paintTownHud,
+body.editor-workspace-open #flowerChallengeHud,
+body.editor-workspace-open #boatPrompt,
+body.editor-workspace-open #boatWaveDock,
+body.editor-workspace-open #activityDiscoveryPanel,
+body.editor-workspace-open #activityDiscoveryPrompt,
+body.editor-workspace-open #activityRunHud,
+body.editor-workspace-open #creatorProfilePanel,
+body.editor-workspace-open #liveEarthLocalPanel,
+body.editor-workspace-open .auth-float-toggle,
+body.editor-workspace-open .auth-float-panel,
+body.editor-workspace-open .pro-access-panel{
+  display:none!important;
+}
+body.editor-workspace-open .floatMenu.open .floatItems{display:none!important}
+.editorToolbar{display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 12px}
+.editorPanelHeader,.editorTabRow,.editorToolbar{flex-shrink:0}
+#editorPanel{position:fixed;inset:0;width:auto;max-height:none;padding:18px;background:transparent;color:#e2e8f0;border:none;border-radius:0;box-shadow:none;backdrop-filter:none;display:none;flex-direction:column;overflow:visible;z-index:240;pointer-events:none}
+.editorPanelHeader,.editorToolbar,.editorTabRow,#editorStatus,.editorSidePanel,.editorPreviewDrawer,.editorHelpDrawer,#editorMinePane.active,#editorModerationPane.active{pointer-events:auto}
+.editorPanelHeader{position:absolute;top:18px;left:18px;width:min(440px,calc(100vw - 420px));padding:12px 14px;background:rgba(8,15,28,0.9);border:1px solid rgba(94,234,212,0.22);border-radius:18px;box-shadow:0 18px 48px rgba(2,6,23,0.34);backdrop-filter:blur(14px);z-index:6}
+.editorPanelTitleWrap{max-width:100%}
+#editorPanelSubline{max-width:380px}
+#editorStatus{position:absolute;top:102px;left:18px;max-width:min(320px,calc(100vw - 36px));padding:8px 12px;border-radius:14px;background:rgba(8,15,28,0.86);border:1px solid rgba(125,211,252,0.18);box-shadow:0 12px 28px rgba(2,6,23,0.22);backdrop-filter:blur(12px);z-index:6}
+.editorToolbar,.editorTabRow{padding:10px 12px;background:rgba(8,15,28,0.82);border:1px solid rgba(148,163,184,0.18);border-radius:14px;box-shadow:0 14px 34px rgba(2,6,23,0.26);backdrop-filter:blur(12px)}
+.editorTabRow{position:absolute;top:18px;right:18px;display:flex;gap:10px;max-width:calc(100vw - 520px);z-index:6}
+.editorTabBtn{flex:0 0 auto;min-width:108px}
+.editorToolbar{position:absolute;left:18px;bottom:18px;transform:none;width:min(336px,calc(100vw - 36px));justify-content:flex-start;z-index:6}
+.editorPanelBody{position:absolute;inset:0;padding:0;overflow:visible;display:flex;flex-direction:column;gap:12px;flex:1;min-height:0;pointer-events:none}
+.editorPane{display:none;flex-direction:column;gap:12px;min-height:0;flex:1;pointer-events:none}
+.editorPane.active{display:flex}
+#editorWorkspacePane.active{display:block}
+.editorToolbar button{border:1px solid rgba(148,163,184,0.26);background:rgba(15,23,42,0.72);color:#cbd5e1;border-radius:10px;padding:8px 10px;font-size:11px;font-weight:700;cursor:pointer}
+.editorToolbar button.active{background:rgba(56,189,248,0.18);border-color:rgba(125,211,252,0.5);color:#e0f2fe}
+.editorToolbarSpacer{display:none}
+.editorWorkspaceShell{position:absolute;inset:0;min-height:0;flex:1;align-items:stretch}
+.editorSidePanel,.editorViewportPanel{min-height:0}
+.editorSidePanel{position:absolute;top:146px;bottom:94px;overflow:auto;display:flex;flex-direction:column;gap:12px;padding:14px;background:rgba(8,15,28,0.88);border:1px solid rgba(148,163,184,0.18);border-radius:16px;box-shadow:0 18px 40px rgba(2,6,23,0.28);backdrop-filter:blur(14px);z-index:5}
+.editorWorkspaceShell>.editorSidePanel:first-child{left:18px;width:min(320px,calc(100vw - 36px))}
+.editorInspectorPanel{position:absolute;top:94px;right:18px;bottom:18px;width:min(340px,calc(100vw - 36px));z-index:5}
+.editorViewportPanel{position:absolute;inset:0;overflow:visible;background:transparent;border:none;padding:0;pointer-events:none}
+.editorViewportHint,.editorViewportMeta{display:none!important}
+.editorViewportMetaChip{display:inline-flex;align-items:center;padding:6px 10px;border-radius:999px;background:rgba(8,30,37,0.86);border:1px solid rgba(45,212,191,0.26);font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#ccfbf1;backdrop-filter:blur(12px)}
+.editorViewportMetaTitle{padding:12px 14px;border-radius:14px;background:rgba(8,15,28,0.82);border:1px solid rgba(125,211,252,0.2);box-shadow:0 18px 40px rgba(2,6,23,0.24);font-family:'Orbitron',sans-serif;font-size:14px;color:#f8fafc;backdrop-filter:blur(14px)}
+.editorViewportMetaText{padding:10px 12px;border-radius:12px;background:rgba(8,15,28,0.74);border:1px solid rgba(148,163,184,0.16);box-shadow:0 14px 30px rgba(2,6,23,0.2);font-size:12px;line-height:1.5;color:#dbeafe;backdrop-filter:blur(14px)}
+.editorPanelSwitch{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.editorPanelSwitch button{border:1px solid rgba(148,163,184,0.22);border-radius:10px;padding:9px 10px;background:rgba(15,23,42,0.58);color:#cbd5e1;font-size:11px;font-weight:700;cursor:pointer}
+.editorPanelSwitch button.active{background:rgba(20,184,166,0.18);border-color:rgba(94,234,212,0.42);color:#ecfeff}
+.editorPanelSwitch button:disabled{opacity:0.42;cursor:default}
+.editorSidebarView{display:flex;flex-direction:column;gap:12px}
+.editorSidebarView[hidden]{display:none!important}
+.editorSectionBlock{display:flex;flex-direction:column;gap:10px}
+.editorOnboardingCard{display:flex;flex-direction:column;gap:12px;padding:14px;border-radius:14px;background:linear-gradient(180deg,rgba(8,30,37,0.92),rgba(15,23,42,0.88));border:1px solid rgba(45,212,191,0.22);box-shadow:0 14px 32px rgba(2,6,23,0.24)}
+.editorOnboardingEyebrow{font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#7dd3fc}
+.editorOnboardingTitle{font-family:'Orbitron',sans-serif;font-size:15px;color:#f8fafc}
+.editorOnboardingCopy{font-size:12px;line-height:1.55;color:#dbeafe}
+.editorOnboardingSteps{display:flex;flex-direction:column;gap:8px}
+.editorOnboardingStep{padding:10px 12px;border-radius:12px;background:rgba(2,6,23,0.3);border:1px solid rgba(148,163,184,0.16);font-size:11px;line-height:1.5;color:#cbd5e1}
+.editorOnboardingStep strong{display:block;margin-bottom:4px;color:#f8fafc;font-size:11px}
+.editorOnboardingActions{display:flex;flex-wrap:wrap;gap:8px}
+.editorOnboardingActions button{border:none;border-radius:10px;padding:10px 12px;font-size:11px;font-weight:700;cursor:pointer;background:#164e63;color:#ecfeff}
+.editorOnboardingActions button.secondary{background:#1e293b;color:#e2e8f0}
+.editorInspectorPanel[hidden]{display:none!important}
+.editorPresetGrid .editorEmptyState,.editorListStack .editorEmptyState{margin:0}
+.editorNoSelection .editorToolbar{width:min(300px,calc(100vw - 36px))}
+.editorSectionTitle{font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#7dd3fc}
+.editorPresetGrid,.editorListStack{display:flex;flex-direction:column;gap:8px}
+.editorPresetCategoryBlock{display:flex;flex-direction:column;gap:8px}
+.editorPresetCategoryLabel{font-size:10px;font-weight:800;letter-spacing:0.08em;text-transform:uppercase;color:#94a3b8}
+.editorPresetCard,.editorListRow{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;border:1px solid rgba(148,163,184,0.18);border-radius:12px;padding:10px 12px;background:rgba(2,6,23,0.34);color:#e2e8f0;cursor:pointer;text-align:left}
+.editorPresetCard strong,.editorListRow span:first-child{font-size:12px}
+.editorPresetCard span,.editorListRow span:last-child{font-size:10px;color:#94a3b8;text-transform:capitalize}
+.editorPresetCard.active,.editorListRow.selected{border-color:rgba(125,211,252,0.58);box-shadow:0 0 0 1px rgba(125,211,252,0.22)}
+.editorPresetSummaryCard{display:flex;flex-direction:column;gap:10px}
+.editorPresetSummaryTitle{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.editorPresetSummaryTitle strong{font-size:13px;color:#f8fafc}
+.editorPresetSummaryMeta{font-size:10px;color:#7dd3fc;text-transform:uppercase;letter-spacing:0.06em}
+.editorPresetSummaryText{font-size:12px;line-height:1.5;color:#dbeafe}
+.editorPresetSummaryList{display:flex;flex-direction:column;gap:6px}
+.editorPresetSummaryList div{font-size:11px;line-height:1.4;color:#cbd5e1}
+.editorPresetSummaryRelated{display:flex;flex-wrap:wrap;gap:6px}
+.editorPresetSummaryRelated button{border:none;border-radius:999px;padding:5px 8px;background:rgba(8,30,37,0.88);color:#ccfbf1;font-size:10px;font-weight:700;cursor:pointer}
+.editorInspectorTop{display:flex;flex-direction:column;gap:4px}
+#editorSelectedFeatureTitle{font-family:'Orbitron',sans-serif;font-size:14px;color:#f8fafc}
+#editorSelectedFeatureMeta{font-size:11px;color:#cbd5e1;line-height:1.45}
+.editorMetaRow{display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:11px;color:#cbd5e1}
+.editorGuidedFieldPanel{display:flex;flex-direction:column;gap:12px}
+.editorFieldGroupCard{display:flex;flex-direction:column;gap:10px;padding:12px;border-radius:12px;background:rgba(2,6,23,0.24);border:1px solid rgba(148,163,184,0.16)}
+.editorFieldGroupTitle{font-size:11px;font-weight:800;letter-spacing:0.06em;text-transform:uppercase;color:#bfdbfe}
+.editorSelectOptionHint{margin-top:6px;font-size:10px;line-height:1.4;color:#94a3b8}
+.editorAdvancedToggle{display:flex;align-items:flex-start;gap:10px;padding:12px;border-radius:12px;background:rgba(8,30,37,0.84);border:1px solid rgba(45,212,191,0.22);font-size:12px;line-height:1.45;color:#e2e8f0}
+.editorAdvancedToggle input{margin-top:2px}
+.editorAdvancedPanel{display:flex;flex-direction:column;gap:12px;padding:12px;border-radius:12px;background:rgba(2,6,23,0.38);border:1px solid rgba(148,163,184,0.18)}
+.editorAdvancedPanel[hidden]{display:none!important}
+.editorAdvancedWarning{font-size:11px;line-height:1.5;color:#fcd34d;background:rgba(120,53,15,0.24);border:1px solid rgba(251,191,36,0.2);border-radius:10px;padding:10px 12px}
+.editorAdvancedMapping{display:flex;flex-direction:column;gap:8px}
+.editorAdvancedMappingRow{display:flex;justify-content:space-between;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(15,23,42,0.72);border:1px solid rgba(148,163,184,0.16)}
+.editorAdvancedMappingRow strong{font-size:11px;color:#f8fafc}
+.editorAdvancedMappingRow span{font-size:10px;color:#94a3b8}
+.editorGridTwo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.editorToggleRow{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.editorToggleRow label{display:flex;align-items:center;gap:8px;font-size:12px;color:#e2e8f0}
+.editorTagList{display:flex;flex-direction:column;gap:8px}
+.editorKeyValueRow{display:grid;grid-template-columns:120px 1fr;gap:8px;align-items:center}
+.editorKeyValueRow span{font-size:11px;color:#cbd5e1;word-break:break-word}
+.editorKeyValueRow input,.editorKeyValueComposer input,.editorField input,.editorField select,.editorField textarea{width:100%;border:1px solid rgba(148,163,184,0.28);border-radius:10px;padding:10px 12px;background:rgba(15,23,42,0.74);color:#f8fafc;font-size:12px;font-family:'Inter',sans-serif}
+.editorKeyValueComposer{display:grid;grid-template-columns:minmax(110px,0.9fr) minmax(0,1fr) auto;gap:8px}
+.editorKeyValueComposer button,.editorActionRow.compact button{border:none;border-radius:10px;padding:10px 12px;font-size:11px;font-weight:700;cursor:pointer;background:#164e63;color:#ecfeff}
+.editorIssue{border-radius:10px;padding:9px 10px;font-size:11px;line-height:1.4;background:rgba(30,41,59,0.72);color:#dbeafe}
+.editorIssue.warning{background:rgba(120,53,15,0.32);color:#fdba74}
+.editorIssue.error{background:rgba(127,29,29,0.34);color:#fecaca}
+.editorIssue.ok{background:rgba(6,78,59,0.28);color:#bbf7d0}
+.editorIssueHead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.editorIssueTitle{font-size:11px;font-weight:700;color:inherit}
+.editorIssueHint{margin-top:6px;font-size:10px;line-height:1.4;color:inherit;opacity:0.92}
+.editorIssueHelpBtn{border:none;border-radius:999px;padding:4px 8px;background:rgba(2,6,23,0.42);color:inherit;font-size:10px;font-weight:700;cursor:pointer}
+.editorPreviewDrawer{display:none;position:absolute;right:18px;bottom:18px;left:auto;transform:none;width:min(360px,calc(100vw - 36px));margin-top:0;border:1px solid rgba(125,211,252,0.22);border-radius:16px;padding:14px;background:rgba(8,30,37,0.92);box-shadow:0 20px 44px rgba(2,6,23,0.28);backdrop-filter:blur(14px);z-index:6}
+.editorPreviewDrawer.show{display:block}
+.editorHasSelection .editorPreviewDrawer{right:370px}
+.editorPreviewHead{display:flex;justify-content:space-between;gap:10px;align-items:flex-start;margin-bottom:10px}
+#editorPreviewSummary{font-size:12px;color:#e0f2fe;line-height:1.5}
+#editorPreviewHighlights,#editorPreviewChecklist{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+.editorPreviewChip{padding:8px 10px;border-radius:10px;background:rgba(15,23,42,0.72);border:1px solid rgba(148,163,184,0.16);font-size:11px;line-height:1.4;color:#e2e8f0}
+#editorPreviewValidation{display:flex;flex-direction:column;gap:8px;margin-top:10px}
+#editorMinePane .editorPaneIntro,#editorModerationPane .editorPaneIntro{font-size:12px;line-height:1.5;color:#cbd5e1;background:rgba(15,23,42,0.72);border:1px solid rgba(148,163,184,0.18);border-radius:12px;padding:12px}
+.editorModerationShell{display:grid;grid-template-columns:minmax(240px,320px) 1fr;gap:12px;min-height:0}
+#editorModerationDetail{background:rgba(15,23,42,0.78);border:1px solid rgba(148,163,184,0.24);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:10px;min-height:180px}
+.editorModerationDetailTitle{font-size:14px;font-weight:700;color:#f8fafc}
+.editorHelpDrawer{position:absolute;top:84px;right:18px;bottom:18px;width:min(420px,calc(100vw - 36px));display:flex;flex-direction:column;gap:12px;padding:18px;background:rgba(6,10,19,0.98);border:1px solid rgba(148,163,184,0.22);border-radius:18px;box-shadow:-18px 0 42px rgba(2,6,23,0.42);transform:translateX(105%);transition:transform 0.22s ease;z-index:5}
+.editorHelpDrawer.show{transform:translateX(0)}
+.editorHelpHead{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.editorHelpHead button{border:none;border-radius:999px;padding:6px 10px;background:rgba(15,23,42,0.92);color:#e2e8f0;font-size:12px;font-weight:700;cursor:pointer}
+.editorHelpTitle{font-family:'Orbitron',sans-serif;font-size:14px;color:#f8fafc}
+.editorHelpSummary{font-size:12px;line-height:1.5;color:#cbd5e1}
+.editorHelpTopicList{display:flex;flex-wrap:wrap;gap:8px}
+.editorHelpTopicList button{border:1px solid rgba(148,163,184,0.2);border-radius:999px;padding:6px 10px;background:rgba(15,23,42,0.7);color:#cbd5e1;font-size:10px;font-weight:700;cursor:pointer}
+.editorHelpTopicList button.active{background:rgba(20,184,166,0.18);border-color:rgba(94,234,212,0.42);color:#ecfeff}
+.editorHelpContent{overflow:auto;display:flex;flex-direction:column;gap:12px;padding-right:4px}
+.editorHelpSection{display:flex;flex-direction:column;gap:8px;padding:12px;border-radius:12px;background:rgba(15,23,42,0.72);border:1px solid rgba(148,163,184,0.16)}
+.editorHelpSection strong{font-size:11px;letter-spacing:0.06em;text-transform:uppercase;color:#7dd3fc}
+.editorHelpSection div{font-size:12px;line-height:1.55;color:#e2e8f0}
+.editorWorldPeek .editorWorkspaceShell{grid-template-columns:1fr}
+.editorWorldPeek .editorSidePanel,
+.editorWorldPeek #editorPreviewDrawer,
+.editorWorldPeek .editorHelpDrawer{display:none!important}
+.editorWorldPeek .editorToolbar,
+.editorWorldPeek #editorStatus,
+.editorWorldPeek .editorPreviewDrawer,
+.editorWorldPeek .editorHelpDrawer{display:none!important}
+#editorMinePane.active,#editorModerationPane.active{position:absolute;top:84px;left:18px;right:18px;bottom:18px;padding:18px;overflow:auto;background:rgba(8,15,28,0.88);border:1px solid rgba(148,163,184,0.18);border-radius:18px;box-shadow:0 18px 40px rgba(2,6,23,0.28);backdrop-filter:blur(14px)}
+
+@media (max-width: 1180px){
+  #editorPanel{padding:10px}
+  .editorPanelHeader,#editorStatus,.editorTabRow,.editorToolbar{position:static;width:auto;max-width:none;transform:none;margin:0 0 10px}
+  .editorPanelBody{position:relative;padding:0;overflow:auto}
+  .editorPane.active{position:relative;display:flex}
+  #editorWorkspacePane.active{display:flex}
+  .editorWorkspaceShell{position:relative;display:grid;grid-template-columns:1fr;gap:12px}
+  .editorWorkspaceShell>.editorSidePanel:first-child,
+  .editorInspectorPanel,
+  .editorViewportPanel,
+  #editorPreviewDrawer{position:relative;inset:auto;left:auto;right:auto;top:auto;bottom:auto;width:auto;transform:none}
+  .editorSidePanel{position:relative;top:auto;bottom:auto}
+  .editorViewportPanel{min-height:220px}
+  .editorViewportHint{position:relative;top:auto;left:auto;transform:none;max-width:none}
+  .editorViewportMeta{position:relative;left:auto;bottom:auto;transform:none;width:auto;margin-top:12px}
+  .editorModerationShell{grid-template-columns:1fr}
+  .editorHelpDrawer{top:auto;right:0;left:0;bottom:0;width:100%;border-left:none;border-radius:18px 18px 0 0}
+  #editorMinePane.active,#editorModerationPane.active{position:relative;top:auto;left:auto;right:auto;bottom:auto}
+}
+
+@media (max-width: 720px){
+  .editorGridTwo,.editorToggleRow,.editorKeyValueComposer,.editorKeyValueRow{grid-template-columns:1fr}
+  .editorToolbar{padding:10px 12px}
+  .editorToolbarSpacer{display:none}
+  .editorFieldLead{flex-direction:column}
+  .editorHeaderActions{align-self:flex-start}
+}
+#editorTutorialStartBtn{background:#14b8a6;color:#042f2e}
+#editorTutorialCancelBtn{background:#334155;color:#e2e8f0}
+
 .auth-float-toggle{position:fixed;top:14px;left:12px;z-index:242;background:#fbbf24;color:#422006;border:none;border-radius:999px;padding:9px 13px;font-size:12px;font-weight:800;cursor:pointer;box-shadow:0 10px 24px rgba(2,6,23,0.34);border:1px solid rgba(251,191,36,0.75)}
 .auth-float-toggle:hover{filter:brightness(1.04)}
 .auth-float-panel{position:fixed;top:56px;left:12px;z-index:241;width:min(350px,calc(100vw - 24px));background:rgba(10,20,35,0.92);border:1px solid rgba(147,197,253,0.48);border-radius:14px;padding:12px;box-shadow:0 16px 36px rgba(2,6,23,0.38);backdrop-filter:blur(10px);display:flex;flex-direction:column;gap:8px}
@@ -706,7 +1345,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
   z-index:104;
 }
 #multiplayerBtn .btnText{display:none}
-#multiplayerBtn .btnIcon{font-size:20px}
+#multiplayerBtn .btnIcon{display:block;font-size:20px;line-height:1}
 #multiplayerMenu.open .floatItems{
   left:145px;
   right:auto;
@@ -731,6 +1370,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .mp-subtitle{font-family:'Poppins',sans-serif;font-size:12px;font-weight:700;color:#1d4ed8}
 .mp-room-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:180px;overflow:auto}
 .mpRoomItem{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:8px}
+.mpRoomItem.active{border-color:#60a5fa;box-shadow:0 0 0 2px rgba(96,165,250,0.18)}
 .mpRoomInfo{display:flex;flex-direction:column;gap:2px;min-width:0}
 .mpRoomName{font-size:12px;font-weight:700;color:#0f172a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mpRoomMeta{font-size:11px;color:#475569;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -792,6 +1432,9 @@ input,textarea{-webkit-user-select:text;user-select:text}
 @media (max-width: 768px){
   #memoryComposer{left:10px;right:10px;bottom:12px;width:auto}
   #memoryInfoPanel{left:10px;right:10px;top:72px;width:auto}
+  #editorPanel{left:10px;right:10px;top:72px;width:auto;max-height:calc(100dvh - 84px)}
+  .editorCaptureRow{grid-template-columns:1fr}
+  .editorFieldGroup,.editorModerationControls,.editorModerationDetailGrid{grid-template-columns:1fr}
   .auth-float-toggle{top:max(8px,calc(env(safe-area-inset-top) + 6px));left:10px;padding:8px 11px;font-size:11px}
   .auth-float-panel{top:max(48px,calc(env(safe-area-inset-top) + 46px));left:8px;right:8px;width:auto}
   .pro-access-panel{top:max(54px,calc(env(safe-area-inset-top) + 52px));padding:10px}
@@ -1173,7 +1816,8 @@ Use this to compare RDT and baseline with real runtime data.
 <div class="ctrl-row"><span class="ctrl-key">LAND ON ... Button</span><span class="ctrl-action">Land when in range</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Click Planets/Asteroids/Galaxies</span><span class="ctrl-action">Inspect deep-space object info</span></div>
 <div class="ctrl-section">Other</div>
-<div class="ctrl-row"><span class="ctrl-key">Exploration Menu</span><span class="ctrl-action">Place/remove memory pin or flower</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Connect Menu</span><span class="ctrl-action">Rooms, share tools, and memory markers</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Contribute Menu</span><span class="ctrl-action">Open the staged contributor workflow</span></div>
 <div class="ctrl-row"><span class="ctrl-key">R</span><span class="ctrl-action">Record/Stop Track</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Esc</span><span class="ctrl-action">Pause</span></div>
 </div>
@@ -1186,7 +1830,7 @@ Use this to compare RDT and baseline with real runtime data.
 <div class="flowerChallengeBadge">Flower + Paint</div>
 </div>
 <div class="flowerChallengeBody">
-<div class="flowerChallengeHint">Track your best challenge runs. Flower is fastest time. Paint is most buildings painted in 2 minutes.</div>
+<div class="flowerChallengeHint">Track your best challenge runs. Flower is fastest time. Paint is most buildings painted in 2 minutes. Sign in to publish scores to the shared board; signed-out runs stay local to this browser.</div>
 <div class="flowerChallengeLocation">Location: <b id="flowerChallengeLocation">Baltimore</b></div>
 <div class="flowerLeaderboardTabs">
 <button id="leaderboardTabFlower" class="flowerLeaderboardTab active" type="button">🌹 Flower</button>
@@ -1247,6 +1891,11 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fon
 <div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>
 <div id="globeSelectorPlace" class="globe-selector-stat-label" style="margin-top:4px">Click the globe to choose a location.</div>
 </div>
+<div class="globe-selector-mode-tabs" role="tablist" aria-label="Globe selector mode">
+<button id="globeSelectorExploreModeBtn" class="globe-selector-mode-tab active" type="button">Explore</button>
+<button id="globeSelectorLiveEarthModeBtn" class="globe-selector-mode-tab" type="button">Live Earth</button>
+</div>
+<div id="globeSelectorExplorePanel" class="globe-selector-mode-panel active">
 <div style="font-size:12px;font-weight:600;color:#1e293b">Search Location</div>
 <div class="globe-selector-row">
 <input id="globeLocationSearch" type="text" placeholder="Try: Seattle, Tokyo, Paris France">
@@ -1267,6 +1916,19 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fon
 <ul id="globeCityList" class="globe-selector-city-list">
   <li class="globe-selector-city-empty">Pick a point on the globe to see nearby cities.</li>
 </ul>
+</div>
+<div id="globeSelectorLiveEarthPanel" class="globe-selector-mode-panel" hidden>
+<div class="globe-selector-live-header">
+<div class="globe-selector-live-title">Live Earth</div>
+<button id="globeLiveEarthRefreshBtn" class="globe-selector-live-refresh" type="button">Refresh</button>
+</div>
+<div id="globeLiveEarthStatus" class="globe-selector-live-status">Live feeds are cached and refreshed only when needed.</div>
+<div id="globeLiveEarthCategoryChips" class="globe-selector-live-chips"></div>
+<div id="globeLiveEarthLayerList" class="globe-selector-live-layer-list"></div>
+<div id="globeLiveEarthDetails" class="globe-selector-live-details">
+  <div class="globe-selector-live-placeholder">Satellites, earthquakes, and weather will appear here.</div>
+</div>
+</div>
 <div class="globe-selector-actions">
 <button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Main Menu</button>
 <button id="globeSelectorStartBtn" class="globe-selector-action-btn" type="button">Start Here</button>
@@ -1278,10 +1940,28 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fon
 </div>
 </div>
 </div>
+<div id="liveEarthLocalPanel" aria-live="polite">
+<div id="liveEarthLocalTitle" class="live-earth-local-title"></div>
+<div id="liveEarthLocalMeta" class="live-earth-local-meta"></div>
+<div class="live-earth-local-actions">
+<button id="liveEarthDismissBtn" class="live-earth-local-btn secondary" type="button">Dismiss</button>
+<button id="liveEarthReplayBtn" class="live-earth-local-btn primary" type="button">Replay Shake</button>
+</div>
+</div>
 <div id="hud"><div class="hud-box" id="hudBox">
 <button id="hudToggleBtn" type="button" aria-label="Collapse HUD" aria-expanded="true">-</button>
+<div id="hudHeader">
+<div id="hudSpeedBlock">
 <div id="speed">0</div>
 <div class="hud-label"><span id="speedUnitLabel">MPH</span> <span style="margin-left:6px"><span id="limitLabel">LIMIT</span> <span id="limit">--</span></span></div>
+</div>
+<div id="weatherPanel">
+<div id="weatherLine"></div>
+<div id="weatherTimeLine"></div>
+<div id="weatherMetaLine"></div>
+</div>
+</div>
+<div id="hudClockDisplay"></div>
 <div id="hudDetails">
 <div id="boostBar"><div id="boostFill"></div></div>
 <div id="street">Loading...</div>
@@ -1291,12 +1971,26 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fon
 </div></div>
 <div id="coords">--</div>
 <div id="interiorPrompt" aria-live="polite"></div>
+<div id="boatPrompt" aria-live="polite"></div>
+<div id="boatWaveDock" aria-hidden="true">
+  <div class="boatWaveMeta">
+    <span id="boatWaveLabel">Moderate Water</span>
+    <span id="boatWaveHint">Wave intensity</span>
+  </div>
+  <input id="boatWaveSlider" type="range" min="0" max="100" step="1" value="46" aria-label="Wave intensity">
+  <span id="boatWaveValue">46%</span>
+</div>
 <div id="flowerChallengeHud">
 <span id="flowerChallengeHudStatus"></span>
 <span id="flowerChallengeHudTimer"></span>
 </div>
 <div id="offRoadWarn"></div>
 <canvas id="minimap" width="150" height="150"></canvas>
+<div id="minimapZoomControls" aria-label="Minimap zoom controls">
+  <button id="minimapZoomIn" class="minimapZoomBtn" type="button" aria-label="Zoom in on minimap">+</button>
+  <div id="minimapZoomLevel" aria-live="polite">Z 15</div>
+  <button id="minimapZoomOut" class="minimapZoomBtn" type="button" aria-label="Zoom out on minimap">−</button>
+</div>
 <div id="largeMap">
 <canvas id="largeMapCanvas" width="800" height="800"></canvas>
 <button id="mapClose">Close Map (M)</button>
@@ -1345,6 +2039,30 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fon
       <div id="enterableBuildingsStatus" style="margin-bottom:6px">Open the legend to scan nearby enterable buildings.</div>
       <div style="margin-bottom:6px;color:#8ef9ff">Press <strong>E</strong> near a listed building to enter or exit.</div>
       <div id="enterableBuildingsList" style="display:grid;gap:4px"></div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:12px">
+    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="filterContributions" checked style="cursor:pointer">
+      <label for="filterContributions" style="cursor:pointer">APPROVED CONTRIBUTIONS</label>
+    </div>
+    <div style="font-size:10px;line-height:1.5;padding-left:24px;opacity:0.9">
+      <div style="margin-bottom:3px"><span style="color:#14b8a6">●</span> Approved place info</div>
+      <div style="margin-bottom:3px"><span style="color:#a855f7">◆</span> Approved artifact markers</div>
+      <div style="margin-bottom:3px">Drafts and pending submissions stay private until approved.</div>
+    </div>
+  </div>
+
+  <div style="margin-bottom:12px">
+    <div style="font-size:11px;font-weight:bold;margin-bottom:6px;color:#0ff;display:flex;align-items:center;gap:6px">
+      <input type="checkbox" id="filterActivities" checked style="cursor:pointer">
+      <label for="filterActivities" style="cursor:pointer">WORLD ACTIVITIES</label>
+    </div>
+    <div style="font-size:10px;line-height:1.5;padding-left:24px;opacity:0.9">
+      <div style="margin-bottom:3px"><span style="color:#f59e0b">▲</span> Nearby and featured activities</div>
+      <div style="margin-bottom:3px"><span style="color:#8b5cf6">◆</span> Room sessions and creator routes</div>
+      <div style="margin-bottom:3px">Click markers to inspect and join them.</div>
     </div>
   </div>
 
@@ -1449,7 +2167,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Fon
         <label for="filterDestination" style="cursor:pointer"><span style="color:#fc0">●</span> Trial Destination</label>
       </div>
       <div style="margin-bottom:3px;display:flex;align-items:center;gap:6px">
-        <input type="checkbox" id="filterCustomTrack" checked style="cursor:pointer">
+        <input type="checkbox" id="filterCustomTrack" style="cursor:pointer">
         <label for="filterCustomTrack" style="cursor:pointer"><span style="color:#fa0">━━</span> Custom Track</label>
       </div>
     </div>
@@ -1540,6 +2258,7 @@ Explore the area
 <div class="floatItem" id="fDriving">🚗 Driving Mode</div>
 <div class="floatItem" id="fWalk">🚶 Walk Mode</div>
 <div class="floatItem" id="fDrone">🚁 Drone Mode</div>
+<div class="floatItem" id="fBoat" style="display:none">🚤 Boat Mode</div>
 <div class="floatItem" id="fOceanMode">🌊 Ocean Mode</div>
 <div class="floatItem" id="fEarthMode">🌍 Earth Mode</div>
 <div class="floatItem" id="fSpaceDirect">🌙 Direct to Moon</div>
@@ -1554,11 +2273,14 @@ Explore the area
 <div class="floatItem" id="fRoads">🛣️ Show Roads</div>
 <div class="floatItem" id="fPaths" hidden>🚶 Path Overlay</div>
 <div class="floatItem" id="fLandUse">🗺️ Land Use</div>
-<div class="floatItem" id="fTimeOfDay">☀️ Day/Night</div>
+<div class="floatItem" id="fTimeOfDay">☀️ Live Sky</div>
+<div class="floatItem" id="fWeatherMode">🌦️ Weather Live</div>
+<div class="floatItem" id="fSeaState" style="display:none">🌊 Sea State: Moderate</div>
 <div class="floatItem" id="fClouds">☁️ Clouds</div>
 <div class="floatItem" id="fConstellations">✨ Constellations</div>
 </div>
 </div>
+
 </div>
 
 <!-- Bottom Row: Game Mode and Real Estate -->
@@ -1566,7 +2288,7 @@ Explore the area
 <div class="floatMenu" id="gameMenu">
 <button class="floatBtn game" id="gameBtn"><span class="btnIcon">🎮</span><span class="btnText">Game Mode</span></button>
 <div class="floatItems">
-<div class="floatItem" id="fPolice">🚔 Police</div>
+<div class="floatItem" id="fActivities">🌍 Browse Games</div>
 <div class="floatItem" id="fTrack">🏁 Record Track</div>
 <div class="floatItem" id="fEraseTrack">🗑️ Erase Track</div>
 <div class="floatItem" id="fBlockBuild">🧱 Build Mode</div>
@@ -1577,9 +2299,12 @@ Explore the area
 </div>
 
 <div class="floatMenu" id="realEstateMenu">
-<button class="floatBtn realEstate" id="realEstateFloatBtn"><span class="btnIcon">🏘️</span><span class="btnText">Real Estate</span></button>
+<button class="floatBtn realEstate" id="realEstateFloatBtn"><span class="btnIcon">🏘️</span><span class="btnText">Land &amp; Property</span></button>
 <div class="floatItems">
-<div class="floatItem" id="fRealEstate">🏘️ Real Estate</div>
+<div class="floatItem" id="fEditorMode">🛠️ Map Editor</div>
+<div class="floatItem" id="fEditorMine" hidden>📬 My Submissions</div>
+<div class="floatItem" id="fModerationPanel" hidden>🛡️ Review Queue</div>
+<div class="floatItem" id="fRealEstate">🏘️ Land &amp; Property</div>
 <div class="floatItem" id="fHistoric">⛩️ Historic</div>
 <div class="floatItem" id="fPOI">📍 POI</div>
 <div class="floatItem" id="fLandUseRE">🗺️ Land Use</div>
@@ -1631,6 +2356,424 @@ Explore the area
 </div>
 </div>
 
+<section id="editorPanel" aria-label="Overlay editor panel">
+  <div class="editorPanelHeader">
+    <div class="editorPanelTitleWrap">
+      <div id="editorPanelTitle">Overlay Editor Beta</div>
+      <div id="editorPanelSubline">Beta demo editor for World Explorer overlays. This does not submit to OpenStreetMap and does not edit the imported base world data.</div>
+      <div id="editorAuthBadge">Preview only • Sign in to save drafts</div>
+    </div>
+    <div class="editorHeaderActions">
+      <button id="editorHelpBtn" type="button">Guide</button>
+      <button id="editorViewModeBtn" type="button">2D Plan</button>
+      <button id="editorPeekBtn" type="button">Peek World</button>
+      <button id="editorCloseBtn" type="button">Close</button>
+    </div>
+  </div>
+  <div id="editorStatus" data-tone="info">Overlay editor is ready.</div>
+  <div id="editorToolbar" class="editorToolbar">
+    <button type="button" data-editor-tool="select">Select</button>
+    <button type="button" data-editor-tool="draw_point">Point</button>
+    <button type="button" data-editor-tool="draw_line">Line</button>
+    <button type="button" data-editor-tool="draw_polygon">Polygon</button>
+    <button type="button" data-editor-tool="add_vertex">Add Vertex</button>
+    <button type="button" data-editor-tool="delete_vertex">Delete Vertex</button>
+    <button type="button" data-editor-tool="split_line">Split</button>
+    <button type="button" data-editor-action="merge">Merge</button>
+    <div class="editorToolbarSpacer"></div>
+    <button type="button" data-editor-action="undo">Undo</button>
+    <button type="button" data-editor-action="redo">Redo</button>
+    <button type="button" data-editor-action="validate">Validate</button>
+    <button type="button" data-editor-action="preview">Preview</button>
+  </div>
+  <div class="editorTabRow">
+    <button id="editorTabWorkspace" class="editorTabBtn active" type="button">Workspace</button>
+    <button id="editorTabMine" class="editorTabBtn" type="button">My Features</button>
+    <button id="editorTabModeration" class="editorTabBtn" type="button" hidden>Moderation</button>
+  </div>
+  <div class="editorPanelBody">
+    <div id="editorWorkspacePane" class="editorPane active">
+      <div class="editorWorkspaceShell">
+        <aside id="editorSidebarPanel" class="editorSidePanel">
+          <div class="editorPanelSwitch">
+            <button id="editorSidebarStartBtn" class="active" type="button">Start Here</button>
+            <button id="editorSidebarPresetsBtn" type="button">Presets</button>
+            <button id="editorSidebarSelectionBtn" type="button">Workspace</button>
+          </div>
+          <div id="editorSidebarStartView" class="editorSidebarView">
+            <div id="editorOnboardingCard" class="editorOnboardingCard"></div>
+            <div class="editorSectionBlock">
+              <div class="editorSectionTitle">Base Feature</div>
+              <div id="editorBaseSelection" class="editorTargetCard">Select a base world feature in the scene to clone it into a World Explorer overlay draft.</div>
+              <button id="editorCloneBaseBtn" class="editorActionBtn" type="button">Clone Base To Overlay</button>
+            </div>
+          </div>
+          <div id="editorSidebarPresetsView" class="editorSidebarView" hidden>
+            <div class="editorSectionTitle">Presets</div>
+            <label class="editorField">
+              <span class="editorFieldLabel">Search Presets</span>
+              <input id="editorPresetSearchInput" type="text" maxlength="80" placeholder="road, building, water, entrance">
+            </label>
+            <div id="editorPresetSummary" class="editorHintCard editorPresetSummaryCard">Road: LineString road. base_patch / local_replace.</div>
+            <div id="editorPresetList" class="editorPresetGrid"></div>
+          </div>
+          <div id="editorSidebarSelectionView" class="editorSidebarView" hidden>
+            <div class="editorSectionBlock">
+              <div class="editorSectionTitle">Workspace Features</div>
+              <div id="editorWorkspaceFeatureList" class="editorListStack"></div>
+            </div>
+            <div class="editorSectionBlock">
+              <div class="editorSectionTitle">Validation</div>
+              <div id="editorValidationIssues" class="editorTagList"></div>
+            </div>
+          </div>
+        </aside>
+        <section class="editorViewportPanel">
+          <div id="editorViewportHint" class="editorViewportHint">Select: select overlay or base features, move vertices, and inspect geometry.</div>
+          <div id="editorViewportMeta" class="editorViewportMeta"></div>
+        </section>
+        <aside id="editorInspectorPanel" class="editorSidePanel editorInspectorPanel">
+          <div class="editorInspectorTop">
+            <div id="editorSelectedFeatureTitle">No Overlay Selected</div>
+            <div id="editorSelectedFeatureMeta">Select a base feature or draw a new overlay.</div>
+            <div class="editorMetaRow"><span>Geometry</span><span id="editorGeometryTypeValue">n/a</span></div>
+            <div class="editorMetaRow"><span>Review State</span><span id="editorReviewStateBadge" class="editorSubmissionStatus">unsaved</span></div>
+          </div>
+          <div class="editorActionRow compact">
+            <button id="editorCenterFeatureBtn" type="button">Focus</button>
+            <button id="editorDeleteFeatureBtn" type="button">Delete</button>
+            <button id="editorAddEntranceBtn" type="button">Add Entrance</button>
+          </div>
+          <div class="editorSectionTitle">Guided Editing</div>
+          <div id="editorSelectedPresetCard" class="editorHintCard">Select a feature or preset to see guided fields and examples.</div>
+          <div id="editorGuidedFieldPanel" class="editorGuidedFieldPanel"></div>
+          <label class="editorAdvancedToggle">
+            <input id="editorAdvancedToggle" type="checkbox">
+            <span>Show advanced mapping and raw editing. Use this only when the guided fields are not enough.</span>
+          </label>
+          <div id="editorAdvancedPanel" class="editorAdvancedPanel" hidden>
+            <div class="editorAdvancedWarning">Advanced edits write raw overlay properties and can create moderation risk if they drift from the preset. Use them deliberately.</div>
+            <div class="editorSectionTitle">Advanced Fields</div>
+            <div id="editorAdvancedFieldPanel" class="editorGuidedFieldPanel"></div>
+            <div class="editorSectionTitle">Underlying Mapping</div>
+            <div id="editorAdvancedMapping" class="editorAdvancedMapping"></div>
+            <div class="editorSectionTitle">Raw Tags</div>
+            <div id="editorTagList" class="editorTagList"></div>
+            <div class="editorKeyValueComposer">
+              <input id="editorNewTagKeyInput" type="text" maxlength="64" placeholder="tag key">
+              <input id="editorNewTagValueInput" type="text" maxlength="180" placeholder="tag value">
+              <button id="editorAddTagBtn" type="button">Add</button>
+            </div>
+            <div class="editorSectionTitle">Manual 3D / Relations</div>
+            <div class="editorGridTwo">
+              <label class="editorField">
+                <span class="editorFieldLabel">Height</span>
+                <input id="editorHeightInput" type="number" step="0.1" placeholder="meters">
+              </label>
+              <label class="editorField">
+                <span class="editorFieldLabel">Building Levels</span>
+                <input id="editorLevelsInput" type="number" step="1" placeholder="levels">
+              </label>
+              <label class="editorField">
+                <span class="editorFieldLabel">Min Height</span>
+                <input id="editorMinHeightInput" type="number" step="0.1" value="0">
+              </label>
+              <label class="editorField">
+                <span class="editorFieldLabel">Roof Shape</span>
+                <select id="editorRoofShapeSelect">
+                  <option value="flat">Flat</option>
+                  <option value="gabled">Gabled</option>
+                  <option value="hipped">Hipped</option>
+                  <option value="shed">Shed</option>
+                  <option value="dome">Dome</option>
+                </select>
+              </label>
+              <label class="editorField">
+                <span class="editorFieldLabel">Layer</span>
+                <input id="editorLayerInput" type="number" step="1" value="0">
+              </label>
+              <label class="editorField">
+                <span class="editorFieldLabel">Surface</span>
+                <input id="editorSurfaceInput" type="text" maxlength="60" placeholder="asphalt, concrete, grass">
+              </label>
+            </div>
+            <div class="editorToggleRow">
+              <label><input id="editorBridgeCheckbox" type="checkbox"> Bridge</label>
+              <label><input id="editorTunnelCheckbox" type="checkbox"> Tunnel</label>
+            </div>
+            <div class="editorGridTwo">
+              <label class="editorField">
+                <span class="editorFieldLabel">Level Ref</span>
+                <input id="editorLevelRefInput" type="text" maxlength="40" placeholder="G, L2, B1">
+              </label>
+              <label class="editorField">
+                <span class="editorFieldLabel">Building Ref</span>
+                <input id="editorBuildingRefInput" type="text" maxlength="180" placeholder="building id">
+              </label>
+            </div>
+            <div class="editorSectionTitle">Entrance Anchors</div>
+            <div id="editorEntrancesList" class="editorListStack"></div>
+          </div>
+        </aside>
+      </div>
+      <div id="editorPreviewDrawer" class="editorPreviewDrawer">
+        <div class="editorPreviewHead">
+          <div class="editorSectionTitle">Submission Preview</div>
+          <span class="editorSubmissionStatus">Overlay</span>
+        </div>
+        <div id="editorPreviewSummary">Select a feature to preview submission details.</div>
+        <div id="editorPreviewHighlights"></div>
+        <div id="editorPreviewValidation"></div>
+        <div id="editorPreviewChecklist"></div>
+        <label class="editorField" style="margin-top:10px">
+          <span class="editorFieldLabel">Submission Note</span>
+          <textarea id="editorSubmissionNoteInput" maxlength="320" placeholder="Optional moderation note or context for reviewers."></textarea>
+        </label>
+        <div class="editorActionRow">
+          <button id="editorSaveDraftBtn" class="editorActionBtn" type="button">Save Draft</button>
+          <button id="editorPreviewBtn" class="editorActionBtn" type="button">Refresh Preview</button>
+          <button id="editorSubmitBtn" class="editorActionBtn" type="button">Submit For Review</button>
+        </div>
+      </div>
+    </div>
+    <div id="editorMinePane" class="editorPane">
+      <div class="editorPaneIntro">Saved overlay drafts stay private until you submit them. This beta demo publishes only through the World Explorer moderation flow and is not connected to OpenStreetMap contribution.</div>
+      <div id="editorOwnFeatureList" class="editorSubmissionList"></div>
+    </div>
+    <div id="editorModerationPane" class="editorPane">
+      <div class="editorPaneIntro">Moderators review submitted overlays, request changes, reject them, or approve and publish them into the runtime layer.</div>
+      <div class="editorModerationControls">
+        <label class="editorField">
+          <span class="editorFieldLabel">Review State</span>
+          <select id="editorModerationStateFilter">
+            <option value="all">All</option>
+            <option value="submitted">Submitted</option>
+            <option value="approved">Approved</option>
+            <option value="needs_changes">Needs Changes</option>
+            <option value="rejected">Rejected</option>
+          </select>
+        </label>
+        <label class="editorField wide">
+          <span class="editorFieldLabel">Search</span>
+          <input id="editorModerationSearchInput" type="text" maxlength="80" placeholder="Search label, preset, or base feature">
+        </label>
+      </div>
+      <div class="editorModerationShell">
+        <div id="editorModerationList" class="editorListStack"></div>
+        <div id="editorModerationDetail">
+          <div class="editorEmptyState">Select a submitted overlay feature to inspect and moderate it.</div>
+        </div>
+      </div>
+      <label class="editorField">
+        <span class="editorFieldLabel">Moderation Note</span>
+        <textarea id="editorModerationNoteInput" maxlength="320" placeholder="Explain approval, rejection, or requested changes."></textarea>
+      </label>
+      <div class="editorActionRow">
+        <button id="editorModerationApproveBtn" class="editorActionBtn" type="button">Approve &amp; Publish</button>
+        <button id="editorModerationNeedsBtn" class="editorActionBtn" type="button">Needs Changes</button>
+        <button id="editorModerationRejectBtn" class="editorActionBtn" type="button">Reject</button>
+      </div>
+    </div>
+  </div>
+  <aside id="editorHelpDrawer" class="editorHelpDrawer" aria-hidden="true">
+    <div class="editorHelpHead">
+      <div>
+        <div class="editorSectionTitle">Contributor Guide</div>
+        <div id="editorHelpDrawerTitle" class="editorHelpTitle">How Editing Works</div>
+        <div id="editorHelpDrawerSummary" class="editorHelpSummary">Use presets and guided fields first. This beta demo is a World Explorer overlay preview, not an OpenStreetMap contribution tool.</div>
+      </div>
+      <button id="editorHelpCloseBtn" type="button">Close</button>
+    </div>
+    <div id="editorHelpTopicList" class="editorHelpTopicList"></div>
+    <div id="editorHelpContent" class="editorHelpContent"></div>
+  </aside>
+</section>
+
+<div id="editorTutorialModal" aria-hidden="true">
+  <div class="editorTutorialCard">
+    <div class="editorTutorialTitle">Overlay Editor Beta Demo</div>
+    <div class="editorTutorialText">This workflow previews World Explorer overlay editing on top of the imported world. It is not connected to OpenStreetMap contribution and it does not edit base ingest data.</div>
+    <div class="editorTutorialList">
+      <div>1. Select a base feature to patch, or choose a preset and draw a point, line, or polygon directly in the 3D world.</div>
+      <div>2. Edit vertices, tags, and 3D properties like height, levels, roof shape, bridges, tunnels, and entrances.</div>
+      <div>3. Validate the overlay, preview it locally, and save draft revisions without affecting the public world.</div>
+      <div>4. Submit the overlay for moderation. Admin review decides whether it needs changes, is rejected, or is approved and published.</div>
+      <div>5. Published overlays merge into runtime render and traversal layers without mutating the imported base dataset.</div>
+    </div>
+    <div class="editorTutorialActions">
+      <button id="editorTutorialCancelBtn" type="button">Cancel</button>
+      <button id="editorTutorialStartBtn" type="button">Start Editing</button>
+    </div>
+  </div>
+</div>
+
+<section id="activityCreatorPanel" aria-label="Activity creator panel">
+  <div class="activityCreatorTopBar">
+    <div class="activityCreatorTitleWrap">
+      <div id="activityCreatorTitle">Activity Creator Beta</div>
+      <div id="activityCreatorSubline">Place anchors directly in the 3D world for routes, zones, dock points, and collectibles.</div>
+    </div>
+    <div class="activityCreatorHeaderActions">
+      <button id="activityCreatorGuideBtn" type="button">Start Here</button>
+      <button id="activityCreatorViewModeBtn" type="button">2D Plan</button>
+      <button id="activityCreatorSaveBtn" type="button">Save Activity</button>
+      <button id="activityCreatorResetBtn" type="button">Clear Draft</button>
+      <button id="activityCreatorCloseBtn" type="button">Close</button>
+    </div>
+  </div>
+  <div id="activityCreatorStatus" data-tone="info">Activity creator is ready.</div>
+  <div class="activityCreatorWorkspaceShell">
+    <aside class="activityCreatorSidePanel activityCreatorLeftPanel">
+      <div id="activityCreatorGuideCard" class="activityCreatorGuideCard">
+        <div class="activityCreatorGuideHead">
+          <div>
+            <div class="activityCreatorSectionTitle">Creator Walkthrough</div>
+            <div id="activityCreatorGuideProgress" class="activityCreatorGuideProgress">Step 1 of 6</div>
+          </div>
+          <button id="activityCreatorGuideDismissBtn" type="button">Hide</button>
+        </div>
+        <div id="activityCreatorGuideTitle" class="activityCreatorGuideTitle">Start with a simple route</div>
+        <div id="activityCreatorGuideBody" class="activityCreatorGuideBody">Pick a template, place a start point, then build a route step by step.</div>
+        <div class="activityCreatorGuideActions">
+          <button id="activityCreatorGuideActionBtn" class="primary" type="button">Let's Build</button>
+          <button id="activityCreatorGuideRestartBtn" type="button">Restart Guide</button>
+        </div>
+      </div>
+      <div class="activityCreatorSectionTitle">Template</div>
+      <label class="activityCreatorField">
+        <span>Activity Template</span>
+        <select id="activityCreatorTemplateSelect"></select>
+      </label>
+      <div id="activityCreatorSummary" class="activityCreatorSummaryCard"></div>
+      <div id="activityCreatorTemplateHelp" class="activityCreatorHelpCard"></div>
+      <div class="activityCreatorSectionTitle">Game Details</div>
+      <label class="activityCreatorField">
+        <span>Title</span>
+        <input id="activityCreatorTitleInput" type="text" maxlength="120" placeholder="Give this activity a name">
+      </label>
+      <label class="activityCreatorField">
+        <span>Description</span>
+        <textarea id="activityCreatorDescriptionInput" maxlength="220" placeholder="Tell players what this activity is about"></textarea>
+      </label>
+      <label class="activityCreatorField">
+        <span>Save To</span>
+        <select id="activityCreatorAudienceSelect">
+          <option value="library">Creator Library</option>
+        </select>
+      </label>
+      <div id="activityCreatorAudienceHelp" class="activityCreatorHelpCard">Saved activities stay in your creator library on this browser until you publish them later.</div>
+      <div class="activityCreatorFieldGrid">
+        <label class="activityCreatorField">
+          <span>Placement Offset</span>
+          <input id="activityCreatorPlacementOffset" type="number" step="0.5" value="0">
+        </label>
+        <label class="activityCreatorToggle">
+          <input id="activityCreatorSnapToggle" type="checkbox" checked>
+          <span>Snap</span>
+        </label>
+      </div>
+      <div class="activityCreatorSectionTitle">Required Anchors</div>
+      <div id="activityCreatorChecklist" class="activityCreatorChecklist"></div>
+      <div class="activityCreatorSectionTitle">Anchor Palette</div>
+      <div id="activityCreatorAnchorPalette" class="activityCreatorAnchorPalette"></div>
+      <div class="activityCreatorSectionTitle">Validation</div>
+      <div id="activityCreatorValidation" class="activityCreatorValidation"></div>
+    </aside>
+    <section class="activityCreatorViewportPanel" aria-hidden="true"></section>
+    <aside class="activityCreatorSidePanel activityCreatorRightPanel">
+      <div class="activityCreatorSectionTitle">Placed Anchors</div>
+      <div id="activityCreatorAnchorList" class="activityCreatorAnchorList"></div>
+      <div class="activityCreatorSectionTitle">Inspector</div>
+      <div id="activityCreatorInspectorBody" class="activityCreatorInspectorBody"></div>
+    </aside>
+  </div>
+  <div id="activityCreatorToolDock" class="activityCreatorToolDock">
+    <button type="button" data-activity-tool="select">Select</button>
+    <button type="button" data-activity-tool="place">Place</button>
+    <button type="button" data-activity-tool="move">Move</button>
+    <button type="button" data-activity-tool="height">Height</button>
+    <button type="button" data-activity-tool="rotate">Rotate</button>
+    <button type="button" data-activity-tool="scale">Scale</button>
+    <button type="button" data-activity-action="undo">Undo</button>
+    <button type="button" data-activity-action="redo">Redo</button>
+    <button type="button" data-activity-action="test" id="activityCreatorTestBtn">Test Activity</button>
+  </div>
+  <div id="activityCreatorTestBar" class="activityCreatorTestBar" hidden>
+    <div id="activityCreatorTestSummary">Testing activity</div>
+    <button id="activityCreatorStopTestBtn" type="button">Return To Creator</button>
+  </div>
+</section>
+
+<section id="activityDiscoveryPanel" aria-label="Activity browser panel">
+  <div class="activityDiscoveryTopBar">
+    <div class="activityDiscoveryTitleWrap">
+      <div id="activityDiscoveryTitle">Games &amp; Activities</div>
+      <div id="activityDiscoverySubline">Discover public games, room sessions, and creator-built activities tied to real places in the world.</div>
+    </div>
+    <div class="activityDiscoveryHeaderActions">
+      <button id="activityDiscoveryOpenCreatorBtn" type="button">Create Game</button>
+      <button id="activityDiscoveryCloseBtn" type="button">Close</button>
+    </div>
+  </div>
+  <div id="activityDiscoveryStatus">Loading activities...</div>
+  <aside class="activityDiscoveryPanelCol activityDiscoveryBrowseCol">
+    <div class="activityDiscoverySectionTitle">Browse</div>
+    <div class="activityDiscoverySearchRow">
+      <input id="activityDiscoverySearchInput" type="text" maxlength="120" placeholder="Search activities, creators, locations">
+      <select id="activityDiscoverySortSelect">
+        <option value="recommended">Recommended</option>
+        <option value="title">Title</option>
+        <option value="duration">Duration</option>
+      </select>
+    </div>
+    <div id="activityDiscoveryScopeChips" class="activityDiscoveryChipRow"></div>
+    <div id="activityDiscoveryCategoryChips" class="activityDiscoveryChipRow"></div>
+    <div class="activityDiscoverySectionTitle">Featured</div>
+    <div id="activityDiscoveryFeatured" class="activityDiscoveryFeaturedStrip"></div>
+    <div class="activityDiscoverySectionTitle">Available Here</div>
+    <div id="activityDiscoveryList" class="activityDiscoveryCardList"></div>
+  </aside>
+  <aside class="activityDiscoveryPanelCol activityDiscoveryDetailCol">
+    <div class="activityDiscoverySectionTitle">Details</div>
+    <div id="activityDiscoveryDetail"></div>
+  </aside>
+</section>
+
+<section id="creatorProfilePanel" class="creatorProfilePanel" aria-label="Creator profile panel">
+  <div class="creatorProfileShell">
+    <div class="creatorProfileTopBar">
+      <div class="creatorProfileTitleWrap">
+        <div id="creatorProfileTitle">Creator Profile</div>
+        <div id="creatorProfileSubline">Recognition, authored activities, and published world work.</div>
+      </div>
+      <button id="creatorProfileCloseBtn" type="button">Close</button>
+    </div>
+    <div id="creatorProfileStatus"></div>
+    <div id="creatorProfileBody"></div>
+  </div>
+</section>
+
+<div id="activityDiscoveryPrompt" class="activityDiscoveryPrompt" aria-live="polite">
+  <div class="activityDiscoveryPromptCopy">
+    <div id="activityDiscoveryPromptTitle" class="activityDiscoveryPromptTitle">Nearby Activity</div>
+    <div id="activityDiscoveryPromptMeta" class="activityDiscoveryPromptMeta">Inspect what you can do here.</div>
+  </div>
+  <div class="activityDiscoveryPromptActions">
+    <button id="activityDiscoveryPromptInspectBtn" type="button">Inspect</button>
+    <button id="activityDiscoveryPromptJoinBtn" class="primary" type="button">Start</button>
+  </div>
+</div>
+
+<div id="activityRunHud" class="activityRunHud" aria-live="polite">
+  <div class="activityRunHudCopy">
+    <div id="activityRunTitle">Activity Running</div>
+    <div id="activityRunStatus">Move to the next target.</div>
+    <div id="activityRunProgress">0 cleared</div>
+  </div>
+  <button id="activityRunReplayBtn" class="primary" type="button">Replay</button>
+  <button id="activityRunStopBtn" type="button">Stop</button>
+</div>
+
 <button class="mainMenuBtn" id="mainMenuBtn">🏠 Main Menu</button>
 <button id="memoryFlowerFloatBtn" title="Place Flower Memory">🌸</button>
 <div id="flowerActionMenu" aria-label="Flower Actions">
@@ -1670,10 +2813,20 @@ Explore the area
 • B - Toggle build mode<br>
 • Click place block, Shift+Click remove
 </div>
+<div id="boatControls" style="display:none">
+<b>🚤 Boat Mode:</b><br>
+• W/S - Throttle / Reverse<br>
+• A/D - Steer<br>
+• Space - Brake / Hold position<br>
+• G - Enter / exit boat travel<br>
+• C - Camera view<br>
+• Use the bottom Wave Intensity slider for calm, moderate, or rough water
+</div>
 <div id="walkingControls" style="display:none">
 <b>🚶 Walking Mode:</b><br>
-• WASD - Move<br>
-• Arrow Keys - Look around<br>
+• W/S - Move forward / reverse<br>
+• A/D or Arrow Left/Right - Turn camera<br>
+• Arrow Up/Down - Look up / down<br>
 • E - Enter/exit building interior<br>
 • Space - Jump<br>
 • Shift - Run (2x speed)<br>
@@ -1895,6 +3048,14 @@ Explore the area
         <button id="roomHomeBaseSaveBtn" class="mp-btn secondary mpSmallBtn" type="button">Save Home Base Here</button>
       </div>
       <div id="roomHomeBaseCurrent" class="mpMeta">No home base set.</div>
+
+      <div class="mp-subtitle">Room Games</div>
+      <div class="mp-row">
+        <button id="roomActivityOpenBtn" class="mp-btn secondary mpSmallBtn" type="button">Browse / Create Room Games</button>
+      </div>
+      <ul id="roomActivityList" class="mp-room-list mpArtifactList">
+        <li class="mpRoomEmpty">Join a room to browse room games.</li>
+      </ul>
 
       <div class="mp-subtitle">Shared Artifacts</div>
       <div class="mp-row">
@@ -2275,5 +3436,5 @@ if (titleScreenObserverTarget) {
   titleObserver.observe(titleScreenObserverTarget, { attributes: true, attributeFilter: ['class'] });
 }
 </script>
-<script type="module" src="js/bootstrap.js?v=73"></script>
+<script type="module" src="js/bootstrap.js?v=261"></script>
 </body></html>

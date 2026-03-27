@@ -1,4 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
+import { currentMapReferenceGeoPosition } from "./map-coordinates.js?v=2";
+import { currentMapReferenceWorldPosition } from "./map-coordinates.js?v=2";
 // game.js - Game modes, police, POI, real estate UI, historic sites, navigation
 // ============================================================================
 
@@ -14,30 +16,46 @@ function updateNearbyPOI() {
     return;
   }
 
-  let closest = null;
-  let minDist = Infinity;
-
-  appCtx.pois.forEach((poi) => {
-    const dx = poi.x - appCtx.car.x;
-    const dz = poi.z - appCtx.car.z;
-    const dist = Math.sqrt(dx * dx + dz * dz);
-
-    if (dist < minDist && dist < 150) {// Within 150m
-      minDist = dist;
-      closest = { ...poi, dist };
+  if (!Array.isArray(appCtx.pois) || appCtx.pois.length === 0) {
+    if (appCtx.nearestPOI) {
+      appCtx.nearestPOI = null;
+      if (poiInfo) poiInfo.style.display = 'none';
     }
-  });
+    return;
+  }
+
+  const ref = currentMapReferenceWorldPosition();
+  const refX = Number.isFinite(ref?.x) ? ref.x : Number(appCtx.car?.x || 0);
+  const refZ = Number.isFinite(ref?.z) ? ref.z : Number(appCtx.car?.z || 0);
+  const maxDistSq = 150 * 150;
+  let closest = null;
+  let minDistSq = Infinity;
+
+  for (let i = 0; i < appCtx.pois.length; i++) {
+    const poi = appCtx.pois[i];
+    if (!poi) continue;
+    const dx = Number(poi.x) - refX;
+    const dz = Number(poi.z) - refZ;
+    const distSq = dx * dx + dz * dz;
+    if (!Number.isFinite(distSq) || distSq >= maxDistSq || distSq >= minDistSq) continue;
+    minDistSq = distSq;
+    closest = { ...poi, dist: Math.sqrt(distSq) };
+  }
 
   if (closest && (closest !== appCtx.nearestPOI || Math.abs(closest.dist - appCtx.nearestPOI?.dist) > 5)) {
     appCtx.nearestPOI = closest;
-    document.getElementById('poiIcon').textContent = closest.icon;
-    document.getElementById('poiName').textContent = closest.name;
-    document.getElementById('poiCategory').textContent = closest.category;
-    document.getElementById('poiDistance').textContent = Math.floor(closest.dist) + 'm ahead';
-    poiInfo.style.display = 'block';
+    const poiIcon = document.getElementById('poiIcon');
+    const poiName = document.getElementById('poiName');
+    const poiCategory = document.getElementById('poiCategory');
+    const poiDistance = document.getElementById('poiDistance');
+    if (poiIcon) poiIcon.textContent = closest.icon;
+    if (poiName) poiName.textContent = closest.name;
+    if (poiCategory) poiCategory.textContent = closest.category;
+    if (poiDistance) poiDistance.textContent = Math.floor(closest.dist) + 'm ahead';
+    if (poiInfo) poiInfo.style.display = 'block';
   } else if (!closest && appCtx.nearestPOI) {
     appCtx.nearestPOI = null;
-    poiInfo.style.display = 'none';
+    if (poiInfo) poiInfo.style.display = 'none';
   }
 }
 
@@ -343,14 +361,19 @@ function updateMapLayers() {
   appCtx.mapLayers.checkpoints = document.getElementById('filterCheckpoints').checked;
   appCtx.mapLayers.destination = document.getElementById('filterDestination').checked;
   appCtx.mapLayers.customTrack = document.getElementById('filterCustomTrack').checked;
+  appCtx.mapLayers.activities = document.getElementById('filterActivities')?.checked !== false;
   appCtx.mapLayers.police = document.getElementById('filterPolice').checked;
   appCtx.mapLayers.memoryPins = document.getElementById('filterMemoryPins').checked;
   appCtx.mapLayers.memoryFlowers = document.getElementById('filterMemoryFlowers').checked;
   appCtx.mapLayers.paths = document.getElementById('filterPaths').checked;
   appCtx.mapLayers.interiors = document.getElementById('filterInteriors').checked;
+  appCtx.mapLayers.contributions = document.getElementById('filterContributions').checked;
   appCtx.showPathOverlays = appCtx.mapLayers.paths;
   if (typeof appCtx.syncLinearFeatureOverlayVisibility === 'function') {
     appCtx.syncLinearFeatureOverlayVisibility();
+  }
+  if (typeof appCtx.syncApprovedEditorContributionVisibility === 'function') {
+    appCtx.syncApprovedEditorContributionVisibility();
   }
 
   // Update parent checkboxes
@@ -387,12 +410,15 @@ function toggleAllLayers(state) {
   document.getElementById('filterCheckpoints').checked = state;
   document.getElementById('filterDestination').checked = state;
   document.getElementById('filterCustomTrack').checked = state;
+  const filterActivities = document.getElementById('filterActivities');
+  if (filterActivities) filterActivities.checked = state;
   document.getElementById('filterPolice').checked = state;
   document.getElementById('filterMemoryPins').checked = state;
   document.getElementById('filterMemoryFlowers').checked = state;
   document.getElementById('filterRoads').checked = state;
   document.getElementById('filterPaths').checked = state;
   document.getElementById('filterInteriors').checked = state;
+  document.getElementById('filterContributions').checked = state;
   appCtx.showRoads = state;
   appCtx.showPathOverlays = state;
   document.getElementById('mapRoadsToggle').classList.toggle('active', state);
@@ -672,8 +698,9 @@ function toggleRealEstate() {
 }
 
 async function loadPropertiesAtCurrentLocation() {
-  const lat = appCtx.LOC.lat - appCtx.car.z / appCtx.SCALE;
-  const lon = appCtx.LOC.lon + appCtx.car.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
+  const refGeo = currentMapReferenceGeoPosition();
+  const lat = Number.isFinite(refGeo?.lat) ? refGeo.lat : Number(appCtx.LOC?.lat || 0);
+  const lon = Number.isFinite(refGeo?.lon) ? refGeo.lon : Number(appCtx.LOC?.lon || 0);
 
   // Check if we have any API keys configured
   const hasRealAPI = appCtx.apiConfig.estated || appCtx.apiConfig.attom || appCtx.apiConfig.rentcast;
@@ -1251,7 +1278,7 @@ function updateNavigationRoute() {
 
 function updatePolice(dt) {
   if (!appCtx.policeOn || appCtx.police.length === 0) return;
-  const mph = Math.abs(appCtx.car.speed * 0.5);
+  const mph = Math.abs(appCtx.car.speed);
   const limit = appCtx.car.road?.limit || 25;
   const speeding = mph > limit;
   appCtx.police.forEach((cop) => {

@@ -1,0 +1,159 @@
+\documentclass[11pt]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{geometry}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\geometry{margin=1in}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{proposition}{Proposition}
+\newtheorem{corollary}{Corollary}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+\title{Appendix v3: Corrected Theorems for Recursive Entropy Calculus}
+\author{Steven Reid}
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+\section*{Scope}
+This appendix records the corrected theorem layer for REC, separating:
+\begin{itemize}
+  \item proven statements,
+  \item a disproven legacy statement, and
+  \item repaired replacement statements.
+\end{itemize}
+
+\section*{Definitions}
+Let $\{p_j(d)\}_{j=1}^{2^d}$ be the depth-$d$ leaf probabilities of a binary recursive partition.
+\[
+S(d):=-\sum_{j=1}^{2^d}p_j(d)\log_2 p_j(d),\qquad
+\bar S(d):=\frac{S(d)}{d},\qquad
+\tilde r(d):=\frac{S(d+1)}{S(d)}\ \ (S(d)>0).
+\]
+Define the one-step increment
+\[
+\Delta(d+1):=S(d+1)-S(d).
+\]
+
+\section*{A. Proven Theorems}
+
+\begin{theorem}[Entropic Ceiling]
+For every binary recursive partition and depth $d\ge1$,
+\[
+\bar S(d)\le1.
+\]
+Equality holds iff the depth-$d$ distribution is uniform.
+\end{theorem}
+
+\begin{proof}
+Entropy over $2^d$ outcomes is maximized by the uniform distribution, hence
+$S(d)\le\log_2(2^d)=d$. Divide by $d$.
+\end{proof}
+
+\begin{lemma}[One-step increment bound]
+For binary recursive partitions,
+\[
+0\le\Delta(d+1)\le1.
+\]
+\end{lemma}
+
+\begin{proof}
+Using conditional entropy by splitting each depth-$d$ cell into two children,
+\[
+S(d+1)=S(d)+\sum_i p_i(d)H(Q_i),
+\]
+where $Q_i$ is the binary conditional split in cell $i$ and $0\le H(Q_i)\le1$.
+Hence $0\le\Delta(d+1)\le\sum_i p_i(d)=1$.
+\end{proof}
+
+\begin{theorem}[Corrected Growth Ratio Bound, B*]
+At any depth with $S(d)>0$,
+\[
+\tilde r(d)\le 1+\frac{1}{S(d)}.
+\]
+In particular, if $S(d)\ge1$, then $\tilde r(d)\le2$.
+\end{theorem}
+
+\begin{proof}
+By definition,
+\[
+\tilde r(d)=\frac{S(d+1)}{S(d)}=1+\frac{\Delta(d+1)}{S(d)}.
+\]
+Apply $\Delta(d+1)\le1$ from the lemma.
+\end{proof}
+
+\begin{theorem}[Asymptotic Convergence on Defined Depths, C*]
+If $S(d)>0$ for all sufficiently large $d$, then
+\[
+\lim_{d\to\infty}\tilde r(d)=1.
+\]
+\end{theorem}
+
+\begin{proof}
+Use
+\[
+\tilde r(d)=1+\frac{\Delta(d+1)}{S(d)},\qquad 0\le\Delta(d+1)\le1.
+\]
+If $S(d)\to\infty$, the fraction tends to $0$. If $S(d)$ is bounded above, then $S(d)$ is monotone nondecreasing and bounded, so $S(d)\to L>0$, implying $\Delta(d+1)\to0$ and again the fraction tends to $0$.
+\end{proof}
+
+\begin{theorem}[Geometric Bound]
+For self-similar geometry parameters $(N,s,D)$ with $s\in(0,1)$ and volume convergence $Ns^D\le1$,
+\[
+\zeta:=\frac{d_H}{D}=\frac{\ln N}{D\ln(1/s)}\le1.
+\]
+\end{theorem}
+
+\begin{proof}
+From $Ns^D\le1$, take logs:
+$\ln N + D\ln s\le0$. Since $\ln s<0$, rearrange to
+$\ln N\le D\ln(1/s)$ and divide by $D\ln(1/s)>0$.
+\end{proof}
+
+\section*{B. Disproved Legacy Statement}
+
+\begin{proposition}[Legacy claim is false]
+The global statement
+\[
+\tilde r(d)\le2\quad\text{for all binary recursive partitions and all }d
+\]
+is false.
+\end{proposition}
+
+\begin{proof}
+Take depth 1 split probabilities $(p,1-p)$ with $p=1/3$. Then
+\[
+S(1)=H_2(1/3)\approx0.918295834.
+\]
+At depth 2, split each depth-1 cell uniformly into two children. This adds one bit:
+\[
+S(2)=S(1)+1\approx1.918295834.
+\]
+Hence
+\[
+\tilde r(1)=\frac{S(2)}{S(1)}\approx2.088973687>2.
+\]
+\end{proof}
+
+\section*{C. Status Table}
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Item & Status & Note \\
+\midrule
+Entropic Ceiling (A) & Proven & Sharp at uniform depth-$d$ distribution \\
+Corrected Growth Bound (B*) & Proven & Sharp via increment bound \\
+Asymptotic Convergence (C*) & Proven & Requires ratio to be defined eventually \\
+Geometric Bound (D) & Proven & Equivalent to volume-convergence inequality \\
+Legacy $\tilde r\le2$ (global) & Disproven & Counterexample at depth 1 with $p=1/3$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\end{document}

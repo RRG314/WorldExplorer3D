@@ -1,5 +1,89 @@
 # Changelog
 
+## [2026-03-16]
+
+### Changed
+
+- First staged Earth boat travel pass:
+  - added `app/js/boat-mode.js` as a dedicated Earth water-travel subsystem layered onto the shared travel-mode controller
+  - boat travel now appears intentionally near valid larger water bodies only, including harbor/coastal/open-water and lakefront-style cases when the loaded world data supports them
+  - boating applies lightweight wave-driven heave/pitch/roll plus sea-state cycling (`Calm`, `Moderate`, `Rough`) without switching to a disconnected minigame
+  - offshore boating now feeds a detail-bias hint into `world.js` so shoreline/city identity is preserved near land while unnecessary distant land detail can be reduced farther offshore
+  - HUD, controls, prompt flow, Earth location resolution, and physics now all understand `boat` as a real traversal mode
+  - added `scripts/test-boat-smoke.mjs` for harbor/lakefront/coast/open-water validation coverage
+  - second-pass polish:
+    - wave response now smooths toward target sea motion instead of snapping directly to raw samples
+    - harbor/coast/lake runs preserve more nearby shoreline detail than true open-ocean runs
+    - docking/exiting now resolves back toward safe shoreline spawns
+    - intentional water-target teleports and custom globe launches can auto-enter boat mode when the clicked target is truly boat-eligible
+- Procedural urban surface pass:
+  - `terrain.js` now generates a shared sidewalk batch from loaded road geometry plus nearby building/landuse context instead of relying on grass terrain with ad hoc per-building pavement
+  - dense city corridors now bias terrain classification toward urban ground without letting sparse desert roads or real beach polygons get incorrectly overridden
+  - near-road sloped building aprons are now suppressed in urban road-core cases so the runtime keeps the needed foundation skirt without stacking extra hidden pavement under city blocks
+  - `ground.js` now samples generated urban surface meshes for walking, so the player stands on procedural sidewalks instead of clipping through them
+  - second-pass polish tightened sidewalk width transitions, tapered intersection joins more cleanly, and added validation metrics for shared sidewalk batching plus skipped building aprons
+- Weather cleanup follow-up:
+  - removed the earlier boxed-in local weather deck approach and kept live/manual weather presentation inside the normal sky, fog, cloud, and light response
+
+## [2026-03-15]
+
+### Added
+
+- First isolated contributor editor workflow:
+  - `app/js/editor/session.js` for intentionally-entered editor mode
+  - `app/js/editor/store.js` for staged Firestore submissions
+  - `app/js/editor/public-layer.js` for nearby approved contribution rendering
+- Second editor pass:
+  - `app/js/editor/config.js` for shared contribution-type definitions
+  - building-related (`building_note`), interior-prep (`interior_seed`), and photo-reference (`photo_point`) submission support
+  - richer moderation filters, search, detail pane, and decision-note workflow inside the isolated editor session
+- Large-map `Approved Contributions` filter section.
+- Firestore editor submission rules and index coverage for staged moderation plus nearby approved-area queries.
+- Backend moderation pass:
+  - `functions/index.js` now exposes `submitContribution`, `getContributionModerationOverview`, `listContributionSubmissions`, and `moderateContributionSubmission`
+  - `account/moderation.html` adds a private plain-language moderation page for owner/admin review
+  - `js/function-api.js` and `js/contribution-api.js` add shared authenticated function clients for contribution workflows
+  - optional direct email alerts for new submissions via configured function params/env
+
+### Changed
+
+- Editor contributions now follow one simple lifecycle:
+  - private preview
+  - pending submission
+  - admin moderation
+  - approved public world/map visibility
+- Approved contributions are publicly readable only after moderation approval; pending and rejected items stay owner/admin-only.
+- Editor previews now fit building/interior contributions to real active-world targets more accurately by outlining the active building or interior shell during private preview/review.
+- Editor payload normalization and Firestore rules now cover place, building, interior-seed, and photo-reference metadata without exposing direct live-world edits.
+- Submission and moderation writes now go through backend endpoints instead of direct browser-side Firestore writes.
+- Runtime invariants now check editor API exposure plus the approved-contribution public layer API.
+- User guide, technical docs, architecture, controls, quickstart, and release checklist now describe the current isolated contributor workflow accurately.
+- Earth sky and lighting now use real location-aware astronomical state:
+  - added `app/js/astro.js` for lightweight sun/moon/phase calculations
+  - `sky.js` now derives day/night, sunrise/sunset, sun direction, moon direction, moon phase, and star visibility from the explored coordinates plus current date/time
+  - `hud.js` now follows the shared `skyState` instead of inventing a second fake sun/moon path every frame
+  - Ocean mode now reuses the same Earth-relative sky state when launched from a real-world ocean site
+- Runtime cleanup pass:
+  - cached astronomical sky refreshes now run on a timed interval instead of every frame
+  - cloud repositioning now moves the cloud group as one unit instead of doing per-cloud follow easing every frame
+  - `world.js` now triggers one shared astronomical refresh after Earth loads instead of splitting star/sky ownership across separate code paths
+  - generated interiors now search multiple valid interior anchors before building their contained shell, which fixes irregular-footprint cases that could fail runtime containment checks
+- Validation coverage now includes location-based astronomical checks and multi-time-zone sky assertions in runtime/world-matrix test flows.
+- Earth weather and climate now use live explored-location conditions:
+  - added `app/js/earth-location.js` so weather and sky resolve the same observed Earth coordinates from drive/walk/drone/ocean state
+  - added `app/js/weather.js` for live Open-Meteo current-condition lookup, caching, HUD display, and lightweight weather-driven presentation adjustments
+  - default environment state now follows the real explored location’s condition, temperature, cloud cover, wind context, and basic precipitation category
+  - manual environment control still works as an override layer, cycling `Live`, `Clear`, `Cloudy`, `Overcast`, `Rain`, `Snow`, `Fog`, and `Storm`
+- Weather polish follow-up:
+  - weather HUD now labels live/manual state more clearly
+  - local weather response now uses a low-cost overhead weather deck plus stronger fog/light/background tinting so overcast/rain/fog feel present around the player instead of only on the horizon
+- Runtime cleanup pass for environment/weather:
+  - weather refresh checks now run on low-frequency timers instead of every frame
+  - weather HUD text is now updated from weather-state changes instead of on every HUD tick
+  - ocean mode now uses the same throttled weather refresh path instead of frame-linked polling
+  - initial live-weather fetches now retry once before giving up, which makes first-load weather more reliable without adding heavy polling
+  - location jumps now invalidate the short weather-throttle window correctly, preventing stale weather from a previous city from carrying into a distant new one
+
 ## [2026-03-14]
 
 ### Changed
@@ -10,6 +94,11 @@
   - arid desert locations now classify to sand terrain, with procedural dune-style texture detail for sparse areas
   - OSM natural tags now include `sand`, `beach`, `bare_rock`, `scree`, `shingle`, and `glacier` in the Earth land-surface pipeline
   - `scripts/test-osm-smoke.mjs` now validates Arctic, Antarctica, and desert custom locations in addition to Monaco water visibility
+- Terrain material classification follow-up:
+  - terrain classification now layers precise rendered OSM polygons, cached raw surface-feature hints, and sparse-area fallback instead of relying on broad world hints alone
+  - localized beach sand now beats nearby urban pressure, so actual loaded beach polygons classify as sand without turning inland/city tiles into desert ground
+  - Hollywood now validates as non-sand while a loaded Santa Monica beach polygon validates as localized sand
+  - world-matrix coverage now includes Hollywood, Las Vegas, London, and Tokyo in addition to the earlier preset/custom spread
 - System-level Earth runtime stabilization pass:
   - added `app/js/travel-mode.js` so keyboard and UI float-menu mode switching share one drive/walk/drone transition path
   - moved road/building terrain-follow refresh ownership into `terrain.js` via `requestWorldSurfaceSync()`, removing duplicate rebuild triggers from walking mode

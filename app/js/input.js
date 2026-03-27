@@ -56,6 +56,15 @@ function onKey(code, event) {
     return;
   }
 
+  if (code === 'KeyG') {
+    if (event?.repeat) return;
+    if (typeof appCtx.handleBoatAction === 'function') {
+      appCtx.handleBoatAction();
+      if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
+    }
+    return;
+  }
+
   // Camera view toggle when walking (C key) - first/third person
   if (code === 'KeyC') {
     if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
@@ -92,6 +101,7 @@ function onKey(code, event) {
       appCtx.logBaselineSnapshot({ trigger: 'F8' });
     }
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
+    if (typeof appCtx.updateEnvDebug === 'function') appCtx.updateEnvDebug();
     if (typeof appCtx.positionTopOverlays === 'function') appCtx.positionTopOverlays();
     return;
   }
@@ -102,6 +112,7 @@ function onKey(code, event) {
     window._debugMode = !window._debugMode;
     const overlay = document.getElementById('debugOverlay');
     if (overlay) overlay.style.display = window._debugMode ? 'block' : 'none';
+    if (typeof appCtx.updateEnvDebug === 'function') appCtx.updateEnvDebug();
     if (typeof appCtx.positionTopOverlays === 'function') appCtx.positionTopOverlays();
 
     // Create/destroy debug marker under car

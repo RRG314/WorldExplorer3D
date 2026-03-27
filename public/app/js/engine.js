@@ -70,9 +70,6 @@ function syncTextureGlobals() {
   appCtx.concreteDiffuse = concreteDiffuse;
   appCtx.concreteNormal = concreteNormal;
   appCtx.concreteRoughness = concreteRoughness;
-  appCtx.brickDiffuse = brickDiffuse;
-  appCtx.brickNormal = brickNormal;
-  appCtx.brickRoughness = brickRoughness;
   appCtx.buildingNormalMap = buildingNormalMap;
   appCtx.buildingRoughnessMap = buildingRoughnessMap;
   appCtx.windowTextures = windowTextures;
@@ -87,11 +84,10 @@ function clearWindowTextureCache() {
 let grassDiffuse = null,grassNormal = null,grassRoughness = null;
 // PBR pavement textures (concrete ground around buildings)
 let pavementDiffuse = null,pavementNormal = null,pavementRoughness = null;
-// PBR building textures (concrete, brick)
+// PBR building textures
 let concreteDiffuse = null,concreteNormal = null,concreteRoughness = null;
-let brickDiffuse = null,brickNormal = null,brickRoughness = null;
 // Track texture loading state
-let pbrTexturesLoaded = { grass: false, pavement: false, concrete: false, brick: false };
+let pbrTexturesLoaded = { grass: false, pavement: false, concrete: false };
 
 syncTextureGlobals();
 
@@ -495,128 +491,6 @@ function createConcreteRoughnessMap() {
   return texture;
 }
 
-function createBrickFacadeTexture() {
-  const size = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;canvas.height = size;
-  const ctx = canvas.getContext('2d');
-
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xB41C) : Math.random.bind(Math);
-
-  // Mortar base color
-  ctx.fillStyle = '#b0a89a';
-  ctx.fillRect(0, 0, size, size);
-
-  // Draw bricks
-  const brickH = 16,brickW = 36,mortarW = 3;
-  const colors = ['#8b4c39', '#934e3a', '#7d4535', '#a05a42', '#8a4937', '#7e4233'];
-
-  for (let row = 0; row < size / (brickH + mortarW); row++) {
-    const offsetX = row % 2 * (brickW / 2); // Stagger every other row
-    for (let col = -1; col < size / (brickW + mortarW) + 1; col++) {
-      const x = col * (brickW + mortarW) + offsetX;
-      const y = row * (brickH + mortarW);
-
-      // Base brick color with variation
-      const baseColor = colors[Math.floor(rng() * colors.length)];
-      ctx.fillStyle = baseColor;
-      ctx.fillRect(x, y, brickW, brickH);
-
-      // Brick surface noise
-      for (let n = 0; n < 15; n++) {
-        const nx = x + rng() * brickW;
-        const ny = y + rng() * brickH;
-        const brightness = rng() > 0.5 ? 20 : -20;
-        ctx.fillStyle = `rgba(${128 + brightness}, ${60 + brightness}, ${40 + brightness}, 0.15)`;
-        ctx.fillRect(nx, ny, 1 + rng() * 3, 1 + rng() * 2);
-      }
-    }
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.encoding = THREE.sRGBEncoding;
-  return texture;
-}
-
-function createBrickNormalMap() {
-  const size = 512;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;canvas.height = size;
-  const ctx = canvas.getContext('2d');
-
-  // Neutral normal
-  ctx.fillStyle = '#8080ff';
-  ctx.fillRect(0, 0, size, size);
-
-  const brickH = 16,brickW = 36,mortarW = 3;
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xB41D) : Math.random.bind(Math);
-
-  // Mortar groove normals (recessed)
-  for (let row = 0; row < size / (brickH + mortarW); row++) {
-    const y = row * (brickH + mortarW);
-    // Horizontal mortar lines
-    ctx.fillStyle = '#7070e0';
-    ctx.fillRect(0, y + brickH, size, mortarW);
-  }
-
-  for (let row = 0; row < size / (brickH + mortarW); row++) {
-    const offsetX = row % 2 * (brickW / 2);
-    for (let col = -1; col < size / (brickW + mortarW) + 1; col++) {
-      const x = col * (brickW + mortarW) + offsetX;
-      const y = row * (brickH + mortarW);
-      // Vertical mortar lines
-      ctx.fillStyle = '#7070e0';
-      ctx.fillRect(x + brickW, y, mortarW, brickH);
-
-      // Brick surface variation
-      for (let n = 0; n < 8; n++) {
-        const nx = x + rng() * brickW;
-        const ny = y + rng() * brickH;
-        ctx.fillStyle = `rgb(${124 + rng() * 12}, ${124 + rng() * 12}, ${240 + rng() * 15})`;
-        ctx.fillRect(nx, ny, 2 + rng() * 3, 1 + rng() * 2);
-      }
-    }
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  return texture;
-}
-
-function createBrickRoughnessMap() {
-  const size = 256;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;canvas.height = size;
-  const ctx = canvas.getContext('2d');
-
-  // Brick is moderately rough
-  ctx.fillStyle = '#c0c0c0';
-  ctx.fillRect(0, 0, size, size);
-
-  const brickH = 8,mortarW = 2;
-  const rng = typeof appCtx.seededRandom === 'function' ? appCtx.seededRandom(appCtx.rdtSeed ^ 0xB41E) : Math.random.bind(Math);
-
-  // Mortar is rougher than brick
-  for (let row = 0; row < size / (brickH + mortarW); row++) {
-    const y = row * (brickH + mortarW);
-    ctx.fillStyle = '#e0e0e0';
-    ctx.fillRect(0, y + brickH, size, mortarW);
-  }
-
-  // Brick surface roughness variation
-  for (let i = 0; i < 1500; i++) {
-    const x = rng() * size,y = rng() * size;
-    const b = 160 + rng() * 70;
-    ctx.fillStyle = `rgb(${b}, ${b}, ${b})`;
-    ctx.fillRect(x, y, 1 + rng() * 2, 1 + rng() * 2);
-  }
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  return texture;
-}
-
 // ===== PROCEDURAL PAVEMENT/SIDEWALK TEXTURES (fallback for CDN) =====
 function createPavementTexture() {
   const size = 512;
@@ -720,12 +594,14 @@ function createPavementRoughnessMap() {
 
 // Create terrain-conforming building ground support meshes.
 // Returns either a single mesh or an array of meshes (apron + foundation skirt).
-function createBuildingGroundPatch(pts, avgElevation) {
+function createBuildingGroundPatch(pts, avgElevation, options = {}) {
   if (!pts || pts.length < 3) return null;
   const footprint = pts.filter((p) => p && Number.isFinite(p.x) && Number.isFinite(p.z));
   if (footprint.length < 3) return null;
 
   const baseElevation = Number.isFinite(avgElevation) ? avgElevation : 0;
+  const includeApron = options?.includeApron !== false;
+  const includeFoundationSkirt = options?.includeFoundationSkirt !== false;
 
   const sampleTerrainY = (x, z) => {
     const terrainY = typeof appCtx.terrainMeshHeightAt === 'function' ?
@@ -737,13 +613,17 @@ function createBuildingGroundPatch(pts, avgElevation) {
 
   const resultMeshes = [];
 
-  // Expand footprint to create a sidewalk-like terrain patch around the building.
+  // Expand footprint by a modest fixed outward distance so the apron stays close
+  // to the building base instead of spreading across narrow street corridors.
   const cx = footprint.reduce((s, p) => s + p.x, 0) / footprint.length;
   const cz = footprint.reduce((s, p) => s + p.z, 0) / footprint.length;
-  const expandFactor = 1.45;
+  const maxRadius = footprint.reduce((best, p) => {
+    return Math.max(best, Math.hypot(p.x - cx, p.z - cz));
+  }, 0);
+  const apronOutset = Math.min(1.5, Math.max(0.65, maxRadius * 0.08));
   const expandedPts = footprint.map((p) => ({
-    x: cx + (p.x - cx) * expandFactor,
-    z: cz + (p.z - cz) * expandFactor
+    x: p.x + ((p.x - cx) / Math.max(1e-4, Math.hypot(p.x - cx, p.z - cz))) * apronOutset,
+    z: p.z + ((p.z - cz) / Math.max(1e-4, Math.hypot(p.x - cx, p.z - cz))) * apronOutset
   }));
 
   const shape = new THREE.Shape();
@@ -777,9 +657,8 @@ function createBuildingGroundPatch(pts, avgElevation) {
     apronUvs.needsUpdate = true;
   }
 
-  let apronMaterial;
-  if (pbrTexturesLoaded.pavement && pavementDiffuse) {
-    apronMaterial = new THREE.MeshStandardMaterial({
+  if (includeApron && pbrTexturesLoaded.pavement && pavementDiffuse) {
+    const apronMaterial = new THREE.MeshStandardMaterial({
       map: pavementDiffuse,
       normalMap: pavementNormal || undefined,
       normalScale: new THREE.Vector2(0.5, 0.5),
@@ -790,25 +669,19 @@ function createBuildingGroundPatch(pts, avgElevation) {
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1
     });
+    const apronMesh = new THREE.Mesh(apronGeometry, apronMaterial);
+    apronMesh.position.y = baseElevation;
+    apronMesh.renderOrder = 1;
+    apronMesh.receiveShadow = true;
+    apronMesh.userData.buildingGround = true;
+    apronMesh.userData.isGroundApron = true;
+    apronMesh.userData.apronOutset = apronOutset;
+    apronMesh.userData.alwaysVisible = true;
+    apronMesh.visible = true;
+    resultMeshes.push(apronMesh);
   } else {
-    apronMaterial = new THREE.MeshStandardMaterial({
-      color: 0xa8a29e,
-      roughness: 0.9,
-      metalness: 0.0,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -1
-    });
+    apronGeometry.dispose();
   }
-
-  const apronMesh = new THREE.Mesh(apronGeometry, apronMaterial);
-  apronMesh.position.y = baseElevation;
-  apronMesh.renderOrder = 1;
-  apronMesh.receiveShadow = true;
-  apronMesh.userData.buildingGround = true;
-  apronMesh.userData.alwaysVisible = true;
-  apronMesh.visible = true;
-  resultMeshes.push(apronMesh);
 
   // Build a vertical skirt at the real building footprint so sloped terrain
   // cannot reveal floating building undersides.
@@ -876,7 +749,7 @@ function createBuildingGroundPatch(pts, avgElevation) {
     }
   }
 
-  if (skirtVertBase >= 4) {
+  if (includeFoundationSkirt && skirtVertBase >= 4) {
     const skirtGeometry = new THREE.BufferGeometry();
     skirtGeometry.setAttribute('position', new THREE.Float32BufferAttribute(skirtPositions, 3));
     skirtGeometry.setAttribute('uv', new THREE.Float32BufferAttribute(skirtUvs, 2));
@@ -1052,28 +925,6 @@ function initPBRTextures(maxAniso) {
     };
   });
 
-  // --- Brick building textures ---
-  loadPBRTextureSet('brick', {
-    diff: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brick_wall_001/brick_wall_001_diffuse_1k.jpg',
-    nor: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brick_wall_001/brick_wall_001_nor_gl_1k.jpg',
-    rough: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brick_wall_001/brick_wall_001_rough_1k.jpg'
-  }, function (diff, nor, rough, fromCDN) {
-    brickDiffuse = diff;
-    brickNormal = nor;
-    brickRoughness = rough;
-    syncTextureGlobals();
-    [brickDiffuse, brickNormal, brickRoughness].forEach((t) => {
-      if (t) {t.anisotropy = aniso;t.wrapS = t.wrapT = THREE.RepeatWrapping;}
-    });
-    pbrTexturesLoaded.brick = true;
-    console.log('Brick textures ready (' + (fromCDN ? 'Poly Haven CDN' : 'procedural fallback') + ')');
-  }, function () {
-    return {
-      diff: createBrickFacadeTexture(),
-      nor: createBrickNormalMap(),
-      rough: createBrickRoughnessMap()
-    };
-  });
 }
 
 // Apply grass textures to existing terrain meshes (called after textures load)
@@ -1144,15 +995,14 @@ function getBuildingMaterial(buildingType, bSeed, baseColorHex) {
   if (buildingType === 'industrial' || buildingType === 'warehouse') {
     facadeType = 'concrete';
   } else if (buildingType === 'house' || buildingType === 'residential' || buildingType === 'detached') {
-    facadeType = br1 > 0.4 ? 'brick' : 'window';
+    facadeType = br1 > 0.55 ? 'concrete' : 'window';
   } else if (buildingType === 'apartments') {
     facadeType = br1 > 0.6 ? 'concrete' : 'window';
   } else if (buildingType === 'church' || buildingType === 'cathedral') {
-    facadeType = 'brick';
+    facadeType = 'concrete';
   } else {
-    // Mixed: ~30% concrete, ~25% brick, ~45% windowed
-    if (br2 < 0.30) facadeType = 'concrete';else
-    if (br2 < 0.55) facadeType = 'brick';
+    // Mixed: concrete or procedural windows only.
+    if (br2 < 0.42) facadeType = 'concrete';
   }
 
   if (facadeType === 'concrete' && pbrTexturesLoaded.concrete && concreteDiffuse) {
@@ -1163,19 +1013,6 @@ function getBuildingMaterial(buildingType, bSeed, baseColorHex) {
       normalScale: new THREE.Vector2(0.5, 0.5),
       roughnessMap: concreteRoughness,
       roughness: 0.9,
-      metalness: 0.02
-    });
-    return mat;
-  }
-
-  if (facadeType === 'brick' && pbrTexturesLoaded.brick && brickDiffuse) {
-    const mat = new THREE.MeshStandardMaterial({
-      color: tintHex,
-      map: brickDiffuse,
-      normalMap: brickNormal,
-      normalScale: new THREE.Vector2(0.6, 0.6),
-      roughnessMap: brickRoughness,
-      roughness: 0.88,
       metalness: 0.02
     });
     return mat;
@@ -1200,7 +1037,7 @@ function getBuildingMaterial(buildingType, bSeed, baseColorHex) {
 }
 
 const CFG = {
-  maxSpd: 120, offMax: 60, accel: 12, boostAccel: 25, brake: 150, friction: 25, offFriction: 120,
+  maxSpd: 120, offMax: 60, accel: 8.2, boostAccel: 15.5, brake: 150, friction: 25, offFriction: 120,
   boostMax: 140, boostDur: 2.5,
   brakeForce: 4.0, // Strong braking
   // Grip settings - realistic car physics
@@ -1908,10 +1745,12 @@ function init() {
   appCtx.sun.shadow.normalBias = 0.02;
   appCtx.sun.shadow.radius = 3; // Soft shadow edges (PCFSoftShadowMap)
   appCtx.scene.add(appCtx.sun);
+  appCtx.scene.add(appCtx.sun.target);
 
   appCtx.fillLight = new THREE.DirectionalLight(0x9db4ff, 0.3);
   appCtx.fillLight.position.set(-50, 50, -50);
   appCtx.scene.add(appCtx.fillLight);
+  appCtx.scene.add(appCtx.fillLight.target);
 
   appCtx.ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
   appCtx.scene.add(appCtx.ambientLight);
@@ -2035,6 +1874,9 @@ function init() {
     appCtx.cloudGroup.add(largeCloud);
   }
 
+  appCtx.cloudGroup.userData.sharedMaterial = cloudMat;
+  appCtx.cloudGroup.userData.weatherDeck = null;
+  appCtx.cloudGroup.userData.weatherDeckMaterial = null;
   appCtx.scene.add(appCtx.cloudGroup);
 
   // Create star field (hidden during day, visible at night)
@@ -2159,8 +2001,9 @@ function init() {
       isPointInPolygon: appCtx.pointInPolygon
     });
     window.Walk = appCtx.Walk;
-    // Start in walking mode by default (character visible, car hidden)
-    appCtx.Walk.setModeWalk();
+    if (appCtx.Walk?.state?.characterMesh) {
+      appCtx.Walk.state.characterMesh.visible = false;
+    }
   } catch (e) {
     console.error('Walking module initialization failed:', e);
     console.error('Stack:', e.stack);

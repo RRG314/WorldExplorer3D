@@ -62,6 +62,13 @@ Use this checklist before pushing a production deploy.
 6. Force a walk -> drive switch near/inside building blockers and confirm the car resolves to a safe road spawn.
 7. Walk near a supported building prompt, press `E` to enter, then press `E` or `Esc` to exit back outside cleanly.
 8. Select at least one real-estate or historic destination, navigate to its entry anchor, and confirm the same `E` building-entry flow works there.
+9. Open `Contributor Editor`, capture `Current Building`, preview a `Building Note`, and confirm the preview is private to that session.
+10. Switch to `Photo Contribution`, add a photo URL, and confirm the draft preview stays isolated while the photo fields appear only for that type.
+11. If signed in with Firebase configured, submit a contribution and confirm it appears as `pending` in `My Submissions`.
+12. If testing with an admin account, open the `Moderation` tab and verify status/type filters, search, detail pane, decision notes, `Preview In World`, `Approve`, and `Reject` actions work without directly mutating the live world until approval.
+13. Open `/account/moderation.html` with the admin/owner account and verify the private moderation page loads the same queue, shows plain-language submission details, and can approve/reject items.
+14. Confirm non-admin accounts cannot load moderation data or moderation actions from the account moderation page.
+15. Confirm contribution email alerts are either arriving correctly or clearly flagged as unconfigured in the moderation page.
 
 ### 4.5 Earth scene data and visuals
 
@@ -72,6 +79,9 @@ Use this checklist before pushing a production deploy.
 5. Confirm interiors are still lazy by default: no building interior is active until the player deliberately enters one.
 6. Confirm sampled interiors expose temporary containment colliders and build-placement targets instead of behaving like a disconnected under-map room.
 7. Run the world matrix and review the generated report for at least one dense downtown, one coastal/water-heavy city, one mixed-terrain city, one sparse rural area, and custom-coordinate cases.
+8. Confirm approved contribution markers can be toggled from the large-map legend and only appear after moderation approval.
+9. Confirm approved contributions still load by nearby area only; moving far away should swap the contribution set instead of keeping a global overlay alive.
+10. Confirm the app/editor still works if the moderation page is never opened.
 
 ### 4.6 Auth and multiplayer critical flows
 
