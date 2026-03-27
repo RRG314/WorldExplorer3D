@@ -129,6 +129,15 @@ At minimum, review/update affected files from:
 - `LIMITATIONS.md`
 - `CHANGELOG.md`
 
+Do not add new dated audit/report files for routine validation work.
+
+Use these locations instead:
+
+- current branch status: `docs/BRANCH_STATUS.md`
+- active regressions: `KNOWN_ISSUES.md`
+- lasting system explanations: `ARCHITECTURE.md`, `TECHNICAL_DOCS.md`, `TESTING.md`
+- project history: `CHANGELOG.md`
+
 ## 7. Plain-Language Change Notes
 
 Write PRs and commit summaries so non-developers can follow what changed.

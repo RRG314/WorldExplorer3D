@@ -1,6 +1,6 @@
 # Release Checklist
 
-Last reviewed: 2026-03-13
+Last reviewed: 2026-03-27
 
 Use this checklist before pushing a production deploy.
 
@@ -19,14 +19,17 @@ Use this checklist before pushing a production deploy.
 
 ## 3. Automated Gates
 
-1. Firestore rules tests:
-   - `npm run test:rules`
-2. Runtime invariants:
+1. Core runtime checks:
+   - `npm run test:performance-stability`
+   - `npm run test:drive-camera-smoothness`
+   - `npm run test:city-reload-cycle`
+   - `npm run test:boat-smoke`
+2. Broader runtime checks:
    - `npm run test:runtime`
-3. Broader world matrix:
    - `npm run test:world-matrix`
-4. Full gate:
+3. Full gate:
    - `npm run release:verify`
+4. Review [docs/BRANCH_STATUS.md](docs/BRANCH_STATUS.md) and [KNOWN_ISSUES.md](KNOWN_ISSUES.md) before release.
 
 ## 4. Manual Functional Gate (Required)
 
@@ -55,20 +58,11 @@ Use this checklist before pushing a production deploy.
 ### 4.4 Driving and controls
 
 1. Verify normal driving and walk/drone transitions.
-2. At speed, hold `Space` and steer through tight turns to confirm drift handling.
+2. Verify acceleration, steering, and camera remain stable through a long straight and through curves.
 3. Verify walking/drone controls are `WASD = move`, `Arrow Keys = look`.
 4. Verify `M` opens/closes the large map.
-5. Verify `F4` still toggles debug overlay.
-6. Force a walk -> drive switch near/inside building blockers and confirm the car resolves to a safe road spawn.
-7. Walk near a supported building prompt, press `E` to enter, then press `E` or `Esc` to exit back outside cleanly.
-8. Select at least one real-estate or historic destination, navigate to its entry anchor, and confirm the same `E` building-entry flow works there.
-9. Open `Contributor Editor`, capture `Current Building`, preview a `Building Note`, and confirm the preview is private to that session.
-10. Switch to `Photo Contribution`, add a photo URL, and confirm the draft preview stays isolated while the photo fields appear only for that type.
-11. If signed in with Firebase configured, submit a contribution and confirm it appears as `pending` in `My Submissions`.
-12. If testing with an admin account, open the `Moderation` tab and verify status/type filters, search, detail pane, decision notes, `Preview In World`, `Approve`, and `Reject` actions work without directly mutating the live world until approval.
-13. Open `/account/moderation.html` with the admin/owner account and verify the private moderation page loads the same queue, shows plain-language submission details, and can approve/reject items.
-14. Confirm non-admin accounts cannot load moderation data or moderation actions from the account moderation page.
-15. Confirm contribution email alerts are either arriving correctly or clearly flagged as unconfigured in the moderation page.
+5. Force a walk -> drive switch near building blockers and confirm the car resolves to a safe road spawn.
+6. Return to main menu, load a second city, and confirm the previous location does not leak into the next load.
 
 ### 4.5 Earth scene data and visuals
 
@@ -103,8 +97,10 @@ Use this checklist before pushing a production deploy.
 
 ## 5. Artifacts to Keep
 
-- `output/playwright/runtime-invariants/report.json`
-- relevant Playwright screenshots for release evidence
+- `output/playwright/performance-stability/report.json`
+- `output/playwright/drive-camera-smoothness/report.json`
+- `output/playwright/city-reload-cycle/report.json`
+- any relevant Playwright screenshots for release evidence
 
 ## 6. Deploy Rules
 

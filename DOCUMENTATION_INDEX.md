@@ -11,53 +11,53 @@ Current documentation set for World Explorer 3D.
 | New visitor | `README.md` |
 | Player / tester | `USER_GUIDE.md` |
 | Contributor (non-dev) | `CONTRIBUTING.md` |
-| Contributor (dev) | `QUICKSTART.md`, `ARCHITECTURE.md`, `TECHNICAL_DOCS.md` |
-| Release / QA reviewer | `RELEASE_CHECKLIST.md`, `KNOWN_ISSUES.md`, `CHANGELOG.md` |
+| Contributor (dev) | `QUICKSTART.md`, `ARCHITECTURE.md`, `TECHNICAL_DOCS.md`, `TESTING.md` |
+| Release / QA reviewer | `docs/BRANCH_STATUS.md`, `KNOWN_ISSUES.md`, `RELEASE_CHECKLIST.md` |
 
-## Public-Facing Core
-
-| File | Scope |
-| --- | --- |
-| `README.md` | Public project overview, install/run/test path |
-| `DATA_SOURCES.md` | Data-source map and provider/terms summary |
-| `ATTRIBUTION.md` | Concise runtime/repo attribution text |
-| `LIMITATIONS.md` | Honest capability boundaries and caveats |
-| `OSM_ECOSYSTEM_METADATA.md` | OSM discovery metadata pack |
-| `OSM_WIKI_ENTRY_DRAFT.md` | Draft OSM Wiki software-entry text |
-
-## Engineering and Operations
+## Core Project Docs
 
 | File | Scope |
 | --- | --- |
-| `QUICKSTART.md` | Local setup and validation command path |
-| `GITHUB_DEPLOYMENT.md` | GitHub Pages and deployment notes |
-| `RELEASE_CHECKLIST.md` | Pre-release gate checklist |
-| `CONTRIBUTING.md` | Branching, validation, contribution standards |
-| `KNOWN_ISSUES.md` | Current risks and follow-up items |
-| `CHANGELOG.md` | Versioned change history |
+| `README.md` | Project overview and quick local run path |
+| `QUICKSTART.md` | Local setup and first validation steps |
+| `USER_GUIDE.md` | Player-facing runtime guide |
+| `CONTRIBUTING.md` | Contribution workflow for both coders and non-coders |
+| `CHANGELOG.md` | Project and branch history |
 
-## Runtime/User/Architecture
+## Engineering Docs
 
 | File | Scope |
 | --- | --- |
-| `USER_GUIDE.md` | Player-facing usage and workflows |
-| `CONTROLS_REFERENCE.md` | Control mapping reference |
-| `ARCHITECTURE.md` | System topology and module layering |
-| `TECHNICAL_DOCS.md` | Engineering contracts and module APIs |
-| `docs/MAPCOMPLETE_ADAPTATION_REPORT.md` | Building-semantics adaptation notes from the MapComplete-style reference audit |
+| `ARCHITECTURE.md` | System topology and runtime ownership |
+| `TECHNICAL_DOCS.md` | Engineering contracts and subsystem reference |
+| `TESTING.md` | Runtime test catalog and interpretation guide |
+| `KNOWN_ISSUES.md` | Active branch regressions and risks |
+| `RELEASE_CHECKLIST.md` | Pre-release validation checklist |
+| `GITHUB_DEPLOYMENT.md` | Deployment notes |
 | `API_SETUP.md` | Firebase/Firestore/Stripe setup checklist |
 
-## Attribution and Legal
+## Branch-Level Status
 
 | File | Scope |
 | --- | --- |
-| `LICENSE` | Source-available license terms |
-| `CITATION.cff` | Citation metadata for repository consumers |
-| `ACKNOWLEDGEMENTS.md` | Full third-party acknowledgements |
+| `docs/BRANCH_STATUS.md` | Current branch purpose, differences from `main`, and latest test snapshot |
+
+## Reference Docs
+
+| File | Scope |
+| --- | --- |
+| `CONTROLS_REFERENCE.md` | Control mapping reference |
+| `DATA_SOURCES.md` | Data-source map and provider summary |
+| `ATTRIBUTION.md` | Runtime and repository attribution text |
+| `ACKNOWLEDGEMENTS.md` | Third-party acknowledgements |
+| `LIMITATIONS.md` | Capability boundaries and non-goals |
 | `SECURITY_STORAGE_NOTICE.md` | Security and storage handling summary |
+| `LICENSE` | Source-available license terms |
+| `CITATION.cff` | Citation metadata |
 
-## Session Log
+## Documentation Policy
 
-| File | Scope |
-| --- | --- |
-| `progress.md` | Rolling implementation/testing notes |
+- Current branch status belongs in `docs/BRANCH_STATUS.md`.
+- Current active regressions belong in `KNOWN_ISSUES.md`.
+- Historical changes belong in `CHANGELOG.md`.
+- Routine reruns should not create new dated audit/report files in the repository root or `docs/`.

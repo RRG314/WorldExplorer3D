@@ -1,8 +1,10 @@
 # Technical Documentation
 
-Last reviewed: 2026-03-15
+Last reviewed: 2026-03-27
 
 Engineering reference for module contracts, data flow, storage keys, APIs, and validation workflows.
+
+Use [TESTING.md](TESTING.md) for the current test catalog and [docs/BRANCH_STATUS.md](docs/BRANCH_STATUS.md) for current measured branch status.
 
 ## 1. Source-of-Truth Paths
 

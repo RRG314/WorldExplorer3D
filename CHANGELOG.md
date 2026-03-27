@@ -1,5 +1,28 @@
 # Changelog
 
+## [2026-03-27]
+
+### Changed
+
+- Continuous-world branch documentation was consolidated into a smaller professional set:
+  - added `TESTING.md`
+  - added `docs/BRANCH_STATUS.md`
+  - refreshed `README.md`, `DOCUMENTATION_INDEX.md`, `CONTRIBUTING.md`, `QUICKSTART.md`, `ARCHITECTURE.md`, `TECHNICAL_DOCS.md`, `RELEASE_CHECKLIST.md`, and `KNOWN_ISSUES.md`
+  - removed dated audit/report files from the repository surface so current branch status has one canonical home
+- Branch status now clearly separates:
+  - system ownership
+  - current validated branch metrics
+  - active regressions
+  - differences from `worldexplorer3d/main`
+
+### Runtime status snapshot
+
+- `test:performance-stability` currently passes overall, with a good warm-reload case and a much slower cold-boot case when upstream Overpass requests are rate-limited
+- `test:drive-camera-smoothness` currently fails on chase-distance drift during normal driving
+- `test:city-reload-cycle` currently fails on a first-load timeout path
+- `test:continuous-world-building-continuity` remains infrastructure-sensitive because public Overpass can return `429`
+- `test:boat-smoke` currently passes `3/5` cases and fails `2/5` valid-water entry cases
+
 ## [2026-03-16]
 
 ### Changed
@@ -188,8 +211,7 @@
 
 ### Added
 
-- New full code-first inventory snapshot:
-  - `COMPLETE_INVENTORY_REPORT_2026-03-02.md`
+- New full code-first inventory snapshot for that branch state.
 
 ### Changed
 

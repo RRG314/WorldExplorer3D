@@ -1,78 +1,84 @@
 # Known Issues
 
-Last reviewed: 2026-03-02
+Last reviewed: 2026-03-27
 
 Current risks and follow-up items for this branch.
 
 ## High Priority
 
-### 1. Cloud Functions Runtime Upgrade
+### 1. Driving Still Degrades Under Long Dense-City Runs
 
-Functions are still configured for Node 20 in repo settings.
+Current failing check:
 
-Required:
+- `npm run test:drive-camera-smoothness`
 
-- move to Node 22
-- revalidate billing and webhook paths
-- re-run rules/runtime/release checks after upgrade
+Current issue:
 
-### 2. Mirror Drift Risk (`app`, landing/account roots vs `public/*`)
+- camera chase distance still drifts too far during a normal drive run
+- the branch still feels laggier in dense areas than in sparse areas
+- the remaining problem is in runtime loading and surface/stream interaction, not just the camera rig
 
-Canonical runtime is edited in `app/*` and canonical landing/account roots live outside `public/*`, but deployment serves `public/*`.
+### 2. Location Switching Is Not Reliable Enough
 
-Risk:
+Current failing check:
 
-- behavior mismatch if mirror sync is skipped
+- `npm run test:city-reload-cycle`
 
-Mitigation:
+Current issue:
 
-- always run `npm run sync:public` and `npm run verify:mirror` before deploy
+- title/menu city reload can still stall before the first playable world finishes
+- the current failing run timed out with `roads 0`, `buildings 0`, and `gameStarted false`
+
+### 3. Public Overpass Still Creates Branch-Level Instability
+
+Current affected checks:
+
+- `npm run test:performance-stability`
+- `npm run test:continuous-world-building-continuity`
+
+Current issue:
+
+- Overpass `429`, `502`, and `504` responses still affect cold boot and far-drive continuity
+- some branch behavior is now better isolated from these failures, but not enough to call the runtime self-contained
+
+### 4. Boat Entry Coverage Is Incomplete
+
+Current failing check:
+
+- `npm run test:boat-smoke`
+
+Current issue:
+
+- `Baltimore Inner Harbor` and `Chicago Lakefront` failed valid-water auto-entry in the latest run
+- `Chicago Harbor`, `Monaco Coast`, and `Miami Offshore` passed
 
 ## Medium Priority
 
-### 3. External Geocoding Dependence
+### 5. Mirror Drift Risk (`app`, landing/account roots vs `public/*`)
 
-Custom location reverse lookup depends on external providers.
-
-Risk:
-
-- occasional timeout/rate-limit can degrade place naming quality
+Canonical runtime is edited in `app/*` and canonical landing/account roots live outside `public/*`, but deployment serves `public/*`.
 
 Mitigation:
 
-- keep fallback naming path and local favorite-city fallback
-- monitor for repeated provider failures
+- always run `npm run sync:public`
+- always run `npm run verify:mirror`
 
-### 4. Local Firestore Offline Noise During Browser Automation
+### 6. Cold Boot Is Much Worse Than Warm Reload
 
-Some Playwright runs can surface Firestore offline warnings in local environments.
+Latest performance snapshot:
 
-Risk:
+- warm reload: `firstControllableMs 8144`, `worldLoadMs 7211`
+- cold boot: `firstControllableMs 40007`, `worldLoadMs 35503`
 
-- false-negative automation pass flags if logs are treated as strict failures
-
-Mitigation:
-
-- separate environment/network failures from functional assertions
-- keep targeted feature assertions in reports
-
-### 5. Stripe Environment Mismatch
-
-Incorrect price IDs or webhook/secret values break donation flows.
-
-Mitigation:
-
-- verify all `WE3D_STRIPE_*` variables before deploy
-- verify logs after checkout and webhook events
+This gap is currently too large for release confidence.
 
 ## Low Priority
 
-### 6. Additional Mobile UX Polish
+### 7. Cloud Functions Runtime Upgrade
+
+Functions are still configured for Node 20 in repo settings.
+
+### 8. Additional Mobile UX Polish
 
 - tighter layout tuning in account/social cards for smaller screens
 - optional hint text for advanced room rules
-
-### 7. Post-Deploy Automation Coverage Expansion
-
-- add automated smoke for signup -> create room -> invite -> accept invite path
-- add automated verification of globe selector favorites delete behavior

@@ -26,6 +26,7 @@ git clone https://github.com/RRG314/WorldExplorer3D.git
 cd WorldExplorer3D
 npm install
 cd functions && npm install && cd ..
+npx playwright install chromium
 ```
 
 ## 3. Run Locally (Hosting-Style)
@@ -76,7 +77,7 @@ This checks:
 
 If you are not changing backend or deployment behavior, you usually do not need every backend step before basic local testing.
 
-## 6. Manual Smoke Checklist (Release Candidate)
+## 6. Manual Smoke Checklist
 
 1. Title launch:
    - verify Earth/Moon/Space/Ocean destination toggles
@@ -87,23 +88,16 @@ If you are not changing backend or deployment behavior, you usually do not need 
 3. Runtime:
    - launch Earth and verify world/map UI loads
    - verify `M` opens the large map
-   - verify `F4` still opens the debug overlay
    - verify `Use My Location` / custom-location launch lands on safe ground, nearest walkable path, or nearest safe road when blocked
-   - run `npm run test:world-matrix` to validate the same rules across preset + custom locations
-   - switch Walk -> Drive from beside buildings and confirm the car is not trapped in geometry
-   - verify greenery appears in parks / woods / mapped tree areas without a large frame-time spike
-   - walk up to a supported building prompt, press `E`, confirm the interior loads only on demand, then press `E` or `Esc` to exit cleanly
-   - select a real-estate or historic destination, navigate to it, and confirm the same `E` prompt/entry flow works there too
-   - open `Contributor Editor`, capture `Current Building`, switch to `Building Note`, preview it, and confirm the live world stayed unchanged
-   - switch to `Photo Contribution`, add a test photo URL, preview it, and confirm the building-specific fields swap to photo fields
-   - if signed in with Firebase configured, submit a test contribution and confirm it appears in `My Submissions` as `pending`
-   - if signed in as admin/allowlisted owner, open `/account/moderation.html`, confirm the queue loads, and verify approve/reject actions work there
-   - switch Earth <-> Ocean from in-game environment controls
-   - verify water remains visible where expected, including coastal water plus rivers / ponds / lakes
-   - verify the current active build keeps path overlays hidden/disabled while walk/drive traversal remains stable on the road-and-ground network
-4. Account / donation surfaces:
-   - verify landing/runtime/account copy does not imply payment is required for map or core play
-5. No new blocking console/runtime errors in primary flows
+   - switch Walk -> Drive -> Drone and confirm traversal stays responsive
+   - return to main menu and load a second city
+   - verify no fullscreen gameplay loader reappears during normal play
+   - verify boat mode appears only near valid water
+4. Validation:
+   - run `npm run test:performance-stability`
+   - run `npm run test:drive-camera-smoothness`
+   - run `npm run test:city-reload-cycle`
+5. Use [RELEASE_CHECKLIST.md](RELEASE_CHECKLIST.md) for the full release gate.
 
 ## 7. GitHub Pages Readiness
 

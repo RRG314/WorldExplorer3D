@@ -1,8 +1,10 @@
 # Architecture
 
-Last reviewed: 2026-03-15
+Last reviewed: 2026-03-27
 
-System topology for gameplay runtime, multiplayer state, account/donations, and security boundaries.
+System topology for gameplay runtime, streaming, traversal, backend services, and validation boundaries.
+
+Current verified branch status lives in [docs/BRANCH_STATUS.md](docs/BRANCH_STATUS.md). This file explains ownership, not day-by-day audit history.
 
 ## 1. System Topology
 
@@ -46,6 +48,17 @@ Flow:
 - editor systems: `editor/config.js`, `editor/public-layer.js`, `editor/session.js`, `editor/store.js`
 - account/admin moderation surface: `account/moderation.html`, `js/contribution-api.js`, `js/function-api.js`
 - UI orchestration: `ui.js`, `ui/globe-selector.js`, `tutorial/tutorial.js`
+
+Continuous-world runtime ownership:
+
+- `continuous-world-runtime.js` owns runtime-level state, region lifetime, and rebasing decisions
+- `continuous-world-region-manager.js` owns region keys and coverage bookkeeping
+- `continuous-world-feature-manager.js` and `continuous-world-feature-ownership.js` own streamed feature identity and retirement
+- `world.js` remains the Earth load/stream orchestrator that decides what to fetch and when
+- `terrain.js` owns terrain conformance and road/building surface sync scheduling
+- `main.js` owns the fixed-step update and render cadence
+- `physics.js` owns traversal motion
+- `hud.js` owns camera follow behavior
 
 Current Earth runtime architecture details:
 
