@@ -1,6 +1,6 @@
 # Testing
 
-Last reviewed: 2026-03-27
+Last reviewed: 2026-03-28
 
 This file describes the runtime checks that matter on the `steven/continuous-world-root-repair` branch and where to find their outputs.
 
@@ -33,9 +33,9 @@ These are the branch-level tests that should be used first when evaluating conti
 | Command | Purpose | Notes |
 | --- | --- | --- |
 | `npm run test:performance-stability` | Startup and warm-reload runtime performance | Treat cold-boot numbers carefully if Overpass is rate-limiting |
-| `npm run test:drive-camera-smoothness` | Normal on-road driving smoothness | This is the main drive-feel regression check |
+| `npm run test:drive-camera-smoothness` | Normal on-road driving smoothness | This is the main normal-drive regression check; it is not the far-continuity test |
 | `npm run test:city-reload-cycle` | Title/menu location switching | Confirms old city data is released and the next city loads cleanly |
-| `npm run test:continuous-world-building-continuity` | Far-drive road/building continuity | External Overpass failures should be recorded separately from logic regressions |
+| `npm run test:continuous-world-building-continuity` | Far-drive road/building continuity | Use this alongside the normal-drive test; it is the main long-distance continuity gate |
 | `npm run test:boat-smoke` | Earth boat entry and exit at real water locations | Focused on valid-water detection and mode transitions |
 
 ## 3. Secondary Checks
@@ -69,8 +69,9 @@ The branch-level summary belongs in [docs/BRANCH_STATUS.md](docs/BRANCH_STATUS.m
 - A test should be considered trustworthy only if its failure matches visible gameplay behavior or a clear infrastructure fault.
 - Overpass `429`, `502`, and `504` responses are infrastructure faults. They should be recorded, but they are not the same thing as a renderer, camera, or physics regression.
 - `test:performance-stability` can pass overall while still showing a cold-boot slowdown caused by upstream data availability. That distinction belongs in the branch status doc.
-- `test:drive-camera-smoothness` is the main gameplay smoothness probe for normal driving. It should not be allowed to hide chase-distance drift or load-coupled stutter behind a false green.
-- `test:city-reload-cycle` should be treated as release-blocking for this branch because location switching is a core user flow.
+- `test:drive-camera-smoothness` is the main gameplay smoothness probe for normal on-road driving. A pass here does not prove that far-distance corridor streaming is healthy.
+- `test:continuous-world-building-continuity` is the branch-level far-travel gate. If this fails, the branch is not ready even if the normal-drive test passes.
+- `test:city-reload-cycle` should be read in two parts: the settled reload path and the quick reload path. A branch can improve a lot here and still remain infrastructure-sensitive.
 
 ## 6. Documentation Policy
 

@@ -34,9 +34,6 @@ const OCEAN_CONSTANTS = Object.freeze({
   ROLL_FROM_TURN: 0.3,
   BATHYMETRY_WAIT_MS: 3200
 });
-const OCEAN_FIXED_STEP = 1 / 60;
-const OCEAN_MAX_SUBSTEPS = 6;
-
 const oceanMode = appCtx.oceanMode && typeof appCtx.oceanMode === 'object' ? appCtx.oceanMode : {};
 Object.assign(oceanMode, {
   active: false,
@@ -50,7 +47,6 @@ Object.assign(oceanMode, {
   sharkEntity: null,
   launchSite: OCEAN_SITE,
   lastFrameMs: 0,
-  simAccumulator: 0,
   cameraLookTarget: null,
   seabedMesh: null,
   reefGroup: null,
@@ -1670,22 +1666,9 @@ function animateOceanMode(nowMs = 0) {
   if (!oceanMode.lastFrameMs) oceanMode.lastFrameMs = nowMs;
   const dt = Math.min(0.05, Math.max(0.001, (nowMs - oceanMode.lastFrameMs) / 1000));
   oceanMode.lastFrameMs = nowMs;
-  oceanMode.simAccumulator = Math.min(
-    OCEAN_FIXED_STEP * OCEAN_MAX_SUBSTEPS,
-    Math.max(0, Number(oceanMode.simAccumulator || 0) + dt)
-  );
-
-  let steps = 0;
-  while (oceanMode.simAccumulator >= OCEAN_FIXED_STEP && steps < OCEAN_MAX_SUBSTEPS) {
-    updateSubmarine(OCEAN_FIXED_STEP);
-    oceanMode.simAccumulator -= OCEAN_FIXED_STEP;
-    steps += 1;
-  }
-  if (oceanMode.simAccumulator >= OCEAN_FIXED_STEP) {
-    oceanMode.simAccumulator = Math.min(oceanMode.simAccumulator, OCEAN_FIXED_STEP * 2);
-  }
+  updateSubmarine(dt);
   oceanMode.skyRefreshTimer = (oceanMode.skyRefreshTimer || 0) + dt;
-  if (oceanMode.skyRefreshTimer >= 0.45 && typeof appCtx.refreshAstronomicalSky === 'function') {
+  if (oceanMode.skyRefreshTimer >= 0.8 && typeof appCtx.refreshAstronomicalSky === 'function') {
     oceanMode.skyRefreshTimer = 0;
     appCtx.refreshAstronomicalSky(false);
   }
@@ -1694,8 +1677,13 @@ function animateOceanMode(nowMs = 0) {
     oceanMode.weatherRefreshTimer = 0;
     void appCtx.refreshLiveWeather(false);
   }
+  const subSpeed = Math.abs(Number(oceanMode.submarine?.speed || 0));
   oceanMode.fishRefreshTimer = (oceanMode.fishRefreshTimer || 0) + dt;
-  if (oceanMode.fishRefreshTimer >= 0.12) {
+  const fishRefreshInterval =
+    subSpeed >= OCEAN_CONSTANTS.MAX_SPEED * 0.45 ? 0.24 :
+    subSpeed >= OCEAN_CONSTANTS.MAX_SPEED * 0.2 ? 0.18 :
+    0.12;
+  if (oceanMode.fishRefreshTimer >= fishRefreshInterval) {
     oceanMode.fishRefreshTimer = 0;
     updateFishLife(nowMs * 0.001);
   }
@@ -1706,7 +1694,8 @@ function animateOceanMode(nowMs = 0) {
   }
 
   oceanMode.hudRefreshTimer = (oceanMode.hudRefreshTimer || 0) + dt;
-  if (oceanMode.hudRefreshTimer >= 0.18) {
+  const hudRefreshInterval = subSpeed >= OCEAN_CONSTANTS.MAX_SPEED * 0.2 ? 0.28 : 0.18;
+  if (oceanMode.hudRefreshTimer >= hudRefreshInterval) {
     oceanMode.hudRefreshTimer = 0;
     updateOceanHud(nowMs * 0.001);
   }
@@ -1729,7 +1718,6 @@ function startOceanMode() {
 
     oceanMode.active = true;
     oceanMode.lastFrameMs = 0;
-    oceanMode.simAccumulator = 0;
     oceanMode.weatherRefreshTimer = 0;
     oceanMode.skyRefreshTimer = 0;
     oceanMode.fishRefreshTimer = 0;
@@ -1780,7 +1768,6 @@ function stopOceanMode() {
 
   oceanMode.active = false;
   oceanMode.lastFrameMs = 0;
-  oceanMode.simAccumulator = 0;
   if (oceanMode.animationId) {
     cancelAnimationFrame(oceanMode.animationId);
     oceanMode.animationId = null;

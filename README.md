@@ -30,6 +30,7 @@ If you want the quickest path:
 - Hosting/runtime mirror: `public/*`
 - Current branch validation and open regressions live in [docs/BRANCH_STATUS.md](docs/BRANCH_STATUS.md)
 - Current known runtime problems live in [KNOWN_ISSUES.md](KNOWN_ISSUES.md)
+- GitHub Pages deployment notes, including manual branch deployment, live in [GITHUB_DEPLOYMENT.md](GITHUB_DEPLOYMENT.md)
 
 ## Core Capabilities
 

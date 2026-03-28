@@ -708,12 +708,14 @@ function update(dt) {
   }
 
   if (reverse && !braking && canAccelerate) {
-    if (appCtx.car.speed > 10) {
-      appCtx.car.speed -= appCtx.CFG.brake * dt;
-      if (Math.abs(appCtx.car.speed) < 0.5) appCtx.car.speed = 0;
+    if (appCtx.car.speed > 3.5) {
+      const reverseTransitionBrake = Math.max(appCtx.CFG.brake, accel * 22);
+      appCtx.car.speed -= reverseTransitionBrake * dt;
+      if (appCtx.car.speed < 0.35) appCtx.car.speed = 0;
     } else {
-      const reverseAccelScale = appCtx.onMoon ? 0.65 : 0.5;
-      appCtx.car.speed -= accel * reverseAccelScale * dt;
+      const reverseAccelScale = appCtx.onMoon ? 0.68 : 0.62;
+      const reverseLaunchBoost = !appCtx.onMoon && appCtx.car.onRoad ? Math.max(0, 1 - spd / 9) * 0.22 : 0;
+      appCtx.car.speed -= accel * (reverseAccelScale + reverseLaunchBoost) * dt;
     }
   }
 
@@ -748,10 +750,10 @@ function update(dt) {
 
   const spdAbs = Math.abs(appCtx.car.speed);
 
-  const maxSteerLow = 0.66;
-  const maxSteerHigh = 0.12;
+  const maxSteerLow = 0.74;
+  const maxSteerHigh = 0.2;
   const steerFadeMin = 5;
-  const steerFadeMax = 62;
+  const steerFadeMax = 92;
 
   let steerAlpha = 0;
   if (spdAbs > steerFadeMin) {
@@ -762,7 +764,7 @@ function update(dt) {
   const clamp01 = (n) => Math.max(0, Math.min(1, n));
   const steerMag = Math.abs(appCtx.car.steerSm);
   const speedNorm = clamp01((spdAbs - 8) / 70);
-  const highSpeedTurnBlend = clamp01((spdAbs - 18) / 28);
+  const highSpeedTurnBlend = clamp01((spdAbs - 28) / 44);
   const parkingTurnBlend = clamp01(1 - spdAbs / 14);
   const reverseTurnBlend = appCtx.car.speed < -1 ? clamp01((Math.abs(appCtx.car.speed) - 1) / 12) : 0;
   const lowSpeedTurnBoost = Math.max(parkingTurnBlend, reverseTurnBlend);
@@ -821,15 +823,10 @@ function update(dt) {
     // Earth-only: stronger off-road lateral damping unless drift is explicitly requested.
     latDamp = (appCtx.car.onRoad ? 15.5 : 19.0) * (0.72 + grip * 0.58);
     yawDamp = (appCtx.car.onRoad ? 9.2 : 11.6) * (0.7 + grip * 0.6);
-    yawResponse = (appCtx.car.onRoad ? 4.4 : 2.55) * (0.64 + grip * 0.42);
-    if (appCtx.car.onRoad && !isDrifting) {
-      latDamp *= 1.14;
-      yawDamp *= 1.08;
-      yawResponse *= 0.92;
-    }
+    yawResponse = (appCtx.car.onRoad ? 4.8 : 2.55) * (0.64 + grip * 0.42);
     if (lowSpeedTurnBoost > 0) {
-      yawResponse += lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.9 : 0.5);
-      yawDamp *= 1 - lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.08 : 0.05);
+      yawResponse += lowSpeedTurnBoost * (appCtx.car.onRoad ? 1.1 : 0.6);
+      yawDamp *= 1 - lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.12 : 0.06);
     }
 
     if (isDrifting) {
@@ -842,22 +839,22 @@ function update(dt) {
       yawDamp += driftRecovery * 0.32;
     }
     if (appCtx.car.onRoad && highSpeedTurnBlend > 0) {
-      yawDamp *= 1 + highSpeedTurnBlend * 0.34;
-      yawResponse *= 1 - highSpeedTurnBlend * 0.24;
+      yawDamp *= 1 + highSpeedTurnBlend * 0.12;
+      yawResponse *= 1 - highSpeedTurnBlend * 0.08;
     }
   }
 
   const wheelBase = 2.6;
   const v = appCtx.car.speed;
-  let steerAuthority = appCtx.car.onRoad ? 1.02 : 0.94;
+  let steerAuthority = appCtx.car.onRoad ? 1.08 : 0.96;
   if (!appCtx.onMoon && lowSpeedTurnBoost > 0) {
-    steerAuthority *= 1 + lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.14 : 0.08);
+    steerAuthority *= 1 + lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.22 : 0.1);
   }
   if (!appCtx.onMoon && (isDrifting || handbrakeTurnIntent)) {
     steerAuthority *= appCtx.car.onRoad ? 1.22 : 1.1;
   }
   if (!appCtx.onMoon && appCtx.car.onRoad && highSpeedTurnBlend > 0) {
-    steerAuthority *= 1 - highSpeedTurnBlend * 0.24;
+    steerAuthority *= 1 - highSpeedTurnBlend * 0.08;
   }
   const yawRateTarget = v / Math.max(1e-3, wheelBase) * Math.tan(steerAngle * steerAuthority);
 
@@ -866,10 +863,10 @@ function update(dt) {
   const parkingPivotIntent = !appCtx.onMoon &&
   steerMag >= 0.12 &&
   spdAbs < (appCtx.car.onRoad ? 5.5 : 8.5) &&
-  (braking || reverse);
+  (braking || reverse || gas);
   if (parkingPivotIntent) {
     const pivotBlend = clamp01(1 - spdAbs / (appCtx.car.onRoad ? 9.5 : 14));
-    appCtx.car.yawRate += appCtx.car.steerSm * (appCtx.car.onRoad ? 1.3 : 1.45) * pivotBlend * dt * 2.2;
+    appCtx.car.yawRate += appCtx.car.steerSm * (appCtx.car.onRoad ? 1.55 : 1.5) * pivotBlend * dt * 2.35;
   }
 
   if (canAccelerate) {
@@ -879,7 +876,12 @@ function update(dt) {
     appCtx.car.angle += appCtx.car.yawRate * dt;
   }
 
-  appCtx.car.vFwd += (appCtx.car.speed - appCtx.car.vFwd) * (1 - Math.exp(-dt * 4.1));
+  const forwardCatchupRate =
+  appCtx.onMoon ? 4.1 :
+  spdAbs < 8 ? 8.6 :
+  spdAbs < 18 ? 7.6 :
+  6.4;
+  appCtx.car.vFwd += (appCtx.car.speed - appCtx.car.vFwd) * (1 - Math.exp(-dt * forwardCatchupRate));
   appCtx.car.vLat *= Math.exp(-dt * latDamp);
 
   // Rear-biased slip model:

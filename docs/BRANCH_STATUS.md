@@ -1,6 +1,6 @@
 # Continuous World Branch Status
 
-Last updated: 2026-03-27
+Last updated: 2026-03-28
 Branch: `steven/continuous-world-root-repair`
 
 This file is the current branch-level status for the continuous-world runtime work. It replaces the dated audit/report files that were previously spread across the repository.
@@ -40,40 +40,42 @@ Compared with `worldexplorer3d/main`, this branch adds or substantially changes:
 
 ## 3. Current Validation Snapshot
 
-The numbers below were refreshed on this branch on 2026-03-27.
+The numbers below were refreshed on this branch on 2026-03-28 from clean local reruns.
 
 | Check | Status | Current result |
 | --- | --- | --- |
-| `npm run test:performance-stability` | Pass with warnings | Warm reload: `firstControllableMs 8144`, `worldLoadMs 7211`, `frameMs 26.2`, `drawCalls 1298`, `surfaceSyncLastMs 7.7` |
-| `npm run test:drive-camera-smoothness` | Fail | `camera chase distance drifted too much: 10.00 .. 10.6469` on `Water Street`; `onRoadRatio 1`, `maxSpeed 40.24`, `loadCoupledStutterRatio 0.0426` |
-| `npm run test:city-reload-cycle` | Fail | First Baltimore load timed out before play; runtime stayed at `roads 0`, `buildings 0`, `gameStarted false` |
-| `npm run test:continuous-world-building-continuity` | Fail (infrastructure) | Far-drive run aborted on Overpass `429` |
-| `npm run test:boat-smoke` | Fail | `3/5` water cases passed; `Baltimore Inner Harbor` and `Chicago Lakefront` failed auto-entry |
+| `npm run test:performance-stability` | Pass | Boot: `firstControllableMs 5097`, `worldLoadMs 7893`, `frameMs 28.95`, `drawCalls 1316`, `surfaceSyncLastMs 7.0`; warm reload: `firstControllableMs 7093`, `worldLoadMs 6103`, `frameMs 17.01`, `drawCalls 1221`, `surfaceSyncLastMs 11.4` |
+| `npm run test:drive-camera-smoothness` | Pass | `North Calvert Street`; `onRoadRatio 1`, `maxSpeed 45.84`, `chaseDistance 10.00 .. 10.0249`, `loadCoupledStutterRatio 0.05` |
+| `npm run test:city-reload-cycle` | Mixed | Settled Baltimore -> menu -> New York path passes cleanly; quick reload path can still land in `partial_world_ready` after Overpass `502` / timeout recovery |
+| `npm run test:continuous-world-building-continuity` | Fail | `drive far-region roads too thin: 0` |
+| `npm run test:boat-smoke` | Pass | `5/5` water cases passed: Baltimore Inner Harbor, Chicago Lakefront, Chicago Harbor, Monaco Coast, Miami Offshore |
 
 ### Performance detail
 
-The current performance report passed overall, but it still showed a cold-boot case that was much worse than warm reload:
+The current performance report is materially stronger than the earlier branch snapshot:
 
-- cold boot: `firstControllableMs 40007`, `worldLoadMs 35503`, `frameMs 24.26`, `surfaceSyncLastMs 11.2`
-- warm reload: `firstControllableMs 8144`, `worldLoadMs 7211`, `frameMs 26.2`, `surfaceSyncLastMs 7.7`
+- boot: `firstControllableMs 5097`, `worldLoadMs 7893`, `frameMs 28.95`
+- warm reload: `firstControllableMs 7093`, `worldLoadMs 6103`, `frameMs 17.01`
+- both cases stayed within draw-call, texture, geometry, heap, and surface-sync budgets
 
-That report also logged Overpass `429`, `502`, and `504` errors, so the cold-boot result is currently a mix of branch behavior and upstream data-service instability.
+The branch is still sensitive to Overpass availability during quick reload and long-distance continuity, but the normal startup and warm-reload performance gate is currently green.
 
 ## 4. Current Read Of The Branch
 
 What is better than `main`:
 
 - the branch has much stronger diagnostics and targeted regression tests
-- warm Earth runtime performance is materially better than the earlier branch state
+- normal Earth startup and warm-reload runtime performance are materially better than the earlier branch state
 - fullscreen loader ownership is better controlled than the regressed earlier passes
 - drive camera behavior is simpler and more stable than the earlier over-reactive chase setup
+- normal on-road driving and boat entry are both passing their primary harnesses on this snapshot
 
 What is not ready:
 
-- location switching is not yet reliable enough for release
-- normal driving is still failing the chase-distance stability test
-- public Overpass dependence still makes far-drive continuity and cold boot too fragile
-- boat entry coverage is inconsistent across real-world locations
+- long-distance road continuity still collapses in the far-drive continuity check
+- quick location reload is still too dependent on Overpass recovery and can fall back to a partial world
+- public Overpass dependence still makes branch behavior too fragile for release confidence
+- manual dense-city traversal reports still describe periodic hitching that is not fully captured by the normal-drive probe
 
 ## 5. Release Readiness
 
@@ -81,10 +83,10 @@ This branch is not release-ready yet.
 
 The release blockers are:
 
-1. `test:drive-camera-smoothness`
-2. `test:city-reload-cycle`
-3. `test:boat-smoke`
-4. infrastructure-sensitive far-drive continuity
+1. `test:continuous-world-building-continuity`
+2. quick-reload degradation inside `test:city-reload-cycle`
+3. manual dense-area traversal hitch still reported by gameplay testing
+4. continued reliance on live Overpass availability during branch-critical Earth loading
 
 ## 6. Where To Look Next
 

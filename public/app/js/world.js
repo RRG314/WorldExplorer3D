@@ -1510,8 +1510,12 @@ function orderedOverpassEndpoints() {
       host === '[::1]';
     if (localHost && origin) {
       const proxyEndpoint = new URL(LOCAL_OVERPASS_PROXY_PATH, origin).href;
-      const localBrowserEndpoints = LOCAL_BROWSER_OVERPASS_ENDPOINTS.slice();
-      return _localOverpassProxyUnavailable ? localBrowserEndpoints : [proxyEndpoint, ...localBrowserEndpoints];
+      if (_localOverpassProxyUnavailable) {
+        return LOCAL_BROWSER_OVERPASS_ENDPOINTS.slice();
+      }
+      // On localhost, keep the proxy as the only authority so browser clients
+      // do not duplicate upstream pressure after the proxy already retried/cached.
+      return [proxyEndpoint];
     }
   } catch {}
   return baseEndpoints;
@@ -2599,6 +2603,43 @@ function continuousWorldInteractiveReasonIsForwardRoadCorridor(reason = 'actor_d
     reasonText === 'forward_road_corridor' ||
     reasonText.startsWith('forward_road_corridor:')
   );
+}
+
+function continuousWorldInteractiveReasonIsRoutine(reason = 'actor_drift') {
+  const reasonText = String(reason || 'actor_drift');
+  return (
+    reasonText === 'runtime_tick' ||
+    reasonText === 'main_loop' ||
+    reasonText === 'actor_drift'
+  );
+}
+
+function continuousWorldInteractiveShouldYieldToSurfaceSync(
+  actorState = null,
+  terrainSnapshot = null,
+  reason = 'actor_drift',
+  roadShellGap = false,
+  buildingShellGap = false,
+  forwardCorridorNeedsRoads = false
+) {
+  if (roadShellGap || buildingShellGap || forwardCorridorNeedsRoads) return false;
+  const reasonText = String(reason || 'actor_drift');
+  if (
+    !continuousWorldInteractiveReasonIsRoutine(reasonText) &&
+    !reasonText.startsWith('region_prefetch:')
+  ) {
+    return false;
+  }
+  const actor = actorState || continuousWorldInteractiveActorMotionState();
+  const mode = String(actor?.mode || 'drive');
+  const pendingSurfaceSyncRoads = Number(terrainSnapshot?.pendingSurfaceSyncRoads || 0);
+  const rebuildInFlight = !!terrainSnapshot?.rebuildInFlight;
+  const backlogThreshold =
+    mode === 'walk' ? 36 :
+    mode === 'boat' || mode === 'ocean' ? 42 :
+    mode === 'drone' ? 56 :
+    64;
+  return rebuildInFlight || pendingSurfaceSyncRoads >= backlogThreshold;
 }
 
 function continuousWorldInteractiveReasonTargetRegionKey(reason = 'actor_drift') {
@@ -7688,6 +7729,10 @@ function getLandusesIntersectingBounds(bounds, padding = 0) {
 
 async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheMeta = null, requestOptions = null) {
   const forwardRoadCorridorQuery = String(requestOptions?.reason || '').startsWith('forward_road_corridor');
+  const startupPlayableCoreQuery = String(cacheMeta?.queryKind || '') === 'startup_playable_core';
+  const interactiveQuery = !!cacheMeta?.continuousWorldInteractive;
+  const fastRoadsOnlyQuery = interactiveQuery && String(cacheMeta?.loadLevel || '') === 'roads_only';
+  const allowNearbyCacheAssist = forwardRoadCorridorQuery || fastRoadsOnlyQuery || startupPlayableCoreQuery;
   const cached = findOverpassMemoryCache(cacheMeta);
   if (cached?.data?.elements) {
     cached.data._overpassEndpoint = cached.endpoint ? `${cached.endpoint} (memory-cache)` : 'memory-cache';
@@ -7696,7 +7741,7 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheM
     return cached.data;
   }
 
-  if (forwardRoadCorridorQuery) {
+  if (allowNearbyCacheAssist) {
     const nearbyCached = findNearbyOverpassMemoryCache(cacheMeta, { extraAllowance: 0.0045 });
     if (nearbyCached?.data?.elements) {
       nearbyCached.data._overpassEndpoint = nearbyCached.endpoint ? `${nearbyCached.endpoint} (memory-cache-nearby)` : 'memory-cache-nearby';
@@ -7715,7 +7760,7 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheM
     return persistentCached.data;
   }
 
-  if (forwardRoadCorridorQuery) {
+  if (allowNearbyCacheAssist) {
     const nearbyPersistentCached = await findNearbyOverpassPersistentCache(cacheMeta, {
       allowStale: true,
       extraAllowance: 0.0045
@@ -7736,9 +7781,6 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheM
   const controllers = [];
   const errors = [];
   const endpoints = orderedOverpassEndpoints();
-  const interactiveQuery = !!cacheMeta?.continuousWorldInteractive;
-  const startupPlayableCoreQuery = String(cacheMeta?.queryKind || '') === 'startup_playable_core';
-  const fastRoadsOnlyQuery = interactiveQuery && String(cacheMeta?.loadLevel || '') === 'roads_only';
   const minTimeoutMs =
     forwardRoadCorridorQuery ? 1800 :
     fastRoadsOnlyQuery ? 2400 :
@@ -7762,36 +7804,40 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheM
   if (requestSignal && abortListener) {
     requestSignal.addEventListener('abort', abortListener, { once: true });
   }
-  const attempts = endpoints.map((endpoint, idx) => (async () => {
+
+  try {
+    for (let idx = 0; idx < endpoints.length; idx++) {
+      const endpoint = endpoints[idx];
     const staggerMs = idx * staggerMsBase;
     if (staggerMs > 0) await delayMs(staggerMs);
 
     const now = performance.now();
     if (now >= deadlineMs - 300) {
-      throw new Error(`[${endpoint}] skipped: load budget exhausted`);
+      errors.push(`[${endpoint}] skipped: load budget exhausted`);
+      continue;
     }
 
     const timeLeftMs = deadlineMs - now;
     const localProxyEndpoint = endpoint.endsWith(LOCAL_OVERPASS_PROXY_PATH);
     const timeoutForEndpointMs = localProxyEndpoint ?
-      Math.max(
-        forwardRoadCorridorQuery ? 3200 :
-        fastRoadsOnlyQuery ? 8200 :
-        startupPlayableCoreQuery ? 9200 :
-        interactiveQuery ? 9800 :
-        11000,
-        Math.min(
-          Math.max(
-            forwardRoadCorridorQuery ? 3200 :
-            fastRoadsOnlyQuery ? 8200 :
-            startupPlayableCoreQuery ? 9200 :
-            interactiveQuery ? 9800 :
-            11000,
-            timeoutMs
-          ),
-          timeLeftMs - 250
-        )
-      ) :
+      (() => {
+        const proxyMinTimeoutMs =
+          forwardRoadCorridorQuery ? 4200 :
+          fastRoadsOnlyQuery ? 14000 :
+          startupPlayableCoreQuery ? 16000 :
+          interactiveQuery ? 16000 :
+          19000;
+        const proxyTargetTimeoutMs =
+          forwardRoadCorridorQuery ? Math.max(timeoutMs + 900, proxyMinTimeoutMs) :
+          fastRoadsOnlyQuery ? Math.max(timeoutMs + 2600, proxyMinTimeoutMs) :
+          startupPlayableCoreQuery ? Math.max(timeoutMs + 3200, proxyMinTimeoutMs) :
+          interactiveQuery ? Math.max(timeoutMs + 2600, proxyMinTimeoutMs) :
+          Math.max(timeoutMs + 2200, proxyMinTimeoutMs);
+        return Math.max(
+          proxyMinTimeoutMs,
+          Math.min(proxyTargetTimeoutMs, timeLeftMs - 250)
+        );
+      })() :
       Math.max(
         fastRoadsOnlyQuery ? 2400 : startupPlayableCoreQuery ? 3200 : 3500,
         Math.min(
@@ -7854,27 +7900,26 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheM
       _lastOverpassEndpoint = endpoint;
       storeOverpassMemoryCache(cacheMeta, data, endpoint);
       void storeOverpassPersistentCache(cacheMeta, data, endpoint);
+      abortAllControllers();
       return data;
     } catch (err) {
       if (localProxyEndpoint && err?.name !== 'AbortError') {
-        _localOverpassProxyUnavailable = true;
+        const errorText = String(err?.message || err || '');
+        const proxyTransportUnavailable =
+          /Failed to fetch|NetworkError|Load failed|ERR_|TypeError/i.test(errorText) &&
+          !/HTTP 5\d\d/.test(errorText);
+        if (proxyTransportUnavailable) {
+          _localOverpassProxyUnavailable = true;
+        }
       }
       const reason = err?.name === 'AbortError' ?
       `timeout after ${Math.floor(timeoutForEndpointMs)}ms` :
       err?.message || String(err);
-      const wrapped = new Error(`[${endpoint}] ${reason}`);
-      errors.push(wrapped.message);
-      throw wrapped;
+      errors.push(`[${endpoint}] ${reason}`);
     } finally {
       clearTimeout(timeoutId);
     }
-  })());
-
-  try {
-    const data = await firstSuccessful(attempts);
-    abortAllControllers();
-    return data;
-  } catch (error) {
+    }
     if (requestSignal?.aborted) {
       throw createAbortError('request aborted during fetch');
     }
@@ -7886,7 +7931,19 @@ async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity, cacheM
       storeOverpassMemoryCache(cacheMeta, staleCached.data, staleCached.endpoint);
       return staleCached.data;
     }
-    if (error?.name === 'AbortError') throw error;
+    if (allowNearbyCacheAssist) {
+      const nearbyStaleCached = await findNearbyOverpassPersistentCache(cacheMeta, {
+        allowStale: true,
+        extraAllowance: 0.0045
+      });
+      if (nearbyStaleCached?.data?.elements) {
+        nearbyStaleCached.data._overpassEndpoint = nearbyStaleCached.endpoint ? `${nearbyStaleCached.endpoint} (persistent-cache-nearby-stale)` : 'persistent-cache-nearby-stale';
+        nearbyStaleCached.data._overpassSource = 'persistent-cache-nearby-stale';
+        nearbyStaleCached.data._overpassCacheAgeMs = Math.max(0, nearbyStaleCached.ageMs || 0);
+        storeOverpassMemoryCache(cacheMeta, nearbyStaleCached.data, nearbyStaleCached.endpoint);
+        return nearbyStaleCached.data;
+      }
+    }
     throw new Error(`All Overpass endpoints failed: ${errors.join(' | ')}`);
   } finally {
     if (requestSignal && abortListener) {
@@ -12418,27 +12475,6 @@ async function loadContinuousWorldInteractiveChunk(centerLat, centerLon, reason 
       if (sourceBuildingId && renderDetailedBuilding) {
         pruneBaseProxyBuildingShells(sourceBuildingId, 'interactive_building_detail_upgrade');
       }
-      if (isImportantBuilding || Math.hypot(centerX - actorX, centerZ - actorZ) <= colliderRadius) {
-        registerBuildingCollision(pts, height, {
-          detail: isImportantBuilding ? 'full' : 'bbox',
-          centerX,
-          centerZ,
-          sourceBuildingId,
-          name: way.tags?.name || '',
-          buildingType,
-          buildingPartKind: buildingSemantics.partKind || 'full',
-          collisionKind: buildingSemantics.collisionKind || 'solid',
-          allowsPassageBelow: buildingSemantics.allowsPassageBelow === true,
-          levels: Number.isFinite(Number.parseFloat(way.tags?.['building:levels'])) ? Number.parseFloat(way.tags['building:levels']) : null,
-          minLevels: Number.isFinite(Number.parseFloat(way.tags?.['building:min_level'])) ? Number.parseFloat(way.tags['building:min_level']) : null,
-          baseY: avgElevation,
-          buildingSemantics,
-          structureSemantics,
-          continuousWorldRegionKeys: regionKeys,
-          continuousWorldInteractiveChunk: true
-        });
-      }
-
       if (buildingSemantics?.roofLike === true && buildingSemantics?.intentionalVerticalStructure !== true) {
         return;
       }
@@ -12475,6 +12511,26 @@ async function loadContinuousWorldInteractiveChunk(centerLat, centerLon, reason 
           }
         );
       if (mesh) {
+        if (isImportantBuilding || actorDistance <= colliderRadius) {
+          registerBuildingCollision(pts, height, {
+            detail: isImportantBuilding ? 'full' : 'bbox',
+            centerX,
+            centerZ,
+            sourceBuildingId,
+            name: way.tags?.name || '',
+            buildingType,
+            buildingPartKind: buildingSemantics.partKind || 'full',
+            collisionKind: buildingSemantics.collisionKind || 'solid',
+            allowsPassageBelow: buildingSemantics.allowsPassageBelow === true,
+            levels: Number.isFinite(Number.parseFloat(way.tags?.['building:levels'])) ? Number.parseFloat(way.tags['building:levels']) : null,
+            minLevels: Number.isFinite(Number.parseFloat(way.tags?.['building:min_level'])) ? Number.parseFloat(way.tags['building:min_level']) : null,
+            baseY: avgElevation,
+            buildingSemantics,
+            structureSemantics,
+            continuousWorldRegionKeys: regionKeys,
+            continuousWorldInteractiveChunk: true
+          });
+        }
         mesh.userData.sourceBuildingId = sourceBuildingId;
         mesh.userData.buildingType = buildingType;
         mesh.userData.continuousWorldInteractiveChunk = true;
@@ -12708,6 +12764,15 @@ function kickContinuousWorldInteractiveStreaming(reason = 'runtime_tick') {
   if (!continuousWorldInteractiveCanStream(reason)) return getContinuousWorldInteractiveStreamSnapshot();
   if (!_continuousWorldInteractiveStreamState.autoKickEnabled) return getContinuousWorldInteractiveStreamSnapshot();
   const actorState = continuousWorldInteractiveActorMotionState();
+  const reasonText = String(reason || 'runtime_tick');
+  const now = performance.now();
+  if (
+    !_continuousWorldInteractiveStreamState.pending &&
+    continuousWorldInteractiveReasonIsRoutine(reasonText) &&
+    (now - _continuousWorldInteractiveStreamState.lastKickAt) < continuousWorldInteractiveStreamIntervalMs(actorState)
+  ) {
+    return getContinuousWorldInteractiveStreamSnapshot();
+  }
   if (continuousWorldInteractiveStartupLockActive()) {
     if (
       continuousWorldStartupLocalShellEnabled() &&
@@ -12734,12 +12799,11 @@ function kickContinuousWorldInteractiveStreaming(reason = 'runtime_tick') {
       pendingAgeMs < 420 &&
       !roadShellGap &&
       !buildingShellGap &&
-      !continuousWorldInteractiveReasonIsForwardRoadCorridor(reason)
+      !continuousWorldInteractiveReasonIsForwardRoadCorridor(reasonText)
     ) {
       return getContinuousWorldInteractiveStreamSnapshot();
     }
     const pendingReason = String(_continuousWorldInteractiveStreamState.lastLoadReason || '');
-    const reasonText = String(reason || 'runtime_tick');
     const pendingForwardRoadCorridor = continuousWorldInteractiveReasonIsForwardRoadCorridor(pendingReason);
     const pendingQueryLat = Number(_continuousWorldInteractiveStreamState.pendingQueryLat);
     const pendingQueryLon = Number(_continuousWorldInteractiveStreamState.pendingQueryLon);
@@ -12854,7 +12918,23 @@ function kickContinuousWorldInteractiveStreaming(reason = 'runtime_tick') {
     Math.abs(Number(actorState?.speed || 0)) >= 4 &&
     forwardCorridorCoverage.totalKeys > 0 &&
     forwardCorridorCoverage.coveredKeys < forwardCorridorCoverage.minCoveredKeys;
-  const now = performance.now();
+  const terrainSnapshot =
+    typeof appCtx.getTerrainStreamingSnapshot === 'function' ?
+      appCtx.getTerrainStreamingSnapshot() :
+      null;
+  if (
+    !_continuousWorldInteractiveStreamState.pending &&
+    continuousWorldInteractiveShouldYieldToSurfaceSync(
+      actorState,
+      terrainSnapshot,
+      reasonText,
+      roadShellGap,
+      buildingShellGap,
+      forwardCorridorNeedsRoads
+    )
+  ) {
+    return getContinuousWorldInteractiveStreamSnapshot();
+  }
   if (now - _continuousWorldInteractiveStreamState.lastKickAt < continuousWorldInteractiveStreamIntervalMs(actorState)) {
     return getContinuousWorldInteractiveStreamSnapshot();
   }

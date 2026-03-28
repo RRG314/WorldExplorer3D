@@ -1,5 +1,25 @@
 # Changelog
 
+## [2026-03-28]
+
+### Changed
+
+- Established the current local control-model baseline for `steven/continuous-world-root-repair`:
+  - tighter steering authority than the earlier branch state
+  - faster forward motion catch-up during launch
+  - quicker forward-to-reverse engagement
+  - simpler fixed-distance car camera retained as the baseline camera behavior
+- Refreshed branch documentation and deployment guidance around the current verified branch state.
+
+### Runtime status snapshot
+
+- `test:performance-stability` currently passes on both boot and warm reload
+- `test:drive-camera-smoothness` currently passes on the normal on-road probe
+- `test:city-reload-cycle` now passes the settled reload scenario but still degrades under quick reload when Overpass recovery is triggered
+- `test:boat-smoke` currently passes all `5/5` water cases
+- `test:continuous-world-building-continuity` currently fails on far-drive road thinning
+- branch status now reflects that the main remaining blockers are far-drive continuity, Overpass-sensitive quick reload, and dense-area manual hitch reports
+
 ## [2026-03-27]
 
 ### Changed

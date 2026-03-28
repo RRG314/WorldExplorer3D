@@ -2035,9 +2035,9 @@ function maybeBootstrapBoatWater(force = false) {
   const waterCount =
     (Array.isArray(appCtx.waterAreas) ? appCtx.waterAreas.length : 0) +
     (Array.isArray(appCtx.waterways) ? appCtx.waterways.length : 0);
-  if (waterCount > 0) return false;
-  if (typeof appCtx.ensureWaterRuntimeCoverage !== 'function') return false;
-  if (appCtx.boatMode?._waterBootstrapPromise) return true;
+  if (waterCount > 0) return null;
+  if (typeof appCtx.ensureWaterRuntimeCoverage !== 'function') return null;
+  if (appCtx.boatMode?._waterBootstrapPromise) return appCtx.boatMode._waterBootstrapPromise;
 
   const waterSignals = appCtx.worldSurfaceProfile?.signals?.normalized || {};
   const likelyWaterNearby =
@@ -2046,7 +2046,7 @@ function maybeBootstrapBoatWater(force = false) {
     appCtx.oceanMode?.active === true ||
     Number(waterSignals.water || 0) >= 0.02 ||
     Number(waterSignals.explicitBlue || 0) >= 0.015;
-  if (!likelyWaterNearby) return false;
+  if (!likelyWaterNearby) return null;
 
   appCtx.boatMode._waterBootstrapPromise = Promise.resolve(
     appCtx.ensureWaterRuntimeCoverage({
@@ -2066,7 +2066,7 @@ function maybeBootstrapBoatWater(force = false) {
       } catch {}
     }, 0);
   });
-  return true;
+  return appCtx.boatMode._waterBootstrapPromise;
 }
 
 function syncBoatPromptState(force = false) {
@@ -2124,7 +2124,7 @@ function syncBoatPromptState(force = false) {
     updateBoatMenuUi();
     return null;
   }
-  maybeBootstrapBoatWater(force);
+  const waterBootstrapPromise = maybeBootstrapBoatWater(force);
   const waterSignature = `${Array.isArray(appCtx.waterAreas) ? appCtx.waterAreas.length : 0}:${Array.isArray(appCtx.waterways) ? appCtx.waterways.length : 0}`;
   const cachedProbe = appCtx.boatMode?._candidateProbe || null;
   let candidate = null;
@@ -2165,6 +2165,9 @@ function syncBoatPromptState(force = false) {
       showBoatPrompt(appCtx.boatMode.promptMessage, 'supported', BOAT_PROMPT_DURATION_MS);
     }
   } else {
+    if (force && waterBootstrapPromise && typeof waterBootstrapPromise.then === 'function') {
+      return waterBootstrapPromise.then(() => syncBoatPromptState(true)).catch(() => null);
+    }
     _boatPromptSignature = '';
     hideBoatPrompt();
   }

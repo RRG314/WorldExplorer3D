@@ -12,6 +12,9 @@ let _boatTimer = 0;
 let _liveEarthTimer = 0;
 let _liveEarthFrameTimer = 0;
 let _interactiveStreamingKickTimer = 0;
+let _continuousWorldRuntimeTimer = 0;
+let _optionalBootKickTimer = 0;
+let _deferredBootKickTimer = 0;
 let _skyRefreshTimer = 0;
 let _activityCreatorTimer = 0;
 let _activityDiscoveryTimer = 0;
@@ -142,9 +145,21 @@ function getSimulationStepBudget() {
   const moving = !movementCountsAsIdle(activeMovement);
   const fastMoving =
     mode === 'walk' ? speed >= 3 :
-    mode === 'drone' ? speed >= 10 :
-    mode === 'boat' || mode === 'ocean' ? speed >= 8 :
+    motionCritical ? speed >= 8 :
     speed >= 10;
+
+  if (motionCritical) {
+    return {
+      maxSubsteps: MAX_SIMULATION_SUBSTEPS,
+      maxAccumulator: FIXED_SIMULATION_STEP * MAX_SIMULATION_SUBSTEPS,
+      preserveAccumulatorSteps: liveFrameMs >= 55 ? 6 : 4,
+      mode:
+        liveFrameMs >= 55 ?
+          moving ? 'fixed_step_motion_critical_recovery' : 'fixed_step_motion_critical_idle_recovery' :
+          moving ? 'fixed_step_motion_critical' : 'fixed_step_motion_critical_idle'
+    };
+  }
+
   if (!moving) {
     if (liveFrameMs >= 55) {
       return {
@@ -335,12 +350,6 @@ function renderLoop(t = 0) {
         });
       }
     }
-    if (typeof appCtx.kickOptionalRuntimeBoot === 'function') {
-      appCtx.kickOptionalRuntimeBoot('main_loop');
-    }
-    if (typeof appCtx.kickDeferredFeatureBoot === 'function') {
-      appCtx.kickDeferredFeatureBoot('main_loop');
-    }
     stepGameplaySimulation(dt);
     if (typeof appCtx.applyInterpolatedVehicleRenderState === 'function') {
       const startedAt = performance.now();
@@ -364,9 +373,17 @@ function renderLoop(t = 0) {
     const perfTier = String(appCtx.getPerfAutoQualityTier?.() || appCtx.perfAutoQualityTier || 'balanced');
     const performanceTier = perfTier === 'performance';
     if (typeof appCtx.updateContinuousWorldRuntime === 'function') {
-      const startedAt = performance.now();
-      appCtx.updateContinuousWorldRuntime(dt);
-      if (typeof appCtx.recordPerfRuntimeSection === 'function') appCtx.recordPerfRuntimeSection('continuousWorldRuntime', performance.now() - startedAt);
+      _continuousWorldRuntimeTimer += dt;
+      const runtimeInterval =
+        activeStreaming ? 0.08 :
+        moving ? 0.1 :
+        0.2;
+      if (_continuousWorldRuntimeTimer >= runtimeInterval) {
+        _continuousWorldRuntimeTimer = 0;
+        const startedAt = performance.now();
+        appCtx.updateContinuousWorldRuntime(dt);
+        if (typeof appCtx.recordPerfRuntimeSection === 'function') appCtx.recordPerfRuntimeSection('continuousWorldRuntime', performance.now() - startedAt);
+      }
     }
     if (typeof appCtx.kickContinuousWorldInteractiveStreaming === 'function') {
       _interactiveStreamingKickTimer += dt;
@@ -387,6 +404,28 @@ function renderLoop(t = 0) {
         if (typeof appCtx.recordPerfRuntimeSection === 'function') appCtx.recordPerfRuntimeSection('interactiveStreamingKick', performance.now() - startedAt);
       }
     }
+    const safeToBootDeferredFeatures =
+      !appCtx.worldLoading &&
+      !activeStreaming &&
+      movementCountsAsIdle(movementState);
+    if (safeToBootDeferredFeatures && typeof appCtx.kickOptionalRuntimeBoot === 'function') {
+      _optionalBootKickTimer += dt;
+      if (_optionalBootKickTimer >= 0.6) {
+        _optionalBootKickTimer = 0;
+        appCtx.kickOptionalRuntimeBoot('main_loop_idle');
+      }
+    } else {
+      _optionalBootKickTimer = 0;
+    }
+    if (safeToBootDeferredFeatures && typeof appCtx.kickDeferredFeatureBoot === 'function') {
+      _deferredBootKickTimer += dt;
+      if (_deferredBootKickTimer >= 0.8) {
+        _deferredBootKickTimer = 0;
+        appCtx.kickDeferredFeatureBoot('main_loop_idle');
+      }
+    } else {
+      _deferredBootKickTimer = 0;
+    }
     _skyRefreshTimer += dt;
     const skyRefreshInterval =
       moving ? (performanceTier ? 0.5 : 0.35) :
@@ -406,6 +445,9 @@ function renderLoop(t = 0) {
       }
     }
     _boatTimer += dt;
+    const allowBoatRefresh =
+      movementState.mode === 'walk' ||
+      movementCountsAsIdle(movementState);
     const boatRefreshEligible =
       !appCtx.boatMode?.active &&
       !appCtx.droneMode &&
@@ -414,13 +456,16 @@ function renderLoop(t = 0) {
       !appCtx.travelingToMoon &&
       !appCtx.spaceFlight?.active &&
       typeof appCtx.isEnv === 'function' &&
-      appCtx.isEnv(appCtx.ENV.EARTH);
+      appCtx.isEnv(appCtx.ENV.EARTH) &&
+      allowBoatRefresh;
     const boatRefreshInterval = boatRefreshEligible ? 0.45 : Number.POSITIVE_INFINITY;
     if (Number.isFinite(boatRefreshInterval) && _boatTimer > boatRefreshInterval) {
       _boatTimer = 0;
       if (typeof appCtx.refreshBoatAvailability === 'function') {
         appCtx.refreshBoatAvailability(false);
       }
+    } else if (!Number.isFinite(boatRefreshInterval)) {
+      _boatTimer = 0;
     }
     {
       const startedAt = performance.now();
@@ -429,7 +474,10 @@ function renderLoop(t = 0) {
     }
     _activityCreatorTimer += dt;
     const creatorOpen = !!document.body?.classList.contains('activity-creator-open');
-    const creatorInterval = creatorOpen ? 0.08 : 0.3;
+    const creatorInterval =
+      creatorOpen ? 0.08 :
+      moving || activeStreaming ? 1.2 :
+      0.6;
     if (_activityCreatorTimer >= creatorInterval && typeof appCtx.updateActivityCreator === 'function') {
       _activityCreatorTimer = 0;
       const startedAt = performance.now();
@@ -444,8 +492,8 @@ function renderLoop(t = 0) {
     const discoveryActive = !!(discoverySnapshot?.active);
     const discoveryInterval =
       discoveryActive ? 0.1 :
-      moving ? 0.28 :
-      0.45;
+      moving || activeStreaming ? 0.9 :
+      0.6;
     if (_activityDiscoveryTimer >= discoveryInterval && typeof appCtx.updateActivityDiscovery === 'function') {
       _activityDiscoveryTimer = 0;
       const startedAt = performance.now();
@@ -454,7 +502,9 @@ function renderLoop(t = 0) {
     }
     _liveEarthFrameTimer += dt;
     const liveEarthFrameInterval =
-      appCtx.liveEarth?.getPanelMode?.() === 'live-earth' ? 0 : 0.2;
+      appCtx.liveEarth?.getPanelMode?.() === 'live-earth' ? 0 :
+      moving || activeStreaming ? 1.2 :
+      0.6;
     if (_liveEarthFrameTimer > liveEarthFrameInterval) {
       _liveEarthFrameTimer = 0;
       if (appCtx.liveEarth && typeof appCtx.liveEarth.updateFrame === 'function') {
@@ -729,8 +779,10 @@ function renderLoop(t = 0) {
   _perfPanelTimer += dt;
   if (_perfPanelTimer > 0.2) {
     _perfPanelTimer = 0;
-    if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(false);
-    positionTopOverlays();
+    const perfPanelVisible = !!_isVisibleRect(document.getElementById('perfPanel'));
+    const debugOverlayVisible = !!_isVisibleRect(document.getElementById('debugOverlay'));
+    if (perfPanelVisible && typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(false);
+    if (perfPanelVisible || debugOverlayVisible) positionTopOverlays();
   }
 }
 

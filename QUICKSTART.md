@@ -104,6 +104,8 @@ If you are not changing backend or deployment behavior, you usually do not need 
 - Ensure `public/*` has the release-ready build state.
 - Ensure runtime links/assets resolve under Pages hosting path.
 - Push branch and verify workflows in Actions tab.
+- For `steven/continuous-world-root-repair`, use manual `workflow_dispatch` if you want to publish that branch on Pages without merging to `main`.
+- Remember that a manual Pages deploy from a branch replaces the current site until a later deploy runs.
 
 ## 8. Backend Deploy (If Needed)
 

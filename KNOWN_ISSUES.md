@@ -1,56 +1,59 @@
 # Known Issues
 
-Last reviewed: 2026-03-27
+Last reviewed: 2026-03-28
 
 Current risks and follow-up items for this branch.
 
 ## High Priority
 
-### 1. Driving Still Degrades Under Long Dense-City Runs
+### 1. Long-Distance Road Continuity Still Breaks
 
 Current failing check:
 
-- `npm run test:drive-camera-smoothness`
+- `npm run test:continuous-world-building-continuity`
 
 Current issue:
 
-- camera chase distance still drifts too far during a normal drive run
-- the branch still feels laggier in dense areas than in sparse areas
-- the remaining problem is in runtime loading and surface/stream interaction, not just the camera rig
+- the current far-drive continuity run still fails with `drive far-region roads too thin: 0`
+- the branch can keep a normal local drive stable, but still loses road density farther from the initial loaded area
+- this is now the clearest automated release blocker on Earth traversal
 
-### 2. Location Switching Is Not Reliable Enough
+### 2. Quick Location Reload Is Still Fragile Under Overpass Recovery
 
-Current failing check:
+Current affected check:
 
 - `npm run test:city-reload-cycle`
 
 Current issue:
 
-- title/menu city reload can still stall before the first playable world finishes
-- the current failing run timed out with `roads 0`, `buildings 0`, and `gameStarted false`
+- the settled Baltimore -> menu -> New York flow is now clean
+- the quick reload scenario can still drop into `partial_world_ready` after Overpass `502` or timeout recovery
+- this means location switching is much better than before, but still not robust enough to trust under upstream instability
 
 ### 3. Public Overpass Still Creates Branch-Level Instability
 
 Current affected checks:
 
-- `npm run test:performance-stability`
+- `npm run test:city-reload-cycle`
 - `npm run test:continuous-world-building-continuity`
 
 Current issue:
 
-- Overpass `429`, `502`, and `504` responses still affect cold boot and far-drive continuity
-- some branch behavior is now better isolated from these failures, but not enough to call the runtime self-contained
+- Overpass `429`, `502`, and timeout failures still affect quick reload and far-drive continuity
+- normal startup/performance is much more isolated than before, but the branch is still not self-contained enough to ignore upstream failures
 
-### 4. Boat Entry Coverage Is Incomplete
+### 4. Manual Dense-Area Traversal Still Feels Hitchy
 
-Current failing check:
+Current automated status:
 
-- `npm run test:boat-smoke`
+- `npm run test:drive-camera-smoothness` currently passes
+- `npm run test:boat-smoke` currently passes all `5/5` cases
 
 Current issue:
 
-- `Baltimore Inner Harbor` and `Chicago Lakefront` failed valid-water auto-entry in the latest run
-- `Chicago Harbor`, `Monaco Coast`, and `Miami Offshore` passed
+- player reports still describe a visible half-second hitch or slowdown pulse in dense areas across drive and other traversal modes
+- the current normal-drive probe is now trustworthy for camera/chase stability, but it still does not fully represent the long dense-city hitch being reported during manual play
+- the remaining problem appears to be in movement-time streaming / surface recovery, not in the simplified camera rig
 
 ## Medium Priority
 
@@ -63,22 +66,33 @@ Mitigation:
 - always run `npm run sync:public`
 - always run `npm run verify:mirror`
 
-### 6. Cold Boot Is Much Worse Than Warm Reload
+### 6. Long-Distance Traversal Still Needs Better Test Coverage
+
+The current automated split is:
+
+- `test:drive-camera-smoothness` now covers normal on-road driving and currently passes
+- `test:continuous-world-building-continuity` covers far-drive continuity and currently fails
+
+The gap is:
+
+- there is still no single branch-level test that perfectly represents the dense-city “every half second it hitches” complaint from manual gameplay
+
+### 7. Cold Boot Is Still Slower Than Warm Reload
 
 Latest performance snapshot:
 
-- warm reload: `firstControllableMs 8144`, `worldLoadMs 7211`
-- cold boot: `firstControllableMs 40007`, `worldLoadMs 35503`
+- boot: `firstControllableMs 5097`, `worldLoadMs 7893`
+- warm reload: `firstControllableMs 7093`, `worldLoadMs 6103`
 
-This gap is currently too large for release confidence.
+This is much better than the earlier branch snapshot, but cold boot is still not as strong as warm reload.
 
 ## Low Priority
 
-### 7. Cloud Functions Runtime Upgrade
+### 8. Cloud Functions Runtime Upgrade
 
 Functions are still configured for Node 20 in repo settings.
 
-### 8. Additional Mobile UX Polish
+### 9. Additional Mobile UX Polish
 
 - tighter layout tuning in account/social cards for smaller screens
 - optional hint text for advanced room rules

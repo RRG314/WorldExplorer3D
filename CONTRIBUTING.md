@@ -77,6 +77,7 @@ git clone https://github.com/RRG314/WorldExplorer3D.git
 cd WorldExplorer3D
 npm install
 cd functions && npm install && cd ..
+npm run sync:public
 python3 -m http.server --directory public 4173
 ```
 

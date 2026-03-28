@@ -58,7 +58,14 @@ const state = {
     reason: null,
     threshold: DEFAULT_REBASE_DISTANCE
   },
-  lastUpdateAt: 0
+  lastUpdateAt: 0,
+  lastTopologyUpdateAt: 0,
+  lastTopologyActor: {
+    x: 0,
+    z: 0,
+    mode: "drive",
+    regionKey: null
+  }
 };
 
 function finite(value, fallback = 0) {
@@ -143,6 +150,13 @@ function subtractCells(primary, exclusion) {
   return (Array.isArray(primary) ? primary : []).filter((cell) => !excluded.has(cell.key));
 }
 
+function topologyRefreshPolicy(mode = "drive") {
+  if (mode === "walk") return { distance: 10, intervalMs: 260 };
+  if (mode === "drone") return { distance: 22, intervalMs: 180 };
+  if (mode === "boat" || mode === "ocean") return { distance: 28, intervalMs: 200 };
+  return { distance: 16, intervalMs: 140 };
+}
+
 function resetContinuousWorldSession(location = null, reason = "location_load") {
   const lat = finite(location?.lat, finite(appCtx.LOC?.lat));
   const lon = finite(location?.lon, finite(appCtx.LOC?.lon));
@@ -183,6 +197,11 @@ function resetContinuousWorldSession(location = null, reason = "location_load") 
   state.rebase.recommended = false;
   state.rebase.reason = reason;
   state.lastUpdateAt = performance.now();
+  state.lastTopologyUpdateAt = state.lastUpdateAt;
+  state.lastTopologyActor.x = 0;
+  state.lastTopologyActor.z = 0;
+  state.lastTopologyActor.mode = "drive";
+  state.lastTopologyActor.regionKey = state.activeRegion?.key || null;
   return getContinuousWorldRuntimeSnapshot();
 }
 
@@ -231,12 +250,31 @@ function updateContinuousWorldRuntime() {
     z: actor.z - state.origin.z,
     distanceFromOrigin: dist
   };
+  state.rebase.recommended = dist >= state.rebase.threshold;
+  state.rebase.reason = state.rebase.recommended ? "distance_from_origin" : null;
+  const now = performance.now();
   const cell = regionCellFromLatLon(lat, lon, state.regionConfig.degrees);
+  const regionKey = `${cell.latIndex}:${cell.lonIndex}`;
+  const topologyPolicy = topologyRefreshPolicy(actor.mode);
+  const topologyMove = Math.hypot(
+    actor.x - finite(state.lastTopologyActor.x),
+    actor.z - finite(state.lastTopologyActor.z)
+  );
+  const shouldRefreshTopology =
+    !state.activeRegion ||
+    state.activeRegion.key !== regionKey ||
+    state.lastTopologyActor.mode !== actor.mode ||
+    topologyMove >= topologyPolicy.distance ||
+    (now - finite(state.lastTopologyUpdateAt, 0)) >= topologyPolicy.intervalMs;
+  if (!shouldRefreshTopology) {
+    state.lastUpdateAt = now;
+    return getContinuousWorldRuntimeSnapshot();
+  }
   const near = buildRegionRing(cell, state.regionConfig.nearRadius);
   const mid = subtractCells(buildRegionRing(cell, state.regionConfig.midRadius), near);
   const far = subtractCells(buildRegionRing(cell, state.regionConfig.farRadius), [...near, ...mid]);
   state.activeRegion = {
-    key: `${cell.latIndex}:${cell.lonIndex}`,
+    key: regionKey,
     lat,
     lon
   };
@@ -251,9 +289,12 @@ function updateContinuousWorldRuntime() {
     runtimeSnapshot: getContinuousWorldRuntimeSnapshot(),
     reason: "runtime_update"
   });
-  state.rebase.recommended = dist >= state.rebase.threshold;
-  state.rebase.reason = state.rebase.recommended ? "distance_from_origin" : null;
-  state.lastUpdateAt = performance.now();
+  state.lastTopologyUpdateAt = now;
+  state.lastTopologyActor.x = actor.x;
+  state.lastTopologyActor.z = actor.z;
+  state.lastTopologyActor.mode = actor.mode;
+  state.lastTopologyActor.regionKey = regionKey;
+  state.lastUpdateAt = now;
   return getContinuousWorldRuntimeSnapshot();
 }
 

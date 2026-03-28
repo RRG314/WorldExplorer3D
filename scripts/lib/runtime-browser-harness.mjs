@@ -43,6 +43,8 @@ async function serveStaticRoot(port) {
     ['.ico', 'image/x-icon'],
     ['.map', 'application/json; charset=utf-8']
   ]);
+  let lastSuccessfulOverpassEndpoint = null;
+  const overpassEndpointCooldownUntil = new Map();
 
   const readRequestBody = (req) => new Promise((resolve, reject) => {
     const chunks = [];
@@ -70,22 +72,43 @@ async function serveStaticRoot(port) {
     return Math.max(9000, Math.min(26000, requestedMs + bodyScaleMs));
   };
 
-  const firstSuccessful = (promises) => new Promise((resolve, reject) => {
-    const errors = new Array(promises.length);
-    let pending = promises.length;
-    promises.forEach((promise, idx) => {
-      Promise.resolve(promise).then(resolve).catch((err) => {
-        errors[idx] = err;
-        pending -= 1;
-        if (pending === 0) reject(errors);
-      });
-    });
-  });
+  const normalizeOverpassCacheBody = (bodyBuffer) => {
+    const rawBody = Buffer.isBuffer(bodyBuffer) ? bodyBuffer.toString('utf8') : String(bodyBuffer || '');
+    let queryText = rawBody;
+    try {
+      const params = new URLSearchParams(rawBody);
+      queryText = String(params.get('data') || rawBody);
+    } catch {}
+    const normalizedQuery = queryText
+      .replace(/\[timeout:\d+\]/gi, '[timeout:N]')
+      .replace(/\s+/g, ' ')
+      .trim();
+    return Buffer.from(`data=${encodeURIComponent(normalizedQuery)}`, 'utf8');
+  };
+
+  const orderedOverpassEndpoints = () => {
+    const base = !lastSuccessfulOverpassEndpoint || !overpassEndpoints.includes(lastSuccessfulOverpassEndpoint) ?
+      overpassEndpoints.slice() :
+      [lastSuccessfulOverpassEndpoint, ...overpassEndpoints.filter((entry) => entry !== lastSuccessfulOverpassEndpoint)];
+    const now = Date.now();
+    return base.filter((endpoint) => Number(overpassEndpointCooldownUntil.get(endpoint) || 0) <= now);
+  };
+
+  const markOverpassEndpointCooldown = (endpoint, errorText = '') => {
+    const text = String(errorText || '');
+    const cooldownMs =
+      /429/.test(text) ? 30000 :
+      /timeout/i.test(text) ? 12000 :
+      /502|503|504/.test(text) ? 10000 :
+      7000;
+    overpassEndpointCooldownUntil.set(endpoint, Date.now() + cooldownMs);
+  };
 
   const proxyOverpass = async (req, res) => {
     const body = await readRequestBody(req);
     const upstreamTimeoutMs = deriveOverpassProxyTimeoutMs(body);
-    const bodyHash = crypto.createHash('sha1').update(body).digest('hex');
+    const cacheKeyBody = normalizeOverpassCacheBody(body);
+    const bodyHash = crypto.createHash('sha1').update(cacheKeyBody).digest('hex');
     const cacheFile = path.join(overpassCacheDir, `${bodyHash}.json`);
     await fs.mkdir(overpassCacheDir, { recursive: true });
     try {
@@ -99,38 +122,40 @@ async function serveStaticRoot(port) {
       return;
     } catch {}
     const failures = [];
-    const attempts = overpassEndpoints.map((endpoint) => (async () => {
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': req.headers['content-type'] || 'application/x-www-form-urlencoded; charset=UTF-8',
-          'Accept': 'application/json',
-          'User-Agent': 'WorldExplorer3D-TestHarness/1.0'
-        },
-        body,
-        signal: AbortSignal.timeout(upstreamTimeoutMs)
-      });
-      if (!response.ok) {
-        throw new Error(`${endpoint} HTTP ${response.status}`);
+    const endpoints = orderedOverpassEndpoints();
+    for (let i = 0; i < endpoints.length; i++) {
+      const endpoint = endpoints[i];
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': req.headers['content-type'] || 'application/x-www-form-urlencoded; charset=UTF-8',
+            'Accept': 'application/json',
+            'User-Agent': 'WorldExplorer3D-TestHarness/1.0'
+          },
+          body,
+          signal: AbortSignal.timeout(upstreamTimeoutMs)
+        });
+        if (!response.ok) {
+          throw new Error(`${endpoint} HTTP ${response.status}`);
+        }
+        const text = await response.text();
+        lastSuccessfulOverpassEndpoint = endpoint;
+        overpassEndpointCooldownUntil.delete(endpoint);
+        await fs.writeFile(cacheFile, text).catch(() => {});
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store',
+          'X-Overpass-Proxy-Cache': 'miss'
+        });
+        res.end(text);
+        return;
+      } catch (error) {
+        const message = `${endpoint} ${String(error?.message || error)}`;
+        failures.push(message);
+        markOverpassEndpointCooldown(endpoint, message);
       }
-      const text = await response.text();
-      return { endpoint, text };
-    })().catch((error) => {
-      const message = `${endpoint} ${String(error?.message || error)}`;
-      failures.push(message);
-      throw new Error(message);
-    }));
-    try {
-      const result = await firstSuccessful(attempts);
-      await fs.writeFile(cacheFile, result.text).catch(() => {});
-      res.writeHead(200, {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Cache-Control': 'no-store',
-        'X-Overpass-Proxy-Cache': 'miss'
-      });
-      res.end(result.text);
-      return;
-    } catch {}
+    }
     res.writeHead(502, { 'Content-Type': 'application/json; charset=utf-8' });
     res.end(JSON.stringify({ error: 'All Overpass upstreams failed', failures }));
   };
@@ -168,7 +193,10 @@ async function serveStaticRoot(port) {
       const ext = path.extname(filePath).toLowerCase();
       const contentType = mime.get(ext) || 'application/octet-stream';
       const buf = await fs.readFile(filePath);
-      res.writeHead(200, { 'Content-Type': contentType });
+      res.writeHead(200, {
+        'Content-Type': contentType,
+        'Cache-Control': 'no-store'
+      });
       res.end(buf);
     } catch (err) {
       res.writeHead(500).end(String(err?.message || err));
