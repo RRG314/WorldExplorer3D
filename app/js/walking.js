@@ -39,6 +39,7 @@ function createWalkingModule(opts) {
     thirdPersonHeight: 2.2,
     thirdPersonLookAhead: 6.0,
     collisionPushBack: 2.0,
+    strafeFactor: 0.85,
     wallJumpVelocity: 6.5, // Upward velocity when wall jumping
     wallJumpOutward: 2.0, // Outward push when wall jumping
     wallDetectRadius: 1.5, // Distance to detect walls for wall jumping
@@ -848,13 +849,14 @@ function createWalkingModule(opts) {
   function updateWalkPhysics(dt) {
     syncWalkTerrain(false);
 
-    // Walking is forward/back plus turn. Left/right strafe is intentionally removed
-    // so keyboard movement feels closer to a traversal game than a level editor.
+    // Match drone mode: WASD moves, arrow keys steer/look.
     const moveForward = keys.KeyW ? 1 : 0;
     const moveBack = keys.KeyS ? 1 : 0;
+    const strafeLeft = keys.KeyA ? 1 : 0;
+    const strafeRight = keys.KeyD ? 1 : 0;
 
-    const lookLeft = keys.KeyA || keys.ArrowLeft ? 1 : 0;
-    const lookRight = keys.KeyD || keys.ArrowRight ? 1 : 0;
+    const lookLeft = keys.ArrowLeft ? 1 : 0;
+    const lookRight = keys.ArrowRight ? 1 : 0;
     const lookUp = keys.ArrowUp ? 1 : 0;
     const lookDown = keys.ArrowDown ? 1 : 0;
 
@@ -864,7 +866,7 @@ function createWalkingModule(opts) {
     // Look rotation speed
     const lookSpeed = 2.5 * dt; // Increased speed
 
-    // Update look angle from WASD (keyboard look)
+    // Update look angle from arrow keys.
     if (lookLeft) state.walker.yaw += lookSpeed;
     if (lookRight) state.walker.yaw -= lookSpeed;
     if (lookUp) {
@@ -884,6 +886,7 @@ function createWalkingModule(opts) {
 
     // Calculate movement direction based on current look angle.
     const forward = moveForward - moveBack;
+    const strafe = strafeLeft - strafeRight;
 
     // MOON ASTRONAUT PHYSICS - Gravity and Jumping
     const MOON_GRAVITY = appCtx.onMoon ? -1.62 : -9.8; // Real moon gravity: 1.62 m/s²
@@ -945,14 +948,15 @@ function createWalkingModule(opts) {
     const speedMultiplier = appCtx.onMoon ? 0.6 : 1.0; // 60% speed on moon
     const adjustedSpeed = speed * speedMultiplier;
 
-    if (forward !== 0) {
-      // Forward/back movement
+    if (forward !== 0 || strafe !== 0) {
       const moveX = Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
       const moveZ = Math.cos(state.walker.angle) * forward * adjustedSpeed * dt;
+      const strafeX = Math.cos(state.walker.angle) * strafe * adjustedSpeed * dt * CFG.strafeFactor;
+      const strafeZ = -Math.sin(state.walker.angle) * strafe * adjustedSpeed * dt * CFG.strafeFactor;
 
       // Calculate new position
-      let newX = state.walker.x + moveX;
-      let newZ = state.walker.z + moveZ;
+      let newX = state.walker.x + moveX + strafeX;
+      let newZ = state.walker.z + moveZ + strafeZ;
 
       // Collision against buildings and user-placed build blocks.
       const checkBuildings = !appCtx.onMoon && (getBuildingsArray || getNearbyBuildings);

@@ -195,7 +195,15 @@ function classifyWorldSurfaceProfile({
   const latitudeDry = absLat >= ARID_LAT_MIN && absLat <= ARID_LAT_MAX;
   const sparseVegetation = norm.vegetated <= 0.28;
   const sparseSurfaceWater = norm.water <= 0.22;
-  const explicitDesert = norm.explicitSand >= 0.07 || norm.barren >= 0.1 && norm.explicitSand >= 0.03;
+  const dryLatitudeExplicitSand =
+    latitudeDry &&
+    sparseSurfaceWater &&
+    norm.vegetated <= 0.45 &&
+    Number(signals.raw?.explicitSand || 0) >= 0.9;
+  const explicitDesert =
+    norm.explicitSand >= 0.07 ||
+    dryLatitudeExplicitSand ||
+    norm.barren >= 0.1 && norm.explicitSand >= 0.03;
   const inferredDesert = latitudeDry && sparseVegetation && sparseSurfaceWater && norm.arid >= 0.24;
   const lowDetailAridFallback = latitudeDry && signals.total < 6 && sparseVegetation && sparseSurfaceWater;
   const aridTerrain = !polar && (explicitDesert || inferredDesert || lowDetailAridFallback);

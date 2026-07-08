@@ -5,12 +5,15 @@ import crypto from 'node:crypto';
 const rootDir = process.cwd();
 const pairs = [
   { a: 'CNAME', b: 'public/CNAME' },
+  { a: 'about.html', b: 'public/about.html' },
+  { a: 'favicon.svg', b: 'public/favicon.svg' },
   { a: 'index.html', b: 'public/index.html' },
-  { a: 'account/index.html', b: 'public/account/index.html' },
-  { a: 'app/index.html', b: 'public/app/index.html' },
-  { a: 'app/assets', b: 'public/app/assets', dir: true },
-  { a: 'app/data', b: 'public/app/data', dir: true },
-  { a: 'app/js', b: 'public/app/js', dir: true }
+  { a: 'about', b: 'public/about', dir: true },
+  { a: 'account', b: 'public/account', dir: true },
+  { a: 'app', b: 'public/app', dir: true },
+  { a: 'assets', b: 'public/assets', dir: true },
+  { a: 'js', b: 'public/js', dir: true },
+  { a: 'legal', b: 'public/legal', dir: true }
 ];
 
 function sha1(buf) {

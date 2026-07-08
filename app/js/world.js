@@ -4657,7 +4657,7 @@ async function loadRoadsInternal(retryPass = 0) {
       }
 
       function addLinearFeatureRibbon(pts, tags, options = {}) {
-        if (!ENABLE_LINEAR_FEATURES && options.force !== true) return false;
+        if (!ENABLE_LINEAR_FEATURES) return false;
         if (!pts || pts.length < 2) return false;
         const classification = classifyLinearFeatureTags(tags, options);
         if (!classification) return false;
@@ -4757,7 +4757,7 @@ async function loadRoadsInternal(retryPass = 0) {
         mesh.userData.linearFeatureRef = feature;
         mesh.userData.structureSemantics = structureSemantics;
         mesh.userData.structureConnector = options.force === true;
-        mesh.visible = options.alwaysVisible === true ? true : appCtx.showPathOverlays !== false;
+        mesh.visible = options.alwaysVisible === true ? true : (ENABLE_LINEAR_FEATURES && appCtx.showPathOverlays !== false);
         appCtx.scene.add(mesh);
         appCtx.linearFeatureMeshes.push(mesh);
         appCtx.linearFeatures.push(feature);
