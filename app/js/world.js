@@ -74,6 +74,11 @@ import {
   safeWorldLoadCall
 } from "./world/load-support.js?v=1";
 import {
+  earthSceneSuppressed,
+  hideEarthSceneMeshes,
+  resetWorldForReload
+} from "./world/load-reset.js?v=1";
+import {
   buildingContainingPoint,
   findNearestRoad,
   initWorldNavigation,
@@ -2171,192 +2176,12 @@ async function loadRoadsInternal(retryPass = 0) {
     _phaseTotals[name] = (_phaseTotals[name] || 0) + dt;
     delete _phaseStartedAt[name];
   };
-  const earthSceneSuppressed = () => {
-    if (appCtx.onMoon || appCtx.travelingToMoon) return true;
-    if (typeof appCtx.isEnv === 'function' && appCtx.ENV) {
-      return !appCtx.isEnv(appCtx.ENV.EARTH);
-    }
-    return false;
-  };
-  const hideEarthSceneMeshes = () => {
-    const hideList = (arr) => {
-      if (!Array.isArray(arr)) return;
-      arr.forEach((mesh) => {
-        if (!mesh) return;
-        mesh.visible = false;
-        if (mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
-      });
-    };
-    hideList(appCtx.roadMeshes);
-    hideList(appCtx.urbanSurfaceMeshes);
-    hideList(appCtx.structureVisualMeshes);
-    hideList(appCtx.buildingMeshes);
-    hideList(appCtx.landuseMeshes);
-    hideList(appCtx.poiMeshes);
-    hideList(appCtx.streetFurnitureMeshes);
-    hideList(appCtx.vegetationMeshes);
-  };
-
-  appCtx.showLoad('Loading ' + locName + '...');
-  appCtx.worldLoading = true;
-  appCtx.urbanSurfaceStats = {
-    sidewalkBatchCount: 0,
-    sidewalkVertices: 0,
-    sidewalkTriangles: 0,
-    skippedBuildingAprons: 0
-  };
-  if (typeof appCtx.clearMemoryMarkersForWorldReload === 'function') {
-    appCtx.clearMemoryMarkersForWorldReload();
-  }
-  if (typeof appCtx.clearBlockBuilderForWorldReload === 'function') {
-    appCtx.clearBlockBuilderForWorldReload();
-  }
-  if (typeof appCtx.clearActiveInterior === 'function') {
-    appCtx.clearActiveInterior({ restorePlayer: false, preserveCache: true });
-  }
-  // Properly dispose of all meshes to prevent memory leaks
-  appCtx.roadMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose());
-      } else {
-        m.material.dispose();
-      }
-    }
+  resetWorldForReload({
+    clearBuildingSpatialIndex,
+    invalidateTraversalNetworks,
+    locName,
+    resetWorldFurnitureCaches
   });
-  appCtx.roadMeshes = [];appCtx.roads = [];
-  if (typeof appCtx.clearStructureVisualMeshes === 'function') {
-    appCtx.clearStructureVisualMeshes();
-  } else {
-    appCtx.structureVisualMeshes = [];
-  }
-  appCtx.urbanSurfaceMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material && !m.userData?.sharedUrbanSurfaceMaterial) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat && typeof mat.dispose === 'function' && mat.dispose());
-      } else if (typeof m.material.dispose === 'function') {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.urbanSurfaceMeshes = [];
-  invalidateTraversalNetworks('world_reload_reset');
-  appCtx.navigationRoutePoints = [];
-  appCtx.navigationRouteDistance = 0;
-
-  appCtx.buildingMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose());
-      } else {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.buildingMeshes = [];appCtx.buildings = [];
-  appCtx.dynamicBuildingColliders = [];
-  clearBuildingSpatialIndex();
-
-  appCtx.landuseMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose());
-      } else {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.landuseMeshes = [];appCtx.landuses = [];appCtx.surfaceFeatureHints = [];appCtx.waterAreas = [];appCtx.waterways = [];appCtx.waterWaveVisuals = [];
-  if (typeof appCtx.setWorldSurfaceProfile === 'function') {
-    appCtx.setWorldSurfaceProfile(null);
-  } else {
-    appCtx.worldSurfaceProfile = null;
-  }
-  appCtx.linearFeatureMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose());
-      } else {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.linearFeatureMeshes = [];appCtx.linearFeatures = [];
-
-  appCtx.poiMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose());
-      } else {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.poiMeshes = [];appCtx.pois = [];
-
-  appCtx.historicMarkers.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose());
-      } else {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.historicMarkers = [];appCtx.historicSites = [];
-
-  appCtx.streetFurnitureMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose());
-      } else {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.streetFurnitureMeshes = [];
-  appCtx.vegetationMeshes.forEach((m) => {
-    appCtx.scene.remove(m);
-    if (m.geometry) m.geometry.dispose();
-    if (m.material) {
-      if (Array.isArray(m.material)) {
-        m.material.forEach((mat) => mat.dispose && mat.dispose());
-      } else if (m.material.dispose) {
-        m.material.dispose();
-      }
-    }
-  });
-  appCtx.vegetationMeshes = [];
-  appCtx.vegetationFeatures = [];
-  appCtx.osmTreeNodes = [];
-  appCtx.osmTreeRows = [];
-  appCtx._worldLoadNodes = null;
-  resetWorldFurnitureCaches();
-  if (typeof appCtx.clearWindowTextureCache === 'function') {
-    appCtx.clearWindowTextureCache(); // Clear RDT-keyed window texture cache for new location
-  } else {
-    appCtx.windowTextures = {};
-  }
-  if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache(); // Clear cached road result
-
-  // Flag that roads will need rebuilding after terrain loads
-  appCtx.roadsNeedRebuild = true;
 
   if (appCtx.selLoc === 'custom') {
     const lat = parseFloat(document.getElementById('customLat').value);

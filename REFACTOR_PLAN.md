@@ -20,7 +20,7 @@ This plan is intentionally conservative. It is a professional cleanup path, not 
 
 Current high-risk files in the live baseline:
 
-- `app/js/world.js`: 4447 lines in the clean refactor workspace (`7549` at original baseline)
+- `app/js/world.js`: 4272 lines in the clean refactor workspace (`7549` at original baseline)
 - `app/js/terrain.js`: 3584 lines
 - `app/index.html`: 3442 lines
 - `app/js/game.js`: 3008 lines
@@ -106,7 +106,7 @@ Rules for keeping this bounded:
 
 Current `app/*` source files still above the target ceiling:
 
-1. `app/js/world.js` - 4447
+1. `app/js/world.js` - 4272
 2. `app/js/terrain.js` - 3584
 3. `app/index.html` - 3442
 4. `app/js/game.js` - 3008
@@ -161,6 +161,7 @@ Suggested destination modules:
 - `app/js/world/lod.js`
 - `app/js/world/budgets.js`
 - `app/js/world/load-support.js`
+- `app/js/world/load-reset.js`
 
 Definition of done:
 
@@ -174,10 +175,10 @@ Definition of done:
 
 Current status on 2026-07-08:
 
-- done: `spawn.js`, `osm-loader.js`, `linear-features.js`, `vegetation.js`, `traversal.js`, `navigation.js`, `furniture.js`, `lod.js`, `budgets.js`, `load-support.js`
+- done: `spawn.js`, `osm-loader.js`, `linear-features.js`, `vegetation.js`, `traversal.js`, `navigation.js`, `furniture.js`, `lod.js`, `budgets.js`, `load-support.js`, `load-reset.js`
 - review result: Phase 1 stays open because `world.js` is still far above the real target
-- current line-count reduction in the clean live-fix workspace: `7549 -> 4447`
-- remaining to close phase: reduce `app/js/world.js` from 4447 lines to 1500 or less through additional targeted extractions
+- current line-count reduction in the clean live-fix workspace: `7549 -> 4272`
+- remaining to close phase: reduce `app/js/world.js` from 4272 lines to 1500 or less through additional targeted extractions
 
 ### Phase 2: Split `ui.js` into UI domains
 
