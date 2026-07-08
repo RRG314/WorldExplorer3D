@@ -66,6 +66,14 @@ import {
   updateWorldLod
 } from "./world/lod.js?v=1";
 import {
+  buildPoiGeometryPass,
+  buildStreetFurniturePass,
+  createSyntheticFallbackWorld,
+  finalizeLoadedWorld,
+  recordWorldLoadWarning,
+  safeWorldLoadCall
+} from "./world/load-support.js?v=1";
+import {
   buildingContainingPoint,
   findNearestRoad,
   initWorldNavigation,
@@ -92,7 +100,6 @@ import {
   MAX_TREE_ROW_WAYS
 } from "./world/vegetation.js?v=1";
 import {
-  generateStreetFurniture,
   resetWorldFurnitureCaches
 } from "./world/furniture.js?v=1";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
@@ -2506,268 +2513,8 @@ async function loadRoadsInternal(retryPass = 0) {
     return building;
   }
 
-  function recordLoadWarning(label, err) {
-    const message = `${label}: ${err?.message || err}`;
-    if (!Array.isArray(loadMetrics.warnings)) loadMetrics.warnings = [];
-    if (loadMetrics.warnings.length < 10) loadMetrics.warnings.push(message);
-    console.warn(`[WorldLoad] ${label} failed:`, err);
-  }
-
-  function safeLoadCall(label, fn) {
-    try {
-      return fn();
-    } catch (err) {
-      recordLoadWarning(label, err);
-      return null;
-    }
-  }
-
-  function finalizeLoadedWorld(reason = 'primary') {
-    if (earthSceneSuppressed()) {
-      loaded = true;
-      loadMetrics.recoveryReason = 'env_changed_during_load';
-      loadMetrics.partialRecovery = true;
-      hideEarthSceneMeshes();
-      appCtx.hideLoad();
-      return;
-    }
-
-    loaded = true;
-    if (reason && reason !== 'primary') {
-      loadMetrics.recoveryReason = reason;
-      loadMetrics.partialRecovery = true;
-    }
-
-    safeLoadCall('buildTraversalNetworks', () => buildTraversalNetworks());
-    safeLoadCall('spawnOnRoad', () => spawnOnRoad());
-    if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.updateTerrainAround === 'function') {
-      safeLoadCall('updateTerrainAround', () => appCtx.updateTerrainAround(appCtx.car.x, appCtx.car.z));
-    }
-    if (typeof appCtx.refreshMemoryMarkersForCurrentLocation === 'function') {
-      safeLoadCall('refreshMemoryMarkersForCurrentLocation', () => appCtx.refreshMemoryMarkersForCurrentLocation());
-    }
-    if (typeof appCtx.refreshBlockBuilderForCurrentLocation === 'function') {
-      safeLoadCall('refreshBlockBuilderForCurrentLocation', () => appCtx.refreshBlockBuilderForCurrentLocation());
-    }
-    if (typeof updateWorldLod === 'function') {
-      safeLoadCall('updateWorldLod', () => updateWorldLod(true));
-    }
-    appCtx.hideLoad();
-    if (typeof appCtx.refreshAstronomicalSky === 'function') {
-      safeLoadCall('refreshAstronomicalSky', () => appCtx.refreshAstronomicalSky(true));
-    } else if (typeof appCtx.alignStarFieldToLocation === 'function') {
-      safeLoadCall('alignStarFieldToLocation', () => appCtx.alignStarFieldToLocation(appCtx.LOC.lat, appCtx.LOC.lon));
-    }
-    if (typeof appCtx.refreshLiveWeather === 'function') {
-      safeLoadCall('refreshLiveWeather', () => appCtx.refreshLiveWeather(true));
-    }
-    if (appCtx.gameStarted) {
-      safeLoadCall('startMode', () => appCtx.startMode());
-    }
-  }
-
-  function createSyntheticFallbackWorld() {
-    if (appCtx.roads.length > 0) return;
-    appCtx.showLoad('Creating default environment...');
-    const isPolarFallback = Math.abs(Number(appCtx.LOC?.lat) || 0) >= 66;
-    const enableFallbackBuildings = false;
-
-    const disposeMeshList = (arr) => {
-      if (!Array.isArray(arr)) return;
-      arr.forEach((mesh) => {
-        if (!mesh) return;
-        if (mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
-        if (mesh.geometry && typeof mesh.geometry.dispose === 'function') mesh.geometry.dispose();
-        if (mesh.material) {
-          if (Array.isArray(mesh.material)) {
-            mesh.material.forEach((mat) => mat && typeof mat.dispose === 'function' && mat.dispose());
-          } else if (typeof mesh.material.dispose === 'function') {
-            mesh.material.dispose();
-          }
-        }
-      });
-    };
-
-    // Remove any partially generated geometry before building a deterministic fallback.
-    disposeMeshList(appCtx.roadMeshes);
-    disposeMeshList(appCtx.urbanSurfaceMeshes);
-    disposeMeshList(appCtx.structureVisualMeshes);
-    disposeMeshList(appCtx.buildingMeshes);
-    disposeMeshList(appCtx.landuseMeshes);
-    disposeMeshList(appCtx.linearFeatureMeshes);
-    disposeMeshList(appCtx.poiMeshes);
-    disposeMeshList(appCtx.streetFurnitureMeshes);
-    disposeMeshList(appCtx.vegetationMeshes);
-    disposeMeshList(appCtx.historicMarkers);
-    appCtx.roadMeshes = [];
-    appCtx.urbanSurfaceMeshes = [];
-    appCtx.structureVisualMeshes = [];
-    appCtx.buildingMeshes = [];
-    appCtx.landuseMeshes = [];
-    appCtx.poiMeshes = [];
-    appCtx.streetFurnitureMeshes = [];
-    appCtx.vegetationMeshes = [];
-    appCtx.vegetationFeatures = [];
-    appCtx.historicMarkers = [];
-    appCtx.roads = [];
-    appCtx.buildings = [];
-    appCtx.landuses = [];
-    appCtx.surfaceFeatureHints = [];
-    appCtx.waterAreas = [];
-    appCtx.waterways = [];
-    appCtx.waterWaveVisuals = [];
-    invalidateTraversalNetworks('fallback_world_reset');
-    appCtx.navigationRoutePoints = [];
-    appCtx.navigationRouteDistance = 0;
-    appCtx.linearFeatures = [];
-    appCtx.linearFeatureMeshes = [];
-    appCtx.dynamicBuildingColliders = [];
-    appCtx.pois = [];
-    appCtx.historicSites = [];
-    appCtx.urbanSurfaceStats = {
-      sidewalkBatchCount: 0,
-      sidewalkVertices: 0,
-      sidewalkTriangles: 0,
-      skippedBuildingAprons: 0
-    };
-    clearBuildingSpatialIndex();
-
-    const makeRoad = (x1, z1, x2, z2, width = 10) => {
-      const pts = [{ x: x1, z: z1 }, { x: x2, z: z2 }];
-      appCtx.roads.push({
-        pts,
-        width,
-        limit: 35,
-        name: 'Main Street',
-        sourceFeatureId: `fallback-road:${x1}:${z1}:${x2}:${z2}`,
-        type: 'primary',
-        sidewalkHint: 'both',
-        networkKind: 'road',
-        walkable: true,
-        driveable: true,
-        lodDepth: 0,
-        subdivideMaxDist: getRoadSubdivisionStep('primary', 0, perfModeNow),
-        bounds: polylineBounds(pts, width * 0.5 + 18)
-      });
-
-      const hw = width / 2;
-      const verts = [],indices = [];
-      for (let i = 0; i < pts.length; i++) {
-        const p = pts[i];
-        const dx = pts[1].x - pts[0].x,dz = pts[1].z - pts[0].z;
-        const len = Math.sqrt(dx * dx + dz * dz) || 1;
-        const nx = -dz / len,nz = dx / len;
-        const y1 = appCtx.elevationWorldYAtWorldXZ(p.x + nx * hw, p.z + nz * hw) + 0.3;
-        const y2 = appCtx.elevationWorldYAtWorldXZ(p.x - nx * hw, p.z - nz * hw) + 0.3;
-        verts.push(p.x + nx * hw, y1, p.z + nz * hw);
-        verts.push(p.x - nx * hw, y2, p.z - nz * hw);
-        if (i < pts.length - 1) {const vi = i * 2;indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);}
-      }
-      const geo = new THREE.BufferGeometry();
-      geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-      geo.setIndex(indices);
-      geo.computeVertexNormals();
-      const roadMat = new THREE.MeshStandardMaterial({
-        color: 0x333333,
-        roughness: 0.95,
-        metalness: 0.05,
-        polygonOffset: true,
-        polygonOffsetFactor: -2,
-        polygonOffsetUnits: -2
-      });
-      const mesh = new THREE.Mesh(geo, roadMat);
-      mesh.renderOrder = 2;
-      mesh.receiveShadow = true;
-      mesh.frustumCulled = false;
-      appCtx.scene.add(mesh);appCtx.roadMeshes.push(mesh);
-    };
-
-    makeRoad(-200, 0, 200, 0, 12);
-    makeRoad(0, -200, 0, 200, 12);
-    makeRoad(-150, -150, 150, 150, 10);
-    makeRoad(-150, 150, 150, -150, 10);
-
-    const makeBuilding = (x, z, w, d, h, idx = 0) => {
-      const pts = [
-      { x: x - w / 2, z: z - d / 2 },
-      { x: x + w / 2, z: z - d / 2 },
-      { x: x + w / 2, z: z + d / 2 },
-      { x: x - w / 2, z: z + d / 2 }];
-
-      const sourceBuildingId = `fallback-${idx}-${Math.round(x)}-${Math.round(z)}`;
-      const colliderRef = registerBuildingCollision(pts, h, {
-        sourceBuildingId,
-        buildingType: 'fallback',
-        name: 'Fallback Building'
-      });
-
-      const shape = new THREE.Shape();
-      shape.moveTo(pts[0].x, pts[0].z);
-      for (let i = 1; i < pts.length; i++) shape.lineTo(pts[i].x, pts[i].z);
-      shape.lineTo(pts[0].x, pts[0].z);
-
-      const geo = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
-      geo.rotateX(-Math.PI / 2);
-      const color = [0x8899aa, 0x887766, 0x7788aa, 0x887799][Math.floor(Math.random() * 4)];
-      const mat = new THREE.MeshLambertMaterial({ color });
-      const mesh = new THREE.Mesh(geo, mat);
-
-      let avgElevation = 0;
-      let minElevation = Infinity;
-      let maxElevation = -Infinity;
-      pts.forEach((p) => {
-        const hTerrain = appCtx.elevationWorldYAtWorldXZ(p.x, p.z);
-        avgElevation += hTerrain;
-        if (hTerrain < minElevation) minElevation = hTerrain;
-        if (hTerrain > maxElevation) maxElevation = hTerrain;
-      });
-      avgElevation /= pts.length;
-      const slopeRange = Number.isFinite(minElevation) && Number.isFinite(maxElevation) ?
-      maxElevation - minElevation :
-      0;
-      const baseElevation = slopeRange >= 0.15 ? minElevation + 0.05 : avgElevation;
-      mesh.position.y = baseElevation;
-      mesh.userData.buildingFootprint = pts;
-      mesh.userData.avgElevation = baseElevation;
-      mesh.userData.terrainAvgElevation = avgElevation;
-      mesh.userData.sourceBuildingId = sourceBuildingId;
-      mesh.userData.buildingType = 'fallback';
-      if (colliderRef) {
-        colliderRef.baseY = baseElevation;
-        colliderRef.minY = baseElevation;
-        colliderRef.maxY = baseElevation + h;
-      }
-
-      mesh.castShadow = true;
-      mesh.receiveShadow = true;
-      appCtx.scene.add(mesh);
-      appCtx.buildingMeshes.push(mesh);
-
-      if (typeof appCtx.createBuildingGroundPatch === 'function' && slopeRange >= 0.15) {
-        const groundPatchesRaw = appCtx.createBuildingGroundPatch(pts, baseElevation);
-        const groundPatches = Array.isArray(groundPatchesRaw) ? groundPatchesRaw : groundPatchesRaw ? [groundPatchesRaw] : [];
-        groundPatches.forEach((groundPatch) => {
-          groundPatch.userData.landuseFootprint = pts;
-          groundPatch.userData.landuseType = 'buildingGround';
-          groundPatch.userData.avgElevation = baseElevation;
-          groundPatch.userData.terrainAvgElevation = avgElevation;
-          groundPatch.userData.alwaysVisible = true;
-          groundPatch.visible = true;
-          appCtx.scene.add(groundPatch);
-          appCtx.landuseMeshes.push(groundPatch);
-        });
-      }
-    };
-
-    if (enableFallbackBuildings && !isPolarFallback) {
-      makeBuilding(-80, -80, 40, 30, 15, 0);
-      makeBuilding(80, -80, 35, 40, 20, 1);
-      makeBuilding(-80, 80, 45, 35, 18, 2);
-      makeBuilding(80, 80, 30, 35, 12, 3);
-      makeBuilding(-50, 50, 25, 20, 10, 4);
-      makeBuilding(50, -50, 30, 25, 14, 5);
-    }
-  }
+  const recordLoadWarning = (label, err) => recordWorldLoadWarning(loadMetrics, label, err);
+  const safeLoadCall = (label, fn) => safeWorldLoadCall(loadMetrics, label, fn);
 
   for (const r of radii) {
     if (loaded) break;
@@ -4314,121 +4061,36 @@ async function loadRoadsInternal(retryPass = 0) {
       }
       endLoadPhase('buildLinearFeatureGeometry');
 
-      const buildPoiGeometryPass = (phaseName = 'buildPoiGeometry') => {
-        startLoadPhase(phaseName);
-        try {
-          poiNodes.forEach((node) => {
-            const tags = node.tags;
-            const poiKey = poiKeyFromTags(tags);
-
-            if (!(poiKey && appCtx.POI_TYPES[poiKey])) return;
-
-            const pos = appCtx.geoToWorld(node.lat, node.lon);
-            const poiData = appCtx.POI_TYPES[poiKey];
-            const centerDist = Math.hypot(pos.x, pos.z);
-            const poiTier = centerDist <= lodNearDist ?
-              'near' :
-              centerDist <= lodMidDist ? 'mid' : 'far';
-            const terrainY = appCtx.elevationWorldYAtWorldXZ(pos.x, pos.z);
-
-            if (poiTier === 'near') {
-              loadMetrics.pois.near += 1;
-            } else if (poiTier === 'mid') {
-              loadMetrics.pois.mid += 1;
-            } else {
-              loadMetrics.pois.far += 1;
-            }
-
-            if (poiTier !== 'far') {
-              const markerRadius = poiTier === 'near' ? 1.5 : 1.2;
-              const markerHeight = poiTier === 'near' ? 4 : 3;
-              const markerSegments = poiTier === 'near' ? 8 : 6;
-              const geometry = new THREE.CylinderGeometry(markerRadius, markerRadius, markerHeight, markerSegments);
-              const material = new THREE.MeshLambertMaterial({
-                color: poiData.color,
-                emissive: poiData.color,
-                emissiveIntensity: poiTier === 'near' ? 0.3 : 0.18
-              });
-              const mesh = new THREE.Mesh(geometry, material);
-              mesh.position.set(pos.x, terrainY + markerHeight * 0.5, pos.z);
-              mesh.userData.poiPosition = { x: pos.x, z: pos.z };
-              mesh.userData.isPOIMarker = true;
-              mesh.userData.lodTier = poiTier;
-              mesh.castShadow = false;
-              mesh.visible = !!appCtx.poiMode;
-              appCtx.scene.add(mesh);
-              appCtx.poiMeshes.push(mesh);
-
-              if (poiTier === 'near') {
-                const capGeo = new THREE.SphereGeometry(1.8, 8, 6);
-                const capMat = new THREE.MeshLambertMaterial({
-                  color: poiData.color,
-                  emissive: poiData.color,
-                  emissiveIntensity: 0.4
-                });
-                const cap = new THREE.Mesh(capGeo, capMat);
-                cap.position.set(pos.x, terrainY + 4, pos.z);
-                cap.userData.poiPosition = { x: pos.x, z: pos.z };
-                cap.userData.isCapMesh = true;
-                cap.userData.isPOIMarker = true;
-                cap.userData.lodTier = 'near';
-                cap.visible = !!appCtx.poiMode;
-                appCtx.scene.add(cap);
-                appCtx.poiMeshes.push(cap);
-              }
-            }
-
-            appCtx.pois.push({
-              x: pos.x,
-              z: pos.z,
-              sourceFeatureId: node.id ? String(node.id) : '',
-              type: poiKey,
-              name: tags.name || poiData.category,
-              lodTier: poiTier,
-              ...poiData
-            });
-
-            if (tags.historic) {
-              appCtx.historicSites.push({
-                x: pos.x,
-                z: pos.z,
-                lat: node.lat,
-                lon: node.lon,
-                type: tags.historic,
-                name: tags.name || 'Historic Site',
-                description: tags.description || tags['name:en'] || null,
-                wikipedia: tags.wikipedia || tags['wikipedia:en'] || null,
-                wikidata: tags.wikidata || null,
-                lodTier: poiTier,
-                ...poiData
-              });
-            }
-          });
-        } finally {
-          endLoadPhase(phaseName);
-        }
-      };
-
-      const buildStreetFurniturePass = (phaseName = 'buildStreetFurniture') => {
-        startLoadPhase(phaseName);
-        try {
-          generateStreetFurniture();
-          loadMetrics.vegetation.generated = Array.isArray(appCtx.vegetationFeatures) ? appCtx.vegetationFeatures.length : 0;
-        } catch (err) {
-          loadMetrics.streetFurnitureError = err?.message || String(err);
-          recordLoadWarning('generateStreetFurniture', err);
-        } finally {
-          endLoadPhase(phaseName);
-        }
-      };
-
       if (appCtx.roads.length > 0) {
         appCtx.showLoad(`Loading POIs... (${poiNodes.length})`);
-        buildPoiGeometryPass('buildPoiGeometry');
+        buildPoiGeometryPass({
+          endLoadPhase,
+          loadMetrics,
+          lodMidDist,
+          lodNearDist,
+          phaseName: 'buildPoiGeometry',
+          poiKeyFromTags,
+          poiNodes,
+          startLoadPhase
+        });
         appCtx.showLoad('Adding details...');
-        buildStreetFurniturePass('buildStreetFurniture');
+        buildStreetFurniturePass({
+          endLoadPhase,
+          loadMetrics,
+          phaseName: 'buildStreetFurniture',
+          startLoadPhase
+        });
 
-        finalizeLoadedWorld('primary');
+        finalizeLoadedWorld({
+          buildTraversalNetworks,
+          earthSceneSuppressed,
+          hideEarthSceneMeshes,
+          loadMetrics,
+          markLoaded: () => { loaded = true; },
+          reason: 'primary',
+          spawnOnRoad,
+          updateWorldLod
+        });
         scheduleDeferredLinearFeatureLoad();
       } else
       {
@@ -4440,7 +4102,16 @@ async function loadRoadsInternal(retryPass = 0) {
       if (appCtx.roads.length > 0) {
         console.warn('[WorldLoad] Recovering with partially loaded world data.');
         loadMetrics.error = e?.message || String(e);
-        finalizeLoadedWorld('partial_after_error');
+        finalizeLoadedWorld({
+          buildTraversalNetworks,
+          earthSceneSuppressed,
+          hideEarthSceneMeshes,
+          loadMetrics,
+          markLoaded: () => { loaded = true; },
+          reason: 'partial_after_error',
+          spawnOnRoad,
+          updateWorldLod
+        });
         break;
       }
       if (!isLastAttempt) {
@@ -4452,26 +4123,85 @@ async function loadRoadsInternal(retryPass = 0) {
       console.error('Road loading failed after all attempts:', e);
       if (appCtx.roads.length === 0) {
         if (useSyntheticFallbackRoads) {
-          createSyntheticFallbackWorld();
-          finalizeLoadedWorld('synthetic_fallback');
+          createSyntheticFallbackWorld({
+            clearBuildingSpatialIndex,
+            getRoadSubdivisionStep,
+            invalidateTraversalNetworks,
+            perfModeNow,
+            polylineBounds,
+            registerBuildingCollision
+          });
+          finalizeLoadedWorld({
+            buildTraversalNetworks,
+            earthSceneSuppressed,
+            hideEarthSceneMeshes,
+            loadMetrics,
+            markLoaded: () => { loaded = true; },
+            reason: 'synthetic_fallback',
+            spawnOnRoad,
+            updateWorldLod
+          });
         } else {
-          finalizeLoadedWorld('no_roads_sparse');
+          finalizeLoadedWorld({
+            buildTraversalNetworks,
+            earthSceneSuppressed,
+            hideEarthSceneMeshes,
+            loadMetrics,
+            markLoaded: () => { loaded = true; },
+            reason: 'no_roads_sparse',
+            spawnOnRoad,
+            updateWorldLod
+          });
         }
       }
     }
   }
   if (!loaded && appCtx.roads.length > 0) {
     console.warn('[WorldLoad] Completing with partially loaded roads.');
-    finalizeLoadedWorld('post_loop_partial');
+    finalizeLoadedWorld({
+      buildTraversalNetworks,
+      earthSceneSuppressed,
+      hideEarthSceneMeshes,
+      loadMetrics,
+      markLoaded: () => { loaded = true; },
+      reason: 'post_loop_partial',
+      spawnOnRoad,
+      updateWorldLod
+    });
   }
   if (!loaded && appCtx.roads.length === 0) {
     if (useSyntheticFallbackRoads) {
       console.warn('[WorldLoad] No road data found for this location. Using synthetic fallback world.');
-      createSyntheticFallbackWorld();
-      finalizeLoadedWorld('synthetic_no_roads');
+      createSyntheticFallbackWorld({
+        clearBuildingSpatialIndex,
+        getRoadSubdivisionStep,
+        invalidateTraversalNetworks,
+        perfModeNow,
+        polylineBounds,
+        registerBuildingCollision
+      });
+      finalizeLoadedWorld({
+        buildTraversalNetworks,
+        earthSceneSuppressed,
+        hideEarthSceneMeshes,
+        loadMetrics,
+        markLoaded: () => { loaded = true; },
+        reason: 'synthetic_no_roads',
+        spawnOnRoad,
+        updateWorldLod
+      });
     } else {
       console.warn('[WorldLoad] No road data found for this location. Loading sparse terrain-only world.');
-      finalizeLoadedWorld('no_roads_sparse');
+      finalizeLoadedWorld({
+        buildTraversalNetworks,
+        earthSceneSuppressed,
+        hideEarthSceneMeshes,
+        loadMetrics,
+        markLoaded: () => { loaded = true; },
+        reason: 'no_roads_sparse',
+        spawnOnRoad,
+        updateWorldLod
+      });
     }
   }
   if (!loaded && retryPass < 1) {
@@ -4486,13 +4216,47 @@ async function loadRoadsInternal(retryPass = 0) {
     console.warn('[WorldLoad] Final load path failed. Entering fallback recovery mode.');
     if (appCtx.roads.length === 0) {
       if (useSyntheticFallbackRoads) {
-        createSyntheticFallbackWorld();
-        finalizeLoadedWorld('synthetic_final_recovery');
+        createSyntheticFallbackWorld({
+          clearBuildingSpatialIndex,
+          getRoadSubdivisionStep,
+          invalidateTraversalNetworks,
+          perfModeNow,
+          polylineBounds,
+          registerBuildingCollision
+        });
+        finalizeLoadedWorld({
+          buildTraversalNetworks,
+          earthSceneSuppressed,
+          hideEarthSceneMeshes,
+          loadMetrics,
+          markLoaded: () => { loaded = true; },
+          reason: 'synthetic_final_recovery',
+          spawnOnRoad,
+          updateWorldLod
+        });
       } else {
-        finalizeLoadedWorld('no_roads_final_recovery');
+        finalizeLoadedWorld({
+          buildTraversalNetworks,
+          earthSceneSuppressed,
+          hideEarthSceneMeshes,
+          loadMetrics,
+          markLoaded: () => { loaded = true; },
+          reason: 'no_roads_final_recovery',
+          spawnOnRoad,
+          updateWorldLod
+        });
       }
     } else {
-      finalizeLoadedWorld('partial_final_recovery');
+      finalizeLoadedWorld({
+        buildTraversalNetworks,
+        earthSceneSuppressed,
+        hideEarthSceneMeshes,
+        loadMetrics,
+        markLoaded: () => { loaded = true; },
+        reason: 'partial_final_recovery',
+        spawnOnRoad,
+        updateWorldLod
+      });
     }
   }
   appCtx.worldLoading = false;
