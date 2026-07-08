@@ -9,10 +9,10 @@ const OCEAN_SITE = Object.freeze({
 const OCEAN_BATHYMETRY_GRID_URL = './data/ocean-bathymetry-great-barrier-reef.json';
 
 const OCEAN_CONSTANTS = Object.freeze({
-  MAX_SPEED: 16.0,
+  MAX_SPEED: 32.0,
   MAX_VERTICAL_SPEED: 7.4,
   MAX_TURN_SPEED: 1.8,
-  SPEED_RESPONSE: 2.7,
+  SPEED_RESPONSE: 3.1,
   TURN_RESPONSE: 4.4,
   VERTICAL_RESPONSE: 3.4,
   DRAG: 0.94,
@@ -61,6 +61,7 @@ Object.assign(oceanMode, {
   localBathymetryGrid: null,
   localBathymetryReady: false,
   localBathymetryPromise: null,
+  weatherRefreshTimer: 0,
   submarine: {
     mesh: null,
     position: new THREE.Vector3(0, -10.5, 62),
@@ -1420,6 +1421,10 @@ function createOceanScene() {
   oceanMode.submarine.mesh = submarineMesh;
   oceanMode.deepBackdrop = backdrop;
   oceanMode.marineParticles = particles;
+  oceanMode.ambientLight = ambient;
+  oceanMode.hemiLight = hemi;
+  oceanMode.keyLight = keyLight;
+  oceanMode.fillLight = fillLight;
 
   rebuildOceanTerrainLayers(scene, renderer);
   initFishLife(scene);
@@ -1433,6 +1438,39 @@ function createOceanScene() {
     if (!ready || oceanMode.scene !== scene) return;
     rebuildOceanTerrainLayers(scene, renderer);
   });
+}
+
+function applyOceanSkyState(state = null) {
+  if (!oceanMode.scene || !oceanMode.renderer || !state) return;
+
+  const dayFactor = Number(state.sun?.daylightFactor || 0);
+  const twilightFactor = Number(state.sun?.twilightFactor || 0);
+  const nightFactor = 1 - dayFactor;
+
+  oceanMode.scene.fog.color.setHex(dayFactor > 0.35 ? 0x0b3551 : twilightFactor > 0.25 ? 0x10253c : 0x06131d);
+  oceanMode.scene.fog.density = 0.0028 + nightFactor * 0.0018;
+  oceanMode.renderer.toneMappingExposure = 0.82 + dayFactor * 0.24 + twilightFactor * 0.08;
+
+  if (oceanMode.ambientLight) {
+    oceanMode.ambientLight.color.setHex(dayFactor > 0.4 ? 0x84d9ef : twilightFactor > 0.2 ? 0x537ba2 : 0x1a3149);
+    oceanMode.ambientLight.intensity = 0.3 + dayFactor * 0.55 + twilightFactor * 0.12;
+  }
+  if (oceanMode.hemiLight) {
+    oceanMode.hemiLight.color.setHex(dayFactor > 0.4 ? 0xa8e9ff : twilightFactor > 0.2 ? 0x7fa9cb : 0x173149);
+    oceanMode.hemiLight.groundColor.setHex(dayFactor > 0.4 ? 0x143246 : twilightFactor > 0.2 ? 0x122f42 : 0x081521);
+    oceanMode.hemiLight.intensity = 0.42 + dayFactor * 0.52 + twilightFactor * 0.14;
+  }
+  if (oceanMode.keyLight) {
+    const sun = state.sun?.direction || { x: 0.45, y: 0.8, z: 0.18 };
+    oceanMode.keyLight.color.setHex(dayFactor > 0.35 ? 0xb8f1ff : twilightFactor > 0.2 ? 0xffc48a : 0x5870a2);
+    oceanMode.keyLight.intensity = 0.16 + dayFactor * 1.1 + twilightFactor * 0.26;
+    oceanMode.keyLight.position.set(sun.x * 210, Math.max(60, sun.y * 240), sun.z * 210);
+  }
+  if (oceanMode.fillLight) {
+    const sun = state.sun?.direction || { x: 0.45, y: 0.8, z: 0.18 };
+    oceanMode.fillLight.intensity = 0.12 + dayFactor * 0.36 + twilightFactor * 0.1;
+    oceanMode.fillLight.position.set(-sun.x * 160, Math.max(40, Math.abs(sun.y) * 110), -sun.z * 160);
+  }
 }
 
 function getWorldCanvas() {
@@ -1628,6 +1666,14 @@ function animateOceanMode(nowMs = 0) {
   oceanMode.lastFrameMs = nowMs;
 
   updateSubmarine(dt);
+  if (typeof appCtx.refreshAstronomicalSky === 'function') {
+    appCtx.refreshAstronomicalSky(false);
+  }
+  oceanMode.weatherRefreshTimer = (oceanMode.weatherRefreshTimer || 0) + dt;
+  if (oceanMode.weatherRefreshTimer >= 5 && typeof appCtx.refreshLiveWeather === 'function') {
+    oceanMode.weatherRefreshTimer = 0;
+    void appCtx.refreshLiveWeather(false);
+  }
   updateFishLife(nowMs * 0.001);
 
   if (oceanMode.marineParticles) {
@@ -1655,9 +1701,17 @@ function startOceanMode() {
 
     oceanMode.active = true;
     oceanMode.lastFrameMs = 0;
+    oceanMode.weatherRefreshTimer = 0;
     oceanMode.animationId = requestAnimationFrame(animateOceanMode);
+    if (typeof appCtx.refreshAstronomicalSky === 'function') {
+      appCtx.refreshAstronomicalSky(true);
+    }
+    if (typeof appCtx.refreshLiveWeather === 'function') {
+      void appCtx.refreshLiveWeather(true);
+    }
 
     if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
+    if (typeof appCtx.refreshBoatAvailability === 'function') appCtx.refreshBoatAvailability(true);
     updateOceanHud(performance.now() * 0.001);
 
     primeLocalBathymetryGrid().then((ready) => {
@@ -1730,6 +1784,7 @@ function stopOceanMode() {
     appCtx.switchEnv(appCtx.ENV.EARTH);
   }
   if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
+  if (typeof appCtx.refreshBoatAvailability === 'function') appCtx.refreshBoatAvailability(true);
   return true;
 }
 
@@ -1781,6 +1836,7 @@ function getOceanModeDebugState() {
 }
 
 Object.assign(appCtx, {
+  applyOceanSkyState,
   animateOceanMode,
   startOceanMode,
   stopOceanMode,

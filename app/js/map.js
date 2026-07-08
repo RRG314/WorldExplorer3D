@@ -1,4 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
+import { getOverlayPreset } from "./editor/preset-registry.js?v=1";
+import { geometryPolygonRings } from "./editor/schema.js?v=1";
 // map.js - Minimap and large map rendering
 // ============================================================================
 
@@ -297,7 +299,7 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
   const refLon = appCtx.LOC.lon + ref.x / (appCtx.SCALE * Math.cos(appCtx.LOC.lat * Math.PI / 180));
 
   // Zoom level based on map size
-  const zoom = isLarge ? appCtx.largeMapZoom : 17;
+  const zoom = isLarge ? appCtx.largeMapZoom : appCtx.minimapZoom;
 
   // Get tile coordinates and pixel position within tile
   const n = Math.pow(2, zoom);
@@ -576,6 +578,79 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
     ctx.restore();
   }
 
+  const overlayMapFeatures = [];
+  if (Array.isArray(appCtx.overlayPublishedFeatures)) {
+    appCtx.overlayPublishedFeatures.forEach((feature) => overlayMapFeatures.push({ feature, draft: false }));
+  }
+  if (Array.isArray(appCtx.overlayDraftPreviewFeatures)) {
+    appCtx.overlayDraftPreviewFeatures.forEach((feature) => overlayMapFeatures.push({ feature, draft: true }));
+  }
+  if (appCtx.mapLayers.contributions !== false && overlayMapFeatures.length > 0) {
+    ctx.save();
+    overlayMapFeatures.forEach(({ feature, draft }) => {
+      if (!feature || feature.worldKind !== 'earth') return;
+      const preset = getOverlayPreset(feature.presetId);
+      const stroke = draft ? '#fde047' : preset.color;
+      const fill = draft ? 'rgba(253,224,71,0.22)' : `${preset.color}33`;
+      ctx.lineWidth = isLarge ? 2 : 1.3;
+      ctx.strokeStyle = stroke;
+      ctx.fillStyle = fill;
+
+      if (feature.geometryType === 'Point') {
+        const lat = Number(feature.geometry?.coordinates?.lat);
+        const lon = Number(feature.geometry?.coordinates?.lon);
+        if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+        const pos = latLonToScreen(lat, lon);
+        if (Math.abs(pos.x - mx) >= w / 2 || Math.abs(pos.y - my) >= h / 2) return;
+        const radius = isLarge ? 6 : 4;
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        if (isLarge) {
+          const label = String(feature.tags?.name || feature.summary || preset.label || 'Overlay');
+          ctx.font = 'bold 10px Arial';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'bottom';
+          ctx.strokeStyle = '#082032';
+          ctx.lineWidth = 3;
+          ctx.strokeText(label.slice(0, 32), pos.x, pos.y - radius - 4);
+          ctx.fillStyle = draft ? '#fef3c7' : '#e0f2fe';
+          ctx.fillText(label.slice(0, 32), pos.x, pos.y - radius - 4);
+        }
+        return;
+      }
+
+      if (feature.geometryType === 'LineString') {
+        const coords = Array.isArray(feature.geometry?.coordinates) ? feature.geometry.coordinates : [];
+        if (coords.length < 2) return;
+        ctx.beginPath();
+        coords.forEach((point, index) => {
+          const pos = latLonToScreen(Number(point.lat), Number(point.lon));
+          if (index === 0) ctx.moveTo(pos.x, pos.y);
+          else ctx.lineTo(pos.x, pos.y);
+        });
+        ctx.stroke();
+        return;
+      }
+
+      if (feature.geometryType === 'Polygon') {
+        const ring = geometryPolygonRings(feature.geometry || {})[0] || [];
+        if (ring.length < 3) return;
+        ctx.beginPath();
+        ring.forEach((point, index) => {
+          const pos = latLonToScreen(Number(point.lat), Number(point.lon));
+          if (index === 0) ctx.moveTo(pos.x, pos.y);
+          else ctx.lineTo(pos.x, pos.y);
+        });
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+    });
+    ctx.restore();
+  }
+
   // Draw game elements using proper coordinate conversion
   if (appCtx.mapLayers.checkpoints && appCtx.gameMode === 'checkpoint') {
     appCtx.checkpoints.forEach((cp) => {
@@ -758,6 +833,72 @@ function drawMapOnCanvas(ctx, w, h, isLarge) {
 
     publicRooms.forEach((room) => drawRoomMarker(room, 'public'));
     userRooms.forEach((room) => drawRoomMarker(room, 'user'));
+  }
+
+  const activityMarkers = appCtx.mapLayers.activities !== false && Array.isArray(appCtx.activityDiscoveryMapMarkers)
+    ? appCtx.activityDiscoveryMapMarkers
+    : [];
+  if (activityMarkers.length > 0) {
+    activityMarkers.forEach((activity) => {
+      if (!activity || !Number.isFinite(activity.x) || !Number.isFinite(activity.z)) return;
+      const pos = worldToScreen(activity.x, activity.z);
+      if (Math.abs(pos.x - mx) >= w / 2 || Math.abs(pos.y - my) >= h / 2) return;
+      const color = String(activity.color || '#fbbf24');
+      const radius = isLarge ? (activity.featured ? 7 : 5) : (activity.featured ? 5 : 4);
+      ctx.save();
+      ctx.fillStyle = color;
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = isLarge ? 2 : 1.25;
+      if (activity.categoryId === 'room') {
+        ctx.translate(pos.x, pos.y);
+        ctx.rotate(Math.PI / 4);
+        ctx.beginPath();
+        ctx.rect(-radius, -radius, radius * 2, radius * 2);
+        ctx.fill();
+        ctx.stroke();
+      } else if (activity.categoryId === 'boat' || activity.categoryId === 'fishing') {
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.beginPath();
+        ctx.arc(pos.x, pos.y, Math.max(1, radius * 0.42), 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(15,23,42,0.88)';
+        ctx.fill();
+      } else if (activity.categoryId === 'drone') {
+        ctx.translate(pos.x, pos.y);
+        ctx.beginPath();
+        for (let i = 0; i < 6; i += 1) {
+          const angle = Math.PI / 6 + i * Math.PI / 3;
+          const px = Math.cos(angle) * radius;
+          const py = Math.sin(angle) * radius;
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      } else {
+        ctx.beginPath();
+        ctx.moveTo(pos.x, pos.y - radius - 2);
+        ctx.lineTo(pos.x - radius * 0.8, pos.y + radius);
+        ctx.lineTo(pos.x + radius * 0.8, pos.y + radius);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      if (isLarge) {
+        const label = String(activity.title || 'Activity');
+        ctx.font = 'bold 10px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = '#ffffff';
+        ctx.strokeStyle = '#0f172a';
+        ctx.lineWidth = 3;
+        ctx.strokeText(label, pos.x, pos.y + radius + 13);
+        ctx.fillText(label, pos.x, pos.y + radius + 13);
+      }
+    });
   }
 
   // Draw properties on minimap

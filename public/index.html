@@ -4,7 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>World Explorer 3D | Explore Any Place on Earth and Beyond</title>
-  <meta name="description" content="Explore Earth, launch into space, and land on the Moon in a single session.">
+  <meta name="description" content="Explore real places, Live Earth systems, local weather, buildings, oceans, orbit, and the Moon in one browser-based world.">
+  <link rel="icon" href="./favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;600;700;800&family=Chakra+Petch:wght@500;600;700&display=swap" rel="stylesheet">
@@ -53,6 +54,52 @@
       background: rgba(8, 18, 34, 0.68);
       box-shadow: 0 24px 48px rgba(2, 8, 18, 0.35);
       margin-bottom: 26px;
+    }
+
+    .announcement {
+      margin-bottom: 18px;
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      background: rgba(8, 18, 34, 0.72);
+      box-shadow: 0 20px 42px rgba(2, 8, 18, 0.28);
+      padding: 18px 22px;
+    }
+
+    .announcement[data-tone="success"] { border-color: rgba(77, 214, 159, 0.34); }
+    .announcement[data-tone="warning"] { border-color: rgba(255, 200, 87, 0.34); }
+
+    .announcement-eyebrow {
+      display: inline-flex;
+      color: var(--accent-2);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .announcement h2 {
+      margin: 0 0 8px;
+      font-family: 'Chakra Petch', sans-serif;
+      font-size: clamp(22px, 3vw, 30px);
+      line-height: 1.02;
+    }
+
+    .announcement p {
+      margin: 0;
+      color: var(--muted);
+      max-width: 860px;
+    }
+
+    .announcement a {
+      display: inline-flex;
+      align-items: center;
+      margin-top: 12px;
+      border-radius: 999px;
+      padding: 10px 14px;
+      border: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.05);
+      text-decoration: none;
+      font-weight: 700;
     }
 
     .hero-grid {
@@ -363,22 +410,43 @@
 </head>
 <body>
   <div class="shell">
+    <section id="landingAnnouncement" class="announcement" hidden>
+      <div id="landingAnnouncementEyebrow" class="announcement-eyebrow">Platform Update</div>
+      <h2 id="landingAnnouncementTitle"></h2>
+      <p id="landingAnnouncementBody"></p>
+      <a id="landingAnnouncementLink" href="#" hidden></a>
+    </section>
+
     <section class="hero">
       <div class="hero-grid">
         <div class="hero-copy">
-          <h1><span class="hero-brand">World Explorer 3D</span><span class="hero-headline">Explore Any Place on Earth and Beyond</span></h1>
-          <p class="lead">Drive, walk, and fly any place in the world. Then launch to orbit and land on the Moon all without leaving your seat.</p>
+          <h1><span id="landingHeroBrand" class="hero-brand">World Explorer 3D</span><span id="landingHeroHeadline" class="hero-headline">An interactive digital Earth for exploration, discovery, and contribution.</span></h1>
+          <p id="landingHeroLead" class="lead">Explore real locations by land, sea, air, or space, experience the real sky and environment, and help expand a shared 3D world built from geographic data.</p>
           <div class="cta-row">
-            <a class="btn btn-play" href="./app/">Play Now</a>
-            <button class="btn btn-trial" id="openMultiplayerBtn" type="button">Sign In for Multiplayer</button>
-            <a class="btn btn-ghost" href="./account/">Account</a>
+            <a class="btn btn-play" id="landingPrimaryCta" href="./app/">Play Now</a>
+            <button class="btn btn-trial" id="landingSecondaryCta" type="button">Sign In for Multiplayer</button>
+            <a class="btn btn-ghost" id="landingTertiaryCta" href="./account/">Account</a>
           </div>
           <p id="multiplayerStatus" class="status-note"></p>
-          <p class="perf-note">Performance note: Desktop recommended for best frame rate and rendering quality.</p>
+          <p id="landingPerformanceNote" class="perf-note">Performance note: Desktop recommended for best frame rate and rendering quality.</p>
         </div>
         <div class="hero-media" aria-hidden="true">
           <img class="hero-media-img" src="./assets/landing/hero.jpg" alt="">
         </div>
+      </div>
+    </section>
+
+    <section>
+      <h2 id="landingHighlightsTitle">Platform Highlights</h2>
+      <div id="landingHighlights" class="features">
+        <article class="feature"><h3>Live Earth</h3><p>Open satellites, earthquakes, and weather on the globe, then jump straight from those layers into the local world.</p></article>
+        <article class="feature"><h3>Real Weather + Time</h3><p>Local time, sun, moon, and live weather follow the place you are actually exploring, not just your own device clock.</p></article>
+        <article class="feature"><h3>Ground, Air, Water & Space Travel</h3><p>Drive, walk, drone, boat, and rocket through one connected runtime instead of separate disconnected modes.</p></article>
+        <article class="feature"><h3>Buildings + Interiors</h3><p>Enter supported buildings on demand and move from streets into mapped or generated interiors without leaving the world.</p></article>
+        <article class="feature"><h3>Land & Property</h3><p>Browse place context, property-linked destinations, and real-world location details while you explore.</p></article>
+        <article class="feature"><h3>Multiplayer Rooms</h3><p>Share locations with other explorers, see live presence, and keep exploration social without putting core access behind a paywall.</p></article>
+        <article class="feature"><h3>Contribute / Edit</h3><p>Stage place, building, interior, and photo contributions for review without directly changing the live world.</p></article>
+        <article class="feature"><h3>Open Access</h3><p>Core exploration stays free. Optional donations help an independent solo build keep growing the platform.</p></article>
       </div>
     </section>
 
@@ -451,18 +519,6 @@
     </section>
 
     <section>
-      <h2>Feature Grid</h2>
-      <div class="features">
-        <article class="feature"><h3>Unified World Loop</h3><p>Stay in one simulation while switching between driving, walking, drone, and rocket.</p></article>
-        <article class="feature"><h3>Map + Terrain Runtime</h3><p>OSM-backed roads, POIs, and adaptive terrain detail for large-scale traversal.</p></article>
-        <article class="feature"><h3>Challenge Layer</h3><p>Timed red-flower challenge with leaderboard storage and repeatable starts.</p></article>
-        <article class="feature"><h3>Memory Markers</h3><p>Drop location-based notes and flowers as part of your exploration trail.</p></article>
-        <article class="feature"><h3>Mobile Controls</h3><p>Dual-pad touch controls for small screens with mode-specific action bindings.</p></article>
-        <article class="feature"><h3>Accessible For Everyone</h3><p>All core gameplay is free. Optional monthly donations help a solo developer keep shipping updates.</p></article>
-      </div>
-    </section>
-
-    <section>
       <h2>Optional Donations</h2>
       <div class="pricing">
         <article class="price-card">
@@ -470,6 +526,7 @@
           <div>$0 / month</div>
           <ul>
             <li>Full core exploration loop</li>
+            <li>Map, core exploration, and traversal modes are free</li>
             <li>Multiplayer for any signed-in account</li>
             <li>No payment required to play</li>
             <li>Open access for everyone</li>
@@ -501,11 +558,12 @@
     <section>
       <h2>FAQ</h2>
       <div class="faq">
-        <article class="qa"><h3>Does it run on mobile?</h3><p>Yes. The runtime includes mobile controls, but desktop is recommended for highest visual quality and smoother frame pacing.</p></article>
-        <article class="qa"><h3>How demanding is it?</h3><p>The app adapts LOD dynamically. Larger cities and space transitions still perform best on modern desktop GPUs.</p></article>
-        <article class="qa"><h3>Is multiplayer free?</h3><p>Yes. Multiplayer is free for any signed-in account. Donations are optional and only help sustain development.</p></article>
-        <article class="qa"><h3>Do I need to pay to use the map?</h3><p>No. The in-game map, core exploration, and traversal modes are free. Donations are optional recognition only.</p></article>
-        <article class="qa"><h3>Where does map data come from?</h3><p>OpenStreetMap contributors (ODbL), with additional optional provider APIs configured by the user.</p></article>
+        <article class="qa"><h3>Does it run on mobile?</h3><p>Yes. The runtime includes mobile controls, but desktop is still the best way to see the full visual range and larger city scenes.</p></article>
+        <article class="qa"><h3>What is Live Earth?</h3><p>Live Earth is the real-time globe section inside World Explorer. It currently brings satellites, earthquakes, and weather into the same platform as the local 3D world.</p></article>
+        <article class="qa"><h3>Can I go inside buildings?</h3><p>Supported buildings can be entered on demand. The platform uses mapped interiors when they exist and enclosed generated interiors when they do not.</p></article>
+        <article class="qa"><h3>Is multiplayer free?</h3><p>Yes. Multiplayer is free for signed-in accounts. Donations are optional and only support continued development.</p></article>
+        <article class="qa"><h3>Can I contribute edits?</h3><p>Yes. The Contribute/Edit flow lets you submit staged place, building, interior, and photo updates for review instead of editing the live world directly.</p></article>
+        <article class="qa"><h3>Where does the data come from?</h3><p>World Explorer combines OpenStreetMap with open real-world feeds such as CelesTrak, USGS, and Open-Meteo, plus optional user-configured provider APIs where available.</p></article>
       </div>
     </section>
 
@@ -514,7 +572,7 @@
       <a href="./legal/privacy">Privacy</a>
       <a href="./legal/terms">Terms</a>
       <span>OpenStreetMap data © OpenStreetMap contributors (ODbL)</span>
-      <a href="mailto:hello@worldexplorer.app">Contact</a>
+      <a href="mailto:mail@worldexplorer3d.io">Contact</a>
       <a href="https://github.com/RRG314/WorldExplorer" target="_blank" rel="noreferrer">GitHub</a>
     </footer>
   </div>
@@ -522,9 +580,10 @@
   <script type="module">
     import { hasFirebaseConfig } from './js/firebase-init.js?v=55';
     import { ensureSignedIn } from './js/auth-ui.js?v=55';
-    import { redirectToCheckout } from './js/billing.js?v=57';
+    import { redirectToCheckout } from './js/billing.js?v=58';
+    import { hydrateLandingPageFromPublishedContent } from './js/site-content.js?v=1';
 
-    const openMultiplayerBtn = document.getElementById('openMultiplayerBtn');
+    const openMultiplayerBtn = document.getElementById('landingSecondaryCta');
     const donateSupporterBtn = document.getElementById('donateSupporterBtn');
     const donateProBtn = document.getElementById('donateProBtn');
     const statusEl = document.getElementById('multiplayerStatus');
@@ -590,6 +649,10 @@
 
     donateSupporterBtn?.addEventListener('click', () => startDonationCheckout('supporter', donateSupporterBtn, 'Supporter'));
     donateProBtn?.addEventListener('click', () => startDonationCheckout('pro', donateProBtn, 'Pro'));
+
+    hydrateLandingPageFromPublishedContent(document).catch((error) => {
+      console.warn('[landing] Published site content unavailable:', error);
+    });
   </script>
 </body>
 </html>

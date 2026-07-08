@@ -34,7 +34,6 @@ function createWalkingModule(opts) {
     walkSpeed: 6.0,
     runSpeed: 12.0,
     turnSpeed: 2.6,
-    strafeFactor: 0.85,
     eyeHeight: 1.7,
     thirdPersonDist: 4.5,
     thirdPersonHeight: 2.2,
@@ -427,7 +426,7 @@ function createWalkingModule(opts) {
       const hits = raycaster.intersectObject(appCtx.moonSurface, false);
       if (hits.length > 0 && Number.isFinite(hits[0].point.y)) y = hits[0].point.y + 1.2;
     } else if (typeof appCtx.GroundHeight !== 'undefined' && appCtx.GroundHeight && typeof appCtx.GroundHeight.carCenterY === 'function') {
-      y = appCtx.GroundHeight.carCenterY(x, z, true, 1.2);
+      y = appCtx.GroundHeight.carCenterY(x, z, true, 1.2, Number.isFinite(fallbackY) ? fallbackY - 1.2 : NaN);
     } else if (typeof appCtx.terrainMeshHeightAt === 'function') {
       const terrainY = appCtx.terrainMeshHeightAt(x, z);
       if (Number.isFinite(terrainY)) y = terrainY + 1.2;
@@ -448,7 +447,8 @@ function createWalkingModule(opts) {
     }
 
     if (appCtx.GroundHeight && typeof appCtx.GroundHeight.walkSurfaceY === 'function') {
-      const surfaceY = appCtx.GroundHeight.walkSurfaceY(x, z);
+      const walkerFeetY = Number.isFinite(state.walker?.y) ? state.walker.y - CFG.eyeHeight : NaN;
+      const surfaceY = appCtx.GroundHeight.walkSurfaceY(x, z, walkerFeetY);
       if (Number.isFinite(surfaceY)) return surfaceY;
     }
 
@@ -508,6 +508,12 @@ function createWalkingModule(opts) {
   }
 
   function setModeWalk() {
+    if (appCtx.boatMode?.active && !appCtx.boatMode?.manualExitPending) {
+      if (typeof appCtx.setTravelMode === 'function') {
+        appCtx.setTravelMode('walk', { source: 'walk_mode_direct' });
+      }
+      return;
+    }
     // Debug log removed
     // Debug log removed
     state.mode = "walk";
@@ -587,6 +593,12 @@ function createWalkingModule(opts) {
   }
 
   function setModeDrive() {
+    if (appCtx.boatMode?.active && !appCtx.boatMode?.manualExitPending) {
+      if (typeof appCtx.setTravelMode === 'function') {
+        appCtx.setTravelMode('drive', { source: 'drive_mode_direct' });
+      }
+      return;
+    }
     const wasWalk = state.mode === "walk";
     state.mode = "drive";
     let resolvedDriveSpawn = null;
@@ -680,6 +692,15 @@ function createWalkingModule(opts) {
     return true;
   }
 
+  function buildingBlocksWalkerAtHeight(b, walkerFeetY, actorHeight = CFG.eyeHeight * 0.95, tolerance = 0.45) {
+    if (!b || !Number.isFinite(walkerFeetY)) return true;
+    const minY = Number.isFinite(b?.minY) ? b.minY : Number.isFinite(b?.baseY) ? b.baseY : NaN;
+    const maxY = Number.isFinite(b?.maxY) ? b.maxY : Number.isFinite(minY) && Number.isFinite(b?.height) ? minY + b.height : NaN;
+    if (!Number.isFinite(minY) || !Number.isFinite(maxY)) return true;
+    const walkerTopY = walkerFeetY + Math.max(0.5, actorHeight);
+    return !(walkerTopY < minY - tolerance || walkerFeetY > maxY + tolerance);
+  }
+
   function queryBuildings(x, z, radius = 100) {
     if (typeof getNearbyBuildings === 'function') {
       const nearby = getNearbyBuildings(x, z, radius);
@@ -712,6 +733,8 @@ function createWalkingModule(opts) {
     for (let i = 0; i < allBuildings.length; i++) {
       const b = allBuildings[i];
       if (!b || b.collisionDisabled) continue;
+      const walkerFeetY = state.walker.y - CFG.eyeHeight;
+      if (!buildingBlocksWalkerAtHeight(b, walkerFeetY)) continue;
       // Broad phase: skip buildings far away
       if (x < b.minX - CFG.wallDetectRadius || x > b.maxX + CFG.wallDetectRadius ||
       z < b.minZ - CFG.wallDetectRadius || z > b.maxZ + CFG.wallDetectRadius) continue;
@@ -825,14 +848,13 @@ function createWalkingModule(opts) {
   function updateWalkPhysics(dt) {
     syncWalkTerrain(false);
 
-    // WASD for movement, arrow keys for directional look.
+    // Walking is forward/back plus turn. Left/right strafe is intentionally removed
+    // so keyboard movement feels closer to a traversal game than a level editor.
     const moveForward = keys.KeyW ? 1 : 0;
     const moveBack = keys.KeyS ? 1 : 0;
-    const strafeLeft = keys.KeyA ? 1 : 0;
-    const strafeRight = keys.KeyD ? 1 : 0;
 
-    const lookLeft = keys.ArrowLeft ? 1 : 0;
-    const lookRight = keys.ArrowRight ? 1 : 0;
+    const lookLeft = keys.KeyA || keys.ArrowLeft ? 1 : 0;
+    const lookRight = keys.KeyD || keys.ArrowRight ? 1 : 0;
     const lookUp = keys.ArrowUp ? 1 : 0;
     const lookDown = keys.ArrowDown ? 1 : 0;
 
@@ -860,9 +882,8 @@ function createWalkingModule(opts) {
     // Sync angle with yaw for movement direction
     state.walker.angle = state.walker.yaw;
 
-    // Calculate movement direction based on current look angle
+    // Calculate movement direction based on current look angle.
     const forward = moveForward - moveBack;
-    const strafe = strafeLeft - strafeRight; // FIXED: was strafeRight - strafeLeft (reversed)
 
     // MOON ASTRONAUT PHYSICS - Gravity and Jumping
     const MOON_GRAVITY = appCtx.onMoon ? -1.62 : -9.8; // Real moon gravity: 1.62 m/s²
@@ -924,18 +945,14 @@ function createWalkingModule(opts) {
     const speedMultiplier = appCtx.onMoon ? 0.6 : 1.0; // 60% speed on moon
     const adjustedSpeed = speed * speedMultiplier;
 
-    if (forward !== 0 || strafe !== 0) {
+    if (forward !== 0) {
       // Forward/back movement
       const moveX = Math.sin(state.walker.angle) * forward * adjustedSpeed * dt;
       const moveZ = Math.cos(state.walker.angle) * forward * adjustedSpeed * dt;
 
-      // Strafe movement (perpendicular to look direction)
-      const strafeX = Math.cos(state.walker.angle) * strafe * adjustedSpeed * dt * CFG.strafeFactor;
-      const strafeZ = -Math.sin(state.walker.angle) * strafe * adjustedSpeed * dt * CFG.strafeFactor;
-
       // Calculate new position
-      let newX = state.walker.x + moveX + strafeX;
-      let newZ = state.walker.z + moveZ + strafeZ;
+      let newX = state.walker.x + moveX;
+      let newZ = state.walker.z + moveZ;
 
       // Collision against buildings and user-placed build blocks.
       const checkBuildings = !appCtx.onMoon && (getBuildingsArray || getNearbyBuildings);
@@ -962,6 +979,7 @@ function createWalkingModule(opts) {
               for (let i = 0; i < allBuildings.length; i++) {
                 const b = allBuildings[i];
                 if (!b || b.collisionDisabled) continue;
+                if (!buildingBlocksWalkerAtHeight(b, walkerFeetY)) continue;
                 if (sx < b.minX || sx > b.maxX || sz < b.minZ || sz > b.maxZ) continue;
 
                 const roofY = buildingBaseYAt(b, sx, sz) + b.height;
@@ -1107,10 +1125,12 @@ function createWalkingModule(opts) {
     const back = interiorCamera ? Math.min(1.05, CFG.thirdPersonDist * 0.24) : CFG.thirdPersonDist;
     const up = interiorCamera ? Math.min(0.78, CFG.thirdPersonHeight * 0.34) : CFG.thirdPersonHeight;
 
-    // Position camera behind and above the character, accounting for pitch
-    const camX = state.walker.x - Math.sin(state.walker.yaw) * Math.cos(state.walker.pitch) * back;
-    const camZ = state.walker.z - Math.cos(state.walker.yaw) * Math.cos(state.walker.pitch) * back;
-    const camY = baseY + up - Math.sin(state.walker.pitch) * back * 0.5; // Adjust height based on pitch
+    // Keep the older pitch-responsive third-person feel, but clamp the collapse so
+    // the camera does not dive into the avatar when looking steeply upward.
+    const pitchBackScale = Math.max(0.46, Math.cos(state.walker.pitch));
+    const camX = state.walker.x - Math.sin(state.walker.yaw) * pitchBackScale * back;
+    const camZ = state.walker.z - Math.cos(state.walker.yaw) * pitchBackScale * back;
+    const camY = baseY + up - Math.sin(state.walker.pitch) * back * 0.42;
 
     let resolvedCamX = camX;
     let resolvedCamZ = camZ;
@@ -1121,6 +1141,10 @@ function createWalkingModule(opts) {
     }
 
     camera.position.set(resolvedCamX, camY, resolvedCamZ);
+
+    if (state.characterMesh && state.view === "third") {
+      state.characterMesh.visible = state.walker.pitch < 0.98;
+    }
 
     // Look at point ahead of character, accounting for pitch
     const lookAhead = interiorCamera ? Math.min(1.45, CFG.thirdPersonLookAhead * 0.24) : CFG.thirdPersonLookAhead;

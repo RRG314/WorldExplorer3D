@@ -245,11 +245,8 @@ function readFirebaseConfig() {
   return normalized;
 }
 
-function canUseCloudSync() {
-  const entitlementState = globalThis.__WE3D_ENTITLEMENTS__;
-  if (!entitlementState || typeof entitlementState !== 'object') return false;
-  const entitlements = entitlementState.entitlements;
-  return !!(entitlements && entitlements.cloudSync);
+function canUseRemoteLeaderboard() {
+  return !!readFirebaseConfig();
 }
 
 function resetFirebaseInitState() {
@@ -260,7 +257,7 @@ function resetFirebaseInitState() {
 }
 
 async function ensureFirebase() {
-  if (!canUseCloudSync()) {
+  if (!canUseRemoteLeaderboard()) {
     resetFirebaseInitState();
     return false;
   }

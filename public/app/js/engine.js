@@ -737,13 +737,17 @@ function createBuildingGroundPatch(pts, avgElevation) {
 
   const resultMeshes = [];
 
-  // Expand footprint to create a sidewalk-like terrain patch around the building.
+  // Expand footprint by a modest fixed outward distance so the apron stays close
+  // to the building base instead of spreading across narrow street corridors.
   const cx = footprint.reduce((s, p) => s + p.x, 0) / footprint.length;
   const cz = footprint.reduce((s, p) => s + p.z, 0) / footprint.length;
-  const expandFactor = 1.45;
+  const maxRadius = footprint.reduce((best, p) => {
+    return Math.max(best, Math.hypot(p.x - cx, p.z - cz));
+  }, 0);
+  const apronOutset = Math.min(1.5, Math.max(0.65, maxRadius * 0.08));
   const expandedPts = footprint.map((p) => ({
-    x: cx + (p.x - cx) * expandFactor,
-    z: cz + (p.z - cz) * expandFactor
+    x: p.x + ((p.x - cx) / Math.max(1e-4, Math.hypot(p.x - cx, p.z - cz))) * apronOutset,
+    z: p.z + ((p.z - cz) / Math.max(1e-4, Math.hypot(p.x - cx, p.z - cz))) * apronOutset
   }));
 
   const shape = new THREE.Shape();
@@ -806,6 +810,8 @@ function createBuildingGroundPatch(pts, avgElevation) {
   apronMesh.renderOrder = 1;
   apronMesh.receiveShadow = true;
   apronMesh.userData.buildingGround = true;
+  apronMesh.userData.isGroundApron = true;
+  apronMesh.userData.apronOutset = apronOutset;
   apronMesh.userData.alwaysVisible = true;
   apronMesh.visible = true;
   resultMeshes.push(apronMesh);
@@ -1908,10 +1914,12 @@ function init() {
   appCtx.sun.shadow.normalBias = 0.02;
   appCtx.sun.shadow.radius = 3; // Soft shadow edges (PCFSoftShadowMap)
   appCtx.scene.add(appCtx.sun);
+  appCtx.scene.add(appCtx.sun.target);
 
   appCtx.fillLight = new THREE.DirectionalLight(0x9db4ff, 0.3);
   appCtx.fillLight.position.set(-50, 50, -50);
   appCtx.scene.add(appCtx.fillLight);
+  appCtx.scene.add(appCtx.fillLight.target);
 
   appCtx.ambientLight = new THREE.AmbientLight(0xffffff, 0.3);
   appCtx.scene.add(appCtx.ambientLight);
@@ -2035,6 +2043,9 @@ function init() {
     appCtx.cloudGroup.add(largeCloud);
   }
 
+  appCtx.cloudGroup.userData.sharedMaterial = cloudMat;
+  appCtx.cloudGroup.userData.weatherDeck = null;
+  appCtx.cloudGroup.userData.weatherDeckMaterial = null;
   appCtx.scene.add(appCtx.cloudGroup);
 
   // Create star field (hidden during day, visible at night)

@@ -1,7 +1,21 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import {
+  buildIndexedBatchMesh,
+  createRoadSurfaceMaterials,
+  disposeRoadSurfaceMaterials,
+  roadSurfaceMaterialCacheKey
+} from "./road-render.js?v=1";
+import {
   classifyTerrainSurfaceProfile as classifySharedTerrainSurfaceProfile
-} from "./surface-rules.js?v=1";
+} from "./surface-rules.js?v=3";
+import {
+  buildFeatureRibbonEdges,
+  isRoadSurfaceReachable,
+  polylineDistances,
+  projectPointToFeature,
+  sampleFeatureSurfaceY,
+  shouldRenderRoadSkirts
+} from "./structure-semantics.js?v=9";
 // terrain.js - Terrain elevation system (Terrarium tiles)
 // ============================================================================
 
@@ -19,6 +33,8 @@ const terrain = {
   _rayDir: null,
   _roadMaterialCacheKey: '',
   _roadMaterials: null,
+  _urbanSurfaceMaterialCacheKey: '',
+  _urbanSurfaceMaterials: null,
   // Performance optimization caching
   _lastUpdatePos: { x: 0, z: 0 },
   _cachedIntersections: null,
@@ -30,16 +46,57 @@ const ROAD_ENDPOINT_EXTENSION_MIN = 0.35;
 const ROAD_ENDPOINT_EXTENSION_MAX = 2.0;
 const ROAD_REBUILD_DEBOUNCE_MS = 90;
 const ROAD_REBUILD_MIN_INTERVAL_MS = 420;
+const SIDEWALK_INNER_GAP = 0.18;
+const SIDEWALK_MIN_WIDTH = 0.9;
+const SIDEWALK_SEGMENT_MIN_WIDTH = 0.62;
+const SIDEWALK_CLEARANCE = 0.4;
+const SIDEWALK_HEIGHT_BIAS = 0.46;
+const SIDEWALK_CURB_LIFT = 0.05;
+const URBAN_CONTEXT_PAD = 26;
 const SNOW_COLOR_HEX = 0xffffff;
 const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
 const SAND_COLOR_HEX = 0xd7c08a;
 const GRASS_COLOR_HEX = 0x6b8e4a;
+const URBAN_GROUND_HEX = 0x8b8f96;
+const SOIL_COLOR_HEX = 0x8c6b47;
+const ROCK_COLOR_HEX = 0x7b7e82;
 const GROUND_FALLBACK_GRASS_HEX = 0x4a7a2e;
 const GROUND_FALLBACK_SNOW_HEX = 0xd6e2ef;
 const GROUND_FALLBACK_ALPINE_HEX = 0xc6d0d8;
 const GROUND_FALLBACK_SAND_HEX = 0xc8aa70;
+const GROUND_FALLBACK_URBAN_HEX = 0x767a82;
+const GROUND_FALLBACK_SOIL_HEX = 0x7d5e3d;
+const GROUND_FALLBACK_ROCK_HEX = 0x6e7279;
 const MIN_VALID_ELEVATION_METERS = -500;
 const MAX_VALID_ELEVATION_METERS = 9000;
+const URBAN_LANDUSE_TYPES = new Set([
+  'residential',
+  'commercial',
+  'industrial',
+  'retail',
+  'construction',
+  'brownfield',
+  'garages',
+  'railway',
+  'harbour',
+  'port',
+  'military'
+]);
+const GREEN_LANDUSE_TYPES = new Set([
+  'forest',
+  'wood',
+  'park',
+  'garden',
+  'grass',
+  'meadow',
+  'orchard',
+  'vineyard',
+  'allotments',
+  'farmland',
+  'recreation_ground',
+  'village_green',
+  'cemetery'
+]);
 
 function clampElevationMeters(meters) {
   if (!Number.isFinite(meters)) return 0;
@@ -48,82 +105,406 @@ function clampElevationMeters(meters) {
 
 function disposeRoadMaterialCache() {
   if (!terrain._roadMaterials) return;
-  Object.values(terrain._roadMaterials).forEach((mat) => {
-    if (mat && typeof mat.dispose === 'function') mat.dispose();
-  });
+  disposeRoadSurfaceMaterials(terrain._roadMaterials);
   terrain._roadMaterials = null;
   terrain._roadMaterialCacheKey = '';
 }
 
+function disposeUrbanSurfaceMaterialCache() {
+  if (!terrain._urbanSurfaceMaterials) return;
+  disposeRoadSurfaceMaterials(terrain._urbanSurfaceMaterials);
+  terrain._urbanSurfaceMaterials = null;
+  terrain._urbanSurfaceMaterialCacheKey = '';
+}
+
 function getSharedRoadMaterials() {
-  const key = `${appCtx.asphaltTex ? 'tex' : 'flat'}:${appCtx.asphaltNormal ? 1 : 0}:${appCtx.asphaltRoughness ? 1 : 0}`;
+  const key = roadSurfaceMaterialCacheKey({
+    asphaltTex: appCtx.asphaltTex,
+    asphaltNormal: appCtx.asphaltNormal,
+    asphaltRoughness: appCtx.asphaltRoughness
+  });
   if (terrain._roadMaterials && terrain._roadMaterialCacheKey === key) return terrain._roadMaterials;
 
   disposeRoadMaterialCache();
-
-  const roadMat = typeof appCtx.asphaltTex !== 'undefined' && appCtx.asphaltTex ? new THREE.MeshStandardMaterial({
-    map: appCtx.asphaltTex,
-    normalMap: appCtx.asphaltNormal || undefined,
-    normalScale: new THREE.Vector2(0.8, 0.8),
-    roughnessMap: appCtx.asphaltRoughness || undefined,
-    roughness: 0.95,
-    metalness: 0.05,
-    side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
-    depthWrite: true,
-    depthTest: true
-  }) : new THREE.MeshStandardMaterial({
-    color: 0x333333,
-    roughness: 0.95,
-    metalness: 0.05,
-    side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
-    depthWrite: true,
-    depthTest: true
-  });
-
-  const skirtMat = new THREE.MeshStandardMaterial({
-    color: 0x222222,
-    roughness: 0.95,
-    metalness: 0.05,
-    side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -1,
-    polygonOffsetUnits: -1
-  });
-
-  const capMat = typeof appCtx.asphaltTex !== 'undefined' && appCtx.asphaltTex ? new THREE.MeshStandardMaterial({
-    map: appCtx.asphaltTex,
-    normalMap: appCtx.asphaltNormal || undefined,
-    normalScale: new THREE.Vector2(0.8, 0.8),
-    roughnessMap: appCtx.asphaltRoughness || undefined,
-    roughness: 0.95,
-    metalness: 0.05,
-    side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -3,
-    polygonOffsetUnits: -3,
-    depthWrite: true,
-    depthTest: true
-  }) : new THREE.MeshStandardMaterial({
-    color: 0x3a3a3a,
-    roughness: 0.95,
-    metalness: 0.05,
-    side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -3,
-    polygonOffsetUnits: -3,
-    depthWrite: true,
-    depthTest: true
+  const materials = createRoadSurfaceMaterials({
+    asphaltTex: appCtx.asphaltTex,
+    asphaltNormal: appCtx.asphaltNormal,
+    asphaltRoughness: appCtx.asphaltRoughness
   });
 
   terrain._roadMaterialCacheKey = key;
-  terrain._roadMaterials = { roadMat, skirtMat, capMat };
+  terrain._roadMaterials = {
+    roadMat: materials.roadMainMaterial,
+    skirtMat: materials.roadSkirtMaterial,
+    capMat: materials.roadCapMaterial
+  };
   return terrain._roadMaterials;
+}
+
+function getSharedUrbanSurfaceMaterials() {
+  const key = roadSurfaceMaterialCacheKey({ includeSidewalk: true });
+  if (terrain._urbanSurfaceMaterials && terrain._urbanSurfaceMaterialCacheKey === key) {
+    return terrain._urbanSurfaceMaterials;
+  }
+
+  disposeUrbanSurfaceMaterialCache();
+  const materials = createRoadSurfaceMaterials({ includeSidewalk: true });
+
+  terrain._urbanSurfaceMaterialCacheKey = key;
+  terrain._urbanSurfaceMaterials = { sidewalkMat: materials.sidewalkMaterial };
+  return terrain._urbanSurfaceMaterials;
+}
+
+function boundsIntersectLocal(a, b, padding = 0) {
+  if (!a || !b) return false;
+  return !(
+    a.maxX < b.minX - padding ||
+    a.minX > b.maxX + padding ||
+    a.maxZ < b.minZ - padding ||
+    a.minZ > b.maxZ + padding
+  );
+}
+
+function expandBoundsLocal(bounds, padding = 0) {
+  if (!bounds) return null;
+  const pad = Number.isFinite(padding) ? Math.max(0, padding) : 0;
+  return {
+    minX: bounds.minX - pad,
+    maxX: bounds.maxX + pad,
+    minZ: bounds.minZ - pad,
+    maxZ: bounds.maxZ + pad
+  };
+}
+
+function pointsBoundsLocal(points = [], padding = 0) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.z)) continue;
+    minX = Math.min(minX, p.x);
+    maxX = Math.max(maxX, p.x);
+    minZ = Math.min(minZ, p.z);
+    maxZ = Math.max(maxZ, p.z);
+  }
+  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minZ) || !Number.isFinite(maxZ)) {
+    return null;
+  }
+  return expandBoundsLocal({ minX, maxX, minZ, maxZ }, padding);
+}
+
+function pointInPolygonXZLocal(x, z, polygon) {
+  if (!Array.isArray(polygon) || polygon.length < 3) return false;
+  let inside = false;
+  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
+    const xi = polygon[i].x;
+    const zi = polygon[i].z;
+    const xj = polygon[j].x;
+    const zj = polygon[j].z;
+    const intersects = (zi > z) !== (zj > z) &&
+      x < (xj - xi) * (z - zi) / ((zj - zi) || 1e-9) + xi;
+    if (intersects) inside = !inside;
+  }
+  return inside;
+}
+
+function pointToSegmentDistanceXZLocal(x, z, p1, p2) {
+  const dx = p2.x - p1.x;
+  const dz = p2.z - p1.z;
+  const len2 = dx * dx + dz * dz;
+  if (len2 <= 1e-9) return Math.hypot(x - p1.x, z - p1.z);
+  let t = ((x - p1.x) * dx + (z - p1.z) * dz) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const px = p1.x + dx * t;
+  const pz = p1.z + dz * t;
+  return Math.hypot(x - px, z - pz);
+}
+
+function distanceToPolygonEdgeXZLocal(x, z, pts) {
+  if (!Array.isArray(pts) || pts.length < 2) return Infinity;
+  let best = Infinity;
+  for (let i = 0; i < pts.length; i++) {
+    const dist = pointToSegmentDistanceXZLocal(x, z, pts[i], pts[(i + 1) % pts.length]);
+    if (dist < best) best = dist;
+  }
+  return best;
+}
+
+function isUrbanLanduseType(type = '') {
+  return URBAN_LANDUSE_TYPES.has(type);
+}
+
+function isGreenLanduseType(type = '') {
+  return GREEN_LANDUSE_TYPES.has(type);
+}
+
+function roadSupportsSidewalks(road) {
+  const type = String(road?.type || '').toLowerCase();
+  if (road?.structureSemantics?.terrainMode && road.structureSemantics.terrainMode !== 'at_grade') return false;
+  if (road?.structureSemantics?.rampCandidate) return false;
+  const explicitSidewalk = roadHasExplicitSidewalkHint(road);
+  if (explicitSidewalk) return true;
+  if (!type) return true;
+  if (type.includes('motorway') || type.includes('trunk')) return false;
+  if (
+    type.includes('service') ||
+    type.includes('parking_aisle') ||
+    type.includes('driveway') ||
+    type.includes('alley') ||
+    type.includes('_link') ||
+    type.includes('link')
+  ) {
+    return false;
+  }
+  if (road?.sidewalkHint === 'no' || road?.sidewalkHint === 'none') return false;
+  return true;
+}
+
+function roadHasExplicitSidewalkHint(road) {
+  return (
+    road?.sidewalkHint === 'both' ||
+    road?.sidewalkHint === 'left' ||
+    road?.sidewalkHint === 'right'
+  );
+}
+
+function roadBaseSidewalkWidth(road, denseUrban = false) {
+  const type = String(road?.type || '').toLowerCase();
+  let width =
+    type.includes('pedestrian') || type.includes('living_street') ? 3.2 :
+    type.includes('primary') ? 2.8 :
+    type.includes('secondary') ? 2.5 :
+    type.includes('tertiary') ? 2.25 :
+    type.includes('service') ? 1.5 :
+    2.0;
+  if (road?.sidewalkHint === 'both') width += 0.35;
+  else if (road?.sidewalkHint === 'left' || road?.sidewalkHint === 'right') width += 0.15;
+  if (denseUrban) width += 0.2;
+  return Math.max(SIDEWALK_MIN_WIDTH, Math.min(3.6, width));
+}
+
+function roadTypeFamily(type = '') {
+  const normalized = String(type || '').toLowerCase();
+  return normalized.replace(/_link$/i, '');
+}
+
+function roadPolylineLength(road) {
+  const pts = Array.isArray(road?.pts) ? road.pts : [];
+  let total = 0;
+  for (let i = 1; i < pts.length; i++) {
+    total += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
+  }
+  return total;
+}
+
+function roadConnectedSidewalkContinuity(road, denseUrbanContext, ruralGreenContext) {
+  if (!roadSupportsSidewalks(road)) return false;
+  if (road?.sidewalkHint === 'no' || road?.sidewalkHint === 'none') return false;
+  const roadName = String(road?.name || '').trim().toLowerCase();
+  const family = roadTypeFamily(road?.type || '');
+  const length = roadPolylineLength(road);
+  const shortContinuation = length > 0 && length <= 170;
+  const bridgeGapContinuation = length > 0 && length <= 80;
+  if (denseUrbanContext && !ruralGreenContext) return true;
+  if (ruralGreenContext && !shortContinuation) return false;
+  const startConnections = Array.isArray(road?.connectedFeatures?.start) ? road.connectedFeatures.start : [];
+  const endConnections = Array.isArray(road?.connectedFeatures?.end) ? road.connectedFeatures.end : [];
+  const continuityScoreFor = (entries) => {
+    let score = 0;
+    let explicitCount = 0;
+    let supportiveCount = 0;
+    let strongCount = 0;
+    let deadEnd = entries.length === 0;
+    for (let i = 0; i < entries.length; i++) {
+      const other = entries[i]?.feature || null;
+      if (!other || !roadSupportsSidewalks(other)) continue;
+      if (other?.structureSemantics?.terrainMode && other.structureSemantics.terrainMode !== 'at_grade') continue;
+      const otherName = String(other?.name || '').trim().toLowerCase();
+      const sameNamedRoad = !!roadName && roadName === otherName;
+      const sameFamily = roadTypeFamily(other?.type || '') === family;
+      const otherLength = roadPolylineLength(other);
+      const otherShort = otherLength > 0 && otherLength <= 170;
+      const explicitSidewalk = roadHasExplicitSidewalkHint(other);
+      if (!sameNamedRoad && !sameFamily) continue;
+      deadEnd = false;
+      if (
+        explicitSidewalk
+      ) {
+        explicitCount += 1;
+        supportiveCount += 1;
+        strongCount += 1;
+        score += sameNamedRoad ? 4 : 3;
+      } else if (sameNamedRoad) {
+        supportiveCount += 1;
+        strongCount += (otherShort || shortContinuation) ? 1 : 0;
+        score += otherShort || shortContinuation ? 2.25 : 1.6;
+      } else if (sameFamily) {
+        supportiveCount += 1;
+        score += otherShort || shortContinuation ? 1.35 : 0.9;
+        if (otherShort || bridgeGapContinuation) strongCount += 1;
+      }
+    }
+    return {
+      score,
+      explicitCount,
+      supportiveCount,
+      strongCount,
+      deadEnd
+    };
+  };
+
+  const startScore = continuityScoreFor(startConnections);
+  const endScore = continuityScoreFor(endConnections);
+  if (startScore.explicitCount + endScore.explicitCount >= 2) return true;
+  if (startScore.strongCount > 0 && endScore.supportiveCount > 0) return true;
+  if (endScore.strongCount > 0 && startScore.supportiveCount > 0) return true;
+  if (shortContinuation && (startScore.score + endScore.score) >= 2.6) return true;
+  if (bridgeGapContinuation && (
+    (startScore.score >= 1.8 && endScore.deadEnd) ||
+    (endScore.score >= 1.8 && startScore.deadEnd)
+  )) {
+    return true;
+  }
+  return startScore.score > 0 && endScore.score > 0;
+}
+
+function pointInsideBuildingCandidate(x, z, building) {
+  if (!building) return false;
+  if (Number.isFinite(building.minX) && Number.isFinite(building.maxX) && (
+    x < building.minX || x > building.maxX || z < building.minZ || z > building.maxZ
+  )) {
+    return false;
+  }
+  if (Array.isArray(building.pts) && building.pts.length >= 3) {
+    return pointInPolygonXZLocal(x, z, building.pts);
+  }
+  return true;
+}
+
+function resolveSidewalkWidth(originX, originZ, outwardX, outwardZ, innerOffset, desiredWidth, buildingCandidates) {
+  const probes = [
+    desiredWidth,
+    desiredWidth * 0.82,
+    desiredWidth * 0.64,
+    desiredWidth * 0.48
+  ];
+  for (let i = 0; i < probes.length; i++) {
+    const width = probes[i];
+    if (!Number.isFinite(width) || width < SIDEWALK_MIN_WIDTH) continue;
+    const testOffsets = [
+      innerOffset + Math.min(0.35, width * 0.35),
+      innerOffset + width * 0.58,
+      innerOffset + Math.max(0.2, width - 0.15)
+    ];
+    let blocked = false;
+    for (let s = 0; s < testOffsets.length && !blocked; s++) {
+      const px = originX + outwardX * testOffsets[s];
+      const pz = originZ + outwardZ * testOffsets[s];
+      for (let b = 0; b < buildingCandidates.length; b++) {
+        const building = buildingCandidates[b];
+        if (!pointInsideBuildingCandidate(px, pz, building)) continue;
+        if (Array.isArray(building.pts) && building.pts.length >= 3) {
+          if (distanceToPolygonEdgeXZLocal(px, pz, building.pts) < SIDEWALK_CLEARANCE) {
+            blocked = true;
+            break;
+          }
+        } else {
+          blocked = true;
+          break;
+        }
+      }
+    }
+    if (!blocked) return width;
+  }
+  return 0;
+}
+
+function clampSidewalkWidthTransitions(widths, pts, caps = null, locked = null) {
+  if (!(widths instanceof Float32Array) || !Array.isArray(pts) || pts.length !== widths.length || widths.length < 2) return;
+
+  const applyCaps = () => {
+    if (!(caps instanceof Float32Array) || caps.length !== widths.length) return;
+    for (let i = 0; i < widths.length; i++) {
+      widths[i] = Math.min(widths[i], Math.max(0, caps[i]));
+    }
+  };
+  const applyLocks = () => {
+    if (!(locked instanceof Uint8Array) || locked.length !== widths.length) return;
+    for (let i = 0; i < widths.length; i++) {
+      if (locked[i]) widths[i] = 0;
+    }
+  };
+
+  for (let i = 1; i < widths.length; i++) {
+    const segLen = Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z) || 1;
+    const maxDelta = Math.max(0.35, Math.min(0.95, segLen * 0.22));
+    if (widths[i] > widths[i - 1] + maxDelta) widths[i] = widths[i - 1] + maxDelta;
+  }
+  applyCaps();
+  applyLocks();
+  for (let i = widths.length - 2; i >= 0; i--) {
+    const segLen = Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].z - pts[i].z) || 1;
+    const maxDelta = Math.max(0.35, Math.min(0.95, segLen * 0.22));
+    if (widths[i] > widths[i + 1] + maxDelta) widths[i] = widths[i + 1] + maxDelta;
+  }
+  applyCaps();
+  applyLocks();
+
+  for (let i = 0; i < widths.length; i++) {
+    if (widths[i] < SIDEWALK_SEGMENT_MIN_WIDTH * 0.45) widths[i] = 0;
+  }
+  applyCaps();
+  applyLocks();
+}
+
+function smoothSidewalkOuterHeights(heights, widths, pts) {
+  if (!(heights instanceof Float32Array) || !(widths instanceof Float32Array) || !Array.isArray(pts) || heights.length !== widths.length || heights.length < 3) return;
+
+  for (let pass = 0; pass < 1; pass++) {
+    for (let i = 1; i < heights.length - 1; i++) {
+      if (widths[i] <= 0) continue;
+      const prevWeight = widths[i - 1] > 0 ? 1 : 0;
+      const nextWeight = widths[i + 1] > 0 ? 1 : 0;
+      if (!prevWeight && !nextWeight) continue;
+      const neighborSum =
+        (prevWeight ? heights[i - 1] : 0) +
+        (nextWeight ? heights[i + 1] : 0);
+      const neighborCount = prevWeight + nextWeight;
+      if (!neighborCount) continue;
+      heights[i] = heights[i] * 0.68 + (neighborSum / neighborCount) * 0.32;
+    }
+  }
+}
+
+function computeSidewalkCornerScale(pts, index, sideSign) {
+  if (!Array.isArray(pts) || index <= 0 || index >= pts.length - 1) return 1;
+  const prev = pts[index - 1];
+  const curr = pts[index];
+  const next = pts[index + 1];
+  if (!prev || !curr || !next) return 1;
+
+  const inX = curr.x - prev.x;
+  const inZ = curr.z - prev.z;
+  const outX = next.x - curr.x;
+  const outZ = next.z - curr.z;
+  const inLen = Math.hypot(inX, inZ) || 1;
+  const outLen = Math.hypot(outX, outZ) || 1;
+  const inDirX = inX / inLen;
+  const inDirZ = inZ / inLen;
+  const outDirX = outX / outLen;
+  const outDirZ = outZ / outLen;
+
+  const turnAngle = Math.acos(Math.max(-1, Math.min(1, inDirX * outDirX + inDirZ * outDirZ)));
+  if (!Number.isFinite(turnAngle) || turnAngle < 0.14) return 1;
+
+  const turnCross = inDirX * outDirZ - inDirZ * outDirX;
+  const insideCorner = turnCross * sideSign > 0.02;
+  if (!insideCorner) return 1;
+
+  const severity = Math.max(0, Math.min(1, (turnAngle - 0.14) / 1.1));
+  return Math.max(0.18, Math.min(1, 1 - severity * 0.78));
 }
 
 function scheduleRoadAndBuildingRebuild() {
@@ -265,7 +646,823 @@ function terrainMeshHeightAt(x, z) {
 // Cache terrain height lookups to avoid repeated queries during road generation
 // =====================
 const terrainHeightCache = new Map();
+const baseTerrainHeightCache = new Map();
 let terrainHeightCacheEnabled = true;
+
+function baseTerrainHeightAt(x, z) {
+  const { lat, lon } = worldToLatLon(x, z);
+  const t = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
+  const tile = getOrLoadTerrainTile(appCtx.TERRAIN_ZOOM, t.x, t.y);
+  if (tile.loaded) {
+    const u = t.xf - t.x;
+    const v = t.yf - t.y;
+    const meters = clampElevationMeters(sampleTileElevationMeters(tile, u, v));
+    return meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
+  }
+  const meshY = terrainMeshHeightAt(x, z);
+  if (Number.isFinite(meshY)) return meshY;
+  return elevationWorldYAtWorldXZ(x, z);
+}
+
+function cachedBaseTerrainHeight(x, z) {
+  const key = `${Math.round(x * 10)},${Math.round(z * 10)}`;
+  if (baseTerrainHeightCache.has(key)) return baseTerrainHeightCache.get(key);
+  const h = baseTerrainHeightAt(x, z);
+  baseTerrainHeightCache.set(key, h);
+  return h;
+}
+
+function applyStructureTerrainCuts(worldX, worldZ, terrainY) {
+  if (!Array.isArray(appCtx.structureTerrainCuts) || appCtx.structureTerrainCuts.length === 0 || !Number.isFinite(terrainY)) {
+    return terrainY;
+  }
+
+  let adjustedY = terrainY;
+  for (let i = 0; i < appCtx.structureTerrainCuts.length; i++) {
+    const cut = appCtx.structureTerrainCuts[i];
+    if (!cut?.feature || !cut?.bounds) continue;
+    if (worldX < cut.bounds.minX || worldX > cut.bounds.maxX || worldZ < cut.bounds.minZ || worldZ > cut.bounds.maxZ) continue;
+
+    const projected = projectPointToFeature(cut.feature, worldX, worldZ);
+    if (!projected) continue;
+    const width = Math.max(4.5, Number(cut.width) || Number(cut.feature?.width) || 6);
+    const influenceRadius = width * 0.82 + 3.4;
+    if (!Number.isFinite(projected.dist) || projected.dist > influenceRadius) continue;
+
+    const surfaceY = sampleFeatureSurfaceY(cut.feature, worldX, worldZ, projected);
+    if (!Number.isFinite(surfaceY)) continue;
+
+    const clearance = Math.max(3.1, Number(cut.clearance) || 3.8);
+    const targetY = surfaceY - clearance;
+    if (!(targetY < adjustedY - 0.05)) continue;
+
+    const lateralT = Math.max(0, Math.min(1, projected.dist / Math.max(0.5, influenceRadius)));
+    let fade = 1 - (lateralT * lateralT * (3 - 2 * lateralT));
+    const distances = cut.feature?.surfaceDistances;
+    const points = cut.feature?.pts;
+    if (distances instanceof Float32Array && Array.isArray(points) && points.length >= 2) {
+      const lastIndex = distances.length - 1;
+      const p1 = points[projected.segIndex];
+      const p2 = points[projected.segIndex + 1];
+      const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
+      const distanceAlong = (Number(distances[projected.segIndex]) || 0) + segLen * projected.t;
+      const totalDistance = Number(distances[lastIndex]) || 0;
+      const portalLength = Math.max(6, Number(cut.portalLength) || 0);
+      if (portalLength > 0 && totalDistance > 0) {
+        const portalDistance = Math.min(distanceAlong, Math.max(0, totalDistance - distanceAlong));
+        const portalT = Math.max(0, Math.min(1, portalDistance / portalLength));
+        fade *= portalT * portalT * (3 - 2 * portalT);
+      }
+    }
+    adjustedY = Math.min(adjustedY, adjustedY + (targetY - adjustedY) * fade);
+  }
+
+  return adjustedY;
+}
+
+function pointAlongPolyline(points = [], distance = 0) {
+  if (!Array.isArray(points) || points.length === 0) return null;
+  if (points.length === 1) return { x: points[0].x, z: points[0].z, tangentX: 1, tangentZ: 0 };
+  let remaining = Math.max(0, Number(distance) || 0);
+  for (let i = 0; i < points.length - 1; i++) {
+    const p1 = points[i];
+    const p2 = points[i + 1];
+    const dx = p2.x - p1.x;
+    const dz = p2.z - p1.z;
+    const segLen = Math.hypot(dx, dz);
+    if (segLen <= 1e-6) continue;
+    if (remaining <= segLen) {
+      const t = remaining / segLen;
+      return {
+        x: p1.x + dx * t,
+        z: p1.z + dz * t,
+        tangentX: dx / segLen,
+        tangentZ: dz / segLen
+      };
+    }
+    remaining -= segLen;
+  }
+  const last = points[points.length - 1];
+  const prev = points[points.length - 2];
+  const dx = last.x - prev.x;
+  const dz = last.z - prev.z;
+  const len = Math.hypot(dx, dz) || 1;
+  return {
+    x: last.x,
+    z: last.z,
+    tangentX: dx / len,
+    tangentZ: dz / len
+  };
+}
+
+function polylineCurvatureMetric(points = []) {
+  if (!Array.isArray(points) || points.length < 3) return 0;
+  let totalTurn = 0;
+  let samples = 0;
+  for (let i = 1; i < points.length - 1; i++) {
+    const prev = points[i - 1];
+    const curr = points[i];
+    const next = points[i + 1];
+    const ax = curr.x - prev.x;
+    const az = curr.z - prev.z;
+    const bx = next.x - curr.x;
+    const bz = next.z - curr.z;
+    const aLen = Math.hypot(ax, az);
+    const bLen = Math.hypot(bx, bz);
+    if (!(aLen > 1e-5) || !(bLen > 1e-5)) continue;
+    const dot = Math.max(-1, Math.min(1, (ax * bx + az * bz) / (aLen * bLen)));
+    totalTurn += Math.acos(dot);
+    samples += 1;
+  }
+  return samples > 0 ? totalTurn / samples : 0;
+}
+
+function countNearbyElevatedFeatures(feature, elevatedFeatures, padding = 28) {
+  const featureBounds = feature?.bounds || polylineBounds(feature?.pts || [], (Number(feature?.width) || 4) + padding);
+  if (!featureBounds) return 0;
+  let count = 0;
+  for (let i = 0; i < elevatedFeatures.length; i++) {
+    const other = elevatedFeatures[i];
+    if (!other || other === feature) continue;
+    const otherBounds = other.bounds || polylineBounds(other.pts || [], (Number(other.width) || 4) + padding);
+    if (!otherBounds) continue;
+    if (boundsIntersectLocal(featureBounds, otherBounds, padding)) count += 1;
+  }
+  return count;
+}
+
+function collectStructureVisualInstances() {
+  const supportInstances = [];
+  const portalInstances = [];
+  const deckInstances = [];
+  const girderInstances = [];
+  const capInstances = [];
+  const wallInstances = [];
+  const roofInstances = [];
+  const elevatedFeatures = []
+    .concat(Array.isArray(appCtx.roads) ? appCtx.roads : [])
+    .concat(Array.isArray(appCtx.linearFeatures) ? appCtx.linearFeatures.filter((feature) => feature?.isStructureConnector === true) : []);
+  const elevatedVisualFeatures = elevatedFeatures.filter((feature) =>
+    feature?.structureSemantics?.terrainMode === 'elevated' &&
+    Array.isArray(feature?.pts) &&
+    feature.pts.length >= 2
+  );
+
+  const addSupportInstance = (instance) => {
+    if (!instance || !(instance.scaleY > 0.5)) return;
+    supportInstances.push(instance);
+  };
+
+  const addPortalBeam = (x, y, z, sx, sy, sz, rotationY = 0) => {
+    if (!(sx > 0 && sy > 0 && sz > 0)) return;
+    portalInstances.push({ x, y, z, scaleX: sx, scaleY: sy, scaleZ: sz, rotationY });
+  };
+
+  const addDeckBody = (x, y, z, width, thickness, depth, rotationY = 0, quaternion = null) => {
+    if (!(width > 0.4 && thickness > 0.12 && depth > 0.35)) return;
+    deckInstances.push({
+      x,
+      y,
+      z,
+      scaleX: width,
+      scaleY: thickness,
+      scaleZ: depth,
+      rotationY,
+      quaternion
+    });
+  };
+
+  const addBeam = (collection, x, y, z, sx, sy, sz, rotationY = 0, quaternion = null) => {
+    if (!(sx > 0.08 && sy > 0.08 && sz > 0.2)) return;
+    collection.push({ x, y, z, scaleX: sx, scaleY: sy, scaleZ: sz, rotationY, quaternion });
+  };
+
+  const deckQuaternionForSegment = (p1, y1, p2, y2) => {
+    const dx = p2.x - p1.x;
+    const dy = y2 - y1;
+    const dz = p2.z - p1.z;
+    const length = Math.hypot(dx, dy, dz);
+    if (!(length > 1e-5) || typeof THREE === 'undefined') return null;
+    const direction = new THREE.Vector3(dx / length, dy / length, dz / length);
+    const quaternion = new THREE.Quaternion().setFromUnitVectors(
+      new THREE.Vector3(0, 0, 1),
+      direction
+    );
+    return { x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w, length };
+  };
+
+  for (let i = 0; i < elevatedFeatures.length; i++) {
+    const feature = elevatedFeatures[i];
+    const semantics = feature?.structureSemantics;
+    if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2 || !semantics) continue;
+    const category = String(semantics.featureCategory || feature.networkKind || feature.kind || 'road').toLowerCase();
+    const isConnectorLike = category === 'connector' || category === 'footway';
+    const isSkywalk = semantics.skywalk || semantics.covered || semantics.indoor;
+    const suppressExteriorVisuals = semantics.embeddedInBuilding === true;
+    const roadLinkFeature = /(?:^|_)link$/i.test(String(feature?.type || ''));
+    const localRoadType = String(feature?.type || '').toLowerCase();
+    const lowPriorityRoadVisual =
+      !isConnectorLike &&
+      /^(service|residential|unclassified|living_street|track)$/.test(localRoadType);
+    const visualDetail =
+      semantics.terrainMode === 'elevated' ?
+        (isConnectorLike || isSkywalk ? 1.6 : 2.1) :
+        0.8;
+    const visualPts =
+      typeof appCtx.subdivideRoadPoints === 'function' && feature.pts.length >= 2 ?
+        appCtx.subdivideRoadPoints(feature.pts, visualDetail) :
+        feature.pts;
+    const structurePts = Array.isArray(visualPts) && visualPts.length >= 2 ? visualPts : feature.pts;
+    const { distances, total } = polylineDistances(structurePts);
+    const curvatureMetric = polylineCurvatureMetric(structurePts);
+    const nearbyElevatedCount = semantics.terrainMode === 'elevated' ?
+      countNearbyElevatedFeatures(feature, elevatedVisualFeatures) :
+      0;
+    const transitionAnchorDistances =
+      Array.isArray(feature?.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0 ?
+        feature.structureTransitionAnchors
+          .map((anchor) => Number(anchor?.distance))
+          .filter((distance) => Number.isFinite(distance)) :
+        [];
+    if (semantics.terrainMode === 'elevated') {
+      if (suppressExteriorVisuals) continue;
+      const clutteredInterchange =
+        !isConnectorLike &&
+        !isSkywalk &&
+        (
+          roadLinkFeature ||
+          !!semantics.rampCandidate ||
+          (lowPriorityRoadVisual && nearbyElevatedCount >= 1) ||
+          (total < 120 && nearbyElevatedCount >= 2) ||
+          (nearbyElevatedCount >= 4) ||
+          (curvatureMetric >= 0.22) ||
+          (transitionAnchorDistances.length >= 2 && nearbyElevatedCount >= 2)
+        );
+      const renderRoadFullDeckBody =
+        !isConnectorLike &&
+        !isSkywalk &&
+        !clutteredInterchange &&
+        total >= 42;
+      const renderRoadSideGirders =
+        renderRoadFullDeckBody &&
+        total >= 140 &&
+        curvatureMetric < 0.12 &&
+        nearbyElevatedCount <= 2;
+      const renderRoadSupports =
+        !isConnectorLike &&
+        !isSkywalk &&
+        !clutteredInterchange &&
+        total >= 58 &&
+        nearbyElevatedCount <= 3;
+      const renderRoadAbutments = renderRoadFullDeckBody;
+      const renderCapBeams = isConnectorLike || isSkywalk || renderRoadSupports;
+      const width = Math.max(2, Number(feature.width) || 4);
+      const deckThickness = isConnectorLike ? 0.72 : Math.max(0.9, Math.min(1.6, width * 0.11));
+      const girderDepth = isConnectorLike ? Math.max(0.34, deckThickness * 0.65) : Math.max(0.58, deckThickness * 0.72);
+      for (let segIndex = 0; segIndex < structurePts.length - 1; segIndex++) {
+        const p1 = structurePts[segIndex];
+        const p2 = structurePts[segIndex + 1];
+        const dx = p2.x - p1.x;
+        const dz = p2.z - p1.z;
+        const segLen = Math.hypot(dx, dz);
+        if (!(segLen > 0.35)) continue;
+        const startY = sampleFeatureSurfaceY(feature, p1.x, p1.z);
+        const endY = sampleFeatureSurfaceY(feature, p2.x, p2.z);
+        const midX = (p1.x + p2.x) * 0.5;
+        const midZ = (p1.z + p2.z) * 0.5;
+        const deckY = sampleFeatureSurfaceY(feature, midX, midZ);
+        if (!Number.isFinite(deckY) || !Number.isFinite(startY) || !Number.isFinite(endY)) continue;
+        const rotationY = Math.atan2(dx, dz);
+        const nx = -dz / (segLen || 1);
+        const nz = dx / (segLen || 1);
+        const segmentQuat = deckQuaternionForSegment(p1, startY, p2, endY);
+        const deckDepth = segmentQuat?.length || segLen;
+        const segmentStartDistance = Number(distances[segIndex]) || 0;
+        const segmentEndDistance = Number(distances[segIndex + 1]) || segmentStartDistance + segLen;
+        const segmentCenterDistance = (segmentStartDistance + segmentEndDistance) * 0.5;
+        const slopeRatio = Math.abs(endY - startY) / Math.max(1, segLen);
+        const terrainMidY = cachedTerrainHeight(midX, midZ);
+        const segmentClearance = deckY - terrainMidY;
+        const transitionVisualGap = Math.max(16, Math.min(42, width * 2.6));
+        const nearTransitionVisual =
+          !isConnectorLike &&
+          !isSkywalk &&
+          (
+            segmentCenterDistance < transitionVisualGap ||
+            segmentCenterDistance > Math.max(0, total - transitionVisualGap) ||
+            transitionAnchorDistances.some((distance) => Math.abs(segmentCenterDistance - distance) < transitionVisualGap)
+          );
+        const rampVisualScale =
+          isConnectorLike || isSkywalk ?
+            1 :
+            Math.max(0.24, 1 - Math.max(0, slopeRatio - 0.01) / 0.065);
+        const renderMinimalRoadDeckBody =
+          !isConnectorLike &&
+          !isSkywalk &&
+          !suppressExteriorVisuals &&
+          !clutteredInterchange &&
+          total >= 24 &&
+          segmentClearance > 0.95 &&
+          (!nearTransitionVisual || segmentClearance > 1.35);
+        const renderDeckBody =
+          (
+            isConnectorLike ||
+            isSkywalk ||
+            renderMinimalRoadDeckBody
+          );
+        const renderSideGirders =
+          !nearTransitionVisual &&
+          (
+            isConnectorLike ||
+            isSkywalk ||
+            renderRoadSideGirders
+          );
+        const deckBodyThickness =
+          isConnectorLike || isSkywalk ?
+            deckThickness :
+            (
+              renderRoadFullDeckBody ?
+                Math.max(0.16, Math.min(0.34, width * 0.028)) * (0.82 + rampVisualScale * 0.18) :
+                Math.max(0.08, Math.min(0.18, width * 0.014)) * (0.88 + rampVisualScale * 0.12)
+            );
+        const deckBodyWidth =
+          isConnectorLike || isSkywalk ?
+            width + 0.5 :
+            (
+              renderRoadFullDeckBody ?
+                width + 0.16 + rampVisualScale * 0.12 :
+                width + 0.08 + rampVisualScale * 0.08
+            );
+        if (renderDeckBody) {
+          addDeckBody(
+            midX,
+            deckY - deckBodyThickness * 0.5 - 0.04,
+            midZ,
+            deckBodyWidth,
+            deckBodyThickness,
+            deckDepth,
+            rotationY,
+            segmentQuat
+          );
+        }
+
+        const sideOffset = Math.max(0.7, width * 0.34);
+        const sideBeamWidth =
+          isConnectorLike ?
+            0.24 :
+            Math.max(0.12, Math.min(0.24, width * 0.022));
+        const sideGirderDepth =
+          isConnectorLike || isSkywalk ?
+            girderDepth :
+            Math.max(0.14, Math.min(0.24, girderDepth * 0.34));
+        if (renderSideGirders) {
+          addBeam(
+            girderInstances,
+            midX + nx * sideOffset,
+            deckY - deckBodyThickness + sideGirderDepth * 0.5,
+            midZ + nz * sideOffset,
+            sideBeamWidth,
+            sideGirderDepth,
+            deckDepth,
+            rotationY,
+            segmentQuat
+          );
+          addBeam(
+            girderInstances,
+            midX - nx * sideOffset,
+            deckY - deckBodyThickness + sideGirderDepth * 0.5,
+            midZ - nz * sideOffset,
+            sideBeamWidth,
+            sideGirderDepth,
+            deckDepth,
+            rotationY,
+            segmentQuat
+          );
+          if (!isConnectorLike && width > 9.5 && rampVisualScale >= 0.82) {
+            addBeam(
+              girderInstances,
+              midX,
+              deckY - deckBodyThickness + sideGirderDepth * 0.44,
+              midZ,
+              Math.max(0.26, Math.min(0.52, width * 0.05)),
+              Math.max(0.28, sideGirderDepth * 0.82),
+              deckDepth,
+              rotationY,
+              segmentQuat
+            );
+          }
+        }
+
+        if (isSkywalk) {
+          const wallHeight = Math.max(1.8, Math.min(2.7, width * 0.22 + 1.2));
+          const wallThickness = 0.18;
+          const wallOffset = Math.max(0.8, width * 0.48);
+          addBeam(
+            wallInstances,
+            midX + nx * wallOffset,
+            deckY + wallHeight * 0.5,
+            midZ + nz * wallOffset,
+            wallThickness,
+            wallHeight,
+            deckDepth,
+            rotationY,
+            segmentQuat
+          );
+          addBeam(
+            wallInstances,
+            midX - nx * wallOffset,
+            deckY + wallHeight * 0.5,
+            midZ - nz * wallOffset,
+            wallThickness,
+            wallHeight,
+            deckDepth,
+            rotationY,
+            segmentQuat
+          );
+          addBeam(
+            roofInstances,
+            midX,
+            deckY + wallHeight + 0.12,
+            midZ,
+            width + 0.36,
+            0.16,
+            deckDepth,
+            rotationY,
+            segmentQuat
+          );
+        }
+      }
+
+      const supportSpacing =
+        isConnectorLike ?
+          Math.max(16, width * 3.6) :
+          Math.max(26, width * 3.8 + nearbyElevatedCount * 5);
+      const skipNear = Math.max(8, width * 0.9);
+      const skipDistance = (distance) => {
+        if (distance < skipNear || distance > total - skipNear) return true;
+        if (!Array.isArray(feature.structureStations)) return false;
+        return feature.structureStations.some((station) =>
+          Math.abs(distance - station.distance) < Math.max(width * 1.6, station.span * 0.58)
+        );
+      };
+
+      if (isConnectorLike || renderRoadSupports) {
+        for (let distance = supportSpacing * 0.5; distance < total; distance += supportSpacing) {
+          if (skipDistance(distance)) continue;
+          const point = pointAlongPolyline(structurePts, distance);
+          if (!point) continue;
+          const terrainY = cachedTerrainHeight(point.x, point.z);
+          const deckY = sampleFeatureSurfaceY(feature, point.x, point.z);
+          const supportDeckThickness = isConnectorLike ? 0.42 : 0.78;
+          const supportHeight = deckY - deckThickness - terrainY;
+          if (!(supportHeight > 2.4)) continue;
+          const nx = -point.tangentZ;
+          const nz = point.tangentX;
+          const pierWidth =
+            isConnectorLike ?
+              Math.max(0.7, width * 0.22) :
+              Math.max(1.2, Math.min(2.0, width * 0.14));
+          if (isConnectorLike) {
+            addSupportInstance({
+              x: point.x,
+              y: terrainY + supportHeight * 0.5,
+              z: point.z,
+              scaleX: pierWidth,
+              scaleY: supportHeight,
+              scaleZ: pierWidth
+            });
+          } else {
+            const columnOffset = Math.max(1.2, Math.min(width * 0.24, width * 0.34));
+            addSupportInstance({
+              x: point.x + nx * columnOffset,
+              y: terrainY + supportHeight * 0.5,
+              z: point.z + nz * columnOffset,
+              scaleX: pierWidth,
+              scaleY: supportHeight,
+              scaleZ: Math.max(1.0, pierWidth * 1.08)
+            });
+            addSupportInstance({
+              x: point.x - nx * columnOffset,
+              y: terrainY + supportHeight * 0.5,
+              z: point.z - nz * columnOffset,
+              scaleX: pierWidth,
+              scaleY: supportHeight,
+              scaleZ: Math.max(1.0, pierWidth * 1.08)
+            });
+            if (renderCapBeams) {
+              addBeam(
+                capInstances,
+                point.x,
+                deckY - supportDeckThickness - 0.18,
+                point.z,
+                width * 0.76,
+                0.26,
+                Math.max(0.5, pierWidth * 1.1),
+                Math.atan2(point.tangentX, point.tangentZ)
+              );
+            }
+          }
+        }
+      }
+
+      if (!isConnectorLike && renderRoadSupports && renderCapBeams && Array.isArray(feature.structureStations)) {
+        const stationSpanFactor = Math.max(8, width * 1.2);
+        for (let s = 0; s < feature.structureStations.length; s++) {
+          const station = feature.structureStations[s];
+          const offsets = [
+            station.distance - Math.max(stationSpanFactor, station.span * 0.68),
+            station.distance + Math.max(stationSpanFactor, station.span * 0.68)
+          ];
+          for (let o = 0; o < offsets.length; o++) {
+            const stationDistance = offsets[o];
+            if (stationDistance <= skipNear || stationDistance >= total - skipNear) continue;
+            const point = pointAlongPolyline(structurePts, stationDistance);
+            if (!point) continue;
+            const terrainY = cachedTerrainHeight(point.x, point.z);
+            const deckY = sampleFeatureSurfaceY(feature, point.x, point.z);
+            const supportHeight = deckY - deckThickness - terrainY;
+            if (!(supportHeight > 2.6)) continue;
+            const nx = -point.tangentZ;
+            const nz = point.tangentX;
+            const pierWidth = Math.max(1.2, Math.min(2.5, width * 0.17));
+            const columnOffset = Math.max(1.2, Math.min(width * 0.28, width * 0.42));
+            addSupportInstance({
+              x: point.x + nx * columnOffset,
+              y: terrainY + supportHeight * 0.5,
+              z: point.z + nz * columnOffset,
+              scaleX: pierWidth,
+              scaleY: supportHeight,
+              scaleZ: Math.max(1.0, pierWidth * 1.1)
+            });
+            addSupportInstance({
+              x: point.x - nx * columnOffset,
+              y: terrainY + supportHeight * 0.5,
+              z: point.z - nz * columnOffset,
+              scaleX: pierWidth,
+              scaleY: supportHeight,
+              scaleZ: Math.max(1.0, pierWidth * 1.1)
+            });
+            addBeam(
+              capInstances,
+              point.x,
+              deckY - deckThickness - 0.2,
+              point.z,
+              width * 0.86,
+              0.36,
+              Math.max(0.58, pierWidth * 1.2),
+              Math.atan2(point.tangentX, point.tangentZ)
+            );
+          }
+        }
+      }
+
+      const addAbutmentAt = (distance) => {
+        const point = pointAlongPolyline(structurePts, distance);
+        if (!point) return;
+        const terrainY = cachedTerrainHeight(point.x, point.z);
+        const deckY = sampleFeatureSurfaceY(feature, point.x, point.z);
+        const supportHeight = deckY - 0.45 - terrainY;
+        if (!(supportHeight > 1.4)) return;
+        const nx = -point.tangentZ;
+        const nz = point.tangentX;
+        const widthScale = Math.max(1.2, Number(feature.width) || 4);
+        addSupportInstance({
+          x: point.x + nx * 0.2,
+          y: terrainY + supportHeight * 0.5,
+          z: point.z + nz * 0.2,
+          scaleX: Math.max(1.8, widthScale * 0.92),
+          scaleY: supportHeight,
+          scaleZ: Math.max(2.1, widthScale * 0.44)
+        });
+        if (!isConnectorLike && renderCapBeams) {
+          addBeam(
+            capInstances,
+            point.x,
+            deckY - deckThickness - 0.18,
+            point.z,
+            Math.max(2.6, widthScale * 0.92),
+            0.32,
+            Math.max(1.2, widthScale * 0.38),
+            Math.atan2(point.tangentX, point.tangentZ)
+          );
+        }
+      };
+      if (isConnectorLike || renderRoadAbutments) {
+        addAbutmentAt(Math.min(6, total * 0.12));
+        addAbutmentAt(Math.max(0, total - Math.min(6, total * 0.12)));
+      }
+    } else if (semantics.terrainMode === 'subgrade') {
+      const width = Math.max(3.4, Number(feature.width) || 6);
+      const openingHalfWidth = width * 0.5 + 0.9;
+      const beamThickness = 0.6;
+      const portalInset = Math.min(4, Math.max(2, total * 0.08));
+      const portalDistances = [portalInset, Math.max(0, total - portalInset)];
+      for (let p = 0; p < portalDistances.length; p++) {
+        const point = pointAlongPolyline(feature.pts, portalDistances[p]);
+        if (!point) continue;
+        const terrainY = cachedTerrainHeight(point.x, point.z);
+        const roadY = sampleFeatureSurfaceY(feature, point.x, point.z);
+        const openingHeight = terrainY - roadY - 0.15;
+        if (!(openingHeight > 2.6)) continue;
+        const nx = -point.tangentZ;
+        const nz = point.tangentX;
+        const pillarWidth = Math.max(0.75, width * 0.16);
+        const pillarHeight = openingHeight;
+        const sideOffset = openingHalfWidth + pillarWidth * 0.5;
+        addPortalBeam(
+          point.x + nx * sideOffset,
+          roadY + pillarHeight * 0.5,
+          point.z + nz * sideOffset,
+          pillarWidth,
+          pillarHeight,
+          Math.max(0.8, width * 0.26),
+          Math.atan2(point.tangentX, point.tangentZ)
+        );
+        addPortalBeam(
+          point.x - nx * sideOffset,
+          roadY + pillarHeight * 0.5,
+          point.z - nz * sideOffset,
+          pillarWidth,
+          pillarHeight,
+          Math.max(0.8, width * 0.26),
+          Math.atan2(point.tangentX, point.tangentZ)
+        );
+        addPortalBeam(
+          point.x,
+          roadY + openingHeight + beamThickness * 0.5,
+          point.z,
+          width + pillarWidth * 2.2,
+          beamThickness,
+          Math.max(0.9, width * 0.34),
+          Math.atan2(point.tangentX, point.tangentZ)
+        );
+        addBeam(
+          portalInstances,
+          point.x + nx * (openingHalfWidth + pillarWidth * 0.88),
+          roadY + openingHeight * 0.48,
+          point.z + nz * (openingHalfWidth + pillarWidth * 0.88),
+          pillarWidth * 0.68,
+          openingHeight * 0.84,
+          Math.max(2.4, width * 0.66),
+          Math.atan2(point.tangentX, point.tangentZ)
+        );
+        addBeam(
+          portalInstances,
+          point.x - nx * (openingHalfWidth + pillarWidth * 0.88),
+          roadY + openingHeight * 0.48,
+          point.z - nz * (openingHalfWidth + pillarWidth * 0.88),
+          pillarWidth * 0.68,
+          openingHeight * 0.84,
+          Math.max(2.4, width * 0.66),
+          Math.atan2(point.tangentX, point.tangentZ)
+        );
+      }
+    }
+  }
+
+  return {
+    supportInstances,
+    portalInstances,
+    deckInstances,
+    girderInstances,
+    capInstances,
+    wallInstances,
+    roofInstances
+  };
+}
+
+function clearStructureVisualMeshes() {
+  if (!Array.isArray(appCtx.structureVisualMeshes)) appCtx.structureVisualMeshes = [];
+  appCtx.structureVisualMeshes.forEach((mesh) => {
+    if (!mesh) return;
+    if (mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
+    if (mesh.geometry && typeof mesh.geometry.dispose === 'function') mesh.geometry.dispose();
+    if (mesh.material && typeof mesh.material.dispose === 'function') mesh.material.dispose();
+  });
+  appCtx.structureVisualMeshes = [];
+}
+
+function buildStructureVisualMesh(instances, material, userData = {}) {
+  if (!Array.isArray(instances) || instances.length === 0 || typeof THREE === 'undefined') return null;
+  const geometry = new THREE.BoxGeometry(1, 1, 1);
+  const mesh = new THREE.InstancedMesh(geometry, material, instances.length);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const matrix = new THREE.Matrix4();
+  const quaternion = new THREE.Quaternion();
+  const scale = new THREE.Vector3();
+  const position = new THREE.Vector3();
+  for (let i = 0; i < instances.length; i++) {
+    const instance = instances[i];
+    position.set(instance.x, instance.y, instance.z);
+    if (instance?.quaternion && Number.isFinite(instance.quaternion.x) && Number.isFinite(instance.quaternion.y) && Number.isFinite(instance.quaternion.z) && Number.isFinite(instance.quaternion.w)) {
+      quaternion.set(instance.quaternion.x, instance.quaternion.y, instance.quaternion.z, instance.quaternion.w);
+    } else {
+      quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Number(instance.rotationY) || 0);
+    }
+    scale.set(instance.scaleX, instance.scaleY, instance.scaleZ);
+    matrix.compose(position, quaternion, scale);
+    mesh.setMatrixAt(i, matrix);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.frustumCulled = false;
+  Object.assign(mesh.userData, userData, { isStructureVisual: true });
+  appCtx.scene.add(mesh);
+  appCtx.structureVisualMeshes.push(mesh);
+  return mesh;
+}
+
+function rebuildStructureVisualMeshes() {
+  clearStructureVisualMeshes();
+  if (appCtx.onMoon || !appCtx.scene) return;
+  const {
+    supportInstances,
+    portalInstances,
+    deckInstances,
+    girderInstances,
+    capInstances,
+    wallInstances,
+    roofInstances
+  } = collectStructureVisualInstances();
+  if (deckInstances.length > 0) {
+    buildStructureVisualMesh(
+      deckInstances,
+      new THREE.MeshStandardMaterial({
+        color: 0x56606b,
+        roughness: 0.92,
+        metalness: 0.03
+      }),
+      { structureVisualType: 'decks' }
+    );
+  }
+  if (girderInstances.length > 0) {
+    buildStructureVisualMesh(
+      girderInstances,
+      new THREE.MeshStandardMaterial({
+        color: 0x404954,
+        roughness: 0.88,
+        metalness: 0.08
+      }),
+      { structureVisualType: 'girders' }
+    );
+  }
+  if (capInstances.length > 0) {
+    buildStructureVisualMesh(
+      capInstances,
+      new THREE.MeshStandardMaterial({
+        color: 0x646c76,
+        roughness: 0.92,
+        metalness: 0.03
+      }),
+      { structureVisualType: 'caps' }
+    );
+  }
+  if (supportInstances.length > 0) {
+    buildStructureVisualMesh(
+      supportInstances,
+      new THREE.MeshStandardMaterial({
+        color: 0x717983,
+        roughness: 0.95,
+        metalness: 0.02
+      }),
+      { structureVisualType: 'supports' }
+    );
+  }
+  if (wallInstances.length > 0) {
+    buildStructureVisualMesh(
+      wallInstances,
+      new THREE.MeshStandardMaterial({
+        color: 0x66727d,
+        roughness: 0.88,
+        metalness: 0.08
+      }),
+      { structureVisualType: 'walls' }
+    );
+  }
+  if (roofInstances.length > 0) {
+    buildStructureVisualMesh(
+      roofInstances,
+      new THREE.MeshStandardMaterial({
+        color: 0x4c5660,
+        roughness: 0.84,
+        metalness: 0.12
+      }),
+      { structureVisualType: 'roofs' }
+    );
+  }
+  if (portalInstances.length > 0) {
+    buildStructureVisualMesh(
+      portalInstances,
+      new THREE.MeshStandardMaterial({
+        color: 0x585e64,
+        roughness: 0.96,
+        metalness: 0.02
+      }),
+      { structureVisualType: 'portals' }
+    );
+  }
+}
 
 function cachedTerrainHeight(x, z) {
   if (!terrainHeightCacheEnabled) return terrainMeshHeightAt(x, z);
@@ -281,6 +1478,7 @@ function cachedTerrainHeight(x, z) {
 
 function clearTerrainHeightCache() {
   terrainHeightCache.clear();
+  baseTerrainHeightCache.clear();
 }
 
 function cloneTerrainTextureWithRepeat(sourceTexture, repeats) {
@@ -295,7 +1493,10 @@ function cloneTerrainTextureWithRepeat(sourceTexture, repeats) {
 const proceduralTerrainTextureBases = {
   snow: null,
   snowRock: null,
-  sand: null
+  sand: null,
+  urban: null,
+  soil: null,
+  rock: null
 };
 
 function hashNoise2D(x, y, seed = 1) {
@@ -327,6 +1528,9 @@ function makeProceduralTerrainTextureSet(mode = 'snow', size = 128) {
 
   const isAlpine = mode === 'snowRock';
   const isSand = mode === 'sand';
+  const isUrban = mode === 'urban';
+  const isSoil = mode === 'soil';
+  const isRock = mode === 'rock';
   const colorSeed = isAlpine ? 9 : 5;
   const normalSeed = isAlpine ? 12 : 7;
   const roughSeed = isAlpine ? 15 : 11;
@@ -348,6 +1552,28 @@ function makeProceduralTerrainTextureSet(mode = 'snow', size = 128) {
         r = baseTone + warmTone;
         g = baseTone * 0.91 + duneBlend * 11;
         b = baseTone * 0.72 + duneBlend * 6;
+      } else if (isUrban) {
+        const slab = Math.sin((x * 0.11) + macro * 3.2) * 0.5 + Math.cos((y * 0.12) + micro * 2.9) * 0.5;
+        const grime = hashNoise2D(x * 0.24, y * 0.24, colorSeed + 6);
+        const baseTone = 118 + macro * 20 + micro * 10;
+        const seam = slab > 0.92 || slab < -0.92 ? -28 : 0;
+        r = baseTone + seam - grime * 9;
+        g = baseTone + 4 + seam - grime * 8;
+        b = baseTone + 10 + seam - grime * 7;
+      } else if (isSoil) {
+        const furrow = Math.sin((x * 0.19 - y * 0.05) + macro * 4.4);
+        const clump = hashNoise2D(x * 0.31, y * 0.31, colorSeed + 8);
+        const baseTone = 118 + macro * 26 + micro * 12;
+        r = baseTone + 20 + furrow * 9;
+        g = baseTone * 0.74 + clump * 12;
+        b = baseTone * 0.48 + furrow * 6;
+      } else if (isRock) {
+        const fracture = Math.sin((x * 0.16 + y * 0.08) + macro * 5.1);
+        const grain = hashNoise2D(x * 0.34, y * 0.34, colorSeed + 10);
+        const baseTone = 122 + macro * 30 + micro * 18;
+        r = baseTone + fracture * 8;
+        g = baseTone + 4 + fracture * 6;
+        b = baseTone + 10 + grain * 10;
       } else {
         const rockMaskRaw = isAlpine ? Math.max(0, macro * 1.25 - 0.55) : 0;
         const rockMask = isAlpine ? Math.min(1, Math.max(0, rockMaskRaw * 1.8 + micro * 0.22)) : 0;
@@ -367,18 +1593,30 @@ function makeProceduralTerrainTextureSet(mode = 'snow', size = 128) {
 
       const nx = isSand ?
         Math.sin((x * 0.22 + y * 0.035) + macro * 4.1) * 46 + (hashNoise2D(x * 0.19, y * 0.19, normalSeed) - 0.5) * 10 :
-        (hashNoise2D(x * 0.16, y * 0.16, normalSeed) - 0.5) * (isAlpine ? 54 : 34);
+        isUrban ?
+          (hashNoise2D(x * 0.14, y * 0.14, normalSeed) - 0.5) * 12 :
+          isSoil ?
+            (hashNoise2D(x * 0.16, y * 0.16, normalSeed) - 0.5) * 28 :
+            isRock ?
+              (hashNoise2D(x * 0.16, y * 0.16, normalSeed) - 0.5) * 52 :
+              (hashNoise2D(x * 0.16, y * 0.16, normalSeed) - 0.5) * (isAlpine ? 54 : 34);
       const ny = isSand ?
         Math.cos((x * 0.12 - y * 0.09) + micro * 3.8) * 28 + (hashNoise2D(x * 0.19 + 41, y * 0.19 - 29, normalSeed + 2) - 0.5) * 8 :
-        (hashNoise2D(x * 0.16 + 41, y * 0.16 - 29, normalSeed + 2) - 0.5) * (isAlpine ? 54 : 34);
+        isUrban ?
+          (hashNoise2D(x * 0.14 + 41, y * 0.14 - 29, normalSeed + 2) - 0.5) * 12 :
+          isSoil ?
+            (hashNoise2D(x * 0.16 + 41, y * 0.16 - 29, normalSeed + 2) - 0.5) * 28 :
+            isRock ?
+              (hashNoise2D(x * 0.16 + 41, y * 0.16 - 29, normalSeed + 2) - 0.5) * 52 :
+              (hashNoise2D(x * 0.16 + 41, y * 0.16 - 29, normalSeed + 2) - 0.5) * (isAlpine ? 54 : 34);
       normalImage.data[idx] = Math.max(0, Math.min(255, Math.round(128 + nx)));
       normalImage.data[idx + 1] = Math.max(0, Math.min(255, Math.round(128 + ny)));
       normalImage.data[idx + 2] = 255;
       normalImage.data[idx + 3] = 255;
 
-      const roughBase = isSand ? 204 : isAlpine ? 168 : 224;
-      const roughVar = hashNoise2D(x * 0.18, y * 0.18, roughSeed) * (isSand ? 38 : isAlpine ? 64 : 28);
-      const roughMask = isSand ? 12 : isAlpine ? Math.max(0, macro * 18) : 0;
+      const roughBase = isSand ? 204 : isAlpine ? 168 : isUrban ? 148 : isSoil ? 196 : isRock ? 176 : 224;
+      const roughVar = hashNoise2D(x * 0.18, y * 0.18, roughSeed) * (isSand ? 38 : isAlpine ? 64 : isUrban ? 26 : isSoil ? 34 : isRock ? 52 : 28);
+      const roughMask = isSand ? 12 : isAlpine ? Math.max(0, macro * 18) : isUrban ? Math.max(0, micro * 12) : isRock ? Math.max(0, macro * 22) : 0;
       const rough = Math.max(0, Math.min(255, Math.round(roughBase + roughVar + roughMask)));
       roughnessImage.data[idx] = rough;
       roughnessImage.data[idx + 1] = rough;
@@ -413,7 +1651,13 @@ function makeProceduralTerrainTextureSet(mode = 'snow', size = 128) {
 }
 
 function getProceduralTerrainTextureBase(mode = 'snow') {
-  const key = mode === 'snowRock' ? 'snowRock' : mode === 'sand' ? 'sand' : 'snow';
+  const key =
+    mode === 'snowRock' ? 'snowRock' :
+    mode === 'sand' ? 'sand' :
+    mode === 'urban' ? 'urban' :
+    mode === 'soil' ? 'soil' :
+    mode === 'rock' ? 'rock' :
+    'snow';
   if (!proceduralTerrainTextureBases[key]) {
     proceduralTerrainTextureBases[key] = makeProceduralTerrainTextureSet(key, 128);
   }
@@ -423,20 +1667,43 @@ function getProceduralTerrainTextureBase(mode = 'snow') {
 function ensureTerrainTextureSet(mesh, repeats, mode = 'grass') {
   if (!mesh || !mesh.userData) return null;
   if (!mesh.userData.terrainTextureSetsByMode) mesh.userData.terrainTextureSetsByMode = {};
-  const modeKey = mode === 'snowRock' ? 'snowRock' : mode === 'snow' ? 'snow' : mode === 'sand' ? 'sand' : 'grass';
+  const modeKey =
+    mode === 'snowRock' ? 'snowRock' :
+    mode === 'snow' ? 'snow' :
+    mode === 'sand' ? 'sand' :
+    mode === 'urban' ? 'urban' :
+    mode === 'soil' ? 'soil' :
+    mode === 'rock' ? 'rock' :
+    'grass';
   const textureCacheKey = `${modeKey}:${Number(repeats) || 12}`;
   if (mesh.userData.terrainTextureSetsByMode[textureCacheKey]) {
     mesh.userData.terrainTextureSet = mesh.userData.terrainTextureSetsByMode[textureCacheKey];
     return mesh.userData.terrainTextureSet;
   }
 
-  const source = modeKey === 'grass' ?
-    {
+  let source = null;
+  if (modeKey === 'grass') {
+    source = {
       map: appCtx.grassDiffuse,
       normalMap: appCtx.grassNormal,
       roughnessMap: appCtx.grassRoughness
-    } :
-    getProceduralTerrainTextureBase(modeKey);
+    };
+  } else if (modeKey === 'urban') {
+    source =
+      (appCtx.pavementDiffuse ? {
+        map: appCtx.pavementDiffuse,
+        normalMap: appCtx.pavementNormal,
+        roughnessMap: appCtx.pavementRoughness
+      } : null) ||
+      (appCtx.concreteDiffuse ? {
+        map: appCtx.concreteDiffuse,
+        normalMap: appCtx.concreteNormal,
+        roughnessMap: appCtx.concreteRoughness
+      } : null) ||
+      getProceduralTerrainTextureBase(modeKey);
+  } else {
+    source = getProceduralTerrainTextureBase(modeKey);
+  }
   if (!source) return null;
 
   const textureSet = {
@@ -469,17 +1736,29 @@ function applyGroundFallbackProfile(profile = null) {
   const ground = getGroundFallbackMesh();
   const material = ground?.material;
   if (!ground || !material || Array.isArray(material)) return;
-  const mode = profile?.mode === 'snow' || profile?.mode === 'snowRock' || profile?.mode === 'sand' ? profile.mode : 'grass';
+  const mode = ['snow', 'snowRock', 'sand', 'urban', 'soil', 'rock'].includes(profile?.mode) ? profile.mode : 'grass';
   const colorHex = mode === 'snow' ?
     GROUND_FALLBACK_SNOW_HEX :
     mode === 'snowRock' ?
       GROUND_FALLBACK_ALPINE_HEX :
       mode === 'sand' ?
         GROUND_FALLBACK_SAND_HEX :
+        mode === 'urban' ?
+          GROUND_FALLBACK_URBAN_HEX :
+          mode === 'soil' ?
+            GROUND_FALLBACK_SOIL_HEX :
+            mode === 'rock' ?
+              GROUND_FALLBACK_ROCK_HEX :
       GROUND_FALLBACK_GRASS_HEX;
   material.color.setHex(colorHex);
-  material.roughness = mode === 'grass' ? 0.95 : mode === 'sand' ? 0.92 : 0.86;
-  material.metalness = mode === 'grass' ? 0 : 0.02;
+  material.roughness =
+    mode === 'grass' ? 0.95 :
+    mode === 'sand' ? 0.92 :
+    mode === 'urban' ? 0.84 :
+    mode === 'soil' ? 0.9 :
+    mode === 'rock' ? 0.87 :
+    0.86;
+  material.metalness = mode === 'urban' ? 0.03 : mode === 'grass' || mode === 'soil' || mode === 'sand' ? 0 : 0.02;
   material.needsUpdate = true;
 }
 
@@ -517,7 +1796,14 @@ function applyTerrainVisualProfile(mesh, profile, repeats = null) {
   const mat = mesh.material;
   const tileBounds = mesh.userData.terrainTile?.bounds || null;
   const nextProfile = profile || classifyTerrainVisualProfile(tileBounds);
-  const nextMode = nextProfile.mode === 'snowRock' ? 'snowRock' : nextProfile.mode === 'snow' ? 'snow' : nextProfile.mode === 'sand' ? 'sand' : 'grass';
+  const nextMode =
+    nextProfile.mode === 'snowRock' ? 'snowRock' :
+    nextProfile.mode === 'snow' ? 'snow' :
+    nextProfile.mode === 'sand' ? 'sand' :
+    nextProfile.mode === 'urban' ? 'urban' :
+    nextProfile.mode === 'soil' ? 'soil' :
+    nextProfile.mode === 'rock' ? 'rock' :
+    'grass';
   const textureRepeats = Number.isFinite(repeats) && repeats > 0 ?
   repeats :
   Number(mesh.userData.terrainTextureRepeats) || 12;
@@ -545,6 +1831,39 @@ function applyTerrainVisualProfile(mesh, profile, repeats = null) {
     mat.roughness = 0.92;
     mat.metalness = 0.0;
     if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.78, 0.42);
+  } else if (nextMode === 'urban') {
+    const textures = ensureTerrainTextureSet(mesh, textureRepeats * 1.1, 'urban');
+    mat.map = textures?.map || null;
+    mat.normalMap = textures?.normalMap || null;
+    mat.roughnessMap = textures?.roughnessMap || null;
+    mat.color.setHex(mat.map ? 0xffffff : URBAN_GROUND_HEX);
+    if (mat.emissive) mat.emissive.setHex(0x000000);
+    mat.emissiveIntensity = 0;
+    mat.roughness = 0.84;
+    mat.metalness = 0.03;
+    if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.28, 0.28);
+  } else if (nextMode === 'soil') {
+    const textures = ensureTerrainTextureSet(mesh, textureRepeats * 1.05, 'soil');
+    mat.map = textures?.map || null;
+    mat.normalMap = textures?.normalMap || null;
+    mat.roughnessMap = textures?.roughnessMap || null;
+    mat.color.setHex(mat.map ? 0xffffff : SOIL_COLOR_HEX);
+    if (mat.emissive) mat.emissive.setHex(0x000000);
+    mat.emissiveIntensity = 0;
+    mat.roughness = 0.9;
+    mat.metalness = 0.0;
+    if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.48, 0.48);
+  } else if (nextMode === 'rock') {
+    const textures = ensureTerrainTextureSet(mesh, textureRepeats * 0.95, 'rock');
+    mat.map = textures?.map || null;
+    mat.normalMap = textures?.normalMap || null;
+    mat.roughnessMap = textures?.roughnessMap || null;
+    mat.color.setHex(mat.map ? 0xffffff : ROCK_COLOR_HEX);
+    if (mat.emissive) mat.emissive.setHex(0x000000);
+    mat.emissiveIntensity = 0;
+    mat.roughness = 0.87;
+    mat.metalness = 0.02;
+    if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.56, 0.56);
   } else {
     const textures = ensureTerrainTextureSet(mesh, textureRepeats, 'grass');
     mat.map = textures?.map || null;
@@ -916,7 +2235,8 @@ function applyHeightsToTerrainMesh(mesh) {
     const v = (bounds.latN - lat) / latRange;
     const meters = clampElevationMeters(sampleTileElevationMeters(tile, u, v));
     elevationMetersSamples.push(meters);
-    const y = meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
+    const baseY = meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
+    const y = applyStructureTerrainCuts(wx, wz, baseY);
     elevations.push(y);
     minElevation = Math.min(minElevation, y);
     maxElevation = Math.max(maxElevation, y);
@@ -1206,6 +2526,10 @@ function rebuildRoadsWithTerrain() {
 
   if (tilesLoaded === 0 || tilesTotal === 0) return;
 
+  if (typeof appCtx.refreshStructureAwareFeatureProfiles === 'function') {
+    appCtx.refreshStructureAwareFeatureProfiles();
+  }
+
   // OPTIMIZATION: Only clear height cache if road count changed (roads added/removed)
   // Otherwise keep cached heights for better performance
   const roadCountChanged = appCtx.roads.length !== terrain._lastRoadCount;
@@ -1230,6 +2554,20 @@ function rebuildRoadsWithTerrain() {
     }
   });
   appCtx.roadMeshes = [];
+  appCtx.urbanSurfaceMeshes.forEach((m) => {
+    appCtx.scene.remove(m);
+    if (m.geometry) m.geometry.dispose();
+    if (m.material && !m.userData?.sharedUrbanSurfaceMaterial && typeof m.material.dispose === 'function') {
+      m.material.dispose();
+    }
+  });
+  appCtx.urbanSurfaceMeshes = [];
+  appCtx.urbanSurfaceStats = {
+    sidewalkBatchCount: 0,
+    sidewalkVertices: 0,
+    sidewalkTriangles: 0,
+    skippedBuildingAprons: Number(appCtx.urbanSurfaceStats?.skippedBuildingAprons || 0)
+  };
 
   // OPTIMIZATION: Cache intersection detection - only recalculate if roads changed
   let intersections;
@@ -1246,46 +2584,46 @@ function rebuildRoadsWithTerrain() {
   const roadSkirtBatchIdx = [];
   const roadCapBatchVerts = [];
   const roadCapBatchIdx = [];
+  const sidewalkBatchVerts = [];
+  const sidewalkBatchIdx = [];
 
   const sharedRoadMaterials = getSharedRoadMaterials();
   const roadMat = sharedRoadMaterials.roadMat;
   const skirtMat = sharedRoadMaterials.skirtMat;
   const capMat = sharedRoadMaterials.capMat;
+  const urbanSurfaceMaterials = getSharedUrbanSurfaceMaterials();
+  const sidewalkMat = urbanSurfaceMaterials.sidewalkMat;
 
-  // Rebuild each road with improved terrain conformance
-  appCtx.roads.forEach((road) => {
-    const { width } = road;
-    const hw = width / 2;
+  const buildSidewalkStrip = (
+    pts,
+    edgePoints,
+    sideSign,
+    halfWidth,
+    desiredWidth,
+    roadFeature,
+    buildingCandidates,
+    nearbyIntersections = [],
+    endpointIntersections = null
+  ) => {
+    if (!Array.isArray(pts) || pts.length < 2 || !Array.isArray(edgePoints) || edgePoints.length !== pts.length) return;
+    if (!Number.isFinite(desiredWidth) || desiredWidth < SIDEWALK_MIN_WIDTH) return;
 
-    // Curvature-aware subdivision: straight = 2-5m, curves = 0.5-2m
-    const detail = Number.isFinite(road?.subdivideMaxDist) ? road.subdivideMaxDist : 3.5;
-    const pts = subdivideRoadPoints(road.pts, detail);
-
-    const verts = [];
-    const indices = [];
-    const leftEdge = [];
-    const rightEdge = [];
-
-    // First pass: sample terrain heights at center of each road point
-    const centerHeights = new Float64Array(pts.length);
-    for (let i = 0; i < pts.length; i++) {
-      centerHeights[i] = cachedTerrainHeight(pts[i].x, pts[i].z);
-    }
-
-    // OPTIMIZATION: Smooth center heights to eliminate stair-stepping (reduced from 3 to 1 pass)
-    for (let pass = 0; pass < 1; pass++) {
-      for (let i = 1; i < pts.length - 1; i++) {
-        centerHeights[i] = centerHeights[i] * 0.6 +
-        (centerHeights[i - 1] + centerHeights[i + 1]) * 0.2;
+    const widths = new Float32Array(pts.length);
+    const widthCaps = new Float32Array(pts.length);
+    const widthLocked = new Uint8Array(pts.length);
+    let pathDistances = null;
+    let totalPathLength = 0;
+    if (endpointIntersections?.start || endpointIntersections?.end) {
+      pathDistances = new Float32Array(pts.length);
+      for (let i = 1; i < pts.length; i++) {
+        totalPathLength += Math.hypot(pts[i].x - pts[i - 1].x, pts[i].z - pts[i - 1].z);
+        pathDistances[i] = totalPathLength;
       }
     }
-
-    // Build road strip with DIRECT edge snapping (not tilt from center)
     for (let i = 0; i < pts.length; i++) {
       const p = pts[i];
-
-      // Calculate tangent direction
-      let dx, dz;
+      let dx;
+      let dz;
       if (i === 0) {
         dx = pts[1].x - p.x;
         dz = pts[1].z - p.z;
@@ -1296,39 +2634,253 @@ function rebuildRoadsWithTerrain() {
         dx = pts[i + 1].x - pts[i - 1].x;
         dz = pts[i + 1].z - pts[i - 1].z;
       }
-
-      const len = Math.sqrt(dx * dx + dz * dz) || 1;
+      const len = Math.hypot(dx, dz) || 1;
       const nx = -dz / len;
       const nz = dx / len;
-      const endpointExtend = Math.max(
-        ROAD_ENDPOINT_EXTENSION_MIN,
-        Math.min(ROAD_ENDPOINT_EXTENSION_MAX, hw * ROAD_ENDPOINT_EXTENSION_SCALE)
+      const outwardX = sideSign > 0 ? nx : -nx;
+      const outwardZ = sideSign > 0 ? nz : -nz;
+      let widthAtPoint = resolveSidewalkWidth(
+        p.x,
+        p.z,
+        outwardX,
+        outwardZ,
+        halfWidth + SIDEWALK_INNER_GAP,
+        desiredWidth,
+        buildingCandidates
       );
-      const isEndpoint = i === 0 || i === pts.length - 1;
-      const endpointDir = i === 0 ? -1 : 1;
-      const px = isEndpoint ? p.x + endpointDir * (dx / len) * endpointExtend : p.x;
-      const pz = isEndpoint ? p.z + endpointDir * (dz / len) * endpointExtend : p.z;
-
-      const leftX = px + nx * hw;
-      const leftZ = pz + nz * hw;
-      const rightX = px - nx * hw;
-      const rightZ = pz - nz * hw;
-
-      let leftY = cachedTerrainHeight(leftX, leftZ);
-      let rightY = cachedTerrainHeight(rightX, rightZ);
-      const verticalBias = 0.42;
-      leftY += verticalBias;
-      rightY += verticalBias;
-
-      leftEdge.push({ x: leftX, y: leftY, z: leftZ });
-      rightEdge.push({ x: rightX, y: rightY, z: rightZ });
+      let widthCap = Math.max(0, desiredWidth * computeSidewalkCornerScale(pts, i, sideSign));
+      if (widthAtPoint > widthCap) widthAtPoint = widthCap;
+      if (pathDistances && widthAtPoint > 0) {
+        const applyEndpointTaper = (intersection, distanceAlongRoad) => {
+          if (!intersection || !Number.isFinite(distanceAlongRoad)) return;
+          const capRadius = computeIntersectionCapRadius(intersection);
+          const clearDistance = capRadius + Math.max(halfWidth * 0.35, 0.9);
+          const taperDistance = clearDistance + Math.max(halfWidth + desiredWidth + 4.5, 10);
+          if (distanceAlongRoad <= clearDistance) {
+            widthAtPoint = 0;
+            widthCap = 0;
+            widthLocked[i] = 1;
+            return;
+          }
+          if (distanceAlongRoad >= taperDistance) return;
+          const t = Math.max(0, Math.min(1, (distanceAlongRoad - clearDistance) / Math.max(1, taperDistance - clearDistance)));
+          const fade = t * t * (3 - 2 * t);
+          widthCap = Math.min(widthCap, desiredWidth * fade);
+          widthAtPoint = Math.min(widthAtPoint, widthCap);
+        };
+        if (endpointIntersections?.start) {
+          applyEndpointTaper(endpointIntersections.start, pathDistances[i]);
+        }
+        if (!widthLocked[i] && endpointIntersections?.end) {
+          applyEndpointTaper(endpointIntersections.end, totalPathLength - pathDistances[i]);
+        }
+      }
+      if (widthAtPoint > 0 && nearbyIntersections.length > 0) {
+        for (let j = 0; j < nearbyIntersections.length; j++) {
+          const intersection = nearbyIntersections[j];
+          const capRadius = computeIntersectionCapRadius(intersection);
+          const taperRadius = capRadius + Math.max(halfWidth + desiredWidth + 2, 8);
+          const dist = Math.hypot(p.x - intersection.x, p.z - intersection.z);
+          if (dist >= taperRadius) continue;
+          if (dist <= capRadius) {
+            widthAtPoint = 0;
+            widthCap = 0;
+            widthLocked[i] = 1;
+            break;
+          }
+          const t = Math.max(0, Math.min(1, (dist - capRadius) / Math.max(1, taperRadius - capRadius)));
+          const fade = t * t * (3 - 2 * t);
+          widthCap = Math.min(widthCap, desiredWidth * fade);
+          widthAtPoint = Math.min(widthAtPoint, widthCap);
+        }
+      }
+      widths[i] = widthAtPoint;
+      widthCaps[i] = widthCap;
     }
 
-    // OPTIMIZATION: Smooth edge heights to eliminate micro-bumps (reduced from 2 to 1 pass)
     for (let pass = 0; pass < 1; pass++) {
+      for (let i = 1; i < widths.length - 1; i++) {
+        if (widthLocked[i]) {
+          widths[i] = 0;
+          continue;
+        }
+        let neighborSum = 0;
+        let neighborCount = 0;
+        if (!widthLocked[i - 1]) {
+          neighborSum += widths[i - 1];
+          neighborCount += 1;
+        }
+        if (!widthLocked[i + 1]) {
+          neighborSum += widths[i + 1];
+          neighborCount += 1;
+        }
+        if (!neighborCount) continue;
+        const neighborAvg = neighborSum / neighborCount;
+        const smoothed = widths[i] * 0.7 + neighborAvg * 0.3;
+        widths[i] = Math.min(widthCaps[i], smoothed);
+      }
+    }
+    clampSidewalkWidthTransitions(widths, pts, widthCaps, widthLocked);
+
+    const outerHeights = new Float32Array(pts.length);
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      let dx;
+      let dz;
+      if (i === 0) {
+        dx = pts[1].x - p.x;
+        dz = pts[1].z - p.z;
+      } else if (i === pts.length - 1) {
+        dx = p.x - pts[i - 1].x;
+        dz = p.z - pts[i - 1].z;
+      } else {
+        dx = pts[i + 1].x - pts[i - 1].x;
+        dz = pts[i + 1].z - pts[i - 1].z;
+      }
+      const len = Math.hypot(dx, dz) || 1;
+      const nx = -dz / len;
+      const nz = dx / len;
+      const outwardX = sideSign > 0 ? nx : -nx;
+      const outwardZ = sideSign > 0 ? nz : -nz;
+      const innerOffset = halfWidth + SIDEWALK_INNER_GAP;
+      const width = widths[i] >= SIDEWALK_MIN_WIDTH ? widths[i] : 0;
+      const innerY = edgePoints[i].y + SIDEWALK_CURB_LIFT;
+      const outerX = p.x + outwardX * (innerOffset + width);
+      const outerZ = p.z + outwardZ * (innerOffset + width);
+      const elevatedSurfaceY =
+        roadFeature?.structureSemantics?.terrainMode !== 'at_grade' ?
+          sampleFeatureSurfaceY(roadFeature, outerX, outerZ) :
+          NaN;
+      const outerTerrainY = Number.isFinite(elevatedSurfaceY) ?
+        elevatedSurfaceY + SIDEWALK_CURB_LIFT :
+        cachedTerrainHeight(outerX, outerZ) + SIDEWALK_HEIGHT_BIAS;
+      outerHeights[i] = width > 0 ? Math.max(outerTerrainY, innerY - 0.18) : innerY;
+    }
+    smoothSidewalkOuterHeights(outerHeights, widths, pts);
+
+    const localVerts = [];
+    const localIdx = [];
+    for (let i = 0; i < pts.length; i++) {
+      const p = pts[i];
+      let dx;
+      let dz;
+      if (i === 0) {
+        dx = pts[1].x - p.x;
+        dz = pts[1].z - p.z;
+      } else if (i === pts.length - 1) {
+        dx = p.x - pts[i - 1].x;
+        dz = p.z - pts[i - 1].z;
+      } else {
+        dx = pts[i + 1].x - pts[i - 1].x;
+        dz = pts[i + 1].z - pts[i - 1].z;
+      }
+      const len = Math.hypot(dx, dz) || 1;
+      const nx = -dz / len;
+      const nz = dx / len;
+      const outwardX = sideSign > 0 ? nx : -nx;
+      const outwardZ = sideSign > 0 ? nz : -nz;
+      const innerOffset = halfWidth + SIDEWALK_INNER_GAP;
+      const width = widths[i] >= SIDEWALK_MIN_WIDTH ? widths[i] : 0;
+      const innerX = p.x + outwardX * innerOffset;
+      const innerZ = p.z + outwardZ * innerOffset;
+      const outerX = p.x + outwardX * (innerOffset + width);
+      const outerZ = p.z + outwardZ * (innerOffset + width);
+      const innerY = edgePoints[i].y + SIDEWALK_CURB_LIFT;
+      const outerY = width > 0 ? Math.max(outerHeights[i], innerY - 0.18) : innerY;
+      localVerts.push(innerX, innerY, innerZ);
+      localVerts.push(outerX, outerY, outerZ);
+      if (i < pts.length - 1) {
+        const nextWidth = widths[i + 1] >= SIDEWALK_MIN_WIDTH ? widths[i + 1] : 0;
+        const segmentWidth = Math.max(width, nextWidth);
+        const narrowSide = Math.min(width, nextWidth);
+        if (segmentWidth >= SIDEWALK_SEGMENT_MIN_WIDTH && narrowSide >= SIDEWALK_SEGMENT_MIN_WIDTH * 0.25) {
+          const vi = i * 2;
+          localIdx.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
+        }
+      }
+    }
+
+    if (localIdx.length > 0) {
+      appendIndexedGeometry(sidewalkBatchVerts, sidewalkBatchIdx, localVerts, localIdx);
+    }
+  };
+
+  // Rebuild each road with improved terrain conformance
+  appCtx.roads.forEach((road, roadIdx) => {
+    if (!road || !Array.isArray(road.pts) || road.pts.length < 2) return;
+    const { width } = road;
+    const hw = width / 2;
+
+    // Curvature-aware subdivision: straight = 2-5m, curves = 0.5-2m
+    const baseDetail = Number.isFinite(road?.subdivideMaxDist) ? road.subdivideMaxDist : 3.5;
+    const hasTransitionAnchors = Array.isArray(road?.structureTransitionAnchors) && road.structureTransitionAnchors.length > 0;
+    const detail =
+      road?.structureSemantics?.terrainMode && road.structureSemantics.terrainMode !== 'at_grade' ?
+        Math.min(baseDetail, 0.55) :
+      hasTransitionAnchors ?
+        Math.min(baseDetail, 0.6) :
+        baseDetail;
+    const pts = subdivideRoadPoints(road.pts, detail);
+
+    const verts = [];
+    const indices = [];
+    const leftEdge = [];
+    const rightEdge = [];
+    const roadBounds = road.bounds || pointsBoundsLocal(road.pts, width * 0.5 + URBAN_CONTEXT_PAD);
+    const contextBounds = expandBoundsLocal(roadBounds, URBAN_CONTEXT_PAD);
+    const buildingCandidates = Array.isArray(appCtx.buildings) ? appCtx.buildings.filter((building) =>
+      boundsIntersectLocal(building, contextBounds)
+    ) : [];
+    const nearbyLanduses = Array.isArray(appCtx.landuses) ? appCtx.landuses.filter((landuse) =>
+      boundsIntersectLocal(landuse.bounds || pointsBoundsLocal(landuse.pts || []), contextBounds)
+    ) : [];
+    const nearbyUrbanLanduses = nearbyLanduses.filter((landuse) => isUrbanLanduseType(landuse?.type)).length;
+    const nearbyGreenLanduses = nearbyLanduses.filter((landuse) => isGreenLanduseType(landuse?.type)).length;
+    const explicitSidewalkHint = roadHasExplicitSidewalkHint(road);
+    const denseUrbanContext =
+      nearbyUrbanLanduses > 0 ||
+      buildingCandidates.length >= 8 ||
+      (buildingCandidates.length >= 6 && width >= 10) ||
+      (nearbyUrbanLanduses > 0 && buildingCandidates.length >= 3);
+    const ruralGreenContext =
+      nearbyUrbanLanduses === 0 &&
+      (nearbyGreenLanduses > 0 || buildingCandidates.length < 5);
+    const continuitySidewalk = roadConnectedSidewalkContinuity(road, denseUrbanContext, ruralGreenContext);
+    const shouldBuildSidewalks =
+      roadSupportsSidewalks(road) &&
+      (explicitSidewalkHint || continuitySidewalk || (denseUrbanContext && !ruralGreenContext));
+    const sidewalkWidth = shouldBuildSidewalks ? roadBaseSidewalkWidth(road, denseUrbanContext) : 0;
+    const nearbyIntersections = shouldBuildSidewalks ? intersections.filter((intersection) =>
+      boundsIntersectLocal(roadBounds, { minX: intersection.x, maxX: intersection.x, minZ: intersection.z, maxZ: intersection.z }, Math.max(width * 1.8, 14))
+    ) : [];
+    const endpointIntersections = shouldBuildSidewalks ? {
+      start: nearbyIntersections.find((intersection) =>
+        intersection?.roads?.some((entry) => entry.roadIdx === roadIdx && entry.ptIdx === 0)
+      ) || null,
+      end: nearbyIntersections.find((intersection) =>
+        intersection?.roads?.some((entry) => entry.roadIdx === roadIdx && entry.ptIdx === road.pts.length - 1)
+      ) || null
+    } : null;
+
+    const ribbonEdges = buildFeatureRibbonEdges(road, pts, hw, cachedBaseTerrainHeight, {
+      surfaceBias: Number.isFinite(road?.surfaceBias) ? road.surfaceBias : 0.42
+    });
+    leftEdge.push(...ribbonEdges.leftEdge);
+    rightEdge.push(...ribbonEdges.rightEdge);
+
+    // OPTIMIZATION: Smooth edge heights to eliminate micro-bumps (reduced from 2 to 1 pass)
+    const edgeSmoothPasses =
+      road?.structureSemantics?.terrainMode === 'elevated' ?
+        3 :
+      road?.structureSemantics?.terrainMode && road.structureSemantics.terrainMode !== 'at_grade' ?
+        2 :
+      hasTransitionAnchors ?
+        2 :
+        1;
+    for (let pass = 0; pass < edgeSmoothPasses; pass++) {
       for (let i = 1; i < leftEdge.length - 1; i++) {
-        leftEdge[i].y = leftEdge[i].y * 0.6 + (leftEdge[i - 1].y + leftEdge[i + 1].y) * 0.2;
-        rightEdge[i].y = rightEdge[i].y * 0.6 + (rightEdge[i - 1].y + rightEdge[i + 1].y) * 0.2;
+        leftEdge[i].y = leftEdge[i].y * 0.52 + (leftEdge[i - 1].y + leftEdge[i + 1].y) * 0.24;
+        rightEdge[i].y = rightEdge[i].y * 0.52 + (rightEdge[i - 1].y + rightEdge[i + 1].y) * 0.24;
       }
     }
 
@@ -1343,41 +2895,89 @@ function rebuildRoadsWithTerrain() {
     appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
 
     // Build road skirts (edge curtains) to hide terrain peeking
-    const skirtData = buildRoadSkirts(leftEdge, rightEdge, 3.6);
-    if (skirtData.verts.length > 0) {
-      appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
+    const terrainMode = road?.structureSemantics?.terrainMode;
+    if (shouldRenderRoadSkirts(road)) {
+      const skirtDepth =
+        terrainMode === 'subgrade' ? 0.3 :
+        3.6;
+      const skirtData = buildRoadSkirts(leftEdge, rightEdge, skirtDepth);
+      if (skirtData.verts.length > 0) {
+        appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
+      }
+    }
+
+    if (shouldBuildSidewalks) {
+      const allowLeft = road.sidewalkHint !== 'right';
+      const allowRight = road.sidewalkHint !== 'left';
+      if (allowLeft) buildSidewalkStrip(pts, leftEdge, 1, hw, sidewalkWidth, road, buildingCandidates, nearbyIntersections, endpointIntersections);
+      if (allowRight) buildSidewalkStrip(pts, rightEdge, -1, hw, sidewalkWidth, road, buildingCandidates, nearbyIntersections, endpointIntersections);
     }
   });
 
   // Build intersection cap patches
   intersections.forEach((intersection) => {
+    const hasGradeSeparatedRoad = Array.isArray(intersection?.roads) && intersection.roads.some((entry) => {
+      const road = appCtx.roads?.[entry?.roadIdx];
+      return road?.structureSemantics?.terrainMode && road.structureSemantics.terrainMode !== 'at_grade';
+    });
+    if (hasGradeSeparatedRoad) return;
     if (!shouldBuildIntersectionCap(intersection)) return;
     const radius = computeIntersectionCapRadius(intersection);
     const capData = buildIntersectionCap(intersection.x, intersection.z, radius, 24);
     appendIndexedGeometry(roadCapBatchVerts, roadCapBatchIdx, capData.verts, capData.indices);
   });
 
-  const buildRoadBatchMesh = (verts, indices, material, renderOrder, userData = {}) => {
-    if (!verts.length || !indices.length) return null;
+  buildIndexedBatchMesh({
+    scene: appCtx.scene,
+    targetList: appCtx.roadMeshes,
+    verts: roadMainBatchVerts,
+    indices: roadMainBatchIdx,
+    material: roadMat,
+    renderOrder: 2,
+    userData: { isRoadBatch: true, sharedRoadMaterial: true }
+  });
+  buildIndexedBatchMesh({
+    scene: appCtx.scene,
+    targetList: appCtx.roadMeshes,
+    verts: roadSkirtBatchVerts,
+    indices: roadSkirtBatchIdx,
+    material: skirtMat,
+    renderOrder: 1,
+    userData: { isRoadBatch: true, isRoadSkirt: true, sharedRoadMaterial: true }
+  });
+  buildIndexedBatchMesh({
+    scene: appCtx.scene,
+    targetList: appCtx.roadMeshes,
+    verts: roadCapBatchVerts,
+    indices: roadCapBatchIdx,
+    material: capMat,
+    renderOrder: 3,
+    userData: { isRoadBatch: true, isIntersectionCap: true, sharedRoadMaterial: true }
+  });
+  if (sidewalkBatchVerts.length > 0 && sidewalkBatchIdx.length > 0) {
     const geo = new THREE.BufferGeometry();
-    geo.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
-    const vertexCount = verts.length / 3;
-    const indexArray = vertexCount > 65535 ? new Uint32Array(indices) : new Uint16Array(indices);
+    geo.setAttribute('position', new THREE.Float32BufferAttribute(sidewalkBatchVerts, 3));
+    const vertexCount = sidewalkBatchVerts.length / 3;
+    const indexArray = vertexCount > 65535 ? new Uint32Array(sidewalkBatchIdx) : new Uint16Array(sidewalkBatchIdx);
     geo.setIndex(new THREE.BufferAttribute(indexArray, 1));
     geo.computeVertexNormals();
-    const mesh = new THREE.Mesh(geo, material);
-    mesh.renderOrder = renderOrder;
+    const mesh = new THREE.Mesh(geo, sidewalkMat);
+    mesh.renderOrder = 2;
     mesh.receiveShadow = true;
     mesh.frustumCulled = false;
-    Object.assign(mesh.userData, userData, { sharedRoadMaterial: true });
+    Object.assign(mesh.userData, {
+      isUrbanSurfaceBatch: true,
+      isSidewalkBatch: true,
+      sharedUrbanSurfaceMaterial: true
+    });
     appCtx.scene.add(mesh);
-    appCtx.roadMeshes.push(mesh);
-    return mesh;
-  };
+    appCtx.urbanSurfaceMeshes.push(mesh);
+    appCtx.urbanSurfaceStats.sidewalkBatchCount += 1;
+    appCtx.urbanSurfaceStats.sidewalkVertices += vertexCount;
+    appCtx.urbanSurfaceStats.sidewalkTriangles += sidewalkBatchIdx.length / 3;
+  }
 
-  buildRoadBatchMesh(roadMainBatchVerts, roadMainBatchIdx, roadMat, 2, { isRoadBatch: true });
-  buildRoadBatchMesh(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtMat, 1, { isRoadBatch: true, isRoadSkirt: true });
-  buildRoadBatchMesh(roadCapBatchVerts, roadCapBatchIdx, capMat, 3, { isRoadBatch: true, isIntersectionCap: true });
+  rebuildStructureVisualMeshes();
 
   appCtx.roadsNeedRebuild = false;
 
@@ -1441,21 +3041,38 @@ function reprojectLinearFeatureMeshToTerrain(mesh) {
   const verticalBias = Number.isFinite(mesh.userData?.linearFeatureBias) ? mesh.userData.linearFeatureBias : 0.05;
   const positions = mesh.geometry?.attributes?.position;
   if (!positions || positions.count < centerline.length * 2) return false;
+  const featureRef = mesh.userData?.linearFeatureRef || null;
+  if (featureRef?.structureSemantics?.gradeSeparated) {
+    const ribbonEdges = buildFeatureRibbonEdges(featureRef, centerline, halfWidth, cachedBaseTerrainHeight, {
+      surfaceBias: verticalBias
+    });
+    if (ribbonEdges.leftEdge.length === centerline.length && ribbonEdges.rightEdge.length === centerline.length) {
+      for (let i = 0; i < centerline.length; i++) {
+        const leftEdge = ribbonEdges.leftEdge[i];
+        const rightEdge = ribbonEdges.rightEdge[i];
+        positions.setXYZ(i * 2, leftEdge.x, leftEdge.y, leftEdge.z);
+        positions.setXYZ(i * 2 + 1, rightEdge.x, rightEdge.y, rightEdge.z);
+      }
+      positions.needsUpdate = true;
+      mesh.geometry.computeVertexNormals();
+      return true;
+    }
+  }
 
   const resolveBaseY = (x, z, kind) => {
     const terrainY = terrainMeshHeightAt(x, z);
     const fallbackTerrain = Number.isFinite(terrainY) ? terrainY : 0;
-    const nearestRoad = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z) : null;
-    const roadHalfWidth = nearestRoad?.road ? Number(nearestRoad.road.width || 0) * 0.5 : 0;
+    const nearestRoad = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z, {
+      y: fallbackTerrain + 0.4,
+      maxVerticalDelta: 6
+    }) : null;
     const snapPadding =
       kind === 'footway' ? 2.4 :
       kind === 'cycleway' ? 2.0 :
       1.0;
-    const shouldSnapToRoad = !!(
-      nearestRoad?.road &&
-      Number.isFinite(nearestRoad.dist) &&
-      nearestRoad.dist <= roadHalfWidth + snapPadding
-    );
+    const shouldSnapToRoad = isRoadSurfaceReachable(nearestRoad, {
+      extraLateralPadding: snapPadding - 1.35
+    });
     if (shouldSnapToRoad) {
       const roadSampleX = Number.isFinite(nearestRoad?.pt?.x) ? nearestRoad.pt.x : x;
       const roadSampleZ = Number.isFinite(nearestRoad?.pt?.z) ? nearestRoad.pt.z : z;
@@ -1551,13 +3168,26 @@ function repositionBuildingsWithTerrain() {
     const reliefLift = slopeRange >= 0.15 ?
     Math.min(0.35, slopeRange * 0.22) :
     0.05;
-    const baseElevation = minElevation + reliefLift;
+    const structureBaseOffset = Number.isFinite(mesh.userData?.structureBaseOffset) ?
+      mesh.userData.structureBaseOffset :
+      0;
+    const baseElevation = minElevation + reliefLift + structureBaseOffset;
 
     const midLodHalfHeight = Number.isFinite(mesh.userData?.midLodHalfHeight) ?
     mesh.userData.midLodHalfHeight :
     0;
     mesh.position.y = baseElevation + midLodHalfHeight;
     mesh.userData.avgElevation = baseElevation;
+    const sourceBuildingId = String(mesh.userData?.sourceBuildingId || '');
+    if (sourceBuildingId && Array.isArray(appCtx.buildings)) {
+      for (let i = 0; i < appCtx.buildings.length; i++) {
+        const building = appCtx.buildings[i];
+        if (!building || String(building.sourceBuildingId || '') !== sourceBuildingId) continue;
+        building.baseY = baseElevation;
+        building.minY = baseElevation;
+        building.maxY = baseElevation + (Number.isFinite(building.height) ? building.height : 0);
+      }
+    }
     buildingsRepositioned++;
   });
 
@@ -1885,8 +3515,11 @@ function validateRoadTerrainConformance() {
 Object.assign(appCtx, {
   applyTerrainVisualProfile,
   applyHeightsToTerrainMesh,
+  baseTerrainHeightAt: cachedBaseTerrainHeight,
   buildRoadSkirts,
+  clearStructureVisualMeshes,
   buildTerrainTileMesh,
+  cachedBaseTerrainHeight,
   cachedTerrainHeight,
   classifyTerrainVisualProfile,
   clearTerrainHeightCache,
@@ -1901,6 +3534,7 @@ Object.assign(appCtx, {
   rebuildRoadsWithTerrain,
   requestWorldSurfaceSync,
   repositionBuildingsWithTerrain,
+  rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
   resetTerrainStreamingState,
   sampleTileElevationMeters,
@@ -1917,8 +3551,11 @@ Object.assign(appCtx, {
 export {
   applyTerrainVisualProfile,
   applyHeightsToTerrainMesh,
+  baseTerrainHeightAt,
   buildRoadSkirts,
+  clearStructureVisualMeshes,
   buildTerrainTileMesh,
+  cachedBaseTerrainHeight,
   cachedTerrainHeight,
   classifyTerrainVisualProfile,
   clearTerrainHeightCache,
@@ -1933,6 +3570,7 @@ export {
   rebuildRoadsWithTerrain,
   requestWorldSurfaceSync,
   repositionBuildingsWithTerrain,
+  rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
   resetTerrainStreamingState,
   sampleTileElevationMeters,

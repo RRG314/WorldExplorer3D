@@ -56,6 +56,15 @@ function onKey(code, event) {
     return;
   }
 
+  if (code === 'KeyG') {
+    if (event?.repeat) return;
+    if (typeof appCtx.handleBoatAction === 'function') {
+      appCtx.handleBoatAction();
+      if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
+    }
+    return;
+  }
+
   // Camera view toggle when walking (C key) - first/third person
   if (code === 'KeyC') {
     if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {

@@ -343,14 +343,19 @@ function updateMapLayers() {
   appCtx.mapLayers.checkpoints = document.getElementById('filterCheckpoints').checked;
   appCtx.mapLayers.destination = document.getElementById('filterDestination').checked;
   appCtx.mapLayers.customTrack = document.getElementById('filterCustomTrack').checked;
+  appCtx.mapLayers.activities = document.getElementById('filterActivities')?.checked !== false;
   appCtx.mapLayers.police = document.getElementById('filterPolice').checked;
   appCtx.mapLayers.memoryPins = document.getElementById('filterMemoryPins').checked;
   appCtx.mapLayers.memoryFlowers = document.getElementById('filterMemoryFlowers').checked;
   appCtx.mapLayers.paths = document.getElementById('filterPaths').checked;
   appCtx.mapLayers.interiors = document.getElementById('filterInteriors').checked;
+  appCtx.mapLayers.contributions = document.getElementById('filterContributions').checked;
   appCtx.showPathOverlays = appCtx.mapLayers.paths;
   if (typeof appCtx.syncLinearFeatureOverlayVisibility === 'function') {
     appCtx.syncLinearFeatureOverlayVisibility();
+  }
+  if (typeof appCtx.syncApprovedEditorContributionVisibility === 'function') {
+    appCtx.syncApprovedEditorContributionVisibility();
   }
 
   // Update parent checkboxes
@@ -387,12 +392,15 @@ function toggleAllLayers(state) {
   document.getElementById('filterCheckpoints').checked = state;
   document.getElementById('filterDestination').checked = state;
   document.getElementById('filterCustomTrack').checked = state;
+  const filterActivities = document.getElementById('filterActivities');
+  if (filterActivities) filterActivities.checked = state;
   document.getElementById('filterPolice').checked = state;
   document.getElementById('filterMemoryPins').checked = state;
   document.getElementById('filterMemoryFlowers').checked = state;
   document.getElementById('filterRoads').checked = state;
   document.getElementById('filterPaths').checked = state;
   document.getElementById('filterInteriors').checked = state;
+  document.getElementById('filterContributions').checked = state;
   appCtx.showRoads = state;
   appCtx.showPathOverlays = state;
   document.getElementById('mapRoadsToggle').classList.toggle('active', state);

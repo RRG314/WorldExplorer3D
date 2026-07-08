@@ -805,6 +805,43 @@ function findInteriorAnchor(footprint) {
   };
 }
 
+function buildInteriorCandidateCenters(footprint, preferredCenter = null) {
+  if (!Array.isArray(footprint) || footprint.length < 3) return [];
+  const bounds = footprintBounds(footprint);
+  const candidates = [];
+  const seen = new Set();
+
+  const pushCandidate = (point) => {
+    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) return;
+    if (!pointInPolygonSafe(point.x, point.z, footprint)) return;
+    const key = `${point.x.toFixed(2)}:${point.z.toFixed(2)}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    candidates.push({ x: point.x, z: point.z });
+  };
+
+  pushCandidate(preferredCenter);
+  pushCandidate(findInteriorAnchor(footprint));
+  pushCandidate(polygonCentroid(footprint));
+
+  polygonSamplePoints(footprint).forEach((point) => {
+    pushCandidate(point);
+  });
+
+  const gridSteps = 6;
+  for (let gx = 0; gx <= gridSteps; gx++) {
+    for (let gz = 0; gz <= gridSteps; gz++) {
+      pushCandidate({
+        x: bounds.minX + bounds.width * (gx / Math.max(1, gridSteps)),
+        z: bounds.minZ + bounds.depth * (gz / Math.max(1, gridSteps))
+      });
+    }
+  }
+
+  candidates.sort((a, b) => polygonEdgeClearance(b, footprint) - polygonEdgeClearance(a, footprint));
+  return candidates;
+}
+
 function buildContainedRectFootprint(footprint, center, minClearance = INTERIOR_SHELL_CLEARANCE) {
   if (!Array.isArray(footprint) || footprint.length < 3 || !center) return [];
   const bounds = footprintBounds(footprint);
@@ -815,19 +852,50 @@ function buildContainedRectFootprint(footprint, center, minClearance = INTERIOR_
   const baseHalfWidth = Math.min(Math.max(1.4, bounds.width * 0.42), maxHalfWidth);
   const baseHalfDepth = Math.min(Math.max(1.4, bounds.depth * 0.42), maxHalfDepth);
   const scales = [1, 0.94, 0.88, 0.82, 0.76, 0.7, 0.64, 0.58, 0.52, 0.46, 0.4, 0.34, 0.28, 0.22];
+  const candidateCenters = buildInteriorCandidateCenters(footprint, center);
 
-  for (let i = 0; i < scales.length; i++) {
-    const scale = scales[i];
-    const halfWidth = Math.max(0.8, Math.min(baseHalfWidth * scale, maxHalfWidth));
-    const halfDepth = Math.max(0.8, Math.min(baseHalfDepth * scale, maxHalfDepth));
-    const rect = [
-      { x: center.x - halfWidth, z: center.z - halfDepth },
-      { x: center.x + halfWidth, z: center.z - halfDepth },
-      { x: center.x + halfWidth, z: center.z + halfDepth },
-      { x: center.x - halfWidth, z: center.z + halfDepth }
-    ];
-    if (footprintFullyContained(rect, footprint, minClearance) && ringAreaAbs(rect) >= 6) {
-      return rect;
+  for (let c = 0; c < candidateCenters.length; c++) {
+    const candidate = candidateCenters[c];
+    const localClearance = polygonEdgeClearance(candidate, footprint) - minClearance;
+    const emergencyHalf = Math.max(0.72, Math.min(localClearance * 0.62, Math.min(maxHalfWidth, maxHalfDepth)));
+    const baseSizes = [];
+
+    if (emergencyHalf > 0.72) {
+      baseSizes.push({
+        halfWidth: emergencyHalf,
+        halfDepth: emergencyHalf
+      });
+      baseSizes.push({
+        halfWidth: Math.min(baseHalfWidth, emergencyHalf * 1.2),
+        halfDepth: emergencyHalf
+      });
+      baseSizes.push({
+        halfWidth: emergencyHalf,
+        halfDepth: Math.min(baseHalfDepth, emergencyHalf * 1.2)
+      });
+    }
+
+    baseSizes.push({
+      halfWidth: baseHalfWidth,
+      halfDepth: baseHalfDepth
+    });
+
+    for (let b = 0; b < baseSizes.length; b++) {
+      const size = baseSizes[b];
+      for (let i = 0; i < scales.length; i++) {
+        const scale = scales[i];
+        const halfWidth = Math.max(0.72, Math.min(size.halfWidth * scale, maxHalfWidth));
+        const halfDepth = Math.max(0.72, Math.min(size.halfDepth * scale, maxHalfDepth));
+        const rect = [
+          { x: candidate.x - halfWidth, z: candidate.z - halfDepth },
+          { x: candidate.x + halfWidth, z: candidate.z - halfDepth },
+          { x: candidate.x + halfWidth, z: candidate.z + halfDepth },
+          { x: candidate.x - halfWidth, z: candidate.z + halfDepth }
+        ];
+        if (footprintFullyContained(rect, footprint, minClearance) && ringAreaAbs(rect) >= 4.5) {
+          return rect;
+        }
+      }
     }
   }
 
@@ -1296,7 +1364,26 @@ function buildInteriorScene(definition) {
     exteriorFootprint.length >= 3 &&
     shellArea > 0 &&
     shellArea < exteriorArea * 0.97;
-  const shellClearanceMin = footprintMinimumClearance(shellFootprint, exteriorFootprint);
+  let shellClearanceMin = footprintMinimumClearance(shellFootprint, exteriorFootprint);
+
+  if (
+    featurePlan.mode === 'generated' &&
+    shellClearanceMin < INTERIOR_WALL_THICKNESS * 0.5 &&
+    Array.isArray(exteriorFootprint) &&
+    exteriorFootprint.length >= 3
+  ) {
+    const emergencyShell = buildContainedRectFootprint(
+      exteriorFootprint,
+      centroid,
+      INTERIOR_WALL_THICKNESS * 0.5 + 0.08
+    );
+    if (emergencyShell.length >= 3) {
+      shellFootprint = emergencyShell;
+      centroid = findInteriorAnchor(shellFootprint) || centroid;
+      featurePlan = prepareInteriorFeaturePlan(definition, shellFootprint, centroid);
+      shellClearanceMin = footprintMinimumClearance(shellFootprint, exteriorFootprint);
+    }
+  }
 
   let desiredEntry = support?.entryAnchor ? { ...support.entryAnchor } : centroid;
   const walker = appCtx.Walk?.state?.walker || null;

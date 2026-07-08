@@ -6,6 +6,9 @@ let _hudTimer = 0;
 let _mapTimer = 0;
 let _lodTimer = 0;
 let _perfPanelTimer = 0;
+let _weatherTimer = 0;
+let _boatTimer = 0;
+let _liveEarthTimer = 0;
 const OVERLAY_EDGE_MARGIN = 6;
 const OVERLAY_ANCHOR_GAP = 10;
 const DEFAULT_LOADING_BG = 'loading-bg.jpg';
@@ -30,6 +33,14 @@ function _isVisibleRect(el) {
   return rect;
 }
 
+function _isEditorWorkspaceOpen() {
+  return !!document.body?.classList.contains('editor-workspace-open');
+}
+
+function _isActivityCreatorOpen() {
+  return !!document.body?.classList.contains('activity-creator-open');
+}
+
 function _positionOverlayBetween(overlay, leftRect, rightRect) {
   if (!overlay || !leftRect || !rightRect) return;
   const overlayRect = overlay.getBoundingClientRect();
@@ -49,7 +60,7 @@ function _positionOverlayBetween(overlay, leftRect, rightRect) {
 }
 
 function positionTopOverlays() {
-  if (!appCtx.gameStarted) return;
+  if (!appCtx.gameStarted || _isEditorWorkspaceOpen() || _isActivityCreatorOpen()) return;
   const hudRect = _isVisibleRect(document.getElementById('hud'));
   const menuRect = _isVisibleRect(document.getElementById('mainMenuBtn'));
   if (!hudRect || !menuRect) return;
@@ -105,23 +116,68 @@ function renderLoop(t = 0) {
   }
 
   if (appCtx.gameStarted) {
+    if (typeof appCtx.kickOptionalRuntimeBoot === 'function') {
+      appCtx.kickOptionalRuntimeBoot('main_loop');
+    }
     appCtx.update(dt);
+    if (typeof appCtx.refreshAstronomicalSky === 'function') {
+      appCtx.refreshAstronomicalSky(false);
+    }
+    if (typeof appCtx.updateWaterWaveVisuals === 'function') {
+      appCtx.updateWaterWaveVisuals();
+    }
+    _weatherTimer += dt;
+    if (_weatherTimer > 5) {
+      _weatherTimer = 0;
+      if (typeof appCtx.refreshLiveWeather === 'function') {
+        void appCtx.refreshLiveWeather(false);
+      }
+    }
+    _boatTimer += dt;
+    const boatRefreshInterval = appCtx.boatMode?.active ? 0.85 : 0.18;
+    if (_boatTimer > boatRefreshInterval) {
+      _boatTimer = 0;
+      if (typeof appCtx.refreshBoatAvailability === 'function') {
+        appCtx.refreshBoatAvailability(false);
+      }
+    }
     appCtx.updateCamera();
+    if (typeof appCtx.updateActivityCreator === 'function') {
+      appCtx.updateActivityCreator(dt, t);
+    }
+    if (typeof appCtx.updateActivityDiscovery === 'function') {
+      appCtx.updateActivityDiscovery(dt, t);
+    }
+    if (appCtx.liveEarth && typeof appCtx.liveEarth.updateFrame === 'function') {
+      appCtx.liveEarth.updateFrame(dt);
+    }
+
+    _liveEarthTimer += dt;
+    if (_liveEarthTimer > 4) {
+      _liveEarthTimer = 0;
+      if (appCtx.liveEarth && typeof appCtx.liveEarth.updateSelectorFrame === 'function') {
+        appCtx.liveEarth.updateSelectorFrame();
+      }
+    }
 
     // Throttle HUD DOM writes to ~15fps (every ~66ms)
     _hudTimer += dt;
     if (_hudTimer > 0.066) {
       _hudTimer = 0;
-      appCtx.updateHUD();
-      positionTopOverlays();
+      if (!_isEditorWorkspaceOpen() && !_isActivityCreatorOpen()) {
+        appCtx.updateHUD();
+        positionTopOverlays();
+      }
     }
 
     // Throttle minimap to ~10fps (every ~100ms)
     _mapTimer += dt;
     if (_mapTimer > 0.1) {
       _mapTimer = 0;
-      appCtx.drawMinimap();
-      if (appCtx.showLargeMap) appCtx.drawLargeMap();
+      if (!_isEditorWorkspaceOpen() && !_isActivityCreatorOpen()) {
+        appCtx.drawMinimap();
+        if (appCtx.showLargeMap) appCtx.drawLargeMap();
+      }
     }
 
     // LOD visibility updates run at low frequency to avoid per-frame overhead.
@@ -164,6 +220,11 @@ function renderLoop(t = 0) {
         refX = Number.isFinite(appCtx.drone?.x) ? appCtx.drone.x : refX;
         refZ = Number.isFinite(appCtx.drone?.z) ? appCtx.drone.z : refZ;
         refY = Number.isFinite(appCtx.drone?.y) ? appCtx.drone.y : refY;
+      } else if (appCtx.boatMode?.active) {
+        modeLabel = 'boat';
+        refX = Number.isFinite(appCtx.boat?.x) ? appCtx.boat.x : refX;
+        refZ = Number.isFinite(appCtx.boat?.z) ? appCtx.boat.z : refZ;
+        refY = Number.isFinite(appCtx.boat?.y) ? appCtx.boat.y : refY;
       } else if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker) {
         modeLabel = 'walk';
         refX = Number.isFinite(appCtx.Walk.state.walker.x) ? appCtx.Walk.state.walker.x : refX;
@@ -171,13 +232,13 @@ function renderLoop(t = 0) {
         refY = Number.isFinite(appCtx.Walk.state.walker.y) ? appCtx.Walk.state.walker.y : refY;
       }
 
-      const nearestSurface = modeLabel === 'drive' ?
+      const nearestSurface = modeLabel === 'drive' || modeLabel === 'boat' ?
         appCtx.findNearestRoad(refX, refZ) :
         typeof appCtx.findNearestTraversalFeature === 'function' ?
           appCtx.findNearestTraversalFeature(refX, refZ, { mode: 'walk', maxDistance: 24 }) :
           appCtx.findNearestRoad(refX, refZ);
       const roadDist = Number.isFinite(nearestSurface?.dist) ? nearestSurface.dist : null;
-      if (modeLabel !== 'drive') {
+      if (modeLabel !== 'drive' && modeLabel !== 'boat') {
         const feature = nearestSurface?.feature || nearestSurface?.road || null;
         roadName = typeof appCtx.surfaceDisplayName === 'function' ? appCtx.surfaceDisplayName(feature) : feature?.name || roadName;
         const halfWidth = feature?.width ? feature.width * 0.5 : 5;
@@ -190,6 +251,8 @@ function renderLoop(t = 0) {
       const rdist = Number.isFinite(roadDist) ? roadDist.toFixed(1) : '?';
       const speed = modeLabel === 'drone' ?
       Math.round(Math.abs((appCtx.drone?.speed || 0) * 1.8)) :
+      modeLabel === 'boat' ?
+      Math.round(Math.abs((appCtx.boat?.speed || 0) * 0.43)) :
       modeLabel === 'walk' ?
       Math.round(Math.abs(appCtx.Walk?.state?.walker?.speedMph || 0)) :
       Math.round(Math.abs((appCtx.car?.speed || 0) * 0.5));
@@ -214,6 +277,10 @@ function renderLoop(t = 0) {
         const feature = nearest?.feature || nearest?.road || null;
         const halfWidth = feature?.width ? feature.width * 0.5 : 5;
         markerOnRoad = Number.isFinite(nearest?.dist) ? nearest.dist <= halfWidth + 3 : false;
+      } else if (appCtx.boatMode?.active) {
+        markerX = Number.isFinite(appCtx.boat?.x) ? appCtx.boat.x : markerX;
+        markerZ = Number.isFinite(appCtx.boat?.z) ? appCtx.boat.z : markerZ;
+        markerOnRoad = false;
       } else if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker) {
         markerX = Number.isFinite(appCtx.Walk.state.walker.x) ? appCtx.Walk.state.walker.x : markerX;
         markerZ = Number.isFinite(appCtx.Walk.state.walker.z) ? appCtx.Walk.state.walker.z : markerZ;

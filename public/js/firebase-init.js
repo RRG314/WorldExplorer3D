@@ -5,6 +5,8 @@ import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.5/firebas
 const FIREBASE_CONFIG_STORAGE_KEY = 'worldExplorer3D.firebaseConfig';
 
 let cachedServices = null;
+let cachedAnalytics = undefined;
+let cachedAnalyticsPromise = null;
 
 function normalizeConfig(raw) {
   if (!raw || typeof raw !== 'object') return null;
@@ -15,7 +17,8 @@ function normalizeConfig(raw) {
     projectId: String(raw.projectId || '').trim(),
     storageBucket: String(raw.storageBucket || '').trim(),
     messagingSenderId: String(raw.messagingSenderId || '').trim(),
-    appId: String(raw.appId || '').trim()
+    appId: String(raw.appId || '').trim(),
+    measurementId: String(raw.measurementId || '').trim()
   };
 
   if (!cfg.apiKey || !cfg.projectId || !cfg.appId) return null;
@@ -58,6 +61,40 @@ export function initFirebase() {
   return cachedServices;
 }
 
+export async function initFirebaseAnalytics() {
+  if (cachedAnalytics !== undefined) return cachedAnalytics;
+  if (cachedAnalyticsPromise) return cachedAnalyticsPromise;
+
+  cachedAnalyticsPromise = (async () => {
+    const services = initFirebase();
+    const measurementId = String(services?.config?.measurementId || '').trim();
+    if (!services?.app || !measurementId || typeof window === 'undefined') {
+      cachedAnalytics = null;
+      return cachedAnalytics;
+    }
+
+    try {
+      const analyticsMod = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-analytics.js');
+      const supported = typeof analyticsMod.isSupported === 'function'
+        ? await analyticsMod.isSupported().catch(() => false)
+        : false;
+      if (!supported) {
+        cachedAnalytics = null;
+        return cachedAnalytics;
+      }
+      cachedAnalytics = analyticsMod.getAnalytics(services.app);
+      return cachedAnalytics;
+    } catch (_) {
+      cachedAnalytics = null;
+      return cachedAnalytics;
+    }
+  })().finally(() => {
+    cachedAnalyticsPromise = null;
+  });
+
+  return cachedAnalyticsPromise;
+}
+
 export function setFirebaseConfig(config) {
   const normalized = normalizeConfig(config);
   if (!normalized) {
@@ -73,6 +110,7 @@ export { FIREBASE_CONFIG_STORAGE_KEY };
 
 globalThis.WorldExplorerFirebase = {
   initFirebase,
+  initFirebaseAnalytics,
   hasFirebaseConfig,
   readFirebaseConfig,
   setFirebaseConfig,

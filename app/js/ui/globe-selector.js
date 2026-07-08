@@ -32,6 +32,15 @@ function createGlobeSelector(options = {}) {
   const spaceBtn = document.getElementById('globeSelectorSpaceBtn');
   const searchBtn = document.getElementById('globeLocationSearchBtn');
   const locateBtn = document.getElementById('globeSelectorLocateBtn');
+  const exploreModeBtn = document.getElementById('globeSelectorExploreModeBtn');
+  const liveEarthModeBtn = document.getElementById('globeSelectorLiveEarthModeBtn');
+  const explorePanel = document.getElementById('globeSelectorExplorePanel');
+  const liveEarthPanel = document.getElementById('globeSelectorLiveEarthPanel');
+  const liveEarthStatus = document.getElementById('globeLiveEarthStatus');
+  const liveEarthCategoryChips = document.getElementById('globeLiveEarthCategoryChips');
+  const liveEarthLayerList = document.getElementById('globeLiveEarthLayerList');
+  const liveEarthDetails = document.getElementById('globeLiveEarthDetails');
+  const liveEarthRefreshBtn = document.getElementById('globeLiveEarthRefreshBtn');
   const nearbyTabBtn = document.getElementById('globeNearbyTabBtn');
   const favoritesTabBtn = document.getElementById('globeFavoritesTabBtn');
   const cityListHint = document.getElementById('globeCityListHint');
@@ -60,6 +69,7 @@ function createGlobeSelector(options = {}) {
   let liveNearbyCity = null;
   let favoritePresetList = [];
   let favoriteSavedList = [];
+  let panelMode = 'explore';
   const reverseLookupCache = new Map();
 
   let scene = null;
@@ -307,6 +317,26 @@ function createGlobeSelector(options = {}) {
     favoriteMarkerGroup.visible = activeCityTab === 'favorites';
   }
 
+  function setPanelMode(nextMode = 'explore') {
+    panelMode = nextMode === 'live-earth' ? 'live-earth' : 'explore';
+    exploreModeBtn?.classList.toggle('active', panelMode === 'explore');
+    liveEarthModeBtn?.classList.toggle('active', panelMode === 'live-earth');
+    explorePanel?.classList.toggle('active', panelMode === 'explore');
+    liveEarthPanel?.classList.toggle('active', panelMode === 'live-earth');
+    if (explorePanel) explorePanel.hidden = panelMode !== 'explore';
+    if (liveEarthPanel) liveEarthPanel.hidden = panelMode !== 'live-earth';
+    document.querySelector('.globe-selector-hint')?.replaceChildren(
+      document.createTextNode(
+        panelMode === 'live-earth' ?
+          'Drag to rotate · Scroll to zoom · Tap markers to inspect Live Earth layers' :
+          'Drag to rotate · Scroll to zoom · Tap/Click to pick'
+      )
+    );
+    if (appCtx.liveEarth && typeof appCtx.liveEarth.setPanelMode === 'function') {
+      appCtx.liveEarth.setPanelMode(panelMode);
+    }
+  }
+
   function renderFavoriteMarkers() {
     if (!favoriteMarkerGroup || !favoriteMarkerGeometry || !menuFavoriteMaterial || !savedFavoriteMaterial) return;
     while (favoriteMarkerGroup.children.length) {
@@ -450,6 +480,9 @@ function createGlobeSelector(options = {}) {
       if (markerMesh) markerMesh.visible = false;
       nearbyCities = [];
       renderCityList();
+      if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorSelectionChanged === 'function') {
+        appCtx.liveEarth.onSelectorSelectionChanged();
+      }
       return;
     }
 
@@ -471,6 +504,9 @@ function createGlobeSelector(options = {}) {
     nearbyCities = buildNearbyCities(selected.lat, selected.lon);
     renderCityList();
     renderFavoriteMarkers();
+    if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorSelectionChanged === 'function') {
+      appCtx.liveEarth.onSelectorSelectionChanged();
+    }
   }
 
   function setLocateButtonBusy(isBusy) {
@@ -739,6 +775,9 @@ function createGlobeSelector(options = {}) {
 
   function renderFrame() {
     if (!openState) return;
+    if (appCtx.liveEarth && typeof appCtx.liveEarth.updateSelectorFrame === 'function') {
+      appCtx.liveEarth.updateSelectorFrame();
+    }
     applyMarkerScales();
     if (renderer && scene && camera) renderer.render(scene, camera);
   }
@@ -785,6 +824,9 @@ function createGlobeSelector(options = {}) {
         if (searchInput) searchInput.value = favoriteCity.name;
         return;
       }
+    }
+    if (appCtx.liveEarth && typeof appCtx.liveEarth.handleGlobePick === 'function' && appCtx.liveEarth.handleGlobePick(raycaster)) {
+      return;
     }
     const hits = raycaster.intersectObject(earthMesh, false);
     if (!hits || hits.length === 0) return;
@@ -967,6 +1009,39 @@ function createGlobeSelector(options = {}) {
     return true;
   }
 
+  function bindLiveEarthBridge() {
+    if (!appCtx.liveEarth || typeof appCtx.liveEarth.bindGlobeSelector !== 'function') return;
+    appCtx.liveEarth.bindGlobeSelector({
+      root,
+      stage,
+      canvas,
+      globeRoot,
+      earthMesh,
+      getSelection() {
+        return selected ? { ...selected } : null;
+      },
+      isOpen() {
+        return openState;
+      },
+      latLonToLocalPoint,
+      setSelection,
+      applySelectionAndResolve,
+      startHere: triggerStartHere,
+      liveEarthUi: {
+        exploreModeBtn,
+        liveEarthModeBtn,
+        explorePanel,
+        liveEarthPanel,
+        status: liveEarthStatus,
+        categoryChips: liveEarthCategoryChips,
+        layerList: liveEarthLayerList,
+        details: liveEarthDetails,
+        refreshBtn: liveEarthRefreshBtn,
+        hint: document.querySelector('.globe-selector-hint')
+      }
+    });
+  }
+
   function open() {
     if (openState) return;
     openState = true;
@@ -975,6 +1050,7 @@ function createGlobeSelector(options = {}) {
     root.setAttribute('aria-hidden', 'false');
 
     initGlobeScene();
+    bindLiveEarthBridge();
     ensureRendererSize();
 
     if (searchStatus) {
@@ -984,6 +1060,7 @@ function createGlobeSelector(options = {}) {
     setLocateButtonBusy(false);
     savedFavoriteCities = loadSavedFavoriteCities();
     setCityTab(activeCityTab);
+    setPanelMode(panelMode);
 
     const savedLat = toFiniteNumber(appCtx.customLoc?.lat ?? document.getElementById('customLat')?.value);
     const savedLon = toFiniteNumber(appCtx.customLoc?.lon ?? document.getElementById('customLon')?.value);
@@ -1009,6 +1086,9 @@ function createGlobeSelector(options = {}) {
 
     if (searchInput) searchInput.value = appCtx.customLoc?.name || '';
 
+    if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorOpen === 'function') {
+      appCtx.liveEarth.onSelectorOpen();
+    }
     startRenderLoop();
     renderFrame();
     if (typeof options.onOpen === 'function') options.onOpen();
@@ -1024,6 +1104,9 @@ function createGlobeSelector(options = {}) {
     root.classList.remove('show');
     root.setAttribute('aria-hidden', 'true');
     setLocateButtonBusy(false);
+    if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorClose === 'function') {
+      appCtx.liveEarth.onSelectorClose();
+    }
     stopRenderLoop();
     if (typeof options.onClose === 'function') options.onClose();
   }
@@ -1087,6 +1170,12 @@ function createGlobeSelector(options = {}) {
     locateBtn.addEventListener('click', () => {
       if (typeof options.onUseMyLocation === 'function') options.onUseMyLocation();
     });
+  }
+  if (exploreModeBtn) {
+    exploreModeBtn.addEventListener('click', () => setPanelMode('explore'));
+  }
+  if (liveEarthModeBtn) {
+    liveEarthModeBtn.addEventListener('click', () => setPanelMode('live-earth'));
   }
   if (nearbyTabBtn) {
     nearbyTabBtn.addEventListener('click', () => setCityTab('nearby'));
@@ -1154,7 +1243,9 @@ function createGlobeSelector(options = {}) {
       return openState;
     },
     open,
+    startHere: triggerStartHere,
     applySelectionAndResolve,
+    setPanelMode,
     setSelection,
     setLocateButtonBusy,
     setSearchStatus(message, color = null) {
