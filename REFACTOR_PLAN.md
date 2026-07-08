@@ -131,8 +131,9 @@ Definition of done:
 
 Current status on 2026-07-08:
 
-- done: `spawn.js`, `osm-loader.js`, `linear-features.js`
-- remaining to close phase: one more seam (`vegetation` or `traversal`) plus reduce `app/js/world.js` from 6705 lines to 5500 or less
+- done: `spawn.js`, `osm-loader.js`, `linear-features.js`, `vegetation.js`
+- review result: Phase 1 stays open because the line-count target is not met yet
+- remaining to close phase: reduce `app/js/world.js` from 6371 lines to 5500 or less, then either extract one final seam or explicitly defer the remainder and close the phase
 
 ### Phase 2: Split `ui.js` into UI domains
 
