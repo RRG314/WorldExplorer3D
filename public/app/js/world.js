@@ -39,6 +39,9 @@ import {
   tryAutoEnterBoatAt
 } from "./world/spawn.js?v=1";
 import {
+  scheduleDeferredWorldLinearFeatureLoad
+} from "./world/linear-features.js?v=1";
+import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,
   getWorldLoadSignature,
@@ -3188,99 +3191,31 @@ async function loadRoadsInternal(retryPass = 0) {
       const landuseGeometryGuards = buildLanduseGeometryGuards(geometryGuards);
       const waterGeometryGuards = buildWaterGeometryGuards(geometryGuards);
       const scheduleDeferredLinearFeatureLoad = () => {
-        if (!ENABLE_LINEAR_FEATURES) return;
-        window.setTimeout(async () => {
-          if (!isActiveLoadContext()) return;
-          try {
-            const extendedDeadline = performance.now() + Math.max(12000, Math.min(overpassTimeoutMs, 18000));
-            const linearData = await fetchOverpassJSON(
-              deferredLinearFeatureQuery,
-              Math.min(overpassTimeoutMs, 18000),
-              extendedDeadline,
-              null
-            );
-            if (!isActiveLoadContext()) return;
-
-            const linearNodes = {};
-            linearData.elements.filter((e) => e.type === 'node').forEach((n) => linearNodes[n.id] = n);
-
-            const allRailwayWays = linearData.elements.filter((e) =>
-              e.type === 'way' &&
-              classifyLinearFeatureTags(e.tags)?.kind === 'railway'
-            );
-            const railwayWays = limitWaysByTileBudget(allRailwayWays, linearNodes, {
-              globalCap: 24,
-              basePerTile: Math.max(3, Math.floor(tileBudgetCfg.roadsPerTile * 0.08)),
-              minPerTile: 1,
-              tileDegrees: tileBudgetCfg.tileDegrees,
-              useRdt: useRdtBudgeting,
-              compareFn: (a, b) =>
-                linearFeaturePriority('railway', classifyLinearFeatureTags(b.tags)?.subtype) -
-                linearFeaturePriority('railway', classifyLinearFeatureTags(a.tags)?.subtype)
-            });
-
-            const allFootwayWays = linearData.elements.filter((e) =>
-              e.type === 'way' &&
-              classifyLinearFeatureTags(e.tags)?.kind === 'footway'
-            );
-            const footwayWays = limitWaysByTileBudget(allFootwayWays, linearNodes, {
-              globalCap: 80,
-              basePerTile: Math.max(6, Math.floor(tileBudgetCfg.landusePerTile * 0.18)),
-              minPerTile: 2,
-              tileDegrees: tileBudgetCfg.tileDegrees,
-              useRdt: useRdtBudgeting,
-              compareFn: (a, b) =>
-                linearFeaturePriority('footway', classifyLinearFeatureTags(b.tags)?.subtype) -
-                linearFeaturePriority('footway', classifyLinearFeatureTags(a.tags)?.subtype)
-            });
-
-            const allCyclewayWays = linearData.elements.filter((e) =>
-              e.type === 'way' &&
-              classifyLinearFeatureTags(e.tags)?.kind === 'cycleway'
-            );
-            const cyclewayWays = limitWaysByTileBudget(allCyclewayWays, linearNodes, {
-              globalCap: 40,
-              basePerTile: Math.max(4, Math.floor(tileBudgetCfg.landusePerTile * 0.12)),
-              minPerTile: 1,
-              tileDegrees: tileBudgetCfg.tileDegrees,
-              useRdt: useRdtBudgeting,
-              compareFn: (a, b) =>
-                linearFeaturePriority('cycleway', classifyLinearFeatureTags(b.tags)?.subtype) -
-                linearFeaturePriority('cycleway', classifyLinearFeatureTags(a.tags)?.subtype)
-            });
-
-            startLoadPhase('buildLinearFeatureGeometryDeferred');
-            try {
-              const linearFeatureGroups = [railwayWays, cyclewayWays, footwayWays];
-              linearFeatureGroups.forEach((featureWays) => {
-                if (!Array.isArray(featureWays) || featureWays.length === 0) return;
-                featureWays.forEach((way) => {
-                  const rawPts = way.nodes.map((id) => linearNodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
-                  const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
-                  if (pts.length < 2) return;
-                  addLinearFeatureRibbon(pts, { ...(way.tags || {}), sourceFeatureId: way.id ? String(way.id) : '' });
-                });
-              });
-            } finally {
-              endLoadPhase('buildLinearFeatureGeometryDeferred');
-            }
-
-            syncLinearFeatureOverlayVisibility();
-            if (typeof appCtx.rebuildStructureVisualMeshes === 'function') {
-              appCtx.rebuildStructureVisualMeshes();
-            }
-            invalidateTraversalNetworks('deferred_linear_features_ready');
-            safeLoadCall('buildTraversalNetworksDeferred', () => buildTraversalNetworks());
-            if (typeof updateWorldLod === 'function') {
-              safeLoadCall('updateWorldLodDeferred', () => updateWorldLod(true));
-            }
-            console.log(
-              `[WorldLoad] Deferred linear features ready (${railwayWays.length} rail, ${footwayWays.length} foot, ${cyclewayWays.length} cycle).`
-            );
-          } catch (err) {
-            recordLoadWarning('deferredLinearFeatures', err);
-          }
-        }, 0);
+        scheduleDeferredWorldLinearFeatureLoad({
+          enabled: ENABLE_LINEAR_FEATURES,
+          isActiveLoadContext,
+          overpassTimeoutMs,
+          deferredLinearFeatureQuery,
+          fetchOverpassJSON,
+          classifyLinearFeatureTags,
+          limitWaysByTileBudget,
+          tileBudgetCfg,
+          useRdtBudgeting,
+          linearFeaturePriority,
+          geometryGuards,
+          geoToWorld: appCtx.geoToWorld,
+          sanitizeWorldPathPoints,
+          addLinearFeatureRibbon,
+          startLoadPhase,
+          endLoadPhase,
+          syncLinearFeatureOverlayVisibility,
+          rebuildStructureVisualMeshes: appCtx.rebuildStructureVisualMeshes,
+          invalidateTraversalNetworks,
+          buildTraversalNetworks,
+          safeLoadCall,
+          updateWorldLod,
+          recordLoadWarning
+        });
       };
 
       // Load roads, buildings, landuse, and POIs in one comprehensive query.

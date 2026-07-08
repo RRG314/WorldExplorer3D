@@ -74,6 +74,20 @@ npm run test:osm-smoke
 
 For smaller internal refactors, `test:rules` can be skipped when no backend-facing files changed, but `verify:mirror` and `test:runtime` should stay mandatory for app runtime work.
 
+## 5A. Phase Boundaries And Stop Conditions
+
+This project should not run forever. Each phase must end in one of two ways:
+
+- the exit criteria for that phase are met, or
+- the remaining work is explicitly deferred into a later phase or backlog note
+
+Rules for keeping this bounded:
+
+- no phase should stay "open" after three coherent extractions without a review of whether the exit criteria are already good enough
+- phases 1 through 5 are the required cleanup path
+- phase 6 is optional backlog work, not part of the required finish line
+- once phases 1 through 5 are complete and release verification is green, the refactor project is done unless a new bug or feature creates a fresh reason to continue
+
 ## 6. Refactor Order
 
 ### Phase 1: Establish module boundaries around `world.js`
@@ -107,10 +121,18 @@ Suggested destination modules:
 
 Definition of done:
 
-- `world.js` is materially smaller
+- `app/js/world/spawn.js`, `app/js/world/osm-loader.js`, and `app/js/world/linear-features.js` exist
+- at least one additional `world.js` seam is either extracted (`vegetation` or `traversal`) or explicitly deferred with a note in this plan
+- `app/js/world.js` is reduced to 5500 lines or less
 - extracted modules have narrow responsibilities
 - exported APIs are explicit
-- no direct behavior regressions in runtime or OSM smoke tests
+- `npm run test:runtime` and `npm run test:osm-smoke` pass from the clean live-fix workspace
+- phase closes even if minor `world.js` cleanup remains, as long as the ownership boundaries above are in place
+
+Current status on 2026-07-08:
+
+- done: `spawn.js`, `osm-loader.js`, `linear-features.js`
+- remaining to close phase: one more seam (`vegetation` or `traversal`) plus reduce `app/js/world.js` from 6705 lines to 5500 or less
 
 ### Phase 2: Split `ui.js` into UI domains
 
@@ -141,9 +163,10 @@ Suggested destination modules:
 
 Definition of done:
 
-- DOM ownership is clearer
-- keyboard and mobile control logic are isolated
-- new UI fixes can be made without reading the entire file
+- `app/js/ui/title-screen.js`, `app/js/ui/mobile-controls.js`, and `app/js/ui/keyboard-routing.js` exist
+- `app/js/ui.js` is reduced to 1800 lines or less
+- launch flow and input wiring can be changed without editing unrelated menu code
+- runtime verification remains green
 
 ### Phase 3: Reduce global mutable state pressure
 
@@ -173,9 +196,10 @@ Suggested outputs:
 
 Definition of done:
 
-- fewer cross-module hidden writes
-- easier tracing of state mutations
-- reduced risk of one feature breaking another through shared globals
+- `app/js/state/config.js` and `app/js/state/runtime.js` exist
+- `app/js/state.js` is reduced to 600 lines or less, or kept as a thin compatibility shim
+- ownership notes exist for the major shared `appCtx` fields still in use
+- hidden cross-module writes are reduced enough that state mutations can be traced by subsystem
 
 ### Phase 4: Break terrain responsibilities apart
 
@@ -204,8 +228,10 @@ Suggested destination modules:
 
 Definition of done:
 
-- performance-sensitive code is easier to profile
-- terrain bugs can be fixed without touching unrelated rendering code
+- `app/js/terrain/materials.js`, `app/js/terrain/tiles.js`, and `app/js/terrain/rebuild.js` exist
+- `app/js/terrain.js` is reduced to 2400 lines or less
+- performance-sensitive terrain code is easier to profile in isolation
+- terrain/runtime verification remains green
 
 ### Phase 5: HTML and boot cleanup
 
@@ -227,8 +253,10 @@ First cleanup targets:
 
 Definition of done:
 
-- startup is easier to reason about
-- UI markup and runtime code are less entangled
+- `app/index.html` is reduced to 2500 lines or less
+- startup sequence is documented in one place and matches the actual boot order
+- app launch wiring is no longer hidden across large inline HTML/script clusters
+- release verification remains green
 
 ### Phase 6: Secondary subsystems
 
@@ -239,6 +267,7 @@ Only after phases 1 through 5 are stable:
 - optional account-side frontend modules
 
 These are important, but they should not come before the main runtime, UI, and state cleanup.
+They are explicitly optional for closing the refactor project.
 
 ## 7. Work Unit Rules
 
@@ -277,6 +306,12 @@ The refactor project is in good shape when:
 - state ownership is documented and mostly local to subsystems
 - live deploy workflow still works from this repo alone
 - release verification remains green through the transition
+
+The refactor project is complete when:
+
+- phases 1 through 5 meet their exit criteria
+- the clean live-fix workspace is the normal place for live-safe edits
+- no additional cleanup is required to make ordinary fixes without hunting across unrelated files
 
 ## 10. Immediate Next Move
 
