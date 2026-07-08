@@ -169,9 +169,9 @@ Definition of done:
 
 Current status on 2026-07-08:
 
-- done: `spawn.js`, `osm-loader.js`, `linear-features.js`, `vegetation.js`
+- done: `spawn.js`, `osm-loader.js`, `linear-features.js`, `vegetation.js`, `traversal.js`
 - review result: Phase 1 stays open because `world.js` is still far above the real target
-- remaining to close phase: reduce `app/js/world.js` from 6371 lines to 1500 or less, with traversal extraction next and further decomposition after that as needed
+- remaining to close phase: reduce `app/js/world.js` from 5875 lines to 1500 or less through additional targeted extractions
 
 ### Phase 2: Split `ui.js` into UI domains
 
