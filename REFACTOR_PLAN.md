@@ -12,6 +12,7 @@ Refactor the live deployment codebase so that:
 - large files are split by responsibility
 - runtime behavior stays stable while code structure improves
 - tests and release checks catch regressions before deploy
+- no primary frontend/runtime source file is over 1500 lines unless there is a documented exception with a specific removal plan
 
 This plan is intentionally conservative. It is a professional cleanup path, not a rewrite.
 
@@ -19,12 +20,14 @@ This plan is intentionally conservative. It is a professional cleanup path, not 
 
 Current high-risk files in the live baseline:
 
-- `app/js/world.js`: 7549 lines
+- `app/js/world.js`: 6371 lines in the clean refactor workspace (`7549` at original baseline)
 - `app/js/terrain.js`: 3584 lines
 - `app/index.html`: 3442 lines
 - `app/js/game.js`: 3008 lines
 - `app/js/ui.js`: 2915 lines
 - `app/js/multiplayer/ui-room.js`: 2794 lines
+- `app/js/boat-mode.js`: 2679 lines
+- `app/js/editor/session.js`: 2592 lines
 - `app/js/state.js`: 978 lines
 
 Current live-baseline branch:
@@ -38,6 +41,16 @@ Current structural risks:
 - global mutable state in `state.js` makes ownership and side effects hard to trace
 - `world.js` mixes data loading, spawn safety, traversal, rendering, classification, and scene mutation
 - `ui.js` mixes DOM querying, event binding, mode switching, mobile controls, and menu orchestration
+
+### Conventional size target
+
+Use these size bands going forward:
+
+- preferred: under 800 lines
+- acceptable for complex orchestration files: 800 to 1500 lines
+- over 1500 lines: treated as refactor-required, not "done"
+
+The working target for this project is therefore stricter than the earlier interim `5500` waypoint. That earlier number is no longer the finish line for any core file.
 
 ## 3. Ground Rules
 
@@ -87,6 +100,30 @@ Rules for keeping this bounded:
 - phases 1 through 5 are the required cleanup path
 - phase 6 is optional backlog work, not part of the required finish line
 - once phases 1 through 5 are complete and release verification is green, the refactor project is done unless a new bug or feature creates a fresh reason to continue
+- a phase does not count as complete if its main target file is still over 1500 lines, unless the remainder is explicitly split into numbered follow-up subphases
+
+## 5B. Oversized File Inventory
+
+Current `app/*` source files still above the target ceiling:
+
+1. `app/js/world.js` - 6371
+2. `app/js/terrain.js` - 3584
+3. `app/index.html` - 3442
+4. `app/js/game.js` - 3008
+5. `app/js/ui.js` - 2915
+6. `app/js/multiplayer/ui-room.js` - 2794
+7. `app/js/boat-mode.js` - 2679
+8. `app/js/editor/session.js` - 2592
+9. `app/js/engine.js` - 2331
+10. `app/js/solar-system.js` - 2416
+
+Priority order for cleanup:
+
+- first: `world.js`, `ui.js`, `terrain.js`
+- second: `game.js`, `ui-room.js`, `boat-mode.js`
+- third: `editor/session.js`, `engine.js`, `solar-system.js`, `app/index.html`
+
+The point of this list is to keep us honest. If a file is still above 1500 lines, it stays on the active cleanup board.
 
 ## 6. Refactor Order
 
@@ -101,6 +138,7 @@ Why first:
 Target result:
 
 - `world.js` becomes an orchestrator instead of a giant owner of everything
+- `world.js` is reduced below 1500 lines through multiple extraction passes if necessary
 
 First extraction targets:
 
@@ -122,18 +160,18 @@ Suggested destination modules:
 Definition of done:
 
 - `app/js/world/spawn.js`, `app/js/world/osm-loader.js`, and `app/js/world/linear-features.js` exist
-- at least one additional `world.js` seam is either extracted (`vegetation` or `traversal`) or explicitly deferred with a note in this plan
-- `app/js/world.js` is reduced to 5500 lines or less
+- `app/js/world/vegetation.js` and `app/js/world/traversal.js` exist, or equivalent narrower modules replace those responsibilities
+- `app/js/world.js` is reduced to 1500 lines or less
 - extracted modules have narrow responsibilities
 - exported APIs are explicit
 - `npm run test:runtime` and `npm run test:osm-smoke` pass from the clean live-fix workspace
-- phase closes even if minor `world.js` cleanup remains, as long as the ownership boundaries above are in place
+- any remaining over-1500 world-adjacent module is explicitly queued as a named follow-up and not hidden inside `world.js`
 
 Current status on 2026-07-08:
 
 - done: `spawn.js`, `osm-loader.js`, `linear-features.js`, `vegetation.js`
-- review result: Phase 1 stays open because the line-count target is not met yet
-- remaining to close phase: reduce `app/js/world.js` from 6371 lines to 5500 or less, then either extract one final seam or explicitly defer the remainder and close the phase
+- review result: Phase 1 stays open because `world.js` is still far above the real target
+- remaining to close phase: reduce `app/js/world.js` from 6371 lines to 1500 or less, with traversal extraction next and further decomposition after that as needed
 
 ### Phase 2: Split `ui.js` into UI domains
 
@@ -165,7 +203,7 @@ Suggested destination modules:
 Definition of done:
 
 - `app/js/ui/title-screen.js`, `app/js/ui/mobile-controls.js`, and `app/js/ui/keyboard-routing.js` exist
-- `app/js/ui.js` is reduced to 1800 lines or less
+- `app/js/ui.js` is reduced to 1500 lines or less
 - launch flow and input wiring can be changed without editing unrelated menu code
 - runtime verification remains green
 
@@ -230,7 +268,7 @@ Suggested destination modules:
 Definition of done:
 
 - `app/js/terrain/materials.js`, `app/js/terrain/tiles.js`, and `app/js/terrain/rebuild.js` exist
-- `app/js/terrain.js` is reduced to 2400 lines or less
+- `app/js/terrain.js` is reduced to 1500 lines or less
 - performance-sensitive terrain code is easier to profile in isolation
 - terrain/runtime verification remains green
 
@@ -254,7 +292,7 @@ First cleanup targets:
 
 Definition of done:
 
-- `app/index.html` is reduced to 2500 lines or less
+- `app/index.html` is reduced to 1500 lines or less, or the remaining inline complexity is moved into referenced templates/partials with a documented reason
 - startup sequence is documented in one place and matches the actual boot order
 - app launch wiring is no longer hidden across large inline HTML/script clusters
 - release verification remains green
@@ -298,11 +336,17 @@ Recommended first four implementation passes:
 
 That sequence gives the fastest structural payoff without forcing a rewrite.
 
+Important correction:
+
+- intermediate reductions are useful, but they do not count as success if the file still sits above the 1500-line ceiling
+- after each extraction, the next question is "what seam gets this file materially closer to under 1500?" not "is it somewhat smaller than before?"
+
 ## 9. Done Definition For The Refactor Project
 
 The refactor project is in good shape when:
 
 - no core runtime file is acting as a catch-all owner for unrelated systems
+- the primary runtime and UI files are under 1500 lines or have documented exceptions with dated follow-up plans
 - `world.js`, `ui.js`, and `terrain.js` are substantially smaller and orchestration-focused
 - state ownership is documented and mostly local to subsystems
 - live deploy workflow still works from this repo alone
@@ -313,6 +357,7 @@ The refactor project is complete when:
 - phases 1 through 5 meet their exit criteria
 - the clean live-fix workspace is the normal place for live-safe edits
 - no additional cleanup is required to make ordinary fixes without hunting across unrelated files
+- no active `app/*` source file that we routinely edit is still sitting above the 1500-line ceiling
 
 ## 10. Immediate Next Move
 
