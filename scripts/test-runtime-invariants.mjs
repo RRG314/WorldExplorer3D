@@ -862,6 +862,9 @@ async function main() {
     if (!checks.waterVisible) {
       console.warn('[runtime-invariants] Water mesh not visible in this run (likely upstream provider outage).');
     }
+    if (!checks.noConsoleErrors) {
+      console.error('[runtime-invariants] Console/page errors:', JSON.stringify(consoleErrors, null, 2));
+    }
     assert(checks.noConsoleErrors, `Console/page errors present: ${consoleErrors.length}`);
 
     console.log(JSON.stringify(fullReport, null, 2));
