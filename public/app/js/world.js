@@ -79,6 +79,9 @@ import {
   resetWorldForReload
 } from "./world/load-reset.js?v=1";
 import {
+  prepareWorldFeatureSelections
+} from "./world/load-budgeting.js?v=1";
+import {
   buildingContainingPoint,
   findNearestRoad,
   initWorldNavigation,
@@ -2424,246 +2427,59 @@ async function loadRoadsInternal(retryPass = 0) {
       const baselineFullWorld = perfModeNow === 'baseline';
 
       startLoadPhase('featureBudgeting');
-      const allRoadWays = data.elements.filter((e) =>
-        e.type === 'way' &&
-        isDriveableHighwayTag(e.tags?.highway)
-      );
-      const roadWays = limitWaysByTileBudget(allRoadWays, nodes, {
-        globalCap: maxRoadWays,
-        basePerTile: tileBudgetCfg.roadsPerTile,
-        minPerTile: tileBudgetCfg.roadsMinPerTile,
-        tileDegrees: tileBudgetCfg.tileDegrees,
-        useRdt: useRdtBudgeting,
-        compareFn: (a, b) => roadTypePriority(b.tags?.highway) - roadTypePriority(a.tags?.highway)
-      });
-
-      const allBuildingWays = data.elements.filter((e) => e.type === 'way' && (e.tags?.building || e.tags?.['building:part']));
-      const buildingWays = baselineFullWorld ?
-      allBuildingWays :
-      limitWaysByTileBudget(allBuildingWays, nodes, {
-        globalCap: maxBuildingWays,
-        basePerTile: tileBudgetCfg.buildingsPerTile,
-        minPerTile: tileBudgetCfg.buildingsMinPerTile,
-        tileDegrees: tileBudgetCfg.tileDegrees,
-        useRdt: useRdtBudgeting,
-        spreadAcrossArea: true,
-        coreRatio: useRdtBudgeting ? 0.35 : 0.45
-      });
-
-      const allLanduseWays = data.elements.filter((e) =>
-      e.type === 'way' &&
-      e.tags && (
-
-      !!e.tags.landuse ||
-      e.tags.natural === 'wood' ||
-      e.tags.natural === 'forest' ||
-      e.tags.natural === 'scrub' ||
-      e.tags.natural === 'grassland' ||
-      e.tags.natural === 'heath' ||
-      e.tags.natural === 'wetland' ||
-      e.tags.natural === 'sand' ||
-      e.tags.natural === 'beach' ||
-      e.tags.natural === 'bare_rock' ||
-      e.tags.natural === 'scree' ||
-      e.tags.natural === 'shingle' ||
-      e.tags.natural === 'glacier' ||
-      e.tags.natural === 'water' ||
-      !!e.tags.water ||
-      e.tags.leisure === 'park' ||
-      e.tags.leisure === 'garden' ||
-      e.tags.leisure === 'nature_reserve')
-
-      );
-      const landuseWays = limitWaysByTileBudget(allLanduseWays, nodes, {
-        globalCap: maxLanduseWays,
-        basePerTile: tileBudgetCfg.landusePerTile,
-        minPerTile: tileBudgetCfg.landuseMinPerTile,
-        tileDegrees: tileBudgetCfg.tileDegrees,
-        useRdt: useRdtBudgeting
-      });
-
-      const allWaterwayWays = data.elements.filter((e) =>
-      e.type === 'way' &&
-      e.tags &&
-      !!e.tags.waterway
-      );
-      const waterwayWays = baselineFullWorld ?
-      allWaterwayWays :
-      limitWaysByTileBudget(allWaterwayWays, nodes, {
-        globalCap: Math.max(240, Math.floor(maxLanduseWays * 0.8)),
-        basePerTile: Math.max(20, Math.floor(tileBudgetCfg.landusePerTile * 0.7)),
-        minPerTile: Math.max(8, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.6)),
-        tileDegrees: tileBudgetCfg.tileDegrees,
-        useRdt: useRdtBudgeting
-      });
-
-      const allRailwayWays = ENABLE_LINEAR_FEATURES ? data.elements.filter((e) =>
-      e.type === 'way' &&
-      classifyLinearFeatureTags(e.tags)?.kind === 'railway'
-      ) : [];
-      const railwayWays = ENABLE_LINEAR_FEATURES ? limitWaysByTileBudget(allRailwayWays, nodes, {
-        globalCap: Math.max(80, Math.floor(maxRoadWays * 0.22)),
-        basePerTile: Math.max(6, Math.floor(tileBudgetCfg.roadsPerTile * 0.22)),
-        minPerTile: Math.max(2, Math.floor(tileBudgetCfg.roadsMinPerTile * 0.18)),
-        tileDegrees: tileBudgetCfg.tileDegrees,
-        useRdt: useRdtBudgeting,
-        compareFn: (a, b) =>
-        linearFeaturePriority('railway', classifyLinearFeatureTags(b.tags)?.subtype) -
-        linearFeaturePriority('railway', classifyLinearFeatureTags(a.tags)?.subtype)
-      }) : [];
-
-      const allFootwayWays = ENABLE_LINEAR_FEATURES ? data.elements.filter((e) =>
-      e.type === 'way' &&
-      classifyLinearFeatureTags(e.tags)?.kind === 'footway'
-      ) : [];
-      const footwayWays = ENABLE_LINEAR_FEATURES ? limitWaysByTileBudget(allFootwayWays, nodes, {
-        globalCap: Math.max(150, Math.floor(maxLanduseWays * 0.65)),
-        basePerTile: Math.max(10, Math.floor(tileBudgetCfg.landusePerTile * 0.55)),
-        minPerTile: Math.max(4, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.5)),
-        tileDegrees: tileBudgetCfg.tileDegrees,
-        useRdt: useRdtBudgeting,
-        spreadAcrossArea: true,
-        coreRatio: 0.45,
-        compareFn: (a, b) =>
-        linearFeaturePriority('footway', classifyLinearFeatureTags(b.tags)?.subtype) -
-        linearFeaturePriority('footway', classifyLinearFeatureTags(a.tags)?.subtype)
-      }) : [];
-
-      const allCyclewayWays = ENABLE_LINEAR_FEATURES ? data.elements.filter((e) =>
-      e.type === 'way' &&
-      classifyLinearFeatureTags(e.tags)?.kind === 'cycleway'
-      ) : [];
-      const cyclewayWays = ENABLE_LINEAR_FEATURES ? limitWaysByTileBudget(allCyclewayWays, nodes, {
-        globalCap: Math.max(110, Math.floor(maxLanduseWays * 0.45)),
-        basePerTile: Math.max(8, Math.floor(tileBudgetCfg.landusePerTile * 0.36)),
-        minPerTile: Math.max(3, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.32)),
-        tileDegrees: tileBudgetCfg.tileDegrees,
-        useRdt: useRdtBudgeting,
-        spreadAcrossArea: true,
-        coreRatio: 0.45,
-        compareFn: (a, b) =>
-        linearFeaturePriority('cycleway', classifyLinearFeatureTags(b.tags)?.subtype) -
-        linearFeaturePriority('cycleway', classifyLinearFeatureTags(a.tags)?.subtype)
-      }) : [];
-
-      const allStructureConnectorWays = data.elements.filter((e) => {
-        if (e.type !== 'way') return false;
-        const classification = classifyLinearFeatureTags(e.tags, { force: true });
-        if (!classification || classification.kind !== 'footway') return false;
-        const semantics = classifyStructureSemantics(e.tags || {}, {
-          featureKind: classification.kind,
-          subtype: classification.subtype
-        });
-        return semantics.gradeSeparated || semantics.skywalk;
-      });
-      const structureConnectorWays = limitWaysByTileBudget(allStructureConnectorWays, nodes, {
-        globalCap: Math.max(36, Math.floor(tileBudgetCfg.landusePerTile * 1.4)),
-        basePerTile: Math.max(3, Math.floor(tileBudgetCfg.landusePerTile * 0.16)),
-        minPerTile: 1,
-        tileDegrees: tileBudgetCfg.tileDegrees,
-        useRdt: useRdtBudgeting,
-        compareFn: (a, b) => {
-          const aSemantics = classifyStructureSemantics(a.tags || {}, { featureKind: 'footway', subtype: a.tags?.highway || '' });
-          const bSemantics = classifyStructureSemantics(b.tags || {}, { featureKind: 'footway', subtype: b.tags?.highway || '' });
-          const aScore = (aSemantics.skywalk ? 4 : aSemantics.gradeSeparated ? 3 : 1);
-          const bScore = (bSemantics.skywalk ? 4 : bSemantics.gradeSeparated ? 3 : 1);
-          return bScore - aScore;
-        }
-      });
-
-      const allTreeNodes = data.elements.filter((e) =>
-        e.type === 'node' &&
-        e.tags?.natural === 'tree'
-      );
-      const treeNodes = limitNodesByTileBudget(allTreeNodes, {
-        globalCap: MAX_TREE_NODES,
-        basePerTile: Math.max(6, Math.floor(tileBudgetCfg.landusePerTile * 0.22)),
-        minPerTile: Math.max(2, Math.floor(tileBudgetCfg.landuseMinPerTile * 0.18)),
-        tileDegrees: tileBudgetCfg.tileDegrees,
-        useRdt: useRdtBudgeting
-      });
-
-      const allTreeRowWays = data.elements.filter((e) =>
-        e.type === 'way' &&
-        e.tags?.natural === 'tree_row'
-      );
-      const treeRowWays = limitWaysByTileBudget(allTreeRowWays, nodes, {
-        globalCap: MAX_TREE_ROW_WAYS,
-        basePerTile: Math.max(3, Math.floor(tileBudgetCfg.landusePerTile * 0.14)),
-        minPerTile: 1,
-        tileDegrees: tileBudgetCfg.tileDegrees,
-        useRdt: useRdtBudgeting,
-        spreadAcrossArea: true,
-        coreRatio: 0.5
-      });
-
-      const allPoiNodes = data.elements.filter((e) =>
-        e.type === 'node' &&
-        !!poiKeyFromTags(e.tags)
-      );
-      const poiNodes = limitNodesByTileBudget(allPoiNodes, {
-        globalCap: maxPoiNodes,
-        basePerTile: tileBudgetCfg.poiPerTile,
-        minPerTile: tileBudgetCfg.poiMinPerTile,
-        tileDegrees: tileBudgetCfg.tileDegrees,
-        useRdt: useRdtBudgeting
-      });
-
-      loadMetrics.roads.requested = allRoadWays.length;
-      loadMetrics.roads.selected = roadWays.length;
-      loadMetrics.buildings.requested = allBuildingWays.length;
-      loadMetrics.buildings.selected = buildingWays.length;
-      loadMetrics.landuse.requested = allLanduseWays.length;
-      loadMetrics.landuse.selected = landuseWays.length;
-      loadMetrics.linearFeatures.railway.requested = allRailwayWays.length;
-      loadMetrics.linearFeatures.railway.selected = railwayWays.length;
-      loadMetrics.linearFeatures.footway.requested = allFootwayWays.length;
-      loadMetrics.linearFeatures.footway.selected = footwayWays.length;
-      loadMetrics.linearFeatures.cycleway.requested = allCyclewayWays.length;
-      loadMetrics.linearFeatures.cycleway.selected = cyclewayWays.length;
-      loadMetrics.vegetation.treesRequested = allTreeNodes.length;
-      loadMetrics.vegetation.treesSelected = treeNodes.length;
-      loadMetrics.vegetation.treeRowsRequested = allTreeRowWays.length;
-      loadMetrics.vegetation.treeRowsSelected = treeRowWays.length;
-      loadMetrics.pois.requested = allPoiNodes.length;
-      loadMetrics.pois.selected = poiNodes.length;
-      loadMetrics.waterways = {
-        requested: allWaterwayWays.length,
-        selected: waterwayWays.length
-      };
-      const worldSurfaceProfile = classifyWorldSurfaceProfile({
-        centerLat: appCtx.LOC?.lat,
+      const {
+        roadWays,
+        buildingWays,
         landuseWays,
-        waterwayWays
+        waterwayWays,
+        railwayWays,
+        footwayWays,
+        cyclewayWays,
+        structureConnectorWays,
+        treeNodes,
+        treeRowWays,
+        poiNodes,
+        worldSurfaceProfile,
+        requestedCounts
+      } = prepareWorldFeatureSelections({
+        baselineFullWorld,
+        centerLat: appCtx.LOC?.lat,
+        classifyLinearFeatureTags,
+        classifyStructureSemantics,
+        classifyWorldSurfaceProfile,
+        data,
+        enableLinearFeatures: ENABLE_LINEAR_FEATURES,
+        isDriveableHighwayTag,
+        limitNodesByTileBudget,
+        limitWaysByTileBudget,
+        linearFeaturePriority,
+        loadMetrics,
+        maxBuildingWays,
+        maxLanduseWays,
+        maxPoiNodes,
+        maxRoadWays,
+        maxTreeNodes: MAX_TREE_NODES,
+        maxTreeRowWays: MAX_TREE_ROW_WAYS,
+        nodes,
+        poiKeyFromTags,
+        roadTypePriority,
+        tileBudgetCfg,
+        useRdtBudgeting
       });
-      loadMetrics.surfaceProfile = {
-        reason: worldSurfaceProfile.reason,
-        terrainModeHint: worldSurfaceProfile.terrainModeHint,
-        waterModeHint: worldSurfaceProfile.waterModeHint,
-        absLat: Number(worldSurfaceProfile.absLat?.toFixed?.(2) || worldSurfaceProfile.absLat || 0),
-        signals: worldSurfaceProfile.signals?.normalized || {}
-      };
-      if (typeof appCtx.setWorldSurfaceProfile === 'function') {
-        appCtx.setWorldSurfaceProfile(worldSurfaceProfile);
-      } else {
-        appCtx.worldSurfaceProfile = worldSurfaceProfile;
-      }
-      appCtx.osmTreeNodes = treeNodes;
-      appCtx.osmTreeRows = treeRowWays;
       endLoadPhase('featureBudgeting');
 
       if (
-      roadWays.length < allRoadWays.length ||
-      buildingWays.length < allBuildingWays.length ||
-      landuseWays.length < allLanduseWays.length ||
-      poiNodes.length < allPoiNodes.length)
+      roadWays.length < requestedCounts.roads ||
+      buildingWays.length < requestedCounts.buildings ||
+      landuseWays.length < requestedCounts.landuse ||
+      poiNodes.length < requestedCounts.pois)
       {
         console.warn(
           `[WorldLoad] Applied adaptive limits ` +
-          `(roads ${roadWays.length}/${allRoadWays.length}, ` +
-          `buildings ${buildingWays.length}/${allBuildingWays.length}, ` +
-          `landuse ${landuseWays.length}/${allLanduseWays.length}, ` +
-          `pois ${poiNodes.length}/${allPoiNodes.length}).`
+          `(roads ${roadWays.length}/${requestedCounts.roads}, ` +
+          `buildings ${buildingWays.length}/${requestedCounts.buildings}, ` +
+          `landuse ${landuseWays.length}/${requestedCounts.landuse}, ` +
+          `pois ${poiNodes.length}/${requestedCounts.pois}).`
         );
       }
 
