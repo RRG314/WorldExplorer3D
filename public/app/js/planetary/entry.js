@@ -7,6 +7,7 @@ export function hidePlanetaryReturnControls() {
 }
 
 export function suspendEarthModesForPlanetaryEntry() {
+  appCtx.cancelPendingEarthArrival?.();
   hidePlanetaryReturnControls();
   if (appCtx.oceanMode?.active && typeof appCtx.stopOceanMode === 'function') {
     appCtx.stopOceanMode();

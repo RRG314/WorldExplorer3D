@@ -2905,3 +2905,12 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - added one bounded retry for fast non-timeout Overture building batch failures while retaining the 20-second timeout and Shortbread outage fallback
   - final production-configured `npm run release:verify` passed: mirror `405/405`, 243 module identities, Firestore rules `42/42`, local-data safety, builder/editor/multiplayer, title planetary transitions, OSM/ocean, provider outage, and all 30 global matrix locations
   - release candidate is ready for a Hosting-only production promotion; Auth, Firestore data, and Functions are unchanged
+
+- Live cross-flight ownership correction (2026-07-14):
+  - post-deploy Chrome smoke exposed a production-timing race where an abandoned Earth landing could survive Main Menu and overwrite a later Mars flight
+  - each space flight now owns a monotonically increasing session id; ready timers, landing animation frames, and delayed landing completion stop when that session exits or is replaced
+  - pending direct Earth restoration is cancelled by Main Menu or a new planetary entry, and Earth scene restoration now checks that Earth is still the active environment after every asynchronous boundary
+  - expanded `test:title-planetary` with four-second destination stability checks and an adversarial abandoned Earth landing -> Main Menu -> Mars launch held for 9.5 seconds
+  - visual review caught intermittent clipped headless SwiftShader screenshots affecting unrelated DOM layers even while runtime state stayed healthy; the permanent test now supports headed installed-Chrome verification for authoritative visual review
+  - targeted runtime and planetary gates pass with no fatal renderer errors; headed installed Chrome passed the complete sequence and produced populated, unclipped, correctly framed release captures
+  - the prior Hosting promotion is not accepted until the complete release gate passes again and this correction is redeployed and verified on the live URL

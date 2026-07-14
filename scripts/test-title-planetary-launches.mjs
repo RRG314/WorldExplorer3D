@@ -70,6 +70,21 @@ async function waitForExpectedState(page, scenario, timeoutMs = 20000) {
   throw new Error(`${scenario.mode} title launch timed out: ${JSON.stringify(state)}`);
 }
 
+async function requireStableExpectedState(page, scenario, stabilityMs = 4000) {
+  const deadline = Date.now() + stabilityMs;
+  let state = await readState(page);
+  while (Date.now() < deadline) {
+    const destinationReady = !scenario.destination || state.destination === scenario.destination;
+    assert(
+      state.env === scenario.env && destinationReady,
+      `${scenario.mode} title launch changed during its stability window: ${JSON.stringify(state)}`
+    );
+    await page.waitForTimeout(250);
+    state = await readState(page);
+  }
+  return state;
+}
+
 async function waitForEarthReturn(page, timeoutMs = 90000) {
   const deadline = Date.now() + timeoutMs;
   let state = await readState(page);
@@ -112,7 +127,8 @@ async function runScenario(browser, baseUrl, scenario) {
     });
     await page.click(scenario.toggle);
     await page.click('#startBtn');
-    const state = await waitForExpectedState(page, scenario);
+    await waitForExpectedState(page, scenario);
+    const state = await requireStableExpectedState(page, scenario);
     await settleVisualFrame(page);
     await page.screenshot({ path: path.join(outputDir, `${scenario.mode}.png`), fullPage: false });
     assert(state.env === scenario.env, `${scenario.mode} title launch ended in ${state.env || 'no environment'}`);
@@ -133,7 +149,9 @@ async function runScenario(browser, baseUrl, scenario) {
       await page.click('#mainMenuBtn');
       await page.click('#marsLaunchToggle');
       await page.click('#startBtn');
-      const marsAfterMoon = await waitForExpectedState(page, scenarios.find((entry) => entry.mode === 'mars'));
+      const marsScenario = scenarios.find((entry) => entry.mode === 'mars');
+      await waitForExpectedState(page, marsScenario);
+      const marsAfterMoon = await requireStableExpectedState(page, marsScenario);
       await settleVisualFrame(page);
       await page.screenshot({ path: path.join(outputDir, 'moon-earth-mars.png'), fullPage: false });
       await page.evaluate(async () => {
@@ -147,7 +165,9 @@ async function runScenario(browser, baseUrl, scenario) {
       await page.click('#mainMenuBtn');
       await page.click('#spaceLaunchToggle');
       await page.click('#startBtn');
-      const spaceAfterMars = await waitForExpectedState(page, scenarios.find((entry) => entry.mode === 'space'));
+      const spaceScenario = scenarios.find((entry) => entry.mode === 'space');
+      await waitForExpectedState(page, spaceScenario);
+      const spaceAfterMars = await requireStableExpectedState(page, spaceScenario);
       spaceAfterMars.rendererReused = await page.evaluate(async () => {
         const { ctx } = await import('/app/js/shared-context.js?v=55');
         return !!ctx.spaceFlight?.renderer && ctx.spaceFlight.renderer === globalThis.__titlePlanetarySpaceRenderer;
@@ -157,6 +177,26 @@ async function runScenario(browser, baseUrl, scenario) {
       assert(mainFrameNavigations === 1, 'Space relaunch after Mars reloaded the page');
       marsAfterMoon.spaceAfterMars = spaceAfterMars;
       earthReturn.marsAfterMoon = marsAfterMoon;
+    }
+    if (scenario.mode === 'space') {
+      const staleLandingStarted = await page.evaluate(async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        return ctx.forceSpaceFlightLanding?.('Earth') === true;
+      });
+      assert(staleLandingStarted, 'Could not start the stale-landing cancellation regression scenario');
+      await page.click('#mainMenuBtn');
+      await page.click('#marsLaunchToggle');
+      await page.click('#startBtn');
+      const marsScenario = scenarios.find((entry) => entry.mode === 'mars');
+      await waitForExpectedState(page, marsScenario);
+      const marsAfterCancelledLanding = await requireStableExpectedState(page, marsScenario, 9500);
+      await settleVisualFrame(page);
+      await page.screenshot({ path: path.join(outputDir, 'cancelled-earth-landing-mars.png'), fullPage: false });
+      assert(
+        marsAfterCancelledLanding.destination === 'Mars' && marsAfterCancelledLanding.spaceFlightActive,
+        'An exited flight landing sequence overwrote the next Mars flight'
+      );
+      state.marsAfterCancelledLanding = marsAfterCancelledLanding;
     }
     return { ...state, elapsedLimitMs: 20000, earthReturn, mainFrameNavigations };
   } finally {
@@ -170,9 +210,12 @@ const server = await startServer({
   host,
   candidatePorts: [4212, 4213, 4214, 4215]
 });
+const headed = process.env.WE3D_HEADED === '1';
+const browserChannel = String(process.env.WE3D_BROWSER_CHANNEL || '').trim();
 const browser = await chromium.launch({
-  headless: true,
-  args: ['--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist']
+  headless: !headed,
+  ...(browserChannel ? { channel: browserChannel } : {}),
+  args: headed ? [] : ['--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist']
 });
 
 try {

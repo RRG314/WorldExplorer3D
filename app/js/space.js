@@ -1,8 +1,8 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
-import { captureEarthWorldSession } from "./earth-session.js?v=2";
-import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=1";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=1";
+import { captureEarthWorldSession } from "./earth-session.js?v=3";
+import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=2";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=2";
 import { createSpaceFlightScene, destroySpaceFlightScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=3";
 import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=1";
 
@@ -38,8 +38,19 @@ appCtx.spaceFlight = {
   _launchSource: null,
   _isThrusting: false,
   _lastFrameMs: 0,
-  _frameScale: 1
+  _frameScale: 1,
+  _sessionId: 0
 };
+
+function beginSpaceFlightSession() {
+  appCtx.spaceFlight._sessionId = Number(appCtx.spaceFlight._sessionId || 0) + 1;
+  return appCtx.spaceFlight._sessionId;
+}
+
+function isCurrentSpaceFlightSession(sessionId, destination = '') {
+  if (!appCtx.spaceFlight.active || appCtx.spaceFlight._sessionId !== sessionId) return false;
+  return !destination || appCtx.spaceFlight.destination === destination;
+}
 
 const landingDeps = {
   completeLanding,
@@ -53,6 +64,7 @@ const animationDeps = {
 
 function startSpaceFlightToMoon() {
   console.log("Starting space flight to Moon...");
+  const sessionId = beginSpaceFlightSession();
 
   appCtx.travelingToMoon = true;
   appCtx.paused = true;
@@ -96,6 +108,7 @@ function startSpaceFlightToMoon() {
   if (typeof appCtx.showSolarSystemUI === 'function') appCtx.showSolarSystemUI();
 
   setTimeout(() => {
+    if (!isCurrentSpaceFlightSession(sessionId, 'moon')) return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
     showFlightMessage('SPACE FLIGHT READY', '#10b981');
@@ -104,6 +117,7 @@ function startSpaceFlightToMoon() {
 
 function startSpaceFlightToEarth() {
   console.log("Starting space flight to Earth...");
+  const sessionId = beginSpaceFlightSession();
 
   appCtx.travelingToMoon = true;
   appCtx.paused = true;
@@ -134,6 +148,7 @@ function startSpaceFlightToEarth() {
   if (typeof appCtx.showSolarSystemUI === 'function') appCtx.showSolarSystemUI();
 
   setTimeout(() => {
+    if (!isCurrentSpaceFlightSession(sessionId, 'earth')) return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
     showFlightMessage('EARTH RETURN READY', '#3b82f6');
@@ -143,6 +158,7 @@ function startSpaceFlightToEarth() {
 function startSpaceFlightToMars() {
   console.log('Starting space flight to Mars...');
   if (appCtx.onMars || appCtx.spaceFlight.active) return;
+  const sessionId = beginSpaceFlightSession();
   appCtx.travelingToMoon = true;
   appCtx.paused = true;
   appCtx.earthPosition = { x: appCtx.car.x, z: appCtx.car.z, angle: appCtx.car.angle };
@@ -171,6 +187,7 @@ function startSpaceFlightToMars() {
   animateSpaceFlight();
   appCtx.showSolarSystemUI?.();
   setTimeout(() => {
+    if (!isCurrentSpaceFlightSession(sessionId, 'mars')) return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
     showFlightMessage('MARS FLIGHT READY', '#e26f45');
@@ -193,13 +210,15 @@ function attemptLanding() {
   return attemptLandingRuntime(landingDeps);
 }
 
-function completeLanding() {
+function completeLanding(sessionId = appCtx.spaceFlight._sessionId) {
+  if (!isCurrentSpaceFlightSession(sessionId)) return;
   const targetName = appCtx.spaceFlight._landingTarget || appCtx.spaceFlight.destination;
   console.log("Landing complete! Target:", targetName);
 
   showFlightMessage('LANDING SUCCESSFUL!', '#10b981');
 
   setTimeout(() => {
+    if (!isCurrentSpaceFlightSession(sessionId) || appCtx.spaceFlight.mode !== 'landing') return;
     exitSpaceFlight();
 
     if (targetName === 'Moon' || targetName === 'moon') {
@@ -216,6 +235,7 @@ function exitSpaceFlight() {
   console.log("Exiting space flight...");
 
   appCtx.spaceFlight.active = false;
+  appCtx.spaceFlight._sessionId = Number(appCtx.spaceFlight._sessionId || 0) + 1;
 
   if (appCtx.spaceFlight.animationId) {
     cancelAnimationFrame(appCtx.spaceFlight.animationId);

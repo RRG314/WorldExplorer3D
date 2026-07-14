@@ -36,8 +36,10 @@ Use this checklist before pushing a production deploy.
    - this includes a forced ESA WorldCover outage across Tokyo, Monaco, and Miami Beach; dense mapped ground must remain neutral and playable without blanket grass
 6. Title planetary launch gate:
    - `npm run test:title-planetary`
+   - final visual acceptance: `WE3D_HEADED=1 WE3D_BROWSER_CHANNEL=chrome npm run test:title-planetary`
    - Moon/Mars/Space must not load an Earth city first; Moon must return to the selected Earth world without a page reload
    - Moon -> Earth -> Main Menu -> Mars -> Main Menu -> Space must retain the requested destination, keep one page navigation, and reuse the space renderer
+   - an in-progress landing exited through Main Menu must not complete against or retarget the next flight; the adversarial Mars destination must remain stable for the full delayed-landing window
 
 ## 4. Manual Functional Gate (Required)
 
@@ -129,6 +131,7 @@ Use this checklist before pushing a production deploy.
 - `output/playwright/editor-multiplayer-surfaces/block-builder-shapes.png`
 - `output/playwright/editor-multiplayer-surfaces/block-builder-jump.png`
 - `output/playwright/title-planetary-launches/moon-earth-mars.png`
+- `output/playwright/title-planetary-launches/cancelled-earth-landing-mars.png`
 - relevant Playwright screenshots for release evidence
 
 ## 7. Deploy Rules

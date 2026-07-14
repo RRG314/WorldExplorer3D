@@ -280,6 +280,10 @@ export function captureEarthWorldSession() {
 export async function reloadEarthWorldSession(options = {}) {
   const transitionDurationMs = Number.isFinite(options.transitionDurationMs) ? options.transitionDurationMs : 700;
   const switchEnv = options.switchEnv !== false;
+  const isCurrent = () => {
+    if (typeof options.isCurrent === 'function' && !options.isCurrent()) return false;
+    return !appCtx.ENV?.EARTH || typeof appCtx.getEnv !== 'function' || appCtx.getEnv() === appCtx.ENV.EARTH;
+  };
 
   if (switchEnv && typeof appCtx.switchEnv === 'function' && appCtx.ENV?.EARTH) {
     appCtx.switchEnv(appCtx.ENV.EARTH);
@@ -290,9 +294,11 @@ export async function reloadEarthWorldSession(options = {}) {
   if (typeof appCtx.showTransitionLoad === 'function') {
     await appCtx.showTransitionLoad('earth', transitionDurationMs);
   }
+  if (!isCurrent()) return { aborted: true, resumed: false };
   if (typeof appCtx.loadRoads === 'function') {
     await appCtx.loadRoads();
   }
+  if (!isCurrent()) return { aborted: true, resumed: false };
   if (typeof appCtx.updateControlsModeUI === 'function') {
     appCtx.updateControlsModeUI();
   }
@@ -307,6 +313,10 @@ export async function reloadEarthWorldSession(options = {}) {
 export async function resumeEarthWorldSession(options = {}) {
   const transitionDurationMs = Number.isFinite(options.transitionDurationMs) ? options.transitionDurationMs : 350;
   const switchEnv = options.switchEnv !== false;
+  const isCurrent = () => {
+    if (typeof options.isCurrent === 'function' && !options.isCurrent()) return false;
+    return !appCtx.ENV?.EARTH || typeof appCtx.getEnv !== 'function' || appCtx.getEnv() === appCtx.ENV.EARTH;
+  };
 
   if (switchEnv && typeof appCtx.switchEnv === 'function' && appCtx.ENV?.EARTH) {
     appCtx.switchEnv(appCtx.ENV.EARTH);
@@ -317,7 +327,8 @@ export async function resumeEarthWorldSession(options = {}) {
     restoreSelectionFromState();
     return reloadEarthWorldSession({
       transitionDurationMs,
-      switchEnv: false
+      switchEnv: false,
+      isCurrent
     });
   }
 
@@ -325,6 +336,7 @@ export async function resumeEarthWorldSession(options = {}) {
   if (typeof appCtx.showTransitionLoad === 'function') {
     await appCtx.showTransitionLoad('earth', transitionDurationMs);
   }
+  if (!isCurrent()) return { aborted: true, resumed: false };
 
   restoreEarthSceneMeshes();
   const resolved = restorePoseFromSession();

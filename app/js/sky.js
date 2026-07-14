@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=2";
+import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=3";
 import {
   cycleTimeOfDay as cycleSkyTimeOfDay,
   getAstronomicalSkySnapshot,
@@ -17,7 +17,7 @@ import {
   showStarInfo
 } from "./sky/starfield-ui.js?v=1";
 import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
-import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=1";
+import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=2";
 // ============================================================================
 // sky.js - Time of day, starfield, constellations, moon system
 // ============================================================================
@@ -63,7 +63,8 @@ function checkMoonClick(clientX, clientY) {
 function runTimedCameraTransition({
   duration = 3000,
   onFrame,
-  onComplete
+  onComplete,
+  isCurrent = () => true
 }) {
   const startTime = Date.now();
   let finished = false;
@@ -76,6 +77,10 @@ function runTimedCameraTransition({
 
   const animate = () => {
     if (finished) return;
+    if (!isCurrent()) {
+      finished = true;
+      return;
+    }
     const elapsed = Date.now() - startTime;
     const progress = Math.min(elapsed / duration, 1);
     const eased = progress < 0.5 ?
@@ -633,8 +638,15 @@ function createMoonSurface() {
 
 
 // Return to Earth
+let earthArrivalSessionId = 0;
+
+function cancelPendingEarthArrival() {
+  earthArrivalSessionId++;
+}
+
 function returnToEarth() {
   if (!appCtx.onMoon || appCtx.travelingToMoon) return;
+  const arrivalSessionId = ++earthArrivalSessionId;
 
   // Always use direct travel for return (no space flight)
 
@@ -655,23 +667,30 @@ function returnToEarth() {
   );
   runTimedCameraTransition({
     duration: 3000,
+    isCurrent: () => arrivalSessionId === earthArrivalSessionId,
     onFrame: (eased) => {
       appCtx.camera.position.lerpVectors(startPos, earthCameraPos, eased);
     },
     onComplete: () => {
-      arriveAtEarth();
+      if (arrivalSessionId === earthArrivalSessionId) void arriveAtEarth(arrivalSessionId);
     }
   });
 }
 
 // Arrive back at Earth
-async function arriveAtEarth() {
+async function arriveAtEarth(expectedSessionId = null) {
+  const arrivalSessionId = expectedSessionId ?? ++earthArrivalSessionId;
+  const isCurrentArrival = () => (
+    arrivalSessionId === earthArrivalSessionId &&
+    (!appCtx.ENV?.EARTH || appCtx.getEnv?.() === appCtx.ENV.EARTH)
+  );
   if (appCtx.spaceFlight?.active && typeof appCtx.exitSpaceFlight === 'function') {
     appCtx.exitSpaceFlight();
   }
   appCtx.switchEnv(appCtx.ENV.EARTH); // sets onMoon=false, travelingToMoon=false
   appCtx.setLunarEarthVisible?.(false);
   await appCtx.setPlanetaryVehicle?.('earth');
+  if (!isCurrentArrival()) return false;
   appCtx.setPlanetaryCharacter?.('earth');
   emitTutorialEvent('returned_to_earth', { source: 'earth_arrival' });
   const weatherPanel = document.getElementById('weatherPanel');
@@ -716,11 +735,13 @@ async function arriveAtEarth() {
   try {
     await resumeEarthWorldSession({
       switchEnv: false,
-      transitionDurationMs: 700
+      transitionDurationMs: 700,
+      isCurrent: isCurrentArrival
     });
   } finally {
-    appCtx.paused = false;
+    if (isCurrentArrival()) appCtx.paused = false;
   }
+  return isCurrentArrival();
 }
 
 // Check if car collides with any building and return collision info
@@ -734,6 +755,7 @@ Object.assign(appCtx, {
   alignStarFieldToLocation,
   arriveAtEarth,
   arriveAtMoon,
+  cancelPendingEarthArrival,
   checkMoonClick,
   checkStarClick,
   clearStarSelection,
@@ -760,6 +782,7 @@ export {
   alignStarFieldToLocation,
   arriveAtEarth,
   arriveAtMoon,
+  cancelPendingEarthArrival,
   checkMoonClick,
   checkStarClick,
   clearStarSelection,
@@ -779,4 +802,5 @@ export {
   showApollo11Info,
   showReturnToEarthButton,
   showStarInfo,
-  travelToMoon };
+  travelToMoon
+};

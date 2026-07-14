@@ -1,8 +1,8 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
-import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=2";
-import { hidePlanetaryReturnControls } from "./planetary/entry.js?v=1";
+import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=3";
+import { hidePlanetaryReturnControls } from "./planetary/entry.js?v=2";
 import { initMapInteractions } from "./ui/map-interactions.js?v=59";
 import { initMobileControls } from "./ui/mobile-controls.js?v=60";
 import { initShareUi } from "./ui/share-links.js?v=60";
@@ -526,6 +526,7 @@ function setupUI() {
   }
   function goToMainMenu() {
     emitTutorialEvent('opened_main_menu', { source: 'main_menu_button' });
+    appCtx.cancelPendingEarthArrival?.();
     hidePlanetaryReturnControls();
     if (appCtx.spaceFlight?.active && typeof appCtx.exitSpaceFlight === 'function') {
       appCtx.exitSpaceFlight();

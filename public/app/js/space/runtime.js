@@ -50,6 +50,7 @@ export function findLandableBodyByName(target) {
 export function startLandingSequence(targetMesh, targetRadius, targetName, deps = {}, landingDuration = 2000) {
   if (!targetMesh || !appCtx.spaceFlight.rocket) return false;
 
+  const sessionId = appCtx.spaceFlight._sessionId;
   appCtx.spaceFlight.mode = 'landing';
   appCtx.spaceFlight._landingTarget = targetName;
   appCtx.spaceFlight._autopilotTarget = null;
@@ -65,6 +66,11 @@ export function startLandingSequence(targetMesh, targetRadius, targetName, deps 
   const toTarget = new THREE.Vector3();
 
   function landingAnimation() {
+    if (
+      !appCtx.spaceFlight.active ||
+      appCtx.spaceFlight._sessionId !== sessionId ||
+      appCtx.spaceFlight.mode !== 'landing'
+    ) return;
     const elapsed = Date.now() - startTime;
     const progress = Math.min(elapsed / duration, 1);
     const eased = 1 - Math.pow(1 - progress, 3);
@@ -77,7 +83,7 @@ export function startLandingSequence(targetMesh, targetRadius, targetName, deps 
     appCtx.spaceFlight.rocket.quaternion.setFromUnitVectors(landingAxis, toTarget);
 
     if (progress < 1) requestAnimationFrame(landingAnimation);
-    else deps.completeLanding?.();
+    else deps.completeLanding?.(sessionId);
   }
 
   landingAnimation();

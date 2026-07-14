@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { sampleDynamicWaterAt } from '../boat-mode.js?v=16';
+import { sampleDynamicWaterAt } from '../boat-mode.js?v=17';
 import {
   getActivityAnchorType,
   getActivityTemplate,
