@@ -81,6 +81,14 @@ async function waitForEarthReturn(page, timeoutMs = 90000) {
   throw new Error(`Moon return to Earth timed out: ${JSON.stringify(state)}`);
 }
 
+async function settleVisualFrame(page) {
+  await page.evaluate(async () => {
+    await document.fonts?.ready;
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  await page.waitForTimeout(500);
+}
+
 async function runScenario(browser, baseUrl, scenario) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
   const page = await context.newPage();
@@ -105,6 +113,7 @@ async function runScenario(browser, baseUrl, scenario) {
     await page.click(scenario.toggle);
     await page.click('#startBtn');
     const state = await waitForExpectedState(page, scenario);
+    await settleVisualFrame(page);
     await page.screenshot({ path: path.join(outputDir, `${scenario.mode}.png`), fullPage: false });
     assert(state.env === scenario.env, `${scenario.mode} title launch ended in ${state.env || 'no environment'}`);
     assert(!scenario.destination || state.destination === scenario.destination, `${scenario.mode} title launch targeted ${state.destination || 'nothing'}`);
@@ -115,10 +124,39 @@ async function runScenario(browser, baseUrl, scenario) {
     if (scenario.mode === 'moon') {
       await page.click('#returnToEarthBtn');
       earthReturn = await waitForEarthReturn(page);
+      await settleVisualFrame(page);
       await page.screenshot({ path: path.join(outputDir, 'moon-return-earth.png'), fullPage: false });
       assert(earthReturn.roads > 0, 'Moon return did not initialize the selected Earth world');
       assert(mainFrameNavigations === 1, 'Moon return reloaded the page instead of restoring Earth in place');
       assert(!earthReturn.fatal, 'Moon return showed a fatal renderer error');
+
+      await page.click('#mainMenuBtn');
+      await page.click('#marsLaunchToggle');
+      await page.click('#startBtn');
+      const marsAfterMoon = await waitForExpectedState(page, scenarios.find((entry) => entry.mode === 'mars'));
+      await settleVisualFrame(page);
+      await page.screenshot({ path: path.join(outputDir, 'moon-earth-mars.png'), fullPage: false });
+      await page.evaluate(async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        globalThis.__titlePlanetarySpaceRenderer = ctx.spaceFlight?.renderer || null;
+      });
+      assert(marsAfterMoon.destination === 'Mars', 'Mars launch after Moon return retained an old flight destination');
+      assert(!marsAfterMoon.fatal, 'Mars launch after Moon return showed a fatal renderer error');
+      assert(mainFrameNavigations === 1, 'Mars launch after Moon return reloaded the page');
+
+      await page.click('#mainMenuBtn');
+      await page.click('#spaceLaunchToggle');
+      await page.click('#startBtn');
+      const spaceAfterMars = await waitForExpectedState(page, scenarios.find((entry) => entry.mode === 'space'));
+      spaceAfterMars.rendererReused = await page.evaluate(async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        return !!ctx.spaceFlight?.renderer && ctx.spaceFlight.renderer === globalThis.__titlePlanetarySpaceRenderer;
+      });
+      assert(spaceAfterMars.rendererReused, 'Space relaunch recreated the renderer after Mars');
+      assert(!spaceAfterMars.fatal, 'Space relaunch after Mars showed a fatal renderer error');
+      assert(mainFrameNavigations === 1, 'Space relaunch after Mars reloaded the page');
+      marsAfterMoon.spaceAfterMars = spaceAfterMars;
+      earthReturn.marsAfterMoon = marsAfterMoon;
     }
     return { ...state, elapsedLimitMs: 20000, earthReturn, mainFrameNavigations };
   } finally {

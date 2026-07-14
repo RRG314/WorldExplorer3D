@@ -37,6 +37,7 @@ Use this checklist before pushing a production deploy.
 6. Title planetary launch gate:
    - `npm run test:title-planetary`
    - Moon/Mars/Space must not load an Earth city first; Moon must return to the selected Earth world without a page reload
+   - Moon -> Earth -> Main Menu -> Mars -> Main Menu -> Space must retain the requested destination, keep one page navigation, and reuse the space renderer
 
 ## 4. Manual Functional Gate (Required)
 
@@ -127,6 +128,7 @@ Use this checklist before pushing a production deploy.
 - `output/playwright/release-retention/`
 - `output/playwright/editor-multiplayer-surfaces/block-builder-shapes.png`
 - `output/playwright/editor-multiplayer-surfaces/block-builder-jump.png`
+- `output/playwright/title-planetary-launches/moon-earth-mars.png`
 - relevant Playwright screenshots for release evidence
 
 ## 7. Deploy Rules

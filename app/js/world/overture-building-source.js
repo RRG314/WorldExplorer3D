@@ -260,6 +260,24 @@ async function fetchArchiveTile(pmtiles, z, x, y) {
   }
 }
 
+function fulfilledTiles(settled) {
+  return settled
+    .filter((entry) => entry.status === 'fulfilled' && entry.value)
+    .map((entry) => entry.value);
+}
+
+function isTimeoutFailure(entry) {
+  if (entry.status !== 'rejected') return false;
+  const reason = entry.reason;
+  return reason?.name === 'AbortError' || /abort|timeout/i.test(String(reason?.message || reason || ''));
+}
+
+async function fetchArchiveTileBatch(pmtiles, coordinates) {
+  return Promise.allSettled(
+    coordinates.map(({ x, y }) => fetchArchiveTile(pmtiles, OVERTURE_BUILDING_ZOOM, x, y))
+  );
+}
+
 export async function fetchOvertureBuildingData(options = {}) {
   const lat = Number(options.lat);
   const lon = Number(options.lon);
@@ -280,12 +298,18 @@ export async function fetchOvertureBuildingData(options = {}) {
   );
   const pmtiles = await getArchive();
   const coordinates = orderedTileCoordinates(range, lat, lon);
-  const settled = await Promise.allSettled(
-    coordinates.map(({ x, y }) => fetchArchiveTile(pmtiles, OVERTURE_BUILDING_ZOOM, x, y))
-  );
-  const tiles = settled
-    .filter((entry) => entry.status === 'fulfilled' && entry.value)
-    .map((entry) => entry.value);
+  let attempts = 1;
+  let settled = await fetchArchiveTileBatch(pmtiles, coordinates);
+  let tiles = fulfilledTiles(settled);
+  const fastTransientFailure = tiles.length === 0 &&
+    settled.some((entry) => entry.status === 'rejected') &&
+    !settled.some(isTimeoutFailure);
+  if (fastTransientFailure) {
+    attempts += 1;
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 250));
+    settled = await fetchArchiveTileBatch(pmtiles, coordinates);
+    tiles = fulfilledTiles(settled);
+  }
   if (tiles.length === 0) {
     const reason = settled.find((entry) => entry.status === 'rejected')?.reason;
     throw new Error(`Overture building coverage unavailable: ${reason?.message || reason || 'no tiles'}`);
@@ -303,6 +327,7 @@ export async function fetchOvertureBuildingData(options = {}) {
     _overtureBuildings: {
       release: OVERTURE_RELEASE,
       zoom: OVERTURE_BUILDING_ZOOM,
+      attempts,
       loadedTiles: tiles.length,
       requestedTiles: coordinates.length,
       radiusDegrees: radius,

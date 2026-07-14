@@ -2896,3 +2896,12 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - added `test:title-planetary` to the permanent release gate; it verifies Moon, Space, and Mars destinations, zero title-triggered Earth road loads, nonblank screenshots, and Moon -> Earth restoration with 764 Baltimore roads in the same page navigation
   - the final global matrix also exposed a too-tight 10-second Overture PMTiles tile deadline; increasing it to 20 seconds kept the existing 32-second bounded detail gate and restored authoritative San Francisco/Las Vegas building massing in about 9 seconds
   - production config, mirror `405/405`, 243 module identities, CSS, and builder contracts pass after the corrections; production data was not migrated or deleted
+
+- Final production transition and provider-resilience closure (2026-07-14):
+  - fixed stale space-flight ownership surviving Main Menu and overriding the next title destination
+  - Moon -> Earth -> Main Menu -> Mars -> Main Menu -> Space now completes in one page navigation with the requested destinations and no fatal renderer state
+  - retained one auxiliary space renderer across flights while disposing each old scene and its resources, reducing context churn and transition lag
+  - added settled-frame capture waits after visual state changes; reviewed builder shapes, block-top landing, Monaco water, and the complete post-Moon Mars HUD without clipped compositor tiles
+  - added one bounded retry for fast non-timeout Overture building batch failures while retaining the 20-second timeout and Shortbread outage fallback
+  - final production-configured `npm run release:verify` passed: mirror `405/405`, 243 module identities, Firestore rules `42/42`, local-data safety, builder/editor/multiplayer, title planetary transitions, OSM/ocean, provider outage, and all 30 global matrix locations
+  - release candidate is ready for a Hosting-only production promotion; Auth, Firestore data, and Functions are unchanged

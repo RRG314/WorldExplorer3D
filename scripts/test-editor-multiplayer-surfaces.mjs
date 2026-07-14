@@ -150,6 +150,14 @@ async function waitFor(page, predicateSource, timeout = 20000) {
   await page.waitForFunction(predicateSource, { timeout });
 }
 
+async function settleVisualFrame(page) {
+  await page.evaluate(async () => {
+    await document.fonts?.ready;
+    await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  });
+  await page.waitForTimeout(500);
+}
+
 async function runBlockBuilderAudit(page) {
   await page.waitForFunction(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -195,6 +203,7 @@ async function runBlockBuilderAudit(page) {
       }))
     };
   });
+  await settleVisualFrame(page);
   await page.screenshot({ path: path.join(outputDir, 'block-builder-shapes.png') });
 
   const limit = await page.evaluate(async () => {
@@ -259,6 +268,7 @@ async function runBlockBuilderAudit(page) {
   jump.airborneSamples = jumpSamples.filter((sample) => !sample.onGround).length;
   jump.maxY = Math.max(...jumpSamples.map((sample) => sample.y));
   jump.startY = jumpSetup.startY;
+  await settleVisualFrame(page);
   await page.screenshot({ path: path.join(outputDir, 'block-builder-jump.png') });
 
   const vehicle = await page.evaluate(async () => {
@@ -317,6 +327,7 @@ async function runAudit(page, baseUrl) {
     const mod = await import('/app/js/shared-context.js?v=55');
     return mod.ctx.getEditorSnapshot();
   });
+  await settleVisualFrame(page);
   await page.screenshot({ path: path.join(outputDir, 'editor-open.png') });
   console.log('[audit] close editor');
   await page.evaluate(async () => {
@@ -339,6 +350,7 @@ async function runAudit(page, baseUrl) {
     const mod = await import('/app/js/shared-context.js?v=55');
     return mod.ctx.getActivityCreatorSnapshot();
   });
+  await settleVisualFrame(page);
   await page.screenshot({ path: path.join(outputDir, 'activity-creator-open.png') });
   console.log('[audit] close activity creator');
   await page.evaluate(async () => {

@@ -172,7 +172,7 @@ import { createWorldRoadLoader } from "./world/load-roads.js?v=29";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=4";
-import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=3";
+import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=4";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
 import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=6";
 // world.js - OSM data loading, roads, buildings, landuse, POIs

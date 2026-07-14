@@ -527,6 +527,9 @@ function setupUI() {
   function goToMainMenu() {
     emitTutorialEvent('opened_main_menu', { source: 'main_menu_button' });
     hidePlanetaryReturnControls();
+    if (appCtx.spaceFlight?.active && typeof appCtx.exitSpaceFlight === 'function') {
+      appCtx.exitSpaceFlight();
+    }
     appCtx.gameStarted = false;appCtx.paused = false;appCtx.clearObjectives();appCtx.clearPolice();appCtx.policeOn = false;appCtx.eraseTrack();appCtx.closePropertyPanel();appCtx.closeHistoricPanel();appCtx.clearPropertyMarkers();appCtx.realEstateMode = false;appCtx.historicMode = false;
     if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
     if (typeof appCtx.stopBoatMode === 'function' && appCtx.boatMode?.active) appCtx.stopBoatMode({ targetMode: 'walk' });

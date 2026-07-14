@@ -1,8 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   createAuxiliaryRenderer,
-  disposeThreeObjectTree,
-  disposeThreeRenderer
+  disposeThreeObjectTree
 } from "../engine/webgl-lifecycle.js?v=1";
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
@@ -14,27 +13,32 @@ export function createSpaceFlightScene() {
   appCtx.spaceFlight.scene = new THREE.Scene();
   appCtx.spaceFlight.scene.background = new THREE.Color(0x000008);
   appCtx.spaceFlight.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.5, 450000);
-  appCtx.spaceFlight.renderer = createAuxiliaryRenderer({
-    canvas: appCtx.spaceFlight.canvas,
-    pixelRatioCap: 1.25,
-    size: { width: window.innerWidth, height: window.innerHeight },
-    optionsList: [
-      {
-        antialias: window.devicePixelRatio <= 1,
-        alpha: false,
-        powerPreference: 'low-power'
-      },
-      {
-        antialias: false,
-        alpha: false,
-        powerPreference: 'low-power'
-      },
-      {
-        antialias: false,
-        alpha: false
-      }
-    ]
-  });
+  if (!appCtx.spaceFlight.renderer) {
+    appCtx.spaceFlight.renderer = createAuxiliaryRenderer({
+      canvas: appCtx.spaceFlight.canvas,
+      pixelRatioCap: 1.25,
+      size: { width: window.innerWidth, height: window.innerHeight },
+      optionsList: [
+        {
+          antialias: window.devicePixelRatio <= 1,
+          alpha: false,
+          powerPreference: 'low-power'
+        },
+        {
+          antialias: false,
+          alpha: false,
+          powerPreference: 'low-power'
+        },
+        {
+          antialias: false,
+          alpha: false
+        }
+      ]
+    });
+  } else {
+    appCtx.spaceFlight.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+    appCtx.spaceFlight.renderer.setSize(window.innerWidth, window.innerHeight, false);
+  }
   if (!appCtx.spaceFlight.renderer) {
     throw new Error('Space renderer unavailable');
   }
@@ -322,7 +326,9 @@ export function destroySpaceFlightScene() {
   if (appCtx.spaceFlight.scene) {
     disposeThreeObjectTree(appCtx.spaceFlight.scene);
   }
-  appCtx.spaceFlight.renderer = disposeThreeRenderer(appCtx.spaceFlight.renderer);
+  appCtx.spaceFlight.renderer?.renderLists?.dispose?.();
+  appCtx.spaceFlight.renderer?.info?.reset?.();
+  appCtx.spaceFlight.renderer?.clear?.();
   appCtx.spaceFlight.scene = null;
   appCtx.spaceFlight.camera = null;
   appCtx.spaceFlight.rocket = null;
