@@ -7,7 +7,7 @@ import { initMapInteractions } from "./ui/map-interactions.js?v=59";
 import { initMobileControls } from "./ui/mobile-controls.js?v=60";
 import { initShareUi } from "./ui/share-links.js?v=60";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=63";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=64";
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {

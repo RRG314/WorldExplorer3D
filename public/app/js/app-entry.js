@@ -11,7 +11,7 @@ import './env.js?v=56';
 import './real-estate.js?v=55';
 import './ground.js?v=64';
 import './terrain.js?v=92';
-import './world.js?v=140';
+import './world.js?v=141';
 import './building-entry.js?v=2';
 import './interiors.js?v=5';
 import { init, tryEnablePostProcessing } from './engine.js?v=69';
@@ -41,7 +41,7 @@ import './memory.js?v=55';
 import './blocks.js?v=60';
 import './block-builder/ui.js?v=2';
 import './flower-challenge.js?v=55';
-import { setupUI } from './ui.js?v=68';
+import { setupUI } from './ui.js?v=69';
 
 let _booted = false;
 let _multiplayerObserverReady = false;

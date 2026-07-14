@@ -20,6 +20,7 @@
     "test:local-data": "node scripts/test-local-data-safety.mjs",
     "test:editor-multiplayer": "node scripts/test-editor-multiplayer-surfaces.mjs",
     "test:block-builder": "node scripts/test-block-builder-contract.mjs",
+    "test:title-planetary": "node scripts/test-title-planetary-launches.mjs",
     "test:retention": "node scripts/test-release-retention.mjs",
     "test:world-matrix": "node scripts/test-world-matrix.mjs",
     "test:osm-smoke": "node scripts/test-osm-smoke.mjs",

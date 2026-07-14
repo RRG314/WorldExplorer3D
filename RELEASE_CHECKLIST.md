@@ -34,6 +34,9 @@ Use this checklist before pushing a production deploy.
 5. Full gate (rules, local data, runtime, editor/multiplayer, OSM smoke, and world matrix):
    - `npm run release:verify`
    - this includes a forced ESA WorldCover outage across Tokyo, Monaco, and Miami Beach; dense mapped ground must remain neutral and playable without blanket grass
+6. Title planetary launch gate:
+   - `npm run test:title-planetary`
+   - Moon/Mars/Space must not load an Earth city first; Moon must return to the selected Earth world without a page reload
 
 ## 4. Manual Functional Gate (Required)
 

@@ -5,7 +5,7 @@ import {
 } from "./shortbread-source.js?v=4";
 
 const OVERTURE_BUILDING_ZOOM = 14;
-const OVERTURE_FETCH_TIMEOUT_MS = 10000;
+const OVERTURE_FETCH_TIMEOUT_MS = 20000;
 const OVERTURE_RELEASE = '2026-06-17.0';
 const DEFAULT_ARCHIVE_URL =
   `https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/${OVERTURE_RELEASE}/buildings.pmtiles`;

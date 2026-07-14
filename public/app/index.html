@@ -78,11 +78,11 @@
 </div>
 <div class="tab-content active" id="tab-location">
 <div class="launch-switch-row">
-<button class="launch-switch-btn active" id="earthLaunchToggle" data-launch="earth" type="button">🌍 Earth</button>
-<button class="launch-switch-btn" id="moonLaunchToggle" data-launch="moon" type="button">🌙 Moon</button>
-<button class="launch-switch-btn" id="marsLaunchToggle" data-launch="mars" type="button">🔴 Mars</button>
-<button class="launch-switch-btn" id="spaceLaunchToggle" data-launch="space" type="button">🚀 Space</button>
-<button class="launch-switch-btn" id="oceanLaunchToggle" data-launch="ocean" type="button">🌊 Ocean</button>
+<button class="launch-switch-btn active" id="earthLaunchToggle" data-launch="earth" type="button" disabled>🌍 Earth</button>
+<button class="launch-switch-btn" id="moonLaunchToggle" data-launch="moon" type="button" disabled>🌙 Moon</button>
+<button class="launch-switch-btn" id="marsLaunchToggle" data-launch="mars" type="button" disabled>🔴 Mars</button>
+<button class="launch-switch-btn" id="spaceLaunchToggle" data-launch="space" type="button" disabled>🚀 Space</button>
+<button class="launch-switch-btn" id="oceanLaunchToggle" data-launch="ocean" type="button" disabled>🌊 Ocean</button>
 </div>
 <div class="loc-grid custom-centered">
 <div class="loc custom" data-loc="custom"><div class="loc-name">🌍 Custom</div><div class="loc-region">Any Location</div></div>
@@ -391,7 +391,7 @@ Use this to compare RDT and baseline with real runtime data.
 <div class="ctrl-row"><span class="ctrl-key">Esc</span><span class="ctrl-action">Pause</span></div>
 </div>
 </div>
-<div class="start-section"><button class="startBtn" id="startBtn">EXPLORE</button></div>
+<div class="start-section"><button class="startBtn" id="startBtn" type="button" disabled aria-busy="true">EXPLORE</button></div>
 </div>
 <aside id="flowerChallengePanel" class="flowerChallengePanel">
 <div class="flowerChallengeHeader">
@@ -1482,5 +1482,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=84"></script>
 <script type="module" src="js/app-auth-shell.js?v=84"></script>
-<script type="module" src="js/bootstrap.js?v=126"></script>
+<script type="module" src="js/bootstrap.js?v=127"></script>
 </body></html>

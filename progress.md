@@ -2889,3 +2889,10 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - standard Chrome launched Baltimore with a nonblank 3D renderer, opened the four-shape/eight-color builder, placed a cube and ramp, cycled travel modes, and showed no fatal renderer or white-screen failure
   - reran `npm run release:verify` after the startup fixes; all gates passed with mirror `405/405`, 243 module identities, rules `42/42`, builder physics, Earth/Moon/Earth renderer retention, OSM/ocean smoke, provider-outage fallbacks, and the complete global matrix
   - production remains untouched; only release operations remain: production config sync, rollback snapshot/tag, commit/push, reviewed rules plus Hosting deploy, and live smoke verification
+
+- Production smoke correction (2026-07-14):
+  - the first live smoke found that title-menu Moon/Mars/Space launches unnecessarily awaited a complete Earth city load before starting the selected destination
+  - planetary title launches now wait for their runtime owner, bypass Earth road loading, and keep launch/Explore controls disabled until title listeners are attached
+  - added `test:title-planetary` to the permanent release gate; it verifies Moon, Space, and Mars destinations, zero title-triggered Earth road loads, nonblank screenshots, and Moon -> Earth restoration with 764 Baltimore roads in the same page navigation
+  - the final global matrix also exposed a too-tight 10-second Overture PMTiles tile deadline; increasing it to 20 seconds kept the existing 32-second bounded detail gate and restored authoritative San Francisco/Las Vegas building massing in about 9 seconds
+  - production config, mirror `405/405`, 243 module identities, CSS, and builder contracts pass after the corrections; production data was not migrated or deleted

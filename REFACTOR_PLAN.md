@@ -1190,3 +1190,5 @@ Closed:
 6. The complete production gate passes with 42/42 Firestore rules, 405-file mirror parity, provider-outage coverage, planetary round trips, and the sustained global location matrix.
 
 The refactor/runtime phase is now complete. Staging-hosted retention and standard-Chrome acceptance also pass. Remaining work is release operations only: rollback creation, production configuration sync, commit/push, reviewed Firestore-rules plus Hosting deployment, and post-deploy smoke verification. Any further file splitting or feature expansion belongs to a new bounded maintenance phase after this release.
+
+Post-deploy smoke addendum: title-menu Moon/Mars/Space launches now have a dedicated release test and do not await an Earth road load. The same test requires Moon -> Earth restoration in one page. Overture PMTiles reads retain a bounded 20-second tile deadline so slower authoritative city tiles do not prematurely fall back after ten seconds.
