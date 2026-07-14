@@ -108,6 +108,8 @@ let boatMode = {
   detailBias: 1,
   waveDirectionX: 0,
   waveDirectionZ: 1,
+  cameraYawOffset: 0,
+  cameraPitch: 0,
   currentWater: null,
   lastEntryMode: 'walk',
   previousCameraMode: null,

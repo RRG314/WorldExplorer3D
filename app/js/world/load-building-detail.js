@@ -59,12 +59,16 @@ export function scheduleDeferredBuildingLoad(options = {}) {
   if (!fetchPreferredData && (!query || typeof options.fetchOverpassJSON !== 'function')) {
     setBuildingDetailState('skipped');
     onSettled();
-    return;
+    return Promise.resolve(appCtx.worldDetailState.buildings);
   }
 
   setBuildingDetailState('loading', { requested: 0, selected: 0 });
-  globalThis.setTimeout(async () => {
-    if (!isActiveLoadContext()) return;
+  const delayMs = Number.isFinite(options.delayMs) ? Math.max(0, options.delayMs) : 80;
+  return new Promise((resolve) => globalThis.setTimeout(async () => {
+    if (!isActiveLoadContext()) {
+      resolve({ status: 'aborted', updatedAt: Date.now() });
+      return;
+    }
     const startedAt = performance.now();
     try {
       let metadataState = { status: 'skipped' };
@@ -159,6 +163,7 @@ export function scheduleDeferredBuildingLoad(options = {}) {
       });
     } finally {
       if (isActiveLoadContext()) onSettled();
+      resolve(appCtx.worldDetailState?.buildings || { status: 'unknown', updatedAt: Date.now() });
     }
-  }, 80);
+  }, delayMs));
 }

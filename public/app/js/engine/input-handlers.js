@@ -1,4 +1,6 @@
 export function setupEngineInputHandlers(appCtx) {
+  const wrapYaw = (angle = 0) => Math.atan2(Math.sin(angle), Math.cos(angle));
+
   addEventListener('resize', () => {
     appCtx.camera.aspect = innerWidth / innerHeight;
     appCtx.camera.updateProjectionMatrix();
@@ -71,17 +73,11 @@ export function setupEngineInputHandlers(appCtx) {
 
     const sensitivity = 0.005;
     if (appCtx.droneMode) {
-      appCtx.drone.cameraYawOffset = Math.max(
-        -1.4,
-        Math.min(1.4, (Number(appCtx.drone.cameraYawOffset) || 0) - deltaX * sensitivity)
-      );
+      appCtx.drone.cameraYawOffset = wrapYaw((Number(appCtx.drone.cameraYawOffset) || 0) - deltaX * sensitivity);
       appCtx.drone.pitch += deltaY * sensitivity;
       appCtx.drone.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.drone.pitch));
     } else if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
-      appCtx.Walk.state.walker.lookYawOffset = Math.max(
-        -1.4,
-        Math.min(1.4, (Number(appCtx.Walk.state.walker.lookYawOffset) || 0) - deltaX * sensitivity)
-      );
+      appCtx.Walk.state.walker.lookYawOffset = wrapYaw((Number(appCtx.Walk.state.walker.lookYawOffset) || 0) - deltaX * sensitivity);
       appCtx.Walk.state.walker.pitch += deltaY * sensitivity;
       appCtx.Walk.state.walker.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.Walk.state.walker.pitch));
     }

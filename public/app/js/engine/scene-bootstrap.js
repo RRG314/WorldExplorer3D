@@ -1,4 +1,4 @@
-import { setupEngineInputHandlers } from "./input-handlers.js?v=2";
+import { setupEngineInputHandlers } from "./input-handlers.js?v=3";
 import { createVehicleHeadlightRig } from "./night-lighting.js?v=6";
 import {
   recordStartupDiagnostic,

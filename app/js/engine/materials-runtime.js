@@ -17,11 +17,11 @@ import {
   createProceduralGrassTexture,
   createRoughnessMap,
   getWindowTextureCache
-} from "./procedural-textures.js?v=1";
+} from "./procedural-textures.js?v=2";
 import {
   getBuildingMaterial,
   refreshBuildingFacadeMaterials
-} from "./building-facade-materials.js?v=4";
+} from "./building-facade-materials.js?v=5";
 
 const USE_REMOTE_PBR_TEXTURES = false;
 

@@ -9,7 +9,7 @@ import {
   createWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
 } from "./load-runtime-session.js?v=2";
-import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=7";
+import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=8";
 export function createWorldRoadLoader(deps = {}) {
   const {
     ENABLE_LINEAR_FEATURES = false,
@@ -491,7 +491,6 @@ export function createWorldRoadLoader(deps = {}) {
         });
 
         if (appCtx.roads.length > 0) {
-          await markLoaded('primary');
           scheduleDeferredWorldDetailPasses({
             endLoadPhase,
             isActiveLoadContext,
@@ -536,12 +535,13 @@ export function createWorldRoadLoader(deps = {}) {
             updateWorldLod,
             recordLoadWarning
           });
-          const scheduleBuildingDetail = () => scheduleDeferredBuildingLoad({
+          const scheduleBuildingDetail = (detailOptions = {}) => scheduleDeferredBuildingLoad({
             baselineFullWorld,
             buildingGeometryGuards,
             buildBuildingGeometryPass,
             cacheMeta: deferredBuildingCacheMeta,
             deadlineMs: performance.now() + Math.max(12000, overpassTimeoutMs + 2500),
+            delayMs: detailOptions.delayMs,
             endLoadPhase,
             featureMinPolygonArea: FEATURE_MIN_POLYGON_AREA,
             fetchOverpassJSON,
@@ -576,11 +576,13 @@ export function createWorldRoadLoader(deps = {}) {
             updateWorldLod,
             useRdtBudgeting
           });
-          if (buildingWays.length > 0) {
+          if (appCtx.buildingMeshes.length > 0) {
             schedulePoiDetail();
           } else {
-            scheduleBuildingDetail();
+            appCtx.showLoad('Loading buildings and preparing the world...');
+            await scheduleBuildingDetail({ delayMs: 0 });
           }
+          await markLoaded('primary');
           scheduleDeferredLinearFeatureLoad();
           scheduleDeferredStructureRefresh({
             roads: appCtx.roads,

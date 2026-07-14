@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=1';
+import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=2';
 
 const J2000_MS = Date.UTC(2000, 0, 1, 12, 0, 0);
 const DAY_MS = 86400000;

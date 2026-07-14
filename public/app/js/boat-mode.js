@@ -37,7 +37,7 @@ import {
 import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=1";
 import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=1";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";
-import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=1";
+import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=2";
 
 const BOAT_PROMPT_DISTANCE = 18;
 const BOAT_ENTRY_OFFSET = 9;
@@ -244,35 +244,6 @@ function syncBoatPromptState(force = false) {
   const candidate = findNearestBoatCandidate(ref.x, ref.z);
   appCtx.boatMode.candidate = candidate;
   appCtx.boatMode.available = !!candidate;
-  const pendingAutoEntry = appCtx.pendingAutoBoatEntry;
-  const pendingExpired =
-    pendingAutoEntry &&
-    Number.isFinite(pendingAutoEntry.expiresAt) &&
-    Date.now() > pendingAutoEntry.expiresAt;
-  if (pendingExpired) {
-    appCtx.pendingAutoBoatEntry = null;
-  }
-  if (
-    pendingAutoEntry &&
-    !pendingExpired &&
-    candidate?.inside &&
-    typeof appCtx.setTravelMode === 'function'
-  ) {
-    appCtx.pendingAutoBoatEntry = null;
-    const resolvedMode = appCtx.setTravelMode('boat', {
-      source: pendingAutoEntry.source || 'auto_water_entry',
-      force: true,
-      emitTutorial: pendingAutoEntry.emitTutorial !== false,
-      candidate,
-      spawnX: candidate.spawnX,
-      spawnZ: candidate.spawnZ,
-      entryMode: pendingAutoEntry.entryMode || 'walk'
-    });
-    if (resolvedMode === 'boat' || appCtx.boatMode?.active) {
-      return appCtx.boatMode.currentWater || candidate;
-    }
-    appCtx.pendingAutoBoatEntry = pendingAutoEntry;
-  }
   if (candidate) {
     appCtx.boatMode.promptLabel = candidate.label;
     appCtx.boatMode.promptMessage = `Boat Travel Available • ${candidate.label} • Press G or choose Boat Mode`;
@@ -507,6 +478,8 @@ function startBoatMode(options = {}) {
     appCtx.updateInteriorInteraction();
   }
   appCtx.boatMode.previousCameraMode = Number.isFinite(appCtx.camMode) ? appCtx.camMode : 0;
+  appCtx.boatMode.cameraYawOffset = 0;
+  appCtx.boatMode.cameraPitch = 0;
   appCtx.camMode = 0;
   appCtx.boatMode.active = true;
   appCtx.boatMode.available = true;
@@ -664,6 +637,8 @@ function stopBoatMode(options = {}) {
     appCtx.camMode = appCtx.boatMode.previousCameraMode;
   }
   appCtx.boatMode.previousCameraMode = null;
+  appCtx.boatMode.cameraYawOffset = 0;
+  appCtx.boatMode.cameraPitch = 0;
   resetBoatDynamics();
   resetBoatFoamFx();
   if (appCtx.camera?.userData) appCtx.camera.userData.boatrig = null;

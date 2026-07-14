@@ -1,5 +1,9 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 
+function wrapYaw(angle = 0) {
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
 function planetarySurface() {
   if (appCtx.onMars && appCtx.marsSurface) return appCtx.marsSurface;
   if (appCtx.onMoon && appCtx.moonSurface) return appCtx.moonSurface;
@@ -18,10 +22,7 @@ export function updateDrone(dt) {
   appCtx.drone.cameraYawOffset = Number(appCtx.drone.cameraYawOffset) || 0;
   if (appCtx.keys.ArrowLeft) appCtx.drone.cameraYawOffset += turnSpeed;
   if (appCtx.keys.ArrowRight) appCtx.drone.cameraYawOffset -= turnSpeed;
-  appCtx.drone.cameraYawOffset = Math.max(-1.4, Math.min(1.4, appCtx.drone.cameraYawOffset));
-  if (forward && !appCtx.keys.ArrowLeft && !appCtx.keys.ArrowRight) {
-    appCtx.drone.cameraYawOffset *= Math.exp(-4.5 * dt);
-  }
+  appCtx.drone.cameraYawOffset = wrapYaw(appCtx.drone.cameraYawOffset);
 
   appCtx.drone.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.drone.pitch));
   appCtx.drone.roll = 0;

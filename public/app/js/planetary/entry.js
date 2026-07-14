@@ -13,8 +13,9 @@ export function suspendEarthModesForPlanetaryEntry() {
     appCtx.stopOceanMode();
   }
   if (appCtx.boatMode?.active && typeof appCtx.stopBoatMode === 'function') {
-    appCtx.stopBoatMode({ targetMode: 'drive' });
+    appCtx.stopBoatMode({ targetMode: 'walk' });
   }
+  appCtx.pendingAutoBoatEntry = null;
 
   ['boatPrompt', 'boatWaveDock', 'interiorPrompt'].forEach((id) => {
     document.getElementById(id)?.classList.remove('show');
@@ -34,7 +35,8 @@ export function prepareTitleEnvironment() {
 
   if (appCtx.spaceFlight?.active) appCtx.exitSpaceFlight?.();
   if (appCtx.oceanMode?.active) appCtx.stopOceanMode?.();
-  if (appCtx.boatMode?.active) appCtx.stopBoatMode?.({ targetMode: 'drive' });
+  if (appCtx.boatMode?.active) appCtx.stopBoatMode?.({ targetMode: 'walk' });
+  appCtx.pendingAutoBoatEntry = null;
 
   hideSurface(appCtx.moonSurface);
   (window._moonObjects || []).forEach(hideSurface);

@@ -3,16 +3,36 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 const MOBILE_CONTROL_PROFILES = {
   driving: {
     moveLabel: 'Drive',
-    lookLabel: 'Steer',
-    move: { up: { channel: 'earth', key: 'KeyW' }, down: { channel: 'earth', key: 'KeyS' }, left: null, right: null },
-    look: { up: null, down: null, left: { channel: 'earth', key: 'KeyA' }, right: { channel: 'earth', key: 'KeyD' } },
+    lookLabel: 'Look',
+    move: {
+      up: { channel: 'earth', key: 'KeyW' },
+      down: { channel: 'earth', key: 'KeyS' },
+      left: { channel: 'earth', key: 'KeyA' },
+      right: { channel: 'earth', key: 'KeyD' }
+    },
+    look: {
+      up: { channel: 'earth', key: 'ArrowUp' },
+      down: { channel: 'earth', key: 'ArrowDown' },
+      left: { channel: 'earth', key: 'ArrowLeft' },
+      right: { channel: 'earth', key: 'ArrowRight' }
+    },
     actions: [{ label: 'Brake', binding: { channel: 'earth', key: 'Space' } }]
   },
   boat: {
     moveLabel: 'Throttle',
-    lookLabel: 'Steer',
-    move: { up: { channel: 'earth', key: 'KeyW' }, down: { channel: 'earth', key: 'KeyS' }, left: null, right: null },
-    look: { up: null, down: null, left: { channel: 'earth', key: 'KeyA' }, right: { channel: 'earth', key: 'KeyD' } },
+    lookLabel: 'Look',
+    move: {
+      up: { channel: 'earth', key: 'KeyW' },
+      down: { channel: 'earth', key: 'KeyS' },
+      left: { channel: 'earth', key: 'KeyA' },
+      right: { channel: 'earth', key: 'KeyD' }
+    },
+    look: {
+      up: { channel: 'earth', key: 'ArrowUp' },
+      down: { channel: 'earth', key: 'ArrowDown' },
+      left: { channel: 'earth', key: 'ArrowLeft' },
+      right: { channel: 'earth', key: 'ArrowRight' }
+    },
     actions: [{ label: 'Brake', binding: { channel: 'earth', key: 'Space' } }]
   },
   walking: {

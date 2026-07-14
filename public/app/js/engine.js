@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { clearWindowTextureCache } from "./engine/procedural-textures.js?v=1";
+import { clearWindowTextureCache } from "./engine/procedural-textures.js?v=2";
 import {
   applyRenderQuality as applyEngineRenderQuality,
   canUseSsao as engineCanUseSsao,
@@ -19,8 +19,8 @@ import {
   getBuildingMaterial as getBuildingMaterialRuntime,
   initEngineTextures as initEngineTexturesRuntime,
   syncTextureGlobals as syncTextureGlobalsRuntime
-} from "./engine/materials-runtime.js?v=9";
-import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=7";
+} from "./engine/materials-runtime.js?v=10";
+import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=8";
 
 const RENDER_QUALITY_LOW = 'low';
 const RENDER_QUALITY_MED = 'med';

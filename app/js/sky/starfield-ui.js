@@ -15,6 +15,24 @@ const _inertialY = new THREE.Vector3(0, 1, 0);
 const _inertialZ = new THREE.Vector3(0, 0, 1);
 const _rotationX = new THREE.Vector3(1, 0, 0);
 const _rotationZ = new THREE.Vector3(0, 0, 1);
+const BRIGHT_STAR_LAYER_NAME = 'Bright Star Catalog';
+const FAINT_STAR_LAYER_NAME = 'Faint Star Background';
+
+function setStarFieldObserverVisuals(observerBody = 'earth') {
+  if (!appCtx.starField) return;
+  const body = String(observerBody || 'earth').toLowerCase();
+  const planetary = body === 'moon' || body === 'mars';
+  const brightStars = appCtx.starField.getObjectByName(BRIGHT_STAR_LAYER_NAME);
+  const faintStars = appCtx.starField.getObjectByName(FAINT_STAR_LAYER_NAME);
+
+  if (brightStars?.material) {
+    brightStars.material.size = planetary ? (body === 'mars' ? 1.2 : 1.5) : 4.2;
+    brightStars.material.vertexColors = !planetary;
+    brightStars.material.color.setHex(0xffffff);
+    brightStars.material.needsUpdate = true;
+  }
+  if (faintStars) faintStars.visible = !planetary;
+}
 
 function raDecToVector(ra, dec, radius = STARFIELD_RADIUS) {
   const raRad = ra / 24 * Math.PI * 2;
@@ -71,7 +89,7 @@ export function createStarField() {
     fog: false
   });
   const brightStars = new THREE.Points(brightGeometry, brightMaterial);
-  brightStars.name = 'Bright Star Catalog';
+  brightStars.name = BRIGHT_STAR_LAYER_NAME;
   brightStars.userData.baseOpacity = brightMaterial.opacity;
   group.add(brightStars);
 
@@ -130,7 +148,9 @@ export function createStarField() {
     fog: false
   });
 
-  group.add(new THREE.Points(faintStarGeometry, faintStarMaterial));
+  const faintStars = new THREE.Points(faintStarGeometry, faintStarMaterial);
+  faintStars.name = FAINT_STAR_LAYER_NAME;
+  group.add(faintStars);
   group.visible = false;
   appCtx.scene.add(group);
   return group;
@@ -138,6 +158,7 @@ export function createStarField() {
 
 export function alignStarFieldToLocation(lat, lng) {
   if (!appCtx.starField) return;
+  setStarFieldObserverVisuals('earth');
   const date = appCtx.skyState?.computedAtIso ? new Date(appCtx.skyState.computedAtIso) : new Date();
   const latitude = lat * Math.PI / 180;
   const lst = normalizeAngle(siderealTime(toDays(date), -lng * Math.PI / 180));
@@ -201,6 +222,7 @@ export function alignStarFieldToBody(options = {}) {
   _skyMatrix.makeBasis(_skyXAxis, _skyYAxis, _skyZAxis);
   appCtx.starField.quaternion.setFromRotationMatrix(_skyMatrix);
   appCtx.starField.userData.observerBody = String(options.body || 'planetary');
+  setStarFieldObserverVisuals(options.body);
   return appCtx.starField.quaternion;
 }
 

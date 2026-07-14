@@ -1,5 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 
+function wrapYaw(angle = 0) {
+  return Math.atan2(Math.sin(angle), Math.cos(angle));
+}
+
 function isPlanetarySurface() {
   return !!(appCtx.onMoon || appCtx.onMars);
 }
@@ -196,14 +200,11 @@ function createWalkingPhysicsHelpers({
     if (lookUp) state.walker.pitch += lookSpeed;
     if (lookDown) state.walker.pitch -= lookSpeed;
 
-    state.walker.lookYawOffset = Math.max(-1.4, Math.min(1.4, state.walker.lookYawOffset));
+    state.walker.lookYawOffset = wrapYaw(state.walker.lookYawOffset);
     state.walker.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, state.walker.pitch));
     state.walker.angle = state.walker.yaw;
 
     const forward = moveForward - moveBack;
-    if (forward !== 0 && !lookLeft && !lookRight) {
-      state.walker.lookYawOffset *= Math.exp(-4.5 * dt);
-    }
     const gravity = appCtx.onMoon ? -1.62 : appCtx.onMars ? -3.71 : -9.80665;
     const jumpVelocity = appCtx.onMoon ? 3.0 : appCtx.onMars ? 4.0 : 5.0;
 

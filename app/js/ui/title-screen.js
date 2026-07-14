@@ -36,7 +36,6 @@ function initTitleScreenUi({
   let skipGlobeGateOnce = false;
   let geolocationBusy = false;
   let oceanEntryHadEarthWorld = false;
-  let pendingTitleBoatEntryTimer = 0;
   let multiplayerWarmupPromise = null;
 
   const primeMultiplayerUi = () => {
@@ -84,92 +83,24 @@ function initTitleScreenUi({
   const emitTutorialEvent = (eventName, payload = {}) => {
     if (typeof appCtx.tutorialOnEvent === 'function') appCtx.tutorialOnEvent(eventName, payload);
   };
-  const clearPendingTitleBoatEntryTimer = () => {
-    if (!pendingTitleBoatEntryTimer) return;
-    clearTimeout(pendingTitleBoatEntryTimer);
-    pendingTitleBoatEntryTimer = 0;
-  };
-  const tryAutoBoatEntry = (source = 'title_custom_start_water') => {
-    if (
-      appCtx.selLoc !== 'custom' ||
-      !appCtx.gameStarted ||
-      appCtx.boatMode?.active ||
-      appCtx.oceanMode?.active ||
-      appCtx.onMoon ||
-      appCtx.travelingToMoon ||
-      appCtx.spaceFlight?.active
-    ) {
-      return false;
+  const resetTitleEarthTravelMode = (source = 'title_earth_start') => {
+    appCtx.pendingAutoBoatEntry = null;
+    if (appCtx.oceanMode?.active) appCtx.stopOceanMode?.();
+    if (appCtx.boatMode?.active) appCtx.stopBoatMode?.({ targetMode: 'walk', source });
+    appCtx.droneMode = false;
+    if (typeof appCtx.setTravelMode === 'function') {
+      appCtx.setTravelMode('walk', { source, emitTutorial: false });
+    } else if (appCtx.Walk?.state?.mode !== 'walk') {
+      appCtx.Walk?.setModeWalk?.();
     }
-
-    const directCandidate =
-      typeof appCtx.inspectBoatCandidate === 'function' ?
-        appCtx.inspectBoatCandidate(0, 0, 220) :
-        null;
-    if (directCandidate?.inside && typeof appCtx.setTravelMode === 'function') {
-      return appCtx.setTravelMode('boat', {
-        source,
-        force: true,
-        candidate: directCandidate,
-        spawnX: directCandidate.spawnX,
-        spawnZ: directCandidate.spawnZ,
-        entryMode: 'walk'
-      }) === 'boat';
+    if (appCtx.boatMode) {
+      appCtx.boatMode.available = false;
+      appCtx.boatMode.candidate = null;
     }
-
-    if (typeof appCtx.refreshBoatAvailability === 'function') {
-      appCtx.refreshBoatAvailability(true);
-    }
-    const shouldAutoEnterBoat =
-      appCtx.boatMode?.available === true &&
-      appCtx.boatMode?.candidate?.inside === true;
-    if (!shouldAutoEnterBoat || typeof appCtx.handleBoatAction !== 'function') return false;
-    return appCtx.handleBoatAction() === true;
-  };
-  const schedulePendingTitleBoatEntry = (options = {}) => {
-    clearPendingTitleBoatEntryTimer();
-    const source = options.source || 'title_custom_start_water';
-    const expiresAt = Number.isFinite(options.expiresAt) ? options.expiresAt : Date.now() + 45000;
-
-    const run = () => {
-      pendingTitleBoatEntryTimer = 0;
-      if (
-        !appCtx.gameStarted ||
-        appCtx.selLoc !== 'custom' ||
-        titleLaunchMode !== 'earth' ||
-        appCtx.oceanMode?.active ||
-        appCtx.onMoon ||
-        appCtx.travelingToMoon ||
-        appCtx.spaceFlight?.active
-      ) {
-        return;
-      }
-      if (appCtx.boatMode?.active) {
-        if (appCtx.pendingAutoBoatEntry?.source === source) {
-          appCtx.pendingAutoBoatEntry = null;
-        }
-        return;
-      }
-      if (Date.now() > expiresAt) {
-        if (appCtx.pendingAutoBoatEntry?.source === source) {
-          appCtx.pendingAutoBoatEntry = null;
-        }
-        return;
-      }
-      if (tryAutoBoatEntry(source)) {
-        if (appCtx.pendingAutoBoatEntry?.source === source) {
-          appCtx.pendingAutoBoatEntry = null;
-        }
-        return;
-      }
-      if (appCtx.worldLoading) {
-        pendingTitleBoatEntryTimer = window.setTimeout(run, 400);
-        return;
-      }
-      pendingTitleBoatEntryTimer = window.setTimeout(run, 400);
-    };
-
-    pendingTitleBoatEntryTimer = window.setTimeout(run, 220);
+    if (appCtx.boatMode?.mesh) appCtx.boatMode.mesh.visible = false;
+    if (appCtx.boatMode?.waterPatch) appCtx.boatMode.waterPatch.visible = false;
+    if (appCtx.carMesh) appCtx.carMesh.visible = false;
+    if (appCtx.Walk?.state?.characterMesh) appCtx.Walk.state.characterMesh.visible = true;
   };
 
   const setLaunchMode = (mode) => {
@@ -224,8 +155,8 @@ function initTitleScreenUi({
       if (titleLaunchMode === 'moon' && typeof appCtx.directTravelToMoon === 'function') {
         return () => appCtx.directTravelToMoon();
       }
-      if (titleLaunchMode === 'mars' && typeof appCtx.startSpaceFlightToMars === 'function') {
-        return () => appCtx.startSpaceFlightToMars();
+      if (titleLaunchMode === 'mars' && typeof appCtx.directTravelToMars === 'function') {
+        return () => appCtx.directTravelToMars();
       }
       if (titleLaunchMode === 'space' && typeof appCtx.travelToMoon === 'function') {
         return () => appCtx.travelToMoon();
@@ -240,7 +171,6 @@ function initTitleScreenUi({
     }
     if (!launch) throw new Error(`${titleLaunchMode} launch runtime did not become ready.`);
 
-    clearPendingTitleBoatEntryTimer();
     const titleReset = prepareTitleEnvironment();
     if (titleReset.env !== appCtx.ENV.EARTH || titleReset.spaceFlightActive) {
       throw new Error('Could not establish a clean title launch environment.');
@@ -253,13 +183,16 @@ function initTitleScreenUi({
       launchMode: titleLaunchMode
     });
     const launchAccepted = await launch();
-    const expectedDestination = titleLaunchMode === 'space' ? 'moon' : titleLaunchMode;
+    const planetarySurfaceReady =
+      (titleLaunchMode === 'moon' && appCtx.getEnv?.() === appCtx.ENV.MOON && appCtx.onMoon) ||
+      (titleLaunchMode === 'mars' && appCtx.getEnv?.() === appCtx.ENV.MARS && appCtx.onMars);
+    const spaceFlightReady =
+      titleLaunchMode === 'space' &&
+      appCtx.spaceFlight?.active &&
+      appCtx.spaceFlight.destination === 'moon';
     if (
       launchAccepted === false ||
-      (titleLaunchMode !== 'moon' && (
-        !appCtx.spaceFlight?.active ||
-        appCtx.spaceFlight.destination !== expectedDestination
-      ))
+      (!planetarySurfaceReady && !spaceFlightReady)
     ) {
       throw new Error(`${titleLaunchMode} launch was not accepted by the planetary runtime.`);
     }
@@ -389,7 +322,6 @@ function initTitleScreenUi({
       skipGlobeGateOnce = true;
       appCtx.pendingCustomLaunchBypass = true;
     }
-    clearPendingTitleBoatEntryTimer();
     triggerTitleStart();
   };
 
@@ -413,13 +345,14 @@ function initTitleScreenUi({
         skipGlobeGateOnce = true;
         triggerTitleStart();
       } else if (typeof appCtx.loadRoads === 'function') {
+        resetTitleEarthTravelMode('globe_location_change');
         appCtx.loadRoads().then(() => {
-          const preferredMode = appCtx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive';
           if (typeof appCtx.applyCustomLocationSpawn === 'function') {
-            appCtx.applyCustomLocationSpawn(preferredMode, { source: 'custom_location', preferBoatIfWater: true });
+            appCtx.applyCustomLocationSpawn('walk', { source: 'custom_location', preferBoatIfWater: false });
           } else if (typeof appCtx.spawnOnRoad === 'function') {
             appCtx.spawnOnRoad();
           }
+          resetTitleEarthTravelMode('globe_location_change');
         });
       }
     },
@@ -598,6 +531,7 @@ function initTitleScreenUi({
     if (await startPlanetaryTitleLaunch()) return;
 
     appCtx.switchEnv(appCtx.ENV.EARTH);
+    resetTitleEarthTravelMode('title_earth_start');
     const explorationMsg = document.getElementById('explorationModeMsg');
     let explorationMsgTimeout;
     if (explorationMsg && !isTouchPreferredClient) {
@@ -624,61 +558,17 @@ function initTitleScreenUi({
       const startRef = appCtx.Walk?.state?.walker || appCtx.car;
       appCtx.updateTerrainAround(startRef.x || 0, startRef.z || 0);
     }
-    let customSpawn = null;
-    let customBoatEntryPending = false;
-    let customBoatEntryExpiresAt = 0;
-    const shouldPrimeCustomBoatEntry = appCtx.selLoc === 'custom' && titleLaunchMode === 'earth';
-    if (shouldPrimeCustomBoatEntry) {
-      customBoatEntryPending = true;
-      customBoatEntryExpiresAt = Date.now() + 45000;
-      appCtx.pendingAutoBoatEntry = {
-        source: 'title_custom_start_water',
-        entryMode: 'walk',
-        emitTutorial: false,
-        expiresAt: customBoatEntryExpiresAt
-      };
-      schedulePendingTitleBoatEntry({
-        source: 'title_custom_start_water',
-        expiresAt: customBoatEntryExpiresAt
-      });
-    } else {
-      clearPendingTitleBoatEntryTimer();
-    }
     await appCtx.loadRoads();
     if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
       const postLoadRef = appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk?.state?.walker ? appCtx.Walk.state.walker : appCtx.car;
       appCtx.updateTerrainAround(postLoadRef.x || 0, postLoadRef.z || 0);
     }
     if (appCtx.selLoc === 'custom' && typeof appCtx.applyCustomLocationSpawn === 'function') {
-      if (appCtx.boatMode?.active) {
-        customSpawn = { mode: 'boat' };
-      } else {
-        customSpawn = appCtx.applyCustomLocationSpawn('walk', { source: 'title_custom_start', preferBoatIfWater: true });
-        if (customSpawn?.mode === 'boat' || tryAutoBoatEntry()) {
-          customBoatEntryPending = true;
-          if (!customBoatEntryExpiresAt) customBoatEntryExpiresAt = Date.now() + 45000;
-        } else {
-          if (!customBoatEntryExpiresAt) customBoatEntryExpiresAt = Date.now() + 45000;
-          appCtx.pendingAutoBoatEntry = {
-            source: 'title_custom_start_water',
-            entryMode: 'walk',
-            emitTutorial: false,
-            expiresAt: customBoatEntryExpiresAt
-          };
-          customBoatEntryPending = true;
-          schedulePendingTitleBoatEntry({
-            source: 'title_custom_start_water',
-            expiresAt: customBoatEntryExpiresAt
-          });
-        }
-      }
+      appCtx.applyCustomLocationSpawn('walk', { source: 'title_custom_start', preferBoatIfWater: false });
     }
 
-    if (appCtx.boatMode?.active) {
-      if (appCtx.carMesh) appCtx.carMesh.visible = false;
-      if (appCtx.Walk?.state?.characterMesh) appCtx.Walk.state.characterMesh.visible = false;
-      if (typeof appCtx.syncTravelModeButtons === 'function') appCtx.syncTravelModeButtons();
-    } else if (appCtx.Walk) {
+    resetTitleEarthTravelMode('title_earth_ready');
+    if (appCtx.Walk) {
       appCtx.Walk.setModeWalk();
       appCtx.Walk.state.view = 'third';
       if (appCtx.carMesh) appCtx.carMesh.visible = false;
@@ -702,14 +592,6 @@ function initTitleScreenUi({
     updateControlsModeUI?.();
     applySharedRuntimeState?.();
     if (typeof appCtx.startMode === 'function') appCtx.startMode();
-    if (customBoatEntryPending) {
-      schedulePendingTitleBoatEntry({
-        source: 'title_custom_start_water',
-        expiresAt: customBoatEntryExpiresAt || Number(appCtx.pendingAutoBoatEntry?.expiresAt) || Date.now() + 45000
-      });
-    } else {
-      clearPendingTitleBoatEntryTimer();
-    }
     persistLastLocationSelection(titleLaunchMode);
     emitTutorialEvent('spawned_in_world', {
       location: appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOCS?.[appCtx.selLoc] || null,

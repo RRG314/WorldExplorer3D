@@ -103,15 +103,17 @@ function updateBoatCamera() {
       Math.hypot(Number(appCtx.boat?.vx || 0), Number(appCtx.boat?.vz || 0)) > 0.35 ?
         Math.atan2(Number(appCtx.boat?.vx || 0), Number(appCtx.boat?.vz || 0)) :
         appCtx.boat.angle;
-    const desiredYaw = lerpValue(
+    const followYaw = lerpValue(
       appCtx.boat.angle,
       velocityHeading,
       clampValue(0.2 + speedNorm * 0.16, 0.2, 0.42)
     );
+    const desiredYaw = normalizeHeading(followYaw + (Number(appCtx.boatMode?.cameraYawOffset) || 0));
     rig.yaw += shortestHeadingDelta(desiredYaw, rig.yaw) * expBlend(dt, 4.4 + speedNorm * 2.4, 0.05, 0.3);
 
     const chaseDistance = 10.8 + speedNorm * 4.2 + waveIntensity * 1.15;
-    const chaseHeight = 4.25 + waveIntensity * 0.82 + Math.abs(appCtx.boat?.pitch || 0) * 2.2;
+    const cameraPitch = Number(appCtx.boatMode?.cameraPitch) || 0;
+    const chaseHeight = 4.25 + waveIntensity * 0.82 + Math.abs(appCtx.boat?.pitch || 0) * 2.2 + Math.sin(cameraPitch) * 5.2;
     const lateralOffset = clampValue(-(appCtx.boat?.turnRate || 0) * (1.08 + speedNorm * 0.72), -1.55, 1.55);
     const offsetX = -Math.sin(rig.yaw) * chaseDistance + Math.cos(rig.yaw) * lateralOffset;
     const offsetZ = -Math.cos(rig.yaw) * chaseDistance - Math.sin(rig.yaw) * lateralOffset;
@@ -439,12 +441,8 @@ function updateCamera(dt = 1 / 60) {
   if (appCtx.keys.ArrowRight) carLook.yaw -= cameraLookSpeed;
   if (appCtx.keys.ArrowUp) carLook.pitch += cameraLookSpeed;
   if (appCtx.keys.ArrowDown) carLook.pitch -= cameraLookSpeed;
-  carLook.yaw = clampValue(carLook.yaw, -1.4, 1.4);
+  carLook.yaw = normalizeHeading(carLook.yaw);
   carLook.pitch = clampValue(carLook.pitch, -0.62, 0.62);
-  if ((appCtx.keys.KeyW || appCtx.keys.KeyS || appCtx.keys.KeyA || appCtx.keys.KeyD) &&
-      !appCtx.keys.ArrowLeft && !appCtx.keys.ArrowRight) {
-    carLook.yaw *= Math.exp(-4.5 * dt);
-  }
 
   // Normal car camera modes
   const lb = appCtx.keys.KeyV;

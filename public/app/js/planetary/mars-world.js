@@ -266,6 +266,14 @@ async function arriveAtMars() {
   showMarsReturnButton();
   appCtx.paused = false;
   appCtx.updateControlsModeUI?.();
+  return true;
+}
+
+async function directTravelToMars() {
+  if (appCtx.onMars) return true;
+  appCtx.prepareEarthDepartureForMars?.();
+  await appCtx.showTransitionLoad?.('mars', 900);
+  return arriveAtMars();
 }
 
 async function returnFromMars() {
@@ -313,10 +321,11 @@ function prepareMarsTitleExit() {
 
 Object.assign(appCtx, {
   arriveAtMars,
+  directTravelToMars,
   prepareEarthDepartureForMars,
   prepareMarsTitleExit,
   returnFromMars,
   sampleMarsLocalHeight
 });
 
-export { arriveAtMars, prepareEarthDepartureForMars, prepareMarsTitleExit, returnFromMars, sampleMarsLocalHeight };
+export { arriveAtMars, directTravelToMars, prepareEarthDepartureForMars, prepareMarsTitleExit, returnFromMars, sampleMarsLocalHeight };

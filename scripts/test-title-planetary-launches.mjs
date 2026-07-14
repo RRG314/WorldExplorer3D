@@ -9,11 +9,31 @@ const outputDir = path.join(rootDir, 'output', 'playwright', 'title-planetary-la
 const scenarios = [
   { mode: 'moon', toggle: '#moonLaunchToggle', env: 'MOON', destination: '' },
   { mode: 'space', toggle: '#spaceLaunchToggle', env: 'SPACE_FLIGHT', destination: 'moon' },
-  { mode: 'mars', toggle: '#marsLaunchToggle', env: 'SPACE_FLIGHT', destination: 'mars' }
+  { mode: 'mars', toggle: '#marsLaunchToggle', env: 'MARS', destination: '' }
 ];
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
+}
+
+function assertCompleteSpaceCatalog(state, label) {
+  const catalog = state.spaceCatalog || {};
+  assert(catalog.groupAttached, `${label} did not attach the solar-system group`);
+  assert(catalog.planets === 7, `${label} rendered ${catalog.planets || 0} of 7 non-Earth planets`);
+  assert(catalog.namedAsteroids === 4, `${label} rendered ${catalog.namedAsteroids || 0} of 4 named asteroids`);
+  assert(catalog.asteroidParticles === 3000, `${label} lost the 3,000-particle asteroid belt`);
+  assert(catalog.kuiperParticles === 1800, `${label} lost the 1,800-particle Kuiper belt`);
+  assert((catalog.spacecraft || 0) + (catalog.deepSpaceSpacecraft || 0) === 5, `${label} rendered an incomplete spacecraft catalog`);
+  assert(catalog.galaxies === 8, `${label} rendered ${catalog.galaxies || 0} of 8 galaxies`);
+}
+
+function assertPlanetaryStarStyle(state, body, label) {
+  const stars = state.starVisuals || {};
+  assert(stars.observerBody === body, `${label} used ${stars.observerBody || 'no'} observer orientation`);
+  assert(stars.brightVisible, `${label} hid the real bright-star catalog`);
+  assert(stars.brightSize > 0 && stars.brightSize <= 1.5, `${label} used oversized ${stars.brightSize || 0}px stars`);
+  assert(stars.brightVertexColors === false, `${label} retained unrealistic colored star points`);
+  assert(stars.faintVisible === false, `${label} retained the synthetic faint-star layer`);
 }
 
 function isTransientNetworkError(message = '') {
@@ -46,6 +66,8 @@ async function instrumentRoadLoads(page) {
 async function readState(page) {
   return page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const brightStars = ctx.starField?.getObjectByName?.('Bright Star Catalog') || null;
+    const faintStars = ctx.starField?.getObjectByName?.('Faint Star Background') || null;
     return {
       env: ctx.getEnv?.() || '',
       destination: ctx.spaceFlight?.destination || '',
@@ -53,7 +75,16 @@ async function readState(page) {
       roadLoads: Number(ctx.__titlePlanetaryRoadLoadCount || 0),
       roads: Array.isArray(ctx.roads) ? ctx.roads.length : 0,
       onMoon: !!ctx.onMoon,
+      onMars: !!ctx.onMars,
       spaceFlightActive: !!ctx.spaceFlight?.active,
+      spaceCatalog: globalThis.getWorldExplorerRuntimeDiagnostics?.().spaceCatalog || null,
+      starVisuals: {
+        observerBody: ctx.starField?.userData?.observerBody || '',
+        brightVisible: !!brightStars?.visible,
+        brightSize: Number(brightStars?.material?.size || 0),
+        brightVertexColors: brightStars?.material?.vertexColors,
+        faintVisible: !!faintStars?.visible
+      },
       fatal: /Startup failed|Renderer Creation Failed|Failed to create 3D renderer/i.test(document.body.innerText)
     };
   });
@@ -136,6 +167,9 @@ async function runScenario(browser, baseUrl, scenario) {
     assert(!scenario.destination || state.destination === scenario.destination, `${scenario.mode} title launch targeted ${state.destination || 'nothing'}`);
     assert(state.roadLoads === 0, `${scenario.mode} title launch loaded an Earth road world first`);
     assert(!state.fatal, `${scenario.mode} title launch showed a fatal renderer error`);
+    if (scenario.mode === 'space') assertCompleteSpaceCatalog(state, 'Initial Space launch');
+    if (scenario.mode === 'mars') assert(state.onMars && !state.spaceFlightActive, 'Mars title launch did not land directly on Mars');
+    if (scenario.mode === 'moon' || scenario.mode === 'mars') assertPlanetaryStarStyle(state, scenario.mode, `${scenario.mode} title launch`);
     assert(consoleErrors.length === 0, `${scenario.mode} title launch logged console errors: ${consoleErrors.join(' | ')}`);
     let earthReturn = null;
     if (scenario.mode === 'moon') {
@@ -158,11 +192,8 @@ async function runScenario(browser, baseUrl, scenario) {
       const marsAfterMoon = await requireStableExpectedState(page, marsScenario);
       await settleVisualFrame(page);
       await page.screenshot({ path: path.join(outputDir, 'moon-earth-mars.png'), fullPage: false });
-      await page.evaluate(async () => {
-        const { ctx } = await import('/app/js/shared-context.js?v=55');
-        globalThis.__titlePlanetarySpaceRenderer = ctx.spaceFlight?.renderer || null;
-      });
-      assert(marsAfterMoon.destination === 'mars', 'Mars launch after Moon return retained an old flight destination');
+      assert(marsAfterMoon.onMars && !marsAfterMoon.spaceFlightActive, 'Mars launch after Moon return did not land on Mars');
+      assertPlanetaryStarStyle(marsAfterMoon, 'mars', 'Mars launch after Moon return');
       assert(!marsAfterMoon.fatal, 'Mars launch after Moon return showed a fatal renderer error');
       assert(mainFrameNavigations === 1, 'Mars launch after Moon return reloaded the page');
 
@@ -172,13 +203,32 @@ async function runScenario(browser, baseUrl, scenario) {
       const spaceScenario = scenarios.find((entry) => entry.mode === 'space');
       await waitForExpectedState(page, spaceScenario);
       const spaceAfterMars = await requireStableExpectedState(page, spaceScenario);
-      spaceAfterMars.rendererReused = await page.evaluate(async () => {
+      assertCompleteSpaceCatalog(spaceAfterMars, 'Space launch after Mars');
+      await page.evaluate(async () => {
         const { ctx } = await import('/app/js/shared-context.js?v=55');
-        return !!ctx.spaceFlight?.renderer && ctx.spaceFlight.renderer === globalThis.__titlePlanetarySpaceRenderer;
+        globalThis.__titlePlanetarySpaceRenderer = ctx.spaceFlight?.renderer || null;
+        globalThis.__titlePlanetarySpaceScene = ctx.spaceFlight?.scene || null;
       });
-      assert(spaceAfterMars.rendererReused, 'Space relaunch recreated the renderer after Mars');
       assert(!spaceAfterMars.fatal, 'Space relaunch after Mars showed a fatal renderer error');
       assert(mainFrameNavigations === 1, 'Space relaunch after Mars reloaded the page');
+
+      await page.click('#mainMenuBtn');
+      await page.click('#spaceLaunchToggle');
+      await page.click('#startBtn');
+      await waitForExpectedState(page, spaceScenario);
+      const repeatedSpace = await requireStableExpectedState(page, spaceScenario);
+      assertCompleteSpaceCatalog(repeatedSpace, 'Repeated Space launch');
+      const reuse = await page.evaluate(async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        return {
+          renderer: ctx.spaceFlight?.renderer === globalThis.__titlePlanetarySpaceRenderer,
+          scene: ctx.spaceFlight?.scene === globalThis.__titlePlanetarySpaceScene
+        };
+      });
+      assert(reuse.renderer, 'Repeated Space launch recreated the renderer');
+      assert(reuse.scene, 'Repeated Space launch discarded the complete space scene');
+      repeatedSpace.reuse = reuse;
+      spaceAfterMars.repeatedSpace = repeatedSpace;
       marsAfterMoon.spaceAfterMars = spaceAfterMars;
       earthReturn.marsAfterMoon = marsAfterMoon;
     }
@@ -200,9 +250,10 @@ async function runScenario(browser, baseUrl, scenario) {
       await settleVisualFrame(page);
       await page.screenshot({ path: path.join(outputDir, 'cancelled-earth-landing-mars.png'), fullPage: false });
       assert(
-        marsAfterCancelledLanding.destination === 'mars' && marsAfterCancelledLanding.spaceFlightActive,
-        'An exited flight landing sequence overwrote the next Mars flight'
+        marsAfterCancelledLanding.env === 'MARS' && marsAfterCancelledLanding.onMars && !marsAfterCancelledLanding.spaceFlightActive,
+        'An exited flight landing sequence overwrote the direct Mars arrival'
       );
+      assertPlanetaryStarStyle(marsAfterCancelledLanding, 'mars', 'Mars arrival after cancelled flight');
       state.marsAfterCancelledLanding = marsAfterCancelledLanding;
     }
     return { ...state, elapsedLimitMs: 20000, earthReturn, mainFrameNavigations };

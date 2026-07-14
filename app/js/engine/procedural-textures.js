@@ -123,9 +123,10 @@ export function createBuildingRoughnessMap() {
   return texture;
 }
 
-export function createWindowTexture(baseColor, seed) {
-  const variantBucket = ((seed || appCtx.rdtSeed || 42) >>> 0) % 4;
-  const cacheKey = `${baseColor}_${appCtx.rdtSeed || 0}_${variantBucket}`;
+export function createWindowTexture(baseColor, seed, options = {}) {
+  const facadeStyle = String(options.style || 'office_grid');
+  const variantBucket = ((seed || appCtx.rdtSeed || 42) >>> 0) % 3;
+  const cacheKey = `${baseColor}_${appCtx.rdtSeed || 0}_${facadeStyle}_${variantBucket}`;
   if (windowTextures[cacheKey]) return windowTextures[cacheKey];
 
   const canvas = document.createElement('canvas');
@@ -143,12 +144,23 @@ export function createWindowTexture(baseColor, seed) {
   const frameTone = wallTone.clone().offsetHSL(0, -0.03, -0.14);
   const coolGlass = ['rgba(72, 96, 120, 0.92)', 'rgba(82, 104, 128, 0.9)', 'rgba(64, 86, 108, 0.93)'];
   const warmGlass = ['rgba(210, 182, 132, 0.62)', 'rgba(232, 205, 156, 0.55)', 'rgba(255, 224, 176, 0.48)'];
-  const cols = 4;
-  const rows = 14;
-  const sidePad = 6;
-  const topPad = 6;
-  const gutterX = 4;
-  const gutterY = 5;
+  const profiles = {
+    apartment_balcony: { cols: 4, rows: 12, sidePad: 5, topPad: 6, gutterX: 4, gutterY: 7, balcony: true },
+    curtain_wall: { cols: 6, rows: 18, sidePad: 2, topPad: 3, gutterX: 1, gutterY: 2, curtain: true },
+    historic_punched: { cols: 3, rows: 10, sidePad: 9, topPad: 8, gutterX: 8, gutterY: 8, historic: true },
+    hotel_vertical: { cols: 3, rows: 16, sidePad: 7, topPad: 4, gutterX: 8, gutterY: 3, vertical: true },
+    industrial_panel: { cols: 5, rows: 6, sidePad: 4, topPad: 10, gutterX: 3, gutterY: 13, industrial: true },
+    residential_punched: { cols: 4, rows: 9, sidePad: 7, topPad: 8, gutterX: 6, gutterY: 9 },
+    townhouse: { cols: 2, rows: 6, sidePad: 12, topPad: 10, gutterX: 14, gutterY: 13 },
+    office_grid: { cols: 4, rows: 14, sidePad: 6, topPad: 6, gutterX: 4, gutterY: 5 }
+  };
+  const profile = profiles[facadeStyle] || profiles.office_grid;
+  const cols = profile.cols;
+  const rows = profile.rows;
+  const sidePad = profile.sidePad;
+  const topPad = profile.topPad;
+  const gutterX = profile.gutterX;
+  const gutterY = profile.gutterY;
   const cellW = Math.floor((canvas.width - sidePad * 2 - gutterX * (cols - 1)) / cols);
   const cellH = Math.floor((canvas.height - topPad * 2 - gutterY * (rows - 1)) / rows);
   const insetX = 2;
@@ -176,6 +188,20 @@ export function createWindowTexture(baseColor, seed) {
       ctx.fillStyle = glassFill;
       ctx.fillRect(x + insetX, y + insetY, cellW - insetX * 2, cellH - insetY * 2);
 
+      if (profile.curtain) {
+        ctx.fillStyle = 'rgba(210,225,238,0.16)';
+        ctx.fillRect(x + Math.floor(cellW * 0.48), y + insetY, 1, cellH - insetY * 2);
+      } else if (profile.historic) {
+        ctx.fillStyle = frameTone.clone().offsetHSL(0, 0, 0.04).getStyle();
+        ctx.fillRect(x, y, cellW, Math.max(2, Math.floor(cellH * 0.16)));
+      } else if (profile.vertical) {
+        ctx.fillStyle = 'rgba(240,244,248,0.14)';
+        ctx.fillRect(x + insetX, y + insetY, 2, cellH - insetY * 2);
+      } else if (profile.industrial) {
+        ctx.fillStyle = 'rgba(230,235,238,0.1)';
+        ctx.fillRect(x + insetX, y + insetY, cellW - insetX * 2, Math.max(2, Math.floor(cellH * 0.2)));
+      }
+
       ctx.fillStyle = lit ? 'rgba(255,255,255,0.08)' : 'rgba(255,255,255,0.12)';
       ctx.fillRect(x + insetX, y + insetY, cellW - insetX * 2, 1);
 
@@ -183,6 +209,10 @@ export function createWindowTexture(baseColor, seed) {
         ctx.fillStyle = 'rgba(18, 24, 30, 0.18)';
         ctx.fillRect(x + insetX, y + insetY + Math.floor((cellH - insetY * 2) * 0.45), cellW - insetX * 2, 1 + Math.floor(rng() * 2));
       }
+    }
+    if (profile.balcony) {
+      ctx.fillStyle = frameTone.clone().offsetHSL(0, 0, -0.06).getStyle();
+      ctx.fillRect(2, Math.min(canvas.height - 2, y + cellH + 2), canvas.width - 4, 2);
     }
   }
 

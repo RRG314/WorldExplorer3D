@@ -15,7 +15,7 @@ import {
   createStarField,
   highlightConstellation,
   showStarInfo
-} from "./sky/starfield-ui.js?v=1";
+} from "./sky/starfield-ui.js?v=2";
 import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=3";
 // ============================================================================
@@ -357,18 +357,6 @@ function arriveAtMoon() {
   }
   if (appCtx.fillLight) {
     appCtx.fillLight.intensity = 0.1; // Very low fill light
-  }
-
-  // ALWAYS show stars on the moon (no atmosphere to block them!)
-  if (appCtx.starField) {
-    appCtx.starField.visible = true;
-    // Full brightness for stars on moon
-    appCtx.starField.children.forEach((child) => {
-      if (child.material) {
-        child.material.opacity = child.userData.baseOpacity || 1.0;
-      }
-    });
-    // Debug log removed
   }
 
   // Show return button

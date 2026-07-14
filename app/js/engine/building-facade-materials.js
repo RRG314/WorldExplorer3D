@@ -1,4 +1,4 @@
-import { createWindowTexture } from "./procedural-textures.js?v=1";
+import { createWindowTexture } from "./procedural-textures.js?v=2";
 import { applyFacadeWallMask } from "./building-facade-shader.js?v=1";
 
 function polygonAreaXZ(pts) {
@@ -42,31 +42,42 @@ function usesOccupiedFacade(type) {
   ].includes(String(type || '').toLowerCase());
 }
 
-function midFacadeStyle(buildingType, facadeType) {
+function midFacadeStyle(buildingType, facadeType, facadeStyle, seed) {
   const type = String(buildingType || 'yes').toLowerCase();
+  const variant = ((Number(seed) || 0) >>> 0) % 3;
+  const adjust = variant === 0 ? -0.035 : variant === 2 ? 0.035 : 0;
+  const resolve = (key, color) => {
+    const resolved = new THREE.Color(color).offsetHSL(0, 0, adjust);
+    return { key: `${facadeType}:${facadeStyle}:${key}:v${variant}`, color: resolved.getHex() };
+  };
   if (type === 'industrial' || type === 'warehouse') {
-    return { key: `${facadeType}:industrial`, color: 0x969b9d };
+    return resolve('industrial', 0x969b9d);
   }
   if (type === 'church' || type === 'cathedral') {
-    return { key: `${facadeType}:historic`, color: 0x9d8977 };
+    return resolve('historic', 0x9d8977);
   }
   if (isGlassForwardBuildingType(type)) {
-    return { key: `${facadeType}:commercial`, color: 0x8f9da8 };
+    return resolve('commercial', 0x8f9da8);
   }
   if (type === 'house' || type === 'residential' || type === 'detached' || type === 'apartments') {
-    return { key: `${facadeType}:residential`, color: facadeType === 'brick' ? 0xa37f6c : 0xb8b1a7 };
+    return resolve('residential', facadeType === 'brick' ? 0xa37f6c : 0xb8b1a7);
   }
-  return { key: `${facadeType}:general`, color: facadeType === 'brick' ? 0x987565 : 0xaab0b2 };
+  return resolve('general', facadeType === 'brick' ? 0x987565 : 0xaab0b2);
 }
 
-function facadeTextureRepeat(facadeType) {
+function facadeTextureRepeat(facadeType, facadeStyle) {
   // ExtrudeGeometry side UVs use meter-scale coordinates rather than normalized UVs.
-  if (facadeType === 'window') return { x: 0.09, y: 1 / 44.8 };
+  if (facadeType === 'window') {
+    if (facadeStyle === 'curtain_wall') return { x: 0.075, y: 1 / 54 };
+    if (facadeStyle === 'townhouse') return { x: 0.055, y: 1 / 34 };
+    if (facadeStyle === 'industrial_panel') return { x: 0.08, y: 1 / 32 };
+    return { x: 0.09, y: 1 / 44.8 };
+  }
   if (facadeType === 'brick') return { x: 0.28, y: 0.45 };
   return { x: 0.12, y: 0.12 };
 }
 
-function nearFacadeBatchKey(facadeType, baseColorHex, mappedMaterial = '') {
+function nearFacadeBatchKey(facadeType, facadeStyle, baseColorHex, mappedMaterial = '') {
   const color = new THREE.Color(baseColorHex || '#999999');
   const hsl = { h: 0, s: 0, l: 0 };
   color.getHSL(hsl);
@@ -77,14 +88,15 @@ function nearFacadeBatchKey(facadeType, baseColorHex, mappedMaterial = '') {
     /brick|masonry|stone/.test(mappedMaterial) ? 'masonry' :
     /metal|steel/.test(mappedMaterial) ? 'metal' :
     'general';
-  return `building-near:${facadeType}:${materialClass}:${hue}:${saturation}:${lightness}`;
+  return `building-near:${facadeType}:${facadeStyle}:${materialClass}:${hue}:${saturation}:${lightness}`;
 }
 
-function tagNearFacadeMaterial(material, facadeType, baseColorHex, mappedMaterial) {
+function tagNearFacadeMaterial(material, facadeType, facadeStyle, baseColorHex, mappedMaterial) {
   if (!material) return material;
   material.userData = {
     ...(material.userData || {}),
-    buildingBatchKey: nearFacadeBatchKey(facadeType, baseColorHex, mappedMaterial)
+    buildingBatchKey: nearFacadeBatchKey(facadeType, facadeStyle, baseColorHex, mappedMaterial),
+    facadeStyle
   };
   return material;
 }
@@ -171,10 +183,25 @@ function selectFacadeType(buildingType, options, br2) {
   return { facadeType, largeUrbanMass };
 }
 
-function createMidFacadeMaterial(buildingType, facadeType, textureRepeat) {
-  const style = midFacadeStyle(buildingType, facadeType);
+function selectFacadeStyle(buildingType, facadeType, options, seed) {
+  const type = String(buildingType || 'yes').toLowerCase();
+  const mappedMaterial = String(options.facadeMaterial || '').trim().toLowerCase();
+  const variant = ((Number(seed) || 0) >>> 0) % 3;
+  if (facadeType === 'brick') return type === 'church' || type === 'cathedral' ? 'historic_punched' : variant === 0 ? 'townhouse' : 'residential_punched';
+  if (facadeType === 'concrete') return /metal|steel/.test(mappedMaterial) || type === 'industrial' || type === 'warehouse' ? 'industrial_panel' : variant === 0 ? 'residential_punched' : 'office_grid';
+  if (/glass|mirror/.test(mappedMaterial) || type === 'skyscraper') return 'curtain_wall';
+  if (type === 'hotel') return 'hotel_vertical';
+  if (type === 'apartments') return variant === 0 ? 'apartment_balcony' : 'residential_punched';
+  if (type === 'house' || type === 'detached' || type === 'residential') return variant === 0 ? 'townhouse' : 'residential_punched';
+  if (type === 'church' || type === 'cathedral') return 'historic_punched';
+  if (type === 'office' || type === 'commercial' || type === 'retail') return variant === 0 ? 'curtain_wall' : variant === 1 ? 'office_grid' : 'hotel_vertical';
+  return ['office_grid', 'residential_punched', 'apartment_balcony'][variant];
+}
+
+function createMidFacadeMaterial(buildingType, facadeType, facadeStyle, textureRepeat, seed) {
+  const style = midFacadeStyle(buildingType, facadeType, facadeStyle, seed);
   const midWindowTexture = facadeType === 'window'
-    ? createWindowTexture(`#${new THREE.Color(style.color).getHexString()}`, style.color)
+    ? createWindowTexture(`#${new THREE.Color(style.color).getHexString()}`, seed, { style: facadeStyle })
     : null;
   if (midWindowTexture) {
     midWindowTexture.wrapS = midWindowTexture.wrapT = THREE.RepeatWrapping;
@@ -207,10 +234,11 @@ export function getBuildingMaterial(ctx, buildingType, bSeed, baseColorHex, opti
   if (baseColorHex) tintColor.lerp(new THREE.Color(baseColorHex), 0.12);
   const tintHex = tintColor.getHex();
   const { facadeType, largeUrbanMass } = selectFacadeType(buildingType, opts, br2);
-  const textureRepeat = facadeTextureRepeat(facadeType);
+  const facadeStyle = selectFacadeStyle(buildingType, facadeType, opts, bSeed);
+  const textureRepeat = facadeTextureRepeat(facadeType, facadeStyle);
 
   if (opts.lodTier === 'mid') {
-    return createMidFacadeMaterial(buildingType, facadeType, textureRepeat);
+    return createMidFacadeMaterial(buildingType, facadeType, facadeStyle, textureRepeat, bSeed);
   }
 
   if (facadeType === 'concrete' && state.pbrTexturesLoaded.concrete && state.concreteDiffuse) {
@@ -222,7 +250,7 @@ export function getBuildingMaterial(ctx, buildingType, bSeed, baseColorHex, opti
       roughnessMap: cloneFacadeTexture(state.concreteRoughness, textureRepeat.x, textureRepeat.y, bSeed ^ 0x221),
       roughness: 0.9,
       metalness: 0.02
-    }), facadeType, baseColorHex, mappedMaterial);
+    }), facadeType, facadeStyle, baseColorHex, mappedMaterial);
   }
 
   if (facadeType === 'brick' && state.pbrTexturesLoaded.brick && state.brickDiffuse) {
@@ -234,11 +262,11 @@ export function getBuildingMaterial(ctx, buildingType, bSeed, baseColorHex, opti
       roughnessMap: cloneFacadeTexture(state.brickRoughness, textureRepeat.x, textureRepeat.y, bSeed ^ 0x321),
       roughness: 0.88,
       metalness: 0.02
-    }), facadeType, baseColorHex, mappedMaterial);
+    }), facadeType, facadeStyle, baseColorHex, mappedMaterial);
   }
 
   const windowTex = cloneFacadeTexture(
-    createWindowTexture(baseColorHex, bSeed),
+    createWindowTexture(baseColorHex, bSeed, { style: facadeStyle }),
     textureRepeat.x,
     textureRepeat.y,
     bSeed
@@ -270,7 +298,7 @@ export function getBuildingMaterial(ctx, buildingType, bSeed, baseColorHex, opti
     material,
     new THREE.Color(baseColorHex || '#777777').offsetHSL(0, -0.04, -0.12)
   );
-  return tagNearFacadeMaterial(material, facadeType, baseColorHex, mappedMaterial);
+  return tagNearFacadeMaterial(material, facadeType, facadeStyle, baseColorHex, mappedMaterial);
 }
 
 export function refreshBuildingFacadeMaterials(ctx) {

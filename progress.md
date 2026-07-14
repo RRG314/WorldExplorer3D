@@ -2923,3 +2923,12 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - Hosting mirror synchronization, targeted planetary/runtime checks, and complete release verification passed, including all 30 world-matrix locations
   - builder/editor verification passed in headless and installed-Chrome headed runs: four shapes, eight colors, a hard 200-block limit, player support/jumping, cube vehicle collision, and traversable ramps
   - final headed captures are populated and unclipped; production promotion remains Hosting-only and requires the exact live Moon -> Earth -> Main Menu -> Mars sequence after deployment
+
+- Earth launch, camera, and world-readiness stabilization (2026-07-14):
+  - removed delayed title auto-boat restoration; ordinary Earth, preset, custom, and geolocation launches now start in walking mode while the explicit Ocean destination retains boat entry
+  - made walking, driving, drone, and boat camera look independent and continuously rotatable through 360 degrees; movement no longer recenters the camera
+  - added deterministic building-type and mapped-material facade families and preserved the facade style in render batching so populated cities no longer collapse to one wall pattern
+  - initial Earth entry now awaits the first building-detail pass and terrain readiness before releasing the loading overlay; optional POI, landmark, and enrichment work remains deferred
+  - consolidated browser verification forced stale boat state before launching Dubai and confirmed walking mode, no active/pending boat, 325 buildings at reveal, and a visible character on land
+  - the same browser run confirmed camera yaw beyond the former limit with unchanged actor heading and no recenter while moving; screenshots cover Baltimore facade/readiness, 360 camera look, and Dubai land entry
+  - external WorldCover and Overpass failures recovered through existing fallbacks; production remains untouched in this stabilization pass

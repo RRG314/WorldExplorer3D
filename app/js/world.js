@@ -168,7 +168,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=1";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=29";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=30";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=4";

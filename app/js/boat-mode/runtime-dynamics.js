@@ -1,4 +1,4 @@
-import { clamp } from "./dynamics.js?v=1";
+import { clamp, normalizeAngle } from "./dynamics.js?v=1";
 
 export function createBoatRuntimeDynamics(deps = {}) {
   const {
@@ -23,11 +23,19 @@ export function createBoatRuntimeDynamics(deps = {}) {
     if (!appCtx.boatMode?.active) return false;
     const cfg = getSeaStateConfig();
     const profile = getBoatWaveProfile(appCtx.boatMode.currentWater || null);
-    const left = !!(appCtx.keys.KeyA || appCtx.keys.ArrowLeft);
-    const right = !!(appCtx.keys.KeyD || appCtx.keys.ArrowRight);
-    const throttle = !!(appCtx.keys.KeyW || appCtx.keys.ArrowUp);
-    const reverse = !!(appCtx.keys.KeyS || appCtx.keys.ArrowDown);
+    const left = !!appCtx.keys.KeyA;
+    const right = !!appCtx.keys.KeyD;
+    const throttle = !!appCtx.keys.KeyW;
+    const reverse = !!appCtx.keys.KeyS;
     const brake = !!appCtx.keys.Space;
+
+    const cameraLookSpeed = 2.2 * dt;
+    if (appCtx.keys.ArrowLeft) appCtx.boatMode.cameraYawOffset += cameraLookSpeed;
+    if (appCtx.keys.ArrowRight) appCtx.boatMode.cameraYawOffset -= cameraLookSpeed;
+    if (appCtx.keys.ArrowUp) appCtx.boatMode.cameraPitch += cameraLookSpeed * 0.55;
+    if (appCtx.keys.ArrowDown) appCtx.boatMode.cameraPitch -= cameraLookSpeed * 0.55;
+    appCtx.boatMode.cameraYawOffset = normalizeAngle(appCtx.boatMode.cameraYawOffset);
+    appCtx.boatMode.cameraPitch = clamp(appCtx.boatMode.cameraPitch, -0.62, 0.62);
 
     if (!Number.isFinite(appCtx.boat.forwardSpeed)) appCtx.boat.forwardSpeed = Number(appCtx.boat.speed) || 0;
     if (!Number.isFinite(appCtx.boat.lateralSpeed)) appCtx.boat.lateralSpeed = 0;

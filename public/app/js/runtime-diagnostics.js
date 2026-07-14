@@ -39,6 +39,24 @@ function rendererSnapshot() {
   };
 }
 
+function spaceCatalogSnapshot() {
+  const scene = appCtx.spaceFlight?.scene;
+  const group = scene?.getObjectByName?.('solarSystemGroup') || null;
+  const asteroidBelt = group?.getObjectByName?.('asteroidBelt') || null;
+  const kuiperBelt = group?.getObjectByName?.('kuiperBelt') || null;
+  const directChildren = group?.children || [];
+  return {
+    groupAttached: !!group && group.parent === scene,
+    planets: directChildren.filter((object) => object?.userData?.isPlanet === true).length,
+    namedAsteroids: directChildren.filter((object) => object?.userData?.isAsteroid === true).length,
+    spacecraft: scene?.children?.filter((object) => object?.userData?.isSpacecraft === true).length || 0,
+    deepSpaceSpacecraft: directChildren.filter((object) => object?.userData?.isSpacecraft === true).length,
+    galaxies: directChildren.filter((object) => object?.userData?.isGalaxy === true).length,
+    asteroidParticles: asteroidBelt?.geometry?.attributes?.position?.count || 0,
+    kuiperParticles: kuiperBelt?.geometry?.attributes?.position?.count || 0
+  };
+}
+
 function composerSnapshot() {
   const composer = appCtx.composer;
   if (!composer) return null;
@@ -81,6 +99,7 @@ function getWorldExplorerRuntimeDiagnostics() {
       onMoon: !!appCtx.onMoon,
       traveling: !!appCtx.travelingToMoon
     },
+    spaceCatalog: spaceCatalogSnapshot(),
     titleVisible: !!document.getElementById("titleScreen") &&
       !document.getElementById("titleScreen").classList.contains("hidden"),
     camera: appCtx.camera
