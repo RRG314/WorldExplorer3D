@@ -206,25 +206,9 @@ async function runBlockBuilderAudit(page) {
   await settleVisualFrame(page);
   await page.screenshot({ path: path.join(outputDir, 'block-builder-shapes.png') });
 
-  const limit = await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    ctx.clearAllBuildBlocks({ persist: false });
-    let accepted = 0;
-    for (let i = 0; i < 200; i += 1) {
-      if (ctx.placeBuildBlock(100 + (i % 20), 10, 100 + Math.floor(i / 20), i % 8, {
-        shape: ['cube', 'slab', 'ramp', 'column'][i % 4],
-        rotation: i % 4,
-        persist: false
-      })) accepted += 1;
-    }
-    const overflowAccepted = ctx.placeBuildBlock(150, 10, 150, 0, { shape: 'cube', persist: false });
-    const rendered = ctx.scene?.getObjectByName('buildBlocksGroup')?.children?.length || 0;
-    ctx.clearAllBuildBlocks({ persist: false });
-    return { accepted, overflowAccepted, rendered };
-  });
-
   const jumpSetup = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
+    ctx.clearAllBuildBlocks({ persist: false });
     const walker = ctx.Walk.state.walker;
     const gx = Math.round(walker.x);
     const gz = Math.round(walker.z);
@@ -270,6 +254,23 @@ async function runBlockBuilderAudit(page) {
   jump.startY = jumpSetup.startY;
   await settleVisualFrame(page);
   await page.screenshot({ path: path.join(outputDir, 'block-builder-jump.png') });
+
+  const limit = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    ctx.clearAllBuildBlocks({ persist: false });
+    let accepted = 0;
+    for (let i = 0; i < 200; i += 1) {
+      if (ctx.placeBuildBlock(100 + (i % 20), 10, 100 + Math.floor(i / 20), i % 8, {
+        shape: ['cube', 'slab', 'ramp', 'column'][i % 4],
+        rotation: i % 4,
+        persist: false
+      })) accepted += 1;
+    }
+    const overflowAccepted = ctx.placeBuildBlock(150, 10, 150, 0, { shape: 'cube', persist: false });
+    const rendered = ctx.scene?.getObjectByName('buildBlocksGroup')?.children?.length || 0;
+    ctx.clearAllBuildBlocks({ persist: false });
+    return { accepted, overflowAccepted, rendered };
+  });
 
   const vehicle = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
@@ -520,7 +521,12 @@ function assertReport(report) {
 const server = await startServer();
 await mkdirp(outputDir);
 
-const browser = await chromium.launch({ headless: true });
+const headed = process.env.WE3D_HEADED === '1';
+const browserChannel = String(process.env.WE3D_BROWSER_CHANNEL || '').trim();
+const browser = await chromium.launch({
+  headless: !headed,
+  ...(browserChannel ? { channel: browserChannel } : {})
+});
 const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 
 try {

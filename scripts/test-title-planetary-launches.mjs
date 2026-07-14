@@ -8,8 +8,8 @@ const host = '127.0.0.1';
 const outputDir = path.join(rootDir, 'output', 'playwright', 'title-planetary-launches');
 const scenarios = [
   { mode: 'moon', toggle: '#moonLaunchToggle', env: 'MOON', destination: '' },
-  { mode: 'space', toggle: '#spaceLaunchToggle', env: 'SPACE_FLIGHT', destination: 'Moon' },
-  { mode: 'mars', toggle: '#marsLaunchToggle', env: 'SPACE_FLIGHT', destination: 'Mars' }
+  { mode: 'space', toggle: '#spaceLaunchToggle', env: 'SPACE_FLIGHT', destination: 'moon' },
+  { mode: 'mars', toggle: '#marsLaunchToggle', env: 'SPACE_FLIGHT', destination: 'mars' }
 ];
 
 function assert(condition, message) {
@@ -48,7 +48,8 @@ async function readState(page) {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return {
       env: ctx.getEnv?.() || '',
-      destination: document.getElementById('sfDestination')?.textContent?.trim() || '',
+      destination: ctx.spaceFlight?.destination || '',
+      nearestBody: ctx.spaceFlight?._nearestBody?.name || '',
       roadLoads: Number(ctx.__titlePlanetaryRoadLoadCount || 0),
       roads: Array.isArray(ctx.roads) ? ctx.roads.length : 0,
       onMoon: !!ctx.onMoon,
@@ -147,6 +148,9 @@ async function runScenario(browser, baseUrl, scenario) {
       assert(!earthReturn.fatal, 'Moon return showed a fatal renderer error');
 
       await page.click('#mainMenuBtn');
+      const titleAfterEarth = await readState(page);
+      assert(titleAfterEarth.env === 'EARTH', 'Main Menu did not normalize the returned Earth environment');
+      assert(!titleAfterEarth.spaceFlightActive, 'Main Menu retained an active flight before Mars launch');
       await page.click('#marsLaunchToggle');
       await page.click('#startBtn');
       const marsScenario = scenarios.find((entry) => entry.mode === 'mars');
@@ -158,7 +162,7 @@ async function runScenario(browser, baseUrl, scenario) {
         const { ctx } = await import('/app/js/shared-context.js?v=55');
         globalThis.__titlePlanetarySpaceRenderer = ctx.spaceFlight?.renderer || null;
       });
-      assert(marsAfterMoon.destination === 'Mars', 'Mars launch after Moon return retained an old flight destination');
+      assert(marsAfterMoon.destination === 'mars', 'Mars launch after Moon return retained an old flight destination');
       assert(!marsAfterMoon.fatal, 'Mars launch after Moon return showed a fatal renderer error');
       assert(mainFrameNavigations === 1, 'Mars launch after Moon return reloaded the page');
 
@@ -185,6 +189,9 @@ async function runScenario(browser, baseUrl, scenario) {
       });
       assert(staleLandingStarted, 'Could not start the stale-landing cancellation regression scenario');
       await page.click('#mainMenuBtn');
+      const titleAfterCancelledLanding = await readState(page);
+      assert(titleAfterCancelledLanding.env === 'EARTH', 'Main Menu left the cancelled flight environment active');
+      assert(!titleAfterCancelledLanding.spaceFlightActive, 'Main Menu retained the cancelled flight runtime');
       await page.click('#marsLaunchToggle');
       await page.click('#startBtn');
       const marsScenario = scenarios.find((entry) => entry.mode === 'mars');
@@ -193,7 +200,7 @@ async function runScenario(browser, baseUrl, scenario) {
       await settleVisualFrame(page);
       await page.screenshot({ path: path.join(outputDir, 'cancelled-earth-landing-mars.png'), fullPage: false });
       assert(
-        marsAfterCancelledLanding.destination === 'Mars' && marsAfterCancelledLanding.spaceFlightActive,
+        marsAfterCancelledLanding.destination === 'mars' && marsAfterCancelledLanding.spaceFlightActive,
         'An exited flight landing sequence overwrote the next Mars flight'
       );
       state.marsAfterCancelledLanding = marsAfterCancelledLanding;

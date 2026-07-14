@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=3";
-import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=2";
+import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=3";
 import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=2";
 import { createSpaceFlightScene, destroySpaceFlightScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=3";
 import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=1";
@@ -63,6 +63,7 @@ const animationDeps = {
 };
 
 function startSpaceFlightToMoon() {
+  if (appCtx.spaceFlight.active) return appCtx.spaceFlight.destination === 'moon';
   console.log("Starting space flight to Moon...");
   const sessionId = beginSpaceFlightSession();
 
@@ -113,9 +114,11 @@ function startSpaceFlightToMoon() {
     appCtx.spaceFlight.speed = 0;
     showFlightMessage('SPACE FLIGHT READY', '#10b981');
   }, 1000);
+  return true;
 }
 
 function startSpaceFlightToEarth() {
+  if (appCtx.spaceFlight.active) return appCtx.spaceFlight.destination === 'earth';
   console.log("Starting space flight to Earth...");
   const sessionId = beginSpaceFlightSession();
 
@@ -153,11 +156,13 @@ function startSpaceFlightToEarth() {
     appCtx.spaceFlight.speed = 0;
     showFlightMessage('EARTH RETURN READY', '#3b82f6');
   }, 1000);
+  return true;
 }
 
 function startSpaceFlightToMars() {
   console.log('Starting space flight to Mars...');
-  if (appCtx.onMars || appCtx.spaceFlight.active) return;
+  if (appCtx.onMars) return false;
+  if (appCtx.spaceFlight.active) return appCtx.spaceFlight.destination === 'mars';
   const sessionId = beginSpaceFlightSession();
   appCtx.travelingToMoon = true;
   appCtx.paused = true;
@@ -192,6 +197,7 @@ function startSpaceFlightToMars() {
     appCtx.spaceFlight.speed = 0;
     showFlightMessage('MARS FLIGHT READY', '#e26f45');
   }, 1000);
+  return true;
 }
 
 function animateSpaceFlight() {

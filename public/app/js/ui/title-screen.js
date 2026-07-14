@@ -1,6 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { createGlobeSelector } from "./globe-selector.js?v=59";
 import { readSharedExperienceParams } from "./share-links.js?v=60";
+import { prepareTitleEnvironment } from "../planetary/entry.js?v=3";
 
 function initTitleScreenUi({
   lastLocationStorageKey,
@@ -240,7 +241,10 @@ function initTitleScreenUi({
     if (!launch) throw new Error(`${titleLaunchMode} launch runtime did not become ready.`);
 
     clearPendingTitleBoatEntryTimer();
-    appCtx.switchEnv(appCtx.ENV.EARTH);
+    const titleReset = prepareTitleEnvironment();
+    if (titleReset.env !== appCtx.ENV.EARTH || titleReset.spaceFlightActive) {
+      throw new Error('Could not establish a clean title launch environment.');
+    }
     appCtx.setBuildModeEnabled?.(false);
     updateControlsModeUI?.();
     persistLastLocationSelection(titleLaunchMode);
@@ -248,7 +252,17 @@ function initTitleScreenUi({
       location: appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOCS?.[appCtx.selLoc] || null,
       launchMode: titleLaunchMode
     });
-    await launch();
+    const launchAccepted = await launch();
+    const expectedDestination = titleLaunchMode === 'space' ? 'moon' : titleLaunchMode;
+    if (
+      launchAccepted === false ||
+      (titleLaunchMode !== 'moon' && (
+        !appCtx.spaceFlight?.active ||
+        appCtx.spaceFlight.destination !== expectedDestination
+      ))
+    ) {
+      throw new Error(`${titleLaunchMode} launch was not accepted by the planetary runtime.`);
+    }
     appCtx.loadingScreenMode = 'earth';
     return true;
   };

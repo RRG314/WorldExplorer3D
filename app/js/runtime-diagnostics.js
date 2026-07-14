@@ -70,6 +70,19 @@ function getWorldExplorerRuntimeDiagnostics() {
       space: !!appCtx.spaceFlight?.active,
       walking: appCtx.Walk?.state?.mode === "walk"
     },
+    planetary: {
+      flightDestination: appCtx.spaceFlight?.destination || null,
+      flightMode: appCtx.spaceFlight?.mode || null,
+      flightSessionId: numberOrNull(appCtx.spaceFlight?._sessionId),
+      landingTarget: appCtx.spaceFlight?._landingTarget || null,
+      manualLandingTarget: appCtx.spaceFlight?._manualLandingTarget || null,
+      nearestBody: appCtx.spaceFlight?._nearestBody?.name || null,
+      onMars: !!appCtx.onMars,
+      onMoon: !!appCtx.onMoon,
+      traveling: !!appCtx.travelingToMoon
+    },
+    titleVisible: !!document.getElementById("titleScreen") &&
+      !document.getElementById("titleScreen").classList.contains("hidden"),
     camera: appCtx.camera
       ? {
           position: vectorSnapshot(appCtx.camera.position),

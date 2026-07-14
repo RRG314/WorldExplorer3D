@@ -20,3 +20,43 @@ export function suspendEarthModesForPlanetaryEntry() {
     document.getElementById(id)?.classList.remove('show');
   });
 }
+
+function hideSurface(object) {
+  if (!object) return;
+  object.visible = false;
+  if (object.parent === appCtx.scene) appCtx.scene.remove(object);
+}
+
+export function prepareTitleEnvironment() {
+  const previousEnv = appCtx.getEnv?.() || null;
+  appCtx.cancelPendingEarthArrival?.();
+  hidePlanetaryReturnControls();
+
+  if (appCtx.spaceFlight?.active) appCtx.exitSpaceFlight?.();
+  if (appCtx.oceanMode?.active) appCtx.stopOceanMode?.();
+  if (appCtx.boatMode?.active) appCtx.stopBoatMode?.({ targetMode: 'drive' });
+
+  hideSurface(appCtx.moonSurface);
+  (window._moonObjects || []).forEach(hideSurface);
+  hideSurface(appCtx.marsSurface);
+  (appCtx.marsObjects || []).forEach(hideSurface);
+  appCtx.prepareMarsTitleExit?.();
+  appCtx.setLunarEarthVisible?.(false);
+  appCtx.setEarthSceneVisible?.(true);
+
+  if (appCtx.ENV?.EARTH && appCtx.getEnv?.() !== appCtx.ENV.EARTH) {
+    appCtx.switchEnv?.(appCtx.ENV.EARTH);
+  }
+  appCtx.onMoon = false;
+  appCtx.onMars = false;
+  appCtx.travelingToMoon = false;
+  appCtx.paused = false;
+
+  return {
+    previousEnv,
+    env: appCtx.getEnv?.() || null,
+    spaceFlightActive: !!appCtx.spaceFlight?.active
+  };
+}
+
+Object.assign(appCtx, { prepareTitleEnvironment });

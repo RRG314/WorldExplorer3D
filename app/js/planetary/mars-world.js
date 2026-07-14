@@ -1,7 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { captureEarthWorldSession, resumeEarthWorldSession } from '../earth-session.js?v=3';
 import { configureColorTexture } from './catalog.js?v=1';
-import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=2';
+import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=3';
 
 const MARS_SIZE = 24000;
 const MARS_SEGMENTS = 200;
@@ -299,11 +299,24 @@ function prepareEarthDepartureForMars() {
   appCtx.setEarthSceneVisible?.(false);
 }
 
+function prepareMarsTitleExit() {
+  if (appCtx.getEnv?.() !== appCtx.ENV?.MARS && !appCtx.onMars) return;
+  setMarsObjectsVisible(false);
+  setMarsInterfaceActive(false);
+  appCtx.scene.fog = null;
+  appCtx.scene.background = new THREE.Color(0x87ceeb);
+  if (appCtx.camera && Number.isFinite(earthCameraFar)) {
+    appCtx.camera.far = earthCameraFar;
+    appCtx.camera.updateProjectionMatrix();
+  }
+}
+
 Object.assign(appCtx, {
   arriveAtMars,
   prepareEarthDepartureForMars,
+  prepareMarsTitleExit,
   returnFromMars,
   sampleMarsLocalHeight
 });
 
-export { arriveAtMars, prepareEarthDepartureForMars, returnFromMars, sampleMarsLocalHeight };
+export { arriveAtMars, prepareEarthDepartureForMars, prepareMarsTitleExit, returnFromMars, sampleMarsLocalHeight };

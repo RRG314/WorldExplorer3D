@@ -2914,3 +2914,12 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - visual review caught intermittent clipped headless SwiftShader screenshots affecting unrelated DOM layers even while runtime state stayed healthy; the permanent test now supports headed installed-Chrome verification for authoritative visual review
   - targeted runtime and planetary gates pass with no fatal renderer errors; headed installed Chrome passed the complete sequence and produced populated, unclipped, correctly framed release captures
   - the prior Hosting promotion is not accepted until the complete release gate passes again and this correction is redeployed and verified on the live URL
+
+- Title environment ownership correction (2026-07-14):
+  - live Chrome exposed that Main Menu stopped the space renderer without leaving the `SPACE_FLIGHT` environment, while the planetary test incorrectly treated the changing Nearest-body HUD label as the requested destination
+  - centralized Main Menu cleanup now restores one Earth-owned title state across Moon, Mars, Ocean, and Space and removes destination-owned return controls and surface meshes
+  - space-flight entry functions now reject conflicting active flights instead of silently replacing their destination and session; title launches validate that the requested runtime accepted ownership
+  - runtime diagnostics and the permanent title test now report the internal flight destination separately from the nearest celestial body
+  - Hosting mirror synchronization, targeted planetary/runtime checks, and complete release verification passed, including all 30 world-matrix locations
+  - builder/editor verification passed in headless and installed-Chrome headed runs: four shapes, eight colors, a hard 200-block limit, player support/jumping, cube vehicle collision, and traversable ramps
+  - final headed captures are populated and unclipped; production promotion remains Hosting-only and requires the exact live Moon -> Earth -> Main Menu -> Mars sequence after deployment
