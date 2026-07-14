@@ -1,4 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
+import { createPerfPanelApi } from "./perf-panel.js?v=1";
+import { createPerfRendererInfoApi } from "./perf-renderer.js?v=1";
+import { createPerfSettingsApi } from "./perf-settings.js?v=1";
 // perf.js - Runtime performance mode + benchmark telemetry for RDT comparisons
 // ============================================================================
 
@@ -57,6 +60,27 @@ let _perfAutoQualityLowStreak = 0;
 let _perfAutoQualityHighStreak = 0;
 let _perfAutoQualityLastChangeAt = 0;
 let _perfAutoQualityLastReason = 'init';
+const perfSettingsApi = createPerfSettingsApi({
+  appCtx,
+  constants: {
+    PERF_MODE_BASELINE,
+    PERF_MODE_RDT,
+    PERF_QUALITY_TIER_BALANCED,
+    PERF_QUALITY_TIER_PERFORMANCE,
+    PERF_QUALITY_TIER_QUALITY
+  },
+  state: {
+    getPerfAutoQualityTier: () => perfAutoQualityTier
+  }
+});
+const {
+  exposeMutableGlobal,
+  getPerfQualityProfile,
+  normalizePerfMode,
+  normalizePerfQualityTier,
+  readStorage,
+  writeStorage
+} = perfSettingsApi;
 
 const perfStats = {
   mode: PERF_MODE_RDT,
@@ -220,66 +244,6 @@ function getPerfSpikeMetrics(includePercentiles = false) {
   return metrics;
 }
 
-function exposeMutableGlobal(name, getter, setter) {
-  Object.defineProperty(appCtx, name, {
-    configurable: true,
-    enumerable: true,
-    get: getter,
-    set: setter
-  });
-}
-
-function readStorage(key) {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeStorage(key, value) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-
-
-    // Ignore storage failures (private browsing / blocked storage).
-  }}
-function normalizePerfMode(mode) {
-  return mode === PERF_MODE_BASELINE ? PERF_MODE_BASELINE : PERF_MODE_RDT;
-}
-
-function normalizePerfQualityTier(tier) {
-  if (tier === PERF_QUALITY_TIER_PERFORMANCE) return PERF_QUALITY_TIER_PERFORMANCE;
-  if (tier === PERF_QUALITY_TIER_QUALITY) return PERF_QUALITY_TIER_QUALITY;
-  return PERF_QUALITY_TIER_BALANCED;
-}
-
-function getPerfQualityProfile(tier = perfAutoQualityTier) {
-  const normalized = normalizePerfQualityTier(tier);
-  if (normalized === PERF_QUALITY_TIER_PERFORMANCE) {
-    return {
-      tier: normalized,
-      label: 'Performance',
-      budgetScale: 0.82,
-      lodScale: 0.90
-    };
-  }
-  if (normalized === PERF_QUALITY_TIER_QUALITY) {
-    return {
-      tier: normalized,
-      label: 'Quality',
-      budgetScale: 1.10,
-      lodScale: 1.08
-    };
-  }
-  return {
-    tier: PERF_QUALITY_TIER_BALANCED,
-    label: 'Balanced',
-    budgetScale: 1.0,
-    lodScale: 1.0
-  };
-}
 
 function getPerfMode() {
   return perfMode;
@@ -513,161 +477,28 @@ function recordPerfFrame(dt) {
   _stepPerfAutoQuality(dt, perfStats.live.fps, perfStats.live.frameMs);
   perfStats.live.quality = getDynamicBudgetState();
 }
+const { recordPerfRendererInfo } = createPerfRendererInfoApi({ appCtx, perfStats });
 
-function recordPerfRendererInfo(rendererRef) {
-  if (!rendererRef || !rendererRef.info) return;
-  const info = rendererRef.info;
-  const render = info.render || {};
-  const memory = info.memory || {};
-  const programs = Array.isArray(info.programs) ? info.programs.length : info.programs || 0;
-
-  perfStats.renderer.calls = render.calls || 0;
-  perfStats.renderer.triangles = render.triangles || 0;
-  perfStats.renderer.points = render.points || 0;
-  perfStats.renderer.lines = render.lines || 0;
-  perfStats.renderer.geometries = memory.geometries || 0;
-  perfStats.renderer.textures = memory.textures || 0;
-  perfStats.renderer.programs = programs || 0;
-
-  perfStats.live.worldCounts = {
-    roads: typeof appCtx.roads !== 'undefined' && Array.isArray(appCtx.roads) ? appCtx.roads.length : 0,
-    buildings: typeof appCtx.buildingMeshes !== 'undefined' && Array.isArray(appCtx.buildingMeshes) ? appCtx.buildingMeshes.length : 0,
-    poiMeshes: typeof appCtx.poiMeshes !== 'undefined' && Array.isArray(appCtx.poiMeshes) ? appCtx.poiMeshes.length : 0,
-    landuseMeshes: typeof appCtx.landuseMeshes !== 'undefined' && Array.isArray(appCtx.landuseMeshes) ? appCtx.landuseMeshes.length : 0
-  };
-  const rdtNoiseConfig = typeof appCtx.getRdtNoiseConfig === 'function' ?
-  appCtx.getRdtNoiseConfig() :
-  {
-    enabled: !!appCtx.rdtNoiseEnabled,
-    variant: appCtx.rdtNoiseVariant || 'standard',
-    chaos: Number.isFinite(Number(appCtx.rdtNoiseChaos)) ? Number(appCtx.rdtNoiseChaos) : 0
-  };
-  perfStats.live.rdtNoise = {
-    ...(perfStats.live.rdtNoise || {}),
-    enabled: !!rdtNoiseConfig?.enabled,
-    variant: String(rdtNoiseConfig?.variant || 'standard'),
-    chaos: Number.isFinite(Number(rdtNoiseConfig?.chaos)) ? Number(rdtNoiseConfig.chaos) : 0
-  };
-  perfStats.updatedAt = Date.now();
-}
-
-function formatPerfNumber(n) {
-  if (!Number.isFinite(n)) return '0';
-  if (Math.abs(n) >= 1000000) return (n / 1000000).toFixed(2) + 'M';
-  if (Math.abs(n) >= 1000) return (n / 1000).toFixed(1) + 'K';
-  return String(Math.round(n));
-}
-
-function getRenderQualityLabel(liveQuality = null) {
-  const level = typeof appCtx.getRenderQualityLevel === 'function' ?
-  String(appCtx.getRenderQualityLevel() || '').toLowerCase() :
-  String(appCtx.renderQualityLevel || '').toLowerCase();
-  if (level === 'low') return 'LOW';
-  if (level === 'med' || level === 'medium') return 'MED';
-  if (level === 'high') return 'HIGH';
-
-  const tier = String(liveQuality?.tier || '').toLowerCase();
-  if (tier === PERF_QUALITY_TIER_PERFORMANCE) return 'LOW';
-  if (tier === PERF_QUALITY_TIER_QUALITY) return 'HIGH';
-  return 'MED';
-}
-
-function logBaselineSnapshot(extra = {}) {
-  const snapshot = capturePerfSnapshot(extra);
-  const fps = Number(snapshot?.fps || 0).toFixed(1);
-  const calls = Number(snapshot?.renderer?.calls || 0);
-  const tris = Number(snapshot?.renderer?.triangles || 0);
-  const textures = Number(snapshot?.renderer?.textures || 0);
-  const baselineLine = `BASELINE: fps=${fps}, calls=${calls}, tris=${tris}, textures=${textures}`;
-  console.log(baselineLine);
-  return { snapshot, baselineLine };
-}
-
-function capturePerfSnapshot(extra = {}) {
-  const locName = (() => {
-    if (typeof appCtx.selLoc === 'undefined') return 'Unknown';
-    if (appCtx.selLoc === 'custom' && typeof appCtx.customLoc !== 'undefined') return appCtx.customLoc?.name || 'Custom';
-    if (typeof appCtx.LOCS !== 'undefined' && appCtx.LOCS && appCtx.LOCS[appCtx.selLoc]) return appCtx.LOCS[appCtx.selLoc].name;
-    return String(appCtx.selLoc);
-  })();
-
-  const spikeMetrics = getPerfSpikeMetrics(true);
-  return {
-    generatedAt: new Date().toISOString(),
-    location: locName,
-    mode: perfMode,
-    fps: Number((perfStats.live.fps || 0).toFixed(2)),
-    frameMs: Number((perfStats.live.frameMs || 0).toFixed(2)),
-    dynamicBudget: getDynamicBudgetState(),
-    renderer: { ...perfStats.renderer },
-    live: { ...perfStats.live },
-    spikes: spikeMetrics,
-    lastLoad: perfStats.lastLoad ? { ...perfStats.lastLoad } : null,
-    ...extra
-  };
-}
-
-async function copyPerfSnapshotToClipboard(extra = {}) {
-  const snapshot = capturePerfSnapshot(extra);
-  const text = JSON.stringify(snapshot, null, 2);
-
-  if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
-    await navigator.clipboard.writeText(text);
-    return snapshot;
+const perfPanelApi = createPerfPanelApi({
+  appCtx,
+  constants: {
+    PERF_QUALITY_TIER_PERFORMANCE,
+    PERF_QUALITY_TIER_QUALITY
+  },
+  perfStats,
+  state: {
+    getDynamicBudgetState,
+    getPerfMode: () => perfMode,
+    getPerfOverlayEnabled: () => perfOverlayEnabled,
+    getPerfSpikeMetrics
   }
-  throw new Error('Clipboard API unavailable in this browser context.');
-}
-
-function updatePerfPanel(force = false) {
-  const panel = document.getElementById('perfPanel');
-  if (!panel) return;
-
-  const shouldShow = !!perfOverlayEnabled && !!appCtx.gameStarted;
-  if (!shouldShow) {
-    panel.style.display = 'none';
-    return;
-  }
-
-  panel.style.display = 'block';
-  const lastLoad = perfStats.lastLoad || {};
-  const r = perfStats.renderer;
-  const live = perfStats.live || {};
-  const lod = live.lodVisible || {};
-  const counts = live.worldCounts || {};
-  const spikes = live.spikes || getPerfSpikeMetrics(false);
-  const quality = live.quality || getDynamicBudgetState();
-  const qualityLabel = getRenderQualityLabel(quality);
-  const rdtNoise = live.rdtNoise || {};
-  const rdtNoiseEdgeSamples = Number.isFinite(rdtNoise.edgeSamples) ? rdtNoise.edgeSamples : 0;
-  const rdtNoiseTerrainEdgeSamples = Number.isFinite(rdtNoise.terrainEdgeSamples) ? rdtNoise.terrainEdgeSamples : 0;
-  const rdtNoiseLanduseVertices = Number.isFinite(rdtNoise.landuseVertices) ? rdtNoise.landuseVertices : 0;
-  const rdtNoiseLanduseMaskedPct = Number.isFinite(rdtNoise.landuseMaskedPct) ? rdtNoise.landuseMaskedPct : 0;
-  const rdtNoiseEdgeAvg = Number.isFinite(rdtNoise.edgeAvgAbsOffset) ? rdtNoise.edgeAvgAbsOffset : 0;
-  const rdtNoiseTerrainEdgeAvg = Number.isFinite(rdtNoise.terrainEdgeAvgAbsOffset) ? rdtNoise.terrainEdgeAvgAbsOffset : 0;
-  const rdtNoiseStatus = rdtNoise.enabled ?
-  `ON ${String(rdtNoise.variant || 'standard').toUpperCase()}` :
-  'OFF';
-
-  const lines = [
-  `MODE: ${String(perfMode).toUpperCase()}`,
-  `FPS: ${(live.fpsCurrent || 0).toFixed(1)} CUR | ${(live.fps || 0).toFixed(1)} AVG | FRAME: ${(live.frameMs || 0).toFixed(1)} ms`,
-  `QUALITY: ${qualityLabel} (${quality.auto ? 'AUTO' : 'LOCK'} ${String(quality.tier || 'balanced').toUpperCase()})`,
-  `DRAW: ${formatPerfNumber(r.calls)} | TRI: ${formatPerfNumber(r.triangles)}`,
-  `GEO: ${formatPerfNumber(r.geometries)} | TEX: ${formatPerfNumber(r.textures)} | PROG: ${formatPerfNumber(r.programs)}`,
-  `LOAD: ${Number.isFinite(lastLoad.loadMs) ? `${lastLoad.loadMs} ms` : '--'}`,
-  `FEATURES: R${counts.roads || 0} B${counts.buildings || 0} P${counts.poiMeshes || 0} L${counts.landuseMeshes || 0}`,
-  `RDT-NOISE: ${rdtNoiseStatus} | EDGE ${rdtNoiseEdgeAvg.toFixed(2)}m/${rdtNoiseTerrainEdgeAvg.toFixed(2)}m`,
-  `ROAD MASK: ${rdtNoiseLanduseMaskedPct.toFixed(1)}% (${rdtNoiseLanduseVertices}) | SAMPLES ${rdtNoiseEdgeSamples + rdtNoiseTerrainEdgeSamples}`,
-  `LOD: NEAR ${lod.near || 0} | MID ${lod.mid || 0}`,
-  `SPIKES: >33 ${spikes.over33_3 || 0} | >50 ${spikes.over50 || 0} | MAX ${(spikes.maxFrameMs || 0).toFixed(1)} ms`,
-  `TERRAIN RING: ${Number.isFinite(live.terrainRing) ? live.terrainRing : '--'} | SPEED ${Math.round(live.speedMph || 0)} mph`];
-
-
-  if (force || panel.textContent !== lines.join('\n')) {
-    panel.textContent = lines.join('\n');
-  }
-  if (typeof appCtx.positionTopOverlays === 'function') appCtx.positionTopOverlays();
-}
+});
+const {
+  capturePerfSnapshot,
+  copyPerfSnapshotToClipboard,
+  logBaselineSnapshot,
+  updatePerfPanel
+} = perfPanelApi;
 
 setPerfMode(readStorage(PERF_STORAGE_MODE_KEY), { persist: false });
 // Always start hidden so benchmark diagnostics are opt-in for every session.

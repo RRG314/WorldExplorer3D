@@ -182,6 +182,29 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
       - `output/playwright/flower-challenge-manual-rerun/ingame-after-flower-menu.png`
 - Follow-up note:
   - To enable shared cloud leaderboard, provide Firebase web config via `window.WORLD_EXPLORER_FIREBASE` or `localStorage['worldExplorer3D.firebaseConfig']` with `apiKey`, `projectId`, `appId` (+ optional authDomain/storageBucket/messagingSenderId).
+
+- Chrome startup/cache recovery verification (2026-07-12):
+  - Confirmed canonical workspace and branch: `/Users/stevenreid/Documents/WorldExplorer3D-live-fix-workspace` on `steven/live-fix-workspace`.
+  - Replaced the stale port `4191` preview with the no-cache local preview server on `http://127.0.0.1:4192/`.
+  - Regular Chrome visually rendered the complete title screen and a nonzero WebGL canvas at `http://127.0.0.1:4192/app/`; the startup diagnostics panel remained hidden.
+  - Chrome logged successful module boot from `http://127.0.0.1:4192/app/js/app-entry.js?v=114` through `bootstrap.js?v=88`.
+  - No fatal load errors referenced the active `4192` build. The two retained errors in Chrome logs belonged to the retired `4191` page and its stale `app-entry.js?v=113` request.
+
+- Production/local Monaco drone root-cause pass (2026-07-12):
+  - Confirmed live production and local both use Three.js r128/WebGL; WebGL was not introduced by the refactor.
+  - Reproduced the local white frame in regular Chrome and compared the identical Monaco drone transition against `https://worldexplorer3d.io/app/`.
+  - Added `app/js/runtime-diagnostics.js` with a hidden JSON snapshot for renderer context, camera, scene, mode, and world counts.
+  - Root evidence on the failing frame: `renderer.contextLost=true`, render calls/triangles dropped to zero, and Monaco had `4503` building render meshes.
+  - Updated `app/js/travel-mode.js` to reset the camera rig, clear nearby roofs for drone launch, and force world LOD before the next frame.
+  - Updated `app/js/world/lod.js` with a quality/mode-aware visible-building mesh budget so elevated cameras cannot expose the entire dense city in one frame.
+  - Visual Chrome verification passed repeated `drive -> drone -> drive -> drone` transitions in Monaco; renderer remained healthy and the drone scene rendered at about `649` calls.
+  - Validation passed:
+    - `npm run sync:public`
+    - `npm run verify:mirror`
+    - `npm run test:runtime`
+    - `npm run test:osm-smoke`
+    - `npm run test:rules` (`41/41`)
+  - Next bounded step: finish the R1 Earth/Space/Moon/Ocean transition matrix, then return to active R3 urban surface coherence.
 - Title leaderboard declutter pass (2026-02-16 follow-up):
   - Converted title challenge panel from always-on layout block into a top-right floating overlay.
   - Added `#flowerChallengeToggleBtn` (top-right) to open/close leaderboard panel on desktop and mobile.
@@ -2706,3 +2729,163 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - identified centroid-scaling shell inset as the likely remaining leak source for concave/irregular footprints
   - replaced it with contained-shell validation plus an inscribed rectangle fallback in app/js/interiors.js
   - next: browser screenshot check of an entered interior on the mirrored build
+
+- Live renderer and environment-transition closure pass (2026-07-12):
+  - audited `worldexplorer3d.io/app/` against the clean live-fix workspace and confirmed both use Three.js r128/WebGL; WebGL was not added by the refactor.
+  - isolated and fixed the local Monaco drone context loss with roof-safe drone entry plus a quality/mode-aware visible-building budget.
+  - reproduced the Moon white-frame failure on live production and traced the shared defect to an Eagle Crater vehicle spawn facing a 500-meter translucent Apollo-site beacon.
+  - moved the playable lunar spawn clear of the crater/site marker, removed the oversized beacon, and added Moon-specific HUD/weather/coordinate presentation.
+  - visually verified `Monaco Earth -> Space -> Moon -> Monaco Earth` in regular Chrome without a reload; the original Earth walking position returned and the primary renderer stayed healthy.
+  - fresh Moon diagnostics: `contextLost=false`, `glError=0`, `paused=false`; fresh runtime invariants passed with zero console errors.
+  - `npm run sync:public`, `npm run verify:mirror`, and `npm run test:runtime` are green after the transition fixes.
+  - R1 is closed; the bounded next implementation phase is R3 road/hardscape/building-ground coherence across Baltimore, Monaco, and San Francisco.
+
+- R3 street-space authority and R4 release-decision pass (2026-07-12):
+  - replaced 42cm elevated ordinary-road surfaces with 8cm terrain-draped surfaces.
+  - removed vertical skirts from at-grade/elevated roads; retained them only for subgrade tunnel cuts.
+  - stopped urban-density sidewalk inference and now generate sidewalk strips only from explicit OSM sidewalk tags.
+  - removed expanded concrete building apron pads while preserving narrow foundation skirts for sloped terrain.
+  - added a `roadSurfacesDraped` runtime contract and direct CDP viewport capture so font loading cannot leave stale matrix screenshots behind.
+  - fresh Baltimore, Monaco, and San Francisco images confirm the prior thick-road walls and stacked sidewalk/apron layers are gone.
+  - R4 decision: footway/cycleway/rail ribbons remain intentionally deferred for this release until they meet equivalent geometry and visual gates.
+  - validation green: `test:runtime`, targeted three-city `test:world-matrix`, `test:osm-smoke`, `sync:public`, and `verify:mirror`.
+  - next bounded phase: R5 preset-city and arbitrary globe-location coverage.
+
+- R5 selector, water-surface, and road-height authority pass (2026-07-12):
+  - verified all 15 presets in three bounded Playwright matrix batches and verified Giza, Great Wall, and North Atlantic custom selections together.
+  - corrected custom-land launch testing and runtime behavior so a safe globe-selected point is preserved instead of forcing an arbitrary distant road spawn.
+  - fixed boat entry camera ownership: boat mode starts in chase view, snaps to the vessel, and restores the prior camera mode on exit.
+  - separated ocean surface height from bathymetry; area water is flat at its authoritative surface while underwater terrain remains independent.
+  - removed the remaining road-height contradictions: rendering, terrain reprojection, sidewalk generation, and physics now agree on an 8cm road bias and 13cm sidewalk curb height.
+  - improved road spawn scoring to prefer interior connected road points and face away from unconnected dead ends.
+  - fresh visual evidence: `output/playwright/world-matrix/great_pyramids_custom.png`, `great_wall_custom.png`, and `atlantic_ocean_custom.png`.
+  - validation green: custom matrix, `test:runtime`, `test:osm-smoke`, `test:rules` (41/41), `sync:public`, and `verify:mirror`.
+  - R5 functional coverage is complete but remains open for bounded load-latency work; Giza landmark realism is recorded as an R6 visual blocker.
+
+- R6 map-authority, landmark, and traversal-race pass (2026-07-13):
+  - moved initial playable geometry to official OSM Shortbread vector tiles, retaining Overpass only for deferred semantic detail and fallback
+  - fixed water-vector ingestion and made mapped water part of world readiness
+  - added stable source-qualified vector IDs so saved editor suppression cannot collide across locations
+  - added generic mapped pyramid and historic-wall rendering from OSM tags, plus refreshable bundled OSM packs for the featured Giza and Great Wall presets
+  - registered deferred landmark footprints with existing collision/spawn authority so late geometry cannot enclose the player
+  - fixed the published-editor overlay callback that could invalidate traversal after load and leave both graphs empty
+  - current authority matrix passes Giza, Great Wall, Iowa farmland, Golden Gate, Tokyo, Monaco, Swiss Alps, Sahara, Everglades, and Panama Canal with drone captures
+  - current validation: `test:runtime` passed, `test:rules` passed 41/41, `sync:public` and `verify:mirror` passed for 340 files
+  - remaining R7 blocker: choose a licensed/configurable global imagery or land-cover baseline for OSM-unmapped ground; do not restore blanket urban pavement or invented sidewalk grids
+  - remaining structure-detail blocker: Golden Gate traversal/deck height is correct, but towers/cables are not yet landmark-grade
+
+- Production-candidate building, retention, and release pass (2026-07-13):
+  - clipped Shortbread building footprints to requested bounds and added bundled OSM metadata packs for all 15 presets
+  - building massing/colliders/interiors now retain mapped height, levels, type, roof, name, and source provenance; unknown dimensions remain explicitly inferred
+  - visually verified Tokyo/Monaco massing and a contained mapped Monaco interior
+  - fixed multiplayer space-to-Earth cleanup so space flight is inactive after room synchronization returns to Earth
+  - fixed desert world/tile classification without overriding mapped wetland/water/vegetation evidence
+  - staging retention passed for auth, room ownership, reload/re-sign-in, build blocks, memories, overlay drafts, and activity drafts
+  - final 30-location matrix passed with zero location failures and zero fatal console errors
+  - `npm run release:verify` passed; rules remain `41/41`; mirror parity is `358/358`
+  - workspace remains intentionally configured for staging; production config is applied only during an approved promotion
+  - bounded remaining release work: staging Hosting preview in standard Chrome, explicit R7 visual acceptance decision, production config+mirror sync, rollback tag, Hosting-only promotion
+
+- R7 global land-cover and Golden Gate closure pass (2026-07-13):
+  - added ESA WorldCover 2021 v200 through the official Terrascope WMS as a licensed 10-meter global visual baseline with visible attribution
+  - added center-first request scheduling, memory/IndexedDB caching, bounded concurrency, abort-safe terrain ownership, and local fallback behavior
+  - fixed terrain streaming bypassing the central disposer, which had left stale provider requests and textures attached to removed meshes during rapid travel
+  - added a seam-free OSM-density built-ground fallback so provider outages do not restore generic grass or blanket sidewalk/pavement textures in mapped cities
+  - added OSM-backed Golden Gate tower parts, full-span main cables, suspenders, and longitudinal girders, including segment-interpolated deck-height sampling
+  - normal-provider visual coverage passed Tokyo, Monaco, Dubai, Everglades, Miami Beach, and Golden Gate in one runtime; forced-provider-outage coverage passed Tokyo, Monaco, and Miami Beach with zero location failures
+  - R7 is closed; remaining work is the complete release gate, staging preview acceptance in standard Chrome, production config/mirror sync, rollback snapshot, and approved Hosting-only promotion
+  - final `npm run release:verify` passed: mirror `360/360`, Firestore rules `41/41`, local data safety, runtime invariants, editor/activity/multiplayer transitions, OSM smoke, forced provider outage, and the 30-location world matrix
+  - final world matrix: `30/30`, zero location failures, zero fatal console errors; forced provider-outage matrix: `3/3`, zero failures
+  - staging retention passed again against `we3d-staging-20260712`, preserving auth, owned room state across reload/re-sign-in, build blocks, memories, editor drafts, and activity drafts
+  - production remains untouched and the workspace remains staging-configured for the local/preview acceptance gate
+
+- R7 production acceptance and building-dimension hardening (2026-07-13):
+  - fixed fallback building inference using temporary sequential vector IDs; inference now uses stable source identity mixed with the world seed
+  - moved fallback dimension policy into `building-semantics.js`; the active building geometry pass is 590 lines and the semantics owner is 345 lines
+  - added rendered-building release assertions for global height limits and meaningful inferred-height variation
+  - focused matrix passed New York, Tokyo, Monaco, Dubai, and a custom unmapped suburban area with zero location failures or fatal errors
+  - added permanent Shinjuku coverage so Tokyo tests include both the residential preset and a downtown high-rise sample; Shinjuku rendered 5,974 buildings with mapped height up to 223 m
+  - visually inspected drone captures for all focused locations; regular Chrome confirmed Tokyo play and drone mode with a healthy WebGL context
+  - fixed an invalid split-CSS boundary: `title-shell.css` ended inside an open landscape media block and `runtime-shell.css` began with its closing braces, causing Chrome to discard the base mode-selector rule
+  - added `test:css` and included it in `release:verify`; it confirms both split stylesheets parse and the runtime selector remains fixed, bounded, and correctly layered
+  - next: run complete release verification, create the reviewed release snapshot, test the production-configured Hosting preview in standard Chrome, then promote Hosting only
+
+- Building facade quality and regression closure (2026-07-13):
+  - corrected meter-scale ExtrudeGeometry facade UV repetition so windows read at architectural scale instead of collapsing into flat color or moire
+  - occupied buildings now retain window/facade detail at near and batched mid LOD; intentionally unoccupied structures keep appropriate concrete/brick surfaces
+  - added a wall-only facade shader so window maps do not wrap across roof caps, including restored shader behavior on cloned batch materials
+  - extracted facade policy into `engine/building-facade-materials.js` (281 lines), reducing the general materials runtime from 791 to 493 lines
+  - added world-matrix facade coverage assertions so cities fail release verification if most visible buildings regress to blank extrusions
+  - targeted Playwright gate passed Tokyo and Shinjuku with zero location failures or fatal console errors; visible detailed facade coverage was 9,121/9,124 and 5,965/5,974 respectively
+  - standard Chrome visually confirmed windows at walking and drone scale, plain roof caps, `contextLost=false`, `glError=0`, about 1.5M triangles, and zero console errors
+  - official Shortbread 1.0 documentation confirms its building layer supplies footprints plus a dummy field only; height/type authority therefore remains deferred OSM metadata plus conservative deterministic fallback, not invented vector-tile attributes
+  - next: rerun the complete release gate, then continue the already-bounded release snapshot and production Hosting preview steps without deploying data services
+
+- Global authoritative building-massing pass (2026-07-13, in progress):
+  - paused release promotion after Baltimore/New York showed that facade detail did not make city massing or skylines authoritative
+  - confirmed the preferred Shortbread building layer has footprints only and caused the richer building-part geometry path to be skipped
+  - added a pinned Overture `2026-06-17.0` PMTiles source for global building footprints, parts, heights, floors, facade attributes, and roof attributes, with Shortbread retained only as an outage fallback
+  - validated the browser source boundary without console errors in Baltimore, New York, Tokyo, London, Dubai, and Sao Paulo; every sample returned authoritative dimensions and building parts, with coverage reported per location
+  - corrected stacked-part semantics so mapped top height and `min_height` produce the actual extrusion thickness instead of double-counting height; removed fallback safety caps from authoritative dimensions
+  - authoritative parts now suppress generic parent blocks, survive building-budget prioritization, retain provenance in colliders/diagnostics, and disable invented tiered-podium massing
+  - mapped facade color/material now reaches rendering; common non-flat roof tags now create bounded roof geometry while preserving total mapped height
+  - added global matrix requirements for the Overture source/provenance plus explicit Baltimore and New York building-part thresholds
+  - next: mirror sync, focused Baltimore/New York runtime and visual matrix, broader global city matrix, standard Chrome inspection, then resume release verification only if the skyline gate passes
+
+- Global building coverage and dense-city batching closure (2026-07-13):
+  - found two independent causes of missing edge buildings: the deferred building query covered only 48% of the playable road radius, and the drone LOD budget hid individually rendered near-facade meshes even after their source data loaded
+  - expanded the global Overture building request to the full playable context radius, kept center-first tile ordering, and added outer-ring coverage diagnostics and release assertions
+  - added stable facade, mapped-roof, and roof-detail batch keys so nearby buildings retain mapped geometry and coarse material variation while sharing render batches
+  - Tokyo now renders 25,210 detailed buildings in 143 meshes; all 1,484 nearby source buildings remain visible in drone mode instead of disappearing behind the mesh budget
+  - Baltimore, New York, Paris, and Nairobi passed the same cross-city drone gate with 100% nearby-source visibility, no fatal console errors, and no WebGL context loss
+  - Playwright screenshots confirm the former empty dense-city band is gone; regular Chrome loaded and switched New York into drone mode with complete nearby coverage and zero console errors
+  - source limitations remain explicit: Overture is authoritative globally where mapped footprints, heights, parts, and roof/facade tags exist; unmapped structures and unknown surveyed heights are not invented or claimed as measured
+  - production promotion remains paused until the complete release verification and staging Hosting preview acceptance steps are rerun against this building-authority candidate
+
+- Sparse custom-location building coverage pass (2026-07-13):
+  - added a bounded inferred-footprint fallback for globe-selected and `Use My Location` starts when the authoritative building source has fewer than three mapped footprints within 300 meters
+  - inference requires either mapped developed landuse plus road frontage or at least three distinct mapped residential/living-street roads; every generated footprint is labeled `inferred_road_frontage`
+  - candidates stay within 520 meters, cap at 72 footprints, preserve road setbacks, avoid mapped buildings, and use deterministic residential dimensions without claiming surveyed height or parcel accuracy
+  - robust polygon overlap blocks inference on water, forest, parks, farmland, cemetery, sand, glacier, quarry, and other protected/non-developed surfaces, including small exclusion polygons fully enclosed by a candidate
+  - added `test:inferred-buildings` and included it in `release:verify`; it covers developed landuse, residential-road evidence, integrated empty-source supplementation, water, farmland, and mapped-building conflicts
+  - browser matrix passed Towson custom, Iowa farmland, and North Atlantic boundaries with no fatal console errors; the final Towson/Atlantic visual pass and regular Chrome reload are clean
+  - the fallback does not replace available Overture geometry: Towson reported 189 mapped central footprints and added zero inferred buildings
+
+- R8 conventional controls and community-building pass (2026-07-13):
+  - unified walking, driving, and drone input around `W/S` movement, `A/D` turning, independent arrow-key camera look, and `F` mode cycling; removed the old key-6 drone path and visible strafe guidance
+  - made walking and Paint Town share building-top authority, with verified roof landing and wall-jump traversal on real loaded colliders
+  - consolidated player creation into Build with Blocks with place/remove, materials, undo/clear, local and multiplayer persistence, and no duplicate player-facing editor entrypoint
+  - added current-coordinate OSM edit links to the HUD and builder plus a bounded current-location OSM core/building cache refresh
+  - fixed Ocean HUD updates deleting the coordinate link during Ocean to Boat transitions
+  - Playwright has verified Baltimore, builder layout and refresh, current-coordinate OSM links, Ocean, Boat, Drone controls, rooftop landing, and wall climbing; final automated regression gates remain the phase-closing task
+
+- R9 vehicle, night-lighting, and mapped-water systems pass (2026-07-13):
+  - replaced the unused off-road toggle/status with automatic smoothed surface dynamics for asphalt, paving, grass, dirt, gravel, sand, snow, and rock
+  - verified a road-centered handling probe: ordinary steering stays planted while `Space` plus steering produces sustained rear slip and a measurable drift
+  - added car headlights with world-space targets plus pooled OSM-aware urban street lighting; rural/unlit roads do not receive blanket lamps
+  - fixed mapped-water boat entry crashing on an undefined `clamp` helper and unified all water-query imports to one runtime module identity
+  - changed shallow harbor entry to move locally inward, with enough clearance for the hull and chase camera, instead of teleporting hundreds of meters offshore
+  - verified New York harbor entry, 2.4 seconds of powered travel, wake foam, boat-owned terrain/LOD streaming, retained building coverage, and Main Menu return
+  - extracted boat runtime dynamics and foam effects; `boat-mode.js` is 854 lines and `boat-mode/surface-effects.js` is 787 lines
+  - added `test:module-versions`; it found and removed ten conflicting ES-module identities across water, Earth sessions, geometry, diagnostics, and data-source modules
+  - changed unhashed JS/CSS/HTML Hosting policy from immutable caching to `must-revalidate`, while keeping true media/font assets immutable
+  - production remains untouched; next bounded phase is the Earth -> Space -> Moon/Mars -> Earth transition contract in one renderer runtime
+
+- Production builder and final release-gate closure (2026-07-14):
+  - Build with Blocks now offers cube, slab, ramp, and column geometry plus eight visually distinct colors; legacy saved entries remain compatible and default to cube/rotation zero
+  - raised the per-location build allowance to exactly 200 while retaining a separate bounded cross-location persistence ceiling
+  - unified walker support, jumping, car blocking, swept vehicle collision, and driveable ramp surfaces around one shape-aware collision contract
+  - multiplayer block persistence and Firestore validation now preserve optional shape and rotation without rejecting legacy block documents
+  - visual Playwright evidence confirms all four shapes, color selection, a real jump landing exactly on a block top, a car stopped by a cube, and a car traversing a stepped ramp
+  - corrected release diagnostics so legitimate mapped supertalls are allowed up to the authoritative safety ceiling while inferred heights retain an independent 80 m ceiling
+  - corrected the sustained matrix deadline to cover the documented deferred-building provider/render window without accepting an unsettled or non-authoritative result
+  - final `npm run release:verify` passed: mirror `405/405`, CSS and 243 module identities, Firestore rules `42/42`, local-data safety, runtime/planetary transitions, builder/editor/multiplayer, OSM smoke, forced provider outage, and the complete world matrix
+  - production remains untouched; next bounded steps are the staging Hosting preview, hosted retention/Chrome acceptance, production config sync, rollback snapshot, and reviewed production promotion
+
+- Staging acceptance and release verification closure (2026-07-14):
+  - deployed the refactored candidate to the isolated `we3d-staging-20260712` Firebase Hosting preview; production remained untouched
+  - fixed two real lazy-multiplayer startup races so the title panel cannot accept input before its module/API is ready and can recover when the initializer is published later in boot
+  - hosted retention passed through the visible multiplayer UI, including room creation, reload/re-sign-in, build blocks, memories, editor drafts, and activity drafts
+  - standard Chrome launched Baltimore with a nonblank 3D renderer, opened the four-shape/eight-color builder, placed a cube and ramp, cycled travel modes, and showed no fatal renderer or white-screen failure
+  - reran `npm run release:verify` after the startup fixes; all gates passed with mirror `405/405`, 243 module identities, rules `42/42`, builder physics, Earth/Moon/Earth renderer retention, OSM/ocean smoke, provider-outage fallbacks, and the complete global matrix
+  - production remains untouched; only release operations remain: production config sync, rollback snapshot/tag, commit/push, reviewed rules plus Hosting deploy, and live smoke verification

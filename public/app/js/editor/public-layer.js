@@ -16,6 +16,13 @@ const state = {
   retryAfterMs: 0
 };
 
+function refreshTraversalNetworks(reason) {
+  appCtx.invalidateTraversalNetworks?.(reason);
+  if (Array.isArray(appCtx.roads) && appCtx.roads.length > 0) {
+    appCtx.buildTraversalNetworks?.();
+  }
+}
+
 function finiteNumber(value, fallback = 0) {
   const n = Number(value);
   return Number.isFinite(n) ? n : fallback;
@@ -75,6 +82,12 @@ function restoreBaseBuildingVisibility() {
 }
 
 function clearPublishedObjects() {
+  const hadRuntimeFeatures = !!(
+    appCtx.overlayRuntimeRoads?.length ||
+    appCtx.overlayRuntimeLinearFeatures?.length ||
+    appCtx.overlaySuppression?.roadIds?.size ||
+    appCtx.overlaySuppression?.buildingIds?.size
+  );
   restoreBaseBuildingVisibility();
   if (state.group) {
     while (state.group.children.length > 0) {
@@ -93,6 +106,7 @@ function clearPublishedObjects() {
     roadIds: new Set(),
     buildingIds: new Set()
   };
+  if (hadRuntimeFeatures) refreshTraversalNetworks('overlay_published_cleared');
 }
 
 function worldPointsBounds(points = []) {
@@ -245,9 +259,7 @@ function applyPublishedFeatures(features = []) {
     roadIds: suppressionRoadIds,
     buildingIds: suppressionBuildingIds
   };
-  if (typeof appCtx.invalidateTraversalNetworks === 'function') {
-    appCtx.invalidateTraversalNetworks('overlay_published_changed');
-  }
+  refreshTraversalNetworks('overlay_published_changed');
 }
 
 function updateListener() {

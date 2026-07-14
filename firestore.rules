@@ -1206,6 +1206,8 @@ service cloud.firestore {
           'gy',
           'gz',
           'materialIndex',
+          'shape',
+          'rotation',
           'createdBy',
           'createdAt',
           'updatedAt'
@@ -1224,6 +1226,12 @@ service cloud.firestore {
         request.resource.data.materialIndex is int &&
         request.resource.data.materialIndex >= 0 &&
         request.resource.data.materialIndex <= 64 &&
+        (!('shape' in request.resource.data) ||
+          request.resource.data.shape in ['cube', 'slab', 'ramp', 'column']) &&
+        (!('rotation' in request.resource.data) ||
+          (request.resource.data.rotation is int &&
+            request.resource.data.rotation >= 0 &&
+            request.resource.data.rotation <= 3)) &&
         request.resource.data.createdBy == request.auth.uid &&
         request.resource.data.createdAt is timestamp &&
         request.resource.data.updatedAt is timestamp &&

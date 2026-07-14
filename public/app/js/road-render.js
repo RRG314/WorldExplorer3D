@@ -2,6 +2,9 @@ function createRoadSurfaceMaterials({
   asphaltTex = null,
   asphaltNormal = null,
   asphaltRoughness = null,
+  sidewalkTex = null,
+  sidewalkNormal = null,
+  sidewalkRoughness = null,
   includeMarkings = false,
   includeSidewalk = false
 } = {}) {
@@ -84,9 +87,23 @@ function createRoadSurfaceMaterials({
   }
 
   if (includeSidewalk) {
-    materials.sidewalkMaterial = new THREE.MeshStandardMaterial({
-      color: 0xb8b9bb,
-      roughness: 0.94,
+    materials.sidewalkMaterial = sidewalkTex ? new THREE.MeshStandardMaterial({
+      color: 0xd9d3ca,
+      map: sidewalkTex,
+      normalMap: sidewalkNormal || undefined,
+      normalScale: new THREE.Vector2(0.32, 0.32),
+      roughnessMap: sidewalkRoughness || undefined,
+      roughness: 0.97,
+      metalness: 0.0,
+      side: THREE.DoubleSide,
+      polygonOffset: true,
+      polygonOffsetFactor: -1,
+      polygonOffsetUnits: -1,
+      depthWrite: true,
+      depthTest: true
+    }) : new THREE.MeshStandardMaterial({
+      color: 0x9f9b95,
+      roughness: 0.97,
       metalness: 0.0,
       side: THREE.DoubleSide,
       polygonOffset: true,
@@ -111,6 +128,9 @@ function roadSurfaceMaterialCacheKey({
   asphaltTex = null,
   asphaltNormal = null,
   asphaltRoughness = null,
+  sidewalkTex = null,
+  sidewalkNormal = null,
+  sidewalkRoughness = null,
   includeMarkings = false,
   includeSidewalk = false
 } = {}) {
@@ -118,6 +138,9 @@ function roadSurfaceMaterialCacheKey({
     asphaltTex ? 'tex' : 'flat',
     asphaltNormal ? 'normal' : 'plain',
     asphaltRoughness ? 'rough' : 'smooth',
+    sidewalkTex ? 'sidewalktex' : 'sidewalkflat',
+    sidewalkNormal ? 'sidewalknormal' : 'sidewalkplain',
+    sidewalkRoughness ? 'sidewalkrough' : 'sidewalksmooth',
     includeMarkings ? 'marks' : 'nomarks',
     includeSidewalk ? 'sidewalk' : 'nosidewalk'
   ].join(':');

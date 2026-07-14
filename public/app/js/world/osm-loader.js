@@ -1,13 +1,19 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import {
+  clearPersistentOverpassCache,
+  readPersistentOverpassCache,
+  readPersistentOverpassFallback,
+  writePersistentOverpassCache
+} from "./osm-cache.js?v=3";
 
 const OVERPASS_ENDPOINTS = [
-  'https://overpass-api.de/api/interpreter',
   'https://lz4.overpass-api.de/api/interpreter',
-  'https://overpass.kumi.systems/api/interpreter'
+  'https://overpass.private.coffee/api/interpreter',
+  'https://overpass-api.de/api/interpreter'
 ];
 
 export const OVERPASS_MIN_TIMEOUT_MS = 5000;
-const OVERPASS_STAGGER_MS = 220;
+const OVERPASS_STAGGER_MS = 2000;
 const OVERPASS_MEMORY_CACHE_TTL_MS = 6 * 60 * 1000;
 const OVERPASS_MEMORY_CACHE_MAX = 6;
 const OVERPASS_LOC_EPSILON = 1e-7;
@@ -44,6 +50,7 @@ function findOverpassMemoryCache(meta) {
   for (let i = 0; i < overpassMemoryCache.length; i++) {
     const entry = overpassMemoryCache[i];
     if (!sameLocation(entry.meta, meta)) continue;
+    if (entry.meta?.kind && meta?.kind && entry.meta.kind !== meta.kind) continue;
     if (entry.meta.roadsRadius + 1e-9 < meta.roadsRadius) continue;
     if (entry.meta.featureRadius + 1e-9 < meta.featureRadius) continue;
     if (entry.meta.poiRadius + 1e-9 < meta.poiRadius) continue;
@@ -64,6 +71,7 @@ function storeOverpassMemoryCache(meta, data, endpoint) {
 
   const existingIdx = overpassMemoryCache.findIndex((entry) =>
     sameLocation(entry.meta, meta) &&
+    String(entry.meta?.kind || '') === String(meta?.kind || '') &&
     Math.abs(entry.meta.roadsRadius - meta.roadsRadius) < 1e-9 &&
     Math.abs(entry.meta.featureRadius - meta.featureRadius) < 1e-9 &&
     Math.abs(entry.meta.poiRadius - meta.poiRadius) < 1e-9
@@ -75,7 +83,8 @@ function storeOverpassMemoryCache(meta, data, endpoint) {
       lon: meta.lon,
       roadsRadius: meta.roadsRadius,
       featureRadius: meta.featureRadius,
-      poiRadius: meta.poiRadius
+      poiRadius: meta.poiRadius,
+      kind: meta.kind || null
     },
     data,
     endpoint: endpoint || null,
@@ -89,6 +98,20 @@ function storeOverpassMemoryCache(meta, data, endpoint) {
   while (overpassMemoryCache.length > OVERPASS_MEMORY_CACHE_MAX) {
     overpassMemoryCache.pop();
   }
+}
+
+export async function invalidateOverpassCaches(location = null, kinds = null) {
+  const hasLocation = Number.isFinite(Number(location?.lat)) && Number.isFinite(Number(location?.lon));
+  const kindSet = Array.isArray(kinds) && kinds.length > 0 ? new Set(kinds) : null;
+  for (let i = overpassMemoryCache.length - 1; i >= 0; i--) {
+    const entry = overpassMemoryCache[i];
+    const locationMatches = !hasLocation || sameLocation(entry.meta, location);
+    const kindMatches = !kindSet || kindSet.has(String(entry.meta?.kind || 'core'));
+    if (locationMatches && kindMatches) {
+      overpassMemoryCache.splice(i, 1);
+    }
+  }
+  return clearPersistentOverpassCache(hasLocation ? location : null, kinds);
 }
 
 function orderedOverpassEndpoints() {
@@ -121,6 +144,23 @@ function formatBounds(location, radius) {
   return `(${location.lat - radius},${location.lon - radius},${location.lat + radius},${location.lon + radius})`;
 }
 
+function overpassCacheKey(meta, query) {
+  if (!meta || !query) return null;
+  let hash = 2166136261;
+  for (let i = 0; i < query.length; i++) {
+    hash ^= query.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return [
+    Number(meta.lat).toFixed(6),
+    Number(meta.lon).toFixed(6),
+    Number(meta.roadsRadius).toFixed(5),
+    Number(meta.featureRadius).toFixed(5),
+    Number(meta.poiRadius).toFixed(5),
+    (hash >>> 0).toString(16)
+  ].join(':');
+}
+
 export function buildWorldOverpassPlan({
   location,
   roadsRadius,
@@ -131,12 +171,21 @@ export function buildWorldOverpassPlan({
   maxTotalLoadMs
 }) {
   const featureRadius = roadsRadius * featureRadiusScale;
+  const buildingRadius = Math.min(
+    0.022,
+    Math.max(featureRadius, 0.014, roadsRadius * 1.2)
+  );
+  const buildingMetadataRadius = Math.min(buildingRadius, Math.max(0.004, roadsRadius * 0.22));
   const poiRadius = roadsRadius * poiRadiusScale;
   const roadsBounds = formatBounds(location, roadsRadius);
   const featureBounds = formatBounds(location, featureRadius);
+  const buildingBounds = formatBounds(location, buildingRadius);
+  const buildingMetadataBounds = formatBounds(location, buildingMetadataRadius);
   const poiBounds = formatBounds(location, poiRadius);
   const linearFeatureRadius = Math.min(featureRadius, Math.max(roadsRadius * 0.6, 0.008));
   const linearFeatureBounds = formatBounds(location, linearFeatureRadius);
+  const landmarkRadius = Math.min(featureRadius, Math.max(roadsRadius * 0.72, 0.014));
+  const landmarkBounds = formatBounds(location, landmarkRadius);
   const queryTimeoutSeconds = Math.max(8, Math.floor(overpassTimeoutMs / 1000));
   const linearTimeoutSeconds = Math.max(8, Math.floor(Math.min(overpassTimeoutMs, 18000) / 1000));
 
@@ -148,16 +197,60 @@ export function buildWorldOverpassPlan({
       lon: location.lon,
       roadsRadius,
       featureRadius,
-      poiRadius
+      poiRadius,
+      kind: 'core'
     },
+    deferredBuildingCacheMeta: {
+      lat: location.lat,
+      lon: location.lon,
+      roadsRadius,
+      featureRadius: buildingRadius,
+      poiRadius,
+      kind: 'buildings'
+    },
+    deferredBuildingMetadataCacheMeta: {
+      lat: location.lat,
+      lon: location.lon,
+      roadsRadius,
+      featureRadius: buildingMetadataRadius,
+      poiRadius,
+      kind: 'building-metadata'
+    },
+    deferredBuildingMetadataQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
+                way["building"]${buildingMetadataBounds};
+            );out tags center qt;`,
+    deferredBuildingQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
+                way["building"]${buildingBounds};
+                way["building:part"]${buildingBounds};
+            );out body;>;out skel qt;`,
+    deferredLandmarkCacheMeta: {
+      lat: location.lat,
+      lon: location.lon,
+      roadsRadius,
+      featureRadius: landmarkRadius,
+      poiRadius,
+      kind: 'landmarks'
+    },
+    deferredLandmarkQuery: `[out:json][timeout:${linearTimeoutSeconds}];(
+                way["tomb"="pyramid"]${landmarkBounds};
+                way["roof:shape"~"^(pyramidal|pyramid)$"]${landmarkBounds};
+                way["historic"="citywalls"]${landmarkBounds};
+                way["barrier"="city_wall"]${landmarkBounds};
+                way["barrier"="wall"]["historic"]${landmarkBounds};
+            );out body;>;out skel qt;`,
     deferredLinearFeatureQuery: `[out:json][timeout:${linearTimeoutSeconds}];(
                 way["railway"~"^(rail|light_rail|tram|subway|narrow_gauge)$"]${linearFeatureBounds};
                 way["highway"~"^(cycleway|footway|pedestrian|path|steps)$"]${linearFeatureBounds};
             );out body;>;out skel qt;`,
+    deferredPoiQuery: `[out:json][timeout:${linearTimeoutSeconds}];(
+                node["amenity"~"school|hospital|police|fire_station|parking|fuel|restaurant|cafe|bank|pharmacy|post_office"]${poiBounds};
+                node["shop"]${poiBounds};
+                node["tourism"]${poiBounds};
+                node["historic"]${poiBounds};
+                node["leisure"~"park|stadium|sports_centre|playground"]${poiBounds};
+            );out body qt;`,
     primaryQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street|service)$"]${roadsBounds};
-                way["building"]${featureBounds};
-                way["building:part"]${featureBounds};
                 way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["bridge"]${featureBounds};
                 way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["layer"]${featureBounds};
                 way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["level"]${featureBounds};
@@ -165,17 +258,16 @@ export function buildWorldOverpassPlan({
                 way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["indoor"]${featureBounds};
                 way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["min_height"]${featureBounds};
                 way["landuse"]${featureBounds};
+                way["area:highway"]${featureBounds};
+                way["amenity"="parking"]${featureBounds};
+                way["highway"="pedestrian"]["area"="yes"]${featureBounds};
+                way["place"="square"]${featureBounds};
+                way["surface"~"^(paved|asphalt|concrete|concrete:plates|paving_stones|sett|cobblestone)$"]["area"="yes"]${featureBounds};
                 way["natural"~"^(wood|forest|scrub|grassland|heath|wetland|tree_row|sand|beach|bare_rock|scree|shingle|glacier)$"]${featureBounds};
                 way["natural"="water"]${featureBounds};
                 way["water"]${featureBounds};
                 way["waterway"~"^(river|stream|canal|drain|ditch)$"]${featureBounds};
                 way["leisure"~"^(park|garden|nature_reserve)$"]${featureBounds};
-                node["natural"="tree"]${featureBounds};
-                node["amenity"~"school|hospital|police|fire_station|parking|fuel|restaurant|cafe|bank|pharmacy|post_office"]${poiBounds};
-                node["shop"]${poiBounds};
-                node["tourism"]${poiBounds};
-                node["historic"]${poiBounds};
-                node["leisure"~"park|stadium|sports_centre|playground"]${poiBounds};
             );out body;>;out skel qt;`,
     loadDeadline: loadStartedAt + maxTotalLoadMs
   };
@@ -190,12 +282,24 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
     return cached.data;
   }
 
+  const persistentCacheKey = overpassCacheKey(cacheMeta, query);
+  const persistent = await readPersistentOverpassCache(persistentCacheKey);
+  if (persistent?.data?.elements) {
+    persistent.data._overpassEndpoint = persistent.endpoint ? `${persistent.endpoint} (persistent-cache)` : 'persistent-cache';
+    persistent.data._overpassSource = 'persistent-cache';
+    persistent.data._overpassCacheAgeMs = Math.max(0, Date.now() - Number(persistent.savedAt || 0));
+    storeOverpassMemoryCache(cacheMeta, persistent.data, persistent.endpoint);
+    return persistent.data;
+  }
+
   const controllers = [];
   const errors = [];
   const endpoints = orderedOverpassEndpoints();
+  let requestSettled = false;
   const attempts = endpoints.map((endpoint, idx) => (async () => {
     const staggerMs = idx * OVERPASS_STAGGER_MS;
     if (staggerMs > 0) await delayMs(staggerMs);
+    if (requestSettled) throw new Error(`[${endpoint}] superseded by successful request`);
 
     const now = performance.now();
     if (now >= deadlineMs - 300) {
@@ -242,8 +346,10 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
       data._overpassEndpoint = endpoint;
       data._overpassSource = 'network';
       data._overpassCacheAgeMs = 0;
+      requestSettled = true;
       lastOverpassEndpoint = endpoint;
       storeOverpassMemoryCache(cacheMeta, data, endpoint);
+      void writePersistentOverpassCache(persistentCacheKey, data, endpoint, cacheMeta);
       return data;
     } catch (err) {
       const reason = err?.name === 'AbortError' ?
@@ -259,9 +365,18 @@ export async function fetchOverpassJSON(query, timeoutMs, deadlineMs = Infinity,
 
   try {
     const data = await firstSuccessful(attempts);
+    requestSettled = true;
     controllers.forEach((controller) => controller.abort());
     return data;
   } catch {
+    const fallback = await readPersistentOverpassFallback(cacheMeta);
+    if (fallback?.data?.elements) {
+      fallback.data._overpassEndpoint = fallback.endpoint ? `${fallback.endpoint} (persistent-fallback)` : 'persistent-fallback';
+      fallback.data._overpassSource = 'persistent-fallback';
+      fallback.data._overpassCacheAgeMs = Math.max(0, Date.now() - Number(fallback.savedAt || 0));
+      storeOverpassMemoryCache(cacheMeta, fallback.data, fallback.endpoint);
+      return fallback.data;
+    }
     throw new Error(`All Overpass endpoints failed: ${errors.join(' | ')}`);
   }
 }

@@ -7,6 +7,7 @@ import {
 } from '../activity-editor/schema.js?v=2';
 
 const STORAGE_KEY = 'worldExplorer3D.activityLibrary.v1';
+const STORAGE_BACKUP_KEY = 'worldExplorer3D.activityLibrary.backup.v1';
 const STORAGE_LIMIT = 80;
 
 function cloneJson(value) {
@@ -20,6 +21,10 @@ function finiteNumber(value, fallback = 0) {
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
+}
+
+function canUseLocalStorage() {
+  return typeof globalThis.localStorage !== 'undefined';
 }
 
 function uniqueId(prefix = 'activity') {
@@ -138,22 +143,51 @@ function normalizeStoredActivity(raw = {}) {
   };
 }
 
-function readRawLibrary() {
-  if (typeof localStorage === 'undefined') return [];
+function parseStoredLibrary(raw) {
+  if (!raw) return null;
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
+    return Array.isArray(parsed) ? parsed : null;
   } catch {
-    return [];
+    return null;
   }
 }
 
-function writeRawLibrary(items) {
-  if (typeof localStorage === 'undefined') return false;
+function readStoredLibrary(key) {
+  if (!canUseLocalStorage()) return null;
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, STORAGE_LIMIT)));
+    return parseStoredLibrary(globalThis.localStorage.getItem(key));
+  } catch {
+    return null;
+  }
+}
+
+function restorePrimaryLibrary(rows) {
+  if (!canUseLocalStorage() || !Array.isArray(rows)) return rows;
+  try {
+    globalThis.localStorage.setItem(STORAGE_KEY, JSON.stringify(rows.slice(0, STORAGE_LIMIT)));
+  } catch {
+    // Best effort only.
+  }
+  return rows;
+}
+
+function readRawLibrary() {
+  const primary = readStoredLibrary(STORAGE_KEY);
+  if (Array.isArray(primary)) return primary;
+
+  const backup = readStoredLibrary(STORAGE_BACKUP_KEY);
+  if (Array.isArray(backup)) return restorePrimaryLibrary(backup);
+  return [];
+}
+
+function writeRawLibrary(items) {
+  if (!canUseLocalStorage()) return false;
+  const trimmed = items.slice(0, STORAGE_LIMIT);
+  const payload = JSON.stringify(trimmed);
+  try {
+    globalThis.localStorage.setItem(STORAGE_KEY, payload);
+    globalThis.localStorage.setItem(STORAGE_BACKUP_KEY, payload);
     return true;
   } catch {
     return false;

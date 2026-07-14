@@ -280,11 +280,11 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
 
   const profileByDepth =
     depth >= 6 ? {
-      radii: [0.019, 0.024, 0.029],
+      radii: [0.009, 0.013, 0.018],
       featureRadiusScale: 0.96,
       poiRadiusScale: 0.88,
       maxRoadWays: 3400,
-      maxBuildingWays: 18000,
+      maxBuildingWays: 26000,
       maxLanduseWays: 4200,
       maxPoiNodes: 1600,
       roadsPerTile: 155,
@@ -299,11 +299,11 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       maxTotalLoadMs: 50000
     } :
     depth === 5 ? {
-      radii: [0.019, 0.024, 0.028],
+      radii: [0.009, 0.014, 0.019],
       featureRadiusScale: 0.94,
       poiRadiusScale: 0.86,
       maxRoadWays: 3900,
-      maxBuildingWays: 17000,
+      maxBuildingWays: 24000,
       maxLanduseWays: 5200,
       maxPoiNodes: 1900,
       roadsPerTile: 165,
@@ -318,11 +318,11 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       maxTotalLoadMs: 44000
     } :
     depth === 4 ? {
-      radii: [0.019, 0.024, 0.028],
+      radii: [0.01, 0.015, 0.02],
       featureRadiusScale: 0.93,
       poiRadiusScale: 0.86,
       maxRoadWays: 4300,
-      maxBuildingWays: 15000,
+      maxBuildingWays: 22000,
       maxLanduseWays: 6200,
       maxPoiNodes: 2200,
       roadsPerTile: 185,
@@ -336,11 +336,11 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       overpassTimeoutMs: 22000,
       maxTotalLoadMs: 50000
     } : {
-      radii: [0.02, 0.025, 0.03],
+      radii: [0.011, 0.016, 0.022],
       featureRadiusScale: 0.95,
       poiRadiusScale: 0.90,
       maxRoadWays: 5600,
-      maxBuildingWays: 17000,
+      maxBuildingWays: 24000,
       maxLanduseWays: 8500,
       maxPoiNodes: 2800,
       roadsPerTile: 220,

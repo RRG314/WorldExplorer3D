@@ -1,5 +1,6 @@
 .DS_Store
 .firebase/
+.playwright-cli/
 node_modules/
 functions/node_modules/
 output/

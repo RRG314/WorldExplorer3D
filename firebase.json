@@ -8,7 +8,16 @@
     ],
     "headers": [
       {
-        "source": "**/*.@(js|css|jpg|jpeg|png|webp|svg|ico|woff|woff2|ttf|map|glb|gltf)",
+        "source": "**/*.@(js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=0, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(jpg|jpeg|png|webp|svg|ico|woff|woff2|ttf|map|glb|gltf)",
         "headers": [
           {
             "key": "Cache-Control",
@@ -21,7 +30,7 @@
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "public, max-age=300"
+            "value": "public, max-age=0, must-revalidate"
           }
         ]
       }

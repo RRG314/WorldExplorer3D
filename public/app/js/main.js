@@ -15,11 +15,13 @@ const DEFAULT_LOADING_BG = 'loading-bg.jpg';
 const TRANSITION_LOADING = {
   space: { background: 'space-transition.png', text: 'Preparing Space Flight...' },
   moon: { background: 'moon-transition.png', text: 'Approaching The Moon...' },
+  mars: { background: 'space-transition.png', text: 'Approaching Olympus Mons...' },
   ocean: { background: 'loading-bg.jpg', text: 'Diving Into Ocean Mode...' }
 };
 const LOADING_BG_BY_MODE = {
   earth: DEFAULT_LOADING_BG,
   moon: 'moon-transition.png',
+  mars: 'space-transition.png',
   space: 'space-transition.png',
   ocean: DEFAULT_LOADING_BG
 };
@@ -120,7 +122,8 @@ function renderLoop(t = 0) {
       appCtx.kickOptionalRuntimeBoot('main_loop');
     }
     appCtx.update(dt);
-    if (typeof appCtx.refreshAstronomicalSky === 'function') {
+    appCtx.updatePlanetaryTracks?.();
+    if (!appCtx.onMars && typeof appCtx.refreshAstronomicalSky === 'function') {
       appCtx.refreshAstronomicalSky(false);
     }
     if (typeof appCtx.updateWaterWaveVisuals === 'function') {
@@ -129,7 +132,7 @@ function renderLoop(t = 0) {
     _weatherTimer += dt;
     if (_weatherTimer > 5) {
       _weatherTimer = 0;
-      if (typeof appCtx.refreshLiveWeather === 'function') {
+      if (!appCtx.onMoon && !appCtx.onMars && typeof appCtx.refreshLiveWeather === 'function') {
         void appCtx.refreshLiveWeather(false);
       }
     }
@@ -141,7 +144,8 @@ function renderLoop(t = 0) {
         appCtx.refreshBoatAvailability(false);
       }
     }
-    appCtx.updateCamera();
+    appCtx.updateCamera(dt);
+    appCtx.updatePlanetarySky?.();
     if (typeof appCtx.updateActivityCreator === 'function') {
       appCtx.updateActivityCreator(dt, t);
     }
@@ -185,6 +189,7 @@ function renderLoop(t = 0) {
     if (_lodTimer > 0.2) {
       _lodTimer = 0;
       if (typeof appCtx.updateWorldLod === 'function') appCtx.updateWorldLod(false);
+      appCtx.enforceEnvironmentSceneOwnership?.();
     }
   }
 

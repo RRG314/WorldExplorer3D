@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=11";
 
 const VEGETATION_ELIGIBLE_TYPES = new Set([
   'forest',
@@ -145,13 +146,7 @@ function isInsideBuildingCollider(x, z, building) {
 }
 
 function isInsideWaterArea(x, z) {
-  if (!Array.isArray(appCtx.waterAreas) || appCtx.waterAreas.length === 0) return false;
-  for (let i = 0; i < appCtx.waterAreas.length; i++) {
-    const area = appCtx.waterAreas[i];
-    if (!Array.isArray(area?.pts) || area.pts.length < 3) continue;
-    if (runtime.pointInPolygon(x, z, area.pts)) return true;
-  }
-  return false;
+  return isPointInsideWaterFootprint(x, z);
 }
 
 function isVegetationPlacementBlocked(x, z, options = {}) {
@@ -358,7 +353,12 @@ export function buildWorldVegetationInstancing(
   if (!trunkGeometry || !canopyGeometry || !trunkMaterial) return 0;
 
   const trunkMesh = new THREE.InstancedMesh(trunkGeometry, trunkMaterial, placements.length);
-  const canopyMat = new THREE.MeshLambertMaterial({ color: 0xffffff, vertexColors: true });
+  const canopyMat = new THREE.MeshStandardMaterial({
+    color: 0xffffff,
+    vertexColors: true,
+    roughness: 0.96,
+    metalness: 0.0
+  });
   const canopyMesh = new THREE.InstancedMesh(canopyGeometry, canopyMat, placements.length);
   const matrix = new THREE.Matrix4();
   const quat = new THREE.Quaternion();
@@ -385,7 +385,7 @@ export function buildWorldVegetationInstancing(
 
     scale.set(trunkScale, trunkScale, trunkScale);
     matrix.compose(
-      new THREE.Vector3(placement.x, baseY + 2 * trunkScale, placement.z),
+      new THREE.Vector3(placement.x, baseY + 2.3 * trunkScale, placement.z),
       quat,
       scale
     );
@@ -393,7 +393,7 @@ export function buildWorldVegetationInstancing(
 
     scale.set(trunkScale, trunkScale * canopyStretch, trunkScale);
     matrix.compose(
-      new THREE.Vector3(placement.x, baseY + (4 + 2.5) * trunkScale, placement.z),
+      new THREE.Vector3(placement.x, baseY + 6.55 * trunkScale, placement.z),
       quat,
       scale
     );

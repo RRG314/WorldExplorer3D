@@ -110,3 +110,27 @@ export function scheduleDeferredWorldLinearFeatureLoad(options = {}) {
     }
   }, 0);
 }
+
+export function scheduleDeferredStructureRefresh(options = {}) {
+  const roads = Array.isArray(options.roads) ? options.roads : [];
+  if (!roads.some((road) => road?.structureSemantics?.gradeSeparated)) return;
+
+  const run = () => {
+    if (typeof options.isActiveLoadContext === 'function' && !options.isActiveLoadContext()) return;
+    options.startLoadPhase?.('refreshStructureGeometryDeferred');
+    try {
+      options.refreshStructureAwareFeatureProfiles?.();
+      options.rebuildStructureVisualMeshes?.();
+    } catch (err) {
+      options.recordLoadWarning?.('refreshStructureGeometryDeferred', err);
+    } finally {
+      options.endLoadPhase?.('refreshStructureGeometryDeferred');
+    }
+  };
+
+  if (typeof globalThis.requestIdleCallback === 'function') {
+    globalThis.requestIdleCallback(run, { timeout: 2200 });
+  } else {
+    globalThis.setTimeout(run, 400);
+  }
+}

@@ -41,6 +41,109 @@ function clampPositive(value, fallback = 0) {
   return Math.max(0, next);
 }
 
+function footprintSizeFactor(footprintArea = 0, footprintWidth = 0, footprintDepth = 0) {
+  const safeArea = clampPositive(footprintArea, 0);
+  const safeWidth = clampPositive(footprintWidth, 0);
+  const safeDepth = clampPositive(footprintDepth, 0);
+  const minSpan =
+    safeWidth > 0 && safeDepth > 0 ?
+      Math.min(safeWidth, safeDepth) :
+      safeWidth > 0 ?
+        safeWidth :
+        safeDepth;
+  const areaFactor = safeArea > 0 ? Math.max(0, Math.min(1, (safeArea - 90) / 900)) : 0;
+  const spanFactor = minSpan > 0 ? Math.max(0, Math.min(1, (minSpan - 9) / 28)) : 0;
+  return Math.max(areaFactor, spanFactor);
+}
+
+function buildingSeedFromIdentity(identity, worldSeed = 0) {
+  const value = String(identity ?? '');
+  let hash = 2166136261;
+  for (let i = 0; i < value.length; i++) {
+    hash ^= value.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return (hash ^ (Number(worldSeed) >>> 0)) >>> 0;
+}
+
+function inferFallbackBuildingHeightMeters(buildingType, footprintArea, footprintWidth, footprintDepth, seedValue) {
+  const type = normalizedTagValue(buildingType);
+  const safeArea = clampPositive(footprintArea, 0);
+  const safeWidth = clampPositive(footprintWidth, 0);
+  const safeDepth = clampPositive(footprintDepth, 0);
+  const minSpan = safeWidth > 0 && safeDepth > 0 ? Math.min(safeWidth, safeDepth) : safeWidth || safeDepth;
+  const sizeFactor = footprintSizeFactor(safeArea, safeWidth, safeDepth);
+
+  let minHeight = 7;
+  let maxHeight = 15;
+  if (type === 'house' || type === 'residential' || type === 'detached') {
+    minHeight = 5.4;
+    maxHeight = 9.2;
+  } else if (type === 'apartments') {
+    minHeight = 10;
+    maxHeight = 20 + sizeFactor * 10;
+  } else if (type === 'commercial' || type === 'retail') {
+    minHeight = 8.5;
+    maxHeight = 18 + sizeFactor * 10;
+  } else if (type === 'office') {
+    minHeight = 12;
+    maxHeight = 22 + sizeFactor * 12;
+  } else if (type === 'hotel') {
+    minHeight = 12;
+    maxHeight = 22 + sizeFactor * 10;
+  } else if (type === 'industrial' || type === 'warehouse') {
+    minHeight = 7.5;
+    maxHeight = 14 + sizeFactor * 5;
+  } else if (type === 'church' || type === 'cathedral') {
+    minHeight = 12;
+    maxHeight = 22 + sizeFactor * 8;
+  } else if (type === 'school' || type === 'stadium') {
+    minHeight = 8.5;
+    maxHeight = 16 + sizeFactor * 6;
+  } else if (type === 'service') {
+    minHeight = 5;
+    maxHeight = 8.5;
+  }
+
+  const blend = Math.max(0, Math.min(1, Number(seedValue) || 0));
+  return Math.max(minHeight, Math.min(maxHeight, minHeight + (maxHeight - minHeight) * blend));
+}
+
+function fallbackFullBuildingHeightCap(buildingType = '', footprintArea = 0, footprintWidth = 0, footprintDepth = 0) {
+  const type = normalizedTagValue(buildingType);
+  const sizeFactor = footprintSizeFactor(footprintArea, footprintWidth, footprintDepth);
+
+  let baseCap = 18;
+  let rangeCap = 8;
+  if (type === 'house' || type === 'residential' || type === 'detached') {
+    baseCap = 10.5;
+    rangeCap = 3.5;
+  } else if (type === 'apartments') {
+    baseCap = 20;
+    rangeCap = 10;
+  } else if (type === 'commercial' || type === 'retail') {
+    baseCap = 18;
+    rangeCap = 10;
+  } else if (type === 'office') {
+    baseCap = 22;
+    rangeCap = 12;
+  } else if (type === 'hotel') {
+    baseCap = 22;
+    rangeCap = 10;
+  } else if (type === 'industrial' || type === 'warehouse') {
+    baseCap = 14;
+    rangeCap = 6;
+  } else if (type === 'church' || type === 'cathedral') {
+    baseCap = 24;
+    rangeCap = 8;
+  } else if (type === 'school' || type === 'stadium') {
+    baseCap = 16;
+    rangeCap = 8;
+  }
+
+  return baseCap + rangeCap * sizeFactor;
+}
+
 function inferBuildingPartKind(tags = {}) {
   const part = normalizedTagValue(tags?.['building:part']);
   if (!part) return 'full';
@@ -98,9 +201,18 @@ function computeBuildingHeight(tags = {}, options = {}) {
   const partKind = inferBuildingPartKind(tags);
   const explicitHeight = parseLinearMetersTag(tags?.height, NaN);
   const buildingLevels = parseNumericTag(tags?.['building:levels'], NaN);
+  const buildingMinLevel = parseNumericTag(tags?.['building:min_level'], NaN);
+  const baseOffsetMeters = clampPositive(options.baseOffsetMeters, 0);
 
-  if (Number.isFinite(explicitHeight)) return Math.max(0.2, explicitHeight);
-  if (Number.isFinite(buildingLevels)) return Math.max(0.2, buildingLevels * levelHeight);
+  if (Number.isFinite(explicitHeight)) {
+    return Math.max(0.2, explicitHeight - baseOffsetMeters);
+  }
+  if (Number.isFinite(buildingLevels)) {
+    const effectiveLevels = Number.isFinite(buildingMinLevel) ?
+      Math.max(0.0625, buildingLevels - buildingMinLevel) :
+      buildingLevels;
+    return Math.max(0.2, effectiveLevels * levelHeight);
+  }
   if (partKind === 'roof') return 0.35;
   if (partKind === 'balcony') return 0.32;
   if (partKind === 'canopy') return 0.45;
@@ -122,6 +234,7 @@ function constrainBuildingHeightMeters(tags = {}, rawHeightMeters, options = {})
       footprintWidth :
       footprintDepth;
   const heightSource = String(options.heightSource || 'fallback');
+  const buildingType = normalizedTagValue(options.buildingType || tags?.building || tags?.['building:part'] || '');
   const buildingPartTag = normalizedTagValue(tags?.['building:part']);
   const intentionalVerticalStructure = hasIntentionalVerticalStructure(tags);
   const elevatedPart =
@@ -129,7 +242,11 @@ function constrainBuildingHeightMeters(tags = {}, rawHeightMeters, options = {})
     partKind !== 'full';
 
   let heightCapped = false;
-  if (!intentionalVerticalStructure && elevatedPart) {
+  if (
+    !intentionalVerticalStructure &&
+    elevatedPart &&
+    (heightSource === 'fallback_part' || heightSource === 'fallback')
+  ) {
     const compactFootprint =
       (footprintArea > 0 && footprintArea <= 180) ||
       (Number.isFinite(minSpan) && minSpan <= 10.5);
@@ -154,6 +271,19 @@ function constrainBuildingHeightMeters(tags = {}, rawHeightMeters, options = {})
     }
   }
 
+  if (!intentionalVerticalStructure && !elevatedPart && heightSource === 'fallback') {
+    const fallbackCap = fallbackFullBuildingHeightCap(
+      buildingType,
+      footprintArea,
+      footprintWidth,
+      footprintDepth
+    );
+    if (heightMeters > fallbackCap) {
+      heightMeters = fallbackCap;
+      heightCapped = true;
+    }
+  }
+
   return {
     heightMeters,
     heightCapped,
@@ -171,6 +301,7 @@ function interpretBuildingSemantics(tags = {}, options = {}) {
   const explicitHeight = parseLinearMetersTag(tags?.height, NaN);
   const rawHeightMeters = computeBuildingHeight(tags, {
     levelHeightMeters,
+    baseOffsetMeters,
     fallbackHeight: options.fallbackHeight,
     fallbackPartHeight: options.fallbackPartHeight
   });
@@ -182,6 +313,7 @@ function interpretBuildingSemantics(tags = {}, options = {}) {
   const constrainedHeight = constrainBuildingHeightMeters(tags, rawHeightMeters, {
     partKind,
     baseOffsetMeters,
+    buildingType: options.buildingType,
     footprintArea: options.footprintArea,
     footprintWidth: options.footprintWidth,
     footprintDepth: options.footprintDepth,
@@ -199,6 +331,7 @@ function interpretBuildingSemantics(tags = {}, options = {}) {
     buildingMinLevel: Number.isFinite(buildingMinLevel) ? buildingMinLevel : null,
     levelHeightMeters,
     baseOffsetMeters,
+    mappedTopOffsetMeters: Number.isFinite(explicitHeight) ? explicitHeight : null,
     rawHeightMeters,
     heightMeters,
     heightSource,
@@ -217,8 +350,10 @@ function interpretBuildingSemantics(tags = {}, options = {}) {
 
 export {
   DEFAULT_LEVEL_HEIGHT_METERS,
+  buildingSeedFromIdentity,
   computeBuildingBaseOffset,
   computeBuildingHeight,
+  inferFallbackBuildingHeightMeters,
   inferBuildingPartKind,
   hasIntentionalVerticalStructure,
   interpretBuildingSemantics

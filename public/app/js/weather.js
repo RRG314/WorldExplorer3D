@@ -369,6 +369,8 @@ function updateWeatherUi() {
   const localTimeLabel = getLiveClockLabel(active, { includeZone: false, showSeconds: true });
   const windCompass = windDirectionLabel(active?.windDirectionDeg);
   const signature = JSON.stringify({
+    onMoon: !!appCtx.onMoon,
+    onMars: !!appCtx.onMars,
     buttonText,
     mode,
     condition: active?.conditionLabel || '',
@@ -384,6 +386,27 @@ function updateWeatherUi() {
   });
   if (_lastWeatherUiSignature === signature) return;
   _lastWeatherUiSignature = signature;
+
+  if (appCtx.onMoon) {
+    if (panel) panel.style.display = 'none';
+    if (clock) clock.style.display = 'none';
+    return;
+  }
+
+  if (appCtx.onMars) {
+    if (panel) panel.style.display = 'block';
+    if (clock) clock.style.display = 'none';
+    if (line) {
+      line.style.display = 'block';
+      line.textContent = 'Mars • Thin CO₂ atmosphere';
+    }
+    if (timeLine) timeLine.style.display = 'none';
+    if (meta) {
+      meta.style.display = 'block';
+      meta.textContent = 'Gravity 0.38g • Olympus Mons region';
+    }
+    return;
+  }
 
   if (btn) {
     btn.textContent = buttonText;
@@ -427,6 +450,10 @@ function updateWeatherUi() {
 }
 
 function applyWeatherPresentation() {
+  if (appCtx.onMoon || appCtx.onMars) {
+    updateWeatherUi();
+    return;
+  }
   const state = appCtx.weatherState || null;
   const skyState = appCtx.skyState || null;
   if (!skyState?.visual) {

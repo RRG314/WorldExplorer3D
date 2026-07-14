@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { generateStreetFurniture } from "./furniture.js?v=1";
+import { generateStreetFurniture } from "./furniture.js?v=7";
 
 export function recordWorldLoadWarning(loadMetrics, label, err) {
   const message = `${label}: ${err?.message || err}`;
@@ -26,6 +26,16 @@ export function finalizeLoadedWorld(options = {}) {
   const buildTraversalNetworks = typeof options.buildTraversalNetworks === 'function' ? options.buildTraversalNetworks : () => {};
   const spawnOnRoad = typeof options.spawnOnRoad === 'function' ? options.spawnOnRoad : () => {};
   const updateWorldLod = typeof options.updateWorldLod === 'function' ? options.updateWorldLod : null;
+  const startLoadPhase = typeof options.startLoadPhase === 'function' ? options.startLoadPhase : () => {};
+  const endLoadPhase = typeof options.endLoadPhase === 'function' ? options.endLoadPhase : () => {};
+  const runFinalStep = (label, fn) => {
+    startLoadPhase(label);
+    try {
+      return safeWorldLoadCall(loadMetrics, label, fn);
+    } finally {
+      endLoadPhase(label);
+    }
+  };
 
   if (earthSceneSuppressed()) {
     markLoaded();
@@ -42,31 +52,40 @@ export function finalizeLoadedWorld(options = {}) {
     loadMetrics.partialRecovery = true;
   }
 
-  safeWorldLoadCall(loadMetrics, 'buildTraversalNetworks', () => buildTraversalNetworks());
-  safeWorldLoadCall(loadMetrics, 'spawnOnRoad', () => spawnOnRoad());
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.updateTerrainAround === 'function') {
-    safeWorldLoadCall(loadMetrics, 'updateTerrainAround', () => appCtx.updateTerrainAround(appCtx.car.x, appCtx.car.z));
+    runFinalStep('updateTerrainAround', () => appCtx.updateTerrainAround(0, 0));
   }
+  if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.requestWorldSurfaceSync === 'function') {
+    runFinalStep('requestWorldSurfaceSync', () => appCtx.requestWorldSurfaceSync({
+      force: true,
+      source: 'world_load_finalize'
+    }));
+  }
+  if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.refreshTerrainSurfaceProfiles === 'function') {
+    runFinalStep('refreshTerrainSurfaceProfiles', () => appCtx.refreshTerrainSurfaceProfiles());
+  }
+  runFinalStep('buildTraversalNetworks', () => buildTraversalNetworks());
+  runFinalStep('spawnOnRoad', () => spawnOnRoad());
   if (typeof appCtx.refreshMemoryMarkersForCurrentLocation === 'function') {
-    safeWorldLoadCall(loadMetrics, 'refreshMemoryMarkersForCurrentLocation', () => appCtx.refreshMemoryMarkersForCurrentLocation());
+    runFinalStep('refreshMemoryMarkersForCurrentLocation', () => appCtx.refreshMemoryMarkersForCurrentLocation());
   }
   if (typeof appCtx.refreshBlockBuilderForCurrentLocation === 'function') {
-    safeWorldLoadCall(loadMetrics, 'refreshBlockBuilderForCurrentLocation', () => appCtx.refreshBlockBuilderForCurrentLocation());
+    runFinalStep('refreshBlockBuilderForCurrentLocation', () => appCtx.refreshBlockBuilderForCurrentLocation());
   }
   if (typeof updateWorldLod === 'function') {
-    safeWorldLoadCall(loadMetrics, 'updateWorldLod', () => updateWorldLod(true));
+    runFinalStep('updateWorldLod', () => updateWorldLod(true));
   }
   appCtx.hideLoad();
   if (typeof appCtx.refreshAstronomicalSky === 'function') {
-    safeWorldLoadCall(loadMetrics, 'refreshAstronomicalSky', () => appCtx.refreshAstronomicalSky(true));
+    runFinalStep('refreshAstronomicalSky', () => appCtx.refreshAstronomicalSky(true));
   } else if (typeof appCtx.alignStarFieldToLocation === 'function') {
-    safeWorldLoadCall(loadMetrics, 'alignStarFieldToLocation', () => appCtx.alignStarFieldToLocation(appCtx.LOC.lat, appCtx.LOC.lon));
+    runFinalStep('alignStarFieldToLocation', () => appCtx.alignStarFieldToLocation(appCtx.LOC.lat, appCtx.LOC.lon));
   }
   if (typeof appCtx.refreshLiveWeather === 'function') {
-    safeWorldLoadCall(loadMetrics, 'refreshLiveWeather', () => appCtx.refreshLiveWeather(true));
+    runFinalStep('refreshLiveWeather', () => appCtx.refreshLiveWeather(true));
   }
   if (appCtx.gameStarted) {
-    safeWorldLoadCall(loadMetrics, 'startMode', () => appCtx.startMode());
+    runFinalStep('startMode', () => appCtx.startMode());
   }
 }
 
@@ -398,4 +417,117 @@ export function buildStreetFurniturePass(options = {}) {
   } finally {
     endLoadPhase(phaseName);
   }
+}
+
+function deferWorldDetailStep(callback, delayMs = 0) {
+  const delay = Math.max(0, Number.isFinite(delayMs) ? delayMs : 0);
+  if (typeof globalThis.requestIdleCallback === 'function') {
+    globalThis.requestIdleCallback(() => callback(), { timeout: Math.max(800, delay + 800) });
+    return;
+  }
+  globalThis.setTimeout(() => callback(), delay);
+}
+
+export function scheduleDeferredWorldDetailPasses(options = {}) {
+  const isActiveLoadContext = typeof options.isActiveLoadContext === 'function' ? options.isActiveLoadContext : () => true;
+  const startLoadPhase = typeof options.startLoadPhase === 'function' ? options.startLoadPhase : () => {};
+  const endLoadPhase = typeof options.endLoadPhase === 'function' ? options.endLoadPhase : () => {};
+  const poiNodes = Array.isArray(options.poiNodes) ? options.poiNodes : [];
+  const poiKeyFromTags = typeof options.poiKeyFromTags === 'function' ? options.poiKeyFromTags : () => null;
+  const lodNearDist = Number.isFinite(options.lodNearDist) ? options.lodNearDist : 0;
+  const lodMidDist = Number.isFinite(options.lodMidDist) ? options.lodMidDist : 0;
+  const loadMetrics = options.loadMetrics || {};
+  const updateWorldLod = typeof options.updateWorldLod === 'function' ? options.updateWorldLod : null;
+
+  const updatePerfWorldCounts = () => {
+    if (typeof appCtx.setPerfLiveStat !== 'function') return;
+    appCtx.setPerfLiveStat('worldCounts', {
+      roads: Array.isArray(appCtx.roads) ? appCtx.roads.length : 0,
+      buildings: Array.isArray(appCtx.buildingMeshes) ? appCtx.buildingMeshes.length : 0,
+      poiMeshes: Array.isArray(appCtx.poiMeshes) ? appCtx.poiMeshes.length : 0,
+      landuseMeshes: Array.isArray(appCtx.landuseMeshes) ? appCtx.landuseMeshes.length : 0
+    });
+  };
+
+  deferWorldDetailStep(() => {
+    if (!isActiveLoadContext()) return;
+    buildPoiGeometryPass({
+      endLoadPhase,
+      loadMetrics,
+      lodMidDist,
+      lodNearDist,
+      phaseName: 'buildPoiGeometryDeferred',
+      poiKeyFromTags,
+      poiNodes,
+      startLoadPhase
+    });
+    updatePerfWorldCounts();
+
+    globalThis.setTimeout(() => {
+      if (!isActiveLoadContext()) return;
+      buildStreetFurniturePass({
+        endLoadPhase,
+        loadMetrics,
+        phaseName: 'buildStreetFurnitureDeferred',
+        startLoadPhase
+      });
+      updatePerfWorldCounts();
+      if (typeof updateWorldLod === 'function') updateWorldLod(true);
+      console.log(
+        `[WorldLoad] Deferred world details ready (${appCtx.poiMeshes.length} poi meshes, ` +
+        `${appCtx.streetFurnitureMeshes.length} furniture, ${appCtx.vegetationMeshes.length} vegetation).`
+      );
+    }, 160);
+  }, 0);
+}
+
+export function scheduleDeferredPoiLoad(options = {}) {
+  const query = String(options.query || '');
+  const isActiveLoadContext = typeof options.isActiveLoadContext === 'function' ? options.isActiveLoadContext : () => true;
+  if (!query || typeof options.fetchOverpassJSON !== 'function') return;
+
+  deferWorldDetailStep(async () => {
+    if (!isActiveLoadContext()) return;
+    try {
+      const timeoutMs = Math.max(6000, Math.min(16000, Number(options.timeoutMs) || 12000));
+      const data = await options.fetchOverpassJSON(
+        query,
+        timeoutMs,
+        performance.now() + timeoutMs + 500,
+        null
+      );
+      if (!isActiveLoadContext()) return;
+
+      const allPoiNodes = data.elements.filter((element) =>
+        element?.type === 'node' && !!options.poiKeyFromTags?.(element.tags)
+      );
+      const tileBudgetCfg = options.tileBudgetCfg || {};
+      const poiNodes = options.limitNodesByTileBudget(allPoiNodes, {
+        globalCap: Math.max(0, Number(options.maxPoiNodes) || 0),
+        basePerTile: Math.max(1, Number(tileBudgetCfg.poiPerTile) || 1),
+        minPerTile: Math.max(1, Number(tileBudgetCfg.poiMinPerTile) || 1),
+        tileDegrees: Number(tileBudgetCfg.tileDegrees) || 0.002,
+        useRdt: options.useRdtBudgeting === true
+      });
+
+      const loadMetrics = options.loadMetrics || {};
+      loadMetrics.pois ||= {};
+      loadMetrics.pois.requested = allPoiNodes.length;
+      loadMetrics.pois.selected = poiNodes.length;
+      options.buildPoiGeometryPass({
+        phaseName: 'buildPoiGeometryDeferred',
+        poiNodes,
+        poiKeyFromTags: options.poiKeyFromTags,
+        lodNearDist: options.lodNearDist,
+        lodMidDist: options.lodMidDist,
+        loadMetrics,
+        startLoadPhase: options.startLoadPhase,
+        endLoadPhase: options.endLoadPhase
+      });
+      options.updateWorldLod?.(true);
+      console.log(`[WorldLoad] Deferred POIs ready (${poiNodes.length}/${allPoiNodes.length}).`);
+    } catch (err) {
+      options.recordLoadWarning?.('deferredPois', err);
+    }
+  }, 900);
 }

@@ -20,13 +20,59 @@ function syncTravelModeButtons() {
   return activeMode;
 }
 
+function buildingTopY(building) {
+  const minY = Number.isFinite(building?.minY) ? building.minY : building?.baseY;
+  if (Number.isFinite(building?.maxY)) return building.maxY;
+  if (Number.isFinite(minY) && Number.isFinite(building?.height)) return minY + building.height;
+  return null;
+}
+
+function distanceToBuildingBounds(x, z, building) {
+  if (
+    !Number.isFinite(building?.minX) ||
+    !Number.isFinite(building?.maxX) ||
+    !Number.isFinite(building?.minZ) ||
+    !Number.isFinite(building?.maxZ)
+  ) {
+    return Infinity;
+  }
+  const nearestX = Math.max(building.minX, Math.min(building.maxX, x));
+  const nearestZ = Math.max(building.minZ, Math.min(building.maxZ, z));
+  return Math.hypot(nearestX - x, nearestZ - z);
+}
+
+function applyDroneRoofClearance(x, z, groundY, desiredY) {
+  const clearanceRadius = 24;
+  const nearbyBuildings = typeof appCtx.getNearbyBuildings === 'function'
+    ? appCtx.getNearbyBuildings(x, z, clearanceRadius + 16)
+    : appCtx.buildings;
+  if (!Array.isArray(nearbyBuildings) || nearbyBuildings.length === 0) return desiredY;
+
+  let highestNearbyRoof = -Infinity;
+  for (let i = 0; i < nearbyBuildings.length; i++) {
+    const building = nearbyBuildings[i];
+    if (!building || distanceToBuildingBounds(x, z, building) > clearanceRadius) continue;
+    const topY = buildingTopY(building);
+    if (Number.isFinite(topY)) highestNearbyRoof = Math.max(highestNearbyRoof, topY);
+  }
+
+  if (!Number.isFinite(highestNearbyRoof) || highestNearbyRoof + 8 <= desiredY) return desiredY;
+  const clearedY = Math.min(groundY + 360, highestNearbyRoof + 8);
+  console.info('[travel-mode] Raised drone launch for nearby roof clearance.', {
+    desiredY: Number(desiredY.toFixed(2)),
+    clearedY: Number(clearedY.toFixed(2))
+  });
+  return clearedY;
+}
+
 function sampleDroneSpawnHeight(x, z) {
-  if (appCtx.onMoon && appCtx.moonSurface) {
+  const planetarySurface = appCtx.onMars && appCtx.marsSurface ? appCtx.marsSurface : appCtx.onMoon ? appCtx.moonSurface : null;
+  if (planetarySurface) {
     const rc = appCtx._getPhysRaycaster?.();
     if (rc && appCtx._physRayStart && appCtx._physRayDir) {
       appCtx._physRayStart.set(x, 2000, z);
       rc.set(appCtx._physRayStart, appCtx._physRayDir);
-      const hits = rc.intersectObject(appCtx.moonSurface, false);
+      const hits = rc.intersectObject(planetarySurface, false);
       if (hits.length > 0 && Number.isFinite(hits[0]?.point?.y)) {
         return hits[0].point.y + 10;
       }
@@ -38,16 +84,22 @@ function sampleDroneSpawnHeight(x, z) {
     appCtx.GroundHeight && typeof appCtx.GroundHeight.walkSurfaceY === 'function' ?
       appCtx.GroundHeight.walkSurfaceY(x, z) :
       null;
-  if (Number.isFinite(walkSurfaceY)) return walkSurfaceY + 12;
+  if (Number.isFinite(walkSurfaceY)) {
+    return applyDroneRoofClearance(x, z, walkSurfaceY, walkSurfaceY + 12);
+  }
 
   if (typeof appCtx.terrainMeshHeightAt === 'function') {
     const terrainY = appCtx.terrainMeshHeightAt(x, z);
-    if (Number.isFinite(terrainY)) return terrainY + 12;
+    if (Number.isFinite(terrainY)) {
+      return applyDroneRoofClearance(x, z, terrainY, terrainY + 12);
+    }
   }
 
   if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
     const terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
-    if (Number.isFinite(terrainY)) return terrainY + 12;
+    if (Number.isFinite(terrainY)) {
+      return applyDroneRoofClearance(x, z, terrainY, terrainY + 12);
+    }
   }
 
   return 50;
@@ -64,9 +116,21 @@ function syncDronePositionFromReference() {
   appCtx.drone.x = ref.x;
   appCtx.drone.z = ref.z;
   appCtx.drone.yaw = Number.isFinite(appCtx.car?.angle) ? appCtx.car.angle : 0;
+  appCtx.drone.cameraYawOffset = 0;
   appCtx.drone.roll = 0;
   appCtx.drone.y = sampleDroneSpawnHeight(ref.x, ref.z);
-  appCtx.drone.pitch = appCtx.onMoon ? -0.2 : -0.3;
+  appCtx.drone.pitch = appCtx.onMoon || appCtx.onMars ? -0.2 : -0.3;
+}
+
+function resetCameraForDroneMode() {
+  if (!appCtx.camera) return;
+  appCtx.camera.up?.set?.(0, 1, 0);
+  appCtx.camera.rotation.order = 'YXZ';
+  if (appCtx.camera.userData) {
+    delete appCtx.camera.userData.lookTarget;
+    delete appCtx.camera.userData.boatrig;
+  }
+  appCtx.camera.updateProjectionMatrix?.();
 }
 
 function emitTravelModeEvent(mode, source = 'runtime') {
@@ -116,8 +180,9 @@ function setTravelMode(mode, options = {}) {
     if (appCtx.Walk?.state?.mode === 'walk') {
       appCtx.Walk.setModeDrive();
     }
-    appCtx.droneMode = true;
     syncDronePositionFromReference();
+    resetCameraForDroneMode();
+    appCtx.droneMode = true;
     if (appCtx.carMesh) appCtx.carMesh.visible = false;
   } else if (targetMode === 'boat') {
     if (typeof appCtx.startBoatMode === 'function') {
@@ -142,11 +207,24 @@ function setTravelMode(mode, options = {}) {
       appCtx.Walk.setModeDrive();
     }
     if (typeof appCtx.camMode !== 'undefined') appCtx.camMode = 0;
+    if (appCtx.camera?.userData) appCtx.camera.userData.carLook = { yaw: 0, pitch: 0 };
     if (appCtx.carMesh) appCtx.carMesh.visible = true;
   }
 
   if (typeof appCtx.clearStarSelection === 'function') {
     appCtx.clearStarSelection();
+  }
+
+  if (typeof appCtx.updateWorldLod === 'function') {
+    appCtx.updateWorldLod(true);
+  }
+  if (
+    targetMode !== 'boat' &&
+    Array.isArray(appCtx.roads) &&
+    appCtx.roads.length > 0 &&
+    typeof appCtx.buildTraversalNetworks === 'function'
+  ) {
+    appCtx.buildTraversalNetworks();
   }
 
   const resolvedMode = syncTravelModeButtons();
@@ -171,6 +249,12 @@ function toggleDroneMode(options = {}) {
   return setTravelMode(nextMode, options);
 }
 
+function cyclePrimaryTravelMode(options = {}) {
+  const currentMode = getCurrentTravelMode();
+  const nextMode = currentMode === 'drive' ? 'walk' : currentMode === 'walk' ? 'drone' : 'drive';
+  return setTravelMode(nextMode, options);
+}
+
 function toggleBoatMode(options = {}) {
   const nextMode = getCurrentTravelMode() === 'boat' ? 'walk' : 'boat';
   return setTravelMode(nextMode, options);
@@ -178,6 +262,7 @@ function toggleBoatMode(options = {}) {
 
 Object.assign(appCtx, {
   getCurrentTravelMode,
+  cyclePrimaryTravelMode,
   setTravelMode,
   syncTravelModeButtons,
   toggleBoatMode,
@@ -186,6 +271,7 @@ Object.assign(appCtx, {
 });
 
 export {
+  cyclePrimaryTravelMode,
   getCurrentTravelMode,
   setTravelMode,
   syncTravelModeButtons,

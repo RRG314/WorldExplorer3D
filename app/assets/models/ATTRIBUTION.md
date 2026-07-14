@@ -9,3 +9,9 @@ Character Assets
 - File: `soldier.glb`
 - Source: Existing project asset pack
 - Notes: Loaded as the primary rigged character model in runtime.
+
+Mars Exploration Rover
+- File: `mars-exploration-rover.glb`
+- Source: NASA Mars Exploration Rover 3D model
+- URL: https://science.nasa.gov/resource/mars-exploration-rovers-3d-model/
+- Notes: NASA media usage guidelines apply.

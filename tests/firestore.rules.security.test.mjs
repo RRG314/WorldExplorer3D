@@ -823,6 +823,23 @@ await runCheck('member can create shared room block', async () => {
     gy: 2,
     gz: 4,
     materialIndex: 1,
+    shape: 'ramp',
+    rotation: 2,
+    createdBy: MEMBER_UID,
+    createdAt: serverTimestamp(),
+    updatedAt: serverTimestamp()
+  }));
+});
+
+await runCheck('member cannot create shared block with invalid shape', async () => {
+  await assertFails(setDoc(doc(memberDb, 'rooms', ROOM_ID, 'blocks', '11_2_4'), {
+    id: '11_2_4',
+    gx: 11,
+    gy: 2,
+    gz: 4,
+    materialIndex: 1,
+    shape: 'sphere',
+    rotation: 0,
     createdBy: MEMBER_UID,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()

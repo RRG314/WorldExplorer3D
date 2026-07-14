@@ -421,7 +421,7 @@ function presentCurrentStage() {
   if (stage === STAGES.MODE_HINT) {
     showPrompt(stage, {
       title: 'Switch Travel Modes',
-      body: 'Use the right-side buttons to swap Walk / Driving / Drone.\nKeyboard: F toggles walk, 6 toggles drone.',
+      body: 'Use the right-side buttons to choose Walk, Driving, or Drone.\nKeyboard: F cycles through all three travel modes.',
       autoHideMs: 9800
     });
     return;
@@ -481,8 +481,8 @@ function presentCurrentStage() {
   if (stage === STAGES.BUILD_HINT) {
     showPrompt(stage, {
       title: 'Build Something',
-      body: 'Open Game Mode and enable Build Mode, or place an artifact in a room.',
-      actionLabel: 'Enable Build Mode',
+      body: 'Open Land & Property and choose Build with Blocks, or place an artifact in a room.',
+      actionLabel: 'Open Build with Blocks',
       onAction: requestBuildMode,
       autoHideMs: 9800
     });

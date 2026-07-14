@@ -73,6 +73,13 @@ function lodReferenceActor() {
   return appCtx.droneMode ? appCtx.drone : appCtx.car;
 }
 
+function visibleBuildingMeshBudget() {
+  const quality = String(appCtx.renderQualityLevel || 'med').toLowerCase();
+  const baseBudget = quality === 'low' ? 480 : quality === 'high' ? 1200 : 820;
+  const modeScale = appCtx.droneMode ? 0.72 : appCtx.camMode === 2 ? 0.82 : 1;
+  return Math.max(280, Math.floor(baseBudget * modeScale));
+}
+
 export function updateWorldLod(force = false) {
   if (appCtx.onMoon || appCtx.travelingToMoon || (typeof appCtx.isEnv === 'function' && appCtx.ENV && !appCtx.isEnv(appCtx.ENV.EARTH))) {
     hideMeshList(appCtx.roadMeshes);
@@ -151,6 +158,8 @@ export function updateWorldLod(force = false) {
     return;
   }
 
+  const nearBuildingCandidates = [];
+  const midBuildingCandidates = [];
   for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
     const mesh = appCtx.buildingMeshes[i];
     if (!mesh) continue;
@@ -176,13 +185,36 @@ export function updateWorldLod(force = false) {
       appCtx.droneMode ? 460 : 280 :
       appCtx.droneMode ? 380 : 220;
     const limitDist = mesh.visible ? visibleDist + hysteresis : visibleDist;
-    const visible = distSq <= limitDist * limitDist;
-    mesh.visible = visible;
-    if (!visible) continue;
-
+    const withinDistance = distSq <= limitDist * limitDist;
+    mesh.visible = false;
+    if (!withinDistance) continue;
     const count = isBatch ? Math.max(1, mesh.userData?.batchCount || 1) : 1;
-    if (tier === 'mid') midVisible += count;
-    else nearVisible += count;
+    const candidate = { count, distSq, mesh, tier };
+    if (tier === 'mid') midBuildingCandidates.push(candidate);
+    else nearBuildingCandidates.push(candidate);
+  }
+
+  nearBuildingCandidates.sort((a, b) => a.distSq - b.distSq);
+  midBuildingCandidates.sort((a, b) => a.distSq - b.distSq);
+  const buildingMeshBudget = visibleBuildingMeshBudget();
+  const nearShare = appCtx.droneMode ? 0.38 : appCtx.camMode === 2 ? 0.5 : 0.62;
+  const nearTarget = Math.floor(buildingMeshBudget * nearShare);
+  const nearCount = Math.min(nearTarget, nearBuildingCandidates.length);
+  const midCount = Math.min(buildingMeshBudget - nearCount, midBuildingCandidates.length);
+  const nearSpillCount = Math.min(
+    nearBuildingCandidates.length,
+    nearCount + Math.max(0, buildingMeshBudget - nearCount - midCount)
+  );
+
+  for (let i = 0; i < nearSpillCount; i++) {
+    const candidate = nearBuildingCandidates[i];
+    candidate.mesh.visible = true;
+    nearVisible += candidate.count;
+  }
+  for (let i = 0; i < midCount; i++) {
+    const candidate = midBuildingCandidates[i];
+    candidate.mesh.visible = true;
+    midVisible += candidate.count;
   }
 
   for (let i = 0; i < appCtx.poiMeshes.length; i++) {
@@ -240,6 +272,13 @@ export function updateWorldLod(force = false) {
 
   if (typeof appCtx.setPerfLiveStat === 'function') {
     appCtx.setPerfLiveStat('lodVisible', { near: nearVisible, mid: midVisible });
+    appCtx.setPerfLiveStat('lodBuildingMeshes', {
+      budget: buildingMeshBudget,
+      eligible: nearBuildingCandidates.length + midBuildingCandidates.length,
+      visible: nearSpillCount + midCount,
+      visibleNearMeshes: nearSpillCount,
+      visibleMidMeshes: midCount
+    });
   }
 
   if (Array.isArray(appCtx.streetFurnitureMeshes) && appCtx.streetFurnitureMeshes.length > 0) {

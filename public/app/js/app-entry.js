@@ -2,37 +2,46 @@
 // Import order mirrors legacy runtime dependencies.
 import { getCurrentUser, observeAuth } from '../../js/auth-ui.js';
 import './rdt.js?v=55';
-import './config.js?v=56';
+import './config.js?v=58';
 import { ctx as appCtx } from './shared-context.js?v=55';
+import './runtime-diagnostics.js?v=3';
 import './state.js?v=58';
 import './perf.js?v=55';
 import './env.js?v=56';
 import './real-estate.js?v=55';
-import './ground.js?v=63';
-import './terrain.js?v=79';
-import './world.js?v=78';
+import './ground.js?v=64';
+import './terrain.js?v=92';
+import './world.js?v=140';
 import './building-entry.js?v=2';
 import './interiors.js?v=5';
-import { init, tryEnablePostProcessing } from './engine.js?v=56';
-import './physics.js?v=61';
-import './walking.js?v=61';
-import './travel-mode.js?v=3';
-import { initBoatMode } from './boat-mode.js?v=6';
-import './sky.js?v=57';
-import './weather.js?v=2';
+import { init, tryEnablePostProcessing } from './engine.js?v=69';
+import './physics.js?v=65';
+import './walking.js?v=62';
+import './travel-mode.js?v=7';
+import { initBoatMode } from './boat-mode.js?v=16';
+import './sky.js?v=59';
+import './weather.js?v=3';
 import './live-earth/controller.js?v=8';
 import './solar-system.js?v=55';
-import './space.js?v=55';
-import './ocean.js?v=4';
+import './space.js?v=56';
+import './planetary/scene-ownership.js?v=1';
+import './planetary/vehicles.js?v=1';
+import './planetary/astronaut.js?v=1';
+import './planetary/sky-orientation.js?v=1';
+import './planetary/moon-sky.js?v=1';
+import './planetary/mars-world.js?v=1';
+import './planetary/tracks.js?v=1';
+import './ocean.js?v=5';
 import './game.js?v=56';
-import './input.js?v=57';
-import './hud.js?v=57';
+import './input.js?v=58';
+import './hud.js?v=65';
 import './map.js?v=56';
-import { renderLoop } from './main.js?v=60';
+import { renderLoop } from './main.js?v=61';
 import './memory.js?v=55';
-import './blocks.js?v=58';
+import './blocks.js?v=60';
+import './block-builder/ui.js?v=2';
 import './flower-challenge.js?v=55';
-import { setupUI } from './ui.js?v=65';
+import { setupUI } from './ui.js?v=68';
 
 let _booted = false;
 let _multiplayerObserverReady = false;
@@ -89,7 +98,7 @@ async function ensureEditorSessionModule() {
 async function ensureActivityCreatorModule() {
   if (_activityCreatorModule) return _activityCreatorModule;
   if (!_activityCreatorPromise) {
-        _activityCreatorPromise = import('./activity-editor/session.js?v=4').then((mod) => {
+        _activityCreatorPromise = import('./activity-editor/session.js?v=5').then((mod) => {
             _activityCreatorModule = mod;
             if (!_activityCreatorReady && typeof mod.initActivityCreator === 'function') {
                 mod.initActivityCreator();
@@ -188,7 +197,7 @@ function scheduleAnalyticsWarmup(timeout = 2800) {
 async function ensureOverlayRuntimeLayer() {
     if (_overlayRuntimeReady) return true;
     if (!_overlayRuntimePromise) {
-        _overlayRuntimePromise = import('./editor/public-layer.js?v=4').then((mod) => {
+        _overlayRuntimePromise = import('./editor/public-layer.js?v=5').then((mod) => {
             if (!_overlayRuntimeReady && typeof mod.initEditorPublicLayer === 'function') {
                 mod.initEditorPublicLayer();
                 _overlayRuntimeReady = true;
@@ -407,6 +416,13 @@ function registerLazySubsystemEntrypoints() {
     appCtx.getCurrentMultiplayerRoomActivities = () => _multiplayerApi?.getCurrentRoomActivities?.() || [];
     appCtx.getCurrentMultiplayerRoomActivity = () => _multiplayerApi?.getActiveRoomActivity?.() || null;
     appCtx.canManageCurrentRoomActivities = () => !!_multiplayerApi?.canManageCurrentRoomActivities?.();
+    appCtx.syncMultiplayerRoomWorld = async (room = {}, options = {}) => {
+        const api = await ensureMultiplayerPlatformReady();
+        if (typeof api?.syncRoomWorldContext !== 'function') {
+            throw new Error('Multiplayer room world sync is unavailable right now.');
+        }
+        return api.syncRoomWorldContext(room, options);
+    };
     appCtx.saveCurrentRoomActivity = async (activity = {}) => {
         const api = await ensureMultiplayerPlatformReady();
         if (typeof api?.saveRoomActivity !== 'function') throw new Error('Room game saving is unavailable right now.');
@@ -471,15 +487,27 @@ function bootApp() {
     if (_booted) {
         return { tryEnablePostProcessing };
     }
-    init();
-    registerLazySubsystemEntrypoints();
-    setupUI();
-    initBoatMode();
-    scheduleEditorSessionWarmup(4200);
-    scheduleTutorialInit();
-    startMultiplayerAfterAuthReady();
-    renderLoop();
-    scheduleAnalyticsWarmup(2800);
+
+    const runBootStep = (label, action) => {
+        console.log(`[boot] step:start:${label}`);
+        const result = action();
+        console.log(`[boot] step:done:${label}`);
+        return result;
+    };
+
+    const initOk = runBootStep('init', () => init());
+    if (initOk === false || appCtx.engineInitFailed === true || !appCtx.renderer) {
+        console.warn('[boot] init aborted before full app startup');
+        _booted = false;
+        return { tryEnablePostProcessing };
+    }
+    runBootStep('registerLazySubsystemEntrypoints', () => registerLazySubsystemEntrypoints());
+    runBootStep('setupUI', () => setupUI());
+    runBootStep('initBoatMode', () => initBoatMode());
+    runBootStep('scheduleTutorialInit', () => scheduleTutorialInit());
+    runBootStep('startMultiplayerAfterAuthReady', () => startMultiplayerAfterAuthReady());
+    runBootStep('renderLoop', () => renderLoop());
+    runBootStep('scheduleAnalyticsWarmup', () => scheduleAnalyticsWarmup(2800));
     _booted = true;
     return { tryEnablePostProcessing };
 }

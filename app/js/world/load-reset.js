@@ -40,6 +40,7 @@ export function hideEarthSceneMeshes() {
   hideList(appCtx.buildingMeshes);
   hideList(appCtx.landuseMeshes);
   hideList(appCtx.poiMeshes);
+  hideList(appCtx.historicMarkers);
   hideList(appCtx.streetFurnitureMeshes);
   hideList(appCtx.vegetationMeshes);
 }

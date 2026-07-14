@@ -1,3 +1,5 @@
+import { buildElevatedTerrainReference } from './structure-profile-grade.js';
+
 function normalizedTagValue(value = '') {
   return String(value || '').trim().toLowerCase();
 }
@@ -340,7 +342,7 @@ function featureEndpointSurfaceY(feature, endpointIndex, sampleTerrainY) {
   if (typeof sampleTerrainY !== 'function') return NaN;
   const terrainY = Number(sampleTerrainY(point.x, point.z));
   if (!Number.isFinite(terrainY)) return NaN;
-  const surfaceBias = Number.isFinite(feature?.surfaceBias) ? Number(feature.surfaceBias) : 0.42;
+  const surfaceBias = Number.isFinite(feature?.surfaceBias) ? Number(feature.surfaceBias) : 0.08;
   return terrainY + surfaceBias;
 }
 
@@ -498,8 +500,11 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
     subtype: feature.type || feature.subtype || ''
   });
   const { distances, total } = polylineDistances(feature.pts);
-  const surfaceBias = Number.isFinite(options.surfaceBias) ? options.surfaceBias : Number(feature.surfaceBias) || 0.42;
+  const surfaceBias = Number.isFinite(options.surfaceBias) ? options.surfaceBias : Number(feature.surfaceBias) || 0.08;
   const terrainHeights = feature.pts.map((point) => Number(sampleTerrainY(point.x, point.z)) || 0);
+  const terrainReference = semantics.terrainMode === 'elevated' ?
+    buildElevatedTerrainReference(terrainHeights, distances, total) :
+    terrainHeights;
   const profileHeights = new Float32Array(feature.pts.length);
   const stations = Array.isArray(feature.structureStations) ? feature.structureStations : [];
   const anchors = buildFeatureProfileAnchors(feature, semantics, total);
@@ -526,11 +531,12 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
       }
     }
 
-    profileHeights[i] = terrainHeights[i] + signedOffset + surfaceBias;
+    profileHeights[i] = terrainReference[i] + signedOffset + surfaceBias;
   }
 
   feature.structureSemantics = semantics;
   feature.surfaceBias = surfaceBias;
+  feature.surfaceTerrainSampler = semantics.terrainMode === 'at_grade' ? sampleTerrainY : null;
   feature.surfaceDistances = distances;
   feature.surfaceHeights = profileHeights;
   feature.structureSurfaceMinY = profileHeights.reduce((best, value) => Math.min(best, value), Infinity);
@@ -547,7 +553,7 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
     featureKind: feature.networkKind || feature.kind || 'road',
     subtype: feature.type || feature.subtype || ''
   });
-  const baseTopBias = Number.isFinite(options.surfaceBias) ? options.surfaceBias : Number(feature.surfaceBias) || 0.42;
+  const baseTopBias = Number.isFinite(options.surfaceBias) ? options.surfaceBias : Number(feature.surfaceBias) || 0.08;
   if (!(feature.surfaceDistances instanceof Float32Array) || !(feature.surfaceHeights instanceof Float32Array)) {
     updateFeatureSurfaceProfile(feature, sampleTerrainY, { surfaceBias: baseTopBias });
   }
@@ -608,15 +614,8 @@ function shouldRenderRoadSkirts(feature) {
   const semantics = feature?.structureSemantics || null;
   if (semantics?.terrainMode === 'elevated') return false;
   if (semantics?.terrainMode === 'subgrade') return true;
-
-  const hasTransitionAnchors =
-    Array.isArray(feature?.structureTransitionAnchors) &&
-    feature.structureTransitionAnchors.length > 0;
-  if (!hasTransitionAnchors) return true;
-  if (semantics?.rampCandidate) return false;
-
-  // Transition roads are where skirts read as detached bridge walls.
-  // Prefer a little terrain peeking over visible slabs on ramp approaches.
+  // Ordinary roads are draped surfaces. Vertical skirts make them read as
+  // elevated slabs and expose wall textures on normal terrain.
   return false;
 }
 
@@ -624,6 +623,16 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
   if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2) return NaN;
   const projection = projected || projectPointToFeature(feature, x, z);
   if (!projection) return NaN;
+  const semantics = feature.structureSemantics || null;
+  const hasTransitionAnchors = Array.isArray(feature.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0;
+  if (
+    semantics?.terrainMode === 'at_grade' &&
+    !hasTransitionAnchors &&
+    typeof feature.surfaceTerrainSampler === 'function'
+  ) {
+    const sampledTerrainY = feature.surfaceTerrainSampler(projection.x, projection.z);
+    if (Number.isFinite(sampledTerrainY)) return sampledTerrainY + (Number(feature.surfaceBias) || 0.08);
+  }
   const distances = feature.surfaceDistances instanceof Float32Array ? feature.surfaceDistances : null;
   const heights = feature.surfaceHeights instanceof Float32Array ? feature.surfaceHeights : null;
   if (!distances || !heights || !distances.length || !heights.length) return NaN;
@@ -821,13 +830,12 @@ function classifyStructureSemantics(tags = {}, options = {}) {
       isBridge ||
       verticalOrder > 0 ||
       explicitBaseOffset > 2.5 ||
-      location === 'roof' ||
-      location === 'overground'
+      location === 'roof'
     );
 
   const skywalk =
     elevatedConnectorCandidate &&
-    (isBridge || isIndoor || isCovered || location === 'roof' || location === 'overground' || explicitBaseOffset > 2.5);
+    (isBridge || isIndoor || isCovered || location === 'roof' || explicitBaseOffset > 2.5);
 
   let structureKind = 'at_grade';
   let terrainMode = 'at_grade';
@@ -843,7 +851,7 @@ function classifyStructureSemantics(tags = {}, options = {}) {
   } else if (isBridge) {
     structureKind = 'bridge';
     terrainMode = 'elevated';
-  } else if (verticalOrder > 0 || explicitBaseOffset > 2.5 || location === 'overground' || location === 'roof') {
+  } else if (verticalOrder > 0 || explicitBaseOffset > 2.5 || location === 'roof') {
     structureKind = isPedestrianConnector ? 'connector' : 'elevated';
     terrainMode = 'elevated';
   } else if (isCovered || isIndoor) {

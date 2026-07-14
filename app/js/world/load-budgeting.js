@@ -3,6 +3,11 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 function isLanduseCandidate(tags) {
   return !!(
     tags?.landuse ||
+    tags?.['area:highway'] ||
+    tags?.amenity === 'parking' ||
+    tags?.place === 'square' ||
+    (tags?.highway === 'pedestrian' && tags?.area === 'yes') ||
+    (tags?.area === 'yes' && /^(paved|asphalt|concrete|concrete:plates|paving_stones|sett|cobblestone)$/.test(tags?.surface || '')) ||
     tags?.natural === 'wood' ||
     tags?.natural === 'forest' ||
     tags?.natural === 'scrub' ||

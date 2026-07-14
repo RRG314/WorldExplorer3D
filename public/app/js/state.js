@@ -110,6 +110,7 @@ let boatMode = {
   waveDirectionZ: 1,
   currentWater: null,
   lastEntryMode: 'walk',
+  previousCameraMode: null,
   candidate: null,
   mesh: null,
   waterPatch: null,

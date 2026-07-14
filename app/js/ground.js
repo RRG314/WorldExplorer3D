@@ -2,14 +2,14 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY
-} from "./structure-semantics.js?v=9";
+} from "./structure-semantics.js?v=12";
 // ground.js - Unified Ground Height Service
 // Single source of truth for y(x,z) used by terrain, roads, and vehicles
 // ============================================================================
 
 const GroundHeight = {
   // Road surface sits this far above raw terrain (prevents z-fighting)
-  ROAD_OFFSET: 0.2,
+  ROAD_OFFSET: 0.08,
 
   // Finite-difference step for normal estimation (world units)
   NORMAL_SAMPLE_DIST: 2.0,
@@ -389,7 +389,7 @@ const GroundHeight = {
         this._shouldUseRoadMeshHeight(nr?.road, meshY, nr?.y) ?
           Math.max(Number.isFinite(nr?.y) ? nr.y : -Infinity, meshY) :
         Number.isFinite(nr?.y) ? nr.y :
-          tY + this.ROAD_OFFSET + 0.05;
+          tY + this.ROAD_OFFSET;
       source = 'road';
     } else {
       y = tY + 0.15; // ground clearance for off-road

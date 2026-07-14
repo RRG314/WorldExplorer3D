@@ -31,13 +31,14 @@ function onKey(code, event) {
     }
   }
 
-  // Walking mode toggle (F key)
+  // Primary travel mode cycle (F key)
   if (code === 'KeyF') {
+    if (event?.repeat) return;
     if (appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
       appCtx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
     }
-    if (typeof appCtx.toggleWalkDriveMode === 'function') {
-      appCtx.toggleWalkDriveMode({ source: 'keyboard_f' });
+    if (typeof appCtx.cyclePrimaryTravelMode === 'function') {
+      appCtx.cyclePrimaryTravelMode({ source: 'keyboard_f' });
     } else if (appCtx.Walk) {
       appCtx.Walk.toggleWalk();
       appCtx.droneMode = false;
@@ -75,17 +76,6 @@ function onKey(code, event) {
     return;
   }
 
-  if (code === 'Digit6') {
-    if (appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
-      appCtx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
-    }
-    if (typeof appCtx.toggleDroneMode === 'function') {
-      appCtx.toggleDroneMode({ source: 'keyboard_digit6' });
-    } else {
-      appCtx.droneMode = !appCtx.droneMode;
-    }
-    if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
-  }
   // Performance overlay toggle (F8)
   if (isPerfToggleKey(code)) {
     if (event?.repeat) return;

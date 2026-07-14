@@ -1,11 +1,13 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=9";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=12";
+import { createWorldSpawnSurfaceApi } from "./spawn-surface.js?v=1";
 
 let worldSpawnDeps = {
   buildingContainingPoint: () => null,
   findNearestRoad: () => null,
   isInsideWaterArea: () => false,
   isVehicleRoad: () => false,
+  sampleFeatureSurfaceY: () => NaN,
   traversableFeaturesForMode: () => []
 };
 
@@ -17,184 +19,31 @@ function initWorldSpawning(deps = {}) {
   return worldSpawnDeps;
 }
 
-function finiteNumberOr(value, fallback = 0) {
-  return Number.isFinite(value) ? value : fallback;
-}
-
-function terrainYAtWorld(x, z) {
-  if (appCtx.onMoon && appCtx.moonSurface) {
-    appCtx.moonSurface.updateMatrixWorld(true);
-    const raycaster = typeof appCtx._getPhysRaycaster === "function" ? appCtx._getPhysRaycaster() : null;
-    if (raycaster && appCtx._physRayStart && appCtx._physRayDir) {
-      appCtx._physRayStart.set(x, 1200, z);
-      raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
-      const hits = raycaster.intersectObject(appCtx.moonSurface, false);
-      if (hits.length > 0 && Number.isFinite(hits[0]?.point?.y)) return hits[0].point.y;
-    }
-  }
-
-  const sample = typeof appCtx.terrainMeshHeightAt === "function" ?
-    appCtx.terrainMeshHeightAt(x, z) :
-    typeof appCtx.elevationWorldYAtWorldXZ === "function" ?
-      appCtx.elevationWorldYAtWorldXZ(x, z) :
-      0;
-  return finiteNumberOr(sample, 0);
-}
-
-function driveCenterYAtWorld(x, z, preferRoad = false) {
-  if (appCtx.onMoon) return terrainYAtWorld(x, z) + 1.2;
-  if (typeof appCtx.GroundHeight !== "undefined" &&
-      appCtx.GroundHeight &&
-      typeof appCtx.GroundHeight.carCenterY === "function") {
-    return finiteNumberOr(appCtx.GroundHeight.carCenterY(x, z, preferRoad, 1.2), terrainYAtWorld(x, z) + 1.2);
-  }
-  return terrainYAtWorld(x, z) + 1.2;
-}
-
-function walkBaseYAtWorld(x, z) {
-  if (appCtx.onMoon) return terrainYAtWorld(x, z);
-  if (typeof appCtx.GroundHeight !== "undefined" &&
-      appCtx.GroundHeight &&
-      typeof appCtx.GroundHeight.walkSurfaceY === "function") {
-    return finiteNumberOr(appCtx.GroundHeight.walkSurfaceY(x, z), terrainYAtWorld(x, z));
-  }
-  return terrainYAtWorld(x, z);
-}
-
-function traversalFeatureKind(feature) {
-  return String(feature?.networkKind || feature?.kind || "road").toLowerCase();
-}
-
-function spawnRoadPenalty(type) {
-  if (!type) return 0;
-  if (type.includes("motorway") || type.includes("trunk")) return 120;
-  if (type.includes("primary")) return 40;
-  if (type.includes("secondary")) return 20;
-  if (type.includes("service")) return 12;
-  return 0;
-}
-
-function spawnSurfacePenalty(feature, mode = "drive") {
-  if (!feature) return 0;
-  const kind = traversalFeatureKind(feature);
-  if (kind === "road") return spawnRoadPenalty(String(feature.type || ""));
-  if (mode === "walk") {
-    if (kind === "footway") return 0;
-    if (kind === "cycleway") return 4;
-    if (kind === "railway") return 16;
-  }
-  return 10;
-}
-
-function slopePenaltyAt(x, z) {
-  const step = 8;
-  const hL = terrainYAtWorld(x - step, z);
-  const hR = terrainYAtWorld(x + step, z);
-  const hU = terrainYAtWorld(x, z - step);
-  const hD = terrainYAtWorld(x, z + step);
-  const slopeX = (hR - hL) / (step * 2);
-  const slopeZ = (hD - hU) / (step * 2);
-  const gradient = Math.hypot(slopeX, slopeZ);
-  const slopeDeg = Math.atan(gradient) * 180 / Math.PI;
-  if (!Number.isFinite(slopeDeg)) return 0;
-  if (slopeDeg <= 16) return 0;
-  if (slopeDeg >= 55) return 1800;
-  return (slopeDeg - 16) * 42;
-}
-
-function slopeDegreesAt(x, z) {
-  const step = 6;
-  const hL = terrainYAtWorld(x - step, z);
-  const hR = terrainYAtWorld(x + step, z);
-  const hU = terrainYAtWorld(x, z - step);
-  const hD = terrainYAtWorld(x, z + step);
-  const slopeX = (hR - hL) / (step * 2);
-  const slopeZ = (hD - hU) / (step * 2);
-  const gradient = Math.hypot(slopeX, slopeZ);
-  return Number.isFinite(gradient) ? Math.atan(gradient) * 180 / Math.PI : 0;
-}
-
-function resolveRoadHeading(road, pointIndex, fallbackAngle = 0) {
-  if (!road || !Array.isArray(road.pts) || road.pts.length < 2) return fallbackAngle;
-  if (pointIndex < road.pts.length - 1) {
-    return Math.atan2(road.pts[pointIndex + 1].x - road.pts[pointIndex].x, road.pts[pointIndex + 1].z - road.pts[pointIndex].z);
-  }
-  if (pointIndex > 0) {
-    return Math.atan2(road.pts[pointIndex].x - road.pts[pointIndex - 1].x, road.pts[pointIndex].z - road.pts[pointIndex - 1].z);
-  }
-  return fallbackAngle;
-}
-
-function driveBuildBlockCollision(x, z, carFeetY) {
-  if (typeof appCtx.getBuildCollisionAtWorldXZ !== "function") return null;
-  const samples = [
-    [0, 0],
-    [2.0, 0],
-    [-2.0, 0],
-    [0, 2.0],
-    [0, -2.0]
-  ];
-  for (let i = 0; i < samples.length; i++) {
-    const sample = samples[i];
-    const hit = appCtx.getBuildCollisionAtWorldXZ(x + sample[0], z + sample[1], carFeetY, 0.12);
-    if (hit && hit.blocked) return hit;
-  }
-  return null;
-}
-
-function walkBuildBlockCollision(x, z, terrainY) {
-  if (typeof appCtx.getBuildCollisionAtWorldXZ !== "function") return null;
-  return appCtx.getBuildCollisionAtWorldXZ(x, z, terrainY, 0.65, 1.7 * 0.95);
-}
-
-function shouldIgnoreDriveCollision(buildingCheck, x, z) {
-  if (!buildingCheck?.collision || typeof worldSpawnDeps.findNearestRoad !== "function") return false;
-  const actorBaseY = Number.isFinite(buildingCheck?.actorBaseY) ? buildingCheck.actorBaseY : NaN;
-  const nearestRoad = worldSpawnDeps.findNearestRoad(x, z, {
-    y: Number.isFinite(actorBaseY) ? actorBaseY + 1.2 : NaN,
-    maxVerticalDelta: 14
-  });
-  const road = nearestRoad?.road;
-  if (!worldSpawnDeps.isVehicleRoad(road)) return false;
-  if (!isRoadSurfaceReachable(nearestRoad, {
-    extraVerticalAllowance: 0.4
-  })) return false;
-
-  const roadHalfWidth = Number.isFinite(road?.width) ? road.width * 0.5 : 0;
-  const onRoadCenter = nearestRoad.dist <= Math.max(2.2, roadHalfWidth - 0.35);
-  const onRoadCore = nearestRoad.dist <= Math.max(1.6, roadHalfWidth - 0.95);
-  const colliderDetail = buildingCheck?.building?.colliderDetail === "bbox" ? "bbox" : "full";
-  const buildingType = String(buildingCheck?.building?.buildingType || "").toLowerCase();
-  const isApproxCollider = colliderDetail !== "full";
-  const partKind = String(buildingCheck?.building?.buildingPartKind || "").toLowerCase();
-  const roofLikeCollider =
-    buildingType === "roof" ||
-    buildingType === "canopy" ||
-    buildingType === "carport" ||
-    partKind === "roof" ||
-    partKind === "balcony" ||
-    partKind === "canopy" ||
-    buildingCheck?.building?.collisionKind === "thin_part" ||
-    buildingCheck?.building?.allowsPassageBelow === true;
-  const shallowRoadsideCollision = !!buildingCheck.collision &&
-    onRoadCenter &&
-    !buildingCheck.inside &&
-    Number.isFinite(buildingCheck.penetration) &&
-    buildingCheck.penetration < 1.25;
-  const likelyRoadGhostCollision = !!buildingCheck.collision &&
-    ((onRoadCenter && isApproxCollider) ||
-      (onRoadCore && buildingCheck.inside) ||
-      (onRoadCenter && roofLikeCollider));
-
-  return shallowRoadsideCollision || likelyRoadGhostCollision;
-}
+const {
+  driveBuildBlockCollision,
+  driveCenterYAtWorld,
+  finiteNumberOr,
+  resolveRoadHeading,
+  shouldIgnoreDriveCollision,
+  spawnEnclosurePenalty,
+  slopeDegreesAt,
+  slopePenaltyAt,
+  spawnSurfacePenalty,
+  terrainYAtWorld,
+  walkBaseYAtWorld,
+  walkBuildBlockCollision
+} = createWorldSpawnSurfaceApi({
+  getDeps: () => worldSpawnDeps
+});
 
 function evaluateWalkSpawnCandidate(x, z, options = {}) {
   const angle = finiteNumberOr(options.angle, finiteNumberOr(appCtx.car?.angle, 0));
   const terrainY = terrainYAtWorld(x, z);
   const walkBaseY = walkBaseYAtWorld(x, z);
   if (!Number.isFinite(terrainY)) return { valid: false, reason: "terrain_missing" };
-  const actorFeetY = Number.isFinite(options.feetY) ? options.feetY : walkBaseY;
+  const hasExplicitFeetY = Number.isFinite(options.feetY);
+  const actorFeetY = hasExplicitFeetY ? options.feetY : walkBaseY;
+  const collisionBaseY = hasExplicitFeetY ? actorFeetY : terrainY;
   const nearestRoad = typeof worldSpawnDeps.findNearestRoad === "function" ? worldSpawnDeps.findNearestRoad(x, z, {
     y: actorFeetY + 1.2,
     maxVerticalDelta: 12
@@ -202,11 +51,13 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
   const onRoadSurface = isRoadSurfaceReachable(nearestRoad, {
     extraLateralPadding: 0.25
   });
+  const road = onRoadSurface ? nearestRoad?.road || null : null;
+  const surfaceY = onRoadSurface && Number.isFinite(nearestRoad?.y) ? nearestRoad.y : walkBaseY;
   if (worldSpawnDeps.isInsideWaterArea(x, z) && !onRoadSurface) {
     return { valid: false, reason: "inside_water", terrainY };
   }
   if (worldSpawnDeps.buildingContainingPoint(x, z, 4, {
-    y: actorFeetY,
+    y: collisionBaseY,
     actorHeight: 1.9,
     tolerance: 0.45
   })) return { valid: false, reason: "inside_building", terrainY };
@@ -221,11 +72,11 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
     x,
     z,
     angle,
-    road: null,
-    onRoad: false,
+    road,
+    onRoad: !!road,
     terrainY,
-    walkY: walkBaseY + 1.7,
-    carY: driveCenterYAtWorld(x, z, false),
+    walkY: surfaceY + 1.7,
+    carY: surfaceY + 1.2,
     slopeDeg,
     source: options.source || "direct"
   };
@@ -274,6 +125,7 @@ function evaluateDriveSpawnCandidate(x, z, options = {}) {
   if (options.requireRoad && !onRoad) {
     return { valid: false, reason: "road_required", terrainY, slopeDeg, onRoad, road };
   }
+  const resolvedSurfaceY = Number.isFinite(nearestRoad?.y) ? nearestRoad.y : terrainY;
 
   return {
     valid: true,
@@ -284,8 +136,8 @@ function evaluateDriveSpawnCandidate(x, z, options = {}) {
     road,
     onRoad,
     terrainY,
-    walkY: terrainY + 1.7,
-    carY: Number.isFinite(nearestRoad?.y) ? nearestRoad.y + 1.2 : driveCenterYAtWorld(x, z, !!road),
+    walkY: resolvedSurfaceY + 1.7,
+    carY: Number.isFinite(nearestRoad?.y) ? resolvedSurfaceY + 1.2 : driveCenterYAtWorld(x, z, !!road),
     slopeDeg,
     source: options.source || "direct"
   };
@@ -316,38 +168,110 @@ function searchNearestSafeGroundSpawn(targetX, targetZ, options = {}) {
   return best;
 }
 
+function findGradeSeparatedRoadAt(x, z) {
+  let best = null;
+  let nearest = null;
+  for (const road of appCtx.roads || []) {
+    if (road?.structureSemantics?.terrainMode === "at_grade" || !Array.isArray(road?.pts)) continue;
+    for (let i = 0; i < road.pts.length - 1; i++) {
+      const p1 = road.pts[i];
+      const p2 = road.pts[i + 1];
+      const dx = p2.x - p1.x;
+      const dz = p2.z - p1.z;
+      const t = Math.max(0, Math.min(1, ((x - p1.x) * dx + (z - p1.z) * dz) / (dx * dx + dz * dz || 1)));
+      const projectedX = p1.x + dx * t;
+      const projectedZ = p1.z + dz * t;
+      const dist = Math.hypot(x - projectedX, z - projectedZ);
+      if (!nearest || dist < nearest.dist) nearest = { road, dist };
+      const snapDistance = road.structureSemantics?.structureKind === "bridge" ? 42 : 18;
+      if (dist > snapDistance) continue;
+      if (best && dist >= best.dist) continue;
+      const y = worldSpawnDeps.sampleFeatureSurfaceY(road, x, z, { segIndex: i, t });
+      if (Number.isFinite(y)) best = { road, dist, y, x: projectedX, z: projectedZ };
+    }
+  }
+  appCtx._lastCustomStructureProbe = nearest ? {
+    distance: nearest.dist,
+    kind: nearest.road?.structureSemantics?.structureKind || null,
+    width: Number(nearest.road?.width || 0)
+  } : null;
+  return best;
+}
+
 function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
   const requestedMode = options.mode === "walk" ? "walk" : "drive";
   const traversableFeatures = worldSpawnDeps.traversableFeaturesForMode(requestedMode);
   if (!Array.isArray(traversableFeatures) || traversableFeatures.length === 0) return null;
   const maxDistance = Number.isFinite(options.maxDistance) ? Math.max(32, options.maxDistance) : 220;
   const limits = [maxDistance, Infinity];
+  const shortlistLimit = requestedMode === "drive" ? 18 : 12;
+
+  const sampleSegmentCandidates = (p1, p2) => {
+    const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
+    if (!(segLen > 1e-6)) return [];
+    const tValues =
+      segLen >= 42 ? [0.18, 0.38, 0.62, 0.82] :
+      segLen >= 20 ? [0.25, 0.5, 0.75] :
+      [0.5];
+    return tValues.map((t) => ({
+      x: p1.x + (p2.x - p1.x) * t,
+      z: p1.z + (p2.z - p1.z) * t,
+      t,
+      segLen
+    }));
+  };
 
   for (let pass = 0; pass < limits.length; pass++) {
     const limit = limits[pass];
-    let best = null;
+    const shortlist = [];
+
+    const pushCandidate = (evaluated, feature, baseScore, spawnMeta = {}) => {
+      const nextResult = {
+        ...evaluated,
+        ...spawnMeta,
+        baseScore,
+        score: baseScore
+      };
+      if (requestedMode === "walk" && worldSpawnDeps.isVehicleRoad(feature)) {
+        nextResult.road = feature;
+        nextResult.onRoad = true;
+      }
+      shortlist.push(nextResult);
+      shortlist.sort((a, b) => a.baseScore - b.baseScore);
+      if (shortlist.length > shortlistLimit) shortlist.length = shortlistLimit;
+    };
 
     for (let r = 0; r < traversableFeatures.length; r++) {
       const feature = traversableFeatures[r];
       if (!Array.isArray(feature?.pts) || feature.pts.length < 2) continue;
-      for (let i = 0; i < feature.pts.length; i++) {
-        const basePoint = feature.pts[i];
-        const candidates = [{ x: basePoint.x, z: basePoint.z, idx: i }];
-        if (i < feature.pts.length - 1 && (i % 2 === 0 || feature.pts.length <= 12)) {
-          const next = feature.pts[i + 1];
-          candidates.push({
-            x: (basePoint.x + next.x) * 0.5,
-            z: (basePoint.z + next.z) * 0.5,
-            idx: i
-          });
-        }
-
+      const segmentLengths = [];
+      let featureLength = 0;
+      for (let i = 0; i < feature.pts.length - 1; i++) {
+        const segmentLength = Math.hypot(
+          feature.pts[i + 1].x - feature.pts[i].x,
+          feature.pts[i + 1].z - feature.pts[i].z
+        );
+        segmentLengths.push(segmentLength);
+        featureLength += segmentLength;
+      }
+      let distanceBeforeSegment = 0;
+      for (let i = 0; i < feature.pts.length - 1; i++) {
+        const p1 = feature.pts[i];
+        const p2 = feature.pts[i + 1];
+        const candidates = sampleSegmentCandidates(p1, p2);
         for (let c = 0; c < candidates.length; c++) {
           const candidate = candidates[c];
           const dist = Math.hypot(candidate.x - targetX, candidate.z - targetZ);
           if (dist > limit) continue;
 
-          const angle = resolveRoadHeading(feature, candidate.idx, options.angle);
+          const distanceAlong = distanceBeforeSegment + candidate.t * candidate.segLen;
+          const distanceFromEnd = Math.max(0, featureLength - distanceAlong);
+          const nearestEndpoint = distanceAlong <= distanceFromEnd ? "start" : "end";
+          const endpointClearance = Math.min(distanceAlong, distanceFromEnd);
+          const endpointConnected = Array.isArray(feature.connectedFeatures?.[nearestEndpoint]) &&
+            feature.connectedFeatures[nearestEndpoint].length > 0;
+          let angle = Math.atan2(p2.x - p1.x, p2.z - p1.z);
+          if (nearestEndpoint === "end" && !endpointConnected) angle += Math.PI;
           const evaluated = requestedMode === "drive" ?
             evaluateDriveSpawnCandidate(candidate.x, candidate.z, {
               angle,
@@ -357,24 +281,55 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
             }) :
             evaluateWalkSpawnCandidate(candidate.x, candidate.z, {
               angle,
+              feetY: options.feetY,
               source: "walk_surface_search"
             });
           if (!evaluated.valid) continue;
 
-          const score = dist + spawnSurfacePenalty(feature, requestedMode) + slopePenaltyAt(candidate.x, candidate.z);
-          if (!best || score < best.score) {
-            const nextResult = { ...evaluated, score };
-            if (requestedMode === "walk" && worldSpawnDeps.isVehicleRoad(feature)) {
-              nextResult.road = feature;
-              nextResult.onRoad = true;
-            }
-            best = nextResult;
-          }
+          const endpointPenalty =
+            endpointClearance >= 22 ? 0 :
+            endpointConnected ? (22 - endpointClearance) * 0.45 :
+            45 + (22 - endpointClearance) * 4;
+          const spawnSlopePenalty = Math.max(
+            0,
+            (Number(evaluated.slopeDeg) || 0) - (requestedMode === "drive" ? 8 : 12)
+          ) * (requestedMode === "drive" ? 4.5 : 2.6);
+          const score =
+            dist +
+            spawnSurfacePenalty(feature, requestedMode) +
+            slopePenaltyAt(candidate.x, candidate.z) +
+            spawnSlopePenalty +
+            endpointPenalty;
+          pushCandidate(evaluated, feature, score, {
+            featureEndpointClearance: endpointClearance,
+            endpointConnected
+          });
         }
+        distanceBeforeSegment += segmentLengths[i] || 0;
       }
     }
 
-    if (best) return best;
+    if (shortlist.length > 0) {
+      let best = null;
+      for (let i = 0; i < shortlist.length; i++) {
+        const candidate = shortlist[i];
+        const enclosurePenalty = spawnEnclosurePenalty(
+          candidate.x,
+          candidate.z,
+          candidate.angle,
+          requestedMode
+        );
+        const score = candidate.baseScore + enclosurePenalty;
+        if (!best || score < best.score) {
+          best = {
+            ...candidate,
+            enclosurePenalty,
+            score
+          };
+        }
+      }
+      if (best) return best;
+    }
   }
 
   return null;
@@ -405,6 +360,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
   const x = finiteNumberOr(targetX, 0);
   const z = finiteNumberOr(targetZ, 0);
   const angle = finiteNumberOr(options.angle, finiteNumberOr(appCtx.car?.angle, 0));
+  const preferRoad = options.preferRoad === true;
 
   if (mode === "walk") {
     const direct = evaluateWalkSpawnCandidate(x, z, {
@@ -434,7 +390,6 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     feetY: options.feetY,
     source: options.source || "direct"
   });
-  if (direct.valid) return direct;
 
   const roadFallback = searchNearestSafeRoadSpawn(x, z, {
     mode: "drive",
@@ -442,7 +397,9 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     feetY: options.feetY,
     maxDistance: options.maxRoadDistance
   });
+  if (direct.valid && (!preferRoad || direct.onRoad)) return direct;
   if (roadFallback) return roadFallback;
+  if (direct.valid) return direct;
 
   return fallbackResolvedSpawn("drive", { x, z, angle, source: "drive_fallback" });
 }
@@ -551,9 +508,15 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
     source: options.source || "custom_location"
   });
   if (boatSpawn) return boatSpawn;
-  return applySpawnTarget(0, 0, {
+  const exactRoad = findGradeSeparatedRoadAt(0, 0);
+  const structureMode = exactRoad?.road?.structureSemantics?.terrainMode || "at_grade";
+  const roadHalfWidth = Math.max(2, Number(exactRoad?.road?.width || 0) * 0.5 + 1);
+  const structureFeetY = structureMode !== "at_grade" && exactRoad?.dist <= roadHalfWidth && Number.isFinite(exactRoad?.y) ? exactRoad.y : null;
+  return applySpawnTarget(exactRoad?.x || 0, exactRoad?.z || 0, {
     ...options,
-    mode
+    mode,
+    feetY: Number.isFinite(structureFeetY) ? structureFeetY : options.feetY,
+    preferRoad: mode === "drive" || Number.isFinite(structureFeetY)
   });
 }
 

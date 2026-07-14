@@ -1,4 +1,25 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
+import {
+  createAsteroidBelt as createSolarSystemAsteroidBelt,
+  createKuiperBelt as createSolarSystemKuiperBelt,
+  createMoonSystems as createSolarSystemMoonSystems
+} from "./solar-system/minor-bodies.js?v=1";
+import { createGalaxies as createSolarSystemGalaxies } from "./solar-system/galaxies.js?v=1";
+import { initSolarSystemModel } from "./solar-system/init.js?v=1";
+import {
+  createInfoPanel as createSolarSystemInfoPanel,
+  createToggleButton as createSolarSystemToggleButton,
+  hideSolarSystemUI as hideSolarSystemUIImpl,
+  onSolarSystemClick as onSolarSystemClickImpl,
+  showSolarSystemUI as showSolarSystemUIImpl,
+  toggleOrbits as toggleSolarSystemOrbitsImpl,
+  toggleSolarSystem as toggleSolarSystemImpl,
+  updateSolarSystem as updateSolarSystemImpl
+} from "./solar-system/ui.js?v=1";
+import {
+  createSpacecraft as createSolarSystemSpacecraft,
+  updateSpacecraftPositions as updateSolarSystemSpacecraftPositions
+} from "./solar-system/spacecraft.js?v=1";
 // solar-system.js - Solar System Planet Rendering for Space Flight Mode
 // Heliocentric orbital model based on JPL "Approximate Positions of the Planets"
 // ============================================================================
@@ -10,8 +31,9 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 // ---------------------------------------------------------------------------
 const SOLAR_SYSTEM_PLANETS = [
 {
-  name: 'Mercury', type: 'Terrestrial', color: 0xb0a090, emissive: 0x584c40,
+  name: 'Mercury', type: 'Terrestrial', color: 0xffffff, emissive: 0x181512,
   glowColor: 0xb0a090,
+  texture: '/app/assets/textures/mercury_messenger.jpg',
   radiusScaled: 22, meanDistanceAU: 0.387, meanDistanceKM: 57910000,
   description: 'Smallest planet, closest to the Sun. Extreme temperature swings.',
   a0: 0.38710, aRate: 0.00000,
@@ -22,8 +44,9 @@ const SOLAR_SYSTEM_PLANETS = [
   LN0: 48.331, LNRate: -0.125
 },
 {
-  name: 'Venus', type: 'Terrestrial', color: 0xe8c080, emissive: 0x745830,
+  name: 'Venus', type: 'Terrestrial', color: 0xffffff, emissive: 0x2a1908,
   glowColor: 0xe8c080,
+  texture: '/app/assets/textures/venus_magellan.jpg',
   radiusScaled: 35, meanDistanceAU: 0.723, meanDistanceKM: 108200000,
   description: 'Hottest planet due to runaway greenhouse effect. Thick toxic atmosphere.',
   a0: 0.72333, aRate: 0.00001,
@@ -36,6 +59,7 @@ const SOLAR_SYSTEM_PLANETS = [
 {
   name: 'Earth', type: 'Terrestrial', color: 0x2255bb, emissive: 0x142a5e,
   glowColor: 0x88ccff,
+  texture: '/app/assets/textures/earth_atmos_2048.jpg',
   radiusScaled: 36, meanDistanceAU: 1.000, meanDistanceKM: 149600000,
   description: 'Our home planet. The only known world with liquid surface water and life.',
   a0: 1.00000, aRate: -0.00001,
@@ -46,8 +70,9 @@ const SOLAR_SYSTEM_PLANETS = [
   LN0: 0.0, LNRate: 0.0
 },
 {
-  name: 'Mars', type: 'Terrestrial', color: 0xcc4422, emissive: 0x662210,
+  name: 'Mars', type: 'Terrestrial', color: 0xffffff, emissive: 0x1c0904,
   glowColor: 0xcc4422,
+  texture: '/app/assets/textures/mars_viking_4096.jpg',
   radiusScaled: 28, meanDistanceAU: 1.524, meanDistanceKM: 227900000,
   description: 'The Red Planet. Has the tallest volcano and deepest canyon in the solar system.',
   a0: 1.52368, aRate: 0.00001,
@@ -58,8 +83,9 @@ const SOLAR_SYSTEM_PLANETS = [
   LN0: 49.558, LNRate: -0.297
 },
 {
-  name: 'Jupiter', type: 'Gas Giant', color: 0xd4a060, emissive: 0x6a5030,
+  name: 'Jupiter', type: 'Gas Giant', color: 0xffffff, emissive: 0x23180e,
   glowColor: 0xd4a060,
+  texture: '/app/assets/textures/jupiter_voyager.jpg',
   radiusScaled: 90, meanDistanceAU: 5.203, meanDistanceKM: 778500000,
   description: 'Largest planet. Its Great Red Spot is a storm larger than Earth.',
   a0: 5.20260, aRate: -0.00036,
@@ -70,8 +96,9 @@ const SOLAR_SYSTEM_PLANETS = [
   LN0: 100.464, LNRate: 0.176
 },
 {
-  name: 'Saturn', type: 'Gas Giant', color: 0xe8d090, emissive: 0x746840,
+  name: 'Saturn', type: 'Gas Giant', color: 0xffffff, emissive: 0x211d12,
   glowColor: 0xe8d090,
+  texture: '/app/assets/textures/saturn_jpl.jpg',
   radiusScaled: 78, meanDistanceAU: 9.537, meanDistanceKM: 1427000000,
   description: 'Famous for its spectacular ring system. Least dense planet.',
   a0: 9.55491, aRate: -0.00121,
@@ -82,8 +109,9 @@ const SOLAR_SYSTEM_PLANETS = [
   LN0: 113.665, LNRate: -0.268
 },
 {
-  name: 'Uranus', type: 'Ice Giant', color: 0x88ccdd, emissive: 0x446670,
+  name: 'Uranus', type: 'Ice Giant', color: 0xffffff, emissive: 0x10262b,
   glowColor: 0x88ccdd,
+  texture: '/app/assets/textures/uranus_jpl.jpg',
   radiusScaled: 55, meanDistanceAU: 19.189, meanDistanceKM: 2871000000,
   description: 'Tilted on its side. Has faint rings and 27 known moons.',
   a0: 19.21845, aRate: -0.00152,
@@ -94,8 +122,9 @@ const SOLAR_SYSTEM_PLANETS = [
   LN0: 74.006, LNRate: 0.074
 },
 {
-  name: 'Neptune', type: 'Ice Giant', color: 0x4466dd, emissive: 0x223370,
+  name: 'Neptune', type: 'Ice Giant', color: 0xffffff, emissive: 0x0d1730,
   glowColor: 0x4466dd,
+  texture: '/app/assets/textures/neptune_jpl.jpg',
   radiusScaled: 52, meanDistanceAU: 30.070, meanDistanceKM: 4498000000,
   description: 'Farthest planet. Has the strongest winds in the solar system.',
   a0: 30.11039, aRate: 0.00030,
@@ -566,943 +595,117 @@ function mapGalaxyDistanceToScene(distanceLy) {
   return 160000 + t * 160000;
 }
 
+function buildSolarSystemModuleContext() {
+  return {
+    ASTEROID_BELT,
+    AU_TO_SCENE,
+    DEG2RAD: _SS_DEG2RAD,
+    GALAXIES,
+    GALAXY_VISUAL_SCALE,
+    HELIO_VISUAL_DIST,
+    KUIPER_BELT,
+    NAMED_ASTEROIDS,
+    PLANET_MOONS,
+    SOLAR_SYSTEM_PLANETS,
+    SPACECRAFT,
+    appCtx,
+    computeOrbitalPosition,
+    createLabel,
+    distanceAU,
+    getEarthHelioPos,
+    helioToScene,
+    mapGalaxyDistanceToScene,
+    normalizeAngle,
+    raDecToScenePosition,
+    solarSystem,
+    updateMoonPositions,
+    updateSolarSystemPositions,
+    updateSpacecraftPositions
+  };
+}
+
+function createMoonSystems() {
+  return createSolarSystemMoonSystems(buildSolarSystemModuleContext());
+}
+
+function createAsteroidBelt() {
+  return createSolarSystemAsteroidBelt(buildSolarSystemModuleContext());
+}
+
+function createKuiperBelt() {
+  return createSolarSystemKuiperBelt(buildSolarSystemModuleContext());
+}
+
+function createSpacecraft() {
+  return createSolarSystemSpacecraft(buildSolarSystemModuleContext());
+}
+
+function updateSpacecraftPositions() {
+  return updateSolarSystemSpacecraftPositions(buildSolarSystemModuleContext());
+}
+
+function createGalaxies() {
+  return createSolarSystemGalaxies(buildSolarSystemModuleContext());
+}
+
+function onSolarSystemClick(event) {
+  return onSolarSystemClickImpl(buildSolarSystemModuleContext(), event);
+}
+
+function createInfoPanel() {
+  return createSolarSystemInfoPanel(buildSolarSystemModuleContext());
+}
+
+function createToggleButton() {
+  return createSolarSystemToggleButton(buildSolarSystemModuleContext());
+}
+
+function toggleSolarSystem() {
+  return toggleSolarSystemImpl(buildSolarSystemModuleContext());
+}
+
+function toggleOrbits() {
+  return toggleSolarSystemOrbitsImpl(buildSolarSystemModuleContext());
+}
+
+function showSolarSystemUI() {
+  return showSolarSystemUIImpl();
+}
+
+function hideSolarSystemUI() {
+  return hideSolarSystemUIImpl(buildSolarSystemModuleContext());
+}
+
+function updateSolarSystem() {
+  return updateSolarSystemImpl(buildSolarSystemModuleContext());
+}
+
 // ---------------------------------------------------------------------------
 // INITIALIZATION
 // ---------------------------------------------------------------------------
 function initSolarSystem(spaceScene) {
-  if (solarSystem.initialized) return;
-
-  console.log('[SolarSystem] Initializing heliocentric model...');
-  solarSystem.mouse = new THREE.Vector2();
-  solarSystem.group = new THREE.Group();
-  solarSystem.group.name = 'solarSystemGroup';
-  solarSystem.raycaster = new THREE.Raycaster();
-
-  // Sun at origin (center of solar system)
-  const sunGeo = new THREE.SphereGeometry(solarSystem.SUN_SIZE, 32, 32);
-  const sunMat = new THREE.MeshBasicMaterial({ color: 0xffdd44 });
-  solarSystem.sunMesh = new THREE.Mesh(sunGeo, sunMat);
-  solarSystem.sunMesh.name = 'Sun';
-  solarSystem.sunMesh.position.set(0, 0, 0);
-  solarSystem.group.add(solarSystem.sunMesh);
-
-  // Sun inner glow
-  const glow1Geo = new THREE.SphereGeometry(solarSystem.SUN_SIZE * 1.5, 24, 24);
-  const glow1Mat = new THREE.MeshBasicMaterial({
-    color: 0xffaa22, transparent: true, opacity: 0.2, side: THREE.BackSide
-  });
-  solarSystem.sunMesh.add(new THREE.Mesh(glow1Geo, glow1Mat));
-
-  // Sun outer glow (large, faint corona)
-  const glow2Geo = new THREE.SphereGeometry(solarSystem.SUN_SIZE * 3, 24, 24);
-  const glow2Mat = new THREE.MeshBasicMaterial({
-    color: 0xff8800, transparent: true, opacity: 0.08, side: THREE.BackSide
-  });
-  solarSystem.sunMesh.add(new THREE.Mesh(glow2Geo, glow2Mat));
-
-  // Sun point light - range covers full proportional solar system + deep space
-  const sunLight = new THREE.PointLight(0xfff8e0, 0.8, 50000);
-  solarSystem.sunMesh.add(sunLight);
-
-  // Sun label
-  createLabel('Sun', solarSystem.sunMesh, solarSystem.SUN_SIZE);
-
-  // Create planet meshes (skip Earth - index 2 - it already exists in the scene)
-  const now = new Date();
-  const earthPos = getEarthHelioPos(now);
-
-  SOLAR_SYSTEM_PLANETS.forEach((planet, i) => {
-    if (planet.name === 'Earth') return; // skip, already in space flight scene
-
-    const geo = new THREE.SphereGeometry(planet.radiusScaled, 24, 24);
-    const mat = new THREE.MeshPhongMaterial({
-      color: planet.color,
-      emissive: planet.emissive,
-      shininess: 30
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.name = planet.name;
-    mesh.userData = { isPlanet: true, planetIndex: i };
-
-    // Atmosphere / glow halo around each planet
-    const glowGeo = new THREE.SphereGeometry(planet.radiusScaled * 1.4, 20, 20);
-    const glowMat = new THREE.MeshBasicMaterial({
-      color: planet.glowColor || planet.color,
-      transparent: true,
-      opacity: 0.15,
-      side: THREE.BackSide
-    });
-    mesh.add(new THREE.Mesh(glowGeo, glowMat));
-
-    // Saturn rings
-    if (planet.name === 'Saturn') {
-      const ringGeo = new THREE.RingGeometry(
-        planet.radiusScaled * 1.3,
-        planet.radiusScaled * 2.2,
-        48
-      );
-      const ringMat = new THREE.MeshBasicMaterial({
-        color: 0xccbb88, transparent: true, opacity: 0.6, side: THREE.DoubleSide
-      });
-      const ring = new THREE.Mesh(ringGeo, ringMat);
-      ring.rotation.x = Math.PI * 0.4;
-      mesh.add(ring);
-    }
-
-    // Invisible hitbox for easier clicking (3x radius, min 50 units)
-    const hitRadius = Math.max(planet.radiusScaled * 3, 50);
-    const hitGeo = new THREE.SphereGeometry(hitRadius, 8, 8);
-    const hitMat = new THREE.MeshBasicMaterial({ visible: false });
-    const hitbox = new THREE.Mesh(hitGeo, hitMat);
-    hitbox.userData = { isPlanet: true, planetIndex: i };
-    mesh.add(hitbox);
-
-    // Label
-    createLabel(planet.name, mesh, planet.radiusScaled);
-
-    solarSystem.group.add(mesh);
-
-    // Real heliocentric position (AU)
-    const realPos = computePlanetPosition(planet, now);
-    const distFromEarth = distanceAU(realPos, earthPos);
-
-    solarSystem.planetMeshes.push({
-      mesh,
-      hitbox,
-      planet,
-      realPosition: realPos,
-      distFromEarthAU: distFromEarth
-    });
-  });
-
-  // ---------------------------------------------------------------------------
-  // ORBIT PATH LINES - Real elliptical paths computed from Keplerian elements
-  // ---------------------------------------------------------------------------
-  solarSystem.orbitLines = [];
-  solarSystem.orbitMarkers = [];
-  SOLAR_SYSTEM_PLANETS.forEach((planet) => {
-    const visualDist = HELIO_VISUAL_DIST[planet.name];
-    if (!visualDist) return;
-
-    // Compute the full elliptical orbit path (128 points for smooth curve)
-    const orbitPoints = computeOrbitPath(planet, 128);
-
-    // Close the loop
-    orbitPoints.push(orbitPoints[0].clone());
-
-    const orbitGeo = new THREE.BufferGeometry().setFromPoints(orbitPoints);
-    const orbitMat = new THREE.LineBasicMaterial({
-      color: planet.color,
-      transparent: true,
-      opacity: 0.4,
-      linewidth: 1
-    });
-    const orbitLine = new THREE.LineLoop(orbitGeo, orbitMat);
-    orbitLine.name = planet.name + '_orbit';
-    solarSystem.group.add(orbitLine);
-    solarSystem.orbitLines.push(orbitLine);
-
-    // Active orbit marker - glowing sphere that shows current position on orbit
-    const markerSize = Math.max(planet.radiusScaled * 0.25, 5);
-    const markerGeo = new THREE.SphereGeometry(markerSize, 12, 12);
-    const markerMat = new THREE.MeshBasicMaterial({
-      color: planet.color,
-      transparent: true,
-      opacity: 0.9
-    });
-    const marker = new THREE.Mesh(markerGeo, markerMat);
-    marker.name = planet.name + '_orbitMarker';
-
-    // Outer pulse glow ring
-    const pulseGeo = new THREE.SphereGeometry(markerSize * 3, 10, 10);
-    const pulseMat = new THREE.MeshBasicMaterial({
-      color: planet.color,
-      transparent: true,
-      opacity: 0.2,
-      side: THREE.BackSide
-    });
-    const pulse = new THREE.Mesh(pulseGeo, pulseMat);
-    pulse.name = 'pulse';
-    marker.add(pulse);
-
-    solarSystem.group.add(marker);
-    solarSystem.orbitMarkers.push({ mesh: marker, planet });
-  });
-
-  // ---------------------------------------------------------------------------
-  // PLANET MOONS - Create moons as children of planet meshes
-  // ---------------------------------------------------------------------------
-  createMoonSystems();
-
-  // ---------------------------------------------------------------------------
-  // ASTEROID BELT - Particle system between Mars and Jupiter
-  // ---------------------------------------------------------------------------
-  createAsteroidBelt();
-
-  // ---------------------------------------------------------------------------
-  // KUIPER BELT - Particle system beyond Neptune (30 - 50 AU)
-  // ---------------------------------------------------------------------------
-  createKuiperBelt();
-
-  // ---------------------------------------------------------------------------
-  // SPACECRAFT - ISS, Hubble, JWST, Voyager 1 & 2
-  // ---------------------------------------------------------------------------
-  createSpacecraft();
-
-  // ---------------------------------------------------------------------------
-  // GALAXIES - deep background targets in real sky directions (RA/Dec)
-  // ---------------------------------------------------------------------------
-  createGalaxies();
-
-  // Position all objects based on current date
-  updateSolarSystemPositions(now);
-
-  spaceScene.add(solarSystem.group);
-
-  // Add Earth-orbiting and L2 spacecraft to the scene (not the group)
-  // These need to track Earth's position, which is a direct scene child
-  solarSystem.spacecraftMeshes.forEach((entry) => {
-    if (entry.orbitData.type === 'earthOrbit' || entry.orbitData.type === 'L2') {
-      spaceScene.add(entry.mesh);
-    }
-  });
-
-  // Create info panel
-  createInfoPanel();
-
-  // Create toggle button
-  createToggleButton();
-
-  // Add click listener for the space flight canvas
-  if (appCtx.spaceFlight.canvas) {
-    appCtx.spaceFlight.canvas.addEventListener('click', onSolarSystemClick);
-  }
-
-  solarSystem.initialized = true;
-  console.log('[SolarSystem] Heliocentric model initialized with',
-  solarSystem.planetMeshes.length, 'planets +',
-  solarSystem.moonMeshes.length, 'moons +',
-  solarSystem.asteroidMeshes.length, 'named asteroids +',
-  ASTEROID_BELT.count, 'belt particles +',
-  KUIPER_BELT.count, 'kuiper particles +',
-  solarSystem.spacecraftMeshes.length, 'spacecraft +',
-  solarSystem.galaxyMeshes.length, 'galaxies + Sun');
-}
-
-// ---------------------------------------------------------------------------
-// MOON SYSTEMS - Create moons as children of planet meshes
-// ---------------------------------------------------------------------------
-function createMoonSystems() {
-  solarSystem.moonMeshes = [];
-
-  solarSystem.planetMeshes.forEach((entry) => {
-    const moonConfig = PLANET_MOONS[entry.planet.name];
-    if (!moonConfig) return;
-
-    moonConfig.forEach((moon, index) => {
-      // Moon sphere
-      const moonGeo = new THREE.SphereGeometry(moon.radiusScaled, 14, 14);
-      const moonMat = new THREE.MeshPhongMaterial({
-        color: moon.color,
-        emissive: 0x101010,
-        shininess: 18
-      });
-      const moonMesh = new THREE.Mesh(moonGeo, moonMat);
-      moonMesh.name = moon.name;
-      entry.mesh.add(moonMesh);
-
-      // Moon orbit ring around planet
-      const moonOrbitGeo = new THREE.RingGeometry(moon.orbitRadius - 0.4, moon.orbitRadius + 0.4, 64);
-      const moonOrbitMat = new THREE.MeshBasicMaterial({
-        color: 0xcbd5e1,
-        transparent: true,
-        opacity: 0.16,
-        side: THREE.DoubleSide
-      });
-      const moonOrbit = new THREE.Mesh(moonOrbitGeo, moonOrbitMat);
-      moonOrbit.rotation.x = -Math.PI / 2;
-      entry.mesh.add(moonOrbit);
-
-      solarSystem.moonMeshes.push({
-        mesh: moonMesh,
-        planetMesh: entry.mesh,
-        orbitRadius: moon.orbitRadius,
-        orbitDays: moon.orbitDays,
-        radiusScaled: moon.radiusScaled,
-        name: moon.name,
-        phaseOffset: index * (Math.PI * 0.8)
-      });
-    });
-  });
-}
-
-// ---------------------------------------------------------------------------
-// ASTEROID BELT - Particle system + named large asteroids
-// ---------------------------------------------------------------------------
-function createAsteroidBelt() {
-  const belt = ASTEROID_BELT;
-  const positions = [];
-  const colors = [];
-  const sizes = [];
-
-  // Seeded random for reproducible belt
-  let seed = 42;
-  function seededRandom() {
-    seed = (seed * 16807 + 0) % 2147483647;
-    return (seed - 1) / 2147483646;
-  }
-
-  // Check if a semi-major axis falls in a Kirkwood gap
-  function isInKirkwoodGap(a) {
-    for (let i = 0; i < belt.kirkwoodGaps.length; i++) {
-      const gap = belt.kirkwoodGaps[i];
-      if (Math.abs(a - gap.au) < gap.width) return true;
-    }
-    return false;
-  }
-
-  for (let i = 0; i < belt.count; i++) {
-    // Random semi-major axis, rejecting Kirkwood gaps
-    let a;
-    do {
-      a = belt.innerAU + seededRandom() * (belt.outerAU - belt.innerAU);
-    } while (isInKirkwoodGap(a));
-
-    // Orbital elements with realistic distributions
-    const e = seededRandom() * belt.maxEccentricity * seededRandom(); // bias toward lower e
-    const I = (seededRandom() - 0.5) * 2 * belt.maxInclination * seededRandom();
-    const LN = seededRandom() * 360;
-    const w = seededRandom() * 360;
-    const M = seededRandom() * 360;
-
-    // Compute position using real orbital mechanics
-    const pos = computeOrbitalPosition(a, e, I, w, LN, M);
-
-    // Convert to scene coordinates (same as helioToScene with AU_TO_SCENE)
-    const x = pos.x * AU_TO_SCENE;
-    const y = pos.z * AU_TO_SCENE * 0.3; // flatten vertical
-    const z = pos.y * AU_TO_SCENE; // swap y/z for Three.js
-
-    positions.push(x, y, z);
-
-    // Color variation (grays and browns)
-    const brightness = 0.4 + seededRandom() * 0.5;
-    const warmth = seededRandom() * 0.15;
-    colors.push(brightness + warmth, brightness, brightness - warmth * 0.5);
-
-    // Size variation (most are small, a few larger)
-    const sizeRoll = seededRandom();
-    sizes.push(sizeRoll < 0.9 ? 2.5 + seededRandom() * 3 : 5 + seededRandom() * 5);
-  }
-
-  const beltGeo = new THREE.BufferGeometry();
-  beltGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  beltGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  beltGeo.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
-
-  const beltMat = new THREE.PointsMaterial({
-    size: 2.4,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.9,
-    sizeAttenuation: false,
-    depthWrite: false
-  });
-
-  solarSystem.asteroidBelt = new THREE.Points(beltGeo, beltMat);
-  solarSystem.asteroidBelt.name = 'asteroidBelt';
-  solarSystem.asteroidBelt.renderOrder = 3;
-  solarSystem.group.add(solarSystem.asteroidBelt);
-
-  // --- Asteroid belt boundary rings (inner and outer edge) ---
-  createBeltBoundaryRing(belt.innerAU, 0xb48357, 'beltInnerEdge');
-  createBeltBoundaryRing(belt.outerAU, 0xb48357, 'beltOuterEdge');
-  createBeltVolumeBand(belt.innerAU, belt.outerAU, 0xb48357, 0.09, 'asteroidBeltBand', 1.5);
-
-  // --- Named large asteroids as meshes ---
-  createNamedAsteroids();
-}
-
-function createKuiperBelt() {
-  const belt = KUIPER_BELT;
-  const positions = [];
-  const colors = [];
-  const sizes = [];
-
-  // Separate seed so Kuiper distribution is stable and distinct from asteroid belt
-  let seed = 314159;
-  function seededRandom() {
-    seed = (seed * 16807 + 0) % 2147483647;
-    return (seed - 1) / 2147483646;
-  }
-
-  for (let i = 0; i < belt.count; i++) {
-    const a = belt.innerAU + seededRandom() * (belt.outerAU - belt.innerAU);
-    const e = seededRandom() * belt.maxEccentricity * seededRandom();
-    const I = (seededRandom() - 0.5) * 2 * belt.maxInclination * seededRandom();
-    const LN = seededRandom() * 360;
-    const w = seededRandom() * 360;
-    const M = seededRandom() * 360;
-
-    const pos = computeOrbitalPosition(a, e, I, w, LN, M);
-
-    // Keep the same scene transform used elsewhere in the heliocentric model.
-    const x = pos.x * AU_TO_SCENE;
-    const y = pos.z * AU_TO_SCENE * 0.3;
-    const z = pos.y * AU_TO_SCENE;
-
-    positions.push(x, y, z);
-
-    // Cooler color palette to visually separate Kuiper objects from rocky asteroids.
-    const brightness = 0.45 + seededRandom() * 0.4;
-    const iceTint = 0.12 + seededRandom() * 0.18;
-    colors.push(brightness - iceTint * 0.2, brightness, brightness + iceTint);
-
-    const sizeRoll = seededRandom();
-    sizes.push(sizeRoll < 0.93 ? 1.6 + seededRandom() * 2.2 : 3.2 + seededRandom() * 3.0);
-  }
-
-  const beltGeo = new THREE.BufferGeometry();
-  beltGeo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  beltGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  beltGeo.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
-
-  const beltMat = new THREE.PointsMaterial({
-    size: 1.9,
-    vertexColors: true,
-    transparent: true,
-    opacity: 0.82,
-    sizeAttenuation: false,
-    depthWrite: false
-  });
-
-  solarSystem.kuiperBelt = new THREE.Points(beltGeo, beltMat);
-  solarSystem.kuiperBelt.name = 'kuiperBelt';
-  solarSystem.kuiperBelt.renderOrder = 3;
-  solarSystem.group.add(solarSystem.kuiperBelt);
-
-  // Boundary guide rings for context.
-  createBeltBoundaryRing(belt.innerAU, 0x7baee0, 'kuiperInnerEdge');
-  createBeltBoundaryRing(belt.outerAU, 0x7baee0, 'kuiperOuterEdge');
-  createBeltVolumeBand(belt.innerAU, belt.outerAU, 0x7baee0, 0.06, 'kuiperBeltBand', 2.8);
-}
-
-function createBeltBoundaryRing(radiusAU, color, name) {
-  const radius = radiusAU * AU_TO_SCENE;
-  const points = [];
-  const segments = 128;
-  for (let i = 0; i <= segments; i++) {
-    const angle = i / segments * Math.PI * 2;
-    points.push(new THREE.Vector3(
-      Math.cos(angle) * radius,
-      0,
-      Math.sin(angle) * radius
-    ));
-  }
-  const geo = new THREE.BufferGeometry().setFromPoints(points);
-  const mat = new THREE.LineBasicMaterial({
-    color: color,
-    transparent: true,
-    opacity: 0.34,
-    linewidth: 1
-  });
-  const ring = new THREE.LineLoop(geo, mat);
-  ring.name = name;
-  solarSystem.group.add(ring);
-}
-
-function createBeltVolumeBand(innerAU, outerAU, color, opacity, name, tiltDeg) {
-  const innerRadius = innerAU * AU_TO_SCENE;
-  const outerRadius = outerAU * AU_TO_SCENE;
-  const ringGeo = new THREE.RingGeometry(innerRadius, outerRadius, 256, 1);
-  const ringMat = new THREE.MeshBasicMaterial({
-    color: color,
-    transparent: true,
-    opacity: opacity,
-    side: THREE.DoubleSide,
-    depthWrite: false
-  });
-  const beltBand = new THREE.Mesh(ringGeo, ringMat);
-  beltBand.name = name;
-  beltBand.rotation.x = -Math.PI / 2;
-  if (typeof tiltDeg === 'number' && tiltDeg !== 0) {
-    beltBand.rotation.z = tiltDeg * _SS_DEG2RAD;
-  }
-  beltBand.renderOrder = 1;
-  solarSystem.group.add(beltBand);
-}
-
-function createNamedAsteroids() {
-  solarSystem.asteroidMeshes = [];
-  const now = new Date();
-  const earthPos = getEarthHelioPos(now);
-
-  NAMED_ASTEROIDS.forEach((asteroid, i) => {
-    // Irregular shape: slightly deformed sphere
-    const geo = new THREE.SphereGeometry(asteroid.radiusScaled, 10, 8);
-    // Deform vertices for rocky appearance
-    const posArr = geo.attributes.position.array;
-    for (let v = 0; v < posArr.length; v += 3) {
-      const deform = 0.8 + Math.sin(v * 3.7) * 0.15 + Math.cos(v * 2.3) * 0.1;
-      posArr[v] *= deform;
-      posArr[v + 1] *= deform;
-      posArr[v + 2] *= deform;
-    }
-    geo.computeVertexNormals();
-
-    const mat = new THREE.MeshPhongMaterial({
-      color: asteroid.color,
-      emissive: asteroid.emissive,
-      shininess: 10,
-      flatShading: true
-    });
-    const mesh = new THREE.Mesh(geo, mat);
-    mesh.name = asteroid.name;
-    mesh.userData = { isAsteroid: true, asteroidIndex: i };
-
-    // Glow halo
-    const glowGeo = new THREE.SphereGeometry(asteroid.radiusScaled * 1.3, 12, 12);
-    const glowMat = new THREE.MeshBasicMaterial({
-      color: asteroid.glowColor,
-      transparent: true,
-      opacity: 0.1,
-      side: THREE.BackSide
-    });
-    mesh.add(new THREE.Mesh(glowGeo, glowMat));
-
-    // Hitbox for clicking
-    const hitRadius = Math.max(asteroid.radiusScaled * 4, 40);
-    const hitGeo = new THREE.SphereGeometry(hitRadius, 6, 6);
-    const hitMat = new THREE.MeshBasicMaterial({ visible: false });
-    const hitbox = new THREE.Mesh(hitGeo, hitMat);
-    hitbox.userData = { isAsteroid: true, asteroidIndex: i };
-    mesh.add(hitbox);
-
-    // Label
-    createLabel(asteroid.name, mesh, asteroid.radiusScaled);
-
-    // Compute position from orbital elements
-    const T = dateToJulianCenturies(now);
-    const a = asteroid.a0;
-    const e = asteroid.e0;
-    const I_val = asteroid.I0;
-    const LP = asteroid.LP0;
-    const LN = asteroid.LN0;
-    const w = LP - LN;
-    const L = asteroid.L0;
-    const M = normalizeAngle(L - LP);
-    const realPos = computeOrbitalPosition(a, e, I_val, w, LN, M);
-
-    const visualDist = a * AU_TO_SCENE;
-    const scenePos = helioToScene(realPos, visualDist, a);
-    mesh.position.set(scenePos.x, scenePos.y, scenePos.z);
-
-    solarSystem.group.add(mesh);
-
-    const distFromEarth = distanceAU(realPos, earthPos);
-    solarSystem.asteroidMeshes.push({
-      mesh,
-      hitbox,
-      asteroid,
-      realPosition: realPos,
-      distFromEarthAU: distFromEarth
-    });
-  });
-}
-
-// ---------------------------------------------------------------------------
-// SPACECRAFT - Real human-made objects in space
-// ---------------------------------------------------------------------------
-function createSpacecraft() {
-  solarSystem.spacecraftMeshes = [];
-
-  SPACECRAFT.forEach((craft, i) => {
-    let meshGroup;
-
-    // Build distinctive mesh for each spacecraft type
-    if (craft.name === 'ISS') {
-      meshGroup = buildISSMesh(craft);
-    } else if (craft.name === 'Hubble') {
-      meshGroup = buildHubbleMesh(craft);
-    } else if (craft.name === 'JWST') {
-      meshGroup = buildJWSTMesh(craft);
-    } else {
-      meshGroup = buildVoyagerMesh(craft);
-    }
-
-    meshGroup.name = craft.name;
-    meshGroup.userData = { isSpacecraft: true, spacecraftIndex: i };
-
-    // Hitbox for clicking
-    const hitRadius = Math.max(craft.size * 6, 30);
-    const hitGeo = new THREE.SphereGeometry(hitRadius, 6, 6);
-    const hitMat = new THREE.MeshBasicMaterial({ visible: false });
-    const hitbox = new THREE.Mesh(hitGeo, hitMat);
-    hitbox.userData = { isSpacecraft: true, spacecraftIndex: i };
-    meshGroup.add(hitbox);
-
-    // Label
-    createLabel(craft.name, meshGroup, craft.size * 2);
-
-    // Position based on orbit type
-    const orbitData = {};
-    if (craft.orbit === 'Earth') {
-      // Earth-orbiting: add to scene (not group), will track Earth position
-      orbitData.type = 'earthOrbit';
-      orbitData.radius = craft.orbitRadius;
-      orbitData.periodDays = craft.orbitPeriodDays;
-      orbitData.inclination = craft.orbitInclination * _SS_DEG2RAD;
-      orbitData.phase = craft.phaseOffset;
-      // Start at Earth's position (will be updated per frame)
-      meshGroup.position.set(0, 0, 0);
-    } else if (craft.orbit === 'L2') {
-      // L2 point: positioned relative to Earth, away from Sun
-      orbitData.type = 'L2';
-      orbitData.offset = craft.orbitOffset;
-      meshGroup.position.set(0, 0, 0);
-    } else if (craft.orbit === 'heliocentric') {
-      // Deep space: fixed position based on RA/Dec direction
-      orbitData.type = 'deepSpace';
-      const ra = craft.directionRA * _SS_DEG2RAD;
-      const dec = craft.directionDec * _SS_DEG2RAD;
-      const dist = craft.visualDistanceAU * AU_TO_SCENE;
-      const x = dist * Math.cos(dec) * Math.cos(ra);
-      const z = dist * Math.cos(dec) * Math.sin(ra);
-      const y = dist * Math.sin(dec) * 0.3; // flatten vertical like planets
-      meshGroup.position.set(x, y, z);
-      solarSystem.group.add(meshGroup);
-    }
-
-    solarSystem.spacecraftMeshes.push({
-      mesh: meshGroup,
-      hitbox,
-      spacecraft: craft,
-      orbitData
-    });
-  });
-}
-
-// --- ISS: Cross-shaped station with solar arrays ---
-function buildISSMesh(craft) {
-  const group = new THREE.Group();
-  const bodyMat = new THREE.MeshPhongMaterial({
-    color: craft.color, emissive: craft.emissive, shininess: 60
-  });
-  const panelMat = new THREE.MeshPhongMaterial({
-    color: 0x223388, emissive: 0x111844, shininess: 40, side: THREE.DoubleSide
-  });
-
-  // Central module (pressurized modules)
-  const body = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1, 6), bodyMat);
-  group.add(body);
-
-  // Truss (horizontal beam)
-  const truss = new THREE.Mesh(new THREE.BoxGeometry(12, 0.3, 0.3), bodyMat);
-  group.add(truss);
-
-  // 4 solar panel arrays
-  for (let side = -1; side <= 1; side += 2) {
-    for (let pair = -1; pair <= 1; pair += 2) {
-      const panel = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.05, 4), panelMat);
-      panel.position.set(side * 4.5, 0, pair * 1.2);
-      group.add(panel);
-    }
-  }
-
-  // Glow for visibility at distance
-  const glowGeo = new THREE.SphereGeometry(craft.size * 2, 10, 10);
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: 0xffffee, transparent: true, opacity: 0.12, side: THREE.BackSide
-  });
-  group.add(new THREE.Mesh(glowGeo, glowMat));
-
-  group.scale.setScalar(craft.size / 3);
-  return group;
-}
-
-// --- Hubble: Cylinder body with solar wing panels ---
-function buildHubbleMesh(craft) {
-  const group = new THREE.Group();
-  const bodyMat = new THREE.MeshPhongMaterial({
-    color: craft.color, emissive: craft.emissive, shininess: 50
-  });
-  const panelMat = new THREE.MeshPhongMaterial({
-    color: 0x223366, emissive: 0x111833, shininess: 30, side: THREE.DoubleSide
-  });
-
-  // Cylindrical body
-  const body = new THREE.Mesh(new THREE.CylinderGeometry(0.8, 0.8, 5, 12), bodyMat);
-  body.rotation.z = Math.PI / 2;
-  group.add(body);
-
-  // Aperture door
-  const door = new THREE.Mesh(new THREE.CircleGeometry(0.8, 12), bodyMat);
-  door.position.x = 2.5;
-  door.rotation.y = Math.PI / 2;
-  group.add(door);
-
-  // Two solar panels
-  for (let side = -1; side <= 1; side += 2) {
-    const panel = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.05, 5), panelMat);
-    panel.position.set(0, side * 1.8, 0);
-    group.add(panel);
-  }
-
-  // Glow
-  const glowGeo = new THREE.SphereGeometry(craft.size * 2, 10, 10);
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: 0xccccff, transparent: true, opacity: 0.12, side: THREE.BackSide
-  });
-  group.add(new THREE.Mesh(glowGeo, glowMat));
-
-  group.scale.setScalar(craft.size / 2.5);
-  return group;
-}
-
-// --- JWST: Gold hexagonal sunshield + telescope ---
-function buildJWSTMesh(craft) {
-  const group = new THREE.Group();
-
-  // Sunshield - hexagonal shape (gold)
-  const shieldShape = new THREE.Shape();
-  const hexR = 3;
-  for (let i = 0; i < 6; i++) {
-    const angle = i / 6 * Math.PI * 2 - Math.PI / 6;
-    const x = Math.cos(angle) * hexR;
-    const y = Math.sin(angle) * hexR;
-    if (i === 0) shieldShape.moveTo(x, y);else
-    shieldShape.lineTo(x, y);
-  }
-  shieldShape.closePath();
-
-  const shieldGeo = new THREE.ShapeGeometry(shieldShape);
-  const shieldMat = new THREE.MeshPhongMaterial({
-    color: 0xddaa22, emissive: 0x665510, shininess: 80, side: THREE.DoubleSide
-  });
-  const shield = new THREE.Mesh(shieldGeo, shieldMat);
-  shield.rotation.x = -Math.PI / 2;
-  group.add(shield);
-
-  // Telescope mirror (smaller hexagon on top)
-  const mirrorGeo = new THREE.CircleGeometry(1.2, 6);
-  const mirrorMat = new THREE.MeshPhongMaterial({
-    color: 0xeecc44, emissive: 0x776622, shininess: 100, side: THREE.DoubleSide
-  });
-  const mirror = new THREE.Mesh(mirrorGeo, mirrorMat);
-  mirror.position.y = 1.5;
-  mirror.rotation.x = -Math.PI / 2;
-  group.add(mirror);
-
-  // Support struts
-  const strutMat = new THREE.MeshBasicMaterial({ color: 0x888888 });
-  for (let i = 0; i < 3; i++) {
-    const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 1.5, 4), strutMat);
-    const angle = i / 3 * Math.PI * 2;
-    strut.position.set(Math.cos(angle) * 0.8, 0.75, Math.sin(angle) * 0.8);
-    group.add(strut);
-  }
-
-  // Glow (gold)
-  const glowGeo = new THREE.SphereGeometry(craft.size * 2.5, 10, 10);
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: 0xddaa44, transparent: true, opacity: 0.15, side: THREE.BackSide
-  });
-  group.add(new THREE.Mesh(glowGeo, glowMat));
-
-  group.scale.setScalar(craft.size / 3);
-  return group;
-}
-
-// --- Voyager: High-gain antenna dish + instrument boom ---
-function buildVoyagerMesh(craft) {
-  const group = new THREE.Group();
-  const bodyMat = new THREE.MeshPhongMaterial({
-    color: craft.color, emissive: craft.emissive, shininess: 30
-  });
-
-  // High-gain antenna dish
-  const dishGeo = new THREE.ConeGeometry(2, 0.8, 16, 1, true);
-  const dish = new THREE.Mesh(dishGeo, bodyMat);
-  dish.rotation.x = Math.PI;
-  group.add(dish);
-
-  // Antenna feed (small cylinder at dish center)
-  const feed = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1.2, 6), bodyMat);
-  feed.position.y = 0.6;
-  group.add(feed);
-
-  // Bus body (small box beneath dish)
-  const bus = new THREE.Mesh(new THREE.BoxGeometry(1, 0.8, 1), bodyMat);
-  bus.position.y = -0.8;
-  group.add(bus);
-
-  // Instrument boom (long arm)
-  const boomMat = new THREE.MeshBasicMaterial({ color: 0xaaaaaa });
-  const boom = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 5, 4), boomMat);
-  boom.position.set(2.5, -0.5, 0);
-  boom.rotation.z = Math.PI / 2;
-  group.add(boom);
-
-  // RTG power source (cylinder at end of boom)
-  const rtg = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1, 6), bodyMat);
-  rtg.position.set(5, -0.5, 0);
-  rtg.rotation.z = Math.PI / 2;
-  group.add(rtg);
-
-  // Glow for distant visibility
-  const glowGeo = new THREE.SphereGeometry(craft.size * 3, 10, 10);
-  const glowMat = new THREE.MeshBasicMaterial({
-    color: 0xffffcc, transparent: true, opacity: 0.15, side: THREE.BackSide
-  });
-  group.add(new THREE.Mesh(glowGeo, glowMat));
-
-  group.scale.setScalar(craft.size / 2);
-  return group;
-}
-
-// --- Update spacecraft positions each frame ---
-function updateSpacecraftPositions() {
-  if (!solarSystem.spacecraftMeshes.length) return;
-
-  const elapsedDays = Date.now() / 86400000;
-
-  // Get Earth's scene position (Earth is a direct scene child, not in the group)
-  let earthPos = null;
-  if (appCtx.spaceFlight && appCtx.spaceFlight.earth) {
-    earthPos = appCtx.spaceFlight.earth.position;
-  }
-
-  // Get Sun's position for L2 calculation (anti-Sun direction from Earth)
-  const sunWorldPos = solarSystem.group ? solarSystem.group.position : new THREE.Vector3(0, 0, 0);
-
-  solarSystem.spacecraftMeshes.forEach((entry) => {
-    const od = entry.orbitData;
-
-    if (od.type === 'earthOrbit' && earthPos) {
-      // Orbit around Earth
-      const angularSpeed = Math.PI * 2 / od.periodDays;
-      const theta = od.phase + elapsedDays * angularSpeed * solarSystem.MOON_TIME_SCALE;
-      const cosInc = Math.cos(od.inclination);
-      const sinInc = Math.sin(od.inclination);
-
-      const localX = Math.cos(theta) * od.radius;
-      const localZ = Math.sin(theta) * od.radius;
-      const localY = Math.sin(theta) * od.radius * sinInc * 0.15;
-
-      entry.mesh.position.set(
-        earthPos.x + localX,
-        earthPos.y + localY,
-        earthPos.z + localZ
-      );
-
-      // Slow tumble
-      entry.mesh.rotation.y += 0.01;
-    } else if (od.type === 'L2' && earthPos) {
-      // L2 point: opposite direction from Sun relative to Earth
-      const toSun = new THREE.Vector3().subVectors(sunWorldPos, earthPos);
-      if (toSun.length() > 0) {
-        toSun.normalize();
-      } else {
-        toSun.set(-1, 0, 0);
-      }
-      // L2 is in the anti-Sun direction from Earth
-      entry.mesh.position.set(
-        earthPos.x - toSun.x * od.offset,
-        earthPos.y - toSun.y * od.offset + 5,
-        earthPos.z - toSun.z * od.offset
-      );
-      // Slow rotation to show sunshield
-      entry.mesh.rotation.y += 0.003;
-    } else if (od.type === 'deepSpace') {
-      // Static position in the solar system group - just tumble slowly
-      entry.mesh.rotation.y += 0.002;
-    }
-  });
-}
-
-const galaxyTextureCache = new Map();
-
-function createGalaxySpriteTexture(colorHex) {
-  const key = String(colorHex);
-  if (galaxyTextureCache.has(key)) return galaxyTextureCache.get(key);
-
-  const canvas = document.createElement('canvas');
-  canvas.width = 256;
-  canvas.height = 256;
-  const ctx = canvas.getContext('2d');
-  const color = new THREE.Color(colorHex);
-  const r = Math.round(color.r * 255);
-  const g = Math.round(color.g * 255);
-  const b = Math.round(color.b * 255);
-
-  const grad = ctx.createRadialGradient(128, 128, 4, 128, 128, 118);
-  grad.addColorStop(0.0, 'rgba(255,255,255,0.98)');
-  grad.addColorStop(0.2, 'rgba(' + r + ',' + g + ',' + b + ',0.95)');
-  grad.addColorStop(0.65, 'rgba(' + r + ',' + g + ',' + b + ',0.35)');
-  grad.addColorStop(1.0, 'rgba(0,0,0,0)');
-  ctx.fillStyle = grad;
-  ctx.beginPath();
-  ctx.arc(128, 128, 118, 0, Math.PI * 2);
-  ctx.fill();
-
-  const texture = new THREE.CanvasTexture(canvas);
-  texture.needsUpdate = true;
-  galaxyTextureCache.set(key, texture);
-  return texture;
-}
-
-function createGalaxies() {
-  solarSystem.galaxyMeshes = [];
-
-  GALAXIES.forEach((galaxy, i) => {
-    const group = new THREE.Group();
-    group.name = galaxy.name;
-    group.userData = { isGalaxy: true, galaxyIndex: i };
-
-    const visualDistance = mapGalaxyDistanceToScene(galaxy.distanceLy);
-    const pos = raDecToScenePosition(galaxy.raDeg, galaxy.decDeg, visualDistance);
-    group.position.copy(pos);
-
-    const texture = createGalaxySpriteTexture(galaxy.color);
-    const coreSize = (galaxy.visualSize || 820) * GALAXY_VISUAL_SCALE;
-
-    const core = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: texture,
-      transparent: true,
-      opacity: 0.95,
-      depthWrite: false
-    }));
-    core.scale.set(coreSize, coreSize, 1);
-    core.renderOrder = 4;
-    group.add(core);
-
-    const halo = new THREE.Sprite(new THREE.SpriteMaterial({
-      map: texture,
-      transparent: true,
-      opacity: 0.28,
-      depthWrite: false
-    }));
-    halo.scale.set(coreSize * 2.2, coreSize * 2.2, 1);
-    halo.renderOrder = 3;
-    group.add(halo);
-
-    const hitRadius = Math.max(coreSize * 0.45, 300);
-    const hitbox = new THREE.Mesh(
-      new THREE.SphereGeometry(hitRadius, 8, 8),
-      new THREE.MeshBasicMaterial({ visible: false })
-    );
-    hitbox.userData = { isGalaxy: true, galaxyIndex: i };
-    group.add(hitbox);
-
-    solarSystem.group.add(group);
-
-    solarSystem.galaxyMeshes.push({
-      mesh: group,
-      hitbox,
-      galaxy,
-      visualDistance
-    });
-  });
+  return initSolarSystemModel({
+    ASTEROID_BELT,
+    KUIPER_BELT,
+    SOLAR_SYSTEM_PLANETS,
+    THREE,
+    appCtx,
+    computeOrbitPath,
+    computePlanetPosition,
+    createAsteroidBelt,
+    createGalaxies,
+    createInfoPanel,
+    createKuiperBelt,
+    createLabel,
+    createMoonSystems,
+    createSpacecraft,
+    createToggleButton,
+    distanceAU,
+    getEarthHelioPos,
+    onSolarSystemClick,
+    solarSystem,
+    updateSolarSystemPositions
+  }, spaceScene);
 }
 
 // ---------------------------------------------------------------------------
@@ -1548,13 +751,16 @@ function createLabel(text, parentMesh, objectRadius) {
   ctx.fillText(text, 256, 64);
 
   const texture = new THREE.CanvasTexture(canvas);
+  const isSpacecraft = parentMesh.userData?.isSpacecraft === true;
   const spriteMat = new THREE.SpriteMaterial({
     map: texture,
     transparent: true,
-    depthTest: false
+    depthTest: !isSpacecraft
   });
   const sprite = new THREE.Sprite(spriteMat);
-  const labelScale = Math.max(objectRadius * 5, 80);
+  const labelScale = isSpacecraft
+    ? Math.max(objectRadius * 1.8, 14)
+    : Math.max(objectRadius * 5, 80);
   sprite.scale.set(labelScale, labelScale * 0.25, 1);
   sprite.position.y = objectRadius * 1.8;
   sprite.name = text + '_label';
@@ -1653,7 +859,7 @@ function getAllSpaceBodies() {
         position: entry.mesh.position.clone().add(solarSystem.group.position),
         radius: entry.planet.radiusScaled,
         mesh: entry.mesh,
-        landable: false
+        landable: entry.planet.name === 'Mars'
       });
     });
 
@@ -1728,667 +934,6 @@ function getAllSpaceBodies() {
 function setSolarSystemCenter(position) {
   if (!solarSystem.group) return;
   solarSystem.group.position.set(0, 0, 0);
-}
-
-// ---------------------------------------------------------------------------
-// CLICK HANDLING / RAYCASTING
-// ---------------------------------------------------------------------------
-function onSolarSystemClick(event) {
-  if (!appCtx.spaceFlight.active || !solarSystem.visible || !solarSystem.group) return;
-
-  solarSystem.mouse.x = event.clientX / window.innerWidth * 2 - 1;
-  solarSystem.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-  solarSystem.raycaster.setFromCamera(solarSystem.mouse, appCtx.spaceFlight.camera);
-
-  // Collect all clickable objects (meshes + hitboxes)
-  const clickables = [];
-  solarSystem.planetMeshes.forEach((entry) => {
-    clickables.push(entry.mesh);
-    clickables.push(entry.hitbox);
-  });
-  // Named asteroids
-  solarSystem.asteroidMeshes.forEach((entry) => {
-    clickables.push(entry.mesh);
-    clickables.push(entry.hitbox);
-  });
-  // Spacecraft
-  solarSystem.spacecraftMeshes.forEach((entry) => {
-    clickables.push(entry.mesh);
-    clickables.push(entry.hitbox);
-  });
-  // Galaxies
-  solarSystem.galaxyMeshes.forEach((entry) => {
-    clickables.push(entry.mesh);
-    clickables.push(entry.hitbox);
-  });
-  // Also test Sun
-  clickables.push(solarSystem.sunMesh);
-
-  const intersects = solarSystem.raycaster.intersectObjects(clickables, true);
-
-  if (intersects.length > 0) {
-    const hit = intersects[0].object;
-    // Walk up to find planet, asteroid, or spacecraft data
-    let target = hit;
-    while (target && !target.userData.isPlanet && !target.userData.isAsteroid && !target.userData.isSpacecraft && !target.userData.isGalaxy && target.parent) {
-      target = target.parent;
-    }
-
-    if (target && target.userData.isPlanet) {
-      const idx = target.userData.planetIndex;
-      const entry = solarSystem.planetMeshes.find((e) => e.planet === SOLAR_SYSTEM_PLANETS[idx]);
-      if (entry) showPlanetInfo(entry);
-    } else if (target && target.userData.isAsteroid) {
-      const idx = target.userData.asteroidIndex;
-      const entry = solarSystem.asteroidMeshes.find((e) => e.asteroid === NAMED_ASTEROIDS[idx]);
-      if (entry) showAsteroidInfo(entry);
-    } else if (target && target.userData.isSpacecraft) {
-      const idx = target.userData.spacecraftIndex;
-      const entry = solarSystem.spacecraftMeshes.find((e) => e.spacecraft === SPACECRAFT[idx]);
-      if (entry) showSpacecraftInfo(entry);
-    } else if (target && target.userData.isGalaxy) {
-      const idx = target.userData.galaxyIndex;
-      const entry = solarSystem.galaxyMeshes.find((e) => e.galaxy === GALAXIES[idx]);
-      if (entry) showGalaxyInfo(entry);
-    } else if (hit === solarSystem.sunMesh || hit.parent === solarSystem.sunMesh) {
-      showSunInfo();
-    }
-  } else {
-    // Click on empty space hides the panel
-    hidePlanetInfo();
-  }
-}
-
-// ---------------------------------------------------------------------------
-// INFO PANEL UI
-// ---------------------------------------------------------------------------
-function createInfoPanel() {
-  const panel = document.createElement('div');
-  panel.id = 'solarSystemInfo';
-  panel.style.cssText = `
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    background: rgba(10, 10, 30, 0.95);
-    border: 2px solid #667eea;
-    border-radius: 12px;
-    padding: 20px;
-    color: #fff;
-    font-family: Orbitron, sans-serif;
-    font-size: 12px;
-    z-index: 10001;
-    display: none;
-    min-width: 280px;
-    max-width: 320px;
-    line-height: 1.6;
-    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3);
-  `;
-  panel.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <div id="ssInfoTitle" style="font-size:18px;color:#667eea;font-weight:700;"></div>
-      <button id="ssInfoClose" style="background:none;border:none;color:#667eea;font-size:20px;cursor:pointer;padding:0 4px;">x</button>
-    </div>
-    <div id="ssInfoType" style="margin-bottom:8px;color:#10b981;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:1px;"></div>
-    <div id="ssInfoDesc" style="margin-bottom:12px;color:#94a3b8;font-family:Inter,sans-serif;font-size:12px;"></div>
-    <div style="background:rgba(102,126,234,0.15);border-radius:8px;padding:12px;margin-bottom:0;">
-      <div id="ssInfoMetaLabel" style="font-size:10px;opacity:0.7;margin-bottom:8px;text-transform:uppercase;letter-spacing:0.5px;">ORBITAL DATA</div>
-      <div style="margin-bottom:6px;"><span id="ssInfoMetric1Label">Mean Distance</span>: <span id="ssInfoDistAU" style="color:#fbbf24;font-weight:600;"></span></div>
-      <div style="margin-bottom:6px;"><span id="ssInfoMetric2Label">Mean Distance</span>: <span id="ssInfoDistKM" style="color:#fbbf24;font-weight:600;"></span></div>
-      <div><span id="ssInfoMetric3Label">Current from Earth</span>: <span id="ssInfoDistEarth" style="color:#0fc;font-weight:600;"></span></div>
-    </div>
-  `;
-  document.body.appendChild(panel);
-  solarSystem.infoPanel = panel;
-
-  document.getElementById('ssInfoClose').addEventListener('click', hidePlanetInfo);
-}
-
-function setInfoMetricBlock(metaLabel, metric1Label, metric1Value, metric2Label, metric2Value, metric3Label, metric3Value) {
-  const metaEl = document.getElementById('ssInfoMetaLabel');
-  const metric1LabelEl = document.getElementById('ssInfoMetric1Label');
-  const metric2LabelEl = document.getElementById('ssInfoMetric2Label');
-  const metric3LabelEl = document.getElementById('ssInfoMetric3Label');
-  const metric1ValueEl = document.getElementById('ssInfoDistAU');
-  const metric2ValueEl = document.getElementById('ssInfoDistKM');
-  const metric3ValueEl = document.getElementById('ssInfoDistEarth');
-
-  if (metaEl) metaEl.textContent = metaLabel;
-  if (metric1LabelEl) metric1LabelEl.textContent = metric1Label;
-  if (metric2LabelEl) metric2LabelEl.textContent = metric2Label;
-  if (metric3LabelEl) metric3LabelEl.textContent = metric3Label;
-  if (metric1ValueEl) metric1ValueEl.textContent = metric1Value;
-  if (metric2ValueEl) metric2ValueEl.textContent = metric2Value;
-  if (metric3ValueEl) metric3ValueEl.textContent = metric3Value;
-}
-
-function showPlanetInfo(entry) {
-  const planet = entry.planet;
-  const now = new Date();
-  const earthPos = getEarthHelioPos(now);
-  const distEarth = distanceAU(entry.realPosition, earthPos);
-  const distEarthKM = distEarth * 149597870.7;
-
-  document.getElementById('ssInfoTitle').textContent = planet.name;
-  document.getElementById('ssInfoType').textContent = planet.type;
-  document.getElementById('ssInfoDesc').textContent = planet.description;
-  setInfoMetricBlock(
-    'ORBITAL DATA',
-    'Mean Distance',
-    planet.meanDistanceAU.toFixed(3) + ' AU',
-    'Mean Distance',
-    formatKM(planet.meanDistanceKM) + ' km',
-    'Current from Earth',
-    distEarth.toFixed(3) + ' AU (' + formatKM(distEarthKM) + ' km)'
-  );
-
-  solarSystem.infoPanel.style.display = 'block';
-  solarSystem.selectedPlanet = entry;
-
-  // Highlight selected planet
-  solarSystem.planetMeshes.forEach((e) => {
-    if (e.mesh.children) {
-      e.mesh.children.forEach((c) => {
-        if (c.name && c.name.endsWith('_label') && c.material) {
-          c.material.opacity = e === entry ? 1.0 : 0.7;
-        }
-      });
-    }
-  });
-}
-
-function showSunInfo() {
-  document.getElementById('ssInfoTitle').textContent = 'Sun';
-  document.getElementById('ssInfoType').textContent = 'G-type Main Sequence Star';
-  document.getElementById('ssInfoDesc').textContent =
-  'Our star. Contains 99.86% of the solar system\'s mass. Surface temperature ~5,500\u00B0C.';
-
-  const now = new Date();
-  const earthPos = getEarthHelioPos(now);
-  const distSun = Math.sqrt(earthPos.x * earthPos.x + earthPos.y * earthPos.y + earthPos.z * earthPos.z);
-  const distSunKM = distSun * 149597870.7;
-  setInfoMetricBlock(
-    'STELLAR DATA',
-    'Position',
-    '0 AU (center)',
-    'Reference Distance',
-    '0 km',
-    'Current from Earth',
-    distSun.toFixed(3) + ' AU (' + formatKM(distSunKM) + ' km)'
-  );
-
-  solarSystem.infoPanel.style.display = 'block';
-  solarSystem.selectedPlanet = null;
-}
-
-function showAsteroidInfo(entry) {
-  const asteroid = entry.asteroid;
-  const now = new Date();
-  const earthPos = getEarthHelioPos(now);
-  const distEarth = distanceAU(entry.realPosition, earthPos);
-  const distEarthKM = distEarth * 149597870.7;
-
-  document.getElementById('ssInfoTitle').textContent = asteroid.name;
-  document.getElementById('ssInfoType').textContent = asteroid.type + ' (Asteroid Belt)';
-  document.getElementById('ssInfoDesc').textContent = asteroid.description;
-  setInfoMetricBlock(
-    'BELT OBJECT DATA',
-    'Mean Distance',
-    asteroid.meanDistanceAU.toFixed(3) + ' AU',
-    'Mean Distance',
-    formatKM(asteroid.meanDistanceKM) + ' km',
-    'Current from Earth',
-    distEarth.toFixed(3) + ' AU (' + formatKM(distEarthKM) + ' km)'
-  );
-
-  solarSystem.infoPanel.style.display = 'block';
-  solarSystem.selectedPlanet = entry; // reuse for distance updates
-}
-
-function showSpacecraftInfo(entry) {
-  const craft = entry.spacecraft;
-  document.getElementById('ssInfoTitle').textContent = craft.name;
-  document.getElementById('ssInfoType').textContent = craft.type;
-  document.getElementById('ssInfoDesc').textContent = craft.description;
-
-  let distAUText;
-  if (craft.orbit === 'heliocentric') {
-    distAUText = craft.realDistanceAU + ' AU (actual)';
-  } else if (craft.orbit === 'L2') {
-    distAUText = 'Sun-Earth L2 Point';
-  } else {
-    distAUText = craft.realDistanceKM + ' km altitude';
-  }
-
-  let sceneDistText = '---';
-
-  // Compute visual scene distance from rocket
-  if (appCtx.spaceFlight.rocket) {
-    const dist = Math.floor(appCtx.spaceFlight.rocket.position.distanceTo(entry.mesh.position));
-    sceneDistText = dist + ' (scene distance)';
-  }
-  setInfoMetricBlock(
-    'MISSION DATA',
-    'Reference Distance',
-    distAUText,
-    'From Earth',
-    formatKM(craft.realDistanceKM) + ' km',
-    'Current from Rocket',
-    sceneDistText
-  );
-
-  solarSystem.infoPanel.style.display = 'block';
-  solarSystem.selectedPlanet = null; // no AU distance updates for spacecraft
-}
-
-function hidePlanetInfo() {
-  if (solarSystem.infoPanel) {
-    solarSystem.infoPanel.style.display = 'none';
-  }
-  solarSystem.selectedPlanet = null;
-}
-
-function formatKM(km) {
-  if (km >= 1e9) return (km / 1e9).toFixed(1) + 'B';
-  if (km >= 1e6) return (km / 1e6).toFixed(1) + 'M';
-  if (km >= 1e3) return (km / 1e3).toFixed(0) + 'K';
-  return Math.round(km).toString();
-}
-
-function formatLightYears(ly) {
-  if (ly >= 1e9) return (ly / 1e9).toFixed(2) + ' billion';
-  if (ly >= 1e6) return (ly / 1e6).toFixed(2) + ' million';
-  if (ly >= 1e3) return (ly / 1e3).toFixed(1) + ' thousand';
-  return Math.round(ly).toString();
-}
-
-function showGalaxyInfo(entry) {
-  const galaxy = entry.galaxy;
-  document.getElementById('ssInfoTitle').textContent = galaxy.name;
-  document.getElementById('ssInfoType').textContent = galaxy.type + ' • ' + galaxy.constellation;
-  document.getElementById('ssInfoDesc').textContent = galaxy.description;
-
-  let sceneDistText = '---';
-  if (appCtx.spaceFlight.rocket) {
-    const dist = Math.floor(appCtx.spaceFlight.rocket.position.distanceTo(entry.mesh.position));
-    sceneDistText = dist + ' (scene distance)';
-  }
-
-  setInfoMetricBlock(
-    'DEEP SKY DATA',
-    'Sky Position',
-    'RA ' + galaxy.raText + ' | Dec ' + galaxy.decText,
-    'Distance',
-    formatLightYears(galaxy.distanceLy) + ' ly',
-    'Current from Rocket',
-    sceneDistText
-  );
-
-  solarSystem.infoPanel.style.display = 'block';
-  solarSystem.selectedPlanet = null;
-}
-
-function setSpaceLandingButtonText(text) {
-  const landBtn = document.getElementById('sfLandBtn');
-  if (!landBtn) return;
-  landBtn.textContent = text;
-}
-
-function triggerSpaceLanding(text) {
-  const landBtn = document.getElementById('sfLandBtn');
-  if (!landBtn) return;
-  landBtn.textContent = text;
-  landBtn.disabled = false;
-  landBtn.style.opacity = '1';
-  landBtn.click();
-}
-
-function handleSpaceReturnAction() {
-  // If already on the moon, use the existing direct return flow.
-  if (typeof appCtx.onMoon !== 'undefined' && appCtx.onMoon) {
-    if (typeof appCtx.returnToEarth === 'function') appCtx.returnToEarth();
-    return;
-  }
-
-  // In space flight, run direct transfer/landing back to Earth.
-  if (appCtx.spaceFlight && appCtx.spaceFlight.active) {
-    if (typeof appCtx.forceSpaceFlightLanding === 'function') {
-      const forced = appCtx.forceSpaceFlightLanding('Earth');
-      if (forced) return;
-    }
-    if (typeof appCtx.setSpaceFlightLandingTarget === 'function') {
-      const handled = appCtx.setSpaceFlightLandingTarget('Earth', { force: true, autoLand: true });
-      if (handled) return;
-    }
-    appCtx.spaceFlight.destination = 'earth';
-    triggerSpaceLanding('LAND ON EARTH');
-    return;
-  }
-
-  if (typeof appCtx.returnToEarth === 'function') appCtx.returnToEarth();
-}
-
-function handleMoonLandingAction() {
-  if (appCtx.spaceFlight && appCtx.spaceFlight.active) {
-    if (typeof appCtx.forceSpaceFlightLanding === 'function') {
-      const forced = appCtx.forceSpaceFlightLanding('Moon');
-      if (forced) return;
-    }
-    if (typeof appCtx.setSpaceFlightLandingTarget === 'function') {
-      const handled = appCtx.setSpaceFlightLandingTarget('Moon', { force: true, autoLand: true });
-      if (handled) return;
-    }
-    appCtx.spaceFlight.destination = 'moon';
-    triggerSpaceLanding('LAND ON MOON');
-    return;
-  }
-
-  if (typeof appCtx.directTravelToMoon === 'function' && !(typeof appCtx.travelingToMoon !== 'undefined' && appCtx.travelingToMoon)) {
-    appCtx.directTravelToMoon();
-  }
-}
-
-// ---------------------------------------------------------------------------
-// TOGGLE BUTTON
-// ---------------------------------------------------------------------------
-function createToggleButton() {
-  // Container for toggle buttons
-  const container = document.createElement('div');
-  container.id = 'ssToggleContainer';
-  container.style.cssText = `
-    position: fixed;
-    top: 20px;
-    left: 20px;
-    display: none;
-    flex-direction: column;
-    gap: 6px;
-    z-index: 10001;
-  `;
-
-  // Primary action: return to Earth
-  const btn = document.createElement('button');
-  btn.id = 'solarSystemToggle';
-  btn.className = 'ssToggleBtn';
-  btn.style.cssText = `
-    background: rgba(10, 10, 30, 0.9);
-    border: 2px solid #3b82f6;
-    border-radius: 8px;
-    padding: 8px 14px;
-    color: #fff;
-    font-family: Orbitron, sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-  `;
-  btn.textContent = 'RETURN TO EARTH';
-  btn.addEventListener('click', handleSpaceReturnAction);
-  container.appendChild(btn);
-
-  // Secondary action: land on Moon
-  const orbitBtn = document.createElement('button');
-  orbitBtn.id = 'orbitsToggle';
-  orbitBtn.className = 'ssToggleBtn';
-  orbitBtn.style.cssText = `
-    background: rgba(10, 10, 30, 0.9);
-    border: 2px solid #10b981;
-    border-radius: 8px;
-    padding: 8px 14px;
-    color: #fff;
-    font-family: Orbitron, sans-serif;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-  `;
-  orbitBtn.textContent = 'LAND ON MOON';
-  orbitBtn.addEventListener('click', handleMoonLandingAction);
-  container.appendChild(orbitBtn);
-
-  document.body.appendChild(container);
-}
-
-function toggleSolarSystem() {
-  handleSpaceReturnAction();
-}
-
-function toggleOrbits() {
-  handleMoonLandingAction();
-}
-
-// ---------------------------------------------------------------------------
-// SHOW/HIDE (called when entering/exiting space flight)
-// ---------------------------------------------------------------------------
-function showSolarSystemUI() {
-  const container = document.getElementById('ssToggleContainer');
-  if (container) container.style.display = 'flex';
-  const returnBtn = document.getElementById('solarSystemToggle');
-  const landMoonBtn = document.getElementById('orbitsToggle');
-  if (returnBtn) returnBtn.textContent = 'RETURN TO EARTH';
-  if (landMoonBtn) landMoonBtn.textContent = 'LAND ON MOON';
-}
-
-function hideSolarSystemUI() {
-  const container = document.getElementById('ssToggleContainer');
-  if (container) container.style.display = 'none';
-  hidePlanetInfo();
-}
-
-// ---------------------------------------------------------------------------
-// PER-FRAME UPDATE (called from animateSpaceFlight)
-// ---------------------------------------------------------------------------
-function updateSolarSystem() {
-  if (!solarSystem.group || !solarSystem.visible) return;
-
-  // One-time log to confirm the solar system is running
-  if (!solarSystem._loggedActive) {
-    console.log('[SolarSystem] Active - rendering', solarSystem.planetMeshes.length, 'planets');
-    solarSystem._loggedActive = true;
-  }
-
-  // Update positions every ~60 frames (once per second at 60fps)
-  if (!solarSystem._frameCount) solarSystem._frameCount = 0;
-  solarSystem._frameCount++;
-  if (solarSystem._frameCount % 60 === 0) {
-    updateSolarSystemPositions(new Date());
-  }
-
-  // Update moon orbital positions
-  updateMoonPositions(new Date());
-
-  // Update spacecraft positions (Earth-orbiting + L2)
-  updateSpacecraftPositions();
-
-  // Slow rotation for visual interest
-  solarSystem.planetMeshes.forEach((entry) => {
-    entry.mesh.rotation.y += 0.002;
-  });
-  solarSystem.asteroidMeshes.forEach((entry) => {
-    entry.mesh.rotation.y += 0.005;
-    entry.mesh.rotation.x += 0.003;
-  });
-  if (solarSystem.sunMesh) {
-    solarSystem.sunMesh.rotation.y += 0.001;
-  }
-
-  // Animate orbit markers (pulsing glow)
-  if (solarSystem.orbitsVisible) {
-    const pulseT = Date.now() * 0.003;
-    solarSystem.orbitMarkers.forEach((entry) => {
-      const pulse = entry.mesh.getObjectByName('pulse');
-      if (pulse) {
-        const scale = 1.0 + Math.sin(pulseT) * 0.4;
-        pulse.scale.setScalar(scale);
-        pulse.material.opacity = 0.15 + Math.sin(pulseT) * 0.1;
-      }
-    });
-  }
-
-  // Proximity detection - show planet name when rocket is nearby
-  updateProximityHUD();
-
-  // Update info panel distance if a planet is selected
-  if (solarSystem.selectedPlanet && solarSystem.infoPanel.style.display !== 'none') {
-    const now = new Date();
-    const ep = getEarthHelioPos(now);
-    const dist = distanceAU(solarSystem.selectedPlanet.realPosition, ep);
-    const distKM = dist * 149597870.7;
-    const el = document.getElementById('ssInfoDistEarth');
-    if (el) {
-      el.textContent = dist.toFixed(3) + ' AU (' + formatKM(distKM) + ' km)';
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// PROXIMITY HUD - shows planet name/distance when rocket flies near
-// ---------------------------------------------------------------------------
-function updateProximityHUD() {
-  if (!appCtx.spaceFlight.rocket) return;
-
-  const rocketWorldPos = appCtx.spaceFlight.rocket.position;
-  let closestDist = Infinity;
-  let closestName = '';
-
-  // Check distance to each planet (world position = group position + local mesh position)
-  solarSystem.planetMeshes.forEach((entry) => {
-    const worldX = solarSystem.group.position.x + entry.mesh.position.x;
-    const worldY = solarSystem.group.position.y + entry.mesh.position.y;
-    const worldZ = solarSystem.group.position.z + entry.mesh.position.z;
-    const dx = rocketWorldPos.x - worldX;
-    const dy = rocketWorldPos.y - worldY;
-    const dz = rocketWorldPos.z - worldZ;
-    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (dist < closestDist) {
-      closestDist = dist;
-      closestName = entry.planet.name;
-    }
-  });
-
-  // Check planet moons
-  solarSystem.moonMeshes.forEach((entry) => {
-    const worldPos = new THREE.Vector3();
-    entry.mesh.getWorldPosition(worldPos);
-    const dist = rocketWorldPos.distanceTo(worldPos);
-    if (dist < closestDist) {
-      closestDist = dist;
-      closestName = entry.name;
-    }
-  });
-
-  // Check named asteroids
-  solarSystem.asteroidMeshes.forEach((entry) => {
-    const worldX = solarSystem.group.position.x + entry.mesh.position.x;
-    const worldY = solarSystem.group.position.y + entry.mesh.position.y;
-    const worldZ = solarSystem.group.position.z + entry.mesh.position.z;
-    const dx = rocketWorldPos.x - worldX;
-    const dy = rocketWorldPos.y - worldY;
-    const dz = rocketWorldPos.z - worldZ;
-    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (dist < closestDist) {
-      closestDist = dist;
-      closestName = entry.asteroid.name;
-    }
-  });
-
-  // Check spacecraft
-  solarSystem.spacecraftMeshes.forEach((entry) => {
-    const dist = rocketWorldPos.distanceTo(entry.mesh.position);
-    if (dist < closestDist) {
-      closestDist = dist;
-      closestName = entry.spacecraft.name;
-    }
-  });
-
-  // Check if rocket is within the asteroid belt region
-  const rocketDistFromSun = Math.sqrt(
-    (rocketWorldPos.x - solarSystem.group.position.x) ** 2 +
-    (rocketWorldPos.z - solarSystem.group.position.z) ** 2
-  );
-  const beltInnerScene = ASTEROID_BELT.innerAU * AU_TO_SCENE;
-  const beltOuterScene = ASTEROID_BELT.outerAU * AU_TO_SCENE;
-  const inBelt = rocketDistFromSun > beltInnerScene * 0.9 && rocketDistFromSun < beltOuterScene * 1.1;
-
-  // Check if rocket is within the Kuiper belt region
-  const kuiperInnerScene = KUIPER_BELT.innerAU * AU_TO_SCENE;
-  const kuiperOuterScene = KUIPER_BELT.outerAU * AU_TO_SCENE;
-  const inKuiperBelt = rocketDistFromSun > kuiperInnerScene * 0.95 && rocketDistFromSun < kuiperOuterScene * 1.05;
-
-  // Also check Sun
-  if (solarSystem.sunMesh) {
-    const worldX = solarSystem.group.position.x + solarSystem.sunMesh.position.x;
-    const worldY = solarSystem.group.position.y + solarSystem.sunMesh.position.y;
-    const worldZ = solarSystem.group.position.z + solarSystem.sunMesh.position.z;
-    const dx = rocketWorldPos.x - worldX;
-    const dy = rocketWorldPos.y - worldY;
-    const dz = rocketWorldPos.z - worldZ;
-    const sunDist = Math.sqrt(dx * dx + dy * dy + dz * dz);
-    if (sunDist < closestDist) {
-      closestDist = sunDist;
-      closestName = 'Sun';
-    }
-  }
-
-  // Also check Earth and Moon (they're not in the group)
-  if (appCtx.spaceFlight.earth) {
-    const dist = rocketWorldPos.distanceTo(appCtx.spaceFlight.earth.position);
-    if (dist < closestDist) {
-      closestDist = dist;
-      closestName = 'Earth';
-    }
-  }
-  if (appCtx.spaceFlight.moon) {
-    const dist = rocketWorldPos.distanceTo(appCtx.spaceFlight.moon.position);
-    if (dist < closestDist) {
-      closestDist = dist;
-      closestName = 'Moon';
-    }
-  }
-
-  // Show/update proximity indicator
-  let indicator = document.getElementById('ssProximity');
-  if (!indicator) {
-    indicator = document.createElement('div');
-    indicator.id = 'ssProximity';
-    indicator.style.cssText =
-    'position:fixed;top:50%;left:50%;transform:translate(-50%,-120px);' +
-    'background:rgba(10,10,30,0.85);border:1px solid #667eea;border-radius:8px;' +
-    'padding:8px 16px;color:#fff;font-family:Orbitron,sans-serif;font-size:12px;' +
-    'z-index:10001;display:none;text-align:center;pointer-events:none;';
-    document.body.appendChild(indicator);
-  }
-
-  const threshold = solarSystem.PROXIMITY_DIST;
-  if (closestDist < threshold * 5) {
-    const distText = Math.floor(closestDist);
-    if (closestDist < threshold) {
-      indicator.innerHTML = '<span style="color:#10b981;font-weight:700;">' + closestName +
-      '</span><br><span style="font-size:10px;opacity:0.8;">Click to inspect</span>';
-    } else {
-      indicator.innerHTML = '<span style="color:#fbbf24;">' + closestName +
-      '</span> <span style="font-size:10px;opacity:0.7;">' + distText + ' km</span>';
-    }
-    // Show asteroid belt context when in the belt
-    if (inBelt) {
-      indicator.innerHTML += '<br><span style="font-size:9px;color:#a08060;opacity:0.8;">ASTEROID BELT REGION</span>';
-    }
-    if (inKuiperBelt) {
-      indicator.innerHTML += '<br><span style="font-size:9px;color:#7aa6d8;opacity:0.85;">KUIPER BELT REGION</span>';
-    }
-    indicator.style.display = 'block';
-  } else if (inBelt) {
-    indicator.innerHTML = '<span style="color:#a08060;font-weight:600;">ASTEROID BELT</span>' +
-    '<br><span style="font-size:10px;opacity:0.7;">' + ASTEROID_BELT.innerAU.toFixed(1) +
-    ' - ' + ASTEROID_BELT.outerAU.toFixed(1) + ' AU from Sun</span>';
-    indicator.style.display = 'block';
-  } else if (inKuiperBelt) {
-    indicator.innerHTML = '<span style="color:#7aa6d8;font-weight:600;">KUIPER BELT</span>' +
-    '<br><span style="font-size:10px;opacity:0.7;">' + KUIPER_BELT.innerAU.toFixed(1) +
-    ' - ' + KUIPER_BELT.outerAU.toFixed(1) + ' AU from Sun</span>';
-    indicator.style.display = 'block';
-  } else {
-    indicator.style.display = 'none';
-  }
 }
 
 Object.assign(appCtx, {
