@@ -46,6 +46,16 @@ export function addBuildingToSpatialIndex(building) {
   }
 }
 
+export function removeBuildingsFromSpatialIndex(buildings) {
+  if (!Array.isArray(buildings) || buildings.length === 0 || buildingSpatialIndex.size === 0) return;
+  const removed = new Set(buildings);
+  buildingSpatialIndex.forEach((bucket, key) => {
+    const retained = bucket.filter((building) => !removed.has(building));
+    if (retained.length > 0) buildingSpatialIndex.set(key, retained);
+    else buildingSpatialIndex.delete(key);
+  });
+}
+
 export function getNearbyBuildings(x, z, radius = 80) {
   const baseBuildings = appCtx.buildings || [];
   const dynamicColliders = Array.isArray(appCtx.dynamicBuildingColliders) ? appCtx.dynamicBuildingColliders : [];

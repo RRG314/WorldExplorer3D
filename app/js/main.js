@@ -122,6 +122,9 @@ function renderLoop(t = 0) {
       appCtx.kickOptionalRuntimeBoot('main_loop');
     }
     appCtx.update(dt);
+    if (typeof appCtx.updateEarthWorldStreaming === 'function') {
+      appCtx.updateEarthWorldStreaming(dt);
+    }
     appCtx.updatePlanetaryTracks?.();
     if (!appCtx.onMars && typeof appCtx.refreshAstronomicalSky === 'function') {
       appCtx.refreshAstronomicalSky(false);

@@ -2932,3 +2932,14 @@ Original prompt: i need to make sure this funtions on mobile properly for all sc
   - consolidated browser verification forced stale boat state before launching Dubai and confirmed walking mode, no active/pending boat, 325 buildings at reveal, and a visible character on land
   - the same browser run confirmed camera yaw beyond the former limit with unchanged actor heading and no recenter while moving; screenshots cover Baltimore facade/readiness, 360 camera look, and Dubai land entry
   - external WorldCover and Overpass failures recovered through existing fallbacks; production remains untouched in this stabilization pass
+
+- R10 continuous Earth foundation (2026-07-14):
+  - established a finite endpoint: continuous Earth traversal must expose no hard map edge, preserve geographic position through origin shifts, retain a fixed CPU/GPU memory ceiling, and share one loader across Earth travel modes
+  - added a mode-independent scheduler with real geographic tracking, speed-derived lookahead, prioritized tile queues, two-request concurrency, cancellation, generation ownership, and runtime diagnostics
+  - added a 72-entry LRU ceiling for Terrarium elevation tiles; a 30 km handoff reached exactly 72 loaded tiles / 18 MiB of elevation arrays without further growth
+  - added independently disposable OSM Shortbread vector chunks for batched roads, real building footprints, far-LOD building massing, drive/walk collision records, polygon water, rivers, and canals
+  - the original high-detail start remains authoritative during launch; after six replacement chunks are ready and the player is 3.6 km away, its geometry, collision records, POIs, and vegetation are retired instead of retained behind the player
+  - added floating-origin rebasing at 24,000 world units; the verified target at 25.160767, 55.604577 retained the exact observed coordinates while the walker returned to local (0,0)
+  - renderer calls fell from about 585 with the abandoned start city retained to 107 after retirement and 81 after the rebase; the browser reported no renderer or console errors in the final handoff
+  - remaining bounded work: streamed land-cover/vegetation detail, explicit plane and multiplayer rebase participation, then one sustained multimode performance and visual acceptance run
+  - production remains untouched; the local preview continues at http://127.0.0.1:4192/app/

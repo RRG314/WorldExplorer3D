@@ -57,8 +57,12 @@ export function vectorTileRangeForBounds(latMin, lonMin, latMax, lonMax, zoom) {
   };
 }
 
-export async function fetchShortbreadTile(z, x, y) {
+export async function fetchShortbreadTile(z, x, y, options = {}) {
   const controller = new AbortController();
+  const externalSignal = options.signal || null;
+  const relayAbort = () => controller.abort();
+  if (externalSignal?.aborted) controller.abort();
+  else externalSignal?.addEventListener?.('abort', relayAbort, { once: true });
   const timeoutId = setTimeout(() => controller.abort(), SHORTBREAD_FETCH_TIMEOUT_MS);
   try {
     const { Pbf, VectorTile } = await getVectorTileLib();
@@ -71,6 +75,7 @@ export async function fetchShortbreadTile(z, x, y) {
     return { tile: new VectorTile(new Pbf(new Uint8Array(buffer))), z, x, y };
   } finally {
     clearTimeout(timeoutId);
+    externalSignal?.removeEventListener?.('abort', relayAbort);
   }
 }
 

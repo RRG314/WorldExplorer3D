@@ -10,6 +10,8 @@ function createTerrainStreamingApi(deps = {}) {
     getTerrainMeshKey,
     terrainTileMeshKey,
     disposeTerrainMesh,
+    pruneTerrainTileCache,
+    terrainTileCacheSnapshot,
     requestWorldSurfaceSync,
     clearTerrainHeightCache
   } = deps;
@@ -108,6 +110,12 @@ function createTerrainStreamingApi(deps = {}) {
 
       if (meshSetChanged && appCtx.roads.length > 0 && !appCtx.onMoon) {
         requestWorldSurfaceSync({ source: "terrain_tiles_changed" });
+      }
+      const cacheSnapshot = typeof pruneTerrainTileCache === "function" ?
+        pruneTerrainTileCache() :
+        typeof terrainTileCacheSnapshot === "function" ? terrainTileCacheSnapshot() : null;
+      if (cacheSnapshot && typeof appCtx.setPerfLiveStat === "function") {
+        appCtx.setPerfLiveStat("terrainCache", cacheSnapshot);
       }
     } else if (needsRoadRebuild) {
       requestWorldSurfaceSync({ source: "terrain_tiles_pending" });

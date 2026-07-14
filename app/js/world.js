@@ -70,7 +70,7 @@ import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=1";
+} from "./world/load-reset.js?v=2";
 import {
   prepareWorldFeatureSelections
 } from "./world/load-budgeting.js?v=2";
@@ -89,7 +89,7 @@ import {
   waterSurfaceBaseElevation,
   WATER_VECTOR_TILE_ZOOM,
   worldLinePointsFromLonLat
-} from "./world/load-geometry.js?v=10";
+} from "./world/load-geometry.js?v=11";
 import {
   decimateRoadCenterlineByDepth,
   getPerfModeValue,
@@ -108,7 +108,7 @@ import {
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
 import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=4";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=14";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=15";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -149,7 +149,7 @@ import {
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
 } from "./world/world-geometry.js?v=2";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=5";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=6";
 import {
   resetWorldFurnitureCaches
 } from "./world/furniture.js?v=7";
@@ -159,7 +159,7 @@ import {
   getNearbyBuildings,
   isSuppressedBaseBuilding,
   isSuppressedBaseRoad
-} from "./world/building-spatial-index.js?v=2";
+} from "./world/building-spatial-index.js?v=3";
 import {
   applyBuildingContextSemanticsToFeature,
   cloneStructureSemantics,
@@ -171,8 +171,8 @@ import {
 import { createWorldRoadLoader } from "./world/load-roads.js?v=30";
 import {
   fetchShortbreadWorldData
-} from "./world/shortbread-source.js?v=4";
-import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=4";
+} from "./world/shortbread-source.js?v=5";
+import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=5";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
 import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=6";
 // world.js - OSM data loading, roads, buildings, landuse, POIs

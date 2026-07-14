@@ -32,12 +32,14 @@ import {
   ensureTerrainGroup,
   getOrLoadTerrainTile,
   latLonToTileXY,
+  pruneTerrainTileCache,
   sampleTileElevationMeters,
+  terrainTileCacheSnapshot,
   terrainTileMeshKey,
   tileXYToLatLonBounds,
   waitForTerrainReadyAt,
   worldToLatLon
-} from "./terrain/tiles.js?v=7";
+} from "./terrain/tiles.js?v=8";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -49,7 +51,7 @@ import {
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=1";
 import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
-import { createTerrainStreamingApi } from "./terrain/streaming.js?v=3";
+import { createTerrainStreamingApi } from "./terrain/streaming.js?v=4";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 // terrain.js - Terrain elevation system (Terrarium tiles)
 // ============================================================================
@@ -195,7 +197,7 @@ const terrainRebuildDeps = {
 };
 
 function scheduleRoadAndBuildingRebuild() {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.roads.length === 0) return;
+  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired || appCtx.roads.length === 0) return;
   appCtx.roadsNeedRebuild = true;
   if (terrain._rebuildTimer) return;
 
@@ -207,7 +209,7 @@ function scheduleRoadAndBuildingRebuild() {
 
   terrain._rebuildTimer = setTimeout(() => {
     terrain._rebuildTimer = null;
-    if (!appCtx.roadsNeedRebuild || appCtx.onMoon || !appCtx.terrainEnabled || appCtx.roads.length === 0) return;
+    if (!appCtx.roadsNeedRebuild || appCtx.onMoon || appCtx.initialEarthWorldRetired || !appCtx.terrainEnabled || appCtx.roads.length === 0) return;
     if (terrain._rebuildInFlight) {
       scheduleRoadAndBuildingRebuild();
       return;
@@ -227,7 +229,7 @@ function scheduleRoadAndBuildingRebuild() {
 }
 
 function canRunRoadAndBuildingRebuildNow() {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.roads.length === 0) return false;
+  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired || appCtx.roads.length === 0) return false;
   let tilesLoaded = 0;
   let tilesTotal = 0;
   appCtx.terrainTileCache.forEach((tile) => {
@@ -238,7 +240,7 @@ function canRunRoadAndBuildingRebuildNow() {
 }
 
 function requestWorldSurfaceSync(options = {}) {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.roads.length === 0) return false;
+  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired || appCtx.roads.length === 0) return false;
   appCtx.roadsNeedRebuild = true;
 
   const force = options.force === true;
@@ -264,6 +266,14 @@ function requestWorldSurfaceSync(options = {}) {
     if (appCtx.roadsNeedRebuild) scheduleRoadAndBuildingRebuild();
   }
 }
+
+function cancelWorldSurfaceSync() {
+  if (terrain._rebuildTimer) {
+    clearTimeout(terrain._rebuildTimer);
+    terrain._rebuildTimer = null;
+  }
+  appCtx.roadsNeedRebuild = false;
+}
 const {
   resetTerrainStreamingState,
   updateTerrainAround
@@ -278,6 +288,8 @@ const {
   getTerrainMeshKey,
   terrainTileMeshKey,
   disposeTerrainMesh,
+  pruneTerrainTileCache,
+  terrainTileCacheSnapshot,
   requestWorldSurfaceSync,
   clearTerrainHeightCache
 });
@@ -312,6 +324,7 @@ Object.assign(appCtx, {
   buildTerrainTileMesh,
   cachedBaseTerrainHeight,
   cachedTerrainHeight,
+  cancelWorldSurfaceSync,
   classifyTerrainVisualProfile,
   clearTerrainHeightCache,
   clearTerrainMeshes,
@@ -322,6 +335,7 @@ Object.assign(appCtx, {
   ensureTerrainGroup,
   getOrLoadTerrainTile,
   latLonToTileXY,
+  pruneTerrainTileCache,
   rebuildRoadsWithTerrain: rebuildRoadsWithTerrainRuntime,
   requestWorldSurfaceSync,
   repositionBuildingsWithTerrain,
@@ -329,6 +343,7 @@ Object.assign(appCtx, {
   refreshTerrainSurfaceProfiles,
   resetTerrainStreamingState,
   sampleTileElevationMeters,
+  terrainTileCacheSnapshot,
   setWorldSurfaceProfile,
   subdivideRoadPoints,
   terrainMeshHeightAt,
@@ -349,6 +364,7 @@ export {
   buildTerrainTileMesh,
   cachedBaseTerrainHeight,
   cachedTerrainHeight,
+  cancelWorldSurfaceSync,
   classifyTerrainVisualProfile,
   clearTerrainHeightCache,
   clearTerrainMeshes,
@@ -359,6 +375,7 @@ export {
   ensureTerrainGroup,
   getOrLoadTerrainTile,
   latLonToTileXY,
+  pruneTerrainTileCache,
   rebuildRoadsWithTerrainRuntime as rebuildRoadsWithTerrain,
   requestWorldSurfaceSync,
   repositionBuildingsWithTerrain,
@@ -366,6 +383,7 @@ export {
   refreshTerrainSurfaceProfiles,
   resetTerrainStreamingState,
   sampleTileElevationMeters,
+  terrainTileCacheSnapshot,
   setWorldSurfaceProfile,
   subdivideRoadPoints,
   terrainMeshHeightAt,

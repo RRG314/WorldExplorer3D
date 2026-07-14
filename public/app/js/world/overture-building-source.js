@@ -2,7 +2,7 @@ import {
   fetchShortbreadBuildingData,
   getVectorTileLib,
   vectorTileRangeForBounds
-} from "./shortbread-source.js?v=4";
+} from "./shortbread-source.js?v=5";
 
 const OVERTURE_BUILDING_ZOOM = 14;
 const OVERTURE_FETCH_TIMEOUT_MS = 20000;

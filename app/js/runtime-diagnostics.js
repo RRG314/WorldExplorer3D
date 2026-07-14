@@ -135,13 +135,21 @@ function getWorldExplorerRuntimeDiagnostics() {
     renderer: rendererSnapshot(),
     composer: composerSnapshot(),
     quality: appCtx.renderQualityLevel || null,
+    earthStreaming: appCtx.getEarthStreamingSnapshot?.() || null,
+    earthOrigin: {
+      lat: numberOrNull(appCtx.LOC?.lat),
+      lon: numberOrNull(appCtx.LOC?.lon),
+      rebases: numberOrNull(appCtx.earthOriginRebaseCount || 0),
+      initialWorldRetired: !!appCtx.initialEarthWorldRetired
+    },
+    terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
     worldCounts: {
       buildings: appCtx.buildings?.length ?? null,
       buildingMeshes: appCtx.buildingMeshes?.length ?? null,
       landuseMeshes: appCtx.landuseMeshes?.length ?? null,
       roadMeshes: appCtx.roadMeshes?.length ?? null,
       roads: appCtx.roads?.length ?? null,
-      terrainTiles: appCtx.terrainTiles?.size ?? null
+      terrainTiles: appCtx.terrainTileCache?.size ?? null
     }
   };
 }
