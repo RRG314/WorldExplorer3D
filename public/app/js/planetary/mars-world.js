@@ -10,6 +10,16 @@ const MARS_SPAWN = Object.freeze({ x: 3200, z: 1900, angle: -2.08 });
 let earthCameraFar = null;
 let marsDemData = null;
 let marsDemLoadPromise = null;
+let marsTransitionSessionId = 0;
+
+function isCurrentMarsTransition(sessionId) {
+  return sessionId === marsTransitionSessionId;
+}
+
+function cancelPendingMarsTransition() {
+  marsTransitionSessionId++;
+  appCtx.travelingToMoon = false;
+}
 
 function loadMarsDemSample() {
   if (marsDemData) return Promise.resolve(marsDemData);
@@ -226,9 +236,12 @@ function enterMarsDriveMode() {
   appCtx.setTravelMode?.('drive', { source: 'mars_arrival', emitTutorial: false });
 }
 
-async function arriveAtMars() {
+async function arriveAtMars(expectedSessionId = null) {
+  const sessionId = expectedSessionId ?? ++marsTransitionSessionId;
+  if (!isCurrentMarsTransition(sessionId)) return false;
   if (appCtx.spaceFlight?.active && typeof appCtx.exitSpaceFlight === 'function') appCtx.exitSpaceFlight();
   suspendEarthModesForPlanetaryEntry();
+  if (!isCurrentMarsTransition(sessionId)) return false;
   appCtx.switchEnv(appCtx.ENV.MARS);
   appCtx.setEarthSceneVisible?.(false);
   appCtx.paused = true;
@@ -247,11 +260,13 @@ async function arriveAtMars() {
   appCtx.setPlanetarySky?.('mars');
 
   await loadMarsDemSample();
+  if (!isCurrentMarsTransition(sessionId) || appCtx.getEnv?.() !== appCtx.ENV.MARS) return false;
   createMarsSurface();
   setMarsObjectsVisible(true);
   enterMarsDriveMode();
   positionPlayerOnMars();
   await appCtx.setPlanetaryVehicle?.('mars');
+  if (!isCurrentMarsTransition(sessionId) || appCtx.getEnv?.() !== appCtx.ENV.MARS) return false;
   appCtx.setPlanetaryCharacter?.('mars');
   positionPlayerOnMars();
   if (appCtx.carMesh) appCtx.carMesh.visible = true;
@@ -271,21 +286,26 @@ async function arriveAtMars() {
 
 async function directTravelToMars() {
   if (appCtx.onMars) return true;
+  const sessionId = ++marsTransitionSessionId;
   appCtx.prepareEarthDepartureForMars?.();
   await appCtx.showTransitionLoad?.('mars', 900);
-  return arriveAtMars();
+  if (!isCurrentMarsTransition(sessionId)) return false;
+  return arriveAtMars(sessionId);
 }
 
 async function returnFromMars() {
   if (!appCtx.onMars || appCtx.travelingToMoon) return;
+  const sessionId = ++marsTransitionSessionId;
   appCtx.travelingToMoon = true;
   appCtx.paused = true;
   const button = document.getElementById('marsReturnEarthBtn');
   if (button) button.style.display = 'none';
   await appCtx.showTransitionLoad?.('earth', 700);
+  if (!isCurrentMarsTransition(sessionId)) return;
   setMarsObjectsVisible(false);
   setMarsInterfaceActive(false);
   await appCtx.setPlanetaryVehicle?.('earth');
+  if (!isCurrentMarsTransition(sessionId)) return;
   appCtx.setPlanetaryCharacter?.('earth');
   appCtx.scene.fog = null;
   appCtx.scene.background = new THREE.Color(0x87ceeb);
@@ -295,14 +315,21 @@ async function returnFromMars() {
   }
   appCtx.switchEnv(appCtx.ENV.EARTH);
   try {
-    await resumeEarthWorldSession({ switchEnv: false, transitionDurationMs: 350 });
+    await resumeEarthWorldSession({
+      switchEnv: false,
+      transitionDurationMs: 350,
+      isCurrent: () => isCurrentMarsTransition(sessionId)
+    });
   } finally {
-    appCtx.paused = false;
-    appCtx.travelingToMoon = false;
+    if (isCurrentMarsTransition(sessionId)) {
+      appCtx.paused = false;
+      appCtx.travelingToMoon = false;
+    }
   }
 }
 
 function prepareEarthDepartureForMars() {
+  appCtx.cancelPendingEarthArrival?.();
   if (appCtx.getEnv?.() === appCtx.ENV?.EARTH) captureEarthWorldSession();
   appCtx.setEarthSceneVisible?.(false);
 }
@@ -321,6 +348,7 @@ function prepareMarsTitleExit() {
 
 Object.assign(appCtx, {
   arriveAtMars,
+  cancelPendingMarsTransition,
   directTravelToMars,
   prepareEarthDepartureForMars,
   prepareMarsTitleExit,
@@ -328,4 +356,12 @@ Object.assign(appCtx, {
   sampleMarsLocalHeight
 });
 
-export { arriveAtMars, directTravelToMars, prepareEarthDepartureForMars, prepareMarsTitleExit, returnFromMars, sampleMarsLocalHeight };
+export {
+  arriveAtMars,
+  cancelPendingMarsTransition,
+  directTravelToMars,
+  prepareEarthDepartureForMars,
+  prepareMarsTitleExit,
+  returnFromMars,
+  sampleMarsLocalHeight
+};

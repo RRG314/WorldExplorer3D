@@ -1,14 +1,12 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { buildingFootprintPoints } from "../building-entry.js?v=3";
+import { buildingFootprintPoints } from "../building-entry.js?v=4";
 import {
   INTERIOR_FLOOR_OFFSET,
   INTERIOR_LEVEL_HEIGHT,
-  INTERIOR_SHELL_CLEARANCE,
   INTERIOR_WALL_HEIGHT,
   INTERIOR_WALL_THICKNESS
 } from "./constants.js?v=1";
 import {
-  addBackdropRoomMesh,
   addFlatSurfaceMesh,
   addWallMesh,
   chooseInteriorSpawnPoint,
@@ -20,67 +18,55 @@ import {
   pointInPolygonSafe,
   polygonCentroid,
   ringAreaAbs
-} from "./core.js?v=2";
+} from "./core.js?v=3";
 import {
-  buildContainedRectFootprint,
-  buildUsableFootprint,
   constrainPointToFootprint,
   findInteriorAnchor,
-  footprintMinimumClearance,
   prepareInteriorFeaturePlan
-} from "./planner.js?v=2";
+} from "./planner.js?v=3";
+
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function createColumnCollider(x, z, radius, baseY, height) {
+  const pts = [
+    { x: x - radius, z: z - radius },
+    { x: x + radius, z: z - radius },
+    { x: x + radius, z: z + radius },
+    { x: x - radius, z: z + radius }
+  ];
+  return {
+    pts,
+    minX: x - radius,
+    maxX: x + radius,
+    minZ: z - radius,
+    maxZ: z + radius,
+    baseY,
+    height,
+    centerX: x,
+    centerZ: z,
+    sourceBuildingId: 'interior-column',
+    buildingType: 'interior_column',
+    colliderDetail: 'full',
+    isInteriorCollider: true
+  };
+}
 
 export function buildInteriorScene(definition) {
   const support = definition.support;
   const building = support?.building || definition.building;
   const exteriorFootprint = buildingFootprintPoints(building);
-  const baseShellFootprint = buildUsableFootprint(exteriorFootprint);
   const exteriorArea = ringAreaAbs(exteriorFootprint);
-  const baseCentroid = findInteriorAnchor(baseShellFootprint) || findInteriorAnchor(exteriorFootprint) || {
+  const baseCentroid = findInteriorAnchor(exteriorFootprint) || {
     x: finiteNumber(building?.centerX, 0),
     z: finiteNumber(building?.centerZ, 0)
   };
-  const generatedRoomFootprint = buildContainedRectFootprint(
-    exteriorFootprint,
-    baseCentroid,
-    INTERIOR_SHELL_CLEARANCE + 0.2
-  );
-  let shellFootprint = baseShellFootprint;
+  let shellFootprint = exteriorFootprint;
   let centroid = baseCentroid;
   let featurePlan = prepareInteriorFeaturePlan(definition, shellFootprint, centroid);
-  if (featurePlan.mode === 'generated' && generatedRoomFootprint.length >= 3) {
-    shellFootprint = generatedRoomFootprint;
-    centroid = findInteriorAnchor(shellFootprint) || centroid;
-    featurePlan = prepareInteriorFeaturePlan(definition, shellFootprint, centroid);
-  }
 
-  const shellArea = ringAreaAbs(shellFootprint);
-  const needsOuterEnvelope =
-    featurePlan.mode === 'mapped' &&
-    Array.isArray(exteriorFootprint) &&
-    exteriorFootprint.length >= 3 &&
-    shellArea > 0 &&
-    shellArea < exteriorArea * 0.97;
-  let shellClearanceMin = footprintMinimumClearance(shellFootprint, exteriorFootprint);
-
-  if (
-    featurePlan.mode === 'generated' &&
-    shellClearanceMin < INTERIOR_WALL_THICKNESS * 0.5 &&
-    Array.isArray(exteriorFootprint) &&
-    exteriorFootprint.length >= 3
-  ) {
-    const emergencyShell = buildContainedRectFootprint(
-      exteriorFootprint,
-      centroid,
-      INTERIOR_WALL_THICKNESS * 0.5 + 0.08
-    );
-    if (emergencyShell.length >= 3) {
-      shellFootprint = emergencyShell;
-      centroid = findInteriorAnchor(shellFootprint) || centroid;
-      featurePlan = prepareInteriorFeaturePlan(definition, shellFootprint, centroid);
-      shellClearanceMin = footprintMinimumClearance(shellFootprint, exteriorFootprint);
-    }
-  }
+  const shellClearanceMin = 0;
 
   let desiredEntry = support?.entryAnchor ? { ...support.entryAnchor } : centroid;
   const walker = appCtx.Walk?.state?.walker || null;
@@ -97,6 +83,17 @@ export function buildInteriorScene(definition) {
   } else {
     desiredEntry = constrainPointToFootprint(desiredEntry, shellFootprint, centroid, 0.65) || centroid;
   }
+  const entryDx = centroid.x - desiredEntry.x;
+  const entryDz = centroid.z - desiredEntry.z;
+  const entryDistance = Math.hypot(entryDx, entryDz);
+  if (entryDistance > 0.5) {
+    const bounds = footprintBounds(shellFootprint);
+    const entryInset = Math.min(4.8, Math.max(2.4, Math.min(bounds.width, bounds.depth) * 0.18));
+    desiredEntry = constrainPointToFootprint({
+      x: desiredEntry.x + entryDx / entryDistance * entryInset,
+      z: desiredEntry.z + entryDz / entryDistance * entryInset
+    }, shellFootprint, centroid, 0.8) || desiredEntry;
+  }
 
   const floorBaseY = estimateInteriorFloorBaseY(
     building,
@@ -106,17 +103,28 @@ export function buildInteriorScene(definition) {
     desiredEntry
   );
   const floorY = floorBaseY + finiteNumber(definition.selectedLevel, 0) * INTERIOR_LEVEL_HEIGHT;
+  const buildingLevels = Math.max(1, Math.round(finiteNumber(building?.levels, 1)));
+  const buildingHeight = Math.max(INTERIOR_WALL_HEIGHT, finiteNumber(building?.height, INTERIOR_WALL_HEIGHT));
+  const type = String(building?.buildingType || '').toLowerCase();
+  const openPlan = /warehouse|industrial|hangar|garage|parking|station/.test(type);
+  const mappedStoryHeight = buildingHeight / buildingLevels;
+  const wallHeight = clamp(mappedStoryHeight, INTERIOR_WALL_HEIGHT, openPlan ? 5.6 : 4.6);
   const group = new THREE.Group();
   group.name = `interior:${definition.key}`;
 
-  const slabMaterial = new THREE.MeshStandardMaterial({ color: 0x20242b, roughness: 0.92, metalness: 0.02 });
-  const roomMaterial = new THREE.MeshStandardMaterial({ color: 0x596674, roughness: 0.84, metalness: 0.04 });
-  const envelopeFloorMaterial = new THREE.MeshStandardMaterial({ color: 0x36403a, roughness: 0.96, metalness: 0.01 });
-  const corridorMaterial = new THREE.MeshStandardMaterial({ color: 0x434f5d, roughness: 0.88, metalness: 0.03 });
-  const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xc9d2da, roughness: 0.95, metalness: 0.01 });
-  const accentWallMaterial = new THREE.MeshStandardMaterial({ color: 0xb8c0c8, roughness: 0.94, metalness: 0.01 });
-  const ceilingMaterial = new THREE.MeshStandardMaterial({ color: 0xe4e8ec, roughness: 0.97, metalness: 0, side: THREE.DoubleSide });
-  const generatedShellMaterial = new THREE.MeshStandardMaterial({ color: 0xcfd6dd, roughness: 0.97, metalness: 0, side: THREE.BackSide });
+  const slabMaterial = new THREE.MeshStandardMaterial({ color: 0x353b42, roughness: 0.86, metalness: 0.02 });
+  const roomMaterial = new THREE.MeshStandardMaterial({ color: 0x71808c, roughness: 0.82, metalness: 0.03 });
+  const corridorMaterial = new THREE.MeshStandardMaterial({ color: 0x4d5b68, roughness: 0.86, metalness: 0.03 });
+  const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xd9e0e5, roughness: 0.91, metalness: 0.01 });
+  const accentWallMaterial = new THREE.MeshStandardMaterial({ color: 0xaeb9c2, roughness: 0.9, metalness: 0.01 });
+  const ceilingMaterial = new THREE.MeshStandardMaterial({ color: 0xf0f3f5, roughness: 0.94, metalness: 0, side: THREE.DoubleSide });
+  const fixtureMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf7f8f3,
+    emissive: 0xe8e2c8,
+    emissiveIntensity: 0.7,
+    roughness: 0.55
+  });
+  const columnMaterial = new THREE.MeshStandardMaterial({ color: 0x87939d, roughness: 0.9, metalness: 0.02 });
   const entryMaterial = new THREE.MeshStandardMaterial({
     color: 0x4cc9b0,
     emissive: 0x21564d,
@@ -130,33 +138,30 @@ export function buildInteriorScene(definition) {
   const placementTargets = [];
 
   const ambientLight = new THREE.HemisphereLight(0xf8fafc, 0x1a2330, 0.72);
-  ambientLight.position.set(centroid.x, floorY + INTERIOR_WALL_HEIGHT * 0.92, centroid.z);
+  ambientLight.position.set(centroid.x, floorY + wallHeight * 0.92, centroid.z);
   group.add(ambientLight);
 
-  const ceilingLight = new THREE.PointLight(0xf7f3ea, 0.82, 36, 2);
-  ceilingLight.position.set(centroid.x, floorY + INTERIOR_WALL_HEIGHT - 0.32, centroid.z);
-  group.add(ceilingLight);
-
-  if (needsOuterEnvelope) {
-    const envelopeFloor = addFlatSurfaceMesh(group, exteriorFootprint, floorY + INTERIOR_FLOOR_OFFSET - 0.012, envelopeFloorMaterial, 10);
-    const envelopeCeiling = addFlatSurfaceMesh(group, exteriorFootprint, floorY + INTERIOR_WALL_HEIGHT, ceilingMaterial, 8);
-    if (envelopeFloor) envelopeFloor.renderOrder = -1;
-    if (envelopeCeiling) envelopeCeiling.renderOrder = 0;
-
-    for (let i = 0; i < exteriorFootprint.length; i++) {
-      const p1 = exteriorFootprint[i];
-      const p2 = exteriorFootprint[(i + 1) % exteriorFootprint.length];
-      addWallMesh(group, p1, p2, floorY + INTERIOR_FLOOR_OFFSET - 0.01, accentWallMaterial);
+  const lightBounds = footprintBounds(shellFootprint);
+  const lightColumns = lightBounds.width > 26 ? 3 : lightBounds.width > 13 ? 2 : 1;
+  const lightRows = lightBounds.depth > 22 ? 2 : 1;
+  for (let gx = 0; gx < lightColumns; gx++) {
+    for (let gz = 0; gz < lightRows; gz++) {
+      const x = lightBounds.minX + lightBounds.width * ((gx + 1) / (lightColumns + 1));
+      const z = lightBounds.minZ + lightBounds.depth * ((gz + 1) / (lightRows + 1));
+      if (!pointInPolygonSafe(x, z, shellFootprint)) continue;
+      const ceilingLight = new THREE.PointLight(0xf7f3ea, 0.7, 30, 2);
+      ceilingLight.position.set(x, floorY + wallHeight - 0.32, z);
+      group.add(ceilingLight);
+      const fixture = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.07, 0.5), fixtureMaterial);
+      fixture.position.set(x, floorY + wallHeight - 0.06, z);
+      group.add(fixture);
     }
   }
 
   const effectiveMode = featurePlan.mode;
   if (Array.isArray(shellFootprint) && shellFootprint.length >= 3) {
-    if (effectiveMode === 'generated') {
-      addBackdropRoomMesh(group, footprintBounds(shellFootprint), floorY + INTERIOR_FLOOR_OFFSET, generatedShellMaterial);
-    }
     const slab = addFlatSurfaceMesh(group, shellFootprint, floorY + INTERIOR_FLOOR_OFFSET, slabMaterial, 12);
-    const shellCeiling = addFlatSurfaceMesh(group, shellFootprint, floorY + INTERIOR_WALL_HEIGHT, ceilingMaterial, 8);
+    const shellCeiling = addFlatSurfaceMesh(group, shellFootprint, floorY + wallHeight, ceilingMaterial, 8);
     if (slab) placementTargets.push(slab);
     if (shellCeiling) shellCeiling.renderOrder = 1;
 
@@ -164,8 +169,8 @@ export function buildInteriorScene(definition) {
     for (let i = 0; i < shellFootprint.length; i++) {
       const p1 = shellFootprint[i];
       const p2 = shellFootprint[(i + 1) % shellFootprint.length];
-      addWallMesh(group, p1, p2, floorY + INTERIOR_FLOOR_OFFSET, wallMaterial);
-      const collider = createWallCollider(p1, p2, floorY + INTERIOR_FLOOR_OFFSET);
+      addWallMesh(group, p1, p2, floorY + INTERIOR_FLOOR_OFFSET, wallMaterial, wallHeight);
+      const collider = createWallCollider(p1, p2, floorY + INTERIOR_FLOOR_OFFSET, wallHeight);
       if (collider) dynamicColliders.push(collider);
     }
   }
@@ -206,10 +211,27 @@ export function buildInteriorScene(definition) {
     if (!Array.isArray(segment) || segment.length < 2) return;
     const p1 = segment[0];
     const p2 = segment[1];
-    addWallMesh(group, p1, p2, floorY + INTERIOR_FLOOR_OFFSET, accentWallMaterial, INTERIOR_WALL_HEIGHT * 0.86, INTERIOR_WALL_THICKNESS * 0.62);
-    const collider = createWallCollider(p1, p2, floorY + INTERIOR_FLOOR_OFFSET, INTERIOR_WALL_HEIGHT * 0.86, INTERIOR_WALL_THICKNESS * 0.62);
+    addWallMesh(group, p1, p2, floorY + INTERIOR_FLOOR_OFFSET, accentWallMaterial, wallHeight * 0.88, INTERIOR_WALL_THICKNESS * 0.62);
+    const collider = createWallCollider(p1, p2, floorY + INTERIOR_FLOOR_OFFSET, wallHeight * 0.88, INTERIOR_WALL_THICKNESS * 0.62);
     if (collider) dynamicColliders.push(collider);
   });
+
+  if (exteriorArea > 900) {
+    const columnRadius = 0.34;
+    const columnColumns = Math.min(4, Math.max(2, Math.floor(lightBounds.width / 20)));
+    const columnRows = Math.min(3, Math.max(2, Math.floor(lightBounds.depth / 18)));
+    for (let gx = 1; gx <= columnColumns; gx++) {
+      for (let gz = 1; gz <= columnRows; gz++) {
+        const x = lightBounds.minX + lightBounds.width * (gx / (columnColumns + 1));
+        const z = lightBounds.minZ + lightBounds.depth * (gz / (columnRows + 1));
+        if (!pointInPolygonSafe(x, z, shellFootprint) || Math.hypot(x - desiredEntry.x, z - desiredEntry.z) < 4) continue;
+        const column = new THREE.Mesh(new THREE.CylinderGeometry(columnRadius, columnRadius, wallHeight, 12), columnMaterial);
+        column.position.set(x, floorY + wallHeight * 0.5, z);
+        group.add(column);
+        dynamicColliders.push(createColumnCollider(x, z, columnRadius + 0.12, floorY, wallHeight));
+      }
+    }
+  }
 
   const resolvedEntryPoint = chooseInteriorSpawnPoint(desiredEntry, walkSurfaces, {
     x: centroid.x,
@@ -238,7 +260,13 @@ export function buildInteriorScene(definition) {
     usableFootprint: shellFootprint,
     center: { x: centroid.x, z: centroid.z },
     shellClearanceMin,
-    requiredShellClearance: INTERIOR_WALL_THICKNESS * 0.5,
+    requiredShellClearance: 0,
+    exteriorArea,
+    usableArea: ringAreaAbs(shellFootprint),
+    partitionCount: featurePlan.partitions.length,
+    layoutKind: featurePlan.layoutKind || (effectiveMode === 'mapped' ? 'mapped' : 'open_plan'),
+    wallHeight,
+    suppressionRadius: Math.min(180, Math.hypot(lightBounds.width, lightBounds.depth) * 0.5 + 14),
     entryPoint: {
       x: resolvedEntryPoint.x,
       z: resolvedEntryPoint.z,

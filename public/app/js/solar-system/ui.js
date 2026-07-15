@@ -10,6 +10,21 @@ import {
   showSunInfo
 } from "./info-panel.js?v=2";
 
+function applySystemMapPresentation(ctx, mode) {
+  const mapScale = mode === 'full' ? 3.2 : mode === 'inner' ? 2.2 : 1;
+  ctx.solarSystem.planetMeshes.forEach((entry) => entry.mesh?.scale.setScalar(mapScale));
+  ctx.solarSystem.asteroidMeshes.forEach((entry) => entry.mesh?.scale.setScalar(mapScale));
+  if (ctx.solarSystem.asteroidBelt?.material) {
+    ctx.solarSystem.asteroidBelt.material.size = mode === 'inner' ? 3.8 : mode === 'full' ? 3 : 2.4;
+  }
+}
+
+function overviewButtonLabel(mode) {
+  if (mode === 'inner') return 'FULL SYSTEM MAP';
+  if (mode === 'full') return 'RESUME FLIGHT';
+  return 'SOLAR SYSTEM MAP';
+}
+
 export function onSolarSystemClick(ctx, event) {
   if (!ctx.appCtx.spaceFlight.active || !ctx.solarSystem.visible || !ctx.solarSystem.group) return;
 
@@ -185,6 +200,20 @@ export function createToggleButton(ctx) {
   marsBtn.addEventListener('click', () => handleMarsLandingAction(ctx));
   container.appendChild(marsBtn);
 
+  const overviewBtn = document.createElement('button');
+  overviewBtn.id = 'solarSystemOverview';
+  overviewBtn.className = 'ssToggleBtn';
+  overviewBtn.style.cssText = orbitBtn.style.cssText.replace('#10b981', '#f0b35a');
+  overviewBtn.textContent = 'SOLAR SYSTEM MAP';
+  overviewBtn.addEventListener('click', () => {
+    const flight = ctx.appCtx.spaceFlight;
+    if (!flight?.active) return;
+    flight.overviewMode = flight.overviewMode === 'inner' ? 'full' : flight.overviewMode === 'full' ? false : 'inner';
+    applySystemMapPresentation(ctx, flight.overviewMode);
+    overviewBtn.textContent = overviewButtonLabel(flight.overviewMode);
+  });
+  container.appendChild(overviewBtn);
+
   document.body.appendChild(container);
 }
 
@@ -202,15 +231,19 @@ export function showSolarSystemUI(ctx) {
   const returnBtn = document.getElementById('solarSystemToggle');
   const landMoonBtn = document.getElementById('orbitsToggle');
   const landMarsBtn = document.getElementById('marsLandingToggle');
+  const overviewBtn = document.getElementById('solarSystemOverview');
   if (returnBtn) returnBtn.textContent = 'RETURN TO EARTH';
   if (landMoonBtn) landMoonBtn.textContent = 'LAND ON MOON';
   if (landMarsBtn) landMarsBtn.textContent = 'LAND ON MARS';
+  if (overviewBtn) overviewBtn.textContent = overviewButtonLabel(ctx?.appCtx?.spaceFlight?.overviewMode);
   ctx?.appCtx?.showUniverseUI?.();
 }
 
 export function hideSolarSystemUI(ctx) {
   const container = document.getElementById('ssToggleContainer');
   if (container) container.style.display = 'none';
+  if (ctx?.appCtx?.spaceFlight) ctx.appCtx.spaceFlight.overviewMode = false;
+  applySystemMapPresentation(ctx, false);
   ctx?.appCtx?.hideUniverseUI?.();
   hidePlanetInfo(ctx);
 }

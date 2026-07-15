@@ -167,20 +167,26 @@ function buildingFootprintPoints(buildingLike) {
   ];
 }
 
-function hasFullBuildingFootprint(building) {
-  return !!(
-    building &&
-    building.colliderDetail === 'full' &&
-    Array.isArray(building.pts) &&
-    building.pts.length >= 3
-  );
+function hasUsableBuildingFootprint(building) {
+  if (!building) return false;
+  const footprint = buildingFootprintPoints(building);
+  if (footprint.length < 3) return false;
+  const bounds = footprintBounds(footprint);
+  if (bounds.width < 2.4 || bounds.depth < 2.4) return false;
+  let area = 0;
+  for (let i = 0, j = footprint.length - 1; i < footprint.length; j = i++) {
+    area += footprint[j].x * footprint[i].z - footprint[i].x * footprint[j].z;
+  }
+  return Math.abs(area * 0.5) >= 12;
 }
 
+const hasFullBuildingFootprint = hasUsableBuildingFootprint;
+
 function isEnterableBuildingCandidate(building) {
-  if (!hasFullBuildingFootprint(building)) return false;
+  if (!hasUsableBuildingFootprint(building)) return false;
   if (building?.collisionKind === 'barrier') return false;
   const buildingType = String(building?.buildingType || '').toLowerCase();
-  if (!buildingType || ENTRY_EXCLUDED_BUILDING_TYPES.has(buildingType)) return false;
+  if (ENTRY_EXCLUDED_BUILDING_TYPES.has(buildingType)) return false;
   return !building.isInteriorCollider && !building.collisionDisabled;
 }
 

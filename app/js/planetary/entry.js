@@ -33,6 +33,7 @@ function hideSurface(object) {
 export function prepareTitleEnvironment() {
   const previousEnv = appCtx.getEnv?.() || null;
   appCtx.cancelPendingEarthArrival?.();
+  appCtx.cancelPendingMarsTransition?.();
   hidePlanetaryReturnControls();
 
   if (appCtx.spaceFlight?.active) appCtx.exitSpaceFlight?.();

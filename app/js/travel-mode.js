@@ -108,21 +108,22 @@ function sampleDroneSpawnHeight(x, z) {
   return 50;
 }
 
-function syncDronePositionFromReference() {
-  const ref = appCtx.Walk?.getMapRefPosition ?
+function syncDronePositionFromReference(options = {}) {
+  const ref = options.reference || (appCtx.Walk?.getMapRefPosition ?
     appCtx.Walk.getMapRefPosition(false, null) :
     {
       x: Number.isFinite(appCtx.car?.x) ? appCtx.car.x : 0,
       z: Number.isFinite(appCtx.car?.z) ? appCtx.car.z : 0
-    };
+    });
 
   appCtx.drone.x = ref.x;
   appCtx.drone.z = ref.z;
-  appCtx.drone.yaw = Number.isFinite(appCtx.car?.angle) ? appCtx.car.angle : 0;
+  appCtx.drone.yaw = Number.isFinite(ref?.yaw) ? ref.yaw : Number.isFinite(ref?.angle) ? ref.angle : Number(appCtx.car?.angle) || 0;
   appCtx.drone.cameraYawOffset = 0;
   appCtx.drone.roll = 0;
-  appCtx.drone.y = sampleDroneSpawnHeight(ref.x, ref.z);
-  appCtx.drone.pitch = appCtx.onMoon || appCtx.onMars ? -0.2 : -0.3;
+  const safeLaunchY = sampleDroneSpawnHeight(ref.x, ref.z);
+  appCtx.drone.y = options.preserveAltitude && Number.isFinite(ref?.y) ? Math.max(safeLaunchY, ref.y) : safeLaunchY;
+  appCtx.drone.pitch = Number.isFinite(ref?.pitch) ? ref.pitch : appCtx.onMoon || appCtx.onMars ? -0.2 : -0.3;
 }
 
 function resetCameraForDroneMode() {
@@ -195,14 +196,15 @@ function setTravelMode(mode, options = {}) {
     });
   }
 
-  if (targetMode !== 'plane' && appCtx.planeMode?.active) {
-    appCtx.stopPlaneMode?.();
-  }
-
   const settlingAerialTransition = targetMode !== currentMode && (
     targetMode === 'plane' || targetMode === 'drone' || currentMode === 'plane' || currentMode === 'drone'
   );
   if (settlingAerialTransition) appCtx.pauseEarthStreaming?.('travel_mode_transition');
+
+  let planeExitState = null;
+  if (targetMode !== 'plane' && appCtx.planeMode?.active) {
+    planeExitState = appCtx.stopPlaneMode?.({ targetMode }) || null;
+  }
 
   if (targetMode === 'plane') {
     if (appCtx.onMoon || appCtx.onMars || !appCtx.startPlaneMode?.(options)) {
@@ -216,7 +218,11 @@ function setTravelMode(mode, options = {}) {
   } else if (targetMode === 'walk') {
     appCtx.droneMode = false;
     if (appCtx.Walk && appCtx.Walk.state?.mode !== 'walk') {
-      appCtx.Walk.setModeWalk();
+      appCtx.Walk.setModeWalk({
+        preserveResolvedSpawn: !!planeExitState,
+        preserveResolvedSurface: planeExitState?.landedOnRoof === true,
+        deferWorldSync: !!planeExitState
+      });
     }
     if (appCtx.Walk?.state?.characterMesh) appCtx.Walk.state.characterMesh.visible = true;
     if (appCtx.carMesh) appCtx.carMesh.visible = false;
@@ -224,7 +230,10 @@ function setTravelMode(mode, options = {}) {
     if (appCtx.Walk?.state?.mode === 'walk') {
       appCtx.Walk.setModeDrive();
     }
-    syncDronePositionFromReference();
+    syncDronePositionFromReference({
+      reference: planeExitState || undefined,
+      preserveAltitude: !!planeExitState
+    });
     resetCameraForDroneMode();
     appCtx.droneMode = true;
     if (appCtx.carMesh) appCtx.carMesh.visible = false;

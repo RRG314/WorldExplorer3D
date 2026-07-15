@@ -20,6 +20,7 @@
     "test:runtime": "node scripts/test-runtime-invariants.mjs",
     "test:local-data": "node scripts/test-local-data-safety.mjs",
     "test:mobile-controls": "node scripts/test-mobile-controls.mjs",
+    "test:plane-interiors": "node scripts/test-plane-interior-lifecycle.mjs",
     "test:editor-multiplayer": "node scripts/test-editor-multiplayer-surfaces.mjs",
     "test:block-builder": "node scripts/test-block-builder-contract.mjs",
     "test:title-planetary": "node scripts/test-title-planetary-launches.mjs",
@@ -50,7 +51,7 @@
   "bugs": {
     "url": "https://github.com/RRG314/WorldExplorer3D/issues"
   },
-  "homepage": "https://github.com/RRG314/WorldExplorer3D#readme",
+  "homepage": "https://worldexplorer3d.io",
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",
     "firebase": "^12.9.0",

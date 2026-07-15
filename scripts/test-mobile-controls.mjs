@@ -195,8 +195,9 @@ async function assertLandscapeShell(browser, baseUrl) {
 
 async function main() {
   await fs.mkdir(outputDir, { recursive: true });
-  const server = await startStaticRootServer({ rootDir, host, candidatePorts: ports });
-  const baseUrl = `http://${host}:${server.port}`;
+  const hostedBaseUrl = String(process.env.TEST_BASE_URL || '').replace(/\/$/, '');
+  const server = hostedBaseUrl ? null : await startStaticRootServer({ rootDir, host, candidatePorts: ports });
+  const baseUrl = hostedBaseUrl || `http://${host}:${server.port}`;
   const browser = await chromium.launch({ headless: true });
   const errors = [];
   try {
@@ -224,7 +225,7 @@ async function main() {
     await assertLandscapeShell(browser, baseUrl);
   } finally {
     await browser.close();
-    await server.close();
+    await server?.close();
   }
   assert(errors.length === 0, `Mobile page errors: ${errors.join(' | ')}`);
   console.log(JSON.stringify({ ok: true, devices: ['iPhone portrait', 'Android portrait', 'iPhone landscape'] }, null, 2));

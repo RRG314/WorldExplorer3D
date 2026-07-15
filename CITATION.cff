@@ -8,12 +8,12 @@ authors:
 repository-code: "https://github.com/RRG314/WorldExplorer3D"
 url: "https://worldexplorer3d.io"
 license: "Proprietary"
-version: "2.1.0-beta"
-date-released: "2026-03-13"
+version: "3.0.0"
+date-released: "2026-07-15"
 abstract: >-
   Browser-based 3D geospatial exploration application using OpenStreetMap-derived
-  data for interactive Earth exploration with additional Moon, Space, and Ocean
-  destination modes.
+  data for interactive Earth exploration with Ocean, Moon, Mars, Solar System,
+  and deep-space destination modes.
 keywords:
   - openstreetmap
   - geospatial

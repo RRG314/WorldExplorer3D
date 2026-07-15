@@ -5,7 +5,7 @@ import {
   listEnterableBuildingSupportsNear,
   pickNearbyEnterableBuildingSupport,
   summarizeSupportType
-} from "../building-entry.js?v=3";
+} from "../building-entry.js?v=4";
 import { createInteriorRuntimeUiApi } from "./runtime-ui.js?v=2";
 
 let nearbyInteriorScanPromise = null;
@@ -158,7 +158,7 @@ export async function enterInteriorForSupport(support, deps) {
   const suppressedWorldMeshes = collectInteriorWorldSuppressionStates(
     sceneState.exteriorFootprint,
     sceneState.center,
-    48,
+    sceneState.suppressionRadius || 48,
     deps
   );
   if (support.building && !support.synthetic) {
@@ -177,6 +177,9 @@ export async function enterInteriorForSupport(support, deps) {
   walker.x = sceneState.entryPoint.x;
   walker.z = sceneState.entryPoint.z;
   walker.y = sceneState.entryPoint.y;
+  const entryYaw = Math.atan2(sceneState.center.x - walker.x, sceneState.center.z - walker.z);
+  walker.angle = entryYaw;
+  walker.yaw = entryYaw;
   walker.vy = 0;
   if (appCtx.car) {
     appCtx.car.x = walker.x;
@@ -202,9 +205,14 @@ export async function enterInteriorForSupport(support, deps) {
     suppressedWorldMeshes,
     walkSurfaces: sceneState.walkSurfaces,
     placementTargets: sceneState.placementTargets,
+    center: sceneState.center,
     usableFootprint: sceneState.usableFootprint,
     shellClearanceMin: sceneState.shellClearanceMin,
     requiredShellClearance: sceneState.requiredShellClearance,
+    exteriorArea: sceneState.exteriorArea,
+    usableArea: sceneState.usableArea,
+    partitionCount: sceneState.partitionCount,
+    layoutKind: sceneState.layoutKind,
     outsideState,
     previousView,
     entryPoint: { ...sceneState.entryPoint },

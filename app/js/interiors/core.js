@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { buildingLabel, pointToSegmentDistance } from "../building-entry.js?v=3";
+import { buildingLabel, pointToSegmentDistance } from "../building-entry.js?v=4";
 import {
   INTERIOR_FETCH_RADIUS_PAD,
   INTERIOR_FLOOR_CLEARANCE,
@@ -398,7 +398,7 @@ export function addWallMesh(group, p1, p2, y, material, height = INTERIOR_WALL_H
   if (!(len > 0.2)) return null;
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(len, height, thickness), material);
   mesh.position.set((p1.x + p2.x) * 0.5, y + height * 0.5, (p1.z + p2.z) * 0.5);
-  mesh.rotation.y = Math.atan2(dx, dz);
+  mesh.rotation.y = Math.atan2(-dz, dx);
   group.add(mesh);
   return mesh;
 }

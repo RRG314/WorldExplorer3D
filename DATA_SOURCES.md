@@ -39,4 +39,4 @@ When configured, this app can call additional provider APIs (for example propert
 
 - [ATTRIBUTION.md](ATTRIBUTION.md)
 - [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)
-- [LIMITATIONS.md](LIMITATIONS.md)
+- [KNOWN_ISSUES.md](KNOWN_ISSUES.md)

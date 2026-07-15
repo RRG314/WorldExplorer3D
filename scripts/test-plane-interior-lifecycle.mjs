@@ -1,0 +1,253 @@
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import { chromium } from 'playwright';
+import { startStaticRootServer } from './test-static-server.mjs';
+
+const rootDir = process.cwd();
+const outputDir = path.join(rootDir, 'output', 'playwright', 'plane-interior-lifecycle');
+
+function assert(condition, message) {
+  if (!condition) throw new Error(message);
+}
+
+async function launchBaltimore(page, baseUrl) {
+  await page.goto(`${baseUrl}/app/?plane-interior=${Date.now()}`, {
+    waitUntil: 'domcontentloaded',
+    timeout: 90000
+  });
+  await page.waitForFunction(() => !document.getElementById('startBtn')?.disabled, null, { timeout: 90000 });
+  await page.locator('.tab-btn[data-tab="location"]').click();
+  await page.locator('.loc[data-loc="baltimore"]').click();
+  await page.locator('#startBtn').click();
+  await page.locator('#loading').waitFor({ state: 'hidden', timeout: 180000 });
+}
+
+async function exerciseLifecycle(page) {
+  return page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const polygonArea = (points = []) => {
+      const ring = Array.isArray(points) ? points : [];
+      let area = 0;
+      for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        area += ring[j].x * ring[i].z - ring[i].x * ring[j].z;
+      }
+      return Math.abs(area * 0.5);
+    };
+    const candidates = (ctx.buildings || [])
+      .filter((building) => {
+        const support = ctx.resolveBuildingEntrySupport?.(building, { allowSynthetic: true });
+        return support?.enterable && Number.isFinite(building.maxY) && polygonArea(building.pts) > 220;
+      })
+      .sort((a, b) => polygonArea(b.pts) - polygonArea(a.pts));
+    const building = candidates.find((item) => Math.min(item.maxX - item.minX, item.maxZ - item.minZ) > 12) || candidates[0];
+    if (!building) throw new Error('No large enterable building was available');
+
+    const center = { x: building.centerX, z: building.centerZ };
+    const roofY = building.maxY;
+    ctx.setTravelMode('plane', {
+      source: 'plane_interior_acceptance',
+      force: true,
+      x: center.x,
+      z: center.z,
+      y: roofY + 7,
+      pitch: -0.3,
+      speed: 20,
+      throttle: 0,
+      airborne: true
+    });
+    ctx.planeMode.pitch = -0.32;
+    ctx.planeMode.speed = 19;
+    ctx.planeMode.throttle = 0;
+    ctx.planeMode.climbRate = -4;
+    for (let i = 0; i < 420; i++) ctx.updatePlane(1 / 60);
+    const roofLanding = ctx.getPlaneSnapshot();
+
+    const walkStartedAt = performance.now();
+    ctx.setTravelMode('walk', { source: 'plane_interior_acceptance', force: true, emitTutorial: false });
+    const walkSwitchMs = performance.now() - walkStartedAt;
+    const walkMode = ctx.getCurrentTravelMode();
+    const walkFeetY = ctx.Walk.state.walker.y - 1.7;
+
+    ctx.setTravelMode('plane', {
+      source: 'plane_interior_acceptance',
+      force: true,
+      x: center.x,
+      z: center.z,
+      y: roofY + 70,
+      speed: 24,
+      throttle: 0.6,
+      airborne: true
+    });
+    const beforeDrone = ctx.getPlaneSnapshot();
+    const droneStartedAt = performance.now();
+    ctx.setTravelMode('drone', { source: 'plane_interior_acceptance', force: true, emitTutorial: false });
+    const droneSwitchMs = performance.now() - droneStartedAt;
+    const drone = { x: ctx.drone.x, y: ctx.drone.y, z: ctx.drone.z };
+
+    const first = building.pts?.[0];
+    const second = building.pts?.[1];
+    const edge = first && second ?
+      { x: (first.x + second.x) * 0.5, z: (first.z + second.z) * 0.5 } :
+      { x: building.minX, z: center.z };
+    let outwardX = edge.x - center.x;
+    let outwardZ = edge.z - center.z;
+    const outwardLength = Math.hypot(outwardX, outwardZ) || 1;
+    outwardX /= outwardLength;
+    outwardZ /= outwardLength;
+    const impactStart = { x: edge.x + outwardX * 4, z: edge.z + outwardZ * 4 };
+    const impactYaw = Math.atan2(center.x - impactStart.x, center.z - impactStart.z);
+    ctx.setTravelMode('plane', {
+      source: 'plane_interior_acceptance',
+      force: true,
+      x: impactStart.x,
+      z: impactStart.z,
+      y: building.minY + (roofY - building.minY) * 0.55,
+      yaw: impactYaw,
+      speed: 30,
+      throttle: 1,
+      airborne: true
+    });
+    ctx.planeMode.speed = 30;
+    ctx.planeMode.throttle = 1;
+    for (let i = 0; i < 90; i++) ctx.updatePlane(1 / 60);
+    const impact = ctx.getPlaneSnapshot();
+
+    const driveStartedAt = performance.now();
+    ctx.setTravelMode('drive', { source: 'plane_interior_acceptance', force: true, emitTutorial: false });
+    const driveSwitchMs = performance.now() - driveStartedAt;
+    const driveHit = ctx.checkBuildingCollision?.(ctx.car.x, ctx.car.z, 2, {
+      actorBaseY: ctx.car.y - 1.2,
+      actorHeight: 1.8
+    });
+    const driveExit = {
+      mode: ctx.getCurrentTravelMode(),
+      x: ctx.car.x,
+      y: ctx.car.y,
+      z: ctx.car.z,
+      switchMs: driveSwitchMs,
+      blocked: !!driveHit?.collision
+    };
+    ctx.setTravelMode('walk', { source: 'plane_interior_acceptance', force: true, emitTutorial: false });
+
+    const support = ctx.resolveBuildingEntrySupport(building, { allowSynthetic: true });
+    const bboxSupport = ctx.resolveBuildingEntrySupport({
+      sourceBuildingId: 'acceptance-bbox-footprint',
+      buildingType: 'commercial',
+      baseY: building.baseY,
+      minY: building.minY,
+      maxY: building.maxY,
+      minX: building.minX,
+      maxX: building.maxX,
+      minZ: building.minZ,
+      maxZ: building.maxZ,
+      centerX: building.centerX,
+      centerZ: building.centerZ
+    });
+    ctx.Walk.state.walker.x = support.entryAnchor.x;
+    ctx.Walk.state.walker.z = support.entryAnchor.z;
+    ctx.Walk.state.walker.y = building.baseY + 1.7;
+    ctx.car.x = support.entryAnchor.x;
+    ctx.car.z = support.entryAnchor.z;
+    const entered = await ctx.enterInteriorForSupport(support);
+    const active = ctx.activeInterior;
+    if (active?.entryPoint && active?.center) {
+      const walker = ctx.Walk.state.walker;
+      walker.x = active.center.x;
+      walker.z = active.center.z;
+      walker.y = active.entryPoint.y;
+      walker.angle = 0;
+      walker.yaw = 0;
+      ctx.Walk.state.view = 'third';
+      if (ctx.Walk.state.characterMesh) ctx.Walk.state.characterMesh.visible = true;
+    }
+
+    return {
+      building: {
+        id: building.sourceBuildingId,
+        type: building.buildingType,
+        area: polygonArea(building.pts),
+        width: building.maxX - building.minX,
+        depth: building.maxZ - building.minZ,
+        roofY
+      },
+      roofLanding: {
+        ...roofLanding,
+        walkMode,
+        walkSwitchMs,
+        walkFeetY,
+        roofDelta: walkFeetY - roofY
+      },
+      droneTransfer: {
+        before: beforeDrone,
+        after: drone,
+        switchMs: droneSwitchMs,
+        horizontalDelta: Math.hypot(drone.x - beforeDrone.x, drone.z - beforeDrone.z),
+        altitudeDelta: drone.y - beforeDrone.y
+      },
+      impact,
+      driveExit,
+      interior: {
+        entered: !!entered && !!active,
+        bboxFootprintEnterable: bboxSupport?.enterable === true,
+        mode: active?.mode,
+        usableArea: active?.usableArea,
+        exteriorArea: active?.exteriorArea,
+        usableRatio: (active?.usableArea || 0) / (active?.exteriorArea || 1),
+        partitionCount: active?.partitionCount,
+        layoutKind: active?.layoutKind,
+        colliderCount: ctx.dynamicBuildingColliders?.length || 0,
+        footprintPoints: active?.usableFootprint?.length || 0
+      }
+    };
+  });
+}
+
+async function main() {
+  await fs.mkdir(outputDir, { recursive: true });
+  const hostedBaseUrl = String(process.env.TEST_BASE_URL || '').replace(/\/$/, '');
+  const server = hostedBaseUrl ? null : await startStaticRootServer({
+    rootDir,
+    host: '127.0.0.1',
+    candidatePorts: [4234, 4235, 4236]
+  });
+  const baseUrl = hostedBaseUrl || `http://127.0.0.1:${server.port}`;
+  const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+  const errors = [];
+  try {
+    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+    page.on('pageerror', (error) => errors.push(error.message));
+    await launchBaltimore(page, baseUrl);
+    const report = await exerciseLifecycle(page);
+    await page.waitForTimeout(500);
+    await page.screenshot({ path: path.join(outputDir, 'interior.png') });
+    await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
+
+    assert(report.roofLanding.contactKind === 'building', `Plane missed the roof surface: ${JSON.stringify(report.roofLanding)}`);
+    assert(!report.roofLanding.airborne, 'Plane did not settle on the building roof');
+    assert(report.roofLanding.walkMode === 'walk', `Plane-to-walk resolved as ${report.roofLanding.walkMode}`);
+    assert(Math.abs(report.roofLanding.roofDelta) <= 0.5, `Walk exit left the roof by ${report.roofLanding.roofDelta}m`);
+    assert(report.roofLanding.walkSwitchMs <= 120, `Plane-to-walk stalled for ${report.roofLanding.walkSwitchMs}ms`);
+    assert(report.droneTransfer.horizontalDelta <= 0.2, 'Plane-to-drone changed horizontal position');
+    assert(report.droneTransfer.altitudeDelta >= -0.2, 'Plane-to-drone lost altitude');
+    assert(report.droneTransfer.switchMs <= 80, `Plane-to-drone stalled for ${report.droneTransfer.switchMs}ms`);
+    assert(report.impact.lastImpactAt > 0 && report.impact.speed <= 5, `Building impact did not settle: ${JSON.stringify(report.impact)}`);
+    assert(report.driveExit.mode === 'drive', `Plane-to-drive resolved as ${report.driveExit.mode}`);
+    assert(report.driveExit.switchMs <= 120, `Plane-to-drive stalled for ${report.driveExit.switchMs}ms`);
+    assert(!report.driveExit.blocked, `Plane-to-drive spawned inside a building: ${JSON.stringify(report.driveExit)}`);
+    assert(report.interior.entered, 'Large building interior did not open');
+    assert(report.interior.bboxFootprintEnterable, 'A valid bounding-box building was not enterable');
+    assert(report.interior.usableRatio >= 0.75, `Interior uses only ${(report.interior.usableRatio * 100).toFixed(1)}% of its footprint`);
+    assert(report.interior.colliderCount >= report.interior.footprintPoints, 'Interior shell is missing collision walls');
+    assert(report.interior.partitionCount > 0, 'Large generated interior has no room circulation plan');
+    assert(errors.length === 0, `Page errors: ${errors.join(' | ')}`);
+    console.log(JSON.stringify({ ok: true, report }, null, 2));
+  } finally {
+    await browser.close();
+    await server?.close();
+  }
+}
+
+main().catch((error) => {
+  console.error(error);
+  process.exitCode = 1;
+});

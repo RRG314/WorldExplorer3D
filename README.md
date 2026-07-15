@@ -1,144 +1,93 @@
 # World Explorer 3D
 
-[![Runtime Verify](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
+[![Runtime Verify](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=main)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
+[![Version](https://img.shields.io/badge/version-3.0.0-41b9a5)](CHANGELOG.md)
 [![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
 
-World Explorer 3D is a browser-based 3D geospatial exploration application built around real-world map data, including OpenStreetMap-derived roads, buildings, land-use, water, and place context.
+World Explorer 3D is a browser-based geospatial exploration game built around real-world map context. Pick a preset city, use the interactive globe, or enter coordinates, then explore by walking, driving, flying, boating, or changing worlds entirely.
 
-It is an interactive exploration app, not a flat map viewer and not a routing/navigation replacement. The focus is immersive place exploration across Earth, Moon, Space, and Ocean destination modes.
+**[Launch World Explorer 3D](https://worldexplorer3d.io/app/)**
 
-## Current Status
+## Version 3.0
 
-- Version 3.0.0 release candidate.
-- Canonical runtime source: `app/*`.
-- Canonical landing/account sources: `index.html`, `account/index.html`.
-- Hosting/runtime mirror: `public/*` (`public/app/*`, `public/index.html`, `public/account/index.html`).
-- Includes geolocation, Earth, Ocean, Moon, Mars, and Space launch flows.
-- Core play, traversal modes, and the large map remain free; donations are optional recognition/support only.
+Version 3.0 is a major runtime and feature release. It replaces the earlier monolithic application structure with smaller, ownership-focused systems and expands the experience across Earth, water, the Moon, Mars, the solar system, and deep space.
 
-## What It Does
+Highlights:
 
-- Launch from preset cities or custom coordinates.
-- Use geolocation (`Use My Location`) in title and globe selector flows.
-- Explore in 3D with driving, walking, drone, plane, boat, rover, and rocket traversal.
-- Stream additional Earth world cells around the player for longer continuous trips while applying distance-based detail budgets.
-- Route walk/drive/drone mode changes through one shared travel-mode controller so keyboard and UI transitions stay in sync.
-- Keep traversal switches and custom/geolocation launches on safe ground: valid positions stay put, invalid positions resolve to the nearest safe road or ground spawn based on the active mode.
-- Switch between Earth, Ocean, Moon, Mars, and Space without reloading the app.
-- Render map-informed world context (roads/buildings/land-use/water) for Earth scenes.
-- Apply shared surface rules so polar regions resolve to snow/frozen water and arid regions resolve to sand terrain instead of defaulting everything to temperate grass.
-- Add OSM-driven vegetation so forests, woods, parks, tree rows, and individual mapped trees make Earth scenes feel less empty without turning every tile into high-detail foliage.
-- Use roads for drive routing and keep walking/navigation aligned to the core road-and-ground traversal network while the separate foot/cycle/rail rollout is paused for cleanup.
-- Use one shared building-entry system for exploration and real-estate destinations: `E` enters supported buildings on demand, OSM indoor data is used when available, and enclosed generated interiors are used as the fallback when it is not.
-- Show an enterable-buildings section in the large-map legend; it scans nearby supported buildings on demand and lists mapped/generated/listing-backed interiors that can actually be entered.
-- Provide minimap/large-map overlays and runtime controls for exploration, with `M` for the large map.
-- Add performance-conscious rooftop HVAC/detail and broader building color variation so dense cities read less flat/repetitive.
-- Explore a full solar-system catalog, asteroid and Kuiper belts, known spacecraft, galaxies, and navigable deep-space destinations.
-- Fish from Boat mode with species, rarity, size, strength, drag, line tension, catches, and a unified game leaderboard.
-- Build up to 200 multiplayer-aware blocks using cube, slab, ramp, and column shapes with eight colors.
-- Support multiplayer/social/account features when backend services are configured.
-
-## Why Mapping/OSM Users May Care
-
-- Uses OSM ecosystem data in a browser-native 3D interaction model.
-- Demonstrates one practical path from OSM feature data to interactive WebGL world exploration.
-- Keeps data attribution visible in both runtime UI and repository docs.
+- Map-informed Earth scenes with roads, buildings, terrain, land use, vegetation, water, bridges, tunnels, and selected landmarks.
+- Preset cities, geolocation, coordinate entry, and an interactive globe for choosing locations worldwide.
+- Walk, drive, drone, plane, boat, underwater, rover, astronaut, and rocket traversal.
+- Optional continuous Earth streaming for longer trips, with quality and distance budgets for ground and aerial play.
+- In-session Earth, Moon, Mars, ocean, and space transitions without a page reload.
+- A navigable solar system with planets, moons, asteroid and Kuiper belts, spacecraft, and inner/full system maps.
+- Deep-space destinations including catalog-backed star systems, nebulae, galaxies, and black-hole encounters.
+- Enterable buildings using mapped indoor geometry where available and footprint-aware generated interiors elsewhere.
+- Multiplayer rooms, social/account features, world and game editors, a 200-piece block builder, fishing, and leaderboards.
+- Responsive touch controls for current iPhone and Android layouts.
 
 ## Screenshots
 
-![Earth city traversal](assets/landing/gameplay/drive-baltimore.png)
-![Space destination mode](assets/landing/gameplay/fly-in-space.png)
-![Ocean destination mode](assets/screenshots/ocean-mode-great-barrier-reef.png)
+![Driving through Baltimore](assets/landing/gameplay/drive-baltimore.png)
+![Exploring Monaco by drone](assets/landing/gameplay/drone-monaco.png)
+![Space flight](assets/landing/gameplay/fly-in-space.png)
 
-## OpenStreetMap Data and Attribution
+## Data and Accuracy
 
-This project uses OpenStreetMap data and services in multiple runtime paths. Attribution and data usage notes are documented here:
+Earth scenes use OpenStreetMap-derived geometry and other attributed public datasets. Source coverage, freshness, height data, and provider availability vary by location. The runtime uses bounded fallbacks when data is missing, but it does not claim survey-grade accuracy and is not a replacement for navigation or GIS software.
 
-- [DATA_SOURCES.md](DATA_SOURCES.md)
-- [ATTRIBUTION.md](ATTRIBUTION.md)
-- [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md)
+- [Data sources](DATA_SOURCES.md)
+- [Attribution](ATTRIBUTION.md)
+- [Known issues and limitations](KNOWN_ISSUES.md)
+- [Acknowledgements](ACKNOWLEDGEMENTS.md)
 
-Required attribution string used by this project:
+Required attribution: `© OpenStreetMap contributors`
 
-- `© OpenStreetMap contributors`
+## Run Locally
 
-## Live and Local Usage
-
-- Primary site: [worldexplorer3d.io](https://worldexplorer3d.io)
-- Repository target: [RRG314/WorldExplorer3D](https://github.com/RRG314/WorldExplorer3D)
-
-Local run:
+Requirements: Node.js 22+, Java 21, and a browser with WebGL support.
 
 ```bash
+git clone https://github.com/RRG314/WorldExplorer3D.git
+cd WorldExplorer3D
 npm install
-cd functions && npm install && cd ..
 npm run sync:public
 python3 -m http.server --directory public 4173
 ```
 
-Open:
+Open `http://127.0.0.1:4173/app/`.
 
-- `http://127.0.0.1:4173/`
-- `http://127.0.0.1:4173/app/`
+Core exploration can run locally without production credentials. Account, multiplayer, moderation, and other backend-dependent features require an authorized environment and are not configured by public repository secrets.
 
-## Test and Release Verification
+## Verify a Change
 
 ```bash
 npm run sync:public
 npm run verify:mirror
-npm run test
-npm run test:world-matrix
 npm run release:verify
 ```
 
-`npm run sync:public` also mirrors the repository `CNAME` file into `public/CNAME`, so the published Pages artifact keeps the `worldexplorer3d.io` custom domain attached to the current build.
+The release gate covers syntax and module integrity, mirror parity, Firestore rules, local-data safety, mobile controls, editor/multiplayer surfaces, building and block contracts, planetary round trips, world-provider fallbacks, ocean/biome behavior, and a global location matrix.
 
-Targeted feature smoke:
+## Repository Layout
 
-```bash
-npm run test:osm-smoke
-npm run test:world-matrix
-```
+- `app/` - canonical browser runtime
+- `public/` - generated hosting mirror
+- `functions/` - authorized backend functions
+- `scripts/` - verification and release tooling
+- `tests/` - security and runtime test fixtures
+- `assets/` - landing and documentation media
+- `github-pages/` - static project explainer for GitHub Pages
 
-`npm run test:osm-smoke` now also checks Monaco water visibility plus shared polar/desert surface behavior using Arctic, Antarctica, and desert custom coordinates.
+Edit canonical files first, then run `npm run sync:public`. Do not edit the mirrored `public/app/` runtime independently.
 
-## Repository Structure (Top-Level)
+## Project Documents
 
-- `app/` - Canonical browser runtime source (edit here first)
-- `public/` - Hosting output roots, including `public/app/` runtime mirror
-- `functions/` - Firebase backend functions (auth/social/billing/runtime support)
-- `scripts/` - Verification and release gate scripts
-- `tests/` - Rules/runtime tests
-- `assets/` - Landing and documentation media assets
-- `docs/` - Research and technical reference material
-
-## Documentation Map
-
-- [DOCUMENTATION_INDEX.md](DOCUMENTATION_INDEX.md)
-- [QUICKSTART.md](QUICKSTART.md)
-- [USER_GUIDE.md](USER_GUIDE.md)
-- [TECHNICAL_DOCS.md](TECHNICAL_DOCS.md)
-- [GITHUB_DEPLOYMENT.md](GITHUB_DEPLOYMENT.md)
-- [LIMITATIONS.md](LIMITATIONS.md)
-
-OSM ecosystem materials:
-
-- [OSM_ECOSYSTEM_METADATA.md](OSM_ECOSYSTEM_METADATA.md)
-- [OSM_WIKI_ENTRY_DRAFT.md](OSM_WIKI_ENTRY_DRAFT.md)
-
-## Limitations and Non-Goals
-
-See [LIMITATIONS.md](LIMITATIONS.md) for current caveats, including:
-
-- upstream data/service variability (Overpass/geocoding/tile/network)
-- browser/device WebGL performance differences
-- experimental destination modes (especially Ocean)
-- backend-dependent features and deployment prerequisites
+- [Changelog](CHANGELOG.md)
+- [Roadmap](ROADMAP.md)
+- [Controls](CONTROLS_REFERENCE.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
 
 ## License
 
-This repository is source-available under the custom terms in [LICENSE](LICENSE). It is not an OSI open-source license.
-
-## Contributing
-
-Contribution workflow and validation requirements are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
+This repository is source-available under the custom terms in [LICENSE](LICENSE). It is not licensed as OSI open-source software. Third-party data and assets remain subject to their respective licenses.

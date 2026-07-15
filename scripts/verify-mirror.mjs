@@ -4,7 +4,6 @@ import crypto from 'node:crypto';
 
 const rootDir = process.cwd();
 const pairs = [
-  { a: 'CNAME', b: 'public/CNAME' },
   { a: 'about.html', b: 'public/about.html' },
   { a: 'favicon.svg', b: 'public/favicon.svg' },
   { a: 'index.html', b: 'public/index.html' },

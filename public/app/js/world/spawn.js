@@ -52,15 +52,27 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
     extraLateralPadding: 0.25
   });
   const road = onRoadSurface ? nearestRoad?.road || null : null;
-  const surfaceY = onRoadSurface && Number.isFinite(nearestRoad?.y) ? nearestRoad.y : walkBaseY;
+  let surfaceY = onRoadSurface && Number.isFinite(nearestRoad?.y) ? nearestRoad.y : walkBaseY;
   if (worldSpawnDeps.isInsideWaterArea(x, z) && !onRoadSurface) {
     return { valid: false, reason: "inside_water", terrainY };
   }
-  if (worldSpawnDeps.buildingContainingPoint(x, z, 4, {
+  const containingBuilding = worldSpawnDeps.buildingContainingPoint(x, z, 4, {
     y: collisionBaseY,
     actorHeight: 1.9,
     tolerance: 0.45
-  })) return { valid: false, reason: "inside_building", terrainY };
+  });
+  if (containingBuilding) {
+    const minY = Number.isFinite(containingBuilding.minY) ? containingBuilding.minY : containingBuilding.baseY;
+    const maxY = Number.isFinite(containingBuilding.maxY) ?
+      containingBuilding.maxY :
+      Number.isFinite(minY) && Number.isFinite(containingBuilding.height) ? minY + containingBuilding.height : NaN;
+    const standingOnRoof = options.allowBuildingRoof === true && Number.isFinite(maxY) &&
+      actorFeetY >= maxY - 0.12 && actorFeetY <= maxY + 1.2;
+    if (!standingOnRoof) return { valid: false, reason: "inside_building", terrainY };
+  }
+  if (options.preserveElevatedSurface === true && hasExplicitFeetY && actorFeetY > surfaceY + 1) {
+    surfaceY = actorFeetY;
+  }
   if (walkBuildBlockCollision(x, z, terrainY)?.blocked) return { valid: false, reason: "build_block", terrainY };
 
   const slopeDeg = slopeDegreesAt(x, z);
@@ -365,6 +377,9 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
   if (mode === "walk") {
     const direct = evaluateWalkSpawnCandidate(x, z, {
       angle,
+      feetY: options.feetY,
+      preserveElevatedSurface: options.preserveElevatedSurface,
+      allowBuildingRoof: options.allowBuildingRoof,
       source: options.source || "direct"
     });
     if (direct.valid) return direct;
@@ -400,6 +415,19 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
   if (direct.valid && (!preferRoad || direct.onRoad)) return direct;
   if (roadFallback) return roadFallback;
   if (direct.valid) return direct;
+
+  const groundFallback = searchNearestSafeGroundSpawn(x, z, {
+    angle,
+    maxRadius: options.maxGroundRadius
+  });
+  if (groundFallback) {
+    return {
+      ...groundFallback,
+      mode: "drive",
+      carY: driveCenterYAtWorld(groundFallback.x, groundFallback.z, !!groundFallback.onRoad),
+      source: "drive_ground_fallback"
+    };
+  }
 
   return fallbackResolvedSpawn("drive", { x, z, angle, source: "drive_fallback" });
 }

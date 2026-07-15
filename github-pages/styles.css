@@ -1,0 +1,66 @@
+:root {
+  color-scheme: dark;
+  --ink: #f6f8f7;
+  --muted: #aeb8b6;
+  --night: #090d0e;
+  --panel: #111718;
+  --line: #2b3637;
+  --aqua: #41d5bb;
+  --coral: #ff795c;
+  --sun: #ffc65a;
+}
+
+* { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+body { margin: 0; background: var(--night); color: var(--ink); font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; letter-spacing: 0; }
+a { color: inherit; }
+
+.site-header { position: absolute; inset: 0 0 auto; z-index: 4; display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 28px; min-height: 76px; padding: 0 5vw; background: linear-gradient(180deg, rgba(0, 0, 0, .74), transparent); }
+.brand { font-weight: 750; text-decoration: none; }
+nav { display: flex; gap: 24px; }
+nav a, .text-links a { color: var(--muted); text-decoration: none; }
+nav a:hover, .text-links a:hover { color: var(--ink); }
+.header-action { justify-self: end; padding: 10px 15px; border: 1px solid rgba(255, 255, 255, .55); border-radius: 5px; text-decoration: none; font-weight: 700; }
+
+.hero { min-height: min(86vh, 880px); display: flex; align-items: flex-end; padding: 150px 7vw 8vh; background: linear-gradient(90deg, rgba(4, 8, 9, .88) 0%, rgba(4, 8, 9, .4) 55%, rgba(4, 8, 9, .12) 100%), linear-gradient(0deg, var(--night), transparent 34%), url("assets/city.jpg") center 44% / cover no-repeat; }
+.hero-content { max-width: 780px; }
+.eyebrow, .section-kicker, .feature-number { margin: 0 0 14px; color: var(--aqua); font-size: .78rem; font-weight: 800; text-transform: uppercase; }
+h1, h2, h3, p { letter-spacing: 0; }
+h1 { margin: 0; font-size: clamp(3.4rem, 8vw, 7.4rem); line-height: .95; }
+h2 { margin: 0; max-width: 850px; font-size: clamp(2rem, 4vw, 4.2rem); line-height: 1.05; }
+h3 { margin: 0 0 10px; font-size: 1.55rem; }
+.hero-copy { max-width: 680px; margin: 25px 0 0; color: #e3e9e7; font-size: clamp(1.05rem, 2vw, 1.34rem); line-height: 1.55; }
+.hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+.primary-action, .secondary-action { display: inline-flex; align-items: center; min-height: 48px; padding: 0 20px; border-radius: 5px; font-weight: 800; text-decoration: none; }
+.primary-action { background: var(--aqua); color: #05110f; }
+.secondary-action { border: 1px solid rgba(255, 255, 255, .5); }
+
+.intro, .closing { padding: 100px 7vw; border-bottom: 1px solid var(--line); }
+.intro > p:last-child { max-width: 760px; margin: 28px 0 0 auto; color: var(--muted); font-size: 1.12rem; line-height: 1.75; }
+.feature-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; background: var(--line); border-bottom: 1px solid var(--line); }
+.feature { min-width: 0; background: var(--panel); }
+.feature img { width: 100%; aspect-ratio: 16 / 9; object-fit: cover; display: block; }
+.feature > div { padding: 34px; }
+.feature p:last-child { color: var(--muted); line-height: 1.65; }
+.feature:nth-child(2) .feature-number { color: var(--sun); }
+.feature:nth-child(3) .feature-number { color: var(--coral); }
+
+.data-band { display: grid; grid-template-columns: 1fr 1fr; gap: 8vw; padding: 110px 7vw; border-bottom: 1px solid var(--line); }
+.data-copy { align-self: end; color: var(--muted); font-size: 1.08rem; line-height: 1.75; }
+.text-links { display: flex; flex-wrap: wrap; gap: 22px; margin-top: 26px; }
+.text-links a { color: var(--aqua); font-weight: 750; }
+.closing { text-align: center; }
+.closing h2 { margin-inline: auto; }
+.closing .primary-action { margin-top: 30px; }
+footer { display: flex; flex-wrap: wrap; gap: 16px 30px; justify-content: space-between; padding: 28px 5vw; color: var(--muted); font-size: .86rem; }
+
+@media (max-width: 760px) {
+  .site-header { grid-template-columns: 1fr auto; padding: 0 20px; }
+  .site-header nav { display: none; }
+  .hero { min-height: 84vh; padding: 130px 24px 9vh; background-position: 58% center; }
+  h1 { font-size: clamp(3rem, 17vw, 5rem); }
+  .intro, .closing, .data-band { padding: 72px 24px; }
+  .feature-grid, .data-band { grid-template-columns: 1fr; }
+  .feature > div { padding: 26px 24px; }
+  footer { padding: 24px; }
+}

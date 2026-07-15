@@ -5,12 +5,17 @@ import { mkdirp, startServer } from './runtime-test-server.mjs';
 
 const rootDir = process.cwd();
 const host = '127.0.0.1';
+const externalBaseUrl = String(process.env.TEST_BASE_URL || '').replace(/\/$/, '');
 const outputDir = path.join(rootDir, 'output', 'playwright', 'title-planetary-launches');
-const scenarios = [
+const scenarioCatalog = [
   { mode: 'moon', toggle: '#moonLaunchToggle', env: 'MOON', destination: '' },
   { mode: 'space', toggle: '#spaceLaunchToggle', env: 'SPACE_FLIGHT', destination: 'moon' },
   { mode: 'mars', toggle: '#marsLaunchToggle', env: 'MARS', destination: '' }
 ];
+const requestedScenario = String(process.env.TEST_SCENARIO || '').trim().toLowerCase();
+const scenarios = requestedScenario
+  ? scenarioCatalog.filter((scenario) => scenario.mode === requestedScenario)
+  : scenarioCatalog;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -34,6 +39,14 @@ function assertPlanetaryStarStyle(state, body, label) {
   assert(stars.brightSize > 0 && stars.brightSize <= 1.5, `${label} used oversized ${stars.brightSize || 0}px stars`);
   assert(stars.brightVertexColors === false, `${label} retained unrealistic colored star points`);
   assert(stars.faintVisible === false, `${label} retained the synthetic faint-star layer`);
+}
+
+function assertMarsSceneOwned(state, label) {
+  const scene = state.sceneOwnership || {};
+  assert(state.env === 'MARS' && state.onMars, `${label} did not retain Mars runtime ownership`);
+  assert(scene.earthVisible === false, `${label} left the Earth scene visible`);
+  assert(scene.marsSurfaceVisible && scene.marsSurfaceAttached, `${label} detached or hid the Mars surface`);
+  assert(scene.visibleMarsObjects > 0, `${label} hid the Mars world objects`);
 }
 
 function isTransientNetworkError(message = '') {
@@ -77,6 +90,17 @@ async function readState(page) {
       onMoon: !!ctx.onMoon,
       onMars: !!ctx.onMars,
       spaceFlightActive: !!ctx.spaceFlight?.active,
+      spaceOverview: {
+        active: !!ctx.spaceFlight?.overviewMode,
+        mode: ctx.spaceFlight?.overviewMode || '',
+        cameraDistance: Number(ctx.spaceFlight?.camera?.position?.length?.() || 0)
+      },
+      sceneOwnership: {
+        earthVisible: !!ctx.earthSceneVisible,
+        marsSurfaceVisible: !!ctx.marsSurface?.visible,
+        marsSurfaceAttached: ctx.marsSurface?.parent === ctx.scene,
+        visibleMarsObjects: (ctx.marsObjects || []).filter((object) => object?.visible && object?.parent === ctx.scene).length
+      },
       spaceCatalog: globalThis.getWorldExplorerRuntimeDiagnostics?.().spaceCatalog || null,
       starVisuals: {
         observerBody: ctx.starField?.userData?.observerBody || '',
@@ -138,6 +162,15 @@ async function settleVisualFrame(page) {
   await page.waitForTimeout(500);
 }
 
+async function waitForEarthVisual(page) {
+  await page.waitForFunction(() => {
+    const loading = document.getElementById('loading');
+    const canvas = document.querySelector('canvas:not(#spaceFlightCanvas)');
+    return !loading?.classList.contains('show') && !!canvas && getComputedStyle(canvas).display !== 'none';
+  }, null, { timeout: 90000 });
+  await settleVisualFrame(page);
+}
+
 async function openMainMenu(page) {
   await page.evaluate(() => document.getElementById('mainMenuBtn')?.click());
   await page.waitForFunction(() => !document.getElementById('titleScreen')?.classList.contains('hidden'), null, {
@@ -178,6 +211,7 @@ async function runScenario(browser, baseUrl, scenario) {
     assert(!state.fatal, `${scenario.mode} title launch showed a fatal renderer error`);
     if (scenario.mode === 'space') assertCompleteSpaceCatalog(state, 'Initial Space launch');
     if (scenario.mode === 'mars') assert(state.onMars && !state.spaceFlightActive, 'Mars title launch did not land directly on Mars');
+    if (scenario.mode === 'mars') assertMarsSceneOwned(state, 'Initial Mars title launch');
     if (scenario.mode === 'moon' || scenario.mode === 'mars') assertPlanetaryStarStyle(state, scenario.mode, `${scenario.mode} title launch`);
     assert(consoleErrors.length === 0, `${scenario.mode} title launch logged console errors: ${consoleErrors.join(' | ')}`);
     let earthReturn = null;
@@ -196,7 +230,7 @@ async function runScenario(browser, baseUrl, scenario) {
       assert(!titleAfterEarth.spaceFlightActive, 'Main Menu retained an active flight before Mars launch');
       await page.click('#marsLaunchToggle');
       await page.click('#startBtn');
-      const marsScenario = scenarios.find((entry) => entry.mode === 'mars');
+      const marsScenario = scenarioCatalog.find((entry) => entry.mode === 'mars');
       await waitForExpectedState(page, marsScenario);
       const marsAfterMoon = await requireStableExpectedState(page, marsScenario);
       await settleVisualFrame(page);
@@ -209,7 +243,7 @@ async function runScenario(browser, baseUrl, scenario) {
       await openMainMenu(page);
       await page.click('#spaceLaunchToggle');
       await page.click('#startBtn');
-      const spaceScenario = scenarios.find((entry) => entry.mode === 'space');
+      const spaceScenario = scenarioCatalog.find((entry) => entry.mode === 'space');
       await waitForExpectedState(page, spaceScenario);
       const spaceAfterMars = await requireStableExpectedState(page, spaceScenario);
       assertCompleteSpaceCatalog(spaceAfterMars, 'Space launch after Mars');
@@ -242,6 +276,23 @@ async function runScenario(browser, baseUrl, scenario) {
       earthReturn.marsAfterMoon = marsAfterMoon;
     }
     if (scenario.mode === 'space') {
+      await page.click('#solarSystemOverview');
+      await page.waitForTimeout(2600);
+      const innerOverview = await readState(page);
+      assert(innerOverview.spaceOverview.mode === 'inner', 'Inner Solar System map did not activate');
+      assert(innerOverview.spaceOverview.cameraDistance > 7000 && innerOverview.spaceOverview.cameraDistance < 15000, 'Inner Solar System map used the wrong frame');
+      await settleVisualFrame(page);
+      await page.screenshot({ path: path.join(outputDir, 'solar-system-inner-overview.png'), fullPage: false });
+
+      await page.click('#solarSystemOverview');
+      await page.waitForTimeout(2600);
+      const fullOverview = await readState(page);
+      assert(fullOverview.spaceOverview.mode === 'full', 'Full Solar System map did not activate');
+      assert(fullOverview.spaceOverview.cameraDistance > 30000, 'Full Solar System map did not frame the complete system');
+      await settleVisualFrame(page);
+      await page.screenshot({ path: path.join(outputDir, 'solar-system-overview.png'), fullPage: false });
+      await page.click('#solarSystemOverview');
+
       const staleLandingStarted = await page.evaluate(async () => {
         const { ctx } = await import('/app/js/shared-context.js?v=55');
         return ctx.forceSpaceFlightLanding?.('Earth') === true;
@@ -253,7 +304,7 @@ async function runScenario(browser, baseUrl, scenario) {
       assert(!titleAfterCancelledLanding.spaceFlightActive, 'Main Menu retained the cancelled flight runtime');
       await page.click('#marsLaunchToggle');
       await page.click('#startBtn');
-      const marsScenario = scenarios.find((entry) => entry.mode === 'mars');
+      const marsScenario = scenarioCatalog.find((entry) => entry.mode === 'mars');
       await waitForExpectedState(page, marsScenario);
       const marsAfterCancelledLanding = await requireStableExpectedState(page, marsScenario, 9500);
       await settleVisualFrame(page);
@@ -265,6 +316,38 @@ async function runScenario(browser, baseUrl, scenario) {
       assertPlanetaryStarStyle(marsAfterCancelledLanding, 'mars', 'Mars arrival after cancelled flight');
       state.marsAfterCancelledLanding = marsAfterCancelledLanding;
     }
+    if (scenario.mode === 'mars') {
+      await page.evaluate(async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        const originalLoadRoads = ctx.loadRoads;
+        ctx.loadRoads = async (...args) => {
+          await new Promise((resolve) => setTimeout(resolve, 1800));
+          return originalLoadRoads(...args);
+        };
+        void ctx.returnFromMars?.();
+      });
+      await page.waitForTimeout(100);
+      await page.evaluate(() => document.getElementById('mainMenuBtn')?.click());
+      await page.waitForFunction(() => !document.getElementById('titleScreen')?.classList.contains('hidden'), null, {
+        timeout: 30000
+      });
+      await page.click('#marsLaunchToggle');
+      await page.click('#startBtn');
+      await waitForExpectedState(page, scenario);
+      const marsAfterCancelledReturn = await requireStableExpectedState(page, scenario, 5000);
+      assertMarsSceneOwned(marsAfterCancelledReturn, 'Mars relaunch after a cancelled return');
+      await settleVisualFrame(page);
+      await page.screenshot({ path: path.join(outputDir, 'cancelled-mars-return-mars.png'), fullPage: false });
+
+      await page.click('#marsReturnEarthBtn');
+      const earthAfterMarsReturn = await waitForEarthReturn(page);
+      assert(earthAfterMarsReturn.sceneOwnership.earthVisible, 'Return to Earth did not restore Earth scene ownership');
+      assert(!earthAfterMarsReturn.sceneOwnership.marsSurfaceVisible, 'Return to Earth left the Mars surface visible');
+      await waitForEarthVisual(page);
+      await page.screenshot({ path: path.join(outputDir, 'mars-return-earth.png'), fullPage: false });
+      state.marsAfterCancelledReturn = marsAfterCancelledReturn;
+      state.earthAfterMarsReturn = earthAfterMarsReturn;
+    }
     return { ...state, elapsedLimitMs: 20000, earthReturn, mainFrameNavigations };
   } finally {
     await context.close();
@@ -272,7 +355,7 @@ async function runScenario(browser, baseUrl, scenario) {
 }
 
 await mkdirp(outputDir);
-const server = await startServer({
+const server = externalBaseUrl ? null : await startServer({
   rootDir,
   host,
   candidatePorts: [4212, 4213, 4214, 4215]
@@ -286,7 +369,7 @@ const browser = await chromium.launch({
 });
 
 try {
-  const baseUrl = `http://${host}:${server.port}`;
+  const baseUrl = externalBaseUrl || `http://${host}:${server.port}`;
   const report = {};
   for (const scenario of scenarios) {
     report[scenario.mode] = await runScenario(browser, baseUrl, scenario);
@@ -295,5 +378,5 @@ try {
   console.log(JSON.stringify({ ok: true, report }, null, 2));
 } finally {
   await browser.close();
-  await server.close();
+  await server?.close();
 }
