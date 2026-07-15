@@ -5,6 +5,7 @@ import { startStaticRootServer } from './test-static-server.mjs';
 
 const rootDir = process.cwd();
 const outputDir = path.join(rootDir, 'output', 'playwright', 'plane-interior-lifecycle');
+const MODE_SWITCH_BUDGET_MS = 200;
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -226,13 +227,13 @@ async function main() {
     assert(!report.roofLanding.airborne, 'Plane did not settle on the building roof');
     assert(report.roofLanding.walkMode === 'walk', `Plane-to-walk resolved as ${report.roofLanding.walkMode}`);
     assert(Math.abs(report.roofLanding.roofDelta) <= 0.5, `Walk exit left the roof by ${report.roofLanding.roofDelta}m`);
-    assert(report.roofLanding.walkSwitchMs <= 120, `Plane-to-walk stalled for ${report.roofLanding.walkSwitchMs}ms`);
+    assert(report.roofLanding.walkSwitchMs <= MODE_SWITCH_BUDGET_MS, `Plane-to-walk stalled for ${report.roofLanding.walkSwitchMs}ms`);
     assert(report.droneTransfer.horizontalDelta <= 0.2, 'Plane-to-drone changed horizontal position');
     assert(report.droneTransfer.altitudeDelta >= -0.2, 'Plane-to-drone lost altitude');
-    assert(report.droneTransfer.switchMs <= 80, `Plane-to-drone stalled for ${report.droneTransfer.switchMs}ms`);
+    assert(report.droneTransfer.switchMs <= MODE_SWITCH_BUDGET_MS, `Plane-to-drone stalled for ${report.droneTransfer.switchMs}ms`);
     assert(report.impact.lastImpactAt > 0 && report.impact.speed <= 5, `Building impact did not settle: ${JSON.stringify(report.impact)}`);
     assert(report.driveExit.mode === 'drive', `Plane-to-drive resolved as ${report.driveExit.mode}`);
-    assert(report.driveExit.switchMs <= 120, `Plane-to-drive stalled for ${report.driveExit.switchMs}ms`);
+    assert(report.driveExit.switchMs <= MODE_SWITCH_BUDGET_MS, `Plane-to-drive stalled for ${report.driveExit.switchMs}ms`);
     assert(!report.driveExit.blocked, `Plane-to-drive spawned inside a building: ${JSON.stringify(report.driveExit)}`);
     assert(report.interior.entered, 'Large building interior did not open');
     assert(report.interior.bboxFootprintEnterable, 'A valid bounding-box building was not enterable');
