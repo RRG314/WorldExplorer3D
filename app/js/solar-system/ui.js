@@ -11,16 +11,19 @@ import {
 } from "./info-panel.js?v=2";
 
 function applySystemMapPresentation(ctx, mode) {
-  const mapScale = mode === 'full' ? 3.2 : mode === 'inner' ? 2.2 : 1;
+  const mapScale = mode === 'full' ? 5.2 : mode === 'inner' ? 2.2 : 1;
   ctx.solarSystem.planetMeshes.forEach((entry) => entry.mesh?.scale.setScalar(mapScale));
   ctx.solarSystem.asteroidMeshes.forEach((entry) => entry.mesh?.scale.setScalar(mapScale));
   if (ctx.solarSystem.asteroidBelt?.material) {
     ctx.solarSystem.asteroidBelt.material.size = mode === 'inner' ? 3.8 : mode === 'full' ? 3 : 2.4;
   }
+  if (ctx.solarSystem.kuiperBelt?.material) {
+    ctx.solarSystem.kuiperBelt.material.size = mode === 'full' ? 4.4 : 1.9;
+  }
 }
 
 function overviewButtonLabel(mode) {
-  if (mode === 'inner') return 'FULL SYSTEM MAP';
+  if (mode === 'inner') return 'OUTER SYSTEM MAP';
   if (mode === 'full') return 'RESUME FLIGHT';
   return 'SOLAR SYSTEM MAP';
 }

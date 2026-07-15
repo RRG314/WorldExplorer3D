@@ -288,7 +288,7 @@ async function runScenario(browser, baseUrl, scenario) {
       await page.waitForTimeout(2600);
       const fullOverview = await readState(page);
       assert(fullOverview.spaceOverview.mode === 'full', 'Full Solar System map did not activate');
-      assert(fullOverview.spaceOverview.cameraDistance > 30000, 'Full Solar System map did not frame the complete system');
+      assert(fullOverview.spaceOverview.cameraDistance > 70000, 'Outer Solar System map did not frame the Kuiper belt');
       await settleVisualFrame(page);
       await page.screenshot({ path: path.join(outputDir, 'solar-system-overview.png'), fullPage: false });
       await page.click('#solarSystemOverview');
