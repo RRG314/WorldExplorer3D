@@ -444,7 +444,7 @@ export function updateSpaceFlightCamera() {
   const rocket = appCtx.spaceFlight.rocket;
   if (appCtx.spaceFlight.overviewMode) {
     if (appCtx.spaceFlight.overviewMode === 'inner') _sfTargetPos.set(0, 5600, 7200);
-    else _sfTargetPos.set(0, 29000, 38000);
+    else _sfTargetPos.set(0, 52000, 68000);
     appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, 0.08);
     appCtx.spaceFlight.camera.up.set(0, 1, 0);
     appCtx.spaceFlight.camera.lookAt(0, 0, 0);

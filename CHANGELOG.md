@@ -8,7 +8,7 @@
 - Plane traversal with chase, cockpit, and overhead cameras plus compact street takeoff and landing behavior.
 - Full Mars destination flow, rover traversal, planetary gravity, surface tracks, minimap support, and in-runtime return to Earth or Space.
 - Expanded solar system and navigable universe with planets, asteroid and Kuiper belts, spacecraft, galaxies, nebulae, catalog-backed destinations, and deep-space encounters.
-- Inner and full solar-system map views that make planets and the asteroid belt visible without replacing normal rocket flight.
+- Inner and outer solar-system map views that make the asteroid and Kuiper belts visible without replacing normal rocket flight.
 - Boat fishing game with multiple species, rarity and size records, tension/drag/fatigue mechanics, persisted catches, and unified leaderboards.
 - Four-shape, eight-color Build with Blocks catalog with a 200-block limit, exact stacking, walk collision, and driveable ramps.
 - Landmark structure passes for Giza pyramids, Golden Gate Bridge, Eiffel Tower, and Elizabeth Tower, plus bridge guardrails and safety geometry.
@@ -21,6 +21,7 @@
 - Replaced colored square star points with round white star materials and body-specific astronomical orientation on Earth, Moon, and Mars.
 - Updated multiplayer/editor transitions, account-safe leaderboard rules, mobile controls, tutorials, and title destination navigation.
 - Made Mars/Earth transitions session-owned so an interrupted return cannot overwrite a newer Mars launch or leave a Mars rover in an Earth scene.
+- Made first-launch Mars setup retain environment ownership across asynchronous terrain and rover loading instead of leaving a partially styled Earth scene.
 - Separated GitHub Pages from production hosting; Pages now publishes a project explainer while `worldexplorer3d.io` remains the live application.
 
 ### Validation

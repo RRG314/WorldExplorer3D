@@ -21,6 +21,16 @@ function cancelPendingMarsTransition() {
   appCtx.travelingToMoon = false;
 }
 
+function retainMarsTransitionOwnership(sessionId) {
+  if (!isCurrentMarsTransition(sessionId)) return false;
+  if (appCtx.getEnv?.() !== appCtx.ENV.MARS) {
+    appCtx.switchEnv?.(appCtx.ENV.MARS);
+  }
+  if (appCtx.getEnv?.() !== appCtx.ENV.MARS) return false;
+  appCtx.setEarthSceneVisible?.(false);
+  return true;
+}
+
 function loadMarsDemSample() {
   if (marsDemData) return Promise.resolve(marsDemData);
   if (marsDemLoadPromise) return marsDemLoadPromise;
@@ -242,8 +252,7 @@ async function arriveAtMars(expectedSessionId = null) {
   if (appCtx.spaceFlight?.active && typeof appCtx.exitSpaceFlight === 'function') appCtx.exitSpaceFlight();
   suspendEarthModesForPlanetaryEntry();
   if (!isCurrentMarsTransition(sessionId)) return false;
-  appCtx.switchEnv(appCtx.ENV.MARS);
-  appCtx.setEarthSceneVisible?.(false);
+  if (!retainMarsTransitionOwnership(sessionId)) return false;
   appCtx.paused = true;
   appCtx.scene.background = new THREE.Color(0x9b5d43);
   appCtx.scene.fog = new THREE.FogExp2(0xb06a4e, 0.000095);
@@ -260,13 +269,13 @@ async function arriveAtMars(expectedSessionId = null) {
   appCtx.setPlanetarySky?.('mars');
 
   await loadMarsDemSample();
-  if (!isCurrentMarsTransition(sessionId) || appCtx.getEnv?.() !== appCtx.ENV.MARS) return false;
+  if (!retainMarsTransitionOwnership(sessionId)) return false;
   createMarsSurface();
   setMarsObjectsVisible(true);
   enterMarsDriveMode();
   positionPlayerOnMars();
   await appCtx.setPlanetaryVehicle?.('mars');
-  if (!isCurrentMarsTransition(sessionId) || appCtx.getEnv?.() !== appCtx.ENV.MARS) return false;
+  if (!retainMarsTransitionOwnership(sessionId)) return false;
   appCtx.setPlanetaryCharacter?.('mars');
   positionPlayerOnMars();
   if (appCtx.carMesh) appCtx.carMesh.visible = true;
