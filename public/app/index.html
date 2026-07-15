@@ -237,18 +237,22 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div style="padding:8px 0">
 <div style="margin-bottom:24px">
 <div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-⚡ Performance Benchmark
+World Loading
 </div>
-<div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:12px;padding:14px">
-<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">Mode</label>
-<select id="perfModeSelect" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;color:#1e293b;margin-bottom:12px">
-<option value="rdt">RDT Optimized</option>
-<option value="baseline">Baseline (No RDT Budgeting)</option>
-</select>
-<label style="display:flex;align-items:center;gap:10px;font-size:12px;color:#334155;margin-bottom:12px;cursor:pointer">
-<input type="checkbox" id="perfOverlayToggle" style="width:16px;height:16px;cursor:pointer">
-Show live benchmark overlay in-game
+<label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:#f8fafc;border-radius:8px;border:2px solid #e2e8f0;transition:all 0.2s" id="continuousWorldToggleLabel">
+<input type="checkbox" id="continuousWorldToggle" style="width:20px;height:20px;margin-top:1px;cursor:pointer">
+<div>
+<div style="font-size:13px;font-weight:600;color:#1e293b">Continuous World</div>
+<div style="font-size:11px;color:#64748b;margin-top:3px;line-height:1.45">Load new map areas during long-distance travel. Leave off for the most complete, stable version of the selected location.</div>
+</div>
 </label>
+<div id="continuousWorldStatus" style="font-size:11px;color:#64748b;margin-top:8px;min-height:16px">Quality Location mode is active.</div>
+</div>
+<div style="margin-bottom:24px">
+<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
+Graphics
+</div>
+<div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:8px;padding:14px">
 <label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">Render Quality</label>
 <select id="renderQualitySelect" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;color:#1e293b;margin-bottom:10px">
 <option value="low">Low (mobile/performance)</option>
@@ -263,26 +267,8 @@ High Quality Boost (stronger shadows + car paint)
 <input type="checkbox" id="ssaoToggle" style="width:16px;height:16px;cursor:pointer">
 High-only SSAO contact shadows
 </label>
-<label style="display:flex;align-items:center;gap:10px;font-size:12px;color:#334155;margin-bottom:10px;cursor:pointer">
-<input type="checkbox" id="rdtNoiseToggle" style="width:16px;height:16px;cursor:pointer">
-Enable RDT micro-detail for roads and land-use masks
-</label>
-<label style="display:block;font-size:12px;font-weight:600;color:#1e293b;margin-bottom:6px">RDT Noise Variant</label>
-<select id="rdtNoiseVariantSelect" style="width:100%;background:#ffffff;border:2px solid #e2e8f0;border-radius:8px;padding:10px;font-size:13px;color:#1e293b;margin-bottom:8px">
-<option value="standard">Standard</option>
-<option value="double">Double</option>
-<option value="split">Split</option>
-<option value="harmonic">Harmonic</option>
-<option value="twisted">Twisted</option>
-<option value="resonant">Resonant</option>
-</select>
-<div id="rdtNoiseStatus" style="font-size:11px;color:#64748b;margin-bottom:12px">Active (standard)</div>
-<div style="display:flex;gap:8px;margin-bottom:8px">
-<button id="perfApplyReload" style="flex:1;background:#0ea5e9;border:none;border-radius:8px;padding:9px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:12px">Apply + Reload World</button>
-<button id="perfCopySnapshot" style="flex:1;background:#475569;border:none;border-radius:8px;padding:9px;color:#ffffff;font-family:'Poppins',sans-serif;font-weight:600;cursor:pointer;font-size:12px">Copy Snapshot</button>
-</div>
 <div id="perfSettingsStatus" style="font-size:11px;color:#64748b;min-height:16px">
-Use this to compare RDT and baseline with real runtime data.
+Graphics changes apply to the current session.
 </div>
 </div>
 </div>
@@ -1559,5 +1545,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=84"></script>
 <script type="module" src="js/app-auth-shell.js?v=84"></script>
-<script type="module" src="js/bootstrap.js?v=195"></script>
+<script type="module" src="js/bootstrap.js?v=200"></script>
 </body></html>

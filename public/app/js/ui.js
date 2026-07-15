@@ -126,17 +126,13 @@ function setupUI() {
   const saveApiKeyBtn = document.getElementById('saveApiKey');
   const realEstateToggle = document.getElementById('realEstateToggle');
   const toggleLabel = document.getElementById('realEstateToggleLabel');
-  const perfModeSelect = document.getElementById('perfModeSelect');
-  const perfOverlayToggle = document.getElementById('perfOverlayToggle');
+  const continuousWorldToggle = document.getElementById('continuousWorldToggle');
+  const continuousWorldToggleLabel = document.getElementById('continuousWorldToggleLabel');
+  const continuousWorldStatus = document.getElementById('continuousWorldStatus');
   const renderQualitySelect = document.getElementById('renderQualitySelect');
   const highQualityToggle = document.getElementById('highQualityToggle');
   const ssaoToggle = document.getElementById('ssaoToggle');
-  const perfApplyReload = document.getElementById('perfApplyReload');
-  const perfCopySnapshot = document.getElementById('perfCopySnapshot');
   const perfSettingsStatus = document.getElementById('perfSettingsStatus');
-  const rdtNoiseToggle = document.getElementById('rdtNoiseToggle');
-  const rdtNoiseVariantSelect = document.getElementById('rdtNoiseVariantSelect');
-  const rdtNoiseStatus = document.getElementById('rdtNoiseStatus');
   const shareExperienceStatus = document.getElementById('shareExperienceStatus');
   const gameShareFloatBtn = document.getElementById('gameShareFloatBtn');
   const hudBox = document.getElementById('hudBox');
@@ -257,17 +253,42 @@ function setupUI() {
     });
   }
 
-  // Performance benchmark controls (RDT vs baseline)
-  if (perfModeSelect) {
-    const currentMode = typeof appCtx.getPerfMode === 'function' ? appCtx.getPerfMode() : appCtx.perfMode || 'rdt';
-    perfModeSelect.value = currentMode === 'baseline' ? 'baseline' : 'rdt';
+  const syncContinuousWorldUi = () => {
+    const enabled = typeof appCtx.getContinuousWorldEnabled === 'function' ?
+      appCtx.getContinuousWorldEnabled() :
+      !!appCtx.earthStreamingState?.enabled;
+    if (continuousWorldToggle) continuousWorldToggle.checked = enabled;
+    if (continuousWorldToggleLabel) {
+      continuousWorldToggleLabel.style.background = enabled ? '#f0f4ff' : '#f8fafc';
+      continuousWorldToggleLabel.style.borderColor = enabled ? '#667eea' : '#e2e8f0';
+    }
+    if (continuousWorldStatus) {
+      continuousWorldStatus.textContent = enabled ?
+        'Continuous World is active. New map areas load as you travel.' :
+        'Quality Location mode is active.';
+    }
+  };
+  syncContinuousWorldUi();
+  if (continuousWorldToggle) {
+    continuousWorldToggle.addEventListener('change', async () => {
+      const enabled = !!continuousWorldToggle.checked;
+      continuousWorldToggle.disabled = true;
+      if (continuousWorldStatus) {
+        continuousWorldStatus.textContent = enabled ?
+          'Enabling continuous map loading...' :
+          'Restoring the complete selected location...';
+      }
+      try {
+        if (typeof appCtx.setContinuousWorldEnabled === 'function') {
+          await appCtx.setContinuousWorldEnabled(enabled);
+        }
+      } finally {
+        continuousWorldToggle.disabled = false;
+        syncContinuousWorldUi();
+      }
+    });
   }
-  if (perfOverlayToggle) {
-    const overlayEnabled = typeof appCtx.getPerfOverlayEnabled === 'function' ?
-    appCtx.getPerfOverlayEnabled() :
-    !!appCtx.perfOverlayEnabled;
-    perfOverlayToggle.checked = overlayEnabled;
-  }
+
   const syncRenderQualityUi = () => {
     const currentLevel = typeof appCtx.getRenderQualityLevel === 'function' ?
     String(appCtx.getRenderQualityLevel() || 'med').toLowerCase() :
@@ -293,48 +314,6 @@ function setupUI() {
     }
   };
   syncRenderQualityUi();
-  const getRdtNoiseConfig = () => {
-    if (typeof appCtx.getRdtNoiseConfig === 'function') return appCtx.getRdtNoiseConfig();
-    return {
-      enabled: !!appCtx.rdtNoiseEnabled,
-      variant: String(appCtx.rdtNoiseVariant || 'standard'),
-      chaos: Number.isFinite(Number(appCtx.rdtNoiseChaos)) ? Number(appCtx.rdtNoiseChaos) : 0
-    };
-  };
-  const syncRdtNoiseUi = () => {
-    const cfg = getRdtNoiseConfig();
-    if (rdtNoiseToggle) rdtNoiseToggle.checked = !!cfg.enabled;
-    if (rdtNoiseVariantSelect) rdtNoiseVariantSelect.value = String(cfg.variant || 'standard');
-    const rdtNoiseFloatItem = document.getElementById('fRdtNoise');
-    if (rdtNoiseFloatItem) rdtNoiseFloatItem.classList.toggle('on', !!cfg.enabled);
-    if (rdtNoiseStatus) {
-      rdtNoiseStatus.textContent = cfg.enabled ?
-      `Active (${String(cfg.variant || 'standard')})` :
-      'Disabled';
-    }
-  };
-  const applyRdtNoiseConfig = async ({ enabled = null, variant = null, source = 'settings' } = {}) => {
-    const initial = getRdtNoiseConfig();
-    const nextEnabled = enabled == null ? !!initial.enabled : !!enabled;
-    const nextVariant = variant == null ? String(initial.variant || 'standard') : String(variant || 'standard');
-    if (typeof appCtx.setRdtNoiseEnabled === 'function') appCtx.setRdtNoiseEnabled(nextEnabled);
-    if (typeof appCtx.setRdtNoiseVariant === 'function') appCtx.setRdtNoiseVariant(nextVariant);
-    syncRdtNoiseUi();
-    if (perfSettingsStatus) {
-      const sourceLabel = source === 'float' ? 'from Environment menu' : 'from Settings';
-      perfSettingsStatus.textContent = appCtx.gameStarted ?
-      `Applying RDT noise ${sourceLabel} and reloading world...` :
-      `Saved RDT noise ${sourceLabel}. It will apply when you start.`;
-    }
-    if (appCtx.gameStarted && typeof appCtx.loadRoads === 'function') {
-      await appCtx.loadRoads();
-      if (perfSettingsStatus) {
-        perfSettingsStatus.textContent = `RDT noise ${nextEnabled ? 'enabled' : 'disabled'} (${nextVariant}) and world reloaded.`;
-      }
-    }
-    if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
-  };
-  syncRdtNoiseUi();
 
   const {
     clearVirtualHeldInputs,
@@ -347,7 +326,7 @@ function setupUI() {
   let shareUi = null;
   const titleUi = initTitleScreenUi({
     lastLocationStorageKey: LAST_LOCATION_STORAGE_KEY,
-    perfModeSelect,
+    perfModeSelect: null,
     shareExperienceStatus,
     perfSettingsStatus,
     gameShareFloatBtn,
@@ -363,54 +342,6 @@ function setupUI() {
     getTitleLaunchMode: titleUi.getTitleLaunchMode
   });
   initMapInteractions();
-
-  if (perfModeSelect) {
-    perfModeSelect.addEventListener('change', (e) => {
-      const selectedMode = e.target.value === 'baseline' ? 'baseline' : 'rdt';
-      if (typeof appCtx.setPerfMode === 'function') appCtx.setPerfMode(selectedMode);
-      if (perfSettingsStatus) {
-        perfSettingsStatus.textContent = selectedMode === 'baseline' ?
-        'Baseline selected. Use Apply + Reload World to rebuild with baseline budgets.' :
-        'RDT selected. Use Apply + Reload World to rebuild with adaptive budgets.';
-      }
-      if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
-    });
-  }
-
-  if (rdtNoiseToggle) {
-    rdtNoiseToggle.addEventListener('change', async (e) => {
-      const cfg = getRdtNoiseConfig();
-      await applyRdtNoiseConfig({
-        enabled: !!e.target.checked,
-        variant: cfg.variant,
-        source: 'settings'
-      });
-    });
-  }
-
-  if (rdtNoiseVariantSelect) {
-    rdtNoiseVariantSelect.addEventListener('change', async (e) => {
-      const cfg = getRdtNoiseConfig();
-      await applyRdtNoiseConfig({
-        enabled: cfg.enabled,
-        variant: e.target.value,
-        source: 'settings'
-      });
-    });
-  }
-
-  if (perfOverlayToggle) {
-    perfOverlayToggle.addEventListener('change', (e) => {
-      const enabled = !!e.target.checked;
-      if (typeof appCtx.setPerfOverlayEnabled === 'function') appCtx.setPerfOverlayEnabled(enabled);
-      if (perfSettingsStatus) {
-        perfSettingsStatus.textContent = enabled ?
-        'Live overlay enabled. Benchmark values will be shown during gameplay.' :
-        'Live overlay disabled.';
-      }
-      if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
-    });
-  }
 
   if (renderQualitySelect) {
     renderQualitySelect.addEventListener('change', () => {
@@ -471,43 +402,6 @@ function setupUI() {
         }
       }
       if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
-    });
-  }
-
-  if (perfApplyReload) {
-    perfApplyReload.addEventListener('click', async () => {
-      const selectedMode = perfModeSelect?.value === 'baseline' ? 'baseline' : 'rdt';
-      if (typeof appCtx.setPerfMode === 'function') appCtx.setPerfMode(selectedMode);
-
-      if (perfSettingsStatus) {
-        perfSettingsStatus.textContent = appCtx.gameStarted ?
-        `Applying ${selectedMode.toUpperCase()} mode and reloading world...` :
-        `Saved ${selectedMode.toUpperCase()} mode. It will apply when you start.`;
-      }
-
-      if (appCtx.gameStarted && typeof appCtx.loadRoads === 'function') {
-        await appCtx.loadRoads();
-        if (perfSettingsStatus) {
-          perfSettingsStatus.textContent = `${selectedMode.toUpperCase()} mode applied and world reloaded.`;
-        }
-      }
-      if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
-    });
-  }
-
-  if (perfCopySnapshot) {
-    perfCopySnapshot.addEventListener('click', async () => {
-      try {
-        if (typeof appCtx.copyPerfSnapshotToClipboard !== 'function') {
-          throw new Error('Snapshot exporter unavailable');
-        }
-        await appCtx.copyPerfSnapshotToClipboard();
-        if (perfSettingsStatus) perfSettingsStatus.textContent = 'Benchmark snapshot copied to clipboard.';
-      } catch (err) {
-        if (perfSettingsStatus) {
-          perfSettingsStatus.textContent = `Unable to copy snapshot: ${err?.message || err}`;
-        }
-      }
     });
   }
 
@@ -710,18 +604,6 @@ function setupUI() {
     });
     closeAllFloatMenus();
   });
-  const rdtNoiseFloatItem = document.getElementById('fRdtNoise');
-  if (rdtNoiseFloatItem) {
-    rdtNoiseFloatItem.addEventListener('click', async () => {
-      const cfg = getRdtNoiseConfig();
-      await applyRdtNoiseConfig({
-        enabled: !cfg.enabled,
-        variant: cfg.variant,
-        source: 'float'
-      });
-      closeAllFloatMenus();
-    });
-  }
   document.getElementById('fTimeOfDay').addEventListener('click', () => {
     if (typeof appCtx.cycleTimeOfDay === 'function') appCtx.cycleTimeOfDay();
     closeAllFloatMenus();

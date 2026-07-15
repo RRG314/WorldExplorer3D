@@ -143,19 +143,26 @@ function emitTravelModeEvent(mode, source = 'runtime') {
 }
 
 let pendingModeLodRefresh = null;
+let pendingModeStreamingRefresh = null;
 
-function scheduleModeLodRefresh() {
+function scheduleModeWorldRefresh(mode) {
   if (pendingModeLodRefresh !== null) {
     if (typeof cancelIdleCallback === 'function') cancelIdleCallback(pendingModeLodRefresh);
     else clearTimeout(pendingModeLodRefresh);
   }
+  if (pendingModeStreamingRefresh !== null) clearTimeout(pendingModeStreamingRefresh);
   const run = () => {
     pendingModeLodRefresh = null;
     appCtx.updateWorldLod?.(true);
   };
   pendingModeLodRefresh = typeof requestIdleCallback === 'function'
-    ? requestIdleCallback(run, { timeout: 120 })
-    : setTimeout(run, 16);
+    ? requestIdleCallback(run, { timeout: 300 })
+    : setTimeout(run, 64);
+  pendingModeStreamingRefresh = setTimeout(() => {
+    pendingModeStreamingRefresh = null;
+    appCtx.resumeEarthStreaming?.(600);
+    appCtx.updateEarthWorldStreaming?.(1);
+  }, mode === 'plane' || mode === 'drone' ? 450 : 180);
 }
 
 function setTravelMode(mode, options = {}) {
@@ -192,8 +199,14 @@ function setTravelMode(mode, options = {}) {
     appCtx.stopPlaneMode?.();
   }
 
+  const settlingAerialTransition = targetMode !== currentMode && (
+    targetMode === 'plane' || targetMode === 'drone' || currentMode === 'plane' || currentMode === 'drone'
+  );
+  if (settlingAerialTransition) appCtx.pauseEarthStreaming?.('travel_mode_transition');
+
   if (targetMode === 'plane') {
     if (appCtx.onMoon || appCtx.onMars || !appCtx.startPlaneMode?.(options)) {
+      if (settlingAerialTransition) appCtx.resumeEarthStreaming?.(600);
       return syncTravelModeButtons();
     }
     appCtx.droneMode = false;
@@ -246,9 +259,8 @@ function setTravelMode(mode, options = {}) {
     appCtx.clearStarSelection();
   }
 
-  scheduleModeLodRefresh();
-
   const resolvedMode = syncTravelModeButtons();
+  scheduleModeWorldRefresh(resolvedMode);
   if (typeof appCtx.updateControlsModeUI === 'function') {
     appCtx.updateControlsModeUI();
   }

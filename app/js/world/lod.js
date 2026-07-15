@@ -77,12 +77,12 @@ function lodReferenceActor() {
 
 function visibleBuildingUnitBudget(dynamicScale = 1) {
   const quality = String(appCtx.renderQualityLevel || 'med').toLowerCase();
-  if (appCtx.planeMode?.active) {
+  if (appCtx.planeMode?.active || appCtx.droneMode) {
     const aerialBudget = quality === 'low' ? 4200 : quality === 'high' ? 9000 : 6500;
     return Math.max(3200, Math.floor(aerialBudget * Math.max(0.72, Number(dynamicScale) || 1)));
   }
   const baseBudget = quality === 'low' ? 2200 : quality === 'high' ? 5600 : 3800;
-  const modeScale = appCtx.droneMode ? 0.7 : appCtx.camMode === 2 ? 0.82 : 1;
+  const modeScale = appCtx.camMode === 2 ? 0.82 : 1;
   return Math.max(1200, Math.floor(baseBudget * modeScale * Math.max(0.72, Number(dynamicScale) || 1)));
 }
 
@@ -163,22 +163,25 @@ export function updateWorldLod(force = false) {
     typeof appCtx.rdtComplexity === 'number' ? appCtx.rdtComplexity : 0;
   const boatLodScale = appCtx.boatMode?.active ? Math.max(0.34, Math.min(1, Number(appCtx.boatMode.detailBias) || 1)) : 1;
   const lodThresholds = runtime.getWorldLodThresholds(depthForLod, mode, dynamicBudgetState.lodScale * boatLodScale);
-  const planeGroundY = appCtx.planeMode?.active
+  const aerialMode = !!(appCtx.planeMode?.active || appCtx.droneMode);
+  const aerialActor = appCtx.planeMode?.active ? appCtx.planeMode : appCtx.drone;
+  const aerialGroundY = aerialMode
     ? Number(appCtx.terrainMeshHeightAt?.(refX, refZ) ?? appCtx.elevationWorldYAtWorldXZ?.(refX, refZ) ?? 0)
     : 0;
-  const planeAltitude = appCtx.planeMode?.active ? Math.max(0, Number(appCtx.planeMode.y) - planeGroundY) : 0;
-  const planeHorizon = appCtx.planeMode?.active ? Math.min(9000, 5000 + planeAltitude * 5) : 0;
+  const aerialAltitude = aerialMode ? Math.max(0, Number(aerialActor?.y) - aerialGroundY) : 0;
+  const aerialHorizon = aerialMode ? Math.min(9000, 5000 + aerialAltitude * 5) : 0;
   const poiMidSq = lodThresholds.mid * lodThresholds.mid;
 
   for (let i = 0; i < appCtx.roadMeshes.length; i += 1) setEarthMeshVisible(appCtx.roadMeshes[i], true);
-  const aerialNear = Math.max(1900, 1200 + planeAltitude * 1.4);
-  const aerialFar = Math.max(6500, planeHorizon + 2800);
+  const protectedDetailRadius = Math.max(1700, Number(appCtx.initialEarthDetailRadius) || 0);
+  const aerialNear = Math.max(protectedDetailRadius + 180, 1200 + aerialAltitude * 1.4);
+  const aerialFar = Math.max(7200, aerialHorizon + 2800);
   const aerialMeshes = Array.isArray(appCtx.aerialContextMeshes) ? appCtx.aerialContextMeshes : [];
   for (let i = 0; i < aerialMeshes.length; i += 1) {
     const mesh = aerialMeshes[i];
     const center = getMeshLodCenter(mesh);
     const distance = center ? Math.hypot(center.x - refX, center.z - refZ) : Infinity;
-    setEarthMeshVisible(mesh, !!appCtx.planeMode?.active && distance >= aerialNear && distance <= aerialFar);
+    setEarthMeshVisible(mesh, aerialMode && distance >= aerialNear && distance <= aerialFar);
   }
 
   let nearVisible = 0;
@@ -205,13 +208,12 @@ export function updateWorldLod(force = false) {
       const batchBoost = isBatch ? Math.min(1300, radius) : Math.min(800, radius);
       visibleDist = lodThresholds.farVisible + batchBoost;
     }
-    if (appCtx.planeMode?.active && mesh.userData?.earthStreamingChunk) {
-      visibleDist = Math.max(visibleDist, planeHorizon + Math.min(700, radius * 0.35));
+    if (aerialMode && mesh.userData?.earthStreamingChunk) {
+      visibleDist = Math.max(visibleDist, aerialHorizon + Math.min(700, radius * 0.35));
     }
     const dx = center.x - refX;
     const dz = center.z - refZ;
     const distSq = dx * dx + dz * dz;
-    const aerialMode = appCtx.droneMode || appCtx.planeMode?.active;
     const hysteresis = tier === 'mid' ?
       appCtx.planeMode?.active ? 1200 : aerialMode ? 460 : 280 :
       appCtx.planeMode?.active ? 1000 : aerialMode ? 380 : 220;

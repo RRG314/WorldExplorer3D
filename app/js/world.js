@@ -51,11 +51,11 @@ import {
   limitWaysByTileBudget,
   rdtDepthForFeatureTile,
   wayCenterLatLon
-} from "./world/budgets.js?v=2";
+} from "./world/budgets.js?v=3";
 import {
   initWorldLod,
   updateWorldLod
-} from "./world/lod.js?v=9";
+} from "./world/lod.js?v=11";
 import {
   buildPoiGeometryPass,
   buildStreetFurniturePass,
@@ -149,7 +149,7 @@ import {
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
 } from "./world/world-geometry.js?v=2";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=8";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=9";
 import {
   resetWorldFurnitureCaches
 } from "./world/furniture.js?v=8";

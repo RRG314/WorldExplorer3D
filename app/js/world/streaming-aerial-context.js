@@ -2,9 +2,8 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import { fetchShortbreadTile } from "./shortbread-source.js?v=6";
 import {
   buildStreamingBuildingVisuals,
-  buildStreamingRoadVisuals,
   queueGeometryDisposal
-} from "./streaming-vector-chunks.js?v=22";
+} from "./streaming-vector-chunks.js?v=24";
 
 function removeMeshesInPlace(source, removed) {
   if (!Array.isArray(source)) return [];
@@ -32,34 +31,16 @@ async function loadAerialContextChunk(request) {
   try {
     const tileRecord = await fetchShortbreadTile(request.z, request.x, request.y, { signal: request.signal });
     if (request.signal?.aborted) throw new DOMException('Aerial context chunk aborted', 'AbortError');
-    await buildStreamingRoadVisuals(tileRecord, chunk, {
+    await buildStreamingBuildingVisuals(tileRecord, chunk, {
       aerialContext: true,
+      batchByCell: false,
       includeInitial: true,
-      maxFeatures: 650,
-      recordFeatures: false
+      lodTier: 'far',
+      maxFeatures: 220,
+      maxFootprintPoints: 14,
+      maxParts: 120,
+      recordColliders: false
     });
-    if (request.signal?.aborted) throw new DOMException('Aerial context chunk aborted', 'AbortError');
-    const childRequests = [];
-    for (let childY = 0; childY < 2; childY += 1) {
-      for (let childX = 0; childX < 2; childX += 1) {
-        childRequests.push(fetchShortbreadTile(request.z + 1, request.x * 2 + childX, request.y * 2 + childY, {
-          signal: request.signal
-        }));
-      }
-    }
-    const childTiles = await Promise.all(childRequests);
-    for (let childIndex = 0; childIndex < childTiles.length; childIndex += 1) {
-      await buildStreamingBuildingVisuals(childTiles[childIndex], chunk, {
-        aerialContext: true,
-        batchByCell: false,
-        includeInitial: true,
-        lodTier: 'far',
-        maxFeatures: 700,
-        maxFootprintPoints: 24,
-        maxParts: 320,
-        recordColliders: false
-      });
-    }
     if (request.signal?.aborted) throw new DOMException('Aerial context chunk aborted', 'AbortError');
     chunk.meshes.forEach((mesh) => {
       mesh.userData.aerialContext = true;
@@ -92,9 +73,10 @@ function initStreamingAerialContext() {
   appCtx._streamingAerialContextRegistered = true;
   appCtx.aerialContextMeshes = Array.isArray(appCtx.aerialContextMeshes) ? appCtx.aerialContextMeshes : [];
   appCtx.unregisterStreamingAerialContext = appCtx.registerEarthStreamLayer('aerial-vector', {
-    activeWhen: ({ mode }) => mode === 'plane',
+    availableWhenDisabled: true,
     loadChunk: loadAerialContextChunk,
     maxActive: 9,
+    maxConcurrent: 1,
     priorityBias: 0.8,
     radius: 1,
     unloadChunk: disposeAerialContextChunk,

@@ -722,6 +722,14 @@ async function loadStreamingVectorChunk(request) {
   };
   try {
     if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
+    if (appCtx.terrainEnabled && typeof appCtx.waitForTerrainReadyAt === 'function') {
+      const centerLat = (Number(request.bounds?.latN) + Number(request.bounds?.latS)) * 0.5;
+      const centerLon = (Number(request.bounds?.lonW) + Number(request.bounds?.lonE)) * 0.5;
+      const center = appCtx.geoToWorld(centerLat, centerLon);
+      const terrainReady = await appCtx.waitForTerrainReadyAt(center.x, center.z, 6000);
+      if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
+      if (!terrainReady) throw new Error(`Terrain elevation unavailable for streaming chunk ${chunk.key}`);
+    }
     const tileRecord = await fetchShortbreadTile(request.z, request.x, request.y, { signal: request.signal });
     if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
     await buildWater(tileRecord, chunk);
@@ -849,7 +857,8 @@ function retireInitialEarthWorld() {
 
 function maybeRetireInitialEarthWorld(actor, snapshot) {
   if (appCtx.initialEarthWorldRetired || !actor) return false;
-  if (Math.hypot(Number(actor.x) || 0, Number(actor.z) || 0) < 3600) return false;
+  const protectedRadius = Math.max(9000, (Number(appCtx.initialEarthDetailRadius) || INITIAL_DETAIL_RADIUS) * 4);
+  if (Math.hypot(Number(actor.x) || 0, Number(actor.z) || 0) < protectedRadius) return false;
   const vectorLayer = snapshot?.layers?.['osm-vector'];
   if (Number(vectorLayer?.loaded || 0) < 6 || Number(vectorLayer?.pending || 0) > 2) return false;
   return retireInitialEarthWorld();

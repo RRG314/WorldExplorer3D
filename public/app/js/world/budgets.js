@@ -280,7 +280,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
 
   const profileByDepth =
     depth >= 6 ? {
-      radii: [0.009, 0.013, 0.018],
+      radii: [0.018, 0.022, 0.026],
       featureRadiusScale: 0.96,
       poiRadiusScale: 0.88,
       maxRoadWays: 3400,
@@ -299,7 +299,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       maxTotalLoadMs: 50000
     } :
     depth === 5 ? {
-      radii: [0.009, 0.014, 0.019],
+      radii: [0.018, 0.022, 0.026],
       featureRadiusScale: 0.94,
       poiRadiusScale: 0.86,
       maxRoadWays: 3900,
@@ -318,7 +318,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       maxTotalLoadMs: 44000
     } :
     depth === 4 ? {
-      radii: [0.01, 0.015, 0.02],
+      radii: [0.019, 0.024, 0.028],
       featureRadiusScale: 0.93,
       poiRadiusScale: 0.86,
       maxRoadWays: 4300,
@@ -336,7 +336,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       overpassTimeoutMs: 22000,
       maxTotalLoadMs: 50000
     } : {
-      radii: [0.011, 0.016, 0.022],
+      radii: [0.02, 0.025, 0.03],
       featureRadiusScale: 0.95,
       poiRadiusScale: 0.90,
       maxRoadWays: 5600,

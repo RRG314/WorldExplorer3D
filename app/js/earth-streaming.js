@@ -7,9 +7,19 @@ const MAX_CONCURRENT_LOADS = 2;
 const MAX_QUEUE_SIZE = 96;
 const MIN_RESUME_GRACE_MS = 4200;
 const WEB_MERCATOR_LAT_LIMIT = 85.05112878;
+const CONTINUOUS_WORLD_STORAGE_KEY = 'worldExplorer3D.continuousWorld.v1';
+
+function readContinuousWorldPreference() {
+  try {
+    return globalThis.localStorage?.getItem(CONTINUOUS_WORLD_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
 
 const layerRegistry = new Map();
 const state = {
+  enabled: readContinuousWorldPreference(),
   anchorSignature: '',
   centerKey: '',
   predictedKey: '',
@@ -231,7 +241,9 @@ function enqueueLayerLoads(layer, desired) {
 
 function drainQueue() {
   while (state.activeLoads < MAX_CONCURRENT_LOADS && state.queue.length > 0) {
-    const queued = state.queue.shift();
+    const queueIndex = state.queue.findIndex((entry) => entry.layer.pending.size < entry.layer.maxConcurrent);
+    if (queueIndex < 0) return;
+    const [queued] = state.queue.splice(queueIndex, 1);
     state.queuedIds.delete(queued.id);
     const { layer, key, tile } = queued;
     if (layer.loaded.has(key) || layer.pending.has(key)) continue;
@@ -332,6 +344,32 @@ function resumeEarthStreaming(graceMs = 1200) {
   state.pauseReason = '';
 }
 
+function getContinuousWorldEnabled() {
+  return state.enabled === true;
+}
+
+async function setContinuousWorldEnabled(enabled, options = {}) {
+  const nextEnabled = enabled === true;
+  const changed = state.enabled !== nextEnabled;
+  state.enabled = nextEnabled;
+  try {
+    globalThis.localStorage?.setItem(CONTINUOUS_WORLD_STORAGE_KEY, nextEnabled ? 'true' : 'false');
+  } catch {
+    // The runtime preference still applies when browser storage is unavailable.
+  }
+  if (!changed) return state.enabled;
+
+  resetEarthStreaming(nextEnabled ? 'continuous_world_enabled' : 'continuous_world_disabled');
+  const shouldReloadRetiredWorld = !nextEnabled && appCtx.initialEarthWorldRetired && appCtx.gameStarted;
+  if (shouldReloadRetiredWorld && options.reloadIfNeeded !== false && typeof appCtx.loadRoads === 'function') {
+    await appCtx.loadRoads();
+  } else if (appCtx.gameStarted) {
+    resumeEarthStreaming(nextEnabled ? 1200 : 800);
+  }
+  appCtx.setPerfLiveStat?.('continuousWorld', state.enabled);
+  return state.enabled;
+}
+
 function acceptEarthStreamingAnchorRebase() {
   state.anchorSignature = anchorSignature();
   state.lastSampleAt = 0;
@@ -353,8 +391,10 @@ function registerEarthStreamLayer(name, options = {}) {
     unloadChunk: options.unloadChunk,
     radius: clamp(Math.round(Number(options.radius) || 2), 1, 4),
     maxActive: clamp(Math.round(Number(options.maxActive) || 36), 9, 81),
+    maxConcurrent: clamp(Math.round(Number(options.maxConcurrent) || MAX_CONCURRENT_LOADS), 1, MAX_CONCURRENT_LOADS),
     zoom: clamp(Math.round(Number(options.zoom) || STREAM_TILE_ZOOM), 8, STREAM_TILE_ZOOM),
     activeWhen: typeof options.activeWhen === 'function' ? options.activeWhen : null,
+    availableWhenDisabled: options.availableWhenDisabled === true,
     priorityBias: Number(options.priorityBias) || 0,
     loaded: new Map(),
     pending: new Map()
@@ -378,10 +418,12 @@ function streamingSnapshot() {
       loaded: layer.loaded.size,
       pending: layer.pending.size,
       maxActive: layer.maxActive,
+      maxConcurrent: layer.maxConcurrent,
       zoom: layer.zoom
     };
   });
   return {
+    enabled: state.enabled,
     generation: state.generation,
     mode: state.mode,
     actorSource: state.actorSource,
@@ -432,17 +474,21 @@ function updateEarthWorldStreaming(dt = 0) {
 
   if (typeof appCtx.updateTerrainAround === 'function') appCtx.updateTerrainAround(actor.x, actor.z);
   layerRegistry.forEach((layer) => {
+    const layerAvailable = state.enabled || layer.availableWhenDisabled;
+    if (!layerAvailable) {
+      abortObsoleteLayerWork(layer, new Set());
+      unloadObsoleteChunks(layer, new Set(), null, Infinity);
+      return;
+    }
     if (layer.activeWhen && !layer.activeWhen({ actor, mode: state.mode, speedMps: state.speedMps })) {
       abortObsoleteLayerWork(layer, new Set());
       unloadObsoleteChunks(layer, new Set(), null, Infinity);
       return;
     }
-    const layerCenterTile = layer.zoom === STREAM_TILE_ZOOM
-      ? centerTile
-      : latLonToTile(center.lat, center.lon, layer.zoom);
-    const layerPredictedTile = layer.zoom === STREAM_TILE_ZOOM
-      ? predictedTile
-      : latLonToTile(predictedCenter.lat, predictedCenter.lon, layer.zoom);
+    const layerCenter = !state.enabled && layer.availableWhenDisabled ? appCtx.LOC : center;
+    const layerPredictedCenter = !state.enabled && layer.availableWhenDisabled ? layerCenter : predictedCenter;
+    const layerCenterTile = latLonToTile(layerCenter.lat, layerCenter.lon, layer.zoom);
+    const layerPredictedTile = latLonToTile(layerPredictedCenter.lat, layerPredictedCenter.lon, layer.zoom);
     const desired = collectDesiredTiles(layerCenterTile, layerPredictedTile, layer.radius);
     const desiredKeys = new Set(desired.keys());
     abortObsoleteLayerWork(layer, desiredKeys);
@@ -451,10 +497,10 @@ function updateEarthWorldStreaming(dt = 0) {
   });
   drainQueue();
 
-  if (typeof appCtx.maybeRetireInitialEarthWorld === 'function') {
+  if (state.enabled && typeof appCtx.maybeRetireInitialEarthWorld === 'function') {
     appCtx.maybeRetireInitialEarthWorld(actor, streamingSnapshot());
   }
-  if (typeof appCtx.maybeRebaseEarthOrigin === 'function') {
+  if (state.enabled && typeof appCtx.maybeRebaseEarthOrigin === 'function') {
     appCtx.maybeRebaseEarthOrigin(actor, streamingSnapshot());
   }
 
@@ -466,21 +512,25 @@ function updateEarthWorldStreaming(dt = 0) {
 Object.assign(appCtx, {
   acceptEarthStreamingAnchorRebase,
   earthStreamingState: state,
+  getContinuousWorldEnabled,
   getEarthStreamingSnapshot: streamingSnapshot,
   pauseEarthStreaming,
   registerEarthStreamLayer,
   resetEarthStreaming,
   resumeEarthStreaming,
+  setContinuousWorldEnabled,
   updateEarthWorldStreaming
 });
 
 export {
   acceptEarthStreamingAnchorRebase,
+  getContinuousWorldEnabled,
   latLonToTile,
   pauseEarthStreaming,
   registerEarthStreamLayer,
   resetEarthStreaming,
   resumeEarthStreaming,
+  setContinuousWorldEnabled,
   streamingSnapshot as getEarthStreamingSnapshot,
   updateEarthWorldStreaming
 };
