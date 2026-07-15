@@ -3,7 +3,6 @@ import path from 'node:path';
 
 const rootDir = process.cwd();
 const syncEntries = [
-  { source: 'CNAME', target: 'public/CNAME', type: 'file' },
   { source: 'about.html', target: 'public/about.html', type: 'file' },
   { source: 'favicon.svg', target: 'public/favicon.svg', type: 'file' },
   { source: 'index.html', target: 'public/index.html', type: 'file' },

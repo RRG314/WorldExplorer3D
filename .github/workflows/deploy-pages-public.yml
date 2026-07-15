@@ -28,10 +28,10 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Upload public artifact
+      - name: Upload project explainer
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./public
+          path: ./github-pages
 
       - name: Deploy to GitHub Pages
         id: deployment

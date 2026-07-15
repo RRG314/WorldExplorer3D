@@ -51,7 +51,7 @@
   "bugs": {
     "url": "https://github.com/RRG314/WorldExplorer3D/issues"
   },
-  "homepage": "https://github.com/RRG314/WorldExplorer3D#readme",
+  "homepage": "https://worldexplorer3d.io",
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",
     "firebase": "^12.9.0",

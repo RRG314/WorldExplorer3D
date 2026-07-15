@@ -1,8 +1,8 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=8";
-import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=5";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=4";
+import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=6";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=6";
 import { createSpaceFlightScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=13";
 import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=4";
 
@@ -39,6 +39,7 @@ appCtx.spaceFlight = {
   _isThrusting: false,
   _lastFrameMs: 0,
   _frameScale: 1,
+  overviewMode: false,
   _sessionId: 0
 };
 
@@ -88,6 +89,7 @@ function startSpaceFlightToMoon() {
   appCtx.spaceFlight._launchSource = 'Earth';
   appCtx.spaceFlight.launchStartMs = Date.now();
   appCtx.spaceFlight._isThrusting = false;
+  appCtx.spaceFlight.overviewMode = false;
   appCtx.switchEnv(appCtx.ENV.SPACE_FLIGHT);
   emitTutorialEvent('entered_space', { destination: 'moon', source: 'space_flight' });
 

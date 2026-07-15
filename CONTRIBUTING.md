@@ -1,6 +1,6 @@
 # Contributing to World Explorer 3D
 
-Last reviewed: 2026-03-13
+Last reviewed: 2026-07-15
 
 Contribution workflow and minimum quality bars for this repository.
 
@@ -28,7 +28,7 @@ python3 -m http.server --directory public 4173
 ## 3. Source-of-Truth Rule
 
 Canonical runtime source is `app/*`.
-Canonical landing/account sources are `index.html` and `account/index.html`.
+Canonical landing/account sources are `index.html` and `account/index.html`. The separate `github-pages/` directory contains only the public project explainer.
 
 Required before merge/deploy:
 
@@ -57,14 +57,13 @@ If backend touched:
 
 Behavior changes must update docs in the same PR.
 
-At minimum, review/update affected files from:
+At minimum, review the affected public documents:
 
 - `README.md`
-- `QUICKSTART.md`
-- `DOCUMENTATION_INDEX.md`
 - `DATA_SOURCES.md`
 - `ATTRIBUTION.md`
-- `LIMITATIONS.md`
+- `KNOWN_ISSUES.md`
+- `ROADMAP.md`
 - `CHANGELOG.md`
 
 ## 6. PR Format

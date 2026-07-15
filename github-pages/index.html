@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="World Explorer 3D is a browser-based geospatial world for exploring Earth, oceans, the Moon, Mars, and space.">
+  <title>World Explorer 3D</title>
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="#top">World Explorer 3D</a>
+    <nav aria-label="Primary navigation">
+      <a href="#experience">Experience</a>
+      <a href="#data">Data</a>
+      <a href="https://github.com/RRG314/WorldExplorer3D">Source</a>
+    </nav>
+    <a class="header-action" href="https://worldexplorer3d.io/app/">Launch app</a>
+  </header>
+
+  <main id="top">
+    <section class="hero" aria-labelledby="hero-title">
+      <div class="hero-content">
+        <p class="eyebrow">Version 3.0</p>
+        <h1 id="hero-title">World Explorer 3D</h1>
+        <p class="hero-copy">Explore real-world places in a browser, cross land and water, then continue to the Moon, Mars, and a navigable solar system.</p>
+        <div class="hero-actions">
+          <a class="primary-action" href="https://worldexplorer3d.io/app/">Explore the world</a>
+          <a class="secondary-action" href="https://github.com/RRG314/WorldExplorer3D/releases">Release notes</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="intro" id="experience">
+      <p class="section-kicker">One connected experience</p>
+      <h2>Choose a place, then choose how to move.</h2>
+      <p>World Explorer 3D combines map-informed environments with walking, driving, drone, plane, boat, rover, and space-flight modes. Preset cities and globe selection provide a quick start, while continuous Earth streaming supports longer trips.</p>
+    </section>
+
+    <section class="feature-grid" aria-label="World Explorer 3D environments">
+      <article class="feature">
+        <img src="assets/earth-drive.png" alt="Driving through a map-informed Baltimore scene">
+        <div><p class="feature-number">01</p><h3>Earth</h3><p>Roads, buildings, terrain, vegetation, water, landmarks, and location context derived from global geospatial sources.</p></div>
+      </article>
+      <article class="feature">
+        <img src="assets/ocean.png" alt="Boat exploration in ocean mode">
+        <div><p class="feature-number">02</p><h3>Water</h3><p>Boat traversal, waves, coastline transitions, underwater exploration, and a fishing game with catches and records.</p></div>
+      </article>
+      <article class="feature">
+        <img src="assets/mars.png" alt="Mars rover on the Olympus Mons surface">
+        <div><p class="feature-number">03</p><h3>Moon and Mars</h3><p>Planet-specific terrain, gravity, vehicles, tracks, skies, and clean in-session travel back to Earth and space.</p></div>
+      </article>
+      <article class="feature">
+        <img src="assets/solar-system.png" alt="Solar system map with planets and asteroid belt">
+        <div><p class="feature-number">04</p><h3>Space</h3><p>A flight experience with planets, moons, asteroid and Kuiper belts, spacecraft, stars, galaxies, and deep-space destinations.</p></div>
+      </article>
+    </section>
+
+    <section class="data-band" id="data">
+      <div><p class="section-kicker">Built from real context</p><h2>Global data, presented as a playable world.</h2></div>
+      <div class="data-copy">
+        <p>Earth scenes use OpenStreetMap-derived geometry and other attributed public datasets. Coverage and detail vary by location, so the runtime combines mapped features with bounded fallbacks where source data is incomplete.</p>
+        <div class="text-links">
+          <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/DATA_SOURCES.md">Data sources</a>
+          <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/ATTRIBUTION.md">Attribution</a>
+          <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/KNOWN_ISSUES.md">Known limitations</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="closing">
+      <p class="section-kicker">Open the live application</p>
+      <h2>The GitHub site documents the project. The world lives at worldexplorer3d.io.</h2>
+      <a class="primary-action" href="https://worldexplorer3d.io/app/">Launch World Explorer 3D</a>
+    </section>
+  </main>
+
+  <footer>
+    <span>World Explorer 3D by Steven Reid</span>
+    <span>Map data © OpenStreetMap contributors</span>
+    <a href="https://github.com/RRG314/WorldExplorer3D/blob/main/LICENSE">License</a>
+  </footer>
+</body>
+</html>

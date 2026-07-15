@@ -106,9 +106,9 @@ export function createAsteroidBelt(ctx) {
   ctx.solarSystem.asteroidBelt.renderOrder = 3;
   ctx.solarSystem.group.add(ctx.solarSystem.asteroidBelt);
 
-  createBeltBoundaryRing(ctx, belt.innerAU, 0xb48357, 'beltInnerEdge');
-  createBeltBoundaryRing(ctx, belt.outerAU, 0xb48357, 'beltOuterEdge');
-  createBeltVolumeBand(ctx, belt.innerAU, belt.outerAU, 0xb48357, 0.09, 'asteroidBeltBand', 1.5);
+  createBeltBoundaryRing(ctx, belt.innerAU, 0xb48357, 'beltInnerEdge', 0.12);
+  createBeltBoundaryRing(ctx, belt.outerAU, 0xb48357, 'beltOuterEdge', 0.12);
+  createBeltVolumeBand(ctx, belt.innerAU, belt.outerAU, 0xb48357, 0.025, 'asteroidBeltBand', 1.5);
   createNamedAsteroids(ctx);
 }
 
@@ -166,12 +166,12 @@ export function createKuiperBelt(ctx) {
   ctx.solarSystem.kuiperBelt.renderOrder = 3;
   ctx.solarSystem.group.add(ctx.solarSystem.kuiperBelt);
 
-  createBeltBoundaryRing(ctx, belt.innerAU, 0x7baee0, 'kuiperInnerEdge');
-  createBeltBoundaryRing(ctx, belt.outerAU, 0x7baee0, 'kuiperOuterEdge');
-  createBeltVolumeBand(ctx, belt.innerAU, belt.outerAU, 0x7baee0, 0.06, 'kuiperBeltBand', 2.8);
+  createBeltBoundaryRing(ctx, belt.innerAU, 0x7baee0, 'kuiperInnerEdge', 0.08);
+  createBeltBoundaryRing(ctx, belt.outerAU, 0x7baee0, 'kuiperOuterEdge', 0.08);
+  createBeltVolumeBand(ctx, belt.innerAU, belt.outerAU, 0x7baee0, 0.018, 'kuiperBeltBand', 2.8);
 }
 
-export function createBeltBoundaryRing(ctx, radiusAU, color, name) {
+export function createBeltBoundaryRing(ctx, radiusAU, color, name, opacity = 0.12) {
   const radius = radiusAU * ctx.AU_TO_SCENE;
   const points = [];
   const segments = 128;
@@ -187,7 +187,7 @@ export function createBeltBoundaryRing(ctx, radiusAU, color, name) {
   const mat = new THREE.LineBasicMaterial({
     color,
     transparent: true,
-    opacity: 0.34,
+    opacity,
     linewidth: 1
   });
   const ring = new THREE.LineLoop(geo, mat);

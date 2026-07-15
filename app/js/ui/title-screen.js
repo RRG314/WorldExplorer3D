@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { createGlobeSelector } from "./globe-selector.js?v=61";
 import { readSharedExperienceParams } from "./share-links.js?v=60";
-import { prepareTitleEnvironment } from "../planetary/entry.js?v=5";
+import { prepareTitleEnvironment } from "../planetary/entry.js?v=6";
 
 function initTitleScreenUi({
   lastLocationStorageKey,

@@ -3,7 +3,7 @@ import {
   createAsteroidBelt as createSolarSystemAsteroidBelt,
   createKuiperBelt as createSolarSystemKuiperBelt,
   createMoonSystems as createSolarSystemMoonSystems
-} from "./solar-system/minor-bodies.js?v=2";
+} from "./solar-system/minor-bodies.js?v=3";
 import { createGalaxies as createSolarSystemGalaxies } from "./solar-system/galaxies.js?v=2";
 import { initSolarSystemModel } from "./solar-system/init.js?v=1";
 import {
@@ -15,7 +15,7 @@ import {
   toggleOrbits as toggleSolarSystemOrbitsImpl,
   toggleSolarSystem as toggleSolarSystemImpl,
   updateSolarSystem as updateSolarSystemImpl
-} from "./solar-system/ui.js?v=2";
+} from "./solar-system/ui.js?v=4";
 import {
   createSpacecraft as createSolarSystemSpacecraft,
   updateSpacecraftPositions as updateSolarSystemSpacecraftPositions
