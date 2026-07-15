@@ -204,13 +204,19 @@ async function exerciseLifecycle(page) {
 
 async function main() {
   await fs.mkdir(outputDir, { recursive: true });
-  const server = await startStaticRootServer({ rootDir, host: '127.0.0.1', candidatePorts: [4234, 4235, 4236] });
+  const hostedBaseUrl = String(process.env.TEST_BASE_URL || '').replace(/\/$/, '');
+  const server = hostedBaseUrl ? null : await startStaticRootServer({
+    rootDir,
+    host: '127.0.0.1',
+    candidatePorts: [4234, 4235, 4236]
+  });
+  const baseUrl = hostedBaseUrl || `http://127.0.0.1:${server.port}`;
   const browser = await chromium.launch({ headless: true, channel: 'chrome' });
   const errors = [];
   try {
     const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
     page.on('pageerror', (error) => errors.push(error.message));
-    await launchBaltimore(page, `http://127.0.0.1:${server.port}`);
+    await launchBaltimore(page, baseUrl);
     const report = await exerciseLifecycle(page);
     await page.waitForTimeout(500);
     await page.screenshot({ path: path.join(outputDir, 'interior.png') });
@@ -237,7 +243,7 @@ async function main() {
     console.log(JSON.stringify({ ok: true, report }, null, 2));
   } finally {
     await browser.close();
-    await server.close();
+    await server?.close();
   }
 }
 
