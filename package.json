@@ -20,6 +20,7 @@
     "test:runtime": "node scripts/test-runtime-invariants.mjs",
     "test:local-data": "node scripts/test-local-data-safety.mjs",
     "test:mobile-controls": "node scripts/test-mobile-controls.mjs",
+    "test:plane-interiors": "node scripts/test-plane-interior-lifecycle.mjs",
     "test:editor-multiplayer": "node scripts/test-editor-multiplayer-surfaces.mjs",
     "test:block-builder": "node scripts/test-block-builder-contract.mjs",
     "test:title-planetary": "node scripts/test-title-planetary-launches.mjs",

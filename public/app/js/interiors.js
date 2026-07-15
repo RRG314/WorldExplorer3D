@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { buildInteriorScene } from "./interiors/scene-builder.js?v=2";
+import { buildInteriorScene } from "./interiors/scene-builder.js?v=3";
 import {
   INTERIOR_ENTRY_RADIUS,
   INTERIOR_INTERACTION_MOVE_EPSILON,
@@ -11,7 +11,7 @@ import {
   isWalkModeActive,
   pointInPolygonSafe,
   sampleSurfaceY
-} from "./interiors/core.js?v=2";
+} from "./interiors/core.js?v=3";
 import {
   resolveInteriorDefinitionForEntry,
   warmMappedInteriorDefinition
@@ -24,7 +24,7 @@ import {
   sampleInteriorWalkSurface as sampleInteriorWalkSurfaceRuntime,
   scanNearbyInteriorSupport as scanNearbyInteriorSupportRuntime,
   updateInteriorInteraction as updateInteriorInteractionRuntime
-} from "./interiors/runtime.js?v=2";
+} from "./interiors/runtime.js?v=3";
 
 const interiorCache = new Map();
 const mappedInteriorWarmPromises = new Map();

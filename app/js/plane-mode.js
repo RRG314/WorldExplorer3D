@@ -15,6 +15,10 @@ const state = {
   cameraYaw: 0,
   cameraPitch: 0,
   cameraLookTimer: 0,
+  contactKind: 'terrain',
+  contactBuildingId: '',
+  lastImpactAt: 0,
+  lastImpactSpeed: 0,
   mesh: null,
   propeller: null
 };
@@ -24,6 +28,8 @@ const surfaceSample = {
   x: 0,
   z: 0,
   y: 0,
+  kind: 'terrain',
+  building: null,
   age: Infinity
 };
 
@@ -128,15 +134,47 @@ function ensurePlaneMesh() {
   return createPlaneMesh();
 }
 
-function groundHeightAt(x, z, options = {}) {
+function buildingTopY(building) {
+  const minY = Number.isFinite(building?.minY) ? building.minY : Number(building?.baseY) || 0;
+  if (Number.isFinite(building?.maxY)) return building.maxY;
+  return minY + Math.max(0, Number(building?.height) || 0);
+}
+
+function pointInsideBuildingFootprint(x, z, building) {
+  if (!building) return false;
+  if (x < building.minX || x > building.maxX || z < building.minZ || z > building.maxZ) return false;
+  return !Array.isArray(building.pts) || building.pts.length < 3 || appCtx.pointInPolygon?.(x, z, building.pts) === true;
+}
+
+function buildingRoofSurfaceAt(x, z, terrainY) {
+  const gearY = state.y - 0.72;
+  const candidates = appCtx.getNearbyBuildings?.(x, z, 8) || appCtx.buildings || [];
+  let best = null;
+  for (let i = 0; i < candidates.length; i += 1) {
+    const building = candidates[i];
+    if (!building || building.collisionDisabled || building.allowsPassageBelow === true) continue;
+    if (building.collisionKind === 'barrier' || !pointInsideBuildingFootprint(x, z, building)) continue;
+    const roofY = buildingTopY(building);
+    if (!Number.isFinite(roofY) || roofY <= terrainY + 1.2 || gearY < roofY - 1.1) continue;
+    if (!best || roofY > best.y) best = { y: roofY, kind: 'building', building };
+  }
+  return best;
+}
+
+function groundSurfaceAt(x, z, options = {}) {
   let terrainY = appCtx.terrainMeshHeightAt?.(x, z);
   if (!Number.isFinite(terrainY)) terrainY = appCtx.elevationWorldYAtWorldXZ?.(x, z);
   if (!Number.isFinite(terrainY)) terrainY = 0;
-  if (options.includeRoad === false) return terrainY;
-  const nearest = appCtx.findNearestRoad?.(x, z, { y: state.y, maxVerticalDelta: 80 });
-  const roadHalfWidth = Math.max(2.5, Number(nearest?.road?.width || 5) * 0.5);
-  if (Number(nearest?.dist) <= roadHalfWidth + 1.2 && Number.isFinite(nearest?.y)) return nearest.y;
-  return terrainY;
+  let surface = { y: terrainY, kind: 'terrain', building: null };
+  if (options.includeRoad !== false) {
+    const nearest = appCtx.findNearestRoad?.(x, z, { y: state.y, maxVerticalDelta: 80 });
+    const roadHalfWidth = Math.max(2.5, Number(nearest?.road?.width || 5) * 0.5);
+    if (Number(nearest?.dist) <= roadHalfWidth + 1.2 && Number.isFinite(nearest?.y)) {
+      surface = { y: nearest.y, kind: 'road', building: null };
+    }
+  }
+  const roof = buildingRoofSurfaceAt(x, z, surface.y);
+  return roof && roof.y > surface.y ? roof : surface;
 }
 
 function samplePlaneSurface(dt = 0, force = false) {
@@ -150,7 +188,10 @@ function samplePlaneSurface(dt = 0, force = false) {
     return surfaceSample.y;
   }
   const includeRoad = !state.airborne || clearance < 12;
-  surfaceSample.y = groundHeightAt(state.x, state.z, { includeRoad });
+  const sampled = groundSurfaceAt(state.x, state.z, { includeRoad });
+  surfaceSample.y = sampled.y;
+  surfaceSample.kind = sampled.kind;
+  surfaceSample.building = sampled.building;
   surfaceSample.x = state.x;
   surfaceSample.z = state.z;
   surfaceSample.age = 0;
@@ -179,6 +220,7 @@ function startPlaneMode(options = {}) {
   state.x = Number.isFinite(options.x) ? options.x : Number(reference?.x) || 0;
   state.z = Number.isFinite(options.z) ? options.z : Number(reference?.z) || 0;
   state.yaw = Number.isFinite(options.yaw) ? options.yaw : Number(reference?.angle ?? reference?.yaw) || 0;
+  if (Number.isFinite(options.y)) state.y = options.y;
   surfaceSample.valid = false;
   const groundY = samplePlaneSurface(0, true);
   state.y = Number.isFinite(options.y) ? Math.max(groundY + 0.72, options.y) : groundY + 0.72;
@@ -198,14 +240,29 @@ function startPlaneMode(options = {}) {
   return true;
 }
 
-function stopPlaneMode() {
+function stopPlaneMode(options = {}) {
   if (!state.active) return false;
+  const exitState = getPlaneSnapshot();
+  const targetMode = String(options.targetMode || 'drive');
   state.active = false;
   if (state.mesh) state.mesh.visible = false;
+  state.speed = 0;
+  state.throttle = 0;
+  state.climbRate = 0;
+
+  if (targetMode === 'drone') return exitState;
+
+  const targetGroundMode = targetMode === 'walk' ? 'walk' : 'drive';
+  const landedOnRoof = targetGroundMode === 'walk' && surfaceSample.kind === 'building' &&
+    Math.abs((exitState.y - 0.72) - surfaceSample.y) <= 1.25;
+  exitState.landedOnRoof = landedOnRoof;
+  exitState.surfaceY = surfaceSample.y;
   const resolved = appCtx.resolveSafeWorldSpawn?.(state.x, state.z, {
-    mode: appCtx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive',
+    mode: targetGroundMode,
     angle: state.yaw,
-    feetY: state.y - 0.72,
+    feetY: landedOnRoof ? surfaceSample.y + 0.04 : undefined,
+    preserveElevatedSurface: landedOnRoof,
+    allowBuildingRoof: landedOnRoof,
     maxRoadDistance: 180,
     maxGroundRadius: 80,
     source: 'plane_exit'
@@ -227,9 +284,7 @@ function stopPlaneMode() {
       appCtx.Walk.state.walker.y = groundY + 1.7;
     }
   }
-  appCtx.updateEarthWorldStreaming?.(1);
-  appCtx.updateWorldLod?.(true);
-  return true;
+  return exitState;
 }
 
 function syncPlaneMesh() {
@@ -239,18 +294,16 @@ function syncPlaneMesh() {
   state.mesh.rotation.set(-state.pitch, state.yaw, -state.roll);
 }
 
-function collidesWithBuilding(x, y, z) {
-  const candidates = appCtx.getNearbyBuildings?.(x, z, 5) || [];
-  for (let i = 0; i < candidates.length; i += 1) {
-    const building = candidates[i];
-    if (!building || building.collisionDisabled) continue;
-    const minY = Number.isFinite(building.minY) ? building.minY : Number(building.baseY) || 0;
-    const maxY = Number.isFinite(building.maxY) ? building.maxY : minY + (Number(building.height) || 4);
-    if (y < minY - 0.4 || y > maxY + 1.4) continue;
-    if (x < building.minX - 1.7 || x > building.maxX + 1.7 || z < building.minZ - 1.7 || z > building.maxZ + 1.7) continue;
-    if (!Array.isArray(building.pts) || building.pts.length < 3 || appCtx.pointInPolygon?.(x, z, building.pts)) return true;
-  }
-  return false;
+function buildingImpactAt(x, y, z) {
+  const actorBaseY = y - 0.68;
+  const hit = appCtx.checkBuildingCollision?.(x, z, 2.15, {
+    actorBaseY,
+    actorHeight: 1.45
+  });
+  if (!hit?.collision || !hit.building) return null;
+  const roofY = buildingTopY(hit.building);
+  if (Number.isFinite(roofY) && actorBaseY >= roofY - 0.32) return null;
+  return hit;
 }
 
 function updatePlane(dt) {
@@ -309,15 +362,25 @@ function updatePlane(dt) {
   state.x += Math.sin(state.yaw) * horizontalSpeed * dt;
   state.z += Math.cos(state.yaw) * horizontalSpeed * dt;
   const horizontalMovement = Math.hypot(state.x - previousX, state.z - previousZ);
-  if (horizontalMovement > 0.05 && state.y - groundY < 520 && collidesWithBuilding(state.x, state.y, state.z)) {
+  const impact = horizontalMovement > 0.05 && state.y - groundY < 520 ?
+    buildingImpactAt(state.x, state.y, state.z) :
+    null;
+  if (impact) {
+    state.lastImpactAt = performance.now();
+    state.lastImpactSpeed = state.speed;
     state.x = previousX;
     state.z = previousZ;
-    state.speed *= 0.22;
-    state.climbRate = Math.max(0, state.climbRate);
+    state.speed = Math.min(2.5, state.speed * 0.12);
+    state.throttle = 0;
+    state.climbRate = Math.max(0, state.climbRate * 0.2);
+    state.pitch = damp(state.pitch, 0, 8, dt);
+    state.roll = damp(state.roll, 0, 8, dt);
   }
   const localGround = groundY;
   state.y = clamp(state.y, localGround + 0.72, localGround + 1400);
   if (state.airborne && state.y <= localGround + 0.73) state.airborne = false;
+  state.contactKind = surfaceSample.kind;
+  state.contactBuildingId = String(surfaceSample.building?.sourceBuildingId || '');
 
   if (state.propeller) state.propeller.rotation.z += dt * (8 + state.throttle * 70);
   syncPlaneMesh();
@@ -378,7 +441,11 @@ function getPlaneSnapshot() {
     roll: state.roll,
     speed: state.speed,
     throttle: state.throttle,
-    airborne: state.airborne
+    airborne: state.airborne,
+    contactKind: state.contactKind,
+    contactBuildingId: state.contactBuildingId,
+    lastImpactAt: state.lastImpactAt,
+    lastImpactSpeed: state.lastImpactSpeed
   };
 }
 

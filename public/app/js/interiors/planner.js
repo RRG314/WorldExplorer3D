@@ -9,7 +9,7 @@ import {
   polygonSamplePoints,
   projectPointToPolygonRing,
   ringAreaAbs
-} from "./core.js?v=2";
+} from "./core.js?v=3";
 
 export function polygonEdgeClearance(point, polygon) {
   const hit = projectPointToPolygonRing(point, polygon);
@@ -260,43 +260,91 @@ export function makeLineFeature(points, width, indoorKind = 'corridor', name = '
   };
 }
 
-export function buildGeneratedPartitions(footprint, centroid) {
-  const bounds = footprintBounds(footprint);
-  const width = bounds.width;
-  const depth = bounds.depth;
-  const partitions = [];
-  const doorway = Math.max(1.5, Math.min(2.6, Math.min(width, depth) * 0.24));
-
-  if (width >= depth && depth >= 9) {
-    const leftX = centroid.x - width * 0.18;
-    const rightX = centroid.x + width * 0.18;
-    [
-      [{ x: leftX, z: bounds.minZ + 1.1 }, { x: leftX, z: centroid.z - doorway * 0.5 }],
-      [{ x: leftX, z: centroid.z + doorway * 0.5 }, { x: leftX, z: bounds.maxZ - 1.1 }],
-      [{ x: rightX, z: bounds.minZ + 1.1 }, { x: rightX, z: centroid.z - doorway * 0.5 }],
-      [{ x: rightX, z: centroid.z + doorway * 0.5 }, { x: rightX, z: bounds.maxZ - 1.1 }]
-    ].forEach(([a, b]) => {
-      const pts = fitLineToFootprint([a, b], footprint, centroid);
-      if (pts.length >= 2 && Math.hypot(pts[1].x - pts[0].x, pts[1].z - pts[0].z) > 2.2) partitions.push(pts);
-    });
-    return partitions;
+function footprintAxisFrame(footprint, centroid) {
+  let longest = null;
+  for (let i = 0; i < footprint.length; i++) {
+    const a = footprint[i];
+    const b = footprint[(i + 1) % footprint.length];
+    const length = Math.hypot(b.x - a.x, b.z - a.z);
+    if (!longest || length > longest.length) longest = { a, b, length };
   }
+  const ux = longest?.length > 0 ? (longest.b.x - longest.a.x) / longest.length : 1;
+  const uz = longest?.length > 0 ? (longest.b.z - longest.a.z) / longest.length : 0;
+  const vx = -uz;
+  const vz = ux;
+  let minU = Infinity;
+  let maxU = -Infinity;
+  let minV = Infinity;
+  let maxV = -Infinity;
+  footprint.forEach((point) => {
+    const dx = point.x - centroid.x;
+    const dz = point.z - centroid.z;
+    const u = dx * ux + dz * uz;
+    const v = dx * vx + dz * vz;
+    minU = Math.min(minU, u);
+    maxU = Math.max(maxU, u);
+    minV = Math.min(minV, v);
+    maxV = Math.max(maxV, v);
+  });
+  return { ux, uz, vx, vz, minU, maxU, minV, maxV };
+}
 
-  if (width >= 9) {
-    [
-      [{ x: bounds.minX + 1.1, z: centroid.z - depth * 0.18 }, { x: centroid.x - doorway * 0.5, z: centroid.z - depth * 0.18 }],
-      [{ x: centroid.x + doorway * 0.5, z: centroid.z - depth * 0.18 }, { x: bounds.maxX - 1.1, z: centroid.z - depth * 0.18 }],
-      [{ x: bounds.minX + 1.1, z: centroid.z + depth * 0.18 }, { x: centroid.x - doorway * 0.5, z: centroid.z + depth * 0.18 }],
-      [{ x: centroid.x + doorway * 0.5, z: centroid.z + depth * 0.18 }, { x: bounds.maxX - 1.1, z: centroid.z + depth * 0.18 }]
-    ].forEach(([a, b]) => {
-      const pts = fitLineToFootprint([a, b], footprint, centroid);
-      if (pts.length >= 2 && Math.hypot(pts[1].x - pts[0].x, pts[1].z - pts[0].z) > 2.2) partitions.push(pts);
-    });
+function axisPoint(frame, centroid, u, v) {
+  return {
+    x: centroid.x + frame.ux * u + frame.vx * v,
+    z: centroid.z + frame.uz * u + frame.vz * v
+  };
+}
+
+function segmentInsideFootprint(segment, footprint) {
+  if (!Array.isArray(segment) || segment.length < 2) return false;
+  const a = segment[0];
+  const b = segment[1];
+  for (let i = 0; i <= 8; i++) {
+    const t = i / 8;
+    if (!pointInPolygonSafe(a.x + (b.x - a.x) * t, a.z + (b.z - a.z) * t, footprint)) return false;
+  }
+  return true;
+}
+
+export function buildGeneratedPartitions(footprint, centroid, options = {}) {
+  const frame = footprintAxisFrame(footprint, centroid);
+  const longSpan = frame.maxU - frame.minU;
+  const shortSpan = frame.maxV - frame.minV;
+  const partitions = [];
+  if (longSpan < 8 || shortSpan < 4.8) return partitions;
+
+  const buildingType = String(options.buildingType || '').toLowerCase();
+  const openPlan = /warehouse|industrial|hangar|garage|parking|supermarket|stadium/.test(buildingType);
+  const residential = /house|residential|apartments|terrace|detached|semidetached/.test(buildingType);
+  const targetRoomLength = openPlan ? 15 : residential ? 6.5 : 8.5;
+  const partitionCount = Math.max(1, Math.min(openPlan ? 3 : 8, Math.floor(longSpan / targetRoomLength)));
+  const doorway = Math.max(1.5, Math.min(2.5, shortSpan * 0.24));
+  const edgeMargin = Math.max(0.45, Math.min(0.9, shortSpan * 0.06));
+
+  const addSegment = (u, fromV, toV) => {
+    const fitted = fitLineToFootprint([
+      axisPoint(frame, centroid, u, fromV),
+      axisPoint(frame, centroid, u, toV)
+    ], footprint, centroid);
+    if (
+      fitted.length >= 2 &&
+      Math.hypot(fitted[1].x - fitted[0].x, fitted[1].z - fitted[0].z) > 1.4 &&
+      segmentInsideFootprint(fitted, footprint)
+    ) partitions.push(fitted);
+  };
+
+  for (let i = 1; i <= partitionCount; i++) {
+    const u = frame.minU + longSpan * (i / (partitionCount + 1));
+    addSegment(u, frame.minV + edgeMargin, -doorway * 0.5);
+    addSegment(u, doorway * 0.5, frame.maxV - edgeMargin);
   }
   return partitions;
 }
 
 export function createGeneratedInteriorPlan(definition, footprint) {
+  const centroid = findInteriorAnchor(footprint) || polygonCentroid(footprint);
+  const buildingType = String(definition?.building?.buildingType || definition?.support?.building?.buildingType || 'building');
   return {
     features: [
       {
@@ -307,7 +355,8 @@ export function createGeneratedInteriorPlan(definition, footprint) {
         pts: footprint
       }
     ],
-    partitions: []
+    partitions: centroid ? buildGeneratedPartitions(footprint, centroid, { buildingType }) : [],
+    layoutKind: /warehouse|industrial|hangar|garage|parking/.test(buildingType.toLowerCase()) ? 'open_plan' : 'room_plan'
   };
 }
 
@@ -326,13 +375,14 @@ export function prepareInteriorFeaturePlan(definition, shellFootprint, centroid)
         if (pts.length >= 2) fittedFeatures.push({ ...feature, pts });
       }
     }
-    if (fittedFeatures.length > 0) return { mode: 'mapped', features: fittedFeatures, partitions: [] };
+    if (fittedFeatures.length > 0) return { mode: 'mapped', features: fittedFeatures, partitions: [], layoutKind: 'mapped' };
   }
 
   const generated = createGeneratedInteriorPlan(definition, shellFootprint);
   return {
     mode: 'generated',
     features: generated.features,
-    partitions: generated.partitions
+    partitions: generated.partitions,
+    layoutKind: generated.layoutKind
   };
 }

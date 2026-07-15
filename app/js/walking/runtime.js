@@ -18,7 +18,7 @@ function createWalkingRuntimeHelpers({
   syncWalkTerrain,
   syncWalkerFromCar
 }) {
-  function setModeWalk() {
+  function setModeWalk(options = {}) {
     if (appCtx.boatMode?.active && !appCtx.boatMode?.manualExitPending) {
       if (typeof appCtx.setTravelMode === "function") {
         appCtx.setTravelMode("walk", { source: "walk_mode_direct" });
@@ -28,8 +28,8 @@ function createWalkingRuntimeHelpers({
 
     state.mode = "walk";
     state.walker.lookYawOffset = 0;
-    let appliedSafeWalkSpawn = false;
-    if (typeof appCtx.resolveSafeWorldSpawn === "function" && typeof appCtx.applyResolvedWorldSpawn === "function") {
+    let appliedSafeWalkSpawn = options.preserveResolvedSpawn === true;
+    if (!appliedSafeWalkSpawn && typeof appCtx.resolveSafeWorldSpawn === "function" && typeof appCtx.applyResolvedWorldSpawn === "function") {
       const safeWalkSpawn = appCtx.resolveSafeWorldSpawn(
         finiteOr(car.x, state.walker.x),
         finiteOr(car.z, state.walker.z),
@@ -48,11 +48,13 @@ function createWalkingRuntimeHelpers({
       appliedSafeWalkSpawn = true;
     }
     if (!appliedSafeWalkSpawn) syncWalkerFromCar();
-    syncWalkTerrain(true);
-    if (typeof appCtx.requestWorldSurfaceSync === "function") {
-      appCtx.requestWorldSurfaceSync({ force: true, source: "set_mode_walk" });
-    } else if (typeof appCtx.repositionBuildingsWithTerrain === "function") {
-      appCtx.repositionBuildingsWithTerrain();
+    if (options.deferWorldSync !== true) {
+      syncWalkTerrain(true);
+      if (typeof appCtx.requestWorldSurfaceSync === "function") {
+        appCtx.requestWorldSurfaceSync({ force: true, source: "set_mode_walk" });
+      } else if (typeof appCtx.repositionBuildingsWithTerrain === "function") {
+        appCtx.repositionBuildingsWithTerrain();
+      }
     }
 
     if (carMesh) {
@@ -63,17 +65,21 @@ function createWalkingRuntimeHelpers({
     }
 
     if (state.characterMesh) {
-      const terrainY = getWalkGroundY(state.walker.x, state.walker.z, car.y - 1.7);
+      const terrainY = options.preserveResolvedSurface === true ?
+        state.walker.y - CFG.eyeHeight :
+        getWalkGroundY(state.walker.x, state.walker.z, car.y - 1.7);
       state.walker.y = terrainY + 1.7;
       state.walker.vy = 0;
       state.characterMesh.visible = state.view !== "first";
       state.characterMesh.position.set(state.walker.x, terrainY, state.walker.z);
       state.characterMesh.rotation.y = state.walker.angle;
-      syncWalkTerrain(true);
-      if (typeof appCtx.requestWorldSurfaceSync === "function") {
-        appCtx.requestWorldSurfaceSync({ force: true, source: "set_mode_walk_character" });
-      } else if (typeof appCtx.repositionBuildingsWithTerrain === "function") {
-        appCtx.repositionBuildingsWithTerrain();
+      if (options.deferWorldSync !== true) {
+        syncWalkTerrain(true);
+        if (typeof appCtx.requestWorldSurfaceSync === "function") {
+          appCtx.requestWorldSurfaceSync({ force: true, source: "set_mode_walk_character" });
+        } else if (typeof appCtx.repositionBuildingsWithTerrain === "function") {
+          appCtx.repositionBuildingsWithTerrain();
+        }
       }
     } else {
       console.error("ERROR: Character mesh is still null after creation!");
