@@ -1,17 +1,34 @@
 {
   "name": "worldexplorer3d",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "description": "Browser-based 3D geospatial exploration app using OpenStreetMap-derived data for Earth and destination-mode exploration.",
+  "type": "module",
   "main": "three.js",
   "scripts": {
     "test": "npm run test:rules && npm run test:runtime && npm run test:osm-smoke",
     "test:rules": "node scripts/test-rules.mjs",
+    "test:css": "node scripts/test-css-integrity.mjs",
+    "test:inferred-buildings": "node scripts/test-inferred-building-coverage.mjs",
+    "test:module-versions": "node scripts/test-module-version-consistency.mjs",
+    "firebase:config": "node scripts/apply-firebase-config.mjs",
+    "firebase:config:production": "node scripts/apply-firebase-config.mjs production",
+    "firebase:config:staging": "node scripts/apply-firebase-config.mjs staging",
     "sync:public": "node scripts/sync-public-app.mjs",
+    "data:landmarks": "node scripts/update-featured-landmarks.mjs",
+    "data:buildings": "node scripts/update-preset-building-metadata.mjs",
     "verify:mirror": "node scripts/verify-mirror.mjs",
     "test:runtime": "node scripts/test-runtime-invariants.mjs",
+    "test:local-data": "node scripts/test-local-data-safety.mjs",
+    "test:mobile-controls": "node scripts/test-mobile-controls.mjs",
+    "test:editor-multiplayer": "node scripts/test-editor-multiplayer-surfaces.mjs",
+    "test:block-builder": "node scripts/test-block-builder-contract.mjs",
+    "test:title-planetary": "node scripts/test-title-planetary-launches.mjs",
+    "test:retention": "node scripts/test-release-retention.mjs",
     "test:world-matrix": "node scripts/test-world-matrix.mjs",
     "test:osm-smoke": "node scripts/test-osm-smoke.mjs",
-    "release:verify": "node scripts/release-verify.mjs"
+    "release:verify": "node scripts/release-verify.mjs",
+    "preview:deploy": "node scripts/firebase-hosting-preview.mjs",
+    "preview:promote": "node scripts/firebase-hosting-promote.mjs"
   },
   "repository": {
     "type": "git",
@@ -36,6 +53,7 @@
   "homepage": "https://github.com/RRG314/WorldExplorer3D#readme",
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",
-    "firebase": "^12.9.0"
+    "firebase": "^12.9.0",
+    "playwright": "^1.61.0"
   }
 }

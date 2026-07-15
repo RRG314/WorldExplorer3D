@@ -8,7 +8,16 @@
     ],
     "headers": [
       {
-        "source": "**/*.@(js|css|jpg|jpeg|png|webp|svg|ico|woff|woff2|ttf|map|glb|gltf)",
+        "source": "**/*.@(js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=0, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(jpg|jpeg|png|webp|svg|ico|woff|woff2|ttf|map|glb|gltf)",
         "headers": [
           {
             "key": "Cache-Control",
@@ -21,7 +30,7 @@
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "public, max-age=300"
+            "value": "public, max-age=0, must-revalidate"
           }
         ]
       }
@@ -58,6 +67,86 @@
       {
         "source": "/deleteAccount",
         "function": "deleteAccount"
+      },
+      {
+        "source": "/submitContribution",
+        "function": "submitContribution"
+      },
+      {
+        "source": "/getContributionModerationOverview",
+        "function": "getContributionModerationOverview"
+      },
+      {
+        "source": "/listContributionSubmissions",
+        "function": "listContributionSubmissions"
+      },
+      {
+        "source": "/moderateContributionSubmission",
+        "function": "moderateContributionSubmission"
+      },
+      {
+        "source": "/saveOverlayFeatureDraft",
+        "function": "saveOverlayFeatureDraft"
+      },
+      {
+        "source": "/submitOverlayFeature",
+        "function": "submitOverlayFeature"
+      },
+      {
+        "source": "/moderateOverlayFeature",
+        "function": "moderateOverlayFeature"
+      },
+      {
+        "source": "/deleteOverlayFeatureDraft",
+        "function": "deleteOverlayFeatureDraft"
+      },
+      {
+        "source": "/getAdminDashboardOverview",
+        "function": "getAdminDashboardOverview"
+      },
+      {
+        "source": "/listAdminOverlayFeatures",
+        "function": "listAdminOverlayFeatures"
+      },
+      {
+        "source": "/getAdminOverlayFeatureDetail",
+        "function": "getAdminOverlayFeatureDetail"
+      },
+      {
+        "source": "/listAdminUsers",
+        "function": "listAdminUsers"
+      },
+      {
+        "source": "/getAdminUserDetail",
+        "function": "getAdminUserDetail"
+      },
+      {
+        "source": "/listAdminRooms",
+        "function": "listAdminRooms"
+      },
+      {
+        "source": "/updateAdminRoomFlags",
+        "function": "updateAdminRoomFlags"
+      },
+      {
+        "source": "/getAdminSiteContent",
+        "function": "getAdminSiteContent"
+      },
+      {
+        "source": "/saveAdminSiteContentDraft",
+        "function": "saveAdminSiteContentDraft"
+      },
+      {
+        "source": "/publishAdminSiteContent",
+        "function": "publishAdminSiteContent"
+      },
+      {
+        "source": "/listAdminActivity",
+        "function": "listAdminActivity"
+      },
+      {
+        "source": "/getAdminOperationsSnapshot",
+        "function": "getAdminOperationsSnapshot"
       },
       {
         "source": "/stripeWebhook",

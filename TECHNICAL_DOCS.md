@@ -119,7 +119,8 @@ Data lanes kept separate on Earth scenes:
   - `railway`
   - `footway`
   - `cycleway`
-  - the subsystem remains in the codebase but is currently disabled in runtime while load, switching, and water regressions are being cleaned up
+  - the subsystem remains in the codebase but is intentionally deferred for this release
+  - re-enabling it requires the same terrain-draping, intersection, and visual-matrix contract now enforced for driveable roads
   - arrays stay empty in the active build, and the map/environment path toggles are hidden
 - traversal graphs: `traversalNetworks.drive` and `traversalNetworks.walk`
   - drive graph stays road-only
@@ -171,6 +172,13 @@ Water / terrain-follow notes:
   - landuse reprojection restores water flattening/offset behavior from the previously stable branch
   - `requestWorldSurfaceSync()` now owns road/building terrain conformance updates, replacing duplicate rebuild triggers from walking mode
   - terrain tile texturing now follows the shared surface rules so snow/ice/desert visuals are driven by one climate-aware rule set instead of isolated terrain-only checks
+- `app/js/terrain/worldcover-baseline.js`
+  - uses ESA WorldCover 2021 v200 through the official Terrascope WMS as a visual land-cover baseline, not as collision or traversal authority
+  - converts classified pixels into restrained built, forest, crop, wetland, bare, snow, and water display colors
+  - prioritizes center tiles and caches immutable responses in memory plus IndexedDB; network failure leaves the existing local surface profile active
+- `app/js/world/bridge-landmark.js`
+  - renders Golden Gate tower-part footprints, main suspension cables, vertical suspenders, and longitudinal girders from the bundled refreshable OSM feature pack
+  - samples the runtime road-deck profile by segment projection so the landmark detail follows the same playable surface as traversal
 
 ## 4. Tutorial Contracts (`app/js/tutorial/tutorial.js`)
 

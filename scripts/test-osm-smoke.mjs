@@ -113,7 +113,11 @@ async function startServer() {
 
 function isTransientNetworkConsoleError(text = '') {
   const msg = String(text || '');
-  return /Failed to load resource:\s+the server responded with a status of\s+(400|429|500|502|503|504)/i.test(msg);
+  return (
+    /Failed to load resource:\s+the server responded with a status of\s+(400|429|500|502|503|504)/i.test(msg) ||
+    /@firebase\/firestore: Firestore .*Could not reach Cloud Firestore backend/i.test(msg) ||
+    /The client will operate in offline mode until it is able to successfully connect/i.test(msg)
+  );
 }
 
 function assert(condition, message) {
@@ -122,16 +126,45 @@ function assert(condition, message) {
   }
 }
 
+async function waitForPageCondition(page, predicateSource, timeoutMs = 90000, label = 'page condition') {
+  const result = await page.evaluate(async ({ predicateSource: source, timeoutMs: timeout, label: nextLabel }) => {
+    const sleep = (ms) => new Promise((resolve) => window.setTimeout(resolve, ms));
+    const predicate = new Function(`return (${source});`)();
+    const deadline = performance.now() + timeout;
+    let lastValue = null;
+    while (performance.now() < deadline) {
+      lastValue = await predicate();
+      if (lastValue) return { ok: true, lastValue };
+      await sleep(250);
+    }
+    return { ok: false, lastValue, label: nextLabel };
+  }, {
+    predicateSource,
+    timeoutMs,
+    label
+  });
+
+  if (!result?.ok) {
+    throw new Error(`Timed out waiting for ${label}. Last value: ${JSON.stringify(result?.lastValue ?? null)}`);
+  }
+  return result.lastValue;
+}
+
 async function waitForUiReady(page) {
-  await page.waitForFunction(async () => {
-    const mod = await import('/app/js/shared-context.js?v=55');
-    const ctx = mod?.ctx;
-    return !!(
-      ctx &&
-      typeof ctx.setTitleLocationMode === 'function' &&
-      typeof ctx.switchEnv === 'function'
-    );
-  }, { timeout: 90000 });
+  await waitForPageCondition(
+    page,
+    `async () => {
+      const mod = await import('/app/js/shared-context.js?v=55');
+      const ctx = mod?.ctx;
+      return !!(
+        ctx &&
+        typeof ctx.setTitleLocationMode === 'function' &&
+        typeof ctx.switchEnv === 'function'
+      );
+    }`,
+    90000,
+    'UI runtime readiness'
+  );
 }
 
 async function bootstrapEarthRuntime(page, locKey = 'baltimore') {
@@ -382,11 +415,30 @@ async function main() {
 
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1365, height: 768 } });
+  let stage = 'browser:boot';
+  const eventLog = [];
+  const markStage = (nextStage) => {
+    stage = nextStage;
+    console.log(`[osm-smoke] stage=${nextStage}`);
+  };
 
   const consoleErrors = [];
+  const requestFailures = [];
+  let deferredNetworkErrorCount = 0;
+  page.on('requestfailed', (request) => {
+    requestFailures.push({
+      url: request.url(),
+      type: request.resourceType(),
+      reason: request.failure()?.errorText || 'unknown'
+    });
+  });
   page.on('console', (msg) => {
     if (msg.type() === 'error') {
       const text = msg.text();
+      if (/Failed to load resource:\s+net::ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|FAILED)/i.test(text) || /blocked by CORS policy/i.test(text)) {
+        deferredNetworkErrorCount += 1;
+        return;
+      }
       if (!isTransientNetworkConsoleError(text)) {
         consoleErrors.push({ type: 'console.error', text });
       }
@@ -395,12 +447,22 @@ async function main() {
   page.on('pageerror', (err) => {
     consoleErrors.push({ type: 'pageerror', text: String(err?.message || err) });
   });
+  page.on('close', () => {
+    eventLog.push({ type: 'page.close', stage, url: page.url() || null });
+  });
+  page.on('crash', () => {
+    eventLog.push({ type: 'page.crash', stage, url: page.url() || null });
+  });
 
   try {
+    markStage('app:navigate');
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
+    markStage('app:wait-start-button');
     await page.waitForSelector('#startBtn', { timeout: 30000 });
+    markStage('app:wait-ui-ready');
     await waitForUiReady(page);
 
+    markStage('title:inspect');
     const titlePresence = await page.evaluate(() => {
       const titleGeoBtn = document.getElementById('titleUseMyLocationBtn');
       const globeGeoBtn = document.getElementById('globeSelectorLocateBtn');
@@ -421,16 +483,20 @@ async function main() {
     assert(titlePresence.hasGlobeGeolocation, 'Missing #globeSelectorLocateBtn');
     assert(titlePresence.hasOceanLaunchToggle, 'Missing #oceanLaunchToggle');
 
+    markStage('earth:bootstrap-baltimore');
     const earthBootstrap = await bootstrapEarthRuntime(page, 'baltimore');
     assert(earthBootstrap.ok, `Failed to bootstrap Earth runtime: ${earthBootstrap.reason || 'unknown error'} ${JSON.stringify(earthBootstrap.details || {})}`);
     await page.waitForTimeout(1800);
+    markStage('earth:resolve-after-bootstrap');
     const earthStateAfterTitleLaunch = await resolveRuntimeState(page);
 
+    markStage('earth:load-monaco');
     const monacoLoad = await loadPresetLocation(page, 'monaco');
     assert(monacoLoad.ok, `Failed to load Monaco preset: ${monacoLoad.reason || 'unknown error'}`);
     assert(monacoLoad.selLoc === 'monaco', `Expected Monaco preset to be active, got ${monacoLoad.selLoc}`);
     await page.waitForTimeout(1800);
 
+    markStage('earth:inspect-monaco-water');
     const monacoWaterRaw = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
       const ctx = mod?.ctx || {};
@@ -499,6 +565,7 @@ async function main() {
       `Monaco water loaded but no visible meshes were rendered: ${JSON.stringify(monacoWater)}`
     );
 
+    markStage('earth:load-arctic');
     const arcticLoad = await loadCustomLocation(page, {
       lat: 78.2232,
       lon: 15.6469,
@@ -523,6 +590,7 @@ async function main() {
       );
     }
 
+    markStage('earth:load-antarctica');
     const antarcticaLoad = await loadCustomLocation(page, {
       lat: -77.846,
       lon: 166.668,
@@ -541,6 +609,7 @@ async function main() {
       `Antarctica water profile did not freeze: ${JSON.stringify(antarcticaSurface.worldSurfaceProfile || {})}`
     );
 
+    markStage('earth:load-desert');
     const desertLoad = await loadCustomLocation(page, {
       lat: 24.9222,
       lon: 55.7676,
@@ -556,6 +625,7 @@ async function main() {
       `Desert terrain did not classify as sand: ${JSON.stringify(desertSurface)}`
     );
 
+    markStage('ocean:start');
     const oceanSwitchIssued = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
       const ctx = mod?.ctx || {};
@@ -567,17 +637,25 @@ async function main() {
     });
     assert(oceanSwitchIssued, 'startOceanMode() is unavailable on app context');
 
-    await page.waitForFunction(async () => {
-      const mod = await import('/app/js/shared-context.js?v=55');
-      const ctx = mod?.ctx || {};
-      const env = typeof ctx.getEnv === 'function' ? ctx.getEnv() : null;
-      return !!(ctx?.oceanMode?.active || env === 'OCEAN');
-    }, { timeout: 90000 });
+    markStage('ocean:wait-active');
+    await waitForPageCondition(
+      page,
+      `async () => {
+        const mod = await import('/app/js/shared-context.js?v=55');
+        const ctx = mod?.ctx || {};
+        const env = typeof ctx.getEnv === 'function' ? ctx.getEnv() : null;
+        return !!(ctx?.oceanMode?.active || env === 'OCEAN');
+      }`,
+      90000,
+      'Ocean mode activation'
+    );
     await page.waitForTimeout(1200);
+    markStage('ocean:resolve-active');
     const oceanState = await resolveRuntimeState(page);
     await page.screenshot({ path: path.join(outputDir, 'ocean-mode.png'), fullPage: true });
     assert(oceanState.oceanActive || oceanState.env === 'OCEAN', `Ocean mode not active (env=${oceanState.env})`);
 
+    markStage('earth:return-from-ocean');
     await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
       const ctx = mod?.ctx || {};
@@ -588,19 +666,46 @@ async function main() {
         ctx.switchEnv(ctx.ENV.EARTH);
       }
     });
-    await page.waitForFunction(async () => {
-      const mod = await import('/app/js/shared-context.js?v=55');
-      const ctx = mod?.ctx || {};
-      const env = typeof ctx.getEnv === 'function' ? ctx.getEnv() : null;
-      return env === 'EARTH' && !ctx?.oceanMode?.active;
-    }, { timeout: 90000 });
+    markStage('earth:wait-restore-after-ocean');
+    await waitForPageCondition(
+      page,
+      `async () => {
+        const mod = await import('/app/js/shared-context.js?v=55');
+        const ctx = mod?.ctx || {};
+        const env = typeof ctx.getEnv === 'function' ? ctx.getEnv() : null;
+        return env === 'EARTH' && !ctx?.oceanMode?.active;
+      }`,
+      90000,
+      'Earth mode restore after ocean return'
+    );
     await page.waitForTimeout(1200);
+    markStage('earth:resolve-after-ocean-return');
     const earthState = await resolveRuntimeState(page);
     await page.screenshot({ path: path.join(outputDir, 'earth-mode.png'), fullPage: true });
 
     assert(earthStateAfterTitleLaunch.env === 'EARTH', `Expected EARTH env after title launch (got ${earthStateAfterTitleLaunch.env})`);
     assert(earthState.env === 'EARTH', `Expected EARTH env after ocean return (got ${earthState.env})`);
     assert(!earthState.oceanActive, 'Ocean renderer remained active after Earth return');
+    const deferredRequests = requestFailures.filter((failure) =>
+      /net::ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|FAILED)/.test(failure.reason)
+    );
+    const localOrigin = new URL(baseUrl).origin;
+    const localFailures = deferredRequests.filter((failure) => {
+      try {
+        return new URL(failure.url).origin === localOrigin;
+      } catch {
+        return true;
+      }
+    });
+    if (deferredNetworkErrorCount > 0 && (deferredRequests.length === 0 || localFailures.length > 0)) {
+      consoleErrors.push({
+        type: 'requestfailed',
+        text: `${deferredNetworkErrorCount} connection failure(s) included local or unidentified resources`,
+        requests: localFailures.length > 0 ? localFailures : deferredRequests
+      });
+    }
+    const desertTerrainTileCount = Object.values(desertSurface.terrainModes || {}).reduce((sum, count) => sum + Number(count || 0), 0);
+    const desertSandTiles = Number(desertSurface.terrainModes.sand || 0);
 
     const checks = {
       titleGeolocationPresent: titlePresence.hasTitleGeolocation,
@@ -616,8 +721,9 @@ async function main() {
         ((antarcticaSurface.terrainModes.snow || 0) + (antarcticaSurface.terrainModes.snowRock || 0) > 0) &&
         antarcticaSurface.worldSurfaceProfile?.waterModeHint === 'ice',
       desertSurfaceSand:
-        (desertSurface.terrainModes.sand || 0) > 0 ||
-        desertSurface.worldSurfaceProfile?.terrainModeHint === 'sand',
+        desertTerrainTileCount <= 0 ?
+          desertSurface.worldSurfaceProfile?.terrainModeHint === 'sand' :
+          desertSandTiles >= Math.max(4, Math.ceil(desertTerrainTileCount * 0.5)),
       earthLaunchWorks:
         earthStateAfterTitleLaunch.env === 'EARTH' &&
         earthState.env === 'EARTH' &&
@@ -628,7 +734,9 @@ async function main() {
     const report = {
       ok: Object.values(checks).every(Boolean),
       url: baseUrl,
+      stage,
       checks,
+      eventLog,
       titlePresence,
       earthStateAfterTitleLaunch,
       monacoLoad,
@@ -642,16 +750,31 @@ async function main() {
       desertSurface,
       oceanState,
       earthState,
-      consoleErrors
+      consoleErrors,
+      requestFailures
     };
 
     await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(report, null, 2));
 
+    assert(report.ok, `OSM smoke checks failed: ${JSON.stringify(checks)}`);
     assert(
       checks.noConsoleErrors,
       `Console/page errors present: ${consoleErrors.length} ${JSON.stringify(consoleErrors.slice(0, 8))}`
     );
+    markStage('done');
     console.log(JSON.stringify(report, null, 2));
+  } catch (err) {
+    const fallback = {
+      ok: false,
+      url: baseUrl,
+      stage,
+      eventLog,
+      consoleErrors,
+      requestFailures,
+      error: err?.message || String(err)
+    };
+    await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(fallback, null, 2));
+    throw err;
   } finally {
     await browser.close();
     if (typeof serverHandle.close === 'function' && serverHandle.owned) {
@@ -667,7 +790,10 @@ main().catch(async (err) => {
   };
   try {
     await mkdirp(outputDir);
-    await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(fallback, null, 2));
+    const reportPath = path.join(outputDir, 'report.json');
+    if (!(await exists(reportPath))) {
+      await fs.writeFile(reportPath, JSON.stringify(fallback, null, 2));
+    }
   } catch {
     // best-effort only
   }

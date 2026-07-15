@@ -1,5 +1,7 @@
 {
   "projects": {
-    "default": "worldexplorer3d-d9b83"
+    "default": "worldexplorer3d-d9b83",
+    "production": "worldexplorer3d-d9b83",
+    "staging": "we3d-staging-20260712"
   }
 }

@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
+import { createLocalSurfaceAnalysisApi } from "./surface-rules-local.js?v=1";
 
 const POLAR_SNOW_LAT_THRESHOLD = 66;
 const POLAR_ICE_LAT_THRESHOLD = 66;
@@ -8,6 +9,9 @@ const ALPINE_SNOWLINE_METERS = 3200;
 const SUBPOLAR_SNOWLINE_METERS = 1800;
 const ARID_LAT_MIN = 12;
 const ARID_LAT_MAX = 35;
+const TILE_SAMPLE_GRID = 5;
+const COASTAL_SAMPLE_PADDING_WORLD = 65;
+const ROAD_SAMPLE_PADDING_WORLD = 24;
 
 const VEGETATED_SURFACE_TYPES = new Set([
   'forest',
@@ -25,6 +29,42 @@ const VEGETATED_SURFACE_TYPES = new Set([
   'cemetery'
 ]);
 
+const URBAN_SURFACE_TYPES = new Set([
+  'paved',
+  'parking',
+  'residential',
+  'commercial',
+  'industrial',
+  'retail',
+  'construction',
+  'brownfield',
+  'garages',
+  'railway',
+  'harbour',
+  'port',
+  'military'
+]);
+
+const SOIL_SURFACE_TYPES = new Set([
+  'farmland',
+  'farmyard',
+  'orchard',
+  'vineyard',
+  'allotments',
+  'plant_nursery',
+  'greenhouse_horticulture'
+]);
+
+const ROCKY_SURFACE_TYPES = new Set([
+  'barren',
+  'quarry'
+]);
+
+const EXPLICIT_SAND_SURFACE_TYPES = new Set([
+  'sand',
+  'dune'
+]);
+
 function midpointLatitude(bounds) {
   if (Number.isFinite(bounds?.latN) && Number.isFinite(bounds?.latS)) {
     return (bounds.latN + bounds.latS) * 0.5;
@@ -34,7 +74,15 @@ function midpointLatitude(bounds) {
 
 function normalizeLanduseSurfaceType(tags = {}) {
   if (!tags || typeof tags !== 'object') return null;
+  if (tags.amenity === 'parking') return 'parking';
+  if (tags['area:highway'] || tags.place === 'square') return 'paved';
+  if (tags.highway === 'pedestrian' && tags.area === 'yes') return 'paved';
+  if (tags.area === 'yes' && /^(paved|asphalt|concrete|concrete:plates|paving_stones|sett|cobblestone)$/.test(tags.surface || '')) return 'paved';
   if (tags.landuse && appCtx.LANDUSE_STYLES?.[tags.landuse]) return tags.landuse;
+  if (tags.landuse === 'quarry') return 'quarry';
+  if (tags.landuse === 'plant_nursery') return 'plant_nursery';
+  if (tags.landuse === 'farmyard') return 'farmyard';
+  if (tags.landuse === 'greenhouse_horticulture') return 'greenhouse_horticulture';
   if (tags.landuse === 'reservoir' || tags.landuse === 'basin') return 'water';
   if (tags.natural === 'water' || !!tags.water) return 'water';
   if (tags.natural === 'glacier') return 'glacier';
@@ -154,10 +202,36 @@ function classifyWorldSurfaceProfile({
   const latitudeDry = absLat >= ARID_LAT_MIN && absLat <= ARID_LAT_MAX;
   const sparseVegetation = norm.vegetated <= 0.28;
   const sparseSurfaceWater = norm.water <= 0.22;
-  const explicitDesert = norm.explicitSand >= 0.07 || norm.barren >= 0.1 && norm.explicitSand >= 0.03;
+  const dryLatitudeExplicitSand =
+    latitudeDry &&
+    sparseSurfaceWater &&
+    norm.vegetated <= 0.45 &&
+    Number(signals.raw?.explicitSand || 0) >= 0.9;
+  const explicitDesert =
+    norm.explicitSand >= 0.07 ||
+    dryLatitudeExplicitSand ||
+    (
+      latitudeDry &&
+      sparseSurfaceWater &&
+      norm.explicitSand >= 0.025 &&
+      norm.arid >= 0.035
+    ) ||
+    norm.barren >= 0.1 && norm.explicitSand >= 0.03;
   const inferredDesert = latitudeDry && sparseVegetation && sparseSurfaceWater && norm.arid >= 0.24;
   const lowDetailAridFallback = latitudeDry && signals.total < 6 && sparseVegetation && sparseSurfaceWater;
-  const aridTerrain = !polar && (explicitDesert || inferredDesert || lowDetailAridFallback);
+  const subtropicalDryFallback =
+    absLat >= 18 &&
+    absLat <= ARID_LAT_MAX &&
+    signals.total >= 6 &&
+    norm.vegetated <= 0.02 &&
+    norm.water <= 0.02 &&
+    norm.arid <= 0.01;
+  const aridTerrain = !polar && (
+    explicitDesert ||
+    inferredDesert ||
+    lowDetailAridFallback ||
+    subtropicalDryFallback
+  );
 
   return {
     absLat,
@@ -190,17 +264,42 @@ function classifyTerrainSurfaceProfile({
     maxMeters >= ALPINE_SNOWLINE_METERS && p75Meters >= ALPINE_SNOWLINE_METERS * 0.5;
   const subpolarSnow = absLat >= SUBPOLAR_SNOW_LAT_THRESHOLD &&
     (p90Meters >= SUBPOLAR_SNOWLINE_METERS || maxMeters >= SUBPOLAR_SNOWLINE_METERS + 500 || minMeters >= SUBPOLAR_SNOWLINE_METERS * 0.55);
-  const useSnow = polar || alpine || subpolarSnow;
-
-  const useSand = !useSnow && worldProfile?.terrainModeHint === 'sand';
-  const mode = useSnow ? (polar ? 'snow' : 'snowRock') : useSand ? 'sand' : 'grass';
+  const localSignals = summarizeLocalGroundSignals(bounds);
+  const norm = localSignals.normalized;
+  const weatherSnow = shouldApplySnowOverlay(absLat, maxMeters);
+  const useSnow = polar || alpine || subpolarSnow || weatherSnow;
+  const waterNearby = localSignals.waterAdjacent || norm.water >= 0.08;
+  const steepTerrain = maxMeters - minMeters >= 210 || (Number.isFinite(p90Meters) && Number.isFinite(p75Meters) && (p90Meters - p75Meters) >= 85);
+  const explicitBeachSand = norm.sand >= 0.08 && waterNearby && (
+    norm.urban < 0.18 ||
+    (norm.sand >= 0.1 && localSignals.candidates.urbanLanduses === 0)
+  );
+  const aridFallback = shouldUseAridFallback(absLat, worldProfile, norm, localSignals);
+  const useSand = !useSnow && (explicitBeachSand || aridFallback);
+  const useRock = !useSnow && !useSand && (norm.rock >= 0.18 || (steepTerrain && norm.rock >= 0.06));
+  const useSoil = !useSnow && !useSand && !useRock && (norm.soil >= 0.2 || (norm.soil >= 0.1 && norm.grass < 0.24));
+  const useBuiltVisual = !useSnow && !useSand && !useRock && !useSoil &&
+    localSignals.candidates.buildings >= 8 &&
+    localSignals.candidates.roads >= 4 &&
+    norm.grass < 0.45;
+  const mode = useSnow ?
+    ((polar || useRock || steepTerrain) ? 'snowRock' : 'snow') :
+    useSand ? 'sand' :
+    useRock ? 'rock' :
+    useSoil ? 'soil' :
+    'grass';
 
   return {
     mode,
+    visualMode: useBuiltVisual ? 'built' : mode,
     reason: useSnow ?
-      (polar ? 'polar_latitude' : alpine ? 'high_elevation' : 'cold_highland') :
-      useSand ? 'arid_surface' : 'temperate',
-    absLat
+      (weatherSnow ? 'live_weather_snow' : polar ? 'polar_latitude' : alpine ? 'high_elevation' : 'cold_highland') :
+      useSand ? (explicitBeachSand ? 'localized_beach' : 'arid_surface') :
+      useRock ? 'rocky_surface' :
+      useSoil ? 'soil_surface' :
+      'vegetated_ground',
+    absLat,
+    localSignals
   };
 }
 
@@ -218,6 +317,102 @@ function classifyWaterSurfaceProfile({
     absLat
   };
 }
+const { summarizeLocalGroundSignals } = createLocalSurfaceAnalysisApi({
+  appCtx,
+  constants: {
+    COASTAL_SAMPLE_PADDING_WORLD,
+    EXPLICIT_SAND_SURFACE_TYPES,
+    ROAD_SAMPLE_PADDING_WORLD,
+    ROCKY_SURFACE_TYPES,
+    SOIL_SURFACE_TYPES,
+    TILE_SAMPLE_GRID,
+    URBAN_SURFACE_TYPES,
+    VEGETATED_SURFACE_TYPES
+  }
+});
+
+function getWeatherForTerrain() {
+  if (appCtx.weatherMode && appCtx.weatherMode !== 'live' && appCtx.weatherState) return appCtx.weatherState;
+  return appCtx.liveWeatherState || appCtx.weatherState || null;
+}
+
+function shouldApplySnowOverlay(absLat, maxMeters = 0) {
+  const weather = getWeatherForTerrain();
+  if (!weather) return false;
+  const tempC = Number.isFinite(weather.temperatureC) ? weather.temperatureC : Number(weather.apparentC);
+  const snowCategory = weather.category === 'snow' || weather.mode === 'snow';
+  if (snowCategory && (!Number.isFinite(tempC) || tempC <= 2.5)) return true;
+  if (Number.isFinite(tempC) && tempC <= -2 && absLat >= 45 && maxMeters >= 500) return true;
+  return false;
+}
+
+function shouldUseAridFallback(absLat, worldProfile, norm, localSignals) {
+  const worldArid = worldProfile?.terrainModeHint === 'sand' || worldProfile?.reason === 'arid_surface';
+  if (!worldArid) return false;
+  const worldNorm = worldProfile?.signals?.normalized || {};
+  const worldRaw = worldProfile?.signals?.raw || {};
+  const lowDetailAridWorld =
+    worldProfile?.reason === 'arid_surface' &&
+    Number(worldProfile?.signals?.total || 0) < 6;
+  const dryBeltNoMoistureWorld =
+    worldProfile?.reason === 'arid_surface' &&
+    absLat >= 18 &&
+    absLat <= ARID_LAT_MAX &&
+    Number(worldProfile?.signals?.total || 0) >= 6 &&
+    Number(worldNorm.vegetated || 0) <= 0.02 &&
+    Number(worldNorm.water || 0) <= 0.02 &&
+    Number(worldNorm.arid || 0) <= 0.01;
+  const explicitAridWorld =
+    worldProfile?.reason === 'arid_surface' &&
+    Number(worldNorm.water || 0) < 0.08 &&
+    (
+      Number(worldNorm.explicitSand || 0) >= 0.1 ||
+      Number(worldNorm.arid || 0) >= 0.1
+    );
+  const mappedAridRegion =
+    worldProfile?.reason === 'arid_surface' &&
+    Number(worldNorm.water || 0) < 0.08 &&
+    Number(worldNorm.explicitSand || 0) >= 0.025 &&
+    Number(worldNorm.arid || 0) >= 0.035;
+  const worldSupportsDesertFallback =
+    Number(worldNorm.explicitSand || 0) >= 0.35 ||
+    lowDetailAridWorld ||
+    dryBeltNoMoistureWorld ||
+    explicitAridWorld ||
+    mappedAridRegion ||
+    (
+      Number(worldNorm.vegetated || 0) < 0.14 &&
+      Number(worldNorm.water || 0) < 0.06 &&
+      Number(worldNorm.arid || 0) >= 0.12
+    ) ||
+    (
+      worldProfile?.reason === 'arid_surface' &&
+      absLat >= ARID_LAT_MIN &&
+      absLat <= ARID_LAT_MAX &&
+      Number(worldRaw.explicitSand || 0) >= 0.9
+    );
+  if (!worldSupportsDesertFallback) return false;
+  const builtPressure = Math.max(norm.urban, Math.min(1, localSignals.candidates.buildings / 12));
+  const lowUrban = builtPressure < 0.18;
+  const moderateUrban = builtPressure < 0.34;
+  const lowVegetation = norm.grass < (localSignals.candidates.greenLanduses > 0 ? 0.16 : 0.28);
+  const moderateVegetation =
+    norm.grass < (localSignals.candidates.greenLanduses > 0 ? 0.22 : 0.5);
+  const lowWater = norm.water < 0.08;
+  const openGround = norm.rock + norm.soil + norm.uncovered >= 0.42 ||
+    (norm.uncovered >= 0.28 && localSignals.candidates.landuses <= 1 && localSignals.candidates.buildings <= 2);
+  const desertLatitude = absLat >= ARID_LAT_MIN && absLat <= ARID_LAT_MAX;
+  const aridWorldOverride =
+    worldProfile?.reason === 'arid_surface' &&
+    desertLatitude &&
+    moderateVegetation &&
+    norm.water < 0.12 &&
+    (openGround || norm.uncovered >= 0.24 || norm.soil + norm.rock >= 0.18);
+  return desertLatitude && (
+    (lowUrban && lowVegetation && lowWater && openGround) ||
+    aridWorldOverride
+  );
+}
 
 export {
   ALPINE_SNOWLINE_METERS,
@@ -228,5 +423,6 @@ export {
   classifyWaterSurfaceProfile,
   classifyWorldSurfaceProfile,
   normalizeLanduseSurfaceType,
+  summarizeLocalGroundSignals,
   summarizeSurfaceSignals
 };

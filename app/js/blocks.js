@@ -1,28 +1,45 @@
-import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
+import { ctx as appCtx } from "./shared-context.js?v=55";
+import { createBlockBuilderInteraction } from "./block-builder/interaction.js?v=2";
+import {
+  BLOCK_MATERIALS,
+  BLOCK_LIMIT_PER_LOCATION,
+  createBlockShapeGeometry,
+  normalizeBlockMaterial,
+  normalizeBlockRotation,
+  normalizeBlockShape
+} from "./block-builder/catalog.js?v=1";
+import { createBuildCollisionQueries } from "./block-builder/collision.js?v=1";
+// ============================================================================
 // blocks.js - Lightweight voxel-style builder (place/stack/remove brick blocks)
 // ============================================================================
 
 const BUILD_BLOCK_SIZE = 1;
 const BUILD_HALF = BUILD_BLOCK_SIZE * 0.5;
 const BUILD_MAX_DISTANCE = 260;
-const BUILD_BLOCK_COLORS = [0xb55239, 0xa74631, 0x9a3d2b, 0xc16345];
+const BUILD_TOOLS = new Set(['place', 'remove']);
+const BUILD_HISTORY_LIMIT = 50;
 
 const BUILD_STORAGE_KEY = 'worldExplorer3D.buildBlocks.v1';
+const BUILD_STORAGE_BACKUP_KEY = 'worldExplorer3D.buildBlocks.backup.v1';
 const BUILD_STORAGE_TEST_KEY = 'worldExplorer3D.buildBlocks.test';
+const BUILD_STORAGE_MIGRATION_KEY = 'worldExplorer3D.buildBlocks.migrated.v2';
+const LEGACY_BUILD_STORAGE_KEYS = Object.freeze([]);
 const BUILD_LOCATION_PRECISION = 5;
-const BUILD_MAX_PER_LOCATION = 100;
-const BUILD_MAX_TOTAL = 100;
+const BUILD_MAX_PER_LOCATION = BLOCK_LIMIT_PER_LOCATION;
+const BUILD_MAX_TOTAL = 5000;
 
 let buildModeEnabled = false;
 let buildGroup = null;
-let buildGeometry = null;
-let buildRaycaster = null;
+const buildGeometries = new Map();
 
 let buildPersistenceEnabled = false;
 let buildPersistenceDetail = 'Not initialized.';
 let buildEntries = [];
-let buildIndicatorResetTimer = null;
-let lastTouchLikePlacement = null;
+let buildTool = 'place';
+let buildMaterialIndex = 0;
+let buildShape = 'cube';
+let buildRotation = 0;
+let buildActionHistory = [];
 let sharedBuildSyncEnabled = false;
 let sharedBuildRoomId = '';
 let sharedBuildEntries = [];
@@ -34,10 +51,20 @@ let sharedBuildClearMineFn = null;
 const buildBlocks = new Map();
 const buildColumns = new Map();
 const buildMaterials = [];
-const buildMouse = typeof THREE !== 'undefined' ? new THREE.Vector2() : null;
-const buildPlane = typeof THREE !== 'undefined' ? new THREE.Plane(new THREE.Vector3(0, 1, 0), 0) : null;
-const buildTempPoint = typeof THREE !== 'undefined' ? new THREE.Vector3() : null;
-const buildNormalMatrix = typeof THREE !== 'undefined' ? new THREE.Matrix3() : null;
+
+const {
+  getBuildCollisionAtWorldXZ,
+  getBuildTopSurfaceAtWorldXZ,
+  getBuildVehicleContact,
+  getBuildVehicleSurfaceAtWorldXZ
+} = createBuildCollisionQueries({
+  blockKey,
+  buildBlocks,
+  buildColumns,
+  columnKey,
+  toGridCoord,
+  toWorldCoord
+});
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -51,6 +78,10 @@ function isFiniteNumber(v) {
 
 function toGridCoord(v) {
   return Math.round(v / BUILD_BLOCK_SIZE);
+}
+
+function toVerticalGridCoord(v) {
+  return Math.round(v / (BUILD_BLOCK_SIZE * 0.5)) * 0.5;
 }
 
 function toWorldCoord(g) {
@@ -112,6 +143,22 @@ function detectBuildStorage() {
   }
 }
 
+function clearLegacyBuildStorage() {
+  if (!buildPersistenceEnabled || !globalThis.localStorage) return;
+  try {
+    if (localStorage.getItem(BUILD_STORAGE_MIGRATION_KEY) === 'done') return;
+    // Data safety first: do not delete existing local build data during runtime boot.
+    // Older saves should remain readable until an explicit migration/export path exists.
+    LEGACY_BUILD_STORAGE_KEYS.forEach((key) => {
+      if (!key || key === BUILD_STORAGE_KEY || key === BUILD_STORAGE_BACKUP_KEY) return;
+    });
+    localStorage.setItem(BUILD_STORAGE_MIGRATION_KEY, 'done');
+    buildPersistenceDetail = 'Existing local build data is preserved for compatibility on this browser.';
+  } catch (err) {
+    console.warn('[blocks] Failed to clear legacy build storage:', err);
+  }
+}
+
 function isSharedBuildSyncActive() {
   return sharedBuildSyncEnabled && !!sharedBuildRoomId;
 }
@@ -122,13 +169,14 @@ function normalizeSharedBlockEntry(raw) {
   const gy = Number(raw.gy);
   const gz = Number(raw.gz);
   if (!Number.isFinite(gx) || !Number.isFinite(gy) || !Number.isFinite(gz)) return null;
-  const materialIndex = Number(raw.materialIndex);
   return {
     id: String(raw.id || `${Math.round(gx)}_${Math.round(gy)}_${Math.round(gz)}`),
     gx: Math.round(gx),
-    gy: Math.round(gy),
+    gy: toVerticalGridCoord(gy),
     gz: Math.round(gz),
-    materialIndex: Number.isFinite(materialIndex) ? Math.max(0, Math.round(materialIndex)) : 0
+    materialIndex: normalizeBlockMaterial(raw.materialIndex),
+    shape: normalizeBlockShape(raw.shape),
+    rotation: normalizeBlockRotation(raw.rotation)
   };
 }
 
@@ -210,30 +258,37 @@ function getBuildLimits() {
   };
 }
 
-function getBuildIndicatorDefaultHtml() {
-  return '🧱 Build Mode ON<br>Click to place blocks, Shift+Click to remove.<br>Press B to toggle.';
+function getBlockBuilderSnapshot() {
+  const limits = getBuildLimits();
+  return {
+    enabled: buildModeEnabled,
+    tool: buildTool,
+    materialIndex: buildMaterialIndex,
+    shape: buildShape,
+    rotation: buildRotation,
+    canUndo: buildActionHistory.length > 0,
+    count: limits.currentLocationCount,
+    maxCount: limits.maxPerLocation,
+    shared: isSharedBuildSyncActive()
+  };
+}
+
+function syncBlockBuilderUi() {
+  if (typeof appCtx.syncBlockBuilderUi === 'function') {
+    appCtx.syncBlockBuilderUi(getBlockBuilderSnapshot());
+  }
+}
+
+function rememberBuildAction(action) {
+  if (!action) return;
+  buildActionHistory.push(action);
+  if (buildActionHistory.length > BUILD_HISTORY_LIMIT) buildActionHistory.shift();
+  showBuildTransientMessage('');
+  syncBlockBuilderUi();
 }
 
 function showBuildTransientMessage(text) {
-  const indicator = document.getElementById('buildModeIndicator');
-  if (!indicator) return;
-  indicator.classList.add('show');
-  indicator.innerHTML = `🧱 ${String(text || '').slice(0, 160)}`;
-
-  if (buildIndicatorResetTimer) {
-    clearTimeout(buildIndicatorResetTimer);
-    buildIndicatorResetTimer = null;
-  }
-  buildIndicatorResetTimer = setTimeout(() => {
-    const target = document.getElementById('buildModeIndicator');
-    if (!target) return;
-    if (buildModeEnabled) {
-      target.innerHTML = getBuildIndicatorDefaultHtml();
-    } else {
-      target.classList.remove('show');
-    }
-    buildIndicatorResetTimer = null;
-  }, 2200);
+  appCtx.showBlockBuilderStatus?.(String(text || '').slice(0, 160));
 }
 
 function canPersistBuildBlocks() {
@@ -251,7 +306,6 @@ function normalizeBuildEntry(raw) {
   const gy = Number(raw.gy);
   const gx = Number(raw.gx);
   const gz = Number(raw.gz);
-  const materialIndex = Number(raw.materialIndex);
 
   if (!locationKey) return null;
   if (!isFiniteNumber(lat) || !isFiniteNumber(lon)) return null;
@@ -263,33 +317,57 @@ function normalizeBuildEntry(raw) {
     lat: Number(lat.toFixed(7)),
     lon: Number(lon.toFixed(7)),
     gx: Number.isInteger(gx) ? gx : null,
-    gy: Math.round(gy),
+    gy: toVerticalGridCoord(gy),
     gz: Number.isInteger(gz) ? gz : null,
-    materialIndex: Number.isInteger(materialIndex) ? materialIndex : 0,
+    materialIndex: normalizeBlockMaterial(raw.materialIndex),
+    shape: normalizeBlockShape(raw.shape),
+    rotation: normalizeBlockRotation(raw.rotation),
     createdAt: String(raw.createdAt || new Date().toISOString())
   };
 }
 
 function loadBuildEntriesFromStorage() {
   if (!buildPersistenceEnabled) return [];
-  try {
-    const raw = localStorage.getItem(BUILD_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    const normalized = parsed.map(normalizeBuildEntry).filter(Boolean);
+  const parseRows = (raw) => {
+    if (!raw) return null;
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : null;
+    } catch {
+      return null;
+    }
+  };
+  const normalizeRows = (rows) => {
+    const normalized = rows.map(normalizeBuildEntry).filter(Boolean);
     if (normalized.length <= BUILD_MAX_TOTAL) return normalized;
     return normalized.slice(normalized.length - BUILD_MAX_TOTAL);
+  };
+
+  try {
+    const primary = parseRows(localStorage.getItem(BUILD_STORAGE_KEY));
+    if (Array.isArray(primary)) return normalizeRows(primary);
+
+    const backup = parseRows(localStorage.getItem(BUILD_STORAGE_BACKUP_KEY));
+    if (Array.isArray(backup)) {
+      try {
+        localStorage.setItem(BUILD_STORAGE_KEY, JSON.stringify(backup));
+      } catch {
+        // Best effort only.
+      }
+      return normalizeRows(backup);
+    }
   } catch (err) {
     console.warn('[blocks] Failed to read storage:', err);
-    return [];
   }
+  return [];
 }
 
 function saveBuildEntriesToStorage() {
   if (!buildPersistenceEnabled) return false;
+  const payload = JSON.stringify(buildEntries);
   try {
-    localStorage.setItem(BUILD_STORAGE_KEY, JSON.stringify(buildEntries));
+    localStorage.setItem(BUILD_STORAGE_KEY, payload);
+    localStorage.setItem(BUILD_STORAGE_BACKUP_KEY, payload);
     return true;
   } catch (err) {
     buildPersistenceEnabled = false;
@@ -323,71 +401,23 @@ function removeBuildColumnEntry(gx, gy, gz) {
   if (ys.size === 0) buildColumns.delete(key);
 }
 
-function getBuildRaycaster() {
-  if (!buildRaycaster && typeof THREE !== 'undefined') {
-    buildRaycaster = new THREE.Raycaster();
-    buildRaycaster.far = 1200;
-  }
-  return buildRaycaster;
-}
-
-function getEventClientPoint(event) {
-  if (!event) return null;
-  if (Number.isFinite(event.clientX) && Number.isFinite(event.clientY)) {
-    return { x: event.clientX, y: event.clientY };
-  }
-  const changed = event.changedTouches;
-  if (changed && changed.length > 0) {
-    const touch = changed[0];
-    if (touch && Number.isFinite(touch.clientX) && Number.isFinite(touch.clientY)) {
-      return { x: touch.clientX, y: touch.clientY };
-    }
-  }
-  const touches = event.touches;
-  if (touches && touches.length > 0) {
-    const touch = touches[0];
-    if (touch && Number.isFinite(touch.clientX) && Number.isFinite(touch.clientY)) {
-      return { x: touch.clientX, y: touch.clientY };
-    }
-  }
-  return null;
-}
-
-function isTouchLikeBuildEvent(event) {
-  if (!event) return false;
-  if (event.source === 'touch') return true;
-  if (event.pointerType && event.pointerType !== 'mouse') return true;
-  const type = typeof event.type === 'string' ? event.type : '';
-  return type.startsWith('touch');
-}
-
-function shouldIgnoreClickAfterTouch(point, event) {
-  if (!lastTouchLikePlacement || !point) return false;
-  if (isTouchLikeBuildEvent(event)) return false;
-  const type = typeof event.type === 'string' ? event.type : '';
-  if (type !== 'click' && type !== 'mouseup') return false;
-  const dt = Date.now() - lastTouchLikePlacement.ts;
-  if (dt < 0 || dt > 700) return false;
-  const dx = Math.abs(point.x - lastTouchLikePlacement.x);
-  const dy = Math.abs(point.y - lastTouchLikePlacement.y);
-  return dx <= 6 && dy <= 6;
-}
-
 function ensureBuildMaterials() {
   if (buildMaterials.length > 0 || typeof THREE === 'undefined') return;
-  BUILD_BLOCK_COLORS.forEach((color) => {
+  BLOCK_MATERIALS.forEach((material) => {
     buildMaterials.push(new THREE.MeshStandardMaterial({
-      color,
-      roughness: 0.92,
-      metalness: 0.04
+      color: material.color,
+      roughness: 0.82,
+      metalness: 0.02
     }));
   });
 }
 
-function ensureBuildGeometry() {
-  if (!buildGeometry && typeof THREE !== 'undefined') {
-    buildGeometry = new THREE.BoxGeometry(BUILD_BLOCK_SIZE, BUILD_BLOCK_SIZE, BUILD_BLOCK_SIZE);
-  }
+function getBuildGeometry(shape) {
+  const normalizedShape = normalizeBlockShape(shape);
+  if (buildGeometries.has(normalizedShape)) return buildGeometries.get(normalizedShape);
+  const created = createBlockShapeGeometry(globalThis.THREE, normalizedShape);
+  if (created) buildGeometries.set(normalizedShape, created);
+  return created;
 }
 
 function ensureBuildGroup() {
@@ -435,33 +465,9 @@ function getSurfaceYAt(x, z) {
   return 0;
 }
 
-function isBuildClickBlocked(target) {
-  if (!target || !target.closest) return false;
-  return !!target.closest(
-    '#titleScreen, #largeMap, #propertyPanel, #propertyModal, #historicPanel, #memoryComposer, ' +
-    '#memoryInfoPanel, #floatMenuContainer, #controlsTab, #pauseScreen, #resultScreen, #caughtScreen, ' +
-    '#legendPanel, #mapInfoPanel, #mainMenuBtn, #realEstateBtn, #historicBtn, #memoryFlowerFloatBtn, #starInfo, #solarSystemInfoPanel'
-  );
-}
-
-function snapFaceNormalToAxis(faceNormal, object) {
-  if (!faceNormal || !object || typeof THREE === 'undefined') return { x: 0, y: 1, z: 0 };
-  const worldNormal = faceNormal.clone();
-  buildNormalMatrix.getNormalMatrix(object.matrixWorld);
-  worldNormal.applyMatrix3(buildNormalMatrix).normalize();
-
-  const ax = Math.abs(worldNormal.x);
-  const ay = Math.abs(worldNormal.y);
-  const az = Math.abs(worldNormal.z);
-
-  if (ax >= ay && ax >= az) return { x: worldNormal.x >= 0 ? 1 : -1, y: 0, z: 0 };
-  if (ay >= ax && ay >= az) return { x: 0, y: worldNormal.y >= 0 ? 1 : -1, z: 0 };
-  return { x: 0, y: 0, z: worldNormal.z >= 0 ? 1 : -1 };
-}
-
-function persistPlacedBuildBlock(gx, gy, gz, materialIndex) {
+function persistPlacedBuildBlock(gx, gy, gz, materialIndex, shape, rotation) {
   if (isSharedBuildSyncActive()) {
-    const entry = normalizeSharedBlockEntry({ gx, gy, gz, materialIndex });
+    const entry = normalizeSharedBlockEntry({ gx, gy, gz, materialIndex, shape, rotation });
     if (!entry) return false;
     sharedBuildEntryMap.set(sharedEntryKey(entry), entry);
     sharedBuildEntries = Array.from(sharedBuildEntryMap.values());
@@ -510,7 +516,9 @@ function persistPlacedBuildBlock(gx, gy, gz, materialIndex) {
     gx,
     gy,
     gz,
-    materialIndex: Number.isInteger(materialIndex) ? materialIndex : 0,
+    materialIndex: normalizeBlockMaterial(materialIndex),
+    shape: normalizeBlockShape(shape),
+    rotation: normalizeBlockRotation(rotation),
     createdAt: idx >= 0 ? buildEntries[idx].createdAt : new Date().toISOString()
   });
   if (!nextEntry) return false;
@@ -544,7 +552,12 @@ function persistRemovedBuildBlock(gx, gy, gz) {
         if (previous) {
           sharedBuildEntryMap.set(key, previous);
           sharedBuildEntries = Array.from(sharedBuildEntryMap.values());
-          placeBuildBlock(previous.gx, previous.gy, previous.gz, previous.materialIndex, { persist: false, enforceLimit: false });
+          placeBuildBlock(previous.gx, previous.gy, previous.gz, previous.materialIndex, {
+            persist: false,
+            enforceLimit: false,
+            shape: previous.shape,
+            rotation: previous.rotation
+          });
         }
         showBuildTransientMessage('Could not remove block from this room.');
       });
@@ -609,7 +622,10 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
   const group = ensureBuildGroup();
   if (!group) return false;
   ensureBuildMaterials();
-  ensureBuildGeometry();
+  const shape = normalizeBlockShape(options.shape);
+  const rotation = normalizeBlockRotation(options.rotation);
+  const shapeGeometry = getBuildGeometry(shape);
+  if (!shapeGeometry?.geometry) return false;
 
   const key = blockKey(gx, gy, gz);
   if (buildBlocks.has(key)) return false;
@@ -625,18 +641,19 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
     }
   }
 
-  const idx = Number.isInteger(materialIndex) ?
-  Math.max(0, Math.min(buildMaterials.length - 1, materialIndex)) :
-  Math.floor(Math.random() * buildMaterials.length);
+  const idx = normalizeBlockMaterial(materialIndex);
 
-  const mesh = new THREE.Mesh(buildGeometry, buildMaterials[idx]);
-  mesh.position.set(toWorldCoord(gx), toWorldCoord(gy), toWorldCoord(gz));
+  const mesh = new THREE.Mesh(shapeGeometry.geometry, buildMaterials[idx]);
+  mesh.position.set(toWorldCoord(gx), toWorldCoord(gy) + shapeGeometry.yOffset, toWorldCoord(gz));
+  mesh.rotation.y = rotation * Math.PI * 0.5;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.userData = {
     isBuildBlock: true,
     buildBlock: true,
     materialIndex: idx,
+    shape,
+    rotation,
     gx, gy, gz,
     blockKey: key
   };
@@ -646,7 +663,7 @@ function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
   addBuildColumnEntry(gx, gy, gz);
 
   if (options.persist !== false) {
-    if (!persistPlacedBuildBlock(gx, gy, gz, idx)) {
+    if (!persistPlacedBuildBlock(gx, gy, gz, idx, shape, rotation)) {
       if (mesh.parent) mesh.parent.remove(mesh);
       buildBlocks.delete(key);
       removeBuildColumnEntry(gx, gy, gz);
@@ -696,82 +713,32 @@ function clearAllBuildBlocks(options = {}) {
   clearRenderedBuildBlocks();
 }
 
-function forEachBlockAtWorldXZ(x, z, cb) {
-  if (!Number.isFinite(x) || !Number.isFinite(z) || typeof cb !== 'function') return;
-  const baseGX = toGridCoord(x);
-  const baseGZ = toGridCoord(z);
-  const epsilon = 0.000001;
-
-  for (let dx = -1; dx <= 1; dx++) {
-    for (let dz = -1; dz <= 1; dz++) {
-      const gx = baseGX + dx;
-      const gz = baseGZ + dz;
-      const cx = toWorldCoord(gx);
-      const cz = toWorldCoord(gz);
-      if (Math.abs(x - cx) > BUILD_HALF + epsilon || Math.abs(z - cz) > BUILD_HALF + epsilon) continue;
-
-      const ys = buildColumns.get(columnKey(gx, gz));
-      if (!ys || ys.size === 0) continue;
-      ys.forEach((gy) => cb(gx, gy, gz));
-    }
-  }
-}
-
-function getBuildTopSurfaceAtWorldXZ(x, z, maxTopY = Infinity) {
-  let best = -Infinity;
-  forEachBlockAtWorldXZ(x, z, (_, gy) => {
-    const topY = toWorldCoord(gy) + BUILD_HALF;
-    if (topY <= maxTopY + 0.0001 && topY > best) best = topY;
-  });
-  return Number.isFinite(best) ? best : null;
-}
-
-function getBuildCollisionAtWorldXZ(x, z, feetY, stepHeight = 0.65, bodyHeight = 0) {
-  if (!Number.isFinite(feetY)) {
-    return { blocked: false, stepTopY: null };
-  }
-
-  const actorTopY = feetY + Math.max(0, Number.isFinite(bodyHeight) ? bodyHeight : 0);
-  let blocked = false;
-  let stepTopY = -Infinity;
-
-  forEachBlockAtWorldXZ(x, z, (_, gy) => {
-    const bottomY = toWorldCoord(gy) - BUILD_HALF;
-    const topY = toWorldCoord(gy) + BUILD_HALF;
-
-    // Block is fully above the actor volume.
-    if (actorTopY <= bottomY + 0.02) return;
-    // Actor feet already above this block.
-    if (feetY >= topY - 0.02) return;
-
-    const requiredStep = topY - feetY;
-    if (requiredStep <= stepHeight + 0.0001) {
-      if (topY > stepTopY) stepTopY = topY;
-      return;
-    }
-    blocked = true;
-  });
-
-  return {
-    blocked,
-    stepTopY: Number.isFinite(stepTopY) ? stepTopY : null
-  };
-}
-
 function updateBuildModeUI() {
-  const toggleBtn = document.getElementById('fBlockBuild');
-  if (toggleBtn) {
-    toggleBtn.classList.toggle('on', buildModeEnabled);
-    toggleBtn.textContent = buildModeEnabled ? '🧱 Build Mode: ON' : '🧱 Build Mode';
-  }
+  syncBlockBuilderUi();
+}
 
-  const indicator = document.getElementById('buildModeIndicator');
-  if (indicator) {
-    if (buildModeEnabled) {
-      indicator.innerHTML = getBuildIndicatorDefaultHtml();
-    }
-    indicator.classList.toggle('show', buildModeEnabled);
-  }
+function setBlockBuildTool(tool) {
+  buildTool = BUILD_TOOLS.has(tool) ? tool : 'place';
+  updateBuildModeUI();
+  return buildTool;
+}
+
+function setBlockBuildMaterial(materialIndex) {
+  buildMaterialIndex = normalizeBlockMaterial(materialIndex);
+  syncBlockBuilderUi();
+  return buildMaterialIndex;
+}
+
+function setBlockBuildShape(shape) {
+  buildShape = normalizeBlockShape(shape);
+  syncBlockBuilderUi();
+  return buildShape;
+}
+
+function rotateBlockBuildShape() {
+  buildRotation = normalizeBlockRotation(buildRotation + 1);
+  syncBlockBuilderUi();
+  return buildRotation;
 }
 
 function setBuildModeEnabled(nextState) {
@@ -781,6 +748,7 @@ function setBuildModeEnabled(nextState) {
     ensureBuildGroup();
     if (typeof appCtx.clearStarSelection === 'function') appCtx.clearStarSelection();
   }
+  if (!wasEnabled && buildModeEnabled) showBuildTransientMessage('');
   updateBuildModeUI();
   if (!wasEnabled && buildModeEnabled) {
     emitTutorialEvent('build_mode_entered', { source: 'build_mode_toggle' });
@@ -797,137 +765,28 @@ function toggleBlockBuildMode(forceState) {
   return setBuildModeEnabled(next);
 }
 
-function raycastBuildAction(event) {
-  const raycaster = getBuildRaycaster();
-  if (!raycaster || !appCtx.camera || !appCtx.renderer || !buildMouse) return null;
-
-  const clientPoint = getEventClientPoint(event);
-  if (!clientPoint) return null;
-
-  const canvasRect = appCtx.renderer.domElement.getBoundingClientRect();
-  buildMouse.x = (clientPoint.x - canvasRect.left) / canvasRect.width * 2 - 1;
-  buildMouse.y = -((clientPoint.y - canvasRect.top) / canvasRect.height) * 2 + 1;
-  raycaster.setFromCamera(buildMouse, appCtx.camera);
-
-  // Existing blocks take precedence for stacking/removal.
-  if (buildGroup && buildGroup.children.length > 0) {
-    const hits = raycaster.intersectObjects(buildGroup.children, false);
-    if (hits.length > 0) {
-      const hit = hits[0];
-      const data = hit.object && hit.object.userData ? hit.object.userData : null;
-      if (data && Number.isFinite(data.gx) && Number.isFinite(data.gy) && Number.isFinite(data.gz)) {
-        if (event.shiftKey) {
-          return { kind: 'remove', gx: data.gx, gy: data.gy, gz: data.gz };
-        }
-        const n = snapFaceNormalToAxis(hit.face && hit.face.normal, hit.object);
-        return {
-          kind: 'place',
-          gx: data.gx + n.x,
-          gy: data.gy + n.y,
-          gz: data.gz + n.z
-        };
-      }
-    }
-  }
-
-  if (event.shiftKey) return null;
-
-  // Place on world surface if not targeting an existing block.
-  let point = null;
-  const worldTargets = [];
-  if (appCtx.activeInterior && Array.isArray(appCtx.activeInterior.placementTargets)) {
-    appCtx.activeInterior.placementTargets.forEach((mesh) => {
-      if (mesh && mesh.visible !== false) worldTargets.push(mesh);
-    });
-  }
-  if (Array.isArray(appCtx.roadMeshes)) {
-    appCtx.roadMeshes.forEach((mesh) => {
-      if (mesh && mesh.visible) worldTargets.push(mesh);
-    });
-  }
-  if (Array.isArray(appCtx.buildingMeshes)) {
-    appCtx.buildingMeshes.forEach((mesh) => {
-      if (mesh && mesh.visible) worldTargets.push(mesh);
-    });
-  }
-  if (Array.isArray(appCtx.landuseMeshes)) {
-    appCtx.landuseMeshes.forEach((mesh) => {
-      if (mesh && mesh.visible) worldTargets.push(mesh);
-    });
-  }
-  if (appCtx.terrainGroup && Array.isArray(appCtx.terrainGroup.children)) {
-    appCtx.terrainGroup.children.forEach((mesh) => {
-      if (mesh && mesh.visible) worldTargets.push(mesh);
-    });
-  }
-  if (appCtx.onMoon && appCtx.moonSurface && appCtx.moonSurface.visible !== false) {
-    worldTargets.push(appCtx.moonSurface);
-  }
-
-  if (worldTargets.length > 0) {
-    const worldHits = raycaster.intersectObjects(worldTargets, true);
-    if (worldHits.length > 0) {
-      point = worldHits[0].point.clone();
-    }
-  }
-
-  if (!point) {
-    if (!buildPlane || !buildTempPoint || !raycaster.ray.intersectPlane(buildPlane, buildTempPoint)) {
-      return null;
-    }
-    point = buildTempPoint.clone();
-    point.y = getSurfaceYAt(point.x, point.z);
-  }
-
-  const gy = toGridCoord(point.y + BUILD_HALF);
-  return {
-    kind: 'place',
-    gx: toGridCoord(point.x),
-    gy,
-    gz: toGridCoord(point.z)
-  };
-}
-
-function handleBlockBuilderClick(event) {
-  if (!buildModeEnabled || !appCtx.gameStarted || appCtx.paused || appCtx.showLargeMap) return false;
-  if (typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return false;
-  if (isBuildClickBlocked(event.target)) return false;
-  const point = getEventClientPoint(event);
-  if (!point) return false;
-  if (shouldIgnoreClickAfterTouch(point, event)) return false;
-
-  const action = raycastBuildAction(event);
+function undoLastBuildAction() {
+  const action = buildActionHistory.pop();
   if (!action) return false;
-
-  const worldX = toWorldCoord(action.gx);
-  const worldY = toWorldCoord(action.gy);
-  const worldZ = toWorldCoord(action.gz);
-  const ref = getBuildReferencePosition();
-  const dist = Math.hypot(worldX - ref.x, worldY - ref.y, worldZ - ref.z);
-  if (dist > BUILD_MAX_DISTANCE) return true;
-
-  if (action.kind === 'remove') {
-    removeBuildBlock(action.gx, action.gy, action.gz);
-    if (isTouchLikeBuildEvent(event)) {
-      lastTouchLikePlacement = { x: point.x, y: point.y, ts: Date.now() };
-    }
-    return true;
-  }
-  if (action.kind === 'place') {
-    placeBuildBlock(action.gx, action.gy, action.gz);
-    if (isTouchLikeBuildEvent(event)) {
-      lastTouchLikePlacement = { x: point.x, y: point.y, ts: Date.now() };
-    }
-    return true;
-  }
-  return false;
+  const changed = action.kind === 'place'
+    ? removeBuildBlock(action.gx, action.gy, action.gz)
+    : placeBuildBlock(action.gx, action.gy, action.gz, action.materialIndex, {
+      shape: action.shape,
+      rotation: action.rotation
+    });
+  if (!changed) buildActionHistory.push(action);
+  syncBlockBuilderUi();
+  return changed;
 }
 
 function clearBlockBuilderForWorldReload() {
+  buildActionHistory = [];
   clearRenderedBuildBlocks();
+  syncBlockBuilderUi();
 }
 
 function refreshBlockBuilderForCurrentLocation() {
+  buildActionHistory = [];
   ensureBuildGroup();
   clearRenderedBuildBlocks();
 
@@ -935,8 +794,14 @@ function refreshBlockBuilderForCurrentLocation() {
     sharedBuildEntries.forEach((entry) => {
       const normalized = normalizeSharedBlockEntry(entry);
       if (!normalized) return;
-      placeBuildBlock(normalized.gx, normalized.gy, normalized.gz, normalized.materialIndex, { persist: false, enforceLimit: false });
+      placeBuildBlock(normalized.gx, normalized.gy, normalized.gz, normalized.materialIndex, {
+        persist: false,
+        enforceLimit: false,
+        shape: normalized.shape,
+        rotation: normalized.rotation
+      });
     });
+    syncBlockBuilderUi();
     return;
   }
 
@@ -947,14 +812,41 @@ function refreshBlockBuilderForCurrentLocation() {
     if (!isFiniteNumber(worldPos.x) || !isFiniteNumber(worldPos.z)) return;
     const gx = toGridCoord(worldPos.x);
     const gz = toGridCoord(worldPos.z);
-    placeBuildBlock(gx, Math.round(entry.gy), gz, entry.materialIndex, { persist: false, enforceLimit: false });
+    placeBuildBlock(gx, toVerticalGridCoord(entry.gy), gz, entry.materialIndex, {
+      persist: false,
+      enforceLimit: false,
+      shape: entry.shape,
+      rotation: entry.rotation
+    });
   });
+  syncBlockBuilderUi();
 }
+
+const { handleBlockBuilderClick } = createBlockBuilderInteraction({
+  appCtx,
+  blockHalf: BUILD_HALF,
+  getBuildGroup: () => buildGroup,
+  getBuildReferencePosition,
+  getBuildShape: () => buildShape,
+  getBuildTool: () => buildTool,
+  getMaterialIndex: () => buildMaterialIndex,
+  getRotation: () => buildRotation,
+  getSurfaceYAt,
+  isEnabled: () => buildModeEnabled,
+  maxDistance: BUILD_MAX_DISTANCE,
+  onAction: rememberBuildAction,
+  placeBuildBlock,
+  removeBuildBlock,
+  toGridCoord,
+  toVerticalGridCoord,
+  toWorldCoord
+});
 
 {
   const storageState = detectBuildStorage();
   buildPersistenceEnabled = storageState.enabled;
   buildPersistenceDetail = storageState.detail;
+  clearLegacyBuildStorage();
 }
 buildEntries = loadBuildEntriesFromStorage();
 
@@ -964,14 +856,22 @@ Object.assign(appCtx, {
   configureSharedBuildSync,
   getBuildCollisionAtWorldXZ,
   getBuildLimits,
+  getBlockBuilderSnapshot,
   getBuildPersistenceStatus,
   getSharedBuildSyncStatus,
   getBuildTopSurfaceAtWorldXZ,
+  getBuildVehicleContact,
+  getBuildVehicleSurfaceAtWorldXZ,
   handleBlockBuilderClick,
   placeBuildBlock,
   refreshBlockBuilderForCurrentLocation,
   setSharedBuildEntries,
   setBuildModeEnabled,
+  setBlockBuildMaterial,
+  setBlockBuildShape,
+  setBlockBuildTool,
+  rotateBlockBuildShape,
+  undoLastBuildAction,
   toggleBlockBuildMode
 });
 
@@ -981,12 +881,20 @@ export {
   configureSharedBuildSync,
   getBuildCollisionAtWorldXZ,
   getBuildLimits,
+  getBlockBuilderSnapshot,
   getBuildPersistenceStatus,
   getSharedBuildSyncStatus,
   getBuildTopSurfaceAtWorldXZ,
+  getBuildVehicleContact,
+  getBuildVehicleSurfaceAtWorldXZ,
   handleBlockBuilderClick,
   placeBuildBlock,
   refreshBlockBuilderForCurrentLocation,
   setSharedBuildEntries,
   setBuildModeEnabled,
+  setBlockBuildMaterial,
+  setBlockBuildShape,
+  setBlockBuildTool,
+  rotateBlockBuildShape,
+  undoLastBuildAction,
   toggleBlockBuildMode };

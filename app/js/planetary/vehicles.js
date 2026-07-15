@@ -1,0 +1,224 @@
+import { ctx as appCtx } from '../shared-context.js?v=55';
+
+let activeVehicle = null;
+let earthChildVisibility = null;
+let marsModelPromise = null;
+
+function material(color, metalness = 0.35, roughness = 0.65) {
+  return new THREE.MeshStandardMaterial({ color, metalness, roughness });
+}
+
+function createWheel(radius, width, color = 0x34383b) {
+  const wheel = new THREE.Mesh(
+    new THREE.CylinderGeometry(radius, radius, width, 16),
+    material(color, 0.5, 0.8)
+  );
+  wheel.rotation.z = Math.PI / 2;
+  wheel.castShadow = true;
+  return wheel;
+}
+
+function createMarsRoverFallback() {
+  const rover = new THREE.Group();
+  rover.name = 'Mars Exploration Rover';
+
+  const deck = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.45, 2.7), material(0xb9a26f, 0.45, 0.5));
+  deck.position.y = 1.45;
+  rover.add(deck);
+
+  const solar = new THREE.Mesh(new THREE.BoxGeometry(3.35, 0.08, 2.45), material(0x1f405d, 0.65, 0.3));
+  solar.position.y = 1.72;
+  rover.add(solar);
+
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 1.6, 10), material(0xc8c2ae, 0.7, 0.35));
+  mast.position.set(0, 2.65, -0.25);
+  rover.add(mast);
+  const cameraBar = new THREE.Mesh(new THREE.BoxGeometry(0.85, 0.28, 0.25), material(0xd9d4c4, 0.55, 0.4));
+  cameraBar.position.set(0, 3.45, -0.25);
+  rover.add(cameraBar);
+
+  [-1.55, 0, 1.55].forEach((z) => {
+    [-1, 1].forEach((side) => {
+      const suspension = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.12, 1.15), material(0x6f6555, 0.75, 0.45));
+      suspension.position.set(side * 1.65, 0.9, z * 0.72);
+      suspension.rotation.y = side * 0.18;
+      rover.add(suspension);
+      const wheel = createWheel(0.58, 0.34);
+      wheel.position.set(side * 2.03, 0.62, z * 0.72);
+      rover.add(wheel);
+    });
+  });
+  rover.scale.setScalar(0.82);
+  rover.rotation.y = Math.PI;
+  rover.userData.vehicleKind = 'mars';
+  return rover;
+}
+
+function createLunarRovingVehicle() {
+  const lrv = new THREE.Group();
+  lrv.name = 'Apollo Lunar Roving Vehicle';
+
+  const frameMat = material(0xb9bcc1, 0.75, 0.35);
+  const frame = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.18, 2.2), frameMat);
+  frame.position.y = 0.9;
+  lrv.add(frame);
+
+  const seatMat = material(0x7b6f5b, 0.15, 0.9);
+  [-0.58, 0.58].forEach((x) => {
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(0.92, 1.0, 0.24), seatMat);
+    seat.position.set(x, 1.48, 0.24);
+    seat.rotation.x = -0.16;
+    lrv.add(seat);
+  });
+
+  const consoleMesh = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.72, 0.42), material(0x222831, 0.35, 0.55));
+  consoleMesh.position.set(0, 1.42, -0.78);
+  lrv.add(consoleMesh);
+
+  const goldFoil = material(0xc99a35, 0.72, 0.42);
+  [-0.82, 0.82].forEach((x) => {
+    const equipment = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.58, 0.62), goldFoil);
+    equipment.position.set(x, 1.16, 0.82);
+    lrv.add(equipment);
+  });
+
+  const mast = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 1.35, 8), frameMat);
+  mast.position.set(0.72, 2.05, -0.65);
+  lrv.add(mast);
+  const dish = new THREE.Mesh(
+    new THREE.ConeGeometry(0.5, 0.18, 20, 1, true),
+    material(0xd8dadd, 0.68, 0.36)
+  );
+  dish.position.set(0.72, 2.72, -0.65);
+  dish.rotation.x = -0.35;
+  lrv.add(dish);
+
+  const control = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.045, 0.52, 8), frameMat);
+  control.position.set(0, 1.92, -0.48);
+  control.rotation.x = 0.28;
+  lrv.add(control);
+
+  [-1.65, 1.65].forEach((x) => {
+    [-0.92, 0.92].forEach((z) => {
+      const wheel = createLunarWheel();
+      wheel.position.set(x, 0.58, z);
+      lrv.add(wheel);
+    });
+  });
+  lrv.rotation.y = Math.PI;
+  lrv.userData.vehicleKind = 'moon';
+  return lrv;
+}
+
+function createLunarWheel() {
+  const wheel = new THREE.Group();
+  const tire = new THREE.Mesh(
+    new THREE.TorusGeometry(0.59, 0.075, 8, 24),
+    material(0x92979a, 0.7, 0.55)
+  );
+  tire.rotation.y = Math.PI / 2;
+  wheel.add(tire);
+  const hub = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.13, 0.13, 0.32, 12),
+    material(0x676d70, 0.78, 0.4)
+  );
+  hub.rotation.z = Math.PI / 2;
+  wheel.add(hub);
+  for (let i = 0; i < 8; i++) {
+    const spoke = new THREE.Mesh(
+      new THREE.BoxGeometry(0.025, 0.5, 0.025),
+      material(0xaeb2b4, 0.72, 0.5)
+    );
+    spoke.rotation.x = i / 8 * Math.PI;
+    wheel.add(spoke);
+  }
+  wheel.castShadow = true;
+  return wheel;
+}
+
+function rememberEarthVehicle() {
+  if (!appCtx.carMesh || earthChildVisibility) return;
+  earthChildVisibility = new Map(appCtx.carMesh.children.map((child) => [child, child.visible]));
+}
+
+function hideEarthVehicleChildren() {
+  rememberEarthVehicle();
+  earthChildVisibility?.forEach((visible, child) => {
+    if (child !== activeVehicle) child.visible = false;
+  });
+}
+
+function fitLoadedRover(root) {
+  const box = new THREE.Box3().setFromObject(root);
+  const size = box.getSize(new THREE.Vector3());
+  const maxDimension = Math.max(size.x, size.y, size.z, 1);
+  root.scale.setScalar(5.4 / maxDimension);
+  root.updateMatrixWorld(true);
+  const fitted = new THREE.Box3().setFromObject(root);
+  root.position.y -= fitted.min.y;
+  root.rotation.y = Math.PI;
+  root.traverse((object) => {
+    if (object.isMesh) {
+      object.castShadow = true;
+      object.receiveShadow = true;
+    }
+  });
+  root.userData.vehicleKind = 'mars';
+  return root;
+}
+
+function alignVehicleToSurface(root) {
+  root.updateMatrixWorld(true);
+  const bounds = new THREE.Box3().setFromObject(root);
+  if (Number.isFinite(bounds.min.y)) root.position.y += -1.2 - bounds.min.y;
+  return root;
+}
+
+function loadMarsRoverModel() {
+  if (marsModelPromise) return marsModelPromise;
+  marsModelPromise = new Promise((resolve) => {
+    if (!THREE.GLTFLoader) return resolve(null);
+    new THREE.GLTFLoader().load(
+      '/app/assets/models/mars-exploration-rover.glb',
+      (gltf) => resolve(fitLoadedRover(gltf.scene)),
+      undefined,
+      (error) => {
+        console.warn('[planetary] NASA Mars rover model failed to load; using local fallback.', error);
+        resolve(null);
+      }
+    );
+  });
+  return marsModelPromise;
+}
+
+async function setPlanetaryVehicle(kind) {
+  if (!appCtx.carMesh) return null;
+  if (activeVehicle?.parent) activeVehicle.parent.remove(activeVehicle);
+  activeVehicle = null;
+
+  if (kind !== 'moon' && kind !== 'mars') {
+    earthChildVisibility?.forEach((visible, child) => { child.visible = visible; });
+    earthChildVisibility = null;
+    return null;
+  }
+
+  hideEarthVehicleChildren();
+  activeVehicle = alignVehicleToSurface(
+    kind === 'moon' ? createLunarRovingVehicle() : createMarsRoverFallback()
+  );
+  appCtx.carMesh.add(activeVehicle);
+
+  if (kind === 'mars') {
+    const loaded = await loadMarsRoverModel();
+    if (loaded && appCtx.onMars && activeVehicle?.userData?.vehicleKind === 'mars') {
+      appCtx.carMesh.remove(activeVehicle);
+      activeVehicle = alignVehicleToSurface(loaded);
+      appCtx.carMesh.add(activeVehicle);
+    }
+  }
+  return activeVehicle;
+}
+
+Object.assign(appCtx, { setPlanetaryVehicle });
+
+export { setPlanetaryVehicle };

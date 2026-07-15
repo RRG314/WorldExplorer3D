@@ -22,6 +22,7 @@ const BLOCK_COORD_MIN = -50000;
 const BLOCK_COORD_MAX = 50000;
 const BLOCK_MATERIAL_MIN = 0;
 const BLOCK_MATERIAL_MAX = 64;
+const BLOCK_SHAPES = new Set(['cube', 'slab', 'ramp', 'column']);
 
 function getServices() {
   const { db } = initFirebase();
@@ -54,13 +55,25 @@ function blockDocIdFromCoords(gx, gy, gz) {
   return `${toInt(gx, 0)}_${toInt(gy, 0)}_${toInt(gz, 0)}`;
 }
 
+function normalizeBlockShape(value) {
+  const shape = String(value || '').toLowerCase();
+  return BLOCK_SHAPES.has(shape) ? shape : 'cube';
+}
+
+function normalizeBlockRotation(value) {
+  const rotation = toInt(value, 0);
+  return ((rotation % 4) + 4) % 4;
+}
+
 function normalizeSharedBlockInput(raw = {}) {
   const gx = clampInt(raw.gx, BLOCK_COORD_MIN, BLOCK_COORD_MAX, 0);
   const gy = clampInt(raw.gy, BLOCK_COORD_MIN, BLOCK_COORD_MAX, 0);
   const gz = clampInt(raw.gz, BLOCK_COORD_MIN, BLOCK_COORD_MAX, 0);
   const materialIndex = clampInt(raw.materialIndex, BLOCK_MATERIAL_MIN, BLOCK_MATERIAL_MAX, 0);
+  const shape = normalizeBlockShape(raw.shape);
+  const rotation = normalizeBlockRotation(raw.rotation);
   const id = String(raw.id || blockDocIdFromCoords(gx, gy, gz));
-  return { id, gx, gy, gz, materialIndex };
+  return { id, gx, gy, gz, materialIndex, shape, rotation };
 }
 
 function toSharedBlockObject(blockSnap) {
@@ -77,6 +90,8 @@ function toSharedBlockObject(blockSnap) {
     gy: Math.round(gy),
     gz: Math.round(gz),
     materialIndex: Number.isFinite(materialIndex) ? Math.max(BLOCK_MATERIAL_MIN, Math.min(BLOCK_MATERIAL_MAX, Math.round(materialIndex))) : 0,
+    shape: normalizeBlockShape(data.shape),
+    rotation: normalizeBlockRotation(data.rotation),
     createdBy: String(data.createdBy || ''),
     createdAt: data.createdAt || null,
     updatedAt: data.updatedAt || null
@@ -97,6 +112,8 @@ async function upsertSharedBlock(roomId, block = {}) {
     gy: normalized.gy,
     gz: normalized.gz,
     materialIndex: normalized.materialIndex,
+    shape: normalized.shape,
+    rotation: normalized.rotation,
     createdBy: user.uid,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp()

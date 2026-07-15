@@ -49,4 +49,3 @@ Current documentation set for World Explorer 3D.
 
 | File | Scope |
 | --- | --- |
-| `progress.md` | Rolling implementation/testing notes |

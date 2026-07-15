@@ -59,6 +59,9 @@ const LANDUSE_STYLES = {
   retail: { color: 0xc9c9c9, name: 'Retail' },
   forest: { color: 0x2d5016, name: 'Forest' },
   farmland: { color: 0x8b7355, name: 'Farmland' },
+  farmyard: { color: 0x8a765f, name: 'Farmyard' },
+  plant_nursery: { color: 0x6f9d55, name: 'Plant Nursery' },
+  greenhouse_horticulture: { color: 0x91a990, name: 'Greenhouses' },
   grass: { color: 0x7cb342, name: 'Grass' },
   meadow: { color: 0x8bc34a, name: 'Meadow' },
   scrub: { color: 0x8d8d4f, name: 'Scrub' },
@@ -68,7 +71,7 @@ const LANDUSE_STYLES = {
   dune: { color: 0xcfa56d, name: 'Dunes' },
   barren: { color: 0x9d8d74, name: 'Barren Ground' },
   glacier: { color: 0xdfe9f4, name: 'Glacier' },
-  water: { color: 0x4a90e2, name: 'Water' },
+  water: { color: 0x2d7cad, name: 'Water' },
   wood: { color: 0x1b4d0d, name: 'Woods' },
   park: { color: 0x66bb6a, name: 'Park' },
   garden: { color: 0x81c784, name: 'Garden' },
@@ -80,7 +83,9 @@ const LANDUSE_STYLES = {
   landfill: { color: 0x757575, name: 'Landfill' },
   construction: { color: 0xbdbdbd, name: 'Construction' },
   brownfield: { color: 0xa1887f, name: 'Brownfield' },
-  greenfield: { color: 0x9ccc65, name: 'Greenfield' }
+  greenfield: { color: 0x9ccc65, name: 'Greenfield' },
+  paved: { color: 0xaaa9a4, name: 'Mapped Paved Area' },
+  parking: { color: 0x969b9e, name: 'Mapped Parking' }
 };
 
 // POI types with icons and colors for meaning in the world

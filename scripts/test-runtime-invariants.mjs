@@ -1,116 +1,15 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import http from 'node:http';
-import net from 'node:net';
 import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
+import { exercisePlanetaryRoundTrip } from './runtime-planetary-check.mjs';
+import { mkdirp, startServer } from './runtime-test-server.mjs';
 
 const rootDir = process.cwd();
 const host = '127.0.0.1';
 const candidatePorts = [4173, 4174, 4175, 4176, 4177];
 const outputDir = path.join(rootDir, 'output', 'playwright', 'runtime-invariants');
 
-async function mkdirp(dir) {
-  await fs.mkdir(dir, { recursive: true });
-}
-
-async function exists(filePath) {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function serveStaticRoot(port) {
-  const root = rootDir;
-  const sockets = new Set();
-  const mime = new Map([
-    ['.html', 'text/html; charset=utf-8'],
-    ['.js', 'text/javascript; charset=utf-8'],
-    ['.css', 'text/css; charset=utf-8'],
-    ['.json', 'application/json; charset=utf-8'],
-    ['.png', 'image/png'],
-    ['.jpg', 'image/jpeg'],
-    ['.jpeg', 'image/jpeg'],
-    ['.svg', 'image/svg+xml'],
-    ['.webp', 'image/webp'],
-    ['.ico', 'image/x-icon'],
-    ['.map', 'application/json; charset=utf-8']
-  ]);
-
-  const server = http.createServer(async (req, res) => {
-    try {
-      const reqUrl = new URL(req.url || '/', `http://${host}:${port}`);
-      let relPath = decodeURIComponent(reqUrl.pathname || '/');
-      if (relPath === '/') relPath = '/index.html';
-      const joined = path.join(root, relPath);
-      const resolved = path.resolve(joined);
-      if (!resolved.startsWith(root)) {
-        res.writeHead(403).end('forbidden');
-        return;
-      }
-
-      let filePath = resolved;
-      let stat = null;
-      try {
-        stat = await fs.stat(filePath);
-      } catch {
-        stat = null;
-      }
-
-      if (stat && stat.isDirectory()) {
-        filePath = path.join(filePath, 'index.html');
-      }
-
-      if (!(await exists(filePath))) {
-        res.writeHead(404).end('not found');
-        return;
-      }
-
-      const ext = path.extname(filePath).toLowerCase();
-      const contentType = mime.get(ext) || 'application/octet-stream';
-      const buf = await fs.readFile(filePath);
-      res.writeHead(200, { 'Content-Type': contentType });
-      res.end(buf);
-    } catch (err) {
-      res.writeHead(500).end(String(err?.message || err));
-    }
-  });
-
-  server.on('connection', (socket) => {
-    sockets.add(socket);
-    socket.on('close', () => sockets.delete(socket));
-  });
-
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(port, host, resolve);
-  });
-
-  return {
-    server,
-    close: () => new Promise((resolve) => {
-      for (const socket of sockets) {
-        if (socket instanceof net.Socket) socket.destroy();
-      }
-      server.close(resolve);
-    })
-  };
-}
-
-async function startServer() {
-  for (const port of candidatePorts) {
-    try {
-      const handle = await serveStaticRoot(port);
-      return { ...handle, port, owned: true };
-    } catch {
-      // try next candidate
-    }
-  }
-  throw new Error(`Unable to start local static server on ports: ${candidatePorts.join(', ')}`);
-}
 
 async function launchFromTitle(page) {
   await page.evaluate(() => {
@@ -318,8 +217,13 @@ function assert(condition, message) {
 function isTransientNetworkConsoleError(text = '') {
   const msg = String(text || '');
   // External OSM/Overpass providers can intermittently return 5xx/429 during
-  // test runs. Treat those as transport noise while still failing on app errors.
-  return /Failed to load resource:\s+the server responded with a status of\s+(429|500|502|503|504)/i.test(msg);
+  // test runs. Response diagnostics retain the exact URL and status, while
+  // same-origin HTTP failures are promoted to application errors separately.
+  return (
+    /Failed to load resource:\s+the server responded with a status of\s+\d+/i.test(msg) ||
+    /@firebase\/firestore: Firestore .*Could not reach Cloud Firestore backend/i.test(msg) ||
+    /The client will operate in offline mode until it is able to successfully connect/i.test(msg)
+  );
 }
 
 async function main() {
@@ -333,16 +237,30 @@ async function main() {
     throw new Error(`Mirror verification failed before runtime test.\n${mirrorCheck.stdout}\n${mirrorCheck.stderr}`);
   }
 
-  const serverHandle = await startServer();
+  const serverHandle = await startServer({ rootDir, host, candidatePorts });
   const baseUrl = `http://${host}:${serverHandle.port}/app/`;
 
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1365, height: 768 } });
   const consoleErrors = [];
+  const requestFailures = [];
+  let deferredNetworkErrorCount = 0;
+
+  page.on('requestfailed', (request) => {
+    requestFailures.push({
+      url: request.url(),
+      type: request.resourceType(),
+      reason: request.failure()?.errorText || 'unknown'
+    });
+  });
 
   page.on('console', (msg) => {
     if (msg.type() === 'error') {
       const text = msg.text();
+      if (/Failed to load resource:\s+net::ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|FAILED)/i.test(text) || /blocked by CORS policy/i.test(text)) {
+        deferredNetworkErrorCount += 1;
+        return;
+      }
       if (!isTransientNetworkConsoleError(text)) {
         consoleErrors.push({ type: 'console.error', text });
       }
@@ -350,6 +268,18 @@ async function main() {
   });
   page.on('pageerror', (err) => {
     consoleErrors.push({ type: 'pageerror', text: String(err?.message || err) });
+  });
+  page.on('response', (response) => {
+    if (response.status() < 400) return;
+    const failure = {
+      url: response.url(),
+      type: response.request().resourceType(),
+      reason: `HTTP ${response.status()}`
+    };
+    requestFailures.push(failure);
+    if (response.url().startsWith(new URL(baseUrl).origin)) {
+      consoleErrors.push({ type: 'local-http-error', text: `${failure.reason} ${failure.url}` });
+    }
   });
 
   let report = null;
@@ -398,6 +328,7 @@ async function main() {
 
     report = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
+      const structureSemantics = await import('/app/js/structure-semantics.js?v=12');
       const ctx = mod?.ctx;
       const roads = Array.isArray(ctx.roads) ? ctx.roads : [];
       const buildings = Array.isArray(ctx.buildings) ? ctx.buildings : [];
@@ -482,13 +413,36 @@ async function main() {
         linearFeatureKinds,
         vegetationFeatures,
         vegetationMeshes,
-        visibleWaterMeshes
+        visibleWaterMeshes,
+        roadSurfaceContract: {
+          atGradeSkirt: structureSemantics.shouldRenderRoadSkirts({
+            structureSemantics: { terrainMode: 'at_grade' }
+          }),
+          elevatedSkirt: structureSemantics.shouldRenderRoadSkirts({
+            structureSemantics: { terrainMode: 'elevated' }
+          }),
+          subgradeSkirt: structureSemantics.shouldRenderRoadSkirts({
+            structureSemantics: { terrainMode: 'subgrade' }
+          })
+        },
+        urbanSurfaceStats: { ...(ctx.urbanSurfaceStats || {}) }
       };
     });
 
     const spawnUiReport = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
       const ctx = mod?.ctx;
+      const initialWalker = ctx.Walk?.state?.walker;
+      const initialRuntimeState = initialWalker ? {
+        mode: ctx.Walk?.state?.mode || 'walk',
+        x: initialWalker.x,
+        z: initialWalker.z,
+        feetY: initialWalker.y - 1.7,
+        angle: initialWalker.angle,
+        pitch: initialWalker.pitch,
+        view: ctx.Walk?.state?.view || 'third',
+        camMode: ctx.camMode
+      } : null;
       const resolveSpawnAvailable =
         typeof ctx.resolveSafeWorldSpawn === 'function' &&
         typeof ctx.applyResolvedWorldSpawn === 'function';
@@ -507,6 +461,7 @@ async function main() {
         spawnPreview: [],
         preservedDriveSamples: 0,
         modeSwitchResult: null,
+        visualStateRestored: false,
         walkingControlsText,
         droneControlsText,
         drivingControlsText,
@@ -662,12 +617,35 @@ async function main() {
         }
       }
 
+      if (initialRuntimeState && resolveSpawnAvailable) {
+        if (initialRuntimeState.mode === 'walk') ctx.Walk?.setModeWalk?.();
+        else ctx.Walk?.setModeDrive?.();
+        const restored = ctx.resolveSafeWorldSpawn(initialRuntimeState.x, initialRuntimeState.z, {
+          mode: initialRuntimeState.mode,
+          angle: initialRuntimeState.angle,
+          feetY: initialRuntimeState.feetY,
+          source: 'runtime_test_restore'
+        });
+        ctx.applyResolvedWorldSpawn(restored, {
+          mode: initialRuntimeState.mode,
+          syncCar: true,
+          syncWalker: true
+        });
+        if (ctx.Walk?.state?.walker) ctx.Walk.state.walker.pitch = initialRuntimeState.pitch;
+        if (ctx.Walk?.state) ctx.Walk.state.view = initialRuntimeState.view;
+        ctx.camMode = initialRuntimeState.camMode;
+        out.visualStateRestored = !!restored?.valid &&
+          Math.hypot(restored.x - initialRuntimeState.x, restored.z - initialRuntimeState.z) <= 2;
+      }
+
       return out;
     });
 
     const networkAndCopyReport = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
       const ctx = mod?.ctx;
+      const semanticsMod = await import('/app/js/structure-semantics.js?v=12');
+      const classifyStructureSemantics = semanticsMod?.classifyStructureSemantics;
       const walkGraph = ctx?.traversalNetworks?.walk || null;
       const driveGraph = ctx?.traversalNetworks?.drive || null;
       const sampleLinearFeature = Array.isArray(ctx?.linearFeatures) ?
@@ -712,6 +690,26 @@ async function main() {
         fetch('/account/').then((res) => res.text()).catch(() => '')
       ]);
 
+      const syntheticStructureSemantics = typeof classifyStructureSemantics === 'function' ? {
+        overgroundFootway: classifyStructureSemantics(
+          { highway: 'footway', location: 'overground' },
+          { featureKind: 'footway', subtype: 'footway' }
+        ),
+        bridgeFootway: classifyStructureSemantics(
+          { highway: 'footway', bridge: 'yes' },
+          { featureKind: 'footway', subtype: 'footway' }
+        ),
+        tunnelRoad: classifyStructureSemantics(
+          { highway: 'primary', tunnel: 'yes' },
+          { featureKind: 'road', subtype: 'primary' }
+        )
+      } : null;
+      const syntheticBridge = {
+        pts: [{ x: 0, z: 0 }, { x: 50, z: 0 }, { x: 100, z: 0 }],
+        structureTags: { bridge: 'yes' }, networkKind: 'road', type: 'primary'
+      };
+      semanticsMod.updateFeatureSurfaceProfile?.(syntheticBridge, (x) => x === 50 ? -80 : 12);
+
       return {
         walkGraphNodeCount: Number(walkGraph?.nodeCount || walkGraph?.nodes?.length || 0),
         driveGraphNodeCount: Number(driveGraph?.nodeCount || driveGraph?.nodes?.length || 0),
@@ -733,6 +731,8 @@ async function main() {
             const material = mesh?.material;
             return material && !Array.isArray(material) && material.transparent === false && Number(material.opacity ?? 1) >= 0.99;
           }),
+        syntheticStructureSemantics,
+        syntheticBridgeHeights: Array.from(syntheticBridge.surfaceHeights || []),
         landingCopyClear:
           /optional/i.test(landingHtml) &&
           /map, core exploration, and traversal modes are free/i.test(landingHtml) &&
@@ -744,26 +744,66 @@ async function main() {
       };
     });
 
-    report = { ...report, ...spawnUiReport, ...networkAndCopyReport };
+    const planetaryRoundTrip = await exercisePlanetaryRoundTrip(page);
+    report = { ...report, ...spawnUiReport, ...networkAndCopyReport, planetaryRoundTrip };
 
-    await page.screenshot({ path: path.join(outputDir, 'runtime-invariants.png'), fullPage: true });
+    const deferredRequests = requestFailures.filter((failure) =>
+      /net::ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|FAILED)/.test(failure.reason)
+    );
+    const localOrigin = new URL(baseUrl).origin;
+    const localFailures = deferredRequests.filter((failure) => {
+      try {
+        return new URL(failure.url).origin === localOrigin;
+      } catch {
+        return true;
+      }
+    });
+    if (deferredNetworkErrorCount > 0 && (deferredRequests.length === 0 || localFailures.length > 0)) {
+      consoleErrors.push({
+        type: 'requestfailed',
+        text: `${deferredNetworkErrorCount} connection failure(s) included local or unidentified resources`,
+        requests: localFailures.length > 0 ? localFailures : deferredRequests
+      });
+    }
+
+    try {
+      await page.screenshot({ path: path.join(outputDir, 'runtime-invariants.png'), fullPage: false });
+    } catch (error) {
+      report.screenshotWarning = String(error?.message || error);
+    }
 
     const checks = {
       roadCenterDriveable: report.blockedDriveRatePct <= 10,
       laneEdgeReasonable: report.laneHitRatePct <= 3.5,
       waterDataPresent: (report.waterAreas + report.waterways + preWaterMetrics.waterAreas + preWaterMetrics.waterways) > 0,
       waterVisible: report.visibleWaterMeshes > 0 || preWaterMetrics.visibleWaterMeshes > 0,
-      linearFeaturesDisabled: (report.linearFeatures + preWaterMetrics.linearFeatures) === 0,
+      linearFeaturesDeferredForRelease: (report.linearFeatures + preWaterMetrics.linearFeatures) === 0,
       spawnResolverAvailable: report.resolveSpawnAvailable === true,
       driveSpawnFallbackSafe: report.buildingInteriorSamples === 0 || report.driveSpawnSafe === report.buildingInteriorSamples,
       walkSpawnFallbackSafe: report.buildingInteriorSamples === 0 || report.walkSpawnSafe === report.buildingInteriorSamples,
       directDrivePreserved: report.preservedDriveSamples >= Math.min(report.driveSampleCount, 1),
       modeSwitchSafe: report.buildingInteriorSamples === 0 || report.modeSwitchResult?.safe === true,
+      visualStateRestored: report.visualStateRestored === true,
       walkTraversalNetworkReady:
         report.walkGraphNodeCount > 0 &&
         report.walkGraphSegmentCount >= report.driveGraphSegmentCount,
       waterMaterialsSolid: report.solidWaterMeshes === true,
       vegetationIntegrated: report.vegetationFeatures > 0 && report.vegetationMeshes > 0,
+      structureSemanticsStable:
+        report.syntheticStructureSemantics?.overgroundFootway?.terrainMode === 'at_grade' &&
+        report.syntheticStructureSemantics?.overgroundFootway?.gradeSeparated === false &&
+        report.syntheticStructureSemantics?.bridgeFootway?.terrainMode === 'elevated' &&
+        report.syntheticStructureSemantics?.bridgeFootway?.gradeSeparated === true &&
+        report.syntheticStructureSemantics?.tunnelRoad?.terrainMode === 'subgrade' &&
+        report.syntheticStructureSemantics?.tunnelRoad?.gradeSeparated === true,
+      bridgeSpansTerrainDepressions:
+        report.syntheticBridgeHeights?.length === 3 &&
+        Math.min(...report.syntheticBridgeHeights) > 15 &&
+        Math.max(...report.syntheticBridgeHeights) - Math.min(...report.syntheticBridgeHeights) < 0.1,
+      roadSurfacesDraped:
+        report.roadSurfaceContract?.atGradeSkirt === false &&
+        report.roadSurfaceContract?.elevatedSkirt === false &&
+        report.roadSurfaceContract?.subgradeSkirt === true,
       lazyInteriorIdle:
         report.buildingEntrySupportExposed === true &&
         report.interiorActionExposed === true &&
@@ -779,13 +819,15 @@ async function main() {
           report.enteredInteriorReport.shellClearanceMin >= report.enteredInteriorReport.requiredShellClearance
         ),
       walkingControlsUpdated:
-        report.walkingControlsText.includes('WASD - Move') &&
+        report.walkingControlsText.includes('W/S - Move forward / back') &&
+        report.walkingControlsText.includes('A/D - Turn left / right') &&
         report.walkingControlsText.includes('Arrow Keys - Look around') &&
         report.walkingControlsText.includes('E - Enter/exit building interior'),
       syntheticDestinationEntryReady: report.syntheticDestinationEntrySupported === true,
       droneControlsUpdated:
-        report.droneControlsText.includes('WASD - Move') &&
-        report.droneControlsText.includes('Arrow Keys - Look around'),
+        report.droneControlsText.includes('Arrow Up/Down - Fly forward / back') &&
+        report.droneControlsText.includes('Arrow Left/Right - Turn left / right') &&
+        report.droneControlsText.includes('WASD - Look around'),
       drivingMapHintUpdated:
         report.drivingControlsText.includes('M - Toggle map') &&
         /Close Map \(M\)/.test(report.mapCloseLabel),
@@ -796,6 +838,19 @@ async function main() {
         !/early access|unlock|locked/i.test(report.proAccessText) &&
         report.landingCopyClear === true &&
         report.accountCopyClear === true,
+      planetaryRoundTripStable:
+        report.planetaryRoundTrip?.moon?.env === 'MOON' &&
+        report.planetaryRoundTrip?.moon?.earthFixed === true &&
+        report.planetaryRoundTrip?.moon?.earthLeakCount === 0 &&
+        report.planetaryRoundTrip?.moon?.astronautGear === true &&
+        report.planetaryRoundTrip?.moon?.minimapVisible === true &&
+        report.planetaryRoundTrip?.moon?.skyObserverBody === 'moon' &&
+        report.planetaryRoundTrip?.earth?.env === 'EARTH' &&
+        report.planetaryRoundTrip?.earth?.rendererPreserved === true &&
+        report.planetaryRoundTrip?.earth?.earthVisible === true &&
+        report.planetaryRoundTrip?.earth?.sequence === report.planetaryRoundTrip?.before?.sequence &&
+        report.planetaryRoundTrip?.earth?.roads === report.planetaryRoundTrip?.before?.roads &&
+        report.planetaryRoundTrip?.earth?.buildings === report.planetaryRoundTrip?.before?.buildings,
       noConsoleErrors: consoleErrors.length === 0
     };
 
@@ -811,7 +866,8 @@ async function main() {
       preWaterMetrics,
       mapToggleCheck,
       debugToggleCheck,
-      consoleErrors
+      consoleErrors,
+      requestFailures
     };
 
     await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(fullReport, null, 2));
@@ -821,7 +877,7 @@ async function main() {
       `Road center driveability degraded: blocked ${report.blockedDriveSamples}/${report.driveSampleCount} (${report.blockedDriveRatePct}%)`
     );
     assert(checks.laneEdgeReasonable, `Lane-edge collision rate too high: ${report.laneHitRatePct}%`);
-    assert(checks.linearFeaturesDisabled, `Expected path layers to stay disabled for this rollback, found ${report.linearFeatures}`);
+    assert(checks.linearFeaturesDeferredForRelease, `Release-deferred path layers became active without their geometry contract: ${report.linearFeatures}`);
     assert(checks.spawnResolverAvailable, 'Spawn resolver helpers are not exposed on runtime context.');
     assert(
       checks.driveSpawnFallbackSafe,
@@ -829,13 +885,15 @@ async function main() {
     );
     assert(
       checks.walkSpawnFallbackSafe,
-      `Walk spawn fallback failed for ${report.buildingInteriorSamples - report.walkSpawnSafe}/${report.buildingInteriorSamples} building-interior samples`
+      `Walk spawn fallback failed for ${report.buildingInteriorSamples - report.walkSpawnSafe}/${report.buildingInteriorSamples} ` +
+      `building-interior samples: ${JSON.stringify(report.spawnPreview)}`
     );
     assert(
       checks.directDrivePreserved,
       `Direct drive spawns no longer preserve valid street positions consistently (${report.preservedDriveSamples} preserved samples)`
     );
     assert(checks.modeSwitchSafe, `Traversal mode switch from building interior did not resolve safely: ${JSON.stringify(report.modeSwitchResult)}`);
+    assert(checks.visualStateRestored, 'Runtime verification did not restore the pre-test gameplay pose.');
     assert(
       checks.walkTraversalNetworkReady,
       `Walk traversal network missing or incomplete: ${JSON.stringify({
@@ -847,6 +905,9 @@ async function main() {
     );
     assert(checks.waterMaterialsSolid, 'Water meshes are still rendering with transparent materials.');
     assert(checks.vegetationIntegrated, `Vegetation layer did not initialize correctly: ${JSON.stringify({ vegetationFeatures: report.vegetationFeatures, vegetationMeshes: report.vegetationMeshes })}`);
+    assert(checks.structureSemanticsStable, `Synthetic structure semantics classification regressed: ${JSON.stringify(report.syntheticStructureSemantics || null)}`);
+    assert(checks.bridgeSpansTerrainDepressions, `Bridge profile followed underlying terrain: ${JSON.stringify(report.syntheticBridgeHeights || null)}`);
+    assert(checks.roadSurfacesDraped, `Road surface skirt policy regressed: ${JSON.stringify(report.roadSurfaceContract || null)}`);
     assert(checks.lazyInteriorIdle, `Interior system is not staying lazy by default: ${JSON.stringify({ buildingEntrySupportExposed: report.buildingEntrySupportExposed, activeInteriorByDefault: report.activeInteriorByDefault, dynamicInteriorCollidersIdle: report.dynamicInteriorCollidersIdle, interiorActionExposed: report.interiorActionExposed, interiorPromptPresent: report.interiorPromptPresent })}`);
     assert(checks.sampledInteriorEnterable, `Sampled building entry did not produce a usable contained interior shell: ${JSON.stringify(report.enteredInteriorReport || null)}`);
     assert(checks.syntheticDestinationEntryReady, `Synthetic real-estate fallback entry is unavailable: ${JSON.stringify({ syntheticDestinationEntrySupported: report.syntheticDestinationEntrySupported })}`);
@@ -856,11 +917,16 @@ async function main() {
     assert(checks.mapTogglesWithM, `M map toggle failed: ${JSON.stringify(mapToggleCheck)}`);
     assert(checks.debugTogglesWithF4, `F4 debug toggle failed: ${JSON.stringify(debugToggleCheck)}`);
     assert(checks.freeAccessCopyClear, `Donation/map copy still suggests gated access: ${report.proAccessText}`);
+    assert(checks.planetaryRoundTripStable, `Planetary round trip regressed: ${JSON.stringify(report.planetaryRoundTrip || null)}`);
     if (!checks.waterDataPresent) {
       console.warn('[runtime-invariants] Water data missing in this run (likely upstream provider outage).');
     }
     if (!checks.waterVisible) {
       console.warn('[runtime-invariants] Water mesh not visible in this run (likely upstream provider outage).');
+    }
+    if (!checks.noConsoleErrors) {
+      console.error('[runtime-invariants] Console/page errors:', JSON.stringify(consoleErrors, null, 2));
+      console.error('[runtime-invariants] Failed requests:', JSON.stringify(requestFailures, null, 2));
     }
     assert(checks.noConsoleErrors, `Console/page errors present: ${consoleErrors.length}`);
 

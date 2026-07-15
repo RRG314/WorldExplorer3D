@@ -1,8 +1,11 @@
-# GitHub Deployment Guide
+# GitHub Pages Deployment Guide
 
 Last reviewed: 2026-03-13
 
-Guide for publishing World Explorer 3D with GitHub Pages while keeping backend dependencies explicit.
+Guide for publishing the static GitHub Pages mirror while keeping backend dependencies explicit.
+
+Important: this is not the production release path for `https://worldexplorer3d.io`.
+Production Hosting for the live site is tracked in `FIREBASE_RELEASE_WORKFLOW.md`, `STAGING_FIREBASE_SETUP.md`, and `LIVE_DEPLOYMENT_BASELINE.md`.
 
 ## 1. Deployment Model
 
@@ -49,7 +52,7 @@ Pages-origin requirements:
 - Firebase Auth authorized domains should include your Pages origin.
 - Optional override for non-standard backend origin: `WORLD_EXPLORER_FUNCTIONS_ORIGIN`.
 
-## 5. Typical Release Sequence
+## 5. Typical Pages Release Sequence
 
 1. Run local release checks.
 2. Push branch and open PR.
@@ -57,7 +60,7 @@ Pages-origin requirements:
 4. Verify both workflows are green:
    - `Runtime Verify`
    - `Deploy GitHub Pages (public)`
-5. Smoke test published site.
+5. Smoke test the published Pages mirror.
 
 ## 6. Cache Troubleshooting
 

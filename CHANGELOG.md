@@ -1,5 +1,29 @@
 # Changelog
 
+## [3.0.0] - 2026-07-15
+
+### Added
+
+- Continuous, budgeted Earth streaming with aerial context, road labels, land-cover fallbacks, and stable mode transitions.
+- Plane traversal with chase, cockpit, and overhead cameras plus compact street takeoff and landing behavior.
+- Full Mars destination flow, rover traversal, planetary gravity, surface tracks, minimap support, and in-runtime return to Earth or Space.
+- Expanded solar system and navigable universe with planets, asteroid and Kuiper belts, spacecraft, galaxies, nebulae, catalog-backed destinations, and deep-space encounters.
+- Boat fishing game with multiple species, rarity and size records, tension/drag/fatigue mechanics, persisted catches, and unified leaderboards.
+- Four-shape, eight-color Build with Blocks catalog with a 200-block limit, exact stacking, walk collision, and driveable ramps.
+- Landmark structure passes for Giza pyramids, Golden Gate Bridge, Eiffel Tower, and Elizabeth Tower, plus bridge guardrails and safety geometry.
+
+### Changed
+
+- Refactored runtime ownership across Earth, terrain, water, planetary, interior, map, and streaming systems to reduce cross-mode state leakage.
+- Improved OSM and fallback building coverage, facade variation, rooftop presentation, distant aerial context, vegetation, water placement, bridge elevation, and tunnel semantics.
+- Reworked walking, driving, drone, plane, boat, rover, and camera controls around consistent travel-mode transitions.
+- Replaced colored square star points with round white star materials and body-specific astronomical orientation on Earth, Moon, and Mars.
+- Updated multiplayer/editor transitions, account-safe leaderboard rules, mobile controls, tutorials, and title destination navigation.
+
+### Validation
+
+- Production release gate covers mirror and module integrity, 45 Firestore security cases, local-data safety, editor/multiplayer transitions, block-builder contracts, planetary round trips, provider outages, water/biome smoke tests, and a global preset/custom-location matrix.
+
 ## [2026-03-14]
 
 ### Changed
@@ -99,8 +123,7 @@
 
 ### Added
 
-- New full code-first inventory snapshot:
-  - `COMPLETE_INVENTORY_REPORT_2026-03-02.md`
+- New full code-first inventory snapshot completed for the March stabilization pass.
 
 ### Changed
 

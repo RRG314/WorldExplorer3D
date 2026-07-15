@@ -140,6 +140,12 @@
     .btn-pro { background: var(--gold); color: #392700; }
     .btn-ghost { background: rgba(8, 22, 40, 0.58); border-color: var(--line); color: var(--ink); }
     .btn-danger { background: #b93844; border-color: #e18289; color: #fff3f4; }
+    .btn-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      text-decoration: none;
+    }
 
     .plans {
       display: grid;
@@ -222,10 +228,177 @@
       padding: 10px 14px;
     }
 
+    .stack-field input,
+    .stack-field textarea,
+    .stack-field select {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: rgba(2, 11, 24, 0.62);
+      color: var(--ink);
+      font-size: 14px;
+      padding: 10px 14px;
+      font-family: inherit;
+      width: 100%;
+    }
+
+    .stack-field textarea {
+      min-height: 92px;
+      resize: vertical;
+    }
+
     .inline-field input:focus {
       outline: none;
       border-color: var(--accent);
       box-shadow: 0 0 0 3px rgba(90, 200, 255, 0.2);
+    }
+
+    .stack-field input:focus,
+    .stack-field textarea:focus,
+    .stack-field select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(90, 200, 255, 0.2);
+    }
+
+    .creator-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+      gap: 10px;
+    }
+
+    .creator-card {
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      background:
+        radial-gradient(circle at top left, rgba(90, 200, 255, 0.08), transparent 42%),
+        rgba(5, 17, 32, 0.45);
+    }
+
+    .creator-identity {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .creator-avatar {
+      width: 64px;
+      height: 64px;
+      border-radius: 16px;
+      display: grid;
+      place-items: center;
+      background: rgba(7, 20, 36, 0.72);
+      border: 1px solid var(--line);
+      font-size: 28px;
+    }
+
+    .creator-name {
+      margin: 0;
+      font-size: 22px;
+      font-family: 'Chakra Petch', sans-serif;
+    }
+
+    .creator-badge-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .creator-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 9px;
+      border-radius: 999px;
+      border: 1px solid rgba(174, 202, 226, 0.22);
+      background: rgba(7, 20, 36, 0.62);
+      color: var(--ink);
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .creator-meta {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .creator-bio {
+      margin: 8px 0 0;
+      color: var(--ink);
+      font-size: 14px;
+      line-height: 1.5;
+      white-space: pre-wrap;
+    }
+
+    .creator-stats {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 10px;
+    }
+
+    .creator-stat {
+      border: 1px solid rgba(174, 202, 226, 0.18);
+      border-radius: 12px;
+      padding: 10px;
+      background: rgba(5, 17, 32, 0.45);
+    }
+
+    .creator-stat .label {
+      margin-bottom: 4px;
+    }
+
+    .creator-stat .value {
+      font-size: 20px;
+    }
+
+    .creator-summary {
+      margin-top: 10px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(7, 20, 36, 0.62);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.5;
+    }
+
+    .creator-form-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+
+    .creator-form-head .hint {
+      margin-top: 6px;
+    }
+
+    .creator-count {
+      flex: 0 0 auto;
+      border: 1px solid rgba(174, 202, 226, 0.18);
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: rgba(7, 20, 36, 0.62);
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .creator-count[data-near-limit="1"] {
+      color: var(--gold);
+      border-color: rgba(255, 200, 87, 0.3);
+    }
+
+    .creator-help-list {
+      margin: 12px 0 0;
+      padding-left: 18px;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.6;
     }
 
     .receipt-list {
@@ -356,6 +529,7 @@
       .status { grid-template-columns: 1fr; }
       .plans { grid-template-columns: 1fr; }
       .identity-grid { grid-template-columns: 1fr; }
+      .creator-grid { grid-template-columns: 1fr; }
       .receipt-item { grid-template-columns: 1fr; }
       .receipt-right { justify-content: flex-start; }
       .actions button { width: 100%; }
@@ -412,6 +586,7 @@
         <button id="upgradeSupporterBtn" class="btn-supporter" type="button">Donate as Supporter ($1/mo)</button>
         <button id="upgradeProBtn" class="btn-pro" type="button">Donate as Pro ($5/mo)</button>
         <button id="enableAdminBtn" class="btn-ghost" type="button">Enable Admin Test Access</button>
+        <a id="moderationPanelLink" class="btn-ghost btn-link" href="./admin.html" hidden>Open Admin Dashboard</a>
         <button id="manageBillingBtn" class="btn-ghost" type="button">Manage Donations</button>
         <button id="refreshAccountBtn" class="btn-ghost" type="button">Refresh Account Data</button>
         <button id="signOutBtn" class="btn-ghost" type="button">Sign Out</button>
@@ -438,6 +613,61 @@
           <span class="label" style="margin-top:10px">Account ID</span>
           <p id="uidValue" class="mono">-</p>
           <p id="providersValue" class="hint">Sign-in providers: -</p>
+        </article>
+      </div>
+
+      <h2 class="section-title">Creator Profile</h2>
+      <div class="creator-grid">
+        <article class="creator-card">
+          <span class="label">Public Creator Card</span>
+          <div class="creator-identity">
+            <div id="creatorAvatarPreview" class="creator-avatar">🌍</div>
+            <div>
+              <p id="creatorDisplayName" class="creator-name">Explorer</p>
+              <p id="creatorJoinDate" class="creator-meta">Public creator profile not loaded yet.</p>
+              <div class="creator-badge-row">
+                <span id="creatorPublicState" class="creator-badge">Preview Only</span>
+                <span id="creatorTierBadge" class="creator-badge">New Creator</span>
+                <span class="creator-badge">Visible in World</span>
+              </div>
+              <p id="creatorBioPreview" class="creator-bio">Add a short bio so people know who built these activities and world edits.</p>
+            </div>
+          </div>
+          <div id="creatorStats" class="creator-stats">
+            <div class="creator-stat"><span class="label">Activities</span><p class="value">0</p></div>
+            <div class="creator-stat"><span class="label">Published</span><p class="value">0</p></div>
+            <div class="creator-stat"><span class="label">Plays</span><p class="value">0</p></div>
+            <div class="creator-stat"><span class="label">World Edits</span><p class="value">0</p></div>
+          </div>
+          <div id="creatorSummary" class="creator-summary">Creator recognition is lightweight here: activities, published overlays, and attribution all point back to this profile.</div>
+        </article>
+        <article class="creator-card">
+          <div class="creator-form-head">
+            <div>
+              <span class="label">Public Creator Details</span>
+              <p class="hint">This is the public identity shown from activities, creator attribution, and published world edits.</p>
+            </div>
+            <div id="creatorBioCount" class="creator-count">0 / 320</div>
+          </div>
+          <div class="stack-field">
+            <select id="creatorAvatarInput" aria-label="Creator icon">
+              <option value="🌍">🌍 Explorer</option>
+              <option value="🏙️">🏙️ Builder</option>
+              <option value="🛠️">🛠️ Maker</option>
+              <option value="🎯">🎯 Challenge</option>
+              <option value="🌊">🌊 Ocean</option>
+              <option value="🚀">🚀 Space</option>
+              <option value="🏁">🏁 Route</option>
+              <option value="🛰️">🛰️ Orbit</option>
+            </select>
+            <textarea id="creatorBioInput" maxlength="320" placeholder="What do you build in World Explorer?"></textarea>
+            <button id="saveCreatorProfileBtn" class="btn-primary" type="button">Save Creator Profile</button>
+          </div>
+          <ul class="creator-help-list">
+            <li>Keep the bio short and world-focused so players know what you build.</li>
+            <li>Your username and creator card appear on activities and published contributions.</li>
+            <li>This stays separate from billing and other private account details.</li>
+          </ul>
         </article>
       </div>
 
@@ -511,7 +741,7 @@
         <a href="../about/">About</a>
         <a href="../legal/privacy">Privacy</a>
         <a href="../legal/terms">Terms</a>
-        <a href="mailto:hello@worldexplorer.app">Contact</a>
+        <a href="mailto:mail@worldexplorer3d.io">Contact</a>
         <a href="https://github.com/RRG314/WorldExplorer" target="_blank" rel="noreferrer">GitHub</a>
       </div>
     </section>
@@ -529,7 +759,11 @@
       redirectToPortal,
       updateAccountProfile,
       deleteAccount
-    } from '../js/billing.js?v=57';
+    } from '../js/billing.js?v=58';
+    import {
+      ensureOwnCreatorProfile,
+      getCreatorProfile
+    } from '../js/creator-profile-api.js?v=1';
     import {
       addFriend,
       dismissInvite,
@@ -547,6 +781,7 @@
     const upgradeSupporterBtn = document.getElementById('upgradeSupporterBtn');
     const upgradeProBtn = document.getElementById('upgradeProBtn');
     const enableAdminBtn = document.getElementById('enableAdminBtn');
+    const moderationPanelLink = document.getElementById('moderationPanelLink');
     const manageBillingBtn = document.getElementById('manageBillingBtn');
     const refreshAccountBtn = document.getElementById('refreshAccountBtn');
     const saveUsernameBtn = document.getElementById('saveUsernameBtn');
@@ -582,6 +817,18 @@
     const inviteMessageInput = document.getElementById('inviteMessageInput');
     const friendsList = document.getElementById('friendsList');
     const invitesList = document.getElementById('invitesList');
+    const creatorAvatarPreview = document.getElementById('creatorAvatarPreview');
+    const creatorDisplayName = document.getElementById('creatorDisplayName');
+    const creatorJoinDate = document.getElementById('creatorJoinDate');
+    const creatorBioPreview = document.getElementById('creatorBioPreview');
+    const creatorStats = document.getElementById('creatorStats');
+    const creatorSummary = document.getElementById('creatorSummary');
+    const creatorPublicState = document.getElementById('creatorPublicState');
+    const creatorTierBadge = document.getElementById('creatorTierBadge');
+    const creatorBioCount = document.getElementById('creatorBioCount');
+    const creatorAvatarInput = document.getElementById('creatorAvatarInput');
+    const creatorBioInput = document.getElementById('creatorBioInput');
+    const saveCreatorProfileBtn = document.getElementById('saveCreatorProfileBtn');
 
     let unsubscribeEntitlements = null;
     let unsubscribeFriends = null;
@@ -591,6 +838,7 @@
     let currentAdminTesterEligible = false;
     let currentFriends = [];
     let currentInvites = [];
+    let currentCreatorProfile = null;
 
     function setStatus(message, type = 'neutral') {
       statusLine.textContent = message || '';
@@ -636,7 +884,7 @@
     }
 
     function setBusy(busy) {
-      [signInBtn, signOutBtn, upgradeSupporterBtn, upgradeProBtn, enableAdminBtn, manageBillingBtn, refreshAccountBtn, saveUsernameBtn, refreshReceiptsBtn, addFriendBtn, deleteAccountBtn].forEach((btn) => {
+      [signInBtn, signOutBtn, upgradeSupporterBtn, upgradeProBtn, enableAdminBtn, manageBillingBtn, refreshAccountBtn, saveUsernameBtn, saveCreatorProfileBtn, refreshReceiptsBtn, addFriendBtn, deleteAccountBtn].forEach((btn) => {
         if (!btn) return;
         btn.disabled = busy;
       });
@@ -651,6 +899,9 @@
         enableAdminBtn.hidden = !adminTesterEligible;
         enableAdminBtn.disabled = isAdmin;
         enableAdminBtn.textContent = isAdmin ? 'Admin Access Active' : 'Enable Admin Test Access';
+      }
+      if (moderationPanelLink) {
+        moderationPanelLink.hidden = !hasAdminVisibility;
       }
     }
 
@@ -678,6 +929,34 @@
       } catch (_) {
         return `${(value / 100).toFixed(2)} ${normalizedCurrency}`;
       }
+    }
+
+    function creatorTierLabel(stats = {}) {
+      const activityWeight = Number(stats.activitiesCreated || 0) + Number(stats.activitiesPublished || 0);
+      const worldWeight = Number(stats.publishedContributions || stats.contributionsCount || 0);
+      const total = activityWeight + worldWeight;
+      if (total >= 18) return 'Established Creator';
+      if (total >= 8) return 'Active Creator';
+      if (total >= 1) return 'Builder';
+      return 'New Creator';
+    }
+
+    function updateCreatorBioCount() {
+      if (!creatorBioCount || !creatorBioInput) return;
+      const length = String(creatorBioInput.value || '').length;
+      creatorBioCount.textContent = `${length} / 320`;
+      creatorBioCount.dataset.nearLimit = length >= 260 ? '1' : '0';
+    }
+
+    function syncCreatorDraftPreview() {
+      const fallbackName = String(currentCreatorProfile?.username || usernameValue.textContent || signedInUser?.displayName || 'Explorer').trim() || 'Explorer';
+      const draftName = String(usernameInput?.value || '').trim().replace(/\s+/g, ' ');
+      creatorDisplayName.textContent = draftName || fallbackName;
+      creatorAvatarPreview.textContent = String(creatorAvatarInput?.value || currentCreatorProfile?.avatar || '🌍').trim() || '🌍';
+      if (document.activeElement === creatorBioInput) {
+        creatorBioPreview.textContent = String(creatorBioInput.value || '').trim() || 'Add a short bio so people know who built these activities and world edits.';
+      }
+      updateCreatorBioCount();
     }
 
     function normalizeStatusLabel(value) {
@@ -823,10 +1102,66 @@
       if (inviteMessageInput) inviteMessageInput.value = '';
       currentFriends = [];
       currentInvites = [];
+      currentCreatorProfile = null;
       renderFriends([]);
       renderInvites([]);
       renderReceipts([]);
+      renderCreatorProfile(null);
       setSocialStatus('Sign in to manage friends and invites.');
+    }
+
+    function renderCreatorProfile(profile) {
+      const stats = profile && profile.stats ? profile.stats : {
+        activitiesCreated: 0,
+        activitiesPublished: 0,
+        totalPlays: 0,
+        contributionsCount: 0,
+        publishedContributions: 0
+      };
+      const displayName = String(profile?.username || usernameValue.textContent || 'Explorer').trim() || 'Explorer';
+      const avatar = String(profile?.avatar || '🌍').trim() || '🌍';
+      const joinDate = profile?.createdAtMs ? formatDateTime(profile.createdAtMs) : null;
+      creatorAvatarPreview.textContent = avatar;
+      creatorDisplayName.textContent = displayName;
+      creatorJoinDate.textContent = joinDate ? `Public profile active since ${joinDate}.` : 'Public creator profile not loaded yet.';
+      creatorPublicState.textContent = profile ? 'Public Profile Live' : 'Preview Only';
+      creatorTierBadge.textContent = creatorTierLabel(stats);
+      creatorBioPreview.textContent = String(profile?.bio || 'Add a short bio so people know who built these activities and world edits.');
+      if (document.activeElement !== creatorBioInput) {
+        creatorBioInput.value = String(profile?.bio || '');
+      }
+      if (creatorAvatarInput) {
+        const hasAvatarOption = Array.from(creatorAvatarInput.options || []).some((option) => option.value === avatar);
+        creatorAvatarInput.value = hasAvatarOption ? avatar : '🌍';
+      }
+      creatorStats.innerHTML = `
+        <div class="creator-stat"><span class="label">Activities</span><p class="value">${Number(stats.activitiesCreated || 0)}</p></div>
+        <div class="creator-stat"><span class="label">Published</span><p class="value">${Number(stats.activitiesPublished || 0)}</p></div>
+        <div class="creator-stat"><span class="label">Plays</span><p class="value">${Number(stats.totalPlays || 0)}</p></div>
+        <div class="creator-stat"><span class="label">World Edits</span><p class="value">${Number(stats.publishedContributions || stats.contributionsCount || 0)}</p></div>
+      `;
+      creatorSummary.textContent = profile
+        ? 'Attribution across activities and world contributions now points to this public creator profile.'
+        : 'Creator recognition is lightweight here: activities, published overlays, and attribution all point back to this profile.';
+      updateCreatorBioCount();
+    }
+
+    async function refreshCreatorProfile(options = {}) {
+      if (!signedInUser) {
+        currentCreatorProfile = null;
+        renderCreatorProfile(null);
+        return null;
+      }
+      const silent = !!options.silent;
+      const profile = await ensureOwnCreatorProfile({
+        username: String(usernameInput.value || signedInUser.displayName || 'Explorer').trim(),
+        bio: creatorBioInput?.value || currentCreatorProfile?.bio || '',
+        avatar: creatorAvatarInput?.value || currentCreatorProfile?.avatar || '🌍'
+      });
+      currentCreatorProfile = await getCreatorProfile(signedInUser.uid) || profile;
+      renderCreatorProfile(currentCreatorProfile);
+      if (!silent) setStatus('Creator profile refreshed.', 'ok');
+      return currentCreatorProfile;
     }
 
     function renderReceipts(receipts = []) {
@@ -934,6 +1269,14 @@
         : 'Allowlist-protected test admin mode.';
       currentAdminTesterEligible = adminTesterEligible;
       syncAdminUiVisibility(isAdmin, adminTesterEligible);
+      if (!currentCreatorProfile) {
+        renderCreatorProfile({
+          username: displayName,
+          avatar: creatorAvatarInput?.value || '🌍',
+          bio: creatorBioInput?.value || '',
+          stats: currentCreatorProfile?.stats || undefined
+        });
+      }
     }
 
     function renderSignedOutState() {
@@ -1012,9 +1355,10 @@
       const silent = !!options.silent;
       if (!silent) setStatus('Refreshing account data...');
 
-      const [overviewResult, receiptsResult] = await Promise.allSettled([
+      const [overviewResult, receiptsResult, creatorProfileResult] = await Promise.allSettled([
         refreshOverview(),
-        refreshReceipts()
+        refreshReceipts(),
+        refreshCreatorProfile({ silent: true })
       ]);
 
       if (overviewResult.status === 'rejected') {
@@ -1023,10 +1367,14 @@
       if (receiptsResult.status === 'rejected') {
         console.error('[account] receipts refresh failed:', receiptsResult.reason);
       }
+      if (creatorProfileResult.status === 'rejected') {
+        console.error('[account] creator profile refresh failed:', creatorProfileResult.reason);
+      }
 
-      if (overviewResult.status === 'rejected' && receiptsResult.status === 'rejected') {
+      if (overviewResult.status === 'rejected' && receiptsResult.status === 'rejected' && creatorProfileResult.status === 'rejected') {
         const errMessage =
           overviewResult.reason?.message ||
+          creatorProfileResult.reason?.message ||
           receiptsResult.reason?.message ||
           'Could not refresh account data.';
         setStatus(errMessage, 'warn');
@@ -1322,10 +1670,16 @@
       }
 
       setBusy(true);
-      setStatus('Saving display name...');
+      setStatus('Saving display name and creator profile...');
       try {
-        await updateAccountProfile(nextName);
+        const result = await updateAccountProfile({
+          displayName: nextName,
+          bio: creatorBioInput?.value || currentCreatorProfile?.bio || '',
+          avatar: creatorAvatarInput?.value || currentCreatorProfile?.avatar || '🌍'
+        });
+        currentCreatorProfile = result?.creatorProfile || currentCreatorProfile;
         await refreshOverview();
+        await refreshCreatorProfile({ silent: true });
         await ensureEntitlements(signedInUser);
         setStatus('Display name updated.', 'ok');
       } catch (err) {
@@ -1336,11 +1690,49 @@
       }
     });
 
+    saveCreatorProfileBtn.addEventListener('click', async () => {
+      if (!signedInUser) return;
+      const displayName = String(usernameInput.value || usernameValue.textContent || signedInUser.displayName || 'Explorer').trim().replace(/\s+/g, ' ').slice(0, 60);
+      if (!displayName) {
+        setStatus('Set a username before saving the creator profile.', 'warn');
+        return;
+      }
+      setBusy(true);
+      setStatus('Saving creator profile...');
+      try {
+        const result = await updateAccountProfile({
+          displayName,
+          bio: creatorBioInput?.value || '',
+          avatar: creatorAvatarInput?.value || '🌍'
+        });
+        currentCreatorProfile = result?.creatorProfile || currentCreatorProfile;
+        await refreshCreatorProfile({ silent: true });
+        setStatus('Creator profile updated.', 'ok');
+      } catch (err) {
+        console.error('[account] update creator profile failed:', err);
+        setStatus(err && err.message ? err.message : 'Could not update creator profile.', 'warn');
+      } finally {
+        setBusy(false);
+      }
+    });
+
     usernameInput.addEventListener('keydown', (event) => {
       if (event.key === 'Enter') {
         event.preventDefault();
         saveUsernameBtn.click();
       }
+    });
+
+    usernameInput.addEventListener('input', () => {
+      syncCreatorDraftPreview();
+    });
+
+    creatorBioInput?.addEventListener('input', () => {
+      syncCreatorDraftPreview();
+    });
+
+    creatorAvatarInput?.addEventListener('change', () => {
+      syncCreatorDraftPreview();
     });
 
     upgradeSupporterBtn.addEventListener('click', async () => {

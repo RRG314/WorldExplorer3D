@@ -15,6 +15,7 @@ const ENV = Object.freeze({
   EARTH: 'EARTH',
   SPACE_FLIGHT: 'SPACE_FLIGHT',
   MOON: 'MOON',
+  MARS: 'MARS',
   OCEAN: 'OCEAN'
 });
 
@@ -25,9 +26,10 @@ let _envDebugEl = null; // debug HUD element
 // Valid transitions: which env can switch to which
 const _validTransitions = {
   null: [ENV.EARTH, ENV.OCEAN],
-  EARTH: [ENV.SPACE_FLIGHT, ENV.MOON, ENV.OCEAN],
-  SPACE_FLIGHT: [ENV.EARTH, ENV.MOON, ENV.OCEAN],
-  MOON: [ENV.SPACE_FLIGHT, ENV.EARTH, ENV.OCEAN],
+  EARTH: [ENV.SPACE_FLIGHT, ENV.MOON, ENV.MARS, ENV.OCEAN],
+  SPACE_FLIGHT: [ENV.EARTH, ENV.MOON, ENV.MARS, ENV.OCEAN],
+  MOON: [ENV.SPACE_FLIGHT, ENV.EARTH, ENV.MARS, ENV.OCEAN],
+  MARS: [ENV.SPACE_FLIGHT, ENV.EARTH, ENV.MOON],
   OCEAN: [ENV.EARTH, ENV.MOON, ENV.SPACE_FLIGHT]
 };
 
@@ -89,6 +91,7 @@ function _syncLegacyFlags(env) {
   switch (env) {
     case ENV.EARTH:
       appCtx.onMoon = false;
+      appCtx.onMars = false;
       appCtx.travelingToMoon = false;
       break;
     case ENV.SPACE_FLIGHT:
@@ -97,10 +100,17 @@ function _syncLegacyFlags(env) {
       break;
     case ENV.MOON:
       appCtx.onMoon = true;
+      appCtx.onMars = false;
+      appCtx.travelingToMoon = false;
+      break;
+    case ENV.MARS:
+      appCtx.onMoon = false;
+      appCtx.onMars = true;
       appCtx.travelingToMoon = false;
       break;
     case ENV.OCEAN:
       appCtx.onMoon = false;
+      appCtx.onMars = false;
       appCtx.travelingToMoon = false;
       break;
   }

@@ -6,17 +6,23 @@ let _hudTimer = 0;
 let _mapTimer = 0;
 let _lodTimer = 0;
 let _perfPanelTimer = 0;
+let _weatherTimer = 0;
+let _boatTimer = 0;
+let _liveEarthTimer = 0;
 const OVERLAY_EDGE_MARGIN = 6;
 const OVERLAY_ANCHOR_GAP = 10;
 const DEFAULT_LOADING_BG = 'loading-bg.jpg';
 const TRANSITION_LOADING = {
+  earth: { background: 'loading-bg.jpg', text: 'Restoring Earth...' },
   space: { background: 'space-transition.png', text: 'Preparing Space Flight...' },
   moon: { background: 'moon-transition.png', text: 'Approaching The Moon...' },
+  mars: { background: 'space-transition.png', text: 'Approaching Olympus Mons...' },
   ocean: { background: 'loading-bg.jpg', text: 'Diving Into Ocean Mode...' }
 };
 const LOADING_BG_BY_MODE = {
   earth: DEFAULT_LOADING_BG,
   moon: 'moon-transition.png',
+  mars: 'space-transition.png',
   space: 'space-transition.png',
   ocean: DEFAULT_LOADING_BG
 };
@@ -28,6 +34,14 @@ function _isVisibleRect(el) {
   const rect = el.getBoundingClientRect();
   if (!(rect.width > 0 && rect.height > 0)) return null;
   return rect;
+}
+
+function _isEditorWorkspaceOpen() {
+  return !!document.body?.classList.contains('editor-workspace-open');
+}
+
+function _isActivityCreatorOpen() {
+  return !!document.body?.classList.contains('activity-creator-open');
 }
 
 function _positionOverlayBetween(overlay, leftRect, rightRect) {
@@ -49,7 +63,7 @@ function _positionOverlayBetween(overlay, leftRect, rightRect) {
 }
 
 function positionTopOverlays() {
-  if (!appCtx.gameStarted) return;
+  if (!appCtx.gameStarted || _isEditorWorkspaceOpen() || _isActivityCreatorOpen()) return;
   const hudRect = _isVisibleRect(document.getElementById('hud'));
   const menuRect = _isVisibleRect(document.getElementById('mainMenuBtn'));
   if (!hudRect || !menuRect) return;
@@ -105,23 +119,74 @@ function renderLoop(t = 0) {
   }
 
   if (appCtx.gameStarted) {
+    if (typeof appCtx.kickOptionalRuntimeBoot === 'function') {
+      appCtx.kickOptionalRuntimeBoot('main_loop');
+    }
     appCtx.update(dt);
-    appCtx.updateCamera();
+    if (typeof appCtx.updateEarthWorldStreaming === 'function') {
+      appCtx.updateEarthWorldStreaming(dt);
+    }
+    appCtx.updatePlanetaryTracks?.();
+    if (!appCtx.onMars && typeof appCtx.refreshAstronomicalSky === 'function') {
+      appCtx.refreshAstronomicalSky(false);
+    }
+    if (typeof appCtx.updateWaterWaveVisuals === 'function') {
+      appCtx.updateWaterWaveVisuals();
+    }
+    _weatherTimer += dt;
+    if (_weatherTimer > 5) {
+      _weatherTimer = 0;
+      if (!appCtx.onMoon && !appCtx.onMars && typeof appCtx.refreshLiveWeather === 'function') {
+        void appCtx.refreshLiveWeather(false);
+      }
+    }
+    _boatTimer += dt;
+    const boatRefreshInterval = appCtx.boatMode?.active ? 0.85 : appCtx.planeMode?.active ? 1.2 : appCtx.droneMode ? 0.65 : 0.25;
+    if (_boatTimer > boatRefreshInterval) {
+      _boatTimer = 0;
+      if (typeof appCtx.refreshBoatAvailability === 'function') {
+        appCtx.refreshBoatAvailability(false);
+      }
+    }
+    appCtx.updateCamera(dt);
+    appCtx.updatePlanetarySky?.();
+    if (typeof appCtx.updateActivityCreator === 'function') {
+      appCtx.updateActivityCreator(dt, t);
+    }
+    if (typeof appCtx.updateActivityDiscovery === 'function') {
+      appCtx.updateActivityDiscovery(dt, t);
+    }
+    if (appCtx.liveEarth && typeof appCtx.liveEarth.updateFrame === 'function') {
+      appCtx.liveEarth.updateFrame(dt);
+    }
+
+    _liveEarthTimer += dt;
+    if (_liveEarthTimer > 4) {
+      _liveEarthTimer = 0;
+      if (appCtx.liveEarth && typeof appCtx.liveEarth.updateSelectorFrame === 'function') {
+        appCtx.liveEarth.updateSelectorFrame();
+      }
+    }
 
     // Throttle HUD DOM writes to ~15fps (every ~66ms)
     _hudTimer += dt;
     if (_hudTimer > 0.066) {
       _hudTimer = 0;
-      appCtx.updateHUD();
-      positionTopOverlays();
+      if (!_isEditorWorkspaceOpen() && !_isActivityCreatorOpen()) {
+        appCtx.updateHUD();
+        positionTopOverlays();
+      }
     }
 
-    // Throttle minimap to ~10fps (every ~100ms)
+    // Aerial modes cover more ground but do not need a 10fps DOM/canvas map refresh.
     _mapTimer += dt;
-    if (_mapTimer > 0.1) {
+    const mapRefreshInterval = appCtx.planeMode?.active ? 0.25 : appCtx.droneMode ? 0.16 : 0.1;
+    if (_mapTimer > mapRefreshInterval) {
       _mapTimer = 0;
-      appCtx.drawMinimap();
-      if (appCtx.showLargeMap) appCtx.drawLargeMap();
+      if (!_isEditorWorkspaceOpen() && !_isActivityCreatorOpen()) {
+        appCtx.drawMinimap();
+        if (appCtx.showLargeMap) appCtx.drawLargeMap();
+      }
     }
 
     // LOD visibility updates run at low frequency to avoid per-frame overhead.
@@ -129,6 +194,7 @@ function renderLoop(t = 0) {
     if (_lodTimer > 0.2) {
       _lodTimer = 0;
       if (typeof appCtx.updateWorldLod === 'function') appCtx.updateWorldLod(false);
+      appCtx.enforceEnvironmentSceneOwnership?.();
     }
   }
 
@@ -159,11 +225,21 @@ function renderLoop(t = 0) {
       let onRoadValue = !!appCtx.car?.onRoad;
       let roadName = appCtx.car?.road?.name || '-';
 
-      if (appCtx.droneMode) {
+      if (appCtx.planeMode?.active) {
+        modeLabel = 'plane';
+        refX = Number.isFinite(appCtx.planeMode.x) ? appCtx.planeMode.x : refX;
+        refZ = Number.isFinite(appCtx.planeMode.z) ? appCtx.planeMode.z : refZ;
+        refY = Number.isFinite(appCtx.planeMode.y) ? appCtx.planeMode.y : refY;
+      } else if (appCtx.droneMode) {
         modeLabel = 'drone';
         refX = Number.isFinite(appCtx.drone?.x) ? appCtx.drone.x : refX;
         refZ = Number.isFinite(appCtx.drone?.z) ? appCtx.drone.z : refZ;
         refY = Number.isFinite(appCtx.drone?.y) ? appCtx.drone.y : refY;
+      } else if (appCtx.boatMode?.active) {
+        modeLabel = 'boat';
+        refX = Number.isFinite(appCtx.boat?.x) ? appCtx.boat.x : refX;
+        refZ = Number.isFinite(appCtx.boat?.z) ? appCtx.boat.z : refZ;
+        refY = Number.isFinite(appCtx.boat?.y) ? appCtx.boat.y : refY;
       } else if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker) {
         modeLabel = 'walk';
         refX = Number.isFinite(appCtx.Walk.state.walker.x) ? appCtx.Walk.state.walker.x : refX;
@@ -171,13 +247,13 @@ function renderLoop(t = 0) {
         refY = Number.isFinite(appCtx.Walk.state.walker.y) ? appCtx.Walk.state.walker.y : refY;
       }
 
-      const nearestSurface = modeLabel === 'drive' ?
+      const nearestSurface = modeLabel === 'drive' || modeLabel === 'boat' ?
         appCtx.findNearestRoad(refX, refZ) :
         typeof appCtx.findNearestTraversalFeature === 'function' ?
           appCtx.findNearestTraversalFeature(refX, refZ, { mode: 'walk', maxDistance: 24 }) :
           appCtx.findNearestRoad(refX, refZ);
       const roadDist = Number.isFinite(nearestSurface?.dist) ? nearestSurface.dist : null;
-      if (modeLabel !== 'drive') {
+      if (modeLabel !== 'drive' && modeLabel !== 'boat') {
         const feature = nearestSurface?.feature || nearestSurface?.road || null;
         roadName = typeof appCtx.surfaceDisplayName === 'function' ? appCtx.surfaceDisplayName(feature) : feature?.name || roadName;
         const halfWidth = feature?.width ? feature.width * 0.5 : 5;
@@ -188,8 +264,12 @@ function renderLoop(t = 0) {
       const tY = appCtx.elevationWorldYAtWorldXZ(refX, refZ).toFixed(2);
       const refYVal = Number.isFinite(refY) ? refY.toFixed(2) : '?';
       const rdist = Number.isFinite(roadDist) ? roadDist.toFixed(1) : '?';
-      const speed = modeLabel === 'drone' ?
+      const speed = modeLabel === 'plane' ?
+      Math.round(Math.abs((appCtx.planeMode?.speed || 0) * 2.237)) :
+      modeLabel === 'drone' ?
       Math.round(Math.abs((appCtx.drone?.speed || 0) * 1.8)) :
+      modeLabel === 'boat' ?
+      Math.round(Math.abs((appCtx.boat?.speed || 0) * 0.43)) :
       modeLabel === 'walk' ?
       Math.round(Math.abs(appCtx.Walk?.state?.walker?.speedMph || 0)) :
       Math.round(Math.abs((appCtx.car?.speed || 0) * 0.5));
@@ -205,7 +285,11 @@ function renderLoop(t = 0) {
       let markerZ = Number.isFinite(appCtx.car?.z) ? appCtx.car.z : 0;
       let markerOnRoad = !!appCtx.car?.onRoad;
 
-      if (appCtx.droneMode) {
+      if (appCtx.planeMode?.active) {
+        markerX = Number.isFinite(appCtx.planeMode.x) ? appCtx.planeMode.x : markerX;
+        markerZ = Number.isFinite(appCtx.planeMode.z) ? appCtx.planeMode.z : markerZ;
+        markerOnRoad = false;
+      } else if (appCtx.droneMode) {
         markerX = Number.isFinite(appCtx.drone?.x) ? appCtx.drone.x : markerX;
         markerZ = Number.isFinite(appCtx.drone?.z) ? appCtx.drone.z : markerZ;
         const nearest = typeof appCtx.findNearestTraversalFeature === 'function' ?
@@ -214,6 +298,10 @@ function renderLoop(t = 0) {
         const feature = nearest?.feature || nearest?.road || null;
         const halfWidth = feature?.width ? feature.width * 0.5 : 5;
         markerOnRoad = Number.isFinite(nearest?.dist) ? nearest.dist <= halfWidth + 3 : false;
+      } else if (appCtx.boatMode?.active) {
+        markerX = Number.isFinite(appCtx.boat?.x) ? appCtx.boat.x : markerX;
+        markerZ = Number.isFinite(appCtx.boat?.z) ? appCtx.boat.z : markerZ;
+        markerOnRoad = false;
       } else if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker) {
         markerX = Number.isFinite(appCtx.Walk.state.walker.x) ? appCtx.Walk.state.walker.x : markerX;
         markerZ = Number.isFinite(appCtx.Walk.state.walker.z) ? appCtx.Walk.state.walker.z : markerZ;

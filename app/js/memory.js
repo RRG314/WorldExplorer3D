@@ -1,8 +1,11 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
+import { createMemoryMarkersApi } from "./memory-markers.js?v=1";
+import { createMemoryUiApi } from "./memory-ui.js?v=1";
 // memory.js - Persistent memory markers (pin/flower + short note)
 // ============================================================================
 
 const MEMORY_STORAGE_KEY = 'worldExplorer3D.memories.v1';
+const MEMORY_STORAGE_BACKUP_KEY = 'worldExplorer3D.memories.backup.v1';
 const MEMORY_STORAGE_TEST_KEY = 'worldExplorer3D.memories.test';
 const MEMORY_MAX_MESSAGE_LENGTH = 200;
 const MEMORY_MAX_LOCATION_LABEL_LENGTH = 120;
@@ -184,14 +187,30 @@ function normalizeMemoryEntry(raw) {
   };
 }
 
+function parseMemoryRows(raw) {
+  if (!raw) return null;
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
 function loadMemoryEntriesFromStorage() {
   if (!memoryPersistenceEnabled) return [];
   try {
-    const raw = localStorage.getItem(MEMORY_STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    const normalized = parsed.map(normalizeMemoryEntry).filter(Boolean);
+    const primary = parseMemoryRows(localStorage.getItem(MEMORY_STORAGE_KEY));
+    const backup = Array.isArray(primary) ? null : parseMemoryRows(localStorage.getItem(MEMORY_STORAGE_BACKUP_KEY));
+    const rows = Array.isArray(primary) ? primary : Array.isArray(backup) ? backup : [];
+    if (!Array.isArray(primary) && Array.isArray(backup)) {
+      try {
+        localStorage.setItem(MEMORY_STORAGE_KEY, JSON.stringify(backup));
+      } catch {
+        // Best effort only.
+      }
+    }
+    const normalized = rows.map(normalizeMemoryEntry).filter(Boolean);
     if (normalized.length <= MEMORY_MAX_TOTAL) return normalized;
     return normalized.slice(normalized.length - MEMORY_MAX_TOTAL);
   } catch (err) {
@@ -210,6 +229,7 @@ function saveMemoryEntriesToStorage() {
       return false;
     }
     localStorage.setItem(MEMORY_STORAGE_KEY, payload);
+    localStorage.setItem(MEMORY_STORAGE_BACKUP_KEY, payload);
     return true;
   } catch (err) {
     memoryPersistenceEnabled = false;
@@ -250,255 +270,57 @@ function disposeObject3D(obj) {
     if (child.material) disposeMaterial(child.material);
   });
 }
-
-function ensureMemoryGroup() {
-  if (!appCtx.scene) return null;
-  if (!memoryGroup) {
-    memoryGroup = new THREE.Group();
-    memoryGroup.name = 'memoryMarkers';
+const memoryMarkersApi = createMemoryMarkersApi({
+  appCtx,
+  helpers: {
+    disposeObject3D,
+    getCurrentLocationKey,
+    getTopSurfaceYAt,
+    isFiniteNumber,
+    latLonToWorldSafe
+  },
+  state: {
+    getMemoryEntries: () => memoryEntries,
+    getMemoryGroup: () => memoryGroup,
+    getMemoryHitboxes: () => memoryHitboxes,
+    getSelectedMemoryEntryId: () => selectedMemoryEntryId,
+    setMemoryGroup: (group) => { memoryGroup = group; },
+    setMemoryHitboxes: (hitboxes) => { memoryHitboxes = hitboxes; },
+    setSelectedMemoryEntryId: (id) => { selectedMemoryEntryId = id; }
   }
-  if (memoryGroup.parent !== appCtx.scene) {
-    appCtx.scene.add(memoryGroup);
+});
+const {
+  clearMemoryMarkersForWorldReload,
+  clearRenderedMemoryMarkers,
+  ensureMemoryGroup,
+  getEntriesForCurrentLocation,
+  getMemoryEntriesForCurrentLocation,
+  refreshMemoryMarkersForCurrentLocation
+} = memoryMarkersApi;
+const memoryUiApi = createMemoryUiApi({
+  appCtx,
+  constants: { MEMORY_MAX_MESSAGE_LENGTH },
+  helpers: {
+    getCurrentLocationLabel,
+    updatePersistenceHint
+  },
+  state: {
+    getMemoryPersistenceEnabled: () => memoryPersistenceEnabled,
+    getSelectedMemoryType: () => selectedMemoryType,
+    setSelectedMemoryEntryId: (id) => { selectedMemoryEntryId = id; },
+    setSelectedMemoryType: (type) => { selectedMemoryType = type; }
   }
-  return memoryGroup;
-}
-
-function clearRenderedMemoryMarkers() {
-  memoryHitboxes = [];
-  if (!memoryGroup) return;
-  while (memoryGroup.children.length > 0) {
-    const child = memoryGroup.children[memoryGroup.children.length - 1];
-    memoryGroup.remove(child);
-    disposeObject3D(child);
-  }
-}
-
-function buildPinMarker(entry) {
-  const root = new THREE.Group();
-  root.name = `memoryPin_${entry.id}`;
-
-  const stem = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.06, 0.06, 1.55, 10),
-    new THREE.MeshStandardMaterial({ color: 0xb91c1c, roughness: 0.42, metalness: 0.2 })
-  );
-  stem.position.y = 0.9;
-  root.add(stem);
-
-  const cap = new THREE.Mesh(
-    new THREE.SphereGeometry(0.34, 16, 12),
-    new THREE.MeshStandardMaterial({ color: 0xef4444, roughness: 0.35, metalness: 0.15 })
-  );
-  cap.position.y = 1.74;
-  root.add(cap);
-
-  const tip = new THREE.Mesh(
-    new THREE.ConeGeometry(0.15, 0.32, 12),
-    new THREE.MeshStandardMaterial({ color: 0x7f1d1d, roughness: 0.55, metalness: 0.05 })
-  );
-  tip.position.y = 0.16;
-  root.add(tip);
-
-  return root;
-}
-
-function buildFlowerMarker(entry) {
-  const root = new THREE.Group();
-  root.name = `memoryFlower_${entry.id}`;
-
-  const stem = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.045, 0.055, 1.45, 9),
-    new THREE.MeshStandardMaterial({ color: 0x15803d, roughness: 0.55, metalness: 0.05 })
-  );
-  stem.position.y = 0.82;
-  root.add(stem);
-
-  const center = new THREE.Mesh(
-    new THREE.SphereGeometry(0.19, 12, 10),
-    new THREE.MeshStandardMaterial({ color: 0xfacc15, roughness: 0.45, metalness: 0.1 })
-  );
-  center.position.y = 1.6;
-  root.add(center);
-
-  const petalMaterial = new THREE.MeshStandardMaterial({ color: 0xec4899, roughness: 0.35, metalness: 0.05 });
-  for (let i = 0; i < 6; i++) {
-    const angle = i / 6 * Math.PI * 2;
-    const petal = new THREE.Mesh(new THREE.SphereGeometry(0.11, 10, 8), petalMaterial.clone());
-    petal.position.set(Math.cos(angle) * 0.24, 1.6, Math.sin(angle) * 0.24);
-    root.add(petal);
-  }
-
-  const leafMaterial = new THREE.MeshStandardMaterial({ color: 0x22c55e, roughness: 0.6, metalness: 0.03 });
-  const leafA = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), leafMaterial);
-  leafA.scale.set(1.5, 0.45, 0.8);
-  leafA.position.set(0.17, 0.74, 0);
-  root.add(leafA);
-
-  const leafB = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), leafMaterial.clone());
-  leafB.scale.set(1.5, 0.45, 0.8);
-  leafB.position.set(-0.16, 0.62, 0.04);
-  root.add(leafB);
-
-  return root;
-}
-
-function createMarkerForEntry(entry, x, y, z) {
-  const marker = entry.type === 'flower' ? buildFlowerMarker(entry) : buildPinMarker(entry);
-  marker.position.set(x, y + 0.02, z);
-  marker.userData = { isMemoryMarker: true, memoryEntryId: entry.id };
-  marker.traverse((child) => {
-    if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = false;
-    }
-  });
-
-  const hitbox = new THREE.Mesh(
-    new THREE.SphereGeometry(0.95, 10, 8),
-    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
-  );
-  hitbox.position.y = 1.1;
-  hitbox.userData = { isMemoryMarkerHitbox: true, memoryEntryId: entry.id };
-  marker.add(hitbox);
-  memoryHitboxes.push(hitbox);
-
-  return marker;
-}
-
-function getEntriesForCurrentLocation() {
-  const key = getCurrentLocationKey();
-  if (!key) return [];
-  return memoryEntries.filter((entry) => entry.locationKey === key);
-}
-
-function getMemoryEntriesForCurrentLocation() {
-  return getEntriesForCurrentLocation().map((entry) => ({
-    id: entry.id,
-    type: entry.type,
-    lat: entry.lat,
-    lon: entry.lon,
-    message: entry.message,
-    locationKey: entry.locationKey,
-    locationLabel: entry.locationLabel,
-    createdAt: entry.createdAt
-  }));
-}
-
-function refreshMemoryMarkersForCurrentLocation() {
-  const group = ensureMemoryGroup();
-  if (!group) return;
-
-  clearRenderedMemoryMarkers();
-
-  if (!appCtx.isEnv || !appCtx.ENV || !appCtx.isEnv(appCtx.ENV.EARTH)) return;
-
-  const entries = getEntriesForCurrentLocation();
-  entries.forEach((entry) => {
-    const worldPos = latLonToWorldSafe(entry.lat, entry.lon);
-    if (!isFiniteNumber(worldPos.x) || !isFiniteNumber(worldPos.z)) return;
-    const y = getTopSurfaceYAt(worldPos.x, worldPos.z);
-    const marker = createMarkerForEntry(entry, worldPos.x, y, worldPos.z);
-    group.add(marker);
-  });
-
-  const infoPanel = document.getElementById('memoryInfoPanel');
-  if (infoPanel && selectedMemoryEntryId && !entries.some((e) => e.id === selectedMemoryEntryId)) {
-    infoPanel.classList.remove('show');
-    selectedMemoryEntryId = null;
-  }
-}
-
-function clearMemoryMarkersForWorldReload() {
-  clearRenderedMemoryMarkers();
-  const infoPanel = document.getElementById('memoryInfoPanel');
-  if (infoPanel) infoPanel.classList.remove('show');
-  selectedMemoryEntryId = null;
-}
-
-function getPlacementReferencePosition() {
-  if (appCtx.droneMode && appCtx.drone) {
-    return { x: appCtx.drone.x, z: appCtx.drone.z };
-  }
-  if (appCtx.Walk && appCtx.Walk.state && appCtx.Walk.state.mode === 'walk' && appCtx.Walk.state.walker) {
-    return { x: appCtx.Walk.state.walker.x, z: appCtx.Walk.state.walker.z };
-  }
-  if (appCtx.car) {
-    return { x: appCtx.car.x, z: appCtx.car.z };
-  }
-  return null;
-}
-
-function setComposerType(type) {
-  selectedMemoryType = type === 'flower' ? 'flower' : 'pin';
-  const pinBtn = document.getElementById('memoryTypePin');
-  const flowerBtn = document.getElementById('memoryTypeFlower');
-  if (pinBtn) pinBtn.classList.toggle('active', selectedMemoryType === 'pin');
-  if (flowerBtn) flowerBtn.classList.toggle('active', selectedMemoryType === 'flower');
-}
-
-function setComposerStatus(text, isError) {
-  const el = document.getElementById('memoryComposerStatus');
-  if (!el) return;
-  el.textContent = text || '';
-  el.classList.toggle('error', !!isError);
-}
-
-function updateComposerCharCount() {
-  const input = document.getElementById('memoryMessageInput');
-  const count = document.getElementById('memoryCharCount');
-  if (!input || !count) return;
-  const msg = String(input.value || '');
-  count.textContent = `${msg.length}/${MEMORY_MAX_MESSAGE_LENGTH}`;
-}
-
-function openMemoryComposer(defaultType = 'pin') {
-  if (!appCtx.gameStarted) return;
-  const panel = document.getElementById('memoryComposer');
-  const input = document.getElementById('memoryMessageInput');
-  if (!panel || !input) return;
-  panel.classList.add('show');
-  setComposerType(defaultType);
-  updatePersistenceHint();
-  if (!memoryPersistenceEnabled) {
-    setComposerStatus('Persistent storage unavailable. Enable local storage for this site.', true);
-  } else {
-    setComposerStatus('Drop point: your current surface position.', false);
-  }
-  updateComposerCharCount();
-  input.focus();
-}
-
-function closeMemoryComposer() {
-  const panel = document.getElementById('memoryComposer');
-  const input = document.getElementById('memoryMessageInput');
-  if (panel) panel.classList.remove('show');
-  if (input) input.value = '';
-  updateComposerCharCount();
-  setComposerStatus('', false);
-}
-
-function showMemoryInfo(entry) {
-  const panel = document.getElementById('memoryInfoPanel');
-  const title = document.getElementById('memoryInfoTitle');
-  const text = document.getElementById('memoryInfoText');
-  const meta = document.getElementById('memoryInfoMeta');
-  if (!panel || !title || !text || !meta) return;
-
-  selectedMemoryEntryId = entry.id;
-  title.textContent = entry.type === 'flower' ? 'Flower Memory' : 'Pin Memory';
-  text.textContent = entry.message;
-
-  const date = new Date(entry.createdAt);
-  const dateText = Number.isFinite(date.getTime()) ? date.toLocaleString() : 'Unknown time';
-  meta.textContent = `${entry.locationLabel} • ${dateText}`;
-
-  panel.classList.add('show');
-}
-
-function hideMemoryInfo() {
-  const panel = document.getElementById('memoryInfoPanel');
-  if (panel) panel.classList.remove('show');
-  selectedMemoryEntryId = null;
-}
+});
+const {
+  closeMemoryComposer,
+  getPlacementReferencePosition,
+  hideMemoryInfo,
+  openMemoryComposer,
+  setComposerStatus,
+  setComposerType,
+  showMemoryInfo,
+  updateComposerCharCount
+} = memoryUiApi;
 
 function removeMemoryById(id) {
   if (!memoryPersistenceEnabled) return false;

@@ -1,11 +1,13 @@
 .DS_Store
 .firebase/
+.playwright-cli/
 node_modules/
 functions/node_modules/
 output/
 test-results/
 coverage/
 *.log
+progress.md
 
 # Local env/param files
 .env

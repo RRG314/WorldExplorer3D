@@ -4,12 +4,15 @@ import path from 'node:path';
 const rootDir = process.cwd();
 const syncEntries = [
   { source: 'CNAME', target: 'public/CNAME', type: 'file' },
+  { source: 'about.html', target: 'public/about.html', type: 'file' },
+  { source: 'favicon.svg', target: 'public/favicon.svg', type: 'file' },
   { source: 'index.html', target: 'public/index.html', type: 'file' },
-  { source: 'account/index.html', target: 'public/account/index.html', type: 'file' },
-  { source: 'app/index.html', target: 'public/app/index.html', type: 'file' },
-  { source: 'app/assets', target: 'public/app/assets', type: 'dir' },
-  { source: 'app/data', target: 'public/app/data', type: 'dir' },
-  { source: 'app/js', target: 'public/app/js', type: 'dir' }
+  { source: 'about', target: 'public/about', type: 'dir' },
+  { source: 'account', target: 'public/account', type: 'dir' },
+  { source: 'app', target: 'public/app', type: 'dir' },
+  { source: 'assets', target: 'public/assets', type: 'dir' },
+  { source: 'js', target: 'public/js', type: 'dir' },
+  { source: 'legal', target: 'public/legal', type: 'dir' }
 ];
 
 function normalizeRel(relPath) {

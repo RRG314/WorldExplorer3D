@@ -104,3 +104,20 @@ firebase deploy --only firestore:rules
 firebase deploy --only firestore:indexes
 firebase deploy --only functions
 ```
+
+## 9. Firebase Preview/Promotion Flow
+
+For the safe staging flow, switch to the staging Firebase web config first:
+
+```bash
+npm run firebase:config:staging
+npm run preview:deploy -- my-fix
+```
+
+For production-targeted work, switch back to the production Firebase web config:
+
+```bash
+npm run firebase:config:production
+```
+
+See `FIREBASE_RELEASE_WORKFLOW.md` and `STAGING_FIREBASE_SETUP.md` for the full staging/production rule set.
