@@ -1,7 +1,9 @@
 # World Explorer 3D
 
 [![Runtime Verify](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=main)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
-[![Version](https://img.shields.io/badge/version-3.0.0-41b9a5)](CHANGELOG.md)
+[![Secret Scan](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml/badge.svg?branch=main)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml)
+[![GitHub Pages](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml/badge.svg?branch=main)](https://rrg314.github.io/WorldExplorer3D/)
+[![Release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=semver)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
 [![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
 
 World Explorer 3D is a browser-based geospatial exploration game built around real-world map context. Pick a preset city, use the interactive globe, or enter coordinates, then explore by walking, driving, flying, boating, or changing worlds entirely.
@@ -63,10 +65,11 @@ Core exploration can run locally without production credentials. Account, multip
 ```bash
 npm run sync:public
 npm run verify:mirror
+npm run runtime:verify
 npm run release:verify
 ```
 
-The release gate covers syntax and module integrity, mirror parity, Firestore rules, local-data safety, mobile controls, editor/multiplayer surfaces, building and block contracts, planetary round trips, world-provider fallbacks, ocean/biome behavior, and a global location matrix.
+`runtime:verify` is the fast pull-request gate. The full release gate additionally covers Firestore rules, mobile controls, editor/multiplayer surfaces, planetary round trips, world-provider fallbacks, ocean/biome behavior, and the global location matrix.
 
 ## Repository Layout
 
