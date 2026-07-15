@@ -878,3 +878,14 @@ body.editor-workspace-open .floatMenu.open .floatItems{display:none!important}
   .pro-access-panel{top:max(54px,calc(env(safe-area-inset-top) + 52px));padding:10px}
   .room-chat-drawer{right:8px;bottom:max(8px,calc(env(safe-area-inset-bottom) + 8px));width:min(360px,calc(100vw - 12px))}
 }
+
+@media (pointer:coarse){
+  #multiplayerMenu{position:relative;left:auto!important;bottom:auto!important;z-index:auto}
+  .floatBtn.multiplayer{width:100%;min-width:0;height:52px;border-radius:12px}
+  #tutorialHintCard{right:max(6px,env(safe-area-inset-right))!important;bottom:max(72px,calc(env(safe-area-inset-bottom) + 66px))!important}
+  body:has(.floatMenu.open) #tutorialHintCard{display:none!important}
+  #multiplayerMenu.open .floatItems{
+    left:max(6px,env(safe-area-inset-left))!important;right:max(6px,env(safe-area-inset-right))!important;
+    bottom:max(66px,calc(env(safe-area-inset-bottom) + 60px))!important
+  }
+}

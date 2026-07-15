@@ -59,6 +59,13 @@ function scheduleProPanelAutoHide() {
     proPanelAutoHideTimer = null;
   }
 
+  const touchLayout = (navigator.maxTouchPoints || 0) > 0 ||
+    window.matchMedia?.('(pointer: coarse)').matches;
+  if (touchLayout) {
+    proAccessPanel.hidden = true;
+    return;
+  }
+
   proAccessPanel.hidden = false;
   proPanelAutoHideTimer = window.setTimeout(() => {
     proAccessPanel.hidden = true;

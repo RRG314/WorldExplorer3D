@@ -7,6 +7,7 @@ const steps = [
   { name: 'Inferred building coverage', cmd: [process.execPath, 'scripts/test-inferred-building-coverage.mjs'] },
   { name: 'Firestore rules', cmd: [process.execPath, 'scripts/test-rules.mjs'] },
   { name: 'Local data safety', cmd: [process.execPath, 'scripts/test-local-data-safety.mjs'] },
+  { name: 'Mobile touch controls', cmd: [process.execPath, 'scripts/test-mobile-controls.mjs'] },
   { name: 'Runtime invariants', cmd: [process.execPath, 'scripts/test-runtime-invariants.mjs'] },
   { name: 'Editor and multiplayer transitions', cmd: [process.execPath, 'scripts/test-editor-multiplayer-surfaces.mjs'] },
   { name: 'Block builder contracts', cmd: [process.execPath, 'scripts/test-block-builder-contract.mjs'] },

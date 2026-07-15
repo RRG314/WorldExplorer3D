@@ -464,7 +464,17 @@ function setupUI() {
     if (!menu) return;
     const isOpen = menu.classList.contains('open');
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
-    if (!isOpen) menu.classList.add('open');
+    if (!isOpen) {
+      menu.classList.add('open');
+      const hideTouchTutorial = () => {
+        const tutorialCard = document.getElementById('tutorialHintCard');
+        if (isTouchPreferredClient && menu.classList.contains('open') && tutorialCard) {
+          tutorialCard.style.display = 'none';
+        }
+      };
+      hideTouchTutorial();
+      setTimeout(hideTouchTutorial, 300);
+    }
   };
 
   const floatMenuContainer = document.getElementById('floatMenuContainer');

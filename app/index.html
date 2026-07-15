@@ -10,8 +10,8 @@
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
-<link rel="stylesheet" href="styles/title-shell.css?v=86">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=85">
+<link rel="stylesheet" href="styles/title-shell.css?v=87">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=86">
 <link rel="stylesheet" href="styles/block-builder.css?v=2">
 <link rel="stylesheet" href="styles/universe.css?v=3">
 <link rel="stylesheet" href="styles/fishing-game.css?v=1">
@@ -868,7 +868,7 @@ Explore the area
 <!-- Top Row: Exploration and Environment -->
 <div class="floatMenuRow">
 <div class="floatMenu" id="exploreMenu">
-<button class="floatBtn explore" id="exploreBtn"><span class="btnIcon">🌍</span><span class="btnText">Exploration</span></button>
+<button class="floatBtn explore" id="exploreBtn" type="button" aria-label="Travel modes" data-mobile-label="Modes"><span class="btnIcon">🌍</span><span class="btnText">Exploration</span></button>
 <div class="floatItems">
 <div class="floatItem" id="fDriving">🚗 Driving Mode</div>
 <div class="floatItem" id="fWalk">🚶 Walk Mode</div>
@@ -884,7 +884,7 @@ Explore the area
 </div>
 
 <div class="floatMenu" id="travelMenu">
-<button class="floatBtn travel" id="travelBtn"><span class="btnIcon">🌿</span><span class="btnText">Environment</span></button>
+<button class="floatBtn travel" id="travelBtn" type="button" aria-label="Environment controls" data-mobile-label="World"><span class="btnIcon">🌿</span><span class="btnText">Environment</span></button>
 <div class="floatItems">
 <div class="floatItem" id="fSatellite">🛰️ Satellite</div>
 <div class="floatItem" id="fRoads">🛣️ Show Roads</div>
@@ -903,7 +903,7 @@ Explore the area
 <!-- Bottom Row: Game Mode and Real Estate -->
 <div class="floatMenuRow">
 <div class="floatMenu" id="gameMenu">
-<button class="floatBtn game" id="gameBtn"><span class="btnIcon">🎮</span><span class="btnText">Game Mode</span></button>
+<button class="floatBtn game" id="gameBtn" type="button" aria-label="Games" data-mobile-label="Games"><span class="btnIcon">🎮</span><span class="btnText">Game Mode</span></button>
 <div class="floatItems">
 <div class="floatItem" id="fActivities">🌍 Browse Games</div>
 <div class="floatItem" id="fRoomGames">👥 Room Games</div>
@@ -918,7 +918,7 @@ Explore the area
 </div>
 
 <div class="floatMenu" id="realEstateMenu">
-<button class="floatBtn realEstate" id="realEstateFloatBtn"><span class="btnIcon">🏘️</span><span class="btnText">Land &amp; Property</span></button>
+<button class="floatBtn realEstate" id="realEstateFloatBtn" type="button" aria-label="Build, land, and property" data-mobile-label="Build"><span class="btnIcon">🏘️</span><span class="btnText">Land &amp; Property</span></button>
 <div class="floatItems">
 <div class="floatItem" id="fEditorMode">🧱 Build with Blocks</div>
 <div class="floatItem" id="fEditorMine" hidden>📬 My Submissions</div>
@@ -932,7 +932,7 @@ Explore the area
 </div>
 <div class="floatMenuRow">
 <div class="floatMenu" id="multiplayerMenu">
-<button class="floatBtn multiplayer" id="multiplayerBtn" title="Multiplayer" aria-label="Multiplayer"><span class="btnIcon">👥</span><span class="btnText">Multiplayer</span></button>
+<button class="floatBtn multiplayer" id="multiplayerBtn" type="button" title="Multiplayer" aria-label="Multiplayer" data-mobile-label="Social"><span class="btnIcon">👥</span><span class="btnText">Multiplayer</span></button>
 <div class="floatItems">
 <div class="floatItem" id="fMpCreate">🆕 Create Room</div>
 <div class="floatItem" id="fMpJoin">🔑 Join Room</div>
@@ -1544,6 +1544,6 @@ Explore the area
 
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=84"></script>
-<script type="module" src="js/app-auth-shell.js?v=84"></script>
-<script type="module" src="js/bootstrap.js?v=200"></script>
+<script type="module" src="js/app-auth-shell.js?v=85"></script>
+<script type="module" src="js/bootstrap.js?v=202"></script>
 </body></html>

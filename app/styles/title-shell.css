@@ -422,14 +422,6 @@ input,textarea{-webkit-user-select:text;user-select:text}
 }
 
 @media (max-width: 480px) {
-  .floatMenuContainer{bottom:5px;right:5px}
-  .floatBtn{width:44px;min-width:44px;height:44px;padding:0;border-radius:50%;font-size:12px;gap:0}
-  .btnIcon{font-size:16px}
-  .btnText{display:none}
-  .floatItems{min-width:120px;max-width:140px;bottom:50px}
-  .floatItem{padding:6px 10px;font-size:10px}
-  .floatMenuRow{gap:6px}
-
   /* Title screen for small phones */
   .logo{font-size:clamp(28px, 10vw, 48px);letter-spacing:2px}
   .sub{font-size:13px;letter-spacing:2px;margin:0}
@@ -548,4 +540,37 @@ input,textarea{-webkit-user-select:text;user-select:text}
     --debug-overlay-top:8px;
     --perf-panel-top:8px;
   }
+}
+
+@media (pointer:coarse) {
+  .floatMenuContainer{
+    left:50%;right:auto;bottom:max(6px,env(safe-area-inset-bottom));
+    width:min(480px,calc(100vw - 12px));transform:translateX(-50%);
+    grid-template-columns:repeat(5,minmax(0,1fr));align-items:end;gap:6px;pointer-events:none
+  }
+  .floatMenuContainer.show{display:grid}
+  .floatMenuRow{display:contents}
+  .floatMenu{width:auto;min-width:0;pointer-events:auto}
+  .floatBtn{width:100%;min-width:0;height:52px;padding:4px 2px;border-radius:12px;flex-direction:column;gap:1px;font-size:12px}
+  .btnIcon{display:block;font-size:17px;line-height:18px}
+  .btnText{display:none}
+  .floatBtn::after{
+    content:attr(data-mobile-label);display:block;max-width:100%;color:currentColor;
+    font-size:9px;font-weight:700;line-height:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap
+  }
+  .floatItems{
+    left:50%;right:auto;bottom:max(66px,calc(env(safe-area-inset-bottom) + 60px));
+    width:min(560px,calc(100vw - 12px));transform:translateX(-50%);
+    min-width:0;max-width:none;max-height:min(52dvh,430px);
+    grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;padding:9px;
+    overflow-y:auto;overscroll-behavior:contain;background:rgba(15,23,42,0.9);
+    border:1px solid rgba(255,255,255,0.22);border-radius:14px;
+    box-shadow:0 16px 38px rgba(2,6,23,0.42);backdrop-filter:blur(10px)
+  }
+  .floatMenu.open .floatItems{display:grid}
+  .floatItem{min-height:44px;padding:8px 10px;display:flex;align-items:center;font-size:11px;line-height:14px;white-space:normal}
+}
+
+@media (max-height:500px) and (orientation:landscape) and (pointer:coarse) {
+  .floatItems{max-height:calc(100dvh - 76px);grid-template-columns:repeat(3,minmax(0,1fr))}
 }
