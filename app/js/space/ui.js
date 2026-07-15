@@ -1,6 +1,43 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 
+const MAX_LOCAL_SPACECRAFT_SPEED_KM_S = 192.2;
+const BODY_RADIUS_KM = Object.freeze({
+  sun: 695700,
+  mercury: 2439.7,
+  venus: 6051.8,
+  earth: 6371,
+  moon: 1737.4,
+  mars: 3389.5,
+  jupiter: 69911,
+  saturn: 58232,
+  uranus: 25362,
+  neptune: 24622
+});
+
+function setMetric(labelId, valueId, unitId, label, value, unit) {
+  const labelElement = document.getElementById(labelId);
+  const valueElement = document.getElementById(valueId);
+  const unitElement = document.getElementById(unitId);
+  if (labelElement) labelElement.textContent = label;
+  if (valueElement) valueElement.textContent = value;
+  if (unitElement) unitElement.textContent = unit;
+}
+
+function formatLightYears(value) {
+  if (!Number.isFinite(value)) return { value: '---', unit: '' };
+  if (value >= 1e6) return { value: (value / 1e6).toFixed(value >= 1e7 ? 1 : 2), unit: 'million ly' };
+  if (value >= 1000) return { value: Math.round(value).toLocaleString(), unit: 'ly' };
+  if (value >= 1) return { value: value.toFixed(value >= 100 ? 0 : 1), unit: 'ly' };
+  const au = value * 63241.077;
+  return { value: au.toFixed(au >= 100 ? 0 : 1), unit: 'AU' };
+}
+
+function formatAcceleration(value) {
+  if (!Number.isFinite(value) || value <= 1) return 'real time';
+  return `time acceleration ×${value.toExponential(1)}`;
+}
+
 export function initSpaceFlightUI(attemptLanding) {
   console.log("Initializing Space Flight UI...");
 
@@ -22,11 +59,11 @@ export function initSpaceFlightUI(attemptLanding) {
       <span style="font-size:24px;">🚀</span> SPACE FLIGHT
     </div>
     <div style="margin-bottom:6px;">Nearest: <span id="sfDestination" style="color:#10b981;font-weight:600;">---</span></div>
-    <div style="margin-bottom:6px;">Altitude: <span id="sfAltitude">0</span> km</div>
-    <div style="margin-bottom:6px;">Speed: <span id="sfSpeed">0</span> km/s</div>
-    <div style="margin-bottom:12px;">Distance: <span id="sfDistance" style="color:#fbbf24;">---</span> km</div>
+    <div style="margin-bottom:6px;"><span id="sfAltitudeLabel">Altitude</span>: <span id="sfAltitude">0</span> <span id="sfAltitudeUnit">km</span></div>
+    <div style="margin-bottom:6px;"><span id="sfSpeedLabel">Velocity</span>: <span id="sfSpeed">0</span> <span id="sfSpeedUnit">km/s</span></div>
+    <div style="margin-bottom:12px;"><span id="sfDistanceLabel">Distance</span>: <span id="sfDistance" style="color:#fbbf24;">---</span> <span id="sfDistanceUnit">km</span></div>
     <div style="background:rgba(102,126,234,0.2);border-radius:8px;padding:10px;margin-bottom:12px;">
-      <div style="font-size:11px;opacity:0.8;margin-bottom:6px;">LANDING ZONE</div>
+      <div id="sfZoneLabel" style="font-size:11px;opacity:0.8;margin-bottom:6px;">LANDING ZONE</div>
       <div style="height:8px;background:rgba(0,0,0,0.3);border-radius:4px;overflow:hidden;">
         <div id="sfLandingBar" style="height:100%;width:0%;background:linear-gradient(90deg,#10b981,#34d399);transition:width 0.3s;"></div>
       </div>
@@ -121,8 +158,12 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
 
   let nearestBody = null;
   let nearestDist = Infinity;
+  const universeTarget = appCtx.getUniverseHudTarget?.();
 
-  if (typeof appCtx.getAllSpaceBodies === 'function') {
+  if (universeTarget?.position) {
+    nearestBody = universeTarget;
+    nearestDist = rocket.position.distanceTo(universeTarget.position);
+  } else if (typeof appCtx.getAllSpaceBodies === 'function') {
     const bodies = appCtx.getAllSpaceBodies();
     bodies.forEach((body) => {
       const dist = rocket.position.distanceTo(body.position);
@@ -133,7 +174,7 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
     });
   }
 
-  if (!nearestBody) {
+  if (!nearestBody && !universeTarget) {
     const target = appCtx.spaceFlight.destination === 'moon' ? appCtx.spaceFlight.moon : appCtx.spaceFlight.earth;
     const targetRadius = appCtx.spaceFlight.destination === 'moon' ? SPACE_CONSTANTS.MOON_SIZE : SPACE_CONSTANTS.EARTH_SIZE;
     nearestDist = rocket.position.distanceTo(target.position);
@@ -157,10 +198,50 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
 
   document.getElementById('sfDestination').textContent = activeHudBody.name;
   const altitude = Math.max(0, activeDist - activeHudBody.radius);
-  document.getElementById('sfAltitude').textContent = Math.floor(altitude);
   const displaySpeed = appCtx.spaceFlight.velocity ? appCtx.spaceFlight.velocity.length() : appCtx.spaceFlight.speed;
-  document.getElementById('sfSpeed').textContent = displaySpeed.toFixed(1);
-  document.getElementById('sfDistance').textContent = Math.floor(activeDist);
+  const zoneLabel = document.getElementById('sfZoneLabel');
+
+  if (universeTarget?.navigation) {
+    const navigation = universeTarget.navigation;
+    const offset = formatLightYears(navigation.offsetLy);
+    const span = formatLightYears(navigation.frameSpanLy);
+    const velocityIsRelativistic = navigation.velocityC >= 0.01;
+    setMetric('sfAltitudeLabel', 'sfAltitude', 'sfAltitudeUnit', 'Frame offset', offset.value, offset.unit);
+    setMetric(
+      'sfSpeedLabel',
+      'sfSpeed',
+      'sfSpeedUnit',
+      'Velocity',
+      velocityIsRelativistic ? navigation.velocityC.toFixed(3) : navigation.velocityKmS.toFixed(0),
+      velocityIsRelativistic ? 'c' : 'km/s'
+    );
+    setMetric('sfDistanceLabel', 'sfDistance', 'sfDistanceUnit', 'Frame span', span.value, span.unit);
+    if (zoneLabel) zoneLabel.textContent = 'NAVIGATION FRAME';
+  } else {
+    const physicalRadius = BODY_RADIUS_KM[String(activeHudBody.name || '').toLowerCase()];
+    const sceneToKm = physicalRadius && activeHudBody.radius > 0
+      ? physicalRadius / activeHudBody.radius
+      : null;
+    const speedKmS = Math.max(0, Math.min(1, displaySpeed / SPACE_CONSTANTS.MAX_SPEED)) * MAX_LOCAL_SPACECRAFT_SPEED_KM_S;
+    setMetric(
+      'sfAltitudeLabel',
+      'sfAltitude',
+      'sfAltitudeUnit',
+      'Altitude',
+      sceneToKm ? Math.round(altitude * sceneToKm).toLocaleString() : Math.floor(altitude).toLocaleString(),
+      sceneToKm ? 'km' : 'display u'
+    );
+    setMetric('sfSpeedLabel', 'sfSpeed', 'sfSpeedUnit', 'Velocity', speedKmS.toFixed(1), 'km/s');
+    setMetric(
+      'sfDistanceLabel',
+      'sfDistance',
+      'sfDistanceUnit',
+      'Distance',
+      sceneToKm ? Math.round(activeDist * sceneToKm).toLocaleString() : Math.floor(activeDist).toLocaleString(),
+      sceneToKm ? 'km' : 'display u'
+    );
+    if (zoneLabel) zoneLabel.textContent = 'LANDING ZONE';
+  }
 
   const landingProgress = Math.max(0, 1 - (activeDist - activeHudBody.radius) / SPACE_CONSTANTS.LANDING_DISTANCE);
   const landingBar = document.getElementById('sfLandingBar');
@@ -171,7 +252,24 @@ export function updateSpaceFlightHUD(findLandableBodyByName) {
 
   const canLand = activeDist < SPACE_CONSTANTS.LANDING_DISTANCE + activeHudBody.radius;
 
-  if (canLand && activeHudBody.landable) {
+  if (universeTarget) {
+    if (landingBar) landingBar.style.width = '0%';
+    if (landingText) {
+      const dilation = universeTarget.encounter?.timeDilation;
+      const generatedEncounter = universeTarget.encounter?.type === 'generated-asteroids'
+        ? `Generated asteroid field · X pulse · ${universeTarget.encounter.active} remaining`
+        : '';
+      landingText.textContent = Number.isFinite(dilation)
+        ? `Relativistic clock rate: ${(dilation * 100).toFixed(1)}%`
+        : generatedEncounter || `${formatAcceleration(universeTarget.navigation?.timeAcceleration)} · ${universeTarget.address}`;
+    }
+    if (landBtn) {
+      landBtn.disabled = true;
+      landBtn.style.opacity = '0.7';
+      landBtn.style.background = '#315d9d';
+      landBtn.textContent = 'EXPLORING ' + activeHudBody.name.toUpperCase();
+    }
+  } else if (canLand && activeHudBody.landable) {
     if (landingText) landingText.textContent = 'IN RANGE - Ready to land!';
     if (landBtn) {
       landBtn.disabled = false;

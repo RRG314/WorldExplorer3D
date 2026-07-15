@@ -335,6 +335,7 @@ function setStage(nextStage) {
 function getCurrentTravelMode() {
   if (appCtx.spaceFlight?.active || (typeof appCtx.isEnv === 'function' && appCtx.isEnv(appCtx.ENV?.SPACE_FLIGHT))) return 'space';
   if (appCtx.onMoon) return 'moon';
+  if (appCtx.planeMode?.active) return 'plane';
   if (appCtx.droneMode) return 'drone';
   if (appCtx.Walk?.state?.mode === 'walk') return 'walk';
   return 'drive';

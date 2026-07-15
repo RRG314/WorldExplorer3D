@@ -752,6 +752,7 @@ async function deleteUserData(uid) {
 
   await deleteDocsByQuery(db.collection('flowerLeaderboard').where('uid', '==', uid), 200, 'flowerLeaderboard(uid)');
   await deleteDocsByQuery(db.collection('paintTownLeaderboard').where('uid', '==', uid), 200, 'paintTownLeaderboard(uid)');
+  await deleteDocsByQuery(db.collection('fishingLeaderboard').where('uid', '==', uid), 200, 'fishingLeaderboard(uid)');
   await deleteDocsByQuery(db.collection('activityFeed').where('uid', '==', uid), 200, 'activityFeed(uid)');
   await db.collection('explorerLeaderboard').doc(uid).delete().catch(() => {});
 

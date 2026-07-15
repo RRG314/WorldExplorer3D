@@ -2,7 +2,7 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   buildWaterShaderLibrary,
   inferWaterRenderContext
-} from "../water-dynamics.js?v=3";
+} from "../water-dynamics.js?v=4";
 
 export function registerWaterWaveMaterial(material, options = {}) {
   if (!material || material.userData?.weWaterWavePatched || typeof THREE === 'undefined') return material;

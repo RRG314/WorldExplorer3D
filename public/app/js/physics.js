@@ -1,6 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import { isRoadSurfaceReachable } from "./structure-semantics.js?v=12";
-import { updateDrone } from "./physics/drone-flight.js?v=2";
+import { updateDrone } from "./physics/drone-flight.js?v=3";
+import { updatePlane } from "./plane-mode.js?v=5";
 import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=1";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=1";
 // physics.js - Car physics, building collision, drone movement
@@ -103,7 +104,19 @@ function update(dt) {
     if (typeof appCtx.updateBoatMode === 'function') {
       appCtx.updateBoatMode(dt);
     }
+    if (typeof appCtx.updateFishingGame === 'function') appCtx.updateFishingGame(dt);
     if (typeof appCtx.updateMode === 'function') appCtx.updateMode(dt);
+    return;
+  }
+
+  if ((appCtx.fishingGame?.open || appCtx.fishingGame?.active) && typeof appCtx.updateFishingGame === 'function') {
+    appCtx.updateFishingGame(dt);
+  }
+
+  if (appCtx.planeMode?.active) {
+    updatePlane(dt);
+    if (typeof appCtx.updateMode === 'function') appCtx.updateMode(dt);
+    if (typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
     return;
   }
 
@@ -147,8 +160,8 @@ function update(dt) {
 
   if (typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
 
-  const left = appCtx.keys.KeyA,right = appCtx.keys.KeyD;
-  const gas = appCtx.keys.KeyW,reverse = appCtx.keys.KeyS;
+  const left = appCtx.keys.ArrowLeft,right = appCtx.keys.ArrowRight;
+  const gas = appCtx.keys.ArrowUp,reverse = appCtx.keys.ArrowDown;
   const braking = appCtx.keys.Space;
   const boostKey = appCtx.keys.ControlLeft || appCtx.keys.ControlRight;
 
@@ -302,8 +315,8 @@ function update(dt) {
 
   const spdAbs = Math.abs(appCtx.car.speed);
 
-  const maxSteerLow = 0.72;
-  const maxSteerHigh = 0.22;
+  const maxSteerLow = 0.82;
+  const maxSteerHigh = 0.2;
   const steerFadeMin = 5;
   const steerFadeMax = 95;
 
@@ -324,7 +337,7 @@ function update(dt) {
   // Reverse steering keeps the same direction (arcade style).
   const steerAngle = appCtx.car.steerSm * Math.min(
     1.08,
-    maxSteer * handbrakeSteerBoost * (1 + lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.22 : 0.12))
+    maxSteer * handbrakeSteerBoost * (1 + lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.3 : 0.16))
   );
   const driftStartSteer = 0.12;
   const driftHoldSteer = 0.05;
@@ -392,19 +405,27 @@ function update(dt) {
   const v = appCtx.car.speed;
   let steerAuthority = appCtx.car.onRoad ? 1.02 : 0.76;
   if (!isPlanetarySurface() && lowSpeedTurnBoost > 0) {
-    steerAuthority *= 1 + lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.24 : 0.12);
+    steerAuthority *= 1 + lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.34 : 0.18);
   }
   if (!isPlanetarySurface() && (isDrifting || handbrakeTurnIntent)) {
     steerAuthority *= appCtx.car.onRoad ? 1.22 : 1.1;
   }
-  const yawRateTarget = v / Math.max(1e-3, wheelBase) * Math.tan(steerAngle * steerAuthority);
+  const rawYawRateTarget = v / Math.max(1e-3, wheelBase) * Math.tan(steerAngle * steerAuthority);
+  const maxYawRate = isPlanetarySurface() ? Infinity : 0.58 + 1.02 * clamp01(1 - spdAbs / 72);
+  const yawRateTarget = Math.max(-maxYawRate, Math.min(maxYawRate, rawYawRateTarget));
 
   appCtx.car.yawRate += (yawRateTarget - appCtx.car.yawRate) * (1 - Math.exp(-dt * yawResponse));
-  appCtx.car.yawRate *= Math.exp(-dt * yawDamp);
+  if (isPlanetarySurface()) {
+    appCtx.car.yawRate *= Math.exp(-dt * yawDamp);
+  } else if (steerMag < 0.04) {
+    appCtx.car.yawRate *= Math.exp(-dt * yawDamp);
+  } else if (!isDrifting) {
+    appCtx.car.yawRate *= Math.exp(-dt * yawDamp * 0.08);
+  }
   const parkingPivotIntent = !isPlanetarySurface() && steerMag >= 0.16 && spdAbs < 9.5 && (braking || reverse || throttleInput === 0);
   if (parkingPivotIntent) {
     const pivotBlend = clamp01(1 - spdAbs / 9.5);
-    appCtx.car.yawRate += appCtx.car.steerSm * (appCtx.car.onRoad ? 1.95 : 1.15) * pivotBlend * dt * 3.1;
+    appCtx.car.yawRate += appCtx.car.steerSm * (appCtx.car.onRoad ? 2.2 : 1.32) * pivotBlend * dt * 3.25;
   }
 
   if (canAccelerate) {

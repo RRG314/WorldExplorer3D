@@ -1,13 +1,13 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
-import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=3";
-import { prepareTitleEnvironment } from "./planetary/entry.js?v=3";
+import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=8";
+import { prepareTitleEnvironment } from "./planetary/entry.js?v=5";
 import { initMapInteractions } from "./ui/map-interactions.js?v=59";
-import { initMobileControls } from "./ui/mobile-controls.js?v=61";
+import { initMobileControls } from "./ui/mobile-controls.js?v=62";
 import { initShareUi } from "./ui/share-links.js?v=60";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=67";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=71";
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -781,6 +781,12 @@ function setupUI() {
       appCtx.droneMode = true;
       emitTutorialEvent('mode_switched', { mode: 'drone', source: 'ui_button' });
     }
+    updateControlsModeUI();
+    closeAllFloatMenus();
+  });
+
+  document.getElementById('fPlane')?.addEventListener('click', () => {
+    appCtx.setTravelMode?.('plane', { source: 'ui_button' });
     updateControlsModeUI();
     closeAllFloatMenus();
   });

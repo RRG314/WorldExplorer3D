@@ -3,6 +3,41 @@ import { currentActorWorldPosition } from "./earth-location.js?v=2";
 
 const REUSE_EXISTING_EARTH_WORLD = true;
 
+function showEarthResumeLoad() {
+  appCtx.earthResumePending = true;
+  appCtx.showLoad?.('Restoring the local Earth world...', {
+    background: 'loading-bg.jpg',
+    hideSpinner: false,
+    transition: true,
+    bold: true,
+    overlay: 0.34
+  });
+}
+
+function finishEarthResumeLoad() {
+  appCtx.earthResumePending = false;
+  appCtx.hideLoad?.();
+}
+
+function waitForRenderedFrames(frameCount = 2, timeoutMs = 280) {
+  return new Promise((resolve) => {
+    let remaining = Math.max(1, frameCount);
+    let settled = false;
+    const finish = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+    const onFrame = () => {
+      remaining -= 1;
+      if (remaining <= 0) finish();
+      else requestAnimationFrame(onFrame);
+    };
+    requestAnimationFrame(onFrame);
+    globalThis.setTimeout(finish, timeoutMs);
+  });
+}
+
 function getEarthSessionState() {
   if (!appCtx.earthSessionState || typeof appCtx.earthSessionState !== 'object') {
     appCtx.earthSessionState = {
@@ -51,12 +86,7 @@ function currentSelectionSignature() {
 }
 
 function hasLoadedEarthWorld() {
-  return !!(
-    (Array.isArray(appCtx.roads) && appCtx.roads.length > 0) ||
-    (Array.isArray(appCtx.roadMeshes) && appCtx.roadMeshes.length > 0) ||
-    (Array.isArray(appCtx.buildings) && appCtx.buildings.length > 0) ||
-    (Array.isArray(appCtx.buildingMeshes) && appCtx.buildingMeshes.length > 0)
-  );
+  return appCtx.initialEarthWorldReady === true;
 }
 
 function setGroundPlaneVisibility(visible) {
@@ -104,6 +134,14 @@ function restoreEarthSceneMeshes() {
   appCtx.earthSceneVisible = true;
 }
 
+async function restoreEarthActorOwnership() {
+  appCtx.onMoon = false;
+  appCtx.onMars = false;
+  appCtx.travelingToMoon = false;
+  await appCtx.setPlanetaryVehicle?.('earth');
+  appCtx.setPlanetaryCharacter?.('earth');
+}
+
 function captureCurrentPose() {
   const state = getEarthSessionState();
   const actor = currentActorWorldPosition();
@@ -124,6 +162,14 @@ function captureCurrentPose() {
     nextPose.droneY = Number(appCtx.drone.y);
     nextPose.dronePitch = Number(appCtx.drone.pitch);
     nextPose.droneRoll = Number(appCtx.drone.roll);
+  } else if (travelMode === 'plane' && appCtx.planeMode) {
+    nextPose.angle = Number(appCtx.planeMode.yaw ?? nextPose.angle) || 0;
+    nextPose.planeY = Number(appCtx.planeMode.y);
+    nextPose.planePitch = Number(appCtx.planeMode.pitch);
+    nextPose.planeRoll = Number(appCtx.planeMode.roll);
+    nextPose.planeSpeed = Number(appCtx.planeMode.speed);
+    nextPose.planeThrottle = Number(appCtx.planeMode.throttle);
+    nextPose.planeAirborne = !!appCtx.planeMode.airborne;
   }
 
   state.pose = nextPose;
@@ -199,19 +245,30 @@ function restorePoseFromSession() {
 
   if (typeof appCtx.setTravelMode === 'function') {
     const resumeMode =
-      pose?.mode === 'walk' || pose?.mode === 'drone' || pose?.mode === 'boat' ?
+      pose?.mode === 'walk' || pose?.mode === 'drone' || pose?.mode === 'boat' || pose?.mode === 'plane' ?
         pose.mode :
         'drive';
     const modeOptions = {
       source: 'earth_resume',
       force: true,
-      emitTutorial: false
+      emitTutorial: false,
+      allowDuringEarthResume: true
     };
     if (resumeMode === 'boat') {
       modeOptions.spawnX = Number.isFinite(pose?.x) ? pose.x : resolved?.x;
       modeOptions.spawnZ = Number.isFinite(pose?.z) ? pose.z : resolved?.z;
       modeOptions.yaw = Number.isFinite(pose?.angle) ? pose.angle : targetAngle;
       modeOptions.entryMode = 'walk';
+    } else if (resumeMode === 'plane') {
+      modeOptions.x = Number.isFinite(pose?.x) ? pose.x : resolved?.x;
+      modeOptions.z = Number.isFinite(pose?.z) ? pose.z : resolved?.z;
+      modeOptions.y = Number.isFinite(pose?.planeY) ? pose.planeY : undefined;
+      modeOptions.yaw = Number.isFinite(pose?.angle) ? pose.angle : targetAngle;
+      modeOptions.pitch = Number.isFinite(pose?.planePitch) ? pose.planePitch : 0;
+      modeOptions.roll = Number.isFinite(pose?.planeRoll) ? pose.planeRoll : 0;
+      modeOptions.speed = Number.isFinite(pose?.planeSpeed) ? pose.planeSpeed : 0;
+      modeOptions.throttle = Number.isFinite(pose?.planeThrottle) ? pose.planeThrottle : 0;
+      modeOptions.airborne = pose?.planeAirborne === true;
     }
     appCtx.setTravelMode(resumeMode, modeOptions);
     if (resumeMode === 'drone' && appCtx.drone) {
@@ -228,13 +285,17 @@ function restorePoseFromSession() {
   return resolved;
 }
 
-function finalizeEarthResume(resolved) {
+async function finalizeEarthResume(resolved) {
   appCtx.setEarthSceneVisible?.(true);
+  const x = Number.isFinite(resolved?.x) ? resolved.x : Number(appCtx.car?.x) || 0;
+  const z = Number.isFinite(resolved?.z) ? resolved.z : Number(appCtx.car?.z) || 0;
   if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
-    const x = Number.isFinite(resolved?.x) ? resolved.x : Number(appCtx.car?.x) || 0;
-    const z = Number.isFinite(resolved?.z) ? resolved.z : Number(appCtx.car?.z) || 0;
     appCtx.updateTerrainAround(x, z);
   }
+  appCtx.requestWorldSurfaceSync?.({ force: true, source: 'earth_resume' });
+  appCtx.resumeEarthStreaming?.(1400);
+  appCtx.updateEarthWorldStreaming?.(1);
+  appCtx.updateWorldLod?.(true);
   if (typeof appCtx.refreshBoatAvailability === 'function') {
     appCtx.refreshBoatAvailability(true);
   }
@@ -247,6 +308,9 @@ function finalizeEarthResume(resolved) {
   if (typeof appCtx.updateControlsModeUI === 'function') {
     appCtx.updateControlsModeUI();
   }
+  await waitForRenderedFrames();
+  appCtx.updateWorldLod?.(true);
+  appCtx.lastTime = performance.now();
   stampLoadedSelection();
 }
 
@@ -285,29 +349,33 @@ export async function reloadEarthWorldSession(options = {}) {
     return !appCtx.ENV?.EARTH || typeof appCtx.getEnv !== 'function' || appCtx.getEnv() === appCtx.ENV.EARTH;
   };
 
-  if (switchEnv && typeof appCtx.switchEnv === 'function' && appCtx.ENV?.EARTH) {
-    appCtx.switchEnv(appCtx.ENV.EARTH);
-  }
-  appCtx.loadingScreenMode = 'earth';
-  normalizeEarthSelection();
+  showEarthResumeLoad();
+  try {
+    if (switchEnv && typeof appCtx.switchEnv === 'function' && appCtx.ENV?.EARTH) {
+      appCtx.switchEnv(appCtx.ENV.EARTH);
+    }
+    await restoreEarthActorOwnership();
+    appCtx.loadingScreenMode = 'earth';
+    normalizeEarthSelection();
 
-  if (typeof appCtx.showTransitionLoad === 'function') {
-    await appCtx.showTransitionLoad('earth', transitionDurationMs);
-  }
-  if (!isCurrent()) return { aborted: true, resumed: false };
-  if (typeof appCtx.loadRoads === 'function') {
-    await appCtx.loadRoads();
-  }
-  if (!isCurrent()) return { aborted: true, resumed: false };
-  if (typeof appCtx.updateControlsModeUI === 'function') {
-    appCtx.updateControlsModeUI();
-  }
+    if (transitionDurationMs > 0) {
+      await new Promise((resolve) => globalThis.setTimeout(resolve, Math.min(transitionDurationMs, 240)));
+    }
+    if (!isCurrent()) return { aborted: true, resumed: false };
+    if (typeof appCtx.loadRoads === 'function') {
+      await appCtx.loadRoads();
+    }
+    if (!isCurrent()) return { aborted: true, resumed: false };
+    const resolved = restorePoseFromSession();
+    await finalizeEarthResume(resolved);
 
-  stampLoadedSelection();
-  return {
-    resumed: false,
-    selLoc: appCtx.selLoc === 'custom' ? 'custom' : String(appCtx.selLoc || 'baltimore')
-  };
+    return {
+      resumed: false,
+      selLoc: appCtx.selLoc === 'custom' ? 'custom' : String(appCtx.selLoc || 'baltimore')
+    };
+  } finally {
+    finishEarthResumeLoad();
+  }
 }
 
 export async function resumeEarthWorldSession(options = {}) {
@@ -318,32 +386,38 @@ export async function resumeEarthWorldSession(options = {}) {
     return !appCtx.ENV?.EARTH || typeof appCtx.getEnv !== 'function' || appCtx.getEnv() === appCtx.ENV.EARTH;
   };
 
-  if (switchEnv && typeof appCtx.switchEnv === 'function' && appCtx.ENV?.EARTH) {
-    appCtx.switchEnv(appCtx.ENV.EARTH);
-  }
-  appCtx.loadingScreenMode = 'earth';
+  showEarthResumeLoad();
+  try {
+    if (switchEnv && typeof appCtx.switchEnv === 'function' && appCtx.ENV?.EARTH) {
+      appCtx.switchEnv(appCtx.ENV.EARTH);
+    }
+    await restoreEarthActorOwnership();
+    appCtx.loadingScreenMode = 'earth';
 
-  if (!canResumeEarthSession()) {
+    if (!canResumeEarthSession()) {
+      restoreSelectionFromState();
+      return reloadEarthWorldSession({
+        transitionDurationMs,
+        switchEnv: false,
+        isCurrent
+      });
+    }
+
     restoreSelectionFromState();
-    return reloadEarthWorldSession({
-      transitionDurationMs,
-      switchEnv: false,
-      isCurrent
-    });
+    if (transitionDurationMs > 0) {
+      await new Promise((resolve) => globalThis.setTimeout(resolve, Math.min(transitionDurationMs, 240)));
+    }
+    if (!isCurrent()) return { aborted: true, resumed: false };
+
+    restoreEarthSceneMeshes();
+    const resolved = restorePoseFromSession();
+    await finalizeEarthResume(resolved);
+
+    return {
+      resumed: true,
+      selLoc: appCtx.selLoc === 'custom' ? 'custom' : String(appCtx.selLoc || 'baltimore')
+    };
+  } finally {
+    finishEarthResumeLoad();
   }
-
-  restoreSelectionFromState();
-  if (typeof appCtx.showTransitionLoad === 'function') {
-    await appCtx.showTransitionLoad('earth', transitionDurationMs);
-  }
-  if (!isCurrent()) return { aborted: true, resumed: false };
-
-  restoreEarthSceneMeshes();
-  const resolved = restorePoseFromSession();
-  finalizeEarthResume(resolved);
-
-  return {
-    resumed: true,
-    selLoc: appCtx.selLoc === 'custom' ? 'custom' : String(appCtx.selLoc || 'baltimore')
-  };
 }

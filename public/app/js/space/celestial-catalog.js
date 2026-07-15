@@ -1,4 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { createRoundStarMaterial } from '../sky/star-point-material.js?v=2';
 
 const CATALOG_RADIUS = 300000;
 const BACKDROP_MIN_RADIUS = 330000;
@@ -25,7 +26,6 @@ function seededRandom(seed = 0x47414941) {
 function createDeterministicBackdrop() {
   const random = seededRandom();
   const positions = [];
-  const colors = [];
   for (let i = 0; i < 5200; i++) {
     const theta = random() * Math.PI * 2;
     const phi = Math.acos(2 * random() - 1);
@@ -36,18 +36,13 @@ function createDeterministicBackdrop() {
       radius * Math.cos(phi),
       radius * sinPhi * Math.sin(theta)
     );
-    const brightness = 0.5 + random() * 0.42;
-    const temperature = random();
-    if (temperature < 0.18) colors.push(brightness * 0.76, brightness * 0.84, brightness);
-    else if (temperature > 0.88) colors.push(brightness, brightness * 0.82, brightness * 0.64);
-    else colors.push(brightness, brightness, brightness * 0.96);
   }
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  const points = new THREE.Points(geometry, new THREE.PointsMaterial({
-    size: 3,
-    vertexColors: true,
+  const points = new THREE.Points(geometry, createRoundStarMaterial({
+    size: 1.8,
+    sizeAttenuation: false,
+    vertexColors: false,
     transparent: true,
     opacity: 0.82,
     depthWrite: false
@@ -63,7 +58,7 @@ function createCatalogStars(group, catalog) {
     const radius = Math.max(260, Math.min(720, 570 - Number(star.mag || 0) * 58));
     const mesh = new THREE.Mesh(
       new THREE.SphereGeometry(radius, 8, 8),
-      new THREE.MeshBasicMaterial({ color: star.color || 0xffffff, fog: false })
+      new THREE.MeshBasicMaterial({ color: 0xffffff, fog: false })
     );
     mesh.position.copy(position);
     mesh.userData = { isCatalogStar: true, starIndex: index, star };

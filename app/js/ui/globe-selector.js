@@ -736,7 +736,7 @@ function createGlobeSelector(options = {}) {
     const lat = toFiniteNumber(latInput?.value);
     const lon = toFiniteNumber(lonInput?.value);
     if (lat == null || lon == null) return false;
-    setSelection(lat, lon, { name: selected?.name || appCtx.customLoc?.name || 'Manual Coordinates' });
+    setSelection(lat, lon, { name: 'Manual Coordinates' });
     reverseLookupPlace(lat, lon);
     return true;
   }
@@ -848,7 +848,8 @@ function createGlobeSelector(options = {}) {
   }
 
   function triggerStartHere() {
-    if (!selected && !applySelectionFromInputs()) {
+    const inputsApplied = applySelectionFromInputs();
+    if (!selected && !inputsApplied) {
       if (searchStatus) {
         searchStatus.textContent = 'Select a point on the globe or enter valid coordinates first.';
         searchStatus.style.color = '#dc2626';
@@ -881,13 +882,10 @@ function createGlobeSelector(options = {}) {
       close();
     });
   }
-  if (latInput) {
-    latInput.addEventListener('change', () => {
-      applySelectionFromInputs();
-    });
-  }
-  if (lonInput) {
-    lonInput.addEventListener('change', () => {
+  for (const coordinateInput of [latInput, lonInput]) {
+    coordinateInput?.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
       applySelectionFromInputs();
     });
   }

@@ -80,6 +80,10 @@ function toGridCoord(v) {
   return Math.round(v / BUILD_BLOCK_SIZE);
 }
 
+function toVerticalGridCoord(v) {
+  return Math.round(v / (BUILD_BLOCK_SIZE * 0.5)) * 0.5;
+}
+
 function toWorldCoord(g) {
   return g * BUILD_BLOCK_SIZE;
 }
@@ -168,7 +172,7 @@ function normalizeSharedBlockEntry(raw) {
   return {
     id: String(raw.id || `${Math.round(gx)}_${Math.round(gy)}_${Math.round(gz)}`),
     gx: Math.round(gx),
-    gy: Math.round(gy),
+    gy: toVerticalGridCoord(gy),
     gz: Math.round(gz),
     materialIndex: normalizeBlockMaterial(raw.materialIndex),
     shape: normalizeBlockShape(raw.shape),
@@ -313,7 +317,7 @@ function normalizeBuildEntry(raw) {
     lat: Number(lat.toFixed(7)),
     lon: Number(lon.toFixed(7)),
     gx: Number.isInteger(gx) ? gx : null,
-    gy: Math.round(gy),
+    gy: toVerticalGridCoord(gy),
     gz: Number.isInteger(gz) ? gz : null,
     materialIndex: normalizeBlockMaterial(raw.materialIndex),
     shape: normalizeBlockShape(raw.shape),
@@ -808,7 +812,7 @@ function refreshBlockBuilderForCurrentLocation() {
     if (!isFiniteNumber(worldPos.x) || !isFiniteNumber(worldPos.z)) return;
     const gx = toGridCoord(worldPos.x);
     const gz = toGridCoord(worldPos.z);
-    placeBuildBlock(gx, Math.round(entry.gy), gz, entry.materialIndex, {
+    placeBuildBlock(gx, toVerticalGridCoord(entry.gy), gz, entry.materialIndex, {
       persist: false,
       enforceLimit: false,
       shape: entry.shape,
@@ -834,6 +838,7 @@ const { handleBlockBuilderClick } = createBlockBuilderInteraction({
   placeBuildBlock,
   removeBuildBlock,
   toGridCoord,
+  toVerticalGridCoord,
   toWorldCoord
 });
 

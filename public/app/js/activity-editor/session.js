@@ -10,7 +10,7 @@ import {
   sanitizeText
 } from './schema.js?v=2';
 import { validateActivityDraft } from './validation.js?v=2';
-import { resolvePlacementCandidateFromPointer } from './environment.js?v=4';
+import { resolvePlacementCandidateFromPointer } from './environment.js?v=9';
 import { ensureSceneGroups, refreshActivityScene } from './renderer.js?v=2';
 import { createActivityCreatorCanvasApi } from './session-canvas.js?v=1';
 import {

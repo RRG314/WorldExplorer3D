@@ -1,10 +1,10 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
-import { captureEarthWorldSession } from "./earth-session.js?v=3";
-import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=3";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=2";
-import { createSpaceFlightScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=3";
-import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=1";
+import { captureEarthWorldSession } from "./earth-session.js?v=8";
+import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=5";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=4";
+import { createSpaceFlightScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=13";
+import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=4";
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -102,11 +102,13 @@ function startSpaceFlightToMoon() {
   hideGameUI();
 
   if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.renderer || !appCtx.spaceFlight.camera) createSpaceFlightScene();
-  else resetSpaceFlightForMoon();
+  appCtx.returnUniverseToSolImmediate?.();
+  resetSpaceFlightForMoon();
 
   animateSpaceFlight();
 
   if (typeof appCtx.showSolarSystemUI === 'function') appCtx.showSolarSystemUI();
+  appCtx.showUniverseUI?.();
 
   setTimeout(() => {
     if (!isCurrentSpaceFlightSession(sessionId, 'moon')) return;
@@ -145,10 +147,12 @@ function startSpaceFlightToEarth() {
 
   hideGameUI();
   if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.renderer || !appCtx.spaceFlight.camera) createSpaceFlightScene();
+  appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForEarth();
   animateSpaceFlight();
 
   if (typeof appCtx.showSolarSystemUI === 'function') appCtx.showSolarSystemUI();
+  appCtx.showUniverseUI?.();
 
   setTimeout(() => {
     if (!isCurrentSpaceFlightSession(sessionId, 'earth')) return;
@@ -188,9 +192,11 @@ function startSpaceFlightToMars() {
   hideGameUI();
 
   if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.renderer || !appCtx.spaceFlight.camera) createSpaceFlightScene();
+  appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForMars();
   animateSpaceFlight();
   appCtx.showSolarSystemUI?.();
+  appCtx.showUniverseUI?.();
   setTimeout(() => {
     if (!isCurrentSpaceFlightSession(sessionId, 'mars')) return;
     appCtx.spaceFlight.mode = 'flying';
@@ -252,6 +258,7 @@ function exitSpaceFlight() {
   appCtx.spaceFlight.hud.style.display = 'none';
 
   if (typeof appCtx.hideSolarSystemUI === 'function') appCtx.hideSolarSystemUI();
+  appCtx.hideUniverseUI?.();
 
   const proxHud = document.getElementById('ssProximity');
   if (proxHud) proxHud.style.display = 'none';
@@ -283,6 +290,7 @@ Object.assign(appCtx, {
   animateSpaceFlight,
   exitSpaceFlight,
   forceSpaceFlightLanding,
+  showSpaceFlightMessage: showFlightMessage,
   setSpaceFlightLandingTarget,
   startSpaceFlightToEarth,
   startSpaceFlightToMars,

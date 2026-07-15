@@ -17,7 +17,7 @@ function readSharedExperienceParams() {
     return value === 'free' ? 'free' : null;
   };
   const normalizeTravelMode = (value) => {
-    if (value === 'driving' || value === 'walking' || value === 'drone' || value === 'boat' || value === 'rocket' || value === 'submarine') return value;
+    if (value === 'driving' || value === 'walking' || value === 'drone' || value === 'plane' || value === 'boat' || value === 'rocket' || value === 'submarine') return value;
     return null;
   };
 
@@ -68,6 +68,7 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
     }
     if (typeof appCtx.isEnv === 'function' && typeof appCtx.ENV !== 'undefined' && appCtx.isEnv(appCtx.ENV.SPACE_FLIGHT)) return 'rocket';
     if (appCtx.boatMode?.active) return 'boat';
+    if (appCtx.planeMode?.active) return 'plane';
     if (appCtx.droneMode) return 'drone';
     if (appCtx.Walk?.state?.mode === 'walk') return 'walking';
     return 'driving';
@@ -84,6 +85,7 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
       document.getElementById('fDriving')?.classList.add('on');
       document.getElementById('fWalk')?.classList.remove('on');
       document.getElementById('fDrone')?.classList.remove('on');
+      document.getElementById('fPlane')?.classList.remove('on');
     };
     const setWalkMode = () => {
       appCtx.droneMode = false;
@@ -91,6 +93,7 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
       document.getElementById('fDriving')?.classList.remove('on');
       document.getElementById('fWalk')?.classList.add('on');
       document.getElementById('fDrone')?.classList.remove('on');
+      document.getElementById('fPlane')?.classList.remove('on');
     };
     const setDroneMode = () => {
       if (!appCtx.droneMode) {
@@ -100,11 +103,21 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
       document.getElementById('fDriving')?.classList.remove('on');
       document.getElementById('fWalk')?.classList.remove('on');
       document.getElementById('fDrone')?.classList.add('on');
+      document.getElementById('fPlane')?.classList.remove('on');
+    };
+    const setPlaneMode = () => {
+      appCtx.droneMode = false;
+      if (appCtx.Walk?.state?.mode === 'walk') appCtx.Walk.setModeDrive();
+      document.getElementById('fDriving')?.classList.remove('on');
+      document.getElementById('fWalk')?.classList.remove('on');
+      document.getElementById('fDrone')?.classList.remove('on');
+      document.getElementById('fPlane')?.classList.add('on');
     };
 
     const mode = pending.travelMode || getCurrentTravelMode();
     if (pending.travelMode === 'walking') setWalkMode();
     else if (pending.travelMode === 'drone') setDroneMode();
+    else if (pending.travelMode === 'plane') setPlaneMode();
     else if (pending.travelMode === 'driving') setDriveMode();
 
     const x = Number.isFinite(pending.refX) ? pending.refX : null;
@@ -114,7 +127,16 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
     const pitch = Number.isFinite(pending.pitch) ? pending.pitch : null;
     const terrainYAt = (tx, tz) => typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(tx, tz) : appCtx.elevationWorldYAtWorldXZ(tx, tz);
 
-    if (mode === 'drone') {
+    if (mode === 'plane') {
+      appCtx.startPlaneMode?.({
+        x: Number.isFinite(x) ? x : undefined,
+        y: Number.isFinite(y) ? y : undefined,
+        z: Number.isFinite(z) ? z : undefined,
+        yaw: Number.isFinite(yaw) ? yaw : undefined,
+        pitch: Number.isFinite(pitch) ? pitch : undefined,
+        airborne: Number.isFinite(y) && y > terrainYAt(x || 0, z || 0) + 1.4
+      });
+    } else if (mode === 'drone') {
       if (Number.isFinite(x)) appCtx.drone.x = x;
       if (Number.isFinite(z)) appCtx.drone.z = z;
       appCtx.drone.y = Number.isFinite(y) ? y : terrainYAt(appCtx.drone.x, appCtx.drone.z) + 45;
@@ -210,7 +232,13 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
     const pendingYaw = pending && Number.isFinite(pending.yaw) ? pending.yaw : null;
     const pendingPitch = pending && Number.isFinite(pending.pitch) ? pending.pitch : null;
 
-    if (mode === 'drone') {
+    if (mode === 'plane') {
+      params.set('rx', fmt(pendingX ?? appCtx.planeMode?.x ?? 0));
+      params.set('ry', fmt(pendingY ?? appCtx.planeMode?.y ?? 0));
+      params.set('rz', fmt(pendingZ ?? appCtx.planeMode?.z ?? 0));
+      params.set('yaw', fmt(pendingYaw ?? appCtx.planeMode?.yaw ?? 0, 4));
+      params.set('pitch', fmt(pendingPitch ?? appCtx.planeMode?.pitch ?? 0, 4));
+    } else if (mode === 'drone') {
       params.set('rx', fmt(pendingX ?? appCtx.drone?.x ?? 0));
       params.set('ry', fmt(pendingY ?? appCtx.drone?.y ?? 0));
       params.set('rz', fmt(pendingZ ?? appCtx.drone?.z ?? 0));

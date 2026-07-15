@@ -34,7 +34,6 @@ Current documentation set for World Explorer 3D.
 | `CONTROLS_REFERENCE.md` | Control mapping reference |
 | `ARCHITECTURE.md` | System topology and module layering |
 | `TECHNICAL_DOCS.md` | Engineering contracts and module APIs |
-| `REFACTOR_PLAN.md` | Safe phased roadmap for splitting giant runtime files |
 | `API_SETUP.md` | Firebase/Firestore/Stripe setup checklist |
 
 ## Attribution and Legal
@@ -50,4 +49,3 @@ Current documentation set for World Explorer 3D.
 
 | File | Scope |
 | --- | --- |
-| `progress.md` | Rolling implementation/testing notes |

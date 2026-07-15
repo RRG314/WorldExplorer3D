@@ -2,7 +2,7 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   buildWorldVegetationInstancing,
   collectWorldVegetationPlacements
-} from "./vegetation.js?v=3";
+} from "./vegetation.js?v=4";
 import {
   registerStreetLamp,
   resetStreetLampFixtures

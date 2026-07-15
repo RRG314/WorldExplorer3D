@@ -1,5 +1,11 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { inferWaterRenderContext, resolveWaterMotionProfile, sampleWaterSurfaceMotion } from "../water-dynamics.js?v=3";
+import {
+  getWaveIntensity,
+  inferWaterRenderContext,
+  resolveWaterMotionProfile,
+  sampleWaterSurfaceMotion,
+  sampleWaterwaySurfaceProfile
+} from "../water-dynamics.js?v=4";
 import { clamp } from "./dynamics.js?v=1";
 
 const BOAT_ENTRY_OFFSET = 9;
@@ -587,6 +593,9 @@ function getBoatWaveProfile(candidate = null, options = {}) {
 
 function waterSurfaceBaseYAt(x, z, candidate = null) {
   if (candidate?.type === 'waterway') {
+    const source = candidate?.source || candidate;
+    const profileY = sampleWaterwaySurfaceProfile(source?.surfaceProfile, x, z);
+    if (Number.isFinite(profileY)) return profileY;
     const terrainY = typeof appCtx.terrainMeshHeightAt === 'function' ?
       appCtx.terrainMeshHeightAt(x, z) :
       appCtx.elevationWorldYAtWorldXZ(x, z);

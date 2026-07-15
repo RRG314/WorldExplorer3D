@@ -1,7 +1,6 @@
 # World Explorer 3D
 
 [![Runtime Verify](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
-[![Deploy GitHub Pages (public)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml/badge.svg)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml)
 [![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
 
 World Explorer 3D is a browser-based 3D geospatial exploration application built around real-world map data, including OpenStreetMap-derived roads, buildings, land-use, water, and place context.
@@ -10,21 +9,22 @@ It is an interactive exploration app, not a flat map viewer and not a routing/na
 
 ## Current Status
 
-- Active and usable, with ongoing iteration.
+- Version 3.0.0 release candidate.
 - Canonical runtime source: `app/*`.
 - Canonical landing/account sources: `index.html`, `account/index.html`.
 - Hosting/runtime mirror: `public/*` (`public/app/*`, `public/index.html`, `public/account/index.html`).
-- Includes geolocation launch flow and Ocean mode in the current branch.
+- Includes geolocation, Earth, Ocean, Moon, Mars, and Space launch flows.
 - Core play, traversal modes, and the large map remain free; donations are optional recognition/support only.
 
 ## What It Does
 
 - Launch from preset cities or custom coordinates.
 - Use geolocation (`Use My Location`) in title and globe selector flows.
-- Explore in 3D with driving, walking, drone, and rocket traversal.
+- Explore in 3D with driving, walking, drone, plane, boat, rover, and rocket traversal.
+- Stream additional Earth world cells around the player for longer continuous trips while applying distance-based detail budgets.
 - Route walk/drive/drone mode changes through one shared travel-mode controller so keyboard and UI transitions stay in sync.
 - Keep traversal switches and custom/geolocation launches on safe ground: valid positions stay put, invalid positions resolve to the nearest safe road or ground spawn based on the active mode.
-- Switch destinations (Earth, Moon, Space, Ocean) from title and in-game menus.
+- Switch between Earth, Ocean, Moon, Mars, and Space without reloading the app.
 - Render map-informed world context (roads/buildings/land-use/water) for Earth scenes.
 - Apply shared surface rules so polar regions resolve to snow/frozen water and arid regions resolve to sand terrain instead of defaulting everything to temperate grass.
 - Add OSM-driven vegetation so forests, woods, parks, tree rows, and individual mapped trees make Earth scenes feel less empty without turning every tile into high-detail foliage.
@@ -33,6 +33,9 @@ It is an interactive exploration app, not a flat map viewer and not a routing/na
 - Show an enterable-buildings section in the large-map legend; it scans nearby supported buildings on demand and lists mapped/generated/listing-backed interiors that can actually be entered.
 - Provide minimap/large-map overlays and runtime controls for exploration, with `M` for the large map.
 - Add performance-conscious rooftop HVAC/detail and broader building color variation so dense cities read less flat/repetitive.
+- Explore a full solar-system catalog, asteroid and Kuiper belts, known spacecraft, galaxies, and navigable deep-space destinations.
+- Fish from Boat mode with species, rarity, size, strength, drag, line tension, catches, and a unified game leaderboard.
+- Build up to 200 multiplayer-aware blocks using cube, slab, ramp, and column shapes with eight colors.
 - Support multiplayer/social/account features when backend services are configured.
 
 ## Why Mapping/OSM Users May Care

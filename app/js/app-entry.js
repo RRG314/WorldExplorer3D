@@ -4,47 +4,49 @@ import { getCurrentUser, observeAuth } from '../../js/auth-ui.js';
 import './rdt.js?v=55';
 import './config.js?v=58';
 import { ctx as appCtx } from './shared-context.js?v=55';
-import './runtime-diagnostics.js?v=7';
+import './runtime-diagnostics.js?v=10';
 import './state.js?v=59';
 import './perf.js?v=55';
 import './env.js?v=56';
 import './real-estate.js?v=55';
 import './ground.js?v=64';
-import './terrain.js?v=94';
-import './world.js?v=147';
-import './earth-streaming.js?v=3';
-import './world/streaming-vector-chunks.js?v=6';
-import './earth-origin.js?v=1';
-import './building-entry.js?v=2';
-import './interiors.js?v=5';
-import { init, tryEnablePostProcessing } from './engine.js?v=71';
-import './physics.js?v=66';
+import './terrain.js?v=98';
+import './world.js?v=168';
+import './earth-streaming.js?v=14';
+import './world/streaming-vector-chunks.js?v=23';
+import './world/streaming-aerial-context.js?v=4';
+import './earth-origin.js?v=2';
+import './building-entry.js?v=3';
+import './interiors.js?v=6';
+import { init, tryEnablePostProcessing } from './engine.js?v=72';
+import './physics.js?v=71';
 import './walking.js?v=63';
-import './travel-mode.js?v=7';
-import { initBoatMode } from './boat-mode.js?v=18';
-import './sky.js?v=62';
+import './travel-mode.js?v=8';
+import { initBoatMode } from './boat-mode.js?v=25';
+import { setupFishingGame } from './fishing-game.js?v=1';
+import './sky.js?v=69';
 import './weather.js?v=3';
 import './live-earth/controller.js?v=8';
-import './solar-system.js?v=55';
-import './space.js?v=60';
-import './planetary/scene-ownership.js?v=1';
+import './solar-system.js?v=58';
+import './space.js?v=77';
+import './planetary/scene-ownership.js?v=3';
 import './planetary/vehicles.js?v=1';
 import './planetary/astronaut.js?v=1';
 import './planetary/sky-orientation.js?v=2';
 import './planetary/moon-sky.js?v=1';
-import './planetary/mars-world.js?v=4';
+import './planetary/mars-world.js?v=9';
 import './planetary/tracks.js?v=1';
 import './ocean.js?v=5';
 import './game.js?v=56';
 import './input.js?v=58';
-import './hud.js?v=66';
-import './map.js?v=56';
-import { renderLoop } from './main.js?v=62';
+import './hud.js?v=67';
+import './map.js?v=58';
+import { renderLoop } from './main.js?v=64';
 import './memory.js?v=55';
 import './blocks.js?v=60';
 import './block-builder/ui.js?v=2';
-import './flower-challenge.js?v=55';
-import { setupUI } from './ui.js?v=75';
+import './flower-challenge.js?v=56';
+import { setupUI } from './ui.js?v=82';
 
 let _booted = false;
 let _multiplayerObserverReady = false;
@@ -101,7 +103,7 @@ async function ensureEditorSessionModule() {
 async function ensureActivityCreatorModule() {
   if (_activityCreatorModule) return _activityCreatorModule;
   if (!_activityCreatorPromise) {
-        _activityCreatorPromise = import('./activity-editor/session.js?v=6').then((mod) => {
+        _activityCreatorPromise = import('./activity-editor/session.js?v=11').then((mod) => {
             _activityCreatorModule = mod;
             if (!_activityCreatorReady && typeof mod.initActivityCreator === 'function') {
                 mod.initActivityCreator();
@@ -507,6 +509,7 @@ function bootApp() {
     runBootStep('registerLazySubsystemEntrypoints', () => registerLazySubsystemEntrypoints());
     runBootStep('setupUI', () => setupUI());
     runBootStep('initBoatMode', () => initBoatMode());
+    runBootStep('setupFishingGame', () => setupFishingGame());
     runBootStep('scheduleTutorialInit', () => scheduleTutorialInit());
     runBootStep('startMultiplayerAfterAuthReady', () => startMultiplayerAfterAuthReady());
     runBootStep('renderLoop', () => renderLoop());

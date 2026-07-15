@@ -1672,6 +1672,28 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /fishingLeaderboard/{entryId} {
+      allow read: if true;
+      allow create: if isSignedIn() &&
+        request.resource.data.uid == request.auth.uid &&
+        request.resource.data.challenge == 'fishing' &&
+        request.resource.data.player is string &&
+        request.resource.data.player.size() > 0 &&
+        request.resource.data.player.size() <= 24 &&
+        request.resource.data.species is string &&
+        request.resource.data.species.size() > 0 &&
+        request.resource.data.species.size() <= 80 &&
+        request.resource.data.score is int &&
+        request.resource.data.score >= 0 &&
+        request.resource.data.weightKg is number &&
+        request.resource.data.weightKg > 0 &&
+        request.resource.data.lengthCm is number &&
+        request.resource.data.lengthCm > 0 &&
+        request.resource.data.location is string &&
+        request.resource.data.location.size() <= 80;
+      allow update, delete: if false;
+    }
+
     match /activityFeed/{entryId} {
       allow read: if isSignedIn();
       allow create: if isSignedIn() && validActivityEntry();

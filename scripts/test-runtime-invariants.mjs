@@ -766,7 +766,11 @@ async function main() {
       });
     }
 
-    await page.screenshot({ path: path.join(outputDir, 'runtime-invariants.png'), fullPage: true });
+    try {
+      await page.screenshot({ path: path.join(outputDir, 'runtime-invariants.png'), fullPage: false });
+    } catch (error) {
+      report.screenshotWarning = String(error?.message || error);
+    }
 
     const checks = {
       roadCenterDriveable: report.blockedDriveRatePct <= 10,
@@ -821,9 +825,9 @@ async function main() {
         report.walkingControlsText.includes('E - Enter/exit building interior'),
       syntheticDestinationEntryReady: report.syntheticDestinationEntrySupported === true,
       droneControlsUpdated:
-        report.droneControlsText.includes('W/S - Fly forward / back') &&
-        report.droneControlsText.includes('A/D - Turn left / right') &&
-        report.droneControlsText.includes('Arrow Keys - Look around'),
+        report.droneControlsText.includes('Arrow Up/Down - Fly forward / back') &&
+        report.droneControlsText.includes('Arrow Left/Right - Turn left / right') &&
+        report.droneControlsText.includes('WASD - Look around'),
       drivingMapHintUpdated:
         report.drivingControlsText.includes('M - Toggle map') &&
         /Close Map \(M\)/.test(report.mapCloseLabel),

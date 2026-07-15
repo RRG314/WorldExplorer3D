@@ -5,6 +5,7 @@ const STREAM_TILE_ZOOM = 14;
 const UPDATE_INTERVAL_SECONDS = 0.25;
 const MAX_CONCURRENT_LOADS = 2;
 const MAX_QUEUE_SIZE = 96;
+const MIN_RESUME_GRACE_MS = 4200;
 const WEB_MERCATOR_LAT_LIMIT = 85.05112878;
 
 const layerRegistry = new Map();
@@ -31,8 +32,15 @@ const state = {
   loadsCompleted: 0,
   loadsCancelled: 0,
   loadsFailed: 0,
-  lastError: ''
+  lastError: '',
+  resumeNotBeforeMs: 0
 };
+
+function releaseActiveLoad(pending) {
+  if (!pending?.counted) return;
+  pending.counted = false;
+  state.activeLoads = Math.max(0, state.activeLoads - 1);
+}
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -48,6 +56,7 @@ function currentTravelMode() {
 }
 
 function isEarthRuntimeActive() {
+  if (performance.now() < state.resumeNotBeforeMs) return false;
   if (!appCtx.gameStarted || appCtx.worldLoading || appCtx.onMoon || appCtx.onMars) return false;
   if (appCtx.oceanMode?.active || appCtx.spaceFlight?.active) return false;
   if (appCtx.ENV?.EARTH && typeof appCtx.getEnv === 'function') {
@@ -104,10 +113,11 @@ function collectDesiredTiles(center, predicted, radius) {
       for (let dy = -ring; dy <= ring; dy += 1) {
         const tile = normalizeTile({ z: origin.z, x: origin.x + dx, y: origin.y + dy });
         const key = tileKey(tile);
-        const distance = tileDistanceSq(tile, predicted || center);
+        const distance = tileDistanceSq(tile, origin);
+        const priority = distance + (lookahead ? 0.35 : 0);
         const previous = desired.get(key);
-        if (!previous || distance < previous.priority) {
-          desired.set(key, { ...tile, key, priority: distance + (lookahead ? -0.25 : 0) });
+        if (!previous || priority < previous.priority) {
+          desired.set(key, { ...tile, key, priority });
         }
       }
     }
@@ -118,15 +128,33 @@ function collectDesiredTiles(center, predicted, radius) {
 }
 
 function lookaheadSeconds(mode, speedMps) {
-  const base = mode === 'plane' ? 9 : mode === 'drone' ? 5 : mode === 'boat' ? 4 : mode === 'drive' ? 4 : 1.5;
-  return base + clamp(speedMps / 30, 0, mode === 'plane' ? 5 : 2);
+  const base = mode === 'plane' ? 18 : mode === 'drone' ? 12 : mode === 'boat' ? 10 : mode === 'drive' ? 14 : 2.5;
+  return base + clamp(speedMps / 20, 0, mode === 'plane' ? 8 : 4);
 }
 
-function updateMotionSample(actor, nowMs) {
+function updateMotionSample(actor, nowMs, mode) {
+  if (state.actorSource !== 'none' && actor.source !== state.actorSource) {
+    state.lastSampleAt = nowMs;
+    state.lastActorX = actor.x;
+    state.lastActorZ = actor.z;
+    state.velocityX = 0;
+    state.velocityZ = 0;
+    state.speedMps = 0;
+    return;
+  }
   const elapsed = state.lastSampleAt > 0 ? Math.max(0.016, (nowMs - state.lastSampleAt) / 1000) : 0;
   if (elapsed > 0 && elapsed < 2.5) {
-    const measuredX = (actor.x - state.lastActorX) / elapsed;
-    const measuredZ = (actor.z - state.lastActorZ) / elapsed;
+    let measuredX = (actor.x - state.lastActorX) / elapsed;
+    let measuredZ = (actor.z - state.lastActorZ) / elapsed;
+    const metersPerUnit = Math.max(0.001, Number(appCtx.METERS_PER_WORLD_UNIT) || 1);
+    const maxMps = mode === 'plane' ? 95 : mode === 'drone' ? 65 : mode === 'drive' ? 80 : mode === 'boat' ? 45 : 15;
+    const maxWorldSpeed = maxMps / metersPerUnit;
+    const measuredSpeed = Math.hypot(measuredX, measuredZ);
+    if (measuredSpeed > maxWorldSpeed) {
+      const scale = maxWorldSpeed / measuredSpeed;
+      measuredX *= scale;
+      measuredZ *= scale;
+    }
     const blend = 0.35;
     state.velocityX += (measuredX - state.velocityX) * blend;
     state.velocityZ += (measuredZ - state.velocityZ) * blend;
@@ -143,8 +171,9 @@ function updateMotionSample(actor, nowMs) {
 function abortObsoleteLayerWork(layer, desiredKeys) {
   layer.pending.forEach((entry, key) => {
     if (desiredKeys.has(key)) return;
+    if (entry.cancelled) return;
+    entry.cancelled = true;
     entry.controller.abort();
-    layer.pending.delete(key);
     state.loadsCancelled += 1;
   });
   state.queue = state.queue.filter((entry) => {
@@ -154,12 +183,26 @@ function abortObsoleteLayerWork(layer, desiredKeys) {
   });
 }
 
-function unloadObsoleteChunks(layer, desiredKeys, centerTile) {
-  const retained = [...layer.loaded.entries()]
-    .sort((a, b) => tileDistanceSq(a[1].tile, centerTile) - tileDistanceSq(b[1].tile, centerTile));
-  for (let i = 0; i < retained.length; i += 1) {
-    const [key, entry] = retained[i];
-    if (desiredKeys.has(key) && i < layer.maxActive) continue;
+function unloadObsoleteChunks(layer, desiredKeys, centerTile, maxUnloads = 1) {
+  const forceAll = !centerTile && desiredKeys.size === 0;
+  const overflow = forceAll ? layer.loaded.size : Math.max(0, layer.loaded.size - layer.maxActive);
+  const retentionDistanceSq = (layer.radius + 1) ** 2;
+  const staleOutsideRetention = forceAll ? layer.loaded.size : [...layer.loaded.entries()].reduce((count, [key, entry]) => {
+    if (desiredKeys.has(key)) return count;
+    return count + (tileDistanceSq(entry.tile, centerTile) > retentionDistanceSq ? 1 : 0);
+  }, 0);
+  const unloadLimit = Math.min(maxUnloads, Math.max(overflow, staleOutsideRetention));
+  if (!(unloadLimit > 0)) return;
+  const candidates = [...layer.loaded.entries()]
+    .filter(([key, entry]) =>
+      forceAll || (!desiredKeys.has(key) && (
+        layer.loaded.size > layer.maxActive || tileDistanceSq(entry.tile, centerTile) > retentionDistanceSq
+      ))
+    )
+    .sort((a, b) => tileDistanceSq(b[1].tile, centerTile) - tileDistanceSq(a[1].tile, centerTile));
+  let unloaded = 0;
+  for (let i = 0; i < candidates.length && unloaded < unloadLimit; i += 1) {
+    const [key, entry] = candidates[i];
     try {
       if (typeof layer.unloadChunk === 'function') layer.unloadChunk(entry.value, entry.tile);
       else entry.value?.dispose?.();
@@ -167,6 +210,7 @@ function unloadObsoleteChunks(layer, desiredKeys, centerTile) {
       console.warn(`[EarthStreaming] ${layer.name} chunk disposal failed`, error);
     }
     layer.loaded.delete(key);
+    unloaded += 1;
   }
 }
 
@@ -193,7 +237,7 @@ function drainQueue() {
     if (layer.loaded.has(key) || layer.pending.has(key)) continue;
     const controller = new AbortController();
     const generation = state.generation;
-    const pending = { controller, generation };
+    const pending = { controller, generation, cancelled: false, counted: true };
     layer.pending.set(key, pending);
     state.activeLoads += 1;
     state.loadsStarted += 1;
@@ -204,7 +248,8 @@ function drainQueue() {
       generation
     })).then((value) => {
       if (controller.signal.aborted || generation !== state.generation) {
-        value?.dispose?.();
+        if (typeof layer.unloadChunk === 'function') layer.unloadChunk(value, tile);
+        else value?.dispose?.();
         return;
       }
       layer.loaded.set(key, { tile, value, loadedAt: performance.now() });
@@ -216,7 +261,7 @@ function drainQueue() {
       console.warn(`[EarthStreaming] ${layer.name} chunk ${key} failed`, error);
     }).finally(() => {
       if (layer.pending.get(key) === pending) layer.pending.delete(key);
-      state.activeLoads = Math.max(0, state.activeLoads - 1);
+      releaseActiveLoad(pending);
       drainQueue();
     });
   }
@@ -239,14 +284,52 @@ function resetEarthStreaming(reason = 'reset') {
   state.velocityZ = 0;
   state.speedMps = 0;
   state.lastError = '';
+  state.resumeNotBeforeMs = 0;
   layerRegistry.forEach((layer) => {
-    layer.pending.forEach((entry) => entry.controller.abort());
+    layer.pending.forEach((entry) => {
+      entry.cancelled = true;
+      entry.controller.abort();
+      releaseActiveLoad(entry);
+    });
     layer.pending.clear();
-    unloadObsoleteChunks(layer, new Set(), null);
+    unloadObsoleteChunks(layer, new Set(), null, Infinity);
   });
   state.activeLoads = 0;
   state.anchorSignature = anchorSignature();
   state.resetReason = reason;
+}
+
+function pauseEarthStreaming(reason = 'earth_inactive') {
+  state.generation += 1;
+  state.queue.length = 0;
+  state.queuedIds.clear();
+  state.resumeNotBeforeMs = Number.POSITIVE_INFINITY;
+  state.lastSampleAt = 0;
+  state.velocityX = 0;
+  state.velocityZ = 0;
+  state.speedMps = 0;
+  state.actorSource = 'none';
+  layerRegistry.forEach((layer) => {
+    layer.pending.forEach((entry) => {
+      if (!entry.cancelled) {
+        entry.cancelled = true;
+        entry.controller.abort();
+        state.loadsCancelled += 1;
+      }
+      releaseActiveLoad(entry);
+    });
+    layer.pending.clear();
+  });
+  state.pauseReason = reason;
+}
+
+function resumeEarthStreaming(graceMs = 1200) {
+  const requestedGraceMs = Math.max(0, Number(graceMs) || 0);
+  state.resumeNotBeforeMs = performance.now() + Math.max(MIN_RESUME_GRACE_MS, requestedGraceMs);
+  state.updateElapsed = 0;
+  state.lastSampleAt = 0;
+  state.actorSource = 'none';
+  state.pauseReason = '';
 }
 
 function acceptEarthStreamingAnchorRebase() {
@@ -270,14 +353,20 @@ function registerEarthStreamLayer(name, options = {}) {
     unloadChunk: options.unloadChunk,
     radius: clamp(Math.round(Number(options.radius) || 2), 1, 4),
     maxActive: clamp(Math.round(Number(options.maxActive) || 36), 9, 81),
+    zoom: clamp(Math.round(Number(options.zoom) || STREAM_TILE_ZOOM), 8, STREAM_TILE_ZOOM),
+    activeWhen: typeof options.activeWhen === 'function' ? options.activeWhen : null,
     priorityBias: Number(options.priorityBias) || 0,
     loaded: new Map(),
     pending: new Map()
   };
   layerRegistry.set(name, layer);
   return () => {
-    layer.pending.forEach((entry) => entry.controller.abort());
-    unloadObsoleteChunks(layer, new Set(), null);
+    layer.pending.forEach((entry) => {
+      entry.cancelled = true;
+      entry.controller.abort();
+      releaseActiveLoad(entry);
+    });
+    unloadObsoleteChunks(layer, new Set(), null, Infinity);
     layerRegistry.delete(name);
   };
 }
@@ -285,7 +374,12 @@ function registerEarthStreamLayer(name, options = {}) {
 function streamingSnapshot() {
   const layers = {};
   layerRegistry.forEach((layer, name) => {
-    layers[name] = { loaded: layer.loaded.size, pending: layer.pending.size, maxActive: layer.maxActive };
+    layers[name] = {
+      loaded: layer.loaded.size,
+      pending: layer.pending.size,
+      maxActive: layer.maxActive,
+      zoom: layer.zoom
+    };
   });
   return {
     generation: state.generation,
@@ -318,8 +412,8 @@ function updateEarthWorldStreaming(dt = 0) {
   const actor = currentActorWorldPosition();
   if (!actor || typeof appCtx.worldToLatLon !== 'function') return false;
   const nowMs = performance.now();
-  updateMotionSample(actor, nowMs);
   state.mode = currentTravelMode();
+  updateMotionSample(actor, nowMs, state.mode);
   state.actorSource = actor.source || state.mode;
 
   const center = appCtx.worldToLatLon(actor.x, actor.z);
@@ -338,10 +432,21 @@ function updateEarthWorldStreaming(dt = 0) {
 
   if (typeof appCtx.updateTerrainAround === 'function') appCtx.updateTerrainAround(actor.x, actor.z);
   layerRegistry.forEach((layer) => {
-    const desired = collectDesiredTiles(centerTile, predictedTile, layer.radius);
+    if (layer.activeWhen && !layer.activeWhen({ actor, mode: state.mode, speedMps: state.speedMps })) {
+      abortObsoleteLayerWork(layer, new Set());
+      unloadObsoleteChunks(layer, new Set(), null, Infinity);
+      return;
+    }
+    const layerCenterTile = layer.zoom === STREAM_TILE_ZOOM
+      ? centerTile
+      : latLonToTile(center.lat, center.lon, layer.zoom);
+    const layerPredictedTile = layer.zoom === STREAM_TILE_ZOOM
+      ? predictedTile
+      : latLonToTile(predictedCenter.lat, predictedCenter.lon, layer.zoom);
+    const desired = collectDesiredTiles(layerCenterTile, layerPredictedTile, layer.radius);
     const desiredKeys = new Set(desired.keys());
     abortObsoleteLayerWork(layer, desiredKeys);
-    unloadObsoleteChunks(layer, desiredKeys, centerTile);
+    unloadObsoleteChunks(layer, desiredKeys, layerCenterTile);
     enqueueLayerLoads(layer, desired);
   });
   drainQueue();
@@ -362,16 +467,20 @@ Object.assign(appCtx, {
   acceptEarthStreamingAnchorRebase,
   earthStreamingState: state,
   getEarthStreamingSnapshot: streamingSnapshot,
+  pauseEarthStreaming,
   registerEarthStreamLayer,
   resetEarthStreaming,
+  resumeEarthStreaming,
   updateEarthWorldStreaming
 });
 
 export {
   acceptEarthStreamingAnchorRebase,
   latLonToTile,
+  pauseEarthStreaming,
   registerEarthStreamLayer,
   resetEarthStreaming,
+  resumeEarthStreaming,
   streamingSnapshot as getEarthStreamingSnapshot,
   updateEarthWorldStreaming
 };

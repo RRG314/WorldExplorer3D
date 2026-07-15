@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 
-const ENTRY_EXCLUDED_BUILDING_TYPES = new Set(['roof', 'canopy', 'carport', 'bridge']);
+const ENTRY_EXCLUDED_BUILDING_TYPES = new Set(['roof', 'canopy', 'carport', 'bridge', 'bridge_guardrail']);
 const DEFAULT_DESTINATION_MATCH_RADIUS = 42;
 const DEFAULT_ENTRY_RADIUS = 8.5;
 const SYNTHETIC_INTERIOR_HEIGHT = 3.4;
@@ -178,6 +178,7 @@ function hasFullBuildingFootprint(building) {
 
 function isEnterableBuildingCandidate(building) {
   if (!hasFullBuildingFootprint(building)) return false;
+  if (building?.collisionKind === 'barrier') return false;
   const buildingType = String(building?.buildingType || '').toLowerCase();
   if (!buildingType || ENTRY_EXCLUDED_BUILDING_TYPES.has(buildingType)) return false;
   return !building.isInteriorCollider && !building.collisionDisabled;

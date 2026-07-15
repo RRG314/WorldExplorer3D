@@ -227,6 +227,7 @@ function createWalkingRuntimeHelpers({
   }
 
   function getMapRefPosition(droneMode, drone) {
+    if (appCtx.planeMode?.active) return { x: appCtx.planeMode.x, z: appCtx.planeMode.z };
     if (droneMode) return { x: drone.x, z: drone.z };
     if (state.mode === "walk") return { x: state.walker.x, z: state.walker.z };
     return { x: car.x, z: car.z };

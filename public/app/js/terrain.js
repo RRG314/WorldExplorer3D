@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   clearStructureVisualMeshes,
   rebuildStructureVisualMeshes
-} from "./terrain/structure-visuals.js?v=1";
+} from "./terrain/structure-visuals.js?v=3";
 import {
   boundsIntersectLocal,
   expandBoundsLocal,
@@ -12,7 +12,7 @@ import {
 } from "./terrain/context-utils.js?v=1";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=1";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=1";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=1";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=2";
 import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
@@ -44,14 +44,14 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   rebuildRoadsWithTerrain
-} from "./terrain/rebuild.js?v=4";
+} from "./terrain/rebuild.js?v=5";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
-} from "./terrain/debug-tools.js?v=1";
+} from "./terrain/debug-tools.js?v=2";
 import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
-import { createTerrainStreamingApi } from "./terrain/streaming.js?v=4";
+import { createTerrainStreamingApi } from "./terrain/streaming.js?v=5";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 // terrain.js - Terrain elevation system (Terrarium tiles)
 // ============================================================================
@@ -288,6 +288,7 @@ const {
   getTerrainMeshKey,
   terrainTileMeshKey,
   disposeTerrainMesh,
+  getOrLoadTerrainTile,
   pruneTerrainTileCache,
   terrainTileCacheSnapshot,
   requestWorldSurfaceSync,

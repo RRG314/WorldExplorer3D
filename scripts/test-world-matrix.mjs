@@ -324,7 +324,7 @@ async function loadLocation(page, spec) {
       visibleWallFacadeSourceCount: 0,
       tiers: {}
     };
-    const diagnosticsModule = await import('/scripts/world-matrix-building-diagnostics.mjs?v=2');
+    const diagnosticsModule = await import('/scripts/world-matrix-building-diagnostics.mjs?v=3');
     const buildingDimensions = diagnosticsModule.collectBuildingDimensions(ctx.buildings || []);
     for (const mesh of ctx.buildingMeshes || []) {
       if (!mesh?.isMesh) continue;
@@ -432,6 +432,7 @@ async function loadLocation(page, spec) {
       const traversalModule = await import('/app/js/world/traversal.js?v=1');
       const spatialModule = await import('/app/js/world/building-spatial-index.js?v=2');
       const runtimeRoads = navigationModule.runtimeRoadFeatures();
+      traversalModule.buildTraversalNetworks();
       traversalDiagnostics = {
         runtimeRoads: runtimeRoads.length,
         suppressedRoads: (ctx.roads || []).filter((road) => spatialModule.isSuppressedBaseRoad(road)).length,
@@ -466,8 +467,8 @@ async function loadLocation(page, spec) {
       driveSwitchMs: Number(driveSwitchMs.toFixed(1)),
       counts: {
         roads: Array.isArray(ctx.roads) ? ctx.roads.length : 0,
-        buildings: Array.isArray(ctx.buildings) ? ctx.buildings.length : 0,
-        buildingMeshes: Array.isArray(ctx.buildingMeshes) ? ctx.buildingMeshes.length : 0,
+        buildings: Array.isArray(ctx.buildings) ? ctx.buildings.filter(Boolean).length : 0,
+        buildingMeshes: Array.isArray(ctx.buildingMeshes) ? ctx.buildingMeshes.filter((mesh) => mesh?.isMesh).length : 0,
         landuses: Array.isArray(ctx.landuses) ? ctx.landuses.length : 0,
         landuseMeshes: Array.isArray(ctx.landuseMeshes) ? ctx.landuseMeshes.length : 0,
         waterAreas: Array.isArray(ctx.waterAreas) ? ctx.waterAreas.length : 0,

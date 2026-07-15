@@ -1,14 +1,14 @@
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=3";
 import { createWorldLandusePass } from "./load-landuse-pass.js?v=11";
-import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=5";
+import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import {
   findNearestBoatCandidate,
   isPointInsideWaterFootprint
-} from "../boat-mode/water-query.js?v=11";
+} from "../boat-mode/water-query.js?v=12";
 import {
   createWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession
-} from "./load-runtime-session.js?v=2";
+} from "./load-runtime-session.js?v=4";
 import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=8";
 export function createWorldRoadLoader(deps = {}) {
   const {
@@ -264,6 +264,7 @@ export function createWorldRoadLoader(deps = {}) {
     const { addLinearFeatureRibbon, buildImmediateLinearFeatureGeometryPass } = linearRuntime;
     for (const radius of radii) {
       if (loaded) break;
+      loadMetrics.activeRadiusDeg = radius;
       try {
         if (performance.now() - loadStartedAt > maxTotalLoadMs) {
           console.warn('[Overpass] Max load budget reached, switching to fallback world.');

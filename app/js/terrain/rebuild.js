@@ -244,6 +244,8 @@ export function rebuildRoadsWithTerrain(deps = {}) {
   } = constants;
 
   if (!appCtx.terrainEnabled || appCtx.roads.length === 0 || appCtx.onMoon) return;
+  const baseRoads = appCtx.roads.filter((road) => !road?._streamChunkKey);
+  if (baseRoads.length === 0) return;
 
   if (typeof disableRoadDebugMode === "function") {
     disableRoadDebugMode();
@@ -260,14 +262,19 @@ export function rebuildRoadsWithTerrain(deps = {}) {
 
   // Terrain tiles arrive asynchronously. Profiles must sample the newly loaded
   // elevation data, never the flat placeholder cached during initial loading.
-  const roadCountChanged = appCtx.roads.length !== terrain?._lastRoadCount;
+  const roadCountChanged = baseRoads.length !== terrain?._lastRoadCount;
   if (typeof clearTerrainHeightCache === "function") clearTerrainHeightCache();
-  terrain._lastRoadCount = appCtx.roads.length;
+  terrain._lastRoadCount = baseRoads.length;
   if (typeof appCtx.refreshStructureAwareFeatureProfiles === "function") {
-    appCtx.refreshStructureAwareFeatureProfiles();
+    appCtx.refreshStructureAwareFeatureProfiles({ includeStreaming: false });
   }
 
+  const retainedRoadMeshes = [];
   appCtx.roadMeshes.forEach((mesh) => {
+    if (mesh?.userData?.earthStreamingChunk || mesh?.userData?.streamChunkKey) {
+      retainedRoadMeshes.push(mesh);
+      return;
+    }
     appCtx.scene.remove(mesh);
     if (mesh.geometry) mesh.geometry.dispose();
     if (mesh.material && !mesh.userData?.sharedRoadMaterial) {
@@ -280,16 +287,21 @@ export function rebuildRoadsWithTerrain(deps = {}) {
       }
     }
   });
-  appCtx.roadMeshes = [];
+  appCtx.roadMeshes = retainedRoadMeshes;
 
+  const retainedUrbanSurfaceMeshes = [];
   appCtx.urbanSurfaceMeshes.forEach((mesh) => {
+    if (mesh?.userData?.earthStreamingChunk || mesh?.userData?.streamChunkKey) {
+      retainedUrbanSurfaceMeshes.push(mesh);
+      return;
+    }
     appCtx.scene.remove(mesh);
     if (mesh.geometry) mesh.geometry.dispose();
     if (mesh.material && !mesh.userData?.sharedUrbanSurfaceMaterial && typeof mesh.material.dispose === "function") {
       mesh.material.dispose();
     }
   });
-  appCtx.urbanSurfaceMeshes = [];
+  appCtx.urbanSurfaceMeshes = retainedUrbanSurfaceMeshes;
   appCtx.urbanSurfaceStats = {
     sidewalkBatchCount: 0,
     sidewalkVertices: 0,
@@ -299,7 +311,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
 
   let intersections;
   if (roadCountChanged || !terrain?._cachedIntersections) {
-    intersections = detectRoadIntersections(appCtx.roads);
+    intersections = detectRoadIntersections(baseRoads);
     if (terrain) terrain._cachedIntersections = intersections;
   } else {
     intersections = terrain._cachedIntersections;
@@ -321,7 +333,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
   const urbanSurfaceMaterials = typeof getSharedUrbanSurfaceMaterials === "function" ? getSharedUrbanSurfaceMaterials() : {};
   const sidewalkMat = urbanSurfaceMaterials.sidewalkMat;
 
-  appCtx.roads.forEach((road, roadIdx) => {
+  baseRoads.forEach((road, roadIdx) => {
     if (!road || !Array.isArray(road.pts) || road.pts.length < 2) return;
     const { width } = road;
     const hw = width / 2;

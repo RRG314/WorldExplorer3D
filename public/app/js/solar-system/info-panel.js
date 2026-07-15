@@ -191,6 +191,10 @@ function handleSpaceReturnAction(ctx) {
   }
 
   if (ctx.appCtx.spaceFlight && ctx.appCtx.spaceFlight.active) {
+    if (ctx.appCtx.universeRuntime?.current?.id && ctx.appCtx.universeRuntime.current.id !== 'sol') {
+      ctx.appCtx.returnToEarthFromUniverse?.();
+      return;
+    }
     if (typeof ctx.appCtx.forceSpaceFlightLanding === 'function') {
       const forced = ctx.appCtx.forceSpaceFlightLanding('Earth');
       if (forced) return;

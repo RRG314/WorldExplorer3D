@@ -1,3 +1,5 @@
+import { createRoadNameResolver } from './streaming-road-labels.js?v=1';
+
 const SHORTBREAD_ZOOM = 14;
 const SHORTBREAD_FETCH_TIMEOUT_MS = 8000;
 const DEFAULT_TILE_TEMPLATE =
@@ -207,6 +209,12 @@ function convertTilesToElements(tiles, layerNames, bounds = null) {
   const featureSignatures = new Set();
   let nextNodeId = -1;
   let nextWayId = -1;
+  const referenceLat = bounds ? (Number(bounds.minLat) + Number(bounds.maxLat)) * 0.5 : 0;
+  const metersPerLonDegree = Math.max(1, Math.cos(referenceLat * Math.PI / 180) * 111320);
+  const projectLine = (coordinates) => (coordinates || []).map((coordinate) => ({
+    x: Number(coordinate?.[0]) * metersPerLonDegree,
+    z: Number(coordinate?.[1]) * 110540
+  })).filter((point) => Number.isFinite(point.x) && Number.isFinite(point.z));
 
   const nodeIdFor = (coordinate) => {
     const lon = Number(coordinate?.[0]);
@@ -221,6 +229,9 @@ function convertTilesToElements(tiles, layerNames, bounds = null) {
   };
 
   for (const { tile, x, y, z } of tiles) {
+    const resolveRoadName = layerNames.includes('streets')
+      ? createRoadNameResolver({ tile, x, y, z }, projectLine)
+      : null;
     for (const layerName of layerNames) {
       const layer = tile.layers[layerName];
       if (!layer || !Number.isFinite(layer.length)) continue;
@@ -235,7 +246,12 @@ function convertTilesToElements(tiles, layerNames, bounds = null) {
             const part = parts[partIndex];
             if (!Array.isArray(part.coords) || part.coords.length < (part.polygon ? 4 : 2)) continue;
             if (!partIntersectsBounds(part, bounds)) continue;
-          const signature = geometrySignature(layerName, part, tags);
+          const resolvedTags = { ...tags };
+          if (layerName === 'streets' && resolveRoadName) {
+            const roadName = resolveRoadName(projectLine(part.coords), geojson.properties?.kind);
+            if (roadName) resolvedTags.name = roadName;
+          }
+          const signature = geometrySignature(layerName, part, resolvedTags);
           if (featureSignatures.has(signature)) continue;
           featureSignatures.add(signature);
           const nodeIds = part.coords.map(nodeIdFor).filter(Number.isFinite);
@@ -250,7 +266,7 @@ function convertTilesToElements(tiles, layerNames, bounds = null) {
             type: 'way',
             id: nextWayId--,
             nodes: nodeIds,
-            tags: { ...tags, _sourceFeatureId: sourceFeatureId }
+            tags: { ...resolvedTags, _sourceFeatureId: sourceFeatureId }
           });
         }
       }

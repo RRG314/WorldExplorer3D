@@ -4,6 +4,9 @@ function currentActorWorldPosition() {
   if (appCtx.boatMode?.active && Number.isFinite(appCtx.boat?.x) && Number.isFinite(appCtx.boat?.z)) {
     return { x: appCtx.boat.x, z: appCtx.boat.z, source: 'boat' };
   }
+  if (appCtx.planeMode?.active && Number.isFinite(appCtx.planeMode?.x) && Number.isFinite(appCtx.planeMode?.z)) {
+    return { x: appCtx.planeMode.x, z: appCtx.planeMode.z, source: 'plane' };
+  }
   if (appCtx.droneMode && Number.isFinite(appCtx.drone?.x) && Number.isFinite(appCtx.drone?.z)) {
     return { x: appCtx.drone.x, z: appCtx.drone.z, source: 'drone' };
   }

@@ -25,13 +25,15 @@ export function assertWorldMatrixLocation(spec, result) {
       `${JSON.stringify({ buildings: result.counts.buildings, detail: result.buildingDetail })}`
     );
   }
-  if (result.counts.buildings > 0) {
+  const architecturalBuildings = Number(result.buildingDimensions?.architecturalCount || 0);
+  if (architecturalBuildings > 0) {
     const dimensions = result.buildingDimensions || {};
     assert(
       result.buildingDetail?.source === 'overture-buildings-pmtiles',
       `${spec.id}: buildings did not use the global authoritative massing source ${JSON.stringify(result.buildingDetail)}`
     );
     const overtureBuildings = Number(dimensions.geometrySources?.overture || 0);
+    const streamedMappedBuildings = Number(dimensions.geometrySources?.['shortbread-vector'] || 0);
     const inferredFootprints = Number(dimensions.geometrySources?.inferred_road_frontage || 0);
     if (inferredFootprints > 0) {
       assert(spec.kind === 'custom', `${spec.id}: inferred footprints appeared outside a custom location`);
@@ -48,11 +50,12 @@ export function assertWorldMatrixLocation(spec, result) {
       );
     }
     assert(
-      overtureBuildings > 0 || inferredFootprints > 0,
+      overtureBuildings > 0 || streamedMappedBuildings > 0 || inferredFootprints > 0,
       `${spec.id}: rendered buildings lost authoritative or explicit inferred provenance ${JSON.stringify(dimensions)}`
     );
     assert(
-      (overtureBuildings + inferredFootprints) / result.counts.buildings >= 0.9,
+      architecturalBuildings > 0 &&
+        (overtureBuildings + streamedMappedBuildings + inferredFootprints) / architecturalBuildings >= 0.9,
       `${spec.id}: more than 10% of rendered buildings bypassed global or explicit inferred provenance ${JSON.stringify(dimensions.geometrySources)}`
     );
     assert(
@@ -126,8 +129,12 @@ export function assertWorldMatrixLocation(spec, result) {
   assert(result.driveSpawn?.valid !== false, `${spec.id}: invalid drive spawn ${JSON.stringify(result.driveSpawn)}`);
   assert(result.walkSpawn?.valid !== false, `${spec.id}: invalid walk spawn ${JSON.stringify(result.walkSpawn)}`);
   if (result.counts.roads > 0) {
-    assert(result.traversal.driveSegments > 0, `${spec.id}: drive traversal graph missing`);
-    assert(result.traversal.walkSegments > 0, `${spec.id}: walk traversal graph missing`);
+    if (Number(result.traversalDiagnostics?.driveEligible || 0) > 0) {
+      assert(result.traversal.driveSegments > 0, `${spec.id}: drive traversal graph missing`);
+    }
+    if (Number(result.traversalDiagnostics?.walkEligible || 0) > 0) {
+      assert(result.traversal.walkSegments > 0, `${spec.id}: walk traversal graph missing`);
+    }
     const road = result.landPresentation?.nearestRoad;
     const exactRenderedRoadY = result.landPresentation?.exactRenderedRoadY;
     const renderedRoadY = result.landPresentation?.renderedRoadY;

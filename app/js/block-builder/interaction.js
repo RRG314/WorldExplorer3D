@@ -14,6 +14,7 @@ export function createBlockBuilderInteraction(options) {
     placeBuildBlock,
     removeBuildBlock,
     toGridCoord,
+    toVerticalGridCoord,
     toWorldCoord
   } = options;
 
@@ -125,7 +126,10 @@ export function createBlockBuilderInteraction(options) {
           };
         }
         const axis = faceAxis(hit.face?.normal, hit.object);
-        return { kind: 'place', gx: data.gx + axis.x, gy: data.gy + axis.y, gz: data.gz + axis.z };
+        const gy = axis.y > 0
+          ? toVerticalGridCoord(hit.point.y + blockHalf)
+          : data.gy + axis.y;
+        return { kind: 'place', gx: data.gx + axis.x, gy, gz: data.gz + axis.z };
       }
     }
 
@@ -140,7 +144,7 @@ export function createBlockBuilderInteraction(options) {
     return {
       kind: 'place',
       gx: toGridCoord(worldPoint.x),
-      gy: toGridCoord(worldPoint.y + blockHalf),
+      gy: toVerticalGridCoord(worldPoint.y + blockHalf),
       gz: toGridCoord(worldPoint.z)
     };
   }

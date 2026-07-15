@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { buildingLabel, pointToSegmentDistance } from "../building-entry.js?v=2";
+import { buildingLabel, pointToSegmentDistance } from "../building-entry.js?v=3";
 import {
   INTERIOR_FETCH_RADIUS_PAD,
   INTERIOR_FLOOR_CLEARANCE,

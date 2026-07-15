@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { addBuildingToSpatialIndex, clearBuildingSpatialIndex } from "./world/building-spatial-index.js?v=3";
+import { addBuildingToSpatialIndex, clearBuildingSpatialIndex } from "./world/building-spatial-index.js?v=5";
 
 const REBASE_DISTANCE_WORLD = 24000;
 const REBASE_COOLDOWN_MS = 2500;
@@ -65,7 +65,7 @@ function shiftMeshLists(offsetX, offsetZ) {
 }
 
 function shiftActors(offsetX, offsetZ) {
-  [appCtx.car, appCtx.drone, appCtx.boat, appCtx.Walk?.state?.walker].forEach((actor) => {
+  [appCtx.car, appCtx.drone, appCtx.boat, appCtx.planeMode, appCtx.Walk?.state?.walker].forEach((actor) => {
     if (!actor) return;
     if (Number.isFinite(actor.x)) actor.x -= offsetX;
     if (Number.isFinite(actor.z)) actor.z -= offsetZ;

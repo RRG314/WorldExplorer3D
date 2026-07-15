@@ -21,7 +21,7 @@ import {
 import {
   getBuildingMaterial,
   refreshBuildingFacadeMaterials
-} from "./building-facade-materials.js?v=5";
+} from "./building-facade-materials.js?v=6";
 
 const USE_REMOTE_PBR_TEXTURES = false;
 

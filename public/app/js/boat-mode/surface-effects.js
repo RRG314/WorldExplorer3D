@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { getSeaStateConfig, getWaveIntensity, inferWaterRenderContext, resolveWaterMotionProfile, surfaceNormalFromMotion } from "../water-dynamics.js?v=3";
+import { getSeaStateConfig, getWaveIntensity, inferWaterRenderContext, resolveWaterMotionProfile, surfaceNormalFromMotion } from "../water-dynamics.js?v=4";
 import { getWaterPalette } from "../water-palette.js?v=1";
 import {
   getBoatWaveProfile,
@@ -7,7 +7,7 @@ import {
   sampleDynamicWaterAt,
   waterSurfaceBaseYAt,
   waterSurfaceYAt
-} from "./water-query.js?v=11";
+} from "./water-query.js?v=12";
 import { clamp, stepBoatSpring } from "./dynamics.js?v=1";
 import { resetBoatFoamFx, updateBoatFoamFx } from "./foam-effects.js?v=1";
 

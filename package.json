@@ -1,7 +1,8 @@
 {
   "name": "worldexplorer3d",
-  "version": "1.0.0",
+  "version": "3.0.0",
   "description": "Browser-based 3D geospatial exploration app using OpenStreetMap-derived data for Earth and destination-mode exploration.",
+  "type": "module",
   "main": "three.js",
   "scripts": {
     "test": "npm run test:rules && npm run test:runtime && npm run test:osm-smoke",

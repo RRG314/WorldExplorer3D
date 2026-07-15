@@ -81,9 +81,12 @@ function getWorldExplorerRuntimeDiagnostics() {
     gameStarted: !!appCtx.gameStarted,
     paused: !!appCtx.paused,
     worldLoading: !!appCtx.worldLoading,
+    earthResumePending: !!appCtx.earthResumePending,
+    worldDetail: appCtx.worldDetailState || null,
     modes: {
       boat: !!appCtx.boatMode?.active,
       drone: !!appCtx.droneMode,
+      plane: !!appCtx.planeMode?.active,
       ocean: !!appCtx.oceanMode?.active,
       space: !!appCtx.spaceFlight?.active,
       walking: appCtx.Walk?.state?.mode === "walk"
@@ -100,6 +103,7 @@ function getWorldExplorerRuntimeDiagnostics() {
       traveling: !!appCtx.travelingToMoon
     },
     spaceCatalog: spaceCatalogSnapshot(),
+    curatedLandmarks: appCtx.curatedLandmarkMetrics || null,
     titleVisible: !!document.getElementById("titleScreen") &&
       !document.getElementById("titleScreen").classList.contains("hidden"),
     camera: appCtx.camera
@@ -149,7 +153,21 @@ function getWorldExplorerRuntimeDiagnostics() {
       landuseMeshes: appCtx.landuseMeshes?.length ?? null,
       roadMeshes: appCtx.roadMeshes?.length ?? null,
       roads: appCtx.roads?.length ?? null,
-      terrainTiles: appCtx.terrainTileCache?.size ?? null
+      terrainTiles: appCtx.terrainTileCache?.size ?? null,
+      visibleBuildingMeshes: Array.isArray(appCtx.buildingMeshes)
+        ? appCtx.buildingMeshes.filter((mesh) => mesh?.visible && mesh?.parent === appCtx.scene).length
+        : null,
+      guardedRoads: Array.isArray(appCtx.roads)
+        ? appCtx.roads.filter((road) => road?.guardrailColliders?.length > 0).length
+        : null,
+      guardrailColliders: Array.isArray(appCtx.buildings)
+        ? appCtx.buildings.filter((building) => building?.buildingType === 'bridge_guardrail').length
+        : null,
+      guardrailVisualInstances: Array.isArray(appCtx.structureVisualMeshes)
+        ? appCtx.structureVisualMeshes
+            .filter((mesh) => mesh?.userData?.structureVisualType === 'guardrails')
+            .reduce((sum, mesh) => sum + (Number(mesh?.count) || 0), 0)
+        : null
     }
   };
 }

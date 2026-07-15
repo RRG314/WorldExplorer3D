@@ -99,6 +99,8 @@ async function waitForExpectedState(page, scenario, timeoutMs = 20000) {
     await page.waitForTimeout(250);
     state = await readState(page);
   }
+  const destinationReady = !scenario.destination || state.destination === scenario.destination;
+  if (state.env === scenario.env && destinationReady) return state;
   throw new Error(`${scenario.mode} title launch timed out: ${JSON.stringify(state)}`);
 }
 
@@ -134,6 +136,13 @@ async function settleVisualFrame(page) {
     await new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   });
   await page.waitForTimeout(500);
+}
+
+async function openMainMenu(page) {
+  await page.evaluate(() => document.getElementById('mainMenuBtn')?.click());
+  await page.waitForFunction(() => !document.getElementById('titleScreen')?.classList.contains('hidden'), null, {
+    timeout: 30000
+  });
 }
 
 async function runScenario(browser, baseUrl, scenario) {
@@ -181,7 +190,7 @@ async function runScenario(browser, baseUrl, scenario) {
       assert(mainFrameNavigations === 1, 'Moon return reloaded the page instead of restoring Earth in place');
       assert(!earthReturn.fatal, 'Moon return showed a fatal renderer error');
 
-      await page.click('#mainMenuBtn');
+      await openMainMenu(page);
       const titleAfterEarth = await readState(page);
       assert(titleAfterEarth.env === 'EARTH', 'Main Menu did not normalize the returned Earth environment');
       assert(!titleAfterEarth.spaceFlightActive, 'Main Menu retained an active flight before Mars launch');
@@ -197,7 +206,7 @@ async function runScenario(browser, baseUrl, scenario) {
       assert(!marsAfterMoon.fatal, 'Mars launch after Moon return showed a fatal renderer error');
       assert(mainFrameNavigations === 1, 'Mars launch after Moon return reloaded the page');
 
-      await page.click('#mainMenuBtn');
+      await openMainMenu(page);
       await page.click('#spaceLaunchToggle');
       await page.click('#startBtn');
       const spaceScenario = scenarios.find((entry) => entry.mode === 'space');
@@ -212,7 +221,7 @@ async function runScenario(browser, baseUrl, scenario) {
       assert(!spaceAfterMars.fatal, 'Space relaunch after Mars showed a fatal renderer error');
       assert(mainFrameNavigations === 1, 'Space relaunch after Mars reloaded the page');
 
-      await page.click('#mainMenuBtn');
+      await openMainMenu(page);
       await page.click('#spaceLaunchToggle');
       await page.click('#startBtn');
       await waitForExpectedState(page, spaceScenario);

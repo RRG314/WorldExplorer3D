@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { createGlobeSelector } from "./globe-selector.js?v=59";
+import { createGlobeSelector } from "./globe-selector.js?v=61";
 import { readSharedExperienceParams } from "./share-links.js?v=60";
-import { prepareTitleEnvironment } from "../planetary/entry.js?v=3";
+import { prepareTitleEnvironment } from "../planetary/entry.js?v=5";
 
 function initTitleScreenUi({
   lastLocationStorageKey,
@@ -87,6 +87,7 @@ function initTitleScreenUi({
     appCtx.pendingAutoBoatEntry = null;
     if (appCtx.oceanMode?.active) appCtx.stopOceanMode?.();
     if (appCtx.boatMode?.active) appCtx.stopBoatMode?.({ targetMode: 'walk', source });
+    if (appCtx.planeMode?.active) appCtx.stopPlaneMode?.();
     appCtx.droneMode = false;
     if (typeof appCtx.setTravelMode === 'function') {
       appCtx.setTravelMode('walk', { source, emitTutorial: false });
@@ -101,6 +102,7 @@ function initTitleScreenUi({
     if (appCtx.boatMode?.waterPatch) appCtx.boatMode.waterPatch.visible = false;
     if (appCtx.carMesh) appCtx.carMesh.visible = false;
     if (appCtx.Walk?.state?.characterMesh) appCtx.Walk.state.characterMesh.visible = true;
+    document.getElementById('fPlane')?.classList.remove('on');
   };
 
   const setLaunchMode = (mode) => {

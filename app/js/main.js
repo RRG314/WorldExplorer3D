@@ -13,6 +13,7 @@ const OVERLAY_EDGE_MARGIN = 6;
 const OVERLAY_ANCHOR_GAP = 10;
 const DEFAULT_LOADING_BG = 'loading-bg.jpg';
 const TRANSITION_LOADING = {
+  earth: { background: 'loading-bg.jpg', text: 'Restoring Earth...' },
   space: { background: 'space-transition.png', text: 'Preparing Space Flight...' },
   moon: { background: 'moon-transition.png', text: 'Approaching The Moon...' },
   mars: { background: 'space-transition.png', text: 'Approaching Olympus Mons...' },
@@ -140,7 +141,7 @@ function renderLoop(t = 0) {
       }
     }
     _boatTimer += dt;
-    const boatRefreshInterval = appCtx.boatMode?.active ? 0.85 : 0.18;
+    const boatRefreshInterval = appCtx.boatMode?.active ? 0.85 : appCtx.planeMode?.active ? 1.2 : appCtx.droneMode ? 0.65 : 0.25;
     if (_boatTimer > boatRefreshInterval) {
       _boatTimer = 0;
       if (typeof appCtx.refreshBoatAvailability === 'function') {
@@ -177,9 +178,10 @@ function renderLoop(t = 0) {
       }
     }
 
-    // Throttle minimap to ~10fps (every ~100ms)
+    // Aerial modes cover more ground but do not need a 10fps DOM/canvas map refresh.
     _mapTimer += dt;
-    if (_mapTimer > 0.1) {
+    const mapRefreshInterval = appCtx.planeMode?.active ? 0.25 : appCtx.droneMode ? 0.16 : 0.1;
+    if (_mapTimer > mapRefreshInterval) {
       _mapTimer = 0;
       if (!_isEditorWorkspaceOpen() && !_isActivityCreatorOpen()) {
         appCtx.drawMinimap();
@@ -223,7 +225,12 @@ function renderLoop(t = 0) {
       let onRoadValue = !!appCtx.car?.onRoad;
       let roadName = appCtx.car?.road?.name || '-';
 
-      if (appCtx.droneMode) {
+      if (appCtx.planeMode?.active) {
+        modeLabel = 'plane';
+        refX = Number.isFinite(appCtx.planeMode.x) ? appCtx.planeMode.x : refX;
+        refZ = Number.isFinite(appCtx.planeMode.z) ? appCtx.planeMode.z : refZ;
+        refY = Number.isFinite(appCtx.planeMode.y) ? appCtx.planeMode.y : refY;
+      } else if (appCtx.droneMode) {
         modeLabel = 'drone';
         refX = Number.isFinite(appCtx.drone?.x) ? appCtx.drone.x : refX;
         refZ = Number.isFinite(appCtx.drone?.z) ? appCtx.drone.z : refZ;
@@ -257,7 +264,9 @@ function renderLoop(t = 0) {
       const tY = appCtx.elevationWorldYAtWorldXZ(refX, refZ).toFixed(2);
       const refYVal = Number.isFinite(refY) ? refY.toFixed(2) : '?';
       const rdist = Number.isFinite(roadDist) ? roadDist.toFixed(1) : '?';
-      const speed = modeLabel === 'drone' ?
+      const speed = modeLabel === 'plane' ?
+      Math.round(Math.abs((appCtx.planeMode?.speed || 0) * 2.237)) :
+      modeLabel === 'drone' ?
       Math.round(Math.abs((appCtx.drone?.speed || 0) * 1.8)) :
       modeLabel === 'boat' ?
       Math.round(Math.abs((appCtx.boat?.speed || 0) * 0.43)) :
@@ -276,7 +285,11 @@ function renderLoop(t = 0) {
       let markerZ = Number.isFinite(appCtx.car?.z) ? appCtx.car.z : 0;
       let markerOnRoad = !!appCtx.car?.onRoad;
 
-      if (appCtx.droneMode) {
+      if (appCtx.planeMode?.active) {
+        markerX = Number.isFinite(appCtx.planeMode.x) ? appCtx.planeMode.x : markerX;
+        markerZ = Number.isFinite(appCtx.planeMode.z) ? appCtx.planeMode.z : markerZ;
+        markerOnRoad = false;
+      } else if (appCtx.droneMode) {
         markerX = Number.isFinite(appCtx.drone?.x) ? appCtx.drone.x : markerX;
         markerZ = Number.isFinite(appCtx.drone?.z) ? appCtx.drone.z : markerZ;
         const nearest = typeof appCtx.findNearestTraversalFeature === 'function' ?

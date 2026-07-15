@@ -13,6 +13,8 @@
 <link rel="stylesheet" href="styles/title-shell.css?v=86">
 <link rel="stylesheet" href="styles/runtime-shell.css?v=85">
 <link rel="stylesheet" href="styles/block-builder.css?v=2">
+<link rel="stylesheet" href="styles/universe.css?v=3">
+<link rel="stylesheet" href="styles/fishing-game.css?v=1">
 </head>
 <body>
 <button id="appSignInBtn" class="auth-float-toggle" type="button" aria-expanded="false" aria-controls="authFloatPanel">Sign In / Sign Up</button>
@@ -343,9 +345,8 @@ Use this to compare RDT and baseline with real runtime data.
 <div class="tab-content" id="tab-controls">
 <div class="ctrl-grid">
 <div class="ctrl-section">Driving</div>
-<div class="ctrl-row"><span class="ctrl-key">W/S</span><span class="ctrl-action">Drive Forward/Reverse</span></div>
-<div class="ctrl-row"><span class="ctrl-key">A/D</span><span class="ctrl-action">Steer Left/Right</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Drive / Steer</span></div>
+<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Handbrake</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Boost</span></div>
 <div class="ctrl-section">Walking Mode</div>
@@ -357,17 +358,24 @@ Use this to compare RDT and baseline with real runtime data.
 <div class="ctrl-row"><span class="ctrl-key">Shift</span><span class="ctrl-action">Run (2x speed)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Right Click + Drag</span><span class="ctrl-action">Mouse Look</span></div>
 <div class="ctrl-section">Drone Controls</div>
-<div class="ctrl-row"><span class="ctrl-key">W/S</span><span class="ctrl-action">Fly Forward/Back</span></div>
-<div class="ctrl-row"><span class="ctrl-key">A/D</span><span class="ctrl-action">Turn Left/Right</span></div>
-<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Fly / Turn</span></div>
+<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Move Up</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift/Ctrl</span><span class="ctrl-action">Move Down</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Mouse</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-section">Plane Controls</div>
+<div class="ctrl-row"><span class="ctrl-key">↑ / ↓</span><span class="ctrl-action">Climb / Descend (Up Assists Takeoff)</span></div>
+<div class="ctrl-row"><span class="ctrl-key">← / →</span><span class="ctrl-action">Bank / Ground Steer</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Shift / Ctrl</span><span class="ctrl-action">Increase / Reduce Throttle</span></div>
+<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Wheel Brake</span></div>
+<div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Chase / Cockpit / Overhead</span></div>
+<div class="ctrl-row"><span class="ctrl-key">P</span><span class="ctrl-action">Enter / Exit Plane</span></div>
 <div class="ctrl-section">Camera & View</div>
 <div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Cycle Camera (3rd/1st/Overhead)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">V</span><span class="ctrl-action">Look Back</span></div>
 <div class="ctrl-section">Mode Switching</div>
-<div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-action">Cycle Drive / Walk / Drone</span></div>
+<div class="ctrl-row"><span class="ctrl-key">F</span><span class="ctrl-action">Cycle Drive / Walk / Drone / Plane</span></div>
 <div class="ctrl-row"><span class="ctrl-key">B</span><span class="ctrl-action">Open / Close Build with Blocks</span></div>
 <div class="ctrl-section">Navigation & Map</div>
 <div class="ctrl-row"><span class="ctrl-key">M</span><span class="ctrl-action">Toggle Map</span></div>
@@ -395,15 +403,17 @@ Use this to compare RDT and baseline with real runtime data.
 </div>
 <aside id="flowerChallengePanel" class="flowerChallengePanel">
 <div class="flowerChallengeHeader">
-<div class="flowerChallengeTitle">Challenge Leaderboard</div>
-<div class="flowerChallengeBadge">Flower + Paint</div>
+<div class="flowerChallengeTitle">Game Leaderboards</div>
+<div class="flowerChallengeBadge">All Games</div>
 </div>
 <div class="flowerChallengeBody">
-<div class="flowerChallengeHint">Track your best challenge runs. Flower is fastest time. Paint is most buildings painted in 2 minutes. Sign in to publish scores to the shared board; signed-out runs stay local to this browser.</div>
+<div id="gameLeaderboardHint" class="flowerChallengeHint">Fastest red-flower runs. Signed-in scores publish to the shared board.</div>
 <div class="flowerChallengeLocation">Location: <b id="flowerChallengeLocation">Baltimore</b></div>
 <div class="flowerLeaderboardTabs">
 <button id="leaderboardTabFlower" class="flowerLeaderboardTab active" type="button">🌹 Flower</button>
 <button id="leaderboardTabPaintTown" class="flowerLeaderboardTab" type="button">🟥 Paint Town</button>
+<button id="leaderboardTabFishing" class="flowerLeaderboardTab" type="button">🎣 Fishing</button>
+<button id="leaderboardTabExplorer" class="flowerLeaderboardTab" type="button">🧭 Explorer</button>
 </div>
 <div class="flowerChallengeRow">
 <input id="flowerPlayerName" class="flowerChallengeName" type="text" maxlength="24" placeholder="Player Name" value="Explorer">
@@ -548,7 +558,57 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · ESA
   </div>
   <input id="boatWaveSlider" type="range" min="0" max="100" step="1" value="46" aria-label="Wave intensity">
   <span id="boatWaveValue">46%</span>
+  <button id="fishingDockBtn" type="button">Fishing</button>
 </div>
+<aside id="fishingGamePanel" aria-label="Fishing game" aria-hidden="true">
+  <header class="fishingHeader">
+    <div>
+      <span class="fishingEyebrow">Boat activity</span>
+      <strong>Fishing</strong>
+    </div>
+    <div class="fishingHeaderActions">
+      <span id="fishingStage">Idle</span>
+      <button id="fishingCloseBtn" type="button" aria-label="Close fishing" title="Close fishing">×</button>
+    </div>
+  </header>
+  <div class="fishingContext">
+    <span id="fishingWater">Water</span>
+    <span id="fishingSpeed">0.0 m/s</span>
+  </div>
+  <div class="fishingScene">
+    <canvas id="fishingCanvas" width="420" height="190" aria-label="Current fish"></canvas>
+    <div class="fishingFishReadout">
+      <strong id="fishingFishName">Unknown fish</strong>
+      <span id="fishingFishMeta">Cast to discover the fish in this water.</span>
+    </div>
+  </div>
+  <div id="fishingMessage" class="fishingMessage" role="status" aria-live="polite">Stop the boat and cast into the water.</div>
+  <button id="fishingActionBtn" class="fishingPrimary" type="button">Cast Line</button>
+  <div class="fishingMeters" aria-label="Fishing status">
+    <div class="fishingMeterRow"><span>Tension</span><div class="fishingMeter"><i id="fishingTensionFill"></i><b class="safeBand"></b></div><em id="fishingTensionValue">0%</em></div>
+    <div class="fishingMeterRow"><span>Fish fatigue</span><div class="fishingMeter"><i id="fishingStaminaFill"></i></div><em id="fishingStaminaValue">0% tired</em></div>
+    <div class="fishingMeterRow"><span>Line</span><div class="fishingMeter"><i id="fishingIntegrityFill"></i></div><em id="fishingIntegrityValue">100%</em></div>
+    <div class="fishingMeterRow"><span>Distance</span><div class="fishingMeter"><i id="fishingProgressFill"></i></div><em id="fishingProgressValue">0%</em></div>
+  </div>
+  <label class="fishingDragRow" for="fishingDrag">
+    <span>Reel drag</span>
+    <input id="fishingDrag" type="range" min="15" max="90" step="1" value="48">
+    <em id="fishingDragValue">48%</em>
+  </label>
+  <div class="fishingFightControls">
+    <button id="fishingGiveBtn" type="button">Give Line <small>Hold Q</small></button>
+    <button id="fishingReelBtn" class="reel" type="button">Reel <small>Hold Space</small></button>
+  </div>
+  <div class="fishingRodControls" role="group" aria-label="Rod direction">
+    <button id="fishingRodLeft" type="button">Rod Left <small>J</small></button>
+    <button id="fishingRodCenter" class="active" type="button">Center <small>K</small></button>
+    <button id="fishingRodRight" type="button">Rod Right <small>L</small></button>
+  </div>
+  <div class="fishingLogHeader">
+    <div><strong id="fishingSummary">0 catches | 0 species | Best 0 pts</strong><span id="fishingRecord">No personal record yet</span></div>
+  </div>
+  <ol id="fishingCatchList" class="fishingCatchList"><li>No catches yet.</li></ol>
+</aside>
 <div id="flowerChallengeHud">
 <span id="flowerChallengeHudStatus"></span>
 <span id="flowerChallengeHudTimer"></span>
@@ -827,6 +887,7 @@ Explore the area
 <div class="floatItem" id="fDriving">🚗 Driving Mode</div>
 <div class="floatItem" id="fWalk">🚶 Walk Mode</div>
 <div class="floatItem" id="fDrone">🚁 Drone Mode</div>
+<div class="floatItem" id="fPlane">✈️ Plane Mode</div>
 <div class="floatItem" id="fBoat" style="display:none">🚤 Boat Mode</div>
 <div class="floatItem" id="fOceanMode">🌊 Ocean Mode</div>
 <div class="floatItem" id="fEarthMode">🌍 Earth Mode</div>
@@ -861,6 +922,7 @@ Explore the area
 <div class="floatItem" id="fActivities">🌍 Browse Games</div>
 <div class="floatItem" id="fRoomGames">👥 Room Games</div>
 <div class="floatItem" id="fActivityCreator">🧩 Create Game</div>
+<div class="floatItem" id="fFishing" style="display:none">🎣 Fishing</div>
 <div class="floatItem" id="fPolice">🚔 Police</div>
 <div class="floatItem" id="fTrack">🏁 Record Track</div>
 <div class="floatItem" id="fEraseTrack">🗑️ Erase Track</div>
@@ -1396,12 +1458,12 @@ Explore the area
 <div id="controlsTab"><div id="ctrlHeader">⚙️ Driving Mode ▼</div><div id="ctrlContent" class="hidden">
 <div id="drivingControls">
 <b>🚗 Driving Mode:</b><br>
-• W/S - Drive forward / reverse<br>
-• A/D - Steer left / right<br>
+• Arrow Up/Down - Drive forward / reverse<br>
+• Arrow Left/Right - Steer left / right<br>
+• WASD - Look around; chase view recenters automatically<br>
 • Space - Handbrake<br>
 • Ctrl - Boost<br>
 • C - Camera view<br>
-• Arrow Keys - Look around<br>
 • F - Cycle drive / walk / drone<br>
 • M - Toggle map<br>
 • N - Next city<br>
@@ -1409,11 +1471,15 @@ Explore the area
 </div>
 <div id="boatControls" style="display:none">
 <b>🚤 Boat Mode:</b><br>
-• W/S - Throttle / Reverse<br>
-• A/D - Steer<br>
+• Arrow Up/Down - Throttle / Reverse<br>
+• Arrow Left/Right - Steer<br>
+• WASD - Look around<br>
 • Space - Brake / Hold position<br>
 • G - Enter / exit boat travel<br>
 • C - Camera view<br>
+• Fishing button - Open fishing while the boat is stopped<br>
+• E - Cast / set hook; hold Space to reel; hold Q to give line<br>
+• J/K/L - Rod left / center / right during a fight<br>
 • Use the bottom Wave Intensity slider for calm, moderate, or rough water
 </div>
 <div id="walkingControls" style="display:none">
@@ -1432,20 +1498,31 @@ Explore the area
 </div>
 <div id="droneControls" style="display:none">
 <b>🚁 Drone Mode:</b><br>
-• W/S - Fly forward / back<br>
-• A/D - Turn left / right<br>
-• Arrow Keys - Look around<br>
+• Arrow Up/Down - Fly forward / back<br>
+• Arrow Left/Right - Turn left / right<br>
+• WASD - Look around<br>
 • Mouse - Look around<br>
 • Space - Fly up<br>
 • Shift/Ctrl - Fly down<br>
-• F - Cycle drone / drive / walk<br>
+• F - Cycle drone / plane / drive / walk<br>
 • B - Open / close Build with Blocks<br>
+</div>
+<div id="planeControls" style="display:none">
+<b>✈️ Plane Mode:</b><br>
+• Arrow Up/Down - Climb / descend (Up assists takeoff)<br>
+• Arrow Left/Right - Bank or ground steer<br>
+• Shift/Ctrl - Increase / reduce throttle<br>
+• Space - Wheel brake on the ground<br>
+• WASD - Look around<br>
+• C - Chase / cockpit / overhead camera<br>
+• P - Enter / exit plane mode<br>
 </div>
 <div id="rocketControls" style="display:none">
 <b>🚀 Rocket Mode:</b><br>
 • Arrow Keys - Steer rocket (yaw/pitch)<br>
 • Space - Thrust / Boost<br>
 • Shift - Brake / Decelerate<br>
+• X - Mining pulse in generated asteroid regions<br>
 • LAND ON ... Button - Land when in range
 </div>
 <div id="oceanControls" style="display:none">
@@ -1482,5 +1559,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=84"></script>
 <script type="module" src="js/app-auth-shell.js?v=84"></script>
-<script type="module" src="js/bootstrap.js?v=139"></script>
+<script type="module" src="js/bootstrap.js?v=195"></script>
 </body></html>

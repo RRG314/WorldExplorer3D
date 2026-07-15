@@ -59,7 +59,8 @@ export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureV
     capInstances,
     wallInstances,
     roofInstances,
-    tunnelLightInstances
+    tunnelLightInstances,
+    guardrailInstances
   } = collectStructureVisualInstances(deps);
 
   if (deckInstances.length > 0) {
@@ -123,5 +124,13 @@ export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureV
     material.emissive.setHex(0xffd98a);
     material.emissiveIntensity = 1.8;
     buildStructureVisualMeshForContext(appCtx, tunnelLightInstances, material, { structureVisualType: "tunnel_lights" });
+  }
+  if (guardrailInstances.length > 0) {
+    buildStructureVisualMeshForContext(
+      appCtx,
+      guardrailInstances,
+      createStructureVisualMaterial(0xb6bdc3, 0.62, 0.42),
+      { structureVisualType: "guardrails" }
+    );
   }
 }

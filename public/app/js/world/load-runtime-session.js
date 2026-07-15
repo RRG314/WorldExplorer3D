@@ -79,6 +79,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     locName,
     resetWorldFurnitureCaches
   });
+  appCtx.initialEarthWorldReady = false;
   appCtx.worldDetailState = {};
 
   if (appCtx.selLoc === 'custom') {
@@ -194,7 +195,13 @@ export function finishWorldLoadRuntimeSession(session = {}) {
   const { appCtx, finalizePerfLoad, loadMetrics, phaseTotals, loaded = false } = session;
   if (!appCtx) return;
 
+  const loadedRadiusDeg = Number(loadMetrics?.activeRadiusDeg);
+  appCtx.initialEarthDetailRadius = Number.isFinite(loadedRadiusDeg)
+    ? Math.max(800, Math.round(loadedRadiusDeg * (appCtx.SCALE || 100000) * 0.92))
+    : 1050;
+
   appCtx.worldLoading = false;
+  appCtx.initialEarthWorldReady = !!loaded;
   if (typeof appCtx.enforceEnvironmentSceneOwnership === 'function') {
     appCtx.enforceEnvironmentSceneOwnership();
   }
@@ -212,6 +219,7 @@ export function finishWorldLoadRuntimeSession(session = {}) {
       Object.entries(phaseTotals).map(([name, ms]) => [name, Math.round(ms)])
     );
   }
+  loadMetrics.initialEarthDetailRadius = appCtx.initialEarthDetailRadius;
   finalizePerfLoad(loaded, {
     roadsFinal: appCtx.roads.length,
     roadVertices: Math.round(loadMetrics.roads.vertices || 0),

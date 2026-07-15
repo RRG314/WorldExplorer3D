@@ -9,7 +9,7 @@ import {
   polygonSamplePoints,
   projectPointToPolygonRing,
   ringAreaAbs
-} from "./core.js?v=1";
+} from "./core.js?v=2";
 
 export function polygonEdgeClearance(point, polygon) {
   const hit = projectPointToPolygonRing(point, polygon);

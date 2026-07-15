@@ -8,7 +8,7 @@ import {
   showPlanetInfo,
   showSpacecraftInfo,
   showSunInfo
-} from "./info-panel.js?v=1";
+} from "./info-panel.js?v=2";
 
 export function onSolarSystemClick(ctx, event) {
   if (!ctx.appCtx.spaceFlight.active || !ctx.solarSystem.visible || !ctx.solarSystem.group) return;
@@ -196,7 +196,7 @@ export function toggleOrbits(ctx) {
   handleMoonLandingAction(ctx);
 }
 
-export function showSolarSystemUI() {
+export function showSolarSystemUI(ctx) {
   const container = document.getElementById('ssToggleContainer');
   if (container) container.style.display = 'flex';
   const returnBtn = document.getElementById('solarSystemToggle');
@@ -205,11 +205,13 @@ export function showSolarSystemUI() {
   if (returnBtn) returnBtn.textContent = 'RETURN TO EARTH';
   if (landMoonBtn) landMoonBtn.textContent = 'LAND ON MOON';
   if (landMarsBtn) landMarsBtn.textContent = 'LAND ON MARS';
+  ctx?.appCtx?.showUniverseUI?.();
 }
 
 export function hideSolarSystemUI(ctx) {
   const container = document.getElementById('ssToggleContainer');
   if (container) container.style.display = 'none';
+  ctx?.appCtx?.hideUniverseUI?.();
   hidePlanetInfo(ctx);
 }
 

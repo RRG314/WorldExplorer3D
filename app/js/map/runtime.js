@@ -1,9 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { drawEarthBaseLayers } from "./earth-base.js?v=1";
-import { drawEarthMarkerLayers } from "./earth-markers.js?v=1";
-import { drawMapCompass, drawMapPlayerIcons } from "./icons.js?v=1";
+import { drawEarthBaseLayers } from "./earth-base.js?v=2";
+import { drawEarthMarkerLayers } from "./earth-markers.js?v=2";
+import { drawMapCompass, drawMapPlayerIcons } from "./icons.js?v=2";
 import { drawMoonMap } from "./moon.js?v=1";
-import { latLonToTile, loadTile, resolveMapView, worldToScreenLarge } from "./tiles.js?v=1";
+import { latLonToTile, loadTile, resolveMapView, worldToScreenLarge } from "./tiles.js?v=2";
 
 const mctx = document.getElementById("minimap").getContext("2d");
 const largeMapCtx = document.getElementById("largeMapCanvas").getContext("2d");

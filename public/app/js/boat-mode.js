@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { captureEarthWorldSession } from "./earth-session.js?v=3";
+import { captureEarthWorldSession } from "./earth-session.js?v=8";
 import {
   DEFAULT_WAVE_INTENSITY,
   SEA_STATE_CONFIG,
@@ -8,7 +8,7 @@ import {
   getWaveIntensity,
   intensityFromSeaState,
   seaStateFromIntensity
-} from "./water-dynamics.js?v=3";
+} from "./water-dynamics.js?v=4";
 import {
   findNearestBoatCandidate,
   getBoatModeSnapshot,
@@ -24,7 +24,7 @@ import {
   syncWaterMeshCache,
   waterKindLabel,
   waterSurfaceYAt
-} from "./boat-mode/water-query.js?v=11";
+} from "./boat-mode/water-query.js?v=12";
 import {
   applyBoatWavePose,
   ensureBoatWaterPatch,
@@ -33,11 +33,11 @@ import {
   updateBoatFoamFx,
   updateBoatWaterPatch,
   updateWaterWaveVisuals
-} from "./boat-mode/surface-effects.js?v=5";
+} from "./boat-mode/surface-effects.js?v=6";
 import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=1";
 import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=1";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";
-import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=2";
+import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=4";
 
 const BOAT_PROMPT_DISTANCE = 18;
 const BOAT_ENTRY_OFFSET = 9;
@@ -585,6 +585,7 @@ function enterBoatAtWorldPoint(worldX, worldZ, options = {}) {
 
 function stopBoatMode(options = {}) {
   if (!appCtx.boatMode?.active) return false;
+  if (typeof appCtx.closeFishingGame === 'function') appCtx.closeFishingGame();
   const exitMode = options.targetMode === 'drive' || appCtx.boatMode.lastEntryMode === 'drive' ? 'drive' : 'walk';
   const entry = appCtx.boatMode.entryPosition || {
     x: appCtx.boat.x,

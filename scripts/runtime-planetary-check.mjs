@@ -19,6 +19,15 @@ async function waitForPlanetaryState(page, expectedEnv, timeoutMs = 20000) {
 }
 
 export async function exercisePlanetaryRoundTrip(page) {
+  await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    ctx.pauseEarthStreaming?.('planetary_round_trip_test');
+  });
+  await page.waitForFunction(() => {
+    const diagnostics = window.getWorldExplorerRuntimeDiagnostics?.();
+    return Number(diagnostics?.earthStreaming?.activeLoads || 0) === 0;
+  }, { timeout: 20000 });
+
   const before = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     ctx.renderer.domElement.dataset.planetaryRoundTrip = 'same-renderer';
@@ -31,7 +40,7 @@ export async function exercisePlanetaryRoundTrip(page) {
 
   await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const { captureEarthWorldSession } = await import('/app/js/earth-session.js?v=2');
+    const { captureEarthWorldSession } = await import('/app/js/earth-session.js?v=8');
     captureEarthWorldSession();
     ctx.earthPosition = {
       x: Number(ctx.car?.x) || 0,

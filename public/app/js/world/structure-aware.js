@@ -265,9 +265,13 @@ export function applyBuildingContextSemanticsToFeature(feature) {
   if (feature.isStructureConnector === true) feature.isStructureConnector = false;
 }
 
-export function refreshStructureAwareFeatureProfiles() {
-  const roadFeatures = Array.isArray(appCtx.roads) ? appCtx.roads : [];
-  const connectorFeatures = structureAwareLinearFeatures();
+export function refreshStructureAwareFeatureProfiles(options = {}) {
+  const includeStreaming = options.includeStreaming !== false;
+  const roadFeatures = Array.isArray(appCtx.roads)
+    ? appCtx.roads.filter((feature) => includeStreaming || !feature?._streamChunkKey)
+    : [];
+  const connectorFeatures = structureAwareLinearFeatures()
+    .filter((feature) => includeStreaming || !feature?._streamChunkKey);
   const transportFeatures = roadFeatures.concat(connectorFeatures);
 
   for (let i = 0; i < transportFeatures.length; i++) {
@@ -319,6 +323,7 @@ export function refreshStructureAwareFeatureProfiles() {
 
   normalizeStructureEndpointHeights(structureFeatures);
   smoothStructureSurfaceProfiles(profiledFeatures);
+  appCtx.refreshBridgeGuardrails?.(roadFeatures);
 
   if (structureFeatures.length > 0) {
     appCtx.structureTerrainCuts = structureFeatures

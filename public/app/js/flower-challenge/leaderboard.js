@@ -1,12 +1,13 @@
 function createFlowerChallengeLeaderboardApi(context) {
   const {
-    FIREBASE_APP_MODULE,
     FIREBASE_CONFIG_KEY,
     FIREBASE_STORE_MODULE,
     LEADERBOARD_LIMIT,
     appCtx,
     challengeState,
     constants,
+    getFirebaseServices,
+    getSignedInUser,
     getActiveActorPosition,
     getRuntimeLocationLabel,
     inferTravelMode,
@@ -22,21 +23,29 @@ function createFlowerChallengeLeaderboardApi(context) {
 
   const {
     FIREBASE_COLLECTION,
+    FIREBASE_EXPLORER_COLLECTION,
+    FIREBASE_FISHING_COLLECTION,
     FIREBASE_PAINT_COLLECTION,
     LOCAL_LEADERBOARD_KEY,
+    LOCAL_EXPLORER_LEADERBOARD_KEY,
+    LOCAL_FISHING_LEADERBOARD_KEY,
     LOCAL_PAINT_LEADERBOARD_KEY
   } = constants;
 
   function getLeaderboardStorageKey(challengeType) {
-    return normalizeChallengeType(challengeType) === 'painttown' ?
-      LOCAL_PAINT_LEADERBOARD_KEY :
-      LOCAL_LEADERBOARD_KEY;
+    const type = normalizeChallengeType(challengeType);
+    if (type === 'painttown') return LOCAL_PAINT_LEADERBOARD_KEY;
+    if (type === 'fishing') return LOCAL_FISHING_LEADERBOARD_KEY;
+    if (type === 'explorer') return LOCAL_EXPLORER_LEADERBOARD_KEY;
+    return LOCAL_LEADERBOARD_KEY;
   }
 
   function getLeaderboardCollection(challengeType) {
-    return normalizeChallengeType(challengeType) === 'painttown' ?
-      FIREBASE_PAINT_COLLECTION :
-      FIREBASE_COLLECTION;
+    const type = normalizeChallengeType(challengeType);
+    if (type === 'painttown') return FIREBASE_PAINT_COLLECTION;
+    if (type === 'fishing') return FIREBASE_FISHING_COLLECTION;
+    if (type === 'explorer') return FIREBASE_EXPLORER_COLLECTION;
+    return FIREBASE_COLLECTION;
   }
 
   function readFirebaseConfig() {
@@ -99,15 +108,10 @@ function createFlowerChallengeLeaderboardApi(context) {
       }
 
       try {
-        const [appMod, firestoreMod] = await Promise.all([
-          import(FIREBASE_APP_MODULE),
-          import(FIREBASE_STORE_MODULE)
-        ]);
-
-        const appName = 'worldexplorer3d-flower';
-        const existingApp = appMod.getApps().find((candidate) => candidate.name === appName);
-        const firebaseApp = existingApp || appMod.initializeApp(cfg, appName);
-        const db = firestoreMod.getFirestore(firebaseApp);
+        const services = typeof getFirebaseServices === 'function' ? getFirebaseServices() : null;
+        if (!services?.db) throw new Error('Firebase services are unavailable.');
+        const firestoreMod = await import(FIREBASE_STORE_MODULE);
+        const db = services.db;
 
         challengeState.firebaseReady = true;
         challengeState.firebase = { db, firestoreMod };
@@ -141,6 +145,15 @@ function createFlowerChallengeLeaderboardApi(context) {
       if (Math.abs(pctDelta) > 0.0001) return pctDelta;
       return String(b.foundAt || '').localeCompare(String(a.foundAt || ''));
     }
+    if (normalizedType === 'fishing' || normalizedType === 'explorer') {
+      const scoreDelta = (Number(b.score) || 0) - (Number(a.score) || 0);
+      if (scoreDelta !== 0) return scoreDelta;
+      if (normalizedType === 'fishing') {
+        const weightDelta = (Number(b.weightKg) || 0) - (Number(a.weightKg) || 0);
+        if (Math.abs(weightDelta) > 0.0001) return weightDelta;
+      }
+      return String(b.foundAt || '').localeCompare(String(a.foundAt || ''));
+    }
     return (Number(a.timeMs) || Infinity) - (Number(b.timeMs) || Infinity);
   }
 
@@ -157,17 +170,13 @@ function createFlowerChallengeLeaderboardApi(context) {
     try {
       const { db, firestoreMod } = challengeState.firebase;
       const leaderboardRef = firestoreMod.collection(db, getLeaderboardCollection(normalizedType));
-      const q = normalizedType === 'painttown'
-        ? firestoreMod.query(
-          leaderboardRef,
-          firestoreMod.orderBy('paintedBuildings', 'desc'),
-          firestoreMod.limit(LEADERBOARD_LIMIT)
-        )
-        : firestoreMod.query(
-          leaderboardRef,
-          firestoreMod.orderBy('timeMs', 'asc'),
-          firestoreMod.limit(LEADERBOARD_LIMIT)
-        );
+      const orderField = normalizedType === 'flower' ? 'timeMs' : normalizedType === 'painttown' ? 'paintedBuildings' : 'score';
+      const orderDirection = normalizedType === 'flower' ? 'asc' : 'desc';
+      const q = firestoreMod.query(
+        leaderboardRef,
+        firestoreMod.orderBy(orderField, orderDirection),
+        firestoreMod.limit(LEADERBOARD_LIMIT)
+      );
 
       return (await firestoreMod.getDocs(q)).docs
         .map((doc) => normalizeLeaderboardEntry({ ...doc.data(), id: doc.id }, normalizedType))
@@ -187,8 +196,11 @@ function createFlowerChallengeLeaderboardApi(context) {
     if (!ready || !challengeState.firebase) return false;
 
     try {
+      const user = typeof getSignedInUser === 'function' ? getSignedInUser() : null;
+      if (!user?.uid || normalizedType === 'explorer') return false;
       const { db, firestoreMod } = challengeState.firebase;
-      await firestoreMod.addDoc(firestoreMod.collection(db, getLeaderboardCollection(normalizedType)), {
+      const payload = {
+        uid: user.uid,
         challenge: normalizedType,
         player: entry.player,
         timeMs: entry.timeMs,
@@ -201,7 +213,24 @@ function createFlowerChallengeLeaderboardApi(context) {
         mode: entry.mode,
         createdAtIso: entry.foundAt,
         createdAt: firestoreMod.serverTimestamp()
-      });
+      };
+      if (normalizedType === 'fishing') {
+        Object.assign(payload, {
+          species: entry.species,
+          speciesId: entry.speciesId,
+          score: entry.score,
+          weightKg: entry.weightKg,
+          lengthCm: entry.lengthCm,
+          strength: entry.strength,
+          rarity: entry.rarity,
+          behavior: entry.behavior,
+          fightTimeMs: entry.fightTimeMs,
+          lineIntegrityPct: entry.lineIntegrityPct,
+          maxTensionPct: entry.maxTensionPct,
+          waterKind: entry.waterKind
+        });
+      }
+      await firestoreMod.addDoc(firestoreMod.collection(db, getLeaderboardCollection(normalizedType)), payload);
       challengeState.leaderboardBackend = 'firebase';
       return true;
     } catch (err) {
@@ -216,6 +245,8 @@ function createFlowerChallengeLeaderboardApi(context) {
     challengeState.leaderboardView = normalizedType;
     if (ui.titleFlowerTabBtn) ui.titleFlowerTabBtn.classList.toggle('active', normalizedType === 'flower');
     if (ui.titlePaintTabBtn) ui.titlePaintTabBtn.classList.toggle('active', normalizedType === 'painttown');
+    if (ui.titleFishingTabBtn) ui.titleFishingTabBtn.classList.toggle('active', normalizedType === 'fishing');
+    if (ui.titleExplorerTabBtn) ui.titleExplorerTabBtn.classList.toggle('active', normalizedType === 'explorer');
     if (ui.titleStartBtn) {
       const flowerView = normalizedType === 'flower';
       ui.titleStartBtn.style.display = flowerView ? '' : 'none';
@@ -224,8 +255,19 @@ function createFlowerChallengeLeaderboardApi(context) {
     const entries = await readRemoteLeaderboard(normalizedType) || readLocalLeaderboard(normalizedType);
     renderLeaderboard(entries);
 
+    if (ui.titleHint) {
+      ui.titleHint.textContent = {
+        flower: 'Fastest red-flower runs. Signed-in scores publish to the shared board.',
+        painttown: 'Most buildings painted during the two-minute rooftop challenge.',
+        fishing: 'Best catches ranked by species rarity, size, strength, and line control.',
+        explorer: 'Community score from joining rooms, sharing artifacts, and making connections.'
+      }[normalizedType];
+    }
     if (ui.status) {
-      const prefix = normalizedType === 'painttown' ? 'Paint leaderboard' : 'Flower leaderboard';
+      const prefix = {
+        flower: 'Flower leaderboard', painttown: 'Paint leaderboard',
+        fishing: 'Fishing leaderboard', explorer: 'Explorer leaderboard'
+      }[normalizedType];
       ui.status.dataset.backend = challengeState.leaderboardBackend === 'firebase'
         ? `${prefix}: Firebase live`
         : `${prefix}: Local fallback`;
@@ -294,6 +336,26 @@ function createFlowerChallengeLeaderboardApi(context) {
     return entry;
   }
 
+  async function submitFishingScore(payload = {}) {
+    const entry = normalizeLeaderboardEntry({
+      ...payload,
+      id: String(payload.id || `fish_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`),
+      challenge: 'fishing',
+      player: resolvePlayerName(),
+      location: payload.location || getRuntimeLocationLabel(),
+      mode: 'boat',
+      foundAt: payload.caughtAt || new Date().toISOString()
+    }, 'fishing');
+    if (!entry) return null;
+
+    if (!(await writeRemoteLeaderboard('fishing', entry))) {
+      storeLocalResult('fishing', entry);
+    }
+    if (challengeState.leaderboardView === 'fishing') await refreshFlowerLeaderboard('fishing');
+    setTitleStatus(`${entry.player} landed ${entry.species} for ${entry.score} points at ${entry.location}.`, 'ok');
+    return entry;
+  }
+
   function setChallengeLeaderboardView(challengeType = 'flower') {
     challengeState.leaderboardView = normalizeChallengeType(challengeType);
     return refreshFlowerLeaderboard(challengeState.leaderboardView);
@@ -310,6 +372,7 @@ function createFlowerChallengeLeaderboardApi(context) {
     setChallengeLeaderboardView,
     sortLeaderboardEntries,
     storeLocalResult,
+    submitFishingScore,
     submitPaintTownScore,
     writeRemoteLeaderboard
   };

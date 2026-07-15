@@ -6,8 +6,10 @@ useDefault = true
 [[allowlists]]
 description = "Firebase web config key paths (public client key expected)"
 paths = [
+  '''config/firebase\.(production|staging)\.json''',
   '''js/firebase-project-config\.js''',
-  '''public/js/firebase-project-config\.js'''
+  '''public/js/firebase-project-config\.js''',
+  '''public/__/firebase/init\.(js|json)'''
 ]
 
 [[allowlists]]

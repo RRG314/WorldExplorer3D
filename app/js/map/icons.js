@@ -24,13 +24,38 @@ function drawMapPlayerIcons(ctx, w, h, isLarge, view) {
     }
   }
 
-  if (appCtx.droneMode) {
+  if (appCtx.planeMode?.active) {
+    drawPlaneIcon(ctx, mx, my, iconSize, isLarge);
+  } else if (appCtx.droneMode) {
     drawDroneIcon(ctx, mx, my, iconSize, isLarge);
   } else if (appCtx.Walk && appCtx.Walk.state.mode === "walk") {
     drawWalkerIcon(ctx, mx, my, iconSize, isLarge);
   } else {
     drawCarIcon(ctx, mx, my, iconSize, isLarge);
   }
+}
+
+function drawPlaneIcon(ctx, mx, my, iconSize, isLarge) {
+  ctx.save();
+  ctx.translate(mx, my);
+  ctx.rotate(Math.PI - (Number(appCtx.planeMode?.yaw) || 0));
+  ctx.fillStyle = '#f5f7fa';
+  ctx.strokeStyle = '#155fa0';
+  ctx.lineWidth = isLarge ? 3 : 2;
+  ctx.beginPath();
+  ctx.moveTo(0, -iconSize * 1.25);
+  ctx.lineTo(-iconSize * 0.3, -iconSize * 0.1);
+  ctx.lineTo(-iconSize, iconSize * 0.3);
+  ctx.lineTo(-iconSize * 0.18, iconSize * 0.25);
+  ctx.lineTo(-iconSize * 0.14, iconSize);
+  ctx.lineTo(iconSize * 0.14, iconSize);
+  ctx.lineTo(iconSize * 0.18, iconSize * 0.25);
+  ctx.lineTo(iconSize, iconSize * 0.3);
+  ctx.lineTo(iconSize * 0.3, -iconSize * 0.1);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
 }
 
 function drawDroneIcon(ctx, mx, my, iconSize, isLarge) {

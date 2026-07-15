@@ -242,7 +242,7 @@ export function getBuildingMaterial(ctx, buildingType, bSeed, baseColorHex, opti
   }
 
   if (facadeType === 'concrete' && state.pbrTexturesLoaded.concrete && state.concreteDiffuse) {
-    return tagNearFacadeMaterial(new THREE.MeshStandardMaterial({
+    const material = new THREE.MeshStandardMaterial({
       color: tintHex,
       map: cloneFacadeTexture(state.concreteDiffuse, textureRepeat.x, textureRepeat.y, bSeed ^ 0x201),
       normalMap: cloneFacadeTexture(state.concreteNormal, textureRepeat.x, textureRepeat.y, bSeed ^ 0x211),
@@ -250,11 +250,13 @@ export function getBuildingMaterial(ctx, buildingType, bSeed, baseColorHex, opti
       roughnessMap: cloneFacadeTexture(state.concreteRoughness, textureRepeat.x, textureRepeat.y, bSeed ^ 0x221),
       roughness: 0.9,
       metalness: 0.02
-    }), facadeType, facadeStyle, baseColorHex, mappedMaterial);
+    });
+    applyFacadeWallMask(material, new THREE.Color(tintHex).offsetHSL(0, -0.04, -0.12));
+    return tagNearFacadeMaterial(material, facadeType, facadeStyle, baseColorHex, mappedMaterial);
   }
 
   if (facadeType === 'brick' && state.pbrTexturesLoaded.brick && state.brickDiffuse) {
-    return tagNearFacadeMaterial(new THREE.MeshStandardMaterial({
+    const material = new THREE.MeshStandardMaterial({
       color: tintHex,
       map: cloneFacadeTexture(state.brickDiffuse, textureRepeat.x, textureRepeat.y, bSeed ^ 0x301),
       normalMap: cloneFacadeTexture(state.brickNormal, textureRepeat.x, textureRepeat.y, bSeed ^ 0x311),
@@ -262,7 +264,9 @@ export function getBuildingMaterial(ctx, buildingType, bSeed, baseColorHex, opti
       roughnessMap: cloneFacadeTexture(state.brickRoughness, textureRepeat.x, textureRepeat.y, bSeed ^ 0x321),
       roughness: 0.88,
       metalness: 0.02
-    }), facadeType, facadeStyle, baseColorHex, mappedMaterial);
+    });
+    applyFacadeWallMask(material, new THREE.Color(tintHex).offsetHSL(0, -0.04, -0.12));
+    return tagNearFacadeMaterial(material, facadeType, facadeStyle, baseColorHex, mappedMaterial);
   }
 
   const windowTex = cloneFacadeTexture(

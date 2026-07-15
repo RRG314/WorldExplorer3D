@@ -49,10 +49,30 @@ export function addBuildingToSpatialIndex(building) {
 export function removeBuildingsFromSpatialIndex(buildings) {
   if (!Array.isArray(buildings) || buildings.length === 0 || buildingSpatialIndex.size === 0) return;
   const removed = new Set(buildings);
-  buildingSpatialIndex.forEach((bucket, key) => {
-    const retained = bucket.filter((building) => !removed.has(building));
-    if (retained.length > 0) buildingSpatialIndex.set(key, retained);
-    else buildingSpatialIndex.delete(key);
+  const affectedKeys = new Set();
+  for (let i = 0; i < buildings.length; i++) {
+    const building = buildings[i];
+    if (!building) continue;
+    const minCellX = Math.floor(building.minX / BUILDING_INDEX_CELL_SIZE);
+    const maxCellX = Math.floor(building.maxX / BUILDING_INDEX_CELL_SIZE);
+    const minCellZ = Math.floor(building.minZ / BUILDING_INDEX_CELL_SIZE);
+    const maxCellZ = Math.floor(building.maxZ / BUILDING_INDEX_CELL_SIZE);
+    for (let cx = minCellX; cx <= maxCellX; cx++) {
+      for (let cz = minCellZ; cz <= maxCellZ; cz++) affectedKeys.add(`${cx},${cz}`);
+    }
+  }
+  affectedKeys.forEach((key) => {
+    const bucket = buildingSpatialIndex.get(key);
+    if (!bucket) return;
+    let writeIndex = 0;
+    for (let readIndex = 0; readIndex < bucket.length; readIndex += 1) {
+      const building = bucket[readIndex];
+      if (removed.has(building)) continue;
+      bucket[writeIndex] = building;
+      writeIndex += 1;
+    }
+    bucket.length = writeIndex;
+    if (bucket.length === 0) buildingSpatialIndex.delete(key);
   });
 }
 

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { buildingLabel, distanceToFootprint } from "../building-entry.js?v=2";
+import { buildingLabel, distanceToFootprint } from "../building-entry.js?v=3";
 import { INTERIOR_FAST_ENTRY_WAIT_MS, INTERIOR_FETCH_TIMEOUT_MS } from "./constants.js?v=1";
 import {
   buildingGeoBounds,
@@ -15,7 +15,7 @@ import {
   wayWorldPoints,
   worldToGeo,
   isClosedWay
-} from "./core.js?v=1";
+} from "./core.js?v=2";
 
 export async function fetchMappedInteriorDefinition(support, interiorCache) {
   if (!support?.enterable || !support.allowMappedData || typeof appCtx.fetchOverpassJSON !== 'function') return null;

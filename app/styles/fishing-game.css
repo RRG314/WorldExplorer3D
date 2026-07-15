@@ -1,0 +1,74 @@
+#fishingDockBtn{
+  border:1px solid rgba(253,186,116,.66);background:#f97316;color:#fff;border-radius:999px;
+  padding:8px 14px;font:700 11px Poppins,sans-serif;cursor:pointer;white-space:nowrap;
+  box-shadow:0 5px 14px rgba(124,45,18,.28)
+}
+#fishingDockBtn:hover{filter:brightness(1.08)}
+#fishingGamePanel{
+  position:fixed;top:max(18px,calc(env(safe-area-inset-top) + 12px));left:50%;transform:translateX(-50%);
+  width:min(540px,calc(100vw - 32px));max-height:calc(100dvh - 36px);display:none;overflow:auto;
+  background:rgba(7,24,33,.97);border:1px solid rgba(125,211,252,.42);border-radius:8px;color:#edf7f7;
+  box-shadow:0 24px 70px rgba(0,0,0,.55);z-index:240;font-family:Inter,sans-serif;overscroll-behavior:contain
+}
+#fishingGamePanel.open{display:block}
+.fishingHeader{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:14px 16px;border-bottom:1px solid rgba(148,163,184,.22)}
+.fishingHeader>div:first-child{display:flex;flex-direction:column;gap:2px}
+.fishingHeader strong{font:700 19px Poppins,sans-serif;color:#fff}
+.fishingEyebrow{font-size:10px;text-transform:uppercase;color:#7dd3fc;font-weight:700}
+.fishingHeaderActions{display:flex;align-items:center;gap:10px}
+#fishingStage{font:700 10px Orbitron,sans-serif;color:#fed7aa;text-transform:uppercase}
+#fishingCloseBtn{width:34px;height:34px;border:0;background:rgba(148,163,184,.14);color:#f8fafc;border-radius:50%;font-size:22px;cursor:pointer}
+.fishingContext{display:flex;justify-content:space-between;gap:12px;padding:9px 16px;border-bottom:1px solid rgba(148,163,184,.16);font-size:11px;color:#bae6fd}
+.fishingScene{position:relative;aspect-ratio:420/190;overflow:hidden;border-bottom:1px solid rgba(148,163,184,.2)}
+#fishingCanvas{display:block;width:100%;height:100%}
+.fishingFishReadout{position:absolute;left:14px;right:14px;bottom:11px;display:flex;justify-content:space-between;gap:14px;align-items:end;text-shadow:0 2px 8px #00101a}
+.fishingFishReadout strong{font:700 17px Poppins,sans-serif;color:#fff}
+.fishingFishReadout span{max-width:65%;font-size:10px;line-height:1.35;text-align:right;color:#d7eff5}
+.fishingMessage{min-height:40px;padding:11px 16px 5px;font-size:12px;line-height:1.45;color:#e2e8f0}
+.fishingPrimary{display:block;width:calc(100% - 32px);margin:7px 16px 12px;border:0;border-radius:6px;background:#f97316;color:#fff;padding:11px 15px;font:700 13px Poppins,sans-serif;cursor:pointer}
+.fishingPrimary:disabled{opacity:.42;cursor:default}
+.fishingMeters{display:flex;flex-direction:column;border-top:1px solid rgba(148,163,184,.18);border-bottom:1px solid rgba(148,163,184,.18)}
+.fishingMeterRow{display:grid;grid-template-columns:90px minmax(110px,1fr) 72px;align-items:center;gap:10px;padding:7px 16px;font-size:10px}
+.fishingMeterRow+ .fishingMeterRow{border-top:1px solid rgba(148,163,184,.1)}
+.fishingMeterRow>span{font-weight:700;color:#cbd5e1}
+.fishingMeterRow>em{font-style:normal;text-align:right;color:#bfdbfe;font-variant-numeric:tabular-nums}
+.fishingMeter{position:relative;height:9px;border-radius:999px;background:#132f3b;overflow:hidden}
+.fishingMeter i{position:absolute;inset:0 auto 0 0;width:0;background:#22c55e;border-radius:inherit;transition:width .08s linear}
+.fishingMeter i.danger{background:#ef4444}
+.fishingMeter .safeBand{position:absolute;left:24%;width:58%;top:0;bottom:0;border-left:1px solid rgba(255,255,255,.7);border-right:1px solid rgba(255,255,255,.7);pointer-events:none}
+.fishingDragRow{display:grid;grid-template-columns:90px 1fr 52px;align-items:center;gap:10px;padding:11px 16px;font-size:10px;font-weight:700;color:#cbd5e1}
+.fishingDragRow input{width:100%;accent-color:#f97316}
+.fishingDragRow em{text-align:right;font-style:normal;color:#fed7aa}
+.fishingFightControls,.fishingRodControls{display:grid;gap:8px;padding:0 16px 10px}
+.fishingFightControls{grid-template-columns:1fr 1.25fr}
+.fishingRodControls{grid-template-columns:repeat(3,1fr);border-bottom:1px solid rgba(148,163,184,.18)}
+.fishingFightControls button,.fishingRodControls button{
+  min-height:42px;border:1px solid rgba(148,163,184,.3);background:rgba(15,40,51,.9);color:#e2e8f0;
+  border-radius:6px;font:700 11px Poppins,sans-serif;cursor:pointer
+}
+.fishingFightControls button small,.fishingRodControls button small{display:block;margin-top:1px;font-size:8px;color:#93c5fd}
+.fishingFightControls .reel{background:#0f766e;border-color:#2dd4bf;color:#fff}
+.fishingFightControls button.active,.fishingRodControls button.active{background:#2563eb;border-color:#93c5fd;color:#fff;box-shadow:inset 0 0 0 1px rgba(255,255,255,.18)}
+.fishingLogHeader{padding:11px 16px 7px}
+.fishingLogHeader>div{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.fishingLogHeader strong{font-size:10px;color:#f8fafc}
+.fishingLogHeader span{font-size:9px;color:#fcd34d;text-align:right}
+.fishingCatchList{list-style:none;margin:0;padding:0 16px 16px;display:flex;flex-direction:column;gap:0}
+.fishingCatchList li{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:7px 0;border-top:1px solid rgba(148,163,184,.14);font-size:10px}
+.fishingCatchList strong{color:#f8fafc}
+.fishingCatchList span{grid-column:1/-1;color:#cbd5e1}
+.fishingCatchList em{grid-column:2;grid-row:1;font-style:normal;color:#7dd3fc;text-align:right}
+body.activity-creator-open #fishingGamePanel,body.editor-workspace-open #fishingGamePanel{display:none!important}
+@media(max-width:640px){
+  #boatWaveDock{gap:7px!important;min-width:calc(100vw - 12px)!important;padding:8px 10px!important}
+  #fishingDockBtn{padding:7px 10px;font-size:10px}
+  #fishingGamePanel{top:auto;bottom:0;width:100vw;max-height:88dvh;border-radius:8px 8px 0 0;padding-bottom:env(safe-area-inset-bottom)}
+  .fishingHeader{padding:11px 12px}.fishingHeader strong{font-size:17px}
+  .fishingContext{padding:7px 12px}.fishingScene{aspect-ratio:420/165}
+  .fishingMessage{padding:9px 12px 3px}.fishingPrimary{width:calc(100% - 24px);margin:7px 12px 10px}
+  .fishingMeterRow{grid-template-columns:76px minmax(90px,1fr) 65px;padding:6px 12px;gap:7px}
+  .fishingDragRow{grid-template-columns:76px 1fr 44px;padding:9px 12px}
+  .fishingFightControls,.fishingRodControls{padding-left:12px;padding-right:12px;gap:6px}
+  .fishingFishReadout{left:10px;right:10px}.fishingFishReadout strong{font-size:14px}.fishingFishReadout span{font-size:9px}
+  .fishingLogHeader{padding:9px 12px 6px}.fishingCatchList{padding:0 12px 12px}
+}

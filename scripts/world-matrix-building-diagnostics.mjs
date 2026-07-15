@@ -24,6 +24,11 @@ export function collectBuildingDimensions(buildings = []) {
   };
 
   for (const building of buildings) {
+    if (building?.collisionKind === 'barrier') {
+      dimensions.infrastructureColliders = Number(dimensions.infrastructureColliders || 0) + 1;
+      continue;
+    }
+    dimensions.architecturalCount = Number(dimensions.architecturalCount || 0) + 1;
     const heightSource = String(building?.heightSource || building?.buildingSemantics?.heightSource || 'unknown');
     const levelSource = String(building?.levelsSource || 'unknown');
     const buildingType = String(building?.buildingType || 'yes');

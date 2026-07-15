@@ -289,6 +289,34 @@ await runCheck('anon can read public room doc', async () => {
   await assertSucceeds(getDoc(doc(anonDb, 'rooms', PUBLIC_ROOM_ID)));
 });
 
+const validFishingScore = {
+  uid: OWNER_UID,
+  challenge: 'fishing',
+  player: 'Owner',
+  species: 'Striped Bass',
+  speciesId: 'striped-bass',
+  score: 1380,
+  weightKg: 8.4,
+  lengthCm: 86.2,
+  location: 'Chesapeake Bay',
+  createdAt: serverTimestamp()
+};
+
+await runCheck('signed-in player can publish own fishing score', async () => {
+  await assertSucceeds(setDoc(doc(ownerDb, 'fishingLeaderboard', 'owner_catch'), validFishingScore));
+});
+
+await runCheck('player cannot publish a fishing score for another account', async () => {
+  await assertFails(setDoc(doc(attackerDb, 'fishingLeaderboard', 'forged_catch'), validFishingScore));
+});
+
+await runCheck('anonymous player cannot publish a fishing score', async () => {
+  await assertFails(setDoc(doc(anonDb, 'fishingLeaderboard', 'anon_catch'), {
+    ...validFishingScore,
+    uid: 'anonymous'
+  }));
+});
+
 await runCheck('non-member cannot read private room doc', async () => {
   await assertFails(getDoc(doc(attackerDb, 'rooms', ROOM_ID)));
 });

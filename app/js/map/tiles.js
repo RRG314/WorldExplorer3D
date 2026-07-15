@@ -35,6 +35,9 @@ function loadTile(x, y, zoom) {
 }
 
 function getMapReferencePosition() {
+  if (appCtx.planeMode?.active) return appCtx.planeMode;
+  if (appCtx.boatMode?.active && appCtx.boat) return appCtx.boat;
+  if (appCtx.droneMode && appCtx.drone) return appCtx.drone;
   return appCtx.Walk ? appCtx.Walk.getMapRefPosition(appCtx.droneMode, appCtx.drone) : { x: appCtx.car.x, z: appCtx.car.z };
 }
 

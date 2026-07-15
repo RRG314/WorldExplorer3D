@@ -8,6 +8,7 @@ export function hidePlanetaryReturnControls() {
 
 export function suspendEarthModesForPlanetaryEntry() {
   appCtx.cancelPendingEarthArrival?.();
+  appCtx.pauseEarthStreaming?.('planetary_entry');
   hidePlanetaryReturnControls();
   if (appCtx.oceanMode?.active && typeof appCtx.stopOceanMode === 'function') {
     appCtx.stopOceanMode();
@@ -15,6 +16,7 @@ export function suspendEarthModesForPlanetaryEntry() {
   if (appCtx.boatMode?.active && typeof appCtx.stopBoatMode === 'function') {
     appCtx.stopBoatMode({ targetMode: 'walk' });
   }
+  if (appCtx.planeMode?.active) appCtx.stopPlaneMode?.();
   appCtx.pendingAutoBoatEntry = null;
 
   ['boatPrompt', 'boatWaveDock', 'interiorPrompt'].forEach((id) => {
@@ -36,6 +38,7 @@ export function prepareTitleEnvironment() {
   if (appCtx.spaceFlight?.active) appCtx.exitSpaceFlight?.();
   if (appCtx.oceanMode?.active) appCtx.stopOceanMode?.();
   if (appCtx.boatMode?.active) appCtx.stopBoatMode?.({ targetMode: 'walk' });
+  if (appCtx.planeMode?.active) appCtx.stopPlaneMode?.();
   appCtx.pendingAutoBoatEntry = null;
 
   hideSurface(appCtx.moonSurface);
@@ -52,6 +55,8 @@ export function prepareTitleEnvironment() {
   appCtx.onMoon = false;
   appCtx.onMars = false;
   appCtx.travelingToMoon = false;
+  void appCtx.setPlanetaryVehicle?.('earth');
+  appCtx.setPlanetaryCharacter?.('earth');
   appCtx.paused = false;
 
   return {

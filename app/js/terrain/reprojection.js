@@ -150,7 +150,20 @@ function createTerrainReprojectionApi(deps = {}) {
   function repositionBuildingsWithTerrain() {
     if (!appCtx.terrainEnabled || appCtx.onMoon) return;
 
+    const collidersBySourceId = new Map();
+    if (Array.isArray(appCtx.buildings)) {
+      for (let i = 0; i < appCtx.buildings.length; i++) {
+        const building = appCtx.buildings[i];
+        if (!building || building._streamChunkKey) continue;
+        const sourceId = String(building.sourceBuildingId || '');
+        if (!sourceId) continue;
+        if (!collidersBySourceId.has(sourceId)) collidersBySourceId.set(sourceId, []);
+        collidersBySourceId.get(sourceId).push(building);
+      }
+    }
+
     appCtx.buildingMeshes.forEach((mesh) => {
+      if (mesh.userData?.earthStreamingChunk || mesh.userData?.streamChunkKey) return;
       const pts = mesh.userData.buildingFootprint;
       if (!pts || pts.length === 0) return;
 
@@ -195,10 +208,10 @@ function createTerrainReprojectionApi(deps = {}) {
       mesh.userData.avgElevation = baseElevation;
 
       const sourceBuildingId = String(mesh.userData?.sourceBuildingId || "");
-      if (sourceBuildingId && Array.isArray(appCtx.buildings)) {
-        for (let i = 0; i < appCtx.buildings.length; i++) {
-          const building = appCtx.buildings[i];
-          if (!building || String(building.sourceBuildingId || "") !== sourceBuildingId) continue;
+      if (sourceBuildingId) {
+        const colliders = collidersBySourceId.get(sourceBuildingId) || [];
+        for (let i = 0; i < colliders.length; i++) {
+          const building = colliders[i];
           building.baseY = baseElevation;
           building.minY = baseElevation;
           building.maxY = baseElevation + (Number.isFinite(building.height) ? building.height : 0);
@@ -207,6 +220,7 @@ function createTerrainReprojectionApi(deps = {}) {
     });
 
     appCtx.landuseMeshes.forEach((mesh) => {
+      if (mesh.userData?.earthStreamingChunk || mesh.userData?.streamChunkKey) return;
       if (mesh.userData?.isWaterwayLine) {
         reprojectWaterwayMeshToTerrain(mesh);
         return;
@@ -242,6 +256,7 @@ function createTerrainReprojectionApi(deps = {}) {
     });
 
     appCtx.linearFeatureMeshes.forEach((mesh) => {
+      if (mesh.userData?.earthStreamingChunk || mesh.userData?.streamChunkKey) return;
       reprojectLinearFeatureMeshToTerrain(mesh);
     });
 

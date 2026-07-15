@@ -9,6 +9,7 @@ import {
   rebuildStructureVisualMeshesForContext
 } from "./structure-visual-meshes.js?v=1";
 import { collectTunnelVisualInstances } from "./structure-tunnel-visuals.js?v=1";
+import { elevatedSegmentSafety } from "../world/bridge-safety.js?v=1";
 
 function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {
   const featureBounds = feature?.bounds || polylineBounds(feature?.pts || [], (Number(feature?.width) || 4) + padding);
@@ -43,6 +44,7 @@ export function collectStructureVisualInstances({
   const wallInstances = [];
   const roofInstances = [];
   const tunnelLightInstances = [];
+  const guardrailInstances = [];
   const elevatedFeatures = []
     .concat(Array.isArray(appCtx.roads) ? appCtx.roads : [])
     .concat(Array.isArray(appCtx.linearFeatures) ? appCtx.linearFeatures.filter((feature) => feature?.isStructureConnector === true) : []);
@@ -105,7 +107,7 @@ export function collectStructureVisualInstances({
       /^(service|residential|unclassified|living_street|track)$/.test(localRoadType);
     const visualDetail =
       semantics.terrainMode === "elevated" ?
-        (isConnectorLike || isSkywalk ? 1.6 : 2.1) :
+        (isConnectorLike || isSkywalk ? 2.4 : 4.2) :
         10;
     const visualPts =
       typeof appCtx.subdivideRoadPoints === "function" && feature.pts.length >= 2 ?
@@ -243,6 +245,53 @@ export function collectStructureVisualInstances({
             rotationY,
             segmentQuat
           );
+        }
+
+        const guardrailSafety = elevatedSegmentSafety(feature, {
+          x: midX,
+          z: midZ,
+          deckY,
+          terrainY: terrainMidY,
+          distance: segmentCenterDistance,
+          total,
+          waterAreas: appCtx.waterAreas
+        });
+        if (guardrailSafety.protected) {
+          const railOffset = width * 0.5 + 0.28;
+          for (const side of [-1, 1]) {
+            addBeam(
+              guardrailInstances,
+              midX + nx * railOffset * side,
+              deckY + 1.02,
+              midZ + nz * railOffset * side,
+              0.14,
+              0.16,
+              deckDepth,
+              rotationY,
+              segmentQuat
+            );
+            addBeam(
+              guardrailInstances,
+              midX + nx * railOffset * side,
+              deckY + 0.56,
+              midZ + nz * railOffset * side,
+              0.1,
+              0.12,
+              deckDepth,
+              rotationY,
+              segmentQuat
+            );
+            addBeam(
+              guardrailInstances,
+              midX + nx * railOffset * side,
+              deckY + 0.52,
+              midZ + nz * railOffset * side,
+              0.1,
+              1.04,
+              0.1,
+              rotationY
+            );
+          }
         }
 
         const sideOffset = Math.max(0.7, width * 0.34);
@@ -510,7 +559,8 @@ export function collectStructureVisualInstances({
     capInstances,
     wallInstances,
     roofInstances,
-    tunnelLightInstances
+    tunnelLightInstances,
+    guardrailInstances
   };
 }
 

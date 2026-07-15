@@ -1,7 +1,12 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { createBridgeStructuralDetails } from './bridge-landmark-structure.js?v=1';
 
 const BRIDGE_COLOR = 0xbf4e3b;
 const MIN_SUSPENSION_SPAN_METERS = 600;
+const BRIDGE_HALF_WIDTH_METERS = 13.5;
+const MAIN_CABLE_RADIUS_METERS = 0.46;
+const SUSPENDER_RADIUS_METERS = 0.06;
+const SUSPENDER_SPACING_METERS = 15.24;
 
 function numberTag(tags, key, fallback = 0) {
   const value = Number.parseFloat(String(tags?.[key] ?? '').replace(',', '.'));
@@ -198,9 +203,9 @@ function createDeckGirderMeshes(path, metrics) {
       const sideX = -point.dz / tangentLength;
       const sideZ = point.dx / tangentLength;
       samples.push(new THREE.Vector3(
-        point.x + sideX * 14.4 * side,
+        point.x + sideX * BRIDGE_HALF_WIDTH_METERS * side,
         sampleRoadDeckY(point.x, point.z) - 0.8,
-        point.z + sideZ * 14.4 * side
+        point.z + sideZ * BRIDGE_HALF_WIDTH_METERS * side
       ));
     }
     const curve = new THREE.CatmullRomCurve3(samples, false, 'centripetal');
@@ -235,13 +240,13 @@ function createCableMeshes(path, metrics, towers) {
       const sideZ = point.dx / tangentLength;
       const deckY = sampleRoadDeckY(point.x, point.z);
       samples.push(new THREE.Vector3(
-        point.x + sideX * 14.2 * side,
+        point.x + sideX * BRIDGE_HALF_WIDTH_METERS * side,
         cableHeight(distance, metrics.total, towers[0], towers[1], deckY),
-        point.z + sideZ * 14.2 * side
+        point.z + sideZ * BRIDGE_HALF_WIDTH_METERS * side
       ));
     }
     const curve = new THREE.CatmullRomCurve3(samples, false, 'centripetal');
-    const geometry = new THREE.TubeGeometry(curve, Math.min(220, sampleCount), 0.62, 6, false);
+    const geometry = new THREE.TubeGeometry(curve, Math.min(220, sampleCount), MAIN_CABLE_RADIUS_METERS, 8, false);
     const mesh = new THREE.Mesh(geometry, material.clone());
     mesh.castShadow = true;
     mesh.frustumCulled = false;
@@ -250,8 +255,8 @@ function createCableMeshes(path, metrics, towers) {
     cableSamplesBySide.push(samples);
   }
 
-  const suspensionCount = Math.max(12, Math.floor((towers[1].distance - towers[0].distance) / 36));
-  const cylinder = new THREE.CylinderGeometry(0.12, 0.12, 1, 6);
+  const suspensionCount = Math.max(12, Math.floor(metrics.total / SUSPENDER_SPACING_METERS));
+  const cylinder = new THREE.CylinderGeometry(SUSPENDER_RADIUS_METERS, SUSPENDER_RADIUS_METERS, 1, 6);
   const suspenderMaterial = new THREE.MeshStandardMaterial({ color: BRIDGE_COLOR, roughness: 0.58, metalness: 0.32 });
   const suspenders = new THREE.InstancedMesh(cylinder, suspenderMaterial, suspensionCount * 2);
   const matrix = new THREE.Matrix4();
@@ -260,7 +265,7 @@ function createCableMeshes(path, metrics, towers) {
   const quaternion = new THREE.Quaternion();
   let instance = 0;
   for (let i = 1; i <= suspensionCount; i++) {
-    const distance = towers[0].distance + (towers[1].distance - towers[0].distance) * i / (suspensionCount + 1);
+    const distance = metrics.total * i / (suspensionCount + 1);
     const pathPoint = pointAtDistance(path, metrics.distances, distance);
     const tangentLength = Math.hypot(pathPoint.dx, pathPoint.dz) || 1;
     const sideX = -pathPoint.dz / tangentLength;
@@ -269,7 +274,11 @@ function createCableMeshes(path, metrics, towers) {
     for (const side of [-1, 1]) {
       const cableY = cableHeight(distance, metrics.total, towers[0], towers[1], deckY);
       const length = Math.max(0.5, cableY - deckY);
-      position.set(pathPoint.x + sideX * 14.2 * side, deckY + length * 0.5, pathPoint.z + sideZ * 14.2 * side);
+      position.set(
+        pathPoint.x + sideX * BRIDGE_HALF_WIDTH_METERS * side,
+        deckY + length * 0.5,
+        pathPoint.z + sideZ * BRIDGE_HALF_WIDTH_METERS * side
+      );
       scale.set(1, length, 1);
       matrix.compose(position, quaternion, scale);
       suspenders.setMatrixAt(instance++, matrix);
@@ -339,6 +348,7 @@ export function renderSuspensionBridgeLandmark(data) {
     towerParts.push(part);
   }
   const towers = towerStations(towerParts, path, metrics);
+  let structuralDetails = null;
   if (towers.length === 2) {
     const cables = createCableMeshes(path, metrics, towers);
     for (const mesh of cables.cableMeshes) {
@@ -354,6 +364,15 @@ export function renderSuspensionBridgeLandmark(data) {
     appCtx.scene.add(cables.suspenders);
     appCtx.historicMarkers.push(cables.suspenders);
     createdMeshes.push(cables.suspenders);
+    structuralDetails = createBridgeStructuralDetails({
+      path,
+      metrics,
+      towers,
+      pointAtDistance,
+      sampleRoadDeckY,
+      color: BRIDGE_COLOR
+    });
+    if (structuralDetails) createdMeshes.push(structuralDetails);
   }
   appCtx.historicSites.push({
     x: footprintCenter(path).x,
@@ -371,6 +390,7 @@ export function renderSuspensionBridgeLandmark(data) {
     cables: towers.length === 2 ? 2 : 0,
     girders: towers.length === 2 ? 2 : 0,
     suspenders: createdMeshes.find((mesh) => mesh.userData?.landmarkKind === 'suspension_bridge_suspender')?.userData?.instanceCount || 0,
+    structuralMembers: structuralDetails?.userData?.instanceCount || 0,
     spanMeters: Number(metrics.total.toFixed(1))
   };
 }

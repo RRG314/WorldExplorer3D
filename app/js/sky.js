@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=3";
+import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=8";
 import {
   cycleTimeOfDay as cycleSkyTimeOfDay,
   getAstronomicalSkySnapshot,
@@ -15,9 +15,9 @@ import {
   createStarField,
   highlightConstellation,
   showStarInfo
-} from "./sky/starfield-ui.js?v=2";
+} from "./sky/starfield-ui.js?v=4";
 import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
-import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=3";
+import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=5";
 // ============================================================================
 // sky.js - Time of day, starfield, constellations, moon system
 // ============================================================================
@@ -675,10 +675,15 @@ async function arriveAtEarth(expectedSessionId = null) {
   if (appCtx.spaceFlight?.active && typeof appCtx.exitSpaceFlight === 'function') {
     appCtx.exitSpaceFlight();
   }
+  appCtx.earthResumePending = true;
+  appCtx.paused = true;
   appCtx.switchEnv(appCtx.ENV.EARTH); // sets onMoon=false, travelingToMoon=false
   appCtx.setLunarEarthVisible?.(false);
   await appCtx.setPlanetaryVehicle?.('earth');
-  if (!isCurrentArrival()) return false;
+  if (!isCurrentArrival()) {
+    appCtx.earthResumePending = false;
+    return false;
+  }
   appCtx.setPlanetaryCharacter?.('earth');
   emitTutorialEvent('returned_to_earth', { source: 'earth_arrival' });
   const weatherPanel = document.getElementById('weatherPanel');

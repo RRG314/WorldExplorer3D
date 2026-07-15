@@ -135,6 +135,26 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function sampleWaterwaySurfaceProfile(profile, x, z) {
+  if (!Array.isArray(profile) || profile.length < 2) return null;
+  let best = null;
+  for (let i = 0; i < profile.length - 1; i += 1) {
+    const a = profile[i];
+    const b = profile[i + 1];
+    const dx = b.x - a.x;
+    const dz = b.z - a.z;
+    const lengthSq = dx * dx + dz * dz;
+    const t = lengthSq > 1e-9 ? clamp(((x - a.x) * dx + (z - a.z) * dz) / lengthSq, 0, 1) : 0;
+    const px = a.x + dx * t;
+    const pz = a.z + dz * t;
+    const distanceSq = (x - px) ** 2 + (z - pz) ** 2;
+    if (!best || distanceSq < best.distanceSq) {
+      best = { distanceSq, y: a.y + (b.y - a.y) * t };
+    }
+  }
+  return Number.isFinite(best?.y) ? best.y : null;
+}
+
 function lerp(a, b, t) {
   return a + (b - a) * t;
 }
@@ -462,6 +482,7 @@ export {
   inferWaterRenderContext,
   intensityFromSeaState,
   resolveWaterMotionProfile,
+  sampleWaterwaySurfaceProfile,
   sampleWaterSurfaceMotion,
   surfaceNormalFromMotion,
   seaStateFromIntensity

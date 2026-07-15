@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=11";
+import { isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=12";
 
 const VEGETATION_ELIGIBLE_TYPES = new Set([
   'forest',

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { buildingFootprintPoints } from "../building-entry.js?v=2";
+import { buildingFootprintPoints } from "../building-entry.js?v=3";
 import {
   INTERIOR_FLOOR_OFFSET,
   INTERIOR_LEVEL_HEIGHT,
@@ -20,7 +20,7 @@ import {
   pointInPolygonSafe,
   polygonCentroid,
   ringAreaAbs
-} from "./core.js?v=1";
+} from "./core.js?v=2";
 import {
   buildContainedRectFootprint,
   buildUsableFootprint,
@@ -28,7 +28,7 @@ import {
   findInteriorAnchor,
   footprintMinimumClearance,
   prepareInteriorFeaturePlan
-} from "./planner.js?v=1";
+} from "./planner.js?v=2";
 
 export function buildInteriorScene(definition) {
   const support = definition.support;

@@ -2,6 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 
 function getCurrentTravelMode() {
   if (appCtx.boatMode?.active) return 'boat';
+  if (appCtx.planeMode?.active) return 'plane';
   if (appCtx.droneMode) return 'drone';
   if (appCtx.Walk?.state?.mode === 'walk') return 'walk';
   return 'drive';
@@ -12,10 +13,12 @@ function syncTravelModeButtons() {
   const drivingBtn = document.getElementById('fDriving');
   const walkingBtn = document.getElementById('fWalk');
   const droneBtn = document.getElementById('fDrone');
+  const planeBtn = document.getElementById('fPlane');
   const boatBtn = document.getElementById('fBoat');
   if (drivingBtn) drivingBtn.classList.toggle('on', activeMode === 'drive');
   if (walkingBtn) walkingBtn.classList.toggle('on', activeMode === 'walk');
   if (droneBtn) droneBtn.classList.toggle('on', activeMode === 'drone');
+  if (planeBtn) planeBtn.classList.toggle('on', activeMode === 'plane');
   if (boatBtn) boatBtn.classList.toggle('on', activeMode === 'boat');
   return activeMode;
 }
@@ -139,8 +142,24 @@ function emitTravelModeEvent(mode, source = 'runtime') {
   }
 }
 
+let pendingModeLodRefresh = null;
+
+function scheduleModeLodRefresh() {
+  if (pendingModeLodRefresh !== null) {
+    if (typeof cancelIdleCallback === 'function') cancelIdleCallback(pendingModeLodRefresh);
+    else clearTimeout(pendingModeLodRefresh);
+  }
+  const run = () => {
+    pendingModeLodRefresh = null;
+    appCtx.updateWorldLod?.(true);
+  };
+  pendingModeLodRefresh = typeof requestIdleCallback === 'function'
+    ? requestIdleCallback(run, { timeout: 120 })
+    : setTimeout(run, 16);
+}
+
 function setTravelMode(mode, options = {}) {
-  const targetMode = mode === 'walk' || mode === 'drone' || mode === 'boat' ? mode : 'drive';
+  const targetMode = mode === 'walk' || mode === 'drone' || mode === 'boat' || mode === 'plane' ? mode : 'drive';
   const currentMode = getCurrentTravelMode();
 
   if (targetMode === 'boat' && appCtx.oceanMode?.active && typeof appCtx.transferSubmarineToBoat === 'function') {
@@ -169,7 +188,19 @@ function setTravelMode(mode, options = {}) {
     });
   }
 
-  if (targetMode === 'walk') {
+  if (targetMode !== 'plane' && appCtx.planeMode?.active) {
+    appCtx.stopPlaneMode?.();
+  }
+
+  if (targetMode === 'plane') {
+    if (appCtx.onMoon || appCtx.onMars || !appCtx.startPlaneMode?.(options)) {
+      return syncTravelModeButtons();
+    }
+    appCtx.droneMode = false;
+    if (appCtx.Walk?.state?.mode === 'walk') appCtx.Walk.setModeDrive();
+    if (appCtx.Walk?.state?.characterMesh) appCtx.Walk.state.characterMesh.visible = false;
+    if (appCtx.carMesh) appCtx.carMesh.visible = false;
+  } else if (targetMode === 'walk') {
     appCtx.droneMode = false;
     if (appCtx.Walk && appCtx.Walk.state?.mode !== 'walk') {
       appCtx.Walk.setModeWalk();
@@ -215,17 +246,7 @@ function setTravelMode(mode, options = {}) {
     appCtx.clearStarSelection();
   }
 
-  if (typeof appCtx.updateWorldLod === 'function') {
-    appCtx.updateWorldLod(true);
-  }
-  if (
-    targetMode !== 'boat' &&
-    Array.isArray(appCtx.roads) &&
-    appCtx.roads.length > 0 &&
-    typeof appCtx.buildTraversalNetworks === 'function'
-  ) {
-    appCtx.buildTraversalNetworks();
-  }
+  scheduleModeLodRefresh();
 
   const resolvedMode = syncTravelModeButtons();
   if (typeof appCtx.updateControlsModeUI === 'function') {
@@ -251,7 +272,12 @@ function toggleDroneMode(options = {}) {
 
 function cyclePrimaryTravelMode(options = {}) {
   const currentMode = getCurrentTravelMode();
-  const nextMode = currentMode === 'drive' ? 'walk' : currentMode === 'walk' ? 'drone' : 'drive';
+  const nextMode = currentMode === 'drive' ? 'walk' : currentMode === 'walk' ? 'drone' : currentMode === 'drone' ? 'plane' : 'drive';
+  return setTravelMode(nextMode, options);
+}
+
+function togglePlaneMode(options = {}) {
+  const nextMode = getCurrentTravelMode() === 'plane' ? 'drive' : 'plane';
   return setTravelMode(nextMode, options);
 }
 
@@ -267,6 +293,7 @@ Object.assign(appCtx, {
   syncTravelModeButtons,
   toggleBoatMode,
   toggleDroneMode,
+  togglePlaneMode,
   toggleWalkDriveMode
 });
 
@@ -277,5 +304,6 @@ export {
   syncTravelModeButtons,
   toggleBoatMode,
   toggleDroneMode,
+  togglePlaneMode,
   toggleWalkDriveMode
 };

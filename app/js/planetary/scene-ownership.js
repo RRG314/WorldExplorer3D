@@ -27,9 +27,15 @@ function setObjectInScene(object, visible) {
   if (!object || !appCtx.scene) return;
   object.visible = visible;
   if (visible) {
-    if (object.parent !== appCtx.scene) appCtx.scene.add(object);
-  } else if (object.parent === appCtx.scene) {
-    appCtx.scene.remove(object);
+    if (!object.parent) {
+      const ownerParent = object.userData?.earthSceneOwnerParent;
+      const parent = ownerParent?.isObject3D ? ownerParent : appCtx.scene;
+      parent.add(object);
+    }
+  } else if (object.parent) {
+    object.userData = object.userData || {};
+    object.userData.earthSceneOwnerParent = object.parent;
+    object.parent.remove(object);
   }
 }
 
@@ -59,12 +65,36 @@ function setEarthSceneVisible(visible) {
   return shouldShow;
 }
 
+function attachEarthSceneWithoutChangingLod() {
+  if (!appCtx.scene) return;
+  [appCtx.terrainGroup, appCtx.cloudGroup].forEach((object) => {
+    if (object && !object.parent) {
+      const ownerParent = object.userData?.earthSceneOwnerParent;
+      (ownerParent?.isObject3D ? ownerParent : appCtx.scene).add(object);
+    }
+  });
+  EARTH_MESH_LISTS.forEach((listName) => {
+    const list = appCtx[listName];
+    if (!Array.isArray(list)) return;
+    list.forEach((mesh) => {
+      if (mesh && !mesh.parent) {
+        const ownerParent = mesh.userData?.earthSceneOwnerParent;
+        (ownerParent?.isObject3D ? ownerParent : appCtx.scene).add(mesh);
+      }
+    });
+  });
+  lastOwnershipSignature = sceneOwnershipSignature();
+}
+
 function enforceEnvironmentSceneOwnership() {
   const env = appCtx.getEnv?.();
   const earthVisible = env === appCtx.ENV?.EARTH;
   const signature = sceneOwnershipSignature();
-  if (earthVisible !== appCtx.earthSceneVisible || signature !== lastOwnershipSignature) {
+  if (earthVisible !== appCtx.earthSceneVisible) {
     setEarthSceneVisible(earthVisible);
+  } else if (signature !== lastOwnershipSignature) {
+    if (earthVisible) attachEarthSceneWithoutChangingLod();
+    else setEarthSceneVisible(false);
   }
   return earthVisible;
 }

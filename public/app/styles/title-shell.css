@@ -41,8 +41,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
 /* Location Grid */
 .loc-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
 .loc-grid.custom-centered{grid-template-columns:1fr;max-width:300px;margin:0 auto}
-.launch-switch-row{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
-.launch-switch-btn{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.9);border-radius:10px;padding:10px 12px;font-family:'Poppins',sans-serif;font-size:12px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.2s;min-height:44px}
+.launch-switch-row{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:14px}
+.launch-switch-btn{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.9);border-radius:10px;padding:9px 7px;font-family:'Poppins',sans-serif;font-size:11px;font-weight:600;color:#475569;cursor:pointer;transition:all 0.2s;min-height:42px;white-space:nowrap}
 .launch-switch-btn:hover{border-color:#cbd5e1;background:#f1f5f9}
 .launch-switch-btn.active{border-color:#667eea;background:#f0f4ff;color:#3b5bdb;box-shadow:0 4px 12px rgba(102,126,234,0.15)}
 .loc{background:rgba(248,250,252,0.9);border:2px solid rgba(226,232,240,0.8);border-radius:12px;padding:16px;cursor:pointer;text-align:center;transition:all 0.2s}
@@ -221,8 +221,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .flowerChallengeLocation{font-size:11px;color:#cbd5e1}
 .flowerChallengeLocation b{color:#f8fafc}
 .flowerChallengeRow{display:flex;gap:8px;align-items:center}
-.flowerLeaderboardTabs{display:flex;gap:8px;margin-top:2px}
-.flowerLeaderboardTab{flex:1;background:rgba(15,23,42,0.64);border:1px solid rgba(148,163,184,0.38);border-radius:9px;color:#cbd5e1;padding:7px 10px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.16s ease}
+.flowerLeaderboardTabs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin-top:2px}
+.flowerLeaderboardTab{min-width:0;background:rgba(15,23,42,0.64);border:1px solid rgba(148,163,184,0.38);border-radius:9px;color:#cbd5e1;padding:7px 8px;font-size:11px;font-weight:700;cursor:pointer;transition:all 0.16s ease}
 .flowerLeaderboardTab.active{background:rgba(59,130,246,0.24);border-color:rgba(96,165,250,0.68);color:#eff6ff}
 .flowerChallengeName{flex:1;min-width:0;background:rgba(15,23,42,0.74);border:1px solid rgba(148,163,184,0.45);border-radius:9px;color:#f8fafc;padding:8px 10px;font-size:12px}
 .flowerChallengeName:focus{outline:none;border-color:#60a5fa;box-shadow:0 0 0 2px rgba(96,165,250,0.22)}
@@ -357,7 +357,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .flowerChallengePanel{top:max(58px,calc(env(safe-area-inset-top) + 54px));left:8px;right:8px;width:auto;max-height:52dvh;padding:10px}
   .flowerLeaderboard{max-height:110px}
   .loc-grid{grid-template-columns:1fr;gap:10px}
-  .launch-switch-row{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+  .launch-switch-row{grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+  .launch-switch-btn{padding:8px 4px;font-size:10px;min-height:40px}
   .tab-btn{font-size:12px;padding:12px 8px}
   #tab-multiplayer{padding-bottom:150px}
 
@@ -442,7 +443,8 @@ input,textarea{-webkit-user-select:text;user-select:text}
   .flowerChallengeBtn{font-size:11px;padding:8px 9px}
   .flowerLeaderboard{max-height:96px}
   .flowerLeaderboardItem{font-size:10px}
-  .launch-switch-row{grid-template-columns:1fr}
+  .launch-switch-row{grid-template-columns:repeat(5,minmax(0,1fr));gap:3px}
+  .launch-switch-btn{padding:7px 2px;font-size:9px;min-height:38px}
   .tab-btn{font-size:11px;padding:10px 6px}
   .tab-content{padding:16px}
   #tab-multiplayer{padding-bottom:170px}

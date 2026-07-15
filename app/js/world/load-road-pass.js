@@ -9,6 +9,7 @@ import {
   shouldRenderRoadSkirts,
   updateFeatureSurfaceProfile
 } from "../structure-semantics.js?v=12";
+import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=6";
 
 const ROAD_SURFACE_BIAS = 0.08;
 
@@ -115,6 +116,9 @@ export function buildRoadGeometryPass(options = {}) {
     };
     appCtx.roads.push(roadFeature);
     updateFeatureSurfaceProfile(roadFeature, worldBaseTerrainY, { surfaceBias: ROAD_SURFACE_BIAS });
+    if (roadFeature.structureSemantics?.terrainMode === 'elevated') {
+      registerBridgeGuardrails(roadFeature);
+    }
 
     const hw = width / 2;
     const subdPts = typeof appCtx.subdivideRoadPoints === 'function' ?

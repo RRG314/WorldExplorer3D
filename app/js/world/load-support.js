@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { generateStreetFurniture } from "./furniture.js?v=7";
+import { generateStreetFurniture } from "./furniture.js?v=8";
 
 export function recordWorldLoadWarning(loadMetrics, label, err) {
   const message = `${label}: ${err?.message || err}`;

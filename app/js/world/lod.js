@@ -9,6 +9,7 @@ const runtime = {
 let lastLodRefX = 0;
 let lastLodRefZ = 0;
 let lastLodReady = false;
+let lastBuildingMeshCount = -1;
 
 export function initWorldLod(deps = {}) {
   if (typeof deps.getPerfModeValue === 'function') runtime.getPerfModeValue = deps.getPerfModeValue;
@@ -68,16 +69,55 @@ function hideMeshList(meshes) {
 }
 
 function lodReferenceActor() {
+  if (appCtx.planeMode?.active) return appCtx.planeMode;
   if (appCtx.boatMode?.active && appCtx.boat) return appCtx.boat;
   if (appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk?.state?.walker) return appCtx.Walk.state.walker;
   return appCtx.droneMode ? appCtx.drone : appCtx.car;
 }
 
-function visibleBuildingMeshBudget() {
+function visibleBuildingUnitBudget(dynamicScale = 1) {
   const quality = String(appCtx.renderQualityLevel || 'med').toLowerCase();
-  const baseBudget = quality === 'low' ? 480 : quality === 'high' ? 1200 : 820;
-  const modeScale = appCtx.droneMode ? 0.72 : appCtx.camMode === 2 ? 0.82 : 1;
-  return Math.max(280, Math.floor(baseBudget * modeScale));
+  if (appCtx.planeMode?.active) {
+    const aerialBudget = quality === 'low' ? 4200 : quality === 'high' ? 9000 : 6500;
+    return Math.max(3200, Math.floor(aerialBudget * Math.max(0.72, Number(dynamicScale) || 1)));
+  }
+  const baseBudget = quality === 'low' ? 2200 : quality === 'high' ? 5600 : 3800;
+  const modeScale = appCtx.droneMode ? 0.7 : appCtx.camMode === 2 ? 0.82 : 1;
+  return Math.max(1200, Math.floor(baseBudget * modeScale * Math.max(0.72, Number(dynamicScale) || 1)));
+}
+
+function setEarthMeshVisible(mesh, visible) {
+  if (!mesh) return;
+  mesh.visible = visible;
+  if (visible && mesh.parent !== appCtx.scene) appCtx.scene.add(mesh);
+}
+
+function setBuildingCandidateVisible(candidate, visible) {
+  const meshes = Array.isArray(candidate?.meshes) ? candidate.meshes : [candidate?.mesh];
+  let changed = 0;
+  for (let i = 0; i < meshes.length; i++) {
+    if (!meshes[i]) continue;
+    setEarthMeshVisible(meshes[i], visible);
+    changed += 1;
+  }
+  return changed;
+}
+
+function selectBuildingCandidates(candidates, budget) {
+  if (!(budget > 0)) return { units: 0, meshes: 0 };
+  let units = 0;
+  let meshes = 0;
+  for (let i = 0; i < candidates.length; i++) {
+    const candidate = candidates[i];
+    if (candidate.selected) continue;
+    const cost = Math.max(1, Number(candidate.count) || 1);
+    if (units > 0 && units + cost > budget) continue;
+    candidate.selected = true;
+    units += cost;
+    meshes += setBuildingCandidateVisible(candidate, true);
+    if (units >= budget) break;
+  }
+  return { units, meshes };
 }
 
 export function updateWorldLod(force = false) {
@@ -88,6 +128,7 @@ export function updateWorldLod(force = false) {
     hideMeshList(appCtx.landuseMeshes);
     hideMeshList(appCtx.poiMeshes);
     hideMeshList(appCtx.streetFurnitureMeshes);
+    hideMeshList(appCtx.aerialContextMeshes);
     if (typeof appCtx.setPerfLiveStat === 'function') {
       appCtx.setPerfLiveStat('lodVisible', { near: 0, mid: 0 });
     }
@@ -103,15 +144,18 @@ export function updateWorldLod(force = false) {
   const ref = lodReferenceActor();
   const refX = Number.isFinite(ref?.x) ? ref.x : 0;
   const refZ = Number.isFinite(ref?.z) ? ref.z : 0;
+  const buildingMeshCount = appCtx.buildingMeshes.length;
+  const buildingSetChanged = buildingMeshCount !== lastBuildingMeshCount;
 
-  if (!force && lastLodReady) {
+  if (!force && lastLodReady && !buildingSetChanged) {
     const moved = Math.hypot(refX - lastLodRefX, refZ - lastLodRefZ);
-    const minMoveForLodUpdate = appCtx.droneMode ? 4 : appCtx.boatMode?.active ? 14 : 8;
+    const minMoveForLodUpdate = appCtx.planeMode?.active ? 45 : appCtx.droneMode ? 6 : appCtx.boatMode?.active ? 14 : 8;
     if (moved < minMoveForLodUpdate) return;
   }
   lastLodRefX = refX;
   lastLodRefZ = refZ;
   lastLodReady = true;
+  lastBuildingMeshCount = buildingMeshCount;
 
   const mode = runtime.getPerfModeValue();
   const dynamicBudgetState = runtime.getRuntimeDynamicBudget(mode);
@@ -119,47 +163,30 @@ export function updateWorldLod(force = false) {
     typeof appCtx.rdtComplexity === 'number' ? appCtx.rdtComplexity : 0;
   const boatLodScale = appCtx.boatMode?.active ? Math.max(0.34, Math.min(1, Number(appCtx.boatMode.detailBias) || 1)) : 1;
   const lodThresholds = runtime.getWorldLodThresholds(depthForLod, mode, dynamicBudgetState.lodScale * boatLodScale);
+  const planeGroundY = appCtx.planeMode?.active
+    ? Number(appCtx.terrainMeshHeightAt?.(refX, refZ) ?? appCtx.elevationWorldYAtWorldXZ?.(refX, refZ) ?? 0)
+    : 0;
+  const planeAltitude = appCtx.planeMode?.active ? Math.max(0, Number(appCtx.planeMode.y) - planeGroundY) : 0;
+  const planeHorizon = appCtx.planeMode?.active ? Math.min(9000, 5000 + planeAltitude * 5) : 0;
   const poiMidSq = lodThresholds.mid * lodThresholds.mid;
+
+  for (let i = 0; i < appCtx.roadMeshes.length; i += 1) setEarthMeshVisible(appCtx.roadMeshes[i], true);
+  const aerialNear = Math.max(1900, 1200 + planeAltitude * 1.4);
+  const aerialFar = Math.max(6500, planeHorizon + 2800);
+  const aerialMeshes = Array.isArray(appCtx.aerialContextMeshes) ? appCtx.aerialContextMeshes : [];
+  for (let i = 0; i < aerialMeshes.length; i += 1) {
+    const mesh = aerialMeshes[i];
+    const center = getMeshLodCenter(mesh);
+    const distance = center ? Math.hypot(center.x - refX, center.z - refZ) : Infinity;
+    setEarthMeshVisible(mesh, !!appCtx.planeMode?.active && distance >= aerialNear && distance <= aerialFar);
+  }
 
   let nearVisible = 0;
   let midVisible = 0;
 
-  if (mode === 'baseline') {
-    for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
-      const mesh = appCtx.buildingMeshes[i];
-      if (!mesh) continue;
-      mesh.visible = true;
-      const tier = mesh.userData?.lodTier || 'near';
-      const isBatch = !!mesh.userData?.isBuildingBatch;
-      const count = isBatch ? Math.max(1, mesh.userData?.batchCount || 1) : 1;
-      if (tier === 'mid') midVisible += count;
-      else nearVisible += count;
-    }
-
-    for (let i = 0; i < appCtx.poiMeshes.length; i++) {
-      const mesh = appCtx.poiMeshes[i];
-      if (mesh) mesh.visible = !!appCtx.poiMode;
-    }
-
-    for (let i = 0; i < appCtx.landuseMeshes.length; i++) {
-      const mesh = appCtx.landuseMeshes[i];
-      if (!mesh) continue;
-      if (mesh.userData?.boatSuppressed) {
-        mesh.visible = false;
-        continue;
-      }
-      const alwaysVisible = !!mesh.userData?.alwaysVisible;
-      mesh.visible = alwaysVisible || !!appCtx.landUseVisible;
-    }
-
-    if (typeof appCtx.setPerfLiveStat === 'function') {
-      appCtx.setPerfLiveStat('lodVisible', { near: nearVisible, mid: midVisible });
-    }
-    return;
-  }
-
   const nearBuildingCandidates = [];
   const midBuildingCandidates = [];
+  const groupedCandidates = new Map();
   for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
     const mesh = appCtx.buildingMeshes[i];
     if (!mesh) continue;
@@ -178,44 +205,57 @@ export function updateWorldLod(force = false) {
       const batchBoost = isBatch ? Math.min(1300, radius) : Math.min(800, radius);
       visibleDist = lodThresholds.farVisible + batchBoost;
     }
+    if (appCtx.planeMode?.active && mesh.userData?.earthStreamingChunk) {
+      visibleDist = Math.max(visibleDist, planeHorizon + Math.min(700, radius * 0.35));
+    }
     const dx = center.x - refX;
     const dz = center.z - refZ;
     const distSq = dx * dx + dz * dz;
+    const aerialMode = appCtx.droneMode || appCtx.planeMode?.active;
     const hysteresis = tier === 'mid' ?
-      appCtx.droneMode ? 460 : 280 :
-      appCtx.droneMode ? 380 : 220;
+      appCtx.planeMode?.active ? 1200 : aerialMode ? 460 : 280 :
+      appCtx.planeMode?.active ? 1000 : aerialMode ? 380 : 220;
     const limitDist = mesh.visible ? visibleDist + hysteresis : visibleDist;
     const withinDistance = distSq <= limitDist * limitDist;
     mesh.visible = false;
-    if (!withinDistance) continue;
     const count = isBatch ? Math.max(1, mesh.userData?.batchCount || 1) : 1;
+    const groupKey = String(mesh.userData?.lodGroupKey || '');
+    if (groupKey) {
+      if (!groupedCandidates.has(groupKey)) {
+        groupedCandidates.set(groupKey, { count: 0, distSq, eligible: false, meshes: [], tier });
+      }
+      const group = groupedCandidates.get(groupKey);
+      group.count += count;
+      group.distSq = Math.min(group.distSq, distSq);
+      group.eligible = group.eligible || withinDistance;
+      group.meshes.push(mesh);
+      continue;
+    }
+    if (!withinDistance) continue;
     const candidate = { count, distSq, mesh, tier };
     if (tier === 'mid') midBuildingCandidates.push(candidate);
     else nearBuildingCandidates.push(candidate);
   }
+  groupedCandidates.forEach((candidate) => {
+    if (!candidate.eligible) return;
+    if (candidate.tier === 'mid') midBuildingCandidates.push(candidate);
+    else nearBuildingCandidates.push(candidate);
+  });
 
   nearBuildingCandidates.sort((a, b) => a.distSq - b.distSq);
   midBuildingCandidates.sort((a, b) => a.distSq - b.distSq);
-  const buildingMeshBudget = visibleBuildingMeshBudget();
-  const nearShare = appCtx.droneMode ? 0.38 : appCtx.camMode === 2 ? 0.5 : 0.62;
-  const nearTarget = Math.floor(buildingMeshBudget * nearShare);
-  const nearCount = Math.min(nearTarget, nearBuildingCandidates.length);
-  const midCount = Math.min(buildingMeshBudget - nearCount, midBuildingCandidates.length);
-  const nearSpillCount = Math.min(
-    nearBuildingCandidates.length,
-    nearCount + Math.max(0, buildingMeshBudget - nearCount - midCount)
+  const buildingUnitBudget = visibleBuildingUnitBudget(dynamicBudgetState.budgetScale);
+  const nearShare = appCtx.planeMode?.active ? 0.3 : appCtx.droneMode ? 0.38 : appCtx.camMode === 2 ? 0.5 : 0.62;
+  const nearPrimary = selectBuildingCandidates(nearBuildingCandidates, Math.floor(buildingUnitBudget * nearShare));
+  const midSelection = selectBuildingCandidates(midBuildingCandidates, Math.max(0, buildingUnitBudget - nearPrimary.units));
+  const nearSpill = selectBuildingCandidates(
+    nearBuildingCandidates,
+    Math.max(0, buildingUnitBudget - nearPrimary.units - midSelection.units)
   );
-
-  for (let i = 0; i < nearSpillCount; i++) {
-    const candidate = nearBuildingCandidates[i];
-    candidate.mesh.visible = true;
-    nearVisible += candidate.count;
-  }
-  for (let i = 0; i < midCount; i++) {
-    const candidate = midBuildingCandidates[i];
-    candidate.mesh.visible = true;
-    midVisible += candidate.count;
-  }
+  nearVisible = nearPrimary.units + nearSpill.units;
+  midVisible = midSelection.units;
+  const visibleNearMeshes = nearPrimary.meshes + nearSpill.meshes;
+  const visibleMidMeshes = midSelection.meshes;
 
   for (let i = 0; i < appCtx.poiMeshes.length; i++) {
     const mesh = appCtx.poiMeshes[i];
@@ -230,7 +270,7 @@ export function updateWorldLod(force = false) {
     const radius = Number.isFinite(mesh.userData?.lodRadius) ? mesh.userData.lodRadius : 0;
     const nearDist = lodThresholds.farVisible + Math.min(600, radius);
     const withinLod = tier === 'mid' ? distSq <= poiMidSq : distSq <= nearDist * nearDist;
-    mesh.visible = !!appCtx.poiMode && withinLod;
+    setEarthMeshVisible(mesh, !!appCtx.poiMode && withinLod);
   }
 
   const landuseVisibleDist = lodThresholds.mid + 120;
@@ -239,45 +279,45 @@ export function updateWorldLod(force = false) {
     const mesh = appCtx.landuseMeshes[i];
     if (!mesh) continue;
     if (mesh.userData?.boatSuppressed) {
-      mesh.visible = false;
+      setEarthMeshVisible(mesh, false);
       continue;
     }
 
     const alwaysVisible = !!mesh.userData?.alwaysVisible;
     if (!appCtx.landUseVisible && !alwaysVisible) {
-      mesh.visible = false;
+      setEarthMeshVisible(mesh, false);
       continue;
     }
     if (alwaysVisible) {
-      mesh.visible = true;
+      setEarthMeshVisible(mesh, true);
       continue;
     }
 
     if (mesh.userData?.isLanduseBatch) {
-      mesh.visible = !!appCtx.landUseVisible;
+      setEarthMeshVisible(mesh, !!appCtx.landUseVisible);
       continue;
     }
 
     const center = getMeshLodCenter(mesh);
     if (!center) {
-      mesh.visible = appCtx.landUseVisible;
+      setEarthMeshVisible(mesh, appCtx.landUseVisible);
       continue;
     }
 
     const dx = center.x - refX;
     const dz = center.z - refZ;
     const distSq = dx * dx + dz * dz;
-    mesh.visible = distSq <= landuseSq;
+    setEarthMeshVisible(mesh, distSq <= landuseSq);
   }
 
   if (typeof appCtx.setPerfLiveStat === 'function') {
     appCtx.setPerfLiveStat('lodVisible', { near: nearVisible, mid: midVisible });
     appCtx.setPerfLiveStat('lodBuildingMeshes', {
-      budget: buildingMeshBudget,
+      budget: buildingUnitBudget,
       eligible: nearBuildingCandidates.length + midBuildingCandidates.length,
-      visible: nearSpillCount + midCount,
-      visibleNearMeshes: nearSpillCount,
-      visibleMidMeshes: midCount
+      visible: visibleNearMeshes + visibleMidMeshes,
+      visibleNearMeshes,
+      visibleMidMeshes
     });
   }
 
@@ -288,14 +328,14 @@ export function updateWorldLod(force = false) {
       const mesh = appCtx.streetFurnitureMeshes[i];
       if (!mesh) continue;
       if (mesh.userData?.boatSuppressed) {
-        mesh.visible = false;
+        setEarthMeshVisible(mesh, false);
         continue;
       }
       const center = getMeshLodCenter(mesh) || mesh.userData?.furniturePos || mesh.position;
       if (!center) continue;
       const dx = center.x - refX;
       const dz = center.z - refZ;
-      mesh.visible = dx * dx + dz * dz <= furnitureSq;
+      setEarthMeshVisible(mesh, dx * dx + dz * dz <= furnitureSq);
     }
   }
 }

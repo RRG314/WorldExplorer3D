@@ -1,12 +1,14 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { clampNumber } from "./budgets.js?v=2";
-import { resolveWaterSurfaceVisualProfile } from "./load-geometry.js?v=11";
+import { resolveWaterSurfaceVisualProfile } from "./load-geometry.js?v=12";
 import { registerWaterWaveMaterial } from "./render-support.js?v=4";
 import { decimatePoints } from "./world-geometry.js?v=2";
-import { inferWaterRenderContext } from "../water-dynamics.js?v=3";
+import { inferWaterRenderContext } from "../water-dynamics.js?v=4";
 import { classifyStructureSemantics } from "../structure-semantics.js?v=12";
 
 function waterwayWidthFromTags(tags) {
+  const explicit = Number.parseFloat(tags?.width);
+  if (Number.isFinite(explicit) && explicit > 1) return Math.min(240, explicit);
   const kind = (tags?.kind || tags?.waterway || '').toString();
   if (kind.includes('ocean') || kind.includes('coast')) return 220;
   if (kind.includes('river')) return 18;
@@ -17,6 +19,15 @@ function waterwayWidthFromTags(tags) {
   return 8;
 }
 
+function waterwayIsNavigable(tags = {}) {
+  const explicitWidth = Number.parseFloat(tags.width);
+  if (Number.isFinite(explicitWidth) && explicitWidth >= 12) return true;
+  return ['boat', 'motorboat', 'ship'].some((key) => {
+    const value = String(tags[key] || '').toLowerCase();
+    return value === 'yes' || value === 'designated' || value === 'permissive';
+  });
+}
+
 export function addWaterwayRibbon(pts, tags) {
   if (!pts || pts.length < 2) return;
   const centerline = decimatePoints(pts, 1000, false);
@@ -24,8 +35,9 @@ export function addWaterwayRibbon(pts, tags) {
 
   const width = waterwayWidthFromTags(tags);
   const structureSemantics = classifyStructureSemantics(tags, { featureKind: 'waterway' });
-  const navigable = structureSemantics.terrainMode !== 'subgrade';
-  if (!navigable) {
+  const surfaceVisible = structureSemantics.terrainMode !== 'subgrade';
+  const navigable = surfaceVisible && waterwayIsNavigable(tags);
+  if (!surfaceVisible) {
     appCtx.waterways.push({
       type: tags?.kind || tags?.waterway || 'waterway',
       width,
@@ -42,6 +54,7 @@ export function addWaterwayRibbon(pts, tags) {
   const heightAt = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt : appCtx.elevationWorldYAtWorldXZ;
   const verts = [];
   const indices = [];
+  const surfaceProfile = [];
 
   for (let i = 0; i < centerline.length; i++) {
     const point = centerline[i];
@@ -66,11 +79,18 @@ export function addWaterwayRibbon(pts, tags) {
     const leftZ = point.z + nz * halfWidth;
     const rightX = point.x - nx * halfWidth;
     const rightZ = point.z - nz * halfWidth;
-    const leftY = heightAt(leftX, leftZ) + verticalBias;
-    const rightY = heightAt(rightX, rightZ) + verticalBias;
+    let surfaceY = heightAt(point.x, point.z) + verticalBias;
+    const previous = surfaceProfile[i - 1];
+    if (!Number.isFinite(surfaceY)) surfaceY = Number(previous?.y) || verticalBias;
+    if (previous) {
+      const segmentLength = Math.hypot(point.x - previous.x, point.z - previous.z);
+      const maxDelta = Math.max(0.35, Math.min(6, segmentLength * 0.08));
+      surfaceY = Math.max(previous.y - maxDelta, Math.min(previous.y + maxDelta, surfaceY));
+    }
+    surfaceProfile.push({ x: point.x, z: point.z, y: surfaceY });
 
-    verts.push(leftX, leftY, leftZ);
-    verts.push(rightX, rightY, rightZ);
+    verts.push(leftX, surfaceY, leftZ);
+    verts.push(rightX, surfaceY, rightZ);
 
     if (i < centerline.length - 1) {
       const vi = i * 2;
@@ -123,9 +143,10 @@ export function addWaterwayRibbon(pts, tags) {
   appCtx.waterways.push({
     type: tags?.kind || tags?.waterway || 'waterway',
     width,
-    surfaceY: verticalBias,
+    surfaceY: null,
+    surfaceProfile,
     pts: centerline,
-    navigable: true,
+    navigable,
     structureSemantics
   });
 }

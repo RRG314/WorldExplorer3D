@@ -91,9 +91,10 @@ export function createAsteroidBelt(ctx) {
   beltGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   beltGeo.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
 
-  const beltMat = new THREE.PointsMaterial({
+  const beltMat = createRoundStarMaterial({
     size: 2.4,
-    vertexColors: true,
+    color: 0xb7bcc2,
+    vertexColors: false,
     transparent: true,
     opacity: 0.9,
     sizeAttenuation: false,
@@ -150,9 +151,10 @@ export function createKuiperBelt(ctx) {
   beltGeo.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
   beltGeo.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
 
-  const beltMat = new THREE.PointsMaterial({
+  const beltMat = createRoundStarMaterial({
     size: 1.9,
-    vertexColors: true,
+    color: 0xc8d4df,
+    vertexColors: false,
     transparent: true,
     opacity: 0.82,
     sizeAttenuation: false,
@@ -284,3 +286,4 @@ export function createNamedAsteroids(ctx) {
     });
   });
 }
+import { createRoundStarMaterial } from '../sky/star-point-material.js?v=2';

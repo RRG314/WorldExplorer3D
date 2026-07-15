@@ -5,16 +5,16 @@ const MOBILE_CONTROL_PROFILES = {
     moveLabel: 'Drive',
     lookLabel: 'Look',
     move: {
-      up: { channel: 'earth', key: 'KeyW' },
-      down: { channel: 'earth', key: 'KeyS' },
-      left: { channel: 'earth', key: 'KeyA' },
-      right: { channel: 'earth', key: 'KeyD' }
-    },
-    look: {
       up: { channel: 'earth', key: 'ArrowUp' },
       down: { channel: 'earth', key: 'ArrowDown' },
       left: { channel: 'earth', key: 'ArrowLeft' },
       right: { channel: 'earth', key: 'ArrowRight' }
+    },
+    look: {
+      up: { channel: 'earth', key: 'KeyW' },
+      down: { channel: 'earth', key: 'KeyS' },
+      left: { channel: 'earth', key: 'KeyA' },
+      right: { channel: 'earth', key: 'KeyD' }
     },
     actions: [{ label: 'Brake', binding: { channel: 'earth', key: 'Space' } }]
   },
@@ -22,16 +22,16 @@ const MOBILE_CONTROL_PROFILES = {
     moveLabel: 'Throttle',
     lookLabel: 'Look',
     move: {
-      up: { channel: 'earth', key: 'KeyW' },
-      down: { channel: 'earth', key: 'KeyS' },
-      left: { channel: 'earth', key: 'KeyA' },
-      right: { channel: 'earth', key: 'KeyD' }
-    },
-    look: {
       up: { channel: 'earth', key: 'ArrowUp' },
       down: { channel: 'earth', key: 'ArrowDown' },
       left: { channel: 'earth', key: 'ArrowLeft' },
       right: { channel: 'earth', key: 'ArrowRight' }
+    },
+    look: {
+      up: { channel: 'earth', key: 'KeyW' },
+      down: { channel: 'earth', key: 'KeyS' },
+      left: { channel: 'earth', key: 'KeyA' },
+      right: { channel: 'earth', key: 'KeyD' }
     },
     actions: [{ label: 'Brake', binding: { channel: 'earth', key: 'Space' } }]
   },
@@ -59,20 +59,40 @@ const MOBILE_CONTROL_PROFILES = {
     moveLabel: 'Move',
     lookLabel: 'Look',
     move: {
-      up: { channel: 'earth', key: 'KeyW' },
-      down: { channel: 'earth', key: 'KeyS' },
-      left: { channel: 'earth', key: 'KeyA' },
-      right: { channel: 'earth', key: 'KeyD' }
-    },
-    look: {
       up: { channel: 'earth', key: 'ArrowUp' },
       down: { channel: 'earth', key: 'ArrowDown' },
       left: { channel: 'earth', key: 'ArrowLeft' },
       right: { channel: 'earth', key: 'ArrowRight' }
     },
+    look: {
+      up: { channel: 'earth', key: 'KeyW' },
+      down: { channel: 'earth', key: 'KeyS' },
+      left: { channel: 'earth', key: 'KeyA' },
+      right: { channel: 'earth', key: 'KeyD' }
+    },
     actions: [
       { label: 'Ascend', binding: { channel: 'earth', key: 'Space' } },
       { label: 'Descend', binding: { channel: 'earth', key: 'ShiftLeft' } }
+    ]
+  },
+  plane: {
+    moveLabel: 'Flight',
+    lookLabel: 'Look',
+    move: {
+      up: { channel: 'earth', key: 'ArrowUp' },
+      down: { channel: 'earth', key: 'ArrowDown' },
+      left: { channel: 'earth', key: 'ArrowLeft' },
+      right: { channel: 'earth', key: 'ArrowRight' }
+    },
+    look: {
+      up: { channel: 'earth', key: 'KeyW' },
+      down: { channel: 'earth', key: 'KeyS' },
+      left: { channel: 'earth', key: 'KeyA' },
+      right: { channel: 'earth', key: 'KeyD' }
+    },
+    actions: [
+      { label: 'Throttle +', binding: { channel: 'earth', key: 'ShiftLeft' } },
+      { label: 'Throttle -', binding: { channel: 'earth', key: 'ControlLeft' } }
     ]
   },
   rocket: {
@@ -120,6 +140,7 @@ function initMobileControls() {
   const boatControls = document.getElementById('boatControls');
   const walkingControls = document.getElementById('walkingControls');
   const droneControls = document.getElementById('droneControls');
+  const planeControls = document.getElementById('planeControls');
   const rocketControls = document.getElementById('rocketControls');
   const oceanControls = document.getElementById('oceanControls');
   const oceanModeMenuItem = document.getElementById('fOceanMode');
@@ -321,6 +342,7 @@ function initMobileControls() {
       return 'rocket';
     }
     if (appCtx.boatMode?.active) return 'boat';
+    if (appCtx.planeMode?.active) return 'plane';
     if (appCtx.droneMode) return 'drone';
     if (appCtx.Walk?.state?.mode === 'walk') return 'walking';
     return 'driving';
@@ -344,7 +366,7 @@ function initMobileControls() {
       mobileTouchControls.dataset.mode = mode;
     }
 
-    mobileTouchControls.classList.remove('mode-driving', 'mode-boat', 'mode-walking', 'mode-drone', 'mode-rocket', 'mode-ocean');
+    mobileTouchControls.classList.remove('mode-driving', 'mode-boat', 'mode-walking', 'mode-drone', 'mode-plane', 'mode-rocket', 'mode-ocean');
     mobileTouchControls.classList.add(`mode-${mode}`);
     mobileTouchControls.style.zIndex = inSpaceFlight ? '10002' : '106';
 
@@ -388,6 +410,7 @@ function initMobileControls() {
     if (boatControls) boatControls.style.display = mode === 'boat' ? 'block' : 'none';
     if (walkingControls) walkingControls.style.display = mode === 'walking' ? 'block' : 'none';
     if (droneControls) droneControls.style.display = mode === 'drone' ? 'block' : 'none';
+    if (planeControls) planeControls.style.display = mode === 'plane' ? 'block' : 'none';
     if (rocketControls) rocketControls.style.display = mode === 'rocket' ? 'block' : 'none';
     if (oceanControls) oceanControls.style.display = mode === 'ocean' ? 'block' : 'none';
     oceanModeMenuItem?.classList.toggle('on', mode === 'ocean');
@@ -409,6 +432,7 @@ function initMobileControls() {
         mode === 'boat' ? 'Boat Mode' :
         mode === 'walking' ? 'Walking Mode' :
         mode === 'drone' ? 'Drone Mode' :
+        mode === 'plane' ? 'Plane Mode' :
         mode === 'rocket' ? 'Rocket Mode' :
         mode === 'ocean' ? 'Submarine Mode' :
         'Driving Mode';

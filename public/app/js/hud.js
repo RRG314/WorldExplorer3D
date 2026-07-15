@@ -401,6 +401,11 @@ function updateSkyPositions() {
 }
 
 function updateCamera(dt = 1 / 60) {
+  if (appCtx.planeMode?.active && appCtx.applyPlaneCamera?.(dt)) {
+    updateBillboardMarkers();
+    updateCameraLinkedEffects();
+    return;
+  }
   if (appCtx.boatMode?.active) {
     updateBoatCamera();
     updateBillboardMarkers();
@@ -437,10 +442,20 @@ function updateCamera(dt = 1 / 60) {
   const carLook = appCtx.camera.userData.carLook || { yaw: 0, pitch: 0 };
   appCtx.camera.userData.carLook = carLook;
   const cameraLookSpeed = 1.8 * clampValue(dt, 1 / 240, 0.05);
-  if (appCtx.keys.ArrowLeft) carLook.yaw += cameraLookSpeed;
-  if (appCtx.keys.ArrowRight) carLook.yaw -= cameraLookSpeed;
-  if (appCtx.keys.ArrowUp) carLook.pitch += cameraLookSpeed;
-  if (appCtx.keys.ArrowDown) carLook.pitch -= cameraLookSpeed;
+  const manualCameraInput = appCtx.keys.KeyW || appCtx.keys.KeyA || appCtx.keys.KeyS || appCtx.keys.KeyD;
+  if (appCtx.keys.KeyA) carLook.yaw += cameraLookSpeed;
+  if (appCtx.keys.KeyD) carLook.yaw -= cameraLookSpeed;
+  if (appCtx.keys.KeyW) carLook.pitch += cameraLookSpeed;
+  if (appCtx.keys.KeyS) carLook.pitch -= cameraLookSpeed;
+  if (manualCameraInput) carLook.lastInputAt = performance.now();
+  const cameraIdleMs = performance.now() - (Number(carLook.lastInputAt) || 0);
+  if (!manualCameraInput && cameraIdleMs > 900 && appCtx.camMode === 0) {
+    const returnBlend = 1 - Math.exp(-4.2 * clampValue(dt, 1 / 240, 0.05));
+    carLook.yaw += (0 - carLook.yaw) * returnBlend;
+    carLook.pitch += (0 - carLook.pitch) * returnBlend;
+    if (Math.abs(carLook.yaw) < 0.002) carLook.yaw = 0;
+    if (Math.abs(carLook.pitch) < 0.002) carLook.pitch = 0;
+  }
   carLook.yaw = normalizeHeading(carLook.yaw);
   carLook.pitch = clampValue(carLook.pitch, -0.62, 0.62);
 
@@ -537,6 +552,31 @@ function updateHUD() {
     document.getElementById('indOff').classList.remove('on', 'warn');
     document.getElementById('offRoadWarn').classList.toggle('active', false);
     updateCoordinatesHud(appCtx.boat.x, appCtx.boat.z, appCtx.boat.angle);
+    return;
+  }
+
+  if (appCtx.planeMode?.active) {
+    const plane = appCtx.planeMode;
+    const groundY = appCtx.terrainMeshHeightAt?.(plane.x, plane.z) ?? appCtx.elevationWorldYAtWorldXZ?.(plane.x, plane.z) ?? 0;
+    const altitude = Math.max(0, Math.round(plane.y - groundY));
+    const mph = Math.max(0, Math.round(plane.speed * 2.237));
+    setHudUnitLabels('MPH', 'ALT');
+    document.getElementById('speed').textContent = `${mph}`;
+    document.getElementById('speed').classList.toggle('fast', mph > 105);
+    document.getElementById('limit').textContent = `${altitude}`;
+    setStreetAndLocation(plane.airborne ? 'Flight' : 'Taxi', locationName());
+    const bf = document.getElementById('boostFill');
+    bf.style.width = `${Math.round(clampValue(plane.throttle, 0, 1) * 100)}%`;
+    bf.classList.toggle('active', plane.throttle > 0.82);
+    document.getElementById('indBrake').classList.toggle('on', !!appCtx.keys.Space && !plane.airborne);
+    document.getElementById('indBoost').classList.toggle('on', plane.throttle > 0.82);
+    document.getElementById('indBoost').textContent = 'PWR';
+    document.getElementById('indDrift').classList.toggle('on', plane.airborne);
+    document.getElementById('indDrift').textContent = plane.airborne ? 'AIR' : 'GEAR';
+    document.getElementById('indOff').classList.remove('on', 'warn');
+    document.getElementById('indOff').textContent = `${altitude} M`;
+    document.getElementById('offRoadWarn').classList.remove('active');
+    updateCoordinatesHud(plane.x, plane.z, plane.yaw);
     return;
   }
 

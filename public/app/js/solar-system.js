@@ -3,8 +3,8 @@ import {
   createAsteroidBelt as createSolarSystemAsteroidBelt,
   createKuiperBelt as createSolarSystemKuiperBelt,
   createMoonSystems as createSolarSystemMoonSystems
-} from "./solar-system/minor-bodies.js?v=1";
-import { createGalaxies as createSolarSystemGalaxies } from "./solar-system/galaxies.js?v=1";
+} from "./solar-system/minor-bodies.js?v=2";
+import { createGalaxies as createSolarSystemGalaxies } from "./solar-system/galaxies.js?v=2";
 import { initSolarSystemModel } from "./solar-system/init.js?v=1";
 import {
   createInfoPanel as createSolarSystemInfoPanel,
@@ -15,7 +15,7 @@ import {
   toggleOrbits as toggleSolarSystemOrbitsImpl,
   toggleSolarSystem as toggleSolarSystemImpl,
   updateSolarSystem as updateSolarSystemImpl
-} from "./solar-system/ui.js?v=1";
+} from "./solar-system/ui.js?v=2";
 import {
   createSpacecraft as createSolarSystemSpacecraft,
   updateSpacecraftPositions as updateSolarSystemSpacecraftPositions
@@ -669,7 +669,7 @@ function toggleOrbits() {
 }
 
 function showSolarSystemUI() {
-  return showSolarSystemUIImpl();
+  return showSolarSystemUIImpl(buildSolarSystemModuleContext());
 }
 
 function hideSolarSystemUI() {
@@ -936,6 +936,19 @@ function setSolarSystemCenter(position) {
   solarSystem.group.position.set(0, 0, 0);
 }
 
+function setSolarSystemFrameVisibility(visible) {
+  solarSystem.visible = Boolean(visible);
+  if (solarSystem.group) solarSystem.group.visible = Boolean(visible);
+  solarSystem.spacecraftMeshes.forEach((entry) => {
+    if (entry?.mesh) entry.mesh.visible = Boolean(visible);
+  });
+  if (!visible) {
+    if (solarSystem.infoPanel) solarSystem.infoPanel.style.display = 'none';
+    const proximity = document.getElementById('ssProximity');
+    if (proximity) proximity.style.display = 'none';
+  }
+}
+
 Object.assign(appCtx, {
   getAllSpaceBodies,
   getEarthHelioScenePosition,
@@ -943,6 +956,7 @@ Object.assign(appCtx, {
   hideSolarSystemUI,
   initSolarSystem,
   setSolarSystemCenter,
+  setSolarSystemFrameVisibility,
   showSolarSystemUI,
   toggleOrbits,
   toggleSolarSystem,
@@ -956,6 +970,7 @@ export {
   hideSolarSystemUI,
   initSolarSystem,
   setSolarSystemCenter,
+  setSolarSystemFrameVisibility,
   showSolarSystemUI,
   toggleOrbits,
   toggleSolarSystem,

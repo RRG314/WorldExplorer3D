@@ -1,6 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { fetchBundledLandmarkData } from "./landmark-source.js?v=1";
-import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=3";
+import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=4";
+import { renderCuratedLandmarkModels } from './landmark-models.js?v=10';
 
 const MAX_PYRAMIDS = 48;
 const MAX_WALL_WAYS = 140;
@@ -187,9 +188,32 @@ function createWallMesh(way, nodes) {
   }
   if (segments.length === 0) return null;
 
+  const merlons = [];
+  const maxMerlons = 120;
+  for (const segment of segments) {
+    if (merlons.length >= maxMerlons) break;
+    const horizontalLength = Math.hypot(segment.dx, segment.dz) || 1;
+    const sideX = -segment.dz / horizontalLength;
+    const sideZ = segment.dx / horizontalLength;
+    const positions = Math.min(60, Math.max(1, Math.floor(segment.length / 4.2)));
+    for (let index = 0; index < positions && merlons.length < maxMerlons; index++) {
+      const t = (index + 0.5) / positions - 0.5;
+      for (const side of [-1, 1]) {
+        merlons.push({
+          x: segment.x + segment.dx * t + sideX * width * 0.34 * side,
+          y: segment.y + segment.dy * t + height * 0.5 + 0.65,
+          z: segment.z + segment.dz * t + sideZ * width * 0.34 * side,
+          dx: segment.dx,
+          dz: segment.dz
+        });
+        if (merlons.length >= maxMerlons) break;
+      }
+    }
+  }
+
   const geometry = new THREE.BoxGeometry(1, 1, 1);
   const material = new THREE.MeshStandardMaterial({ color: 0x8f8878, roughness: 0.98, metalness: 0 });
-  const mesh = new THREE.InstancedMesh(geometry, material, segments.length);
+  const mesh = new THREE.InstancedMesh(geometry, material, segments.length + merlons.length);
   const matrix = new THREE.Matrix4();
   const position = new THREE.Vector3();
   const quaternion = new THREE.Quaternion();
@@ -205,6 +229,15 @@ function createWallMesh(way, nodes) {
     matrix.compose(position, quaternion, scale);
     mesh.setMatrixAt(i, matrix);
   }
+  for (let i = 0; i < merlons.length; i++) {
+    const merlon = merlons[i];
+    position.set(merlon.x, merlon.y, merlon.z);
+    direction.set(merlon.dx, 0, merlon.dz).normalize();
+    quaternion.setFromUnitVectors(forward, direction);
+    scale.set(1.15, 1.3, 0.9);
+    matrix.compose(position, quaternion, scale);
+    mesh.setMatrixAt(segments.length + i, matrix);
+  }
   mesh.instanceMatrix.needsUpdate = true;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
@@ -215,7 +248,8 @@ function createWallMesh(way, nodes) {
     sourceFeatureId: `osm-way:${way.id}`,
     landmarkName: tags.name || tags['name:en'] || 'Historic Wall',
     heightMeters: height,
-    widthMeters: width
+    widthMeters: width,
+    crenellationCount: merlons.length
   };
   addHistoricSite(way, points, 'historic_wall', height);
   return mesh;
@@ -265,6 +299,7 @@ function renderLandmarks(data, options) {
       cables: suspensionBridge.cables,
       girders: suspensionBridge.girders,
       suspenders: suspensionBridge.suspenders,
+      structuralMembers: suspensionBridge.structuralMembers,
       spanMeters: suspensionBridge.spanMeters
     } : null,
     actorReprojected: reprojectActorOutsideLandmarks(createdMeshes)
@@ -287,6 +322,8 @@ export function scheduleDeferredLandmarkLoad(options = {}) {
         );
       if (!options.isActiveLoadContext?.()) return;
       const metrics = renderLandmarks(data, options);
+      metrics.curatedModels = await renderCuratedLandmarkModels(options);
+      if (!options.isActiveLoadContext?.()) return;
       metrics.source = data._overpassSource || null;
       metrics.packId = data._landmarkPackId || null;
       options.loadMetrics.landmarks = metrics;

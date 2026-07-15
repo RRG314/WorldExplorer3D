@@ -20,6 +20,7 @@ export function normalizeLandingTargetName(target) {
 export function findLandableBodyByName(target) {
   const normalized = normalizeLandingTargetName(target);
   if (!normalized) return null;
+  if (appCtx.universeRuntime?.current?.id && appCtx.universeRuntime.current.id !== 'sol') return null;
 
   if (typeof appCtx.getAllSpaceBodies === 'function') {
     const body = appCtx.getAllSpaceBodies().find((b) => b.landable && String(b.name).toLowerCase() === normalized.toLowerCase());
@@ -95,6 +96,11 @@ export function setSpaceFlightLandingTarget(target, options = {}, deps = {}) {
 
   const normalized = normalizeLandingTargetName(target);
   if (!normalized) return false;
+  if (appCtx.universeRuntime?.current?.id && appCtx.universeRuntime.current.id !== 'sol') {
+    if (normalized === 'Earth') return Boolean(appCtx.returnToEarthFromUniverse?.());
+    deps.showFlightMessage?.('RETURN TO SOL BEFORE PLANETARY LANDING', '#8ab4ff');
+    return false;
+  }
 
   const body = findLandableBodyByName(normalized);
   if (!body) return false;
@@ -121,6 +127,11 @@ export function forceSpaceFlightLanding(target, deps = {}) {
   if (!appCtx.spaceFlight.active || !appCtx.spaceFlight.rocket || appCtx.spaceFlight.mode === 'landing') return false;
   const normalized = normalizeLandingTargetName(target);
   if (!normalized) return false;
+  if (appCtx.universeRuntime?.current?.id && appCtx.universeRuntime.current.id !== 'sol') {
+    if (normalized === 'Earth') return Boolean(appCtx.returnToEarthFromUniverse?.());
+    deps.showFlightMessage?.('RETURN TO SOL BEFORE PLANETARY LANDING', '#8ab4ff');
+    return false;
+  }
 
   const body = findLandableBodyByName(normalized);
   if (!body || !body.mesh || !body.position) return false;
@@ -220,6 +231,7 @@ function getBodyGravityMu(body) {
 }
 
 function shouldApplyGravityFromBody(body) {
+  if (appCtx.universeRuntime?.current?.id && appCtx.universeRuntime.current.id !== 'sol') return false;
   if (!body || !body.position) return false;
   const name = String(body.name || '').toLowerCase();
   if (name === 'sun') return true;
@@ -397,6 +409,10 @@ export function updateSpaceFlightPhysics() {
     });
   }
 
+  if (typeof appCtx.getAllSpaceBodies === 'function' && appCtx.universeRuntime?.current?.id !== 'sol') {
+    return;
+  }
+
   if (typeof appCtx.getAllSpaceBodies === 'function') {
     const bodies = appCtx.getAllSpaceBodies();
     for (let i = 0; i < bodies.length; i++) {
@@ -485,6 +501,7 @@ export function animateSpaceFlight(deps = {}) {
     appCtx.updateSolarSystem();
   }
 
+  appCtx.updateUniverseRuntime?.(appCtx.spaceFlight._frameScale / 60);
   updateSpaceFlightPhysics();
   deps.updateSpaceFlightHUD?.(findLandableBodyByName);
   updateSpaceFlightCamera();

@@ -13,15 +13,15 @@ function planetarySurface() {
 export function updateDrone(dt) {
   const moveSpeed = appCtx.drone.speed * dt;
   const turnSpeed = 2 * dt;
-  const forward = (appCtx.keys.KeyW ? 1 : 0) - (appCtx.keys.KeyS ? 1 : 0);
-  const turn = (appCtx.keys.KeyA ? 1 : 0) - (appCtx.keys.KeyD ? 1 : 0);
+  const forward = (appCtx.keys.ArrowUp ? 1 : 0) - (appCtx.keys.ArrowDown ? 1 : 0);
+  const turn = (appCtx.keys.ArrowLeft ? 1 : 0) - (appCtx.keys.ArrowRight ? 1 : 0);
 
   appCtx.drone.yaw += turn * turnSpeed;
-  if (appCtx.keys.ArrowUp) appCtx.drone.pitch += turnSpeed;
-  if (appCtx.keys.ArrowDown) appCtx.drone.pitch -= turnSpeed;
+  if (appCtx.keys.KeyW) appCtx.drone.pitch += turnSpeed;
+  if (appCtx.keys.KeyS) appCtx.drone.pitch -= turnSpeed;
   appCtx.drone.cameraYawOffset = Number(appCtx.drone.cameraYawOffset) || 0;
-  if (appCtx.keys.ArrowLeft) appCtx.drone.cameraYawOffset += turnSpeed;
-  if (appCtx.keys.ArrowRight) appCtx.drone.cameraYawOffset -= turnSpeed;
+  if (appCtx.keys.KeyA) appCtx.drone.cameraYawOffset += turnSpeed;
+  if (appCtx.keys.KeyD) appCtx.drone.cameraYawOffset -= turnSpeed;
   appCtx.drone.cameraYawOffset = wrapYaw(appCtx.drone.cameraYawOffset);
 
   appCtx.drone.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.drone.pitch));

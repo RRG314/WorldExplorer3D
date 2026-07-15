@@ -49,6 +49,13 @@ function onKey(code, event) {
     return;
   }
 
+  if (code === 'KeyP') {
+    if (event?.repeat) return;
+    appCtx.togglePlaneMode?.({ source: 'keyboard_p' });
+    appCtx.updateControlsModeUI?.();
+    return;
+  }
+
   // Builder mode toggle (B key)
   if (code === 'KeyB') {
     if (typeof appCtx.toggleBlockBuildMode === 'function') {

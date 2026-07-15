@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { normalizeAngle, siderealTime, toDays } from "../astro.js?v=1";
+import { createRoundStarMaterial } from "./star-point-material.js?v=2";
 
 const STARFIELD_RADIUS = 5000;
 const _skyMatrix = new THREE.Matrix4();
@@ -26,8 +27,8 @@ function setStarFieldObserverVisuals(observerBody = 'earth') {
   const faintStars = appCtx.starField.getObjectByName(FAINT_STAR_LAYER_NAME);
 
   if (brightStars?.material) {
-    brightStars.material.size = planetary ? (body === 'mars' ? 1.2 : 1.5) : 4.2;
-    brightStars.material.vertexColors = !planetary;
+    brightStars.material.size = planetary ? (body === 'mars' ? 1.2 : 1.5) : 3.1;
+    brightStars.material.vertexColors = false;
     brightStars.material.color.setHex(0xffffff);
     brightStars.material.needsUpdate = true;
   }
@@ -50,13 +51,10 @@ export function createStarField() {
   const hitboxGeometry = new THREE.SphereGeometry(1, 6, 4);
   const hitboxMaterial = new THREE.MeshBasicMaterial({ visible: false });
   const brightPositions = [];
-  const brightColors = [];
 
   appCtx.BRIGHT_STARS.forEach((star) => {
     const pos = raDecToVector(star.ra, star.dec);
-    const color = new THREE.Color(star.color);
     brightPositions.push(pos.x, pos.y, pos.z);
-    brightColors.push(color.r, color.g, color.b);
 
     const hitbox = new THREE.Mesh(hitboxGeometry, hitboxMaterial);
     hitbox.position.copy(pos);
@@ -79,11 +77,10 @@ export function createStarField() {
 
   const brightGeometry = new THREE.BufferGeometry();
   brightGeometry.setAttribute('position', new THREE.Float32BufferAttribute(brightPositions, 3));
-  brightGeometry.setAttribute('color', new THREE.Float32BufferAttribute(brightColors, 3));
-  const brightMaterial = new THREE.PointsMaterial({
-    size: 4.2,
+  const brightMaterial = createRoundStarMaterial({
+    size: 3.1,
     sizeAttenuation: false,
-    vertexColors: true,
+    vertexColors: false,
     transparent: true,
     opacity: 0.92,
     fog: false
@@ -121,7 +118,6 @@ export function createStarField() {
   const faintStarCount = 2000;
   const faintStarGeometry = new THREE.BufferGeometry();
   const positions = [];
-  const colors = [];
 
   for (let i = 0; i < faintStarCount; i++) {
     const theta = Math.random() * Math.PI * 2;
@@ -133,16 +129,14 @@ export function createStarField() {
 
     positions.push(x, y, z);
 
-    const c = 0.8 + Math.random() * 0.2;
-    colors.push(c, c, c + 0.1);
   }
 
   faintStarGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-  faintStarGeometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
 
-  const faintStarMaterial = new THREE.PointsMaterial({
-    size: 2,
-    vertexColors: true,
+  const faintStarMaterial = createRoundStarMaterial({
+    size: 1.25,
+    sizeAttenuation: false,
+    vertexColors: false,
     transparent: true,
     opacity: 0.6,
     fog: false

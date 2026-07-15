@@ -6,14 +6,13 @@ function disposeSceneMeshes(meshes, options = {}) {
   meshes.forEach((mesh) => {
     if (!mesh) return;
     appCtx.scene.remove(mesh);
-    if (mesh.geometry) mesh.geometry.dispose();
-    if (!mesh.material) return;
-    if (skipSharedUrbanSurfaceMaterial && mesh.userData?.sharedUrbanSurfaceMaterial) return;
-    if (Array.isArray(mesh.material)) {
-      mesh.material.forEach((material) => material && typeof material.dispose === 'function' && material.dispose());
-    } else if (typeof mesh.material.dispose === 'function') {
-      mesh.material.dispose();
-    }
+    mesh.traverse?.((object) => {
+      object.geometry?.dispose?.();
+      if (!object.material) return;
+      if (skipSharedUrbanSurfaceMaterial && object.userData?.sharedUrbanSurfaceMaterial) return;
+      if (Array.isArray(object.material)) object.material.forEach((material) => material?.dispose?.());
+      else object.material.dispose?.();
+    });
   });
 }
 
@@ -55,6 +54,7 @@ export function resetWorldForReload(options = {}) {
     appCtx.resetEarthStreaming('full_world_reload');
   }
   appCtx.initialEarthWorldRetired = false;
+  appCtx.initialEarthDetailRadius = 0;
 
   appCtx.showLoad(`Loading ${locName}...`);
   appCtx.worldLoading = true;
@@ -120,6 +120,7 @@ export function resetWorldForReload(options = {}) {
   disposeSceneMeshes(appCtx.historicMarkers);
   appCtx.historicMarkers = [];
   appCtx.historicSites = [];
+  appCtx.curatedLandmarkMetrics = null;
 
   disposeSceneMeshes(appCtx.streetFurnitureMeshes);
   appCtx.streetFurnitureMeshes = [];

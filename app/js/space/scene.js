@@ -5,7 +5,8 @@ import {
 } from "../engine/webgl-lifecycle.js?v=1";
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
-import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=1";
+import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=3";
+import { initUniverseRuntime } from "../universe/runtime.js?v=11";
 
 export function createSpaceFlightScene() {
   console.log("Creating space flight scene...");
@@ -59,6 +60,7 @@ export function createSpaceFlightScene() {
   if (typeof appCtx.initSolarSystem === 'function') {
     appCtx.initSolarSystem(appCtx.spaceFlight.scene);
   }
+  initUniverseRuntime(appCtx.spaceFlight.scene);
 
   resetSpaceFlightForMoon();
   console.log("Space flight scene ready!");

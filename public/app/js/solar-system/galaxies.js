@@ -71,7 +71,9 @@ function createGalaxySpriteTexture(colorHex, type = '') {
       const x = 128 + Math.cos(angle) * radius;
       const y = 128 + Math.sin(angle) * radius * 0.68;
       ctx.fillStyle = `rgba(${r},${g},${b},${0.16 + (i % 5) * 0.035})`;
-      ctx.fillRect(x, y, 2 + i % 3, 2 + i % 3);
+      ctx.beginPath();
+      ctx.arc(x, y, 1 + i % 2, 0, Math.PI * 2);
+      ctx.fill();
     }
   }
 
