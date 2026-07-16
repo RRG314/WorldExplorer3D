@@ -5,7 +5,7 @@ import {
 } from "../engine/webgl-lifecycle.js?v=1";
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
-import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=3";
+import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=4";
 import { initUniverseRuntime } from "../universe/runtime.js?v=11";
 
 export function createSpaceFlightScene() {

@@ -23,9 +23,9 @@ function applySystemMapPresentation(ctx, mode) {
 }
 
 function overviewButtonLabel(mode) {
-  if (mode === 'inner') return 'OUTER SYSTEM MAP';
+  if (mode === 'inner') return 'KUIPER BELT MAP';
   if (mode === 'full') return 'RESUME FLIGHT';
-  return 'SOLAR SYSTEM MAP';
+  return 'ASTEROID BELT MAP';
 }
 
 export function onSolarSystemClick(ctx, event) {
@@ -207,7 +207,7 @@ export function createToggleButton(ctx) {
   overviewBtn.id = 'solarSystemOverview';
   overviewBtn.className = 'ssToggleBtn';
   overviewBtn.style.cssText = orbitBtn.style.cssText.replace('#10b981', '#f0b35a');
-  overviewBtn.textContent = 'SOLAR SYSTEM MAP';
+  overviewBtn.textContent = 'ASTEROID BELT MAP';
   overviewBtn.addEventListener('click', () => {
     const flight = ctx.appCtx.spaceFlight;
     if (!flight?.active) return;

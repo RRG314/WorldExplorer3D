@@ -15,7 +15,7 @@ import {
   toggleOrbits as toggleSolarSystemOrbitsImpl,
   toggleSolarSystem as toggleSolarSystemImpl,
   updateSolarSystem as updateSolarSystemImpl
-} from "./solar-system/ui.js?v=5";
+} from "./solar-system/ui.js?v=6";
 import {
   createSpacecraft as createSolarSystemSpacecraft,
   updateSpacecraftPositions as updateSolarSystemSpacecraftPositions

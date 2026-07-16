@@ -7,6 +7,16 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" content="#1a1a2e">
 <title>World Explorer 3D</title>
+<script>
+if (location.protocol === 'file:') document.documentElement.classList.add('unsupported-file-launch');
+</script>
+<style>
+.unsupported-file-launch body>*:not(#fileLaunchError){display:none!important}
+#fileLaunchError{display:none;min-height:100vh;box-sizing:border-box;padding:48px 24px;background:#071821;color:#eef7f8;font:16px/1.55 Inter,system-ui,sans-serif}
+.unsupported-file-launch #fileLaunchError{display:grid!important;place-content:center;text-align:center}
+#fileLaunchError strong{font:700 24px/1.2 Poppins,system-ui,sans-serif}
+#fileLaunchError code{display:block;margin-top:14px;color:#7dd3fc}
+</style>
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
@@ -14,9 +24,10 @@
 <link rel="stylesheet" href="styles/runtime-shell.css?v=86">
 <link rel="stylesheet" href="styles/block-builder.css?v=2">
 <link rel="stylesheet" href="styles/universe.css?v=3">
-<link rel="stylesheet" href="styles/fishing-game.css?v=1">
+<link rel="stylesheet" href="styles/fishing-game.css?v=2">
 </head>
 <body>
+<div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
 <button id="appSignInBtn" class="auth-float-toggle" type="button" aria-expanded="false" aria-controls="authFloatPanel">Sign In / Sign Up</button>
 <aside id="authFloatPanel" class="auth-float-panel" hidden>
   <div id="authFormBlock" class="auth-form-block">
@@ -1545,5 +1556,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=84"></script>
 <script type="module" src="js/app-auth-shell.js?v=85"></script>
-<script type="module" src="js/bootstrap.js?v=207"></script>
+<script type="module" src="js/bootstrap.js?v=208"></script>
 </body></html>

@@ -315,8 +315,8 @@ function update(dt) {
 
   const spdAbs = Math.abs(appCtx.car.speed);
 
-  const maxSteerLow = 0.82;
-  const maxSteerHigh = 0.2;
+  const maxSteerLow = 1.02;
+  const maxSteerHigh = 0.28;
   const steerFadeMin = 5;
   const steerFadeMax = 95;
 
@@ -337,7 +337,7 @@ function update(dt) {
   // Reverse steering keeps the same direction (arcade style).
   const steerAngle = appCtx.car.steerSm * Math.min(
     1.08,
-    maxSteer * handbrakeSteerBoost * (1 + lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.3 : 0.16))
+    maxSteer * handbrakeSteerBoost * (1 + lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.42 : 0.34))
   );
   const driftStartSteer = 0.12;
   const driftHoldSteer = 0.05;
@@ -403,15 +403,15 @@ function update(dt) {
 
   const wheelBase = 2.6;
   const v = appCtx.car.speed;
-  let steerAuthority = appCtx.car.onRoad ? 1.02 : 0.76;
+  let steerAuthority = appCtx.car.onRoad ? 1.08 : 0.94;
   if (!isPlanetarySurface() && lowSpeedTurnBoost > 0) {
-    steerAuthority *= 1 + lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.34 : 0.18);
+    steerAuthority *= 1 + lowSpeedTurnBoost * (appCtx.car.onRoad ? 0.48 : 0.38);
   }
   if (!isPlanetarySurface() && (isDrifting || handbrakeTurnIntent)) {
     steerAuthority *= appCtx.car.onRoad ? 1.22 : 1.1;
   }
   const rawYawRateTarget = v / Math.max(1e-3, wheelBase) * Math.tan(steerAngle * steerAuthority);
-  const maxYawRate = isPlanetarySurface() ? Infinity : 0.58 + 1.02 * clamp01(1 - spdAbs / 72);
+  const maxYawRate = isPlanetarySurface() ? Infinity : 0.74 + 1.46 * clamp01(1 - spdAbs / 68);
   const yawRateTarget = Math.max(-maxYawRate, Math.min(maxYawRate, rawYawRateTarget));
 
   appCtx.car.yawRate += (yawRateTarget - appCtx.car.yawRate) * (1 - Math.exp(-dt * yawResponse));
@@ -422,10 +422,11 @@ function update(dt) {
   } else if (!isDrifting) {
     appCtx.car.yawRate *= Math.exp(-dt * yawDamp * 0.08);
   }
-  const parkingPivotIntent = !isPlanetarySurface() && steerMag >= 0.16 && spdAbs < 9.5 && (braking || reverse || throttleInput === 0);
+  const parkingPivotIntent = !isPlanetarySurface() && steerMag >= 0.16 && spdAbs < 9.5 &&
+    (braking || reverse || throttleInput === 0 || spdAbs < 7.5);
   if (parkingPivotIntent) {
     const pivotBlend = clamp01(1 - spdAbs / 9.5);
-    appCtx.car.yawRate += appCtx.car.steerSm * (appCtx.car.onRoad ? 2.2 : 1.32) * pivotBlend * dt * 3.25;
+    appCtx.car.yawRate += appCtx.car.steerSm * (appCtx.car.onRoad ? 2.75 : 2.1) * pivotBlend * dt * 3.5;
   }
 
   if (canAccelerate) {

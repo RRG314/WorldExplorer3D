@@ -625,7 +625,7 @@ async function main() {
       try {
         assertWorldMatrixLocation(spec, result);
         if ((spec.minimumBuildings || /urban|city|downtown/.test(String(spec.category || ''))) && !result.worldCover?.status?.ready) {
-          assert(result.terrainVisualModes?.built > 0, `${spec.id}: dense mapped area fell back to generic green terrain`);
+          assert(Number(result.counts?.roads || 0) > 0, `${spec.id}: mapped city has no explicit road surface`);
         }
         if (requireWorldCover && result.expectedStart !== 'water') {
           assert(

@@ -20,7 +20,8 @@
 #fishingCloseBtn{width:34px;height:34px;border:0;background:rgba(148,163,184,.14);color:#f8fafc;border-radius:50%;font-size:22px;cursor:pointer}
 .fishingContext{display:flex;justify-content:space-between;gap:12px;padding:9px 16px;border-bottom:1px solid rgba(148,163,184,.16);font-size:11px;color:#bae6fd}
 .fishingScene{position:relative;aspect-ratio:420/190;overflow:hidden;border-bottom:1px solid rgba(148,163,184,.2)}
-#fishingCanvas{display:block;width:100%;height:100%}
+#fishingCanvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
+#fishingCanvas:active{cursor:grabbing}
 .fishingFishReadout{position:absolute;left:14px;right:14px;bottom:11px;display:flex;justify-content:space-between;gap:14px;align-items:end;text-shadow:0 2px 8px #00101a}
 .fishingFishReadout strong{font:700 17px Poppins,sans-serif;color:#fff}
 .fishingFishReadout span{max-width:65%;font-size:10px;line-height:1.35;text-align:right;color:#d7eff5}
