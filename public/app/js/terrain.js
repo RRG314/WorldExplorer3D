@@ -19,7 +19,7 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=10";
+} from "./terrain/surface-profiles.js?v=11";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -39,7 +39,7 @@ import {
   tileXYToLatLonBounds,
   waitForTerrainReadyAt,
   worldToLatLon
-} from "./terrain/tiles.js?v=9";
+} from "./terrain/tiles.js?v=10";
 import {
   buildRoadSkirts,
   detectRoadIntersections,

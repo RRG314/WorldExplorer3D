@@ -8,7 +8,7 @@ import { initMobileControls } from "./ui/mobile-controls.js?v=63";
 import { initShareUi } from "./ui/share-links.js?v=61";
 import { setupSettingsUi } from "./ui/settings.js?v=1";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=74";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=75";
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -133,7 +133,6 @@ function setupUI() {
   let shareUi = null;
   const titleUi = initTitleScreenUi({
     lastLocationStorageKey: LAST_LOCATION_STORAGE_KEY,
-    perfModeSelect: null,
     shareExperienceStatus,
     perfSettingsStatus,
     gameShareFloatBtn,

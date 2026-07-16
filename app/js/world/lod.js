@@ -187,6 +187,27 @@ export function updateWorldLod(force = false) {
   let nearVisible = 0;
   let midVisible = 0;
 
+  if (mode === 'baseline') {
+    for (let i = 0; i < appCtx.buildingMeshes.length; i += 1) {
+      const mesh = appCtx.buildingMeshes[i];
+      if (!mesh) continue;
+      setEarthMeshVisible(mesh, true);
+      const count = mesh.userData?.isBuildingBatch ? Math.max(1, mesh.userData?.batchCount || 1) : 1;
+      if (mesh.userData?.lodTier === 'mid') midVisible += count;
+      else nearVisible += count;
+    }
+    for (let i = 0; i < appCtx.poiMeshes.length; i += 1) {
+      setEarthMeshVisible(appCtx.poiMeshes[i], !!appCtx.poiMode);
+    }
+    for (let i = 0; i < appCtx.landuseMeshes.length; i += 1) {
+      const mesh = appCtx.landuseMeshes[i];
+      if (!mesh) continue;
+      setEarthMeshVisible(mesh, !mesh.userData?.boatSuppressed && (mesh.userData?.alwaysVisible || !!appCtx.landUseVisible));
+    }
+    appCtx.setPerfLiveStat?.('lodVisible', { near: nearVisible, mid: midVisible });
+    return;
+  }
+
   const nearBuildingCandidates = [];
   const midBuildingCandidates = [];
   const groupedCandidates = new Map();

@@ -215,7 +215,11 @@ async function runScenario(browser, baseUrl, scenario) {
     assert(!scenario.destination || state.destination === scenario.destination, `${scenario.mode} title launch targeted ${state.destination || 'nothing'}`);
     assert(state.roadLoads === 0, `${scenario.mode} title launch loaded an Earth road world first`);
     assert(!state.fatal, `${scenario.mode} title launch showed a fatal renderer error`);
-    if (scenario.mode === 'space') assertCompleteSpaceCatalog(state, 'Initial Space launch');
+    if (scenario.mode === 'space') {
+      assertCompleteSpaceCatalog(state, 'Initial Space launch');
+      assert(state.spaceOverview.mode === 'full', 'Initial Space launch did not open in the full-system view');
+      assert(state.spaceOverview.cameraDistance > 70000, 'Initial Space launch did not frame the Kuiper belt');
+    }
     if (scenario.mode === 'mars') assert(state.onMars && !state.spaceFlightActive, 'Mars title launch did not land directly on Mars');
     if (scenario.mode === 'mars') assertMarsSceneOwned(state, 'Initial Mars title launch');
     if (scenario.mode === 'moon' || scenario.mode === 'mars') assertPlanetaryStarStyle(state, scenario.mode, `${scenario.mode} title launch`);
@@ -282,6 +286,11 @@ async function runScenario(browser, baseUrl, scenario) {
       earthReturn.marsAfterMoon = marsAfterMoon;
     }
     if (scenario.mode === 'space') {
+      await page.click('#solarSystemOverview');
+      await page.waitForTimeout(2600);
+      const flightView = await readState(page);
+      assert(!flightView.spaceOverview.active, 'Resume Flight did not restore the flight camera');
+
       await page.click('#solarSystemOverview');
       await page.waitForTimeout(2600);
       const innerOverview = await readState(page);

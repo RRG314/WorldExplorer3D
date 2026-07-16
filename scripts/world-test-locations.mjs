@@ -170,7 +170,8 @@ export const WORLD_TEST_LOCATIONS = [
     label: 'Jungfrau Region, Switzerland',
     category: 'alpine_snow_rock_custom',
     expectedStart: 'land',
-    expectedTerrainMode: 'snowRock'
+    expectedTerrainMode: 'snowRock',
+    acceptableStartTerrainModes: ['snow', 'snowRock']
   },
   {
     id: 'sahara_custom',

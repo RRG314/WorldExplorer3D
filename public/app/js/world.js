@@ -55,7 +55,7 @@ import {
 import {
   initWorldLod,
   updateWorldLod
-} from "./world/lod.js?v=11";
+} from "./world/lod.js?v=12";
 import {
   buildPoiGeometryPass,
   buildStreetFurniturePass,

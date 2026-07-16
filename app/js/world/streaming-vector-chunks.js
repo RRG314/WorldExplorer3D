@@ -624,6 +624,19 @@ const initialWorldRetirementApi = createInitialWorldRetirementApi({
 });
 const { maybeRetireInitialEarthWorld, retireInitialEarthWorld } = initialWorldRetirementApi;
 
+function streamPrefetchRatio(mode = 'walk', speedMps = 0) {
+  const baseRatio = mode === 'plane' ? 0.34 : mode === 'drone' ? 0.44 : mode === 'drive' ? 0.54 : mode === 'boat' ? 0.5 : 0.62;
+  const speedLead = Math.min(0.12, Math.max(0, Number(speedMps) || 0) / 260);
+  return Math.max(0.28, baseRatio - speedLead);
+}
+
+function actorNearInitialWorldEdge({ actor, mode, speedMps } = {}) {
+  if (!actor) return false;
+  if (appCtx.initialEarthWorldRetired) return true;
+  const initialRadius = Math.max(INITIAL_DETAIL_RADIUS, Number(appCtx.initialEarthDetailRadius) || 0);
+  return Math.hypot(Number(actor.x) || 0, Number(actor.z) || 0) >= initialRadius * streamPrefetchRatio(mode, speedMps);
+}
+
 function initStreamingVectorChunks() {
   if (typeof appCtx.registerEarthStreamLayer !== 'function') return false;
   if (appCtx._streamingVectorChunksRegistered) return true;
@@ -631,6 +644,7 @@ function initStreamingVectorChunks() {
   appCtx.maybeRetireInitialEarthWorld = maybeRetireInitialEarthWorld;
   appCtx.retireInitialEarthWorld = retireInitialEarthWorld;
   appCtx.unregisterStreamingVectorChunks = appCtx.registerEarthStreamLayer('osm-vector', {
+    activeWhen: actorNearInitialWorldEdge,
     radius: 1,
     maxActive: 20,
     loadChunk: loadStreamingVectorChunk,

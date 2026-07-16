@@ -394,6 +394,7 @@ function registerEarthStreamLayer(name, options = {}) {
     maxConcurrent: clamp(Math.round(Number(options.maxConcurrent) || MAX_CONCURRENT_LOADS), 1, MAX_CONCURRENT_LOADS),
     zoom: clamp(Math.round(Number(options.zoom) || STREAM_TILE_ZOOM), 8, STREAM_TILE_ZOOM),
     activeWhen: typeof options.activeWhen === 'function' ? options.activeWhen : null,
+    centerWhen: typeof options.centerWhen === 'function' ? options.centerWhen : null,
     availableWhenDisabled: options.availableWhenDisabled === true,
     priorityBias: Number(options.priorityBias) || 0,
     loaded: new Map(),
@@ -485,8 +486,21 @@ function updateEarthWorldStreaming(dt = 0) {
       unloadObsoleteChunks(layer, new Set(), null, Infinity);
       return;
     }
-    const layerCenter = !state.enabled && layer.availableWhenDisabled ? appCtx.LOC : center;
-    const layerPredictedCenter = !state.enabled && layer.availableWhenDisabled ? layerCenter : predictedCenter;
+    let layerCenter = !state.enabled && layer.availableWhenDisabled ? appCtx.LOC : center;
+    let layerPredictedCenter = !state.enabled && layer.availableWhenDisabled ? layerCenter : predictedCenter;
+    if (layer.centerWhen) {
+      const ownedCenter = layer.centerWhen({
+        actor,
+        center,
+        enabled: state.enabled,
+        predictedCenter,
+        speedMps: state.speedMps
+      });
+      if (Number.isFinite(ownedCenter?.lat) && Number.isFinite(ownedCenter?.lon)) {
+        layerCenter = ownedCenter;
+        layerPredictedCenter = ownedCenter;
+      }
+    }
     const layerCenterTile = latLonToTile(layerCenter.lat, layerCenter.lon, layer.zoom);
     const layerPredictedTile = latLonToTile(layerPredictedCenter.lat, layerPredictedCenter.lon, layer.zoom);
     const desired = collectDesiredTiles(layerCenterTile, layerPredictedTile, layer.radius);
@@ -497,9 +511,6 @@ function updateEarthWorldStreaming(dt = 0) {
   });
   drainQueue();
 
-  if (state.enabled && typeof appCtx.maybeRetireInitialEarthWorld === 'function') {
-    appCtx.maybeRetireInitialEarthWorld(actor, streamingSnapshot());
-  }
   if (state.enabled && typeof appCtx.maybeRebaseEarthOrigin === 'function') {
     appCtx.maybeRebaseEarthOrigin(actor, streamingSnapshot());
   }

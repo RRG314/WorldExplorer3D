@@ -2,9 +2,8 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import { fetchShortbreadTile } from "./shortbread-source.js?v=6";
 import {
   buildStreamingBuildingVisuals,
-  buildStreamingRoadVisuals,
   queueGeometryDisposal
-} from "./streaming-vector-chunks.js?v=28";
+} from "./streaming-vector-chunks.js?v=31";
 
 function removeMeshesInPlace(source, removed) {
   if (!Array.isArray(source)) return [];
@@ -32,17 +31,10 @@ async function loadAerialContextChunk(request) {
   try {
     const tileRecord = await fetchShortbreadTile(request.z, request.x, request.y, { signal: request.signal });
     if (request.signal?.aborted) throw new DOMException('Aerial context chunk aborted', 'AbortError');
-    await buildStreamingRoadVisuals(tileRecord, chunk, {
-      aerialContext: true,
-      includeInitial: true,
-      maxFeatures: 260,
-      recordFeatures: false
-    });
-    if (request.signal?.aborted) throw new DOMException('Aerial context chunk aborted', 'AbortError');
     await buildStreamingBuildingVisuals(tileRecord, chunk, {
       aerialContext: true,
       batchByCell: false,
-      includeInitial: true,
+      includeInitial: false,
       lodTier: 'far',
       maxFeatures: 220,
       maxFootprintPoints: 14,
@@ -76,12 +68,18 @@ function disposeAerialContextChunk(chunk) {
   removeMeshesInPlace(appCtx.aerialContextMeshes, removed);
 }
 
+function aerialContextCenter() {
+  return appCtx.LOC;
+}
+
 function initStreamingAerialContext() {
   if (typeof appCtx.registerEarthStreamLayer !== 'function' || appCtx._streamingAerialContextRegistered) return false;
   appCtx._streamingAerialContextRegistered = true;
   appCtx.aerialContextMeshes = Array.isArray(appCtx.aerialContextMeshes) ? appCtx.aerialContextMeshes : [];
   appCtx.unregisterStreamingAerialContext = appCtx.registerEarthStreamLayer('aerial-vector', {
+    activeWhen: () => !!appCtx.initialEarthWorldReady,
     availableWhenDisabled: true,
+    centerWhen: aerialContextCenter,
     loadChunk: loadAerialContextChunk,
     maxActive: 25,
     maxConcurrent: 3,

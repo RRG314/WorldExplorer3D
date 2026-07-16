@@ -238,7 +238,9 @@ export function showSolarSystemUI(ctx) {
   if (returnBtn) returnBtn.textContent = 'RETURN TO EARTH';
   if (landMoonBtn) landMoonBtn.textContent = 'LAND ON MOON';
   if (landMarsBtn) landMarsBtn.textContent = 'LAND ON MARS';
-  if (overviewBtn) overviewBtn.textContent = overviewButtonLabel(ctx?.appCtx?.spaceFlight?.overviewMode);
+  const overviewMode = ctx?.appCtx?.spaceFlight?.overviewMode;
+  applySystemMapPresentation(ctx, overviewMode);
+  if (overviewBtn) overviewBtn.textContent = overviewButtonLabel(overviewMode);
   ctx?.appCtx?.showUniverseUI?.();
 }
 

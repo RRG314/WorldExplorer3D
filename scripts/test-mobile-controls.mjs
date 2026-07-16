@@ -173,16 +173,7 @@ async function assertMainMenuReturn(page) {
 async function assertLandscapeShell(browser, baseUrl) {
   const context = await browser.newContext(contextOptions(devices.iphoneLandscape));
   const page = await context.newPage();
-  await page.goto(`${baseUrl}/app/?mobile-landscape=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await waitForRuntime(page);
-  await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    ctx.gameStarted = true;
-    ctx.paused = false;
-    document.getElementById('titleScreen')?.classList.add('hidden');
-    document.getElementById('floatMenuContainer')?.classList.add('show');
-    ctx.updateControlsModeUI?.();
-  });
+  await bootstrapEarth(page, baseUrl);
   await assertDockHitTargets(page);
   await page.locator('#exploreBtn').tap();
   await page.waitForFunction(() => {

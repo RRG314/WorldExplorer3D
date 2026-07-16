@@ -414,11 +414,7 @@ function classifyWorldCoverSurfaceProfile(mesh, result) {
 
 function applyLoadedWorldCoverBaseline(mesh) {
   const result = mesh?.userData?.worldCoverResult;
-  const material = mesh?.material;
-  if (!result?.texture || !material || Array.isArray(material) || mesh.userData?.terrainDisposed) return false;
-  material.map = result.texture;
-  material.color.setHex(0xffffff);
-  material.needsUpdate = true;
+  if (!result?.texture || !mesh?.material || Array.isArray(mesh.material) || mesh.userData?.terrainDisposed) return false;
   mesh.userData.worldCoverTexture = result.texture;
   mesh.userData.worldCoverStatus = 'ready';
   mesh.userData.worldCoverSummary = {
@@ -431,11 +427,8 @@ function applyLoadedWorldCoverBaseline(mesh) {
   };
   const semanticProfile = classifyWorldCoverSurfaceProfile(mesh, result);
   if (semanticProfile) {
-    mesh.userData.terrainVisualProfile = semanticProfile;
     mesh.userData.worldCoverSurfaceMode = semanticProfile.mode;
-    if (semanticProfile.mode === 'sand') material.roughness = 0.92;
-    else if (semanticProfile.mode === 'rock') material.roughness = 0.87;
-    else if (semanticProfile.mode === 'snow') material.roughness = 0.94;
+    applyTerrainVisualProfile(mesh, semanticProfile, null, { skipWorldCoverQueue: true });
   }
   return true;
 }
@@ -491,7 +484,7 @@ function queueWorldCoverBaseline(mesh, bounds) {
     });
 }
 
-export function applyTerrainVisualProfile(mesh, profile, repeats = null) {
+export function applyTerrainVisualProfile(mesh, profile, repeats = null, options = {}) {
   if (!mesh || !mesh.material || Array.isArray(mesh.material)) return;
   if (!mesh.userData) mesh.userData = {};
   const mat = mesh.material;
@@ -593,7 +586,7 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null) {
   mesh.userData.terrainVisualProfile = nextProfile;
   applyGroundFallbackProfile(nextProfile);
   mat.needsUpdate = true;
-  queueWorldCoverBaseline(mesh, tileBounds);
+  if (!options.skipWorldCoverQueue) queueWorldCoverBaseline(mesh, tileBounds);
 }
 
 export function refreshTerrainSurfaceProfiles(profile = null) {

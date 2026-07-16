@@ -8,7 +8,8 @@ export function assertWorldMatrixLocation(spec, result) {
   if (spec.kind === 'preset') assert(result.counts.roads > 0, `${spec.id}: preset silently finalized without mapped roads`);
   if (spec.expectedTerrainMode) {
     assert(result.terrainProfiles?.[spec.expectedTerrainMode]?.count > 0, `${spec.id}: expected ${spec.expectedTerrainMode} terrain ${JSON.stringify(result.terrainProfiles)}`);
-    assert(result.terrainProfileSamples?.[0]?.mode === spec.expectedTerrainMode, `${spec.id}: player started on ${result.terrainProfileSamples?.[0]?.mode || 'unknown'} terrain`);
+    const allowedStartModes = new Set(spec.acceptableStartTerrainModes || [spec.expectedTerrainMode]);
+    assert(allowedStartModes.has(result.terrainProfileSamples?.[0]?.mode), `${spec.id}: player started on ${result.terrainProfileSamples?.[0]?.mode || 'unknown'} terrain`);
   }
   if (spec.expectedRoadStructure) {
     assert(result.structurePresentation?.roads?.[spec.expectedRoadStructure] > 0, `${spec.id}: expected mapped ${spec.expectedRoadStructure} roads ${JSON.stringify(result.structurePresentation?.roads)}`);

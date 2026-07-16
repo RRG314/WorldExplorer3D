@@ -27,7 +27,7 @@ const AUTO_QUALITY_DEGRADE_STREAK = 3;
 const AUTO_QUALITY_RECOVER_STREAK = 6;
 const AUTO_QUALITY_COOLDOWN_S = 12;
 
-let perfMode = PERF_MODE_RDT;
+let perfMode = PERF_MODE_BASELINE;
 let perfOverlayEnabled = false;
 let perfAutoQualityEnabled = true;
 let perfAutoQualityTier = PERF_QUALITY_TIER_BALANCED;
@@ -83,7 +83,7 @@ const {
 } = perfSettingsApi;
 
 const perfStats = {
-  mode: PERF_MODE_RDT,
+  mode: PERF_MODE_BASELINE,
   lastLoad: null,
   renderer: {
     calls: 0,
@@ -500,7 +500,10 @@ const {
   updatePerfPanel
 } = perfPanelApi;
 
-setPerfMode(readStorage(PERF_STORAGE_MODE_KEY), { persist: false });
+// RDT remains available for explicit diagnostics, but the product runtime is
+// quality-first. Migrate stale settings left by the removed RDT controls.
+setPerfMode(PERF_MODE_BASELINE, { persist: false });
+writeStorage(PERF_STORAGE_MODE_KEY, PERF_MODE_BASELINE);
 // Always start hidden so benchmark diagnostics are opt-in for every session.
 setPerfOverlayEnabled(false, { persist: false });
 writeStorage(PERF_STORAGE_OVERLAY_KEY, '0');

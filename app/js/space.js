@@ -45,6 +45,7 @@ appCtx.spaceFlight = {
 
 function beginSpaceFlightSession() {
   appCtx.spaceFlight._sessionId = Number(appCtx.spaceFlight._sessionId || 0) + 1;
+  appCtx.spaceFlight.overviewMode = 'full';
   return appCtx.spaceFlight._sessionId;
 }
 
@@ -89,7 +90,6 @@ function startSpaceFlightToMoon() {
   appCtx.spaceFlight._launchSource = 'Earth';
   appCtx.spaceFlight.launchStartMs = Date.now();
   appCtx.spaceFlight._isThrusting = false;
-  appCtx.spaceFlight.overviewMode = false;
   appCtx.switchEnv(appCtx.ENV.SPACE_FLIGHT);
   emitTutorialEvent('entered_space', { destination: 'moon', source: 'space_flight' });
 

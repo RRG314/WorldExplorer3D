@@ -6,7 +6,6 @@ import { prepareTitleEnvironment } from "../planetary/entry.js?v=8";
 
 function initTitleScreenUi({
   lastLocationStorageKey,
-  perfModeSelect,
   shareExperienceStatus,
   perfSettingsStatus,
   gameShareFloatBtn,
@@ -431,10 +430,6 @@ function initTitleScreenUi({
         document.querySelectorAll('.mode').forEach((element) => element.classList.remove('sel'));
         targetMode.classList.add('sel');
       }
-    }
-    if (sharedExperienceParams.perfMode && typeof appCtx.setPerfMode === 'function') {
-      appCtx.setPerfMode(sharedExperienceParams.perfMode);
-      if (perfModeSelect) perfModeSelect.value = sharedExperienceParams.perfMode;
     }
     const hasCustomCoords = Number.isFinite(sharedExperienceParams.lat) && Number.isFinite(sharedExperienceParams.lon);
     const hasPresetLoc = !!(sharedExperienceParams.loc && sharedExperienceParams.loc !== 'custom' && appCtx.LOCS?.[sharedExperienceParams.loc]);
