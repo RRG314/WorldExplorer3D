@@ -278,23 +278,37 @@ function classifyTerrainSurfaceProfile({
   const useSand = !useSnow && (explicitBeachSand || aridFallback);
   const useRock = !useSnow && !useSand && (norm.rock >= 0.18 || (steepTerrain && norm.rock >= 0.06));
   const useSoil = !useSnow && !useSand && !useRock && (norm.soil >= 0.2 || (norm.soil >= 0.1 && norm.grass < 0.24));
+  const useBuilt =
+    !useSnow &&
+    !useSand &&
+    !useRock &&
+    !useSoil &&
+    !steepTerrain &&
+    norm.grass < 0.24 &&
+    (
+      norm.urban >= 0.18 ||
+      (localSignals.candidates.buildings >= 40 && localSignals.candidates.roads >= 12)
+    );
   const mode = useSnow ?
     ((polar || useRock || steepTerrain) ? 'snowRock' : 'snow') :
     useSand ? 'sand' :
     useRock ? 'rock' :
     useSoil ? 'soil' :
+    useBuilt ? 'built' :
     'grass';
 
   return {
     mode,
-    // Base elevation tiles represent natural ground. Roads and hardscape own
-    // their mapped footprints; urban density must never pave an entire hill.
+    // Dense, low-relief city tiles need a neutral baseline beneath mapped
+    // roads and land-use polygons. Relief remains natural so an urban signal
+    // cannot turn hills or mountains into pavement.
     visualMode: mode,
     reason: useSnow ?
       (weatherSnow ? 'live_weather_snow' : polar ? 'polar_latitude' : alpine ? 'high_elevation' : 'cold_highland') :
       useSand ? (explicitBeachSand ? 'localized_beach' : 'arid_surface') :
       useRock ? 'rocky_surface' :
       useSoil ? 'soil_surface' :
+      useBuilt ? 'mapped_urban_context' :
       'vegetated_ground',
     absLat,
     localSignals

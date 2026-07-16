@@ -45,7 +45,7 @@ appCtx.spaceFlight = {
 
 function beginSpaceFlightSession() {
   appCtx.spaceFlight._sessionId = Number(appCtx.spaceFlight._sessionId || 0) + 1;
-  appCtx.spaceFlight.overviewMode = 'full';
+  appCtx.spaceFlight.overviewMode = false;
   return appCtx.spaceFlight._sessionId;
 }
 

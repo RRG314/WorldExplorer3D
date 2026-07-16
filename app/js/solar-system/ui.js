@@ -28,6 +28,53 @@ function overviewButtonLabel(mode) {
   return 'ASTEROID BELT MAP';
 }
 
+function drawSystemRadar(ctx) {
+  const canvas = document.getElementById('solarSystemRadar');
+  const painter = canvas?.getContext?.('2d');
+  if (!canvas || !painter) return;
+  const width = canvas.width;
+  const height = canvas.height;
+  const centerX = width * 0.5;
+  const centerY = height * 0.5;
+  const outerRadius = Math.min(width, height) * 0.43;
+  painter.clearRect(0, 0, width, height);
+  painter.fillStyle = 'rgba(3, 7, 18, 0.92)';
+  painter.fillRect(0, 0, width, height);
+
+  painter.strokeStyle = 'rgba(123, 174, 224, 0.42)';
+  painter.lineWidth = 2;
+  painter.beginPath();
+  painter.arc(centerX, centerY, outerRadius * 0.72, 0, Math.PI * 2);
+  painter.stroke();
+  painter.strokeStyle = 'rgba(180, 131, 87, 0.62)';
+  painter.beginPath();
+  painter.arc(centerX, centerY, outerRadius * 0.27, 0, Math.PI * 2);
+  painter.stroke();
+
+  painter.fillStyle = '#f9d86c';
+  painter.beginPath();
+  painter.arc(centerX, centerY, 4, 0, Math.PI * 2);
+  painter.fill();
+
+  const rocket = ctx.appCtx.spaceFlight?.rocket;
+  const maxSceneRadius = Math.max(1, Number(ctx.KUIPER_BELT?.outerAU || 50) * Number(ctx.AU_TO_SCENE || 1));
+  if (rocket?.position) {
+    const scale = outerRadius / maxSceneRadius;
+    const x = centerX + rocket.position.x * scale;
+    const y = centerY + rocket.position.z * scale;
+    painter.fillStyle = '#ffffff';
+    painter.beginPath();
+    painter.arc(Math.max(5, Math.min(width - 5, x)), Math.max(5, Math.min(height - 5, y)), 3, 0, Math.PI * 2);
+    painter.fill();
+  }
+
+  painter.font = '600 9px Inter, sans-serif';
+  painter.fillStyle = '#d4a06f';
+  painter.fillText('ASTEROID BELT', 8, height - 18);
+  painter.fillStyle = '#8fc5f2';
+  painter.fillText('KUIPER BELT', width - 72, 13);
+}
+
 export function onSolarSystemClick(ctx, event) {
   if (!ctx.appCtx.spaceFlight.active || !ctx.solarSystem.visible || !ctx.solarSystem.group) return;
 
@@ -174,6 +221,13 @@ export function createToggleButton(ctx) {
   `;
   btn.textContent = 'RETURN TO EARTH';
   btn.addEventListener('click', () => handleSpaceReturnAction(ctx));
+  const radar = document.createElement('canvas');
+  radar.id = 'solarSystemRadar';
+  radar.width = 190;
+  radar.height = 128;
+  radar.setAttribute('aria-label', 'Solar system position radar showing the asteroid and Kuiper belts');
+  radar.style.cssText = 'width:190px;height:128px;border:1px solid rgba(123,174,224,.55);background:#030712;';
+  container.appendChild(radar);
   container.appendChild(btn);
 
   const orbitBtn = document.createElement('button');
@@ -263,6 +317,7 @@ export function updateSolarSystem(ctx) {
 
   if (!ctx.solarSystem._frameCount) ctx.solarSystem._frameCount = 0;
   ctx.solarSystem._frameCount++;
+  if (ctx.solarSystem._frameCount % 12 === 1) drawSystemRadar(ctx);
   if (ctx.solarSystem._frameCount % 60 === 0) {
     ctx.updateSolarSystemPositions(new Date());
   }

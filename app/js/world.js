@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import {
   classifyWorldSurfaceProfile,
-} from "./surface-rules.js?v=13";
+} from "./surface-rules.js?v=14";
 import {
   inferWaterRenderContext
 } from "./water-dynamics.js?v=4";
@@ -168,7 +168,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=3";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=35";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=37";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=6";

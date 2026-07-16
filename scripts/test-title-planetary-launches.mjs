@@ -217,8 +217,12 @@ async function runScenario(browser, baseUrl, scenario) {
     assert(!state.fatal, `${scenario.mode} title launch showed a fatal renderer error`);
     if (scenario.mode === 'space') {
       assertCompleteSpaceCatalog(state, 'Initial Space launch');
-      assert(state.spaceOverview.mode === 'full', 'Initial Space launch did not open in the full-system view');
-      assert(state.spaceOverview.cameraDistance > 70000, 'Initial Space launch did not frame the Kuiper belt');
+      assert(!state.spaceOverview.active, 'Initial Space launch did not open in controllable flight view');
+      const radarVisible = await page.evaluate(() => {
+        const radar = document.getElementById('solarSystemRadar');
+        return !!radar && radar.width > 0 && getComputedStyle(radar).display !== 'none';
+      });
+      assert(radarVisible, 'Initial Space launch did not expose persistent belt context');
     }
     if (scenario.mode === 'mars') assert(state.onMars && !state.spaceFlightActive, 'Mars title launch did not land directly on Mars');
     if (scenario.mode === 'mars') assertMarsSceneOwned(state, 'Initial Mars title launch');
@@ -288,11 +292,6 @@ async function runScenario(browser, baseUrl, scenario) {
     if (scenario.mode === 'space') {
       await page.click('#solarSystemOverview');
       await page.waitForTimeout(2600);
-      const flightView = await readState(page);
-      assert(!flightView.spaceOverview.active, 'Resume Flight did not restore the flight camera');
-
-      await page.click('#solarSystemOverview');
-      await page.waitForTimeout(2600);
       const innerOverview = await readState(page);
       assert(innerOverview.spaceOverview.mode === 'inner', 'Inner Solar System map did not activate');
       assert(innerOverview.spaceOverview.cameraDistance > 7000 && innerOverview.spaceOverview.cameraDistance < 15000, 'Inner Solar System map used the wrong frame');
@@ -307,6 +306,9 @@ async function runScenario(browser, baseUrl, scenario) {
       await settleVisualFrame(page);
       await page.screenshot({ path: path.join(outputDir, 'solar-system-overview.png'), fullPage: false });
       await page.click('#solarSystemOverview');
+      await page.waitForTimeout(800);
+      const flightView = await readState(page);
+      assert(!flightView.spaceOverview.active, 'Resume Flight did not restore the flight camera');
 
       const staleLandingStarted = await page.evaluate(async () => {
         const { ctx } = await import('/app/js/shared-context.js?v=55');
