@@ -135,9 +135,6 @@ function restoreEarthSceneMeshes() {
 }
 
 async function restoreEarthActorOwnership() {
-  appCtx.onMoon = false;
-  appCtx.onMars = false;
-  appCtx.travelingToMoon = false;
   await appCtx.setPlanetaryVehicle?.('earth');
   appCtx.setPlanetaryCharacter?.('earth');
 }

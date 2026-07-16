@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { fetchBundledLandmarkData } from "./landmark-source.js?v=1";
-import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=4";
+import { fetchBundledLandmarkData } from "./landmark-source.js?v=2";
+import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=6";
 import { renderCuratedLandmarkModels } from './landmark-models.js?v=10';
 
 const MAX_PYRAMIDS = 48;
@@ -21,7 +21,11 @@ function normalized(value) {
 
 function isPyramid(tags = {}) {
   const roofShape = normalized(tags['roof:shape']);
-  return normalized(tags.tomb) === 'pyramid' || roofShape === 'pyramidal' || roofShape === 'pyramid';
+  const tomb = normalized(tags.tomb);
+  const historic = normalized(tags.historic);
+  const explicitPyramid = tomb === 'pyramid' || historic === 'pyramid';
+  const historicTombRoof = historic === 'tomb' && (roofShape === 'pyramidal' || roofShape === 'pyramid');
+  return explicitPyramid || historicTombRoof;
 }
 
 function isHistoricWall(tags = {}) {

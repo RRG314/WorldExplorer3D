@@ -1,3 +1,5 @@
+import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=1';
+
 export function createWorldLandusePass(options = {}) {
   const {
     FEATURE_MIN_HOLE_AREA = 6,
@@ -25,6 +27,15 @@ export function createWorldLandusePass(options = {}) {
     'plant_nursery', 'greenhouse_horticulture', 'recreation_ground',
     'village_green', 'cemetery', 'sand', 'dune', 'barren', 'glacier', 'quarry'
   ]);
+  const denseNaturalTypes = new Set(['forest', 'wood', 'scrub', 'orchard', 'vineyard']);
+  const mineralSurfaceTypes = new Set(['sand', 'dune', 'barren', 'glacier', 'quarry']);
+
+  function landuseOverlayOpacity(landuseType, isExplicitHardscape) {
+    if (isExplicitHardscape) return 0.94;
+    if (mineralSurfaceTypes.has(landuseType)) return 0.55;
+    if (denseNaturalTypes.has(landuseType)) return 0.28;
+    return 0.2;
+  }
 
   function addLandusePolygon(runtime, pts, landuseType, holeRings = [], guardOptions = null) {
     if (!pts || pts.length < 3) return;
@@ -70,13 +81,7 @@ export function createWorldLandusePass(options = {}) {
       Number.isFinite(value) ? Math.min(best, value) : best,
     Infinity);
 
-    const shape = new THREE.Shape();
-    ring.forEach((point, index) => {
-      if (index === 0) shape.moveTo(point.x, -point.z);
-      else shape.lineTo(point.x, -point.z);
-    });
-    shape.closePath();
-
+    const cleanedHoles = [];
     if (holeRings && holeRings.length > 0) {
       holeRings.forEach((holeRing) => {
         if (!holeRing || holeRing.length < 3) return;
@@ -90,6 +95,28 @@ export function createWorldLandusePass(options = {}) {
         if (!Number.isFinite(holeArea) || holeArea < FEATURE_MIN_HOLE_AREA) return;
         if (holeArea >= outerArea * 0.92) return;
 
+        cleanedHoles.push(cleanedHole);
+      });
+    }
+
+    const isWater = landuseType === 'water';
+    const isExplicitHardscape = landuseType === 'paved' || landuseType === 'parking';
+    const isMappedGroundCover = visibleMappedSurfaceTypes.has(landuseType);
+    const overlayOpacity = landuseOverlayOpacity(landuseType, isExplicitHardscape);
+    const waterVisualProfile = isWater ? resolveWaterSurfaceVisualProfile() : null;
+    const surfaceBaseElevation = isWater
+      ? waterSurfaceBaseElevation(sampledHeights)
+      : avgElevation;
+    const waterFlattenFactor = isWater ? 0 : 1.0;
+    let geometry;
+    if (isWater) {
+      const shape = new THREE.Shape();
+      ring.forEach((point, index) => {
+        if (index === 0) shape.moveTo(point.x, -point.z);
+        else shape.lineTo(point.x, -point.z);
+      });
+      shape.closePath();
+      cleanedHoles.forEach((cleanedHole) => {
         const path = new THREE.Path();
         cleanedHole.forEach((point, index) => {
           if (index === 0) path.moveTo(point.x, -point.z);
@@ -98,31 +125,28 @@ export function createWorldLandusePass(options = {}) {
         path.closePath();
         shape.holes.push(path);
       });
+      geometry = new THREE.ShapeGeometry(shape, 20);
+      geometry.rotateX(-Math.PI / 2);
+      const positions = geometry.attributes.position;
+      for (let i = 0; i < positions.count; i++) positions.setY(i, 0.08);
+      positions.needsUpdate = true;
+      geometry.computeVertexNormals();
+    } else {
+      geometry = buildTerrainConformingPolygonGeometry(
+        ring,
+        cleanedHoles,
+        (x, z) => {
+          const terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
+          return terrainY === 0 && Math.abs(surfaceBaseElevation) > 2 ? surfaceBaseElevation : terrainY;
+        },
+        {
+          baseY: surfaceBaseElevation,
+          maxEdgeLength: 42,
+          maxTriangles: Math.max(140, Math.min(900, ring.length * 8)),
+          surfaceOffset: 0.035
+        }
+      );
     }
-
-    const geometry = new THREE.ShapeGeometry(shape, 20);
-    geometry.rotateX(-Math.PI / 2);
-
-    const isWater = landuseType === 'water';
-    const isExplicitHardscape = landuseType === 'paved' || landuseType === 'parking';
-    const isMappedGroundCover = visibleMappedSurfaceTypes.has(landuseType);
-    const waterVisualProfile = isWater ? resolveWaterSurfaceVisualProfile() : null;
-    const surfaceBaseElevation = isWater
-      ? waterSurfaceBaseElevation(sampledHeights)
-      : avgElevation;
-    const waterFlattenFactor = isWater ? 0 : 1.0;
-    const positions = geometry.attributes.position;
-
-    for (let i = 0; i < positions.count; i++) {
-      const x = positions.getX(i);
-      const z = positions.getZ(i);
-      const terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
-      const useY = terrainY === 0 && Math.abs(surfaceBaseElevation) > 2 ? surfaceBaseElevation : terrainY;
-      positions.setY(i, (useY - surfaceBaseElevation) * waterFlattenFactor + (isWater ? 0.08 : 0.02));
-    }
-
-    positions.needsUpdate = true;
-    geometry.computeVertexNormals();
 
     const material = new THREE.MeshStandardMaterial(isWater ? {
       color: waterVisualProfile?.color || appCtx.LANDUSE_STYLES.water.color,
@@ -142,8 +166,8 @@ export function createWorldLandusePass(options = {}) {
       roughness: 0.95,
       metalness: 0.0,
       transparent: true,
-      opacity: 0.85,
-      depthWrite: true,
+      opacity: overlayOpacity,
+      depthWrite: isExplicitHardscape,
       polygonOffset: true,
       polygonOffsetFactor: -2,
       polygonOffsetUnits: -2

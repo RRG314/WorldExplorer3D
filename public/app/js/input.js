@@ -39,11 +39,8 @@ function onKey(code, event) {
     }
     if (typeof appCtx.cyclePrimaryTravelMode === 'function') {
       appCtx.cyclePrimaryTravelMode({ source: 'keyboard_f' });
-    } else if (appCtx.Walk) {
-      appCtx.Walk.toggleWalk();
-      appCtx.droneMode = false;
     } else {
-      console.error('Walk module does not exist!');
+      console.error('Travel mode controller is unavailable.');
     }
     if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
     return;

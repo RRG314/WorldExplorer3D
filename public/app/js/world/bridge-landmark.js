@@ -7,6 +7,7 @@ const BRIDGE_HALF_WIDTH_METERS = 13.5;
 const MAIN_CABLE_RADIUS_METERS = 0.46;
 const SUSPENDER_RADIUS_METERS = 0.06;
 const SUSPENDER_SPACING_METERS = 15.24;
+const GOLDEN_GATE_DECK_ELEVATION_METERS = 67;
 
 function numberTag(tags, key, fallback = 0) {
   const value = Number.parseFloat(String(tags?.[key] ?? '').replace(',', '.'));
@@ -142,7 +143,15 @@ function sampleRoadDeckY(x, z) {
       best = { distance, y: Number.isFinite(profileY) ? profileY : appCtx.elevationWorldYAtWorldXZ(x, z) + 55 };
     }
   }
-  return best?.y ?? appCtx.elevationWorldYAtWorldXZ(x, z) + 55;
+  const terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
+  const worldUnitsPerMeter = Math.max(0.01, Number(appCtx.WORLD_UNITS_PER_METER) || 1);
+  const documentedDeckFloor = GOLDEN_GATE_DECK_ELEVATION_METERS * worldUnitsPerMeter;
+  const localRoadY = best?.distance <= 45 ? Number(best.y) : NaN;
+  return Math.max(
+    documentedDeckFloor,
+    terrainY + 8 * worldUnitsPerMeter,
+    Number.isFinite(localRoadY) ? localRoadY : -Infinity
+  );
 }
 
 function createTowerPartMesh(way, nodes) {
@@ -222,6 +231,79 @@ function createDeckGirderMeshes(path, metrics) {
     meshes.push(mesh);
   }
   return meshes;
+}
+
+function createDeckSurfaceMeshes(path, metrics) {
+  const sampleCount = Math.max(64, Math.ceil(metrics.total / 18));
+  const positions = [];
+  const indices = [];
+  const laneOffsets = [-4.5, 0, 4.5];
+  const laneCurves = laneOffsets.map(() => []);
+  for (let i = 0; i <= sampleCount; i++) {
+    const distance = metrics.total * i / sampleCount;
+    const point = pointAtDistance(path, metrics.distances, distance);
+    const tangentLength = Math.hypot(point.dx, point.dz) || 1;
+    const sideX = -point.dz / tangentLength;
+    const sideZ = point.dx / tangentLength;
+    const deckY = sampleRoadDeckY(point.x, point.z) + 0.18;
+    for (const side of [-1, 1]) {
+      positions.push(
+        point.x + sideX * BRIDGE_HALF_WIDTH_METERS * side,
+        deckY,
+        point.z + sideZ * BRIDGE_HALF_WIDTH_METERS * side
+      );
+    }
+    laneCurves.forEach((curve, laneIndex) => {
+      const laneOffset = laneOffsets[laneIndex];
+      curve.push(new THREE.Vector3(
+        point.x + sideX * laneOffset,
+        deckY + 0.045,
+        point.z + sideZ * laneOffset
+      ));
+    });
+    if (i < sampleCount) {
+      const vertex = i * 2;
+      indices.push(vertex, vertex + 1, vertex + 2, vertex + 1, vertex + 3, vertex + 2);
+    }
+  }
+
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  geometry.computeBoundingSphere();
+  const deck = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({
+    color: 0x34393d,
+    roughness: 0.9,
+    metalness: 0.04,
+    side: THREE.DoubleSide
+  }));
+  deck.receiveShadow = true;
+  deck.frustumCulled = false;
+  deck.userData = {
+    isHistoricLandmark: true,
+    landmarkKind: 'suspension_bridge_deck',
+    landmarkName: 'Golden Gate Bridge'
+  };
+
+  const laneMaterials = [0xf1f0dc, 0xf0c84b, 0xf1f0dc].map((color) =>
+    new THREE.MeshBasicMaterial({ color, toneMapped: false })
+  );
+  const lanes = laneCurves.map((samples, index) => {
+    const curve = new THREE.CatmullRomCurve3(samples, false, 'centripetal');
+    const lane = new THREE.Mesh(
+      new THREE.TubeGeometry(curve, Math.min(260, sampleCount), 0.07, 5, false),
+      laneMaterials[index]
+    );
+    lane.frustumCulled = false;
+    lane.userData = {
+      isHistoricLandmark: true,
+      landmarkKind: 'suspension_bridge_lane',
+      landmarkName: 'Golden Gate Bridge'
+    };
+    return lane;
+  });
+  return [deck, ...lanes];
 }
 
 function createCableMeshes(path, metrics, towers) {
@@ -351,6 +433,11 @@ export function renderSuspensionBridgeLandmark(data) {
   let structuralDetails = null;
   if (towers.length === 2) {
     const cables = createCableMeshes(path, metrics, towers);
+    for (const mesh of createDeckSurfaceMeshes(path, metrics)) {
+      appCtx.scene.add(mesh);
+      appCtx.historicMarkers.push(mesh);
+      createdMeshes.push(mesh);
+    }
     for (const mesh of cables.cableMeshes) {
       appCtx.scene.add(mesh);
       appCtx.historicMarkers.push(mesh);

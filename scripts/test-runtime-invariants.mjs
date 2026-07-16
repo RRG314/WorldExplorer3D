@@ -819,9 +819,9 @@ async function main() {
           report.enteredInteriorReport.shellClearanceMin >= report.enteredInteriorReport.requiredShellClearance
         ),
       walkingControlsUpdated:
-        report.walkingControlsText.includes('W/S - Move forward / back') &&
-        report.walkingControlsText.includes('A/D - Turn left / right') &&
-        report.walkingControlsText.includes('Arrow Keys - Look around') &&
+        report.walkingControlsText.includes('Arrow Up/Down - Move forward / back') &&
+        report.walkingControlsText.includes('Arrow Left/Right - Turn left / right') &&
+        report.walkingControlsText.includes('WASD - Look around') &&
         report.walkingControlsText.includes('E - Enter/exit building interior'),
       syntheticDestinationEntryReady: report.syntheticDestinationEntrySupported === true,
       droneControlsUpdated:
@@ -911,7 +911,7 @@ async function main() {
     assert(checks.lazyInteriorIdle, `Interior system is not staying lazy by default: ${JSON.stringify({ buildingEntrySupportExposed: report.buildingEntrySupportExposed, activeInteriorByDefault: report.activeInteriorByDefault, dynamicInteriorCollidersIdle: report.dynamicInteriorCollidersIdle, interiorActionExposed: report.interiorActionExposed, interiorPromptPresent: report.interiorPromptPresent })}`);
     assert(checks.sampledInteriorEnterable, `Sampled building entry did not produce a usable contained interior shell: ${JSON.stringify(report.enteredInteriorReport || null)}`);
     assert(checks.syntheticDestinationEntryReady, `Synthetic real-estate fallback entry is unavailable: ${JSON.stringify({ syntheticDestinationEntrySupported: report.syntheticDestinationEntrySupported })}`);
-    assert(checks.walkingControlsUpdated, 'Walking controls help text is out of sync with WASD/Arrow behavior.');
+    assert(checks.walkingControlsUpdated, 'Walking controls help text is out of sync with Arrow/WASD behavior.');
     assert(checks.droneControlsUpdated, 'Drone controls help text is out of sync with WASD/Arrow behavior.');
     assert(checks.drivingMapHintUpdated, `Map key hints are out of sync: ${report.mapCloseLabel}`);
     assert(checks.mapTogglesWithM, `M map toggle failed: ${JSON.stringify(mapToggleCheck)}`);

@@ -1,8 +1,8 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv, switchEnv } from "../env.js?v=57";
 import { createGlobeSelector } from "./globe-selector.js?v=61";
-import { readSharedExperienceParams } from "./share-links.js?v=60";
-import { prepareTitleEnvironment } from "../planetary/entry.js?v=7";
+import { readSharedExperienceParams } from "./share-links.js?v=61";
+import { prepareTitleEnvironment } from "../planetary/entry.js?v=8";
 
 function initTitleScreenUi({
   lastLocationStorageKey,
@@ -89,7 +89,6 @@ function initTitleScreenUi({
     if (appCtx.oceanMode?.active) appCtx.stopOceanMode?.();
     if (appCtx.boatMode?.active) appCtx.stopBoatMode?.({ targetMode: 'walk', source });
     if (appCtx.planeMode?.active) appCtx.stopPlaneMode?.();
-    appCtx.droneMode = false;
     if (typeof appCtx.setTravelMode === 'function') {
       appCtx.setTravelMode('walk', { source, emitTutorial: false });
     } else if (appCtx.Walk?.state?.mode !== 'walk') {
@@ -576,7 +575,6 @@ function initTitleScreenUi({
 
     resetTitleEarthTravelMode('title_earth_ready');
     if (appCtx.Walk) {
-      appCtx.Walk.setModeWalk();
       appCtx.Walk.state.view = 'third';
       if (appCtx.carMesh) appCtx.carMesh.visible = false;
       if (appCtx.Walk.state.characterMesh) appCtx.Walk.state.characterMesh.visible = true;

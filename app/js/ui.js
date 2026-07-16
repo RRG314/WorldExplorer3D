@@ -1,13 +1,13 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
-import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=8";
-import { prepareTitleEnvironment } from "./planetary/entry.js?v=7";
+import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=9";
+import { prepareTitleEnvironment } from "./planetary/entry.js?v=8";
 import { initMapInteractions } from "./ui/map-interactions.js?v=59";
-import { initMobileControls } from "./ui/mobile-controls.js?v=62";
-import { initShareUi } from "./ui/share-links.js?v=60";
+import { initMobileControls } from "./ui/mobile-controls.js?v=63";
+import { initShareUi } from "./ui/share-links.js?v=61";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=72";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=74";
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -644,9 +644,7 @@ function setupUI() {
     if (typeof appCtx.setTravelMode === 'function') {
       appCtx.setTravelMode('drive', { source: 'ui_button' });
     } else {
-      appCtx.droneMode = false;
-      if (appCtx.Walk) appCtx.Walk.setModeDrive();
-      emitTutorialEvent('mode_switched', { mode: 'drive', source: 'ui_button' });
+      console.error('Travel mode controller is unavailable.');
     }
     updateControlsModeUI();
     closeAllFloatMenus();
@@ -655,12 +653,8 @@ function setupUI() {
   document.getElementById('fWalk').addEventListener('click', () => {
     if (typeof appCtx.setTravelMode === 'function') {
       appCtx.setTravelMode('walk', { source: 'ui_button' });
-    } else if (appCtx.Walk) {
-      if (appCtx.Walk.state.mode !== 'walk') appCtx.Walk.toggleWalk();
-      emitTutorialEvent('mode_switched', {
-        mode: appCtx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive',
-        source: 'ui_button'
-      });
+    } else {
+      console.error('Travel mode controller is unavailable.');
     }
     updateControlsModeUI();
     closeAllFloatMenus();
@@ -670,8 +664,7 @@ function setupUI() {
     if (typeof appCtx.setTravelMode === 'function') {
       appCtx.setTravelMode('drone', { source: 'ui_button' });
     } else {
-      appCtx.droneMode = true;
-      emitTutorialEvent('mode_switched', { mode: 'drone', source: 'ui_button' });
+      console.error('Travel mode controller is unavailable.');
     }
     updateControlsModeUI();
     closeAllFloatMenus();

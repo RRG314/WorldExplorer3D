@@ -78,48 +78,7 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
     const pending = appCtx.pendingExperienceState;
     if (!pending || typeof pending !== 'object') return;
 
-    const setDriveMode = () => {
-      appCtx.droneMode = false;
-      if (appCtx.Walk) appCtx.Walk.setModeDrive();
-      if (appCtx.carMesh) appCtx.carMesh.visible = true;
-      document.getElementById('fDriving')?.classList.add('on');
-      document.getElementById('fWalk')?.classList.remove('on');
-      document.getElementById('fDrone')?.classList.remove('on');
-      document.getElementById('fPlane')?.classList.remove('on');
-    };
-    const setWalkMode = () => {
-      appCtx.droneMode = false;
-      if (appCtx.Walk?.state?.mode !== 'walk') appCtx.Walk?.toggleWalk?.();
-      document.getElementById('fDriving')?.classList.remove('on');
-      document.getElementById('fWalk')?.classList.add('on');
-      document.getElementById('fDrone')?.classList.remove('on');
-      document.getElementById('fPlane')?.classList.remove('on');
-    };
-    const setDroneMode = () => {
-      if (!appCtx.droneMode) {
-        appCtx.droneMode = true;
-        if (appCtx.Walk?.state?.mode === 'walk') appCtx.Walk.setModeDrive();
-      }
-      document.getElementById('fDriving')?.classList.remove('on');
-      document.getElementById('fWalk')?.classList.remove('on');
-      document.getElementById('fDrone')?.classList.add('on');
-      document.getElementById('fPlane')?.classList.remove('on');
-    };
-    const setPlaneMode = () => {
-      appCtx.droneMode = false;
-      if (appCtx.Walk?.state?.mode === 'walk') appCtx.Walk.setModeDrive();
-      document.getElementById('fDriving')?.classList.remove('on');
-      document.getElementById('fWalk')?.classList.remove('on');
-      document.getElementById('fDrone')?.classList.remove('on');
-      document.getElementById('fPlane')?.classList.add('on');
-    };
-
     const mode = pending.travelMode || getCurrentTravelMode();
-    if (pending.travelMode === 'walking') setWalkMode();
-    else if (pending.travelMode === 'drone') setDroneMode();
-    else if (pending.travelMode === 'plane') setPlaneMode();
-    else if (pending.travelMode === 'driving') setDriveMode();
-
     const x = Number.isFinite(pending.refX) ? pending.refX : null;
     const y = Number.isFinite(pending.refY) ? pending.refY : null;
     const z = Number.isFinite(pending.refZ) ? pending.refZ : null;
@@ -127,15 +86,29 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
     const pitch = Number.isFinite(pending.pitch) ? pending.pitch : null;
     const terrainYAt = (tx, tz) => typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(tx, tz) : appCtx.elevationWorldYAtWorldXZ(tx, tz);
 
-    if (mode === 'plane') {
-      appCtx.startPlaneMode?.({
+    const runtimeMode = {
+      driving: 'drive',
+      walking: 'walk',
+      drone: 'drone',
+      plane: 'plane'
+    }[pending.travelMode];
+    if (runtimeMode && typeof appCtx.setTravelMode === 'function') {
+      const groundY = runtimeMode === 'plane' ? terrainYAt(x || 0, z || 0) : null;
+      appCtx.setTravelMode(runtimeMode, {
+        source: 'shared_state',
+        emitTutorial: false,
+        force: true,
         x: Number.isFinite(x) ? x : undefined,
         y: Number.isFinite(y) ? y : undefined,
         z: Number.isFinite(z) ? z : undefined,
         yaw: Number.isFinite(yaw) ? yaw : undefined,
         pitch: Number.isFinite(pitch) ? pitch : undefined,
-        airborne: Number.isFinite(y) && y > terrainYAt(x || 0, z || 0) + 1.4
+        airborne: runtimeMode === 'plane' && Number.isFinite(y) && y > groundY + 1.4
       });
+    }
+
+    if (mode === 'plane') {
+      // Plane placement is applied atomically by setTravelMode above.
     } else if (mode === 'drone') {
       if (Number.isFinite(x)) appCtx.drone.x = x;
       if (Number.isFinite(z)) appCtx.drone.z = z;

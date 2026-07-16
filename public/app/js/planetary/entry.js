@@ -54,9 +54,6 @@ export function prepareTitleEnvironment() {
   if (getEnv() !== ENV.EARTH) {
     switchEnv(ENV.EARTH);
   }
-  appCtx.onMoon = false;
-  appCtx.onMars = false;
-  appCtx.travelingToMoon = false;
   void appCtx.setPlanetaryVehicle?.('earth');
   appCtx.setPlanetaryCharacter?.('earth');
   appCtx.paused = false;

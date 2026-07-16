@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { buildInteriorScene } from "./interiors/scene-builder.js?v=3";
+import { buildInteriorScene } from "./interiors/scene-builder.js?v=4";
 import {
   INTERIOR_ENTRY_RADIUS,
   INTERIOR_INTERACTION_MOVE_EPSILON,

@@ -2,8 +2,9 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import { fetchShortbreadTile } from "./shortbread-source.js?v=6";
 import {
   buildStreamingBuildingVisuals,
+  buildStreamingRoadVisuals,
   queueGeometryDisposal
-} from "./streaming-vector-chunks.js?v=24";
+} from "./streaming-vector-chunks.js?v=28";
 
 function removeMeshesInPlace(source, removed) {
   if (!Array.isArray(source)) return [];
@@ -30,6 +31,13 @@ async function loadAerialContextChunk(request) {
   };
   try {
     const tileRecord = await fetchShortbreadTile(request.z, request.x, request.y, { signal: request.signal });
+    if (request.signal?.aborted) throw new DOMException('Aerial context chunk aborted', 'AbortError');
+    await buildStreamingRoadVisuals(tileRecord, chunk, {
+      aerialContext: true,
+      includeInitial: true,
+      maxFeatures: 260,
+      recordFeatures: false
+    });
     if (request.signal?.aborted) throw new DOMException('Aerial context chunk aborted', 'AbortError');
     await buildStreamingBuildingVisuals(tileRecord, chunk, {
       aerialContext: true,
@@ -75,10 +83,10 @@ function initStreamingAerialContext() {
   appCtx.unregisterStreamingAerialContext = appCtx.registerEarthStreamLayer('aerial-vector', {
     availableWhenDisabled: true,
     loadChunk: loadAerialContextChunk,
-    maxActive: 9,
-    maxConcurrent: 1,
+    maxActive: 25,
+    maxConcurrent: 3,
     priorityBias: 0.8,
-    radius: 1,
+    radius: 2,
     unloadChunk: disposeAerialContextChunk,
     zoom: 13
   });

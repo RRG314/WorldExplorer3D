@@ -27,12 +27,18 @@ function setStarFieldObserverVisuals(observerBody = 'earth') {
   const faintStars = appCtx.starField.getObjectByName(FAINT_STAR_LAYER_NAME);
 
   if (brightStars?.material) {
-    brightStars.material.size = planetary ? (body === 'mars' ? 1.2 : 1.5) : 3.1;
+    brightStars.material.size = planetary ? (body === 'mars' ? 5.0 : 5.4) : 6.2;
     brightStars.material.vertexColors = false;
     brightStars.material.color.setHex(0xffffff);
+    brightStars.material.opacity = Number(brightStars.userData?.baseOpacity) || 0.98;
     brightStars.material.needsUpdate = true;
   }
-  if (faintStars) faintStars.visible = !planetary;
+  if (faintStars?.material) {
+    faintStars.visible = true;
+    faintStars.material.size = planetary ? (body === 'mars' ? 3.9 : 4.0) : 4.2;
+    faintStars.material.opacity = Number(faintStars.userData?.baseOpacity) || 0.92;
+    faintStars.material.needsUpdate = true;
+  }
 }
 
 function raDecToVector(ra, dec, radius = STARFIELD_RADIUS) {
@@ -78,12 +84,14 @@ export function createStarField() {
   const brightGeometry = new THREE.BufferGeometry();
   brightGeometry.setAttribute('position', new THREE.Float32BufferAttribute(brightPositions, 3));
   const brightMaterial = createRoundStarMaterial({
-    size: 3.1,
+    size: 6.2,
     sizeAttenuation: false,
     vertexColors: false,
     transparent: true,
-    opacity: 0.92,
-    fog: false
+    opacity: 0.98,
+    fog: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false
   });
   const brightStars = new THREE.Points(brightGeometry, brightMaterial);
   brightStars.name = BRIGHT_STAR_LAYER_NAME;
@@ -115,13 +123,21 @@ export function createStarField() {
 
   group.add(appCtx.allConstellationLines);
 
-  const faintStarCount = 2000;
+  const faintStarCount = 3600;
   const faintStarGeometry = new THREE.BufferGeometry();
   const positions = [];
 
+  let sequence = 0x6d2b79f5;
+  const random = () => {
+    sequence += 0x6d2b79f5;
+    let value = sequence;
+    value = Math.imul(value ^ value >>> 15, value | 1);
+    value ^= value + Math.imul(value ^ value >>> 7, value | 61);
+    return ((value ^ value >>> 14) >>> 0) / 4294967296;
+  };
   for (let i = 0; i < faintStarCount; i++) {
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos(Math.random() * 2 - 1);
+    const theta = random() * Math.PI * 2;
+    const phi = Math.acos(random() * 2 - 1);
 
     const x = STARFIELD_RADIUS * Math.sin(phi) * Math.cos(theta);
     const y = STARFIELD_RADIUS * Math.sin(phi) * Math.sin(theta);
@@ -134,16 +150,19 @@ export function createStarField() {
   faintStarGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
 
   const faintStarMaterial = createRoundStarMaterial({
-    size: 1.25,
+    size: 4.2,
     sizeAttenuation: false,
     vertexColors: false,
     transparent: true,
-    opacity: 0.6,
-    fog: false
+    opacity: 0.92,
+    fog: false,
+    blending: THREE.AdditiveBlending,
+    toneMapped: false
   });
 
   const faintStars = new THREE.Points(faintStarGeometry, faintStarMaterial);
   faintStars.name = FAINT_STAR_LAYER_NAME;
+  faintStars.userData.baseOpacity = faintStarMaterial.opacity;
   group.add(faintStars);
   group.visible = false;
   appCtx.scene.add(group);

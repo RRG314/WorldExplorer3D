@@ -7,7 +7,7 @@ import {
 } from "./building-spatial-index.js?v=5";
 import { waterSurfaceBaseElevation } from "./load-geometry.js?v=12";
 import { fetchShortbreadTile } from "./shortbread-source.js?v=6";
-import { buildStreamingLandcover } from "./streaming-landcover.js?v=5";
+import { buildStreamingLandcover } from "./streaming-landcover.js?v=8";
 import { createRoadNameResolver } from "./streaming-road-labels.js?v=1";
 import { applyFacadeWallMask } from "../engine/building-facade-shader.js?v=1";
 import { createWindowTexture } from "../engine/procedural-textures.js?v=2";
@@ -349,10 +349,18 @@ async function buildRoads(tileRecord, chunk, options = {}) {
     const properties = geojson.properties || {};
     const kind = String(properties.kind || '').toLowerCase();
     if (!kind || properties.rail === true) return;
+    if (options.aerialContext && /(?:foot|path|track|steps|cycle|service|pedestrian)/.test(kind)) return;
     geometryParts(geojson.geometry, 'line').forEach((coordinates, partIndex) => {
-      const points = cleanLine(coordinates);
-      if (points.length < 2 || (!options.includeInitial && !outsideInitialDetail(points))) return;
-      const width = roadWidth(properties);
+      const sourcePoints = cleanLine(coordinates);
+      if (sourcePoints.length < 2 || (!options.includeInitial && !outsideInitialDetail(sourcePoints))) return;
+      const subdivisionStep = options.aerialContext ? 54 : 24;
+      const points = typeof appCtx.subdivideRoadPoints === 'function'
+        ? appCtx.subdivideRoadPoints(sourcePoints, subdivisionStep)
+        : sourcePoints;
+      const mappedWidth = roadWidth(properties);
+      const width = options.aerialContext
+        ? Math.max(1.6, Math.min(4.6, mappedWidth * 0.36))
+        : mappedWidth;
       const structureTags = {
         highway: kind,
         bridge: properties.bridge === true ? 'yes' : String(properties.bridge || ''),
@@ -381,6 +389,7 @@ async function buildRoads(tileRecord, chunk, options = {}) {
         structureSemantics,
         baseStructureSemantics: { ...structureSemantics },
         surfaceBias: ROAD_SURFACE_OFFSET,
+        subdivideMaxDist: subdivisionStep,
         bounds: polylineBounds(points, width * 0.5 + 18),
         _streamChunkKey: chunk.key
       };

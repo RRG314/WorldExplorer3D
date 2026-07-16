@@ -3,7 +3,7 @@ import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=9";
+} from "./surface-profiles.js?v=10";
 
 const TERRAIN_TILE_CACHE_LIMIT = 72;
 

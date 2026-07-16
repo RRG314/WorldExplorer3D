@@ -92,6 +92,7 @@ function createWalkingTerrainHelpers({ car, state, CFG }) {
 
   function syncWalkTerrain(force = false) {
     if (appCtx.onMoon || appCtx.onMars) return;
+    if (appCtx.activeInterior) return;
     if (typeof appCtx.terrainEnabled !== "undefined" && !appCtx.terrainEnabled) return;
     if (typeof appCtx.worldLoading !== "undefined" && appCtx.worldLoading) return;
     if (typeof appCtx.updateTerrainAround !== "function") return;

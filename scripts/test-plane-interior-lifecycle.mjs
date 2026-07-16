@@ -46,6 +46,30 @@ async function exerciseLifecycle(page) {
     const center = { x: building.centerX, z: building.centerZ };
     const roofY = building.maxY;
     ctx.setTravelMode('plane', {
+      source: 'plane_control_acceptance',
+      force: true,
+      x: center.x,
+      z: center.z,
+      y: roofY + 70,
+      pitch: 0,
+      speed: 28,
+      throttle: 0.6,
+      airborne: true
+    });
+    ctx.planeMode.pitch = 0;
+    ctx.planeMode.climbRate = 0;
+    ctx.keys.ArrowDown = true;
+    for (let i = 0; i < 45; i++) ctx.updatePlane(1 / 60);
+    ctx.keys.ArrowDown = false;
+    const pullUpPitch = ctx.planeMode.pitch;
+    ctx.planeMode.pitch = 0;
+    ctx.planeMode.climbRate = 0;
+    ctx.keys.ArrowUp = true;
+    for (let i = 0; i < 45; i++) ctx.updatePlane(1 / 60);
+    ctx.keys.ArrowUp = false;
+    const noseDownPitch = ctx.planeMode.pitch;
+
+    ctx.setTravelMode('plane', {
       source: 'plane_interior_acceptance',
       force: true,
       x: center.x,
@@ -151,15 +175,46 @@ async function exerciseLifecycle(page) {
     ctx.car.z = support.entryAnchor.z;
     const entered = await ctx.enterInteriorForSupport(support);
     const active = ctx.activeInterior;
+    let interiorMovement = null;
     if (active?.entryPoint && active?.center) {
       const walker = ctx.Walk.state.walker;
-      walker.x = active.center.x;
-      walker.z = active.center.z;
+      walker.x = active.entryPoint.x;
+      walker.z = active.entryPoint.z;
       walker.y = active.entryPoint.y;
-      walker.angle = 0;
-      walker.yaw = 0;
+      walker.angle = Math.atan2(active.center.x - walker.x, active.center.z - walker.z);
+      walker.yaw = walker.angle;
+      walker.lookYawOffset = 0;
       ctx.Walk.state.view = 'third';
       if (ctx.Walk.state.characterMesh) ctx.Walk.state.characterMesh.visible = true;
+
+      const start = { x: walker.x, z: walker.z, lookYawOffset: walker.lookYawOffset };
+      const entryCollision = ctx.checkBuildingCollision?.(walker.x, walker.z, 0.28, {
+        actorBaseY: walker.y - 1.7,
+        actorHeight: 1.62
+      });
+      ctx.keys.ArrowUp = true;
+      for (let i = 0; i < 30; i++) {
+        ctx.Walk.update(1 / 60);
+        ctx.keepActiveInteriorContained?.();
+      }
+      ctx.keys.ArrowUp = false;
+      const moved = Math.hypot(walker.x - start.x, walker.z - start.z);
+      const beforeCamera = { x: walker.x, z: walker.z, lookYawOffset: walker.lookYawOffset };
+      ctx.keys.KeyA = true;
+      for (let i = 0; i < 20; i++) ctx.Walk.update(1 / 60);
+      ctx.keys.KeyA = false;
+      interiorMovement = {
+        moved,
+        cameraPositionDelta: Math.hypot(walker.x - beforeCamera.x, walker.z - beforeCamera.z),
+        cameraYawDelta: Math.abs(walker.lookYawOffset - beforeCamera.lookYawOffset),
+        remainedInside: !!ctx.activeInterior,
+        entryCollision: entryCollision?.collision ? {
+          id: entryCollision.building?.sourceBuildingId || '',
+          type: entryCollision.building?.buildingType || '',
+          interior: !!entryCollision.building?.isInteriorCollider,
+          disabled: !!entryCollision.building?.collisionDisabled
+        } : null
+      };
     }
 
     return {
@@ -186,6 +241,7 @@ async function exerciseLifecycle(page) {
         altitudeDelta: drone.y - beforeDrone.y
       },
       impact,
+      planeControls: { pullUpPitch, noseDownPitch },
       driveExit,
       interior: {
         entered: !!entered && !!active,
@@ -197,7 +253,8 @@ async function exerciseLifecycle(page) {
         partitionCount: active?.partitionCount,
         layoutKind: active?.layoutKind,
         colliderCount: ctx.dynamicBuildingColliders?.length || 0,
-        footprintPoints: active?.usableFootprint?.length || 0
+        footprintPoints: active?.usableFootprint?.length || 0,
+        movement: interiorMovement
       }
     };
   });
@@ -232,6 +289,8 @@ async function main() {
     assert(report.droneTransfer.altitudeDelta >= -0.2, 'Plane-to-drone lost altitude');
     assert(report.droneTransfer.switchMs <= MODE_SWITCH_BUDGET_MS, `Plane-to-drone stalled for ${report.droneTransfer.switchMs}ms`);
     assert(report.impact.lastImpactAt > 0 && report.impact.speed <= 5, `Building impact did not settle: ${JSON.stringify(report.impact)}`);
+    assert(report.planeControls.pullUpPitch > 0.1, `Arrow Down did not pull the plane nose up: ${JSON.stringify(report.planeControls)}`);
+    assert(report.planeControls.noseDownPitch < -0.1, `Arrow Up did not push the plane nose down: ${JSON.stringify(report.planeControls)}`);
     assert(report.driveExit.mode === 'drive', `Plane-to-drive resolved as ${report.driveExit.mode}`);
     assert(report.driveExit.switchMs <= MODE_SWITCH_BUDGET_MS, `Plane-to-drive stalled for ${report.driveExit.switchMs}ms`);
     assert(!report.driveExit.blocked, `Plane-to-drive spawned inside a building: ${JSON.stringify(report.driveExit)}`);
@@ -240,6 +299,10 @@ async function main() {
     assert(report.interior.usableRatio >= 0.75, `Interior uses only ${(report.interior.usableRatio * 100).toFixed(1)}% of its footprint`);
     assert(report.interior.colliderCount >= report.interior.footprintPoints, 'Interior shell is missing collision walls');
     assert(report.interior.partitionCount > 0, 'Large generated interior has no room circulation plan');
+    assert(report.interior.movement?.moved > 0.35, `Arrow movement was blocked inside the building: ${JSON.stringify(report.interior.movement)}`);
+    assert(report.interior.movement?.cameraPositionDelta < 0.05, `WASD camera input moved the character: ${JSON.stringify(report.interior.movement)}`);
+    assert(report.interior.movement?.cameraYawDelta > 0.2, `WASD did not control the interior camera: ${JSON.stringify(report.interior.movement)}`);
+    assert(report.interior.movement?.remainedInside, 'Walking input unexpectedly exited the building interior');
     assert(errors.length === 0, `Page errors: ${errors.join(' | ')}`);
     console.log(JSON.stringify({ ok: true, report }, null, 2));
   } finally {

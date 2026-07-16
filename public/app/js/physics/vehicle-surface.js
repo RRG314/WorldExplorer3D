@@ -76,16 +76,35 @@ function pointInsideRecord(appCtx, x, z, record) {
   return !!(points?.length >= 3 && appCtx.pointInPolygon?.(x, z, points));
 }
 
+function worldCoverTerrainSurface(appCtx, x, z) {
+  let nearest = null;
+  let nearestDistance = Infinity;
+  for (const mesh of appCtx.terrainGroup?.children || []) {
+    const mode = normalizedTag(mesh?.userData?.worldCoverSurfaceMode);
+    if (!SURFACE_PROFILES[mode]) continue;
+    const distance = Math.hypot(Number(mesh.position?.x || 0) - x, Number(mesh.position?.z || 0) - z);
+    if (distance >= nearestDistance) continue;
+    nearest = mode;
+    nearestDistance = distance;
+  }
+  return nearest;
+}
+
 function localLandSurface(appCtx, x, z) {
+  const baselineKind = worldCoverTerrainSurface(appCtx, x, z);
   const collections = [appCtx.landuses, appCtx.surfaceFeatureHints];
   for (const records of collections) {
     if (!Array.isArray(records)) continue;
     for (let index = records.length - 1; index >= 0; index--) {
       const record = records[index];
       const kind = LANDUSE_SURFACE[normalizedTag(record?.type)];
-      if (kind && pointInsideRecord(appCtx, x, z, record)) return kind;
+      if (!kind || !pointInsideRecord(appCtx, x, z, record)) continue;
+      if (baselineKind === 'sand' && (kind === 'grass' || kind === 'dirt')) return baselineKind;
+      if (baselineKind === 'rock' && (kind === 'grass' || kind === 'dirt')) return baselineKind;
+      return kind;
     }
   }
+  if (baselineKind) return baselineKind;
   const worldHint = normalizedTag(appCtx.worldSurfaceProfile?.terrainModeHint);
   if (worldHint === 'sand') return 'sand';
   if (worldHint === 'snow') return 'snow';

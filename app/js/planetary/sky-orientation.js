@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=4';
+import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=10';
 
 const J2000_MS = Date.UTC(2000, 0, 1, 12, 0, 0);
 const DAY_MS = 86400000;
@@ -13,7 +13,7 @@ const OBSERVERS = Object.freeze({
     poleDecPerCentury: 0.013,
     primeAtJ2000: 38.3213,
     rotationPerDay: 13.17635815,
-    starOpacity: 0.92
+    starOpacity: 0.94
   }),
   mars: Object.freeze({
     latitudeDeg: 18.65,
@@ -24,7 +24,7 @@ const OBSERVERS = Object.freeze({
     poleDecPerCentury: -0.0609,
     primeAtJ2000: 176.63,
     rotationPerDay: 350.89198226,
-    starOpacity: 0.28
+    starOpacity: 0.92
   })
 });
 

@@ -108,7 +108,7 @@ import {
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
 import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=7";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=16";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=18";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -168,13 +168,13 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=3";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=32";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=35";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=6";
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=6";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
-import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=16";
+import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=20";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 

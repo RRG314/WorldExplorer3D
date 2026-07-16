@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 
 const steps = [
+  { name: 'Maintainability guard', cmd: [process.execPath, 'scripts/test-maintainability-guard.mjs'] },
   { name: 'Mirror parity', cmd: [process.execPath, 'scripts/verify-mirror.mjs'] },
   { name: 'CSS integrity', cmd: [process.execPath, 'scripts/test-css-integrity.mjs'] },
   { name: 'ES module URL identity', cmd: [process.execPath, 'scripts/test-module-version-consistency.mjs'] },

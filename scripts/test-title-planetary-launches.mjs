@@ -36,9 +36,12 @@ function assertPlanetaryStarStyle(state, body, label) {
   const stars = state.starVisuals || {};
   assert(stars.observerBody === body, `${label} used ${stars.observerBody || 'no'} observer orientation`);
   assert(stars.brightVisible, `${label} hid the real bright-star catalog`);
-  assert(stars.brightSize > 0 && stars.brightSize <= 1.5, `${label} used oversized ${stars.brightSize || 0}px stars`);
+  assert(stars.brightSize >= 4 && stars.brightSize <= 6.5, `${label} used unreadable ${stars.brightSize || 0}px bright stars`);
   assert(stars.brightVertexColors === false, `${label} retained unrealistic colored star points`);
-  assert(stars.faintVisible === false, `${label} retained the synthetic faint-star layer`);
+  assert(stars.brightRoundSprite, `${label} lost the round bright-star sprite`);
+  assert(stars.faintVisible, `${label} hid the background star field`);
+  assert(stars.faintSize >= 3 && stars.faintSize <= 4.2, `${label} used unreadable ${stars.faintSize || 0}px background stars`);
+  assert(stars.faintRoundSprite, `${label} lost the round background-star sprite`);
 }
 
 function assertMarsSceneOwned(state, label) {
@@ -107,7 +110,10 @@ async function readState(page) {
         brightVisible: !!brightStars?.visible,
         brightSize: Number(brightStars?.material?.size || 0),
         brightVertexColors: brightStars?.material?.vertexColors,
-        faintVisible: !!faintStars?.visible
+        brightRoundSprite: !!brightStars?.material?.map,
+        faintVisible: !!faintStars?.visible,
+        faintSize: Number(faintStars?.material?.size || 0),
+        faintRoundSprite: !!faintStars?.material?.map
       },
       fatal: /Startup failed|Renderer Creation Failed|Failed to create 3D renderer/i.test(document.body.innerText)
     };

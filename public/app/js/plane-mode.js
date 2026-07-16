@@ -310,8 +310,8 @@ function updatePlane(dt) {
   if (!state.active) return false;
   const previousX = state.x;
   const previousZ = state.z;
-  const up = !!appCtx.keys.ArrowUp;
-  const down = !!appCtx.keys.ArrowDown;
+  const pitchDown = !!appCtx.keys.ArrowUp;
+  const pitchUp = !!appCtx.keys.ArrowDown;
   const left = !!appCtx.keys.ArrowLeft;
   const right = !!appCtx.keys.ArrowRight;
   const throttleUp = !!(appCtx.keys.ShiftLeft || appCtx.keys.ShiftRight);
@@ -319,13 +319,13 @@ function updatePlane(dt) {
   const brake = !!appCtx.keys.Space;
 
   state.throttle = clamp(state.throttle + ((throttleUp ? 1 : 0) - (throttleDown ? 1 : 0)) * dt * 0.58, 0, 1);
-  if (!state.airborne && up) state.throttle = Math.max(state.throttle, Math.min(0.82, state.throttle + dt * 0.42));
+  if (!state.airborne && pitchUp) state.throttle = Math.max(state.throttle, Math.min(0.82, state.throttle + dt * 0.42));
   const targetSpeed = state.throttle * 58;
   const speedRate = state.airborne ? 0.72 : 1.35;
   state.speed = damp(state.speed, targetSpeed, speedRate, dt);
   if (brake && !state.airborne) state.speed *= Math.exp(-5.8 * dt);
 
-  const pitchInput = (up ? 1 : 0) - (down ? 1 : 0);
+  const pitchInput = (pitchUp ? 1 : 0) - (pitchDown ? 1 : 0);
   const rollInput = (left ? 1 : 0) - (right ? 1 : 0);
   const groundY = samplePlaneSurface(dt);
 

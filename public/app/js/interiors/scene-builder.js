@@ -29,6 +29,61 @@ function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
 }
 
+function pointInsideCollider(x, z, collider) {
+  if (!collider || collider.collisionDisabled) return false;
+  if (x < collider.minX || x > collider.maxX || z < collider.minZ || z > collider.maxZ) return false;
+  return Array.isArray(collider.pts) && collider.pts.length >= 3
+    ? pointInPolygonSafe(x, z, collider.pts)
+    : true;
+}
+
+function interiorSpawnIsClear(point, footprint, colliders) {
+  if (!pointInPolygonSafe(point.x, point.z, footprint)) return false;
+  const radius = 0.34;
+  const samples = [
+    [0, 0],
+    [radius, 0],
+    [-radius, 0],
+    [0, radius],
+    [0, -radius]
+  ];
+  return !samples.some(([dx, dz]) =>
+    colliders.some((collider) => pointInsideCollider(point.x + dx, point.z + dz, collider))
+  );
+}
+
+function chooseClearInteriorSpawn(desired, center, footprint, colliders) {
+  const candidates = [];
+  const push = (x, z) => candidates.push({ x, z });
+  const dx = center.x - desired.x;
+  const dz = center.z - desired.z;
+
+  for (let step = 0; step <= 16; step += 1) {
+    const t = step / 16;
+    push(desired.x + dx * t, desired.z + dz * t);
+  }
+  [1.2, 2.4, 3.8, 5.4].forEach((radius) => {
+    for (let index = 0; index < 16; index += 1) {
+      const angle = index / 16 * Math.PI * 2;
+      push(center.x + Math.cos(angle) * radius, center.z + Math.sin(angle) * radius);
+    }
+  });
+
+  for (let index = 0; index < candidates.length; index += 1) {
+    const candidate = candidates[index];
+    if (!interiorSpawnIsClear(candidate, footprint, colliders)) continue;
+    const towardCenterX = center.x - candidate.x;
+    const towardCenterZ = center.z - candidate.z;
+    const length = Math.hypot(towardCenterX, towardCenterZ) || 1;
+    const forward = {
+      x: candidate.x + towardCenterX / length * 0.8,
+      z: candidate.z + towardCenterZ / length * 0.8
+    };
+    if (interiorSpawnIsClear(forward, footprint, colliders)) return candidate;
+  }
+  return center;
+}
+
 function createColumnCollider(x, z, radius, baseY, height) {
   const pts = [
     { x: x - radius, z: z - radius },
@@ -233,7 +288,7 @@ export function buildInteriorScene(definition) {
     }
   }
 
-  const resolvedEntryPoint = chooseInteriorSpawnPoint(desiredEntry, walkSurfaces, {
+  const surfaceEntryPoint = chooseInteriorSpawnPoint(desiredEntry, walkSurfaces, {
     x: centroid.x,
     z: centroid.z,
     y: floorY + INTERIOR_FLOOR_OFFSET
@@ -241,6 +296,12 @@ export function buildInteriorScene(definition) {
     x: centroid.x,
     z: centroid.z,
     y: floorY + INTERIOR_FLOOR_OFFSET
+  };
+  const clearEntryPoint = chooseClearInteriorSpawn(surfaceEntryPoint, centroid, shellFootprint, dynamicColliders);
+  const resolvedEntryPoint = {
+    x: clearEntryPoint.x,
+    z: clearEntryPoint.z,
+    y: surfaceEntryPoint.y
   };
 
   const entryMarker = new THREE.Mesh(

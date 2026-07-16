@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { buildMergedGeometry } from "./geometry-batching.js?v=2";
+import { appendTerrainConformingPolygonBatch } from './terrain-conforming-polygon.js?v=1';
 
 const MAX_LAND_FEATURES = 220;
 const MAX_VEGETATION_PER_TILE = 150;
@@ -29,6 +30,15 @@ const LAND_STYLE = {
   marsh: { color: 0x587e69, vegetation: true, density: 0.16 }
 };
 
+const DENSE_NATURAL_KINDS = new Set(['forest', 'wood', 'scrub', 'orchard', 'vineyard']);
+const MINERAL_SURFACE_KINDS = new Set(['sand', 'beach', 'bare_rock', 'scree', 'shingle']);
+
+function landOverlayOpacity(kind) {
+  if (MINERAL_SURFACE_KINDS.has(kind)) return 0.55;
+  if (DENSE_NATURAL_KINDS.has(kind)) return 0.28;
+  return 0.2;
+}
+
 let sharedMaterials = null;
 
 function materials() {
@@ -39,6 +49,9 @@ function materials() {
       color: style.color,
       roughness: 0.98,
       metalness: 0,
+      transparent: true,
+      opacity: landOverlayOpacity(kind),
+      depthWrite: false,
       polygonOffset: true,
       polygonOffsetFactor: -1,
       polygonOffsetUnits: -1
@@ -111,24 +124,6 @@ function landKind(properties = {}) {
   if (LAND_STYLE[kind]) return kind;
   if (['bog', 'swamp', 'wet_meadow', 'string_bog'].includes(kind)) return 'wetland';
   return '';
-}
-
-function appendTerrainConformingPolygon(points, terrainY, batch) {
-  const contour = points.map((point) => new THREE.Vector2(point.x, point.z));
-  const triangles = THREE.ShapeUtils.triangulateShape(contour, []);
-  if (triangles.length === 0) return false;
-  const baseVertex = batch.positions.length / 3;
-  points.forEach((point) => {
-    batch.positions.push(point.x, terrainY(point.x, point.z) + 0.045, point.z);
-    batch.normals.push(0, 1, 0);
-    batch.uvs.push(point.x * 0.02, point.z * 0.02);
-  });
-  triangles.forEach((triangle) => batch.indices.push(
-    baseVertex + triangle[0],
-    baseVertex + triangle[2],
-    baseVertex + triangle[1]
-  ));
-  return true;
 }
 
 function pointSegmentDistanceSq(x, z, a, b) {
@@ -232,7 +227,11 @@ export async function buildStreamingLandcover(tileRecord, chunk, deps = {}) {
       const landuse = { type: kind, pts: points, area, sourceFeatureId: identity, _streamChunkKey: chunk.key };
       chunk.landuses.push(landuse);
       if (!landBatches.has(kind)) landBatches.set(kind, { positions: [], normals: [], uvs: [], indices: [] });
-      appendTerrainConformingPolygon(points, terrainY, landBatches.get(kind));
+      appendTerrainConformingPolygonBatch(points, terrainY, landBatches.get(kind), {
+        maxEdgeLength: 48,
+        maxTriangles: Math.max(100, Math.min(520, points.length * 6)),
+        surfaceOffset: 0.045
+      });
       if (!style.vegetation || placements.length >= MAX_VEGETATION_PER_TILE) return;
       const bounds = polygonBounds(points);
       const desired = Math.min(

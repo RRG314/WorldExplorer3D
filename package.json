@@ -11,6 +11,7 @@
     "test:css": "node scripts/test-css-integrity.mjs",
     "test:inferred-buildings": "node scripts/test-inferred-building-coverage.mjs",
     "test:module-versions": "node scripts/test-module-version-consistency.mjs",
+    "test:maintainability": "node scripts/test-maintainability-guard.mjs",
     "firebase:config": "node scripts/apply-firebase-config.mjs",
     "firebase:config:production": "node scripts/apply-firebase-config.mjs production",
     "firebase:config:staging": "node scripts/apply-firebase-config.mjs staging",

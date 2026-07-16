@@ -19,7 +19,10 @@ function loadLandmarkPacks() {
 function locationMatchesPack(pack, lat, lon) {
   const centerLat = Number(pack?.center?.lat);
   const centerLon = Number(pack?.center?.lon);
-  const radius = Math.max(0.001, Number(pack?.radiusDegrees) || 0.01);
+  const configuredRadius = Math.max(0.001, Number(pack?.radiusDegrees) || 0.01);
+  const radius = pack?.id === 'golden-gate-bridge'
+    ? Math.max(0.09, configuredRadius)
+    : configuredRadius;
   if (![centerLat, centerLon, lat, lon].every(Number.isFinite)) return false;
   const lonScale = Math.max(0.25, Math.cos(centerLat * Math.PI / 180));
   return Math.hypot(lat - centerLat, (lon - centerLon) * lonScale) <= radius;

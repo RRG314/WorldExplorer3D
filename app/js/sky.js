@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=8";
+import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=9";
 import {
   cycleTimeOfDay as cycleSkyTimeOfDay,
   getAstronomicalSkySnapshot,
@@ -15,9 +15,9 @@ import {
   createStarField,
   highlightConstellation,
   showStarInfo
-} from "./sky/starfield-ui.js?v=4";
+} from "./sky/starfield-ui.js?v=10";
 import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
-import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=7";
+import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=8";
 // ============================================================================
 // sky.js - Time of day, starfield, constellations, moon system
 // ============================================================================

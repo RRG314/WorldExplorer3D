@@ -362,6 +362,56 @@ function worldCoverStats() {
   return appCtx.worldCoverStats;
 }
 
+function classifyWorldCoverSurfaceProfile(mesh, result) {
+  const current = mesh?.userData?.terrainVisualProfile || null;
+  const counts = result?.counts || {};
+  const total = Math.max(1, Number(result?.recognizedPixels || result?.totalPixels || 0));
+  const ratio = (className) => Number(counts[className] || 0) / total;
+  const bounds = mesh?.userData?.terrainTile?.bounds || null;
+  const centerLat = Number.isFinite(bounds?.latN) && Number.isFinite(bounds?.latS) ?
+    (bounds.latN + bounds.latS) * 0.5 :
+    Number(appCtx.LOC?.lat || 0);
+  const absLat = Math.abs(centerLat);
+  const bare = ratio('bare');
+  const built = ratio('built');
+  const vegetated = ratio('tree') + ratio('shrub') + ratio('grass') + ratio('crop') + ratio('wetland') + ratio('mangrove') + ratio('moss');
+  const snow = ratio('snow');
+  const aridLatitude = absLat >= 12 && absLat <= 35;
+  const aridBareSurface = aridLatitude && (
+    bare >= 0.34 ||
+    (bare >= 0.12 && bare + built >= 0.68 && vegetated <= 0.25)
+  );
+
+  if (snow >= 0.35) {
+    return {
+      ...current,
+      mode: 'snow',
+      visualMode: 'snow',
+      reason: 'worldcover_snow',
+      worldCoverConfidence: snow
+    };
+  }
+  if (aridBareSurface) {
+    return {
+      ...current,
+      mode: 'sand',
+      visualMode: 'sand',
+      reason: 'worldcover_arid_bare',
+      worldCoverConfidence: bare
+    };
+  }
+  if (bare >= 0.62 && vegetated <= 0.16) {
+    return {
+      ...current,
+      mode: 'rock',
+      visualMode: 'rock',
+      reason: 'worldcover_bare_ground',
+      worldCoverConfidence: bare
+    };
+  }
+  return current;
+}
+
 function applyLoadedWorldCoverBaseline(mesh) {
   const result = mesh?.userData?.worldCoverResult;
   const material = mesh?.material;
@@ -379,6 +429,14 @@ function applyLoadedWorldCoverBaseline(mesh) {
     recognizedPixels: result.recognizedPixels,
     totalPixels: result.totalPixels
   };
+  const semanticProfile = classifyWorldCoverSurfaceProfile(mesh, result);
+  if (semanticProfile) {
+    mesh.userData.terrainVisualProfile = semanticProfile;
+    mesh.userData.worldCoverSurfaceMode = semanticProfile.mode;
+    if (semanticProfile.mode === 'sand') material.roughness = 0.92;
+    else if (semanticProfile.mode === 'rock') material.roughness = 0.87;
+    else if (semanticProfile.mode === 'snow') material.roughness = 0.94;
+  }
   return true;
 }
 

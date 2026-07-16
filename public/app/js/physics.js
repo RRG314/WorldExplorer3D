@@ -1,8 +1,8 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import { isRoadSurfaceReachable } from "./structure-semantics.js?v=12";
 import { updateDrone } from "./physics/drone-flight.js?v=3";
-import { updatePlane } from "./plane-mode.js?v=6";
-import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=1";
+import { updatePlane } from "./plane-mode.js?v=7";
+import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=2";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=1";
 // physics.js - Car physics, building collision, drone movement
 // ============================================================================

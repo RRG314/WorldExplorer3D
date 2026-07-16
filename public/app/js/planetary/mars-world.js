@@ -1,8 +1,8 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { captureEarthWorldSession, resumeEarthWorldSession } from '../earth-session.js?v=8';
+import { captureEarthWorldSession, resumeEarthWorldSession } from '../earth-session.js?v=9';
 import { ENV, getEnv, switchEnv } from '../env.js?v=57';
 import { configureColorTexture } from './catalog.js?v=1';
-import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=7';
+import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=8';
 
 const MARS_SIZE = 24000;
 const MARS_SEGMENTS = 200;

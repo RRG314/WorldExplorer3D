@@ -184,14 +184,14 @@ function createWalkingPhysicsHelpers({
   function updateWalkPhysics(dt, finiteOr) {
     syncWalkTerrain(false);
 
-    const moveForward = keys.KeyW ? 1 : 0;
-    const moveBack = keys.KeyS ? 1 : 0;
-    const turnLeft = keys.KeyA ? 1 : 0;
-    const turnRight = keys.KeyD ? 1 : 0;
-    const lookLeft = keys.ArrowLeft ? 1 : 0;
-    const lookRight = keys.ArrowRight ? 1 : 0;
-    const lookUp = keys.ArrowUp ? 1 : 0;
-    const lookDown = keys.ArrowDown ? 1 : 0;
+    const moveForward = keys.ArrowUp ? 1 : 0;
+    const moveBack = keys.ArrowDown ? 1 : 0;
+    const turnLeft = keys.ArrowLeft ? 1 : 0;
+    const turnRight = keys.ArrowRight ? 1 : 0;
+    const lookLeft = keys.KeyA ? 1 : 0;
+    const lookRight = keys.KeyD ? 1 : 0;
+    const lookUp = keys.KeyW ? 1 : 0;
+    const lookDown = keys.KeyS ? 1 : 0;
     const speed = keys.ShiftLeft || keys.ShiftRight ? CFG.runSpeed : CFG.walkSpeed;
     const lookSpeed = 2.5 * dt;
 

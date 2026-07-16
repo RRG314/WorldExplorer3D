@@ -39,16 +39,16 @@ const MOBILE_CONTROL_PROFILES = {
     moveLabel: 'Move',
     lookLabel: 'Look',
     move: {
-      up: { channel: 'earth', key: 'KeyW' },
-      down: { channel: 'earth', key: 'KeyS' },
-      left: { channel: 'earth', key: 'KeyA' },
-      right: { channel: 'earth', key: 'KeyD' }
-    },
-    look: {
       up: { channel: 'earth', key: 'ArrowUp' },
       down: { channel: 'earth', key: 'ArrowDown' },
       left: { channel: 'earth', key: 'ArrowLeft' },
       right: { channel: 'earth', key: 'ArrowRight' }
+    },
+    look: {
+      up: { channel: 'earth', key: 'KeyW' },
+      down: { channel: 'earth', key: 'KeyS' },
+      left: { channel: 'earth', key: 'KeyA' },
+      right: { channel: 'earth', key: 'KeyD' }
     },
     actions: [
       { label: 'Jump', binding: { channel: 'earth', key: 'Space' } },

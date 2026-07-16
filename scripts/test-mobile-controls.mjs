@@ -132,13 +132,13 @@ async function assertHeldMovement(page) {
   await page.waitForTimeout(120);
   const held = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return !!ctx.keys?.KeyW && document.getElementById('mobileMoveUp')?.classList.contains('active');
+    return !!ctx.keys?.ArrowUp && document.getElementById('mobileMoveUp')?.classList.contains('active');
   });
   await page.mouse.up();
   await page.waitForTimeout(60);
   const released = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return !ctx.keys?.KeyW && !document.getElementById('mobileMoveUp')?.classList.contains('active');
+    return !ctx.keys?.ArrowUp && !document.getElementById('mobileMoveUp')?.classList.contains('active');
   });
   assert(held && released, `Mobile held input did not press/release cleanly (${held}/${released})`);
 }

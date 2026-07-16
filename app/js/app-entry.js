@@ -5,40 +5,40 @@ import './rdt.js?v=55';
 import './config.js?v=58';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import './runtime-diagnostics.js?v=10';
-import './state.js?v=59';
+import './state.js?v=60';
 import './perf.js?v=55';
 import './env.js?v=57';
 import './real-estate.js?v=55';
 import './ground.js?v=64';
-import './terrain.js?v=98';
-import './world.js?v=173';
+import './terrain.js?v=100';
+import './world.js?v=181';
 import './earth-streaming.js?v=16';
-import './world/streaming-vector-chunks.js?v=24';
-import './world/streaming-aerial-context.js?v=6';
+import './world/streaming-vector-chunks.js?v=29';
+import './world/streaming-aerial-context.js?v=12';
 import './earth-origin.js?v=2';
 import './building-entry.js?v=4';
-import './interiors.js?v=7';
+import './interiors.js?v=8';
 import { init, tryEnablePostProcessing } from './engine.js?v=72';
-import './physics.js?v=73';
-import './walking.js?v=64';
+import './physics.js?v=75';
+import './walking.js?v=65';
 import './travel-mode.js?v=11';
 import { initBoatMode } from './boat-mode.js?v=25';
 import { setupFishingGame } from './fishing-game.js?v=2';
-import './sky.js?v=69';
+import './sky.js?v=75';
 import './weather.js?v=3';
 import './live-earth/controller.js?v=8';
 import './solar-system.js?v=62';
-import './space.js?v=81';
+import './space.js?v=82';
 import './planetary/scene-ownership.js?v=3';
 import './planetary/vehicles.js?v=1';
 import './planetary/astronaut.js?v=1';
-import './planetary/sky-orientation.js?v=2';
+import './planetary/sky-orientation.js?v=8';
 import './planetary/moon-sky.js?v=1';
 import './planetary/mars-world.js?v=13';
 import './planetary/tracks.js?v=1';
 import './ocean.js?v=5';
 import './game.js?v=56';
-import './input.js?v=58';
+import './input.js?v=59';
 import './hud.js?v=67';
 import './map.js?v=58';
 import { renderLoop } from './main.js?v=64';
@@ -46,7 +46,7 @@ import './memory.js?v=55';
 import './blocks.js?v=60';
 import './block-builder/ui.js?v=2';
 import './flower-challenge.js?v=56';
-import { setupUI } from './ui.js?v=86';
+import { setupUI } from './ui.js?v=89';
 
 let _booted = false;
 let _multiplayerObserverReady = false;
@@ -261,8 +261,8 @@ function scheduleTutorialInit() {
     _tutorialInitPromise = new Promise((resolve) => {
         scheduleIdleTask(async () => {
             try {
-                const mod = await import('./tutorial/tutorial.js?v=1');
-                if (typeof mod.initTutorial === 'function') mod.initTutorial(appCtx);
+                const mod = await import('./tutorial/tutorial.js?v=2');
+                if (typeof mod.initTutorial === 'function') mod.initTutorial();
             } catch (error) {
                 console.warn('[boot] Tutorial init deferred import failed.', error);
             } finally {
