@@ -133,6 +133,12 @@ function _updateEnvDebug() {
   _envDebugEl.textContent = 'ENV:' + (_activeEnv || 'INIT');
 }
 
-Object.assign(appCtx, { ENV, getEnv, isEnv, switchEnv });
+Object.defineProperty(appCtx, 'ENV', {
+  value: ENV,
+  enumerable: true,
+  configurable: false,
+  writable: false
+});
+Object.assign(appCtx, { getEnv, isEnv, switchEnv });
 
 export { ENV, getEnv, isEnv, switchEnv };

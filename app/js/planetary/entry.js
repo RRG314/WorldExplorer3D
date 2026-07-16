@@ -1,4 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { ENV, getEnv, switchEnv } from '../env.js?v=57';
 
 export function hidePlanetaryReturnControls() {
   appCtx.hideReturnToEarthButton?.();
@@ -50,8 +51,8 @@ export function prepareTitleEnvironment() {
   appCtx.setLunarEarthVisible?.(false);
   appCtx.setEarthSceneVisible?.(true);
 
-  if (appCtx.ENV?.EARTH && appCtx.getEnv?.() !== appCtx.ENV.EARTH) {
-    appCtx.switchEnv?.(appCtx.ENV.EARTH);
+  if (getEnv() !== ENV.EARTH) {
+    switchEnv(ENV.EARTH);
   }
   appCtx.onMoon = false;
   appCtx.onMars = false;
@@ -62,7 +63,7 @@ export function prepareTitleEnvironment() {
 
   return {
     previousEnv,
-    env: appCtx.getEnv?.() || null,
+    env: getEnv(),
     spaceFlightActive: !!appCtx.spaceFlight?.active
   };
 }

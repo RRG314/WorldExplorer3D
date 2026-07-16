@@ -1,7 +1,8 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { ENV, getEnv, switchEnv } from "../env.js?v=57";
 import { createGlobeSelector } from "./globe-selector.js?v=61";
 import { readSharedExperienceParams } from "./share-links.js?v=60";
-import { prepareTitleEnvironment } from "../planetary/entry.js?v=6";
+import { prepareTitleEnvironment } from "../planetary/entry.js?v=7";
 
 function initTitleScreenUi({
   lastLocationStorageKey,
@@ -151,16 +152,17 @@ function initTitleScreenUi({
       localStorage.setItem(lastLocationStorageKey, JSON.stringify(payload));
     } catch {}
   };
-  const startPlanetaryTitleLaunch = async () => {
-    if (titleLaunchMode !== 'moon' && titleLaunchMode !== 'mars' && titleLaunchMode !== 'space') return false;
+  const startPlanetaryTitleLaunch = async (requestedMode) => {
+    const launchMode = requestedMode === 'moon' || requestedMode === 'mars' || requestedMode === 'space' ? requestedMode : null;
+    if (!launchMode) return false;
     const resolveLauncher = () => {
-      if (titleLaunchMode === 'moon' && typeof appCtx.directTravelToMoon === 'function') {
+      if (launchMode === 'moon' && typeof appCtx.directTravelToMoon === 'function') {
         return () => appCtx.directTravelToMoon();
       }
-      if (titleLaunchMode === 'mars' && typeof appCtx.directTravelToMars === 'function') {
+      if (launchMode === 'mars' && typeof appCtx.directTravelToMars === 'function') {
         return () => appCtx.directTravelToMars();
       }
-      if (titleLaunchMode === 'space' && typeof appCtx.travelToMoon === 'function') {
+      if (launchMode === 'space' && typeof appCtx.travelToMoon === 'function') {
         return () => appCtx.travelToMoon();
       }
       return null;
@@ -171,32 +173,32 @@ function initTitleScreenUi({
       await new Promise((resolve) => window.setTimeout(resolve, 50));
       launch = resolveLauncher();
     }
-    if (!launch) throw new Error(`${titleLaunchMode} launch runtime did not become ready.`);
+    if (!launch) throw new Error(`${launchMode} launch runtime did not become ready.`);
 
     const titleReset = prepareTitleEnvironment();
-    if (titleReset.env !== appCtx.ENV.EARTH || titleReset.spaceFlightActive) {
+    if (titleReset.env !== ENV.EARTH || titleReset.spaceFlightActive) {
       throw new Error('Could not establish a clean title launch environment.');
     }
     appCtx.setBuildModeEnabled?.(false);
     updateControlsModeUI?.();
-    persistLastLocationSelection(titleLaunchMode);
+    persistLastLocationSelection(launchMode);
     emitTutorialEvent('spawned_in_world', {
       location: appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOCS?.[appCtx.selLoc] || null,
-      launchMode: titleLaunchMode
+      launchMode
     });
     const launchAccepted = await launch();
     const planetarySurfaceReady =
-      (titleLaunchMode === 'moon' && appCtx.getEnv?.() === appCtx.ENV.MOON && appCtx.onMoon) ||
-      (titleLaunchMode === 'mars' && appCtx.getEnv?.() === appCtx.ENV.MARS && appCtx.onMars);
+      (launchMode === 'moon' && getEnv() === ENV.MOON && appCtx.onMoon) ||
+      (launchMode === 'mars' && getEnv() === ENV.MARS && appCtx.onMars);
     const spaceFlightReady =
-      titleLaunchMode === 'space' &&
+      launchMode === 'space' &&
       appCtx.spaceFlight?.active &&
       appCtx.spaceFlight.destination === 'moon';
     if (
       launchAccepted === false ||
       (!planetarySurfaceReady && !spaceFlightReady)
     ) {
-      throw new Error(`${titleLaunchMode} launch was not accepted by the planetary runtime.`);
+      throw new Error(`${launchMode} launch was not accepted by the planetary runtime.`);
     }
     appCtx.loadingScreenMode = 'earth';
     return true;
@@ -490,8 +492,11 @@ function initTitleScreenUi({
   }));
 
   document.getElementById('startBtn')?.addEventListener('click', async () => {
+    const requestedLaunchMode = Object.entries(launchModeButtons)
+      .find(([, button]) => button?.classList.contains('active'))?.[0] || titleLaunchMode;
+    setLaunchMode(requestedLaunchMode);
     const externalBypassCustomGate = appCtx.pendingCustomLaunchBypass === true;
-    const shouldGateToGlobe = !appCtx.gameStarted && !skipGlobeGateOnce && !externalBypassCustomGate && titleLaunchMode === 'earth' && String(appCtx.selLoc || '') === 'custom';
+    const shouldGateToGlobe = !appCtx.gameStarted && !skipGlobeGateOnce && !externalBypassCustomGate && requestedLaunchMode === 'earth' && String(appCtx.selLoc || '') === 'custom';
     if (shouldGateToGlobe) {
       setTitleLocationMode('custom');
       globeSelector?.open?.();
@@ -503,7 +508,7 @@ function initTitleScreenUi({
     if (globeSelector?.isOpen?.()) globeSelector.close();
 
     const pendingFlowerChallengeRequested = typeof appCtx.consumePendingFlowerChallengeStart === 'function' ? appCtx.consumePendingFlowerChallengeStart() : false;
-    appCtx.loadingScreenMode = titleLaunchMode;
+    appCtx.loadingScreenMode = requestedLaunchMode;
     document.getElementById('titleScreen')?.classList.add('hidden');
     document.getElementById('hud')?.classList.add('show');
     document.getElementById('minimap')?.classList.add('show');
@@ -520,7 +525,7 @@ function initTitleScreenUi({
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     appCtx.disableNearBuildingBatching = appCtx.gameMode === 'painttown';
 
-    if (titleLaunchMode === 'ocean' && typeof appCtx.startOceanMode === 'function') {
+    if (requestedLaunchMode === 'ocean' && typeof appCtx.startOceanMode === 'function') {
       oceanEntryHadEarthWorld = hasLoadedEarthWorld();
       if (typeof appCtx.showTransitionLoad === 'function') await appCtx.showTransitionLoad('ocean', 1100);
       if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
@@ -530,9 +535,9 @@ function initTitleScreenUi({
       return;
     }
 
-    if (await startPlanetaryTitleLaunch()) return;
+    if (await startPlanetaryTitleLaunch(requestedLaunchMode)) return;
 
-    appCtx.switchEnv(appCtx.ENV.EARTH);
+    switchEnv(ENV.EARTH);
     resetTitleEarthTravelMode('title_earth_start');
     const explorationMsg = document.getElementById('explorationModeMsg');
     let explorationMsgTimeout;
@@ -594,10 +599,10 @@ function initTitleScreenUi({
     updateControlsModeUI?.();
     applySharedRuntimeState?.();
     if (typeof appCtx.startMode === 'function') appCtx.startMode();
-    persistLastLocationSelection(titleLaunchMode);
+    persistLastLocationSelection(requestedLaunchMode);
     emitTutorialEvent('spawned_in_world', {
       location: appCtx.selLoc === 'custom' ? appCtx.customLoc : appCtx.LOCS?.[appCtx.selLoc] || null,
-      launchMode: titleLaunchMode
+      launchMode: requestedLaunchMode
     });
     if (pendingFlowerChallengeRequested && typeof appCtx.startFlowerChallenge === 'function') {
       let challengeStartAttempts = 0;

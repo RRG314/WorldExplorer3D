@@ -17,7 +17,7 @@ import {
   showStarInfo
 } from "./sky/starfield-ui.js?v=4";
 import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
-import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=6";
+import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=7";
 // ============================================================================
 // sky.js - Time of day, starfield, constellations, moon system
 // ============================================================================

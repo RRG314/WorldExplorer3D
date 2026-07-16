@@ -2,12 +2,12 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=8";
-import { prepareTitleEnvironment } from "./planetary/entry.js?v=6";
+import { prepareTitleEnvironment } from "./planetary/entry.js?v=7";
 import { initMapInteractions } from "./ui/map-interactions.js?v=59";
 import { initMobileControls } from "./ui/mobile-controls.js?v=62";
 import { initShareUi } from "./ui/share-links.js?v=60";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=71";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=72";
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {

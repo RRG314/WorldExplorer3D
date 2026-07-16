@@ -1,7 +1,8 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { captureEarthWorldSession, resumeEarthWorldSession } from '../earth-session.js?v=8';
+import { ENV, getEnv, switchEnv } from '../env.js?v=57';
 import { configureColorTexture } from './catalog.js?v=1';
-import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=6';
+import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=7';
 
 const MARS_SIZE = 24000;
 const MARS_SEGMENTS = 200;
@@ -23,10 +24,10 @@ function cancelPendingMarsTransition() {
 
 function retainMarsTransitionOwnership(sessionId) {
   if (!isCurrentMarsTransition(sessionId)) return false;
-  if (appCtx.getEnv?.() !== appCtx.ENV.MARS) {
-    appCtx.switchEnv?.(appCtx.ENV.MARS);
+  if (getEnv() !== ENV.MARS) {
+    switchEnv(ENV.MARS);
   }
-  if (appCtx.getEnv?.() !== appCtx.ENV.MARS) return false;
+  if (getEnv() !== ENV.MARS) return false;
   appCtx.setEarthSceneVisible?.(false);
   return true;
 }
@@ -322,7 +323,7 @@ async function returnFromMars() {
     appCtx.camera.far = earthCameraFar;
     appCtx.camera.updateProjectionMatrix();
   }
-  appCtx.switchEnv(appCtx.ENV.EARTH);
+  switchEnv(ENV.EARTH);
   try {
     await resumeEarthWorldSession({
       switchEnv: false,
@@ -339,12 +340,12 @@ async function returnFromMars() {
 
 function prepareEarthDepartureForMars() {
   appCtx.cancelPendingEarthArrival?.();
-  if (appCtx.getEnv?.() === appCtx.ENV?.EARTH) captureEarthWorldSession();
+  if (getEnv() === ENV.EARTH) captureEarthWorldSession();
   appCtx.setEarthSceneVisible?.(false);
 }
 
 function prepareMarsTitleExit() {
-  if (appCtx.getEnv?.() !== appCtx.ENV?.MARS && !appCtx.onMars) return;
+  if (getEnv() !== ENV.MARS && !appCtx.onMars) return;
   setMarsObjectsVisible(false);
   setMarsInterfaceActive(false);
   appCtx.scene.fog = null;
