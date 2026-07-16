@@ -41,6 +41,11 @@ function isEnv(env) {
   return _activeEnv === env;
 }
 
+function setEnvironmentTransitionActive(active) {
+  appCtx.travelingToMoon = active === true;
+  return appCtx.travelingToMoon;
+}
+
 function switchEnv(newEnv) {
   // Guard: no re-entrant transitions
   if (_transitioning) {
@@ -92,7 +97,7 @@ function _syncLegacyFlags(env) {
     case ENV.EARTH:
       appCtx.onMoon = false;
       appCtx.onMars = false;
-      appCtx.travelingToMoon = false;
+      setEnvironmentTransitionActive(false);
       break;
     case ENV.SPACE_FLIGHT:
       // travelingToMoon is set by the caller before switchEnv
@@ -101,17 +106,17 @@ function _syncLegacyFlags(env) {
     case ENV.MOON:
       appCtx.onMoon = true;
       appCtx.onMars = false;
-      appCtx.travelingToMoon = false;
+      setEnvironmentTransitionActive(false);
       break;
     case ENV.MARS:
       appCtx.onMoon = false;
       appCtx.onMars = true;
-      appCtx.travelingToMoon = false;
+      setEnvironmentTransitionActive(false);
       break;
     case ENV.OCEAN:
       appCtx.onMoon = false;
       appCtx.onMars = false;
-      appCtx.travelingToMoon = false;
+      setEnvironmentTransitionActive(false);
       break;
   }
 }
@@ -139,6 +144,6 @@ Object.defineProperty(appCtx, 'ENV', {
   configurable: false,
   writable: false
 });
-Object.assign(appCtx, { getEnv, isEnv, switchEnv });
+Object.assign(appCtx, { getEnv, isEnv, setEnvironmentTransitionActive, switchEnv });
 
-export { ENV, getEnv, isEnv, switchEnv };
+export { ENV, getEnv, isEnv, setEnvironmentTransitionActive, switchEnv };

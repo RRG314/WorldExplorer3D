@@ -75,7 +75,7 @@ function onKey(code, event) {
     if (appCtx.Walk && appCtx.Walk.state.mode === 'walk') {
       appCtx.Walk.toggleView();
     } else {
-      appCtx.camMode = (appCtx.camMode + 1) % 3; // Normal car camera cycling
+      appCtx.cycleCameraMode();
     }
     return;
   }
@@ -159,8 +159,8 @@ function onKey(code, event) {
       appCtx.showLargeMap = false;
       document.getElementById('largeMap').classList.remove('show');
     } else {
-      appCtx.paused = !appCtx.paused;
-      document.getElementById('pauseScreen').classList.toggle('show', appCtx.paused);
+      const paused = appCtx.togglePauseReason?.('manual_pause') ?? appCtx.paused;
+      document.getElementById('pauseScreen').classList.toggle('show', paused);
     }
   }
 }
@@ -219,10 +219,10 @@ function rebuildTrackMesh() {
 
 function nextCity() {
   if (appCtx.selLoc === 'custom') {
-    appCtx.selLoc = appCtx.locKeys[0];
+    appCtx.selectPresetLocation?.(appCtx.locKeys[0]);
   } else {
     const idx = appCtx.locKeys.indexOf(appCtx.selLoc);
-    appCtx.selLoc = appCtx.locKeys[(idx + 1) % appCtx.locKeys.length];
+    appCtx.selectPresetLocation?.(appCtx.locKeys[(idx + 1) % appCtx.locKeys.length]);
   }
   appCtx.loadRoads();
 }
@@ -388,8 +388,7 @@ async function searchLocation() {
     // Debug log removed
 
     // Set custom location
-    appCtx.customLoc = { lat, lon, name: locationName };
-    appCtx.selLoc = 'custom';
+    appCtx.setCustomLocation?.({ lat, lon, name: locationName });
 
     // Debug log removed
     // Debug log removed

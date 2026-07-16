@@ -152,7 +152,7 @@ export async function enterInteriorForSupport(support, deps) {
 
   const sceneState = deps.buildInteriorScene(definition);
   appCtx.scene.add(sceneState.group);
-  appCtx.dynamicBuildingColliders = sceneState.dynamicColliders.slice();
+  appCtx.replaceWorldCollection('dynamicBuildingColliders', sceneState.dynamicColliders.slice());
 
   const exteriorShellState = support.synthetic ? [] : prepareExteriorShellForInterior(support.building);
   const suppressedWorldMeshes = collectInteriorWorldSuppressionStates(
@@ -238,7 +238,7 @@ export async function enterInteriorForSupport(support, deps) {
 export function clearActiveInterior(options = {}, deps) {
   const active = appCtx.activeInterior;
   if (!active) {
-    appCtx.dynamicBuildingColliders = [];
+    appCtx.replaceWorldCollection('dynamicBuildingColliders');
     if (!options.preservePrompt) clearPrompt();
     return false;
   }
@@ -269,7 +269,7 @@ export function clearActiveInterior(options = {}, deps) {
   }
   restoreExteriorShellState(active.exteriorShellState);
   restoreInteriorWorldSuppression(active.suppressedWorldMeshes);
-  appCtx.dynamicBuildingColliders = [];
+  appCtx.replaceWorldCollection('dynamicBuildingColliders');
   disposeObject3D(active.group);
   appCtx.activeInterior = null;
   appCtx.interiorHint = null;

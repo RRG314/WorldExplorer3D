@@ -92,7 +92,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
       return { aborted: true };
     }
     appCtx.LOC = { lat, lon };
-    appCtx.customLoc = { lat, lon, name: appCtx.customLoc?.name || 'Custom' };
+    appCtx.setCustomLocation?.({ lat, lon, name: appCtx.customLoc?.name || 'Custom' }, { syncInputs: false });
   } else {
     appCtx.LOC = { lat: appCtx.LOCS[appCtx.selLoc].lat, lon: appCtx.LOCS[appCtx.selLoc].lon };
   }

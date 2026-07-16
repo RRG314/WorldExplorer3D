@@ -287,7 +287,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
       }
     }
   });
-  appCtx.roadMeshes = retainedRoadMeshes;
+  appCtx.replaceWorldCollection('roadMeshes', retainedRoadMeshes);
 
   const retainedUrbanSurfaceMeshes = [];
   appCtx.urbanSurfaceMeshes.forEach((mesh) => {
@@ -301,7 +301,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
       mesh.material.dispose();
     }
   });
-  appCtx.urbanSurfaceMeshes = retainedUrbanSurfaceMeshes;
+  appCtx.replaceWorldCollection('urbanSurfaceMeshes', retainedUrbanSurfaceMeshes);
   appCtx.urbanSurfaceStats = {
     sidewalkBatchCount: 0,
     sidewalkVertices: 0,

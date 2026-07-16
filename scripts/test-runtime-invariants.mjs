@@ -502,13 +502,18 @@ async function main() {
         const building = colliders[i];
         if (!building || building.colliderDetail !== 'full') continue;
         if (!Number.isFinite(building.centerX) || !Number.isFinite(building.centerZ)) continue;
-        const hit = ctx.checkBuildingCollision?.(building.centerX, building.centerZ, 1.5);
+        const actorBaseY = Number(ctx.terrainMeshHeightAt?.(building.centerX, building.centerZ));
+        if (!Number.isFinite(actorBaseY)) continue;
+        const hit = ctx.checkBuildingCollision?.(building.centerX, building.centerZ, 1.5, {
+          actorBaseY,
+          actorHeight: 1.9
+        });
         if (!hit?.collision) continue;
         sampleBuilding = building;
         sample = {
           x: building.centerX,
           z: building.centerZ,
-          baseY: Number.isFinite(building.baseY) ? building.baseY : 0,
+          baseY: actorBaseY,
           height: Number.isFinite(building.height) ? building.height : 10
         };
         break;
@@ -527,8 +532,14 @@ async function main() {
           angle: 0,
           source: 'runtime_test_walk'
         });
-        const driveBlocked = !!ctx.checkBuildingCollision?.(driveResolved?.x, driveResolved?.z, 2.0)?.collision;
-        const walkBlocked = !!ctx.checkBuildingCollision?.(walkResolved?.x, walkResolved?.z, 1.5)?.collision;
+        const driveBlocked = !!ctx.checkBuildingCollision?.(driveResolved?.x, driveResolved?.z, 2.0, {
+          actorBaseY: Number(driveResolved?.carY) - 1.2,
+          actorHeight: 1.9
+        })?.collision;
+        const walkBlocked = !!ctx.checkBuildingCollision?.(walkResolved?.x, walkResolved?.z, 1.5, {
+          actorBaseY: Number(walkResolved?.walkY) - 1.7,
+          actorHeight: 1.9
+        })?.collision;
         if (driveResolved?.valid && !driveBlocked && driveResolved.onRoad) out.driveSpawnSafe = 1;
         if (walkResolved?.valid && !walkBlocked) out.walkSpawnSafe = 1;
         out.spawnPreview.push({

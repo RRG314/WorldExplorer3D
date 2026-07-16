@@ -1,5 +1,19 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { resolveObservedEarthLocation, haversineKm } from "./earth-location.js?v=2";
+import {
+  assignResolvedPlace,
+  cleanCountry,
+  fetchJsonWithTimeout,
+  fetchPlaceForLocation,
+  getActiveWeatherLocationLabel,
+  getFallbackPlaceLabel,
+  parseReverseAddress,
+  placeCacheKey,
+  refreshLivePlace,
+  uniqueNonEmptyParts,
+  weatherCacheKey
+} from './weather/place-resolver.js?v=1';
+import { weatherCodeDescriptor } from './weather/catalog.js?v=1';
 
 const WEATHER_API_BASE = 'https://api.open-meteo.com/v1/forecast';
 const WEATHER_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
@@ -7,7 +21,6 @@ const WEATHER_FETCH_TIMEOUT_MS = 9000;
 const WEATHER_CHECK_INTERVAL_MS = 5000;
 const WEATHER_RETRY_DELAY_MS = 450;
 const WEATHER_MAX_ATTEMPTS = 2;
-const WEATHER_LOCATION_PRECISION = 1;
 const WEATHER_MOVE_THRESHOLD_KM = 12;
 const WEATHER_MODES = ['live', 'clear', 'cloudy', 'overcast', 'rain', 'snow', 'fog', 'storm'];
 const WEATHER_FOG_COLOR = 0x9aa4b2;
@@ -20,41 +33,6 @@ let _lastWeatherUiSignature = '';
 let _lastWeatherCheckMs = 0;
 let _pendingWeatherRequest = null;
 let _weatherUiClockInterval = null;
-let _pendingPlaceRequest = null;
-
-const PLACE_API_TIMEOUT_MS = 6500;
-const PLACE_LOCATION_PRECISION = 2;
-
-const WMO_CODE_MAP = new Map([
-  [0, { label: 'Clear', category: 'clear', icon: '☀️' }],
-  [1, { label: 'Mostly Clear', category: 'clear', icon: '🌤️' }],
-  [2, { label: 'Partly Cloudy', category: 'cloudy', icon: '⛅' }],
-  [3, { label: 'Overcast', category: 'overcast', icon: '☁️' }],
-  [45, { label: 'Fog', category: 'fog', icon: '🌫️' }],
-  [48, { label: 'Rime Fog', category: 'fog', icon: '🌫️' }],
-  [51, { label: 'Light Drizzle', category: 'rain', icon: '🌦️' }],
-  [53, { label: 'Drizzle', category: 'rain', icon: '🌦️' }],
-  [55, { label: 'Dense Drizzle', category: 'rain', icon: '🌧️' }],
-  [56, { label: 'Freezing Drizzle', category: 'snow', icon: '🌨️' }],
-  [57, { label: 'Dense Freezing Drizzle', category: 'snow', icon: '🌨️' }],
-  [61, { label: 'Light Rain', category: 'rain', icon: '🌦️' }],
-  [63, { label: 'Rain', category: 'rain', icon: '🌧️' }],
-  [65, { label: 'Heavy Rain', category: 'rain', icon: '🌧️' }],
-  [66, { label: 'Freezing Rain', category: 'snow', icon: '🌨️' }],
-  [67, { label: 'Heavy Freezing Rain', category: 'snow', icon: '🌨️' }],
-  [71, { label: 'Light Snow', category: 'snow', icon: '🌨️' }],
-  [73, { label: 'Snow', category: 'snow', icon: '❄️' }],
-  [75, { label: 'Heavy Snow', category: 'snow', icon: '❄️' }],
-  [77, { label: 'Snow Grains', category: 'snow', icon: '❄️' }],
-  [80, { label: 'Rain Showers', category: 'rain', icon: '🌦️' }],
-  [81, { label: 'Heavy Showers', category: 'rain', icon: '🌧️' }],
-  [82, { label: 'Violent Showers', category: 'storm', icon: '⛈️' }],
-  [85, { label: 'Snow Showers', category: 'snow', icon: '🌨️' }],
-  [86, { label: 'Heavy Snow Showers', category: 'snow', icon: '❄️' }],
-  [95, { label: 'Thunderstorm', category: 'storm', icon: '⛈️' }],
-  [96, { label: 'Thunderstorm & Hail', category: 'storm', icon: '⛈️' }],
-  [99, { label: 'Severe Storm', category: 'storm', icon: '⛈️' }]
-]);
 
 const WEATHER_PRESETS = {
   clear: { label: 'Clear', icon: '☀️', category: 'clear', cloudCover: 8, haze: 0.92, sunFactor: 1, fillFactor: 1, exposureFactor: 1.02, cloudColor: WEATHER_CLEAR_COLOR, skyTint: 0xd8efff },
@@ -163,155 +141,6 @@ function getWeatherModeDisplay(mode, activeState = null) {
   }
   const preset = WEATHER_PRESETS[mode] || WEATHER_PRESETS.clear;
   return { icon: preset.icon, label: `Weather: ${preset.label}` };
-}
-
-function getActiveWeatherLocationLabel() {
-  if (appCtx.selLoc === 'custom') {
-    const name = String(appCtx.customLoc?.name || '').trim();
-    return name || 'Custom Location';
-  }
-  const preset = appCtx.LOCS?.[appCtx.selLoc];
-  if (preset?.name) return String(preset.name);
-  const fallback = String(appCtx.customLoc?.name || '').trim();
-  return fallback || 'Current Location';
-}
-
-function weatherCacheKey(lat, lon) {
-  return `${lat.toFixed(WEATHER_LOCATION_PRECISION)}:${lon.toFixed(WEATHER_LOCATION_PRECISION)}`;
-}
-
-function placeCacheKey(lat, lon) {
-  return `${lat.toFixed(PLACE_LOCATION_PRECISION)}:${lon.toFixed(PLACE_LOCATION_PRECISION)}`;
-}
-
-function cleanCountry(value) {
-  const text = String(value || '').trim();
-  if (!text) return '';
-  return text === 'United States of America' ? 'United States' : text;
-}
-
-function uniqueNonEmptyParts(parts) {
-  const out = [];
-  const seen = new Set();
-  for (const part of parts || []) {
-    const text = String(part || '').trim();
-    const key = text.toLowerCase();
-    if (!text || seen.has(key)) continue;
-    seen.add(key);
-    out.push(text);
-  }
-  return out;
-}
-
-function parseReverseAddress(payload) {
-  const addr = payload?.address || {};
-  const adminRows = Array.isArray(payload?.localityInfo?.administrative) ? payload.localityInfo.administrative : [];
-  const countyFromBdc = adminRows.find((row) => Number(row?.adminLevel) === 6)?.name ||
-    adminRows.find((row) => /county/i.test(String(row?.description || '')))?.name ||
-    '';
-  const city =
-    addr.city ||
-    addr.town ||
-    addr.village ||
-    addr.hamlet ||
-    addr.municipality ||
-    addr.city_district ||
-    payload?.city ||
-    payload?.locality ||
-    '';
-  const county =
-    addr.county ||
-    addr.state_district ||
-    addr.district ||
-    countyFromBdc ||
-    '';
-  const region =
-    addr.state ||
-    addr.region ||
-    addr.province ||
-    addr.territory ||
-    payload?.principalSubdivision ||
-    '';
-  const country = cleanCountry(addr.country || payload?.countryName || '');
-  const parts = uniqueNonEmptyParts([city, county, region, country]);
-  const display =
-    parts.join(', ') ||
-    String(payload?.display_name || '').split(',').slice(0, 4).map((v) => String(v || '').trim()).filter(Boolean).join(', ');
-  return {
-    display,
-    shortLabel: city || county || region || country || '',
-    details: { city, county, region, country }
-  };
-}
-
-async function fetchJsonWithTimeout(url, timeoutMs = PLACE_API_TIMEOUT_MS) {
-  const controller = new AbortController();
-  const timeoutId = window.setTimeout(() => controller.abort(), timeoutMs);
-  try {
-    const response = await fetch(url, { signal: controller.signal });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.json();
-  } finally {
-    window.clearTimeout(timeoutId);
-  }
-}
-
-async function fetchPlaceForLocation(lat, lon) {
-  const nominatimUrl = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=10&addressdetails=1&lat=${encodeURIComponent(lat.toFixed(6))}&lon=${encodeURIComponent(lon.toFixed(6))}`;
-  try {
-    return parseReverseAddress(await fetchJsonWithTimeout(nominatimUrl, 6000));
-  } catch {
-    const bdcUrl = `https://api-bdc.io/data/reverse-geocode-client?latitude=${encodeURIComponent(lat.toFixed(6))}&longitude=${encodeURIComponent(lon.toFixed(6))}&localityLanguage=en`;
-    return parseReverseAddress(await fetchJsonWithTimeout(bdcUrl, 7000));
-  }
-}
-
-function getFallbackPlaceLabel(location) {
-  const activeName = getActiveWeatherLocationLabel();
-  return {
-    display: activeName,
-    shortLabel: activeName,
-    details: null
-  };
-}
-
-function assignResolvedPlace(place, location) {
-  const resolved = place?.display ? place : getFallbackPlaceLabel(location);
-  appCtx.livePlaceState = {
-    ...resolved,
-    lat: location.lat,
-    lon: location.lon,
-    key: placeCacheKey(location.lat, location.lon)
-  };
-  return appCtx.livePlaceState;
-}
-
-async function refreshLivePlace(location, force = false) {
-  if (!Number.isFinite(location?.lat) || !Number.isFinite(location?.lon)) return appCtx.livePlaceState || null;
-  const key = placeCacheKey(location.lat, location.lon);
-  const cache = appCtx.placeCache instanceof Map ? appCtx.placeCache : (appCtx.placeCache = new Map());
-  const cached = cache.get(key) || null;
-  if (!force && cached) return assignResolvedPlace(cached, location);
-  if (_pendingPlaceRequest?.key === key && !force) {
-    try {
-      await _pendingPlaceRequest.promise;
-    } catch {
-      // fall through to current value
-    }
-    return appCtx.livePlaceState || null;
-  }
-  const promise = fetchPlaceForLocation(location.lat, location.lon).then((place) => {
-    cache.set(key, place);
-    return assignResolvedPlace(place, location);
-  }).catch(() => assignResolvedPlace(getFallbackPlaceLabel(location), location)).finally(() => {
-    if (_pendingPlaceRequest?.key === key) _pendingPlaceRequest = null;
-  });
-  _pendingPlaceRequest = { key, promise };
-  return await promise;
-}
-
-function weatherCodeDescriptor(code) {
-  return WMO_CODE_MAP.get(Number(code)) || { label: 'Weather', category: 'cloudy', icon: '🌦️' };
 }
 
 function weatherVisualProfile(state) {

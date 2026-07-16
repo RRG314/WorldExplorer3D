@@ -121,7 +121,7 @@ function initTitleScreenUi({
         document.querySelectorAll('.loc').forEach((element) => element.classList.remove('sel'));
         customCard.classList.add('sel');
       }
-      appCtx.selLoc = 'custom';
+      appCtx.activateCustomLocation?.();
       customPanel?.classList.remove('show');
       return;
     }
@@ -129,7 +129,7 @@ function initTitleScreenUi({
     if (selectedSuggested) {
       document.querySelectorAll('.loc').forEach((element) => element.classList.remove('sel'));
       selectedSuggested.classList.add('sel');
-      appCtx.selLoc = selectedSuggested.dataset.loc;
+      appCtx.selectPresetLocation?.(selectedSuggested.dataset.loc);
     }
     customPanel?.classList.remove('show');
   };
@@ -213,9 +213,7 @@ function initTitleScreenUi({
       const customLonInput = document.getElementById('customLon');
       if (customLatInput) customLatInput.value = lat.toFixed(6);
       if (customLonInput) customLonInput.value = lon.toFixed(6);
-      appCtx.customLoc = { lat, lon, name: String(record.customLoc.name || 'Custom Location') };
-      appCtx.customLocTransient = false;
-      appCtx.selLoc = 'custom';
+      appCtx.setCustomLocation?.({ lat, lon, name: String(record.customLoc.name || 'Custom Location') });
       setTitleLocationMode('custom');
       setLaunchMode(launch);
       return true;
@@ -227,7 +225,7 @@ function initTitleScreenUi({
       document.querySelectorAll('.loc').forEach((element) => element.classList.remove('sel'));
       card.classList.add('sel');
     }
-    appCtx.selLoc = locKey;
+    appCtx.selectPresetLocation?.(locKey);
     setTitleLocationMode('suggested');
     setLaunchMode(launch);
     return true;
@@ -293,7 +291,7 @@ function initTitleScreenUi({
       const position = await requestCurrentPosition();
       const coords = clampDetectedCoords(position.lat, position.lon);
       const coordsName = `Current Location ${coords.lat.toFixed(3)}, ${coords.lon.toFixed(3)}`;
-      appCtx.customLocTransient = true;
+      appCtx.setCustomLocationTransient?.(true);
       if (globeSelector?.applySelectionAndResolve) {
         globeSelector.applySelectionAndResolve(coords.lat, coords.lon, {
           name: coordsName,
@@ -304,8 +302,7 @@ function initTitleScreenUi({
           skipAutoFavorite: true
         });
       } else {
-        appCtx.customLoc = { lat: coords.lat, lon: coords.lon, name: coordsName };
-        appCtx.selLoc = 'custom';
+        appCtx.setCustomLocation?.({ lat: coords.lat, lon: coords.lon, name: coordsName }, { transient: true });
       }
       const successMessage = 'Location found. Review it on the globe, then press Start Here.';
       setTitleUseMyLocationStatus(successMessage, '#059669');
@@ -393,7 +390,7 @@ function initTitleScreenUi({
     if (!selectedLoc || selectedLoc.dataset.loc === 'custom') return;
     document.querySelectorAll('.loc').forEach((element) => element.classList.remove('sel'));
     selectedLoc.classList.add('sel');
-    appCtx.selLoc = selectedLoc.dataset.loc;
+    appCtx.selectPresetLocation?.(selectedLoc.dataset.loc);
     customPanel?.classList.remove('show');
     setLaunchMode('earth');
   };
@@ -401,7 +398,8 @@ function initTitleScreenUi({
   document.querySelectorAll('.loc').forEach((element) => element.addEventListener('click', () => {
     document.querySelectorAll('.loc').forEach((node) => node.classList.remove('sel'));
     element.classList.add('sel');
-    appCtx.selLoc = element.dataset.loc;
+    if (element.dataset.loc === 'custom') appCtx.activateCustomLocation?.();
+    else appCtx.selectPresetLocation?.(element.dataset.loc);
     if (appCtx.selLoc === 'custom') {
       setTitleLocationMode('custom');
       globeSelector.open();
@@ -445,13 +443,11 @@ function initTitleScreenUi({
       const customLonInput = document.getElementById('customLon');
       if (customLatInput) customLatInput.value = sharedExperienceParams.lat.toFixed(6);
       if (customLonInput) customLonInput.value = sharedExperienceParams.lon.toFixed(6);
-      appCtx.customLoc = {
+      appCtx.setCustomLocation?.({
         lat: sharedExperienceParams.lat,
         lon: sharedExperienceParams.lon,
         name: sharedExperienceParams.name || appCtx.customLoc?.name || 'Shared Location'
-      };
-      appCtx.customLocTransient = false;
-      appCtx.selLoc = 'custom';
+      });
       setTitleLocationMode('custom');
     } else if (sharedExperienceParams.loc === 'custom' && !hasCustomCoords && perfSettingsStatus) {
       perfSettingsStatus.textContent = 'Share link missing custom coordinates (lat/lon). Using current location selection.';
@@ -461,7 +457,7 @@ function initTitleScreenUi({
         document.querySelectorAll('.loc').forEach((element) => element.classList.remove('sel'));
         selectedLocCard.classList.add('sel');
       }
-      appCtx.selLoc = sharedExperienceParams.loc;
+      appCtx.selectPresetLocation?.(sharedExperienceParams.loc);
       customPanel?.classList.remove('show');
       setLaunchMode('earth');
     }

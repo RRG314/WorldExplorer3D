@@ -56,7 +56,7 @@ export function prepareTitleEnvironment() {
   }
   void appCtx.setPlanetaryVehicle?.('earth');
   appCtx.setPlanetaryCharacter?.('earth');
-  appCtx.paused = false;
+  appCtx.clearPauseReasons?.();
 
   return {
     previousEnv,

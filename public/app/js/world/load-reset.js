@@ -75,34 +75,33 @@ export function resetWorldForReload(options = {}) {
   }
 
   disposeSceneMeshes(appCtx.roadMeshes);
-  appCtx.roadMeshes = [];
-  appCtx.roads = [];
+  appCtx.clearWorldCollections(['roadMeshes', 'roads']);
 
   if (typeof appCtx.clearStructureVisualMeshes === 'function') {
     appCtx.clearStructureVisualMeshes();
   } else {
-    appCtx.structureVisualMeshes = [];
+    appCtx.replaceWorldCollection('structureVisualMeshes');
   }
 
   disposeSceneMeshes(appCtx.urbanSurfaceMeshes, { skipSharedUrbanSurfaceMaterial: true });
-  appCtx.urbanSurfaceMeshes = [];
+  appCtx.replaceWorldCollection('urbanSurfaceMeshes');
   invalidateTraversalNetworks('world_reload_reset');
   appCtx.navigationRoutePoints = [];
   appCtx.navigationRouteDistance = 0;
 
   disposeSceneMeshes(appCtx.buildingMeshes);
-  appCtx.buildingMeshes = [];
-  appCtx.buildings = [];
-  appCtx.dynamicBuildingColliders = [];
+  appCtx.clearWorldCollections(['buildingMeshes', 'buildings', 'dynamicBuildingColliders']);
   clearBuildingSpatialIndex();
 
   disposeSceneMeshes(appCtx.landuseMeshes);
-  appCtx.landuseMeshes = [];
-  appCtx.landuses = [];
-  appCtx.surfaceFeatureHints = [];
-  appCtx.waterAreas = [];
-  appCtx.waterways = [];
-  appCtx.waterWaveVisuals = [];
+  appCtx.clearWorldCollections([
+    'landuseMeshes',
+    'landuses',
+    'surfaceFeatureHints',
+    'waterAreas',
+    'waterways',
+    'waterWaveVisuals'
+  ]);
   if (typeof appCtx.setWorldSurfaceProfile === 'function') {
     appCtx.setWorldSurfaceProfile(null);
   } else {
@@ -110,24 +109,20 @@ export function resetWorldForReload(options = {}) {
   }
 
   disposeSceneMeshes(appCtx.linearFeatureMeshes);
-  appCtx.linearFeatureMeshes = [];
-  appCtx.linearFeatures = [];
+  appCtx.clearWorldCollections(['linearFeatureMeshes', 'linearFeatures']);
 
   disposeSceneMeshes(appCtx.poiMeshes);
-  appCtx.poiMeshes = [];
-  appCtx.pois = [];
+  appCtx.clearWorldCollections(['poiMeshes', 'pois']);
 
   disposeSceneMeshes(appCtx.historicMarkers);
-  appCtx.historicMarkers = [];
-  appCtx.historicSites = [];
+  appCtx.clearWorldCollections(['historicMarkers', 'historicSites']);
   appCtx.curatedLandmarkMetrics = null;
 
   disposeSceneMeshes(appCtx.streetFurnitureMeshes);
-  appCtx.streetFurnitureMeshes = [];
+  appCtx.replaceWorldCollection('streetFurnitureMeshes');
 
   disposeSceneMeshes(appCtx.vegetationMeshes);
-  appCtx.vegetationMeshes = [];
-  appCtx.vegetationFeatures = [];
+  appCtx.clearWorldCollections(['vegetationMeshes', 'vegetationFeatures']);
   appCtx.osmTreeNodes = [];
   appCtx.osmTreeRows = [];
   appCtx._worldLoadNodes = null;

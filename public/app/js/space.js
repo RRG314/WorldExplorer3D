@@ -68,8 +68,8 @@ function startSpaceFlightToMoon() {
   console.log("Starting space flight to Moon...");
   const sessionId = beginSpaceFlightSession();
 
-  appCtx.travelingToMoon = true;
-  appCtx.paused = true;
+  appCtx.setEnvironmentTransitionActive(true);
+  appCtx.setPauseReason?.('planetary_transition', true);
   appCtx.earthPosition = { x: appCtx.car.x, z: appCtx.car.z, angle: appCtx.car.angle };
   captureEarthWorldSession();
   suspendEarthModesForPlanetaryEntry();
@@ -126,8 +126,8 @@ function startSpaceFlightToEarth() {
   console.log("Starting space flight to Earth...");
   const sessionId = beginSpaceFlightSession();
 
-  appCtx.travelingToMoon = true;
-  appCtx.paused = true;
+  appCtx.setEnvironmentTransitionActive(true);
+  appCtx.setPauseReason?.('planetary_transition', true);
   if (typeof appCtx.hideReturnToEarthButton === 'function') appCtx.hideReturnToEarthButton();
 
   appCtx.spaceFlight.destination = 'earth';
@@ -170,8 +170,8 @@ function startSpaceFlightToMars() {
   if (appCtx.onMars) return false;
   if (appCtx.spaceFlight.active) return appCtx.spaceFlight.destination === 'mars';
   const sessionId = beginSpaceFlightSession();
-  appCtx.travelingToMoon = true;
-  appCtx.paused = true;
+  appCtx.setEnvironmentTransitionActive(true);
+  appCtx.setPauseReason?.('planetary_transition', true);
   appCtx.earthPosition = { x: appCtx.car.x, z: appCtx.car.z, angle: appCtx.car.angle };
   appCtx.prepareEarthDepartureForMars?.();
   suspendEarthModesForPlanetaryEntry();

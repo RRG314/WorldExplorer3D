@@ -41,48 +41,10 @@ function waitForRenderedFrames(frameCount = 2, timeoutMs = 280) {
 function getEarthSessionState() {
   if (!appCtx.earthSessionState || typeof appCtx.earthSessionState !== 'object') {
     appCtx.earthSessionState = {
-      loadedSignature: '',
-      loadedSelLoc: 'baltimore',
-      loadedCustomLoc: null,
       pose: null
     };
   }
   return appCtx.earthSessionState;
-}
-
-function cloneCustomLoc(customLoc) {
-  const lat = Number(customLoc?.lat);
-  const lon = Number(customLoc?.lon);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  return {
-    lat,
-    lon,
-    name: String(customLoc?.name || 'Custom Location')
-  };
-}
-
-function readCustomSelection() {
-  const customLatInput = document.getElementById('customLat');
-  const customLonInput = document.getElementById('customLon');
-  const lat = Number(appCtx.customLoc?.lat ?? customLatInput?.value);
-  const lon = Number(appCtx.customLoc?.lon ?? customLonInput?.value);
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) return null;
-  return {
-    lat,
-    lon,
-    name: String(appCtx.customLoc?.name || 'Custom Location')
-  };
-}
-
-function currentSelectionSignature() {
-  if (appCtx.selLoc === 'custom') {
-    const customLoc = readCustomSelection();
-    if (customLoc) {
-      return `custom:${customLoc.lat.toFixed(6)}:${customLoc.lon.toFixed(6)}`;
-    }
-  }
-  const locKey = appCtx.LOCS?.[appCtx.selLoc] ? String(appCtx.selLoc) : 'baltimore';
-  return `preset:${locKey}`;
 }
 
 function hasLoadedEarthWorld() {
@@ -175,9 +137,7 @@ function captureCurrentPose() {
 
 function stampLoadedSelection() {
   const state = getEarthSessionState();
-  state.loadedSignature = currentSelectionSignature();
-  state.loadedSelLoc = appCtx.selLoc === 'custom' ? 'custom' : String(appCtx.selLoc || 'baltimore');
-  state.loadedCustomLoc = cloneCustomLoc(readCustomSelection());
+  appCtx.markLocationSelectionLoaded?.();
   captureCurrentPose();
   return state;
 }
@@ -186,27 +146,11 @@ function canResumeEarthSession() {
   const state = getEarthSessionState();
   if (!hasLoadedEarthWorld()) return false;
   if (appCtx.worldDetailState?.buildings?.status === 'loading') return false;
-  if (!state.loadedSignature) return false;
-  if (state.loadedSignature !== currentSelectionSignature()) return false;
-  return true;
+  return appCtx.isLoadedLocationSelectionCurrent?.() === true;
 }
 
 function restoreSelectionFromState() {
-  const state = getEarthSessionState();
-  if (!state.loadedSignature) {
-    return normalizeEarthSelection();
-  }
-  if (state.loadedSelLoc === 'custom' && state.loadedCustomLoc) {
-    appCtx.selLoc = 'custom';
-    appCtx.customLoc = cloneCustomLoc(state.loadedCustomLoc);
-    appCtx.customLocTransient = false;
-    const customLatInput = document.getElementById('customLat');
-    const customLonInput = document.getElementById('customLon');
-    if (customLatInput) customLatInput.value = state.loadedCustomLoc.lat.toFixed(6);
-    if (customLonInput) customLonInput.value = state.loadedCustomLoc.lon.toFixed(6);
-    return 'custom';
-  }
-  return normalizeEarthSelection();
+  return appCtx.restoreLoadedLocationSelection?.() || normalizeEarthSelection();
 }
 
 function restorePoseFromSession() {
@@ -316,20 +260,7 @@ export function shouldReuseExistingEarthWorld() {
 }
 
 export function normalizeEarthSelection() {
-  if (appCtx.selLoc === 'custom') {
-    const customLoc = readCustomSelection();
-    if (customLoc) {
-      appCtx.customLoc = customLoc;
-      appCtx.customLocTransient = false;
-      return 'custom';
-    }
-  }
-
-  if (!appCtx.LOCS?.[appCtx.selLoc]) {
-    appCtx.selLoc = 'baltimore';
-  }
-  appCtx.customLocTransient = false;
-  return String(appCtx.selLoc || 'baltimore');
+  return appCtx.normalizeLocationSelection?.('baltimore') || String(appCtx.selLoc || 'baltimore');
 }
 
 export function captureEarthWorldSession() {

@@ -9,6 +9,8 @@ import {
   normalizeBlockShape
 } from "./block-builder/catalog.js?v=1";
 import { createBuildCollisionQueries } from "./block-builder/collision.js?v=1";
+import { createBlockLocalStore } from './block-builder/local-store.js?v=1';
+import { createSharedBlockSync } from './block-builder/shared-sync.js?v=1';
 // ============================================================================
 // blocks.js - Lightweight voxel-style builder (place/stack/remove brick blocks)
 // ============================================================================
@@ -32,22 +34,11 @@ let buildModeEnabled = false;
 let buildGroup = null;
 const buildGeometries = new Map();
 
-let buildPersistenceEnabled = false;
-let buildPersistenceDetail = 'Not initialized.';
-let buildEntries = [];
 let buildTool = 'place';
 let buildMaterialIndex = 0;
 let buildShape = 'cube';
 let buildRotation = 0;
 let buildActionHistory = [];
-let sharedBuildSyncEnabled = false;
-let sharedBuildRoomId = '';
-let sharedBuildEntries = [];
-let sharedBuildEntryMap = new Map();
-let sharedBuildUpsertFn = null;
-let sharedBuildRemoveFn = null;
-let sharedBuildClearMineFn = null;
-
 const buildBlocks = new Map();
 const buildColumns = new Map();
 const buildMaterials = [];
@@ -96,6 +87,18 @@ function columnKey(gx, gz) {
   return `${gx}|${gz}`;
 }
 
+const sharedBuildSync = createSharedBlockSync({
+  blockKey,
+  toVerticalGridCoord,
+  onRefresh: () => refreshBlockBuilderForCurrentLocation()
+});
+
+const isSharedBuildSyncActive = () => sharedBuildSync.isActive();
+const normalizeSharedBlockEntry = (entry) => sharedBuildSync.normalizeEntry(entry);
+const setSharedBuildEntries = (entries = []) => sharedBuildSync.setEntries(entries);
+const configureSharedBuildSync = (config = {}) => sharedBuildSync.configure(config);
+const getSharedBuildSyncStatus = () => sharedBuildSync.getStatus();
+
 function getLocRef() {
   const loc = appCtx.LOC;
   if (!loc || !isFiniteNumber(loc.lat) || !isFiniteNumber(loc.lon)) return null;
@@ -128,133 +131,30 @@ function latLonToWorldSafe(lat, lon) {
   return { x, z };
 }
 
-function detectBuildStorage() {
-  try {
-    if (!globalThis.localStorage) {
-      return { enabled: false, detail: 'localStorage is unavailable in this environment.' };
-    }
-    localStorage.setItem(BUILD_STORAGE_TEST_KEY, 'ok');
-    const probe = localStorage.getItem(BUILD_STORAGE_TEST_KEY);
-    localStorage.removeItem(BUILD_STORAGE_TEST_KEY);
-    if (probe !== 'ok') return { enabled: false, detail: 'Storage round-trip check failed.' };
-    return { enabled: true, detail: 'Storage round-trip check passed.' };
-  } catch (err) {
-    return { enabled: false, detail: `Storage access blocked: ${err && err.message ? err.message : String(err)}` };
-  }
-}
-
-function clearLegacyBuildStorage() {
-  if (!buildPersistenceEnabled || !globalThis.localStorage) return;
-  try {
-    if (localStorage.getItem(BUILD_STORAGE_MIGRATION_KEY) === 'done') return;
-    // Data safety first: do not delete existing local build data during runtime boot.
-    // Older saves should remain readable until an explicit migration/export path exists.
-    LEGACY_BUILD_STORAGE_KEYS.forEach((key) => {
-      if (!key || key === BUILD_STORAGE_KEY || key === BUILD_STORAGE_BACKUP_KEY) return;
-    });
-    localStorage.setItem(BUILD_STORAGE_MIGRATION_KEY, 'done');
-    buildPersistenceDetail = 'Existing local build data is preserved for compatibility on this browser.';
-  } catch (err) {
-    console.warn('[blocks] Failed to clear legacy build storage:', err);
-  }
-}
-
-function isSharedBuildSyncActive() {
-  return sharedBuildSyncEnabled && !!sharedBuildRoomId;
-}
-
-function normalizeSharedBlockEntry(raw) {
-  if (!raw || typeof raw !== 'object') return null;
-  const gx = Number(raw.gx);
-  const gy = Number(raw.gy);
-  const gz = Number(raw.gz);
-  if (!Number.isFinite(gx) || !Number.isFinite(gy) || !Number.isFinite(gz)) return null;
-  return {
-    id: String(raw.id || `${Math.round(gx)}_${Math.round(gy)}_${Math.round(gz)}`),
-    gx: Math.round(gx),
-    gy: toVerticalGridCoord(gy),
-    gz: Math.round(gz),
-    materialIndex: normalizeBlockMaterial(raw.materialIndex),
-    shape: normalizeBlockShape(raw.shape),
-    rotation: normalizeBlockRotation(raw.rotation)
-  };
-}
-
-function sharedEntryKey(entry) {
-  return blockKey(entry.gx, entry.gy, entry.gz);
-}
-
-function refreshSharedBuildEntryCache(entries = []) {
-  sharedBuildEntryMap = new Map();
-  const next = [];
-  entries.forEach((entry) => {
-    const normalized = normalizeSharedBlockEntry(entry);
-    if (!normalized) return;
-    sharedBuildEntryMap.set(sharedEntryKey(normalized), normalized);
-    next.push(normalized);
-  });
-  sharedBuildEntries = next;
-}
-
-function setSharedBuildEntries(entries = []) {
-  refreshSharedBuildEntryCache(entries);
-  if (isSharedBuildSyncActive()) {
-    refreshBlockBuilderForCurrentLocation();
-  }
-}
-
-function configureSharedBuildSync(config = {}) {
-  const enabled = !!config && config.enabled === true && typeof config.roomId === 'string' && config.roomId.length > 0;
-  const nextRoomId = enabled ? String(config.roomId) : '';
-  const roomChanged = sharedBuildRoomId !== nextRoomId || sharedBuildSyncEnabled !== enabled;
-  sharedBuildSyncEnabled = enabled;
-  sharedBuildRoomId = nextRoomId;
-  sharedBuildUpsertFn = enabled && typeof config.upsert === 'function' ? config.upsert : null;
-  sharedBuildRemoveFn = enabled && typeof config.remove === 'function' ? config.remove : null;
-  sharedBuildClearMineFn = enabled && typeof config.clearMine === 'function' ? config.clearMine : null;
-  if (!enabled || roomChanged) {
-    refreshSharedBuildEntryCache([]);
-  }
-  refreshBlockBuilderForCurrentLocation();
-}
-
-function getSharedBuildSyncStatus() {
-  return {
-    enabled: isSharedBuildSyncActive(),
-    roomId: sharedBuildRoomId,
-    totalCount: sharedBuildEntries.length
-  };
-}
-
 function getBuildPersistenceStatus() {
   return {
-    enabled: buildPersistenceEnabled,
-    detail: buildPersistenceDetail,
-    storageKey: BUILD_STORAGE_KEY,
+    ...blockLocalStore.getStatus(),
     shared: getSharedBuildSyncStatus()
   };
 }
 
 function getBuildLimits() {
   if (isSharedBuildSyncActive()) {
+    const sharedStatus = getSharedBuildSyncStatus();
     return {
       maxPerLocation: BUILD_MAX_PER_LOCATION,
       maxTotal: BUILD_MAX_TOTAL,
-      currentLocationCount: sharedBuildEntries.length,
-      totalCount: sharedBuildEntries.length
+      currentLocationCount: sharedStatus.totalCount,
+      totalCount: sharedStatus.totalCount
     };
   }
   const locationKey = getCurrentLocationKey();
-  let locationCount = 0;
-  if (locationKey) {
-    locationCount = buildEntries.reduce((count, entry) =>
-    count + (entry.locationKey === locationKey ? 1 : 0), 0);
-  }
+  const localStatus = blockLocalStore.getStatus();
   return {
     maxPerLocation: BUILD_MAX_PER_LOCATION,
     maxTotal: BUILD_MAX_TOTAL,
-    currentLocationCount: locationCount,
-    totalCount: buildEntries.length
+    currentLocationCount: locationKey ? blockLocalStore.countForLocation(locationKey) : 0,
+    totalCount: localStatus.totalCount
   };
 }
 
@@ -326,61 +226,20 @@ function normalizeBuildEntry(raw) {
   };
 }
 
-function loadBuildEntriesFromStorage() {
-  if (!buildPersistenceEnabled) return [];
-  const parseRows = (raw) => {
-    if (!raw) return null;
-    try {
-      const parsed = JSON.parse(raw);
-      return Array.isArray(parsed) ? parsed : null;
-    } catch {
-      return null;
-    }
-  };
-  const normalizeRows = (rows) => {
-    const normalized = rows.map(normalizeBuildEntry).filter(Boolean);
-    if (normalized.length <= BUILD_MAX_TOTAL) return normalized;
-    return normalized.slice(normalized.length - BUILD_MAX_TOTAL);
-  };
-
-  try {
-    const primary = parseRows(localStorage.getItem(BUILD_STORAGE_KEY));
-    if (Array.isArray(primary)) return normalizeRows(primary);
-
-    const backup = parseRows(localStorage.getItem(BUILD_STORAGE_BACKUP_KEY));
-    if (Array.isArray(backup)) {
-      try {
-        localStorage.setItem(BUILD_STORAGE_KEY, JSON.stringify(backup));
-      } catch {
-        // Best effort only.
-      }
-      return normalizeRows(backup);
-    }
-  } catch (err) {
-    console.warn('[blocks] Failed to read storage:', err);
-  }
-  return [];
-}
-
-function saveBuildEntriesToStorage() {
-  if (!buildPersistenceEnabled) return false;
-  const payload = JSON.stringify(buildEntries);
-  try {
-    localStorage.setItem(BUILD_STORAGE_KEY, payload);
-    localStorage.setItem(BUILD_STORAGE_BACKUP_KEY, payload);
-    return true;
-  } catch (err) {
-    buildPersistenceEnabled = false;
-    buildPersistenceDetail = `Storage write failed: ${err && err.message ? err.message : String(err)}`;
-    console.warn('[blocks] Failed to save storage:', err);
-    return false;
-  }
-}
+const blockLocalStore = createBlockLocalStore({
+  backupKey: BUILD_STORAGE_BACKUP_KEY,
+  legacyKeys: LEGACY_BUILD_STORAGE_KEYS,
+  maxPerLocation: BUILD_MAX_PER_LOCATION,
+  maxTotal: BUILD_MAX_TOTAL,
+  migrationKey: BUILD_STORAGE_MIGRATION_KEY,
+  normalizeEntry: normalizeBuildEntry,
+  storageKey: BUILD_STORAGE_KEY,
+  testKey: BUILD_STORAGE_TEST_KEY
+});
 
 function getBuildEntriesForCurrentLocation() {
   const locationKey = getCurrentLocationKey();
-  if (!locationKey) return [];
-  return buildEntries.filter((entry) => entry.locationKey === locationKey);
+  return locationKey ? blockLocalStore.listForLocation(locationKey) : [];
 }
 
 function addBuildColumnEntry(gx, gy, gz) {
@@ -467,49 +326,25 @@ function getSurfaceYAt(x, z) {
 
 function persistPlacedBuildBlock(gx, gy, gz, materialIndex, shape, rotation) {
   if (isSharedBuildSyncActive()) {
-    const entry = normalizeSharedBlockEntry({ gx, gy, gz, materialIndex, shape, rotation });
+    const entry = sharedBuildSync.upsert({ gx, gy, gz, materialIndex, shape, rotation }, (err, failedEntry) => {
+      console.warn('[blocks] Failed to save room block:', err);
+      removeBuildBlock(failedEntry.gx, failedEntry.gy, failedEntry.gz, { persist: false });
+      showBuildTransientMessage('Could not save block to this room.');
+    });
     if (!entry) return false;
-    sharedBuildEntryMap.set(sharedEntryKey(entry), entry);
-    sharedBuildEntries = Array.from(sharedBuildEntryMap.values());
-
-    if (typeof sharedBuildUpsertFn === 'function') {
-      Promise.resolve(sharedBuildUpsertFn(entry)).catch((err) => {
-        console.warn('[blocks] Failed to save room block:', err);
-        removeBuildBlock(entry.gx, entry.gy, entry.gz, { persist: false });
-        sharedBuildEntryMap.delete(sharedEntryKey(entry));
-        sharedBuildEntries = Array.from(sharedBuildEntryMap.values());
-        showBuildTransientMessage('Could not save block to this room.');
-      });
-    }
     return true;
   }
 
-  if (!buildPersistenceEnabled) return true;
   if (!canPersistBuildBlocks()) return true;
   const locationKey = getCurrentLocationKey();
   if (!locationKey || !getLocRef()) return false;
-
-  const existingIndex = buildEntries.findIndex((entry) =>
-  entry.locationKey === locationKey && entry.gx === gx && entry.gy === gy && entry.gz === gz
-  );
-  if (existingIndex < 0) {
-    const locationCount = buildEntries.reduce((count, entry) =>
-    count + (entry.locationKey === locationKey ? 1 : 0), 0);
-    if (locationCount >= BUILD_MAX_PER_LOCATION || buildEntries.length >= BUILD_MAX_TOTAL) {
-      return false;
-    }
-  }
 
   const worldX = toWorldCoord(gx);
   const worldZ = toWorldCoord(gz);
   const latLon = worldToLatLonSafe(worldX, worldZ);
   if (!latLon || !isFiniteNumber(latLon.lat) || !isFiniteNumber(latLon.lon)) return false;
 
-  const prev = buildEntries.slice();
-  const idx = existingIndex;
-
-  const nextEntry = normalizeBuildEntry({
-    id: idx >= 0 ? buildEntries[idx].id : undefined,
+  return blockLocalStore.upsert({
     locationKey,
     lat: latLon.lat,
     lon: latLon.lon,
@@ -518,76 +353,38 @@ function persistPlacedBuildBlock(gx, gy, gz, materialIndex, shape, rotation) {
     gz,
     materialIndex: normalizeBlockMaterial(materialIndex),
     shape: normalizeBlockShape(shape),
-    rotation: normalizeBlockRotation(rotation),
-    createdAt: idx >= 0 ? buildEntries[idx].createdAt : new Date().toISOString()
+    rotation: normalizeBlockRotation(rotation)
   });
-  if (!nextEntry) return false;
-
-  if (idx >= 0) buildEntries[idx] = nextEntry;else
-  buildEntries.push(nextEntry);
-
-  if (buildEntries.length > BUILD_MAX_TOTAL) {
-    buildEntries = buildEntries.slice(buildEntries.length - BUILD_MAX_TOTAL);
-  }
-
-  if (!saveBuildEntriesToStorage()) {
-    buildEntries = prev;
-    return false;
-  }
-  return true;
 }
 
 function persistRemovedBuildBlock(gx, gy, gz) {
   if (isSharedBuildSyncActive()) {
-    const entry = normalizeSharedBlockEntry({ gx, gy, gz });
+    const entry = sharedBuildSync.remove({ gx, gy, gz }, (err, previous) => {
+      console.warn('[blocks] Failed to remove room block:', err);
+      if (previous) {
+        placeBuildBlock(previous.gx, previous.gy, previous.gz, previous.materialIndex, {
+          persist: false,
+          enforceLimit: false,
+          shape: previous.shape,
+          rotation: previous.rotation
+        });
+      }
+      showBuildTransientMessage('Could not remove block from this room.');
+    });
     if (!entry) return false;
-    const key = sharedEntryKey(entry);
-    const previous = sharedBuildEntryMap.get(key) || null;
-    sharedBuildEntryMap.delete(key);
-    sharedBuildEntries = Array.from(sharedBuildEntryMap.values());
-
-    if (typeof sharedBuildRemoveFn === 'function') {
-      Promise.resolve(sharedBuildRemoveFn(entry)).catch((err) => {
-        console.warn('[blocks] Failed to remove room block:', err);
-        if (previous) {
-          sharedBuildEntryMap.set(key, previous);
-          sharedBuildEntries = Array.from(sharedBuildEntryMap.values());
-          placeBuildBlock(previous.gx, previous.gy, previous.gz, previous.materialIndex, {
-            persist: false,
-            enforceLimit: false,
-            shape: previous.shape,
-            rotation: previous.rotation
-          });
-        }
-        showBuildTransientMessage('Could not remove block from this room.');
-      });
-    }
     return true;
   }
 
-  if (!buildPersistenceEnabled) return true;
   if (!canPersistBuildBlocks()) return true;
   const locationKey = getCurrentLocationKey();
-  if (!locationKey) return false;
-
-  const next = buildEntries.filter((entry) =>
-  !(entry.locationKey === locationKey && entry.gx === gx && entry.gy === gy && entry.gz === gz)
-  );
-  if (next.length === buildEntries.length) return true;
-
-  const prev = buildEntries;
-  buildEntries = next;
-  if (!saveBuildEntriesToStorage()) {
-    buildEntries = prev;
-    return false;
-  }
-  return true;
+  return locationKey ? blockLocalStore.removeAt(locationKey, gx, gy, gz) : false;
 }
 
 function clearPersistedBuildBlocksForCurrentLocation() {
   if (isSharedBuildSyncActive()) {
-    if (typeof sharedBuildClearMineFn === 'function') {
-      Promise.resolve(sharedBuildClearMineFn()).then((count) => {
+    const clearRequest = sharedBuildSync.clearMine();
+    if (clearRequest) {
+      clearRequest.then((count) => {
         const removed = Number.isFinite(Number(count)) ? Number(count) : 0;
         showBuildTransientMessage(`Removed ${removed} of your room blocks.`);
       }).catch((err) => {
@@ -600,21 +397,9 @@ function clearPersistedBuildBlocksForCurrentLocation() {
     return false;
   }
 
-  if (!buildPersistenceEnabled) return true;
   if (!canPersistBuildBlocks()) return true;
   const locationKey = getCurrentLocationKey();
-  if (!locationKey) return false;
-
-  const next = buildEntries.filter((entry) => entry.locationKey !== locationKey);
-  if (next.length === buildEntries.length) return true;
-
-  const prev = buildEntries;
-  buildEntries = next;
-  if (!saveBuildEntriesToStorage()) {
-    buildEntries = prev;
-    return false;
-  }
-  return true;
+  return locationKey ? blockLocalStore.clearLocation(locationKey) : false;
 }
 
 function placeBuildBlock(gx, gy, gz, materialIndex = null, options = {}) {
@@ -791,7 +576,7 @@ function refreshBlockBuilderForCurrentLocation() {
   clearRenderedBuildBlocks();
 
   if (isSharedBuildSyncActive()) {
-    sharedBuildEntries.forEach((entry) => {
+    sharedBuildSync.getEntries().forEach((entry) => {
       const normalized = normalizeSharedBlockEntry(entry);
       if (!normalized) return;
       placeBuildBlock(normalized.gx, normalized.gy, normalized.gz, normalized.materialIndex, {
@@ -842,13 +627,7 @@ const { handleBlockBuilderClick } = createBlockBuilderInteraction({
   toWorldCoord
 });
 
-{
-  const storageState = detectBuildStorage();
-  buildPersistenceEnabled = storageState.enabled;
-  buildPersistenceDetail = storageState.detail;
-  clearLegacyBuildStorage();
-}
-buildEntries = loadBuildEntriesFromStorage();
+blockLocalStore.initialize();
 
 Object.assign(appCtx, {
   clearAllBuildBlocks,

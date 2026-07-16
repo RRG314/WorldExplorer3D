@@ -139,12 +139,11 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
   }
 
   function setRoomEarthSelection(room, lat, lon) {
-    appCtx.customLoc = {
+    appCtx.setCustomLocation?.({
       lat,
       lon,
       name: sanitizeText(room.name || room.locationTag?.label || room.code || "Room World", 80) || "Room World"
-    };
-    appCtx.selLoc = "custom";
+    });
 
     const customLatInput = document.getElementById("customLat");
     const customLonInput = document.getElementById("customLon");

@@ -413,6 +413,6 @@ export function buildWorldVegetationInstancing(
   appCtx.scene.add(trunkMesh);
   appCtx.scene.add(canopyMesh);
   appCtx.vegetationMeshes.push(trunkMesh, canopyMesh);
-  appCtx.vegetationFeatures = placements;
+  appCtx.replaceWorldCollection('vegetationFeatures', placements);
   return placements.length;
 }

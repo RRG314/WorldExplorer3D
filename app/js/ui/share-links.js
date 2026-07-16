@@ -159,7 +159,7 @@ function initShareUi({ bindTouchFriendlyPress, closeAllFloatMenus, getTitleLaunc
       }
     }
 
-    if (Number.isFinite(pending.camMode)) appCtx.camMode = pending.camMode;
+    if (Number.isFinite(pending.camMode)) appCtx.setCameraMode(pending.camMode);
     if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
     if (typeof appCtx.updateCamera === 'function') appCtx.updateCamera();
     appCtx.pendingExperienceState = null;

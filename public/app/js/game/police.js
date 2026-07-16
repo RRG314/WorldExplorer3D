@@ -75,7 +75,7 @@ export function updatePolice(dt) {
       cop.speed = 0;
       document.getElementById("police").textContent = `💔 ${appCtx.policeHits}/3`;
       if (appCtx.policeHits >= 3) {
-        appCtx.paused = true;
+        appCtx.setPauseReason?.('caught', true);
         document.getElementById("caughtScreen").classList.add("show");
       }
     }

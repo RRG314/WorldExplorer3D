@@ -128,31 +128,35 @@ export function createSyntheticFallbackWorld(options = {}) {
   disposeMeshList(appCtx.streetFurnitureMeshes);
   disposeMeshList(appCtx.vegetationMeshes);
   disposeMeshList(appCtx.historicMarkers);
-  appCtx.roadMeshes = [];
-  appCtx.urbanSurfaceMeshes = [];
-  appCtx.structureVisualMeshes = [];
-  appCtx.buildingMeshes = [];
-  appCtx.landuseMeshes = [];
-  appCtx.poiMeshes = [];
-  appCtx.streetFurnitureMeshes = [];
-  appCtx.vegetationMeshes = [];
-  appCtx.vegetationFeatures = [];
-  appCtx.historicMarkers = [];
-  appCtx.roads = [];
-  appCtx.buildings = [];
-  appCtx.landuses = [];
-  appCtx.surfaceFeatureHints = [];
-  appCtx.waterAreas = [];
-  appCtx.waterways = [];
-  appCtx.waterWaveVisuals = [];
+  appCtx.clearWorldCollections([
+    'roadMeshes',
+    'urbanSurfaceMeshes',
+    'structureVisualMeshes',
+    'buildingMeshes',
+    'landuseMeshes',
+    'poiMeshes',
+    'streetFurnitureMeshes',
+    'vegetationMeshes',
+    'vegetationFeatures',
+    'historicMarkers',
+    'roads',
+    'buildings',
+    'landuses',
+    'surfaceFeatureHints',
+    'waterAreas',
+    'waterways',
+    'waterWaveVisuals'
+  ]);
   invalidateTraversalNetworks('fallback_world_reset');
   appCtx.navigationRoutePoints = [];
   appCtx.navigationRouteDistance = 0;
-  appCtx.linearFeatures = [];
-  appCtx.linearFeatureMeshes = [];
-  appCtx.dynamicBuildingColliders = [];
-  appCtx.pois = [];
-  appCtx.historicSites = [];
+  appCtx.clearWorldCollections([
+    'linearFeatures',
+    'linearFeatureMeshes',
+    'dynamicBuildingColliders',
+    'pois',
+    'historicSites'
+  ]);
   appCtx.urbanSurfaceStats = {
     sidewalkBatchCount: 0,
     sidewalkVertices: 0,

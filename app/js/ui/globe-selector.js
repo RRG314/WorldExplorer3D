@@ -1,9 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import {
-  createAuxiliaryRenderer,
-  disposeThreeObjectTree,
-  disposeThreeRenderer
-} from "../engine/webgl-lifecycle.js?v=1";
+import { createGlobeSelectorScene } from './globe-selector/scene.js?v=1';
 import {
   addSelectionToSavedFavorites,
   buildFavoriteCities as buildFavoriteCitiesFromData,
@@ -16,7 +12,6 @@ import {
   getMenuFavoriteCities as getMenuFavoriteCitiesFromLocs,
   latLonToLocalPoint,
   loadSavedFavoriteCities as loadSavedFavoriteCitiesFromStorage,
-  localPointToLatLon,
   normalizeCityRecord,
   parseReverseAddress,
   persistSavedFavoriteCities as persistSavedFavoriteCitiesToStorage,
@@ -69,8 +64,6 @@ function createGlobeSelector(options = {}) {
 
   let openState = false;
   let selected = null;
-  let renderLoopId = 0;
-  let sceneReady = false;
   let searchInFlight = false;
   let reverseLookupToken = 0;
   let activeCityTab = 'nearby';
@@ -81,32 +74,27 @@ function createGlobeSelector(options = {}) {
   let panelMode = 'explore';
   const reverseLookupCache = new Map();
 
-  let scene = null;
-  let camera = null;
-  let renderer = null;
-  let globeRoot = null;
-  let earthMesh = null;
-  let markerMesh = null;
-  let raycaster = null;
-  let favoriteMarkerGroup = null;
-  let favoriteMarkerGeometry = null;
-  let menuFavoriteMaterial = null;
-  let savedFavoriteMaterial = null;
-  let favoriteMarkerNodes = [];
-
   let savedFavoriteCities = [];
 
-  let cameraDistance = 2.8;
-  const minDistance = 1.35;
-  const maxDistance = 4.4;
-
-  let pointerActive = false;
-  let pointerDragDistance = 0;
-  let pointerDownX = 0;
-  let pointerDownY = 0;
-  let pointerDownTime = 0;
-  let dragLastX = 0;
-  let dragLastY = 0;
+  const globeScene = createGlobeSelectorScene({
+    appCtx,
+    canvas,
+    stage,
+    placeReadout,
+    getActiveCityTab: () => activeCityTab,
+    getOpenState: () => openState,
+    cityMatchesSelection,
+    onFavoritePick(city) {
+      setSelection(city.lat, city.lon, { name: city.name, focus: true });
+      if (searchInput) searchInput.value = city.name;
+    },
+    onGlobePick(next) {
+      const fallbackName = `Selected ${next.lat.toFixed(2)}, ${next.lon.toFixed(2)}`;
+      setSelection(next.lat, next.lon, { name: fallbackName });
+      reverseLookupPlace(next.lat, next.lon);
+      if (searchInput) searchInput.value = fallbackName;
+    }
+  });
 
   function saveSelectionAsFavorite(nextSelection) {
     savedFavoriteCities = addSelectionToSavedFavorites(nextSelection, savedFavoriteCities);
@@ -117,8 +105,7 @@ function createGlobeSelector(options = {}) {
   }
 
   function setFavoriteMarkersVisible() {
-    if (!favoriteMarkerGroup) return;
-    favoriteMarkerGroup.visible = activeCityTab === 'favorites';
+    globeScene.setFavoriteMarkersVisible(activeCityTab === 'favorites');
   }
 
   function setPanelMode(nextMode = 'explore') {
@@ -142,28 +129,11 @@ function createGlobeSelector(options = {}) {
   }
 
   function renderFavoriteMarkers() {
-    if (!favoriteMarkerGroup || !favoriteMarkerGeometry || !menuFavoriteMaterial || !savedFavoriteMaterial) return;
-    while (favoriteMarkerGroup.children.length) {
-      favoriteMarkerGroup.remove(favoriteMarkerGroup.children[0]);
-    }
-    favoriteMarkerNodes = [];
     const favorites = buildFavoriteCitiesFromData({
       menuFavoriteCities: getMenuFavoriteCitiesFromLocs(appCtx.LOCS || {}),
       savedFavoriteCities
     });
-    favorites.forEach((city) => {
-      const marker = new THREE.Mesh(
-        favoriteMarkerGeometry,
-        city.source === 'saved' ? savedFavoriteMaterial : menuFavoriteMaterial
-      );
-      const position = latLonToLocalPoint(city.lat, city.lon, 1.018);
-      marker.position.set(position.x, position.y, position.z);
-      marker.userData.favoriteCity = city;
-      favoriteMarkerGroup.add(marker);
-      favoriteMarkerNodes.push({ city, mesh: marker });
-    });
-    applyMarkerScales();
-    setFavoriteMarkersVisible();
+    globeScene.renderFavoriteMarkers(favorites);
   }
 
   function setCityTab(nextTab) {
@@ -236,13 +206,7 @@ function createGlobeSelector(options = {}) {
   }
 
   function focusOnSelection(lat, lon) {
-    if (!globeRoot) return;
-    const latRad = lat * Math.PI / 180;
-    const lonRad = lon * Math.PI / 180;
-    // Camera sits on +Z looking toward origin; to center selected longitude on
-    // the front hemisphere we need lon + rotY = -90deg.
-    globeRoot.rotation.y = -(lonRad + Math.PI * 0.5);
-    globeRoot.rotation.x = Math.max(-1.2, Math.min(1.2, latRad));
+    globeScene.focusOnSelection(lat, lon);
   }
 
   function syncLegacyCustomState(next) {
@@ -253,7 +217,7 @@ function createGlobeSelector(options = {}) {
     if (!selected) {
       if (latLonReadout) latLonReadout.textContent = 'No point selected';
       if (placeReadout) placeReadout.textContent = 'Click the globe to choose a location.';
-      if (markerMesh) markerMesh.visible = false;
+      globeScene.setSelectionMarker(null);
       nearbyCities = [];
       renderCityList();
       if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorSelectionChanged === 'function') {
@@ -271,12 +235,7 @@ function createGlobeSelector(options = {}) {
     if (latInput) latInput.value = selected.lat.toFixed(6);
     if (lonInput) lonInput.value = selected.lon.toFixed(6);
 
-    if (markerMesh) {
-      const p = latLonToLocalPoint(selected.lat, selected.lon, 1.02);
-      markerMesh.position.set(p.x, p.y, p.z);
-      markerMesh.visible = true;
-    }
-    applyMarkerScales();
+    globeScene.setSelectionMarker(selected);
     nearbyCities = buildNearbyCitiesFromData({
       savedFavoriteCities,
       liveNearbyCity,
@@ -322,11 +281,7 @@ function createGlobeSelector(options = {}) {
       skipAutoFavorite: !!meta.skipAutoFavorite,
       fromGeolocation: !!meta.fromGeolocation
     });
-    if (Number.isFinite(meta.zoomDistance) && camera) {
-      cameraDistance = Math.max(minDistance, Math.min(maxDistance, Number(meta.zoomDistance)));
-      camera.position.z = cameraDistance;
-      camera.updateProjectionMatrix();
-    }
+    if (Number.isFinite(meta.zoomDistance)) globeScene.setCameraDistance(Number(meta.zoomDistance));
     if (searchInput && typeof meta.searchLabel === 'string' && meta.searchLabel.trim()) {
       searchInput.value = meta.searchLabel.trim();
     }
@@ -448,290 +403,6 @@ function createGlobeSelector(options = {}) {
     }
   }
 
-  function ensureRendererSize() {
-    if (!renderer || !camera) return;
-    const bounds = stage?.getBoundingClientRect();
-    const width = Math.max(1, Math.floor(bounds?.width || canvas.clientWidth || 1));
-    const height = Math.max(1, Math.floor(bounds?.height || canvas.clientHeight || 1));
-    renderer.setSize(width, height, false);
-    camera.aspect = width / height;
-    camera.updateProjectionMatrix();
-    applyMarkerScales();
-  }
-
-  function getMarkerScale() {
-    const zoomScale = cameraDistance / 2.8;
-    return Math.max(0.34, Math.min(1.0, zoomScale));
-  }
-
-  function applyMarkerScales() {
-    const zoomScale = getMarkerScale();
-    if (markerMesh) markerMesh.scale.setScalar(zoomScale);
-    favoriteMarkerNodes.forEach((entry) => {
-      const selectedScale = cityMatchesSelection(entry.city) ? 1.26 : 1.0;
-      entry.mesh.scale.setScalar(selectedScale * zoomScale);
-    });
-  }
-
-  function renderFrame() {
-    if (!openState) return;
-    if (appCtx.liveEarth && typeof appCtx.liveEarth.updateSelectorFrame === 'function') {
-      appCtx.liveEarth.updateSelectorFrame();
-    }
-    applyMarkerScales();
-    if (renderer && scene && camera) renderer.render(scene, camera);
-  }
-
-  function loopRender() {
-    if (!openState) {
-      renderLoopId = 0;
-      return;
-    }
-    renderFrame();
-    renderLoopId = requestAnimationFrame(loopRender);
-  }
-
-  function startRenderLoop() {
-    if (renderLoopId || !sceneReady) return;
-    renderLoopId = requestAnimationFrame(loopRender);
-  }
-
-  function stopRenderLoop() {
-    if (!renderLoopId) return;
-    cancelAnimationFrame(renderLoopId);
-    renderLoopId = 0;
-  }
-
-  function destroyGlobeScene() {
-    stopRenderLoop();
-    favoriteMarkerNodes = [];
-    sceneReady = false;
-    if (scene) {
-      disposeThreeObjectTree(scene);
-    }
-    renderer = disposeThreeRenderer(renderer);
-    scene = null;
-    camera = null;
-    globeRoot = null;
-    earthMesh = null;
-    markerMesh = null;
-    raycaster = null;
-    favoriteMarkerGroup = null;
-    favoriteMarkerGeometry = null;
-    menuFavoriteMaterial = null;
-    savedFavoriteMaterial = null;
-  }
-
-  function handlePick(clientX, clientY) {
-    if (!renderer || !camera || !raycaster || !earthMesh) return;
-    const rect = canvas.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-
-    const ndc = {
-      x: (clientX - rect.left) / rect.width * 2 - 1,
-      y: -((clientY - rect.top) / rect.height) * 2 + 1
-    };
-    raycaster.setFromCamera(ndc, camera);
-    if (activeCityTab === 'favorites' && favoriteMarkerNodes.length > 0) {
-      const markerHits = raycaster.intersectObjects(favoriteMarkerNodes.map((entry) => entry.mesh), false);
-      const markerHit = markerHits && markerHits.length ? markerHits[0] : null;
-      const favoriteCity = markerHit?.object?.userData?.favoriteCity || null;
-      if (favoriteCity) {
-        setSelection(favoriteCity.lat, favoriteCity.lon, {
-          name: favoriteCity.name,
-          focus: true
-        });
-        if (searchInput) searchInput.value = favoriteCity.name;
-        return;
-      }
-    }
-    if (appCtx.liveEarth && typeof appCtx.liveEarth.handleGlobePick === 'function' && appCtx.liveEarth.handleGlobePick(raycaster)) {
-      return;
-    }
-    const hits = raycaster.intersectObject(earthMesh, false);
-    if (!hits || hits.length === 0) return;
-
-    const localPoint = hits[0].point.clone();
-    earthMesh.worldToLocal(localPoint);
-    const next = localPointToLatLon(localPoint);
-    const fallbackName = `Selected ${next.lat.toFixed(2)}, ${next.lon.toFixed(2)}`;
-    setSelection(next.lat, next.lon, { name: fallbackName });
-    reverseLookupPlace(next.lat, next.lon);
-    if (searchInput) searchInput.value = fallbackName;
-  }
-
-  function initGlobeScene() {
-    if (scene || !canvas || typeof THREE === 'undefined') {
-      if (typeof THREE === 'undefined' && placeReadout) {
-        placeReadout.textContent = 'Three.js not ready. You can still use manual search.';
-      }
-      return;
-    }
-
-    scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(42, 1, 0.1, 20);
-    camera.position.set(0, 0, cameraDistance);
-
-    renderer = createAuxiliaryRenderer({
-      canvas,
-      pixelRatioCap: 1.5,
-      optionsList: [
-        {
-          antialias: true,
-          alpha: true,
-          powerPreference: 'low-power'
-        },
-        {
-          antialias: false,
-          alpha: true,
-          powerPreference: 'low-power'
-        },
-        {
-          antialias: false,
-          alpha: true
-        }
-      ]
-    });
-    if (!renderer) {
-      renderer = null;
-      scene = null;
-      camera = null;
-      globeRoot = null;
-      earthMesh = null;
-      markerMesh = null;
-      raycaster = null;
-      sceneReady = false;
-      if (placeReadout) {
-        placeReadout.textContent = '3D globe unavailable on this device. You can still use search and coordinates.';
-      }
-      return;
-    }
-    if (typeof renderer.outputColorSpace !== 'undefined' && typeof THREE.SRGBColorSpace !== 'undefined') {
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-    } else if (typeof renderer.outputEncoding !== 'undefined' && typeof THREE.sRGBEncoding !== 'undefined') {
-      renderer.outputEncoding = THREE.sRGBEncoding;
-    }
-
-    const ambient = new THREE.AmbientLight(0xffffff, 1.15);
-    scene.add(ambient);
-    const hemi = new THREE.HemisphereLight(0xe7f3ff, 0x8aa6c9, 0.45);
-    scene.add(hemi);
-    const sun = new THREE.DirectionalLight(0xffffff, 1.05);
-    sun.position.set(2.2, 1.6, 1.3);
-    scene.add(sun);
-
-    globeRoot = new THREE.Group();
-    scene.add(globeRoot);
-
-    const earthMaterial = new THREE.MeshStandardMaterial({
-      color: 0x2f6fbb,
-      roughness: 0.95,
-      metalness: 0.0,
-      emissive: new THREE.Color(0x1b2b44),
-      emissiveIntensity: 0.12
-    });
-    earthMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), earthMaterial);
-    globeRoot.add(earthMesh);
-
-    markerMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.018, 14, 12),
-      new THREE.MeshBasicMaterial({ color: 0xff3b30 })
-    );
-    markerMesh.visible = false;
-    globeRoot.add(markerMesh);
-
-    favoriteMarkerGroup = new THREE.Group();
-    favoriteMarkerGeometry = new THREE.SphereGeometry(0.009, 10, 9);
-    menuFavoriteMaterial = new THREE.MeshBasicMaterial({ color: 0x60a5fa });
-    savedFavoriteMaterial = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
-    globeRoot.add(favoriteMarkerGroup);
-
-    try {
-      const loader = new THREE.TextureLoader();
-      loader.load(
-        '/app/assets/textures/earth_atmos_2048.jpg',
-        (texture) => {
-          texture.wrapS = THREE.RepeatWrapping;
-          texture.wrapT = THREE.ClampToEdgeWrapping;
-          if (typeof texture.colorSpace !== 'undefined' && typeof THREE.SRGBColorSpace !== 'undefined') {
-            texture.colorSpace = THREE.SRGBColorSpace;
-          } else if (typeof texture.encoding !== 'undefined' && typeof THREE.sRGBEncoding !== 'undefined') {
-            texture.encoding = THREE.sRGBEncoding;
-          }
-          if (renderer?.capabilities && Number.isFinite(renderer.capabilities.getMaxAnisotropy?.())) {
-            texture.anisotropy = Math.max(1, Math.min(8, renderer.capabilities.getMaxAnisotropy()));
-          }
-          earthMaterial.map = texture;
-          earthMaterial.emissiveMap = texture;
-          earthMaterial.emissiveIntensity = 0.28;
-          earthMaterial.color.setHex(0xffffff);
-          earthMaterial.needsUpdate = true;
-        },
-        undefined,
-        () => {
-          // Keep blue fallback material if texture fetch fails.
-        }
-      );
-    } catch {
-      // Keep fallback material.
-    }
-
-    raycaster = new THREE.Raycaster();
-    ensureRendererSize();
-    renderFavoriteMarkers();
-    applyMarkerScales();
-
-    canvas.addEventListener('pointerdown', (event) => {
-      pointerActive = true;
-      pointerDragDistance = 0;
-      pointerDownX = event.clientX;
-      pointerDownY = event.clientY;
-      pointerDownTime = performance.now();
-      dragLastX = event.clientX;
-      dragLastY = event.clientY;
-      canvas.setPointerCapture?.(event.pointerId);
-    });
-
-    canvas.addEventListener('pointermove', (event) => {
-      if (!pointerActive || !globeRoot) return;
-      const dx = event.clientX - dragLastX;
-      const dy = event.clientY - dragLastY;
-      dragLastX = event.clientX;
-      dragLastY = event.clientY;
-      pointerDragDistance += Math.hypot(dx, dy);
-      globeRoot.rotation.y += dx * 0.0055;
-      globeRoot.rotation.x += dy * 0.0038;
-      globeRoot.rotation.x = Math.max(-1.2, Math.min(1.2, globeRoot.rotation.x));
-    });
-
-    canvas.addEventListener('pointerup', (event) => {
-      if (!pointerActive) return;
-      pointerActive = false;
-      canvas.releasePointerCapture?.(event.pointerId);
-      const tapDist = Math.hypot(event.clientX - pointerDownX, event.clientY - pointerDownY);
-      const tapTime = performance.now() - pointerDownTime;
-      const looksLikeTap = pointerDragDistance < 7 && tapDist < 7 && tapTime < 420;
-      if (looksLikeTap) handlePick(event.clientX, event.clientY);
-    });
-
-    canvas.addEventListener('pointercancel', () => {
-      pointerActive = false;
-    });
-
-    canvas.addEventListener('wheel', (event) => {
-      event.preventDefault();
-      const delta = Math.sign(event.deltaY || 0);
-      cameraDistance += delta * 0.16;
-      cameraDistance = Math.max(minDistance, Math.min(maxDistance, cameraDistance));
-      camera.position.z = cameraDistance;
-    }, { passive: false });
-
-    window.addEventListener('resize', () => {
-      ensureRendererSize();
-    });
-    sceneReady = true;
-  }
-
   function applySelectionFromInputs() {
     const lat = toFiniteNumber(latInput?.value);
     const lon = toFiniteNumber(lonInput?.value);
@@ -747,8 +418,7 @@ function createGlobeSelector(options = {}) {
       root,
       stage,
       canvas,
-      globeRoot,
-      earthMesh,
+      ...globeScene.getBridgeRefs(),
       getSelection() {
         return selected ? { ...selected } : null;
       },
@@ -781,9 +451,9 @@ function createGlobeSelector(options = {}) {
     root.classList.add('show');
     root.setAttribute('aria-hidden', 'false');
 
-    initGlobeScene();
+    globeScene.init();
     bindLiveEarthBridge();
-    ensureRendererSize();
+    globeScene.ensureSize();
 
     if (searchStatus) {
       searchStatus.textContent = 'Uses the same search flow as Custom Location.';
@@ -824,8 +494,8 @@ function createGlobeSelector(options = {}) {
     if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorOpen === 'function') {
       appCtx.liveEarth.onSelectorOpen();
     }
-    startRenderLoop();
-    renderFrame();
+    globeScene.startRenderLoop();
+    globeScene.renderFrame();
     if (typeof options.onOpen === 'function') options.onOpen();
   }
 
@@ -833,8 +503,6 @@ function createGlobeSelector(options = {}) {
     if (!openState) return;
     openState = false;
     setGlobeSelectorScrollLock(false);
-    pointerActive = false;
-    pointerDragDistance = 0;
     reverseLookupToken += 1;
     root.classList.remove('show');
     root.setAttribute('aria-hidden', 'true');
@@ -842,8 +510,8 @@ function createGlobeSelector(options = {}) {
     if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorClose === 'function') {
       appCtx.liveEarth.onSelectorClose();
     }
-    stopRenderLoop();
-    destroyGlobeScene();
+    globeScene.stopRenderLoop();
+    globeScene.destroy();
     if (typeof options.onClose === 'function') options.onClose();
   }
 

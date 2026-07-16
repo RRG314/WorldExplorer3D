@@ -173,7 +173,7 @@ function showResult(title, stats) {
   document.getElementById('resultTitle').textContent = title;
   document.getElementById('resultStats').textContent = stats;
   document.getElementById('resultScreen').classList.add('show');
-  appCtx.paused = true;
+  appCtx.setPauseReason?.('game_result', true);
 }
 
 function hideResult() {

@@ -98,7 +98,7 @@ totalEmissiveRadiance += vec3(0.036, 0.052, 0.072) * (weFoamBands * 0.44 + weWhi
   };
 
   if (Array.isArray(appCtx.waterWaveVisuals)) appCtx.waterWaveVisuals.push(material);
-  else appCtx.waterWaveVisuals = [material];
+  else appCtx.replaceWorldCollection('waterWaveVisuals', [material]);
   material.needsUpdate = true;
   return material;
 }

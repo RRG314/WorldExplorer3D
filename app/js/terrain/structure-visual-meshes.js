@@ -1,12 +1,12 @@
 export function clearStructureVisualMeshesForContext(appCtx) {
-  if (!Array.isArray(appCtx.structureVisualMeshes)) appCtx.structureVisualMeshes = [];
+  if (!Array.isArray(appCtx.structureVisualMeshes)) appCtx.replaceWorldCollection('structureVisualMeshes');
   appCtx.structureVisualMeshes.forEach((mesh) => {
     if (!mesh) return;
     if (mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
     if (mesh.geometry && typeof mesh.geometry.dispose === "function") mesh.geometry.dispose();
     if (mesh.material && typeof mesh.material.dispose === "function") mesh.material.dispose();
   });
-  appCtx.structureVisualMeshes = [];
+  appCtx.replaceWorldCollection('structureVisualMeshes');
 }
 
 export function buildStructureVisualMeshForContext(appCtx, instances, material, userData = {}) {

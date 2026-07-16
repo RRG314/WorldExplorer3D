@@ -140,7 +140,7 @@ export function batchLanduseMeshes() {
       appCtx._lastLanduseBatchStats = { groupCount: groups.size, batchMeshCount: 0, sourceMeshCount: 0 };
       return 0;
     }
-    appCtx.landuseMeshes = [...keep, ...batched];
+    appCtx.replaceWorldCollection('landuseMeshes', [...keep, ...batched]);
     appCtx._lastLanduseBatchStats = {
       groupCount: groups.size,
       batchMeshCount: batched.length,

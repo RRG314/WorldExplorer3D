@@ -19,7 +19,7 @@ function isCurrentMarsTransition(sessionId) {
 
 function cancelPendingMarsTransition() {
   marsTransitionSessionId++;
-  appCtx.travelingToMoon = false;
+  appCtx.setEnvironmentTransitionActive(false);
 }
 
 function retainMarsTransitionOwnership(sessionId) {
@@ -242,7 +242,7 @@ function setMarsInterfaceActive(active) {
 }
 
 function enterMarsDriveMode() {
-  appCtx.droneMode = false;
+  appCtx.setDroneModeActive(false);
   if (appCtx.Walk?.state?.mode === 'walk') appCtx.Walk.setModeDrive();
   appCtx.setTravelMode?.('drive', { source: 'mars_arrival', emitTutorial: false });
 }
@@ -254,7 +254,7 @@ async function arriveAtMars(expectedSessionId = null) {
   suspendEarthModesForPlanetaryEntry();
   if (!isCurrentMarsTransition(sessionId)) return false;
   if (!retainMarsTransitionOwnership(sessionId)) return false;
-  appCtx.paused = true;
+  appCtx.setPauseReason?.('planetary_transition', true);
   appCtx.scene.background = new THREE.Color(0x9b5d43);
   appCtx.scene.fog = new THREE.FogExp2(0xb06a4e, 0.000095);
   if (appCtx.renderer) appCtx.renderer.toneMappingExposure = 1.1;
@@ -289,7 +289,7 @@ async function arriveAtMars(expectedSessionId = null) {
   if (appCtx.fillLight) appCtx.fillLight.intensity = 0.18;
   setMarsInterfaceActive(true);
   showMarsReturnButton();
-  appCtx.paused = false;
+  appCtx.setPauseReason?.('planetary_transition', false);
   appCtx.updateControlsModeUI?.();
   return true;
 }
@@ -306,8 +306,8 @@ async function directTravelToMars() {
 async function returnFromMars() {
   if (!appCtx.onMars || appCtx.travelingToMoon) return;
   const sessionId = ++marsTransitionSessionId;
-  appCtx.travelingToMoon = true;
-  appCtx.paused = true;
+  appCtx.setEnvironmentTransitionActive(true);
+  appCtx.setPauseReason?.('planetary_transition', true);
   const button = document.getElementById('marsReturnEarthBtn');
   if (button) button.style.display = 'none';
   await appCtx.showTransitionLoad?.('earth', 700);
@@ -332,8 +332,8 @@ async function returnFromMars() {
     });
   } finally {
     if (isCurrentMarsTransition(sessionId)) {
-      appCtx.paused = false;
-      appCtx.travelingToMoon = false;
+      appCtx.setPauseReason?.('planetary_transition', false);
+      appCtx.setEnvironmentTransitionActive(false);
     }
   }
 }

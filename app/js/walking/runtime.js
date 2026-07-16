@@ -133,7 +133,7 @@ function createWalkingRuntimeHelpers({
       carMesh.rotation.y = car.angle;
       carMesh.updateMatrixWorld(true);
     }
-    if (typeof appCtx.camMode !== "undefined") appCtx.camMode = 0;
+    appCtx.setCameraMode(0);
     if (state.characterMesh) state.characterMesh.visible = false;
     window.walkMouseLookActive = false;
   }

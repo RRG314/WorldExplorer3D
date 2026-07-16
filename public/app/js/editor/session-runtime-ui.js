@@ -59,7 +59,7 @@ export function applyEditorViewMode(ctx, mode = '3d') {
       ctx.appCtx.Walk.state.view = 'overhead';
       if (ctx.appCtx.Walk.state.characterMesh) ctx.appCtx.Walk.state.characterMesh.visible = true;
     } else if (Number.isFinite(ctx.appCtx.camMode)) {
-      ctx.appCtx.camMode = 2;
+      ctx.appCtx.setCameraMode(2);
     }
     ctx.setStatus('2D plan view enabled. Drag paths and box out footprints from above.', 'ok');
   } else if (ctx.state.editorViewRestore) {
@@ -67,7 +67,7 @@ export function applyEditorViewMode(ctx, mode = '3d') {
       ctx.appCtx.Walk.state.view = ctx.state.editorViewRestore.walkView;
       if (ctx.appCtx.Walk.state.characterMesh) ctx.appCtx.Walk.state.characterMesh.visible = ctx.appCtx.Walk.state.view !== 'first';
     } else if (Number.isFinite(ctx.state.editorViewRestore.camMode)) {
-      ctx.appCtx.camMode = ctx.state.editorViewRestore.camMode;
+      ctx.appCtx.setCameraMode(ctx.state.editorViewRestore.camMode);
     }
     ctx.state.editorViewRestore = null;
     ctx.setStatus('3D edit view restored.', 'ok');
@@ -84,7 +84,7 @@ export function restoreEditorViewMode(ctx) {
     ctx.appCtx.Walk.state.view = ctx.state.editorViewRestore.walkView;
     if (ctx.appCtx.Walk.state.characterMesh) ctx.appCtx.Walk.state.characterMesh.visible = ctx.appCtx.Walk.state.view !== 'first';
   } else if (Number.isFinite(ctx.state.editorViewRestore.camMode)) {
-    ctx.appCtx.camMode = ctx.state.editorViewRestore.camMode;
+    ctx.appCtx.setCameraMode(ctx.state.editorViewRestore.camMode);
   }
   ctx.state.editorViewRestore = null;
   ctx.state.viewMode = '3d';

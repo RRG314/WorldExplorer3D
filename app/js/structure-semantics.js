@@ -1,182 +1,14 @@
 import { buildElevatedTerrainReference } from './structure-profile-grade.js';
-
-function normalizedTagValue(value = '') {
-  return String(value || '').trim().toLowerCase();
-}
-
-function isTruthyTag(value = '') {
-  const normalized = normalizedTagValue(value);
-  if (!normalized) return false;
-  return !/^(no|false|0|none)$/i.test(normalized);
-}
-
-function parseNumericTag(value, fallback = NaN) {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  const raw = String(value ?? '').trim();
-  if (!raw) return fallback;
-  const first = raw.split(/[;,]/)[0]?.trim();
-  const parsed = Number.parseFloat(first);
-  return Number.isFinite(parsed) ? parsed : fallback;
-}
-
-function parseIntegerTag(value, fallback = 0) {
-  const parsed = parseNumericTag(value, fallback);
-  return Number.isFinite(parsed) ? Math.round(parsed) : fallback;
-}
-
-function featureTypeCategory(featureKind = 'road', subtype = '') {
-  const kind = normalizedTagValue(featureKind);
-  const type = normalizedTagValue(subtype);
-  if (kind === 'railway') return 'railway';
-  if (kind === 'building') return 'building';
-  if (kind === 'connector') return 'connector';
-  if (kind === 'footway' || kind === 'cycleway') return kind;
-  if (kind === 'road') return 'road';
-  if (/^(footway|pedestrian|path|steps|corridor)$/.test(type)) return 'footway';
-  if (type === 'cycleway') return 'cycleway';
-  if (/^(rail|light_rail|tram|subway|narrow_gauge)$/.test(type)) return 'railway';
-  return kind || 'road';
-}
-
-function baseClearanceForCategory(category = 'road') {
-  switch (category) {
-    case 'railway':
-      return 6.2;
-    case 'cycleway':
-      return 4.5;
-    case 'footway':
-    case 'connector':
-      return 4.2;
-    case 'building':
-      return 0;
-    default:
-      return 5.5;
-  }
-}
-
-function baseDepthForCategory(category = 'road') {
-  switch (category) {
-    case 'railway':
-      return 5.2;
-    case 'cycleway':
-      return 3.4;
-    case 'footway':
-    case 'connector':
-      return 3.0;
-    case 'building':
-      return 0;
-    default:
-      return 4.6;
-  }
-}
-
-function smoothstep01(value) {
-  const t = Math.max(0, Math.min(1, Number(value) || 0));
-  return t * t * (3 - 2 * t);
-}
-
-function polylineDistances(points = []) {
-  const distances = new Float32Array(points.length);
-  let total = 0;
-  for (let i = 1; i < points.length; i++) {
-    total += Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z);
-    distances[i] = total;
-  }
-  return { distances, total };
-}
-
-function sampleProfileAtDistance(distances, values, distance) {
-  if (!(distances instanceof Float32Array) || !Array.isArray(values) && !(values instanceof Float32Array)) return NaN;
-  if (distances.length === 0 || values.length === 0) return NaN;
-  if (distance <= 0) return Number(values[0]) || NaN;
-  const lastIndex = Math.min(distances.length, values.length) - 1;
-  if (distance >= distances[lastIndex]) return Number(values[lastIndex]) || NaN;
-
-  for (let i = 0; i < lastIndex; i++) {
-    const start = distances[i];
-    const end = distances[i + 1];
-    if (distance < start || distance > end) continue;
-    const span = end - start;
-    const t = span > 1e-6 ? (distance - start) / span : 0;
-    const from = Number(values[i]) || 0;
-    const to = Number(values[i + 1]) || from;
-    return from + (to - from) * t;
-  }
-  return Number(values[lastIndex]) || NaN;
-}
-
-function segmentIntersection2D(a1, a2, b1, b2) {
-  const x1 = a1.x;
-  const z1 = a1.z;
-  const x2 = a2.x;
-  const z2 = a2.z;
-  const x3 = b1.x;
-  const z3 = b1.z;
-  const x4 = b2.x;
-  const z4 = b2.z;
-  const denom = (x1 - x2) * (z3 - z4) - (z1 - z2) * (x3 - x4);
-  if (Math.abs(denom) < 1e-7) return null;
-
-  const t = ((x1 - x3) * (z3 - z4) - (z1 - z3) * (x3 - x4)) / denom;
-  const u = ((x1 - x3) * (z1 - z2) - (z1 - z3) * (x1 - x2)) / denom;
-  if (t < 0 || t > 1 || u < 0 || u > 1) return null;
-
-  return {
-    x: x1 + (x2 - x1) * t,
-    z: z1 + (z2 - z1) * t,
-    t,
-    u
-  };
-}
-
-function polylineBounds(points = [], padding = 0) {
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minZ = Infinity;
-  let maxZ = -Infinity;
-  for (let i = 0; i < points.length; i++) {
-    const point = points[i];
-    if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) continue;
-    minX = Math.min(minX, point.x);
-    maxX = Math.max(maxX, point.x);
-    minZ = Math.min(minZ, point.z);
-    maxZ = Math.max(maxZ, point.z);
-  }
-  if (!Number.isFinite(minX) || !Number.isFinite(maxX) || !Number.isFinite(minZ) || !Number.isFinite(maxZ)) return null;
-  const pad = Math.max(0, Number(padding) || 0);
-  return {
-    minX: minX - pad,
-    maxX: maxX + pad,
-    minZ: minZ - pad,
-    maxZ: maxZ + pad
-  };
-}
-
-function boundsIntersect(a, b, padding = 0) {
-  if (!a || !b) return false;
-  const pad = Math.max(0, Number(padding) || 0);
-  return !(
-    a.maxX < b.minX - pad ||
-    a.minX > b.maxX + pad ||
-    a.maxZ < b.minZ - pad ||
-    a.minZ > b.maxZ + pad
-  );
-}
-
-function pointInPolygonXZ(x, z, polygon) {
-  if (!Array.isArray(polygon) || polygon.length < 3) return false;
-  let inside = false;
-  for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
-    const xi = polygon[i].x;
-    const zi = polygon[i].z;
-    const xj = polygon[j].x;
-    const zj = polygon[j].z;
-    const intersects = (zi > z) !== (zj > z) &&
-      x < (xj - xi) * (z - zi) / ((zj - zi) || 1e-9) + xi;
-    if (intersects) inside = !inside;
-  }
-  return inside;
-}
+import { classifyStructureSemantics, normalizedTagValue } from './structure-semantics/classification.js?v=1';
+import {
+  boundsIntersect,
+  pointInPolygonXZ,
+  polylineBounds,
+  polylineDistances,
+  sampleProfileAtDistance,
+  segmentIntersection2D,
+  smoothstep01
+} from './structure-semantics/geometry.js?v=1';
 
 function connectionEndpointKey(point) {
   if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) return '';
@@ -536,7 +368,6 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
 
   feature.structureSemantics = semantics;
   feature.surfaceBias = surfaceBias;
-  feature.surfaceTerrainSampler = semantics.terrainMode === 'at_grade' ? sampleTerrainY : null;
   feature.surfaceDistances = distances;
   feature.surfaceHeights = profileHeights;
   feature.structureSurfaceMinY = profileHeights.reduce((best, value) => Math.min(best, value), Infinity);
@@ -549,10 +380,6 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
     return { leftEdge: [], rightEdge: [], centerlineHeights: [] };
   }
 
-  const semantics = feature.structureSemantics || classifyStructureSemantics(feature.structureTags || {}, {
-    featureKind: feature.networkKind || feature.kind || 'road',
-    subtype: feature.type || feature.subtype || ''
-  });
   const baseTopBias = Number.isFinite(options.surfaceBias) ? options.surfaceBias : Number(feature.surfaceBias) || 0.08;
   if (!(feature.surfaceDistances instanceof Float32Array) || !(feature.surfaceHeights instanceof Float32Array)) {
     updateFeatureSurfaceProfile(feature, sampleTerrainY, { surfaceBias: baseTopBias });
@@ -563,8 +390,6 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
   const leftEdge = [];
   const rightEdge = [];
   const centerlineHeights = [];
-  const hasTransitionAnchors = Array.isArray(feature?.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0;
-
   for (let i = 0; i < points.length; i++) {
     const point = points[i];
     let dx;
@@ -592,17 +417,14 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
     const leftZ = point.z + nz * halfWidth;
     const rightX = point.x - nx * halfWidth;
     const rightZ = point.z - nz * halfWidth;
-    const terrainSnappedEdges = semantics.terrainMode === 'at_grade' && !hasTransitionAnchors && options.terrainSnappedEdges !== false;
-    const edgeBias = terrainSnappedEdges ? baseTopBias : 0;
-
     leftEdge.push({
       x: leftX,
-      y: terrainSnappedEdges ? sampleTerrainY(leftX, leftZ) + edgeBias : centerY,
+      y: centerY,
       z: leftZ
     });
     rightEdge.push({
       x: rightX,
-      y: terrainSnappedEdges ? sampleTerrainY(rightX, rightZ) + edgeBias : centerY,
+      y: centerY,
       z: rightZ
     });
   }
@@ -623,16 +445,6 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
   if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2) return NaN;
   const projection = projected || projectPointToFeature(feature, x, z);
   if (!projection) return NaN;
-  const semantics = feature.structureSemantics || null;
-  const hasTransitionAnchors = Array.isArray(feature.structureTransitionAnchors) && feature.structureTransitionAnchors.length > 0;
-  if (
-    semantics?.terrainMode === 'at_grade' &&
-    !hasTransitionAnchors &&
-    typeof feature.surfaceTerrainSampler === 'function'
-  ) {
-    const sampledTerrainY = feature.surfaceTerrainSampler(projection.x, projection.z);
-    if (Number.isFinite(sampledTerrainY)) return sampledTerrainY + (Number(feature.surfaceBias) || 0.08);
-  }
   const distances = feature.surfaceDistances instanceof Float32Array ? feature.surfaceDistances : null;
   const heights = feature.surfaceHeights instanceof Float32Array ? feature.surfaceHeights : null;
   if (!distances || !heights || !distances.length || !heights.length) return NaN;
@@ -771,115 +583,6 @@ function projectPointToFeature(feature, x, z) {
 function featureTraversalKey(feature) {
   const semantics = feature?.structureSemantics || null;
   return semantics?.verticalGroup || 'grade:0';
-}
-
-function classifyStructureSemantics(tags = {}, options = {}) {
-  const featureCategory = featureTypeCategory(options.featureKind, options.subtype || tags?.highway || tags?.railway || tags?.building);
-  const highway = normalizedTagValue(tags?.highway);
-  const bridgeTag = normalizedTagValue(tags?.bridge);
-  const tunnelTag = normalizedTagValue(tags?.tunnel);
-  const coveredTag = normalizedTagValue(tags?.covered);
-  const indoorTag = normalizedTagValue(tags?.indoor);
-  const location = normalizedTagValue(tags?.location);
-  const manMade = normalizedTagValue(tags?.man_made);
-  const placement = normalizedTagValue(tags?.placement);
-  const rampTag = normalizedTagValue(tags?.ramp);
-  const passage = normalizedTagValue(tags?.passage || tags?.building_passage);
-  const layer = parseIntegerTag(tags?.layer, 0);
-  const level = parseNumericTag(tags?.level, NaN);
-  const minHeight = parseNumericTag(tags?.min_height, NaN);
-  const buildingMinLevel = parseNumericTag(tags?.['building:min_level'], NaN);
-  const culvert = tunnelTag === 'culvert' || normalizedTagValue(tags?.culvert) === 'yes';
-  const isBridge = isTruthyTag(bridgeTag) || manMade === 'bridge';
-  const isTunnel = (isTruthyTag(tunnelTag) && tunnelTag !== 'building_passage') || location === 'underground' || location === 'underwater';
-  const isCovered = isTruthyTag(coveredTag) || tunnelTag === 'building_passage' || passage === 'yes';
-  const isIndoor = !!indoorTag;
-  const isPedestrianConnector = /^(footway|pedestrian|path|corridor|steps)$/.test(highway) || featureCategory === 'connector';
-  const rampCandidate =
-    rampTag === 'yes' ||
-    placement === 'transition' ||
-    /_link$/.test(highway);
-  const explicitBaseOffset =
-    Number.isFinite(minHeight) ? minHeight :
-    Number.isFinite(buildingMinLevel) ? buildingMinLevel * 3.4 :
-    Number.isFinite(level) && level > 0 ? level * 3.4 :
-    0;
-
-  const baseClearance = baseClearanceForCategory(featureCategory);
-  const baseDepth = baseDepthForCategory(featureCategory);
-  const verticalOrder =
-    layer !== 0 ? layer :
-    isTunnel || culvert ? -1 :
-    isBridge || explicitBaseOffset > 2.5 || (Number.isFinite(level) && level > 0) ? 1 :
-    0;
-
-  const deckClearance = Math.max(
-    explicitBaseOffset,
-    verticalOrder > 0 ? baseClearance + Math.max(0, verticalOrder - 1) * 3.4 : 0
-  );
-  const cutDepth = Math.max(
-    verticalOrder < 0 ? baseDepth + Math.max(0, Math.abs(verticalOrder) - 1) * 3.2 : 0,
-    culvert ? 2.4 : 0
-  );
-
-  const elevatedConnectorCandidate =
-    isPedestrianConnector &&
-    !isTunnel &&
-    !culvert &&
-    (
-      isBridge ||
-      verticalOrder > 0 ||
-      explicitBaseOffset > 2.5 ||
-      location === 'roof'
-    );
-
-  const skywalk =
-    elevatedConnectorCandidate &&
-    (isBridge || isIndoor || isCovered || location === 'roof' || explicitBaseOffset > 2.5);
-
-  let structureKind = 'at_grade';
-  let terrainMode = 'at_grade';
-  if (culvert) {
-    structureKind = 'culvert';
-    terrainMode = 'subgrade';
-  } else if (isTunnel) {
-    structureKind = 'tunnel';
-    terrainMode = 'subgrade';
-  } else if (skywalk) {
-    structureKind = 'skywalk';
-    terrainMode = 'elevated';
-  } else if (isBridge) {
-    structureKind = 'bridge';
-    terrainMode = 'elevated';
-  } else if (verticalOrder > 0 || explicitBaseOffset > 2.5 || location === 'roof') {
-    structureKind = isPedestrianConnector ? 'connector' : 'elevated';
-    terrainMode = 'elevated';
-  } else if (isCovered || isIndoor) {
-    structureKind = 'covered';
-  }
-
-  return {
-    featureCategory,
-    structureKind,
-    terrainMode,
-    gradeSeparated: terrainMode !== 'at_grade',
-    isBridge,
-    isTunnel,
-    culvert,
-    covered: isCovered,
-    indoor: isIndoor,
-    skywalk,
-    placement,
-    layer,
-    level: Number.isFinite(level) ? level : null,
-    verticalOrder,
-    deckClearance,
-    cutDepth,
-    explicitBaseOffset,
-    elevatedConnectorCandidate,
-    rampCandidate,
-    verticalGroup: `${terrainMode}:${verticalOrder}:${structureKind}`
-  };
 }
 
 export {

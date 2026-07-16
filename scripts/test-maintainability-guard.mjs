@@ -5,32 +5,15 @@ const ROOT = process.cwd();
 const APP_JS = path.join(ROOT, 'app', 'js');
 const DEFAULT_MAX_LINES = 700;
 const ABSOLUTE_MAX_LINES = 1000;
+const WORLD_COLLECTIONS = [
+  'roads', 'roadMeshes', 'urbanSurfaceMeshes', 'buildings', 'buildingMeshes',
+  'dynamicBuildingColliders', 'landuses', 'surfaceFeatureHints', 'landuseMeshes',
+  'waterAreas', 'waterways', 'waterWaveVisuals', 'linearFeatures', 'linearFeatureMeshes',
+  'structureVisualMeshes', 'pois', 'poiMeshes', 'historicSites', 'historicMarkers',
+  'streetFurnitureMeshes', 'vegetationFeatures', 'vegetationMeshes'
+];
 
-// Cohesive legacy modules may stay above the preferred ceiling, but may not grow.
-// Remove entries as ownership-driven extractions bring each module below 700 lines.
-const LEGACY_LINE_BUDGETS = Object.freeze({
-  'activity-editor/session.js': 852,
-  'blocks.js': 900,
-  'boat-mode.js': 830,
-  'boat-mode/surface-effects.js': 787,
-  'boat-mode/water-query.js': 879,
-  'editor/config.js': 885,
-  'flower-challenge.js': 956,
-  'hud.js': 721,
-  'multiplayer/rooms.js': 999,
-  'multiplayer/ui-room.js': 880,
-  'ocean.js': 749,
-  'physics.js': 828,
-  'sky.js': 799,
-  'solar-system.js': 977,
-  'structure-semantics.js': 903,
-  'tutorial/tutorial.js': 802,
-  'ui.js': 860,
-  'ui/globe-selector.js': 995,
-  'weather.js': 849,
-  'world/load-roads.js': 703,
-  'world/streaming-vector-chunks.js': 900
-});
+const LEGACY_LINE_BUDGETS = Object.freeze({});
 
 function listJavaScriptFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -65,6 +48,31 @@ for (const file of files) {
 
   if (relative !== 'env.js' && /appCtx\.(?:onMoon|onMars)\s*=/.test(source)) {
     failures.push(`${relative}: writes environment surface flags owned by env.js`);
+  }
+
+  if (relative !== 'pause-state.js' && /appCtx\.paused\s*=/.test(source)) {
+    failures.push(`${relative}: writes pause state instead of using pause-state.js`);
+  }
+
+  if (relative !== 'camera-mode.js' && /(?:appCtx|ctx\.appCtx)\.camMode\s*=(?!=)/.test(source)) {
+    failures.push(`${relative}: writes camera mode instead of using camera-mode.js`);
+  }
+
+  if (relative !== 'travel-mode.js' && /appCtx\.droneMode\s*=(?!=)/.test(source)) {
+    failures.push(`${relative}: writes drone mode instead of using travel-mode.js`);
+  }
+
+  if (relative !== 'env.js' && /appCtx\.travelingToMoon\s*=(?!=)/.test(source)) {
+    failures.push(`${relative}: writes environment transition state instead of using env.js`);
+  }
+
+  if (relative !== 'location-session.js' && /appCtx\.(?:selLoc|customLoc|customLocTransient)\s*=(?!=)/.test(source)) {
+    failures.push(`${relative}: writes location selection instead of using location-session.js`);
+  }
+
+  const worldCollectionPattern = new RegExp(`appCtx\\.(?:${WORLD_COLLECTIONS.join('|')})\\s*=(?!=)`);
+  if (relative !== 'world/collection-registry.js' && worldCollectionPattern.test(source)) {
+    failures.push(`${relative}: replaces a world collection instead of using world/collection-registry.js`);
   }
 
   if ((relative === 'input.js' || relative === 'ui.js' || relative.startsWith('ui/')) && /appCtx\.droneMode\s*=/.test(source)) {

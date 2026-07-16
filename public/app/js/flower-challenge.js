@@ -1,5 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { createFlowerChallengeLeaderboardApi } from "./flower-challenge/leaderboard.js?v=2";
+import { createFlowerLeaderboardView } from "./flower-challenge/leaderboard-view.js?v=1";
+import { createFlowerMarkerRuntime } from "./flower-challenge/marker-runtime.js?v=1";
 import { getCurrentUser } from "../../js/auth-ui.js";
 import { initFirebase } from "../../js/firebase-init.js";
 
@@ -227,143 +229,17 @@ function toggleFlowerActionMenu() {
   }
 }
 
-function normalizeLeaderboardEntry(raw, forcedChallengeType = null) {
-  if (!raw || typeof raw !== 'object') return null;
-  const challenge = normalizeChallengeType(forcedChallengeType || raw.challenge || raw.challengeType);
-  const player = sanitizePlayerName(raw.player || raw.displayName || raw.name || 'Explorer');
-  const location = String(raw.location || 'Unknown Location').slice(0, 80);
-  const lat = Number(raw.lat);
-  const lon = Number(raw.lon);
-  const mode = String(raw.mode || 'driving').slice(0, 24);
-  const foundAtSource = raw.foundAt || raw.createdAtIso || raw.lastActiveAt || new Date();
-  const foundAtDate = typeof foundAtSource?.toDate === 'function' ? foundAtSource.toDate() : new Date(foundAtSource);
-  const foundAt = Number.isFinite(foundAtDate.getTime()) ? foundAtDate.toISOString() : new Date().toISOString();
-  const timeMs = Number(raw.timeMs);
-  const paintedPct = Number(raw.paintedPct);
-  const paintedBuildings = Number(raw.paintedBuildings);
-  const totalBuildings = Number(raw.totalBuildings);
-  const score = Number(raw.score);
-  const weightKg = Number(raw.weightKg);
-  const lengthCm = Number(raw.lengthCm);
-  const strength = Number(raw.strength);
-  const fightTimeMs = Number(raw.fightTimeMs);
-  const species = String(raw.species || '').slice(0, 80);
-  const speciesId = String(raw.speciesId || '').slice(0, 48);
-  const rarity = String(raw.rarity || '').slice(0, 24);
-  const behavior = String(raw.behavior || '').slice(0, 32);
-  const waterKind = String(raw.waterKind || '').slice(0, 24);
-  const lineIntegrityPct = Number(raw.lineIntegrityPct);
-  const maxTensionPct = Number(raw.maxTensionPct);
-  const roomsJoined = Number(raw.roomsJoined);
-  const artifactsShared = Number(raw.artifactsShared);
-  const friendsAdded = Number(raw.friendsAdded);
-
-  if (challenge === 'flower') {
-    if (!Number.isFinite(timeMs) || timeMs <= 0) return null;
-  } else if (challenge === 'painttown') {
-    const hasCount = Number.isFinite(paintedBuildings) && paintedBuildings >= 0;
-    const hasPct = Number.isFinite(paintedPct) && paintedPct >= 0;
-    if (!hasCount && !hasPct) return null;
-  } else if (!Number.isFinite(score) || score < 0) {
-    return null;
-  }
-
-  return {
-    id: String(raw.id || raw.docId || `entry_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`),
-    challenge,
-    player,
-    timeMs: Number.isFinite(timeMs) && timeMs > 0 ? timeMs : null,
-    paintedPct: Number.isFinite(paintedPct) ? Math.max(0, Math.min(100, paintedPct)) : null,
-    paintedBuildings: Number.isFinite(paintedBuildings) ? Math.max(0, Math.round(paintedBuildings)) : 0,
-    totalBuildings: Number.isFinite(totalBuildings) ? Math.max(0, Math.round(totalBuildings)) : 0,
-    score: Number.isFinite(score) ? Math.max(0, Math.round(score)) : 0,
-    weightKg: Number.isFinite(weightKg) ? Math.max(0, weightKg) : null,
-    lengthCm: Number.isFinite(lengthCm) ? Math.max(0, lengthCm) : null,
-    strength: Number.isFinite(strength) ? Math.max(0, strength) : null,
-    fightTimeMs: Number.isFinite(fightTimeMs) ? Math.max(0, Math.round(fightTimeMs)) : null,
-    species,
-    speciesId,
-    rarity,
-    behavior,
-    waterKind,
-    lineIntegrityPct: Number.isFinite(lineIntegrityPct) ? Math.max(0, Math.min(100, lineIntegrityPct)) : null,
-    maxTensionPct: Number.isFinite(maxTensionPct) ? Math.max(0, Math.min(100, maxTensionPct)) : null,
-    roomsJoined: Number.isFinite(roomsJoined) ? Math.max(0, Math.round(roomsJoined)) : 0,
-    artifactsShared: Number.isFinite(artifactsShared) ? Math.max(0, Math.round(artifactsShared)) : 0,
-    friendsAdded: Number.isFinite(friendsAdded) ? Math.max(0, Math.round(friendsAdded)) : 0,
-    location,
-    lat: Number.isFinite(lat) ? lat : null,
-    lon: Number.isFinite(lon) ? lon : null,
-    mode,
-    foundAt
-  };
-}
-
-function readLocalLeaderboard(challengeType = 'flower') {
-  const normalizedType = normalizeChallengeType(challengeType);
-  try {
-    const raw = localStorage.getItem(getLeaderboardStorageKey(normalizedType));
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    if (!Array.isArray(parsed)) return [];
-    return sortLeaderboardEntries(
-      parsed.map((entry) => normalizeLeaderboardEntry(entry, normalizedType)).filter(Boolean),
-      normalizedType
-    ).slice(0, LEADERBOARD_LIMIT);
-  } catch (_) {
-    return [];
-  }
-}
-
-function writeLocalLeaderboard(challengeType, entries) {
-  const normalizedType = normalizeChallengeType(challengeType);
-  try {
-    localStorage.setItem(
-      getLeaderboardStorageKey(normalizedType),
-      JSON.stringify(sortLeaderboardEntries(entries, normalizedType).slice(0, LEADERBOARD_LIMIT))
-    );
-    return true;
-  } catch (_) {
-    return false;
-  }
-}
-
-function renderLeaderboard(entries) {
-  if (!ui.titleList) return;
-  const challengeType = normalizeChallengeType(challengeState.leaderboardView);
-
-  if (!entries || entries.length === 0) {
-    const empty = {
-      flower: 'No flower runs yet. Be the first.',
-      painttown: 'No paint runs yet. Reach rooftops to paint and post a score.',
-      fishing: 'No catches yet. Launch a boat, stop in open water, and cast.',
-      explorer: 'Explorer scores appear as people join rooms, share artifacts, and make connections.'
-    }[challengeType];
-    ui.titleList.innerHTML = `<li class="flowerLeaderboardEmpty">${safeText(empty)}</li>`;
-    return;
-  }
-
-  ui.titleList.innerHTML = entries.map((entry, idx) => {
-    let metric = `${((Number(entry.timeMs) || 0) / 1000).toFixed(2)}s`;
-    let locationLine = safeText(entry.location);
-    if (challengeType === 'painttown') {
-      metric = `${Math.max(0, Math.round(Number(entry.paintedBuildings) || 0))} bldgs`;
-      locationLine = `${safeText(entry.location)} | ${safeText((entry.paintedBuildings || 0) + '/' + (entry.totalBuildings || 0))}`;
-    } else if (challengeType === 'fishing') {
-      metric = `${Math.max(0, Number(entry.score) || 0)} pts`;
-      locationLine = `${safeText(entry.species || 'Fish')} | ${Number(entry.weightKg || 0).toFixed(2)} kg | ${Number(entry.lengthCm || 0).toFixed(1)} cm | ${safeText(entry.location)}`;
-    } else if (challengeType === 'explorer') {
-      metric = `${Math.max(0, Number(entry.score) || 0)} pts`;
-      locationLine = `Rooms ${entry.roomsJoined || 0} | Artifacts ${entry.artifactsShared || 0} | Friends ${entry.friendsAdded || 0}`;
-    }
-    return `<li class="flowerLeaderboardItem">
-      <span class="flowerLeaderboardRank">#${idx + 1}</span>
-      <span class="flowerLeaderboardPlayer">${safeText(entry.player)}</span>
-      <span class="flowerLeaderboardTime">${safeText(metric)}</span>
-      <span class="flowerLeaderboardLoc">${locationLine}</span>
-    </li>`;
-  }).join('');
-}
+const leaderboardView = createFlowerLeaderboardView({
+  challengeState,
+  getLeaderboardStorageKey,
+  getSortLeaderboardEntries: () => sortLeaderboardEntries,
+  leaderboardLimit: LEADERBOARD_LIMIT,
+  normalizeChallengeType,
+  safeText,
+  sanitizePlayerName,
+  ui
+});
+const { normalizeLeaderboardEntry, readLocalLeaderboard, renderLeaderboard, writeLocalLeaderboard } = leaderboardView;
 
 const leaderboardApi = createFlowerChallengeLeaderboardApi({
   FIREBASE_CONFIG_KEY,
@@ -410,189 +286,14 @@ const {
   writeRemoteLeaderboard
 } = leaderboardApi;
 
-function isInsidePolygon(x, z, pts) {
-  if (!Array.isArray(pts) || pts.length < 3) return false;
-  if (typeof appCtx.pointInPolygon === 'function') return !!appCtx.pointInPolygon(x, z, pts);
-
-  let inside = false;
-  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
-    const xi = pts[i].x;
-    const zi = pts[i].z;
-    const xj = pts[j].x;
-    const zj = pts[j].z;
-    const intersects = zi > z !== zj > z && x < (xj - xi) * (z - zi) / (zj - zi) + xi;
-    if (intersects) inside = !inside;
-  }
-  return inside;
-}
-
-function getTerrainY(x, z) {
-  if (typeof appCtx.terrainMeshHeightAt === 'function') {
-    const h = appCtx.terrainMeshHeightAt(x, z);
-    if (Number.isFinite(h)) return h;
-  }
-  if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
-    const h = appCtx.elevationWorldYAtWorldXZ(x, z);
-    if (Number.isFinite(h)) return h;
-  }
-  return 0;
-}
-
-function getBuildingRoofY(x, z, groundY) {
-  if (!Array.isArray(appCtx.buildings) || appCtx.buildings.length === 0) return null;
-
-  const candidates = typeof appCtx.getNearbyBuildings === 'function' ?
-  appCtx.getNearbyBuildings(x, z, 30) || [] :
-  appCtx.buildings;
-
-  let roof = null;
-  for (let i = 0; i < candidates.length; i++) {
-    const b = candidates[i];
-    if (!b) continue;
-    if (x < b.minX || x > b.maxX || z < b.minZ || z > b.maxZ) continue;
-    if (!isInsidePolygon(x, z, b.pts)) continue;
-    const h = Number(b.height);
-    if (!Number.isFinite(h) || h <= 0) continue;
-    const top = groundY + h;
-    if (!Number.isFinite(roof) || top > roof) roof = top;
-  }
-
-  return roof;
-}
-
-function getTopSurfaceY(x, z) {
-  const groundY = getTerrainY(x, z);
-  let topY = groundY;
-
-  const roofY = getBuildingRoofY(x, z, groundY);
-  if (Number.isFinite(roofY) && roofY > topY) topY = roofY;
-
-  if (typeof appCtx.getBuildTopSurfaceAtWorldXZ === 'function') {
-    const blockTop = appCtx.getBuildTopSurfaceAtWorldXZ(x, z, Infinity);
-    if (Number.isFinite(blockTop) && blockTop > topY) topY = blockTop;
-  }
-
-  return topY;
-}
-
-function pickFlowerSpawn() {
-  const actor = getActiveActorPosition();
-  const baseX = Number(actor?.x || appCtx.car?.x || 0);
-  const baseZ = Number(actor?.z || appCtx.car?.z || 0);
-
-  const roads = Array.isArray(appCtx.roads) ? appCtx.roads : [];
-  if (roads.length > 0) {
-    for (let attempt = 0; attempt < 220; attempt++) {
-      const road = roads[Math.floor(Math.random() * roads.length)];
-      if (!road || !Array.isArray(road.pts) || road.pts.length === 0) continue;
-      const pt = road.pts[Math.floor(Math.random() * road.pts.length)];
-      if (!pt) continue;
-
-      const roadWidth = Number(road.width) > 0 ? Number(road.width) : 10;
-      const jitter = roadWidth * 0.75;
-      const x = pt.x + (Math.random() - 0.5) * jitter;
-      const z = pt.z + (Math.random() - 0.5) * jitter;
-      const dist = Math.hypot(x - baseX, z - baseZ);
-      if (dist < FLOWER_MIN_DISTANCE || dist > FLOWER_MAX_DISTANCE) continue;
-
-      const y = getTopSurfaceY(x, z);
-      if (!Number.isFinite(y)) continue;
-
-      return { x, y, z };
-    }
-  }
-
-  for (let attempt = 0; attempt < 160; attempt++) {
-    const radius = FLOWER_MIN_DISTANCE + Math.random() * (FLOWER_MAX_DISTANCE - FLOWER_MIN_DISTANCE);
-    const theta = Math.random() * Math.PI * 2;
-    const x = baseX + Math.cos(theta) * radius;
-    const z = baseZ + Math.sin(theta) * radius;
-    const y = getTopSurfaceY(x, z);
-    if (!Number.isFinite(y)) continue;
-    return { x, y, z };
-  }
-
-  return null;
-}
-
-function buildFlowerMarkerMesh() {
-  if (typeof THREE === 'undefined') return null;
-
-  const root = new THREE.Group();
-  root.name = 'redFlowerChallenge';
-
-  const stem = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.05, 0.06, 1.5, 10),
-    new THREE.MeshStandardMaterial({ color: 0x047857, roughness: 0.45, metalness: 0.05 })
-  );
-  stem.position.y = 0.8;
-  root.add(stem);
-
-  const center = new THREE.Mesh(
-    new THREE.SphereGeometry(0.18, 16, 12),
-    new THREE.MeshStandardMaterial({ color: 0xfbbf24, roughness: 0.35, metalness: 0.1 })
-  );
-  center.position.y = 1.64;
-  root.add(center);
-
-  for (let i = 0; i < 8; i++) {
-    const ang = i / 8 * Math.PI * 2;
-    const petal = new THREE.Mesh(
-      new THREE.SphereGeometry(0.16, 14, 10),
-      new THREE.MeshStandardMaterial({ color: 0xdc2626, roughness: 0.35, metalness: 0.05 })
-    );
-    petal.scale.set(1.4, 0.8, 0.8);
-    petal.position.set(Math.cos(ang) * 0.29, 1.64, Math.sin(ang) * 0.29);
-    root.add(petal);
-  }
-
-  const beacon = new THREE.Mesh(
-    new THREE.TorusGeometry(0.52, 0.03, 10, 40),
-    new THREE.MeshBasicMaterial({ color: 0xef4444, transparent: true, opacity: 0.85 })
-  );
-  beacon.rotation.x = Math.PI * 0.5;
-  beacon.position.y = 0.08;
-  beacon.userData.isBeacon = true;
-  root.add(beacon);
-
-  root.traverse((child) => {
-    if (child.isMesh) {
-      child.castShadow = true;
-      child.receiveShadow = false;
-    }
-  });
-
-  return root;
-}
-
-function removeFlowerMarker() {
-  if (!challengeState.marker) return;
-  const marker = challengeState.marker;
-  challengeState.marker = null;
-  challengeState.markerPos = null;
-  if (marker.parent) marker.parent.remove(marker);
-  marker.traverse((child) => {
-    if (child.geometry && typeof child.geometry.dispose === 'function') child.geometry.dispose();
-    if (child.material) {
-      if (Array.isArray(child.material)) child.material.forEach((m) => m?.dispose?.());
-      else child.material.dispose?.();
-    }
-  });
-}
-
-function placeFlowerMarker(spawnPoint) {
-  if (!appCtx.scene) return false;
-  const marker = buildFlowerMarkerMesh();
-  if (!marker) return false;
-
-  marker.position.set(spawnPoint.x, spawnPoint.y + 0.02, spawnPoint.z);
-  appCtx.scene.add(marker);
-
-  challengeState.marker = marker;
-  challengeState.markerBaseY = spawnPoint.y + 0.02;
-  challengeState.markerPos = { x: spawnPoint.x, y: spawnPoint.y + 0.02, z: spawnPoint.z };
-  return true;
-}
+const flowerMarkerRuntime = createFlowerMarkerRuntime({
+  appCtx,
+  challengeState,
+  getActiveActorPosition,
+  minDistance: FLOWER_MIN_DISTANCE,
+  maxDistance: FLOWER_MAX_DISTANCE
+});
+const { pickFlowerSpawn, placeFlowerMarker, removeFlowerMarker } = flowerMarkerRuntime;
 
 function captureRunEntry(elapsedMs, actor) {
   const player = resolvePlayerName();

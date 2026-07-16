@@ -326,13 +326,11 @@ export function syncLegacyCustomSelection(appCtx, selection) {
   const legacyLon = document.getElementById('customLon');
   if (legacyLat) legacyLat.value = Number(selection.lat).toFixed(6);
   if (legacyLon) legacyLon.value = Number(selection.lon).toFixed(6);
-  appCtx.customLoc = {
+  appCtx.setCustomLocation?.({
     lat: selection.lat,
     lon: selection.lon,
     name: selection.name || appCtx.customLoc?.name || 'Custom Location'
-  };
-  appCtx.customLocTransient = selection.fromGeolocation === true;
-  appCtx.selLoc = 'custom';
+  }, { transient: selection.fromGeolocation === true, syncInputs: false });
 }
 
 export function setGlobeSelectorScrollLock(locked) {

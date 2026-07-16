@@ -149,7 +149,7 @@ function batchBuildingMeshesByTier(tiers = ['near']) {
       appCtx._lastBuildingBatchStats = { groupCount: groups.size, batchMeshCount: 0, sourceMeshCount: 0 };
       return 0;
     }
-    appCtx.buildingMeshes = [...keep, ...batchedMeshes];
+    appCtx.replaceWorldCollection('buildingMeshes', [...keep, ...batchedMeshes]);
     appCtx._lastBuildingBatchStats = {
       groupCount: groups.size,
       batchMeshCount: batchedMeshes.length,

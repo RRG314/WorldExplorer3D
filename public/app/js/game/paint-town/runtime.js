@@ -41,7 +41,7 @@ function showPaintTownSummary(title, stats) {
   if (titleEl) titleEl.textContent = title;
   if (statsEl) statsEl.textContent = stats;
   if (screen) screen.classList.add("show");
-  appCtx.paused = true;
+  appCtx.setPauseReason?.('game_result', true);
 }
 
 export function resetPaintTownMode() {

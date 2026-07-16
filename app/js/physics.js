@@ -4,6 +4,8 @@ import { updateDrone } from "./physics/drone-flight.js?v=3";
 import { updatePlane } from "./plane-mode.js?v=7";
 import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=2";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=1";
+import { updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=1";
+import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=1";
 // physics.js - Car physics, building collision, drone movement
 // ============================================================================
 
@@ -100,65 +102,9 @@ function update(dt) {
   }
   if (typeof appCtx.updateFlowerChallenge === 'function') appCtx.updateFlowerChallenge(dt);
 
-  if (appCtx.boatMode?.active) {
-    if (typeof appCtx.updateBoatMode === 'function') {
-      appCtx.updateBoatMode(dt);
-    }
-    if (typeof appCtx.updateFishingGame === 'function') appCtx.updateFishingGame(dt);
-    if (typeof appCtx.updateMode === 'function') appCtx.updateMode(dt);
-    return;
-  }
+  if (updateAlternateTravelMode(appCtx, dt, { isPlanetarySurface, updateDrone, updatePlane })) return;
 
-  if ((appCtx.fishingGame?.open || appCtx.fishingGame?.active) && typeof appCtx.updateFishingGame === 'function') {
-    appCtx.updateFishingGame(dt);
-  }
-
-  if (appCtx.planeMode?.active) {
-    updatePlane(dt);
-    if (typeof appCtx.updateMode === 'function') appCtx.updateMode(dt);
-    if (typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
-    return;
-  }
-
-  if (appCtx.droneMode) {
-    updateDrone(dt);
-    if (typeof appCtx.updateMode === 'function') appCtx.updateMode(dt);
-    if (typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
-    if (!isPlanetarySurface() && !appCtx.worldLoading) appCtx.updateTerrainAround(appCtx.drone.x, appCtx.drone.z);
-    return;
-  }
-
-  if (appCtx.Walk) {
-    appCtx.Walk.update(dt);
-    if (appCtx.Walk.state.mode === 'walk') {
-      if (appCtx.isRecording && appCtx.customTrack.length > 0) {
-        const lp = appCtx.customTrack[appCtx.customTrack.length - 1];
-        const d = Math.hypot(appCtx.Walk.state.walker.x - lp.x, appCtx.Walk.state.walker.z - lp.z);
-        if (d > 5) appCtx.customTrack.push({ x: appCtx.Walk.state.walker.x, z: appCtx.Walk.state.walker.z });
-      } else if (appCtx.isRecording) {
-        appCtx.customTrack.push({ x: appCtx.Walk.state.walker.x, z: appCtx.Walk.state.walker.z });
-      }
-
-      appCtx.police.forEach((p) => {
-        const dx = appCtx.Walk.state.walker.x - p.x,dz = appCtx.Walk.state.walker.z - p.z,d = Math.hypot(dx, dz);
-        if (d < 15 && !p.caught) {
-          p.caught = true;appCtx.policeHits++;
-          document.getElementById('police').textContent = '💔 ' + appCtx.policeHits + '/3';
-          document.getElementById('police').classList.add('warn');
-          if (appCtx.policeHits >= 3) {
-            appCtx.paused = true;
-            document.getElementById('caughtScreen').classList.add('show');
-          }
-        }
-      });
-
-      if (typeof appCtx.updateMode === 'function') appCtx.updateMode(dt);
-      if (typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
-      return;
-    }
-  }
-
-  if (typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
+  appCtx.updateInteriorInteraction?.();
 
   const left = appCtx.keys.ArrowLeft,right = appCtx.keys.ArrowRight;
   const gas = appCtx.keys.ArrowUp,reverse = appCtx.keys.ArrowDown;
@@ -655,92 +601,13 @@ function update(dt) {
 
   const planetarySurface = getPlanetarySurfaceMesh();
   if (planetarySurface) {
-    planetarySurface.updateMatrixWorld(true);
-    const raycaster = _getPhysRaycaster();
-    const sampleMoonSurfaceY = (sx, sz) => {
-      _physRayStart.set(sx, 1200, sz);
-      raycaster.set(_physRayStart, _physRayDir || new THREE.Vector3(0, -1, 0));
-      const sampleHits = raycaster.intersectObject(planetarySurface, false);
-      return sampleHits.length > 0 ? sampleHits[0].point.y + 1.2 : null;
-    };
-
-    const targetY = sampleMoonSurfaceY(appCtx.car.x, appCtx.car.z);
-
-    if (targetY !== null) {
-      const speedAbs = Math.abs(appCtx.car.speed || 0);
-      const smoothedTargetY = Number.isFinite(appCtx.car._lastSurfaceY) ?
-      appCtx.car._lastSurfaceY * 0.35 + targetY * 0.65 :
-      targetY;
-      const prevSurfaceY = Number.isFinite(appCtx.car._lastSurfaceY) ? appCtx.car._lastSurfaceY : smoothedTargetY;
-      const surfaceDelta = smoothedTargetY - prevSurfaceY;
-      const surfaceVel = dt > 1e-4 ? surfaceDelta / dt : 0;
-      const currentY = Number.isFinite(appCtx.car.y) ? appCtx.car.y : smoothedTargetY;
-      const clearanceAboveGround = currentY - smoothedTargetY;
-
-      // Detect crest/drop transitions ahead of the car so launches work with keyboard or touch.
-      const fwdStep = Math.min(12, Math.max(3, speedAbs * 0.14 + 2.5));
-      const dirX = Math.sin(appCtx.car.angle || 0);
-      const dirZ = Math.cos(appCtx.car.angle || 0);
-      const aheadY = sampleMoonSurfaceY(appCtx.car.x + dirX * fwdStep, appCtx.car.z + dirZ * fwdStep);
-      const forwardSlope = aheadY === null ? 0 : (aheadY - smoothedTargetY) / fwdStep;
-      const dropAhead = aheadY === null ? 0 : smoothedTargetY - aheadY;
-
-      const alreadyAirborne = !!appCtx.car.isAirborne;
-      const crestLaunch =
-      speedAbs > 11 &&
-      surfaceVel > 0.9 &&
-      forwardSlope < -0.08;
-      const craterDropLaunch =
-      speedAbs > 10 &&
-      dropAhead > 0.9;
-      const separationLaunch = clearanceAboveGround > 0.85 && speedAbs > 8;
-
-      if (!alreadyAirborne && (crestLaunch || craterDropLaunch || separationLaunch)) {
-        const launchFromRise = Math.max(0, surfaceVel * 0.16);
-        const launchFromSpeed = Math.max(0, (speedAbs - 8) * 0.03);
-        appCtx.car.vy = Math.max(appCtx.car.vy, launchFromRise + launchFromSpeed);
-        appCtx.car.isAirborne = true;
-        appCtx.car._terrainAirTimer = 0;
-      }
-
-      if (appCtx.car.isAirborne) {
-        appCtx.car._terrainAirTimer += dt;
-        appCtx.car.vy += getPlanetaryGravity() * dt;
-        appCtx.car.y = currentY + appCtx.car.vy * dt;
-
-        const canLand = appCtx.car._terrainAirTimer > 0.02;
-        if (canLand && appCtx.car.y <= smoothedTargetY) {
-          appCtx.car.y = smoothedTargetY;
-          appCtx.car.vy = 0;
-          appCtx.car.isAirborne = false;
-          appCtx.car._terrainAirTimer = 0;
-        }
-        carY = appCtx.car.y;
-      } else {
-        const diff = smoothedTargetY - currentY;
-        if (Math.abs(diff) > 20 || Math.abs(diff) < 0.005) {
-          carY = smoothedTargetY;
-        } else {
-          const baseLerp = 18;
-          const speedBoost = Math.min(12, speedAbs * 0.09);
-          const lerpRate = Math.min(1.0, dt * (baseLerp + speedBoost));
-          carY = currentY + diff * lerpRate;
-        }
-        if (Math.abs(carY - smoothedTargetY) < 0.04) carY = smoothedTargetY;
-        appCtx.car.y = carY;
-        appCtx.car.vy = 0;
-        appCtx.car.isAirborne = false;
-        appCtx.car._terrainAirTimer = 0;
-      }
-
-      appCtx.car._lastSurfaceY = smoothedTargetY;
-    } else {
-      appCtx.car.isAirborne = false;
-      appCtx.car._terrainAirTimer = 0;
-      appCtx.car._lastSurfaceY = null;
-      if (!Number.isFinite(appCtx.car.y)) appCtx.car.y = (planetarySurface.position?.y || -100) + 1.2;
-      carY = appCtx.car.y;
-    }
+    carY = updatePlanetaryVehicleHeight(appCtx, dt, {
+      planetarySurface,
+      getPlanetaryGravity,
+      getRaycaster: _getPhysRaycaster,
+      rayStart: _physRayStart,
+      rayDir: _physRayDir
+    });
   } else if (appCtx.terrainEnabled) {
     let surfaceY = typeof appCtx.GroundHeight !== 'undefined' && appCtx.GroundHeight && typeof appCtx.GroundHeight.driveSurfaceY === 'function' ?
     appCtx.GroundHeight.driveSurfaceY(appCtx.car.x, appCtx.car.z, !!appCtx.car.onRoad, Number.isFinite(appCtx.car.y) ? appCtx.car.y - 1.2 : NaN) :

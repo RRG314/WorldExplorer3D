@@ -8,6 +8,11 @@ function getCurrentTravelMode() {
   return 'drive';
 }
 
+function setDroneModeActive(active) {
+  appCtx.droneMode = active === true;
+  return appCtx.droneMode;
+}
+
 function syncTravelModeButtons() {
   const activeMode = getCurrentTravelMode();
   const drivingBtn = document.getElementById('fDriving');
@@ -211,12 +216,12 @@ function setTravelMode(mode, options = {}) {
       if (settlingAerialTransition) appCtx.resumeEarthStreaming?.(600);
       return syncTravelModeButtons();
     }
-    appCtx.droneMode = false;
+    setDroneModeActive(false);
     if (appCtx.Walk?.state?.mode === 'walk') appCtx.Walk.setModeDrive();
     if (appCtx.Walk?.state?.characterMesh) appCtx.Walk.state.characterMesh.visible = false;
     if (appCtx.carMesh) appCtx.carMesh.visible = false;
   } else if (targetMode === 'walk') {
-    appCtx.droneMode = false;
+    setDroneModeActive(false);
     if (appCtx.Walk && appCtx.Walk.state?.mode !== 'walk') {
       appCtx.Walk.setModeWalk({
         preserveResolvedSpawn: !!planeExitState,
@@ -235,7 +240,7 @@ function setTravelMode(mode, options = {}) {
       preserveAltitude: !!planeExitState
     });
     resetCameraForDroneMode();
-    appCtx.droneMode = true;
+    setDroneModeActive(true);
     if (appCtx.carMesh) appCtx.carMesh.visible = false;
   } else if (targetMode === 'boat') {
     if (typeof appCtx.startBoatMode === 'function') {
@@ -255,11 +260,11 @@ function setTravelMode(mode, options = {}) {
       return syncTravelModeButtons();
     }
   } else {
-    appCtx.droneMode = false;
+    setDroneModeActive(false);
     if (appCtx.Walk?.state?.mode === 'walk') {
       appCtx.Walk.setModeDrive();
     }
-    if (typeof appCtx.camMode !== 'undefined') appCtx.camMode = 0;
+    appCtx.setCameraMode(0);
     if (appCtx.camera?.userData) appCtx.camera.userData.carLook = { yaw: 0, pitch: 0 };
     if (appCtx.carMesh) appCtx.carMesh.visible = true;
   }
@@ -310,6 +315,7 @@ function toggleBoatMode(options = {}) {
 Object.assign(appCtx, {
   getCurrentTravelMode,
   cyclePrimaryTravelMode,
+  setDroneModeActive,
   setTravelMode,
   syncTravelModeButtons,
   toggleBoatMode,
@@ -321,6 +327,7 @@ Object.assign(appCtx, {
 export {
   cyclePrimaryTravelMode,
   getCurrentTravelMode,
+  setDroneModeActive,
   setTravelMode,
   syncTravelModeButtons,
   toggleBoatMode,

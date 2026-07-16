@@ -10,6 +10,7 @@ import {
   seaStateFromIntensity
 } from "./water-dynamics.js?v=4";
 import {
+  buildSyntheticBoatCandidate,
   findNearestBoatCandidate,
   getBoatModeSnapshot,
   getBoatWaveProfile,
@@ -38,6 +39,8 @@ import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=1";
 import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=1";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";
 import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=4";
+import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=1";
+import { createBoatModePolicy } from "./boat-mode/policy.js?v=1";
 
 const BOAT_PROMPT_DISTANCE = 18;
 const BOAT_ENTRY_OFFSET = 9;
@@ -261,183 +264,37 @@ function syncBoatPromptState(force = false) {
   return candidate;
 }
 
-function canExitBoatMode(targetMode = 'walk', options = {}) {
-  if (!appCtx.boatMode?.active) return true;
-  const maxShoreline = targetMode === 'drive' ? BOAT_EXIT_MAX_SHORELINE_DRIVE : BOAT_EXIT_MAX_SHORELINE_WALK;
-  const shoreline = Number(appCtx.boatMode?.shorelineDistance || 0);
-  if (Number.isFinite(shoreline) && shoreline <= maxShoreline) return true;
-  if (options.showNotice !== false) {
-    _boatPromptSignature = `blocked_exit:${targetMode}`;
-    showBoatPrompt('Move closer to shore before leaving Boat Mode', 'notice', BOAT_PROMPT_DURATION_MS);
-  }
-  updateBoatMenuUi();
-  return false;
-}
+const boatModePolicy = createBoatModePolicy({
+  appCtx,
+  exitMaxShorelineDrive: BOAT_EXIT_MAX_SHORELINE_DRIVE,
+  exitMaxShorelineWalk: BOAT_EXIT_MAX_SHORELINE_WALK,
+  minimumBoatShorelineDistance,
+  promptDurationMs: BOAT_PROMPT_DURATION_MS,
+  setPromptSignature: (value) => { _boatPromptSignature = value; },
+  showBoatPrompt,
+  updateBoatMenuUi
+});
+const { canDiveBoatMode, canExitBoatMode } = boatModePolicy;
 
-function canDiveBoatMode(options = {}) {
-  if (!appCtx.boatMode?.active) return false;
-  const currentWater = appCtx.boatMode.currentWater || appCtx.boatMode.candidate || null;
-  const waterKind = String(currentWater?.waterKind || '').toLowerCase();
-  const shoreline = Number(appCtx.boatMode?.shorelineDistance || currentWater?.shorelineDistance || 0);
-  const minimumDiveDistance = minimumBoatShorelineDistance(waterKind) + (
-    waterKind === 'open_ocean' ? 14 :
-    waterKind === 'coastal' ? 10 :
-    waterKind === 'lake' ? 8 :
-    6
-  );
-  const diveEligible =
-    currentWater?.type === 'area' &&
-    waterKind !== 'channel' &&
-    waterKind !== 'harbor' &&
-    shoreline >= minimumDiveDistance;
-
-  if (!diveEligible && options.showNotice !== false) {
-    _boatPromptSignature = 'blocked_dive';
-    showBoatPrompt('Move into larger open water before diving underwater', 'notice', BOAT_PROMPT_DURATION_MS);
-  }
-  return diveEligible;
-}
-
-function suspendBoatModeForOceanTransfer() {
-  appCtx.boatMode.active = false;
-  appCtx.boatMode.available = false;
-  appCtx.boatMode.candidate = null;
-  appCtx.boatMode.currentWater = null;
-  appCtx.boatMode.shorelineDistance = 0;
-  appCtx.boatMode.offshoreDistance = 0;
-  resetBoatDynamics();
-  resetBoatFoamFx();
-  if (appCtx.boatMode.mesh) appCtx.boatMode.mesh.visible = false;
-  if (appCtx.boatMode.waterPatch) appCtx.boatMode.waterPatch.visible = false;
-  syncBoatTerrainSuppression();
-  updateWaterWaveVisuals();
-  updateBoatMenuUi();
-  hideBoatPrompt();
-}
-
-async function transferBoatToSubmarine(options = {}) {
-  if (!appCtx.boatMode?.active) return false;
-  if (!canDiveBoatMode({ showNotice: options.showNotice !== false })) return false;
-  if (typeof appCtx.worldToLatLon !== 'function' || typeof appCtx.startOceanMode !== 'function') return false;
-
-  const geo = appCtx.worldToLatLon(appCtx.boat.x, appCtx.boat.z);
-  if (!Number.isFinite(geo?.lat) || !Number.isFinite(geo?.lon)) {
-    showBoatPrompt('Could not resolve water location for underwater entry', 'notice', BOAT_PROMPT_DURATION_MS);
-    return false;
-  }
-
-  captureEarthWorldSession();
-  _boatPromptSignature = 'boat_to_submarine_transfer';
-  showBoatPrompt('Diving underwater…', 'supported', BOAT_PROMPT_DURATION_MS);
-
-  suspendBoatModeForOceanTransfer();
-  if (typeof appCtx.showTransitionLoad === 'function') {
-    await appCtx.showTransitionLoad('ocean', 700);
-  }
-
-  const started = appCtx.startOceanMode({
-    launchSite: {
-      lat: geo.lat,
-      lon: geo.lon,
-      name: appCtx.customLoc?.name || 'Open Water',
-      region: 'Underwater'
-    },
-    submarinePose: {
-      x: 0,
-      y: -8.5,
-      z: 24,
-      yaw: Number.isFinite(appCtx.boat?.angle) ? appCtx.boat.angle : 0
-    }
-  });
-  if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
-  return !!started;
-}
-
-async function transferSubmarineToBoat(options = {}) {
-  if (!appCtx.oceanMode?.active) return false;
-  const launchSite = appCtx.oceanMode?.launchSite || {};
-  const sub = appCtx.oceanMode?.submarine || {};
-  if (!Number.isFinite(sub?.position?.x) || !Number.isFinite(sub?.position?.z) || !Number.isFinite(launchSite.lat) || !Number.isFinite(launchSite.lon)) {
-    showBoatPrompt('Could not resolve submarine position for boat transfer', 'notice', BOAT_PROMPT_DURATION_MS);
-    return false;
-  }
-  const lonDenom = appCtx.SCALE * Math.cos(launchSite.lat * Math.PI / 180);
-  const lat = launchSite.lat - sub.position.z / appCtx.SCALE;
-  const lon = launchSite.lon + sub.position.x / (Math.abs(lonDenom) > 0.0001 ? lonDenom : appCtx.SCALE);
-  const customName = `${launchSite.name || 'Ocean Site'} Surface`;
-  const customLatInput = document.getElementById('customLat');
-  const customLonInput = document.getElementById('customLon');
-  if (customLatInput) customLatInput.value = lat.toFixed(6);
-  if (customLonInput) customLonInput.value = lon.toFixed(6);
-
-  appCtx.customLoc = { lat, lon, name: customName };
-  appCtx.customLocTransient = false;
-  appCtx.selLoc = 'custom';
-
-  _boatPromptSignature = 'submarine_transfer';
-  showBoatPrompt('Switching from submarine to surface boat…', 'supported', BOAT_PROMPT_DURATION_MS);
-
-  try {
-    if (typeof appCtx.stopOceanMode === 'function') appCtx.stopOceanMode();
-    if (typeof appCtx.showTransitionLoad === 'function') {
-      await appCtx.showTransitionLoad('earth', 700);
-    }
-    if (typeof appCtx.loadRoads === 'function') {
-      await appCtx.loadRoads();
-    }
-    if (typeof appCtx.applyCustomLocationSpawn === 'function') {
-      appCtx.applyCustomLocationSpawn('walk', {
-        source: 'submarine_transfer_spawn',
-        preferBoatIfWater: true,
-        allowSyntheticWater: true,
-        waterKind: 'open_ocean'
-      });
-    }
-    if (appCtx.boatMode?.active) {
-      if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
-      return true;
-    }
-    const candidate =
-      findNearestBoatCandidate(0, 0, BOAT_MAX_CANDIDATE_DISTANCE * 2.2, {
-        allowSynthetic: true,
-        waterKind: 'open_ocean'
-      }) ||
-      buildSyntheticBoatCandidate(0, 0, { waterKind: 'open_ocean' });
-    if (!candidate) {
-      showBoatPrompt('No surface boat spawn was available here', 'notice', BOAT_PROMPT_DURATION_MS);
-      return false;
-    }
-    const resolved = typeof appCtx.setTravelMode === 'function' ?
-      appCtx.setTravelMode('boat', {
-        source: options.source || 'submarine_transfer',
-        force: true,
-        emitTutorial: options.emitTutorial !== false,
-        spawnX: Number.isFinite(candidate.spawnX) ? candidate.spawnX : 0,
-        spawnZ: Number.isFinite(candidate.spawnZ) ? candidate.spawnZ : 0,
-        yaw: Number.isFinite(sub.yaw) ? sub.yaw : 0,
-        candidate,
-        allowSynthetic: true,
-        waterKind: candidate.waterKind || 'open_ocean',
-        entryMode: 'walk'
-      }) :
-      startBoatMode({
-        source: options.source || 'submarine_transfer',
-        spawnX: Number.isFinite(candidate.spawnX) ? candidate.spawnX : 0,
-        spawnZ: Number.isFinite(candidate.spawnZ) ? candidate.spawnZ : 0,
-        yaw: Number.isFinite(sub.yaw) ? sub.yaw : 0,
-        candidate,
-        allowSynthetic: true,
-        waterKind: candidate.waterKind || 'open_ocean',
-        entryMode: 'walk'
-      });
-    return resolved === 'boat' || resolved === true;
-  } catch (error) {
-    console.warn('[BoatMode] submarine transfer failed', error);
-    _boatPromptSignature = 'submarine_transfer_error';
-    showBoatPrompt('Could not switch from submarine to surface boat here', 'notice', BOAT_PROMPT_DURATION_MS);
-    return false;
-  }
-}
+const boatOceanTransferApi = createBoatOceanTransferApi({
+  appCtx,
+  buildSyntheticBoatCandidate,
+  canDiveBoatMode,
+  captureEarthWorldSession,
+  findNearestBoatCandidate,
+  hideBoatPrompt,
+  maxCandidateDistance: BOAT_MAX_CANDIDATE_DISTANCE,
+  promptDurationMs: BOAT_PROMPT_DURATION_MS,
+  resetBoatDynamics,
+  resetBoatFoamFx,
+  setPromptSignature: (value) => { _boatPromptSignature = value; },
+  showBoatPrompt,
+  startBoatMode: (options) => startBoatMode(options),
+  syncBoatTerrainSuppression,
+  updateBoatMenuUi,
+  updateWaterWaveVisuals
+});
+const { suspendBoatModeForOceanTransfer, transferBoatToSubmarine, transferSubmarineToBoat } = boatOceanTransferApi;
 
 function startBoatMode(options = {}) {
   if (appCtx.boatMode?.active) return true;
@@ -469,7 +326,7 @@ function startBoatMode(options = {}) {
     appCtx.boatMode.waveIntensity = intensityFromSeaState(appCtx.boatMode.seaState || 'moderate');
   }
   appCtx.boatMode.seaState = seaStateFromIntensity(getWaveIntensity());
-  appCtx.droneMode = false;
+  appCtx.setDroneModeActive(false);
   if (appCtx.Walk?.state?.mode === 'walk') appCtx.Walk.setModeDrive();
   if (appCtx.activeInterior && typeof appCtx.clearActiveInterior === 'function') {
     appCtx.clearActiveInterior({ restorePlayer: true, preserveCache: true });
@@ -480,7 +337,7 @@ function startBoatMode(options = {}) {
   appCtx.boatMode.previousCameraMode = Number.isFinite(appCtx.camMode) ? appCtx.camMode : 0;
   appCtx.boatMode.cameraYawOffset = 0;
   appCtx.boatMode.cameraPitch = 0;
-  appCtx.camMode = 0;
+  appCtx.setCameraMode(0);
   appCtx.boatMode.active = true;
   appCtx.boatMode.available = true;
 
@@ -635,7 +492,7 @@ function stopBoatMode(options = {}) {
   appCtx.boatMode.waveDirectionX = 0;
   appCtx.boatMode.waveDirectionZ = 1;
   if (Number.isFinite(appCtx.boatMode.previousCameraMode)) {
-    appCtx.camMode = appCtx.boatMode.previousCameraMode;
+    appCtx.setCameraMode(appCtx.boatMode.previousCameraMode);
   }
   appCtx.boatMode.previousCameraMode = null;
   appCtx.boatMode.cameraYawOffset = 0;

@@ -235,7 +235,7 @@ function startPlaneMode(options = {}) {
   state.cameraLookTimer = 0;
   state.active = true;
   mesh.visible = true;
-  appCtx.camMode = Number.isFinite(appCtx.camMode) ? appCtx.camMode : 0;
+  appCtx.setCameraMode(appCtx.camMode);
   syncPlaneMesh();
   return true;
 }

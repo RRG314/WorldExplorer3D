@@ -18,18 +18,9 @@ import {
   renderUi as renderActivityCreatorUi
 } from './session-ui.js?v=3';
 import { createActivityCreatorTestingApi } from './session-testing.js?v=1';
-
-const CREATOR_GUIDE_STORAGE_KEY = 'worldExplorer3D.activityCreatorGuide.v1';
-
-function defaultCreatorGuideState() {
-  return {
-    started: false,
-    tested: false,
-    saved: false,
-    completed: false,
-    lastSavedActivityId: ''
-  };
-}
+import { createActivityCreatorGuideApi, defaultCreatorGuideState } from './session-guide.js?v=1';
+import { getRefs } from './session-refs.js?v=1';
+import { createActivityCreatorViewApi } from './session-view.js?v=1';
 
 const state = {
   active: false,
@@ -77,6 +68,9 @@ const sceneState = {
   ghostGroup: null,
   handleGroup: null
 };
+const creatorGuideApi = createActivityCreatorGuideApi({ state, sanitizeText, selectedTemplate, hasAnchorType });
+const { currentCreatorGuideStep, loadCreatorGuideState, markCreatorGuideProgress, saveCreatorGuideState } = creatorGuideApi;
+
 
 function cloneJson(value) {
   return value == null ? value : JSON.parse(JSON.stringify(value));
@@ -101,81 +95,8 @@ function escapeHtml(value) {
   })[character]);
 }
 
-function loadCreatorGuideState() {
-  if (typeof localStorage === 'undefined') return defaultCreatorGuideState();
-  try {
-    const raw = localStorage.getItem(CREATOR_GUIDE_STORAGE_KEY);
-    if (!raw) return defaultCreatorGuideState();
-    const parsed = JSON.parse(raw);
-    return {
-      started: parsed?.started === true,
-      tested: parsed?.tested === true,
-      saved: parsed?.saved === true,
-      completed: parsed?.completed === true,
-      lastSavedActivityId: sanitizeText(parsed?.lastSavedActivityId || '', 120).toLowerCase()
-    };
-  } catch (_) {
-    return defaultCreatorGuideState();
-  }
-}
-
-function saveCreatorGuideState() {
-  if (typeof localStorage === 'undefined') return;
-  try {
-    localStorage.setItem(CREATOR_GUIDE_STORAGE_KEY, JSON.stringify({
-      started: state.guide.started === true,
-      tested: state.guide.tested === true,
-      saved: state.guide.saved === true,
-      completed: state.guide.completed === true,
-      lastSavedActivityId: sanitizeText(state.guide.lastSavedActivityId || '', 120).toLowerCase()
-    }));
-  } catch (_) {
-    // Guide persistence should never interrupt creation.
-  }
-}
-
 function uniqueId(prefix = 'activity') {
   return `${sanitizeText(prefix, 24).toLowerCase()}_${Math.random().toString(36).slice(2, 9)}`;
-}
-
-function getRefs() {
-  return {
-    panel: document.getElementById('activityCreatorPanel'),
-    title: document.getElementById('activityCreatorTitle'),
-    subline: document.getElementById('activityCreatorSubline'),
-    status: document.getElementById('activityCreatorStatus'),
-    templateSelect: document.getElementById('activityCreatorTemplateSelect'),
-    templateHelp: document.getElementById('activityCreatorTemplateHelp'),
-    titleInput: document.getElementById('activityCreatorTitleInput'),
-    descriptionInput: document.getElementById('activityCreatorDescriptionInput'),
-    audienceSelect: document.getElementById('activityCreatorAudienceSelect'),
-    audienceHelp: document.getElementById('activityCreatorAudienceHelp'),
-    checklist: document.getElementById('activityCreatorChecklist'),
-    validation: document.getElementById('activityCreatorValidation'),
-    anchorPalette: document.getElementById('activityCreatorAnchorPalette'),
-    anchorList: document.getElementById('activityCreatorAnchorList'),
-    summary: document.getElementById('activityCreatorSummary'),
-    inspector: document.getElementById('activityCreatorInspectorBody'),
-    snapToggle: document.getElementById('activityCreatorSnapToggle'),
-    placementOffsetInput: document.getElementById('activityCreatorPlacementOffset'),
-    viewModeBtn: document.getElementById('activityCreatorViewModeBtn'),
-    saveBtn: document.getElementById('activityCreatorSaveBtn'),
-    closeBtn: document.getElementById('activityCreatorCloseBtn'),
-    resetBtn: document.getElementById('activityCreatorResetBtn'),
-    guideBtn: document.getElementById('activityCreatorGuideBtn'),
-    testBtn: document.getElementById('activityCreatorTestBtn'),
-    testBar: document.getElementById('activityCreatorTestBar'),
-    testSummary: document.getElementById('activityCreatorTestSummary'),
-    testStopBtn: document.getElementById('activityCreatorStopTestBtn'),
-    toolDock: document.getElementById('activityCreatorToolDock'),
-    guideCard: document.getElementById('activityCreatorGuideCard'),
-    guideProgress: document.getElementById('activityCreatorGuideProgress'),
-    guideTitle: document.getElementById('activityCreatorGuideTitle'),
-    guideBody: document.getElementById('activityCreatorGuideBody'),
-    guideActionBtn: document.getElementById('activityCreatorGuideActionBtn'),
-    guideDismissBtn: document.getElementById('activityCreatorGuideDismissBtn'),
-    guideRestartBtn: document.getElementById('activityCreatorGuideRestartBtn')
-  };
 }
 
 function buildActivityCreatorUiContext() {
@@ -258,56 +179,6 @@ function ensureDraftMetadata(options = {}) {
     state.draftTitle = nextTitle;
   }
   state.draftDescription = sanitizeText(state.draftDescription || '', 220);
-}
-
-function markCreatorGuideProgress(patch = {}) {
-  state.guide = {
-    ...state.guide,
-    ...patch
-  };
-  saveCreatorGuideState();
-}
-
-function creatorGuideStepIds() {
-  const steps = [
-    { id: 'intro' },
-    { id: 'start', anchorTypeId: 'start', label: 'Start Point', min: 1 }
-  ];
-  selectedTemplate().requiredAnchors
-    .filter((entry) => entry.id !== 'start' && (entry.min || 0) > 0)
-    .forEach((entry) => {
-      steps.push({
-        id: `anchor_${entry.id}`,
-        anchorTypeId: entry.id,
-        label: entry.label,
-        min: entry.min
-      });
-    });
-  steps.push({ id: 'test' }, { id: 'save' });
-  return steps;
-}
-
-function currentCreatorGuideStep() {
-  const steps = creatorGuideStepIds();
-  if (!state.guide.started) {
-    return { ...steps[0], index: 1, total: steps.length };
-  }
-  for (let index = 1; index < steps.length; index += 1) {
-    const step = steps[index];
-    if (!step.anchorTypeId) continue;
-    if (!hasAnchorType(step.anchorTypeId, step.min || 1)) {
-      return { ...step, index: index + 1, total: steps.length };
-    }
-  }
-  if (!state.guide.tested) {
-    const stepIndex = steps.findIndex((entry) => entry.id === 'test');
-    return { ...steps[stepIndex], index: stepIndex + 1, total: steps.length };
-  }
-  if (!state.guide.saved) {
-    const stepIndex = steps.findIndex((entry) => entry.id === 'save');
-    return { ...steps[stepIndex], index: stepIndex + 1, total: steps.length };
-  }
-  return { id: 'complete', index: steps.length, total: steps.length };
 }
 
 function defaultTemplateFromRuntime() {
@@ -603,112 +474,14 @@ function refreshScenePreview() {
   });
 }
 
-function collapseRuntimeUiForCreator() {
-  document.querySelectorAll('.floatMenu').forEach((menu) => menu.classList.remove('open'));
-  appCtx.showLargeMap = false;
-  document.getElementById('largeMap')?.classList.remove('show');
-  document.getElementById('legendPanel')?.style?.setProperty('display', 'none');
-  document.getElementById('mapInfoPanel')?.style?.setProperty('display', 'none');
-  document.getElementById('navigationHud')?.style?.setProperty('display', 'none');
-  document.getElementById('flowerActionMenu')?.classList.remove('open');
-  document.getElementById('gameShareMenu')?.classList.remove('show');
-  document.getElementById('roomPanelModal')?.classList.remove('show');
-  document.getElementById('memoryInfoPanel')?.classList.remove('show');
-  document.getElementById('boatPrompt')?.classList.remove('show');
-  document.getElementById('liveEarthLocalPanel')?.classList.remove('show');
-  document.getElementById('flowerChallengeHud')?.classList.remove('show');
-  document.getElementById('paintTownHud')?.classList.remove('show');
-  if (typeof appCtx.closePropertyPanel === 'function') appCtx.closePropertyPanel();
-  if (typeof appCtx.closeHistoricPanel === 'function') appCtx.closeHistoricPanel();
-  if (typeof appCtx.closeMemoryComposer === 'function') appCtx.closeMemoryComposer();
-}
-
-function restoreRuntimeUiAfterCreator() {
-  if (!appCtx.gameStarted) return;
-  if (typeof appCtx.updateHUD === 'function') appCtx.updateHUD();
-  if (typeof appCtx.drawMinimap === 'function') appCtx.drawMinimap();
-  if (appCtx.showLargeMap && typeof appCtx.drawLargeMap === 'function') appCtx.drawLargeMap();
-}
-
-function captureCreatorViewRestoreState() {
-  if (state.creatorViewRestore) return state.creatorViewRestore;
-  state.creatorViewRestore = {
-    walkView: sanitizeText(appCtx.Walk?.state?.view || '', 24).toLowerCase(),
-    camMode: Number.isFinite(appCtx.camMode) ? appCtx.camMode : null
-  };
-  return state.creatorViewRestore;
-}
-
-function applyCreatorViewMode(mode = '3d') {
-  const nextMode = sanitizeText(mode || '3d', 8).toLowerCase() === '2d' ? '2d' : '3d';
-  state.viewMode = nextMode;
-  if (nextMode === '2d') {
-    captureCreatorViewRestoreState();
-    if (appCtx.Walk?.state) {
-      appCtx.Walk.state.view = 'overhead';
-      if (appCtx.Walk.state.characterMesh) appCtx.Walk.state.characterMesh.visible = true;
-    } else if (Number.isFinite(appCtx.camMode)) {
-      appCtx.camMode = 2;
-    }
-    setStatus('2D plan view enabled for anchor layout and route ordering.', 'ok');
-  } else if (state.creatorViewRestore) {
-    if (appCtx.Walk?.state && state.creatorViewRestore.walkView) {
-      appCtx.Walk.state.view = state.creatorViewRestore.walkView;
-      if (appCtx.Walk.state.characterMesh) appCtx.Walk.state.characterMesh.visible = appCtx.Walk.state.view !== 'first';
-    } else if (Number.isFinite(state.creatorViewRestore.camMode)) {
-      appCtx.camMode = state.creatorViewRestore.camMode;
-    }
-    state.creatorViewRestore = null;
-    setStatus('3D creator view restored.', 'ok');
-  }
-  renderUi();
-}
-
-function restoreCreatorViewMode() {
-  if (!state.creatorViewRestore) {
-    state.viewMode = '3d';
-    return;
-  }
-  if (appCtx.Walk?.state && state.creatorViewRestore.walkView) {
-    appCtx.Walk.state.view = state.creatorViewRestore.walkView;
-    if (appCtx.Walk.state.characterMesh) appCtx.Walk.state.characterMesh.visible = appCtx.Walk.state.view !== 'first';
-  } else if (Number.isFinite(state.creatorViewRestore.camMode)) {
-    appCtx.camMode = state.creatorViewRestore.camMode;
-  }
-  state.creatorViewRestore = null;
-  state.viewMode = '3d';
-}
-
-function enterCreatorPerformanceMode() {
-  const currentTier = typeof appCtx.getPerfAutoQualityTier === 'function' ? appCtx.getPerfAutoQualityTier() : '';
-  const autoEnabled = typeof appCtx.getPerfAutoQualityEnabled === 'function' ? appCtx.getPerfAutoQualityEnabled() : false;
-  state.creatorPerfRestore = {
-    autoEnabled,
-    tier: sanitizeText(currentTier || '', 24).toLowerCase()
-  };
-  const performanceTier = sanitizeText(appCtx.PERF_QUALITY_TIER_PERFORMANCE || 'performance', 24).toLowerCase();
-  if (autoEnabled && performanceTier && currentTier !== performanceTier && typeof appCtx.setPerfAutoQualityTier === 'function') {
-    appCtx.setPerfAutoQualityTier(performanceTier, { reason: 'activity_creator' });
-  }
-  const renderQuality = typeof appCtx.getRenderQualityLevel === 'function' ? appCtx.getRenderQualityLevel() : appCtx.renderQualityLevel;
-  state.creatorRenderQualityRestore = sanitizeText(renderQuality || '', 24).toLowerCase();
-  if (state.creatorRenderQualityRestore && state.creatorRenderQualityRestore !== 'low' && typeof appCtx.setRenderQualityLevel === 'function') {
-    appCtx.setRenderQualityLevel('low', { persist: false });
-  }
-}
-
-function restoreCreatorPerformanceMode() {
-  const restore = state.creatorPerfRestore;
-  const renderRestore = sanitizeText(state.creatorRenderQualityRestore || '', 24).toLowerCase();
-  state.creatorPerfRestore = null;
-  state.creatorRenderQualityRestore = '';
-  if (restore?.autoEnabled === true && restore.tier && typeof appCtx.getPerfAutoQualityTier === 'function' && typeof appCtx.setPerfAutoQualityTier === 'function') {
-    if (appCtx.getPerfAutoQualityTier() !== restore.tier) appCtx.setPerfAutoQualityTier(restore.tier, { reason: 'activity_creator_restore' });
-  }
-  if (renderRestore && typeof appCtx.getRenderQualityLevel === 'function' && typeof appCtx.setRenderQualityLevel === 'function') {
-    if (appCtx.getRenderQualityLevel() !== renderRestore) appCtx.setRenderQualityLevel(renderRestore, { persist: false });
-  }
-}
+const creatorViewApi = createActivityCreatorViewApi({
+  appCtx,
+  state,
+  sanitizeText,
+  setStatus: (...args) => setStatus(...args),
+  renderUi: () => renderUi()
+});
+const { collapseRuntimeUiForCreator, restoreRuntimeUiAfterCreator, captureCreatorViewRestoreState, applyCreatorViewMode, restoreCreatorViewMode, enterCreatorPerformanceMode, restoreCreatorPerformanceMode } = creatorViewApi;
 
 const canvasApi = createActivityCreatorCanvasApi({
   appCtx,
