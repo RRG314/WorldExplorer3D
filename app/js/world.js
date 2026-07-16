@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import {
   classifyWorldSurfaceProfile,
-} from "./surface-rules.js?v=12";
+} from "./surface-rules.js?v=13";
 import {
   inferWaterRenderContext
 } from "./water-dynamics.js?v=4";
@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=11";
+} from "./world/spawn.js?v=12";
 import {
   scheduleDeferredStructureRefresh,
   scheduleDeferredWorldLinearFeatureLoad

@@ -278,10 +278,6 @@ function classifyTerrainSurfaceProfile({
   const useSand = !useSnow && (explicitBeachSand || aridFallback);
   const useRock = !useSnow && !useSand && (norm.rock >= 0.18 || (steepTerrain && norm.rock >= 0.06));
   const useSoil = !useSnow && !useSand && !useRock && (norm.soil >= 0.2 || (norm.soil >= 0.1 && norm.grass < 0.24));
-  const useBuiltVisual = !useSnow && !useSand && !useRock && !useSoil &&
-    localSignals.candidates.buildings >= 8 &&
-    localSignals.candidates.roads >= 4 &&
-    norm.grass < 0.45;
   const mode = useSnow ?
     ((polar || useRock || steepTerrain) ? 'snowRock' : 'snow') :
     useSand ? 'sand' :
@@ -291,7 +287,9 @@ function classifyTerrainSurfaceProfile({
 
   return {
     mode,
-    visualMode: useBuiltVisual ? 'built' : mode,
+    // Base elevation tiles represent natural ground. Roads and hardscape own
+    // their mapped footprints; urban density must never pave an entire hill.
+    visualMode: mode,
     reason: useSnow ?
       (weatherSnow ? 'live_weather_snow' : polar ? 'polar_latitude' : alpine ? 'high_elevation' : 'cold_highland') :
       useSand ? (explicitBeachSand ? 'localized_beach' : 'arid_surface') :

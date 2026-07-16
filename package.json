@@ -5,6 +5,7 @@
   "type": "module",
   "main": "three.js",
   "scripts": {
+    "dev": "node scripts/serve-local-preview.mjs",
     "test": "npm run test:rules && npm run test:runtime && npm run test:osm-smoke",
     "test:rules": "node scripts/test-rules.mjs",
     "test:css": "node scripts/test-css-integrity.mjs",

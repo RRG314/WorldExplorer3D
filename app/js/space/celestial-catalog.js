@@ -40,11 +40,11 @@ function createDeterministicBackdrop() {
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   const points = new THREE.Points(geometry, createRoundStarMaterial({
-    size: 1.8,
+    size: 2.6,
     sizeAttenuation: false,
     vertexColors: false,
     transparent: true,
-    opacity: 0.82,
+    opacity: 0.96,
     depthWrite: false
   }));
   points.name = 'Deterministic deep-space backdrop';
@@ -80,7 +80,7 @@ function createConstellations(group, catalog) {
   const material = new THREE.LineBasicMaterial({
     color: 0x628bb8,
     transparent: true,
-    opacity: 0.24,
+    opacity: 0.12,
     depthWrite: false
   });
   Object.entries(appCtx.CONSTELLATION_LINES || {}).forEach(([name, segments]) => {

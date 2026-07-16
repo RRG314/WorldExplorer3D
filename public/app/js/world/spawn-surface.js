@@ -211,6 +211,54 @@ function createWorldSpawnSurfaceApi(context) {
     return shallowRoadsideCollision || likelyRoadGhostCollision;
   }
 
+  function spawnDepartureAssessment(x, z, angle, mode = "drive") {
+    if (typeof appCtx.checkBuildingCollision !== "function") {
+      return { valid: true, reverseHeading: false, penalty: 0 };
+    }
+
+    const driveMode = mode === "drive";
+    const distances = driveMode ? [5, 9, 14] : [3, 6, 10];
+    const radius = driveMode ? 2 : 0.8;
+    const actorHeight = driveMode ? 1.9 : 1.75;
+    const forwardX = Math.sin(angle);
+    const forwardZ = Math.cos(angle);
+
+    const blockedSteps = (direction) => {
+      let blocked = 0;
+      for (let i = 0; i < distances.length; i++) {
+        const sampleX = x + forwardX * distances[i] * direction;
+        const sampleZ = z + forwardZ * distances[i] * direction;
+        const actorBaseY = terrainYAtWorld(sampleX, sampleZ);
+        const buildingCheck = appCtx.checkBuildingCollision(sampleX, sampleZ, radius, {
+          actorBaseY,
+          actorHeight
+        });
+        const ignoredRoadGhost = driveMode && shouldIgnoreDriveCollision(buildingCheck, sampleX, sampleZ);
+        const buildBlock = driveMode
+          ? driveBuildBlockCollision(sampleX, sampleZ, actorBaseY)
+          : walkBuildBlockCollision(sampleX, sampleZ, actorBaseY);
+        if ((buildingCheck?.collision && !ignoredRoadGhost) || buildBlock?.blocked) blocked += 1;
+      }
+      return blocked;
+    };
+
+    const forwardBlocked = blockedSteps(1);
+    const reverseBlocked = blockedSteps(-1);
+    const forwardClosed = forwardBlocked >= 2;
+    const reverseClosed = reverseBlocked >= 2;
+    if (forwardClosed && reverseClosed) {
+      return { valid: false, reverseHeading: false, penalty: Infinity, forwardBlocked, reverseBlocked };
+    }
+
+    return {
+      valid: true,
+      reverseHeading: forwardClosed && !reverseClosed,
+      penalty: Math.min(forwardBlocked, reverseBlocked) * (driveMode ? 18 : 8),
+      forwardBlocked,
+      reverseBlocked
+    };
+  }
+
   function nearestPointOnBounds(x, z, building) {
     const minX = Number(building?.minX);
     const maxX = Number(building?.maxX);
@@ -313,6 +361,7 @@ function createWorldSpawnSurfaceApi(context) {
     finiteNumberOr,
     resolveRoadHeading,
     shouldIgnoreDriveCollision,
+    spawnDepartureAssessment,
     slopeDegreesAt,
     slopePenaltyAt,
     spawnEnclosurePenalty,

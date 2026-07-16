@@ -204,24 +204,97 @@ function drawFishPortrait(canvas, fish, animation = {}) {
     ctx.fill();
   }
 
+  const stage = String(animation.stage || 'idle');
+  const phase = Number(animation.phase || 0);
+  const tension = Math.max(0, Math.min(1, Number(animation.tension) || 0));
+  const progress = Math.max(0, Math.min(1, Number(animation.progress) || 0));
+  const burst = Math.max(0, Math.min(1, Number(animation.burst) || 0));
+  const rodDirection = Math.max(-1, Math.min(1, Number(animation.rodDirection) || 0));
+
+  const surfaceY = height * 0.22;
+  ctx.strokeStyle = 'rgba(150,226,242,0.34)';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let x = 0; x <= width; x += 8) {
+    const y = surfaceY + Math.sin(x * 0.055 + phase * 1.3) * 2.2;
+    if (x === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+
+  const rodBaseX = width * 0.9;
+  const rodBaseY = height * 0.92;
+  const rodTipX = width * (0.72 + rodDirection * 0.08);
+  const rodTipY = height * (0.12 + tension * 0.1);
+  ctx.strokeStyle = '#d4a373';
+  ctx.lineWidth = 5;
+  ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(rodBaseX, rodBaseY);
+  ctx.quadraticCurveTo(width * 0.88, height * 0.48, rodTipX, rodTipY);
+  ctx.stroke();
+
   if (!fish) {
-    ctx.fillStyle = 'rgba(221,241,247,0.72)';
-    ctx.font = '600 15px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText('Cast into open water', width / 2, height / 2);
+    if (stage === 'casting' || stage === 'waiting') {
+      const bobberX = width * 0.36 + Math.sin(phase * 0.8) * 9;
+      const bobberY = surfaceY + Math.sin(phase * 2.1) * 2;
+      ctx.strokeStyle = 'rgba(222,244,248,0.8)';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(rodTipX, rodTipY);
+      ctx.quadraticCurveTo(width * 0.57, height * 0.02, bobberX, bobberY);
+      ctx.stroke();
+      ctx.fillStyle = '#f8fafc';
+      ctx.beginPath();
+      ctx.arc(bobberX, bobberY, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#ef4444';
+      ctx.fillRect(bobberX - 5, bobberY - 5, 10, 5);
+      ctx.strokeStyle = 'rgba(186,230,253,0.35)';
+      ctx.beginPath();
+      ctx.ellipse(bobberX, bobberY + 4, 13 + Math.sin(phase) * 2, 4, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    } else {
+      ctx.fillStyle = 'rgba(221,241,247,0.72)';
+      ctx.font = '600 15px Inter, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('Cast into open water', width * 0.43, height * 0.56);
+    }
     return;
   }
 
   const visual = fish.visual || {};
-  const phase = Number(animation.phase || 0);
-  const cx = width * 0.52 + Math.sin(phase) * 4;
-  const cy = height * 0.51;
+  const direction = animation.direction === -1 ? -1 : 1;
+  const cx = width * (0.48 + direction * (1 - progress) * 0.18) + Math.sin(phase) * (5 + burst * 9);
+  const cy = height * (0.5 + burst * 0.13) + Math.cos(phase * 0.72) * (3 + burst * 5);
   const fishWidth = Math.min(width * 0.64, 250);
   const shapeHeight = visual.shape === 'long' || visual.shape === 'billfish' ? 52 : visual.shape === 'deep' ? 84 : 68;
 
+  const mouthX = cx + direction * fishWidth * 0.45;
+  const mouthY = cy - shapeHeight * 0.05;
+  ctx.strokeStyle = tension > 0.84 ? '#fb7185' : tension < 0.18 && stage === 'fighting' ? '#facc15' : 'rgba(224,247,250,0.88)';
+  ctx.lineWidth = 1.4 + tension * 1.8;
+  ctx.beginPath();
+  ctx.moveTo(rodTipX, rodTipY);
+  const sag = (1 - tension) * 35;
+  ctx.quadraticCurveTo((rodTipX + mouthX) * 0.5, Math.min(height - 8, (rodTipY + mouthY) * 0.5 + sag), mouthX, mouthY);
+  ctx.stroke();
+
+  if (burst > 0.32) {
+    const splashX = Math.max(18, Math.min(width - 18, cx));
+    const splashAlpha = Math.min(0.8, 0.2 + burst * 0.65);
+    ctx.strokeStyle = `rgba(186,230,253,${splashAlpha})`;
+    for (let i = 0; i < 3; i++) {
+      const radius = 8 + i * 10 + Math.sin(phase * 2 + i) * 3;
+      ctx.beginPath();
+      ctx.ellipse(splashX, surfaceY + 3, radius, radius * 0.28, 0, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
   ctx.save();
   ctx.translate(cx, cy);
-  ctx.scale(animation.direction === -1 ? -1 : 1, 1);
+  ctx.scale(direction, 1);
   ctx.translate(-cx, -cy);
   const tailWave = Math.sin(phase * 2.4) * 8;
   ctx.fillStyle = visual.fin || visual.body;

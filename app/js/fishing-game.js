@@ -1,6 +1,6 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { fishMetricText, generateFish } from './fishing/catalog.js?v=1';
-import { clearFishingScene, drawFishPortrait, updateFishingScene } from './fishing/visuals.js?v=1';
+import { clearFishingScene, drawFishPortrait, updateFishingScene } from './fishing/visuals.js?v=2';
 
 const CATCH_STORAGE_KEY = 'worldExplorer3D.fishing.catches.v1';
 const MAX_SAVED_CATCHES = 60;
@@ -388,7 +388,17 @@ function renderUi(force = false) {
   const summary = catchSummary();
   if (refs.summary) refs.summary.textContent = `${summary.total} catches | ${summary.species} species | Best ${summary.best?.score || 0} pts`;
   if (refs.record) refs.record.textContent = summary.heaviest ? `Heaviest: ${summary.heaviest.species} ${Number(summary.heaviest.weightKg).toFixed(2)} kg` : 'No personal record yet';
-  drawFishPortrait(refs.canvas, state.fish, { phase: state.portraitPhase, direction: state.fishDirection });
+  drawFishPortrait(refs.canvas, state.fish, {
+    phase: state.portraitPhase,
+    direction: state.fishDirection,
+    stage: state.stage,
+    tension: state.lineTension,
+    progress: state.reelProgress,
+    burst: state.currentBurst,
+    rodDirection: state.rodDirection,
+    reeling: state.reeling,
+    givingLine: state.givingLine
+  });
   renderCatches();
 }
 
@@ -415,6 +425,7 @@ function updateFishingGame(dt) {
     state.open = false;
     stopFight('Fishing is available only from the surface boat.');
   }
+  if (state.stage !== 'fighting') state.portraitPhase += delta * (state.stage === 'waiting' ? 1.6 : 0.8);
   updateStage(delta);
   updateFishingScene(state, appCtx, delta);
   renderUi(false);
@@ -436,6 +447,36 @@ function bindHold(button, key) {
   button.addEventListener('pointerup', stop);
   button.addEventListener('pointercancel', stop);
   button.addEventListener('lostpointercapture', stop);
+}
+
+function setRodFromCanvasPointer(event) {
+  if (!refs.canvas || state.stage !== 'fighting') return;
+  const bounds = refs.canvas.getBoundingClientRect();
+  const normalizedX = (event.clientX - bounds.left) / Math.max(1, bounds.width);
+  state.rodDirection = normalizedX < 0.42 ? -1 : normalizedX > 0.58 ? 1 : 0;
+}
+
+function bindFishingCanvas() {
+  if (!refs.canvas) return;
+  const stop = (event) => {
+    if (event?.cancelable) event.preventDefault();
+    state.reeling = false;
+  };
+  refs.canvas.addEventListener('pointerdown', (event) => {
+    if (state.stage !== 'fighting') return;
+    if (event.cancelable) event.preventDefault();
+    state.reeling = true;
+    setRodFromCanvasPointer(event);
+    refs.canvas.setPointerCapture?.(event.pointerId);
+  });
+  refs.canvas.addEventListener('pointermove', (event) => {
+    if (!state.reeling) return;
+    if (event.cancelable) event.preventDefault();
+    setRodFromCanvasPointer(event);
+  });
+  refs.canvas.addEventListener('pointerup', stop);
+  refs.canvas.addEventListener('pointercancel', stop);
+  refs.canvas.addEventListener('lostpointercapture', stop);
 }
 
 function setupFishingGame() {
@@ -483,6 +524,7 @@ function setupFishingGame() {
   });
   bindHold(refs.reel, 'reeling');
   bindHold(refs.give, 'givingLine');
+  bindFishingCanvas();
   refs.rodLeft?.addEventListener('click', () => { state.rodDirection = -1; renderUi(true); });
   refs.rodCenter?.addEventListener('click', () => { state.rodDirection = 0; renderUi(true); });
   refs.rodRight?.addEventListener('click', () => { state.rodDirection = 1; renderUi(true); });

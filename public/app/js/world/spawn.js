@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { isRoadSurfaceReachable } from "../structure-semantics.js?v=12";
-import { createWorldSpawnSurfaceApi } from "./spawn-surface.js?v=1";
+import { createWorldSpawnSurfaceApi } from "./spawn-surface.js?v=2";
 
 let worldSpawnDeps = {
   buildingContainingPoint: () => null,
@@ -25,6 +25,7 @@ const {
   finiteNumberOr,
   resolveRoadHeading,
   shouldIgnoreDriveCollision,
+  spawnDepartureAssessment,
   spawnEnclosurePenalty,
   slopeDegreesAt,
   slopePenaltyAt,
@@ -298,6 +299,15 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
             });
           if (!evaluated.valid) continue;
 
+          const departure = spawnDepartureAssessment(
+            candidate.x,
+            candidate.z,
+            evaluated.angle,
+            requestedMode
+          );
+          if (!departure.valid) continue;
+          if (departure.reverseHeading) evaluated.angle += Math.PI;
+
           const endpointPenalty =
             endpointClearance >= 22 ? 0 :
             endpointConnected ? (22 - endpointClearance) * 0.45 :
@@ -311,10 +321,16 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
             spawnSurfacePenalty(feature, requestedMode) +
             slopePenaltyAt(candidate.x, candidate.z) +
             spawnSlopePenalty +
-            endpointPenalty;
+            endpointPenalty +
+            departure.penalty;
           pushCandidate(evaluated, feature, score, {
             featureEndpointClearance: endpointClearance,
-            endpointConnected
+            endpointConnected,
+            departureClearance: {
+              forwardBlocked: departure.forwardBlocked,
+              reverseBlocked: departure.reverseBlocked,
+              reversed: departure.reverseHeading
+            }
           });
         }
         distanceBeforeSegment += segmentLengths[i] || 0;
