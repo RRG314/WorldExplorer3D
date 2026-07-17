@@ -459,12 +459,12 @@ export function updateSpaceFlightCamera() {
   if (launchBody?.position && launchAltitude < 180) {
     _sfLaunchRadial.copy(rocket.position).sub(launchBody.position).normalize();
     _sfTargetPos.copy(rocket.position)
-      .addScaledVector(_sfLaunchRadial, 48)
-      .addScaledVector(_sfTempVec, 24);
+      .addScaledVector(_sfLaunchRadial, 135)
+      .addScaledVector(_sfTempVec, 58);
   } else {
     _sfTargetPos.copy(rocket.position)
-      .addScaledVector(_sfForward, -70)
-      .addScaledVector(_sfTempVec, 25);
+      .addScaledVector(_sfForward, -165)
+      .addScaledVector(_sfTempVec, 62);
   }
 
   appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, 0.1);

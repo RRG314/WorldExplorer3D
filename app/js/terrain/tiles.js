@@ -3,7 +3,8 @@ import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=12";
+} from "./surface-profiles.js?v=16";
+import { queueTerrainImagery } from "./imagery-baseline.js?v=3";
 
 const TERRAIN_TILE_CACHE_LIMIT = 72;
 
@@ -258,6 +259,10 @@ export function disposeTerrainMesh(mesh) {
   if (worldCoverTexture && typeof worldCoverTexture.dispose === "function") {
     worldCoverTexture.dispose();
   }
+  const terrainImageryTexture = mesh?.userData?.terrainImageryTexture;
+  if (terrainImageryTexture && typeof terrainImageryTexture.dispose === "function") {
+    terrainImageryTexture.dispose();
+  }
   const texSet = mesh?.userData?.terrainTextureSet;
   if (texSet && typeof texSet === "object") {
     Object.values(texSet).forEach((tex) => {
@@ -317,6 +322,7 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
   mesh.userData.terrainTextureRepeats = repeats;
 
   applyTerrainVisualProfile(mesh, classifyTerrainVisualProfile(bounds), repeats);
+  queueTerrainImagery(mesh, z, tx, ty);
 
   if (typeof deps.applyHeightsToTerrainMesh === "function") {
     deps.applyHeightsToTerrainMesh(mesh);

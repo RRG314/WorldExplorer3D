@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   classifyTerrainSurfaceProfile as classifySharedTerrainSurfaceProfile
-} from "../surface-rules.js?v=14";
+} from "../surface-rules.js?v=15";
 import {
   loadWorldCoverBaseline,
   worldCoverSupportsBounds
@@ -414,7 +414,13 @@ function classifyWorldCoverSurfaceProfile(mesh, result) {
 
 function applyLoadedWorldCoverBaseline(mesh) {
   const result = mesh?.userData?.worldCoverResult;
-  if (!result?.texture || !mesh?.material || Array.isArray(mesh.material) || mesh.userData?.terrainDisposed) return false;
+  const material = mesh?.material;
+  if (!result?.texture || !material || Array.isArray(material) || mesh.userData?.terrainDisposed) return false;
+  if (mesh.userData.terrainImageryStatus !== 'ready') {
+    material.map = result.texture;
+    material.color.setHex(0xffffff);
+    material.needsUpdate = true;
+  }
   mesh.userData.worldCoverTexture = result.texture;
   mesh.userData.worldCoverStatus = 'ready';
   mesh.userData.worldCoverSummary = {
@@ -427,8 +433,11 @@ function applyLoadedWorldCoverBaseline(mesh) {
   };
   const semanticProfile = classifyWorldCoverSurfaceProfile(mesh, result);
   if (semanticProfile) {
+    mesh.userData.terrainVisualProfile = semanticProfile;
     mesh.userData.worldCoverSurfaceMode = semanticProfile.mode;
-    applyTerrainVisualProfile(mesh, semanticProfile, null, { skipWorldCoverQueue: true });
+    if (semanticProfile.mode === 'sand') material.roughness = 0.92;
+    else if (semanticProfile.mode === 'rock') material.roughness = 0.87;
+    else if (semanticProfile.mode === 'snow') material.roughness = 0.94;
   }
   return true;
 }
@@ -484,7 +493,7 @@ function queueWorldCoverBaseline(mesh, bounds) {
     });
 }
 
-export function applyTerrainVisualProfile(mesh, profile, repeats = null, options = {}) {
+export function applyTerrainVisualProfile(mesh, profile, repeats = null) {
   if (!mesh || !mesh.material || Array.isArray(mesh.material)) return;
   if (!mesh.userData) mesh.userData = {};
   const mat = mesh.material;
@@ -585,8 +594,15 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
 
   mesh.userData.terrainVisualProfile = nextProfile;
   applyGroundFallbackProfile(nextProfile);
+  if (mesh.userData.terrainImageryStatus === 'ready' && mesh.userData.terrainImageryTexture) {
+    mat.map = mesh.userData.terrainImageryTexture;
+    mat.color.setHex(0xffffff);
+    if (mat.emissive) mat.emissive.setHex(0xffffff);
+    mat.emissiveMap = mesh.userData.terrainImageryTexture;
+    mat.emissiveIntensity = 0.035;
+  }
   mat.needsUpdate = true;
-  if (!options.skipWorldCoverQueue) queueWorldCoverBaseline(mesh, tileBounds);
+  queueWorldCoverBaseline(mesh, tileBounds);
 }
 
 export function refreshTerrainSurfaceProfiles(profile = null) {

@@ -5,7 +5,7 @@ import {
   clearBuildingSpatialIndex,
   removeBuildingsFromSpatialIndex
 } from "./building-spatial-index.js?v=5";
-import { waterSurfaceBaseElevation } from "./load-geometry.js?v=12";
+import { waterSurfaceBaseElevation } from "./load-geometry.js?v=13";
 import { fetchShortbreadTile } from "./shortbread-source.js?v=6";
 import { buildStreamingLandcover } from "./streaming-landcover.js?v=8";
 import { createRoadNameResolver } from "./streaming-road-labels.js?v=1";

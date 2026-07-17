@@ -19,7 +19,7 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=12";
+} from "./terrain/surface-profiles.js?v=16";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -39,7 +39,7 @@ import {
   tileXYToLatLonBounds,
   waitForTerrainReadyAt,
   worldToLatLon
-} from "./terrain/tiles.js?v=10";
+} from "./terrain/tiles.js?v=15";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -295,6 +295,40 @@ const {
   clearTerrainHeightCache
 });
 
+async function waitForTerrainCoverageAt(x = 0, z = 0, timeoutMs = 5000, minLoadedRatio = 0.72) {
+  if (!appCtx.terrainEnabled || appCtx.onMoon) return { ready: false, loaded: 0, total: 0 };
+  updateTerrainAround(x, z);
+
+  const deadline = performance.now() + Math.max(500, Number(timeoutMs) || 5000);
+  const requiredRatio = Math.max(0.5, Math.min(1, Number(minLoadedRatio) || 0.72));
+  let snapshot = { ready: false, loaded: 0, total: 0 };
+
+  while (performance.now() < deadline) {
+    const terrainMeshes = (appCtx.terrainGroup?.children || []).filter((mesh) => mesh?.userData?.isTerrainMesh);
+    const tiles = terrainMeshes
+      .map((mesh) => appCtx.terrainTileCache.get(mesh.userData?.terrainTileKey))
+      .filter(Boolean);
+    const loaded = tiles.filter((tile) => tile.loaded).length;
+    snapshot = {
+      ready: tiles.length > 0 && loaded / tiles.length >= requiredRatio,
+      loaded,
+      total: tiles.length
+    };
+    if (snapshot.ready) break;
+
+    const pending = tiles.filter((tile) => !tile.loaded && !tile.failed && tile.ready instanceof Promise);
+    await Promise.race([
+      pending.length > 0 ? Promise.allSettled(pending.map((tile) => tile.ready)) : Promise.resolve(),
+      new Promise((resolve) => globalThis.setTimeout(resolve, 140))
+    ]);
+  }
+
+  if (snapshot.loaded > 0) {
+    requestWorldSurfaceSync({ force: true, source: 'initial_terrain_coverage_ready' });
+  }
+  return snapshot;
+}
+
 function disableRoadDebugMode() {
   return disableRoadDebugModeInternal();
 }
@@ -352,6 +386,7 @@ Object.assign(appCtx, {
   toggleRoadDebugMode,
   updateTerrainAround,
   validateRoadTerrainConformance,
+  waitForTerrainCoverageAt,
   waitForTerrainReadyAt: (x, z, timeoutMs) => waitForTerrainReadyAt(x, z, timeoutMs, terrainTileDeps),
   worldToLatLon
 });
@@ -392,5 +427,6 @@ export {
   toggleRoadDebugMode,
   updateTerrainAround,
   validateRoadTerrainConformance,
+  waitForTerrainCoverageAt,
   waitForTerrainReadyAt,
   worldToLatLon };

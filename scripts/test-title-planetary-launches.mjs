@@ -27,7 +27,7 @@ function assertCompleteSpaceCatalog(state, label) {
   assert(catalog.planets === 7, `${label} rendered ${catalog.planets || 0} of 7 non-Earth planets`);
   assert(catalog.namedAsteroids === 4, `${label} rendered ${catalog.namedAsteroids || 0} of 4 named asteroids`);
   assert(catalog.asteroidParticles === 3000, `${label} lost the 3,000-particle asteroid belt`);
-  assert(catalog.kuiperParticles === 1800, `${label} lost the 1,800-particle Kuiper belt`);
+  assert(catalog.kuiperParticles === 3600, `${label} lost the 3,600-particle Kuiper belt`);
   assert((catalog.spacecraft || 0) + (catalog.deepSpaceSpacecraft || 0) === 5, `${label} rendered an incomplete spacecraft catalog`);
   assert(catalog.galaxies === 8, `${label} rendered ${catalog.galaxies || 0} of 8 galaxies`);
 }
@@ -218,11 +218,21 @@ async function runScenario(browser, baseUrl, scenario) {
     if (scenario.mode === 'space') {
       assertCompleteSpaceCatalog(state, 'Initial Space launch');
       assert(!state.spaceOverview.active, 'Initial Space launch did not open in controllable flight view');
-      const radarVisible = await page.evaluate(() => {
-        const radar = document.getElementById('solarSystemRadar');
-        return !!radar && radar.width > 0 && getComputedStyle(radar).display !== 'none';
+      const beltPresentation = await page.evaluate(async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        const scene = ctx.spaceFlight?.scene;
+        return {
+          asteroidBelt: !!scene?.getObjectByName?.('asteroidBelt') && scene.getObjectByName('asteroidBelt').visible !== false,
+          asteroidBand: !!scene?.getObjectByName?.('asteroidBeltBand'),
+          kuiperBelt: !!scene?.getObjectByName?.('kuiperBelt') && scene.getObjectByName('kuiperBelt').visible !== false,
+          kuiperBand: !!scene?.getObjectByName?.('kuiperBeltBand'),
+          mapButton: !!document.getElementById('solarSystemOverview'),
+          radar: !!document.getElementById('solarSystemRadar')
+        };
       });
-      assert(radarVisible, 'Initial Space launch did not expose persistent belt context');
+      assert(beltPresentation.asteroidBelt && beltPresentation.asteroidBand, 'Asteroid belt is not a persistent Space scene layer');
+      assert(beltPresentation.kuiperBelt && beltPresentation.kuiperBand, 'Kuiper belt is not a persistent Space scene layer');
+      assert(!beltPresentation.mapButton && !beltPresentation.radar, 'Space still exposes a separate belt map control');
     }
     if (scenario.mode === 'mars') assert(state.onMars && !state.spaceFlightActive, 'Mars title launch did not land directly on Mars');
     if (scenario.mode === 'mars') assertMarsSceneOwned(state, 'Initial Mars title launch');
@@ -290,26 +300,6 @@ async function runScenario(browser, baseUrl, scenario) {
       earthReturn.marsAfterMoon = marsAfterMoon;
     }
     if (scenario.mode === 'space') {
-      await page.click('#solarSystemOverview');
-      await page.waitForTimeout(2600);
-      const innerOverview = await readState(page);
-      assert(innerOverview.spaceOverview.mode === 'inner', 'Inner Solar System map did not activate');
-      assert(innerOverview.spaceOverview.cameraDistance > 7000 && innerOverview.spaceOverview.cameraDistance < 15000, 'Inner Solar System map used the wrong frame');
-      await settleVisualFrame(page);
-      await page.screenshot({ path: path.join(outputDir, 'solar-system-inner-overview.png'), fullPage: false });
-
-      await page.click('#solarSystemOverview');
-      await page.waitForTimeout(2600);
-      const fullOverview = await readState(page);
-      assert(fullOverview.spaceOverview.mode === 'full', 'Full Solar System map did not activate');
-      assert(fullOverview.spaceOverview.cameraDistance > 70000, 'Outer Solar System map did not frame the Kuiper belt');
-      await settleVisualFrame(page);
-      await page.screenshot({ path: path.join(outputDir, 'solar-system-overview.png'), fullPage: false });
-      await page.click('#solarSystemOverview');
-      await page.waitForTimeout(800);
-      const flightView = await readState(page);
-      assert(!flightView.spaceOverview.active, 'Resume Flight did not restore the flight camera');
-
       const staleLandingStarted = await page.evaluate(async () => {
         const { ctx } = await import('/app/js/shared-context.js?v=55');
         return ctx.forceSpaceFlightLanding?.('Earth') === true;

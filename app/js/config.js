@@ -35,7 +35,7 @@ const TERRAIN_TILE_URL = (z, x, y) =>
 `https://s3.amazonaws.com/elevation-tiles-prod/terrarium/${z}/${x}/${y}.png`;
 
 // Terrain settings
-const TERRAIN_ZOOM = 13; // 12–14 is typical for driving
+const TERRAIN_ZOOM = 15;
 const TERRAIN_RING = 2; // 2 => 5x5 tiles around player (reduces visible terrain edge cliffs)
 const TERRAIN_SEGMENTS = 128; // mesh resolution per tile (128 for accurate road-terrain alignment)
 const TERRAIN_Y_EXAGGERATION = 1.0; // 1.0 = real elevation

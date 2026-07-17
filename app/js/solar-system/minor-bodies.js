@@ -73,9 +73,10 @@ export function createAsteroidBelt(ctx) {
     const M = seededRandom() * 360;
     const pos = ctx.computeOrbitalPosition(a, e, I, w, LN, M);
 
-    const x = pos.x * ctx.AU_TO_SCENE;
-    const y = pos.z * ctx.AU_TO_SCENE * 0.3;
-    const z = pos.y * ctx.AU_TO_SCENE;
+    const visualScale = Number(belt.visualScale) || 1;
+    const x = pos.x * ctx.AU_TO_SCENE * visualScale;
+    const y = pos.z * ctx.AU_TO_SCENE * visualScale * 0.65;
+    const z = pos.y * ctx.AU_TO_SCENE * visualScale;
     positions.push(x, y, z);
 
     const brightness = 0.4 + seededRandom() * 0.5;
@@ -92,9 +93,9 @@ export function createAsteroidBelt(ctx) {
   beltGeo.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
 
   const beltMat = createRoundStarMaterial({
-    size: 2.4,
+    size: 4.8,
     color: 0xb7bcc2,
-    vertexColors: false,
+    vertexColors: true,
     transparent: true,
     opacity: 0.9,
     sizeAttenuation: false,
@@ -103,12 +104,13 @@ export function createAsteroidBelt(ctx) {
 
   ctx.solarSystem.asteroidBelt = new THREE.Points(beltGeo, beltMat);
   ctx.solarSystem.asteroidBelt.name = 'asteroidBelt';
+  ctx.solarSystem.asteroidBelt.frustumCulled = false;
   ctx.solarSystem.asteroidBelt.renderOrder = 3;
   ctx.solarSystem.group.add(ctx.solarSystem.asteroidBelt);
 
-  createBeltBoundaryRing(ctx, belt.innerAU, 0xb48357, 'beltInnerEdge', 0.12);
-  createBeltBoundaryRing(ctx, belt.outerAU, 0xb48357, 'beltOuterEdge', 0.12);
-  createBeltVolumeBand(ctx, belt.innerAU, belt.outerAU, 0xb48357, 0.025, 'asteroidBeltBand', 1.5);
+  createBeltBoundaryRing(ctx, belt.innerAU, 0xc49a73, 'beltInnerEdge', 0.3, belt.visualScale);
+  createBeltBoundaryRing(ctx, belt.outerAU, 0xc49a73, 'beltOuterEdge', 0.3, belt.visualScale);
+  createBeltVolumeBand(ctx, belt.innerAU, belt.outerAU, 0xc49a73, 0.07, 'asteroidBeltBand', 1.5, belt.visualScale);
   createNamedAsteroids(ctx);
 }
 
@@ -133,14 +135,15 @@ export function createKuiperBelt(ctx) {
     const M = seededRandom() * 360;
     const pos = ctx.computeOrbitalPosition(a, e, I, w, LN, M);
 
-    const x = pos.x * ctx.AU_TO_SCENE;
-    const y = pos.z * ctx.AU_TO_SCENE * 0.3;
-    const z = pos.y * ctx.AU_TO_SCENE;
+    const visualScale = Number(belt.visualScale) || 1;
+    const x = pos.x * ctx.AU_TO_SCENE * visualScale;
+    const y = pos.z * ctx.AU_TO_SCENE * visualScale;
+    const z = pos.y * ctx.AU_TO_SCENE * visualScale;
     positions.push(x, y, z);
 
     const brightness = 0.45 + seededRandom() * 0.4;
     const iceTint = 0.12 + seededRandom() * 0.18;
-    colors.push(brightness - iceTint * 0.2, brightness, brightness + iceTint);
+    colors.push(brightness * 0.72, brightness * 0.9, Math.min(1, brightness + iceTint * 1.35));
 
     const sizeRoll = seededRandom();
     sizes.push(sizeRoll < 0.93 ? 1.6 + seededRandom() * 2.2 : 3.2 + seededRandom() * 3.0);
@@ -152,27 +155,28 @@ export function createKuiperBelt(ctx) {
   beltGeo.setAttribute('size', new THREE.Float32BufferAttribute(sizes, 1));
 
   const beltMat = createRoundStarMaterial({
-    size: 1.9,
-    color: 0xc8d4df,
-    vertexColors: false,
+    size: 5.2,
+    color: 0x8fc5f2,
+    vertexColors: true,
     transparent: true,
-    opacity: 0.82,
+    opacity: 0.96,
     sizeAttenuation: false,
     depthWrite: false
   });
 
   ctx.solarSystem.kuiperBelt = new THREE.Points(beltGeo, beltMat);
   ctx.solarSystem.kuiperBelt.name = 'kuiperBelt';
+  ctx.solarSystem.kuiperBelt.frustumCulled = false;
   ctx.solarSystem.kuiperBelt.renderOrder = 3;
   ctx.solarSystem.group.add(ctx.solarSystem.kuiperBelt);
 
-  createBeltBoundaryRing(ctx, belt.innerAU, 0x7baee0, 'kuiperInnerEdge', 0.08);
-  createBeltBoundaryRing(ctx, belt.outerAU, 0x7baee0, 'kuiperOuterEdge', 0.08);
-  createBeltVolumeBand(ctx, belt.innerAU, belt.outerAU, 0x7baee0, 0.018, 'kuiperBeltBand', 2.8);
+  createBeltBoundaryRing(ctx, belt.innerAU, 0x8fc5f2, 'kuiperInnerEdge', 0.38, belt.visualScale);
+  createBeltBoundaryRing(ctx, belt.outerAU, 0x8fc5f2, 'kuiperOuterEdge', 0.38, belt.visualScale);
+  createBeltVolumeBand(ctx, belt.innerAU, belt.outerAU, 0x8fc5f2, 0.07, 'kuiperBeltBand', 2.8, belt.visualScale);
 }
 
-export function createBeltBoundaryRing(ctx, radiusAU, color, name, opacity = 0.12) {
-  const radius = radiusAU * ctx.AU_TO_SCENE;
+export function createBeltBoundaryRing(ctx, radiusAU, color, name, opacity = 0.12, visualScale = 1) {
+  const radius = radiusAU * ctx.AU_TO_SCENE * visualScale;
   const points = [];
   const segments = 128;
   for (let i = 0; i <= segments; i++) {
@@ -195,9 +199,9 @@ export function createBeltBoundaryRing(ctx, radiusAU, color, name, opacity = 0.1
   ctx.solarSystem.group.add(ring);
 }
 
-export function createBeltVolumeBand(ctx, innerAU, outerAU, color, opacity, name, tiltDeg) {
-  const innerRadius = innerAU * ctx.AU_TO_SCENE;
-  const outerRadius = outerAU * ctx.AU_TO_SCENE;
+export function createBeltVolumeBand(ctx, innerAU, outerAU, color, opacity, name, tiltDeg, visualScale = 1) {
+  const innerRadius = innerAU * ctx.AU_TO_SCENE * visualScale;
+  const outerRadius = outerAU * ctx.AU_TO_SCENE * visualScale;
   const ringGeo = new THREE.RingGeometry(innerRadius, outerRadius, 256, 1);
   const ringMat = new THREE.MeshBasicMaterial({
     color,
@@ -206,14 +210,22 @@ export function createBeltVolumeBand(ctx, innerAU, outerAU, color, opacity, name
     side: THREE.DoubleSide,
     depthWrite: false
   });
-  const beltBand = new THREE.Mesh(ringGeo, ringMat);
-  beltBand.name = name;
-  beltBand.rotation.x = -Math.PI / 2;
+  const beltVolume = new THREE.Group();
+  beltVolume.name = name;
+  const thickness = outerRadius * (name === 'kuiperBeltBand' ? 0.035 : 0.025);
+  [-1, -0.5, 0, 0.5, 1].forEach((layer, index) => {
+    const layerMaterial = index === 2 ? ringMat : ringMat.clone();
+    layerMaterial.opacity = opacity * (index === 2 ? 1 : 0.48);
+    const beltBand = new THREE.Mesh(ringGeo, layerMaterial);
+    beltBand.position.y = layer * thickness;
+    beltBand.rotation.x = -Math.PI / 2;
+    beltBand.renderOrder = 1;
+    beltVolume.add(beltBand);
+  });
   if (typeof tiltDeg === 'number' && tiltDeg !== 0) {
-    beltBand.rotation.z = tiltDeg * ctx.DEG2RAD;
+    beltVolume.rotation.z = tiltDeg * ctx.DEG2RAD;
   }
-  beltBand.renderOrder = 1;
-  ctx.solarSystem.group.add(beltBand);
+  ctx.solarSystem.group.add(beltVolume);
 }
 
 export function createNamedAsteroids(ctx) {
@@ -270,7 +282,7 @@ export function createNamedAsteroids(ctx) {
     const M = ctx.normalizeAngle(L - LP);
     const realPos = ctx.computeOrbitalPosition(a, e, I, w, LN, M);
 
-    const visualDist = a * ctx.AU_TO_SCENE;
+    const visualDist = a * ctx.AU_TO_SCENE * (Number(ctx.ASTEROID_BELT.visualScale) || 1);
     const scenePos = ctx.helioToScene(realPos, visualDist, a);
     mesh.position.set(scenePos.x, scenePos.y, scenePos.z);
 

@@ -25,89 +25,15 @@ export function createWorldLandusePass(options = {}) {
     'forest', 'wood', 'park', 'garden', 'grass', 'meadow', 'scrub',
     'orchard', 'vineyard', 'allotments', 'farmland', 'farmyard',
     'plant_nursery', 'greenhouse_horticulture', 'recreation_ground',
-    'village_green', 'cemetery', 'sand', 'dune', 'barren', 'glacier', 'quarry',
-    'residential', 'commercial', 'industrial', 'retail', 'construction',
-    'brownfield', 'greenfield', 'landfill'
+    'village_green', 'cemetery', 'sand', 'dune', 'barren', 'glacier', 'quarry'
   ]);
   const denseNaturalTypes = new Set(['forest', 'wood', 'scrub', 'orchard', 'vineyard']);
   const mineralSurfaceTypes = new Set(['sand', 'dune', 'barren', 'glacier', 'quarry']);
-  const greenSurfaceTypes = new Set([
-    'forest', 'wood', 'park', 'garden', 'grass', 'meadow', 'scrub',
-    'orchard', 'vineyard', 'allotments', 'recreation_ground',
-    'village_green', 'cemetery', 'greenfield'
-  ]);
-  const soilSurfaceTypes = new Set([
-    'farmland', 'farmyard', 'plant_nursery', 'greenhouse_horticulture',
-    'brownfield', 'landfill'
-  ]);
-  const hardscapeSurfaceTypes = new Set(['paved', 'parking']);
-  const surfaceMaterials = new Map();
-
-  function mappedSurfaceTint(landuseType) {
-    if (greenSurfaceTypes.has(landuseType)) {
-      if (denseNaturalTypes.has(landuseType)) return 0x52654d;
-      if (landuseType === 'orchard' || landuseType === 'vineyard') return 0x66745a;
-      return 0x6f8068;
-    }
-    if (hardscapeSurfaceTypes.has(landuseType)) return 0xb2b0aa;
-    return appCtx.LANDUSE_STYLES[landuseType].color;
-  }
-
-  function surfaceTextureSet(landuseType) {
-    if (greenSurfaceTypes.has(landuseType)) {
-      return {
-        map: appCtx.grassDiffuse,
-        normalMap: appCtx.grassNormal,
-        roughnessMap: appCtx.grassRoughness,
-        normalScale: 0.42
-      };
-    }
-    if (hardscapeSurfaceTypes.has(landuseType)) {
-      return {
-        map: appCtx.pavementDiffuse || appCtx.concreteDiffuse,
-        normalMap: appCtx.pavementNormal || appCtx.concreteNormal,
-        roughnessMap: appCtx.pavementRoughness || appCtx.concreteRoughness,
-        normalScale: 0.32
-      };
-    }
-    if (!mineralSurfaceTypes.has(landuseType) && !soilSurfaceTypes.has(landuseType)) {
-      return {
-        map: appCtx.concreteDiffuse || appCtx.pavementDiffuse,
-        normalMap: appCtx.concreteNormal || appCtx.pavementNormal,
-        roughnessMap: appCtx.concreteRoughness || appCtx.pavementRoughness,
-        normalScale: 0.18
-      };
-    }
-    return null;
-  }
-
-  function mappedSurfaceMaterial(landuseType) {
-    const textures = surfaceTextureSet(landuseType);
-    const textureKey = [
-      landuseType,
-      textures?.map?.uuid || '-',
-      textures?.normalMap?.uuid || '-',
-      textures?.roughnessMap?.uuid || '-'
-    ].join(':');
-    if (surfaceMaterials.has(textureKey)) return surfaceMaterials.get(textureKey);
-
-    const material = new THREE.MeshStandardMaterial({
-      color: mappedSurfaceTint(landuseType),
-      map: textures?.map || null,
-      normalMap: textures?.normalMap || null,
-      roughnessMap: textures?.roughnessMap || null,
-      normalScale: new THREE.Vector2(textures?.normalScale || 0.2, textures?.normalScale || 0.2),
-      roughness: hardscapeSurfaceTypes.has(landuseType) ? 0.88 : 0.95,
-      metalness: 0,
-      transparent: false,
-      opacity: 1,
-      depthWrite: true,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2
-    });
-    surfaceMaterials.set(textureKey, material);
-    return material;
+  function landuseOverlayOpacity(landuseType, isExplicitHardscape) {
+    if (isExplicitHardscape) return 0.94;
+    if (mineralSurfaceTypes.has(landuseType)) return 0.55;
+    if (denseNaturalTypes.has(landuseType)) return 0.28;
+    return 0.2;
   }
 
   function addLandusePolygon(runtime, pts, landuseType, holeRings = [], guardOptions = null) {
@@ -175,6 +101,7 @@ export function createWorldLandusePass(options = {}) {
     const isWater = landuseType === 'water';
     const isExplicitHardscape = landuseType === 'paved' || landuseType === 'parking';
     const isMappedGroundCover = visibleMappedSurfaceTypes.has(landuseType);
+    const overlayOpacity = landuseOverlayOpacity(landuseType, isExplicitHardscape);
     const waterVisualProfile = isWater ? resolveWaterSurfaceVisualProfile() : null;
     const surfaceBaseElevation = isWater
       ? waterSurfaceBaseElevation(sampledHeights)
@@ -220,7 +147,7 @@ export function createWorldLandusePass(options = {}) {
       );
     }
 
-    const material = isWater ? new THREE.MeshStandardMaterial({
+    const material = new THREE.MeshStandardMaterial(isWater ? {
       color: waterVisualProfile?.color || appCtx.LANDUSE_STYLES.water.color,
       emissive: waterVisualProfile?.emissive || 0x0f355a,
       emissiveIntensity: waterVisualProfile?.emissiveIntensity ?? 0.18,
@@ -233,7 +160,17 @@ export function createWorldLandusePass(options = {}) {
       polygonOffset: true,
       polygonOffsetFactor: -6,
       polygonOffsetUnits: -6
-    }) : mappedSurfaceMaterial(landuseType);
+    } : {
+      color: appCtx.LANDUSE_STYLES[landuseType].color,
+      roughness: 0.95,
+      metalness: 0.0,
+      transparent: true,
+      opacity: overlayOpacity,
+      depthWrite: isExplicitHardscape,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2
+    });
 
     if (isWater) {
       registerWaterWaveMaterial(material, {

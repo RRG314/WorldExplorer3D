@@ -1,9 +1,22 @@
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=3";
-import { createWorldLandusePass } from "./load-landuse-pass.js?v=16";
+import { createWorldLandusePass } from "./load-landuse-pass.js?v=17";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=12";
 import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=4";
 import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=8";
+async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
+  if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
+  const waitForCoverage = appCtx.waitForTerrainCoverageAt;
+  const waitForCenter = appCtx.waitForTerrainReadyAt;
+  if (typeof waitForCoverage !== 'function' && typeof waitForCenter !== 'function') return false;
+  startLoadPhase('waitForTerrainCoverage');
+  try {
+    if (typeof waitForCoverage === 'function') return await waitForCoverage(0, 0, 5000, 0.72);
+    return await waitForCenter(0, 0, 3000);
+  } finally {
+    endLoadPhase('waitForTerrainCoverage');
+  }
+}
 export function createWorldRoadLoader(deps = {}) {
   const {
     ENABLE_LINEAR_FEATURES = false,
@@ -112,7 +125,6 @@ export function createWorldRoadLoader(deps = {}) {
     updateFeatureSurfaceProfile,
     worldBaseTerrainY
   });
-
   const landusePass = createWorldLandusePass({
     FEATURE_MIN_HOLE_AREA,
     FEATURE_MIN_POLYGON_AREA,
@@ -137,7 +149,6 @@ export function createWorldRoadLoader(deps = {}) {
     appCtx,
     pointInPolygon: deps.pointInPolygon
   });
-
   async function loadRoadsInternal(retryPass = 0) {
     const session = createWorldLoadRuntimeSession({
       appCtx,
@@ -186,19 +197,10 @@ export function createWorldRoadLoader(deps = {}) {
     const safeLoadCall = (label, fn) => safeWorldLoadCall(loadMetrics, label, fn);
     let loaded = false;
     let providerUnavailable = false;
+    let terrainCoverageReady = false;
     const markLoaded = async (reason) => {
-      if (
-        appCtx.terrainEnabled &&
-        !appCtx.onMoon &&
-        appCtx.roads.length > 0 &&
-        typeof appCtx.waitForTerrainReadyAt === 'function'
-      ) {
-        startLoadPhase('waitForTerrainReady');
-        try {
-          await appCtx.waitForTerrainReadyAt(0, 0, 3000);
-        } finally {
-          endLoadPhase('waitForTerrainReady');
-        }
+      if (!terrainCoverageReady && appCtx.roads.length > 0) {
+        terrainCoverageReady = await waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase);
       }
       finalizeLoadedWorld({
         buildTraversalNetworks,
@@ -416,6 +418,7 @@ export function createWorldRoadLoader(deps = {}) {
           );
         }
 
+        terrainCoverageReady = await waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase);
         buildRoadGeometryPass({
           appendIndexedGeometry,
           classifyStructureSemantics,

@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import {
   classifyWorldSurfaceProfile,
-} from "./surface-rules.js?v=14";
+} from "./surface-rules.js?v=15";
 import {
   inferWaterRenderContext
 } from "./water-dynamics.js?v=4";
@@ -89,7 +89,7 @@ import {
   waterSurfaceBaseElevation,
   WATER_VECTOR_TILE_ZOOM,
   worldLinePointsFromLonLat
-} from "./world/load-geometry.js?v=12";
+} from "./world/load-geometry.js?v=13";
 import {
   decimateRoadCenterlineByDepth,
   getPerfModeValue,
@@ -108,7 +108,7 @@ import {
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
 import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=7";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=18";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=19";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -149,7 +149,7 @@ import {
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
 } from "./world/world-geometry.js?v=2";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=9";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=10";
 import {
   resetWorldFurnitureCaches
 } from "./world/furniture.js?v=8";
@@ -168,7 +168,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=3";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=37";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=39";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=6";

@@ -2,8 +2,9 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import { fetchShortbreadTile } from "./shortbread-source.js?v=6";
 import {
   buildStreamingBuildingVisuals,
+  buildStreamingRoadVisuals,
   queueGeometryDisposal
-} from "./streaming-vector-chunks.js?v=31";
+} from "./streaming-vector-chunks.js?v=32";
 
 function removeMeshesInPlace(source, removed) {
   if (!Array.isArray(source)) return [];
@@ -31,10 +32,17 @@ async function loadAerialContextChunk(request) {
   try {
     const tileRecord = await fetchShortbreadTile(request.z, request.x, request.y, { signal: request.signal });
     if (request.signal?.aborted) throw new DOMException('Aerial context chunk aborted', 'AbortError');
+    await buildStreamingRoadVisuals(tileRecord, chunk, {
+      aerialContext: true,
+      includeInitial: true,
+      maxFeatures: 260,
+      recordFeatures: false
+    });
+    if (request.signal?.aborted) throw new DOMException('Aerial context chunk aborted', 'AbortError');
     await buildStreamingBuildingVisuals(tileRecord, chunk, {
       aerialContext: true,
       batchByCell: false,
-      includeInitial: false,
+      includeInitial: true,
       lodTier: 'far',
       maxFeatures: 220,
       maxFootprintPoints: 14,
@@ -68,8 +76,8 @@ function disposeAerialContextChunk(chunk) {
   removeMeshesInPlace(appCtx.aerialContextMeshes, removed);
 }
 
-function aerialContextCenter() {
-  return appCtx.LOC;
+function aerialContextCenter({ center, enabled } = {}) {
+  return enabled && Number.isFinite(center?.lat) && Number.isFinite(center?.lon) ? center : appCtx.LOC;
 }
 
 function initStreamingAerialContext() {

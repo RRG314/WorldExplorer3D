@@ -10,71 +10,6 @@ import {
   showSunInfo
 } from "./info-panel.js?v=2";
 
-function applySystemMapPresentation(ctx, mode) {
-  const mapScale = mode === 'full' ? 5.2 : mode === 'inner' ? 2.2 : 1;
-  ctx.solarSystem.planetMeshes.forEach((entry) => entry.mesh?.scale.setScalar(mapScale));
-  ctx.solarSystem.asteroidMeshes.forEach((entry) => entry.mesh?.scale.setScalar(mapScale));
-  if (ctx.solarSystem.asteroidBelt?.material) {
-    ctx.solarSystem.asteroidBelt.material.size = mode === 'inner' ? 3.8 : mode === 'full' ? 3 : 2.4;
-  }
-  if (ctx.solarSystem.kuiperBelt?.material) {
-    ctx.solarSystem.kuiperBelt.material.size = mode === 'full' ? 4.4 : 1.9;
-  }
-}
-
-function overviewButtonLabel(mode) {
-  if (mode === 'inner') return 'KUIPER BELT MAP';
-  if (mode === 'full') return 'RESUME FLIGHT';
-  return 'ASTEROID BELT MAP';
-}
-
-function drawSystemRadar(ctx) {
-  const canvas = document.getElementById('solarSystemRadar');
-  const painter = canvas?.getContext?.('2d');
-  if (!canvas || !painter) return;
-  const width = canvas.width;
-  const height = canvas.height;
-  const centerX = width * 0.5;
-  const centerY = height * 0.5;
-  const outerRadius = Math.min(width, height) * 0.43;
-  painter.clearRect(0, 0, width, height);
-  painter.fillStyle = 'rgba(3, 7, 18, 0.92)';
-  painter.fillRect(0, 0, width, height);
-
-  painter.strokeStyle = 'rgba(123, 174, 224, 0.42)';
-  painter.lineWidth = 2;
-  painter.beginPath();
-  painter.arc(centerX, centerY, outerRadius * 0.72, 0, Math.PI * 2);
-  painter.stroke();
-  painter.strokeStyle = 'rgba(180, 131, 87, 0.62)';
-  painter.beginPath();
-  painter.arc(centerX, centerY, outerRadius * 0.27, 0, Math.PI * 2);
-  painter.stroke();
-
-  painter.fillStyle = '#f9d86c';
-  painter.beginPath();
-  painter.arc(centerX, centerY, 4, 0, Math.PI * 2);
-  painter.fill();
-
-  const rocket = ctx.appCtx.spaceFlight?.rocket;
-  const maxSceneRadius = Math.max(1, Number(ctx.KUIPER_BELT?.outerAU || 50) * Number(ctx.AU_TO_SCENE || 1));
-  if (rocket?.position) {
-    const scale = outerRadius / maxSceneRadius;
-    const x = centerX + rocket.position.x * scale;
-    const y = centerY + rocket.position.z * scale;
-    painter.fillStyle = '#ffffff';
-    painter.beginPath();
-    painter.arc(Math.max(5, Math.min(width - 5, x)), Math.max(5, Math.min(height - 5, y)), 3, 0, Math.PI * 2);
-    painter.fill();
-  }
-
-  painter.font = '600 9px Inter, sans-serif';
-  painter.fillStyle = '#d4a06f';
-  painter.fillText('ASTEROID BELT', 8, height - 18);
-  painter.fillStyle = '#8fc5f2';
-  painter.fillText('KUIPER BELT', width - 72, 13);
-}
-
 export function onSolarSystemClick(ctx, event) {
   if (!ctx.appCtx.spaceFlight.active || !ctx.solarSystem.visible || !ctx.solarSystem.group) return;
 
@@ -221,13 +156,6 @@ export function createToggleButton(ctx) {
   `;
   btn.textContent = 'RETURN TO EARTH';
   btn.addEventListener('click', () => handleSpaceReturnAction(ctx));
-  const radar = document.createElement('canvas');
-  radar.id = 'solarSystemRadar';
-  radar.width = 190;
-  radar.height = 128;
-  radar.setAttribute('aria-label', 'Solar system position radar showing the asteroid and Kuiper belts');
-  radar.style.cssText = 'width:190px;height:128px;border:1px solid rgba(123,174,224,.55);background:#030712;';
-  container.appendChild(radar);
   container.appendChild(btn);
 
   const orbitBtn = document.createElement('button');
@@ -257,20 +185,6 @@ export function createToggleButton(ctx) {
   marsBtn.addEventListener('click', () => handleMarsLandingAction(ctx));
   container.appendChild(marsBtn);
 
-  const overviewBtn = document.createElement('button');
-  overviewBtn.id = 'solarSystemOverview';
-  overviewBtn.className = 'ssToggleBtn';
-  overviewBtn.style.cssText = orbitBtn.style.cssText.replace('#10b981', '#f0b35a');
-  overviewBtn.textContent = 'ASTEROID BELT MAP';
-  overviewBtn.addEventListener('click', () => {
-    const flight = ctx.appCtx.spaceFlight;
-    if (!flight?.active) return;
-    flight.overviewMode = flight.overviewMode === 'inner' ? 'full' : flight.overviewMode === 'full' ? false : 'inner';
-    applySystemMapPresentation(ctx, flight.overviewMode);
-    overviewBtn.textContent = overviewButtonLabel(flight.overviewMode);
-  });
-  container.appendChild(overviewBtn);
-
   document.body.appendChild(container);
 }
 
@@ -288,13 +202,9 @@ export function showSolarSystemUI(ctx) {
   const returnBtn = document.getElementById('solarSystemToggle');
   const landMoonBtn = document.getElementById('orbitsToggle');
   const landMarsBtn = document.getElementById('marsLandingToggle');
-  const overviewBtn = document.getElementById('solarSystemOverview');
   if (returnBtn) returnBtn.textContent = 'RETURN TO EARTH';
   if (landMoonBtn) landMoonBtn.textContent = 'LAND ON MOON';
   if (landMarsBtn) landMarsBtn.textContent = 'LAND ON MARS';
-  const overviewMode = ctx?.appCtx?.spaceFlight?.overviewMode;
-  applySystemMapPresentation(ctx, overviewMode);
-  if (overviewBtn) overviewBtn.textContent = overviewButtonLabel(overviewMode);
   ctx?.appCtx?.showUniverseUI?.();
 }
 
@@ -302,7 +212,6 @@ export function hideSolarSystemUI(ctx) {
   const container = document.getElementById('ssToggleContainer');
   if (container) container.style.display = 'none';
   if (ctx?.appCtx?.spaceFlight) ctx.appCtx.spaceFlight.overviewMode = false;
-  applySystemMapPresentation(ctx, false);
   ctx?.appCtx?.hideUniverseUI?.();
   hidePlanetInfo(ctx);
 }
@@ -317,7 +226,6 @@ export function updateSolarSystem(ctx) {
 
   if (!ctx.solarSystem._frameCount) ctx.solarSystem._frameCount = 0;
   ctx.solarSystem._frameCount++;
-  if (ctx.solarSystem._frameCount % 12 === 1) drawSystemRadar(ctx);
   if (ctx.solarSystem._frameCount % 60 === 0) {
     ctx.updateSolarSystemPositions(new Date());
   }
@@ -419,12 +327,14 @@ export function updateProximityHUD(ctx) {
     (rocketWorldPos.x - ctx.solarSystem.group.position.x) ** 2 +
     (rocketWorldPos.z - ctx.solarSystem.group.position.z) ** 2
   );
-  const beltInnerScene = ctx.ASTEROID_BELT.innerAU * ctx.AU_TO_SCENE;
-  const beltOuterScene = ctx.ASTEROID_BELT.outerAU * ctx.AU_TO_SCENE;
+  const beltVisualScale = Number(ctx.ASTEROID_BELT.visualScale) || 1;
+  const beltInnerScene = ctx.ASTEROID_BELT.innerAU * ctx.AU_TO_SCENE * beltVisualScale;
+  const beltOuterScene = ctx.ASTEROID_BELT.outerAU * ctx.AU_TO_SCENE * beltVisualScale;
   const inBelt = rocketDistFromSun > beltInnerScene * 0.9 && rocketDistFromSun < beltOuterScene * 1.1;
 
-  const kuiperInnerScene = ctx.KUIPER_BELT.innerAU * ctx.AU_TO_SCENE;
-  const kuiperOuterScene = ctx.KUIPER_BELT.outerAU * ctx.AU_TO_SCENE;
+  const kuiperVisualScale = Number(ctx.KUIPER_BELT.visualScale) || 1;
+  const kuiperInnerScene = ctx.KUIPER_BELT.innerAU * ctx.AU_TO_SCENE * kuiperVisualScale;
+  const kuiperOuterScene = ctx.KUIPER_BELT.outerAU * ctx.AU_TO_SCENE * kuiperVisualScale;
   const inKuiperBelt =
     rocketDistFromSun > kuiperInnerScene * 0.95 &&
     rocketDistFromSun < kuiperOuterScene * 1.05;

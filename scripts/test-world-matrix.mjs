@@ -9,9 +9,13 @@ import { startStaticRootServer } from './test-static-server.mjs';
 const rootDir = process.cwd();
 const host = '127.0.0.1';
 const candidatePorts = [4173, 4174, 4175, 4176, 4177];
-const outputDir = path.join(rootDir, 'output', 'playwright', 'world-matrix');
+const outputLabel = /^[a-z0-9._-]+$/i.test(String(process.env.WORLD_MATRIX_OUTPUT_LABEL || '')) ?
+  String(process.env.WORLD_MATRIX_OUTPUT_LABEL) : '';
+const outputDir = path.join(rootDir, 'output', 'playwright', 'world-matrix', outputLabel);
+const externalBaseUrl = String(process.env.WORLD_MATRIX_BASE_URL || '').replace(/\/$/, '');
 const exerciseTraversalModes = process.env.WORLD_MATRIX_EXERCISE_MODES !== '0';
 const captureDroneViews = process.env.WORLD_MATRIX_CAPTURE_DRONE === '1';
+const forceDaylight = process.env.WORLD_MATRIX_FORCE_DAYLIGHT === '1';
 const requireWorldCover = process.env.WORLD_MATRIX_REQUIRE_WORLDCOVER === '1';
 const blockWorldCover = process.env.WORLD_MATRIX_BLOCK_WORLDCOVER === '1';
 const locationDelayMs = Math.max(0, Number(process.env.WORLD_MATRIX_LOCATION_DELAY_MS ?? 1200) || 0);
@@ -324,8 +328,13 @@ async function loadLocation(page, spec) {
       visibleWallFacadeSourceCount: 0,
       tiers: {}
     };
-    const diagnosticsModule = await import('/scripts/world-matrix-building-diagnostics.mjs?v=3');
-    const buildingDimensions = diagnosticsModule.collectBuildingDimensions(ctx.buildings || []);
+    let buildingDimensions = null;
+    try {
+      const diagnosticsModule = await import('/scripts/world-matrix-building-diagnostics.mjs?v=3');
+      buildingDimensions = diagnosticsModule.collectBuildingDimensions(ctx.buildings || []);
+    } catch {
+      buildingDimensions = { unavailable: true };
+    }
     for (const mesh of ctx.buildingMeshes || []) {
       if (!mesh?.isMesh) continue;
       const sourceCount = Math.max(1, Number(mesh.userData?.batchCount || 1));
@@ -447,9 +456,12 @@ async function loadLocation(page, spec) {
 
     const worldCoverMeshes = Array.isArray(ctx.terrainGroup?.children) ? ctx.terrainGroup.children : [];
     const worldCoverStatus = {};
+    const imageryStatus = {};
     for (const mesh of worldCoverMeshes) {
       const status = String(mesh?.userData?.worldCoverStatus || 'not_requested');
       worldCoverStatus[status] = Number(worldCoverStatus[status] || 0) + 1;
+      const imagery = String(mesh?.userData?.terrainImageryStatus || 'not_requested');
+      imageryStatus[imagery] = Number(imageryStatus[imagery] || 0) + 1;
     }
 
     return {
@@ -490,6 +502,15 @@ async function loadLocation(page, spec) {
           .filter((mesh) => mesh?.userData?.worldCoverSummary)
           .slice(0, 5)
           .map((mesh) => ({ ...mesh.userData.worldCoverSummary }))
+      },
+      terrainImagery: {
+        status: imageryStatus,
+        samples: worldCoverMeshes.slice(0, 5).map((mesh) => ({
+          key: mesh?.userData?.terrainTileKey || null,
+          mapMatchesImagery: mesh?.material?.map === mesh?.userData?.terrainImageryTexture,
+          emissiveMatchesImagery: mesh?.material?.emissiveMap === mesh?.userData?.terrainImageryTexture,
+          mapSource: mesh?.material?.map?.image?.currentSrc || mesh?.material?.map?.image?.src || null
+        }))
       },
       landusePresentation,
       structurePresentation,
@@ -579,8 +600,8 @@ async function main() {
     throw new Error(`WORLD_MATRIX_IDS did not match a configured location: ${[...requestedLocationIds].join(', ')}`);
   }
   await mkdirp(outputDir);
-  const server = await startStaticRootServer({ rootDir, host, candidatePorts });
-  const baseUrl = `http://${host}:${server.port}`;
+  const server = externalBaseUrl ? null : await startStaticRootServer({ rootDir, host, candidatePorts });
+  const baseUrl = externalBaseUrl || `http://${host}:${server.port}`;
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
   if (blockWorldCover) await page.route('https://titiler.terrascope.be/**', (route) => route.abort('blockedbyclient'));
@@ -639,6 +660,13 @@ async function main() {
       }
 
       try {
+        if (forceDaylight) {
+          await page.evaluate(async () => {
+            const { ctx } = await import('/app/js/shared-context.js?v=55');
+            ctx?.setTimeOfDay?.('day');
+          });
+          await page.waitForTimeout(400);
+        }
         await page.waitForTimeout(800);
         result.visualDiagnostics = await captureViewport(page, path.join(outputDir, `${spec.id}.png`));
         if (captureDroneViews && result.expectedStart !== 'water') {
@@ -673,7 +701,7 @@ async function main() {
     await fs.writeFile(path.join(outputDir, reportName), JSON.stringify(report, null, 2));
   } finally {
     await browser.close();
-    await server.close();
+    await server?.close();
   }
 
   const fatalConsoleErrors = fatalConsoleEntries(consoleErrors, requestFailures, baseUrl);
