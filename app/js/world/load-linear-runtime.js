@@ -1,3 +1,5 @@
+import { appendUpwardRibbonGeometry } from "../road-render.js?v=2";
+
 export function createLinearFeatureRuntime(options = {}) {
   const {
     appCtx,
@@ -77,16 +79,7 @@ export function createLinearFeatureRuntime(options = {}) {
       surfaceBias: spec.bias
     });
 
-    for (let i = 0; i < ribbonEdges.leftEdge.length; i++) {
-      const leftEdge = ribbonEdges.leftEdge[i];
-      const rightEdge = ribbonEdges.rightEdge[i];
-      verts.push(leftEdge.x, leftEdge.y, leftEdge.z);
-      verts.push(rightEdge.x, rightEdge.y, rightEdge.z);
-      if (i < ribbonEdges.leftEdge.length - 1) {
-        const vi = i * 2;
-        indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
-      }
-    }
+    appendUpwardRibbonGeometry(ribbonEdges.leftEdge, ribbonEdges.rightEdge, verts, indices);
 
     if (verts.length < 12 || indices.length < 6) return false;
 

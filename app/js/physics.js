@@ -1,14 +1,11 @@
-import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
-import { isRoadSurfaceReachable } from "./structure-semantics.js?v=12";
-import { updateDrone } from "./physics/drone-flight.js?v=3";
+import { ctx as appCtx } from "./shared-context.js?v=55";
+import { isRoadSurfaceReachable } from "./structure-semantics.js?v=13";
+import { updateDrone } from "./physics/drone-flight.js?v=4";
 import { updatePlane } from "./plane-mode.js?v=7";
 import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=2";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=1";
 import { updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=1";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=1";
-// physics.js - Car physics, building collision, drone movement
-// ============================================================================
-
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
 let _rdtPhysFrame = 0;
@@ -100,16 +97,26 @@ function update(dt) {
     if (!appCtx.boatMode?.active && typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
     return;
   }
+  if (dt > 1 / 30) {
+    const steps = Math.ceil(dt / (1 / 45));
+    for (let i = 0; i < steps; i += 1) update(dt / steps);
+    return;
+  }
   if (typeof appCtx.updateFlowerChallenge === 'function') appCtx.updateFlowerChallenge(dt);
 
   if (updateAlternateTravelMode(appCtx, dt, { isPlanetarySurface, updateDrone, updatePlane })) return;
 
   appCtx.updateInteriorInteraction?.();
 
-  const left = appCtx.keys.ArrowLeft,right = appCtx.keys.ArrowRight;
-  const gas = appCtx.keys.ArrowUp,reverse = appCtx.keys.ArrowDown;
-  const braking = appCtx.keys.Space;
-  const boostKey = appCtx.keys.ControlLeft || appCtx.keys.ControlRight;
+  const actions = appCtx.readControlActions?.('drive') || {};
+  const steerControl = Number(actions.steer) || 0;
+  const throttleControl = Math.max(0, Number(actions.throttle) || 0);
+  const reverseControl = Math.max(0, Number(actions.reverse) || 0);
+  const brakeControl = Math.max(0, Number(actions.brake) || 0);
+  const left = steerControl > 0.05, right = steerControl < -0.05;
+  const gas = throttleControl > 0.05, reverse = reverseControl > 0.05;
+  const braking = brakeControl > 0.05;
+  const boostKey = Number(actions.boost) > 0.05;
 
   // Ensure new handling state exists (safe even if car object persisted)
   if (appCtx.car.yawRate === undefined) appCtx.car.yawRate = 0;
@@ -206,7 +213,7 @@ function update(dt) {
       const lowSpeedBoost = Math.max(0, 1 - spd / 14);
       throttleAccel *= 1 + lowSpeedBoost * 0.75;
     }
-    appCtx.car.speed += throttleAccel * (1 - spd / maxSpd * 0.7) * dt;
+    appCtx.car.speed += throttleAccel * throttleControl * (1 - spd / maxSpd * 0.7) * dt;
   }
 
   if (braking && spd > 0.5 && canAccelerate) {
@@ -215,18 +222,18 @@ function update(dt) {
       const driftBrakeRate = appCtx.car.onRoad ? 0.72 : 1.1;
       appCtx.car.speed *= Math.exp(-driftBrakeRate * dt);
     } else {
-      appCtx.car.speed *= 1 - appCtx.CFG.brakeForce * dt;
+      appCtx.car.speed *= 1 - appCtx.CFG.brakeForce * brakeControl * dt;
     }
     if (Math.abs(appCtx.car.speed) < 0.5) appCtx.car.speed = 0;
   }
 
   if (reverse && !braking && canAccelerate) {
     if (appCtx.car.speed > 10) {
-      appCtx.car.speed -= appCtx.CFG.brake * dt;
+      appCtx.car.speed -= appCtx.CFG.brake * reverseControl * dt;
       if (Math.abs(appCtx.car.speed) < 0.5) appCtx.car.speed = 0;
     } else {
       const reverseAccelScale = isPlanetarySurface() ? 0.65 : 0.5;
-      appCtx.car.speed -= accel * reverseAccelScale * dt;
+      appCtx.car.speed -= accel * reverseAccelScale * reverseControl * dt;
     }
   }
 
@@ -251,8 +258,8 @@ function update(dt) {
   // Slowroads-like handling core (yaw inertia + slip)
   // =========================================================================
 
-  const steerInput = (left ? 1 : 0) - (right ? 1 : 0);
-  const throttleInput = gas && !reverse ? 1 : 0;
+  const steerInput = steerControl;
+  const throttleInput = gas && !reverse ? throttleControl : 0;
 
   const steerSmooth = 1 - Math.exp(-dt * 14);
   const throttleSmooth = 1 - Math.exp(-dt * 6);
@@ -609,11 +616,11 @@ function update(dt) {
       rayDir: _physRayDir
     });
   } else if (appCtx.terrainEnabled) {
-    let surfaceY = typeof appCtx.GroundHeight !== 'undefined' && appCtx.GroundHeight && typeof appCtx.GroundHeight.driveSurfaceY === 'function' ?
-    appCtx.GroundHeight.driveSurfaceY(appCtx.car.x, appCtx.car.z, !!appCtx.car.onRoad, Number.isFinite(appCtx.car.y) ? appCtx.car.y - 1.2 : NaN) :
-    (typeof appCtx.terrainMeshHeightAt === 'function' ?
-    appCtx.terrainMeshHeightAt(appCtx.car.x, appCtx.car.z) :
-    appCtx.elevationWorldYAtWorldXZ(appCtx.car.x, appCtx.car.z)) + (appCtx.car.onRoad ? 0.2 : 0);
+    const currentY = Number.isFinite(appCtx.car.y) ? appCtx.car.y - 1.2 : NaN;
+    let surfaceY = appCtx.SurfaceQuery.driveAt(appCtx.car.x, appCtx.car.z, {
+      preferRoad: !!appCtx.car.onRoad,
+      currentY
+    }).position.y;
 
     if (typeof appCtx.getBuildVehicleSurfaceAtWorldXZ === 'function') {
       const carFeetY = Number.isFinite(appCtx.car.y) ? appCtx.car.y - 1.2 : surfaceY;
@@ -670,8 +677,6 @@ function update(dt) {
     }
   }
 }
-
-// Check for nearby POIs and display info
 
 Object.assign(appCtx, {
   _getPhysRaycaster,

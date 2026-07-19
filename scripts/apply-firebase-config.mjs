@@ -21,23 +21,6 @@ function buildProjectConfigScript(env, config) {
     `window.WORLD_EXPLORER_FIREBASE = window.WORLD_EXPLORER_FIREBASE || ${JSON.stringify(config, null, 2)};\n`;
 }
 
-function buildInitJson(config) {
-  const payload = {
-    apiKey: String(config.apiKey || ''),
-    appId: String(config.appId || ''),
-    authDomain: String(config.authDomain || ''),
-    measurementId: String(config.measurementId || ''),
-    messagingSenderId: String(config.messagingSenderId || ''),
-    projectId: String(config.projectId || ''),
-    storageBucket: String(config.storageBucket || '')
-  };
-  return `${JSON.stringify(payload, null, 2)}\n`;
-}
-
-function buildInitJs(config) {
-  return `self.__FIREBASE_DEFAULTS__ = ${buildInitJson(config).trim()};\n`;
-}
-
 async function writeFile(targetPath, content) {
   await fs.mkdir(path.dirname(targetPath), { recursive: true });
   await fs.writeFile(targetPath, content, 'utf8');
@@ -50,28 +33,14 @@ async function main() {
   const config = JSON.parse(raw);
 
   const projectConfigScript = buildProjectConfigScript(envName, config);
-  const initJson = buildInitJson(config);
-  const initJs = buildInitJs(config);
-
-  const writes = [
-    writeFile(path.join(rootDir, 'js/firebase-project-config.js'), projectConfigScript),
-    writeFile(path.join(rootDir, 'public/js/firebase-project-config.js'), projectConfigScript),
-    writeFile(path.join(rootDir, 'public/__/firebase/init.json'), initJson),
-    writeFile(path.join(rootDir, 'public/__/firebase/init.js'), initJs)
-  ];
-
-  await Promise.all(writes);
+  await writeFile(path.join(rootDir, 'js/firebase-project-config.js'), projectConfigScript);
 
   console.log(JSON.stringify({
     ok: true,
     environment: envName,
     projectId: config.projectId,
-    outputs: [
-      'js/firebase-project-config.js',
-      'public/js/firebase-project-config.js',
-      'public/__/firebase/init.json',
-      'public/__/firebase/init.js'
-    ]
+    outputs: ['js/firebase-project-config.js'],
+    note: 'Hosting configuration is injected into dist/ by scripts/hosting-artifact.mjs.'
   }, null, 2));
 }
 

@@ -229,12 +229,17 @@ function isTransientNetworkConsoleError(text = '') {
 async function main() {
   await mkdirp(outputDir);
 
-  const mirrorCheck = spawnSync(process.execPath, [path.join('scripts', 'verify-mirror.mjs')], {
+  const artifactCheck = spawnSync(process.execPath, [
+    path.join('scripts', 'hosting-artifact.mjs'),
+    'build',
+    '--firebase-env',
+    'staging'
+  ], {
     cwd: rootDir,
     encoding: 'utf8'
   });
-  if (mirrorCheck.status !== 0) {
-    throw new Error(`Mirror verification failed before runtime test.\n${mirrorCheck.stdout}\n${mirrorCheck.stderr}`);
+  if (artifactCheck.status !== 0) {
+    throw new Error(`Hosting artifact verification failed before runtime test.\n${artifactCheck.stdout}\n${artifactCheck.stderr}`);
   }
 
   const serverHandle = await startServer({ rootDir, host, candidatePorts });
@@ -328,7 +333,7 @@ async function main() {
 
     report = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
-      const structureSemantics = await import('/app/js/structure-semantics.js?v=12');
+      const structureSemantics = await import('/app/js/structure-semantics.js?v=13');
       const ctx = mod?.ctx;
       const roads = Array.isArray(ctx.roads) ? ctx.roads : [];
       const buildings = Array.isArray(ctx.buildings) ? ctx.buildings : [];
@@ -479,8 +484,38 @@ async function main() {
           Array.isArray(ctx.dynamicBuildingColliders) ?
             ctx.dynamicBuildingColliders.length === 0 :
             true,
-        interiorPromptPresent: !!document.getElementById('interiorPrompt')
+        interiorPromptPresent: !!document.getElementById('interiorPrompt'),
+        surfaceContractParity: null
       };
+
+      if (ctx.SurfaceQuery && ctx.GroundHeight) {
+        const roadPoints = (Array.isArray(ctx.roads) ? ctx.roads : [])
+          .flatMap((road) => Array.isArray(road?.pts) ? road.pts.slice(0, 1) : [])
+          .slice(0, 12);
+        const fallbackPoints = [
+          { x: Number(ctx.car?.x || 0), z: Number(ctx.car?.z || 0) },
+          { x: Number(ctx.car?.x || 0) + 24, z: Number(ctx.car?.z || 0) + 24 }
+        ];
+        const samples = [...roadPoints, ...fallbackPoints].map(({ x, z }) => {
+          const terrainOld = ctx.GroundHeight.terrainY(x, z);
+          const walkOld = ctx.GroundHeight.walkSurfaceY(x, z);
+          const driveOld = ctx.GroundHeight.driveSurfaceY(x, z, true);
+          const terrainNew = ctx.SurfaceQuery.terrainAt(x, z).position.y;
+          const walkNew = ctx.SurfaceQuery.walkAt(x, z).position.y;
+          const driveNew = ctx.SurfaceQuery.driveAt(x, z, { preferRoad: true }).position.y;
+          return {
+            terrainDelta: Math.abs(terrainOld - terrainNew),
+            walkDelta: Math.abs(walkOld - walkNew),
+            driveDelta: Math.abs(driveOld - driveNew)
+          };
+        });
+        out.surfaceContractParity = {
+          sampleCount: samples.length,
+          maxTerrainDelta: Math.max(0, ...samples.map((sample) => sample.terrainDelta)),
+          maxWalkDelta: Math.max(0, ...samples.map((sample) => sample.walkDelta)),
+          maxDriveDelta: Math.max(0, ...samples.map((sample) => sample.driveDelta))
+        };
+      }
 
       const syntheticDestinationSupport = ctx.resolveBuildingEntrySupport?.({
         id: 'runtime-test-destination',
@@ -655,7 +690,7 @@ async function main() {
     const networkAndCopyReport = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
       const ctx = mod?.ctx;
-      const semanticsMod = await import('/app/js/structure-semantics.js?v=12');
+      const semanticsMod = await import('/app/js/structure-semantics.js?v=13');
       const classifyStructureSemantics = semanticsMod?.classifyStructureSemantics;
       const walkGraph = ctx?.traversalNetworks?.walk || null;
       const driveGraph = ctx?.traversalNetworks?.drive || null;
@@ -829,6 +864,11 @@ async function main() {
           report.enteredInteriorReport.containedColliders > 0 &&
           report.enteredInteriorReport.shellClearanceMin >= report.enteredInteriorReport.requiredShellClearance
         ),
+      surfaceContractExact:
+        report.surfaceContractParity?.sampleCount >= 2 &&
+        report.surfaceContractParity.maxTerrainDelta <= 1e-9 &&
+        report.surfaceContractParity.maxWalkDelta <= 1e-9 &&
+        report.surfaceContractParity.maxDriveDelta <= 1e-9,
       walkingControlsUpdated:
         report.walkingControlsText.includes('Arrow Up/Down - Move forward / back') &&
         report.walkingControlsText.includes('Arrow Left/Right - Turn left / right') &&
@@ -921,6 +961,7 @@ async function main() {
     assert(checks.roadSurfacesDraped, `Road surface skirt policy regressed: ${JSON.stringify(report.roadSurfaceContract || null)}`);
     assert(checks.lazyInteriorIdle, `Interior system is not staying lazy by default: ${JSON.stringify({ buildingEntrySupportExposed: report.buildingEntrySupportExposed, activeInteriorByDefault: report.activeInteriorByDefault, dynamicInteriorCollidersIdle: report.dynamicInteriorCollidersIdle, interiorActionExposed: report.interiorActionExposed, interiorPromptPresent: report.interiorPromptPresent })}`);
     assert(checks.sampledInteriorEnterable, `Sampled building entry did not produce a usable contained interior shell: ${JSON.stringify(report.enteredInteriorReport || null)}`);
+    assert(checks.surfaceContractExact, `Surface contract changed authoritative heights: ${JSON.stringify(report.surfaceContractParity || null)}`);
     assert(checks.syntheticDestinationEntryReady, `Synthetic real-estate fallback entry is unavailable: ${JSON.stringify({ syntheticDestinationEntrySupported: report.syntheticDestinationEntrySupported })}`);
     assert(checks.walkingControlsUpdated, 'Walking controls help text is out of sync with Arrow/WASD behavior.');
     assert(checks.droneControlsUpdated, 'Drone controls help text is out of sync with WASD/Arrow behavior.');

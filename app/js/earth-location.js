@@ -1,6 +1,8 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 
 function currentActorWorldPosition() {
+  const contracted = appCtx.activeEarthActorPosition?.();
+  if (contracted) return contracted;
   if (appCtx.boatMode?.active && Number.isFinite(appCtx.boat?.x) && Number.isFinite(appCtx.boat?.z)) {
     return { x: appCtx.boat.x, z: appCtx.boat.z, source: 'boat' };
   }

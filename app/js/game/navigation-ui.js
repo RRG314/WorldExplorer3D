@@ -276,23 +276,9 @@ function navigationRouteNeedsRebuild(fromX, fromZ, toX, toZ, mode) {
 }
 
 function navigationSurfaceY(x, z, mode = 'drive') {
-  if (mode === 'walk' && appCtx.GroundHeight && typeof appCtx.GroundHeight.walkSurfaceY === 'function') {
-    const walkY = appCtx.GroundHeight.walkSurfaceY(x, z);
-    if (Number.isFinite(walkY)) return walkY;
-  }
-  if (mode === 'drive' && appCtx.GroundHeight && typeof appCtx.GroundHeight.driveSurfaceY === 'function') {
-    const driveY = appCtx.GroundHeight.driveSurfaceY(x, z, true);
-    if (Number.isFinite(driveY)) return driveY;
-  }
-  if (typeof appCtx.terrainYAtWorld === 'function') {
-    const terrainY = appCtx.terrainYAtWorld(x, z);
-    if (Number.isFinite(terrainY)) return terrainY;
-  }
-  if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
-    const elevY = appCtx.elevationWorldYAtWorldXZ(x, z);
-    if (Number.isFinite(elevY)) return elevY;
-  }
-  return 0;
+  if (!appCtx.SurfaceQuery) return 0;
+  const queryMode = mode === 'walk' ? 'walk' : mode === 'drive' ? 'drive' : 'terrain';
+  return appCtx.SurfaceQuery.at(x, z, { mode: queryMode }).position.y;
 }
 
 function routePointsToWorldVectors(points, mode = 'drive') {

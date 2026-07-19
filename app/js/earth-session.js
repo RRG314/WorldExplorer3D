@@ -1,12 +1,13 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { currentActorWorldPosition } from "./earth-location.js?v=2";
+import { commitEnvironment, registerEnvironmentLifecycle } from './session-coordinator.js?v=2';
 
 const REUSE_EXISTING_EARTH_WORLD = true;
 
 function showEarthResumeLoad() {
   appCtx.earthResumePending = true;
   appCtx.showLoad?.('Restoring the local Earth world...', {
-    background: 'loading-bg.jpg',
+    background: '../assets/landing/city.jpg',
     hideSpinner: false,
     transition: true,
     bold: true,
@@ -49,51 +50,6 @@ function getEarthSessionState() {
 
 function hasLoadedEarthWorld() {
   return appCtx.initialEarthWorldReady === true;
-}
-
-function setGroundPlaneVisibility(visible) {
-  if (!appCtx.scene || typeof appCtx.scene.traverse !== 'function') return;
-  appCtx.scene.traverse((obj) => {
-    if (obj?.userData?.isGroundPlane) {
-      obj.visible = visible;
-    }
-  });
-}
-
-function restoreMeshList(meshes, visibilityResolver = null) {
-  if (!Array.isArray(meshes) || !appCtx.scene) return;
-  meshes.forEach((mesh) => {
-    if (!mesh) return;
-    mesh.visible = typeof visibilityResolver === 'function' ? visibilityResolver(mesh) : true;
-    if (mesh.parent !== appCtx.scene) {
-      appCtx.scene.add(mesh);
-    }
-  });
-}
-
-function restoreEarthSceneMeshes() {
-  if (appCtx.terrainGroup) {
-    appCtx.terrainGroup.visible = true;
-    if (appCtx.terrainGroup.parent !== appCtx.scene) appCtx.scene.add(appCtx.terrainGroup);
-  }
-  if (appCtx.cloudGroup) {
-    appCtx.cloudGroup.visible = true;
-    if (appCtx.cloudGroup.parent !== appCtx.scene) appCtx.scene.add(appCtx.cloudGroup);
-  }
-
-  setGroundPlaneVisibility(true);
-
-  restoreMeshList(appCtx.roadMeshes);
-  restoreMeshList(appCtx.urbanSurfaceMeshes);
-  restoreMeshList(appCtx.structureVisualMeshes);
-  restoreMeshList(appCtx.buildingMeshes);
-  restoreMeshList(appCtx.landuseMeshes, (mesh) => appCtx.landUseVisible || !!mesh?.userData?.alwaysVisible);
-  restoreMeshList(appCtx.linearFeatureMeshes);
-  restoreMeshList(appCtx.poiMeshes, () => !!appCtx.poiMode);
-  restoreMeshList(appCtx.historicMarkers);
-  restoreMeshList(appCtx.streetFurnitureMeshes);
-  restoreMeshList(appCtx.vegetationMeshes);
-  appCtx.earthSceneVisible = true;
 }
 
 async function restoreEarthActorOwnership() {
@@ -226,7 +182,8 @@ function restorePoseFromSession() {
   return resolved;
 }
 
-async function finalizeEarthResume(resolved) {
+async function finalizeEarthResume(resolved, isCurrent = () => true) {
+  if (!isCurrent()) return false;
   appCtx.setEarthSceneVisible?.(true);
   const x = Number.isFinite(resolved?.x) ? resolved.x : Number(appCtx.car?.x) || 0;
   const z = Number.isFinite(resolved?.z) ? resolved.z : Number(appCtx.car?.z) || 0;
@@ -250,9 +207,11 @@ async function finalizeEarthResume(resolved) {
     appCtx.updateControlsModeUI();
   }
   await waitForRenderedFrames();
+  if (!isCurrent()) return false;
   appCtx.updateWorldLod?.(true);
   appCtx.lastTime = performance.now();
   stampLoadedSelection();
+  return true;
 }
 
 export function shouldReuseExistingEarthWorld() {
@@ -271,7 +230,7 @@ export function captureEarthWorldSession() {
 
 export async function reloadEarthWorldSession(options = {}) {
   const transitionDurationMs = Number.isFinite(options.transitionDurationMs) ? options.transitionDurationMs : 700;
-  const switchEnv = options.switchEnv !== false;
+  const shouldSwitchEnv = options.switchEnv !== false;
   const isCurrent = () => {
     if (typeof options.isCurrent === 'function' && !options.isCurrent()) return false;
     return !appCtx.ENV?.EARTH || typeof appCtx.getEnv !== 'function' || appCtx.getEnv() === appCtx.ENV.EARTH;
@@ -279,9 +238,7 @@ export async function reloadEarthWorldSession(options = {}) {
 
   showEarthResumeLoad();
   try {
-    if (switchEnv && typeof appCtx.switchEnv === 'function' && appCtx.ENV?.EARTH) {
-      appCtx.switchEnv(appCtx.ENV.EARTH);
-    }
+    if (shouldSwitchEnv && appCtx.ENV?.EARTH) commitEnvironment(appCtx.ENV.EARTH, { source: 'earth_reload' });
     await restoreEarthActorOwnership();
     appCtx.loadingScreenMode = 'earth';
     normalizeEarthSelection();
@@ -295,7 +252,7 @@ export async function reloadEarthWorldSession(options = {}) {
     }
     if (!isCurrent()) return { aborted: true, resumed: false };
     const resolved = restorePoseFromSession();
-    await finalizeEarthResume(resolved);
+    if (!await finalizeEarthResume(resolved, isCurrent)) return { aborted: true, resumed: false };
 
     return {
       resumed: false,
@@ -308,7 +265,7 @@ export async function reloadEarthWorldSession(options = {}) {
 
 export async function resumeEarthWorldSession(options = {}) {
   const transitionDurationMs = Number.isFinite(options.transitionDurationMs) ? options.transitionDurationMs : 350;
-  const switchEnv = options.switchEnv !== false;
+  const shouldSwitchEnv = options.switchEnv !== false;
   const isCurrent = () => {
     if (typeof options.isCurrent === 'function' && !options.isCurrent()) return false;
     return !appCtx.ENV?.EARTH || typeof appCtx.getEnv !== 'function' || appCtx.getEnv() === appCtx.ENV.EARTH;
@@ -316,9 +273,7 @@ export async function resumeEarthWorldSession(options = {}) {
 
   showEarthResumeLoad();
   try {
-    if (switchEnv && typeof appCtx.switchEnv === 'function' && appCtx.ENV?.EARTH) {
-      appCtx.switchEnv(appCtx.ENV.EARTH);
-    }
+    if (shouldSwitchEnv && appCtx.ENV?.EARTH) commitEnvironment(appCtx.ENV.EARTH, { source: 'earth_resume' });
     await restoreEarthActorOwnership();
     appCtx.loadingScreenMode = 'earth';
 
@@ -337,9 +292,8 @@ export async function resumeEarthWorldSession(options = {}) {
     }
     if (!isCurrent()) return { aborted: true, resumed: false };
 
-    restoreEarthSceneMeshes();
     const resolved = restorePoseFromSession();
-    await finalizeEarthResume(resolved);
+    if (!await finalizeEarthResume(resolved, isCurrent)) return { aborted: true, resumed: false };
 
     return {
       resumed: true,
@@ -349,3 +303,16 @@ export async function resumeEarthWorldSession(options = {}) {
     finishEarthResumeLoad();
   }
 }
+
+registerEnvironmentLifecycle(appCtx.ENV.EARTH, {
+  exitSync: () => captureEarthWorldSession(),
+  snapshot: () => ({
+    active: appCtx.getEnv?.() === appCtx.ENV.EARTH,
+    buildings: Array.isArray(appCtx.buildings) ? appCtx.buildings.length : 0,
+    loaded: hasLoadedEarthWorld(),
+    roads: Array.isArray(appCtx.roads) ? appCtx.roads.length : 0,
+    selection: String(appCtx.selLoc || ''),
+    streamingActive: !!appCtx.earthStreaming?.active,
+    worldLoading: !!appCtx.worldLoading
+  })
+});

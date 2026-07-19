@@ -110,11 +110,7 @@ function latLonToWorldSafe(lat, lon) {
 }
 
 function getGroundYAt(x, z) {
-  if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
-    const y = appCtx.elevationWorldYAtWorldXZ(x, z);
-    if (isFiniteNumber(y)) return y;
-  }
-  return 0;
+  return appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y ?? 0;
 }
 
 function isInsideFootprintSafe(x, z, pts) {

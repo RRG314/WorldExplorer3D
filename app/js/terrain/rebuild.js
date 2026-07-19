@@ -1,10 +1,10 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { buildIndexedBatchMesh } from "../road-render.js?v=1";
+import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-render.js?v=2";
 import { detectRoadIntersections } from "./intersections.js?v=1";
 import {
   buildFeatureRibbonEdges,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=12";
+} from "../structure-semantics.js?v=13";
 import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=2";
 
 const ROAD_SURFACE_BIAS = 0.08;
@@ -275,7 +275,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
       retainedRoadMeshes.push(mesh);
       return;
     }
-    appCtx.scene.remove(mesh);
+    mesh.parent?.remove?.(mesh);
     if (mesh.geometry) mesh.geometry.dispose();
     if (mesh.material && !mesh.userData?.sharedRoadMaterial) {
       if (Array.isArray(mesh.material)) {
@@ -295,7 +295,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
       retainedUrbanSurfaceMeshes.push(mesh);
       return;
     }
-    appCtx.scene.remove(mesh);
+    mesh.parent?.remove?.(mesh);
     if (mesh.geometry) mesh.geometry.dispose();
     if (mesh.material && !mesh.userData?.sharedUrbanSurfaceMaterial && typeof mesh.material.dispose === "function") {
       mesh.material.dispose();
@@ -434,14 +434,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
       }
     }
 
-    for (let i = 0; i < leftEdge.length; i++) {
-      verts.push(leftEdge[i].x, leftEdge[i].y, leftEdge[i].z);
-      verts.push(rightEdge[i].x, rightEdge[i].y, rightEdge[i].z);
-      if (i < leftEdge.length - 1) {
-        const vi = i * 2;
-        indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
-      }
-    }
+    appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
     appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
 
     const terrainMode = road?.structureSemantics?.terrainMode;
@@ -540,7 +533,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
     indices: roadMainBatchIdx,
     material: roadMat,
     renderOrder: 2,
-    userData: { isRoadBatch: true, sharedRoadMaterial: true }
+    userData: { isRoadBatch: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
   });
   buildIndexedBatchMesh({
     scene: appCtx.scene,
@@ -549,7 +542,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
     indices: roadSkirtBatchIdx,
     material: skirtMat,
     renderOrder: 1,
-    userData: { isRoadBatch: true, isRoadSkirt: true, sharedRoadMaterial: true }
+    userData: { isRoadBatch: true, isRoadSkirt: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
   });
   buildIndexedBatchMesh({
     scene: appCtx.scene,
@@ -558,7 +551,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
     indices: roadCapBatchIdx,
     material: capMat,
     renderOrder: 3,
-    userData: { isRoadBatch: true, isIntersectionCap: true, sharedRoadMaterial: true }
+    userData: { isRoadBatch: true, isIntersectionCap: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
   });
   if (sidewalkBatchVerts.length > 0 && sidewalkBatchIdx.length > 0) {
     const geo = new THREE.BufferGeometry();

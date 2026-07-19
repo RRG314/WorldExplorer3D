@@ -4,7 +4,7 @@ import {
   buildFeatureStations,
   buildFeatureTransitionAnchors,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=12";
+} from "../structure-semantics.js?v=13";
 
 const runtime = {
   enableLinearFeatures: () => false,

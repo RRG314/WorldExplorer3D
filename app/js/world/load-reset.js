@@ -5,7 +5,8 @@ function disposeSceneMeshes(meshes, options = {}) {
   const skipSharedUrbanSurfaceMaterial = options.skipSharedUrbanSurfaceMaterial === true;
   meshes.forEach((mesh) => {
     if (!mesh) return;
-    appCtx.scene.remove(mesh);
+    if (typeof mesh.removeFromParent === 'function') mesh.removeFromParent();
+    else mesh.parent?.remove?.(mesh);
     mesh.traverse?.((object) => {
       object.geometry?.dispose?.();
       if (!object.material) return;
@@ -30,7 +31,7 @@ export function hideEarthSceneMeshes() {
     arr.forEach((mesh) => {
       if (!mesh) return;
       mesh.visible = false;
-      if (mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
+      if (mesh.parent === appCtx.scene) mesh.parent.remove(mesh);
     });
   };
   hideList(appCtx.roadMeshes);
@@ -50,6 +51,7 @@ export function resetWorldForReload(options = {}) {
   const clearBuildingSpatialIndex = typeof options.clearBuildingSpatialIndex === 'function' ? options.clearBuildingSpatialIndex : () => {};
   const resetWorldFurnitureCaches = typeof options.resetWorldFurnitureCaches === 'function' ? options.resetWorldFurnitureCaches : () => {};
 
+  appCtx.cancelWorldSurfaceSync?.();
   if (typeof appCtx.resetEarthStreaming === 'function') {
     appCtx.resetEarthStreaming('full_world_reload');
   }
@@ -126,6 +128,10 @@ export function resetWorldForReload(options = {}) {
   appCtx.osmTreeNodes = [];
   appCtx.osmTreeRows = [];
   appCtx._worldLoadNodes = null;
+
+  // The scene root is the authoritative owner. This removes any deferred or
+  // previously batched world objects that are no longer reachable from a list.
+  appCtx.clearEarthWorldSceneObjects?.();
 
   resetWorldFurnitureCaches();
   if (typeof appCtx.clearWindowTextureCache === 'function') {

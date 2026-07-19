@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=12";
-import { createWorldSpawnSurfaceApi } from "./spawn-surface.js?v=2";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=13";
+import { createWorldSpawnSurfaceApi } from "./spawn-surface.js?v=3";
 
 let worldSpawnDeps = {
   buildingContainingPoint: () => null,
@@ -45,7 +45,7 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
   const hasExplicitFeetY = Number.isFinite(options.feetY);
   const actorFeetY = hasExplicitFeetY ? options.feetY : walkBaseY;
   const collisionBaseY = hasExplicitFeetY ? actorFeetY : terrainY;
-  const nearestRoad = typeof worldSpawnDeps.findNearestRoad === "function" ? worldSpawnDeps.findNearestRoad(x, z, {
+  const nearestRoad = !options.skipRoadQuery && typeof worldSpawnDeps.findNearestRoad === "function" ? worldSpawnDeps.findNearestRoad(x, z, {
     y: actorFeetY + 1.2,
     maxVerticalDelta: 12
   }) : null;
@@ -102,7 +102,7 @@ function evaluateDriveSpawnCandidate(x, z, options = {}) {
 
   const desiredFeetY = Number.isFinite(options.feetY) ? options.feetY : NaN;
   const actorFeetY = Number.isFinite(desiredFeetY) ? desiredFeetY : terrainY;
-  const nearestRoad = typeof worldSpawnDeps.findNearestRoad === "function" ? worldSpawnDeps.findNearestRoad(x, z, {
+  const nearestRoad = !options.skipRoadQuery && typeof worldSpawnDeps.findNearestRoad === "function" ? worldSpawnDeps.findNearestRoad(x, z, {
     y: actorFeetY + 1.2,
     maxVerticalDelta: 18
   }) : null;
@@ -179,6 +179,27 @@ function searchNearestSafeGroundSpawn(targetX, targetZ, options = {}) {
   }
 
   return best;
+}
+
+function searchNearestSafeDriveGroundSpawn(targetX, targetZ, options = {}) {
+  const maxRadius = Number.isFinite(options.maxRadius) ? Math.max(8, options.maxRadius) : 36;
+  for (let radius = 4; radius <= maxRadius; radius += 4) {
+    const steps = Math.max(8, Math.round(radius * 0.8));
+    for (let i = 0; i < steps; i += 1) {
+      const theta = i / steps * Math.PI * 2;
+      const candidate = evaluateDriveSpawnCandidate(
+        targetX + Math.cos(theta) * radius,
+        targetZ + Math.sin(theta) * radius,
+        {
+          angle: options.angle,
+          skipRoadQuery: true,
+          source: 'local_drive_ground'
+        }
+      );
+      if (candidate.valid) return candidate;
+    }
+  }
+  return null;
 }
 
 function findGradeSeparatedRoadAt(x, z) {
@@ -363,6 +384,40 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
   return null;
 }
 
+function resolveProjectedRoadSpawn(targetX, targetZ, options = {}) {
+  if (typeof worldSpawnDeps.findNearestRoad !== 'function') return null;
+  const maxDistance = Number.isFinite(options.maxDistance) ? Math.max(8, options.maxDistance) : 220;
+  const nearest = worldSpawnDeps.findNearestRoad(targetX, targetZ, {
+    y: Number.isFinite(options.feetY) ? options.feetY + 1.2 : NaN,
+    maxVerticalDelta: 18
+  });
+  const road = nearest?.road;
+  if (!road || !worldSpawnDeps.isVehicleRoad(road) || Number(nearest.dist) > maxDistance) return null;
+  const point = { x: Number(nearest.pt?.x), z: Number(nearest.pt?.z) };
+  if (!Number.isFinite(point.x) || !Number.isFinite(point.z)) return null;
+  let nearestPointIndex = 0;
+  let nearestPointDistance = Infinity;
+  for (let i = 0; i < road.pts.length; i += 1) {
+    const distance = Math.hypot(point.x - road.pts[i].x, point.z - road.pts[i].z);
+    if (distance < nearestPointDistance) {
+      nearestPointDistance = distance;
+      nearestPointIndex = i;
+    }
+  }
+  const angle = resolveRoadHeading(road, nearestPointIndex, options.angle);
+  const evaluated = evaluateDriveSpawnCandidate(point.x, point.z, {
+    angle,
+    feetY: options.feetY,
+    requireRoad: true,
+    source: 'projected_road'
+  });
+  if (!evaluated.valid) return null;
+  const departure = spawnDepartureAssessment(point.x, point.z, angle, 'drive');
+  if (!departure.valid) return null;
+  if (departure.reverseHeading) evaluated.angle += Math.PI;
+  return evaluated;
+}
+
 function fallbackResolvedSpawn(mode = "drive", options = {}) {
   const x = finiteNumberOr(options.x, 0);
   const z = finiteNumberOr(options.z, 0);
@@ -422,7 +477,17 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     source: options.source || "direct"
   });
 
-  const roadFallback = searchNearestSafeRoadSpawn(x, z, {
+  const projectedRoad = resolveProjectedRoadSpawn(x, z, {
+    angle,
+    feetY: options.feetY,
+    maxDistance: options.maxRoadDistance
+  });
+  const localGroundFallback = options.fastLocalFallback === true && !projectedRoad ?
+    searchNearestSafeDriveGroundSpawn(x, z, {
+      angle,
+      maxRadius: options.maxGroundRadius
+    }) : null;
+  const roadFallback = projectedRoad || localGroundFallback || searchNearestSafeRoadSpawn(x, z, {
     mode: "drive",
     angle,
     feetY: options.feetY,

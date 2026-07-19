@@ -7,7 +7,12 @@ export async function captureViewport(page, filePath) {
     const ctx = mod?.ctx || {};
     const camera = ctx.camera;
     const nearbyMeshes = [];
+    const roadBatchSummary = {};
     ctx.scene?.traverse?.((object) => {
+      if (object?.isMesh && object.userData?.isRoadBatch) {
+        const key = `${object.parent?.name || object.parent?.type || 'unknown'}:${Number(object.userData.worldLoadSequence || 0)}`;
+        roadBatchSummary[key] = Number(roadBatchSummary[key] || 0) + 1;
+      }
       if (!camera || !object?.isMesh || object.visible === false || !object.geometry) return;
       object.geometry.computeBoundingBox?.();
       const bounds = object.geometry.boundingBox;
@@ -18,11 +23,24 @@ export async function captureViewport(page, filePath) {
       object.geometry.computeBoundingSphere?.();
       nearbyMeshes.push({
         name: object.name || '(unnamed)',
+        parent: object.parent?.name || object.parent?.type || '(unnamed)',
+        ancestry: (() => {
+          const names = [];
+          let current = object;
+          while (current && names.length < 6) {
+            names.push(current.name || current.type || '(unnamed)');
+            current = current.parent;
+          }
+          return names;
+        })(),
         distance: Number(distance.toFixed(2)),
         radius: Number(Number(object.geometry.boundingSphere?.radius || 0).toFixed(1)),
         terrain: !!object.userData?.isTerrainMesh,
         landuseType: object.userData?.landuseType || null,
-        roadBatch: !!object.userData?.roadBatch
+        roadBatch: !!(object.userData?.roadBatch || object.userData?.isRoadBatch),
+        structureVisual: !!object.userData?.structureVisual,
+        groundPlane: !!object.userData?.isGroundPlane,
+        userDataKeys: Object.keys(object.userData || {}).sort()
       });
     });
     return {
@@ -36,6 +54,8 @@ export async function captureViewport(page, filePath) {
         meshY: Number(Number(ctx.carMesh?.position?.y || 0).toFixed(2)),
         onRoad: !!ctx.car?.onRoad
       },
+      lastEarthWorldSceneClear: ctx.lastEarthWorldSceneClear || null,
+      roadBatchSummary,
       nearbyMeshes: nearbyMeshes.sort((a, b) => a.distance - b.distance).slice(0, 20)
     };
   });

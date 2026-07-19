@@ -59,8 +59,12 @@ function maybeRetireInitialEarthWorld(actor, snapshot) {
   if (appCtx.initialEarthWorldRetired || !actor) return false;
   const protectedRadius = Math.max(9000, (Number(appCtx.initialEarthDetailRadius) || INITIAL_DETAIL_RADIUS) * 4);
   if (Math.hypot(Number(actor.x) || 0, Number(actor.z) || 0) < protectedRadius) return false;
-  const vectorLayer = snapshot?.layers?.['osm-vector'];
-  if (Number(vectorLayer?.loaded || 0) < 6 || Number(vectorLayer?.pending || 0) > 2) return false;
+  const vectorLayer = snapshot?.layers?.['global-vector'];
+  if (
+    vectorLayer?.centerLoaded !== true ||
+    Number(vectorLayer?.loadedNearCenter || 0) < 6 ||
+    Number(vectorLayer?.pending || 0) > 2
+  ) return false;
   return retireInitialEarthWorld();
 }
 

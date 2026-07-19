@@ -9,6 +9,9 @@ const state = {
   pitch: 0,
   roll: 0,
   speed: 0,
+  vx: 0,
+  vy: 0,
+  vz: 0,
   throttle: 0,
   climbRate: 0,
   airborne: false,
@@ -162,9 +165,7 @@ function buildingRoofSurfaceAt(x, z, terrainY) {
 }
 
 function groundSurfaceAt(x, z, options = {}) {
-  let terrainY = appCtx.terrainMeshHeightAt?.(x, z);
-  if (!Number.isFinite(terrainY)) terrainY = appCtx.elevationWorldYAtWorldXZ?.(x, z);
-  if (!Number.isFinite(terrainY)) terrainY = 0;
+  const terrainY = appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y ?? 0;
   let surface = { y: terrainY, kind: 'terrain', building: null };
   if (options.includeRoad !== false) {
     const nearest = appCtx.findNearestRoad?.(x, z, { y: state.y, maxVerticalDelta: 80 });
@@ -230,6 +231,9 @@ function startPlaneMode(options = {}) {
   state.throttle = clamp(Number(options.throttle) || 0, 0, 1);
   state.airborne = options.airborne === true || state.y > groundY + 1.4;
   state.climbRate = 0;
+  state.vx = 0;
+  state.vy = 0;
+  state.vz = 0;
   state.cameraYaw = 0;
   state.cameraPitch = 0;
   state.cameraLookTimer = 0;
@@ -249,6 +253,9 @@ function stopPlaneMode(options = {}) {
   state.speed = 0;
   state.throttle = 0;
   state.climbRate = 0;
+  state.vx = 0;
+  state.vy = 0;
+  state.vz = 0;
 
   if (targetMode === 'drone') return exitState;
 
@@ -264,7 +271,8 @@ function stopPlaneMode(options = {}) {
     preserveElevatedSurface: landedOnRoof,
     allowBuildingRoof: landedOnRoof,
     maxRoadDistance: 180,
-    maxGroundRadius: 80,
+    maxGroundRadius: 36,
+    fastLocalFallback: true,
     source: 'plane_exit'
   });
   if (resolved && typeof appCtx.applyResolvedWorldSpawn === 'function') {
@@ -308,25 +316,28 @@ function buildingImpactAt(x, y, z) {
 
 function updatePlane(dt) {
   if (!state.active) return false;
+  if (dt > 1 / 30) {
+    const steps = Math.ceil(dt / (1 / 45));
+    const stepDt = dt / steps;
+    for (let i = 0; i < steps; i += 1) updatePlane(stepDt);
+    return true;
+  }
   const previousX = state.x;
+  const previousY = state.y;
   const previousZ = state.z;
-  const pitchDown = !!appCtx.keys.ArrowUp;
-  const pitchUp = !!appCtx.keys.ArrowDown;
-  const left = !!appCtx.keys.ArrowLeft;
-  const right = !!appCtx.keys.ArrowRight;
-  const throttleUp = !!(appCtx.keys.ShiftLeft || appCtx.keys.ShiftRight);
-  const throttleDown = !!(appCtx.keys.ControlLeft || appCtx.keys.ControlRight);
-  const brake = !!appCtx.keys.Space;
+  const actions = appCtx.readControlActions?.('plane') || {};
+  const pitchInput = Number(actions.pitch) || 0;
+  const rollInput = Number(actions.roll) || 0;
+  const throttleAdjust = Number(actions.throttleAdjust) || 0;
+  const brake = Number(actions.brake) > 0.05;
 
-  state.throttle = clamp(state.throttle + ((throttleUp ? 1 : 0) - (throttleDown ? 1 : 0)) * dt * 0.58, 0, 1);
-  if (!state.airborne && pitchUp) state.throttle = Math.max(state.throttle, Math.min(0.82, state.throttle + dt * 0.42));
+  state.throttle = clamp(state.throttle + throttleAdjust * dt * 0.66, 0, 1);
+  if (!state.airborne && pitchInput > 0.2) state.throttle = Math.max(state.throttle, Math.min(0.82, state.throttle + dt * 0.42));
   const targetSpeed = state.throttle * 58;
   const speedRate = state.airborne ? 0.72 : 1.35;
   state.speed = damp(state.speed, targetSpeed, speedRate, dt);
   if (brake && !state.airborne) state.speed *= Math.exp(-5.8 * dt);
 
-  const pitchInput = (pitchUp ? 1 : 0) - (pitchDown ? 1 : 0);
-  const rollInput = (left ? 1 : 0) - (right ? 1 : 0);
   const groundY = samplePlaneSurface(dt);
 
   if (!state.airborne) {
@@ -341,11 +352,14 @@ function updatePlane(dt) {
     }
   } else {
     const controlAuthority = clamp(state.speed / 20, 0.3, 1.25);
-    state.pitch = damp(state.pitch, pitchInput * 0.42, 2.15 * controlAuthority, dt);
-    state.roll = damp(state.roll, rollInput * 0.78, 2.6 * controlAuthority, dt);
-    state.yaw += Math.sin(state.roll) * dt * (0.5 + controlAuthority * 0.52);
+    const stallBlend = clamp((13 - state.speed) / 5, 0, 1);
+    const pitchTarget = pitchInput * 0.52 - stallBlend * 0.18;
+    state.pitch = damp(state.pitch, pitchTarget, 2.35 * controlAuthority, dt);
+    state.roll = damp(state.roll, rollInput * 0.88, 2.8 * controlAuthority, dt);
+    state.yaw += Math.sin(state.roll) * dt * (0.55 + controlAuthority * 0.58);
     const liftBalance = clamp((state.speed - 15) * 0.09, -2.4, 2.8);
-    const desiredClimb = Math.sin(state.pitch) * state.speed + liftBalance - 0.8;
+    const stallSink = stallBlend * (2.2 + (13 - state.speed) * 0.32);
+    const desiredClimb = Math.sin(state.pitch) * state.speed + liftBalance - 0.8 - stallSink;
     state.climbRate = damp(state.climbRate, desiredClimb, 1.6, dt);
     state.y += state.climbRate * dt;
     if (state.y <= groundY + 0.72) {
@@ -379,6 +393,10 @@ function updatePlane(dt) {
   const localGround = groundY;
   state.y = clamp(state.y, localGround + 0.72, localGround + 1400);
   if (state.airborne && state.y <= localGround + 0.73) state.airborne = false;
+  const elapsed = Math.max(0.001, dt);
+  state.vx = (state.x - previousX) / elapsed;
+  state.vy = (state.y - previousY) / elapsed;
+  state.vz = (state.z - previousZ) / elapsed;
   state.contactKind = surfaceSample.kind;
   state.contactBuildingId = String(surfaceSample.building?.sourceBuildingId || '');
 
@@ -390,13 +408,14 @@ function updatePlane(dt) {
 function applyPlaneCamera(dt) {
   if (!state.active || !appCtx.camera) return false;
   const lookSpeed = 1.8 * dt;
-  const manualLook = !!(appCtx.keys.KeyA || appCtx.keys.KeyD || appCtx.keys.KeyW || appCtx.keys.KeyS);
+  const actions = appCtx.readControlActions?.('plane') || {};
+  const lookYaw = Number(actions.lookYaw) || 0;
+  const lookPitch = Number(actions.lookPitch) || 0;
+  const manualLook = Math.abs(lookYaw) > 0.05 || Math.abs(lookPitch) > 0.05;
   if (manualLook) state.cameraLookTimer = 1.6;
   else state.cameraLookTimer = Math.max(0, state.cameraLookTimer - dt);
-  if (appCtx.keys.KeyA) state.cameraYaw += lookSpeed;
-  if (appCtx.keys.KeyD) state.cameraYaw -= lookSpeed;
-  if (appCtx.keys.KeyW) state.cameraPitch += lookSpeed;
-  if (appCtx.keys.KeyS) state.cameraPitch -= lookSpeed;
+  state.cameraYaw += lookYaw * lookSpeed;
+  state.cameraPitch += lookPitch * lookSpeed;
   if (!manualLook && state.cameraLookTimer <= 0 && appCtx.camMode === 0) {
     state.cameraYaw = damp(state.cameraYaw, 0, 2.7, dt);
     state.cameraPitch = damp(state.cameraPitch, 0, 2.7, dt);
@@ -440,6 +459,9 @@ function getPlaneSnapshot() {
     pitch: state.pitch,
     roll: state.roll,
     speed: state.speed,
+    vx: state.vx,
+    vy: state.vy,
+    vz: state.vz,
     throttle: state.throttle,
     airborne: state.airborne,
     contactKind: state.contactKind,

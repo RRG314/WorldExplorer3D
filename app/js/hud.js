@@ -413,7 +413,7 @@ function updateHUD() {
 
   if (appCtx.planeMode?.active) {
     const plane = appCtx.planeMode;
-    const groundY = appCtx.terrainMeshHeightAt?.(plane.x, plane.z) ?? appCtx.elevationWorldYAtWorldXZ?.(plane.x, plane.z) ?? 0;
+    const groundY = appCtx.SurfaceQuery?.terrainAt?.(plane.x, plane.z)?.position?.y ?? 0;
     const altitude = Math.max(0, Math.round(plane.y - groundY));
     const mph = Math.max(0, Math.round(plane.speed * 2.237));
     setHudUnitLabels('MPH', 'ALT');
@@ -449,7 +449,7 @@ function updateHUD() {
         groundY = hits[0].point.y;
       }
     } else if (appCtx.terrainEnabled) {
-      groundY = appCtx.elevationWorldYAtWorldXZ(appCtx.drone.x, appCtx.drone.z);
+      groundY = appCtx.SurfaceQuery?.terrainAt?.(appCtx.drone.x, appCtx.drone.z)?.position?.y ?? 0;
     }
 
     const altitudeMeters = Math.max(0, Math.round(appCtx.drone.y - groundY));

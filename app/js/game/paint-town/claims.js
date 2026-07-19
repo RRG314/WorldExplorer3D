@@ -58,12 +58,7 @@ function buildingContainsPoint(building, x, z) {
 function getBuildingRoofY(building, x, z) {
   if (Number.isFinite(building?.maxY)) return building.maxY;
   let baseY = Number.isFinite(building?.baseY) ? building.baseY : NaN;
-  if (!Number.isFinite(baseY) && typeof appCtx.terrainMeshHeightAt === "function") {
-    baseY = appCtx.terrainMeshHeightAt(x, z);
-  }
-  if (!Number.isFinite(baseY) && typeof appCtx.elevationWorldYAtWorldXZ === "function") {
-    baseY = appCtx.elevationWorldYAtWorldXZ(x, z);
-  }
+  if (!Number.isFinite(baseY)) baseY = appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y;
   if (!Number.isFinite(baseY) && Number.isFinite(building?.minY)) {
     baseY = building.minY;
   }

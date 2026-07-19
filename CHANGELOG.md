@@ -1,5 +1,77 @@
 # Changelog
 
+## [Unreleased]
+
+### Changed
+
+- Split Earth source ownership by play profile: detailed location sessions retain OSM data, while continuous streaming consumes normalized Overture transportation, building, base land-cover, and water tiles.
+- Routed continuous Earth cold starts directly through a scheduler-owned Overture neighborhood bootstrap; continuous sessions no longer construct and later retire a temporary OSM world.
+- Replaced source-order road/building truncation with deterministic transportation-class priorities and spatially distributed building budgets.
+- Made continuous building budgets distance-aware: the active tile retains up to 3,600 mapped footprints, adjacent tiles retain 1,200, and diagonal context tiles retain 900, preserving nearby city completeness without applying the full cost to the entire streaming ring.
+- Accelerated and instrumented retired streaming-geometry disposal with deduplication and bounded time slices, eliminating the disposal backlog seen during repeated long-distance travel.
+- Removed full-animation-frame barriers from streamed vector construction, reducing a 300-feature road build from roughly 38 seconds to milliseconds in the browser profiling fixture.
+- Gated initial-world retirement and Earth-origin rebasing on current-tile neighborhood coverage, with decoded terrain pruning after streamed chunk and terrain-mesh handoffs.
+- Added source/tile provenance to streamed terrain, road, path, cycleway, building, land-cover, vegetation, and water meshes so visual regressions can be traced to their owning dataset and renderer.
+- Conformed at-grade road edges and streamed building foundations to sampled terrain while preserving engineered bridge, ramp, and tunnel profiles.
+- Split Overture transportation rendering by vehicle, pedestrian, and cycle surface class instead of drawing every segment as dark asphalt; expanded normalized Overture land-use coverage for parks, managed land, recreation, residential, education, and related classes.
+- Removed Esri aerial photography from the playable 3D Earth surface and replaced it with a crisp ESA WorldCover semantic baseline under authoritative OSM/Overture roads, water, and land-use geometry.
+- Made streamed road ribbons consistently upward-facing across OSM, Overture, terrain rebuilds, fallback roads, elevated connectors, and painted markings so roads remain visible from walking and driving cameras.
+- Consolidated terrain-tile texture ownership and disposal for the semantic baseline, preventing classified textures from accumulating across repeated continuous-world travel.
+- Removed legacy grass normal/roughness detail from continuous semantic terrain, including the pre-classification loading state, so continuous ground never falls back to a satellite-like textured presentation.
+- Added shared surface-composition precedence across OSM location and Overture continuous land classes, eliminating coplanar land-use conflicts and dark triangular surface fans.
+- Made vector geometry acquire retryable DEM coverage immediately before construction and include the vector-tile buffer around nominal bounds, preventing steep-terrain roads near tile edges from being baked at sea level.
+- Added a continuous-renderer browser gate covering Overture neighborhood handoff, terrain contact, semantic surface ownership, mesh provenance, actor continuity, and walking/drone screenshots.
+- Replaced the tracked Firebase Hosting mirror with a generated, ignored `dist/` artifact.
+- Added content-hashed hosting manifests tied to the Git commit, Firebase environment, and canonical source fingerprint.
+- Updated preview, runtime, release, and integration-test tooling to verify the generated artifact instead of copying and comparing a second source tree.
+- Added a strict hosted-source reachability audit and included it in runtime verification.
+- Consolidated title/loading/planetary transition media onto the canonical landing assets without changing their pixels.
+- Reserved OSM-focused data access for high-detail location play in the architecture plan; continuous travel will use globally tiled sources through the same world and surface contracts.
+- Added a session coordinator as the sole environment-state commit owner plus cancellable lifecycle scopes for transition/session timers.
+- Routed Earth, Ocean, Moon, Mars, Space, title, and menu environment commits through the coordinator; Space delayed callbacks now expire with their owning flight session.
+- Registered lifecycle adapters for all five environments with owner-specific exit hooks and debug resource snapshots; title exits now stop Space and Ocean through the coordinator instead of cross-calling their internals.
+- Separated Ocean resource teardown from environment selection so a superseded Ocean session cannot redirect a newer planetary transition back to Earth.
+- Removed cross-environment Space/Ocean teardown calls from planetary, menu, title, and boat-transfer modules; callers now request an owner-controlled exit from the coordinator.
+- Added a repeated lifecycle plateau check covering three Space and three Ocean launches, adapter/render-loop shutdown, GPU resource stability, renderer disposal, and duplicate-canvas prevention.
+- Added the first normalized Earth surface contract with explicit OSM-location/global-continuous source profiles, surface kinds, provenance/confidence, vertical-datum metadata, traversal capabilities, and tile descriptors; current `GroundHeight` behavior remains the compatibility backend.
+- Migrated spawn, walking, driving, drone/plane altitude, navigation, blocks, editor/activity placement, interiors, memories, flower markers, and Paint Town surface reads to the normalized query boundary with loaded-world height parity checks.
+- Added explicit stream-layer source profiles and normalized loading/loaded tile descriptors so diagnostics expose OSM-backed continuous-world layers instead of mislabeling them as global-source data.
+- Bounded editor/multiplayer overlay readiness in the browser audit so an unavailable external overlay service cannot hang verification indefinitely.
+- Corrected inland-water vertical datum ownership so lakes and canal reservoirs retain real elevation while open ocean remains at sea level; water polygons remain individually reprojectable and boat mode no longer hides whole shoreline terrain tiles.
+- Normalized water areas and waterways behind one identity/datum contract used by location rendering, continuous rendering, terrain reprojection, boat physics, and surface queries; delayed DEM updates now reclassify elevated lakes atomically instead of leaving stale ocean physics.
+- Made custom globe starts enter the mapped boat flow when the selected point is valid water, preserving that successful boat start through title finalization and supporting a boat/submarine/boat round trip at the same geographic water body.
+- Added water acceptance contracts for Atlantic open ocean, Lake Tahoe, and Gatun Lake covering classification, elevation bands, flat water geometry, boat/surface alignment, and rendered shoreline context.
+- Kept title launch disabled until the complete runtime boot sequence is registered, preventing touch users from entering a partially initialized app.
+- Added a mobile-only initial location budget that reduces source radius and geometry counts before construction while leaving desktop location detail and continuous-world scheduling unchanged.
+- Strengthened iPhone/Android acceptance to use the real title launch, wait for a visibly completed world transaction, verify reachable dock controls and mode handoffs, and retain portrait/landscape screenshots.
+- Expanded the single release gate to cover hosted-source reachability, normalized surfaces, Overture adapters and budgets, renderer provenance, continuous-world visuals, and repeated environment lifecycle plateaus.
+- Corrected transportation ribbon winding so OSM location roads, Overture continuous roads, terrain-rebuilt roads, fallback roads, elevated connectors, and painted markings render from the gameplay side instead of being culled from walking and driving views.
+- Made the Earth scene root authoritative during location reloads and replaced unsupported Three.js detach calls with compatible parent removal, preventing deferred city geometry from surviving into later ocean, mountain, or rural worlds.
+- Corrected subgrade road-height selection so tunnel profiles win over overlapping surface roads; mapped, rendered, and playable Holland Tunnel floor heights now agree.
+- Added explicit bridge/tunnel gameplay probes and representative visual acceptance across New York, Monaco, Atlantic open ocean, the Swiss Alps, Sahara, Amazon, Everglades, Iowa farmland, Lake Tahoe, Golden Gate Bridge, Holland Tunnel, and Panama Canal.
+- Completed Phase 5 Earth-realism acceptance while preserving the semantic ground and aerial presentation: city density, biome-specific terrain, blue navigable water, elevated lake datum, shore context, bridge rails, and tunnel traversal were checked in rendered browser frames.
+- Added `.mjs` MIME support to the local preview server and aligned runtime module/cache identity for deterministic visual candidate checks.
+- Added one semantic keyboard, touch, and gamepad action layer across walking, driving, drone, plane, boat, and submarine travel, with a shared active-actor pose/velocity contract for streaming prediction.
+- Moved plane throttle to `X/Z`, retained inverted arrow-key pitch, and claimed gameplay keys from the browser without intercepting form controls, eliminating Control-plus-arrow browser shortcut conflicts during flight.
+- Added bounded low-frame-rate physics stepping for cars, planes, and boats plus fast surface-safe plane handoffs to walking, driving, and drone modes.
+- Made synthetic open-ocean traversal a recentering navigation envelope while preserving mapped shoreline authority, so boats can continue across unmapped ocean instead of being pinned to their entry point.
+- Replaced generated faint-star filler on Earth, Moon, Mars, Sol space, and universe frames with a bundled ESA Gaia DR3 bright/nearby-star sample; display color remains an explicitly documented BP-RP approximation.
+- Added a closable desktop/mobile universe navigator that releases flight controls on close, supports Escape and outside-click dismissal, and closes automatically when travel begins.
+- Added catalog-framed black-hole destinations and an explicitly labeled speculative M87* to Sagittarius A* wormhole gameplay route; the endpoints remain observed catalog positions while the connection is not presented as science.
+- Restored asteroid- and Kuiper-belt placement to their proportional 2.06-3.27 AU and 30-50 AU ranges, with an always-visible logarithmic Sol distance inset instead of physically compressing the two regions together.
+- Replaced the procedural Apollo 11 crater/noise surface with an LROC NAC 2 m/post, LOLA-controlled DTM and matching orthophoto converted to bounded browser assets; lunar traversal and landing equipment now query that same measured mesh at 1:1 vertical scale.
+- Replaced the Mars sky box with a camera-centered atmosphere dome, removed synthetic volcano/noise relief from Olympus Mons, and retained the bundled MOLA-derived elevation field as the terrain owner.
+- Made direct Moon title launch await the environment transition contract, eliminating its false launch-rejected error while the surface loaded successfully.
+- Made Mars entry playable before the optional rover GLB finishes downloading; a request-owned fallback rover now permits the environment commit immediately, while a late model response may only replace the vehicle that requested it.
+- Made globe-selector launches transactional and request-owned, with strict coordinate validation, duplicate-launch prevention, and visible recovery when an Earth, Moon, or Space transition fails.
+- Reworked the globe selector into one responsive scroll surface with mobile-safe globe gestures, reachable actions, populated nearby locations, and a valid Baltimore fallback instead of an unconfigured zero-coordinate start.
+- Removed unimplemented Live Earth preview layers and labeled the remaining derived and modeled layers honestly; fixed their shared render context so satellite, earthquake, weather, storm, ocean-state, ship, and aircraft views update without breaking the selector.
+
+### Removed
+
+- Removed the duplicated `public/` source mirror, obsolete mirror sync/verification scripts, and the tracked generated Itch wrapper archive.
+- Removed an unreachable pre-refactor root simulation tree (about 31,000 lines), its unused styles/media, and one superseded activity-editor event module.
+
 ## [3.0.0] - 2026-07-15
 
 ### Added

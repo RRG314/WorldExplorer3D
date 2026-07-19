@@ -7,7 +7,7 @@ import {
   sampleDynamicWaterAt,
   waterSurfaceBaseYAt,
   waterSurfaceYAt
-} from "./water-query.js?v=12";
+} from "./water-query.js?v=14";
 import { clamp, stepBoatSpring } from "./dynamics.js?v=1";
 import { resetBoatFoamFx, updateBoatFoamFx } from "./foam-effects.js?v=1";
 import { customizeBoatWaterPatchShader } from "./water-patch-shader.js?v=1";
@@ -215,13 +215,6 @@ function syncBoatTerrainSuppression() {
     active &&
     offshore > 160 &&
     (waterKind === 'open_ocean' || waterKind === 'coastal');
-  const terrainRadius = active ?
-    farOffshoreWater ? clamp(offshore * 4.2, 900, 5600) :
-    waterKind === 'open_ocean' ? clamp(offshore * 0.68, 120, 320) :
-    waterKind === 'coastal' ? clamp(offshore * 0.54, 80, 210) :
-    waterKind === 'lake' ? clamp(offshore * 0.44, 54, 150) :
-    0 :
-    0;
   const clutterRadius = active ?
     farOffshoreWater ? clamp(offshore * 4.5, 1080, 6200) :
     waterKind === 'open_ocean' ? clamp(offshore * 0.92, 160, 460) :
@@ -236,6 +229,10 @@ function syncBoatTerrainSuppression() {
   );
 
   const terrainMeshes = Array.isArray(appCtx.terrainGroup?.children) ? appCtx.terrainGroup.children : [];
+  const groundPlanes = [];
+  (appCtx.earthSceneRoot || appCtx.scene)?.traverse?.((object) => {
+    if (object?.userData?.isGroundPlane) groundPlanes.push(object);
+  });
   const urbanSurfaceMeshes = Array.isArray(appCtx.urbanSurfaceMeshes) ? appCtx.urbanSurfaceMeshes : [];
   const landuseMeshes = Array.isArray(appCtx.landuseMeshes) ? appCtx.landuseMeshes : [];
   const streetFurnitureMeshes = Array.isArray(appCtx.streetFurnitureMeshes) ? appCtx.streetFurnitureMeshes : [];
@@ -290,16 +287,21 @@ function syncBoatTerrainSuppression() {
     return landuseType === 'water' || surfaceVariant === 'water' || surfaceVariant === 'ice';
   };
 
-  for (let i = 0; i < terrainMeshes.length; i++) {
-    const mesh = terrainMeshes[i];
-    if (!mesh) continue;
-    if (!active || terrainRadius <= 0) {
+  const suppressFallbackGround = farOffshoreWater;
+  for (let i = 0; i < groundPlanes.length; i++) {
+    const mesh = groundPlanes[i];
+    if (!suppressFallbackGround) {
       clearSuppression(mesh, true);
       continue;
     }
-    const suppressed = overlapSuppressed(mesh, terrainRadius);
-    mesh.userData.boatSuppressed = suppressed;
-    mesh.visible = !suppressed;
+    mesh.userData.boatSuppressed = true;
+    mesh.visible = false;
+  }
+
+  for (let i = 0; i < terrainMeshes.length; i++) {
+    const mesh = terrainMeshes[i];
+    if (!mesh) continue;
+    clearSuppression(mesh, true);
   }
 
   for (let i = 0; i < landuseMeshes.length; i++) {

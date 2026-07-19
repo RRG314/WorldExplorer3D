@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { appendUpwardRibbonGeometry } from "../road-render.js?v=2";
 import { generateStreetFurniture } from "./furniture.js?v=8";
 
 export function recordWorldLoadWarning(loadMetrics, label, err) {
@@ -106,7 +107,7 @@ export function createSyntheticFallbackWorld(options = {}) {
     if (!Array.isArray(arr)) return;
     arr.forEach((mesh) => {
       if (!mesh) return;
-      if (mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
+      mesh.parent?.remove?.(mesh);
       if (mesh.geometry && typeof mesh.geometry.dispose === 'function') mesh.geometry.dispose();
       if (mesh.material) {
         if (Array.isArray(mesh.material)) {
@@ -186,6 +187,8 @@ export function createSyntheticFallbackWorld(options = {}) {
     const hw = width / 2;
     const verts = [];
     const indices = [];
+    const leftEdge = [];
+    const rightEdge = [];
     for (let i = 0; i < pts.length; i++) {
       const p = pts[i];
       const dx = pts[1].x - pts[0].x;
@@ -195,13 +198,10 @@ export function createSyntheticFallbackWorld(options = {}) {
       const nz = dx / len;
       const y1 = appCtx.elevationWorldYAtWorldXZ(p.x + nx * hw, p.z + nz * hw) + 0.3;
       const y2 = appCtx.elevationWorldYAtWorldXZ(p.x - nx * hw, p.z - nz * hw) + 0.3;
-      verts.push(p.x + nx * hw, y1, p.z + nz * hw);
-      verts.push(p.x - nx * hw, y2, p.z - nz * hw);
-      if (i < pts.length - 1) {
-        const vi = i * 2;
-        indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
-      }
+      leftEdge.push({ x: p.x + nx * hw, y: y1, z: p.z + nz * hw });
+      rightEdge.push({ x: p.x - nx * hw, y: y2, z: p.z - nz * hw });
     }
+    appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
     const geometry = new THREE.BufferGeometry();
     geometry.setAttribute('position', new THREE.Float32BufferAttribute(verts, 3));
     geometry.setIndex(indices);

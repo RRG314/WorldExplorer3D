@@ -165,7 +165,7 @@ export const ASTEROID_BELT = {
   outerAU: 3.27, // outer edge
   centerAU: 2.7, // belt center
   count: 3000, // number of particle asteroids
-  visualScale: 0.72,
+  visualScale: 1,
   maxInclination: 20, // degrees - most belt asteroids
   maxEccentricity: 0.3,
   // Kirkwood gaps (orbital resonances with Jupiter)
@@ -183,7 +183,7 @@ export const KUIPER_BELT = {
   outerAU: 50.0,
   centerAU: 40.0,
   count: 3600,
-  visualScale: 0.05,
+  visualScale: 1,
   maxInclination: 35,
   maxEccentricity: 0.35
 };

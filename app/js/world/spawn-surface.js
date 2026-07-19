@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=12";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=13";
 
 function createWorldSpawnSurfaceApi(context) {
   const { getDeps } = context;
@@ -25,35 +25,21 @@ function createWorldSpawnSurfaceApi(context) {
       }
     }
 
-    const sample = typeof appCtx.terrainMeshHeightAt === "function"
-      ? appCtx.terrainMeshHeightAt(x, z)
-      : typeof appCtx.elevationWorldYAtWorldXZ === "function"
-        ? appCtx.elevationWorldYAtWorldXZ(x, z)
-        : 0;
+    const sample = appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y;
     return finiteNumberOr(sample, 0);
   }
 
   function driveCenterYAtWorld(x, z, preferRoad = false) {
     if (appCtx.onMoon) return terrainYAtWorld(x, z) + 1.2;
-    if (
-      typeof appCtx.GroundHeight !== "undefined" &&
-      appCtx.GroundHeight &&
-      typeof appCtx.GroundHeight.carCenterY === "function"
-    ) {
-      return finiteNumberOr(appCtx.GroundHeight.carCenterY(x, z, preferRoad, 1.2), terrainYAtWorld(x, z) + 1.2);
-    }
+    const sample = appCtx.SurfaceQuery?.driveAt?.(x, z, { preferRoad });
+    if (Number.isFinite(sample?.position?.y)) return sample.position.y + 1.2;
     return terrainYAtWorld(x, z) + 1.2;
   }
 
   function walkBaseYAtWorld(x, z) {
     if (appCtx.onMoon) return terrainYAtWorld(x, z);
-    if (
-      typeof appCtx.GroundHeight !== "undefined" &&
-      appCtx.GroundHeight &&
-      typeof appCtx.GroundHeight.walkSurfaceY === "function"
-    ) {
-      return finiteNumberOr(appCtx.GroundHeight.walkSurfaceY(x, z), terrainYAtWorld(x, z));
-    }
+    const sample = appCtx.SurfaceQuery?.walkAt?.(x, z);
+    if (Number.isFinite(sample?.position?.y)) return sample.position.y;
     return terrainYAtWorld(x, z);
   }
 

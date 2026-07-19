@@ -160,7 +160,9 @@ export const WORLD_TEST_LOCATIONS = [
     lon: -40,
     label: 'North Atlantic Ocean',
     category: 'open_ocean_custom',
-    expectedStart: 'water'
+    expectedStart: 'water',
+    expectedWaterKind: 'open_ocean',
+    expectedWaterElevationRange: [-2, 2]
   },
   {
     id: 'swiss_alps_custom',
@@ -256,6 +258,8 @@ export const WORLD_TEST_LOCATIONS = [
     label: 'Lake Tahoe',
     category: 'mountain_lake_custom',
     expectedStart: 'water',
+    expectedWaterKind: 'lake',
+    expectedWaterElevationRange: [1500, 2200],
     minimumWaterAreas: 1
   },
   {
@@ -286,6 +290,8 @@ export const WORLD_TEST_LOCATIONS = [
     label: 'Gatun Lake, Panama Canal',
     category: 'canal_reservoir_tropical_custom',
     expectedStart: 'water',
+    expectedWaterKind: 'lake',
+    expectedWaterElevationRange: [15, 40],
     minimumWaterAreas: 1
   }
 ];

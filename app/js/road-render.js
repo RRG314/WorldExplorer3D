@@ -1,3 +1,20 @@
+function appendUpwardRibbonGeometry(leftEdge = [], rightEdge = [], vertices = [], indices = []) {
+  const count = Math.min(leftEdge.length, rightEdge.length);
+  if (count < 2) return false;
+
+  const start = vertices.length / 3;
+  for (let i = 0; i < count; i += 1) {
+    const left = leftEdge[i];
+    const right = rightEdge[i];
+    vertices.push(left.x, left.y, left.z, right.x, right.y, right.z);
+    if (i < count - 1) {
+      const vi = start + i * 2;
+      indices.push(vi, vi + 2, vi + 1, vi + 1, vi + 2, vi + 3);
+    }
+  }
+  return true;
+}
+
 function createRoadSurfaceMaterials({
   asphaltTex = null,
   asphaltNormal = null,
@@ -179,6 +196,7 @@ function buildIndexedBatchMesh({
 }
 
 export {
+  appendUpwardRibbonGeometry,
   buildIndexedBatchMesh,
   createRoadSurfaceMaterials,
   disposeRoadSurfaceMaterials,

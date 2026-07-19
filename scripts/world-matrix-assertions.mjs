@@ -13,10 +13,12 @@ export function assertWorldMatrixLocation(spec, result) {
   }
   if (spec.expectedRoadStructure) {
     assert(result.structurePresentation?.roads?.[spec.expectedRoadStructure] > 0, `${spec.id}: expected mapped ${spec.expectedRoadStructure} roads ${JSON.stringify(result.structurePresentation?.roads)}`);
-    assert(result.initialSpawn?.structureKind === spec.expectedRoadStructure, `${spec.id}: player did not start on the mapped ${spec.expectedRoadStructure} surface ${JSON.stringify(result.initialSpawn)}`);
-    if (result.initialSpawn?.terrainMode === 'elevated') {
-      assert(result.landPresentation?.walkerY > result.landPresentation?.nearestRoad?.surfaceMinY, `${spec.id}: player ended below the elevated road deck ${JSON.stringify(result.landPresentation)}`);
-    }
+    const probe = result.customStructureProbe;
+    assert(probe?.kind === spec.expectedRoadStructure, `${spec.id}: mapped ${spec.expectedRoadStructure} probe was not created ${JSON.stringify(probe)}`);
+    assert(probe?.applied, `${spec.id}: gameplay actor was not placed on the mapped ${spec.expectedRoadStructure}`);
+    assert(probe?.nearestKind === spec.expectedRoadStructure, `${spec.id}: structure probe resolved to the wrong traversal surface ${JSON.stringify(probe)}`);
+    assert(Number.isFinite(probe?.surfaceY) && Number.isFinite(probe?.renderedY), `${spec.id}: structure probe has no rendered surface ${JSON.stringify(probe)}`);
+    assert(probe.renderedDelta <= 2.5, `${spec.id}: mapped and rendered ${spec.expectedRoadStructure} surfaces diverged ${JSON.stringify(probe)}`);
   }
   if (spec.minimumWaterAreas) assert(result.counts.waterAreas >= spec.minimumWaterAreas, `${spec.id}: expected mapped water areas`);
   if (spec.minimumBuildings) {
@@ -119,9 +121,23 @@ export function assertWorldMatrixLocation(spec, result) {
     assert(result.boatPresentation?.meshVisible, `${spec.id}: boat mesh is not visible`);
     assert(result.boatPresentation?.cameraMode === 0, `${spec.id}: boat did not start in chase camera mode`);
     assert(result.boatPresentation?.cameraDistance >= 8 && result.boatPresentation?.cameraDistance <= 30, `${spec.id}: boat camera is outside the usable chase range ${JSON.stringify(result.boatPresentation)}`);
+    assert(
+      Math.abs(result.boatPresentation.boatY - result.boatPresentation.waterPatchY) <= 2,
+      `${spec.id}: boat and rendered water surface elevations diverged ${JSON.stringify(result.boatPresentation)}`
+    );
+    assert(result.boatPresentation.maxWaterGeometryYSpan <= 0.25, `${spec.id}: area water is still draped over terrain ${JSON.stringify(result.boatPresentation)}`);
+    if (spec.expectedWaterKind) {
+      assert(result.boatPresentation.waterKind === spec.expectedWaterKind, `${spec.id}: expected ${spec.expectedWaterKind} water, received ${result.boatPresentation.waterKind}`);
+    }
+    if (Array.isArray(spec.expectedWaterElevationRange)) {
+      const [minimumY, maximumY] = spec.expectedWaterElevationRange;
+      assert(
+        result.boatPresentation.waterPatchY >= minimumY && result.boatPresentation.waterPatchY <= maximumY,
+        `${spec.id}: rendered water elevation is outside the expected range ${JSON.stringify({ expected: spec.expectedWaterElevationRange, presentation: result.boatPresentation })}`
+      );
+    }
     if (result.boatPresentation?.waterKind === 'open_ocean') {
       assert(Math.abs(result.boatPresentation.boatY) <= 12 && Math.abs(result.boatPresentation.waterPatchY) <= 12, `${spec.id}: open-ocean surface used seabed elevation ${JSON.stringify(result.boatPresentation)}`);
-      assert(result.boatPresentation.maxWaterGeometryYSpan <= 0.25, `${spec.id}: area water is still draped over seabed terrain ${JSON.stringify(result.boatPresentation)}`);
     }
     return;
   }

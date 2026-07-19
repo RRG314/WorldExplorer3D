@@ -1,6 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { normalizeAngle, siderealTime, toDays } from "../astro.js?v=1";
 import { createRoundStarMaterial } from "./star-point-material.js?v=2";
+import { createGaiaSkyLayers } from "./gaia-catalog.js?v=1";
 
 const STARFIELD_RADIUS = 5000;
 const _skyMatrix = new THREE.Matrix4();
@@ -123,47 +124,16 @@ export function createStarField() {
 
   group.add(appCtx.allConstellationLines);
 
-  const faintStarCount = 3600;
-  const faintStarGeometry = new THREE.BufferGeometry();
-  const positions = [];
-
-  let sequence = 0x6d2b79f5;
-  const random = () => {
-    sequence += 0x6d2b79f5;
-    let value = sequence;
-    value = Math.imul(value ^ value >>> 15, value | 1);
-    value ^= value + Math.imul(value ^ value >>> 7, value | 61);
-    return ((value ^ value >>> 14) >>> 0) / 4294967296;
-  };
-  for (let i = 0; i < faintStarCount; i++) {
-    const theta = random() * Math.PI * 2;
-    const phi = Math.acos(random() * 2 - 1);
-
-    const x = STARFIELD_RADIUS * Math.sin(phi) * Math.cos(theta);
-    const y = STARFIELD_RADIUS * Math.sin(phi) * Math.sin(theta);
-    const z = STARFIELD_RADIUS * Math.cos(phi);
-
-    positions.push(x, y, z);
-
-  }
-
-  faintStarGeometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-
-  const faintStarMaterial = createRoundStarMaterial({
-    size: 4.2,
-    sizeAttenuation: false,
-    vertexColors: false,
-    transparent: true,
-    opacity: 0.92,
-    fog: false,
-    blending: THREE.AdditiveBlending,
-    toneMapped: false
+  const gaiaSky = createGaiaSkyLayers({
+    name: 'ESA Gaia DR3 planetary sky',
+    radius: STARFIELD_RADIUS,
+    brightName: 'Gaia DR3 supplemental bright stars',
+    faintName: FAINT_STAR_LAYER_NAME,
+    brightSize: 4.8,
+    faintSize: 3.1
   });
-
-  const faintStars = new THREE.Points(faintStarGeometry, faintStarMaterial);
-  faintStars.name = FAINT_STAR_LAYER_NAME;
-  faintStars.userData.baseOpacity = faintStarMaterial.opacity;
-  group.add(faintStars);
+  group.add(gaiaSky.group);
+  group.userData.gaiaSky = gaiaSky;
   group.visible = false;
   appCtx.scene.add(group);
   return group;

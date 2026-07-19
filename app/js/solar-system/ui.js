@@ -186,6 +186,64 @@ export function createToggleButton(ctx) {
   container.appendChild(marsBtn);
 
   document.body.appendChild(container);
+  createSolarSystemScale(ctx);
+}
+
+function createSolarSystemScale(ctx) {
+  if (document.getElementById('solarSystemScale')) return;
+  const panel = document.createElement('aside');
+  panel.id = 'solarSystemScale';
+  panel.className = 'solar-system-scale';
+  panel.setAttribute('aria-label', 'Solar System distance scale showing asteroid and Kuiper belts');
+  const canvas = document.createElement('canvas');
+  canvas.width = 380;
+  canvas.height = 184;
+  canvas.setAttribute('aria-hidden', 'true');
+  panel.appendChild(canvas);
+  document.body.appendChild(panel);
+
+  const draw = canvas.getContext('2d');
+  if (!draw) return;
+  draw.scale(2, 2);
+  const left = 14;
+  const right = 178;
+  const axisY = 44;
+  const xForAu = (au) => left + Math.log10(Math.max(0, au) + 1) / Math.log10(51) * (right - left);
+  draw.fillStyle = 'rgba(7, 12, 25, 0.93)';
+  draw.fillRect(0, 0, 190, 92);
+  draw.fillStyle = '#a9bdd9';
+  draw.font = '600 8px Inter, sans-serif';
+  draw.fillText('SOLAR SYSTEM DISTANCE | LOG AU', 10, 13);
+  draw.strokeStyle = '#526987';
+  draw.lineWidth = 1;
+  draw.beginPath();
+  draw.moveTo(left, axisY);
+  draw.lineTo(right, axisY);
+  draw.stroke();
+
+  const drawBand = (inner, outer, color, label, labelY) => {
+    const x1 = xForAu(inner);
+    const x2 = xForAu(outer);
+    draw.fillStyle = color;
+    draw.fillRect(x1, axisY - 9, Math.max(3, x2 - x1), 18);
+    draw.fillStyle = '#eef6ff';
+    draw.fillText(`${label} ${inner.toFixed(1)}-${outer.toFixed(1)} AU`, Math.min(x1, 91), labelY);
+  };
+  drawBand(ctx.ASTEROID_BELT.innerAU, ctx.ASTEROID_BELT.outerAU, '#b9875b', 'ASTEROID', 67);
+  drawBand(ctx.KUIPER_BELT.innerAU, ctx.KUIPER_BELT.outerAU, '#6eafe3', 'KUIPER', 80);
+
+  draw.fillStyle = '#ffd76a';
+  draw.beginPath();
+  draw.arc(left, axisY, 4, 0, Math.PI * 2);
+  draw.fill();
+  [1, 5.2, 30, 50].forEach((au) => {
+    const x = xForAu(au);
+    draw.strokeStyle = 'rgba(174, 197, 226, 0.5)';
+    draw.beginPath();
+    draw.moveTo(x, axisY - 4);
+    draw.lineTo(x, axisY + 4);
+    draw.stroke();
+  });
 }
 
 export function toggleSolarSystem(ctx) {
@@ -205,6 +263,8 @@ export function showSolarSystemUI(ctx) {
   if (returnBtn) returnBtn.textContent = 'RETURN TO EARTH';
   if (landMoonBtn) landMoonBtn.textContent = 'LAND ON MOON';
   if (landMarsBtn) landMarsBtn.textContent = 'LAND ON MARS';
+  const scale = document.getElementById('solarSystemScale');
+  if (scale) scale.style.display = 'block';
   ctx?.appCtx?.showUniverseUI?.();
 }
 
@@ -212,6 +272,8 @@ export function hideSolarSystemUI(ctx) {
   const container = document.getElementById('ssToggleContainer');
   if (container) container.style.display = 'none';
   if (ctx?.appCtx?.spaceFlight) ctx.appCtx.spaceFlight.overviewMode = false;
+  const scale = document.getElementById('solarSystemScale');
+  if (scale) scale.style.display = 'none';
   ctx?.appCtx?.hideUniverseUI?.();
   hidePlanetInfo(ctx);
 }

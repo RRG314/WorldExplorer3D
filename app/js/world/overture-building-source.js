@@ -1,41 +1,14 @@
 import {
   fetchShortbreadBuildingData,
-  getVectorTileLib,
   vectorTileRangeForBounds
 } from "./shortbread-source.js?v=6";
+import {
+  OVERTURE_RELEASE,
+  fetchOvertureThemeTile,
+  overtureThemeArchiveUrl
+} from './overture-tile-source.js?v=1';
 
 const OVERTURE_BUILDING_ZOOM = 14;
-const OVERTURE_FETCH_TIMEOUT_MS = 20000;
-const OVERTURE_RELEASE = '2026-06-17.0';
-const DEFAULT_ARCHIVE_URL =
-  `https://overturemaps-extras-us-west-2.s3.us-west-2.amazonaws.com/tiles/${OVERTURE_RELEASE}/buildings.pmtiles`;
-
-let pmtilesLibPromise = null;
-let archive = null;
-let archiveUrl = '';
-
-function configuredArchiveUrl() {
-  const configured =
-    globalThis.WORLD_EXPLORER_CONFIG?.overtureBuildingsPmtilesUrl ||
-    globalThis.document?.querySelector?.('meta[name="worldexplorer-overture-buildings"]')?.content;
-  return String(configured || DEFAULT_ARCHIVE_URL).trim();
-}
-
-async function getArchive() {
-  const url = configuredArchiveUrl();
-  if (archive && archiveUrl === url) return archive;
-  if (!pmtilesLibPromise) {
-    pmtilesLibPromise = import('https://cdn.jsdelivr.net/npm/pmtiles@4.4.1/+esm')
-      .catch((error) => {
-        pmtilesLibPromise = null;
-        throw error;
-      });
-  }
-  const { PMTiles } = await pmtilesLibPromise;
-  archive = new PMTiles(url);
-  archiveUrl = url;
-  return archive;
-}
 
 function geometryParts(geometry) {
   if (geometry?.type === 'Polygon') {
@@ -247,19 +220,6 @@ function orderedTileCoordinates(range, centerLat, centerLon) {
   return coordinates;
 }
 
-async function fetchArchiveTile(pmtiles, z, x, y) {
-  const controller = new AbortController();
-  const timeoutId = globalThis.setTimeout(() => controller.abort(), OVERTURE_FETCH_TIMEOUT_MS);
-  try {
-    const result = await pmtiles.getZxy(z, x, y, controller.signal);
-    if (!result?.data) return null;
-    const { Pbf, VectorTile } = await getVectorTileLib();
-    return { tile: new VectorTile(new Pbf(result.data)), z, x, y };
-  } finally {
-    globalThis.clearTimeout(timeoutId);
-  }
-}
-
 function fulfilledTiles(settled) {
   return settled
     .filter((entry) => entry.status === 'fulfilled' && entry.value)
@@ -272,9 +232,9 @@ function isTimeoutFailure(entry) {
   return reason?.name === 'AbortError' || /abort|timeout/i.test(String(reason?.message || reason || ''));
 }
 
-async function fetchArchiveTileBatch(pmtiles, coordinates) {
+async function fetchArchiveTileBatch(coordinates) {
   return Promise.allSettled(
-    coordinates.map(({ x, y }) => fetchArchiveTile(pmtiles, OVERTURE_BUILDING_ZOOM, x, y))
+    coordinates.map(({ x, y }) => fetchOvertureThemeTile('buildings', OVERTURE_BUILDING_ZOOM, x, y))
   );
 }
 
@@ -296,10 +256,9 @@ export async function fetchOvertureBuildingData(options = {}) {
     bounds.maxLon,
     OVERTURE_BUILDING_ZOOM
   );
-  const pmtiles = await getArchive();
   const coordinates = orderedTileCoordinates(range, lat, lon);
   let attempts = 1;
-  let settled = await fetchArchiveTileBatch(pmtiles, coordinates);
+  let settled = await fetchArchiveTileBatch(coordinates);
   let tiles = fulfilledTiles(settled);
   const fastTransientFailure = tiles.length === 0 &&
     settled.some((entry) => entry.status === 'rejected') &&
@@ -307,7 +266,7 @@ export async function fetchOvertureBuildingData(options = {}) {
   if (fastTransientFailure) {
     attempts += 1;
     await new Promise((resolve) => globalThis.setTimeout(resolve, 250));
-    settled = await fetchArchiveTileBatch(pmtiles, coordinates);
+    settled = await fetchArchiveTileBatch(coordinates);
     tiles = fulfilledTiles(settled);
   }
   if (tiles.length === 0) {
@@ -322,7 +281,7 @@ export async function fetchOvertureBuildingData(options = {}) {
   return {
     elements: converted.elements,
     _overpassSource: 'overture-buildings-pmtiles',
-    _overpassEndpoint: configuredArchiveUrl(),
+    _overpassEndpoint: overtureThemeArchiveUrl('buildings'),
     _overpassCacheAgeMs: 0,
     _overtureBuildings: {
       release: OVERTURE_RELEASE,

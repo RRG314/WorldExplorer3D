@@ -91,8 +91,8 @@ const MOBILE_CONTROL_PROFILES = {
       right: { channel: 'earth', key: 'KeyD' }
     },
     actions: [
-      { label: 'Throttle +', binding: { channel: 'earth', key: 'ShiftLeft' } },
-      { label: 'Throttle -', binding: { channel: 'earth', key: 'ControlLeft' } }
+      { label: 'Throttle +', binding: { channel: 'earth', key: 'KeyX' } },
+      { label: 'Throttle -', binding: { channel: 'earth', key: 'KeyZ' } }
     ]
   },
   rocket: {
@@ -112,18 +112,18 @@ const MOBILE_CONTROL_PROFILES = {
   },
   ocean: {
     moveLabel: 'Sub Move',
-    lookLabel: 'Depth',
+    lookLabel: 'Look',
     move: {
+      up: { channel: 'earth', key: 'ArrowUp' },
+      down: { channel: 'earth', key: 'ArrowDown' },
+      left: { channel: 'earth', key: 'ArrowLeft' },
+      right: { channel: 'earth', key: 'ArrowRight' }
+    },
+    look: {
       up: { channel: 'earth', key: 'KeyW' },
       down: { channel: 'earth', key: 'KeyS' },
       left: { channel: 'earth', key: 'KeyA' },
       right: { channel: 'earth', key: 'KeyD' }
-    },
-    look: {
-      up: { channel: 'earth', key: 'Space' },
-      down: { channel: 'earth', key: 'ShiftLeft' },
-      left: { channel: 'earth', key: 'ArrowLeft' },
-      right: { channel: 'earth', key: 'ArrowRight' }
     },
     actions: [
       { label: 'Ascend', binding: { channel: 'earth', key: 'Space' } },

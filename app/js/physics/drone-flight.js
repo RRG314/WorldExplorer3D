@@ -11,23 +11,24 @@ function planetarySurface() {
 }
 
 export function updateDrone(dt) {
+  const previousX = appCtx.drone.x;
+  const previousY = appCtx.drone.y;
+  const previousZ = appCtx.drone.z;
+  const actions = appCtx.readControlActions?.('drone') || {};
   const moveSpeed = appCtx.drone.speed * dt;
   const turnSpeed = 2 * dt;
-  const forward = (appCtx.keys.ArrowUp ? 1 : 0) - (appCtx.keys.ArrowDown ? 1 : 0);
-  const turn = (appCtx.keys.ArrowLeft ? 1 : 0) - (appCtx.keys.ArrowRight ? 1 : 0);
+  const forward = Number(actions.move) || 0;
+  const turn = Number(actions.turn) || 0;
 
   appCtx.drone.yaw += turn * turnSpeed;
-  if (appCtx.keys.KeyW) appCtx.drone.pitch += turnSpeed;
-  if (appCtx.keys.KeyS) appCtx.drone.pitch -= turnSpeed;
+  appCtx.drone.pitch += (Number(actions.lookPitch) || 0) * turnSpeed;
   appCtx.drone.cameraYawOffset = Number(appCtx.drone.cameraYawOffset) || 0;
-  if (appCtx.keys.KeyA) appCtx.drone.cameraYawOffset += turnSpeed;
-  if (appCtx.keys.KeyD) appCtx.drone.cameraYawOffset -= turnSpeed;
+  appCtx.drone.cameraYawOffset += (Number(actions.lookYaw) || 0) * turnSpeed;
   appCtx.drone.cameraYawOffset = wrapYaw(appCtx.drone.cameraYawOffset);
 
   appCtx.drone.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, appCtx.drone.pitch));
   appCtx.drone.roll = 0;
-  const vertical = (appCtx.keys.Space ? 1 : 0) -
-    (appCtx.keys.ControlLeft || appCtx.keys.ControlRight || appCtx.keys.ShiftLeft || appCtx.keys.ShiftRight ? 1 : 0);
+  const vertical = Number(actions.vertical) || 0;
   appCtx.drone.x += -Math.sin(appCtx.drone.yaw) * forward * moveSpeed;
   appCtx.drone.y += vertical * moveSpeed;
   appCtx.drone.z += -Math.cos(appCtx.drone.yaw) * forward * moveSpeed;
@@ -41,14 +42,21 @@ export function updateDrone(dt) {
     const hit = raycaster.intersectObject(surface, false)[0];
     if (Number.isFinite(hit?.point?.y)) groundY = hit.point.y;
   } else if (appCtx.terrainEnabled) {
-    groundY = appCtx.elevationWorldYAtWorldXZ(appCtx.drone.x, appCtx.drone.z);
+    groundY = appCtx.SurfaceQuery?.terrainAt?.(appCtx.drone.x, appCtx.drone.z)?.position?.y ?? 0;
   }
 
   const planetary = !!surface;
   const minAltitude = groundY + 5;
   const maxAltitude = planetary ? groundY + 2000 : groundY + 400;
   appCtx.drone.y = Math.max(minAltitude, Math.min(maxAltitude, appCtx.drone.y));
-  const worldLimit = planetary ? 4800 : 5000;
-  appCtx.drone.x = Math.max(-worldLimit, Math.min(worldLimit, appCtx.drone.x));
-  appCtx.drone.z = Math.max(-worldLimit, Math.min(worldLimit, appCtx.drone.z));
+  const earthLimit = Number(appCtx.SurfaceQuery?.getTraversalBounds?.().horizontalRadius);
+  const worldLimit = planetary ? 4800 : Number.isFinite(earthLimit) && earthLimit > 0 ? earthLimit : null;
+  if (worldLimit !== null) {
+    appCtx.drone.x = Math.max(-worldLimit, Math.min(worldLimit, appCtx.drone.x));
+    appCtx.drone.z = Math.max(-worldLimit, Math.min(worldLimit, appCtx.drone.z));
+  }
+  const elapsed = Math.max(0.001, dt);
+  appCtx.drone.vx = (appCtx.drone.x - previousX) / elapsed;
+  appCtx.drone.vy = (appCtx.drone.y - previousY) / elapsed;
+  appCtx.drone.vz = (appCtx.drone.z - previousZ) / elapsed;
 }

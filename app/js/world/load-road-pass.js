@@ -1,14 +1,15 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
+  appendUpwardRibbonGeometry,
   buildIndexedBatchMesh,
   createRoadSurfaceMaterials
-} from "../road-render.js?v=1";
+} from "../road-render.js?v=2";
 import { estimateDriveableRoadWidth } from "./load-style.js?v=1";
 import {
   buildFeatureRibbonEdges,
   shouldRenderRoadSkirts,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=12";
+} from "../structure-semantics.js?v=13";
 import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=6";
 
 const ROAD_SURFACE_BIAS = 0.08;
@@ -133,14 +134,7 @@ export function buildRoadGeometryPass(options = {}) {
     const { leftEdge, rightEdge } = buildFeatureRibbonEdges(roadFeature, subdPts, hw, worldBaseTerrainY, {
       surfaceBias: ROAD_SURFACE_BIAS
     });
-    for (let i = 0; i < leftEdge.length; i++) {
-      verts.push(leftEdge[i].x, leftEdge[i].y, leftEdge[i].z);
-      verts.push(rightEdge[i].x, rightEdge[i].y, rightEdge[i].z);
-      if (i < leftEdge.length - 1) {
-        const vi = i * 2;
-        indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
-      }
-    }
+    appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
     appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
     loadMetrics.roads.vertices += verts.length / 3;
 
@@ -186,7 +180,7 @@ export function buildRoadGeometryPass(options = {}) {
               x + dx * len + nx * mw, y, z + dz * len + nz * mw,
               x + dx * len - nx * mw, y, z + dz * len - nz * mw
             );
-            markIdx.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
+            markIdx.push(vi, vi + 2, vi + 1, vi + 1, vi + 2, vi + 3);
           }
           segDist += dashLen + gapLen;
         }
@@ -206,7 +200,7 @@ export function buildRoadGeometryPass(options = {}) {
     indices: roadMainBatchIdx,
     material: roadMainMaterial,
     renderOrder: 2,
-    userData: { isRoadBatch: true, sharedRoadMaterial: true }
+    userData: { isRoadBatch: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
   });
   buildIndexedBatchMesh({
     scene: appCtx.scene,
@@ -215,7 +209,7 @@ export function buildRoadGeometryPass(options = {}) {
     indices: roadSkirtBatchIdx,
     material: roadSkirtMaterial,
     renderOrder: 1,
-    userData: { isRoadBatch: true, isRoadSkirt: true, sharedRoadMaterial: true }
+    userData: { isRoadBatch: true, isRoadSkirt: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
   });
   buildIndexedBatchMesh({
     scene: appCtx.scene,
@@ -224,7 +218,7 @@ export function buildRoadGeometryPass(options = {}) {
     indices: roadMarkBatchIdx,
     material: roadMarkMaterial,
     renderOrder: 3,
-    userData: { isRoadBatch: true, isRoadMarking: true, sharedRoadMaterial: true }
+    userData: { isRoadBatch: true, isRoadMarking: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
   });
 
   endLoadPhase('buildRoadGeometry');

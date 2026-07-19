@@ -2,7 +2,7 @@ import {
   createRoadSurfaceMaterials,
   disposeRoadSurfaceMaterials,
   roadSurfaceMaterialCacheKey
-} from "../road-render.js?v=1";
+} from "../road-render.js?v=2";
 
 function createTerrainMaterialCacheApi(deps = {}) {
   const { appCtx, terrainState } = deps;

@@ -1,5 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=10';
+import { alignStarFieldToBody } from '../sky/starfield-ui.js?v=11';
+import { ensurePlanetaryAtmosphere, updatePlanetaryAtmosphere } from './atmosphere-dome.js?v=1';
 
 const J2000_MS = Date.UTC(2000, 0, 1, 12, 0, 0);
 const DAY_MS = 86400000;
@@ -46,7 +47,8 @@ function bodyOrientation(body, date = new Date()) {
 }
 
 function setPlanetarySky(body, date = new Date()) {
-  const orientation = bodyOrientation(String(body || '').toLowerCase(), date);
+  const normalizedBody = String(body || '').toLowerCase();
+  const orientation = bodyOrientation(normalizedBody, date);
   if (!orientation || !appCtx.starField) return null;
   alignStarFieldToBody(orientation);
   appCtx.starField.visible = true;
@@ -57,8 +59,16 @@ function setPlanetarySky(body, date = new Date()) {
     child.material.opacity = Math.min(baseOpacity, orientation.starOpacity);
   });
   appCtx.planetarySkyOrientation = orientation;
+  const marsAtmosphere = ensurePlanetaryAtmosphere(appCtx.scene, 'mars');
+  if (marsAtmosphere) marsAtmosphere.visible = normalizedBody === 'mars';
   updatePlanetarySky();
   return orientation;
+}
+
+function clearPlanetarySky() {
+  const marsAtmosphere = appCtx.scene?.getObjectByName('Planetary atmosphere: mars');
+  if (marsAtmosphere) marsAtmosphere.visible = false;
+  appCtx.planetarySkyOrientation = null;
 }
 
 function updatePlanetarySky() {
@@ -67,8 +77,10 @@ function updatePlanetarySky() {
   if (env === appCtx.ENV?.MOON || env === appCtx.ENV?.MARS) {
     appCtx.starField.position.copy(appCtx.camera.position);
   }
+  const marsAtmosphere = appCtx.scene?.getObjectByName('Planetary atmosphere: mars');
+  updatePlanetaryAtmosphere(marsAtmosphere, appCtx.camera, appCtx.sun?.position);
 }
 
-Object.assign(appCtx, { bodyOrientation, setPlanetarySky, updatePlanetarySky });
+Object.assign(appCtx, { bodyOrientation, clearPlanetarySky, setPlanetarySky, updatePlanetarySky });
 
-export { bodyOrientation, setPlanetarySky, updatePlanetarySky };
+export { bodyOrientation, clearPlanetarySky, setPlanetarySky, updatePlanetarySky };

@@ -36,6 +36,12 @@ function createTerrainStreamingApi(deps = {}) {
     });
     if (obsolete.length > 0 || desiredTerrainMeshKeys.size > 0) {
       clearTerrainHeightCache();
+      const cacheSnapshot = typeof pruneTerrainTileCache === 'function'
+        ? pruneTerrainTileCache()
+        : typeof terrainTileCacheSnapshot === 'function' ? terrainTileCacheSnapshot() : null;
+      if (cacheSnapshot && typeof appCtx.setPerfLiveStat === 'function') {
+        appCtx.setPerfLiveStat('terrainCache', cacheSnapshot);
+      }
       if (appCtx.roads.length > 0 && !appCtx.onMoon) {
         requestWorldSurfaceSync({ source: "terrain_tiles_streamed" });
       }

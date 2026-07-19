@@ -13,6 +13,55 @@ const EARTH_MESH_LISTS = Object.freeze([
   'vegetationMeshes'
 ]);
 let lastOwnershipSignature = '';
+let earthSceneRoot = null;
+
+function disposeDetachedWorldObject(object) {
+  if (!object) return;
+  object.parent?.remove?.(object);
+  object.traverse?.((child) => {
+    child.geometry?.dispose?.();
+    if (!child.material) return;
+    const sharedMaterial = !!(
+      child.userData?.earthStreamingChunk ||
+      child.userData?.streamChunkKey ||
+      child.userData?.sharedRoadMaterial ||
+      child.userData?.sharedUrbanSurfaceMaterial
+    );
+    if (sharedMaterial) return;
+    if (Array.isArray(child.material)) child.material.forEach((material) => material?.dispose?.());
+    else child.material.dispose?.();
+  });
+}
+
+function isDirectWorldObject(object, trackedObjects) {
+  if (!object || trackedObjects.has(object)) return true;
+  const data = object.userData || {};
+  return !!(
+    data.isRoadBatch ||
+    data.isUrbanSurfaceBatch ||
+    data.isBuildingBatch ||
+    data.isLanduseBatch ||
+    data.isRoofDetail ||
+    data.isHistoricLandmark ||
+    data.isStreetFurniture ||
+    data.isVegetation ||
+    data.structureVisual ||
+    data.sourceBuildingId ||
+    data.landuseType
+  );
+}
+
+function ensureEarthSceneRoot() {
+  if (!appCtx.scene) return null;
+  if (earthSceneRoot?.parent !== appCtx.scene) {
+    earthSceneRoot = new THREE.Group();
+    earthSceneRoot.name = 'Earth Runtime Root';
+    earthSceneRoot.userData.environmentOwner = appCtx.ENV?.EARTH || 'EARTH';
+    appCtx.scene.add(earthSceneRoot);
+    appCtx.earthSceneRoot = earthSceneRoot;
+  }
+  return earthSceneRoot;
+}
 
 function sceneOwnershipSignature() {
   const listState = EARTH_MESH_LISTS.map((listName) => {
@@ -23,20 +72,9 @@ function sceneOwnershipSignature() {
   return `${appCtx.scene?.children?.length || 0}|${listState}`;
 }
 
-function setObjectInScene(object, visible) {
-  if (!object || !appCtx.scene) return;
-  object.visible = visible;
-  if (visible) {
-    if (!object.parent) {
-      const ownerParent = object.userData?.earthSceneOwnerParent;
-      const parent = ownerParent?.isObject3D ? ownerParent : appCtx.scene;
-      parent.add(object);
-    }
-  } else if (object.parent) {
-    object.userData = object.userData || {};
-    object.userData.earthSceneOwnerParent = object.parent;
-    object.parent.remove(object);
-  }
+function adoptEarthObject(object, root) {
+  if (!object || !root || object === root || object.parent === root) return;
+  if (!object.parent || object.parent === appCtx.scene) root.add(object);
 }
 
 function earthMeshVisibility(listName, mesh, visible) {
@@ -48,42 +86,75 @@ function earthMeshVisibility(listName, mesh, visible) {
 
 function setEarthSceneVisible(visible) {
   const shouldShow = !!visible;
-  setObjectInScene(appCtx.terrainGroup, shouldShow);
-  setObjectInScene(appCtx.cloudGroup, shouldShow);
-
-  EARTH_MESH_LISTS.forEach((listName) => {
-    const list = appCtx[listName];
-    if (!Array.isArray(list)) return;
-    list.forEach((mesh) => setObjectInScene(mesh, earthMeshVisibility(listName, mesh, shouldShow)));
-  });
-
-  appCtx.scene?.traverse?.((object) => {
-    if (object?.userData?.isGroundPlane) object.visible = shouldShow;
-  });
+  const root = ensureEarthSceneRoot();
+  if (!root) return false;
+  const signature = sceneOwnershipSignature();
+  if (signature !== lastOwnershipSignature) attachEarthSceneWithoutChangingLod();
+  if (shouldShow) {
+    ['landuseMeshes', 'poiMeshes'].forEach((listName) => {
+      const list = appCtx[listName];
+      if (!Array.isArray(list)) return;
+      list.forEach((mesh) => { if (mesh) mesh.visible = earthMeshVisibility(listName, mesh, true); });
+    });
+  }
+  root.visible = shouldShow;
   appCtx.earthSceneVisible = shouldShow;
   lastOwnershipSignature = sceneOwnershipSignature();
   return shouldShow;
 }
 
 function attachEarthSceneWithoutChangingLod() {
-  if (!appCtx.scene) return;
-  [appCtx.terrainGroup, appCtx.cloudGroup].forEach((object) => {
-    if (object && !object.parent) {
-      const ownerParent = object.userData?.earthSceneOwnerParent;
-      (ownerParent?.isObject3D ? ownerParent : appCtx.scene).add(object);
-    }
-  });
+  const root = ensureEarthSceneRoot();
+  if (!root) return;
+  [appCtx.terrainGroup, appCtx.cloudGroup].forEach((object) => adoptEarthObject(object, root));
   EARTH_MESH_LISTS.forEach((listName) => {
     const list = appCtx[listName];
     if (!Array.isArray(list)) return;
-    list.forEach((mesh) => {
-      if (mesh && !mesh.parent) {
-        const ownerParent = mesh.userData?.earthSceneOwnerParent;
-        (ownerParent?.isObject3D ? ownerParent : appCtx.scene).add(mesh);
-      }
-    });
+    list.forEach((mesh) => adoptEarthObject(mesh, root));
   });
+  const groundPlanes = appCtx.scene.children.filter((object) => object?.userData?.isGroundPlane);
+  groundPlanes.forEach((object) => adoptEarthObject(object, root));
   lastOwnershipSignature = sceneOwnershipSignature();
+}
+
+function clearEarthWorldSceneObjects() {
+  const root = appCtx.earthSceneRoot || earthSceneRoot;
+  const rootChildrenBefore = root?.children?.length || 0;
+  const sceneChildrenBefore = appCtx.scene?.children?.length || 0;
+  const persistent = new Set([appCtx.terrainGroup, appCtx.cloudGroup].filter(Boolean));
+  const trackedObjects = new Set();
+  EARTH_MESH_LISTS.forEach((listName) => {
+    appCtx[listName]?.forEach?.((object) => trackedObjects.add(object));
+  });
+
+  let removed = 0;
+  if (root) {
+    [...root.children].forEach((object) => {
+      if (persistent.has(object) || object?.userData?.isGroundPlane) return;
+      disposeDetachedWorldObject(object);
+      removed += 1;
+    });
+  }
+
+  [...(appCtx.scene?.children || [])].forEach((object) => {
+    if (object === root || persistent.has(object) || object?.userData?.isGroundPlane) return;
+    if (!isDirectWorldObject(object, trackedObjects)) return;
+    disposeDetachedWorldObject(object);
+    removed += 1;
+  });
+
+  lastOwnershipSignature = '';
+  appCtx.lastEarthWorldSceneClear = {
+    removed,
+    rootChildrenBefore,
+    rootChildrenAfter: root?.children?.length || 0,
+    sceneChildrenBefore,
+    sceneChildrenAfter: appCtx.scene?.children?.length || 0,
+    loadSequence: Number(appCtx._worldLoadSequence || 0),
+    location: appCtx.selLoc === 'custom' ? appCtx.customLoc?.name || 'Custom' : appCtx.selLoc || null,
+    clearedAt: Date.now()
+  };
+  return removed;
 }
 
 function enforceEnvironmentSceneOwnership() {
@@ -100,8 +171,9 @@ function enforceEnvironmentSceneOwnership() {
 }
 
 Object.assign(appCtx, {
+  clearEarthWorldSceneObjects,
   enforceEnvironmentSceneOwnership,
   setEarthSceneVisible
 });
 
-export { EARTH_MESH_LISTS, enforceEnvironmentSceneOwnership, setEarthSceneVisible };
+export { clearEarthWorldSceneObjects, EARTH_MESH_LISTS, enforceEnvironmentSceneOwnership, setEarthSceneVisible };

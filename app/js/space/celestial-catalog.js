@@ -1,9 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { createRoundStarMaterial } from '../sky/star-point-material.js?v=2';
+import { createGaiaSkyLayers } from '../sky/gaia-catalog.js?v=1';
 
 const CATALOG_RADIUS = 300000;
-const BACKDROP_MIN_RADIUS = 330000;
-const BACKDROP_DEPTH = 55000;
 
 function raDecToPosition(raHours, decDeg, radius = CATALOG_RADIUS) {
   const ra = Number(raHours) / 24 * Math.PI * 2;
@@ -13,42 +11,6 @@ function raDecToPosition(raHours, decDeg, radius = CATALOG_RADIUS) {
     radius * Math.sin(dec),
     radius * Math.cos(dec) * Math.sin(ra)
   );
-}
-
-function seededRandom(seed = 0x47414941) {
-  let state = seed >>> 0;
-  return () => {
-    state = (Math.imul(state, 1664525) + 1013904223) >>> 0;
-    return state / 4294967296;
-  };
-}
-
-function createDeterministicBackdrop() {
-  const random = seededRandom();
-  const positions = [];
-  for (let i = 0; i < 5200; i++) {
-    const theta = random() * Math.PI * 2;
-    const phi = Math.acos(2 * random() - 1);
-    const radius = BACKDROP_MIN_RADIUS + random() * BACKDROP_DEPTH;
-    const sinPhi = Math.sin(phi);
-    positions.push(
-      radius * sinPhi * Math.cos(theta),
-      radius * Math.cos(phi),
-      radius * sinPhi * Math.sin(theta)
-    );
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  const points = new THREE.Points(geometry, createRoundStarMaterial({
-    size: 2.6,
-    sizeAttenuation: false,
-    vertexColors: false,
-    transparent: true,
-    opacity: 0.96,
-    depthWrite: false
-  }));
-  points.name = 'Deterministic deep-space backdrop';
-  return points;
 }
 
 function createCatalogStars(group, catalog) {
@@ -134,7 +96,13 @@ function createSpaceCelestialCatalog(scene) {
   const group = new THREE.Group();
   group.name = 'Catalog celestial sphere';
   const catalog = { group, starEntries: [], constellationEntries: [] };
-  group.add(createDeterministicBackdrop());
+  catalog.gaiaSky = createGaiaSkyLayers({
+    name: 'ESA Gaia DR3 space sky',
+    radius: CATALOG_RADIUS + 30000,
+    brightSize: 3.6,
+    faintSize: 2.1
+  });
+  group.add(catalog.gaiaSky.group);
   createCatalogStars(group, catalog);
   createConstellations(group, catalog);
   scene.add(group);

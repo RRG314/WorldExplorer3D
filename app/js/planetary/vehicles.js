@@ -3,6 +3,7 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 let activeVehicle = null;
 let earthChildVisibility = null;
 let marsModelPromise = null;
+let vehicleRequestSequence = 0;
 
 function material(color, metalness = 0.35, roughness = 0.65) {
   return new THREE.MeshStandardMaterial({ color, metalness, roughness });
@@ -192,6 +193,7 @@ function loadMarsRoverModel() {
 }
 
 async function setPlanetaryVehicle(kind) {
+  const requestId = ++vehicleRequestSequence;
   if (!appCtx.carMesh) return null;
   if (activeVehicle?.parent) activeVehicle.parent.remove(activeVehicle);
   activeVehicle = null;
@@ -210,7 +212,12 @@ async function setPlanetaryVehicle(kind) {
 
   if (kind === 'mars') {
     const loaded = await loadMarsRoverModel();
-    if (loaded && appCtx.onMars && activeVehicle?.userData?.vehicleKind === 'mars') {
+    if (
+      loaded &&
+      requestId === vehicleRequestSequence &&
+      appCtx.onMars &&
+      activeVehicle?.userData?.vehicleKind === 'mars'
+    ) {
       appCtx.carMesh.remove(activeVehicle);
       activeVehicle = alignVehicleToSurface(loaded);
       appCtx.carMesh.add(activeVehicle);

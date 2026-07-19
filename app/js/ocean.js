@@ -19,6 +19,11 @@ import {
 import { createOceanFishLifeApi } from "./ocean/fish-life.js?v=1";
 import { createOceanBathymetryApi } from "./ocean/bathymetry.js?v=1";
 import { updateOceanHud as updateOceanHudView } from "./ocean/hud.js?v=1";
+import {
+  commitEnvironment,
+  exitCurrentEnvironmentSync,
+  registerEnvironmentLifecycle
+} from './session-coordinator.js?v=2';
 
 const OCEAN_SITE = Object.freeze({
   name: 'Coral Shelf Reserve',
@@ -402,11 +407,10 @@ function resetSubmarineAtLaunch(spawn = null) {
 
 function updateSubmarine(dt) {
   const sub = oceanMode.submarine;
-  const forwardInput = (appCtx.keys.KeyW || appCtx.keys.ArrowUp ? 1 : 0) - (appCtx.keys.KeyS || appCtx.keys.ArrowDown ? 1 : 0);
-  const yawInput = (appCtx.keys.KeyA || appCtx.keys.ArrowLeft ? 1 : 0) - (appCtx.keys.KeyD || appCtx.keys.ArrowRight ? 1 : 0);
-  const verticalInput = (appCtx.keys.Space || appCtx.keys.KeyR ? 1 : 0) - (
-    appCtx.keys.ShiftLeft || appCtx.keys.ShiftRight || appCtx.keys.ControlLeft || appCtx.keys.ControlRight ? 1 : 0
-  );
+  const actions = appCtx.readControlActions?.('ocean') || {};
+  const forwardInput = Number(actions.move) || 0;
+  const yawInput = Number(actions.turn) || 0;
+  const verticalInput = Number(actions.vertical) || 0;
 
   const targetSpeed = forwardInput * OCEAN_CONSTANTS.MAX_SPEED;
   const speedFactor = expApproachFactor(OCEAN_CONSTANTS.SPEED_RESPONSE, dt);
@@ -512,9 +516,8 @@ function animateOceanMode(nowMs = 0) {
 function startOceanMode(options = {}) {
   if (oceanMode.active) return true;
   try {
-    if (typeof appCtx.switchEnv === 'function' && appCtx.ENV && appCtx.ENV.OCEAN) {
-      appCtx.switchEnv(appCtx.ENV.OCEAN);
-    }
+    if (appCtx.ENV?.OCEAN) exitCurrentEnvironmentSync(appCtx.ENV.OCEAN, { source: 'ocean_start' });
+    if (appCtx.ENV?.OCEAN) commitEnvironment(appCtx.ENV.OCEAN, { source: 'ocean_start' });
 
     if (options.launchSite) {
       resetOceanLaunchSite(options.launchSite);
@@ -563,17 +566,14 @@ function startOceanMode(options = {}) {
     if (oceanMode.canvas) oceanMode.canvas.style.display = 'none';
     const worldCanvas = getWorldCanvas();
     if (worldCanvas) worldCanvas.style.display = 'block';
-    if (typeof appCtx.switchEnv === 'function' && appCtx.ENV && appCtx.ENV.EARTH) {
-      appCtx.switchEnv(appCtx.ENV.EARTH);
-    }
+    if (appCtx.ENV?.EARTH) commitEnvironment(appCtx.ENV.EARTH, { source: 'ocean_start_rollback' });
     if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
     return false;
   }
 }
 
-function stopOceanMode() {
-  if (!oceanMode.active) return false;
-
+function stopOceanMode(options = {}) {
+  const wasActive = !!oceanMode.active;
   oceanMode.active = false;
   if (oceanMode.animationId) {
     cancelAnimationFrame(oceanMode.animationId);
@@ -608,14 +608,26 @@ function stopOceanMode() {
   }
   if (offRoadWarn) offRoadWarn.classList.remove('active');
 
-  if (typeof appCtx.switchEnv === 'function' && appCtx.ENV && appCtx.ENV.EARTH) {
-    appCtx.switchEnv(appCtx.ENV.EARTH);
+  if (options.commitEnvironment !== false && appCtx.ENV?.EARTH) {
+    commitEnvironment(appCtx.ENV.EARTH, { source: 'ocean_stop' });
   }
   if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
   if (typeof appCtx.refreshBoatAvailability === 'function') appCtx.refreshBoatAvailability(true);
   destroyOceanScene();
-  return true;
+  return wasActive;
 }
+
+registerEnvironmentLifecycle(appCtx.ENV.OCEAN, {
+  exitSync: () => stopOceanMode({ commitEnvironment: false }),
+  snapshot: () => ({
+    active: !!oceanMode.active,
+    animationActive: oceanMode.animationId != null,
+    bathymetryReady: !!oceanMode.bathymetryReady,
+    localBathymetryReady: !!oceanMode.localBathymetryReady,
+    rendererReady: !!oceanMode.renderer,
+    sceneReady: !!oceanMode.scene
+  })
+});
 
 function initOceanModeUI() {
   if (oceanMode.canvas) return;

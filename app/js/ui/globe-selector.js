@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { createGlobeSelectorScene } from './globe-selector/scene.js?v=1';
+import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=1';
 import {
   addSelectionToSavedFavorites,
   buildFavoriteCities as buildFavoriteCitiesFromData,
@@ -65,6 +66,7 @@ function createGlobeSelector(options = {}) {
   let openState = false;
   let selected = null;
   let searchInFlight = false;
+  let coordinateInputsDirty = false;
   let reverseLookupToken = 0;
   let activeCityTab = 'nearby';
   let nearbyCities = [];
@@ -220,6 +222,7 @@ function createGlobeSelector(options = {}) {
       globeScene.setSelectionMarker(null);
       nearbyCities = [];
       renderCityList();
+      setStartButtonBusy(false);
       if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorSelectionChanged === 'function') {
         appCtx.liveEarth.onSelectorSelectionChanged();
       }
@@ -234,6 +237,7 @@ function createGlobeSelector(options = {}) {
     }
     if (latInput) latInput.value = selected.lat.toFixed(6);
     if (lonInput) lonInput.value = selected.lon.toFixed(6);
+    coordinateInputsDirty = false;
 
     globeScene.setSelectionMarker(selected);
     nearbyCities = buildNearbyCitiesFromData({
@@ -247,12 +251,20 @@ function createGlobeSelector(options = {}) {
     if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorSelectionChanged === 'function') {
       appCtx.liveEarth.onSelectorSelectionChanged();
     }
+    setStartButtonBusy(false);
   }
 
   function setLocateButtonBusy(isBusy) {
     if (!locateBtn) return;
     locateBtn.disabled = !!isBusy;
     locateBtn.textContent = isBusy ? 'Locating…' : 'Use My Location';
+  }
+
+  function setStartButtonBusy(isBusy) {
+    if (!startBtn) return;
+    startBtn.disabled = !!isBusy || !selected;
+    startBtn.setAttribute('aria-busy', isBusy ? 'true' : 'false');
+    startBtn.textContent = isBusy ? 'Starting...' : 'Start Here';
   }
 
   function setSelection(lat, lon, meta = {}) {
@@ -406,10 +418,46 @@ function createGlobeSelector(options = {}) {
   function applySelectionFromInputs() {
     const lat = toFiniteNumber(latInput?.value);
     const lon = toFiniteNumber(lonInput?.value);
-    if (lat == null || lon == null) return false;
+    if (lat == null || lon == null || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+      if (searchStatus) {
+        searchStatus.textContent = 'Enter latitude from -90 to 90 and longitude from -180 to 180.';
+        searchStatus.style.color = '#dc2626';
+      }
+      return false;
+    }
     setSelection(lat, lon, { name: 'Manual Coordinates' });
+    coordinateInputsDirty = false;
     reverseLookupPlace(lat, lon);
     return true;
+  }
+
+  const launchCoordinator = createGlobeSelectorLaunch({
+    applyCoordinateSelection: applySelectionFromInputs,
+    close,
+    getSelection: () => selected,
+    hasDirtyCoordinates: () => coordinateInputsDirty,
+    isOpen: () => openState,
+    onStartHere: options.onStartHere,
+    prepareSelection(nextSelection) {
+      if (!nextSelection.skipAutoFavorite) saveSelectionAsFavorite(nextSelection);
+      renderFavoriteMarkers();
+      renderCityList();
+      syncLegacyCustomState(nextSelection);
+    },
+    setShortcutButtonsBusy(isBusy) {
+      if (moonBtn) moonBtn.disabled = isBusy;
+      if (spaceBtn) spaceBtn.disabled = isBusy;
+    },
+    setStartButtonBusy,
+    setStatus(message, color) {
+      if (!searchStatus) return;
+      searchStatus.textContent = message;
+      searchStatus.style.color = color;
+    }
+  });
+
+  function triggerStartHere() {
+    return launchCoordinator.startHere();
   }
 
   function bindLiveEarthBridge() {
@@ -460,12 +508,13 @@ function createGlobeSelector(options = {}) {
       searchStatus.style.color = '#64748b';
     }
     setLocateButtonBusy(false);
+    setStartButtonBusy(false);
     savedFavoriteCities = loadSavedFavoriteCitiesFromStorage();
     setCityTab(activeCityTab);
     setPanelMode(panelMode);
 
-    const savedLat = toFiniteNumber(appCtx.customLoc?.lat ?? document.getElementById('customLat')?.value);
-    const savedLon = toFiniteNumber(appCtx.customLoc?.lon ?? document.getElementById('customLon')?.value);
+    const savedLat = toFiniteNumber(appCtx.customLoc?.lat);
+    const savedLon = toFiniteNumber(appCtx.customLoc?.lon);
     if (savedLat != null && savedLon != null) {
       setSelection(savedLat, savedLon, { name: appCtx.customLoc?.name || 'Custom Location', focus: true });
     } else {
@@ -490,6 +539,7 @@ function createGlobeSelector(options = {}) {
     }
 
     if (searchInput) searchInput.value = appCtx.customLoc?.name || '';
+    if (selected) reverseLookupPlace(selected.lat, selected.lon);
 
     if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorOpen === 'function') {
       appCtx.liveEarth.onSelectorOpen();
@@ -507,6 +557,7 @@ function createGlobeSelector(options = {}) {
     root.classList.remove('show');
     root.setAttribute('aria-hidden', 'true');
     setLocateButtonBusy(false);
+    launchCoordinator.cancel();
     if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorClose === 'function') {
       appCtx.liveEarth.onSelectorClose();
     }
@@ -515,46 +566,25 @@ function createGlobeSelector(options = {}) {
     if (typeof options.onClose === 'function') options.onClose();
   }
 
-  function triggerStartHere() {
-    const inputsApplied = applySelectionFromInputs();
-    if (!selected && !inputsApplied) {
-      if (searchStatus) {
-        searchStatus.textContent = 'Select a point on the globe or enter valid coordinates first.';
-        searchStatus.style.color = '#dc2626';
-      }
-      return;
-    }
-    if (!selected?.skipAutoFavorite) {
-      saveSelectionAsFavorite(selected);
-    }
-    renderFavoriteMarkers();
-    renderCityList();
-    syncLegacyCustomState(selected);
-    if (typeof options.onStartHere === 'function') options.onStartHere({ ...selected });
-  }
-
-  if (startBtn) startBtn.addEventListener('click', triggerStartHere);
+  if (startBtn) startBtn.addEventListener('click', () => void triggerStartHere());
   if (backBtn) backBtn.addEventListener('click', () => {
     if (typeof options.onBack === 'function') options.onBack();
     close();
   });
   if (moonBtn) {
-    moonBtn.addEventListener('click', () => {
-      if (typeof options.onMoonShortcut === 'function') options.onMoonShortcut();
-      close();
-    });
+    moonBtn.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onMoonShortcut, 'Moon'));
   }
   if (spaceBtn) {
-    spaceBtn.addEventListener('click', () => {
-      if (typeof options.onSpaceShortcut === 'function') options.onSpaceShortcut();
-      close();
-    });
+    spaceBtn.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onSpaceShortcut, 'Space'));
   }
   for (const coordinateInput of [latInput, lonInput]) {
+    coordinateInput?.addEventListener('input', () => {
+      coordinateInputsDirty = true;
+    });
     coordinateInput?.addEventListener('keydown', (event) => {
       if (event.key !== 'Enter') return;
       event.preventDefault();
-      applySelectionFromInputs();
+      if (applySelectionFromInputs()) setStartButtonBusy(false);
     });
   }
   if (searchInput) {
@@ -595,8 +625,9 @@ function createGlobeSelector(options = {}) {
         if (!Number.isFinite(deleteIndex) || deleteIndex < 0 || deleteIndex >= favoriteSavedList.length) return;
         const cityToDelete = favoriteSavedList[deleteIndex];
         if (!cityToDelete) return;
-        savedFavoriteCities = savedFavoriteCities.
-        filter((city) => Math.abs(city.lat - cityToDelete.lat) > 0.0005 || Math.abs(city.lon - cityToDelete.lon) > 0.0005);
+        savedFavoriteCities = savedFavoriteCities.filter(
+          (city) => Math.abs(city.lat - cityToDelete.lat) > 0.0005 || Math.abs(city.lon - cityToDelete.lon) > 0.0005
+        );
         persistSavedFavoriteCitiesToStorage(savedFavoriteCities);
         renderFavoriteMarkers();
         renderCityList();

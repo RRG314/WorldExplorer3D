@@ -127,6 +127,7 @@ async function loadLocation(page, spec) {
     const ctx = mod?.ctx || {};
     const startedAt = performance.now();
     const expectedStart = locationSpec.expectedStart || 'land';
+    ctx._lastCustomStructureProbe = null;
 
     if (locationSpec.kind === 'custom') {
       const customLatInput = document.getElementById('customLat');
@@ -211,23 +212,23 @@ async function loadLocation(page, spec) {
       driveSwitchMs = performance.now() - switchDriveAt;
     }
 
-    const actorX = ctx.boatMode?.active ? Number(ctx.boat?.x || 0) : Number.isFinite(ctx.car?.x) ? ctx.car.x : Number(ctx.Walk?.state?.walker?.x || 0);
-    const actorZ = ctx.boatMode?.active ? Number(ctx.boat?.z || 0) : Number.isFinite(ctx.car?.z) ? ctx.car.z : Number(ctx.Walk?.state?.walker?.z || 0);
-    const actorFeetY = Number(ctx.car?.y) - 1.2;
+    let actorX = ctx.boatMode?.active ? Number(ctx.boat?.x || 0) : Number.isFinite(ctx.car?.x) ? ctx.car.x : Number(ctx.Walk?.state?.walker?.x || 0);
+    let actorZ = ctx.boatMode?.active ? Number(ctx.boat?.z || 0) : Number.isFinite(ctx.car?.z) ? ctx.car.z : Number(ctx.Walk?.state?.walker?.z || 0);
+    let actorFeetY = Number(ctx.car?.y) - 1.2;
     const driveSpawn = expectedStart !== 'water' && typeof ctx.resolveSafeWorldSpawn === 'function' ?
       ctx.resolveSafeWorldSpawn(actorX, actorZ, { mode: 'drive', source: 'world_matrix_drive' }) :
       null;
     const walkSpawn = expectedStart !== 'water' && typeof ctx.resolveSafeWorldSpawn === 'function' ?
       ctx.resolveSafeWorldSpawn(actorX, actorZ, { mode: 'walk', source: 'world_matrix_walk' }) :
       null;
-    const nearestRoad = expectedStart !== 'water' && typeof ctx.findNearestRoad === 'function' ?
+    let nearestRoad = expectedStart !== 'water' && typeof ctx.findNearestRoad === 'function' ?
       ctx.findNearestRoad(actorX, actorZ, {
         y: Number.isFinite(actorFeetY) ? actorFeetY : NaN,
         maxVerticalDelta: 18,
         preferredRoad: ctx.car?.road || null
       }) :
       null;
-    const roadSegments = Array.isArray(nearestRoad?.road?.pts) ? nearestRoad.road.pts.slice(0, -1).map((point, index) =>
+    let roadSegments = Array.isArray(nearestRoad?.road?.pts) ? nearestRoad.road.pts.slice(0, -1).map((point, index) =>
       Math.hypot(nearestRoad.road.pts[index + 1].x - point.x, nearestRoad.road.pts[index + 1].z - point.z)
     ) : [];
     const boatCameraDistance = ctx.boatMode?.active && ctx.camera?.position ?
@@ -317,6 +318,77 @@ async function loadLocation(page, spec) {
       if (waterway?.navigable === false) structurePresentation.nonNavigableWaterways += 1;
     }
 
+    let customStructureProbe = null;
+    if (locationSpec.expectedRoadStructure) {
+      const targetRoad = (ctx.roads || []).find((road) =>
+        road?.structureSemantics?.structureKind === locationSpec.expectedRoadStructure &&
+        Array.isArray(road.pts) && road.pts.length >= 2
+      );
+      if (targetRoad) {
+        let segmentIndex = 0;
+        let segmentLength = -1;
+        for (let i = 0; i < targetRoad.pts.length - 1; i += 1) {
+          const length = Math.hypot(
+            targetRoad.pts[i + 1].x - targetRoad.pts[i].x,
+            targetRoad.pts[i + 1].z - targetRoad.pts[i].z
+          );
+          if (length > segmentLength) {
+            segmentLength = length;
+            segmentIndex = i;
+          }
+        }
+        const start = targetRoad.pts[segmentIndex];
+        const end = targetRoad.pts[segmentIndex + 1];
+        const x = (start.x + end.x) * 0.5;
+        const z = (start.z + end.z) * 0.5;
+        const angle = Math.atan2(-(end.x - start.x), -(end.z - start.z));
+        const surfaceY = Number(ctx.sampleFeatureSurfaceY?.(targetRoad, x, z, { segIndex: segmentIndex, t: 0.5 }));
+        const renderedY = Number.isFinite(surfaceY) && ctx.GroundHeight?._raycastMeshY ?
+          ctx.GroundHeight._raycastMeshY(ctx.roadMeshes || [], x, z, surfaceY + 2.2, 5) :
+          null;
+        const probeSpawn = Number.isFinite(surfaceY) ? {
+          valid: true,
+          mode: 'drive',
+          x,
+          z,
+          angle,
+          carY: surfaceY + 1.2,
+          walkY: surfaceY + 1.7,
+          onRoad: true,
+          road: targetRoad,
+          source: 'world_matrix_structure_probe'
+        } : null;
+        if (probeSpawn && typeof ctx.applyResolvedWorldSpawn === 'function') {
+          ctx.setTravelMode?.('drive', { source: 'world_matrix_structure_probe', emitTutorial: false, force: true });
+          ctx.applyResolvedWorldSpawn(probeSpawn, { mode: 'drive' });
+          actorX = x;
+          actorZ = z;
+          actorFeetY = surfaceY;
+        }
+        const nearest = typeof ctx.findNearestRoad === 'function' ? ctx.findNearestRoad(x, z, {
+          y: surfaceY,
+          maxVerticalDelta: 8,
+          preferredRoad: targetRoad
+        }) : null;
+        customStructureProbe = {
+          kind: targetRoad.structureSemantics?.structureKind || null,
+          terrainMode: targetRoad.structureSemantics?.terrainMode || null,
+          segmentLength: Number(segmentLength.toFixed(2)),
+          surfaceY: Number.isFinite(surfaceY) ? Number(surfaceY.toFixed(2)) : null,
+          renderedY: Number.isFinite(renderedY) ? Number(renderedY.toFixed(2)) : null,
+          renderedDelta: Number.isFinite(surfaceY) && Number.isFinite(renderedY) ? Number(Math.abs(surfaceY - renderedY).toFixed(2)) : null,
+          nearestKind: nearest?.road?.structureSemantics?.structureKind || null,
+          nearestDistance: Number.isFinite(nearest?.dist) ? Number(nearest.dist.toFixed(2)) : null,
+          applied: !!probeSpawn
+        };
+        ctx._lastCustomStructureProbe = customStructureProbe;
+        nearestRoad = nearest;
+        roadSegments = Array.isArray(nearest?.road?.pts) ? nearest.road.pts.slice(0, -1).map((point, index) =>
+          Math.hypot(nearest.road.pts[index + 1].x - point.x, nearest.road.pts[index + 1].z - point.z)
+        ) : [];
+      }
+    }
+
     const buildingPresentation = {
       meshCount: 0,
       visibleMeshCount: 0,
@@ -391,8 +463,8 @@ async function loadLocation(page, spec) {
         Array.isArray(ctx.roadMeshes) ? ctx.roadMeshes : [],
         actorX,
         actorZ,
-        Number.isFinite(actorFeetY) ? actorFeetY + 5.5 : 1500,
-        Number.isFinite(actorFeetY) ? 26 : Infinity
+        Number.isFinite(actorFeetY) ? actorFeetY + (locationSpec.expectedRoadStructure ? 2.2 : 5.5) : 1500,
+        Number.isFinite(actorFeetY) ? (locationSpec.expectedRoadStructure ? 5 : 26) : Infinity
       ) :
       null;
     const renderedRoadY = expectedStart !== 'water' && ctx.GroundHeight?.roadMeshY ?
@@ -456,12 +528,14 @@ async function loadLocation(page, spec) {
 
     const worldCoverMeshes = Array.isArray(ctx.terrainGroup?.children) ? ctx.terrainGroup.children : [];
     const worldCoverStatus = {};
-    const imageryStatus = {};
+    const terrainRasterUrls = [];
+    let terrainImageryOwners = 0;
     for (const mesh of worldCoverMeshes) {
       const status = String(mesh?.userData?.worldCoverStatus || 'not_requested');
       worldCoverStatus[status] = Number(worldCoverStatus[status] || 0) + 1;
-      const imagery = String(mesh?.userData?.terrainImageryStatus || 'not_requested');
-      imageryStatus[imagery] = Number(imageryStatus[imagery] || 0) + 1;
+      if (mesh?.userData?.terrainImageryTexture || mesh?.userData?.terrainImageryStatus) terrainImageryOwners += 1;
+      const source = String(mesh?.material?.map?.image?.currentSrc || mesh?.material?.map?.image?.src || '');
+      if (/arcgisonline|World_Imagery/i.test(source)) terrainRasterUrls.push(source);
     }
 
     return {
@@ -503,12 +577,13 @@ async function loadLocation(page, spec) {
           .slice(0, 5)
           .map((mesh) => ({ ...mesh.userData.worldCoverSummary }))
       },
-      terrainImagery: {
-        status: imageryStatus,
+      terrainSurface: {
+        imageryOwners: terrainImageryOwners,
+        rasterUrls: terrainRasterUrls,
         samples: worldCoverMeshes.slice(0, 5).map((mesh) => ({
           key: mesh?.userData?.terrainTileKey || null,
-          mapMatchesImagery: mesh?.material?.map === mesh?.userData?.terrainImageryTexture,
-          emissiveMatchesImagery: mesh?.material?.emissiveMap === mesh?.userData?.terrainImageryTexture,
+          visualMode: mesh?.userData?.terrainVisualProfile?.visualMode || mesh?.userData?.terrainVisualProfile?.mode || null,
+          worldCoverMode: mesh?.userData?.worldCoverSurfaceMode || null,
           mapSource: mesh?.material?.map?.image?.currentSrc || mesh?.material?.map?.image?.src || null
         }))
       },
@@ -538,7 +613,7 @@ async function loadLocation(page, spec) {
           Number(initialSpawn.featureEndpointClearance.toFixed(2)) : null,
         endpointConnected: initialSpawn.endpointConnected ?? null
       } : null,
-      customStructureProbe: ctx._lastCustomStructureProbe || null,
+      customStructureProbe,
       boatActive: !!ctx.boatMode?.active,
       boatPresentation: ctx.boatMode?.active ? {
         meshVisible: !!ctx.boatMode?.mesh?.visible,

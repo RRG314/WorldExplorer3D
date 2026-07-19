@@ -36,18 +36,29 @@ export function getRuntimeDynamicBudget(mode = runtime.getPerfModeValue()) {
     lodScale: 1
   };
   const source = state && typeof state === 'object' ? state : defaultState;
-  const budgetScale =
+  const mobileLike = typeof appCtx.isLikelyMobileDevice === 'function'
+    ? appCtx.isLikelyMobileDevice()
+    : /android|iphone|ipad|mobile/i.test(String(globalThis.navigator?.userAgent || ''));
+  const requestedBudgetScale =
     mode === 'baseline' ?
-      clampNumber(source.budgetScale, 0.80, 1.00, 1) :
-      clampNumber(source.budgetScale, 0.78, 1.16, 1);
-  const lodScale =
+      clampNumber(source.budgetScale, 0.30, 1.00, 1) :
+      clampNumber(source.budgetScale, 0.30, 1.16, 1);
+  const requestedLodScale =
     mode === 'baseline' ?
-      clampNumber(source.lodScale, 0.90, 1.00, 1) :
-      clampNumber(source.lodScale, 0.85, 1.14, 1);
+      clampNumber(source.lodScale, 0.72, 1.00, 1) :
+      clampNumber(source.lodScale, 0.72, 1.14, 1);
+  const budgetScale = mobileLike
+    ? Math.min(requestedBudgetScale, mode === 'baseline' ? 0.32 : 0.52)
+    : requestedBudgetScale;
+  const lodScale = mobileLike
+    ? Math.min(requestedLodScale, mode === 'baseline' ? 0.68 : 0.78)
+    : requestedLodScale;
   return {
     ...source,
     budgetScale,
-    lodScale
+    lodScale,
+    deviceClass: mobileLike ? 'mobile' : 'desktop',
+    reason: mobileLike ? `${source.reason || 'init'}:mobile_cap` : source.reason
   };
 }
 
@@ -249,8 +260,8 @@ export function getWorldLodThresholds(loadDepth, mode = runtime.getPerfModeValue
 
 export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValue(), budgetScale = 1) {
   const depth = Math.max(0, loadDepth | 0);
-  const scale = clampNumber(budgetScale, 0.65, 1.35, 1);
-  const radiusScale = clampNumber(Math.sqrt(scale), 0.88, 1.08, 1);
+  const scale = clampNumber(budgetScale, 0.30, 1.35, 1);
+  const radiusScale = clampNumber(Math.sqrt(scale), 0.58, 1.08, 1);
   const scaledRadii = (radii) => radii.map((r) => Number((r * radiusScale).toFixed(5)));
 
   if (mode === 'baseline') {

@@ -1,6 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { buildMergedGeometry } from "./geometry-batching.js?v=2";
+import { buildMergedGeometry } from "./geometry-batching.js?v=4";
 import { appendTerrainConformingPolygonBatch } from './terrain-conforming-polygon.js?v=1';
+import { surfaceComposition } from './surface-contract.js?v=6';
 
 const MAX_LAND_FEATURES = 220;
 const MAX_VEGETATION_PER_TILE = 150;
@@ -27,17 +28,15 @@ const LAND_STYLE = {
   scree: { color: 0x8b887d, vegetation: false, density: 0 },
   shingle: { color: 0x969184, vegetation: false, density: 0 },
   wetland: { color: 0x547e68, vegetation: true, density: 0.2 },
-  marsh: { color: 0x587e69, vegetation: true, density: 0.16 }
+  marsh: { color: 0x587e69, vegetation: true, density: 0.16 },
+  residential: { color: 0xb4b5ad, vegetation: false, density: 0 },
+  construction: { color: 0xa79b87, vegetation: false, density: 0 },
+  education: { color: 0xb3b29f, vegetation: false, density: 0 },
+  pedestrian: { color: 0xb9b6ac, vegetation: false, density: 0 },
+  religious: { color: 0xaaa99c, vegetation: false, density: 0 },
+  medical: { color: 0xb6aaa7, vegetation: false, density: 0 },
+  transportation: { color: 0x8c9090, vegetation: false, density: 0 }
 };
-
-const DENSE_NATURAL_KINDS = new Set(['forest', 'wood', 'scrub', 'orchard', 'vineyard']);
-const MINERAL_SURFACE_KINDS = new Set(['sand', 'beach', 'bare_rock', 'scree', 'shingle']);
-
-function landOverlayOpacity(kind) {
-  if (MINERAL_SURFACE_KINDS.has(kind)) return 0.55;
-  if (DENSE_NATURAL_KINDS.has(kind)) return 0.28;
-  return 0.2;
-}
 
 let sharedMaterials = null;
 
@@ -45,16 +44,17 @@ function materials() {
   if (sharedMaterials) return sharedMaterials;
   const land = new Map();
   Object.entries(LAND_STYLE).forEach(([kind, style]) => {
+    const composition = surfaceComposition(kind);
     land.set(kind, new THREE.MeshStandardMaterial({
       color: style.color,
       roughness: 0.98,
       metalness: 0,
-      transparent: true,
-      opacity: landOverlayOpacity(kind),
-      depthWrite: false,
+      transparent: false,
+      opacity: 1,
+      depthWrite: true,
       polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -1
+      polygonOffsetFactor: composition.polygonOffsetFactor,
+      polygonOffsetUnits: composition.polygonOffsetUnits
     }));
   });
   sharedMaterials = {
@@ -162,7 +162,7 @@ function vegetationType(kind, x, z, terrainY, seed) {
   return 'broadleaf';
 }
 
-function buildVegetationMeshes(placements, chunk) {
+function buildVegetationMeshes(placements, chunk, provenance = null) {
   if (placements.length === 0) return;
   const groups = { broadleaf: [], conifer: [], shrub: [] };
   placements.forEach((placement) => groups[placement.type].push(placement));
@@ -185,7 +185,12 @@ function buildVegetationMeshes(placements, chunk) {
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
     mesh.castShadow = false;
     mesh.receiveShadow = true;
-    mesh.userData = { earthStreamingChunk: true, streamChunkKey: chunk.key, vegetationType: meshType };
+    mesh.userData = {
+      earthStreamingChunk: true,
+      streamChunkKey: chunk.key,
+      vegetationType: meshType,
+      renderProvenance: provenance
+    };
     chunk.meshes.push(mesh);
     chunk.vegetationMeshes.push(mesh);
   };
@@ -224,13 +229,21 @@ export async function buildStreamingLandcover(tileRecord, chunk, deps = {}) {
       const area = polygonArea(points);
       if (area < 24) return;
       const identity = `${chunk.key}:land:${featureId}:${partIndex}`;
-      const landuse = { type: kind, pts: points, area, sourceFeatureId: identity, _streamChunkKey: chunk.key };
+      const composition = surfaceComposition(kind);
+      const landuse = {
+        type: kind,
+        pts: points,
+        area,
+        sourceFeatureId: identity,
+        geometrySource: String(tileRecord.source || 'shortbread-vector'),
+        _streamChunkKey: chunk.key
+      };
       chunk.landuses.push(landuse);
       if (!landBatches.has(kind)) landBatches.set(kind, { positions: [], normals: [], uvs: [], indices: [] });
       appendTerrainConformingPolygonBatch(points, terrainY, landBatches.get(kind), {
         maxEdgeLength: 48,
         maxTriangles: Math.max(100, Math.min(520, points.length * 6)),
-        surfaceOffset: 0.045
+        surfaceOffset: composition.surfaceOffset
       });
       if (!style.vegetation || placements.length >= MAX_VEGETATION_PER_TILE) return;
       const bounds = polygonBounds(points);
@@ -271,17 +284,23 @@ export async function buildStreamingLandcover(tileRecord, chunk, deps = {}) {
     if (!geometry) continue;
     const mesh = new THREE.Mesh(geometry, materials().land.get(kind));
     mesh.receiveShadow = true;
-    mesh.renderOrder = 1;
+    mesh.renderOrder = surfaceComposition(kind).renderOrder;
     mesh.userData = {
       earthStreamingChunk: true,
       streamChunkKey: chunk.key,
-      landuseType: kind
+      landuseType: kind,
+      alwaysVisible: true,
+      renderProvenance: deps.createProvenance?.('base.land_cover/land_use', 'land-cover') || null
     };
     chunk.meshes.push(mesh);
     chunk.landuseMeshes.push(mesh);
     batchIndex += 1;
-    if (batchIndex % 4 === 0) await new Promise((resolve) => requestAnimationFrame(resolve));
+    if (batchIndex % 4 === 0) await new Promise((resolve) => globalThis.setTimeout(resolve, 0));
   }
   chunk.vegetationFeatures.push(...placements);
-  buildVegetationMeshes(placements, chunk);
+  buildVegetationMeshes(
+    placements,
+    chunk,
+    deps.createProvenance?.('base.land_cover/land_use', 'vegetation') || null
+  );
 }

@@ -260,7 +260,7 @@ async function imageFromBlob(blob) {
   });
 }
 
-async function createDisplayTexture(blob, size) {
+async function createSemanticTexture(blob, size) {
   const sourceImage = await imageFromBlob(blob);
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -272,33 +272,51 @@ async function createDisplayTexture(blob, size) {
   if (typeof sourceImage.close === 'function') sourceImage.close();
   const imageData = context.getImageData(0, 0, size, size);
   const counts = {};
+  const classes = new Array(size * size);
   let recognized = 0;
 
   for (let i = 0; i < imageData.data.length; i += 4) {
     const entry = nearestWorldCoverClass(imageData.data[i], imageData.data[i + 1], imageData.data[i + 2]);
+    classes[i / 4] = entry;
     if (!entry) {
-      imageData.data[i] = 102;
-      imageData.data[i + 1] = 119;
-      imageData.data[i + 2] = 90;
-      imageData.data[i + 3] = 255;
       continue;
     }
-    const pixel = i / 4;
-    const x = pixel % size;
-    const y = Math.floor(pixel / size);
-    const variation = ((x * 17 + y * 31 + entry.id * 13) % 13) - 6;
-    imageData.data[i] = Math.max(0, Math.min(255, entry.display[0] + variation));
-    imageData.data[i + 1] = Math.max(0, Math.min(255, entry.display[1] + variation));
-    imageData.data[i + 2] = Math.max(0, Math.min(255, entry.display[2] + variation));
-    imageData.data[i + 3] = 255;
     counts[entry.name] = Number(counts[entry.name] || 0) + 1;
     recognized += 1;
+  }
+  const builtClass = WORLD_COVER_CLASSES.find((entry) => entry.name === 'built');
+  for (let pixel = 0; pixel < classes.length; pixel += 1) {
+    const x = pixel % size;
+    const y = Math.floor(pixel / size);
+    let entry = classes[pixel];
+    if (entry && entry.name !== 'built') {
+      let nearbyBuilt = 0;
+      for (let oy = -2; oy <= 2; oy += 1) {
+        for (let ox = -2; ox <= 2; ox += 1) {
+          const sx = x + ox;
+          const sy = y + oy;
+          if (sx < 0 || sy < 0 || sx >= size || sy >= size) continue;
+          if (classes[sy * size + sx]?.name === 'built') nearbyBuilt += 1;
+        }
+      }
+      if (nearbyBuilt >= 12) entry = builtClass;
+    }
+    const display = entry?.display || [102, 119, 90];
+    const variation = entry ? ((x * 17 + y * 31 + entry.id * 13) % 5) - 2 : 0;
+    const index = pixel * 4;
+    imageData.data[index] = Math.max(0, Math.min(255, display[0] + variation));
+    imageData.data[index + 1] = Math.max(0, Math.min(255, display[1] + variation));
+    imageData.data[index + 2] = Math.max(0, Math.min(255, display[2] + variation));
+    imageData.data[index + 3] = 255;
   }
   context.putImageData(imageData, 0, 0);
   if (recognized < size * size * 0.2) throw new Error('WorldCover tile contained insufficient classified coverage');
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
+  texture.generateMipmaps = false;
+  texture.minFilter = THREE.NearestFilter;
+  texture.magFilter = THREE.NearestFilter;
   if (typeof texture.colorSpace !== 'undefined' && typeof THREE.SRGBColorSpace !== 'undefined') {
     texture.colorSpace = THREE.SRGBColorSpace;
   } else if (typeof texture.encoding !== 'undefined' && typeof THREE.sRGBEncoding !== 'undefined') {
@@ -325,7 +343,7 @@ export async function loadWorldCoverBaseline(bounds, options = {}) {
     options.signal || null,
     Number(options.priority) || 0
   );
-  const result = await createDisplayTexture(loaded.blob, size);
+  const result = await createSemanticTexture(loaded.blob, size);
   return { ...result, key, source: loaded.source };
 }
 

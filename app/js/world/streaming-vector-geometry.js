@@ -1,8 +1,10 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { buildFeatureRibbonEdges } from '../structure-semantics.js?v=12';
+import { buildFeatureRibbonEdges } from '../structure-semantics.js?v=13';
+import { appendUpwardRibbonGeometry } from '../road-render.js?v=2';
 
 const INITIAL_DETAIL_RADIUS = 1050;
 const ROAD_SURFACE_OFFSET = 0.1;
+const WEB_MERCATOR_MAX_LAT = 85.05112878;
 
 function finite(value, fallback = 0) {
   const parsed = Number.parseFloat(value);
@@ -17,6 +19,24 @@ function stableHash(value) {
     hash = Math.imul(hash, 16777619);
   }
   return hash >>> 0;
+}
+
+function expandGeographicBounds(bounds, marginMeters = 96) {
+  const latN = Number(bounds?.latN);
+  const latS = Number(bounds?.latS);
+  const lonW = Number(bounds?.lonW);
+  const lonE = Number(bounds?.lonE);
+  if (![latN, latS, lonW, lonE].every(Number.isFinite)) return bounds;
+  const centerLat = (latN + latS) * 0.5;
+  const latitudeDelta = Math.max(0, Number(marginMeters) || 0) / 111320;
+  const longitudeDelta = latitudeDelta / Math.max(0.05, Math.cos(centerLat * Math.PI / 180));
+  const wrapLongitude = (longitude) => ((longitude + 180) % 360 + 360) % 360 - 180;
+  return {
+    latN: Math.min(WEB_MERCATOR_MAX_LAT, latN + latitudeDelta),
+    latS: Math.max(-WEB_MERCATOR_MAX_LAT, latS - latitudeDelta),
+    lonW: wrapLongitude(lonW - longitudeDelta),
+    lonE: wrapLongitude(lonE + longitudeDelta)
+  };
 }
 
 function worldPoint(coordinate) {
@@ -163,7 +183,8 @@ function stableTerrainProfile(points, offset = 0) {
 
 function appendRoadRibbon(points, width, vertices, indices, options = {}) {
   if (points.length < 2) return;
-  const start = vertices.length / 3;
+  const leftEdge = [];
+  const rightEdge = [];
   for (let i = 0; i < points.length; i += 1) {
     const previous = points[Math.max(0, i - 1)];
     const next = points[Math.min(points.length - 1, i + 1)];
@@ -175,31 +196,17 @@ function appendRoadRibbon(points, width, vertices, indices, options = {}) {
     const halfWidth = width * 0.5;
     const profileY = Number(options.surfaceProfile?.[i]?.y);
     const y = Number.isFinite(profileY) ? profileY : terrainY(points[i].x, points[i].z) + ROAD_SURFACE_OFFSET;
-    vertices.push(
-      points[i].x + nx * halfWidth, y, points[i].z + nz * halfWidth,
-      points[i].x - nx * halfWidth, y, points[i].z - nz * halfWidth
-    );
-    if (i < points.length - 1) {
-      const vi = start + i * 2;
-      indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
-    }
+    leftEdge.push({ x: points[i].x + nx * halfWidth, y, z: points[i].z + nz * halfWidth });
+    rightEdge.push({ x: points[i].x - nx * halfWidth, y, z: points[i].z - nz * halfWidth });
   }
+  appendUpwardRibbonGeometry(leftEdge, rightEdge, vertices, indices);
 }
 
 function appendRoadFeatureRibbon(road, vertices, indices) {
   const edges = buildFeatureRibbonEdges(road, road.pts, road.width * 0.5, terrainY, {
     surfaceBias: ROAD_SURFACE_OFFSET
   });
-  const start = vertices.length / 3;
-  for (let i = 0; i < edges.leftEdge.length; i += 1) {
-    const left = edges.leftEdge[i];
-    const right = edges.rightEdge[i];
-    vertices.push(left.x, left.y, left.z, right.x, right.y, right.z);
-    if (i < edges.leftEdge.length - 1) {
-      const vi = start + i * 2;
-      indices.push(vi, vi + 1, vi + 2, vi + 1, vi + 3, vi + 2);
-    }
-  }
+  appendUpwardRibbonGeometry(edges.leftEdge, edges.rightEdge, vertices, indices);
 }
 
 function createIndexedMesh(vertices, indices, material, userData) {
@@ -216,10 +223,8 @@ function createIndexedMesh(vertices, indices, material, userData) {
 }
 
 function yieldToRenderer() {
-  return new Promise((resolve) => {
-    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => resolve());
-    else setTimeout(resolve, 0);
-  });
+  if (typeof globalThis.scheduler?.yield === 'function') return globalThis.scheduler.yield();
+  return new Promise((resolve) => globalThis.setTimeout(resolve, 0));
 }
 
 
@@ -228,6 +233,7 @@ export {
   ROAD_SURFACE_OFFSET,
   finite,
   stableHash,
+  expandGeographicBounds,
   worldPoint,
   cleanLine,
   cleanRing,

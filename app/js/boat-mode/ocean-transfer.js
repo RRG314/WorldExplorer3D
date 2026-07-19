@@ -96,7 +96,8 @@ async function transferSubmarineToBoat(options = {}) {
   showBoatPrompt('Switching from submarine to surface boat…', 'supported', promptDurationMs);
 
   try {
-    if (typeof appCtx.stopOceanMode === 'function') appCtx.stopOceanMode();
+    appCtx.exitCurrentEnvironmentSync?.(appCtx.ENV?.EARTH, { source: 'submarine_transfer' });
+    appCtx.commitEnvironment?.(appCtx.ENV?.EARTH, { source: 'submarine_transfer' });
     if (typeof appCtx.showTransitionLoad === 'function') {
       await appCtx.showTransitionLoad('earth', 700);
     }

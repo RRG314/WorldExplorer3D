@@ -1,14 +1,15 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
-import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=9";
-import { prepareTitleEnvironment } from "./planetary/entry.js?v=8";
+import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=11";
+import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
 import { initMapInteractions } from "./ui/map-interactions.js?v=59";
 import { initMobileControls } from "./ui/mobile-controls.js?v=63";
 import { initShareUi } from "./ui/share-links.js?v=61";
 import { setupSettingsUi } from "./ui/settings.js?v=1";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=75";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=78";
+import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {
   if (typeof appCtx.tutorialOnEvent === 'function') {
@@ -165,10 +166,10 @@ function setupUI() {
   function goToMainMenu() {
     emitTutorialEvent('opened_main_menu', { source: 'main_menu_button' });
     prepareTitleEnvironment();
+    appCtx.hideLoad?.();
     appCtx.gameStarted = false;appCtx.clearPauseReasons?.();appCtx.clearObjectives();appCtx.clearPolice();appCtx.policeOn = false;appCtx.eraseTrack();appCtx.closePropertyPanel();appCtx.closeHistoricPanel();appCtx.clearPropertyMarkers();appCtx.realEstateMode = false;appCtx.historicMode = false;
     if (typeof appCtx.closeActivityBrowser === 'function') appCtx.closeActivityBrowser();
     if (typeof appCtx.stopBoatMode === 'function' && appCtx.boatMode?.active) appCtx.stopBoatMode({ targetMode: 'walk' });
-    if (typeof appCtx.stopOceanMode === 'function' && appCtx.oceanMode && appCtx.oceanMode.active) appCtx.stopOceanMode();
     if (typeof appCtx.stopFlowerChallenge === 'function') appCtx.stopFlowerChallenge();
     if (typeof appCtx.setBuildModeEnabled === 'function') appCtx.setBuildModeEnabled(false);
     document.querySelectorAll('.floatMenu').forEach((m) => m.classList.remove('open'));
@@ -459,16 +460,14 @@ function setupUI() {
 
   const switchToEarthMode = async () => {
     const comingFromOcean = !!(appCtx.oceanMode && appCtx.oceanMode.active);
-    if (comingFromOcean && typeof appCtx.stopOceanMode === 'function') {
-      appCtx.stopOceanMode();
-    }
+    exitCurrentEnvironmentSync(appCtx.ENV.EARTH, { source: 'earth_menu' });
 
     if (comingFromOcean) {
       await resumeEarthWorldSession({
         transitionDurationMs: 700
       });
-    } else if (typeof appCtx.switchEnv === 'function' && appCtx.ENV && appCtx.ENV.EARTH) {
-      appCtx.switchEnv(appCtx.ENV.EARTH);
+    } else if (appCtx.ENV?.EARTH) {
+      commitEnvironment(appCtx.ENV.EARTH, { source: 'earth_menu' });
     }
 
     updateControlsModeUI();

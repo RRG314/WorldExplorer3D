@@ -88,26 +88,9 @@ function sampleDroneSpawnHeight(x, z) {
     return 10;
   }
 
-  const walkSurfaceY =
-    appCtx.GroundHeight && typeof appCtx.GroundHeight.walkSurfaceY === 'function' ?
-      appCtx.GroundHeight.walkSurfaceY(x, z) :
-      null;
+  const walkSurfaceY = appCtx.SurfaceQuery?.walkAt?.(x, z)?.position?.y;
   if (Number.isFinite(walkSurfaceY)) {
     return applyDroneRoofClearance(x, z, walkSurfaceY, walkSurfaceY + 12);
-  }
-
-  if (typeof appCtx.terrainMeshHeightAt === 'function') {
-    const terrainY = appCtx.terrainMeshHeightAt(x, z);
-    if (Number.isFinite(terrainY)) {
-      return applyDroneRoofClearance(x, z, terrainY, terrainY + 12);
-    }
-  }
-
-  if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
-    const terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
-    if (Number.isFinite(terrainY)) {
-      return applyDroneRoofClearance(x, z, terrainY, terrainY + 12);
-    }
   }
 
   return 50;

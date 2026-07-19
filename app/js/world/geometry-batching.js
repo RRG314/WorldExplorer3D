@@ -172,7 +172,7 @@ export function boundingSphereCenter(mesh, fallbackX = 0, fallbackZ = 0) {
 
 export function disposeSceneMesh(mesh) {
   if (!mesh) return;
-  appCtx.scene.remove(mesh);
+  mesh.parent?.remove?.(mesh);
   if (mesh.geometry) mesh.geometry.dispose();
   if (mesh.material) mesh.material.dispose();
 }

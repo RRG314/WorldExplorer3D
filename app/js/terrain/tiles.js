@@ -3,13 +3,103 @@ import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=16";
-import { queueTerrainImagery } from "./imagery-baseline.js?v=3";
+} from "./surface-profiles.js?v=22";
 
 const TERRAIN_TILE_CACHE_LIMIT = 72;
+const TERRAIN_TILE_MAX_ATTEMPTS = 3;
+const TERRAIN_TILE_RETRY_BASE_MS = 300;
+const TERRAIN_TILE_ATTEMPT_TIMEOUT_MS = 2400;
+const terrainTileLifetime = { failures: 0, retries: 0, recovered: 0 };
+const recentTerrainFailures = new Map();
+const TERRAIN_FAILURE_HISTORY_MS = 30000;
+const TERRAIN_FAILURE_HISTORY_LIMIT = 128;
+
+function terrainNow() {
+  return typeof globalThis.performance?.now === "function" ? globalThis.performance.now() : Date.now();
+}
 
 function touchTerrainTile(tile) {
-  if (tile) tile.lastUsedAt = performance.now();
+  if (tile) tile.lastUsedAt = terrainNow();
+  return tile;
+}
+
+function failTerrainTileAttempt(tile, reason) {
+  if (!tile || tile.evicted || tile.failed) return;
+  tile.loaded = false;
+  tile.loading = false;
+  tile.failed = true;
+  tile.elev = null;
+  tile.failedAt = terrainNow();
+  tile.nextRetryAt = tile.failedAt + TERRAIN_TILE_RETRY_BASE_MS * (2 ** Math.max(0, tile.attempts - 1));
+  tile.lastError = String(reason?.message || reason || "terrain tile request failed").slice(0, 160);
+  terrainTileLifetime.failures += 1;
+  recentTerrainFailures.set(tile.key, { attempts: tile.attempts, failedAt: tile.failedAt });
+  while (recentTerrainFailures.size > TERRAIN_FAILURE_HISTORY_LIMIT) {
+    recentTerrainFailures.delete(recentTerrainFailures.keys().next().value);
+  }
+  tile.resolveReady?.(false);
+}
+
+function startTerrainTileAttempt(tile, z, x, y, deps) {
+  const img = new Image();
+  const attempt = tile.attempts + 1;
+  let resolveReady;
+  tile.ready = new Promise((resolve) => { resolveReady = resolve; });
+  tile.resolveReady = resolveReady;
+  tile.img = img;
+  tile.attempts = attempt;
+  if (attempt > 1) terrainTileLifetime.retries += 1;
+  tile.loaded = false;
+  tile.loading = true;
+  tile.failed = false;
+  tile.lastError = "";
+  img.crossOrigin = "anonymous";
+
+  img.onload = () => {
+    if (tile.evicted || tile.attempts !== attempt) {
+      resolveReady(false);
+      return;
+    }
+    try {
+      const canvas = document.createElement("canvas");
+      canvas.width = 256;
+      canvas.height = 256;
+      const ctx = canvas.getContext("2d", { willReadFrequently: true });
+      ctx.drawImage(img, 0, 0);
+      const { data } = ctx.getImageData(0, 0, 256, 256);
+
+      const elev = new Float32Array(256 * 256);
+      for (let i = 0, p = 0; i < elev.length; i++, p += 4) {
+        elev[i] = decodeTerrariumRGB(data[p], data[p + 1], data[p + 2]);
+      }
+
+      tile.loaded = true;
+      tile.loading = false;
+      tile.failed = false;
+      tile.elev = elev;
+      tile.recovered = attempt > 1;
+      if (tile.recovered) terrainTileLifetime.recovered += 1;
+      recentTerrainFailures.delete(tile.key);
+      touchTerrainTile(tile);
+
+      if (appCtx.terrainGroup && typeof deps.reapplyTerrainMeshHeights === "function") {
+        appCtx.terrainGroup.children.forEach((mesh) => {
+          const tileInfo = mesh.userData?.terrainTile;
+          if (tileInfo && tileInfo.z === z && tileInfo.tx === x && tileInfo.ty === y) {
+            deps.reapplyTerrainMeshHeights(mesh);
+          }
+        });
+      }
+
+      deps.scheduleRoadAndBuildingRebuild?.();
+      resolveReady(true);
+    } catch (error) {
+      console.warn("Terrain tile decode failed:", z, x, y, error);
+      failTerrainTileAttempt(tile, error);
+    }
+  };
+  img.onerror = () => failTerrainTileAttempt(tile, "terrain tile image request failed");
+  img.src = appCtx.TERRAIN_TILE_URL(z, x, y);
   return tile;
 }
 
@@ -37,91 +127,74 @@ export function decodeTerrariumRGB(r, g, b) {
 
 export function getOrLoadTerrainTile(z, x, y, deps = {}) {
   const key = `${z}/${x}/${y}`;
-  if (appCtx.terrainTileCache.has(key)) return touchTerrainTile(appCtx.terrainTileCache.get(key));
+  const cached = appCtx.terrainTileCache.get(key);
+  if (cached) {
+    touchTerrainTile(cached);
+    if (
+      cached.failed &&
+      cached.attempts >= TERRAIN_TILE_MAX_ATTEMPTS &&
+      terrainNow() - cached.failedAt >= TERRAIN_FAILURE_HISTORY_MS
+    ) {
+      cached.attempts = 0;
+      cached.nextRetryAt = terrainNow();
+      recentTerrainFailures.delete(key);
+    }
+    if (
+      cached.failed &&
+      cached.attempts < TERRAIN_TILE_MAX_ATTEMPTS &&
+      terrainNow() >= cached.nextRetryAt
+    ) startTerrainTileAttempt(cached, z, x, y, deps);
+    return cached;
+  }
 
-  const img = new Image();
-  img.crossOrigin = "anonymous";
-  img.src = appCtx.TERRAIN_TILE_URL(z, x, y);
-
-  let resolveReady;
-  const ready = new Promise((resolve) => { resolveReady = resolve; });
+  const recentFailure = recentTerrainFailures.get(key);
+  const initialAttempts = recentFailure && terrainNow() - recentFailure.failedAt <= TERRAIN_FAILURE_HISTORY_MS
+    ? Math.min(TERRAIN_TILE_MAX_ATTEMPTS, Number(recentFailure.attempts) || 0)
+    : 0;
+  if (!initialAttempts) recentTerrainFailures.delete(key);
   const tile = {
-    img,
+    key,
+    img: null,
     loaded: false,
     failed: false,
+    loading: false,
     evicted: false,
     elev: null,
     w: 256,
     h: 256,
-    ready,
-    lastUsedAt: performance.now()
+    ready: null,
+    resolveReady: null,
+    attempts: initialAttempts,
+    recovered: false,
+    failedAt: 0,
+    nextRetryAt: 0,
+    lastError: "",
+    lastUsedAt: terrainNow()
   };
   appCtx.terrainTileCache.set(key, tile);
-
-  img.onload = () => {
-    try {
-      if (tile.evicted) {
-        resolveReady(false);
-        return;
-      }
-      const canvas = document.createElement("canvas");
-      canvas.width = 256;
-      canvas.height = 256;
-      const ctx = canvas.getContext("2d", { willReadFrequently: true });
-      ctx.drawImage(img, 0, 0);
-      const { data } = ctx.getImageData(0, 0, 256, 256);
-
-      const elev = new Float32Array(256 * 256);
-      for (let i = 0, p = 0; i < elev.length; i++, p += 4) {
-        elev[i] = decodeTerrariumRGB(data[p], data[p + 1], data[p + 2]);
-      }
-
-      tile.loaded = true;
-      tile.failed = false;
-      tile.elev = elev;
-      touchTerrainTile(tile);
-
-      if (appCtx.terrainGroup && typeof deps.reapplyTerrainMeshHeights === "function") {
-        appCtx.terrainGroup.children.forEach((mesh) => {
-          const tileInfo = mesh.userData?.terrainTile;
-          if (tileInfo && tileInfo.z === z && tileInfo.tx === x && tileInfo.ty === y) {
-            deps.reapplyTerrainMeshHeights(mesh);
-          }
-        });
-      }
-
-      if (typeof deps.scheduleRoadAndBuildingRebuild === "function") {
-        deps.scheduleRoadAndBuildingRebuild();
-      }
-      resolveReady(true);
-    } catch (e) {
-      console.warn("Terrain tile decode failed:", z, x, y, e);
-      tile.loaded = false;
-      tile.failed = true;
-      tile.elev = null;
-      resolveReady(false);
-    }
-  };
-
-  img.onerror = () => {
-    tile.loaded = false;
+  if (initialAttempts >= TERRAIN_TILE_MAX_ATTEMPTS) {
     tile.failed = true;
-    tile.elev = null;
-    resolveReady(false);
-  };
-
-  return tile;
+    tile.failedAt = recentFailure.failedAt;
+    tile.nextRetryAt = tile.failedAt + TERRAIN_FAILURE_HISTORY_MS;
+    tile.lastError = "terrain tile retry budget exhausted";
+    return tile;
+  }
+  return startTerrainTileAttempt(tile, z, x, y, deps);
 }
 
 export function terrainTileCacheSnapshot() {
   let loaded = 0;
   let pending = 0;
   let failed = 0;
+  let cachedRetries = 0;
+  let cachedRecovered = 0;
   let elevationBytes = 0;
   appCtx.terrainTileCache.forEach((tile) => {
     if (tile?.loaded) loaded += 1;
     else if (tile?.failed) failed += 1;
     else pending += 1;
+    cachedRetries += Math.max(0, Number(tile?.attempts || 0) - 1);
+    if (tile?.recovered) cachedRecovered += 1;
     if (tile?.elev?.byteLength) elevationBytes += tile.elev.byteLength;
   });
   return {
@@ -129,8 +202,14 @@ export function terrainTileCacheSnapshot() {
     loaded,
     pending,
     failed,
+    retries: terrainTileLifetime.retries,
+    recovered: terrainTileLifetime.recovered,
+    failures: terrainTileLifetime.failures,
+    cachedRetries,
+    cachedRecovered,
     elevationBytes,
-    limit: TERRAIN_TILE_CACHE_LIMIT
+    limit: TERRAIN_TILE_CACHE_LIMIT,
+    maxAttempts: TERRAIN_TILE_MAX_ATTEMPTS
   };
 }
 
@@ -164,19 +243,81 @@ export function pruneTerrainTileCache(limit = TERRAIN_TILE_CACHE_LIMIT) {
   return terrainTileCacheSnapshot();
 }
 
+async function waitForTerrainTileReady(z, x, y, deadline, deps) {
+  while (terrainNow() < deadline) {
+    const tile = getOrLoadTerrainTile(z, x, y, deps);
+    if (tile.loaded) return true;
+    if (tile.failed) {
+      if (tile.attempts >= TERRAIN_TILE_MAX_ATTEMPTS) return false;
+      const delay = Math.min(Math.max(0, tile.nextRetryAt - terrainNow()), deadline - terrainNow());
+      if (delay > 0) await new Promise((resolve) => globalThis.setTimeout(resolve, delay));
+      continue;
+    }
+    if (!(tile.ready instanceof Promise)) return false;
+    const remaining = Math.max(0, deadline - terrainNow());
+    const attemptTimeout = Math.min(TERRAIN_TILE_ATTEMPT_TIMEOUT_MS, remaining);
+    const timedOut = Symbol("terrain-timeout");
+    const result = await Promise.race([
+      tile.ready,
+      new Promise((resolve) => globalThis.setTimeout(() => resolve(timedOut), attemptTimeout))
+    ]);
+    if (result === true) return true;
+    if (result === timedOut) {
+      if (tile.img) {
+        tile.img.onload = null;
+        tile.img.onerror = null;
+        tile.img.src = "";
+      }
+      failTerrainTileAttempt(tile, `terrain tile request timed out after ${Math.round(attemptTimeout)}ms`);
+    }
+  }
+  return false;
+}
+
 export async function waitForTerrainReadyAt(x, z, timeoutMs = 3000, deps = {}) {
   const { lat, lon } = worldToLatLon(x, z);
   const tilePoint = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
-  const tile = getOrLoadTerrainTile(appCtx.TERRAIN_ZOOM, tilePoint.x, tilePoint.y, deps);
-  if (tile.loaded) return true;
-  if (tile.failed) return false;
-
   const timeout = Math.max(0, Number(timeoutMs) || 0);
-  if (!(tile.ready instanceof Promise) || timeout === 0) return false;
-  return Promise.race([
-    tile.ready,
-    new Promise((resolve) => globalThis.setTimeout(() => resolve(false), timeout))
-  ]);
+  return waitForTerrainTileReady(
+    appCtx.TERRAIN_ZOOM,
+    tilePoint.x,
+    tilePoint.y,
+    terrainNow() + timeout,
+    deps
+  );
+}
+
+export async function waitForTerrainReadyBounds(bounds, timeoutMs = 6000, deps = {}) {
+  const latN = Number(bounds?.latN);
+  const latS = Number(bounds?.latS);
+  const lonW = Number(bounds?.lonW);
+  const lonE = Number(bounds?.lonE);
+  if (![latN, latS, lonW, lonE].every(Number.isFinite)) return false;
+
+  const zoom = appCtx.TERRAIN_ZOOM;
+  const epsilon = 1e-8;
+  const northWest = latLonToTileXY(latN - epsilon, lonW + epsilon, zoom);
+  const southEast = latLonToTileXY(latS + epsilon, lonE - epsilon, zoom);
+  const minY = Math.min(northWest.y, southEast.y);
+  const maxY = Math.max(northWest.y, southEast.y);
+  const tileCount = 2 ** zoom;
+  const xValues = [];
+  if (lonW <= lonE) {
+    for (let x = Math.min(northWest.x, southEast.x); x <= Math.max(northWest.x, southEast.x); x += 1) xValues.push(x);
+  } else {
+    for (let x = northWest.x; x < tileCount; x += 1) xValues.push(x);
+    for (let x = 0; x <= southEast.x; x += 1) xValues.push(x);
+  }
+  const deadline = terrainNow() + Math.max(0, Number(timeoutMs) || 0);
+  const waits = [];
+  xValues.forEach((x) => {
+    for (let y = minY; y <= maxY; y += 1) {
+      waits.push(waitForTerrainTileReady(zoom, x, y, deadline, deps));
+    }
+  });
+  if (waits.length === 0) return false;
+  const results = await Promise.all(waits);
+  return results.every(Boolean);
 }
 
 export function sampleTileElevationMeters(tile, u, v, clampElevationMeters = null) {
@@ -255,19 +396,24 @@ export function disposeTerrainMesh(mesh) {
   if (!mesh) return;
   if (mesh.userData) mesh.userData.terrainDisposed = true;
   mesh?.userData?.worldCoverAbortController?.abort?.();
-  const worldCoverTexture = mesh?.userData?.worldCoverTexture;
-  if (worldCoverTexture && typeof worldCoverTexture.dispose === "function") {
-    worldCoverTexture.dispose();
-  }
-  const terrainImageryTexture = mesh?.userData?.terrainImageryTexture;
-  if (terrainImageryTexture && typeof terrainImageryTexture.dispose === "function") {
-    terrainImageryTexture.dispose();
-  }
-  const texSet = mesh?.userData?.terrainTextureSet;
-  if (texSet && typeof texSet === "object") {
-    Object.values(texSet).forEach((tex) => {
-      if (tex && typeof tex.dispose === "function") tex.dispose();
-    });
+  const ownedTextures = new Set();
+  const registerTexture = (texture) => {
+    if (texture && typeof texture.dispose === "function") ownedTextures.add(texture);
+  };
+  const registerTextureSet = (textureSet) => {
+    if (!textureSet || typeof textureSet !== "object") return;
+    Object.values(textureSet).forEach(registerTexture);
+  };
+  registerTexture(mesh?.userData?.worldCoverTexture);
+  registerTexture(mesh?.userData?.worldCoverResult?.texture);
+  registerTextureSet(mesh?.userData?.terrainTextureSet);
+  Object.values(mesh?.userData?.terrainTextureSetsByMode || {}).forEach(registerTextureSet);
+  ownedTextures.forEach((texture) => texture.dispose());
+  if (mesh.userData) {
+    mesh.userData.worldCoverTexture = null;
+    mesh.userData.worldCoverResult = null;
+    mesh.userData.terrainTextureSet = null;
+    mesh.userData.terrainTextureSetsByMode = {};
   }
   if (mesh.geometry) mesh.geometry.dispose();
   if (mesh.material) mesh.material.dispose();
@@ -320,9 +466,20 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
   mesh.userData.terrainTileKey = terrainTileMeshKey(z, tx, ty);
   mesh.userData.isTerrainMesh = true;
   mesh.userData.terrainTextureRepeats = repeats;
+  mesh.userData.renderProvenance = {
+    version: 1,
+    profile: appCtx.getContinuousWorldEnabled?.() === true ? 'continuous_global' : 'location_osm',
+    provider: 'AWS Open Data / ESA / mapped vector provider',
+    dataset: 'Mapzen Terrarium elevation + semantic surface classification',
+    release: '',
+    tileKey: mesh.userData.terrainTileKey,
+    layer: 'terrain',
+    role: 'terrain',
+    sources: ['mapzen-terrarium', 'esa-worldcover'],
+    fallback: false
+  };
 
   applyTerrainVisualProfile(mesh, classifyTerrainVisualProfile(bounds), repeats);
-  queueTerrainImagery(mesh, z, tx, ty);
 
   if (typeof deps.applyHeightsToTerrainMesh === "function") {
     deps.applyHeightsToTerrainMesh(mesh);

@@ -1,5 +1,4 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { sampleDynamicWaterAt } from '../boat-mode.js?v=25';
 import {
   getActivityAnchorType,
   getActivityTemplate,
@@ -94,21 +93,19 @@ function fallbackWorldPointFromEvent(event) {
   let x = origin.x;
   let z = origin.z;
   for (let i = 0; i < 3; i += 1) {
-    const walkY = appCtx.GroundHeight?.walkSurfaceY?.(x, z);
-    const terrainY = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ?.(x, z);
-    const targetY = i === 0 ? 0 : (Number.isFinite(walkY) ? walkY : finiteNumber(terrainY, 0));
+    const targetY = i === 0 ? 0 : appCtx.SurfaceQuery?.walkAt?.(x, z)?.position?.y ?? 0;
     const distance = (targetY - origin.y) / direction.y;
     x = origin.x + direction.x * distance;
     z = origin.z + direction.z * distance;
   }
-  const y = appCtx.GroundHeight?.walkSurfaceY?.(x, z) ?? finiteNumber(appCtx.elevationWorldYAtWorldXZ?.(x, z), 0);
+  const y = appCtx.SurfaceQuery?.walkAt?.(x, z)?.position?.y ?? 0;
   return { x, y, z, hitType: 'terrain', object: null, faceNormal: null };
 }
 
 function sampleRoofSurfaceAt(x, z) {
   if (!_downRaycaster || !_downRayStart || !_downRayDir) return null;
   if (!Array.isArray(appCtx.buildingMeshes) || appCtx.buildingMeshes.length === 0) return null;
-  const terrainY = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : finiteNumber(appCtx.elevationWorldYAtWorldXZ?.(x, z), 0);
+  const terrainY = appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y ?? 0;
   _downRayStart.set(x, 1800, z);
   _downRaycaster.set(_downRayStart, _downRayDir);
   const hits = _downRaycaster.intersectObjects(appCtx.buildingMeshes, false);
@@ -132,29 +129,26 @@ function nearestRoadSupport(x, z) {
   const nearest = appCtx.findNearestRoad(x, z);
   if (!nearest?.road) return null;
   const pt = nearest.pt ? { x: nearest.pt.x, z: nearest.pt.z } : { x, z };
-  const y = appCtx.GroundHeight?.roadMeshY?.(pt.x, pt.z) ??
-    appCtx.GroundHeight?.roadSurfaceY?.(pt.x, pt.z) ??
-    finiteNumber(appCtx.elevationWorldYAtWorldXZ?.(pt.x, pt.z), 0);
+  const sample = appCtx.SurfaceQuery?.driveAt?.(pt.x, pt.z, { preferRoad: true, currentY: nearest.y });
   return {
     road: nearest.road,
     dist: finiteNumber(nearest.dist, Infinity),
-    x: pt.x,
-    y: finiteNumber(y, 0),
-    z: pt.z
+    x: sample?.contact?.x ?? pt.x,
+    y: finiteNumber(sample?.position?.y, 0),
+    z: sample?.contact?.z ?? pt.z
   };
 }
 
 function nearestWalkSupport(x, z) {
-  const walkInfo = appCtx.GroundHeight?.walkSurfaceInfo?.(x, z) || null;
-  if (!walkInfo) return null;
-  const pt = walkInfo.pt ? { x: walkInfo.pt.x, z: walkInfo.pt.z } : { x, z };
+  const sample = appCtx.SurfaceQuery?.walkAt?.(x, z) || null;
+  if (!sample) return null;
   return {
-    source: sanitizeText(walkInfo.source || 'terrain', 48).toLowerCase(),
-    feature: walkInfo.feature || null,
-    dist: finiteNumber(walkInfo.dist, Infinity),
-    x: pt.x,
-    y: finiteNumber(walkInfo.y, 0),
-    z: pt.z
+    source: sanitizeText(sample.kind || 'terrain', 48).toLowerCase(),
+    feature: sample.feature || null,
+    dist: finiteNumber(sample.distance, Infinity),
+    x: sample.contact.x,
+    y: sample.position.y,
+    z: sample.contact.z
   };
 }
 
@@ -162,9 +156,9 @@ function nearestWaterSupport(x, z) {
   if (typeof appCtx.inspectBoatCandidate !== 'function') return null;
   const candidate = appCtx.inspectBoatCandidate(x, z, 240, { allowSynthetic: false });
   if (!candidate) return null;
-  const sample = sampleDynamicWaterAt(x, z, candidate, { time: performance.now() * 0.001 });
-  const surfaceY = Number.isFinite(sample?.surfaceY) ? sample.surfaceY : finiteNumber(candidate.surfaceY, 0);
-  const seabedY = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : finiteNumber(appCtx.elevationWorldYAtWorldXZ?.(x, z), surfaceY - 8);
+  const sample = appCtx.SurfaceQuery?.waterAt?.(x, z, { candidate, time: performance.now() * 0.001 });
+  const surfaceY = finiteNumber(sample?.position?.y, candidate.surfaceY);
+  const seabedY = appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y ?? surfaceY - 8;
   return {
     candidate,
     surfaceY,
@@ -220,11 +214,11 @@ function resolvePlacementCandidateFromPointer(event, options = {}) {
 
   const x = finiteNumber(basePoint.x, 0);
   const z = finiteNumber(basePoint.z, 0);
-  const terrainY = typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : finiteNumber(appCtx.elevationWorldYAtWorldXZ?.(x, z), 0);
+  const terrainY = appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y ?? 0;
   const roof = sampleRoofSurfaceAt(x, z);
   const walk = nearestWalkSupport(x, z);
   const road = nearestRoadSupport(x, z);
-  const interior = typeof appCtx.sampleInteriorWalkSurface === 'function' ? appCtx.sampleInteriorWalkSurface(x, z) : null;
+  const interior = walk?.source === 'interior' ? { y: walk.y, feature: walk.feature } : null;
   const water = nearestWaterSupport(x, z);
   const requestedOffset = finiteNumber(options.heightOffset, anchorType.defaultHeightOffset || 0);
 

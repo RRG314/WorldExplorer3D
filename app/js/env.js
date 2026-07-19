@@ -3,7 +3,8 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 // ============================================================================
 // Single source of truth for which environment is active.
 // Only ONE environment can be active at a time.
-// All transitions go through switchEnv() which syncs legacy flags.
+// session-coordinator.js owns transition requests and commits through switchEnv().
+// This module only validates and records the final environment identity.
 //
 // Render layer order:
 //   EARTH:        main renderLoop → update() → renderer.render(scene, camera)

@@ -5,7 +5,7 @@ import {
   buildMergedGeometry,
   disposeSceneMesh,
   materialBatchKey
-} from "./geometry-batching.js?v=2";
+} from "./geometry-batching.js?v=4";
 
 export function batchLanduseMeshes() {
   try {
@@ -32,6 +32,10 @@ export function batchLanduseMeshes() {
       }
       const type = mesh.userData?.landuseType || 'unknown';
       const isWaterwayLine = !!mesh.userData?.isWaterwayLine;
+      if (type === 'water' || isWaterwayLine) {
+        keep.push(mesh);
+        continue;
+      }
       const key = `${type}|${isWaterwayLine ? 1 : 0}|${mesh.renderOrder || 0}|${matKey}`;
 
       if (!groups.has(key)) {

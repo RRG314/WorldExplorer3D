@@ -153,8 +153,12 @@ function maybeRebaseEarthOrigin(actor, snapshot) {
   if (!appCtx.initialEarthWorldRetired || !actor) return false;
   if (performance.now() - lastRebaseAt < REBASE_COOLDOWN_MS) return false;
   if (Math.hypot(Number(actor.x) || 0, Number(actor.z) || 0) < REBASE_DISTANCE_WORLD) return false;
-  const vectorLayer = snapshot?.layers?.['osm-vector'];
-  if (Number(vectorLayer?.loaded || 0) < 6 || Number(vectorLayer?.pending || 0) > 2) return false;
+  const vectorLayer = snapshot?.layers?.['global-vector'];
+  if (
+    vectorLayer?.centerLoaded !== true ||
+    Number(vectorLayer?.loadedNearCenter || 0) < 6 ||
+    Number(vectorLayer?.pending || 0) > 2
+  ) return false;
   return rebaseEarthOrigin(actor);
 }
 

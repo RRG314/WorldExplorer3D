@@ -97,7 +97,7 @@ function createMoonLandingUiApi(context) {
       date: 'July 20, 1969',
       crew: 'Neil Armstrong, Buzz Aldrin, Michael Collins',
       location: 'Mare Tranquillitatis',
-      coordinates: '0.67408°N, 23.47297°E',
+      coordinates: '0.67416°N, 23.47314°E',
       landingTime: '20:17:40 UTC',
       quote: '"That\'s one small step for man, one giant leap for mankind."'
     };

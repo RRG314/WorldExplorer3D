@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=9";
+import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=11";
 import {
   cycleTimeOfDay as cycleSkyTimeOfDay,
   getAstronomicalSkySnapshot,
@@ -15,10 +15,15 @@ import {
   createStarField,
   highlightConstellation,
   showStarInfo
-} from "./sky/starfield-ui.js?v=10";
+} from "./sky/starfield-ui.js?v=11";
 import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
-import { createMoonSurface as createMoonSurfaceRuntime } from "./sky/moon-surface.js?v=1";
-import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=8";
+import { createMoonSurface as createMoonSurfaceRuntime } from "./sky/moon-surface.js?v=2";
+import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
+import {
+  commitEnvironment,
+  exitCurrentEnvironmentSync,
+  registerEnvironmentLifecycle
+} from './session-coordinator.js?v=2';
 // ============================================================================
 // sky.js - Time of day, starfield, constellations, moon system
 // ============================================================================
@@ -103,11 +108,13 @@ function runTimedCameraTransition({
 
 // Direct travel to moon (bypasses space flight module)
 async function directTravelToMoon() {
-  if (appCtx.travelingToMoon || appCtx.onMoon) return;
+  if (appCtx.onMoon) return true;
+  if (appCtx.travelingToMoon) return false;
 
   if (typeof appCtx.showTransitionLoad === 'function') {
     await appCtx.showTransitionLoad('moon');
-    if (appCtx.travelingToMoon || appCtx.onMoon) return;
+    if (appCtx.onMoon) return true;
+    if (appCtx.travelingToMoon) return false;
   }
 
   appCtx.setEnvironmentTransitionActive(true);
@@ -119,30 +126,25 @@ async function directTravelToMoon() {
     angle: appCtx.car.angle
   };
   captureEarthWorldSession();
-  suspendEarthModesForPlanetaryEntry();
+  suspendEarthModesForPlanetaryEntry(appCtx.ENV.MOON);
 
   appCtx.setPauseReason?.('planetary_transition', true);
   appCtx.scene.background = new THREE.Color(0x000000);
 
-  if (appCtx.terrainGroup) {appCtx.terrainGroup.visible = false;appCtx.scene.remove(appCtx.terrainGroup);}
-  if (appCtx.cloudGroup) {appCtx.cloudGroup.visible = false;appCtx.scene.remove(appCtx.cloudGroup);}
-  appCtx.roadMeshes.forEach((m) => {m.visible = false;appCtx.scene.remove(m);});
-  appCtx.buildingMeshes.forEach((m) => {m.visible = false;appCtx.scene.remove(m);});
-  appCtx.landuseMeshes.forEach((m) => {m.visible = false;appCtx.scene.remove(m);});
-  appCtx.poiMeshes.forEach((m) => {m.visible = false;appCtx.scene.remove(m);});
-  appCtx.streetFurnitureMeshes.forEach((m) => {m.visible = false;appCtx.scene.remove(m);});
-
   const moonPos = appCtx.moonSphere.position.clone();
   const startPos = appCtx.camera.position.clone();
-  runTimedCameraTransition({
-    duration: 3000,
-    onFrame: (eased) => {
-      appCtx.camera.position.lerpVectors(startPos, moonPos, eased);
-      appCtx.camera.lookAt(moonPos);
-    },
-    onComplete: () => {
-      arriveAtMoon();
-    }
+  return new Promise((resolve) => {
+    runTimedCameraTransition({
+      duration: 3000,
+      onFrame: (eased) => {
+        appCtx.camera.position.lerpVectors(startPos, moonPos, eased);
+        appCtx.camera.lookAt(moonPos);
+      },
+      onComplete: () => {
+        arriveAtMoon();
+        resolve(appCtx.getEnv?.() === appCtx.ENV.MOON);
+      }
+    });
   });
 }
 
@@ -176,48 +178,13 @@ async function travelToMoon() {
     angle: appCtx.car.angle
   };
   captureEarthWorldSession();
-  suspendEarthModesForPlanetaryEntry();
+  suspendEarthModesForPlanetaryEntry(appCtx.ENV.MOON);
 
   // Disable controls during travel
   appCtx.setPauseReason?.('planetary_transition', true);
 
   // IMMEDIATELY set background to black for space
   appCtx.scene.background = new THREE.Color(0x000000);
-
-  // IMMEDIATELY hide Earth terrain to prevent "green sheet" during travel
-  if (appCtx.terrainGroup) {
-    appCtx.terrainGroup.visible = false;
-    appCtx.scene.remove(appCtx.terrainGroup);
-  }
-  if (appCtx.cloudGroup) {
-    appCtx.cloudGroup.visible = false;
-    appCtx.scene.remove(appCtx.cloudGroup);
-  }
-
-  // Hide Earth ground plane (grass texture fallback)
-  appCtx.scene.traverse((obj) => {
-    if (obj.userData && obj.userData.isGroundPlane) {
-      obj.visible = false;
-    }
-  });
-
-  // Remove all city meshes from scene
-  appCtx.roadMeshes.forEach((m) => {
-    m.visible = false;
-    appCtx.scene.remove(m);
-  });
-  appCtx.buildingMeshes.forEach((m) => {
-    m.visible = false;
-    appCtx.scene.remove(m);
-  });
-  appCtx.landuseMeshes.forEach((m) => {
-    m.visible = false;
-    appCtx.scene.remove(m);
-  });
-  appCtx.poiMeshes.forEach((m) => {
-    m.visible = false;
-    appCtx.scene.remove(m);
-  });
 
   // Get moon position
   const moonPos = appCtx.moonSphere.position.clone();
@@ -238,9 +205,9 @@ async function travelToMoon() {
 function arriveAtMoon() {
   // Debug log removed
 
-  suspendEarthModesForPlanetaryEntry();
+  suspendEarthModesForPlanetaryEntry(appCtx.ENV.MOON);
 
-  appCtx.switchEnv(appCtx.ENV.MOON); // sets onMoon=true, travelingToMoon=false
+  commitEnvironment(appCtx.ENV.MOON, { source: 'moon_arrival' });
   appCtx.setEarthSceneVisible?.(false);
   emitTutorialEvent('entered_moon', { source: 'moon_arrival' });
   const weatherPanel = document.getElementById('weatherPanel');
@@ -275,50 +242,6 @@ function arriveAtMoon() {
   if (directBtn) directBtn.textContent = '🌍 Return to Earth';
   if (rocketBtn) rocketBtn.textContent = '🌍 Return to Earth';
 
-  // Earth terrain already hidden during travel animation
-
-  // Hide ALL earth objects to prevent any flash of earth ground
-  if (appCtx.terrainGroup) {
-    appCtx.terrainGroup.visible = false;
-    appCtx.scene.remove(appCtx.terrainGroup);
-  }
-  if (appCtx.cloudGroup) {
-    appCtx.cloudGroup.visible = false;
-    appCtx.scene.remove(appCtx.cloudGroup);
-  }
-  appCtx.scene.traverse((obj) => {
-    if (obj.userData && obj.userData.isGroundPlane) {
-      obj.visible = false;
-    }
-  });
-  // Force-hide Earth world meshes here as a final guard. This keeps the moon
-  // scene clean even if an Earth load finished moments before/after transition.
-  appCtx.roadMeshes.forEach((m) => {
-    if (!m) return;
-    m.visible = false;
-    appCtx.scene.remove(m);
-  });
-  appCtx.buildingMeshes.forEach((m) => {
-    if (!m) return;
-    m.visible = false;
-    appCtx.scene.remove(m);
-  });
-  appCtx.landuseMeshes.forEach((m) => {
-    if (!m) return;
-    m.visible = false;
-    appCtx.scene.remove(m);
-  });
-  appCtx.poiMeshes.forEach((m) => {
-    if (!m) return;
-    m.visible = false;
-    appCtx.scene.remove(m);
-  });
-  appCtx.streetFurnitureMeshes.forEach((m) => {
-    if (!m) return;
-    m.visible = false;
-    appCtx.scene.remove(m);
-  });
-
   // Hide moon sphere (we're on it now!)
   appCtx.moonSphere.visible = false;
   if (appCtx.moonSphere.userData.glow) appCtx.moonSphere.userData.glow.visible = false;
@@ -339,11 +262,14 @@ function arriveAtMoon() {
     if (window._moonObjects) {
       window._moonObjects.forEach((obj) => {obj.visible = true;appCtx.scene.add(obj);});
     }
-    // Position car immediately if moonSurface already exists
-    positionCarOnMoon();
-    // Show car and unpause now that moon is ready
-    if (appCtx.carMesh) appCtx.carMesh.visible = true;
-    appCtx.setPauseReason?.('planetary_transition', false);
+    const resumeMoon = () => {
+      if (!appCtx.onMoon) return;
+      positionCarOnMoon();
+      if (appCtx.carMesh) appCtx.carMesh.visible = true;
+      appCtx.setPauseReason?.('planetary_transition', false);
+    };
+    if (appCtx.moonSurfaceReady?.then) void appCtx.moonSurfaceReady.then(resumeMoon);
+    else resumeMoon();
   }
   void appCtx.setPlanetaryVehicle?.('moon');
   appCtx.setPlanetaryCharacter?.('moon');
@@ -418,13 +344,12 @@ async function arriveAtEarth(expectedSessionId = null) {
     arrivalSessionId === earthArrivalSessionId &&
     (!appCtx.ENV?.EARTH || appCtx.getEnv?.() === appCtx.ENV.EARTH)
   );
-  if (appCtx.spaceFlight?.active && typeof appCtx.exitSpaceFlight === 'function') {
-    appCtx.exitSpaceFlight();
-  }
+  exitCurrentEnvironmentSync(appCtx.ENV.EARTH, { source: 'moon_return' });
   appCtx.earthResumePending = true;
   appCtx.setPauseReason?.('planetary_transition', true);
-  appCtx.switchEnv(appCtx.ENV.EARTH); // sets onMoon=false, travelingToMoon=false
+  commitEnvironment(appCtx.ENV.EARTH, { source: 'moon_return' });
   appCtx.setLunarEarthVisible?.(false);
+  appCtx.clearPlanetarySky?.();
   await appCtx.setPlanetaryVehicle?.('earth');
   if (!isCurrentArrival()) {
     appCtx.earthResumePending = false;
@@ -440,16 +365,6 @@ async function arriveAtEarth(expectedSessionId = null) {
   const rocketBtn = document.getElementById('fSpaceRocket');
   if (directBtn) directBtn.textContent = '🌙 Direct to Moon';
   if (rocketBtn) rocketBtn.textContent = '🚀 Rocket to Moon';
-
-  // Hide moon surface
-  // Hide ALL moon objects (surface, flag, beacon, plaque, pole, footprints)
-  if (appCtx.moonSurface) {appCtx.moonSurface.visible = false;appCtx.scene.remove(appCtx.moonSurface);}
-  if (window.apollo11Beacon) {window.apollo11Beacon.visible = false;appCtx.scene.remove(window.apollo11Beacon);}
-  const apollo11Flag = getApollo11Flag();
-  if (apollo11Flag) {apollo11Flag.visible = false;appCtx.scene.remove(apollo11Flag);}
-  if (window._moonObjects) {
-    window._moonObjects.forEach((obj) => {obj.visible = false;appCtx.scene.remove(obj);});
-  }
 
   // Restore Earth lighting
   if (appCtx.sun) {
@@ -488,6 +403,38 @@ async function arriveAtEarth(expectedSessionId = null) {
 Object.defineProperty(appCtx, 'apollo11Flag', {
   configurable: true,
   get: getApollo11Flag
+});
+
+function suspendMoonEnvironment() {
+  hideReturnToEarthButton();
+  appCtx.setLunarEarthVisible?.(false);
+  if (appCtx.moonSurface) {
+    appCtx.moonSurface.visible = false;
+    if (appCtx.moonSurface.parent === appCtx.scene) appCtx.scene.remove(appCtx.moonSurface);
+  }
+  if (window.apollo11Beacon) {
+    window.apollo11Beacon.visible = false;
+    if (window.apollo11Beacon.parent === appCtx.scene) appCtx.scene.remove(window.apollo11Beacon);
+  }
+  const apollo11Flag = getApollo11Flag();
+  if (apollo11Flag) {
+    apollo11Flag.visible = false;
+    if (apollo11Flag.parent === appCtx.scene) appCtx.scene.remove(apollo11Flag);
+  }
+  (window._moonObjects || []).forEach((object) => {
+    object.visible = false;
+    if (object.parent === appCtx.scene) appCtx.scene.remove(object);
+  });
+}
+
+registerEnvironmentLifecycle(appCtx.ENV.MOON, {
+  exitSync: suspendMoonEnvironment,
+  snapshot: () => ({
+    active: appCtx.getEnv?.() === appCtx.ENV.MOON,
+    objectCount: (window._moonObjects || []).length,
+    surfaceAttached: appCtx.moonSurface?.parent === appCtx.scene,
+    surfaceVisible: !!appCtx.moonSurface?.visible
+  })
 });
 
 Object.assign(appCtx, {

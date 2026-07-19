@@ -223,6 +223,7 @@ Object.assign(appCtx, {
   getShadowMapResolution,
   getSsaoEnabled,
   init,
+  isLikelyMobileDevice,
   setSsaoEnabled,
   setHighQualityEnabled,
   setRenderQualityLevel,

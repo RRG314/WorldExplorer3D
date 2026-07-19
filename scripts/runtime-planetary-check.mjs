@@ -64,13 +64,21 @@ export async function exercisePlanetaryRoundTrip(page) {
       'landuseMeshes', 'linearFeatureMeshes', 'poiMeshes', 'historicMarkers', 'streetFurnitureMeshes',
       'vegetationMeshes'
     ];
+    const isEffectivelyVisible = (object) => {
+      let current = object;
+      while (current) {
+        if (current.visible === false) return false;
+        current = current.parent;
+      }
+      return !!object?.parent;
+    };
     return {
       env: ctx.getEnv?.(),
       earthFixed: earthBefore.length === 3 && earthBefore.every((value, index) =>
         Math.abs(value - earthAfter[index]) < 1e-9
       ),
       earthLeakCount: lists.reduce((total, name) =>
-        total + (ctx[name] || []).filter((object) => object?.visible && object?.parent).length, 0
+        total + (ctx[name] || []).filter(isEffectivelyVisible).length, 0
       ),
       astronautGear: !!ctx.Walk?.state?.characterMesh?.getObjectByName?.('Planetary Astronaut Gear'),
       minimapVisible: getComputedStyle(document.getElementById('minimap')).display !== 'none',

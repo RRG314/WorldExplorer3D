@@ -397,7 +397,10 @@ async function runAudit(page, baseUrl) {
     const mod = await import('/app/js/shared-context.js?v=55');
     const ctx = mod?.ctx || {};
     if (typeof ctx.ensureOverlayRuntimeReady === 'function') {
-      await ctx.ensureOverlayRuntimeReady();
+      await Promise.race([
+        ctx.ensureOverlayRuntimeReady(),
+        new Promise((resolve) => window.setTimeout(() => resolve('timeout'), 20000))
+      ]);
     }
     return ctx.getApprovedEditorContributionSnapshot?.() || null;
   });
@@ -462,14 +465,44 @@ async function runAudit(page, baseUrl) {
   }, spaceRoom);
 
   console.log('[audit] cleanup to earth');
-  await page.evaluate(async (room) => {
+  report.multiplayer.cleanupBefore = await page.evaluate(async () => {
     const mod = await import('/app/js/shared-context.js?v=55');
     const ctx = mod?.ctx || {};
+    return {
+      env: ctx.getEnv?.() || null,
+      initialEarthWorldReady: ctx.initialEarthWorldReady === true,
+      loadedSelectionCurrent: ctx.isLoadedLocationSelectionCurrent?.() ?? null,
+      buildingDetailStatus: ctx.worldDetailState?.buildings?.status || null,
+      roads: Number(ctx.roads?.length || 0),
+      buildings: Number(ctx.buildings?.length || 0),
+      worldLoading: ctx.worldLoading === true,
+      coordinator: ctx.getSessionCoordinatorDebugState?.() || null
+    };
+  });
+  console.log('[audit] cleanup state', JSON.stringify(report.multiplayer.cleanupBefore));
+  report.multiplayer.cleanupTransition = await page.evaluate(async (room) => {
+    const mod = await import('/app/js/shared-context.js?v=55');
+    const ctx = mod?.ctx || {};
+    let outcome = 'room_sync';
     if (ctx.spaceFlight?.active && typeof ctx.arriveAtEarth === 'function') {
-      await ctx.arriveAtEarth();
-      return;
+      outcome = await Promise.race([
+        ctx.arriveAtEarth().then((value) => value === false ? 'superseded' : 'arrived'),
+        new Promise((resolve) => window.setTimeout(() => resolve('timeout'), 25000))
+      ]);
+    } else {
+      await ctx.syncMultiplayerRoomWorld(room, { force: true, respawn: false });
     }
-    await ctx.syncMultiplayerRoomWorld(room, { force: true, respawn: false });
+    return {
+      outcome,
+      env: ctx.getEnv?.() || null,
+      initialEarthWorldReady: ctx.initialEarthWorldReady === true,
+      loadedSelectionCurrent: ctx.isLoadedLocationSelectionCurrent?.() ?? null,
+      roads: Number(ctx.roads?.length || 0),
+      buildings: Number(ctx.buildings?.length || 0),
+      worldLoading: ctx.worldLoading === true,
+      earthResumePending: ctx.earthResumePending === true,
+      transition: ctx.getSessionCoordinatorDebugState?.() || null
+    };
   }, earthRoom);
 
   console.log('[audit] final snapshot');
@@ -479,9 +512,16 @@ async function runAudit(page, baseUrl) {
     return {
       onMoon: !!ctx.onMoon,
       spaceFlightActive: !!ctx.spaceFlight?.active,
-      selLoc: ctx.selLoc
+      selLoc: ctx.selLoc,
+      earthSceneRoot: {
+        attached: ctx.earthSceneRoot?.parent === ctx.scene,
+        children: Number(ctx.earthSceneRoot?.children?.length || 0),
+        visible: ctx.earthSceneRoot?.visible === true
+      }
     };
   });
+  await settleVisualFrame(page);
+  await page.screenshot({ path: path.join(outputDir, 'earth-after-space-return.png') });
 
   return report;
 }
@@ -513,8 +553,16 @@ function assertReport(report) {
   if (report.multiplayer.earthSync?.selLoc !== 'custom') throw new Error('Earth room sync did not set custom Earth location.');
   if (report.multiplayer.moonSync?.onMoon !== true) throw new Error('Moon room sync did not enter Moon runtime.');
   if (report.multiplayer.spaceSync?.spaceFlightActive !== true) throw new Error('Space room sync did not enter Space runtime.');
+  if (report.multiplayer.cleanupTransition?.outcome !== 'arrived') {
+    throw new Error(`Space-to-Earth cleanup did not finish: ${JSON.stringify(report.multiplayer.cleanupTransition)}`);
+  }
   if (report.multiplayer.cleanup?.onMoon !== false || report.multiplayer.cleanup?.spaceFlightActive !== false) {
     throw new Error('Cleanup did not return runtime to Earth.');
+  }
+  if (!report.multiplayer.cleanup?.earthSceneRoot?.attached ||
+    !report.multiplayer.cleanup?.earthSceneRoot?.visible ||
+    report.multiplayer.cleanup?.earthSceneRoot?.children < 1) {
+    throw new Error('Cleanup returned to Earth without a visible, populated Earth scene owner.');
   }
 }
 

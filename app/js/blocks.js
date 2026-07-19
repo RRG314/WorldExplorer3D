@@ -306,11 +306,9 @@ function getBuildReferencePosition() {
 }
 
 function getSurfaceYAt(x, z) {
-  if (appCtx.activeInterior && typeof appCtx.sampleInteriorWalkSurface === 'function') {
-    const interiorSurface = appCtx.sampleInteriorWalkSurface(x, z);
-    if (interiorSurface && Number.isFinite(interiorSurface.y)) {
-      return interiorSurface.y;
-    }
+  if (appCtx.activeInterior) {
+    const interiorY = appCtx.SurfaceQuery?.walkAt?.(x, z)?.position?.y;
+    if (Number.isFinite(interiorY)) return interiorY;
   }
   if (appCtx.onMoon && appCtx.moonSurface && typeof appCtx._getPhysRaycaster === 'function' && appCtx._physRayStart && appCtx._physRayDir) {
     const raycaster = appCtx._getPhysRaycaster();
@@ -319,9 +317,7 @@ function getSurfaceYAt(x, z) {
     const hits = raycaster.intersectObject(appCtx.moonSurface, false);
     if (hits.length > 0) return hits[0].point.y;
   }
-  if (typeof appCtx.terrainMeshHeightAt === 'function') return appCtx.terrainMeshHeightAt(x, z);
-  if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') return appCtx.elevationWorldYAtWorldXZ(x, z);
-  return 0;
+  return appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y ?? 0;
 }
 
 function persistPlacedBuildBlock(gx, gy, gz, materialIndex, shape, rotation) {

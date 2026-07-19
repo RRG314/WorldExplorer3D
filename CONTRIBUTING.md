@@ -22,22 +22,26 @@ git clone https://github.com/RRG314/WorldExplorer3D.git
 cd WorldExplorer3D
 npm install
 cd functions && npm install && cd ..
-python3 -m http.server --directory public 4173
+npm run build:hosting -- --firebase-env staging
+python3 -m http.server --directory dist 4173
 ```
 
 ## 3. Source-of-Truth Rule
 
 Canonical runtime source is `app/*`.
 Canonical landing/account sources are `index.html` and `account/index.html`. The separate `github-pages/` directory contains only the public project explainer.
+Firebase Hosting output is generated into ignored `dist/`; it is not a second source tree.
 
 Required before merge/deploy:
 
 ```bash
-npm run sync:public
-npm run verify:mirror
+npm run build:hosting -- --firebase-env staging
+npm run verify:hosting
+npm run audit:reachability
 ```
 
-Do not merge gameplay/UI/runtime changes without mirror parity.
+Do not merge gameplay/UI/runtime changes unless the generated hosting artifact matches canonical source and reports a traceable build ID.
+Do not retain superseded runtime modules: the reachability audit must report zero orphan JavaScript or CSS files.
 
 ## 4. Minimum Validation Before PR
 

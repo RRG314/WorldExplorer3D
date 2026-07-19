@@ -1,5 +1,13 @@
 export function setupEngineInputHandlers(appCtx) {
   const wrapYaw = (angle = 0) => Math.atan2(Math.sin(angle), Math.cos(angle));
+  const gameplayKeys = new Set([
+    'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+    'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX', 'KeyZ'
+  ]);
+  const isFormControl = (target) => !!target && (
+    target.isContentEditable ||
+    ['INPUT', 'TEXTAREA', 'SELECT', 'BUTTON'].includes(target.tagName)
+  );
 
   addEventListener('resize', () => {
     appCtx.camera.aspect = innerWidth / innerHeight;
@@ -16,6 +24,10 @@ export function setupEngineInputHandlers(appCtx) {
   });
 
   addEventListener('keydown', (e) => {
+    if (isFormControl(e.target)) return;
+    if (appCtx.gameStarted && gameplayKeys.has(e.code)) {
+      e.preventDefault();
+    }
     appCtx.keys[e.code] = true;
     appCtx.onKey(e.code, e);
   });

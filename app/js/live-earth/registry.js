@@ -2,14 +2,14 @@ const LIVE_EARTH_CATEGORIES = [
   {
     id: 'space',
     label: 'Space',
-    summary: 'Orbital systems, launch infrastructure, and near-Earth awareness.',
-    layers: ['satellites', 'space-weather', 'near-earth-objects', 'rocket-launches']
+    summary: 'Operational satellite tracking and local-sky visibility.',
+    layers: ['satellites']
   },
   {
     id: 'planet',
     label: 'Planet Activity',
-    summary: 'Geologic activity, volcanic systems, and surface risk watch.',
-    layers: ['earthquakes', 'volcanoes', 'wildfires']
+    summary: 'Recent observed earthquake activity from the USGS feed.',
+    layers: ['earthquakes']
   },
   {
     id: 'atmosphere',
@@ -22,12 +22,6 @@ const LIVE_EARTH_CATEGORIES = [
     label: 'Transport',
     summary: 'Air and marine movement context around the world.',
     layers: ['ships', 'aircraft']
-  },
-  {
-    id: 'reality',
-    label: 'Media & Places',
-    summary: 'Curated real-world viewing and public place context.',
-    layers: ['live-media']
   }
 ];
 
@@ -42,36 +36,6 @@ const LIVE_EARTH_LAYERS = {
     summary: 'Track a curated set of stations, Earth-observation, and weather satellites.',
     localSummary: 'Selected satellites can appear in the local sky when above the horizon.'
   },
-  'space-weather': {
-    id: 'space-weather',
-    categoryId: 'space',
-    label: 'Space Weather',
-    shortLabel: 'Space Wx',
-    status: 'preview',
-    globeMode: 'preview',
-    summary: 'Solar weather context, aurora outlook guidance, and local sky readiness.',
-    localSummary: 'Uses the current sky, orbital catalog, and globe selection to explain what space-weather conditions matter here.'
-  },
-  'near-earth-objects': {
-    id: 'near-earth-objects',
-    categoryId: 'space',
-    label: 'Near-Earth Objects',
-    shortLabel: 'NEOs',
-    status: 'preview',
-    globeMode: 'preview',
-    summary: 'Curated near-Earth object awareness and observation context.',
-    localSummary: 'Shows notable observation targets and explains where this layer is headed next.'
-  },
-  'rocket-launches': {
-    id: 'rocket-launches',
-    categoryId: 'space',
-    label: 'Rocket Launches',
-    shortLabel: 'Launches',
-    status: 'preview',
-    globeMode: 'preview',
-    summary: 'Launch sites, orbital corridors, and the next expansion path for launch tracking.',
-    localSummary: 'Uses curated launch-space regions so Live Earth stays useful before a full launch feed is attached.'
-  },
   earthquakes: {
     id: 'earthquakes',
     categoryId: 'planet',
@@ -81,26 +45,6 @@ const LIVE_EARTH_LAYERS = {
     globeMode: 'markers',
     summary: 'Recent USGS earthquakes with travel and local replay context.',
     localSummary: 'Travel to an event and replay a lightweight local shake.'
-  },
-  volcanoes: {
-    id: 'volcanoes',
-    categoryId: 'planet',
-    label: 'Volcanoes',
-    shortLabel: 'Volcanoes',
-    status: 'preview',
-    globeMode: 'preview',
-    summary: 'Major volcanic systems, observatory context, and travel-ready hotspots.',
-    localSummary: 'Curated volcanic systems are available now while the fuller observatory feed is staged.'
-  },
-  wildfires: {
-    id: 'wildfires',
-    categoryId: 'planet',
-    label: 'Wildfires',
-    shortLabel: 'Wildfires',
-    status: 'preview',
-    globeMode: 'preview',
-    summary: 'Fire-weather watchpoints and smoke-risk context for selected regions.',
-    localSummary: 'This beta layer explains likely fire-weather pressure until a dedicated incident feed is attached.'
   },
   weather: {
     id: 'weather',
@@ -139,8 +83,8 @@ const LIVE_EARTH_LAYERS = {
     shortLabel: 'Ships',
     status: 'implemented',
     globeMode: 'markers-tracks',
-    summary: 'Moving shipping lanes, major marine corridors, and active vessel context.',
-    localSummary: 'Shows active vessel markers and major shipping corridors across the globe.'
+    summary: 'Modeled vessel movement along major marine corridors.',
+    localSummary: 'Shows explicitly modeled vessel markers and major shipping corridors across the globe.'
   },
   aircraft: {
     id: 'aircraft',
@@ -149,18 +93,8 @@ const LIVE_EARTH_LAYERS = {
     shortLabel: 'Aircraft',
     status: 'implemented',
     globeMode: 'markers-tracks',
-    summary: 'Moving flights, major air corridors, and global airway context.',
-    localSummary: 'Shows active aircraft markers and major route corridors across the globe.'
-  },
-  'live-media': {
-    id: 'live-media',
-    categoryId: 'reality',
-    label: 'Curated Live Media',
-    shortLabel: 'Live Media',
-    status: 'preview',
-    globeMode: 'preview',
-    summary: 'Curated public-viewing regions, landmark cameras, and media-ready places.',
-    localSummary: 'This beta layer highlights where a future curated media window system can attach cleanly.'
+    summary: 'Modeled flights along major air corridors.',
+    localSummary: 'Shows explicitly modeled aircraft markers and major route corridors across the globe.'
   }
 };
 

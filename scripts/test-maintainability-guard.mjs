@@ -12,6 +12,25 @@ const WORLD_COLLECTIONS = [
   'structureVisualMeshes', 'pois', 'poiMeshes', 'historicSites', 'historicMarkers',
   'streetFurnitureMeshes', 'vegetationFeatures', 'vegetationMeshes'
 ];
+const SURFACE_CONTRACT_CONSUMERS = new Set([
+  'activity-editor/environment.js',
+  'blocks.js',
+  'editor/geometry.js',
+  'flower-challenge/marker-runtime.js',
+  'game/navigation-ui.js',
+  'game/paint-town/claims.js',
+  'game/paint-town/projectiles.js',
+  'hud.js',
+  'interiors/core.js',
+  'memory.js',
+  'physics.js',
+  'physics/drone-flight.js',
+  'plane-mode.js',
+  'travel-mode.js',
+  'walking/physics.js',
+  'walking/terrain.js',
+  'world/spawn-surface.js'
+]);
 
 const LEGACY_LINE_BUDGETS = Object.freeze({});
 
@@ -50,6 +69,18 @@ for (const file of files) {
     failures.push(`${relative}: writes environment surface flags owned by env.js`);
   }
 
+  if (relative !== 'env.js' && relative !== 'session-coordinator.js' && /(?:appCtx\.)?switchEnv\s*\(/.test(source)) {
+    failures.push(`${relative}: commits environment state outside session-coordinator.js`);
+  }
+
+  if (relative !== 'space.js' && /(?:appCtx\.)?exitSpaceFlight\s*\(/.test(source)) {
+    failures.push(`${relative}: tears down Space outside its lifecycle adapter`);
+  }
+
+  if (relative !== 'ocean.js' && /(?:appCtx\.)?stopOceanMode\s*\(/.test(source)) {
+    failures.push(`${relative}: tears down Ocean outside its lifecycle adapter`);
+  }
+
   if (relative !== 'pause-state.js' && /appCtx\.paused\s*=/.test(source)) {
     failures.push(`${relative}: writes pause state instead of using pause-state.js`);
   }
@@ -85,6 +116,13 @@ for (const file of files) {
   ) {
     failures.push(`${relative}: UI/input code calls a walking-mode implementation instead of travel-mode.js`);
   }
+
+  if (
+    SURFACE_CONTRACT_CONSUMERS.has(relative) &&
+    /appCtx\.(?:GroundHeight|terrainMeshHeightAt|elevationWorldYAtWorldXZ|sampleInteriorWalkSurface|sampleDynamicWaterAt)/.test(source)
+  ) {
+    failures.push(`${relative}: bypasses SurfaceQuery from a migrated runtime consumer`);
+  }
 }
 
 for (const legacyFile of Object.keys(LEGACY_LINE_BUDGETS)) {
@@ -102,4 +140,4 @@ if (failures.length > 0) {
 const legacyCount = Object.keys(LEGACY_LINE_BUDGETS).length;
 console.log(`[maintainability] ${files.length} modules checked; no file exceeds ${ABSOLUTE_MAX_LINES} lines.`);
 console.log(`[maintainability] New modules are capped at ${DEFAULT_MAX_LINES} lines; ${legacyCount} legacy modules cannot grow.`);
-console.log('[maintainability] Environment and UI travel-state ownership checks passed.');
+console.log('[maintainability] Environment, travel-state, and migrated surface-query ownership checks passed.');

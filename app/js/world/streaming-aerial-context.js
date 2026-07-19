@@ -4,7 +4,8 @@ import {
   buildStreamingBuildingVisuals,
   buildStreamingRoadVisuals,
   queueGeometryDisposal
-} from "./streaming-vector-chunks.js?v=32";
+} from "./streaming-vector-chunks.js?v=52";
+import { SOURCE_PROFILE } from "./surface-contract.js?v=6";
 
 function removeMeshesInPlace(source, removed) {
   if (!Array.isArray(source)) return [];
@@ -23,6 +24,8 @@ async function loadAerialContextChunk(request) {
   const chunk = {
     key: `aerial:${request.z}/${request.x}/${request.y}`,
     tile: request,
+    surfaceTile: request.surfaceTile || null,
+    featureBudget: {},
     meshes: [],
     roadMeshes: [],
     buildingMeshes: [],
@@ -85,14 +88,16 @@ function initStreamingAerialContext() {
   appCtx._streamingAerialContextRegistered = true;
   appCtx.aerialContextMeshes = Array.isArray(appCtx.aerialContextMeshes) ? appCtx.aerialContextMeshes : [];
   appCtx.unregisterStreamingAerialContext = appCtx.registerEarthStreamLayer('aerial-vector', {
-    activeWhen: () => !!appCtx.initialEarthWorldReady,
+    activeWhen: () => !!appCtx.initialEarthWorldReady && appCtx.getContinuousWorldEnabled?.() !== true,
     availableWhenDisabled: true,
     centerWhen: aerialContextCenter,
     loadChunk: loadAerialContextChunk,
     maxActive: 25,
     maxConcurrent: 3,
     priorityBias: 0.8,
+    profile: SOURCE_PROFILE.LOCATION_OSM,
     radius: 2,
+    sources: ['osm-shortbread'],
     unloadChunk: disposeAerialContextChunk,
     zoom: 13
   });

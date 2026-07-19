@@ -404,15 +404,7 @@ export function updatePaintballProjectiles(dt) {
     }
 
     if (!consumed) {
-      let terrainY = -Infinity;
-      if (typeof appCtx.terrainMeshHeightAt === "function") {
-        const height = appCtx.terrainMeshHeightAt(shot.mesh.position.x, shot.mesh.position.z);
-        if (Number.isFinite(height)) terrainY = height;
-      }
-      if (!Number.isFinite(terrainY) && typeof appCtx.elevationWorldYAtWorldXZ === "function") {
-        const height = appCtx.elevationWorldYAtWorldXZ(shot.mesh.position.x, shot.mesh.position.z);
-        if (Number.isFinite(height)) terrainY = height;
-      }
+      const terrainY = appCtx.SurfaceQuery?.terrainAt?.(shot.mesh.position.x, shot.mesh.position.z)?.position?.y;
       if (Number.isFinite(terrainY) && shot.mesh.position.y <= terrainY + 0.1) {
         spawnPaintSplatAt({ x: shot.mesh.position.x, y: terrainY, z: shot.mesh.position.z }, shot.colorHex);
         consumed = true;

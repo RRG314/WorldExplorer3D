@@ -11,19 +11,19 @@ let _boatTimer = 0;
 let _liveEarthTimer = 0;
 const OVERLAY_EDGE_MARGIN = 6;
 const OVERLAY_ANCHOR_GAP = 10;
-const DEFAULT_LOADING_BG = 'loading-bg.jpg';
+const DEFAULT_LOADING_BG = '../assets/landing/city.jpg';
 const TRANSITION_LOADING = {
-  earth: { background: 'loading-bg.jpg', text: 'Restoring Earth...' },
-  space: { background: 'space-transition.png', text: 'Preparing Space Flight...' },
-  moon: { background: 'moon-transition.png', text: 'Approaching The Moon...' },
-  mars: { background: 'space-transition.png', text: 'Approaching Olympus Mons...' },
-  ocean: { background: 'loading-bg.jpg', text: 'Diving Into Ocean Mode...' }
+  earth: { background: DEFAULT_LOADING_BG, text: 'Restoring Earth...' },
+  space: { background: '../assets/landing/space.jpg', text: 'Preparing Space Flight...' },
+  moon: { background: '../assets/landing/moon.jpg', text: 'Approaching The Moon...' },
+  mars: { background: '../assets/landing/space.jpg', text: 'Approaching Olympus Mons...' },
+  ocean: { background: DEFAULT_LOADING_BG, text: 'Diving Into Ocean Mode...' }
 };
 const LOADING_BG_BY_MODE = {
   earth: DEFAULT_LOADING_BG,
-  moon: 'moon-transition.png',
-  mars: 'space-transition.png',
-  space: 'space-transition.png',
+  moon: '../assets/landing/moon.jpg',
+  mars: '../assets/landing/space.jpg',
+  space: '../assets/landing/space.jpg',
   ocean: DEFAULT_LOADING_BG
 };
 
@@ -122,6 +122,7 @@ function renderLoop(t = 0) {
     if (typeof appCtx.kickOptionalRuntimeBoot === 'function') {
       appCtx.kickOptionalRuntimeBoot('main_loop');
     }
+    appCtx.updateControlInput?.();
     appCtx.update(dt);
     if (typeof appCtx.updateEarthWorldStreaming === 'function') {
       appCtx.updateEarthWorldStreaming(dt);

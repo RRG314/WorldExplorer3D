@@ -33,7 +33,12 @@ import {
   resolveBoatSpawnPoint,
   segmentDistanceInfo,
   shortestAngleDelta
-} from './water-geometry.js?v=1';
+} from './water-geometry.js?v=2';
+import {
+  normalizeWaterBody,
+  resolveWaterBodySurfaceY,
+  waterKindLabel
+} from '../world/water-body-contract.js?v=2';
 
 let _waterRaycaster = null;
 let _waterRayStart = null;
@@ -62,23 +67,31 @@ function buildSyntheticBoatCandidate(x, z, options = {}) {
       z: z + Math.sin(angle) * radius
     });
   }
+  const surfaceY = waterSurfaceBaseYAt(x, z, { waterKind });
+  const source = normalizeWaterBody({
+    shape: 'area',
+    synthetic: true,
+    type: 'synthetic_water',
+    pts,
+    area: Math.PI * radius * radius,
+    centerX: x,
+    centerZ: z,
+    surfaceY,
+    bounds: {
+      minX: x - radius,
+      maxX: x + radius,
+      minZ: z - radius,
+      maxZ: z + radius
+    },
+    kindHint: waterKind,
+    geometrySource: 'synthetic-transition',
+    datumMethod: waterKind === 'open_ocean' ? 'sea-level' : 'terrain-fallback',
+    datumConfidence: 0.35
+  });
   return {
     type: 'area',
     synthetic: true,
-    source: {
-      type: 'synthetic_water',
-      pts,
-      area: Math.PI * radius * radius,
-      centerX: x,
-      centerZ: z,
-      surfaceY: waterSurfaceBaseYAt(x, z, { waterKind }),
-      bounds: {
-        minX: x - radius,
-        maxX: x + radius,
-        minZ: z - radius,
-        maxZ: z + radius
-      }
-    },
+    source,
     waterKind,
     label: waterKindLabel(waterKind),
     inside: true,
@@ -90,8 +103,14 @@ function buildSyntheticBoatCandidate(x, z, options = {}) {
     spawnZ: z,
     centerX: x,
     centerZ: z,
-    surfaceY: waterSurfaceBaseYAt(x, z, { waterKind })
+    surfaceY
   };
+}
+
+function isSyntheticBoatCandidate(candidate) {
+  return candidate?.synthetic === true ||
+    candidate?.source?.synthetic === true ||
+    candidate?.source?.provenance?.dataset === 'synthetic-transition';
 }
 
 function resolveBoatWaterKind(candidate = null) {
@@ -113,18 +132,16 @@ function getBoatWaveProfile(candidate = null, options = {}) {
 }
 
 function waterSurfaceBaseYAt(x, z, candidate = null) {
-  if (candidate?.type === 'waterway') {
-    const source = candidate?.source || candidate;
-    const profileY = sampleWaterwaySurfaceProfile(source?.surfaceProfile, x, z);
-    if (Number.isFinite(profileY)) return profileY;
-    const terrainY = typeof appCtx.terrainMeshHeightAt === 'function' ?
-      appCtx.terrainMeshHeightAt(x, z) :
-      appCtx.elevationWorldYAtWorldXZ(x, z);
-    const bias = Number.isFinite(candidate?.surfaceY) ? Number(candidate.surfaceY) : 0.14;
-    if (Number.isFinite(terrainY)) return terrainY + bias;
+  const source = candidate?.source || candidate;
+  if (source && (source.waterSchemaVersion || Number.isFinite(source.surfaceY) || source.surfaceProfile)) {
+    return resolveWaterBodySurfaceY(candidate, x, z, {
+      sampleWaterwayProfile: sampleWaterwaySurfaceProfile,
+      terrainHeightAt: (sampleX, sampleZ) => typeof appCtx.terrainMeshHeightAt === 'function'
+        ? appCtx.terrainMeshHeightAt(sampleX, sampleZ)
+        : appCtx.elevationWorldYAtWorldXZ(sampleX, sampleZ),
+      waterwayBias: 0.14
+    });
   }
-
-  if (Number.isFinite(candidate?.surfaceY)) return Number(candidate.surfaceY);
 
   ensureRaycaster();
   if (_waterRaycaster && Array.isArray(_cachedWaterMeshes) && _cachedWaterMeshes.length > 0) {
@@ -168,14 +185,6 @@ function syncWaterMeshCache() {
     if (mesh.userData?.isWaterwayLine) return true;
     return mesh.userData?.landuseType === 'water' || mesh.userData?.surfaceVariant === 'water' || mesh.userData?.surfaceVariant === 'ice';
   });
-}
-
-function waterKindLabel(kind) {
-  if (kind === 'open_ocean') return 'Open Water';
-  if (kind === 'coastal') return 'Coastal Water';
-  if (kind === 'harbor') return 'Harbor Water';
-  if (kind === 'channel') return 'Channel Water';
-  return 'Lake Water';
 }
 
 function localizeWaterKind(kind, shorelineDistance = 0) {
@@ -355,8 +364,21 @@ function findNearestBoatCandidate(x, z, maxDistance = BOAT_MAX_CANDIDATE_DISTANC
   }
 
   if (!best && options?.allowSynthetic === true) {
+    const previous = options.syntheticCandidate;
+    if (isSyntheticBoatCandidate(previous) && previous?.source) {
+      const source = previous.source;
+      const stats = source._boatStats || polygonStats(source.pts || []);
+      source._boatStats = stats;
+      const centerX = Number.isFinite(source.centerX) ? source.centerX : stats.centerX;
+      const centerZ = Number.isFinite(source.centerZ) ? source.centerZ : stats.centerZ;
+      const radius = Math.max(80, stats.minSpan * 0.5);
+      if (Math.hypot(x - centerX, z - centerZ) < radius * 0.52) {
+        const continued = buildAreaCandidate(source, x, z);
+        if (continued) return { ...continued, synthetic: true };
+      }
+    }
     return buildSyntheticBoatCandidate(x, z, {
-      waterKind: options.waterKind || 'open_ocean'
+      waterKind: options.waterKind || previous?.source?.waterKind || previous?.waterKind || 'open_ocean'
     });
   }
 
@@ -387,6 +409,7 @@ export {
   getBoatWaveProfile,
   getReferencePosition,
   isPointInsideWaterFootprint,
+  isSyntheticBoatCandidate,
   localizeBoatCandidate,
   measureBoatShorelineDistance,
   minimumBoatShorelineDistance,

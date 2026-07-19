@@ -171,7 +171,9 @@ export async function enterInteriorForSupport(support, deps) {
     z: deps.finiteNumber(walker.z, 0),
     y: deps.finiteNumber(walker.y, 0),
     yaw: deps.finiteNumber(walker.yaw || walker.angle, 0),
-    angle: deps.finiteNumber(walker.angle, 0)
+    angle: deps.finiteNumber(walker.angle, 0),
+    pitch: deps.finiteNumber(walker.pitch, 0),
+    lookYawOffset: deps.finiteNumber(walker.lookYawOffset, 0)
   };
 
   walker.x = sceneState.entryPoint.x;
@@ -180,6 +182,8 @@ export async function enterInteriorForSupport(support, deps) {
   const entryYaw = Math.atan2(sceneState.center.x - walker.x, sceneState.center.z - walker.z);
   walker.angle = entryYaw;
   walker.yaw = entryYaw;
+  walker.pitch = 0;
+  walker.lookYawOffset = 0;
   walker.vy = 0;
   if (appCtx.car) {
     appCtx.car.x = walker.x;
@@ -187,9 +191,9 @@ export async function enterInteriorForSupport(support, deps) {
   }
   const previousView = appCtx.Walk?.state?.view || "third";
   if (appCtx.Walk?.state) {
-    appCtx.Walk.state.view = previousView === "first" ? "third" : previousView;
+    appCtx.Walk.state.view = "first";
     if (appCtx.Walk.state.characterMesh) {
-      appCtx.Walk.state.characterMesh.visible = appCtx.Walk.state.view !== "first";
+      appCtx.Walk.state.characterMesh.visible = false;
     }
   }
 
@@ -250,6 +254,8 @@ export function clearActiveInterior(options = {}, deps) {
     walker.y = active.outsideState.y;
     walker.yaw = active.outsideState.yaw;
     walker.angle = active.outsideState.angle;
+    walker.pitch = deps.finiteNumber(active.outsideState.pitch, 0);
+    walker.lookYawOffset = deps.finiteNumber(active.outsideState.lookYawOffset, 0);
     walker.vy = 0;
     if (appCtx.car) {
       appCtx.car.x = walker.x;

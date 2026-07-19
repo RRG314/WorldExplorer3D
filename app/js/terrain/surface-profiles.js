@@ -5,7 +5,7 @@ import {
 import {
   loadWorldCoverBaseline,
   worldCoverSupportsBounds
-} from "./worldcover-baseline.js?v=4";
+} from "./worldcover-baseline.js?v=7";
 
 const SNOW_COLOR_HEX = 0xffffff;
 const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
@@ -415,13 +415,7 @@ function classifyWorldCoverSurfaceProfile(mesh, result) {
 function applyLoadedWorldCoverBaseline(mesh) {
   const result = mesh?.userData?.worldCoverResult;
   const material = mesh?.material;
-  if (!result?.texture || !material || Array.isArray(material) || mesh.userData?.terrainDisposed) return false;
-  if (mesh.userData.terrainImageryStatus !== 'ready') {
-    material.map = result.texture;
-    material.color.setHex(0xffffff);
-    material.needsUpdate = true;
-  }
-  mesh.userData.worldCoverTexture = result.texture;
+  if (!result || !material || Array.isArray(material) || mesh.userData?.terrainDisposed) return false;
   mesh.userData.worldCoverStatus = 'ready';
   mesh.userData.worldCoverSummary = {
     key: result.key,
@@ -435,11 +429,40 @@ function applyLoadedWorldCoverBaseline(mesh) {
   if (semanticProfile) {
     mesh.userData.terrainVisualProfile = semanticProfile;
     mesh.userData.worldCoverSurfaceMode = semanticProfile.mode;
-    if (semanticProfile.mode === 'sand') material.roughness = 0.92;
-    else if (semanticProfile.mode === 'rock') material.roughness = 0.87;
-    else if (semanticProfile.mode === 'snow') material.roughness = 0.94;
+    applyTerrainVisualProfile(mesh, semanticProfile, null, { queueWorldCover: false });
   }
+  if (result.texture) {
+    material.map = result.texture;
+    material.normalMap = null;
+    material.roughnessMap = null;
+    material.color.setHex(0xffffff);
+    material.emissiveMap = null;
+    material.emissiveIntensity = 0;
+    material.roughness = 0.96;
+    material.metalness = 0;
+    material.needsUpdate = true;
+  }
+  mesh.userData.worldCoverTexture = result.texture || null;
   return true;
+}
+
+function applyPendingSemanticSurface(material, mode) {
+  const color = mode === 'snow' ? SNOW_COLOR_HEX :
+    mode === 'snowRock' ? ALPINE_SNOW_COLOR_HEX :
+    mode === 'sand' ? SAND_COLOR_HEX :
+    mode === 'built' || mode === 'urban' ? URBAN_GROUND_HEX :
+    mode === 'soil' ? SOIL_COLOR_HEX :
+    mode === 'rock' ? ROCK_COLOR_HEX :
+    TERRAIN_GRASS_COLOR_HEX;
+  material.map = null;
+  material.normalMap = null;
+  material.roughnessMap = null;
+  material.color.setHex(color);
+  material.emissiveMap = null;
+  material.emissiveIntensity = 0;
+  material.roughness = 0.96;
+  material.metalness = 0;
+  material.needsUpdate = true;
 }
 
 function queueWorldCoverBaseline(mesh, bounds) {
@@ -464,7 +487,7 @@ function queueWorldCoverBaseline(mesh, bounds) {
   const distanceFromWorldCenter = Math.hypot(Number(mesh.position?.x || 0), Number(mesh.position?.z || 0));
   mesh.userData.worldCoverPromise = loadWorldCoverBaseline(bounds, {
     key,
-    size: 64,
+    size: 128,
     signal: controller.signal,
     priority: Math.max(0, 100000 - distanceFromWorldCenter)
   })
@@ -493,7 +516,7 @@ function queueWorldCoverBaseline(mesh, bounds) {
     });
 }
 
-export function applyTerrainVisualProfile(mesh, profile, repeats = null) {
+export function applyTerrainVisualProfile(mesh, profile, repeats = null, options = {}) {
   if (!mesh || !mesh.material || Array.isArray(mesh.material)) return;
   if (!mesh.userData) mesh.userData = {};
   const mat = mesh.material;
@@ -512,6 +535,17 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null) {
     repeats :
     Number(mesh.userData.terrainTextureRepeats) || 12;
   mesh.userData.terrainTextureRepeats = textureRepeats;
+
+  const pendingContinuousSemanticSurface =
+    appCtx.getContinuousWorldEnabled?.() === true &&
+    !mesh.userData.worldCoverResult;
+  if (pendingContinuousSemanticSurface) {
+    applyPendingSemanticSurface(mat, nextMode);
+    mesh.userData.terrainVisualProfile = nextProfile;
+    applyGroundFallbackProfile(nextProfile);
+    if (options.queueWorldCover !== false) queueWorldCoverBaseline(mesh, tileBounds);
+    return;
+  }
 
   if (nextMode === "snow" || nextMode === "snowRock") {
     const textures = ensureTerrainTextureSet(mesh, textureRepeats, nextMode);
@@ -594,15 +628,9 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null) {
 
   mesh.userData.terrainVisualProfile = nextProfile;
   applyGroundFallbackProfile(nextProfile);
-  if (mesh.userData.terrainImageryStatus === 'ready' && mesh.userData.terrainImageryTexture) {
-    mat.map = mesh.userData.terrainImageryTexture;
-    mat.color.setHex(0xffffff);
-    if (mat.emissive) mat.emissive.setHex(0xffffff);
-    mat.emissiveMap = mesh.userData.terrainImageryTexture;
-    mat.emissiveIntensity = 0.035;
-  }
+  mat.emissiveMap = null;
   mat.needsUpdate = true;
-  queueWorldCoverBaseline(mesh, tileBounds);
+  if (options.queueWorldCover !== false) queueWorldCoverBaseline(mesh, tileBounds);
 }
 
 export function refreshTerrainSurfaceProfiles(profile = null) {

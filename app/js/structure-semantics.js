@@ -417,14 +417,17 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
     const leftZ = point.z + nz * halfWidth;
     const rightX = point.x - nx * halfWidth;
     const rightZ = point.z - nz * halfWidth;
+    const atGrade = feature.structureSemantics?.terrainMode === 'at_grade';
+    const leftY = atGrade ? Number(sampleTerrainY(leftX, leftZ)) + baseTopBias : centerY;
+    const rightY = atGrade ? Number(sampleTerrainY(rightX, rightZ)) + baseTopBias : centerY;
     leftEdge.push({
       x: leftX,
-      y: centerY,
+      y: Number.isFinite(leftY) ? leftY : centerY,
       z: leftZ
     });
     rightEdge.push({
       x: rightX,
-      y: centerY,
+      y: Number.isFinite(rightY) ? rightY : centerY,
       z: rightZ
     });
   }

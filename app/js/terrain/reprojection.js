@@ -1,7 +1,9 @@
 import {
   buildFeatureRibbonEdges,
   isRoadSurfaceReachable
-} from "../structure-semantics.js?v=12";
+} from "../structure-semantics.js?v=13";
+import { waterSurfaceBaseElevation } from "../world/load-geometry.js?v=15";
+import { reconcileWaterBodySurface } from '../world/water-body-contract.js?v=2';
 
 function createTerrainReprojectionApi(deps = {}) {
   const {
@@ -229,12 +231,14 @@ function createTerrainReprojectionApi(deps = {}) {
       const pts = mesh.userData.landuseFootprint;
       if (!pts || pts.length === 0) return;
 
-      let avgElevation = 0;
+      const sampledHeights = [];
       pts.forEach((p) => {
-        avgElevation += terrainMeshHeightAt(p.x, p.z);
+        sampledHeights.push(terrainMeshHeightAt(p.x, p.z));
       });
-      avgElevation /= pts.length;
       const isWaterPolygon = mesh.userData?.landuseType === "water";
+      const avgElevation = isWaterPolygon
+        ? waterSurfaceBaseElevation(sampledHeights)
+        : sampledHeights.reduce((sum, value) => sum + value, 0) / sampledHeights.length;
       mesh.position.y = avgElevation;
 
       const positions = mesh.geometry.attributes.position;
@@ -252,7 +256,15 @@ function createTerrainReprojectionApi(deps = {}) {
       }
       positions.needsUpdate = true;
       mesh.geometry.computeVertexNormals();
-      if (isWaterPolygon) mesh.userData.waterSurfaceBase = avgElevation;
+      if (isWaterPolygon) {
+        mesh.userData.waterSurfaceBase = avgElevation;
+        if (mesh.userData.waterAreaRef) {
+          reconcileWaterBodySurface(mesh.userData.waterAreaRef, avgElevation + vertexOffset, {
+            datumMethod: 'terrain-reprojection',
+            datumConfidence: 0.92
+          });
+        }
+      }
     });
 
     appCtx.linearFeatureMeshes.forEach((mesh) => {

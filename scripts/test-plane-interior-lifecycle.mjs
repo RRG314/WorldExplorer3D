@@ -68,6 +68,60 @@ async function exerciseLifecycle(page) {
     for (let i = 0; i < 45; i++) ctx.updatePlane(1 / 60);
     ctx.keys.ArrowUp = false;
     const noseDownPitch = ctx.planeMode.pitch;
+    ctx.planeMode.throttle = 0.6;
+    ctx.keys.ControlLeft = true;
+    ctx.keys.ArrowDown = true;
+    for (let i = 0; i < 20; i++) ctx.updatePlane(1 / 60);
+    ctx.keys.ControlLeft = false;
+    ctx.keys.ArrowDown = false;
+    const controlChordThrottle = ctx.planeMode.throttle;
+    ctx.keys.KeyZ = true;
+    for (let i = 0; i < 20; i++) ctx.updatePlane(1 / 60);
+    ctx.keys.KeyZ = false;
+    const zThrottle = ctx.planeMode.throttle;
+    ctx.planeMode.throttle = 0.4;
+    ctx.keys.KeyX = true;
+    for (let i = 0; i < 20; i++) ctx.updatePlane(1 / 60);
+    ctx.keys.KeyX = false;
+    const xThrottle = ctx.planeMode.throttle;
+    const gameplayArrow = new KeyboardEvent('keydown', {
+      code: 'ArrowLeft',
+      key: 'ArrowLeft',
+      bubbles: true,
+      cancelable: true
+    });
+    window.dispatchEvent(gameplayArrow);
+    window.dispatchEvent(new KeyboardEvent('keyup', { code: 'ArrowLeft', key: 'ArrowLeft', bubbles: true }));
+    const formControl = document.createElement('input');
+    document.body.appendChild(formControl);
+    const formArrow = new KeyboardEvent('keydown', {
+      code: 'ArrowLeft',
+      key: 'ArrowLeft',
+      bubbles: true,
+      cancelable: true
+    });
+    formControl.dispatchEvent(formArrow);
+    formControl.remove();
+    const inputOwnership = {
+      gameplayArrowClaimed: gameplayArrow.defaultPrevented,
+      formArrowClaimed: formArrow.defaultPrevented,
+      scrollY: window.scrollY
+    };
+
+    const originalGetGamepads = navigator.getGamepads?.bind(navigator);
+    const buttons = Array.from({ length: 16 }, () => ({ pressed: false, value: 0 }));
+    buttons[7] = { pressed: true, value: 1 };
+    Object.defineProperty(navigator, 'getGamepads', {
+      configurable: true,
+      value: () => [{ connected: true, id: 'Phase 6 Test Pad', axes: [0.5, 0.75, -0.4, 0.3], buttons }]
+    });
+    ctx.updateControlInput();
+    const gamepadActions = ctx.getControlInputSnapshot('plane');
+    Object.defineProperty(navigator, 'getGamepads', {
+      configurable: true,
+      value: originalGetGamepads || (() => [])
+    });
+    ctx.updateControlInput();
 
     ctx.setTravelMode('plane', {
       source: 'plane_interior_acceptance',
@@ -184,8 +238,6 @@ async function exerciseLifecycle(page) {
       walker.angle = Math.atan2(active.center.x - walker.x, active.center.z - walker.z);
       walker.yaw = walker.angle;
       walker.lookYawOffset = 0;
-      ctx.Walk.state.view = 'third';
-      if (ctx.Walk.state.characterMesh) ctx.Walk.state.characterMesh.visible = true;
 
       const start = { x: walker.x, z: walker.z, lookYawOffset: walker.lookYawOffset };
       const entryCollision = ctx.checkBuildingCollision?.(walker.x, walker.z, 0.28, {
@@ -241,7 +293,7 @@ async function exerciseLifecycle(page) {
         altitudeDelta: drone.y - beforeDrone.y
       },
       impact,
-      planeControls: { pullUpPitch, noseDownPitch },
+      planeControls: { pullUpPitch, noseDownPitch, controlChordThrottle, zThrottle, xThrottle, inputOwnership, gamepadActions },
       driveExit,
       interior: {
         entered: !!entered && !!active,
@@ -254,6 +306,7 @@ async function exerciseLifecycle(page) {
         layoutKind: active?.layoutKind,
         colliderCount: ctx.dynamicBuildingColliders?.length || 0,
         footprintPoints: active?.usableFootprint?.length || 0,
+        view: ctx.Walk.state.view,
         movement: interiorMovement
       }
     };
@@ -291,6 +344,15 @@ async function main() {
     assert(report.impact.lastImpactAt > 0 && report.impact.speed <= 5, `Building impact did not settle: ${JSON.stringify(report.impact)}`);
     assert(report.planeControls.pullUpPitch > 0.1, `Arrow Down did not pull the plane nose up: ${JSON.stringify(report.planeControls)}`);
     assert(report.planeControls.noseDownPitch < -0.1, `Arrow Up did not push the plane nose down: ${JSON.stringify(report.planeControls)}`);
+    assert(Math.abs(report.planeControls.controlChordThrottle - 0.6) < 0.02, `Control changed plane throttle: ${JSON.stringify(report.planeControls)}`);
+    assert(report.planeControls.zThrottle < 0.5, `Z did not reduce plane throttle: ${JSON.stringify(report.planeControls)}`);
+    assert(report.planeControls.xThrottle > 0.5, `X did not increase plane throttle: ${JSON.stringify(report.planeControls)}`);
+    assert(report.planeControls.inputOwnership.gameplayArrowClaimed, 'Gameplay arrow key was not claimed from the browser');
+    assert(!report.planeControls.inputOwnership.formArrowClaimed, 'Form control arrow key was incorrectly claimed');
+    assert(report.planeControls.inputOwnership.scrollY === 0, 'Gameplay arrow key scrolled the page');
+    assert(report.planeControls.gamepadActions?.device === 'gamepad', 'Gamepad was not recognized');
+    assert(report.planeControls.gamepadActions.actions.pitch > 0.5, 'Gamepad pitch was not inverted');
+    assert(report.planeControls.gamepadActions.actions.throttleAdjust > 0.5, 'Gamepad throttle was not mapped');
     assert(report.driveExit.mode === 'drive', `Plane-to-drive resolved as ${report.driveExit.mode}`);
     assert(report.driveExit.switchMs <= MODE_SWITCH_BUDGET_MS, `Plane-to-drive stalled for ${report.driveExit.switchMs}ms`);
     assert(!report.driveExit.blocked, `Plane-to-drive spawned inside a building: ${JSON.stringify(report.driveExit)}`);
@@ -299,6 +361,7 @@ async function main() {
     assert(report.interior.usableRatio >= 0.75, `Interior uses only ${(report.interior.usableRatio * 100).toFixed(1)}% of its footprint`);
     assert(report.interior.colliderCount >= report.interior.footprintPoints, 'Interior shell is missing collision walls');
     assert(report.interior.partitionCount > 0, 'Large generated interior has no room circulation plan');
+    assert(report.interior.view === 'first', `Interior did not use the first-person camera: ${JSON.stringify(report.interior)}`);
     assert(report.interior.movement?.moved > 0.35, `Arrow movement was blocked inside the building: ${JSON.stringify(report.interior.movement)}`);
     assert(report.interior.movement?.cameraPositionDelta < 0.05, `WASD camera input moved the character: ${JSON.stringify(report.interior.movement)}`);
     assert(report.interior.movement?.cameraYawDelta > 0.2, `WASD did not control the interior camera: ${JSON.stringify(report.interior.movement)}`);

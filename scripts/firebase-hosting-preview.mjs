@@ -3,7 +3,6 @@
 import {
   firstPositional,
   parseFlag,
-  readDefaultFirebaseProjectId,
   runFirebase,
   runNodeScript
 } from './firebase-hosting-utils.mjs';
@@ -22,14 +21,12 @@ if (!channelId) {
 }
 
 try {
-  console.log(`[preview:deploy] Applying Firebase config environment "${configEnv}"`);
-  runNodeScript('scripts/apply-firebase-config.mjs', [configEnv], cwd);
+  console.log(`[preview:deploy] Building immutable hosting artifact for Firebase environment "${configEnv}"`);
+  runNodeScript('scripts/hosting-artifact.mjs', ['build', '--firebase-env', configEnv], cwd);
 
   if (!skipChecks) {
-    console.log(`[preview:deploy] Syncing canonical app files into public/`);
-    runNodeScript('scripts/sync-public-app.mjs', [], cwd);
-    console.log(`[preview:deploy] Verifying mirror parity`);
-    runNodeScript('scripts/verify-mirror.mjs', [], cwd);
+    console.log('[preview:deploy] Verifying hosting artifact identity and source parity');
+    runNodeScript('scripts/hosting-artifact.mjs', ['verify'], cwd);
   }
 
   console.log(`[preview:deploy] Deploying Firebase Hosting preview channel "${channelId}" for project "${projectId}"`);

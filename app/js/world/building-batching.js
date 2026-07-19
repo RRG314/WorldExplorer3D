@@ -5,7 +5,7 @@ import {
   disposeSceneMesh,
   materialBatchKey,
   appendGeometryWithTransform
-} from "./geometry-batching.js?v=2";
+} from "./geometry-batching.js?v=4";
 import { restoreFacadeWallMask } from "../engine/building-facade-shader.js?v=1";
 
 const BUILDING_BATCH_CELL_METERS = 420;

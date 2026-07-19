@@ -15,7 +15,7 @@ import {
   toggleOrbits as toggleSolarSystemOrbitsImpl,
   toggleSolarSystem as toggleSolarSystemImpl,
   updateSolarSystem as updateSolarSystemImpl
-} from "./solar-system/ui.js?v=11";
+} from "./solar-system/ui.js?v=12";
 import {
   ASTEROID_BELT,
   AU_TO_SCENE,
@@ -28,7 +28,7 @@ import {
   PLANET_MOONS,
   SOLAR_SYSTEM_PLANETS,
   SPACECRAFT
-} from "./solar-system/catalog.js?v=4";
+} from "./solar-system/catalog.js?v=5";
 import {
   createSpacecraft as createSolarSystemSpacecraft,
   updateSpacecraftPositions as updateSolarSystemSpacecraftPositions

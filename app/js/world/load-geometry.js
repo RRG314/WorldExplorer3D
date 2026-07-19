@@ -3,7 +3,7 @@ import {
   classifyWaterSurfaceProfile,
   normalizeLanduseSurfaceType
 } from "../surface-rules.js?v=15";
-import { geometryHasFinitePositions } from "./geometry-batching.js?v=2";
+import { geometryHasFinitePositions } from "./geometry-batching.js?v=4";
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
@@ -256,18 +256,7 @@ export function buildWaterGeometryGuards(baseGuards) {
   };
 }
 
-export function waterSurfaceBaseElevation(heights) {
-  if (!Array.isArray(heights) || heights.length === 0) return 0;
-  const finite = heights.filter((value) => Number.isFinite(value));
-  if (finite.length === 0) return 0;
-  finite.sort((a, b) => a - b);
-  const min = finite[0];
-  const percentileIdx = Math.max(0, Math.min(finite.length - 1, Math.floor((finite.length - 1) * 0.12)));
-  const representativeSurface = Math.min(finite[percentileIdx], min + 0.1);
-  // Elevation tiles report bathymetry below oceans. Surface water remains at
-  // sea level; seabed depth belongs to underwater terrain, not surface height.
-  return representativeSurface < -1 ? 0 : representativeSurface;
-}
+export { waterSurfaceBaseElevation } from './water-body-contract.js?v=2';
 
 export function resolveWaterSurfaceVisualProfile(bounds = null) {
   const surfaceProfile = classifyWaterSurfaceProfile({

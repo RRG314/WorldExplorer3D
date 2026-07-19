@@ -1,8 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { ENV, getEnv, switchEnv } from "../env.js?v=57";
-import { createGlobeSelector } from "./globe-selector.js?v=61";
+import { ENV, getEnv } from "../env.js?v=57";
+import { commitEnvironment } from '../session-coordinator.js?v=2';
+import { createGlobeSelector } from "./globe-selector.js?v=63";
 import { readSharedExperienceParams } from "./share-links.js?v=61";
-import { prepareTitleEnvironment } from "../planetary/entry.js?v=8";
+import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
 
 function initTitleScreenUi({
   lastLocationStorageKey,
@@ -37,6 +38,7 @@ function initTitleScreenUi({
   let geolocationBusy = false;
   let oceanEntryHadEarthWorld = false;
   let multiplayerWarmupPromise = null;
+  let requestTitleStart = () => Promise.resolve(false);
 
   const primeMultiplayerUi = () => {
     if (multiplayerWarmupPromise) return multiplayerWarmupPromise;
@@ -85,7 +87,6 @@ function initTitleScreenUi({
   };
   const resetTitleEarthTravelMode = (source = 'title_earth_start') => {
     appCtx.pendingAutoBoatEntry = null;
-    if (appCtx.oceanMode?.active) appCtx.stopOceanMode?.();
     if (appCtx.boatMode?.active) appCtx.stopBoatMode?.({ targetMode: 'walk', source });
     if (appCtx.planeMode?.active) appCtx.stopPlaneMode?.();
     if (typeof appCtx.setTravelMode === 'function') {
@@ -132,7 +133,6 @@ function initTitleScreenUi({
     }
     customPanel?.classList.remove('show');
   };
-  const triggerTitleStart = () => document.getElementById('startBtn')?.click();
   const persistLastLocationSelection = (launchMode = 'earth') => {
     try {
       const payload = {
@@ -321,7 +321,7 @@ function initTitleScreenUi({
       skipGlobeGateOnce = true;
       appCtx.pendingCustomLaunchBypass = true;
     }
-    triggerTitleStart();
+    return requestTitleStart();
   };
 
   document.querySelectorAll('.tab-btn').forEach((button) => button.addEventListener('click', () => {
@@ -337,41 +337,47 @@ function initTitleScreenUi({
     onOpen: () => emitTutorialEvent('opened_globe_selector'),
     onUseMyLocation: () => runUseMyLocation('globe'),
     onBack: () => customPanel?.classList.remove('show'),
-    onStartHere: (selection = null) => {
+    onStartHere: async (selection = null) => {
       emitTutorialEvent('location_selected', selection || {});
       setTitleLocationMode('custom');
       if (!appCtx.gameStarted) {
-        skipGlobeGateOnce = true;
-        triggerTitleStart();
+        return appCtx.triggerTitleStart({ bypassCustomGate: true });
       } else if (typeof appCtx.loadRoads === 'function') {
         resetTitleEarthTravelMode('globe_location_change');
-        appCtx.loadRoads().then(() => {
-          if (typeof appCtx.applyCustomLocationSpawn === 'function') {
-            appCtx.applyCustomLocationSpawn('walk', { source: 'custom_location', preferBoatIfWater: false });
-          } else if (typeof appCtx.spawnOnRoad === 'function') {
-            appCtx.spawnOnRoad();
-          }
+        await appCtx.loadRoads();
+        let customSpawn = null;
+        if (typeof appCtx.applyCustomLocationSpawn === 'function') {
+          customSpawn = appCtx.applyCustomLocationSpawn('walk', {
+            source: 'custom_location',
+            preferBoatIfWater: true
+          });
+        } else if (typeof appCtx.spawnOnRoad === 'function') {
+          appCtx.spawnOnRoad();
+        }
+        if (customSpawn?.mode !== 'boat' && !appCtx.boatMode?.active) {
           resetTitleEarthTravelMode('globe_location_change');
-        });
+        }
+        return true;
       }
+      return false;
     },
-    onMoonShortcut: () => {
+    onMoonShortcut: async () => {
       if (!appCtx.gameStarted) {
         setLaunchMode('moon');
-        skipGlobeGateOnce = true;
-        triggerTitleStart();
+        return appCtx.triggerTitleStart({ bypassCustomGate: true });
       } else if (!appCtx.onMoon && !appCtx.travelingToMoon && typeof appCtx.directTravelToMoon === 'function') {
-        appCtx.directTravelToMoon();
+        return appCtx.directTravelToMoon();
       }
+      return false;
     },
-    onSpaceShortcut: () => {
+    onSpaceShortcut: async () => {
       if (!appCtx.gameStarted) {
         setLaunchMode('space');
-        skipGlobeGateOnce = true;
-        triggerTitleStart();
+        return appCtx.triggerTitleStart({ bypassCustomGate: true });
       } else if (!appCtx.onMoon && !appCtx.travelingToMoon && typeof appCtx.travelToMoon === 'function') {
-        appCtx.travelToMoon();
+        return appCtx.travelToMoon();
       }
+      return false;
     }
   });
 
@@ -481,7 +487,8 @@ function initTitleScreenUi({
     appCtx.gameMode = element.dataset.mode;
   }));
 
-  document.getElementById('startBtn')?.addEventListener('click', async () => {
+  const runTitleStart = async () => {
+    if (appCtx.runtimeReady !== true) return false;
     const requestedLaunchMode = Object.entries(launchModeButtons)
       .find(([, button]) => button?.classList.contains('active'))?.[0] || titleLaunchMode;
     setLaunchMode(requestedLaunchMode);
@@ -491,7 +498,7 @@ function initTitleScreenUi({
       setTitleLocationMode('custom');
       globeSelector?.open?.();
       emitTutorialEvent('opened_globe_selector');
-      return;
+      return false;
     }
     if (skipGlobeGateOnce) skipGlobeGateOnce = false;
     if (externalBypassCustomGate) appCtx.pendingCustomLaunchBypass = false;
@@ -522,12 +529,12 @@ function initTitleScreenUi({
       appCtx.startOceanMode();
       updateControlsModeUI?.();
       appCtx.loadingScreenMode = 'earth';
-      return;
+      return true;
     }
 
-    if (await startPlanetaryTitleLaunch(requestedLaunchMode)) return;
+    if (await startPlanetaryTitleLaunch(requestedLaunchMode)) return true;
 
-    switchEnv(ENV.EARTH);
+    commitEnvironment(ENV.EARTH, { source: 'title_earth_start' });
     resetTitleEarthTravelMode('title_earth_start');
     const explorationMsg = document.getElementById('explorationModeMsg');
     let explorationMsgTimeout;
@@ -560,12 +567,17 @@ function initTitleScreenUi({
       const postLoadRef = appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk?.state?.walker ? appCtx.Walk.state.walker : appCtx.car;
       appCtx.updateTerrainAround(postLoadRef.x || 0, postLoadRef.z || 0);
     }
+    let customSpawn = null;
     if (appCtx.selLoc === 'custom' && typeof appCtx.applyCustomLocationSpawn === 'function') {
-      appCtx.applyCustomLocationSpawn('walk', { source: 'title_custom_start', preferBoatIfWater: false });
+      customSpawn = appCtx.applyCustomLocationSpawn('walk', {
+        source: 'title_custom_start',
+        preferBoatIfWater: true
+      });
     }
 
-    resetTitleEarthTravelMode('title_earth_ready');
-    if (appCtx.Walk) {
+    const startedOnWater = customSpawn?.mode === 'boat' || appCtx.boatMode?.active === true;
+    if (!startedOnWater) resetTitleEarthTravelMode('title_earth_ready');
+    if (!startedOnWater && appCtx.Walk) {
       appCtx.Walk.state.view = 'third';
       if (appCtx.carMesh) appCtx.carMesh.visible = false;
       if (appCtx.Walk.state.characterMesh) appCtx.Walk.state.characterMesh.visible = true;
@@ -577,7 +589,7 @@ function initTitleScreenUi({
       document.getElementById('fDriving')?.classList.remove('on');
       document.getElementById('fWalk')?.classList.add('on');
       document.getElementById('fDrone')?.classList.remove('on');
-    } else {
+    } else if (!startedOnWater) {
       if (appCtx.carMesh) appCtx.carMesh.visible = true;
       document.getElementById('fDriving')?.classList.add('on');
       document.getElementById('fWalk')?.classList.remove('on');
@@ -609,7 +621,23 @@ function initTitleScreenUi({
     document.getElementById('fLandUse')?.classList.remove('on');
     document.getElementById('fLandUseRE')?.classList.remove('on');
     appCtx.loadingScreenMode = 'earth';
+    return true;
+  };
 
+  let titleStartPromise = null;
+  requestTitleStart = () => {
+    if (titleStartPromise) return titleStartPromise;
+    const pending = runTitleStart();
+    const tracked = pending.finally(() => {
+      if (titleStartPromise === tracked) titleStartPromise = null;
+    });
+    titleStartPromise = tracked;
+    return titleStartPromise;
+  };
+  document.getElementById('startBtn')?.addEventListener('click', () => {
+    void requestTitleStart().catch((error) => {
+      console.error('[title] launch failed:', error);
+    });
   });
 
   Object.values(launchModeButtons).forEach((button) => {
@@ -617,8 +645,9 @@ function initTitleScreenUi({
   });
   const titleStartButton = document.getElementById('startBtn');
   if (titleStartButton) {
-    titleStartButton.disabled = false;
-    titleStartButton.removeAttribute('aria-busy');
+    const runtimeReady = appCtx.runtimeReady === true;
+    titleStartButton.disabled = !runtimeReady;
+    titleStartButton.setAttribute('aria-busy', runtimeReady ? 'false' : 'true');
   }
 
   return {

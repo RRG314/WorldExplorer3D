@@ -46,14 +46,10 @@ function createWalkingTerrainHelpers({ car, state, CFG }) {
       raycaster.set(appCtx._physRayStart, appCtx._physRayDir);
       const hits = raycaster.intersectObject(planetarySurface, false);
       if (hits.length > 0 && Number.isFinite(hits[0].point.y)) y = hits[0].point.y + 1.2;
-    } else if (appCtx.GroundHeight && typeof appCtx.GroundHeight.carCenterY === "function") {
-      y = appCtx.GroundHeight.carCenterY(x, z, true, 1.2, Number.isFinite(fallbackY) ? fallbackY - 1.2 : NaN);
-    } else if (typeof appCtx.terrainMeshHeightAt === "function") {
-      const terrainY = appCtx.terrainMeshHeightAt(x, z);
-      if (Number.isFinite(terrainY)) y = terrainY + 1.2;
-    } else if (typeof appCtx.elevationWorldYAtWorldXZ === "function") {
-      const elevY = appCtx.elevationWorldYAtWorldXZ(x, z);
-      if (Number.isFinite(elevY)) y = elevY + 1.2;
+    } else if (appCtx.SurfaceQuery) {
+      const currentY = Number.isFinite(fallbackY) ? fallbackY - 1.2 : NaN;
+      const surfaceY = appCtx.SurfaceQuery.driveAt(x, z, { currentY }).position.y;
+      if (Number.isFinite(surfaceY)) y = surfaceY + 1.2;
     }
     return finiteOr(y, 1.2);
   }
@@ -68,18 +64,10 @@ function createWalkingTerrainHelpers({ car, state, CFG }) {
       return hits.length > 0 && Number.isFinite(hits[0]?.point?.y) ? hits[0].point.y : fallbackY;
     }
 
-    if (appCtx.GroundHeight && typeof appCtx.GroundHeight.walkSurfaceY === "function") {
+    if (appCtx.SurfaceQuery) {
       const walkerFeetY = Number.isFinite(state.walker?.y) ? state.walker.y - CFG.eyeHeight : NaN;
-      const surfaceY = appCtx.GroundHeight.walkSurfaceY(x, z, walkerFeetY);
+      const surfaceY = appCtx.SurfaceQuery.walkAt(x, z, { currentY: walkerFeetY }).position.y;
       if (Number.isFinite(surfaceY)) return surfaceY;
-    }
-    if (typeof appCtx.terrainMeshHeightAt === "function") {
-      const terrainY = appCtx.terrainMeshHeightAt(x, z);
-      if (Number.isFinite(terrainY)) return terrainY;
-    }
-    if (typeof appCtx.elevationWorldYAtWorldXZ === "function") {
-      const elevY = appCtx.elevationWorldYAtWorldXZ(x, z);
-      if (Number.isFinite(elevY)) return elevY;
     }
     return finiteOr(fallbackY, 0);
   }

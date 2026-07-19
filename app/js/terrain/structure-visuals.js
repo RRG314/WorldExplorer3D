@@ -3,11 +3,11 @@ import {
   polylineBounds,
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=12";
+} from "../structure-semantics.js?v=13";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext
-} from "./structure-visual-meshes.js?v=1";
+} from "./structure-visual-meshes.js?v=3";
 import { collectTunnelVisualInstances } from "./structure-tunnel-visuals.js?v=1";
 import { elevatedSegmentSafety } from "../world/bridge-safety.js?v=1";
 

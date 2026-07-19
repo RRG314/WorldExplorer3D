@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import process from 'node:process';
@@ -40,8 +40,17 @@ async function waitForServerReady(url, server, timeoutMs = 15000) {
 }
 
 function startStaticServer() {
-  const publicDir = path.join(process.cwd(), 'public');
-  const child = spawn('python3', ['-m', 'http.server', '-d', publicDir, String(PORT)], {
+  const build = spawnSync(process.execPath, [
+    'scripts/hosting-artifact.mjs',
+    'build',
+    '--firebase-env',
+    'staging'
+  ], { cwd: process.cwd(), encoding: 'utf8' });
+  if (build.status !== 0) {
+    throw new Error(`Hosting artifact build failed.\n${build.stdout}\n${build.stderr}`);
+  }
+  const distDir = path.join(process.cwd(), 'dist');
+  const child = spawn('python3', ['-m', 'http.server', '-d', distDir, String(PORT)], {
     stdio: ['ignore', 'pipe', 'pipe']
   });
   child.stdout.on('data', () => {});

@@ -1,10 +1,11 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { clampNumber } from "./budgets.js?v=3";
-import { resolveWaterSurfaceVisualProfile } from "./load-geometry.js?v=13";
-import { registerWaterWaveMaterial } from "./render-support.js?v=4";
+import { clampNumber } from "./budgets.js?v=5";
+import { resolveWaterSurfaceVisualProfile } from "./load-geometry.js?v=15";
+import { registerWaterWaveMaterial } from "./render-support.js?v=5";
 import { decimatePoints } from "./world-geometry.js?v=2";
 import { inferWaterRenderContext } from "../water-dynamics.js?v=4";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=12";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=13";
+import { normalizeWaterBody } from './water-body-contract.js?v=2';
 
 function waterwayWidthFromTags(tags) {
   const explicit = Number.parseFloat(tags?.width);
@@ -38,14 +39,18 @@ export function addWaterwayRibbon(pts, tags) {
   const surfaceVisible = structureSemantics.terrainMode !== 'subgrade';
   const navigable = surfaceVisible && waterwayIsNavigable(tags);
   if (!surfaceVisible) {
-    appCtx.waterways.push({
+    appCtx.waterways.push(normalizeWaterBody({
+      shape: 'waterway',
       type: tags?.kind || tags?.waterway || 'waterway',
       width,
       surfaceY: null,
       pts: centerline,
       navigable: false,
-      structureSemantics
-    });
+      structureSemantics,
+      kindHint: tags?.kind || tags?.waterway,
+      geometrySource: tags?._geometrySource || 'osm-overpass',
+      datumMethod: 'subgrade-hidden'
+    }));
     return;
   }
   const waterVisualProfile = resolveWaterSurfaceVisualProfile();
@@ -140,13 +145,17 @@ export function addWaterwayRibbon(pts, tags) {
   mesh.visible = true;
   appCtx.scene.add(mesh);
   appCtx.landuseMeshes.push(mesh);
-  appCtx.waterways.push({
+  appCtx.waterways.push(normalizeWaterBody({
+    shape: 'waterway',
     type: tags?.kind || tags?.waterway || 'waterway',
     width,
     surfaceY: null,
     surfaceProfile,
     pts: centerline,
     navigable,
-    structureSemantics
-  });
+    structureSemantics,
+    kindHint: tags?.kind || tags?.waterway,
+    geometrySource: tags?._geometrySource || 'osm-overpass',
+    datumMethod: 'terrain-profile'
+  }));
 }

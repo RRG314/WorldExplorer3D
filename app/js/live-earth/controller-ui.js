@@ -1,12 +1,6 @@
-import { LIVE_EARTH_CATEGORIES, getLayersForCategory, getLiveEarthLayer } from "./registry.js?v=5";
+import { LIVE_EARTH_CATEGORIES, getLayersForCategory, getLiveEarthLayer } from "./registry.js?v=6";
 import { CURATED_SATELLITES } from "./satellites.js?v=4";
 import { nearestRouteContext } from "./transport.js?v=3";
-import {
-  STATIC_PREVIEW_LAYER_ITEMS,
-  previewLayerItems as buildPreviewLayerItems,
-  renderPreviewLayerDetails as renderPreviewLayerPanel,
-  setPreviewSelection as updatePreviewSelectionState
-} from "./preview-layers.js?v=2";
 import { startEarthquakeReplay as startLocalEarthquakeReplay } from "./local-events.js?v=2";
 import {
   renderGlobeLayers,
@@ -14,30 +8,6 @@ import {
   renderTransportGlobe,
   renderWeatherGlobe
 } from "./render-globe.js?v=1";
-
-function buildPreviewContext(ctx) {
-  return {
-    appCtx: ctx.appCtx,
-    escapeHtml: ctx.escapeHtml,
-    filteredSatelliteItems: ctx.filteredSatelliteItems,
-    fireWeatherSamples: ctx.fireWeatherSamples,
-    getLiveEarthLayer,
-    STATIC_PREVIEW_LAYER_ITEMS,
-    setDetailsHtml: ctx.setDetailsHtml
-  };
-}
-
-function previewLayerItems(ctx, state, layerId = '') {
-  return buildPreviewLayerItems(buildPreviewContext(ctx), state, layerId);
-}
-
-function setPreviewSelection(ctx, state, layerId = '', itemId = '') {
-  updatePreviewSelectionState(buildPreviewContext(ctx), state, layerId, itemId);
-}
-
-function renderPreviewLayerDetails(ctx, state, layer) {
-  renderPreviewLayerPanel(buildPreviewContext(ctx), state, layer);
-}
 
 function selectedLayerCount(ctx, state, layerId) {
   if (layerId === 'satellites') return ctx.filteredSatelliteItems(state).length;
@@ -47,8 +17,14 @@ function selectedLayerCount(ctx, state, layerId) {
   if (layerId === 'ocean-state') return ctx.oceanSamples(state).length;
   if (layerId === 'ships') return state.shipItems.length;
   if (layerId === 'aircraft') return state.aircraftItems.length;
-  if (getLiveEarthLayer(layerId)?.status === 'preview') return previewLayerItems(ctx, state, layerId).length;
   return 0;
+}
+
+function layerCountLabel(ctx, state, layer) {
+  const count = selectedLayerCount(ctx, state, layer.id);
+  if (layer.id === 'ships' || layer.id === 'aircraft') return `${count} modeled`;
+  if (layer.id === 'storms' || layer.id === 'ocean-state') return `${count} derived`;
+  return `${count} live`;
 }
 
 function formatWeatherLine(snapshot) {
@@ -98,7 +74,7 @@ function renderTransportDetails(ctx, state, layerId) {
     <div class="globe-selector-live-detail-card">
       <div class="globe-selector-live-detail-heading">${ctx.escapeHtml(selected?.label || (isShipLayer ? 'Select a ship corridor' : 'Select an airway flight'))}</div>
       <div class="globe-selector-live-detail-copy">${ctx.escapeHtml(selected?.routeSummary || getLiveEarthLayer(layerId)?.summary || '')}</div>
-      <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${items.length} live markers across ${routes.length} major ${isShipLayer ? 'shipping corridors' : 'air corridors'}.`)}</div>
+      <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${items.length} modeled markers across ${routes.length} major ${isShipLayer ? 'shipping corridors' : 'air corridors'}.`)}</div>
       ${selected ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${selected.operator || ''} • ${selected.speedKt} kt • heading ${Math.round(selected.headingDeg || 0)}°`)}</div>` : ''}
       ${selected ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${selected.routeLabel} • ${selected.region}`)}</div>` : ''}
       ${localContext ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Closest selected-world corridor: ${localContext.routeLabel} • ${Math.round(localContext.distanceKm)} km away`)}</div>` : ''}
@@ -116,17 +92,7 @@ export function renderLiveEarthDetails(ctx, state) {
   if (!ui?.details) return;
   const layer = getLiveEarthLayer(state.activeLayerId);
   if (!layer) {
-    ctx.setDetailsHtml(state, '<div class="globe-selector-live-placeholder">Select a Live Earth layer.</div>');
-    return;
-  }
-
-  if (layer.status === 'preview') {
-    renderPreviewLayerDetails(ctx, state, layer);
-    return;
-  }
-
-  if (layer.status !== 'implemented') {
-    ctx.setDetailsHtml(state, '<div class="globe-selector-live-placeholder">This Live Earth layer is unavailable right now.</div>');
+    ctx.setDetailsHtml(state, '<div class="globe-selector-live-loading">Live Earth data is unavailable. Choose another category or refresh.</div>');
     return;
   }
 
@@ -262,7 +228,7 @@ export function renderLiveEarthDetails(ctx, state) {
         <div class="globe-selector-live-detail-copy">${ctx.escapeHtml(selected?.oceanState?.summary || layer.summary)}</div>
         <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Current 3D world sea state: ${localSeaState} • wave intensity ${localIntensity}%`)}</div>
         ${localWorld ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Local wind ${Math.round(localWorld.windMph || 0)} mph • ${localWorld.conditionLabel || 'Weather'}`)}</div>` : ''}
-        <div class="globe-selector-live-list">${sampleList || '<div class="globe-selector-live-placeholder">No marine sample points are available right now.</div>'}</div>
+        <div class="globe-selector-live-list">${sampleList || '<div class="globe-selector-live-loading">No marine sample points are available right now.</div>'}</div>
       </div>
     `);
     return;
@@ -285,7 +251,7 @@ export function renderLiveEarthStatus(ctx, state) {
     layer?.id === 'earthquakes' ? state.earthquakesLoadedAt :
     layer?.id === 'ships' ? state.shipsLoadedAt :
     layer?.id === 'aircraft' ? state.aircraftLoadedAt :
-    layer?.id === 'weather' ? state.weatherSamplesLoadedAt :
+    ['weather', 'storms', 'ocean-state'].includes(layer?.id) ? state.weatherSamplesLoadedAt :
     0;
   const stamp = lastUpdate ? new Date(lastUpdate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Pending';
   ui.status.textContent = `Live feed updates cached for stability. Last refresh: ${stamp}`;
@@ -303,11 +269,7 @@ export function renderLiveEarthUi(ctx, state) {
 
   ui.layerList.innerHTML = getLayersForCategory(state.activeCategoryId).map((layer) => {
     const active = layer.id === state.activeLayerId ? ' active' : '';
-    const status = layer.status === 'implemented'
-      ? `${selectedLayerCount(ctx, state, layer.id)} live`
-      : layer.status === 'preview'
-        ? `${selectedLayerCount(ctx, state, layer.id)} preview`
-        : 'Planned';
+    const status = layerCountLabel(ctx, state, layer);
     return `
       <button class="globe-selector-live-layer${active}" type="button" data-live-earth-action="layer" data-id="${layer.id}">
         <span class="globe-selector-live-layer-label">${ctx.escapeHtml(layer.label)}</span>
@@ -384,7 +346,7 @@ export async function setActiveLayer(ctx, state, layerId, force = false) {
   await refreshActiveLayer(ctx, state, force);
 }
 
-export async function handleUiAction(ctx, state, action, value, aux = '') {
+export async function handleUiAction(ctx, state, action, value) {
   if (action === 'category') {
     state.activeCategoryId = value;
     const nextLayer = getLayersForCategory(value)[0];
@@ -429,11 +391,6 @@ export async function handleUiAction(ctx, state, action, value, aux = '') {
   if (action === 'select-aircraft') {
     state.selectedAircraftId = value;
     renderGlobeLayers(ctx, state);
-    renderLiveEarthUi(ctx, state);
-    return;
-  }
-  if (action === 'select-preview') {
-    setPreviewSelection(ctx, state, value || state.activeLayerId, aux || '');
     renderLiveEarthUi(ctx, state);
     return;
   }
@@ -495,10 +452,6 @@ export function bindSelectorUi(ctx, state) {
   ui.details?.addEventListener('click', (event) => {
     const target = event.target instanceof Element ? event.target.closest('[data-live-earth-action]') : null;
     if (!(target instanceof HTMLElement)) return;
-    if (target.dataset.liveEarthAction === 'select-preview') {
-      void handleUiAction(ctx, state, 'select-preview', target.dataset.layer || state.activeLayerId, target.dataset.id || '');
-      return;
-    }
     void handleUiAction(ctx, state, target.dataset.liveEarthAction, target.dataset.id || target.dataset.filter || '');
   });
   ui.details?.addEventListener('scroll', () => {

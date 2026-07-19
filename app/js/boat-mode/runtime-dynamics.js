@@ -21,20 +21,24 @@ export function createBoatRuntimeDynamics(deps = {}) {
 
   return function updateBoatMode(dt) {
     if (!appCtx.boatMode?.active) return false;
+    if (dt > 1 / 30) {
+      const steps = Math.ceil(dt / (1 / 45));
+      const stepDt = dt / steps;
+      for (let i = 0; i < steps; i += 1) updateBoatMode(stepDt);
+      return true;
+    }
     const cfg = getSeaStateConfig();
     const profile = getBoatWaveProfile(appCtx.boatMode.currentWater || null);
     const fishingLocked = !!appCtx.fishingGame?.active;
-    const left = !fishingLocked && !!appCtx.keys.ArrowLeft;
-    const right = !fishingLocked && !!appCtx.keys.ArrowRight;
-    const throttle = !fishingLocked && !!appCtx.keys.ArrowUp;
-    const reverse = !fishingLocked && !!appCtx.keys.ArrowDown;
-    const brake = fishingLocked || !!appCtx.keys.Space;
+    const actions = appCtx.readControlActions?.('boat') || {};
+    const steerInput = fishingLocked ? 0 : Number(actions.steer) || 0;
+    const throttleInput = fishingLocked ? 0 : Math.max(0, Number(actions.throttle) || 0);
+    const reverseInput = fishingLocked ? 0 : Math.max(0, Number(actions.reverse) || 0);
+    const brake = fishingLocked || Number(actions.brake) > 0.05;
 
     const cameraLookSpeed = 2.2 * dt;
-    if (appCtx.keys.KeyA) appCtx.boatMode.cameraYawOffset += cameraLookSpeed;
-    if (appCtx.keys.KeyD) appCtx.boatMode.cameraYawOffset -= cameraLookSpeed;
-    if (appCtx.keys.KeyW) appCtx.boatMode.cameraPitch += cameraLookSpeed * 0.55;
-    if (appCtx.keys.KeyS) appCtx.boatMode.cameraPitch -= cameraLookSpeed * 0.55;
+    appCtx.boatMode.cameraYawOffset += (Number(actions.lookYaw) || 0) * cameraLookSpeed;
+    appCtx.boatMode.cameraPitch += (Number(actions.lookPitch) || 0) * cameraLookSpeed * 0.55;
     appCtx.boatMode.cameraYawOffset = normalizeAngle(appCtx.boatMode.cameraYawOffset);
     appCtx.boatMode.cameraPitch = clamp(appCtx.boatMode.cameraPitch, -0.62, 0.62);
 
@@ -42,8 +46,7 @@ export function createBoatRuntimeDynamics(deps = {}) {
     if (!Number.isFinite(appCtx.boat.lateralSpeed)) appCtx.boat.lateralSpeed = 0;
     if (!Number.isFinite(appCtx.boat.throttle)) appCtx.boat.throttle = 0;
 
-    const steerInput = (left ? 1 : 0) - (right ? 1 : 0);
-    const throttleTarget = throttle ? 1 : reverse ? -0.58 : 0;
+    const throttleTarget = throttleInput > 0.05 ? throttleInput : reverseInput > 0.05 ? -0.58 * reverseInput : 0;
     appCtx.boat.throttle += (throttleTarget - appCtx.boat.throttle) * clamp(dt * 3.6, 0.06, 0.24);
 
     const maxForwardSpeed = Math.max(1, cfg.speedMax || 1);
@@ -60,7 +63,7 @@ export function createBoatRuntimeDynamics(deps = {}) {
       (0.26 + profile.intensity * 0.22 + headSea * 0.12) *
       appCtx.boat.forwardSpeed * Math.abs(appCtx.boat.forwardSpeed) /
       Math.max(26, maxForwardSpeed * 0.9);
-    const idleBrake = throttle || reverse ? 0 : Math.sign(appCtx.boat.forwardSpeed) * (1.4 + profile.intensity * 0.5);
+    const idleBrake = throttleInput > 0.05 || reverseInput > 0.05 ? 0 : Math.sign(appCtx.boat.forwardSpeed) * (1.4 + profile.intensity * 0.5);
     const slamDrag = Number(appCtx.boatMode.slamStrength || 0) * 1.2 + Math.abs(appCtx.boat.verticalVelocity || 0) * 0.08;
     appCtx.boat.forwardSpeed += (driveAccel - hullDrag - idleBrake - slamDrag) * dt;
     if (brake) appCtx.boat.forwardSpeed *= Math.exp(-4.4 * dt);
@@ -104,7 +107,13 @@ export function createBoatRuntimeDynamics(deps = {}) {
 
     const nextX = appCtx.boat.x + appCtx.boat.vx * dt;
     const nextZ = appCtx.boat.z + appCtx.boat.vz * dt;
-    const nextCandidate = findNearestBoatCandidate(nextX, nextZ, 24);
+    const currentWater = appCtx.boatMode.currentWater || null;
+    const syntheticTraversal = currentWater?.synthetic === true || currentWater?.source?.synthetic === true;
+    const nextCandidate = findNearestBoatCandidate(nextX, nextZ, 24, {
+      allowSynthetic: syntheticTraversal,
+      syntheticCandidate: currentWater,
+      waterKind: currentWater?.source?.waterKind || currentWater?.waterKind || 'open_ocean'
+    });
     if (!nextCandidate) {
       appCtx.boat.speed *= 0.45;
       appCtx.boat.forwardSpeed *= 0.45;

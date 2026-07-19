@@ -54,13 +54,8 @@ function createWalkingPhysicsHelpers({
 
   function buildingBaseYAt(b, x, z) {
     if (Number.isFinite(b?.baseY)) return b.baseY;
-    if (typeof appCtx.terrainMeshHeightAt === "function") {
-      const terrainY = appCtx.terrainMeshHeightAt(x, z);
-      if (Number.isFinite(terrainY)) return terrainY;
-    } else if (typeof appCtx.elevationWorldYAtWorldXZ === "function") {
-      const terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
-      if (Number.isFinite(terrainY)) return terrainY;
-    }
+    const terrainY = appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y;
+    if (Number.isFinite(terrainY)) return terrainY;
     return 0;
   }
 
@@ -183,28 +178,21 @@ function createWalkingPhysicsHelpers({
 
   function updateWalkPhysics(dt, finiteOr) {
     syncWalkTerrain(false);
-
-    const moveForward = keys.ArrowUp ? 1 : 0;
-    const moveBack = keys.ArrowDown ? 1 : 0;
-    const turnLeft = keys.ArrowLeft ? 1 : 0;
-    const turnRight = keys.ArrowRight ? 1 : 0;
-    const lookLeft = keys.KeyA ? 1 : 0;
-    const lookRight = keys.KeyD ? 1 : 0;
-    const lookUp = keys.KeyW ? 1 : 0;
-    const lookDown = keys.KeyS ? 1 : 0;
-    const speed = keys.ShiftLeft || keys.ShiftRight ? CFG.runSpeed : CFG.walkSpeed;
+    const startX = finiteOr(state.walker.x, 0);
+    const startZ = finiteOr(state.walker.z, 0);
+    const actions = appCtx.readControlActions?.('walk') || {};
+    const speed = Number(actions.sprint) > 0.05 ? CFG.runSpeed : CFG.walkSpeed;
     const lookSpeed = 2.5 * dt;
 
-    state.walker.yaw += (turnLeft - turnRight) * CFG.turnSpeed * dt;
-    state.walker.lookYawOffset += (lookLeft - lookRight) * lookSpeed;
-    if (lookUp) state.walker.pitch += lookSpeed;
-    if (lookDown) state.walker.pitch -= lookSpeed;
+    state.walker.yaw += (Number(actions.turn) || 0) * CFG.turnSpeed * dt;
+    state.walker.lookYawOffset += (Number(actions.lookYaw) || 0) * lookSpeed;
+    state.walker.pitch += (Number(actions.lookPitch) || 0) * lookSpeed;
 
     state.walker.lookYawOffset = wrapYaw(state.walker.lookYawOffset);
     state.walker.pitch = Math.max(-Math.PI / 2 + 0.1, Math.min(Math.PI / 2 - 0.1, state.walker.pitch));
     state.walker.angle = state.walker.yaw;
 
-    const forward = moveForward - moveBack;
+    const forward = Number(actions.move) || 0;
     const gravity = appCtx.onMoon ? -1.62 : appCtx.onMars ? -3.71 : -9.80665;
     const jumpVelocity = appCtx.onMoon ? 3.0 : appCtx.onMars ? 4.0 : 5.0;
 
@@ -225,12 +213,12 @@ function createWalkingPhysicsHelpers({
       state.walker.wallJumpTimer -= dt;
     }
 
-    if (keys.Space && state.walker.onGround) {
+    if (Number(actions.jump) > 0.05 && state.walker.onGround) {
       state.walker.vy = jumpVelocity;
       state.walker.onGround = false;
     }
 
-    if (keys.Space && !state.walker.onGround && state.walker.wallJumpTimer <= 0 && !isPlanetarySurface()) {
+    if (Number(actions.jump) > 0.05 && !state.walker.onGround && state.walker.wallJumpTimer <= 0 && !isPlanetarySurface()) {
       const wall = findNearestWall(state.walker.x, state.walker.z);
       if (wall && state.walker.y - CFG.eyeHeight < buildingRoofYAt(wall.building, wall.pointX, wall.pointZ) + 0.35) {
         state.walker.vy = CFG.wallJumpVelocity;
@@ -351,6 +339,9 @@ function createWalkingPhysicsHelpers({
     } else {
       state.walker.speedMph = 0;
     }
+    const elapsed = Math.max(0.001, dt);
+    state.walker.vx = (state.walker.x - startX) / elapsed;
+    state.walker.vz = (state.walker.z - startZ) / elapsed;
 
     if (state.characterMesh && state.characterMesh.visible) {
       const meshGroundState = resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y, finiteOr);

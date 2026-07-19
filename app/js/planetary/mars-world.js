@@ -1,13 +1,21 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { captureEarthWorldSession, resumeEarthWorldSession } from '../earth-session.js?v=9';
-import { ENV, getEnv, switchEnv } from '../env.js?v=57';
+import { captureEarthWorldSession, resumeEarthWorldSession } from '../earth-session.js?v=11';
+import { ENV, getEnv } from '../env.js?v=57';
+import {
+  commitEnvironment,
+  exitCurrentEnvironmentSync,
+  registerEnvironmentLifecycle
+} from '../session-coordinator.js?v=2';
 import { configureColorTexture } from './catalog.js?v=1';
-import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=8';
+import { suspendEarthModesForPlanetaryEntry } from './entry.js?v=9';
 
 const MARS_SIZE = 24000;
 const MARS_SEGMENTS = 200;
 const MARS_SURFACE_Y = -80;
 const MARS_SPAWN = Object.freeze({ x: 3200, z: 1900, angle: -2.08 });
+const OLYMPUS_REGION_DIAMETER_KM = 600;
+const OLYMPUS_RELIEF_KM = 21.9;
+const OLYMPUS_RELIEF_SCENE = MARS_SIZE * OLYMPUS_RELIEF_KM / OLYMPUS_REGION_DIAMETER_KM;
 let earthCameraFar = null;
 let marsDemData = null;
 let marsDemLoadPromise = null;
@@ -24,10 +32,6 @@ function cancelPendingMarsTransition() {
 
 function retainMarsTransitionOwnership(sessionId) {
   if (!isCurrentMarsTransition(sessionId)) return false;
-  if (getEnv() !== ENV.MARS) {
-    switchEnv(ENV.MARS);
-  }
-  if (getEnv() !== ENV.MARS) return false;
   appCtx.setEarthSceneVisible?.(false);
   return true;
 }
@@ -59,8 +63,8 @@ function loadMarsDemSample() {
 
 function sampleMarsDem(x, z) {
   if (!marsDemData) return 0;
-  const u = Math.max(0, Math.min(1, 0.42 + x / MARS_SIZE));
-  const v = Math.max(0, Math.min(1, 0.53 + z / MARS_SIZE));
+  const u = Math.max(0, Math.min(1, 0.5 + x / MARS_SIZE));
+  const v = Math.max(0, Math.min(1, 0.5 + z / MARS_SIZE));
   const px = Math.round(u * (marsDemData.width - 1));
   const py = Math.round(v * (marsDemData.height - 1));
   const index = (py * marsDemData.width + px) * 4;
@@ -69,28 +73,11 @@ function sampleMarsDem(x, z) {
     marsDemData.pixels[index + 1] +
     marsDemData.pixels[index + 2]
   ) / 3;
-  return Math.max(0, elevationByte - 42) / 213 * 360;
-}
-
-function hashNoise(x, z, frequency = 0.01) {
-  const n = Math.sin(x * frequency * 12.9898 + z * frequency * 78.233) * 43758.5453;
-  return n - Math.floor(n);
+  return Math.max(0, Math.min(1, (elevationByte - 42) / 213)) * OLYMPUS_RELIEF_SCENE;
 }
 
 function sampleMarsLocalHeight(x, z) {
-  const radius = Math.hypot(x, z);
-  const shieldRadius = 9000;
-  const shield = radius < shieldRadius ? 760 * Math.pow(1 - radius / shieldRadius, 1.58) : 0;
-  const summitPlateau = 145 * Math.exp(-(radius * radius) / (2 * 1180 * 1180));
-  const caldera = -190 * Math.exp(-(radius * radius) / (2 * 480 * 480));
-  const calderaRim = 72 * Math.exp(-Math.pow(radius - 760, 2) / (2 * 220 * 220));
-  const aureole = radius > 7000 && radius < 10800 ?
-    62 * Math.sin((radius - 7000) * 0.008) * (1 - Math.abs(radius - 8900) / 1900) : 0;
-
-  const regionalTilt = -x * 0.006 + z * 0.002;
-  const ridges = Math.sin(x * 0.008 + z * 0.003) * 17 + Math.cos(z * 0.011 - x * 0.002) * 12;
-  const grain = (hashNoise(x, z, 0.014) - 0.5) * 12 + (hashNoise(x + 791, z - 319, 0.031) - 0.5) * 4;
-  return shield + summitPlateau + caldera + calderaRim + aureole + regionalTilt + ridges + grain + sampleMarsDem(x, z);
+  return sampleMarsDem(x, z);
 }
 
 function createMarsSurface() {
@@ -108,16 +95,13 @@ function createMarsSurface() {
     new THREE.TextureLoader().load('/app/assets/textures/mars_olympus_viking_900.jpg'),
     appCtx.renderer
   );
-  const elevationTexture = new THREE.TextureLoader().load('/app/assets/textures/mars_mola_olympus_dem_512.jpg');
   const material = new THREE.MeshStandardMaterial({
     map: texture,
     color: 0xffffff,
     roughness: 0.98,
     metalness: 0,
-    bumpMap: elevationTexture,
-    bumpScale: 3.2,
     emissive: 0x35160f,
-    emissiveIntensity: 0.34
+    emissiveIntensity: 0.18
   });
   const surface = new THREE.Mesh(geometry, material);
   surface.name = 'Mars Olympus Mons Surface';
@@ -126,6 +110,12 @@ function createMarsSurface() {
   surface.castShadow = true;
   surface.frustumCulled = false;
   surface.userData.planetaryBody = 'mars';
+  surface.userData.terrainSource = 'NASA MOLA regional elevation image';
+  surface.userData.reliefCalibration = {
+    regionDiameterKm: OLYMPUS_REGION_DIAMETER_KM,
+    summitReliefKm: OLYMPUS_RELIEF_KM,
+    displayReliefScene: OLYMPUS_RELIEF_SCENE
+  };
   appCtx.marsSurface = surface;
   appCtx.scene.add(surface);
   createMarsRocks(surface);
@@ -250,8 +240,7 @@ function enterMarsDriveMode() {
 async function arriveAtMars(expectedSessionId = null) {
   const sessionId = expectedSessionId ?? ++marsTransitionSessionId;
   if (!isCurrentMarsTransition(sessionId)) return false;
-  if (appCtx.spaceFlight?.active && typeof appCtx.exitSpaceFlight === 'function') appCtx.exitSpaceFlight();
-  suspendEarthModesForPlanetaryEntry();
+  suspendEarthModesForPlanetaryEntry(ENV.MARS);
   if (!isCurrentMarsTransition(sessionId)) return false;
   if (!retainMarsTransitionOwnership(sessionId)) return false;
   appCtx.setPauseReason?.('planetary_transition', true);
@@ -267,7 +256,6 @@ async function arriveAtMars(expectedSessionId = null) {
   (window._moonObjects || []).forEach((object) => { object.visible = false; });
   if (appCtx.moonSphere) appCtx.moonSphere.visible = false;
   appCtx.setLunarEarthVisible?.(false);
-  appCtx.setPlanetarySky?.('mars');
 
   await loadMarsDemSample();
   if (!retainMarsTransitionOwnership(sessionId)) return false;
@@ -275,7 +263,7 @@ async function arriveAtMars(expectedSessionId = null) {
   setMarsObjectsVisible(true);
   enterMarsDriveMode();
   positionPlayerOnMars();
-  await appCtx.setPlanetaryVehicle?.('mars');
+  void appCtx.setPlanetaryVehicle?.('mars');
   if (!retainMarsTransitionOwnership(sessionId)) return false;
   appCtx.setPlanetaryCharacter?.('mars');
   positionPlayerOnMars();
@@ -287,6 +275,9 @@ async function arriveAtMars(expectedSessionId = null) {
   }
   if (appCtx.ambientLight) appCtx.ambientLight.intensity = 0.34;
   if (appCtx.fillLight) appCtx.fillLight.intensity = 0.18;
+  if (!retainMarsTransitionOwnership(sessionId)) return false;
+  if (!commitEnvironment(ENV.MARS, { source: 'mars_arrival' })) return false;
+  appCtx.setPlanetarySky?.('mars');
   setMarsInterfaceActive(true);
   showMarsReturnButton();
   appCtx.setPauseReason?.('planetary_transition', false);
@@ -312,18 +303,18 @@ async function returnFromMars() {
   if (button) button.style.display = 'none';
   await appCtx.showTransitionLoad?.('earth', 700);
   if (!isCurrentMarsTransition(sessionId)) return;
-  setMarsObjectsVisible(false);
-  setMarsInterfaceActive(false);
+  exitCurrentEnvironmentSync(ENV.EARTH, { source: 'mars_return' });
   await appCtx.setPlanetaryVehicle?.('earth');
   if (!isCurrentMarsTransition(sessionId)) return;
   appCtx.setPlanetaryCharacter?.('earth');
+  appCtx.clearPlanetarySky?.();
   appCtx.scene.fog = null;
   appCtx.scene.background = new THREE.Color(0x87ceeb);
   if (appCtx.camera && Number.isFinite(earthCameraFar)) {
     appCtx.camera.far = earthCameraFar;
     appCtx.camera.updateProjectionMatrix();
   }
-  switchEnv(ENV.EARTH);
+  commitEnvironment(ENV.EARTH, { source: 'mars_return' });
   try {
     await resumeEarthWorldSession({
       switchEnv: false,
@@ -348,6 +339,7 @@ function prepareMarsTitleExit() {
   if (getEnv() !== ENV.MARS && !appCtx.onMars) return;
   setMarsObjectsVisible(false);
   setMarsInterfaceActive(false);
+  appCtx.clearPlanetarySky?.();
   appCtx.scene.fog = null;
   appCtx.scene.background = new THREE.Color(0x87ceeb);
   if (appCtx.camera && Number.isFinite(earthCameraFar)) {
@@ -355,6 +347,17 @@ function prepareMarsTitleExit() {
     appCtx.camera.updateProjectionMatrix();
   }
 }
+
+registerEnvironmentLifecycle(ENV.MARS, {
+  exitSync: prepareMarsTitleExit,
+  snapshot: () => ({
+    active: getEnv() === ENV.MARS,
+    objectCount: (appCtx.marsObjects || []).length,
+    surfaceAttached: appCtx.marsSurface?.parent === appCtx.scene,
+    surfaceVisible: !!appCtx.marsSurface?.visible,
+    transitionSessionId: marsTransitionSessionId
+  })
+});
 
 Object.assign(appCtx, {
   arriveAtMars,

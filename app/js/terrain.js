@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   clearStructureVisualMeshes,
   rebuildStructureVisualMeshes
-} from "./terrain/structure-visuals.js?v=3";
+} from "./terrain/structure-visuals.js?v=4";
 import {
   boundsIntersectLocal,
   expandBoundsLocal,
@@ -12,14 +12,14 @@ import {
 } from "./terrain/context-utils.js?v=1";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=1";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=1";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=2";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=4";
 import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=16";
+} from "./terrain/surface-profiles.js?v=22";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -37,21 +37,22 @@ import {
   terrainTileCacheSnapshot,
   terrainTileMeshKey,
   tileXYToLatLonBounds,
+  waitForTerrainReadyBounds,
   waitForTerrainReadyAt,
   worldToLatLon
-} from "./terrain/tiles.js?v=15";
+} from "./terrain/tiles.js?v=24";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
   rebuildRoadsWithTerrain
-} from "./terrain/rebuild.js?v=5";
+} from "./terrain/rebuild.js?v=9";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
-} from "./terrain/debug-tools.js?v=2";
+} from "./terrain/debug-tools.js?v=3";
 import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
-import { createTerrainStreamingApi } from "./terrain/streaming.js?v=5";
+import { createTerrainStreamingApi } from "./terrain/streaming.js?v=8";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 // terrain.js - Terrain elevation system (Terrarium tiles)
 // ============================================================================
@@ -197,7 +198,7 @@ const terrainRebuildDeps = {
 };
 
 function scheduleRoadAndBuildingRebuild() {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired || appCtx.roads.length === 0) return;
+  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired) return;
   appCtx.roadsNeedRebuild = true;
   if (terrain._rebuildTimer) return;
 
@@ -209,7 +210,7 @@ function scheduleRoadAndBuildingRebuild() {
 
   terrain._rebuildTimer = setTimeout(() => {
     terrain._rebuildTimer = null;
-    if (!appCtx.roadsNeedRebuild || appCtx.onMoon || appCtx.initialEarthWorldRetired || !appCtx.terrainEnabled || appCtx.roads.length === 0) return;
+    if (!appCtx.roadsNeedRebuild || appCtx.onMoon || appCtx.initialEarthWorldRetired || !appCtx.terrainEnabled) return;
     if (terrain._rebuildInFlight) {
       scheduleRoadAndBuildingRebuild();
       return;
@@ -217,7 +218,7 @@ function scheduleRoadAndBuildingRebuild() {
 
     terrain._rebuildInFlight = true;
     try {
-      rebuildRoadsWithTerrain(terrainRebuildDeps);
+      if (appCtx.roads.length > 0) rebuildRoadsWithTerrain(terrainRebuildDeps);
       repositionBuildingsWithTerrain();
       reconcileActorsAfterSurfaceRebuild(appCtx);
       terrain._lastRoadRebuildAt = performance.now();
@@ -229,7 +230,7 @@ function scheduleRoadAndBuildingRebuild() {
 }
 
 function canRunRoadAndBuildingRebuildNow() {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired || appCtx.roads.length === 0) return false;
+  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired) return false;
   let tilesLoaded = 0;
   let tilesTotal = 0;
   appCtx.terrainTileCache.forEach((tile) => {
@@ -240,7 +241,7 @@ function canRunRoadAndBuildingRebuildNow() {
 }
 
 function requestWorldSurfaceSync(options = {}) {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired || appCtx.roads.length === 0) return false;
+  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired) return false;
   appCtx.roadsNeedRebuild = true;
 
   const force = options.force === true;
@@ -256,7 +257,7 @@ function requestWorldSurfaceSync(options = {}) {
 
   terrain._rebuildInFlight = true;
   try {
-    rebuildRoadsWithTerrain(terrainRebuildDeps);
+    if (appCtx.roads.length > 0) rebuildRoadsWithTerrain(terrainRebuildDeps);
     repositionBuildingsWithTerrain();
     reconcileActorsAfterSurfaceRebuild(appCtx);
     terrain._lastRoadRebuildAt = performance.now();
@@ -387,6 +388,7 @@ Object.assign(appCtx, {
   updateTerrainAround,
   validateRoadTerrainConformance,
   waitForTerrainCoverageAt,
+  waitForTerrainReadyBounds: (bounds, timeoutMs) => waitForTerrainReadyBounds(bounds, timeoutMs, terrainTileDeps),
   waitForTerrainReadyAt: (x, z, timeoutMs) => waitForTerrainReadyAt(x, z, timeoutMs, terrainTileDeps),
   worldToLatLon
 });
@@ -428,5 +430,6 @@ export {
   updateTerrainAround,
   validateRoadTerrainConformance,
   waitForTerrainCoverageAt,
+  waitForTerrainReadyBounds,
   waitForTerrainReadyAt,
   worldToLatLon };

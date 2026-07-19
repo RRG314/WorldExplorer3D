@@ -18,15 +18,7 @@ function isInsidePolygon(x, z, pts) {
 }
 
 function getTerrainY(x, z) {
-  if (typeof appCtx.terrainMeshHeightAt === 'function') {
-    const h = appCtx.terrainMeshHeightAt(x, z);
-    if (Number.isFinite(h)) return h;
-  }
-  if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
-    const h = appCtx.elevationWorldYAtWorldXZ(x, z);
-    if (Number.isFinite(h)) return h;
-  }
-  return 0;
+  return appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y ?? 0;
 }
 
 function getBuildingRoofY(x, z, groundY) {

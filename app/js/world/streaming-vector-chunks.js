@@ -1,21 +1,20 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { appendGeometryWithTransform, buildMergedGeometry } from "./geometry-batching.js?v=2";
+import { appendGeometryWithTransform, buildMergedGeometry } from "./geometry-batching.js?v=4";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
   removeBuildingsFromSpatialIndex
 } from "./building-spatial-index.js?v=5";
-import { waterSurfaceBaseElevation } from "./load-geometry.js?v=13";
-import { fetchShortbreadTile } from "./shortbread-source.js?v=6";
-import { buildStreamingLandcover } from "./streaming-landcover.js?v=8";
+import { waterSurfaceBaseElevation } from "./load-geometry.js?v=15";
+import { fetchOvertureStreamingTile } from './overture-streaming-source.js?v=2';
+import { buildStreamingLandcover } from "./streaming-landcover.js?v=13";
 import { createRoadNameResolver } from "./streaming-road-labels.js?v=1";
-import { applyFacadeWallMask } from "../engine/building-facade-shader.js?v=1";
-import { createWindowTexture } from "../engine/procedural-textures.js?v=2";
+import { streamingVectorMaterials as materials, transportSurfaceClass } from './streaming-vector-materials.js?v=1';
 import {
   classifyStructureSemantics,
   polylineBounds,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=12";
+} from "../structure-semantics.js?v=13";
 import {
   INITIAL_DETAIL_RADIUS,
   ROAD_SURFACE_OFFSET,
@@ -24,6 +23,7 @@ import {
   cleanLine,
   cleanRing,
   createIndexedMesh,
+  expandGeographicBounds,
   finite,
   forEachLayerFeature,
   forEachLayerFeatureAsync,
@@ -38,20 +38,29 @@ import {
   waterwayRenderWidth,
   worldPoint,
   yieldToRenderer
-} from './streaming-vector-geometry.js?v=1';
+} from './streaming-vector-geometry.js?v=4';
 import { registerBridgeGuardrails, removeBridgeGuardrails } from "./bridge-guardrails.js?v=6";
-import { createInitialWorldRetirementApi } from "./streaming-initial-retirement.js?v=1";
+import { createInitialWorldRetirementApi } from "./streaming-initial-retirement.js?v=3";
+import { SOURCE_PROFILE } from "./surface-contract.js?v=6";
+import { normalizeWaterBody } from './water-body-contract.js?v=2';
+import { attachStreamProvenance, createRenderProvenance } from './render-provenance.js?v=2';
+import { selectBuildingFeatures, selectTransportationFeatures } from './streaming-feature-budget.js?v=1';
 
 const MAX_ROAD_FEATURES = 900;
 const MAX_BUILDING_FEATURES = 900;
+const CENTER_BUILDING_FEATURES = 3600;
+const ADJACENT_BUILDING_FEATURES = 1200;
 const MAX_WATER_FEATURES = 180;
 const BUILDING_BATCH_CELL_METERS = 520;
 
-let sharedMaterials = null;
 let structureRefreshTimer = null;
 let structureRefreshIdle = null;
 let geometryDisposalIdle = null;
 const geometryDisposalQueue = [];
+const geometryDisposalSet = new Set();
+let geometriesQueuedForDisposal = 0;
+let geometriesDisposed = 0;
+let lastGeometryQueuedAt = 0;
 
 function retainArrayItemsInPlace(source, keep) {
   if (!Array.isArray(source)) return [];
@@ -67,25 +76,44 @@ function retainArrayItemsInPlace(source, keep) {
 }
 
 function queueGeometryDisposal(geometry) {
-  if (!geometry) return;
+  if (!geometry || geometryDisposalSet.has(geometry)) return;
+  geometryDisposalSet.add(geometry);
   geometryDisposalQueue.push(geometry);
+  geometriesQueuedForDisposal += 1;
+  lastGeometryQueuedAt = performance.now();
   if (geometryDisposalIdle !== null) return;
   const drain = (deadline) => {
     geometryDisposalIdle = null;
+    const startedAt = performance.now();
     let disposed = 0;
-    while (geometryDisposalQueue.length > 0 && disposed < 24) {
-      if (disposed > 0 && deadline && !deadline.didTimeout && deadline.timeRemaining() < 2) break;
-      geometryDisposalQueue.shift()?.dispose?.();
+    while (geometryDisposalQueue.length > 0 && disposed < 96) {
+      if (disposed > 0 && performance.now() - startedAt >= 4) break;
+      if (disposed > 0 && deadline && !deadline.didTimeout && deadline.timeRemaining() < 1) break;
+      const next = geometryDisposalQueue.shift();
+      geometryDisposalSet.delete(next);
+      next?.dispose?.();
+      geometriesDisposed += 1;
       disposed += 1;
     }
     if (geometryDisposalQueue.length > 0) schedule();
   };
   const schedule = () => {
-    geometryDisposalIdle = typeof requestIdleCallback === 'function'
+    geometryDisposalIdle = geometryDisposalQueue.length > 192
+      ? setTimeout(() => drain(null), 0)
+      : typeof requestIdleCallback === 'function'
       ? requestIdleCallback(drain, { timeout: 500 })
       : setTimeout(() => drain(null), 16);
   };
   schedule();
+}
+
+function streamingVectorResourceSnapshot() {
+  return {
+    pendingGeometryDisposals: geometryDisposalQueue.length,
+    geometriesQueuedForDisposal,
+    geometriesDisposed,
+    idleForMs: lastGeometryQueuedAt > 0 ? Math.max(0, performance.now() - lastGeometryQueuedAt) : Number.POSITIVE_INFINITY
+  };
 }
 
 function scheduleStreamingStructureRefresh() {
@@ -106,56 +134,22 @@ function scheduleStreamingStructureRefresh() {
   }, 180);
 }
 
-function materials() {
-  if (sharedMaterials) return sharedMaterials;
-  const facadeStyles = ['office_grid', 'residential_punched', 'townhouse', 'industrial_panel'];
-  const buildingColors = [0x9da5a8, 0xb4aa99, 0x879398, 0xc2b9aa];
-  sharedMaterials = {
-    road: new THREE.MeshStandardMaterial({
-      color: 0x353b40,
-      roughness: 0.94,
-      metalness: 0.01,
-      polygonOffset: true,
-      polygonOffsetFactor: -1,
-      polygonOffsetUnits: -2
-    }),
-    buildings: buildingColors.map((color, index) => {
-      const baseTexture = createWindowTexture(`#${new THREE.Color(color).getHexString()}`, 9101 + index, {
-        style: facadeStyles[index]
-      });
-      const texture = baseTexture?.clone?.() || baseTexture || null;
-      if (texture) {
-        texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-        texture.repeat.set(index === 2 ? 0.06 : 0.085, 1 / 42);
-        texture.needsUpdate = true;
-      }
-      const buildingMaterial = new THREE.MeshStandardMaterial({
-        color: texture ? 0xffffff : color,
-        map: texture,
-        roughness: 0.84,
-        metalness: 0.04
-      });
-      applyFacadeWallMask(buildingMaterial, new THREE.Color(color).offsetHSL(0, -0.04, -0.12));
-      return buildingMaterial;
-    }),
-    water: new THREE.MeshStandardMaterial({
-      color: 0x2477ad,
-      emissive: 0x0b2e4a,
-      emissiveIntensity: 0.16,
-      roughness: 0.3,
-      metalness: 0.02,
-      side: THREE.DoubleSide
-    })
-  };
-  return sharedMaterials;
-}
-
 async function buildRoads(tileRecord, chunk, options = {}) {
-  const vertices = [];
-  const indices = [];
+  const batches = new Map();
+  const getBatch = (surfaceClass) => {
+    if (!batches.has(surfaceClass)) batches.set(surfaceClass, { vertices: [], indices: [] });
+    return batches.get(surfaceClass);
+  };
   const resolveRoadName = createRoadNameResolver(tileRecord, cleanLine);
   const featureLimit = Math.max(1, Number(options.maxFeatures) || MAX_ROAD_FEATURES);
-  await forEachLayerFeatureAsync(tileRecord, 'streets', featureLimit, (geojson, featureId) => {
+  const selection = selectTransportationFeatures(tileRecord.tile.layers.streets, featureLimit);
+  chunk.featureBudget.transportation = {
+    requested: selection.requested,
+    selected: selection.selected,
+    classes: selection.classes || null
+  };
+  const selectedRecord = { ...tileRecord, tile: { ...tileRecord.tile, layers: { ...tileRecord.tile.layers, streets: selection.layer } } };
+  await forEachLayerFeatureAsync(selectedRecord, 'streets', selection.selected, (geojson, featureId) => {
     const properties = geojson.properties || {};
     const kind = String(properties.kind || '').toLowerCase();
     if (!kind || properties.rail === true) return;
@@ -194,6 +188,7 @@ async function buildRoads(tileRecord, chunk, options = {}) {
         walkable: true,
         driveable: !kind.includes('footway') && !kind.includes('path'),
         surfaceTag: String(properties.surface || '').toLowerCase(),
+        geometrySource: String(options.geometrySource || tileRecord.source || 'shortbread-vector'),
         litTag: String(properties.lit || '').toLowerCase(),
         structureTags,
         structureSemantics,
@@ -205,18 +200,26 @@ async function buildRoads(tileRecord, chunk, options = {}) {
       };
       if (options.recordFeatures !== false) chunk.roads.push(road);
       updateFeatureSurfaceProfile(road, terrainY, { surfaceBias: ROAD_SURFACE_OFFSET });
-      appendRoadFeatureRibbon(road, vertices, indices);
+      const batch = getBatch(transportSurfaceClass(kind));
+      appendRoadFeatureRibbon(road, batch.vertices, batch.indices);
     });
   });
-  const mesh = createIndexedMesh(vertices, indices, materials().road, {
-    isRoadBatch: true,
-    streamChunkKey: chunk.key,
-    aerialContext: options.aerialContext === true
+  batches.forEach((batch, surfaceClass) => {
+    const mesh = createIndexedMesh(batch.vertices, batch.indices, materials().transport[surfaceClass], {
+      isRoadBatch: true,
+      streamChunkKey: chunk.key,
+      transportSurfaceClass: surfaceClass,
+      aerialContext: options.aerialContext === true
+    });
+    if (!mesh) return;
+    attachStreamProvenance(mesh, chunk, tileRecord, {
+      layer: 'transportation.segment',
+      role: options.aerialContext ? 'aerial-road' : surfaceClass === 'road' ? 'road' : surfaceClass
+    });
+    mesh.renderOrder = 2;
+    chunk.meshes.push(mesh);
+    chunk.roadMeshes.push(mesh);
   });
-  if (!mesh) return;
-  mesh.renderOrder = 2;
-  chunk.meshes.push(mesh);
-  chunk.roadMeshes.push(mesh);
 }
 
 function buildingHeight(properties, footprint, identity) {
@@ -253,7 +256,7 @@ function footprintBounds(points) {
   return { minX, maxX, minZ, maxZ, centerX: (minX + maxX) * 0.5, centerZ: (minZ + maxZ) * 0.5 };
 }
 
-function appendBuildingGeometry(footprint, height, baseY, batch) {
+function appendBuildingGeometry(footprint, height, terrainBaseHeights, foundationY, batch) {
   if (!Array.isArray(footprint) || footprint.length < 3 || !(height > 0)) return;
   let signedArea = 0;
   for (let i = 0; i < footprint.length; i += 1) {
@@ -261,10 +264,12 @@ function appendBuildingGeometry(footprint, height, baseY, batch) {
     signedArea += footprint[i].x * next.z - next.x * footprint[i].z;
   }
 
-  const topY = baseY + height;
+  const topY = foundationY + height;
   for (let i = 0; i < footprint.length; i += 1) {
     const a = footprint[i];
     const b = footprint[(i + 1) % footprint.length];
+    const aBaseY = Number(terrainBaseHeights[i]) - 0.12;
+    const bBaseY = Number(terrainBaseHeights[(i + 1) % footprint.length]) - 0.12;
     const dx = b.x - a.x;
     const dz = b.z - a.z;
     const length = Math.hypot(dx, dz);
@@ -275,9 +280,9 @@ function appendBuildingGeometry(footprint, height, baseY, batch) {
     const nx = leftX * outwardSign;
     const nz = leftZ * outwardSign;
     const start = batch.positions.length / 3;
-    batch.positions.push(a.x, baseY, a.z, b.x, baseY, b.z, b.x, topY, b.z, a.x, topY, a.z);
+    batch.positions.push(a.x, aBaseY, a.z, b.x, bBaseY, b.z, b.x, topY, b.z, a.x, topY, a.z);
     for (let vertex = 0; vertex < 4; vertex += 1) batch.normals.push(nx, 0, nz);
-    batch.uvs.push(0, 0, length, 0, length, height, 0, height);
+    batch.uvs.push(0, 0, length, 0, length, topY - bBaseY, 0, topY - aBaseY);
     if (signedArea >= 0) batch.indices.push(start, start + 2, start + 1, start, start + 3, start + 2);
     else batch.indices.push(start, start + 1, start + 2, start, start + 2, start + 3);
   }
@@ -324,8 +329,15 @@ async function buildBuildings(tileRecord, chunk, options = {}) {
     }
     return batches.get(key);
   };
-  const layer = tileRecord.tile.layers.buildings;
-  const featureCount = Math.min(Number(layer?.length) || 0, Math.max(1, Number(options.maxFeatures) || MAX_BUILDING_FEATURES));
+  const featureLimit = Math.max(1, Number(options.maxFeatures) || MAX_BUILDING_FEATURES);
+  const selection = selectBuildingFeatures(tileRecord.tile.layers.buildings, featureLimit);
+  chunk.featureBudget.buildings = {
+    requested: selection.requested,
+    selected: selection.selected,
+    populatedCells: selection.populatedCells || null
+  };
+  const layer = selection.layer;
+  const featureCount = selection.selected;
   const partLimit = Math.max(100, Number(options.maxParts) || MAX_BUILDING_FEATURES * 3);
   for (let featureIndex = 0; featureIndex < featureCount; featureIndex += 1) {
     if (partsBuilt >= partLimit) break;
@@ -348,10 +360,13 @@ async function buildBuildings(tileRecord, chunk, options = {}) {
       const identity = `${chunk.key}:${featureId}:${partIndex}`;
       const bounds = footprintBounds(footprint);
       const height = buildingHeight(properties, footprint, identity);
-      const baseY = terrainY(bounds.centerX, bounds.centerZ);
+      const terrainBaseHeights = footprint.map((point) => terrainY(point.x, point.z));
+      const centerTerrainY = terrainY(bounds.centerX, bounds.centerZ);
+      const baseY = Math.max(centerTerrainY, ...terrainBaseHeights);
+      const minTerrainY = Math.min(centerTerrainY, ...terrainBaseHeights);
       const materialIndex = stableHash(`${identity}:${properties.kind || ''}`) % materials().buildings.length;
       const batch = getBatch(bounds, materialIndex);
-      appendBuildingGeometry(footprint, height, baseY, batch);
+      appendBuildingGeometry(footprint, height, terrainBaseHeights, baseY, batch);
       batch.count += 1;
       partsBuilt += 1;
       if (options.recordColliders !== false) {
@@ -360,13 +375,13 @@ async function buildBuildings(tileRecord, chunk, options = {}) {
           ...bounds,
           height,
           baseY,
-          minY: baseY,
+          minY: minTerrainY,
           maxY: baseY + height,
           colliderDetail: 'bbox',
           sourceBuildingId: `stream:${identity}`,
           buildingType: String(properties.kind || 'yes'),
           collisionKind: 'solid',
-          geometrySource: 'shortbread-vector',
+          geometrySource: String(options.geometrySource || tileRecord.source || 'shortbread-vector'),
           _streamChunkKey: chunk.key
         });
       }
@@ -390,8 +405,12 @@ async function buildBuildings(tileRecord, chunk, options = {}) {
       batchCount: batch.count,
       lodCenter: sphere ? { x: sphere.center.x, z: sphere.center.z } : null,
       lodRadius: Number(sphere?.radius) || BUILDING_BATCH_CELL_METERS * 0.75,
-      aerialContext: options.aerialContext === true
+      aerialContext: options.aerialContext === true,
+      featureBudget: chunk.featureBudget.buildings
     };
+    attachStreamProvenance(mesh, chunk, tileRecord, {
+      layer: 'buildings', role: options.aerialContext ? 'aerial-building' : 'building'
+    });
     mesh.castShadow = false;
     mesh.receiveShadow = true;
     chunk.meshes.push(mesh);
@@ -411,6 +430,7 @@ function polygonArea(points) {
 }
 
 async function buildWater(tileRecord, chunk) {
+  const geometrySource = String(tileRecord.source || 'shortbread-vector');
   const batch = { positions: [], normals: [], uvs: [], indices: [] };
   const lineVertices = [];
   const lineIndices = [];
@@ -437,15 +457,21 @@ async function buildWater(tileRecord, chunk) {
         geometry.rotateX(-Math.PI / 2);
         appendGeometryWithTransform(batch, geometry, new THREE.Matrix4().makeTranslation(0, surfaceY + 0.08, 0));
         geometry.dispose();
-        const water = {
-          type: 'water',
+        const sourceFeatureId = `stream:${chunk.key}:water:${featureId}:${partIndex}`;
+        const water = normalizeWaterBody({
+          shape: 'area',
           pts: footprint,
           area,
-          ...bounds,
+          bounds,
           surfaceY: surfaceY + 0.08,
-          sourceFeatureId: `stream:${chunk.key}:water:${featureId}:${partIndex}`,
-          _streamChunkKey: chunk.key
-        };
+          kindHint: layerName === 'ocean' ? 'open_ocean' : geojson.properties?.kind || geojson.properties?.subtype,
+          layer: layerName,
+          sourceFeatureId,
+          geometrySource,
+          _streamChunkKey: chunk.key,
+          datumMethod: layerName === 'ocean' ? 'sea-level' : 'dem-water-surface',
+          datumConfidence: layerName === 'ocean' ? 0.98 : 0.82
+        });
         chunk.waterAreas.push(water);
       });
     });
@@ -460,15 +486,19 @@ async function buildWater(tileRecord, chunk) {
       const width = waterwayRenderWidth(properties);
       const surfaceProfile = stableTerrainProfile(points, 0.14);
       appendRoadRibbon(points, width, lineVertices, lineIndices, { surfaceProfile });
-      const waterway = {
+      const waterway = normalizeWaterBody({
+        shape: 'waterway',
         type: String(properties.kind || properties.waterway || 'waterway'),
         pts: points,
         width,
         navigable: waterwayIsNavigable(properties),
         surfaceProfile,
+        kindHint: properties.kind || properties.waterway,
+        layer: 'water_lines',
         sourceFeatureId: `stream:${chunk.key}:waterway:${featureId}:${partIndex}`,
+        geometrySource,
         _streamChunkKey: chunk.key
-      };
+      });
       chunk.waterways.push(waterway);
     });
   });
@@ -484,6 +514,7 @@ async function buildWater(tileRecord, chunk) {
         landuseType: 'water',
         alwaysVisible: true
       };
+      attachStreamProvenance(mesh, chunk, tileRecord, { layer: 'base.water', role: 'water-area' });
       chunk.meshes.push(mesh);
       chunk.landuseMeshes.push(mesh);
     }
@@ -494,6 +525,7 @@ async function buildWater(tileRecord, chunk) {
     alwaysVisible: true
   });
   if (lineMesh) {
+    attachStreamProvenance(lineMesh, chunk, tileRecord, { layer: 'base.water', role: 'waterway' });
     lineMesh.renderOrder = 1;
     chunk.meshes.push(lineMesh);
     chunk.landuseMeshes.push(lineMesh);
@@ -526,6 +558,8 @@ async function loadStreamingVectorChunk(request) {
   const chunk = {
     key: `${request.z}/${request.x}/${request.y}`,
     tile: request,
+    surfaceTile: request.surfaceTile || null,
+    featureBudget: {},
     meshes: [],
     roadMeshes: [],
     buildingMeshes: [],
@@ -541,23 +575,22 @@ async function loadStreamingVectorChunk(request) {
   };
   try {
     if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
-    if (appCtx.terrainEnabled && typeof appCtx.waitForTerrainReadyAt === 'function') {
-      const centerLat = (Number(request.bounds?.latN) + Number(request.bounds?.latS)) * 0.5;
-      const centerLon = (Number(request.bounds?.lonW) + Number(request.bounds?.lonE)) * 0.5;
-      const center = appCtx.geoToWorld(centerLat, centerLon);
-      const terrainReady = await appCtx.waitForTerrainReadyAt(center.x, center.z, 6000);
-      if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
-      if (!terrainReady) throw new Error(`Terrain elevation unavailable for streaming chunk ${chunk.key}`);
-    }
-    const tileRecord = await fetchShortbreadTile(request.z, request.x, request.y, { signal: request.signal });
+    const tileRecord = await fetchOvertureStreamingTile(request.z, request.x, request.y, { signal: request.signal });
     if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
+    if (appCtx.terrainEnabled && typeof appCtx.waitForTerrainReadyBounds === 'function') {
+      const terrainReady = await appCtx.waitForTerrainReadyBounds(expandGeographicBounds(request.bounds), 8000);
+      if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
+      if (!terrainReady) throw new Error(`Terrain elevation coverage unavailable for streaming chunk ${chunk.key}`);
+    }
     await buildWater(tileRecord, chunk);
     await yieldToRenderer();
     if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
     await buildRoads(tileRecord, chunk);
     await yieldToRenderer();
     if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
-    await buildBuildings(tileRecord, chunk);
+    const buildingLimit = Number(request.priority) < 0.5 ? CENTER_BUILDING_FEATURES :
+      Number(request.priority) < 1.5 ? ADJACENT_BUILDING_FEATURES : MAX_BUILDING_FEATURES;
+    await buildBuildings(tileRecord, chunk, { maxFeatures: buildingLimit, maxParts: buildingLimit * 3 });
     await yieldToRenderer();
     if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
     await buildStreamingLandcover(tileRecord, chunk, {
@@ -566,10 +599,19 @@ async function loadStreamingVectorChunk(request) {
       forEachLayerFeatureAsync,
       geometryParts,
       outsideInitialDetail,
-      terrainY
+      terrainY,
+      createProvenance: (layer, role) => createRenderProvenance({
+        surfaceTile: chunk.surfaceTile,
+        tileRecord,
+        provider: 'Overture Maps Foundation',
+        dataset: tileRecord.source,
+        layer,
+        role
+      })
     });
     if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
     commitStreamingVectorChunk(chunk);
+    appCtx.pruneTerrainTileCache?.();
     appCtx.refreshBridgeGuardrails?.(chunk.roads);
     appCtx.invalidateRoadCache?.();
     scheduleStreamingStructureRefresh();
@@ -624,29 +666,18 @@ const initialWorldRetirementApi = createInitialWorldRetirementApi({
 });
 const { maybeRetireInitialEarthWorld, retireInitialEarthWorld } = initialWorldRetirementApi;
 
-function streamPrefetchRatio(mode = 'walk', speedMps = 0) {
-  const baseRatio = mode === 'plane' ? 0.34 : mode === 'drone' ? 0.44 : mode === 'drive' ? 0.54 : mode === 'boat' ? 0.5 : 0.62;
-  const speedLead = Math.min(0.12, Math.max(0, Number(speedMps) || 0) / 260);
-  return Math.max(0.28, baseRatio - speedLead);
-}
-
-function actorNearInitialWorldEdge({ actor, mode, speedMps } = {}) {
-  if (!actor) return false;
-  if (appCtx.initialEarthWorldRetired) return true;
-  const initialRadius = Math.max(INITIAL_DETAIL_RADIUS, Number(appCtx.initialEarthDetailRadius) || 0);
-  return Math.hypot(Number(actor.x) || 0, Number(actor.z) || 0) >= initialRadius * streamPrefetchRatio(mode, speedMps);
-}
-
 function initStreamingVectorChunks() {
   if (typeof appCtx.registerEarthStreamLayer !== 'function') return false;
   if (appCtx._streamingVectorChunksRegistered) return true;
   appCtx._streamingVectorChunksRegistered = true;
   appCtx.maybeRetireInitialEarthWorld = maybeRetireInitialEarthWorld;
   appCtx.retireInitialEarthWorld = retireInitialEarthWorld;
-  appCtx.unregisterStreamingVectorChunks = appCtx.registerEarthStreamLayer('osm-vector', {
-    activeWhen: actorNearInitialWorldEdge,
+  appCtx.getStreamingVectorResourceSnapshot = streamingVectorResourceSnapshot;
+  appCtx.unregisterStreamingVectorChunks = appCtx.registerEarthStreamLayer('global-vector', {
     radius: 1,
     maxActive: 20,
+    profile: SOURCE_PROFILE.CONTINUOUS_GLOBAL,
+    sources: ['overture-transportation', 'overture-buildings', 'overture-base'],
     loadChunk: loadStreamingVectorChunk,
     unloadChunk: disposeStreamingVectorChunk
   });

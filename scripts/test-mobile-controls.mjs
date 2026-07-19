@@ -37,7 +37,9 @@ async function waitForRuntime(page) {
     return typeof ctx?.loadRoads === 'function' &&
       typeof ctx?.setTravelMode === 'function' &&
       typeof ctx?.switchEnv === 'function' &&
-      !!ctx?.ENV?.EARTH;
+      !!ctx?.ENV?.EARTH &&
+      ctx.runtimeReady === true &&
+      globalThis.__WE3D_RUNTIME_READY__ === true;
   }, null, { timeout: 90000 });
 }
 
@@ -56,36 +58,40 @@ async function assertTitleTouch(page, baseUrl) {
 async function bootstrapEarth(page, baseUrl) {
   await page.goto(`${baseUrl}/app/?mobile-runtime=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await waitForRuntime(page);
-  await page.evaluate(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const deadline = performance.now() + 30000;
-    while (
-      performance.now() < deadline &&
-      (typeof ctx.switchEnv !== 'function' || !ctx.ENV?.EARTH || typeof ctx.loadRoads !== 'function')
-    ) {
-      await new Promise((resolve) => window.setTimeout(resolve, 100));
+  await page.waitForFunction(() => !document.getElementById('startBtn')?.disabled, null, { timeout: 90000 });
+  await page.locator('.tab-btn[data-tab="location"]').tap();
+  await page.locator('.loc[data-loc="baltimore"]').tap();
+  await page.locator('#startBtn').tap();
+  await page.locator('#loading.show').waitFor({ state: 'visible', timeout: 15000 });
+  try {
+    const deadline = Date.now() + 90000;
+    let consecutiveReadySamples = 0;
+    while (Date.now() < deadline && consecutiveReadySamples < 6) {
+      const ready = await page.evaluate(async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        const loading = document.getElementById('loading');
+        return !!loading && ctx.gameStarted && !ctx.worldLoading && (ctx.roads?.length || 0) > 300 &&
+          document.getElementById('titleScreen')?.classList.contains('hidden') &&
+          !loading.classList.contains('show') && getComputedStyle(loading).display === 'none';
+      });
+      consecutiveReadySamples = ready ? consecutiveReadySamples + 1 : 0;
+      if (consecutiveReadySamples < 6) await page.waitForTimeout(250);
     }
-    if (typeof ctx.switchEnv !== 'function' || !ctx.ENV?.EARTH || typeof ctx.loadRoads !== 'function') {
-      throw new Error('Earth runtime did not stabilize for the mobile acceptance test');
-    }
-    ctx.selLoc = 'baltimore';
-    ctx.gameMode = 'free';
-    ctx.loadingScreenMode = 'earth';
-    ctx.gameStarted = true;
-    ctx.paused = false;
-    ctx.switchEnv(ctx.ENV?.EARTH || 'EARTH');
-    document.getElementById('titleScreen')?.classList.add('hidden');
-    ['hud', 'minimap', 'floatMenuContainer', 'mainMenuBtn', 'controlsTab', 'coords'].forEach((id) => {
-      document.getElementById(id)?.classList.add('show');
-    });
-    await ctx.loadRoads();
-    ctx.setTravelMode('walk', { source: 'mobile_acceptance', emitTutorial: false });
-    ctx.startMode?.();
-  });
-  await page.waitForFunction(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return ctx.gameStarted && !ctx.worldLoading && (ctx.roads?.length || 0) > 300;
-  }, null, { timeout: 150000 });
+    if (consecutiveReadySamples < 6) throw new Error('Earth runtime did not remain interactive for six consecutive readiness samples');
+  } catch (error) {
+    const diagnostics = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      return {
+        worldLoading: !!ctx.worldLoading,
+        roads: Number(ctx.roads?.length || 0),
+        buildings: Number(ctx.buildings?.length || 0),
+        titleHidden: document.getElementById('titleScreen')?.classList.contains('hidden'),
+        loadingVisible: document.getElementById('loading')?.classList.contains('show'),
+        loadMetrics: ctx.perfStats?.lastLoad || ctx.lastLoadMetrics || null
+      };
+    }).catch(() => ({ unavailable: 'renderer main thread did not answer diagnostics' }));
+    throw new Error(`Mobile Earth bootstrap exceeded its acceptance budget: ${JSON.stringify(diagnostics)} (${error.message})`);
+  }
 }
 
 async function readMode(page) {
@@ -117,8 +123,21 @@ async function switchMode(page, selector, expected) {
 async function assertDockHitTargets(page) {
   const failures = await page.evaluate(() => [...document.querySelectorAll('.floatBtn')].flatMap((button) => {
     const rect = button.getBoundingClientRect();
-    const hit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2)?.closest('.floatBtn');
-    return hit === button ? [] : [{ button: button.id, hit: hit?.id || null }];
+    const rawHit = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    const hit = rawHit?.closest('.floatBtn');
+    const loading = document.getElementById('loading');
+    return hit === button ? [] : [{
+      button: button.id,
+      hit: hit?.id || null,
+      coveringElement: rawHit ? { id: rawHit.id || null, className: String(rawHit.className || ''), tagName: rawHit.tagName } : null,
+      loading: loading ? {
+        className: loading.className,
+        display: getComputedStyle(loading).display,
+        text: document.getElementById('loadText')?.textContent || ''
+      } : null,
+      rect: { x: rect.x, y: rect.y, width: rect.width, height: rect.height },
+      viewport: { width: innerWidth, height: innerHeight }
+    }];
   }));
   assert(failures.length === 0, `Mobile dock has blocked hit targets: ${JSON.stringify(failures)}`);
 }
@@ -192,16 +211,19 @@ async function main() {
   const browser = await chromium.launch({ headless: true });
   const errors = [];
   try {
+    console.log('[mobile-controls] iPhone title touch');
     const iphone = await browser.newContext(contextOptions(devices.iphone));
     const iphonePage = await iphone.newPage();
     iphonePage.on('pageerror', (error) => errors.push(`iphone: ${error.message}`));
     await assertTitleTouch(iphonePage, baseUrl);
     await iphone.close();
 
+    console.log('[mobile-controls] Android Earth bootstrap and mode controls');
     const android = await browser.newContext(contextOptions(devices.android));
     const androidPage = await android.newPage();
     androidPage.on('pageerror', (error) => errors.push(`android: ${error.message}`));
     await bootstrapEarth(androidPage, baseUrl);
+    await androidPage.screenshot({ path: path.join(outputDir, 'android-bootstrap.png') });
     await assertDockHitTargets(androidPage);
     await switchMode(androidPage, '#fDriving', 'drive');
     await switchMode(androidPage, '#fDrone', 'drone');
@@ -213,6 +235,7 @@ async function main() {
     await assertMainMenuReturn(androidPage);
     await android.close();
 
+    console.log('[mobile-controls] iPhone landscape Earth bootstrap');
     await assertLandscapeShell(browser, baseUrl);
   } finally {
     await browser.close();

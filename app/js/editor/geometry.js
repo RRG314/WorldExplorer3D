@@ -38,18 +38,8 @@ function geoToWorldPoint(lat, lon) {
 }
 
 function sampleSurfaceY(x, z, fallback = 0) {
-  if (appCtx.GroundHeight && typeof appCtx.GroundHeight.walkSurfaceY === 'function') {
-    const y = appCtx.GroundHeight.walkSurfaceY(x, z);
-    if (Number.isFinite(y)) return y;
-  }
-  if (typeof appCtx.terrainMeshHeightAt === 'function') {
-    const y = appCtx.terrainMeshHeightAt(x, z);
-    if (Number.isFinite(y)) return y;
-  }
-  if (typeof appCtx.elevationWorldYAtWorldXZ === 'function') {
-    const y = appCtx.elevationWorldYAtWorldXZ(x, z);
-    if (Number.isFinite(y)) return y;
-  }
+  const y = appCtx.SurfaceQuery?.walkAt?.(x, z)?.position?.y;
+  if (Number.isFinite(y)) return y;
   return finiteNumber(fallback, 0);
 }
 

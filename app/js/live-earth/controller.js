@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveObservedEarthLocation, haversineKm } from "../earth-location.js?v=2";
 import { getWeatherSnapshotForLocation } from "../weather.js?v=2";
-import { LIVE_EARTH_CATEGORIES, LIVE_EARTH_LAYERS, getLiveEarthLayer } from "./registry.js?v=5";
+import { LIVE_EARTH_CATEGORIES, LIVE_EARTH_LAYERS, getLiveEarthLayer } from "./registry.js?v=6";
 import { getSatelliteLookAngles, getSatelliteSnapshot, getSatelliteTrack, refreshSatelliteCatalog } from "./satellites.js?v=4";
 import { buildEarthquakeReplayProfile, refreshEarthquakes } from "./earthquakes.js?v=1";
 import { buildAircraftTrafficSnapshot, buildShipTrafficSnapshot } from "./transport.js?v=3";
@@ -23,7 +23,7 @@ import {
   setActiveLayer,
   setPanelMode,
   updateSelectorFrame
-} from "./controller-ui.js?v=1";
+} from "./controller-ui.js?v=3";
 
 const SATELLITE_POSITION_REFRESH_MS = 15000;
 const EARTHQUAKE_UI_REFRESH_MS = 5 * 60 * 1000;
@@ -113,7 +113,6 @@ function buildLiveEarthState() {
     localSatelliteLook: null,
     localSatelliteLookAt: 0,
     localSatelliteObserverKey: '',
-    previewSelections: {},
     earthquakeReplay: {
       active: false,
       startedAtMs: 0,
@@ -134,17 +133,7 @@ function buildLiveEarthState() {
       markerRecords: [],
       detailsScrollTopByLayer: {}
     },
-    localSatelliteVisual: null,
-    scaffoldedLayerNotes: {
-      'space-weather': 'Future solar wind and geomagnetic conditions layer.',
-      'near-earth-objects': 'Future close-approach and object awareness layer.',
-      'rocket-launches': 'Future launch schedule and ascent tracking layer.',
-      volcanoes: 'Future observatory-fed volcanic activity layer.',
-      wildfires: 'Future fire detection and smoke integration layer.',
-      storms: 'Future storm-track and alert-grade weather layer.',
-      'ocean-state': 'Future swell, currents, and marine state layer.',
-      'live-media': 'Future curated public camera and media windows.'
-    }
+    localSatelliteVisual: null
   };
 }
 
@@ -164,7 +153,6 @@ function buildLiveEarthModuleContext() {
     ensureShipTrafficData,
     ensureWeatherSamples,
     filteredSatelliteItems,
-    fireWeatherSamples,
     getLiveEarthLayer,
     getSatelliteLookAngles,
     haversineKm,
@@ -313,8 +301,9 @@ function warmImplementedLayers(state, force = false) {
     ensureEarthquakeData(state, force),
     ensureWeatherSamples(state, force)
   ]).then(() => {
-    renderGlobeLayers(state);
-    renderLiveEarthUi(state);
+    const ctx = buildLiveEarthModuleContext();
+    renderGlobeLayers(ctx, state);
+    renderLiveEarthUi(ctx, state);
   }).finally(() => {
     state.warmPromise = null;
   });
@@ -442,36 +431,6 @@ function oceanSamples(state) {
       ...sample,
       oceanState: oceanStateProfile(sample.snapshot)
     }));
-}
-
-function fireWeatherRisk(snapshot = null) {
-  if (!snapshot) return 0;
-  const temp = Number(snapshot.temperatureF) || 0;
-  const humidity = Number(snapshot.humidityPct) || 0;
-  const wind = Number(snapshot.windMph) || 0;
-  const precip = Number(snapshot.precipitationMm) || 0;
-  let score = 0;
-  if (temp >= 95) score += 3;
-  else if (temp >= 85) score += 2;
-  else if (temp >= 76) score += 1;
-  if (humidity <= 20) score += 3;
-  else if (humidity <= 30) score += 2;
-  else if (humidity <= 40) score += 1;
-  if (wind >= 24) score += 3;
-  else if (wind >= 16) score += 2;
-  else if (wind >= 10) score += 1;
-  if (precip <= 0.3) score += 1;
-  return score;
-}
-
-function fireWeatherSamples(state) {
-  return state.weatherSamples
-    .map((sample) => ({
-      ...sample,
-      fireRisk: fireWeatherRisk(sample.snapshot)
-    }))
-    .filter((sample) => sample.fireRisk > 0)
-    .sort((a, b) => b.fireRisk - a.fireRisk);
 }
 
 async function refreshSatelliteTrack(state, force = false) {

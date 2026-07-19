@@ -9,36 +9,40 @@ import './state.js?v=60';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
 import './location-session.js?v=1';
+import './controls/action-input.js?v=1';
+import './transport/actor-contract.js?v=1';
 import './world/collection-registry.js?v=1';
 import './perf.js?v=56';
 import './env.js?v=57';
+import './session-coordinator.js?v=2';
 import './real-estate.js?v=55';
-import './ground.js?v=64';
-import './terrain.js?v=107';
-import './world.js?v=186';
-import './earth-streaming.js?v=17';
-import './world/streaming-vector-chunks.js?v=32';
-import './world/streaming-aerial-context.js?v=17';
-import './earth-origin.js?v=2';
+import './ground.js?v=66';
+import './terrain.js?v=126';
+import './world.js?v=194';
+import './earth-streaming.js?v=22';
+import './world/streaming-vector-chunks.js?v=52';
+import './world/load-continuous-world.js?v=1';
+import './world/streaming-aerial-context.js?v=26';
+import './earth-origin.js?v=4';
 import './building-entry.js?v=4';
-import './interiors.js?v=8';
-import { init, tryEnablePostProcessing } from './engine.js?v=72';
-import './physics.js?v=75';
+import './interiors.js?v=9';
+import { init, tryEnablePostProcessing } from './engine.js?v=73';
+import './physics.js?v=76';
 import './walking.js?v=65';
 import './travel-mode.js?v=11';
-import { initBoatMode } from './boat-mode.js?v=25';
+import { initBoatMode } from './boat-mode.js?v=27';
 import { setupFishingGame } from './fishing-game.js?v=2';
-import './sky.js?v=75';
+import './sky.js?v=77';
 import './weather.js?v=3';
-import './live-earth/controller.js?v=8';
+import './live-earth/controller.js?v=11';
 import './solar-system.js?v=70';
-import './space.js?v=85';
-import './planetary/scene-ownership.js?v=3';
-import './planetary/vehicles.js?v=1';
+import './space.js?v=87';
+import './planetary/scene-ownership.js?v=7';
+import './planetary/vehicles.js?v=2';
 import './planetary/astronaut.js?v=1';
-import './planetary/sky-orientation.js?v=8';
+import './planetary/sky-orientation.js?v=9';
 import './planetary/moon-sky.js?v=1';
-import './planetary/mars-world.js?v=13';
+import './planetary/mars-world.js?v=16';
 import './planetary/tracks.js?v=1';
 import './ocean.js?v=5';
 import './game.js?v=56';
@@ -50,7 +54,7 @@ import './memory.js?v=55';
 import './blocks.js?v=60';
 import './block-builder/ui.js?v=2';
 import './flower-challenge.js?v=56';
-import { setupUI } from './ui.js?v=90';
+import { setupUI } from './ui.js?v=95';
 
 let _booted = false;
 let _multiplayerObserverReady = false;
@@ -497,6 +501,9 @@ function bootApp() {
         return { tryEnablePostProcessing };
     }
 
+    appCtx.runtimeReady = false;
+    globalThis.__WE3D_RUNTIME_READY__ = false;
+
     const runBootStep = (label, action) => {
         console.log(`[boot] step:start:${label}`);
         const result = action();
@@ -517,6 +524,16 @@ function bootApp() {
     runBootStep('scheduleTutorialInit', () => scheduleTutorialInit());
     runBootStep('startMultiplayerAfterAuthReady', () => startMultiplayerAfterAuthReady());
     runBootStep('renderLoop', () => renderLoop());
+    runBootStep('markRuntimeReady', () => {
+        appCtx.runtimeReady = true;
+        globalThis.__WE3D_RUNTIME_READY__ = true;
+        const startButton = document.getElementById('startBtn');
+        if (startButton) {
+            startButton.disabled = false;
+            startButton.setAttribute('aria-busy', 'false');
+        }
+        globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-ready'));
+    });
     runBootStep('scheduleAnalyticsWarmup', () => scheduleAnalyticsWarmup(2800));
     _booted = true;
     return { tryEnablePostProcessing };

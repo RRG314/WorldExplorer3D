@@ -52,8 +52,8 @@ Requirements: Node.js 22+, Java 21, and a browser with WebGL support.
 git clone https://github.com/RRG314/WorldExplorer3D.git
 cd WorldExplorer3D
 npm install
-npm run sync:public
-python3 -m http.server --directory public 4173
+npm run build:hosting -- --firebase-env staging
+python3 -m http.server --directory dist 4173
 ```
 
 Open `http://127.0.0.1:4173/app/`.
@@ -63,8 +63,9 @@ Core exploration can run locally without production credentials. Account, multip
 ## Verify a Change
 
 ```bash
-npm run sync:public
-npm run verify:mirror
+npm run build:hosting -- --firebase-env staging
+npm run verify:hosting
+npm run audit:reachability
 npm run runtime:verify
 npm run release:verify
 ```
@@ -74,14 +75,15 @@ npm run release:verify
 ## Repository Layout
 
 - `app/` - canonical browser runtime
-- `public/` - generated hosting mirror
+- `dist/` - ignored, generated hosting artifact
 - `functions/` - authorized backend functions
 - `scripts/` - verification and release tooling
 - `tests/` - security and runtime test fixtures
 - `assets/` - landing and documentation media
 - `github-pages/` - static project explainer for GitHub Pages
 
-Edit canonical files first, then run `npm run sync:public`. Do not edit the mirrored `public/app/` runtime independently.
+Edit canonical source only. `npm run build:hosting` creates a fresh, content-hashed hosting artifact; generated `dist/` files are never edited or committed.
+`npm run audit:reachability` rejects hosted JavaScript or CSS that is no longer reachable from a declared page/runtime entrypoint.
 
 ## Project Documents
 

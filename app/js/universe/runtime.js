@@ -5,17 +5,26 @@ import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js
 import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=2';
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
 import { getUniverseNavigationMetrics } from './navigation-scale.js?v=1';
-import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=3';
+import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=4';
 import { createUniverseFrameVisual, updateUniverseFrameVisual } from './visuals.js?v=11';
 import {
+  closeUniverseNavigator,
   createUniverseNavigator,
   hideUniverseNavigator,
   setUniverseSelection,
   showUniverseNavigator,
   updateUniverseNavigator
-} from './ui.js?v=2';
+} from './ui.js?v=3';
+import {
+  createWormholeVisual,
+  getWormholeRoute,
+  startWormholeVisual,
+  stopWormholeVisual,
+  updateWormholeVisual
+} from './wormhole.js?v=1';
 
 const TRANSIT_DURATION_MS = 3400;
+const WORMHOLE_DURATION_MS = 4800;
 const FRAME_REBASE_DISTANCE = 30000;
 const _rebase = new THREE.Vector3();
 const _forward = new THREE.Vector3();
@@ -25,6 +34,7 @@ const universeRuntime = {
   scene: null,
   frameGroup: null,
   transitGroup: null,
+  wormholeGroup: null,
   sky: null,
   deepSky: null,
   current: resolveUniverseAddress('sol'),
@@ -56,6 +66,8 @@ function setSolVisibility(visible) {
   const marsButton = document.getElementById('marsLandingToggle');
   if (moonButton) moonButton.style.display = visible ? '' : 'none';
   if (marsButton) marsButton.style.display = visible ? '' : 'none';
+  const scale = document.getElementById('solarSystemScale');
+  if (scale) scale.style.display = visible ? 'block' : 'none';
 }
 
 function disposeActiveFrame() {
@@ -166,11 +178,16 @@ function travelToUniverseDestination(addressOrId, options = {}) {
     from: universeRuntime.current,
     to: destination,
     startedAt: performance.now(),
-    swapped: false
+    swapped: false,
+    kind: options.kind || 'navigation',
+    routeLabel: options.routeLabel || ''
   };
   appCtx.spaceFlight.mode = 'transit';
   resetFlightMotion();
-  if (universeRuntime.transitGroup) universeRuntime.transitGroup.visible = true;
+  if (universeRuntime.transitGroup) {
+    universeRuntime.transitGroup.visible = universeRuntime.transition.kind !== 'wormhole';
+  }
+  closeUniverseNavigator();
   showMessage(`NAVIGATING TO ${destination.name.toUpperCase()}`, '#8ab4ff');
   updateUniverseNavigator(universeRuntime);
   return true;
@@ -205,6 +222,7 @@ function returnUniverseToSolImmediate() {
   universeRuntime.transition = null;
   universeRuntime.pendingEarthReturn = false;
   if (universeRuntime.transitGroup) universeRuntime.transitGroup.visible = false;
+  stopWormholeVisual(universeRuntime.wormholeGroup);
   if (universeRuntime.scene) installFrame(resolveUniverseAddress('sol'));
   return true;
 }
@@ -242,8 +260,16 @@ function setupUniverseInput() {
 function updateTransition(nowMs) {
   const transition = universeRuntime.transition;
   if (!transition) return;
-  const progress = Math.min(1, (nowMs - transition.startedAt) / TRANSIT_DURATION_MS);
-  if (universeRuntime.transitGroup) {
+  const duration = transition.kind === 'wormhole' ? WORMHOLE_DURATION_MS : TRANSIT_DURATION_MS;
+  const progress = Math.min(1, (nowMs - transition.startedAt) / duration);
+  if (transition.kind === 'wormhole') {
+    updateWormholeVisual(
+      universeRuntime.wormholeGroup,
+      appCtx.spaceFlight.camera,
+      progress,
+      universeRuntime.elapsedSeconds
+    );
+  } else if (universeRuntime.transitGroup) {
     universeRuntime.transitGroup.position.copy(appCtx.spaceFlight.rocket.position);
     universeRuntime.transitGroup.rotation.z += 0.012 * (appCtx.spaceFlight._frameScale || 1);
     universeRuntime.transitGroup.material.opacity = Math.sin(progress * Math.PI) * 0.86;
@@ -256,6 +282,7 @@ function updateTransition(nowMs) {
   if (progress < 1) return;
   universeRuntime.transition = null;
   if (universeRuntime.transitGroup) universeRuntime.transitGroup.visible = false;
+  stopWormholeVisual(universeRuntime.wormholeGroup);
   appCtx.spaceFlight.mode = 'flying';
   updateUniverseNavigator(universeRuntime);
   showMessage(`${transition.to.name.toUpperCase()} FRAME ACQUIRED`, '#68d8c0');
@@ -264,9 +291,24 @@ function updateTransition(nowMs) {
   }
 }
 
+function startCapturedWormhole(route) {
+  const destination = resolveUniverseAddress(route.destinationId);
+  if (!destination) return false;
+  universeRuntime.captureRecoveryAt = performance.now() + WORMHOLE_DURATION_MS + 1500;
+  startWormholeVisual(universeRuntime.wormholeGroup);
+  const started = travelToUniverseDestination(destination.id, {
+    kind: 'wormhole',
+    routeLabel: route.label
+  });
+  if (started) {
+    showMessage('SPECULATIVE WORMHOLE TRANSIT - CATALOG ENDPOINTS', '#bf9bff');
+  }
+  return started;
+}
+
 function updateBlackHole(frameScale) {
   const group = universeRuntime.frameGroup;
-  if (universeRuntime.current.objectClass !== 'black_hole' || !group) {
+  if (universeRuntime.transition || universeRuntime.current.objectClass !== 'black_hole' || !group) {
     return;
   }
   updateBlackHoleVisual(group, appCtx.spaceFlight.camera, universeRuntime.elapsedSeconds);
@@ -277,6 +319,8 @@ function updateBlackHole(frameScale) {
     frameScale
   );
   if (!universeRuntime.encounter?.captured || performance.now() < universeRuntime.captureRecoveryAt) return;
+  const route = getWormholeRoute(universeRuntime.current.id);
+  if (route && startCapturedWormhole(route)) return;
   universeRuntime.captureRecoveryAt = performance.now() + 4000;
   const radius = group.userData.blackHole.visualRadius;
   appCtx.spaceFlight.rocket.position.copy(group.position).add(new THREE.Vector3(0, radius * 2.2, radius * 12));
@@ -350,6 +394,7 @@ function initUniverseRuntime(scene) {
     disposeActiveFrame();
     universeRuntime.scene = scene;
     universeRuntime.transitGroup = createTransitVisual(scene);
+    universeRuntime.wormholeGroup = createWormholeVisual(scene);
     universeRuntime.sky = createUniverseSky(scene);
     universeRuntime.deepSky = createDeepSkyLayer(scene);
     universeRuntime.initialized = true;

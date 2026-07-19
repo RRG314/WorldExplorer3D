@@ -1,5 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { clamp } from './dynamics.js?v=1';
+import { normalizeWaterKind, waterKindLabel } from '../world/water-body-contract.js?v=2';
 
 const BOAT_ENTRY_OFFSET = 9;
 const BOAT_MAX_CANDIDATE_DISTANCE = 58;
@@ -93,6 +94,8 @@ function classifyWaterArea(area) {
   if (!area) return null;
   area._boatStats = stats;
   if (!(stats.area >= BOAT_AREA_MIN_AREA || stats.span >= BOAT_AREA_MIN_SPAN)) return null;
+  const declaredKind = normalizeWaterKind(area.waterKind || area.kind);
+  if (declaredKind) return { kind: declaredKind, label: waterKindLabel(declaredKind) };
   const elevatedInlandWater = Number.isFinite(area.surfaceY) && area.surfaceY > 12;
   const broadOpenWater =
     stats.area > 900000 ||
@@ -119,6 +122,8 @@ function classifyWaterway(way) {
   }
   way._boatLength = length;
   if (width < BOAT_WATERWAY_MIN_WIDTH || length < BOAT_WATERWAY_MIN_LENGTH) return null;
+  const declaredKind = normalizeWaterKind(way.waterKind || way.kind || way.type);
+  if (declaredKind) return { kind: declaredKind, label: waterKindLabel(declaredKind) };
   if (width >= 80 || length >= 1600) return { kind: 'coastal', label: 'Coastal Water' };
   if (width >= 28 || length >= 480) return { kind: 'channel', label: 'Channel Water' };
   return { kind: 'harbor', label: 'Harbor Water' };

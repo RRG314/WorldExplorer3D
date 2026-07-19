@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=12";
+} from "./structure-semantics.js?v=13";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -51,7 +51,7 @@ import {
   limitWaysByTileBudget,
   rdtDepthForFeatureTile,
   wayCenterLatLon
-} from "./world/budgets.js?v=3";
+} from "./world/budgets.js?v=5";
 import {
   initWorldLod,
   updateWorldLod
@@ -65,12 +65,12 @@ import {
   scheduleDeferredPoiLoad,
   scheduleDeferredWorldDetailPasses,
   safeWorldLoadCall
-} from "./world/load-support.js?v=11";
+} from "./world/load-support.js?v=14";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=4";
+} from "./world/load-reset.js?v=7";
 import {
   prepareWorldFeatureSelections
 } from "./world/load-budgeting.js?v=2";
@@ -89,7 +89,7 @@ import {
   waterSurfaceBaseElevation,
   WATER_VECTOR_TILE_ZOOM,
   worldLinePointsFromLonLat
-} from "./world/load-geometry.js?v=13";
+} from "./world/load-geometry.js?v=15";
 import {
   decimateRoadCenterlineByDepth,
   getPerfModeValue,
@@ -107,13 +107,13 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=7";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=19";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=9";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=20";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
   registerWaterWaveMaterial
-} from "./world/render-support.js?v=4";
+} from "./world/render-support.js?v=5";
 import {
   buildingContainingPoint,
   findNearestRoad,
@@ -149,7 +149,7 @@ import {
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
 } from "./world/world-geometry.js?v=2";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=10";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=15";
 import {
   resetWorldFurnitureCaches
 } from "./world/furniture.js?v=8";
@@ -168,7 +168,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=3";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=39";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=43";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=6";
@@ -183,7 +183,7 @@ const FEATURE_MIN_HOLE_AREA = 6;
 // Release decision: keep separate footway/cycleway/rail ribbons disabled until
 // they have terrain-draping and intersection tests equivalent to road surfaces.
 const ENABLE_LINEAR_FEATURES = false;
-const { loadRoads, isVehicleRoad, isInsideWaterArea } = createWorldRoadLoader({
+const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorldRoadLoader({
   ENABLE_LINEAR_FEATURES,
   FEATURE_MIN_HOLE_AREA,
   FEATURE_MIN_POLYGON_AREA,
@@ -273,9 +273,22 @@ const { loadRoads, isVehicleRoad, isInsideWaterArea } = createWorldRoadLoader({
   worldLinePointsFromLonLat
 });
 
+async function loadRoads(retryPass = 0) {
+  if (retryPass === 0 && appCtx.getContinuousWorldEnabled?.() === true) {
+    if (typeof appCtx.loadContinuousEarthWorld !== 'function') {
+      throw new Error('Continuous Earth loader is not registered.');
+    }
+    return appCtx.loadContinuousEarthWorld();
+  }
+  return loadOsmRoads(retryPass);
+}
+
 async function refreshAuthoritativeMapData() {
   if (appCtx.onMoon || appCtx.onMars || appCtx.spaceFlight?.active) {
     throw new Error('OpenStreetMap refresh is available on Earth.');
+  }
+  if (appCtx.getContinuousWorldEnabled?.() === true) {
+    throw new Error('OpenStreetMap refresh is available in Quality Location mode.');
   }
   await invalidateOverpassCaches(appCtx.LOC, ['core', 'buildings', 'building-metadata']);
   return loadRoads();

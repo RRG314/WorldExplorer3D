@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { captureEarthWorldSession } from "./earth-session.js?v=9";
+import { captureEarthWorldSession } from "./earth-session.js?v=11";
 import {
   DEFAULT_WAVE_INTENSITY,
   SEA_STATE_CONFIG,
@@ -25,7 +25,7 @@ import {
   syncWaterMeshCache,
   waterKindLabel,
   waterSurfaceYAt
-} from "./boat-mode/water-query.js?v=12";
+} from "./boat-mode/water-query.js?v=14";
 import {
   applyBoatWavePose,
   ensureBoatWaterPatch,
@@ -34,11 +34,11 @@ import {
   updateBoatFoamFx,
   updateBoatWaterPatch,
   updateWaterWaveVisuals
-} from "./boat-mode/surface-effects.js?v=6";
+} from "./boat-mode/surface-effects.js?v=8";
 import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=1";
 import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=1";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";
-import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=4";
+import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=5";
 import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=1";
 import { createBoatModePolicy } from "./boat-mode/policy.js?v=1";
 

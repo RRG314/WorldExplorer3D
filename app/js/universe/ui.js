@@ -27,6 +27,25 @@ function makeButton(id, label, className = '') {
   return button;
 }
 
+function setNavigatorOpen(open) {
+  const panel = document.getElementById('universeNavigator');
+  if (!panel) return false;
+  panel.hidden = !open;
+  panel.setAttribute('aria-hidden', String(!open));
+  const toggle = document.getElementById('universeToggle');
+  if (toggle) toggle.setAttribute('aria-expanded', String(open));
+  return true;
+}
+
+function closeUniverseNavigator() {
+  return setNavigatorOpen(false);
+}
+
+function toggleUniverseNavigator() {
+  const panel = document.getElementById('universeNavigator');
+  return panel ? setNavigatorOpen(panel.hidden) : false;
+}
+
 function populateDestinationSelect(select) {
   const destinations = getUniverseDestinations();
   Object.entries(CLASS_LABELS).forEach(([objectClass, label]) => {
@@ -49,6 +68,8 @@ function createUniverseNavigator(handlers) {
   panel = document.createElement('aside');
   panel.id = 'universeNavigator';
   panel.className = 'universe-navigator';
+  panel.setAttribute('aria-label', 'Universe navigation map');
+  panel.setAttribute('aria-hidden', 'true');
   panel.hidden = true;
   panel.innerHTML = `
     <div class="universe-heading">
@@ -56,7 +77,7 @@ function createUniverseNavigator(handlers) {
         <div class="universe-kicker">NAVIGATION FRAME</div>
         <div id="universeFrameName" class="universe-frame-name">Solar System</div>
       </div>
-      <button id="universeCloseBtn" class="universe-icon-button" type="button" aria-label="Close universe navigator">×</button>
+      <button id="universeCloseBtn" class="universe-icon-button" type="button" aria-label="Close universe navigator" title="Close universe map">×</button>
     </div>
     <div id="universeAddress" class="universe-address">universe/local-group/milky-way/sol</div>
     <label class="universe-field" for="universeDestinationSelect">
@@ -86,18 +107,36 @@ function createUniverseNavigator(handlers) {
 
   const refreshSelection = () => handlers.onSelection?.(select.value);
   select.addEventListener('change', refreshSelection);
-  travel.addEventListener('click', () => handlers.onTravel?.(select.value));
-  enterGalaxy.addEventListener('click', () => handlers.onEnterGalaxy?.());
+  travel.addEventListener('click', () => {
+    if (handlers.onTravel?.(select.value) !== false) closeUniverseNavigator();
+  });
+  enterGalaxy.addEventListener('click', () => {
+    if (handlers.onEnterGalaxy?.() !== false) closeUniverseNavigator();
+  });
   pulse.addEventListener('click', () => handlers.onPulse?.());
-  returnSol.addEventListener('click', () => handlers.onReturnSol?.());
-  returnEarth.addEventListener('click', () => handlers.onReturnEarth?.());
-  panel.querySelector('#universeCloseBtn').addEventListener('click', () => { panel.hidden = true; });
+  returnSol.addEventListener('click', () => {
+    if (handlers.onReturnSol?.() !== false) closeUniverseNavigator();
+  });
+  returnEarth.addEventListener('click', () => {
+    if (handlers.onReturnEarth?.() !== false) closeUniverseNavigator();
+  });
+  panel.querySelector('#universeCloseBtn').addEventListener('click', closeUniverseNavigator);
+
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && !panel.hidden) closeUniverseNavigator();
+  });
+  document.addEventListener('pointerdown', (event) => {
+    if (panel.hidden || panel.contains(event.target) || event.target.closest?.('#universeToggle')) return;
+    closeUniverseNavigator();
+  });
 
   const existingControls = document.getElementById('ssToggleContainer');
   if (existingControls && !document.getElementById('universeToggle')) {
     const toggle = makeButton('universeToggle', 'UNIVERSE MAP');
     toggle.classList.add('ssToggleBtn');
-    toggle.addEventListener('click', () => { panel.hidden = !panel.hidden; });
+    toggle.setAttribute('aria-controls', 'universeNavigator');
+    toggle.setAttribute('aria-expanded', 'false');
+    toggle.addEventListener('click', toggleUniverseNavigator);
     existingControls.appendChild(toggle);
   }
   return panel;
@@ -152,14 +191,15 @@ function showUniverseNavigator() {
 function hideUniverseNavigator() {
   const toggle = document.getElementById('universeToggle');
   if (toggle) toggle.style.display = 'none';
-  const panel = document.getElementById('universeNavigator');
-  if (panel) panel.hidden = true;
+  closeUniverseNavigator();
 }
 
 export {
+  closeUniverseNavigator,
   createUniverseNavigator,
   hideUniverseNavigator,
   setUniverseSelection,
   showUniverseNavigator,
+  toggleUniverseNavigator,
   updateUniverseNavigator
 };
