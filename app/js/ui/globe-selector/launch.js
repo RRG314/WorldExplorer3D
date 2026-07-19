@@ -36,7 +36,7 @@ export function createGlobeSelectorLaunch({
     prepareSelection(selection);
     const launchGeneration = ++generation;
     setStartButtonBusy(true);
-    setStatus(`Starting at ${selection.name || 'selected location'}...`, '#334155');
+    setStatus(`Loading ${selection.name || 'selected location'}...`, '#334155');
     const launch = Promise.resolve(onStartHere({ ...selection }))
       .then((launched) => {
         if (launched === false) throw new Error('The world did not accept this location.');

@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=57";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
-import { createGlobeSelector } from "./globe-selector.js?v=63";
+import { createGlobeSelector } from "./globe-selector.js?v=64";
 import { readSharedExperienceParams } from "./share-links.js?v=61";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
 
@@ -303,7 +303,7 @@ function initTitleScreenUi({
       } else {
         appCtx.setCustomLocation?.({ lat: coords.lat, lon: coords.lon, name: coordsName }, { transient: true });
       }
-      const successMessage = 'Location found. Review it on the globe, then press Start Here.';
+      const successMessage = 'Location found. Review it on the globe, then press Explore.';
       setTitleUseMyLocationStatus(successMessage, '#059669');
       globeSelector?.setSearchStatus?.(successMessage, '#059669');
     } catch (error) {

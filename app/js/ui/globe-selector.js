@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { createGlobeSelectorScene } from './globe-selector/scene.js?v=1';
-import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=1';
+import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
 import {
   addSelectionToSavedFavorites,
   buildFavoriteCities as buildFavoriteCitiesFromData,
@@ -178,7 +178,7 @@ function createGlobeSelector(options = {}) {
     favoriteSavedList = groups.saved;
 
     if (!favoritePresetList.length && !favoriteSavedList.length) {
-      cityList.innerHTML = '<li class="globe-selector-city-empty">No favorite cities yet. Save one with Start Here.</li>';
+      cityList.innerHTML = '<li class="globe-selector-city-empty">No favorite cities yet. Explore a location to save it.</li>';
       return;
     }
 
@@ -202,7 +202,7 @@ function createGlobeSelector(options = {}) {
         );
       });
     } else {
-      html.push('<li class="globe-selector-city-empty">No saved favorites yet. Use Start Here to save this location.</li>');
+      html.push('<li class="globe-selector-city-empty">No saved favorites yet. Explore a location to save it.</li>');
     }
     cityList.innerHTML = html.join('');
   }
@@ -264,7 +264,7 @@ function createGlobeSelector(options = {}) {
     if (!startBtn) return;
     startBtn.disabled = !!isBusy || !selected;
     startBtn.setAttribute('aria-busy', isBusy ? 'true' : 'false');
-    startBtn.textContent = isBusy ? 'Starting...' : 'Start Here';
+    startBtn.textContent = isBusy ? 'Loading...' : 'Explore';
   }
 
   function setSelection(lat, lon, meta = {}) {

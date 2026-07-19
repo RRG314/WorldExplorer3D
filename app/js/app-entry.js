@@ -54,7 +54,7 @@ import './memory.js?v=55';
 import './blocks.js?v=60';
 import './block-builder/ui.js?v=2';
 import './flower-challenge.js?v=56';
-import { setupUI } from './ui.js?v=95';
+import { setupUI } from './ui.js?v=96';
 
 let _booted = false;
 let _multiplayerObserverReady = false;

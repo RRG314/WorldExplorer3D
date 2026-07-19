@@ -122,7 +122,7 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .globe-selector-city-delete{border:1px solid #fecaca;background:#fff1f2;color:#b91c1c;border-radius:6px;padding:4px 7px;font-size:10px;font-weight:600;cursor:pointer;flex:0 0 auto}
 .globe-selector-city-delete:hover{background:#ffe4e6}
 .globe-selector-city-empty{font-size:11px;color:#64748b;padding:8px 2px}
-.globe-selector-actions{margin-top:auto;display:flex;gap:8px;background:#f8fafc;padding:8px 0 0;flex:0 0 auto}
+.globe-selector-actions{display:grid;grid-template-columns:minmax(100px,0.7fr) minmax(0,1.3fr);gap:8px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:7px;position:sticky;top:-12px;z-index:4;flex:0 0 auto}
 .globe-selector-action-btn{flex:1;border:none;border-radius:10px;padding:11px 12px;font-family:'Poppins',sans-serif;font-size:13px;font-weight:600;cursor:pointer}
 #globeSelectorBackBtn{background:#e2e8f0;color:#334155}
 #globeSelectorStartBtn{background:#334e8c;color:#ffffff}

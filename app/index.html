@@ -20,7 +20,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
-<link rel="stylesheet" href="styles/title-shell.css?v=89">
+<link rel="stylesheet" href="styles/title-shell.css?v=90">
 <link rel="stylesheet" href="styles/runtime-shell.css?v=86">
 <link rel="stylesheet" href="styles/block-builder.css?v=2">
 <link rel="stylesheet" href="styles/universe.css?v=4">
@@ -467,8 +467,12 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Ima
 <div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>
 <div id="globeSelectorPlace" class="globe-selector-stat-label" style="margin-top:4px">Click the globe to choose a location.</div>
 </div>
+<div class="globe-selector-actions">
+<button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Main Menu</button>
+<button id="globeSelectorStartBtn" class="globe-selector-action-btn" type="button">Explore</button>
+</div>
 <div class="globe-selector-mode-tabs" role="tablist" aria-label="Globe selector mode">
-<button id="globeSelectorExploreModeBtn" class="globe-selector-mode-tab active" type="button">Explore</button>
+<button id="globeSelectorExploreModeBtn" class="globe-selector-mode-tab active" type="button">Choose Location</button>
 <button id="globeSelectorLiveEarthModeBtn" class="globe-selector-mode-tab" type="button">Live Earth</button>
 </div>
 <div id="globeSelectorExplorePanel" class="globe-selector-mode-panel active">
@@ -504,10 +508,6 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Ima
 <div id="globeLiveEarthDetails" class="globe-selector-live-details" aria-live="polite">
   <div class="globe-selector-live-loading">Loading working Live Earth layers...</div>
 </div>
-</div>
-<div class="globe-selector-actions">
-<button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Main Menu</button>
-<button id="globeSelectorStartBtn" class="globe-selector-action-btn" type="button">Start Here</button>
 </div>
 </div>
 <div class="globe-selector-stage">
@@ -1556,5 +1556,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=84"></script>
 <script type="module" src="js/app-auth-shell.js?v=85"></script>
-<script type="module" src="js/bootstrap.js?v=276"></script>
+<script type="module" src="js/bootstrap.js?v=277"></script>
 </body></html>

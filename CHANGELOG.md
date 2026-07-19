@@ -4,6 +4,7 @@
 
 ### Changed
 
+- Replaced the globe selector's ambiguous Explore panel tab and hidden Start Here footer with an always-visible Explore action that launches the selected coordinates; the former tab is now labeled Choose Location.
 - Split Earth source ownership by play profile: detailed location sessions retain OSM data, while continuous streaming consumes normalized Overture transportation, building, base land-cover, and water tiles.
 - Routed continuous Earth cold starts directly through a scheduler-owned Overture neighborhood bootstrap; continuous sessions no longer construct and later retire a temporary OSM world.
 - Replaced source-order road/building truncation with deterministic transportation-class priorities and spatially distributed building budgets.
