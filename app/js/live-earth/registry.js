@@ -132,9 +132,9 @@ const LIVE_EARTH_LAYERS = {
     shortLabel: 'Aircraft',
     status: 'observed',
     globeMode: 'markers-tracks',
-    summary: 'Current OpenSky aircraft observations near the selected point, with labeled reference routes only as fallback.',
+    summary: 'Current live ADS-B aircraft observations near the selected point, with labeled reference routes only as fallback.',
     localSummary: 'Shows observed ADS-B and Mode S state vectors without presenting schedules or inferred destinations as facts.',
-    sourceIds: ['opensky', 'transport-reference']
+    sourceIds: ['opensky', 'adsb-lol', 'transport-reference']
   }
 };
 

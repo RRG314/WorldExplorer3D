@@ -3,6 +3,7 @@ const https = require('node:https');
 const PANORAMAX_API = 'https://panoramax.openstreetmap.fr/api';
 const KARTAVIEW_API = 'https://api.openstreetcam.org/2.0/photo/';
 const OPENSKY_API = 'https://opensky-network.org/api/states/all';
+const ADSB_LOL_API = 'https://api.adsb.lol/v2/point';
 const MEMORY_CACHE = new Map();
 const AIRCRAFT_CACHE = new Map();
 const CACHE_TTL_MS = 15 * 60 * 1000;
@@ -150,6 +151,54 @@ function normalizeOpenSkyState(state, query, responseTime) {
   };
 }
 
+function normalizeAdsbLolState(state, query, responseTimeMs) {
+  const lat = Number(state?.lat);
+  const lon = Number(state?.lon);
+  const icao24 = String(state?.hex || '').replace(/^~/, '').trim().toLowerCase();
+  if (!icao24 || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  const altitudeFt = Number(state.alt_geom ?? state.alt_baro);
+  const seenSeconds = Math.max(0, Number(state.seen_pos ?? state.seen) || 0);
+  return {
+    id: `adsblol-${icao24}`,
+    icao24,
+    callsign: String(state.flight || state.r || icao24).trim(),
+    originCountry: '',
+    observedAt: new Date(responseTimeMs - seenSeconds * 1000).toISOString(),
+    lat,
+    lon,
+    altitudeM: Number.isFinite(altitudeFt) ? altitudeFt * 0.3048 : null,
+    onGround: state.alt_baro === 'ground',
+    velocityKt: Number.isFinite(Number(state.gs)) ? Math.round(Number(state.gs)) : null,
+    headingDeg: Number.isFinite(Number(state.track)) ? Number(state.track) : null,
+    verticalRateMps: Number.isFinite(Number(state.geom_rate ?? state.baro_rate)) ? Number(state.geom_rate ?? state.baro_rate) * 0.00508 : null,
+    squawk: String(state.squawk || ''),
+    positionSource: String(state.type || ''),
+    category: String(state.category || ''),
+    distanceKm: Number.isFinite(Number(state.dst)) ? Math.round(Number(state.dst) * 1.852) : Math.round(distanceM(query.lat, query.lon, lat, lon) / 1000)
+  };
+}
+
+async function queryAdsbLol(query, options = {}) {
+  const radiusNm = Math.max(11, Math.min(250, Math.ceil(query.radiusKm / 1.852)));
+  const url = `${ADSB_LOL_API}/${query.lat}/${query.lon}/${radiusNm}`;
+  const payload = await fetchJson(url, { ...options, timeoutMs: 9000, forceIpv4: true });
+  const responseTimeMs = Number(payload.now || payload.ctime) || Date.now();
+  return {
+    schemaVersion: 1,
+    provider: 'adsb-lol',
+    fetchedAt: new Date(responseTimeMs).toISOString(),
+    query,
+    bounds: aircraftBounds(query),
+    items: (payload.ac || [])
+      .map((state) => normalizeAdsbLolState(state, query, responseTimeMs))
+      .filter(Boolean)
+      .sort((a, b) => a.distanceKm - b.distanceKm)
+      .slice(0, query.limit),
+    warnings: ['OpenSky was unavailable; current observations are supplied by ADSB.lol under ODbL.'],
+    cache: 'upstream'
+  };
+}
+
 function aircraftCacheKey(query) {
   return `${query.lat.toFixed(2)}:${query.lon.toFixed(2)}:${query.radiusKm}:${query.limit}`;
 }
@@ -162,23 +211,27 @@ async function queryAircraft(input = {}, options = {}) {
   const bounds = aircraftBounds(query);
   const url = new URL(OPENSKY_API);
   Object.entries({ ...bounds, extended: 1 }).forEach(([name, value]) => url.searchParams.set(name, String(value)));
-  const payload = await fetchJson(url.href, { ...options, timeoutMs: 9000, forceIpv4: true });
-  const responseTime = Number(payload.time) || Math.floor(Date.now() / 1000);
-  const items = (payload.states || [])
-    .map((state) => normalizeOpenSkyState(state, query, responseTime))
-    .filter(Boolean)
-    .sort((a, b) => a.distanceKm - b.distanceKm)
-    .slice(0, query.limit);
-  const value = {
-    schemaVersion: 1,
-    provider: 'opensky',
-    fetchedAt: new Date(responseTime * 1000).toISOString(),
-    query,
-    bounds,
-    items,
-    warnings: [],
-    cache: 'upstream'
-  };
+  let value;
+  try {
+    const payload = await fetchJson(url.href, { ...options, timeoutMs: 9000, forceIpv4: true });
+    const responseTime = Number(payload.time) || Math.floor(Date.now() / 1000);
+    value = {
+      schemaVersion: 1,
+      provider: 'opensky',
+      fetchedAt: new Date(responseTime * 1000).toISOString(),
+      query,
+      bounds,
+      items: (payload.states || [])
+        .map((state) => normalizeOpenSkyState(state, query, responseTime))
+        .filter(Boolean)
+        .sort((a, b) => a.distanceKm - b.distanceKm)
+        .slice(0, query.limit),
+      warnings: [],
+      cache: 'upstream'
+    };
+  } catch (openSkyError) {
+    value = await queryAdsbLol(query, options);
+  }
   AIRCRAFT_CACHE.set(key, { value, expiresAt: Date.now() + AIRCRAFT_CACHE_TTL_MS });
   while (AIRCRAFT_CACHE.size > 24) AIRCRAFT_CACHE.delete(AIRCRAFT_CACHE.keys().next().value);
   return value;
@@ -355,6 +408,7 @@ function buildGeospatialExports({ functions, setCors }) {
 module.exports = {
   buildGeospatialExports,
   normalizeAircraftQuery,
+  normalizeAdsbLolState,
   normalizeOpenSkyState,
   normalizeQuery,
   queryAircraft,

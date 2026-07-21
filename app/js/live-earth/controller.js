@@ -433,14 +433,15 @@ async function ensureAircraftTrafficData(state, force = false) {
     try {
       const result = await aircraftService.search({ lat, lon, radiusKm: 160, limit: 80 }, { force });
       if (result.items.length) {
+        const providerLabel = result.items[0]?.dataSource === 'adsb-lol' ? 'ADSB.lol' : 'OpenSky';
         state.aircraftRoutes = [];
         state.aircraftItems = result.items.map((item) => ({
           ...item,
           type: 'aircraft',
           operator: item.originCountry,
           routeId: '',
-          routeLabel: 'OpenSky observation',
-          routeSummary: 'Current aircraft state vector observed by the OpenSky Network.',
+          routeLabel: `${providerLabel} observation`,
+          routeSummary: `Current aircraft state vector observed by ${providerLabel}.`,
           region: `${item.distanceKm} km from selected point`,
           speedKt: item.velocityKt || 0,
           progressPct: null,
@@ -455,9 +456,9 @@ async function ensureAircraftTrafficData(state, force = false) {
         }
         return state.aircraftItems;
       }
-      state.aircraftError = 'No current OpenSky aircraft positions were reported in this area.';
+      state.aircraftError = 'No current aircraft positions were reported in this area.';
     } catch (error) {
-      state.aircraftError = error?.message || 'OpenSky aircraft observations are unavailable.';
+      state.aircraftError = error?.message || 'Live aircraft observations are unavailable.';
     }
   }
   const snapshot = buildAircraftTrafficSnapshot(new Date(now));

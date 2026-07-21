@@ -70,7 +70,7 @@ function focusTransportSelection(state, item) {
     name: item.routeLabel || item.label,
     focus: true
   });
-  state.selector.api?.setCameraDistance?.(item.dataSource === 'opensky' ? 1.16 : 1.9);
+  state.selector.api?.setCameraDistance?.(item.dataSource !== 'reference' ? 1.16 : 1.9);
 }
 
 function renderTransportDetails(ctx, state, layerId) {
@@ -82,7 +82,7 @@ function renderTransportDetails(ctx, state, layerId) {
   const relatedLayer = getLiveEarthLayer(isShipLayer ? 'ocean-state' : 'weather');
   const list = items.map((item) => {
     const active = item.id === selected?.id ? ' active' : '';
-    const detail = !isShipLayer && item.dataSource === 'opensky'
+    const detail = !isShipLayer && item.dataSource !== 'reference'
       ? `${item.meta || ''} • observed ${item.observedAt ? new Date(item.observedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'recently'}`
       : `${item.meta || ''} • ${item.progressPct}% along route`;
     return `<button class="globe-selector-live-list-item${active}" type="button" data-live-earth-action="${isShipLayer ? 'select-ship' : 'select-aircraft'}" data-id="${ctx.escapeHtml(item.id)}">
@@ -92,11 +92,11 @@ function renderTransportDetails(ctx, state, layerId) {
   }).join('');
   const observedAircraft = !isShipLayer && state.aircraftSourceMode === 'observed';
   const sourceSummary = observedAircraft
-    ? `${items.length} current OpenSky state vectors near the selected location.`
+    ? `${items.length} current live ADS-B state vectors near the selected location.`
     : `${items.length} reference markers across ${routes.length} major ${isShipLayer ? 'shipping corridors' : 'air corridors'}.`;
   const sourceCaveat = observedAircraft
     ? 'Observed ADS-B and Mode S positions. Callsigns, altitude, and velocity can be unavailable when not reported.'
-    : (isShipLayer ? 'Reference layer only. Live vessel identity and position require a licensed AIS provider.' : `${state.aircraftError || 'OpenSky is unavailable in this area.'} Showing labeled reference routes.`);
+    : (isShipLayer ? 'Reference layer only. Live vessel identity and position require a licensed AIS provider.' : `${state.aircraftError || 'Live ADS-B is unavailable in this area.'} Showing labeled reference routes.`);
   ctx.setDetailsHtml(state, `
     <div class="globe-selector-live-detail-card">
       <div class="globe-selector-live-detail-heading">${ctx.escapeHtml(selected?.label || (isShipLayer ? 'Select a ship corridor' : 'Select an airway flight'))}</div>
@@ -124,7 +124,7 @@ function renderOverviewDetails(ctx, state) {
     { id: 'earthquakes', label: 'Earthquakes', value: `${state.earthquakeItems.length} observed`, source: 'USGS GeoJSON feed', health: health.earthquakes.label },
     { id: 'weather', label: 'Weather', value: `${state.weatherSamples.length} current`, source: 'Open-Meteo current conditions', health: health.weather.label },
     { id: 'street-imagery', label: 'Street imagery', value: 'selected location', source: 'Panoramax and KartaView community observations', health: health.streetImagery.label },
-    { id: 'aircraft', label: 'Aircraft', value: `${state.aircraftItems.length} ${state.aircraftSourceMode === 'observed' ? 'observed' : 'reference'}`, source: state.aircraftSourceMode === 'observed' ? 'OpenSky current state vectors' : 'Modeled route fallback', health: state.aircraftSourceMode === 'observed' ? health.aircraft.label : 'Fallback active · OpenSky observations unavailable' },
+    { id: 'aircraft', label: 'Aircraft', value: `${state.aircraftItems.length} ${state.aircraftSourceMode === 'observed' ? 'observed' : 'reference'}`, source: state.aircraftSourceMode === 'observed' ? 'Current live ADS-B state vectors' : 'Modeled route fallback', health: state.aircraftSourceMode === 'observed' ? health.aircraft.label : 'Fallback active · Live ADS-B unavailable' },
     { id: 'ships', label: 'Marine traffic', value: `${state.shipItems.length} reference`, source: 'Major corridor context, not live AIS', health: 'Reference only · AIS provider not configured' }
   ];
   const list = sourceRows.map((entry) => `
@@ -308,7 +308,7 @@ export function renderLiveEarthStatus(ctx, state) {
   const qualifier = layer?.id === 'aircraft' && state.aircraftSourceMode === 'reference'
     ? 'Reference fallback'
     : layer?.id === 'aircraft'
-      ? 'Observed OpenSky feed'
+      ? 'Observed live ADS-B feed'
       : layer?.id === 'overview'
         ? 'Mixed-source overview'
       : layer?.status === 'mixed'

@@ -13,7 +13,7 @@ function normalizeAircraftRequest(input = {}) {
   return Object.freeze({ lat, lon, radiusKm, limit });
 }
 
-function normalizeAircraftItem(item, fetchedAt) {
+function normalizeAircraftItem(item, fetchedAt, providerId = 'opensky') {
   return Object.freeze({
     ...item,
     id: String(item.id || item.icao24 || ''),
@@ -22,9 +22,9 @@ function normalizeAircraftItem(item, fetchedAt) {
     lon: Number(item.lon),
     headingDeg: Number.isFinite(Number(item.headingDeg)) ? Number(item.headingDeg) : 0,
     altitude: 1.024 + Math.min(0.04, Math.max(0.004, (Number(item.altitudeM) || 0) / 400000)),
-    dataSource: 'opensky',
+    dataSource: providerId,
     provenance: createProvenance({
-      sourceId: 'opensky',
+      sourceId: providerId,
       observedAt: item.observedAt,
       fetchedAt
     })
@@ -53,7 +53,7 @@ function createAircraftService(options = {}) {
       if (!response.ok) throw new Error(payload.error || `Aircraft provider failed (${response.status}).`);
       return {
         fetchedAt: payload.fetchedAt,
-        items: (payload.items || []).map((item) => normalizeAircraftItem(item, payload.fetchedAt)),
+        items: (payload.items || []).map((item) => normalizeAircraftItem(item, payload.fetchedAt, payload.provider || 'opensky')),
         warnings: payload.warnings || []
       };
     }

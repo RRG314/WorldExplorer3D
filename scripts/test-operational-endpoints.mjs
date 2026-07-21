@@ -22,7 +22,7 @@ async function fetchJson(pathname, timeoutMs = 15000) {
 
 const aircraft = await fetchJson('/api/geospatial/aircraft?lat=39.29&lon=-76.61&radiusKm=160&limit=5');
 assert.equal(aircraft.schemaVersion, 1, 'Aircraft response schema is not version 1.');
-assert.equal(aircraft.provider, 'opensky', 'Aircraft response is not from OpenSky.');
+assert(['opensky', 'adsb-lol'].includes(aircraft.provider), 'Aircraft response is not from an approved live ADS-B provider.');
 assert(Array.isArray(aircraft.items), 'Aircraft response is missing its items array.');
 assert(aircraft.bounds && Number.isFinite(aircraft.bounds.lamin), 'Aircraft response is missing query bounds.');
 

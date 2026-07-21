@@ -35,7 +35,7 @@ function transportMarkerSpec(item = {}, type = 'aircraft', selected = false, ove
   const lat = Number(item.lat);
   const lon = Number(item.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
-  const observedAircraft = type === 'aircraft' && item.dataSource === 'opensky';
+  const observedAircraft = type === 'aircraft' && item.dataSource !== 'reference';
   const radius = Number.isFinite(Number(item.altitude))
     ? Number(item.altitude)
     : (type === 'ship' ? 1.018 : 1.055);

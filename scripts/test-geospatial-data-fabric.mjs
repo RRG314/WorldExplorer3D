@@ -287,6 +287,28 @@ assert.equal(normalizedAircraft.callsign, 'TEST123');
 assert.equal(normalizedAircraft.velocityKt, 250);
 assert.equal(normalizedAircraft.altitudeM, 3048);
 assert.equal(normalizedAircraft.category, 3);
+const normalizedAdsbLol = geospatialFunctions.normalizeAdsbLolState({
+  hex: 'a1b2c3', flight: 'FALLBACK1 ', lat: 39.4, lon: -76.7,
+  alt_geom: 10000, gs: 250, track: 90, geom_rate: 500, seen_pos: 1, dst: 8
+}, { lat: 39.2904, lon: -76.6122 }, Date.parse('2026-07-20T12:00:00Z'));
+assert.equal(normalizedAdsbLol.callsign, 'FALLBACK1');
+assert.equal(Math.round(normalizedAdsbLol.altitudeM), 3048);
+assert.equal(normalizedAdsbLol.velocityKt, 250);
+const fallbackAircraft = await geospatialFunctions.queryAircraft({ lat: 12.34, lon: 56.78, radiusKm: 80, limit: 2 }, {
+  force: true,
+  fetchImpl: async (url) => {
+    if (String(url).includes('opensky-network.org')) throw new Error('simulated OpenSky outage');
+    return {
+      ok: true,
+      async json() {
+        return { now: Date.parse('2026-07-20T12:00:00Z'), ac: [{ hex: 'a1b2c3', flight: 'FALLBACK1', lat: 12.4, lon: 56.8, alt_geom: 10000, gs: 250, dst: 4 }] };
+      }
+    };
+  }
+});
+assert.equal(fallbackAircraft.provider, 'adsb-lol');
+assert.equal(fallbackAircraft.items[0].callsign, 'FALLBACK1');
+assert.match(fallbackAircraft.warnings[0], /OpenSky was unavailable/);
 
 console.log(JSON.stringify({
   ok: true,

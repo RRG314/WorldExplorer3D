@@ -94,6 +94,16 @@ const DATA_SOURCES = Object.freeze({
     homepage: 'https://opensky-network.org/',
     description: 'Current aircraft state vectors derived from ADS-B and Mode S observations.'
   }),
+  'adsb-lol': Object.freeze({
+    id: 'adsb-lol',
+    label: 'ADSB.lol',
+    operator: 'ADSB.lol community',
+    truthType: 'observed',
+    licenseId: 'ODbL-1.0',
+    licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',
+    homepage: 'https://www.adsb.lol/',
+    description: 'Current community-fed ADS-B observations used when OpenSky is unavailable.'
+  }),
   'transport-reference': Object.freeze({
     id: 'transport-reference',
     label: 'World Explorer reference routes',

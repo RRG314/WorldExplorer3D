@@ -17,6 +17,7 @@ This is the concise public attribution index. Asset-level details are in `app/as
 - CelesTrak GP orbital elements. <https://celestrak.org/>
 - USGS Earthquake Hazards Program feeds. <https://earthquake.usgs.gov/earthquakes/feed/>
 - OpenSky Network aircraft state vectors, subject to OpenSky terms of use. <https://opensky-network.org/about/terms-of-use>
+- ADSB.lol community aircraft observations, available under ODbL 1.0. <https://www.adsb.lol/>
 - Open-Meteo weather and marine APIs, subject to provider terms. <https://open-meteo.com/>
 - NOAA Center for Operational Oceanographic Products and Services water-level observations and tide predictions. <https://tidesandcurrents.noaa.gov/>
 - Panoramax and KartaView community street imagery, CC BY-SA 4.0. <https://panoramax.openstreetmap.fr/> and <https://kartaview.org/>
