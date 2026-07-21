@@ -5,7 +5,7 @@ Version 3.1 completes the runtime-ownership work begun in 3.0 and turns Live Ear
 ## Highlights
 
 - A consolidated, responsive globe selector is now the primary start hub for Earth, Moon, Mars, Space, Ocean, missions, multiplayer, library, and quick-start actions.
-- Live Earth places current OpenSky aircraft at their reported coordinates and exposes observed CelesTrak satellites, USGS earthquakes, current Open-Meteo weather, community street imagery, modeled marine conditions, and NOAA water-level/tide coverage.
+- Live Earth places current ADS-B aircraft at their reported coordinates using OpenSky as the primary provider and ADSB.lol as a resilient fallback. It also exposes observed CelesTrak satellites, USGS earthquakes, current Open-Meteo weather, community street imagery, modeled marine conditions, and NOAA water-level/tide coverage.
 - Every operational provider reports provenance, freshness, cache state, health, warnings, and fallback state. Observations, models, predictions, and reference-only layers remain visibly distinct.
 - Earth location play retains detailed OSM geometry, while optional continuous travel uses tiled Overture data through a separate source profile and shared surface contract.
 - Terrain, land use, hydrology, road elevation, bridges, tunnels, vegetation, building placement, and actor spawning now share explicit ownership and surface-query boundaries.
