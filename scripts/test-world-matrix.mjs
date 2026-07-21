@@ -122,7 +122,7 @@ async function bootstrapRuntime(page, baseUrl) {
 }
 
 async function loadLocation(page, spec) {
-  return await page.evaluate(async ({ locationSpec, exerciseModes, requireBaseline, buildingDetailWaitLimit }) => {
+  return await page.evaluate(async ({ locationSpec, exerciseModes, requireBaseline, buildingDetailWaitLimit, allowTestDiagnostics }) => {
     const mod = await import('/app/js/shared-context.js?v=55');
     const ctx = mod?.ctx || {};
     const startedAt = performance.now();
@@ -402,6 +402,7 @@ async function loadLocation(page, spec) {
     };
     let buildingDimensions = null;
     try {
+      if (!allowTestDiagnostics) throw new Error('Internal diagnostics are not published with hosted artifacts.');
       const diagnosticsModule = await import('/scripts/world-matrix-building-diagnostics.mjs?v=3');
       buildingDimensions = diagnosticsModule.collectBuildingDimensions(ctx.buildings || []);
     } catch {
@@ -721,7 +722,8 @@ async function loadLocation(page, spec) {
     locationSpec: spec,
     exerciseModes: exerciseTraversalModes,
     requireBaseline: requireWorldCover,
-    buildingDetailWaitLimit: buildingDetailWaitLimitMs
+    buildingDetailWaitLimit: buildingDetailWaitLimitMs,
+    allowTestDiagnostics: !externalBaseUrl
   });
 }
 
