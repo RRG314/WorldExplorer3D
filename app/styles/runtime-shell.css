@@ -1,3 +1,4 @@
+@layer legacy {
 #controlsTab{position:fixed;bottom:20px;left:200px;transform:none;width:220px;background:rgba(255,255,255,0.95);border:none;border-radius:12px;z-index:104;display:none;font-size:12px;color:#475569;max-width:220px;max-height:60vh;overflow:hidden;box-shadow:0 8px 24px rgba(0,0,0,0.1)}
 #controlsTab.show{display:block}
 #ctrlHeader{padding:12px 16px;cursor:pointer;color:#667eea;font-family:'Poppins',sans-serif;font-weight:600}
@@ -886,6 +887,7 @@ body.editor-workspace-open .floatMenu.open .floatItems{display:none!important}
   body:has(.floatMenu.open) #tutorialHintCard{display:none!important}
   #multiplayerMenu.open .floatItems{
     left:max(6px,env(safe-area-inset-left))!important;right:max(6px,env(safe-area-inset-right))!important;
-    bottom:max(66px,calc(env(safe-area-inset-bottom) + 60px))!important
+    bottom:max(78px,calc(env(safe-area-inset-bottom) + 78px))!important
   }
+}
 }

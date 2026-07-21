@@ -40,8 +40,6 @@ const authPanelStatus = document.getElementById('authPanelStatus');
 let unsubscribeEntitlements = null;
 let currentState = getFreeEntitlementsState();
 let authMode = 'signin';
-let proPanelAutoHideTimer = null;
-const PRO_PANEL_AUTO_HIDE_MS = 2000;
 
 function setProStatus(message, isWarn = false) {
   proAccessStatus.textContent = message || '';
@@ -53,24 +51,8 @@ function setAuthStatus(message, isWarn = false) {
   authPanelStatus.style.color = isWarn ? '#fca5a5' : '#93c5fd';
 }
 
-function scheduleProPanelAutoHide() {
-  if (proPanelAutoHideTimer) {
-    clearTimeout(proPanelAutoHideTimer);
-    proPanelAutoHideTimer = null;
-  }
-
-  const touchLayout = (navigator.maxTouchPoints || 0) > 0 ||
-    window.matchMedia?.('(pointer: coarse)').matches;
-  if (touchLayout) {
-    proAccessPanel.hidden = true;
-    return;
-  }
-
-  proAccessPanel.hidden = false;
-  proPanelAutoHideTimer = window.setTimeout(() => {
-    proAccessPanel.hidden = true;
-    proPanelAutoHideTimer = null;
-  }, PRO_PANEL_AUTO_HIDE_MS);
+function hideProAccessPanel() {
+  proAccessPanel.hidden = true;
 }
 
 function setAuthMode(mode) {
@@ -153,7 +135,7 @@ function renderState(state, user) {
   }
 
   const isPro = adminMode || plan === 'pro';
-  scheduleProPanelAutoHide();
+  hideProAccessPanel();
   proAccessState.textContent = isPro ? 'Donation Recognition' : 'Open Access';
   upgradeFromAppBtn.style.display = isPro ? 'none' : 'inline-flex';
 

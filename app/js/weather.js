@@ -14,10 +14,9 @@ import {
   weatherCacheKey
 } from './weather/place-resolver.js?v=1';
 import { weatherCodeDescriptor } from './weather/catalog.js?v=1';
+import { operationalFeedService } from './geospatial/operational-feeds.js?v=1';
 
-const WEATHER_API_BASE = 'https://api.open-meteo.com/v1/forecast';
 const WEATHER_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
-const WEATHER_FETCH_TIMEOUT_MS = 9000;
 const WEATHER_CHECK_INTERVAL_MS = 5000;
 const WEATHER_RETRY_DELAY_MS = 450;
 const WEATHER_MAX_ATTEMPTS = 2;
@@ -428,29 +427,21 @@ function syncActiveWeatherState() {
   return appCtx.weatherState;
 }
 
-async function fetchWeatherForLocation(lat, lon, { ocean = false } = {}) {
+async function fetchWeatherForLocation(lat, lon, { ocean = false, force = false } = {}) {
   let lastError = null;
   for (let attempt = 0; attempt < WEATHER_MAX_ATTEMPTS; attempt++) {
-    const controller = new AbortController();
-    const timeout = window.setTimeout(() => controller.abort('weather_timeout'), WEATHER_FETCH_TIMEOUT_MS);
     try {
-      const url = new URL(WEATHER_API_BASE);
-      url.searchParams.set('latitude', lat.toFixed(4));
-      url.searchParams.set('longitude', lon.toFixed(4));
-      url.searchParams.set('current', 'temperature_2m,relative_humidity_2m,apparent_temperature,is_day,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,precipitation,rain,showers,snowfall,visibility');
-      url.searchParams.set('timezone', 'auto');
-      url.searchParams.set('forecast_days', '1');
-      if (ocean) url.searchParams.set('cell_selection', 'sea');
-      const response = await fetch(url.toString(), { signal: controller.signal });
-      if (!response.ok) throw new Error(`weather_http_${response.status}`);
-      return await response.json();
+      const result = await operationalFeedService.weather([{ lat, lon }], {
+        ocean,
+        force: force || attempt > 0
+      });
+      if (!result.items[0]) throw new Error('weather_payload_empty');
+      return result.items[0];
     } catch (err) {
       lastError = err;
       if (attempt < WEATHER_MAX_ATTEMPTS - 1) {
         await sleep(WEATHER_RETRY_DELAY_MS);
       }
-    } finally {
-      window.clearTimeout(timeout);
     }
   }
   throw lastError || new Error('weather_fetch_failed');
@@ -483,7 +474,7 @@ async function getWeatherSnapshotForLocation(lat, lon, { force = false, ocean = 
     return { ...cached };
   }
   const [payload, place] = await Promise.all([
-    fetchWeatherForLocation(safeLat, safeLon, { ocean }),
+    fetchWeatherForLocation(safeLat, safeLon, { ocean, force }),
     getResolvedPlaceForLocation(safeLat, safeLon, force)
   ]);
   const state = buildLiveWeatherState({ lat: safeLat, lon: safeLon, source: 'live_earth_lookup' }, payload);
@@ -565,7 +556,7 @@ async function refreshLiveWeather(force = false) {
     }
     updateWeatherUi();
   });
-  const promise = fetchWeatherForLocation(location.lat, location.lon, { ocean }).then((payload) => {
+  const promise = fetchWeatherForLocation(location.lat, location.lon, { ocean, force }).then((payload) => {
     const state = buildLiveWeatherState(location, payload);
     state.locationDisplay = String(appCtx.livePlaceState?.display || state.locationDisplay || '').trim();
     state.locationShortLabel = String(appCtx.livePlaceState?.shortLabel || state.locationShortLabel || '').trim();

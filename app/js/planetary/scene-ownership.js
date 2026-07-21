@@ -159,7 +159,9 @@ function clearEarthWorldSceneObjects() {
 
 function enforceEnvironmentSceneOwnership() {
   const env = appCtx.getEnv?.();
-  const earthVisible = env === appCtx.ENV?.EARTH;
+  const earthVisible = env === appCtx.ENV?.EARTH && (
+    appCtx.earthResumePending !== true || appCtx.earthResumeRenderReady === true
+  );
   const signature = sceneOwnershipSignature();
   if (earthVisible !== appCtx.earthSceneVisible) {
     setEarthSceneVisible(earthVisible);

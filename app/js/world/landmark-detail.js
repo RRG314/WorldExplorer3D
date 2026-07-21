@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { fetchBundledLandmarkData } from "./landmark-source.js?v=2";
-import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=6";
-import { renderCuratedLandmarkModels } from './landmark-models.js?v=10';
+import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=7";
+import { renderCuratedLandmarkModels } from './landmark-models.js?v=12';
 
 const MAX_PYRAMIDS = 48;
 const MAX_WALL_WAYS = 140;
@@ -304,6 +304,7 @@ function renderLandmarks(data, options) {
       girders: suspensionBridge.girders,
       suspenders: suspensionBridge.suspenders,
       structuralMembers: suspensionBridge.structuralMembers,
+      synchronizedRoads: suspensionBridge.synchronizedRoads,
       spanMeters: suspensionBridge.spanMeters
     } : null,
     actorReprojected: reprojectActorOutsideLandmarks(createdMeshes)

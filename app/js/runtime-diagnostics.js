@@ -77,6 +77,13 @@ function composerSnapshot() {
 
 function getWorldExplorerRuntimeDiagnostics() {
   return {
+    runtimeKernel: appCtx.getRuntimeKernelSnapshot?.() || null,
+    sessionLifecycle: appCtx.getSessionCoordinatorDebugState?.() || null,
+    account: appCtx.getAccountSnapshot?.() || null,
+    platformServices: appCtx.getPlatformServicesSnapshot?.() || null,
+    gameplayPlugins: appCtx.getGameplayRegistrySnapshot?.() || null,
+    transportControllers: appCtx.getEarthTransportControllerSnapshot?.() || null,
+    activeActor: appCtx.activeTransportActor?.() || null,
     environment: appCtx.getEnv?.() || null,
     gameStarted: !!appCtx.gameStarted,
     paused: !!appCtx.paused,

@@ -23,7 +23,15 @@ import {
   refreshBuildingFacadeMaterials
 } from "./building-facade-materials.js?v=6";
 
-const USE_REMOTE_PBR_TEXTURES = false;
+const EARTH_TEXTURE_ROOT = 'assets/textures/earth';
+
+function localPbrUrls(assetId) {
+  return {
+    diff: `${EARTH_TEXTURE_ROOT}/${assetId}_diffuse.jpg`,
+    nor: `${EARTH_TEXTURE_ROOT}/${assetId}_normal.jpg`,
+    rough: `${EARTH_TEXTURE_ROOT}/${assetId}_roughness.jpg`
+  };
+}
 
 export function syncTextureGlobals(ctx) {
   const { appCtx, state } = ctx;
@@ -42,6 +50,7 @@ export function syncTextureGlobals(ctx) {
   appCtx.brickDiffuse = state.brickDiffuse;
   appCtx.brickNormal = state.brickNormal;
   appCtx.brickRoughness = state.brickRoughness;
+  appCtx.surfaceTextureSets = state.surfaceTextureSets;
   appCtx.buildingNormalMap = state.buildingNormalMap;
   appCtx.buildingRoughnessMap = state.buildingRoughnessMap;
   appCtx.windowTextures = getWindowTextureCache();
@@ -266,11 +275,6 @@ export function createBuildingGroundPatch(ctx, pts, avgElevation, options = {}) 
 }
 
 function loadPbrTextureSet(name, urls, onLoaded, fallbackFns) {
-  if (!USE_REMOTE_PBR_TEXTURES) {
-    const fallback = fallbackFns();
-    onLoaded(fallback.diff, fallback.nor, fallback.rough, false);
-    return;
-  }
   const loader = new THREE.TextureLoader();
   let loadedCount = 0;
   let resolved = false;
@@ -302,7 +306,7 @@ function loadPbrTextureSet(name, urls, onLoaded, fallbackFns) {
 
   setTimeout(() => {
     if (!resolved) {
-      console.warn('PBR texture CDN timeout (' + name + '), using procedural fallback');
+      console.warn('PBR texture timeout (' + name + '), using procedural fallback');
       resolve(false);
     }
   }, 4000);
@@ -377,7 +381,7 @@ function applyGrassToTerrain(ctx) {
 }
 
 function initPbrTextures(ctx, maxAniso) {
-  const { state } = ctx;
+  const { appCtx, state } = ctx;
   const aniso = Math.min(maxAniso, 8);
   const tuneSet = (textures) => {
     textures.forEach((tex) => {
@@ -388,18 +392,23 @@ function initPbrTextures(ctx, maxAniso) {
     });
   };
 
-  loadPbrTextureSet('grass', {
-    diff: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forrest_ground_01/forrest_ground_01_diff_1k.jpg',
-    nor: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forrest_ground_01/forrest_ground_01_nor_gl_1k.jpg',
-    rough: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/forrest_ground_01/forrest_ground_01_rough_1k.jpg'
-  }, (diff, nor, rough, fromCDN) => {
+  const registerSurfaceSet = (mode, diff, nor, rough) => {
+    if (!diff) return false;
+    state.surfaceTextureSets[mode] = { map: diff, normalMap: nor, roughnessMap: rough };
+    state.pbrTexturesLoaded[mode] = true;
+    syncTextureGlobals(ctx);
+    appCtx.refreshTerrainSurfaceProfiles?.();
+    return true;
+  };
+  const emptyFallback = () => ({ diff: null, nor: null, rough: null });
+
+  loadPbrTextureSet('grass', localPbrUrls('grass_001'), (diff, nor, rough, fromPrimary) => {
     state.grassDiffuse = diff;
     state.grassNormal = nor;
     state.grassRoughness = rough;
-    syncTextureGlobals(ctx);
     tuneSet([state.grassDiffuse, state.grassNormal, state.grassRoughness]);
-    state.pbrTexturesLoaded.grass = true;
-    console.log('Grass textures ready (' + (fromCDN ? 'Poly Haven CDN' : 'procedural fallback') + ')');
+    registerSurfaceSet('grass', diff, nor, rough);
+    console.log('Grass textures ready (' + (fromPrimary ? 'bundled CC0 asset' : 'procedural fallback') + ')');
     applyGrassToTerrain(ctx);
   }, () => {
     return {
@@ -409,18 +418,13 @@ function initPbrTextures(ctx, maxAniso) {
     };
   });
 
-  loadPbrTextureSet('pavement', {
-    diff: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brushed_concrete/brushed_concrete_diff_1k.jpg',
-    nor: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brushed_concrete/brushed_concrete_nor_gl_1k.jpg',
-    rough: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brushed_concrete/brushed_concrete_rough_1k.jpg'
-  }, (diff, nor, rough, fromCDN) => {
+  loadPbrTextureSet('pavement', localPbrUrls('brushed_concrete'), (diff, nor, rough, fromPrimary) => {
     state.pavementDiffuse = diff;
     state.pavementNormal = nor;
     state.pavementRoughness = rough;
-    syncTextureGlobals(ctx);
     tuneSet([state.pavementDiffuse, state.pavementNormal, state.pavementRoughness]);
-    state.pbrTexturesLoaded.pavement = true;
-    console.log('Pavement textures ready (' + (fromCDN ? 'Poly Haven CDN' : 'procedural fallback') + ')');
+    registerSurfaceSet('pavement', diff, nor, rough);
+    console.log('Pavement textures ready (' + (fromPrimary ? 'bundled CC0 asset' : 'procedural fallback') + ')');
   }, () => {
     return {
       diff: createPavementTexture(),
@@ -429,18 +433,14 @@ function initPbrTextures(ctx, maxAniso) {
     };
   });
 
-  loadPbrTextureSet('concrete', {
-    diff: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete/concrete_diff_1k.jpg',
-    nor: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete/concrete_nor_gl_1k.jpg',
-    rough: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/concrete/concrete_rough_1k.jpg'
-  }, (diff, nor, rough, fromCDN) => {
+  loadPbrTextureSet('concrete', localPbrUrls('concrete'), (diff, nor, rough, fromPrimary) => {
     state.concreteDiffuse = diff;
     state.concreteNormal = nor;
     state.concreteRoughness = rough;
     syncTextureGlobals(ctx);
     tuneSet([state.concreteDiffuse, state.concreteNormal, state.concreteRoughness]);
     state.pbrTexturesLoaded.concrete = true;
-    console.log('Concrete textures ready (' + (fromCDN ? 'Poly Haven CDN' : 'procedural fallback') + ')');
+    console.log('Concrete textures ready (' + (fromPrimary ? 'bundled CC0 asset' : 'procedural fallback') + ')');
     refreshBuildingFacadeMaterials(ctx);
   }, () => {
     return {
@@ -450,18 +450,14 @@ function initPbrTextures(ctx, maxAniso) {
     };
   });
 
-  loadPbrTextureSet('brick', {
-    diff: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brick_wall_001/brick_wall_001_diffuse_1k.jpg',
-    nor: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brick_wall_001/brick_wall_001_nor_gl_1k.jpg',
-    rough: 'https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/brick_wall_001/brick_wall_001_rough_1k.jpg'
-  }, (diff, nor, rough, fromCDN) => {
+  loadPbrTextureSet('brick', localPbrUrls('brick_wall_001'), (diff, nor, rough, fromPrimary) => {
     state.brickDiffuse = diff;
     state.brickNormal = nor;
     state.brickRoughness = rough;
     syncTextureGlobals(ctx);
     tuneSet([state.brickDiffuse, state.brickNormal, state.brickRoughness]);
     state.pbrTexturesLoaded.brick = true;
-    console.log('Brick textures ready (' + (fromCDN ? 'Poly Haven CDN' : 'procedural fallback') + ')');
+    console.log('Brick textures ready (' + (fromPrimary ? 'bundled CC0 asset' : 'procedural fallback') + ')');
     refreshBuildingFacadeMaterials(ctx);
   }, () => {
     return {
@@ -469,6 +465,21 @@ function initPbrTextures(ctx, maxAniso) {
       nor: createBrickNormalMap(),
       rough: createBrickRoughnessMap()
     };
+  });
+
+  [
+    ['forest', 'forest_ground_04'],
+    ['sand', 'sand_01'],
+    ['soil', 'dirt'],
+    ['rock', 'rock_ground'],
+    ['snow', 'snow_01']
+  ].forEach(([mode, assetId]) => {
+    loadPbrTextureSet(mode, localPbrUrls(assetId), (diff, nor, rough, fromPrimary) => {
+      tuneSet([diff, nor, rough]);
+      if (registerSurfaceSet(mode, diff, nor, rough)) {
+        console.log(`${mode} textures ready (${fromPrimary ? 'bundled CC0 asset' : 'fallback'})`);
+      }
+    }, emptyFallback);
   });
 }
 

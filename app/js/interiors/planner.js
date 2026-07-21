@@ -334,10 +334,33 @@ export function buildGeneratedPartitions(footprint, centroid, options = {}) {
     ) partitions.push(fitted);
   };
 
+  const addCrossSegment = (v, fromU, toU) => {
+    const fitted = fitLineToFootprint([
+      axisPoint(frame, centroid, fromU, v),
+      axisPoint(frame, centroid, toU, v)
+    ], footprint, centroid);
+    if (
+      fitted.length >= 2 &&
+      Math.hypot(fitted[1].x - fitted[0].x, fitted[1].z - fitted[0].z) > 1.4 &&
+      segmentInsideFootprint(fitted, footprint)
+    ) partitions.push(fitted);
+  };
+
   for (let i = 1; i <= partitionCount; i++) {
     const u = frame.minU + longSpan * (i / (partitionCount + 1));
     addSegment(u, frame.minV + edgeMargin, -doorway * 0.5);
     addSegment(u, doorway * 0.5, frame.maxV - edgeMargin);
+  }
+
+  if (!openPlan && shortSpan >= targetRoomLength * 1.45) {
+    const crossCount = Math.max(1, Math.min(6, Math.floor(shortSpan / targetRoomLength)));
+    const crossDoorway = Math.max(1.7, Math.min(3, longSpan * 0.04));
+    const longEdgeMargin = Math.max(0.45, Math.min(0.9, longSpan * 0.025));
+    for (let i = 1; i <= crossCount; i++) {
+      const v = frame.minV + shortSpan * (i / (crossCount + 1));
+      addCrossSegment(v, frame.minU + longEdgeMargin, -crossDoorway * 0.5);
+      addCrossSegment(v, crossDoorway * 0.5, frame.maxU - longEdgeMargin);
+    }
   }
   return partitions;
 }
@@ -375,7 +398,21 @@ export function prepareInteriorFeaturePlan(definition, shellFootprint, centroid)
         if (pts.length >= 2) fittedFeatures.push({ ...feature, pts });
       }
     }
-    if (fittedFeatures.length > 0) return { mode: 'mapped', features: fittedFeatures, partitions: [], layoutKind: 'mapped' };
+    if (fittedFeatures.length > 0) {
+      const mappedLines = fittedFeatures.filter((feature) => feature.kind === 'line').length;
+      const mappedRooms = fittedFeatures.filter((feature) => feature.kind === 'polygon').length;
+      const sparseMappedShell = mappedLines === 0 && mappedRooms <= 1;
+      const buildingType = String(definition?.building?.buildingType || definition?.support?.building?.buildingType || 'building');
+      const partitions = sparseMappedShell
+        ? buildGeneratedPartitions(shellFootprint, centroid, { buildingType })
+        : [];
+      return {
+        mode: 'mapped',
+        features: fittedFeatures,
+        partitions,
+        layoutKind: partitions.length > 0 ? 'mapped_shell_with_generated_rooms' : 'mapped'
+      };
+    }
   }
 
   const generated = createGeneratedInteriorPlan(definition, shellFootprint);

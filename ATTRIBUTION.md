@@ -1,36 +1,34 @@
 # Attribution
 
-Last reviewed: 2026-03-13
+Last reviewed: 2026-07-20 for version 3.1.0.
 
-This file provides the concise public attribution text for World Explorer 3D.
+This is the concise public attribution index. Asset-level details are in `app/assets/models/ATTRIBUTION.md` and `app/assets/textures/ATTRIBUTION.md`.
 
-For full third-party acknowledgements, see [ACKNOWLEDGEMENTS.md](ACKNOWLEDGEMENTS.md).
+## Maps And Earth Data
 
-## Core Map Data Attribution
+- OpenStreetMap data and tiles: `© OpenStreetMap contributors`, ODbL 1.0. <https://www.openstreetmap.org/copyright>
+- Overture Maps Foundation data: source-specific Overture attribution and licenses. <https://docs.overturemaps.org/attribution/>
+- ESA WorldCover 2021: contains modified Copernicus Sentinel data processed by the ESA WorldCover consortium, CC BY 4.0. <https://esa-worldcover.org/>
+- GEBCO Compilation Group bathymetry: CC BY 4.0. <https://www.gebco.net/>
+- Mapzen Terrarium elevation service and upstream elevation sources: provider terms apply.
 
-World Explorer 3D uses OpenStreetMap-derived map data and services.
+## Operational Feeds
 
-Primary attribution text:
+- CelesTrak GP orbital elements. <https://celestrak.org/>
+- USGS Earthquake Hazards Program feeds. <https://earthquake.usgs.gov/earthquakes/feed/>
+- OpenSky Network aircraft state vectors, subject to OpenSky terms of use. <https://opensky-network.org/about/terms-of-use>
+- Open-Meteo weather and marine APIs, subject to provider terms. <https://open-meteo.com/>
+- NOAA Center for Operational Oceanographic Products and Services water-level observations and tide predictions. <https://tidesandcurrents.noaa.gov/>
+- Panoramax and KartaView community street imagery, CC BY-SA 4.0. <https://panoramax.openstreetmap.fr/> and <https://kartaview.org/>
 
-- `© OpenStreetMap contributors`
+## Astronomy And Planetary Assets
 
-OpenStreetMap data is licensed under the Open Database License (ODbL) 1.0:
+- ESA Gaia DR3 star data. <https://www.cosmos.esa.int/web/gaia/dr3>
+- NASA, JPL-Caltech, LROC, and USGS Astrogeology imagery, terrain, and reference material. Source-specific details are retained beside the bundled assets.
+- Third-party landmark and character model attribution is retained in `app/assets/models/ATTRIBUTION.md`.
 
-- <https://www.openstreetmap.org/copyright>
+## Runtime Attribution
 
-## Runtime Attribution Locations
+Attribution is presented in the app footer/legal UI, provider detail panels, source-health views, repository documentation, and bundled asset records. Optional third-party property services remain governed by their own contracts.
 
-Attribution is surfaced in visible app UI areas, including:
-
-- the in-app footer/legal line
-- data-source labels in map/historic panels
-- repository documentation (README and data-source notes)
-
-## Additional Service Attribution
-
-The app may also use optional third-party providers (for example, property-data APIs) configured by the deployer. Those services remain under their own terms.
-
-## Notes
-
-- This file is informational and not legal advice.
-- If data flows or providers change, update this file and [DATA_SOURCES.md](DATA_SOURCES.md) in the same change.
+This file is informational and is not legal advice.

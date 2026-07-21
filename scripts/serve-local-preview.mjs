@@ -1,10 +1,12 @@
 import fs from 'node:fs/promises';
 import http from 'node:http';
 import path from 'node:path';
+import geospatial from '../functions/geospatial.js';
 
 const rootDir = process.cwd();
 const host = '127.0.0.1';
 const port = Number(process.env.PORT || 4192);
+const { queryAircraft, queryStreetImagery } = geospatial;
 
 const mime = new Map([
   ['.html', 'text/html; charset=utf-8'],
@@ -34,6 +36,52 @@ async function exists(filePath) {
 const server = http.createServer(async (req, res) => {
   try {
     const reqUrl = new URL(req.url || '/', `http://${host}:${port}`);
+    if (reqUrl.pathname === '/api/geospatial/street-imagery') {
+      if (req.method !== 'GET') {
+        res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'Method not allowed.' }));
+        return;
+      }
+      try {
+        const payload = await queryStreetImagery(Object.fromEntries(reqUrl.searchParams));
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'public, max-age=300, stale-while-revalidate=900'
+        });
+        res.end(JSON.stringify(payload));
+      } catch (error) {
+        const status = Number(error?.statusCode) || (error?.name === 'AbortError' ? 504 : 502);
+        res.writeHead(status, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store'
+        });
+        res.end(JSON.stringify({ error: status === 504 ? 'Street imagery provider timed out.' : (error?.message || 'Street imagery unavailable.') }));
+      }
+      return;
+    }
+    if (reqUrl.pathname === '/api/geospatial/aircraft') {
+      if (req.method !== 'GET') {
+        res.writeHead(405, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ error: 'Method not allowed.' }));
+        return;
+      }
+      try {
+        const payload = await queryAircraft(Object.fromEntries(reqUrl.searchParams));
+        res.writeHead(200, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'public, max-age=30, stale-while-revalidate=120'
+        });
+        res.end(JSON.stringify(payload));
+      } catch (error) {
+        const status = Number(error?.statusCode) || (error?.name === 'AbortError' ? 504 : 502);
+        res.writeHead(status, {
+          'Content-Type': 'application/json; charset=utf-8',
+          'Cache-Control': 'no-store'
+        });
+        res.end(JSON.stringify({ error: status === 504 ? 'OpenSky timed out.' : (error?.message || 'Aircraft observations unavailable.') }));
+      }
+      return;
+    }
     let relPath = decodeURIComponent(reqUrl.pathname || '/');
     if (relPath === '/') relPath = '/index.html';
 

@@ -1,8 +1,5 @@
-const EARTHQUAKE_FEED_URL = 'https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson';
-const EARTHQUAKE_REFRESH_MS = 5 * 60 * 1000;
+import { operationalFeedService } from '../geospatial/operational-feeds.js?v=1';
 
-let _earthquakePromise = null;
-let _lastEarthquakeAt = 0;
 let _earthquakes = [];
 
 function clamp(value, min, max) {
@@ -64,29 +61,15 @@ function mapEarthquakeFeature(feature) {
 }
 
 async function refreshEarthquakes(force = false) {
-  const now = Date.now();
-  if (!force && _earthquakes.length && (now - _lastEarthquakeAt) < EARTHQUAKE_REFRESH_MS) {
-    return _earthquakes;
-  }
-  if (_earthquakePromise && !force) return _earthquakePromise;
-  _earthquakePromise = fetch(EARTHQUAKE_FEED_URL).then(async (response) => {
-    if (!response.ok) throw new Error(`earthquake_feed_${response.status}`);
-    return await response.json();
-  }).then((payload) => {
-    const features = Array.isArray(payload?.features) ? payload.features : [];
-    const items = features.map(mapEarthquakeFeature).filter(Boolean);
-    items.sort((a, b) => {
-      const magDelta = (Number(b.magnitude) || 0) - (Number(a.magnitude) || 0);
-      if (Math.abs(magDelta) > 0.01) return magDelta;
-      return (Number(b.timeMs) || 0) - (Number(a.timeMs) || 0);
-    });
-    _earthquakes = items.slice(0, 140);
-    _lastEarthquakeAt = Date.now();
-    return _earthquakes;
-  }).finally(() => {
-    _earthquakePromise = null;
+  const result = await operationalFeedService.earthquakes({ force });
+  const items = result.items.map(mapEarthquakeFeature).filter(Boolean);
+  items.sort((a, b) => {
+    const magDelta = (Number(b.magnitude) || 0) - (Number(a.magnitude) || 0);
+    if (Math.abs(magDelta) > 0.01) return magDelta;
+    return (Number(b.timeMs) || 0) - (Number(a.timeMs) || 0);
   });
-  return _earthquakePromise;
+  _earthquakes = items.slice(0, 140);
+  return _earthquakes;
 }
 
 function buildEarthquakeReplayProfile(event) {

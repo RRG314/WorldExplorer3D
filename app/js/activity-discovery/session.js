@@ -7,11 +7,12 @@ import {
   getCompletionState,
   getRuntimeSnapshot,
   navigateToActivityStart,
+  registerActivityGameplayPlugin,
   replayLastActivity,
   startActivity,
   stopActivity,
   updateActivityRuntime
-} from './runtime.js?v=4';
+} from './runtime.js?v=5';
 import {
   discoveryActionLabel,
   discoveryBadgeForActivity,
@@ -516,7 +517,7 @@ function updateActivityDiscovery() {
     return;
   }
   refreshCatalog(false);
-  updateActivityRuntime();
+  if (appCtx.getGameplayRegistrySnapshot?.().activeId !== 'activity') updateActivityRuntime();
   updateExternalState();
   renderRunHud();
   renderPrompt();
@@ -537,6 +538,7 @@ function findActivityById(activityId = '') {
 }
 
 function initActivityDiscovery() {
+  registerActivityGameplayPlugin();
   bindEvents();
   Object.assign(appCtx, {
     startSharedRoomActivityRuntime: (activity = {}) => startActivity(activity),

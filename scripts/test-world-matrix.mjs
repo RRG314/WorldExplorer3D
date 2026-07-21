@@ -457,8 +457,8 @@ async function loadLocation(page, spec) {
       landmarkPresentation[kind].meshes += 1;
       if (mesh.visible !== false) landmarkPresentation[kind].visibleMeshes += 1;
     }
-    const roadProfileY = Number(nearestRoad?.y);
-    const exactRenderedRoadY = expectedStart !== 'water' && ctx.GroundHeight?._raycastMeshY ?
+    let roadProfileY = Number(nearestRoad?.y);
+    let exactRenderedRoadY = expectedStart !== 'water' && ctx.GroundHeight?._raycastMeshY ?
       ctx.GroundHeight._raycastMeshY(
         Array.isArray(ctx.roadMeshes) ? ctx.roadMeshes : [],
         actorX,
@@ -467,7 +467,7 @@ async function loadLocation(page, spec) {
         Number.isFinite(actorFeetY) ? (locationSpec.expectedRoadStructure ? 5 : 26) : Infinity
       ) :
       null;
-    const renderedRoadY = expectedStart !== 'water' && ctx.GroundHeight?.roadMeshY ?
+    let renderedRoadY = expectedStart !== 'water' && ctx.GroundHeight?.roadMeshY ?
       ctx.GroundHeight.roadMeshY(actorX, actorZ, roadProfileY) :
       null;
     const terrainMeshY = expectedStart !== 'water' && typeof ctx.terrainMeshHeightAt === 'function' ?
@@ -536,6 +536,48 @@ async function loadLocation(page, spec) {
       if (mesh?.userData?.terrainImageryTexture || mesh?.userData?.terrainImageryStatus) terrainImageryOwners += 1;
       const source = String(mesh?.material?.map?.image?.currentSrc || mesh?.material?.map?.image?.src || '');
       if (/arcgisonline|World_Imagery/i.test(source)) terrainRasterUrls.push(source);
+    }
+
+    // Keep actor pose and road evidence from the same frame. The nearest-road API
+    // reuses one result object, and the diagnostics above can yield while the game
+    // continues to reconcile streamed terrain.
+    if (expectedStart !== 'water') {
+      actorX = Number.isFinite(ctx.car?.x) ? ctx.car.x : Number(ctx.Walk?.state?.walker?.x || 0);
+      actorZ = Number.isFinite(ctx.car?.z) ? ctx.car.z : Number(ctx.Walk?.state?.walker?.z || 0);
+      actorFeetY = Number(ctx.car?.y) - 1.2;
+      const finalNearestRoad = typeof ctx.findNearestRoad === 'function' ?
+        ctx.findNearestRoad(actorX, actorZ, {
+          y: Number.isFinite(actorFeetY) ? actorFeetY : NaN,
+          maxVerticalDelta: 18,
+          preferredRoad: ctx.car?.road || null
+        }) :
+        null;
+      nearestRoad = finalNearestRoad ? {
+        road: finalNearestRoad.road || null,
+        dist: Number(finalNearestRoad.dist),
+        pt: finalNearestRoad.pt ? { x: Number(finalNearestRoad.pt.x), z: Number(finalNearestRoad.pt.z) } : null,
+        y: Number(finalNearestRoad.y),
+        verticalDelta: Number(finalNearestRoad.verticalDelta),
+        distanceAlong: Number(finalNearestRoad.distanceAlong),
+        distanceToEndpoint: Number(finalNearestRoad.distanceToEndpoint),
+        distanceToTransitionZone: Number(finalNearestRoad.distanceToTransitionZone)
+      } : null;
+      roadSegments = Array.isArray(nearestRoad?.road?.pts) ? nearestRoad.road.pts.slice(0, -1).map((point, index) =>
+        Math.hypot(nearestRoad.road.pts[index + 1].x - point.x, nearestRoad.road.pts[index + 1].z - point.z)
+      ) : [];
+      roadProfileY = Number(nearestRoad?.y);
+      exactRenderedRoadY = ctx.GroundHeight?._raycastMeshY ?
+        ctx.GroundHeight._raycastMeshY(
+          Array.isArray(ctx.roadMeshes) ? ctx.roadMeshes : [],
+          actorX,
+          actorZ,
+          Number.isFinite(actorFeetY) ? actorFeetY + (locationSpec.expectedRoadStructure ? 2.2 : 5.5) : 1500,
+          Number.isFinite(actorFeetY) ? (locationSpec.expectedRoadStructure ? 5 : 26) : Infinity
+        ) :
+        null;
+      renderedRoadY = ctx.GroundHeight?.roadMeshY ?
+        ctx.GroundHeight.roadMeshY(actorX, actorZ, roadProfileY) :
+        null;
     }
 
     return {
@@ -620,6 +662,12 @@ async function loadLocation(page, spec) {
         waterKind: String(ctx.boatMode?.waterKind || ''),
         boatY: Number(Number(ctx.boat?.y || 0).toFixed(2)),
         waterPatchY: Number(Number(ctx.boatMode?.waterPatch?.position?.y || 0).toFixed(2)),
+        surfaceEnvelope: Object.fromEntries(
+          Object.entries(ctx.boatMode?.surfaceEnvelope || {}).map(([key, value]) => [
+            key,
+            Number.isFinite(value) ? Number(Number(value).toFixed(key === 'sampledAt' ? 3 : 2)) : null
+          ])
+        ),
         maxWaterGeometryYSpan: Number(maxWaterGeometryYSpan.toFixed(3)),
         cameraMode: Number(ctx.camMode),
         cameraDistance: Number(boatCameraDistance.toFixed(2)),
@@ -630,6 +678,8 @@ async function loadLocation(page, spec) {
         walkerY: Number(Number(ctx.Walk?.state?.walker?.y || 0).toFixed(2)),
         terrainY: Number(Number(ctx.elevationWorldYAtWorldXZ?.(actorX, actorZ) || 0).toFixed(2)),
         terrainMeshY: Number.isFinite(terrainMeshY) ? Number(terrainMeshY.toFixed(2)) : null,
+        actorX: Number(Number(actorX || 0).toFixed(2)),
+        actorZ: Number(Number(actorZ || 0).toFixed(2)),
         terrainMeshesAtActor,
         exactRenderedRoadY: Number.isFinite(exactRenderedRoadY) ? Number(exactRenderedRoadY.toFixed(2)) : null,
         renderedRoadY: Number.isFinite(renderedRoadY) ? Number(renderedRoadY.toFixed(2)) : null,
@@ -641,6 +691,11 @@ async function loadLocation(page, spec) {
           pointCount: nearestRoad.road.pts?.length || 0,
           maxSegment: Number(Math.max(0, ...roadSegments).toFixed(2)),
           terrainMode: String(nearestRoad.road.structureSemantics?.terrainMode || ''),
+          activeWorldOwner: Array.isArray(ctx.roads) && ctx.roads.includes(nearestRoad.road),
+          terrainSamplerActive: typeof nearestRoad.road.surfaceTerrainSampler === 'function',
+          terrainSamplerY: typeof nearestRoad.road.surfaceTerrainSampler === 'function' && nearestRoad.pt ?
+            Number(Number(nearestRoad.road.surfaceTerrainSampler(nearestRoad.pt.x, nearestRoad.pt.z)).toFixed(2)) :
+            null,
           verticalDelta: Number.isFinite(nearestRoad.verticalDelta) ? Number(nearestRoad.verticalDelta.toFixed(2)) : null,
           surfaceY: Number.isFinite(roadProfileY) ? Number(roadProfileY.toFixed(2)) : null,
           surfaceMinY: Number(Number(nearestRoad.road.structureSurfaceMinY || 0).toFixed(2)),

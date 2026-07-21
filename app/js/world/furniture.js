@@ -2,7 +2,7 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   buildWorldVegetationInstancing,
   collectWorldVegetationPlacements
-} from "./vegetation.js?v=4";
+} from "./vegetation.js?v=6";
 import {
   registerStreetLamp,
   resetStreetLampFixtures
@@ -12,6 +12,7 @@ let furnitureMaterialsReady = false;
 let furnitureGeometriesReady = false;
 let signTextureCache = new Map();
 let signTextGeometry = null;
+let worldCoverVegetationTimer = null;
 
 let matPole;
 let matSignBg;
@@ -293,15 +294,7 @@ export function generateStreetFurniture() {
     }
   });
 
-  buildWorldVegetationInstancing(collectWorldVegetationPlacements(), {
-    initFurnitureMaterials,
-    initFurnitureGeometries,
-    getResources: () => ({
-      geoTreeTrunk,
-      geoTreeCanopy,
-      matTrunk
-    })
-  });
+  refreshWorldCoverVegetation();
 
   const lampSpacing = budget.lampSpacing;
   let totalLamps = 0;
@@ -342,7 +335,43 @@ export function generateStreetFurniture() {
   });
 }
 
+export function refreshWorldCoverVegetation() {
+  if (appCtx.getContinuousWorldEnabled?.() !== true) {
+    (appCtx.vegetationMeshes || []).forEach((mesh) => {
+      mesh?.parent?.remove?.(mesh);
+      if (Array.isArray(mesh?.material)) {
+        mesh.material.forEach((material) => {
+          if (material !== matTrunk) material?.dispose?.();
+        });
+      } else if (mesh?.material !== matTrunk) {
+        mesh?.material?.dispose?.();
+      }
+    });
+    appCtx.clearWorldCollections?.(['vegetationMeshes', 'vegetationFeatures']);
+  }
+  return buildWorldVegetationInstancing(collectWorldVegetationPlacements(), {
+    initFurnitureMaterials,
+    initFurnitureGeometries,
+    getResources: () => ({ geoTreeTrunk, geoTreeCanopy, matTrunk })
+  });
+}
+
+export function scheduleWorldCoverVegetationRefresh() {
+  if (appCtx.getContinuousWorldEnabled?.() === true) return;
+  if (worldCoverVegetationTimer) globalThis.clearTimeout(worldCoverVegetationTimer);
+  const loadSequence = appCtx._worldLoadSequence;
+  worldCoverVegetationTimer = globalThis.setTimeout(() => {
+    worldCoverVegetationTimer = null;
+    if (loadSequence !== appCtx._worldLoadSequence) return;
+    refreshWorldCoverVegetation();
+  }, 500);
+}
+
 export function resetWorldFurnitureCaches() {
+  if (worldCoverVegetationTimer) globalThis.clearTimeout(worldCoverVegetationTimer);
+  worldCoverVegetationTimer = null;
   signTextureCache.clear();
   signTextGeometry = null;
 }
+
+Object.assign(appCtx, { scheduleWorldCoverVegetationRefresh });

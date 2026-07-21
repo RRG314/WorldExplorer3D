@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-07-15 for version 3.0.0.
+Last reviewed: 2026-07-20 for version 3.1.0.
 
 ## Map Coverage
 
@@ -18,10 +18,15 @@ Last reviewed: 2026-07-15 for version 3.0.0.
 
 - Geocoding, map geometry, elevation, imagery, weather, and other live context can be degraded by upstream rate limits or outages.
 - The runtime includes timeout and fallback behavior, but a fallback may be less detailed than the primary source.
+- OpenSky access can be restricted from some cloud-hosting networks. The release preview must pass the production-egress preflight; otherwise aircraft remain explicitly labeled reference routes rather than observed flights.
+- Panoramax and KartaView street imagery is an inspection layer with uneven global coverage. It is not used as an unlicensed facade texture source.
+- Live vessel positions are not currently presented as observed AIS data. Shipping corridors remain labeled reference data until an AIS source and redistribution license are selected.
+- NOAA water-level observations and tide predictions are limited to supported stations, primarily in the United States. Open-Meteo marine values are modeled guidance and remain labeled separately.
 
 ## Generated Content
 
 - Real indoor data is uncommon. Buildings without usable indoor mapping receive a footprint-aware generated interior.
+- Generated interiors are traversable and sized from the building footprint, but may be visually sparse when no authoritative indoor geometry exists.
 - Procedural vegetation, inferred buildings, distant aerial context, and deep-space encounters fill data gaps and should not be interpreted as exact observations.
 - Solar-system distances and planetary sizes use documented visual scaling so destinations remain navigable. The experience is educational and exploratory, not an orbital-navigation simulator.
 

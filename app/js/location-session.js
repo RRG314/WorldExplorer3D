@@ -72,6 +72,26 @@ export function getLocationSelectionSnapshot() {
   };
 }
 
+export function resolveLocationSelection() {
+  if (appCtx.selLoc === 'custom') {
+    const custom = cloneCustomLocation(appCtx.customLoc);
+    if (!custom) return null;
+    return { key: 'custom', ...custom };
+  }
+
+  const key = String(appCtx.selLoc || '').trim();
+  const preset = appCtx.LOCS?.[key];
+  const lat = Number(preset?.lat);
+  const lon = Number(preset?.lon);
+  if (!key || !Number.isFinite(lat) || !Number.isFinite(lon)) return null;
+  return {
+    key,
+    lat: Math.max(-90, Math.min(90, lat)),
+    lon: ((lon + 180) % 360 + 360) % 360 - 180,
+    name: String(preset?.name || key).trim() || key
+  };
+}
+
 export function getLocationSelectionSignature() {
   const selection = getLocationSelectionSnapshot();
   if (selection.selLoc === 'custom' && selection.customLoc) {
@@ -118,6 +138,7 @@ Object.assign(appCtx, {
   isLoadedLocationSelectionCurrent,
   markLocationSelectionLoaded,
   normalizeLocationSelection,
+  resolveLocationSelection,
   restoreLoadedLocationSelection,
   selectPresetLocation,
   setCustomLocation,

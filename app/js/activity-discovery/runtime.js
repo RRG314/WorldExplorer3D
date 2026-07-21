@@ -287,16 +287,7 @@ async function joinRoomActivity(activity = {}) {
   return true;
 }
 
-async function startActivity(activity = {}) {
-  if (sanitizeText(activity.sourceType, 24).toLowerCase() === 'room') {
-    return joinRoomActivity(activity);
-  }
-  const distance = distanceToStart(activity);
-  if (activity.requiresNearbyStart !== false && distance > 90) {
-    navigateToActivityStart(activity);
-    state.message = 'Navigate to the activity start, then start again.';
-    return false;
-  }
+function beginActivityRuntime(activity = {}) {
   if (!applySpawnForActivity(activity)) return false;
   const sequence = resolveSequence(activity);
   const startsWithStart = sequence[0]?.typeId === 'start';
@@ -324,7 +315,7 @@ async function startActivity(activity = {}) {
   return true;
 }
 
-function stopActivity(options = {}) {
+function resetActivityRuntime(options = {}) {
   state.active = false;
   state.activity = null;
   state.targetIndex = 0;
@@ -338,6 +329,49 @@ function stopActivity(options = {}) {
     clearRuntimeNavigation();
   }
   return true;
+}
+
+let gameplayPluginRegistered = false;
+
+function registerActivityGameplayPlugin() {
+  if (gameplayPluginRegistered) return true;
+  if (typeof appCtx.registerGameplayPlugin !== 'function') return false;
+  appCtx.registerGameplayPlugin({
+    id: 'activity',
+    label: 'Created Activity',
+    category: 'created-game',
+    start: ({ activity }) => beginActivityRuntime(activity),
+    update: () => updateActivityRuntime(),
+    stop: (context = {}) => resetActivityRuntime(context.activityStopOptions || {}),
+    save: () => getRuntimeSnapshot(),
+    leaderboard: () => getCompletionState(state.activity?.id || state.lastActivity?.id || '')
+  });
+  gameplayPluginRegistered = true;
+  return true;
+}
+
+function startActivity(activity = {}) {
+  if (sanitizeText(activity.sourceType, 24).toLowerCase() === 'room') {
+    return joinRoomActivity(activity);
+  }
+  const distance = distanceToStart(activity);
+  if (activity.requiresNearbyStart !== false && distance > 90) {
+    navigateToActivityStart(activity);
+    state.message = 'Navigate to the activity start, then start again.';
+    return false;
+  }
+  if (registerActivityGameplayPlugin() && typeof appCtx.startGameplayPlugin === 'function') {
+    return appCtx.startGameplayPlugin('activity', { activity: cloneJson(activity) });
+  }
+  return beginActivityRuntime(activity);
+}
+
+function stopActivity(options = {}) {
+  const activePluginId = appCtx.getGameplayRegistrySnapshot?.().activeId || '';
+  if (activePluginId === 'activity' && typeof appCtx.stopGameplayPlugin === 'function') {
+    return appCtx.stopGameplayPlugin('activity-stop', { activityStopOptions: options });
+  }
+  return resetActivityRuntime(options);
 }
 
 function replayLastActivity() {
@@ -404,6 +438,7 @@ export {
   getCompletionState,
   getRuntimeSnapshot,
   navigateToActivityStart,
+  registerActivityGameplayPlugin,
   replayLastActivity,
   startActivity,
   stopActivity,

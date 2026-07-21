@@ -1,3 +1,4 @@
+@layer legacy {
 #fishingDockBtn{
   border:1px solid rgba(253,186,116,.66);background:#f97316;color:#fff;border-radius:999px;
   padding:8px 14px;font:700 11px Poppins,sans-serif;cursor:pointer;white-space:nowrap;
@@ -72,4 +73,5 @@ body.activity-creator-open #fishingGamePanel,body.editor-workspace-open #fishing
   .fishingFightControls,.fishingRodControls{padding-left:12px;padding-right:12px;gap:6px}
   .fishingFishReadout{left:10px;right:10px}.fishingFishReadout strong{font-size:14px}.fishingFishReadout span{font-size:9px}
   .fishingLogHeader{padding:9px 12px 6px}.fishingCatchList{padding:0 12px 12px}
+}
 }

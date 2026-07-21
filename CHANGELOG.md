@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-07-20
+
+### Added
+
+- Added a consolidated globe-first start hub that keeps location selection, destinations, missions, multiplayer, Live Earth, library, and quick-start navigation in one responsive workspace.
+- Added a shared geospatial provider registry with bounded caching, request deduplication, timeouts, provenance, truth classification, and provider-health diagnostics.
+- Added current OpenSky aircraft placement on the globe, Panoramax and KartaView street-imagery inspection, CelesTrak satellite groups, USGS earthquakes, Open-Meteo weather and marine guidance, and NOAA water-level/tide coverage.
+- Added an always-visible top-down logarithmic Solar System inset that distinguishes the real 2.06-3.27 AU asteroid belt from the 30-50 AU Kuiper belt.
+- Added runtime-kernel, platform-service, gameplay-plugin, transport-controller, account-service, geospatial-contract, and operational-endpoint verification.
+
 ### Changed
 
 - Replaced the globe selector's ambiguous Explore panel tab and hidden Start Here footer with an always-visible Explore action that launches the selected coordinates; the former tab is now labeled Choose Location.

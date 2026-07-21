@@ -173,6 +173,7 @@ export const WORLD_TEST_LOCATIONS = [
     category: 'alpine_snow_rock_custom',
     expectedStart: 'land',
     expectedTerrainMode: 'snowRock',
+    acceptableTerrainModes: ['snow', 'snowRock'],
     acceptableStartTerrainModes: ['snow', 'snowRock']
   },
   {
@@ -270,7 +271,8 @@ export const WORLD_TEST_LOCATIONS = [
     label: 'Golden Gate Bridge',
     category: 'major_bridge_coastal_custom',
     expectedStart: 'land',
-    expectedRoadStructure: 'bridge'
+    expectedRoadStructure: 'bridge',
+    minimumStructureClearance: 6
   },
   {
     id: 'holland_tunnel_custom',

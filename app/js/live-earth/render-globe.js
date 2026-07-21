@@ -31,13 +31,52 @@ function removeChildren(group) {
   }
 }
 
+function transportMarkerSpec(item = {}, type = 'aircraft', selected = false, overview = false) {
+  const lat = Number(item.lat);
+  const lon = Number(item.lon);
+  if (!Number.isFinite(lat) || !Number.isFinite(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) return null;
+  const observedAircraft = type === 'aircraft' && item.dataSource === 'opensky';
+  const radius = Number.isFinite(Number(item.altitude))
+    ? Number(item.altitude)
+    : (type === 'ship' ? 1.018 : 1.055);
+  return Object.freeze({
+    lat,
+    lon,
+    radius,
+    observedAircraft,
+    color: type === 'ship' ? 0x9de5ff : (observedAircraft ? 0x55e6ff : 0xffd166),
+    size: selected && !overview ? 0.003 : (observedAircraft ? (item.onGround ? 0.0015 : 0.002) : 0.012)
+  });
+}
+
+function createAircraftMarkerGeometry(size) {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, size * 1.35);
+  shape.lineTo(size * 0.18, size * 0.35);
+  shape.lineTo(size, size * 0.02);
+  shape.lineTo(size, -size * 0.2);
+  shape.lineTo(size * 0.2, -size * 0.08);
+  shape.lineTo(size * 0.28, -size * 0.8);
+  shape.lineTo(size * 0.08, -size * 0.92);
+  shape.lineTo(0, -size * 0.58);
+  shape.lineTo(-size * 0.08, -size * 0.92);
+  shape.lineTo(-size * 0.28, -size * 0.8);
+  shape.lineTo(-size * 0.2, -size * 0.08);
+  shape.lineTo(-size, -size * 0.2);
+  shape.lineTo(-size, size * 0.02);
+  shape.lineTo(-size * 0.18, size * 0.35);
+  shape.closePath();
+  return new THREE.ShapeGeometry(shape);
+}
+
 export function renderSatelliteGlobe(ctx, state) {
   ensureSelectorGroups(state);
   const selector = state.selector;
   const api = selector.api;
   removeChildren(selector.satelliteGroup);
   selector.markerRecords = selector.markerRecords.filter((entry) => entry.type !== 'satellite');
-  if (state.panelMode !== 'live-earth' || state.activeLayerId !== 'satellites') {
+  const overview = state.activeLayerId === 'overview';
+  if (state.panelMode !== 'live-earth' || (!overview && state.activeLayerId !== 'satellites')) {
     selector.satelliteGroup.visible = false;
     if (selector.trackLine) selector.trackLine.visible = false;
     return;
@@ -69,7 +108,7 @@ export function renderSatelliteGlobe(ctx, state) {
     selector.trackLine = null;
   }
 
-  if (!state.satelliteTrackPoints.length) return;
+  if (overview || !state.satelliteTrackPoints.length) return;
   const points = state.satelliteTrackPoints.map((entry) => {
     const radius = 1.05 + ctx.clamp01(Number(entry.altitudeKm) / 42000) * 0.14;
     const point = api.latLonToLocalPoint(entry.lat, entry.lon, radius);
@@ -89,12 +128,13 @@ export function renderEarthquakeGlobe(ctx, state) {
   const api = selector.api;
   removeChildren(selector.earthquakeGroup);
   selector.markerRecords = selector.markerRecords.filter((entry) => entry.type !== 'earthquake');
-  if (state.panelMode !== 'live-earth' || state.activeLayerId !== 'earthquakes') {
+  const overview = state.activeLayerId === 'overview';
+  if (state.panelMode !== 'live-earth' || (!overview && state.activeLayerId !== 'earthquakes')) {
     selector.earthquakeGroup.visible = false;
     return;
   }
   selector.earthquakeGroup.visible = true;
-  state.earthquakeItems.slice(0, 100).forEach((event) => {
+  state.earthquakeItems.slice(0, overview ? 45 : 100).forEach((event) => {
     const point = api.latLonToLocalPoint(event.lat, event.lon, 1.018);
     const radius = 0.008 + ctx.clamp01((Number(event.magnitude) || 0) / 8) * 0.018;
     const mesh = new THREE.Mesh(
@@ -117,7 +157,8 @@ export function renderWeatherGlobe(ctx, state) {
   removeChildren(selector.weatherGroup);
   selector.markerRecords = selector.markerRecords.filter((entry) => entry.type !== 'weather');
   const layerId = state.activeLayerId;
-  if (state.panelMode !== 'live-earth' || !['weather', 'storms', 'ocean-state'].includes(layerId)) {
+  const overview = layerId === 'overview';
+  if (state.panelMode !== 'live-earth' || (!overview && !['weather', 'storms', 'ocean-state'].includes(layerId))) {
     selector.weatherGroup.visible = false;
     return;
   }
@@ -173,7 +214,8 @@ export function renderTransportGlobe(ctx, state) {
   removeChildren(selector.transportMarkerGroup);
   selector.markerRecords = selector.markerRecords.filter((entry) => entry.type !== 'ship' && entry.type !== 'aircraft');
   const layerId = state.activeLayerId;
-  if (state.panelMode !== 'live-earth' || !['ships', 'aircraft'].includes(layerId)) {
+  const overview = layerId === 'overview';
+  if (state.panelMode !== 'live-earth' || (!overview && !['ships', 'aircraft'].includes(layerId))) {
     selector.transportRouteGroup.visible = false;
     selector.transportMarkerGroup.visible = false;
     return;
@@ -181,11 +223,17 @@ export function renderTransportGlobe(ctx, state) {
 
   selector.transportRouteGroup.visible = true;
   selector.transportMarkerGroup.visible = true;
-  const routes = layerId === 'ships' ? state.shipRoutes : state.aircraftRoutes;
-  const items = layerId === 'ships' ? state.shipItems : state.aircraftItems;
-  const selectedId = layerId === 'ships' ? state.selectedShipId : state.selectedAircraftId;
+  const transportSets = overview ? [
+    { type: 'ship', routes: state.shipRoutes, items: state.shipItems, selectedId: state.selectedShipId },
+    { type: 'aircraft', routes: state.aircraftRoutes, items: state.aircraftItems, selectedId: state.selectedAircraftId }
+  ] : [{
+    type: layerId === 'ships' ? 'ship' : 'aircraft',
+    routes: layerId === 'ships' ? state.shipRoutes : state.aircraftRoutes,
+    items: layerId === 'ships' ? state.shipItems : state.aircraftItems,
+    selectedId: layerId === 'ships' ? state.selectedShipId : state.selectedAircraftId
+  }];
 
-  routes.forEach((route) => {
+  transportSets.forEach(({ type, routes, items, selectedId }) => routes.forEach((route) => {
     const points = (route.renderPoints || []).map((entry) => {
       const point = api.latLonToLocalPoint(entry.lat, entry.lon, entry.altitude);
       return new THREE.Vector3(point.x, point.y, point.z);
@@ -193,32 +241,56 @@ export function renderTransportGlobe(ctx, state) {
     if (points.length < 2) return;
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
     const material = new THREE.LineBasicMaterial({
-      color: route.color || (layerId === 'ships' ? 0x67e8f9 : 0xfbbf24),
+      color: route.color || (type === 'ship' ? 0x67e8f9 : 0xfbbf24),
       transparent: true,
-      opacity: route.id === (items.find((entry) => entry.id === selectedId)?.routeId || '') ? 0.96 : 0.34
+      opacity: route.id === (items.find((entry) => entry.id === selectedId)?.routeId || '') ? 0.9 : (overview ? 0.22 : 0.34)
     });
     const line = new THREE.Line(geometry, material);
     selector.transportRouteGroup.add(line);
-  });
+  }));
 
-  items.forEach((item) => {
-    const point = api.latLonToLocalPoint(item.lat, item.lon, item.altitude || (layerId === 'ships' ? 1.018 : 1.055));
+  transportSets.forEach(({ type, items, selectedId }) => items.forEach((item) => {
     const selected = item.id === selectedId;
-    const color = layerId === 'ships' ? 0x9de5ff : 0xffd166;
+    const spec = transportMarkerSpec(item, type, selected, overview);
+    if (!spec) return;
+    const point = api.latLonToLocalPoint(spec.lat, spec.lon, spec.radius);
+    if (spec.observedAircraft) {
+      const surface = api.latLonToLocalPoint(spec.lat, spec.lon, 1.014);
+      const stem = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([
+          new THREE.Vector3(surface.x, surface.y, surface.z),
+          new THREE.Vector3(point.x, point.y, point.z)
+        ]),
+        new THREE.LineBasicMaterial({ color: spec.color, transparent: true, opacity: selected ? 0.9 : 0.42 })
+      );
+      selector.transportMarkerGroup.add(stem);
+    }
     const mesh = new THREE.Mesh(
-      layerId === 'ships'
-        ? new THREE.ConeGeometry(selected ? 0.015 : 0.011, selected ? 0.05 : 0.036, 6)
-        : new THREE.ConeGeometry(selected ? 0.013 : 0.01, selected ? 0.054 : 0.04, 5),
-      new THREE.MeshBasicMaterial({ color })
+      spec.observedAircraft
+        ? createAircraftMarkerGeometry(spec.size)
+        : type === 'ship'
+        ? new THREE.ConeGeometry(selected && !overview ? 0.015 : 0.011, selected && !overview ? 0.05 : 0.036, 6)
+        : new THREE.ConeGeometry(selected && !overview ? 0.013 : 0.01, selected && !overview ? 0.054 : 0.04, 5),
+      new THREE.MeshBasicMaterial({
+        color: selected && spec.observedAircraft ? 0xffffff : spec.color,
+        side: spec.observedAircraft ? THREE.DoubleSide : THREE.FrontSide,
+        transparent: spec.observedAircraft,
+        opacity: 0.96,
+        depthWrite: !spec.observedAircraft
+      })
     );
     mesh.position.set(point.x, point.y, point.z);
     mesh.lookAt(0, 0, 0);
-    mesh.rotateX(Math.PI * 0.5);
-    mesh.rotateY((Number(item.headingDeg) || 0) * Math.PI / 180);
-    mesh.userData.liveEarth = { type: layerId === 'ships' ? 'ship' : 'aircraft', id: item.id };
+    if (spec.observedAircraft) mesh.rotateZ(-(Number(item.headingDeg) || 0) * Math.PI / 180);
+    else {
+      mesh.rotateX(Math.PI * 0.5);
+      mesh.rotateY((Number(item.headingDeg) || 0) * Math.PI / 180);
+    }
+    mesh.renderOrder = spec.observedAircraft ? 5 : 2;
+    mesh.userData.liveEarth = { type, id: item.id };
     selector.transportMarkerGroup.add(mesh);
-    selector.markerRecords.push({ type: layerId === 'ships' ? 'ship' : 'aircraft', id: item.id, mesh });
-  });
+    selector.markerRecords.push({ type, id: item.id, lat: spec.lat, lon: spec.lon, altitude: spec.radius, dataSource: item.dataSource || 'reference', mesh });
+  }));
 }
 
 export function renderGlobeLayers(ctx, state) {
@@ -227,3 +299,5 @@ export function renderGlobeLayers(ctx, state) {
   renderWeatherGlobe(ctx, state);
   renderTransportGlobe(ctx, state);
 }
+
+export { transportMarkerSpec };

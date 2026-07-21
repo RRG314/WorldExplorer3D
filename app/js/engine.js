@@ -19,7 +19,7 @@ import {
   getBuildingMaterial as getBuildingMaterialRuntime,
   initEngineTextures as initEngineTexturesRuntime,
   syncTextureGlobals as syncTextureGlobalsRuntime
-} from "./engine/materials-runtime.js?v=11";
+} from "./engine/materials-runtime.js?v=16";
 import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=8";
 
 const RENDER_QUALITY_LOW = 'low';
@@ -53,11 +53,17 @@ const engineState = {
   brickDiffuse: null,
   brickNormal: null,
   brickRoughness: null,
+  surfaceTextureSets: {},
   pbrTexturesLoaded: {
     grass: false,
+    forest: false,
     pavement: false,
     concrete: false,
-    brick: false
+    brick: false,
+    sand: false,
+    soil: false,
+    rock: false,
+    snow: false
   }
 };
 

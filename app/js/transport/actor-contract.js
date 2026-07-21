@@ -52,7 +52,7 @@ function activeTransportActor() {
     });
   }
   if (mode === 'rocket') {
-    return actorRecord(mode, appCtx.spaceFlight, {
+    return actorRecord(mode, appCtx.spaceFlight?.rocket, {
       bounds: { radius: 2, height: 5 },
       grounded: false,
       contactKind: 'space'

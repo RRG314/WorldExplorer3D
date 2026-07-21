@@ -42,7 +42,6 @@ export function prepareWorldFeatureSelections(options = {}) {
   const loadMetrics = options.loadMetrics || {};
   const tileBudgetCfg = options.tileBudgetCfg || {};
   const useRdtBudgeting = options.useRdtBudgeting === true;
-  const baselineFullWorld = options.baselineFullWorld === true;
   const enableLinearFeatures = options.enableLinearFeatures === true;
   const maxRoadWays = Number(options.maxRoadWays || 0);
   const maxBuildingWays = Number(options.maxBuildingWays || 0);
@@ -77,17 +76,15 @@ export function prepareWorldFeatureSelections(options = {}) {
   const allBuildingWays = data.elements.filter((element) =>
     element.type === 'way' && (element.tags?.building || element.tags?.['building:part'])
   );
-  const buildingWays = baselineFullWorld ?
-    allBuildingWays :
-    limitWaysByTileBudget(allBuildingWays, nodes, {
-      globalCap: maxBuildingWays,
-      basePerTile: tileBudgetCfg.buildingsPerTile,
-      minPerTile: tileBudgetCfg.buildingsMinPerTile,
-      tileDegrees: tileBudgetCfg.tileDegrees,
-      useRdt: useRdtBudgeting,
-      spreadAcrossArea: true,
-      coreRatio: useRdtBudgeting ? 0.35 : 0.45
-    });
+  const buildingWays = limitWaysByTileBudget(allBuildingWays, nodes, {
+    globalCap: maxBuildingWays,
+    basePerTile: tileBudgetCfg.buildingsPerTile,
+    minPerTile: tileBudgetCfg.buildingsMinPerTile,
+    tileDegrees: tileBudgetCfg.tileDegrees,
+    useRdt: useRdtBudgeting,
+    spreadAcrossArea: true,
+    coreRatio: useRdtBudgeting ? 0.35 : 0.45
+  });
 
   const allLanduseWays = data.elements.filter((element) =>
     element.type === 'way' &&
@@ -107,7 +104,7 @@ export function prepareWorldFeatureSelections(options = {}) {
     element.tags &&
     !!element.tags.waterway
   );
-  const waterwayWays = baselineFullWorld ?
+  const waterwayWays = options.baselineFullWorld === true ?
     allWaterwayWays :
     limitWaysByTileBudget(allWaterwayWays, nodes, {
       globalCap: Math.max(240, Math.floor(maxLanduseWays * 0.8)),

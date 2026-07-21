@@ -110,6 +110,10 @@ function updateBoatCamera() {
       y: boatY + 1.3 + (appCtx.boat?.pitch || 0) * 2.6 + speedNorm * 0.42,
       z: appCtx.boat.z + Math.cos(appCtx.boat.angle) * lookAhead
     };
+    if (Math.abs(rig.pos.y - desiredPos.y) > 18 || Math.abs(rig.look.y - desiredLook.y) > 18) {
+      Object.assign(rig.pos, desiredPos);
+      Object.assign(rig.look, desiredLook);
+    }
     blendBoatCameraVector(rig.pos, desiredPos, expBlend(dt, 4.8 + speedNorm * 1.6, 0.06, 0.26));
     blendBoatCameraVector(rig.look, desiredLook, expBlend(dt, 5.4 + speedNorm * 1.8, 0.08, 0.32));
     blendBoatCameraVector(rig.up, surfaceNormal, expBlend(dt, 2.8 + waveIntensity * 1.6, 0.04, 0.2));

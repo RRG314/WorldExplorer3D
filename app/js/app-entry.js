@@ -4,40 +4,42 @@ import { getCurrentUser, observeAuth } from '../../js/auth-ui.js';
 import './rdt.js?v=55';
 import './config.js?v=59';
 import { ctx as appCtx } from './shared-context.js?v=55';
-import './runtime-diagnostics.js?v=10';
+import { createAccountService } from './platform/account-service.js?v=1';
+import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
+import './runtime-diagnostics.js?v=14';
 import './state.js?v=60';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
-import './location-session.js?v=1';
+import './location-session.js?v=2';
 import './controls/action-input.js?v=1';
-import './transport/actor-contract.js?v=1';
+import './transport/actor-contract.js?v=2';
 import './world/collection-registry.js?v=1';
 import './perf.js?v=56';
 import './env.js?v=57';
 import './session-coordinator.js?v=2';
 import './real-estate.js?v=55';
-import './ground.js?v=66';
-import './terrain.js?v=126';
-import './world.js?v=194';
+import './ground.js?v=68';
+import './terrain.js?v=129';
+import './world.js?v=208';
 import './earth-streaming.js?v=22';
 import './world/streaming-vector-chunks.js?v=52';
-import './world/load-continuous-world.js?v=1';
+import './world/load-continuous-world.js?v=3';
 import './world/streaming-aerial-context.js?v=26';
 import './earth-origin.js?v=4';
 import './building-entry.js?v=4';
 import './interiors.js?v=9';
-import { init, tryEnablePostProcessing } from './engine.js?v=73';
-import './physics.js?v=76';
+import { init, tryEnablePostProcessing } from './engine.js?v=78';
+import './physics.js?v=77';
 import './walking.js?v=65';
 import './travel-mode.js?v=11';
-import { initBoatMode } from './boat-mode.js?v=27';
+import { initBoatMode } from './boat-mode.js?v=28';
 import { setupFishingGame } from './fishing-game.js?v=2';
-import './sky.js?v=77';
-import './weather.js?v=3';
-import './live-earth/controller.js?v=11';
-import './solar-system.js?v=70';
-import './space.js?v=87';
-import './planetary/scene-ownership.js?v=7';
+import './sky.js?v=79';
+import './weather.js?v=4';
+import './live-earth/controller.js?v=21';
+import './solar-system.js?v=71';
+import './space.js?v=89';
+import './planetary/scene-ownership.js?v=8';
 import './planetary/vehicles.js?v=2';
 import './planetary/astronaut.js?v=1';
 import './planetary/sky-orientation.js?v=9';
@@ -45,44 +47,30 @@ import './planetary/moon-sky.js?v=1';
 import './planetary/mars-world.js?v=16';
 import './planetary/tracks.js?v=1';
 import './ocean.js?v=5';
-import './game.js?v=56';
+import './game.js?v=58';
 import './input.js?v=59';
-import './hud.js?v=67';
+import './hud.js?v=68';
 import './map.js?v=58';
-import { renderLoop } from './main.js?v=64';
+import { renderLoop } from './main.js?v=67';
 import './memory.js?v=55';
 import './blocks.js?v=60';
 import './block-builder/ui.js?v=2';
 import './flower-challenge.js?v=56';
-import { setupUI } from './ui.js?v=96';
+import { setupUI } from './ui.js?v=102';
 
 let _booted = false;
-let _multiplayerObserverReady = false;
-let _multiplayerApi = null;
-let _multiplayerApiPromise = null;
 let _lastObservedAuthUser = null;
-let _editorSessionModule = null;
-let _editorSessionPromise = null;
-let _editorSessionReady = false;
-let _activityCreatorModule = null;
-let _activityCreatorPromise = null;
-let _activityCreatorReady = false;
-let _activityDiscoveryModule = null;
-let _activityDiscoveryPromise = null;
-let _activityDiscoveryReady = false;
-let _creatorProfileModule = null;
-let _creatorProfilePromise = null;
-let _creatorProfileReady = false;
-let _analyticsModule = null;
-let _analyticsModulePromise = null;
-let _analyticsReady = false;
-let _overlayRuntimePromise = null;
-let _overlayRuntimeReady = false;
 let _tutorialInitPromise = null;
 let _optionalRuntimeBootScheduled = false;
 let _editorWarmupScheduled = false;
 let _activityDiscoveryWarmupScheduled = false;
 let _analyticsWarmupScheduled = false;
+let _platformServicesRegistered = false;
+const platformServices = createPlatformServiceRegistry({
+    onEvent(event) {
+        globalThis.dispatchEvent?.(new CustomEvent('we3d:platform-service', { detail: event }));
+    }
+});
 
 function scheduleIdleTask(task, timeout = 1200) {
     if (typeof task !== 'function') return;
@@ -93,95 +81,104 @@ function scheduleIdleTask(task, timeout = 1200) {
     window.setTimeout(() => task(), Math.max(32, timeout));
 }
 
-async function ensureEditorSessionModule() {
-    if (_editorSessionModule) return _editorSessionModule;
-    if (!_editorSessionPromise) {
-        _editorSessionPromise = import('./editor/session.js?v=5').then((mod) => {
-            _editorSessionModule = mod;
-            if (!_editorSessionReady && typeof mod.initEditorSession === 'function') {
-                mod.initEditorSession();
-                _editorSessionReady = true;
-            }
+function registerPlatformServices() {
+    if (_platformServicesRegistered) return;
+    _platformServicesRegistered = true;
+    platformServices.register({
+        id: 'account', category: 'identity',
+        load: async () => {
+            const account = createAccountService({
+                getCurrentUser,
+                observeAuth,
+                onChange(user) {
+                    _lastObservedAuthUser = user || null;
+                    globalThis.__WE3D_AUTH_UID__ = user?.uid || '';
+                    const multiplayer = platformServices.peek('multiplayer');
+                    try {
+                        multiplayer?.setAuthUser?.(user || null);
+                    } catch (error) {
+                        console.warn('[boot] Multiplayer auth sync failed.', error);
+                    }
+                }
+            });
+            return account.start();
+        }
+    });
+    platformServices.register({
+        id: 'editor', category: 'authoring',
+        load: async () => {
+            const mod = await import('./editor/session.js?v=5');
+            mod.initEditorSession?.();
             return mod;
-        });
-    }
-    return _editorSessionPromise;
-}
-
-async function ensureActivityCreatorModule() {
-  if (_activityCreatorModule) return _activityCreatorModule;
-  if (!_activityCreatorPromise) {
-        _activityCreatorPromise = import('./activity-editor/session.js?v=11').then((mod) => {
-            _activityCreatorModule = mod;
-            if (!_activityCreatorReady && typeof mod.initActivityCreator === 'function') {
-                mod.initActivityCreator();
-                _activityCreatorReady = true;
-            }
+        }
+    });
+    platformServices.register({
+        id: 'activity-creator', category: 'gameplay-authoring',
+        load: async () => {
+            const mod = await import('./activity-editor/session.js?v=11');
+            mod.initActivityCreator?.();
             return mod;
-        });
-    }
-    return _activityCreatorPromise;
-}
-
-async function ensureActivityDiscoveryModule() {
-    if (_activityDiscoveryModule) return _activityDiscoveryModule;
-    if (!_activityDiscoveryPromise) {
-        _activityDiscoveryPromise = import('./activity-discovery/session.js?v=4').then((mod) => {
-            _activityDiscoveryModule = mod;
-            if (!_activityDiscoveryReady && typeof mod.initActivityDiscovery === 'function') {
-                mod.initActivityDiscovery();
-                _activityDiscoveryReady = true;
-            }
+        }
+    });
+    platformServices.register({
+        id: 'activity-discovery', category: 'discovery',
+        load: async () => {
+            const mod = await import('./activity-discovery/session.js?v=5');
+            mod.initActivityDiscovery?.();
             return mod;
-        }).catch((error) => {
-            _activityDiscoveryPromise = null;
-            throw error;
-        });
-    }
-    return _activityDiscoveryPromise;
-}
-
-async function ensureCreatorProfileModule() {
-    if (_creatorProfileModule) return _creatorProfileModule;
-    if (!_creatorProfilePromise) {
-        _creatorProfilePromise = import('./creator/session.js?v=2').then((mod) => {
-            _creatorProfileModule = mod;
-            if (!_creatorProfileReady && typeof mod.initCreatorProfileSession === 'function') {
-                mod.initCreatorProfileSession();
-                _creatorProfileReady = true;
-            }
+        }
+    });
+    platformServices.register({
+        id: 'creator-profile', category: 'identity',
+        load: async () => {
+            const mod = await import('./creator/session.js?v=2');
+            mod.initCreatorProfileSession?.();
             return mod;
-        }).catch((error) => {
-            _creatorProfilePromise = null;
-            throw error;
-        });
-    }
-    return _creatorProfilePromise;
-}
-
-async function ensureAnalyticsModule() {
-    if (_analyticsModule) return _analyticsModule;
-    if (!_analyticsModulePromise) {
-        _analyticsModulePromise = import('../../js/analytics.js?v=1').then((mod) => {
-            _analyticsModule = mod;
+        }
+    });
+    platformServices.register({
+        id: 'analytics', category: 'telemetry',
+        load: async () => {
+            const mod = await import('../../js/analytics.js?v=1');
             if (typeof mod.getAnalyticsSessionSnapshot === 'function') {
                 appCtx.getAnalyticsSessionSnapshot = () => mod.getAnalyticsSessionSnapshot(appCtx);
             }
-            if (!_analyticsReady && typeof mod.startAnalyticsTracking === 'function') {
-                mod.startAnalyticsTracking(appCtx);
-                _analyticsReady = true;
-            }
+            mod.startAnalyticsTracking?.(appCtx);
             return mod;
-        }).catch((error) => {
-            _analyticsModulePromise = null;
-            throw error;
-        });
-    }
-    return _analyticsModulePromise;
+        }
+    });
+    platformServices.register({
+        id: 'editor-overlay', category: 'world-content',
+        load: async () => {
+            const mod = await import('./editor/public-layer.js?v=5');
+            mod.initEditorPublicLayer?.();
+            return mod;
+        }
+    });
+    platformServices.register({
+        id: 'multiplayer', category: 'social',
+        load: async () => {
+            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=74');
+            const api = initMultiplayerPlatform({ getScene: () => appCtx.scene });
+            api?.setAuthUser?.(_lastObservedAuthUser || getCurrentUser() || null);
+            return api;
+        }
+    });
 }
 
+function ensurePlatformService(id) {
+    registerPlatformServices();
+    return platformServices.ensure(id);
+}
+
+const ensureEditorSessionModule = () => ensurePlatformService('editor');
+const ensureActivityCreatorModule = () => ensurePlatformService('activity-creator');
+const ensureActivityDiscoveryModule = () => ensurePlatformService('activity-discovery');
+const ensureCreatorProfileModule = () => ensurePlatformService('creator-profile');
+const ensureAnalyticsModule = () => ensurePlatformService('analytics');
+
 function scheduleEditorSessionWarmup(timeout = 900) {
-    if (_editorWarmupScheduled || _editorSessionReady) return;
+    if (_editorWarmupScheduled || platformServices.isReady('editor')) return;
     _editorWarmupScheduled = true;
     scheduleIdleTask(() => {
         void ensureEditorSessionModule();
@@ -189,7 +186,7 @@ function scheduleEditorSessionWarmup(timeout = 900) {
 }
 
 function scheduleActivityDiscoveryWarmup(timeout = 2600) {
-    if (_activityDiscoveryWarmupScheduled || _activityDiscoveryReady) return;
+    if (_activityDiscoveryWarmupScheduled || platformServices.isReady('activity-discovery')) return;
     _activityDiscoveryWarmupScheduled = true;
     scheduleIdleTask(() => {
         _activityDiscoveryWarmupScheduled = false;
@@ -199,7 +196,7 @@ function scheduleActivityDiscoveryWarmup(timeout = 2600) {
 }
 
 function scheduleAnalyticsWarmup(timeout = 2800) {
-    if (_analyticsWarmupScheduled || _analyticsReady) return;
+    if (_analyticsWarmupScheduled || platformServices.isReady('analytics')) return;
     _analyticsWarmupScheduled = true;
     scheduleIdleTask(() => {
         _analyticsWarmupScheduled = false;
@@ -208,20 +205,8 @@ function scheduleAnalyticsWarmup(timeout = 2800) {
 }
 
 async function ensureOverlayRuntimeLayer() {
-    if (_overlayRuntimeReady) return true;
-    if (!_overlayRuntimePromise) {
-        _overlayRuntimePromise = import('./editor/public-layer.js?v=5').then((mod) => {
-            if (!_overlayRuntimeReady && typeof mod.initEditorPublicLayer === 'function') {
-                mod.initEditorPublicLayer();
-                _overlayRuntimeReady = true;
-            }
-            return true;
-        }).catch((error) => {
-            _overlayRuntimePromise = null;
-            throw error;
-        });
-    }
-    return _overlayRuntimePromise;
+    await ensurePlatformService('editor-overlay');
+    return true;
 }
 
 function shouldBootOverlayRuntime() {
@@ -234,7 +219,7 @@ function shouldBootOverlayRuntime() {
 }
 
 function kickOptionalRuntimeBoot(reason = 'runtime') {
-    if (_overlayRuntimeReady || _optionalRuntimeBootScheduled || !shouldBootOverlayRuntime()) return false;
+    if (platformServices.isReady('editor-overlay') || _optionalRuntimeBootScheduled || !shouldBootOverlayRuntime()) return false;
     _optionalRuntimeBootScheduled = true;
     scheduleIdleTask(() => {
         _optionalRuntimeBootScheduled = false;
@@ -245,23 +230,7 @@ function kickOptionalRuntimeBoot(reason = 'runtime') {
 }
 
 async function ensureMultiplayerPlatformReady() {
-    if (_multiplayerApi) return _multiplayerApi;
-    if (!_multiplayerApiPromise) {
-        _multiplayerApiPromise = import('./multiplayer/ui-room.js?v=74').then(({ initMultiplayerPlatform }) => {
-            _multiplayerApi = initMultiplayerPlatform({
-                getScene: () => appCtx.scene
-            });
-            const authed = _lastObservedAuthUser || getCurrentUser();
-            if (typeof _multiplayerApi?.setAuthUser === 'function') {
-                _multiplayerApi.setAuthUser(authed || null);
-            }
-            return _multiplayerApi;
-        }).catch((error) => {
-            _multiplayerApiPromise = null;
-            throw error;
-        });
-    }
-    return _multiplayerApiPromise;
+    return ensurePlatformService('multiplayer');
 }
 
 function scheduleTutorialInit() {
@@ -282,6 +251,7 @@ function scheduleTutorialInit() {
 }
 
 function registerLazySubsystemEntrypoints() {
+    registerPlatformServices();
     if (typeof appCtx.getEditorSnapshot !== 'function') {
         appCtx.getEditorSnapshot = () => ({
             active: false,
@@ -303,22 +273,25 @@ function registerLazySubsystemEntrypoints() {
         });
     }
     appCtx.captureEditorHereTarget = (...args) => {
-        if (_editorSessionModule && typeof _editorSessionModule.captureEditorHereTarget === 'function') {
-            return _editorSessionModule.captureEditorHereTarget(...args);
+        const editor = platformServices.peek('editor');
+        if (typeof editor?.captureEditorHereTarget === 'function') {
+            return editor.captureEditorHereTarget(...args);
         }
         scheduleEditorSessionWarmup();
         return null;
     };
     appCtx.setEditorDraft = (...args) => {
-        if (_editorSessionModule && typeof _editorSessionModule.setEditorDraft === 'function') {
-            return _editorSessionModule.setEditorDraft(...args);
+        const editor = platformServices.peek('editor');
+        if (typeof editor?.setEditorDraft === 'function') {
+            return editor.setEditorDraft(...args);
         }
         scheduleEditorSessionWarmup();
         return null;
     };
     appCtx.previewEditorDraft = (...args) => {
-        if (_editorSessionModule && typeof _editorSessionModule.previewEditorDraft === 'function') {
-            return _editorSessionModule.previewEditorDraft(...args);
+        const editor = platformServices.peek('editor');
+        if (typeof editor?.previewEditorDraft === 'function') {
+            return editor.previewEditorDraft(...args);
         }
         scheduleEditorSessionWarmup();
         return null;
@@ -328,8 +301,8 @@ function registerLazySubsystemEntrypoints() {
         return typeof mod.openEditorSession === 'function' ? mod.openEditorSession(options) : false;
     };
     appCtx.closeEditorSession = async (options = {}) => {
-        if (!_editorSessionModule || typeof _editorSessionModule.closeEditorSession !== 'function') return false;
-        return _editorSessionModule.closeEditorSession(options);
+        const editor = platformServices.peek('editor');
+        return typeof editor?.closeEditorSession === 'function' ? editor.closeEditorSession(options) : false;
     };
     appCtx.toggleEditorSession = async () => {
         const mod = await ensureEditorSessionModule();
@@ -387,8 +360,8 @@ function registerLazySubsystemEntrypoints() {
         return typeof mod.openActivityCreator === 'function' ? mod.openActivityCreator(options) : false;
     };
     appCtx.closeActivityCreator = async () => {
-        if (!_activityCreatorModule || typeof _activityCreatorModule.closeActivityCreator !== 'function') return false;
-        return _activityCreatorModule.closeActivityCreator();
+        const creator = platformServices.peek('activity-creator');
+        return typeof creator?.closeActivityCreator === 'function' ? creator.closeActivityCreator() : false;
     };
     appCtx.toggleActivityCreator = async () => {
         const mod = await ensureActivityCreatorModule();
@@ -400,8 +373,8 @@ function registerLazySubsystemEntrypoints() {
         return typeof mod.openActivityBrowser === 'function' ? mod.openActivityBrowser(options) : false;
     };
     appCtx.closeActivityBrowser = async () => {
-        if (!_activityDiscoveryModule || typeof _activityDiscoveryModule.closeActivityBrowser !== 'function') return false;
-        return _activityDiscoveryModule.closeActivityBrowser();
+        const discovery = platformServices.peek('activity-discovery');
+        return typeof discovery?.closeActivityBrowser === 'function' ? discovery.closeActivityBrowser() : false;
     };
     appCtx.toggleActivityBrowser = async (options = {}) => {
         const mod = await ensureActivityDiscoveryModule();
@@ -412,8 +385,8 @@ function registerLazySubsystemEntrypoints() {
         return typeof mod.openCreatorProfile === 'function' ? mod.openCreatorProfile(options) : false;
     };
     appCtx.closeCreatorProfile = async () => {
-        if (!_creatorProfileModule || typeof _creatorProfileModule.closeCreatorProfile !== 'function') return false;
-        return _creatorProfileModule.closeCreatorProfile();
+        const profile = platformServices.peek('creator-profile');
+        return typeof profile?.closeCreatorProfile === 'function' ? profile.closeCreatorProfile() : false;
     };
     appCtx.ensureAnalyticsTracking = async () => {
         const mod = await ensureAnalyticsModule();
@@ -424,11 +397,20 @@ function registerLazySubsystemEntrypoints() {
     appCtx.scheduleActivityDiscoveryWarmup = scheduleActivityDiscoveryWarmup;
     appCtx.ensureOverlayRuntimeReady = ensureOverlayRuntimeLayer;
     appCtx.kickOptionalRuntimeBoot = kickOptionalRuntimeBoot;
+    appCtx.ensurePlatformService = ensurePlatformService;
+    appCtx.getPlatformServicesSnapshot = () => platformServices.snapshot();
+    appCtx.getAccountSnapshot = () => platformServices.peek('account')?.snapshot?.() || {
+        started: false,
+        signedIn: false,
+        anonymous: false,
+        providerCount: 0,
+        revision: 0
+    };
     appCtx.ensureMultiplayerPlatformReady = ensureMultiplayerPlatformReady;
-    appCtx.getCurrentMultiplayerRoom = () => _multiplayerApi?.getCurrentRoom?.() || null;
-    appCtx.getCurrentMultiplayerRoomActivities = () => _multiplayerApi?.getCurrentRoomActivities?.() || [];
-    appCtx.getCurrentMultiplayerRoomActivity = () => _multiplayerApi?.getActiveRoomActivity?.() || null;
-    appCtx.canManageCurrentRoomActivities = () => !!_multiplayerApi?.canManageCurrentRoomActivities?.();
+    appCtx.getCurrentMultiplayerRoom = () => platformServices.peek('multiplayer')?.getCurrentRoom?.() || null;
+    appCtx.getCurrentMultiplayerRoomActivities = () => platformServices.peek('multiplayer')?.getCurrentRoomActivities?.() || [];
+    appCtx.getCurrentMultiplayerRoomActivity = () => platformServices.peek('multiplayer')?.getActiveRoomActivity?.() || null;
+    appCtx.canManageCurrentRoomActivities = () => !!platformServices.peek('multiplayer')?.canManageCurrentRoomActivities?.();
     appCtx.syncMultiplayerRoomWorld = async (room = {}, options = {}) => {
         const api = await ensureMultiplayerPlatformReady();
         if (typeof api?.syncRoomWorldContext !== 'function') {
@@ -480,20 +462,7 @@ function registerLazySubsystemEntrypoints() {
 }
 
 function startMultiplayerAfterAuthReady() {
-    if (_multiplayerObserverReady) return;
-    _multiplayerObserverReady = true;
-
-    observeAuth((user) => {
-        _lastObservedAuthUser = user || null;
-        globalThis.__WE3D_AUTH_UID__ = user && user.uid ? user.uid : '';
-        if (_multiplayerApi && typeof _multiplayerApi.setAuthUser === 'function') {
-            try {
-                _multiplayerApi.setAuthUser(user || null);
-            } catch (error) {
-                console.warn('[boot] Multiplayer auth sync failed.', error);
-            }
-        }
-    });
+    return ensurePlatformService('account');
 }
 
 function bootApp() {

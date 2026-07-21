@@ -113,6 +113,7 @@ function createTerrainStreamingApi(deps = {}) {
 
   function updateTerrainAround(x, z) {
     if (!appCtx.terrainEnabled) return;
+    if (![x, z].every(Number.isFinite)) return;
 
     ensureTerrainGroup();
 

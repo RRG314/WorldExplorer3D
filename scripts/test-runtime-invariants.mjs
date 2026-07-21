@@ -290,7 +290,11 @@ async function main() {
   let report = null;
   try {
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    await page.waitForSelector('#startBtn', { timeout: 30000 });
+    await page.waitForFunction(() => {
+      const globeStart = document.getElementById('globeSelectorStartBtn');
+      const legacyStart = document.getElementById('startBtn');
+      return [globeStart, legacyStart].some((element) => element && element.getClientRects().length > 0);
+    }, { timeout: 30000 });
     const boot = await bootstrapEarthRuntime(page, 'baltimore');
     assert(boot.ok, `Failed to bootstrap Earth runtime: ${boot.reason || 'unknown error'} ${JSON.stringify(boot.details || {})}`);
 
@@ -333,7 +337,7 @@ async function main() {
 
     report = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
-      const structureSemantics = await import('/app/js/structure-semantics.js?v=13');
+      const structureSemantics = await import('/app/js/structure-semantics.js?v=14');
       const ctx = mod?.ctx;
       const roads = Array.isArray(ctx.roads) ? ctx.roads : [];
       const buildings = Array.isArray(ctx.buildings) ? ctx.buildings : [];
@@ -504,6 +508,14 @@ async function main() {
           const walkNew = ctx.SurfaceQuery.walkAt(x, z).position.y;
           const driveNew = ctx.SurfaceQuery.driveAt(x, z, { preferRoad: true }).position.y;
           return {
+            x,
+            z,
+            terrainOld,
+            terrainNew,
+            walkOld,
+            walkNew,
+            driveOld,
+            driveNew,
             terrainDelta: Math.abs(terrainOld - terrainNew),
             walkDelta: Math.abs(walkOld - walkNew),
             driveDelta: Math.abs(driveOld - driveNew)
@@ -513,7 +525,10 @@ async function main() {
           sampleCount: samples.length,
           maxTerrainDelta: Math.max(0, ...samples.map((sample) => sample.terrainDelta)),
           maxWalkDelta: Math.max(0, ...samples.map((sample) => sample.walkDelta)),
-          maxDriveDelta: Math.max(0, ...samples.map((sample) => sample.driveDelta))
+          maxDriveDelta: Math.max(0, ...samples.map((sample) => sample.driveDelta)),
+          divergentSamples: samples.filter((sample) =>
+            sample.terrainDelta > 1e-9 || sample.walkDelta > 1e-9 || sample.driveDelta > 1e-9
+          )
         };
       }
 
@@ -578,8 +593,15 @@ async function main() {
         if (driveResolved?.valid && !driveBlocked && driveResolved.onRoad) out.driveSpawnSafe = 1;
         if (walkResolved?.valid && !walkBlocked) out.walkSpawnSafe = 1;
         out.spawnPreview.push({
+          driveValid: !!driveResolved?.valid,
+          driveReason: driveResolved?.reason || null,
           driveSource: driveResolved?.source || null,
           driveOnRoad: !!driveResolved?.onRoad,
+          driveBlocked,
+          driveX: Number.isFinite(driveResolved?.x) ? Number(driveResolved.x.toFixed(2)) : null,
+          driveZ: Number.isFinite(driveResolved?.z) ? Number(driveResolved.z.toFixed(2)) : null,
+          walkValid: !!walkResolved?.valid,
+          walkReason: walkResolved?.reason || null,
           walkSource: walkResolved?.source || null,
           driveMoved: Number(Math.hypot((driveResolved?.x || 0) - sample.x, (driveResolved?.z || 0) - sample.z).toFixed(2)),
           walkMoved: Number(Math.hypot((walkResolved?.x || 0) - sample.x, (walkResolved?.z || 0) - sample.z).toFixed(2))
@@ -690,7 +712,7 @@ async function main() {
     const networkAndCopyReport = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
       const ctx = mod?.ctx;
-      const semanticsMod = await import('/app/js/structure-semantics.js?v=13');
+      const semanticsMod = await import('/app/js/structure-semantics.js?v=14');
       const classifyStructureSemantics = semanticsMod?.classifyStructureSemantics;
       const walkGraph = ctx?.traversalNetworks?.walk || null;
       const driveGraph = ctx?.traversalNetworks?.drive || null;
@@ -765,6 +787,7 @@ async function main() {
         driveGraphKinds: driveGraph?.featureKinds || {},
         walkFeatureRoute,
         walkSurfaceSample,
+        linearFeatureMeshCount: linearFeatureMeshes.length,
         solidLinearMaterials:
           linearFeatureMeshes.length > 0 &&
           linearFeatureMeshes.every((mesh) => {
@@ -823,7 +846,10 @@ async function main() {
       laneEdgeReasonable: report.laneHitRatePct <= 3.5,
       waterDataPresent: (report.waterAreas + report.waterways + preWaterMetrics.waterAreas + preWaterMetrics.waterways) > 0,
       waterVisible: report.visibleWaterMeshes > 0 || preWaterMetrics.visibleWaterMeshes > 0,
-      linearFeaturesDeferredForRelease: (report.linearFeatures + preWaterMetrics.linearFeatures) === 0,
+      linearFeatureGeometryReady:
+        (report.linearFeatures + preWaterMetrics.linearFeatures) > 0 &&
+        report.linearFeatureMeshCount > 0 &&
+        report.solidLinearMaterials === true,
       spawnResolverAvailable: report.resolveSpawnAvailable === true,
       driveSpawnFallbackSafe: report.buildingInteriorSamples === 0 || report.driveSpawnSafe === report.buildingInteriorSamples,
       walkSpawnFallbackSafe: report.buildingInteriorSamples === 0 || report.walkSpawnSafe === report.buildingInteriorSamples,
@@ -928,11 +954,19 @@ async function main() {
       `Road center driveability degraded: blocked ${report.blockedDriveSamples}/${report.driveSampleCount} (${report.blockedDriveRatePct}%)`
     );
     assert(checks.laneEdgeReasonable, `Lane-edge collision rate too high: ${report.laneHitRatePct}%`);
-    assert(checks.linearFeaturesDeferredForRelease, `Release-deferred path layers became active without their geometry contract: ${report.linearFeatures}`);
+    assert(
+      checks.linearFeatureGeometryReady,
+      `Mapped path geometry contract is incomplete: ${JSON.stringify({
+        linearFeatures: report.linearFeatures,
+        linearFeatureMeshCount: report.linearFeatureMeshCount,
+        solidLinearMaterials: report.solidLinearMaterials
+      })}`
+    );
     assert(checks.spawnResolverAvailable, 'Spawn resolver helpers are not exposed on runtime context.');
     assert(
       checks.driveSpawnFallbackSafe,
-      `Drive spawn fallback failed for ${report.buildingInteriorSamples - report.driveSpawnSafe}/${report.buildingInteriorSamples} building-interior samples`
+      `Drive spawn fallback failed for ${report.buildingInteriorSamples - report.driveSpawnSafe}/${report.buildingInteriorSamples} ` +
+      `building-interior samples: ${JSON.stringify(report.spawnPreview)}`
     );
     assert(
       checks.walkSpawnFallbackSafe,

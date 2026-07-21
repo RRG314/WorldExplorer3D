@@ -1,9 +1,9 @@
-import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=4";
-import { createWorldLandusePass } from "./load-landuse-pass.js?v=21";
+import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=7";
+import { createWorldLandusePass } from "./load-landuse-pass.js?v=25";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
-import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=4";
-import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=8";
+import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=5";
+import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=9";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   const waitForCoverage = appCtx.waitForTerrainCoverageAt;
@@ -11,8 +11,12 @@ async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (typeof waitForCoverage !== 'function' && typeof waitForCenter !== 'function') return false;
   startLoadPhase('waitForTerrainCoverage');
   try {
-    if (typeof waitForCoverage === 'function') return await waitForCoverage(0, 0, 5000, 0.72);
-    return await waitForCenter(0, 0, 3000);
+    const startedAt = performance.now();
+    const centerReady = typeof waitForCenter === 'function' ? await waitForCenter(0, 0, 3000) : false;
+    if (typeof waitForCoverage !== 'function') return centerReady;
+    const remainingMs = Math.max(800, 5000 - (performance.now() - startedAt));
+    const coverage = await waitForCoverage(0, 0, remainingMs, 0.72);
+    return centerReady || coverage?.ready === true;
   } finally {
     endLoadPhase('waitForTerrainCoverage');
   }
@@ -20,6 +24,7 @@ async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
 export function createWorldRoadLoader(deps = {}) {
   const {
     ENABLE_LINEAR_FEATURES = false,
+    LINEAR_FEATURE_POLICY = {},
     FEATURE_MIN_HOLE_AREA = 6,
     FEATURE_MIN_POLYGON_AREA = 8,
     MAX_TREE_NODES = 0,
@@ -106,8 +111,14 @@ export function createWorldRoadLoader(deps = {}) {
     worldLinePointsFromLonLat
   } = deps;
   let activeWorldLoad = null;
-  const classifyLinearFeatureTags = (tags = {}, options = {}) =>
-    classifyLinearFeatureTagsBase(tags, { ...options, linearFeaturesEnabled: ENABLE_LINEAR_FEATURES });
+  const classifyLinearFeatureTags = (tags = {}, options = {}) => {
+    const classification = classifyLinearFeatureTagsBase(tags, {
+      ...options,
+      linearFeaturesEnabled: ENABLE_LINEAR_FEATURES
+    });
+    if (!classification || options.force === true) return classification;
+    return LINEAR_FEATURE_POLICY[classification.kind] === true ? classification : null;
+  };
   const linearRuntime = createLinearFeatureRuntime({
     appCtx,
     applyBuildingContextSemanticsToFeature,
@@ -165,7 +176,6 @@ export function createWorldRoadLoader(deps = {}) {
       sameLocation
     });
     if (session.aborted) return;
-
     const {
       endLoadPhase,
       finalizePerfLoad,
@@ -199,7 +209,7 @@ export function createWorldRoadLoader(deps = {}) {
     let providerUnavailable = false;
     let terrainCoverageReady = false;
     const markLoaded = async (reason) => {
-      if (!terrainCoverageReady && appCtx.roads.length > 0) {
+      if (!terrainCoverageReady && (appCtx.roads.length > 0 || appCtx.waterAreas.length > 0 || appCtx.waterways.length > 0)) {
         terrainCoverageReady = await waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase);
       }
       finalizeLoadedWorld({
@@ -296,7 +306,6 @@ export function createWorldRoadLoader(deps = {}) {
         );
         const landuseGeometryGuards = buildLanduseGeometryGuards(geometryGuards);
         buildWaterGeometryGuards(geometryGuards);
-
         const scheduleDeferredLinearFeatureLoad = () => {
           scheduleDeferredWorldLinearFeatureLoad({
             enabled: ENABLE_LINEAR_FEATURES,
@@ -342,7 +351,6 @@ export function createWorldRoadLoader(deps = {}) {
         } finally {
           endLoadPhase('fetchOverpass');
         }
-
         if (data?._overpassSource) loadMetrics.overpassSource = data._overpassSource;
         if (data?._overpassEndpoint) loadMetrics.overpassEndpoint = data._overpassEndpoint;
         if (Number.isFinite(data?._overpassCacheAgeMs)) {
@@ -355,12 +363,10 @@ export function createWorldRoadLoader(deps = {}) {
           hideEarthSceneMeshes();
           break;
         }
-
         const nodes = {};
         data.elements.filter((element) => element.type === 'node').forEach((node) => { nodes[node.id] = node; });
         appCtx._worldLoadNodes = nodes;
         const baselineFullWorld = perfModeNow === 'baseline';
-
         startLoadPhase('featureBudgeting');
         const selection = prepareWorldFeatureSelections({
           baselineFullWorld,
@@ -388,7 +394,6 @@ export function createWorldRoadLoader(deps = {}) {
           useRdtBudgeting
         });
         endLoadPhase('featureBudgeting');
-
         const {
           roadWays,
           buildingWays,
@@ -402,7 +407,6 @@ export function createWorldRoadLoader(deps = {}) {
           requestedCounts,
           worldSurfaceProfile
         } = selection;
-
         if (
           roadWays.length < requestedCounts.roads ||
           buildingWays.length < requestedCounts.buildings ||
@@ -417,7 +421,6 @@ export function createWorldRoadLoader(deps = {}) {
             `pois ${poiNodes.length}/${requestedCounts.pois}).`
           );
         }
-
         terrainCoverageReady = await waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase);
         buildRoadGeometryPass({
           appendIndexedGeometry,
@@ -442,7 +445,6 @@ export function createWorldRoadLoader(deps = {}) {
           wayCenterLatLon,
           worldBaseTerrainY
         });
-
         if (buildingWays.length > 0) {
           buildBuildingGeometryPass({
             buildingGeometryGuards,
@@ -462,7 +464,6 @@ export function createWorldRoadLoader(deps = {}) {
             useRdtBudgeting
           });
         }
-
         await landusePass.buildLanduseGeometryPass({
           classifyLanduseType,
           endLoadPhase,
@@ -475,7 +476,6 @@ export function createWorldRoadLoader(deps = {}) {
           waterwayWays,
           worldSurfaceProfile
         });
-
         buildImmediateLinearFeatureGeometryPass({
           cyclewayWays,
           endLoadPhase,
@@ -487,19 +487,19 @@ export function createWorldRoadLoader(deps = {}) {
           structureConnectorWays,
           deferStructureRefresh: true
         });
+        scheduleDeferredWorldDetailPasses({
+          endLoadPhase,
+          isActiveLoadContext,
+          loadMetrics,
+          lodMidDist,
+          lodNearDist,
+          poiKeyFromTags,
+          poiNodes,
+          startLoadPhase,
+          updateWorldLod
+        });
 
         if (appCtx.roads.length > 0) {
-          scheduleDeferredWorldDetailPasses({
-            endLoadPhase,
-            isActiveLoadContext,
-            loadMetrics,
-            lodMidDist,
-            lodNearDist,
-            poiKeyFromTags,
-            poiNodes,
-            startLoadPhase,
-            updateWorldLod
-          });
           scheduleDeferredLandmarkLoad({
             cacheMeta: deferredLandmarkCacheMeta,
             featureMinPolygonArea: FEATURE_MIN_POLYGON_AREA,

@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap describes intended directions after version 3.0.0. It is not a delivery guarantee.
+This roadmap describes intended directions after version 3.1.0. It is not a delivery guarantee.
 
 ## Near Term
 
@@ -9,6 +9,8 @@ This roadmap describes intended directions after version 3.0.0. It is not a deli
 - Improve mapped and generated building variety while preserving real footprints, heights, roofs, and source attribution.
 - Refine ocean traversal, shoreline transitions, boat handling, underwater scenes, and fishing progression.
 - Expand accessible interior layouts and mapped indoor support.
+- Complete production OpenSky egress/OAuth validation and select an AIS provider whose terms permit observed vessel display.
+- Continue consolidating provider health, freshness, coverage, and provenance across Live Earth tools.
 
 ## World Data
 
@@ -16,6 +18,7 @@ This roadmap describes intended directions after version 3.0.0. It is not a deli
 - Add bike routes, bicycle traversal, and route-aware cycling behavior.
 - Add hiking routes and trail-focused exploration using mapped footways and elevation context.
 - Improve regional vegetation, land-cover, hydrology, terrain, and landmark coverage through licensed global datasets.
+- Evaluate licensed facade and night-light datasets separately from street-imagery inspection.
 
 ## Play and Platform
 

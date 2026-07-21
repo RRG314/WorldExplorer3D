@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { fetchShortbreadTile } from "./shortbread-source.js?v=6";
+import { fetchShortbreadTile } from "./shortbread-source.js?v=8";
 import {
   buildStreamingBuildingVisuals,
   buildStreamingRoadVisuals,

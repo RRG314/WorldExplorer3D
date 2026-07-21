@@ -4,12 +4,12 @@ import {
   buildIndexedBatchMesh,
   createRoadSurfaceMaterials
 } from "../road-render.js?v=2";
-import { estimateDriveableRoadWidth } from "./load-style.js?v=1";
+import { estimateDriveableRoadWidth } from "./load-style.js?v=3";
 import {
   buildFeatureRibbonEdges,
   shouldRenderRoadSkirts,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=13";
+} from "../structure-semantics.js?v=16";
 import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=6";
 
 const ROAD_SURFACE_BIAS = 0.08;

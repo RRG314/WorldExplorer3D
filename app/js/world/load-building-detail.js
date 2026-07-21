@@ -107,7 +107,7 @@ export function scheduleDeferredBuildingLoad(options = {}) {
       const requested = (data.elements || []).filter((element) =>
         element?.type === 'way' && (element.tags?.building || element.tags?.['building:part'])
       );
-      const buildingWays = options.baselineFullWorld ? requested : options.limitWaysByTileBudget(requested, nodes, {
+      const buildingWays = options.limitWaysByTileBudget(requested, nodes, {
         globalCap: options.maxBuildingWays,
         basePerTile: options.tileBudgetCfg.buildingsPerTile,
         minPerTile: options.tileBudgetCfg.buildingsMinPerTile,

@@ -1,3 +1,4 @@
+@layer legacy {
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
   --debug-overlay-top:20px;
@@ -388,17 +389,6 @@ input,textarea{-webkit-user-select:text;user-select:text}
   #weatherLine{font-size:11px}
   #weatherMetaLine{font-size:10px}
   :root{--minimap-size:120px}
-  #coords{bottom:158px!important;left:10px!important;font-size:10px;padding:8px 12px}
-  #controlsTab{left:50%!important;transform:translateX(-50%)!important;width:min(280px,calc(100vw - 20px))!important;max-width:none!important;font-size:11px;bottom:106px!important;max-height:56vh!important}
-  #controlsTab.compact{width:auto!important;max-width:max-content!important;left:62%!important;transform:translateX(-50%)!important}
-  #controlsTab.compact #ctrlHeader{padding:9px 12px;font-size:12px}
-  #ctrlContent{max-height:calc(56vh - 44px)!important}
-  #gameShareFloatBtn{left:10px!important;bottom:24px!important}
-  #memoryFlowerFloatBtn{left:10px!important;bottom:76px!important}
-  #multiplayerMenu{left:62px!important;bottom:76px!important}
-  #multiplayerMenu.open .floatItems{left:10px!important;right:auto!important;bottom:126px!important}
-  #gameShareMenu{left:10px!important;bottom:128px!important}
-  #flowerActionMenu{left:10px!important;bottom:126px!important;min-width:192px}
   #flowerChallengeHud{top:74px;left:50%;transform:translateX(-50%);padding:8px 10px}
   #flowerChallengeHudStatus{font-size:11px}
   #flowerChallengeHudTimer{font-size:11px;min-width:54px}
@@ -473,17 +463,6 @@ input,textarea{-webkit-user-select:text;user-select:text}
   :root{--minimap-size:100px;--minimap-edge:12px}
   .minimapZoomBtn{width:28px;height:28px;font-size:16px}
   #minimapZoomLevel{min-width:34px;font-size:9px;padding:4px 5px}
-  #coords{bottom:144px!important;left:5px!important;font-size:9px;padding:6px 10px}
-  #controlsTab{left:50%!important;transform:translateX(-50%)!important;width:min(270px,calc(100vw - 16px))!important;max-width:none!important;font-size:10px;bottom:100px!important;max-height:52vh!important}
-  #controlsTab.compact{width:auto!important;max-width:max-content!important;left:64%!important;transform:translateX(-50%)!important}
-  #controlsTab.compact #ctrlHeader{padding:8px 10px;font-size:11px}
-  #ctrlContent{max-height:calc(52vh - 40px)!important}
-  #gameShareFloatBtn{left:8px!important;bottom:22px!important}
-  #memoryFlowerFloatBtn{left:8px!important;bottom:74px!important}
-  #multiplayerMenu{left:58px!important;bottom:74px!important}
-  #multiplayerMenu.open .floatItems{left:8px!important;right:auto!important;bottom:124px!important}
-  #gameShareMenu{left:8px!important;bottom:126px!important}
-  #flowerActionMenu{left:8px!important;bottom:124px!important;min-width:176px}
   #flowerChallengeHud{top:68px;padding:7px 9px}
   #flowerChallengeHudStatus{font-size:10px}
   #flowerChallengeHudTimer{font-size:10px;min-width:48px}
@@ -536,13 +515,6 @@ input,textarea{-webkit-user-select:text;user-select:text}
   }
 }
 
-@media (max-width: 360px) {
-  #memoryFlowerFloatBtn{left:8px!important;bottom:126px!important}
-  #multiplayerMenu{left:58px!important;bottom:126px!important}
-  #multiplayerMenu.open .floatItems{left:8px!important;right:auto!important;bottom:176px!important}
-  #flowerActionMenu{left:8px!important;bottom:176px!important;min-width:164px}
-}
-
 /* Landscape orientation adjustments */
 @media (max-height: 500px) and (orientation: landscape) {
   .menu-container{max-height:calc(100dvh - 78px);width:min(95vw,980px)}
@@ -588,4 +560,5 @@ input,textarea{-webkit-user-select:text;user-select:text}
 
 @media (max-height:500px) and (orientation:landscape) and (pointer:coarse) {
   .floatItems{max-height:calc(100dvh - 76px);grid-template-columns:repeat(3,minmax(0,1fr))}
+}
 }

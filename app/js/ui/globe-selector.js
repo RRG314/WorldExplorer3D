@@ -1,6 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { createGlobeSelectorScene } from './globe-selector/scene.js?v=1';
+import { createGlobeSelectorScene } from './globe-selector/scene.js?v=5';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
+import { getGlobeSelectorElements } from './globe-selector/dom.js?v=1';
 import {
   addSelectionToSavedFavorites,
   buildFavoriteCities as buildFavoriteCitiesFromData,
@@ -22,34 +23,14 @@ import {
 } from "./globe-selector/helpers.js?v=1";
 
 function createGlobeSelector(options = {}) {
-  const root = document.getElementById('globeSelectorScreen');
-  const stage = document.querySelector('.globe-selector-stage');
-  const canvas = document.getElementById('globeSelectorCanvas');
-  const latLonReadout = document.getElementById('globeSelectorLatLon');
-  const placeReadout = document.getElementById('globeSelectorPlace');
-  const searchInput = document.getElementById('globeLocationSearch');
-  const searchStatus = document.getElementById('globeLocationSearchStatus');
-  const latInput = document.getElementById('globeCustomLat');
-  const lonInput = document.getElementById('globeCustomLon');
-  const startBtn = document.getElementById('globeSelectorStartBtn');
-  const backBtn = document.getElementById('globeSelectorBackBtn');
-  const moonBtn = document.getElementById('globeSelectorMoonBtn');
-  const spaceBtn = document.getElementById('globeSelectorSpaceBtn');
-  const searchBtn = document.getElementById('globeLocationSearchBtn');
-  const locateBtn = document.getElementById('globeSelectorLocateBtn');
-  const exploreModeBtn = document.getElementById('globeSelectorExploreModeBtn');
-  const liveEarthModeBtn = document.getElementById('globeSelectorLiveEarthModeBtn');
-  const explorePanel = document.getElementById('globeSelectorExplorePanel');
-  const liveEarthPanel = document.getElementById('globeSelectorLiveEarthPanel');
-  const liveEarthStatus = document.getElementById('globeLiveEarthStatus');
-  const liveEarthCategoryChips = document.getElementById('globeLiveEarthCategoryChips');
-  const liveEarthLayerList = document.getElementById('globeLiveEarthLayerList');
-  const liveEarthDetails = document.getElementById('globeLiveEarthDetails');
-  const liveEarthRefreshBtn = document.getElementById('globeLiveEarthRefreshBtn');
-  const nearbyTabBtn = document.getElementById('globeNearbyTabBtn');
-  const favoritesTabBtn = document.getElementById('globeFavoritesTabBtn');
-  const cityListHint = document.getElementById('globeCityListHint');
-  const cityList = document.getElementById('globeCityList');
+  const {
+    root, stage, canvas, latLonReadout, placeReadout, searchInput, mobileSearchInput,
+    mobileSearchBtn, searchStatus, latInput, lonInput, startBtn, backBtn, moonBtn,
+    spaceBtn, searchBtn, locateBtn, exploreModeBtn, liveEarthModeBtn, explorePanel,
+    liveEarthPanel, liveEarthStatus, liveEarthCategoryChips, liveEarthLayerList,
+    liveEarthDetails, liveEarthRefreshBtn, nearbyTabBtn, favoritesTabBtn,
+    cityListHint, cityList
+  } = getGlobeSelectorElements();
 
   if (!root || !canvas) {
     return {
@@ -84,6 +65,7 @@ function createGlobeSelector(options = {}) {
     stage,
     placeReadout,
     getActiveCityTab: () => activeCityTab,
+    getPanelMode: () => panelMode,
     getOpenState: () => openState,
     cityMatchesSelection,
     onFavoritePick(city) {
@@ -128,6 +110,9 @@ function createGlobeSelector(options = {}) {
     if (appCtx.liveEarth && typeof appCtx.liveEarth.setPanelMode === 'function') {
       appCtx.liveEarth.setPanelMode(panelMode);
     }
+    globeScene.setSelectionMarker(selected);
+    globeScene.startRenderLoop();
+    globeScene.renderFrame();
   }
 
   function renderFavoriteMarkers() {
@@ -474,6 +459,7 @@ function createGlobeSelector(options = {}) {
         return openState;
       },
       latLonToLocalPoint,
+      setCameraDistance: globeScene.setCameraDistance,
       setSelection,
       applySelectionAndResolve,
       startHere: triggerStartHere,
@@ -495,6 +481,7 @@ function createGlobeSelector(options = {}) {
   function open() {
     if (openState) return;
     openState = true;
+    document.body.classList.add('start-hub-open');
     setGlobeSelectorScrollLock(true);
     root.classList.add('show');
     root.setAttribute('aria-hidden', 'false');
@@ -539,6 +526,7 @@ function createGlobeSelector(options = {}) {
     }
 
     if (searchInput) searchInput.value = appCtx.customLoc?.name || '';
+    if (mobileSearchInput) mobileSearchInput.value = searchInput?.value || appCtx.customLoc?.name || '';
     if (selected) reverseLookupPlace(selected.lat, selected.lon);
 
     if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorOpen === 'function') {
@@ -552,6 +540,7 @@ function createGlobeSelector(options = {}) {
   function close() {
     if (!openState) return;
     openState = false;
+    document.body.classList.remove('start-hub-open');
     setGlobeSelectorScrollLock(false);
     reverseLookupToken += 1;
     root.classList.remove('show');
@@ -589,7 +578,7 @@ function createGlobeSelector(options = {}) {
   }
   if (searchInput) {
     searchInput.addEventListener('keydown', (event) => {
-      if (event.key === 'Escape') close();
+      if (event.key === 'Escape') searchInput.blur();
       if (event.key === 'Enter' && !searchInFlight) runSearchFromOverlay();
     });
   }
@@ -598,6 +587,19 @@ function createGlobeSelector(options = {}) {
       if (!searchInFlight) runSearchFromOverlay();
     });
   }
+  const runMobileSearch = () => {
+    if (!searchInput || !mobileSearchInput || searchInFlight) return;
+    searchInput.value = mobileSearchInput.value;
+    runSearchFromOverlay();
+  };
+  mobileSearchBtn?.addEventListener('click', runMobileSearch);
+  mobileSearchInput?.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape') mobileSearchInput.blur();
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      runMobileSearch();
+    }
+  });
   if (locateBtn) {
     locateBtn.addEventListener('click', () => {
       if (typeof options.onUseMyLocation === 'function') options.onUseMyLocation();

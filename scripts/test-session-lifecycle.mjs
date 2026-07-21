@@ -16,21 +16,62 @@ function isTransientNetworkError(message = '') {
 }
 
 async function waitForRuntime(page) {
-  await page.waitForFunction(async () => {
+  await pollPageState(page, async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return !!(
       typeof ctx?.getSessionCoordinatorDebugState === 'function' &&
       typeof ctx?.startOceanMode === 'function' &&
       typeof ctx?.startSpaceFlightToMoon === 'function'
     );
-  }, null, { timeout: 90000 });
+  }, null, 90000, 'runtime initialization');
+}
+
+async function pollPageState(page, evaluator, argument, timeoutMs, label) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await page.evaluate(evaluator, argument)) return;
+    await page.waitForTimeout(50);
+  }
+  throw new Error(`Timed out waiting for ${label}.`);
 }
 
 async function readLifecycleState(page, mode) {
   return page.evaluate(async (requestedMode) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const renderer = requestedMode === 'space' ? ctx.spaceFlight?.renderer : ctx.oceanMode?.renderer;
+    const scene = requestedMode === 'space' ? ctx.spaceFlight?.scene : ctx.oceanMode?.scene;
     const memory = renderer?.info?.memory || {};
+    const sceneSummary = {
+      objects: 0,
+      geometries: 0,
+      materials: 0,
+      textures: 0,
+      resourceSignature: ''
+    };
+    if (scene?.traverse) {
+      const geometries = new Set();
+      const materials = new Set();
+      const textures = new Set();
+      scene.traverse((object) => {
+        sceneSummary.objects += 1;
+        if (object.geometry?.uuid) geometries.add(object.geometry.uuid);
+        const objectMaterials = Array.isArray(object.material) ? object.material : [object.material];
+        objectMaterials.filter(Boolean).forEach((material) => {
+          if (material.uuid) materials.add(material.uuid);
+          Object.values(material).forEach((value) => {
+            if (value?.isTexture && value.uuid) textures.add(value.uuid);
+          });
+        });
+      });
+      sceneSummary.geometries = geometries.size;
+      sceneSummary.materials = materials.size;
+      sceneSummary.textures = textures.size;
+      sceneSummary.resourceSignature = [
+        ...geometries,
+        ...materials,
+        ...textures
+      ].sort().join('|');
+    }
     return {
       coordinator: ctx.getSessionCoordinatorDebugState?.(),
       canvases: {
@@ -41,39 +82,48 @@ async function readLifecycleState(page, mode) {
       gpu: {
         geometries: Number(memory.geometries || 0),
         textures: Number(memory.textures || 0)
-      }
+      },
+      scene: sceneSummary
     };
   }, mode);
 }
 
-async function waitForMode(page, mode) {
-  await page.waitForFunction(async (requestedMode) => {
+async function waitForMode(page, mode, previousSpaceSessionId = -1) {
+  await pollPageState(page, async ({ requestedMode, previousSessionId }) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     if (requestedMode === 'space') {
-      return ctx.getEnv?.() === ctx.ENV?.SPACE_FLIGHT && ctx.spaceFlight?.active && ctx.spaceFlight?.animationId != null;
+      return (
+        ctx.getEnv?.() === ctx.ENV?.SPACE_FLIGHT &&
+        ctx.spaceFlight?.active &&
+        ctx.spaceFlight?.animationId != null &&
+        Number(ctx.spaceFlight?._sessionId || 0) > previousSessionId
+      );
     }
     return ctx.getEnv?.() === ctx.ENV?.OCEAN && ctx.oceanMode?.active && ctx.oceanMode?.animationId != null;
-  }, mode, { timeout: 30000 });
+  }, { requestedMode: mode, previousSessionId: previousSpaceSessionId }, 30000, `${mode} render-loop ownership`);
 }
 
-async function waitForTitleExit(page, mode) {
-  await page.waitForFunction(async (requestedMode) => {
+async function waitForHubExit(page, mode) {
+  await pollPageState(page, async (requestedMode) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const titleVisible = !document.getElementById('titleScreen')?.classList.contains('hidden');
+    const globeVisible = document.getElementById('globeSelectorScreen')?.classList.contains('show');
     const ownerStopped = requestedMode === 'space'
       ? !ctx.spaceFlight?.active && ctx.spaceFlight?.animationId == null
       : !ctx.oceanMode?.active && ctx.oceanMode?.animationId == null;
-    return titleVisible && ctx.getEnv?.() === ctx.ENV?.EARTH && ownerStopped;
-  }, mode, { timeout: 30000 });
+    return (globeVisible || titleVisible) && ctx.getEnv?.() === ctx.ENV?.EARTH && ownerStopped;
+  }, mode, 30000, `${mode} return to hub`);
 }
 
-async function runModeCycles(page, mode) {
-  const toggle = mode === 'space' ? '#spaceLaunchToggle' : '#oceanLaunchToggle';
+async function runModeCycles(page, mode, lifecycleEvents) {
+  const destination = mode === 'space' ? '#globeSelectorSpaceBtn' : '#globeSelectorOceanBtn';
   const cycles = [];
   for (let cycle = 1; cycle <= 3; cycle++) {
-    await page.click(toggle);
-    await page.click('#startBtn');
-    await waitForMode(page, mode);
+    const beforeLaunch = await readLifecycleState(page, mode);
+    const previousSpaceSessionId = Number(beforeLaunch.coordinator.environments.SPACE_FLIGHT?.sessionId || 0);
+    await page.click(destination);
+    await waitForMode(page, mode, previousSpaceSessionId);
+    const observed = await readLifecycleState(page, mode);
     await page.waitForTimeout(1200);
     const active = await readLifecycleState(page, mode);
     if (cycle === 1 || cycle === 3) {
@@ -81,9 +131,9 @@ async function runModeCycles(page, mode) {
     }
 
     await page.click('#mainMenuBtn');
-    await waitForTitleExit(page, mode);
+    await waitForHubExit(page, mode);
     const exited = await readLifecycleState(page, mode);
-    cycles.push({ active, exited });
+    cycles.push({ observed, active, exited, events: lifecycleEvents.splice(0) });
   }
   return cycles;
 }
@@ -103,8 +153,13 @@ function assertPlateau(mode, cycles) {
       assert(!exitedAdapter.rendererReady && !exitedAdapter.sceneReady, `ocean cycle ${index + 1} retained renderer resources`);
     }
   }
-  assert(third.active.gpu.geometries <= second.active.gpu.geometries, `${mode} GPU geometry count grew after warm-up`);
-  assert(third.active.gpu.textures <= second.active.gpu.textures + 1, `${mode} GPU texture count kept growing after warm-up`);
+  assert(third.active.scene.objects === second.active.scene.objects, `${mode} scene object count changed after warm-up`);
+  assert(third.active.scene.geometries === second.active.scene.geometries, `${mode} scene geometry count changed after warm-up`);
+  assert(third.active.scene.materials === second.active.scene.materials, `${mode} scene material count changed after warm-up`);
+  assert(third.active.scene.textures === second.active.scene.textures, `${mode} scene texture count changed after warm-up`);
+  if (mode === 'space') {
+    assert(third.active.scene.resourceSignature === second.active.scene.resourceSignature, 'space persistent scene resources were replaced after warm-up');
+  }
   assert(third.exited.canvases.total === second.exited.canvases.total, `${mode} DOM canvas count grew after warm-up`);
 }
 
@@ -118,11 +173,16 @@ const browser = await chromium.launch({
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const consoleErrors = [];
+  const lifecycleEvents = [];
   page.on('console', (message) => {
-    if (message.type() === 'error' && !isTransientNetworkError(message.text())) consoleErrors.push(message.text());
+    const text = message.text();
+    if (/Starting space flight|Exiting space flight|Starting ocean mode|Stopping ocean mode/i.test(text)) {
+      lifecycleEvents.push({ at: Date.now(), text });
+    }
+    if (message.type() === 'error' && !isTransientNetworkError(text)) consoleErrors.push(text);
   });
   await page.goto(`http://${host}:${server.port}/app/?lifecycle-plateau=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForSelector('#startBtn', { state: 'visible', timeout: 90000 });
+  await page.waitForSelector('#globeSelectorScreen.show', { state: 'visible', timeout: 90000 });
   await waitForRuntime(page);
   await page.evaluate(() => {
     const panel = document.getElementById('proAccessPanel');
@@ -130,9 +190,10 @@ try {
   });
 
   const report = {
-    space: await runModeCycles(page, 'space'),
-    ocean: await runModeCycles(page, 'ocean')
+    space: await runModeCycles(page, 'space', lifecycleEvents),
+    ocean: await runModeCycles(page, 'ocean', lifecycleEvents)
   };
+  await fs.writeFile(path.join(outputDir, 'plateau-report.json'), `${JSON.stringify({ ok: false, report }, null, 2)}\n`);
   assertPlateau('space', report.space);
   assertPlateau('ocean', report.ocean);
   const registered = report.ocean.at(-1).exited.coordinator.registeredEnvironments;

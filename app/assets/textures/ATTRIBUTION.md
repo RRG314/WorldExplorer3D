@@ -13,3 +13,24 @@
 - `saturn_jpl.jpg`: NASA/JPL-Caltech synthesized Saturn map for NASA 3D resources. It is documented by NASA as fictional rather than measured global imagery. Source: https://science.nasa.gov/3d-resources/saturn/
 - `uranus_jpl.jpg`: JPL/Caltech Uranus map. JPL documents it as a synthesized solid atmospheric color because available global detail is limited. Source: https://space.jpl.nasa.gov/tmaps/uranus.html
 - `neptune_jpl.jpg`: Don Davis/JPL-Caltech synthesized Neptune cloud map for NASA 3D resources. It is documented by NASA as fictional. Source: https://science.nasa.gov/3d-resources/neptune/
+
+## Earth Surface Materials
+
+The diffuse, OpenGL normal, and roughness maps under `earth/` are resized local copies of CC0 materials:
+
+- `grass_001_*`: ambientCG Grass 001. Source: https://ambientcg.com/view?id=Grass001
+- `forest_ground_04_*`: Forest Ground 04. Source: https://polyhaven.com/a/forest_ground_04
+- `sand_01_*`: Sand 01. Source: https://polyhaven.com/a/sand_01
+- `rock_ground_*`: Rock Ground. Source: https://polyhaven.com/a/rock_ground
+- `dirt_*`: Dirt. Source: https://polyhaven.com/a/dirt
+- `snow_01_*`: Snow 01. Source: https://polyhaven.com/a/snow_01
+- `brushed_concrete_*`: Brushed Concrete. Source: https://polyhaven.com/a/brushed_concrete
+- `concrete_*`: Concrete. Source: https://polyhaven.com/a/concrete
+- `brick_wall_001_*`: Brick Wall 001. Source: https://polyhaven.com/a/brick_wall_001
+
+## Live Data Providers
+
+- Aircraft state vectors: The OpenSky Network live API, used under OpenSky terms for research and non-commercial use. Source: https://openskynetwork.github.io/opensky-api/
+- Street imagery: Panoramax and KartaView community observations, CC BY-SA 4.0.
+- Global marine model guidance: Open-Meteo Marine Weather API under provider terms. Source: https://open-meteo.com/en/docs/marine-weather-api
+- United States water-level observations and tide predictions: NOAA Center for Operational Oceanographic Products and Services. Source: https://tidesandcurrents.noaa.gov/

@@ -5,7 +5,7 @@ import { updateBlackHoleEncounter, updateBlackHoleVisual } from './black-hole.js
 import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-sky.js?v=2';
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
 import { getUniverseNavigationMetrics } from './navigation-scale.js?v=1';
-import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=4';
+import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=5';
 import { createUniverseFrameVisual, updateUniverseFrameVisual } from './visuals.js?v=11';
 import {
   closeUniverseNavigator,

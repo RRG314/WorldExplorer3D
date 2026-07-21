@@ -1,9 +1,9 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
-import { captureEarthWorldSession } from "./earth-session.js?v=11";
+import { captureEarthWorldSession } from "./earth-session.js?v=16";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=9";
-import { createSpaceFlightScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=14";
+import { createSpaceFlightScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=15";
 import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=4";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=1';
 import {
@@ -239,7 +239,7 @@ function completeLanding(sessionId = appCtx.spaceFlight._sessionId) {
 
   spaceSessionScope?.timeout(() => {
     if (!isCurrentSpaceFlightSession(sessionId) || appCtx.spaceFlight.mode !== 'landing') return;
-    exitSpaceFlight();
+    exitSpaceFlight('landing_complete');
 
     if (targetName === 'Moon' || targetName === 'moon') {
       if (typeof appCtx.arriveAtMoon === 'function') appCtx.arriveAtMoon();
@@ -251,8 +251,8 @@ function completeLanding(sessionId = appCtx.spaceFlight._sessionId) {
   }, 1500);
 }
 
-function exitSpaceFlight() {
-  console.log("Exiting space flight...");
+function exitSpaceFlight(source = 'runtime') {
+  console.log('Exiting space flight...', String(source || 'runtime'));
 
   appCtx.spaceFlight.active = false;
   spaceSessionScope?.dispose('space-flight-exit');
@@ -288,8 +288,8 @@ function exitSpaceFlight() {
 }
 
 registerEnvironmentLifecycle(appCtx.ENV.SPACE_FLIGHT, {
-  exitSync: () => {
-    if (appCtx.spaceFlight.active) exitSpaceFlight();
+  exitSync: ({ source } = {}) => {
+    if (appCtx.spaceFlight.active) exitSpaceFlight(source || 'environment_transition');
   },
   snapshot: () => ({
     active: !!appCtx.spaceFlight.active,

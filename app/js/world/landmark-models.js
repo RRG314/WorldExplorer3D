@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { curatedLandmarksNear } from './landmark-catalog.js?v=5';
+import { curatedLandmarksNear } from './landmark-catalog.js?v=7';
 import { createMeasuredEiffelTower } from './eiffel-structure.js?v=1';
 import { createMeasuredElizabethTower } from './elizabeth-tower-structure.js?v=1';
 import { createMeasuredKhufuPyramid } from './giza-pyramid-structure.js?v=3';

@@ -1,3 +1,4 @@
+@layer legacy {
 #blockBuilderPanel {
   position: fixed;
   top: 84px;
@@ -81,4 +82,5 @@
 
 @media (max-width: 640px) {
   #blockBuilderPanel { top: 72px; right: 10px; width: min(276px, calc(100vw - 20px)); }
+}
 }

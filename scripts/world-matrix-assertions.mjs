@@ -7,7 +7,8 @@ export function assertWorldMatrixLocation(spec, result) {
   assert(!result.terrainProfiles?.urban, `${spec.id}: base terrain still resolved to urban pavement ${JSON.stringify(result.terrainProfiles.urban)}`);
   if (spec.kind === 'preset') assert(result.counts.roads > 0, `${spec.id}: preset silently finalized without mapped roads`);
   if (spec.expectedTerrainMode) {
-    assert(result.terrainProfiles?.[spec.expectedTerrainMode]?.count > 0, `${spec.id}: expected ${spec.expectedTerrainMode} terrain ${JSON.stringify(result.terrainProfiles)}`);
+    const acceptableTerrainModes = spec.acceptableTerrainModes || [spec.expectedTerrainMode];
+    assert(acceptableTerrainModes.some((mode) => result.terrainProfiles?.[mode]?.count > 0), `${spec.id}: expected ${acceptableTerrainModes.join(' or ')} terrain ${JSON.stringify(result.terrainProfiles)}`);
     const allowedStartModes = new Set(spec.acceptableStartTerrainModes || [spec.expectedTerrainMode]);
     assert(allowedStartModes.has(result.terrainProfileSamples?.[0]?.mode), `${spec.id}: player started on ${result.terrainProfileSamples?.[0]?.mode || 'unknown'} terrain`);
   }
@@ -19,6 +20,14 @@ export function assertWorldMatrixLocation(spec, result) {
     assert(probe?.nearestKind === spec.expectedRoadStructure, `${spec.id}: structure probe resolved to the wrong traversal surface ${JSON.stringify(probe)}`);
     assert(Number.isFinite(probe?.surfaceY) && Number.isFinite(probe?.renderedY), `${spec.id}: structure probe has no rendered surface ${JSON.stringify(probe)}`);
     assert(probe.renderedDelta <= 2.5, `${spec.id}: mapped and rendered ${spec.expectedRoadStructure} surfaces diverged ${JSON.stringify(probe)}`);
+    if (Number.isFinite(spec.minimumStructureClearance)) {
+      const terrainY = Number(result.landPresentation?.terrainY);
+      assert(
+        Number.isFinite(terrainY) && probe.surfaceY - terrainY >= spec.minimumStructureClearance,
+        `${spec.id}: mapped ${spec.expectedRoadStructure} fell below its required terrain clearance ` +
+        `${JSON.stringify({ surfaceY: probe.surfaceY, terrainY, required: spec.minimumStructureClearance })}`
+      );
+    }
   }
   if (spec.minimumWaterAreas) assert(result.counts.waterAreas >= spec.minimumWaterAreas, `${spec.id}: expected mapped water areas`);
   if (spec.minimumBuildings) {
@@ -31,9 +40,13 @@ export function assertWorldMatrixLocation(spec, result) {
   const architecturalBuildings = Number(result.buildingDimensions?.architecturalCount || 0);
   if (architecturalBuildings > 0) {
     const dimensions = result.buildingDimensions || {};
+    const buildingSource = String(result.buildingDetail?.source || '');
+    const authoritativeBuildingSource =
+      buildingSource === 'overture-buildings-pmtiles' ||
+      buildingSource === 'shortbread-vector-buildings';
     assert(
-      result.buildingDetail?.source === 'overture-buildings-pmtiles',
-      `${spec.id}: buildings did not use the global authoritative massing source ${JSON.stringify(result.buildingDetail)}`
+      authoritativeBuildingSource,
+      `${spec.id}: buildings did not use an authoritative mapped massing source ${JSON.stringify(result.buildingDetail)}`
     );
     const overtureBuildings = Number(dimensions.geometrySources?.overture || 0);
     const streamedMappedBuildings = Number(dimensions.geometrySources?.['shortbread-vector'] || 0);
@@ -61,10 +74,11 @@ export function assertWorldMatrixLocation(spec, result) {
         (overtureBuildings + streamedMappedBuildings + inferredFootprints) / architecturalBuildings >= 0.9,
       `${spec.id}: more than 10% of rendered buildings bypassed global or explicit inferred provenance ${JSON.stringify(dimensions.geometrySources)}`
     );
-    assert(
-      Number(result.buildingDetail?.sourceDetails?.radiusDegrees || 0) >= 0.0135,
-      `${spec.id}: building coverage radius is smaller than the visible-world contract ${JSON.stringify(result.buildingDetail?.sourceDetails)}`
-    );
+    const sourceDetails = result.buildingDetail?.sourceDetails || {};
+    const coverageIsWideEnough = buildingSource === 'shortbread-vector-buildings'
+      ? Number(sourceDetails.loaded || 0) >= 4 && Number(sourceDetails.zoom || 0) >= 14
+      : Number(sourceDetails.radiusDegrees || 0) >= 0.0135;
+    assert(coverageIsWideEnough, `${spec.id}: building coverage is smaller than the visible-world contract ${JSON.stringify(sourceDetails)}`);
     assert(Number(dimensions.minHeight) >= 0.2, `${spec.id}: building height fell below the usable minimum ${JSON.stringify(dimensions)}`);
     assert(
       Number(dimensions.maxHeightBySource?.fallback || 0) <= 80,
@@ -85,10 +99,17 @@ export function assertWorldMatrixLocation(spec, result) {
       assert(inferredBuckets >= 6, `${spec.id}: inferred building heights lack neighborhood-scale variation ${JSON.stringify(dimensions)}`);
     }
     if (spec.minimumAuthoritativeBuildingParts) {
-      assert(
-        Number(dimensions.buildingParts || 0) >= spec.minimumAuthoritativeBuildingParts,
-        `${spec.id}: expected at least ${spec.minimumAuthoritativeBuildingParts} authoritative building parts ${JSON.stringify(dimensions)}`
-      );
+      if (buildingSource === 'overture-buildings-pmtiles') {
+        assert(
+          Number(dimensions.buildingParts || 0) >= spec.minimumAuthoritativeBuildingParts,
+          `${spec.id}: expected at least ${spec.minimumAuthoritativeBuildingParts} authoritative building parts ${JSON.stringify(dimensions)}`
+        );
+      } else {
+        assert(
+          Number(dimensions.metadataMatched || 0) > 0 && Number(sourceDetails.loaded || 0) >= 4,
+          `${spec.id}: mapped building fallback lost its metadata enrichment or visible coverage ${JSON.stringify({ dimensions, sourceDetails })}`
+        );
+      }
     }
     if (result.counts.buildings >= 1000) {
       assert(
@@ -121,9 +142,22 @@ export function assertWorldMatrixLocation(spec, result) {
     assert(result.boatPresentation?.meshVisible, `${spec.id}: boat mesh is not visible`);
     assert(result.boatPresentation?.cameraMode === 0, `${spec.id}: boat did not start in chase camera mode`);
     assert(result.boatPresentation?.cameraDistance >= 8 && result.boatPresentation?.cameraDistance <= 30, `${spec.id}: boat camera is outside the usable chase range ${JSON.stringify(result.boatPresentation)}`);
+    const surface = result.boatPresentation?.surfaceEnvelope || {};
     assert(
-      Math.abs(result.boatPresentation.boatY - result.boatPresentation.waterPatchY) <= 2,
-      `${spec.id}: boat and rendered water surface elevations diverged ${JSON.stringify(result.boatPresentation)}`
+      Number.isFinite(surface.baseY) && Math.abs(surface.baseY - result.boatPresentation.waterPatchY) <= 0.15,
+      `${spec.id}: rendered water patch diverged from the water datum ${JSON.stringify(result.boatPresentation)}`
+    );
+    assert(
+      Number.isFinite(surface.averageY) && Number.isFinite(surface.maximumY) && surface.maximumY >= surface.averageY,
+      `${spec.id}: dynamic water envelope is invalid ${JSON.stringify(result.boatPresentation)}`
+    );
+    assert(
+      Number.isFinite(surface.resolvedBoatY) && Math.abs(surface.resolvedBoatY - result.boatPresentation.boatY) <= 0.15,
+      `${spec.id}: boat pose diverged from the resolved buoyancy surface ${JSON.stringify(result.boatPresentation)}`
+    );
+    assert(
+      result.boatPresentation.boatY >= surface.averageY + Math.max(0.2, Number(surface.hullDraft || 0) * 0.3),
+      `${spec.id}: boat hull is submerged below the dynamic water surface ${JSON.stringify(result.boatPresentation)}`
     );
     assert(result.boatPresentation.maxWaterGeometryYSpan <= 0.25, `${spec.id}: area water is still draped over terrain ${JSON.stringify(result.boatPresentation)}`);
     if (spec.expectedWaterKind) {
@@ -176,6 +210,23 @@ export function assertWorldMatrixLocation(spec, result) {
           `${spec.id}: playable car surface diverged from raw rendered road geometry ` +
           `${JSON.stringify({ carFeetY, exactRenderedRoadY, road })}`
         );
+      }
+      if (road.terrainMode === 'at_grade') {
+        const terrainMeshY = Number(result.landPresentation?.terrainMeshY);
+        if (Number.isFinite(terrainMeshY)) {
+          assert(
+            Math.abs(roadSurfaceY - terrainMeshY) <= 2.5,
+            `${spec.id}: at-grade road profile detached from current terrain ` +
+            `${JSON.stringify({ roadSurfaceY, terrainMeshY, road })}`
+          );
+          if (Number.isFinite(exactRenderedRoadY)) {
+            assert(
+              Math.abs(exactRenderedRoadY - terrainMeshY) <= 2.5,
+              `${spec.id}: rendered at-grade road detached from current terrain ` +
+              `${JSON.stringify({ exactRenderedRoadY, terrainMeshY, road })}`
+            );
+          }
+        }
       }
     }
   }

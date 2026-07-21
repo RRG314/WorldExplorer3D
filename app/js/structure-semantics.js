@@ -338,6 +338,7 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
     buildElevatedTerrainReference(terrainHeights, distances, total) :
     terrainHeights;
   const profileHeights = new Float32Array(feature.pts.length);
+  const profileOffsets = new Float32Array(feature.pts.length);
   const stations = Array.isArray(feature.structureStations) ? feature.structureStations : [];
   const anchors = buildFeatureProfileAnchors(feature, semantics, total);
   const anchorDistances = new Float32Array(anchors.length);
@@ -363,13 +364,26 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
       }
     }
 
-    profileHeights[i] = terrainReference[i] + signedOffset + surfaceBias;
+    // The grade-separated feature owns its ramp or portal transition. Carrying
+    // that offset onto an ordinary road can pull the entire at-grade segment
+    // above or below the terrain between sparse OSM endpoints.
+    if (semantics.terrainMode === 'at_grade') signedOffset = 0;
+
+    let profileY = terrainReference[i] + signedOffset + surfaceBias;
+    const minimumSurfaceY = Number(feature.minimumStructureSurfaceY);
+    if (semantics.terrainMode === 'elevated' && Number.isFinite(minimumSurfaceY)) {
+      profileY = Math.max(profileY, minimumSurfaceY);
+    }
+    profileOffsets[i] = signedOffset;
+    profileHeights[i] = profileY;
   }
 
   feature.structureSemantics = semantics;
   feature.surfaceBias = surfaceBias;
   feature.surfaceDistances = distances;
   feature.surfaceHeights = profileHeights;
+  feature.surfaceOffsets = profileOffsets;
+  feature.surfaceTerrainSampler = semantics.terrainMode === 'at_grade' ? sampleTerrainY : null;
   feature.structureSurfaceMinY = profileHeights.reduce((best, value) => Math.min(best, value), Infinity);
   feature.structureSurfaceMaxY = profileHeights.reduce((best, value) => Math.max(best, value), -Infinity);
   return feature;
@@ -410,16 +424,28 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
     const nz = dx / len;
     const distanceRatio = total > 1e-6 ? pointDistances[i] / total : 0;
     const profileDistance = profileTotal * distanceRatio;
-    const centerY = Number(sampleProfileAtDistance(feature.surfaceDistances, feature.surfaceHeights, profileDistance)) || sampleTerrainY(point.x, point.z) + baseTopBias;
+    const atGrade = feature.structureSemantics?.terrainMode === 'at_grade';
+    const terrainY = Number(sampleTerrainY(point.x, point.z));
+    const surfaceOffset = feature.surfaceOffsets instanceof Float32Array ?
+      Number(sampleProfileAtDistance(feature.surfaceDistances, feature.surfaceOffsets, profileDistance)) || 0 :
+      0;
+    const storedProfileY = Number(sampleProfileAtDistance(feature.surfaceDistances, feature.surfaceHeights, profileDistance));
+    const centerY = atGrade && Number.isFinite(terrainY) ?
+      terrainY + surfaceOffset + baseTopBias :
+      Number.isFinite(storedProfileY) ? storedProfileY : terrainY + baseTopBias;
     centerlineHeights.push(centerY);
 
     const leftX = point.x + nx * halfWidth;
     const leftZ = point.z + nz * halfWidth;
     const rightX = point.x - nx * halfWidth;
     const rightZ = point.z - nz * halfWidth;
-    const atGrade = feature.structureSemantics?.terrainMode === 'at_grade';
-    const leftY = atGrade ? Number(sampleTerrainY(leftX, leftZ)) + baseTopBias : centerY;
-    const rightY = atGrade ? Number(sampleTerrainY(rightX, rightZ)) + baseTopBias : centerY;
+    const maxCrossfall = Math.max(0.12, Math.min(0.45, halfWidth * 0.08));
+    const clampCrossfall = (terrainY) => centerY + Math.max(
+      -maxCrossfall,
+      Math.min(maxCrossfall, Number(terrainY) + baseTopBias - centerY)
+    );
+    const leftY = atGrade ? clampCrossfall(sampleTerrainY(leftX, leftZ)) : centerY;
+    const rightY = atGrade ? clampCrossfall(sampleTerrainY(rightX, rightZ)) : centerY;
     leftEdge.push({
       x: leftX,
       y: Number.isFinite(leftY) ? leftY : centerY,
@@ -456,6 +482,18 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
   const p2 = feature.pts[projection.segIndex + 1];
   const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
   const distance = distances[projection.segIndex] + segLen * projection.t;
+  if (
+    feature.structureSemantics?.terrainMode === 'at_grade' &&
+    typeof feature.surfaceTerrainSampler === 'function'
+  ) {
+    const terrainY = Number(feature.surfaceTerrainSampler(projection.x, projection.z));
+    if (Number.isFinite(terrainY)) {
+      const offsets = feature.surfaceOffsets instanceof Float32Array ? feature.surfaceOffsets : null;
+      const structureOffset = offsets ? Number(sampleProfileAtDistance(distances, offsets, distance)) || 0 : 0;
+      const surfaceBias = Number.isFinite(feature.surfaceBias) ? Number(feature.surfaceBias) : 0.08;
+      return terrainY + structureOffset + surfaceBias;
+    }
+  }
   return sampleProfileAtDistance(distances, heights, distance);
 }
 

@@ -1,9 +1,14 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { resolveObservedEarthLocation, haversineKm } from "../earth-location.js?v=2";
-import { getWeatherSnapshotForLocation } from "../weather.js?v=2";
-import { LIVE_EARTH_CATEGORIES, LIVE_EARTH_LAYERS, getLiveEarthLayer } from "./registry.js?v=6";
-import { getSatelliteLookAngles, getSatelliteSnapshot, getSatelliteTrack, refreshSatelliteCatalog } from "./satellites.js?v=4";
-import { buildEarthquakeReplayProfile, refreshEarthquakes } from "./earthquakes.js?v=1";
+import { getWeatherSnapshotForLocation } from "../weather.js?v=4";
+import { getWeatherSampleSnapshots } from "./weather-samples.js?v=2";
+import { aircraftService } from "../geospatial/aircraft.js?v=1";
+import { marineService } from "../geospatial/marine.js?v=1";
+import { streetImageryService } from "../geospatial/street-imagery.js?v=1";
+import { createMarineState, ensureSelectedMarineData } from "./marine-state.js?v=1";
+import { LIVE_EARTH_CATEGORIES, LIVE_EARTH_LAYERS, getLiveEarthLayer } from "./registry.js?v=10";
+import { getSatelliteLookAngles, getSatelliteSnapshot, getSatelliteTrack, refreshSatelliteCatalog } from "./satellites.js?v=6";
+import { buildEarthquakeReplayProfile, refreshEarthquakes } from "./earthquakes.js?v=2";
 import { buildAircraftTrafficSnapshot, buildShipTrafficSnapshot } from "./transport.js?v=3";
 import { updateLocalSatelliteVisual as syncLocalSatelliteVisual } from "./local-satellite.js?v=1";
 import {
@@ -13,7 +18,7 @@ import {
   updateEarthquakeReplay as animateEarthquakeReplay,
   updateLocalEventContext as syncLocalEventContext
 } from "./local-events.js?v=2";
-import { renderGlobeLayers } from "./render-globe.js?v=1";
+import { renderGlobeLayers } from "./render-globe.js?v=5";
 import {
   bindSelectorUi,
   handleGlobePick,
@@ -23,12 +28,13 @@ import {
   setActiveLayer,
   setPanelMode,
   updateSelectorFrame
-} from "./controller-ui.js?v=3";
+} from "./controller-ui.js?v=11";
 
 const SATELLITE_POSITION_REFRESH_MS = 15000;
 const EARTHQUAKE_UI_REFRESH_MS = 5 * 60 * 1000;
 const WEATHER_SAMPLE_REFRESH_MS = 15 * 60 * 1000;
 const TRANSPORT_REFRESH_MS = 4000;
+const AIRCRAFT_REFRESH_MS = 60 * 1000;
 const LOCAL_EVENT_CHECK_MS = 1500;
 const LOCAL_EVENT_RANGE_KM = 120;
 const WEATHER_SAMPLE_LOCATIONS = [
@@ -81,12 +87,13 @@ function buildLiveEarthState() {
     ready: true,
     panelMode: 'explore',
     activeCategoryId: LIVE_EARTH_CATEGORIES[0].id,
-    activeLayerId: 'satellites',
+    activeLayerId: 'overview',
     satelliteFilter: 'all',
     selectedSatelliteId: '',
     selectedEarthquakeId: '',
     selectedWeatherSampleId: '',
     selectionWeather: null,
+    ...createMarineState(),
     weatherSamples: [],
     weatherSamplesLoadedAt: 0,
     warmPromise: null,
@@ -106,6 +113,19 @@ function buildLiveEarthState() {
     aircraftRoutes: [],
     aircraftLoadedAt: 0,
     selectedAircraftId: '',
+    aircraftQueryKey: '',
+    aircraftSourceMode: 'pending',
+    aircraftError: '',
+    streetImageryProviderId: 'panoramax',
+    streetImageryItems: [],
+    streetImageryLoadedAt: 0,
+    streetImageryQueryKey: '',
+    streetImageryLoading: false,
+    streetImageryError: '',
+    streetImageryExternalUrl: '',
+    streetImageryRadiusM: 350,
+    selectedStreetImageId: '',
+    streetImageryRequestToken: 0,
     selectorSatelliteTickAt: 0,
     localEvent: null,
     localEventDismissedId: '',
@@ -147,10 +167,12 @@ function buildLiveEarthModuleContext() {
     colorForWeatherCategory,
     ensureAircraftTrafficData,
     ensureEarthquakeData,
+    ensureMarineData,
     ensureSelectionWeather,
     ensureSatelliteData,
     ensureSatellitePositions,
     ensureShipTrafficData,
+    ensureStreetImagery,
     ensureWeatherSamples,
     filteredSatelliteItems,
     getLiveEarthLayer,
@@ -168,6 +190,7 @@ function buildLiveEarthModuleContext() {
     selectedSatelliteEntry,
     selectedSatellitePosition,
     selectedShip,
+    selectedStreetImage,
     selectorSelection,
     setDetailsHtml,
     stateWaveIntensity,
@@ -250,26 +273,12 @@ async function ensureWeatherSamples(state, force = false) {
   if (!force && state.weatherSamples.length && (now - state.weatherSamplesLoadedAt) < WEATHER_SAMPLE_REFRESH_MS) {
     return state.weatherSamples;
   }
-  const samples = await Promise.all(WEATHER_SAMPLE_LOCATIONS.map(async (sample) => {
-    try {
-      const snapshot = await getWeatherSnapshotForLocation(sample.lat, sample.lon, { force });
-      return {
-        id: sample.id,
-        label: sample.label,
-        lat: sample.lat,
-        lon: sample.lon,
-        snapshot
-      };
-    } catch {
-      return {
-        id: sample.id,
-        label: sample.label,
-        lat: sample.lat,
-        lon: sample.lon,
-        snapshot: null
-      };
-    }
-  }));
+  let samples = [];
+  try {
+    samples = await getWeatherSampleSnapshots(WEATHER_SAMPLE_LOCATIONS, force);
+  } catch {
+    samples = WEATHER_SAMPLE_LOCATIONS.map((sample) => ({ ...sample, snapshot: null }));
+  }
   state.weatherSamples = samples;
   state.weatherSamplesLoadedAt = now;
   if (!state.selectedWeatherSampleId && samples[0]) state.selectedWeatherSampleId = samples[0].id;
@@ -294,12 +303,60 @@ async function ensureSelectionWeather(state, force = false) {
   return state.selectionWeather;
 }
 
+async function ensureMarineData(state, force = false) {
+  return ensureSelectedMarineData({ marineService, selectorSelection }, state, force);
+}
+
+async function ensureStreetImagery(state, force = false) {
+  const selected = selectorSelection(state);
+  if (!Number.isFinite(selected?.lat) || !Number.isFinite(selected?.lon)) {
+    state.streetImageryItems = [];
+    state.streetImageryError = 'Choose a point on the globe before checking street imagery.';
+    return [];
+  }
+  const providerId = state.streetImageryProviderId || 'panoramax';
+  const queryKey = `${providerId}:${selected.lat.toFixed(4)}:${selected.lon.toFixed(4)}`;
+  if (!force && queryKey === state.streetImageryQueryKey && state.streetImageryLoadedAt) return state.streetImageryItems;
+  const token = ++state.streetImageryRequestToken;
+  state.streetImageryLoading = true;
+  state.streetImageryError = '';
+  state.streetImageryExternalUrl = streetImageryService.externalViewerUrl(providerId, selected.lat, selected.lon);
+  try {
+    const result = await streetImageryService.search(providerId, {
+      lat: selected.lat,
+      lon: selected.lon,
+      radiusM: state.streetImageryRadiusM,
+      limit: 8
+    }, { force });
+    if (token !== state.streetImageryRequestToken) return state.streetImageryItems;
+    state.streetImageryItems = result.items;
+    state.streetImageryExternalUrl = result.externalViewerUrl || state.streetImageryExternalUrl;
+    state.streetImageryQueryKey = queryKey;
+    state.streetImageryLoadedAt = Date.now();
+    if (!result.items.some((item) => item.id === state.selectedStreetImageId)) {
+      state.selectedStreetImageId = result.items[0]?.id || '';
+    }
+  } catch (error) {
+    if (token !== state.streetImageryRequestToken) return state.streetImageryItems;
+    state.streetImageryItems = [];
+    state.selectedStreetImageId = '';
+    state.streetImageryQueryKey = queryKey;
+    state.streetImageryLoadedAt = Date.now();
+    state.streetImageryError = error?.message || 'Street imagery is unavailable right now.';
+  } finally {
+    if (token === state.streetImageryRequestToken) state.streetImageryLoading = false;
+  }
+  return state.streetImageryItems;
+}
+
 function warmImplementedLayers(state, force = false) {
   if (state.warmPromise && !force) return state.warmPromise;
   state.warmPromise = Promise.allSettled([
     ensureSatelliteData(state, force).then(() => ensureSatellitePositions(state, force)),
     ensureEarthquakeData(state, force),
-    ensureWeatherSamples(state, force)
+    ensureWeatherSamples(state, force),
+    ensureShipTrafficData(state, force),
+    ensureAircraftTrafficData(state, force)
   ]).then(() => {
     const ctx = buildLiveEarthModuleContext();
     renderGlobeLayers(ctx, state);
@@ -346,6 +403,10 @@ function selectedAircraft(state) {
   return state.aircraftItems.find((entry) => entry.id === state.selectedAircraftId) || null;
 }
 
+function selectedStreetImage(state) {
+  return state.streetImageryItems.find((entry) => entry.id === state.selectedStreetImageId) || state.streetImageryItems[0] || null;
+}
+
 async function ensureShipTrafficData(state, force = false) {
   const now = Date.now();
   if (!force && state.shipItems.length && (now - state.shipsLoadedAt) < TRANSPORT_REFRESH_MS) {
@@ -361,14 +422,53 @@ async function ensureShipTrafficData(state, force = false) {
 
 async function ensureAircraftTrafficData(state, force = false) {
   const now = Date.now();
-  if (!force && state.aircraftItems.length && (now - state.aircraftLoadedAt) < TRANSPORT_REFRESH_MS) {
+  const selection = selectorSelection(state);
+  const lat = Number(selection?.lat);
+  const lon = Number(selection?.lon);
+  const queryKey = Number.isFinite(lat) && Number.isFinite(lon) ? `${lat.toFixed(2)}:${lon.toFixed(2)}` : '';
+  if (!force && state.aircraftItems.length && queryKey === state.aircraftQueryKey && (now - state.aircraftLoadedAt) < AIRCRAFT_REFRESH_MS) {
     return state.aircraftItems;
+  }
+  if (queryKey) {
+    try {
+      const result = await aircraftService.search({ lat, lon, radiusKm: 160, limit: 80 }, { force });
+      if (result.items.length) {
+        state.aircraftRoutes = [];
+        state.aircraftItems = result.items.map((item) => ({
+          ...item,
+          type: 'aircraft',
+          operator: item.originCountry,
+          routeId: '',
+          routeLabel: 'OpenSky observation',
+          routeSummary: 'Current aircraft state vector observed by the OpenSky Network.',
+          region: `${item.distanceKm} km from selected point`,
+          speedKt: item.velocityKt || 0,
+          progressPct: null,
+          meta: `${item.onGround ? 'On ground' : `${Math.round(item.altitudeM || 0).toLocaleString()} m`} • ${item.velocityKt ?? '--'} kt`
+        }));
+        state.aircraftLoadedAt = now;
+        state.aircraftQueryKey = queryKey;
+        state.aircraftSourceMode = 'observed';
+        state.aircraftError = '';
+        if (!state.aircraftItems.some((item) => item.id === state.selectedAircraftId)) {
+          state.selectedAircraftId = state.aircraftItems[0]?.id || '';
+        }
+        return state.aircraftItems;
+      }
+      state.aircraftError = 'No current OpenSky aircraft positions were reported in this area.';
+    } catch (error) {
+      state.aircraftError = error?.message || 'OpenSky aircraft observations are unavailable.';
+    }
   }
   const snapshot = buildAircraftTrafficSnapshot(new Date(now));
   state.aircraftRoutes = snapshot.routes || [];
-  state.aircraftItems = snapshot.items || [];
+  state.aircraftItems = (snapshot.items || []).map((item) => ({ ...item, dataSource: 'reference' }));
   state.aircraftLoadedAt = now;
-  if (!state.selectedAircraftId && state.aircraftItems[0]) state.selectedAircraftId = state.aircraftItems[0].id;
+  state.aircraftQueryKey = queryKey;
+  state.aircraftSourceMode = 'reference';
+  if (!state.aircraftItems.some((item) => item.id === state.selectedAircraftId)) {
+    state.selectedAircraftId = state.aircraftItems[0]?.id || '';
+  }
   return state.aircraftItems;
 }
 
@@ -519,7 +619,7 @@ function initLiveEarth() {
     updateSelectorFrame() {
       updateSelectorFrame(buildLiveEarthModuleContext(), state);
     },
-    openLiveEarth(layerId = 'satellites') {
+    openLiveEarth(layerId = 'overview') {
       if (typeof appCtx.openGlobeSelector === 'function') appCtx.openGlobeSelector();
       setPanelMode(state, 'live-earth');
       void setActiveLayer(buildLiveEarthModuleContext(), state, layerId, false);
@@ -533,11 +633,18 @@ function initLiveEarth() {
         weatherSamples: state.weatherSamples.length,
         ships: state.shipItems.length,
         aircraft: state.aircraftItems.length,
+        aircraftSourceMode: state.aircraftSourceMode,
+        streetImagery: state.streetImageryItems.length,
         localEventId: state.localEvent?.id || '',
         selectedSatelliteId: state.selectedSatelliteId || '',
         selectedEarthquakeId: state.selectedEarthquakeId || '',
         selectedShipId: state.selectedShipId || '',
-        selectedAircraftId: state.selectedAircraftId || ''
+        selectedAircraftId: state.selectedAircraftId || '',
+        aircraftMarkers: state.selector.markerRecords.filter((entry) => entry.type === 'aircraft').map((entry) => ({
+          id: entry.id, lat: entry.lat, lon: entry.lon, altitude: entry.altitude, dataSource: entry.dataSource
+        })),
+        selectedStreetImageId: state.selectedStreetImageId || '',
+        streetImageryProviderId: state.streetImageryProviderId || 'panoramax'
       };
     },
     inspectState() {
@@ -561,7 +668,7 @@ function initLiveEarth() {
 
   bindLocalPanelActions(state);
   appCtx.liveEarth = liveEarth;
-  appCtx.openLiveEarthSelector = (layerId = 'satellites') => liveEarth.openLiveEarth(layerId);
+  appCtx.openLiveEarthSelector = (layerId = 'overview') => liveEarth.openLiveEarth(layerId);
   appCtx.getLiveEarthSummary = () => liveEarth.getSummary();
   appCtx.inspectLiveEarthState = () => liveEarth.inspectState();
   return liveEarth;

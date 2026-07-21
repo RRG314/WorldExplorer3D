@@ -2,12 +2,12 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   classifyWaterSurfaceProfile,
   normalizeLanduseSurfaceType
-} from "../surface-rules.js?v=15";
+} from "../surface-rules.js?v=17";
 import { geometryHasFinitePositions } from "./geometry-batching.js?v=4";
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
-} from "./shortbread-source.js?v=6";
+} from "./shortbread-source.js?v=8";
 
 const WATER_VECTOR_TILE_ZOOM = 13;
 const FEATURE_CLIP_RADIUS_SCALE = 1.75;

@@ -4,7 +4,7 @@ import {
   buildFeatureStations,
   buildFeatureTransitionAnchors,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=13";
+} from "../structure-semantics.js?v=16";
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -214,6 +214,12 @@ function smoothStructureSurfaceProfiles(structureFeatures) {
       smoothed.set(next);
     }
     heights.set(smoothed);
+    const minimumSurfaceY = Number(feature.minimumStructureSurfaceY);
+    if (semantics?.terrainMode === 'elevated' && Number.isFinite(minimumSurfaceY)) {
+      for (let h = 0; h < heights.length; h++) {
+        heights[h] = Math.max(heights[h], minimumSurfaceY);
+      }
+    }
     feature.structureSurfaceMinY = heights.reduce((best, value) => Math.min(best, value), Infinity);
     feature.structureSurfaceMaxY = heights.reduce((best, value) => Math.max(best, value), -Infinity);
   }
@@ -302,7 +308,12 @@ export function refreshStructureAwareFeatureProfiles(options = {}) {
 
   for (let i = 0; i < transportFeatures.length; i++) {
     const feature = transportFeatures[i];
-    if (feature) buildFeatureTransitionAnchors(feature, worldBaseTerrainY);
+    if (!feature) continue;
+    if (feature.structureSemantics?.terrainMode === 'at_grade') {
+      feature.structureTransitionAnchors = [];
+      continue;
+    }
+    buildFeatureTransitionAnchors(feature, worldBaseTerrainY);
   }
 
   const profiledFeatures = [];
@@ -347,7 +358,9 @@ export function syncLinearFeatureOverlayVisibility() {
   for (let i = 0; i < appCtx.linearFeatureMeshes.length; i++) {
     const mesh = appCtx.linearFeatureMeshes[i];
     if (!mesh) continue;
-    const alwaysVisible = mesh.userData?.structureConnector === true;
+    const alwaysVisible =
+      mesh.userData?.structureConnector === true ||
+      mesh.userData?.alwaysMappedPedestrian === true;
     mesh.visible = !mesh.userData?.boatSuppressed && (alwaysVisible || visible);
   }
 }

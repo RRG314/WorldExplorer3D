@@ -78,6 +78,11 @@ export function resetWorldForReload(options = {}) {
 
   disposeSceneMeshes(appCtx.roadMeshes);
   appCtx.clearWorldCollections(['roadMeshes', 'roads']);
+  if (appCtx.car) {
+    appCtx.car.road = null;
+    appCtx.car.onRoad = false;
+    appCtx.car._lastSurfaceY = null;
+  }
 
   if (typeof appCtx.clearStructureVisualMeshes === 'function') {
     appCtx.clearStructureVisualMeshes();

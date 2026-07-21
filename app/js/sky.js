@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=11";
+import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=16";
 import {
   cycleTimeOfDay as cycleSkyTimeOfDay,
   getAstronomicalSkySnapshot,

@@ -1,30 +1,46 @@
-import { LIVE_EARTH_CATEGORIES, getLayersForCategory, getLiveEarthLayer } from "./registry.js?v=6";
-import { CURATED_SATELLITES } from "./satellites.js?v=4";
+import { LIVE_EARTH_CATEGORIES, getLayersForCategory, getLiveEarthLayer } from "./registry.js?v=10";
+import { CURATED_SATELLITES } from "./satellites.js?v=6";
 import { nearestRouteContext } from "./transport.js?v=3";
 import { startEarthquakeReplay as startLocalEarthquakeReplay } from "./local-events.js?v=2";
+import { renderStreetImageryDetails } from "./street-imagery-ui.js?v=1";
+import { renderMarineDetails } from "./marine-ui.js?v=1";
+import { collectLiveEarthProviderHealth } from "./provider-health.js?v=1";
 import {
   renderGlobeLayers,
   renderSatelliteGlobe,
   renderTransportGlobe,
   renderWeatherGlobe
-} from "./render-globe.js?v=1";
+} from "./render-globe.js?v=5";
 
 function selectedLayerCount(ctx, state, layerId) {
+  if (layerId === 'overview') return 6;
   if (layerId === 'satellites') return ctx.filteredSatelliteItems(state).length;
   if (layerId === 'earthquakes') return state.earthquakeItems.length;
   if (layerId === 'weather') return state.weatherSamples.length;
   if (layerId === 'storms') return ctx.stormSamples(state).length;
-  if (layerId === 'ocean-state') return ctx.oceanSamples(state).length;
+  if (layerId === 'ocean-state') {
+    const snapshot = state.marineSnapshot;
+    return Number(snapshot?.model?.hasGuidance === true) + Number(Boolean(snapshot?.observation)) + Number(Boolean(snapshot?.predictions?.length));
+  }
   if (layerId === 'ships') return state.shipItems.length;
   if (layerId === 'aircraft') return state.aircraftItems.length;
+  if (layerId === 'street-imagery') return state.streetImageryItems.length;
   return 0;
 }
 
 function layerCountLabel(ctx, state, layer) {
   const count = selectedLayerCount(ctx, state, layer.id);
-  if (layer.id === 'ships' || layer.id === 'aircraft') return `${count} modeled`;
-  if (layer.id === 'storms' || layer.id === 'ocean-state') return `${count} derived`;
-  return `${count} live`;
+  if (layer.id === 'overview') return `${count} systems`;
+  if (layer.id === 'aircraft') return `${count} ${state.aircraftSourceMode === 'observed' ? 'observed' : 'reference'}`;
+  if (layer.id === 'ships') return `${count} reference`;
+  if (layer.id === 'ocean-state') return state.marineLoading ? 'loading' : `${count} ${count === 1 ? 'source' : 'sources'}`;
+  if (layer.id === 'storms') return `${count} derived`;
+  if (layer.id === 'satellites') {
+    const observed = state.satelliteItems.filter((entry) => entry.dataSource === 'live').length;
+    return observed === count ? `${count} observed` : `${observed}/${count} observed`;
+  }
+  if (layer.status === 'current') return `${count} current`;
+  return `${count} observed`;
 }
 
 function formatWeatherLine(snapshot) {
@@ -54,6 +70,7 @@ function focusTransportSelection(state, item) {
     name: item.routeLabel || item.label,
     focus: true
   });
+  state.selector.api?.setCameraDistance?.(item.dataSource === 'opensky' ? 1.16 : 1.9);
 }
 
 function renderTransportDetails(ctx, state, layerId) {
@@ -65,23 +82,63 @@ function renderTransportDetails(ctx, state, layerId) {
   const relatedLayer = getLiveEarthLayer(isShipLayer ? 'ocean-state' : 'weather');
   const list = items.map((item) => {
     const active = item.id === selected?.id ? ' active' : '';
+    const detail = !isShipLayer && item.dataSource === 'opensky'
+      ? `${item.meta || ''} • observed ${item.observedAt ? new Date(item.observedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'recently'}`
+      : `${item.meta || ''} • ${item.progressPct}% along route`;
     return `<button class="globe-selector-live-list-item${active}" type="button" data-live-earth-action="${isShipLayer ? 'select-ship' : 'select-aircraft'}" data-id="${ctx.escapeHtml(item.id)}">
       <span>${ctx.escapeHtml(item.label)} • ${ctx.escapeHtml(item.routeLabel)}</span>
-      <small>${ctx.escapeHtml(item.meta || '')} • ${ctx.escapeHtml(`${item.progressPct}% along route`)}</small>
+      <small>${ctx.escapeHtml(detail)}</small>
     </button>`;
   }).join('');
+  const observedAircraft = !isShipLayer && state.aircraftSourceMode === 'observed';
+  const sourceSummary = observedAircraft
+    ? `${items.length} current OpenSky state vectors near the selected location.`
+    : `${items.length} reference markers across ${routes.length} major ${isShipLayer ? 'shipping corridors' : 'air corridors'}.`;
+  const sourceCaveat = observedAircraft
+    ? 'Observed ADS-B and Mode S positions. Callsigns, altitude, and velocity can be unavailable when not reported.'
+    : (isShipLayer ? 'Reference layer only. Live vessel identity and position require a licensed AIS provider.' : `${state.aircraftError || 'OpenSky is unavailable in this area.'} Showing labeled reference routes.`);
   ctx.setDetailsHtml(state, `
     <div class="globe-selector-live-detail-card">
       <div class="globe-selector-live-detail-heading">${ctx.escapeHtml(selected?.label || (isShipLayer ? 'Select a ship corridor' : 'Select an airway flight'))}</div>
       <div class="globe-selector-live-detail-copy">${ctx.escapeHtml(selected?.routeSummary || getLiveEarthLayer(layerId)?.summary || '')}</div>
-      <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${items.length} modeled markers across ${routes.length} major ${isShipLayer ? 'shipping corridors' : 'air corridors'}.`)}</div>
+      <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(sourceSummary)}</div>
+      <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(sourceCaveat)}</div>
       ${selected ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${selected.operator || ''} • ${selected.speedKt} kt • heading ${Math.round(selected.headingDeg || 0)}°`)}</div>` : ''}
       ${selected ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${selected.routeLabel} • ${selected.region}`)}</div>` : ''}
+      ${selected && !isShipLayer ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`${Number(selected.lat).toFixed(4)}°, ${Number(selected.lon).toFixed(4)}° • reported aircraft position`)}</div>` : ''}
       ${localContext ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Closest selected-world corridor: ${localContext.routeLabel} • ${Math.round(localContext.distanceKm)} km away`)}</div>` : ''}
       <div class="globe-selector-live-detail-actions">
         <button class="globe-selector-live-action-btn" type="button" data-live-earth-action="focus-transport"${selected ? '' : ' disabled'}>Focus Marker</button>
         <button class="globe-selector-live-action-btn secondary" type="button" data-live-earth-action="open-related-layer" data-id="${ctx.escapeHtml(relatedLayer?.id || '')}">${ctx.escapeHtml(`Open ${relatedLayer?.label || 'Related Layer'}`)}</button>
       </div>
+      <div class="globe-selector-live-list">${list}</div>
+    </div>
+  `);
+}
+
+function renderOverviewDetails(ctx, state) {
+  const observedSatellites = state.satelliteItems.filter((entry) => entry.dataSource === 'live').length;
+  const health = collectLiveEarthProviderHealth(state);
+  const sourceRows = [
+    { id: 'satellites', label: 'Satellites', value: `${observedSatellites}/${state.satelliteItems.length} observed`, source: 'CelesTrak GP orbital elements', health: health.satellites.label },
+    { id: 'earthquakes', label: 'Earthquakes', value: `${state.earthquakeItems.length} observed`, source: 'USGS GeoJSON feed', health: health.earthquakes.label },
+    { id: 'weather', label: 'Weather', value: `${state.weatherSamples.length} current`, source: 'Open-Meteo current conditions', health: health.weather.label },
+    { id: 'street-imagery', label: 'Street imagery', value: 'selected location', source: 'Panoramax and KartaView community observations', health: health.streetImagery.label },
+    { id: 'aircraft', label: 'Aircraft', value: `${state.aircraftItems.length} ${state.aircraftSourceMode === 'observed' ? 'observed' : 'reference'}`, source: state.aircraftSourceMode === 'observed' ? 'OpenSky current state vectors' : 'Modeled route fallback', health: state.aircraftSourceMode === 'observed' ? health.aircraft.label : 'Fallback active · OpenSky observations unavailable' },
+    { id: 'ships', label: 'Marine traffic', value: `${state.shipItems.length} reference`, source: 'Major corridor context, not live AIS', health: 'Reference only · AIS provider not configured' }
+  ];
+  const list = sourceRows.map((entry) => `
+    <button class="globe-selector-live-list-item" type="button" data-live-earth-action="layer" data-id="${entry.id}">
+      <span>${ctx.escapeHtml(entry.label)} · ${ctx.escapeHtml(entry.value)}</span>
+      <small>${ctx.escapeHtml(entry.source)}</small>
+      <small>${ctx.escapeHtml(entry.health)}</small>
+    </button>
+  `).join('');
+  ctx.setDetailsHtml(state, `
+    <div class="globe-selector-live-detail-card">
+      <div class="globe-selector-live-detail-heading">Operational Earth Overview</div>
+      <div class="globe-selector-live-detail-copy">Observed science feeds and clearly labeled transport reference layers are visible together. Open a layer for details and actions.</div>
+      <div class="globe-selector-live-detail-meta">Observed, derived, and reference data are never presented as the same thing.</div>
       <div class="globe-selector-live-list">${list}</div>
     </div>
   `);
@@ -93,6 +150,16 @@ export function renderLiveEarthDetails(ctx, state) {
   const layer = getLiveEarthLayer(state.activeLayerId);
   if (!layer) {
     ctx.setDetailsHtml(state, '<div class="globe-selector-live-loading">Live Earth data is unavailable. Choose another category or refresh.</div>');
+    return;
+  }
+
+  if (layer.id === 'overview') {
+    renderOverviewDetails(ctx, state);
+    return;
+  }
+
+  if (layer.id === 'street-imagery') {
+    renderStreetImageryDetails(ctx, state);
     return;
   }
 
@@ -120,6 +187,7 @@ export function renderLiveEarthDetails(ctx, state) {
         <div class="globe-selector-live-detail-heading">${ctx.escapeHtml(selectedEntry?.label || 'Select a satellite')}</div>
         <div class="globe-selector-live-detail-copy">${ctx.escapeHtml(selectedEntry?.description || layer.summary)}</div>
         ${selectedEntry && selected ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(selectedEntry.operator || '')} • ${ctx.escapeHtml(formatSatelliteVisibility(state, selected))}</div>` : ''}
+        ${selectedEntry ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(selectedEntry.dataSource === 'live' ? 'Observed source: CelesTrak GP orbital elements' : 'Calculated fallback orbit: live orbital elements unavailable')}</div>` : ''}
         ${selectedEntry && selected ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Subpoint ${selectedSubpoint} • ${Math.round(selected.altitudeKm)} km altitude`)}</div>` : ''}
         ${selectedEntry && selected ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml((state.localSatelliteLook?.elevationDeg >= 0 ? 'Visible in local sky now' : 'Not above your current horizon') || '')}</div>` : ''}
         <div class="globe-selector-live-detail-actions">
@@ -210,27 +278,7 @@ export function renderLiveEarthDetails(ctx, state) {
   }
 
   if (layer.id === 'ocean-state') {
-    const samples = ctx.oceanSamples(state);
-    const selected = samples.find((entry) => entry.id === state.selectedWeatherSampleId) || samples[0] || null;
-    const localWorld = typeof ctx.appCtx.getWeatherSnapshot === 'function' ? ctx.appCtx.getWeatherSnapshot() : null;
-    const localSeaState = String(ctx.appCtx.boatMode?.seaState || 'moderate').replace(/_/g, ' ');
-    const localIntensity = Math.round(ctx.stateWaveIntensity() * 100);
-    const sampleList = samples.map((sample) => {
-      const active = sample.id === selected?.id ? ' active' : '';
-      return `<button class="globe-selector-live-list-item${active}" type="button" data-live-earth-action="select-weather" data-id="${sample.id}">
-        <span>${ctx.escapeHtml(sample.label)} • ${ctx.escapeHtml(sample.oceanState?.label || 'Moderate')}</span>
-        <small>${ctx.escapeHtml(`Wind ${Math.round(sample.snapshot?.windMph || 0)} mph • ${sample.snapshot?.conditionLabel || 'Marine weather'}`)}</small>
-      </button>`;
-    }).join('');
-    ctx.setDetailsHtml(state, `
-      <div class="globe-selector-live-detail-card">
-        <div class="globe-selector-live-detail-heading">${ctx.escapeHtml(selected?.label || 'Ocean State')}</div>
-        <div class="globe-selector-live-detail-copy">${ctx.escapeHtml(selected?.oceanState?.summary || layer.summary)}</div>
-        <div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Current 3D world sea state: ${localSeaState} • wave intensity ${localIntensity}%`)}</div>
-        ${localWorld ? `<div class="globe-selector-live-detail-meta">${ctx.escapeHtml(`Local wind ${Math.round(localWorld.windMph || 0)} mph • ${localWorld.conditionLabel || 'Weather'}`)}</div>` : ''}
-        <div class="globe-selector-live-list">${sampleList || '<div class="globe-selector-live-loading">No marine sample points are available right now.</div>'}</div>
-      </div>
-    `);
+    renderMarineDetails(ctx, state);
     return;
   }
 
@@ -247,14 +295,32 @@ export function renderLiveEarthStatus(ctx, state) {
     return false;
   }
   const layer = getLiveEarthLayer(state.activeLayerId);
-  const lastUpdate = layer?.id === 'satellites' ? state.satellitesLoadedAt :
+  const lastUpdate = layer?.id === 'overview' ? Math.max(state.satellitesLoadedAt, state.earthquakesLoadedAt, state.weatherSamplesLoadedAt, state.shipsLoadedAt, state.aircraftLoadedAt) :
+    layer?.id === 'satellites' ? state.satellitesLoadedAt :
     layer?.id === 'earthquakes' ? state.earthquakesLoadedAt :
     layer?.id === 'ships' ? state.shipsLoadedAt :
     layer?.id === 'aircraft' ? state.aircraftLoadedAt :
-    ['weather', 'storms', 'ocean-state'].includes(layer?.id) ? state.weatherSamplesLoadedAt :
+    layer?.id === 'street-imagery' ? state.streetImageryLoadedAt :
+    layer?.id === 'ocean-state' ? Math.max(state.weatherSamplesLoadedAt, state.marineLoadedAt) :
+    ['weather', 'storms'].includes(layer?.id) ? state.weatherSamplesLoadedAt :
     0;
   const stamp = lastUpdate ? new Date(lastUpdate).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : 'Pending';
-  ui.status.textContent = `Live feed updates cached for stability. Last refresh: ${stamp}`;
+  const qualifier = layer?.id === 'aircraft' && state.aircraftSourceMode === 'reference'
+    ? 'Reference fallback'
+    : layer?.id === 'aircraft'
+      ? 'Observed OpenSky feed'
+      : layer?.id === 'overview'
+        ? 'Mixed-source overview'
+      : layer?.status === 'mixed'
+        ? 'Modeled, observed, and predicted data'
+      : layer?.status === 'reference'
+    ? 'Reference layer'
+    : layer?.status === 'derived'
+      ? 'Derived layer'
+      : layer?.status === 'current'
+          ? 'Current conditions'
+          : 'Observed feed';
+  ui.status.textContent = `${qualifier}. Cached for stability. Last refresh: ${stamp}`;
   return true;
 }
 
@@ -306,7 +372,9 @@ export function setPanelMode(state, mode = 'explore') {
 export async function refreshActiveLayer(ctx, state, force = false) {
   try {
     const layerId = state.activeLayerId;
-    if (layerId === 'satellites') {
+    if (layerId === 'overview') {
+      await ctx.warmImplementedLayers(state, force);
+    } else if (layerId === 'satellites') {
       await ctx.ensureSatelliteData(state, force);
       await ctx.ensureSatellitePositions(state, force);
       await ctx.refreshSatelliteTrack(state, force);
@@ -316,7 +384,15 @@ export async function refreshActiveLayer(ctx, state, force = false) {
       await ctx.ensureShipTrafficData(state, force);
     } else if (layerId === 'aircraft') {
       await ctx.ensureAircraftTrafficData(state, force);
-    } else if (layerId === 'weather' || layerId === 'storms' || layerId === 'ocean-state') {
+    } else if (layerId === 'street-imagery') {
+      const pending = ctx.ensureStreetImagery(state, force);
+      renderLiveEarthUi(ctx, state);
+      await pending;
+    } else if (layerId === 'ocean-state') {
+      const pending = ctx.ensureMarineData(state, force);
+      renderLiveEarthUi(ctx, state);
+      await Promise.all([pending, ctx.ensureWeatherSamples(state, force), ctx.ensureSelectionWeather(state, force)]);
+    } else if (layerId === 'weather' || layerId === 'storms') {
       await ctx.ensureWeatherSamples(state, force);
       await ctx.ensureSelectionWeather(state, force);
     }
@@ -343,6 +419,7 @@ export async function setActiveLayer(ctx, state, layerId, force = false) {
   if (layer.id === 'aircraft' && !state.selectedAircraftId) {
     state.selectedAircraftId = state.aircraftItems[0]?.id || '';
   }
+  if (layer.id === 'aircraft') state.selector.api?.setCameraDistance?.(1.18);
   await refreshActiveLayer(ctx, state, force);
 }
 
@@ -394,6 +471,27 @@ export async function handleUiAction(ctx, state, action, value) {
     renderLiveEarthUi(ctx, state);
     return;
   }
+  if (action === 'street-provider') {
+    state.streetImageryProviderId = value === 'kartaview' ? 'kartaview' : 'panoramax';
+    state.streetImageryQueryKey = '';
+    const pending = ctx.ensureStreetImagery(state, false);
+    renderLiveEarthUi(ctx, state);
+    await pending;
+    renderLiveEarthUi(ctx, state);
+    return;
+  }
+  if (action === 'select-street-image') {
+    state.selectedStreetImageId = value;
+    renderLiveEarthUi(ctx, state);
+    return;
+  }
+  if (action === 'focus-street-image') {
+    const image = ctx.selectedStreetImage(state);
+    if (image && typeof state.selector.api?.setSelection === 'function') {
+      state.selector.api.setSelection(image.lat, image.lon, { name: 'Street imagery', focus: true });
+    }
+    return;
+  }
   if (action === 'open-related-layer') {
     await setActiveLayer(ctx, state, value);
     return;
@@ -424,6 +522,13 @@ export function syncSelectionWeather(ctx, state, force = false) {
     renderWeatherGlobe(ctx, state);
     renderLiveEarthUi(ctx, state);
   });
+}
+
+function syncSelectionMarine(ctx, state, force = false) {
+  state.marineQueryKey = '';
+  const pending = ctx.ensureMarineData(state, force);
+  renderLiveEarthUi(ctx, state);
+  void pending.then(() => renderLiveEarthUi(ctx, state));
 }
 
 export function bindSelectorUi(ctx, state) {
@@ -491,8 +596,24 @@ export function handleGlobePick(ctx, state, raycaster) {
 }
 
 export function onSelectorSelectionChanged(ctx, state) {
+  if (state.panelMode === 'live-earth' && state.activeLayerId === 'street-imagery') {
+    state.streetImageryQueryKey = '';
+    const pending = ctx.ensureStreetImagery(state, true);
+    renderLiveEarthUi(ctx, state);
+    void pending.then(() => renderLiveEarthUi(ctx, state));
+    return;
+  }
   if (state.panelMode === 'live-earth' && ['weather', 'storms', 'ocean-state'].includes(state.activeLayerId)) {
+    if (state.activeLayerId === 'ocean-state') syncSelectionMarine(ctx, state, true);
     syncSelectionWeather(ctx, state, true);
+    return;
+  }
+  if (state.panelMode === 'live-earth' && state.activeLayerId === 'aircraft') {
+    state.aircraftQueryKey = '';
+    void ctx.ensureAircraftTrafficData(state, true).then(() => {
+      renderTransportGlobe(ctx, state);
+      renderLiveEarthUi(ctx, state);
+    });
     return;
   }
   if (state.panelMode === 'live-earth' && ['ships', 'aircraft'].includes(state.activeLayerId)) {
@@ -502,6 +623,19 @@ export function onSelectorSelectionChanged(ctx, state) {
 
 export function updateSelectorFrame(ctx, state) {
   if (!state.selector.api?.isOpen?.() || state.panelMode !== 'live-earth') return;
+  if (state.activeLayerId === 'overview') {
+    if ((Date.now() - state.selectorSatelliteTickAt) < 1500) return;
+    state.selectorSatelliteTickAt = Date.now();
+    void Promise.all([
+      ctx.ensureSatellitePositions(state, false),
+      ctx.ensureShipTrafficData(state, true),
+      ctx.ensureAircraftTrafficData(state, false)
+    ]).then(() => {
+      renderGlobeLayers(ctx, state);
+      renderLiveEarthStatus(ctx, state);
+    });
+    return;
+  }
   if (state.activeLayerId === 'satellites') {
     if ((Date.now() - state.selectorSatelliteTickAt) < 1500) return;
     state.selectorSatelliteTickAt = Date.now();
@@ -519,8 +653,8 @@ export function updateSelectorFrame(ctx, state) {
     return;
   }
   if (state.activeLayerId === 'aircraft') {
-    if ((Date.now() - state.aircraftLoadedAt) < 1400) return;
-    void ctx.ensureAircraftTrafficData(state, true).then(() => {
+    if ((Date.now() - state.aircraftLoadedAt) < 60000) return;
+    void ctx.ensureAircraftTrafficData(state, false).then(() => {
       renderTransportGlobe(ctx, state);
       renderLiveEarthStatus(ctx, state);
     });

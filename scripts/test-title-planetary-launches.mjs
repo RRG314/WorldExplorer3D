@@ -8,9 +8,9 @@ const host = '127.0.0.1';
 const externalBaseUrl = String(process.env.TEST_BASE_URL || '').replace(/\/$/, '');
 const outputDir = path.join(rootDir, 'output', 'playwright', 'title-planetary-launches');
 const scenarioCatalog = [
-  { mode: 'moon', toggle: '#moonLaunchToggle', env: 'MOON', destination: '' },
-  { mode: 'space', toggle: '#spaceLaunchToggle', env: 'SPACE_FLIGHT', destination: 'moon' },
-  { mode: 'mars', toggle: '#marsLaunchToggle', env: 'MARS', destination: '' }
+  { mode: 'moon', shortcut: '#globeSelectorMoonBtn', env: 'MOON', destination: '' },
+  { mode: 'space', shortcut: '#globeSelectorSpaceBtn', env: 'SPACE_FLIGHT', destination: 'moon' },
+  { mode: 'mars', shortcut: '#globeSelectorMarsBtn', env: 'MARS', destination: '' }
 ];
 const requestedScenario = String(process.env.TEST_SCENARIO || '').trim().toLowerCase();
 const scenarios = requestedScenario
@@ -179,9 +179,12 @@ async function waitForEarthVisual(page) {
 
 async function openMainMenu(page) {
   await page.evaluate(() => document.getElementById('mainMenuBtn')?.click());
-  await page.waitForFunction(() => !document.getElementById('titleScreen')?.classList.contains('hidden'), null, {
-    timeout: 30000
-  });
+  await page.locator('#globeSelectorScreen.show').waitFor({ state: 'visible', timeout: 30000 });
+}
+
+async function launchFromHub(page, selector) {
+  await page.locator('#globeSelectorScreen.show').waitFor({ state: 'visible', timeout: 30000 });
+  await page.click(selector);
 }
 
 async function runScenario(browser, baseUrl, scenario) {
@@ -198,15 +201,14 @@ async function runScenario(browser, baseUrl, scenario) {
 
   try {
     await page.goto(`${baseUrl}/app/?title-launch=${scenario.mode}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
-    await page.waitForSelector('#startBtn', { state: 'visible', timeout: 90000 });
     await waitForRuntime(page);
+    await page.locator('#globeSelectorScreen.show').waitFor({ state: 'visible', timeout: 90000 });
     await instrumentRoadLoads(page);
     await page.evaluate(() => {
       const panel = document.getElementById('proAccessPanel');
       if (panel) panel.hidden = true;
     });
-    await page.click(scenario.toggle);
-    await page.click('#startBtn');
+    await launchFromHub(page, scenario.shortcut);
     await waitForExpectedState(page, scenario);
     const state = await requireStableExpectedState(page, scenario);
     await settleVisualFrame(page);
@@ -252,8 +254,7 @@ async function runScenario(browser, baseUrl, scenario) {
       const titleAfterEarth = await readState(page);
       assert(titleAfterEarth.env === 'EARTH', 'Main Menu did not normalize the returned Earth environment');
       assert(!titleAfterEarth.spaceFlightActive, 'Main Menu retained an active flight before Mars launch');
-      await page.click('#marsLaunchToggle');
-      await page.click('#startBtn');
+      await launchFromHub(page, '#globeSelectorMarsBtn');
       const marsScenario = scenarioCatalog.find((entry) => entry.mode === 'mars');
       await waitForExpectedState(page, marsScenario);
       const marsAfterMoon = await requireStableExpectedState(page, marsScenario);
@@ -265,8 +266,7 @@ async function runScenario(browser, baseUrl, scenario) {
       assert(mainFrameNavigations === 1, 'Mars launch after Moon return reloaded the page');
 
       await openMainMenu(page);
-      await page.click('#spaceLaunchToggle');
-      await page.click('#startBtn');
+      await launchFromHub(page, '#globeSelectorSpaceBtn');
       const spaceScenario = scenarioCatalog.find((entry) => entry.mode === 'space');
       await waitForExpectedState(page, spaceScenario);
       const spaceAfterMars = await requireStableExpectedState(page, spaceScenario);
@@ -280,8 +280,7 @@ async function runScenario(browser, baseUrl, scenario) {
       assert(mainFrameNavigations === 1, 'Space relaunch after Mars reloaded the page');
 
       await openMainMenu(page);
-      await page.click('#spaceLaunchToggle');
-      await page.click('#startBtn');
+      await launchFromHub(page, '#globeSelectorSpaceBtn');
       await waitForExpectedState(page, spaceScenario);
       const repeatedSpace = await requireStableExpectedState(page, spaceScenario);
       assertCompleteSpaceCatalog(repeatedSpace, 'Repeated Space launch');
@@ -306,11 +305,11 @@ async function runScenario(browser, baseUrl, scenario) {
       });
       assert(staleLandingStarted, 'Could not start the stale-landing cancellation regression scenario');
       await page.click('#mainMenuBtn');
+      await page.locator('#globeSelectorScreen.show').waitFor({ state: 'visible', timeout: 30000 });
       const titleAfterCancelledLanding = await readState(page);
       assert(titleAfterCancelledLanding.env === 'EARTH', 'Main Menu left the cancelled flight environment active');
       assert(!titleAfterCancelledLanding.spaceFlightActive, 'Main Menu retained the cancelled flight runtime');
-      await page.click('#marsLaunchToggle');
-      await page.click('#startBtn');
+      await launchFromHub(page, '#globeSelectorMarsBtn');
       const marsScenario = scenarioCatalog.find((entry) => entry.mode === 'mars');
       await waitForExpectedState(page, marsScenario);
       const marsAfterCancelledLanding = await requireStableExpectedState(page, marsScenario, 9500);
@@ -335,11 +334,8 @@ async function runScenario(browser, baseUrl, scenario) {
       });
       await page.waitForTimeout(100);
       await page.evaluate(() => document.getElementById('mainMenuBtn')?.click());
-      await page.waitForFunction(() => !document.getElementById('titleScreen')?.classList.contains('hidden'), null, {
-        timeout: 30000
-      });
-      await page.click('#marsLaunchToggle');
-      await page.click('#startBtn');
+      await page.locator('#globeSelectorScreen.show').waitFor({ state: 'visible', timeout: 30000 });
+      await launchFromHub(page, '#globeSelectorMarsBtn');
       await waitForExpectedState(page, scenario);
       const marsAfterCancelledReturn = await requireStableExpectedState(page, scenario, 5000);
       assertMarsSceneOwned(marsAfterCancelledReturn, 'Mars relaunch after a cancelled return');

@@ -270,7 +270,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       featureRadiusScale: clampNumber(1.0 * radiusScale, 0.90, 1.02, 1),
       poiRadiusScale: clampNumber(1.0 * radiusScale, 0.88, 1.02, 1),
       maxRoadWays: scaledInt(20000, scale, 3200),
-      maxBuildingWays: scaledInt(50000, scale, 7000),
+      maxBuildingWays: scaledInt(26000, scale, 7000),
       maxLanduseWays: scaledInt(15000, scale, 2200),
       maxPoiNodes: scaledInt(8000, scale, 1200),
       tileBudgetCfg: {

@@ -1,9 +1,10 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=57";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
-import { createGlobeSelector } from "./globe-selector.js?v=64";
+import { createGlobeSelector } from "./globe-selector.js?v=69";
 import { readSharedExperienceParams } from "./share-links.js?v=61";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
+import { setupGlobeHub } from './title-screen/globe-hub.js?v=1';
 
 function initTitleScreenUi({
   lastLocationStorageKey,
@@ -381,6 +382,18 @@ function initTitleScreenUi({
     }
   });
 
+  const { closePanel: closeGlobeHubPanel } = setupGlobeHub({
+    globeSelector,
+    onEarthMode: () => setTitleLocationMode('custom'),
+    onLaunchMode: (mode) => {
+      setLaunchMode(mode);
+      void appCtx.triggerTitleStart({ bypassCustomGate: true }).catch((error) => {
+        console.error(`[title] ${mode} launch failed:`, error);
+      });
+    },
+    primeMultiplayerUi
+  });
+
   appCtx.globeSelector = globeSelector;
   appCtx.openGlobeSelector = () => {
     setTitleLocationMode('custom');
@@ -408,9 +421,18 @@ function initTitleScreenUi({
     if (appCtx.selLoc === 'custom') {
       setTitleLocationMode('custom');
       globeSelector.open();
+      closeGlobeHubPanel();
       return;
     }
-    globeSelector.close();
+    const preset = appCtx.LOCS?.[element.dataset.loc];
+    if (Number.isFinite(Number(preset?.lat)) && Number.isFinite(Number(preset?.lon))) {
+      globeSelector.applySelectionAndResolve(Number(preset.lat), Number(preset.lon), {
+        name: String(preset.name || element.querySelector('.loc-name')?.textContent || element.dataset.loc),
+        focus: true,
+        zoomDistance: 2.05
+      });
+    }
+    closeGlobeHubPanel();
     customPanel?.classList.remove('show');
     setLaunchMode('earth');
   }));
@@ -648,6 +670,10 @@ function initTitleScreenUi({
     const runtimeReady = appCtx.runtimeReady === true;
     titleStartButton.disabled = !runtimeReady;
     titleStartButton.setAttribute('aria-busy', runtimeReady ? 'false' : 'true');
+  }
+
+  if (!sharedExperienceParams && !appCtx.gameStarted) {
+    window.requestAnimationFrame(() => globeSelector.open());
   }
 
   return {

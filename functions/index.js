@@ -12,6 +12,7 @@ const {
   sanitizeUsername
 } = require('./creator-profile');
 const { buildOverlayExports } = require('./overlay');
+const { buildGeospatialExports } = require('./geospatial');
 
 if (!admin.apps.length) {
   admin.initializeApp();
@@ -604,7 +605,7 @@ function setCors(req, res) {
   res.set('Access-Control-Allow-Origin', allowOrigin);
   res.set('Vary', 'Origin');
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
-  res.set('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 
   if (req.method === 'OPTIONS') {
     res.status(204).send('');
@@ -1869,4 +1870,9 @@ Object.assign(exports, buildAdminDashboardExports({
   contributionNotificationConfig,
   contributionNotificationEnabled,
   logAdminActivity
+}));
+
+Object.assign(exports, buildGeospatialExports({
+  functions,
+  setCors
 }));

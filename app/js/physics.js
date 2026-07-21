@@ -1,10 +1,10 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "./structure-semantics.js?v=13";
+import { isRoadSurfaceReachable } from "./structure-semantics.js?v=16";
 import { updateDrone } from "./physics/drone-flight.js?v=4";
 import { updatePlane } from "./plane-mode.js?v=7";
 import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=2";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=1";
-import { updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=1";
+import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=2";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=1";
 // RDT-based adaptive throttling state
 // At high complexity, skip findNearestRoad on some frames (reuse cached result)
@@ -23,9 +23,7 @@ let _physRaycaster = null;
 const _physRayStart = typeof THREE !== 'undefined' ? new THREE.Vector3() : null;
 const _physRayDir = typeof THREE !== 'undefined' ? new THREE.Vector3(0, -1, 0) : null;
 
-function isPlanetarySurface() {
-  return !!(appCtx.onMoon || appCtx.onMars);
-}
+function isPlanetarySurface() { return !!(appCtx.onMoon || appCtx.onMars); }
 
 function getPlanetarySurfaceMesh() {
   if (appCtx.onMars && appCtx.marsSurface) return appCtx.marsSurface;
@@ -684,6 +682,7 @@ Object.assign(appCtx, {
   _physRayStart,
   checkBuildingCollision,
   getNearestRoadThrottled,
+  getEarthTransportControllerSnapshot: () => getEarthTransportControllerSnapshot(appCtx, { isPlanetarySurface, updateDrone, updatePlane }),
   invalidateRoadCache,
   update,
   updateDrone

@@ -44,7 +44,7 @@ function setUniverseSkyFrame(state, entity, visible) {
   if (!state) return;
   state.currentEntity = entity || null;
   state.group.visible = Boolean(visible);
-  rebuildGaiaGeometry(state);
+  if (state.group.visible) rebuildGaiaGeometry(state);
 }
 
 function updateUniverseSky(state, rocket) {

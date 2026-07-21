@@ -150,6 +150,7 @@ function isInsideWaterArea(x, z) {
 }
 
 function isVegetationPlacementBlocked(x, z, options = {}) {
+  if (Math.hypot(x, z) < 18) return true;
   const roadPadding = Number.isFinite(options.roadPadding) ? options.roadPadding : 4.5;
   const buildingPadding = Number.isFinite(options.buildingPadding) ? options.buildingPadding : 1.8;
   const terrainY = typeof appCtx.baseTerrainHeightAt === 'function' ?
@@ -186,6 +187,17 @@ function isVegetationPlacementBlocked(x, z, options = {}) {
 
   if (isInsideWaterArea(x, z)) return true;
   return false;
+}
+
+function mappedLanduseAt(x, z) {
+  const landuses = Array.isArray(appCtx.landuses) ? appCtx.landuses : [];
+  for (let i = 0; i < landuses.length; i++) {
+    const landuse = landuses[i];
+    const bounds = landuse?.bounds;
+    if (!bounds || x < bounds.minX || x > bounds.maxX || z < bounds.minZ || z > bounds.maxZ) continue;
+    if (Array.isArray(landuse.pts) && runtime.pointInPolygon(x, z, landuse.pts)) return landuse;
+  }
+  return null;
 }
 
 export function collectWorldVegetationPlacements() {
@@ -312,6 +324,40 @@ export function collectWorldVegetationPlacements() {
     }
   }
 
+  const terrainMeshes = (appCtx.terrainGroup?.children || []).filter(
+    (mesh) => mesh?.userData?.worldCoverResult?.vegetationSamples?.length
+  );
+  for (let tileIndex = 0; tileIndex < terrainMeshes.length && placements.length < maxTrees; tileIndex++) {
+    const mesh = terrainMeshes[tileIndex];
+    const bounds = mesh.userData?.terrainTile?.bounds;
+    const samples = mesh.userData.worldCoverResult.vegetationSamples;
+    if (!bounds || !Array.isArray(samples)) continue;
+    for (let sampleIndex = 0; sampleIndex < samples.length && placements.length < maxTrees; sampleIndex++) {
+      const sample = samples[sampleIndex];
+      const lat = bounds.latN - (bounds.latN - bounds.latS) * Number(sample.v || 0);
+      const lon = bounds.lonW + (bounds.lonE - bounds.lonW) * Number(sample.u || 0);
+      const point = appCtx.geoToWorld(lat, lon);
+      if (!Number.isFinite(point?.x) || !Number.isFinite(point?.z)) continue;
+      if (mappedLanduseAt(point.x, point.z)) continue;
+      const seed = vegetationSeed(
+        (appCtx.rdtSeed ^ Math.floor((lat + 90) * 10000) ^ Math.floor((lon + 180) * 10000)) >>> 0
+      );
+      const kind = String(sample.kind || 'tree');
+      const isShrub = kind === 'shrub' || kind === 'wetland';
+      pushPlacement({
+        x: point.x,
+        z: point.z,
+        scale: isShrub ? 0.42 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * 0.35 : 0.78 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * 0.62,
+        canopyStretch: isShrub ? 0.72 : 0.9 + appCtx.rand01FromInt(seed ^ 0x9e3779b9) * 0.28,
+        rotation: appCtx.rand01FromInt(seed ^ 0x85ebca6b) * Math.PI * 2,
+        color: isShrub ? 0x55723c : kind === 'mangrove' ? 0x285f3b : 0x285f2d,
+        source: 'worldcover',
+        landuseType: kind,
+        options: { roadPadding: 1.8, buildingPadding: 1.0 }
+      });
+    }
+  }
+
   if (placements.length === 0 && Array.isArray(appCtx.landuses)) {
     for (let i = 0; i < appCtx.landuses.length && placements.length < 24; i++) {
       const lu = appCtx.landuses[i];
@@ -356,6 +402,8 @@ export function buildWorldVegetationInstancing(
   const canopyMat = new THREE.MeshStandardMaterial({
     color: 0xffffff,
     vertexColors: true,
+    emissive: 0x102d14,
+    emissiveIntensity: 0.32,
     roughness: 0.96,
     metalness: 0.0
   });

@@ -320,10 +320,11 @@ export function findNearestRoad(x, z, options = {}) {
   nearRoadResult.distanceToTransitionZone = Infinity;
   const targetY = Number.isFinite(options?.y) ? Number(options.y) : NaN;
   const maxVerticalDelta = Number.isFinite(options?.maxVerticalDelta) ? Math.max(0.5, Number(options.maxVerticalDelta)) : Infinity;
-  const preferredRoad = options?.preferredRoad || null;
   let bestWeighted = Infinity;
 
   const roads = runtimeRoadFeatures();
+  const requestedPreferredRoad = options?.preferredRoad || null;
+  const preferredRoad = requestedPreferredRoad && roads.includes(requestedPreferredRoad) ? requestedPreferredRoad : null;
   if (preferredRoad) {
     const preferredCandidates = roadContinuityCandidates(preferredRoad);
     for (let i = 0; i < preferredCandidates.length; i++) {

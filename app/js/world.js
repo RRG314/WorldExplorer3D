@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import {
   classifyWorldSurfaceProfile,
-} from "./surface-rules.js?v=15";
+} from "./surface-rules.js?v=17";
 import {
   inferWaterRenderContext
 } from "./water-dynamics.js?v=4";
@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=13";
+} from "./structure-semantics.js?v=16";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=12";
+} from "./world/spawn.js?v=19";
 import {
   scheduleDeferredStructureRefresh,
   scheduleDeferredWorldLinearFeatureLoad
@@ -51,7 +51,7 @@ import {
   limitWaysByTileBudget,
   rdtDepthForFeatureTile,
   wayCenterLatLon
-} from "./world/budgets.js?v=5";
+} from "./world/budgets.js?v=6";
 import {
   initWorldLod,
   updateWorldLod
@@ -65,15 +65,15 @@ import {
   scheduleDeferredPoiLoad,
   scheduleDeferredWorldDetailPasses,
   safeWorldLoadCall
-} from "./world/load-support.js?v=14";
+} from "./world/load-support.js?v=16";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=7";
+} from "./world/load-reset.js?v=8";
 import {
   prepareWorldFeatureSelections
-} from "./world/load-budgeting.js?v=2";
+} from "./world/load-budgeting.js?v=3";
 import {
   buildBuildingGeometryGuards,
   buildFeatureGeometryGuards,
@@ -89,7 +89,7 @@ import {
   waterSurfaceBaseElevation,
   WATER_VECTOR_TILE_ZOOM,
   worldLinePointsFromLonLat
-} from "./world/load-geometry.js?v=15";
+} from "./world/load-geometry.js?v=16";
 import {
   decimateRoadCenterlineByDepth,
   getPerfModeValue,
@@ -101,13 +101,13 @@ import {
   poiKeyFromTags,
   roadTypePriority,
   classifyLinearFeatureTags as classifyLinearFeatureTagsBase
-} from "./world/load-style.js?v=1";
+} from "./world/load-style.js?v=3";
 import {
   limitNodesByDistance,
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=9";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=10";
 import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=20";
 import {
   batchLanduseMeshes,
@@ -123,7 +123,7 @@ import {
   pointInPolygon,
   runtimeRoadFeatures,
   teleportToLocation
-} from "./world/navigation.js?v=1";
+} from "./world/navigation.js?v=2";
 import {
   buildTraversalNetworks,
   findNearestTraversalFeature,
@@ -139,7 +139,7 @@ import {
   initWorldVegetation,
   MAX_TREE_NODES,
   MAX_TREE_ROW_WAYS
-} from "./world/vegetation.js?v=4";
+} from "./world/vegetation.js?v=6";
 import {
   appendIndexedGeometry,
   decimatePoints,
@@ -152,7 +152,7 @@ import {
 import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=15";
 import {
   resetWorldFurnitureCaches
-} from "./world/furniture.js?v=8";
+} from "./world/furniture.js?v=10";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
@@ -167,24 +167,30 @@ import {
   refreshStructureAwareFeatureProfiles,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=3";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=43";
+} from "./world/structure-aware.js?v=5";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=52";
 import {
   fetchShortbreadWorldData
-} from "./world/shortbread-source.js?v=6";
+} from "./world/shortbread-source.js?v=8";
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=6";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
-import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=20";
+import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=22";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
 const FEATURE_MIN_POLYGON_AREA = 8;
 const FEATURE_MIN_HOLE_AREA = 6;
-// Release decision: keep separate footway/cycleway/rail ribbons disabled until
-// they have terrain-draping and intersection tests equivalent to road surfaces.
-const ENABLE_LINEAR_FEATURES = false;
+// Mapped pedestrian surfaces are terrain-draped. Rail and cycle overlays remain
+// disabled until they have dedicated intersection and rendering ownership.
+const LINEAR_FEATURE_POLICY = Object.freeze({
+  footway: true,
+  cycleway: false,
+  railway: false
+});
+const ENABLE_LINEAR_FEATURES = Object.values(LINEAR_FEATURE_POLICY).some(Boolean);
 const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorldRoadLoader({
   ENABLE_LINEAR_FEATURES,
+  LINEAR_FEATURE_POLICY,
   FEATURE_MIN_HOLE_AREA,
   FEATURE_MIN_POLYGON_AREA,
   WATER_VECTOR_TILE_ZOOM,

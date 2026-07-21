@@ -29,7 +29,7 @@ const LINEAR_FEATURE_STYLE_PRESETS = {
     opacity: 1
   },
   footway: {
-    width: 2.9,
+    width: 1.8,
     bias: 0.018,
     color: 0xbfb8ad,
     emissive: 0x1c1a17,
@@ -179,6 +179,10 @@ export function classifyLinearFeatureTags(tags = {}, options = {}) {
   const highway = String(tags?.highway || '').toLowerCase();
   const railway = String(tags?.railway || '').toLowerCase();
   const bicycle = String(tags?.bicycle || '').toLowerCase();
+  const footway = String(tags?.footway || '').toLowerCase();
+  const generalizedVectorFeature = Number(tags?.sourceFeatureId) < 0;
+
+  if (tags?.area === 'yes' && options.force !== true) return null;
 
   if (/^(rail|light_rail|tram|subway|narrow_gauge)$/.test(railway)) {
     return { kind: 'railway', subtype: railway };
@@ -189,8 +193,12 @@ export function classifyLinearFeatureTags(tags = {}, options = {}) {
   if (highway === 'path' && bicycle === 'designated') {
     return { kind: 'cycleway', subtype: 'shared_path' };
   }
+  if (generalizedVectorFeature && /^(footway|path)$/.test(highway) && !/^(sidewalk|crossing)$/.test(footway)) {
+    return null;
+  }
   if (/^(footway|pedestrian|steps|path)$/.test(highway)) {
-    return { kind: 'footway', subtype: highway || 'footway' };
+    const subtype = highway === 'footway' && /^(sidewalk|crossing)$/.test(footway) ? footway : highway;
+    return { kind: 'footway', subtype: subtype || 'footway' };
   }
   return null;
 }
@@ -204,6 +212,7 @@ export function linearFeaturePriority(kind, subtype = '') {
   if (kind === 'cycleway') return subtype === 'cycleway' ? 3 : 2;
   if (kind === 'footway') {
     if (subtype === 'pedestrian') return 3;
+    if (subtype === 'sidewalk' || subtype === 'crossing') return 3;
     if (subtype === 'footway') return 2;
     return 1;
   }
@@ -220,9 +229,12 @@ export function linearFeatureVisualSpec(classification, tags = {}) {
     if (classification?.subtype === 'tram') width = 2.4;
     if (classification?.subtype === 'subway') width = 2.2;
   } else if (kind === 'footway') {
-    if (classification?.subtype === 'pedestrian') width = 3.3;
-    if (classification?.subtype === 'footway') width = 3.0;
-    if (classification?.subtype === 'steps') width = 1.4;
+    if (classification?.subtype === 'pedestrian') width = 2.6;
+    if (classification?.subtype === 'sidewalk') width = 1.8;
+    if (classification?.subtype === 'crossing') width = 2.2;
+    if (classification?.subtype === 'footway') width = 1.8;
+    if (classification?.subtype === 'path') width = 1.4;
+    if (classification?.subtype === 'steps') width = 1.3;
   } else if (kind === 'cycleway' && classification?.subtype === 'shared_path') {
     width = 2.5;
   }

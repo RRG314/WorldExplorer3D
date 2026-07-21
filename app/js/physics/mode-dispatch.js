@@ -1,37 +1,10 @@
-export function updateAlternateTravelMode(appCtx, dt, options = {}) {
-  const { isPlanetarySurface, updateDrone, updatePlane } = options;
+import { createTransportControllerRegistry } from '../transport/controller-registry.js?v=1';
 
-  if (appCtx.boatMode?.active) {
-    appCtx.updateBoatMode?.(dt);
-    appCtx.updateFishingGame?.(dt);
-    appCtx.updateMode?.(dt);
-    return true;
-  }
+let controllerRegistry = null;
+let controllerContext = null;
 
-  if (appCtx.fishingGame?.open || appCtx.fishingGame?.active) {
-    appCtx.updateFishingGame?.(dt);
-  }
-
-  if (appCtx.planeMode?.active) {
-    updatePlane(dt);
-    appCtx.updateMode?.(dt);
-    appCtx.updateInteriorInteraction?.();
-    return true;
-  }
-
-  if (appCtx.droneMode) {
-    updateDrone(dt);
-    appCtx.updateMode?.(dt);
-    appCtx.updateInteriorInteraction?.();
-    if (!isPlanetarySurface() && !appCtx.worldLoading) {
-      appCtx.updateTerrainAround(appCtx.drone.x, appCtx.drone.z);
-    }
-    return true;
-  }
-
-  if (!appCtx.Walk) return false;
+function updateWalkController(appCtx, dt) {
   appCtx.Walk.update(dt);
-  if (appCtx.Walk.state.mode !== 'walk') return false;
 
   if (appCtx.isRecording && appCtx.customTrack.length > 0) {
     const lastPoint = appCtx.customTrack[appCtx.customTrack.length - 1];
@@ -65,5 +38,77 @@ export function updateAlternateTravelMode(appCtx, dt, options = {}) {
 
   appCtx.updateMode?.(dt);
   appCtx.updateInteriorInteraction?.();
-  return true;
 }
+
+function createEarthTransportControllers(appCtx, options = {}) {
+  const { isPlanetarySurface, updateDrone, updatePlane } = options;
+  const registry = createTransportControllerRegistry({
+    onConflict({ activeId, candidates }) {
+      console.warn(`[transport] Conflicting active modes (${candidates.join(', ')}); ${activeId} owns this frame.`);
+    },
+    onError({ controller, error, stage }) {
+      console.error(`[transport] ${controller.id} ${stage} failed`, error);
+    }
+  });
+  registry.registerController({
+    id: 'boat',
+    priority: 10,
+    isActive: () => !!appCtx.boatMode?.active,
+    update(dt) {
+      appCtx.updateBoatMode?.(dt);
+      appCtx.updateFishingGame?.(dt);
+      appCtx.updateMode?.(dt);
+    }
+  });
+  registry.registerController({
+    id: 'plane',
+    priority: 20,
+    isActive: () => !!appCtx.planeMode?.active,
+    update(dt) {
+      updatePlane(dt);
+      appCtx.updateMode?.(dt);
+      appCtx.updateInteriorInteraction?.();
+    }
+  });
+  registry.registerController({
+    id: 'drone',
+    priority: 30,
+    isActive: () => !!appCtx.droneMode,
+    update(dt) {
+      updateDrone(dt);
+      appCtx.updateMode?.(dt);
+      appCtx.updateInteriorInteraction?.();
+      if (!isPlanetarySurface() && !appCtx.worldLoading) {
+        appCtx.updateTerrainAround(appCtx.drone.x, appCtx.drone.z);
+      }
+    }
+  });
+  registry.registerController({
+    id: 'walk',
+    priority: 40,
+    isActive: () => appCtx.Walk?.state?.mode === 'walk',
+    update: (dt) => updateWalkController(appCtx, dt)
+  });
+  return registry;
+}
+
+function ensureControllerRegistry(appCtx, options) {
+  if (!controllerRegistry || controllerContext !== appCtx) {
+    controllerContext = appCtx;
+    controllerRegistry = createEarthTransportControllers(appCtx, options);
+  }
+  return controllerRegistry;
+}
+
+function updateAlternateTravelMode(appCtx, dt, options = {}) {
+  if (!appCtx.boatMode?.active && (appCtx.fishingGame?.open || appCtx.fishingGame?.active)) {
+    appCtx.updateFishingGame?.(dt);
+  }
+  return ensureControllerRegistry(appCtx, options).update(dt, { appCtx });
+}
+
+function getEarthTransportControllerSnapshot(appCtx, options = {}) {
+  return ensureControllerRegistry(appCtx, options).snapshot({ appCtx });
+}
+
+export { getEarthTransportControllerSnapshot, updateAlternateTravelMode };

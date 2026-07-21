@@ -12,6 +12,7 @@ export function createGlobeSelectorScene(options = {}) {
     stage,
     placeReadout,
     getActiveCityTab,
+    getPanelMode,
     getOpenState,
     cityMatchesSelection,
     onFavoritePick,
@@ -42,7 +43,7 @@ export function createGlobeSelectorScene(options = {}) {
   let dragLastY = 0;
   let eventsBound = false;
 
-  const minDistance = 1.35;
+  const minDistance = 1.08;
   const maxDistance = 4.4;
 
   function getMarkerScale() {
@@ -127,6 +128,7 @@ export function createGlobeSelectorScene(options = {}) {
     const lonRad = lon * Math.PI / 180;
     globeRoot.rotation.y = -(lonRad + Math.PI * 0.5);
     globeRoot.rotation.x = Math.max(-1.2, Math.min(1.2, latRad));
+    renderFrame();
   }
 
   function setSelectionMarker(selected) {
@@ -137,8 +139,9 @@ export function createGlobeSelectorScene(options = {}) {
     }
     const point = latLonToLocalPoint(selected.lat, selected.lon, 1.02);
     markerMesh.position.set(point.x, point.y, point.z);
-    markerMesh.visible = true;
+    markerMesh.visible = getPanelMode() !== 'live-earth';
     applyMarkerScales();
+    renderFrame();
   }
 
   function setCameraDistance(nextDistance) {
@@ -147,6 +150,7 @@ export function createGlobeSelectorScene(options = {}) {
     if (camera) {
       camera.position.z = cameraDistance;
       camera.updateProjectionMatrix();
+      renderFrame();
     }
   }
 
@@ -197,6 +201,7 @@ export function createGlobeSelectorScene(options = {}) {
       pointerDragDistance += Math.hypot(dx, dy);
       globeRoot.rotation.y += dx * 0.0055;
       globeRoot.rotation.x = Math.max(-1.2, Math.min(1.2, globeRoot.rotation.x + dy * 0.0038));
+      renderFrame();
     });
     canvas.addEventListener('pointerup', (event) => {
       if (!pointerActive) return;
@@ -212,6 +217,7 @@ export function createGlobeSelectorScene(options = {}) {
     canvas.addEventListener('wheel', (event) => {
       event.preventDefault();
       setCameraDistance(cameraDistance + Math.sign(event.deltaY || 0) * 0.16);
+      renderFrame();
     }, { passive: false });
     window.addEventListener('resize', ensureSize);
   }
@@ -225,7 +231,7 @@ export function createGlobeSelectorScene(options = {}) {
     }
     bindEvents();
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(42, 1, 0.1, 20);
+    camera = new THREE.PerspectiveCamera(42, 1, 0.02, 20);
     camera.position.set(0, 0, cameraDistance);
     renderer = createAuxiliaryRenderer({
       canvas,
@@ -290,6 +296,7 @@ export function createGlobeSelectorScene(options = {}) {
         earthMaterial.emissiveIntensity = 0.28;
         earthMaterial.color.setHex(0xffffff);
         earthMaterial.needsUpdate = true;
+        renderFrame();
       });
     } catch {
       // The fallback material remains usable when the texture cannot load.

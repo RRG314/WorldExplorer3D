@@ -611,7 +611,20 @@ function applyBoatWavePose(x, z, angle, candidate = null, dt = 0, forceSnap = fa
     rotationClearance +
     bowClearance +
     visualFreeboard;
-  appCtx.boat.y = Math.max(targetBoatY, hullFloorY);
+  const resolvedBoatY = Math.max(targetBoatY, hullFloorY);
+  appCtx.boat.y = resolvedBoatY;
+  appCtx.boatMode.surfaceEnvelope = {
+    baseY: baseCenterY,
+    averageY: averageSurfaceY,
+    maximumY: sampledMaxSurfaceY,
+    targetBoatY,
+    hullFloorY,
+    resolvedBoatY,
+    hullDraft,
+    keelClearance,
+    rotationClearance,
+    sampledAt: time
+  };
 }
 
 

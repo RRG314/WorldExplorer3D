@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { captureEarthWorldSession } from "./earth-session.js?v=11";
+import { captureEarthWorldSession } from "./earth-session.js?v=16";
 import {
   DEFAULT_WAVE_INTENSITY,
   SEA_STATE_CONFIG,
@@ -34,7 +34,7 @@ import {
   updateBoatFoamFx,
   updateBoatWaterPatch,
   updateWaterWaveVisuals
-} from "./boat-mode/surface-effects.js?v=8";
+} from "./boat-mode/surface-effects.js?v=9";
 import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=1";
 import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=1";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";
@@ -403,6 +403,7 @@ function enterBoatAtWorldPoint(worldX, worldZ, options = {}) {
     resetBoatFoamFx();
     setBoatActorPose(spawnPoint.x, spawnPoint.z, yaw, activeCandidate, { forceSnap: true });
     updateBoatWaterPatch(activeCandidate);
+    snapBoatChaseCamera();
     updateBoatLodBias();
     syncBoatTerrainSuppression();
     updateBoatMesh();

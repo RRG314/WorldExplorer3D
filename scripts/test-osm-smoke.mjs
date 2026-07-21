@@ -457,8 +457,12 @@ async function main() {
   try {
     markStage('app:navigate');
     await page.goto(baseUrl, { waitUntil: 'domcontentloaded', timeout: 60000 });
-    markStage('app:wait-start-button');
-    await page.waitForSelector('#startBtn', { timeout: 30000 });
+    markStage('app:wait-start-surface');
+    await page.waitForFunction(() => {
+      const globeStart = document.getElementById('globeSelectorStartBtn');
+      const legacyStart = document.getElementById('startBtn');
+      return [globeStart, legacyStart].some((element) => element && element.getClientRects().length > 0);
+    }, { timeout: 30000 });
     markStage('app:wait-ui-ready');
     await waitForUiReady(page);
 

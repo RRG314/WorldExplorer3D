@@ -23,7 +23,7 @@ import {
   constrainPointToFootprint,
   findInteriorAnchor,
   prepareInteriorFeaturePlan
-} from "./planner.js?v=3";
+} from "./planner.js?v=5";
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -168,11 +168,36 @@ export function buildInteriorScene(definition) {
   group.name = `interior:${definition.key}`;
 
   const slabMaterial = new THREE.MeshStandardMaterial({ color: 0x353b42, roughness: 0.86, metalness: 0.02 });
-  const roomMaterial = new THREE.MeshStandardMaterial({ color: 0x71808c, roughness: 0.82, metalness: 0.03 });
+  const roomMaterial = new THREE.MeshStandardMaterial({
+    color: 0x71808c,
+    emissive: 0x18232b,
+    emissiveIntensity: 0.2,
+    roughness: 0.82,
+    metalness: 0.03
+  });
   const corridorMaterial = new THREE.MeshStandardMaterial({ color: 0x4d5b68, roughness: 0.86, metalness: 0.03 });
-  const wallMaterial = new THREE.MeshStandardMaterial({ color: 0xd9e0e5, roughness: 0.91, metalness: 0.01 });
-  const accentWallMaterial = new THREE.MeshStandardMaterial({ color: 0xaeb9c2, roughness: 0.9, metalness: 0.01 });
-  const ceilingMaterial = new THREE.MeshStandardMaterial({ color: 0xf0f3f5, roughness: 0.94, metalness: 0, side: THREE.DoubleSide });
+  const wallMaterial = new THREE.MeshStandardMaterial({
+    color: 0xd9e0e5,
+    emissive: 0x293238,
+    emissiveIntensity: 0.16,
+    roughness: 0.91,
+    metalness: 0.01
+  });
+  const accentWallMaterial = new THREE.MeshStandardMaterial({
+    color: 0xaeb9c2,
+    emissive: 0x232b30,
+    emissiveIntensity: 0.14,
+    roughness: 0.9,
+    metalness: 0.01
+  });
+  const ceilingMaterial = new THREE.MeshStandardMaterial({
+    color: 0xf0f3f5,
+    emissive: 0x3d4244,
+    emissiveIntensity: 0.2,
+    roughness: 0.94,
+    metalness: 0,
+    side: THREE.DoubleSide
+  });
   const fixtureMaterial = new THREE.MeshStandardMaterial({
     color: 0xf7f8f3,
     emissive: 0xe8e2c8,
@@ -192,9 +217,10 @@ export function buildInteriorScene(definition) {
   const dynamicColliders = [];
   const placementTargets = [];
 
-  const ambientLight = new THREE.HemisphereLight(0xf8fafc, 0x1a2330, 0.72);
+  const ambientLight = new THREE.HemisphereLight(0xf8fafc, 0x1a2330, 1.05);
   ambientLight.position.set(centroid.x, floorY + wallHeight * 0.92, centroid.z);
   group.add(ambientLight);
+  group.add(new THREE.AmbientLight(0xffffff, 0.62));
 
   const lightBounds = footprintBounds(shellFootprint);
   const lightColumns = lightBounds.width > 26 ? 3 : lightBounds.width > 13 ? 2 : 1;
@@ -204,7 +230,7 @@ export function buildInteriorScene(definition) {
       const x = lightBounds.minX + lightBounds.width * ((gx + 1) / (lightColumns + 1));
       const z = lightBounds.minZ + lightBounds.depth * ((gz + 1) / (lightRows + 1));
       if (!pointInPolygonSafe(x, z, shellFootprint)) continue;
-      const ceilingLight = new THREE.PointLight(0xf7f3ea, 0.7, 30, 2);
+      const ceilingLight = new THREE.PointLight(0xf7f3ea, 0.88, 32, 2);
       ceilingLight.position.set(x, floorY + wallHeight - 0.32, z);
       group.add(ceilingLight);
       const fixture = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.07, 0.5), fixtureMaterial);

@@ -1,5 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=13";
+import { inferSelectedLocationWaterKind } from "./water-location-hint.js?v=1";
+import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=16";
 import { createWorldSpawnSurfaceApi } from "./spawn-surface.js?v=3";
 
 let worldSpawnDeps = {
@@ -10,7 +12,6 @@ let worldSpawnDeps = {
   sampleFeatureSurfaceY: () => NaN,
   traversableFeaturesForMode: () => []
 };
-
 function initWorldSpawning(deps = {}) {
   worldSpawnDeps = {
     ...worldSpawnDeps,
@@ -18,7 +19,6 @@ function initWorldSpawning(deps = {}) {
   };
   return worldSpawnDeps;
 }
-
 const {
   driveBuildBlockCollision,
   driveCenterYAtWorld,
@@ -36,7 +36,6 @@ const {
 } = createWorldSpawnSurfaceApi({
   getDeps: () => worldSpawnDeps
 });
-
 function evaluateWalkSpawnCandidate(x, z, options = {}) {
   const angle = finiteNumberOr(options.angle, finiteNumberOr(appCtx.car?.angle, 0));
   const terrainY = terrainYAtWorld(x, z);
@@ -110,6 +109,8 @@ function evaluateDriveSpawnCandidate(x, z, options = {}) {
   const onRoad = isRoadSurfaceReachable(nearestRoad, {
     extraVerticalAllowance: 0.5
   }) && !!road;
+  const resolvedSurfaceY = onRoad && Number.isFinite(nearestRoad?.y) ? nearestRoad.y : terrainY;
+  const collisionBaseY = onRoad ? resolvedSurfaceY : actorFeetY;
   if (worldSpawnDeps.isInsideWaterArea(x, z) && !onRoad) {
     return { valid: false, reason: "inside_water", terrainY, onRoad, road };
   }
@@ -117,13 +118,13 @@ function evaluateDriveSpawnCandidate(x, z, options = {}) {
   if (Number.isFinite(desiredFeetY) && desiredFeetY > terrainY + 2.8 && !onRoad) {
     return { valid: false, reason: "elevated_surface", terrainY, onRoad, road };
   }
-  if (driveBuildBlockCollision(x, z, actorFeetY)) {
+  if (driveBuildBlockCollision(x, z, collisionBaseY)) {
     return { valid: false, reason: "build_block", terrainY, onRoad, road };
   }
 
   const buildingCheck = typeof appCtx.checkBuildingCollision === "function" ?
     appCtx.checkBuildingCollision(x, z, 2.0, {
-      actorBaseY: actorFeetY,
+      actorBaseY: collisionBaseY,
       actorHeight: 1.9
     }) :
     { collision: false };
@@ -138,8 +139,6 @@ function evaluateDriveSpawnCandidate(x, z, options = {}) {
   if (options.requireRoad && !onRoad) {
     return { valid: false, reason: "road_required", terrainY, slopeDeg, onRoad, road };
   }
-  const resolvedSurfaceY = Number.isFinite(nearestRoad?.y) ? nearestRoad.y : terrainY;
-
   return {
     valid: true,
     mode: "drive",
@@ -476,6 +475,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     feetY: options.feetY,
     source: options.source || "direct"
   });
+  if (direct.valid && (!preferRoad || direct.onRoad)) return direct;
 
   const projectedRoad = resolveProjectedRoadSpawn(x, z, {
     angle,
@@ -493,7 +493,6 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     feetY: options.feetY,
     maxDistance: options.maxRoadDistance
   });
-  if (direct.valid && (!preferRoad || direct.onRoad)) return direct;
   if (roadFallback) return roadFallback;
   if (direct.valid) return direct;
 
@@ -580,9 +579,11 @@ function applySpawnTarget(worldX, worldZ, options = {}) {
 function tryAutoEnterBoatAt(worldX, worldZ, options = {}) {
   if (!options?.preferBoatIfWater || typeof appCtx.enterBoatAtWorldPoint !== "function") return null;
   const entryMode = options.mode === "walk" ? "walk" : "drive";
+  const inferredWaterKind = inferSelectedLocationWaterKind(appCtx);
   const allowSynthetic = !!(
     options.allowSyntheticWater ||
     (
+      inferredWaterKind &&
       appCtx.selLoc === "custom" &&
       (!Array.isArray(appCtx.roads) || appCtx.roads.length === 0) &&
       (!Array.isArray(appCtx.waterAreas) || appCtx.waterAreas.length === 0) &&
@@ -595,7 +596,7 @@ function tryAutoEnterBoatAt(worldX, worldZ, options = {}) {
     emitTutorial: options.emitTutorial !== false,
     maxDistance: Number.isFinite(options.maxWaterDistance) ? options.maxWaterDistance : undefined,
     allowSynthetic,
-    waterKind: options.waterKind || "open_ocean"
+    waterKind: options.waterKind || inferredWaterKind || "open_ocean"
   });
   if (!started) return null;
   return {
@@ -617,6 +618,23 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
     source: options.source || "custom_location"
   });
   if (boatSpawn) return boatSpawn;
+  const arrival = featuredArrivalNear(appCtx.LOC);
+  if (arrival) {
+    const viewpoint = appCtx.geoToWorld(arrival.viewpoint.lat, arrival.viewpoint.lon);
+    const lookAt = appCtx.geoToWorld(arrival.lookAt.lat, arrival.lookAt.lon);
+    const angle = Math.atan2(lookAt.x - viewpoint.x, lookAt.z - viewpoint.z);
+    const resolved = resolveSafeWorldSpawn(viewpoint.x, viewpoint.z, {
+      ...options,
+      angle,
+      mode,
+      preferRoad: false,
+      maxGroundRadius: 96,
+      maxRoadDistance: 160,
+      source: "featured_landmark_arrival"
+    });
+    if (resolved) resolved.angle = Math.atan2(lookAt.x - resolved.x, lookAt.z - resolved.z);
+    return applyResolvedWorldSpawn(resolved, options);
+  }
   const exactRoad = findGradeSeparatedRoadAt(0, 0);
   const structureMode = exactRoad?.road?.structureSemantics?.terrainMode || "at_grade";
   const roadHalfWidth = Math.max(2, Number(exactRoad?.road?.width || 0) * 0.5 + 1);

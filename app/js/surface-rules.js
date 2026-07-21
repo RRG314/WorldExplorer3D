@@ -213,6 +213,12 @@ function classifyWorldSurfaceProfile({
     (
       latitudeDry &&
       sparseSurfaceWater &&
+      norm.explicitSand >= 0.012 &&
+      norm.arid >= 0.018
+    ) ||
+    (
+      latitudeDry &&
+      sparseSurfaceWater &&
       norm.explicitSand >= 0.025 &&
       norm.arid >= 0.035
     ) ||
@@ -277,11 +283,18 @@ function classifyTerrainSurfaceProfile({
   const aridFallback = shouldUseAridFallback(absLat, worldProfile, norm, localSignals);
   const useSand = !useSnow && (explicitBeachSand || aridFallback);
   const useRock = !useSnow && !useSand && (norm.rock >= 0.18 || (steepTerrain && norm.rock >= 0.06));
-  const useSoil = !useSnow && !useSand && !useRock && (norm.soil >= 0.2 || (norm.soil >= 0.1 && norm.grass < 0.24));
+  const useBuilt = !useSnow && !useSand && !useRock &&
+    norm.urban >= 0.52 &&
+    norm.urban >= norm.grass * 1.6 &&
+    norm.water < 0.45 &&
+    localSignals.candidates.buildings >= 20 &&
+    localSignals.candidates.roads >= 8;
+  const useSoil = !useSnow && !useSand && !useRock && !useBuilt && (norm.soil >= 0.2 || (norm.soil >= 0.1 && norm.grass < 0.24));
   const mode = useSnow ?
     ((polar || useRock || steepTerrain) ? 'snowRock' : 'snow') :
     useSand ? 'sand' :
     useRock ? 'rock' :
+    useBuilt ? 'built' :
     useSoil ? 'soil' :
     'grass';
 
@@ -294,6 +307,7 @@ function classifyTerrainSurfaceProfile({
       (weatherSnow ? 'live_weather_snow' : polar ? 'polar_latitude' : alpine ? 'high_elevation' : 'cold_highland') :
       useSand ? (explicitBeachSand ? 'localized_beach' : 'arid_surface') :
       useRock ? 'rocky_surface' :
+      useBuilt ? 'mapped_urban_ground' :
       useSoil ? 'soil_surface' :
       'vegetated_ground',
     absLat,

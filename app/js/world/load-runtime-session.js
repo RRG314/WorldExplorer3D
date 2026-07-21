@@ -14,7 +14,8 @@ export function createWorldLoadRuntimeSession(options = {}) {
     sameLocation
   } = options;
 
-  const locName = appCtx.selLoc === 'custom' ? appCtx.customLoc?.name || 'Custom' : appCtx.LOCS[appCtx.selLoc].name;
+  const locationSelection = appCtx.resolveLocationSelection?.() || null;
+  const locName = locationSelection?.name || 'Unknown location';
   const perfModeNow = getPerfModeValue();
   const useRdtBudgeting = perfModeNow === 'rdt';
   const loadMetrics = {
@@ -82,19 +83,15 @@ export function createWorldLoadRuntimeSession(options = {}) {
   appCtx.initialEarthWorldReady = false;
   appCtx.worldDetailState = {};
 
-  if (appCtx.selLoc === 'custom') {
-    const lat = parseFloat(document.getElementById('customLat').value);
-    const lon = parseFloat(document.getElementById('customLon').value);
-    if (isNaN(lat) || isNaN(lon)) {
-      appCtx.showLoad('Enter valid coordinates');
-      appCtx.worldLoading = false;
-      finalizePerfLoad(false, { reason: 'invalid_coordinates' });
-      return { aborted: true };
-    }
-    appCtx.LOC = { lat, lon };
-    appCtx.setCustomLocation?.({ lat, lon, name: appCtx.customLoc?.name || 'Custom' }, { syncInputs: false });
-  } else {
-    appCtx.LOC = { lat: appCtx.LOCS[appCtx.selLoc].lat, lon: appCtx.LOCS[appCtx.selLoc].lon };
+  if (!locationSelection) {
+    appCtx.showLoad('Choose a valid location');
+    appCtx.worldLoading = false;
+    finalizePerfLoad(false, { reason: 'invalid_location_selection' });
+    return { aborted: true };
+  }
+  appCtx.LOC = { lat: locationSelection.lat, lon: locationSelection.lon };
+  if (locationSelection.key === 'custom') {
+    appCtx.setCustomLocation?.(locationSelection, { syncInputs: false });
   }
 
   const loadLocation = { lat: appCtx.LOC.lat, lon: appCtx.LOC.lon };

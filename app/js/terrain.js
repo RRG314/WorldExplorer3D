@@ -19,7 +19,7 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=22";
+} from "./terrain/surface-profiles.js?v=26";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -40,7 +40,7 @@ import {
   waitForTerrainReadyBounds,
   waitForTerrainReadyAt,
   worldToLatLon
-} from "./terrain/tiles.js?v=24";
+} from "./terrain/tiles.js?v=27";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -52,7 +52,7 @@ import {
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=3";
 import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
-import { createTerrainStreamingApi } from "./terrain/streaming.js?v=8";
+import { createTerrainStreamingApi } from "./terrain/streaming.js?v=9";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 // terrain.js - Terrain elevation system (Terrarium tiles)
 // ============================================================================
@@ -298,6 +298,7 @@ const {
 
 async function waitForTerrainCoverageAt(x = 0, z = 0, timeoutMs = 5000, minLoadedRatio = 0.72) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return { ready: false, loaded: 0, total: 0 };
+  if (![x, z].every(Number.isFinite)) return { ready: false, loaded: 0, total: 0 };
   updateTerrainAround(x, z);
 
   const deadline = performance.now() + Math.max(500, Number(timeoutMs) || 5000);

@@ -501,6 +501,7 @@ async function runAudit(page, baseUrl) {
       buildings: Number(ctx.buildings?.length || 0),
       worldLoading: ctx.worldLoading === true,
       earthResumePending: ctx.earthResumePending === true,
+      earthResumeDiagnostics: ctx.earthResumeDiagnostics || null,
       transition: ctx.getSessionCoordinatorDebugState?.() || null
     };
   }, earthRoom);

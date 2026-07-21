@@ -1,6 +1,13 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { createGameplayPluginRegistry } from "../gameplay/plugin-registry.js?v=1";
 import { clearPolice, spawnPolice } from "./police.js?v=1";
 import { resetPaintTownMode, startPaintTownMode, updateActivePaintTownMode } from "./paint-town.js?v=1";
+
+const gameplayRegistry = createGameplayPluginRegistry({
+  onError(error, id, phase) {
+    console.error(`[gameplay] ${id} ${phase} failed.`, error);
+  }
+});
 
 function fmtTime(seconds) {
   const value = Math.max(0, Math.floor(seconds));
@@ -119,68 +126,143 @@ export function spawnCheckpoints() {
   }
 }
 
-export function startMode() {
-  appCtx.gameTimer = 0;
-  clearObjectives();
-  clearPolice();
-  appCtx.policeOn = false;
-
+function setPoliceMode(active) {
+  appCtx.policeOn = active;
   const policeHud = document.getElementById("police");
-  if (policeHud) policeHud.classList.remove("show");
   const policeToggle = document.getElementById("fPolice");
-  if (policeToggle) policeToggle.classList.remove("on");
+  policeHud?.classList.toggle("show", active);
+  policeToggle?.classList.toggle("on", active);
+  if (active) spawnPolice();
+  else clearPolice();
+}
 
-  if (typeof appCtx.stopFlowerChallenge === "function") appCtx.stopFlowerChallenge();
-
-  if (appCtx.gameMode === "trial") spawnDest();
-  else if (appCtx.gameMode === "checkpoint") spawnCheckpoints();
-  else if (appCtx.gameMode === "painttown") startPaintTownMode();
-  else if (appCtx.gameMode === "police") {
-    appCtx.policeOn = true;
-    if (policeHud) policeHud.classList.add("show");
-    if (policeToggle) policeToggle.classList.add("on");
-    spawnPolice();
-  } else if (appCtx.gameMode === "flower" && typeof appCtx.startFlowerChallenge === "function") {
-    appCtx.startFlowerChallenge("game-mode");
+function updateTrialMode(dt) {
+  appCtx.gameTimer += dt;
+  if (!appCtx.destination || appCtx.trialDone) return;
+  const dist = Math.hypot(appCtx.destination.x - appCtx.car.x, appCtx.destination.z - appCtx.car.z);
+  if (dist < appCtx.CFG.cpRadius) {
+    appCtx.trialDone = true;
+    showModeResult("Destination Reached!", "Time: " + fmtTime(appCtx.gameTimer));
+  } else if (appCtx.gameTimer > appCtx.CFG.trialTime) {
+    appCtx.trialDone = true;
+    showModeResult("Time's Up!", "Result: Failed");
   }
 }
 
-export function updateMode(dt) {
-  if (appCtx.gameMode === "trial" || appCtx.gameMode === "checkpoint" || appCtx.gameMode === "painttown") {
-    appCtx.gameTimer += dt;
+function updateCheckpointMode(dt) {
+  appCtx.gameTimer += dt;
+  for (let i = 0; i < appCtx.checkpoints.length; i++) {
+    const checkpoint = appCtx.checkpoints[i];
+    if (checkpoint.collected) continue;
+    if (Math.hypot(checkpoint.x - appCtx.car.x, checkpoint.z - appCtx.car.z) >= appCtx.CFG.cpRadius) continue;
+    checkpoint.collected = true;
+    appCtx.cpCollected++;
+    if (appCtx.cpMeshes[i]) appCtx.cpMeshes[i].visible = false;
+    if (appCtx.cpCollected >= appCtx.checkpoints.length) {
+      showModeResult("All Checkpoints!", "Time: " + fmtTime(appCtx.gameTimer));
+    }
+    break;
   }
+}
+
+gameplayRegistry.register({ id: "free", label: "Free Explore", category: "exploration" });
+gameplayRegistry.register({
+  id: "trial",
+  label: "Time Trial",
+  start: spawnDest,
+  update: updateTrialMode,
+  save: () => ({ elapsedSeconds: appCtx.gameTimer, completed: !!appCtx.trialDone })
+});
+gameplayRegistry.register({
+  id: "checkpoint",
+  label: "Checkpoint Run",
+  start: spawnCheckpoints,
+  update: updateCheckpointMode,
+  save: () => ({ elapsedSeconds: appCtx.gameTimer, collected: appCtx.cpCollected, total: appCtx.checkpoints.length })
+});
+gameplayRegistry.register({
+  id: "painttown",
+  label: "Paint the Town",
+  category: "multiplayer-game",
+  start: startPaintTownMode,
+  update(dt) {
+    appCtx.gameTimer += dt;
+    updateActivePaintTownMode(dt);
+  },
+  stop: resetPaintTownMode,
+  save: () => appCtx.paintTownDebugSnapshot?.() || null,
+  leaderboard: () => appCtx.paintTownDebugSnapshot?.()?.scores || null
+});
+gameplayRegistry.register({
+  id: "police",
+  label: "Police Chase",
+  start: () => setPoliceMode(true),
+  stop: () => setPoliceMode(false)
+});
+gameplayRegistry.register({
+  id: "flower",
+  label: "Flower Challenge",
+  start: () => appCtx.startFlowerChallenge?.("game-mode"),
+  stop: () => appCtx.stopFlowerChallenge?.()
+});
+
+export function registerGameplayPlugin(definition) {
+  return gameplayRegistry.register(definition);
+}
+
+export function getGameplayRegistrySnapshot() {
+  return gameplayRegistry.snapshot();
+}
+
+export function saveActiveGameplay() {
+  return gameplayRegistry.save({ appCtx });
+}
+
+export function getActiveGameplayLeaderboard() {
+  return gameplayRegistry.leaderboard({ appCtx });
+}
+
+function prepareGameplayTransition(reason, context = {}) {
+  appCtx.gameTimer = 0;
+  gameplayRegistry.stop(reason, { appCtx, ...context });
+  clearObjectives();
+  setPoliceMode(false);
+  appCtx.stopFlowerChallenge?.();
+}
+
+export function startGameplayPlugin(id, context = {}) {
+  const pluginId = String(id || "free");
+  if (!gameplayRegistry.has(pluginId)) throw new Error(`Unknown gameplay plugin: ${pluginId}`);
+  prepareGameplayTransition("replaced", context);
+  if (!["trial", "checkpoint", "painttown", "police", "flower"].includes(pluginId)) {
+    appCtx.gameMode = "free";
+  }
+  return gameplayRegistry.start(pluginId, { appCtx, ...context });
+}
+
+export function stopGameplayPlugin(reason = "stopped", context = {}) {
+  const stopped = gameplayRegistry.stop(reason, { appCtx, ...context });
+  if (context.resumeFree !== false && gameplayRegistry.has("free")) {
+    prepareGameplayTransition("resume-free", context);
+    appCtx.gameMode = "free";
+    gameplayRegistry.start("free", { appCtx, ...context });
+  }
+  return stopped;
+}
+
+export function startMode() {
+
+  const requestedMode = String(appCtx.gameMode || "free");
+  const mode = gameplayRegistry.has(requestedMode) ? requestedMode : "free";
+  if (mode !== requestedMode) console.warn(`[gameplay] Unknown mode "${requestedMode}"; using free explore.`);
+  appCtx.gameMode = mode;
+  return startGameplayPlugin(mode);
+}
+
+export function updateMode(dt) {
   appCtx.cpMeshes.forEach((mesh) => {
     mesh.rotation.y += dt * 1.5;
   });
   if (appCtx.destMesh) appCtx.destMesh.rotation.y += dt * 1.2;
-
-  if (appCtx.gameMode === "trial" && appCtx.destination && !appCtx.trialDone) {
-    const dist = Math.hypot(appCtx.destination.x - appCtx.car.x, appCtx.destination.z - appCtx.car.z);
-    if (dist < appCtx.CFG.cpRadius) {
-      appCtx.trialDone = true;
-      showModeResult("Destination Reached!", "Time: " + fmtTime(appCtx.gameTimer));
-    } else if (appCtx.gameTimer > appCtx.CFG.trialTime) {
-      showModeResult("Time's Up!", "Result: Failed");
-    }
-  }
-
-  if (appCtx.gameMode === "checkpoint") {
-    for (let i = 0; i < appCtx.checkpoints.length; i++) {
-      const checkpoint = appCtx.checkpoints[i];
-      if (checkpoint.collected) continue;
-      if (Math.hypot(checkpoint.x - appCtx.car.x, checkpoint.z - appCtx.car.z) < appCtx.CFG.cpRadius) {
-        checkpoint.collected = true;
-        appCtx.cpCollected++;
-        if (appCtx.cpMeshes[i]) appCtx.cpMeshes[i].visible = false;
-        if (appCtx.cpCollected >= appCtx.checkpoints.length) {
-          showModeResult("All Checkpoints!", "Time: " + fmtTime(appCtx.gameTimer));
-        }
-        break;
-      }
-    }
-  }
-
-  if (appCtx.gameMode === "painttown") {
-    updateActivePaintTownMode(dt);
-  }
+  gameplayRegistry.update(dt, { appCtx });
 }

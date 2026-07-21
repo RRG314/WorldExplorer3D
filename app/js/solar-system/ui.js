@@ -194,10 +194,10 @@ function createSolarSystemScale(ctx) {
   const panel = document.createElement('aside');
   panel.id = 'solarSystemScale';
   panel.className = 'solar-system-scale';
-  panel.setAttribute('aria-label', 'Solar System distance scale showing asteroid and Kuiper belts');
+  panel.setAttribute('aria-label', 'Top-down logarithmic Solar System map showing the asteroid and Kuiper belts');
   const canvas = document.createElement('canvas');
-  canvas.width = 380;
-  canvas.height = 184;
+  canvas.width = 440;
+  canvas.height = 260;
   canvas.setAttribute('aria-hidden', 'true');
   panel.appendChild(canvas);
   document.body.appendChild(panel);
@@ -205,45 +205,59 @@ function createSolarSystemScale(ctx) {
   const draw = canvas.getContext('2d');
   if (!draw) return;
   draw.scale(2, 2);
-  const left = 14;
-  const right = 178;
-  const axisY = 44;
-  const xForAu = (au) => left + Math.log10(Math.max(0, au) + 1) / Math.log10(51) * (right - left);
+  const centerX = 64;
+  const centerY = 70;
+  const maxRadius = 52;
+  const radiusForAu = (au) => Math.log10(Math.max(0, au) + 1) / Math.log10(51) * maxRadius;
   draw.fillStyle = 'rgba(7, 12, 25, 0.93)';
-  draw.fillRect(0, 0, 190, 92);
+  draw.fillRect(0, 0, 220, 130);
   draw.fillStyle = '#a9bdd9';
   draw.font = '600 8px Inter, sans-serif';
-  draw.fillText('SOLAR SYSTEM DISTANCE | LOG AU', 10, 13);
-  draw.strokeStyle = '#526987';
-  draw.lineWidth = 1;
-  draw.beginPath();
-  draw.moveTo(left, axisY);
-  draw.lineTo(right, axisY);
-  draw.stroke();
+  draw.fillText('SOLAR SYSTEM | TOP VIEW | LOG AU', 10, 13);
 
-  const drawBand = (inner, outer, color, label, labelY) => {
-    const x1 = xForAu(inner);
-    const x2 = xForAu(outer);
-    draw.fillStyle = color;
-    draw.fillRect(x1, axisY - 9, Math.max(3, x2 - x1), 18);
-    draw.fillStyle = '#eef6ff';
-    draw.fillText(`${label} ${inner.toFixed(1)}-${outer.toFixed(1)} AU`, Math.min(x1, 91), labelY);
+  const drawBand = (inner, outer, color, opacity) => {
+    const innerRadius = radiusForAu(inner);
+    const outerRadius = radiusForAu(outer);
+    draw.save();
+    draw.strokeStyle = color;
+    draw.globalAlpha = opacity;
+    draw.lineWidth = Math.max(3, outerRadius - innerRadius);
+    draw.beginPath();
+    draw.arc(centerX, centerY, (innerRadius + outerRadius) / 2, 0, Math.PI * 2);
+    draw.stroke();
+    draw.restore();
   };
-  drawBand(ctx.ASTEROID_BELT.innerAU, ctx.ASTEROID_BELT.outerAU, '#b9875b', 'ASTEROID', 67);
-  drawBand(ctx.KUIPER_BELT.innerAU, ctx.KUIPER_BELT.outerAU, '#6eafe3', 'KUIPER', 80);
+  drawBand(ctx.ASTEROID_BELT.innerAU, ctx.ASTEROID_BELT.outerAU, '#c49368', 0.8);
+  drawBand(ctx.KUIPER_BELT.innerAU, ctx.KUIPER_BELT.outerAU, '#6eafe3', 0.55);
+
+  const planetDistances = [0.387, 0.723, 1, 1.524, 5.203, 9.537, 19.189, 30.07];
+  const planetColors = ['#b9aaa0', '#e8c080', '#65a6e8', '#d36b45', '#d7b37a', '#d9c88c', '#92d8de', '#6388df'];
+  planetDistances.forEach((au, index) => {
+    const angle = -0.7 + index * 0.92;
+    const radius = radiusForAu(au);
+    draw.fillStyle = planetColors[index];
+    draw.beginPath();
+    draw.arc(centerX + Math.cos(angle) * radius, centerY + Math.sin(angle) * radius, index < 4 ? 1.5 : 2, 0, Math.PI * 2);
+    draw.fill();
+  });
 
   draw.fillStyle = '#ffd76a';
   draw.beginPath();
-  draw.arc(left, axisY, 4, 0, Math.PI * 2);
+  draw.arc(centerX, centerY, 4, 0, Math.PI * 2);
   draw.fill();
-  [1, 5.2, 30, 50].forEach((au) => {
-    const x = xForAu(au);
-    draw.strokeStyle = 'rgba(174, 197, 226, 0.5)';
-    draw.beginPath();
-    draw.moveTo(x, axisY - 4);
-    draw.lineTo(x, axisY + 4);
-    draw.stroke();
-  });
+
+  draw.fillStyle = '#eef6ff';
+  draw.font = '600 8px Inter, sans-serif';
+  draw.fillText(`ASTEROID BELT`, 126, 47);
+  draw.fillStyle = '#c7a17f';
+  draw.fillText(`${ctx.ASTEROID_BELT.innerAU.toFixed(1)}-${ctx.ASTEROID_BELT.outerAU.toFixed(1)} AU`, 126, 58);
+  draw.fillStyle = '#eef6ff';
+  draw.fillText('KUIPER BELT', 126, 82);
+  draw.fillStyle = '#8fc5f2';
+  draw.fillText(`${ctx.KUIPER_BELT.innerAU.toFixed(0)}-${ctx.KUIPER_BELT.outerAU.toFixed(0)} AU`, 126, 93);
+  draw.fillStyle = '#8297b4';
+  draw.font = '500 7px Inter, sans-serif';
+  draw.fillText('REAL ORBITAL POSITIONS', 126, 113);
 }
 
 export function toggleSolarSystem(ctx) {

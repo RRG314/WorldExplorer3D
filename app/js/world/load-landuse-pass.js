@@ -2,6 +2,88 @@ import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-poly
 import { surfaceComposition } from './surface-contract.js?v=6';
 import { normalizeWaterBody } from './water-body-contract.js?v=2';
 
+const SOIL_LANDUSE_TYPES = new Set([
+  'farmland', 'farmyard', 'orchard', 'vineyard', 'allotments',
+  'plant_nursery', 'greenhouse_horticulture'
+]);
+const ROCK_LANDUSE_TYPES = new Set(['barren', 'quarry', 'landfill']);
+const PAVED_LANDUSE_TYPES = new Set(['paved', 'parking']);
+
+function surfaceModeForLanduse(landuseType) {
+  if (landuseType === 'forest' || landuseType === 'wood') return 'forest';
+  if (landuseType === 'sand' || landuseType === 'dune') return 'sand';
+  if (landuseType === 'glacier') return 'snow';
+  if (SOIL_LANDUSE_TYPES.has(landuseType)) return 'soil';
+  if (ROCK_LANDUSE_TYPES.has(landuseType)) return 'rock';
+  if (PAVED_LANDUSE_TYPES.has(landuseType)) return 'pavement';
+  return 'grass';
+}
+
+function textureSetForLanduse(appCtx, landuseType) {
+  const mode = surfaceModeForLanduse(landuseType);
+  const registered = appCtx.surfaceTextureSets?.[mode];
+  if (registered?.map) return { ...registered, mode };
+  if (mode === 'pavement' && appCtx.pavementDiffuse) {
+    return {
+      map: appCtx.pavementDiffuse,
+      normalMap: appCtx.pavementNormal,
+      roughnessMap: appCtx.pavementRoughness,
+      mode
+    };
+  }
+  if (mode === 'grass' && appCtx.grassDiffuse) {
+    return {
+      map: appCtx.grassDiffuse,
+      normalMap: appCtx.grassNormal,
+      roughnessMap: appCtx.grassRoughness,
+      mode
+    };
+  }
+  return null;
+}
+
+function applyWorldSpaceSurfaceUvs(geometry, metersPerTile) {
+  const positions = geometry?.attributes?.position;
+  if (!positions) return;
+  const scale = 1 / Math.max(1, Number(metersPerTile) || 6);
+  const uvs = new Float32Array(positions.count * 2);
+  for (let i = 0; i < positions.count; i += 1) {
+    uvs[i * 2] = positions.getX(i) * scale;
+    uvs[i * 2 + 1] = positions.getZ(i) * scale;
+  }
+  geometry.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+}
+
+function mappedSurfaceMaterialOptions(appCtx, landuseType, composition) {
+  const textures = textureSetForLanduse(appCtx, landuseType);
+  const metersPerTile =
+    textures?.mode === 'pavement' ? 3.2 :
+    textures?.mode === 'forest' ? 5.5 :
+    textures?.mode === 'rock' ? 5 :
+    textures?.mode === 'soil' ? 6 :
+    textures?.mode === 'sand' ? 8 :
+    textures?.mode === 'snow' ? 9 :
+    7;
+  return {
+    material: {
+      color: textures?.map ? 0xffffff : appCtx.LANDUSE_STYLES[landuseType].color,
+      map: textures?.map || null,
+      normalMap: textures?.normalMap || null,
+      roughnessMap: textures?.roughnessMap || null,
+      normalScale: textures?.normalMap ? new THREE.Vector2(0.34, 0.34) : undefined,
+      roughness: textures?.mode === 'pavement' ? 0.9 : 0.95,
+      metalness: 0.0,
+      transparent: false,
+      opacity: 1,
+      depthWrite: true,
+      polygonOffset: true,
+      polygonOffsetFactor: composition.polygonOffsetFactor,
+      polygonOffsetUnits: composition.polygonOffsetUnits
+    },
+    metersPerTile
+  };
+}
+
 export function createWorldLandusePass(options = {}) {
   const {
     FEATURE_MIN_HOLE_AREA = 6,
@@ -96,8 +178,14 @@ export function createWorldLandusePass(options = {}) {
     const isMappedGroundCover = visibleMappedSurfaceTypes.has(landuseType);
     const waterVisualProfile = isWater ? resolveWaterSurfaceVisualProfile() : null;
     const composition = surfaceComposition(landuseType, isWater ? 'water' : 'land-cover');
+    const centerElevation = isWater ? appCtx.elevationWorldYAtWorldXZ(
+      (minX + maxX) * 0.5,
+      (minZ + maxZ) * 0.5
+    ) : NaN;
     const surfaceBaseElevation = isWater
-      ? waterSurfaceBaseElevation(sampledHeights)
+      ? Number.isFinite(centerElevation) && centerElevation > 12
+        ? centerElevation
+        : waterSurfaceBaseElevation(sampledHeights)
       : avgElevation;
     const waterArea = isWater ? normalizeWaterBody({
       shape: 'area',
@@ -154,6 +242,8 @@ export function createWorldLandusePass(options = {}) {
       );
     }
 
+    const mappedSurface = isWater ? null : mappedSurfaceMaterialOptions(appCtx, landuseType, composition);
+    if (!isWater) applyWorldSpaceSurfaceUvs(geometry, mappedSurface.metersPerTile);
     const material = new THREE.MeshStandardMaterial(isWater ? {
       color: waterVisualProfile?.color || appCtx.LANDUSE_STYLES.water.color,
       emissive: waterVisualProfile?.emissive || 0x0f355a,
@@ -167,17 +257,7 @@ export function createWorldLandusePass(options = {}) {
       polygonOffset: true,
       polygonOffsetFactor: -6,
       polygonOffsetUnits: -6
-    } : {
-      color: appCtx.LANDUSE_STYLES[landuseType].color,
-      roughness: 0.95,
-      metalness: 0.0,
-      transparent: false,
-      opacity: 1,
-      depthWrite: true,
-      polygonOffset: true,
-      polygonOffsetFactor: composition.polygonOffsetFactor,
-      polygonOffsetUnits: composition.polygonOffsetUnits
-    });
+    } : mappedSurface.material);
 
     if (isWater) {
       registerWaterWaveMaterial(material, {
@@ -276,14 +356,18 @@ export function createWorldLandusePass(options = {}) {
     let lines = 0;
     const geom = geojson.geometry;
     const props = geojson.properties || {};
+    const waterFeatureMeta = {
+      ...featureMeta,
+      kindHint: props.kind || props.water || props.class || props.subclass || featureMeta.kindHint || null
+    };
 
     if (geom.type === 'Polygon') {
-      if (addWaterPolygonFromVectorCoords(runtime, geom.coordinates, featureMeta)) polygons++;
+      if (addWaterPolygonFromVectorCoords(runtime, geom.coordinates, waterFeatureMeta)) polygons++;
       return { polygons, lines };
     }
     if (geom.type === 'MultiPolygon') {
       geom.coordinates.forEach((polyCoords) => {
-        if (addWaterPolygonFromVectorCoords(runtime, polyCoords, featureMeta)) polygons++;
+        if (addWaterPolygonFromVectorCoords(runtime, polyCoords, waterFeatureMeta)) polygons++;
       });
       return { polygons, lines };
     }
@@ -346,7 +430,7 @@ export function createWorldLandusePass(options = {}) {
           if (!feature || typeof feature.toGeoJSON !== 'function') continue;
           const out = addVectorWaterGeoJSON(runtime, feature.toGeoJSON(x, y, z), {
             layer: layerName,
-            kindHint: layerName === 'ocean' ? 'open_ocean' : null,
+            kindHint: layerName === 'ocean' ? 'open_ocean' : 'lake',
             sourceFeatureId: `shortbread:${z}/${x}/${y}:${layerName}:${i}`,
             geometrySource: 'osm-shortbread',
             tileKey: `${z}/${x}/${y}`

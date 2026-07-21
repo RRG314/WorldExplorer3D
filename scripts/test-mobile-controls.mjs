@@ -43,25 +43,29 @@ async function waitForRuntime(page) {
   }, null, { timeout: 90000 });
 }
 
+async function selectBaltimoreAndExplore(page) {
+  await page.locator('#globeCustomLat').fill('39.2904');
+  await page.locator('#globeCustomLon').fill('-76.6122');
+  await page.locator('#globeSelectorStartBtn').tap();
+}
+
 async function assertTitleTouch(page, baseUrl) {
   await page.goto(`${baseUrl}/app/?mobile-title=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
-  await page.waitForFunction(() => !document.getElementById('startBtn')?.disabled, null, { timeout: 90000 });
+  await waitForRuntime(page);
+  await page.locator('#globeSelectorScreen.show').waitFor({ state: 'visible', timeout: 90000 });
   assert(await page.locator('#proAccessPanel').evaluate((el) => el.hidden), 'Touch title was blocked by the automatic donation panel');
-  await page.locator('.tab-btn[data-tab="settings"]').tap();
-  assert(await page.locator('.tab-btn[data-tab="settings"]').evaluate((el) => el.classList.contains('active')), 'Settings tab ignored an iPhone tap');
-  await page.locator('.tab-btn[data-tab="location"]').tap();
-  await page.locator('.loc[data-loc="baltimore"]').tap();
-  await page.locator('#startBtn').tap();
+  await page.locator('.globe-hub-tools [data-globe-destination="settings"]').tap();
+  assert(await page.locator('#tab-settings').evaluate((el) => el.classList.contains('active')), 'Settings panel ignored an iPhone tap');
+  await page.locator('#globeHubOverlayCloseBtn').tap();
+  await selectBaltimoreAndExplore(page);
   await page.waitForFunction(() => document.getElementById('titleScreen')?.classList.contains('hidden'), null, { timeout: 15000 });
 }
 
 async function bootstrapEarth(page, baseUrl) {
   await page.goto(`${baseUrl}/app/?mobile-runtime=${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await waitForRuntime(page);
-  await page.waitForFunction(() => !document.getElementById('startBtn')?.disabled, null, { timeout: 90000 });
-  await page.locator('.tab-btn[data-tab="location"]').tap();
-  await page.locator('.loc[data-loc="baltimore"]').tap();
-  await page.locator('#startBtn').tap();
+  await page.locator('#globeSelectorScreen.show').waitFor({ state: 'visible', timeout: 90000 });
+  await selectBaltimoreAndExplore(page);
   await page.locator('#loading.show').waitFor({ state: 'visible', timeout: 15000 });
   try {
     const deadline = Date.now() + 90000;
@@ -184,9 +188,9 @@ async function assertDockMenus(page) {
 
 async function assertMainMenuReturn(page) {
   await page.locator('#mainMenuBtn').tap();
-  await page.waitForFunction(() => !document.getElementById('titleScreen')?.classList.contains('hidden'), null, { timeout: 15000 });
-  await page.locator('.tab-btn[data-tab="settings"]').tap();
-  assert(await page.locator('.tab-btn[data-tab="settings"]').evaluate((el) => el.classList.contains('active')), 'Title controls stopped responding after Main Menu');
+  await page.locator('#globeSelectorScreen.show').waitFor({ state: 'visible', timeout: 15000 });
+  await page.locator('.globe-hub-tools [data-globe-destination="settings"]').tap();
+  assert(await page.locator('#tab-settings').evaluate((el) => el.classList.contains('active')), 'Globe hub controls stopped responding after Main Menu');
 }
 
 async function assertLandscapeShell(browser, baseUrl) {

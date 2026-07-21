@@ -1,15 +1,8 @@
+import { operationalFeedService } from '../geospatial/operational-feeds.js?v=1';
+
 const SATELLITE_JS_URL = 'https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/+esm';
-const SATELLITE_REFRESH_MS = 30 * 60 * 1000;
-const FEED_FETCH_TIMEOUT_MS = 3200;
 const EARTH_RADIUS_KM = 6378.137;
 const FALLBACK_ORBIT_EPOCH_MS = Date.UTC(2026, 2, 16, 0, 0, 0);
-
-const FEED_URLS = {
-  stations: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=stations&FORMAT=tle',
-  weather: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=weather&FORMAT=tle',
-  resource: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=resource&FORMAT=tle',
-  science: 'https://celestrak.org/NORAD/elements/gp.php?GROUP=science&FORMAT=tle'
-};
 
 const CURATED_SATELLITES = [
   {
@@ -196,8 +189,6 @@ const FALLBACK_ORBITS = {
 };
 
 let _satLibPromise = null;
-let _feedPromise = null;
-let _lastFeedAt = 0;
 let _curatedEntries = [];
 
 function normalizeLongitude(lonDeg) {
@@ -228,25 +219,6 @@ function parseTleBlock(text, source) {
     records.push({ name, line1, line2, source });
   }
   return records;
-}
-
-async function fetchFeed(source) {
-  const url = FEED_URLS[source];
-  if (!url) return [];
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), FEED_FETCH_TIMEOUT_MS);
-  let response = null;
-  try {
-    response = await fetch(url, {
-      signal: controller.signal,
-      cache: 'no-store'
-    });
-  } finally {
-    clearTimeout(timeout);
-  }
-  if (!response.ok) throw new Error(`satellite_feed_${source}_${response.status}`);
-  const text = await response.text();
-  return parseTleBlock(text, source);
 }
 
 function altitudeToSpeedKmS(altitudeKm = 0, periodMinutes = 90) {
@@ -427,25 +399,18 @@ function sampleEntryState(entry, at, lib) {
 }
 
 async function refreshSatelliteCatalog(force = false) {
-  const now = Date.now();
-  if (!force && _curatedEntries.length && (now - _lastFeedAt) < SATELLITE_REFRESH_MS) {
-    return _curatedEntries;
-  }
-  if (_feedPromise && !force) return _feedPromise;
-
   const groupedSources = Array.from(new Set(CURATED_SATELLITES.map((entry) => entry.source)));
-  _feedPromise = Promise.allSettled(groupedSources.map((source) => fetchFeed(source))).then(async (groups) => {
-    const allRecords = groups.flatMap((result) => (result.status === 'fulfilled' ? result.value : []));
-    const lib = allRecords.length ? await getSatelliteLib() : null;
-    const curated = buildCuratedEntries(allRecords, lib);
-    _curatedEntries = curated;
-    _lastFeedAt = Date.now();
-    return _curatedEntries;
-  }).finally(() => {
-    _feedPromise = null;
-  });
-
-  return _feedPromise;
+  let feedGroups = [];
+  try {
+    const result = await operationalFeedService.celestrak(groupedSources, { force });
+    feedGroups = result.items;
+  } catch {
+    feedGroups = [];
+  }
+  const allRecords = feedGroups.flatMap((group) => parseTleBlock(group.text, group.source));
+  const lib = allRecords.length ? await getSatelliteLib() : null;
+  _curatedEntries = buildCuratedEntries(allRecords, lib);
+  return _curatedEntries;
 }
 
 function safeVelocityMagnitude(velocity = null) {

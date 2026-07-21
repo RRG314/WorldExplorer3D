@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY
-} from "./structure-semantics.js?v=13";
+} from "./structure-semantics.js?v=16";
 import { createSurfaceQuery } from './world/surface-contract.js?v=6';
 // ground.js - Unified Ground Height Service
 // Single source of truth for y(x,z) used by terrain, roads, and vehicles
@@ -191,7 +191,8 @@ const GroundHeight = {
         best = {
           dist,
           pt: { x: px, z: pz },
-          segIndex: i
+          segIndex: i,
+          t
         };
       }
     }
@@ -213,7 +214,8 @@ const GroundHeight = {
           feature: cachedFeature,
           dist: cachedProjection.dist,
           pt: cachedProjection.pt,
-          segIndex: cachedProjection.segIndex
+          segIndex: cachedProjection.segIndex,
+          t: cachedProjection.t
         };
       }
     }

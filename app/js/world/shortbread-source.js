@@ -96,6 +96,9 @@ function roadTags(properties = {}) {
     oneway: properties.oneway ? (properties.oneway_reverse ? '-1' : 'yes') : '',
     service: properties.service || '',
     surface: properties.surface || '',
+    width: properties.width || '',
+    footway: properties.footway || '',
+    sidewalk: properties.sidewalk || '',
     tracktype: properties.tracktype || '',
     bicycle: properties.bicycle || '',
     horse: properties.horse || ''
@@ -246,7 +249,10 @@ function convertTilesToElements(tiles, layerNames, bounds = null) {
             const part = parts[partIndex];
             if (!Array.isArray(part.coords) || part.coords.length < (part.polygon ? 4 : 2)) continue;
             if (!partIntersectsBounds(part, bounds)) continue;
-          const resolvedTags = { ...tags };
+          const resolvedTags = {
+            ...tags,
+            ...(layerName === 'buildings' ? { _geometrySource: 'shortbread-vector' } : {})
+          };
           if (layerName === 'streets' && resolveRoadName) {
             const roadName = resolveRoadName(projectLine(part.coords), geojson.properties?.kind);
             if (roadName) resolvedTags.name = roadName;

@@ -1,3 +1,78 @@
+function drawOceanNavigationMap(oceanMode, depth) {
+  const canvas = document.getElementById('minimap');
+  const ctx = canvas?.getContext?.('2d');
+  if (!canvas || !ctx) return;
+
+  const width = canvas.width || 150;
+  const height = canvas.height || 150;
+  const centerX = width * 0.5;
+  const centerY = height * 0.5;
+  const sub = oceanMode.submarine;
+  const positionX = Number(sub?.position?.x) || 0;
+  const positionZ = Number(sub?.position?.z) || 0;
+
+  const water = ctx.createRadialGradient(centerX, centerY, 8, centerX, centerY, width * 0.7);
+  water.addColorStop(0, '#123b53');
+  water.addColorStop(0.58, '#082b3e');
+  water.addColorStop(1, '#031924');
+  ctx.fillStyle = water;
+  ctx.fillRect(0, 0, width, height);
+
+  ctx.save();
+  ctx.strokeStyle = 'rgba(104, 210, 227, 0.18)';
+  ctx.lineWidth = 1;
+  for (let step = 25; step < width; step += 25) {
+    ctx.beginPath();
+    ctx.moveTo(step, 0);
+    ctx.lineTo(step, height);
+    ctx.stroke();
+  }
+  for (let step = 25; step < height; step += 25) {
+    ctx.beginPath();
+    ctx.moveTo(0, step);
+    ctx.lineTo(width, step);
+    ctx.stroke();
+  }
+
+  const contourOffsetX = (positionX * 0.06) % 18;
+  const contourOffsetY = (positionZ * 0.04) % 16;
+  ctx.strokeStyle = 'rgba(83, 183, 202, 0.34)';
+  for (let band = -1; band < 7; band += 1) {
+    ctx.beginPath();
+    for (let x = -8; x <= width + 8; x += 4) {
+      const y = 18 + band * 23 + Math.sin((x + band * 11 + contourOffsetX) * 0.055) * 8 + contourOffsetY;
+      if (x === -8) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.stroke();
+  }
+
+  const markerX = Math.max(12, Math.min(width - 12, centerX + positionX * 0.2));
+  const markerY = Math.max(18, Math.min(height - 12, centerY + positionZ * 0.2));
+  ctx.translate(markerX, markerY);
+  ctx.rotate(-(Number(sub?.yaw) || 0));
+  ctx.fillStyle = '#e9fbff';
+  ctx.strokeStyle = '#42d4e8';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  ctx.moveTo(0, -8);
+  ctx.lineTo(5.5, 6);
+  ctx.lineTo(0, 3.5);
+  ctx.lineTo(-5.5, 6);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.restore();
+
+  ctx.fillStyle = '#d8f8ff';
+  ctx.font = '700 9px monospace';
+  ctx.fillText(oceanMode.bathymetryReady ? 'BATHYMETRY' : 'LOCAL SONAR', 8, 13);
+  ctx.fillStyle = '#8ed9e6';
+  ctx.font = '8px monospace';
+  ctx.fillText(`${depth}m`, 8, height - 8);
+  ctx.fillText('N', width - 14, 13);
+}
+
 export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0) {
   const speedEl = document.getElementById('speed');
   const limitEl = document.getElementById('limit');
@@ -41,6 +116,7 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0) {
     link.hidden = false;
     link.setAttribute('aria-disabled', 'false');
   });
+  drawOceanNavigationMap(oceanMode, depth);
 
   if (boostFill) {
     boostFill.style.width = `${batteryPct}%`;

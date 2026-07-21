@@ -180,13 +180,19 @@ async function rendererMetrics(page) {
     let terrainImageryOwners = 0;
     let classifiedTextureOwners = 0;
     let terrainDetailMapOwners = 0;
+    let semanticPbrOwners = 0;
+    let unclassifiedDetailOwners = 0;
     const terrainRasterUrls = [];
     for (const mesh of ctx.terrainGroup?.children || []) {
       const mode = String(mesh.userData?.terrainVisualProfile?.visualMode || mesh.userData?.terrainVisualProfile?.mode || 'unknown');
       terrainSurfaceModes[mode] = Number(terrainSurfaceModes[mode] || 0) + 1;
       if (mesh.userData?.terrainImageryTexture || mesh.userData?.terrainImageryStatus) terrainImageryOwners += 1;
       if (mesh.userData?.worldCoverTexture && mesh.material?.map === mesh.userData.worldCoverTexture) classifiedTextureOwners += 1;
-      if (mesh.material?.normalMap || mesh.material?.roughnessMap) terrainDetailMapOwners += 1;
+      if (mesh.material?.normalMap || mesh.material?.roughnessMap) {
+        terrainDetailMapOwners += 1;
+        if (mesh.userData?.terrainDetailProvenance?.kind === 'semantic-pbr') semanticPbrOwners += 1;
+        else unclassifiedDetailOwners += 1;
+      }
       const source = String(mesh.material?.map?.image?.currentSrc || mesh.material?.map?.image?.src || '');
       if (/arcgisonline|World_Imagery/i.test(source)) terrainRasterUrls.push(source);
     }
@@ -210,6 +216,8 @@ async function rendererMetrics(page) {
         imageryOwners: terrainImageryOwners,
         classifiedTextureOwners,
         detailMapOwners: terrainDetailMapOwners,
+        semanticPbrOwners,
+        unclassifiedDetailOwners,
         rasterUrls: terrainRasterUrls
       },
       gpu: {
@@ -402,7 +410,12 @@ async function main() {
     assert(report.drone.opaqueLandCoverMeshes === report.drone.visibleLandCoverMeshes, 'Mapped land cover was not visually authoritative.');
     assert(report.drone.terrainSurface.imageryOwners === 0, 'A terrain mesh still retained a satellite-imagery owner.');
     assert(report.drone.terrainSurface.rasterUrls.length === 0, 'A terrain material still referenced satellite imagery.');
-    assert(report.drone.terrainSurface.detailMapOwners === 0, 'Continuous terrain retained a photographic-style detail map.');
+    assert(report.drone.terrainSurface.detailMapOwners > 0, 'Continuous terrain lost its semantic PBR surface detail.');
+    assert(
+      report.drone.terrainSurface.semanticPbrOwners === report.drone.terrainSurface.detailMapOwners,
+      'A continuous terrain detail map is missing semantic PBR provenance.'
+    );
+    assert(report.drone.terrainSurface.unclassifiedDetailOwners === 0, 'Continuous terrain retained an unclassified detail map.');
     assert(report.drone.missingProvenance === 0, 'A continuous renderer mesh is missing source provenance.');
     assert(!report.drone.rendererContextLost, 'WebGL context was lost during the renderer check.');
     assert(errors.length === 0, `Browser errors: ${errors.join(' | ')}`);

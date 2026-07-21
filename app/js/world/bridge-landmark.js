@@ -122,6 +122,42 @@ function projectDistanceToPath(point, points, distances) {
   return bestAlong;
 }
 
+function distanceToPath(point, points) {
+  let bestDistance = Infinity;
+  for (let i = 0; i < points.length - 1; i++) {
+    const start = points[i];
+    const end = points[i + 1];
+    const dx = end.x - start.x;
+    const dz = end.z - start.z;
+    const lengthSq = dx * dx + dz * dz || 1;
+    const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.z - start.z) * dz) / lengthSq));
+    const px = start.x + dx * t;
+    const pz = start.z + dz * t;
+    bestDistance = Math.min(bestDistance, Math.hypot(point.x - px, point.z - pz));
+  }
+  return bestDistance;
+}
+
+function synchronizeNavigableDeck(path) {
+  const worldUnitsPerMeter = Math.max(0.01, Number(appCtx.WORLD_UNITS_PER_METER) || 1);
+  const minimumDeckY = GOLDEN_GATE_DECK_ELEVATION_METERS * worldUnitsPerMeter;
+  let matchedRoads = 0;
+
+  for (const road of appCtx.roads || []) {
+    if (road?.structureSemantics?.terrainMode !== 'elevated' || !Array.isArray(road.pts)) continue;
+    const namedBridge = /golden gate bridge/i.test(String(road.name || ''));
+    const pathMatches = road.pts.filter((point) => distanceToPath(point, path) <= 42).length;
+    if (!namedBridge && pathMatches < Math.min(2, road.pts.length)) continue;
+    road.minimumStructureSurfaceY = minimumDeckY;
+    matchedRoads += 1;
+  }
+
+  if (matchedRoads > 0) {
+    appCtx.requestWorldSurfaceSync?.({ force: true, source: 'landmark_bridge_deck' });
+  }
+  return matchedRoads;
+}
+
 function sampleRoadDeckY(x, z) {
   let best = null;
   for (const road of appCtx.roads || []) {
@@ -418,6 +454,7 @@ export function renderSuspensionBridgeLandmark(data) {
   const path = pathPoints(spanWay, nodes);
   const metrics = polylineMetrics(path);
   if (path.length < 3 || metrics.total < MIN_SUSPENSION_SPAN_METERS) return null;
+  const synchronizedRoads = synchronizeNavigableDeck(path);
 
   const createdMeshes = [];
   const towerParts = [];
@@ -478,6 +515,7 @@ export function renderSuspensionBridgeLandmark(data) {
     girders: towers.length === 2 ? 2 : 0,
     suspenders: createdMeshes.find((mesh) => mesh.userData?.landmarkKind === 'suspension_bridge_suspender')?.userData?.instanceCount || 0,
     structuralMembers: structuralDetails?.userData?.instanceCount || 0,
+    synchronizedRoads,
     spanMeters: Number(metrics.total.toFixed(1))
   };
 }

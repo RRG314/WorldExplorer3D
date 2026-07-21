@@ -1,11 +1,12 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   classifyTerrainSurfaceProfile as classifySharedTerrainSurfaceProfile
-} from "../surface-rules.js?v=15";
+} from "../surface-rules.js?v=17";
 import {
+  classifyWorldCoverSurface,
   loadWorldCoverBaseline,
   worldCoverSupportsBounds
-} from "./worldcover-baseline.js?v=7";
+} from "./worldcover-baseline.js?v=10";
 
 const SNOW_COLOR_HEX = 0xffffff;
 const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
@@ -14,6 +15,7 @@ export const TERRAIN_GRASS_COLOR_HEX = 0x6b8e4a;
 const URBAN_GROUND_HEX = 0x8b8f96;
 const SOIL_COLOR_HEX = 0x8c6b47;
 const ROCK_COLOR_HEX = 0x7b7e82;
+const FOREST_COLOR_HEX = 0x4d633b;
 const GROUND_FALLBACK_GRASS_HEX = 0x4a7a2e;
 const GROUND_FALLBACK_SNOW_HEX = 0xd6e2ef;
 const GROUND_FALLBACK_ALPINE_HEX = 0xc6d0d8;
@@ -21,6 +23,7 @@ const GROUND_FALLBACK_SAND_HEX = 0xc8aa70;
 const GROUND_FALLBACK_URBAN_HEX = 0x767a82;
 const GROUND_FALLBACK_SOIL_HEX = 0x7d5e3d;
 const GROUND_FALLBACK_ROCK_HEX = 0x6e7279;
+const GROUND_FALLBACK_FOREST_HEX = 0x3f5633;
 
 function cloneTerrainTextureWithRepeat(sourceTexture, repeats) {
   if (!sourceTexture) return null;
@@ -228,15 +231,13 @@ function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
     mode === "urban" ? "urban" :
     mode === "soil" ? "soil" :
     mode === "rock" ? "rock" :
+    mode === "forest" ? "forest" :
     "grass";
-  const textureCacheKey = `${modeKey}:${Number(repeats) || 12}`;
-  if (mesh.userData.terrainTextureSetsByMode[textureCacheKey]) {
-    mesh.userData.terrainTextureSet = mesh.userData.terrainTextureSetsByMode[textureCacheKey];
-    return mesh.userData.terrainTextureSet;
-  }
-
   let source = null;
-  if (modeKey === "grass") {
+  const registeredMode = modeKey === 'snowRock' ? 'rock' : modeKey;
+  if (appCtx.surfaceTextureSets?.[registeredMode]?.map) {
+    source = appCtx.surfaceTextureSets[registeredMode];
+  } else if (modeKey === "grass" || modeKey === "forest") {
     source = {
       map: appCtx.grassDiffuse,
       normalMap: appCtx.grassNormal,
@@ -261,6 +262,18 @@ function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
     source = getProceduralTerrainTextureBase(modeKey);
   }
   if (!source) return null;
+
+  const textureCacheKey = [
+    modeKey,
+    Number(repeats) || 12,
+    source.map?.uuid || 'none',
+    source.normalMap?.uuid || 'none',
+    source.roughnessMap?.uuid || 'none'
+  ].join(':');
+  if (mesh.userData.terrainTextureSetsByMode[textureCacheKey]) {
+    mesh.userData.terrainTextureSet = mesh.userData.terrainTextureSetsByMode[textureCacheKey];
+    return mesh.userData.terrainTextureSet;
+  }
 
   const textureSet = {
     map: cloneTerrainTextureWithRepeat(source.map, repeats),
@@ -293,7 +306,7 @@ function applyGroundFallbackProfile(profile = null) {
   const material = ground?.material;
   if (!ground || !material || Array.isArray(material)) return;
   const requestedMode = profile?.visualMode || profile?.mode;
-  const mode = ["snow", "snowRock", "sand", "built", "urban", "soil", "rock"].includes(requestedMode) ? requestedMode : "grass";
+  const mode = ["snow", "snowRock", "sand", "built", "urban", "soil", "rock", "forest"].includes(requestedMode) ? requestedMode : "grass";
   const colorHex = mode === "snow" ?
     GROUND_FALLBACK_SNOW_HEX :
     mode === "snowRock" ?
@@ -306,6 +319,8 @@ function applyGroundFallbackProfile(profile = null) {
             GROUND_FALLBACK_SOIL_HEX :
             mode === "rock" ?
               GROUND_FALLBACK_ROCK_HEX :
+              mode === "forest" ?
+                GROUND_FALLBACK_FOREST_HEX :
               GROUND_FALLBACK_GRASS_HEX;
   material.color.setHex(colorHex);
   material.roughness =
@@ -364,52 +379,19 @@ function worldCoverStats() {
 
 function classifyWorldCoverSurfaceProfile(mesh, result) {
   const current = mesh?.userData?.terrainVisualProfile || null;
-  const counts = result?.counts || {};
-  const total = Math.max(1, Number(result?.recognizedPixels || result?.totalPixels || 0));
-  const ratio = (className) => Number(counts[className] || 0) / total;
   const bounds = mesh?.userData?.terrainTile?.bounds || null;
   const centerLat = Number.isFinite(bounds?.latN) && Number.isFinite(bounds?.latS) ?
     (bounds.latN + bounds.latS) * 0.5 :
     Number(appCtx.LOC?.lat || 0);
-  const absLat = Math.abs(centerLat);
-  const bare = ratio('bare');
-  const built = ratio('built');
-  const vegetated = ratio('tree') + ratio('shrub') + ratio('grass') + ratio('crop') + ratio('wetland') + ratio('mangrove') + ratio('moss');
-  const snow = ratio('snow');
-  const aridLatitude = absLat >= 12 && absLat <= 35;
-  const aridBareSurface = aridLatitude && (
-    bare >= 0.34 ||
-    (bare >= 0.12 && bare + built >= 0.68 && vegetated <= 0.25)
-  );
-
-  if (snow >= 0.35) {
-    return {
-      ...current,
-      mode: 'snow',
-      visualMode: 'snow',
-      reason: 'worldcover_snow',
-      worldCoverConfidence: snow
-    };
-  }
-  if (aridBareSurface) {
-    return {
-      ...current,
-      mode: 'sand',
-      visualMode: 'sand',
-      reason: 'worldcover_arid_bare',
-      worldCoverConfidence: bare
-    };
-  }
-  if (bare >= 0.62 && vegetated <= 0.16) {
-    return {
-      ...current,
-      mode: 'rock',
-      visualMode: 'rock',
-      reason: 'worldcover_bare_ground',
-      worldCoverConfidence: bare
-    };
-  }
-  return current;
+  const semantic = classifyWorldCoverSurface(result, centerLat);
+  if (!semantic) return current;
+  return {
+    ...current,
+    mode: semantic.mode,
+    visualMode: semantic.mode,
+    reason: semantic.reason,
+    worldCoverConfidence: semantic.confidence
+  };
 }
 
 function applyLoadedWorldCoverBaseline(mesh) {
@@ -431,18 +413,44 @@ function applyLoadedWorldCoverBaseline(mesh) {
     mesh.userData.worldCoverSurfaceMode = semanticProfile.mode;
     applyTerrainVisualProfile(mesh, semanticProfile, null, { queueWorldCover: false });
   }
-  if (result.texture) {
+  const continuousMode = appCtx.getContinuousWorldEnabled?.() === true;
+  if (result.texture && continuousMode) {
+    const detailMode =
+      result.dominantClass === 'built' ? 'urban' :
+      result.dominantClass === 'crop' ? 'soil' :
+      result.dominantClass === 'bare' ? (semanticProfile?.mode === 'sand' ? 'sand' : 'rock') :
+      result.dominantClass === 'snow' ? 'snow' :
+      result.dominantClass === 'tree' || result.dominantClass === 'mangrove' ? 'forest' :
+      'grass';
+    const detailTextures = ensureTerrainTextureSet(
+      mesh,
+      Number(mesh.userData.terrainTextureRepeats) || 12,
+      detailMode
+    );
     material.map = result.texture;
-    material.normalMap = null;
-    material.roughnessMap = null;
+    material.normalMap = detailTextures?.normalMap || null;
+    material.roughnessMap = detailTextures?.roughnessMap || null;
+    if (material.normalMap) material.normalScale = new THREE.Vector2(0.28, 0.28);
     material.color.setHex(0xffffff);
     material.emissiveMap = null;
     material.emissiveIntensity = 0;
     material.roughness = 0.96;
     material.metalness = 0;
     material.needsUpdate = true;
+    mesh.userData.terrainDetailProvenance = {
+      kind: 'semantic-pbr',
+      source: 'surface-material-registry',
+      mode: detailMode
+    };
+  } else {
+    mesh.userData.terrainDetailProvenance = null;
   }
-  mesh.userData.worldCoverTexture = result.texture || null;
+  if (!continuousMode && result.texture) {
+    result.texture.dispose?.();
+    result.texture = null;
+  }
+  mesh.userData.worldCoverTexture = continuousMode ? result.texture || null : null;
+  if (!continuousMode) appCtx.scheduleWorldCoverVegetationRefresh?.();
   return true;
 }
 
@@ -453,6 +461,7 @@ function applyPendingSemanticSurface(material, mode) {
     mode === 'built' || mode === 'urban' ? URBAN_GROUND_HEX :
     mode === 'soil' ? SOIL_COLOR_HEX :
     mode === 'rock' ? ROCK_COLOR_HEX :
+    mode === 'forest' ? FOREST_COLOR_HEX :
     TERRAIN_GRASS_COLOR_HEX;
   material.map = null;
   material.normalMap = null;
@@ -530,6 +539,7 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
     nextProfile.mode === "urban" ? "urban" :
     nextProfile.mode === "soil" ? "soil" :
     nextProfile.mode === "rock" ? "rock" :
+    nextProfile.mode === "forest" ? "forest" :
     "grass";
   const textureRepeats = Number.isFinite(repeats) && repeats > 0 ?
     repeats :
@@ -613,6 +623,17 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
     mat.roughness = 0.87;
     mat.metalness = 0.02;
     if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.56, 0.56);
+  } else if (nextMode === "forest") {
+    const textures = ensureTerrainTextureSet(mesh, textureRepeats * 1.1, "forest");
+    mat.map = textures?.map || null;
+    mat.normalMap = textures?.normalMap || null;
+    mat.roughnessMap = textures?.roughnessMap || null;
+    mat.color.setHex(mat.map ? 0xffffff : FOREST_COLOR_HEX);
+    if (mat.emissive) mat.emissive.setHex(0x000000);
+    mat.emissiveIntensity = 0;
+    mat.roughness = 0.96;
+    mat.metalness = 0;
+    if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.48, 0.48);
   } else {
     const textures = ensureTerrainTextureSet(mesh, textureRepeats, "grass");
     mat.map = textures?.map || null;

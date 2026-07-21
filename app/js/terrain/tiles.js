@@ -3,7 +3,7 @@ import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=22";
+} from "./surface-profiles.js?v=26";
 
 const TERRAIN_TILE_CACHE_LIMIT = 72;
 const TERRAIN_TILE_MAX_ATTEMPTS = 3;
@@ -13,6 +13,24 @@ const terrainTileLifetime = { failures: 0, retries: 0, recovered: 0 };
 const recentTerrainFailures = new Map();
 const TERRAIN_FAILURE_HISTORY_MS = 30000;
 const TERRAIN_FAILURE_HISTORY_LIMIT = 128;
+const INVALID_TERRAIN_TILE = Object.freeze({
+  key: "invalid",
+  img: null,
+  loaded: false,
+  failed: true,
+  loading: false,
+  evicted: false,
+  elev: null,
+  w: 256,
+  h: 256,
+  ready: null,
+  attempts: TERRAIN_TILE_MAX_ATTEMPTS,
+  recovered: false,
+  failedAt: 0,
+  nextRetryAt: Number.POSITIVE_INFINITY,
+  lastError: "invalid terrain tile coordinates",
+  lastUsedAt: 0
+});
 
 function terrainNow() {
   return typeof globalThis.performance?.now === "function" ? globalThis.performance.now() : Date.now();
@@ -126,6 +144,8 @@ export function decodeTerrariumRGB(r, g, b) {
 }
 
 export function getOrLoadTerrainTile(z, x, y, deps = {}) {
+  if (![z, x, y].every(Number.isFinite)) return INVALID_TERRAIN_TILE;
+
   const key = `${z}/${x}/${y}`;
   const cached = appCtx.terrainTileCache.get(key);
   if (cached) {

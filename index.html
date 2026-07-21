@@ -12,17 +12,17 @@
   <script src="./js/firebase-project-config.js"></script>
   <style>
     :root {
-      --bg-0: #071324;
-      --bg-1: #0f2742;
-      --bg-2: #1f4f73;
-      --ink: #e6f2ff;
-      --muted: #b7cde0;
-      --card: rgba(7, 19, 36, 0.72);
-      --line: rgba(183, 205, 224, 0.24);
-      --accent: #ffc857;
-      --accent-2: #53c4ff;
-      --ok: #4dd69f;
-      --danger: #ff6b6b;
+      --bg-0: #05090d;
+      --bg-1: #0a1219;
+      --bg-2: #101921;
+      --ink: #f4f7f9;
+      --muted: #9aa8b2;
+      --card: #0a1219;
+      --line: rgba(157, 174, 186, 0.3);
+      --accent: #f4b942;
+      --accent-2: #2d7dff;
+      --ok: #35d272;
+      --danger: #ef5b5b;
     }
 
     * { box-sizing: border-box; }
@@ -30,39 +30,74 @@
     body {
       margin: 0;
       color: var(--ink);
-      background:
-        radial-gradient(circle at 20% 20%, rgba(83, 196, 255, 0.2), transparent 45%),
-        radial-gradient(circle at 80% 10%, rgba(255, 200, 87, 0.18), transparent 40%),
-        linear-gradient(170deg, var(--bg-2), var(--bg-1) 52%, var(--bg-0));
+      background: var(--bg-0);
       min-height: 100vh;
       font-family: 'Barlow', sans-serif;
+      letter-spacing: 0;
       line-height: 1.45;
     }
 
     a { color: inherit; }
 
     .shell {
-      width: min(1120px, 92vw);
-      margin: 0 auto;
-      padding: 28px 0 42px;
+      width: 100%;
+      margin: 0;
+      padding: 0;
+    }
+
+    .landing-masthead {
+      position: sticky;
+      z-index: 20;
+      top: 0;
+      height: 68px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 clamp(18px, 4vw, 64px);
+      background: rgba(3, 9, 14, 0.96);
+      border-bottom: 1px solid var(--line);
+    }
+
+    .landing-brand {
+      color: var(--ink);
+      font: 700 16px/1 'Chakra Petch', sans-serif;
+      text-decoration: none;
+      text-transform: uppercase;
+    }
+
+    .landing-brand strong { color: var(--accent-2); }
+
+    .landing-nav { display: flex; align-items: center; gap: 26px; }
+    .landing-nav a {
+      color: var(--muted);
+      font: 600 11px/1 'Chakra Petch', sans-serif;
+      text-decoration: none;
+      text-transform: uppercase;
+    }
+    .landing-nav a:hover { color: var(--ink); }
+    .landing-nav .nav-launch { padding: 11px 16px; color: #fff; background: var(--accent-2); border: 1px solid #65a1ff; }
     }
 
     .hero {
-      border: 1px solid var(--line);
-      border-radius: 22px;
+      position: relative;
+      padding: 0;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
       overflow: hidden;
-      background: rgba(8, 18, 34, 0.68);
-      box-shadow: 0 24px 48px rgba(2, 8, 18, 0.35);
-      margin-bottom: 26px;
+      background: var(--bg-0);
+      box-shadow: none;
+      margin: 0;
     }
 
     .announcement {
-      margin-bottom: 18px;
-      border: 1px solid var(--line);
-      border-radius: 18px;
-      background: rgba(8, 18, 34, 0.72);
-      box-shadow: 0 20px 42px rgba(2, 8, 18, 0.28);
-      padding: 18px 22px;
+      margin: 0;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
+      background: var(--bg-1);
+      box-shadow: none;
+      padding: 18px clamp(18px, 4vw, 64px);
     }
 
     .announcement[data-tone="success"] { border-color: rgba(77, 214, 159, 0.34); }
@@ -94,7 +129,7 @@
       display: inline-flex;
       align-items: center;
       margin-top: 12px;
-      border-radius: 999px;
+      border-radius: 2px;
       padding: 10px 14px;
       border: 1px solid var(--line);
       background: rgba(255, 255, 255, 0.05);
@@ -104,41 +139,45 @@
 
     .hero-grid {
       display: grid;
-      grid-template-columns: 1.1fr 1fr;
-      gap: 0;
-      min-height: 430px;
+      position: relative;
+      display: block;
+      min-height: calc(100svh - 118px);
     }
 
     .hero-copy {
-      padding: 34px;
+      position: relative;
+      z-index: 2;
+      min-height: calc(100svh - 118px);
+      padding: clamp(44px, 8vw, 112px) clamp(20px, 7vw, 110px);
       display: flex;
       flex-direction: column;
       justify-content: center;
       gap: 16px;
+      width: min(760px, 82vw);
     }
 
     h1 {
       margin: 0;
       font-family: 'Chakra Petch', sans-serif;
-      font-size: clamp(34px, 5vw, 54px);
+      font-size: 44px;
       line-height: 1.02;
-      letter-spacing: 0.015em;
+      letter-spacing: 0;
     }
 
     .hero-brand {
       display: block;
       margin-bottom: 10px;
-      color: #a2efd0;
-      font-size: clamp(40px, 6.2vw, 78px);
-      letter-spacing: 0.1em;
+      color: var(--ink);
+      font-size: 58px;
+      letter-spacing: 0;
       text-transform: uppercase;
     }
 
     .hero-headline {
       display: block;
-      font-size: clamp(24px, 2.8vw, 40px);
-      letter-spacing: 0.04em;
-      color: #dbe8ff;
+      font-size: 30px;
+      letter-spacing: 0;
+      color: #dbe8ef;
       line-height: 1.08;
     }
 
@@ -146,7 +185,7 @@
       margin: 0;
       color: var(--muted);
       font-size: clamp(17px, 2vw, 21px);
-      max-width: 34ch;
+      max-width: 48ch;
     }
 
     .cta-row {
@@ -157,11 +196,11 @@
 
     .btn {
       border: 1px solid transparent;
-      border-radius: 999px;
+      border-radius: 2px;
       padding: 12px 18px;
       font-size: 15px;
       font-weight: 700;
-      letter-spacing: 0.015em;
+      letter-spacing: 0;
       text-decoration: none;
       cursor: pointer;
       transition: transform 0.16s ease, filter 0.16s ease, box-shadow 0.16s ease;
@@ -171,14 +210,14 @@
 
     .btn-play {
       background: var(--accent-2);
-      color: #03192d;
-      box-shadow: 0 10px 24px rgba(83, 196, 255, 0.34);
+      color: #fff;
+      box-shadow: none;
     }
 
     .btn-trial {
       background: var(--accent);
       color: #271900;
-      box-shadow: 0 10px 24px rgba(255, 200, 87, 0.28);
+      box-shadow: none;
     }
 
     .btn-ghost {
@@ -203,8 +242,9 @@
     }
 
     .hero-media {
-      position: relative;
-      min-height: 280px;
+      position: absolute;
+      inset: 0;
+      min-height: 0;
       background: #020913;
       overflow: hidden;
     }
@@ -213,32 +253,33 @@
       width: 100%;
       height: 100%;
       object-fit: cover;
-      object-position: center bottom;
+      object-position: center;
       display: block;
-      transform: scale(2.15);
-      transform-origin: center bottom;
+      transform: none;
     }
 
     .hero-media::before {
       content: '';
       position: absolute;
       inset: 0;
-      background: linear-gradient(180deg, rgba(9, 23, 42, 0) 20%, rgba(9, 23, 42, 0.58));
+      background: rgba(2, 7, 11, 0.48);
+      box-shadow: inset 60vw 0 120px rgba(2, 7, 11, 0.74);
     }
 
     section {
-      border: 1px solid var(--line);
-      border-radius: 18px;
+      border: 0;
+      border-bottom: 1px solid var(--line);
+      border-radius: 0;
       background: var(--card);
-      padding: 20px;
-      margin-bottom: 18px;
-      backdrop-filter: blur(6px);
+      padding: 64px clamp(18px, 6vw, 96px);
+      margin: 0;
+      backdrop-filter: none;
     }
 
     h2 {
       margin: 0 0 12px;
       font-family: 'Chakra Petch', sans-serif;
-      letter-spacing: 0.02em;
+      letter-spacing: 0;
       font-size: clamp(24px, 3vw, 31px);
     }
 
@@ -256,7 +297,7 @@
 
     .gameplayGalleryWrap::-webkit-scrollbar-thumb {
       background: rgba(183, 205, 224, 0.34);
-      border-radius: 999px;
+      border-radius: 2px;
     }
 
     .gameplayGallery {
@@ -267,7 +308,7 @@
 
     .gameplayCard {
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 4px;
       overflow: hidden;
       background: #030a14;
     }
@@ -305,7 +346,7 @@
 
     .feature {
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 4px;
       padding: 12px;
       background: rgba(4, 12, 24, 0.35);
     }
@@ -326,7 +367,7 @@
 
     .price-card {
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 4px;
       background: rgba(4, 12, 24, 0.35);
       padding: 14px;
       display: flex;
@@ -363,7 +404,7 @@
 
     .qa {
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: 4px;
       padding: 12px;
       background: rgba(4, 12, 24, 0.35);
     }
@@ -400,8 +441,16 @@
     }
 
     @media (max-width: 640px) {
-      .shell { width: min(1120px, 94vw); }
-      .hero-copy { padding: 22px; }
+      .shell { width: 100%; }
+      .landing-masthead { height: 58px; padding: 0 14px; }
+      .landing-nav a:not(.nav-launch) { display: none; }
+      .landing-nav .nav-launch { padding: 9px 11px; font-size: 9px; }
+      .hero-grid, .hero-copy { min-height: calc(100svh - 104px); }
+      .hero-copy { width: 100%; padding: 36px 20px; }
+      .hero-brand { font-size: 40px; }
+      .hero-headline { font-size: 23px; }
+      .lead { font-size: 16px; }
+      .hero-media::before { background: rgba(2, 7, 11, 0.62); box-shadow: none; }
       .gameplayGalleryWrap { max-height: min(76vh, 1020px); }
       .features { grid-template-columns: 1fr; }
       .btn { width: 100%; text-align: center; }
@@ -410,6 +459,15 @@
 </head>
 <body>
   <div class="shell">
+    <header class="landing-masthead">
+      <a class="landing-brand" href="./">World Explorer <strong>3D</strong></a>
+      <nav class="landing-nav" aria-label="Site navigation">
+        <a href="#highlights">Platform</a>
+        <a href="#gameplay">Gameplay</a>
+        <a href="#faq">FAQ</a>
+        <a class="nav-launch" href="./app/">Launch Explorer</a>
+      </nav>
+    </header>
     <section id="landingAnnouncement" class="announcement" hidden>
       <div id="landingAnnouncementEyebrow" class="announcement-eyebrow">Platform Update</div>
       <h2 id="landingAnnouncementTitle"></h2>
@@ -431,12 +489,12 @@
           <p id="landingPerformanceNote" class="perf-note">Performance note: Desktop recommended for best frame rate and rendering quality.</p>
         </div>
         <div class="hero-media" aria-hidden="true">
-          <img class="hero-media-img" src="./assets/landing/hero.jpg" alt="">
+          <img class="hero-media-img" src="./assets/landing/hero-interface.png" alt="">
         </div>
       </div>
     </section>
 
-    <section>
+    <section id="highlights">
       <h2 id="landingHighlightsTitle">Platform Highlights</h2>
       <div id="landingHighlights" class="features">
         <article class="feature"><h3>Live Earth</h3><p>Open satellites, earthquakes, and weather on the globe, then jump straight from those layers into the local world.</p></article>
@@ -450,7 +508,7 @@
       </div>
     </section>
 
-    <section>
+    <section id="gameplay">
       <h2>Gameplay</h2>
       <div class="gameplayGalleryWrap">
         <div class="gameplayGallery">
@@ -555,7 +613,7 @@
       </div>
     </section>
 
-    <section>
+    <section id="faq">
       <h2>FAQ</h2>
       <div class="faq">
         <article class="qa"><h3>Does it run on mobile?</h3><p>Yes. The runtime includes mobile controls, but desktop is still the best way to see the full visual range and larger city scenes.</p></article>

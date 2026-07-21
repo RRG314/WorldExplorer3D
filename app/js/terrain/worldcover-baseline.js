@@ -169,6 +169,33 @@ export function worldCoverTileKey(bounds, size = DEFAULT_TEXTURE_SIZE) {
   ].join(':');
 }
 
+export function classifyWorldCoverSurface(result, latitude = 0) {
+  const counts = result?.counts || {};
+  const total = Math.max(1, Number(result?.recognizedPixels || result?.totalPixels || 0));
+  const ratio = (name) => Number(counts[name] || 0) / total;
+  const bare = ratio('bare');
+  const built = ratio('built');
+  const snow = ratio('snow');
+  const forest = ratio('tree') + ratio('mangrove');
+  const crop = ratio('crop');
+  const vegetated = forest + ratio('shrub') + ratio('grass') + crop + ratio('wetland') + ratio('moss');
+  const absLat = Math.abs(Number(latitude) || 0);
+  const aridBare = absLat >= 12 && absLat <= 35 && (
+    bare >= 0.34 || (bare >= 0.12 && bare + built >= 0.68 && vegetated <= 0.25)
+  );
+  if (snow >= 0.35) return { mode: 'snow', reason: 'worldcover_snow', confidence: snow };
+  if (forest >= 0.34) return { mode: 'forest', reason: 'worldcover_forest', confidence: forest };
+  if (crop >= 0.48) return { mode: 'soil', reason: 'worldcover_crop', confidence: crop };
+  if (built >= 0.52 && built >= vegetated * 1.35) {
+    return { mode: 'built', reason: 'worldcover_built', confidence: built };
+  }
+  if (aridBare) return { mode: 'sand', reason: 'worldcover_arid_bare', confidence: bare };
+  if (bare >= 0.62 && vegetated <= 0.16) {
+    return { mode: 'rock', reason: 'worldcover_bare_ground', confidence: bare };
+  }
+  return null;
+}
+
 function buildWorldCoverUrl(bounds, size) {
   const safe = normalizedBounds(bounds);
   const params = new URLSearchParams({
@@ -267,7 +294,8 @@ async function createSemanticTexture(blob, size) {
   canvas.height = size;
   const context = canvas.getContext('2d', { willReadFrequently: true });
   if (!context) throw new Error('WorldCover canvas context unavailable');
-  context.imageSmoothingEnabled = false;
+  context.imageSmoothingEnabled = true;
+  context.imageSmoothingQuality = 'high';
   context.drawImage(sourceImage, 0, 0, size, size);
   if (typeof sourceImage.close === 'function') sourceImage.close();
   const imageData = context.getImageData(0, 0, size, size);
@@ -314,21 +342,36 @@ async function createSemanticTexture(blob, size) {
 
   const texture = new THREE.CanvasTexture(canvas);
   texture.wrapS = texture.wrapT = THREE.ClampToEdgeWrapping;
-  texture.generateMipmaps = false;
-  texture.minFilter = THREE.NearestFilter;
-  texture.magFilter = THREE.NearestFilter;
+  texture.generateMipmaps = true;
+  texture.minFilter = THREE.LinearMipmapLinearFilter;
+  texture.magFilter = THREE.LinearFilter;
   if (typeof texture.colorSpace !== 'undefined' && typeof THREE.SRGBColorSpace !== 'undefined') {
     texture.colorSpace = THREE.SRGBColorSpace;
   } else if (typeof texture.encoding !== 'undefined' && typeof THREE.sRGBEncoding !== 'undefined') {
     texture.encoding = THREE.sRGBEncoding;
   }
   texture.needsUpdate = true;
+  const vegetationSamples = [];
+  const vegetationKinds = new Set(['tree', 'shrub', 'wetland', 'mangrove']);
+  const sampleStep = Math.max(6, Math.round(size / 16));
+  for (let y = Math.floor(sampleStep / 2); y < size; y += sampleStep) {
+    for (let x = Math.floor(sampleStep / 2); x < size; x += sampleStep) {
+      const kind = classes[y * size + x]?.name || '';
+      if (!vegetationKinds.has(kind)) continue;
+      vegetationSamples.push({
+        kind,
+        u: (x + 0.5) / size,
+        v: (y + 0.5) / size
+      });
+    }
+  }
   return {
     texture,
     counts,
     recognizedPixels: recognized,
     totalPixels: size * size,
-    dominantClass: Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown'
+    dominantClass: Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || 'unknown',
+    vegetationSamples
   };
 }
 

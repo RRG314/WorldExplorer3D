@@ -16,10 +16,13 @@ async function launchBaltimore(page, baseUrl) {
     waitUntil: 'domcontentloaded',
     timeout: 90000
   });
-  await page.waitForFunction(() => !document.getElementById('startBtn')?.disabled, null, { timeout: 90000 });
-  await page.locator('.tab-btn[data-tab="location"]').click();
-  await page.locator('.loc[data-loc="baltimore"]').click();
-  await page.locator('#startBtn').click();
+  await page.waitForFunction(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return ctx.runtimeReady === true && document.getElementById('globeSelectorScreen')?.classList.contains('show');
+  }, null, { timeout: 90000 });
+  await page.locator('#globeCustomLat').fill('39.2904');
+  await page.locator('#globeCustomLon').fill('-76.6122');
+  await page.locator('#globeSelectorStartBtn').click();
   await page.locator('#loading').waitFor({ state: 'hidden', timeout: 180000 });
 }
 

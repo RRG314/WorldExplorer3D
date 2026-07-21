@@ -20,11 +20,14 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="icon" href="../favicon.svg" type="image/svg+xml">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
+<style>@layer legacy, interface;</style>
 <link rel="stylesheet" href="styles/title-shell.css?v=90">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=86">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=87">
 <link rel="stylesheet" href="styles/block-builder.css?v=2">
-<link rel="stylesheet" href="styles/universe.css?v=4">
+<link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
+<link rel="stylesheet" href="styles/interface-v4.css?v=8">
+<link rel="stylesheet" href="styles/start-hub.css?v=8">
 </head>
 <body>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
@@ -447,28 +450,46 @@ Graphics changes apply to the current session.
 </div>
 <div id="shareExperienceStatus"></div>
 <div class="title-license">
-Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Imagery © Esri and source providers · ESA WorldCover 2021 / modified Copernicus Sentinel data (CC BY 4.0) · Fonts under SIL OFL · API providers under their own terms · © 2026 Steven Reid. All Rights Reserved. · <a href="../about/" target="_blank">About</a> · <a href="../legal/terms" target="_blank">Terms</a> · <a href="../legal/privacy" target="_blank">Privacy</a>
+Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Street imagery by Panoramax and KartaView contributors (CC BY-SA 4.0) · Aircraft observations by the OpenSky Network under provider terms · Imagery © Esri and source providers · ESA WorldCover 2021 / modified Copernicus Sentinel data (CC BY 4.0) · USGS earthquake data · CelesTrak orbital data · Weather and marine model data by Open-Meteo · NOAA CO-OPS water-level observations and tide predictions · Fonts under SIL OFL · API providers under their own terms · © 2026 Steven Reid. All Rights Reserved. · <a href="../about/" target="_blank">About</a> · <a href="../legal/terms" target="_blank">Terms</a> · <a href="../legal/privacy" target="_blank">Privacy</a>
 </div>
 </div>
 </div>
 <div id="globeSelectorScreen" aria-hidden="true">
 <div class="globe-selector-shell">
-<button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Go to Moon" aria-label="Launch Moon">🌙</button>
-<button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Go to Space" aria-label="Launch Space">🪐</button>
+<div class="globe-selector-brand" aria-label="World Explorer 3D"><span class="globe-brand-mark" aria-hidden="true">◎</span>WORLD EXPLORER <strong>3D</strong></div>
+<nav class="globe-app-rail" aria-label="Main sections">
+  <button class="active" type="button" data-globe-destination="location"><span>◎</span>Explore</button>
+  <button type="button" data-globe-destination="games"><span>⌖</span>Missions</button>
+  <button type="button" data-globe-destination="multiplayer"><span>♙</span>Multiplayer</button>
+  <button type="button" data-globe-destination="live-earth"><span>⌁</span>Live Data</button>
+  <button type="button" data-globe-destination="library"><span>▥</span>Library</button>
+  <button type="button" data-globe-destination="controls"><span>⌨</span>Quick Start</button>
+</nav>
 <div class="globe-selector-top">
-<div style="text-align:center">
-<div class="globe-selector-title">Globe Location Selector</div>
-<div class="globe-selector-subtitle">Pick a point on Earth or use manual search</div>
+<div class="globe-hub-search">
+<span aria-hidden="true">⌕</span>
+<input id="globeLocationSearch" type="text" placeholder="Search location or enter coordinates" aria-label="Search location or enter coordinates">
+<button id="globeLocationSearchBtn" type="button">Search</button>
+</div>
+<div class="globe-hub-tools" aria-label="Account and application tools">
+<button id="globeHubShareBtn" type="button" title="Share World Explorer" aria-label="Share World Explorer">↗</button>
+<button type="button" data-globe-destination="settings" title="Settings" aria-label="Open settings">⚙</button>
+<button type="button" data-globe-destination="controls" title="Controls" aria-label="Open controls">?</button>
+<button id="globeHubFullscreenBtn" type="button" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
 </div>
 </div>
 <div class="globe-selector-side">
+<div class="globe-mobile-search">
+  <input id="globeMobileLocationSearch" type="text" placeholder="Search city or place" aria-label="Search city or place">
+  <button id="globeMobileLocationSearchBtn" type="button">Search</button>
+</div>
 <div class="globe-selector-stat">
 <div class="globe-selector-stat-label">Selected Coordinates</div>
 <div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>
 <div id="globeSelectorPlace" class="globe-selector-stat-label" style="margin-top:4px">Click the globe to choose a location.</div>
 </div>
 <div class="globe-selector-actions">
-<button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Main Menu</button>
+<button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Close</button>
 <button id="globeSelectorStartBtn" class="globe-selector-action-btn" type="button">Explore</button>
 </div>
 <div class="globe-selector-mode-tabs" role="tablist" aria-label="Globe selector mode">
@@ -476,11 +497,6 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Ima
 <button id="globeSelectorLiveEarthModeBtn" class="globe-selector-mode-tab" type="button">Live Earth</button>
 </div>
 <div id="globeSelectorExplorePanel" class="globe-selector-mode-panel active">
-<div class="globe-selector-field-label">Search Location</div>
-<div class="globe-selector-row">
-<input id="globeLocationSearch" type="text" placeholder="Try: Seattle, Tokyo, Paris France">
-<button id="globeLocationSearchBtn" class="globe-selector-search-btn" type="button">Search</button>
-</div>
 <button id="globeSelectorLocateBtn" class="globe-selector-search-btn globe-selector-locate-btn" type="button">Use My Location</button>
 <div id="globeLocationSearchStatus" style="font-size:11px;min-height:14px;color:#64748b">Uses the same search flow as Custom Location.</div>
 <div class="globe-selector-field-label">Manual Coordinates</div>
@@ -514,6 +530,32 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Ima
 <canvas id="globeSelectorCanvas"></canvas>
 <div class="globe-selector-hint">Drag to rotate · Scroll to zoom · Tap/Click to pick</div>
 </div>
+<div class="globe-destination-bar" aria-label="World destinations">
+  <button id="globeSelectorEarthBtn" class="active" type="button"><span class="destination-thumb earth" aria-hidden="true"></span>Earth</button>
+  <button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Go to Moon" aria-label="Launch Moon"><span class="destination-thumb moon" aria-hidden="true"></span>Moon</button>
+  <button id="globeSelectorMarsBtn" type="button" title="Go to Mars"><span class="destination-thumb mars" aria-hidden="true"></span>Mars</button>
+  <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Go to Space" aria-label="Launch Space"><span class="destination-thumb space" aria-hidden="true"></span>Space</button>
+  <button id="globeSelectorOceanBtn" type="button" title="Explore the ocean"><span class="destination-thumb ocean" aria-hidden="true"></span>Ocean</button>
+</div>
+<div class="globe-system-bar" aria-label="Data status">
+  <span><b>Satellites</b><em>Observed</em></span>
+  <span><b>Aircraft</b><em>OpenSky</em></span>
+  <span><b>Marine traffic</b><em>Reference</em></span>
+  <span><b>Weather</b><em>Current</em></span>
+  <span><b>USGS earthquakes</b><em>Live data</em></span>
+  <span><b>OSM data</b><em>Up to date</em></span>
+</div>
+<section id="globeHubOverlay" class="globe-hub-overlay" hidden aria-hidden="true">
+  <header class="globe-hub-overlay-header">
+    <div>
+      <span>World Explorer 3D</span>
+      <h2 id="globeHubOverlayTitle">Library</h2>
+    </div>
+    <button id="globeHubOverlayCloseBtn" type="button" aria-label="Return to globe">×</button>
+  </header>
+  <div id="globeHubPanelHost" class="globe-hub-panel-host"></div>
+  <div id="globeHubFooterHost" class="globe-hub-footer-host"></div>
+</section>
 </div>
 </div>
 <div id="liveEarthLocalPanel" aria-live="polite">
@@ -1555,6 +1597,6 @@ Explore the area
 
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=84"></script>
-<script type="module" src="js/app-auth-shell.js?v=85"></script>
-<script type="module" src="js/bootstrap.js?v=277"></script>
+<script type="module" src="js/app-auth-shell.js?v=86"></script>
+<script type="module" src="js/bootstrap.js?v=287"></script>
 </body></html>

@@ -1,3 +1,4 @@
+@layer legacy {
 .universe-navigator {
   position: fixed;
   top: 92px;
@@ -160,8 +161,8 @@
   right: 20px;
   bottom: 16px;
   z-index: 10000;
-  width: 190px;
-  height: 92px;
+  width: 220px;
+  height: 130px;
   overflow: hidden;
   border: 1px solid rgba(122, 162, 218, 0.58);
   border-radius: 5px;
@@ -171,21 +172,21 @@
 
 .solar-system-scale canvas {
   display: block;
-  width: 190px;
-  height: 92px;
+  width: 220px;
+  height: 130px;
 }
 
 @media (max-width: 720px) {
   .solar-system-scale {
     right: 10px;
     bottom: 10px;
-    width: 152px;
-    height: 74px;
+    width: 176px;
+    height: 104px;
   }
 
   .solar-system-scale canvas {
-    width: 152px;
-    height: 74px;
+    width: 176px;
+    height: 104px;
   }
 
   .universe-navigator {
@@ -202,4 +203,5 @@
   .universe-return-actions {
     grid-template-columns: 1fr;
   }
+}
 }

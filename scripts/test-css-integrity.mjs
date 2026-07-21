@@ -25,6 +25,8 @@ try {
         left: controlsStyle.left,
         maxWidth: controlsStyle.maxWidth,
         position: controlsStyle.position,
+        right: controlsStyle.right,
+        top: controlsStyle.top,
         width: controlsStyle.width,
         zIndex: controlsStyle.zIndex
       } : null,
@@ -45,7 +47,8 @@ try {
   if (
     !result.controls ||
     result.controls.position !== 'fixed' ||
-    result.controls.bottom === 'auto' ||
+    (result.controls.bottom === 'auto' && result.controls.top === 'auto') ||
+    (result.controls.left === 'auto' && result.controls.right === 'auto') ||
     Number.parseFloat(result.controls.width) > 300 ||
     Number(result.controls.zIndex) < 100
   ) {

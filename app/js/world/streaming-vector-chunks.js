@@ -5,7 +5,7 @@ import {
   clearBuildingSpatialIndex,
   removeBuildingsFromSpatialIndex
 } from "./building-spatial-index.js?v=5";
-import { waterSurfaceBaseElevation } from "./load-geometry.js?v=15";
+import { waterSurfaceBaseElevation } from "./load-geometry.js?v=16";
 import { fetchOvertureStreamingTile } from './overture-streaming-source.js?v=2';
 import { buildStreamingLandcover } from "./streaming-landcover.js?v=13";
 import { createRoadNameResolver } from "./streaming-road-labels.js?v=1";
@@ -14,7 +14,7 @@ import {
   classifyStructureSemantics,
   polylineBounds,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=13";
+} from "../structure-semantics.js?v=16";
 import {
   INITIAL_DETAIL_RADIUS,
   ROAD_SURFACE_OFFSET,
