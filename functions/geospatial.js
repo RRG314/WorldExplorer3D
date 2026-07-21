@@ -1,3 +1,5 @@
+const https = require('node:https');
+
 const PANORAMAX_API = 'https://panoramax.openstreetmap.fr/api';
 const KARTAVIEW_API = 'https://api.openstreetcam.org/2.0/photo/';
 const OPENSKY_API = 'https://opensky-network.org/api/states/all';
@@ -47,6 +49,38 @@ function safeUrl(value, base = '') {
 }
 
 async function fetchJson(url, options = {}) {
+  if (!options.fetchImpl && options.forceIpv4) {
+    return new Promise((resolve, reject) => {
+      const request = https.get(url, {
+        family: 4,
+        headers: { Accept: 'application/json', 'User-Agent': 'WorldExplorer3D/3.1 geospatial-client' }
+      }, (response) => {
+        let body = '';
+        response.setEncoding('utf8');
+        response.on('data', (chunk) => {
+          body += chunk;
+          if (body.length > 8 * 1024 * 1024) request.destroy(new Error('Upstream response exceeded 8 MB.'));
+        });
+        response.on('end', () => {
+          if ((response.statusCode || 500) < 200 || (response.statusCode || 500) >= 300) {
+            reject(new Error(`Upstream HTTP ${response.statusCode || 500}`));
+            return;
+          }
+          try {
+            resolve(JSON.parse(body));
+          } catch {
+            reject(new Error('Upstream returned invalid JSON.'));
+          }
+        });
+      });
+      request.setTimeout(options.timeoutMs || 9000, () => {
+        const error = new Error('Upstream request timed out.');
+        error.name = 'AbortError';
+        request.destroy(error);
+      });
+      request.on('error', reject);
+    });
+  }
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), options.timeoutMs || 9000);
   try {
@@ -128,7 +162,7 @@ async function queryAircraft(input = {}, options = {}) {
   const bounds = aircraftBounds(query);
   const url = new URL(OPENSKY_API);
   Object.entries({ ...bounds, extended: 1 }).forEach(([name, value]) => url.searchParams.set(name, String(value)));
-  const payload = await fetchJson(url.href, { ...options, timeoutMs: 9000 });
+  const payload = await fetchJson(url.href, { ...options, timeoutMs: 9000, forceIpv4: true });
   const responseTime = Number(payload.time) || Math.floor(Date.now() / 1000);
   const items = (payload.states || [])
     .map((state) => normalizeOpenSkyState(state, query, responseTime))
