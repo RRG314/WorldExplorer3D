@@ -498,6 +498,17 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 #memoryFlowerFloatBtn { left: 250px; bottom: 14px; width: 46px; height: 46px; border-radius: 50%; background: #a62867; }
 #controlsTab { top: 66px; right: 14px; bottom: auto; left: auto; transform: none; color: var(--wx-text); background: var(--wx-panel); border: 1px solid var(--wx-line-soft); border-radius: 0; box-shadow: none; }
 #ctrlHeader { color: var(--wx-blue); }
+#controlsTab.compact #ctrlHeader {
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  overflow: hidden;
+  color: transparent;
+  font-size: 0;
+  display: grid;
+  place-items: center;
+}
+#controlsTab.compact #ctrlHeader::before { content: '⌘'; color: var(--wx-blue); font-size: 18px; }
 
 /* Mobile play shell */
 @media (max-width: 760px), (pointer: coarse) {

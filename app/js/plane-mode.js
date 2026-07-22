@@ -35,6 +35,11 @@ const surfaceSample = {
   building: null,
   age: Infinity
 };
+const chaseCameraTarget = { x: 0, y: 0, z: 0 };
+let chaseCameraOccluded = false;
+let chaseCameraRaycaster = null;
+let chaseCameraRayOrigin = null;
+let chaseCameraRayDirection = null;
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -405,6 +410,107 @@ function updatePlane(dt) {
   return true;
 }
 
+function resolvePlaneChaseTarget(targetX, targetY, targetZ) {
+  const originX = state.x;
+  const originY = state.y + 0.8;
+  const originZ = state.z;
+  const nearbyBuildings = appCtx.getNearbyBuildings?.(originX, originZ, 90) || [];
+
+  const lineIsClear = (candidateX, candidateY, candidateZ) => {
+    if (nearbyBuildings.length === 0) return true;
+    for (let step = 1; step <= 14; step += 1) {
+      const t = step / 14;
+      const x = originX + (candidateX - originX) * t;
+      const y = originY + (candidateY - originY) * t;
+      const z = originZ + (candidateZ - originZ) * t;
+      const contact = nearbyBuildings.some((building) => {
+        const minY = Number(building?.minY ?? building?.baseY);
+        const maxY = Number(building?.maxY ?? (Number.isFinite(minY) ? minY + Number(building?.height || 0) : NaN));
+        if (Number.isFinite(minY) && Number.isFinite(maxY) && (y + 0.2 < minY || y - 0.2 > maxY)) return false;
+        return x >= Number(building?.minX) - 0.8 && x <= Number(building?.maxX) + 0.8 &&
+          z >= Number(building?.minZ) - 0.8 && z <= Number(building?.maxZ) + 0.8;
+      });
+      if (contact) return false;
+    }
+    return true;
+  };
+
+  const setClearTarget = (x, y, z) => {
+    if (!lineIsClear(x, y, z)) return false;
+    chaseCameraTarget.x = x;
+    chaseCameraTarget.y = y;
+    chaseCameraTarget.z = z;
+    return true;
+  };
+
+  chaseCameraOccluded = !setClearTarget(targetX, targetY, targetZ);
+  if (chaseCameraOccluded) {
+    const backX = targetX - originX;
+    const backZ = targetZ - originZ;
+    const backLength = Math.max(0.001, Math.hypot(backX, backZ));
+    const unitBackX = backX / backLength;
+    const unitBackZ = backZ / backLength;
+    const sideX = -unitBackZ;
+    const sideZ = unitBackX;
+    const foundClearView =
+      setClearTarget(originX + unitBackX * 9, originY + 16, originZ + unitBackZ * 9) ||
+      setClearTarget(originX + sideX * 12, originY + 18, originZ + sideZ * 12) ||
+      setClearTarget(originX - sideX * 12, originY + 18, originZ - sideZ * 12) ||
+      setClearTarget(originX + unitBackX * 5 + sideX * 8, originY + 28, originZ + unitBackZ * 5 + sideZ * 8) ||
+      setClearTarget(originX + 8, originY + 36, originZ + 8);
+    if (!foundClearView) {
+      chaseCameraTarget.x = originX + 6;
+      chaseCameraTarget.y = originY + 48;
+      chaseCameraTarget.z = originZ + 6;
+    }
+  }
+  const terrainY = appCtx.SurfaceQuery?.terrainAt?.(chaseCameraTarget.x, chaseCameraTarget.z)?.position?.y;
+  if (Number.isFinite(terrainY)) chaseCameraTarget.y = Math.max(chaseCameraTarget.y, terrainY + 0.8);
+  return chaseCameraTarget;
+}
+
+function clearRenderedCameraObstruction(target) {
+  if (!chaseCameraOccluded || typeof THREE === 'undefined') return target;
+  const buildingMeshes = appCtx.buildingMeshes;
+  if (!Array.isArray(buildingMeshes) || buildingMeshes.length === 0) return target;
+  if (!chaseCameraRaycaster) {
+    chaseCameraRaycaster = new THREE.Raycaster();
+    chaseCameraRayOrigin = new THREE.Vector3();
+    chaseCameraRayDirection = new THREE.Vector3();
+  }
+  chaseCameraRayOrigin.set(state.x, state.y + 0.8, state.z);
+  chaseCameraRayDirection.set(
+    target.x - chaseCameraRayOrigin.x,
+    target.y - chaseCameraRayOrigin.y,
+    target.z - chaseCameraRayOrigin.z
+  );
+  const requestedDistance = chaseCameraRayDirection.length();
+  if (requestedDistance < 0.1) return target;
+  chaseCameraRayDirection.multiplyScalar(1 / requestedDistance);
+  chaseCameraRaycaster.set(chaseCameraRayOrigin, chaseCameraRayDirection);
+  chaseCameraRaycaster.near = 0.4;
+  chaseCameraRaycaster.far = requestedDistance;
+  const forwardHit = chaseCameraRaycaster.intersectObjects(buildingMeshes, false)[0];
+  let clearDistance = forwardHit ? forwardHit.distance - 1.2 : requestedDistance;
+  if (!forwardHit) {
+    chaseCameraRayOrigin.set(target.x, target.y, target.z);
+    chaseCameraRayDirection.multiplyScalar(-1);
+    chaseCameraRaycaster.set(chaseCameraRayOrigin, chaseCameraRayDirection);
+    chaseCameraRaycaster.near = 0.4;
+    chaseCameraRaycaster.far = requestedDistance;
+    const reverseHit = chaseCameraRaycaster.intersectObjects(buildingMeshes, false)[0];
+    if (reverseHit) clearDistance = requestedDistance - reverseHit.distance - 1.2;
+    chaseCameraRayDirection.multiplyScalar(-1);
+  }
+  chaseCameraRaycaster.far = Infinity;
+  if (clearDistance >= requestedDistance) return target;
+  clearDistance = Math.max(1.2, clearDistance);
+  target.x = state.x + chaseCameraRayDirection.x * clearDistance;
+  target.y = state.y + 0.8 + chaseCameraRayDirection.y * clearDistance;
+  target.z = state.z + chaseCameraRayDirection.z * clearDistance;
+  return target;
+}
+
 function applyPlaneCamera(dt) {
   if (!state.active || !appCtx.camera) return false;
   const lookSpeed = 1.8 * dt;
@@ -437,14 +543,38 @@ function applyPlaneCamera(dt) {
     appCtx.camera.lookAt(state.x + forwardX * 5, state.y, state.z + forwardZ * 5);
   } else {
     const distance = 12 + clamp(state.speed / 18, 0, 4);
-    const targetX = state.x - Math.sin(viewYaw) * distance;
-    const targetY = state.y + 4.2 + Math.sin(state.cameraPitch) * 6;
-    const targetZ = state.z - Math.cos(viewYaw) * distance;
+    const target = resolvePlaneChaseTarget(
+      state.x - Math.sin(viewYaw) * distance,
+      state.y + 4.2 + Math.sin(state.cameraPitch) * 6,
+      state.z - Math.cos(viewYaw) * distance
+    );
+    clearRenderedCameraObstruction(target);
     const blend = 1 - Math.exp(-6.5 * dt);
-    appCtx.camera.position.x += (targetX - appCtx.camera.position.x) * blend;
-    appCtx.camera.position.y += (targetY - appCtx.camera.position.y) * blend;
-    appCtx.camera.position.z += (targetZ - appCtx.camera.position.z) * blend;
-    appCtx.camera.lookAt(state.x + forwardX * 3, state.y + 0.4, state.z + forwardZ * 3);
+    if (chaseCameraOccluded) {
+      appCtx.camera.position.set(target.x, target.y, target.z);
+    } else {
+      appCtx.camera.position.x += (target.x - appCtx.camera.position.x) * blend;
+      appCtx.camera.position.y += (target.y - appCtx.camera.position.y) * blend;
+      appCtx.camera.position.z += (target.z - appCtx.camera.position.z) * blend;
+    }
+    const cameraContact = chaseCameraOccluded ? appCtx.checkBuildingCollision?.(
+      appCtx.camera.position.x,
+      appCtx.camera.position.z,
+      0.8,
+      { actorBaseY: appCtx.camera.position.y - 0.2, actorHeight: 0.4 }
+    ) : null;
+    if (cameraContact?.collision && cameraContact.building) {
+      appCtx.camera.position.y = Math.max(appCtx.camera.position.y, buildingTopY(cameraContact.building) + 1.2);
+    }
+    const cameraInsideBuilding = appCtx.buildingContainingPoint?.(
+      appCtx.camera.position.x,
+      appCtx.camera.position.z,
+      0.3,
+      { y: appCtx.camera.position.y - 0.2, actorHeight: 0.4 }
+    );
+    if (cameraInsideBuilding) appCtx.camera.position.set(target.x, target.y, target.z);
+    if (chaseCameraOccluded) appCtx.camera.lookAt(state.x, state.y, state.z);
+    else appCtx.camera.lookAt(state.x + forwardX * 3, state.y + 0.4, state.z + forwardZ * 3);
   }
   return true;
 }

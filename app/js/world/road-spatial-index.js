@@ -9,7 +9,9 @@ let cache = {
   baseLast: null,
   overlayFirst: null,
   overlayLast: null,
-  cells: new Map()
+  cells: new Map(),
+  rebuilds: 0,
+  incrementalAdds: 0
 };
 
 function sourceChanged(base, overlay) {
@@ -74,14 +76,47 @@ function rebuild(base, overlay) {
     baseLast: base[base.length - 1] || null,
     overlayFirst: overlay[0] || null,
     overlayLast: overlay[overlay.length - 1] || null,
-    cells
+    cells,
+    rebuilds: cache.rebuilds + 1,
+    incrementalAdds: cache.incrementalAdds
   };
+}
+
+function isAppendOnly(source, cachedSource, cachedLength, cachedFirst, cachedLast) {
+  if (source !== cachedSource || cachedLength < 0 || source.length < cachedLength) return false;
+  if (cachedLength === 0) return true;
+  return source[0] === cachedFirst && source[cachedLength - 1] === cachedLast;
+}
+
+function appendNewRoads(base, overlay) {
+  const baseStart = cache.baseLength;
+  const overlayStart = cache.overlayLength;
+  for (let i = baseStart; i < base.length; i += 1) addRoad(cache.cells, base[i]);
+  for (let i = overlayStart; i < overlay.length; i += 1) addRoad(cache.cells, overlay[i]);
+  cache.incrementalAdds += Math.max(0, base.length - baseStart) + Math.max(0, overlay.length - overlayStart);
+  cache.baseLength = base.length;
+  cache.overlayLength = overlay.length;
+  cache.baseFirst = base[0] || null;
+  cache.baseLast = base[base.length - 1] || null;
+  cache.overlayFirst = overlay[0] || null;
+  cache.overlayLast = overlay[overlay.length - 1] || null;
+}
+
+function syncIndex(base, overlay) {
+  if (!sourceChanged(base, overlay)) return;
+  const baseAppendOnly = isAppendOnly(base, cache.base, cache.baseLength, cache.baseFirst, cache.baseLast);
+  const overlayAppendOnly = isAppendOnly(overlay, cache.overlay, cache.overlayLength, cache.overlayFirst, cache.overlayLast);
+  if (baseAppendOnly && overlayAppendOnly) {
+    appendNewRoads(base, overlay);
+    return;
+  }
+  rebuild(base, overlay);
 }
 
 export function queryNearbyRoads(baseRoads, overlayRoads, x, z, radius = 260) {
   const base = Array.isArray(baseRoads) ? baseRoads : [];
   const overlay = Array.isArray(overlayRoads) ? overlayRoads : [];
-  if (sourceChanged(base, overlay)) rebuild(base, overlay);
+  syncIndex(base, overlay);
   if (!Number.isFinite(x) || !Number.isFinite(z) || cache.cells.size === 0) return base.concat(overlay);
 
   const queryRadius = Math.max(ROAD_INDEX_CELL_SIZE, Number(radius) || 0);
@@ -109,6 +144,8 @@ export function roadSpatialIndexSnapshot() {
   return {
     cellSize: ROAD_INDEX_CELL_SIZE,
     cells: cache.cells.size,
-    roads: Math.max(0, cache.baseLength) + Math.max(0, cache.overlayLength)
+    roads: Math.max(0, cache.baseLength) + Math.max(0, cache.overlayLength),
+    rebuilds: cache.rebuilds,
+    incrementalAdds: cache.incrementalAdds
   };
 }

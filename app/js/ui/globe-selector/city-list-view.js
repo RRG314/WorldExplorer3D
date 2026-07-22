@@ -1,4 +1,4 @@
-import { cityLocationLabel } from './helpers.js?v=2';
+import { cityLocationLabel } from './helpers.js?v=3';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -29,26 +29,37 @@ export function renderNearbyCityItems(cityList, cities, cityMatchesSelection) {
   }).join('');
 }
 
-export function renderLibraryCityItems(cityList, presets, saved, cityMatchesSelection) {
+function pushCityRows(html, cities, source, cityMatchesSelection, { removable = false } = {}) {
+  cities.forEach((city, index) => {
+    const remove = removable
+      ? `<button class="globe-selector-city-delete" type="button" data-delete-saved-index="${index}" aria-label="Remove ${escapeHtml(city.name)} from saved places">Remove</button>`
+      : '';
+    html.push(`<li class="globe-selector-city-item" data-city-source="${source}" data-city-index="${index}"${selectedStyle(cityMatchesSelection(city))}><div class="globe-selector-city-item-main"><span class="globe-selector-city-item-name">${escapeHtml(city.name)}</span><span class="globe-selector-city-item-meta">${escapeHtml(city.category || cityLocationLabel(city))}</span></div>${remove}</li>`);
+  });
+}
+
+export function renderLibraryCityItems(cityList, presets, saved, recent, cityMatchesSelection) {
   if (!cityList) return;
-  if (!presets.length && !saved.length) {
-    cityList.innerHTML = '<li class="globe-selector-city-empty">No favorite places yet.</li>';
+  if (!presets.length && !saved.length && !recent.length) {
+    cityList.innerHTML = '<li class="globe-selector-city-empty">No places are available yet.</li>';
     return;
   }
 
-  const html = ['<li class="globe-selector-city-section">Curated destinations</li>'];
-  presets.forEach((city, index) => {
-    html.push(`<li class="globe-selector-city-item" data-city-source="preset" data-city-index="${index}"${selectedStyle(cityMatchesSelection(city))}><div class="globe-selector-city-item-main"><span class="globe-selector-city-item-name">${escapeHtml(city.name)}</span><span class="globe-selector-city-item-meta">${escapeHtml(city.category || cityLocationLabel(city))}</span></div></li>`);
-  });
-
-  html.push('<li class="globe-selector-city-section">Your saved favorites</li>');
+  const majorCities = presets.filter((city) => city.collection === 'major-city');
+  const destinations = presets.filter((city) => city.collection !== 'major-city');
+  const html = ['<li class="globe-selector-city-section"><strong>Saved Places</strong><span>Your personal collection</span></li>'];
   if (saved.length) {
-    saved.forEach((city, index) => {
-      html.push(`<li class="globe-selector-city-item" data-city-source="saved" data-city-index="${index}"${selectedStyle(cityMatchesSelection(city))}><div class="globe-selector-city-item-main"><span class="globe-selector-city-item-name">${escapeHtml(city.name)}</span><span class="globe-selector-city-item-meta">${escapeHtml(cityLocationLabel(city))}</span></div><button class="globe-selector-city-delete" type="button" data-delete-saved-index="${index}" aria-label="Delete saved favorite ${escapeHtml(city.name)}">Delete</button></li>`);
-    });
+    pushCityRows(html, saved, 'saved', cityMatchesSelection, { removable: true });
   } else {
-    html.push('<li class="globe-selector-city-empty">Select a place and use the star button to add it.</li>');
+    html.push('<li class="globe-selector-city-empty">Select a place and use the star to save it.</li>');
   }
+  html.push('<li class="globe-selector-city-section"><strong>Recent</strong><span>Locations you explored</span></li>');
+  if (recent.length) pushCityRows(html, recent, 'recent', cityMatchesSelection);
+  else html.push('<li class="globe-selector-city-empty">Your explored locations will appear here.</li>');
+  html.push('<li class="globe-selector-city-section"><strong>Major Cities</strong><span>Global city collection</span></li>');
+  pushCityRows(html, majorCities, 'preset', cityMatchesSelection);
+  html.push('<li class="globe-selector-city-section"><strong>Destinations</strong><span>Landmarks and natural places</span></li>');
+  pushCityRows(html, destinations, 'preset', cityMatchesSelection);
   cityList.innerHTML = html.join('');
 }
 

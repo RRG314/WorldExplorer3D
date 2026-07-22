@@ -1,11 +1,12 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { createGlobeSelectorScene } from './globe-selector/scene.js?v=7';
+import { createGlobeSelectorScene } from './globe-selector/scene.js?v=8';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
 import { getGlobeSelectorElements } from './globe-selector/dom.js?v=2';
-import { CURATED_DESTINATIONS, fetchNearbyCities } from './globe-selector/catalog.js?v=2';
-import { bindCityListInteractions, renderLibraryCityItems, renderNearbyCityItems } from './globe-selector/city-list-view.js?v=2';
+import { CURATED_DESTINATIONS, MAJOR_CITY_DESTINATIONS, fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=5';
+import { bindCityListInteractions, renderLibraryCityItems, renderNearbyCityItems } from './globe-selector/city-list-view.js?v=3';
 import {
   addSelectionToSavedFavorites,
+  addRecentPlace,
   buildFavoriteCities as buildFavoriteCitiesFromData,
   buildNearbyCities as buildNearbyCitiesFromData,
   cityMatchesGlobeSelection,
@@ -15,13 +16,14 @@ import {
   getMenuFavoriteCities as getMenuFavoriteCitiesFromLocs,
   latLonToLocalPoint,
   loadSavedFavoriteCities as loadSavedFavoriteCitiesFromStorage,
+  loadRecentPlaces,
   normalizeCityRecord,
   parseReverseAddress,
   persistSavedFavoriteCities as persistSavedFavoriteCitiesToStorage,
   syncLegacyCustomSelection,
   setGlobeSelectorScrollLock,
   toFiniteNumber
-} from "./globe-selector/helpers.js?v=2";
+} from "./globe-selector/helpers.js?v=3";
 
 function createGlobeSelector(options = {}) {
   const {
@@ -51,17 +53,12 @@ function createGlobeSelector(options = {}) {
   let coordinateInputsDirty = false;
   let reverseLookupToken = 0;
   let activeCityTab = 'nearby';
-  let nearbyCities = [];
-  let mappedNearbyCities = [];
-  let liveNearbyCity = null;
-  let favoritePresetList = [];
-  let favoriteSavedList = [];
+  let nearbyCities = [], mappedNearbyCities = [], liveNearbyCity = null;
+  let favoritePresetList = [], favoriteSavedList = [], favoriteRecentList = [];
   let panelMode = 'explore';
   const reverseLookupCache = new Map();
-  let nearbyLookupController = null;
-  let nearbyLookupToken = 0;
-
-  let savedFavoriteCities = [];
+  let nearbyLookupController = null, nearbyLookupToken = 0;
+  let savedFavoriteCities = [], recentPlaces = [];
 
   const globeScene = createGlobeSelectorScene({
     appCtx,
@@ -91,6 +88,7 @@ function createGlobeSelector(options = {}) {
   function getLibraryPresets() {
     return [
       ...CURATED_DESTINATIONS,
+      ...MAJOR_CITY_DESTINATIONS,
       ...getMenuFavoriteCitiesFromLocs(appCtx.LOCS || {})
     ];
   }
@@ -144,8 +142,8 @@ function createGlobeSelector(options = {}) {
     favoritesTabBtn?.classList.toggle('active', activeCityTab === 'favorites');
     if (cityListHint) {
       cityListHint.textContent = activeCityTab === 'favorites' ?
-      'Curated world destinations plus places you save.' :
-      'Cities and towns nearest to the selected point, from OpenStreetMap.';
+      'Saved places, recent trips, major cities, and world destinations.' :
+      'Major cities within 100 miles of the selected point, from OpenStreetMap.';
     }
     renderCityList();
     setFavoriteMarkersVisible();
@@ -168,7 +166,7 @@ function createGlobeSelector(options = {}) {
     favoritePresetList = groups.presets;
     favoriteSavedList = groups.saved;
 
-    renderLibraryCityItems(cityList, favoritePresetList, favoriteSavedList, cityMatchesSelection);
+    renderLibraryCityItems(cityList, favoritePresetList, favoriteSavedList, favoriteRecentList, cityMatchesSelection);
   }
 
   function focusOnSelection(lat, lon) {
@@ -268,11 +266,11 @@ function createGlobeSelector(options = {}) {
       void refreshNearbyCities(selected.lat, selected.lon);
     }
   }
-
   async function refreshNearbyCities(lat, lon) {
     const token = ++nearbyLookupToken;
     nearbyLookupController?.abort();
     nearbyLookupController = new AbortController();
+    mappedNearbyCities = nearbyMajorCities(lat, lon); nearbyCities = buildNearbyCitiesFromData({ mappedCities: mappedNearbyCities, liveNearbyCity, lat, lon }); renderCityList();
     if (activeCityTab === 'nearby' && cityListHint) cityListHint.textContent = 'Finding nearby cities and towns…';
     try {
       const cities = await fetchNearbyCities(lat, lon, { signal: nearbyLookupController.signal });
@@ -443,6 +441,8 @@ function createGlobeSelector(options = {}) {
     isOpen: () => openState,
     onStartHere: options.onStartHere,
     prepareSelection(nextSelection) {
+      recentPlaces = addRecentPlace(nextSelection, recentPlaces);
+      favoriteRecentList = recentPlaces;
       renderFavoriteMarkers();
       renderCityList();
       syncLegacyCustomState(nextSelection);
@@ -515,6 +515,8 @@ function createGlobeSelector(options = {}) {
     setLocateButtonBusy(false);
     setStartButtonBusy(false);
     savedFavoriteCities = loadSavedFavoriteCitiesFromStorage();
+    recentPlaces = loadRecentPlaces();
+    favoriteRecentList = recentPlaces;
     setCityTab(activeCityTab);
     setPanelMode(panelMode);
 
@@ -649,7 +651,7 @@ function createGlobeSelector(options = {}) {
     renderFavoriteMarkers();
   });
   bindCityListInteractions(cityList, {
-    getLists: () => ({ nearby: nearbyCities, preset: favoritePresetList, saved: favoriteSavedList }),
+    getLists: () => ({ nearby: nearbyCities, preset: favoritePresetList, saved: favoriteSavedList, recent: favoriteRecentList }),
     getSavedCities: () => favoriteSavedList,
     onDelete(cityToDelete) {
       savedFavoriteCities = savedFavoriteCities.filter((city) => !cityMatchesGlobeSelection(city, cityToDelete));
@@ -695,5 +697,4 @@ function createGlobeSelector(options = {}) {
 }
 
 Object.assign(appCtx, { createGlobeSelector });
-
 export { createGlobeSelector };

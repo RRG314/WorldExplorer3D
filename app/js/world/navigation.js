@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { queryNearbyRoads, roadSpatialIndexSnapshot } from "./road-spatial-index.js?v=1";
+import { queryNearbyRoads, roadSpatialIndexSnapshot } from "./road-spatial-index.js?v=2";
 
 const runtime = {
   applySpawnTarget: () => null,

@@ -56,6 +56,7 @@ async function readState(page) {
       worldLoading: !!ctx.worldLoading,
       activeElement: document.activeElement?.tagName || null,
       boatActions: ctx.readControlActions?.('boat') || null,
+      oceanActions: ctx.readControlActions?.('ocean') || null,
       boat: {
         active: !!ctx.boatMode?.active,
         visible: !!ctx.boatMode?.mesh?.visible,
@@ -94,6 +95,10 @@ const browser = await chromium.launch({
 try {
   const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
   const consoleErrors = [];
+  const httpErrors = [];
+  page.on('response', (response) => {
+    if (response.status() >= 400) httpErrors.push({ status: response.status(), url: response.url() });
+  });
   page.on('console', (message) => {
     const text = message.text();
     if (message.type() === 'error' && !/net::ERR_|Failed to load resource:.*\b(429|500|502|503|504)\b/i.test(text)) {
@@ -142,6 +147,7 @@ try {
   await page.waitForTimeout(250);
   const subMoved = await readState(page);
   await page.screenshot({ path: path.join(outputDir, 'submarine-moving.png'), fullPage: false });
+  await fs.writeFile(path.join(outputDir, 'submarine-control-report.json'), `${JSON.stringify({ subStart, subMoved }, null, 2)}\n`);
 
   assert(subStart.ocean?.active, 'Ocean owner was not active after the dive');
   assert(distance2d(subStart.ocean?.position, subMoved.ocean?.position) > 0.8, 'Real Arrow key input did not move the submarine');
@@ -167,9 +173,10 @@ try {
   assert(restored.canvases.visibleOcean === 0, 'Ocean canvas remained visible after surfacing');
   assert(restored.worldCanvasVisible, 'Earth canvas was not restored after surfacing');
   assert(Object.values(restored.camera || {}).every(Number.isFinite), 'Earth camera was invalid after surfacing');
+  await fs.writeFile(path.join(outputDir, 'network-report.json'), `${JSON.stringify({ httpErrors, consoleErrors }, null, 2)}\n`);
   assert(consoleErrors.length === 0, `Water travel logged errors: ${consoleErrors.join(' | ')}`);
 
-  const report = { ok: true, boatStart, boatMoved, subStart, subMoved, restored, consoleErrors };
+  const report = { ok: true, boatStart, boatMoved, subStart, subMoved, restored, httpErrors, consoleErrors };
   await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify({
     ok: true,

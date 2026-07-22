@@ -1,6 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 
 const TRAVERSAL_NODE_GRID = 2.5;
+const TRAVERSAL_SEGMENT_CELL_SIZE = 220;
 const TRAVERSAL_MAX_ANCHOR_DISTANCE = {
   drive: 260,
   walk: 180
@@ -107,8 +108,24 @@ function buildTraversalGraph(mode = 'walk') {
   const nodes = [];
   const adjacency = [];
   const segments = [];
+  const segmentCells = new Map();
   const nodesByKey = new Map();
   const featureKinds = {};
+
+  const indexSegment = (segment) => {
+    const minCellX = Math.floor(Math.min(segment.p1.x, segment.p2.x) / TRAVERSAL_SEGMENT_CELL_SIZE);
+    const maxCellX = Math.floor(Math.max(segment.p1.x, segment.p2.x) / TRAVERSAL_SEGMENT_CELL_SIZE);
+    const minCellZ = Math.floor(Math.min(segment.p1.z, segment.p2.z) / TRAVERSAL_SEGMENT_CELL_SIZE);
+    const maxCellZ = Math.floor(Math.max(segment.p1.z, segment.p2.z) / TRAVERSAL_SEGMENT_CELL_SIZE);
+    for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+      for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ += 1) {
+        const key = `${cellX},${cellZ}`;
+        const bucket = segmentCells.get(key) || [];
+        bucket.push(segment);
+        segmentCells.set(key, bucket);
+      }
+    }
+  };
 
   const upsertNode = (point, feature) => {
     const key = traversalNodeKey(point.x, point.z, feature);
@@ -158,7 +175,7 @@ function buildTraversalGraph(mode = 'walk') {
       const weight = length * segmentPenalty;
       adjacency[fromId].push({ to: toId, weight });
       adjacency[toId].push({ to: fromId, weight });
-      segments.push({
+      const segment = {
         feature,
         segIndex: i,
         fromId,
@@ -167,7 +184,9 @@ function buildTraversalGraph(mode = 'walk') {
         p2,
         length,
         penalty: segmentPenalty
-      });
+      };
+      segments.push(segment);
+      indexSegment(segment);
     }
   }
 
@@ -176,11 +195,34 @@ function buildTraversalGraph(mode = 'walk') {
     nodes: nodes.map((node) => ({ x: node.x, z: node.z })),
     adjacency,
     segments,
+    segmentCells,
     featureKinds,
     featureCount: features.length,
     nodeCount: nodes.length,
     segmentCount: segments.length
   };
+}
+
+function nearbyTraversalSegments(graph, x, z, radius) {
+  if (!(graph?.segmentCells instanceof Map) || graph.segmentCells.size === 0) return graph?.segments || [];
+  const minCellX = Math.floor((x - radius) / TRAVERSAL_SEGMENT_CELL_SIZE);
+  const maxCellX = Math.floor((x + radius) / TRAVERSAL_SEGMENT_CELL_SIZE);
+  const minCellZ = Math.floor((z - radius) / TRAVERSAL_SEGMENT_CELL_SIZE);
+  const maxCellZ = Math.floor((z + radius) / TRAVERSAL_SEGMENT_CELL_SIZE);
+  const segments = [];
+  const seen = new Set();
+  for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+    for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ += 1) {
+      const bucket = graph.segmentCells.get(`${cellX},${cellZ}`) || [];
+      for (let i = 0; i < bucket.length; i += 1) {
+        const segment = bucket[i];
+        if (seen.has(segment)) continue;
+        seen.add(segment);
+        segments.push(segment);
+      }
+    }
+  }
+  return segments;
 }
 
 export function buildTraversalNetworks() {
@@ -245,10 +287,10 @@ function projectPointToSegment(x, z, p1, p2) {
 export function findNearestTraversalFeature(x, z, options = {}) {
   const mode = options.mode === 'drive' ? 'drive' : 'walk';
   const graph = traversalGraphForMode(mode);
-  const segments = Array.isArray(graph?.segments) ? graph.segments : [];
   const maxDistance = Number.isFinite(options.maxDistance) ?
     Math.max(4, options.maxDistance) :
     TRAVERSAL_MAX_ANCHOR_DISTANCE[mode];
+  const segments = nearbyTraversalSegments(graph, x, z, maxDistance);
 
   let best = null;
   for (let i = 0; i < segments.length; i++) {

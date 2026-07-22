@@ -24,7 +24,9 @@ function surfaceModeForLanduse(landuseType) {
 }
 
 function textureSetForLanduse(appCtx, landuseType) {
-  const mode = surfaceModeForLanduse(landuseType);
+  const mode = appCtx.worldSurfaceProfile?.reason === 'grand_canyon_striated_rock'
+    ? 'rock'
+    : surfaceModeForLanduse(landuseType);
   const registered = appCtx.surfaceTextureSets?.[mode];
   if (registered?.map) return { ...registered, mode };
   if (mode === 'pavement' && appCtx.pavementDiffuse) {
@@ -60,6 +62,8 @@ function applyWorldSpaceSurfaceUvs(geometry, metersPerTile) {
 
 function mappedSurfaceMaterialOptions(appCtx, landuseType, composition) {
   const textures = textureSetForLanduse(appCtx, landuseType);
+  const canyonRock = textures?.mode === 'rock' && appCtx.worldSurfaceProfile?.reason === 'grand_canyon_striated_rock';
+  const tropicalForest = textures?.mode === 'forest' && appCtx.worldSurfaceProfile?.biomeHint === 'tropical_rainforest';
   const metersPerTile =
     textures?.mode === 'pavement' ? 3.2 :
     textures?.mode === 'forest' ? 5.5 :
@@ -71,7 +75,7 @@ function mappedSurfaceMaterialOptions(appCtx, landuseType, composition) {
     7;
   return {
     material: {
-      color: textures?.map ? 0xffffff : appCtx.LANDUSE_STYLES[landuseType].color,
+      color: canyonRock ? 0xc47b50 : tropicalForest ? 0x769563 : textures?.map ? 0xffffff : appCtx.LANDUSE_STYLES[landuseType].color,
       map: textures?.map || null,
       normalMap: textures?.normalMap || null,
       roughnessMap: textures?.roughnessMap || null,

@@ -23,7 +23,7 @@ function showEarthResumeLoad() {
   appCtx.earthResumePending = true;
   appCtx.earthResumeRenderReady = false;
   appCtx.showLoad?.('Restoring the local Earth world...', {
-    background: '../assets/landing/gameplay/drone-monaco.png',
+    background: '../assets/landing/city.jpg',
     hideSpinner: false,
     transition: true,
     bold: true,

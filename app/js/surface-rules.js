@@ -72,6 +72,20 @@ function midpointLatitude(bounds) {
   return Number(appCtx.LOC?.lat || 0);
 }
 
+function midpointLongitude(bounds) {
+  if (Number.isFinite(bounds?.lonW) && Number.isFinite(bounds?.lonE)) {
+    return (bounds.lonW + bounds.lonE) * 0.5;
+  }
+  return Number(appCtx.LOC?.lon || 0);
+}
+
+function isWithinGeographicBounds(lat, lon, region) {
+  return lat >= region.latS && lat <= region.latN && lon >= region.lonW && lon <= region.lonE;
+}
+
+const GRAND_CANYON_REGION = { latS: 35.72, latN: 36.48, lonW: -112.72, lonE: -111.58 };
+const CENTRAL_AMAZON_REGION = { latS: -4.4, latN: -2.1, lonW: -61.4, lonE: -58.7 };
+
 function normalizeLanduseSurfaceType(tags = {}) {
   if (!tags || typeof tags !== 'object') return null;
   if (tags.amenity === 'parking') return 'parking';
@@ -185,10 +199,12 @@ function summarizeSurfaceSignals(landuseWays = [], waterwayWays = []) {
 
 function classifyWorldSurfaceProfile({
   centerLat = null,
+  centerLon = null,
   landuseWays = [],
   waterwayWays = []
 } = {}) {
   const lat = Number.isFinite(centerLat) ? centerLat : Number(appCtx.LOC?.lat || 0);
+  const lon = Number.isFinite(centerLon) ? centerLon : Number(appCtx.LOC?.lon || 0);
   const absLat = Math.abs(lat);
   const signals = summarizeSurfaceSignals(landuseWays, waterwayWays);
   const norm = signals.normalized;
@@ -239,12 +255,14 @@ function classifyWorldSurfaceProfile({
     subtropicalDryFallback
   );
 
+  const rainforest = isWithinGeographicBounds(lat, lon, CENTRAL_AMAZON_REGION);
   return {
     absLat,
     centerLat: lat,
-    terrainModeHint: polar ? 'snow' : aridTerrain ? 'sand' : 'grass',
+    terrainModeHint: polar ? 'snow' : aridTerrain ? 'sand' : rainforest ? 'forest' : 'grass',
+    biomeHint: rainforest ? 'tropical_rainforest' : '',
     waterModeHint: frozenWater ? 'ice' : 'water',
-    reason: polar ? 'polar_latitude' : aridTerrain ? 'arid_surface' : 'temperate',
+    reason: polar ? 'polar_latitude' : aridTerrain ? 'arid_surface' : rainforest ? 'tropical_rainforest' : 'temperate',
     signals
   };
 }
@@ -257,6 +275,7 @@ function classifyTerrainSurfaceProfile({
   worldSurfaceProfile = null
 } = {}) {
   const latMid = midpointLatitude(bounds);
+  const lonMid = midpointLongitude(bounds);
   const absLat = Math.abs(latMid);
   const maxMeters = Number.isFinite(maxElevationMeters) ? maxElevationMeters : 0;
   const minMeters = Number.isFinite(minElevationMeters) ? minElevationMeters : 0;
@@ -282,7 +301,10 @@ function classifyTerrainSurfaceProfile({
   );
   const aridFallback = shouldUseAridFallback(absLat, worldProfile, norm, localSignals);
   const useSand = !useSnow && (explicitBeachSand || aridFallback);
-  const useRock = !useSnow && !useSand && (norm.rock >= 0.18 || (steepTerrain && norm.rock >= 0.06));
+  const grandCanyon = isWithinGeographicBounds(latMid, lonMid, GRAND_CANYON_REGION);
+  const rainforest = worldProfile?.biomeHint === 'tropical_rainforest' ||
+    isWithinGeographicBounds(latMid, lonMid, CENTRAL_AMAZON_REGION);
+  const useRock = !useSnow && !useSand && (grandCanyon || norm.rock >= 0.18 || (steepTerrain && norm.rock >= 0.06));
   const useBuilt = !useSnow && !useSand && !useRock &&
     norm.urban >= 0.52 &&
     norm.urban >= norm.grass * 1.6 &&
@@ -290,12 +312,15 @@ function classifyTerrainSurfaceProfile({
     localSignals.candidates.buildings >= 20 &&
     localSignals.candidates.roads >= 8;
   const useSoil = !useSnow && !useSand && !useRock && !useBuilt && (norm.soil >= 0.2 || (norm.soil >= 0.1 && norm.grass < 0.24));
+  const useForest = !useSnow && !useSand && !useRock && !useBuilt && !useSoil &&
+    rainforest && norm.urban < 0.22;
   const mode = useSnow ?
     ((polar || useRock || steepTerrain) ? 'snowRock' : 'snow') :
     useSand ? 'sand' :
     useRock ? 'rock' :
     useBuilt ? 'built' :
     useSoil ? 'soil' :
+    useForest ? 'forest' :
     'grass';
 
   return {
@@ -306,9 +331,10 @@ function classifyTerrainSurfaceProfile({
     reason: useSnow ?
       (weatherSnow ? 'live_weather_snow' : polar ? 'polar_latitude' : alpine ? 'high_elevation' : 'cold_highland') :
       useSand ? (explicitBeachSand ? 'localized_beach' : 'arid_surface') :
-      useRock ? 'rocky_surface' :
+      useRock ? (grandCanyon ? 'grand_canyon_striated_rock' : 'rocky_surface') :
       useBuilt ? 'mapped_urban_ground' :
       useSoil ? 'soil_surface' :
+      useForest ? 'tropical_rainforest' :
       'vegetated_ground',
     absLat,
     localSignals

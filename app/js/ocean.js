@@ -665,6 +665,7 @@ function getOceanModeDebugState() {
     pitch: Number.isFinite(sub.pitch) ? sub.pitch : null,
     roll: Number.isFinite(sub.roll) ? sub.roll : null,
     speed: Number.isFinite(sub.speed) ? sub.speed : null,
+    turnSpeed: Number.isFinite(sub.turnSpeed) ? sub.turnSpeed : null,
     verticalSpeed: Number.isFinite(sub.verticalSpeed) ? sub.verticalSpeed : null,
     position: sub.position ? {
       x: Number.isFinite(sub.position.x) ? sub.position.x : null,

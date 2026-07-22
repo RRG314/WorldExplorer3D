@@ -131,8 +131,25 @@ async function moveMode(page, mode) {
     await page.keyboard.up('ArrowUp');
   }
   await page.waitForTimeout(200);
-  const end = await readState(page, mode);
-  return { start, during, end, distance: distance3d(start.actor, end.actor) };
+  let end = await readState(page, mode);
+  let distance = distance3d(start.actor, end.actor);
+  let collisionRecovery = false;
+  if ((mode === 'walk' || mode === 'drive') && distance <= 0.25) {
+    collisionRecovery = true;
+    await page.keyboard.down('ArrowDown');
+    await page.waitForTimeout(200);
+    await page.evaluate(async (requestedMode) => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      const frames = requestedMode === 'drive' ? 120 : 90;
+      for (let frame = 0; frame < frames; frame += 1) ctx.update(1 / 60);
+      ctx.updateCamera?.(1 / 60);
+    }, mode);
+    await page.keyboard.up('ArrowDown');
+    await page.waitForTimeout(100);
+    end = await readState(page, mode);
+    distance = distance3d(start.actor, end.actor);
+  }
+  return { start, during, end, distance, collisionRecovery };
 }
 
 await mkdirp(outputDir);

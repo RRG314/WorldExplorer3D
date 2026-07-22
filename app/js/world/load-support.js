@@ -76,10 +76,6 @@ export async function finalizeLoadedWorld(options = {}) {
   if (typeof updateWorldLod === 'function') {
     runFinalStep('updateWorldLod', () => updateWorldLod(true));
   }
-  if (typeof appCtx.waitForWorldRenderReadiness === 'function') {
-    loadMetrics.renderReadiness = await appCtx.waitForWorldRenderReadiness();
-  }
-  appCtx.hideLoad();
   if (typeof appCtx.refreshAstronomicalSky === 'function') {
     runFinalStep('refreshAstronomicalSky', () => appCtx.refreshAstronomicalSky(true));
   } else if (typeof appCtx.alignStarFieldToLocation === 'function') {
@@ -91,6 +87,20 @@ export async function finalizeLoadedWorld(options = {}) {
   if (appCtx.gameStarted) {
     runFinalStep('startMode', () => appCtx.startMode());
   }
+  if (typeof appCtx.primeAerialContext === 'function' && appCtx.getContinuousWorldEnabled?.() !== true) {
+    startLoadPhase('primeAerialContext');
+    try {
+      await appCtx.primeAerialContext({ minLoadedTiles: 9, timeoutMs: 20000 });
+    } catch (err) {
+      recordWorldLoadWarning(loadMetrics, 'primeAerialContext', err);
+    } finally {
+      endLoadPhase('primeAerialContext');
+    }
+  }
+  if (typeof appCtx.waitForWorldRenderReadiness === 'function') {
+    loadMetrics.renderReadiness = await appCtx.waitForWorldRenderReadiness();
+  }
+  appCtx.hideLoad();
 }
 
 export function createSyntheticFallbackWorld(options = {}) {

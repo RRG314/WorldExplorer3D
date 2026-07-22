@@ -9,6 +9,8 @@ function parseArgs(argv) {
     out: 'output/playwright/perf-overlay.json',
     waitMs: 12000,
     location: 'baltimore',
+    mode: 'walk',
+    moveKey: '',
     hardware: false
   };
   for (let i = 2; i < argv.length; i++) {
@@ -26,6 +28,12 @@ function parseArgs(argv) {
       i++;
     } else if (arg === '--location' && next) {
       args.location = String(next).trim() || 'baltimore';
+      i++;
+    } else if (arg === '--mode' && next) {
+      args.mode = String(next).trim() || 'walk';
+      i++;
+    } else if (arg === '--move-key' && next) {
+      args.moveKey = String(next).trim();
       i++;
     } else if (arg === '--hardware') {
       args.hardware = true;
@@ -107,7 +115,7 @@ async function main() {
   await page.goto(args.url, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(500);
 
-  await page.evaluate(async (location) => {
+  await page.evaluate(async ({ location, mode }) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const { ENV } = await import('/app/js/env.js?v=57');
     const deadline = performance.now() + 120000;
@@ -131,13 +139,16 @@ async function main() {
       document.getElementById(id)?.classList.add('show');
     });
     await ctx.loadRoads();
+    ctx.setTravelMode?.(mode, { source: 'performance_profiler', force: true, emitTutorial: false });
     ctx.spawnOnRoad?.();
-  }, args.location);
+  }, { location: args.location, mode: args.mode });
 
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Profiler.enable');
   await cdp.send('Profiler.start');
+  if (args.moveKey) await page.keyboard.down(args.moveKey);
   await page.waitForTimeout(args.waitMs);
+  if (args.moveKey) await page.keyboard.up(args.moveKey);
   const cpuProfile = await cdp.send('Profiler.stop');
   await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');

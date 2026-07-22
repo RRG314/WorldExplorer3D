@@ -56,16 +56,24 @@ for (const manifestPath of [
 const forbiddenFiles = [
   'app/assets/models/Astronaut.glb',
   'app/assets/models/soldier.glb',
-  'assets/landing/hero.jpg',
-  'assets/landing/city.jpg',
-  'assets/landing/space.jpg',
-  'assets/landing/moon.jpg'
+  'assets/landing/hero.jpg'
 ];
 
 for (const relativePath of forbiddenFiles) {
   assert(!fs.existsSync(path.join(root, relativePath)),
     `Unverified or replaced asset must remain absent: ${relativePath}`);
 }
+
+const landingAttribution = read('assets/landing/ATTRIBUTION.md');
+const mediaLicense = read('MEDIA_LICENSE.md');
+for (const transitionAsset of ['city.jpg', 'moon.jpg', 'space.jpg']) {
+  assert(landingAttribution.includes(transitionAsset),
+    `Transition artwork is missing provenance: ${transitionAsset}`);
+  assert(mediaLicense.includes(`assets/landing/${transitionAsset}`),
+    `Transition artwork is missing from MEDIA_LICENSE.md: ${transitionAsset}`);
+}
+assert(landingAttribution.includes('ChatGPT/GPT-4o C2PA'),
+  'Generated transition artwork must retain its C2PA provenance notice.');
 
 const publicDocs = [
   'README.md',

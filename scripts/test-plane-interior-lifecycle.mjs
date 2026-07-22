@@ -301,7 +301,7 @@ async function exerciseLifecycle(page) {
     ctx.clearActiveInterior?.({ restorePlayer: true, preserveCache: true });
     const modeCycles = [];
     const settleFrames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-    for (let cycle = 1; cycle <= 3; cycle += 1) {
+    for (let cycle = 1; cycle <= 5; cycle += 1) {
       const origin = {
         x: Number(ctx.car?.x) || center.x,
         y: Math.max(Number(ctx.car?.y) || roofY, roofY) + 35,
@@ -409,15 +409,15 @@ async function main() {
     assert(report.driveExit.mode === 'drive', `Plane-to-drive resolved as ${report.driveExit.mode}`);
     assert(report.driveExit.switchMs <= MODE_SWITCH_BUDGET_MS, `Plane-to-drive stalled for ${report.driveExit.switchMs}ms`);
     assert(!report.driveExit.blocked, `Plane-to-drive spawned inside a building: ${JSON.stringify(report.driveExit)}`);
-    const secondModeCycle = report.modeCycles[1];
-    const thirdModeCycle = report.modeCycles[2];
+    const warmModeCycle = report.modeCycles.at(-2);
+    const finalModeCycle = report.modeCycles.at(-1);
     assert(report.modeCycles.every((cycle) => cycle.currentMode === 'walk'), 'Repeated mode cycle did not return to walk');
     assert(report.modeCycles.every((cycle) => cycle.planeMeshes === 1), 'Repeated mode cycle duplicated the plane mesh');
-    assert(thirdModeCycle.geometries <= secondModeCycle.geometries, 'Renderer geometry count grew after mode warm-up');
-    assert(thirdModeCycle.textures <= secondModeCycle.textures, 'Renderer texture count grew after mode warm-up');
-    assert(thirdModeCycle.pendingGeometryDisposals <= 192, 'Mode cycle left the geometry disposal queue over budget');
-    if (secondModeCycle.heapBytes > 0 && thirdModeCycle.heapBytes > 0) {
-      assert(thirdModeCycle.heapBytes <= secondModeCycle.heapBytes * 1.15, 'Browser heap retained growth after mode warm-up');
+    assert(finalModeCycle.geometries <= warmModeCycle.geometries, 'Renderer geometry count grew after mode warm-up');
+    assert(finalModeCycle.textures <= warmModeCycle.textures, 'Renderer texture count grew after mode warm-up');
+    assert(finalModeCycle.pendingGeometryDisposals <= 192, 'Mode cycle left the geometry disposal queue over budget');
+    if (warmModeCycle.heapBytes > 0 && finalModeCycle.heapBytes > 0) {
+      assert(finalModeCycle.heapBytes <= warmModeCycle.heapBytes * 1.15, 'Browser heap retained growth after mode warm-up');
     }
     assert(report.interior.entered, 'Large building interior did not open');
     assert(report.interior.bboxFootprintEnterable, 'A valid bounding-box building was not enterable');

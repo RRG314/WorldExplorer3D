@@ -124,6 +124,13 @@ function _syncLegacyFlags(env) {
 
 // Lightweight debug overlay (top-left, unobtrusive)
 function _updateEnvDebug() {
+  const debugEnabled = typeof location !== 'undefined' &&
+    new URLSearchParams(location.search).get('envDebug') === '1';
+  if (!debugEnabled) {
+    _envDebugEl?.remove();
+    _envDebugEl = null;
+    return;
+  }
   if (!_envDebugEl) {
     _envDebugEl = document.getElementById('envDebug');
     if (!_envDebugEl) {

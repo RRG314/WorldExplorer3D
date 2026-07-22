@@ -50,6 +50,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         appCtx.updatePlanetaryTracks?.();
         if (!appCtx.onMars) appCtx.refreshAstronomicalSky?.(false);
         appCtx.updateWaterWaveVisuals?.();
+        appCtx.updateWeatherEffects?.(frame.dt);
 
         weatherTimer += frame.dt;
         if (weatherTimer > 5) {

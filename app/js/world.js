@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import {
   classifyWorldSurfaceProfile,
-} from "./surface-rules.js?v=17";
+} from "./surface-rules.js?v=18";
 import {
   inferWaterRenderContext
 } from "./water-dynamics.js?v=4";
@@ -65,7 +65,7 @@ import {
   scheduleDeferredPoiLoad,
   scheduleDeferredWorldDetailPasses,
   safeWorldLoadCall
-} from "./world/load-support.js?v=17";
+} from "./world/load-support.js?v=19";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -73,7 +73,7 @@ import {
 } from "./world/load-reset.js?v=8";
 import {
   prepareWorldFeatureSelections
-} from "./world/load-budgeting.js?v=3";
+} from "./world/load-budgeting.js?v=4";
 import {
   buildBuildingGeometryGuards,
   buildFeatureGeometryGuards,
@@ -123,7 +123,7 @@ import {
   pointInPolygon,
   runtimeRoadFeatures,
   teleportToLocation
-} from "./world/navigation.js?v=4";
+} from "./world/navigation.js?v=5";
 import {
   buildTraversalNetworks,
   findNearestTraversalFeature,
@@ -134,12 +134,12 @@ import {
   pickNavigationTargetPoint,
   surfaceDisplayName,
   traversableFeaturesForMode
-} from "./world/traversal.js?v=1";
+} from "./world/traversal.js?v=2";
 import {
   initWorldVegetation,
   MAX_TREE_NODES,
   MAX_TREE_ROW_WAYS
-} from "./world/vegetation.js?v=10";
+} from "./world/vegetation.js?v=13";
 import {
   appendIndexedGeometry,
   decimatePoints,
@@ -168,7 +168,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=5";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=54";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=55";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=9";

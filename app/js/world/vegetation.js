@@ -216,7 +216,7 @@ export function collectWorldVegetationPlacements() {
       mesh.userData?.worldCoverSurfaceMode === 'forest';
   }).length;
   const tropicalForest =
-    Math.abs(Number(appCtx.LOC?.lat) || 0) <= 24 &&
+    (appCtx.worldSurfaceProfile?.biomeHint === 'tropical_rainforest' || Math.abs(Number(appCtx.LOC?.lat) || 0) <= 24) &&
     forestTileCount >= Math.max(1, Math.ceil(terrainMeshes.length * 0.35));
   const worldDensityScale = vegetationWorldDensityScale();
   const budgetScale =
@@ -267,17 +267,23 @@ export function collectWorldVegetationPlacements() {
       const point = samplePolylinePointAtDistance(pts, p * TREE_ROW_SPACING * spacingNoise);
       if (!point) continue;
       const seed = vegetationSeed(rowSeed ^ p ^ 0x85ebca6b);
-      pushPlacement({
-        x: point.x,
-        z: point.z,
-        scale: 0.86 + appCtx.rand01FromInt(seed ^ 0x7f4a7c15) * 0.62,
-        canopyStretch: 0.88 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * 0.24,
-        rotation: appCtx.rand01FromInt(seed ^ 0x165667b1) * Math.PI * 2,
-        color: [0x2c6726, 0x356f2d, 0x3a7b33][Math.floor(appCtx.rand01FromInt(seed ^ 0xd3a2646c) * 3) % 3],
-        source: 'tree_row',
-        landuseType: 'tree_row',
-        options: { roadPadding: 1.75, buildingPadding: 1.0 }
-      });
+      const clusterCount = tropicalForest ? 2 + Math.floor(appCtx.rand01FromInt(seed ^ 0x243f6a88) * 3) : 1;
+      for (let clusterIndex = 0; clusterIndex < clusterCount && placements.length < maxTrees; clusterIndex++) {
+        const clusterSeed = vegetationSeed(seed ^ Math.imul(clusterIndex + 1, 0x9e3779b9));
+        const clusterRadius = clusterIndex === 0 ? 0 : 1.5 + appCtx.rand01FromInt(clusterSeed) * 5.5;
+        const clusterAngle = appCtx.rand01FromInt(clusterSeed ^ 0x85ebca6b) * Math.PI * 2;
+        pushPlacement({
+          x: point.x + Math.cos(clusterAngle) * clusterRadius,
+          z: point.z + Math.sin(clusterAngle) * clusterRadius,
+          scale: 0.86 + appCtx.rand01FromInt(clusterSeed ^ 0x7f4a7c15) * 0.62,
+          canopyStretch: 0.88 + appCtx.rand01FromInt(clusterSeed ^ 0x27d4eb2f) * 0.24,
+          rotation: appCtx.rand01FromInt(clusterSeed ^ 0x165667b1) * Math.PI * 2,
+          color: [0x2c6726, 0x356f2d, 0x3a7b33][Math.floor(appCtx.rand01FromInt(clusterSeed ^ 0xd3a2646c) * 3) % 3],
+          source: 'tree_row',
+          landuseType: 'tree_row',
+          options: { roadPadding: 1.75, buildingPadding: 1.0 }
+        });
+      }
     }
   }
 
@@ -376,33 +382,39 @@ export function collectWorldVegetationPlacements() {
       const kind = String(sample.kind || 'tree');
       const isShrub = kind === 'shrub' || kind === 'wetland';
       const isTropicalTree = tropicalForest && !isShrub;
-      pushPlacement({
-        x: point.x,
-        z: point.z,
-        scale: isShrub ?
-          0.42 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * 0.35 :
-          isTropicalTree ?
-            1.18 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * 0.92 :
-            0.78 + appCtx.rand01FromInt(seed ^ 0x27d4eb2f) * 0.62,
-        canopyStretch: isShrub ?
-          0.72 :
-          isTropicalTree ?
-            1.08 + appCtx.rand01FromInt(seed ^ 0x9e3779b9) * 0.34 :
-            0.9 + appCtx.rand01FromInt(seed ^ 0x9e3779b9) * 0.28,
-        canopyWidth: isTropicalTree ?
-          2.0 + appCtx.rand01FromInt(seed ^ 0x6a09e667) * 0.46 :
-          1,
-        rotation: appCtx.rand01FromInt(seed ^ 0x85ebca6b) * Math.PI * 2,
-        color: isShrub ?
-          0x55723c :
-          isTropicalTree ?
-            TROPICAL_TREE_COLORS[Math.floor(appCtx.rand01FromInt(seed ^ 0xd3a2646c) * TROPICAL_TREE_COLORS.length) % TROPICAL_TREE_COLORS.length] :
-            kind === 'mangrove' ? 0x285f3b : 0x285f2d,
-        source: mesh.userData?.worldCoverStatus === 'neighbor-fallback' ? 'worldcover_neighbor_fallback' : 'worldcover',
-        landuseType: kind,
-        biome: isTropicalTree ? 'tropical_forest' : 'temperate',
-        options: { roadPadding: 1.8, buildingPadding: 1.0 }
-      });
+      const clusterCount = isTropicalTree ? 2 + Math.floor(appCtx.rand01FromInt(seed ^ 0x243f6a88) * 3) : 1;
+      for (let clusterIndex = 0; clusterIndex < clusterCount && placements.length < maxTrees; clusterIndex++) {
+        const clusterSeed = vegetationSeed(seed ^ Math.imul(clusterIndex + 1, 0x9e3779b9));
+        const clusterRadius = clusterIndex === 0 ? 0 : 1.5 + appCtx.rand01FromInt(clusterSeed) * 5.5;
+        const clusterAngle = appCtx.rand01FromInt(clusterSeed ^ 0x85ebca6b) * Math.PI * 2;
+        pushPlacement({
+          x: point.x + Math.cos(clusterAngle) * clusterRadius,
+          z: point.z + Math.sin(clusterAngle) * clusterRadius,
+          scale: isShrub ?
+            0.42 + appCtx.rand01FromInt(clusterSeed ^ 0x27d4eb2f) * 0.35 :
+            isTropicalTree ?
+              1.18 + appCtx.rand01FromInt(clusterSeed ^ 0x27d4eb2f) * 0.92 :
+              0.78 + appCtx.rand01FromInt(clusterSeed ^ 0x27d4eb2f) * 0.62,
+          canopyStretch: isShrub ?
+            0.72 :
+            isTropicalTree ?
+              1.08 + appCtx.rand01FromInt(clusterSeed ^ 0x9e3779b9) * 0.34 :
+              0.9 + appCtx.rand01FromInt(clusterSeed ^ 0x9e3779b9) * 0.28,
+          canopyWidth: isTropicalTree ?
+            2.15 + appCtx.rand01FromInt(clusterSeed ^ 0x6a09e667) * 0.85 :
+            1,
+          rotation: appCtx.rand01FromInt(clusterSeed ^ 0x85ebca6b) * Math.PI * 2,
+          color: isShrub ?
+            0x55723c :
+            isTropicalTree ?
+              TROPICAL_TREE_COLORS[Math.floor(appCtx.rand01FromInt(clusterSeed ^ 0xd3a2646c) * TROPICAL_TREE_COLORS.length) % TROPICAL_TREE_COLORS.length] :
+              kind === 'mangrove' ? 0x285f3b : 0x285f2d,
+          source: mesh.userData?.worldCoverStatus === 'neighbor-fallback' ? 'worldcover_neighbor_fallback' : 'worldcover',
+          landuseType: kind,
+          biome: isTropicalTree ? 'tropical_forest' : 'temperate',
+          options: { roadPadding: 1.8, buildingPadding: 1.0 }
+        });
+      }
     }
   }
 

@@ -1,4 +1,4 @@
-import { distanceKmBetween, normalizeCityRecord } from './helpers.js?v=2';
+import { distanceKmBetween, normalizeCityRecord } from './helpers.js?v=3';
 
 const OVERPASS_ENDPOINTS = [
   'https://lz4.overpass-api.de/api/interpreter',
@@ -14,7 +14,7 @@ export const CURATED_DESTINATIONS = [
   ['mount-everest', 'Mount Everest', 27.9881, 86.925, 'Mountain'],
   ['victoria-falls', 'Victoria Falls', -17.9243, 25.8572, 'Natural wonder'],
   ['serengeti', 'Serengeti National Park', -2.3333, 34.8333, 'Wildlife'],
-  ['amazon', 'Amazon Rainforest', -3.4653, -62.2159, 'Rainforest'],
+  ['amazon', 'Amazon Rainforest River Bank', -2.6500, -60.9120, 'Rio Negro rainforest bank'],
   ['sahara', 'Sahara Desert', 23.4162, 25.6628, 'Desert'],
   ['machu-picchu', 'Machu Picchu', -13.1631, -72.545, 'Historic site'],
   ['easter-island', 'Rapa Nui', -27.1127, -109.3497, 'Historic site'],
@@ -39,7 +39,72 @@ export const CURATED_DESTINATIONS = [
   ['table-mountain', 'Table Mountain', -33.9628, 18.4098, 'Mountain']
 ].map(([key, name, lat, lon, category]) => ({ key, name, lat, lon, category, source: 'curated' }));
 
+export const MAJOR_CITY_DESTINATIONS = [
+  ['new-york', 'New York', 40.7128, -74.0060, 'North America'],
+  ['washington-dc', 'Washington, DC', 38.9072, -77.0369, 'North America'],
+  ['philadelphia', 'Philadelphia', 39.9526, -75.1652, 'North America'],
+  ['boston', 'Boston', 42.3601, -71.0589, 'North America'],
+  ['los-angeles', 'Los Angeles', 34.0522, -118.2437, 'North America'],
+  ['chicago', 'Chicago', 41.8781, -87.6298, 'North America'],
+  ['miami', 'Miami', 25.7617, -80.1918, 'North America'],
+  ['san-francisco', 'San Francisco', 37.7749, -122.4194, 'North America'],
+  ['seattle', 'Seattle', 47.6062, -122.3321, 'North America'],
+  ['vancouver', 'Vancouver', 49.2827, -123.1207, 'North America'],
+  ['toronto', 'Toronto', 43.6532, -79.3832, 'North America'],
+  ['mexico-city', 'Mexico City', 19.4326, -99.1332, 'North America'],
+  ['sao-paulo', 'Sao Paulo', -23.5505, -46.6333, 'South America'],
+  ['rio-de-janeiro', 'Rio de Janeiro', -22.9068, -43.1729, 'South America'],
+  ['buenos-aires', 'Buenos Aires', -34.6037, -58.3816, 'South America'],
+  ['london', 'London', 51.5074, -0.1278, 'Europe'],
+  ['paris', 'Paris', 48.8566, 2.3522, 'Europe'],
+  ['berlin', 'Berlin', 52.5200, 13.4050, 'Europe'],
+  ['rome', 'Rome', 41.9028, 12.4964, 'Europe'],
+  ['madrid', 'Madrid', 40.4168, -3.7038, 'Europe'],
+  ['monaco', 'Monaco', 43.7384, 7.4246, 'Europe'],
+  ['cairo', 'Cairo', 30.0444, 31.2357, 'Africa'],
+  ['lagos', 'Lagos', 6.5244, 3.3792, 'Africa'],
+  ['cape-town', 'Cape Town', -33.9249, 18.4241, 'Africa'],
+  ['nairobi', 'Nairobi', -1.2921, 36.8219, 'Africa'],
+  ['dubai', 'Dubai', 25.2048, 55.2708, 'Middle East'],
+  ['riyadh', 'Riyadh', 24.7136, 46.6753, 'Middle East'],
+  ['mumbai', 'Mumbai', 19.0760, 72.8777, 'Asia'],
+  ['delhi', 'Delhi', 28.6139, 77.2090, 'Asia'],
+  ['singapore', 'Singapore', 1.3521, 103.8198, 'Asia'],
+  ['tokyo', 'Tokyo', 35.6762, 139.6503, 'Asia'],
+  ['seoul', 'Seoul', 37.5665, 126.9780, 'Asia'],
+  ['beijing', 'Beijing', 39.9042, 116.4074, 'Asia'],
+  ['shanghai', 'Shanghai', 31.2304, 121.4737, 'Asia'],
+  ['sydney', 'Sydney', -33.8688, 151.2093, 'Oceania'],
+  ['melbourne', 'Melbourne', -37.8136, 144.9631, 'Oceania'],
+  ['auckland', 'Auckland', -36.8509, 174.7645, 'Oceania']
+].map(([key, name, lat, lon, region]) => ({
+  key: `major-${key}`,
+  name,
+  lat,
+  lon,
+  category: region,
+  collection: 'major-city',
+  source: 'curated'
+}));
+
 const nearbyCache = new Map();
+
+export function nearbyMajorCities(lat, lon) {
+  return MAJOR_CITY_DESTINATIONS
+    .map((city) => ({ ...city, distanceKm: distanceKmBetween(lat, lon, city.lat, city.lon) }))
+    .filter((city) => city.distanceKm <= 160.934)
+    .sort((a, b) => a.distanceKm - b.distanceKm);
+}
+
+function mergeNearbyCities(primary, fallback) {
+  const seen = new Set();
+  return [...primary, ...fallback].filter((city) => {
+    const key = String(city.name || '').trim().toLowerCase();
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
 
 function nearbyCacheKey(lat, lon) {
   return `${Number(lat).toFixed(1)},${Number(lon).toFixed(1)}`;
@@ -55,15 +120,22 @@ function parseNearbyElements(elements, lat, lon) {
         lon: element?.lon ?? element?.center?.lon
       }, 'live');
       if (!city) return null;
+      const population = Number.parseInt(String(element?.tags?.population || '').replaceAll(',', ''), 10);
       return {
         ...city,
         placeType: String(element?.tags?.place || 'place'),
-        distanceKm: distanceKmBetween(lat, lon, city.lat, city.lon)
+        distanceKm: distanceKmBetween(lat, lon, city.lat, city.lon),
+        population: Number.isFinite(population) ? population : 0
       };
     })
     .filter(Boolean)
-    .sort((a, b) => a.distanceKm - b.distanceKm)
-    .slice(0, 8);
+    .filter((city) => city.distanceKm <= 160.934)
+    .sort((a, b) => {
+      const populationDelta = Number(b.population || 0) - Number(a.population || 0);
+      if (populationDelta) return populationDelta;
+      return a.distanceKm - b.distanceKm;
+    })
+    .slice(0, 12);
 }
 
 async function fetchFromEndpoint(endpoint, query, signal) {
@@ -76,13 +148,14 @@ export async function fetchNearbyCities(lat, lon, options = {}) {
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) return [];
   const key = nearbyCacheKey(lat, lon);
   if (nearbyCache.has(key)) return nearbyCache.get(key);
+  const fallbackCities = nearbyMajorCities(lat, lon);
 
-  const query = `[out:json][timeout:8];node(around:25000,${lat.toFixed(5)},${lon.toFixed(5)})["place"~"^(city|town)$"]["name"];out body 24;`;
+  const query = `[out:json][timeout:12];node(around:160934,${lat.toFixed(5)},${lon.toFixed(5)})["place"="city"]["name"];out body 80;`;
   let lastError = null;
   for (const endpoint of OVERPASS_ENDPOINTS) {
     try {
       const payload = await fetchFromEndpoint(endpoint, query, options.signal);
-      const cities = parseNearbyElements(payload?.elements, lat, lon);
+      const cities = mergeNearbyCities(parseNearbyElements(payload?.elements, lat, lon), fallbackCities);
       nearbyCache.set(key, cities);
       return cities;
     } catch (error) {
@@ -90,5 +163,7 @@ export async function fetchNearbyCities(lat, lon, options = {}) {
       lastError = error;
     }
   }
-  throw lastError || new Error('Nearby places unavailable');
+  if (lastError && options.signal?.aborted) throw lastError;
+  nearbyCache.set(key, fallbackCities);
+  return fallbackCities;
 }

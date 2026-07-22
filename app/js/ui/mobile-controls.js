@@ -425,7 +425,7 @@ function initMobileControls() {
       earthModeMenuItem.textContent = mode === 'ocean' ? '🌍 Return to Earth' : '🌍 Earth Mode';
     }
     if (controlsTab && ctrlContent) {
-      controlsTab.classList.toggle('compact', isTouchPreferredClient && ctrlContent.classList.contains('hidden'));
+      controlsTab.classList.toggle('compact', ctrlContent.classList.contains('hidden'));
     }
     if (ctrlHeader) {
       const modeLabel =
@@ -438,6 +438,7 @@ function initMobileControls() {
         'Driving Mode';
       const arrow = ctrlContent?.classList.contains('hidden') ? '▼' : '▲';
       ctrlHeader.textContent = `⚙️ ${modeLabel} ${arrow}`;
+      ctrlHeader.title = `${modeLabel} controls`;
     }
     updateMobileTouchControls(mode);
   }

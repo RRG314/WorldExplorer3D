@@ -1,6 +1,26 @@
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+
+function releaseEnvironment() {
+  const env = { ...process.env };
+  if (process.platform !== 'darwin') return env;
+  const configuredJava = env.JAVA_HOME && path.join(env.JAVA_HOME, 'bin', 'java');
+  if (configuredJava && existsSync(configuredJava)) return env;
+  const candidates = [
+    '/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home',
+    '/usr/local/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home'
+  ];
+  const javaHome = candidates.find((candidate) => existsSync(path.join(candidate, 'bin', 'java')));
+  if (!javaHome) return env;
+  env.JAVA_HOME = javaHome;
+  env.PATH = `${path.join(javaHome, 'bin')}:${env.PATH || ''}`;
+  return env;
+}
+
+const baseEnvironment = releaseEnvironment();
 
 const steps = [
   { name: 'Maintainability guard', cmd: [process.execPath, 'scripts/test-maintainability-guard.mjs'] },
@@ -59,7 +79,7 @@ for (const step of steps) {
   console.log(`\n=== ${step.name} ===`);
   const res = spawnSync(step.cmd[0], step.cmd.slice(1), {
     stdio: 'inherit',
-    env: { ...process.env, ...(step.env || {}) },
+    env: { ...baseEnvironment, ...(step.env || {}) },
     cwd: process.cwd()
   });
   if (res.status !== 0) {

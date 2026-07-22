@@ -189,12 +189,22 @@ export const WORLD_TEST_LOCATIONS = [
   {
     id: 'amazon_custom',
     kind: 'custom',
-    lat: -3.4653,
-    lon: -62.2159,
-    label: 'Amazon Basin, Brazil',
+    lat: -2.6500,
+    lon: -60.9120,
+    label: 'Rio Negro Rainforest Bank, Brazil',
     category: 'tropical_forest_river_custom',
     expectedStart: 'land',
     minimumVegetationFeatures: 1800
+  },
+  {
+    id: 'grand_canyon_custom',
+    kind: 'custom',
+    lat: 36.1069,
+    lon: -112.1129,
+    label: 'Grand Canyon, Arizona',
+    category: 'striated_canyon_rock_custom',
+    expectedStart: 'land',
+    expectedTerrainMode: 'rock'
   },
   {
     id: 'saopaulo_custom',

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=3';
+import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=4';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=1';
 import { createRuntimeKernel } from './runtime/kernel.js?v=1';
 
@@ -7,19 +7,19 @@ let perfPanelTimer = 0;
 let runtimeSystemsRegistered = false;
 const OVERLAY_EDGE_MARGIN = 6;
 const OVERLAY_ANCHOR_GAP = 10;
-const DEFAULT_LOADING_BG = '../assets/landing/gameplay/drone-monaco.png';
+const DEFAULT_LOADING_BG = '../assets/landing/city.jpg';
 const TRANSITION_LOADING = {
   earth: { background: DEFAULT_LOADING_BG, text: 'Restoring Earth...' },
-  space: { background: '../assets/landing/gameplay/fly-in-space.png', text: 'Preparing Space Flight...' },
-  moon: { background: '../assets/landing/gameplay/walk-on-moon.png', text: 'Approaching The Moon...' },
-  mars: { background: '../assets/landing/gameplay/mars.png', text: 'Approaching Olympus Mons...' },
+  space: { background: '../assets/landing/space.jpg', text: 'Preparing Space Flight...' },
+  moon: { background: '../assets/landing/moon.jpg', text: 'Approaching The Moon...' },
+  mars: { background: '../assets/landing/space.jpg', text: 'Approaching Olympus Mons...' },
   ocean: { background: DEFAULT_LOADING_BG, text: 'Diving Into Ocean Mode...' }
 };
 const LOADING_BG_BY_MODE = {
   earth: DEFAULT_LOADING_BG,
-  moon: '../assets/landing/gameplay/walk-on-moon.png',
-  mars: '../assets/landing/gameplay/mars.png',
-  space: '../assets/landing/gameplay/fly-in-space.png',
+  moon: '../assets/landing/moon.jpg',
+  mars: '../assets/landing/space.jpg',
+  space: '../assets/landing/space.jpg',
   ocean: DEFAULT_LOADING_BG
 };
 
@@ -156,27 +156,66 @@ function renderLoop() {
   return runtimeKernel.start();
 }
 
+function warmNearbyWorldRenderResources(radius = 900) {
+  if (!appCtx.renderer || !appCtx.scene || !appCtx.camera || !Array.isArray(appCtx.buildingMeshes)) return 0;
+  const actor = appCtx.activeTransportActor?.()?.position || appCtx.car || { x: 0, z: 0 };
+  const radiusSq = radius * radius;
+  const restored = [];
+  const startedAt = performance.now();
+  for (let i = 0; i < appCtx.buildingMeshes.length; i += 1) {
+    const mesh = appCtx.buildingMeshes[i];
+    if (!mesh?.geometry) continue;
+    if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
+    const center = mesh.userData?.lodCenter || mesh.geometry.boundingSphere?.center;
+    const x = Number(center?.x || 0) + Number(mesh.position?.x || 0);
+    const z = Number(center?.z || 0) + Number(mesh.position?.z || 0);
+    if ((x - actor.x) ** 2 + (z - actor.z) ** 2 > radiusSq) continue;
+    restored.push({ mesh, parent: mesh.parent, visible: mesh.visible });
+    mesh.visible = true;
+    if (!mesh.parent) appCtx.scene.add(mesh);
+  }
+  try {
+    appCtx.renderer.compile?.(appCtx.scene, appCtx.camera);
+    appCtx.renderer.render(appCtx.scene, appCtx.camera);
+  } finally {
+    for (let i = 0; i < restored.length; i += 1) {
+      const { mesh, parent, visible } = restored[i];
+      mesh.visible = visible;
+      if (!parent && mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
+    }
+  }
+  return performance.now() - startedAt;
+}
+
 async function waitForWorldRenderReadiness(options = {}) {
   if (!appCtx.renderer || !appCtx.scene || !appCtx.camera) {
     return { ready: false, reason: 'renderer_unavailable', durationMs: 0, frames: 0 };
   }
   const timeoutMs = Math.max(500, Math.min(12000, Number(options.timeoutMs) || 9000));
-  const requiredStableFrames = Math.max(2, Math.min(8, Number(options.stableFrames) || 3));
+  const requiredStableFrames = Math.max(4, Math.min(16, Number(options.stableFrames) || 8));
+  const minimumReadyMs = Math.max(250, Math.min(2500, Number(options.minimumReadyMs) || 650));
   const startedAt = performance.now();
+  const warmupMs = warmNearbyWorldRenderResources();
+  let previousFrameAt = startedAt;
   let previousSignature = '';
   let stableFrames = 0;
   let frames = 0;
 
-  while (performance.now() - startedAt < timeoutMs && stableFrames < requiredStableFrames) {
-    await new Promise((resolve) => requestAnimationFrame(resolve));
+  while (
+    performance.now() - startedAt < timeoutMs &&
+    (stableFrames < requiredStableFrames || performance.now() - startedAt < minimumReadyMs)
+  ) {
+    const frameAt = await new Promise((resolve) => requestAnimationFrame(resolve));
     frames += 1;
+    const frameMs = frameAt - previousFrameAt;
+    previousFrameAt = frameAt;
     const info = appCtx.renderer.info;
     const signature = [
       Number(info?.memory?.geometries || 0),
       Number(info?.memory?.textures || 0),
       Number(info?.programs?.length || 0)
     ].join(':');
-    stableFrames = signature === previousSignature ? stableFrames + 1 : 0;
+    stableFrames = signature === previousSignature && frameMs <= 50 ? stableFrames + 1 : 0;
     previousSignature = signature;
   }
 
@@ -186,6 +225,8 @@ async function waitForWorldRenderReadiness(options = {}) {
     durationMs: Math.round(performance.now() - startedAt),
     frames,
     stableFrames,
+    minimumReadyMs,
+    warmupMs: Math.round(warmupMs),
     geometries: Number(appCtx.renderer.info?.memory?.geometries || 0),
     textures: Number(appCtx.renderer.info?.memory?.textures || 0),
     programs: Number(appCtx.renderer.info?.programs?.length || 0)

@@ -83,9 +83,17 @@ function aerialContextCenter({ center, enabled } = {}) {
   return enabled && Number.isFinite(center?.lat) && Number.isFinite(center?.lon) ? center : appCtx.LOC;
 }
 
-function aerialTravelModeActive() {
-  const mode = appCtx.getCurrentTravelMode?.();
-  return mode === 'plane' || mode === 'drone' || appCtx.planeMode?.active === true || appCtx.droneMode === true;
+async function primeAerialContext(options = {}) {
+  const minLoadedTiles = Math.max(1, Math.round(Number(options.minLoadedTiles) || 9));
+  const timeoutMs = Math.max(1000, Number(options.timeoutMs) || 20000);
+  const startedAt = performance.now();
+  while (performance.now() - startedAt < timeoutMs) {
+    appCtx.updateEarthWorldStreaming?.(0.25, { allowLoading: true });
+    const layer = appCtx.getEarthStreamingSnapshot?.()?.layers?.['aerial-vector'];
+    if (layer?.centerLoaded && Number(layer.loadedNearCenter || 0) >= minLoadedTiles) return layer;
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 80));
+  }
+  throw new Error(`Aerial context preparation timed out after ${Math.round(timeoutMs)}ms.`);
 }
 
 function initStreamingAerialContext() {
@@ -93,16 +101,12 @@ function initStreamingAerialContext() {
   appCtx._streamingAerialContextRegistered = true;
   appCtx.aerialContextMeshes = Array.isArray(appCtx.aerialContextMeshes) ? appCtx.aerialContextMeshes : [];
   appCtx.unregisterStreamingAerialContext = appCtx.registerEarthStreamLayer('aerial-vector', {
-    activeWhen: () => (
-      !!appCtx.initialEarthWorldReady &&
-      appCtx.getContinuousWorldEnabled?.() !== true &&
-      aerialTravelModeActive()
-    ),
+    activeWhen: () => !!appCtx.initialEarthWorldReady && appCtx.getContinuousWorldEnabled?.() !== true,
     availableWhenDisabled: true,
     centerWhen: aerialContextCenter,
     loadChunk: loadAerialContextChunk,
     maxActive: 25,
-    maxConcurrent: 3,
+    maxConcurrent: 2,
     priorityBias: 0.8,
     profile: SOURCE_PROFILE.LOCATION_OSM,
     radius: 2,
@@ -110,9 +114,10 @@ function initStreamingAerialContext() {
     unloadChunk: disposeAerialContextChunk,
     zoom: 13
   });
+  appCtx.primeAerialContext = primeAerialContext;
   return true;
 }
 
 initStreamingAerialContext();
 
-export { disposeAerialContextChunk, initStreamingAerialContext, loadAerialContextChunk };
+export { disposeAerialContextChunk, initStreamingAerialContext, loadAerialContextChunk, primeAerialContext };

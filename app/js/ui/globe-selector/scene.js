@@ -3,7 +3,7 @@ import {
   disposeThreeObjectTree,
   disposeThreeRenderer
 } from '../../engine/webgl-lifecycle.js?v=1';
-import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=2';
+import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=3';
 
 export function createGlobeSelectorScene(options = {}) {
   const {
@@ -47,7 +47,7 @@ export function createGlobeSelectorScene(options = {}) {
   const maxDistance = 4.4;
 
   function getMarkerScale() {
-    return Math.max(0.34, Math.min(1, cameraDistance / 2.8));
+    return Math.max(0.18, Math.min(1, cameraDistance / 2.8));
   }
 
   function applyMarkerScales() {
@@ -275,13 +275,13 @@ export function createGlobeSelectorScene(options = {}) {
     earthMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 128, 96), earthMaterial);
     globeRoot.add(earthMesh);
     markerMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(0.018, 14, 12),
+      new THREE.SphereGeometry(0.010, 14, 12),
       new THREE.MeshBasicMaterial({ color: 0xff3b30 })
     );
     markerMesh.visible = false;
     globeRoot.add(markerMesh);
     favoriteMarkerGroup = new THREE.Group();
-    favoriteMarkerGeometry = new THREE.SphereGeometry(0.009, 10, 9);
+    favoriteMarkerGeometry = new THREE.SphereGeometry(0.006, 10, 9);
     menuFavoriteMaterial = new THREE.MeshBasicMaterial({ color: 0x60a5fa });
     savedFavoriteMaterial = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
     globeRoot.add(favoriteMarkerGroup);
@@ -289,6 +289,9 @@ export function createGlobeSelectorScene(options = {}) {
       new THREE.TextureLoader().load('/app/assets/textures/earth_atmos_2048.jpg', (texture) => {
         texture.wrapS = THREE.RepeatWrapping;
         texture.wrapT = THREE.ClampToEdgeWrapping;
+        texture.minFilter = THREE.LinearMipmapLinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.generateMipmaps = true;
         if (typeof texture.colorSpace !== 'undefined' && typeof THREE.SRGBColorSpace !== 'undefined') {
           texture.colorSpace = THREE.SRGBColorSpace;
         } else if (typeof texture.encoding !== 'undefined' && typeof THREE.sRGBEncoding !== 'undefined') {

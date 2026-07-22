@@ -15,6 +15,7 @@ import {
 } from './weather/place-resolver.js?v=1';
 import { weatherCodeDescriptor } from './weather/catalog.js?v=1';
 import { operationalFeedService } from './geospatial/operational-feeds.js?v=1';
+import { createPrecipitationEffects } from './weather/precipitation-effects.js?v=1';
 
 const WEATHER_REFRESH_INTERVAL_MS = 10 * 60 * 1000;
 const WEATHER_CHECK_INTERVAL_MS = 5000;
@@ -32,6 +33,7 @@ let _lastWeatherUiSignature = '';
 let _lastWeatherCheckMs = 0;
 let _pendingWeatherRequest = null;
 let _weatherUiClockInterval = null;
+const precipitationEffects = createPrecipitationEffects(appCtx);
 
 const WEATHER_PRESETS = {
   clear: { label: 'Clear', icon: '☀️', category: 'clear', cloudCover: 8, haze: 0.92, sunFactor: 1, fillFactor: 1, exposureFactor: 1.02, cloudColor: WEATHER_CLEAR_COLOR, skyTint: 0xd8efff },
@@ -278,6 +280,7 @@ function updateWeatherUi() {
 }
 
 function applyWeatherPresentation() {
+  precipitationEffects.setWeatherState(appCtx.weatherState || null);
   if (appCtx.onMoon || appCtx.onMars) {
     updateWeatherUi();
     return;
@@ -647,7 +650,8 @@ Object.assign(appCtx, {
   inspectWeatherDescriptor,
   refreshLiveWeather,
   setWeatherMode,
-  syncWeatherState: syncActiveWeatherState
+  syncWeatherState: syncActiveWeatherState,
+  updateWeatherEffects: precipitationEffects.update
 });
 
 ensureWeatherUiClockTicker();

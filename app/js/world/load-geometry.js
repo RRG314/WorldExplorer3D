@@ -2,7 +2,7 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   classifyWaterSurfaceProfile,
   normalizeLanduseSurfaceType
-} from "../surface-rules.js?v=17";
+} from "../surface-rules.js?v=18";
 import { geometryHasFinitePositions } from "./geometry-batching.js?v=4";
 import {
   fetchShortbreadTile,

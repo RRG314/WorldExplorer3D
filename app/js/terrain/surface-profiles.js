@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   classifyTerrainSurfaceProfile as classifySharedTerrainSurfaceProfile
-} from "../surface-rules.js?v=17";
+} from "../surface-rules.js?v=18";
 import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline,
@@ -13,6 +13,7 @@ import {
   terrainTextureCacheSnapshot
 } from "./texture-set-cache.js?v=1";
 import { applyWorldCoverNeighborFallback } from "./worldcover-neighbor-fallback.js?v=1";
+import { applyCanyonStrata } from "./canyon-strata.js?v=1";
 
 const SNOW_COLOR_HEX = 0xffffff;
 const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
@@ -21,6 +22,7 @@ export const TERRAIN_GRASS_COLOR_HEX = 0x6b8e4a;
 const URBAN_GROUND_HEX = 0x8b8f96;
 const SOIL_COLOR_HEX = 0x8c6b47;
 const ROCK_COLOR_HEX = 0x7b7e82;
+const CANYON_ROCK_COLOR_HEX = 0xc47b50;
 const FOREST_COLOR_HEX = 0x4d633b;
 const GROUND_FALLBACK_GRASS_HEX = 0x4a7a2e;
 const GROUND_FALLBACK_SNOW_HEX = 0xd6e2ef;
@@ -313,7 +315,7 @@ function applyGroundFallbackProfile(profile = null) {
           mode === "soil" ?
             GROUND_FALLBACK_SOIL_HEX :
             mode === "rock" ?
-              GROUND_FALLBACK_ROCK_HEX :
+              (profile?.reason === 'grand_canyon_striated_rock' ? 0xa85f3b : GROUND_FALLBACK_ROCK_HEX) :
               mode === "forest" ?
                 GROUND_FALLBACK_FOREST_HEX :
               GROUND_FALLBACK_GRASS_HEX;
@@ -374,6 +376,7 @@ function worldCoverStats() {
 
 function classifyWorldCoverSurfaceProfile(mesh, result) {
   const current = mesh?.userData?.terrainVisualProfile || null;
+  if (current?.reason === 'grand_canyon_striated_rock') return current;
   const bounds = mesh?.userData?.terrainTile?.bounds || null;
   const centerLat = Number.isFinite(bounds?.latN) && Number.isFinite(bounds?.latS) ?
     (bounds.latN + bounds.latS) * 0.5 :
@@ -534,6 +537,7 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
   const mat = mesh.material;
   const tileBounds = mesh.userData.terrainTile?.bounds || null;
   const nextProfile = profile || classifyTerrainVisualProfile(tileBounds);
+  const canyonRock = nextProfile.reason === 'grand_canyon_striated_rock';
   const nextMode =
     nextProfile.visualMode === "built" ? "built" :
     nextProfile.mode === "snowRock" ? "snowRock" :
@@ -553,6 +557,7 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
     appCtx.getContinuousWorldEnabled?.() === true &&
     !mesh.userData.worldCoverResult;
   if (pendingContinuousSemanticSurface) {
+    applyCanyonStrata(mesh, canyonRock);
     applyPendingSemanticSurface(mat, nextMode);
     mesh.userData.terrainVisualProfile = nextProfile;
     applyGroundFallbackProfile(nextProfile);
@@ -620,18 +625,19 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
     mat.map = textures?.map || null;
     mat.normalMap = textures?.normalMap || null;
     mat.roughnessMap = textures?.roughnessMap || null;
-    mat.color.setHex(mat.map ? 0xffffff : ROCK_COLOR_HEX);
+    mat.color.setHex(canyonRock ? CANYON_ROCK_COLOR_HEX : (mat.map ? 0xffffff : ROCK_COLOR_HEX));
     if (mat.emissive) mat.emissive.setHex(0x000000);
     mat.emissiveIntensity = 0;
     mat.roughness = 0.87;
     mat.metalness = 0.02;
-    if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.56, 0.56);
+    if (mat.normalMap) mat.normalScale = new THREE.Vector2(canyonRock ? 0.72 : 0.56, canyonRock ? 0.34 : 0.56);
   } else if (nextMode === "forest") {
     const textures = ensureTerrainTextureSet(mesh, textureRepeats * 1.1, "forest");
     mat.map = textures?.map || null;
     mat.normalMap = textures?.normalMap || null;
     mat.roughnessMap = textures?.roughnessMap || null;
-    mat.color.setHex(mat.map ? 0xffffff : FOREST_COLOR_HEX);
+    const tropicalForest = appCtx.worldSurfaceProfile?.biomeHint === 'tropical_rainforest';
+    mat.color.setHex(mat.map ? (tropicalForest ? 0x78966a : 0xffffff) : FOREST_COLOR_HEX);
     if (mat.emissive) mat.emissive.setHex(0x000000);
     mat.emissiveIntensity = 0;
     mat.roughness = 0.96;
@@ -650,6 +656,7 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
     if (mat.normalMap) mat.normalScale = new THREE.Vector2(0.6, 0.6);
   }
 
+  applyCanyonStrata(mesh, canyonRock);
   mesh.userData.terrainVisualProfile = nextProfile;
   applyGroundFallbackProfile(nextProfile);
   mat.emissiveMap = null;
