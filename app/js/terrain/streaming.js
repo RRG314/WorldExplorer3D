@@ -160,7 +160,6 @@ function createTerrainStreamingApi(deps = {}) {
             `${appCtx.TERRAIN_ZOOM}/${tx}/${ty}`;
           desiredKeys.add(key);
           if (!existingMeshesByKey.has(key)) {
-            getOrLoadTerrainTile?.(appCtx.TERRAIN_ZOOM, tx, ty, terrainTileDeps);
             missing.push({
               key,
               z: appCtx.TERRAIN_ZOOM,
@@ -175,6 +174,7 @@ function createTerrainStreamingApi(deps = {}) {
       desiredTerrainMeshKeys = desiredKeys;
       pendingTerrainMeshes.clear();
       missing.sort((a, b) => a.distance - b.distance).forEach((request) => {
+        getOrLoadTerrainTile?.(request.z, request.tx, request.ty, terrainTileDeps);
         pendingTerrainMeshes.set(request.key, request);
       });
       scheduleTerrainMeshDrain();

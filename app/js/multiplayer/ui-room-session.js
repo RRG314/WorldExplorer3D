@@ -4,7 +4,7 @@ import {
   listenSharedBlocks,
   removeSharedBlock,
   upsertSharedBlock
-} from "./blocks.js?v=62";
+} from "./blocks.js?v=64";
 import { listenChat } from "./chat.js?v=55";
 import { listenPlayers, startPresence } from "./presence.js?v=60";
 import {
@@ -18,6 +18,7 @@ import {
 } from "./room-activities.js?v=1";
 import { listenPaintClaims } from "./painttown.js?v=55";
 import { recordRecentPlayers } from "./social.js?v=55";
+import { startAuthoritativeRoomSession } from './authoritative-session.js?v=6';
 
 export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, runtime }) {
   const {
@@ -32,6 +33,7 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
     renderArtifacts,
     renderChat,
     renderHomeBase,
+    renderMmoPanel,
     renderPlayerList,
     renderRoomActivities,
     renderRoomMeta,
@@ -62,7 +64,61 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       origin: String(originLabel || "room")
     });
     upsertOwnedRoomLocal(room);
-    if (typeof appCtx.configureSharedBuildSync === "function") {
+    let playerRosterKey = '';
+    const authoritativeSession = await startAuthoritativeRoomSession({
+      room,
+      appCtx,
+      userUid: state.authUser?.uid,
+      readPoseSnapshot: helpers.readPoseSnapshot,
+      onPlayers(players, selfUid) {
+        state.players = players;
+        state.mmoSelfUid = String(selfUid || state.mmoSelfUid || '');
+        const nextRosterKey = JSON.stringify(players.map((player) => [
+          player.uid,
+          player.displayName,
+          player.role,
+          player.mode,
+          player.vehicleId,
+          player.connected,
+          player.health,
+          player.level
+        ]));
+        if (nextRosterKey !== playerRosterKey) {
+          playerRosterKey = nextRosterKey;
+          renderPlayerList();
+        }
+        renderMmoPanel();
+        ensureGhostManager();
+        state.ghostManager?.setVisible(state.ghostsEnabled);
+        state.ghostManager?.updateGhosts(players);
+      },
+      onProgression(profile, leaderboard, catalog) {
+        state.mmoProgression = profile;
+        state.mmoLeaderboard = Array.isArray(leaderboard) ? leaderboard : [];
+        state.mmoCatalog = catalog && typeof catalog === 'object' ? catalog : null;
+        renderMmoPanel();
+      },
+      onStatus(event) {
+        if (event.status === 'reconnecting') setStatus('Realtime room connection interrupted; reconnecting...', true);
+        void appCtx.recordProductEvent?.('room', {
+          action: event.status,
+          world_kind: room.world?.kind || 'earth'
+        });
+      },
+      onGameEvent(event) {
+        appCtx.onAuthoritativeGameEvent?.(event);
+        const eventType = String(event?.type || 'unknown');
+        const category = eventType.startsWith('mission.') || eventType.startsWith('progression.')
+          ? 'progression'
+          : 'room';
+        void appCtx.recordProductEvent?.(category, {
+          action: eventType,
+          world_kind: room.world?.kind || 'earth'
+        });
+      }
+    });
+    state.authoritativeSession = authoritativeSession;
+    if (!authoritativeSession && typeof appCtx.configureSharedBuildSync === "function") {
       appCtx.configureSharedBuildSync({
         enabled: true,
         roomId: room.id,
@@ -113,7 +169,7 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       publishMapRoomsToContext();
     });
 
-    state.unsubPlayers = listenPlayers(room.id, (players) => {
+    state.unsubPlayers = authoritativeSession ? null : listenPlayers(room.id, (players) => {
       state.players = players;
       renderPlayerList();
       recordRecentPlayers(room.code, currentRoomName(), players).catch((err) => {
@@ -165,7 +221,7 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       }
     });
 
-    state.unsubSharedBlocks = listenSharedBlocks(room.id, (blocks) => {
+    state.unsubSharedBlocks = authoritativeSession ? null : listenSharedBlocks(room.id, (blocks) => {
       if (typeof appCtx.setSharedBuildEntries === "function") {
         appCtx.setSharedBuildEntries(Array.isArray(blocks) ? blocks : []);
       }
@@ -185,7 +241,7 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       }
     });
 
-    startPresence(room.id, helpers.readPoseSnapshot);
+    if (!authoritativeSession) startPresence(room.id, helpers.readPoseSnapshot);
     await syncRoomWorldContext(room, false, true);
 
     const invite = helpers.buildInviteLink(room.code);
@@ -195,7 +251,12 @@ export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, r
       window.history.replaceState({}, "", url.toString());
     }
 
-    setStatus(`Connected to ${originLabel}: ${room.code} (seed ${deriveRoomDeterministicSeed(room)}).`);
+    setStatus(`${authoritativeSession ? 'Authoritative realtime' : 'Legacy multiplayer'} connected to ${originLabel}: ${room.code} (seed ${deriveRoomDeterministicSeed(room)}).`);
+    void appCtx.recordProductEvent?.('room', {
+      action: authoritativeSession ? 'authoritative_joined' : 'legacy_joined',
+      world_kind: room.world?.kind || 'earth',
+      visibility: room.visibility || 'private'
+    });
     publishMapRoomsToContext();
   }
 

@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import {
   classifyWorldSurfaceProfile,
-} from "./surface-rules.js?v=17";
+} from "./surface-rules.js?v=18";
 import {
   inferWaterRenderContext
 } from "./water-dynamics.js?v=4";
@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=16";
+} from "./structure-semantics.js?v=17";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=19";
+} from "./world/spawn.js?v=20";
 import {
   scheduleDeferredStructureRefresh,
   scheduleDeferredWorldLinearFeatureLoad
@@ -65,7 +65,7 @@ import {
   scheduleDeferredPoiLoad,
   scheduleDeferredWorldDetailPasses,
   safeWorldLoadCall
-} from "./world/load-support.js?v=16";
+} from "./world/load-support.js?v=19";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -73,7 +73,7 @@ import {
 } from "./world/load-reset.js?v=8";
 import {
   prepareWorldFeatureSelections
-} from "./world/load-budgeting.js?v=3";
+} from "./world/load-budgeting.js?v=4";
 import {
   buildBuildingGeometryGuards,
   buildFeatureGeometryGuards,
@@ -123,7 +123,7 @@ import {
   pointInPolygon,
   runtimeRoadFeatures,
   teleportToLocation
-} from "./world/navigation.js?v=2";
+} from "./world/navigation.js?v=5";
 import {
   buildTraversalNetworks,
   findNearestTraversalFeature,
@@ -134,12 +134,12 @@ import {
   pickNavigationTargetPoint,
   surfaceDisplayName,
   traversableFeaturesForMode
-} from "./world/traversal.js?v=1";
+} from "./world/traversal.js?v=2";
 import {
   initWorldVegetation,
   MAX_TREE_NODES,
   MAX_TREE_ROW_WAYS
-} from "./world/vegetation.js?v=6";
+} from "./world/vegetation.js?v=13";
 import {
   appendIndexedGeometry,
   decimatePoints,
@@ -168,13 +168,13 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=5";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=52";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=55";
 import {
   fetchShortbreadWorldData
-} from "./world/shortbread-source.js?v=8";
+} from "./world/shortbread-source.js?v=9";
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=6";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
-import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=22";
+import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=26";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 

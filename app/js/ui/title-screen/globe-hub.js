@@ -1,10 +1,39 @@
 const HUB_PANELS = {
   games: { tab: 'games', title: 'Missions & Games' },
   multiplayer: { tab: 'multiplayer', title: 'Multiplayer' },
-  library: { tab: 'location', title: 'Location Library' },
+  library: { tab: 'location', title: 'My Places' },
   settings: { tab: 'settings', title: 'Settings' },
   controls: { tab: 'controls', title: 'Controls & Quick Start' }
 };
+
+const HUB_THEME_KEY = 'worldExplorer3D.hubTheme';
+const HUB_THEMES = ['day', 'night'];
+
+function setupHubTheme() {
+  const button = document.getElementById('globeHubThemeBtn');
+  if (!button) return;
+  let mode = 'night';
+  try {
+    const stored = localStorage.getItem(HUB_THEME_KEY);
+    if (HUB_THEMES.includes(stored)) mode = stored;
+  } catch {
+    // Keep the stable night default when browser storage is unavailable.
+  }
+
+  const apply = () => {
+    document.documentElement.dataset.hubTheme = mode;
+    button.textContent = mode === 'day' ? '☼' : '◒';
+    button.title = `Appearance: ${mode[0].toUpperCase()}${mode.slice(1)}`;
+    button.setAttribute('aria-label', `${button.title}. Activate to change.`);
+  };
+
+  button.addEventListener('click', () => {
+    mode = HUB_THEMES[(HUB_THEMES.indexOf(mode) + 1) % HUB_THEMES.length];
+    try { localStorage.setItem(HUB_THEME_KEY, mode); } catch {}
+    apply();
+  });
+  apply();
+}
 
 function setupGlobeHub({
   globeSelector,
@@ -16,6 +45,21 @@ function setupGlobeHub({
   const panelHost = document.getElementById('globeHubPanelHost');
   const footerHost = document.getElementById('globeHubFooterHost');
   const overlayTitle = document.getElementById('globeHubOverlayTitle');
+
+  const multiplayerNav = document.querySelector('.mp-workspace-nav');
+  multiplayerNav?.addEventListener('click', (event) => {
+    const button = event.target instanceof Element ? event.target.closest('[data-mp-panel-target]') : null;
+    if (!(button instanceof HTMLButtonElement)) return;
+    const target = button.dataset.mpPanelTarget;
+    multiplayerNav.querySelectorAll('[data-mp-panel-target]').forEach((item) => {
+      item.classList.toggle('active', item === button);
+    });
+    document.querySelectorAll('[data-mp-panel]').forEach((panel) => {
+      const active = panel.getAttribute('data-mp-panel') === target;
+      panel.classList.toggle('active', active);
+      panel.hidden = !active;
+    });
+  });
 
   const setActiveDestination = (destination = 'location') => {
     document.querySelectorAll('[data-globe-destination]').forEach((button) => {
@@ -68,6 +112,7 @@ function setupGlobeHub({
     if (document.fullscreenElement) void document.exitFullscreen?.();
     else void document.documentElement.requestFullscreen?.();
   });
+  setupHubTheme();
 
   document.querySelectorAll('[data-globe-destination]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -79,6 +124,11 @@ function setupGlobeHub({
         closePanel();
         setActiveDestination('live-earth');
         document.getElementById('globeSelectorLiveEarthModeBtn')?.click();
+      } else if (destination === 'library') {
+        closePanel();
+        setActiveDestination('library');
+        document.getElementById('globeSelectorExploreModeBtn')?.click();
+        document.getElementById('globeFavoritesTabBtn')?.click();
       } else {
         openPanel(destination);
       }

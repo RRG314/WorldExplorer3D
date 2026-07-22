@@ -1,4 +1,4 @@
-import { buildElevatedTerrainReference } from './structure-profile-grade.js';
+import { buildElevatedTerrainReference, buildSubgradeTerrainReference } from './structure-profile-grade.js';
 import { classifyStructureSemantics, normalizedTagValue } from './structure-semantics/classification.js?v=1';
 import {
   boundsIntersect,
@@ -334,8 +334,9 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
   const { distances, total } = polylineDistances(feature.pts);
   const surfaceBias = Number.isFinite(options.surfaceBias) ? options.surfaceBias : Number(feature.surfaceBias) || 0.08;
   const terrainHeights = feature.pts.map((point) => Number(sampleTerrainY(point.x, point.z)) || 0);
-  const terrainReference = semantics.terrainMode === 'elevated' ?
-    buildElevatedTerrainReference(terrainHeights, distances, total) :
+  const terrainReference =
+    semantics.terrainMode === 'elevated' ? buildElevatedTerrainReference(terrainHeights, distances, total) :
+    semantics.terrainMode === 'subgrade' ? buildSubgradeTerrainReference(terrainHeights, distances, total) :
     terrainHeights;
   const profileHeights = new Float32Array(feature.pts.length);
   const profileOffsets = new Float32Array(feature.pts.length);

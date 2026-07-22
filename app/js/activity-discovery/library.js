@@ -4,7 +4,7 @@ import {
   getActivityTemplate,
   orderedRouteAnchors,
   sanitizeText
-} from '../activity-editor/schema.js?v=2';
+} from '../activity-editor/schema.js?v=3';
 
 const STORAGE_KEY = 'worldExplorer3D.activityLibrary.v1';
 const STORAGE_BACKUP_KEY = 'worldExplorer3D.activityLibrary.backup.v1';
@@ -82,6 +82,7 @@ function estimateDurationMinutes(templateId = '', anchors = []) {
   const template = getActivityTemplate(templateId);
   const paceMetersPerMinute =
     template.traversalMode === 'boat' ? 520 :
+    template.traversalMode === 'plane' ? 1900 :
     template.traversalMode === 'drone' ? 760 :
     template.traversalMode === 'walk' ? 110 :
     template.traversalMode === 'submarine' ? 320 :
@@ -186,8 +187,8 @@ function writeRawLibrary(items) {
   const trimmed = items.slice(0, STORAGE_LIMIT);
   const payload = JSON.stringify(trimmed);
   try {
-    globalThis.localStorage.setItem(STORAGE_KEY, payload);
     globalThis.localStorage.setItem(STORAGE_BACKUP_KEY, payload);
+    globalThis.localStorage.setItem(STORAGE_KEY, payload);
     return true;
   } catch {
     return false;
@@ -214,7 +215,9 @@ function saveStoredActivity(record = {}) {
     center: cloneJson(normalized.center),
     startPoint: cloneJson(normalized.startPoint)
   });
-  writeRawLibrary(items);
+  if (!writeRawLibrary(items)) {
+    throw new Error('Could not save this activity in browser storage. Check storage permissions and try again.');
+  }
   return normalized;
 }
 

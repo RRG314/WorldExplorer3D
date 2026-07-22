@@ -2,8 +2,8 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY
-} from "./structure-semantics.js?v=16";
-import { createSurfaceQuery } from './world/surface-contract.js?v=6';
+} from "./structure-semantics.js?v=17";
+import { createSurfaceQuery } from './world/surface-contract.js?v=7';
 // ground.js - Unified Ground Height Service
 // Single source of truth for y(x,z) used by terrain, roads, and vehicles
 // ============================================================================
@@ -127,17 +127,6 @@ const GroundHeight = {
       currentRoad,
       extraVerticalAllowance: 0.5
     });
-
-    if (roadReachable && Number.isFinite(currentY)) {
-      const localStartY = currentY + 5.5;
-      const localMeshY = this._raycastMeshY(roadSurfaceMeshes, x, z, localStartY, 26);
-      if (Number.isFinite(localMeshY)) {
-        const profileY = Number(nearestRoad?.y);
-        if (this._shouldUseRoadMeshHeight(nearestRoad?.road, localMeshY, profileY)) {
-          return this._resolveRoadSurfaceY(nearestRoad?.road, localMeshY, profileY);
-        }
-      }
-    }
 
     if (roadReachable && Number.isFinite(nearestRoad?.y)) {
       return nearestRoad.y;
@@ -263,9 +252,6 @@ const GroundHeight = {
       currentRoad: appCtx.car?.road || null,
       extraLateralPadding: -0.1
     });
-    const urbanSurfaceY = this.urbanSurfaceMeshY(x, z);
-    const onUrbanSurface = Number.isFinite(urbanSurfaceY) && urbanSurfaceY > terrainY + 0.12;
-
     const linear = this._nearestLinearWalkFeature(x, z);
     const featureWidth = Number(linear?.feature?.width) || 0;
     const onLinear = !!(
@@ -287,7 +273,7 @@ const GroundHeight = {
         Number.isFinite(feature?.bias) ?
           feature.bias :
           0.05;
-      const sampledY = sampleFeatureSurfaceY(feature, sampleX, sampleZ, linear);
+      const sampledY = sampleFeatureSurfaceY(feature, sampleX, sampleZ);
       const meshY = Number.isFinite(sampledY) ? sampledY : this.linearFeatureMeshY(sampleX, sampleZ);
       const baseY = this.terrainY(sampleX, sampleZ);
       return {
@@ -299,31 +285,27 @@ const GroundHeight = {
       };
     }
 
-    if (onUrbanSurface) {
-      return {
-        y: urbanSurfaceY + 0.02,
-        source: 'urban_surface',
-        feature: null,
-        dist: 0,
-        pt: { x, z }
-      };
-    }
-
     if (roadOnSurface) {
       const sampleX = Number.isFinite(nr?.pt?.x) ? nr.pt.x : x;
       const sampleZ = Number.isFinite(nr?.pt?.z) ? nr.pt.z : z;
-      const meshY = this.roadMeshY(sampleX, sampleZ, currentY);
-      const roadY =
-        this._shouldUseRoadMeshHeight(nr?.road, meshY, nr?.y) ?
-          this._resolveRoadSurfaceY(nr?.road, meshY, nr?.y) :
-        Number.isFinite(nr?.y) ? nr.y :
-          meshY;
+      const roadY = Number.isFinite(nr?.y) ? nr.y : this.roadMeshY(sampleX, sampleZ, currentY);
       return {
         y: Number.isFinite(roadY) ? roadY : this.roadSurfaceY(sampleX, sampleZ) + 0.05,
         source: 'road',
         feature: nr.road,
         dist: nr.dist,
         pt: nr.pt ? { x: nr.pt.x, z: nr.pt.z } : null
+      };
+    }
+
+    const urbanSurfaceY = this.urbanSurfaceMeshY(x, z);
+    if (Number.isFinite(urbanSurfaceY) && urbanSurfaceY > terrainY + 0.12) {
+      return {
+        y: urbanSurfaceY + 0.02,
+        source: 'urban_surface',
+        feature: null,
+        dist: 0,
+        pt: { x, z }
       };
     }
 

@@ -144,6 +144,11 @@
       display: inline-flex;
       align-items: center;
       justify-content: center;
+      border: 1px solid var(--line);
+      border-radius: 999px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-weight: 700;
       text-decoration: none;
     }
 
@@ -455,6 +460,41 @@
       color: var(--muted);
     }
 
+    .saved-place-list {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+      margin-top: 14px;
+    }
+
+    .saved-place {
+      border: 1px solid var(--line);
+      background: rgba(8, 22, 40, 0.72);
+      padding: 13px 14px;
+    }
+
+    .saved-place strong,
+    .saved-place span {
+      display: block;
+    }
+
+    .saved-place strong {
+      font-size: 15px;
+      margin-bottom: 4px;
+    }
+
+    .saved-place span {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .saved-place-head {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
     .social-list {
       margin-top: 10px;
       border: 1px solid var(--line);
@@ -532,6 +572,8 @@
       .creator-grid { grid-template-columns: 1fr; }
       .receipt-item { grid-template-columns: 1fr; }
       .receipt-right { justify-content: flex-start; }
+      .saved-place-list { grid-template-columns: 1fr; }
+      .saved-place-head { flex-direction: column; }
       .actions button { width: 100%; }
       .top { flex-wrap: wrap; }
       .top a { width: 100%; text-align: center; }
@@ -551,6 +593,17 @@
       <div class="actions">
         <button id="signInBtn" class="btn-primary" type="button">Sign In</button>
       </div>
+    </section>
+
+    <section class="panel" id="savedPlacesPanel">
+      <div class="saved-place-head">
+        <div>
+          <h2 class="section-title" style="margin-top:0">Saved Places</h2>
+          <p id="savedPlacesStatus" class="hint">Places saved in this browser from the globe library.</p>
+        </div>
+        <a class="btn-ghost btn-link" href="../app/">Manage on Globe</a>
+      </div>
+      <div id="savedPlacesList" class="saved-place-list" aria-live="polite"></div>
     </section>
 
     <section class="panel" id="accountPanel">
@@ -747,6 +800,7 @@
     </section>
   </div>
 
+  <script type="module" src="../js/account-saved-places.js?v=1"></script>
   <script type="module">
     import { hasFirebaseConfig } from '../js/firebase-init.js?v=55';
     import { ensureSignedIn, observeAuth, signOutUser } from '../js/auth-ui.js?v=55';
@@ -759,7 +813,7 @@
       redirectToPortal,
       updateAccountProfile,
       deleteAccount
-    } from '../js/billing.js?v=58';
+    } from '../js/billing.js?v=60';
     import {
       ensureOwnCreatorProfile,
       getCreatorProfile

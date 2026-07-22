@@ -1,6 +1,6 @@
 # Roadmap
 
-This roadmap describes intended directions after version 3.1.0. It is not a delivery guarantee.
+This roadmap describes intended directions after version 4.0.0. It is not a delivery guarantee.
 
 ## Near Term
 

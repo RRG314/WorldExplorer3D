@@ -289,7 +289,7 @@ async function createRoom(options = {}) {
       if (localRoomCreateLimit <= 0 || !hasEntitlement) {
         throw new Error('Multiplayer room creation requires sign-in and a valid account profile.');
       }
-      throw new Error('Room creation limit reached for this account. Rename or reuse existing rooms, or use Account to adjust your donation plan.');
+      throw new Error('Room creation limit reached for this account. Rename, reuse, or delete an existing room.');
     }
 
     try {

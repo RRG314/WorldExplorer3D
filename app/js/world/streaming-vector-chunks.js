@@ -14,7 +14,7 @@ import {
   classifyStructureSemantics,
   polylineBounds,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=16";
+} from "../structure-semantics.js?v=17";
 import {
   INITIAL_DETAIL_RADIUS,
   ROAD_SURFACE_OFFSET,
@@ -41,7 +41,7 @@ import {
 } from './streaming-vector-geometry.js?v=4';
 import { registerBridgeGuardrails, removeBridgeGuardrails } from "./bridge-guardrails.js?v=6";
 import { createInitialWorldRetirementApi } from "./streaming-initial-retirement.js?v=3";
-import { SOURCE_PROFILE } from "./surface-contract.js?v=6";
+import { SOURCE_PROFILE } from "./surface-contract.js?v=7";
 import { normalizeWaterBody } from './water-body-contract.js?v=2';
 import { attachStreamProvenance, createRenderProvenance } from './render-provenance.js?v=2';
 import { selectBuildingFeatures, selectTransportationFeatures } from './streaming-feature-budget.js?v=1';

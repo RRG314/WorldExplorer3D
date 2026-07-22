@@ -6,6 +6,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
   let boatTimer = 0;
   let liveEarthTimer = 0;
   const workspaceOpen = () => hooks.isEditorWorkspaceOpen?.() || hooks.isActivityCreatorOpen?.();
+  const gameplayReady = () => !!appCtx.gameStarted && !appCtx.worldLoading;
 
   return [
     {
@@ -15,7 +16,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       priority: -100,
       update(frame) {
         appCtx.lastTime = frame.timestamp;
-        appCtx.recordPerfFrame?.(frame.dt);
+        if (!appCtx.worldLoading) appCtx.recordPerfFrame?.(frame.dt);
         appCtx.tutorialUpdate?.(frame.dt);
         if (appCtx.renderer?.info?.autoReset === false) appCtx.renderer.info.reset?.();
       }
@@ -24,7 +25,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.input',
       owner: 'engine',
       phase: 'input',
-      enabled: () => !!appCtx.gameStarted,
+      enabled: gameplayReady,
       update() {
         appCtx.updateControlInput?.();
       }
@@ -33,7 +34,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.simulation',
       owner: 'engine',
       phase: 'simulation',
-      enabled: () => !!appCtx.gameStarted,
+      enabled: gameplayReady,
       update(frame) {
         appCtx.update(frame.dt);
       }
@@ -42,13 +43,14 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.world',
       owner: 'world',
       phase: 'world',
-      enabled: () => !!appCtx.gameStarted,
+      enabled: gameplayReady,
       update(frame) {
         appCtx.kickOptionalRuntimeBoot?.('main_loop');
         appCtx.updateEarthWorldStreaming?.(frame.dt);
         appCtx.updatePlanetaryTracks?.();
         if (!appCtx.onMars) appCtx.refreshAstronomicalSky?.(false);
         appCtx.updateWaterWaveVisuals?.();
+        appCtx.updateWeatherEffects?.(frame.dt);
 
         weatherTimer += frame.dt;
         if (weatherTimer > 5) {
@@ -68,7 +70,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       id: 'core.camera',
       owner: 'camera',
       phase: 'camera',
-      enabled: () => !!appCtx.gameStarted,
+      enabled: gameplayReady,
       update(frame) {
         appCtx.updateCamera(frame.dt);
         appCtx.updatePlanetarySky?.();
@@ -79,7 +81,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       owner: 'platform',
       phase: 'camera',
       priority: 20,
-      enabled: () => !!appCtx.gameStarted,
+      enabled: gameplayReady,
       update(frame) {
         appCtx.updateActivityCreator?.(frame.dt, frame.timestamp);
         appCtx.updateActivityDiscovery?.(frame.dt, frame.timestamp);

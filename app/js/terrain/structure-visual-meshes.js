@@ -48,6 +48,17 @@ function createStructureVisualMaterial(hex, roughness, metalness) {
   });
 }
 
+function createTunnelFloorMaterial(appCtx) {
+  return new THREE.MeshStandardMaterial({
+    color: 0x343a3f,
+    map: appCtx.asphaltTex || null,
+    normalMap: appCtx.asphaltNormal || null,
+    roughnessMap: appCtx.asphaltRoughness || null,
+    roughness: 0.9,
+    metalness: 0.02
+  });
+}
+
 export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureVisualInstances, deps = {}) {
   clearStructureVisualMeshesForContext(appCtx);
   if (appCtx.onMoon || !appCtx.scene) return;
@@ -59,6 +70,7 @@ export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureV
     capInstances,
     wallInstances,
     roofInstances,
+    tunnelFloorInstances,
     tunnelLightInstances,
     guardrailInstances
   } = collectStructureVisualInstances(deps);
@@ -109,6 +121,14 @@ export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureV
       roofInstances,
       createStructureVisualMaterial(0x4c5660, 0.84, 0.12),
       { structureVisualType: "roofs" }
+    );
+  }
+  if (tunnelFloorInstances.length > 0) {
+    buildStructureVisualMeshForContext(
+      appCtx,
+      tunnelFloorInstances,
+      createTunnelFloorMaterial(appCtx),
+      { structureVisualType: "tunnel_floors" }
     );
   }
   if (portalInstances.length > 0) {

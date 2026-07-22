@@ -28,6 +28,26 @@ export function assertWorldMatrixLocation(spec, result) {
         `${JSON.stringify({ surfaceY: probe.surfaceY, terrainY, required: spec.minimumStructureClearance })}`
       );
     }
+    if (spec.expectedRoadStructure === 'tunnel' && result.tunnelPortalTraversal) {
+      const traversal = result.tunnelPortalTraversal;
+      const checkpoints = traversal?.checkpoints || [];
+      const interior = checkpoints.filter((checkpoint) => checkpoint?.terrainMode === 'subgrade');
+      const exit = checkpoints.find((checkpoint) => checkpoint?.stage === 'exit');
+      assert(checkpoints.length === 5, `${spec.id}: tunnel lifecycle did not produce all five checkpoints ${JSON.stringify(traversal)}`);
+      assert(interior.length >= 4, `${spec.id}: tunnel lifecycle lost its subgrade road ${JSON.stringify(traversal)}`);
+      assert(interior.every((checkpoint) => checkpoint.applied && checkpoint.renderedDelta <= 0.2), `${spec.id}: tunnel road diverged during traversal ${JSON.stringify(traversal)}`);
+      assert(interior.every((checkpoint) => checkpoint.cameraAboveRoad <= 1.75), `${spec.id}: tunnel camera crossed the shell ceiling ${JSON.stringify(traversal)}`);
+      assert(
+        Number(traversal?.movement?.distance || 0) >= 0.5 &&
+        Number(traversal?.movement?.running?.speed || 0) >= 3,
+        `${spec.id}: accelerator input did not produce sustained vehicle motion inside the tunnel ${JSON.stringify(traversal)}`
+      );
+      assert(traversal?.movement?.remainedInTunnel, `${spec.id}: vehicle detached from the tunnel during movement ${JSON.stringify(traversal)}`);
+      assert(exit?.applied && exit?.terrainMode !== 'subgrade', `${spec.id}: no mapped at-grade tunnel exit was traversable ${JSON.stringify(traversal)}`);
+      assert(Number.isFinite(exit?.terrainY), `${spec.id}: exterior terrain is missing at the tunnel exit ${JSON.stringify(traversal)}`);
+      assert(exit?.renderedDelta <= 2.5, `${spec.id}: exit road diverged from its rendered surface ${JSON.stringify(traversal)}`);
+      assert(exit?.cameraAboveRoad >= 2, `${spec.id}: camera remained tunnel-constrained after exit ${JSON.stringify(traversal)}`);
+    }
   }
   if (spec.minimumWaterAreas) assert(result.counts.waterAreas >= spec.minimumWaterAreas, `${spec.id}: expected mapped water areas`);
   if (spec.minimumBuildings) {
@@ -35,6 +55,13 @@ export function assertWorldMatrixLocation(spec, result) {
       result.counts.buildings >= spec.minimumBuildings,
       `${spec.id}: expected at least ${spec.minimumBuildings} rendered buildings ` +
       `${JSON.stringify({ buildings: result.counts.buildings, detail: result.buildingDetail })}`
+    );
+  }
+  if (spec.minimumVegetationFeatures) {
+    assert(
+      result.counts.vegetationFeatures >= spec.minimumVegetationFeatures,
+      `${spec.id}: expected at least ${spec.minimumVegetationFeatures} mapped vegetation instances ` +
+      `${JSON.stringify({ vegetationFeatures: result.counts.vegetationFeatures, worldCover: result.worldCover?.status })}`
     );
   }
   const architecturalBuildings = Number(result.buildingDimensions?.architecturalCount || 0);

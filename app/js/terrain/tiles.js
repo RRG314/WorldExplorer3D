@@ -2,13 +2,14 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
+  releaseTerrainTextureSets,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=26";
+} from "./surface-profiles.js?v=32";
 
 const TERRAIN_TILE_CACHE_LIMIT = 72;
 const TERRAIN_TILE_MAX_ATTEMPTS = 3;
 const TERRAIN_TILE_RETRY_BASE_MS = 300;
-const TERRAIN_TILE_ATTEMPT_TIMEOUT_MS = 2400;
+const TERRAIN_TILE_ATTEMPT_TIMEOUT_MS = 6000;
 const terrainTileLifetime = { failures: 0, retries: 0, recovered: 0 };
 const recentTerrainFailures = new Map();
 const TERRAIN_FAILURE_HISTORY_MS = 30000;
@@ -420,20 +421,13 @@ export function disposeTerrainMesh(mesh) {
   const registerTexture = (texture) => {
     if (texture && typeof texture.dispose === "function") ownedTextures.add(texture);
   };
-  const registerTextureSet = (textureSet) => {
-    if (!textureSet || typeof textureSet !== "object") return;
-    Object.values(textureSet).forEach(registerTexture);
-  };
   registerTexture(mesh?.userData?.worldCoverTexture);
   registerTexture(mesh?.userData?.worldCoverResult?.texture);
-  registerTextureSet(mesh?.userData?.terrainTextureSet);
-  Object.values(mesh?.userData?.terrainTextureSetsByMode || {}).forEach(registerTextureSet);
   ownedTextures.forEach((texture) => texture.dispose());
+  releaseTerrainTextureSets(mesh);
   if (mesh.userData) {
     mesh.userData.worldCoverTexture = null;
     mesh.userData.worldCoverResult = null;
-    mesh.userData.terrainTextureSet = null;
-    mesh.userData.terrainTextureSetsByMode = {};
   }
   if (mesh.geometry) mesh.geometry.dispose();
   if (mesh.material) mesh.material.dispose();
@@ -481,7 +475,7 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
   mesh.position.set(cx, 0, cz);
   mesh.receiveShadow = true;
   mesh.castShadow = false;
-  mesh.frustumCulled = false;
+  mesh.frustumCulled = true;
   mesh.userData = { terrainTile: { z, tx, ty, bounds } };
   mesh.userData.terrainTileKey = terrainTileMeshKey(z, tx, ty);
   mesh.userData.isTerrainMesh = true;
@@ -530,7 +524,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
   const tile = getOrLoadTerrainTile(z, tx, ty, deps);
   if (!tile.loaded) {
     mesh.userData.pendingTerrainTile = true;
-    applyFlatFallbackToTerrainMesh(mesh);
+    mesh.visible = false;
     return;
   }
 

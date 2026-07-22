@@ -1,7 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { buildActivityCatalog, currentReferencePose } from './catalog.js?v=3';
-import { getStoredActivityById, listStoredActivities, removeStoredActivity } from './library.js?v=2';
-import { bindMarkerClicks, refreshWorldMarkers } from './markers.js?v=3';
+import { buildActivityCatalog, currentReferencePose } from './catalog.js?v=4';
+import { getStoredActivityById, listStoredActivities, removeStoredActivity } from './library.js?v=4';
+import { bindMarkerClicks, refreshWorldMarkers } from './markers.js?v=4';
 import {
   distanceToStart,
   getCompletionState,
@@ -12,7 +12,7 @@ import {
   startActivity,
   stopActivity,
   updateActivityRuntime
-} from './runtime.js?v=5';
+} from './runtime.js?v=6';
 import {
   discoveryActionLabel,
   discoveryBadgeForActivity,
@@ -21,7 +21,7 @@ import {
   getDiscoveryCategory,
   listDiscoveryCategories,
   sanitizeText
-} from './schema.js?v=2';
+} from './schema.js?v=3';
 import { syncOwnCreatorActivityStats } from '../../../js/creator-profile-api.js?v=1';
 
 const state = {

@@ -188,6 +188,17 @@ export function createWorldLoadRuntimeSession(options = {}) {
   };
 }
 
+export function recordWorldSourceMetrics(loadMetrics = {}, data = null) {
+  if (!data || typeof data !== 'object') return loadMetrics;
+  if (data._overpassSource) loadMetrics.overpassSource = data._overpassSource;
+  if (data._overpassEndpoint) loadMetrics.overpassEndpoint = data._overpassEndpoint;
+  if (data._shortbreadTiles) loadMetrics.sourceCoverage = { ...data._shortbreadTiles };
+  if (Number.isFinite(data._overpassCacheAgeMs)) {
+    loadMetrics.overpassCacheAgeMs = Math.floor(data._overpassCacheAgeMs);
+  }
+  return loadMetrics;
+}
+
 export function finishWorldLoadRuntimeSession(session = {}) {
   const { appCtx, finalizePerfLoad, loadMetrics, phaseTotals, loaded = false } = session;
   if (!appCtx) return;

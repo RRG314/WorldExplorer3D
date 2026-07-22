@@ -4,7 +4,13 @@ import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-const FIRESTORE_RULE_TEST_SCRIPT = 'node tests/firestore.rules.security.test.mjs';
+function argumentValue(name) {
+  const index = process.argv.indexOf(name);
+  return index >= 0 ? String(process.argv[index + 1] || '').trim() : '';
+}
+
+const FIRESTORE_RULE_TEST_SCRIPT = argumentValue('--command') || 'node tests/firestore.rules.security.test.mjs';
+const FIRESTORE_PROJECT = argumentValue('--project');
 const PATH_SEPARATOR = process.platform === 'win32' ? ';' : ':';
 const JAVA_BIN_NAME = process.platform === 'win32' ? 'java.exe' : 'java';
 
@@ -101,12 +107,14 @@ function printJavaInstallHelp() {
 async function runWithFirebaseCli() {
   const javaInfo = resolveJava();
   const env = javaEnv(javaInfo);
-  const direct = await runCommand('firebase', [
+  const emulatorArgs = [
     'emulators:exec',
     '--only',
     'firestore',
+    ...(FIRESTORE_PROJECT ? ['--project', FIRESTORE_PROJECT] : []),
     FIRESTORE_RULE_TEST_SCRIPT
-  ], env);
+  ];
+  const direct = await runCommand('firebase', emulatorArgs, env);
 
   if (!direct.error || direct.error.code !== 'ENOENT') {
     return direct.code;
@@ -116,10 +124,7 @@ async function runWithFirebaseCli() {
   const fallback = await runCommand(npxCmd, [
     '--yes',
     'firebase-tools',
-    'emulators:exec',
-    '--only',
-    'firestore',
-    FIRESTORE_RULE_TEST_SCRIPT
+    ...emulatorArgs
   ], env);
 
   if (fallback.error && fallback.error.code === 'ENOENT') {

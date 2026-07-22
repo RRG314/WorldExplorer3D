@@ -4,7 +4,7 @@ import path from 'node:path';
 import geospatial from '../functions/geospatial.js';
 
 const rootDir = process.cwd();
-const host = '127.0.0.1';
+const host = process.env.HOST || '127.0.0.1';
 const port = Number(process.env.PORT || 4192);
 const { queryAircraft, queryStreetImagery } = geospatial;
 
@@ -78,7 +78,7 @@ const server = http.createServer(async (req, res) => {
           'Content-Type': 'application/json; charset=utf-8',
           'Cache-Control': 'no-store'
         });
-        res.end(JSON.stringify({ error: status === 504 ? 'OpenSky timed out.' : (error?.message || 'Aircraft observations unavailable.') }));
+        res.end(JSON.stringify({ error: status === 504 ? 'Aircraft provider timed out.' : (error?.message || 'Aircraft observations unavailable.') }));
       }
       return;
     }

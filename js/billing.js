@@ -1,4 +1,5 @@
 import { getReturnUrlBase, postProtectedFunction } from './function-api.js?v=1';
+import { recordProductEvent } from './analytics.js?v=4';
 
 export async function createCheckoutSession(plan) {
   const payload = await postProtectedFunction(
@@ -25,11 +26,13 @@ export async function createPortalSession() {
 }
 
 export async function redirectToCheckout(plan) {
+  void recordProductEvent('support', { action: 'checkout_requested', plan: String(plan || 'unknown') });
   const url = await createCheckoutSession(plan);
   globalThis.location.assign(url);
 }
 
 export async function redirectToPortal() {
+  void recordProductEvent('support', { action: 'portal_requested' });
   const url = await createPortalSession();
   globalThis.location.assign(url);
 }

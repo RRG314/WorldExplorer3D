@@ -1,9 +1,9 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "./structure-semantics.js?v=16";
+import { isRoadSurfaceReachable } from "./structure-semantics.js?v=17";
 import { updateDrone } from "./physics/drone-flight.js?v=4";
-import { updatePlane } from "./plane-mode.js?v=7";
+import { updatePlane } from "./plane-mode.js?v=16";
 import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=2";
-import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=1";
+import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=2";
 import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=2";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=1";
 // RDT-based adaptive throttling state
@@ -90,14 +90,9 @@ function getNearestRoadThrottled(x, z, forceCheck = false, currentY = NaN) {
 
 const checkBuildingCollision = createBuildingCollisionQuery(appCtx);
 
-function update(dt) {
+function updateStep(dt) {
   if (appCtx.paused || !appCtx.gameStarted) {
     if (!appCtx.boatMode?.active && typeof appCtx.updateInteriorInteraction === 'function') appCtx.updateInteriorInteraction();
-    return;
-  }
-  if (dt > 1 / 30) {
-    const steps = Math.ceil(dt / (1 / 45));
-    for (let i = 0; i < steps; i += 1) update(dt / steps);
     return;
   }
   if (typeof appCtx.updateFlowerChallenge === 'function') appCtx.updateFlowerChallenge(dt);
@@ -674,6 +669,11 @@ function update(dt) {
       appCtx.repositionBuildingsWithTerrain();
     }
   }
+}
+
+function update(dt) {
+  // Prevent slow frames from recursively repeating the whole gameplay update.
+  updateStep(Math.min(Math.max(0, Number(dt) || 0), 1 / 30));
 }
 
 Object.assign(appCtx, {

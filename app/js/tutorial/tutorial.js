@@ -262,6 +262,25 @@ function requestGlobeOpen() {
   safeCall(appCtx.openGlobeSelector);
 }
 
+function getMovementHint() {
+  if (appCtx.oceanMode?.active) {
+    return 'Submarine controls:\nArrow keys steer and change speed, Control dives, Shift rises.';
+  }
+  if (appCtx.boatMode?.active) {
+    return 'Boat controls:\nArrow keys steer and change speed, Space brakes, F changes travel mode.';
+  }
+  if (appCtx.planeMode?.active) {
+    return 'Plane controls:\nArrow keys steer, Space adds throttle, Shift reduces throttle, V changes camera.';
+  }
+  if (appCtx.droneMode) {
+    return 'Drone controls:\nArrow keys move, Space climbs, Control descends, WASD looks around.';
+  }
+  if (appCtx.Walk?.state?.mode !== 'walk') {
+    return 'Driving controls:\nArrow keys steer and change speed, Space brakes, WASD looks around.';
+  }
+  return 'Walk controls:\nArrow keys move and turn, WASD looks around, Space jumps, Shift runs.';
+}
+
 function presentCurrentStage() {
   if (!runtime.state.enabled || runtime.state.completed) {
     hidePrompt();
@@ -283,7 +302,7 @@ function presentCurrentStage() {
   if (stage === STAGES.MOVE_HINT) {
     showPrompt(stage, {
       title: 'Try Moving Around',
-      body: 'Walk controls:\nArrow keys move, A/D turn, W/S look, Space jump, Shift run.',
+      body: getMovementHint(),
       autoHideMs: 9600
     });
     return;
@@ -404,6 +423,7 @@ function tutorialOnEvent(eventName, payload = {}) {
     runtime.state.modeSwitchCount += 1;
     if (runtime.state.inMoon) runtime.state.moonModeSwitchCount += 1;
     saveState();
+    if (runtime.state.stage === STAGES.MOVE_HINT) presentCurrentStage();
     if (runtime.state.stage === STAGES.MODE_HINT && runtime.state.modeSwitchCount >= 1) {
       setStage(STAGES.SPACE_HINT);
       return;
@@ -541,6 +561,10 @@ function tutorialUpdate(dt) {
 
   if (appCtx.gameStarted && !runtime.state.inMoon && !runtime.state.inSpace) {
     runtime.state.worldSeconds += delta;
+  }
+  if (runtime.state.stage === STAGES.MOVE_HINT && runtime.bodyEl) {
+    const movementHint = getMovementHint();
+    if (runtime.bodyEl.textContent !== movementHint) runtime.bodyEl.textContent = movementHint;
   }
   if (runtime.state.inMoon) {
     runtime.state.moonSeconds += delta;

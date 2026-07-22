@@ -1,7 +1,8 @@
 import {
   buildFeatureRibbonEdges,
-  isRoadSurfaceReachable
-} from "../structure-semantics.js?v=16";
+  isRoadSurfaceReachable,
+  updateFeatureSurfaceProfile
+} from "../structure-semantics.js?v=17";
 import { waterSurfaceBaseElevation } from "../world/load-geometry.js?v=16";
 import { reconcileWaterBodySurface } from '../world/water-body-contract.js?v=2';
 
@@ -67,6 +68,11 @@ function createTerrainReprojectionApi(deps = {}) {
     const positions = mesh.geometry?.attributes?.position;
     if (!positions || positions.count < centerline.length * 2) return false;
     const featureRef = mesh.userData?.linearFeatureRef || null;
+    if (featureRef?.structureSemantics?.terrainMode === "at_grade") {
+      updateFeatureSurfaceProfile(featureRef, terrainMeshHeightAt, {
+        surfaceBias: verticalBias
+      });
+    }
     if (featureRef?.structureSemantics?.gradeSeparated) {
       const ribbonEdges = buildFeatureRibbonEdges(featureRef, centerline, halfWidth, cachedBaseTerrainHeight, {
         surfaceBias: verticalBias
@@ -177,11 +183,7 @@ function createTerrainReprojectionApi(deps = {}) {
       let maxElevation = -Infinity;
       let sampleCount = 0;
       pts.forEach((p) => {
-        let h = terrainMeshHeightAt(p.x, p.z);
-        if ((!Number.isFinite(h) || h === 0) && typeof elevationWorldYAtWorldXZ === "function") {
-          h = elevationWorldYAtWorldXZ(p.x, p.z);
-        }
-        if (h === 0 && Math.abs(fallbackElevation) > 2) h = fallbackElevation;
+        const h = terrainMeshHeightAt(p.x, p.z);
         if (!Number.isFinite(h)) return;
         minElevation = Math.min(minElevation, h);
         maxElevation = Math.max(maxElevation, h);

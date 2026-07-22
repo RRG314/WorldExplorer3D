@@ -1,14 +1,14 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
-import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=16";
+import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=19";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
 import { initMapInteractions } from "./ui/map-interactions.js?v=59";
-import { initMobileControls } from "./ui/mobile-controls.js?v=63";
+import { initMobileControls } from "./ui/mobile-controls.js?v=65";
 import { initShareUi } from "./ui/share-links.js?v=61";
 import { setupSettingsUi } from "./ui/settings.js?v=1";
 import { bindSpaceActions } from "./ui/space-actions.js?v=1";
-import { initTitleScreenUi } from "./ui/title-screen.js?v=84";
+import { initTitleScreenUi } from "./ui/title-screen.js?v=91";
 import { commitEnvironment, exitCurrentEnvironmentSync } from './session-coordinator.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {

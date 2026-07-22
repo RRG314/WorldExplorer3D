@@ -2,7 +2,7 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import {
   getActivityAnchorType,
   orderedRouteAnchors
-} from './schema.js?v=2';
+} from './schema.js?v=3';
 
 function finiteNumber(value, fallback = 0) {
   const number = Number(value);

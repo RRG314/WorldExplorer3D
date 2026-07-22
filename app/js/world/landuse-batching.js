@@ -106,7 +106,7 @@ export function batchLanduseMeshes() {
       mergedMesh.renderOrder = group.renderOrder;
       mergedMesh.receiveShadow = false;
       mergedMesh.castShadow = false;
-      mergedMesh.frustumCulled = false;
+      mergedMesh.frustumCulled = true;
 
       let centerX = 0;
       let centerZ = 0;

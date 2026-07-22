@@ -20,7 +20,7 @@ import {
   listLocalOverlayDrafts,
   removeLocalOverlayDraft,
   upsertLocalOverlayDraft
-} from './local-drafts.js?v=1';
+} from './local-drafts.js?v=2';
 
 const OVERLAY_FEATURES_COLLECTION = 'overlayFeatures';
 const OVERLAY_PUBLISHED_COLLECTION = 'overlayPublished';

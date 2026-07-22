@@ -1,7 +1,6 @@
 const functions = require('firebase-functions/v1');
 const admin = require('firebase-admin');
 const { defineString } = require('firebase-functions/params');
-const Stripe = require('stripe');
 const { ADMIN_ACTIVITY_COLLECTION, buildAdminDashboardExports } = require('./admin-dashboard');
 const {
   CREATOR_PROFILES_COLLECTION,
@@ -490,6 +489,7 @@ function getStripeClient() {
   if (!cfg.secret) {
     throw new Error('Stripe secret is missing. Set WE3D_STRIPE_SECRET (Firebase param or env).');
   }
+  const Stripe = require('stripe');
   return new Stripe(cfg.secret, { apiVersion: '2024-06-20' });
 }
 

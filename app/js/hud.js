@@ -19,6 +19,32 @@ const OVERHEAD_CAMERA_Z_OFFSET = 15;
 const WALK_ROAD_EDGE_MIN = 6;
 const WALK_ROAD_EDGE_SCALE = 0.75;
 
+function tunnelCameraY(targetY, x, z, roadY, semantics) {
+  const clearance = clampValue(Number(semantics?.cutDepth || 4.6) - 0.35, 3.2, 4.8);
+  const shellLimit = roadY + clearance - 0.42;
+  const renderedTerrainY = appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y;
+  const terrainLimit = Number.isFinite(renderedTerrainY) && renderedTerrainY > roadY + 0.9
+    ? renderedTerrainY - 0.32
+    : Infinity;
+  const interiorViewLimit = roadY + Math.min(1.65, clearance - 0.6);
+  const headroomFloor = roadY + 1.15;
+  return Math.max(headroomFloor, Math.min(targetY, shellLimit, terrainLimit, interiorViewLimit));
+}
+
+function syncTunnelGroundOcclusion(insideTunnel) {
+  const ground = appCtx.groundFallbackMesh;
+  if (ground?.userData?.isGroundPlane) ground.visible = !insideTunnel;
+  const terrainSide = insideTunnel ? THREE.FrontSide : THREE.DoubleSide;
+  for (const mesh of appCtx.terrainGroup?.children || []) {
+    const materials = Array.isArray(mesh?.material) ? mesh.material : [mesh?.material];
+    for (const material of materials) {
+      if (!material || material.side === terrainSide) continue;
+      material.side = terrainSide;
+      material.needsUpdate = true;
+    }
+  }
+}
+
 function locationName() {
   if (appCtx.onMars) return 'Olympus Mons, Mars';
   if (appCtx.onMoon) return 'Mare Tranquillitatis, Moon';
@@ -298,11 +324,10 @@ function updateCamera(dt = 1 / 60) {
   const carLook = appCtx.camera.userData.carLook || { yaw: 0, pitch: 0 };
   appCtx.camera.userData.carLook = carLook;
   const cameraLookSpeed = 1.8 * clampValue(dt, 1 / 240, 0.05);
-  const manualCameraInput = appCtx.keys.KeyW || appCtx.keys.KeyA || appCtx.keys.KeyS || appCtx.keys.KeyD;
-  if (appCtx.keys.KeyA) carLook.yaw += cameraLookSpeed;
-  if (appCtx.keys.KeyD) carLook.yaw -= cameraLookSpeed;
-  if (appCtx.keys.KeyW) carLook.pitch += cameraLookSpeed;
-  if (appCtx.keys.KeyS) carLook.pitch -= cameraLookSpeed;
+  const cameraActions = appCtx.readControlActions?.('drive') || {};
+  const manualCameraInput = Math.abs(Number(cameraActions.lookYaw) || 0) > 0.05 || Math.abs(Number(cameraActions.lookPitch) || 0) > 0.05;
+  carLook.yaw += (Number(cameraActions.lookYaw) || 0) * cameraLookSpeed;
+  carLook.pitch += (Number(cameraActions.lookPitch) || 0) * cameraLookSpeed;
   if (manualCameraInput) carLook.lastInputAt = performance.now();
   const cameraIdleMs = performance.now() - (Number(carLook.lastInputAt) || 0);
   if (!manualCameraInput && cameraIdleMs > 900 && appCtx.camMode === 0) {
@@ -317,7 +342,9 @@ function updateCamera(dt = 1 / 60) {
 
   // Normal car camera modes
   const lb = appCtx.keys.KeyV;
-  const insideTunnel = appCtx.car?.road?.structureSemantics?.terrainMode === 'subgrade';
+  const carRoadSemantics = appCtx.car?.road?.structureSemantics;
+  const insideTunnel = carRoadSemantics?.terrainMode === 'subgrade';
+  syncTunnelGroundOcclusion(insideTunnel);
   const planetaryChase = !!(appCtx.onMoon || appCtx.onMars);
   const d = insideTunnel ? 6.5 : appCtx.onMars ? 12 : CHASE_CAMERA_DISTANCE;
   const h = insideTunnel ? 2.35 : appCtx.onMars ? 6.5 : CHASE_CAMERA_HEIGHT;
@@ -331,14 +358,17 @@ function updateCamera(dt = 1 / 60) {
     appCtx.carMesh.visible = true;
   }
 
-  if (appCtx.camMode === 0) {
+  if (appCtx.camMode === 0 || (insideTunnel && appCtx.camMode === 2)) {
     // Chase camera - follow behind car at terrain height
     const horizontalDistance = d * Math.cos(carLook.pitch * 0.55);
     const ox = -Math.sin(viewAngle) * horizontalDistance;
     const oz = -Math.cos(viewAngle) * horizontalDistance;
     const targetX = appCtx.car.x + ox;
-    const targetY = carGroundY + h + Math.sin(carLook.pitch) * d * 0.72;
     const targetZ = appCtx.car.z + oz;
+    const unconstrainedTargetY = carGroundY + h + Math.sin(carLook.pitch) * d * 0.72;
+    const targetY = insideTunnel
+      ? tunnelCameraY(unconstrainedTargetY, targetX, targetZ, carGroundY, carRoadSemantics)
+      : unconstrainedTargetY;
     const lookX = appCtx.car.x;
     const lookY = carGroundY + (planetaryChase ? 2.1 : 0.5);
     const lookZ = appCtx.car.z;
@@ -349,6 +379,15 @@ function updateCamera(dt = 1 / 60) {
     appCtx.camera.position.x += (targetX - appCtx.camera.position.x) * smoothFactor;
     appCtx.camera.position.y += (targetY - appCtx.camera.position.y) * smoothFactor;
     appCtx.camera.position.z += (targetZ - appCtx.camera.position.z) * smoothFactor;
+    if (insideTunnel) {
+      appCtx.camera.position.y = tunnelCameraY(
+        appCtx.camera.position.y,
+        appCtx.camera.position.x,
+        appCtx.camera.position.z,
+        carGroundY,
+        carRoadSemantics
+      );
+    }
 
     // Initialize lookAt target if needed
     if (!appCtx.camera.userData.lookTarget) {
@@ -366,7 +405,12 @@ function updateCamera(dt = 1 / 60) {
     // Move camera forward to the hood area (1.2 units ahead of car center)
     const fwdX = Math.sin(appCtx.car.angle) * HOOD_FORWARD_OFFSET;
     const fwdZ = Math.cos(appCtx.car.angle) * HOOD_FORWARD_OFFSET;
-    appCtx.camera.position.set(appCtx.car.x + fwdX, carGroundY + HOOD_CAMERA_HEIGHT, appCtx.car.z + fwdZ);
+    const hoodX = appCtx.car.x + fwdX;
+    const hoodZ = appCtx.car.z + fwdZ;
+    const hoodY = insideTunnel
+      ? tunnelCameraY(carGroundY + HOOD_CAMERA_HEIGHT, hoodX, hoodZ, carGroundY, carRoadSemantics)
+      : carGroundY + HOOD_CAMERA_HEIGHT;
+    appCtx.camera.position.set(hoodX, hoodY, hoodZ);
     appCtx.camera.lookAt(
       appCtx.car.x + Math.sin(viewAngle) * HOOD_LOOK_DISTANCE,
       carGroundY + 1.6 + Math.sin(carLook.pitch) * HOOD_LOOK_DISTANCE,

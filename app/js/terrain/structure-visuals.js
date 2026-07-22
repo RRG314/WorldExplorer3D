@@ -3,12 +3,12 @@ import {
   polylineBounds,
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=16";
+} from "../structure-semantics.js?v=17";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext
-} from "./structure-visual-meshes.js?v=3";
-import { collectTunnelVisualInstances } from "./structure-tunnel-visuals.js?v=1";
+} from "./structure-visual-meshes.js?v=4";
+import { collectTunnelVisualInstances } from "./structure-tunnel-visuals.js?v=4";
 import { elevatedSegmentSafety } from "../world/bridge-safety.js?v=1";
 
 function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {
@@ -43,6 +43,7 @@ export function collectStructureVisualInstances({
   const capInstances = [];
   const wallInstances = [];
   const roofInstances = [];
+  const tunnelFloorInstances = [];
   const tunnelLightInstances = [];
   const guardrailInstances = [];
   const elevatedFeatures = []
@@ -547,6 +548,7 @@ export function collectStructureVisualInstances({
       portalInstances.push(...tunnel.portals);
       wallInstances.push(...tunnel.walls);
       roofInstances.push(...tunnel.roofs);
+      tunnelFloorInstances.push(...tunnel.floors);
       tunnelLightInstances.push(...tunnel.lights);
     }
   }
@@ -559,6 +561,7 @@ export function collectStructureVisualInstances({
     capInstances,
     wallInstances,
     roofInstances,
+    tunnelFloorInstances,
     tunnelLightInstances,
     guardrailInstances
   };

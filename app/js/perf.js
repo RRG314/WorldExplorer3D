@@ -430,6 +430,15 @@ function finishPerfLoad(summary = {}) {
     ...(loadSpikes ? { spikes: loadSpikes } : {}),
     ...(typeof summary === 'object' ? summary : {})
   };
+  void appCtx.recordProductEvent?.('load', {
+    action: summary?.success === false ? 'failed' : 'completed',
+    mode: perfStats.lastLoad.mode,
+    load_ms: perfStats.lastLoad.loadMs,
+    roads: Number(summary?.roadsFinal) || 0,
+    buildings: Number(summary?.buildingMeshes) || 0,
+    retry_pass: Number(summary?.retryPass) || 0,
+    reason: String(summary?.reason || 'none')
+  });
   _perfLoadStart = null;
   _perfLoadSpikeState = null;
   perfStats.updatedAt = Date.now();

@@ -11,7 +11,14 @@ import {
 import { createBuildCollisionQueries } from '../app/js/block-builder/collision.js';
 
 assert.equal(BLOCK_LIMIT_PER_LOCATION, 200, 'builder must allow 200 blocks per location');
-assert.deepEqual(BLOCK_SHAPES.map((shape) => shape.id), ['cube', 'slab', 'ramp', 'column']);
+assert.deepEqual(BLOCK_SHAPES.map((shape) => shape.id), [
+  'cube', 'slab', 'ramp', 'column', 'cylinder', 'wedge',
+  'pyramid', 'stairs', 'wall', 'beam', 'roof', 'panel'
+]);
+assert.deepEqual(BLOCK_MATERIALS.map((material) => material.id), [
+  'red', 'blue', 'green', 'yellow', 'orange', 'purple', 'white', 'charcoal',
+  'brick', 'stone', 'concrete', 'wood', 'glass', 'metal', 'grass', 'sand'
+]);
 assert.equal(new Set(BLOCK_MATERIALS.map((material) => material.color)).size, BLOCK_MATERIALS.length);
 assert.equal(normalizeBlockShape(undefined), 'cube', 'old records must default to cube');
 assert.equal(normalizeBlockShape('unknown'), 'cube');
@@ -25,6 +32,13 @@ const rampRotatedHigh = getBlockShapeSurface('ramp', 1, 0, 0, 0, 0.49, 0);
 assert.ok(rampLow && rampHigh && rampHigh.topY > rampLow.topY);
 assert.ok(rampRotatedHigh && rampRotatedHigh.topY > 0.45, 'rotation must rotate the ramp rise direction');
 assert.equal(getBlockShapeSurface('column', 0, 0, 0, 0, 0.49, 0), null);
+assert.equal(getBlockShapeSurface('cube', 0, 0, 0, 0, 0, 0).topY, 0.5);
+assert.equal(getBlockShapeSurface('cube', 0, 0, 1, 0, 0, 0).bottomY, 0.5,
+  'whole-grid cube stacking must join faces without a gap');
+assert.ok(getBlockShapeSurface('stairs', 0, 0, 0, 0, 0, 0.49).topY >
+  getBlockShapeSurface('stairs', 0, 0, 0, 0, 0, -0.49).topY);
+assert.ok(getBlockShapeSurface('roof', 0, 0, 0, 0, 0, 0).topY >
+  getBlockShapeSurface('roof', 0, 0, 0, 0, 0, 0.49).topY);
 
 const blockKey = (gx, gy, gz) => `${gx}|${gy}|${gz}`;
 const columnKey = (gx, gz) => `${gx}|${gz}`;

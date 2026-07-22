@@ -221,7 +221,9 @@ async function finalizeEarthResume(resolved, isCurrent = () => true, options = {
   if (typeof appCtx.refreshBoatAvailability === 'function') {
     appCtx.refreshBoatAvailability(true);
   }
-  if (typeof appCtx.refreshAstronomicalSky === 'function') {
+  if (typeof appCtx.setTimeOfDay === 'function') {
+    appCtx.setTimeOfDay(appCtx.skyMode || 'live');
+  } else if (typeof appCtx.refreshAstronomicalSky === 'function') {
     appCtx.refreshAstronomicalSky(true);
   }
   if (typeof appCtx.refreshLiveWeather === 'function') {

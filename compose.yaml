@@ -1,0 +1,27 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: npm run dev
+    environment:
+      HOST: 0.0.0.0
+      PORT: 4192
+    ports:
+      - "4192:4192"
+    init: true
+
+  mmo:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    command: npm run dev:mmo-server
+    environment:
+      HOST: 0.0.0.0
+      PORT: 2567
+      WE3D_MMO_ALLOW_TEST_AUTH: "true"
+      WE3D_MMO_SEED_LOCAL: "true"
+      WE3D_MMO_STORE: memory
+    ports:
+      - "2567:2567"
+    init: true

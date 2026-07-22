@@ -28,6 +28,7 @@ function getGlobeSelectorElements() {
     liveEarthRefreshBtn: document.getElementById('globeLiveEarthRefreshBtn'),
     nearbyTabBtn: document.getElementById('globeNearbyTabBtn'),
     favoritesTabBtn: document.getElementById('globeFavoritesTabBtn'),
+    saveFavoriteBtn: document.getElementById('globeSaveFavoriteBtn'),
     cityListHint: document.getElementById('globeCityListHint'),
     cityList: document.getElementById('globeCityList')
   };

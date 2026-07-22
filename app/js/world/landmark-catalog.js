@@ -28,23 +28,6 @@ const CURATED_LANDMARKS = [
     color: 0xb6a477,
     hideRadiusMeters: 18,
     wikidata: 'Q41225'
-  },
-  {
-    id: 'pyramid-khufu',
-    name: 'Great Pyramid of Giza',
-    lat: 29.9792345,
-    lon: 31.1342019,
-    matchRadiusMeters: 5000,
-    builder: 'measured-khufu-pyramid',
-    preserveMaterials: true,
-    modelHeightMeters: 138.5,
-    totalHeightMeters: 138.5,
-    modelWidthMeters: 230.3,
-    modelDepthMeters: 230.3,
-    rotation: { x: 0, y: 0.02, z: 0 },
-    color: 0xc39b59,
-    hideRadiusMeters: 126,
-    wikidata: 'Q37200'
   }
 ];
 

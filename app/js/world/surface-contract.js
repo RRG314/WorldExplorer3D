@@ -27,9 +27,9 @@ const EARTH_TRAVERSAL_BOUNDS = Object.freeze({
 
 const SURFACE_COMPOSITION_LAYER = Object.freeze({
   TERRAIN: 0,
-  NATURAL: 1,
+  DEVELOPED: 1,
   AGRICULTURE: 2,
-  DEVELOPED: 3,
+  NATURAL: 3,
   PEDESTRIAN: 4,
   TRANSPORTATION: 5,
   ROAD: 6,
@@ -40,7 +40,7 @@ const NATURAL_SURFACES = new Set([
   'forest', 'wood', 'scrub', 'park', 'garden', 'grass', 'grassland', 'meadow',
   'orchard', 'recreation_ground', 'village_green', 'cemetery', 'sand', 'beach',
   'bare_rock', 'scree', 'shingle', 'wetland', 'marsh', 'bog', 'swamp', 'dune',
-  'barren', 'glacier', 'quarry'
+  'barren', 'glacier', 'quarry', 'greenfield'
 ]);
 const AGRICULTURAL_SURFACES = new Set([
   'farmland', 'farmyard', 'vineyard', 'allotments', 'plant_nursery', 'greenhouse_horticulture'

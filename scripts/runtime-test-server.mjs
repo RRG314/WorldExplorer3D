@@ -21,6 +21,7 @@ async function serveStaticRoot(rootDir, host, port) {
   const mime = new Map([
     ['.html', 'text/html; charset=utf-8'],
     ['.js', 'text/javascript; charset=utf-8'],
+    ['.mjs', 'text/javascript; charset=utf-8'],
     ['.css', 'text/css; charset=utf-8'],
     ['.json', 'application/json; charset=utf-8'],
     ['.png', 'image/png'],
@@ -56,7 +57,10 @@ async function serveStaticRoot(rootDir, host, port) {
         return;
       }
 
-      const contentType = mime.get(path.extname(filePath).toLowerCase()) || 'application/octet-stream';
+      const requestExtension = path.extname(reqUrl.pathname).toLowerCase();
+      const resolvedExtension = path.extname(filePath).toLowerCase();
+      const contentType = mime.get(requestExtension) || mime.get(resolvedExtension) ||
+        (filePath.endsWith('.js') ? 'text/javascript; charset=utf-8' : 'application/octet-stream');
       res.writeHead(200, { 'Content-Type': contentType });
       res.end(await fs.readFile(filePath));
     } catch (err) {

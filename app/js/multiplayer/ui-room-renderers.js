@@ -367,23 +367,23 @@ export function createUiRoomRenderers({ appCtx, refs, state, helpers }) {
     if (!refs.titlePlanState) return;
     const plan = state.entitlement.plan;
     if (state.entitlement.isAdmin === true) {
-      refs.titlePlanState.textContent = "Admin mode: Multiplayer + Pro features unlocked for live testing.";
+      refs.titlePlanState.textContent = "Admin mode: multiplayer testing tools are available.";
       refs.titlePlanState.classList.remove("warn");
       return;
     }
     if (plan === "pro") {
-      refs.titlePlanState.textContent = "Pro donation active: multiplayer is open, plus early demo access.";
+      refs.titlePlanState.textContent = "Signed in. Multiplayer rooms and early previews are available.";
       refs.titlePlanState.classList.remove("warn");
       return;
     }
     if (plan === "supporter" || plan === "support") {
       refs.titlePlanState.textContent =
-        "Supporter donation active: multiplayer is fully open. Upgrade to Pro for early demos.";
+        "Signed in. Multiplayer rooms are available.";
       refs.titlePlanState.classList.remove("warn");
       return;
     }
     refs.titlePlanState.textContent =
-      "Signed-in explorers can create and join multiplayer rooms. Donations are optional.";
+      "Signed-in explorers can create and join multiplayer rooms.";
     refs.titlePlanState.classList.remove("warn");
   }
 

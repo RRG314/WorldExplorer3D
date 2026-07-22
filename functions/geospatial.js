@@ -10,6 +10,11 @@ const CACHE_TTL_MS = 15 * 60 * 1000;
 const AIRCRAFT_CACHE_TTL_MS = 60 * 1000;
 const MAX_CACHE_ENTRIES = 80;
 
+function openSkyEnabled(options = {}) {
+  if (typeof options.openSkyEnabled === 'boolean') return options.openSkyEnabled;
+  return /^(1|true|yes)$/i.test(String(process.env.WE3D_OPENSKY_ENABLED || '').trim());
+}
+
 function numberInRange(value, min, max, fallback = NaN) {
   const number = Number(value);
   if (!Number.isFinite(number)) return fallback;
@@ -194,43 +199,50 @@ async function queryAdsbLol(query, options = {}) {
       .filter(Boolean)
       .sort((a, b) => a.distanceKm - b.distanceKm)
       .slice(0, query.limit),
-    warnings: ['OpenSky was unavailable; current observations are supplied by ADSB.lol under ODbL.'],
+    warnings: [options.openSkyAttempted
+      ? 'OpenSky was unavailable; current observations are supplied by ADSB.lol under ODbL.'
+      : 'Current observations are supplied by the default ADSB.lol provider under ODbL.'],
     cache: 'upstream'
   };
 }
 
-function aircraftCacheKey(query) {
-  return `${query.lat.toFixed(2)}:${query.lon.toFixed(2)}:${query.radiusKm}:${query.limit}`;
+function aircraftCacheKey(query, providerMode) {
+  return `${providerMode}:${query.lat.toFixed(2)}:${query.lon.toFixed(2)}:${query.radiusKm}:${query.limit}`;
 }
 
 async function queryAircraft(input = {}, options = {}) {
   const query = normalizeAircraftQuery(input);
-  const key = aircraftCacheKey(query);
+  const useOpenSky = openSkyEnabled(options);
+  const key = aircraftCacheKey(query, useOpenSky ? 'opensky' : 'adsb-lol');
   const cached = AIRCRAFT_CACHE.get(key);
   if (!options.force && cached?.expiresAt > Date.now()) return { ...cached.value, cache: 'memory' };
-  const bounds = aircraftBounds(query);
-  const url = new URL(OPENSKY_API);
-  Object.entries({ ...bounds, extended: 1 }).forEach(([name, value]) => url.searchParams.set(name, String(value)));
-  let value;
-  try {
-    const payload = await fetchJson(url.href, { ...options, timeoutMs: 9000, forceIpv4: true });
-    const responseTime = Number(payload.time) || Math.floor(Date.now() / 1000);
-    value = {
-      schemaVersion: 1,
-      provider: 'opensky',
-      fetchedAt: new Date(responseTime * 1000).toISOString(),
-      query,
-      bounds,
-      items: (payload.states || [])
-        .map((state) => normalizeOpenSkyState(state, query, responseTime))
-        .filter(Boolean)
-        .sort((a, b) => a.distanceKm - b.distanceKm)
-        .slice(0, query.limit),
-      warnings: [],
-      cache: 'upstream'
-    };
-  } catch (openSkyError) {
-    value = await queryAdsbLol(query, options);
+  let value = null;
+  if (useOpenSky) {
+    const bounds = aircraftBounds(query);
+    const url = new URL(OPENSKY_API);
+    Object.entries({ ...bounds, extended: 1 }).forEach(([name, value]) => url.searchParams.set(name, String(value)));
+    try {
+      const payload = await fetchJson(url.href, { ...options, timeoutMs: 9000, forceIpv4: true });
+      const responseTime = Number(payload.time) || Math.floor(Date.now() / 1000);
+      value = {
+        schemaVersion: 1,
+        provider: 'opensky',
+        fetchedAt: new Date(responseTime * 1000).toISOString(),
+        query,
+        bounds,
+        items: (payload.states || [])
+          .map((state) => normalizeOpenSkyState(state, query, responseTime))
+          .filter(Boolean)
+          .sort((a, b) => a.distanceKm - b.distanceKm)
+          .slice(0, query.limit),
+        warnings: [],
+        cache: 'upstream'
+      };
+    } catch (openSkyError) {
+      value = await queryAdsbLol(query, { ...options, openSkyAttempted: true });
+    }
+  } else {
+    value = await queryAdsbLol(query, { ...options, openSkyAttempted: false });
   }
   AIRCRAFT_CACHE.set(key, { value, expiresAt: Date.now() + AIRCRAFT_CACHE_TTL_MS });
   while (AIRCRAFT_CACHE.size > 24) AIRCRAFT_CACHE.delete(AIRCRAFT_CACHE.keys().next().value);
@@ -399,7 +411,7 @@ function buildGeospatialExports({ functions, setCors }) {
       } catch (error) {
         const status = Number(error?.statusCode) || (error?.name === 'AbortError' ? 504 : 502);
         console.warn('[getAircraftStates] request failed:', error?.message || error);
-        res.status(status).json({ error: status === 504 ? 'OpenSky timed out.' : (error?.message || 'Aircraft observations unavailable.') });
+        res.status(status).json({ error: status === 504 ? 'Aircraft provider timed out.' : (error?.message || 'Aircraft observations unavailable.') });
       }
     })
   };
@@ -410,6 +422,7 @@ module.exports = {
   normalizeAircraftQuery,
   normalizeAdsbLolState,
   normalizeOpenSkyState,
+  openSkyEnabled,
   normalizeQuery,
   queryAircraft,
   queryStreetImagery,

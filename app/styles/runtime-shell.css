@@ -842,11 +842,15 @@ body.editor-workspace-open .floatMenu.open .floatItems{display:none!important}
 .room-meta-code{font-size:13px;font-weight:700;color:#a7f3d0}
 .room-meta-name{font-size:11px;color:#cbd5e1;margin-top:4px}
 .room-player-head{display:flex;align-items:center;justify-content:space-between;font-size:11px;color:#cbd5e1}
-.mp-player-list{list-style:none;padding:0;margin:0;display:flex;flex-direction:column;gap:6px;max-height:200px;overflow:auto}
+.mp-player-list{list-style:none;padding:0;margin:0;display:flex;flex:0 0 auto;flex-direction:column;gap:6px;max-height:200px;overflow:auto}
 .mpPlayerItem{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;background:rgba(15,23,42,0.66);border:1px solid rgba(148,163,184,0.28);border-radius:9px}
 .mpPlayerName{font-size:12px;color:#f8fafc;font-weight:600}
 .mpPlayerMeta{font-size:11px;color:#94a3b8}
 .mpPlayerEmpty{font-size:11px;color:#94a3b8;padding:10px;background:rgba(15,23,42,0.42);border:1px dashed rgba(148,163,184,0.3);border-radius:9px;text-align:center}
+.mmo-progress-summary{padding:9px 10px;background:rgba(15,23,42,0.66);border:1px solid rgba(52,211,153,0.32);border-radius:8px;color:#d1fae5;font-size:11px;line-height:1.4}
+.mmo-leaderboard-list{max-height:150px}
+.room-panel .mp-select{min-width:150px;flex:1;background:#0f172a;color:#e2e8f0;border-color:rgba(148,163,184,0.42)}
+.room-panel .mp-btn:disabled{opacity:0.45;cursor:not-allowed}
 #roomPanelStatus{min-height:16px;font-size:11px;color:#93c5fd}
 
 .room-chat-drawer{position:fixed;right:12px;bottom:max(14px,calc(env(safe-area-inset-bottom) + 12px));z-index:130;width:min(340px,calc(100vw - 18px));max-height:min(56vh,440px);display:flex;flex-direction:column;background:rgba(9,18,32,0.95);border:1px solid rgba(148,163,184,0.42);border-radius:14px;box-shadow:0 16px 36px rgba(2,6,23,0.45);transform:translateY(120%);opacity:0;pointer-events:none;transition:transform 0.22s ease,opacity 0.22s ease}
@@ -888,6 +892,21 @@ body.editor-workspace-open .floatMenu.open .floatItems{display:none!important}
   #multiplayerMenu.open .floatItems{
     left:max(6px,env(safe-area-inset-left))!important;right:max(6px,env(safe-area-inset-right))!important;
     bottom:max(78px,calc(env(safe-area-inset-bottom) + 78px))!important
+  }
+}
+
+@media (pointer:coarse) and (min-height:561px){
+  #tutorialHintCard{
+    top:max(280px,31dvh)!important;right:max(10px,env(safe-area-inset-right))!important;
+    bottom:auto!important;max-width:min(360px,calc(100vw - 20px))!important
+  }
+}
+
+@media (pointer:coarse) and (max-height:560px){
+  #tutorialHintCard{
+    top:max(72px,calc(env(safe-area-inset-top) + 66px))!important;
+    right:max(10px,env(safe-area-inset-right))!important;bottom:auto!important;
+    max-width:min(320px,calc(100vw - 260px))!important
   }
 }
 }

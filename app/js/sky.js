@@ -1,12 +1,12 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=16";
+import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=19";
 import {
   cycleTimeOfDay as cycleSkyTimeOfDay,
   getAstronomicalSkySnapshot,
   inspectAstronomicalSkyState,
   refreshAstronomicalSky as refreshAstronomicalSkyState,
   setTimeOfDay as setSkyTimeOfDay
-} from "./sky/astronomical-state.js?v=1";
+} from "./sky/astronomical-state.js?v=2";
 import {
   alignStarFieldToLocation,
   checkMoonClick as checkMoonSelection,

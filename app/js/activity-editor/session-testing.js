@@ -32,6 +32,15 @@ export function createActivityCreatorTestingApi(context = {}) {
         angle: finiteNumber(appCtx.drone?.yaw, 0)
       };
     }
+    if (mode === 'plane') {
+      return {
+        mode,
+        x: finiteNumber(appCtx.planeMode?.x, 0),
+        y: finiteNumber(appCtx.planeMode?.y, 2),
+        z: finiteNumber(appCtx.planeMode?.z, 0),
+        angle: finiteNumber(appCtx.planeMode?.yaw, 0)
+      };
+    }
     if (mode === 'walk' && appCtx.Walk?.state?.walker) {
       const walker = appCtx.Walk.state.walker;
       return {
@@ -104,6 +113,31 @@ export function createActivityCreatorTestingApi(context = {}) {
     return true;
   }
 
+  function applyDirectPlanePose(anchor) {
+    if (typeof appCtx.setTravelMode !== 'function') return false;
+    appCtx.setTravelMode('plane', {
+      source: 'activity_creator_test',
+      force: true,
+      x: anchor.x,
+      y: Math.max(anchor.y, finiteNumber(anchor.baseY, anchor.y) + 3),
+      z: anchor.z,
+      yaw: anchor.yaw || 0,
+      pitch: 0,
+      roll: 0,
+      speed: 0,
+      throttle: 0,
+      airborne: anchor.y > finiteNumber(anchor.baseY, anchor.y) + 2
+    });
+    return appCtx.planeMode?.active === true;
+  }
+
+  function applyDirectSubmarinePose(anchor) {
+    if (typeof appCtx.startOceanMode !== 'function') return false;
+    return appCtx.startOceanMode({
+      submarinePose: { x: anchor.x, y: anchor.y, z: anchor.z, yaw: anchor.yaw || 0 }
+    }) === true;
+  }
+
   function applyDirectBoatPose(anchor) {
     if (typeof appCtx.setTravelMode !== 'function') return false;
     const candidate = typeof appCtx.inspectBoatCandidate === 'function'
@@ -130,6 +164,8 @@ export function createActivityCreatorTestingApi(context = {}) {
     };
     if (snapshot.mode === 'boat') return applyDirectBoatPose(anchor);
     if (snapshot.mode === 'drone') return applyDirectDronePose(anchor);
+    if (snapshot.mode === 'plane') return applyDirectPlanePose(anchor);
+    if (snapshot.mode === 'submarine') return applyDirectSubmarinePose(anchor);
     if (snapshot.mode === 'walk') return applyDirectWalkPose(anchor);
     return applyDirectDrivePose(anchor);
   }
@@ -138,7 +174,8 @@ export function createActivityCreatorTestingApi(context = {}) {
     const traversal = selectedTemplate().traversalMode;
     if (traversal === 'boat') return applyDirectBoatPose(anchor);
     if (traversal === 'drone') return applyDirectDronePose(anchor);
-    if (traversal === 'submarine') return false;
+    if (traversal === 'plane') return applyDirectPlanePose(anchor);
+    if (traversal === 'submarine') return applyDirectSubmarinePose(anchor);
     if (traversal === 'walk') return applyDirectWalkPose(anchor);
     return applyDirectDrivePose(anchor);
   }
@@ -147,6 +184,11 @@ export function createActivityCreatorTestingApi(context = {}) {
     const mode = typeof appCtx.getCurrentTravelMode === 'function' ? appCtx.getCurrentTravelMode() : 'drive';
     if (mode === 'boat') return { x: finiteNumber(appCtx.boat?.x, 0), y: finiteNumber(appCtx.boat?.y, 0), z: finiteNumber(appCtx.boat?.z, 0) };
     if (mode === 'drone') return { x: finiteNumber(appCtx.drone?.x, 0), y: finiteNumber(appCtx.drone?.y, 0), z: finiteNumber(appCtx.drone?.z, 0) };
+    if (mode === 'plane') return { x: finiteNumber(appCtx.planeMode?.x, 0), y: finiteNumber(appCtx.planeMode?.y, 0), z: finiteNumber(appCtx.planeMode?.z, 0) };
+    if (appCtx.oceanMode?.active) {
+      const position = appCtx.oceanMode.submarine?.position || {};
+      return { x: finiteNumber(position.x, 0), y: finiteNumber(position.y, 0), z: finiteNumber(position.z, 0) };
+    }
     if (mode === 'walk' && appCtx.Walk?.state?.walker) {
       const walker = appCtx.Walk.state.walker;
       return { x: finiteNumber(walker.x, 0), y: finiteNumber(walker.y, 0) - 1.7, z: finiteNumber(walker.z, 0) };

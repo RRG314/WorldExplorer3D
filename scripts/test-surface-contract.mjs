@@ -115,7 +115,7 @@ const inferred = provenanceFor({ id: 'fallback-1', tags: { _geometrySource: 'inf
 assert.equal(inferred.fallback, true);
 assert.ok(inferred.confidence <= 0.45);
 
-const surfaceOrder = ['grass', 'farmland', 'residential', 'pedestrian', 'transportation']
+const surfaceOrder = ['residential', 'farmland', 'grass', 'pedestrian', 'transportation']
   .map((kind) => surfaceComposition(kind));
 for (let index = 1; index < surfaceOrder.length; index += 1) {
   assert.ok(surfaceOrder[index].layer > surfaceOrder[index - 1].layer);

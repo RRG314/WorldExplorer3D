@@ -11,10 +11,10 @@ const MOBILE_CONTROL_PROFILES = {
       right: { channel: 'earth', key: 'ArrowRight' }
     },
     look: {
-      up: { channel: 'earth', key: 'KeyW' },
-      down: { channel: 'earth', key: 'KeyS' },
-      left: { channel: 'earth', key: 'KeyA' },
-      right: { channel: 'earth', key: 'KeyD' }
+      up: { channel: 'earth', key: 'VirtualLookUp' },
+      down: { channel: 'earth', key: 'VirtualLookDown' },
+      left: { channel: 'earth', key: 'VirtualLookLeft' },
+      right: { channel: 'earth', key: 'VirtualLookRight' }
     },
     actions: [{ label: 'Brake', binding: { channel: 'earth', key: 'Space' } }]
   },
@@ -28,10 +28,10 @@ const MOBILE_CONTROL_PROFILES = {
       right: { channel: 'earth', key: 'ArrowRight' }
     },
     look: {
-      up: { channel: 'earth', key: 'KeyW' },
-      down: { channel: 'earth', key: 'KeyS' },
-      left: { channel: 'earth', key: 'KeyA' },
-      right: { channel: 'earth', key: 'KeyD' }
+      up: { channel: 'earth', key: 'VirtualLookUp' },
+      down: { channel: 'earth', key: 'VirtualLookDown' },
+      left: { channel: 'earth', key: 'VirtualLookLeft' },
+      right: { channel: 'earth', key: 'VirtualLookRight' }
     },
     actions: [{ label: 'Brake', binding: { channel: 'earth', key: 'Space' } }]
   },
@@ -45,10 +45,10 @@ const MOBILE_CONTROL_PROFILES = {
       right: { channel: 'earth', key: 'ArrowRight' }
     },
     look: {
-      up: { channel: 'earth', key: 'KeyW' },
-      down: { channel: 'earth', key: 'KeyS' },
-      left: { channel: 'earth', key: 'KeyA' },
-      right: { channel: 'earth', key: 'KeyD' }
+      up: { channel: 'earth', key: 'VirtualLookUp' },
+      down: { channel: 'earth', key: 'VirtualLookDown' },
+      left: { channel: 'earth', key: 'VirtualLookLeft' },
+      right: { channel: 'earth', key: 'VirtualLookRight' }
     },
     actions: [
       { label: 'Jump', binding: { channel: 'earth', key: 'Space' } },
@@ -65,10 +65,10 @@ const MOBILE_CONTROL_PROFILES = {
       right: { channel: 'earth', key: 'ArrowRight' }
     },
     look: {
-      up: { channel: 'earth', key: 'KeyW' },
-      down: { channel: 'earth', key: 'KeyS' },
-      left: { channel: 'earth', key: 'KeyA' },
-      right: { channel: 'earth', key: 'KeyD' }
+      up: { channel: 'earth', key: 'VirtualLookUp' },
+      down: { channel: 'earth', key: 'VirtualLookDown' },
+      left: { channel: 'earth', key: 'VirtualLookLeft' },
+      right: { channel: 'earth', key: 'VirtualLookRight' }
     },
     actions: [
       { label: 'Ascend', binding: { channel: 'earth', key: 'Space' } },
@@ -85,10 +85,10 @@ const MOBILE_CONTROL_PROFILES = {
       right: { channel: 'earth', key: 'ArrowRight' }
     },
     look: {
-      up: { channel: 'earth', key: 'KeyW' },
-      down: { channel: 'earth', key: 'KeyS' },
-      left: { channel: 'earth', key: 'KeyA' },
-      right: { channel: 'earth', key: 'KeyD' }
+      up: { channel: 'earth', key: 'VirtualLookUp' },
+      down: { channel: 'earth', key: 'VirtualLookDown' },
+      left: { channel: 'earth', key: 'VirtualLookLeft' },
+      right: { channel: 'earth', key: 'VirtualLookRight' }
     },
     actions: [
       { label: 'Throttle +', binding: { channel: 'earth', key: 'KeyX' } },
@@ -120,10 +120,10 @@ const MOBILE_CONTROL_PROFILES = {
       right: { channel: 'earth', key: 'ArrowRight' }
     },
     look: {
-      up: { channel: 'earth', key: 'KeyW' },
-      down: { channel: 'earth', key: 'KeyS' },
-      left: { channel: 'earth', key: 'KeyA' },
-      right: { channel: 'earth', key: 'KeyD' }
+      up: { channel: 'earth', key: 'VirtualLookUp' },
+      down: { channel: 'earth', key: 'VirtualLookDown' },
+      left: { channel: 'earth', key: 'VirtualLookLeft' },
+      right: { channel: 'earth', key: 'VirtualLookRight' }
     },
     actions: [
       { label: 'Ascend', binding: { channel: 'earth', key: 'Space' } },
@@ -425,7 +425,7 @@ function initMobileControls() {
       earthModeMenuItem.textContent = mode === 'ocean' ? '🌍 Return to Earth' : '🌍 Earth Mode';
     }
     if (controlsTab && ctrlContent) {
-      controlsTab.classList.toggle('compact', isTouchPreferredClient && ctrlContent.classList.contains('hidden'));
+      controlsTab.classList.toggle('compact', ctrlContent.classList.contains('hidden'));
     }
     if (ctrlHeader) {
       const modeLabel =
@@ -438,6 +438,7 @@ function initMobileControls() {
         'Driving Mode';
       const arrow = ctrlContent?.classList.contains('hidden') ? '▼' : '▲';
       ctrlHeader.textContent = `⚙️ ${modeLabel} ${arrow}`;
+      ctrlHeader.title = `${modeLabel} controls`;
     }
     updateMobileTouchControls(mode);
   }

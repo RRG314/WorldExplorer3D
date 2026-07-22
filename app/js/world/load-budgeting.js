@@ -251,6 +251,7 @@ export function prepareWorldFeatureSelections(options = {}) {
 
   const worldSurfaceProfile = classifyWorldSurfaceProfile({
     centerLat: options.centerLat,
+    centerLon: options.centerLon,
     landuseWays,
     waterwayWays
   });

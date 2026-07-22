@@ -314,7 +314,9 @@ function applySkyVisualState(config, state) {
     Math.round((state?.moon?.phase || 0) * 128),
     Math.round((state?.starsOpacity || 0) * 100)
   ].join("|");
-  if (_lastAppliedSkySignature === signature) return;
+  const backgroundMatches = appCtx.scene.background?.isColor &&
+    appCtx.scene.background.getHex() === config.skyColor;
+  if (_lastAppliedSkySignature === signature && backgroundMatches) return;
   _lastAppliedSkySignature = signature;
 
   appCtx.timeOfDay = config.phase;

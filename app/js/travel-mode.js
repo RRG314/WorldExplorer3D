@@ -205,7 +205,7 @@ function setTravelMode(mode, options = {}) {
     if (appCtx.carMesh) appCtx.carMesh.visible = false;
   } else if (targetMode === 'walk') {
     setDroneModeActive(false);
-    if (appCtx.Walk && appCtx.Walk.state?.mode !== 'walk') {
+    if (appCtx.Walk && (appCtx.Walk.state?.mode !== 'walk' || options.refreshSurface === true)) {
       appCtx.Walk.setModeWalk({
         preserveResolvedSpawn: !!planeExitState,
         preserveResolvedSurface: planeExitState?.landedOnRoof === true,

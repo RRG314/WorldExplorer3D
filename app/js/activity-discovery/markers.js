@@ -4,7 +4,7 @@ import {
   discoveryIconForActivity,
   discoveryMarkerShape,
   sanitizeText
-} from './schema.js?v=2';
+} from './schema.js?v=3';
 
 const sceneState = {
   initialized: false,

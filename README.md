@@ -4,15 +4,15 @@
 [![Secret Scan](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml/badge.svg?branch=main)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml)
 [![GitHub Pages](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml/badge.svg?branch=main)](https://rrg314.github.io/WorldExplorer3D/)
 [![Release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=semver)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
-[![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
+[![License: Apache 2.0](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 World Explorer 3D is a browser-based geospatial exploration game built around real-world map context. Pick a preset city, use the interactive globe, or enter coordinates, then explore by walking, driving, flying, boating, or changing worlds entirely.
 
 **[Launch World Explorer 3D](https://worldexplorer3d.io/app/)**
 
-## Version 3.1 Release Candidate
+## Version 4.0 Release Candidate
 
-Version 3.1 completes the ownership-focused runtime work started in 3.0 and adds a consolidated globe-first interface plus provenance-aware operational data tools. It is being verified on a release branch before the live application and GitHub `main` are updated together.
+Version 4.0 turns the refactored explorer into an open-source world platform. It adds an authoritative multiplayer foundation, contributor-facing gameplay contracts, stronger persistence and security boundaries, and a release-tested runtime spanning Earth, ocean, Moon, Mars, and space. It is being verified on one exact release-candidate commit before the live application and GitHub `main` are updated together.
 
 Highlights:
 
@@ -28,6 +28,7 @@ Highlights:
 - Multiplayer rooms, social/account features, world and game editors, a 200-piece block builder, fishing, and leaderboards.
 - Responsive touch controls for current iPhone and Android layouts.
 - Provider health, freshness, cache, quality, datum, and fallback labels that distinguish observations, models, predictions, and reference-only data.
+- Apache-2.0 project licensing, contributor governance, self-hosting guidance, and explicit third-party asset/data notices.
 
 ## Screenshots
 
@@ -93,8 +94,18 @@ Edit canonical source only. `npm run build:hosting` creates a fresh, content-has
 - [Roadmap](ROADMAP.md)
 - [Controls](CONTROLS_REFERENCE.md)
 - [Contributing](CONTRIBUTING.md)
+- [Governance](GOVERNANCE.md)
+- [Community conduct](CODE_OF_CONDUCT.md)
+- [Support](SUPPORT.md)
 - [Security policy](SECURITY.md)
+- [Local MMO stack](SELF_HOSTING.md)
+- [Gameplay extension guide](CONTENT_EXTENSION_GUIDE.md)
+- [MMO architecture](MMO_ARCHITECTURE.md)
 
 ## License
 
-This repository is source-available under the custom terms in [LICENSE](LICENSE). It is not licensed as OSI open-source software. Third-party data and assets remain subject to their respective licenses.
+Original project code and documentation are open source under the
+[Apache License 2.0](LICENSE). Third-party data, assets, and hosted services are
+not relicensed; review [third-party notices](THIRD_PARTY_NOTICES.md),
+[data licensing](DATA_LICENSES.md), [media licensing](MEDIA_LICENSE.md), and
+[trademark guidance](TRADEMARKS.md) before redistributing a build.

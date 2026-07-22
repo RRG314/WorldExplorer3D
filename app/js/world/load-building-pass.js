@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=16";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=17";
 import {
   buildingSeedFromIdentity,
   inferFallbackBuildingHeightMeters,
@@ -19,7 +19,7 @@ import {
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
-} from "./building-batching.js?v=3";
+} from "./building-batching.js?v=4";
 
 export function buildBuildingGeometryPass(options = {}) {
   const buildingWays = Array.isArray(options.buildingWays) ? options.buildingWays : [];
@@ -377,6 +377,11 @@ export function buildBuildingGeometryPass(options = {}) {
       way.id ||
       `osm-${Math.round(centerX * 10)}-${Math.round(centerZ * 10)}`
     );
+    const roomSourceId = appCtx.normalizeRoomBaseFeatureId?.({
+      sourceBuildingId,
+      overtureBuildingId: way.tags?._overtureBuildingId || ''
+    }) || sourceBuildingId;
+    if (appCtx.roomBaseSuppressionIds?.has?.(roomSourceId)) return;
     const apronFootprint = expandFootprintForGroundApron(pts);
     const roadCorridorStats = sampleFootprintCoverage(apronFootprint, pointOnRoadCorridor);
     const roadCorridorOverlap = overlapsRoadCorridor(roadCorridorStats);
@@ -401,7 +406,9 @@ export function buildBuildingGeometryPass(options = {}) {
     let minElevation = Infinity;
     let maxElevation = -Infinity;
     pts.forEach((p) => {
-      const h = appCtx.elevationWorldYAtWorldXZ(p.x, p.z);
+      const h = appCtx.SurfaceQuery?.terrainAt?.(p.x, p.z)?.position?.y ??
+        appCtx.terrainMeshHeightAt?.(p.x, p.z) ??
+        appCtx.elevationWorldYAtWorldXZ(p.x, p.z);
       avgElevation += h;
       if (h < minElevation) minElevation = h;
       if (h > maxElevation) maxElevation = h;

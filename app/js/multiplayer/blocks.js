@@ -22,7 +22,7 @@ const BLOCK_COORD_MIN = -50000;
 const BLOCK_COORD_MAX = 50000;
 const BLOCK_MATERIAL_MIN = 0;
 const BLOCK_MATERIAL_MAX = 64;
-const BLOCK_SHAPES = new Set(['cube', 'slab', 'ramp', 'column']);
+const BLOCK_SHAPES = new Set(['cube', 'slab', 'ramp', 'column', 'wedge', 'pyramid']);
 
 function getServices() {
   const { db } = initFirebase();

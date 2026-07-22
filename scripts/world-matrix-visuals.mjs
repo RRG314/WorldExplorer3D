@@ -104,12 +104,18 @@ export async function captureDroneView(page, spec, result, outputDir) {
     };
   });
   await captureViewport(page, path.join(outputDir, `${spec.id}-drone.png`));
-  if (String(spec.category || '').includes('bridge')) {
+  const category = String(spec.category || '');
+  const captureBridge = category.includes('bridge');
+  const capturePyramid = category.includes('historic_arid');
+  const captureCurated = category.includes('historic');
+  if (captureBridge || capturePyramid || captureCurated) {
     const landmarkOverview = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
       const ctx = mod?.ctx || {};
       const targets = (ctx.historicMarkers || []).filter((mesh) =>
-        String(mesh?.userData?.landmarkKind || '').startsWith('suspension_bridge')
+        String(mesh?.userData?.landmarkKind || '').startsWith('suspension_bridge') ||
+        String(mesh?.userData?.landmarkKind || '') === 'pyramid' ||
+        !!mesh?.userData?.curatedLandmarkId
       );
       if (!ctx.camera || !ctx.renderer || targets.length === 0 || typeof THREE === 'undefined') return null;
       const bounds = new THREE.Box3();
@@ -117,10 +123,15 @@ export async function captureDroneView(page, spec, result, outputDir) {
       const center = bounds.getCenter(new THREE.Vector3());
       const size = bounds.getSize(new THREE.Vector3());
       const bridgeRunsAlongX = size.x >= size.z;
-      const sideDistance = Math.max(520, Math.min(980, Math.max(size.x, size.z) * 0.34));
-      const cameraY = center.y + Math.max(80, Math.min(180, size.y * 0.18));
-      const cameraX = center.x + (bridgeRunsAlongX ? 0 : sideDistance);
-      const cameraZ = center.z + (bridgeRunsAlongX ? sideDistance : 0);
+      const pyramidComplex = targets.some((mesh) => String(mesh?.userData?.landmarkKind || '') === 'pyramid');
+      const sideDistance = pyramidComplex
+        ? Math.max(420, Math.min(760, Math.max(size.x, size.z) * 0.58))
+        : Math.max(520, Math.min(980, Math.max(size.x, size.z) * 0.34));
+      const cameraY = center.y + (pyramidComplex
+        ? Math.max(105, Math.min(190, size.y * 0.72))
+        : Math.max(80, Math.min(180, size.y * 0.18)));
+      const cameraX = center.x + (pyramidComplex ? sideDistance : (bridgeRunsAlongX ? 0 : sideDistance));
+      const cameraZ = center.z + (pyramidComplex ? sideDistance * -0.78 : (bridgeRunsAlongX ? sideDistance : 0));
       const targetY = center.y + size.y * 0.06;
       const dx = center.x - cameraX;
       const dy = targetY - cameraY;
@@ -156,4 +167,172 @@ export async function captureDroneView(page, spec, result, outputDir) {
     mod?.ctx?.setTravelMode?.('drive', { source: 'world_matrix_visual', emitTutorial: false });
   }).catch(() => {});
   result.dronePresentation = presentation;
+}
+
+export async function captureTunnelPortalTraversal(page, spec, result, outputDir) {
+  const placeAtStage = async (stage, ratio = null) => page.evaluate(async ({ stageName, stationRatio }) => {
+    const mod = await import('/app/js/shared-context.js?v=55');
+    const ctx = mod?.ctx || {};
+    const tunnelRoads = (ctx.roads || []).filter((road) =>
+      road?.structureSemantics?.structureKind === 'tunnel' &&
+      Array.isArray(road.pts) && road.pts.length >= 2
+    );
+    const roadLength = (road) => road.pts.slice(0, -1).reduce((total, point, index) =>
+      total + Math.hypot(road.pts[index + 1].x - point.x, road.pts[index + 1].z - point.z), 0
+    );
+    tunnelRoads.sort((a, b) => roadLength(b) - roadLength(a));
+    const tunnel = tunnelRoads[0] || null;
+    if (!tunnel) return { stage: stageName, applied: false, reason: 'tunnel_missing' };
+
+    let road = tunnel;
+    let endpoint = null;
+    let targetDistance = roadLength(tunnel) * Number(stationRatio || 0);
+    if (stageName === 'exit') {
+      const candidates = ['start', 'end'].flatMap((side) =>
+        (tunnel.connectedFeatures?.[side] || []).map((entry) => ({ side, ...entry }))
+      ).filter((entry) =>
+        entry.feature &&
+        entry.feature?.structureSemantics?.terrainMode !== 'subgrade' &&
+        Array.isArray(entry.feature.pts) && entry.feature.pts.length >= 2
+      );
+      const connection = candidates[0] || null;
+      if (!connection) {
+        return {
+          stage: stageName,
+          applied: false,
+          reason: 'at_grade_portal_connection_missing',
+          tunnelLength: Number(roadLength(tunnel).toFixed(2))
+        };
+      }
+      road = connection.feature;
+      endpoint = connection.endpoint;
+      const length = roadLength(road);
+      targetDistance = endpoint === 'start' ? Math.min(8, length * 0.25) : Math.max(0, length - Math.min(8, length * 0.25));
+    }
+
+    const totalLength = roadLength(road);
+    const clampedDistance = Math.max(0, Math.min(totalLength, targetDistance));
+    let traversed = 0;
+    let segmentIndex = 0;
+    let t = 0;
+    for (let i = 0; i < road.pts.length - 1; i += 1) {
+      const segmentLength = Math.hypot(
+        road.pts[i + 1].x - road.pts[i].x,
+        road.pts[i + 1].z - road.pts[i].z
+      );
+      if (traversed + segmentLength >= clampedDistance || i === road.pts.length - 2) {
+        segmentIndex = i;
+        t = segmentLength > 0 ? (clampedDistance - traversed) / segmentLength : 0;
+        break;
+      }
+      traversed += segmentLength;
+    }
+    const start = road.pts[segmentIndex];
+    const end = road.pts[segmentIndex + 1];
+    const x = start.x + (end.x - start.x) * t;
+    const z = start.z + (end.z - start.z) * t;
+    const angle = Math.atan2(-(end.x - start.x), -(end.z - start.z));
+    const surfaceY = Number(ctx.sampleFeatureSurfaceY?.(road, x, z, { segIndex: segmentIndex, t }));
+    if (!Number.isFinite(surfaceY) || typeof ctx.applyResolvedWorldSpawn !== 'function') {
+      return { stage: stageName, applied: false, reason: 'surface_or_spawn_unavailable' };
+    }
+    ctx.setTravelMode?.('drive', { source: 'world_matrix_tunnel_portal', emitTutorial: false, force: true });
+    ctx.applyResolvedWorldSpawn({
+      valid: true,
+      mode: 'drive',
+      x,
+      z,
+      angle,
+      carY: surfaceY + 1.2,
+      walkY: surfaceY + 1.7,
+      onRoad: true,
+      road,
+      source: `world_matrix_tunnel_${stageName}`
+    }, { mode: 'drive' });
+    await new Promise((resolve) => window.setTimeout(resolve, 650));
+    const renderedY = ctx.GroundHeight?._raycastMeshY?.(ctx.roadMeshes || [], x, z, surfaceY + 2.2, 5);
+    const terrainY = ctx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y;
+    return {
+      stage: stageName,
+      applied: true,
+      endpoint,
+      ratio: Number.isFinite(stationRatio) ? stationRatio : null,
+      x: Number(x.toFixed(2)),
+      z: Number(z.toFixed(2)),
+      roadName: road.name || road.ref || null,
+      structureKind: road.structureSemantics?.structureKind || 'at_grade',
+      terrainMode: road.structureSemantics?.terrainMode || 'at_grade',
+      surfaceY: Number(surfaceY.toFixed(2)),
+      renderedY: Number.isFinite(renderedY) ? Number(renderedY.toFixed(2)) : null,
+      renderedDelta: Number.isFinite(renderedY) ? Number(Math.abs(renderedY - surfaceY).toFixed(2)) : null,
+      terrainY: Number.isFinite(terrainY) ? Number(terrainY.toFixed(2)) : null,
+      cameraY: Number(Number(ctx.camera?.position?.y || 0).toFixed(2)),
+      cameraAboveRoad: Number((Number(ctx.camera?.position?.y || 0) - surfaceY).toFixed(2)),
+      tunnelLength: Number(roadLength(tunnel).toFixed(2))
+    };
+  }, { stageName: stage, stationRatio: ratio });
+
+  const checkpoints = [];
+  checkpoints.push(await placeAtStage('entry', 0.08));
+  const entryVisual = await captureViewport(page, path.join(outputDir, `${spec.id}-tunnel-entry.png`));
+  checkpoints.push(await placeAtStage('interior_a', 0.3));
+  const movementStart = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    document.activeElement?.blur?.();
+    document.body?.focus?.();
+    return { x: Number(ctx.car?.x || 0), z: Number(ctx.car?.z || 0) };
+  });
+  await page.keyboard.down('ArrowUp');
+  await page.waitForTimeout(120);
+  const movementInput = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return {
+      keyActive: !!ctx.keys?.ArrowUp,
+      throttle: Number(ctx.readControlActions?.('drive')?.throttle || 0),
+      paused: !!ctx.paused,
+      gameStarted: !!ctx.gameStarted,
+      worldLoading: !!ctx.worldLoading,
+      travelMode: ctx.getCurrentTravelMode?.() || null,
+      speed: Number(ctx.car?.speed || 0)
+    };
+  });
+  await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    for (let frame = 0; frame < 90; frame += 1) ctx.update?.(1 / 60);
+  });
+  await page.waitForTimeout(300);
+  const movementRunning = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return {
+      keyActive: !!ctx.keys?.ArrowUp,
+      throttle: Number(ctx.readControlActions?.('drive')?.throttle || 0),
+      speed: Number(ctx.car?.speed || 0),
+      vFwd: Number(ctx.car?.vFwd || 0)
+    };
+  });
+  await page.keyboard.up('ArrowUp');
+  await page.waitForTimeout(300);
+  const movementEnd = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return {
+      x: Number(ctx.car?.x || 0),
+      z: Number(ctx.car?.z || 0),
+      structureKind: ctx.car?.road?.structureSemantics?.structureKind || null
+    };
+  });
+  checkpoints.push(await placeAtStage('interior_b', 0.5));
+  const interiorVisual = await captureViewport(page, path.join(outputDir, `${spec.id}-tunnel-interior.png`));
+  checkpoints.push(await placeAtStage('interior_c', 0.82));
+  checkpoints.push(await placeAtStage('exit'));
+  const exitVisual = await captureViewport(page, path.join(outputDir, `${spec.id}-tunnel-exit.png`));
+  result.tunnelPortalTraversal = {
+    checkpoints,
+    visuals: { entry: entryVisual, interior: interiorVisual, exit: exitVisual },
+    movement: {
+      distance: Number(Math.hypot(movementEnd.x - movementStart.x, movementEnd.z - movementStart.z).toFixed(2)),
+      remainedInTunnel: movementEnd.structureKind === 'tunnel',
+      input: movementInput,
+      running: movementRunning
+    }
+  };
 }
