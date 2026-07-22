@@ -21,13 +21,13 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Orbitron:wght@500;700;900&family=Righteous&display=swap" rel="stylesheet">
 <script src="../js/firebase-project-config.js"></script>
 <style>@layer legacy, interface;</style>
-<link rel="stylesheet" href="styles/title-shell.css?v=90">
-<link rel="stylesheet" href="styles/runtime-shell.css?v=87">
+<link rel="stylesheet" href="styles/title-shell.css?v=91">
+<link rel="stylesheet" href="styles/runtime-shell.css?v=91">
 <link rel="stylesheet" href="styles/block-builder.css?v=2">
 <link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
 <link rel="stylesheet" href="styles/interface-v4.css?v=8">
-<link rel="stylesheet" href="styles/start-hub.css?v=8">
+<link rel="stylesheet" href="styles/start-hub.css?v=11">
 </head>
 <body>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
@@ -345,29 +345,29 @@ Graphics changes apply to the current session.
 <div class="tab-content" id="tab-controls">
 <div class="ctrl-grid">
 <div class="ctrl-section">Driving</div>
-<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Drive / Steer</span></div>
-<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">WASD / Arrows</span><span class="ctrl-action">Drive / Steer</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Mouse / Right Stick</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Handbrake</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Ctrl</span><span class="ctrl-action">Boost</span></div>
 <div class="ctrl-section">Walking Mode</div>
-<div class="ctrl-row"><span class="ctrl-key">↑ / ↓</span><span class="ctrl-action">Walk Forward / Back</span></div>
-<div class="ctrl-row"><span class="ctrl-key">← / →</span><span class="ctrl-action">Turn Left / Right</span></div>
-<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">W/S or ↑/↓</span><span class="ctrl-action">Walk Forward / Back</span></div>
+<div class="ctrl-row"><span class="ctrl-key">A/D or ←/→</span><span class="ctrl-action">Turn Left / Right</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Mouse / Right Stick</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space at Wall</span><span class="ctrl-action">Climb / Wall Jump</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift</span><span class="ctrl-action">Run (2x speed)</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Right Click + Drag</span><span class="ctrl-action">Mouse Look</span></div>
 <div class="ctrl-section">Drone Controls</div>
-<div class="ctrl-row"><span class="ctrl-key">Arrow Keys</span><span class="ctrl-action">Fly / Turn</span></div>
-<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">WASD / Arrows</span><span class="ctrl-action">Fly / Turn</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Mouse / Right Stick</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Move Up</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Shift/Ctrl</span><span class="ctrl-action">Move Down</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Mouse</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-section">Plane Controls</div>
-<div class="ctrl-row"><span class="ctrl-key">↑ / ↓</span><span class="ctrl-action">Nose Down / Pull Up (Inverted)</span></div>
-<div class="ctrl-row"><span class="ctrl-key">← / →</span><span class="ctrl-action">Bank / Ground Steer</span></div>
+<div class="ctrl-row"><span class="ctrl-key">W/S or ↑/↓</span><span class="ctrl-action">Nose Down / Pull Up (Inverted)</span></div>
+<div class="ctrl-row"><span class="ctrl-key">A/D or ←/→</span><span class="ctrl-action">Bank / Ground Steer</span></div>
 <div class="ctrl-row"><span class="ctrl-key">X / Z</span><span class="ctrl-action">Increase / Reduce Throttle</span></div>
-<div class="ctrl-row"><span class="ctrl-key">WASD</span><span class="ctrl-action">Look Around</span></div>
+<div class="ctrl-row"><span class="ctrl-key">Mouse / Right Stick</span><span class="ctrl-action">Look Around</span></div>
 <div class="ctrl-row"><span class="ctrl-key">Space</span><span class="ctrl-action">Wheel Brake</span></div>
 <div class="ctrl-row"><span class="ctrl-key">C</span><span class="ctrl-action">Chase / Cockpit / Overhead</span></div>
 <div class="ctrl-row"><span class="ctrl-key">P</span><span class="ctrl-action">Enter / Exit Plane</span></div>
@@ -450,7 +450,7 @@ Graphics changes apply to the current session.
 </div>
 <div id="shareExperienceStatus"></div>
 <div class="title-license">
-Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Street imagery by Panoramax and KartaView contributors (CC BY-SA 4.0) · Aircraft observations by the OpenSky Network under provider terms · Imagery © Esri and source providers · ESA WorldCover 2021 / modified Copernicus Sentinel data (CC BY 4.0) · USGS earthquake data · CelesTrak orbital data · Weather and marine model data by Open-Meteo · NOAA CO-OPS water-level observations and tide predictions · Fonts under SIL OFL · API providers under their own terms · © 2026 Steven Reid. All Rights Reserved. · <a href="../about/" target="_blank">About</a> · <a href="../legal/terms" target="_blank">Terms</a> · <a href="../legal/privacy" target="_blank">Privacy</a>
+Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Street imagery by Panoramax and KartaView contributors (CC BY-SA 4.0) · Aircraft observations by ADSB.lol (ODbL); OpenSky is optional for authorized operators · Imagery © Esri and source providers · ESA WorldCover 2021 / modified Copernicus Sentinel data (CC BY 4.0) · USGS earthquake data · CelesTrak orbital data · Weather and marine model data by Open-Meteo · NOAA CO-OPS water-level observations and tide predictions · Fonts under SIL OFL · API providers under their own terms · World Explorer 3D code © 2026 Steven Reid, Apache-2.0 · <a href="../about/" target="_blank">About</a> · <a href="../legal/terms" target="_blank">Terms</a> · <a href="../legal/privacy" target="_blank">Privacy</a>
 </div>
 </div>
 </div>
@@ -473,6 +473,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 </div>
 <div class="globe-hub-tools" aria-label="Account and application tools">
 <button id="globeHubShareBtn" type="button" title="Share World Explorer" aria-label="Share World Explorer">↗</button>
+<button id="globeHubThemeBtn" type="button" title="Appearance: Auto" aria-label="Change appearance">◐</button>
 <button type="button" data-globe-destination="settings" title="Settings" aria-label="Open settings">⚙</button>
 <button type="button" data-globe-destination="controls" title="Controls" aria-label="Open controls">?</button>
 <button id="globeHubFullscreenBtn" type="button" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
@@ -487,6 +488,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <div class="globe-selector-stat-label">Selected Coordinates</div>
 <div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>
 <div id="globeSelectorPlace" class="globe-selector-stat-label" style="margin-top:4px">Click the globe to choose a location.</div>
+<button id="globeSaveFavoriteBtn" class="globe-save-favorite" type="button" title="Add selected place to favorites" aria-label="Add selected place to favorites" disabled>☆</button>
 </div>
 <div class="globe-selector-actions">
 <button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Close</button>
@@ -506,7 +508,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 </div>
 <div class="globe-selector-city-tabs" role="tablist" aria-label="City lists">
 <button id="globeNearbyTabBtn" class="globe-selector-city-tab active" type="button" data-city-tab="nearby">Nearby</button>
-<button id="globeFavoritesTabBtn" class="globe-selector-city-tab" type="button" data-city-tab="favorites">Favorites</button>
+<button id="globeFavoritesTabBtn" class="globe-selector-city-tab" type="button" data-city-tab="favorites">Library</button>
 </div>
 <div id="globeCityListHint" class="globe-selector-stat-label">Pick a point to see nearby cities.</div>
 <ul id="globeCityList" class="globe-selector-city-list">
@@ -531,19 +533,11 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <div class="globe-selector-hint">Drag to rotate · Scroll to zoom · Tap/Click to pick</div>
 </div>
 <div class="globe-destination-bar" aria-label="World destinations">
-  <button id="globeSelectorEarthBtn" class="active" type="button"><span class="destination-thumb earth" aria-hidden="true"></span>Earth</button>
-  <button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Go to Moon" aria-label="Launch Moon"><span class="destination-thumb moon" aria-hidden="true"></span>Moon</button>
-  <button id="globeSelectorMarsBtn" type="button" title="Go to Mars"><span class="destination-thumb mars" aria-hidden="true"></span>Mars</button>
-  <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Go to Space" aria-label="Launch Space"><span class="destination-thumb space" aria-hidden="true"></span>Space</button>
-  <button id="globeSelectorOceanBtn" type="button" title="Explore the ocean"><span class="destination-thumb ocean" aria-hidden="true"></span>Ocean</button>
-</div>
-<div class="globe-system-bar" aria-label="Data status">
-  <span><b>Satellites</b><em>Observed</em></span>
-  <span><b>Aircraft</b><em>OpenSky</em></span>
-  <span><b>Marine traffic</b><em>Reference</em></span>
-  <span><b>Weather</b><em>Current</em></span>
-  <span><b>USGS earthquakes</b><em>Live data</em></span>
-  <span><b>OSM data</b><em>Up to date</em></span>
+  <button id="globeSelectorEarthBtn" class="active" type="button" title="Travel to Earth" aria-label="Travel to Earth"><span class="destination-thumb earth" aria-hidden="true"></span><span class="destination-label">Earth</span></button>
+  <button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Travel to Moon" aria-label="Travel to Moon"><span class="destination-thumb moon" aria-hidden="true"></span><span class="destination-label">Moon</span></button>
+  <button id="globeSelectorMarsBtn" type="button" title="Travel to Mars" aria-label="Travel to Mars"><span class="destination-thumb mars" aria-hidden="true"></span><span class="destination-label">Mars</span></button>
+  <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Travel to Space" aria-label="Travel to Space"><span class="destination-thumb space" aria-hidden="true"></span><span class="destination-label">Space</span></button>
+  <button id="globeSelectorOceanBtn" type="button" title="Travel to Ocean" aria-label="Travel to Ocean"><span class="destination-thumb ocean" aria-hidden="true"></span><span class="destination-label">Ocean</span></button>
 </div>
 <section id="globeHubOverlay" class="globe-hub-overlay" hidden aria-hidden="true">
   <header class="globe-hub-overlay-header">
@@ -1282,7 +1276,7 @@ Explore the area
 <section id="activityCreatorPanel" aria-label="Activity creator panel">
   <div class="activityCreatorTopBar">
     <div class="activityCreatorTitleWrap">
-      <div id="activityCreatorTitle">Activity Creator Beta</div>
+      <div id="activityCreatorTitle">Activity Creator</div>
       <div id="activityCreatorSubline">Place anchors directly in the 3D world for routes, zones, dock points, and collectibles.</div>
     </div>
     <div class="activityCreatorHeaderActions">
@@ -1499,7 +1493,7 @@ Explore the area
 <b>🚗 Driving Mode:</b><br>
 • Arrow Up/Down - Drive forward / reverse<br>
 • Arrow Left/Right - Steer left / right<br>
-• WASD - Look around; chase view recenters automatically<br>
+• WASD, mouse, touch look pad, or right stick - Look around; chase view recenters automatically<br>
 • Space - Handbrake<br>
 • Ctrl - Boost<br>
 • C - Camera view<br>
@@ -1512,7 +1506,7 @@ Explore the area
 <b>🚤 Boat Mode:</b><br>
 • Arrow Up/Down - Throttle / Reverse<br>
 • Arrow Left/Right - Steer<br>
-• WASD - Look around<br>
+• WASD, mouse, touch look pad, or right stick - Look around<br>
 • Space - Brake / Hold position<br>
 • G - Enter / exit boat travel<br>
 • C - Camera view<br>
@@ -1526,6 +1520,7 @@ Explore the area
 • Arrow Up/Down - Move forward / back<br>
 • Arrow Left/Right - Turn left / right<br>
 • WASD - Look around<br>
+• Mouse, touch look pad, or right stick - Look around<br>
 • E - Enter/exit building interior<br>
 • Space - Jump<br>
 • Space at a wall - Climb / wall jump<br>
@@ -1540,6 +1535,7 @@ Explore the area
 • Arrow Up/Down - Fly forward / back<br>
 • Arrow Left/Right - Turn left / right<br>
 • WASD - Look around<br>
+• Mouse, touch look pad, or right stick - Look around<br>
 • Mouse - Look around<br>
 • Space - Fly up<br>
 • Shift/Ctrl - Fly down<br>
@@ -1552,7 +1548,7 @@ Explore the area
 • Arrow Left/Right - Bank or ground steer<br>
 • X/Z - Increase / reduce throttle<br>
 • Space - Wheel brake on the ground<br>
-• WASD - Look around<br>
+• WASD, mouse, touch look pad, or right stick - Look around<br>
 • C - Chase / cockpit / overhead camera<br>
 • P - Enter / exit plane mode<br>
 </div>
@@ -1596,7 +1592,8 @@ Explore the area
 </div>
 
 <!-- Real Estate System -->
-<script type="module" src="js/app-shell-fragments.js?v=84"></script>
+<script src="vendor/colyseus-sdk.js?v=1"></script>
+<script type="module" src="js/app-shell-fragments.js?v=85"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=287"></script>
+<script type="module" src="js/bootstrap.js?v=304"></script>
 </body></html>

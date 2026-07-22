@@ -207,6 +207,81 @@ async function assertLandscapeShell(browser, baseUrl) {
   await context.close();
 }
 
+async function assertMobileEnvironmentShell(browser, baseUrl, spec) {
+  const context = await browser.newContext(contextOptions(devices.android));
+  const page = await context.newPage();
+  await page.goto(`${baseUrl}/app/?mobile-environment=${spec.id}-${Date.now()}`, { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await waitForRuntime(page);
+  await page.locator('#globeSelectorScreen.show').waitFor({ state: 'visible', timeout: 90000 });
+  if (spec.boat) {
+    await page.locator('#globeCustomLat').fill('30');
+    await page.locator('#globeCustomLon').fill('-40');
+    await page.locator('#globeSelectorStartBtn').tap();
+  } else {
+    await page.locator(spec.selector).tap();
+  }
+  await page.waitForFunction(async ({ expectedEnv, boat }) => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    if (boat) return ctx.getEnv?.() === ctx.ENV?.EARTH && ctx.boatMode?.active && ctx.boatMode?.mesh?.visible && !ctx.worldLoading;
+    return ctx.getEnv?.() === ctx.ENV?.[expectedEnv] && (
+      expectedEnv === 'SPACE_FLIGHT' ? ctx.spaceFlight?.active :
+      expectedEnv === 'OCEAN' ? ctx.oceanMode?.active :
+      expectedEnv === 'MOON' ? ctx.onMoon :
+      expectedEnv === 'MARS' ? ctx.onMars : false
+    );
+  }, { expectedEnv: spec.env, boat: !!spec.boat }, { timeout: spec.boat ? 180000 : 90000 });
+  {
+    const deadline = Date.now() + 90000;
+    let stableSamples = 0;
+    while (Date.now() < deadline && stableSamples < 6) {
+      const stable = await page.evaluate(async ({ expectedEnv, boat }) => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        const loading = document.getElementById('loading');
+        const ownerReady = boat
+          ? ctx.getEnv?.() === ctx.ENV?.EARTH && ctx.boatMode?.active && ctx.boatMode?.mesh?.visible
+          : ctx.getEnv?.() === ctx.ENV?.[expectedEnv] && (
+            expectedEnv === 'SPACE_FLIGHT' ? ctx.spaceFlight?.active :
+            expectedEnv === 'OCEAN' ? ctx.oceanMode?.active :
+            expectedEnv === 'MOON' ? ctx.onMoon :
+            expectedEnv === 'MARS' ? ctx.onMars : false
+          );
+        return ownerReady && !ctx.worldLoading && !loading?.classList.contains('show') && getComputedStyle(loading).display === 'none';
+      }, { expectedEnv: spec.env, boat: !!spec.boat });
+      stableSamples = stable ? stableSamples + 1 : 0;
+      if (stableSamples < 6) await page.waitForTimeout(250);
+    }
+    assert(stableSamples === 6, `${spec.id} endpoint did not remain ready for six consecutive samples`);
+  }
+  await page.waitForTimeout(900);
+  const state = await page.evaluate(async ({ expectedEnv, boat }) => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const controls = document.getElementById('mobileTouchControls');
+    const visibleCanvases = [...document.querySelectorAll('canvas')].filter((canvas) => getComputedStyle(canvas).display !== 'none');
+    return {
+      env: ctx.getEnv?.(),
+      boatActive: !!ctx.boatMode?.active,
+      travelMode: ctx.getCurrentTravelMode?.() || '',
+      boatSnapshot: ctx.getBoatModeSnapshot?.() || null,
+      loading: !!ctx.worldLoading,
+      controlsVisible: !!controls?.classList.contains('show'),
+      controlsMode: controls?.dataset.mode || '',
+      visibleCanvases: visibleCanvases.length,
+      viewportFits: document.documentElement.scrollWidth <= innerWidth + 1,
+      fatal: /Startup failed|Renderer Creation Failed|Failed to create 3D renderer/i.test(document.body.innerText),
+      expectedEnv,
+      boat
+    };
+  }, { expectedEnv: spec.env, boat: !!spec.boat });
+  await page.screenshot({ path: path.join(outputDir, `android-${spec.id}.png`) });
+  assert(state.env === spec.env, `${spec.id} resolved to ${state.env}`);
+  assert(!spec.boat || state.boatActive, `${spec.id} did not retain Boat ownership: ${JSON.stringify(state)}`);
+  assert(state.controlsVisible, `${spec.id} did not expose mobile controls`);
+  assert(state.visibleCanvases >= 1, `${spec.id} has no visible canvas`);
+  assert(state.viewportFits, `${spec.id} overflows the mobile viewport`);
+  assert(!state.fatal, `${spec.id} displayed a renderer failure`);
+  await context.close();
+}
+
 async function main() {
   await fs.mkdir(outputDir, { recursive: true });
   const hostedBaseUrl = String(process.env.TEST_BASE_URL || '').replace(/\/$/, '');
@@ -214,7 +289,9 @@ async function main() {
   const baseUrl = hostedBaseUrl || `http://${host}:${server.port}`;
   const browser = await chromium.launch({ headless: true });
   const errors = [];
+  const environmentFilter = String(process.env.MOBILE_CONTROL_SCENARIO || '').trim().toLowerCase();
   try {
+    if (!environmentFilter) {
     console.log('[mobile-controls] iPhone title touch');
     const iphone = await browser.newContext(contextOptions(devices.iphone));
     const iphonePage = await iphone.newPage();
@@ -230,23 +307,47 @@ async function main() {
     await androidPage.screenshot({ path: path.join(outputDir, 'android-bootstrap.png') });
     await assertDockHitTargets(androidPage);
     await switchMode(androidPage, '#fDriving', 'drive');
-    await switchMode(androidPage, '#fDrone', 'drone');
-    await switchMode(androidPage, '#fPlane', 'plane');
-    await switchMode(androidPage, '#fWalk', 'walk');
-    await assertDockMenus(androidPage);
     await assertHeldMovement(androidPage);
+    await androidPage.screenshot({ path: path.join(outputDir, 'android-drive.png') });
+    await switchMode(androidPage, '#fDrone', 'drone');
+    await assertHeldMovement(androidPage);
+    await androidPage.screenshot({ path: path.join(outputDir, 'android-drone.png') });
+    await switchMode(androidPage, '#fPlane', 'plane');
+    await assertHeldMovement(androidPage);
+    await androidPage.screenshot({ path: path.join(outputDir, 'android-plane.png') });
+    await switchMode(androidPage, '#fWalk', 'walk');
+    await assertHeldMovement(androidPage);
+    await androidPage.screenshot({ path: path.join(outputDir, 'android-walk.png') });
+    await assertDockMenus(androidPage);
     await androidPage.screenshot({ path: path.join(outputDir, 'android-portrait.png') });
     await assertMainMenuReturn(androidPage);
     await android.close();
 
     console.log('[mobile-controls] iPhone landscape Earth bootstrap');
     await assertLandscapeShell(browser, baseUrl);
+    }
+
+    const environments = [
+      { id: 'boat', env: 'EARTH', boat: true },
+      { id: 'ocean', env: 'OCEAN', selector: '#globeSelectorOceanBtn' },
+      { id: 'space', env: 'SPACE_FLIGHT', selector: '#globeSelectorSpaceBtn' },
+      { id: 'moon', env: 'MOON', selector: '#globeSelectorMoonBtn' },
+      { id: 'mars', env: 'MARS', selector: '#globeSelectorMarsBtn' }
+    ].filter((environment) => !environmentFilter || environment.id === environmentFilter);
+    for (const environment of environments) {
+      console.log(`[mobile-controls] Android ${environment.id} endpoint`);
+      await assertMobileEnvironmentShell(browser, baseUrl, environment);
+    }
   } finally {
     await browser.close();
     await server?.close();
   }
   assert(errors.length === 0, `Mobile page errors: ${errors.join(' | ')}`);
-  console.log(JSON.stringify({ ok: true, devices: ['iPhone portrait', 'Android portrait', 'iPhone landscape'] }, null, 2));
+  console.log(JSON.stringify({
+    ok: true,
+    devices: ['iPhone portrait', 'Android portrait', 'iPhone landscape'],
+    mobileEnvironmentEndpoints: ['boat', 'ocean', 'space', 'moon', 'mars']
+  }, null, 2));
 }
 
 main().catch((error) => {

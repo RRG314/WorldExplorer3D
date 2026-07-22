@@ -2,7 +2,7 @@ import {
   normalizeBlockMaterial,
   normalizeBlockRotation,
   normalizeBlockShape
-} from './catalog.js?v=1';
+} from './catalog.js?v=4';
 
 export function createSharedBlockSync(options = {}) {
   const { blockKey, onRefresh, toVerticalGridCoord } = options;

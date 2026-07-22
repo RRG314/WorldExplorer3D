@@ -1,6 +1,6 @@
 # Data Sources
 
-Last reviewed: 2026-07-20 for version 3.1.0.
+Last reviewed: 2026-07-22 for version 4.0.0.
 
 World Explorer keeps source identity and truth type in its runtime contracts. Observations, forecasts/models, predictions, mapped features, and visual fallbacks are not interchangeable.
 
@@ -25,8 +25,8 @@ Required map attribution: `© OpenStreetMap contributors`.
 | --- | --- | --- | --- |
 | CelesTrak GP data | Satellite positions propagated from current orbital elements | Observed orbital elements / propagated position | Two-hour shared cache; partial groups can degrade independently |
 | USGS GeoJSON earthquake feed | Recent earthquake locations and magnitudes | Observed events | Five-minute shared cache |
-| OpenSky Network | Aircraft state vectors near the selected location | Observed state vectors | Same-origin server adapter; hosting egress and provider terms apply |
-| ADSB.lol | Fallback aircraft observations when OpenSky is unavailable | Observed ADS-B state vectors | Same-origin server adapter; ODbL 1.0; provider availability and rate limits apply |
+| ADSB.lol | Default aircraft observations near the selected location | Observed ADS-B state vectors | Same-origin server adapter; ODbL 1.0; provider availability and rate limits apply |
+| OpenSky Network | Optional aircraft state vectors for authorized operators | Observed state vectors | Disabled by default; enable only after obtaining any written operational agreement required by OpenSky |
 | Open-Meteo Forecast API | Current weather samples | Modeled current conditions | Ten-minute shared cache |
 | Open-Meteo Marine API | Wave, current, temperature, and sea-level guidance | Modeled marine guidance | Fifteen-minute shared cache |
 | NOAA CO-OPS | Water-level station metadata and observations | Observed station data | Coverage is station-dependent; datum and quality are retained |
@@ -53,7 +53,7 @@ When authoritative coverage is missing or a provider is unavailable, the app may
 ## Provider Boundaries
 
 - Browser clients do not receive private provider credentials.
-- Panoramax, KartaView, OpenSky, and ADSB.lol requests use allowlisted same-origin server adapters.
+- Panoramax, KartaView, and ADSB.lol requests use allowlisted same-origin server adapters. Optional OpenSky requests use the same boundary only when explicitly enabled by an authorized operator.
 - Provider requests use bounded caches, timeouts, in-flight deduplication, and health diagnostics.
 - Production Firebase, payment, and administrative credentials are never included in this repository.
 

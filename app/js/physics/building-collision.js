@@ -20,9 +20,10 @@ function createBuildingCollisionQuery(appCtx) {
     for (let i = 0; i < candidates.length; i += 1) {
       const building = candidates[i];
       if (!building || building.collisionDisabled) continue;
+      const collisionRadius = building.collisionKind === 'barrier' ? Math.min(carRadius, 0.95) : carRadius;
       if (!buildingVerticalRangeOverlap(building, actorBaseY, actorHeight)) continue;
-      if (x < building.minX - carRadius || x > building.maxX + carRadius ||
-        z < building.minZ - carRadius || z > building.maxZ + carRadius) continue;
+      if (x < building.minX - collisionRadius || x > building.maxX + collisionRadius ||
+        z < building.minZ - collisionRadius || z > building.maxZ + collisionRadius) continue;
 
       const hasPolygon = Array.isArray(building.pts) && building.pts.length >= 3;
       const isInside = hasPolygon
@@ -81,7 +82,7 @@ function createBuildingCollisionQuery(appCtx) {
         }
       }
 
-      if ((isInside || nearestEdgeDist < carRadius) && nearestEdgeInfo) {
+      if ((isInside || nearestEdgeDist < collisionRadius) && nearestEdgeInfo) {
         return {
           collision: true,
           building,
@@ -90,7 +91,7 @@ function createBuildingCollisionQuery(appCtx) {
           nearestPoint: { x: nearestEdgeInfo.nearestX, z: nearestEdgeInfo.nearestZ },
           pushX: nearestEdgeInfo.pushX,
           pushZ: nearestEdgeInfo.pushZ,
-          penetration: carRadius - nearestEdgeDist
+          penetration: collisionRadius - nearestEdgeDist
         };
       }
     }

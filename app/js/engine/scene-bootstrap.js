@@ -312,6 +312,7 @@ function addSkyVisuals(appCtx, gpuTier) {
   ground.position.y = -0.1;
   ground.receiveShadow = true;
   ground.userData.isGroundPlane = true;
+  appCtx.groundFallbackMesh = ground;
   appCtx.scene.add(ground);
 }
 

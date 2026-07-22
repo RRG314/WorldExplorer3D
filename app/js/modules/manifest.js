@@ -1,4 +1,4 @@
-const CACHE_BUST = 'v=348';
+const CACHE_BUST = 'v=365';
 
 export const vendorScriptsCritical = [
   'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',

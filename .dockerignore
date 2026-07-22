@@ -1,0 +1,12 @@
+.git
+.firebase
+.playwright-cli
+node_modules
+functions/node_modules
+dist
+output
+test-results
+coverage
+*.log
+.env
+.env.*

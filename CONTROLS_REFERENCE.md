@@ -1,13 +1,15 @@
 # Controls Reference
 
-Last reviewed: 2026-03-13
+Last reviewed: 2026-07-21
 
 Canonical control map for current runtime behavior.
 
 ## Global Controls
 
-- `F`: toggle Walk/Drive mode
-- `6`: toggle Drone mode
+- `F`: cycle Drive, Walk, and Drone modes
+- `P`: enter or exit Plane mode
+- `G`: enter or exit Boat mode when suitable water is available
+- `E`: use the current nearby interaction, including building entry
 - `C`: cycle camera mode
 - `M`: toggle large map
 - `N`: next city
@@ -26,8 +28,8 @@ Canonical control map for current runtime behavior.
 - `D` / `ArrowRight`: steer right
 - `Space`: handbrake / drift trigger at speed
 - `Ctrl`: boost
-- `Shift`: off-road modifier
 - `V`: look back
+- mouse drag / controller right stick: camera look
 
 Handling note:
 
@@ -35,10 +37,8 @@ Handling note:
 
 ## Walking Mode
 
-- `W` / `S`: move forward/back
-- `A` / `D`: strafe left/right
-- `ArrowLeft` / `ArrowRight`: look left/right
-- `ArrowUp` / `ArrowDown`: look up/down
+- `W` / `S` or `ArrowUp` / `ArrowDown`: move forward/back
+- `A` / `D` or `ArrowLeft` / `ArrowRight`: turn left/right
 - `E`: enter/exit a supported building interior when the prompt is visible
 - `Space`: jump
 - `Shift`: run
@@ -51,12 +51,22 @@ Walking/navigation note:
 
 ## Drone Mode
 
-- `W` / `S`: move forward/back
-- `A` / `D`: strafe left/right
+- `W` / `S` or `ArrowUp` / `ArrowDown`: move forward/back
+- `A` / `D` or `ArrowLeft` / `ArrowRight`: turn left/right
 - `Space`: ascend
 - `Shift` or `Ctrl`: descend
-- `ArrowUp` / `ArrowDown`: pitch
-- `ArrowLeft` / `ArrowRight`: yaw
+- mouse drag / controller right stick: camera look
+
+## Plane Mode
+
+- `W` / `ArrowUp`: nose down
+- `S` / `ArrowDown`: pull up
+- `A` / `ArrowLeft`: bank or ground-steer left
+- `D` / `ArrowRight`: bank or ground-steer right
+- `X` / `Z`: increase/reduce throttle
+- `Space`: wheel brake on the ground
+- `C`: cycle chase, cockpit, and overhead cameras
+- mouse drag / controller right stick: camera look
 
 ## Rocket/Space Flight Mode
 
@@ -110,6 +120,7 @@ Walking/navigation note:
 Virtual controls adapt by mode:
 
 - driving profile
-- walking profile (`WASD` movement on left pad, arrows-style look on right pad)
-- drone profile (`WASD` movement on left pad, arrows-style look on right pad)
+- walking profile (directional movement on the left pad, camera look on the right pad)
+- drone profile (directional flight on the left pad, camera look on the right pad)
+- plane profile (inverted pitch/bank on the left pad, camera look on the right pad)
 - rocket profile

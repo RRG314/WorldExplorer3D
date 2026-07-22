@@ -6,32 +6,33 @@ import './config.js?v=59';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
-import './runtime-diagnostics.js?v=14';
+import './runtime-diagnostics.js?v=16';
 import './state.js?v=60';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
 import './location-session.js?v=2';
-import './controls/action-input.js?v=1';
+import './controls/action-input.js?v=3';
 import './transport/actor-contract.js?v=2';
 import './world/collection-registry.js?v=1';
-import './perf.js?v=56';
+import './perf.js?v=57';
 import './env.js?v=57';
 import './session-coordinator.js?v=2';
 import './real-estate.js?v=55';
-import './ground.js?v=68';
-import './terrain.js?v=129';
-import './world.js?v=208';
+import './ground.js?v=70';
+import './terrain.js?v=137';
+import './world.js?v=216';
 import './earth-streaming.js?v=22';
 import './world/streaming-vector-chunks.js?v=52';
-import './world/load-continuous-world.js?v=3';
-import './world/streaming-aerial-context.js?v=26';
+import './world/load-continuous-world.js?v=4';
+import './world/streaming-aerial-context.js?v=27';
 import './earth-origin.js?v=4';
 import './building-entry.js?v=4';
 import './interiors.js?v=9';
-import { init, tryEnablePostProcessing } from './engine.js?v=78';
-import './physics.js?v=77';
+import './multiplayer/room-world-patches.js?v=1';
+import { init, tryEnablePostProcessing } from './engine.js?v=79';
+import './physics.js?v=78';
 import './walking.js?v=65';
-import './travel-mode.js?v=11';
+import './travel-mode.js?v=12';
 import { initBoatMode } from './boat-mode.js?v=28';
 import { setupFishingGame } from './fishing-game.js?v=2';
 import './sky.js?v=79';
@@ -49,14 +50,14 @@ import './planetary/tracks.js?v=1';
 import './ocean.js?v=5';
 import './game.js?v=58';
 import './input.js?v=59';
-import './hud.js?v=68';
+import './hud.js?v=71';
 import './map.js?v=58';
-import { renderLoop } from './main.js?v=67';
-import './memory.js?v=55';
-import './blocks.js?v=60';
-import './block-builder/ui.js?v=2';
+import { renderLoop } from './main.js?v=70';
+import './memory.js?v=56';
+import './blocks.js?v=63';
+import './block-builder/ui.js?v=3';
 import './flower-challenge.js?v=56';
-import { setupUI } from './ui.js?v=102';
+import { setupUI } from './ui.js?v=106';
 
 let _booted = false;
 let _lastObservedAuthUser = null;
@@ -115,7 +116,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'activity-creator', category: 'gameplay-authoring',
         load: async () => {
-            const mod = await import('./activity-editor/session.js?v=11');
+            const mod = await import('./activity-editor/session.js?v=13');
             mod.initActivityCreator?.();
             return mod;
         }
@@ -123,7 +124,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'activity-discovery', category: 'discovery',
         load: async () => {
-            const mod = await import('./activity-discovery/session.js?v=5');
+            const mod = await import('./activity-discovery/session.js?v=6');
             mod.initActivityDiscovery?.();
             return mod;
         }
@@ -139,7 +140,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'analytics', category: 'telemetry',
         load: async () => {
-            const mod = await import('../../js/analytics.js?v=1');
+            const mod = await import('../../js/analytics.js?v=4');
             if (typeof mod.getAnalyticsSessionSnapshot === 'function') {
                 appCtx.getAnalyticsSessionSnapshot = () => mod.getAnalyticsSessionSnapshot(appCtx);
             }
@@ -158,7 +159,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'multiplayer', category: 'social',
         load: async () => {
-            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=74');
+            const { initMultiplayerPlatform } = await import('./multiplayer/ui-room.js?v=84');
             const api = initMultiplayerPlatform({ getScene: () => appCtx.scene });
             api?.setAuthUser?.(_lastObservedAuthUser || getCurrentUser() || null);
             return api;
@@ -238,7 +239,7 @@ function scheduleTutorialInit() {
     _tutorialInitPromise = new Promise((resolve) => {
         scheduleIdleTask(async () => {
             try {
-                const mod = await import('./tutorial/tutorial.js?v=2');
+                const mod = await import('./tutorial/tutorial.js?v=4');
                 if (typeof mod.initTutorial === 'function') mod.initTutorial();
             } catch (error) {
                 console.warn('[boot] Tutorial init deferred import failed.', error);
@@ -393,6 +394,12 @@ function registerLazySubsystemEntrypoints() {
         return typeof mod.getAnalyticsSessionSnapshot === 'function'
             ? mod.getAnalyticsSessionSnapshot(appCtx)
             : appCtx.getAnalyticsSessionSnapshot();
+    };
+    appCtx.recordProductEvent = async (category, params = {}) => {
+        const mod = await ensureAnalyticsModule();
+        return typeof mod.recordProductEvent === 'function'
+            ? mod.recordProductEvent(category, params)
+            : false;
     };
     appCtx.scheduleActivityDiscoveryWarmup = scheduleActivityDiscoveryWarmup;
     appCtx.ensureOverlayRuntimeReady = ensureOverlayRuntimeLayer;

@@ -1,11 +1,24 @@
 import { observeAuth } from './auth-ui.js';
 import { initFirebaseAnalytics, readFirebaseConfig } from './firebase-init.js';
+import {
+  sanitizeAnalyticsName,
+  sanitizeProductParams,
+  updateVisitContext
+} from './analytics-contract.js?v=1';
 
 const ANALYTICS_EVENT_WORLD_START = 'we3d_world_session_start';
 const ANALYTICS_EVENT_WORLD_END = 'we3d_world_session_end';
 const ANALYTICS_EVENT_MODE_CHANGE = 'we3d_travel_mode_change';
 const ANALYTICS_EVENT_ENV_CHANGE = 'we3d_environment_change';
 const ANALYTICS_EVENT_RUNTIME_READY = 'we3d_runtime_ready';
+const ANALYTICS_EVENT_VISIT = 'we3d_visit';
+const ANALYTICS_PRODUCT_EVENTS = Object.freeze({
+  load: 'we3d_world_load',
+  room: 'we3d_room_event',
+  progression: 'we3d_progress_event',
+  creator: 'we3d_creator_event',
+  support: 'we3d_support_event'
+});
 const ANALYTICS_POLL_MS = 2000;
 const ANALYTICS_MAX_SESSION_SEC = 24 * 60 * 60;
 
@@ -20,9 +33,9 @@ const state = {
   enabled: false,
   ready: false,
   measurementId: '',
-  currentUserId: '',
   runtimeStartedAt: 0,
   runtimeReadyLogged: false,
+  visitLogged: false,
   worldSessionActive: false,
   worldSessionStartedAt: 0,
   worldSessionCount: 0,
@@ -34,19 +47,6 @@ const state = {
   lastReason: '',
   errors: []
 };
-
-function sanitizeAnalyticsName(value, fallback = 'unknown', max = 40) {
-  const normalized = String(value || '')
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9_ -]/g, '')
-    .replace(/\s+/g, '_')
-    .replace(/-+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, max);
-  return normalized || fallback;
-}
 
 function clampDurationSec(value) {
   const seconds = Math.round(Number(value) || 0);
@@ -116,7 +116,6 @@ async function ensureAnalyticsTools() {
     analyticsTools = {
       analytics,
       logEvent: analyticsMod.logEvent,
-      setUserId: analyticsMod.setUserId,
       setUserProperties: analyticsMod.setUserProperties
     };
     state.enabled = true;
@@ -146,16 +145,28 @@ async function logAnalyticsEvent(eventName, params = {}) {
   }
 }
 
+async function recordProductEvent(category, params = {}) {
+  const eventName = ANALYTICS_PRODUCT_EVENTS[String(category || '').toLowerCase()];
+  if (!eventName) return false;
+  return logAnalyticsEvent(eventName, sanitizeProductParams(params));
+}
+
+async function logVisitContext() {
+  if (state.visitLogged || typeof localStorage === 'undefined') return;
+  state.visitLogged = true;
+  const visit = updateVisitContext(localStorage);
+  if (!visit.new_visit) return;
+  await logAnalyticsEvent(ANALYTICS_EVENT_VISIT, visit);
+}
+
 async function syncAnalyticsUser(user = null) {
   const tools = await ensureAnalyticsTools();
   if (!tools?.analytics) return;
   try {
-    tools.setUserId?.(tools.analytics, user?.uid || null);
     tools.setUserProperties?.(tools.analytics, {
       signed_in: !!user,
       auth_provider: user?.isAnonymous ? 'guest' : (user?.providerData?.[0]?.providerId || (user ? 'password' : 'none'))
     });
-    state.currentUserId = user?.uid || '';
   } catch (error) {
     state.errors.push(String(error?.message || error));
   }
@@ -268,6 +279,7 @@ function startAnalyticsTracking(appCtx) {
   state.measurementId = String(readFirebaseConfig()?.measurementId || '').trim();
 
   void ensureAnalyticsTools();
+  void logVisitContext();
   bindLifecycle(appCtx);
 
   authUnsubscribe = observeAuth((user) => {
@@ -302,7 +314,6 @@ function getAnalyticsSessionSnapshot(appCtx = null) {
     enabled: !!state.enabled,
     ready: !!state.ready,
     measurementId: state.measurementId || '',
-    currentUserId: state.currentUserId || '',
     trackingStarted,
     runtimeAgeSec: clampDurationSec((now - (state.runtimeStartedAt || now)) / 1000),
     worldSessionActive: !!state.worldSessionActive,
@@ -319,6 +330,7 @@ function getAnalyticsSessionSnapshot(appCtx = null) {
 
 export {
   getAnalyticsSessionSnapshot,
+  recordProductEvent,
   startAnalyticsTracking,
   stopAnalyticsTracking
 };

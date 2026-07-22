@@ -1,11 +1,11 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { fetchShortbreadTile } from "./shortbread-source.js?v=8";
+import { fetchShortbreadTile } from "./shortbread-source.js?v=9";
 import {
   buildStreamingBuildingVisuals,
   buildStreamingRoadVisuals,
   queueGeometryDisposal
 } from "./streaming-vector-chunks.js?v=52";
-import { SOURCE_PROFILE } from "./surface-contract.js?v=6";
+import { SOURCE_PROFILE } from "./surface-contract.js?v=7";
 
 function removeMeshesInPlace(source, removed) {
   if (!Array.isArray(source)) return [];
@@ -83,12 +83,21 @@ function aerialContextCenter({ center, enabled } = {}) {
   return enabled && Number.isFinite(center?.lat) && Number.isFinite(center?.lon) ? center : appCtx.LOC;
 }
 
+function aerialTravelModeActive() {
+  const mode = appCtx.getCurrentTravelMode?.();
+  return mode === 'plane' || mode === 'drone' || appCtx.planeMode?.active === true || appCtx.droneMode === true;
+}
+
 function initStreamingAerialContext() {
   if (typeof appCtx.registerEarthStreamLayer !== 'function' || appCtx._streamingAerialContextRegistered) return false;
   appCtx._streamingAerialContextRegistered = true;
   appCtx.aerialContextMeshes = Array.isArray(appCtx.aerialContextMeshes) ? appCtx.aerialContextMeshes : [];
   appCtx.unregisterStreamingAerialContext = appCtx.registerEarthStreamLayer('aerial-vector', {
-    activeWhen: () => !!appCtx.initialEarthWorldReady && appCtx.getContinuousWorldEnabled?.() !== true,
+    activeWhen: () => (
+      !!appCtx.initialEarthWorldReady &&
+      appCtx.getContinuousWorldEnabled?.() !== true &&
+      aerialTravelModeActive()
+    ),
     availableWhenDisabled: true,
     centerWhen: aerialContextCenter,
     loadChunk: loadAerialContextChunk,

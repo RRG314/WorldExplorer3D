@@ -2,7 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
 import { WORLD_TEST_LOCATIONS } from './world-test-locations.mjs';
-import { captureDroneView, captureViewport } from './world-matrix-visuals.mjs';
+import { captureDroneView, captureTunnelPortalTraversal, captureViewport } from './world-matrix-visuals.mjs';
 import { assertWorldMatrixLocation } from './world-matrix-assertions.mjs';
 import { startStaticRootServer } from './test-static-server.mjs';
 
@@ -192,6 +192,18 @@ async function loadLocation(page, spec) {
     }
     const baselineWaitMs = performance.now() - baselineWaitStartedAt;
 
+    const vegetationWaitStartedAt = performance.now();
+    const minimumVegetationFeatures = Number(locationSpec.minimumVegetationFeatures || 0);
+    if (minimumVegetationFeatures > 0) {
+      while (
+        Number(ctx.vegetationFeatures?.length || 0) < minimumVegetationFeatures &&
+        performance.now() - vegetationWaitStartedAt < 20000
+      ) {
+        await new Promise((resolve) => window.setTimeout(resolve, 200));
+      }
+    }
+    const vegetationWaitMs = performance.now() - vegetationWaitStartedAt;
+
     let walkSwitchMs = 0;
     let driveSwitchMs = 0;
     if (exerciseModes && expectedStart !== 'water') {
@@ -277,6 +289,7 @@ async function loadLocation(page, spec) {
     const terrainProfiles = {};
     const terrainVisualModes = {};
     const terrainProfileSamples = [];
+    const terrainTiles = [];
     for (const mesh of ctx.terrainGroup?.children || []) {
       if (!mesh?.userData?.isTerrainMesh) continue;
       const profile = mesh.userData?.terrainVisualProfile || {};
@@ -293,6 +306,18 @@ async function loadLocation(page, spec) {
         reason,
         distance: Number(Math.hypot(Number(mesh.position?.x || 0) - actorX, Number(mesh.position?.z || 0) - actorZ).toFixed(1)),
         localSignals: profile.localSignals || null
+      });
+      const positions = mesh.geometry?.attributes?.position;
+      const segments = Number(ctx.TERRAIN_SEGMENTS || 0);
+      const side = segments + 1;
+      const cornerIndices = [0, segments, segments * side, Math.min((side * side) - 1, Number(positions?.count || 1) - 1)];
+      terrainTiles.push({
+        key: mesh.userData?.terrainTileKey || null,
+        pending: !!mesh.userData?.pendingTerrainTile,
+        positionY: Number(Number(mesh.position?.y || 0).toFixed(2)),
+        minY: Number(Number(mesh.userData?.minElevation || 0).toFixed(2)),
+        maxY: Number(Number(mesh.userData?.maxElevation || 0).toFixed(2)),
+        corners: positions ? cornerIndices.map((index) => Number((positions.getY(index) + mesh.position.y).toFixed(2))) : []
       });
     }
     terrainProfileSamples.sort((a, b) => a.distance - b.distance);
@@ -591,6 +616,7 @@ async function loadLocation(page, spec) {
       buildingDetailWaitMs: Number(buildingDetailWaitMs.toFixed(1)),
       landmarkWaitMs: Number(landmarkWaitMs.toFixed(1)),
       baselineWaitMs: Number(baselineWaitMs.toFixed(1)),
+      vegetationWaitMs: Number(vegetationWaitMs.toFixed(1)),
       buildingDetail: ctx.worldDetailState?.buildings || null,
       walkSwitchMs: Number(walkSwitchMs.toFixed(1)),
       driveSwitchMs: Number(driveSwitchMs.toFixed(1)),
@@ -612,6 +638,7 @@ async function loadLocation(page, spec) {
       terrainProfiles,
       terrainVisualModes,
       terrainProfileSamples: terrainProfileSamples.slice(0, 5),
+      terrainTiles,
       worldCover: {
         stats: ctx.worldCoverStats ? JSON.parse(JSON.stringify(ctx.worldCoverStats)) : null,
         status: worldCoverStatus,
@@ -801,6 +828,10 @@ async function main() {
         }
         await page.waitForTimeout(800);
         result.visualDiagnostics = await captureViewport(page, path.join(outputDir, `${spec.id}.png`));
+        if (spec.expectedRoadStructure === 'tunnel') {
+          await captureTunnelPortalTraversal(page, spec, result, outputDir);
+          assertWorldMatrixLocation(spec, result);
+        }
         if (captureDroneViews && result.expectedStart !== 'water') {
           await captureDroneView(page, spec, result, outputDir);
           if (result.counts.buildings >= 1000 && Number(result.dronePresentation?.totalNearSources || 0) >= 100) {
@@ -815,7 +846,10 @@ async function main() {
         }
       } catch (err) {
         result.screenshotWarning = String(err?.message || err);
-        if (/drone LOD hid nearby building neighborhoods/.test(result.screenshotWarning)) {
+        if (
+          /drone LOD hid nearby building neighborhoods/.test(result.screenshotWarning) ||
+          spec.expectedRoadStructure === 'tunnel'
+        ) {
           result.assertionError = result.screenshotWarning;
           locationFailures.push(result.screenshotWarning);
         }

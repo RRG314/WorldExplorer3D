@@ -1,11 +1,11 @@
 import { createRoadNameResolver } from './streaming-road-labels.js?v=1';
+import Pbf from '../../vendor/vector-tile/pbf-3.2.1.mjs';
+import { VectorTile } from '../../vendor/vector-tile/mapbox-vector-tile-1.3.1.mjs';
 
 const SHORTBREAD_ZOOM = 14;
 const SHORTBREAD_FETCH_TIMEOUT_MS = 8000;
 const DEFAULT_TILE_TEMPLATE =
   'https://vector.openstreetmap.org/shortbread_v1/{z}/{x}/{y}.mvt';
-
-let vectorTileLibPromise = null;
 
 function tileTemplate() {
   const configured =
@@ -22,18 +22,7 @@ function tileUrl(z, x, y) {
 }
 
 export async function getVectorTileLib() {
-  if (vectorTileLibPromise) return vectorTileLibPromise;
-  vectorTileLibPromise = Promise.all([
-    import('https://cdn.jsdelivr.net/npm/pbf@3.2.1/+esm'),
-    import('https://cdn.jsdelivr.net/npm/@mapbox/vector-tile@1.3.1/+esm')
-  ]).then(([pbfMod, vtMod]) => ({
-    Pbf: pbfMod.default || pbfMod.Pbf,
-    VectorTile: vtMod.VectorTile
-  })).catch((err) => {
-    vectorTileLibPromise = null;
-    throw err;
-  });
-  return vectorTileLibPromise;
+  return { Pbf, VectorTile };
 }
 
 function latLonToTileFloat(lat, lon, zoom) {
@@ -296,17 +285,36 @@ async function fetchTileCoverage(lat, lon, radius, zoom) {
     lon + safeRadius,
     zoom
   );
-  const jobs = [];
+  const coordinates = [];
   for (let x = range.xMin; x <= range.xMax; x++) {
-    for (let y = range.yMin; y <= range.yMax; y++) jobs.push(fetchShortbreadTile(zoom, x, y));
+    for (let y = range.yMin; y <= range.yMax; y++) coordinates.push({ x, y });
   }
-  const settled = await Promise.allSettled(jobs);
+  let attempts = 1;
+  let settled = await Promise.allSettled(
+    coordinates.map(({ x, y }) => fetchShortbreadTile(zoom, x, y))
+  );
+  const failedCoordinates = coordinates.filter((_, index) => settled[index]?.status === 'rejected');
+  if (failedCoordinates.length > 0) {
+    attempts += 1;
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 250));
+    const retried = await Promise.allSettled(
+      failedCoordinates.map(({ x, y }) => fetchShortbreadTile(zoom, x, y))
+    );
+    let retryIndex = 0;
+    settled = settled.map((entry) => entry.status === 'fulfilled' ? entry : retried[retryIndex++]);
+  }
   const tiles = settled.filter((entry) => entry.status === 'fulfilled').map((entry) => entry.value);
   if (tiles.length === 0) {
     const reason = settled.find((entry) => entry.status === 'rejected')?.reason;
     throw new Error(`Shortbread coverage unavailable: ${reason?.message || reason || 'no tiles'}`);
   }
-  return { tiles, requestedTiles: jobs.length, bounds };
+  return {
+    tiles,
+    requestedTiles: coordinates.length,
+    failedTiles: coordinates.length - tiles.length,
+    attempts,
+    bounds
+  };
 }
 
 export async function fetchShortbreadWorldData(options = {}) {
@@ -314,7 +322,7 @@ export async function fetchShortbreadWorldData(options = {}) {
   const lon = Number(options.lon);
   if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('Shortbread location is invalid.');
   const includeBuildings = options.includeBuildings !== false;
-  const { tiles, requestedTiles, bounds } = await fetchTileCoverage(
+  const { tiles, requestedTiles, failedTiles, attempts, bounds } = await fetchTileCoverage(
     lat,
     lon,
     options.radius,
@@ -328,20 +336,37 @@ export async function fetchShortbreadWorldData(options = {}) {
     _overpassSource: 'shortbread-vector',
     _overpassEndpoint: tileTemplate(),
     _overpassCacheAgeMs: 0,
-    _shortbreadTiles: { loaded: tiles.length, requested: requestedTiles, zoom: SHORTBREAD_ZOOM }
+    _shortbreadTiles: {
+      loaded: tiles.length,
+      requested: requestedTiles,
+      failed: failedTiles,
+      attempts,
+      zoom: SHORTBREAD_ZOOM
+    }
   };
 }
 
 export async function fetchShortbreadBuildingData(options = {}) {
   const lat = Number(options.lat);
   const lon = Number(options.lon);
-  const { tiles, requestedTiles, bounds } = await fetchTileCoverage(lat, lon, options.radius, SHORTBREAD_ZOOM);
+  const { tiles, requestedTiles, failedTiles, attempts, bounds } = await fetchTileCoverage(
+    lat,
+    lon,
+    options.radius,
+    SHORTBREAD_ZOOM
+  );
   return {
     elements: convertTilesToElements(tiles, ['buildings'], bounds),
     _overpassSource: 'shortbread-vector-buildings',
     _overpassEndpoint: tileTemplate(),
     _overpassCacheAgeMs: 0,
-    _shortbreadTiles: { loaded: tiles.length, requested: requestedTiles, zoom: SHORTBREAD_ZOOM }
+    _shortbreadTiles: {
+      loaded: tiles.length,
+      requested: requestedTiles,
+      failed: failedTiles,
+      attempts,
+      zoom: SHORTBREAD_ZOOM
+    }
   };
 }
 

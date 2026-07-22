@@ -4,7 +4,7 @@ import { detectRoadIntersections } from "./intersections.js?v=1";
 import {
   buildFeatureRibbonEdges,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=16";
+} from "../structure-semantics.js?v=17";
 import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=2";
 
 const ROAD_SURFACE_BIAS = 0.08;

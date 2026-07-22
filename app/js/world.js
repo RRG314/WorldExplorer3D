@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=16";
+} from "./structure-semantics.js?v=17";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=19";
+} from "./world/spawn.js?v=20";
 import {
   scheduleDeferredStructureRefresh,
   scheduleDeferredWorldLinearFeatureLoad
@@ -65,7 +65,7 @@ import {
   scheduleDeferredPoiLoad,
   scheduleDeferredWorldDetailPasses,
   safeWorldLoadCall
-} from "./world/load-support.js?v=16";
+} from "./world/load-support.js?v=17";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -123,7 +123,7 @@ import {
   pointInPolygon,
   runtimeRoadFeatures,
   teleportToLocation
-} from "./world/navigation.js?v=2";
+} from "./world/navigation.js?v=4";
 import {
   buildTraversalNetworks,
   findNearestTraversalFeature,
@@ -139,7 +139,7 @@ import {
   initWorldVegetation,
   MAX_TREE_NODES,
   MAX_TREE_ROW_WAYS
-} from "./world/vegetation.js?v=6";
+} from "./world/vegetation.js?v=10";
 import {
   appendIndexedGeometry,
   decimatePoints,
@@ -168,13 +168,13 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=5";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=52";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=54";
 import {
   fetchShortbreadWorldData
-} from "./world/shortbread-source.js?v=8";
+} from "./world/shortbread-source.js?v=9";
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=6";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
-import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=22";
+import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=26";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 

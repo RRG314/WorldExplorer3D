@@ -1,9 +1,13 @@
 {
   "name": "worldexplorer3d",
-  "version": "3.1.0",
+  "version": "4.0.0",
   "description": "Browser-based 3D geospatial exploration app using OpenStreetMap-derived data for Earth and destination-mode exploration.",
   "type": "module",
   "main": "three.js",
+  "workspaces": [
+    "packages/*",
+    "server"
+  ],
   "scripts": {
     "dev": "node scripts/serve-local-preview.mjs",
     "test": "npm run test:rules && npm run test:runtime && npm run test:osm-smoke",
@@ -25,22 +29,36 @@
     "test:transport-controllers": "node scripts/test-transport-controller-registry.mjs",
     "test:platform-services": "node scripts/test-platform-service-registry.mjs",
     "test:geospatial": "node scripts/test-geospatial-data-fabric.mjs",
+    "test:open-source": "node scripts/test-open-source-distribution.mjs",
     "test:functions-runtime": "node scripts/test-functions-runtime.mjs",
     "test:operational-endpoints": "node scripts/test-operational-endpoints.mjs",
     "test:account-service": "node scripts/test-account-service.mjs",
     "test:gameplay-plugins": "node scripts/test-gameplay-plugin-registry.mjs",
+    "test:activity-platform": "node scripts/test-activity-platform.mjs",
     "test:local-data": "node scripts/test-local-data-safety.mjs",
     "test:mobile-controls": "node scripts/test-mobile-controls.mjs",
     "test:plane-interiors": "node scripts/test-plane-interior-lifecycle.mjs",
+    "test:earth-travel": "node scripts/test-earth-travel-lifecycle.mjs",
+    "test:water-travel": "node scripts/test-water-travel-lifecycle.mjs",
     "test:editor-multiplayer": "node scripts/test-editor-multiplayer-surfaces.mjs",
     "test:block-builder": "node scripts/test-block-builder-contract.mjs",
     "test:title-planetary": "node scripts/test-title-planetary-launches.mjs",
+    "test:planetary-runtime": "node scripts/test-planetary-runtime-lifecycle.mjs",
     "test:session-lifecycle": "node scripts/test-session-lifecycle.mjs",
+    "test:hardware-performance": "node scripts/test-hardware-performance.mjs",
     "test:surface-contract": "node scripts/test-surface-contract.mjs",
     "test:overture-source": "node scripts/test-overture-tile-source.mjs && node scripts/test-overture-streaming-source.mjs && node scripts/test-streaming-feature-budget.mjs && node scripts/test-render-provenance.mjs",
     "test:continuous-renderer": "node scripts/test-continuous-renderer.mjs",
     "test:retention": "node scripts/test-release-retention.mjs",
+    "test:analytics": "node --test scripts/test-analytics-contract.mjs",
     "test:world-matrix": "node scripts/test-world-matrix.mjs",
+    "test:mmo-contracts": "npm test --workspace @we3d/mmo-contracts",
+    "test:mmo-server": "npm test --workspace @we3d/mmo-server",
+    "test:mmo-firestore": "firebase emulators:exec --only firestore --project demo-we3d-mmo \"npm run test:firestore:emulator --workspace @we3d/mmo-server\"",
+    "test:mmo": "npm run test:mmo-contracts && npm run test:mmo-server",
+    "test:mmo-load": "node --expose-gc scripts/test-mmo-load.mjs",
+    "test:mmo-browser": "node scripts/test-mmo-browser-acceptance.mjs",
+    "dev:mmo-server": "npm run dev --workspace @we3d/mmo-server",
     "test:osm-smoke": "node scripts/test-osm-smoke.mjs",
     "runtime:verify": "node scripts/runtime-verify.mjs",
     "release:verify": "node scripts/release-verify.mjs",
@@ -63,7 +81,10 @@
     "world-exploration"
   ],
   "author": "Steven Reid",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "Apache-2.0",
+  "overrides": {
+    "uuid": "^11.1.1"
+  },
   "bugs": {
     "url": "https://github.com/RRG314/WorldExplorer3D/issues"
   },

@@ -61,8 +61,8 @@ function writeRows(rows) {
   if (!canUseLocalStorage()) return false;
   const payload = JSON.stringify(rows);
   try {
-    globalThis.localStorage.setItem(LOCAL_DRAFTS_STORAGE_KEY, payload);
     globalThis.localStorage.setItem(LOCAL_DRAFTS_BACKUP_STORAGE_KEY, payload);
+    globalThis.localStorage.setItem(LOCAL_DRAFTS_STORAGE_KEY, payload);
     return true;
   } catch {
     return false;
@@ -84,7 +84,9 @@ function upsertLocalOverlayDraft(feature = {}) {
   });
   const rows = readRows().filter((row) => sanitizeText(row?.featureId || '', 180) !== normalized.featureId);
   rows.unshift(cloneJson(normalized));
-  writeRows(rows);
+  if (!writeRows(rows)) {
+    throw new Error('Could not save this editor draft in browser storage. Check storage permissions and try again.');
+  }
   return normalized;
 }
 
@@ -94,8 +96,7 @@ function removeLocalOverlayDraft(featureId = '') {
   const rows = readRows();
   const nextRows = rows.filter((row) => sanitizeText(row?.featureId || '', 180) !== cleanId);
   if (nextRows.length === rows.length) return false;
-  writeRows(nextRows);
-  return true;
+  return writeRows(nextRows);
 }
 
 export {

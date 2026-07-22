@@ -33,6 +33,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     renderHomeBase,
     renderInvites,
     renderLeaderboard,
+    renderMmoPanel,
     renderOwnedRooms,
     renderPlayerList,
     renderRecentPlayers,
@@ -45,6 +46,12 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
   } = renderers;
 
   function clearSubscriptions() {
+    if (state.authoritativeSession) {
+      state.authoritativeSession.stop().catch((error) => {
+        console.warn('[multiplayer][authority] disconnect failed:', error);
+      });
+      state.authoritativeSession = null;
+    }
     if (typeof state.unsubRoom === "function") state.unsubRoom();
     if (typeof state.unsubPlayers === "function") state.unsubPlayers();
     if (typeof state.unsubChat === "function") state.unsubChat();
@@ -295,6 +302,10 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     state.roomActivities = [];
     state.activeRoomActivity = null;
     state.homeBase = null;
+    state.mmoProgression = null;
+    state.mmoLeaderboard = [];
+    state.mmoCatalog = null;
+    state.mmoSelfUid = '';
     if (typeof appCtx.clearPaintTownMultiplayerConfig === "function") {
       appCtx.clearPaintTownMultiplayerConfig();
     }
@@ -309,6 +320,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     renderArtifacts();
     renderRoomActivities();
     renderHomeBase();
+    renderMmoPanel();
     updateToggleStates();
     publishMapRoomsToContext();
   }
@@ -319,7 +331,7 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     if (!appCtx.scene) return;
 
     state.ghostManager = createGhostManager(appCtx.scene, {
-      getSelfUid: () => state.authUser?.uid || state.entitlement.uid || ""
+      getSelfUid: () => state.mmoSelfUid || state.authUser?.uid || state.entitlement.uid || ""
     });
     state.ghostManager.setVisible(state.ghostsEnabled);
   }

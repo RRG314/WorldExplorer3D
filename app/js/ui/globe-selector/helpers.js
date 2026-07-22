@@ -27,13 +27,14 @@ export function normalizeCityRecord(raw, source = "menu") {
   if (lat == null || lon == null) return null;
   const clamped = clampLatLon(lat, lon);
   const name = normalizeCityName(raw.name, clamped.lat, clamped.lon, source === "saved" ? "Saved Custom" : "City");
-  const normalizedSource = source === "saved" ? "saved" : source === "live" ? "live" : "menu";
+  const normalizedSource = source === "saved" ? "saved" : source === "live" ? "live" : source === "curated" ? "curated" : "menu";
   return {
     key: String(raw.key || ""),
     name,
     lat: Number(clamped.lat),
     lon: Number(clamped.lon),
     source: normalizedSource,
+    category: String(raw.category || ""),
     savedAt: Number(raw.savedAt || 0)
   };
 }
@@ -150,13 +151,10 @@ export function distanceKmBetween(latA, lonA, latB, lonB) {
   return 6371 * c;
 }
 
-export function buildNearbyCities({ savedFavoriteCities = [], liveNearbyCity = null, lat, lon }) {
-  const savedFavorites = savedFavoriteCities
-    .map((city) => normalizeCityRecord(city, "saved"))
-    .filter(Boolean);
+export function buildNearbyCities({ mappedCities = [], liveNearbyCity = null, lat, lon }) {
   const combined = [];
   if (liveNearbyCity) combined.push(liveNearbyCity);
-  combined.push(...savedFavorites);
+  combined.push(...mappedCities);
   if (!combined.length) return [];
 
   const seen = new Set();

@@ -9,6 +9,8 @@ const WATER_LOCATION_PATTERNS = Object.freeze([
 function inferSelectedLocationWaterKind(appCtx) {
   const location = appCtx?.LOC || {};
   const text = [
+    appCtx?.customLoc?.name,
+    appCtx?.customLoc?.region,
     location.name,
     location.region,
     location.state,

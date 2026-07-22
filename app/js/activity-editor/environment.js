@@ -3,7 +3,7 @@ import {
   getActivityAnchorType,
   getActivityTemplate,
   sanitizeText
-} from './schema.js?v=2';
+} from './schema.js?v=3';
 
 const _pointerRaycaster = typeof THREE !== 'undefined' ? new THREE.Raycaster() : null;
 const _pointerMouse = typeof THREE !== 'undefined' ? new THREE.Vector2() : null;

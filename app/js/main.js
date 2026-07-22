@@ -1,5 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=1';
+import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=3';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=1';
 import { createRuntimeKernel } from './runtime/kernel.js?v=1';
 
@@ -7,19 +7,19 @@ let perfPanelTimer = 0;
 let runtimeSystemsRegistered = false;
 const OVERLAY_EDGE_MARGIN = 6;
 const OVERLAY_ANCHOR_GAP = 10;
-const DEFAULT_LOADING_BG = '../assets/landing/city.jpg';
+const DEFAULT_LOADING_BG = '../assets/landing/gameplay/drone-monaco.png';
 const TRANSITION_LOADING = {
   earth: { background: DEFAULT_LOADING_BG, text: 'Restoring Earth...' },
-  space: { background: '../assets/landing/space.jpg', text: 'Preparing Space Flight...' },
-  moon: { background: '../assets/landing/moon.jpg', text: 'Approaching The Moon...' },
-  mars: { background: '../assets/landing/space.jpg', text: 'Approaching Olympus Mons...' },
+  space: { background: '../assets/landing/gameplay/fly-in-space.png', text: 'Preparing Space Flight...' },
+  moon: { background: '../assets/landing/gameplay/walk-on-moon.png', text: 'Approaching The Moon...' },
+  mars: { background: '../assets/landing/gameplay/mars.png', text: 'Approaching Olympus Mons...' },
   ocean: { background: DEFAULT_LOADING_BG, text: 'Diving Into Ocean Mode...' }
 };
 const LOADING_BG_BY_MODE = {
   earth: DEFAULT_LOADING_BG,
-  moon: '../assets/landing/moon.jpg',
-  mars: '../assets/landing/space.jpg',
-  space: '../assets/landing/space.jpg',
+  moon: '../assets/landing/gameplay/walk-on-moon.png',
+  mars: '../assets/landing/gameplay/mars.png',
+  space: '../assets/landing/gameplay/fly-in-space.png',
   ocean: DEFAULT_LOADING_BG
 };
 
@@ -87,7 +87,6 @@ function shouldUseComposer() {
 
 function dedicatedRendererActive() {
   return !!(
-    appCtx.worldLoading ||
     appCtx.isEnv?.(appCtx.ENV?.SPACE_FLIGHT) ||
     appCtx.spaceFlight?.active ||
     appCtx.oceanMode?.active
@@ -157,6 +156,44 @@ function renderLoop() {
   return runtimeKernel.start();
 }
 
+async function waitForWorldRenderReadiness(options = {}) {
+  if (!appCtx.renderer || !appCtx.scene || !appCtx.camera) {
+    return { ready: false, reason: 'renderer_unavailable', durationMs: 0, frames: 0 };
+  }
+  const timeoutMs = Math.max(500, Math.min(12000, Number(options.timeoutMs) || 9000));
+  const requiredStableFrames = Math.max(2, Math.min(8, Number(options.stableFrames) || 3));
+  const startedAt = performance.now();
+  let previousSignature = '';
+  let stableFrames = 0;
+  let frames = 0;
+
+  while (performance.now() - startedAt < timeoutMs && stableFrames < requiredStableFrames) {
+    await new Promise((resolve) => requestAnimationFrame(resolve));
+    frames += 1;
+    const info = appCtx.renderer.info;
+    const signature = [
+      Number(info?.memory?.geometries || 0),
+      Number(info?.memory?.textures || 0),
+      Number(info?.programs?.length || 0)
+    ].join(':');
+    stableFrames = signature === previousSignature ? stableFrames + 1 : 0;
+    previousSignature = signature;
+  }
+
+  const result = {
+    ready: stableFrames >= requiredStableFrames,
+    reason: stableFrames >= requiredStableFrames ? 'stable' : 'timeout',
+    durationMs: Math.round(performance.now() - startedAt),
+    frames,
+    stableFrames,
+    geometries: Number(appCtx.renderer.info?.memory?.geometries || 0),
+    textures: Number(appCtx.renderer.info?.memory?.textures || 0),
+    programs: Number(appCtx.renderer.info?.programs?.length || 0)
+  };
+  appCtx._lastWorldRenderReadiness = result;
+  return result;
+}
+
 function registerRuntimeSystem(definition) {
   registerRuntimeSystems();
   return runtimeKernel.registerSystem(definition);
@@ -217,6 +254,7 @@ Object.assign(appCtx, {
   positionTopOverlays,
   registerRuntimeSystem,
   renderLoop,
+  waitForWorldRenderReadiness,
   showLoad,
   showTransitionLoad,
   stopRuntimeKernel: (reason) => runtimeKernel.stop(reason),
@@ -229,6 +267,7 @@ export {
   positionTopOverlays,
   registerRuntimeSystem,
   renderLoop,
+  waitForWorldRenderReadiness,
   showLoad,
   showTransitionLoad
 };

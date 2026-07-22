@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { queryNearbyRoads, roadSpatialIndexSnapshot } from "./road-spatial-index.js?v=1";
 
 const runtime = {
   applySpawnTarget: () => null,
@@ -322,7 +323,12 @@ export function findNearestRoad(x, z, options = {}) {
   const maxVerticalDelta = Number.isFinite(options?.maxVerticalDelta) ? Math.max(0.5, Number(options.maxVerticalDelta)) : Infinity;
   let bestWeighted = Infinity;
 
-  const roads = runtimeRoadFeatures();
+  const baseRoads = Array.isArray(appCtx.roads) ? appCtx.roads : [];
+  const overlayRoads = Array.isArray(appCtx.overlayRuntimeRoads) ? appCtx.overlayRuntimeRoads : [];
+  let roads = queryNearbyRoads(baseRoads, overlayRoads, x, z, 260);
+  if (roads.length === 0) roads = queryNearbyRoads(baseRoads, overlayRoads, x, z, 880);
+  if (roads.length === 0) roads = queryNearbyRoads(baseRoads, overlayRoads, x, z, 2400);
+  roads = roads.filter((road) => !runtime.isSuppressedBaseRoad(road));
   const requestedPreferredRoad = options?.preferredRoad || null;
   const preferredRoad = requestedPreferredRoad && roads.includes(requestedPreferredRoad) ? requestedPreferredRoad : null;
   if (preferredRoad) {
@@ -343,6 +349,8 @@ export function findNearestRoad(x, z, options = {}) {
         nearRoadResult.distanceToTransitionZone = preferredHit.distanceToTransitionZone;
       }
     }
+    const continuityRadius = Math.max(12, Number(preferredRoad.width || 0) * 1.5);
+    if (nearRoadResult.road && nearRoadResult.dist <= continuityRadius) return nearRoadResult;
   }
 
   for (let r = 0; r < roads.length; r++) {
@@ -367,3 +375,5 @@ export function findNearestRoad(x, z, options = {}) {
   }
   return nearRoadResult;
 }
+
+export { roadSpatialIndexSnapshot };

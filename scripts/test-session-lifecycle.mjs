@@ -164,7 +164,9 @@ function assertPlateau(mode, cycles) {
 }
 
 await mkdirp(outputDir);
-const server = await startServer({ rootDir, host, candidatePorts: [4216, 4217, 4218] });
+const suppliedBaseUrl = String(process.env.SESSION_LIFECYCLE_BASE_URL || '').replace(/\/$/, '');
+const server = suppliedBaseUrl ? null : await startServer({ rootDir, host, candidatePorts: [4216, 4217, 4218] });
+const baseUrl = suppliedBaseUrl || `http://${host}:${server.port}`;
 const browser = await chromium.launch({
   headless: true,
   args: ['--use-angle=swiftshader', '--enable-webgl', '--ignore-gpu-blocklist']
@@ -181,7 +183,7 @@ try {
     }
     if (message.type() === 'error' && !isTransientNetworkError(text)) consoleErrors.push(text);
   });
-  await page.goto(`http://${host}:${server.port}/app/?lifecycle-plateau=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
+  await page.goto(`${baseUrl}/app/?lifecycle-plateau=1`, { waitUntil: 'domcontentloaded', timeout: 90000 });
   await page.waitForSelector('#globeSelectorScreen.show', { state: 'visible', timeout: 90000 });
   await waitForRuntime(page);
   await page.evaluate(() => {
@@ -210,5 +212,5 @@ try {
   }, null, 2));
 } finally {
   await browser.close();
-  await server.close();
+  await server?.close();
 }

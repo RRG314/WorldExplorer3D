@@ -3,7 +3,7 @@ import {
   disposeThreeObjectTree,
   disposeThreeRenderer
 } from '../../engine/webgl-lifecycle.js?v=1';
-import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=1';
+import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=2';
 
 export function createGlobeSelectorScene(options = {}) {
   const {
@@ -43,7 +43,7 @@ export function createGlobeSelectorScene(options = {}) {
   let dragLastY = 0;
   let eventsBound = false;
 
-  const minDistance = 1.08;
+  const minDistance = 1.045;
   const maxDistance = 4.4;
 
   function getMarkerScale() {
@@ -211,12 +211,17 @@ export function createGlobeSelectorScene(options = {}) {
       const tapTime = performance.now() - pointerDownTime;
       if (pointerDragDistance < 7 && tapDist < 7 && tapTime < 420) handlePick(event.clientX, event.clientY);
     });
+    canvas.addEventListener('dblclick', (event) => {
+      handlePick(event.clientX, event.clientY);
+      setCameraDistance(Math.max(minDistance, cameraDistance * 0.72));
+    });
     canvas.addEventListener('pointercancel', () => {
       pointerActive = false;
     });
     canvas.addEventListener('wheel', (event) => {
       event.preventDefault();
-      setCameraDistance(cameraDistance + Math.sign(event.deltaY || 0) * 0.16);
+      const delta = Math.max(-1, Math.min(1, Number(event.deltaY || 0) / 100));
+      setCameraDistance(cameraDistance * (1 + delta * 0.09));
       renderFrame();
     }, { passive: false });
     window.addEventListener('resize', ensureSize);
@@ -231,7 +236,7 @@ export function createGlobeSelectorScene(options = {}) {
     }
     bindEvents();
     scene = new THREE.Scene();
-    camera = new THREE.PerspectiveCamera(42, 1, 0.02, 20);
+    camera = new THREE.PerspectiveCamera(40, 1, 0.015, 20);
     camera.position.set(0, 0, cameraDistance);
     renderer = createAuxiliaryRenderer({
       canvas,
@@ -267,7 +272,7 @@ export function createGlobeSelectorScene(options = {}) {
       emissive: new THREE.Color(0x1b2b44),
       emissiveIntensity: 0.12
     });
-    earthMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), earthMaterial);
+    earthMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 128, 96), earthMaterial);
     globeRoot.add(earthMesh);
     markerMesh = new THREE.Mesh(
       new THREE.SphereGeometry(0.018, 14, 12),

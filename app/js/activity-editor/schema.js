@@ -129,6 +129,37 @@ const ACTIVITY_ANCHOR_TYPES = Object.freeze([
     placementMode: 'dock',
     defaultHeightOffset: 0,
     transform: { translate: true, height: true, rotate: true, scale: false }
+  },
+  {
+    id: 'location_clue',
+    label: 'Location Clue',
+    icon: '🔎',
+    color: '#f59e0b',
+    description: 'An ordered clue tied to a real place, mapped feature, or creator-selected landmark.',
+    placementMode: 'walk',
+    defaultHeightOffset: 0.2,
+    transform: { translate: true, height: true, rotate: true, scale: false }
+  },
+  {
+    id: 'search_zone',
+    label: 'Search Zone',
+    icon: '⌖',
+    color: '#14b8a6',
+    description: 'A readable search area for rescue, survey, and location-finding activities.',
+    placementMode: 'air',
+    defaultHeightOffset: 18,
+    defaultRadius: 28,
+    transform: { translate: true, height: true, rotate: false, scale: true }
+  },
+  {
+    id: 'rescue_target',
+    label: 'Rescue Target',
+    icon: '✚',
+    color: '#ef4444',
+    description: 'The target that completes a search or rescue leg.',
+    placementMode: 'air',
+    defaultHeightOffset: 8,
+    transform: { translate: true, height: true, rotate: true, scale: false }
   }
 ]);
 
@@ -148,6 +179,24 @@ const ACTIVITY_TEMPLATES = Object.freeze([
     requiredAnchors: [
       { id: 'start', label: 'Start', min: 1, max: 1 },
       { id: 'checkpoint', label: 'Checkpoint', min: 1, max: 24 },
+      { id: 'finish', label: 'Finish', min: 1, max: 1 }
+    ]
+  },
+  {
+    id: 'rally_route',
+    label: 'Rally Run',
+    category: 'ground',
+    traversalMode: 'drive',
+    preferredSurface: 'mixed',
+    description: 'A mixed-surface vehicle course for roads, trails, sand, and open terrain.',
+    help: [
+      'Use this for longer point-to-point drives and off-pavement racing.',
+      'Place checkpoints on clear, traversable ground and use hazards to mark unsafe terrain.'
+    ],
+    allowedAnchorTypes: ['start', 'checkpoint', 'finish', 'boost_ring', 'obstacle_barrier', 'hazard_zone', 'trigger_zone'],
+    requiredAnchors: [
+      { id: 'start', label: 'Start', min: 1, max: 1 },
+      { id: 'checkpoint', label: 'Checkpoint', min: 2, max: 32 },
       { id: 'finish', label: 'Finish', min: 1, max: 1 }
     ]
   },
@@ -278,6 +327,24 @@ const ACTIVITY_TEMPLATES = Object.freeze([
     ]
   },
   {
+    id: 'plane_course',
+    label: 'Flight Course',
+    category: 'air',
+    traversalMode: 'plane',
+    preferredSurface: 'air',
+    description: 'A full aircraft route with runway start, altitude gates, and a landing finish.',
+    help: [
+      'Use this for flight races, sightseeing loops, and precision landing challenges.',
+      'Air anchors retain their altitude so the route tests climbing, banking, and descent.'
+    ],
+    allowedAnchorTypes: ['start', 'checkpoint', 'finish', 'boost_ring', 'hazard_zone', 'search_zone', 'trigger_zone'],
+    requiredAnchors: [
+      { id: 'start', label: 'Start', min: 1, max: 1 },
+      { id: 'checkpoint', label: 'Checkpoint', min: 2, max: 32 },
+      { id: 'finish', label: 'Finish', min: 1, max: 1 }
+    ]
+  },
+  {
     id: 'collectible_hunt',
     label: 'Treasure Hunt',
     category: 'ground',
@@ -292,6 +359,41 @@ const ACTIVITY_TEMPLATES = Object.freeze([
     requiredAnchors: [
       { id: 'start', label: 'Start', min: 1, max: 1 },
       { id: 'collectible', label: 'Collectible', min: 1, max: 64 }
+    ]
+  },
+  {
+    id: 'location_hunt',
+    label: 'Landmark Hunt',
+    category: 'ground',
+    traversalMode: 'walk',
+    preferredSurface: 'walk',
+    description: 'An ordered location-finding game built around real mapped places and landmarks.',
+    help: [
+      'Use real nearby places as clues so players learn and explore the location.',
+      'Clues are visited in placement order and can finish at a separate destination.'
+    ],
+    allowedAnchorTypes: ['start', 'location_clue', 'finish', 'hazard_zone', 'trigger_zone'],
+    requiredAnchors: [
+      { id: 'start', label: 'Start', min: 1, max: 1 },
+      { id: 'location_clue', label: 'Location Clue', min: 2, max: 32 }
+    ]
+  },
+  {
+    id: 'search_rescue',
+    label: 'Search and Rescue',
+    category: 'air',
+    traversalMode: 'drone',
+    preferredSurface: 'air',
+    description: 'A multi-stage aerial search with survey zones and a final rescue target.',
+    help: [
+      'Use this for drone search games above cities, coastlines, forests, or mountains.',
+      'Search zones should remain readable from the air and lead to one rescue target.'
+    ],
+    allowedAnchorTypes: ['start', 'search_zone', 'rescue_target', 'finish', 'hazard_zone', 'boost_ring', 'trigger_zone'],
+    requiredAnchors: [
+      { id: 'start', label: 'Start', min: 1, max: 1 },
+      { id: 'search_zone', label: 'Search Zone', min: 1, max: 12 },
+      { id: 'rescue_target', label: 'Rescue Target', min: 1, max: 1 }
     ]
   }
 ]);
@@ -340,10 +442,19 @@ function orderedRouteAnchors(anchors = []) {
   const start = anchors.find((entry) => entry.typeId === 'start') || null;
   const checkpoints = anchors.filter((entry) => entry.typeId === 'checkpoint');
   const fishingZones = anchors.filter((entry) => entry.typeId === 'fishing_zone');
+  const locationClues = anchors.filter((entry) => entry.typeId === 'location_clue');
+  const searchZones = anchors.filter((entry) => entry.typeId === 'search_zone');
+  const rescueTargets = anchors.filter((entry) => entry.typeId === 'rescue_target');
   const finish = anchors.find((entry) => entry.typeId === 'finish') || null;
   const dockPoint = anchors.find((entry) => entry.typeId === 'dock_point') || null;
   if (checkpoints.length > 0) {
     return [start, ...checkpoints, finish].filter(Boolean);
+  }
+  if (locationClues.length > 0) {
+    return [start, ...locationClues, finish].filter(Boolean);
+  }
+  if (searchZones.length > 0 || rescueTargets.length > 0) {
+    return [start, ...searchZones, ...rescueTargets, finish].filter(Boolean);
   }
   return [start, ...fishingZones, finish || dockPoint].filter(Boolean);
 }

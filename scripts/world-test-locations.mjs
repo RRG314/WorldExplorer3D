@@ -193,7 +193,8 @@ export const WORLD_TEST_LOCATIONS = [
     lon: -62.2159,
     label: 'Amazon Basin, Brazil',
     category: 'tropical_forest_river_custom',
-    expectedStart: 'land'
+    expectedStart: 'land',
+    minimumVegetationFeatures: 1800
   },
   {
     id: 'saopaulo_custom',

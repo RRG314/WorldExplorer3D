@@ -18,7 +18,7 @@ export function safeWorldLoadCall(loadMetrics, label, fn) {
   }
 }
 
-export function finalizeLoadedWorld(options = {}) {
+export async function finalizeLoadedWorld(options = {}) {
   const reason = options.reason || 'primary';
   const loadMetrics = options.loadMetrics || {};
   const markLoaded = typeof options.markLoaded === 'function' ? options.markLoaded : () => {};
@@ -75,6 +75,9 @@ export function finalizeLoadedWorld(options = {}) {
   }
   if (typeof updateWorldLod === 'function') {
     runFinalStep('updateWorldLod', () => updateWorldLod(true));
+  }
+  if (typeof appCtx.waitForWorldRenderReadiness === 'function') {
+    loadMetrics.renderReadiness = await appCtx.waitForWorldRenderReadiness();
   }
   appCtx.hideLoad();
   if (typeof appCtx.refreshAstronomicalSky === 'function') {
@@ -196,8 +199,12 @@ export function createSyntheticFallbackWorld(options = {}) {
       const len = Math.sqrt(dx * dx + dz * dz) || 1;
       const nx = -dz / len;
       const nz = dx / len;
-      const y1 = appCtx.elevationWorldYAtWorldXZ(p.x + nx * hw, p.z + nz * hw) + 0.3;
-      const y2 = appCtx.elevationWorldYAtWorldXZ(p.x - nx * hw, p.z - nz * hw) + 0.3;
+      const y1 = (appCtx.SurfaceQuery?.terrainAt?.(p.x + nx * hw, p.z + nz * hw)?.position?.y ??
+        appCtx.terrainMeshHeightAt?.(p.x + nx * hw, p.z + nz * hw) ??
+        appCtx.elevationWorldYAtWorldXZ(p.x + nx * hw, p.z + nz * hw)) + 0.3;
+      const y2 = (appCtx.SurfaceQuery?.terrainAt?.(p.x - nx * hw, p.z - nz * hw)?.position?.y ??
+        appCtx.terrainMeshHeightAt?.(p.x - nx * hw, p.z - nz * hw) ??
+        appCtx.elevationWorldYAtWorldXZ(p.x - nx * hw, p.z - nz * hw)) + 0.3;
       leftEdge.push({ x: p.x + nx * hw, y: y1, z: p.z + nz * hw });
       rightEdge.push({ x: p.x - nx * hw, y: y2, z: p.z - nz * hw });
     }
@@ -257,7 +264,9 @@ export function createSyntheticFallbackWorld(options = {}) {
     let minElevation = Infinity;
     let maxElevation = -Infinity;
     pts.forEach((point) => {
-      const terrainHeight = appCtx.elevationWorldYAtWorldXZ(point.x, point.z);
+      const terrainHeight = appCtx.SurfaceQuery?.terrainAt?.(point.x, point.z)?.position?.y ??
+        appCtx.terrainMeshHeightAt?.(point.x, point.z) ??
+        appCtx.elevationWorldYAtWorldXZ(point.x, point.z);
       avgElevation += terrainHeight;
       if (terrainHeight < minElevation) minElevation = terrainHeight;
       if (terrainHeight > maxElevation) maxElevation = terrainHeight;
@@ -329,7 +338,9 @@ export function buildPoiGeometryPass(options = {}) {
       const poiData = appCtx.POI_TYPES[poiKey];
       const centerDist = Math.hypot(pos.x, pos.z);
       const poiTier = centerDist <= lodNearDist ? 'near' : centerDist <= lodMidDist ? 'mid' : 'far';
-      const terrainY = appCtx.elevationWorldYAtWorldXZ(pos.x, pos.z);
+      const terrainY = appCtx.SurfaceQuery?.terrainAt?.(pos.x, pos.z)?.position?.y ??
+        appCtx.terrainMeshHeightAt?.(pos.x, pos.z) ??
+        appCtx.elevationWorldYAtWorldXZ(pos.x, pos.z);
 
       if (poiTier === 'near') loadMetrics.pois.near += 1;
       else if (poiTier === 'mid') loadMetrics.pois.mid += 1;

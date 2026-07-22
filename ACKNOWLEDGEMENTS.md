@@ -88,7 +88,7 @@ you may distribute the result only under the same license.
 - Data is community-contributed and continuously updated
 - Free to use for commercial applications with attribution
 - Derivative data must be shared under ODbL if distributed
-- Using data in proprietary software (as done here) is permitted
+- Use in this open-source application is permitted under the applicable data terms
 
 **Community**:
 OpenStreetMap is built by a community of mappers that contribute and maintain 
@@ -388,19 +388,19 @@ These are first-party research components used in the engine (not external third
 
 ### Attribution Requirements
 
-When using World Explorer, the following attributions are **REQUIRED**:
+When redistributing World Explorer 3D, preserve the notices required by the
+applicable code, data, and asset licenses:
 
 **In-Application Credits**:
 ```
-World Explorer © 2026. All Rights Reserved.
+World Explorer 3D code © 2026 Steven Reid, Apache-2.0
 Powered by Three.js (MIT License)
 Map data © OpenStreetMap contributors
 ```
 
 **For Public Demonstrations**:
 ```
-World Explorer - Proprietary Software
-© 2026 All Rights Reserved
+World Explorer 3D code © 2026 Steven Reid, Apache-2.0
 
 Built with:
 • Three.js (MIT License) - 3D graphics
@@ -436,7 +436,7 @@ Map data is provided by OpenStreetMap contributors and is:
 
 ## Contribution Acknowledgments
 
-While World Explorer is proprietary software, we acknowledge concepts and techniques learned from:
+World Explorer 3D is open-source software. We acknowledge concepts and techniques learned from:
 
 - Open-source Three.js examples and documentation
 - WebGL tutorials and educational resources
@@ -473,8 +473,10 @@ Thank you all for your contributions to the technologies and standards that make
 
 ---
 
-**World Explorer**  
-Proprietary Software - All Rights Reserved  
-© 2026
+**World Explorer 3D**
+
+Code licensed under Apache License 2.0
+
+© 2026 Steven Reid
 
 For licensing inquiries: hello@worldexplorer.app

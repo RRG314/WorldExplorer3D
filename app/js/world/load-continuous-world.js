@@ -2,7 +2,7 @@ import { ctx as appCtx } from '../shared-context.js?v=55';
 import { clearBuildingSpatialIndex } from './building-spatial-index.js?v=5';
 import { resetWorldFurnitureCaches } from './furniture.js?v=10';
 import { earthSceneSuppressed, hideEarthSceneMeshes, resetWorldForReload } from './load-reset.js?v=8';
-import { finalizeLoadedWorld } from './load-support.js?v=16';
+import { finalizeLoadedWorld } from './load-support.js?v=17';
 
 let activeLoad = null;
 
@@ -70,9 +70,8 @@ async function loadContinuousEarthWorldInternal(location) {
     if (!snapshot) throw new Error('The continuous Earth scheduler is unavailable.');
     if (!isCurrent()) return { aborted: true };
 
-    appCtx.worldLoading = false;
     appCtx.initialEarthWorldReady = true;
-    finalizeLoadedWorld({
+    await finalizeLoadedWorld({
       buildTraversalNetworks: appCtx.buildTraversalNetworks,
       earthSceneSuppressed,
       hideEarthSceneMeshes,
@@ -82,6 +81,7 @@ async function loadContinuousEarthWorldInternal(location) {
       spawnOnRoad: appCtx.spawnOnRoad,
       updateWorldLod: appCtx.updateWorldLod
     });
+    appCtx.worldLoading = false;
     appCtx.enforceEnvironmentSceneOwnership?.();
     appCtx.setPerfLiveStat?.('worldCounts', {
       roads: appCtx.roads.length,

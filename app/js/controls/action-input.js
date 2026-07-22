@@ -49,8 +49,8 @@ function keyboardActions(mode) {
   const keys = appCtx.keys || {};
   const move = digital(pressed(keys, 'ArrowUp'), pressed(keys, 'ArrowDown'));
   const turn = digital(pressed(keys, 'ArrowLeft'), pressed(keys, 'ArrowRight'));
-  const lookYaw = digital(pressed(keys, 'KeyA'), pressed(keys, 'KeyD'));
-  const lookPitch = digital(pressed(keys, 'KeyW'), pressed(keys, 'KeyS'));
+  const lookYaw = digital(pressed(keys, 'VirtualLookLeft', 'KeyA'), pressed(keys, 'VirtualLookRight', 'KeyD'));
+  const lookPitch = digital(pressed(keys, 'VirtualLookUp', 'KeyW'), pressed(keys, 'VirtualLookDown', 'KeyS'));
   const ascend = pressed(keys, 'Space', 'KeyR');
   const descend = pressed(keys, 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight');
   return {

@@ -6,6 +6,37 @@ const HUB_PANELS = {
   controls: { tab: 'controls', title: 'Controls & Quick Start' }
 };
 
+const HUB_THEME_KEY = 'worldExplorer3D.hubTheme';
+const HUB_THEMES = ['auto', 'day', 'night'];
+
+function setupHubTheme() {
+  const button = document.getElementById('globeHubThemeBtn');
+  if (!button) return;
+  let mode = 'auto';
+  try {
+    const stored = localStorage.getItem(HUB_THEME_KEY);
+    if (HUB_THEMES.includes(stored)) mode = stored;
+  } catch {
+    // Auto remains available when browser storage is unavailable.
+  }
+
+  const apply = () => {
+    const hour = new Date().getHours();
+    const resolved = mode === 'auto' ? (hour >= 7 && hour < 19 ? 'day' : 'night') : mode;
+    document.documentElement.dataset.hubTheme = resolved;
+    button.textContent = mode === 'day' ? '☼' : mode === 'night' ? '◒' : '◐';
+    button.title = `Appearance: ${mode[0].toUpperCase()}${mode.slice(1)}`;
+    button.setAttribute('aria-label', `${button.title}. Activate to change.`);
+  };
+
+  button.addEventListener('click', () => {
+    mode = HUB_THEMES[(HUB_THEMES.indexOf(mode) + 1) % HUB_THEMES.length];
+    try { localStorage.setItem(HUB_THEME_KEY, mode); } catch {}
+    apply();
+  });
+  apply();
+}
+
 function setupGlobeHub({
   globeSelector,
   onEarthMode,
@@ -68,6 +99,7 @@ function setupGlobeHub({
     if (document.fullscreenElement) void document.exitFullscreen?.();
     else void document.documentElement.requestFullscreen?.();
   });
+  setupHubTheme();
 
   document.querySelectorAll('[data-globe-destination]').forEach((button) => {
     button.addEventListener('click', () => {
@@ -79,6 +111,11 @@ function setupGlobeHub({
         closePanel();
         setActiveDestination('live-earth');
         document.getElementById('globeSelectorLiveEarthModeBtn')?.click();
+      } else if (destination === 'library') {
+        closePanel();
+        setActiveDestination('library');
+        document.getElementById('globeSelectorExploreModeBtn')?.click();
+        document.getElementById('globeFavoritesTabBtn')?.click();
       } else {
         openPanel(destination);
       }

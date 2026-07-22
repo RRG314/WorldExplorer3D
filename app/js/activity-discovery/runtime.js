@@ -1,6 +1,6 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { orderedRouteAnchors, sanitizeText } from '../activity-editor/schema.js?v=2';
-import { getStoredActivityById } from './library.js?v=2';
+import { orderedRouteAnchors, sanitizeText } from '../activity-editor/schema.js?v=3';
+import { getStoredActivityById } from './library.js?v=4';
 
 const COMPLETION_STORAGE_KEY = 'worldExplorer3D.activityCompletions.v1';
 
@@ -76,6 +76,13 @@ function currentPose() {
   if (mode === 'drone') {
     return { mode, x: finiteNumber(appCtx.drone?.x, 0), y: finiteNumber(appCtx.drone?.y, 12), z: finiteNumber(appCtx.drone?.z, 0) };
   }
+  if (mode === 'plane') {
+    return { mode, x: finiteNumber(appCtx.planeMode?.x, 0), y: finiteNumber(appCtx.planeMode?.y, 2), z: finiteNumber(appCtx.planeMode?.z, 0) };
+  }
+  if (appCtx.oceanMode?.active) {
+    const position = appCtx.oceanMode.submarine?.position || {};
+    return { mode: 'submarine', x: finiteNumber(position.x, 0), y: finiteNumber(position.y, -8), z: finiteNumber(position.z, 0) };
+  }
   if (mode === 'walk' && appCtx.Walk?.state?.walker) {
     return { mode, x: finiteNumber(appCtx.Walk.state.walker.x, 0), y: finiteNumber(appCtx.Walk.state.walker.y, 1.7), z: finiteNumber(appCtx.Walk.state.walker.z, 0) };
   }
@@ -138,7 +145,7 @@ function activityDistanceToAnchor(activity = {}, pose = currentPose(), anchor = 
 
 function activityVerticalWeight(activity = {}, pose = currentPose()) {
   const mode = sanitizeText(activity.traversalMode || pose.mode || 'drive', 32).toLowerCase();
-  return mode === 'drone' || mode === 'submarine' ? 0.8 : mode === 'boat' ? 0.18 : 0.28;
+  return mode === 'drone' || mode === 'plane' || mode === 'submarine' ? 0.8 : mode === 'boat' ? 0.18 : 0.28;
 }
 
 function weightedPoint(point = {}, verticalWeight = 0.28) {
@@ -236,6 +243,38 @@ function applySpawnForActivity(activity = {}) {
       return true;
     }
     return false;
+  }
+  if (mode === 'plane') {
+    if (typeof appCtx.setTravelMode !== 'function') return false;
+    appCtx.setTravelMode('plane', {
+      source: 'activity_runtime',
+      force: true,
+      x: start.x,
+      y: Math.max(start.y, finiteNumber(start.baseY, start.y) + 3),
+      z: start.z,
+      yaw: finiteNumber(start.yaw, 0),
+      pitch: 0,
+      roll: 0,
+      speed: 0,
+      throttle: 0,
+      airborne: start.y > finiteNumber(start.baseY, start.y) + 2
+    });
+    return appCtx.planeMode?.active === true;
+  }
+  if (mode === 'submarine') {
+    return appCtx.startOceanMode?.({
+      launchSite: {
+        lat: finiteNumber(appCtx.customLoc?.lat ?? appCtx.LOCS?.[appCtx.selLoc]?.lat, 0),
+        lon: finiteNumber(appCtx.customLoc?.lon ?? appCtx.LOCS?.[appCtx.selLoc]?.lon, 0),
+        name: activity.locationLabel || 'Dive Activity'
+      },
+      submarinePose: {
+        x: start.x,
+        y: start.y,
+        z: start.z,
+        yaw: finiteNumber(start.yaw, 0)
+      }
+    }) === true;
   }
   if (mode === 'walk') {
     if (typeof appCtx.setTravelMode === 'function') {

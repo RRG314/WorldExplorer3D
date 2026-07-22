@@ -1,7 +1,7 @@
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=16";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=17";
 
-function beam(x, y, z, scaleX, scaleY, scaleZ, rotationY) {
-  return { x, y, z, scaleX, scaleY, scaleZ, rotationY };
+function beam(x, y, z, scaleX, scaleY, scaleZ, rotationY, quaternion = null) {
+  return { x, y, z, scaleX, scaleY, scaleZ, rotationY, quaternion };
 }
 
 export function collectTunnelVisualInstances(feature, structurePts, total, deps = {}) {
@@ -10,8 +10,9 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
   const portals = [];
   const walls = [];
   const roofs = [];
+  const floors = [];
   const lights = [];
-  if (!Array.isArray(structurePts) || structurePts.length < 2) return { portals, walls, roofs, lights };
+  if (!Array.isArray(structurePts) || structurePts.length < 2) return { portals, walls, roofs, floors, lights };
 
   const width = Math.max(3.4, Number(feature?.width) || 6);
   const clearance = Math.max(3.2, Math.min(4.8, Number(feature?.structureSemantics?.cutDepth || 4.6) - 0.35));
@@ -30,15 +31,31 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
     if (!(length > 0.2)) continue;
     const x = (p1.x + p2.x) * 0.5;
     const z = (p1.z + p2.z) * 0.5;
-    const roadY = sampleFeatureSurfaceY(feature, x, z);
+    const roadY1 = sampleFeatureSurfaceY(feature, p1.x, p1.z);
+    const roadY2 = sampleFeatureSurfaceY(feature, p2.x, p2.z);
+    const roadY = Number.isFinite(roadY1) && Number.isFinite(roadY2)
+      ? (roadY1 + roadY2) * 0.5
+      : sampleFeatureSurfaceY(feature, x, z);
     if (!Number.isFinite(roadY)) continue;
     const nx = -dz / length;
     const nz = dx / length;
     const rotationY = Math.atan2(dx, dz);
     const sideOffset = interiorHalfWidth + wallThickness * 0.5;
-    walls.push(beam(x + nx * sideOffset, roadY + clearance * 0.5, z + nz * sideOffset, wallThickness, clearance, length + 0.2, rotationY));
-    walls.push(beam(x - nx * sideOffset, roadY + clearance * 0.5, z - nz * sideOffset, wallThickness, clearance, length + 0.2, rotationY));
-    roofs.push(beam(x, roadY + clearance + roofThickness * 0.5, z, interiorHalfWidth * 2 + wallThickness * 2, roofThickness, length + 0.25, rotationY));
+    let segmentQuaternion = null;
+    let structureLength = length;
+    if (Number.isFinite(roadY1) && Number.isFinite(roadY2) && typeof THREE !== 'undefined') {
+      const dy = roadY2 - roadY1;
+      structureLength = Math.hypot(dx, dy, dz);
+      const quaternion = new THREE.Quaternion().setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        new THREE.Vector3(dx / structureLength, dy / structureLength, dz / structureLength)
+      );
+      segmentQuaternion = { x: quaternion.x, y: quaternion.y, z: quaternion.z, w: quaternion.w };
+    }
+    walls.push(beam(x + nx * sideOffset, roadY + clearance * 0.5, z + nz * sideOffset, wallThickness, clearance, structureLength + 0.04, rotationY, segmentQuaternion));
+    walls.push(beam(x - nx * sideOffset, roadY + clearance * 0.5, z - nz * sideOffset, wallThickness, clearance, structureLength + 0.04, rotationY, segmentQuaternion));
+    roofs.push(beam(x, roadY + clearance + roofThickness * 0.5, z, interiorHalfWidth * 2 + wallThickness * 2, roofThickness, structureLength + 0.04, rotationY, segmentQuaternion));
+    floors.push(beam(x, roadY + 0.015, z, interiorHalfWidth * 2, 0.12, structureLength + 0.04, rotationY, segmentQuaternion));
     const lightStation = Math.floor((traveled + length * 0.5) / 24);
     if (lightStation !== lastLightStation) {
       lights.push(beam(x, roadY + clearance - 0.08, z, Math.min(3.2, width * 0.48), 0.08, 1.4, rotationY));
@@ -47,7 +64,7 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
     traveled += length;
   }
 
-  if (typeof samplePoint !== "function" || typeof sampleTerrain !== "function") return { portals, walls, roofs, lights };
+  if (typeof samplePoint !== "function" || typeof sampleTerrain !== "function") return { portals, walls, roofs, floors, lights };
   const portalInset = Math.min(4, Math.max(2, total * 0.08));
   for (const distance of [portalInset, Math.max(0, total - portalInset)]) {
     const point = samplePoint(feature.pts, distance);
@@ -65,5 +82,5 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
     portals.push(beam(point.x - nx * sideOffset, roadY + openingHeight * 0.5, point.z - nz * sideOffset, pillarWidth, openingHeight, Math.max(1.2, width * 0.55), rotationY));
     portals.push(beam(point.x, roadY + openingHeight + 0.3, point.z, width + pillarWidth * 2.2, 0.6, Math.max(0.9, width * 0.34), rotationY));
   }
-  return { portals, walls, roofs, lights };
+  return { portals, walls, roofs, floors, lights };
 }

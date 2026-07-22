@@ -20,7 +20,7 @@ import {
   initEngineTextures as initEngineTexturesRuntime,
   syncTextureGlobals as syncTextureGlobalsRuntime
 } from "./engine/materials-runtime.js?v=16";
-import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=8";
+import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=9";
 
 const RENDER_QUALITY_LOW = 'low';
 const RENDER_QUALITY_MED = 'med';

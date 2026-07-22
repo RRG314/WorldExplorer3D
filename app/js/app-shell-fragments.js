@@ -119,6 +119,33 @@ const APP_SHELL_FRAGMENT_HTML = `
       <ul id="roomPanelPlayerList" class="mp-player-list">
         <li class="mpPlayerEmpty">No active room.</li>
       </ul>
+      <div class="mp-subtitle">Explorer Progress</div>
+      <div id="mmoProgressSummary" class="mmo-progress-summary">Authoritative progression is unavailable.</div>
+      <div class="mp-row">
+        <select id="mmoMissionSelect" class="mp-select" aria-label="Mission"></select>
+        <button id="mmoMissionAcceptBtn" class="mp-btn secondary mpSmallBtn" type="button">Accept Mission</button>
+      </div>
+      <div id="mmoMissionStatus" class="mpMeta">No mission active.</div>
+      <div class="mp-row">
+        <select id="mmoWeaponSelect" class="mp-select" aria-label="Weapon"></select>
+        <button id="mmoWeaponEquipBtn" class="mp-btn secondary mpSmallBtn" type="button">Equip</button>
+      </div>
+      <div class="mp-row">
+        <select id="mmoTargetSelect" class="mp-select" aria-label="Combat target"></select>
+        <button id="mmoAttackBtn" class="mp-btn secondary mpSmallBtn" type="button">Use Weapon</button>
+        <button id="mmoInteractBtn" class="mp-btn secondary mpSmallBtn" type="button">Use Nearby Vehicle</button>
+      </div>
+      <div class="mp-subtitle">Room World Editing</div>
+      <div id="mmoWorldEditSummary" class="mpMeta">Walk near a mapped building to inspect it.</div>
+      <div class="mp-row">
+        <button id="mmoDemolishBtn" class="mp-btn warn mpSmallBtn" type="button">Demolish Nearby</button>
+        <select id="mmoRestoreSelect" class="mp-select" aria-label="Demolished building"></select>
+        <button id="mmoRestoreBtn" class="mp-btn secondary mpSmallBtn" type="button">Restore</button>
+      </div>
+      <div class="room-player-head"><span>Room Ranking</span><span>Server verified</span></div>
+      <ul id="mmoLeaderboardList" class="mp-player-list mmo-leaderboard-list">
+        <li class="mpPlayerEmpty">Complete server missions to enter this room board.</li>
+      </ul>
       <div class="mp-subtitle">Room Settings</div>
       <div class="mp-row">
         <input id="roomPanelNameInput" class="mp-input" type="text" maxlength="80" placeholder="Room name (optional)">

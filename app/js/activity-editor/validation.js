@@ -4,7 +4,7 @@ import {
   getActivityTemplate,
   orderedRouteAnchors,
   sanitizeText
-} from './schema.js?v=2';
+} from './schema.js?v=3';
 
 function clamp(value, min, max) {
   return Math.max(min, Math.min(max, value));
@@ -63,6 +63,9 @@ function validateAnchor(template, anchor, issues) {
   if (anchor.typeId === 'dock_point' && anchor.environment !== 'water_surface' && anchor.environment !== 'dock') {
     pushIssue(issues, 'error', 'dock_point_surface', 'Dock points need shoreline or dock-adjacent water placement.', 'Move the dock point closer to the waterfront until it turns valid.', anchor.id);
   }
+  if (anchor.typeId === 'search_zone' && !(Number(anchor.radius) >= 8)) {
+    pushIssue(issues, 'warning', 'search_zone_radius', 'Search zones should be large enough to scan while moving.', 'Increase the search radius so it is readable from the air.', anchor.id);
+  }
 }
 
 function validateActivityDraft(activity = {}) {
@@ -96,7 +99,7 @@ function validateActivityDraft(activity = {}) {
 
   const route = orderedRouteAnchors(anchors);
   if (
-    ['driving_route', 'walking_route', 'rooftop_run', 'interior_route', 'boat_course', 'fishing_trip', 'submarine_course', 'drone_course'].includes(template.id) &&
+    ['driving_route', 'rally_route', 'walking_route', 'rooftop_run', 'interior_route', 'boat_course', 'fishing_trip', 'submarine_course', 'drone_course', 'plane_course', 'location_hunt', 'search_rescue'].includes(template.id) &&
     route.length >= 2
   ) {
     for (let index = 1; index < route.length; index += 1) {

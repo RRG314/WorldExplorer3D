@@ -1,6 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { mergeBuildingMetadata } from "./building-metadata.js?v=1";
 import { supplementSparseBuildingData } from "./inferred-building-footprints.js?v=2";
+import { fetchBundledLandmarkData } from "./landmark-source.js?v=2";
+import { createLandmarkBuildingOwnership } from "./landmark-building-ownership.js?v=3";
+import { curatedLandmarksNear } from "./landmark-catalog.js?v=8";
 
 function buildingDataPriority(way) {
   const tags = way?.tags || {};
@@ -100,13 +103,31 @@ export function scheduleDeferredBuildingLoad(options = {}) {
       if (!isActiveLoadContext()) return;
       const inferredCoverage = supplementSparseBuildingData(data, appCtx);
 
+      const curatedLandmarks = curatedLandmarksNear(options.location);
+      let landmarkOwnership = createLandmarkBuildingOwnership(null, curatedLandmarks);
+      try {
+        const landmarkData = await fetchBundledLandmarkData({
+          lat: options.location?.lat,
+          lon: options.location?.lon
+        });
+        landmarkOwnership = createLandmarkBuildingOwnership(landmarkData, curatedLandmarks);
+      } catch (landmarkOwnershipErr) {
+        options.recordLoadWarning?.('landmark building ownership', landmarkOwnershipErr);
+      }
+
       const nodes = {};
       for (const element of data.elements || []) {
         if (element?.type === 'node') nodes[element.id] = element;
       }
-      const requested = (data.elements || []).filter((element) =>
+      const buildingNodeMap = new Map(
+        Object.entries(nodes).map(([id, node]) => [Number(id), node])
+      );
+      const buildingCandidates = (data.elements || []).filter((element) =>
         element?.type === 'way' && (element.tags?.building || element.tags?.['building:part'])
       );
+      const buildingOwnership = landmarkOwnership.partition(buildingCandidates, buildingNodeMap);
+      const requested = buildingOwnership.selected;
+      const suppressedLandmarkBuildings = buildingOwnership.suppressed.length;
       const buildingWays = options.limitWaysByTileBudget(requested, nodes, {
         globalCap: options.maxBuildingWays,
         basePerTile: options.tileBudgetCfg.buildingsPerTile,
@@ -153,7 +174,12 @@ export function scheduleDeferredBuildingLoad(options = {}) {
         endpoint: data._overpassEndpoint || null,
         metadata: data._buildingMetadata || metadataState,
         sourceDetails: data._overtureBuildings || data._shortbreadTiles || null,
-        inferredCoverage
+        inferredCoverage,
+        landmarkOwnership: {
+          footprints: landmarkOwnership.footprintCount,
+          curatedSites: landmarkOwnership.curatedCount,
+          suppressedBuildings: suppressedLandmarkBuildings
+        }
       });
     } catch (err) {
       options.recordLoadWarning?.('deferred buildings', err);

@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { fetchBundledLandmarkData } from "./landmark-source.js?v=2";
 import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=7";
-import { renderCuratedLandmarkModels } from './landmark-models.js?v=12';
+import { renderCuratedLandmarkModels } from './landmark-models.js?v=15';
 
 const MAX_PYRAMIDS = 48;
 const MAX_WALL_WAYS = 140;
@@ -68,6 +68,43 @@ function addHistoricSite(way, points, kind, height) {
   });
 }
 
+function createSolidPyramid(footprint, height, baseY) {
+  if (footprint.length < 3) return null;
+  const center = footprint.reduce((sum, point) => ({
+    x: sum.x + point.x,
+    z: sum.z + point.z
+  }), { x: 0, z: 0 });
+  center.x /= footprint.length;
+  center.z /= footprint.length;
+  const positions = [];
+  for (let index = 0; index < footprint.length; index += 1) {
+    const point = footprint[index];
+    const next = footprint[(index + 1) % footprint.length];
+    positions.push(
+      point.x, baseY, point.z,
+      next.x, baseY, next.z,
+      center.x, baseY + height, center.z
+    );
+  }
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+  geometry.computeVertexNormals();
+  const material = new THREE.MeshStandardMaterial({
+    color: 0xb99a68,
+    roughness: 0.98,
+    metalness: 0,
+    flatShading: true,
+    emissive: 0x3c2d1d,
+    emissiveIntensity: 0.16,
+    side: THREE.DoubleSide
+  });
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  mesh.frustumCulled = false;
+  return mesh;
+}
+
 function createPyramidMesh(way, nodes, sanitizeFootprint, registerBuildingCollision) {
   const points = wayPoints(way, nodes, sanitizeFootprint, true);
   if (points.length < 3 || typeof THREE === 'undefined') return null;
@@ -82,39 +119,14 @@ function createPyramidMesh(way, nodes, sanitizeFootprint, registerBuildingCollis
 
   const tags = way.tags || {};
   const height = numericMeters(tags.height ?? tags['roof:height'], DEFAULT_PYRAMID_HEIGHT, 3, 220);
-  let centerX = 0;
-  let centerZ = 0;
   let baseY = 0;
   for (let i = 0; i < footprint.length; i++) {
-    centerX += footprint[i].x;
-    centerZ += footprint[i].z;
     baseY += appCtx.elevationWorldYAtWorldXZ(footprint[i].x, footprint[i].z);
   }
-  centerX /= footprint.length;
-  centerZ /= footprint.length;
   baseY /= footprint.length;
 
-  const positions = [];
-  for (let i = 0; i < footprint.length; i++) {
-    const current = footprint[i];
-    const next = footprint[(i + 1) % footprint.length];
-    positions.push(
-      current.x, baseY, current.z,
-      next.x, baseY, next.z,
-      centerX, baseY + height, centerZ
-    );
-  }
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
-  geometry.computeVertexNormals();
-  geometry.computeBoundingSphere();
-  const material = new THREE.MeshStandardMaterial({
-    color: 0xc9a96a,
-    roughness: 0.96,
-    metalness: 0.01,
-    side: THREE.DoubleSide
-  });
-  const mesh = new THREE.Mesh(geometry, material);
+  const mesh = createSolidPyramid(footprint, height, baseY);
+  if (!mesh) return null;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   mesh.frustumCulled = false;
@@ -313,33 +325,40 @@ function renderLandmarks(data, options) {
 
 export function scheduleDeferredLandmarkLoad(options = {}) {
   const query = String(options.query || '');
-  if (!query || typeof options.fetchOverpassJSON !== 'function') return;
   globalThis.setTimeout(async () => {
     if (!options.isActiveLoadContext?.()) return;
+    const metrics = {
+      requested: 0,
+      pyramids: 0,
+      walls: 0,
+      suspensionBridge: null,
+      actorReprojected: false
+    };
+    let data = null;
     try {
       const timeoutMs = Math.max(7000, Math.min(18000, Number(options.timeoutMs) || 14000));
       const bundledData = await fetchBundledLandmarkData({ lat: appCtx.LOC?.lat, lon: appCtx.LOC?.lon });
-      const data = bundledData || await options.fetchOverpassJSON(
+      data = bundledData || (query && typeof options.fetchOverpassJSON === 'function' ? await options.fetchOverpassJSON(
           query,
           timeoutMs,
           performance.now() + timeoutMs + 800,
           options.cacheMeta || null
-        );
-      if (!options.isActiveLoadContext?.()) return;
-      const metrics = renderLandmarks(data, options);
-      metrics.curatedModels = await renderCuratedLandmarkModels(options);
-      if (!options.isActiveLoadContext?.()) return;
-      metrics.source = data._overpassSource || null;
-      metrics.packId = data._landmarkPackId || null;
-      options.loadMetrics.landmarks = metrics;
-      if (appCtx.perfStats?.lastLoad) appCtx.perfStats.lastLoad.landmarks = metrics;
-      options.updateWorldLod?.(true);
-      console.log(
-        `[WorldLoad] Deferred landmarks ready (${metrics.pyramids} pyramids, ${metrics.walls} walls, ` +
-        `${metrics.suspensionBridge?.towerParts || 0} bridge tower parts).`
-      );
+        ) : null);
     } catch (err) {
       options.recordLoadWarning?.('deferredLandmarks', err);
     }
+    if (!options.isActiveLoadContext?.()) return;
+    if (data) Object.assign(metrics, renderLandmarks(data, options));
+    metrics.curatedModels = await renderCuratedLandmarkModels(options);
+    if (!options.isActiveLoadContext?.()) return;
+    metrics.source = data?._overpassSource || null;
+    metrics.packId = data?._landmarkPackId || null;
+    options.loadMetrics.landmarks = metrics;
+    if (appCtx.perfStats?.lastLoad) appCtx.perfStats.lastLoad.landmarks = metrics;
+    options.updateWorldLod?.(true);
+    console.log(
+      `[WorldLoad] Deferred landmarks ready (${metrics.pyramids} pyramids, ${metrics.walls} walls, ` +
+      `${metrics.suspensionBridge?.towerParts || 0} bridge tower parts).`
+    );
   }, 240);
 }

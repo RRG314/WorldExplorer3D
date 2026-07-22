@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { captureEarthWorldSession } from "./earth-session.js?v=16";
+import { captureEarthWorldSession } from "./earth-session.js?v=18";
 import {
   DEFAULT_WAVE_INTENSITY,
   SEA_STATE_CONFIG,

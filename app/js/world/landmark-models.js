@@ -1,8 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { curatedLandmarksNear } from './landmark-catalog.js?v=7';
+import { curatedLandmarksNear } from './landmark-catalog.js?v=8';
 import { createMeasuredEiffelTower } from './eiffel-structure.js?v=1';
 import { createMeasuredElizabethTower } from './elizabeth-tower-structure.js?v=1';
-import { createMeasuredKhufuPyramid } from './giza-pyramid-structure.js?v=3';
 
 function disposeModel(root) {
   root?.traverse?.((object) => {
@@ -17,7 +16,7 @@ function colorizeModel(root, landmark) {
     color: landmark.color,
     roughness: landmark.id === 'eiffel-tower' ? 0.63 : 0.9,
     metalness: landmark.id === 'eiffel-tower' ? 0.34 : 0.02,
-    flatShading: landmark.id === 'pyramid-khufu',
+    flatShading: false,
     side: THREE.DoubleSide,
     emissive: landmark.id === 'eiffel-tower' ? 0x42200c : landmark.id === 'elizabeth-tower' ? 0x241c0e : 0x000000,
     emissiveIntensity: landmark.id === 'eiffel-tower' ? 0.72 : landmark.id === 'elizabeth-tower' ? 0.16 : 0
@@ -96,7 +95,6 @@ async function loadCuratedLandmark(landmark, isActiveLoadContext) {
   let model;
   if (landmark.builder === 'measured-eiffel-tower') model = createMeasuredEiffelTower();
   else if (landmark.builder === 'measured-elizabeth-tower') model = createMeasuredElizabethTower();
-  else if (landmark.builder === 'measured-khufu-pyramid') model = createMeasuredKhufuPyramid();
   else model = await loadModel(landmark.modelUrl);
   if (!isActiveLoadContext?.()) {
     disposeModel(model);

@@ -41,7 +41,7 @@ function buildMappedPedestrianBatch(appCtx, candidates, subtype) {
   const batch = new THREE.Mesh(geometry, material);
   batch.renderOrder = 2;
   batch.receiveShadow = false;
-  batch.frustumCulled = false;
+  batch.frustumCulled = true;
   batch.userData.isLinearFeatureLine = true;
   batch.userData.isLinearFeatureBatch = true;
   batch.userData.alwaysMappedPedestrian = true;

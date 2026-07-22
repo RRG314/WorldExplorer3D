@@ -25,6 +25,8 @@ function systemSnapshot(record) {
     fixedUpdates: record.fixedUpdates,
     failures: record.failures,
     lastDurationMs: Number(record.lastDurationMs.toFixed(3)),
+    smoothedDurationMs: Number(record.smoothedDurationMs.toFixed(3)),
+    maxDurationMs: Number(record.maxDurationMs.toFixed(3)),
     lastError: record.lastError
   };
 }
@@ -88,6 +90,8 @@ function createRuntimeKernel(options = {}) {
       fixedUpdates: 0,
       failures: 0,
       lastDurationMs: 0,
+      smoothedDurationMs: 0,
+      maxDurationMs: 0,
       lastError: ''
     };
     systems.set(id, record);
@@ -130,6 +134,10 @@ function createRuntimeKernel(options = {}) {
       if (method === 'fixedUpdate') record.fixedUpdates++;
       else record.updates++;
       record.lastDurationMs = Math.max(0, now() - startedAt);
+      record.smoothedDurationMs = record.smoothedDurationMs <= 0
+        ? record.lastDurationMs
+        : record.smoothedDurationMs * 0.9 + record.lastDurationMs * 0.1;
+      record.maxDurationMs = Math.max(record.maxDurationMs, record.lastDurationMs);
     } catch (error) {
       record.failures++;
       record.lastError = error instanceof Error ? error.message : String(error);
@@ -244,10 +252,18 @@ function createRuntimeKernel(options = {}) {
       maxDelta,
       lastFrameDurationMs: Number(lastFrameDurationMs.toFixed(3)),
       owners: records.reduce((owners, record) => {
-        const owner = owners[record.owner] || { systems: [], failures: 0, lastDurationMs: 0 };
+        const owner = owners[record.owner] || {
+          systems: [],
+          failures: 0,
+          lastDurationMs: 0,
+          smoothedDurationMs: 0,
+          maxDurationMs: 0
+        };
         owner.systems.push(record.id);
         owner.failures += record.failures;
         owner.lastDurationMs = Number((owner.lastDurationMs + record.lastDurationMs).toFixed(3));
+        owner.smoothedDurationMs = Number((owner.smoothedDurationMs + record.smoothedDurationMs).toFixed(3));
+        owner.maxDurationMs = Math.max(owner.maxDurationMs, record.maxDurationMs);
         owners[record.owner] = owner;
         return owners;
       }, {}),

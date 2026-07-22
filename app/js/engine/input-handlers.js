@@ -2,7 +2,8 @@ export function setupEngineInputHandlers(appCtx) {
   const wrapYaw = (angle = 0) => Math.atan2(Math.sin(angle), Math.cos(angle));
   const gameplayKeys = new Set([
     'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
-    'Space', 'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX', 'KeyZ'
+    'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight',
+    'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyX', 'KeyZ'
   ]);
   const isFormControl = (target) => !!target && (
     target.isContentEditable ||

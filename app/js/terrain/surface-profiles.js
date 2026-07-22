@@ -6,7 +6,13 @@ import {
   classifyWorldCoverSurface,
   loadWorldCoverBaseline,
   worldCoverSupportsBounds
-} from "./worldcover-baseline.js?v=10";
+} from "./worldcover-baseline.js?v=11";
+import {
+  releaseTerrainTextureSets,
+  retainTerrainTextureSet,
+  terrainTextureCacheSnapshot
+} from "./texture-set-cache.js?v=1";
+import { applyWorldCoverNeighborFallback } from "./worldcover-neighbor-fallback.js?v=1";
 
 const SNOW_COLOR_HEX = 0xffffff;
 const ALPINE_SNOW_COLOR_HEX = 0xe5ebf2;
@@ -24,16 +30,6 @@ const GROUND_FALLBACK_URBAN_HEX = 0x767a82;
 const GROUND_FALLBACK_SOIL_HEX = 0x7d5e3d;
 const GROUND_FALLBACK_ROCK_HEX = 0x6e7279;
 const GROUND_FALLBACK_FOREST_HEX = 0x3f5633;
-
-function cloneTerrainTextureWithRepeat(sourceTexture, repeats) {
-  if (!sourceTexture) return null;
-  const texture = sourceTexture.clone();
-  texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-  texture.repeat.set(repeats, repeats);
-  texture.needsUpdate = true;
-  return texture;
-}
-
 const proceduralTerrainTextureBases = {
   snow: null,
   snowRock: null,
@@ -263,9 +259,10 @@ function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
   }
   if (!source) return null;
 
+  const sharedRepeats = Math.max(2, Math.round((Number(repeats) || 12) / 2) * 2);
   const textureCacheKey = [
     modeKey,
-    Number(repeats) || 12,
+    sharedRepeats,
     source.map?.uuid || 'none',
     source.normalMap?.uuid || 'none',
     source.roughnessMap?.uuid || 'none'
@@ -275,15 +272,13 @@ function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
     return mesh.userData.terrainTextureSet;
   }
 
-  const textureSet = {
-    map: cloneTerrainTextureWithRepeat(source.map, repeats),
-    normalMap: cloneTerrainTextureWithRepeat(source.normalMap, repeats),
-    roughnessMap: cloneTerrainTextureWithRepeat(source.roughnessMap, repeats)
-  };
+  const textureSet = retainTerrainTextureSet(mesh, textureCacheKey, source, sharedRepeats);
   mesh.userData.terrainTextureSetsByMode[textureCacheKey] = textureSet;
   mesh.userData.terrainTextureSet = textureSet;
   return textureSet;
 }
+
+export { releaseTerrainTextureSets, terrainTextureCacheSnapshot };
 
 let cachedGroundFallbackMesh = null;
 
@@ -474,6 +469,12 @@ function applyPendingSemanticSurface(material, mode) {
   material.needsUpdate = true;
 }
 
+function applyDominantNaturalWorldCoverFallback() {
+  applyWorldCoverNeighborFallback(appCtx.terrainGroup, (mesh, profile) => {
+    applyTerrainVisualProfile(mesh, profile, null, { queueWorldCover: false });
+  });
+}
+
 function queueWorldCoverBaseline(mesh, bounds) {
   if (!mesh?.userData || !worldCoverSupportsBounds(bounds)) return;
   if (mesh.userData.worldCoverResult) {
@@ -515,6 +516,7 @@ function queueWorldCoverBaseline(mesh, bounds) {
         stats.classes[className] = Number(stats.classes[className] || 0) + Number(count || 0);
       });
       applyLoadedWorldCoverBaseline(mesh);
+      applyDominantNaturalWorldCoverFallback();
     })
     .catch(() => {
       mesh.userData.worldCoverPromise = null;
@@ -522,6 +524,7 @@ function queueWorldCoverBaseline(mesh, bounds) {
       if (mesh.userData.terrainDisposed) return;
       mesh.userData.worldCoverStatus = 'unavailable';
       stats.failed += 1;
+      applyDominantNaturalWorldCoverFallback();
     });
 }
 

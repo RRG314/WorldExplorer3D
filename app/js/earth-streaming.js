@@ -3,7 +3,7 @@ import { currentActorWorldPosition } from "./earth-location.js?v=2";
 import {
   SOURCE_PROFILE,
   createSurfaceTileDescriptor
-} from "./world/surface-contract.js?v=6";
+} from "./world/surface-contract.js?v=7";
 
 const STREAM_TILE_ZOOM = 14;
 const UPDATE_INTERVAL_SECONDS = 0.25;

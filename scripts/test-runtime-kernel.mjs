@@ -1,5 +1,15 @@
 import assert from 'node:assert/strict';
+import { createCoreFrameSystems } from '../app/js/runtime/core-frame-systems.js';
+import { diagnoseRuntimeBudgets } from '../app/js/runtime/budget-diagnostics.js';
 import { RUNTIME_PHASES, createRuntimeKernel } from '../app/js/runtime/kernel.js';
+
+const loadingSystems = createCoreFrameSystems({ gameStarted: true, worldLoading: true });
+const loadingSystem = (id) => loadingSystems.find((system) => system.id === id);
+assert.equal(loadingSystem('core.input').enabled(), false);
+assert.equal(loadingSystem('core.simulation').enabled(), false);
+assert.equal(loadingSystem('core.world').enabled(), false);
+assert.equal(loadingSystem('core.camera').enabled(), false);
+assert.equal(loadingSystem('core.presentation').enabled(), true);
 
 const calls = [];
 let requestedFrame = null;
@@ -67,6 +77,41 @@ assert.equal(snapshot.phases.input[0].id, 'test.input');
 assert.equal(snapshot.phases.simulation[0].fixedUpdates, 2);
 assert.equal(snapshot.phases.world[0].updates, 0);
 assert.equal(snapshot.owners['input-test'].systems[0], 'test.input');
+assert.equal(typeof snapshot.owners['simulation-test'].smoothedDurationMs, 'number');
+assert.equal(typeof snapshot.phases.simulation[0].maxDurationMs, 'number');
+
+const budgetStatus = diagnoseRuntimeBudgets({
+  runtimeKernel: {
+    lastFrameDurationMs: 41,
+    phases: {
+      simulation: [{ id: 'core.simulation', owner: 'world', phase: 'simulation', smoothedDurationMs: 17, maxDurationMs: 27 }],
+      render: [{ id: 'core.renderer', owner: 'renderer', phase: 'render', smoothedDurationMs: 6, maxDurationMs: 10 }]
+    },
+    owners: {
+      world: { systems: ['core.world'], smoothedDurationMs: 18, maxDurationMs: 28 },
+      engine: { systems: ['core.simulation'], smoothedDurationMs: 7, maxDurationMs: 12 }
+    }
+  },
+  renderer: { calls: 1200, triangles: 1200000, geometries: 400, textures: 40 },
+  browserMemory: { usedBytes: 1200 * 1024 * 1024 },
+  streamingResources: { pendingGeometryDisposals: 240 },
+  lastLoad: { loadMs: 72000 },
+  renderReadiness: { durationMs: 9500 }
+});
+assert.equal(budgetStatus.ok, false);
+assert.equal(budgetStatus.topRuntimeOwner.owner, 'world');
+assert.equal(budgetStatus.topRuntimeSystem.id, 'core.simulation');
+assert.deepEqual(
+  budgetStatus.violations.map((violation) => `${violation.metric}:${violation.owner}`),
+  [
+    'frameMs:world',
+    'calls:world-rendering',
+    'heapBytes:resource-lifecycle',
+    'pendingGeometryDisposals:earth-streaming',
+    'loadMs:world-loading',
+    'renderReadyMs:renderer-readiness'
+  ]
+);
 
 assert.equal(kernel.unregisterOwner('input-test'), 1);
 assert.equal(kernel.snapshot().owners['input-test'], undefined);

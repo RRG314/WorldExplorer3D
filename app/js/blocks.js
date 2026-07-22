@@ -7,10 +7,10 @@ import {
   normalizeBlockMaterial,
   normalizeBlockRotation,
   normalizeBlockShape
-} from "./block-builder/catalog.js?v=1";
-import { createBuildCollisionQueries } from "./block-builder/collision.js?v=1";
-import { createBlockLocalStore } from './block-builder/local-store.js?v=1';
-import { createSharedBlockSync } from './block-builder/shared-sync.js?v=1';
+} from "./block-builder/catalog.js?v=4";
+import { createBuildCollisionQueries } from "./block-builder/collision.js?v=2";
+import { createBlockLocalStore } from './block-builder/local-store.js?v=2';
+import { createSharedBlockSync } from './block-builder/shared-sync.js?v=2';
 // ============================================================================
 // blocks.js - Lightweight voxel-style builder (place/stack/remove brick blocks)
 // ============================================================================
@@ -265,8 +265,11 @@ function ensureBuildMaterials() {
   BLOCK_MATERIALS.forEach((material) => {
     buildMaterials.push(new THREE.MeshStandardMaterial({
       color: material.color,
-      roughness: 0.82,
-      metalness: 0.02
+      roughness: Number.isFinite(material.roughness) ? material.roughness : 0.82,
+      metalness: Number.isFinite(material.metalness) ? material.metalness : 0.02,
+      transparent: Number.isFinite(material.opacity) && material.opacity < 1,
+      opacity: Number.isFinite(material.opacity) ? material.opacity : 1,
+      depthWrite: !(Number.isFinite(material.opacity) && material.opacity < 1)
     }));
   });
 }

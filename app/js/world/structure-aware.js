@@ -4,7 +4,7 @@ import {
   buildFeatureStations,
   buildFeatureTransitionAnchors,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=16";
+} from "../structure-semantics.js?v=17";
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -23,7 +23,8 @@ export function cloneStructureSemantics(semantics) {
 }
 
 export function worldBaseTerrainY(x, z) {
-  if (typeof appCtx.baseTerrainHeightAt === 'function') return appCtx.baseTerrainHeightAt(x, z);
+  const surfaceY = appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y;
+  if (Number.isFinite(surfaceY)) return surfaceY;
   if (typeof appCtx.terrainMeshHeightAt === 'function') return appCtx.terrainMeshHeightAt(x, z);
   return appCtx.elevationWorldYAtWorldXZ(x, z);
 }

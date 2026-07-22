@@ -1,0 +1,26 @@
+{
+  "name": "@we3d/mmo-server",
+  "version": "0.1.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "WE3D_MMO_ALLOW_TEST_AUTH=true node --watch src/main.js",
+    "start": "node src/main.js",
+    "test": "node --test --test-concurrency=1 test/*.test.mjs",
+    "test:firestore:emulator": "node --test test/firestore-store.test.mjs"
+  },
+  "dependencies": {
+    "@colyseus/core": "^0.17.42",
+    "@colyseus/schema": "^4.0.28",
+    "@colyseus/ws-transport": "^0.17.13",
+    "@we3d/mmo-contracts": "*",
+    "firebase-admin": "^14.2.0"
+  },
+  "devDependencies": {
+    "@colyseus/sdk": "^0.17.43"
+  }
+}

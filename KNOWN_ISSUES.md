@@ -1,6 +1,6 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-07-20 for version 3.1.0.
+Last reviewed: 2026-07-22 for version 4.0.0.
 
 ## Map Coverage
 
@@ -18,7 +18,7 @@ Last reviewed: 2026-07-20 for version 3.1.0.
 
 - Geocoding, map geometry, elevation, imagery, weather, and other live context can be degraded by upstream rate limits or outages.
 - The runtime includes timeout and fallback behavior, but a fallback may be less detailed than the primary source.
-- OpenSky access can be restricted from some cloud-hosting networks. The release preview must pass the production-egress preflight; otherwise aircraft remain explicitly labeled reference routes rather than observed flights.
+- ADSB.lol is the default observed-aircraft provider and can degrade under upstream outages or rate limits. OpenSky is disabled by default and is not a release dependency; operators may enable it only after obtaining any required written provider agreement.
 - Panoramax and KartaView street imagery is an inspection layer with uneven global coverage. It is not used as an unlicensed facade texture source.
 - Live vessel positions are not currently presented as observed AIS data. Shipping corridors remain labeled reference data until an AIS source and redistribution license are selected.
 - NOAA water-level observations and tide predictions are limited to supported stations, primarily in the United States. Open-Meteo marine values are modeled guidance and remain labeled separately.

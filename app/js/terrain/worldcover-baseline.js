@@ -356,12 +356,17 @@ async function createSemanticTexture(blob, size) {
   const sampleStep = Math.max(6, Math.round(size / 16));
   for (let y = Math.floor(sampleStep / 2); y < size; y += sampleStep) {
     for (let x = Math.floor(sampleStep / 2); x < size; x += sampleStep) {
-      const kind = classes[y * size + x]?.name || '';
+      const seed = Math.imul(x + 1, 73856093) ^ Math.imul(y + 1, 19349663);
+      const offsetX = ((seed >>> 4) % sampleStep) - Math.floor(sampleStep / 2);
+      const offsetY = ((seed >>> 13) % sampleStep) - Math.floor(sampleStep / 2);
+      const sampleX = Math.max(0, Math.min(size - 1, x + offsetX));
+      const sampleY = Math.max(0, Math.min(size - 1, y + offsetY));
+      const kind = classes[sampleY * size + sampleX]?.name || '';
       if (!vegetationKinds.has(kind)) continue;
       vegetationSamples.push({
         kind,
-        u: (x + 0.5) / size,
-        v: (y + 0.5) / size
+        u: (sampleX + 0.5) / size,
+        v: (sampleY + 0.5) / size
       });
     }
   }

@@ -1,4 +1,4 @@
-import { getBlockShapeSurface } from './catalog.js?v=1';
+import { getBlockShapeSurface } from './catalog.js?v=4';
 
 function createBuildCollisionQueries(options) {
   const {

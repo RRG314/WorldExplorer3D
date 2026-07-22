@@ -1,8 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import http from 'node:http';
-import net from 'node:net';
 import { chromium } from 'playwright';
+import { startServer } from './runtime-test-server.mjs';
 
 const rootDir = process.cwd();
 const host = '127.0.0.1';
@@ -11,93 +10,6 @@ const outputDir = path.join(rootDir, 'output', 'playwright', 'editor-multiplayer
 
 async function mkdirp(dir) {
   await fs.mkdir(dir, { recursive: true });
-}
-
-async function exists(filePath) {
-  try {
-    await fs.access(filePath);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function serveStaticRoot(port) {
-  const sockets = new Set();
-  const mime = new Map([
-    ['.html', 'text/html; charset=utf-8'],
-    ['.js', 'text/javascript; charset=utf-8'],
-    ['.css', 'text/css; charset=utf-8'],
-    ['.json', 'application/json; charset=utf-8'],
-    ['.png', 'image/png'],
-    ['.jpg', 'image/jpeg'],
-    ['.jpeg', 'image/jpeg'],
-    ['.svg', 'image/svg+xml'],
-    ['.webp', 'image/webp'],
-    ['.ico', 'image/x-icon'],
-    ['.map', 'application/json; charset=utf-8']
-  ]);
-
-  const server = http.createServer(async (req, res) => {
-    try {
-      const reqUrl = new URL(req.url || '/', `http://${host}:${port}`);
-      let relPath = decodeURIComponent(reqUrl.pathname || '/');
-      if (relPath === '/') relPath = '/index.html';
-
-      const resolved = path.resolve(path.join(rootDir, relPath));
-      if (!resolved.startsWith(rootDir)) {
-        res.writeHead(403).end('forbidden');
-        return;
-      }
-
-      let filePath = resolved;
-      const stat = await fs.stat(filePath).catch(() => null);
-      if (stat?.isDirectory()) filePath = path.join(filePath, 'index.html');
-      if (!(await exists(filePath))) {
-        res.writeHead(404).end('not found');
-        return;
-      }
-
-      const ext = path.extname(filePath).toLowerCase();
-      const contentType = mime.get(ext) || 'application/octet-stream';
-      const buf = await fs.readFile(filePath);
-      res.writeHead(200, { 'Content-Type': contentType });
-      res.end(buf);
-    } catch (err) {
-      res.writeHead(500).end(String(err?.message || err));
-    }
-  });
-
-  server.on('connection', (socket) => {
-    sockets.add(socket);
-    socket.on('close', () => sockets.delete(socket));
-  });
-
-  await new Promise((resolve, reject) => {
-    server.once('error', reject);
-    server.listen(port, host, resolve);
-  });
-
-  return {
-    port,
-    close: () => new Promise((resolve) => {
-      for (const socket of sockets) {
-        if (socket instanceof net.Socket) socket.destroy();
-      }
-      server.close(resolve);
-    })
-  };
-}
-
-async function startServer() {
-  for (const port of candidatePorts) {
-    try {
-      return await serveStaticRoot(port);
-    } catch {
-      // try next
-    }
-  }
-  throw new Error(`Unable to start local static server on ports: ${candidatePorts.join(', ')}`);
 }
 
 async function bootstrapEarthRuntime(page, baseUrl) {
@@ -177,11 +89,13 @@ async function runBlockBuilderAudit(page) {
     const angle = Number(walker?.angle) || 0;
     const forward = { x: Math.sin(angle), z: Math.cos(angle) };
     const right = { x: Math.cos(angle), z: -Math.sin(angle) };
-    const shapes = ['cube', 'slab', 'ramp', 'column'];
-    const sides = [-2.4, -0.8, 0.8, 2.4];
+    const shapes = ['cube', 'slab', 'ramp', 'column', 'cylinder', 'wedge', 'pyramid', 'stairs', 'wall', 'beam', 'roof', 'panel'];
     const placed = shapes.map((shape, index) => {
-      const gx = Math.round(walker.x + forward.x * 5 + right.x * sides[index]);
-      const gz = Math.round(walker.z + forward.z * 5 + right.z * sides[index]);
+      const row = Math.floor(index / 4);
+      const side = (index % 4 - 1.5) * 2;
+      const distance = 4 + row * 2;
+      const gx = Math.round(walker.x + forward.x * distance + right.x * side);
+      const gz = Math.round(walker.z + forward.z * distance + right.z * side);
       const ground = ctx.terrainMeshHeightAt?.(gx, gz) ?? 0;
       return ctx.placeBuildBlock?.(gx, Math.round(ground + 0.5), gz, index, {
         shape,
@@ -294,6 +208,7 @@ async function runAudit(page, baseUrl) {
     builder: {},
     editor: {},
     activityCreator: {},
+    interiors: {},
     creatorLibrary: {},
     overlayRuntime: {},
     multiplayer: {}
@@ -349,7 +264,10 @@ async function runAudit(page, baseUrl) {
   await waitFor(page, () => !!document.getElementById('activityCreatorPanel')?.classList.contains('show'));
   report.activityCreator.open = await page.evaluate(async () => {
     const mod = await import('/app/js/shared-context.js?v=55');
-    return mod.ctx.getActivityCreatorSnapshot();
+    return {
+      ...mod.ctx.getActivityCreatorSnapshot(),
+      templates: Array.from(document.querySelectorAll('#activityCreatorTemplateSelect option')).map((option) => option.value)
+    };
   });
   await settleVisualFrame(page);
   await page.screenshot({ path: path.join(outputDir, 'activity-creator-open.png') });
@@ -366,7 +284,7 @@ async function runAudit(page, baseUrl) {
 
   console.log('[audit] creator library roundtrip');
   report.creatorLibrary = await page.evaluate(async () => {
-    const lib = await import('/app/js/activity-discovery/library.js?v=2');
+    const lib = await import('/app/js/activity-discovery/library.js?v=3');
     const before = lib.listStoredActivities().length;
     const saved = lib.saveCreatorActivityDraft({
       templateId: 'walking_route',
@@ -404,6 +322,68 @@ async function runAudit(page, baseUrl) {
     }
     return ctx.getApprovedEditorContributionSnapshot?.() || null;
   });
+
+  console.log('[audit] mapped building interior');
+  report.interiors.entry = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    ctx.setTravelMode?.('walk', { source: 'interior_acceptance', force: true });
+    const target = (ctx.buildings || []).find((building) => (
+      ctx.isEnterableBuildingCandidate?.(building) && ctx.normalizeRoomBaseFeatureId?.(building)
+    ));
+    if (!target) return { found: false };
+    const support = ctx.resolveBuildingEntrySupport?.(target, { allowSynthetic: false, forceRefresh: true });
+    if (!support?.enterable) return { found: true, enterable: false };
+    const walker = ctx.Walk?.state?.walker;
+    if (!walker) return { found: true, enterable: true, walker: false };
+    walker.x = support.entryAnchor.x;
+    walker.z = support.entryAnchor.z;
+    walker.y = (ctx.SurfaceQuery?.walkAt?.(walker.x, walker.z)?.position?.y ?? 0) + 1.7;
+    const entered = await Promise.race([
+      ctx.enterInteriorForSupport(support),
+      new Promise((resolve) => setTimeout(() => resolve(false), 30000))
+    ]);
+    const active = ctx.activeInterior;
+    return {
+      found: true,
+      enterable: true,
+      entered: entered === true,
+      sourceId: ctx.normalizeRoomBaseFeatureId(target),
+      label: support.label,
+      mode: active?.mode || '',
+      usableArea: Number(active?.usableArea || 0),
+      exteriorArea: Number(active?.exteriorArea || 0),
+      partitionCount: Number(active?.partitionCount || 0),
+      walkSurfaceCount: Number(active?.walkSurfaces?.length || 0)
+    };
+  });
+  await settleVisualFrame(page);
+  await page.screenshot({ path: path.join(outputDir, 'mapped-building-interior.png') });
+
+  report.interiors.roomTeardown = await page.evaluate(async (sourceId) => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    ctx.clearActiveInterior?.({ restorePlayer: true, preserveCache: true });
+    const target = (ctx.buildings || []).find((building) => ctx.normalizeRoomBaseFeatureId?.(building) === sourceId);
+    const matchingMeshes = (ctx.buildingMeshes || []).filter((mesh) => ctx.normalizeRoomBaseFeatureId?.(mesh?.userData || {}) === sourceId);
+    ctx.applyRoomBaseSuppressions?.([{ sourceId }], { reload: false });
+    const suppressed = {
+      colliderDisabled: target?.collisionDisabled === true,
+      roomSuppressed: target?.roomSuppressed === true,
+      hiddenMeshCount: matchingMeshes.filter((mesh) => mesh.visible === false).length,
+      meshCount: matchingMeshes.length,
+      enterable: ctx.isEnterableBuildingCandidate?.(target) === true
+    };
+    ctx.clearRoomBaseSuppressions?.({ reload: false });
+    return {
+      sourceId,
+      suppressed,
+      restored: {
+        colliderDisabled: target?.collisionDisabled === true,
+        roomSuppressed: target?.roomSuppressed === true,
+        enterable: ctx.isEnterableBuildingCandidate?.(target) === true,
+        visibleMeshCount: matchingMeshes.filter((mesh) => mesh.visible !== false).length
+      }
+    };
+  }, report.interiors.entry.sourceId);
 
   const earthRoom = {
     id: 'audit_earth',
@@ -518,7 +498,9 @@ async function runAudit(page, baseUrl) {
         attached: ctx.earthSceneRoot?.parent === ctx.scene,
         children: Number(ctx.earthSceneRoot?.children?.length || 0),
         visible: ctx.earthSceneRoot?.visible === true
-      }
+      },
+      skyMode: ctx.skyMode || null,
+      skyBackground: ctx.scene?.background?.isColor ? ctx.scene.background.getHexString() : null
     };
   });
   await settleVisualFrame(page);
@@ -528,12 +510,12 @@ async function runAudit(page, baseUrl) {
 }
 
 function assertReport(report) {
-  if (report.builder.visual?.shapeControls !== 4) throw new Error('Builder shape controls are incomplete.');
-  if (report.builder.visual?.colorControls !== 8) throw new Error('Builder color controls are incomplete.');
+  if (report.builder.visual?.shapeControls !== 12) throw new Error('Builder shape controls are incomplete.');
+  if (report.builder.visual?.colorControls !== 16) throw new Error('Builder material controls are incomplete.');
   if (report.builder.visual?.maxCount !== 200) throw new Error('Builder limit is not 200 blocks.');
   if (report.builder.visual?.placed?.some((placed) => placed !== true)) throw new Error('A builder shape did not render.');
-  if (new Set(report.builder.visual?.meshes?.map((mesh) => mesh.shape)).size !== 4) throw new Error('Rendered builder shapes are not distinct.');
-  if (new Set(report.builder.visual?.meshes?.map((mesh) => mesh.color)).size !== 4) throw new Error('Rendered builder colors are not distinct.');
+  if (new Set(report.builder.visual?.meshes?.map((mesh) => mesh.shape)).size !== 12) throw new Error('Rendered builder shapes are not distinct.');
+  if (new Set(report.builder.visual?.meshes?.map((mesh) => mesh.color)).size !== 12) throw new Error('Rendered builder materials are not distinct.');
   if (report.builder.limit?.accepted !== 200 || report.builder.limit?.overflowAccepted !== false) throw new Error('Builder 200-block boundary failed.');
   const jumpArcObserved = report.builder.jump?.airborneSamples >= 1 ||
     report.builder.jump?.maxY > report.builder.jump?.startY + 0.5;
@@ -548,9 +530,21 @@ function assertReport(report) {
   if (report.editor.open?.active !== true) throw new Error('Editor did not open.');
   if (report.editor.closed?.active !== false) throw new Error('Editor did not close cleanly.');
   if (report.activityCreator.open?.active !== true) throw new Error('Activity creator did not open.');
+  for (const templateId of ['rally_route', 'plane_course', 'location_hunt', 'search_rescue']) {
+    if (!report.activityCreator.open?.templates?.includes(templateId)) throw new Error(`Activity creator is missing ${templateId}.`);
+  }
   if (report.activityCreator.closed?.active !== false) throw new Error('Activity creator did not close cleanly.');
   if (!(report.creatorLibrary.afterSave > report.creatorLibrary.before)) throw new Error('Creator library save did not persist.');
   if (!(report.creatorLibrary.afterRemove <= report.creatorLibrary.afterSave - 1)) throw new Error('Creator library cleanup did not remove the saved draft.');
+  if (report.interiors.entry?.entered !== true || report.interiors.entry?.usableArea <= 12 || report.interiors.entry?.walkSurfaceCount < 1) {
+    throw new Error(`Mapped building interior acceptance failed: ${JSON.stringify(report.interiors.entry)}`);
+  }
+  if (!report.interiors.roomTeardown?.suppressed?.colliderDisabled || report.interiors.roomTeardown?.suppressed?.enterable !== false) {
+    throw new Error(`Room building suppression failed: ${JSON.stringify(report.interiors.roomTeardown)}`);
+  }
+  if (report.interiors.roomTeardown?.restored?.colliderDisabled || report.interiors.roomTeardown?.restored?.enterable !== true) {
+    throw new Error(`Room building restore failed: ${JSON.stringify(report.interiors.roomTeardown)}`);
+  }
   if (report.multiplayer.earthSync?.selLoc !== 'custom') throw new Error('Earth room sync did not set custom Earth location.');
   if (report.multiplayer.moonSync?.onMoon !== true) throw new Error('Moon room sync did not enter Moon runtime.');
   if (report.multiplayer.spaceSync?.spaceFlightActive !== true) throw new Error('Space room sync did not enter Space runtime.');
@@ -565,9 +559,12 @@ function assertReport(report) {
     report.multiplayer.cleanup?.earthSceneRoot?.children < 1) {
     throw new Error('Cleanup returned to Earth without a visible, populated Earth scene owner.');
   }
+  if (report.multiplayer.cleanup?.skyMode === 'day' && report.multiplayer.cleanup?.skyBackground === '000000') {
+    throw new Error('Space-to-Earth cleanup left the daytime Earth sky black.');
+  }
 }
 
-const server = await startServer();
+const server = await startServer({ rootDir, host, candidatePorts });
 await mkdirp(outputDir);
 
 const headed = process.env.WE3D_HEADED === '1';

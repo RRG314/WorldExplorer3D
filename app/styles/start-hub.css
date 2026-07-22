@@ -10,6 +10,24 @@
   --hub-green: #4ade80;
 }
 
+:root[data-hub-theme="day"] {
+  --hub-bg: #dfe8ee;
+  --hub-panel: #eef3f6;
+  --hub-panel-2: #ffffff;
+  --hub-line: rgba(42, 65, 82, 0.22);
+  --hub-line-strong: rgba(42, 65, 82, 0.38);
+  --hub-text: #172630;
+  --hub-muted: #526573;
+  --wx-bg: #dfe8ee;
+  --wx-panel: rgba(244, 248, 250, 0.96);
+  --wx-panel-solid: #eef3f6;
+  --wx-panel-soft: #e3ebef;
+  --wx-line: #71838f;
+  --wx-line-soft: rgba(42, 65, 82, 0.22);
+  --wx-text: #172630;
+  --wx-muted: #526573;
+}
+
 /* The globe hub owns the complete pre-game experience. */
 #titleScreen { display: none; }
 body.start-hub-open { overflow: hidden; background: var(--hub-bg); }
@@ -37,8 +55,29 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 #globeSelectorScreen { color: var(--hub-text); background: var(--hub-bg); }
 #globeSelectorScreen .globe-selector-shell {
   grid-template-columns: 160px minmax(0, 1fr) 332px;
-  grid-template-rows: 76px minmax(0, 1fr) 110px 58px;
+  grid-template-rows: 84px minmax(0, 1fr) 92px;
 }
+:root[data-hub-theme="day"] body.start-hub-open,
+:root[data-hub-theme="day"] #globeSelectorScreen { background: var(--hub-bg); }
+:root[data-hub-theme="day"] .globe-selector-brand,
+:root[data-hub-theme="day"] .globe-selector-top,
+:root[data-hub-theme="day"] .globe-app-rail,
+:root[data-hub-theme="day"] .globe-destination-bar { background: #edf3f6; }
+:root[data-hub-theme="day"] .globe-hub-search,
+:root[data-hub-theme="day"] .globe-hub-panel-host input,
+:root[data-hub-theme="day"] .globe-hub-panel-host select { background: #ffffff; }
+:root[data-hub-theme="day"] .globe-hub-search button { color: #ffffff; background: #20384b; }
+:root[data-hub-theme="day"] .globe-selector-row input { color: #172630; background: #ffffff; }
+:root[data-hub-theme="day"] .globe-mobile-search input { color: #172630; background: #ffffff; }
+:root[data-hub-theme="day"] .globe-selector-mode-tab,
+:root[data-hub-theme="day"] .globe-selector-city-tab { color: #526573; background: #f8fafb; }
+:root[data-hub-theme="day"] .globe-selector-mode-tab.active,
+:root[data-hub-theme="day"] .globe-selector-city-tab.active { color: #ffffff; background: #163b66; }
+:root[data-hub-theme="day"] .globe-hub-tools button:hover { color: #0f2230; background: #d7e5ef; }
+:root[data-hub-theme="day"] .globe-selector-city-item,
+:root[data-hub-theme="day"] .globe-selector-stat,
+:root[data-hub-theme="day"] .globe-selector-live-detail-card,
+:root[data-hub-theme="day"] .globe-selector-live-list-item { background: #ffffff; }
 .globe-selector-brand {
   gap: 5px;
   padding: 0 8px;
@@ -67,7 +106,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   padding: 0 18px 0 24px;
 }
 .globe-hub-search {
-  height: 42px;
+  height: 48px;
   display: grid;
   grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
@@ -145,11 +184,30 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   gap: 11px;
 }
 .globe-selector-stat {
+  position: relative;
   padding: 14px 12px;
   border-width: 0 0 1px;
   background: transparent;
 }
+.globe-save-favorite {
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--hub-muted);
+  background: transparent;
+  border: 1px solid var(--hub-line);
+  border-radius: 2px;
+  font: 22px/1 Inter, sans-serif;
+  cursor: pointer;
+}
+.globe-save-favorite.saved { color: #f0a620; }
+.globe-save-favorite:disabled { opacity: 0.35; cursor: default; }
 .globe-selector-stat-value { margin-top: 7px; font: 700 17px/1.2 Inter, sans-serif; }
+.globe-selector-stat-value,
+#globeSelectorPlace { padding-right: 38px; }
 .globe-selector-actions { position: static; display: block; padding: 0; background: transparent; border: 0; }
 #globeSelectorBackBtn { display: none; }
 #globeSelectorStartBtn {
@@ -234,11 +292,17 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-selector-street-thumb small { color: var(--hub-muted); font-size: 9px; }
 .globe-selector-live-action-btn:is(a) { display: inline-flex; align-items: center; justify-content: center; text-decoration: none; }
 
-.globe-destination-bar { padding: 0 18px; }
+.globe-destination-bar {
+  padding: 8px 18px;
+  gap: 8px;
+  border-top: 0;
+}
 .globe-destination-bar button {
-  gap: 7px;
+  position: relative;
+  gap: 0;
   letter-spacing: 0;
-  overflow: hidden;
+  overflow: visible;
+  border: 0;
 }
 .globe-destination-bar button .destination-thumb {
   width: 46px;
@@ -264,6 +328,30 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .destination-thumb.ocean { background-image: url('../../assets/screenshots/ocean-mode-great-barrier-reef.png'); background-position: 40% 58%; }
 .globe-destination-bar button:hover .destination-thumb,
 .globe-destination-bar button.active .destination-thumb { border-color: #d8ebff; box-shadow: 0 0 20px rgba(45,125,255,0.35); }
+.globe-destination-bar .destination-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+.globe-destination-bar button::after {
+  content: attr(aria-label);
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  padding: 7px 9px;
+  color: #f8fafc;
+  background: #071018;
+  border: 1px solid var(--hub-line-strong);
+  border-radius: 2px;
+  font: 600 10px/1 Inter, sans-serif;
+  text-transform: none;
+  white-space: nowrap;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 120ms ease, transform 120ms ease;
+}
+.globe-destination-bar button:is(:hover, :focus-visible)::after { opacity: 1; transform: translate(-50%, 0); }
+.globe-app-rail { grid-row: 2 / 4; }
+.globe-selector-side { grid-row: 2 / 4; }
+.globe-hub-overlay { grid-row: 2 / 4; }
 
 .globe-system-bar span { letter-spacing: 0; }
 
@@ -486,6 +574,5 @@ body.start-hub-open #flowerChallengePanel {
   .globe-hub-tools button { width: 34px; height: 34px; font-size: 15px; }
   .globe-destination-bar button { gap: 5px; font-size: 7px; }
   .globe-destination-bar button .destination-thumb { width: 34px; height: 34px; flex-basis: 34px; }
-  .globe-app-rail button:nth-child(5) { display: none; }
   .globe-hub-panel-host .loc-grid { grid-template-columns: 1fr; }
 }

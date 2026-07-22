@@ -1,4 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
+import { diagnoseRuntimeBudgets } from "./runtime/budget-diagnostics.js?v=1";
 
 function numberOrNull(value) {
   return Number.isFinite(value) ? Number(value) : null;
@@ -35,7 +36,19 @@ function rendererSnapshot() {
     height: numberOrNull(renderer.domElement?.height),
     calls: numberOrNull(renderer.info?.render?.calls),
     triangles: numberOrNull(renderer.info?.render?.triangles),
+    geometries: numberOrNull(renderer.info?.memory?.geometries),
+    textures: numberOrNull(renderer.info?.memory?.textures),
     programs: Array.isArray(renderer.info?.programs) ? renderer.info.programs.length : null
+  };
+}
+
+function browserMemorySnapshot() {
+  const memory = globalThis.performance?.memory;
+  if (!memory) return null;
+  return {
+    usedBytes: numberOrNull(memory.usedJSHeapSize),
+    totalBytes: numberOrNull(memory.totalJSHeapSize),
+    limitBytes: numberOrNull(memory.jsHeapSizeLimit)
   };
 }
 
@@ -76,7 +89,7 @@ function composerSnapshot() {
 }
 
 function getWorldExplorerRuntimeDiagnostics() {
-  return {
+  const snapshot = {
     runtimeKernel: appCtx.getRuntimeKernelSnapshot?.() || null,
     sessionLifecycle: appCtx.getSessionCoordinatorDebugState?.() || null,
     account: appCtx.getAccountSnapshot?.() || null,
@@ -144,6 +157,10 @@ function getWorldExplorerRuntimeDiagnostics() {
         }
       : null,
     renderer: rendererSnapshot(),
+    browserMemory: browserMemorySnapshot(),
+    streamingResources: appCtx.getStreamingVectorResourceSnapshot?.() || null,
+    lastLoad: appCtx.perfStats?.lastLoad || null,
+    renderReadiness: appCtx._lastWorldRenderReadiness || null,
     composer: composerSnapshot(),
     quality: appCtx.renderQualityLevel || null,
     earthStreaming: appCtx.getEarthStreamingSnapshot?.() || null,
@@ -177,6 +194,8 @@ function getWorldExplorerRuntimeDiagnostics() {
         : null
     }
   };
+  snapshot.budgetStatus = diagnoseRuntimeBudgets(snapshot);
+  return snapshot;
 }
 
 globalThis.getWorldExplorerRuntimeDiagnostics = getWorldExplorerRuntimeDiagnostics;

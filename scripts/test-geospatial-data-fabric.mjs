@@ -294,10 +294,12 @@ const normalizedAdsbLol = geospatialFunctions.normalizeAdsbLolState({
 assert.equal(normalizedAdsbLol.callsign, 'FALLBACK1');
 assert.equal(Math.round(normalizedAdsbLol.altitudeM), 3048);
 assert.equal(normalizedAdsbLol.velocityKt, 250);
-const fallbackAircraft = await geospatialFunctions.queryAircraft({ lat: 12.34, lon: 56.78, radiusKm: 80, limit: 2 }, {
+const defaultAircraftUrls = [];
+const defaultAircraft = await geospatialFunctions.queryAircraft({ lat: 12.34, lon: 56.78, radiusKm: 80, limit: 2 }, {
   force: true,
   fetchImpl: async (url) => {
-    if (String(url).includes('opensky-network.org')) throw new Error('simulated OpenSky outage');
+    defaultAircraftUrls.push(String(url));
+    if (String(url).includes('opensky-network.org')) throw new Error('Default configuration contacted OpenSky.');
     return {
       ok: true,
       async json() {
@@ -306,9 +308,29 @@ const fallbackAircraft = await geospatialFunctions.queryAircraft({ lat: 12.34, l
     };
   }
 });
-assert.equal(fallbackAircraft.provider, 'adsb-lol');
-assert.equal(fallbackAircraft.items[0].callsign, 'FALLBACK1');
-assert.match(fallbackAircraft.warnings[0], /OpenSky was unavailable/);
+assert.equal(defaultAircraft.provider, 'adsb-lol');
+assert.equal(defaultAircraft.items[0].callsign, 'FALLBACK1');
+assert.equal(defaultAircraftUrls.some((url) => url.includes('opensky-network.org')), false);
+assert.match(defaultAircraft.warnings[0], /default ADSB\.lol provider/);
+
+const optInAircraftUrls = [];
+const optInFallback = await geospatialFunctions.queryAircraft({ lat: 13.34, lon: 57.78, radiusKm: 80, limit: 2 }, {
+  force: true,
+  openSkyEnabled: true,
+  fetchImpl: async (url) => {
+    optInAircraftUrls.push(String(url));
+    if (String(url).includes('opensky-network.org')) throw new Error('simulated authorized OpenSky outage');
+    return {
+      ok: true,
+      async json() {
+        return { now: Date.parse('2026-07-20T12:00:00Z'), ac: [{ hex: 'd4e5f6', flight: 'OPTIN1', lat: 13.4, lon: 57.8, alt_geom: 9000, gs: 220, dst: 3 }] };
+      }
+    };
+  }
+});
+assert.equal(optInFallback.provider, 'adsb-lol');
+assert.equal(optInAircraftUrls.some((url) => url.includes('opensky-network.org')), true);
+assert.match(optInFallback.warnings[0], /OpenSky was unavailable/);
 
 console.log(JSON.stringify({
   ok: true,

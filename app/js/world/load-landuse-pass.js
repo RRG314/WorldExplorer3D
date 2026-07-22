@@ -1,5 +1,5 @@
 import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=1';
-import { surfaceComposition } from './surface-contract.js?v=6';
+import { surfaceComposition } from './surface-contract.js?v=7';
 import { normalizeWaterBody } from './water-body-contract.js?v=2';
 
 const SOIL_LANDUSE_TYPES = new Set([
@@ -8,6 +8,9 @@ const SOIL_LANDUSE_TYPES = new Set([
 ]);
 const ROCK_LANDUSE_TYPES = new Set(['barren', 'quarry', 'landfill']);
 const PAVED_LANDUSE_TYPES = new Set(['paved', 'parking']);
+const DEVELOPED_LANDUSE_TYPES = new Set([
+  'residential', 'commercial', 'industrial', 'retail', 'construction', 'brownfield'
+]);
 
 function surfaceModeForLanduse(landuseType) {
   if (landuseType === 'forest' || landuseType === 'wood') return 'forest';
@@ -16,6 +19,7 @@ function surfaceModeForLanduse(landuseType) {
   if (SOIL_LANDUSE_TYPES.has(landuseType)) return 'soil';
   if (ROCK_LANDUSE_TYPES.has(landuseType)) return 'rock';
   if (PAVED_LANDUSE_TYPES.has(landuseType)) return 'pavement';
+  if (DEVELOPED_LANDUSE_TYPES.has(landuseType)) return 'built';
   return 'grass';
 }
 
@@ -60,6 +64,7 @@ function mappedSurfaceMaterialOptions(appCtx, landuseType, composition) {
     textures?.mode === 'pavement' ? 3.2 :
     textures?.mode === 'forest' ? 5.5 :
     textures?.mode === 'rock' ? 5 :
+    textures?.mode === 'built' ? 4.5 :
     textures?.mode === 'soil' ? 6 :
     textures?.mode === 'sand' ? 8 :
     textures?.mode === 'snow' ? 9 :
@@ -71,7 +76,7 @@ function mappedSurfaceMaterialOptions(appCtx, landuseType, composition) {
       normalMap: textures?.normalMap || null,
       roughnessMap: textures?.roughnessMap || null,
       normalScale: textures?.normalMap ? new THREE.Vector2(0.34, 0.34) : undefined,
-      roughness: textures?.mode === 'pavement' ? 0.9 : 0.95,
+      roughness: textures?.mode === 'pavement' ? 0.9 : textures?.mode === 'built' ? 0.93 : 0.95,
       metalness: 0.0,
       transparent: false,
       opacity: 1,
@@ -109,7 +114,9 @@ export function createWorldLandusePass(options = {}) {
     'forest', 'wood', 'park', 'garden', 'grass', 'meadow', 'scrub',
     'orchard', 'vineyard', 'allotments', 'farmland', 'farmyard',
     'plant_nursery', 'greenhouse_horticulture', 'recreation_ground',
-    'village_green', 'cemetery', 'sand', 'dune', 'barren', 'glacier', 'quarry'
+    'village_green', 'greenfield', 'cemetery', 'sand', 'dune', 'barren',
+    'glacier', 'quarry', 'landfill',
+    ...DEVELOPED_LANDUSE_TYPES
   ]);
   function addLandusePolygon(runtime, pts, landuseType, holeRings = [], guardOptions = null, featureMeta = {}) {
     if (!pts || pts.length < 3) return;
@@ -145,7 +152,9 @@ export function createWorldLandusePass(options = {}) {
     const sampledHeights = [];
     let avgElevation = 0;
     ring.forEach((point) => {
-      const sample = appCtx.elevationWorldYAtWorldXZ(point.x, point.z);
+      const sample = appCtx.SurfaceQuery?.terrainAt?.(point.x, point.z)?.position?.y ??
+        appCtx.terrainMeshHeightAt?.(point.x, point.z) ??
+        appCtx.elevationWorldYAtWorldXZ(point.x, point.z);
       sampledHeights.push(sample);
       avgElevation += sample;
     });
@@ -178,9 +187,12 @@ export function createWorldLandusePass(options = {}) {
     const isMappedGroundCover = visibleMappedSurfaceTypes.has(landuseType);
     const waterVisualProfile = isWater ? resolveWaterSurfaceVisualProfile() : null;
     const composition = surfaceComposition(landuseType, isWater ? 'water' : 'land-cover');
-    const centerElevation = isWater ? appCtx.elevationWorldYAtWorldXZ(
-      (minX + maxX) * 0.5,
-      (minZ + maxZ) * 0.5
+    const centerX = (minX + maxX) * 0.5;
+    const centerZ = (minZ + maxZ) * 0.5;
+    const centerElevation = isWater ? (
+      appCtx.SurfaceQuery?.terrainAt?.(centerX, centerZ)?.position?.y ??
+      appCtx.terrainMeshHeightAt?.(centerX, centerZ) ??
+      appCtx.elevationWorldYAtWorldXZ(centerX, centerZ)
     ) : NaN;
     const surfaceBaseElevation = isWater
       ? Number.isFinite(centerElevation) && centerElevation > 12
@@ -230,8 +242,9 @@ export function createWorldLandusePass(options = {}) {
         ring,
         cleanedHoles,
         (x, z) => {
-          const terrainY = appCtx.elevationWorldYAtWorldXZ(x, z);
-          return terrainY === 0 && Math.abs(surfaceBaseElevation) > 2 ? surfaceBaseElevation : terrainY;
+          return appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y ??
+            appCtx.terrainMeshHeightAt?.(x, z) ??
+            appCtx.elevationWorldYAtWorldXZ(x, z);
         },
         {
           baseY: surfaceBaseElevation,

@@ -2,6 +2,33 @@
 
 ## [Unreleased]
 
+## [4.0.0] - 2026-07-22
+
+### Added
+
+- Added an authoritative multiplayer server foundation with shared contracts, command validation, interest management, recovery snapshots, persistence adapters, reconnect support, and bounded-load verification.
+- Added reusable progression, mission, combat, vehicle, inventory, building, demolition, leaderboard, and activity-platform contracts for browser and server gameplay.
+- Added contributor governance, conduct, DCO, self-hosting, extension, support, data/media licensing, trademark, and third-party notice documentation.
+- Added landmark footprint ownership that prevents ordinary mapped buildings from rendering beneath curated or mapped landmark geometry.
+
+### Changed
+
+- Relicensed original project code and documentation under Apache-2.0 while retaining third-party assets, data, APIs, and trademarks under their own terms.
+- Reworked multiplayer, editor, block-building, account, save, admin, analytics, and browser-storage paths around explicit ownership and backward-compatible record normalization.
+- Split browser-admin community, moderation, and formatting presentation from the controller without changing administrative routes or access boundaries.
+- Made Cloud Functions billing dependencies lazy so unrelated functions no longer pay Stripe startup cost.
+- Consolidated the globe-first start hub, mobile controls, travel-mode input, environment sessions, surface ownership, streaming budgets, and visual diagnostics.
+- Made Earth, ocean, Moon, Mars, and space transitions preserve compatible state and dispose incompatible actors, renderers, controls, and resources in one runtime.
+- Replaced duplicate Giza pyramid layers with one measured footprint-and-height owner per mapped pyramid and made curated landmark loading independent of optional network enrichment.
+
+### Removed
+
+- Removed source assets whose redistribution terms were not verified and removed the superseded layered Giza pyramid renderer.
+
+### Verification
+
+- Added release gates for Apache-2.0 distribution metadata, emulator-backed MMO compatibility, Firestore rules, browser gameplay, mobile environments, planetary round trips, plane/interior lifecycle, operational feeds, hosting identity, and hosted-source reachability.
+
 ## [3.1.0] - 2026-07-20
 
 ### Added
