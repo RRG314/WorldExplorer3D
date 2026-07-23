@@ -246,17 +246,22 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
     const nx = p1.x + t * dx;
     const nz = p1.z + t * dz;
     const d = Math.hypot(x - nx, z - nz);
-    // Navigation runs every simulation frame. Road surface profiles are
-    // refreshed when terrain changes. Production roads use point-aligned typed
-    // arrays, so interpolate them directly and retain the general sampler only
-    // for irregular or legacy profiles.
+    // Navigation runs every simulation frame. Elevated and subgrade structures
+    // own their stored profiles, so point-aligned typed arrays are safe to
+    // interpolate directly. At-grade roads remain owned by the current terrain
+    // sampler: terrain tiles can be replaced after the road profile was built.
+    // Bypassing that sampler leaves ordinary roads floating above or buried
+    // below the rendered ground.
     const fromY = profileHeights?.length === pts.length ? Number(profileHeights[i]) : NaN;
     const toY = profileHeights?.length === pts.length ? Number(profileHeights[i + 1]) : NaN;
+    const requiresLiveTerrain =
+      semantics?.terrainMode === 'at_grade' &&
+      typeof road?.surfaceTerrainSampler === 'function';
     const roadY =
-      Number.isFinite(fromY) && Number.isFinite(toY) ?
+      !requiresLiveTerrain && Number.isFinite(fromY) && Number.isFinite(toY) ?
         fromY + (toY - fromY) * t :
         runtime.sampleFeatureSurfaceY(road, x, z, { x: nx, z: nz, dist: d, segIndex: i, t }, {
-          preferStoredProfile: true
+          preferStoredProfile: !requiresLiveTerrain
         });
     const verticalDelta = Number.isFinite(targetY) && Number.isFinite(roadY) ? Math.abs(roadY - targetY) : 0;
     const distanceAlong =

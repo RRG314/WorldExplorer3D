@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Kept at-grade navigation surfaces owned by the active terrain sampler after streamed terrain replacement, preventing ordinary roads from retaining stale elevations.
+- Made tunnel water suppression persistent across LOD refreshes and restored normal water visibility ownership on exit.
+
 ## [4.0.0] - 2026-07-22
 
 ### Added

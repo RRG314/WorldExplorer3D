@@ -29,6 +29,21 @@ assert.equal(typedProfileHit.y, 3);
 assert.equal(typedProfileHit.dist, 1);
 assert.equal(fallbackSamples, 0);
 
+const terrainOwnedRoad = {
+  ...profiledRoad,
+  structureSemantics: { terrainMode: 'at_grade' },
+  surfaceTerrainSampler: () => 6.92
+};
+appCtx.roads = [terrainOwnedRoad];
+const terrainOwnedHit = findNearestRoad(5, 1, { y: 7, maxVerticalDelta: 10 });
+assert.equal(terrainOwnedHit.road, terrainOwnedRoad);
+assert.equal(terrainOwnedHit.y, 7);
+assert.equal(
+  fallbackSamples,
+  1,
+  'at-grade roads must use the live surface sampler instead of a stale typed profile'
+);
+
 const irregularRoad = {
   ...profiledRoad,
   surfaceHeights: new Float32Array([7])
@@ -42,5 +57,6 @@ assert.ok(fallbackSamples > 0);
 console.log(JSON.stringify({
   ok: true,
   typedProfileFastPath: true,
+  atGradeTerrainOwnership: true,
   irregularProfileFallback: true
 }, null, 2));

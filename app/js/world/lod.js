@@ -326,7 +326,7 @@ export function updateWorldLod(force = false) {
   for (let i = 0; i < appCtx.landuseMeshes.length; i++) {
     const mesh = appCtx.landuseMeshes[i];
     if (!mesh) continue;
-    if (mesh.userData?.boatSuppressed) {
+    if (mesh.userData?.boatSuppressed || mesh.userData?.tunnelSuppressed) {
       setEarthMeshVisible(mesh, false);
       continue;
     }

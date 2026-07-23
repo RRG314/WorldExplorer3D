@@ -64,6 +64,7 @@ function syncTunnelGroundOcclusion(insideTunnel) {
   if (ground?.userData?.isGroundPlane) ground.visible = !insideTunnel;
   for (const mesh of appCtx.landuseMeshes || []) {
     if (!mesh || (mesh.userData?.landuseType !== 'water' && !mesh.userData?.waterAreaRef)) continue;
+    mesh.userData.tunnelSuppressed = insideTunnel;
     if (insideTunnel) mesh.visible = false;
   }
   if (!insideTunnel && tunnelWaterOcclusionActive) {
