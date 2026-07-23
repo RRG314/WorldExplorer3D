@@ -28,6 +28,16 @@ export function assertWorldMatrixLocation(spec, result) {
         `${JSON.stringify({ surfaceY: probe.surfaceY, terrainY, required: spec.minimumStructureClearance })}`
       );
     }
+    if (spec.expectedRoadStructure === 'bridge') {
+      const guardrails = result.structurePresentation?.guardrails || {};
+      assert(guardrails.protectedRoads > 0, `${spec.id}: mapped bridge registered no protected road guardrails ${JSON.stringify(guardrails)}`);
+      assert(guardrails.colliders > 0, `${spec.id}: mapped bridge registered no guardrail collision barriers ${JSON.stringify(guardrails)}`);
+      assert(guardrails.visualInstances > 0, `${spec.id}: mapped bridge rendered no guardrail instances ${JSON.stringify(guardrails)}`);
+      assert(
+        guardrails.visualInstances <= guardrails.colliders * 10,
+        `${spec.id}: guardrail visuals exceeded the physical collider-density budget ${JSON.stringify(guardrails)}`
+      );
+    }
     if (spec.expectedRoadStructure === 'tunnel' && result.tunnelPortalTraversal) {
       const traversal = result.tunnelPortalTraversal;
       const checkpoints = traversal?.checkpoints || [];

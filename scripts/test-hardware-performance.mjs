@@ -711,5 +711,18 @@ try {
   }, null, 2));
   if (!report.pass) process.exitCode = 1;
 } finally {
-  await browser.close();
+  let closeTimedOut = false;
+  let closeTimer = null;
+  await Promise.race([
+    browser.close(),
+    new Promise((resolve) => {
+      closeTimer = globalThis.setTimeout(() => {
+        closeTimedOut = true;
+        resolve();
+      }, 5000);
+    })
+  ]);
+  if (closeTimer) globalThis.clearTimeout(closeTimer);
+  if (closeTimedOut) console.warn('[hardware-performance] Browser shutdown exceeded 5 seconds; forcing harness exit.');
 }
+process.exit(process.exitCode || 0);

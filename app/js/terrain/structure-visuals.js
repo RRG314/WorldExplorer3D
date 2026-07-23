@@ -13,6 +13,7 @@ import {
   buildGuardrailEdges,
   elevatedSegmentSafety
 } from "../world/bridge-safety.js?v=2";
+import { sampleStructureVisualPolyline } from "./structure-visual-sampling.js?v=1";
 
 function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {
   const featureBounds = feature?.bounds || polylineBounds(feature?.pts || [], (Number(feature?.width) || 4) + padding);
@@ -113,10 +114,7 @@ export function collectStructureVisualInstances({
       semantics.terrainMode === "elevated" ?
         (isConnectorLike || isSkywalk ? 2.4 : 4.2) :
         10;
-    const visualPts =
-      typeof appCtx.subdivideRoadPoints === "function" && feature.pts.length >= 2 ?
-        appCtx.subdivideRoadPoints(feature.pts, visualDetail) :
-        feature.pts;
+    const visualPts = sampleStructureVisualPolyline(feature.pts, visualDetail);
     const structurePts = Array.isArray(visualPts) && visualPts.length >= 2 ? visualPts : feature.pts;
     const guardrailEdges = buildGuardrailEdges(feature, structurePts, {
       outsideGap: 0.28,

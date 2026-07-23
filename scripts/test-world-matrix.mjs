@@ -18,6 +18,7 @@ const captureDroneViews = process.env.WORLD_MATRIX_CAPTURE_DRONE === '1';
 const forceDaylight = process.env.WORLD_MATRIX_FORCE_DAYLIGHT === '1';
 const requireWorldCover = process.env.WORLD_MATRIX_REQUIRE_WORLDCOVER === '1';
 const blockWorldCover = process.env.WORLD_MATRIX_BLOCK_WORLDCOVER === '1';
+const hardwareBrowser = process.env.WORLD_MATRIX_HARDWARE === '1';
 const locationDelayMs = Math.max(0, Number(process.env.WORLD_MATRIX_LOCATION_DELAY_MS ?? 1200) || 0);
 const buildingDetailWaitLimitMs = 32000;
 const reportName = /^[a-z0-9._-]+$/i.test(String(process.env.WORLD_MATRIX_REPORT_NAME || '')) ?
@@ -332,7 +333,18 @@ async function loadLocation(page, spec) {
       if (mesh?.visible !== false) landusePresentation[type].visibleSources += sourceCount;
     }
 
-    const structurePresentation = { roads: {}, waterways: {}, nonNavigableWaterways: 0 };
+    const structurePresentation = {
+      roads: {},
+      waterways: {},
+      nonNavigableWaterways: 0,
+      guardrails: {
+        protectedRoads: (ctx.roads || []).filter((road) => road?.guardrailColliders?.length > 0).length,
+        colliders: (ctx.buildings || []).filter((building) => building?.buildingType === 'bridge_guardrail').length,
+        visualInstances: (ctx.structureVisualMeshes || [])
+          .filter((mesh) => mesh?.userData?.structureVisualType === 'guardrails')
+          .reduce((sum, mesh) => sum + (Number(mesh?.count) || 0), 0)
+      }
+    };
     for (const road of ctx.roads || []) {
       const kind = String(road?.structureSemantics?.structureKind || 'at_grade');
       structurePresentation.roads[kind] = (structurePresentation.roads[kind] || 0) + 1;
@@ -761,7 +773,17 @@ async function main() {
   await mkdirp(outputDir);
   const server = externalBaseUrl ? null : await startStaticRootServer({ rootDir, host, candidatePorts });
   const baseUrl = externalBaseUrl || `http://${host}:${server.port}`;
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch(hardwareBrowser ? {
+    channel: 'chrome',
+    headless: false,
+    args: [
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--enable-gpu-rasterization',
+      '--ignore-gpu-blocklist'
+    ]
+  } : { headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
   if (blockWorldCover) await page.route('https://titiler.terrascope.be/**', (route) => route.abort('blockedbyclient'));
   const consoleErrors = [];

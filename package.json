@@ -32,6 +32,8 @@
     "test:world-load-transaction": "node scripts/test-world-load-transaction.mjs",
     "test:world-load-stage": "node scripts/test-world-load-stage.mjs",
     "test:navigation-surface-query": "node scripts/test-navigation-surface-query.mjs",
+    "test:bridge-guardrails": "node scripts/test-bridge-guardrail-contract.mjs",
+    "test:structure-visual-sampling": "node scripts/test-structure-visual-sampling.mjs",
     "test:transport-controllers": "node scripts/test-transport-controller-registry.mjs",
     "test:platform-services": "node scripts/test-platform-service-registry.mjs",
     "test:geospatial": "node scripts/test-geospatial-data-fabric.mjs",
