@@ -24,6 +24,21 @@ function placeCacheKey(lat, lon) {
   return `${lat.toFixed(PLACE_LOCATION_PRECISION)}:${lon.toFixed(PLACE_LOCATION_PRECISION)}`;
 }
 
+function placeStateMatchesLocation(place, location, maxDistanceKm = 30) {
+  const latA = Number(place?.lat);
+  const lonA = Number(place?.lon);
+  const latB = Number(location?.lat);
+  const lonB = Number(location?.lon);
+  if (![latA, lonA, latB, lonB].every(Number.isFinite)) return false;
+  const toRad = Math.PI / 180;
+  const dLat = (latB - latA) * toRad;
+  const dLon = (lonB - lonA) * toRad;
+  const a = Math.sin(dLat * 0.5) ** 2 +
+    Math.cos(latA * toRad) * Math.cos(latB * toRad) * Math.sin(dLon * 0.5) ** 2;
+  const distanceKm = 6371 * (2 * Math.atan2(Math.sqrt(a), Math.sqrt(Math.max(0, 1 - a))));
+  return distanceKm <= Math.max(1, Number(maxDistanceKm) || 30);
+}
+
 function cleanCountry(value) {
   const text = String(value || '').trim();
   if (!text) return '';
@@ -80,7 +95,8 @@ function parseReverseAddress(payload) {
   return {
     display,
     shortLabel: city || county || region || country || '',
-    details: { city, county, region, country }
+    details: { city, county, region, country },
+    resolutionSource: 'reverse-geocode'
   };
 }
 
@@ -111,7 +127,8 @@ function getFallbackPlaceLabel(location) {
   return {
     display: activeName,
     shortLabel: activeName,
-    details: null
+    details: null,
+    resolutionSource: 'selection-fallback'
   };
 }
 
@@ -155,6 +172,7 @@ export {
   getActiveWeatherLocationLabel,
   weatherCacheKey,
   placeCacheKey,
+  placeStateMatchesLocation,
   cleanCountry,
   uniqueNonEmptyParts,
   parseReverseAddress,

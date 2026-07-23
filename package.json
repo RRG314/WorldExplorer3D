@@ -36,6 +36,8 @@
     "test:structure-visual-sampling": "node scripts/test-structure-visual-sampling.mjs",
     "test:tunnel-camera": "node scripts/test-tunnel-camera-corridor.mjs",
     "test:boat-prompt-policy": "node scripts/test-boat-prompt-policy.mjs",
+    "test:place-location-authority": "node scripts/test-place-location-authority.mjs",
+    "test:world-load-location-authority": "node scripts/test-world-load-location-authority.mjs",
     "test:transport-controllers": "node scripts/test-transport-controller-registry.mjs",
     "test:platform-services": "node scripts/test-platform-service-registry.mjs",
     "test:geospatial": "node scripts/test-geospatial-data-fabric.mjs",

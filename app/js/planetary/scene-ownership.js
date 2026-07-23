@@ -193,15 +193,16 @@ function createEarthSceneStage(label = 'world-load-stage') {
     attachEarthSceneWithoutChangingLod();
     stageRoot.visible = appCtx.earthSceneVisible !== false;
 
+    if (previousTerrainGroup && previousTerrainGroup !== appCtx.terrainGroup) {
+      [...(previousTerrainGroup.children || [])].forEach((mesh) => {
+        previousTerrainGroup.remove?.(mesh);
+        if (typeof appCtx.disposeTerrainMesh === 'function') appCtx.disposeTerrainMesh(mesh);
+        else disposeEarthWorldObject(mesh);
+      });
+      previousTerrainGroup.parent?.remove?.(previousTerrainGroup);
+    }
     [...previousRoot.children].forEach((object) => {
-      if (object === previousTerrainGroup && typeof appCtx.disposeTerrainMesh === 'function') {
-        [...object.children].forEach((mesh) => {
-          object.remove?.(mesh);
-          appCtx.disposeTerrainMesh(mesh);
-        });
-        object.parent?.remove?.(object);
-        return;
-      }
+      if (object === previousTerrainGroup) return;
       disposeEarthWorldObject(object);
     });
     previousRoot.parent?.remove?.(previousRoot);

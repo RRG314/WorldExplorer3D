@@ -1,5 +1,5 @@
 import { WORLD_COLLECTION_NAMES } from './collection-registry.js?v=1';
-import { EARTH_MESH_LISTS, disposeEarthWorldObject } from '../planetary/scene-ownership.js?v=10';
+import { EARTH_MESH_LISTS, disposeEarthWorldObject } from '../planetary/scene-ownership.js?v=11';
 
 const RUNTIME_STATE_NAMES = Object.freeze([
   'LOC',

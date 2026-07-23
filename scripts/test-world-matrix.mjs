@@ -98,7 +98,9 @@ async function bootstrapRuntime(page, baseUrl) {
       ctx = mod?.ctx || {};
       if (
         ctx &&
+        ctx.runtimeReady === true &&
         typeof ctx.loadRoads === 'function' &&
+        typeof ctx.setCustomLocation === 'function' &&
         typeof ctx.switchEnv === 'function' &&
         ctx.ENV?.EARTH
       ) {
@@ -129,24 +131,40 @@ async function loadLocation(page, spec) {
     const startedAt = performance.now();
     const expectedStart = locationSpec.expectedStart || 'land';
     ctx._lastCustomStructureProbe = null;
+    let customLocationIdentityAfterSelection = null;
 
     if (locationSpec.kind === 'custom') {
       const customLatInput = document.getElementById('customLat');
       const customLonInput = document.getElementById('customLon');
       if (customLatInput) customLatInput.value = String(locationSpec.lat);
       if (customLonInput) customLonInput.value = String(locationSpec.lon);
-      ctx.customLoc = {
+      const customLocation = {
         lat: Number(locationSpec.lat),
         lon: Number(locationSpec.lon),
         name: String(locationSpec.label || 'Custom Location')
       };
-      ctx.customLocTransient = false;
-      ctx.selLoc = 'custom';
+      if (typeof ctx.setCustomLocation === 'function') {
+        ctx.setCustomLocation(customLocation, { transient: false, syncInputs: false });
+      } else {
+        ctx.customLoc = customLocation;
+        ctx.customLocTransient = false;
+        ctx.selLoc = 'custom';
+      }
+      customLocationIdentityAfterSelection = {
+        selLoc: String(ctx.selLoc || ''),
+        customLoc: ctx.customLoc ? { ...ctx.customLoc } : null,
+        resolved: ctx.resolveLocationSelection?.() || null
+      };
     } else {
       ctx.selLoc = String(locationSpec.key);
     }
 
     await ctx.loadRoads();
+    const customLocationIdentityAfterLoad = locationSpec.kind === 'custom' ? {
+      selLoc: String(ctx.selLoc || ''),
+      customLoc: ctx.customLoc ? { ...ctx.customLoc } : null,
+      resolved: ctx.resolveLocationSelection?.() || null
+    } : null;
     const loadMs = performance.now() - startedAt;
     await new Promise((resolve) => window.setTimeout(resolve, 1200));
     const buildingDetailWaitStartedAt = performance.now();
@@ -252,9 +270,25 @@ async function loadLocation(page, spec) {
       ) :
       null;
     const visibleBoatSceneMeshes = [];
+    const terrainSceneGroups = [];
     let maxWaterGeometryYSpan = 0;
     if (ctx.boatMode?.active && ctx.scene?.traverse) {
       ctx.scene.traverse((object) => {
+        if (object?.isGroup && /TerrainGroup/i.test(String(object.name || ''))) {
+          let effectivelyVisible = object.visible !== false;
+          let ancestor = object.parent;
+          while (effectivelyVisible && ancestor) {
+            effectivelyVisible = ancestor.visible !== false;
+            ancestor = ancestor.parent;
+          }
+          terrainSceneGroups.push({
+            name: object.name || '(unnamed)',
+            current: object === ctx.terrainGroup,
+            childCount: object.children?.length || 0,
+            visibleChildren: (object.children || []).filter((child) => child?.visible !== false).length,
+            effectivelyVisible
+          });
+        }
         if (
           object?.isMesh &&
           object.userData?.landuseType === 'water' &&
@@ -739,7 +773,51 @@ async function loadLocation(page, spec) {
         maxWaterGeometryYSpan: Number(maxWaterGeometryYSpan.toFixed(3)),
         cameraMode: Number(ctx.camMode),
         cameraDistance: Number(boatCameraDistance.toFixed(2)),
-        visibleSceneMeshes: visibleBoatSceneMeshes
+        shorelineDistance: Number(Number(ctx.boatMode?.shorelineDistance || 0).toFixed(2)),
+        waterPatchRadius: Number(Number(ctx.boatMode?.waterPatch?.userData?.waterPatchRadius || 0).toFixed(2)),
+        waterPatchEdgeFade: Number(Number(
+          ctx.boatMode?.waterPatch?.material?.userData?.weWaterWaveConfig?.edgeFade || 0
+        ).toFixed(3)),
+        oceanHorizonPatchVisible: !!ctx.boatMode?.oceanHorizonPatch?.visible,
+        visibleOverlappingNonWaterLanduses: (ctx.landuseMeshes || []).filter((mesh) => {
+          if (!mesh || mesh.visible === false || mesh.userData?.landuseType === 'water') return false;
+          const footprint = mesh.userData?.landuseFootprint;
+          return Array.isArray(footprint) && footprint.length >= 3 &&
+            ctx.pointInPolygon?.(Number(ctx.boat?.x || 0), Number(ctx.boat?.z || 0), footprint);
+        }).length,
+        visibleTerrainMeshes: (ctx.terrainGroup?.children || []).filter((mesh) => mesh?.visible !== false).length,
+        suppressedTerrainMeshes: (ctx.terrainGroup?.children || []).filter((mesh) => mesh?.userData?.boatSuppressed).length,
+        visibleNonWaterLanduses: (ctx.landuseMeshes || []).filter((mesh) =>
+          mesh?.visible !== false && mesh?.userData?.landuseType !== 'water'
+        ).length,
+        visibleWaterLanduses: (ctx.landuseMeshes || []).filter((mesh) =>
+          mesh?.visible !== false && (
+            mesh?.userData?.landuseType === 'water' ||
+            mesh?.userData?.surfaceVariant === 'water' ||
+            mesh?.userData?.surfaceVariant === 'ice' ||
+            mesh?.userData?.isWaterwayLine
+          )
+        ).length,
+        visibleGroundPlanes: (() => {
+          let count = 0;
+          (ctx.earthSceneRoot || ctx.scene)?.traverse?.((object) => {
+            if (object?.userData?.isGroundPlane && object.visible !== false) count += 1;
+          });
+          return count;
+        })(),
+        visibleSceneMeshes: visibleBoatSceneMeshes,
+        terrainSceneGroups
+      } : null,
+      hudLocationLabel: String(ctx.getHudLocationLabel?.() || ''),
+      customLocationLabel: String(ctx.customLoc?.name || ''),
+      customLocationIdentity: {
+        afterSelection: customLocationIdentityAfterSelection,
+        afterLoad: customLocationIdentityAfterLoad
+      },
+      livePlaceLocation: ctx.livePlaceState ? {
+        lat: Number(ctx.livePlaceState.lat),
+        lon: Number(ctx.livePlaceState.lon),
+        display: String(ctx.livePlaceState.display || '')
       } : null,
       landPresentation: expectedStart !== 'water' ? {
         carY: Number(Number(ctx.car?.y || 0).toFixed(2)),

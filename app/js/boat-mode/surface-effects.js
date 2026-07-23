@@ -12,11 +12,37 @@ import { clamp, stepBoatSpring } from "./dynamics.js?v=1";
 import { resetBoatFoamFx, updateBoatFoamFx } from "./foam-effects.js?v=1";
 import { customizeBoatWaterPatchShader } from "./water-patch-shader.js?v=1";
 
+function ensureBoatOceanHorizonPatch() {
+  if (appCtx.boatMode?.oceanHorizonPatch || typeof THREE === 'undefined' || !appCtx.scene) {
+    return appCtx.boatMode?.oceanHorizonPatch || null;
+  }
+  const palette = getWaterPalette();
+  const mesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(1, 1, 1, 1).rotateX(-Math.PI / 2),
+    new THREE.MeshStandardMaterial({
+      color: palette.surface,
+      emissive: palette.emissive,
+      emissiveIntensity: 0.1,
+      roughness: 0.5,
+      metalness: 0.02,
+      side: THREE.DoubleSide
+    })
+  );
+  mesh.name = 'BoatOceanHorizonPatch';
+  mesh.visible = false;
+  mesh.frustumCulled = false;
+  mesh.renderOrder = -1;
+  appCtx.scene.add(mesh);
+  appCtx.boatMode.oceanHorizonPatch = mesh;
+  return mesh;
+}
+
 function ensureBoatWaterPatch() {
+  ensureBoatOceanHorizonPatch();
   if (appCtx.boatMode?.waterPatch || typeof THREE === 'undefined' || !appCtx.scene) return appCtx.boatMode?.waterPatch || null;
   const geometry = new THREE.PlaneGeometry(1, 1, 128, 128);
   geometry.rotateX(-Math.PI / 2);
-  const palette = getWaterPalette(appCtx.boatMode?.waterKind);
+  const palette = getWaterPalette();
   const material = new THREE.MeshStandardMaterial({
     color: palette.surface,
     emissive: palette.emissive,
@@ -37,7 +63,7 @@ function ensureBoatWaterPatch() {
       waveBase: 1.28,
       visualBase: 0.78,
       foamBase: 1.38,
-      edgeFade: 0.46,
+      edgeFade: 0.08,
       useRuntimeKind: true,
       localPatch: true,
       shaderKey: 'boatPatchWake',
@@ -68,15 +94,20 @@ function updateBoatWaterPatch(candidate = null) {
   if (!patch) return false;
   if (!appCtx.boatMode?.active) {
     patch.visible = false;
+    if (appCtx.boatMode?.oceanHorizonPatch) appCtx.boatMode.oceanHorizonPatch.visible = false;
     return false;
   }
   const waterKind = String(candidate?.waterKind || appCtx.boatMode?.waterKind || 'coastal').toLowerCase();
-  const palette = getWaterPalette(waterKind);
-  const radius =
+  const palette = getWaterPalette();
+  const baseRadius =
     waterKind === 'harbor' ? 110 :
     waterKind === 'channel' ? 90 :
     waterKind === 'lake' ? 150 :
-    waterKind === 'open_ocean' ? 320 : 210;
+    waterKind === 'open_ocean' ? 96 : 210;
+  const shorelineDistance = Number(candidate?.shorelineDistance ?? appCtx.boatMode?.shorelineDistance);
+  const radius = Number.isFinite(shorelineDistance) && shorelineDistance > 0 && waterKind !== 'open_ocean'
+    ? Math.min(baseRadius, Math.max(18, shorelineDistance * 0.8))
+    : baseRadius;
   patch.visible = true;
   patch.position.set(
     appCtx.boat.x,
@@ -86,6 +117,7 @@ function updateBoatWaterPatch(candidate = null) {
   // The geometry is pre-rotated onto the XZ plane, so scale the footprint on X/Z.
   // Scaling Y here collapses the patch into a moving strip and exaggerates wave height.
   patch.scale.set(radius * 2.05, 1, radius * 2.05);
+  patch.userData.waterPatchRadius = radius;
   patch.material.opacity = 1;
   if (patch.material.color?.setHex) patch.material.color.setHex(palette.surface);
   if (patch.material.emissive?.setHex) patch.material.emissive.setHex(palette.emissive);
@@ -95,6 +127,14 @@ function updateBoatWaterPatch(candidate = null) {
     waterKind === 'harbor' || waterKind === 'channel' ? 0.4 :
     0.42;
   patch.material.metalness = 0.02;
+  const horizonPatch = ensureBoatOceanHorizonPatch();
+  if (horizonPatch) {
+    horizonPatch.visible = waterKind === 'open_ocean';
+    if (horizonPatch.visible) {
+      horizonPatch.position.set(appCtx.boat.x, patch.position.y - 0.025, appCtx.boat.z);
+      horizonPatch.scale.set(24000, 1, 24000);
+    }
+  }
   if (!patch.material.userData?.weWaterWaveShader) patch.material.needsUpdate = true;
   return true;
 }
@@ -219,6 +259,9 @@ function syncBoatTerrainSuppression() {
     farOffshoreWater ? clamp(offshore * 4.5, 1080, 6200) :
     waterKind === 'open_ocean' ? clamp(offshore * 0.92, 160, 460) :
     waterKind === 'coastal' ? clamp(offshore * 0.7, 110, 300) :
+    waterKind === 'lake' ? 34 :
+    waterKind === 'harbor' ? 24 :
+    waterKind === 'channel' ? 18 :
     0 :
     0;
   const hideVegetation = active && (
@@ -288,6 +331,7 @@ function syncBoatTerrainSuppression() {
   };
 
   const suppressFallbackGround = farOffshoreWater;
+  const replaceMappedWaterSurface = active && waterKind === 'open_ocean';
   for (let i = 0; i < groundPlanes.length; i++) {
     const mesh = groundPlanes[i];
     if (!suppressFallbackGround) {
@@ -301,13 +345,32 @@ function syncBoatTerrainSuppression() {
   for (let i = 0; i < terrainMeshes.length; i++) {
     const mesh = terrainMeshes[i];
     if (!mesh) continue;
-    clearSuppression(mesh, true);
+    if (!active) {
+      clearSuppression(mesh, true);
+      continue;
+    }
+    const suppressed = farOffshoreWater
+      ? waterKind === 'open_ocean' || overlapSuppressed(mesh, clutterRadius)
+      : clutterRadius > 0 && overlapSuppressed(mesh, clutterRadius);
+    mesh.userData.boatSuppressed = suppressed;
+    if (suppressed) mesh.visible = false;
+    else clearSuppression(mesh, true);
   }
 
   for (let i = 0; i < landuseMeshes.length; i++) {
     const mesh = landuseMeshes[i];
     if (!mesh) continue;
-    if (!active || clutterRadius <= 0 || isWaterSurfaceMesh(mesh)) {
+    const waterSurface = isWaterSurfaceMesh(mesh);
+    if (waterSurface) {
+      if (replaceMappedWaterSurface) {
+        mesh.userData.boatSuppressed = true;
+        mesh.visible = false;
+      } else {
+        clearSuppression(mesh, mesh.userData?.alwaysVisible || !!appCtx.landUseVisible);
+      }
+      continue;
+    }
+    if (!active || clutterRadius <= 0) {
       clearSuppression(mesh, mesh.userData?.alwaysVisible || !!appCtx.landUseVisible);
       continue;
     }

@@ -4,8 +4,9 @@ import { resetWorldFurnitureCaches } from './furniture.js?v=10';
 import { earthSceneSuppressed, hideEarthSceneMeshes, resetWorldForReload } from './load-reset.js?v=9';
 import { finalizeLoadedWorld } from './load-support.js?v=25';
 import { worldLoadTransactions } from './load-transaction.js?v=2';
-import { beginWorldLoadStage } from './load-stage.js?v=2';
+import { beginWorldLoadStage } from './load-stage.js?v=3';
 import { restoreWorldRuntimeAfterRollback } from './load-rollback.js?v=1';
+import { commitWorldLocationAuthority } from './load-location-authority.js?v=1';
 
 let activeLoad = null;
 
@@ -16,11 +17,11 @@ function selectedLocation() {
     const lat = Number.parseFloat(latInput?.value ?? appCtx.customLoc?.lat);
     const lon = Number.parseFloat(lonInput?.value ?? appCtx.customLoc?.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('Enter valid coordinates.');
-    return { lat, lon, name: appCtx.customLoc?.name || 'Custom' };
+    return { key: 'custom', lat, lon, name: appCtx.customLoc?.name || 'Custom', arrivalMode: appCtx.customLoc?.arrivalMode };
   }
   const preset = appCtx.LOCS?.[appCtx.selLoc] || appCtx.LOCS?.baltimore;
   if (!preset) throw new Error('The selected Earth location is unavailable.');
-  return { lat: Number(preset.lat), lon: Number(preset.lon), name: preset.name || String(appCtx.selLoc) };
+  return { key: String(appCtx.selLoc), lat: Number(preset.lat), lon: Number(preset.lon), name: preset.name || String(appCtx.selLoc) };
 }
 
 function resetActors() {
@@ -128,6 +129,7 @@ async function loadContinuousEarthWorldInternal(location) {
       poiMeshes: appCtx.poiMeshes.length,
       landuseMeshes: appCtx.landuseMeshes.length
     });
+    commitWorldLocationAuthority(appCtx, location);
     releaseStageRollback();
     transaction.commit({
       buildings: appCtx.buildingMeshes.length,

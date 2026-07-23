@@ -1,6 +1,7 @@
 import { worldLoadTransactions } from './load-transaction.js?v=2';
-import { beginWorldLoadStage } from './load-stage.js?v=2';
+import { beginWorldLoadStage } from './load-stage.js?v=3';
 import { restoreWorldRuntimeAfterRollback } from './load-rollback.js?v=1';
+import { commitWorldLocationAuthority } from './load-location-authority.js?v=1';
 
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
@@ -215,6 +216,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     isActiveLoadContext,
     loadMetrics,
     loadProfile,
+    locationSelection,
     lodThresholds,
     perfModeNow,
     phaseTotals,
@@ -248,6 +250,7 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     finalizePerfLoad,
     isActiveLoadContext,
     loadMetrics,
+    locationSelection,
     phaseTotals,
     transaction,
     releaseStageRollback,
@@ -300,6 +303,7 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     landuseMeshes: appCtx.landuseMeshes.length
   });
   if (loaded) {
+    commitWorldLocationAuthority(appCtx, locationSelection);
     releaseStageRollback?.();
     transaction.commit({
       buildings: appCtx.buildingMeshes.length,

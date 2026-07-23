@@ -6,7 +6,7 @@ import {
   createWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession,
   recordWorldSourceMetrics
-} from "./load-runtime-session.js?v=10";
+} from "./load-runtime-session.js?v=11";
 import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=18";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
@@ -187,10 +187,12 @@ export function createWorldRoadLoader(deps = {}) {
       isActiveLoadContext,
       loadMetrics,
       loadProfile,
+      locationSelection,
       lodThresholds,
       perfModeNow,
       phaseTotals,
       rdtLoadComplexity,
+      releaseStageRollback,
       startLoadPhase,
       transaction,
       worldLoadStage,
@@ -697,8 +699,10 @@ export function createWorldRoadLoader(deps = {}) {
       appCtx,
       finalizePerfLoad,
       loadMetrics,
+      locationSelection,
       loaded,
       phaseTotals,
+      releaseStageRollback,
       transaction,
       isActiveLoadContext
     });

@@ -4,6 +4,12 @@ function assert(value, message) {
 
 export function assertWorldMatrixLocation(spec, result) {
   assert(result.worldLoading === false, `${spec.id}: worldLoading stayed true`);
+  if (spec.kind === 'custom') {
+    assert(
+      String(result.customLocationLabel || '') === String(spec.label || ''),
+      `${spec.id}: custom location identity changed during load ${JSON.stringify({ expected: spec.label, actual: result.customLocationLabel })}`
+    );
+  }
   assert(!result.terrainProfiles?.urban, `${spec.id}: base terrain still resolved to urban pavement ${JSON.stringify(result.terrainProfiles.urban)}`);
   if (spec.kind === 'preset') assert(result.counts.roads > 0, `${spec.id}: preset silently finalized without mapped roads`);
   if (spec.expectedTerrainMode) {
@@ -213,6 +219,59 @@ export function assertWorldMatrixLocation(spec, result) {
       `${spec.id}: boat hull is submerged below the dynamic water surface ${JSON.stringify(result.boatPresentation)}`
     );
     assert(result.boatPresentation.maxWaterGeometryYSpan <= 0.25, `${spec.id}: area water is still draped over terrain ${JSON.stringify(result.boatPresentation)}`);
+    assert(
+      result.boatPresentation.visibleOverlappingNonWaterLanduses === 0,
+      `${spec.id}: a non-water land-use surface remained visible beneath the boat ${JSON.stringify(result.boatPresentation)}`
+    );
+    assert(
+      result.boatPresentation.waterPatchEdgeFade > 0 &&
+      result.boatPresentation.waterPatchEdgeFade <= 0.12,
+      `${spec.id}: local water surface feather exposes terrain beneath the hull ${JSON.stringify(result.boatPresentation)}`
+    );
+    if (
+      result.boatPresentation.waterKind !== 'open_ocean' &&
+      result.boatPresentation.shorelineDistance > 24
+    ) {
+      assert(
+        result.boatPresentation.waterPatchRadius <= result.boatPresentation.shorelineDistance * 0.85,
+        `${spec.id}: local water patch covered the mapped shoreline ${JSON.stringify(result.boatPresentation)}`
+      );
+    }
+    if (result.boatPresentation.waterKind === 'open_ocean') {
+      assert(
+        result.boatPresentation.terrainSceneGroups?.every((group) => group.current || !group.effectivelyVisible),
+        `${spec.id}: a superseded terrain scene remains visible after the atomic world commit ${JSON.stringify(result.boatPresentation.terrainSceneGroups)}`
+      );
+      assert(
+        result.boatPresentation.oceanHorizonPatchVisible === true,
+        `${spec.id}: open-ocean surface cannot cover the visible horizon ${JSON.stringify(result.boatPresentation)}`
+      );
+      assert(
+        result.boatPresentation.visibleTerrainMeshes === 0 &&
+        result.boatPresentation.visibleGroundPlanes === 0 &&
+        result.boatPresentation.visibleWaterLanduses === 0,
+        `${spec.id}: land rendering leaked into far-offshore presentation ${JSON.stringify(result.boatPresentation)}`
+      );
+    } else {
+      assert(
+        result.boatPresentation.oceanHorizonPatchVisible === false,
+        `${spec.id}: open-ocean horizon surface leaked into inland or coastal water ${JSON.stringify(result.boatPresentation)}`
+      );
+    }
+    assert(String(result.hudLocationLabel || '').trim(), `${spec.id}: water start has no HUD location label`);
+    if (Array.isArray(spec.expectedHudLocationTerms) && spec.expectedHudLocationTerms.length > 0) {
+      assert(
+        spec.expectedHudLocationTerms.some((term) =>
+          String(result.hudLocationLabel || '').toLowerCase().includes(String(term).toLowerCase())
+        ),
+        `${spec.id}: HUD location label does not identify the selected destination ${JSON.stringify({ expectedTerms: spec.expectedHudLocationTerms, actual: result.hudLocationLabel })}`
+      );
+    }
+    if (result.livePlaceLocation && String(result.livePlaceLocation.display || '').trim() === String(result.hudLocationLabel || '').trim()) {
+      const latDelta = Math.abs(Number(result.livePlaceLocation.lat) - Number(spec.lat));
+      const lonDelta = Math.abs(Number(result.livePlaceLocation.lon) - Number(spec.lon));
+      assert(latDelta <= 0.4 && lonDelta <= 0.4, `${spec.id}: HUD reused a stale place label ${JSON.stringify(result.livePlaceLocation)}`);
+    }
     if (spec.expectedWaterKind) {
       assert(result.boatPresentation.waterKind === spec.expectedWaterKind, `${spec.id}: expected ${spec.expectedWaterKind} water, received ${result.boatPresentation.waterKind}`);
     }

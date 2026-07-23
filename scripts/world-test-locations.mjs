@@ -162,6 +162,7 @@ export const WORLD_TEST_LOCATIONS = [
     category: 'open_ocean_custom',
     expectedStart: 'water',
     expectedWaterKind: 'open_ocean',
+    expectedHudLocationTerms: ['Atlantic', 'Ocean'],
     expectedWaterElevationRange: [-2, 2]
   },
   {
