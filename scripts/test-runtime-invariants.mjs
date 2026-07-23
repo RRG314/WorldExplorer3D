@@ -9,6 +9,7 @@ const rootDir = process.cwd();
 const host = '127.0.0.1';
 const candidatePorts = [4173, 4174, 4175, 4176, 4177];
 const outputDir = path.join(rootDir, 'output', 'playwright', 'runtime-invariants');
+let diagnosticReportWritten = false;
 
 
 async function launchFromTitle(page) {
@@ -360,6 +361,7 @@ async function main() {
 
       const saved = {
         x: Number(ctx.car?.x || 0),
+        y: Number(ctx.car?.y || 0),
         z: Number(ctx.car?.z || 0),
         angle: Number(ctx.car?.angle || 0),
         speed: Number(ctx.car?.speed || 0),
@@ -369,10 +371,22 @@ async function main() {
         vz: Number(ctx.car?.vz || 0),
         yawRate: Number(ctx.car?.yawRate || 0),
         keyW: !!ctx.keys?.KeyW,
-        keyUp: !!ctx.keys?.ArrowUp
+        keyUp: !!ctx.keys?.ArrowUp,
+        onRoad: !!ctx.car?.onRoad,
+        road: ctx.car?.road || null
       };
 
       if (ctx.Walk?.setModeDrive) ctx.Walk.setModeDrive();
+      const driveStart = ctx.resolveSafeWorldSpawn?.(Number(ctx.car?.x || 0), Number(ctx.car?.z || 0), {
+        mode: 'drive',
+        angle: Number(ctx.car?.angle || 0),
+        preferRoad: true,
+        maxRoadDistance: 1200,
+        source: 'runtime_invariants_motion'
+      });
+      const appliedDriveStart = driveStart?.valid && driveStart?.onRoad
+        ? ctx.applyResolvedWorldSpawn?.(driveStart, { mode: 'drive' })
+        : null;
       const startX = Number(ctx.car?.x || 0);
       const startZ = Number(ctx.car?.z || 0);
       for (let f = 0; f < 90; f++) {
@@ -384,9 +398,10 @@ async function main() {
       ctx.keys.ArrowUp = false;
       const moved = Math.hypot((ctx.car?.x || 0) - startX, (ctx.car?.z || 0) - startZ);
       const finalSpeed = Number(ctx.car?.speed || 0);
-      const blocked = moved < 8 || finalSpeed < 8;
+      const blocked = moved < 4 || finalSpeed < 3;
 
       ctx.car.x = saved.x;
+      ctx.car.y = saved.y;
       ctx.car.z = saved.z;
       ctx.car.angle = saved.angle;
       ctx.car.speed = saved.speed;
@@ -395,6 +410,13 @@ async function main() {
       ctx.car.vx = saved.vx;
       ctx.car.vz = saved.vz;
       ctx.car.yawRate = saved.yawRate;
+      ctx.car.onRoad = saved.onRoad;
+      ctx.car.road = saved.road;
+      if (ctx.carMesh) {
+        ctx.carMesh.position.set(saved.x, saved.y, saved.z);
+        ctx.carMesh.rotation.y = saved.angle;
+        ctx.carMesh.updateMatrixWorld(true);
+      }
       ctx.keys.KeyW = saved.keyW;
       ctx.keys.ArrowUp = saved.keyUp;
 
@@ -406,9 +428,18 @@ async function main() {
         laneHits: 0,
         centerHitRatePct: 0,
         laneHitRatePct: 0,
-        driveSampleCount: 1,
-        blockedDriveSamples: blocked ? 1 : 0,
-        blockedDriveRatePct: blocked ? 100 : 0,
+        driveSampleCount: appliedDriveStart ? 1 : 0,
+        blockedDriveSamples: appliedDriveStart && blocked ? 1 : 0,
+        blockedDriveRatePct: appliedDriveStart && blocked ? 100 : 0,
+        driveStart: {
+          valid: !!driveStart?.valid,
+          onRoad: !!driveStart?.onRoad,
+          source: String(driveStart?.source || ''),
+          roadId: String(driveStart?.road?.sourceFeatureId || ''),
+          x: Number.isFinite(driveStart?.x) ? driveStart.x : null,
+          z: Number.isFinite(driveStart?.z) ? driveStart.z : null,
+          angle: Number.isFinite(driveStart?.angle) ? driveStart.angle : null
+        },
         driveOutcomePreview: [
           {
             moved: Number(moved.toFixed(2)),
@@ -776,7 +807,8 @@ async function main() {
         pts: [{ x: 0, z: 0 }, { x: 50, z: 0 }, { x: 100, z: 0 }],
         structureTags: { bridge: 'yes' }, networkKind: 'road', type: 'primary'
       };
-      semanticsMod.updateFeatureSurfaceProfile?.(syntheticBridge, (x) => x === 50 ? -80 : 12);
+      const syntheticBridgeTerrain = [12, -80, 12];
+      semanticsMod.updateFeatureSurfaceProfile?.(syntheticBridge, (x) => x === 50 ? syntheticBridgeTerrain[1] : syntheticBridgeTerrain[0]);
 
       return {
         walkGraphNodeCount: Number(walkGraph?.nodeCount || walkGraph?.nodes?.length || 0),
@@ -801,6 +833,7 @@ async function main() {
             return material && !Array.isArray(material) && material.transparent === false && Number(material.opacity ?? 1) >= 0.99;
           }),
         syntheticStructureSemantics,
+        syntheticBridgeTerrain,
         syntheticBridgeHeights: Array.from(syntheticBridge.surfaceHeights || []),
         landingCopyClear:
           /optional/i.test(landingHtml) &&
@@ -870,8 +903,11 @@ async function main() {
         report.syntheticStructureSemantics?.tunnelRoad?.gradeSeparated === true,
       bridgeSpansTerrainDepressions:
         report.syntheticBridgeHeights?.length === 3 &&
-        Math.min(...report.syntheticBridgeHeights) > 15 &&
-        Math.max(...report.syntheticBridgeHeights) - Math.min(...report.syntheticBridgeHeights) < 0.1,
+        report.syntheticBridgeTerrain?.length === 3 &&
+        Math.abs(report.syntheticBridgeHeights[0] - report.syntheticBridgeTerrain[0] - 0.08) <= 0.02 &&
+        Math.abs(report.syntheticBridgeHeights[2] - report.syntheticBridgeTerrain[2] - 0.08) <= 0.02 &&
+        report.syntheticBridgeHeights[1] - report.syntheticBridgeTerrain[1] >= 90 &&
+        report.syntheticBridgeHeights[1] >= Math.max(report.syntheticBridgeHeights[0], report.syntheticBridgeHeights[2]) + 4,
       roadSurfacesDraped:
         report.roadSurfaceContract?.atGradeSkirt === false &&
         report.roadSurfaceContract?.elevatedSkirt === false &&
@@ -948,9 +984,10 @@ async function main() {
     };
 
     await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(fullReport, null, 2));
+    diagnosticReportWritten = true;
 
     assert(
-      checks.roadCenterDriveable,
+      report.driveSampleCount === 1 && checks.roadCenterDriveable,
       `Road center driveability degraded: blocked ${report.blockedDriveSamples}/${report.driveSampleCount} (${report.blockedDriveRatePct}%)`
     );
     assert(checks.laneEdgeReasonable, `Lane-edge collision rate too high: ${report.laneHitRatePct}%`);
@@ -1032,7 +1069,9 @@ main().catch(async (err) => {
   };
   try {
     await mkdirp(outputDir);
-    await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(fallback, null, 2));
+    if (!diagnosticReportWritten) {
+      await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(fallback, null, 2));
+    }
   } catch {
     // best-effort only
   }

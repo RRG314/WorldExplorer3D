@@ -63,14 +63,24 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
     actorHeight: 1.9,
     tolerance: 0.45
   });
+  let standingOnRoof = false;
   if (containingBuilding) {
     const minY = Number.isFinite(containingBuilding.minY) ? containingBuilding.minY : containingBuilding.baseY;
     const maxY = Number.isFinite(containingBuilding.maxY) ?
       containingBuilding.maxY :
       Number.isFinite(minY) && Number.isFinite(containingBuilding.height) ? minY + containingBuilding.height : NaN;
-    const standingOnRoof = options.allowBuildingRoof === true && Number.isFinite(maxY) &&
+    standingOnRoof = options.allowBuildingRoof === true && Number.isFinite(maxY) &&
       actorFeetY >= maxY - 0.12 && actorFeetY <= maxY + 1.2;
     if (!standingOnRoof) return { valid: false, reason: "inside_building", terrainY };
+  }
+  if (!standingOnRoof && typeof appCtx.checkBuildingCollision === "function") {
+    const buildingCheck = appCtx.checkBuildingCollision(x, z, 1.5, {
+      actorBaseY: collisionBaseY,
+      actorHeight: 1.9
+    });
+    if (buildingCheck?.collision) {
+      return { valid: false, reason: "building_clearance", terrainY, buildingCheck };
+    }
   }
   if (options.preserveElevatedSurface === true && hasExplicitFeetY && actorFeetY > surfaceY + 1) {
     surfaceY = actorFeetY;

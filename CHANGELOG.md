@@ -32,6 +32,7 @@
 - Added release gates for Apache-2.0 distribution metadata, emulator-backed MMO compatibility, Firestore rules, browser gameplay, mobile environments, planetary round trips, plane/interior lifecycle, operational feeds, hosting identity, and hosted-source reachability.
 - Added release-version consistency, hosting-size budgets, release-harness privacy checks, and a final artifact hash verification after the complete release suite.
 - Made continuous-streaming resource certification compare reachable scene/stream geometry ownership and exact disposal completion; mapped-source retention and bounded visible LOD density are verified separately.
+- Made walking spawn validation honor the actor's full building-clearance radius and corrected runtime motion/bridge certification to exercise an authoritative road spawn and the intended terrain-connected bridge ramp profile.
 
 ## [3.1.0] - 2026-07-20
 
