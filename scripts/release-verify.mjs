@@ -49,6 +49,7 @@ const steps = [
   { name: 'Firestore-backed MMO compatibility', cmd: [npmCommand, 'run', 'test:mmo-firestore'] },
   { name: 'Authoritative room browser gameplay', cmd: [process.execPath, 'scripts/test-mmo-browser-acceptance.mjs'] },
   { name: 'Runtime kernel', cmd: [process.execPath, 'scripts/test-runtime-kernel.mjs'] },
+  { name: 'Frame ownership registry', cmd: [process.execPath, 'scripts/test-frame-ownership.mjs'] },
   { name: 'Transport controller registry', cmd: [process.execPath, 'scripts/test-transport-controller-registry.mjs'] },
   { name: 'Platform service registry', cmd: [process.execPath, 'scripts/test-platform-service-registry.mjs'] },
   { name: 'Account service', cmd: [process.execPath, 'scripts/test-account-service.mjs'] },

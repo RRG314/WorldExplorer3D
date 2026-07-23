@@ -6,6 +6,7 @@ import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as atte
 import { createSpaceFlightScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=16";
 import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=4";
 import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=1';
+import { registerFrameOwner } from './runtime/frame-ownership.js?v=1';
 import {
   beginEnvironmentTransition,
   commitEnvironment,
@@ -48,6 +49,18 @@ appCtx.spaceFlight = {
   overviewMode: false,
   _sessionId: 0
 };
+
+registerFrameOwner({
+  id: 'space.flight-renderer',
+  label: 'Space flight renderer',
+  kind: 'continuous-renderer',
+  exclusiveGroup: 'environment-renderer',
+  getState: () => ({
+    active: !!appCtx.spaceFlight.active && appCtx.spaceFlight.animationId != null && !document.hidden,
+    scheduled: !!appCtx.spaceFlight.active && appCtx.spaceFlight.animationId != null,
+    suspended: !!appCtx.spaceFlight.active && appCtx.spaceFlight.animationId != null && document.hidden
+  })
+});
 
 let spaceSessionScope = null;
 

@@ -3,6 +3,7 @@ import {
   disposeThreeObjectTree,
   disposeThreeRenderer
 } from '../../engine/webgl-lifecycle.js?v=1';
+import { registerFrameOwner } from '../../runtime/frame-ownership.js?v=1';
 import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=4';
 
 export function createGlobeSelectorScene(options = {}) {
@@ -42,9 +43,25 @@ export function createGlobeSelectorScene(options = {}) {
   let dragLastX = 0;
   let dragLastY = 0;
   let eventsBound = false;
+  let releaseFrameOwner = null;
 
   const minDistance = 1.045;
   const maxDistance = 4.4;
+
+  function ensureFrameOwner() {
+    if (releaseFrameOwner) return;
+    releaseFrameOwner = registerFrameOwner({
+      id: 'title.globe-selector-renderer',
+      label: 'Title globe selector renderer',
+      kind: 'continuous-renderer',
+      exclusiveGroup: 'title-auxiliary-renderer',
+      getState: () => ({
+        active: getOpenState() && renderLoopId !== 0 && !document.hidden,
+        scheduled: getOpenState() && renderLoopId !== 0,
+        suspended: getOpenState() && renderLoopId !== 0 && document.hidden
+      })
+    });
+  }
 
   function getMarkerScale() {
     return Math.max(0.18, Math.min(1, cameraDistance / 2.8));
@@ -240,6 +257,7 @@ export function createGlobeSelectorScene(options = {}) {
   }
 
   function init() {
+    ensureFrameOwner();
     if (scene || !canvas || typeof THREE === 'undefined') {
       if (typeof THREE === 'undefined' && placeReadout) {
         placeReadout.textContent = 'Three.js not ready. You can still use manual search.';
@@ -328,6 +346,8 @@ export function createGlobeSelectorScene(options = {}) {
 
   function destroy() {
     stopRenderLoop();
+    releaseFrameOwner?.();
+    releaseFrameOwner = null;
     pointerActive = false;
     favoriteMarkerNodes = [];
     sceneReady = false;

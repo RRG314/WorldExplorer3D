@@ -74,6 +74,7 @@ async function readLifecycleState(page, mode) {
     }
     return {
       coordinator: ctx.getSessionCoordinatorDebugState?.(),
+      frameOwnership: ctx.getFrameOwnershipSnapshot?.(),
       canvases: {
         ocean: document.querySelectorAll('#oceanModeCanvas').length,
         space: document.querySelectorAll('#spaceFlightCanvas').length,
@@ -145,8 +146,18 @@ function assertPlateau(mode, cycles) {
   for (const [index, cycle] of cycles.entries()) {
     const activeAdapter = cycle.active.coordinator.environments[adapterKey];
     const exitedAdapter = cycle.exited.coordinator.environments[adapterKey];
+    const expectedFrameOwner = mode === 'space' ? 'space.flight-renderer' : 'ocean.mode-renderer';
     assert(activeAdapter.active && activeAdapter.animationActive, `${mode} cycle ${index + 1} did not own an active render loop`);
     assert(!exitedAdapter.active && !exitedAdapter.animationActive, `${mode} cycle ${index + 1} left its render loop active`);
+    assert(cycle.active.frameOwnership?.ok, `${mode} cycle ${index + 1} has conflicting frame owners`);
+    assert(
+      cycle.active.frameOwnership?.active?.includes(expectedFrameOwner),
+      `${mode} cycle ${index + 1} was not registered as the active environment renderer`
+    );
+    assert(
+      !cycle.exited.frameOwnership?.active?.includes(expectedFrameOwner),
+      `${mode} cycle ${index + 1} retained frame ownership after exit`
+    );
     assert(cycle.exited.coordinator.transition === null, `${mode} cycle ${index + 1} left a transition token active`);
     assert(cycle.exited.canvases[mode] === 1, `${mode} cycle ${index + 1} duplicated its canvas`);
     if (mode === 'ocean') {

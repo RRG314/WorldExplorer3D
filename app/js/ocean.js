@@ -24,6 +24,7 @@ import {
   exitCurrentEnvironmentSync,
   registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
+import { registerFrameOwner } from './runtime/frame-ownership.js?v=1';
 
 const OCEAN_SITE = Object.freeze({
   name: 'Coral Shelf Reserve',
@@ -96,6 +97,18 @@ Object.assign(oceanMode, {
     turnSpeed: 0,
     verticalSpeed: 0
   }
+});
+
+registerFrameOwner({
+  id: 'ocean.mode-renderer',
+  label: 'Ocean mode renderer',
+  kind: 'continuous-renderer',
+  exclusiveGroup: 'environment-renderer',
+  getState: () => ({
+    active: !!oceanMode.active && oceanMode.animationId != null && !document.hidden,
+    scheduled: !!oceanMode.active && oceanMode.animationId != null,
+    suspended: !!oceanMode.active && oceanMode.animationId != null && document.hidden
+  })
 });
 appCtx.oceanMode = oceanMode;
 

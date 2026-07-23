@@ -90,6 +90,7 @@ function composerSnapshot() {
 
 function getWorldExplorerRuntimeDiagnostics() {
   const snapshot = {
+    frameOwnership: appCtx.getFrameOwnershipSnapshot?.() || null,
     runtimeKernel: appCtx.getRuntimeKernelSnapshot?.() || null,
     sessionLifecycle: appCtx.getSessionCoordinatorDebugState?.() || null,
     account: appCtx.getAccountSnapshot?.() || null,
