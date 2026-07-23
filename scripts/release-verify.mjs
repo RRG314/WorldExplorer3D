@@ -56,6 +56,8 @@ const steps = [
   { name: 'World load staged swap', cmd: [process.execPath, 'scripts/test-world-load-stage.mjs'] },
   { name: 'Navigation surface query', cmd: [process.execPath, 'scripts/test-navigation-surface-query.mjs'] },
   { name: 'Bridge guardrail contract', cmd: [process.execPath, 'scripts/test-bridge-guardrail-contract.mjs'] },
+  { name: 'Tunnel camera corridor contract', cmd: [process.execPath, 'scripts/test-tunnel-camera-corridor.mjs'] },
+  { name: 'Boat prompt subgrade policy', cmd: [process.execPath, 'scripts/test-boat-prompt-policy.mjs'] },
   { name: 'Structure visual sampling', cmd: [process.execPath, 'scripts/test-structure-visual-sampling.mjs'] },
   { name: 'Transport controller registry', cmd: [process.execPath, 'scripts/test-transport-controller-registry.mjs'] },
   { name: 'Platform service registry', cmd: [process.execPath, 'scripts/test-platform-service-registry.mjs'] },

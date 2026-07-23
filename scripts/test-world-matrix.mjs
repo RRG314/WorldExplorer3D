@@ -343,8 +343,36 @@ async function loadLocation(page, spec) {
         visualInstances: (ctx.structureVisualMeshes || [])
           .filter((mesh) => mesh?.userData?.structureVisualType === 'guardrails')
           .reduce((sum, mesh) => sum + (Number(mesh?.count) || 0), 0)
+      },
+      tunnelVisuals: {
+        tunnelRoads: (ctx.roads || []).filter((road) =>
+          road?.structureSemantics?.structureKind === 'tunnel'
+        ).length,
+        tunnelFeatures: []
+          .concat(ctx.roads || [], ctx.linearFeatures || [])
+          .filter((feature) => feature?.structureSemantics?.terrainMode === 'subgrade').length,
+        walls: 0,
+        roofs: 0,
+        floors: 0,
+        lights: 0,
+        portals: 0,
+        totalInstances: 0
       }
     };
+    const tunnelVisualTypeMap = {
+      walls: 'walls',
+      roofs: 'roofs',
+      tunnel_floors: 'floors',
+      tunnel_lights: 'lights',
+      portals: 'portals'
+    };
+    for (const mesh of ctx.structureVisualMeshes || []) {
+      const metric = tunnelVisualTypeMap[String(mesh?.userData?.structureVisualType || '')];
+      if (!metric) continue;
+      const count = Number(mesh?.count) || 0;
+      structurePresentation.tunnelVisuals[metric] += count;
+      structurePresentation.tunnelVisuals.totalInstances += count;
+    }
     for (const road of ctx.roads || []) {
       const kind = String(road?.structureSemantics?.structureKind || 'at_grade');
       structurePresentation.roads[kind] = (structurePresentation.roads[kind] || 0) + 1;

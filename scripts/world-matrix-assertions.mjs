@@ -39,14 +39,27 @@ export function assertWorldMatrixLocation(spec, result) {
       );
     }
     if (spec.expectedRoadStructure === 'tunnel' && result.tunnelPortalTraversal) {
+      const tunnelVisuals = result.structurePresentation?.tunnelVisuals || {};
+      assert(tunnelVisuals.tunnelRoads > 0, `${spec.id}: no mapped tunnel roads were registered ${JSON.stringify(tunnelVisuals)}`);
+      assert(tunnelVisuals.walls > 0 && tunnelVisuals.roofs > 0 && tunnelVisuals.floors > 0, `${spec.id}: tunnel shell is incomplete ${JSON.stringify(tunnelVisuals)}`);
+      assert(tunnelVisuals.lights > 0 && tunnelVisuals.portals > 0, `${spec.id}: tunnel presentation is incomplete ${JSON.stringify(tunnelVisuals)}`);
+      assert(
+        tunnelVisuals.totalInstances <= tunnelVisuals.walls * 4,
+        `${spec.id}: tunnel visual density exceeded the shell-derived budget ${JSON.stringify(tunnelVisuals)}`
+      );
       const traversal = result.tunnelPortalTraversal;
       const checkpoints = traversal?.checkpoints || [];
       const interior = checkpoints.filter((checkpoint) => checkpoint?.terrainMode === 'subgrade');
+      const interiorCore = interior.filter((checkpoint) => checkpoint?.stage !== 'entry');
+      const entry = checkpoints.find((checkpoint) => checkpoint?.stage === 'entry');
       const exit = checkpoints.find((checkpoint) => checkpoint?.stage === 'exit');
       assert(checkpoints.length === 5, `${spec.id}: tunnel lifecycle did not produce all five checkpoints ${JSON.stringify(traversal)}`);
       assert(interior.length >= 4, `${spec.id}: tunnel lifecycle lost its subgrade road ${JSON.stringify(traversal)}`);
-      assert(interior.every((checkpoint) => checkpoint.applied && checkpoint.renderedDelta <= 0.2), `${spec.id}: tunnel road diverged during traversal ${JSON.stringify(traversal)}`);
+      assert(interiorCore.every((checkpoint) => checkpoint.applied && checkpoint.renderedDelta <= 0.2), `${spec.id}: tunnel road diverged during interior traversal ${JSON.stringify(traversal)}`);
+      assert(entry?.applied && entry?.renderedDelta <= 0.5, `${spec.id}: tunnel portal transition diverged from its rendered surface ${JSON.stringify(traversal)}`);
       assert(interior.every((checkpoint) => checkpoint.cameraAboveRoad <= 1.75), `${spec.id}: tunnel camera crossed the shell ceiling ${JSON.stringify(traversal)}`);
+      assert(interior.every((checkpoint) => checkpoint.visibleWaterMeshes === 0), `${spec.id}: water surface remained visible inside the tunnel ${JSON.stringify(traversal)}`);
+      assert(interior.every((checkpoint) => !checkpoint.boatAvailable && !checkpoint.boatPromptVisible), `${spec.id}: boat travel was offered inside the tunnel ${JSON.stringify(traversal)}`);
       assert(
         Number(traversal?.movement?.distance || 0) >= 0.5 &&
         Number(traversal?.movement?.running?.speed || 0) >= 3,
@@ -57,6 +70,9 @@ export function assertWorldMatrixLocation(spec, result) {
       assert(Number.isFinite(exit?.terrainY), `${spec.id}: exterior terrain is missing at the tunnel exit ${JSON.stringify(traversal)}`);
       assert(exit?.renderedDelta <= 2.5, `${spec.id}: exit road diverged from its rendered surface ${JSON.stringify(traversal)}`);
       assert(exit?.cameraAboveRoad >= 2, `${spec.id}: camera remained tunnel-constrained after exit ${JSON.stringify(traversal)}`);
+      if (exit?.waterMeshes > 0) {
+        assert(exit.visibleWaterMeshes > 0, `${spec.id}: water visibility was not restored after tunnel exit ${JSON.stringify(traversal)}`);
+      }
     }
   }
   if (spec.minimumWaterAreas) assert(result.counts.waterAreas >= spec.minimumWaterAreas, `${spec.id}: expected mapped water areas`);
