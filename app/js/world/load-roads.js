@@ -1,13 +1,13 @@
-import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=8";
-import { createWorldLandusePass } from "./load-landuse-pass.js?v=28";
+import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=9";
+import { createWorldLandusePass } from "./load-landuse-pass.js?v=30";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
 import {
   createWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession,
   recordWorldSourceMetrics
-} from "./load-runtime-session.js?v=6";
-import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=13";
+} from "./load-runtime-session.js?v=7";
+import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=17";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   const waitForCoverage = appCtx.waitForTerrainCoverageAt;
@@ -407,6 +407,15 @@ export function createWorldRoadLoader(deps = {}) {
           requestedCounts,
           worldSurfaceProfile
         } = selection;
+        if (Array.isArray(appCtx.osmTreeRows)) {
+          appCtx.osmTreeRows.forEach((way) => {
+            if (!way || Array.isArray(way._worldPoints) || !Array.isArray(way.nodes)) return;
+            way._worldPoints = way.nodes
+              .map((id) => nodes[id])
+              .filter(Boolean)
+              .map((node) => appCtx.geoToWorld(node.lat, node.lon));
+          });
+        }
         if (
           roadWays.length < requestedCounts.roads ||
           buildingWays.length < requestedCounts.buildings ||
@@ -487,17 +496,34 @@ export function createWorldRoadLoader(deps = {}) {
           structureConnectorWays,
           deferStructureRefresh: true
         });
-        scheduleDeferredWorldDetailPasses({
+        void scheduleDeferredWorldDetailPasses({
           endLoadPhase,
           isActiveLoadContext,
           loadMetrics,
           lodMidDist,
           lodNearDist,
           poiKeyFromTags,
-          poiNodes,
+          poiNodes: poiNodes.slice(),
           startLoadPhase,
           updateWorldLod
         });
+        const hasPrimaryPoiCoverage = poiNodes.length > 0;
+        [
+          roadWays,
+          buildingWays,
+          landuseWays,
+          waterwayWays,
+          railwayWays,
+          footwayWays,
+          cyclewayWays,
+          structureConnectorWays,
+          poiNodes
+        ].forEach((items) => {
+          if (Array.isArray(items)) items.length = 0;
+        });
+        if (Array.isArray(data?.elements)) data.elements.length = 0;
+        data = null;
+        appCtx._worldLoadNodes = null;
 
         if (appCtx.roads.length > 0) {
           scheduleDeferredLandmarkLoad({
@@ -540,6 +566,7 @@ export function createWorldRoadLoader(deps = {}) {
             cacheMeta: deferredBuildingCacheMeta,
             deadlineMs: performance.now() + Math.max(12000, overpassTimeoutMs + 2500),
             delayMs: detailOptions.delayMs,
+            deferSurfaceSync: detailOptions.deferSurfaceSync === true,
             endLoadPhase,
             featureMinPolygonArea: FEATURE_MIN_POLYGON_AREA,
             fetchOverpassJSON,
@@ -548,7 +575,7 @@ export function createWorldRoadLoader(deps = {}) {
                 lat: appCtx.LOC.lat,
                 lon: appCtx.LOC.lon,
                 radius: deferredBuildingCacheMeta.featureRadius
-              }, (error) => recordLoadWarning('Overture building massing fallback', error)),
+              }, (error) => recordLoadWarning('OSM building detail fallback', error)),
             isActiveLoadContext,
             location: { lat: appCtx.LOC.lat, lon: appCtx.LOC.lon },
             limitWaysByTileBudget,
@@ -559,7 +586,7 @@ export function createWorldRoadLoader(deps = {}) {
             metadataDeadlineMs: Infinity,
             metadataQuery: deferredBuildingMetadataQuery,
             metadataTimeoutMs: 9000,
-            onSettled: schedulePoiDetail,
+            onSettled: hasPrimaryPoiCoverage ? () => {} : schedulePoiDetail,
             pickBuildingBaseColor,
             query: deferredBuildingQuery,
             rdtLoadComplexity,
@@ -575,22 +602,20 @@ export function createWorldRoadLoader(deps = {}) {
             useRdtBudgeting
           });
           if (appCtx.buildingMeshes.length > 0) {
-            schedulePoiDetail();
+            if (!hasPrimaryPoiCoverage) schedulePoiDetail();
           } else {
             appCtx.showLoad('Loading buildings and preparing the world...');
-            await scheduleBuildingDetail({ delayMs: 0 });
+            startLoadPhase('loadBuildingsCritical');
+            try {
+              await scheduleBuildingDetail({ delayMs: 0, deferSurfaceSync: true });
+            } finally {
+              endLoadPhase('loadBuildingsCritical');
+            }
           }
           await markLoaded('primary');
-          scheduleDeferredLinearFeatureLoad();
-          scheduleDeferredStructureRefresh({
-            roads: appCtx.roads,
-            isActiveLoadContext,
-            startLoadPhase,
-            endLoadPhase,
-            refreshStructureAwareFeatureProfiles,
-            rebuildStructureVisualMeshes: appCtx.rebuildStructureVisualMeshes,
-            recordLoadWarning
-          });
+          if (!Array.isArray(appCtx.linearFeatures) || appCtx.linearFeatures.length === 0) {
+            scheduleDeferredLinearFeatureLoad();
+          }
         } else {
           const waterOnlyCandidate = resolveWaterOnlyStartCandidate();
           if (waterOnlyCandidate) {

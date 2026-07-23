@@ -174,6 +174,10 @@ export function createLinearFeatureRuntime(options = {}) {
     if (runtimeOptions.force === true && !feature.isStructureConnector) return false;
 
     updateFeatureSurfaceProfile(feature, worldBaseTerrainY, { surfaceBias: spec.bias });
+    if (classification.kind === 'footway' && !feature.isStructureConnector) {
+      appCtx.linearFeatures.push(feature);
+      return true;
+    }
     const ribbonEdges = buildFeatureRibbonEdges(feature, centerline, halfWidth, worldBaseTerrainY, {
       surfaceBias: spec.bias
     });
@@ -238,8 +242,8 @@ export function createLinearFeatureRuntime(options = {}) {
     mesh.userData.linearFeatureRef = feature;
     mesh.userData.structureSemantics = structureSemantics;
     mesh.userData.structureConnector = runtimeOptions.force === true;
-    mesh.userData.alwaysMappedPedestrian = classification.kind === 'footway';
-    mesh.visible = mesh.userData.alwaysMappedPedestrian || runtimeOptions.alwaysVisible === true || appCtx.showPathOverlays !== false;
+    mesh.userData.alwaysMappedPedestrian = false;
+    mesh.visible = runtimeOptions.alwaysVisible === true || appCtx.showPathOverlays !== false;
 
     appCtx.scene.add(mesh);
     appCtx.linearFeatureMeshes.push(mesh);

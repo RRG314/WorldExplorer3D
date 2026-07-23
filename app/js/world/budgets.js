@@ -63,6 +63,16 @@ export function getRuntimeDynamicBudget(mode = runtime.getPerfModeValue()) {
 }
 
 export function wayCenterLatLon(way, nodeMap) {
+  if (way?._coordinates?.length >= 2) {
+    let latSum = 0;
+    let lonSum = 0;
+    const sampleCount = Math.min(Math.floor(way._coordinates.length / 2), 8);
+    for (let i = 0; i < sampleCount; i++) {
+      lonSum += way._coordinates[i * 2];
+      latSum += way._coordinates[i * 2 + 1];
+    }
+    return sampleCount > 0 ? { lat: latSum / sampleCount, lon: lonSum / sampleCount } : null;
+  }
   if (!way?.nodes?.length) return null;
 
   let latSum = 0;
@@ -270,7 +280,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       featureRadiusScale: clampNumber(1.0 * radiusScale, 0.90, 1.02, 1),
       poiRadiusScale: clampNumber(1.0 * radiusScale, 0.88, 1.02, 1),
       maxRoadWays: scaledInt(20000, scale, 3200),
-      maxBuildingWays: scaledInt(26000, scale, 7000),
+      maxBuildingWays: scaledInt(18000, scale, 7000),
       maxLanduseWays: scaledInt(15000, scale, 2200),
       maxPoiNodes: scaledInt(8000, scale, 1200),
       tileBudgetCfg: {
@@ -295,7 +305,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       featureRadiusScale: 0.96,
       poiRadiusScale: 0.88,
       maxRoadWays: 3400,
-      maxBuildingWays: 26000,
+      maxBuildingWays: 14000,
       maxLanduseWays: 4200,
       maxPoiNodes: 1600,
       roadsPerTile: 155,
@@ -314,7 +324,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       featureRadiusScale: 0.94,
       poiRadiusScale: 0.86,
       maxRoadWays: 3900,
-      maxBuildingWays: 24000,
+      maxBuildingWays: 14000,
       maxLanduseWays: 5200,
       maxPoiNodes: 1900,
       roadsPerTile: 165,
@@ -333,7 +343,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       featureRadiusScale: 0.93,
       poiRadiusScale: 0.86,
       maxRoadWays: 4300,
-      maxBuildingWays: 22000,
+      maxBuildingWays: 15000,
       maxLanduseWays: 6200,
       maxPoiNodes: 2200,
       roadsPerTile: 185,
@@ -351,7 +361,7 @@ export function getAdaptiveLoadProfile(loadDepth, mode = runtime.getPerfModeValu
       featureRadiusScale: 0.95,
       poiRadiusScale: 0.90,
       maxRoadWays: 5600,
-      maxBuildingWays: 24000,
+      maxBuildingWays: 16000,
       maxLanduseWays: 8500,
       maxPoiNodes: 2800,
       roadsPerTile: 220,

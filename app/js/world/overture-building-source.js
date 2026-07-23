@@ -1,12 +1,12 @@
 import {
   fetchShortbreadBuildingData,
   vectorTileRangeForBounds
-} from "./shortbread-source.js?v=9";
+} from "./shortbread-source.js?v=13";
 import {
   OVERTURE_RELEASE,
   fetchOvertureThemeTile,
   overtureThemeArchiveUrl
-} from './overture-tile-source.js?v=1';
+} from './overture-tile-source.js?v=3';
 
 const OVERTURE_BUILDING_ZOOM = 14;
 
@@ -234,7 +234,13 @@ function isTimeoutFailure(entry) {
 
 async function fetchArchiveTileBatch(coordinates) {
   return Promise.allSettled(
-    coordinates.map(({ x, y }) => fetchOvertureThemeTile('buildings', OVERTURE_BUILDING_ZOOM, x, y))
+    coordinates.map(({ x, y }) => fetchOvertureThemeTile(
+      'buildings',
+      OVERTURE_BUILDING_ZOOM,
+      x,
+      y,
+      { timeoutMs: 8000 }
+    ))
   );
 }
 
@@ -303,10 +309,10 @@ export async function fetchOvertureBuildingData(options = {}) {
 
 export async function fetchGlobalBuildingData(options = {}, onFallback = null) {
   try {
-    return await fetchOvertureBuildingData(options);
+    return await fetchShortbreadBuildingData(options);
   } catch (error) {
     if (typeof onFallback === 'function') onFallback(error);
-    return fetchShortbreadBuildingData(options);
+    return fetchOvertureBuildingData(options);
   }
 }
 

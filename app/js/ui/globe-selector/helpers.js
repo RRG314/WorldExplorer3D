@@ -361,7 +361,8 @@ export function syncLegacyCustomSelection(appCtx, selection) {
   appCtx.setCustomLocation?.({
     lat: selection.lat,
     lon: selection.lon,
-    name: selection.name || appCtx.customLoc?.name || 'Custom Location'
+    name: selection.name || appCtx.customLoc?.name || 'Custom Location',
+    arrivalMode: selection.arrivalMode || 'auto'
   }, { transient: selection.fromGeolocation === true, syncInputs: false });
 }
 

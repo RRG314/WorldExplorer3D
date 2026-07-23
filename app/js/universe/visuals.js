@@ -66,7 +66,7 @@ function createPlanetarySystem(entity) {
     new THREE.MeshBasicMaterial({ color })
   );
   star.name = entity.name;
-  star.userData = { universeEntityId: entity.id };
+  star.userData = { universeEntityId: entity.id, bodyRadius: starRadius, catalogEntity: entity };
   group.add(star);
   const glow = new THREE.Mesh(
     new THREE.SphereGeometry(starRadius * 1.55, 24, 16),
@@ -93,12 +93,14 @@ function createPlanetarySystem(entity) {
       new THREE.MeshPhongMaterial({ color: new THREE.Color().setHSL(hue, 0.42, 0.54), shininess: 8 })
     );
     body.name = planet.name;
-    body.userData = { universeEntityId: planet.id, planet };
+    const catalogPlanet = { ...planet, parentId: entity.id };
+    body.userData = { universeEntityId: planet.id, planet: catalogPlanet, bodyRadius: radius };
     const phase = random() * Math.PI * 2;
     body.position.set(Math.cos(phase) * orbitRadius, (random() - 0.5) * 8, Math.sin(phase) * orbitRadius);
     group.add(body);
     group.userData.orbitingPlanets.push({ body, orbitRadius, phase, orbitDays: Number(planet.orbitDays || 365) });
   });
+  group.userData.centralStar = star;
   return group;
 }
 

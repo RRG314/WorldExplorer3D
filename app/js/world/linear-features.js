@@ -113,24 +113,34 @@ export function scheduleDeferredWorldLinearFeatureLoad(options = {}) {
 
 export function scheduleDeferredStructureRefresh(options = {}) {
   const roads = Array.isArray(options.roads) ? options.roads : [];
-  if (!roads.some((road) => road?.structureSemantics?.gradeSeparated)) return;
+  if (!roads.some((road) => road?.structureSemantics?.gradeSeparated)) return Promise.resolve(false);
 
-  const run = () => {
-    if (typeof options.isActiveLoadContext === 'function' && !options.isActiveLoadContext()) return;
+  const run = (resolve) => {
+    if (typeof options.isActiveLoadContext === 'function' && !options.isActiveLoadContext()) {
+      resolve(false);
+      return;
+    }
     options.startLoadPhase?.('refreshStructureGeometryDeferred');
     try {
       options.refreshStructureAwareFeatureProfiles?.();
       options.rebuildStructureVisualMeshes?.();
+      resolve(true);
     } catch (err) {
       options.recordLoadWarning?.('refreshStructureGeometryDeferred', err);
+      resolve(false);
     } finally {
       options.endLoadPhase?.('refreshStructureGeometryDeferred');
     }
   };
 
-  if (typeof globalThis.requestIdleCallback === 'function') {
-    globalThis.requestIdleCallback(run, { timeout: 2200 });
-  } else {
-    globalThis.setTimeout(run, 400);
+  if (options.immediate === true) {
+    return new Promise((resolve) => run(resolve));
   }
+  return new Promise((resolve) => {
+    if (typeof globalThis.requestIdleCallback === 'function') {
+      globalThis.requestIdleCallback(() => run(resolve), { timeout: 2200 });
+    } else {
+      globalThis.setTimeout(() => run(resolve), 400);
+    }
+  });
 }

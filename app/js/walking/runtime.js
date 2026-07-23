@@ -1,4 +1,8 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
+import { resolveChaseCameraPosition } from "../camera/clearance.js?v=4";
+
+const walkCameraOrigin = { x: 0, y: 0, z: 0 };
+const walkCameraTarget = { x: 0, y: 0, z: 0 };
 
 function createWalkingRuntimeHelpers({
   CFG,
@@ -217,10 +221,25 @@ function createWalkingRuntimeHelpers({
       resolvedCamZ = clamped.z;
     }
 
-    camera.position.set(resolvedCamX, camY, resolvedCamZ);
+    walkCameraOrigin.x = state.walker.x;
+    walkCameraOrigin.y = baseY - CFG.eyeHeight + 1.1;
+    walkCameraOrigin.z = state.walker.z;
+    walkCameraTarget.x = resolvedCamX;
+    walkCameraTarget.y = camY;
+    walkCameraTarget.z = resolvedCamZ;
+    resolveChaseCameraPosition(walkCameraOrigin, walkCameraTarget, {
+      cacheKey: "walk",
+      radius: 0.38,
+    });
+    camera.position.set(walkCameraTarget.x, walkCameraTarget.y, walkCameraTarget.z);
+    const cameraClearanceDistance = Math.hypot(
+      walkCameraTarget.x - walkCameraOrigin.x,
+      walkCameraTarget.y - walkCameraOrigin.y,
+      walkCameraTarget.z - walkCameraOrigin.z
+    );
 
     if (state.characterMesh && state.view === "third") {
-      state.characterMesh.visible = state.walker.pitch < 0.98;
+      state.characterMesh.visible = state.walker.pitch < 0.98 && cameraClearanceDistance > 1.15;
     }
 
     const lookAhead = interiorCamera ? Math.min(1.45, CFG.thirdPersonLookAhead * 0.24) : CFG.thirdPersonLookAhead;

@@ -2,8 +2,8 @@ import {
   buildFeatureRibbonEdges,
   isRoadSurfaceReachable,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=17";
-import { waterSurfaceBaseElevation } from "../world/load-geometry.js?v=16";
+} from "../structure-semantics.js?v=19";
+import { waterSurfaceBaseElevation } from "../world/load-geometry.js?v=19";
 import { reconcileWaterBodySurface } from '../world/water-body-contract.js?v=2';
 
 function createTerrainReprojectionApi(deps = {}) {

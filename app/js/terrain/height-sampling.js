@@ -1,7 +1,7 @@
 import {
   projectPointToFeature,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=17";
+} from "../structure-semantics.js?v=19";
 
 function createTerrainHeightSamplingApi(deps = {}) {
   const {
@@ -87,14 +87,14 @@ function createTerrainHeightSamplingApi(deps = {}) {
     return h;
   }
 
-  function applyStructureTerrainCuts(worldX, worldZ, terrainY) {
-    if (!Array.isArray(appCtx.structureTerrainCuts) || appCtx.structureTerrainCuts.length === 0 || !Number.isFinite(terrainY)) {
+  function applyStructureTerrainCuts(worldX, worldZ, terrainY, candidateCuts = appCtx.structureTerrainCuts) {
+    if (!Array.isArray(candidateCuts) || candidateCuts.length === 0 || !Number.isFinite(terrainY)) {
       return terrainY;
     }
 
     let adjustedY = terrainY;
-    for (let i = 0; i < appCtx.structureTerrainCuts.length; i++) {
-      const cut = appCtx.structureTerrainCuts[i];
+    for (let i = 0; i < candidateCuts.length; i++) {
+      const cut = candidateCuts[i];
       if (!cut?.feature || !cut?.bounds) continue;
       if (worldX < cut.bounds.minX || worldX > cut.bounds.maxX || worldZ < cut.bounds.minZ || worldZ > cut.bounds.maxZ) continue;
 

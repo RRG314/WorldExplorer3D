@@ -1,8 +1,8 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { clearBuildingSpatialIndex } from './building-spatial-index.js?v=5';
+import { clearBuildingSpatialIndex } from './building-spatial-index.js?v=6';
 import { resetWorldFurnitureCaches } from './furniture.js?v=10';
 import { earthSceneSuppressed, hideEarthSceneMeshes, resetWorldForReload } from './load-reset.js?v=8';
-import { finalizeLoadedWorld } from './load-support.js?v=19';
+import { finalizeLoadedWorld } from './load-support.js?v=24';
 
 let activeLoad = null;
 

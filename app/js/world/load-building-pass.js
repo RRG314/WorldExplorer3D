@@ -1,11 +1,11 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=17";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=19";
 import {
   buildingSeedFromIdentity,
   inferFallbackBuildingHeightMeters,
   interpretBuildingSemantics
 } from "../building-semantics.js?v=4";
-import { createMidLodBuildingMesh } from "./load-geometry.js?v=16";
+import { createMidLodBuildingMesh } from "./load-geometry.js?v=19";
 import {
   appendGeometryWithTransform,
   buildMergedGeometry,
@@ -284,8 +284,14 @@ export function buildBuildingGeometryPass(options = {}) {
 
   const lodNearDist = lodThresholds.near;
   const buildingDetailDist = Math.min(lodNearDist, 300);
+  let unbatchedMidBuildings = 0;
   buildingWays.forEach((way) => {
-    const rawPts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
+    const compactCoordinates = way?._coordinates;
+    const rawPts = compactCoordinates?.length >= 6
+      ? Array.from({ length: Math.floor(compactCoordinates.length / 2) }, (_, index) =>
+        appCtx.geoToWorld(compactCoordinates[index * 2 + 1], compactCoordinates[index * 2]))
+      : way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
+    way._coordinates = null;
     const pts = sanitizeWorldFootprintPoints(rawPts, featureMinPolygonArea, buildingGeometryGuards);
     if (pts.length < 3 || !isBuildingNearLoadedRoad(pts)) return;
     const roadCoreStats = sampleFootprintCoverage(pts, pointOnRoadCore);
@@ -631,6 +637,13 @@ export function buildBuildingGeometryPass(options = {}) {
         appCtx.scene.add(groundPatch);
         appCtx.landuseMeshes.push(groundPatch);
       });
+    }
+    if (lodTier === 'mid') {
+      unbatchedMidBuildings += 1;
+      if (unbatchedMidBuildings >= 640) {
+        batchMidLodBuildingMeshes();
+        unbatchedMidBuildings = 0;
+      }
     }
   });
 

@@ -77,6 +77,8 @@ function initSolarSystemModel(context, spaceScene) {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.name = planet.name;
     mesh.userData = { isPlanet: true, planetIndex: i };
+    mesh.rotation.order = 'ZYX';
+    mesh.rotation.z = THREE.MathUtils.degToRad(Number(planet.axialTiltDeg) || 0);
 
     const glowGeo = new THREE.SphereGeometry(planet.radiusScaled * 1.4, 20, 20);
     const glowMat = new THREE.MeshBasicMaterial({

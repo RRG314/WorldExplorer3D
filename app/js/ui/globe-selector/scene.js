@@ -3,7 +3,7 @@ import {
   disposeThreeObjectTree,
   disposeThreeRenderer
 } from '../../engine/webgl-lifecycle.js?v=1';
-import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=3';
+import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=4';
 
 export function createGlobeSelectorScene(options = {}) {
   const {
@@ -126,8 +126,20 @@ export function createGlobeSelectorScene(options = {}) {
     if (!globeRoot) return;
     const latRad = lat * Math.PI / 180;
     const lonRad = lon * Math.PI / 180;
-    globeRoot.rotation.y = -(lonRad + Math.PI * 0.5);
-    globeRoot.rotation.x = Math.max(-1.2, Math.min(1.2, latRad));
+    const surfaceNormal = new THREE.Vector3(
+      Math.cos(latRad) * Math.cos(lonRad),
+      Math.sin(latRad),
+      -Math.cos(latRad) * Math.sin(lonRad)
+    ).normalize();
+    const localNorth = new THREE.Vector3(
+      -Math.sin(latRad) * Math.cos(lonRad),
+      Math.cos(latRad),
+      Math.sin(latRad) * Math.sin(lonRad)
+    ).normalize();
+    const localEast = new THREE.Vector3().crossVectors(localNorth, surfaceNormal).normalize();
+    const geographicBasis = new THREE.Matrix4().makeBasis(localEast, localNorth, surfaceNormal);
+    geographicBasis.transpose();
+    globeRoot.quaternion.setFromRotationMatrix(geographicBasis);
     renderFrame();
   }
 

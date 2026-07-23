@@ -1,3 +1,5 @@
+const NO_BUILDING_COLLISION = Object.freeze({ collision: false });
+
 function buildingVerticalRangeOverlap(building, actorBaseY, actorHeight, tolerance = 0.45) {
   if (!Number.isFinite(actorBaseY)) return true;
   const actorTopY = actorBaseY + (Number.isFinite(actorHeight) ? Math.max(0.5, actorHeight) : 1.8);
@@ -8,14 +10,16 @@ function buildingVerticalRangeOverlap(building, actorBaseY, actorHeight, toleran
 }
 
 function createBuildingCollisionQuery(appCtx) {
+  const candidateBuffer = [];
+  const candidateDedupe = new Set();
   return function checkBuildingCollision(x, z, carRadius = 2, options = {}) {
-    if (!Array.isArray(appCtx.buildings) || appCtx.buildings.length === 0) return { collision: false };
+    if (!Array.isArray(appCtx.buildings) || appCtx.buildings.length === 0) return NO_BUILDING_COLLISION;
     const actorBaseY = Number.isFinite(options?.actorBaseY) ? Number(options.actorBaseY) : NaN;
     const actorHeight = Number.isFinite(options?.actorHeight) ? Number(options.actorHeight) : 1.9;
     const candidates = typeof appCtx.getNearbyBuildings === 'function'
-      ? appCtx.getNearbyBuildings(x, z, carRadius + 8)
+      ? appCtx.getNearbyBuildings(x, z, carRadius + 8, candidateBuffer, candidateDedupe)
       : appCtx.buildings;
-    if (!candidates?.length) return { collision: false };
+    if (!candidates?.length) return NO_BUILDING_COLLISION;
 
     for (let i = 0; i < candidates.length; i += 1) {
       const building = candidates[i];
@@ -95,7 +99,7 @@ function createBuildingCollisionQuery(appCtx) {
         };
       }
     }
-    return { collision: false };
+    return NO_BUILDING_COLLISION;
   };
 }
 

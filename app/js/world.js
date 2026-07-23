@@ -16,21 +16,22 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=17";
+} from "./structure-semantics.js?v=19";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
   applySpawnTarget,
   initWorldSpawning,
+  revalidateActiveWorldSpawn,
   resolveSafeWorldSpawn,
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=20";
+} from "./world/spawn.js?v=21";
 import {
   scheduleDeferredStructureRefresh,
   scheduleDeferredWorldLinearFeatureLoad
-} from "./world/linear-features.js?v=2";
+} from "./world/linear-features.js?v=4";
 import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,
@@ -51,11 +52,11 @@ import {
   limitWaysByTileBudget,
   rdtDepthForFeatureTile,
   wayCenterLatLon
-} from "./world/budgets.js?v=6";
+} from "./world/budgets.js?v=8";
 import {
   initWorldLod,
   updateWorldLod
-} from "./world/lod.js?v=12";
+} from "./world/lod.js?v=16";
 import {
   buildPoiGeometryPass,
   buildStreetFurniturePass,
@@ -65,7 +66,7 @@ import {
   scheduleDeferredPoiLoad,
   scheduleDeferredWorldDetailPasses,
   safeWorldLoadCall
-} from "./world/load-support.js?v=19";
+} from "./world/load-support.js?v=24";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -89,7 +90,7 @@ import {
   waterSurfaceBaseElevation,
   WATER_VECTOR_TILE_ZOOM,
   worldLinePointsFromLonLat
-} from "./world/load-geometry.js?v=16";
+} from "./world/load-geometry.js?v=19";
 import {
   decimateRoadCenterlineByDepth,
   getPerfModeValue,
@@ -106,9 +107,9 @@ import {
   limitNodesByDistance,
   limitWaysByDistance,
   nodeDistanceSq
-} from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=10";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=20";
+} from "./world/load-selection.js?v=2";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=12";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=22";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -139,7 +140,7 @@ import {
   initWorldVegetation,
   MAX_TREE_NODES,
   MAX_TREE_ROW_WAYS
-} from "./world/vegetation.js?v=13";
+} from "./world/vegetation.js?v=14";
 import {
   appendIndexedGeometry,
   decimatePoints,
@@ -159,7 +160,7 @@ import {
   getNearbyBuildings,
   isSuppressedBaseBuilding,
   isSuppressedBaseRoad
-} from "./world/building-spatial-index.js?v=5";
+} from "./world/building-spatial-index.js?v=6";
 import {
   applyBuildingContextSemanticsToFeature,
   cloneStructureSemantics,
@@ -168,11 +169,11 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=5";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=55";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=68";
 import {
   fetchShortbreadWorldData
-} from "./world/shortbread-source.js?v=9";
-import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=6";
+} from "./world/shortbread-source.js?v=13";
+import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=10";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
 import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=26";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
@@ -384,6 +385,7 @@ Object.assign(appCtx, {
   refreshStructureAwareFeatureProfiles,
   refreshAuthoritativeMapData,
   resolveSafeWorldSpawn,
+  revalidateActiveWorldSpawn,
   sampleFeatureSurfaceY,
   syncLinearFeatureOverlayVisibility,
   surfaceDisplayName,
@@ -414,6 +416,7 @@ export {
   refreshStructureAwareFeatureProfiles,
   refreshAuthoritativeMapData,
   resolveSafeWorldSpawn,
+  revalidateActiveWorldSpawn,
   sampleFeatureSurfaceY,
   syncLinearFeatureOverlayVisibility,
   surfaceDisplayName,

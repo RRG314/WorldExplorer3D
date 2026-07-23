@@ -1,7 +1,15 @@
+import {
+  CURATED_DESTINATIONS,
+  MAJOR_CITY_DESTINATIONS
+} from '../globe-selector/catalog.js?v=8';
+import {
+  loadRecentPlaces,
+  loadSavedFavoriteCities
+} from '../globe-selector/helpers.js?v=4';
+
 const HUB_PANELS = {
   games: { tab: 'games', title: 'Missions & Games' },
   multiplayer: { tab: 'multiplayer', title: 'Multiplayer' },
-  library: { tab: 'location', title: 'My Places' },
   settings: { tab: 'settings', title: 'Settings' },
   controls: { tab: 'controls', title: 'Controls & Quick Start' }
 };
@@ -45,6 +53,82 @@ function setupGlobeHub({
   const panelHost = document.getElementById('globeHubPanelHost');
   const footerHost = document.getElementById('globeHubFooterHost');
   const overlayTitle = document.getElementById('globeHubOverlayTitle');
+  const liveEarthPanel = document.getElementById('globeSelectorLiveEarthPanel');
+  const liveEarthHome = liveEarthPanel?.parentElement || null;
+  const liveEarthNextSibling = liveEarthPanel?.nextSibling || null;
+  const libraryPanel = document.createElement('section');
+  libraryPanel.className = 'hub-library-panel';
+  libraryPanel.hidden = true;
+
+  const appendLibrarySection = (host, title, subtitle, places) => {
+    const section = document.createElement('section');
+    section.className = 'hub-library-section';
+    const heading = document.createElement('header');
+    const strong = document.createElement('strong');
+    const description = document.createElement('span');
+    strong.textContent = title;
+    description.textContent = subtitle;
+    heading.append(strong, description);
+    section.appendChild(heading);
+
+    const grid = document.createElement('div');
+    grid.className = 'hub-library-grid';
+    if (places.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'hub-library-empty';
+      empty.textContent = title === 'Saved Places'
+        ? 'Use the star beside a selected location to add it here.'
+        : 'Explored locations will appear here.';
+      section.appendChild(empty);
+    } else {
+      places.forEach((place) => {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.dataset.libraryLat = String(place.lat);
+        button.dataset.libraryLon = String(place.lon);
+        button.dataset.libraryName = String(place.name || 'Selected place');
+        const name = document.createElement('strong');
+        const meta = document.createElement('span');
+        name.textContent = place.name;
+        meta.textContent = place.category || place.region || 'Saved location';
+        button.append(name, meta);
+        grid.appendChild(button);
+      });
+      section.appendChild(grid);
+    }
+    host.appendChild(section);
+  };
+
+  const renderLibraryPanel = () => {
+    libraryPanel.replaceChildren();
+    const canonicalPlaces = new Map(
+      [...CURATED_DESTINATIONS, ...MAJOR_CITY_DESTINATIONS]
+        .map((place) => [String(place.name || '').trim().toLowerCase(), place])
+    );
+    const useCanonicalCoordinates = (places) => places.map((place) => {
+      const canonical = canonicalPlaces.get(String(place?.name || '').trim().toLowerCase());
+      return canonical ? { ...place, lat: canonical.lat, lon: canonical.lon } : place;
+    });
+    const saved = useCanonicalCoordinates(loadSavedFavoriteCities());
+    const recent = useCanonicalCoordinates(loadRecentPlaces());
+    appendLibrarySection(libraryPanel, 'Saved Places', 'Your personal collection', saved);
+    appendLibrarySection(libraryPanel, 'Recent', 'Locations you explored', recent);
+
+    const regions = [...new Set(MAJOR_CITY_DESTINATIONS.map((city) => city.category))];
+    regions.forEach((region) => {
+      appendLibrarySection(
+        libraryPanel,
+        region,
+        'Major cities',
+        MAJOR_CITY_DESTINATIONS.filter((city) => city.category === region)
+      );
+    });
+
+    const historic = CURATED_DESTINATIONS.filter((place) => /historic|landmark/i.test(place.category));
+    const nature = CURATED_DESTINATIONS.filter((place) => !historic.includes(place));
+    appendLibrarySection(libraryPanel, 'Historic Sites & Landmarks', 'Architecture, monuments, and cultural sites', historic);
+    appendLibrarySection(libraryPanel, 'Nature & Landscapes', 'Parks, mountains, coastlines, and natural wonders', nature);
+  };
 
   const multiplayerNav = document.querySelector('.mp-workspace-nav');
   multiplayerNav?.addEventListener('click', (event) => {
@@ -68,15 +152,45 @@ function setupGlobeHub({
   };
 
   const closePanel = () => {
+    if (liveEarthPanel && liveEarthHome && liveEarthPanel.parentElement === panelHost) {
+      liveEarthHome.insertBefore(liveEarthPanel, liveEarthNextSibling);
+      liveEarthPanel.classList.remove('hub-center-panel');
+      document.getElementById('globeSelectorExploreModeBtn')?.click();
+    }
     if (overlay) {
       overlay.hidden = true;
       overlay.setAttribute('aria-hidden', 'true');
     }
     panelHost?.querySelectorAll('.tab-content').forEach((panel) => panel.classList.remove('active'));
+    libraryPanel.hidden = true;
+    libraryPanel.classList.remove('active');
     setActiveDestination('location');
   };
 
   const openPanel = (destination) => {
+    if (destination === 'library' && overlay && panelHost) {
+      panelHost.querySelectorAll('.tab-content, .hub-center-panel').forEach((node) => node.classList.remove('active'));
+      renderLibraryPanel();
+      libraryPanel.hidden = false;
+      libraryPanel.classList.add('active');
+      overlay.hidden = false;
+      overlay.setAttribute('aria-hidden', 'false');
+      if (overlayTitle) overlayTitle.textContent = 'My Places';
+      setActiveDestination(destination);
+      return true;
+    }
+    if (destination === 'live-earth' && liveEarthPanel && overlay && panelHost) {
+      panelHost.querySelectorAll('.tab-content, .hub-center-panel').forEach((node) => node.classList.remove('active'));
+      panelHost.appendChild(liveEarthPanel);
+      liveEarthPanel.hidden = false;
+      liveEarthPanel.classList.add('hub-center-panel', 'active');
+      overlay.hidden = false;
+      overlay.setAttribute('aria-hidden', 'false');
+      if (overlayTitle) overlayTitle.textContent = 'Live Data';
+      setActiveDestination(destination);
+      document.getElementById('globeSelectorLiveEarthModeBtn')?.click();
+      return true;
+    }
     const target = HUB_PANELS[destination];
     const panel = target ? document.getElementById(`tab-${target.tab}`) : null;
     if (!target || !panel || !overlay || !panelHost) return false;
@@ -91,6 +205,7 @@ function setupGlobeHub({
   };
 
   if (panelHost) {
+    panelHost.appendChild(libraryPanel);
     ['location', 'games', 'multiplayer', 'settings', 'controls'].forEach((tabName) => {
       const panel = document.getElementById(`tab-${tabName}`);
       if (panel) panelHost.appendChild(panel);
@@ -102,12 +217,25 @@ function setupGlobeHub({
     if (challengePanel && overlay) overlay.appendChild(challengePanel);
   }
 
+  libraryPanel.addEventListener('click', (event) => {
+    const button = event.target instanceof Element
+      ? event.target.closest('[data-library-lat][data-library-lon]')
+      : null;
+    if (!(button instanceof HTMLButtonElement)) return;
+    const lat = Number(button.dataset.libraryLat);
+    const lon = Number(button.dataset.libraryLon);
+    if (!Number.isFinite(lat) || !Number.isFinite(lon)) return;
+    globeSelector.setSelection(lat, lon, {
+      name: button.dataset.libraryName || 'Selected place',
+      focus: true,
+      arrivalMode: 'walk'
+    });
+    closePanel();
+  });
+
   const titleFooter = document.querySelector('.title-footer');
   if (titleFooter && footerHost) footerHost.appendChild(titleFooter);
   document.getElementById('globeHubOverlayCloseBtn')?.addEventListener('click', closePanel);
-  document.getElementById('globeHubShareBtn')?.addEventListener('click', () => {
-    document.getElementById('shareExperienceBtn')?.click();
-  });
   document.getElementById('globeHubFullscreenBtn')?.addEventListener('click', () => {
     if (document.fullscreenElement) void document.exitFullscreen?.();
     else void document.documentElement.requestFullscreen?.();
@@ -121,14 +249,9 @@ function setupGlobeHub({
         closePanel();
         document.getElementById('globeSelectorExploreModeBtn')?.click();
       } else if (destination === 'live-earth') {
-        closePanel();
-        setActiveDestination('live-earth');
-        document.getElementById('globeSelectorLiveEarthModeBtn')?.click();
+        openPanel('live-earth');
       } else if (destination === 'library') {
-        closePanel();
-        setActiveDestination('library');
-        document.getElementById('globeSelectorExploreModeBtn')?.click();
-        document.getElementById('globeFavoritesTabBtn')?.click();
+        openPanel('library');
       } else {
         openPanel(destination);
       }

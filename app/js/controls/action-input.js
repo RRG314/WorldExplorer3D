@@ -6,6 +6,7 @@ const inputState = {
   previousButtons: [],
   updatedAt: 0
 };
+const actionCache = new Map();
 
 function clamp(value, min = -1, max = 1) {
   return Math.max(min, Math.min(max, Number(value) || 0));
@@ -18,8 +19,10 @@ function axis(value) {
   return Math.sign(numeric) * (magnitude - DEAD_ZONE) / (1 - DEAD_ZONE);
 }
 
-function pressed(keys, ...codes) {
-  return codes.some((code) => keys?.[code] === true);
+function pressed(keys, first, second, third) {
+  return keys?.[first] === true ||
+    (second !== undefined && keys?.[second] === true) ||
+    (third !== undefined && keys?.[third] === true);
 }
 
 function digital(positive, negative) {
@@ -36,7 +39,10 @@ function normalizeMode(mode) {
 function connectedGamepad() {
   const pads = typeof navigator !== 'undefined' && navigator.getGamepads?.();
   if (!pads) return null;
-  return Array.from(pads).find((pad) => pad?.connected) || null;
+  for (let i = 0; i < pads.length; i += 1) {
+    if (pads[i]?.connected) return pads[i];
+  }
+  return null;
 }
 
 function buttonValue(gamepad, index) {
@@ -45,7 +51,7 @@ function buttonValue(gamepad, index) {
   return clamp(button.value ?? (button.pressed ? 1 : 0), 0, 1);
 }
 
-function keyboardActions(mode) {
+function keyboardActions(mode, actions) {
   const keys = appCtx.keys || {};
   const move = digital(pressed(keys, 'ArrowUp'), pressed(keys, 'ArrowDown'));
   const turn = digital(pressed(keys, 'ArrowLeft'), pressed(keys, 'ArrowRight'));
@@ -53,24 +59,23 @@ function keyboardActions(mode) {
   const lookPitch = digital(pressed(keys, 'VirtualLookUp', 'KeyW'), pressed(keys, 'VirtualLookDown', 'KeyS'));
   const ascend = pressed(keys, 'Space', 'KeyR');
   const descend = pressed(keys, 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight');
-  return {
-    mode,
-    move,
-    turn,
-    steer: turn,
-    lookYaw,
-    lookPitch,
-    throttle: Math.max(0, move),
-    reverse: Math.max(0, -move),
-    brake: pressed(keys, 'Space') ? 1 : 0,
-    boost: pressed(keys, 'ControlLeft', 'ControlRight') ? 1 : 0,
-    jump: pressed(keys, 'Space') ? 1 : 0,
-    sprint: pressed(keys, 'ShiftLeft', 'ShiftRight') ? 1 : 0,
-    vertical: digital(ascend, descend),
-    pitch: mode === 'plane' ? -move : lookPitch,
-    roll: turn,
-    throttleAdjust: digital(pressed(keys, 'KeyX'), pressed(keys, 'KeyZ'))
-  };
+  actions.mode = mode;
+  actions.move = move;
+  actions.turn = turn;
+  actions.steer = turn;
+  actions.lookYaw = lookYaw;
+  actions.lookPitch = lookPitch;
+  actions.throttle = Math.max(0, move);
+  actions.reverse = Math.max(0, -move);
+  actions.brake = pressed(keys, 'Space') ? 1 : 0;
+  actions.boost = pressed(keys, 'ControlLeft', 'ControlRight') ? 1 : 0;
+  actions.jump = pressed(keys, 'Space') ? 1 : 0;
+  actions.sprint = pressed(keys, 'ShiftLeft', 'ShiftRight') ? 1 : 0;
+  actions.vertical = digital(ascend, descend);
+  actions.pitch = mode === 'plane' ? -move : lookPitch;
+  actions.roll = turn;
+  actions.throttleAdjust = digital(pressed(keys, 'KeyX'), pressed(keys, 'KeyZ'));
+  return actions;
 }
 
 function mergeGamepad(actions, gamepad) {
@@ -112,7 +117,12 @@ function mergeGamepad(actions, gamepad) {
 
 function readControlActions(mode = 'drive') {
   const normalizedMode = normalizeMode(mode);
-  return mergeGamepad(keyboardActions(normalizedMode), inputState.gamepad || connectedGamepad());
+  let actions = actionCache.get(normalizedMode);
+  if (!actions) {
+    actions = {};
+    actionCache.set(normalizedMode, actions);
+  }
+  return mergeGamepad(keyboardActions(normalizedMode, actions), inputState.gamepad || connectedGamepad());
 }
 
 function buttonRising(gamepad, index) {
@@ -127,7 +137,7 @@ function updateControlInput() {
   inputState.gamepad = gamepad;
   inputState.updatedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
   if (!gamepad) {
-    inputState.previousButtons = [];
+    inputState.previousButtons.length = 0;
     return false;
   }
   if (buttonRising(gamepad, 9)) appCtx.cyclePrimaryTravelMode?.({ source: 'gamepad' });
@@ -139,7 +149,7 @@ function getControlInputSnapshot(mode = appCtx.getCurrentTravelMode?.() || 'driv
   return {
     device: inputState.gamepad ? 'gamepad' : 'keyboard_touch',
     gamepadId: String(inputState.gamepad?.id || ''),
-    actions: readControlActions(mode),
+    actions: { ...readControlActions(mode) },
     updatedAt: inputState.updatedAt
   };
 }

@@ -1,9 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { createGlobeSelectorScene } from './globe-selector/scene.js?v=8';
+import { createGlobeSelectorScene } from './globe-selector/scene.js?v=10';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
 import { getGlobeSelectorElements } from './globe-selector/dom.js?v=2';
-import { CURATED_DESTINATIONS, MAJOR_CITY_DESTINATIONS, fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=5';
-import { bindCityListInteractions, renderLibraryCityItems, renderNearbyCityItems } from './globe-selector/city-list-view.js?v=3';
+import { CURATED_DESTINATIONS, MAJOR_CITY_DESTINATIONS, fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=8';
+import { bindCityListInteractions, renderLibraryCityItems, renderNearbyCityItems } from './globe-selector/city-list-view.js?v=5';
 import {
   addSelectionToSavedFavorites,
   addRecentPlace,
@@ -23,7 +23,7 @@ import {
   syncLegacyCustomSelection,
   setGlobeSelectorScrollLock,
   toFiniteNumber
-} from "./globe-selector/helpers.js?v=3";
+} from "./globe-selector/helpers.js?v=4";
 
 function createGlobeSelector(options = {}) {
   const {
@@ -70,7 +70,7 @@ function createGlobeSelector(options = {}) {
     getOpenState: () => openState,
     cityMatchesSelection,
     onFavoritePick(city) {
-      setSelection(city.lat, city.lon, { name: city.name, focus: true });
+      setSelection(city.lat, city.lon, { name: city.name, focus: true, arrivalMode: 'walk' });
       if (searchInput) searchInput.value = city.name;
     },
     onGlobePick(next) {
@@ -257,7 +257,10 @@ function createGlobeSelector(options = {}) {
       lon: clamped.lon,
       name: named || selected?.name || appCtx.customLoc?.name || 'Custom Location',
       skipAutoFavorite: !!meta.skipAutoFavorite,
-      fromGeolocation: !!meta.fromGeolocation
+      fromGeolocation: !!meta.fromGeolocation,
+      arrivalMode: meta.arrivalMode === 'walk' || meta.arrivalMode === 'boat'
+        ? meta.arrivalMode
+        : coordsChanged ? 'auto' : selected?.arrivalMode || 'auto'
     };
     if (meta.focus) focusOnSelection(selected.lat, selected.lon);
     syncLegacyCustomState(selected);
@@ -384,20 +387,19 @@ function createGlobeSelector(options = {}) {
       if (typeof appCtx.searchLocation === 'function') {
         searchInFlight = true;
         if (searchBtn) searchBtn.disabled = true;
-        await appCtx.searchLocation();
+        const result = await appCtx.searchLocation();
+        if (!result || !Number.isFinite(result.lat) || !Number.isFinite(result.lon)) {
+          throw new Error(legacyStatus?.textContent || 'Location was not found');
+        }
+        setSelection(result.lat, result.lon, {
+          name: result.name || query,
+          focus: true,
+          fetchNearby: true,
+          arrivalMode: result.arrivalMode || 'walk'
+        });
+        reverseLookupPlace(result.lat, result.lon);
       } else {
         throw new Error('Search function unavailable');
-      }
-
-      const foundLat = toFiniteNumber(appCtx.customLoc?.lat ?? document.getElementById('customLat')?.value);
-      const foundLon = toFiniteNumber(appCtx.customLoc?.lon ?? document.getElementById('customLon')?.value);
-      if (foundLat != null && foundLon != null) {
-        setSelection(foundLat, foundLon, {
-          name: appCtx.customLoc?.name || query,
-          focus: true,
-          fetchNearby: true
-        });
-        reverseLookupPlace(foundLat, foundLon);
       }
 
       if (searchStatus) {
@@ -509,7 +511,7 @@ function createGlobeSelector(options = {}) {
     globeScene.ensureSize();
 
     if (searchStatus) {
-      searchStatus.textContent = 'Uses the same search flow as Custom Location.';
+      searchStatus.textContent = 'Uses the same search flow as location search.';
       searchStatus.style.color = '#64748b';
     }
     setLocateButtonBusy(false);
@@ -523,21 +525,29 @@ function createGlobeSelector(options = {}) {
     const savedLat = toFiniteNumber(appCtx.customLoc?.lat);
     const savedLon = toFiniteNumber(appCtx.customLoc?.lon);
     if (savedLat != null && savedLon != null) {
-      setSelection(savedLat, savedLon, { name: appCtx.customLoc?.name || 'Custom Location', focus: true });
+      setSelection(savedLat, savedLon, {
+        name: appCtx.customLoc?.name || 'Custom Location',
+        focus: true,
+        arrivalMode: appCtx.customLoc?.arrivalMode || 'auto'
+      });
     } else {
       const selectedLoc = String(appCtx.selLoc || '').trim();
       const preset = selectedLoc && selectedLoc !== 'custom' ? appCtx.LOCS?.[selectedLoc] : null;
       const presetLat = toFiniteNumber(preset?.lat);
       const presetLon = toFiniteNumber(preset?.lon);
       if (presetLat != null && presetLon != null) {
-        setSelection(presetLat, presetLon, { name: String(preset?.name || selectedLoc || 'Custom Location'), focus: true });
+        setSelection(presetLat, presetLon, {
+          name: String(preset?.name || selectedLoc || 'Custom Location'),
+          focus: true,
+          arrivalMode: 'walk'
+        });
       } else {
         const fallback = buildFavoriteCitiesFromData({
           menuFavoriteCities: getLibraryPresets(),
           savedFavoriteCities
         })[0] || null;
         if (fallback) {
-          setSelection(fallback.lat, fallback.lon, { name: fallback.name, focus: true });
+          setSelection(fallback.lat, fallback.lon, { name: fallback.name, focus: true, arrivalMode: 'walk' });
         } else {
           selected = null;
           renderSelection();

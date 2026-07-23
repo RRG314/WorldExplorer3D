@@ -6,7 +6,7 @@ import {
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
 import { createSpaceCelestialCatalog } from "./celestial-catalog.js?v=5";
-import { initUniverseRuntime } from "../universe/runtime.js?v=13";
+import { initUniverseRuntime } from "../universe/runtime.js?v=14";
 
 export function createSpaceFlightScene() {
   console.log("Creating space flight scene...");
@@ -80,6 +80,8 @@ function createSpaceEarth() {
     shininess: 4
   });
   appCtx.spaceFlight.earth = new THREE.Mesh(earthGeo, earthMat);
+  appCtx.spaceFlight.earth.rotation.order = 'ZYX';
+  appCtx.spaceFlight.earth.rotation.z = THREE.MathUtils.degToRad(23.439);
   appCtx.spaceFlight.scene.add(appCtx.spaceFlight.earth);
 
   const atmoGeo = new THREE.SphereGeometry(SPACE_CONSTANTS.EARTH_SIZE * 1.035, 48, 32);
@@ -138,6 +140,8 @@ function createSpaceMoon() {
     shininess: 5
   });
   appCtx.spaceFlight.moon = new THREE.Mesh(moonGeo, moonMat);
+  appCtx.spaceFlight.moon.rotation.order = 'ZYX';
+  appCtx.spaceFlight.moon.rotation.z = THREE.MathUtils.degToRad(6.68);
   appCtx.spaceFlight.scene.add(appCtx.spaceFlight.moon);
 
   const ringGeo = new THREE.TorusGeometry(SPACE_CONSTANTS.MOON_SIZE * 1.8, 2, 12, 32);

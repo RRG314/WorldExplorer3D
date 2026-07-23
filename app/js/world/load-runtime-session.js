@@ -228,6 +228,7 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     );
   }
   loadMetrics.initialEarthDetailRadius = appCtx.initialEarthDetailRadius;
+  appCtx.lastWorldLoadMetrics = loadMetrics;
   finalizePerfLoad(loaded, {
     roadsFinal: appCtx.roads.length,
     roadVertices: Math.round(loadMetrics.roads.vertices || 0),

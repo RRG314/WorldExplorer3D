@@ -1,10 +1,10 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { ENV, getEnv } from "../env.js?v=57";
 import { commitEnvironment } from '../session-coordinator.js?v=2';
-import { createGlobeSelector } from "./globe-selector.js?v=76";
+import { createGlobeSelector } from "./globe-selector.js?v=80";
 import { readSharedExperienceParams } from "./share-links.js?v=61";
 import { prepareTitleEnvironment } from "../planetary/entry.js?v=9";
-import { setupGlobeHub } from './title-screen/globe-hub.js?v=4';
+import { setupGlobeHub } from './title-screen/globe-hub.js?v=9';
 
 function initTitleScreenUi({
   lastLocationStorageKey,
@@ -88,6 +88,7 @@ function initTitleScreenUi({
   };
   const resetTitleEarthTravelMode = (source = 'title_earth_start') => {
     appCtx.pendingAutoBoatEntry = null;
+    if (appCtx.Walk?.state) appCtx.Walk.state.view = 'third';
     if (appCtx.boatMode?.active) appCtx.stopBoatMode?.({ targetMode: 'walk', source });
     if (appCtx.planeMode?.active) appCtx.stopPlaneMode?.();
     if (typeof appCtx.setTravelMode === 'function') {
@@ -354,7 +355,7 @@ function initTitleScreenUi({
         if (typeof appCtx.applyCustomLocationSpawn === 'function') {
           customSpawn = appCtx.applyCustomLocationSpawn('walk', {
             source: 'custom_location',
-            preferBoatIfWater: true
+            preferBoatIfWater: appCtx.customLoc?.arrivalMode !== 'walk'
           });
         } else if (typeof appCtx.spawnOnRoad === 'function') {
           appCtx.spawnOnRoad();
@@ -597,7 +598,7 @@ function initTitleScreenUi({
     if (appCtx.selLoc === 'custom' && typeof appCtx.applyCustomLocationSpawn === 'function') {
       customSpawn = appCtx.applyCustomLocationSpawn('walk', {
         source: 'title_custom_start',
-        preferBoatIfWater: true
+        preferBoatIfWater: appCtx.customLoc?.arrivalMode !== 'walk'
       });
     }
 

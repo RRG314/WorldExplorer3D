@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { buildMergedGeometry } from "./geometry-batching.js?v=4";
-import { appendTerrainConformingPolygonBatch } from './terrain-conforming-polygon.js?v=1';
+import { appendTerrainConformingPolygonBatch } from './terrain-conforming-polygon.js?v=2';
 import { surfaceComposition } from './surface-contract.js?v=7';
 
 const MAX_LAND_FEATURES = 220;

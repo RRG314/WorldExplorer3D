@@ -9,6 +9,8 @@ const scenarioMs = Math.max(8000, Number(process.env.HARDWARE_PERF_SAMPLE_MS || 
 const outputDir = path.join(rootDir, 'output', 'playwright', 'hardware-performance');
 const reportPath = path.join(outputDir, 'production-gameplay-report.json');
 const requestedModes = new Set(String(process.env.HARDWARE_PERF_MODES || 'walk,drive,drone,plane').split(',').map((mode) => mode.trim()).filter(Boolean));
+const heapProfileEnabled = process.env.HARDWARE_PERF_HEAP_PROFILE === '1';
+const heapProfileIncludesLoad = process.env.HARDWARE_PERF_HEAP_PROFILE === 'load';
 const budgets = Object.freeze({
   loadMs: 60000,
   medianFps: 45,
@@ -55,6 +57,23 @@ function roundNumbers(value) {
 
 function metricValue(metrics, name) {
   return Number(metrics.find((metric) => metric.name === name)?.value || 0);
+}
+
+function summarizeHeapAllocations(profile, limit = 20) {
+  const totals = new Map();
+  const visit = (node) => {
+    if (!node) return;
+    const frame = node.callFrame || {};
+    const key = `${frame.functionName || '(anonymous)'} @ ${frame.url || '(runtime)'}:${Number(frame.lineNumber || 0) + 1}`;
+    const bytes = Number(node.selfSize || 0);
+    if (bytes > 0) totals.set(key, (totals.get(key) || 0) + bytes);
+    (node.children || []).forEach(visit);
+  };
+  visit(profile?.head);
+  return [...totals.entries()]
+    .map(([frame, bytes]) => ({ frame, bytes }))
+    .sort((left, right) => right.bytes - left.bytes)
+    .slice(0, limit);
 }
 
 function isTransientConsoleError(message = '') {
@@ -185,7 +204,7 @@ async function setMode(page, mode) {
     const terrainY = ctx.SurfaceQuery?.terrainAt?.(reference.x, reference.z)?.position?.y || 0;
     const options = nextMode === 'plane' ? {
       source: 'hardware_performance', force: true, x: reference.x, z: reference.z,
-      y: terrainY + 70, speed: 28, throttle: 0.72, airborne: true
+      y: terrainY + 140, speed: 28, throttle: 0.72, airborne: true
     } : { source: 'hardware_performance', force: true, emitTutorial: false };
     return ctx.setTravelMode?.(nextMode, options);
   }, mode);
@@ -200,9 +219,18 @@ async function runScenario(page, definition) {
   const before = await runtimeSnapshot(page);
 
   await startFrameRecorder(page);
-  for (const key of definition.keys) await page.keyboard.down(key);
-  await page.waitForTimeout(scenarioMs);
-  for (const key of [...definition.keys].reverse()) await page.keyboard.up(key);
+  const phases = definition.phases?.length ? definition.phases : [{ share: 1, keys: definition.keys || [] }];
+  let elapsed = 0;
+  for (let index = 0; index < phases.length; index += 1) {
+    const phase = phases[index];
+    const duration = index === phases.length - 1
+      ? scenarioMs - elapsed
+      : Math.max(250, Math.round(scenarioMs * Number(phase.share || 0)));
+    for (const key of phase.keys) await page.keyboard.down(key);
+    await page.waitForTimeout(duration);
+    for (const key of [...phase.keys].reverse()) await page.keyboard.up(key);
+    elapsed += duration;
+  }
   const frames = summarizeFrames(await stopFrameRecorder(page));
   await page.waitForTimeout(250);
   const after = await runtimeSnapshot(page);
@@ -251,6 +279,10 @@ try {
 
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Performance.enable');
+  if (heapProfileIncludesLoad) {
+    await cdp.send('HeapProfiler.enable');
+    await cdp.send('HeapProfiler.startSampling', { samplingInterval: 32768 });
+  }
   const navigationStarted = performance.now();
   await page.goto(`${baseUrl}/app/?hardware-performance=production`, {
     waitUntil: 'domcontentloaded',
@@ -306,13 +338,37 @@ try {
     };
   });
   const metricsBefore = (await cdp.send('Performance.getMetrics')).metrics;
+  if (heapProfileEnabled) {
+    await cdp.send('HeapProfiler.enable');
+    await cdp.send('HeapProfiler.startSampling', { samplingInterval: 32768 });
+  }
   const scenarios = [];
   for (const definition of [
-    { mode: 'walk', keys: ['ArrowUp'] },
-    { mode: 'drive', keys: ['ArrowUp', 'ArrowRight'] },
-    { mode: 'drone', keys: ['ArrowUp'] },
-    { mode: 'plane', keys: ['ArrowLeft', 'KeyX'] }
+    { mode: 'walk', phases: [
+      { share: 0.3, keys: ['ArrowUp'] },
+      { share: 0.16, keys: ['ArrowUp', 'ArrowLeft'] },
+      { share: 0.38, keys: ['ArrowUp'] },
+      { share: 0.16, keys: ['ArrowUp', 'ArrowRight'] }
+    ] },
+    { mode: 'drive', phases: [
+      { share: 0.5, keys: ['ArrowUp'] },
+      { share: 0.25, keys: ['ArrowUp', 'ArrowRight'] },
+      { share: 0.25, keys: ['ArrowUp', 'ArrowLeft'] }
+    ] },
+    { mode: 'drone', phases: [
+      { share: 0.6, keys: ['ArrowUp'] },
+      { share: 0.2, keys: ['ArrowUp', 'ArrowLeft'] },
+      { share: 0.2, keys: ['ArrowUp', 'ArrowRight'] }
+    ] },
+    { mode: 'plane', phases: [
+      { share: 0.5, keys: ['KeyX'] },
+      { share: 0.25, keys: ['KeyX', 'ArrowLeft'] },
+      { share: 0.25, keys: ['KeyX', 'ArrowRight'] }
+    ] }
   ].filter(({ mode }) => requestedModes.has(mode))) scenarios.push(await runScenario(page, definition));
+  const heapAllocations = heapProfileEnabled || heapProfileIncludesLoad
+    ? summarizeHeapAllocations((await cdp.send('HeapProfiler.stopSampling')).profile)
+    : [];
   const metricsAfter = (await cdp.send('Performance.getMetrics')).metrics;
 
   const heapBefore = metricValue(metricsBefore, 'JSHeapUsedSize');
@@ -360,6 +416,7 @@ try {
     memory: { heapBefore, heapAfter, heapGrowth: heapAfter - heapBefore },
     webglLosses,
     scenarios,
+    heapAllocations,
     violations,
     consoleErrors,
     pageErrors
@@ -371,6 +428,7 @@ try {
     setup: report.setup,
     memory: report.memory,
     scenarios: report.scenarios.map(({ mode, movement, frames, transitionFrames }) => ({ mode, movement, frames, transitionFrames })),
+    heapAllocations: report.heapAllocations,
     violations
   }, null, 2));
   if (!report.pass) process.exitCode = 1;

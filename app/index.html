@@ -24,10 +24,10 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/title-shell.css?v=91">
 <link rel="stylesheet" href="styles/runtime-shell.css?v=92">
 <link rel="stylesheet" href="styles/block-builder.css?v=2">
-<link rel="stylesheet" href="styles/universe.css?v=5">
+<link rel="stylesheet" href="styles/universe.css?v=6">
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
-<link rel="stylesheet" href="styles/interface-v4.css?v=9">
-<link rel="stylesheet" href="styles/start-hub.css?v=12">
+<link rel="stylesheet" href="styles/interface-v4.css?v=12">
+<link rel="stylesheet" href="styles/start-hub.css?v=15">
 </head>
 <body>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
@@ -99,9 +99,6 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <button class="launch-switch-btn" id="marsLaunchToggle" data-launch="mars" type="button" disabled>🔴 Mars</button>
 <button class="launch-switch-btn" id="spaceLaunchToggle" data-launch="space" type="button" disabled>🚀 Space</button>
 <button class="launch-switch-btn" id="oceanLaunchToggle" data-launch="ocean" type="button" disabled>🌊 Ocean</button>
-</div>
-<div class="loc-grid custom-centered">
-<div class="loc custom" data-loc="custom"><div class="loc-name">🌍 Custom</div><div class="loc-region">Any Location</div></div>
 </div>
 <div class="title-location-actions">
 <button id="titleUseMyLocationBtn" class="title-use-location-btn" type="button">Use My Location</button>
@@ -499,7 +496,6 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <button id="globeLocationSearchBtn" type="button">Search</button>
 </div>
 <div class="globe-hub-tools" aria-label="Account and application tools">
-<button id="globeHubShareBtn" type="button" title="Share World Explorer" aria-label="Share World Explorer">↗</button>
 <button id="globeHubThemeBtn" type="button" title="Appearance: Night" aria-label="Change appearance">◒</button>
 <button type="button" data-globe-destination="settings" title="Settings" aria-label="Open settings">⚙</button>
 <button type="button" data-globe-destination="controls" title="Controls" aria-label="Open controls">?</button>
@@ -527,7 +523,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 </div>
 <div id="globeSelectorExplorePanel" class="globe-selector-mode-panel active">
 <button id="globeSelectorLocateBtn" class="globe-selector-search-btn globe-selector-locate-btn" type="button">Use My Location</button>
-<div id="globeLocationSearchStatus" style="font-size:11px;min-height:14px;color:#64748b">Uses the same search flow as Custom Location.</div>
+<div id="globeLocationSearchStatus" style="font-size:11px;min-height:14px;color:#64748b">Uses the same search flow as location search.</div>
 <div class="globe-selector-field-label">Manual Coordinates</div>
 <div class="globe-selector-row globe-selector-coordinate-row">
 <input id="globeCustomLat" type="number" step="0.0001" placeholder="Latitude">
@@ -565,6 +561,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <button id="globeSelectorMarsBtn" type="button" title="Travel to Mars" aria-label="Travel to Mars"><span class="destination-thumb mars" aria-hidden="true"></span><span class="destination-label">Mars</span></button>
   <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Travel to Space" aria-label="Travel to Space"><span class="destination-thumb space" aria-hidden="true"></span><span class="destination-label">Space</span></button>
   <button id="globeSelectorOceanBtn" type="button" title="Travel to Ocean" aria-label="Travel to Ocean"><span class="destination-thumb ocean" aria-hidden="true"></span><span class="destination-label">Ocean</span></button>
+  <button class="destination-control" type="button" title="Open controls" aria-label="Open controls" data-globe-destination="controls"><span class="destination-control-icon" aria-hidden="true">⌨</span><span class="destination-label">Controls</span></button>
 </div>
 <section id="globeHubOverlay" class="globe-hub-overlay" hidden aria-hidden="true">
   <header class="globe-hub-overlay-header">
@@ -1015,6 +1012,9 @@ Explore the area
 <div class="floatItem on" id="fMpGhosts">👻 Toggle Ghosts</div>
 <div class="floatItem" id="fMpChat">💬 Toggle Chat</div>
 </div>
+</div>
+<div class="floatMenu" id="controlsMenu">
+<button class="floatBtn controls" id="gameControlsBtn" type="button" title="Controls" aria-label="Controls" data-mobile-label="Controls"><span class="btnIcon">⌨</span><span class="btnText">Controls</span></button>
 </div>
 </div>
 </div>
@@ -1622,5 +1622,5 @@ Explore the area
 <script src="vendor/colyseus-sdk.js?v=1"></script>
 <script type="module" src="js/app-shell-fragments.js?v=85"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=306"></script>
+<script type="module" src="js/bootstrap.js?v=323"></script>
 </body></html>

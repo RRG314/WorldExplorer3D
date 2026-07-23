@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { inferSelectedLocationWaterKind } from "./water-location-hint.js?v=2";
 import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=17";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=19";
 import { createWorldSpawnSurfaceApi } from "./spawn-surface.js?v=3";
 
 let worldSpawnDeps = {
@@ -420,21 +420,27 @@ function resolveProjectedRoadSpawn(targetX, targetZ, options = {}) {
 function fallbackResolvedSpawn(mode = "drive", options = {}) {
   const x = finiteNumberOr(options.x, 0);
   const z = finiteNumberOr(options.z, 0);
-  const terrainY = terrainYAtWorld(x, z);
-  return {
-    valid: true,
-    mode: mode === "walk" ? "walk" : "drive",
-    x,
-    z,
-    angle: finiteNumberOr(options.angle, 0),
-    road: null,
-    onRoad: false,
-    terrainY,
-    walkY: walkBaseYAtWorld(x, z) + 1.7,
-    carY: driveCenterYAtWorld(x, z, false),
-    slopeDeg: slopeDegreesAt(x, z),
-    source: options.source || "fallback_origin"
-  };
+  const angle = finiteNumberOr(options.angle, 0);
+  const direct = mode === "walk"
+    ? evaluateWalkSpawnCandidate(x, z, { angle, source: options.source || "verified_fallback" })
+    : evaluateDriveSpawnCandidate(x, z, { angle, source: options.source || "verified_fallback" });
+  if (direct.valid) return direct;
+
+  const broadGround = searchNearestSafeGroundSpawn(x, z, {
+    angle,
+    maxRadius: 720,
+    step: 12
+  });
+  if (broadGround) {
+    if (mode === "walk") return broadGround;
+    return {
+      ...broadGround,
+      mode: "drive",
+      carY: driveCenterYAtWorld(broadGround.x, broadGround.z, !!broadGround.onRoad),
+      source: "verified_drive_fallback"
+    };
+  }
+  return { valid: false, mode, x, z, angle, reason: direct.reason || "no_safe_spawn" };
 }
 
 function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
@@ -514,14 +520,8 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
 
 function applyResolvedWorldSpawn(spawn, options = {}) {
   if (!spawn) return null;
-  const resolved = spawn.valid === false ?
-    fallbackResolvedSpawn(options.mode || spawn.mode || "drive", {
-      x: spawn.x,
-      z: spawn.z,
-      angle: spawn.angle,
-      source: "invalid_spawn_fallback"
-    }) :
-    spawn;
+  const resolved = spawn.valid === false ? null : spawn;
+  if (!resolved) return null;
 
   const syncCar = options.syncCar !== false;
   const syncWalker = options.syncWalker !== false;
@@ -569,6 +569,32 @@ function applyResolvedWorldSpawn(spawn, options = {}) {
   }
 
   return resolved;
+}
+
+function revalidateActiveWorldSpawn(options = {}) {
+  const walking = appCtx.Walk?.state?.mode === "walk";
+  const actor = walking ? appCtx.Walk?.state?.walker : appCtx.car;
+  if (!actor || !Number.isFinite(actor.x) || !Number.isFinite(actor.z)) return null;
+  const mode = walking ? "walk" : "drive";
+  const direct = mode === "walk"
+    ? evaluateWalkSpawnCandidate(actor.x, actor.z, {
+      angle: actor.angle,
+      source: options.source || "post_load_recheck"
+    })
+    : evaluateDriveSpawnCandidate(actor.x, actor.z, {
+      angle: actor.angle,
+      source: options.source || "post_load_recheck"
+    });
+  if (direct.valid) return direct;
+  const resolved = resolveSafeWorldSpawn(actor.x, actor.z, {
+    mode,
+    angle: actor.angle,
+    preferRoad: mode === "drive",
+    maxGroundRadius: 360,
+    maxRoadDistance: 480,
+    source: options.source || "post_load_recovery"
+  });
+  return applyResolvedWorldSpawn(resolved, { mode });
 }
 
 function applySpawnTarget(worldX, worldZ, options = {}) {
@@ -691,6 +717,7 @@ export {
   applySpawnTarget,
   initWorldSpawning,
   resolveSafeWorldSpawn,
+  revalidateActiveWorldSpawn,
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt

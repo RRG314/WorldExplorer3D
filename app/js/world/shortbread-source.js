@@ -6,6 +6,17 @@ const SHORTBREAD_ZOOM = 14;
 const SHORTBREAD_FETCH_TIMEOUT_MS = 8000;
 const DEFAULT_TILE_TEMPLATE =
   'https://vector.openstreetmap.org/shortbread_v1/{z}/{x}/{y}.mvt';
+const inFlightTileRequests = new Map();
+const resolvedTileCache = new Map();
+const MAX_RESOLVED_TILES = 96;
+
+function rememberResolvedTile(cacheKey, tile) {
+  resolvedTileCache.delete(cacheKey);
+  resolvedTileCache.set(cacheKey, tile);
+  while (resolvedTileCache.size > MAX_RESOLVED_TILES) {
+    resolvedTileCache.delete(resolvedTileCache.keys().next().value);
+  }
+}
 
 function tileTemplate() {
   const configured =
@@ -49,24 +60,42 @@ export function vectorTileRangeForBounds(latMin, lonMin, latMax, lonMax, zoom) {
 }
 
 export async function fetchShortbreadTile(z, x, y, options = {}) {
-  const controller = new AbortController();
-  const externalSignal = options.signal || null;
-  const relayAbort = () => controller.abort();
-  if (externalSignal?.aborted) controller.abort();
-  else externalSignal?.addEventListener?.('abort', relayAbort, { once: true });
-  const timeoutId = setTimeout(() => controller.abort(), SHORTBREAD_FETCH_TIMEOUT_MS);
+  const cacheKey = `${z}/${x}/${y}`;
+  const cached = resolvedTileCache.get(cacheKey);
+  if (cached) {
+    rememberResolvedTile(cacheKey, cached);
+    return cached;
+  }
+  const pending = inFlightTileRequests.get(cacheKey);
+  if (pending) return pending;
+  const request = (async () => {
+    const controller = new AbortController();
+    const externalSignal = options.signal || null;
+    const relayAbort = () => controller.abort();
+    if (externalSignal?.aborted) controller.abort();
+    else externalSignal?.addEventListener?.('abort', relayAbort, { once: true });
+    const timeoutId = setTimeout(() => controller.abort(), SHORTBREAD_FETCH_TIMEOUT_MS);
+    try {
+      const { Pbf, VectorTile } = await getVectorTileLib();
+      const response = await fetch(tileUrl(z, x, y), {
+        signal: controller.signal,
+        cache: 'default'
+      });
+      if (!response.ok) throw new Error(`Shortbread tile ${z}/${x}/${y}: HTTP ${response.status}`);
+      const buffer = await response.arrayBuffer();
+      return { tile: new VectorTile(new Pbf(new Uint8Array(buffer))), z, x, y };
+    } finally {
+      clearTimeout(timeoutId);
+      externalSignal?.removeEventListener?.('abort', relayAbort);
+    }
+  })();
+  inFlightTileRequests.set(cacheKey, request);
   try {
-    const { Pbf, VectorTile } = await getVectorTileLib();
-    const response = await fetch(tileUrl(z, x, y), {
-      signal: controller.signal,
-      cache: 'default'
-    });
-    if (!response.ok) throw new Error(`Shortbread tile ${z}/${x}/${y}: HTTP ${response.status}`);
-    const buffer = await response.arrayBuffer();
-    return { tile: new VectorTile(new Pbf(new Uint8Array(buffer))), z, x, y };
+    const tile = await request;
+    rememberResolvedTile(cacheKey, tile);
+    return tile;
   } finally {
-    clearTimeout(timeoutId);
-    externalSignal?.removeEventListener?.('abort', relayAbort);
+    if (inFlightTileRequests.get(cacheKey) === request) inFlightTileRequests.delete(cacheKey);
   }
 }
 
@@ -270,6 +299,58 @@ function convertTilesToElements(tiles, layerNames, bounds = null) {
   return elements;
 }
 
+function convertTilesToCompactBuildingWays(tiles, bounds = null) {
+  const ways = [];
+  const featureSignatures = new Set();
+  let nextWayId = -1;
+  for (const { tile, x, y, z } of tiles) {
+    const layer = tile.layers.buildings;
+    if (!layer || !Number.isFinite(layer.length)) continue;
+    for (let index = 0; index < layer.length; index++) {
+      const feature = layer.feature(index);
+      if (!feature || typeof feature.toGeoJSON !== 'function') continue;
+      const geojson = feature.toGeoJSON(x, y, z);
+      const tags = featureTags('buildings', geojson.properties || {});
+      if (!tags) continue;
+      const parts = geometryParts(geojson.geometry);
+      for (let partIndex = 0; partIndex < parts.length; partIndex++) {
+        const part = parts[partIndex];
+        if (!Array.isArray(part.coords) || part.coords.length < 4 || !partIntersectsBounds(part, bounds)) continue;
+        const resolvedTags = { ...tags, _geometrySource: 'shortbread-vector' };
+        const signature = geometrySignature('buildings', part, resolvedTags);
+        if (featureSignatures.has(signature)) continue;
+        featureSignatures.add(signature);
+        const coordinateCount = part.coords.length > 1 &&
+          Number(part.coords[0]?.[0]) === Number(part.coords.at(-1)?.[0]) &&
+          Number(part.coords[0]?.[1]) === Number(part.coords.at(-1)?.[1])
+          ? part.coords.length - 1
+          : part.coords.length;
+        const coordinates = new Float64Array(coordinateCount * 2);
+        let writeIndex = 0;
+        for (let coordinateIndex = 0; coordinateIndex < coordinateCount; coordinateIndex++) {
+          const lon = Number(part.coords[coordinateIndex]?.[0]);
+          const lat = Number(part.coords[coordinateIndex]?.[1]);
+          if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+          coordinates[writeIndex++] = lon;
+          coordinates[writeIndex++] = lat;
+        }
+        if (writeIndex < 6) continue;
+        ways.push({
+          type: 'way',
+          id: nextWayId--,
+          nodes: [],
+          _coordinates: writeIndex === coordinates.length ? coordinates : coordinates.slice(0, writeIndex),
+          tags: {
+            ...resolvedTags,
+            _sourceFeatureId: ['shortbread', 'buildings', z, x, y, feature.id ?? index, partIndex].join(':')
+          }
+        });
+      }
+    }
+  }
+  return ways;
+}
+
 async function fetchTileCoverage(lat, lon, radius, zoom) {
   const safeRadius = Math.max(0.004, Math.min(0.04, Number(radius) || 0.012));
   const bounds = {
@@ -356,7 +437,7 @@ export async function fetchShortbreadBuildingData(options = {}) {
     SHORTBREAD_ZOOM
   );
   return {
-    elements: convertTilesToElements(tiles, ['buildings'], bounds),
+    elements: convertTilesToCompactBuildingWays(tiles, bounds),
     _overpassSource: 'shortbread-vector-buildings',
     _overpassEndpoint: tileTemplate(),
     _overpassCacheAgeMs: 0,

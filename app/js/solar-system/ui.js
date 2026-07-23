@@ -309,15 +309,19 @@ export function updateSolarSystem(ctx) {
   ctx.updateMoonPositions(new Date());
   ctx.updateSpacecraftPositions();
 
+  const elapsedHours = Date.now() / 3600000;
   ctx.solarSystem.planetMeshes.forEach((entry) => {
-    entry.mesh.rotation.y += 0.002;
+    const rotationHours = Number(entry.planet?.rotationHours);
+    if (Number.isFinite(rotationHours) && rotationHours !== 0) {
+      entry.mesh.rotation.y = (elapsedHours / rotationHours * Math.PI * 2) % (Math.PI * 2);
+    }
   });
   ctx.solarSystem.asteroidMeshes.forEach((entry) => {
     entry.mesh.rotation.y += 0.005;
     entry.mesh.rotation.x += 0.003;
   });
   if (ctx.solarSystem.sunMesh) {
-    ctx.solarSystem.sunMesh.rotation.y += 0.001;
+    ctx.solarSystem.sunMesh.rotation.y = (elapsedHours / 609.12 * Math.PI * 2) % (Math.PI * 2);
   }
 
   if (ctx.solarSystem.orbitsVisible) {

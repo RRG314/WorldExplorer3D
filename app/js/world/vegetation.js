@@ -256,7 +256,9 @@ export function collectWorldVegetationPlacements() {
 
   for (let i = 0; i < treeRows.length && placements.length < maxTrees; i++) {
     const way = treeRows[i];
-    const rawPts = way?.nodes?.map((id) => appCtx._worldLoadNodes?.[id]).filter(Boolean).map((node) => appCtx.geoToWorld(node.lat, node.lon)) || [];
+    const rawPts = Array.isArray(way?._worldPoints)
+      ? way._worldPoints
+      : way?.nodes?.map((id) => appCtx._worldLoadNodes?.[id]).filter(Boolean).map((node) => appCtx.geoToWorld(node.lat, node.lon)) || [];
     const pts = runtime.sanitizeWorldPathPoints(rawPts);
     if (pts.length < 2) continue;
     const totalLength = polylineLength(pts);

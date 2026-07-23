@@ -10,7 +10,7 @@ import {
   isUrbanLanduseType,
   pointsBoundsLocal
 } from "./terrain/context-utils.js?v=1";
-import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=1";
+import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=2";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=1";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=5";
 import {
@@ -40,7 +40,7 @@ import {
   waitForTerrainReadyBounds,
   waitForTerrainReadyAt,
   worldToLatLon
-} from "./terrain/tiles.js?v=32";
+} from "./terrain/tiles.js?v=35";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -102,7 +102,8 @@ function clampElevationMeters(meters) {
 const terrainTileDeps = {
   clampElevationMeters,
   scheduleRoadAndBuildingRebuild: () => scheduleRoadAndBuildingRebuild(),
-  applyStructureTerrainCuts: (worldX, worldZ, terrainY) => applyStructureTerrainCuts(worldX, worldZ, terrainY),
+  applyStructureTerrainCuts: (worldX, worldZ, terrainY, candidateCuts) =>
+    applyStructureTerrainCuts(worldX, worldZ, terrainY, candidateCuts),
   computeElevationStatsMeters: (samplesMeters) => computeElevationStatsMeters(samplesMeters),
   reapplyTerrainMeshHeights: (mesh) => applyHeightsToTerrainMesh(mesh, terrainTileDeps),
   applyHeightsToTerrainMesh: (mesh) => applyHeightsToTerrainMesh(mesh, terrainTileDeps)

@@ -9,8 +9,8 @@ import {
   buildFeatureRibbonEdges,
   shouldRenderRoadSkirts,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=17";
-import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=6";
+} from "../structure-semantics.js?v=19";
+import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=7";
 
 const ROAD_SURFACE_BIAS = 0.08;
 
@@ -81,9 +81,16 @@ export function buildRoadGeometryPass(options = {}) {
       roadSubdivideStepBase;
     const decimatedRoadPts = decimateRoadCenterlineByDepth(pts, type, roadTileDepth, perfModeNow);
     if (decimatedRoadPts.length < 2) return;
+    const subdPts = typeof appCtx.subdivideRoadPoints === 'function' ?
+      appCtx.subdivideRoadPoints(decimatedRoadPts, roadSubdivideStep) :
+      decimatedRoadPts;
+    const profilePts =
+      structureSemantics?.gradeSeparated || structureSemantics?.rampCandidate ?
+        subdPts :
+        decimatedRoadPts;
 
     const roadFeature = {
-      pts: decimatedRoadPts,
+      pts: profilePts,
       width,
       limit,
       name,
@@ -122,9 +129,6 @@ export function buildRoadGeometryPass(options = {}) {
     }
 
     const hw = width / 2;
-    const subdPts = typeof appCtx.subdivideRoadPoints === 'function' ?
-      appCtx.subdivideRoadPoints(decimatedRoadPts, roadSubdivideStep) :
-      decimatedRoadPts;
     loadMetrics.roads.sourcePoints += pts.length;
     loadMetrics.roads.decimatedPoints += decimatedRoadPts.length;
     loadMetrics.roads.subdividedPoints += subdPts.length;

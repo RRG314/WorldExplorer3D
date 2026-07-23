@@ -270,12 +270,6 @@ function getLaunchAssistState(rocket) {
 function applyPlanetaryGravity(rocket, launchAssist, isThrusting) {
   if (!appCtx.spaceFlight.gravityVelocity || typeof appCtx.getAllSpaceBodies !== 'function') return;
 
-  if (launchAssist && !isThrusting) {
-    appCtx.spaceFlight.gravityVelocity.set(0, 0, 0);
-    if (appCtx.spaceFlight._gravityVec) appCtx.spaceFlight._gravityVec.set(0, 0, 0);
-    return;
-  }
-
   const bodies = appCtx.getAllSpaceBodies();
   const nearLandableDist = nearestLandableDistance(rocket, bodies);
   _sfGravitySum.set(0, 0, 0);
@@ -354,20 +348,25 @@ export function updateSpaceFlightPhysics() {
     rocket.quaternion.normalize();
   }
 
+  _sfForward.set(0, 1, 0).applyQuaternion(rocket.quaternion).normalize();
+  const driveVelocity = appCtx.spaceFlight.velocity;
+  if (driveVelocity.lengthSq() < 1e-6 && appCtx.spaceFlight.speed > 0) {
+    driveVelocity.copy(_sfForward).multiplyScalar(appCtx.spaceFlight.speed);
+  }
+
   let isThrusting = false;
   if (keys[' ']) {
     const launchBoostMult = launchAssist ? SPACE_CONSTANTS.LAUNCH_BOOST_MULTIPLIER : 1;
-    appCtx.spaceFlight.speed = Math.min(appCtx.spaceFlight.speed + SPACE_CONSTANTS.BOOST * launchBoostMult * frameScale, SPACE_CONSTANTS.MAX_SPEED);
-    if (launchAssist) {
-      appCtx.spaceFlight.speed = Math.max(appCtx.spaceFlight.speed, SPACE_CONSTANTS.LAUNCH_MIN_SPEED);
+    driveVelocity.addScaledVector(_sfForward, SPACE_CONSTANTS.BOOST * launchBoostMult * frameScale);
+    if (launchAssist && driveVelocity.length() < SPACE_CONSTANTS.LAUNCH_MIN_SPEED) {
+      driveVelocity.copy(_sfForward).multiplyScalar(SPACE_CONSTANTS.LAUNCH_MIN_SPEED);
     }
+    if (driveVelocity.length() > SPACE_CONSTANTS.MAX_SPEED) driveVelocity.setLength(SPACE_CONSTANTS.MAX_SPEED);
     isThrusting = true;
-  } else if (keys['shift']) {
-    appCtx.spaceFlight.speed = Math.max(appCtx.spaceFlight.speed - SPACE_CONSTANTS.BRAKE * frameScale, 0);
-  } else if (appCtx.spaceFlight.speed > 0) {
-    if (appCtx.spaceFlight.speed > SPACE_CONSTANTS.CRUISE_SPEED) {
-      appCtx.spaceFlight.speed = Math.max(appCtx.spaceFlight.speed - SPACE_CONSTANTS.DRIFT_RATE * frameScale, SPACE_CONSTANTS.CRUISE_SPEED);
-    }
+  } else if (keys['shift'] && driveVelocity.lengthSq() > 1e-6) {
+    const nextSpeed = Math.max(0, driveVelocity.length() - SPACE_CONSTANTS.BRAKE * frameScale);
+    if (nextSpeed === 0) driveVelocity.set(0, 0, 0);
+    else driveVelocity.setLength(nextSpeed);
   }
 
   const nearBody = appCtx.spaceFlight._nearestBody;
@@ -377,24 +376,23 @@ export function updateSpaceFlightPhysics() {
     if (inSlowZone) {
       const inLandingZone = distToBody < SPACE_CONSTANTS.LANDING_DISTANCE + nearBody.radius;
       const targetSpeed = inLandingZone ? 0.8 : 2.0;
-      if (appCtx.spaceFlight.speed > targetSpeed) {
-        appCtx.spaceFlight.speed = Math.max(targetSpeed, appCtx.spaceFlight.speed - SPACE_CONSTANTS.BRAKE * 1.2 * frameScale);
+      if (driveVelocity.length() > targetSpeed) {
+        driveVelocity.setLength(Math.max(targetSpeed, driveVelocity.length() - SPACE_CONSTANTS.BRAKE * 1.2 * frameScale));
       }
     }
   }
 
   appCtx.spaceFlight._isThrusting = isThrusting;
   applyPlanetaryGravity(rocket, launchAssist, isThrusting);
-  _sfForward.set(0, 1, 0).applyQuaternion(rocket.quaternion);
-  appCtx.spaceFlight.velocity.copy(_sfForward).multiplyScalar(appCtx.spaceFlight.speed);
+  appCtx.spaceFlight.speed = driveVelocity.length();
+  rocket.position.addScaledVector(driveVelocity, frameScale);
   if (appCtx.spaceFlight.gravityVelocity) {
-    appCtx.spaceFlight.velocity.add(appCtx.spaceFlight.gravityVelocity);
+    rocket.position.addScaledVector(appCtx.spaceFlight.gravityVelocity, frameScale);
   }
-  rocket.position.addScaledVector(appCtx.spaceFlight.velocity, frameScale);
 
   const glow = rocket.getObjectByName('engineGlow');
   const exhaust = rocket.getObjectByName('exhaust');
-  const thrustLevel = isThrusting ? 1.0 : appCtx.spaceFlight.speed / SPACE_CONSTANTS.MAX_SPEED;
+  const thrustLevel = isThrusting ? 1.0 : 0;
   if (glow) {
     glow.material.opacity = 0.2 + thrustLevel * 0.6;
     glow.scale.y = 0.4 + thrustLevel * 0.6 + (isThrusting ? Math.random() * 0.3 : 0);
@@ -422,7 +420,10 @@ export function updateSpaceFlightPhysics() {
       if (dist < minDist) {
         _sfTempVec.copy(rocket.position).sub(body.position).normalize().multiplyScalar(minDist);
         rocket.position.copy(body.position).add(_sfTempVec);
-        appCtx.spaceFlight.speed = Math.max(appCtx.spaceFlight.speed * 0.5, SPACE_CONSTANTS.MIN_SPEED);
+        if (driveVelocity.lengthSq() > 1e-6) {
+          driveVelocity.setLength(Math.max(driveVelocity.length() * 0.5, SPACE_CONSTANTS.MIN_SPEED));
+        }
+        appCtx.spaceFlight.speed = driveVelocity.length();
         if (appCtx.spaceFlight.gravityVelocity) appCtx.spaceFlight.gravityVelocity.multiplyScalar(0.35);
       }
     }
@@ -435,7 +436,10 @@ export function updateSpaceFlightPhysics() {
   if (sourceDist < sourceRadius + 5) {
     _sfTempVec.copy(rocket.position).sub(source.position).normalize().multiplyScalar(sourceRadius + 5);
     rocket.position.copy(source.position).add(_sfTempVec);
-    appCtx.spaceFlight.speed = Math.max(appCtx.spaceFlight.speed * 0.5, SPACE_CONSTANTS.MIN_SPEED);
+    if (driveVelocity.lengthSq() > 1e-6) {
+      driveVelocity.setLength(Math.max(driveVelocity.length() * 0.5, SPACE_CONSTANTS.MIN_SPEED));
+    }
+    appCtx.spaceFlight.speed = driveVelocity.length();
     if (appCtx.spaceFlight.gravityVelocity) appCtx.spaceFlight.gravityVelocity.multiplyScalar(0.35);
   }
 }
@@ -482,8 +486,13 @@ export function animateSpaceFlight(deps = {}) {
   appCtx.spaceFlight._frameScale = Math.min(2.5, Math.max(0.25, (frameNow - previousFrame) / (1000 / 60)));
   appCtx.spaceFlight._lastFrameMs = frameNow;
 
-  if (appCtx.spaceFlight.earth) appCtx.spaceFlight.earth.rotation.y += 0.0005 * appCtx.spaceFlight._frameScale;
-  if (appCtx.spaceFlight.moon) appCtx.spaceFlight.moon.rotation.y += 0.0002 * appCtx.spaceFlight._frameScale;
+  const elapsedHours = Date.now() / 3600000;
+  if (appCtx.spaceFlight.earth) {
+    appCtx.spaceFlight.earth.rotation.y = (elapsedHours / 23.9345 * Math.PI * 2) % (Math.PI * 2);
+  }
+  if (appCtx.spaceFlight.moon) {
+    appCtx.spaceFlight.moon.rotation.y = (elapsedHours / 655.7199 * Math.PI * 2) % (Math.PI * 2);
+  }
 
   [appCtx.spaceFlight.earth, appCtx.spaceFlight.moon].forEach((body) => {
     if (!body) return;
