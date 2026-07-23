@@ -17,7 +17,7 @@ function createLifecycleScope(owner = 'runtime') {
     if (record) records.delete(record);
   }
 
-  function timeout(callback, delay = 0) {
+  function timeoutFn(callback, delay = 0) {
     let record = null;
     const handle = globalThis.setTimeout(() => {
       release(record);
@@ -26,6 +26,8 @@ function createLifecycleScope(owner = 'runtime') {
     record = track('timeout', () => globalThis.clearTimeout(handle));
     return handle;
   }
+
+  const timeout = timeoutFn;
 
   function interval(callback, delay = 0) {
     const handle = globalThis.setInterval(() => {
@@ -43,6 +45,22 @@ function createLifecycleScope(owner = 'runtime') {
       if (active) callback(timestamp);
     });
     record = track('animation-frame', () => globalThis.cancelAnimationFrame?.(handle));
+    return handle;
+  }
+
+  function idle(callback, timeout = 2000) {
+    if (typeof globalThis.requestIdleCallback !== 'function') {
+      return timeoutFn(
+        () => callback({ didTimeout: true, timeRemaining: () => 0 }),
+        Math.min(50, Math.max(0, Number(timeout) || 0))
+      );
+    }
+    let record = null;
+    const handle = globalThis.requestIdleCallback((deadline) => {
+      release(record);
+      if (active) callback(deadline);
+    }, { timeout: Math.max(0, Number(timeout) || 0) });
+    record = track('idle-callback', () => globalThis.cancelIdleCallback?.(handle));
     return handle;
   }
 
@@ -104,6 +122,7 @@ function createLifecycleScope(owner = 'runtime') {
     defer,
     dispose,
     guard,
+    idle,
     interval,
     isActive: () => active,
     listen,

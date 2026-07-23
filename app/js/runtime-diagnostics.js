@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { diagnoseRuntimeBudgets } from "./runtime/budget-diagnostics.js?v=1";
-import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=1';
+import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 
 function numberOrNull(value) {
   return Number.isFinite(value) ? Number(value) : null;
@@ -216,11 +216,20 @@ function publishRuntimeDiagnostics() {
 
 publishRuntimeDiagnostics();
 const runtimeDiagnosticsScope = createLifecycleScope('runtime-diagnostics');
+let diagnosticsPublishPending = false;
+function scheduleRuntimeDiagnosticsPublish() {
+  if (diagnosticsPublishPending || document.hidden) return;
+  diagnosticsPublishPending = true;
+  runtimeDiagnosticsScope.idle(() => {
+    diagnosticsPublishPending = false;
+    if (!document.hidden) publishRuntimeDiagnostics();
+  }, 2500);
+}
 runtimeDiagnosticsScope.interval(() => {
-  if (!document.hidden) publishRuntimeDiagnostics();
-}, 1000);
+  scheduleRuntimeDiagnosticsPublish();
+}, 5000);
 runtimeDiagnosticsScope.listen(document, 'visibilitychange', () => {
-  if (!document.hidden) publishRuntimeDiagnostics();
+  if (!document.hidden) scheduleRuntimeDiagnosticsPublish();
 });
 
 Object.assign(appCtx, {

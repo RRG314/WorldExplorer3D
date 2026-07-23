@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=1';
+import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=19";
 import {
   cycleTimeOfDay as cycleSkyTimeOfDay,
