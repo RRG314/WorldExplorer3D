@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { createWalkingCharacterHelpers } from "./walking/character.js?v=2";
-import { createWalkingGeometryHelpers } from "./walking/geometry.js?v=1";
+import { createWalkingGeometryHelpers } from "./walking/geometry.js?v=2";
 import { createWalkingPhysicsHelpers } from "./walking/physics.js?v=4";
 import { createWalkingRuntimeHelpers } from "./walking/runtime.js?v=7";
 import { createWalkingTerrainHelpers } from "./walking/terrain.js?v=2";
@@ -47,7 +47,9 @@ function createWalkingModule(opts) {
   };
 
   const { animateCharacterWalk, createCharacterMesh } = createWalkingCharacterHelpers({ THREE, scene });
-  const { clampPointInsideFootprint, pointInPolygonSafe } = createWalkingGeometryHelpers();
+  const { clampPointInsideFootprint, pointInPolygonSafe } = createWalkingGeometryHelpers({
+    pointInPolygon: isPointInPolygon
+  });
   const {
     finiteOr,
     getSafeDriveY,

@@ -104,17 +104,18 @@ import {
   classifyLinearFeatureTags as classifyLinearFeatureTagsBase
 } from "./world/load-style.js?v=3";
 import {
+  initWorldLoadSelection,
   limitNodesByDistance,
   limitWaysByDistance,
   nodeDistanceSq
-} from "./world/load-selection.js?v=2";
+} from "./world/load-selection.js?v=3";
 import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=13";
 import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=25";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
   registerWaterWaveMaterial
-} from "./world/render-support.js?v=5";
+} from "./world/render-support.js?v=6";
 import {
   buildingContainingPoint,
   findNearestRoad,
@@ -319,6 +320,9 @@ initWorldNavigation({
   sampleFeatureSurfaceY,
   tryAutoEnterBoatAt
 });
+initWorldLoadSelection({
+  getLocation: () => appCtx.LOC
+});
 initWorldBudgets({
   getPerfModeValue,
   limitNodesByDistance,
@@ -354,6 +358,7 @@ initWorldRenderSupport({
   distanceToPolygonEdgeXZ,
   pickRoofColor,
   pointInPolygon,
+  rand01FromInt: appCtx.rand01FromInt,
   signedPolygonAreaXZ
 });
 initWorldLoadGeometry({

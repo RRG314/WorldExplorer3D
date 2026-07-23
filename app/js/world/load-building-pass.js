@@ -11,7 +11,7 @@ import {
   buildMergedGeometry,
   geometryHasFinitePositions
 } from "./geometry-batching.js?v=4";
-import { createRoofDetailMesh } from "./roof-details.js?v=2";
+import { createRoofDetailMesh } from "./roof-details.js?v=3";
 import {
   createMappedRoofMesh,
   resolveMappedRoof

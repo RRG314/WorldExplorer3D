@@ -1,10 +1,12 @@
-import { ctx as appCtx } from "../shared-context.js?v=55";
+function createWalkingGeometryHelpers(options = {}) {
+  const pointInPolygon = typeof options.pointInPolygon === 'function'
+    ? options.pointInPolygon
+    : null;
 
-function createWalkingGeometryHelpers() {
   function pointInPolygonSafe(x, z, polygon) {
     if (!Array.isArray(polygon) || polygon.length < 3) return false;
-    if (typeof appCtx.pointInPolygon === "function") {
-      return appCtx.pointInPolygon(x, z, polygon) === true;
+    if (pointInPolygon) {
+      return pointInPolygon(x, z, polygon) === true;
     }
     let inside = false;
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
