@@ -6,14 +6,21 @@ const REUSE_EXISTING_EARTH_WORLD = true;
 
 function markEarthResumePhase(phase, details = {}) {
   const previous = appCtx.earthResumeDiagnostics || {};
-  const startedAt = Number(previous.startedAt) || performance.now();
+  const now = performance.now();
+  const startedAt = Number(previous.startedAt) || now;
+  const timeline = Array.isArray(previous.timeline) ? previous.timeline.slice(-23) : [];
+  timeline.push({
+    phase,
+    elapsedMs: Math.round((now - startedAt) * 10) / 10
+  });
   appCtx.earthResumeDiagnostics = {
     ...previous,
     ...details,
     phase,
     startedAt,
-    updatedAt: performance.now(),
-    elapsedMs: performance.now() - startedAt
+    updatedAt: now,
+    elapsedMs: now - startedAt,
+    timeline
   };
 }
 
@@ -138,6 +145,10 @@ function restorePoseFromSession() {
   const targetMode = pose?.mode === 'walk' ? 'walk' : 'drive';
   const targetAngle = Number(pose?.angle ?? fallbackAngle) || 0;
 
+  markEarthResumePhase('pose_resolve', {
+    poseMode: String(pose?.mode || targetMode),
+    poseTarget: { x: targetX, z: targetZ }
+  });
   const resolved = typeof appCtx.resolveSafeWorldSpawn === 'function' ?
     appCtx.resolveSafeWorldSpawn(targetX, targetZ, {
       mode: targetMode,
@@ -155,10 +166,16 @@ function restorePoseFromSession() {
       onRoad: false,
       road: null
     };
+  markEarthResumePhase('pose_resolved', {
+    resolvedMode: String(resolved?.mode || targetMode),
+    resolvedSource: String(resolved?.source || ''),
+    resolvedValid: resolved?.valid !== false
+  });
 
   if (typeof appCtx.applyResolvedWorldSpawn === 'function') {
     appCtx.applyResolvedWorldSpawn(resolved, { mode: targetMode });
   }
+  markEarthResumePhase('pose_applied');
 
   if (typeof appCtx.setTravelMode === 'function') {
     const resumeMode =
@@ -188,6 +205,7 @@ function restorePoseFromSession() {
       modeOptions.airborne = pose?.planeAirborne === true;
     }
     appCtx.setTravelMode(resumeMode, modeOptions);
+    markEarthResumePhase('pose_mode_applied', { resumeMode });
     if (resumeMode === 'drone' && appCtx.drone) {
       appCtx.drone.x = Number.isFinite(pose?.x) ? pose.x : appCtx.drone.x;
       appCtx.drone.z = Number.isFinite(pose?.z) ? pose.z : appCtx.drone.z;
@@ -199,6 +217,7 @@ function restorePoseFromSession() {
   }
 
   if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
+  markEarthResumePhase('pose_ready');
   return resolved;
 }
 
@@ -210,22 +229,28 @@ async function finalizeEarthResume(resolved, isCurrent = () => true, options = {
   if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
     appCtx.updateTerrainAround(x, z);
   }
+  markEarthResumePhase('terrain_streaming_ready');
   if (options.syncSurface === true) {
     markEarthResumePhase('surface_sync');
     appCtx.requestWorldSurfaceSync?.({ force: true, source: 'earth_reload' });
+    markEarthResumePhase('surface_sync_requested');
   }
   markEarthResumePhase('world_lod');
   appCtx.resumeEarthStreaming?.(1400);
   appCtx.updateEarthWorldStreaming?.(1);
+  markEarthResumePhase('earth_streaming_ready');
   appCtx.updateWorldLod?.(true);
+  markEarthResumePhase('world_lod_ready');
   if (typeof appCtx.refreshBoatAvailability === 'function') {
     appCtx.refreshBoatAvailability(true);
   }
+  markEarthResumePhase('boat_availability_ready');
   if (typeof appCtx.setTimeOfDay === 'function') {
     appCtx.setTimeOfDay(appCtx.skyMode || 'live');
   } else if (typeof appCtx.refreshAstronomicalSky === 'function') {
     appCtx.refreshAstronomicalSky(true);
   }
+  markEarthResumePhase('sky_ready');
   if (typeof appCtx.refreshLiveWeather === 'function') {
     void appCtx.refreshLiveWeather(true);
   }
@@ -323,9 +348,11 @@ export async function resumeEarthWorldSession(options = {}) {
     }
 
     restoreSelectionFromState();
-    if (transitionDurationMs > 0) {
-      await new Promise((resolve) => globalThis.setTimeout(resolve, Math.min(transitionDurationMs, 240)));
-    }
+    // A reusable Earth scene is already constructed. Yielding here lets the
+    // newly committed Earth runtime run a full frame before its actor, LOD, and
+    // ownership state are restored. Dense cities can turn that cosmetic delay
+    // into a multi-second main-thread stall, so finish the atomic resume in the
+    // current task and let finalizeEarthResume own the first presented frame.
     if (!isCurrent()) return { aborted: true, resumed: false };
 
     const resolved = restorePoseFromSession();

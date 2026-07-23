@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 // ui.js - UI setup, event binding, button handlers
 // ============================================================================
-import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=19";
+import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=20";
 import { prepareTitleEnvironment } from "./planetary/entry.js?v=9";
 import { initMapInteractions } from "./ui/map-interactions.js?v=59";
 import { initMobileControls } from "./ui/mobile-controls.js?v=65";

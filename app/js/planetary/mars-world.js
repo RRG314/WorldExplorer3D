@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { captureEarthWorldSession, resumeEarthWorldSession } from '../earth-session.js?v=19';
+import { captureEarthWorldSession, resumeEarthWorldSession } from '../earth-session.js?v=20';
 import { ENV, getEnv } from '../env.js?v=57';
 import {
   commitEnvironment,
