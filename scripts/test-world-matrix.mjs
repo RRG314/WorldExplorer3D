@@ -242,6 +242,13 @@ async function loadLocation(page, spec) {
       }
       driveSwitchMs = performance.now() - switchDriveAt;
     }
+    if (locationSpec.captureMode && typeof ctx.setTravelMode === 'function') {
+      ctx.setTravelMode(locationSpec.captureMode, {
+        source: 'world_matrix_capture',
+        emitTutorial: false
+      });
+      await new Promise((resolve) => window.setTimeout(resolve, 350));
+    }
 
     let actorX = ctx.boatMode?.active ? Number(ctx.boat?.x || 0) : Number.isFinite(ctx.car?.x) ? ctx.car.x : Number(ctx.Walk?.state?.walker?.x || 0);
     let actorZ = ctx.boatMode?.active ? Number(ctx.boat?.z || 0) : Number.isFinite(ctx.car?.z) ? ctx.car.z : Number(ctx.Walk?.state?.walker?.z || 0);
@@ -553,9 +560,29 @@ async function loadLocation(page, spec) {
     for (const mesh of ctx.historicMarkers || []) {
       if (!mesh?.userData?.isHistoricLandmark) continue;
       const kind = String(mesh.userData.landmarkKind || 'unknown');
-      landmarkPresentation[kind] ||= { meshes: 0, visibleMeshes: 0 };
+      landmarkPresentation[kind] ||= {
+        meshes: 0,
+        visibleMeshes: 0,
+        segments: 0,
+        maxSegmentLength: 0,
+        maxHeight: 0,
+        maxWidth: 0
+      };
       landmarkPresentation[kind].meshes += 1;
       if (mesh.visible !== false) landmarkPresentation[kind].visibleMeshes += 1;
+      landmarkPresentation[kind].segments += Number(mesh.userData.segmentCount || 0);
+      landmarkPresentation[kind].maxSegmentLength = Math.max(
+        landmarkPresentation[kind].maxSegmentLength,
+        Number(mesh.userData.maxSegmentLength || 0)
+      );
+      landmarkPresentation[kind].maxHeight = Math.max(
+        landmarkPresentation[kind].maxHeight,
+        Number(mesh.userData.heightMeters || 0)
+      );
+      landmarkPresentation[kind].maxWidth = Math.max(
+        landmarkPresentation[kind].maxWidth,
+        Number(mesh.userData.widthMeters || 0)
+      );
     }
     let roadProfileY = Number(nearestRoad?.y);
     let exactRenderedRoadY = expectedStart !== 'water' && ctx.GroundHeight?._raycastMeshY ?
@@ -747,15 +774,65 @@ async function loadLocation(page, spec) {
         z: Number(actorZ.toFixed(2)),
         currentMode: typeof ctx.getCurrentTravelMode === 'function' ? ctx.getCurrentTravelMode() : (ctx.droneMode ? 'drone' : ctx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive')
       },
+      boatAvailability: (() => {
+        const candidate = ctx.boatMode?.candidate || ctx.inspectBoatCandidate?.(actorX, actorZ) || null;
+        const source = candidate?.source || null;
+        return {
+          available: !!ctx.boatMode?.available,
+          promptMessage: String(ctx.boatMode?.promptMessage || ''),
+          promptVisible: !!document.getElementById('boatPrompt')?.classList.contains('show'),
+          candidate: candidate ? {
+            type: candidate.type || null,
+            label: candidate.label || null,
+            waterKind: candidate.waterKind || null,
+            inside: !!candidate.inside,
+            distanceToWater: Number.isFinite(candidate.distanceToWater) ?
+              Number(candidate.distanceToWater.toFixed(2)) : null,
+            surfaceY: Number.isFinite(candidate.surfaceY) ? Number(candidate.surfaceY.toFixed(2)) : null,
+            sourceFeatureId: source?.sourceFeatureId || null,
+            geometrySource: source?.geometrySource || source?.provenance?.dataset || null,
+            layer: source?.layer || source?.provenance?.layer || null,
+            tileKey: source?.tileKey || source?.provenance?.tileKey || null
+          } : null
+        };
+      })(),
+      waterAreaSamples: (ctx.waterAreas || [])
+        .map((area) => ({
+          distance: Math.hypot(Number(area?.centerX || 0) - actorX, Number(area?.centerZ || 0) - actorZ),
+          area
+        }))
+        .sort((a, b) => a.distance - b.distance)
+        .slice(0, 12)
+        .map(({ distance, area }) => ({
+          distance: Number(distance.toFixed(2)),
+          centerX: Number(Number(area?.centerX || 0).toFixed(2)),
+          centerZ: Number(Number(area?.centerZ || 0).toFixed(2)),
+          span: Number(Number(area?.span || Math.max(
+            Number(area?.maxX || 0) - Number(area?.minX || 0),
+            Number(area?.maxZ || 0) - Number(area?.minZ || 0)
+          )).toFixed(2)),
+          surfaceY: Number.isFinite(area?.surfaceY) ? Number(area.surfaceY.toFixed(2)) : null,
+          waterKind: area?.waterKind || null,
+          sourceFeatureId: area?.sourceFeatureId || null,
+          layer: area?.layer || area?.provenance?.layer || null,
+          terrainAssessment: area?.terrainAssessment || null
+        })),
       initialSpawn: initialSpawn ? {
         valid: initialSpawn.valid !== false,
         mode: initialSpawn.mode || null,
         source: initialSpawn.source || null,
+        x: Number.isFinite(initialSpawn.x) ? Number(initialSpawn.x.toFixed(2)) : null,
+        z: Number.isFinite(initialSpawn.z) ? Number(initialSpawn.z.toFixed(2)) : null,
         structureKind: initialSpawn.road?.structureSemantics?.structureKind || null,
         terrainMode: initialSpawn.road?.structureSemantics?.terrainMode || null,
         featureEndpointClearance: Number.isFinite(initialSpawn.featureEndpointClearance) ?
           Number(initialSpawn.featureEndpointClearance.toFixed(2)) : null,
-        endpointConnected: initialSpawn.endpointConnected ?? null
+        endpointConnected: initialSpawn.endpointConnected ?? null,
+        slopeDeg: Number.isFinite(initialSpawn.slopeDeg) ? Number(initialSpawn.slopeDeg.toFixed(2)) : null,
+        vistaScore: Number.isFinite(initialSpawn.vistaScore) ? Number(initialSpawn.vistaScore.toFixed(2)) : null,
+        landmarkDistance: Number.isFinite(initialSpawn.landmarkDistance) ?
+          Number(initialSpawn.landmarkDistance.toFixed(2)) :
+          null
       } : null,
       customStructureProbe,
       boatActive: !!ctx.boatMode?.active,

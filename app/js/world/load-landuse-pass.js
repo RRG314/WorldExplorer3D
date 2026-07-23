@@ -1,6 +1,7 @@
 import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=2';
 import { surfaceComposition } from './surface-contract.js?v=7';
 import { normalizeWaterBody } from './water-body-contract.js?v=2';
+import { assessMappedWaterTerrain } from './water-surface-validity.js?v=3';
 
 const SOIL_LANDUSE_TYPES = new Set([
   'farmland', 'farmyard', 'orchard', 'vineyard', 'allotments',
@@ -216,6 +217,30 @@ export function createWorldLandusePass(options = {}) {
         ? centerElevation
         : waterSurfaceBaseElevation(sampledHeights)
       : avgElevation;
+    let waterTerrain = null;
+    if (isWater) {
+      waterTerrain = assessMappedWaterTerrain({
+        sampledHeights,
+        surfaceY: surfaceBaseElevation,
+        ambientY:
+          appCtx.SurfaceQuery?.terrainAt?.(0, 0)?.position?.y ??
+          appCtx.terrainMeshHeightAt?.(0, 0) ??
+          appCtx.elevationWorldYAtWorldXZ?.(0, 0),
+        span: Math.max(maxX - minX, maxZ - minZ),
+        layer: featureMeta.layer
+      });
+      if (!waterTerrain.valid) {
+        runtime.waterSurfaceRejections ||= { highElevationRelief: 0, samples: [] };
+        runtime.waterSurfaceRejections.highElevationRelief += 1;
+        if (runtime.waterSurfaceRejections.samples.length < 6) {
+          runtime.waterSurfaceRejections.samples.push({
+            sourceFeatureId: featureMeta.sourceFeatureId || null,
+            ...waterTerrain
+          });
+        }
+        return false;
+      }
+    }
     const waterArea = isWater ? normalizeWaterBody({
       shape: 'area',
       pts: ring,
@@ -228,7 +253,8 @@ export function createWorldLandusePass(options = {}) {
       tileKey: featureMeta.tileKey,
       layer: featureMeta.layer,
       datumMethod: featureMeta.layer === 'ocean' ? 'sea-level' : 'dem-water-surface',
-      datumConfidence: featureMeta.layer === 'ocean' ? 0.98 : 0.82
+      datumConfidence: featureMeta.layer === 'ocean' ? 0.98 : 0.82,
+      terrainAssessment: waterTerrain
     }) : null;
     const waterFlattenFactor = isWater ? 0 : 1.0;
     let geometry;
@@ -323,6 +349,7 @@ export function createWorldLandusePass(options = {}) {
       mesh.userData.waterAreaRef = waterArea;
       appCtx.waterAreas.push(waterArea);
     }
+    return true;
   }
 
   function cacheSurfaceFeatureHint(pts, landuseType, guardOptions = null) {
@@ -375,8 +402,7 @@ export function createWorldLandusePass(options = {}) {
       if (hole && Math.abs(signedPolygonAreaXZ(hole)) > FEATURE_MIN_HOLE_AREA) holes.push(hole);
     }
 
-    addLandusePolygon(runtime, outer, 'water', holes, null, featureMeta);
-    return true;
+    return addLandusePolygon(runtime, outer, 'water', holes, null, featureMeta) === true;
   }
 
   function addVectorWaterGeoJSON(runtime, geojson, featureMeta = {}) {
@@ -488,7 +514,15 @@ export function createWorldLandusePass(options = {}) {
       });
     });
 
-    return { polygons, lines, tiles: tileJobs.length, okTiles, errors };
+    return {
+      polygons,
+      lines,
+      tiles: tileJobs.length,
+      okTiles,
+      errors,
+      rejectedHighElevationRelief: Number(runtime.waterSurfaceRejections?.highElevationRelief || 0),
+      rejectionSamples: runtime.waterSurfaceRejections?.samples || []
+    };
   }
 
   async function buildLanduseGeometryPass(runtime = {}) {

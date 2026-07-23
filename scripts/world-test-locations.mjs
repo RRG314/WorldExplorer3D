@@ -140,6 +140,7 @@ export const WORLD_TEST_LOCATIONS = [
     label: 'Great Pyramids of Giza',
     category: 'historic_arid_custom',
     expectedStart: 'land',
+    captureMode: 'walk',
     expectedTerrainMode: 'sand',
     expectedLandmarkKind: 'pyramid'
   },
@@ -151,6 +152,8 @@ export const WORLD_TEST_LOCATIONS = [
     label: 'Great Wall of China',
     category: 'historic_mountain_custom',
     expectedStart: 'land',
+    captureMode: 'walk',
+    minimumLandmarkSpawnDistance: 35,
     expectedLandmarkKind: 'historic_wall'
   },
   {
@@ -173,6 +176,8 @@ export const WORLD_TEST_LOCATIONS = [
     label: 'Jungfrau Region, Switzerland',
     category: 'alpine_snow_rock_custom',
     expectedStart: 'land',
+    maximumWaterAreaSpan: 50,
+    rejectBoatPrompt: true,
     expectedTerrainMode: 'snowRock',
     acceptableTerrainModes: ['snow', 'snowRock'],
     acceptableStartTerrainModes: ['snow', 'snowRock']

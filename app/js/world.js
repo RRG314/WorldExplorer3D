@@ -27,7 +27,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=22";
+} from "./world/spawn.js?v=33";
 import {
   scheduleDeferredStructureRefresh,
   scheduleDeferredWorldLinearFeatureLoad
@@ -172,14 +172,14 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=5";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=72";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=75";
 import { worldLoadTransactions } from './world/load-transaction.js?v=2';
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=13";
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=10";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
-import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=26";
+import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=28";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 

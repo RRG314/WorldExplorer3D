@@ -38,6 +38,7 @@
     "test:boat-prompt-policy": "node scripts/test-boat-prompt-policy.mjs",
     "test:place-location-authority": "node scripts/test-place-location-authority.mjs",
     "test:world-load-location-authority": "node scripts/test-world-load-location-authority.mjs",
+    "test:water-surface-validity": "node scripts/test-water-surface-validity.mjs",
     "test:transport-controllers": "node scripts/test-transport-controller-registry.mjs",
     "test:platform-services": "node scripts/test-platform-service-registry.mjs",
     "test:geospatial": "node scripts/test-geospatial-data-fabric.mjs",

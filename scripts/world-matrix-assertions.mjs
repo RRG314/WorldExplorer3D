@@ -192,6 +192,41 @@ export function assertWorldMatrixLocation(spec, result) {
       `${spec.id}: expected mapped ${spec.expectedLandmarkKind} landmark ` +
       `${JSON.stringify({ landmarks: result.landmarkPresentation, diagnostics: result.loadDiagnostics?.landmarks })}`
     );
+    if (spec.expectedLandmarkKind === 'historic_wall') {
+      const wall = result.landmarkPresentation.historic_wall;
+      assert(
+        wall.segments > 0 &&
+        wall.maxSegmentLength <= 14.7 &&
+        wall.maxHeight <= 14 &&
+        wall.maxWidth <= 8,
+        `${spec.id}: historic wall contains terrain-bridging slab geometry ${JSON.stringify(wall)}`
+      );
+    }
+  }
+
+  if (Number.isFinite(spec.minimumLandmarkSpawnDistance)) {
+    assert(
+      Number(result.initialSpawn?.landmarkDistance) >= spec.minimumLandmarkSpawnDistance,
+      `${spec.id}: landmark arrival is too close to mapped landmark geometry ` +
+      `${JSON.stringify(result.initialSpawn)}`
+    );
+  }
+
+  if (Number.isFinite(spec.maximumWaterAreaSpan)) {
+    const oversizedWater = (result.waterAreaSamples || []).filter(
+      (water) => Number(water?.span || 0) > spec.maximumWaterAreaSpan
+    );
+    assert(
+      oversizedWater.length === 0,
+      `${spec.id}: unvalidated mapped water sheet exceeded ${spec.maximumWaterAreaSpan}m ` +
+      `${JSON.stringify(oversizedWater.slice(0, 3))}`
+    );
+  }
+  if (spec.rejectBoatPrompt) {
+    assert(
+      result.boatAvailability?.available !== true && result.boatAvailability?.promptVisible !== true,
+      `${spec.id}: false boat prompt appeared on a land arrival ${JSON.stringify(result.boatAvailability)}`
+    );
   }
 
   const hasMappedWorld = result.counts.roads > 0 || result.counts.buildings > 0 || result.counts.landuses > 0;
