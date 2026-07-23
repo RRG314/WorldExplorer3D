@@ -205,18 +205,20 @@ function createRendererWithFallback() {
 
 function addSkyVisuals(appCtx, gpuTier) {
   appCtx.sunSphere = new THREE.Mesh(
-    new THREE.SphereGeometry(40, 16, 8),
+    new THREE.SphereGeometry(7, 16, 8),
     new THREE.MeshBasicMaterial({ color: 0xffdd00, fog: false })
   );
   appCtx.sunSphere.position.set(500, 800, 200);
   appCtx.scene.add(appCtx.sunSphere);
 
   const sunGlow = new THREE.Mesh(
-    new THREE.SphereGeometry(60, 12, 8),
+    new THREE.SphereGeometry(15, 12, 8),
     new THREE.MeshBasicMaterial({
       color: 0xffee88,
       transparent: true,
       opacity: 0.3,
+      depthWrite: false,
+      depthTest: true,
       fog: false
     })
   );

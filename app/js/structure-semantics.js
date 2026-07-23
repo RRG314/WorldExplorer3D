@@ -10,13 +10,17 @@ import {
   smoothstep01
 } from './structure-semantics/geometry.js?v=1';
 
+const CONNECTION_CELL_SIZE = 3;
+const CONNECTION_MAX_DISTANCE = 2.6;
+
 function connectionEndpointKey(point) {
   if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) return '';
-  return `${Math.round(point.x * 10)},${Math.round(point.z * 10)}`;
+  return `${Math.floor(point.x / CONNECTION_CELL_SIZE)},${Math.floor(point.z / CONNECTION_CELL_SIZE)}`;
 }
 
 function assignFeatureConnections(features = []) {
   const endpointGroups = new Map();
+  const entries = [];
   for (let i = 0; i < features.length; i++) {
     const feature = features[i];
     const points = Array.isArray(feature?.pts) ? feature.pts : null;
@@ -35,28 +39,35 @@ function assignFeatureConnections(features = []) {
         bucket = [];
         endpointGroups.set(key, bucket);
       }
-      bucket.push({ feature, ...entry });
+      const record = { feature, ...entry };
+      bucket.push(record);
+      entries.push(record);
     }
   }
 
-  endpointGroups.forEach((entries) => {
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i];
-      const target = entry.feature?.connectedFeatures?.[entry.endpoint];
-      if (!Array.isArray(target)) continue;
-      target.length = 0;
-      for (let j = 0; j < entries.length; j++) {
-        const other = entries[j];
-        if (other === entry || other.feature === entry.feature) continue;
-        target.push({
-          feature: other.feature,
-          endpoint: other.endpoint,
-          endpointIndex: other.endpointIndex,
-          point: other.point
-        });
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    const target = entry.feature?.connectedFeatures?.[entry.endpoint];
+    if (!Array.isArray(target)) continue;
+    const cellX = Math.floor(entry.point.x / CONNECTION_CELL_SIZE);
+    const cellZ = Math.floor(entry.point.z / CONNECTION_CELL_SIZE);
+    for (let offsetX = -1; offsetX <= 1; offsetX++) {
+      for (let offsetZ = -1; offsetZ <= 1; offsetZ++) {
+        const nearby = endpointGroups.get(`${cellX + offsetX},${cellZ + offsetZ}`) || [];
+        for (let j = 0; j < nearby.length; j++) {
+          const other = nearby[j];
+          if (other === entry || other.feature === entry.feature) continue;
+          if (Math.hypot(other.point.x - entry.point.x, other.point.z - entry.point.z) > CONNECTION_MAX_DISTANCE) continue;
+          target.push({
+            feature: other.feature,
+            endpoint: other.endpoint,
+            endpointIndex: other.endpointIndex,
+            point: other.point
+          });
+        }
       }
     }
-  });
+  }
 }
 
 function buildFeatureStations(feature, context = {}) {
@@ -252,17 +263,45 @@ function buildFeatureTransitionAnchors(feature, sampleTerrainY) {
   return anchors;
 }
 
+function hasStructureContinuation(feature, endpoint, semantics) {
+  if (!semantics?.gradeSeparated) return false;
+  const linked = Array.isArray(feature?.connectedFeatures?.[endpoint])
+    ? feature.connectedFeatures[endpoint]
+    : [];
+  return linked.some((connection) => {
+    const other = connection?.feature?.structureSemantics;
+    return other?.gradeSeparated === true && other?.terrainMode === semantics.terrainMode;
+  });
+}
+
+function endpointStructureOffset(feature, endpoint, semantics) {
+  if (!hasStructureContinuation(feature, endpoint, semantics)) return 0;
+  return semantics.terrainMode === 'subgrade'
+    ? -Math.max(0, Number(semantics.cutDepth) || 0)
+    : Math.max(0, Number(semantics.deckClearance) || Number(semantics.explicitBaseOffset) || 0);
+}
+
+function unconnectedEndpointBlend(feature, semantics, distance, total) {
+  if (!semantics?.gradeSeparated || !(total > 0)) return 1;
+  const transitionLength = Math.max(
+    14,
+    Math.min(semantics.rampCandidate ? 96 : 72, total * 0.42)
+  );
+  let blend = 1;
+  if (!hasStructureContinuation(feature, 'start', semantics)) {
+    blend = Math.min(blend, smoothstep01(distance / transitionLength));
+  }
+  if (!hasStructureContinuation(feature, 'end', semantics)) {
+    blend = Math.min(blend, smoothstep01((total - distance) / transitionLength));
+  }
+  return blend;
+}
+
 function buildFeatureProfileAnchors(feature, semantics, totalDistance) {
   const total = Math.max(0, Number(totalDistance) || 0);
-  const endpointBaseOffset =
-    semantics?.terrainMode === 'subgrade' ?
-      -Math.max(0, Number(semantics.cutDepth) || 0) :
-    semantics?.terrainMode === 'elevated' ?
-      Math.max(0, Number(semantics.deckClearance) || Number(semantics.explicitBaseOffset) || 0) :
-      0;
   const anchors = [
-    { distance: 0, targetOffset: endpointBaseOffset, source: 'endpoint_default' },
-    { distance: total, targetOffset: endpointBaseOffset, source: 'endpoint_default' }
+    { distance: 0, targetOffset: endpointStructureOffset(feature, 'start', semantics), source: 'endpoint_connection' },
+    { distance: total, targetOffset: endpointStructureOffset(feature, 'end', semantics), source: 'endpoint_connection' }
   ];
   const transitionAnchors = Array.isArray(feature?.structureTransitionAnchors) ? feature.structureTransitionAnchors : [];
   for (let i = 0; i < transitionAnchors.length; i++) {
@@ -369,6 +408,7 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
     // that offset onto an ordinary road can pull the entire at-grade segment
     // above or below the terrain between sparse OSM endpoints.
     if (semantics.terrainMode === 'at_grade') signedOffset = 0;
+    else signedOffset *= unconnectedEndpointBlend(feature, semantics, distances[i], total);
 
     let profileY = terrainReference[i] + signedOffset + surfaceBias;
     const minimumSurfaceY = Number(feature.minimumStructureSurfaceY);

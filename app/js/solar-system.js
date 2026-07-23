@@ -3,9 +3,9 @@ import {
   createAsteroidBelt as createSolarSystemAsteroidBelt,
   createKuiperBelt as createSolarSystemKuiperBelt,
   createMoonSystems as createSolarSystemMoonSystems
-} from "./solar-system/minor-bodies.js?v=9";
+} from "./solar-system/minor-bodies.js?v=10";
 import { createGalaxies as createSolarSystemGalaxies } from "./solar-system/galaxies.js?v=2";
-import { initSolarSystemModel } from "./solar-system/init.js?v=1";
+import { initSolarSystemModel } from "./solar-system/init.js?v=2";
 import {
   createInfoPanel as createSolarSystemInfoPanel,
   createToggleButton as createSolarSystemToggleButton,
@@ -15,7 +15,7 @@ import {
   toggleOrbits as toggleSolarSystemOrbitsImpl,
   toggleSolarSystem as toggleSolarSystemImpl,
   updateSolarSystem as updateSolarSystemImpl
-} from "./solar-system/ui.js?v=13";
+} from "./solar-system/ui.js?v=14";
 import {
   ASTEROID_BELT,
   AU_TO_SCENE,
@@ -28,7 +28,7 @@ import {
   PLANET_MOONS,
   SOLAR_SYSTEM_PLANETS,
   SPACECRAFT
-} from "./solar-system/catalog.js?v=5";
+} from "./solar-system/catalog.js?v=6";
 import {
   createSpacecraft as createSolarSystemSpacecraft,
   updateSpacecraftPositions as updateSolarSystemSpacecraftPositions
@@ -65,7 +65,7 @@ const solarSystem = {
   selectedPlanet: null,
   raycaster: null,
   mouse: null,
-  MOON_TIME_SCALE: 8, // Speed up moon orbits for visual effect
+  MOON_TIME_SCALE: 1,
   SUN_SIZE: 100, // Scaled up for visibility at proportional distances
   PROXIMITY_DIST: 200, // distance to trigger proximity HUD
   _earthVisualPos: null, // cached Earth visual position for space.js
@@ -352,6 +352,7 @@ function updateMoonPositions(date) {
 
   const elapsedDays = date.getTime() / 86400000;
   solarSystem.moonMeshes.forEach((moon) => {
+    moon.orbitGroup?.position.copy(moon.planetMesh.position);
     const angularSpeed = Math.PI * 2 / moon.orbitDays;
     const theta = moon.phaseOffset + elapsedDays * angularSpeed * solarSystem.MOON_TIME_SCALE;
     const localX = Math.cos(theta) * moon.orbitRadius;

@@ -10,7 +10,12 @@ function localMeters(lat, lon, originLat, originLon) {
 }
 
 function polygonRecord(way, nodes, originLat, originLon, index) {
-  const points = (way?.nodes || []).map((id) => nodes.get(id)).filter(Boolean);
+  const points = way?._coordinates?.length >= 6
+    ? Array.from({ length: Math.floor(way._coordinates.length / 2) }, (_, pointIndex) => ({
+      lon: way._coordinates[pointIndex * 2],
+      lat: way._coordinates[pointIndex * 2 + 1]
+    }))
+    : (way?.nodes || []).map((id) => nodes.get(id)).filter(Boolean);
   if (points.length < 3) return null;
 
   let lat = 0;

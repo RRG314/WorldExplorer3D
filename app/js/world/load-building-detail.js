@@ -1,8 +1,8 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { mergeBuildingMetadata } from "./building-metadata.js?v=1";
-import { supplementSparseBuildingData } from "./inferred-building-footprints.js?v=2";
+import { mergeBuildingMetadata } from "./building-metadata.js?v=2";
+import { supplementSparseBuildingData } from "./inferred-building-footprints.js?v=3";
 import { fetchBundledLandmarkData } from "./landmark-source.js?v=2";
-import { createLandmarkBuildingOwnership } from "./landmark-building-ownership.js?v=3";
+import { createLandmarkBuildingOwnership } from "./landmark-building-ownership.js?v=5";
 import { curatedLandmarksNear } from "./landmark-catalog.js?v=8";
 
 function buildingDataPriority(way) {
@@ -160,20 +160,27 @@ export function scheduleDeferredBuildingLoad(options = {}) {
       });
       if (!isActiveLoadContext()) return;
 
-      options.refreshStructureAwareFeatureProfiles?.();
-      appCtx.refreshTerrainSurfaceProfiles?.();
-      appCtx.clearTerrainHeightCache?.();
-      appCtx.requestWorldSurfaceSync?.({ force: true, source: 'deferred_buildings' });
+      if (options.deferSurfaceSync !== true) {
+        options.refreshStructureAwareFeatureProfiles?.();
+        appCtx.refreshTerrainSurfaceProfiles?.();
+        appCtx.clearTerrainHeightCache?.();
+        appCtx.requestWorldSurfaceSync?.({ force: true, source: 'deferred_buildings' });
+      }
       options.updateWorldLod?.(true);
+      const source = data._overpassSource || null;
+      const endpoint = data._overpassEndpoint || null;
+      const metadata = data._buildingMetadata || metadataState;
+      const sourceDetails = data._overtureBuildings || data._shortbreadTiles || null;
+      if (Array.isArray(data.elements)) data.elements.length = 0;
       setBuildingDetailState('ready', {
         requested: requested.length,
         selected: buildingWays.length,
         meshes: appCtx.buildingMeshes.length,
         durationMs: Math.round(performance.now() - startedAt),
-        source: data._overpassSource || null,
-        endpoint: data._overpassEndpoint || null,
-        metadata: data._buildingMetadata || metadataState,
-        sourceDetails: data._overtureBuildings || data._shortbreadTiles || null,
+        source,
+        endpoint,
+        metadata,
+        sourceDetails,
         inferredCoverage,
         landmarkOwnership: {
           footprints: landmarkOwnership.footprintCount,

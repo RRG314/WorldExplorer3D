@@ -10,6 +10,48 @@ let lastLodRefX = 0;
 let lastLodRefZ = 0;
 let lastLodReady = false;
 let lastBuildingMeshCount = -1;
+const nearBuildingCandidates = [];
+const midBuildingCandidates = [];
+const groupedCandidates = new Map();
+const buildingCandidatePool = [];
+const groupedCandidatePool = [];
+let buildingCandidateCursor = 0;
+let groupedCandidateCursor = 0;
+
+function resetBuildingCandidateScratch() {
+  nearBuildingCandidates.length = 0;
+  midBuildingCandidates.length = 0;
+  groupedCandidates.clear();
+  buildingCandidateCursor = 0;
+  groupedCandidateCursor = 0;
+}
+
+function takeBuildingCandidate(count, distSq, mesh, tier) {
+  const candidate = buildingCandidatePool[buildingCandidateCursor] || {};
+  buildingCandidatePool[buildingCandidateCursor] = candidate;
+  buildingCandidateCursor += 1;
+  candidate.count = count;
+  candidate.distSq = distSq;
+  candidate.mesh = mesh;
+  candidate.meshes = null;
+  candidate.tier = tier;
+  candidate.selected = false;
+  return candidate;
+}
+
+function takeGroupedCandidate(tier, distSq) {
+  const candidate = groupedCandidatePool[groupedCandidateCursor] || { meshes: [] };
+  groupedCandidatePool[groupedCandidateCursor] = candidate;
+  groupedCandidateCursor += 1;
+  candidate.count = 0;
+  candidate.distSq = distSq;
+  candidate.eligible = false;
+  candidate.mesh = null;
+  candidate.meshes.length = 0;
+  candidate.tier = tier;
+  candidate.selected = false;
+  return candidate;
+}
 
 export function initWorldLod(deps = {}) {
   if (typeof deps.getPerfModeValue === 'function') runtime.getPerfModeValue = deps.getPerfModeValue;
@@ -149,7 +191,7 @@ export function updateWorldLod(force = false) {
 
   if (!force && lastLodReady && !buildingSetChanged) {
     const moved = Math.hypot(refX - lastLodRefX, refZ - lastLodRefZ);
-    const minMoveForLodUpdate = appCtx.planeMode?.active ? 45 : appCtx.droneMode ? 6 : appCtx.boatMode?.active ? 14 : 8;
+    const minMoveForLodUpdate = appCtx.planeMode?.active ? 60 : appCtx.droneMode ? 40 : appCtx.boatMode?.active ? 14 : 8;
     if (moved < minMoveForLodUpdate) return;
   }
   lastLodRefX = refX;
@@ -174,7 +216,9 @@ export function updateWorldLod(force = false) {
 
   for (let i = 0; i < appCtx.roadMeshes.length; i += 1) setEarthMeshVisible(appCtx.roadMeshes[i], true);
   const protectedDetailRadius = Math.max(1700, Number(appCtx.initialEarthDetailRadius) || 0);
-  const aerialNear = Math.max(protectedDetailRadius + 180, 1200 + aerialAltitude * 1.4);
+  // Keep a broad overlap between detailed and aerial layers. The replacement
+  // layer must already be visible before budget selection can hide detail.
+  const aerialNear = Math.max(850, protectedDetailRadius * 0.68, 720 + aerialAltitude * 0.8);
   const aerialFar = Math.max(7200, aerialHorizon + 2800);
   const aerialMeshes = Array.isArray(appCtx.aerialContextMeshes) ? appCtx.aerialContextMeshes : [];
   for (let i = 0; i < aerialMeshes.length; i += 1) {
@@ -187,30 +231,9 @@ export function updateWorldLod(force = false) {
   let nearVisible = 0;
   let midVisible = 0;
 
-  if (mode === 'baseline') {
-    for (let i = 0; i < appCtx.buildingMeshes.length; i += 1) {
-      const mesh = appCtx.buildingMeshes[i];
-      if (!mesh) continue;
-      setEarthMeshVisible(mesh, true);
-      const count = mesh.userData?.isBuildingBatch ? Math.max(1, mesh.userData?.batchCount || 1) : 1;
-      if (mesh.userData?.lodTier === 'mid') midVisible += count;
-      else nearVisible += count;
-    }
-    for (let i = 0; i < appCtx.poiMeshes.length; i += 1) {
-      setEarthMeshVisible(appCtx.poiMeshes[i], !!appCtx.poiMode);
-    }
-    for (let i = 0; i < appCtx.landuseMeshes.length; i += 1) {
-      const mesh = appCtx.landuseMeshes[i];
-      if (!mesh) continue;
-      setEarthMeshVisible(mesh, !mesh.userData?.boatSuppressed && (mesh.userData?.alwaysVisible || !!appCtx.landUseVisible));
-    }
-    appCtx.setPerfLiveStat?.('lodVisible', { near: nearVisible, mid: midVisible });
-    return;
-  }
-
-  const nearBuildingCandidates = [];
-  const midBuildingCandidates = [];
-  const groupedCandidates = new Map();
+  // Baseline controls how much source detail is loaded, not how much is drawn
+  // in one frame. All quality modes share the bounded runtime LOD below.
+  resetBuildingCandidateScratch();
   for (let i = 0; i < appCtx.buildingMeshes.length; i++) {
     const mesh = appCtx.buildingMeshes[i];
     if (!mesh) continue;
@@ -245,7 +268,7 @@ export function updateWorldLod(force = false) {
     const groupKey = String(mesh.userData?.lodGroupKey || '');
     if (groupKey) {
       if (!groupedCandidates.has(groupKey)) {
-        groupedCandidates.set(groupKey, { count: 0, distSq, eligible: false, meshes: [], tier });
+        groupedCandidates.set(groupKey, takeGroupedCandidate(tier, distSq));
       }
       const group = groupedCandidates.get(groupKey);
       group.count += count;
@@ -255,20 +278,20 @@ export function updateWorldLod(force = false) {
       continue;
     }
     if (!withinDistance) continue;
-    const candidate = { count, distSq, mesh, tier };
+    const candidate = takeBuildingCandidate(count, distSq, mesh, tier);
     if (tier === 'mid') midBuildingCandidates.push(candidate);
     else nearBuildingCandidates.push(candidate);
   }
-  groupedCandidates.forEach((candidate) => {
-    if (!candidate.eligible) return;
+  for (const candidate of groupedCandidates.values()) {
+    if (!candidate.eligible) continue;
     if (candidate.tier === 'mid') midBuildingCandidates.push(candidate);
     else nearBuildingCandidates.push(candidate);
-  });
+  }
 
   nearBuildingCandidates.sort((a, b) => a.distSq - b.distSq);
   midBuildingCandidates.sort((a, b) => a.distSq - b.distSq);
   const buildingUnitBudget = visibleBuildingUnitBudget(dynamicBudgetState.budgetScale);
-  const nearShare = appCtx.planeMode?.active ? 0.3 : appCtx.droneMode ? 0.38 : appCtx.camMode === 2 ? 0.5 : 0.62;
+  const nearShare = appCtx.planeMode?.active ? 0.58 : appCtx.droneMode ? 0.54 : appCtx.camMode === 2 ? 0.5 : 0.62;
   const nearPrimary = selectBuildingCandidates(nearBuildingCandidates, Math.floor(buildingUnitBudget * nearShare));
   const midSelection = selectBuildingCandidates(midBuildingCandidates, Math.max(0, buildingUnitBudget - nearPrimary.units));
   const nearSpill = selectBuildingCandidates(
@@ -296,7 +319,9 @@ export function updateWorldLod(force = false) {
     setEarthMeshVisible(mesh, !!appCtx.poiMode && withinLod);
   }
 
-  const landuseVisibleDist = lodThresholds.mid + 120;
+  const landuseVisibleDist = aerialMode
+    ? Math.max(lodThresholds.mid + 120, Math.min(5200, 2400 + aerialAltitude * 3.2))
+    : lodThresholds.mid + 120;
   const landuseSq = landuseVisibleDist * landuseVisibleDist;
   for (let i = 0; i < appCtx.landuseMeshes.length; i++) {
     const mesh = appCtx.landuseMeshes[i];

@@ -502,6 +502,41 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
   return mesh;
 }
 
+function computeHeightfieldNormals(geometry, segments = appCtx.TERRAIN_SEGMENTS) {
+  const positions = geometry?.attributes?.position;
+  const side = Math.max(2, Math.round(Number(segments) || 0) + 1);
+  if (!positions || positions.count !== side * side) {
+    geometry?.computeVertexNormals?.();
+    return;
+  }
+
+  let normals = geometry.attributes.normal;
+  if (!normals || normals.count !== positions.count) {
+    normals = new THREE.BufferAttribute(new Float32Array(positions.count * 3), 3);
+    geometry.setAttribute('normal', normals);
+  }
+  const sample = (row, column, axis) => {
+    const index = Math.max(0, Math.min(side - 1, row)) * side + Math.max(0, Math.min(side - 1, column));
+    return axis === 'x' ? positions.getX(index) : axis === 'y' ? positions.getY(index) : positions.getZ(index);
+  };
+
+  for (let row = 0; row < side; row += 1) {
+    for (let column = 0; column < side; column += 1) {
+      const left = Math.max(0, column - 1);
+      const right = Math.min(side - 1, column + 1);
+      const north = Math.max(0, row - 1);
+      const south = Math.min(side - 1, row + 1);
+      const dx = sample(row, right, 'x') - sample(row, left, 'x') || 1;
+      const dz = sample(south, column, 'z') - sample(north, column, 'z') || 1;
+      const slopeX = (sample(row, right, 'y') - sample(row, left, 'y')) / dx;
+      const slopeZ = (sample(south, column, 'y') - sample(north, column, 'y')) / dz;
+      const length = Math.hypot(slopeX, 1, slopeZ) || 1;
+      normals.setXYZ(row * side + column, -slopeX / length, 1 / length, -slopeZ / length);
+    }
+  }
+  normals.needsUpdate = true;
+}
+
 export function applyFlatFallbackToTerrainMesh(mesh) {
   if (!mesh || !mesh.geometry || !mesh.geometry.attributes?.position) return;
   const pos = mesh.geometry.attributes.position;
@@ -509,7 +544,7 @@ export function applyFlatFallbackToTerrainMesh(mesh) {
     pos.setY(i, 0);
   }
   pos.needsUpdate = true;
-  mesh.geometry.computeVertexNormals();
+  computeHeightfieldNormals(mesh.geometry);
   mesh.position.y = 0;
   mesh.visible = true;
   const bounds = mesh.userData?.terrainTile?.bounds || null;
@@ -531,23 +566,40 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
   const pos = mesh.geometry.attributes.position;
   const latRange = bounds.latN - bounds.latS || 1;
   const lonRange = bounds.lonE - bounds.lonW || 1;
+  const latRadians = appCtx.LOC.lat * Math.PI / 180;
+  const lonWorldScale = appCtx.SCALE * Math.cos(latRadians);
+  if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+  const tileBounds = mesh.geometry.boundingBox;
+  const tileMinX = Number(tileBounds?.min?.x || 0) + mesh.position.x;
+  const tileMaxX = Number(tileBounds?.max?.x || 0) + mesh.position.x;
+  const tileMinZ = Number(tileBounds?.min?.z || 0) + mesh.position.z;
+  const tileMaxZ = Number(tileBounds?.max?.z || 0) + mesh.position.z;
+  const structureCuts = Array.isArray(appCtx.structureTerrainCuts)
+    ? appCtx.structureTerrainCuts.filter((cut) => cut?.bounds && !(
+      cut.bounds.maxX < tileMinX || cut.bounds.minX > tileMaxX ||
+      cut.bounds.maxZ < tileMinZ || cut.bounds.minZ > tileMaxZ
+    ))
+    : [];
 
   let minElevation = Infinity;
   let maxElevation = -Infinity;
-  const elevations = [];
+  const elevations = new Float32Array(pos.count);
   const elevationMetersSamples = [];
 
   for (let i = 0; i < pos.count; i++) {
     const wx = pos.getX(i) + mesh.position.x;
     const wz = pos.getZ(i) + mesh.position.z;
-    const { lat, lon } = worldToLatLon(wx, wz);
+    const lat = appCtx.LOC.lat - wz / appCtx.SCALE;
+    const lon = appCtx.LOC.lon + wx / lonWorldScale;
     const u = (lon - bounds.lonW) / lonRange;
     const v = (bounds.latN - lat) / latRange;
     const meters = sampleTileElevationMeters(tile, u, v, deps.clampElevationMeters);
-    elevationMetersSamples.push(meters);
+    if (i % 16 === 0) elevationMetersSamples.push(meters);
     const baseY = meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
-    const y = typeof deps.applyStructureTerrainCuts === "function" ? deps.applyStructureTerrainCuts(wx, wz, baseY) : baseY;
-    elevations.push(y);
+    const y = typeof deps.applyStructureTerrainCuts === "function"
+      ? deps.applyStructureTerrainCuts(wx, wz, baseY, structureCuts)
+      : baseY;
+    elevations[i] = y;
     minElevation = Math.min(minElevation, y);
     maxElevation = Math.max(maxElevation, y);
   }
@@ -558,7 +610,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
   }
 
   pos.needsUpdate = true;
-  mesh.geometry.computeVertexNormals();
+  computeHeightfieldNormals(mesh.geometry);
   mesh.userData.pendingTerrainTile = false;
   mesh.visible = true;
 

@@ -1,4 +1,4 @@
-import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=1';
+import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=2';
 import { surfaceComposition } from './surface-contract.js?v=7';
 import { normalizeWaterBody } from './water-body-contract.js?v=2';
 
@@ -64,6 +64,7 @@ function mappedSurfaceMaterialOptions(appCtx, landuseType, composition) {
   const textures = textureSetForLanduse(appCtx, landuseType);
   const canyonRock = textures?.mode === 'rock' && appCtx.worldSurfaceProfile?.reason === 'grand_canyon_striated_rock';
   const tropicalForest = textures?.mode === 'forest' && appCtx.worldSurfaceProfile?.biomeHint === 'tropical_rainforest';
+  const forestGround = textures?.mode === 'forest';
   const metersPerTile =
     textures?.mode === 'pavement' ? 3.2 :
     textures?.mode === 'forest' ? 5.5 :
@@ -75,7 +76,7 @@ function mappedSurfaceMaterialOptions(appCtx, landuseType, composition) {
     7;
   return {
     material: {
-      color: canyonRock ? 0xc47b50 : tropicalForest ? 0x769563 : textures?.map ? 0xffffff : appCtx.LANDUSE_STYLES[landuseType].color,
+      color: canyonRock ? 0xc47b50 : tropicalForest ? 0x769563 : forestGround ? 0x718568 : textures?.map ? 0xffffff : appCtx.LANDUSE_STYLES[landuseType].color,
       map: textures?.map || null,
       normalMap: textures?.normalMap || null,
       roughnessMap: textures?.roughnessMap || null,
@@ -119,8 +120,7 @@ export function createWorldLandusePass(options = {}) {
     'orchard', 'vineyard', 'allotments', 'farmland', 'farmyard',
     'plant_nursery', 'greenhouse_horticulture', 'recreation_ground',
     'village_green', 'greenfield', 'cemetery', 'sand', 'dune', 'barren',
-    'glacier', 'quarry', 'landfill',
-    ...DEVELOPED_LANDUSE_TYPES
+    'glacier', 'quarry', 'landfill'
   ]);
   function addLandusePolygon(runtime, pts, landuseType, holeRings = [], guardOptions = null, featureMeta = {}) {
     if (!pts || pts.length < 3) return;
@@ -152,6 +152,19 @@ export function createWorldLandusePass(options = {}) {
       minZ = Math.min(minZ, point.z);
       maxZ = Math.max(maxZ, point.z);
     });
+
+    // These OSM values describe zoning, not literal pavement. Keep their
+    // polygons for building and sidewalk context without painting over the
+    // terrain, parks, and explicit ground-cover features underneath.
+    if (DEVELOPED_LANDUSE_TYPES.has(landuseType)) {
+      appCtx.landuses.push({
+        type: landuseType,
+        pts: ring,
+        bounds: { minX, maxX, minZ, maxZ },
+        semanticOnly: true
+      });
+      return;
+    }
 
     const sampledHeights = [];
     let avgElevation = 0;

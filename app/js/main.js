@@ -156,31 +156,38 @@ function renderLoop() {
   return runtimeKernel.start();
 }
 
-function warmNearbyWorldRenderResources(radius = 900) {
-  if (!appCtx.renderer || !appCtx.scene || !appCtx.camera || !Array.isArray(appCtx.buildingMeshes)) return 0;
+function warmNearbyWorldRenderResources(radius = Number.POSITIVE_INFINITY) {
+  if (!appCtx.renderer || !appCtx.scene || !appCtx.camera) return 0;
   const actor = appCtx.activeTransportActor?.()?.position || appCtx.car || { x: 0, z: 0 };
   const radiusSq = radius * radius;
   const restored = [];
+  const candidates = [...new Set([
+    ...(appCtx.buildingMeshes || []),
+    ...(appCtx.aerialContextMeshes || []),
+    ...(appCtx.landuseMeshes || []),
+    ...(appCtx.roadMeshes || [])
+  ])];
   const startedAt = performance.now();
-  for (let i = 0; i < appCtx.buildingMeshes.length; i += 1) {
-    const mesh = appCtx.buildingMeshes[i];
+  for (let i = 0; i < candidates.length; i += 1) {
+    const mesh = candidates[i];
     if (!mesh?.geometry) continue;
     if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
     const center = mesh.userData?.lodCenter || mesh.geometry.boundingSphere?.center;
     const x = Number(center?.x || 0) + Number(mesh.position?.x || 0);
     const z = Number(center?.z || 0) + Number(mesh.position?.z || 0);
     if ((x - actor.x) ** 2 + (z - actor.z) ** 2 > radiusSq) continue;
-    restored.push({ mesh, parent: mesh.parent, visible: mesh.visible });
+    restored.push({ mesh, parent: mesh.parent, visible: mesh.visible, frustumCulled: mesh.frustumCulled });
     mesh.visible = true;
+    mesh.frustumCulled = false;
     if (!mesh.parent) appCtx.scene.add(mesh);
   }
   try {
-    appCtx.renderer.compile?.(appCtx.scene, appCtx.camera);
     appCtx.renderer.render(appCtx.scene, appCtx.camera);
   } finally {
     for (let i = 0; i < restored.length; i += 1) {
-      const { mesh, parent, visible } = restored[i];
+      const { mesh, parent, visible, frustumCulled } = restored[i];
       mesh.visible = visible;
+      mesh.frustumCulled = frustumCulled;
       if (!parent && mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
     }
   }
@@ -195,7 +202,7 @@ async function waitForWorldRenderReadiness(options = {}) {
   const requiredStableFrames = Math.max(4, Math.min(16, Number(options.stableFrames) || 8));
   const minimumReadyMs = Math.max(250, Math.min(2500, Number(options.minimumReadyMs) || 650));
   const startedAt = performance.now();
-  const warmupMs = warmNearbyWorldRenderResources();
+  const warmupMs = await warmNearbyWorldRenderResources();
   let previousFrameAt = startedAt;
   let previousSignature = '';
   let stableFrames = 0;

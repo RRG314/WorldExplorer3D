@@ -87,20 +87,33 @@ export async function finalizeLoadedWorld(options = {}) {
   if (appCtx.gameStarted) {
     runFinalStep('startMode', () => appCtx.startMode());
   }
-  if (typeof appCtx.primeAerialContext === 'function' && appCtx.getContinuousWorldEnabled?.() !== true) {
-    startLoadPhase('primeAerialContext');
-    try {
-      await appCtx.primeAerialContext({ minLoadedTiles: 9, timeoutMs: 20000 });
-    } catch (err) {
-      recordWorldLoadWarning(loadMetrics, 'primeAerialContext', err);
-    } finally {
-      endLoadPhase('primeAerialContext');
-    }
-  }
   if (typeof appCtx.waitForWorldRenderReadiness === 'function') {
-    loadMetrics.renderReadiness = await appCtx.waitForWorldRenderReadiness();
+    loadMetrics.renderReadiness = await appCtx.waitForWorldRenderReadiness({
+      timeoutMs: 4500,
+      stableFrames: 5,
+      minimumReadyMs: 500
+    });
+  }
+  if (typeof appCtx.revalidateActiveWorldSpawn === 'function') {
+    runFinalStep('revalidateActiveWorldSpawn', () => appCtx.revalidateActiveWorldSpawn({
+      source: 'world_render_ready'
+    }));
   }
   appCtx.hideLoad();
+  if (typeof appCtx.primeAerialContext === 'function' && appCtx.getContinuousWorldEnabled?.() !== true) {
+    loadMetrics.aerialContext = { status: 'warming' };
+    globalThis.setTimeout(async () => {
+      try {
+        const layer = await appCtx.primeAerialContext({ minLoadedTiles: 9, timeoutMs: 12000 });
+        loadMetrics.aerialContext = {
+          status: 'ready',
+          loadedNearCenter: Number(layer?.loadedNearCenter || 0)
+        };
+      } catch (err) {
+        loadMetrics.aerialContext = { status: 'deferred', error: err?.message || String(err) };
+      }
+    }, 0);
+  }
 }
 
 export function createSyntheticFallbackWorld(options = {}) {
@@ -446,11 +459,14 @@ export function buildStreetFurniturePass(options = {}) {
 
 function deferWorldDetailStep(callback, delayMs = 0) {
   const delay = Math.max(0, Number.isFinite(delayMs) ? delayMs : 0);
-  if (typeof globalThis.requestIdleCallback === 'function') {
-    globalThis.requestIdleCallback(() => callback(), { timeout: Math.max(800, delay + 800) });
-    return;
-  }
-  globalThis.setTimeout(() => callback(), delay);
+  return new Promise((resolve) => {
+    const run = () => Promise.resolve(callback()).finally(resolve);
+    if (typeof globalThis.requestIdleCallback === 'function') {
+      globalThis.requestIdleCallback(run, { timeout: Math.max(800, delay + 800) });
+      return;
+    }
+    globalThis.setTimeout(run, delay);
+  });
 }
 
 export function scheduleDeferredWorldDetailPasses(options = {}) {
@@ -474,7 +490,7 @@ export function scheduleDeferredWorldDetailPasses(options = {}) {
     });
   };
 
-  deferWorldDetailStep(() => {
+  return deferWorldDetailStep(async () => {
     if (!isActiveLoadContext()) return;
     buildPoiGeometryPass({
       endLoadPhase,
@@ -488,7 +504,8 @@ export function scheduleDeferredWorldDetailPasses(options = {}) {
     });
     updatePerfWorldCounts();
 
-    globalThis.setTimeout(() => {
+    await new Promise((resolve) => globalThis.setTimeout(resolve, 160));
+    {
       if (!isActiveLoadContext()) return;
       buildStreetFurniturePass({
         endLoadPhase,
@@ -502,7 +519,7 @@ export function scheduleDeferredWorldDetailPasses(options = {}) {
         `[WorldLoad] Deferred world details ready (${appCtx.poiMeshes.length} poi meshes, ` +
         `${appCtx.streetFurnitureMeshes.length} furniture, ${appCtx.vegetationMeshes.length} vegetation).`
       );
-    }, 160);
+    }
   }, 0);
 }
 

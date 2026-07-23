@@ -1,4 +1,4 @@
-import { cityLocationLabel } from './helpers.js?v=3';
+import { cityLocationLabel } from './helpers.js?v=4';
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -47,6 +47,8 @@ export function renderLibraryCityItems(cityList, presets, saved, recent, cityMat
 
   const majorCities = presets.filter((city) => city.collection === 'major-city');
   const destinations = presets.filter((city) => city.collection !== 'major-city');
+  const historicSites = destinations.filter((city) => /historic|landmark/i.test(city.category));
+  const naturalPlaces = destinations.filter((city) => !historicSites.includes(city));
   const html = ['<li class="globe-selector-city-section"><strong>Saved Places</strong><span>Your personal collection</span></li>'];
   if (saved.length) {
     pushCityRows(html, saved, 'saved', cityMatchesSelection, { removable: true });
@@ -58,8 +60,10 @@ export function renderLibraryCityItems(cityList, presets, saved, recent, cityMat
   else html.push('<li class="globe-selector-city-empty">Your explored locations will appear here.</li>');
   html.push('<li class="globe-selector-city-section"><strong>Major Cities</strong><span>Global city collection</span></li>');
   pushCityRows(html, majorCities, 'preset', cityMatchesSelection);
-  html.push('<li class="globe-selector-city-section"><strong>Destinations</strong><span>Landmarks and natural places</span></li>');
-  pushCityRows(html, destinations, 'preset', cityMatchesSelection);
+  html.push('<li class="globe-selector-city-section"><strong>Historic Sites & Landmarks</strong><span>Architecture, monuments, and cultural sites</span></li>');
+  pushCityRows(html, historicSites, 'preset', cityMatchesSelection);
+  html.push('<li class="globe-selector-city-section"><strong>Nature & Landscapes</strong><span>Parks, mountains, coastlines, and natural wonders</span></li>');
+  pushCityRows(html, naturalPlaces, 'preset', cityMatchesSelection);
   cityList.innerHTML = html.join('');
 }
 

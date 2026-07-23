@@ -38,7 +38,13 @@ function drawMapPlayerIcons(ctx, w, h, isLarge, view) {
 function drawPlaneIcon(ctx, mx, my, iconSize, isLarge) {
   ctx.save();
   ctx.translate(mx, my);
-  ctx.rotate(Math.PI - (Number(appCtx.planeMode?.yaw) || 0));
+  const velocityX = Number(appCtx.planeMode?.vx) || 0;
+  const velocityZ = Number(appCtx.planeMode?.vz) || 0;
+  const movementSpeed = Math.hypot(velocityX, velocityZ);
+  const heading = movementSpeed > 0.2
+    ? Math.atan2(velocityX, -velocityZ)
+    : Math.PI - (Number(appCtx.planeMode?.yaw) || 0);
+  ctx.rotate(heading);
   ctx.fillStyle = '#f5f7fa';
   ctx.strokeStyle = '#155fa0';
   ctx.lineWidth = isLarge ? 3 : 2;

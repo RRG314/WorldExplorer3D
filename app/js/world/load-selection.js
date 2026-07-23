@@ -1,6 +1,20 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 
 export function wayCenterDistanceSq(way, nodeMap) {
+  if (way?._coordinates?.length >= 2) {
+    let latSum = 0;
+    let lonSum = 0;
+    const sampleCount = Math.min(Math.floor(way._coordinates.length / 2), 8);
+    for (let i = 0; i < sampleCount; i++) {
+      lonSum += way._coordinates[i * 2];
+      latSum += way._coordinates[i * 2 + 1];
+    }
+    const lat = latSum / sampleCount;
+    const lon = lonSum / sampleCount;
+    const dLat = lat - appCtx.LOC.lat;
+    const dLon = (lon - appCtx.LOC.lon) * Math.cos(appCtx.LOC.lat * Math.PI / 180);
+    return dLat * dLat + dLon * dLon;
+  }
   if (!way?.nodes?.length) return Infinity;
 
   let latSum = 0;

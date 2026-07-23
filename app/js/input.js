@@ -346,7 +346,7 @@ async function searchLocation() {
       // Debug log removed
       status.textContent = '✗ Location not found. Try "City, State" or "City, Country"';
       status.style.color = '#dc2626';
-      return;
+      return null;
     }
 
     // Prioritize actual cities
@@ -388,7 +388,7 @@ async function searchLocation() {
     // Debug log removed
 
     // Set custom location
-    appCtx.setCustomLocation?.({ lat, lon, name: locationName });
+    appCtx.setCustomLocation?.({ lat, lon, name: locationName, arrivalMode: 'walk' });
 
     // Debug log removed
     // Debug log removed
@@ -430,12 +430,20 @@ async function searchLocation() {
 
       // Debug log removed
     } // Debug log removed
+    return {
+      lat,
+      lon,
+      name: locationName,
+      displayName: result.display_name || locationName,
+      arrivalMode: 'walk'
+    };
   } catch (e) {
     console.error('=== SEARCH LOCATION DEBUG END - ERROR ===');
     console.error('Search error:', e);
     console.error('Error stack:', e.stack);
     status.textContent = `✗ Search failed: ${e.message}`;
     status.style.color = '#dc2626';
+    return null;
   }
 }
 

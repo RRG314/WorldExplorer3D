@@ -1,6 +1,7 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import { updateNightLighting } from "./engine/night-lighting.js?v=6";
 import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=2";
+import { resolveChaseCameraPosition } from "./camera/clearance.js?v=4";
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 
@@ -18,6 +19,31 @@ const OVERHEAD_CAMERA_HEIGHT = 50;
 const OVERHEAD_CAMERA_Z_OFFSET = 15;
 const WALK_ROAD_EDGE_MIN = 6;
 const WALK_ROAD_EDGE_SCALE = 0.75;
+const carCameraOrigin = { x: 0, y: 0, z: 0 };
+const carCameraTarget = { x: 0, y: 0, z: 0 };
+
+function positionStableShadowLight(light, direction, cameraX, cameraY, cameraZ, distance) {
+  if (!light) return;
+  const shadowCamera = light.shadow?.camera;
+  const mapWidth = Math.max(1, Number(light.shadow?.mapSize?.width) || 1024);
+  const shadowSpan = shadowCamera
+    ? Math.max(1, Number(shadowCamera.right) - Number(shadowCamera.left))
+    : 240;
+  const worldUnitsPerTexel = shadowSpan / mapWidth;
+  const snap = (value) => Math.round(value / worldUnitsPerTexel) * worldUnitsPerTexel;
+  const anchorX = snap(cameraX);
+  const anchorY = snap(cameraY);
+  const anchorZ = snap(cameraZ);
+  light.position.set(
+    anchorX + direction.x * distance,
+    anchorY + direction.y * distance,
+    anchorZ + direction.z * distance
+  );
+  if (light.target) {
+    light.target.position.set(anchorX, anchorY, anchorZ);
+    light.target.updateMatrixWorld();
+  }
+}
 
 function tunnelCameraY(targetY, x, z, roadY, semantics) {
   const clearance = clampValue(Number(semantics?.cutDepth || 4.6) - 0.35, 3.2, 4.8);
@@ -177,9 +203,7 @@ function updateSkyPositions() {
       );
     }
     if (appCtx.sun) {
-      appCtx.sun.position.set(cameraX + lunarSun.x * 220, cameraY + lunarSun.y * 220, cameraZ + lunarSun.z * 220);
-      appCtx.sun.target?.position.set(cameraX, cameraY, cameraZ);
-      appCtx.sun.target?.updateMatrixWorld();
+      positionStableShadowLight(appCtx.sun, lunarSun, cameraX, cameraY, cameraZ, 220);
     }
     if (appCtx.moonSphere) appCtx.moonSphere.visible = false;
     return;
@@ -203,9 +227,7 @@ function updateSkyPositions() {
       }
     }
     if (appCtx.sun) {
-      appCtx.sun.position.set(cameraX + marsSun.x * 220, cameraY + marsSun.y * 220, cameraZ + marsSun.z * 220);
-      appCtx.sun.target?.position.set(cameraX, cameraY, cameraZ);
-      appCtx.sun.target?.updateMatrixWorld();
+      positionStableShadowLight(appCtx.sun, marsSun, cameraX, cameraY, cameraZ, 220);
     }
     if (appCtx.fillLight) {
       appCtx.fillLight.position.set(cameraX - marsSun.x * 150, cameraY + 70, cameraZ - marsSun.z * 150);
@@ -238,11 +260,7 @@ function updateSkyPositions() {
     const dirX = Number.isFinite(sunDir?.x) ? sunDir.x : 0.52;
     const dirY = Number.isFinite(sunDir?.y) ? sunDir.y : 0.82;
     const dirZ = Number.isFinite(sunDir?.z) ? sunDir.z : 0.22;
-    appCtx.sun.position.set(cameraX + dirX * 220, cameraY + dirY * 220, cameraZ + dirZ * 220);
-    if (appCtx.sun.target) {
-      appCtx.sun.target.position.set(cameraX, cameraY, cameraZ);
-      appCtx.sun.target.updateMatrixWorld();
-    }
+    positionStableShadowLight(appCtx.sun, { x: dirX, y: dirY, z: dirZ }, cameraX, cameraY, cameraZ, 220);
   }
 
   // Moon follows the computed lunar direction and stays centered on the observer.
@@ -376,9 +394,21 @@ function updateCamera(dt = 1 / 60) {
     // Smooth both camera position and lookAt target together
     // Higher factor = camera stays more rigidly fixed to car
     const smoothFactor = CHASE_CAMERA_SMOOTH_FACTOR;
-    appCtx.camera.position.x += (targetX - appCtx.camera.position.x) * smoothFactor;
-    appCtx.camera.position.y += (targetY - appCtx.camera.position.y) * smoothFactor;
-    appCtx.camera.position.z += (targetZ - appCtx.camera.position.z) * smoothFactor;
+    carCameraOrigin.x = appCtx.car.x;
+    carCameraOrigin.y = lookY;
+    carCameraOrigin.z = appCtx.car.z;
+    carCameraTarget.x = targetX;
+    carCameraTarget.y = targetY;
+    carCameraTarget.z = targetZ;
+    if (!insideTunnel && !planetaryChase) {
+      resolveChaseCameraPosition(carCameraOrigin, carCameraTarget, {
+        cacheKey: "drive",
+        radius: 0.6,
+      });
+    }
+    appCtx.camera.position.x += (carCameraTarget.x - appCtx.camera.position.x) * smoothFactor;
+    appCtx.camera.position.y += (carCameraTarget.y - appCtx.camera.position.y) * smoothFactor;
+    appCtx.camera.position.z += (carCameraTarget.z - appCtx.camera.position.z) * smoothFactor;
     if (insideTunnel) {
       appCtx.camera.position.y = tunnelCameraY(
         appCtx.camera.position.y,

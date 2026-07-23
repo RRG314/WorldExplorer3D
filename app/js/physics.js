@@ -1,9 +1,9 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "./structure-semantics.js?v=17";
+import { isRoadSurfaceReachable } from "./structure-semantics.js?v=19";
 import { updateDrone } from "./physics/drone-flight.js?v=4";
-import { updatePlane } from "./plane-mode.js?v=16";
+import { updatePlane } from "./plane-mode.js?v=20";
 import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=2";
-import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=2";
+import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=3";
 import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=2";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=1";
 // RDT-based adaptive throttling state

@@ -1,4 +1,9 @@
-import { distanceLightYears, getUniverseDestinations } from './catalog.js?v=5';
+import { distanceLightYears, getUniverseDestinations, resolveUniverseAddress } from './catalog.js?v=5';
+import { createUniverseMap } from './map.js?v=1';
+
+let universeMap = null;
+let inspectedEntity = null;
+let setUniverseMapScope = null;
 
 const CLASS_LABELS = Object.freeze({
   planetary_system: 'Star Systems',
@@ -25,6 +30,21 @@ function makeButton(id, label, className = '') {
   button.className = `universe-action ${className}`.trim();
   button.textContent = label;
   return button;
+}
+
+function physicalFacts(entity) {
+  const physical = entity?.physical || {};
+  const facts = [];
+  if (Number.isFinite(physical.hostMassSolar)) facts.push(`${physical.hostMassSolar} solar masses`);
+  if (Number.isFinite(physical.hostTemperatureK)) facts.push(`${physical.hostTemperatureK.toLocaleString()} K`);
+  if (Number.isFinite(physical.radiusLy)) facts.push(`${physical.radiusLy.toLocaleString()} ly radius`);
+  if (Number.isFinite(physical.massSolar)) facts.push(`${physical.massSolar.toLocaleString()} solar masses`);
+  if (Number.isFinite(physical.memberEstimate)) facts.push(`about ${physical.memberEstimate.toLocaleString()} members`);
+  if (Number.isFinite(entity?.radiusEarth)) facts.push(`${entity.radiusEarth} Earth radii`);
+  if (Number.isFinite(entity?.massEarth)) facts.push(`${entity.massEarth} Earth masses`);
+  if (Number.isFinite(entity?.orbitDays)) facts.push(`${entity.orbitDays.toLocaleString()} day orbit`);
+  if (Number.isFinite(entity?.semiMajorAxisAu)) facts.push(`${entity.semiMajorAxisAu} AU`);
+  return facts;
 }
 
 function setNavigatorOpen(open) {
@@ -61,6 +81,11 @@ function populateDestinationSelect(select) {
   });
 }
 
+function selectCatalogValue(panel, id) {
+  const select = panel?.querySelector?.('#universeDestinationSelect');
+  if (select && [...select.options].some((option) => option.value === id)) select.value = id;
+}
+
 function createUniverseNavigator(handlers) {
   let panel = document.getElementById('universeNavigator');
   if (panel) return panel;
@@ -80,16 +105,58 @@ function createUniverseNavigator(handlers) {
       <button id="universeCloseBtn" class="universe-icon-button" type="button" aria-label="Close universe navigator" title="Close universe map">×</button>
     </div>
     <div id="universeAddress" class="universe-address">universe/local-group/milky-way/sol</div>
+    <div class="universe-map-toolbar" role="group" aria-label="Universe map scale">
+      <button type="button" class="active" data-universe-scope="nearby">Nearby</button>
+      <button type="button" data-universe-scope="galaxy">Milky Way</button>
+      <button type="button" data-universe-scope="deep">Deep Space</button>
+      <button type="button" data-universe-scope="system">System</button>
+    </div>
+    <div class="universe-map-frame">
+      <canvas id="universeMapCanvas" aria-label="Spatial universe map"></canvas>
+      <div class="universe-map-note">Catalog ICRS direction + logarithmic distance · System orbit radii use catalog data; orbital phase is illustrative · Drag, zoom, inspect, or double-click to travel</div>
+    </div>
     <label class="universe-field" for="universeDestinationSelect">
-      <span>Catalog destination</span>
+      <span>Catalog index</span>
       <select id="universeDestinationSelect"></select>
     </label>
-    <div id="universeDestinationMeta" class="universe-destination-meta"></div>
+    <section class="universe-object-detail" aria-live="polite">
+      <div id="universeObjectClass" class="universe-object-class"></div>
+      <strong id="universeObjectName"></strong>
+      <div id="universeDestinationMeta" class="universe-destination-meta"></div>
+      <div id="universePhysicalFacts" class="universe-physical-facts"></div>
+    </section>
     <div class="universe-actions" id="universePrimaryActions"></div>
     <div class="universe-actions universe-return-actions" id="universeReturnActions"></div>
     <a id="universeSourceLink" class="universe-source" href="#" target="_blank" rel="noopener noreferrer">Catalog source</a>
   `;
   document.body.appendChild(panel);
+
+  const scopeButtons = [...panel.querySelectorAll('[data-universe-scope]')];
+  const setScope = (scope) => {
+    scopeButtons.forEach((button) => button.classList.toggle('active', button.dataset.universeScope === scope));
+    universeMap?.setScope(scope, inspectedEntity);
+  };
+  setUniverseMapScope = (scope, focus) => {
+    inspectedEntity = focus || inspectedEntity;
+    scopeButtons.forEach((button) => button.classList.toggle('active', button.dataset.universeScope === scope));
+    universeMap?.setScope(scope, focus);
+  };
+  universeMap = createUniverseMap(panel.querySelector('#universeMapCanvas'), {
+    onInspect: (entity) => {
+      inspectedEntity = entity;
+      if (entity.travelable !== false) {
+        handlers.onSelection?.(entity.id);
+        selectCatalogValue(panel, entity.id);
+      }
+      setUniverseSelection(entity);
+      universeMap?.inspect(entity);
+    },
+    onTravel: (id) => {
+      if (handlers.onTravel?.(id) !== false) closeUniverseNavigator();
+    }
+  });
+  setScope('nearby');
+  scopeButtons.forEach((button) => button.addEventListener('click', () => setScope(button.dataset.universeScope)));
 
   const select = panel.querySelector('#universeDestinationSelect');
   populateDestinationSelect(select);
@@ -145,10 +212,22 @@ function createUniverseNavigator(handlers) {
 function setUniverseSelection(entity) {
   const panel = document.getElementById('universeNavigator');
   if (!panel || !entity) return;
+  inspectedEntity = entity;
+  if (entity.objectClass === 'exoplanet' && entity.parentId) {
+    setUniverseMapScope?.('system', resolveUniverseAddress(entity.parentId));
+  }
   const meta = panel.querySelector('#universeDestinationMeta');
   const source = entity.provenance?.[0];
   const generated = entity.generatedFlags?.length ? ' · generated detail labeled in scene' : '';
   meta.textContent = formatDistance(entity) + ' · ' + entity.accuracy + generated;
+  panel.querySelector('#universeObjectClass').textContent = String(entity.objectClass || 'catalog object').replaceAll('_', ' ');
+  panel.querySelector('#universeObjectName').textContent = entity.name || 'Unnamed object';
+  const factHost = panel.querySelector('#universePhysicalFacts');
+  factHost.replaceChildren(...physicalFacts(entity).map((fact) => {
+    const span = document.createElement('span');
+    span.textContent = fact;
+    return span;
+  }));
   const link = panel.querySelector('#universeSourceLink');
   if (source?.url) {
     link.href = source.url;
@@ -157,6 +236,7 @@ function setUniverseSelection(entity) {
   } else {
     link.hidden = true;
   }
+  universeMap?.inspect(entity);
 }
 
 function updateUniverseNavigator(state) {
@@ -167,6 +247,7 @@ function updateUniverseNavigator(state) {
   const select = panel.querySelector('#universeDestinationSelect');
   if (!state.transition && select.value !== state.selected?.id) select.value = state.selected?.id || state.current.id;
   setUniverseSelection(state.selected || state.current);
+  universeMap?.update(state);
 
   panel.classList.toggle('is-busy', Boolean(state.transition));
   select.disabled = Boolean(state.transition);
@@ -188,6 +269,13 @@ function showUniverseNavigator() {
   if (toggle) toggle.style.display = '';
 }
 
+function inspectUniverseEntity(entity) {
+  if (!entity) return false;
+  setUniverseSelection(entity);
+  setNavigatorOpen(true);
+  return true;
+}
+
 function hideUniverseNavigator() {
   const toggle = document.getElementById('universeToggle');
   if (toggle) toggle.style.display = 'none';
@@ -198,6 +286,7 @@ export {
   closeUniverseNavigator,
   createUniverseNavigator,
   hideUniverseNavigator,
+  inspectUniverseEntity,
   setUniverseSelection,
   showUniverseNavigator,
   toggleUniverseNavigator,

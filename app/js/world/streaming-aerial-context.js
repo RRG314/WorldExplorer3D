@@ -1,10 +1,10 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { fetchShortbreadTile } from "./shortbread-source.js?v=9";
+import { fetchShortbreadTile } from "./shortbread-source.js?v=13";
 import {
   buildStreamingBuildingVisuals,
   buildStreamingRoadVisuals,
   queueGeometryDisposal
-} from "./streaming-vector-chunks.js?v=52";
+} from "./streaming-vector-chunks.js?v=54";
 import { SOURCE_PROFILE } from "./surface-contract.js?v=7";
 
 function removeMeshesInPlace(source, removed) {
@@ -38,7 +38,7 @@ async function loadAerialContextChunk(request) {
     await buildStreamingRoadVisuals(tileRecord, chunk, {
       aerialContext: true,
       includeInitial: true,
-      maxFeatures: 260,
+      maxFeatures: 140,
       recordFeatures: false
     });
     if (request.signal?.aborted) throw new DOMException('Aerial context chunk aborted', 'AbortError');
@@ -47,9 +47,9 @@ async function loadAerialContextChunk(request) {
       batchByCell: false,
       includeInitial: true,
       lodTier: 'far',
-      maxFeatures: 220,
+      maxFeatures: 120,
       maxFootprintPoints: 14,
-      maxParts: 120,
+      maxParts: 80,
       recordColliders: false
     });
     if (request.signal?.aborted) throw new DOMException('Aerial context chunk aborted', 'AbortError');
@@ -105,11 +105,11 @@ function initStreamingAerialContext() {
     availableWhenDisabled: true,
     centerWhen: aerialContextCenter,
     loadChunk: loadAerialContextChunk,
-    maxActive: 25,
-    maxConcurrent: 2,
+    maxActive: 9,
+    maxConcurrent: 3,
     priorityBias: 0.8,
     profile: SOURCE_PROFILE.LOCATION_OSM,
-    radius: 2,
+    radius: 1,
     sources: ['osm-shortbread'],
     unloadChunk: disposeAerialContextChunk,
     zoom: 13

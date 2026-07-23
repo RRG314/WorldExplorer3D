@@ -1,4 +1,4 @@
-import { fetchOvertureThemeTile } from './overture-tile-source.js?v=1';
+import { fetchOvertureThemeTile } from './overture-tile-source.js?v=3';
 
 const STREAMING_THEMES = Object.freeze(['transportation', 'buildings', 'base']);
 

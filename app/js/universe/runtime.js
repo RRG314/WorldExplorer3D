@@ -6,15 +6,16 @@ import { createDeepSkyLayer, setDeepSkyFrame, updateDeepSkyLayer } from './deep-
 import { createRegionEncounter, fireEncounterPulse, updateRegionEncounter } from './encounters.js?v=1';
 import { getUniverseNavigationMetrics } from './navigation-scale.js?v=1';
 import { createUniverseSky, setUniverseSkyFrame, updateUniverseSky } from './sky-field.js?v=5';
-import { createUniverseFrameVisual, updateUniverseFrameVisual } from './visuals.js?v=11';
+import { createUniverseFrameVisual, updateUniverseFrameVisual } from './visuals.js?v=12';
 import {
   closeUniverseNavigator,
   createUniverseNavigator,
   hideUniverseNavigator,
+  inspectUniverseEntity,
   setUniverseSelection,
   showUniverseNavigator,
   updateUniverseNavigator
-} from './ui.js?v=3';
+} from './ui.js?v=4';
 import {
   createWormholeVisual,
   getWormholeRoute,
@@ -28,6 +29,9 @@ const WORMHOLE_DURATION_MS = 4800;
 const FRAME_REBASE_DISTANCE = 30000;
 const _rebase = new THREE.Vector3();
 const _forward = new THREE.Vector3();
+const _localBodyOffset = new THREE.Vector3();
+const _universePointer = new THREE.Vector2();
+const _universeRaycaster = new THREE.Raycaster();
 
 const universeRuntime = {
   initialized: false,
@@ -46,6 +50,7 @@ const universeRuntime = {
   encounter: null,
   captureRecoveryAt: 0,
   galaxyEntry: null,
+  localBody: null,
   inputReady: false
 };
 
@@ -77,6 +82,7 @@ function disposeActiveFrame() {
   universeRuntime.frameGroup = null;
   universeRuntime.encounter = null;
   universeRuntime.galaxyEntry = null;
+  universeRuntime.localBody = null;
 }
 
 function resetFlightMotion() {
@@ -255,6 +261,21 @@ function setupUniverseInput() {
     ) return;
     fireCurrentEncounterPulse();
   });
+  appCtx.spaceFlight?.canvas?.addEventListener('click', (event) => {
+    if (!appCtx.spaceFlight?.active || universeRuntime.current.id === 'sol' || !universeRuntime.frameGroup) return;
+    const canvas = appCtx.spaceFlight.canvas;
+    const rect = canvas.getBoundingClientRect();
+    _universePointer.set(
+      (event.clientX - rect.left) / rect.width * 2 - 1,
+      -((event.clientY - rect.top) / rect.height * 2 - 1)
+    );
+    _universeRaycaster.setFromCamera(_universePointer, appCtx.spaceFlight.camera);
+    const hit = _universeRaycaster.intersectObject(universeRuntime.frameGroup, true)[0]?.object;
+    let target = hit;
+    while (target && !target.userData?.catalogEntity && !target.userData?.planet) target = target.parent;
+    const entity = target?.userData?.catalogEntity || target?.userData?.planet;
+    if (entity) inspectUniverseEntity(entity);
+  });
 }
 
 function updateTransition(nowMs) {
@@ -329,6 +350,47 @@ function updateBlackHole(frameScale) {
   showMessage('EVENT HORIZON CROSSED - SAFETY RECOVERY', '#ff8066');
 }
 
+function updateLocalSystemBodies() {
+  universeRuntime.localBody = null;
+  if (universeRuntime.current?.objectClass !== 'planetary_system' || !universeRuntime.frameGroup) return;
+  const rocket = appCtx.spaceFlight?.rocket;
+  if (!rocket) return;
+  const candidates = [];
+  const star = universeRuntime.frameGroup.userData?.centralStar;
+  if (star) candidates.push({
+    name: universeRuntime.current.name,
+    objectClass: 'star',
+    position: star.getWorldPosition(new THREE.Vector3()),
+    radius: Number(star.userData?.bodyRadius) || 24,
+    entity: universeRuntime.current
+  });
+  (universeRuntime.frameGroup.userData?.orbitingPlanets || []).forEach(({ body }) => {
+    if (!body) return;
+    candidates.push({
+      name: body.name,
+      objectClass: body.userData?.planet?.objectClass || 'exoplanet',
+      position: body.getWorldPosition(new THREE.Vector3()),
+      radius: Number(body.userData?.bodyRadius) || 4,
+      entity: body.userData?.planet || null
+    });
+  });
+  let nearest = null;
+  candidates.forEach((candidate) => {
+    const distance = rocket.position.distanceTo(candidate.position);
+    if (!nearest || distance < nearest.distance) nearest = { ...candidate, distance };
+  });
+  if (!nearest) return;
+  universeRuntime.localBody = nearest;
+  if (nearest.distance >= nearest.radius + 4) return;
+  _localBodyOffset.copy(rocket.position).sub(nearest.position);
+  if (_localBodyOffset.lengthSq() < 0.001) _localBodyOffset.set(0, 1, 0);
+  _localBodyOffset.setLength(nearest.radius + 4);
+  rocket.position.copy(nearest.position).add(_localBodyOffset);
+  appCtx.spaceFlight.velocity?.multiplyScalar?.(0.35);
+  appCtx.spaceFlight.speed = appCtx.spaceFlight.velocity?.length?.() || 0;
+  appCtx.spaceFlight.gravityVelocity?.multiplyScalar?.(0.25);
+}
+
 function rebaseActiveFrame() {
   const rocket = appCtx.spaceFlight?.rocket;
   if (!rocket || rocket.position.length() < FRAME_REBASE_DISTANCE || universeRuntime.transition) return;
@@ -346,6 +408,18 @@ function rebaseActiveFrame() {
 
 function getUniverseHudTarget() {
   if (universeRuntime.current.id === 'sol') return null;
+  if (universeRuntime.localBody && universeRuntime.localBody.distance < 520) {
+    const body = universeRuntime.localBody;
+    return {
+      name: body.name,
+      position: body.position,
+      radius: body.radius,
+      landable: false,
+      objectClass: body.objectClass,
+      address: `${universeRuntime.current.address}/${body.entity?.id || 'local-body'}`,
+      encounter: { type: 'catalog-body', distance: body.distance, entity: body.entity }
+    };
+  }
   const group = universeRuntime.frameGroup;
   const radius = universeRuntime.current.objectClass === 'black_hole'
     ? group?.userData?.blackHole?.visualRadius || 100
@@ -375,6 +449,7 @@ function updateUniverseRuntime(frameSeconds = 1 / 60) {
   universeRuntime.elapsedSeconds += Math.min(0.1, Math.max(0, frameSeconds));
   updateTransition(performance.now());
   updateUniverseFrameVisual(universeRuntime.frameGroup, universeRuntime.elapsedSeconds, frameScale);
+  updateLocalSystemBodies();
   updateBlackHole(frameScale);
   if (universeRuntime.encounter?.type === 'generated-asteroids') {
     updateRegionEncounter(universeRuntime.encounter, frameSeconds);

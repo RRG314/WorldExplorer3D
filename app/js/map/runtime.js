@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { drawEarthBaseLayers } from "./earth-base.js?v=2";
 import { drawEarthMarkerLayers } from "./earth-markers.js?v=2";
-import { drawMapCompass, drawMapPlayerIcons } from "./icons.js?v=2";
+import { drawMapCompass, drawMapPlayerIcons } from "./icons.js?v=3";
 import { drawMoonMap } from "./moon.js?v=1";
 import { latLonToTile, loadTile, resolveMapView, worldToScreenLarge } from "./tiles.js?v=2";
 

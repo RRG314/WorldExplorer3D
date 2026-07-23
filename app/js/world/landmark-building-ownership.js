@@ -6,10 +6,15 @@ function isLandmarkOwnedBuilding(tags = {}) {
 }
 
 function wayCoordinates(way, nodes) {
-  const coordinates = (way?.nodes || [])
-    .map((nodeId) => nodes.get(nodeId))
-    .filter((node) => Number.isFinite(node?.lat) && Number.isFinite(node?.lon))
-    .map((node) => ({ lat: Number(node.lat), lon: Number(node.lon) }));
+  const coordinates = way?._coordinates?.length >= 6
+    ? Array.from({ length: Math.floor(way._coordinates.length / 2) }, (_, index) => ({
+      lon: way._coordinates[index * 2],
+      lat: way._coordinates[index * 2 + 1]
+    }))
+    : (way?.nodes || [])
+      .map((nodeId) => nodes.get(nodeId))
+      .filter((node) => Number.isFinite(node?.lat) && Number.isFinite(node?.lon))
+      .map((node) => ({ lat: Number(node.lat), lon: Number(node.lon) }));
   const first = coordinates[0];
   const last = coordinates.at(-1);
   if (coordinates.length > 2 && first.lat === last.lat && first.lon === last.lon) coordinates.pop();
@@ -82,6 +87,9 @@ export function createLandmarkBuildingOwnership(data, curatedLandmarks = []) {
     footprintCount: footprints.length,
     curatedCount: curated.length,
     partition(ways, buildingNodes) {
+      if (footprints.length === 0 && curated.length === 0) {
+        return { selected: ways, suppressed: [] };
+      }
       const candidates = ways.map((way) => ({
         way,
         metrics: footprintMetrics(wayCoordinates(way, buildingNodes))

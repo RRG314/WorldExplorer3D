@@ -102,7 +102,11 @@ export function buildTerrainConformingPolygonGeometry(outer, holes, sampler, opt
   const geometry = new THREE.BufferGeometry();
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geometry.setAttribute('uv', new THREE.Float32BufferAttribute(uvs, 2));
-  geometry.computeVertexNormals();
+  // These polygons are non-indexed triangles. Per-face normals expose every
+  // triangulation seam as a different shade, even across smooth ground.
+  const normals = new Float32Array(positions.length);
+  for (let i = 0; i < normals.length; i += 3) normals[i + 1] = 1;
+  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
   geometry.computeBoundingBox();
   geometry.computeBoundingSphere();
   return geometry;

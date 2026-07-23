@@ -9,6 +9,7 @@ const PUBLISHED_POLL_MS = 2600;
 
 const state = {
   areaSignature: '',
+  traversalSignature: '',
   unsub: null,
   group: null,
   pollId: 0,
@@ -81,7 +82,7 @@ function restoreBaseBuildingVisibility() {
   state.hiddenBaseBuildingMeshes.clear();
 }
 
-function clearPublishedObjects() {
+function clearPublishedObjects(options = {}) {
   const hadRuntimeFeatures = !!(
     appCtx.overlayRuntimeRoads?.length ||
     appCtx.overlayRuntimeLinearFeatures?.length ||
@@ -106,7 +107,26 @@ function clearPublishedObjects() {
     roadIds: new Set(),
     buildingIds: new Set()
   };
-  if (hadRuntimeFeatures) refreshTraversalNetworks('overlay_published_cleared');
+  const topologyChanged = state.traversalSignature !== '';
+  state.traversalSignature = '';
+  if (options.refreshTraversal !== false && (hadRuntimeFeatures || topologyChanged)) {
+    refreshTraversalNetworks('overlay_published_cleared');
+  }
+}
+
+function traversalTopologySignature(roads = [], linearFeatures = [], suppressedRoadIds = new Set()) {
+  const featureSignature = (feature) => {
+    const points = Array.isArray(feature?.pts) ? feature.pts : [];
+    const geometry = points.map((point) =>
+      `${Number(point?.x || 0).toFixed(2)},${Number(point?.z || 0).toFixed(2)}`
+    ).join(';');
+    return `${feature?.sourceFeatureId || ''}:${feature?.networkKind || ''}:${geometry}`;
+  };
+  return [
+    ...roads.map(featureSignature),
+    ...linearFeatures.map(featureSignature),
+    ...[...suppressedRoadIds].sort().map((id) => `suppress:${id}`)
+  ].sort().join('|');
 }
 
 function worldPointsBounds(points = []) {
@@ -193,7 +213,8 @@ function suppressBaseBuildings(features = []) {
 }
 
 function applyPublishedFeatures(features = []) {
-  clearPublishedObjects();
+  const previousTraversalSignature = state.traversalSignature;
+  clearPublishedObjects({ refreshTraversal: false });
   const group = ensureGroup();
   if (!group) return;
 
@@ -259,7 +280,10 @@ function applyPublishedFeatures(features = []) {
     roadIds: suppressionRoadIds,
     buildingIds: suppressionBuildingIds
   };
-  refreshTraversalNetworks('overlay_published_changed');
+  state.traversalSignature = traversalTopologySignature(runtimeRoads, runtimeLinear, suppressionRoadIds);
+  if (state.traversalSignature !== previousTraversalSignature) {
+    refreshTraversalNetworks('overlay_published_changed');
+  }
 }
 
 function updateListener() {
