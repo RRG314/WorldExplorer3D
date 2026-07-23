@@ -25,6 +25,7 @@ const baseEnvironment = releaseEnvironment();
 const steps = [
   { name: 'Maintainability guard', cmd: [process.execPath, 'scripts/test-maintainability-guard.mjs'] },
   { name: 'Hosting release contract', cmd: [process.execPath, 'scripts/test-hosting-release-contract.mjs'] },
+  { name: 'Release version identity', cmd: [process.execPath, 'scripts/test-release-version.mjs'] },
   { name: 'Cloud Functions dependency install', cmd: [npmCommand, 'ci', '--prefix', 'functions', '--ignore-scripts'] },
   { name: 'Cloud Functions security audit', cmd: [npmCommand, 'audit', '--omit=dev', '--prefix', 'functions'] },
   { name: 'Cloud Functions runtime exports', cmd: [process.execPath, 'scripts/test-functions-runtime.mjs'] },
@@ -88,7 +89,8 @@ const steps = [
       WORLD_MATRIX_REPORT_NAME: 'r7-provider-outage.json'
     }
   },
-  { name: 'World matrix', cmd: [process.execPath, 'scripts/test-world-matrix.mjs'] }
+  { name: 'World matrix', cmd: [process.execPath, 'scripts/test-world-matrix.mjs'] },
+  { name: 'Final hosting artifact parity', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify'] }
 ];
 
 for (const step of steps) {

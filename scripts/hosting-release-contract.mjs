@@ -4,6 +4,15 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+function assertChannelId(channelId, label = 'Preview') {
+  const normalized = String(channelId || '').trim().toLowerCase();
+  assert(
+    /^[a-z0-9][a-z0-9-]{0,62}$/.test(normalized),
+    `${label} channel must be a 1-63 character Firebase Hosting channel id.`
+  );
+  return normalized;
+}
+
 function assertProductionArtifact(manifest, options = {}) {
   const expectedProjectId = String(options.expectedProjectId || '').trim();
   const currentCommit = String(options.currentCommit || '').trim();
@@ -39,11 +48,15 @@ function normalizePreviewUrl(value, channelId) {
   assert(url.protocol === 'https:', 'Promotion preview URL must use HTTPS.');
   assert(!url.username && !url.password, 'Promotion preview URL must not contain credentials.');
   const hostname = url.hostname.toLowerCase();
-  const normalizedChannel = String(channelId || '').trim().toLowerCase();
+  const normalizedChannel = assertChannelId(channelId);
   assert(hostname.endsWith(FIREBASE_PREVIEW_HOST_SUFFIX), 'Promotion source must be a Firebase preview-channel web.app URL.');
   assert(hostname.includes('--'), 'Promotion source must be a preview channel, not a live Hosting URL.');
+  const channelHostname = hostname
+    .slice(0, -FIREBASE_PREVIEW_HOST_SUFFIX.length)
+    .split('--')
+    .at(-1);
   assert(
-    normalizedChannel && hostname.includes(normalizedChannel),
+    channelHostname === normalizedChannel || channelHostname.startsWith(`${normalizedChannel}-`),
     `Preview URL hostname does not identify channel "${channelId}".`
   );
   url.pathname = '/';
@@ -81,9 +94,25 @@ function assertPromotionContract(options = {}) {
   return { normalizedPreviewUrl };
 }
 
+function assertRollbackContract(options = {}) {
+  const expectedBuildId = String(options.expectedBuildId || '').trim();
+  const targetProjectId = String(options.targetProjectId || '').trim();
+  const rollbackManifest = options.rollbackManifest;
+  assert(expectedBuildId, 'Rollback requires an explicit expected buildId.');
+  assert(targetProjectId, 'Rollback requires an explicit target Firebase project.');
+  assertProductionArtifact(rollbackManifest, { expectedProjectId: targetProjectId });
+  assert(
+    rollbackManifest.buildId === expectedBuildId,
+    `Rollback channel buildId "${rollbackManifest.buildId || 'unknown'}" does not match expected "${expectedBuildId}".`
+  );
+  return true;
+}
+
 export {
+  assertChannelId,
   assertMatchingArtifacts,
   assertProductionArtifact,
   assertPromotionContract,
+  assertRollbackContract,
   normalizePreviewUrl
 };

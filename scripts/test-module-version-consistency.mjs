@@ -50,12 +50,17 @@ if (conflicts.length > 0) {
 const firebaseConfig = JSON.parse(await fs.readFile(path.resolve('firebase.json'), 'utf8'));
 const hostingHeaders = firebaseConfig?.hosting?.headers || [];
 const codeHeader = hostingHeaders.find((entry) => String(entry?.source || '').includes('js|css'));
+const mediaHeader = hostingHeaders.find((entry) => String(entry?.source || '').includes('jpg|jpeg'));
 const htmlHeader = hostingHeaders.find((entry) => String(entry?.source || '').includes('*.html'));
 const cacheValue = (entry) => String(entry?.headers?.find((header) => header?.key === 'Cache-Control')?.value || '').toLowerCase();
-if (!cacheValue(codeHeader).includes('must-revalidate') || !cacheValue(htmlHeader).includes('must-revalidate')) {
+if (
+  !cacheValue(codeHeader).includes('must-revalidate') ||
+  !cacheValue(mediaHeader).includes('must-revalidate') ||
+  !cacheValue(htmlHeader).includes('must-revalidate')
+) {
   console.error(JSON.stringify({
     ok: false,
-    reason: 'Unhashed JavaScript, CSS, and HTML must revalidate so deployments cannot mix generations.'
+    reason: 'Unhashed code, HTML, fonts, models, and media must revalidate so deployments cannot mix generations.'
   }, null, 2));
   process.exit(1);
 }
@@ -63,5 +68,5 @@ if (!cacheValue(codeHeader).includes('must-revalidate') || !cacheValue(htmlHeade
 console.log(JSON.stringify({
   ok: true,
   checkedTargets: importsByTarget.size,
-  message: 'Every local ES module has one runtime URL identity and deploy-time code revalidation is enabled.'
+  message: 'Every local ES module has one runtime URL identity and every unhashed hosted asset class revalidates.'
 }, null, 2));

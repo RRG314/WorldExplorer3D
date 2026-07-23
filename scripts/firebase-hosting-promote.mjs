@@ -9,7 +9,12 @@ import {
   runFirebase,
   runNodeScript
 } from './firebase-hosting-utils.mjs';
-import { assertPromotionContract, normalizePreviewUrl } from './hosting-release-contract.mjs';
+import {
+  assertChannelId,
+  assertProductionArtifact,
+  assertPromotionContract,
+  normalizePreviewUrl
+} from './hosting-release-contract.mjs';
 
 const cwd = process.cwd();
 const argv = process.argv.slice(2);
@@ -17,6 +22,7 @@ const channelId = firstPositional(argv) || process.env.FIREBASE_PREVIEW_CHANNEL_
 const targetProjectId = parseFlag(argv, '--target-project', process.env.FIREBASE_TARGET_PROJECT_ID || 'worldexplorer3d-d9b83');
 const sourceProjectId = parseFlag(argv, '--source-project', process.env.FIREBASE_SOURCE_PROJECT_ID || targetProjectId);
 const previewUrl = parseFlag(argv, '--preview-url', process.env.FIREBASE_PREVIEW_URL || '');
+const rollbackChannel = parseFlag(argv, '--rollback-channel', process.env.FIREBASE_ROLLBACK_CHANNEL || 'rollback');
 const dryRun = argv.includes('--dry-run');
 
 if (!channelId || !previewUrl) {
@@ -48,16 +54,38 @@ try {
     sourceProjectId,
     targetProjectId
   });
+  assertChannelId(rollbackChannel, 'Rollback');
+  const liveManifestUrl = `https://${targetProjectId}.web.app/build-manifest.json`;
+  const liveResponse = await fetch(liveManifestUrl, {
+    cache: 'no-store',
+    headers: { accept: 'application/json' },
+    signal: AbortSignal.timeout(15000)
+  });
+  if (!liveResponse.ok) {
+    throw new Error(`Unable to read current live build manifest (${liveResponse.status} ${liveResponse.statusText}).`);
+  }
+  const liveManifest = await liveResponse.json();
+  assertProductionArtifact(liveManifest, { expectedProjectId: targetProjectId });
   console.log(JSON.stringify({
     ok: true,
     dryRun,
     buildId: localManifest.buildId,
     channelId,
+    previousBuildId: liveManifest.buildId,
     previewUrl: contract.normalizedPreviewUrl,
-    projectId: targetProjectId
+    projectId: targetProjectId,
+    rollbackChannel
   }, null, 2));
   if (dryRun) process.exit(0);
 
+  console.log(
+    `[preview:promote] Snapshotting current live build "${liveManifest.buildId}" to rollback channel "${rollbackChannel}"`
+  );
+  runFirebase([
+    'hosting:clone',
+    `${targetProjectId}:live`,
+    `${targetProjectId}:${rollbackChannel}`
+  ], cwd);
   console.log(
     `[preview:promote] Promoting Firebase Hosting channel "${channelId}" from "${sourceProjectId}" to "${targetProjectId}:live"`
   );

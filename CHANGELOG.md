@@ -20,6 +20,8 @@
 - Consolidated the globe-first start hub, mobile controls, travel-mode input, environment sessions, surface ownership, streaming budgets, and visual diagnostics.
 - Made Earth, ocean, Moon, Mars, and space transitions preserve compatible state and dispose incompatible actors, renderers, controls, and resources in one runtime.
 - Replaced duplicate Giza pyramid layers with one measured footprint-and-height owner per mapped pyramid and made curated landmark loading independent of optional network enrichment.
+- Made all unhashed hosted code, documents, fonts, models, and media revalidate so a deployment cannot mix assets from different releases.
+- Added verified live-release snapshotting and exact-build rollback commands; production promotion remains a separate, explicit approval step.
 
 ### Removed
 
@@ -28,6 +30,7 @@
 ### Verification
 
 - Added release gates for Apache-2.0 distribution metadata, emulator-backed MMO compatibility, Firestore rules, browser gameplay, mobile environments, planetary round trips, plane/interior lifecycle, operational feeds, hosting identity, and hosted-source reachability.
+- Added release-version consistency, hosting-size budgets, release-harness privacy checks, and a final artifact hash verification after the complete release suite.
 
 ## [3.1.0] - 2026-07-20
 

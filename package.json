@@ -15,6 +15,7 @@
     "test:css": "node scripts/test-css-integrity.mjs",
     "test:inferred-buildings": "node scripts/test-inferred-building-coverage.mjs",
     "test:module-versions": "node scripts/test-module-version-consistency.mjs",
+    "test:release-version": "node scripts/test-release-version.mjs",
     "test:maintainability": "node scripts/test-maintainability-guard.mjs",
     "firebase:config": "node scripts/apply-firebase-config.mjs",
     "firebase:config:production": "node scripts/apply-firebase-config.mjs production",
@@ -81,7 +82,8 @@
     "release:verify": "node scripts/release-verify.mjs",
     "preview:deploy": "node scripts/firebase-hosting-preview.mjs",
     "preview:release-candidate": "node scripts/firebase-hosting-preview.mjs --release-candidate",
-    "preview:promote": "node scripts/firebase-hosting-promote.mjs"
+    "preview:promote": "node scripts/firebase-hosting-promote.mjs",
+    "preview:rollback": "node scripts/firebase-hosting-rollback.mjs"
   },
   "repository": {
     "type": "git",

@@ -3,7 +3,7 @@ import { getCurrentUser } from '../../../js/auth-ui.js';
 const COMMAND_TIMEOUT_MS = 8000;
 const INPUT_INTERVAL_MS = 40;
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost']);
-const COLYSEUS_SDK_URL = '/app/vendor/colyseus-sdk.js?v=1';
+const COLYSEUS_SDK_URL = new URL('../../vendor/colyseus-sdk.js?v=1', import.meta.url).href;
 let colyseusSdkPromise = null;
 
 function ensureColyseusSdk() {

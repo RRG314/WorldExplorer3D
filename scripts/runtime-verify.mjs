@@ -7,6 +7,7 @@ const steps = [
   ['Hosting source reachability', 'scripts/audit-hosting-reachability.mjs', ['--strict']],
   ['CSS integrity and browser boot', 'scripts/test-css-integrity.mjs'],
   ['ES module URL identity', 'scripts/test-module-version-consistency.mjs'],
+  ['Release version identity', 'scripts/test-release-version.mjs'],
   ['Surface contract', 'scripts/test-surface-contract.mjs'],
   ['Overture continuous source', 'scripts/test-overture-tile-source.mjs'],
   ['Inferred building coverage', 'scripts/test-inferred-building-coverage.mjs'],

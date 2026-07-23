@@ -34,10 +34,15 @@ jobs:
       - name: Full release verification
         run: npm run release:verify
 
+      - name: Read package version
+        id: package-version
+        run: |
+          echo "version=$(node -p 'require("./package.json").version')" >> "$GITHUB_OUTPUT"
+
       - name: Preserve verified hosting artifact
         uses: actions/upload-artifact@v4
         with:
-          name: worldexplorer3d-4.0.0-${{ github.sha }}
+          name: worldexplorer3d-${{ steps.package-version.outputs.version }}-${{ github.sha }}
           path: dist/
           if-no-files-found: error
           retention-days: 30

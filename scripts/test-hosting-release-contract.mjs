@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
 import {
+  assertChannelId,
   assertProductionArtifact,
   assertPromotionContract,
+  assertRollbackContract,
   normalizePreviewUrl
 } from './hosting-release-contract.mjs';
 
@@ -26,6 +28,7 @@ assert.equal(
   normalizePreviewUrl('https://worldexplorer3d-d9b83--release-400-ab12.web.app/app/?x=1', 'release-400'),
   'https://worldexplorer3d-d9b83--release-400-ab12.web.app'
 );
+assert.equal(assertChannelId('rollback', 'Rollback'), 'rollback');
 assert.equal(assertProductionArtifact(manifest, { expectedProjectId: projectId, currentCommit: commit }), true);
 assert.deepEqual(
   assertPromotionContract({
@@ -39,6 +42,11 @@ assert.deepEqual(
   }),
   { normalizedPreviewUrl: 'https://worldexplorer3d-d9b83--release-400-ab12.web.app' }
 );
+assert.equal(assertRollbackContract({
+  expectedBuildId: manifest.buildId,
+  rollbackManifest: manifest,
+  targetProjectId: projectId
+}), true);
 
 assert.throws(
   () => assertProductionArtifact({ ...manifest, sourceDirty: true }, { expectedProjectId: projectId }),
@@ -51,6 +59,14 @@ assert.throws(
 assert.throws(
   () => normalizePreviewUrl('https://worldexplorer3d.io', 'release-400'),
   /preview-channel/
+);
+assert.throws(
+  () => normalizePreviewUrl('https://worldexplorer3d-d9b83--release-4000-ab12.web.app', 'release-400'),
+  /does not identify channel/
+);
+assert.throws(
+  () => assertChannelId('../live', 'Rollback'),
+  /Rollback channel/
 );
 assert.throws(
   () => assertPromotionContract({
@@ -75,6 +91,14 @@ assert.throws(
     targetProjectId: projectId
   }),
   /contentHash/
+);
+assert.throws(
+  () => assertRollbackContract({
+    expectedBuildId: '4.0.0+different.production',
+    rollbackManifest: manifest,
+    targetProjectId: projectId
+  }),
+  /does not match expected/
 );
 
 console.log(JSON.stringify({ ok: true, projectId, buildId: manifest.buildId }, null, 2));

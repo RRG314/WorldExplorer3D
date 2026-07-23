@@ -91,6 +91,7 @@ Edit canonical source only. `npm run build:hosting` creates a fresh, content-has
 ## Project Documents
 
 - [Changelog](CHANGELOG.md)
+- [Release runbook](RELEASE_RUNBOOK.md)
 - [Roadmap](ROADMAP.md)
 - [Controls](CONTROLS_REFERENCE.md)
 - [Contributing](CONTRIBUTING.md)
