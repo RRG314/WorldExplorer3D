@@ -50,6 +50,7 @@
     "test:surface-contract": "node scripts/test-surface-contract.mjs",
     "test:overture-source": "node scripts/test-overture-tile-source.mjs && node scripts/test-overture-streaming-source.mjs && node scripts/test-streaming-feature-budget.mjs && node scripts/test-render-provenance.mjs",
     "test:continuous-renderer": "node scripts/test-continuous-renderer.mjs",
+    "test:hosting-release-contract": "node scripts/test-hosting-release-contract.mjs",
     "test:retention": "node scripts/test-release-retention.mjs",
     "test:analytics": "node --test scripts/test-analytics-contract.mjs",
     "test:world-matrix": "node scripts/test-world-matrix.mjs",
@@ -64,6 +65,7 @@
     "runtime:verify": "node scripts/runtime-verify.mjs",
     "release:verify": "node scripts/release-verify.mjs",
     "preview:deploy": "node scripts/firebase-hosting-preview.mjs",
+    "preview:release-candidate": "node scripts/firebase-hosting-preview.mjs --release-candidate",
     "preview:promote": "node scripts/firebase-hosting-promote.mjs"
   },
   "repository": {

@@ -8,6 +8,24 @@
     ],
     "headers": [
       {
+        "source": "/build-manifest.json",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-store"
+          }
+        ]
+      },
+      {
+        "source": "/asset-manifest.json",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-store"
+          }
+        ]
+      },
+      {
         "source": "/",
         "headers": [
           {
