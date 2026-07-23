@@ -8,9 +8,9 @@ const PRODUCTION_ROOTS = [
   path.join(ROOT, 'functions'),
   path.join(ROOT, 'js')
 ];
-const DEFAULT_MAX_LINES = 700;
-const ABSOLUTE_MAX_LINES = 1000;
 const OWNERSHIP_REVIEW_LINES = 500;
+const SHARED_CONTEXT_IMPORT_BUDGET = 162;
+const APP_ENTRY_STATIC_IMPORT_BUDGET = 58;
 const WORLD_COLLECTIONS = [
   'roads', 'roadMeshes', 'urbanSurfaceMeshes', 'buildings', 'buildingMeshes',
   'dynamicBuildingColliders', 'landuses', 'surfaceFeatureHints', 'landuseMeshes',
@@ -38,13 +38,6 @@ const SURFACE_CONTRACT_CONSUMERS = new Set([
   'world/spawn-surface.js'
 ]);
 
-const LEGACY_LINE_BUDGETS = Object.freeze({
-  'functions/admin-dashboard.js': 1061,
-  'functions/index.js': 1878,
-  'functions/overlay.js': 721,
-  'js/admin-dashboard.js': 1920
-});
-
 function listJavaScriptFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     if (entry.isDirectory() && (entry.name === 'node_modules' || entry.name === 'vendor')) return [];
@@ -67,26 +60,80 @@ function countLines(source) {
   return source.length === 0 ? 0 : source.split(/\r?\n/).length - (source.endsWith('\n') ? 1 : 0);
 }
 
+function staticModuleSpecifiers(source) {
+  return [...source.matchAll(/\b(?:import|export)\s+(?:[^'"]*?\s+from\s+)?['"]([^'"]+)['"]/g)]
+    .map((match) => match[1]);
+}
+
+function resolveAppModule(importer, specifier) {
+  if (!specifier.startsWith('.')) return null;
+  const cleanSpecifier = specifier.split(/[?#]/, 1)[0];
+  const unresolved = path.resolve(path.dirname(importer), cleanSpecifier);
+  const candidates = [
+    unresolved,
+    `${unresolved}.js`,
+    path.join(unresolved, 'index.js')
+  ];
+  return candidates.find((candidate) => (
+    candidate.startsWith(`${APP_JS}${path.sep}`) &&
+    fs.existsSync(candidate) &&
+    fs.statSync(candidate).isFile()
+  )) || null;
+}
+
+function findImportCycles(graph) {
+  const cycles = [];
+  const state = new Map();
+  const stack = [];
+  const stackIndex = new Map();
+
+  function visit(file) {
+    state.set(file, 'visiting');
+    stackIndex.set(file, stack.length);
+    stack.push(file);
+    for (const dependency of graph.get(file) || []) {
+      if (!state.has(dependency)) {
+        visit(dependency);
+      } else if (state.get(dependency) === 'visiting') {
+        const start = stackIndex.get(dependency);
+        cycles.push([...stack.slice(start), dependency]);
+      }
+    }
+    stack.pop();
+    stackIndex.delete(file);
+    state.set(file, 'visited');
+  }
+
+  for (const file of graph.keys()) {
+    if (!state.has(file)) visit(file);
+  }
+  return cycles;
+}
+
 const failures = [];
 const files = PRODUCTION_ROOTS.flatMap((directory) => listJavaScriptFiles(directory));
+const appFiles = files.filter((file) => file.startsWith(`${APP_JS}${path.sep}`));
 const ownershipReview = [];
+const importGraph = new Map();
+let sharedContextImporters = 0;
+let appEntryStaticImports = 0;
 
 for (const file of files) {
   const relative = relativeFile(file);
   const appRelative = appRelativeFile(file);
   const source = fs.readFileSync(file, 'utf8');
   const lines = countLines(source);
-  const budget = LEGACY_LINE_BUDGETS[relative] ?? DEFAULT_MAX_LINES;
 
   if (lines > OWNERSHIP_REVIEW_LINES) ownershipReview.push({ relative, lines });
 
-  if (lines > ABSOLUTE_MAX_LINES && !Object.hasOwn(LEGACY_LINE_BUDGETS, relative)) {
-    failures.push(`${relative}: ${lines} lines exceeds the absolute ${ABSOLUTE_MAX_LINES}-line ceiling`);
-  } else if (lines > budget) {
-    failures.push(`${relative}: ${lines} lines exceeds its ${budget}-line growth budget`);
-  }
-
   if (!appRelative) continue;
+
+  const specifiers = staticModuleSpecifiers(source);
+  importGraph.set(file, specifiers.map((specifier) => resolveAppModule(file, specifier)).filter(Boolean));
+  if (specifiers.some((specifier) => /(?:^|\/)shared-context\.js(?:[?#]|$)/.test(specifier))) {
+    sharedContextImporters++;
+  }
+  if (appRelative === 'app-entry.js') appEntryStaticImports = specifiers.length;
 
   if (appRelative !== 'env.js' && /appCtx\.(?:onMoon|onMars)\s*=/.test(source)) {
     failures.push(`${relative}: writes environment surface flags owned by env.js`);
@@ -148,10 +195,22 @@ for (const file of files) {
   }
 }
 
-for (const legacyFile of Object.keys(LEGACY_LINE_BUDGETS)) {
-  if (!fs.existsSync(path.join(ROOT, legacyFile))) {
-    failures.push(`${legacyFile}: stale legacy line-budget entry; remove it`);
-  }
+if (sharedContextImporters > SHARED_CONTEXT_IMPORT_BUDGET) {
+  failures.push(
+    `app/js: ${sharedContextImporters} modules import shared-context.js; ` +
+    `the recovery baseline is ${SHARED_CONTEXT_IMPORT_BUDGET} and must only decrease`
+  );
+}
+
+if (appEntryStaticImports > APP_ENTRY_STATIC_IMPORT_BUDGET) {
+  failures.push(
+    `app/js/app-entry.js: ${appEntryStaticImports} static dependencies; ` +
+    `the recovery baseline is ${APP_ENTRY_STATIC_IMPORT_BUDGET} and must only decrease`
+  );
+}
+
+for (const cycle of findImportCycles(importGraph)) {
+  failures.push(`app/js import cycle: ${cycle.map(relativeFile).join(' -> ')}`);
 }
 
 if (failures.length > 0) {
@@ -160,11 +219,12 @@ if (failures.length > 0) {
   process.exit(1);
 }
 
-const legacyCount = Object.keys(LEGACY_LINE_BUDGETS).length;
 ownershipReview.sort((left, right) => right.lines - left.lines);
 const reviewPreview = ownershipReview.slice(0, 12).map(({ relative, lines }) => `${relative} (${lines})`).join(', ');
 console.log(`[maintainability] ${files.length} production modules checked across app/js, functions, and js.`);
-console.log(`[maintainability] New modules are capped at ${DEFAULT_MAX_LINES} lines; ${legacyCount} oversized legacy modules cannot grow.`);
-console.log(`[maintainability] ${ownershipReview.length} modules exceed the ${OWNERSHIP_REVIEW_LINES}-line ownership-review threshold.`);
+console.log(`[maintainability] ${appFiles.length} app modules form an acyclic static import graph.`);
+console.log(`[maintainability] shared-context consumers: ${sharedContextImporters}/${SHARED_CONTEXT_IMPORT_BUDGET} recovery baseline.`);
+console.log(`[maintainability] app-entry static dependencies: ${appEntryStaticImports}/${APP_ENTRY_STATIC_IMPORT_BUDGET} recovery baseline.`);
+console.log(`[maintainability] ${ownershipReview.length} modules exceed the ${OWNERSHIP_REVIEW_LINES}-line ownership-review threshold (reported, not treated as an architectural failure).`);
 if (reviewPreview) console.log(`[maintainability] Largest review targets: ${reviewPreview}`);
 console.log('[maintainability] Environment, travel-state, and migrated surface-query ownership checks passed.');

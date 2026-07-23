@@ -4,6 +4,7 @@ let activeVehicle = null;
 let earthChildVisibility = null;
 let marsModelPromise = null;
 let vehicleRequestSequence = 0;
+const vehicleCache = new Map();
 
 function material(color, metalness = 0.35, roughness = 0.65) {
   return new THREE.MeshStandardMaterial({ color, metalness, roughness });
@@ -205,9 +206,12 @@ async function setPlanetaryVehicle(kind) {
   }
 
   hideEarthVehicleChildren();
-  activeVehicle = alignVehicleToSurface(
-    kind === 'moon' ? createLunarRovingVehicle() : createMarsRoverFallback()
-  );
+  if (!vehicleCache.has(kind)) {
+    vehicleCache.set(kind, alignVehicleToSurface(
+      kind === 'moon' ? createLunarRovingVehicle() : createMarsRoverFallback()
+    ));
+  }
+  activeVehicle = vehicleCache.get(kind);
   appCtx.carMesh.add(activeVehicle);
 
   if (kind === 'mars') {
@@ -219,7 +223,10 @@ async function setPlanetaryVehicle(kind) {
       activeVehicle?.userData?.vehicleKind === 'mars'
     ) {
       appCtx.carMesh.remove(activeVehicle);
-      activeVehicle = alignVehicleToSurface(loaded);
+      if (!vehicleCache.has('mars-loaded')) {
+        vehicleCache.set('mars-loaded', alignVehicleToSurface(loaded));
+      }
+      activeVehicle = vehicleCache.get('mars-loaded');
       appCtx.carMesh.add(activeVehicle);
     }
   }

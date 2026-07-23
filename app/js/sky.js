@@ -17,7 +17,7 @@ import {
   showStarInfo
 } from "./sky/starfield-ui.js?v=11";
 import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
-import { createMoonSurface as createMoonSurfaceRuntime } from "./sky/moon-surface.js?v=2";
+import { createMoonSurface as createMoonSurfaceRuntime } from "./sky/moon-surface.js?v=4";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import {
   commitEnvironment,

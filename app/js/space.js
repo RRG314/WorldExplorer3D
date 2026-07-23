@@ -116,7 +116,7 @@ function startSpaceFlightToMoon() {
   appCtx.showUniverseUI?.();
 
   spaceSessionScope.timeout(() => {
-    if (!isCurrentSpaceFlightSession(sessionId, 'moon')) return;
+    if (!isCurrentSpaceFlightSession(sessionId, 'moon') || appCtx.spaceFlight.mode !== 'launching') return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
     showFlightMessage('SPACE FLIGHT READY', '#10b981');
@@ -162,7 +162,7 @@ function startSpaceFlightToEarth() {
   appCtx.showUniverseUI?.();
 
   spaceSessionScope.timeout(() => {
-    if (!isCurrentSpaceFlightSession(sessionId, 'earth')) return;
+    if (!isCurrentSpaceFlightSession(sessionId, 'earth') || appCtx.spaceFlight.mode !== 'launching') return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
     showFlightMessage('EARTH RETURN READY', '#3b82f6');
@@ -206,7 +206,7 @@ function startSpaceFlightToMars() {
   appCtx.showSolarSystemUI?.();
   appCtx.showUniverseUI?.();
   spaceSessionScope.timeout(() => {
-    if (!isCurrentSpaceFlightSession(sessionId, 'mars')) return;
+    if (!isCurrentSpaceFlightSession(sessionId, 'mars') || appCtx.spaceFlight.mode !== 'launching') return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
     showFlightMessage('MARS FLIGHT READY', '#e26f45');

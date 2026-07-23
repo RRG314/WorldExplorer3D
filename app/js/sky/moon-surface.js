@@ -1,13 +1,18 @@
 import { APOLLO11_TERRAIN, landingLocal, loadApollo11Terrain } from './moon-lroc-terrain.js?v=1';
 
 const LANDING_SITE = Object.freeze({ x: 200, z: -500 });
+const TERRAIN_SEGMENTS = Object.freeze({ x: 96, z: 448 });
+const TERRAIN_MESH_RESOLUTION_METERS = Math.max(
+  APOLLO11_TERRAIN.widthMeters / TERRAIN_SEGMENTS.x,
+  APOLLO11_TERRAIN.lengthMeters / TERRAIN_SEGMENTS.z
+);
 
 function createMeasuredSurface(appCtx) {
   const geometry = new THREE.PlaneGeometry(
     APOLLO11_TERRAIN.widthMeters,
     APOLLO11_TERRAIN.lengthMeters,
-    144,
-    640
+    TERRAIN_SEGMENTS.x,
+    TERRAIN_SEGMENTS.z
   );
   geometry.rotateX(-Math.PI / 2);
   const material = new THREE.MeshStandardMaterial({
@@ -31,7 +36,8 @@ function createMeasuredSurface(appCtx) {
     terrainSource: APOLLO11_TERRAIN.source,
     sourceUrl: APOLLO11_TERRAIN.sourceUrl,
     originalResolutionMeters: APOLLO11_TERRAIN.originalDtmResolutionMeters,
-    runtimeResolutionMeters: APOLLO11_TERRAIN.horizontalResolutionMeters,
+    textureResolutionMeters: APOLLO11_TERRAIN.horizontalResolutionMeters,
+    runtimeGeometryResolutionMeters: TERRAIN_MESH_RESOLUTION_METERS,
     verticalScale: 1,
     coordinateSystem: 'IAU Moon planetocentric latitude / positive-east longitude'
   };

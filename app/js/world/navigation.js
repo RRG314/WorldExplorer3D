@@ -227,7 +227,12 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
     const nz = p1.z + t * dz;
     const d = Math.hypot(x - nx, z - nz);
     const projected = { x: nx, z: nz, dist: d, segIndex: i, t };
-    const roadY = runtime.sampleFeatureSurfaceY(road, x, z, projected);
+    // Navigation runs every simulation frame. Road surface profiles are
+    // refreshed when terrain changes, so querying them here is authoritative
+    // and avoids a terrain ray sample for every candidate segment.
+    const roadY = runtime.sampleFeatureSurfaceY(road, x, z, projected, {
+      preferStoredProfile: true
+    });
     const verticalDelta = Number.isFinite(targetY) && Number.isFinite(roadY) ? Math.abs(roadY - targetY) : 0;
     const distanceAlong =
       profileDistances && profileDistances.length > i ?

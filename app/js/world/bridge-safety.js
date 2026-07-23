@@ -1,7 +1,7 @@
 import {
   buildFeatureRibbonEdges,
   pointInPolygonXZ
-} from "../structure-semantics.js?v=19";
+} from "../structure-semantics.js?v=21";
 
 function isProtectedRoadFeature(feature) {
   const semantics = feature?.structureSemantics;

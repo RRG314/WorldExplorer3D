@@ -54,11 +54,6 @@ function createWalkingRuntimeHelpers({
     if (!appliedSafeWalkSpawn) syncWalkerFromCar();
     if (options.deferWorldSync !== true) {
       syncWalkTerrain(true);
-      if (typeof appCtx.requestWorldSurfaceSync === "function") {
-        appCtx.requestWorldSurfaceSync({ force: true, source: "set_mode_walk" });
-      } else if (typeof appCtx.repositionBuildingsWithTerrain === "function") {
-        appCtx.repositionBuildingsWithTerrain();
-      }
     }
 
     if (carMesh) {
@@ -77,14 +72,6 @@ function createWalkingRuntimeHelpers({
       state.characterMesh.visible = state.view !== "first";
       state.characterMesh.position.set(state.walker.x, terrainY, state.walker.z);
       state.characterMesh.rotation.y = state.walker.angle;
-      if (options.deferWorldSync !== true) {
-        syncWalkTerrain(true);
-        if (typeof appCtx.requestWorldSurfaceSync === "function") {
-          appCtx.requestWorldSurfaceSync({ force: true, source: "set_mode_walk_character" });
-        } else if (typeof appCtx.repositionBuildingsWithTerrain === "function") {
-          appCtx.repositionBuildingsWithTerrain();
-        }
-      }
     } else {
       console.error("ERROR: Character mesh is still null after creation!");
     }

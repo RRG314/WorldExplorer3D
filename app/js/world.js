@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=19";
+} from "./structure-semantics.js?v=21";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -124,7 +124,7 @@ import {
   pointInPolygon,
   runtimeRoadFeatures,
   teleportToLocation
-} from "./world/navigation.js?v=5";
+} from "./world/navigation.js?v=6";
 import {
   buildTraversalNetworks,
   findNearestTraversalFeature,
