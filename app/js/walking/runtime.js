@@ -216,7 +216,7 @@ function createWalkingRuntimeHelpers({
     walkCameraTarget.z = resolvedCamZ;
     resolveChaseCameraPosition(walkCameraOrigin, walkCameraTarget, {
       cacheKey: "walk",
-      radius: 0.38,
+      radius: 1.25,
     });
     camera.position.set(walkCameraTarget.x, walkCameraTarget.y, walkCameraTarget.z);
     const cameraClearanceDistance = Math.hypot(

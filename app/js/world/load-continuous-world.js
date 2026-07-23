@@ -3,6 +3,7 @@ import { clearBuildingSpatialIndex } from './building-spatial-index.js?v=7';
 import { resetWorldFurnitureCaches } from './furniture.js?v=10';
 import { earthSceneSuppressed, hideEarthSceneMeshes, resetWorldForReload } from './load-reset.js?v=8';
 import { finalizeLoadedWorld } from './load-support.js?v=24';
+import { worldLoadTransactions } from './load-transaction.js?v=1';
 
 let activeLoad = null;
 
@@ -32,8 +33,14 @@ function loadSignature(location) {
 }
 
 async function loadContinuousEarthWorldInternal(location) {
+  const transaction = worldLoadTransactions.begin({
+    signature: loadSignature(location),
+    source: 'continuous-global',
+    location
+  });
   const loadSequence = appCtx._worldLoadSequence = (appCtx._worldLoadSequence || 0) + 1;
   const isCurrent = () =>
+    transaction.isCurrent() &&
     appCtx._worldLoadSequence === loadSequence &&
     appCtx.getContinuousWorldEnabled?.() === true &&
     !earthSceneSuppressed();
@@ -68,7 +75,10 @@ async function loadContinuousEarthWorldInternal(location) {
       timeoutMs: 120000
     });
     if (!snapshot) throw new Error('The continuous Earth scheduler is unavailable.');
-    if (!isCurrent()) return { aborted: true };
+    if (!isCurrent()) {
+      transaction.abort('stale-after-prime');
+      return { aborted: true };
+    }
 
     appCtx.initialEarthWorldReady = true;
     await finalizeLoadedWorld({
@@ -89,9 +99,17 @@ async function loadContinuousEarthWorldInternal(location) {
       poiMeshes: appCtx.poiMeshes.length,
       landuseMeshes: appCtx.landuseMeshes.length
     });
+    transaction.commit({
+      buildings: appCtx.buildingMeshes.length,
+      roads: appCtx.roads.length
+    });
     return { loaded: true, profile: 'continuous_global', snapshot };
   } catch (error) {
-    if (error?.name === 'AbortError') return { aborted: true };
+    if (error?.name === 'AbortError' || !transaction.isCurrent()) {
+      transaction.abort(error?.name === 'AbortError' ? 'provider-aborted' : 'stale-after-error');
+      return { aborted: true };
+    }
+    transaction.fail(error);
     appCtx.worldLoading = false;
     appCtx.initialEarthWorldReady = false;
     appCtx.hideLoad?.();

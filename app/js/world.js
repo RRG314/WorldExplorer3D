@@ -172,7 +172,8 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=5";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=69";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=70";
+import { worldLoadTransactions } from './world/load-transaction.js?v=1';
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=13";
@@ -386,6 +387,7 @@ initWorldLoadGeometry({
 });
 
 Object.assign(appCtx, {
+  getWorldLoadTransactionSnapshot: () => worldLoadTransactions.snapshot(),
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
   applySpawnTarget,

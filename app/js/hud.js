@@ -403,7 +403,7 @@ function updateCamera(dt = 1 / 60) {
     if (!insideTunnel && !planetaryChase) {
       resolveChaseCameraPosition(carCameraOrigin, carCameraTarget, {
         cacheKey: "drive",
-        radius: 0.6,
+        radius: 1,
       });
     }
     appCtx.camera.position.x += (carCameraTarget.x - appCtx.camera.position.x) * smoothFactor;

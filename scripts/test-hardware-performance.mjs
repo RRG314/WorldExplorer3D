@@ -502,7 +502,10 @@ try {
     await ctx.loadRoads();
     ctx.setTravelMode('walk', { source: 'hardware_performance', force: true, emitTutorial: false });
     ctx.spawnOnRoad?.();
-    return { worldLoadMs: performance.now() - startedAt };
+    return {
+      worldLoadMs: performance.now() - startedAt,
+      worldLoadTransaction: ctx.getWorldLoadTransactionSnapshot?.() || null
+    };
   });
   setup.navigationAndLoadMs = performance.now() - navigationStarted;
   await page.waitForTimeout(2000);
@@ -614,6 +617,13 @@ try {
     }
   }
   if (/swiftshader|software/i.test(String(glInfo.renderer || ''))) violations.push(`software renderer: ${glInfo.renderer}`);
+  if (setup.worldLoadTransaction?.active !== null) violations.push('world load transaction remained active after entry');
+  if (setup.worldLoadTransaction?.lastFinished?.status !== 'committed') {
+    violations.push(`world load transaction ended as ${setup.worldLoadTransaction?.lastFinished?.status || 'unreported'}`);
+  }
+  if (!(setup.worldLoadTransaction?.lastFinished?.details?.roads > 0)) {
+    violations.push('committed world load transaction reported no roads');
+  }
   if (setup.navigationAndLoadMs > budgets.loadMs) violations.push(`load time ${setup.navigationAndLoadMs}ms`);
   if (heapAfter > budgets.heapBytes) violations.push(`heap ${heapAfter} bytes`);
   if (heapAfter - heapBefore > budgets.heapGrowthBytes) violations.push(`heap growth ${heapAfter - heapBefore} bytes`);

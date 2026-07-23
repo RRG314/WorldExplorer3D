@@ -6,7 +6,7 @@ import {
   createWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession,
   recordWorldSourceMetrics
-} from "./load-runtime-session.js?v=7";
+} from "./load-runtime-session.js?v=8";
 import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=18";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
@@ -191,6 +191,7 @@ export function createWorldRoadLoader(deps = {}) {
       phaseTotals,
       rdtLoadComplexity,
       startLoadPhase,
+      transaction,
       useRdtBudgeting,
       useSyntheticFallbackRoads
     } = session;
@@ -694,7 +695,9 @@ export function createWorldRoadLoader(deps = {}) {
       finalizePerfLoad,
       loadMetrics,
       loaded,
-      phaseTotals
+      phaseTotals,
+      transaction,
+      isActiveLoadContext
     });
   }
 
