@@ -1,5 +1,3 @@
-import { ctx as appCtx } from '../shared-context.js?v=55';
-
 const BRIDGE_WIDTH = 27;
 const TRUSS_DEPTH = 8.2;
 const TRUSS_BAY = 15.24;
@@ -106,7 +104,7 @@ export function createBridgeStructuralDetails(options) {
     instanceCount: beams.length,
     source: 'official-dimensions-and-osm-alignment'
   };
-  appCtx.scene.add(mesh);
-  appCtx.historicMarkers.push(mesh);
+  options.scene.add(mesh);
+  options.historicMarkers.push(mesh);
   return mesh;
 }

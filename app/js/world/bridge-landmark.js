@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { createBridgeStructuralDetails } from './bridge-landmark-structure.js?v=1';
+import { createBridgeStructuralDetails } from './bridge-landmark-structure.js?v=2';
 
 const BRIDGE_COLOR = 0xbf4e3b;
 const MIN_SUSPENSION_SPAN_METERS = 600;
@@ -489,8 +489,10 @@ export function renderSuspensionBridgeLandmark(data) {
     appCtx.historicMarkers.push(cables.suspenders);
     createdMeshes.push(cables.suspenders);
     structuralDetails = createBridgeStructuralDetails({
+      historicMarkers: appCtx.historicMarkers,
       path,
       metrics,
+      scene: appCtx.scene,
       towers,
       pointAtDistance,
       sampleRoadDeckY,

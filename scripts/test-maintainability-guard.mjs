@@ -9,7 +9,7 @@ const PRODUCTION_ROOTS = [
   path.join(ROOT, 'js')
 ];
 const OWNERSHIP_REVIEW_LINES = 500;
-const SHARED_CONTEXT_IMPORT_BUDGET = 159;
+const SHARED_CONTEXT_IMPORT_BUDGET = 155;
 const APP_ENTRY_STATIC_IMPORT_BUDGET = 58;
 const WORLD_COLLECTIONS = [
   'roads', 'roadMeshes', 'urbanSurfaceMeshes', 'buildings', 'buildingMeshes',

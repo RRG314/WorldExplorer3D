@@ -115,7 +115,7 @@ import {
   batchLanduseMeshes,
   initWorldRenderSupport,
   registerWaterWaveMaterial
-} from "./world/render-support.js?v=6";
+} from "./world/render-support.js?v=7";
 import {
   buildingContainingPoint,
   findNearestRoad,
@@ -159,9 +159,11 @@ import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
   getNearbyBuildings,
+  initBuildingSpatialIndex,
   isSuppressedBaseBuilding,
   isSuppressedBaseRoad
-} from "./world/building-spatial-index.js?v=6";
+} from "./world/building-spatial-index.js?v=7";
+import { initCameraClearance } from './camera/clearance.js?v=5';
 import {
   applyBuildingContextSemanticsToFeature,
   cloneStructureSemantics,
@@ -320,6 +322,16 @@ initWorldNavigation({
   sampleFeatureSurfaceY,
   tryAutoEnterBoatAt
 });
+initBuildingSpatialIndex({
+  getBuildings: () => appCtx.buildings,
+  getDynamicColliders: () => appCtx.dynamicBuildingColliders,
+  getOverlayColliders: () => appCtx.overlayRuntimeBuildingColliders,
+  getOverlaySuppression: () => appCtx.overlaySuppression
+});
+initCameraClearance({
+  getNearbyBuildings,
+  sampleTerrainY: (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y
+});
 initWorldLoadSelection({
   getLocation: () => appCtx.LOC
 });
@@ -359,7 +371,11 @@ initWorldRenderSupport({
   pickRoofColor,
   pointInPolygon,
   rand01FromInt: appCtx.rand01FromInt,
-  signedPolygonAreaXZ
+  signedPolygonAreaXZ,
+  trackWaterWaveMaterial(material) {
+    if (Array.isArray(appCtx.waterWaveVisuals)) appCtx.waterWaveVisuals.push(material);
+    else appCtx.replaceWorldCollection('waterWaveVisuals', [material]);
+  }
 });
 initWorldLoadGeometry({
   clampNumber,

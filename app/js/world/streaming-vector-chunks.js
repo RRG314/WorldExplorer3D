@@ -4,7 +4,7 @@ import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
   removeBuildingsFromSpatialIndex
-} from "./building-spatial-index.js?v=6";
+} from "./building-spatial-index.js?v=7";
 import { waterSurfaceBaseElevation } from "./load-geometry.js?v=19";
 import { fetchOvertureStreamingTile } from './overture-streaming-source.js?v=3';
 import { buildStreamingLandcover } from "./streaming-landcover.js?v=14";
