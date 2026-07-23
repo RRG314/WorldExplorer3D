@@ -222,7 +222,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 
 .globe-selector-stage {
   background-color: #02070c;
-  background-image: url('../assets/textures/universe/orion-nebula-nasa.jpg');
+  background-image: url('../assets/textures/start-hub/orion-background.jpg');
   background-position: center;
   background-size: cover;
   isolation: isolate;
@@ -401,16 +401,16 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   background: #164378;
   border-color: var(--hub-blue);
 }
-.destination-thumb.earth { background-image: url('../assets/textures/earth_atmos_2048.jpg'); background-position: 28% 50%; }
-.destination-thumb.moon { background-image: url('../assets/textures/moon_lroc_2048.jpg'); background-position: 38% 50%; }
-.destination-thumb.mars { background-image: url('../assets/textures/mars_viking_4096.jpg'); background-position: 42% 50%; }
+.destination-thumb.earth { background-image: url('../assets/textures/start-hub/earth.jpg'); background-position: 28% 50%; }
+.destination-thumb.moon { background-image: url('../assets/textures/start-hub/moon.jpg'); background-position: 38% 50%; }
+.destination-thumb.mars { background-image: url('../assets/textures/start-hub/mars.jpg'); background-position: 42% 50%; }
 .globe-destination-bar button .destination-thumb.space {
   width: 60px;
   border-radius: 3px;
-  background-image: url('../assets/textures/universe/andromeda-galex-spitzer.jpg');
+  background-image: url('../assets/textures/start-hub/space.jpg');
   background-size: contain;
 }
-.destination-thumb.ocean { background-image: url('../../assets/screenshots/ocean-mode-great-barrier-reef.png'); background-position: 40% 58%; }
+.destination-thumb.ocean { background-image: url('../assets/textures/start-hub/ocean.jpg'); background-position: 40% 58%; }
 .globe-destination-bar button:hover .destination-thumb,
 .globe-destination-bar button.active .destination-thumb { border-color: #d8ebff; box-shadow: 0 0 20px rgba(45,125,255,0.35); }
 .globe-destination-bar .destination-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }

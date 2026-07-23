@@ -17,7 +17,7 @@ import {
   createUiRoomEventsApi
 } from './ui-room-events.js?v=1';
 import { createUiRoomRenderers } from './ui-room-renderers.js?v=1';
-import { createUiRoomActions } from './ui-room-actions.js?v=9';
+import { createUiRoomActions } from './ui-room-actions.js?v=10';
 import { createMmoRoomPanel } from './ui-room-mmo.js?v=4';
 import {
   emitTutorialEvent,

@@ -18,7 +18,7 @@ import {
 } from "./room-activities.js?v=1";
 import { listenPaintClaims } from "./painttown.js?v=55";
 import { recordRecentPlayers } from "./social.js?v=55";
-import { startAuthoritativeRoomSession } from './authoritative-session.js?v=6';
+import { startAuthoritativeRoomSession } from './authoritative-session.js?v=7';
 
 export function createUiRoomSession({ appCtx, refs, state, renderers, helpers, runtime }) {
   const {

@@ -23,7 +23,7 @@ import {
 } from "./social.js?v=55";
 import { createUiRoomRoomActionsApi } from "./ui-room-room-actions.js?v=1";
 import { createUiRoomRuntime } from "./ui-room-runtime.js?v=3";
-import { createUiRoomSession } from "./ui-room-session.js?v=8";
+import { createUiRoomSession } from "./ui-room-session.js?v=9";
 
 export function createUiRoomActions({ appCtx, refs, state, renderers, helpers, callbacks }) {
   const {

@@ -1,5 +1,5 @@
 import { BLOCK_MATERIALS } from '../block-builder/catalog.js?v=4';
-import { createAuthoritativeRoomClient } from './authoritative-client.js?v=7';
+import { createAuthoritativeRoomClient } from './authoritative-client.js?v=8';
 
 const INPUT_SAMPLE_MS = 50;
 
