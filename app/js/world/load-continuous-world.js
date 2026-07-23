@@ -1,9 +1,10 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { clearBuildingSpatialIndex } from './building-spatial-index.js?v=7';
 import { resetWorldFurnitureCaches } from './furniture.js?v=10';
-import { earthSceneSuppressed, hideEarthSceneMeshes, resetWorldForReload } from './load-reset.js?v=8';
-import { finalizeLoadedWorld } from './load-support.js?v=24';
-import { worldLoadTransactions } from './load-transaction.js?v=1';
+import { earthSceneSuppressed, hideEarthSceneMeshes, resetWorldForReload } from './load-reset.js?v=9';
+import { finalizeLoadedWorld } from './load-support.js?v=25';
+import { worldLoadTransactions } from './load-transaction.js?v=2';
+import { beginWorldLoadStage } from './load-stage.js?v=1';
 
 let activeLoad = null;
 
@@ -38,6 +39,16 @@ async function loadContinuousEarthWorldInternal(location) {
     source: 'continuous-global',
     location
   });
+  let worldLoadStage;
+  try {
+    worldLoadStage = beginWorldLoadStage(appCtx, {
+      label: `${location.name}:${transaction.id}`
+    });
+  } catch (error) {
+    transaction.fail(error);
+    throw error;
+  }
+  const releaseStageRollback = transaction.deferRollback((reason) => worldLoadStage.rollback(reason));
   const loadSequence = appCtx._worldLoadSequence = (appCtx._worldLoadSequence || 0) + 1;
   const isCurrent = () =>
     transaction.isCurrent() &&
@@ -49,12 +60,18 @@ async function loadContinuousEarthWorldInternal(location) {
   if (appCtx.selLoc === 'custom') {
     appCtx.setCustomLocation?.(location, { syncInputs: false });
   }
-  resetWorldForReload({
-    clearBuildingSpatialIndex,
-    invalidateTraversalNetworks: appCtx.invalidateTraversalNetworks,
-    locName: location.name,
-    resetWorldFurnitureCaches
-  });
+  try {
+    resetWorldForReload({
+      clearBuildingSpatialIndex,
+      invalidateTraversalNetworks: appCtx.invalidateTraversalNetworks,
+      locName: location.name,
+      resetWorldFurnitureCaches,
+      preserveEarthSceneRoot: true
+    });
+  } catch (error) {
+    transaction.fail(error);
+    throw error;
+  }
   resetActors();
   appCtx.initialEarthWorldRetired = true;
   appCtx.initialEarthDetailRadius = 0;
@@ -89,7 +106,8 @@ async function loadContinuousEarthWorldInternal(location) {
       markLoaded: () => {},
       reason: 'continuous_global',
       spawnOnRoad: appCtx.spawnOnRoad,
-      updateWorldLod: appCtx.updateWorldLod
+      updateWorldLod: appCtx.updateWorldLod,
+      commitWorldStage: worldLoadStage.commit
     });
     appCtx.worldLoading = false;
     appCtx.enforceEnvironmentSceneOwnership?.();
@@ -99,6 +117,7 @@ async function loadContinuousEarthWorldInternal(location) {
       poiMeshes: appCtx.poiMeshes.length,
       landuseMeshes: appCtx.landuseMeshes.length
     });
+    releaseStageRollback();
     transaction.commit({
       buildings: appCtx.buildingMeshes.length,
       roads: appCtx.roads.length

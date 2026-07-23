@@ -11,6 +11,11 @@ const first = manager.begin({
 });
 assert.equal(first.isCurrent(), true);
 assert.equal(first.signal.aborted, false);
+let firstRollbackCalls = 0;
+first.deferRollback((reason) => {
+  firstRollbackCalls += 1;
+  assert.equal(reason, 'superseded');
+});
 
 now = 125;
 const second = manager.begin({
@@ -22,12 +27,15 @@ assert.equal(first.isCurrent(), false);
 assert.equal(first.signal.aborted, true);
 assert.equal(first.snapshot().status, 'aborted');
 assert.equal(first.snapshot().reason, 'superseded');
+assert.equal(firstRollbackCalls, 1);
 assert.equal(second.isCurrent(), true);
 assert.equal(first.commit(), false);
 
 now = 160;
 assert.equal(second.commit({ roads: 20, buildings: 30 }), true);
 assert.equal(second.commit(), false);
+assert.equal(first.abort('duplicate-abort'), false);
+assert.equal(firstRollbackCalls, 1);
 assert.equal(manager.getActive(), null);
 assert.deepEqual(manager.snapshot().lastFinished, {
   id: 2,
@@ -63,6 +71,7 @@ assert.equal(perfResult.reason, 'invalid_location_selection');
 
 console.log(JSON.stringify({
   ok: true,
+  rollbackHooksExactlyOnce: true,
   staleCommitRejected: true,
   invalidSelectionPreservedWorld: true
 }, null, 2));

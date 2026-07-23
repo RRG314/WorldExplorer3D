@@ -23,9 +23,26 @@ function createWorldLoadTransactionManager(options = {}) {
 
   function finish(token, status, reason = '', details = null) {
     if (!token || token.status !== 'active') return false;
+    const rollbackErrors = [];
+    if (status !== 'committed') {
+      [...token.rollbackHandlers].reverse().forEach((handler) => {
+        try {
+          handler(String(reason || status));
+        } catch (error) {
+          rollbackErrors.push(error instanceof Error ? error.message : String(error));
+        }
+      });
+    }
+    token.rollbackHandlers.clear();
     token.status = status;
     token.reason = String(reason || status);
     token.details = details && typeof details === 'object' ? { ...details } : null;
+    if (rollbackErrors.length > 0) {
+      token.details = {
+        ...(token.details || {}),
+        rollbackErrors
+      };
+    }
     token.finishedAt = now();
     if (active === token) active = null;
     lastFinished = snapshotToken(token);
@@ -56,8 +73,15 @@ function createWorldLoadTransactionManager(options = {}) {
       reason: '',
       details: null,
       abortController,
+      rollbackHandlers: new Set(),
       signal: abortController.signal,
       isCurrent: () => active === token && token.status === 'active' && !token.signal.aborted,
+      deferRollback: (handler) => {
+        if (typeof handler !== 'function') throw new TypeError('Rollback handlers must be functions.');
+        if (token.status !== 'active') return () => false;
+        token.rollbackHandlers.add(handler);
+        return () => token.rollbackHandlers.delete(handler);
+      },
       commit: (details = null) => (
         token.isCurrent() && finish(token, 'committed', 'committed', details)
       ),

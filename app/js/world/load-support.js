@@ -29,6 +29,7 @@ export async function finalizeLoadedWorld(options = {}) {
   const updateWorldLod = typeof options.updateWorldLod === 'function' ? options.updateWorldLod : null;
   const startLoadPhase = typeof options.startLoadPhase === 'function' ? options.startLoadPhase : () => {};
   const endLoadPhase = typeof options.endLoadPhase === 'function' ? options.endLoadPhase : () => {};
+  const commitWorldStage = typeof options.commitWorldStage === 'function' ? options.commitWorldStage : null;
   const runFinalStep = (label, fn) => {
     startLoadPhase(label);
     try {
@@ -98,6 +99,16 @@ export async function finalizeLoadedWorld(options = {}) {
     runFinalStep('revalidateActiveWorldSpawn', () => appCtx.revalidateActiveWorldSpawn({
       source: 'world_render_ready'
     }));
+  }
+  if (commitWorldStage) {
+    startLoadPhase('commitWorldStage');
+    try {
+      if (commitWorldStage() !== true) {
+        throw new Error('The staged world could not be committed.');
+      }
+    } finally {
+      endLoadPhase('commitWorldStage');
+    }
   }
   appCtx.hideLoad();
   if (typeof appCtx.primeAerialContext === 'function' && appCtx.getContinuousWorldEnabled?.() !== true) {

@@ -1,4 +1,5 @@
-import { worldLoadTransactions } from './load-transaction.js?v=1';
+import { worldLoadTransactions } from './load-transaction.js?v=2';
+import { beginWorldLoadStage } from './load-stage.js?v=1';
 
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
@@ -90,13 +91,29 @@ export function createWorldLoadRuntimeSession(options = {}) {
     source: retryPass > 0 ? 'location-osm-retry' : 'location-osm',
     location: { ...loadLocation, name: locName }
   });
+  let worldLoadStage;
+  try {
+    worldLoadStage = beginWorldLoadStage(appCtx, {
+      label: `${locName}:${transaction.id}`
+    });
+  } catch (error) {
+    transaction.fail(error);
+    throw error;
+  }
+  const releaseStageRollback = transaction.deferRollback((reason) => worldLoadStage.rollback(reason));
 
-  resetWorldForReload({
-    clearBuildingSpatialIndex,
-    invalidateTraversalNetworks,
-    locName,
-    resetWorldFurnitureCaches
-  });
+  try {
+    resetWorldForReload({
+      clearBuildingSpatialIndex,
+      invalidateTraversalNetworks,
+      locName,
+      resetWorldFurnitureCaches,
+      preserveEarthSceneRoot: true
+    });
+  } catch (error) {
+    transaction.fail(error);
+    throw error;
+  }
   appCtx.initialEarthWorldReady = false;
   appCtx.worldDetailState = {};
 
@@ -192,6 +209,8 @@ export function createWorldLoadRuntimeSession(options = {}) {
     rdtLoadComplexity,
     startLoadPhase,
     transaction,
+    worldLoadStage,
+    releaseStageRollback,
     useRdtBudgeting,
     useSyntheticFallbackRoads:
       appCtx.gameMode === 'trial' ||
@@ -219,6 +238,7 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     loadMetrics,
     phaseTotals,
     transaction,
+    releaseStageRollback,
     loaded = false
   } = session;
   if (!appCtx) return;
@@ -268,6 +288,7 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     landuseMeshes: appCtx.landuseMeshes.length
   });
   if (loaded) {
+    releaseStageRollback?.();
     transaction.commit({
       buildings: appCtx.buildingMeshes.length,
       roads: appCtx.roads.length

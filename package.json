@@ -30,6 +30,7 @@
     "test:lifecycle-scope": "node scripts/test-lifecycle-scope.mjs",
     "test:domain-boundaries": "node scripts/test-domain-dependency-boundaries.mjs",
     "test:world-load-transaction": "node scripts/test-world-load-transaction.mjs",
+    "test:world-load-stage": "node scripts/test-world-load-stage.mjs",
     "test:transport-controllers": "node scripts/test-transport-controller-registry.mjs",
     "test:platform-services": "node scripts/test-platform-service-registry.mjs",
     "test:geospatial": "node scripts/test-geospatial-data-fabric.mjs",

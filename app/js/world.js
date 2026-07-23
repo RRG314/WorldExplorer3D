@@ -66,12 +66,12 @@ import {
   scheduleDeferredPoiLoad,
   scheduleDeferredWorldDetailPasses,
   safeWorldLoadCall
-} from "./world/load-support.js?v=24";
+} from "./world/load-support.js?v=25";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=8";
+} from "./world/load-reset.js?v=9";
 import {
   prepareWorldFeatureSelections
 } from "./world/load-budgeting.js?v=4";
@@ -172,8 +172,8 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=5";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=70";
-import { worldLoadTransactions } from './world/load-transaction.js?v=1';
+import { createWorldRoadLoader } from "./world/load-roads.js?v=71";
+import { worldLoadTransactions } from './world/load-transaction.js?v=2';
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=13";

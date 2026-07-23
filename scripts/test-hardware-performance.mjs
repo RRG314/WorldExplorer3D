@@ -504,7 +504,8 @@ try {
     ctx.spawnOnRoad?.();
     return {
       worldLoadMs: performance.now() - startedAt,
-      worldLoadTransaction: ctx.getWorldLoadTransactionSnapshot?.() || null
+      worldLoadTransaction: ctx.getWorldLoadTransactionSnapshot?.() || null,
+      worldLoadStage: ctx.lastWorldLoadStage || null
     };
   });
   setup.navigationAndLoadMs = performance.now() - navigationStarted;
@@ -623,6 +624,12 @@ try {
   }
   if (!(setup.worldLoadTransaction?.lastFinished?.details?.roads > 0)) {
     violations.push('committed world load transaction reported no roads');
+  }
+  if (setup.worldLoadStage?.status !== 'committed') {
+    violations.push(`world load stage ended as ${setup.worldLoadStage?.status || 'unreported'}`);
+  }
+  if (!(setup.worldLoadStage?.stagedCounts?.roads > 0)) {
+    violations.push('committed world load stage reported no roads');
   }
   if (setup.navigationAndLoadMs > budgets.loadMs) violations.push(`load time ${setup.navigationAndLoadMs}ms`);
   if (heapAfter > budgets.heapBytes) violations.push(`heap ${heapAfter} bytes`);
