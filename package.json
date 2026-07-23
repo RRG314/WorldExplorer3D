@@ -27,6 +27,7 @@
     "test:runtime": "node scripts/test-runtime-invariants.mjs",
     "test:runtime-kernel": "node scripts/test-runtime-kernel.mjs",
     "test:frame-ownership": "node scripts/test-frame-ownership.mjs",
+    "test:lifecycle-scope": "node scripts/test-lifecycle-scope.mjs",
     "test:transport-controllers": "node scripts/test-transport-controller-registry.mjs",
     "test:platform-services": "node scripts/test-platform-service-registry.mjs",
     "test:geospatial": "node scripts/test-geospatial-data-fabric.mjs",

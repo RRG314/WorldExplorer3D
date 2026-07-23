@@ -74,6 +74,7 @@ async function readLifecycleState(page, mode) {
     }
     return {
       coordinator: ctx.getSessionCoordinatorDebugState?.(),
+      diagnosticsLifecycle: ctx.getRuntimeDiagnosticsLifecycleSnapshot?.(),
       frameOwnership: ctx.getFrameOwnershipSnapshot?.(),
       canvases: {
         ocean: document.querySelectorAll('#oceanModeCanvas').length,
@@ -157,6 +158,11 @@ function assertPlateau(mode, cycles) {
     assert(
       !cycle.exited.frameOwnership?.active?.includes(expectedFrameOwner),
       `${mode} cycle ${index + 1} retained frame ownership after exit`
+    );
+    assert(
+      cycle.active.diagnosticsLifecycle?.resources?.interval === 1 &&
+        cycle.active.diagnosticsLifecycle?.resources?.listener === 1,
+      `${mode} cycle ${index + 1} lost diagnostics lifecycle ownership`
     );
     assert(cycle.exited.coordinator.transition === null, `${mode} cycle ${index + 1} left a transition token active`);
     assert(cycle.exited.canvases[mode] === 1, `${mode} cycle ${index + 1} duplicated its canvas`);

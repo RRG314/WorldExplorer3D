@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { diagnoseRuntimeBudgets } from "./runtime/budget-diagnostics.js?v=1";
+import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=1';
 
 function numberOrNull(value) {
   return Number.isFinite(value) ? Number(value) : null;
@@ -214,6 +215,17 @@ function publishRuntimeDiagnostics() {
 }
 
 publishRuntimeDiagnostics();
-globalThis.setInterval(publishRuntimeDiagnostics, 1000);
+const runtimeDiagnosticsScope = createLifecycleScope('runtime-diagnostics');
+runtimeDiagnosticsScope.interval(() => {
+  if (!document.hidden) publishRuntimeDiagnostics();
+}, 1000);
+runtimeDiagnosticsScope.listen(document, 'visibilitychange', () => {
+  if (!document.hidden) publishRuntimeDiagnostics();
+});
+
+Object.assign(appCtx, {
+  getRuntimeDiagnosticsLifecycleSnapshot: () => runtimeDiagnosticsScope.snapshot(),
+  stopRuntimeDiagnostics: (reason = 'stopped') => runtimeDiagnosticsScope.dispose(reason)
+});
 
 export { getWorldExplorerRuntimeDiagnostics };
