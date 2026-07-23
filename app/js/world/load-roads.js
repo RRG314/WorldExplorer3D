@@ -7,7 +7,7 @@ import {
   finishWorldLoadRuntimeSession,
   recordWorldSourceMetrics
 } from "./load-runtime-session.js?v=7";
-import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=17";
+import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=18";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   const waitForCoverage = appCtx.waitForTerrainCoverageAt;
@@ -583,9 +583,9 @@ export function createWorldRoadLoader(deps = {}) {
             lodThresholds,
             maxBuildingWays,
             metadataCacheMeta: deferredBuildingMetadataCacheMeta,
-            metadataDeadlineMs: Infinity,
+            metadataDeadlineMs: performance.now() + 5000,
             metadataQuery: deferredBuildingMetadataQuery,
-            metadataTimeoutMs: 9000,
+            metadataTimeoutMs: 4500,
             onSettled: hasPrimaryPoiCoverage ? () => {} : schedulePoiDetail,
             pickBuildingBaseColor,
             query: deferredBuildingQuery,

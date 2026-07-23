@@ -1,7 +1,11 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=19";
 import { addBuildingToSpatialIndex, removeBuildingsFromSpatialIndex } from "./building-spatial-index.js?v=6";
-import { elevatedSegmentSafety, isProtectedRoadFeature } from "./bridge-safety.js?v=1";
+import {
+  buildGuardrailEdges,
+  elevatedSegmentSafety,
+  isProtectedRoadFeature
+} from "./bridge-safety.js?v=2";
 
 function removeArrayItemsInPlace(source, removed) {
   if (!Array.isArray(source) || !(removed instanceof Set) || removed.size === 0) return source || [];
@@ -47,9 +51,15 @@ export function registerBridgeGuardrails(road, owner = null) {
   if (road._guardrailsRegistered) return road.guardrailColliders || [];
   if (Array.isArray(road.guardrailColliders) && road.guardrailColliders.length > 0) return road.guardrailColliders;
   const colliders = [];
-  const width = Math.max(3, Number(road.width) || 5);
-  const offset = width * 0.5 + 0.3;
   const thickness = 0.24;
+  const terrainSampler = (x, z) =>
+    appCtx.baseTerrainHeightAt?.(x, z) ??
+    appCtx.terrainMeshHeightAt?.(x, z) ??
+    0;
+  const guardrailEdges = buildGuardrailEdges(road, road.pts, {
+    outsideGap: 0.3,
+    sampleTerrainY: terrainSampler
+  });
   const distances = new Float32Array(road.pts.length);
   for (let i = 1; i < road.pts.length; i += 1) {
     distances[i] = distances[i - 1] + Math.hypot(
@@ -60,8 +70,9 @@ export function registerBridgeGuardrails(road, owner = null) {
   const total = Number(distances[distances.length - 1]) || 0;
   const maxColliderLength = 10;
   const minimumDirectionDot = Math.cos(15 * Math.PI / 180);
-  let pending = null;
-  const flushPending = () => {
+  const pendingBySide = new Map();
+  const flushPending = (side) => {
+    const pending = pendingBySide.get(side);
     if (!pending) return;
     const a = pending.start;
     const b = pending.end;
@@ -69,46 +80,40 @@ export function registerBridgeGuardrails(road, owner = null) {
     const dz = b.z - a.z;
     const length = Math.hypot(dx, dz);
     if (!(length > 0.4)) {
-      pending = null;
+      pendingBySide.delete(side);
       return;
     }
-    const nx = -dz / length;
-    const nz = dx / length;
     const midX = (a.x + b.x) * 0.5;
     const midZ = (a.z + b.z) * 0.5;
     const surfaceSamples = [
-      sampleFeatureSurfaceY(road, a.x, a.z),
+      a.y,
       sampleFeatureSurfaceY(road, midX, midZ),
-      sampleFeatureSurfaceY(road, b.x, b.z)
+      b.y
     ].filter(Number.isFinite);
     const minSurfaceY = surfaceSamples.length > 0 ? Math.min(...surfaceSamples) : 0;
     const maxSurfaceY = surfaceSamples.length > 0 ? Math.max(...surfaceSamples) : minSurfaceY;
-    for (const side of [-1, 1]) {
-      const x = midX + nx * offset * side;
-      const z = midZ + nz * offset * side;
-      const pts = barrierFootprint(x, z, dx, dz, length + 0.3, thickness);
-      const collider = {
-        pts,
-        ...colliderBounds(pts),
-        baseY: minSurfaceY,
-        minY: minSurfaceY,
-        maxY: maxSurfaceY + 1.25,
-        height: maxSurfaceY - minSurfaceY + 1.25,
-        buildingType: 'bridge_guardrail',
-        collisionKind: 'barrier',
-        geometrySource: 'road_guardrail',
-        heightSource: 'infrastructure',
-        levelsSource: 'not_applicable',
-        colliderDetail: 'full',
-        sourceBuildingId: `${road.sourceFeatureId}:guardrail:${pending.startIndex}:${side}`,
-        guardrailReason: pending.reason,
-        _streamChunkKey: road._streamChunkKey || null
-      };
-      colliders.push(collider);
-      appCtx.buildings.push(collider);
-      addBuildingToSpatialIndex(collider);
-    }
-    pending = null;
+    const pts = barrierFootprint(midX, midZ, dx, dz, length + 0.3, thickness);
+    const collider = {
+      pts,
+      ...colliderBounds(pts),
+      baseY: minSurfaceY,
+      minY: minSurfaceY,
+      maxY: maxSurfaceY + 1.25,
+      height: maxSurfaceY - minSurfaceY + 1.25,
+      buildingType: 'bridge_guardrail',
+      collisionKind: 'barrier',
+      geometrySource: 'road_guardrail',
+      heightSource: 'infrastructure',
+      levelsSource: 'not_applicable',
+      colliderDetail: 'full',
+      sourceBuildingId: `${road.sourceFeatureId}:guardrail:${pending.startIndex}:${side}`,
+      guardrailReason: pending.reason,
+      _streamChunkKey: road._streamChunkKey || null
+    };
+    colliders.push(collider);
+    appCtx.buildings.push(collider);
+    addBuildingToSpatialIndex(collider);
+    pendingBySide.delete(side);
   };
   for (let i = 0; i < road.pts.length - 1; i += 1) {
     const a = road.pts[i];
@@ -117,8 +122,6 @@ export function registerBridgeGuardrails(road, owner = null) {
     const dz = b.z - a.z;
     const length = Math.hypot(dx, dz);
     if (!(length > 0.4)) continue;
-    const nx = -dz / length;
-    const nz = dx / length;
     const midX = (a.x + b.x) * 0.5;
     const midZ = (a.z + b.z) * 0.5;
     const surfaceY = sampleFeatureSurfaceY(road, midX, midZ);
@@ -133,34 +136,47 @@ export function registerBridgeGuardrails(road, owner = null) {
       waterAreas: appCtx.waterAreas
     });
     if (!safety.protected) {
-      flushPending();
+      flushPending(-1);
+      flushPending(1);
       continue;
     }
-    const directionX = dx / length;
-    const directionZ = dz / length;
-    const compatible = pending &&
-      pending.reason === safety.reason &&
-      pending.pathLength + length <= maxColliderLength &&
-      pending.directionX * directionX + pending.directionZ * directionZ >= minimumDirectionDot;
-    if (!compatible) {
-      flushPending();
-      pending = {
-        start: a,
-        end: b,
-        startIndex: i,
-        pathLength: length,
-        directionX,
-        directionZ,
-        reason: safety.reason
-      };
-      continue;
+    for (const side of [-1, 1]) {
+      const edge = side < 0 ? guardrailEdges.rightEdge : guardrailEdges.leftEdge;
+      const edgeA = edge[i];
+      const edgeB = edge[i + 1];
+      if (!edgeA || !edgeB) continue;
+      const edgeDx = edgeB.x - edgeA.x;
+      const edgeDz = edgeB.z - edgeA.z;
+      const edgeLength = Math.hypot(edgeDx, edgeDz);
+      if (!(edgeLength > 0.4)) continue;
+      const directionX = edgeDx / edgeLength;
+      const directionZ = edgeDz / edgeLength;
+      const pending = pendingBySide.get(side);
+      const compatible = pending &&
+        pending.reason === safety.reason &&
+        pending.pathLength + edgeLength <= maxColliderLength &&
+        pending.directionX * directionX + pending.directionZ * directionZ >= minimumDirectionDot;
+      if (!compatible) {
+        flushPending(side);
+        pendingBySide.set(side, {
+          start: edgeA,
+          end: edgeB,
+          startIndex: i,
+          pathLength: edgeLength,
+          directionX,
+          directionZ,
+          reason: safety.reason
+        });
+        continue;
+      }
+      pending.end = edgeB;
+      pending.pathLength += edgeLength;
+      pending.directionX = directionX;
+      pending.directionZ = directionZ;
     }
-    pending.end = b;
-    pending.pathLength += length;
-    pending.directionX = directionX;
-    pending.directionZ = directionZ;
   }
-  flushPending();
+  flushPending(-1);
+  flushPending(1);
   road._guardrailsRegistered = true;
   road.guardrailColliders = colliders;
   road._guardrailOwner = owner || null;

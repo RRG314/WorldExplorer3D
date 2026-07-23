@@ -480,6 +480,10 @@ export function animateSpaceFlight(deps = {}) {
   if (!appCtx.spaceFlight.active) return;
 
   appCtx.spaceFlight.animationId = requestAnimationFrame(() => animateSpaceFlight(deps));
+  if (document.hidden) {
+    appCtx.spaceFlight._lastFrameMs = performance.now();
+    return;
+  }
 
   const frameNow = performance.now();
   const previousFrame = appCtx.spaceFlight._lastFrameMs || frameNow - (1000 / 60);

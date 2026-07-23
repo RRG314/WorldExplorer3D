@@ -27,7 +27,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=21";
+} from "./world/spawn.js?v=22";
 import {
   scheduleDeferredStructureRefresh,
   scheduleDeferredWorldLinearFeatureLoad
@@ -39,7 +39,7 @@ import {
   initWorldOsmLoader,
   invalidateOverpassCaches,
   sameLocation
-} from "./world/osm-loader.js?v=12";
+} from "./world/osm-loader.js?v=13";
 import {
   clampNumber,
   featureTileKeyForLatLon,
@@ -108,8 +108,8 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=2";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=12";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=22";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=13";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=25";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -169,7 +169,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=5";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=68";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=69";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=13";

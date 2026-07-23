@@ -698,10 +698,14 @@ function spawnOnRoad(options = {}) {
 
   const originX = finiteNumberOr(opts.x, 0);
   const originZ = finiteNumberOr(opts.z, 0);
-  const bestRoadSpawn = searchNearestSafeRoadSpawn(originX, originZ, {
+  const bestRoadSpawn = resolveSafeWorldSpawn(originX, originZ, {
     mode: "drive",
     angle: appCtx.car?.angle,
-    maxDistance: 320
+    preferRoad: true,
+    fastLocalFallback: true,
+    maxGroundRadius: 36,
+    maxRoadDistance: 320,
+    source: "initial_world_spawn"
   });
   if (bestRoadSpawn) return applyResolvedWorldSpawn(bestRoadSpawn, { mode: "drive" });
 

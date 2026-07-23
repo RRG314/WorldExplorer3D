@@ -488,6 +488,10 @@ function updateSubmarine(dt) {
 function animateOceanMode(nowMs = 0) {
   if (!oceanMode.active) return;
   oceanMode.animationId = requestAnimationFrame(animateOceanMode);
+  if (document.hidden) {
+    oceanMode.lastFrameMs = nowMs;
+    return;
+  }
 
   if (!oceanMode.lastFrameMs) oceanMode.lastFrameMs = nowMs;
   const dt = Math.min(0.05, Math.max(0.001, (nowMs - oceanMode.lastFrameMs) / 1000));

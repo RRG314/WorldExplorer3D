@@ -82,7 +82,7 @@ export function createGlobeSelectorScene(options = {}) {
       renderLoopId = 0;
       return;
     }
-    renderFrame();
+    if (!document.hidden) renderFrame();
     renderLoopId = requestAnimationFrame(loopRender);
   }
 

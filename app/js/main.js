@@ -102,7 +102,7 @@ const runtimeKernel = createRuntimeKernel({
     environment: appCtx.getEnv?.() || null,
     gameStarted: !!appCtx.gameStarted
   }),
-  isSuspended: dedicatedRendererActive,
+  isSuspended: () => document.hidden || dedicatedRendererActive(),
   onSuspendedFrame: ({ timestamp }) => {
     appCtx.lastTime = timestamp;
   },

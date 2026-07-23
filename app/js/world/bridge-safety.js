@@ -1,4 +1,7 @@
-import { pointInPolygonXZ } from "../structure-semantics.js?v=19";
+import {
+  buildFeatureRibbonEdges,
+  pointInPolygonXZ
+} from "../structure-semantics.js?v=19";
 
 function isProtectedRoadFeature(feature) {
   const semantics = feature?.structureSemantics;
@@ -27,6 +30,24 @@ function stationCrossesWater(feature, distance) {
     if (Math.abs(distance - (Number(station?.distance) || 0)) <= span * 0.62) return true;
   }
   return false;
+}
+
+export function buildGuardrailEdges(feature, points = feature?.pts, options = {}) {
+  if (!Array.isArray(points) || points.length < 2) {
+    return { leftEdge: [], rightEdge: [] };
+  }
+  const width = Math.max(3, Number(feature?.width) || 5);
+  const outsideGap = Number.isFinite(options.outsideGap) ? Number(options.outsideGap) : 0.28;
+  const sampleTerrainY = typeof options.sampleTerrainY === 'function' ?
+    options.sampleTerrainY :
+    () => 0;
+  return buildFeatureRibbonEdges(
+    feature,
+    points,
+    width * 0.5 + outsideGap,
+    sampleTerrainY,
+    { surfaceBias: Number(feature?.surfaceBias) || 0.08 }
+  );
 }
 
 export function elevatedSegmentSafety(feature, options = {}) {

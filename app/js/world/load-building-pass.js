@@ -320,11 +320,7 @@ export function buildBuildingGeometryPass(options = {}) {
     const footprintDepth = Math.max(0, maxFootprintZ - minFootprintZ);
     const footprintArea = Math.abs(signedPolygonAreaXZ(pts));
     const centerDist = Math.hypot(centerX, centerZ);
-    const lodTier = centerDist <= buildingDetailDist ? 'near' : centerDist <= lodThresholds.farVisible ? 'mid' : 'far';
-    if (lodTier === 'far') {
-      loadMetrics.lod.farSkipped += 1;
-      return;
-    }
+    let lodTier = centerDist <= buildingDetailDist ? 'near' : centerDist <= lodThresholds.farVisible ? 'mid' : 'far';
 
     const bSeed = buildingSeedFromIdentity(way.tags?._sourceFeatureId || way.id, appCtx.rdtSeed);
     const br1 = appCtx.rand01FromInt(bSeed);
@@ -352,6 +348,22 @@ export function buildBuildingGeometryPass(options = {}) {
       buildingSemantics.heightSource === 'explicit_height' ? 'estimated_from_mapped_height' : 'estimated_from_inferred_height';
     const roofShape = String(way.tags['roof:shape'] || '').trim().toLowerCase();
     const mappedFacadeColor = String(way.tags['building:colour'] || way.tags['building:color'] || '').trim();
+    const hasMappedDimension =
+      buildingSemantics.heightSource === 'explicit_height' ||
+      buildingSemantics.heightSource === 'levels';
+    const skylinePriority = hasMappedDimension && (
+      height >= 70 ||
+      (height >= 40 && !!way.tags.name) ||
+      (height >= 55 && !!way.tags['building:part']) ||
+      ['tower', 'skyscraper'].includes(String(bt).toLowerCase())
+    );
+    if (lodTier === 'far' && skylinePriority && centerDist <= lodThresholds.farVisible + 1200) {
+      lodTier = 'mid';
+    }
+    if (lodTier === 'far') {
+      loadMetrics.lod.farSkipped += 1;
+      return;
+    }
     loadMetrics.buildingDimensions.total += 1;
     if (way.tags._buildingMetadataSourceId) loadMetrics.buildingDimensions.metadataMatched += 1;
     if (buildingSemantics.heightSource === 'explicit_height') loadMetrics.buildingDimensions.mappedHeight += 1;

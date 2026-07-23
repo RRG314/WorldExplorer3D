@@ -39,7 +39,7 @@ import {
   worldPoint,
   yieldToRenderer
 } from './streaming-vector-geometry.js?v=4';
-import { registerBridgeGuardrails, removeBridgeGuardrails } from "./bridge-guardrails.js?v=7";
+import { registerBridgeGuardrails, removeBridgeGuardrails } from "./bridge-guardrails.js?v=8";
 import { createInitialWorldRetirementApi } from "./streaming-initial-retirement.js?v=3";
 import { SOURCE_PROFILE } from "./surface-contract.js?v=7";
 import { normalizeWaterBody } from './water-body-contract.js?v=2';

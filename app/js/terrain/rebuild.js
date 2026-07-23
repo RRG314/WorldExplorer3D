@@ -8,8 +8,69 @@ import {
 import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=2";
 
 const ROAD_SURFACE_BIAS = 0.08;
+const CONTEXT_GRID_SIZE = 320;
+const MAX_CONTEXT_GRID_CELLS = 4096;
 
 export { detectRoadIntersections };
+
+function createBoundsGrid(items, boundsForItem, cellSize = CONTEXT_GRID_SIZE) {
+  const cells = new Map();
+  const allItems = [];
+  const overflow = [];
+  (items || []).forEach((item) => {
+    const bounds = boundsForItem(item);
+    if (!bounds) return;
+    const values = [bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ];
+    if (!values.every(Number.isFinite)) return;
+    allItems.push(item);
+    const minCellX = Math.floor(bounds.minX / cellSize);
+    const maxCellX = Math.floor(bounds.maxX / cellSize);
+    const minCellZ = Math.floor(bounds.minZ / cellSize);
+    const maxCellZ = Math.floor(bounds.maxZ / cellSize);
+    const cellCount = (maxCellX - minCellX + 1) * (maxCellZ - minCellZ + 1);
+    if (!Number.isFinite(cellCount) || cellCount > MAX_CONTEXT_GRID_CELLS) {
+      overflow.push(item);
+      return;
+    }
+    for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
+      for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
+        const key = `${cellX},${cellZ}`;
+        const bucket = cells.get(key) || [];
+        bucket.push(item);
+        cells.set(key, bucket);
+      }
+    }
+  });
+  return { cellSize, cells, allItems, overflow };
+}
+
+function queryBoundsGrid(grid, bounds) {
+  if (!grid?.cells || !bounds) return [];
+  const values = [bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ];
+  if (!values.every(Number.isFinite)) return [];
+  const minCellX = Math.floor(bounds.minX / grid.cellSize);
+  const maxCellX = Math.floor(bounds.maxX / grid.cellSize);
+  const minCellZ = Math.floor(bounds.minZ / grid.cellSize);
+  const maxCellZ = Math.floor(bounds.maxZ / grid.cellSize);
+  const cellCount = (maxCellX - minCellX + 1) * (maxCellZ - minCellZ + 1);
+  if (!Number.isFinite(cellCount) || cellCount > MAX_CONTEXT_GRID_CELLS) {
+    return Array.isArray(grid.allItems) ? grid.allItems : [];
+  }
+  const result = Array.isArray(grid.overflow) ? grid.overflow.slice() : [];
+  const seen = new Set(result);
+  for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
+    for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
+      const bucket = grid.cells.get(`${cellX},${cellZ}`) || [];
+      for (let i = 0; i < bucket.length; i++) {
+        const item = bucket[i];
+        if (seen.has(item)) continue;
+        seen.add(item);
+        result.push(item);
+      }
+    }
+  }
+  return result;
+}
 
 function shouldBuildIntersectionCap(intersection) {
   if (!intersection || !Array.isArray(intersection.roads)) return false;
@@ -316,6 +377,26 @@ export function rebuildRoadsWithTerrain(deps = {}) {
   } else {
     intersections = terrain._cachedIntersections;
   }
+  const endpointIntersectionByRoad = new Map();
+  intersections.forEach((intersection) => {
+    if (intersection?.hasGradeSeparatedRoad) return;
+    (intersection.roads || []).forEach((entry) => {
+      endpointIntersectionByRoad.set(`${entry.roadIdx}:${entry.ptIdx}`, intersection);
+    });
+  });
+  const intersectionGrid = createBoundsGrid(
+    intersections.filter((intersection) => !intersection?.hasGradeSeparatedRoad),
+    (intersection) => ({
+      minX: intersection.x,
+      maxX: intersection.x,
+      minZ: intersection.z,
+      maxZ: intersection.z
+    })
+  );
+  const landuseGrid = createBoundsGrid(
+    appCtx.landuses,
+    (landuse) => landuse.bounds || pointsBoundsLocal(landuse.pts || [])
+  );
 
   const roadMainBatchVerts = [];
   const roadMainBatchIdx = [];
@@ -348,14 +429,8 @@ export function rebuildRoadsWithTerrain(deps = {}) {
           baseDetail;
     const basePts = subdivideRoadPoints(road.pts, detail);
     const endpointIntersectionRefs = {
-      start: intersections.find((intersection) =>
-        !intersection?.hasGradeSeparatedRoad &&
-        intersection?.roads?.some((entry) => entry.roadIdx === roadIdx && entry.ptIdx === 0)
-      ) || null,
-      end: intersections.find((intersection) =>
-        !intersection?.hasGradeSeparatedRoad &&
-        intersection?.roads?.some((entry) => entry.roadIdx === roadIdx && entry.ptIdx === road.pts.length - 1)
-      ) || null
+      start: endpointIntersectionByRoad.get(`${roadIdx}:0`) || null,
+      end: endpointIntersectionByRoad.get(`${roadIdx}:${road.pts.length - 1}`) || null
     };
     const pts =
       road?.structureSemantics?.terrainMode === "at_grade" && !hasTransitionAnchors ?
@@ -385,9 +460,9 @@ export function rebuildRoadsWithTerrain(deps = {}) {
     const buildingCandidates = Array.isArray(nearbyBuildings) ? nearbyBuildings.filter((building) =>
       boundsIntersectLocal(building, contextBounds)
     ) : [];
-    const nearbyLanduses = Array.isArray(appCtx.landuses) ? appCtx.landuses.filter((landuse) =>
+    const nearbyLanduses = queryBoundsGrid(landuseGrid, contextBounds).filter((landuse) =>
       boundsIntersectLocal(landuse.bounds || pointsBoundsLocal(landuse.pts || []), contextBounds)
-    ) : [];
+    );
     const nearbyUrbanLanduses = nearbyLanduses.filter((landuse) => isUrbanLanduseType(landuse?.type)).length;
     const nearbyGreenLanduses = nearbyLanduses.filter((landuse) => isGreenLanduseType(landuse?.type)).length;
     const explicitSidewalkHint = roadHasExplicitSidewalkHint(road);
@@ -404,7 +479,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
       roadSupportsSidewalks(road) &&
       explicitSidewalkHint;
     const sidewalkWidth = shouldBuildSidewalks ? roadBaseSidewalkWidth(road, denseUrbanContext) : 0;
-    const nearbyIntersections = shouldBuildSidewalks ? intersections.filter((intersection) =>
+    const nearbyIntersections = shouldBuildSidewalks ? queryBoundsGrid(intersectionGrid, roadBounds).filter((intersection) =>
       !intersection?.hasGradeSeparatedRoad &&
       boundsIntersectLocal(roadBounds, { minX: intersection.x, maxX: intersection.x, minZ: intersection.z, maxZ: intersection.z }, Math.max(width * 1.1, 8))
     ) : [];

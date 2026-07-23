@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   clearStructureVisualMeshes,
   rebuildStructureVisualMeshes
-} from "./terrain/structure-visuals.js?v=5";
+} from "./terrain/structure-visuals.js?v=6";
 import {
   boundsIntersectLocal,
   expandBoundsLocal,
@@ -45,12 +45,12 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   rebuildRoadsWithTerrain
-} from "./terrain/rebuild.js?v=9";
+} from "./terrain/rebuild.js?v=11";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
-} from "./terrain/debug-tools.js?v=3";
+} from "./terrain/debug-tools.js?v=5";
 import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
 import { createTerrainStreamingApi } from "./terrain/streaming.js?v=10";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
