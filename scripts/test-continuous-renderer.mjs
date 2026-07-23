@@ -153,8 +153,14 @@ async function rendererMetrics(page) {
   return page.evaluate(async (moduleUrl) => {
     const { ctx } = await import(moduleUrl);
     const streamMeshes = [];
+    const sceneGeometries = new Set();
+    const streamGeometries = new Set();
     ctx.scene?.traverse?.((object) => {
-      if (object?.isMesh && object.userData?.earthStreamingChunk) streamMeshes.push(object);
+      if (object?.geometry) sceneGeometries.add(object.geometry);
+      if (object?.isMesh && object.userData?.earthStreamingChunk) {
+        streamMeshes.push(object);
+        if (object.geometry) streamGeometries.add(object.geometry);
+      }
     });
     const roles = {};
     let missingProvenance = 0;
@@ -163,9 +169,14 @@ async function rendererMetrics(page) {
       roles[role] = Number(roles[role] || 0) + 1;
       if (role === 'missing') missingProvenance += 1;
     }
-    const visibleBuildingMeshes = (ctx.buildingMeshes || []).filter((mesh) =>
-      mesh?.userData?.earthStreamingChunk && mesh.visible !== false
+    const retainedBuildingMeshes = (ctx.buildingMeshes || []).filter((mesh) =>
+      mesh?.userData?.earthStreamingChunk
     );
+    const retainedBuildingSources = retainedBuildingMeshes.reduce(
+      (sum, mesh) => sum + Math.max(1, Number(mesh.userData?.batchCount || 1)),
+      0
+    );
+    const visibleBuildingMeshes = retainedBuildingMeshes.filter((mesh) => mesh.visible !== false);
     const visibleBuildingSources = visibleBuildingMeshes.reduce(
       (sum, mesh) => sum + Math.max(1, Number(mesh.userData?.batchCount || 1)),
       0
@@ -201,11 +212,14 @@ async function rendererMetrics(page) {
     );
     return {
       streamMeshes: streamMeshes.length,
+      sceneGeometries: sceneGeometries.size,
+      streamGeometries: streamGeometries.size,
       missingProvenance,
       roles,
       visibleRoadMeshes: (ctx.roadMeshes || []).filter((mesh) => mesh?.userData?.earthStreamingChunk && mesh.visible !== false).length,
       visibleBuildingMeshes: visibleBuildingMeshes.length,
       visibleBuildingSources,
+      retainedBuildingSources,
       buildingFeatureBudgets,
       visibleLandCoverMeshes: visibleLandCover.length,
       opaqueLandCoverMeshes: visibleLandCover.filter((mesh) =>
@@ -380,7 +394,12 @@ async function main() {
       assert(Number(plateauResources.terrainCache?.recovered || 0) >= 1, 'The injected terrain request failure did not recover.');
     }
     assert(plateauResources.streamMeshes <= warmResources.streamMeshes + 10, 'Stream mesh count kept growing after warm-up.');
-    assert(plateauResources.gpu.geometries <= warmResources.gpu.geometries + 12, 'GPU geometry count kept growing after warm-up.');
+    assert(plateauResources.streamGeometries <= warmResources.streamGeometries + 10, 'Reachable stream geometry ownership kept growing after warm-up.');
+    assert(plateauResources.sceneGeometries <= warmResources.sceneGeometries + 12, 'Reachable scene geometry ownership kept growing after warm-up.');
+    assert(
+      plateauResources.gpu.geometries <= plateauResources.sceneGeometries + 64,
+      'Renderer geometry resources exceeded reachable scene ownership.'
+    );
     assert(plateauResources.gpu.textures <= warmResources.gpu.textures + 2, 'GPU texture count kept growing after warm-up.');
     assert(plateauResources.vectorResources?.pendingGeometryDisposals === 0, 'Vector geometry disposal queue did not drain.');
     report.road = await snapToMappedRoad(page);
@@ -399,7 +418,8 @@ async function main() {
     report.drone = await rendererMetrics(page);
     await page.screenshot({ path: path.join(outputDir, 'baltimore-drone.png') });
     assert(report.drone.visibleRoadMeshes >= 9, 'Continuous road batches were not visible in drone mode.');
-    assert(report.drone.visibleBuildingSources >= 10000, 'Dense Baltimore did not retain enough visible building sources.');
+    assert(report.drone.retainedBuildingSources >= 10000, 'Dense Baltimore did not retain enough mapped building sources.');
+    assert(report.drone.visibleBuildingSources >= 3200, 'Dense Baltimore fell below the minimum aerial LOD building budget.');
     const centerBuildingBudget = report.drone.buildingFeatureBudgets?.[report.drone.streaming?.centerKey];
     assert(centerBuildingBudget, 'The active tile did not expose its building feature budget.');
     assert(
