@@ -126,7 +126,19 @@ function isTransientConsoleError(message = '') {
 
 async function startFrameRecorder(page) {
   await page.evaluate(() => {
-    const state = { active: true, samples: [], previous: performance.now() };
+    const state = { active: true, samples: [], previous: performance.now(), longTasks: [], observer: null };
+    if (typeof PerformanceObserver === 'function' && PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
+      state.observer = new PerformanceObserver((list) => {
+        list.getEntries().forEach((entry) => {
+          state.longTasks.push({
+            duration: entry.duration,
+            name: entry.name,
+            startTime: entry.startTime
+          });
+        });
+      });
+      state.observer.observe({ entryTypes: ['longtask'] });
+    }
     window.__hardwarePerfFrames = state;
     const sample = (now) => {
       if (!state.active) return;
@@ -144,8 +156,14 @@ async function stopFrameRecorder(page) {
     const state = window.__hardwarePerfFrames;
     if (!state) return [];
     state.active = false;
+    state.observer?.disconnect?.();
+    window.__lastHardwareLongTasks = state.longTasks;
     return state.samples;
   });
+}
+
+async function readLastLongTasks(page) {
+  return page.evaluate(() => globalThis.__lastHardwareLongTasks || []);
 }
 
 async function runtimeSnapshot(page) {
@@ -280,6 +298,7 @@ async function runtimeSnapshot(page) {
         }))
       },
       webglContextLost: !gl || gl.isContextLost(),
+      mapRoadDraw: ctx.lastMapRoadDrawStats || null,
       diagnostics: globalThis.getWorldExplorerRuntimeDiagnostics?.() || null
     };
   });
@@ -298,12 +317,14 @@ async function sampleEnvironment(page, label, durationMs = scenarioMs) {
   await startFrameRecorder(page);
   await page.waitForTimeout(durationMs);
   const frames = summarizeFrames(await stopFrameRecorder(page));
+  const longTasks = await readLastLongTasks(page);
   const snapshot = await runtimeSnapshot(page);
   const screenshot = path.join(outputDir, `${label}.png`);
   await page.screenshot({ path: screenshot, fullPage: false });
   return roundNumbers({
     label,
     frames,
+    longTasks,
     snapshot,
     screenshot: path.relative(rootDir, screenshot)
   });
@@ -439,7 +460,13 @@ await fs.mkdir(outputDir, { recursive: true });
 const browser = await chromium.launch({
   channel: 'chrome',
   headless: false,
-  args: ['--enable-gpu-rasterization', '--ignore-gpu-blocklist']
+  args: [
+    '--disable-background-timer-throttling',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
+    '--enable-gpu-rasterization',
+    '--ignore-gpu-blocklist'
+  ]
 });
 
 try {
@@ -505,7 +532,8 @@ try {
     return {
       worldLoadMs: performance.now() - startedAt,
       worldLoadTransaction: ctx.getWorldLoadTransactionSnapshot?.() || null,
-      worldLoadStage: ctx.lastWorldLoadStage || null
+      worldLoadStage: ctx.lastWorldLoadStage || null,
+      mapRoadDraw: ctx.lastMapRoadDrawStats || null
     };
   });
   setup.navigationAndLoadMs = performance.now() - navigationStarted;
@@ -630,6 +658,9 @@ try {
   }
   if (!(setup.worldLoadStage?.stagedCounts?.roads > 0)) {
     violations.push('committed world load stage reported no roads');
+  }
+  if (!(setup.worldLoadStage?.stagedTerrainMeshes > 0)) {
+    violations.push('committed world load stage reported no terrain meshes');
   }
   if (setup.navigationAndLoadMs > budgets.loadMs) violations.push(`load time ${setup.navigationAndLoadMs}ms`);
   if (heapAfter > budgets.heapBytes) violations.push(`heap ${heapAfter} bytes`);

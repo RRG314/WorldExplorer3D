@@ -159,6 +159,7 @@ function clearEarthWorldSceneObjects() {
 
 function createEarthSceneStage(label = 'world-load-stage') {
   const previousRoot = ensureEarthSceneRoot();
+  const previousTerrainGroup = appCtx.terrainGroup;
   if (!previousRoot || !appCtx.scene) throw new Error('Earth scene root is unavailable.');
   const stageRoot = new THREE.Group();
   stageRoot.name = `Earth Runtime Stage: ${String(label || 'world-load-stage')}`;
@@ -192,7 +193,17 @@ function createEarthSceneStage(label = 'world-load-stage') {
     attachEarthSceneWithoutChangingLod();
     stageRoot.visible = appCtx.earthSceneVisible !== false;
 
-    [...previousRoot.children].forEach(disposeEarthWorldObject);
+    [...previousRoot.children].forEach((object) => {
+      if (object === previousTerrainGroup && typeof appCtx.disposeTerrainMesh === 'function') {
+        [...object.children].forEach((mesh) => {
+          object.remove?.(mesh);
+          appCtx.disposeTerrainMesh(mesh);
+        });
+        object.parent?.remove?.(object);
+        return;
+      }
+      disposeEarthWorldObject(object);
+    });
     previousRoot.parent?.remove?.(previousRoot);
     lastOwnershipSignature = sceneOwnershipSignature();
     status = 'committed';

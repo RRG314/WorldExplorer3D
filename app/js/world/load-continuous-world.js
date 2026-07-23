@@ -1,10 +1,11 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { clearBuildingSpatialIndex } from './building-spatial-index.js?v=7';
+import { addBuildingToSpatialIndex, clearBuildingSpatialIndex } from './building-spatial-index.js?v=7';
 import { resetWorldFurnitureCaches } from './furniture.js?v=10';
 import { earthSceneSuppressed, hideEarthSceneMeshes, resetWorldForReload } from './load-reset.js?v=9';
 import { finalizeLoadedWorld } from './load-support.js?v=25';
 import { worldLoadTransactions } from './load-transaction.js?v=2';
-import { beginWorldLoadStage } from './load-stage.js?v=1';
+import { beginWorldLoadStage } from './load-stage.js?v=2';
+import { restoreWorldRuntimeAfterRollback } from './load-rollback.js?v=1';
 
 let activeLoad = null;
 
@@ -48,7 +49,17 @@ async function loadContinuousEarthWorldInternal(location) {
     transaction.fail(error);
     throw error;
   }
-  const releaseStageRollback = transaction.deferRollback((reason) => worldLoadStage.rollback(reason));
+  const releaseStageRollback = transaction.deferRollback((reason) => {
+    const rolledBack = worldLoadStage.rollback(reason);
+    if (!rolledBack) return false;
+    restoreWorldRuntimeAfterRollback(appCtx, {
+      addBuildingToSpatialIndex,
+      clearBuildingSpatialIndex,
+      invalidateTraversalNetworks: appCtx.invalidateTraversalNetworks,
+      reason
+    });
+    return true;
+  });
   const loadSequence = appCtx._worldLoadSequence = (appCtx._worldLoadSequence || 0) + 1;
   const isCurrent = () =>
     transaction.isCurrent() &&

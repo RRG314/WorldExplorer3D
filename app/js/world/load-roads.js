@@ -6,7 +6,7 @@ import {
   createWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession,
   recordWorldSourceMetrics
-} from "./load-runtime-session.js?v=9";
+} from "./load-runtime-session.js?v=10";
 import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=18";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
@@ -166,6 +166,7 @@ export function createWorldRoadLoader(deps = {}) {
   });
   async function loadRoadsInternal(retryPass = 0) {
     const session = createWorldLoadRuntimeSession({
+      addBuildingToSpatialIndex,
       appCtx,
       clearBuildingSpatialIndex,
       earthSceneSuppressed,

@@ -1,8 +1,10 @@
 import { worldLoadTransactions } from './load-transaction.js?v=2';
-import { beginWorldLoadStage } from './load-stage.js?v=1';
+import { beginWorldLoadStage } from './load-stage.js?v=2';
+import { restoreWorldRuntimeAfterRollback } from './load-rollback.js?v=1';
 
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
+    addBuildingToSpatialIndex,
     appCtx,
     clearBuildingSpatialIndex,
     earthSceneSuppressed,
@@ -100,7 +102,17 @@ export function createWorldLoadRuntimeSession(options = {}) {
     transaction.fail(error);
     throw error;
   }
-  const releaseStageRollback = transaction.deferRollback((reason) => worldLoadStage.rollback(reason));
+  const releaseStageRollback = transaction.deferRollback((reason) => {
+    const rolledBack = worldLoadStage.rollback(reason);
+    if (!rolledBack) return false;
+    restoreWorldRuntimeAfterRollback(appCtx, {
+      addBuildingToSpatialIndex,
+      clearBuildingSpatialIndex,
+      invalidateTraversalNetworks,
+      reason
+    });
+    return true;
+  });
 
   try {
     resetWorldForReload({
