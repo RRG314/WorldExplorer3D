@@ -29,6 +29,11 @@ async function launchBaltimore(page, baseUrl) {
     { timeout: 90000 }
   );
   await page.locator('#loading').waitFor({ state: 'hidden', timeout: 180000 });
+  await page.waitForFunction(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const status = String(ctx.worldDetailState?.buildings?.status || '');
+    return status !== '' && status !== 'loading';
+  }, null, { timeout: 60000 });
 }
 
 async function exerciseLifecycle(page) {
@@ -301,6 +306,29 @@ async function exerciseLifecycle(page) {
     ctx.clearActiveInterior?.({ restorePlayer: true, preserveCache: true });
     const modeCycles = [];
     const settleFrames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const collectReachableResources = () => {
+      const geometries = new Set();
+      const materials = new Set();
+      const textures = new Set();
+      const collectTexture = (value) => {
+        if (value?.isTexture) textures.add(value);
+      };
+      ctx.scene?.traverse?.((object) => {
+        if (object?.geometry) geometries.add(object.geometry);
+        const objectMaterials = Array.isArray(object?.material) ? object.material : [object?.material];
+        for (const material of objectMaterials) {
+          if (!material) continue;
+          materials.add(material);
+          for (const value of Object.values(material)) collectTexture(value);
+          for (const uniform of Object.values(material.uniforms || {})) collectTexture(uniform?.value);
+        }
+      });
+      return {
+        geometries: geometries.size,
+        materials: materials.size,
+        textures: textures.size
+      };
+    };
     for (let cycle = 1; cycle <= 5; cycle += 1) {
       const origin = {
         x: Number(ctx.car?.x) || center.x,
@@ -317,6 +345,7 @@ async function exerciseLifecycle(page) {
       await settleFrames();
       globalThis.gc?.();
       await settleFrames();
+      const reachable = collectReachableResources();
       modeCycles.push({
         cycle,
         durationMs: performance.now() - startedAt,
@@ -325,10 +354,32 @@ async function exerciseLifecycle(page) {
         planeMeshes: ctx.scene?.children?.filter((child) => child?.name === 'Explorer STOL Aircraft').length || 0,
         geometries: Number(ctx.renderer?.info?.memory?.geometries || 0),
         textures: Number(ctx.renderer?.info?.memory?.textures || 0),
+        reachableGeometries: reachable.geometries,
+        reachableMaterials: reachable.materials,
+        reachableTextures: reachable.textures,
         pendingGeometryDisposals: Number(ctx.getStreamingVectorResourceSnapshot?.()?.pendingGeometryDisposals || 0),
         heapBytes: Number(performance.memory?.usedJSHeapSize || 0)
       });
     }
+    const warmedHeapSamples = modeCycles
+      .slice(1, -1)
+      .map((cycle) => cycle.heapBytes)
+      .filter((value) => value > 0)
+      .sort((a, b) => a - b);
+    const heapMidpoint = Math.floor(warmedHeapSamples.length / 2);
+    const warmedHeapMedian = warmedHeapSamples.length === 0
+      ? 0
+      : warmedHeapSamples.length % 2 === 0
+        ? (warmedHeapSamples[heapMidpoint - 1] + warmedHeapSamples[heapMidpoint]) / 2
+        : warmedHeapSamples[heapMidpoint];
+    const finalHeapBytes = Number(modeCycles.at(-1)?.heapBytes || 0);
+    const modeResourcePlateau = {
+      buildingDetailStatus: String(ctx.worldDetailState?.buildings?.status || ''),
+      warmedHeapSamples,
+      warmedHeapMedian,
+      finalHeapBytes,
+      finalToMedianRatio: warmedHeapMedian > 0 ? finalHeapBytes / warmedHeapMedian : null
+    };
 
     return {
       building: {
@@ -357,6 +408,7 @@ async function exerciseLifecycle(page) {
       planeControls: { pullUpPitch, noseDownPitch, controlChordThrottle, zThrottle, xThrottle, inputOwnership, gamepadActions },
       driveExit,
       modeCycles,
+      modeResourcePlateau,
       interior: interiorReport
     };
   });
@@ -374,7 +426,7 @@ async function main() {
   const browser = await chromium.launch({
     headless: true,
     channel: 'chrome',
-    args: ['--js-flags=--expose-gc']
+    args: ['--js-flags=--expose-gc', '--enable-precise-memory-info']
   });
   const errors = [];
   try {
@@ -413,11 +465,28 @@ async function main() {
     const finalModeCycle = report.modeCycles.at(-1);
     assert(report.modeCycles.every((cycle) => cycle.currentMode === 'walk'), 'Repeated mode cycle did not return to walk');
     assert(report.modeCycles.every((cycle) => cycle.planeMeshes === 1), 'Repeated mode cycle duplicated the plane mesh');
-    assert(finalModeCycle.geometries <= warmModeCycle.geometries, 'Renderer geometry count grew after mode warm-up');
-    assert(finalModeCycle.textures <= warmModeCycle.textures, 'Renderer texture count grew after mode warm-up');
+    assert(
+      finalModeCycle.reachableGeometries <= warmModeCycle.reachableGeometries,
+      'Reachable scene geometry count grew after mode warm-up'
+    );
+    assert(
+      finalModeCycle.reachableMaterials <= warmModeCycle.reachableMaterials,
+      'Reachable scene material count grew after mode warm-up'
+    );
+    assert(
+      finalModeCycle.reachableTextures <= warmModeCycle.reachableTextures,
+      'Reachable scene texture count grew after mode warm-up'
+    );
     assert(finalModeCycle.pendingGeometryDisposals <= 192, 'Mode cycle left the geometry disposal queue over budget');
-    if (warmModeCycle.heapBytes > 0 && finalModeCycle.heapBytes > 0) {
-      assert(finalModeCycle.heapBytes <= warmModeCycle.heapBytes * 1.15, 'Browser heap retained growth after mode warm-up');
+    assert(
+      report.modeResourcePlateau.buildingDetailStatus !== 'loading',
+      'Mode resource plateau started before deferred world detail settled'
+    );
+    if (report.modeResourcePlateau.warmedHeapMedian > 0 && finalModeCycle.heapBytes > 0) {
+      assert(
+        finalModeCycle.heapBytes <= report.modeResourcePlateau.warmedHeapMedian * 1.15,
+        `Browser heap retained growth after mode warm-up: ${JSON.stringify(report.modeResourcePlateau)}`
+      );
     }
     assert(report.interior.entered, 'Large building interior did not open');
     assert(report.interior.bboxFootprintEnterable, 'A valid bounding-box building was not enterable');

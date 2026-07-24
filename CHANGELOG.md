@@ -7,6 +7,10 @@
 - Kept at-grade navigation surfaces owned by the active terrain sampler after streamed terrain replacement, preventing ordinary roads from retaining stale elevations.
 - Made tunnel water suppression persistent across LOD refreshes and restored normal water visibility ownership on exit.
 
+### Verification
+
+- Made plane/interior lifecycle retention wait for deferred building detail, use precise forced-GC heap measurements across multiple warmed samples, and compare exact reachable scene resources instead of Three.js upload-history counters.
+
 ## [4.0.0] - 2026-07-22
 
 ### Added
