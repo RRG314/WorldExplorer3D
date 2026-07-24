@@ -65,6 +65,9 @@ export function startLandingSequence(targetMesh, targetRadius, targetName, deps 
   const duration = Math.max(1200, landingDuration);
   const landingAxis = new THREE.Vector3(0, -1, 0);
   const toTarget = new THREE.Vector3();
+  const scheduleFrame = typeof deps.scheduleFrame === 'function'
+    ? deps.scheduleFrame
+    : (callback) => requestAnimationFrame(callback);
 
   function landingAnimation() {
     if (
@@ -83,7 +86,7 @@ export function startLandingSequence(targetMesh, targetRadius, targetName, deps 
     toTarget.copy(frozenTargetPos).sub(appCtx.spaceFlight.rocket.position).normalize();
     appCtx.spaceFlight.rocket.quaternion.setFromUnitVectors(landingAxis, toTarget);
 
-    if (progress < 1) requestAnimationFrame(landingAnimation);
+    if (progress < 1) scheduleFrame(landingAnimation);
     else deps.completeLanding?.(sessionId);
   }
 
@@ -480,6 +483,10 @@ export function animateSpaceFlight(deps = {}) {
   if (!appCtx.spaceFlight.active) return;
 
   appCtx.spaceFlight.animationId = requestAnimationFrame(() => animateSpaceFlight(deps));
+  if (document.hidden) {
+    appCtx.spaceFlight._lastFrameMs = performance.now();
+    return;
+  }
 
   const frameNow = performance.now();
   const previousFrame = appCtx.spaceFlight._lastFrameMs || frameNow - (1000 / 60);

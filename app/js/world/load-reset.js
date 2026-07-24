@@ -47,6 +47,7 @@ export function hideEarthSceneMeshes() {
 
 export function resetWorldForReload(options = {}) {
   const locName = options.locName || 'World';
+  const preserveEarthSceneRoot = options.preserveEarthSceneRoot === true;
   const invalidateTraversalNetworks = typeof options.invalidateTraversalNetworks === 'function' ? options.invalidateTraversalNetworks : () => {};
   const clearBuildingSpatialIndex = typeof options.clearBuildingSpatialIndex === 'function' ? options.clearBuildingSpatialIndex : () => {};
   const resetWorldFurnitureCaches = typeof options.resetWorldFurnitureCaches === 'function' ? options.resetWorldFurnitureCaches : () => {};
@@ -136,7 +137,7 @@ export function resetWorldForReload(options = {}) {
 
   // The scene root is the authoritative owner. This removes any deferred or
   // previously batched world objects that are no longer reachable from a list.
-  appCtx.clearEarthWorldSceneObjects?.();
+  if (!preserveEarthSceneRoot) appCtx.clearEarthWorldSceneObjects?.();
 
   resetWorldFurnitureCaches();
   if (typeof appCtx.clearWindowTextureCache === 'function') {

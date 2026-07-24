@@ -138,7 +138,10 @@ try {
   await page.evaluate(() => document.activeElement?.blur?.());
   await page.keyboard.down('ArrowUp');
   await page.keyboard.down('ControlLeft');
-  await page.waitForTimeout(1800);
+  await pollPageState(page, async (startY) => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return Number(ctx.oceanMode?.submarine?.position?.y) < Number(startY) - 0.2;
+  }, subStart.ocean?.position?.y, 5000, 'submarine descent input');
   await page.keyboard.up('ControlLeft');
   await page.keyboard.down('ArrowLeft');
   await page.waitForTimeout(700);
@@ -173,10 +176,31 @@ try {
   assert(restored.canvases.visibleOcean === 0, 'Ocean canvas remained visible after surfacing');
   assert(restored.worldCanvasVisible, 'Earth canvas was not restored after surfacing');
   assert(Object.values(restored.camera || {}).every(Number.isFinite), 'Earth camera was invalid after surfacing');
-  await fs.writeFile(path.join(outputDir, 'network-report.json'), `${JSON.stringify({ httpErrors, consoleErrors }, null, 2)}\n`);
-  assert(consoleErrors.length === 0, `Water travel logged errors: ${consoleErrors.join(' | ')}`);
+  const transientFirestoreListenerError = httpErrors.some(({ status, url }) =>
+    status === 400 && /firestore\.googleapis\.com\/google\.firestore\.v1\.Firestore\/Listen\/channel/i.test(url)
+  );
+  const actionableConsoleErrors = consoleErrors.filter((text) => !(
+    transientFirestoreListenerError &&
+    /Failed to load resource: the server responded with a status of 400/i.test(text)
+  ));
+  await fs.writeFile(path.join(outputDir, 'network-report.json'), `${JSON.stringify({
+    httpErrors,
+    consoleErrors,
+    actionableConsoleErrors
+  }, null, 2)}\n`);
+  assert(actionableConsoleErrors.length === 0, `Water travel logged errors: ${actionableConsoleErrors.join(' | ')}`);
 
-  const report = { ok: true, boatStart, boatMoved, subStart, subMoved, restored, httpErrors, consoleErrors };
+  const report = {
+    ok: true,
+    boatStart,
+    boatMoved,
+    subStart,
+    subMoved,
+    restored,
+    httpErrors,
+    consoleErrors,
+    actionableConsoleErrors
+  };
   await fs.writeFile(path.join(outputDir, 'report.json'), `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify({
     ok: true,

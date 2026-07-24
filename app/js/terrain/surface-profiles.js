@@ -232,8 +232,12 @@ function ensureTerrainTextureSet(mesh, repeats, mode = "grass") {
     mode === "forest" ? "forest" :
     "grass";
   let source = null;
-  const registeredMode = modeKey === 'snowRock' ? 'rock' : modeKey;
-  if (appCtx.surfaceTextureSets?.[registeredMode]?.map) {
+  // Extreme biomes need a deterministic semantic surface. The registered
+  // snow/rock and sand assets are useful detail maps elsewhere, but their
+  // dominant colors misrepresent alpine snow and open desert at terrain scale.
+  const registeredMode =
+    modeKey === "snow" || modeKey === "snowRock" || modeKey === "sand" ? null : modeKey;
+  if (registeredMode && appCtx.surfaceTextureSets?.[registeredMode]?.map) {
     source = appCtx.surfaceTextureSets[registeredMode];
   } else if (modeKey === "grass" || modeKey === "forest") {
     source = {
@@ -425,11 +429,15 @@ function applyLoadedWorldCoverBaseline(mesh) {
       Number(mesh.userData.terrainTextureRepeats) || 12,
       detailMode
     );
-    material.map = result.texture;
+    const preferSemanticPbr =
+      semanticProfile?.mode === 'sand' ||
+      semanticProfile?.mode === 'snow' ||
+      semanticProfile?.mode === 'snowRock';
+    material.map = preferSemanticPbr ? detailTextures?.map || null : result.texture;
     material.normalMap = detailTextures?.normalMap || null;
     material.roughnessMap = detailTextures?.roughnessMap || null;
     if (material.normalMap) material.normalScale = new THREE.Vector2(0.28, 0.28);
-    material.color.setHex(0xffffff);
+    material.color.setHex(semanticProfile?.mode === 'sand' ? 0xffd18a : 0xffffff);
     material.emissiveMap = null;
     material.emissiveIntensity = 0;
     material.roughness = 0.96;
@@ -440,6 +448,10 @@ function applyLoadedWorldCoverBaseline(mesh) {
       source: 'surface-material-registry',
       mode: detailMode
     };
+    if (preferSemanticPbr && result.texture) {
+      result.texture.dispose?.();
+      result.texture = null;
+    }
   } else {
     mesh.userData.terrainDetailProvenance = null;
   }

@@ -29,6 +29,7 @@ function suspendBoatModeForOceanTransfer() {
   resetBoatFoamFx();
   if (appCtx.boatMode.mesh) appCtx.boatMode.mesh.visible = false;
   if (appCtx.boatMode.waterPatch) appCtx.boatMode.waterPatch.visible = false;
+  if (appCtx.boatMode.oceanHorizonPatch) appCtx.boatMode.oceanHorizonPatch.visible = false;
   syncBoatTerrainSuppression();
   updateWaterWaveVisuals();
   updateBoatMenuUi();

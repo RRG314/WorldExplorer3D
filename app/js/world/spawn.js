@@ -1,8 +1,8 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { inferSelectedLocationWaterKind } from "./water-location-hint.js?v=2";
-import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=19";
-import { createWorldSpawnSurfaceApi } from "./spawn-surface.js?v=3";
+import { featuredArrivalNear } from "./featured-arrivals.js?v=6";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=21";
+import { createWorldSpawnSurfaceApi } from "./spawn-surface.js?v=6";
 
 let worldSpawnDeps = {
   buildingContainingPoint: () => null,
@@ -22,6 +22,7 @@ function initWorldSpawning(deps = {}) {
 const {
   driveBuildBlockCollision,
   driveCenterYAtWorld,
+  cameraTerrainObstructionAt,
   finiteNumberOr,
   resolveRoadHeading,
   shouldIgnoreDriveCollision,
@@ -29,6 +30,7 @@ const {
   spawnEnclosurePenalty,
   slopeDegreesAt,
   slopePenaltyAt,
+  terrainVistaHeadingAt,
   spawnSurfacePenalty,
   terrainYAtWorld,
   walkBaseYAtWorld,
@@ -37,7 +39,7 @@ const {
   getDeps: () => worldSpawnDeps
 });
 function evaluateWalkSpawnCandidate(x, z, options = {}) {
-  const angle = finiteNumberOr(options.angle, finiteNumberOr(appCtx.car?.angle, 0));
+  let angle = finiteNumberOr(options.angle, finiteNumberOr(appCtx.car?.angle, 0));
   const terrainY = terrainYAtWorld(x, z);
   const walkBaseY = walkBaseYAtWorld(x, z);
   if (!Number.isFinite(terrainY)) return { valid: false, reason: "terrain_missing" };
@@ -61,14 +63,24 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
     actorHeight: 1.9,
     tolerance: 0.45
   });
+  let standingOnRoof = false;
   if (containingBuilding) {
     const minY = Number.isFinite(containingBuilding.minY) ? containingBuilding.minY : containingBuilding.baseY;
     const maxY = Number.isFinite(containingBuilding.maxY) ?
       containingBuilding.maxY :
       Number.isFinite(minY) && Number.isFinite(containingBuilding.height) ? minY + containingBuilding.height : NaN;
-    const standingOnRoof = options.allowBuildingRoof === true && Number.isFinite(maxY) &&
+    standingOnRoof = options.allowBuildingRoof === true && Number.isFinite(maxY) &&
       actorFeetY >= maxY - 0.12 && actorFeetY <= maxY + 1.2;
     if (!standingOnRoof) return { valid: false, reason: "inside_building", terrainY };
+  }
+  if (!standingOnRoof && typeof appCtx.checkBuildingCollision === "function") {
+    const buildingCheck = appCtx.checkBuildingCollision(x, z, 1.5, {
+      actorBaseY: collisionBaseY,
+      actorHeight: 1.9
+    });
+    if (buildingCheck?.collision) {
+      return { valid: false, reason: "building_clearance", terrainY, buildingCheck };
+    }
   }
   if (options.preserveElevatedSurface === true && hasExplicitFeetY && actorFeetY > surfaceY + 1) {
     surfaceY = actorFeetY;
@@ -76,7 +88,16 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
   if (walkBuildBlockCollision(x, z, terrainY)?.blocked) return { valid: false, reason: "build_block", terrainY };
 
   const slopeDeg = slopeDegreesAt(x, z);
-  if (slopeDeg > 40) return { valid: false, reason: "slope_too_steep", terrainY, slopeDeg };
+  if (slopeDeg > 22) return { valid: false, reason: "slope_too_steep", terrainY, slopeDeg };
+  let vistaScore = 0;
+  const preserveExplicitHeading =
+    options.source === 'featured_landmark_arrival' ||
+    options.source === 'walk_mode_switch';
+  if (!road && slopeDeg > 10 && !preserveExplicitHeading) {
+    const vista = terrainVistaHeadingAt(x, z, angle);
+    angle = finiteNumberOr(vista?.angle, angle);
+    vistaScore = finiteNumberOr(vista?.score, 0);
+  }
 
   return {
     valid: true,
@@ -90,6 +111,7 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
     walkY: surfaceY + 1.7,
     carY: surfaceY + 1.2,
     slopeDeg,
+    vistaScore,
     source: options.source || "direct"
   };
 }
@@ -155,9 +177,35 @@ function evaluateDriveSpawnCandidate(x, z, options = {}) {
   };
 }
 
+function historicLandmarkDistanceAt(x, z) {
+  let nearest = Infinity;
+  const matrix = typeof THREE !== 'undefined' ? new THREE.Matrix4() : null;
+  for (const mesh of appCtx.historicMarkers || []) {
+    if (!mesh?.userData?.isHistoricLandmark) continue;
+    if (matrix && mesh.isInstancedMesh && typeof mesh.getMatrixAt === 'function') {
+      for (let index = 0; index < mesh.count; index += 1) {
+        mesh.getMatrixAt(index, matrix);
+        const elements = matrix.elements;
+        nearest = Math.min(nearest, Math.hypot(x - elements[12], z - elements[14]));
+      }
+      continue;
+    }
+    if (Number.isFinite(mesh.position?.x) && Number.isFinite(mesh.position?.z)) {
+      nearest = Math.min(nearest, Math.hypot(x - mesh.position.x, z - mesh.position.z));
+    }
+  }
+  return nearest;
+}
+
 function searchNearestSafeGroundSpawn(targetX, targetZ, options = {}) {
   const maxRadius = Number.isFinite(options.maxRadius) ? Math.max(4, options.maxRadius) : 72;
   const step = Number.isFinite(options.step) ? Math.max(2, options.step) : 6;
+  const maxSlopeDeg = Number.isFinite(options.maxSlopeDeg) ?
+    Math.max(2, Math.min(22, options.maxSlopeDeg)) :
+    22;
+  const minLandmarkDistance = Number.isFinite(options.minLandmarkDistance) ?
+    Math.max(0, options.minLandmarkDistance) :
+    0;
   let best = null;
 
   for (let radius = step; radius <= maxRadius; radius += step) {
@@ -166,13 +214,30 @@ function searchNearestSafeGroundSpawn(targetX, targetZ, options = {}) {
       const theta = i / steps * Math.PI * 2;
       const x = targetX + Math.cos(theta) * radius;
       const z = targetZ + Math.sin(theta) * radius;
+      const candidateAngle =
+        Number.isFinite(options.lookAtX) && Number.isFinite(options.lookAtZ) ?
+          Math.atan2(options.lookAtX - x, options.lookAtZ - z) :
+          options.angle;
       const evaluated = evaluateWalkSpawnCandidate(x, z, {
-        angle: options.angle,
-        source: "ground_search"
+        angle: candidateAngle,
+        source: options.source || "ground_search"
       });
       if (!evaluated.valid) continue;
-      const score = radius + evaluated.slopeDeg * 0.6;
-      if (!best || score < best.score) best = { ...evaluated, score };
+      if (evaluated.slopeDeg > maxSlopeDeg) continue;
+      const landmarkDistance = minLandmarkDistance > 0 ? historicLandmarkDistanceAt(x, z) : Infinity;
+      if (landmarkDistance < minLandmarkDistance) continue;
+      const cameraObstruction = Number.isFinite(options.maxCameraObstruction) ?
+        cameraTerrainObstructionAt(x, z, evaluated.angle) :
+        0;
+      if (cameraObstruction > options.maxCameraObstruction) continue;
+      const score =
+        radius +
+        evaluated.slopeDeg * 0.6 +
+        evaluated.vistaScore * 0.08 +
+        cameraObstruction * 8;
+      if (!best || score < best.score) {
+        best = { ...evaluated, score, landmarkDistance, cameraObstruction };
+      }
     }
     if (best) break;
   }
@@ -460,6 +525,27 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     });
     if (direct.valid) return direct;
 
+    if (options.preferGroundFallback === true || options.preferRoad !== true) {
+      const nearbyGround = searchNearestSafeGroundSpawn(x, z, {
+        angle,
+        maxRadius: options.maxGroundRadius,
+        maxSlopeDeg: options.maxGroundSlope,
+        minLandmarkDistance: options.minLandmarkDistance,
+        maxCameraObstruction: options.maxCameraObstruction,
+        lookAtX: options.lookAtX,
+        lookAtZ: options.lookAtZ,
+        source: options.source
+      });
+      if (nearbyGround) {
+        return {
+          ...nearbyGround,
+          source: options.source === 'featured_landmark_arrival' ?
+            'featured_ground_search' :
+            'ground_search'
+        };
+      }
+    }
+
     const surfaceFallback = searchNearestSafeRoadSpawn(x, z, {
       mode: "walk",
       angle,
@@ -654,7 +740,13 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
       angle,
       mode,
       preferRoad: false,
-      maxGroundRadius: 96,
+      preferGroundFallback: true,
+      maxGroundRadius: 160,
+      maxGroundSlope: 18,
+      minLandmarkDistance: 35,
+      maxCameraObstruction: 1.5,
+      lookAtX: lookAt.x,
+      lookAtZ: lookAt.z,
       maxRoadDistance: 160,
       source: "featured_landmark_arrival"
     });
@@ -698,10 +790,14 @@ function spawnOnRoad(options = {}) {
 
   const originX = finiteNumberOr(opts.x, 0);
   const originZ = finiteNumberOr(opts.z, 0);
-  const bestRoadSpawn = searchNearestSafeRoadSpawn(originX, originZ, {
+  const bestRoadSpawn = resolveSafeWorldSpawn(originX, originZ, {
     mode: "drive",
     angle: appCtx.car?.angle,
-    maxDistance: 320
+    preferRoad: true,
+    fastLocalFallback: true,
+    maxGroundRadius: 36,
+    maxRoadDistance: 320,
+    source: "initial_world_spawn"
   });
   if (bestRoadSpawn) return applyResolvedWorldSpawn(bestRoadSpawn, { mode: "drive" });
 

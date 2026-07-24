@@ -1,6 +1,22 @@
-import { ctx as appCtx } from "../shared-context.js?v=55";
+let getLocationFn = () => ({ lat: 0, lon: 0 });
+
+export function initWorldLoadSelection(options = {}) {
+  if (typeof options.getLocation !== 'function') {
+    throw new TypeError('World load selection requires getLocation().');
+  }
+  getLocationFn = options.getLocation;
+}
+
+function activeLocation() {
+  const location = getLocationFn() || {};
+  return {
+    lat: Number(location.lat) || 0,
+    lon: Number(location.lon) || 0
+  };
+}
 
 export function wayCenterDistanceSq(way, nodeMap) {
+  const location = activeLocation();
   if (way?._coordinates?.length >= 2) {
     let latSum = 0;
     let lonSum = 0;
@@ -11,8 +27,8 @@ export function wayCenterDistanceSq(way, nodeMap) {
     }
     const lat = latSum / sampleCount;
     const lon = lonSum / sampleCount;
-    const dLat = lat - appCtx.LOC.lat;
-    const dLon = (lon - appCtx.LOC.lon) * Math.cos(appCtx.LOC.lat * Math.PI / 180);
+    const dLat = lat - location.lat;
+    const dLon = (lon - location.lon) * Math.cos(location.lat * Math.PI / 180);
     return dLat * dLat + dLon * dLon;
   }
   if (!way?.nodes?.length) return Infinity;
@@ -33,15 +49,16 @@ export function wayCenterDistanceSq(way, nodeMap) {
 
   const lat = latSum / count;
   const lon = lonSum / count;
-  const dLat = lat - appCtx.LOC.lat;
-  const dLon = (lon - appCtx.LOC.lon) * Math.cos(appCtx.LOC.lat * Math.PI / 180);
+  const dLat = lat - location.lat;
+  const dLon = (lon - location.lon) * Math.cos(location.lat * Math.PI / 180);
   return dLat * dLat + dLon * dLon;
 }
 
 export function nodeDistanceSq(node) {
   if (!node) return Infinity;
-  const dLat = node.lat - appCtx.LOC.lat;
-  const dLon = (node.lon - appCtx.LOC.lon) * Math.cos(appCtx.LOC.lat * Math.PI / 180);
+  const location = activeLocation();
+  const dLat = node.lat - location.lat;
+  const dLon = (node.lon - location.lon) * Math.cos(location.lat * Math.PI / 180);
   return dLat * dLat + dLon * dLon;
 }
 

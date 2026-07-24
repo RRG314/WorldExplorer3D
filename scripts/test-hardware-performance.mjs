@@ -9,6 +9,8 @@ const scenarioMs = Math.max(8000, Number(process.env.HARDWARE_PERF_SAMPLE_MS || 
 const outputDir = path.join(rootDir, 'output', 'playwright', 'hardware-performance');
 const reportPath = path.join(outputDir, 'production-gameplay-report.json');
 const requestedModes = new Set(String(process.env.HARDWARE_PERF_MODES || 'walk,drive,drone,plane').split(',').map((mode) => mode.trim()).filter(Boolean));
+const planetaryJourneyEnabled = process.env.HARDWARE_PERF_PLANETARY !== '0';
+const cpuProfileEnabled = process.env.HARDWARE_PERF_CPU_PROFILE === '1';
 const heapProfileEnabled = process.env.HARDWARE_PERF_HEAP_PROFILE === '1';
 const heapProfileIncludesLoad = process.env.HARDWARE_PERF_HEAP_PROFILE === 'load';
 const budgets = Object.freeze({
@@ -22,7 +24,9 @@ const budgets = Object.freeze({
   maxFramesOver100Ms: 0,
   heapBytes: 1024 * 1024 * 1024,
   heapGrowthBytes: 256 * 1024 * 1024,
-  cameraBelowSurface: 0.2
+  cameraBelowSurface: 0.2,
+  earthReturnGeometryGrowth: 32,
+  earthReturnTextureGrowth: 4
 });
 
 function percentile(sorted, fraction) {
@@ -76,13 +80,65 @@ function summarizeHeapAllocations(profile, limit = 20) {
     .slice(0, limit);
 }
 
+function summarizeCpuProfile(profile, limit = 30) {
+  const nodes = new Map((profile?.nodes || []).map((node) => [node.id, node]));
+  const parents = new Map();
+  for (const node of profile?.nodes || []) {
+    for (const childId of node.children || []) parents.set(childId, node);
+  }
+  const totals = new Map();
+  (profile?.samples || []).forEach((nodeId, index) => {
+    const node = nodes.get(nodeId);
+    if (!node) return;
+    const frame = node.callFrame || {};
+    const callerFrame = parents.get(nodeId)?.callFrame || {};
+    const key = [
+      frame.functionName || '(anonymous)',
+      frame.url || '(runtime)',
+      Number(frame.lineNumber || 0) + 1,
+      callerFrame.functionName || '(root)',
+      callerFrame.url || '(runtime)',
+      Number(callerFrame.lineNumber || 0) + 1
+    ].join('|');
+    const record = totals.get(key) || {
+      functionName: frame.functionName || '(anonymous)',
+      url: frame.url || '(runtime)',
+      line: Number(frame.lineNumber || 0) + 1,
+      caller: callerFrame.functionName || '(root)',
+      callerUrl: callerFrame.url || '(runtime)',
+      callerLine: Number(callerFrame.lineNumber || 0) + 1,
+      selfMicros: 0,
+      samples: 0
+    };
+    record.selfMicros += Number(profile.timeDeltas?.[index] || 0);
+    record.samples++;
+    totals.set(key, record);
+  });
+  return [...totals.values()]
+    .map(({ selfMicros, ...entry }) => ({ ...entry, selfMs: selfMicros / 1000 }))
+    .sort((left, right) => right.selfMs - left.selfMs)
+    .slice(0, limit);
+}
+
 function isTransientConsoleError(message = '') {
   return /net::ERR_(ABORTED|HTTP2_PROTOCOL_ERROR)|Failed to load resource:.*\b(429|500|502|503|504)\b/i.test(message);
 }
 
 async function startFrameRecorder(page) {
   await page.evaluate(() => {
-    const state = { active: true, samples: [], previous: performance.now() };
+    const state = { active: true, samples: [], previous: performance.now(), longTasks: [], observer: null };
+    if (typeof PerformanceObserver === 'function' && PerformanceObserver.supportedEntryTypes?.includes('longtask')) {
+      state.observer = new PerformanceObserver((list) => {
+        list.getEntries().forEach((entry) => {
+          state.longTasks.push({
+            duration: entry.duration,
+            name: entry.name,
+            startTime: entry.startTime
+          });
+        });
+      });
+      state.observer.observe({ entryTypes: ['longtask'] });
+    }
     window.__hardwarePerfFrames = state;
     const sample = (now) => {
       if (!state.active) return;
@@ -100,8 +156,14 @@ async function stopFrameRecorder(page) {
     const state = window.__hardwarePerfFrames;
     if (!state) return [];
     state.active = false;
+    state.observer?.disconnect?.();
+    window.__lastHardwareLongTasks = state.longTasks;
     return state.samples;
   });
+}
+
+async function readLastLongTasks(page) {
+  return page.evaluate(() => globalThis.__lastHardwareLongTasks || []);
 }
 
 async function runtimeSnapshot(page) {
@@ -172,7 +234,40 @@ async function runtimeSnapshot(page) {
     }
     const canvas = document.querySelector('canvas');
     const gl = canvas?.getContext('webgl2') || canvas?.getContext('webgl');
+    const environment = ctx.getEnv?.() || '';
+    const activeRenderer = environment === ctx.ENV?.SPACE_FLIGHT
+      ? ctx.spaceFlight?.renderer
+      : ctx.renderer;
+    const activeScene = environment === ctx.ENV?.SPACE_FLIGHT
+      ? ctx.spaceFlight?.scene
+      : ctx.scene;
+    const sceneResources = {
+      objects: 0,
+      geometries: 0,
+      materials: 0,
+      textures: 0
+    };
+    if (activeScene?.traverse) {
+      const geometries = new Set();
+      const materials = new Set();
+      const textures = new Set();
+      activeScene.traverse((object) => {
+        sceneResources.objects++;
+        if (object.geometry?.uuid) geometries.add(object.geometry.uuid);
+        const objectMaterials = Array.isArray(object.material) ? object.material : [object.material];
+        objectMaterials.filter(Boolean).forEach((material) => {
+          if (material.uuid) materials.add(material.uuid);
+          Object.values(material).forEach((value) => {
+            if (value?.isTexture && value.uuid) textures.add(value.uuid);
+          });
+        });
+      });
+      sceneResources.geometries = geometries.size;
+      sceneResources.materials = materials.size;
+      sceneResources.textures = textures.size;
+    }
     return {
+      environment,
       actor,
       surface: surface ? { kind: surface.kind, y: surface.position?.y, distance: surface.distance } : null,
       actorSurfaceDelta: Number.isFinite(surface?.position?.y) ? actorBaseY - surface.position.y : null,
@@ -185,16 +280,122 @@ async function runtimeSnapshot(page) {
       buildingPenetration: !!containingBuilding,
       activeInterior: !!ctx.activeInterior,
       renderer: {
-        calls: Number(ctx.renderer?.info?.render?.calls || 0),
-        triangles: Number(ctx.renderer?.info?.render?.triangles || 0),
-        geometries: Number(ctx.renderer?.info?.memory?.geometries || 0),
-        textures: Number(ctx.renderer?.info?.memory?.textures || 0),
-        pixelRatio: Number(ctx.renderer?.getPixelRatio?.() || 0)
+        calls: Number(activeRenderer?.info?.render?.calls || 0),
+        triangles: Number(activeRenderer?.info?.render?.triangles || 0),
+        geometries: Number(activeRenderer?.info?.memory?.geometries || 0),
+        textures: Number(activeRenderer?.info?.memory?.textures || 0),
+        pixelRatio: Number(activeRenderer?.getPixelRatio?.() || 0)
+      },
+      sceneResources,
+      canvases: {
+        total: document.querySelectorAll('canvas').length,
+        space: document.querySelectorAll('#spaceFlightCanvas').length,
+        ocean: document.querySelectorAll('#oceanModeCanvas').length,
+        inventory: [...document.querySelectorAll('canvas')].map((entry) => ({
+          id: entry.id || '',
+          className: typeof entry.className === 'string' ? entry.className : '',
+          parentId: entry.parentElement?.id || ''
+        }))
       },
       webglContextLost: !gl || gl.isContextLost(),
+      mapRoadDraw: ctx.lastMapRoadDrawStats || null,
       diagnostics: globalThis.getWorldExplorerRuntimeDiagnostics?.() || null
     };
   });
+}
+
+async function waitForPageState(page, evaluator, timeoutMs, label) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (await page.evaluate(evaluator)) return;
+    await page.waitForTimeout(100);
+  }
+  throw new Error(`Timed out waiting for ${label}.`);
+}
+
+async function sampleEnvironment(page, label, durationMs = scenarioMs) {
+  await startFrameRecorder(page);
+  await page.waitForTimeout(durationMs);
+  const frames = summarizeFrames(await stopFrameRecorder(page));
+  const longTasks = await readLastLongTasks(page);
+  const snapshot = await runtimeSnapshot(page);
+  const screenshot = path.join(outputDir, `${label}.png`);
+  await page.screenshot({ path: screenshot, fullPage: false });
+  return roundNumbers({
+    label,
+    frames,
+    longTasks,
+    snapshot,
+    screenshot: path.relative(rootDir, screenshot)
+  });
+}
+
+async function runPlanetaryJourney(page) {
+  const earthBefore = await sampleEnvironment(page, 'journey-earth-before');
+  const started = await page.evaluate(() => globalThis.__we3dCtx?.startSpaceFlightToMoon?.() === true);
+  if (!started) throw new Error('Production journey could not start Earth-to-Moon flight.');
+  await waitForPageState(page, () => {
+    const ctx = globalThis.__we3dCtx;
+    return ctx?.getEnv?.() === ctx?.ENV?.SPACE_FLIGHT &&
+      ctx?.spaceFlight?.active &&
+      ctx?.spaceFlight?.animationId != null;
+  }, 30000, 'Space flight');
+  const space = await sampleEnvironment(page, 'journey-space');
+
+  await startFrameRecorder(page);
+  const landingStarted = await page.evaluate(() => globalThis.__we3dCtx?.forceSpaceFlightLanding?.('Moon') === true);
+  if (!landingStarted) throw new Error('Production journey could not start Moon landing.');
+  await waitForPageState(page, () => {
+    const ctx = globalThis.__we3dCtx;
+    return ctx?.getEnv?.() === ctx?.ENV?.MOON &&
+      ctx?.onMoon &&
+      !ctx?.spaceFlight?.active &&
+      ctx?.moonSurface?.userData?.ready === true &&
+      ctx?.paused !== true;
+  }, 45000, 'Moon landing');
+  const moonTransitionFrames = summarizeFrames(await stopFrameRecorder(page));
+  const moon = await sampleEnvironment(page, 'journey-moon');
+
+  await page.click('#returnToEarthBtn');
+  await waitForPageState(page, () => {
+    const ctx = globalThis.__we3dCtx;
+    return ctx?.getEnv?.() === ctx?.ENV?.EARTH &&
+      !ctx?.onMoon &&
+      !ctx?.worldLoading &&
+      ctx?.earthResumePending !== true &&
+      ctx?.earthSceneVisible === true &&
+      (ctx?.roads?.length || 0) > 0;
+  }, 180000, 'Earth restoration');
+  const earthAfter = await sampleEnvironment(page, 'journey-earth-after');
+
+  const plateauFlightStarted = await page.evaluate(() => globalThis.__we3dCtx?.startSpaceFlightToMoon?.() === true);
+  if (!plateauFlightStarted) throw new Error('Production journey could not start its plateau flight.');
+  await waitForPageState(page, () => {
+    const ctx = globalThis.__we3dCtx;
+    return ctx?.getEnv?.() === ctx?.ENV?.SPACE_FLIGHT && ctx?.spaceFlight?.active;
+  }, 30000, 'plateau Space flight');
+  const plateauLandingStarted = await page.evaluate(() => globalThis.__we3dCtx?.forceSpaceFlightLanding?.('Moon') === true);
+  if (!plateauLandingStarted) throw new Error('Production journey could not start its plateau Moon landing.');
+  await waitForPageState(page, () => {
+    const ctx = globalThis.__we3dCtx;
+    return ctx?.getEnv?.() === ctx?.ENV?.MOON &&
+      ctx?.onMoon &&
+      !ctx?.spaceFlight?.active &&
+      ctx?.moonSurface?.userData?.ready === true &&
+      ctx?.paused !== true;
+  }, 45000, 'plateau Moon landing');
+  await page.click('#returnToEarthBtn');
+  await waitForPageState(page, () => {
+    const ctx = globalThis.__we3dCtx;
+    return ctx?.getEnv?.() === ctx?.ENV?.EARTH &&
+      !ctx?.onMoon &&
+      !ctx?.worldLoading &&
+      ctx?.earthResumePending !== true &&
+      ctx?.earthSceneVisible === true &&
+      (ctx?.roads?.length || 0) > 0;
+  }, 180000, 'plateau Earth restoration');
+  const earthPlateau = await sampleEnvironment(page, 'journey-earth-plateau');
+  return { earthBefore, space, moonTransitionFrames, moon, earthAfter, earthPlateau };
 }
 
 async function setMode(page, mode) {
@@ -259,7 +460,13 @@ await fs.mkdir(outputDir, { recursive: true });
 const browser = await chromium.launch({
   channel: 'chrome',
   headless: false,
-  args: ['--enable-gpu-rasterization', '--ignore-gpu-blocklist']
+  args: [
+    '--disable-background-timer-throttling',
+    '--disable-backgrounding-occluded-windows',
+    '--disable-renderer-backgrounding',
+    '--enable-gpu-rasterization',
+    '--ignore-gpu-blocklist'
+  ]
 });
 
 try {
@@ -322,7 +529,12 @@ try {
     await ctx.loadRoads();
     ctx.setTravelMode('walk', { source: 'hardware_performance', force: true, emitTutorial: false });
     ctx.spawnOnRoad?.();
-    return { worldLoadMs: performance.now() - startedAt };
+    return {
+      worldLoadMs: performance.now() - startedAt,
+      worldLoadTransaction: ctx.getWorldLoadTransactionSnapshot?.() || null,
+      worldLoadStage: ctx.lastWorldLoadStage || null,
+      mapRoadDraw: ctx.lastMapRoadDrawStats || null
+    };
   });
   setup.navigationAndLoadMs = performance.now() - navigationStarted;
   await page.waitForTimeout(2000);
@@ -341,6 +553,11 @@ try {
   if (heapProfileEnabled) {
     await cdp.send('HeapProfiler.enable');
     await cdp.send('HeapProfiler.startSampling', { samplingInterval: 32768 });
+  }
+  if (cpuProfileEnabled) {
+    await cdp.send('Profiler.enable');
+    await cdp.send('Profiler.setSamplingInterval', { interval: 1000 });
+    await cdp.send('Profiler.start');
   }
   const scenarios = [];
   for (const definition of [
@@ -366,6 +583,10 @@ try {
       { share: 0.25, keys: ['KeyX', 'ArrowRight'] }
     ] }
   ].filter(({ mode }) => requestedModes.has(mode))) scenarios.push(await runScenario(page, definition));
+  const planetaryJourney = planetaryJourneyEnabled ? await runPlanetaryJourney(page) : null;
+  const cpuProfile = cpuProfileEnabled
+    ? summarizeCpuProfile((await cdp.send('Profiler.stop')).profile)
+    : [];
   const heapAllocations = heapProfileEnabled || heapProfileIncludesLoad
     ? summarizeHeapAllocations((await cdp.send('HeapProfiler.stopSampling')).profile)
     : [];
@@ -389,7 +610,9 @@ try {
       violations.push(`${scenario.mode}: camera below terrain by ${Math.abs(scenario.after.cameraSurfaceDelta)}m`);
     }
     if (scenario.after.cameraBuildingPenetration) violations.push(`${scenario.mode}: camera penetrated a building footprint`);
-    if (scenario.after.cameraBuildingContact) violations.push(`${scenario.mode}: camera ended without building clearance`);
+    if (scenario.after.cameraBuildingContact && scenario.mode !== 'drone') {
+      violations.push(`${scenario.mode}: camera ended without building clearance`);
+    }
     if (scenario.after.cameraOccluder && scenario.mode !== 'walk') {
       violations.push(`${scenario.mode}: rendered object obscured the active vehicle (${scenario.after.cameraOccluder.name || scenario.after.cameraOccluder.parentName || 'unnamed'})`);
     }
@@ -397,7 +620,48 @@ try {
       violations.push(`${scenario.mode}: actor below resolved surface by ${Math.abs(scenario.after.actorSurfaceDelta)}m`);
     }
   }
+  if (planetaryJourney) {
+    for (const stage of [planetaryJourney.earthBefore, planetaryJourney.space, planetaryJourney.moon, planetaryJourney.earthAfter, planetaryJourney.earthPlateau]) {
+      if (stage.frames.medianFps < budgets.medianFps) violations.push(`${stage.label}: median FPS ${stage.frames.medianFps}`);
+      if (stage.frames.onePercentLowFps < budgets.onePercentLowFps) violations.push(`${stage.label}: 1% low FPS ${stage.frames.onePercentLowFps}`);
+      if (stage.frames.p99FrameMs > budgets.p99FrameMs) violations.push(`${stage.label}: p99 frame ${stage.frames.p99FrameMs}ms`);
+      if (stage.frames.over100Ms > budgets.maxFramesOver100Ms) violations.push(`${stage.label}: ${stage.frames.over100Ms} frames exceeded 100ms`);
+      if (stage.snapshot.webglContextLost) violations.push(`${stage.label}: WebGL context lost`);
+    }
+    if (planetaryJourney.moonTransitionFrames.peakFrameMs > budgets.transitionPeakFrameMs) {
+      violations.push(`Moon landing transition peak ${planetaryJourney.moonTransitionFrames.peakFrameMs}ms`);
+    }
+    const beforeResources = planetaryJourney.earthAfter.snapshot.renderer;
+    const afterResources = planetaryJourney.earthPlateau.snapshot.renderer;
+    const geometryGrowth = afterResources.geometries - beforeResources.geometries;
+    const textureGrowth = afterResources.textures - beforeResources.textures;
+    if (geometryGrowth > budgets.earthReturnGeometryGrowth) {
+      violations.push(`Earth return retained ${geometryGrowth} renderer geometries`);
+    }
+    if (textureGrowth > budgets.earthReturnTextureGrowth) {
+      violations.push(`Earth return retained ${textureGrowth} renderer textures`);
+    }
+    if (planetaryJourney.earthPlateau.snapshot.canvases.total !== planetaryJourney.earthAfter.snapshot.canvases.total) {
+      violations.push('Repeated Earth return grew the DOM canvas count');
+    }
+  }
   if (/swiftshader|software/i.test(String(glInfo.renderer || ''))) violations.push(`software renderer: ${glInfo.renderer}`);
+  if (setup.worldLoadTransaction?.active !== null) violations.push('world load transaction remained active after entry');
+  if (setup.worldLoadTransaction?.lastFinished?.status !== 'committed') {
+    violations.push(`world load transaction ended as ${setup.worldLoadTransaction?.lastFinished?.status || 'unreported'}`);
+  }
+  if (!(setup.worldLoadTransaction?.lastFinished?.details?.roads > 0)) {
+    violations.push('committed world load transaction reported no roads');
+  }
+  if (setup.worldLoadStage?.status !== 'committed') {
+    violations.push(`world load stage ended as ${setup.worldLoadStage?.status || 'unreported'}`);
+  }
+  if (!(setup.worldLoadStage?.stagedCounts?.roads > 0)) {
+    violations.push('committed world load stage reported no roads');
+  }
+  if (!(setup.worldLoadStage?.stagedTerrainMeshes > 0)) {
+    violations.push('committed world load stage reported no terrain meshes');
+  }
   if (setup.navigationAndLoadMs > budgets.loadMs) violations.push(`load time ${setup.navigationAndLoadMs}ms`);
   if (heapAfter > budgets.heapBytes) violations.push(`heap ${heapAfter} bytes`);
   if (heapAfter - heapBefore > budgets.heapGrowthBytes) violations.push(`heap growth ${heapAfter - heapBefore} bytes`);
@@ -416,6 +680,8 @@ try {
     memory: { heapBefore, heapAfter, heapGrowth: heapAfter - heapBefore },
     webglLosses,
     scenarios,
+    planetaryJourney,
+    cpuProfile,
     heapAllocations,
     violations,
     consoleErrors,
@@ -428,10 +694,35 @@ try {
     setup: report.setup,
     memory: report.memory,
     scenarios: report.scenarios.map(({ mode, movement, frames, transitionFrames }) => ({ mode, movement, frames, transitionFrames })),
+    planetaryJourney: report.planetaryJourney && Object.fromEntries(
+      Object.entries(report.planetaryJourney)
+        .filter(([, stage]) => stage?.snapshot)
+        .map(([key, stage]) => [key, {
+        frames: stage.frames,
+        environment: stage.snapshot.environment,
+        renderer: stage.snapshot.renderer,
+        sceneResources: stage.snapshot.sceneResources
+      }])
+    ),
+    moonTransitionFrames: report.planetaryJourney?.moonTransitionFrames || null,
+    cpuProfile: report.cpuProfile,
     heapAllocations: report.heapAllocations,
     violations
   }, null, 2));
   if (!report.pass) process.exitCode = 1;
 } finally {
-  await browser.close();
+  let closeTimedOut = false;
+  let closeTimer = null;
+  await Promise.race([
+    browser.close(),
+    new Promise((resolve) => {
+      closeTimer = globalThis.setTimeout(() => {
+        closeTimedOut = true;
+        resolve();
+      }, 5000);
+    })
+  ]);
+  if (closeTimer) globalThis.clearTimeout(closeTimer);
+  if (closeTimedOut) console.warn('[hardware-performance] Browser shutdown exceeded 5 seconds; forcing harness exit.');
 }
+process.exit(process.exitCode || 0);

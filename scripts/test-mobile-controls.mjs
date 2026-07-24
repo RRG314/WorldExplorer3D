@@ -199,10 +199,12 @@ async function assertLandscapeShell(browser, baseUrl) {
   await bootstrapEarth(page, baseUrl);
   await assertDockHitTargets(page);
   await page.locator('#exploreBtn').tap();
-  await page.waitForFunction(() => {
+  await page.locator('#exploreMenu.open').waitFor({ state: 'attached', timeout: 10000 });
+  const tutorialHidden = await page.evaluate(() => {
     const card = document.getElementById('tutorialHintCard');
     return !card || getComputedStyle(card).display === 'none';
-  }, null, { timeout: 2000 });
+  });
+  assert(tutorialHidden, 'Landscape Explore menu did not suppress the tutorial card');
   await page.screenshot({ path: path.join(outputDir, 'iphone-landscape.png') });
   await context.close();
 }

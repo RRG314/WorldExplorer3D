@@ -511,7 +511,7 @@ function shouldRenderRoadSkirts(feature) {
   return false;
 }
 
-function sampleFeatureSurfaceY(feature, x, z, projected = null) {
+function sampleFeatureSurfaceY(feature, x, z, projected = null, options = {}) {
   if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2) return NaN;
   const projection = projected || projectPointToFeature(feature, x, z);
   if (!projection) return NaN;
@@ -523,19 +523,35 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
   const p2 = feature.pts[projection.segIndex + 1];
   const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
   const distance = distances[projection.segIndex] + segLen * projection.t;
+  const interpolateProjectedValue = (values) => {
+    const index = projection.segIndex;
+    if (
+      index < 0 ||
+      index + 1 >= values.length ||
+      values.length !== feature.pts.length
+    ) {
+      return sampleProfileAtDistance(distances, values, distance);
+    }
+    const from = Number(values[index]);
+    const to = Number(values[index + 1]);
+    if (!Number.isFinite(from)) return Number.isFinite(to) ? to : NaN;
+    if (!Number.isFinite(to)) return from;
+    return from + (to - from) * projection.t;
+  };
   if (
+    options.preferStoredProfile !== true &&
     feature.structureSemantics?.terrainMode === 'at_grade' &&
     typeof feature.surfaceTerrainSampler === 'function'
   ) {
     const terrainY = Number(feature.surfaceTerrainSampler(projection.x, projection.z));
     if (Number.isFinite(terrainY)) {
       const offsets = feature.surfaceOffsets instanceof Float32Array ? feature.surfaceOffsets : null;
-      const structureOffset = offsets ? Number(sampleProfileAtDistance(distances, offsets, distance)) || 0 : 0;
+      const structureOffset = offsets ? Number(interpolateProjectedValue(offsets)) || 0 : 0;
       const surfaceBias = Number.isFinite(feature.surfaceBias) ? Number(feature.surfaceBias) : 0.08;
       return terrainY + structureOffset + surfaceBias;
     }
   }
-  return sampleProfileAtDistance(distances, heights, distance);
+  return interpolateProjectedValue(heights);
 }
 
 function areRoadsConnected(a, b) {

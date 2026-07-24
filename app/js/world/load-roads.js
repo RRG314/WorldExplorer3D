@@ -1,13 +1,13 @@
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=9";
-import { createWorldLandusePass } from "./load-landuse-pass.js?v=30";
+import { createWorldLandusePass } from "./load-landuse-pass.js?v=34";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
 import {
   createWorldLoadRuntimeSession,
   finishWorldLoadRuntimeSession,
   recordWorldSourceMetrics
-} from "./load-runtime-session.js?v=7";
-import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=17";
+} from "./load-runtime-session.js?v=11";
+import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=18";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   const waitForCoverage = appCtx.waitForTerrainCoverageAt;
@@ -166,6 +166,7 @@ export function createWorldRoadLoader(deps = {}) {
   });
   async function loadRoadsInternal(retryPass = 0) {
     const session = createWorldLoadRuntimeSession({
+      addBuildingToSpatialIndex,
       appCtx,
       clearBuildingSpatialIndex,
       earthSceneSuppressed,
@@ -186,11 +187,15 @@ export function createWorldRoadLoader(deps = {}) {
       isActiveLoadContext,
       loadMetrics,
       loadProfile,
+      locationSelection,
       lodThresholds,
       perfModeNow,
       phaseTotals,
       rdtLoadComplexity,
+      releaseStageRollback,
       startLoadPhase,
+      transaction,
+      worldLoadStage,
       useRdtBudgeting,
       useSyntheticFallbackRoads
     } = session;
@@ -225,6 +230,7 @@ export function createWorldRoadLoader(deps = {}) {
         reason,
         spawnOnRoad,
         updateWorldLod,
+        commitWorldStage: worldLoadStage.commit,
         startLoadPhase,
         endLoadPhase
       });
@@ -583,9 +589,9 @@ export function createWorldRoadLoader(deps = {}) {
             lodThresholds,
             maxBuildingWays,
             metadataCacheMeta: deferredBuildingMetadataCacheMeta,
-            metadataDeadlineMs: Infinity,
+            metadataDeadlineMs: performance.now() + 5000,
             metadataQuery: deferredBuildingMetadataQuery,
-            metadataTimeoutMs: 9000,
+            metadataTimeoutMs: 4500,
             onSettled: hasPrimaryPoiCoverage ? () => {} : schedulePoiDetail,
             pickBuildingBaseColor,
             query: deferredBuildingQuery,
@@ -693,8 +699,12 @@ export function createWorldRoadLoader(deps = {}) {
       appCtx,
       finalizePerfLoad,
       loadMetrics,
+      locationSelection,
       loaded,
-      phaseTotals
+      phaseTotals,
+      releaseStageRollback,
+      transaction,
+      isActiveLoadContext
     });
   }
 

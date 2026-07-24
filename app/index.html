@@ -27,7 +27,7 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/universe.css?v=6">
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
 <link rel="stylesheet" href="styles/interface-v4.css?v=12">
-<link rel="stylesheet" href="styles/start-hub.css?v=15">
+<link rel="stylesheet" href="styles/start-hub.css?v=16">
 </head>
 <body>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
@@ -1618,9 +1618,8 @@ Explore the area
 </div>
 </div>
 
-<!-- Real Estate System -->
-<script src="vendor/colyseus-sdk.js?v=1"></script>
+<!-- Authoritative multiplayer loads its SDK only when a configured room connects. -->
 <script type="module" src="js/app-shell-fragments.js?v=85"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=323"></script>
+<script type="module" src="js/bootstrap.js?v=340"></script>
 </body></html>

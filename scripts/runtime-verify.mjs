@@ -3,9 +3,11 @@ import { spawnSync } from 'node:child_process';
 const steps = [
   ['Build hosting artifact', 'scripts/hosting-artifact.mjs', ['build', '--firebase-env', 'staging']],
   ['Hosting artifact parity', 'scripts/hosting-artifact.mjs', ['verify']],
+  ['Hosting and cold-title size budgets', 'scripts/test-hosting-size-budget.mjs'],
   ['Hosting source reachability', 'scripts/audit-hosting-reachability.mjs', ['--strict']],
   ['CSS integrity and browser boot', 'scripts/test-css-integrity.mjs'],
   ['ES module URL identity', 'scripts/test-module-version-consistency.mjs'],
+  ['Release version identity', 'scripts/test-release-version.mjs'],
   ['Surface contract', 'scripts/test-surface-contract.mjs'],
   ['Overture continuous source', 'scripts/test-overture-tile-source.mjs'],
   ['Inferred building coverage', 'scripts/test-inferred-building-coverage.mjs'],

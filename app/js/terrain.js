@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   clearStructureVisualMeshes,
   rebuildStructureVisualMeshes
-} from "./terrain/structure-visuals.js?v=5";
+} from "./terrain/structure-visuals.js?v=7";
 import {
   boundsIntersectLocal,
   expandBoundsLocal,
@@ -19,7 +19,7 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=32";
+} from "./terrain/surface-profiles.js?v=35";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -40,17 +40,17 @@ import {
   waitForTerrainReadyBounds,
   waitForTerrainReadyAt,
   worldToLatLon
-} from "./terrain/tiles.js?v=35";
+} from "./terrain/tiles.js?v=36";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
   rebuildRoadsWithTerrain
-} from "./terrain/rebuild.js?v=9";
+} from "./terrain/rebuild.js?v=11";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
-} from "./terrain/debug-tools.js?v=3";
+} from "./terrain/debug-tools.js?v=5";
 import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
 import { createTerrainStreamingApi } from "./terrain/streaming.js?v=10";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
@@ -368,6 +368,7 @@ Object.assign(appCtx, {
   clearTerrainMeshes,
   decodeTerrariumRGB,
   detectRoadIntersections,
+  disposeTerrainMesh,
   elevationMetersAtLatLon,
   elevationWorldYAtWorldXZ,
   ensureTerrainGroup,
@@ -410,6 +411,7 @@ export {
   clearTerrainMeshes,
   decodeTerrariumRGB,
   detectRoadIntersections,
+  disposeTerrainMesh,
   elevationMetersAtLatLon,
   elevationWorldYAtWorldXZ,
   ensureTerrainGroup,

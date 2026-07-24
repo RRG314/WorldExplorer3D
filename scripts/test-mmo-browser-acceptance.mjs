@@ -49,7 +49,7 @@ async function startOwnedPreview() {
 async function installHarness(page, endpoint) {
   return page.evaluate(async ({ endpoint }) => {
     const [{ createAuthoritativeRoomClient }, { createMmoRoomPanel }, { ctx: appCtx }] = await Promise.all([
-      import('./js/multiplayer/authoritative-client.js?v=7'),
+      import('./js/multiplayer/authoritative-client.js?v=8'),
       import('./js/multiplayer/ui-room-mmo.js?v=4'),
       import('./js/shared-context.js?v=55')
     ]);
@@ -187,8 +187,13 @@ try {
   url.searchParams.set('mmoTestToken', 'test:local-owner:Local Owner');
   await page.goto(url.toString(), { waitUntil: 'domcontentloaded', timeout: 60000 });
   await page.waitForSelector('#roomPanelModal', { state: 'attached', timeout: 60000 });
-  await page.waitForFunction(() => Boolean(globalThis.Colyseus?.Client), null, { timeout: 10000 });
+  assert.equal(
+    await page.evaluate(() => Boolean(globalThis.Colyseus?.Client)),
+    false,
+    'Authoritative MMO SDK loaded before an authoritative room connection.'
+  );
   await installHarness(page, runtime.url);
+  await page.waitForFunction(() => Boolean(globalThis.Colyseus?.Client), null, { timeout: 10000 });
   await waitForPlatform(page);
 
   await page.selectOption('#mmoMissionSelect', 'mission.build.foundation');

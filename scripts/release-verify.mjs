@@ -24,12 +24,15 @@ const baseEnvironment = releaseEnvironment();
 
 const steps = [
   { name: 'Maintainability guard', cmd: [process.execPath, 'scripts/test-maintainability-guard.mjs'] },
+  { name: 'Hosting release contract', cmd: [process.execPath, 'scripts/test-hosting-release-contract.mjs'] },
+  { name: 'Release version identity', cmd: [process.execPath, 'scripts/test-release-version.mjs'] },
   { name: 'Cloud Functions dependency install', cmd: [npmCommand, 'ci', '--prefix', 'functions', '--ignore-scripts'] },
   { name: 'Cloud Functions security audit', cmd: [npmCommand, 'audit', '--omit=dev', '--prefix', 'functions'] },
   { name: 'Cloud Functions runtime exports', cmd: [process.execPath, 'scripts/test-functions-runtime.mjs'] },
   { name: 'Open-source distribution', cmd: [process.execPath, 'scripts/test-open-source-distribution.mjs'] },
   { name: 'Build production hosting artifact', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'build', '--firebase-env', 'production'] },
   { name: 'Hosting artifact parity', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify'] },
+  { name: 'Hosting and cold-title size budgets', cmd: [process.execPath, 'scripts/test-hosting-size-budget.mjs'] },
   { name: 'Hosted source reachability', cmd: [process.execPath, 'scripts/audit-hosting-reachability.mjs', '--strict'] },
   { name: 'CSS integrity', cmd: [process.execPath, 'scripts/test-css-integrity.mjs'] },
   { name: 'ES module URL identity', cmd: [process.execPath, 'scripts/test-module-version-consistency.mjs'] },
@@ -43,11 +46,26 @@ const steps = [
   { name: 'Firestore rules', cmd: [process.execPath, 'scripts/test-rules.mjs'] },
   { name: 'Local data safety', cmd: [process.execPath, 'scripts/test-local-data-safety.mjs'] },
   { name: 'Analytics privacy contract', cmd: [process.execPath, '--test', 'scripts/test-analytics-contract.mjs'] },
+  { name: 'Release harness privacy and cleanup', cmd: [process.execPath, 'scripts/test-release-harness-privacy.mjs'] },
   { name: 'Authoritative room load budget', cmd: [process.execPath, '--expose-gc', 'scripts/test-mmo-load.mjs'] },
   { name: 'Authoritative MMO contracts and server', cmd: [npmCommand, 'run', 'test:mmo'] },
   { name: 'Firestore-backed MMO compatibility', cmd: [npmCommand, 'run', 'test:mmo-firestore'] },
   { name: 'Authoritative room browser gameplay', cmd: [process.execPath, 'scripts/test-mmo-browser-acceptance.mjs'] },
   { name: 'Runtime kernel', cmd: [process.execPath, 'scripts/test-runtime-kernel.mjs'] },
+  { name: 'Frame ownership registry', cmd: [process.execPath, 'scripts/test-frame-ownership.mjs'] },
+  { name: 'Lifecycle scope cancellation', cmd: [process.execPath, 'scripts/test-lifecycle-scope.mjs'] },
+  { name: 'Domain dependency boundaries', cmd: [process.execPath, 'scripts/test-domain-dependency-boundaries.mjs'] },
+  { name: 'World load transaction authority', cmd: [process.execPath, 'scripts/test-world-load-transaction.mjs'] },
+  { name: 'World load staged swap', cmd: [process.execPath, 'scripts/test-world-load-stage.mjs'] },
+  { name: 'Navigation surface query', cmd: [process.execPath, 'scripts/test-navigation-surface-query.mjs'] },
+  { name: 'Bridge guardrail contract', cmd: [process.execPath, 'scripts/test-bridge-guardrail-contract.mjs'] },
+  { name: 'Tunnel camera corridor contract', cmd: [process.execPath, 'scripts/test-tunnel-camera-corridor.mjs'] },
+  { name: 'Terrain/boat visibility ownership', cmd: [process.execPath, 'scripts/test-terrain-streaming-boat-suppression.mjs'] },
+  { name: 'Boat prompt subgrade policy', cmd: [process.execPath, 'scripts/test-boat-prompt-policy.mjs'] },
+  { name: 'HUD place-location authority', cmd: [process.execPath, 'scripts/test-place-location-authority.mjs'] },
+  { name: 'World-load location authority', cmd: [process.execPath, 'scripts/test-world-load-location-authority.mjs'] },
+  { name: 'Mapped water terrain validity', cmd: [process.execPath, 'scripts/test-water-surface-validity.mjs'] },
+  { name: 'Structure visual sampling', cmd: [process.execPath, 'scripts/test-structure-visual-sampling.mjs'] },
   { name: 'Transport controller registry', cmd: [process.execPath, 'scripts/test-transport-controller-registry.mjs'] },
   { name: 'Platform service registry', cmd: [process.execPath, 'scripts/test-platform-service-registry.mjs'] },
   { name: 'Account service', cmd: [process.execPath, 'scripts/test-account-service.mjs'] },
@@ -72,7 +90,8 @@ const steps = [
       WORLD_MATRIX_REPORT_NAME: 'r7-provider-outage.json'
     }
   },
-  { name: 'World matrix', cmd: [process.execPath, 'scripts/test-world-matrix.mjs'] }
+  { name: 'World matrix', cmd: [process.execPath, 'scripts/test-world-matrix.mjs'] },
+  { name: 'Final hosting artifact parity', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify'] }
 ];
 
 for (const step of steps) {

@@ -8,9 +8,14 @@ import { curatedLandmarksNear } from "./landmark-catalog.js?v=8";
 function buildingDataPriority(way) {
   const tags = way?.tags || {};
   let score = tags._geometrySource === 'overture' ? 2 : 0;
-  if (tags.height || tags['building:levels']) score += 4;
-  if (tags['building:part']) score += 3;
-  if (tags['roof:shape'] || tags['roof:height']) score += 1;
+  const height = Number.parseFloat(tags.height);
+  const levels = Number.parseFloat(tags['building:levels']);
+  const mappedHeight = Number.isFinite(height) ? height : Number.isFinite(levels) ? levels * 3.2 : 0;
+  if (mappedHeight > 0) score += 4 + Math.min(18, mappedHeight / 12);
+  if (tags['building:part']) score += 4;
+  if (tags['roof:shape'] || tags['roof:height']) score += 2;
+  if (tags.name) score += mappedHeight >= 20 ? 8 : 2;
+  if (['tower', 'skyscraper', 'office', 'hotel'].includes(String(tags.building || '').toLowerCase())) score += 5;
   return score;
 }
 
@@ -76,14 +81,23 @@ export function scheduleDeferredBuildingLoad(options = {}) {
     try {
       let metadataState = { status: 'skipped' };
       let data;
+      options.startLoadPhase?.('fetchBuildingFootprints');
       try {
         data = fetchPreferredData ? await fetchPreferredData() : null;
       } catch (preferredErr) {
         options.recordLoadWarning?.('vector building detail', preferredErr);
+      } finally {
+        options.endLoadPhase?.('fetchBuildingFootprints');
       }
       const authoritativeMassing = data?._overpassSource === 'overture-buildings-pmtiles';
       if (data && !authoritativeMassing) {
-        const metadata = await fetchBuildingMetadata(options, metadataState);
+        options.startLoadPhase?.('fetchBuildingMetadata');
+        let metadata;
+        try {
+          metadata = await fetchBuildingMetadata(options, metadataState);
+        } finally {
+          options.endLoadPhase?.('fetchBuildingMetadata');
+        }
         if (!isActiveLoadContext()) return;
         if (metadata) {
           mergeBuildingMetadata(data, metadata, {
@@ -101,6 +115,7 @@ export function scheduleDeferredBuildingLoad(options = {}) {
         );
       }
       if (!isActiveLoadContext()) return;
+      options.startLoadPhase?.('prepareBuildingOwnership');
       const inferredCoverage = supplementSparseBuildingData(data, appCtx);
 
       const curatedLandmarks = curatedLandmarksNear(options.location);
@@ -138,6 +153,7 @@ export function scheduleDeferredBuildingLoad(options = {}) {
         coreRatio: options.useRdtBudgeting ? 0.35 : 0.45,
         compareFn: (a, b) => buildingDataPriority(b) - buildingDataPriority(a)
       });
+      options.endLoadPhase?.('prepareBuildingOwnership');
 
       options.loadMetrics.buildings.requested = requested.length;
       options.loadMetrics.buildings.selected = buildingWays.length;

@@ -203,7 +203,27 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
   if (!pts || pts.length < 2) return null;
   const semantics = road?.structureSemantics || null;
   const profileDistances = road?.surfaceDistances instanceof Float32Array ? road.surfaceDistances : null;
+  const profileHeights = road?.surfaceHeights instanceof Float32Array ? road.surfaceHeights : null;
   const transitionAnchors = Array.isArray(road?.structureTransitionAnchors) ? road.structureTransitionAnchors : [];
+  const sameRoad = road === preferredRoad;
+  const connectedRoad = !!(
+    preferredRoad &&
+    !sameRoad &&
+    (
+      Array.isArray(preferredRoad?.connectedFeatures?.start) && preferredRoad.connectedFeatures.start.some((entry) => entry?.feature === road) ||
+      Array.isArray(preferredRoad?.connectedFeatures?.end) && preferredRoad.connectedFeatures.end.some((entry) => entry?.feature === road)
+    )
+  );
+  const sameVerticalGroup = !!(
+    preferredRoad?.structureSemantics?.verticalGroup &&
+    road?.structureSemantics?.verticalGroup === preferredRoad.structureSemantics.verticalGroup
+  );
+  const continuityAccess = !!preferredRoad && (
+    sameRoad ||
+    connectedRoad ||
+    sameVerticalGroup ||
+    runtime.areRoadsConnected(preferredRoad, road)
+  );
   let totalDistance = Number.isFinite(profileDistances?.[profileDistances.length - 1]) ? Number(profileDistances[profileDistances.length - 1]) : NaN;
   if (!Number.isFinite(totalDistance) || totalDistance <= 0) {
     totalDistance = 0;
@@ -226,8 +246,23 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
     const nx = p1.x + t * dx;
     const nz = p1.z + t * dz;
     const d = Math.hypot(x - nx, z - nz);
-    const projected = { x: nx, z: nz, dist: d, segIndex: i, t };
-    const roadY = runtime.sampleFeatureSurfaceY(road, x, z, projected);
+    // Navigation runs every simulation frame. Elevated and subgrade structures
+    // own their stored profiles, so point-aligned typed arrays are safe to
+    // interpolate directly. At-grade roads remain owned by the current terrain
+    // sampler: terrain tiles can be replaced after the road profile was built.
+    // Bypassing that sampler leaves ordinary roads floating above or buried
+    // below the rendered ground.
+    const fromY = profileHeights?.length === pts.length ? Number(profileHeights[i]) : NaN;
+    const toY = profileHeights?.length === pts.length ? Number(profileHeights[i + 1]) : NaN;
+    const requiresLiveTerrain =
+      semantics?.terrainMode === 'at_grade' &&
+      typeof road?.surfaceTerrainSampler === 'function';
+    const roadY =
+      !requiresLiveTerrain && Number.isFinite(fromY) && Number.isFinite(toY) ?
+        fromY + (toY - fromY) * t :
+        runtime.sampleFeatureSurfaceY(road, x, z, { x: nx, z: nz, dist: d, segIndex: i, t }, {
+          preferStoredProfile: !requiresLiveTerrain
+        });
     const verticalDelta = Number.isFinite(targetY) && Number.isFinite(roadY) ? Math.abs(roadY - targetY) : 0;
     const distanceAlong =
       profileDistances && profileDistances.length > i ?
@@ -253,14 +288,6 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
       0.38;
     let weightedDist = d + (Number.isFinite(targetY) && Number.isFinite(roadY) ? verticalDelta * verticalWeight : 0);
     if (preferredRoad) {
-      const sameRoad = road === preferredRoad;
-      const connectedRoad = !sameRoad && (
-        Array.isArray(preferredRoad?.connectedFeatures?.start) && preferredRoad.connectedFeatures.start.some((entry) => entry?.feature === road) ||
-        Array.isArray(preferredRoad?.connectedFeatures?.end) && preferredRoad.connectedFeatures.end.some((entry) => entry?.feature === road)
-      );
-      const sameVerticalGroup =
-        preferredRoad?.structureSemantics?.verticalGroup &&
-        road?.structureSemantics?.verticalGroup === preferredRoad.structureSemantics.verticalGroup;
       if (sameRoad) {
         weightedDist = d + verticalDelta * 0.12;
       } else if (connectedRoad) {
@@ -273,15 +300,6 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
       else if (sameVerticalGroup) weightedDist -= 0.7;
       if ((sameRoad || connectedRoad) && (t < 0.08 || t > 0.92)) weightedDist -= 0.55;
     }
-    const continuityAccess =
-      !!preferredRoad && (
-        road === preferredRoad ||
-        runtime.areRoadsConnected(preferredRoad, road) ||
-        (
-          preferredRoad?.structureSemantics?.verticalGroup &&
-          road?.structureSemantics?.verticalGroup === preferredRoad.structureSemantics.verticalGroup
-        )
-      );
     if (semantics?.gradeSeparated && !continuityAccess && Number.isFinite(verticalDelta)) {
       const directLockThreshold = semantics.terrainMode === 'elevated' ? 1.25 : 1.35;
       const transitionLockThreshold = semantics.terrainMode === 'elevated' ? 1.65 : 1.85;
@@ -376,4 +394,4 @@ export function findNearestRoad(x, z, options = {}) {
   return nearRoadResult;
 }
 
-export { roadSpatialIndexSnapshot };
+export { evaluateNearestRoadCandidate, roadSpatialIndexSnapshot };

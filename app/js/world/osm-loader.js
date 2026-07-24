@@ -216,8 +216,11 @@ export function buildWorldOverpassPlan({
       poiRadius,
       kind: 'building-metadata'
     },
-    deferredBuildingMetadataQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
-                way["building"]${buildingMetadataBounds};
+    deferredBuildingMetadataQuery: `[out:json][timeout:${Math.min(queryTimeoutSeconds, 8)}];(
+                way["building"]["height"]${buildingMetadataBounds};
+                way["building"]["building:levels"]${buildingMetadataBounds};
+                way["building"]["name"]${buildingMetadataBounds};
+                way["building"]["roof:shape"]${buildingMetadataBounds};
             );out tags center qt;`,
     deferredBuildingQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["building"]${buildingBounds};

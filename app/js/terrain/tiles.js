@@ -4,7 +4,7 @@ import {
   classifyTerrainVisualProfile,
   releaseTerrainTextureSets,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=32";
+} from "./surface-profiles.js?v=35";
 
 const TERRAIN_TILE_CACHE_LIMIT = 72;
 const TERRAIN_TILE_MAX_ATTEMPTS = 3;

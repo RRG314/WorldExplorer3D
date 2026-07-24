@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { fetchBundledLandmarkData } from "./landmark-source.js?v=2";
-import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=7";
+import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=8";
 import { renderCuratedLandmarkModels } from './landmark-models.js?v=15';
 
 const MAX_PYRAMIDS = 48;
@@ -187,20 +187,42 @@ function createWallMesh(way, nodes) {
   const points = wayPoints(way, nodes, (value) => value, false);
   if (points.length < 2 || typeof THREE === 'undefined') return null;
   const tags = way.tags || {};
-  const height = numericMeters(tags.height, DEFAULT_WALL_HEIGHT, 1.2, 30);
-  const width = numericMeters(tags.width, DEFAULT_WALL_WIDTH, 0.8, 14);
+  const height = numericMeters(tags.height, DEFAULT_WALL_HEIGHT, 1.2, 14);
+  const width = numericMeters(tags.width, DEFAULT_WALL_WIDTH, 0.8, 8);
   const segments = [];
+  const maxSegmentLength = 14;
+  const maxSegments = 900;
   for (let i = 0; i < points.length - 1; i++) {
     const start = points[i];
     const end = points[i + 1];
-    const startY = appCtx.elevationWorldYAtWorldXZ(start.x, start.z) + height * 0.5;
-    const endY = appCtx.elevationWorldYAtWorldXZ(end.x, end.z) + height * 0.5;
-    const dx = end.x - start.x;
-    const dy = endY - startY;
-    const dz = end.z - start.z;
-    const length = Math.hypot(dx, dy, dz);
-    if (length < 0.35 || length > 1200) continue;
-    segments.push({ x: (start.x + end.x) * 0.5, y: (startY + endY) * 0.5, z: (start.z + end.z) * 0.5, dx, dy, dz, length });
+    const sourceDx = end.x - start.x;
+    const sourceDz = end.z - start.z;
+    const horizontalLength = Math.hypot(sourceDx, sourceDz);
+    if (horizontalLength < 0.35 || horizontalLength > 1200) continue;
+    const subdivisions = Math.max(1, Math.ceil(horizontalLength / maxSegmentLength));
+    for (let part = 0; part < subdivisions && segments.length < maxSegments; part++) {
+      const t0 = part / subdivisions;
+      const t1 = (part + 1) / subdivisions;
+      const startX = start.x + sourceDx * t0;
+      const startZ = start.z + sourceDz * t0;
+      const endX = start.x + sourceDx * t1;
+      const endZ = start.z + sourceDz * t1;
+      const startY = appCtx.elevationWorldYAtWorldXZ(startX, startZ) + height * 0.5;
+      const endY = appCtx.elevationWorldYAtWorldXZ(endX, endZ) + height * 0.5;
+      const dx = endX - startX;
+      const dz = endZ - startZ;
+      const length = Math.hypot(dx, dz);
+      if (length < 0.35 || length > maxSegmentLength * 1.05) continue;
+      segments.push({
+        x: (startX + endX) * 0.5,
+        y: (startY + endY) * 0.5,
+        z: (startZ + endZ) * 0.5,
+        dx,
+        dz,
+        length
+      });
+    }
+    if (segments.length >= maxSegments) break;
   }
   if (segments.length === 0) return null;
 
@@ -239,9 +261,10 @@ function createWallMesh(way, nodes) {
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i];
     position.set(segment.x, segment.y, segment.z);
-    direction.set(segment.dx, segment.dy, segment.dz).normalize();
-    quaternion.setFromUnitVectors(forward, direction);
-    scale.set(width, height, segment.length);
+    // Wall faces remain vertical while each short segment steps with terrain.
+    // Rotating the local up axis into a 3D slope produces enormous tilted slabs.
+    quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.atan2(segment.dx, segment.dz));
+    scale.set(width, height, segment.length * 1.04);
     matrix.compose(position, quaternion, scale);
     mesh.setMatrixAt(i, matrix);
   }
@@ -265,6 +288,8 @@ function createWallMesh(way, nodes) {
     landmarkName: tags.name || tags['name:en'] || 'Historic Wall',
     heightMeters: height,
     widthMeters: width,
+    segmentCount: segments.length,
+    maxSegmentLength: Math.max(...segments.map((segment) => segment.length)),
     crenellationCount: merlons.length
   };
   addHistoricSite(way, points, 'historic_wall', height);

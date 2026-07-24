@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { diagnoseRuntimeBudgets } from "./runtime/budget-diagnostics.js?v=1";
+import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 
 function numberOrNull(value) {
   return Number.isFinite(value) ? Number(value) : null;
@@ -90,6 +91,7 @@ function composerSnapshot() {
 
 function getWorldExplorerRuntimeDiagnostics() {
   const snapshot = {
+    frameOwnership: appCtx.getFrameOwnershipSnapshot?.() || null,
     runtimeKernel: appCtx.getRuntimeKernelSnapshot?.() || null,
     sessionLifecycle: appCtx.getSessionCoordinatorDebugState?.() || null,
     account: appCtx.getAccountSnapshot?.() || null,
@@ -213,6 +215,26 @@ function publishRuntimeDiagnostics() {
 }
 
 publishRuntimeDiagnostics();
-globalThis.setInterval(publishRuntimeDiagnostics, 1000);
+const runtimeDiagnosticsScope = createLifecycleScope('runtime-diagnostics');
+let diagnosticsPublishPending = false;
+function scheduleRuntimeDiagnosticsPublish() {
+  if (diagnosticsPublishPending || document.hidden) return;
+  diagnosticsPublishPending = true;
+  runtimeDiagnosticsScope.idle(() => {
+    diagnosticsPublishPending = false;
+    if (!document.hidden) publishRuntimeDiagnostics();
+  }, 2500);
+}
+runtimeDiagnosticsScope.interval(() => {
+  scheduleRuntimeDiagnosticsPublish();
+}, 5000);
+runtimeDiagnosticsScope.listen(document, 'visibilitychange', () => {
+  if (!document.hidden) scheduleRuntimeDiagnosticsPublish();
+});
+
+Object.assign(appCtx, {
+  getRuntimeDiagnosticsLifecycleSnapshot: () => runtimeDiagnosticsScope.snapshot(),
+  stopRuntimeDiagnostics: (reason = 'stopped') => runtimeDiagnosticsScope.dispose(reason)
+});
 
 export { getWorldExplorerRuntimeDiagnostics };

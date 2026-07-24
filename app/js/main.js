@@ -1,6 +1,7 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=4';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=1';
+import { getFrameOwnershipSnapshot, registerFrameOwner } from './runtime/frame-ownership.js?v=1';
 import { createRuntimeKernel } from './runtime/kernel.js?v=1';
 
 let perfPanelTimer = 0;
@@ -102,7 +103,7 @@ const runtimeKernel = createRuntimeKernel({
     environment: appCtx.getEnv?.() || null,
     gameStarted: !!appCtx.gameStarted
   }),
-  isSuspended: dedicatedRendererActive,
+  isSuspended: () => document.hidden || dedicatedRendererActive(),
   onSuspendedFrame: ({ timestamp }) => {
     appCtx.lastTime = timestamp;
   },
@@ -111,6 +112,22 @@ const runtimeKernel = createRuntimeKernel({
     globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-system-error', {
       detail: { system, message: error instanceof Error ? error.message : String(error) }
     }));
+  }
+});
+
+registerFrameOwner({
+  id: 'earth.runtime-kernel',
+  label: 'Earth runtime kernel',
+  kind: 'continuous-renderer',
+  exclusiveGroup: 'environment-renderer',
+  getState: () => {
+    const running = runtimeKernel.snapshot().running;
+    const suspended = document.hidden || dedicatedRendererActive();
+    return {
+      active: running && !suspended,
+      scheduled: running,
+      suspended: running && suspended
+    };
   }
 });
 
@@ -297,6 +314,7 @@ window.addEventListener('resize', () => {
 }, { passive: true });
 
 Object.assign(appCtx, {
+  getFrameOwnershipSnapshot,
   getRuntimeKernelSnapshot: () => runtimeKernel.snapshot(),
   hideLoad,
   positionTopOverlays,

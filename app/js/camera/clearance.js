@@ -1,11 +1,23 @@
-import { ctx as appCtx } from "../shared-context.js?v=55";
-
 const queryCaches = new Map();
+let getNearbyBuildingsFn = () => [];
+let sampleTerrainYFn = () => null;
 const candidateTargets = [
   { x: 0, y: 0, z: 0 },
   { x: 0, y: 0, z: 0 },
   { x: 0, y: 0, z: 0 }
 ];
+
+export function initCameraClearance(options = {}) {
+  if (typeof options.getNearbyBuildings !== 'function') {
+    throw new TypeError('Camera clearance requires getNearbyBuildings().');
+  }
+  if (typeof options.sampleTerrainY !== 'function') {
+    throw new TypeError('Camera clearance requires sampleTerrainY().');
+  }
+  getNearbyBuildingsFn = options.getNearbyBuildings;
+  sampleTerrainYFn = options.sampleTerrainY;
+  queryCaches.clear();
+}
 
 function buildingVerticalOverlap(building, y, radius) {
   const minY = Number.isFinite(building?.minY) ? building.minY : building?.baseY;
@@ -32,7 +44,7 @@ function nearbyBuildings(x, z, radius, cacheKey) {
       Math.hypot(x - cached.x, z - cached.z) < 12) {
     return cached.buildings;
   }
-  const buildings = appCtx.getNearbyBuildings?.(x, z, radius) || [];
+  const buildings = getNearbyBuildingsFn(x, z, radius) || [];
   queryCaches.set(cacheKey, { x, z, radius, updatedAt: now, buildings });
   return buildings;
 }
@@ -131,7 +143,7 @@ export function resolveChaseCameraPosition(origin, target, options = {}) {
   target.y = origin.y + selectedDy * resolvedScale;
   target.z = origin.z + selectedDz * resolvedScale;
 
-  const terrainY = appCtx.SurfaceQuery?.terrainAt?.(target.x, target.z)?.position?.y;
+  const terrainY = sampleTerrainYFn(target.x, target.z);
   if (Number.isFinite(terrainY)) target.y = Math.max(target.y, terrainY + radius + 0.25);
   return target;
 }

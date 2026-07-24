@@ -1,5 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { resolveChaseCameraPosition } from './camera/clearance.js?v=4';
+import { resolveChaseCameraPosition } from './camera/clearance.js?v=5';
 
 const state = {
   active: false,

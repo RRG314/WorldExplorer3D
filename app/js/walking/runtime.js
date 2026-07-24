@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { resolveChaseCameraPosition } from "../camera/clearance.js?v=4";
+import { resolveChaseCameraPosition } from "../camera/clearance.js?v=5";
 
 const walkCameraOrigin = { x: 0, y: 0, z: 0 };
 const walkCameraTarget = { x: 0, y: 0, z: 0 };
@@ -54,11 +54,6 @@ function createWalkingRuntimeHelpers({
     if (!appliedSafeWalkSpawn) syncWalkerFromCar();
     if (options.deferWorldSync !== true) {
       syncWalkTerrain(true);
-      if (typeof appCtx.requestWorldSurfaceSync === "function") {
-        appCtx.requestWorldSurfaceSync({ force: true, source: "set_mode_walk" });
-      } else if (typeof appCtx.repositionBuildingsWithTerrain === "function") {
-        appCtx.repositionBuildingsWithTerrain();
-      }
     }
 
     if (carMesh) {
@@ -77,14 +72,6 @@ function createWalkingRuntimeHelpers({
       state.characterMesh.visible = state.view !== "first";
       state.characterMesh.position.set(state.walker.x, terrainY, state.walker.z);
       state.characterMesh.rotation.y = state.walker.angle;
-      if (options.deferWorldSync !== true) {
-        syncWalkTerrain(true);
-        if (typeof appCtx.requestWorldSurfaceSync === "function") {
-          appCtx.requestWorldSurfaceSync({ force: true, source: "set_mode_walk_character" });
-        } else if (typeof appCtx.repositionBuildingsWithTerrain === "function") {
-          appCtx.repositionBuildingsWithTerrain();
-        }
-      }
     } else {
       console.error("ERROR: Character mesh is still null after creation!");
     }
@@ -229,7 +216,7 @@ function createWalkingRuntimeHelpers({
     walkCameraTarget.z = resolvedCamZ;
     resolveChaseCameraPosition(walkCameraOrigin, walkCameraTarget, {
       cacheKey: "walk",
-      radius: 0.38,
+      radius: 1.25,
     });
     camera.position.set(walkCameraTarget.x, walkCameraTarget.y, walkCameraTarget.z);
     const cameraClearanceDistance = Math.hypot(

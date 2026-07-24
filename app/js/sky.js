@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=19";
+import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
+import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-session.js?v=20";
 import {
   cycleTimeOfDay as cycleSkyTimeOfDay,
   getAstronomicalSkySnapshot,
@@ -17,7 +18,7 @@ import {
   showStarInfo
 } from "./sky/starfield-ui.js?v=11";
 import { createMoonLandingUiApi } from "./sky/moon-landing-ui.js?v=2";
-import { createMoonSurface as createMoonSurfaceRuntime } from "./sky/moon-surface.js?v=2";
+import { createMoonSurface as createMoonSurfaceRuntime } from "./sky/moon-surface.js?v=4";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import {
   commitEnvironment,
@@ -66,25 +67,32 @@ function checkMoonClick(clientX, clientY) {
   return checkMoonSelection(clientX, clientY, travelToMoon);
 }
 
+let cameraTransitionScope = null;
+
 function runTimedCameraTransition({
   duration = 3000,
   onFrame,
   onComplete,
   isCurrent = () => true
 }) {
+  cameraTransitionScope?.dispose('camera-transition-superseded');
+  const scope = createLifecycleScope('planetary-camera-transition');
+  cameraTransitionScope = scope;
   const startTime = Date.now();
   let finished = false;
 
-  const complete = () => {
+  const finish = (reason, shouldComplete) => {
     if (finished) return;
     finished = true;
-    if (typeof onComplete === 'function') onComplete();
+    if (cameraTransitionScope === scope) cameraTransitionScope = null;
+    scope.dispose(reason);
+    if (shouldComplete && typeof onComplete === 'function') onComplete();
   };
 
   const animate = () => {
     if (finished) return;
     if (!isCurrent()) {
-      finished = true;
+      finish('camera-transition-stale', false);
       return;
     }
     const elapsed = Date.now() - startTime;
@@ -96,14 +104,14 @@ function runTimedCameraTransition({
     if (typeof onFrame === 'function') onFrame(eased, progress);
 
     if (progress < 1) {
-      requestAnimationFrame(animate);
+      scope.animationFrame(animate);
     } else {
-      complete();
+      finish('camera-transition-complete', true);
     }
   };
 
-  requestAnimationFrame(animate);
-  window.setTimeout(complete, duration + 250);
+  scope.animationFrame(animate);
+  scope.timeout(() => finish('camera-transition-timeout', true), duration + 250);
 }
 
 // Direct travel to moon (bypasses space flight module)

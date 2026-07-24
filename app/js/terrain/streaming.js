@@ -65,6 +65,10 @@ function createTerrainStreamingApi(deps = {}) {
         if (!alreadyPresent) {
           const mesh = buildTerrainTileMesh(request.z, request.tx, request.ty, terrainTileDeps);
           appCtx.terrainGroup.add(mesh);
+          // Terrain drains asynchronously. Boat presentation may already own
+          // offshore visibility, so every newly attached tile must enter that
+          // ownership policy before it can render a frame.
+          appCtx.syncBoatTerrainSuppression?.();
         }
       }
       if (pendingTerrainMeshes.size > 0) scheduleTerrainMeshDrain();

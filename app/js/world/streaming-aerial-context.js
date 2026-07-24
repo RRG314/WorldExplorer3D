@@ -4,7 +4,7 @@ import {
   buildStreamingBuildingVisuals,
   buildStreamingRoadVisuals,
   queueGeometryDisposal
-} from "./streaming-vector-chunks.js?v=54";
+} from "./streaming-vector-chunks.js?v=56";
 import { SOURCE_PROFILE } from "./surface-contract.js?v=7";
 
 function removeMeshesInPlace(source, removed) {

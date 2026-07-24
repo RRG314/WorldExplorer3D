@@ -8,6 +8,24 @@
     ],
     "headers": [
       {
+        "source": "/build-manifest.json",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-store"
+          }
+        ]
+      },
+      {
+        "source": "/asset-manifest.json",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-store"
+          }
+        ]
+      },
+      {
         "source": "/",
         "headers": [
           {
@@ -48,7 +66,7 @@
         "headers": [
           {
             "key": "Cache-Control",
-            "value": "public, max-age=31536000, immutable"
+            "value": "public, max-age=0, must-revalidate"
           }
         ]
       },

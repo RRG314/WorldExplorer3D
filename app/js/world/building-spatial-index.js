@@ -1,12 +1,27 @@
-import { ctx as appCtx } from "../shared-context.js?v=55";
-
 const BUILDING_INDEX_CELL_SIZE = 120;
 let buildingSpatialIndex = new Map();
+let getBuildingsFn = () => [];
+let getDynamicCollidersFn = () => [];
+let getOverlayCollidersFn = () => [];
+let getOverlaySuppressionFn = () => null;
 const EMPTY_SUPPRESSION_SET = new Set();
 const suppressionArrayCache = new WeakMap();
 
+export function initBuildingSpatialIndex(options = {}) {
+  for (const key of ['getBuildings', 'getDynamicColliders', 'getOverlayColliders', 'getOverlaySuppression']) {
+    if (typeof options[key] !== 'function') {
+      throw new TypeError(`Building spatial index requires ${key}().`);
+    }
+  }
+  getBuildingsFn = options.getBuildings;
+  getDynamicCollidersFn = options.getDynamicColliders;
+  getOverlayCollidersFn = options.getOverlayColliders;
+  getOverlaySuppressionFn = options.getOverlaySuppression;
+  clearBuildingSpatialIndex();
+}
+
 function overlaySuppressionSet(key = 'roadIds') {
-  const source = appCtx.overlaySuppression?.[key];
+  const source = getOverlaySuppressionFn()?.[key];
   if (source instanceof Set) return source;
   if (Array.isArray(source)) {
     let cached = suppressionArrayCache.get(source);
@@ -86,9 +101,11 @@ export function removeBuildingsFromSpatialIndex(buildings) {
 }
 
 export function getNearbyBuildings(x, z, radius = 80, output = null, dedupe = null) {
-  const baseBuildings = appCtx.buildings || [];
-  const dynamicColliders = Array.isArray(appCtx.dynamicBuildingColliders) ? appCtx.dynamicBuildingColliders : [];
-  const overlayColliders = Array.isArray(appCtx.overlayRuntimeBuildingColliders) ? appCtx.overlayRuntimeBuildingColliders : [];
+  const baseBuildings = getBuildingsFn() || [];
+  const dynamicSource = getDynamicCollidersFn();
+  const overlaySource = getOverlayCollidersFn();
+  const dynamicColliders = Array.isArray(dynamicSource) ? dynamicSource : [];
+  const overlayColliders = Array.isArray(overlaySource) ? overlaySource : [];
   const out = Array.isArray(output) ? output : [];
   out.length = 0;
   const seen = dedupe instanceof Set ? dedupe : new Set();

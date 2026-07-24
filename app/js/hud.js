@@ -1,7 +1,8 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import { updateNightLighting } from "./engine/night-lighting.js?v=6";
 import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=2";
-import { resolveChaseCameraPosition } from "./camera/clearance.js?v=4";
+import { resolveChaseCameraPosition } from "./camera/clearance.js?v=5";
+import { constrainTunnelCameraXZ } from "./camera/tunnel-corridor.js?v=1";
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
 
@@ -21,6 +22,7 @@ const WALK_ROAD_EDGE_MIN = 6;
 const WALK_ROAD_EDGE_SCALE = 0.75;
 const carCameraOrigin = { x: 0, y: 0, z: 0 };
 const carCameraTarget = { x: 0, y: 0, z: 0 };
+let tunnelWaterOcclusionActive = false;
 
 function positionStableShadowLight(light, direction, cameraX, cameraY, cameraZ, distance) {
   if (!light) return;
@@ -60,6 +62,15 @@ function tunnelCameraY(targetY, x, z, roadY, semantics) {
 function syncTunnelGroundOcclusion(insideTunnel) {
   const ground = appCtx.groundFallbackMesh;
   if (ground?.userData?.isGroundPlane) ground.visible = !insideTunnel;
+  for (const mesh of appCtx.landuseMeshes || []) {
+    if (!mesh || (mesh.userData?.landuseType !== 'water' && !mesh.userData?.waterAreaRef)) continue;
+    mesh.userData.tunnelSuppressed = insideTunnel;
+    if (insideTunnel) mesh.visible = false;
+  }
+  if (!insideTunnel && tunnelWaterOcclusionActive) {
+    appCtx.updateWorldLod?.(true);
+  }
+  tunnelWaterOcclusionActive = insideTunnel;
   const terrainSide = insideTunnel ? THREE.FrontSide : THREE.DoubleSide;
   for (const mesh of appCtx.terrainGroup?.children || []) {
     const materials = Array.isArray(mesh?.material) ? mesh.material : [mesh?.material];
@@ -381,8 +392,19 @@ function updateCamera(dt = 1 / 60) {
     const horizontalDistance = d * Math.cos(carLook.pitch * 0.55);
     const ox = -Math.sin(viewAngle) * horizontalDistance;
     const oz = -Math.cos(viewAngle) * horizontalDistance;
-    const targetX = appCtx.car.x + ox;
-    const targetZ = appCtx.car.z + oz;
+    let targetX = appCtx.car.x + ox;
+    let targetZ = appCtx.car.z + oz;
+    if (insideTunnel) {
+      const corridorTarget = constrainTunnelCameraXZ(
+        appCtx.car.road,
+        targetX,
+        targetZ,
+        appCtx.car.x,
+        appCtx.car.z
+      );
+      targetX = corridorTarget.x;
+      targetZ = corridorTarget.z;
+    }
     const unconstrainedTargetY = carGroundY + h + Math.sin(carLook.pitch) * d * 0.72;
     const targetY = insideTunnel
       ? tunnelCameraY(unconstrainedTargetY, targetX, targetZ, carGroundY, carRoadSemantics)
@@ -403,13 +425,22 @@ function updateCamera(dt = 1 / 60) {
     if (!insideTunnel && !planetaryChase) {
       resolveChaseCameraPosition(carCameraOrigin, carCameraTarget, {
         cacheKey: "drive",
-        radius: 0.6,
+        radius: 1,
       });
     }
     appCtx.camera.position.x += (carCameraTarget.x - appCtx.camera.position.x) * smoothFactor;
     appCtx.camera.position.y += (carCameraTarget.y - appCtx.camera.position.y) * smoothFactor;
     appCtx.camera.position.z += (carCameraTarget.z - appCtx.camera.position.z) * smoothFactor;
     if (insideTunnel) {
+      const corridorPosition = constrainTunnelCameraXZ(
+        appCtx.car.road,
+        appCtx.camera.position.x,
+        appCtx.camera.position.z,
+        appCtx.car.x,
+        appCtx.car.z
+      );
+      appCtx.camera.position.x = corridorPosition.x;
+      appCtx.camera.position.z = corridorPosition.z;
       appCtx.camera.position.y = tunnelCameraY(
         appCtx.camera.position.y,
         appCtx.camera.position.x,

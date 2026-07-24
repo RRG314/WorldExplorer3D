@@ -4,8 +4,9 @@ import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
   removeBuildingsFromSpatialIndex
-} from "./building-spatial-index.js?v=6";
+} from "./building-spatial-index.js?v=7";
 import { waterSurfaceBaseElevation } from "./load-geometry.js?v=19";
+import { assessMappedWaterTerrain } from "./water-surface-validity.js?v=3";
 import { fetchOvertureStreamingTile } from './overture-streaming-source.js?v=3';
 import { buildStreamingLandcover } from "./streaming-landcover.js?v=14";
 import { createRoadNameResolver } from "./streaming-road-labels.js?v=1";
@@ -14,7 +15,7 @@ import {
   classifyStructureSemantics,
   polylineBounds,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=19";
+} from "../structure-semantics.js?v=21";
 import {
   INITIAL_DETAIL_RADIUS,
   ROAD_SURFACE_OFFSET,
@@ -39,7 +40,7 @@ import {
   worldPoint,
   yieldToRenderer
 } from './streaming-vector-geometry.js?v=4';
-import { registerBridgeGuardrails, removeBridgeGuardrails } from "./bridge-guardrails.js?v=7";
+import { registerBridgeGuardrails, removeBridgeGuardrails } from "./bridge-guardrails.js?v=8";
 import { createInitialWorldRetirementApi } from "./streaming-initial-retirement.js?v=3";
 import { SOURCE_PROFILE } from "./surface-contract.js?v=7";
 import { normalizeWaterBody } from './water-body-contract.js?v=2';
@@ -447,6 +448,14 @@ async function buildWater(tileRecord, chunk) {
           .filter((_, index) => index % stride === 0)
           .map((point) => terrainY(point.x, point.z));
         const surfaceY = layerName === 'ocean' ? 0 : waterSurfaceBaseElevation(sampledHeights);
+        const terrainAssessment = assessMappedWaterTerrain({
+          sampledHeights,
+          surfaceY,
+          ambientY: terrainY(0, 0),
+          span: Math.max(bounds.maxX - bounds.minX, bounds.maxZ - bounds.minZ),
+          layer: layerName
+        });
+        if (!terrainAssessment.valid) return;
         const shape = new THREE.Shape();
         footprint.forEach((point, index) => {
           if (index === 0) shape.moveTo(point.x, -point.z);
@@ -470,7 +479,8 @@ async function buildWater(tileRecord, chunk) {
           geometrySource,
           _streamChunkKey: chunk.key,
           datumMethod: layerName === 'ocean' ? 'sea-level' : 'dem-water-surface',
-          datumConfidence: layerName === 'ocean' ? 0.98 : 0.82
+          datumConfidence: layerName === 'ocean' ? 0.98 : 0.82,
+          terrainAssessment
         });
         chunk.waterAreas.push(water);
       });

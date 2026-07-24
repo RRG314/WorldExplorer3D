@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=19";
+} from "./structure-semantics.js?v=21";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -27,7 +27,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=21";
+} from "./world/spawn.js?v=34";
 import {
   scheduleDeferredStructureRefresh,
   scheduleDeferredWorldLinearFeatureLoad
@@ -39,7 +39,7 @@ import {
   initWorldOsmLoader,
   invalidateOverpassCaches,
   sameLocation
-} from "./world/osm-loader.js?v=12";
+} from "./world/osm-loader.js?v=13";
 import {
   clampNumber,
   featureTileKeyForLatLon,
@@ -66,12 +66,12 @@ import {
   scheduleDeferredPoiLoad,
   scheduleDeferredWorldDetailPasses,
   safeWorldLoadCall
-} from "./world/load-support.js?v=24";
+} from "./world/load-support.js?v=25";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=8";
+} from "./world/load-reset.js?v=9";
 import {
   prepareWorldFeatureSelections
 } from "./world/load-budgeting.js?v=4";
@@ -104,17 +104,18 @@ import {
   classifyLinearFeatureTags as classifyLinearFeatureTagsBase
 } from "./world/load-style.js?v=3";
 import {
+  initWorldLoadSelection,
   limitNodesByDistance,
   limitWaysByDistance,
   nodeDistanceSq
-} from "./world/load-selection.js?v=2";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=12";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=22";
+} from "./world/load-selection.js?v=3";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=13";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=25";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
   registerWaterWaveMaterial
-} from "./world/render-support.js?v=5";
+} from "./world/render-support.js?v=7";
 import {
   buildingContainingPoint,
   findNearestRoad,
@@ -124,7 +125,7 @@ import {
   pointInPolygon,
   runtimeRoadFeatures,
   teleportToLocation
-} from "./world/navigation.js?v=5";
+} from "./world/navigation.js?v=7";
 import {
   buildTraversalNetworks,
   findNearestTraversalFeature,
@@ -158,9 +159,11 @@ import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
   getNearbyBuildings,
+  initBuildingSpatialIndex,
   isSuppressedBaseBuilding,
   isSuppressedBaseRoad
-} from "./world/building-spatial-index.js?v=6";
+} from "./world/building-spatial-index.js?v=7";
+import { initCameraClearance } from './camera/clearance.js?v=5';
 import {
   applyBuildingContextSemanticsToFeature,
   cloneStructureSemantics,
@@ -169,13 +172,14 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=5";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=68";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=75";
+import { worldLoadTransactions } from './world/load-transaction.js?v=2';
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=13";
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=10";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
-import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=26";
+import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=28";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
 
@@ -319,6 +323,19 @@ initWorldNavigation({
   sampleFeatureSurfaceY,
   tryAutoEnterBoatAt
 });
+initBuildingSpatialIndex({
+  getBuildings: () => appCtx.buildings,
+  getDynamicColliders: () => appCtx.dynamicBuildingColliders,
+  getOverlayColliders: () => appCtx.overlayRuntimeBuildingColliders,
+  getOverlaySuppression: () => appCtx.overlaySuppression
+});
+initCameraClearance({
+  getNearbyBuildings,
+  sampleTerrainY: (x, z) => appCtx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y
+});
+initWorldLoadSelection({
+  getLocation: () => appCtx.LOC
+});
 initWorldBudgets({
   getPerfModeValue,
   limitNodesByDistance,
@@ -354,7 +371,12 @@ initWorldRenderSupport({
   distanceToPolygonEdgeXZ,
   pickRoofColor,
   pointInPolygon,
-  signedPolygonAreaXZ
+  rand01FromInt: appCtx.rand01FromInt,
+  signedPolygonAreaXZ,
+  trackWaterWaveMaterial(material) {
+    if (Array.isArray(appCtx.waterWaveVisuals)) appCtx.waterWaveVisuals.push(material);
+    else appCtx.replaceWorldCollection('waterWaveVisuals', [material]);
+  }
 });
 initWorldLoadGeometry({
   clampNumber,
@@ -365,6 +387,7 @@ initWorldLoadGeometry({
 });
 
 Object.assign(appCtx, {
+  getWorldLoadTransactionSnapshot: () => worldLoadTransactions.snapshot(),
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
   applySpawnTarget,

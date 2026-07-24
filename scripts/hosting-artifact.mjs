@@ -4,6 +4,7 @@ import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import { assertProductionArtifact } from './hosting-release-contract.mjs';
 
 const ROOT = process.cwd();
 const OUTPUT_DIR = path.join(ROOT, 'dist');
@@ -38,6 +39,15 @@ function canonicalJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
 }
 
+function releaseHashFor({ contentHash, environment, firebaseProjectId, hostingConfigHash }) {
+  return sha256(canonicalJson({
+    contentHash,
+    firebaseEnvironment: environment,
+    firebaseProjectId,
+    hostingConfigHash
+  }));
+}
+
 function readFlag(name, fallback = '') {
   const exact = process.argv.find((arg) => arg.startsWith(`${name}=`));
   if (exact) return exact.slice(name.length + 1);
@@ -51,6 +61,10 @@ function git(args, fallback = '') {
   } catch {
     return fallback;
   }
+}
+
+function workingTreeDirty() {
+  return git(['status', '--porcelain', '--untracked-files=all'], '').length > 0;
 }
 
 async function listFiles(directory, base = '') {
@@ -147,6 +161,7 @@ async function sourceFingerprint(sourceFiles, environment, config) {
     records.push([relative, await hashFile(absolute)]);
   }
   records.push([`config/firebase.${environment}.json`, sha256(canonicalJson(config))]);
+  records.push(['firebase.json', await hashFile(path.join(ROOT, 'firebase.json'))]);
   return sha256(canonicalJson(records));
 }
 
@@ -155,6 +170,10 @@ async function readPackage() {
 }
 
 async function buildArtifact(environment) {
+  const dirty = workingTreeDirty();
+  if (environment === 'production' && dirty) {
+    throw new Error('Production artifacts must be built from a clean working tree, including untracked files.');
+  }
   const sourceFiles = await collectSourceFiles();
   const config = JSON.parse(await fs.readFile(firebaseConfigPath(environment), 'utf8'));
   await copySources(sourceFiles);
@@ -165,14 +184,21 @@ async function buildArtifact(environment) {
   const commit = git(['rev-parse', 'HEAD'], 'unknown');
   const shortCommit = commit.slice(0, 12);
   const contentHash = sha256(canonicalJson(files));
+  const hostingConfigHash = await hashFile(path.join(ROOT, 'firebase.json'));
+  const firebaseProjectId = String(config.projectId || '');
+  const releaseHash = releaseHashFor({
+    contentHash,
+    environment,
+    firebaseProjectId,
+    hostingConfigHash
+  });
   const fingerprint = await sourceFingerprint(sourceFiles, environment, config);
-  const dirty = git(['status', '--porcelain', '--untracked-files=no'], '').length > 0;
   const commitTime = git(['show', '-s', '--format=%cI', 'HEAD'], 'unknown');
-  const buildId = `${packageJson.version}+${shortCommit}.${contentHash.slice(0, 16)}.${environment}`;
+  const buildId = `${packageJson.version}+${shortCommit}.${releaseHash.slice(0, 16)}.${environment}`;
 
   await fs.writeFile(path.join(OUTPUT_DIR, ASSET_MANIFEST), canonicalJson({ schemaVersion: 1, files }));
   await fs.writeFile(path.join(OUTPUT_DIR, BUILD_MANIFEST), canonicalJson({
-    schemaVersion: 1,
+    schemaVersion: 2,
     product: packageJson.name,
     version: packageJson.version,
     buildId,
@@ -181,8 +207,10 @@ async function buildArtifact(environment) {
     sourceDirty: dirty,
     sourceFingerprint: fingerprint,
     contentHash,
+    hostingConfigHash,
+    releaseHash,
     firebaseEnvironment: environment,
-    firebaseProjectId: String(config.projectId || ''),
+    firebaseProjectId,
     fileCount: Object.keys(files).length
   }));
 
@@ -200,6 +228,9 @@ async function verifyArtifact() {
     throw new Error('firebase.json must serve the generated dist artifact.');
   }
   const environment = String(buildManifest.firebaseEnvironment || '');
+  if (buildManifest.schemaVersion !== 2) {
+    throw new Error(`Unsupported build manifest schema "${buildManifest.schemaVersion || 'unknown'}". Rebuild the artifact.`);
+  }
   const config = JSON.parse(await fs.readFile(firebaseConfigPath(environment), 'utf8'));
   const expectedFiles = assetManifest.files || {};
   const actualFiles = (await listFiles(OUTPUT_DIR)).filter((relative) =>
@@ -231,18 +262,33 @@ async function verifyArtifact() {
     throw new Error('Hosting artifact contains the wrong Firebase environment configuration.');
   }
   const contentHash = sha256(canonicalJson(expectedFiles));
+  const hostingConfigHash = await hashFile(path.join(ROOT, 'firebase.json'));
+  const releaseHash = releaseHashFor({
+    contentHash,
+    environment,
+    firebaseProjectId: String(config.projectId || ''),
+    hostingConfigHash
+  });
   const fingerprint = await sourceFingerprint(sourceFiles, environment, config);
   const commit = git(['rev-parse', 'HEAD'], 'unknown');
-  const buildId = `${packageJson.version}+${commit.slice(0, 12)}.${contentHash.slice(0, 16)}.${environment}`;
+  const buildId = `${packageJson.version}+${commit.slice(0, 12)}.${releaseHash.slice(0, 16)}.${environment}`;
   if (
     buildManifest.buildId !== buildId ||
     buildManifest.contentHash !== contentHash ||
+    buildManifest.hostingConfigHash !== hostingConfigHash ||
+    buildManifest.releaseHash !== releaseHash ||
     buildManifest.sourceFingerprint !== fingerprint ||
     buildManifest.commit !== commit ||
     buildManifest.firebaseProjectId !== String(config.projectId || '') ||
     buildManifest.fileCount !== expectedNames.length
   ) {
     throw new Error('Hosting build identity no longer matches the current source and artifact.');
+  }
+  if (environment === 'production') {
+    assertProductionArtifact(buildManifest, {
+      expectedProjectId: String(config.projectId || ''),
+      currentCommit: commit
+    });
   }
 
   const result = {

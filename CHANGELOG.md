@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+### Fixed
+
+- Kept at-grade navigation surfaces owned by the active terrain sampler after streamed terrain replacement, preventing ordinary roads from retaining stale elevations.
+- Made tunnel water suppression persistent across LOD refreshes and restored normal water visibility ownership on exit.
+- Applied active offshore boat visibility ownership to every asynchronously attached terrain tile, preventing late terrain from appearing through open-ocean presentation.
+
+### Verification
+
+- Made plane/interior lifecycle retention wait for deferred building detail, use precise forced-GC heap measurements across multiple warmed samples, and compare exact reachable scene resources instead of Three.js upload-history counters.
+- Made landscape mobile acceptance assert the Explore menu's actual open state and tutorial-card suppression instead of relying on an unrelated two-second polling window.
+- Added a direct terrain-streaming/boat-suppression contract to the release suite.
+
 ## [4.0.0] - 2026-07-22
 
 ### Added
@@ -20,6 +32,8 @@
 - Consolidated the globe-first start hub, mobile controls, travel-mode input, environment sessions, surface ownership, streaming budgets, and visual diagnostics.
 - Made Earth, ocean, Moon, Mars, and space transitions preserve compatible state and dispose incompatible actors, renderers, controls, and resources in one runtime.
 - Replaced duplicate Giza pyramid layers with one measured footprint-and-height owner per mapped pyramid and made curated landmark loading independent of optional network enrichment.
+- Made all unhashed hosted code, documents, fonts, models, and media revalidate so a deployment cannot mix assets from different releases.
+- Added verified live-release snapshotting and exact-build rollback commands; production promotion remains a separate, explicit approval step.
 
 ### Removed
 
@@ -28,6 +42,9 @@
 ### Verification
 
 - Added release gates for Apache-2.0 distribution metadata, emulator-backed MMO compatibility, Firestore rules, browser gameplay, mobile environments, planetary round trips, plane/interior lifecycle, operational feeds, hosting identity, and hosted-source reachability.
+- Added release-version consistency, hosting-size budgets, release-harness privacy checks, and a final artifact hash verification after the complete release suite.
+- Made continuous-streaming resource certification compare reachable scene/stream geometry ownership and exact disposal completion; mapped-source retention and bounded visible LOD density are verified separately.
+- Made walking spawn validation honor the actor's full building-clearance radius and corrected runtime motion/bridge certification to exercise an authoritative road spawn and the intended terrain-connected bridge ramp profile.
 
 ## [3.1.0] - 2026-07-20
 

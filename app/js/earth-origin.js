@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { addBuildingToSpatialIndex, clearBuildingSpatialIndex } from "./world/building-spatial-index.js?v=6";
+import { addBuildingToSpatialIndex, clearBuildingSpatialIndex } from "./world/building-spatial-index.js?v=7";
 
 const REBASE_DISTANCE_WORLD = 24000;
 const REBASE_COOLDOWN_MS = 2500;

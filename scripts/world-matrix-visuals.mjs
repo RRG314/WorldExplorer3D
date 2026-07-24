@@ -252,6 +252,9 @@ export async function captureTunnelPortalTraversal(page, spec, result, outputDir
     await new Promise((resolve) => window.setTimeout(resolve, 650));
     const renderedY = ctx.GroundHeight?._raycastMeshY?.(ctx.roadMeshes || [], x, z, surfaceY + 2.2, 5);
     const terrainY = ctx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y;
+    const waterMeshes = (ctx.landuseMeshes || []).filter((mesh) =>
+      mesh?.userData?.landuseType === 'water' || !!mesh?.userData?.waterAreaRef
+    );
     return {
       stage: stageName,
       applied: true,
@@ -268,6 +271,10 @@ export async function captureTunnelPortalTraversal(page, spec, result, outputDir
       terrainY: Number.isFinite(terrainY) ? Number(terrainY.toFixed(2)) : null,
       cameraY: Number(Number(ctx.camera?.position?.y || 0).toFixed(2)),
       cameraAboveRoad: Number((Number(ctx.camera?.position?.y || 0) - surfaceY).toFixed(2)),
+      waterMeshes: waterMeshes.length,
+      visibleWaterMeshes: waterMeshes.filter((mesh) => mesh?.visible !== false).length,
+      boatAvailable: !!ctx.boatMode?.available,
+      boatPromptVisible: !!document.getElementById('boatPrompt')?.classList?.contains('show'),
       tunnelLength: Number(roadLength(tunnel).toFixed(2))
     };
   }, { stageName: stage, stationRatio: ratio });

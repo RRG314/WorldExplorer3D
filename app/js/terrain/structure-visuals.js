@@ -3,13 +3,17 @@ import {
   polylineBounds,
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=19";
+} from "../structure-semantics.js?v=21";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext
 } from "./structure-visual-meshes.js?v=4";
 import { collectTunnelVisualInstances } from "./structure-tunnel-visuals.js?v=4";
-import { elevatedSegmentSafety } from "../world/bridge-safety.js?v=1";
+import {
+  buildGuardrailEdges,
+  elevatedSegmentSafety
+} from "../world/bridge-safety.js?v=2";
+import { sampleStructureVisualPolyline } from "./structure-visual-sampling.js?v=1";
 
 function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {
   const featureBounds = feature?.bounds || polylineBounds(feature?.pts || [], (Number(feature?.width) || 4) + padding);
@@ -110,11 +114,12 @@ export function collectStructureVisualInstances({
       semantics.terrainMode === "elevated" ?
         (isConnectorLike || isSkywalk ? 2.4 : 4.2) :
         10;
-    const visualPts =
-      typeof appCtx.subdivideRoadPoints === "function" && feature.pts.length >= 2 ?
-        appCtx.subdivideRoadPoints(feature.pts, visualDetail) :
-        feature.pts;
+    const visualPts = sampleStructureVisualPolyline(feature.pts, visualDetail);
     const structurePts = Array.isArray(visualPts) && visualPts.length >= 2 ? visualPts : feature.pts;
+    const guardrailEdges = buildGuardrailEdges(feature, structurePts, {
+      outsideGap: 0.28,
+      sampleTerrainY: sampleTerrainHeight
+    });
     const { distances, total } = polylineDistances(structurePts);
     const curvatureMetric = measureCurvature(structurePts);
     const nearbyElevatedCount = semantics.terrainMode === "elevated" ?
@@ -258,35 +263,43 @@ export function collectStructureVisualInstances({
           waterAreas: appCtx.waterAreas
         });
         if (guardrailSafety.protected) {
-          const railOffset = width * 0.5 + 0.28;
           for (const side of [-1, 1]) {
+            const edge = side < 0 ? guardrailEdges.rightEdge : guardrailEdges.leftEdge;
+            const edgeStart = edge[segIndex];
+            const edgeEnd = edge[segIndex + 1];
+            if (!edgeStart || !edgeEnd) continue;
+            const railQuat = deckQuaternionForSegment(edgeStart, edgeStart.y, edgeEnd, edgeEnd.y);
+            if (!railQuat) continue;
+            const railX = (edgeStart.x + edgeEnd.x) * 0.5;
+            const railY = (edgeStart.y + edgeEnd.y) * 0.5;
+            const railZ = (edgeStart.z + edgeEnd.z) * 0.5;
             addBeam(
               guardrailInstances,
-              midX + nx * railOffset * side,
-              deckY + 1.02,
-              midZ + nz * railOffset * side,
+              railX,
+              railY + 1.02,
+              railZ,
               0.14,
               0.16,
-              deckDepth,
+              railQuat.length,
               rotationY,
-              segmentQuat
+              railQuat
             );
             addBeam(
               guardrailInstances,
-              midX + nx * railOffset * side,
-              deckY + 0.56,
-              midZ + nz * railOffset * side,
+              railX,
+              railY + 0.56,
+              railZ,
               0.1,
               0.12,
-              deckDepth,
+              railQuat.length,
               rotationY,
-              segmentQuat
+              railQuat
             );
             addBeam(
               guardrailInstances,
-              midX + nx * railOffset * side,
-              deckY + 0.52,
-              midZ + nz * railOffset * side,
+              railX,
+              railY + 0.52,
+              railZ,
               0.1,
               1.04,
               0.1,

@@ -1,5 +1,11 @@
+import { worldLoadTransactions } from './load-transaction.js?v=2';
+import { beginWorldLoadStage } from './load-stage.js?v=3';
+import { restoreWorldRuntimeAfterRollback } from './load-rollback.js?v=1';
+import { commitWorldLocationAuthority } from './load-location-authority.js?v=1';
+
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
+    addBuildingToSpatialIndex,
     appCtx,
     clearBuildingSpatialIndex,
     earthSceneSuppressed,
@@ -74,29 +80,64 @@ export function createWorldLoadRuntimeSession(options = {}) {
     delete phaseStartedAt[name];
   };
 
-  resetWorldForReload({
-    clearBuildingSpatialIndex,
-    invalidateTraversalNetworks,
-    locName,
-    resetWorldFurnitureCaches
-  });
-  appCtx.initialEarthWorldReady = false;
-  appCtx.worldDetailState = {};
-
   if (!locationSelection) {
     appCtx.showLoad('Choose a valid location');
-    appCtx.worldLoading = false;
     finalizePerfLoad(false, { reason: 'invalid_location_selection' });
     return { aborted: true };
   }
+  const loadLocation = {
+    lat: Number(locationSelection.lat),
+    lon: Number(locationSelection.lon)
+  };
+  const transaction = worldLoadTransactions.begin({
+    signature: `${loadLocation.lat.toFixed(7)}:${loadLocation.lon.toFixed(7)}:${retryPass}`,
+    source: retryPass > 0 ? 'location-osm-retry' : 'location-osm',
+    location: { ...loadLocation, name: locName }
+  });
+  let worldLoadStage;
+  try {
+    worldLoadStage = beginWorldLoadStage(appCtx, {
+      label: `${locName}:${transaction.id}`
+    });
+  } catch (error) {
+    transaction.fail(error);
+    throw error;
+  }
+  const releaseStageRollback = transaction.deferRollback((reason) => {
+    const rolledBack = worldLoadStage.rollback(reason);
+    if (!rolledBack) return false;
+    restoreWorldRuntimeAfterRollback(appCtx, {
+      addBuildingToSpatialIndex,
+      clearBuildingSpatialIndex,
+      invalidateTraversalNetworks,
+      reason
+    });
+    return true;
+  });
+
+  try {
+    resetWorldForReload({
+      clearBuildingSpatialIndex,
+      invalidateTraversalNetworks,
+      locName,
+      resetWorldFurnitureCaches,
+      preserveEarthSceneRoot: true
+    });
+  } catch (error) {
+    transaction.fail(error);
+    throw error;
+  }
+  appCtx.initialEarthWorldReady = false;
+  appCtx.worldDetailState = {};
+
   appCtx.LOC = { lat: locationSelection.lat, lon: locationSelection.lon };
   if (locationSelection.key === 'custom') {
     appCtx.setCustomLocation?.(locationSelection, { syncInputs: false });
   }
 
-  const loadLocation = { lat: appCtx.LOC.lat, lon: appCtx.LOC.lon };
   const loadSequence = appCtx._worldLoadSequence = (appCtx._worldLoadSequence || 0) + 1;
   const isActiveLoadContext = () =>
+    transaction.isCurrent() &&
     appCtx._worldLoadSequence === loadSequence &&
     sameLocation(appCtx.LOC, loadLocation) &&
     !earthSceneSuppressed();
@@ -175,11 +216,15 @@ export function createWorldLoadRuntimeSession(options = {}) {
     isActiveLoadContext,
     loadMetrics,
     loadProfile,
+    locationSelection,
     lodThresholds,
     perfModeNow,
     phaseTotals,
     rdtLoadComplexity,
     startLoadPhase,
+    transaction,
+    worldLoadStage,
+    releaseStageRollback,
     useRdtBudgeting,
     useSyntheticFallbackRoads:
       appCtx.gameMode === 'trial' ||
@@ -200,8 +245,24 @@ export function recordWorldSourceMetrics(loadMetrics = {}, data = null) {
 }
 
 export function finishWorldLoadRuntimeSession(session = {}) {
-  const { appCtx, finalizePerfLoad, loadMetrics, phaseTotals, loaded = false } = session;
+  const {
+    appCtx,
+    finalizePerfLoad,
+    isActiveLoadContext,
+    loadMetrics,
+    locationSelection,
+    phaseTotals,
+    transaction,
+    releaseStageRollback,
+    loaded = false
+  } = session;
   if (!appCtx) return;
+
+  if (!transaction?.isCurrent?.() || isActiveLoadContext?.() === false) {
+    transaction?.abort?.('stale-before-finalize');
+    finalizePerfLoad(false, { reason: 'stale_before_finalize' });
+    return;
+  }
 
   const loadedRadiusDeg = Number(loadMetrics?.activeRadiusDeg);
   appCtx.initialEarthDetailRadius = Number.isFinite(loadedRadiusDeg)
@@ -241,4 +302,14 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     poiMeshes: appCtx.poiMeshes.length,
     landuseMeshes: appCtx.landuseMeshes.length
   });
+  if (loaded) {
+    commitWorldLocationAuthority(appCtx, locationSelection);
+    releaseStageRollback?.();
+    transaction.commit({
+      buildings: appCtx.buildingMeshes.length,
+      roads: appCtx.roads.length
+    });
+  } else {
+    transaction.fail('world-load-not-loaded');
+  }
 }

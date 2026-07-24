@@ -3,6 +3,32 @@ import { getCurrentUser } from '../../../js/auth-ui.js';
 const COMMAND_TIMEOUT_MS = 8000;
 const INPUT_INTERVAL_MS = 40;
 const LOCAL_HOSTS = new Set(['127.0.0.1', 'localhost']);
+const COLYSEUS_SDK_URL = new URL('../../vendor/colyseus-sdk.js?v=1', import.meta.url).href;
+let colyseusSdkPromise = null;
+
+function ensureColyseusSdk() {
+  if (globalThis.Colyseus?.Client) return Promise.resolve(globalThis.Colyseus);
+  if (colyseusSdkPromise) return colyseusSdkPromise;
+  colyseusSdkPromise = new Promise((resolve, reject) => {
+    const existing = document.querySelector(`script[src="${COLYSEUS_SDK_URL}"]`);
+    const script = existing || document.createElement('script');
+    const finish = () => {
+      if (globalThis.Colyseus?.Client) resolve(globalThis.Colyseus);
+      else reject(new Error('Authoritative multiplayer SDK loaded without a Client export.'));
+    };
+    script.addEventListener('load', finish, { once: true });
+    script.addEventListener('error', () => {
+      colyseusSdkPromise = null;
+      reject(new Error('Authoritative multiplayer SDK failed to load.'));
+    }, { once: true });
+    if (!existing) {
+      script.src = COLYSEUS_SDK_URL;
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  });
+  return colyseusSdkPromise;
+}
 
 function finite(value, fallback = 0) {
   const parsed = Number(value);
@@ -93,7 +119,7 @@ class AuthoritativeRoomClient {
   }
 
   get enabled() {
-    return Boolean(this.endpoint && globalThis.Colyseus?.Client);
+    return Boolean(this.endpoint);
   }
 
   get connected() {
@@ -244,6 +270,7 @@ class AuthoritativeRoomClient {
     }
 
     await this.disconnect();
+    await ensureColyseusSdk();
     this.uid = String(user?.uid || (localTestToken.startsWith('test:') ? localTestToken.split(':')[1] : ''));
     this.roomWorld = { ...(roomLike.world || {}) };
     this.sdk = new globalThis.Colyseus.Client(this.endpoint);

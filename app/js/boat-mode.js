@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { captureEarthWorldSession } from "./earth-session.js?v=19";
+import { captureEarthWorldSession } from "./earth-session.js?v=20";
 import {
   DEFAULT_WAVE_INTENSITY,
   SEA_STATE_CONFIG,
@@ -34,13 +34,14 @@ import {
   updateBoatFoamFx,
   updateBoatWaterPatch,
   updateWaterWaveVisuals
-} from "./boat-mode/surface-effects.js?v=9";
+} from "./boat-mode/surface-effects.js?v=15";
 import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=1";
 import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=1";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";
 import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=5";
-import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=1";
+import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=2";
 import { createBoatModePolicy } from "./boat-mode/policy.js?v=1";
+import { boatPromptBlockedBySubgradeTravel } from "./boat-mode/prompt-policy.js?v=1";
 
 const BOAT_PROMPT_DISTANCE = 18;
 const BOAT_ENTRY_OFFSET = 9;
@@ -229,7 +230,12 @@ function syncBoatPromptState(force = false) {
     return appCtx.boatMode.currentWater || null;
   }
 
-  if (appCtx.droneMode || appCtx.activeInterior || !appCtx.isEnv?.(appCtx.ENV.EARTH)) {
+  if (
+    appCtx.droneMode ||
+    appCtx.activeInterior ||
+    boatPromptBlockedBySubgradeTravel(appCtx) ||
+    !appCtx.isEnv?.(appCtx.ENV.EARTH)
+  ) {
     appCtx.boatMode.available = false;
     appCtx.boatMode.candidate = null;
     _boatPromptSignature = '';
@@ -504,6 +510,7 @@ function stopBoatMode(options = {}) {
   if (appCtx.camera?.up?.set) appCtx.camera.up.set(0, 1, 0);
   if (appCtx.boatMode.mesh) appCtx.boatMode.mesh.visible = false;
   if (appCtx.boatMode.waterPatch) appCtx.boatMode.waterPatch.visible = false;
+  if (appCtx.boatMode.oceanHorizonPatch) appCtx.boatMode.oceanHorizonPatch.visible = false;
   if (resolvedExit && typeof appCtx.applyResolvedWorldSpawn === 'function') {
     appCtx.applyResolvedWorldSpawn(resolvedExit, { mode: exitModeName });
   } else {

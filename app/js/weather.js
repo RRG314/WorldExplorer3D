@@ -9,10 +9,11 @@ import {
   getFallbackPlaceLabel,
   parseReverseAddress,
   placeCacheKey,
+  placeStateMatchesLocation,
   refreshLivePlace,
   uniqueNonEmptyParts,
   weatherCacheKey
-} from './weather/place-resolver.js?v=1';
+} from './weather/place-resolver.js?v=2';
 import { weatherCodeDescriptor } from './weather/catalog.js?v=1';
 import { operationalFeedService } from './geospatial/operational-feeds.js?v=1';
 import { createPrecipitationEffects } from './weather/precipitation-effects.js?v=1';
@@ -162,7 +163,10 @@ function weatherVisualProfile(state) {
 }
 
 function getHudLocationLabel() {
-  const detailed = String(appCtx.livePlaceState?.display || '').trim();
+  const observedLocation = resolveObservedEarthLocation();
+  const detailed = placeStateMatchesLocation(appCtx.livePlaceState, observedLocation)
+    ? String(appCtx.livePlaceState?.display || '').trim()
+    : '';
   if (detailed) return detailed;
   return getActiveWeatherLocationLabel();
 }

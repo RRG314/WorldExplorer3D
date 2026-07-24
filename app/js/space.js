@@ -1,11 +1,12 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
-import { captureEarthWorldSession } from "./earth-session.js?v=19";
+import { captureEarthWorldSession } from "./earth-session.js?v=20";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=11";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=13";
 import { createSpaceFlightScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=16";
 import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=4";
-import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=1';
+import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
+import { registerFrameOwner } from './runtime/frame-ownership.js?v=1';
 import {
   beginEnvironmentTransition,
   commitEnvironment,
@@ -49,6 +50,18 @@ appCtx.spaceFlight = {
   _sessionId: 0
 };
 
+registerFrameOwner({
+  id: 'space.flight-renderer',
+  label: 'Space flight renderer',
+  kind: 'continuous-renderer',
+  exclusiveGroup: 'environment-renderer',
+  getState: () => ({
+    active: !!appCtx.spaceFlight.active && appCtx.spaceFlight.animationId != null && !document.hidden,
+    scheduled: !!appCtx.spaceFlight.active && appCtx.spaceFlight.animationId != null,
+    suspended: !!appCtx.spaceFlight.active && appCtx.spaceFlight.animationId != null && document.hidden
+  })
+});
+
 let spaceSessionScope = null;
 
 function beginSpaceFlightSession() {
@@ -66,6 +79,9 @@ function isCurrentSpaceFlightSession(sessionId, destination = '') {
 
 const landingDeps = {
   completeLanding,
+  scheduleFrame(callback) {
+    return spaceSessionScope?.animationFrame(callback) ?? null;
+  },
   showFlightMessage
 };
 
@@ -116,7 +132,7 @@ function startSpaceFlightToMoon() {
   appCtx.showUniverseUI?.();
 
   spaceSessionScope.timeout(() => {
-    if (!isCurrentSpaceFlightSession(sessionId, 'moon')) return;
+    if (!isCurrentSpaceFlightSession(sessionId, 'moon') || appCtx.spaceFlight.mode !== 'launching') return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
     showFlightMessage('SPACE FLIGHT READY', '#10b981');
@@ -162,7 +178,7 @@ function startSpaceFlightToEarth() {
   appCtx.showUniverseUI?.();
 
   spaceSessionScope.timeout(() => {
-    if (!isCurrentSpaceFlightSession(sessionId, 'earth')) return;
+    if (!isCurrentSpaceFlightSession(sessionId, 'earth') || appCtx.spaceFlight.mode !== 'launching') return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
     showFlightMessage('EARTH RETURN READY', '#3b82f6');
@@ -206,7 +222,7 @@ function startSpaceFlightToMars() {
   appCtx.showSolarSystemUI?.();
   appCtx.showUniverseUI?.();
   spaceSessionScope.timeout(() => {
-    if (!isCurrentSpaceFlightSession(sessionId, 'mars')) return;
+    if (!isCurrentSpaceFlightSession(sessionId, 'mars') || appCtx.spaceFlight.mode !== 'launching') return;
     appCtx.spaceFlight.mode = 'flying';
     appCtx.spaceFlight.speed = 0;
     showFlightMessage('MARS FLIGHT READY', '#e26f45');

@@ -1,8 +1,12 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { clearBuildingSpatialIndex } from './building-spatial-index.js?v=6';
+import { addBuildingToSpatialIndex, clearBuildingSpatialIndex } from './building-spatial-index.js?v=7';
 import { resetWorldFurnitureCaches } from './furniture.js?v=10';
-import { earthSceneSuppressed, hideEarthSceneMeshes, resetWorldForReload } from './load-reset.js?v=8';
-import { finalizeLoadedWorld } from './load-support.js?v=24';
+import { earthSceneSuppressed, hideEarthSceneMeshes, resetWorldForReload } from './load-reset.js?v=9';
+import { finalizeLoadedWorld } from './load-support.js?v=25';
+import { worldLoadTransactions } from './load-transaction.js?v=2';
+import { beginWorldLoadStage } from './load-stage.js?v=3';
+import { restoreWorldRuntimeAfterRollback } from './load-rollback.js?v=1';
+import { commitWorldLocationAuthority } from './load-location-authority.js?v=1';
 
 let activeLoad = null;
 
@@ -13,11 +17,11 @@ function selectedLocation() {
     const lat = Number.parseFloat(latInput?.value ?? appCtx.customLoc?.lat);
     const lon = Number.parseFloat(lonInput?.value ?? appCtx.customLoc?.lon);
     if (!Number.isFinite(lat) || !Number.isFinite(lon)) throw new Error('Enter valid coordinates.');
-    return { lat, lon, name: appCtx.customLoc?.name || 'Custom' };
+    return { key: 'custom', lat, lon, name: appCtx.customLoc?.name || 'Custom', arrivalMode: appCtx.customLoc?.arrivalMode };
   }
   const preset = appCtx.LOCS?.[appCtx.selLoc] || appCtx.LOCS?.baltimore;
   if (!preset) throw new Error('The selected Earth location is unavailable.');
-  return { lat: Number(preset.lat), lon: Number(preset.lon), name: preset.name || String(appCtx.selLoc) };
+  return { key: String(appCtx.selLoc), lat: Number(preset.lat), lon: Number(preset.lon), name: preset.name || String(appCtx.selLoc) };
 }
 
 function resetActors() {
@@ -32,8 +36,34 @@ function loadSignature(location) {
 }
 
 async function loadContinuousEarthWorldInternal(location) {
+  const transaction = worldLoadTransactions.begin({
+    signature: loadSignature(location),
+    source: 'continuous-global',
+    location
+  });
+  let worldLoadStage;
+  try {
+    worldLoadStage = beginWorldLoadStage(appCtx, {
+      label: `${location.name}:${transaction.id}`
+    });
+  } catch (error) {
+    transaction.fail(error);
+    throw error;
+  }
+  const releaseStageRollback = transaction.deferRollback((reason) => {
+    const rolledBack = worldLoadStage.rollback(reason);
+    if (!rolledBack) return false;
+    restoreWorldRuntimeAfterRollback(appCtx, {
+      addBuildingToSpatialIndex,
+      clearBuildingSpatialIndex,
+      invalidateTraversalNetworks: appCtx.invalidateTraversalNetworks,
+      reason
+    });
+    return true;
+  });
   const loadSequence = appCtx._worldLoadSequence = (appCtx._worldLoadSequence || 0) + 1;
   const isCurrent = () =>
+    transaction.isCurrent() &&
     appCtx._worldLoadSequence === loadSequence &&
     appCtx.getContinuousWorldEnabled?.() === true &&
     !earthSceneSuppressed();
@@ -42,12 +72,18 @@ async function loadContinuousEarthWorldInternal(location) {
   if (appCtx.selLoc === 'custom') {
     appCtx.setCustomLocation?.(location, { syncInputs: false });
   }
-  resetWorldForReload({
-    clearBuildingSpatialIndex,
-    invalidateTraversalNetworks: appCtx.invalidateTraversalNetworks,
-    locName: location.name,
-    resetWorldFurnitureCaches
-  });
+  try {
+    resetWorldForReload({
+      clearBuildingSpatialIndex,
+      invalidateTraversalNetworks: appCtx.invalidateTraversalNetworks,
+      locName: location.name,
+      resetWorldFurnitureCaches,
+      preserveEarthSceneRoot: true
+    });
+  } catch (error) {
+    transaction.fail(error);
+    throw error;
+  }
   resetActors();
   appCtx.initialEarthWorldRetired = true;
   appCtx.initialEarthDetailRadius = 0;
@@ -68,7 +104,10 @@ async function loadContinuousEarthWorldInternal(location) {
       timeoutMs: 120000
     });
     if (!snapshot) throw new Error('The continuous Earth scheduler is unavailable.');
-    if (!isCurrent()) return { aborted: true };
+    if (!isCurrent()) {
+      transaction.abort('stale-after-prime');
+      return { aborted: true };
+    }
 
     appCtx.initialEarthWorldReady = true;
     await finalizeLoadedWorld({
@@ -79,7 +118,8 @@ async function loadContinuousEarthWorldInternal(location) {
       markLoaded: () => {},
       reason: 'continuous_global',
       spawnOnRoad: appCtx.spawnOnRoad,
-      updateWorldLod: appCtx.updateWorldLod
+      updateWorldLod: appCtx.updateWorldLod,
+      commitWorldStage: worldLoadStage.commit
     });
     appCtx.worldLoading = false;
     appCtx.enforceEnvironmentSceneOwnership?.();
@@ -89,9 +129,19 @@ async function loadContinuousEarthWorldInternal(location) {
       poiMeshes: appCtx.poiMeshes.length,
       landuseMeshes: appCtx.landuseMeshes.length
     });
+    commitWorldLocationAuthority(appCtx, location);
+    releaseStageRollback();
+    transaction.commit({
+      buildings: appCtx.buildingMeshes.length,
+      roads: appCtx.roads.length
+    });
     return { loaded: true, profile: 'continuous_global', snapshot };
   } catch (error) {
-    if (error?.name === 'AbortError') return { aborted: true };
+    if (error?.name === 'AbortError' || !transaction.isCurrent()) {
+      transaction.abort(error?.name === 'AbortError' ? 'provider-aborted' : 'stale-after-error');
+      return { aborted: true };
+    }
+    transaction.fail(error);
     appCtx.worldLoading = false;
     appCtx.initialEarthWorldReady = false;
     appCtx.hideLoad?.();

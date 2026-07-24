@@ -4,6 +4,12 @@ function assert(value, message) {
 
 export function assertWorldMatrixLocation(spec, result) {
   assert(result.worldLoading === false, `${spec.id}: worldLoading stayed true`);
+  if (spec.kind === 'custom') {
+    assert(
+      String(result.customLocationLabel || '') === String(spec.label || ''),
+      `${spec.id}: custom location identity changed during load ${JSON.stringify({ expected: spec.label, actual: result.customLocationLabel })}`
+    );
+  }
   assert(!result.terrainProfiles?.urban, `${spec.id}: base terrain still resolved to urban pavement ${JSON.stringify(result.terrainProfiles.urban)}`);
   if (spec.kind === 'preset') assert(result.counts.roads > 0, `${spec.id}: preset silently finalized without mapped roads`);
   if (spec.expectedTerrainMode) {
@@ -28,15 +34,38 @@ export function assertWorldMatrixLocation(spec, result) {
         `${JSON.stringify({ surfaceY: probe.surfaceY, terrainY, required: spec.minimumStructureClearance })}`
       );
     }
+    if (spec.expectedRoadStructure === 'bridge') {
+      const guardrails = result.structurePresentation?.guardrails || {};
+      assert(guardrails.protectedRoads > 0, `${spec.id}: mapped bridge registered no protected road guardrails ${JSON.stringify(guardrails)}`);
+      assert(guardrails.colliders > 0, `${spec.id}: mapped bridge registered no guardrail collision barriers ${JSON.stringify(guardrails)}`);
+      assert(guardrails.visualInstances > 0, `${spec.id}: mapped bridge rendered no guardrail instances ${JSON.stringify(guardrails)}`);
+      assert(
+        guardrails.visualInstances <= guardrails.colliders * 10,
+        `${spec.id}: guardrail visuals exceeded the physical collider-density budget ${JSON.stringify(guardrails)}`
+      );
+    }
     if (spec.expectedRoadStructure === 'tunnel' && result.tunnelPortalTraversal) {
+      const tunnelVisuals = result.structurePresentation?.tunnelVisuals || {};
+      assert(tunnelVisuals.tunnelRoads > 0, `${spec.id}: no mapped tunnel roads were registered ${JSON.stringify(tunnelVisuals)}`);
+      assert(tunnelVisuals.walls > 0 && tunnelVisuals.roofs > 0 && tunnelVisuals.floors > 0, `${spec.id}: tunnel shell is incomplete ${JSON.stringify(tunnelVisuals)}`);
+      assert(tunnelVisuals.lights > 0 && tunnelVisuals.portals > 0, `${spec.id}: tunnel presentation is incomplete ${JSON.stringify(tunnelVisuals)}`);
+      assert(
+        tunnelVisuals.totalInstances <= tunnelVisuals.walls * 4,
+        `${spec.id}: tunnel visual density exceeded the shell-derived budget ${JSON.stringify(tunnelVisuals)}`
+      );
       const traversal = result.tunnelPortalTraversal;
       const checkpoints = traversal?.checkpoints || [];
       const interior = checkpoints.filter((checkpoint) => checkpoint?.terrainMode === 'subgrade');
+      const interiorCore = interior.filter((checkpoint) => checkpoint?.stage !== 'entry');
+      const entry = checkpoints.find((checkpoint) => checkpoint?.stage === 'entry');
       const exit = checkpoints.find((checkpoint) => checkpoint?.stage === 'exit');
       assert(checkpoints.length === 5, `${spec.id}: tunnel lifecycle did not produce all five checkpoints ${JSON.stringify(traversal)}`);
       assert(interior.length >= 4, `${spec.id}: tunnel lifecycle lost its subgrade road ${JSON.stringify(traversal)}`);
-      assert(interior.every((checkpoint) => checkpoint.applied && checkpoint.renderedDelta <= 0.2), `${spec.id}: tunnel road diverged during traversal ${JSON.stringify(traversal)}`);
+      assert(interiorCore.every((checkpoint) => checkpoint.applied && checkpoint.renderedDelta <= 0.2), `${spec.id}: tunnel road diverged during interior traversal ${JSON.stringify(traversal)}`);
+      assert(entry?.applied && entry?.renderedDelta <= 0.5, `${spec.id}: tunnel portal transition diverged from its rendered surface ${JSON.stringify(traversal)}`);
       assert(interior.every((checkpoint) => checkpoint.cameraAboveRoad <= 1.75), `${spec.id}: tunnel camera crossed the shell ceiling ${JSON.stringify(traversal)}`);
+      assert(interior.every((checkpoint) => checkpoint.visibleWaterMeshes === 0), `${spec.id}: water surface remained visible inside the tunnel ${JSON.stringify(traversal)}`);
+      assert(interior.every((checkpoint) => !checkpoint.boatAvailable && !checkpoint.boatPromptVisible), `${spec.id}: boat travel was offered inside the tunnel ${JSON.stringify(traversal)}`);
       assert(
         Number(traversal?.movement?.distance || 0) >= 0.5 &&
         Number(traversal?.movement?.running?.speed || 0) >= 3,
@@ -47,6 +76,9 @@ export function assertWorldMatrixLocation(spec, result) {
       assert(Number.isFinite(exit?.terrainY), `${spec.id}: exterior terrain is missing at the tunnel exit ${JSON.stringify(traversal)}`);
       assert(exit?.renderedDelta <= 2.5, `${spec.id}: exit road diverged from its rendered surface ${JSON.stringify(traversal)}`);
       assert(exit?.cameraAboveRoad >= 2, `${spec.id}: camera remained tunnel-constrained after exit ${JSON.stringify(traversal)}`);
+      if (exit?.waterMeshes > 0) {
+        assert(exit.visibleWaterMeshes > 0, `${spec.id}: water visibility was not restored after tunnel exit ${JSON.stringify(traversal)}`);
+      }
     }
   }
   if (spec.minimumWaterAreas) assert(result.counts.waterAreas >= spec.minimumWaterAreas, `${spec.id}: expected mapped water areas`);
@@ -160,6 +192,41 @@ export function assertWorldMatrixLocation(spec, result) {
       `${spec.id}: expected mapped ${spec.expectedLandmarkKind} landmark ` +
       `${JSON.stringify({ landmarks: result.landmarkPresentation, diagnostics: result.loadDiagnostics?.landmarks })}`
     );
+    if (spec.expectedLandmarkKind === 'historic_wall') {
+      const wall = result.landmarkPresentation.historic_wall;
+      assert(
+        wall.segments > 0 &&
+        wall.maxSegmentLength <= 14.7 &&
+        wall.maxHeight <= 14 &&
+        wall.maxWidth <= 8,
+        `${spec.id}: historic wall contains terrain-bridging slab geometry ${JSON.stringify(wall)}`
+      );
+    }
+  }
+
+  if (Number.isFinite(spec.minimumLandmarkSpawnDistance)) {
+    assert(
+      Number(result.initialSpawn?.landmarkDistance) >= spec.minimumLandmarkSpawnDistance,
+      `${spec.id}: landmark arrival is too close to mapped landmark geometry ` +
+      `${JSON.stringify(result.initialSpawn)}`
+    );
+  }
+
+  if (Number.isFinite(spec.maximumWaterAreaSpan)) {
+    const oversizedWater = (result.waterAreaSamples || []).filter(
+      (water) => Number(water?.span || 0) > spec.maximumWaterAreaSpan
+    );
+    assert(
+      oversizedWater.length === 0,
+      `${spec.id}: unvalidated mapped water sheet exceeded ${spec.maximumWaterAreaSpan}m ` +
+      `${JSON.stringify(oversizedWater.slice(0, 3))}`
+    );
+  }
+  if (spec.rejectBoatPrompt) {
+    assert(
+      result.boatAvailability?.available !== true && result.boatAvailability?.promptVisible !== true,
+      `${spec.id}: false boat prompt appeared on a land arrival ${JSON.stringify(result.boatAvailability)}`
+    );
   }
 
   const hasMappedWorld = result.counts.roads > 0 || result.counts.buildings > 0 || result.counts.landuses > 0;
@@ -187,6 +254,59 @@ export function assertWorldMatrixLocation(spec, result) {
       `${spec.id}: boat hull is submerged below the dynamic water surface ${JSON.stringify(result.boatPresentation)}`
     );
     assert(result.boatPresentation.maxWaterGeometryYSpan <= 0.25, `${spec.id}: area water is still draped over terrain ${JSON.stringify(result.boatPresentation)}`);
+    assert(
+      result.boatPresentation.visibleOverlappingNonWaterLanduses === 0,
+      `${spec.id}: a non-water land-use surface remained visible beneath the boat ${JSON.stringify(result.boatPresentation)}`
+    );
+    assert(
+      result.boatPresentation.waterPatchEdgeFade > 0 &&
+      result.boatPresentation.waterPatchEdgeFade <= 0.12,
+      `${spec.id}: local water surface feather exposes terrain beneath the hull ${JSON.stringify(result.boatPresentation)}`
+    );
+    if (
+      result.boatPresentation.waterKind !== 'open_ocean' &&
+      result.boatPresentation.shorelineDistance > 24
+    ) {
+      assert(
+        result.boatPresentation.waterPatchRadius <= result.boatPresentation.shorelineDistance * 0.85,
+        `${spec.id}: local water patch covered the mapped shoreline ${JSON.stringify(result.boatPresentation)}`
+      );
+    }
+    if (result.boatPresentation.waterKind === 'open_ocean') {
+      assert(
+        result.boatPresentation.terrainSceneGroups?.every((group) => group.current || !group.effectivelyVisible),
+        `${spec.id}: a superseded terrain scene remains visible after the atomic world commit ${JSON.stringify(result.boatPresentation.terrainSceneGroups)}`
+      );
+      assert(
+        result.boatPresentation.oceanHorizonPatchVisible === true,
+        `${spec.id}: open-ocean surface cannot cover the visible horizon ${JSON.stringify(result.boatPresentation)}`
+      );
+      assert(
+        result.boatPresentation.visibleTerrainMeshes === 0 &&
+        result.boatPresentation.visibleGroundPlanes === 0 &&
+        result.boatPresentation.visibleWaterLanduses === 0,
+        `${spec.id}: land rendering leaked into far-offshore presentation ${JSON.stringify(result.boatPresentation)}`
+      );
+    } else {
+      assert(
+        result.boatPresentation.oceanHorizonPatchVisible === false,
+        `${spec.id}: open-ocean horizon surface leaked into inland or coastal water ${JSON.stringify(result.boatPresentation)}`
+      );
+    }
+    assert(String(result.hudLocationLabel || '').trim(), `${spec.id}: water start has no HUD location label`);
+    if (Array.isArray(spec.expectedHudLocationTerms) && spec.expectedHudLocationTerms.length > 0) {
+      assert(
+        spec.expectedHudLocationTerms.some((term) =>
+          String(result.hudLocationLabel || '').toLowerCase().includes(String(term).toLowerCase())
+        ),
+        `${spec.id}: HUD location label does not identify the selected destination ${JSON.stringify({ expectedTerms: spec.expectedHudLocationTerms, actual: result.hudLocationLabel })}`
+      );
+    }
+    if (result.livePlaceLocation && String(result.livePlaceLocation.display || '').trim() === String(result.hudLocationLabel || '').trim()) {
+      const latDelta = Math.abs(Number(result.livePlaceLocation.lat) - Number(spec.lat));
+      const lonDelta = Math.abs(Number(result.livePlaceLocation.lon) - Number(spec.lon));
+      assert(latDelta <= 0.4 && lonDelta <= 0.4, `${spec.id}: HUD reused a stale place label ${JSON.stringify(result.livePlaceLocation)}`);
+    }
     if (spec.expectedWaterKind) {
       assert(result.boatPresentation.waterKind === spec.expectedWaterKind, `${spec.id}: expected ${spec.expectedWaterKind} water, received ${result.boatPresentation.waterKind}`);
     }
