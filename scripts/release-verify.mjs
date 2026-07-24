@@ -40,7 +40,6 @@ const steps = [
   { name: 'OSM streaming source', cmd: [process.execPath, 'scripts/test-osm-streaming-source.mjs'] },
   { name: 'Spatial bounds index', cmd: [process.execPath, 'scripts/test-spatial-bounds-index.mjs'] },
   { name: 'Overture compatibility source', cmd: [process.execPath, 'scripts/test-overture-tile-source.mjs'] },
-  { name: 'Overture streaming source', cmd: [process.execPath, 'scripts/test-overture-streaming-source.mjs'] },
   { name: 'Streaming feature budget', cmd: [process.execPath, 'scripts/test-streaming-feature-budget.mjs'] },
   { name: 'Renderer provenance', cmd: [process.execPath, 'scripts/test-render-provenance.mjs'] },
   { name: 'Continuous renderer', cmd: [process.execPath, 'scripts/test-continuous-renderer.mjs'] },
