@@ -1,0 +1,65 @@
+name: Bug report
+description: Report a reproducible defect in World Explorer 3D
+title: "[Bug]: "
+labels:
+  - bug
+  - needs-triage
+body:
+  - type: checkboxes
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and Discussions for this problem.
+          required: true
+        - label: I can reproduce this on the current live version or current main branch.
+          required: true
+  - type: textarea
+    attributes:
+      label: Summary
+      description: What went wrong?
+      placeholder: Describe the defect clearly and briefly.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open…
+        2. Select…
+        3. Observe…
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Location and travel mode
+      description: Include the city or coordinates and mode, such as walk, drive, plane, boat, ocean, or space.
+    validations:
+      required: true
+  - type: input
+    attributes:
+      label: Browser, operating system, and device
+      placeholder: Chrome 149, macOS 26, MacBook Pro
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Console output
+      description: Paste relevant errors. Remove tokens, account data, coordinates you consider private, and other sensitive information.
+      render: shell
+  - type: textarea
+    attributes:
+      label: Screenshots or video
+      description: Drag files here when they help show the problem.
+  - type: textarea
+    attributes:
+      label: Additional context

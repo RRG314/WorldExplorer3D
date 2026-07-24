@@ -10,9 +10,9 @@ World Explorer 3D is a browser-based geospatial exploration game built around re
 
 **[Launch World Explorer 3D](https://worldexplorer3d.io/app/)**
 
-## Version 4.0 Release Candidate
+## Version 4.0
 
-Version 4.0 turns the refactored explorer into an open-source world platform. It adds an authoritative multiplayer foundation, contributor-facing gameplay contracts, stronger persistence and security boundaries, and a release-tested runtime spanning Earth, ocean, Moon, Mars, and space. It is being verified on one exact release-candidate commit before the live application and GitHub `main` are updated together.
+Version 4.0 turns the refactored explorer into an open-source world platform. It adds an authoritative multiplayer foundation, contributor-facing gameplay contracts, stronger persistence and security boundaries, and a release-tested runtime spanning Earth, ocean, Moon, Mars, and space.
 
 Highlights:
 
