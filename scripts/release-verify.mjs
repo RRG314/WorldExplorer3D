@@ -60,6 +60,7 @@ const steps = [
   { name: 'Navigation surface query', cmd: [process.execPath, 'scripts/test-navigation-surface-query.mjs'] },
   { name: 'Bridge guardrail contract', cmd: [process.execPath, 'scripts/test-bridge-guardrail-contract.mjs'] },
   { name: 'Tunnel camera corridor contract', cmd: [process.execPath, 'scripts/test-tunnel-camera-corridor.mjs'] },
+  { name: 'Terrain/boat visibility ownership', cmd: [process.execPath, 'scripts/test-terrain-streaming-boat-suppression.mjs'] },
   { name: 'Boat prompt subgrade policy', cmd: [process.execPath, 'scripts/test-boat-prompt-policy.mjs'] },
   { name: 'HUD place-location authority', cmd: [process.execPath, 'scripts/test-place-location-authority.mjs'] },
   { name: 'World-load location authority', cmd: [process.execPath, 'scripts/test-world-load-location-authority.mjs'] },

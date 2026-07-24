@@ -6,11 +6,13 @@
 
 - Kept at-grade navigation surfaces owned by the active terrain sampler after streamed terrain replacement, preventing ordinary roads from retaining stale elevations.
 - Made tunnel water suppression persistent across LOD refreshes and restored normal water visibility ownership on exit.
+- Applied active offshore boat visibility ownership to every asynchronously attached terrain tile, preventing late terrain from appearing through open-ocean presentation.
 
 ### Verification
 
 - Made plane/interior lifecycle retention wait for deferred building detail, use precise forced-GC heap measurements across multiple warmed samples, and compare exact reachable scene resources instead of Three.js upload-history counters.
 - Made landscape mobile acceptance assert the Explore menu's actual open state and tutorial-card suppression instead of relying on an unrelated two-second polling window.
+- Added a direct terrain-streaming/boat-suppression contract to the release suite.
 
 ## [4.0.0] - 2026-07-22
 

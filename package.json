@@ -36,6 +36,7 @@
     "test:bridge-guardrails": "node scripts/test-bridge-guardrail-contract.mjs",
     "test:structure-visual-sampling": "node scripts/test-structure-visual-sampling.mjs",
     "test:tunnel-camera": "node scripts/test-tunnel-camera-corridor.mjs",
+    "test:terrain-boat-suppression": "node scripts/test-terrain-streaming-boat-suppression.mjs",
     "test:boat-prompt-policy": "node scripts/test-boat-prompt-policy.mjs",
     "test:place-location-authority": "node scripts/test-place-location-authority.mjs",
     "test:world-load-location-authority": "node scripts/test-world-load-location-authority.mjs",
