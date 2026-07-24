@@ -66,7 +66,7 @@ import {
   scheduleDeferredPoiLoad,
   scheduleDeferredWorldDetailPasses,
   safeWorldLoadCall
-} from "./world/load-support.js?v=27";
+} from "./world/load-support.js?v=29";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -125,7 +125,7 @@ import {
   pointInPolygon,
   runtimeRoadFeatures,
   teleportToLocation
-} from "./world/navigation.js?v=7";
+} from "./world/navigation.js?v=8";
 import {
   buildTraversalNetworks,
   findNearestTraversalFeature,
@@ -141,7 +141,7 @@ import {
   initWorldVegetation,
   MAX_TREE_NODES,
   MAX_TREE_ROW_WAYS
-} from "./world/vegetation.js?v=14";
+} from "./world/vegetation.js?v=15";
 import {
   appendIndexedGeometry,
   decimatePoints,
@@ -154,7 +154,7 @@ import {
 import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=15";
 import {
   resetWorldFurnitureCaches
-} from "./world/furniture.js?v=10";
+} from "./world/furniture.js?v=12";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
@@ -172,7 +172,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=7";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=75";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=76";
 import { worldLoadTransactions } from './world/load-transaction.js?v=2';
 import {
   fetchShortbreadWorldData

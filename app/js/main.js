@@ -182,11 +182,26 @@ function warmNearbyWorldRenderResources(radius = Number.POSITIVE_INFINITY) {
     ...(appCtx.buildingMeshes || []),
     ...(appCtx.aerialContextMeshes || []),
     ...(appCtx.landuseMeshes || []),
-    ...(appCtx.roadMeshes || [])
+    ...(appCtx.roadMeshes || []),
+    ...(appCtx.linearFeatureMeshes || []),
+    ...(appCtx.poiMeshes || []),
+    ...(appCtx.streetFurnitureMeshes || []),
+    ...(appCtx.structureVisualMeshes || []),
+    ...(appCtx.vegetationMeshes || []),
+    ...(appCtx.waterWaveVisuals || [])
   ])];
+  appCtx.earthSceneRoot?.traverse?.((object) => {
+    if (object?.geometry) candidates.push(object);
+  });
+  // Persistent transport actors live outside the replaceable Earth root.
+  // Exercise their material/program variants before the first mode switch.
+  appCtx.carMesh?.traverse?.((object) => {
+    if (object?.geometry) candidates.push(object);
+  });
+  const uniqueCandidates = [...new Set(candidates)];
   const startedAt = performance.now();
-  for (let i = 0; i < candidates.length; i += 1) {
-    const mesh = candidates[i];
+  for (let i = 0; i < uniqueCandidates.length; i += 1) {
+    const mesh = uniqueCandidates[i];
     if (!mesh?.geometry) continue;
     if (!mesh.geometry.boundingSphere) mesh.geometry.computeBoundingSphere();
     const center = mesh.userData?.lodCenter || mesh.geometry.boundingSphere?.center;

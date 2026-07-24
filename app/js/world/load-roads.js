@@ -502,7 +502,7 @@ export function createWorldRoadLoader(deps = {}) {
           structureConnectorWays,
           deferStructureRefresh: true
         });
-        void scheduleDeferredWorldDetailPasses({
+        await scheduleDeferredWorldDetailPasses({
           endLoadPhase,
           isActiveLoadContext,
           loadMetrics,

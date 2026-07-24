@@ -1,6 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry } from "../road-render.js?v=2";
-import { generateStreetFurniture } from "./furniture.js?v=10";
+import {
+  flushWorldCoverVegetationRefresh,
+  generateStreetFurniture
+} from "./furniture.js?v=12";
 
 export function recordWorldLoadWarning(loadMetrics, label, err) {
   const message = `${label}: ${err?.message || err}`;
@@ -119,12 +122,13 @@ export async function finalizeLoadedWorld(options = {}) {
       endLoadPhase('waitForApprovedEditorContributions');
     }
   }
-  if (typeof appCtx.waitForWorldRenderReadiness === 'function') {
-    loadMetrics.renderReadiness = await appCtx.waitForWorldRenderReadiness({
-      timeoutMs: 4500,
-      stableFrames: 5,
-      minimumReadyMs: 500
-    });
+  if (typeof appCtx.waitForTerrainStreamingIdle === 'function') {
+    startLoadPhase('waitForTerrainStreamingIdle');
+    try {
+      loadMetrics.terrainStreaming = await appCtx.waitForTerrainStreamingIdle(5000);
+    } finally {
+      endLoadPhase('waitForTerrainStreamingIdle');
+    }
   }
   if (
     appCtx.terrainEnabled &&
@@ -151,6 +155,18 @@ export async function finalizeLoadedWorld(options = {}) {
     } finally {
       endLoadPhase('commitWorldStage');
     }
+  }
+  runFinalStep('finalizeWorldCoverVegetation', () => flushWorldCoverVegetationRefresh());
+  // Render readiness must be measured against the committed world. The final
+  // surface synchronization can replace geometry, and stage adoption changes
+  // scene ownership; warming before either step leaves replacement resources
+  // GPU-cold for the first aerial LOD transition.
+  if (typeof appCtx.waitForWorldRenderReadiness === 'function') {
+    loadMetrics.renderReadiness = await appCtx.waitForWorldRenderReadiness({
+      timeoutMs: 4500,
+      stableFrames: 5,
+      minimumReadyMs: 500
+    });
   }
   appCtx.hideLoad();
 }

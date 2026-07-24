@@ -2,7 +2,7 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   buildWorldVegetationInstancing,
   collectWorldVegetationPlacements
-} from "./vegetation.js?v=14";
+} from "./vegetation.js?v=15";
 import {
   registerStreetLamp,
   resetStreetLampFixtures
@@ -367,6 +367,13 @@ export function scheduleWorldCoverVegetationRefresh() {
   }, 500);
 }
 
+export function flushWorldCoverVegetationRefresh() {
+  if (appCtx.getContinuousWorldEnabled?.() === true) return [];
+  if (worldCoverVegetationTimer) globalThis.clearTimeout(worldCoverVegetationTimer);
+  worldCoverVegetationTimer = null;
+  return refreshWorldCoverVegetation();
+}
+
 export function resetWorldFurnitureCaches() {
   if (worldCoverVegetationTimer) globalThis.clearTimeout(worldCoverVegetationTimer);
   worldCoverVegetationTimer = null;
@@ -374,4 +381,7 @@ export function resetWorldFurnitureCaches() {
   signTextGeometry = null;
 }
 
-Object.assign(appCtx, { scheduleWorldCoverVegetationRefresh });
+Object.assign(appCtx, {
+  flushWorldCoverVegetationRefresh,
+  scheduleWorldCoverVegetationRefresh
+});

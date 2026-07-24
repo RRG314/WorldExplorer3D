@@ -88,6 +88,29 @@ function createTerrainStreamingApi(deps = {}) {
     clearTerrainHeightCache();
   }
 
+  async function waitForTerrainStreamingIdle(timeoutMs = 5000) {
+    const deadline = performance.now() + Math.max(250, Number(timeoutMs) || 5000);
+    let stableFrames = 0;
+    while (performance.now() < deadline) {
+      const idle = pendingTerrainMeshes.size === 0 && terrainDrainScheduled === false;
+      stableFrames = idle ? stableFrames + 1 : 0;
+      if (stableFrames >= 2) {
+        removeObsoleteTerrainMeshes();
+        return {
+          idle: true,
+          pending: 0,
+          meshes: appCtx.terrainGroup?.children?.length || 0
+        };
+      }
+      await new Promise((resolve) => requestAnimationFrame(resolve));
+    }
+    return {
+      idle: false,
+      pending: pendingTerrainMeshes.size,
+      meshes: appCtx.terrainGroup?.children?.length || 0
+    };
+  }
+
   function getStreamingSpeedMph() {
     if (appCtx.planeMode?.active) return Math.max(0, Math.abs((appCtx.planeMode.speed || 0) * 2.237));
     if (appCtx.droneMode && appCtx.drone) return Math.max(0, Math.abs((appCtx.drone.speed || 0) * 1.8));
@@ -194,7 +217,8 @@ function createTerrainStreamingApi(deps = {}) {
 
   return {
     resetTerrainStreamingState,
-    updateTerrainAround
+    updateTerrainAround,
+    waitForTerrainStreamingIdle
   };
 }
 

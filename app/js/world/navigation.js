@@ -198,7 +198,7 @@ function roadContinuityCandidates(preferredRoad) {
   return candidates;
 }
 
-function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, preferredRoad) {
+function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, preferredRoad, preferStoredProfile = false) {
   const pts = Array.isArray(road?.pts) ? road.pts : null;
   if (!pts || pts.length < 2) return null;
   const semantics = road?.structureSemantics || null;
@@ -255,6 +255,7 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
     const fromY = profileHeights?.length === pts.length ? Number(profileHeights[i]) : NaN;
     const toY = profileHeights?.length === pts.length ? Number(profileHeights[i + 1]) : NaN;
     const requiresLiveTerrain =
+      preferStoredProfile !== true &&
       semantics?.terrainMode === 'at_grade' &&
       typeof road?.surfaceTerrainSampler === 'function';
     const roadY =
@@ -339,6 +340,7 @@ export function findNearestRoad(x, z, options = {}) {
   nearRoadResult.distanceToTransitionZone = Infinity;
   const targetY = Number.isFinite(options?.y) ? Number(options.y) : NaN;
   const maxVerticalDelta = Number.isFinite(options?.maxVerticalDelta) ? Math.max(0.5, Number(options.maxVerticalDelta)) : Infinity;
+  const preferStoredProfile = options?.preferStoredProfile === true;
   let bestWeighted = Infinity;
 
   const baseRoads = Array.isArray(appCtx.roads) ? appCtx.roads : [];
@@ -352,7 +354,15 @@ export function findNearestRoad(x, z, options = {}) {
   if (preferredRoad) {
     const preferredCandidates = roadContinuityCandidates(preferredRoad);
     for (let i = 0; i < preferredCandidates.length; i++) {
-      const preferredHit = evaluateNearestRoadCandidate(preferredCandidates[i], x, z, targetY, maxVerticalDelta, preferredRoad);
+      const preferredHit = evaluateNearestRoadCandidate(
+        preferredCandidates[i],
+        x,
+        z,
+        targetY,
+        maxVerticalDelta,
+        preferredRoad,
+        preferStoredProfile
+      );
       if (!preferredHit) continue;
       if (preferredHit.weightedDist < bestWeighted) {
         bestWeighted = preferredHit.weightedDist;
@@ -378,7 +388,15 @@ export function findNearestRoad(x, z, options = {}) {
     const fp = pts[0];
     const roughDist = Math.abs(x - fp.x) + Math.abs(z - fp.z);
     if (roughDist > nearRoadResult.dist + 500) continue;
-    const hit = evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, preferredRoad);
+    const hit = evaluateNearestRoadCandidate(
+      road,
+      x,
+      z,
+      targetY,
+      maxVerticalDelta,
+      preferredRoad,
+      preferStoredProfile
+    );
     if (!hit || hit.weightedDist >= bestWeighted) continue;
     bestWeighted = hit.weightedDist;
     nearRoadResult.road = hit.road;

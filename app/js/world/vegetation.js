@@ -162,7 +162,8 @@ function isVegetationPlacementBlocked(x, z, options = {}) {
 
   const nr = runtime.findNearestRoad(x, z, {
     y: Number.isFinite(terrainY) ? terrainY + 0.4 : NaN,
-    maxVerticalDelta: 4.5
+    maxVerticalDelta: 4.5,
+    preferStoredProfile: true
   });
   if (runtime.isRoadSurfaceReachable(nr, {
     extraLateralPadding: roadPadding - 1.35,

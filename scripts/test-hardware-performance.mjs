@@ -92,6 +92,17 @@ function summarizeCpuProfile(profile, limit = 30) {
     if (!node) return;
     const frame = node.callFrame || {};
     const callerFrame = parents.get(nodeId)?.callFrame || {};
+    const ancestry = [];
+    let ancestor = parents.get(nodeId);
+    while (ancestor && ancestry.length < 6) {
+      const ancestorFrame = ancestor.callFrame || {};
+      ancestry.push({
+        functionName: ancestorFrame.functionName || '(anonymous)',
+        url: ancestorFrame.url || '(runtime)',
+        line: Number(ancestorFrame.lineNumber || 0) + 1
+      });
+      ancestor = parents.get(ancestor.id);
+    }
     const key = [
       frame.functionName || '(anonymous)',
       frame.url || '(runtime)',
@@ -107,6 +118,7 @@ function summarizeCpuProfile(profile, limit = 30) {
       caller: callerFrame.functionName || '(root)',
       callerUrl: callerFrame.url || '(runtime)',
       callerLine: Number(callerFrame.lineNumber || 0) + 1,
+      ancestry,
       selfMicros: 0,
       samples: 0
     };

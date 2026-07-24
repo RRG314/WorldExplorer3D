@@ -6,7 +6,10 @@ import {
   TERRAIN_GRASS_COLOR_HEX
 } from "./surface-profiles.js?v=35";
 
-const TERRAIN_TILE_CACHE_LIMIT = 72;
+// A ring of four requires 81 active tiles. Keep at least one movement band
+// beyond that working set so normal travel does not immediately evict and
+// decode the same terrain textures again.
+const TERRAIN_TILE_CACHE_LIMIT = 128;
 const TERRAIN_TILE_MAX_ATTEMPTS = 3;
 const TERRAIN_TILE_RETRY_BASE_MS = 300;
 const TERRAIN_TILE_ATTEMPT_TIMEOUT_MS = 6000;

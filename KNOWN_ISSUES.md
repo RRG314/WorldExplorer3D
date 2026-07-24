@@ -18,7 +18,6 @@ approval to ignore a reproducible defect.
 - The initial world load intentionally waits for core roads and buildings so play does not begin in an empty scene. Additional distant detail may continue to refine afterward.
 - Version 4.0 used a detailed initial location/OSM build and a separate Overture-backed continuous-streaming build. Development has moved continuous vector acquisition to OSM Shortbread, but the initial and streaming geometry builders are not yet fully unified, so quality can still change after traveling beyond the initial area or crossing world-cell boundaries.
 - Whole-cell streaming and LOD replacement can produce visible vegetation or ground-detail changes while traveling, particularly at vehicle or aircraft speed.
-- The installed-Chrome drone gate still detects an intermittent roughly 0.53-second first-use WebGL buffer/program upload in the detailed location world. OSM requests, terrain queues, and structure profiling are complete before the event; deployment remains blocked until the owning LOD/render resource is identified and prepared or streamed within budget.
 - Browser GPU support and memory limits differ significantly, especially on older phones and integrated graphics.
 
 ## Rendering and World Geometry

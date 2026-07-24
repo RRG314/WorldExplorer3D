@@ -40,7 +40,7 @@ import {
   waitForTerrainReadyBounds,
   waitForTerrainReadyAt,
   worldToLatLon
-} from "./terrain/tiles.js?v=38";
+} from "./terrain/tiles.js?v=39";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -52,7 +52,7 @@ import {
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=5";
 import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
-import { createTerrainStreamingApi } from "./terrain/streaming.js?v=11";
+import { createTerrainStreamingApi } from "./terrain/streaming.js?v=12";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 // terrain.js - Terrain elevation system (Terrarium tiles)
 // ============================================================================
@@ -344,7 +344,8 @@ function cancelWorldSurfaceSync() {
 }
 const {
   resetTerrainStreamingState,
-  updateTerrainAround
+  updateTerrainAround,
+  waitForTerrainStreamingIdle
 } = createTerrainStreamingApi({
   appCtx,
   terrainState: terrain,
@@ -455,6 +456,7 @@ Object.assign(appCtx, {
   tileXYToLatLonBounds,
   toggleRoadDebugMode,
   updateTerrainAround,
+  waitForTerrainStreamingIdle,
   validateRoadTerrainConformance,
   waitForTerrainCoverageAt,
   waitForTerrainReadyBounds: (bounds, timeoutMs) => waitForTerrainReadyBounds(bounds, timeoutMs, terrainTileDeps),
@@ -498,6 +500,7 @@ export {
   tileXYToLatLonBounds,
   toggleRoadDebugMode,
   updateTerrainAround,
+  waitForTerrainStreamingIdle,
   validateRoadTerrainConformance,
   waitForTerrainCoverageAt,
   waitForTerrainReadyBounds,
