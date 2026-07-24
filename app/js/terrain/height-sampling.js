@@ -1,7 +1,8 @@
 import {
   projectPointToFeature,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=21";
+} from "../structure-semantics.js?v=22";
+import { querySpatialBoundsPoint } from "../spatial-bounds-index.js?v=1";
 
 function createTerrainHeightSamplingApi(deps = {}) {
   const {
@@ -87,14 +88,19 @@ function createTerrainHeightSamplingApi(deps = {}) {
     return h;
   }
 
-  function applyStructureTerrainCuts(worldX, worldZ, terrainY, candidateCuts = appCtx.structureTerrainCuts) {
-    if (!Array.isArray(candidateCuts) || candidateCuts.length === 0 || !Number.isFinite(terrainY)) {
+  function applyStructureTerrainCuts(worldX, worldZ, terrainY, candidateCuts = null) {
+    const resolvedCuts = Array.isArray(candidateCuts)
+      ? candidateCuts
+      : appCtx.structureTerrainCutIndex
+        ? querySpatialBoundsPoint(appCtx.structureTerrainCutIndex, worldX, worldZ)
+        : appCtx.structureTerrainCuts;
+    if (!Array.isArray(resolvedCuts) || resolvedCuts.length === 0 || !Number.isFinite(terrainY)) {
       return terrainY;
     }
 
     let adjustedY = terrainY;
-    for (let i = 0; i < candidateCuts.length; i++) {
-      const cut = candidateCuts[i];
+    for (let i = 0; i < resolvedCuts.length; i++) {
+      const cut = resolvedCuts[i];
       if (!cut?.feature || !cut?.bounds) continue;
       if (worldX < cut.bounds.minX || worldX > cut.bounds.maxX || worldZ < cut.bounds.minZ || worldZ > cut.bounds.maxZ) continue;
 

@@ -39,4 +39,19 @@ attachStreamProvenance(
 );
 assert.equal(streamMesh.userData.renderProvenance.provider, 'Overture Maps Foundation');
 
-console.log(JSON.stringify({ ok: true, provenance }, null, 2));
+const osmStreamMesh = { userData: {} };
+attachStreamProvenance(
+  osmStreamMesh,
+  { surfaceTile: { z: 14, x: 4705, y: 6244, profile: 'continuous_global', sources: ['osm-shortbread'] } },
+  { source: 'osm-shortbread', release: 'shortbread_v1', z: 14, x: 4705, y: 6244 },
+  { layer: 'transportation.segment', role: 'road' }
+);
+assert.equal(osmStreamMesh.userData.renderProvenance.provider, 'OpenStreetMap Foundation');
+assert.equal(osmStreamMesh.userData.renderProvenance.dataset, 'osm-shortbread');
+assert.deepEqual(osmStreamMesh.userData.renderProvenance.sources, ['osm-shortbread']);
+
+console.log(JSON.stringify({
+  ok: true,
+  provenance,
+  osmProvenance: osmStreamMesh.userData.renderProvenance
+}, null, 2));

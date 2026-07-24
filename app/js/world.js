@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=21";
+} from "./structure-semantics.js?v=22";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -66,7 +66,7 @@ import {
   scheduleDeferredPoiLoad,
   scheduleDeferredWorldDetailPasses,
   safeWorldLoadCall
-} from "./world/load-support.js?v=25";
+} from "./world/load-support.js?v=27";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -171,7 +171,7 @@ import {
   refreshStructureAwareFeatureProfiles,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=5";
+} from "./world/structure-aware.js?v=7";
 import { createWorldRoadLoader } from "./world/load-roads.js?v=75";
 import { worldLoadTransactions } from './world/load-transaction.js?v=2';
 import {

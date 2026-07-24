@@ -4,7 +4,7 @@ import { detectRoadIntersections } from "./intersections.js?v=1";
 import {
   buildFeatureRibbonEdges,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=21";
+} from "../structure-semantics.js?v=22";
 import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=2";
 
 const ROAD_SURFACE_BIAS = 0.08;
@@ -327,7 +327,13 @@ export function rebuildRoadsWithTerrain(deps = {}) {
   if (typeof clearTerrainHeightCache === "function") clearTerrainHeightCache();
   terrain._lastRoadCount = baseRoads.length;
   if (typeof appCtx.refreshStructureAwareFeatureProfiles === "function") {
-    appCtx.refreshStructureAwareFeatureProfiles({ includeStreaming: false });
+    appCtx.refreshStructureAwareFeatureProfiles({
+      includeStreaming: false,
+      // Road/structure topology is established by the world-loading passes.
+      // Terrain arrivals only change sampled elevations and must not rebuild
+      // the city-wide crossing graph on the gameplay thread.
+      rebuildTopology: false
+    });
   }
 
   const retainedRoadMeshes = [];

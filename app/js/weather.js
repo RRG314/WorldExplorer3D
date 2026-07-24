@@ -629,7 +629,16 @@ function ensureWeatherUiClockTicker() {
   if (_weatherUiClockInterval || typeof window === 'undefined') return;
   _weatherUiClockInterval = window.setInterval(() => {
     if (document?.hidden) return;
-    updateWeatherUi();
+    const active = appCtx.weatherState || appCtx.liveWeatherState || null;
+    if (!active || appCtx.onMoon || appCtx.onMars) return;
+    const localTimeLabel = getLiveClockLabel(active, {
+      includeZone: false,
+      showSeconds: true
+    });
+    const clock = document.getElementById('hudClockDisplay');
+    const timeLine = document.getElementById('weatherTimeLine');
+    if (clock && clock.textContent !== localTimeLabel) clock.textContent = localTimeLabel;
+    if (timeLine && timeLine.textContent !== localTimeLabel) timeLine.textContent = localTimeLabel;
   }, 1000);
 }
 

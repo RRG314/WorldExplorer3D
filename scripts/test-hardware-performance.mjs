@@ -157,7 +157,24 @@ async function stopFrameRecorder(page) {
     if (!state) return [];
     state.active = false;
     state.observer?.disconnect?.();
-    window.__lastHardwareLongTasks = state.longTasks;
+    const resources = performance.getEntriesByType('resource');
+    window.__lastHardwareLongTasks = state.longTasks.map((task) => ({
+      ...task,
+      nearbyResources: resources
+        .filter((entry) =>
+          entry.responseEnd >= task.startTime - 750 &&
+          entry.startTime <= task.startTime + task.duration + 250
+        )
+        .map((entry) => ({
+          name: entry.name,
+          initiatorType: entry.initiatorType,
+          startTime: entry.startTime,
+          responseEnd: entry.responseEnd,
+          duration: entry.duration,
+          transferSize: entry.transferSize
+        }))
+        .slice(-20)
+    }));
     return state.samples;
   });
 }
@@ -417,6 +434,7 @@ async function runScenario(page, definition) {
   await setMode(page, definition.mode);
   await page.waitForTimeout(1500);
   const transitionFrames = summarizeFrames(await stopFrameRecorder(page));
+  const transitionLongTasks = await readLastLongTasks(page);
   const before = await runtimeSnapshot(page);
 
   await startFrameRecorder(page);
@@ -433,6 +451,7 @@ async function runScenario(page, definition) {
     elapsed += duration;
   }
   const frames = summarizeFrames(await stopFrameRecorder(page));
+  const longTasks = await readLastLongTasks(page);
   await page.waitForTimeout(250);
   const after = await runtimeSnapshot(page);
   const beforePosition = before.actor?.position || {};
@@ -448,7 +467,9 @@ async function runScenario(page, definition) {
     mode: definition.mode,
     transitionMs: Date.now() - transitionStarted - scenarioMs - 250,
     transitionFrames,
+    transitionLongTasks,
     frames,
+    longTasks,
     movement,
     before,
     after,

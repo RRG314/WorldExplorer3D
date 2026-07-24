@@ -216,6 +216,9 @@ function publishRuntimeDiagnostics() {
 
 publishRuntimeDiagnostics();
 const runtimeDiagnosticsScope = createLifecycleScope('runtime-diagnostics');
+const autoPublishRuntimeDiagnostics =
+  globalThis.__WE3D_AUTO_PUBLISH_DIAGNOSTICS === true ||
+  new URLSearchParams(globalThis.location?.search || '').has('runtimeDiagnostics');
 let diagnosticsPublishPending = false;
 function scheduleRuntimeDiagnosticsPublish() {
   if (diagnosticsPublishPending || document.hidden) return;
@@ -225,14 +228,17 @@ function scheduleRuntimeDiagnosticsPublish() {
     if (!document.hidden) publishRuntimeDiagnostics();
   }, 2500);
 }
-runtimeDiagnosticsScope.interval(() => {
-  scheduleRuntimeDiagnosticsPublish();
-}, 5000);
-runtimeDiagnosticsScope.listen(document, 'visibilitychange', () => {
-  if (!document.hidden) scheduleRuntimeDiagnosticsPublish();
-});
+if (autoPublishRuntimeDiagnostics) {
+  runtimeDiagnosticsScope.interval(() => {
+    scheduleRuntimeDiagnosticsPublish();
+  }, 5000);
+  runtimeDiagnosticsScope.listen(document, 'visibilitychange', () => {
+    if (!document.hidden) scheduleRuntimeDiagnosticsPublish();
+  });
+}
 
 Object.assign(appCtx, {
+  publishRuntimeDiagnostics,
   getRuntimeDiagnosticsLifecycleSnapshot: () => runtimeDiagnosticsScope.snapshot(),
   stopRuntimeDiagnostics: (reason = 'stopped') => runtimeDiagnosticsScope.dispose(reason)
 });

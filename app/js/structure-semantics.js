@@ -77,6 +77,12 @@ function buildFeatureStations(feature, context = {}) {
 
   const { distances, total } = polylineDistances(points);
   const features = Array.isArray(context.features) ? context.features : [];
+  const queryFeatureSegments = typeof context.queryFeatureSegments === 'function'
+    ? context.queryFeatureSegments
+    : null;
+  const queryWaterAreas = typeof context.queryWaterAreas === 'function'
+    ? context.queryWaterAreas
+    : null;
   const waterAreas = Array.isArray(context.waterAreas) ? context.waterAreas : [];
   const bounds = feature.bounds || polylineBounds(points, (Number(feature.width) || 4) + 24);
   const stations = [];
@@ -94,41 +100,66 @@ function buildFeatureStations(feature, context = {}) {
     });
   };
 
-  for (let i = 0; i < features.length; i++) {
-    const other = features[i];
-    if (!other || other === feature || !Array.isArray(other.pts) || other.pts.length < 2) continue;
-    const otherBounds = other.bounds || polylineBounds(other.pts, (Number(other.width) || 4) + 18);
-    if (!boundsIntersect(bounds, otherBounds, 14)) continue;
-
+  const addFeatureCrossing = (other, segA, segB) => {
+    if (!other || other === feature || !Array.isArray(other.pts) || other.pts.length < 2) return;
     const otherSemantics = other.structureSemantics || null;
     const otherOrder = Number.isFinite(otherSemantics?.verticalOrder) ? otherSemantics.verticalOrder : 0;
     const ownOrder = Number.isFinite(semantics.verticalOrder) ? semantics.verticalOrder : 0;
-    if (semantics.terrainMode === 'elevated' && otherOrder > ownOrder) continue;
-    if (semantics.terrainMode === 'subgrade' && otherOrder < ownOrder) continue;
+    if (semantics.terrainMode === 'elevated' && otherOrder > ownOrder) return;
+    if (semantics.terrainMode === 'subgrade' && otherOrder < ownOrder) return;
 
+    const a1 = points[segA];
+    const a2 = points[segA + 1];
+    const b1 = other.pts[segB];
+    const b2 = other.pts[segB + 1];
+    if (!a1 || !a2 || !b1 || !b2) return;
+    const segLen = Math.hypot(a2.x - a1.x, a2.z - a1.z);
+    if (!(segLen > 0.01)) return;
+    const intersection = segmentIntersection2D(a1, a2, b1, b2);
+    if (!intersection) return;
+    const distance = distances[segA] + segLen * intersection.t;
+    let target = defaultTarget;
+    if (semantics.terrainMode === 'elevated') {
+      const otherTarget = Number.isFinite(otherSemantics?.deckClearance) ? otherSemantics.deckClearance : 0;
+      target = Math.max(defaultTarget, otherTarget + 2.2);
+    } else if (semantics.terrainMode === 'subgrade') {
+      const otherDepth = Number.isFinite(otherSemantics?.cutDepth) ? otherSemantics.cutDepth : 0;
+      target = Math.max(defaultTarget, otherDepth + 1.4);
+    }
+    addStation(distance, target, defaultSpan, 'feature_crossing');
+  };
+
+  if (queryFeatureSegments) {
     for (let segA = 0; segA < points.length - 1; segA++) {
       const a1 = points[segA];
       const a2 = points[segA + 1];
-      const segLen = Math.hypot(a2.x - a1.x, a2.z - a1.z);
-      if (!(segLen > 0.01)) continue;
-      for (let segB = 0; segB < other.pts.length - 1; segB++) {
-        const intersection = segmentIntersection2D(a1, a2, other.pts[segB], other.pts[segB + 1]);
-        if (!intersection) continue;
-        const distance = distances[segA] + segLen * intersection.t;
-        let target = defaultTarget;
-        if (semantics.terrainMode === 'elevated') {
-          const otherTarget = Number.isFinite(otherSemantics?.deckClearance) ? otherSemantics.deckClearance : 0;
-          target = Math.max(defaultTarget, otherTarget + 2.2);
-        } else if (semantics.terrainMode === 'subgrade') {
-          const otherDepth = Number.isFinite(otherSemantics?.cutDepth) ? otherSemantics.cutDepth : 0;
-          target = Math.max(defaultTarget, otherDepth + 1.4);
+      if (!a1 || !a2) continue;
+      const candidates = queryFeatureSegments({
+        minX: Math.min(a1.x, a2.x) - 14,
+        maxX: Math.max(a1.x, a2.x) + 14,
+        minZ: Math.min(a1.z, a2.z) - 14,
+        maxZ: Math.max(a1.z, a2.z) + 14
+      });
+      for (let i = 0; i < candidates.length; i++) {
+        const candidate = candidates[i];
+        addFeatureCrossing(candidate?.feature, segA, Number(candidate?.segIndex));
+      }
+    }
+  } else {
+    for (let i = 0; i < features.length; i++) {
+      const other = features[i];
+      if (!other || other === feature || !Array.isArray(other.pts) || other.pts.length < 2) continue;
+      const otherBounds = other.bounds || polylineBounds(other.pts, (Number(other.width) || 4) + 18);
+      if (!boundsIntersect(bounds, otherBounds, 14)) continue;
+      for (let segA = 0; segA < points.length - 1; segA++) {
+        for (let segB = 0; segB < other.pts.length - 1; segB++) {
+          addFeatureCrossing(other, segA, segB);
         }
-        addStation(distance, target, defaultSpan, 'feature_crossing');
       }
     }
   }
 
-  if (semantics.terrainMode === 'elevated' && waterAreas.length > 0) {
+  if (semantics.terrainMode === 'elevated' && (waterAreas.length > 0 || queryWaterAreas)) {
     for (let i = 0; i < points.length; i++) {
       const point = points[i];
       const prev = points[Math.max(0, i - 1)];
@@ -138,8 +169,11 @@ function buildFeatureStations(feature, context = {}) {
         z: (prev.z + next.z) * 0.5
       } : point;
       let insideWater = false;
-      for (let w = 0; w < waterAreas.length; w++) {
-        const polygon = waterAreas[w]?.pts;
+      const localWaterAreas = queryWaterAreas
+        ? queryWaterAreas(midpoint.x, midpoint.z, point.x, point.z)
+        : waterAreas;
+      for (let w = 0; w < localWaterAreas.length; w++) {
+        const polygon = localWaterAreas[w]?.pts;
         if (pointInPolygonXZ(midpoint.x, midpoint.z, polygon) || pointInPolygonXZ(point.x, point.z, polygon)) {
           insideWater = true;
           break;

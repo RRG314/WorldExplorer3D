@@ -1,10 +1,10 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { fetchShortbreadTile } from "./shortbread-source.js?v=13";
+import { fetchOsmStreamingTile } from "./osm-streaming-source.js?v=1";
 import {
   buildStreamingBuildingVisuals,
   buildStreamingRoadVisuals,
   queueGeometryDisposal
-} from "./streaming-vector-chunks.js?v=56";
+} from "./streaming-vector-chunks.js?v=58";
 import { SOURCE_PROFILE } from "./surface-contract.js?v=7";
 
 function removeMeshesInPlace(source, removed) {
@@ -33,7 +33,7 @@ async function loadAerialContextChunk(request) {
     buildings: []
   };
   try {
-    const tileRecord = await fetchShortbreadTile(request.z, request.x, request.y, { signal: request.signal });
+    const tileRecord = await fetchOsmStreamingTile(request.z, request.x, request.y, { signal: request.signal });
     if (request.signal?.aborted) throw new DOMException('Aerial context chunk aborted', 'AbortError');
     await buildStreamingRoadVisuals(tileRecord, chunk, {
       aerialContext: true,
@@ -101,7 +101,12 @@ function initStreamingAerialContext() {
   appCtx._streamingAerialContextRegistered = true;
   appCtx.aerialContextMeshes = Array.isArray(appCtx.aerialContextMeshes) ? appCtx.aerialContextMeshes : [];
   appCtx.unregisterStreamingAerialContext = appCtx.registerEarthStreamLayer('aerial-vector', {
-    activeWhen: () => !!appCtx.initialEarthWorldReady && appCtx.getContinuousWorldEnabled?.() !== true,
+    // Finalization primes this layer before the world-ready flag is committed.
+    // Allow that explicit loading phase so vector decoding and GPU uploads do
+    // not spill into the player's first movement frames.
+    activeWhen: () =>
+      (!!appCtx.initialEarthWorldReady || !!appCtx.worldLoading) &&
+      appCtx.getContinuousWorldEnabled?.() !== true,
     availableWhenDisabled: true,
     centerWhen: aerialContextCenter,
     loadChunk: loadAerialContextChunk,

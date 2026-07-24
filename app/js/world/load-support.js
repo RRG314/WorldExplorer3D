@@ -88,12 +88,54 @@ export async function finalizeLoadedWorld(options = {}) {
   if (appCtx.gameStarted) {
     runFinalStep('startMode', () => appCtx.startMode());
   }
+  if (typeof appCtx.primeAerialContext === 'function' && appCtx.getContinuousWorldEnabled?.() !== true) {
+    loadMetrics.aerialContext = { status: 'warming' };
+    startLoadPhase('primeAerialContext');
+    try {
+      const layer = await appCtx.primeAerialContext({ minLoadedTiles: 9, timeoutMs: 20000 });
+      loadMetrics.aerialContext = {
+        status: 'ready',
+        loadedNearCenter: Number(layer?.loadedNearCenter || 0)
+      };
+    } catch (err) {
+      loadMetrics.aerialContext = { status: 'deferred', error: err?.message || String(err) };
+    } finally {
+      endLoadPhase('primeAerialContext');
+    }
+  }
+  if (typeof appCtx.ensureOverlayRuntimeReady === 'function') {
+    startLoadPhase('ensureOverlayRuntimeReady');
+    try {
+      await appCtx.ensureOverlayRuntimeReady();
+    } finally {
+      endLoadPhase('ensureOverlayRuntimeReady');
+    }
+  }
+  if (typeof appCtx.waitForApprovedEditorContributions === 'function') {
+    startLoadPhase('waitForApprovedEditorContributions');
+    try {
+      loadMetrics.editorContributions = await appCtx.waitForApprovedEditorContributions(12000);
+    } finally {
+      endLoadPhase('waitForApprovedEditorContributions');
+    }
+  }
   if (typeof appCtx.waitForWorldRenderReadiness === 'function') {
     loadMetrics.renderReadiness = await appCtx.waitForWorldRenderReadiness({
       timeoutMs: 4500,
       stableFrames: 5,
       minimumReadyMs: 500
     });
+  }
+  if (
+    appCtx.terrainEnabled &&
+    !appCtx.onMoon &&
+    appCtx.roadsNeedRebuild &&
+    typeof appCtx.requestWorldSurfaceSync === 'function'
+  ) {
+    runFinalStep('finalWorldSurfaceSync', () => appCtx.requestWorldSurfaceSync({
+      force: true,
+      source: 'world_render_ready'
+    }));
   }
   if (typeof appCtx.revalidateActiveWorldSpawn === 'function') {
     runFinalStep('revalidateActiveWorldSpawn', () => appCtx.revalidateActiveWorldSpawn({
@@ -111,20 +153,6 @@ export async function finalizeLoadedWorld(options = {}) {
     }
   }
   appCtx.hideLoad();
-  if (typeof appCtx.primeAerialContext === 'function' && appCtx.getContinuousWorldEnabled?.() !== true) {
-    loadMetrics.aerialContext = { status: 'warming' };
-    globalThis.setTimeout(async () => {
-      try {
-        const layer = await appCtx.primeAerialContext({ minLoadedTiles: 9, timeoutMs: 12000 });
-        loadMetrics.aerialContext = {
-          status: 'ready',
-          loadedNearCenter: Number(layer?.loadedNearCenter || 0)
-        };
-      } catch (err) {
-        loadMetrics.aerialContext = { status: 'deferred', error: err?.message || String(err) };
-      }
-    }, 0);
-  }
 }
 
 export function createSyntheticFallbackWorld(options = {}) {

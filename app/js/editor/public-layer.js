@@ -14,8 +14,28 @@ const state = {
   group: null,
   pollId: 0,
   hiddenBaseBuildingMeshes: new Map(),
-  retryAfterMs: 0
+  retryAfterMs: 0,
+  backendReady: null,
+  publishedSignature: '',
+  firstSnapshotSettled: false,
+  firstSnapshotWaiters: new Set()
 };
+
+function settleFirstPublishedSnapshot() {
+  if (state.firstSnapshotSettled) return;
+  state.firstSnapshotSettled = true;
+  state.firstSnapshotWaiters.forEach((resolve) => resolve(true));
+  state.firstSnapshotWaiters.clear();
+}
+
+function publishedFeatureSignature(features = []) {
+  return features.map((feature) => [
+    feature?.featureId || '',
+    feature?.updatedAtMs || feature?.publishedAtMs || '',
+    feature?.reviewState || '',
+    feature?.publicationState || ''
+  ].join(':')).sort().join('|');
+}
 
 function refreshTraversalNetworks(reason) {
   appCtx.invalidateTraversalNetworks?.(reason);
@@ -30,7 +50,8 @@ function finiteNumber(value, fallback = 0) {
 }
 
 function shouldShowOverlayRuntime() {
-  return appCtx.gameStarted === true && overlayBackendReady() && !appCtx.onMoon;
+  if (state.backendReady === null) state.backendReady = overlayBackendReady();
+  return appCtx.gameStarted === true && state.backendReady === true && !appCtx.onMoon;
 }
 
 function getReferencePoint() {
@@ -213,6 +234,11 @@ function suppressBaseBuildings(features = []) {
 }
 
 function applyPublishedFeatures(features = []) {
+  const nextSignature = publishedFeatureSignature(features);
+  if (nextSignature === state.publishedSignature) {
+    settleFirstPublishedSnapshot();
+    return;
+  }
   const previousTraversalSignature = state.traversalSignature;
   clearPublishedObjects({ refreshTraversal: false });
   const group = ensureGroup();
@@ -281,9 +307,11 @@ function applyPublishedFeatures(features = []) {
     buildingIds: suppressionBuildingIds
   };
   state.traversalSignature = traversalTopologySignature(runtimeRoads, runtimeLinear, suppressionRoadIds);
+  state.publishedSignature = nextSignature;
   if (state.traversalSignature !== previousTraversalSignature) {
     refreshTraversalNetworks('overlay_published_changed');
   }
+  settleFirstPublishedSnapshot();
 }
 
 function updateListener() {
@@ -345,6 +373,20 @@ function refreshApprovedEditorContributions() {
   return getApprovedEditorContributionSnapshot();
 }
 
+async function waitForApprovedEditorContributions(timeoutMs = 12000) {
+  updateListener();
+  if (!shouldShowOverlayRuntime()) {
+    return { ready: true, reason: 'backend_unavailable' };
+  }
+  if (state.firstSnapshotSettled) return { ready: true, reason: 'snapshot_ready' };
+  const timeout = Math.max(500, Number(timeoutMs) || 12000);
+  const ready = await Promise.race([
+    new Promise((resolve) => state.firstSnapshotWaiters.add(resolve)),
+    new Promise((resolve) => globalThis.setTimeout(() => resolve(false), timeout))
+  ]);
+  return { ready: ready === true, reason: ready === true ? 'snapshot_ready' : 'timeout' };
+}
+
 function initEditorPublicLayer() {
   clearPublishedObjects();
   updateListener();
@@ -363,6 +405,7 @@ function initEditorPublicLayer() {
   Object.assign(appCtx, {
     getApprovedEditorContributionSnapshot,
     refreshApprovedEditorContributions,
+    waitForApprovedEditorContributions,
     refreshOverlayRuntimeLayer: updateListener,
     syncApprovedEditorContributionVisibility
   });

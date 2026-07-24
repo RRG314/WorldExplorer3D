@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=21";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=22";
+import { querySpatialBoundsPoint } from "../spatial-bounds-index.js?v=1";
 import { addBuildingToSpatialIndex, removeBuildingsFromSpatialIndex } from "./building-spatial-index.js?v=7";
 import {
   buildGuardrailEdges,
@@ -87,7 +88,6 @@ export function registerBridgeGuardrails(road, owner = null) {
     const midZ = (a.z + b.z) * 0.5;
     const surfaceSamples = [
       a.y,
-      sampleFeatureSurfaceY(road, midX, midZ),
       b.y
     ].filter(Number.isFinite);
     const minSurfaceY = surfaceSamples.length > 0 ? Math.min(...surfaceSamples) : 0;
@@ -124,8 +124,17 @@ export function registerBridgeGuardrails(road, owner = null) {
     if (!(length > 0.4)) continue;
     const midX = (a.x + b.x) * 0.5;
     const midZ = (a.z + b.z) * 0.5;
-    const surfaceY = sampleFeatureSurfaceY(road, midX, midZ);
+    const surfaceY = sampleFeatureSurfaceY(road, midX, midZ, {
+      x: midX,
+      z: midZ,
+      dist: 0,
+      segIndex: i,
+      t: 0.5
+    });
     const terrainY = appCtx.baseTerrainHeightAt?.(midX, midZ) ?? appCtx.terrainMeshHeightAt?.(midX, midZ) ?? 0;
+    const waterAreas = appCtx.waterAreaIndex
+      ? querySpatialBoundsPoint(appCtx.waterAreaIndex, midX, midZ)
+      : appCtx.waterAreas;
     const safety = elevatedSegmentSafety(road, {
       x: midX,
       z: midZ,
@@ -133,7 +142,7 @@ export function registerBridgeGuardrails(road, owner = null) {
       terrainY,
       distance: (distances[i] + distances[i + 1]) * 0.5,
       total,
-      waterAreas: appCtx.waterAreas
+      waterAreas
     });
     if (!safety.protected) {
       flushPending(-1);

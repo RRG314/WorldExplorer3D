@@ -6,7 +6,7 @@ import './config.js?v=59';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
-import './runtime-diagnostics.js?v=18';
+import './runtime-diagnostics.js?v=19';
 import './state.js?v=60';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
@@ -19,12 +19,12 @@ import './env.js?v=57';
 import './session-coordinator.js?v=2';
 import './real-estate.js?v=55';
 import './ground.js?v=70';
-import './terrain.js?v=150';
-import './world.js?v=263';
+import './terrain.js?v=152';
+import './world.js?v=266';
 import './earth-streaming.js?v=22';
-import './world/streaming-vector-chunks.js?v=56';
-import './world/load-continuous-world.js?v=13';
-import './world/streaming-aerial-context.js?v=34';
+import './world/streaming-vector-chunks.js?v=58';
+import './world/load-continuous-world.js?v=15';
+import './world/streaming-aerial-context.js?v=36';
 import './earth-origin.js?v=4';
 import './building-entry.js?v=4';
 import './interiors.js?v=9';
@@ -36,7 +36,7 @@ import './travel-mode.js?v=12';
 import { initBoatMode } from './boat-mode.js?v=36';
 import { setupFishingGame } from './fishing-game.js?v=2';
 import './sky.js?v=83';
-import './weather.js?v=6';
+import './weather.js?v=7';
 import './live-earth/controller.js?v=21';
 import './solar-system.js?v=72';
 import './space.js?v=94';
@@ -151,7 +151,7 @@ function registerPlatformServices() {
     platformServices.register({
         id: 'editor-overlay', category: 'world-content',
         load: async () => {
-            const mod = await import('./editor/public-layer.js?v=6');
+            const mod = await import('./editor/public-layer.js?v=7');
             mod.initEditorPublicLayer?.();
             return mod;
         }

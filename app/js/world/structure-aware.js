@@ -3,8 +3,14 @@ import {
   assignFeatureConnections,
   buildFeatureStations,
   buildFeatureTransitionAnchors,
+  polylineBounds,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=21";
+} from "../structure-semantics.js?v=22";
+import {
+  createSpatialBoundsIndex,
+  querySpatialBoundsIndex,
+  querySpatialBoundsPoint
+} from "../spatial-bounds-index.js?v=1";
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -37,6 +43,44 @@ function worldRenderedTerrainY(x, z) {
 function structureAwareLinearFeatures() {
   if (!Array.isArray(appCtx.linearFeatures)) return [];
   return appCtx.linearFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
+}
+
+function expandedFeatureBounds(feature, padding = 0) {
+  const points = Array.isArray(feature?.pts) ? feature.pts : [];
+  const source = feature?.bounds || (points.length >= 2
+    ? polylineBounds(points, Math.max(0, Number(feature?.width) || 0) * 0.5)
+    : null);
+  if (!source) return null;
+  const minX = Number(source.minX);
+  const maxX = Number(source.maxX);
+  const minZ = Number(source.minZ);
+  const maxZ = Number(source.maxZ);
+  if (![minX, maxX, minZ, maxZ].every(Number.isFinite)) return null;
+  return {
+    minX: minX - padding,
+    maxX: maxX + padding,
+    minZ: minZ - padding,
+    maxZ: maxZ + padding
+  };
+}
+
+function pointsBounds(points) {
+  if (!Array.isArray(points) || points.length === 0) return null;
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (let i = 0; i < points.length; i++) {
+    const point = points[i];
+    if (!Number.isFinite(point?.x) || !Number.isFinite(point?.z)) continue;
+    minX = Math.min(minX, point.x);
+    maxX = Math.max(maxX, point.x);
+    minZ = Math.min(minZ, point.z);
+    maxZ = Math.max(maxZ, point.z);
+  }
+  return [minX, maxX, minZ, maxZ].every(Number.isFinite)
+    ? { minX, maxX, minZ, maxZ }
+    : null;
 }
 
 function smoothstep01Local(value) {
@@ -274,6 +318,7 @@ export function applyBuildingContextSemanticsToFeature(feature) {
 
 export function refreshStructureAwareFeatureProfiles(options = {}) {
   const includeStreaming = options.includeStreaming !== false;
+  const rebuildTopology = options.rebuildTopology !== false;
   const roadFeatures = Array.isArray(appCtx.roads)
     ? appCtx.roads.filter((feature) => includeStreaming || !feature?._streamChunkKey)
     : [];
@@ -281,30 +326,76 @@ export function refreshStructureAwareFeatureProfiles(options = {}) {
     .filter((feature) => includeStreaming || !feature?._streamChunkKey);
   const transportFeatures = roadFeatures.concat(connectorFeatures);
 
-  for (let i = 0; i < transportFeatures.length; i++) {
-    applyBuildingContextSemanticsToFeature(transportFeatures[i]);
-  }
+  if (rebuildTopology) {
+    for (let i = 0; i < transportFeatures.length; i++) {
+      applyBuildingContextSemanticsToFeature(transportFeatures[i]);
+    }
 
-  if (Array.isArray(appCtx.linearFeatureMeshes)) {
-    for (let i = 0; i < appCtx.linearFeatureMeshes.length; i++) {
-      const mesh = appCtx.linearFeatureMeshes[i];
-      const feature = mesh?.userData?.linearFeatureRef || null;
-      if (!mesh || !feature) continue;
-      mesh.userData.structureConnector = feature.isStructureConnector === true;
-      mesh.userData.structureSemantics = feature.structureSemantics || null;
+    if (Array.isArray(appCtx.linearFeatureMeshes)) {
+      for (let i = 0; i < appCtx.linearFeatureMeshes.length; i++) {
+        const mesh = appCtx.linearFeatureMeshes[i];
+        const feature = mesh?.userData?.linearFeatureRef || null;
+        if (!mesh || !feature) continue;
+        mesh.userData.structureConnector = feature.isStructureConnector === true;
+        mesh.userData.structureSemantics = feature.structureSemantics || null;
+      }
     }
   }
 
   const structureFeatures = transportFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
-  assignFeatureConnections(transportFeatures);
-
-  for (let i = 0; i < structureFeatures.length; i++) {
-    const feature = structureFeatures[i];
-    if (!feature?.structureSemantics?.gradeSeparated) continue;
-    feature.structureStations = buildFeatureStations(feature, {
-      features: structureFeatures,
-      waterAreas: appCtx.waterAreas
+  if (rebuildTopology) {
+    assignFeatureConnections(transportFeatures);
+    const structureSegments = [];
+    for (let i = 0; i < structureFeatures.length; i++) {
+      const feature = structureFeatures[i];
+      const points = Array.isArray(feature?.pts) ? feature.pts : [];
+      for (let segIndex = 0; segIndex < points.length - 1; segIndex++) {
+        const start = points[segIndex];
+        const end = points[segIndex + 1];
+        if (!start || !end) continue;
+        structureSegments.push({
+          feature,
+          segIndex,
+          bounds: {
+            minX: Math.min(start.x, end.x),
+            maxX: Math.max(start.x, end.x),
+            minZ: Math.min(start.z, end.z),
+            maxZ: Math.max(start.z, end.z)
+          }
+        });
+      }
+    }
+    const structureSegmentIndex = createSpatialBoundsIndex(structureSegments, {
+      boundsForItem: (segment) => segment.bounds,
+      cellSize: 96
     });
+    const waterAreaIndex = createSpatialBoundsIndex(appCtx.waterAreas, {
+      boundsForItem: (area) => area?.bounds || pointsBounds(area?.pts),
+      cellSize: 192
+    });
+    appCtx.waterAreaIndex = waterAreaIndex;
+
+    for (let i = 0; i < structureFeatures.length; i++) {
+      const feature = structureFeatures[i];
+      if (!feature?.structureSemantics?.gradeSeparated) continue;
+      feature.structureStations = buildFeatureStations(feature, {
+        queryFeatureSegments: (bounds) => querySpatialBoundsIndex(structureSegmentIndex, bounds),
+        queryWaterAreas: (midX, midZ, pointX, pointZ) => {
+          const midpointCandidates = querySpatialBoundsPoint(waterAreaIndex, midX, midZ);
+          if (midX === pointX && midZ === pointZ) return midpointCandidates;
+          const result = midpointCandidates.slice();
+          const seen = new Set(result);
+          const pointCandidates = querySpatialBoundsPoint(waterAreaIndex, pointX, pointZ);
+          for (let w = 0; w < pointCandidates.length; w++) {
+            const area = pointCandidates[w];
+            if (seen.has(area)) continue;
+            seen.add(area);
+            result.push(area);
+          }
+          return result;
+        }
+      });
+    }
   }
 
   for (let i = 0; i < transportFeatures.length; i++) {
@@ -337,7 +428,7 @@ export function refreshStructureAwareFeatureProfiles(options = {}) {
   smoothStructureSurfaceProfiles(profiledFeatures);
   appCtx.refreshBridgeGuardrails?.(roadFeatures);
 
-  if (structureFeatures.length > 0) {
+  if (rebuildTopology && structureFeatures.length > 0) {
     appCtx.structureTerrainCuts = structureFeatures
       .filter((feature) => feature?.structureSemantics?.terrainMode === 'subgrade')
       .map((feature) => ({
@@ -346,10 +437,15 @@ export function refreshStructureAwareFeatureProfiles(options = {}) {
         width: Math.max(6.2, (Number(feature.width) || 6) + 3.2),
         clearance: Math.max(3.8, Number(feature?.structureSemantics?.cutDepth) ? 3.35 + Math.min(3.4, Number(feature.structureSemantics.cutDepth) * 0.45) : 3.8),
         portalLength: Math.max(12, Math.min(34, (Number(feature.width) || 6) * 2.2)),
-        bounds: feature.bounds
+        bounds: expandedFeatureBounds(feature)
       }));
-  } else {
+    appCtx.structureTerrainCutIndex = createSpatialBoundsIndex(appCtx.structureTerrainCuts, {
+      boundsForItem: (cut) => cut?.bounds,
+      cellSize: 96
+    });
+  } else if (rebuildTopology) {
     appCtx.structureTerrainCuts = [];
+    appCtx.structureTerrainCutIndex = createSpatialBoundsIndex([], { cellSize: 96 });
   }
 }
 

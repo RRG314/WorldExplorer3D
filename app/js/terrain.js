@@ -10,7 +10,7 @@ import {
   isUrbanLanduseType,
   pointsBoundsLocal
 } from "./terrain/context-utils.js?v=1";
-import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=2";
+import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=4";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=1";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=5";
 import {
@@ -40,19 +40,19 @@ import {
   waitForTerrainReadyBounds,
   waitForTerrainReadyAt,
   worldToLatLon
-} from "./terrain/tiles.js?v=36";
+} from "./terrain/tiles.js?v=38";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
   rebuildRoadsWithTerrain
-} from "./terrain/rebuild.js?v=11";
+} from "./terrain/rebuild.js?v=12";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=5";
 import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
-import { createTerrainStreamingApi } from "./terrain/streaming.js?v=10";
+import { createTerrainStreamingApi } from "./terrain/streaming.js?v=11";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 // terrain.js - Terrain elevation system (Terrarium tiles)
 // ============================================================================
@@ -99,9 +99,71 @@ function clampElevationMeters(meters) {
   return Math.max(MIN_VALID_ELEVATION_METERS, Math.min(MAX_VALID_ELEVATION_METERS, meters));
 }
 
+function terrainMeshAffectsStaticRoads(mesh) {
+  if (!mesh?.geometry) return false;
+  const baseRoads = appCtx.roads.filter((road) => !road?._streamChunkKey);
+  if (baseRoads.length === 0) return false;
+  const worldSequence = Number(appCtx._worldLoadSequence || 0);
+  if (
+    terrain._staticRoadBounds?.roadCount !== baseRoads.length ||
+    terrain._staticRoadBounds?.worldSequence !== worldSequence
+  ) {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (let i = 0; i < baseRoads.length; i++) {
+      const road = baseRoads[i];
+      const bounds = road?.bounds;
+      if (bounds && [bounds.minX, bounds.maxX, bounds.minZ, bounds.maxZ].every(Number.isFinite)) {
+        minX = Math.min(minX, bounds.minX);
+        maxX = Math.max(maxX, bounds.maxX);
+        minZ = Math.min(minZ, bounds.minZ);
+        maxZ = Math.max(maxZ, bounds.maxZ);
+        continue;
+      }
+      const points = Array.isArray(road?.pts) ? road.pts : [];
+      for (let p = 0; p < points.length; p++) {
+        const point = points[p];
+        if (!Number.isFinite(point?.x) || !Number.isFinite(point?.z)) continue;
+        minX = Math.min(minX, point.x);
+        maxX = Math.max(maxX, point.x);
+        minZ = Math.min(minZ, point.z);
+        maxZ = Math.max(maxZ, point.z);
+      }
+    }
+    terrain._staticRoadBounds = {
+      roadCount: baseRoads.length,
+      worldSequence,
+      minX: minX - 32,
+      maxX: maxX + 32,
+      minZ: minZ - 32,
+      maxZ: maxZ + 32
+    };
+  }
+
+  const roadBounds = terrain._staticRoadBounds;
+  if (![roadBounds.minX, roadBounds.maxX, roadBounds.minZ, roadBounds.maxZ].every(Number.isFinite)) return false;
+  if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+  const tileBounds = mesh.geometry.boundingBox;
+  if (!tileBounds) return false;
+  const tileMinX = Number(tileBounds.min?.x) + Number(mesh.position?.x || 0);
+  const tileMaxX = Number(tileBounds.max?.x) + Number(mesh.position?.x || 0);
+  const tileMinZ = Number(tileBounds.min?.z) + Number(mesh.position?.z || 0);
+  const tileMaxZ = Number(tileBounds.max?.z) + Number(mesh.position?.z || 0);
+  return !(
+    tileMaxX < roadBounds.minX ||
+    tileMinX > roadBounds.maxX ||
+    tileMaxZ < roadBounds.minZ ||
+    tileMinZ > roadBounds.maxZ
+  );
+}
+
 const terrainTileDeps = {
   clampElevationMeters,
-  scheduleRoadAndBuildingRebuild: () => scheduleRoadAndBuildingRebuild(),
+  scheduleRoadAndBuildingRebuild: ({ mesh } = {}) => {
+    if (mesh && terrainMeshAffectsStaticRoads(mesh)) scheduleRoadAndBuildingRebuild();
+  },
   applyStructureTerrainCuts: (worldX, worldZ, terrainY, candidateCuts) =>
     applyStructureTerrainCuts(worldX, worldZ, terrainY, candidateCuts),
   computeElevationStatsMeters: (samplesMeters) => computeElevationStatsMeters(samplesMeters),
@@ -201,6 +263,10 @@ const terrainRebuildDeps = {
 function scheduleRoadAndBuildingRebuild() {
   if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired) return;
   appCtx.roadsNeedRebuild = true;
+  // World loading owns a single final surface synchronization behind the
+  // loading screen. Per-tile timers here would escape into initial gameplay
+  // and rebuild the entire static city on the first movement frames.
+  if (appCtx.worldLoading) return;
   if (terrain._rebuildTimer) return;
 
   const now = performance.now();

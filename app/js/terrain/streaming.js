@@ -42,9 +42,6 @@ function createTerrainStreamingApi(deps = {}) {
       if (cacheSnapshot && typeof appCtx.setPerfLiveStat === 'function') {
         appCtx.setPerfLiveStat('terrainCache', cacheSnapshot);
       }
-      if (appCtx.roads.length > 0 && !appCtx.onMoon) {
-        requestWorldSurfaceSync({ source: "terrain_tiles_streamed" });
-      }
     }
   }
 

@@ -7,7 +7,7 @@ import {
 } from "./building-spatial-index.js?v=7";
 import { waterSurfaceBaseElevation } from "./load-geometry.js?v=19";
 import { assessMappedWaterTerrain } from "./water-surface-validity.js?v=3";
-import { fetchOvertureStreamingTile } from './overture-streaming-source.js?v=3';
+import { fetchOsmStreamingTile } from './osm-streaming-source.js?v=1';
 import { buildStreamingLandcover } from "./streaming-landcover.js?v=14";
 import { createRoadNameResolver } from "./streaming-road-labels.js?v=1";
 import { streamingVectorMaterials as materials, transportSurfaceClass } from './streaming-vector-materials.js?v=1';
@@ -15,7 +15,7 @@ import {
   classifyStructureSemantics,
   polylineBounds,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=21";
+} from "../structure-semantics.js?v=22";
 import {
   INITIAL_DETAIL_RADIUS,
   ROAD_SURFACE_OFFSET,
@@ -40,7 +40,7 @@ import {
   worldPoint,
   yieldToRenderer
 } from './streaming-vector-geometry.js?v=4';
-import { registerBridgeGuardrails, removeBridgeGuardrails } from "./bridge-guardrails.js?v=8";
+import { registerBridgeGuardrails, removeBridgeGuardrails } from "./bridge-guardrails.js?v=9";
 import { createInitialWorldRetirementApi } from "./streaming-initial-retirement.js?v=3";
 import { SOURCE_PROFILE } from "./surface-contract.js?v=7";
 import { normalizeWaterBody } from './water-body-contract.js?v=2';
@@ -419,6 +419,8 @@ async function buildBuildings(tileRecord, chunk, options = {}) {
     batchIndex += 1;
     if (batchIndex % 12 === 0) await yieldToRenderer();
   }
+  chunk.featureBudget.buildings.partsVisited = partsVisited;
+  chunk.featureBudget.buildings.partsBuilt = partsBuilt;
 }
 
 function polygonArea(points) {
@@ -585,7 +587,7 @@ async function loadStreamingVectorChunk(request) {
   };
   try {
     if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
-    const tileRecord = await fetchOvertureStreamingTile(request.z, request.x, request.y, { signal: request.signal });
+    const tileRecord = await fetchOsmStreamingTile(request.z, request.x, request.y, { signal: request.signal });
     if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
     if (appCtx.terrainEnabled && typeof appCtx.waitForTerrainReadyBounds === 'function') {
       const terrainReady = await appCtx.waitForTerrainReadyBounds(expandGeographicBounds(request.bounds), 8000);
@@ -600,7 +602,7 @@ async function loadStreamingVectorChunk(request) {
     if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
     const buildingLimit = Number(request.priority) < 0.5 ? CENTER_BUILDING_FEATURES :
       Number(request.priority) < 1.5 ? ADJACENT_BUILDING_FEATURES : MAX_BUILDING_FEATURES;
-    await buildBuildings(tileRecord, chunk, { maxFeatures: buildingLimit, maxParts: buildingLimit * 3 });
+    await buildBuildings(tileRecord, chunk, { maxFeatures: buildingLimit, maxParts: buildingLimit });
     await yieldToRenderer();
     if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
     await buildStreamingLandcover(tileRecord, chunk, {
@@ -613,7 +615,8 @@ async function loadStreamingVectorChunk(request) {
       createProvenance: (layer, role) => createRenderProvenance({
         surfaceTile: chunk.surfaceTile,
         tileRecord,
-        provider: 'Overture Maps Foundation',
+        provider: 'OpenStreetMap contributors',
+        dataset: 'OSM Shortbread vector tiles',
         dataset: tileRecord.source,
         layer,
         role
@@ -687,7 +690,7 @@ function initStreamingVectorChunks() {
     radius: 1,
     maxActive: 20,
     profile: SOURCE_PROFILE.CONTINUOUS_GLOBAL,
-    sources: ['overture-transportation', 'overture-buildings', 'overture-base'],
+    sources: ['osm-shortbread'],
     loadChunk: loadStreamingVectorChunk,
     unloadChunk: disposeStreamingVectorChunk
   });

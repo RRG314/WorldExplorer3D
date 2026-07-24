@@ -106,11 +106,10 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
           const tileInfo = mesh.userData?.terrainTile;
           if (tileInfo && tileInfo.z === z && tileInfo.tx === x && tileInfo.ty === y) {
             deps.reapplyTerrainMeshHeights(mesh);
+            deps.scheduleRoadAndBuildingRebuild?.({ mesh, tile });
           }
         });
       }
-
-      deps.scheduleRoadAndBuildingRebuild?.();
       resolveReady(true);
     } catch (error) {
       console.warn("Terrain tile decode failed:", z, x, y, error);
@@ -568,19 +567,6 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
   const lonRange = bounds.lonE - bounds.lonW || 1;
   const latRadians = appCtx.LOC.lat * Math.PI / 180;
   const lonWorldScale = appCtx.SCALE * Math.cos(latRadians);
-  if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
-  const tileBounds = mesh.geometry.boundingBox;
-  const tileMinX = Number(tileBounds?.min?.x || 0) + mesh.position.x;
-  const tileMaxX = Number(tileBounds?.max?.x || 0) + mesh.position.x;
-  const tileMinZ = Number(tileBounds?.min?.z || 0) + mesh.position.z;
-  const tileMaxZ = Number(tileBounds?.max?.z || 0) + mesh.position.z;
-  const structureCuts = Array.isArray(appCtx.structureTerrainCuts)
-    ? appCtx.structureTerrainCuts.filter((cut) => cut?.bounds && !(
-      cut.bounds.maxX < tileMinX || cut.bounds.minX > tileMaxX ||
-      cut.bounds.maxZ < tileMinZ || cut.bounds.minZ > tileMaxZ
-    ))
-    : [];
-
   let minElevation = Infinity;
   let maxElevation = -Infinity;
   const elevations = new Float32Array(pos.count);
@@ -597,7 +583,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
     if (i % 16 === 0) elevationMetersSamples.push(meters);
     const baseY = meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
     const y = typeof deps.applyStructureTerrainCuts === "function"
-      ? deps.applyStructureTerrainCuts(wx, wz, baseY, structureCuts)
+      ? deps.applyStructureTerrainCuts(wx, wz, baseY)
       : baseY;
     elevations[i] = y;
     minElevation = Math.min(minElevation, y);
