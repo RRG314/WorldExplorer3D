@@ -10,6 +10,7 @@
 ### Verification
 
 - Made plane/interior lifecycle retention wait for deferred building detail, use precise forced-GC heap measurements across multiple warmed samples, and compare exact reachable scene resources instead of Three.js upload-history counters.
+- Made landscape mobile acceptance assert the Explore menu's actual open state and tutorial-card suppression instead of relying on an unrelated two-second polling window.
 
 ## [4.0.0] - 2026-07-22
 
