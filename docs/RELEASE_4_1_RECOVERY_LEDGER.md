@@ -136,11 +136,11 @@ checkpoint commit must be recreated as bounded tests in the owning phase.
 - [x] Create a clean recovery branch from reviewed `origin/main`.
 - [x] Classify both prototype path families.
 - [x] Classify test outcomes.
-- [ ] Recreate the five recovery fixtures as small, deterministic scenario
+- [x] Recreate the five recovery fixtures as small, deterministic scenario
       definitions without importing prototype runtime code.
 - [ ] Verify the deployed reference manifest and capture the supported product
       journeys using one browser session at a time.
-- [ ] Retire PR #41 as superseded.
+- [x] Retire PR #41 as superseded.
 - [ ] Confirm the recovery branch is clean and publish one draft Phase 0 PR.
 
 Phase 1 cannot begin until the remaining boxes are complete.
