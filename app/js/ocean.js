@@ -500,13 +500,14 @@ function updateSubmarine(dt) {
 
 function animateOceanMode(nowMs = 0) {
   if (!oceanMode.active) return;
+  if (document.hidden) {
+    oceanMode.animationId = null;
+    oceanMode.lastFrameMs = nowMs;
+    return;
+  }
   oceanMode.animationId = oceanSessionScope?.animationFrame(animateOceanMode) ?? null;
   if (oceanMode.animationId == null) {
     oceanMode.active = false;
-    return;
-  }
-  if (document.hidden) {
-    oceanMode.lastFrameMs = nowMs;
     return;
   }
 
@@ -534,6 +535,21 @@ function animateOceanMode(nowMs = 0) {
   oceanMode.renderer.render(oceanMode.scene, oceanMode.camera);
 }
 
+function bindOceanSessionVisibility(destinationScope) {
+  destinationScope.listen(document, 'visibilitychange', () => {
+    if (oceanSessionScope !== destinationScope || !oceanMode.active) return;
+    if (document.hidden) {
+      destinationScope.cancelAnimationFrame(oceanMode.animationId);
+      oceanMode.animationId = null;
+      oceanMode.lastFrameMs = performance.now();
+      return;
+    }
+    if (oceanMode.animationId == null) {
+      oceanMode.animationId = destinationScope.animationFrame(animateOceanMode);
+    }
+  });
+}
+
 function startOceanMode(options = {}) {
   if (oceanMode.active) return true;
   try {
@@ -543,6 +559,7 @@ function startOceanMode(options = {}) {
       throw new Error('Ocean destination commit was rejected.');
     }
     oceanSessionScope = transition.session.scope;
+    bindOceanSessionVisibility(oceanSessionScope);
 
     if (options.launchSite) {
       resetOceanLaunchSite(options.launchSite);
@@ -558,7 +575,9 @@ function startOceanMode(options = {}) {
     oceanMode.active = true;
     oceanMode.lastFrameMs = 0;
     oceanMode.weatherRefreshTimer = 0;
-    oceanMode.animationId = oceanSessionScope.animationFrame(animateOceanMode);
+    oceanMode.animationId = document.hidden
+      ? null
+      : oceanSessionScope.animationFrame(animateOceanMode);
     if (typeof appCtx.refreshAstronomicalSky === 'function') {
       appCtx.refreshAstronomicalSky(true);
     }

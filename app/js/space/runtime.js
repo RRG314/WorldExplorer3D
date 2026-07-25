@@ -482,13 +482,14 @@ export function updateSpaceFlightCamera() {
 export function animateSpaceFlight(deps = {}) {
   if (!appCtx.spaceFlight.active) return;
 
+  if (document.hidden) {
+    appCtx.spaceFlight.animationId = null;
+    appCtx.spaceFlight._lastFrameMs = performance.now();
+    return;
+  }
   appCtx.spaceFlight.animationId = deps.scheduleFrame?.(() => animateSpaceFlight(deps)) ?? null;
   if (appCtx.spaceFlight.animationId == null) {
     appCtx.spaceFlight.active = false;
-    return;
-  }
-  if (document.hidden) {
-    appCtx.spaceFlight._lastFrameMs = performance.now();
     return;
   }
 

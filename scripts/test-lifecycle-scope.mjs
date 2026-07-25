@@ -65,6 +65,14 @@ try {
   assert.equal(frameCalls, 1);
   assert.equal(completedScope.snapshot().resourceCount, 0);
 
+  const cancelledScope = createLifecycleScope('cancelled-frame');
+  const cancelledHandle = cancelledScope.animationFrame(() => {
+    frameCalls += 1;
+  });
+  assert.equal(cancelledScope.cancelAnimationFrame(cancelledHandle), true);
+  assert.equal(cancelledScope.cancelAnimationFrame(cancelledHandle), false);
+  assert.equal(cancelledScope.snapshot().resourceCount, 0);
+
   const idleScope = createLifecycleScope('idle-scope');
   let idleCalls = 0;
   idleScope.idle(() => {

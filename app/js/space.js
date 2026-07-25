@@ -69,6 +69,18 @@ function beginSpaceFlightSession(destinationScope) {
     spaceSessionScope.dispose('space-session-replaced');
   }
   spaceSessionScope = destinationScope;
+  destinationScope.listen(document, 'visibilitychange', () => {
+    if (spaceSessionScope !== destinationScope || !appCtx.spaceFlight.active) return;
+    if (document.hidden) {
+      destinationScope.cancelAnimationFrame(appCtx.spaceFlight.animationId);
+      appCtx.spaceFlight.animationId = null;
+      appCtx.spaceFlight._lastFrameMs = performance.now();
+      return;
+    }
+    if (appCtx.spaceFlight.animationId == null) {
+      appCtx.spaceFlight.animationId = destinationScope.animationFrame(animateSpaceFlight);
+    }
+  });
   appCtx.spaceFlight._sessionId = Number(appCtx.spaceFlight._sessionId || 0) + 1;
   appCtx.spaceFlight.overviewMode = false;
   return appCtx.spaceFlight._sessionId;

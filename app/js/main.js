@@ -173,16 +173,43 @@ function registerRuntimeSystems() {
 }
 
 function createSharedSceneScheduler({ destination }) {
+  let active = false;
+  let releaseVisibilityListener = null;
+
+  function syncVisibility() {
+    if (!active) return false;
+    if (document.hidden) {
+      runtimeKernel.stop(`${destination}:hidden`);
+      return false;
+    }
+    return runtimeKernel.start();
+  }
+
   return Object.freeze({
     start() {
       registerRuntimeSystems();
-      return runtimeKernel.start();
+      active = true;
+      if (!releaseVisibilityListener) {
+        const onVisibilityChange = () => syncVisibility();
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        releaseVisibilityListener = () => {
+          document.removeEventListener('visibilitychange', onVisibilityChange);
+          releaseVisibilityListener = null;
+        };
+      }
+      return syncVisibility();
     },
     stop(reason = 'destination-exit') {
+      active = false;
+      releaseVisibilityListener?.();
       return runtimeKernel.stop(`${destination}:${reason}`);
     },
     snapshot() {
-      return runtimeKernel.snapshot();
+      return {
+        ...runtimeKernel.snapshot(),
+        active,
+        visibilityBound: releaseVisibilityListener != null
+      };
     }
   });
 }
