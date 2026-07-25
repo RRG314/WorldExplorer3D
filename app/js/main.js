@@ -4,9 +4,11 @@ import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v
 import { registerDestinationScheduler } from './runtime/destination-schedulers.js';
 import { getFrameOwnershipSnapshot, registerFrameOwner } from './runtime/frame-ownership.js?v=1';
 import { createRuntimeKernel } from './runtime/kernel.js?v=1';
+import { getRuntimeProductPorts } from './session-coordinator.js?v=2';
 
 let perfPanelTimer = 0;
 let runtimeSystemsRegistered = false;
+const runtimeProductPorts = getRuntimeProductPorts();
 const OVERLAY_EDGE_MARGIN = 6;
 const OVERLAY_ANCHOR_GAP = 10;
 const DEFAULT_LOADING_BG = '../assets/landing/city.jpg';
@@ -110,9 +112,10 @@ const runtimeKernel = createRuntimeKernel({
   },
   onSystemError: ({ error, system }) => {
     console.error(`[runtime] System failed: ${system.id}`, error);
-    globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-system-error', {
-      detail: { system, message: error instanceof Error ? error.message : String(error) }
-    }));
+    runtimeProductPorts.tryCall('shell', 'reportRuntimeError', {
+      system,
+      message: error instanceof Error ? error.message : String(error)
+    });
   }
 });
 
@@ -138,7 +141,8 @@ function registerRuntimeSystems() {
   const systems = createCoreFrameSystems(appCtx, {
     isActivityCreatorOpen,
     isEditorWorkspaceOpen,
-    positionTopOverlays
+    positionTopOverlays,
+    updateInput: () => runtimeProductPorts.call('input', 'update')
   });
   systems.forEach((system) => runtimeKernel.registerSystem(system));
   runtimeKernel.registerSystem(createDebugPresentationSystem(appCtx));

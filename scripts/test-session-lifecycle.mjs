@@ -76,6 +76,7 @@ async function readLifecycleState(page, mode) {
       coordinator: ctx.getSessionCoordinatorDebugState?.(),
       diagnosticsLifecycle: ctx.getRuntimeDiagnosticsLifecycleSnapshot?.(),
       frameOwnership: ctx.getFrameOwnershipSnapshot?.(),
+      productPorts: ctx.getRuntimeProductPortsSnapshot?.(),
       canvases: {
         ocean: document.querySelectorAll('#oceanModeCanvas').length,
         space: document.querySelectorAll('#spaceFlightCanvas').length,
@@ -196,6 +197,11 @@ function assertPlateau(mode, cycles) {
     assert(
       exitedSession.scheduler?.running === true,
       `${mode} cycle ${index + 1} returned to Earth without starting its session scheduler`
+    );
+    assert(
+      cycle.active.productPorts?.ports?.length === 4 &&
+        cycle.active.productPorts.ports.every((port) => port.bound),
+      `${mode} cycle ${index + 1} did not boot all four runtime product ports`
     );
     assert(
       cycle.active.diagnosticsLifecycle?.resources?.interval === 1 &&

@@ -27,7 +27,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       phase: 'input',
       enabled: gameplayReady,
       update() {
-        appCtx.updateControlInput?.();
+        hooks.updateInput?.();
       }
     },
     {

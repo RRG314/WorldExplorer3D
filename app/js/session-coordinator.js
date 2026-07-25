@@ -2,18 +2,29 @@ import { ctx as appCtx } from './shared-context.js?v=55';
 import { ENV, getEnv, switchEnv } from './env.js?v=57';
 import { createAppRuntime } from './runtime/app-runtime.js';
 import { createDestinationScheduler } from './runtime/destination-schedulers.js';
+import { createProductPorts } from './runtime/product-ports.js';
 
 const validEnvironments = new Set(Object.values(ENV));
+const productPorts = createProductPorts();
 
 const runtime = createAppRuntime({
   getDestination: getEnv,
   isDestinationValid: (environment) => validEnvironments.has(environment),
   commitDestination: ({ target }) => getEnv() === target || switchEnv(target),
   createScheduler: createDestinationScheduler,
+  ports: productPorts,
   onEvent(event) {
-    globalThis.dispatchEvent?.(new CustomEvent('we3d:app-runtime', { detail: event }));
+    productPorts.tryCall('shell', 'publishRuntimeEvent', event);
   }
 });
+
+function bindRuntimeProductPort(name, adapter) {
+  return productPorts.bind(name, adapter);
+}
+
+function getRuntimeProductPorts() {
+  return productPorts;
+}
 
 function withLegacyContext(adapter) {
   const wrap = (method) => typeof adapter[method] === 'function'
@@ -72,24 +83,28 @@ function getSessionCoordinatorDebugState() {
 }
 
 Object.assign(appCtx, {
+  bindRuntimeProductPort,
   beginEnvironmentTransition,
   cancelEnvironmentTransition,
   commitEnvironment,
   exitCurrentEnvironmentSync,
   finishEnvironmentTransition,
   getSessionCoordinatorDebugState,
+  getRuntimeProductPortsSnapshot: () => productPorts.snapshot(),
   isEnvironmentTransitionCurrent,
   registerEnvironmentLifecycle,
   transitionEnvironment
 });
 
 export {
+  bindRuntimeProductPort,
   beginEnvironmentTransition,
   cancelEnvironmentTransition,
   commitEnvironment,
   exitCurrentEnvironmentSync,
   finishEnvironmentTransition,
   getSessionCoordinatorDebugState,
+  getRuntimeProductPorts,
   isEnvironmentTransitionCurrent,
   registerEnvironmentLifecycle,
   transitionEnvironment

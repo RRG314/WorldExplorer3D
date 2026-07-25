@@ -11,12 +11,18 @@ import './state.js?v=60';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
 import './location-session.js?v=3';
-import './controls/action-input.js?v=4';
+import {
+    getControlInputSnapshot,
+    updateControlInput
+} from './controls/action-input.js?v=4';
 import './transport/actor-contract.js?v=2';
 import './world/collection-registry.js?v=1';
 import './perf.js?v=57';
 import './env.js?v=57';
-import './session-coordinator.js?v=2';
+import {
+    bindRuntimeProductPort,
+    getRuntimeProductPorts
+} from './session-coordinator.js?v=2';
 import './real-estate.js?v=55';
 import './ground.js?v=70';
 import './terrain.js?v=150';
@@ -67,11 +73,71 @@ let _editorWarmupScheduled = false;
 let _activityDiscoveryWarmupScheduled = false;
 let _analyticsWarmupScheduled = false;
 let _platformServicesRegistered = false;
+let _runtimeProductPortsBound = false;
 const platformServices = createPlatformServiceRegistry({
     onEvent(event) {
         globalThis.dispatchEvent?.(new CustomEvent('we3d:platform-service', { detail: event }));
     }
 });
+const runtimeProductPorts = getRuntimeProductPorts();
+
+function bindRuntimeProductPorts() {
+    if (_runtimeProductPortsBound) return;
+    _runtimeProductPortsBound = true;
+    bindRuntimeProductPort('shell', {
+        publishRuntimeEvent(event) {
+            globalThis.dispatchEvent?.(new CustomEvent('we3d:app-runtime', { detail: event }));
+        },
+        reportRuntimeError(detail) {
+            globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-system-error', { detail }));
+        },
+        setRuntimeReady(ready) {
+            const isReady = ready === true;
+            appCtx.runtimeReady = isReady;
+            globalThis.__WE3D_RUNTIME_READY__ = isReady;
+            const startButton = document.getElementById('startBtn');
+            if (startButton) {
+                startButton.disabled = !isReady;
+                startButton.setAttribute('aria-busy', isReady ? 'false' : 'true');
+            }
+            if (isReady) globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-ready'));
+            return isReady;
+        }
+    });
+    bindRuntimeProductPort('input', {
+        snapshot: getControlInputSnapshot,
+        update: updateControlInput
+    });
+    bindRuntimeProductPort('persistence', {
+        async capture(destination = appCtx.getEnv?.()) {
+            if (destination !== appCtx.ENV?.EARTH) return null;
+            const module = await import('./earth-session.js?v=20');
+            return module.captureEarthWorldSession();
+        },
+        async restore(destination = appCtx.getEnv?.(), options = {}) {
+            if (destination !== appCtx.ENV?.EARTH) return false;
+            const module = await import('./earth-session.js?v=20');
+            return module.resumeEarthWorldSession(options);
+        },
+        snapshot() {
+            return {
+                destination: appCtx.getEnv?.() || null,
+                earthLoaded: Array.isArray(appCtx.roads) && appCtx.roads.length > 0,
+                selection: String(appCtx.selLoc || '')
+            };
+        }
+    });
+    bindRuntimeProductPort('multiplayer', {
+        ensureReady: ensureMultiplayerPlatformReady,
+        snapshot() {
+            return {
+                service: platformServices.snapshot().services
+                    .find((service) => service.id === 'multiplayer') || null,
+                room: platformServices.peek('multiplayer')?.getCurrentRoom?.() || null
+            };
+        }
+    });
+}
 
 function scheduleIdleTask(task, timeout = 1200) {
     if (typeof task !== 'function') return;
@@ -477,8 +543,8 @@ function bootApp() {
         return { tryEnablePostProcessing };
     }
 
-    appCtx.runtimeReady = false;
-    globalThis.__WE3D_RUNTIME_READY__ = false;
+    bindRuntimeProductPorts();
+    runtimeProductPorts.call('shell', 'setRuntimeReady', false);
 
     const runBootStep = (label, action) => {
         console.log(`[boot] step:start:${label}`);
@@ -501,14 +567,7 @@ function bootApp() {
     runBootStep('startMultiplayerAfterAuthReady', () => startMultiplayerAfterAuthReady());
     runBootStep('renderLoop', () => renderLoop());
     runBootStep('markRuntimeReady', () => {
-        appCtx.runtimeReady = true;
-        globalThis.__WE3D_RUNTIME_READY__ = true;
-        const startButton = document.getElementById('startBtn');
-        if (startButton) {
-            startButton.disabled = false;
-            startButton.setAttribute('aria-busy', 'false');
-        }
-        globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-ready'));
+        runtimeProductPorts.call('shell', 'setRuntimeReady', true);
     });
     runBootStep('scheduleAnalyticsWarmup', () => scheduleAnalyticsWarmup(2800));
     _booted = true;

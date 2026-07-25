@@ -16,7 +16,8 @@ const RUNTIME_DOMAIN_MODULES = new Set([
   'runtime/destination-session.js',
   'runtime/destination-schedulers.js',
   'runtime/kernel.js',
-  'runtime/lifecycle-scope.js'
+  'runtime/lifecycle-scope.js',
+  'runtime/product-ports.js'
 ]);
 const WORLD_COLLECTIONS = [
   'roads', 'roadMeshes', 'urbanSurfaceMeshes', 'buildings', 'buildingMeshes',

@@ -10,6 +10,7 @@ function createAppRuntime(options = {}) {
   const commitDestination = options.commitDestination;
   const isDestinationValid = options.isDestinationValid;
   const createScheduler = options.createScheduler;
+  const ports = options.ports || null;
   const onEvent = typeof options.onEvent === 'function' ? options.onEvent : null;
   const now = typeof options.now === 'function' ? options.now : defaultNow;
 
@@ -210,6 +211,7 @@ function createAppRuntime(options = {}) {
     const fromAdapter = adapters.get(token.from);
     const targetAdapter = adapters.get(target);
     const baseContext = {
+      ports,
       signal: token.signal,
       scope: token.scope,
       session: token.session,
