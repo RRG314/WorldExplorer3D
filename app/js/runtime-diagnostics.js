@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { diagnoseRuntimeBudgets } from "./runtime/budget-diagnostics.js?v=1";
-import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
+import { createLifecycleScope } from './runtime/lifecycle-scope.js';
 
 function numberOrNull(value) {
   return Number.isFinite(value) ? Number(value) : null;

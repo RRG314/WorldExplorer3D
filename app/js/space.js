@@ -5,7 +5,7 @@ import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=13";
 import { createSpaceFlightScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=16";
 import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=4";
-import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
+import { createLifecycleScope } from './runtime/lifecycle-scope.js';
 import { registerFrameOwner } from './runtime/frame-ownership.js?v=1';
 import {
   beginEnvironmentTransition,
