@@ -1,5 +1,11 @@
 # World Explorer 3D Production Roadmap
 
+> The ordered 4.1 implementation authority is
+> [`docs/RELEASE_4_1_RECOVERY_PLAN.md`](docs/RELEASE_4_1_RECOVERY_PLAN.md).
+> Its preservation and classification status is recorded in
+> [`docs/RELEASE_4_1_RECOVERY_LEDGER.md`](docs/RELEASE_4_1_RECOVERY_LEDGER.md).
+> This broader roadmap cannot be used to skip a 4.1 phase gate.
+
 Last reviewed: 2026-07-23.
 
 This is the repository's governing technical roadmap after version 4.0.0. It
