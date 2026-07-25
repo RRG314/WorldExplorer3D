@@ -128,6 +128,10 @@ Fixture images and bulky generated reports remain outside the repository.
 Their source scenario, coordinates, travel mode, expected invariant, and
 checkpoint commit must be recreated as bounded tests in the owning phase.
 
+The verified production identity, observed title and Baltimore journeys, and
+complete parity inventory are recorded in
+[RELEASE_4_1_DEPLOYED_REFERENCE.md](RELEASE_4_1_DEPLOYED_REFERENCE.md).
+
 ## Phase 0 remaining work
 
 - [x] Preserve the integration prototype.
@@ -138,7 +142,7 @@ checkpoint commit must be recreated as bounded tests in the owning phase.
 - [x] Classify test outcomes.
 - [x] Recreate the five recovery fixtures as small, deterministic scenario
       definitions without importing prototype runtime code.
-- [ ] Verify the deployed reference manifest and capture the supported product
+- [x] Verify the deployed reference manifest and capture the supported product
       journeys using one browser session at a time.
 - [x] Retire PR #41 as superseded.
 - [ ] Confirm the recovery branch is clean and publish one draft Phase 0 PR.
