@@ -1,6 +1,7 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { ENV, getEnv, switchEnv } from './env.js?v=57';
 import { createAppRuntime } from './runtime/app-runtime.js';
+import { createDestinationScheduler } from './runtime/destination-schedulers.js';
 
 const validEnvironments = new Set(Object.values(ENV));
 
@@ -8,6 +9,7 @@ const runtime = createAppRuntime({
   getDestination: getEnv,
   isDestinationValid: (environment) => validEnvironments.has(environment),
   commitDestination: ({ target }) => getEnv() === target || switchEnv(target),
+  createScheduler: createDestinationScheduler,
   onEvent(event) {
     globalThis.dispatchEvent?.(new CustomEvent('we3d:app-runtime', { detail: event }));
   }

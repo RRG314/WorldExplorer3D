@@ -158,9 +158,9 @@ function createAppRuntime(options = {}) {
       }
 
       const previousSession = activeSession;
+      previousSession?.dispose(`destination-changed:${target}`, now());
       activeSession = token.session;
       token.session.activate(now());
-      previousSession?.dispose(`destination-changed:${target}`, now());
     } else {
       token.session.dispose('destination-already-active', now());
     }

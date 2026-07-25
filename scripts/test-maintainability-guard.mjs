@@ -14,6 +14,7 @@ const APP_ENTRY_STATIC_IMPORT_BUDGET = 58;
 const RUNTIME_DOMAIN_MODULES = new Set([
   'runtime/app-runtime.js',
   'runtime/destination-session.js',
+  'runtime/destination-schedulers.js',
   'runtime/kernel.js',
   'runtime/lifecycle-scope.js'
 ]);

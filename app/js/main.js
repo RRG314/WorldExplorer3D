@@ -1,6 +1,7 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=4';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=1';
+import { registerDestinationScheduler } from './runtime/destination-schedulers.js';
 import { getFrameOwnershipSnapshot, registerFrameOwner } from './runtime/frame-ownership.js?v=1';
 import { createRuntimeKernel } from './runtime/kernel.js?v=1';
 
@@ -168,9 +169,40 @@ function registerRuntimeSystems() {
   });
 }
 
+function createSharedSceneScheduler({ destination }) {
+  return Object.freeze({
+    start() {
+      registerRuntimeSystems();
+      return runtimeKernel.start();
+    },
+    stop(reason = 'destination-exit') {
+      return runtimeKernel.stop(`${destination}:${reason}`);
+    },
+    snapshot() {
+      return runtimeKernel.snapshot();
+    }
+  });
+}
+
+[
+  appCtx.ENV?.EARTH,
+  appCtx.ENV?.MOON,
+  appCtx.ENV?.MARS
+].filter(Boolean).forEach((destination) => {
+  registerDestinationScheduler(destination, createSharedSceneScheduler);
+});
+
 function renderLoop() {
   registerRuntimeSystems();
-  return runtimeKernel.start();
+  const destination = appCtx.getEnv?.();
+  if (
+    destination === appCtx.ENV?.EARTH ||
+    destination === appCtx.ENV?.MOON ||
+    destination === appCtx.ENV?.MARS
+  ) {
+    return runtimeKernel.start();
+  }
+  return true;
 }
 
 function warmNearbyWorldRenderResources(radius = Number.POSITIVE_INFINITY) {

@@ -6,6 +6,7 @@ let destination = null;
 const events = [];
 const lifecycle = [];
 const schedulers = [];
+const schedulerLifecycle = [];
 
 function createScheduler({ destination: target, generation }) {
   const state = {
@@ -18,10 +19,12 @@ function createScheduler({ destination: target, generation }) {
   return {
     start() {
       state.starts++;
+      schedulerLifecycle.push(`start:${target}:${generation}`);
       return true;
     },
     dispose() {
       state.disposals++;
+      schedulerLifecycle.push(`dispose:${target}:${generation}`);
       return true;
     },
     snapshot() {
@@ -73,6 +76,11 @@ assert.equal(runtime.commit('SPACE', { token: spaceToken }), true);
 assert.equal(destination, 'SPACE');
 assert.equal(schedulers[0].disposals, 1);
 assert.equal(schedulers[2].starts, 1);
+assert.ok(
+  schedulerLifecycle.indexOf('dispose:EARTH:1') <
+    schedulerLifecycle.indexOf('start:SPACE:3'),
+  'Previous destination scheduler must stop before the next scheduler starts.'
+);
 snapshot = runtime.snapshot();
 assert.equal(snapshot.activeSession.destination, 'SPACE');
 assert.equal(snapshot.transition, null);
@@ -143,6 +151,7 @@ assert.ok(events.some((event) => event.type === 'destination-committed'));
 console.log(JSON.stringify({
   ok: true,
   events: events.map((event) => event.type),
+  schedulerLifecycle,
   schedulers,
   lifecycle
 }, null, 2));

@@ -182,8 +182,20 @@ function assertPlateau(mode, cycles) {
       `${mode} cycle ${index + 1} was not registered as the active environment renderer`
     );
     assert(
+      !cycle.active.frameOwnership?.scheduled?.includes('earth.runtime-kernel'),
+      `${mode} cycle ${index + 1} left the shared Earth/Moon/Mars kernel scheduled`
+    );
+    assert(
       !cycle.exited.frameOwnership?.active?.includes(expectedFrameOwner),
       `${mode} cycle ${index + 1} retained frame ownership after exit`
+    );
+    assert(
+      cycle.exited.frameOwnership?.active?.includes('earth.runtime-kernel'),
+      `${mode} cycle ${index + 1} did not return frame ownership to the shared scene kernel`
+    );
+    assert(
+      exitedSession.scheduler?.running === true,
+      `${mode} cycle ${index + 1} returned to Earth without starting its session scheduler`
     );
     assert(
       cycle.active.diagnosticsLifecycle?.resources?.interval === 1 &&
