@@ -5,11 +5,9 @@ import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=13";
 import { createSpaceFlightScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=16";
 import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=4";
-import { registerFrameOwner } from './runtime/frame-ownership.js?v=1';
 import {
   beginEnvironmentTransition,
-  commitEnvironment,
-  registerEnvironmentLifecycle
+  commitEnvironment
 } from './session-coordinator.js?v=2';
 
 function emitTutorialEvent(eventName, payload = {}) {
@@ -49,7 +47,7 @@ appCtx.spaceFlight = {
   _sessionId: 0
 };
 
-registerFrameOwner({
+const spaceFrameOwnerDefinition = Object.freeze({
   id: 'space.flight-renderer',
   label: 'Space flight renderer',
   kind: 'continuous-renderer',
@@ -310,7 +308,7 @@ function exitSpaceFlight(source = 'runtime') {
   if (appCtx.spaceFlight._gravityVec) appCtx.spaceFlight._gravityVec.set(0, 0, 0);
 }
 
-registerEnvironmentLifecycle(appCtx.ENV.SPACE_FLIGHT, {
+const spaceDestinationAdapter = Object.freeze({
   exitSync: ({ source } = {}) => {
     if (appCtx.spaceFlight.active) exitSpaceFlight(source || 'environment_transition');
   },
@@ -333,6 +331,10 @@ function initSpaceFlightWhenReady() {
   }
 }
 
+function initSpaceFlightModule() {
+  initSpaceFlightWhenReady();
+}
+
 Object.assign(appCtx, {
   animateSpaceFlight,
   exitSpaceFlight,
@@ -348,14 +350,11 @@ export {
   animateSpaceFlight,
   exitSpaceFlight,
   forceSpaceFlightLanding,
+  initSpaceFlightModule,
   setSpaceFlightLandingTarget,
+  spaceDestinationAdapter,
+  spaceFrameOwnerDefinition,
   startSpaceFlightToEarth,
   startSpaceFlightToMars,
   startSpaceFlightToMoon
 };
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initSpaceFlightWhenReady);
-} else {
-  initSpaceFlightWhenReady();
-}

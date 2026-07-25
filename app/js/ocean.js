@@ -22,10 +22,8 @@ import { updateOceanHud as updateOceanHudView } from "./ocean/hud.js?v=2";
 import {
   beginEnvironmentTransition,
   commitEnvironment,
-  exitCurrentEnvironmentSync,
-  registerEnvironmentLifecycle
+  exitCurrentEnvironmentSync
 } from './session-coordinator.js?v=2';
-import { registerFrameOwner } from './runtime/frame-ownership.js?v=1';
 
 const OCEAN_SITE = Object.freeze({
   name: 'Coral Shelf Reserve',
@@ -100,7 +98,7 @@ Object.assign(oceanMode, {
   }
 });
 
-registerFrameOwner({
+const oceanFrameOwnerDefinition = Object.freeze({
   id: 'ocean.mode-renderer',
   label: 'Ocean mode renderer',
   kind: 'continuous-renderer',
@@ -648,7 +646,7 @@ function stopOceanMode(options = {}) {
   return wasActive;
 }
 
-registerEnvironmentLifecycle(appCtx.ENV.OCEAN, {
+const oceanDestinationAdapter = Object.freeze({
   exitSync: () => stopOceanMode({ commitEnvironment: false }),
   snapshot: () => ({
     active: !!oceanMode.active,
@@ -717,14 +715,15 @@ Object.assign(appCtx, {
   getOceanModeDebugState
 });
 
-export { animateOceanMode, startOceanMode, stopOceanMode };
+export {
+  animateOceanMode,
+  initOceanModeUI,
+  oceanDestinationAdapter,
+  oceanFrameOwnerDefinition,
+  startOceanMode,
+  stopOceanMode
+};
 
 if (typeof globalThis !== 'undefined') {
   globalThis.getOceanModeDebugState = getOceanModeDebugState;
-}
-
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initOceanModeUI);
-} else {
-  initOceanModeUI();
 }

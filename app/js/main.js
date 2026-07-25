@@ -1,8 +1,7 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=4';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=1';
-import { registerDestinationScheduler } from './runtime/destination-schedulers.js';
-import { getFrameOwnershipSnapshot, registerFrameOwner } from './runtime/frame-ownership.js?v=1';
+import { getFrameOwnershipSnapshot } from './runtime/frame-ownership.js?v=1';
 import { createRuntimeKernel } from './runtime/kernel.js?v=1';
 import { getRuntimeProductPorts } from './session-coordinator.js?v=2';
 
@@ -119,7 +118,7 @@ const runtimeKernel = createRuntimeKernel({
   }
 });
 
-registerFrameOwner({
+const earthFrameOwnerDefinition = Object.freeze({
   id: 'earth.runtime-kernel',
   label: 'Earth runtime kernel',
   kind: 'continuous-renderer',
@@ -187,14 +186,6 @@ function createSharedSceneScheduler({ destination }) {
     }
   });
 }
-
-[
-  appCtx.ENV?.EARTH,
-  appCtx.ENV?.MOON,
-  appCtx.ENV?.MARS
-].filter(Boolean).forEach((destination) => {
-  registerDestinationScheduler(destination, createSharedSceneScheduler);
-});
 
 function renderLoop() {
   registerRuntimeSystems();
@@ -365,6 +356,8 @@ Object.assign(appCtx, {
 });
 
 export {
+  createSharedSceneScheduler,
+  earthFrameOwnerDefinition,
   hideLoad,
   positionTopOverlays,
   registerRuntimeSystem,

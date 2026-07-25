@@ -41,24 +41,20 @@ import './walking.js?v=71';
 import './travel-mode.js?v=12';
 import { initBoatMode } from './boat-mode.js?v=36';
 import { setupFishingGame } from './fishing-game.js?v=2';
-import './sky.js?v=83';
 import './weather.js?v=6';
 import './live-earth/controller.js?v=21';
 import './solar-system.js?v=72';
-import './space.js?v=94';
 import './planetary/scene-ownership.js?v=11';
 import './planetary/vehicles.js?v=3';
 import './planetary/astronaut.js?v=1';
 import './planetary/sky-orientation.js?v=9';
 import './planetary/moon-sky.js?v=1';
-import './planetary/mars-world.js?v=17';
 import './planetary/tracks.js?v=1';
-import './ocean.js?v=7';
 import './game.js?v=58';
 import './input.js?v=61';
 import './hud.js?v=76';
 import './map.js?v=60';
-import { renderLoop } from './main.js?v=77';
+import { composeRuntimeOwnership, renderLoop } from './runtime-composition.js';
 import './memory.js?v=56';
 import './blocks.js?v=63';
 import './block-builder/ui.js?v=3';
@@ -544,6 +540,7 @@ function bootApp() {
     }
 
     bindRuntimeProductPorts();
+    composeRuntimeOwnership();
     runtimeProductPorts.call('shell', 'setRuntimeReady', false);
 
     const runBootStep = (label, action) => {

@@ -22,8 +22,7 @@ import { createMoonSurface as createMoonSurfaceRuntime } from "./sky/moon-surfac
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
 import {
   commitEnvironment,
-  exitCurrentEnvironmentSync,
-  registerEnvironmentLifecycle
+  exitCurrentEnvironmentSync
 } from './session-coordinator.js?v=2';
 // ============================================================================
 // sky.js - Time of day, starfield, constellations, moon system
@@ -435,7 +434,7 @@ function suspendMoonEnvironment() {
   });
 }
 
-registerEnvironmentLifecycle(appCtx.ENV.MOON, {
+const moonDestinationAdapter = Object.freeze({
   exitSync: suspendMoonEnvironment,
   snapshot: () => ({
     active: appCtx.getEnv?.() === appCtx.ENV.MOON,
@@ -488,6 +487,7 @@ export {
   highlightConstellation,
   inspectAstronomicalSkyState,
   getAstronomicalSkySnapshot,
+  moonDestinationAdapter,
   positionCarOnMoon,
   refreshAstronomicalSky,
   returnToEarth,

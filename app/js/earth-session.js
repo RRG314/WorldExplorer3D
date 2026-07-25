@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { currentActorWorldPosition } from "./earth-location.js?v=2";
-import { commitEnvironment, registerEnvironmentLifecycle } from './session-coordinator.js?v=2';
+import { commitEnvironment } from './session-coordinator.js?v=2';
 
 const REUSE_EXISTING_EARTH_WORLD = true;
 
@@ -370,7 +370,7 @@ export async function resumeEarthWorldSession(options = {}) {
   }
 }
 
-registerEnvironmentLifecycle(appCtx.ENV.EARTH, {
+export const earthDestinationAdapter = Object.freeze({
   exitSync: () => captureEarthWorldSession(),
   snapshot: () => ({
     active: appCtx.getEnv?.() === appCtx.ENV.EARTH,
