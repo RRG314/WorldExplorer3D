@@ -145,6 +145,7 @@ complete parity inventory are recorded in
 - [x] Verify the deployed reference manifest and capture the supported product
       journeys using one browser session at a time.
 - [x] Retire PR #41 as superseded.
-- [ ] Confirm the recovery branch is clean and publish one draft Phase 0 PR.
+- [x] Confirm the recovery branch is clean and publish one draft Phase 0 PR
+      ([#42](https://github.com/RRG314/WorldExplorer3D/pull/42)).
 
 Phase 1 cannot begin until the remaining boxes are complete.
