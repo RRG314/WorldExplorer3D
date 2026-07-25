@@ -19,7 +19,10 @@ const LEADERBOARD_LIMIT = 10;
 const FLOWER_MIN_DISTANCE = 120;
 const FLOWER_MAX_DISTANCE = 2600;
 
-const FIREBASE_STORE_MODULE = 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+const FIREBASE_STORE_MODULE = new URL(
+  './platform/firebase/firestore.js',
+  import.meta.url
+).toString();
 
 const challengeState = {
   active: false,

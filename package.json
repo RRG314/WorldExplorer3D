@@ -117,10 +117,12 @@
   "homepage": "https://worldexplorer3d.io",
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.1",
-    "firebase": "^12.16.0",
+    "firebase": "12.16.0",
     "playwright": "^1.61.0"
   },
   "dependencies": {
+    "pmtiles": "4.4.1",
+    "satellite.js": "5.0.0",
     "three": "0.128.0"
   }
 }

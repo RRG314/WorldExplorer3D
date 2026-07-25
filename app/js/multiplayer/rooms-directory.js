@@ -10,7 +10,7 @@ import {
   serverTimestamp,
   setDoc,
   where
-} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+} from '../platform/firebase/firestore.js';
 
 function createMultiplayerRoomsDirectoryApi(context) {
   const {

@@ -10,7 +10,7 @@ import {
   signInWithRedirect,
   signOut,
   updateProfile
-} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
+} from '../app/js/platform/firebase/auth.js';
 import { initFirebase } from './firebase-init.js';
 
 const provider = new GoogleAuthProvider();

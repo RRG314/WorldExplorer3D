@@ -31,7 +31,11 @@ function overtureThemeArchiveUrl(theme) {
 
 async function getPmtilesLibrary() {
   if (!pmtilesLibPromise) {
-    pmtilesLibPromise = import('https://cdn.jsdelivr.net/npm/pmtiles@4.4.1/+esm')
+    const moduleUrl = new URL(
+      '../../vendor/pmtiles-4.4.1/index.js',
+      import.meta.url
+    ).toString();
+    pmtilesLibPromise = import(moduleUrl)
       .catch((error) => {
         pmtilesLibPromise = null;
         throw error;

@@ -5,7 +5,7 @@ import {
   onSnapshot,
   serverTimestamp,
   setDoc
-} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+} from '../app/js/platform/firebase/firestore.js';
 import { initFirebase } from './firebase-init.js';
 
 const USERS_COLLECTION = 'users';

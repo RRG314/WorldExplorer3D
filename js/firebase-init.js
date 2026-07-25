@@ -1,6 +1,6 @@
-import { getApp, getApps, initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-app.js';
-import { getAuth } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-auth.js';
-import { getFirestore } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+import { getApp, getApps, initializeApp } from '../app/js/platform/firebase/app.js';
+import { getAuth } from '../app/js/platform/firebase/auth.js';
+import { getFirestore } from '../app/js/platform/firebase/firestore.js';
 
 const FIREBASE_CONFIG_STORAGE_KEY = 'worldExplorer3D.firebaseConfig';
 
@@ -74,7 +74,7 @@ export async function initFirebaseAnalytics() {
     }
 
     try {
-      const analyticsMod = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-analytics.js');
+      const analyticsMod = await import('../app/js/platform/firebase/analytics.js');
       const supported = typeof analyticsMod.isSupported === 'function'
         ? await analyticsMod.isSupported().catch(() => false)
         : false;
