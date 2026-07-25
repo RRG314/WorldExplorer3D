@@ -1,4 +1,5 @@
 import { classifyStructureSemantics } from '../structure-semantics/classification.js';
+import { createRoadNameResolver } from './streaming-road-labels.js';
 import { createWorldTile, deepFreeze } from './world-tile-contract.js';
 import { adaptShortbreadTransportTile } from './shortbread-tile-adapter.js';
 
@@ -213,6 +214,7 @@ function accessContract(tags, classification) {
 
 function compileTransportRecords(options = {}) {
   const { address, features, project } = options;
+  const resolveName = typeof options.resolveName === 'function' ? options.resolveName : () => '';
   if (!address?.key || typeof project !== 'function' || !Array.isArray(features)) {
     throw new TypeError('Transport compilation requires a tile address, feature array, and projection function.');
   }
@@ -243,7 +245,7 @@ function compileTransportRecords(options = {}) {
         },
         featureKind: classification.featureKind,
         subtype: classification.subtype,
-        name: String(tags.name || tags.ref || '').trim(),
+        name: String(tags.name || tags.ref || resolveName(points, classification.subtype, feature) || '').trim(),
         tags,
         geometry: {
           type: 'polyline',
@@ -276,7 +278,8 @@ function compileShortbreadTransportTile(options = {}) {
     key: `${tileRecord?.z}/${tileRecord?.x}/${tileRecord?.y}`
   };
   const features = adaptShortbreadTransportTile(tileRecord);
-  const transport = compileTransportRecords({ address, features, project });
+  const resolveName = createRoadNameResolver(tileRecord, (coordinates) => localPoints(coordinates, project));
+  const transport = compileTransportRecords({ address, features, project, resolveName });
   return createWorldTile({
     address,
     generation,

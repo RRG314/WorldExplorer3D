@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  selectCanonicalTransportRecords,
   selectBuildingFeatures,
   selectTransportationFeatures
 } from '../app/js/world/streaming-feature-budget.js';
@@ -62,6 +63,29 @@ assert.deepEqual(
   'Transportation selection is not deterministic.'
 );
 
+const canonicalTransportation = transportation.map((entry, index) => {
+  const geojson = entry.toGeoJSON();
+  const kind = geojson.properties.kind;
+  return Object.freeze({
+    id: `canonical-${entry.id}`,
+    featureKind: kind === 'cycleway' ? 'cycleway' : kind === 'footway' ? 'footway' : 'road',
+    subtype: kind,
+    name: entry.id === 'late-primary' ? 'Priority Road' : '',
+    geometry: { points: [{ x: index, z: 0 }, { x: index + 1, z: 1 }] },
+    structure: { gradeSeparated: false }
+  });
+});
+const canonicalSelection = selectCanonicalTransportRecords(canonicalTransportation, 100);
+assert.equal(canonicalSelection.selected, 100);
+assert.ok(canonicalSelection.records.some((record) => record.id === 'canonical-late-primary'));
+assert.ok(canonicalSelection.records.some((record) => record.featureKind === 'footway'));
+assert.ok(canonicalSelection.records.some((record) => record.featureKind === 'cycleway'));
+assert.deepEqual(
+  canonicalSelection.records.map((record) => record.id),
+  selectCanonicalTransportRecords(canonicalTransportation, 100).records.map((record) => record.id),
+  'Canonical transportation selection is not deterministic.'
+);
+
 const buildings = [];
 for (let y = 0; y < 10; y += 1) {
   for (let x = 0; x < 10; x += 1) {
@@ -75,9 +99,24 @@ assert.ok(Number(buildingSelection.populatedCells) >= 32, 'Building grid did not
 assert.ok(new Set(selectedBuildings.map((id) => id.split('-')[1])).size >= 6, 'Selected buildings do not span the tile width.');
 assert.ok(new Set(selectedBuildings.map((id) => id.split('-')[2])).size >= 6, 'Selected buildings do not span the tile height.');
 
+let decodedWithTileCoordinates = null;
+selectBuildingFeatures(layer([{
+  id: 'tile-aware',
+  toGeoJSON(x, y, z) {
+    decodedWithTileCoordinates = { x, y, z };
+    return buildingFeature('tile-aware', 0, 0).toGeoJSON();
+  }
+}]), 1, { x: 4705, y: 6244, z: 14 });
+assert.deepEqual(decodedWithTileCoordinates, { x: 4705, y: 6244, z: 14 });
+
 console.log(JSON.stringify({
   ok: true,
   transportation: transportationSelection,
+  canonicalTransportation: {
+    requested: canonicalSelection.requested,
+    selected: canonicalSelection.selected,
+    classes: canonicalSelection.classes
+  },
   buildings: {
     requested: buildingSelection.requested,
     selected: buildingSelection.selected,

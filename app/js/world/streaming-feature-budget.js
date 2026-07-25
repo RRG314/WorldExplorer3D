@@ -17,13 +17,17 @@ function geometryCoordinates(geometry, output = []) {
   return output;
 }
 
-function featureEntries(layer) {
+function featureEntries(layer, tileCoordinates = null) {
   const count = Math.max(0, Number(layer?.length) || 0);
+  const hasTileCoordinates = [tileCoordinates?.x, tileCoordinates?.y, tileCoordinates?.z]
+    .every((value) => Number.isFinite(Number(value)));
   const entries = [];
   for (let index = 0; index < count; index += 1) {
     const feature = layer.feature(index);
     if (!feature || typeof feature.toGeoJSON !== 'function') continue;
-    const geojson = feature.toGeoJSON();
+    const geojson = hasTileCoordinates
+      ? feature.toGeoJSON(Number(tileCoordinates.x), Number(tileCoordinates.y), Number(tileCoordinates.z))
+      : feature.toGeoJSON();
     entries.push({
       feature: { id: feature.id, toGeoJSON: () => geojson },
       geojson,
@@ -88,8 +92,8 @@ function takeBalanced(groups, limit, ratios) {
   return selected.slice(0, limit);
 }
 
-export function selectTransportationFeatures(layer, maxFeatures) {
-  const entries = featureEntries(layer);
+export function selectTransportationFeatures(layer, maxFeatures, tileCoordinates = null) {
+  const entries = featureEntries(layer, tileCoordinates);
   const limit = Math.max(1, Math.round(Number(maxFeatures) || entries.length || 1));
   if (entries.length <= limit) return { layer: adaptedLayer(entries), requested: entries.length, selected: entries.length };
   const groups = { road: [], pedestrian: [], cycleway: [] };
@@ -99,6 +103,65 @@ export function selectTransportationFeatures(layer, maxFeatures) {
     layer: adaptedLayer(selected),
     requested: entries.length,
     selected: selected.length,
+    classes: Object.fromEntries(Object.entries(groups).map(([name, group]) => [name, group.length]))
+  };
+}
+
+function canonicalTransportImportance(record) {
+  const kind = String(record?.subtype || '').toLowerCase();
+  const rank = [
+    ['motorway', 1000], ['trunk', 950], ['primary', 900], ['secondary', 820],
+    ['tertiary', 740], ['residential', 650], ['unclassified', 590],
+    ['living_street', 560], ['service', 470], ['cycle', 380],
+    ['pedestrian', 330], ['footway', 300], ['path', 260], ['track', 220], ['steps', 160]
+  ].find(([pattern]) => kind.includes(pattern))?.[1] || 400;
+  const pointCount = Number(record?.geometry?.points?.length) || 0;
+  return rank + Math.min(120, pointCount * 2) + (record?.name ? 35 : 0) +
+    (record?.structure?.gradeSeparated ? 90 : 0);
+}
+
+function canonicalTransportClass(record) {
+  if (record?.featureKind === 'cycleway') return 'cycleway';
+  if (record?.featureKind === 'road') return 'road';
+  return 'pedestrian';
+}
+
+export function selectCanonicalTransportRecords(records, maxFeatures) {
+  const entries = (Array.isArray(records) ? records : [])
+    .filter((record) => record?.featureKind !== 'railway')
+    .map((record) => ({
+      id: String(record.id),
+      record,
+      score: canonicalTransportImportance(record)
+    }));
+  const limit = Math.max(1, Math.round(Number(maxFeatures) || entries.length || 1));
+  if (entries.length <= limit) {
+    return { records: entries.map((entry) => entry.record), requested: entries.length, selected: entries.length };
+  }
+  const groups = { road: [], pedestrian: [], cycleway: [] };
+  entries.forEach((entry) => groups[canonicalTransportClass(entry.record)].push(entry));
+  const prioritizedCanonical = (values) => values.slice()
+    .sort((left, right) => right.score - left.score || left.id.localeCompare(right.id));
+  const selected = [];
+  const leftovers = [];
+  const ratios = { road: 0.72, pedestrian: 0.2, cycleway: 0.08 };
+  for (const [name, values] of Object.entries(groups)) {
+    const sorted = prioritizedCanonical(values);
+    const quota = Math.max(1, Math.floor(limit * ratios[name]));
+    selected.push(...sorted.slice(0, quota));
+    leftovers.push(...sorted.slice(quota));
+  }
+  const selectedIds = new Set(selected.map((entry) => entry.id));
+  for (const entry of prioritizedCanonical(leftovers)) {
+    if (selected.length >= limit) break;
+    if (selectedIds.has(entry.id)) continue;
+    selected.push(entry);
+    selectedIds.add(entry.id);
+  }
+  return {
+    records: selected.slice(0, limit).map((entry) => entry.record),
+    requested: entries.length,
+    selected: Math.min(selected.length, limit),
     classes: Object.fromEntries(Object.entries(groups).map(([name, group]) => [name, group.length]))
   };
 }
@@ -132,8 +195,8 @@ function buildingImportance(entry) {
     (properties.name ? 50 : 0) + (properties.is_part ? 20 : 0);
 }
 
-export function selectBuildingFeatures(layer, maxFeatures) {
-  const entries = featureEntries(layer);
+export function selectBuildingFeatures(layer, maxFeatures, tileCoordinates = null) {
+  const entries = featureEntries(layer, tileCoordinates);
   const limit = Math.max(1, Math.round(Number(maxFeatures) || entries.length || 1));
   entries.forEach((entry) => { entry.stats = polygonStats(entry); });
   if (entries.length <= limit) return { layer: adaptedLayer(entries), requested: entries.length, selected: entries.length };

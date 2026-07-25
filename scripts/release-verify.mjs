@@ -38,7 +38,6 @@ const steps = [
   { name: 'ES module URL identity', cmd: [process.execPath, 'scripts/test-module-version-consistency.mjs'] },
   { name: 'Surface contract', cmd: [process.execPath, 'scripts/test-surface-contract.mjs'] },
   { name: 'Overture tile source', cmd: [process.execPath, 'scripts/test-overture-tile-source.mjs'] },
-  { name: 'Overture streaming source', cmd: [process.execPath, 'scripts/test-overture-streaming-source.mjs'] },
   { name: 'Streaming feature budget', cmd: [process.execPath, 'scripts/test-streaming-feature-budget.mjs'] },
   { name: 'Renderer provenance', cmd: [process.execPath, 'scripts/test-render-provenance.mjs'] },
   { name: 'Continuous renderer', cmd: [process.execPath, 'scripts/test-continuous-renderer.mjs'] },

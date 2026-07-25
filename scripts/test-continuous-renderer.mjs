@@ -323,16 +323,18 @@ async function main() {
     report.bootstrap = await startEarth(page);
     report.sourceRequests = {
       overpass: requestedUrls.filter((url) => /\/api\/interpreter|overpass-api|overpass\.private/i.test(url)),
-      shortbread: requestedUrls.filter((url) => /^https:\/\/vector\.openstreetmap\.org\/shortbread/i.test(url))
+      shortbread: requestedUrls.filter((url) => /^https:\/\/vector\.openstreetmap\.org\/shortbread/i.test(url)),
+      overture: requestedUrls.filter((url) => /overturemaps|overturemaps-us-west-2|overture-pmtiles/i.test(url))
     };
     assert(report.bootstrap.initialEarthWorldReady, 'Continuous Earth did not become ready at its starting location.');
     assert(report.bootstrap.initialEarthWorldRetired, 'Continuous Earth retained a legacy initial world.');
     assert(report.bootstrap.profile === 'continuous_global', `Continuous Earth reported ${report.bootstrap.profile || 'no'} source profile.`);
-    assert(Number(report.bootstrap.snapshot?.layers?.['global-vector']?.loadedNearCenter || 0) >= 9, 'The starting Overture neighborhood was incomplete.');
+    assert(Number(report.bootstrap.snapshot?.layers?.['global-vector']?.loadedNearCenter || 0) >= 9, 'The starting OSM neighborhood was incomplete.');
     assert(report.bootstrap.nonStreamRoads === 0, 'Continuous cold start retained non-streamed roads.');
     assert(report.bootstrap.nonStreamBuildings === 0, 'Continuous cold start retained non-streamed buildings.');
     assert(report.sourceRequests.overpass.length === 0, 'Continuous cold start requested Overpass data.');
-    assert(report.sourceRequests.shortbread.length === 0, 'Continuous cold start requested Shortbread data.');
+    assert(report.sourceRequests.shortbread.length >= 9, 'Continuous cold start did not request its OSM Shortbread neighborhood.');
+    assert(report.sourceRequests.overture.length === 0, 'Continuous cold start requested Overture data.');
     const bootstrapCenterKey = report.bootstrap.snapshot.centerKey;
     await moveWalker(page, 9500, 900);
     report.seamTravel = await waitForStream(page, ({ snapshot }) =>

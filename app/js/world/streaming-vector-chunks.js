@@ -7,12 +7,11 @@ import {
 } from "./building-spatial-index.js?v=7";
 import { waterSurfaceBaseElevation } from "./load-geometry.js?v=19";
 import { assessMappedWaterTerrain } from "./water-surface-validity.js?v=3";
-import { fetchOvertureStreamingTile } from './overture-streaming-source.js?v=3';
+import { fetchShortbreadTile } from './shortbread-source.js?v=13';
+import { compileShortbreadTransportTile } from './transport-compiler.js';
 import { buildStreamingLandcover } from "./streaming-landcover.js?v=14";
-import { createRoadNameResolver } from "./streaming-road-labels.js?v=1";
 import { streamingVectorMaterials as materials, transportSurfaceClass } from './streaming-vector-materials.js?v=1';
 import {
-  classifyStructureSemantics,
   polylineBounds,
   updateFeatureSurfaceProfile
 } from "../structure-semantics.js?v=21";
@@ -30,8 +29,6 @@ import {
   forEachLayerFeatureAsync,
   geometryParts,
   outsideInitialDetail,
-  roadSpeedLimit,
-  roadWidth,
   stableHash,
   stableTerrainProfile,
   terrainY,
@@ -45,7 +42,7 @@ import { createInitialWorldRetirementApi } from "./streaming-initial-retirement.
 import { SOURCE_PROFILE } from "./surface-contract.js?v=7";
 import { normalizeWaterBody } from './water-body-contract.js?v=2';
 import { attachStreamProvenance, createRenderProvenance } from './render-provenance.js?v=2';
-import { selectBuildingFeatures, selectTransportationFeatures } from './streaming-feature-budget.js?v=1';
+import { selectBuildingFeatures, selectCanonicalTransportRecords } from './streaming-feature-budget.js?v=1';
 
 const MAX_ROAD_FEATURES = 900;
 const MAX_BUILDING_FEATURES = 900;
@@ -141,70 +138,66 @@ async function buildRoads(tileRecord, chunk, options = {}) {
     if (!batches.has(surfaceClass)) batches.set(surfaceClass, { vertices: [], indices: [] });
     return batches.get(surfaceClass);
   };
-  const resolveRoadName = createRoadNameResolver(tileRecord, cleanLine);
   const featureLimit = Math.max(1, Number(options.maxFeatures) || MAX_ROAD_FEATURES);
-  const selection = selectTransportationFeatures(tileRecord.tile.layers.streets, featureLimit);
+  const worldTile = compileShortbreadTransportTile({
+    tileRecord,
+    project: (lat, lon) => appCtx.geoToWorld(lat, lon),
+    origin: appCtx.LOC,
+    generation: Number(chunk.tile?.generation) || 0,
+    revision: String(tileRecord.release || 'live')
+  });
+  chunk.worldTile = worldTile;
+  const selection = selectCanonicalTransportRecords(worldTile.records.transport, featureLimit);
   chunk.featureBudget.transportation = {
     requested: selection.requested,
     selected: selection.selected,
     classes: selection.classes || null
   };
-  const selectedRecord = { ...tileRecord, tile: { ...tileRecord.tile, layers: { ...tileRecord.tile.layers, streets: selection.layer } } };
-  await forEachLayerFeatureAsync(selectedRecord, 'streets', selection.selected, (geojson, featureId) => {
-    const properties = geojson.properties || {};
-    const kind = String(properties.kind || '').toLowerCase();
-    if (!kind || properties.rail === true) return;
-    if (options.aerialContext && /(?:foot|path|track|steps|cycle|service|pedestrian)/.test(kind)) return;
-    geometryParts(geojson.geometry, 'line').forEach((coordinates, partIndex) => {
-      const sourcePoints = cleanLine(coordinates);
-      if (sourcePoints.length < 2 || (!options.includeInitial && !outsideInitialDetail(sourcePoints))) return;
-      const subdivisionStep = options.aerialContext ? 54 : 24;
-      const points = typeof appCtx.subdivideRoadPoints === 'function'
-        ? appCtx.subdivideRoadPoints(sourcePoints, subdivisionStep)
-        : sourcePoints;
-      const mappedWidth = roadWidth(properties);
-      const width = options.aerialContext
-        ? Math.max(1.6, Math.min(4.6, mappedWidth * 0.36))
-        : mappedWidth;
-      const structureTags = {
-        highway: kind,
-        bridge: properties.bridge === true ? 'yes' : String(properties.bridge || ''),
-        tunnel: properties.tunnel === true ? 'yes' : String(properties.tunnel || ''),
-        layer: String(properties.layer || ''),
-        covered: String(properties.covered || ''),
-        location: String(properties.location || '')
-      };
-      const structureSemantics = classifyStructureSemantics(structureTags, {
-        featureKind: 'road',
-        subtype: kind
-      });
-      const road = {
-        pts: points,
-        width,
-        limit: roadSpeedLimit(properties),
-        name: resolveRoadName(points, kind) || String(properties.name || kind || 'Road'),
-        type: kind,
-        sourceFeatureId: `stream:${chunk.key}:road:${featureId}:${partIndex}`,
-        networkKind: 'road',
-        walkable: true,
-        driveable: !kind.includes('footway') && !kind.includes('path'),
-        surfaceTag: String(properties.surface || '').toLowerCase(),
-        geometrySource: String(options.geometrySource || tileRecord.source || 'shortbread-vector'),
-        litTag: String(properties.lit || '').toLowerCase(),
-        structureTags,
-        structureSemantics,
-        baseStructureSemantics: { ...structureSemantics },
-        surfaceBias: ROAD_SURFACE_OFFSET,
-        subdivideMaxDist: subdivisionStep,
-        bounds: polylineBounds(points, width * 0.5 + 18),
-        _streamChunkKey: chunk.key
-      };
-      if (options.recordFeatures !== false) chunk.roads.push(road);
-      updateFeatureSurfaceProfile(road, terrainY, { surfaceBias: ROAD_SURFACE_OFFSET });
-      const batch = getBatch(transportSurfaceClass(kind));
-      appendRoadFeatureRibbon(road, batch.vertices, batch.indices);
-    });
-  });
+  for (let recordIndex = 0; recordIndex < selection.records.length; recordIndex += 1) {
+    const record = selection.records[recordIndex];
+    const kind = record.subtype;
+    if (options.aerialContext && /(?:foot|path|track|steps|cycle|service|pedestrian)/.test(kind)) continue;
+    const sourcePoints = record.geometry.points;
+    if (sourcePoints.length < 2 || (!options.includeInitial && !outsideInitialDetail(sourcePoints))) continue;
+    const subdivisionStep = options.aerialContext ? 54 : 24;
+    const points = typeof appCtx.subdivideRoadPoints === 'function'
+      ? appCtx.subdivideRoadPoints(sourcePoints, subdivisionStep)
+      : sourcePoints;
+    const mappedWidth = record.dimensions.widthMeters;
+    const width = options.aerialContext
+      ? Math.max(1.6, Math.min(4.6, mappedWidth * 0.36))
+      : mappedWidth;
+    const structureSemantics = { ...record.structure };
+    const road = {
+      pts: points,
+      width,
+      limit: Number.isFinite(record.mobility.speedLimitKph)
+        ? Math.round(record.mobility.speedLimitKph / 1.609344)
+        : 25,
+      name: record.name || kind || 'Road',
+      type: kind,
+      sourceFeatureId: record.id,
+      networkKind: record.featureKind === 'road' ? 'road' : record.featureKind,
+      walkable: record.access.walkable,
+      driveable: record.access.driveable,
+      surfaceTag: record.surface === 'unspecified' ? '' : record.surface,
+      geometrySource: 'shortbread-vector',
+      litTag: String(record.tags.lit || '').toLowerCase(),
+      structureTags: { ...record.tags },
+      structureSemantics,
+      baseStructureSemantics: { ...structureSemantics },
+      surfaceBias: ROAD_SURFACE_OFFSET,
+      subdivideMaxDist: subdivisionStep,
+      bounds: polylineBounds(points, width * 0.5 + 18),
+      _streamChunkKey: chunk.key,
+      worldTileId: worldTile.id
+    };
+    if (options.recordFeatures !== false) chunk.roads.push(road);
+    updateFeatureSurfaceProfile(road, terrainY, { surfaceBias: ROAD_SURFACE_OFFSET });
+    const batch = getBatch(transportSurfaceClass(kind));
+    appendRoadFeatureRibbon(road, batch.vertices, batch.indices);
+    if (recordIndex > 0 && recordIndex % 64 === 0) await yieldToRenderer();
+  }
   batches.forEach((batch, surfaceClass) => {
     const mesh = createIndexedMesh(batch.vertices, batch.indices, materials().transport[surfaceClass], {
       isRoadBatch: true,
@@ -214,7 +207,7 @@ async function buildRoads(tileRecord, chunk, options = {}) {
     });
     if (!mesh) return;
     attachStreamProvenance(mesh, chunk, tileRecord, {
-      layer: 'transportation.segment',
+      layer: 'streets',
       role: options.aerialContext ? 'aerial-road' : surfaceClass === 'road' ? 'road' : surfaceClass
     });
     mesh.renderOrder = 2;
@@ -331,7 +324,7 @@ async function buildBuildings(tileRecord, chunk, options = {}) {
     return batches.get(key);
   };
   const featureLimit = Math.max(1, Number(options.maxFeatures) || MAX_BUILDING_FEATURES);
-  const selection = selectBuildingFeatures(tileRecord.tile.layers.buildings, featureLimit);
+  const selection = selectBuildingFeatures(tileRecord.tile.layers.buildings, featureLimit, tileRecord);
   chunk.featureBudget.buildings = {
     requested: selection.requested,
     selected: selection.selected,
@@ -524,7 +517,7 @@ async function buildWater(tileRecord, chunk) {
         landuseType: 'water',
         alwaysVisible: true
       };
-      attachStreamProvenance(mesh, chunk, tileRecord, { layer: 'base.water', role: 'water-area' });
+      attachStreamProvenance(mesh, chunk, tileRecord, { layer: 'water_polygons', role: 'water-area' });
       chunk.meshes.push(mesh);
       chunk.landuseMeshes.push(mesh);
     }
@@ -535,7 +528,7 @@ async function buildWater(tileRecord, chunk) {
     alwaysVisible: true
   });
   if (lineMesh) {
-    attachStreamProvenance(lineMesh, chunk, tileRecord, { layer: 'base.water', role: 'waterway' });
+    attachStreamProvenance(lineMesh, chunk, tileRecord, { layer: 'water_lines', role: 'waterway' });
     lineMesh.renderOrder = 1;
     chunk.meshes.push(lineMesh);
     chunk.landuseMeshes.push(lineMesh);
@@ -585,7 +578,7 @@ async function loadStreamingVectorChunk(request) {
   };
   try {
     if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
-    const tileRecord = await fetchOvertureStreamingTile(request.z, request.x, request.y, { signal: request.signal });
+    const tileRecord = await fetchShortbreadTile(request.z, request.x, request.y, { signal: request.signal });
     if (request.signal?.aborted) throw new DOMException('Streaming chunk aborted', 'AbortError');
     if (appCtx.terrainEnabled && typeof appCtx.waitForTerrainReadyBounds === 'function') {
       const terrainReady = await appCtx.waitForTerrainReadyBounds(expandGeographicBounds(request.bounds), 8000);
@@ -613,7 +606,7 @@ async function loadStreamingVectorChunk(request) {
       createProvenance: (layer, role) => createRenderProvenance({
         surfaceTile: chunk.surfaceTile,
         tileRecord,
-        provider: 'Overture Maps Foundation',
+        provider: 'OpenStreetMap Foundation',
         dataset: tileRecord.source,
         layer,
         role
@@ -687,7 +680,7 @@ function initStreamingVectorChunks() {
     radius: 1,
     maxActive: 20,
     profile: SOURCE_PROFILE.CONTINUOUS_GLOBAL,
-    sources: ['overture-transportation', 'overture-buildings', 'overture-base'],
+    sources: ['osm-shortbread'],
     loadChunk: loadStreamingVectorChunk,
     unloadChunk: disposeStreamingVectorChunk
   });

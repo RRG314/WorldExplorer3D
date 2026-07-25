@@ -1,4 +1,4 @@
-import { createRoadNameResolver } from './streaming-road-labels.js?v=1';
+import { createRoadNameResolver } from './streaming-road-labels.js';
 import Pbf from '../../vendor/vector-tile/pbf-3.2.1.mjs';
 import { VectorTile } from '../../vendor/vector-tile/mapbox-vector-tile-1.3.1.mjs';
 
@@ -83,7 +83,14 @@ export async function fetchShortbreadTile(z, x, y, options = {}) {
       });
       if (!response.ok) throw new Error(`Shortbread tile ${z}/${x}/${y}: HTTP ${response.status}`);
       const buffer = await response.arrayBuffer();
-      return { tile: new VectorTile(new Pbf(new Uint8Array(buffer))), z, x, y };
+      return {
+        tile: new VectorTile(new Pbf(new Uint8Array(buffer))),
+        source: 'shortbread-vector',
+        release: 'live',
+        z,
+        x,
+        y
+      };
     } finally {
       clearTimeout(timeoutId);
       externalSignal?.removeEventListener?.('abort', relayAbort);

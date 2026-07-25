@@ -12,18 +12,18 @@ const provenance = createRenderProvenance({
     x: 4705,
     y: 6244,
     profile: 'continuous_global',
-    sources: ['overture-base', 'overture-base']
+    sources: ['osm-shortbread', 'osm-shortbread']
   },
-  tileRecord: { source: 'overture-pmtiles', release: '2026-06-17.0' },
-  provider: 'Overture Maps Foundation',
-  layer: 'base.water',
+  tileRecord: { source: 'shortbread-vector', release: 'live' },
+  provider: 'OpenStreetMap Foundation',
+  layer: 'water_polygons',
   role: 'water-area'
 });
 
 assert.equal(provenance.version, RENDER_PROVENANCE_VERSION);
 assert.equal(provenance.tileKey, '14/4705/6244');
 assert.equal(provenance.profile, 'continuous_global');
-assert.deepEqual(provenance.sources, ['overture-base']);
+assert.deepEqual(provenance.sources, ['osm-shortbread']);
 assert(Object.isFrozen(provenance));
 
 const mesh = { userData: {} };
@@ -34,9 +34,9 @@ const streamMesh = { userData: {} };
 attachStreamProvenance(
   streamMesh,
   { surfaceTile: { z: 14, x: 4705, y: 6244, profile: 'continuous_global' } },
-  { source: 'overture-pmtiles', release: '2026-06-17.0', z: 14, x: 4705, y: 6244 },
-  { layer: 'transportation.segment', role: 'road' }
+  { source: 'shortbread-vector', release: 'live', z: 14, x: 4705, y: 6244 },
+  { layer: 'streets', role: 'road' }
 );
-assert.equal(streamMesh.userData.renderProvenance.provider, 'Overture Maps Foundation');
+assert.equal(streamMesh.userData.renderProvenance.provider, 'OpenStreetMap Foundation');
 
 console.log(JSON.stringify({ ok: true, provenance }, null, 2));
