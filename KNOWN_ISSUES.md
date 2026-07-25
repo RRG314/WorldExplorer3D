@@ -1,10 +1,21 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-07-23 for version 4.0.0.
+Last reviewed: 2026-07-25 during the 4.1 recovery audit.
 
 The production-quality work required to resolve the architectural limitations
 below is tracked in [ROADMAP.md](ROADMAP.md). A listed limitation is not an
 approval to ignore a reproducible defect.
+
+## 4.1 Release Blockers
+
+- The verified 4.0.0 Baltimore production journey can render a large building
+  mass across or immediately over the street corridor. This is a systemic
+  surface/occupancy failure, not an approved data variation. Release 4.1
+  remains blocked until initial and streamed content use the same canonical
+  surface and occupancy contracts and the global fixtures pass visual review.
+- Passing source counts, runtime counters, or unit tests do not clear a world
+  frame with missing roads, road/building overlap, invalid grade separation,
+  or similarly broken composition.
 
 ## Map Coverage
 

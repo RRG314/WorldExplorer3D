@@ -17,6 +17,7 @@
     "test:module-versions": "node scripts/test-module-version-consistency.mjs",
     "test:release-version": "node scripts/test-release-version.mjs",
     "test:maintainability": "node scripts/test-maintainability-guard.mjs",
+    "test:release-4.1-scenarios": "node scripts/test-release-4.1-scenario-contract.mjs",
     "firebase:config": "node scripts/apply-firebase-config.mjs",
     "firebase:config:production": "node scripts/apply-firebase-config.mjs production",
     "firebase:config:staging": "node scripts/apply-firebase-config.mjs staging",
