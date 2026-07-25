@@ -1,5 +1,5 @@
 import { buildElevatedTerrainReference, buildSubgradeTerrainReference } from './structure-profile-grade.js';
-import { classifyStructureSemantics, normalizedTagValue } from './structure-semantics/classification.js?v=1';
+import { classifyStructureSemantics, normalizedTagValue } from './structure-semantics/classification.js';
 import {
   boundsIntersect,
   pointInPolygonXZ,
