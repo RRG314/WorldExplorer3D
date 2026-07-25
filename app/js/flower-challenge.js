@@ -3,7 +3,6 @@ import { createFlowerChallengeLeaderboardApi } from "./flower-challenge/leaderbo
 import { createFlowerLeaderboardView } from "./flower-challenge/leaderboard-view.js?v=1";
 import { createFlowerMarkerRuntime } from "./flower-challenge/marker-runtime.js?v=1";
 import { getCurrentUser } from "../../js/auth-ui.js";
-import { initFirebase } from "../../js/firebase-init.js";
 
 const LOCAL_LEADERBOARD_KEY = 'worldExplorer3D.flowerChallenge.localLeaderboard.v1';
 const LOCAL_PAINT_LEADERBOARD_KEY = 'worldExplorer3D.paintTown.localLeaderboard.v1';
@@ -260,7 +259,10 @@ const leaderboardApi = createFlowerChallengeLeaderboardApi({
     LOCAL_FISHING_LEADERBOARD_KEY,
     LOCAL_PAINT_LEADERBOARD_KEY
   },
-  getFirebaseServices: initFirebase,
+  getFirebaseServices: async () => {
+    const { initFirebase } = await import("../../js/firebase-init.js");
+    return initFirebase();
+  },
   getSignedInUser: getCurrentUser,
   getActiveActorPosition,
   getRuntimeLocationLabel,
@@ -611,7 +613,7 @@ function setupFlowerChallenge() {
 
   challengeUiBound = true;
   setTitlePanelOpen(false);
-  refreshFlowerLeaderboard(challengeState.leaderboardView);
+  refreshFlowerLeaderboard(challengeState.leaderboardView, { remote: false });
 }
 
 function getFlowerChallengeBackendStatus() {

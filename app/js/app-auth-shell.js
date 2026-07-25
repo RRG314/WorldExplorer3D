@@ -1,4 +1,4 @@
-import { hasFirebaseConfig } from '../../js/firebase-init.js?v=55';
+import { hasFirebaseConfig } from '../../js/firebase-config.js?v=1';
 import {
   observeAuth,
   requestPasswordReset,
@@ -7,11 +7,7 @@ import {
   signOutUser,
   signUpWithEmailPassword
 } from '../../js/auth-ui.js?v=55';
-import {
-  ensureEntitlements,
-  getFreeEntitlementsState,
-  subscribeEntitlements
-} from '../../js/entitlements.js?v=71';
+import { getFreeEntitlementsState } from '../../js/entitlements-free.js?v=1';
 
 const appSignInBtn = document.getElementById('appSignInBtn');
 const proAccessPanel = document.getElementById('proAccessPanel');
@@ -38,8 +34,16 @@ const authForgotBtn = document.getElementById('authForgotBtn');
 const authPanelStatus = document.getElementById('authPanelStatus');
 
 let unsubscribeEntitlements = null;
+let entitlementsModulePromise = null;
 let currentState = getFreeEntitlementsState();
 let authMode = 'signin';
+
+function loadEntitlementsModule() {
+  if (!entitlementsModulePromise) {
+    entitlementsModulePromise = import('../../js/entitlements.js?v=72');
+  }
+  return entitlementsModulePromise;
+}
 
 function setProStatus(message, isWarn = false) {
   proAccessStatus.textContent = message || '';
@@ -165,6 +169,7 @@ async function applySignedOutState() {
 }
 
 async function applySignedInState(user) {
+  const { ensureEntitlements, subscribeEntitlements } = await loadEntitlementsModule();
   const state = await ensureEntitlements(user);
   renderState(state, user);
   clearEntitlementSubscription();

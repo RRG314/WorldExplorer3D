@@ -7,6 +7,13 @@ import {
   setDoc
 } from '../app/js/platform/firebase/firestore.js';
 import { initFirebase } from './firebase-init.js';
+import {
+  FREE_ENTITLEMENTS,
+  broadcastEntitlements,
+  cloneEntitlements,
+  createFreeEntitlementsState,
+  getFreeEntitlementsState
+} from './entitlements-free.js';
 
 const USERS_COLLECTION = 'users';
 const ACTIVE_SUB_STATUSES = new Set(['active', 'trialing', 'past_due']);
@@ -17,15 +24,6 @@ const ROOM_CREATE_LIMITS = Object.freeze({
   pro: 10
 });
 const ADMIN_TEST_ROOM_CREATE_LIMIT = 10000;
-
-const FREE_ENTITLEMENTS = Object.freeze({
-  fullAccess: true,
-  cloudSync: true,
-  proEarlyAccess: false,
-  prioritySupport: false,
-  featureConsideration: false,
-  directContact: false
-});
 
 const TRIAL_ENTITLEMENTS = Object.freeze({
   fullAccess: true,
@@ -53,17 +51,6 @@ const PRO_ENTITLEMENTS = Object.freeze({
   featureConsideration: true,
   directContact: true
 });
-
-function cloneEntitlements(source) {
-  return {
-    fullAccess: !!source.fullAccess,
-    cloudSync: !!source.cloudSync,
-    proEarlyAccess: !!source.proEarlyAccess,
-    prioritySupport: !!source.prioritySupport,
-    featureConsideration: !!source.featureConsideration,
-    directContact: !!source.directContact
-  };
-}
 
 export function entitlementsForPlan(plan) {
   switch (normalizePlan(plan)) {
@@ -208,43 +195,7 @@ function normalizeProfile(uid, raw = {}, options = {}) {
 }
 
 function freeState() {
-  return {
-    uid: null,
-    plan: 'free',
-    planLabel: 'Free',
-    isAdmin: false,
-    subscriptionStatus: 'none',
-    stripeCustomerId: null,
-    stripeSubscriptionId: null,
-    trialEndsAt: null,
-    trialEndsAtMs: null,
-    roomCreateCount: 0,
-    roomCreateLimit: ROOM_CREATE_LIMITS.free,
-    entitlements: entitlementsForPlan('free'),
-    updatedAt: null
-  };
-}
-
-function broadcastEntitlements(state, user = null) {
-  const payload = {
-    isAuthenticated: !!user,
-    uid: user ? user.uid : null,
-    email: user && user.email ? user.email : null,
-    displayName: user && user.displayName ? user.displayName : null,
-    isAdmin: !!state.isAdmin,
-    role: state.isAdmin ? 'admin' : 'member',
-    plan: state.plan,
-    planLabel: state.planLabel,
-    subscriptionStatus: state.subscriptionStatus,
-    trialEndsAtMs: state.trialEndsAtMs,
-    roomCreateCount: state.roomCreateCount,
-    roomCreateLimit: state.roomCreateLimit,
-    entitlements: { ...state.entitlements }
-  };
-
-  globalThis.__WE3D_ENTITLEMENTS__ = payload;
-  globalThis.dispatchEvent(new CustomEvent('we3d-entitlements-changed', { detail: payload }));
-  return payload;
+  return createFreeEntitlementsState();
 }
 
 async function ensureUserDoc(user, options = {}) {
@@ -423,11 +374,7 @@ export function subscribeEntitlements(user, callback) {
   });
 }
 
-export function getFreeEntitlementsState() {
-  const state = freeState();
-  broadcastEntitlements(state, null);
-  return state;
-}
+export { getFreeEntitlementsState };
 
 export function isProPlan(state) {
   return !!state && (state.plan === 'pro' || state.isAdmin === true);

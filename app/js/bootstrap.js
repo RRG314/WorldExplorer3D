@@ -55,6 +55,35 @@ function resolveScriptSources(sources) {
   return sources.map((source) => new URL(source, import.meta.url).toString());
 }
 
+function deferOptionalRenderingScripts(appApi) {
+  if (vendorScriptsOptional.length === 0) return;
+  const resolvedOptionalScripts = resolveScriptSources(vendorScriptsOptional);
+  let loadPromise = null;
+
+  const loadOptionalScripts = () => {
+    if (loadPromise) return loadPromise;
+    loadPromise = loadScriptList(resolvedOptionalScripts, { timeoutMs: 10000 })
+      .then(() => {
+        recordStartupDiagnostic('bootstrap', 'optional rendering scripts ready');
+        appApi?.tryEnablePostProcessing?.();
+        return true;
+      })
+      .catch((error) => {
+        recordStartupDiagnostic(
+          'bootstrap',
+          'optional rendering scripts failed',
+          summarizeStartupError(error)
+        );
+        console.warn('[bootstrap] Optional rendering scripts not fully available:', error);
+        appApi?.tryEnablePostProcessing?.();
+        return false;
+      });
+    return loadPromise;
+  };
+
+  globalThis.addEventListener('we3d:game-started', loadOptionalScripts, { once: true });
+}
+
 async function boot() {
   try {
     recordStartupDiagnostic('bootstrap', 'loading critical vendor scripts');
@@ -91,23 +120,7 @@ async function boot() {
     recordStartupDiagnostic('bootstrap', 'entrypoint booted', { entrypoint });
     console.log('[bootstrap] World Explorer loaded through ES module entrypoint:', entrypoint);
 
-    if (vendorScriptsOptional.length > 0) {
-      const resolvedOptionalScripts = resolveScriptSources(vendorScriptsOptional);
-      loadScriptList(resolvedOptionalScripts, { timeoutMs: 10000 })
-        .then(() => {
-          recordStartupDiagnostic('bootstrap', 'optional rendering scripts ready');
-          if (typeof appApi?.tryEnablePostProcessing === 'function') {
-            appApi.tryEnablePostProcessing();
-          }
-        })
-        .catch((err) => {
-          recordStartupDiagnostic('bootstrap', 'optional rendering scripts failed', summarizeStartupError(err));
-          console.warn('[bootstrap] Optional rendering scripts not fully available:', err);
-          if (typeof appApi?.tryEnablePostProcessing === 'function') {
-            appApi.tryEnablePostProcessing();
-          }
-        });
-    }
+    deferOptionalRenderingScripts(appApi);
   } catch (error) {
     recordStartupDiagnostic('bootstrap', 'fatal load error', summarizeStartupError(error));
     console.error('[bootstrap] Fatal load error:', error);

@@ -1,5 +1,6 @@
 import { observeAuth } from './auth-ui.js';
-import { initFirebaseAnalytics, readFirebaseConfig } from './firebase-init.js';
+import { initFirebaseAnalytics } from './firebase-analytics-init.js';
+import { readFirebaseConfig } from './firebase-config.js';
 import {
   sanitizeAnalyticsName,
   sanitizeProductParams,

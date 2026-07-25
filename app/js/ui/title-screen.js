@@ -546,6 +546,7 @@ function initTitleScreenUi({
     gameShareFloatBtn?.classList.add('show');
     closeGameShareMenu?.();
     appCtx.gameStarted = true;
+    globalThis.dispatchEvent?.(new CustomEvent('we3d:game-started'));
     if (typeof appCtx.updatePerfPanel === 'function') appCtx.updatePerfPanel(true);
     appCtx.disableNearBuildingBatching = appCtx.gameMode === 'painttown';
 
