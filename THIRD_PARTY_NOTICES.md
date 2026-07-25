@@ -6,7 +6,9 @@ project code and documentation unless a file says otherwise.
 
 ## Bundled Software
 
-- Three.js is distributed under the MIT License.
+- Three.js 0.128.0 is distributed under the MIT License. The exact runtime
+  files and license are retained under `app/vendor/three-r128/`; their byte
+  sizes and SHA-256 checksums are recorded in that directory's `manifest.json`.
 - The Colyseus browser SDK is distributed under the MIT License. Its bundled
   license is retained at `app/vendor/COLYSEUS-SDK-LICENSE.txt`.
 - Pbf 3.2.1 and Mapbox Vector Tile JS 1.3.1 are distributed under BSD-3-Clause

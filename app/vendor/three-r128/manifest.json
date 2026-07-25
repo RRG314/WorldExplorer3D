@@ -1,0 +1,98 @@
+{
+  "package": "three",
+  "version": "0.128.0",
+  "license": "MIT",
+  "runtimeBytes": 825348,
+  "files": [
+    {
+      "path": "three.min.js",
+      "upstream": "build/three.min.js",
+      "bytes": 603445,
+      "sha256": "9274bbcec8d96168626c732b5d31c775aa8cfb7eaa0599bec0c175908a2c1ce2"
+    },
+    {
+      "path": "loaders/GLTFLoader.js",
+      "upstream": "examples/js/loaders/GLTFLoader.js",
+      "bytes": 96550,
+      "sha256": "5c15967ba830918a9caea6338712c994c354bccd4edc4569bde411c3ec06a3e6"
+    },
+    {
+      "path": "math/SimplexNoise.js",
+      "upstream": "examples/js/math/SimplexNoise.js",
+      "bytes": 14696,
+      "sha256": "eaab4ae3184e1a74a4983ffe8e4afe828e63fe4f837717cc44cb5e68727e4d3d"
+    },
+    {
+      "path": "postprocessing/EffectComposer.js",
+      "upstream": "examples/js/postprocessing/EffectComposer.js",
+      "bytes": 6271,
+      "sha256": "4fc320fa3185847797332bc2b0125b1a39b9cf5fc4170a2f180cfa54fb057a2b"
+    },
+    {
+      "path": "postprocessing/RenderPass.js",
+      "upstream": "examples/js/postprocessing/RenderPass.js",
+      "bytes": 1746,
+      "sha256": "57a549b2d6a947cddf0385a804dc70c3b2d155663d908e99e35d42274b3878be"
+    },
+    {
+      "path": "postprocessing/SMAAPass.js",
+      "upstream": "examples/js/postprocessing/SMAAPass.js",
+      "bytes": 49427,
+      "sha256": "14b91fe03b8afa9fdc6f4bd1bce7b15199e7e21230dd3a19c0172834f1286d4a"
+    },
+    {
+      "path": "postprocessing/SSAOPass.js",
+      "upstream": "examples/js/postprocessing/SSAOPass.js",
+      "bytes": 12292,
+      "sha256": "19134f19e564199311962acfab4bbaf17284ed93eebb5697305805aeb76f6db0"
+    },
+    {
+      "path": "postprocessing/ShaderPass.js",
+      "upstream": "examples/js/postprocessing/ShaderPass.js",
+      "bytes": 1416,
+      "sha256": "2e64890b8e4c4dafcfd796d5c84877f2ad36a101c83263211c500ec40eaf1240"
+    },
+    {
+      "path": "postprocessing/UnrealBloomPass.js",
+      "upstream": "examples/js/postprocessing/UnrealBloomPass.js",
+      "bytes": 12612,
+      "sha256": "1ed342b273e9b077a3e92e5caeecd45043f03071306c696564d5b53f0562dced"
+    },
+    {
+      "path": "shaders/CopyShader.js",
+      "upstream": "examples/js/shaders/CopyShader.js",
+      "bytes": 606,
+      "sha256": "6b5da4fe3b410286974590885f82fe4a446f25c728f7d6c888e2a2a331333949"
+    },
+    {
+      "path": "shaders/DepthLimitedBlurShader.js",
+      "upstream": "examples/js/shaders/DepthLimitedBlurShader.js",
+      "bytes": 3821,
+      "sha256": "7ea5555f9354409b7876cbb14f6f466bf02102418575b0e12964baa67bd020e3"
+    },
+    {
+      "path": "shaders/LuminosityHighPassShader.js",
+      "upstream": "examples/js/shaders/LuminosityHighPassShader.js",
+      "bytes": 1228,
+      "sha256": "00ed0682e61ca207d9c62298269472d6d4eedd9d33528400e7cbc633da8544da"
+    },
+    {
+      "path": "shaders/SMAAShader.js",
+      "upstream": "examples/js/shaders/SMAAShader.js",
+      "bytes": 14723,
+      "sha256": "f4e3d4c659246342c53ef8a22ed56ab2d00658f96c9a23d40aed4158118322be"
+    },
+    {
+      "path": "shaders/SSAOShader.js",
+      "upstream": "examples/js/shaders/SSAOShader.js",
+      "bytes": 6515,
+      "sha256": "5d83ca46be72857c56dc8d2ba778cef4b77da58412aac8e84a872c0fb2ccab8e"
+    },
+    {
+      "path": "LICENSE.txt",
+      "upstream": "LICENSE",
+      "bytes": 1081,
+      "sha256": "7dddf7c5b8fd10ee654db8857d75d104b5557889aa5a91fc4ca545ea7c07062f"
+    }
+  ]
+}

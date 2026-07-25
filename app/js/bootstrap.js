@@ -51,28 +51,28 @@ function formatReason(reason) {
   return reason?.stack || reason?.message || String(reason);
 }
 
+function resolveScriptSources(sources) {
+  return sources.map((source) => new URL(source, import.meta.url).toString());
+}
+
 async function boot() {
   try {
     recordStartupDiagnostic('bootstrap', 'loading critical vendor scripts');
-    const [coreThreeScript, ...dependentVendorScripts] = vendorScriptsCritical;
+    const [coreThreeScript, ...dependentVendorScripts] = resolveScriptSources(vendorScriptsCritical);
     if (coreThreeScript) {
       await loadScriptList([coreThreeScript], { timeoutMs: 12000 });
     }
     if (dependentVendorScripts.length > 0) {
-      await loadScriptList(dependentVendorScripts, { timeoutMs: 12000, parallel: true });
+      await loadScriptList(dependentVendorScripts, { timeoutMs: 12000 });
     }
     recordStartupDiagnostic('bootstrap', 'critical vendor scripts ready', {
       hasTHREE: !!globalThis.THREE,
-      hasRGBELoader: !!globalThis.THREE?.RGBELoader,
-      hasDRACOLoader: !!globalThis.THREE?.DRACOLoader,
       hasGLTFLoader: !!globalThis.THREE?.GLTFLoader
     });
     console.log(
       '[bootstrap] critical vendor state:',
       JSON.stringify({
         hasTHREE: !!globalThis.THREE,
-        hasRGBELoader: !!globalThis.THREE?.RGBELoader,
-        hasDRACOLoader: !!globalThis.THREE?.DRACOLoader,
         hasGLTFLoader: !!globalThis.THREE?.GLTFLoader
       })
     );
@@ -92,7 +92,8 @@ async function boot() {
     console.log('[bootstrap] World Explorer loaded through ES module entrypoint:', entrypoint);
 
     if (vendorScriptsOptional.length > 0) {
-      loadScriptList(vendorScriptsOptional, { timeoutMs: 10000, parallel: true })
+      const resolvedOptionalScripts = resolveScriptSources(vendorScriptsOptional);
+      loadScriptList(resolvedOptionalScripts, { timeoutMs: 10000 })
         .then(() => {
           recordStartupDiagnostic('bootstrap', 'optional rendering scripts ready');
           if (typeof appApi?.tryEnablePostProcessing === 'function') {

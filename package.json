@@ -20,6 +20,7 @@
     "test:app-runtime": "node scripts/test-app-runtime.mjs",
     "test:destination-schedulers": "node scripts/test-destination-schedulers.mjs",
     "test:product-ports": "node scripts/test-product-ports.mjs",
+    "test:runtime-dependencies": "node scripts/test-runtime-dependencies.mjs",
     "test:release-4.1-scenarios": "node scripts/test-release-4.1-scenario-contract.mjs",
     "firebase:config": "node scripts/apply-firebase-config.mjs",
     "firebase:config:production": "node scripts/apply-firebase-config.mjs production",
@@ -118,5 +119,8 @@
     "@firebase/rules-unit-testing": "^5.0.1",
     "firebase": "^12.16.0",
     "playwright": "^1.61.0"
+  },
+  "dependencies": {
+    "three": "0.128.0"
   }
 }
