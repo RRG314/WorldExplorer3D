@@ -20,6 +20,7 @@ import { createOceanFishLifeApi } from "./ocean/fish-life.js?v=1";
 import { createOceanBathymetryApi } from "./ocean/bathymetry.js?v=1";
 import { updateOceanHud as updateOceanHudView } from "./ocean/hud.js?v=2";
 import {
+  beginEnvironmentTransition,
   commitEnvironment,
   exitCurrentEnvironmentSync,
   registerEnvironmentLifecycle
@@ -111,6 +112,7 @@ registerFrameOwner({
   })
 });
 appCtx.oceanMode = oceanMode;
+let oceanSessionScope = null;
 
 const _tmpVecA = new THREE.Vector3();
 const _tmpVecB = new THREE.Vector3();
@@ -500,7 +502,11 @@ function updateSubmarine(dt) {
 
 function animateOceanMode(nowMs = 0) {
   if (!oceanMode.active) return;
-  oceanMode.animationId = requestAnimationFrame(animateOceanMode);
+  oceanMode.animationId = oceanSessionScope?.animationFrame(animateOceanMode) ?? null;
+  if (oceanMode.animationId == null) {
+    oceanMode.active = false;
+    return;
+  }
   if (document.hidden) {
     oceanMode.lastFrameMs = nowMs;
     return;
@@ -533,8 +539,12 @@ function animateOceanMode(nowMs = 0) {
 function startOceanMode(options = {}) {
   if (oceanMode.active) return true;
   try {
+    const transition = beginEnvironmentTransition(appCtx.ENV.OCEAN, { source: 'ocean_start' });
     if (appCtx.ENV?.OCEAN) exitCurrentEnvironmentSync(appCtx.ENV.OCEAN, { source: 'ocean_start' });
-    if (appCtx.ENV?.OCEAN) commitEnvironment(appCtx.ENV.OCEAN, { source: 'ocean_start' });
+    if (!commitEnvironment(appCtx.ENV.OCEAN, { token: transition })) {
+      throw new Error('Ocean destination commit was rejected.');
+    }
+    oceanSessionScope = transition.session.scope;
 
     if (options.launchSite) {
       resetOceanLaunchSite(options.launchSite);
@@ -550,7 +560,7 @@ function startOceanMode(options = {}) {
     oceanMode.active = true;
     oceanMode.lastFrameMs = 0;
     oceanMode.weatherRefreshTimer = 0;
-    oceanMode.animationId = requestAnimationFrame(animateOceanMode);
+    oceanMode.animationId = oceanSessionScope.animationFrame(animateOceanMode);
     if (typeof appCtx.refreshAstronomicalSky === 'function') {
       appCtx.refreshAstronomicalSky(true);
     }
@@ -562,20 +572,22 @@ function startOceanMode(options = {}) {
     if (typeof appCtx.refreshBoatAvailability === 'function') appCtx.refreshBoatAvailability(true);
     updateOceanHud(performance.now() * 0.001);
 
-    primeLocalBathymetryGrid().then((ready) => {
+    primeLocalBathymetryGrid().then(oceanSessionScope.guard((ready) => {
       if (!ready || !oceanMode.scene) return;
       rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
-    });
+    }));
 
-    primeBathymetryTiles().then((ready) => {
+    primeBathymetryTiles().then(oceanSessionScope.guard((ready) => {
       if (!ready || !oceanMode.scene) return;
       rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
-    });
+    }));
 
     return true;
   } catch (error) {
     console.error('[OceanMode] start failed', error);
     oceanMode.active = false;
+    oceanSessionScope?.dispose('ocean-start-failed');
+    oceanSessionScope = null;
     if (oceanMode.animationId) {
       cancelAnimationFrame(oceanMode.animationId);
       oceanMode.animationId = null;
@@ -592,6 +604,8 @@ function startOceanMode(options = {}) {
 function stopOceanMode(options = {}) {
   const wasActive = !!oceanMode.active;
   oceanMode.active = false;
+  oceanSessionScope?.dispose('ocean-mode-exit');
+  oceanSessionScope = null;
   if (oceanMode.animationId) {
     cancelAnimationFrame(oceanMode.animationId);
     oceanMode.animationId = null;
@@ -642,7 +656,8 @@ registerEnvironmentLifecycle(appCtx.ENV.OCEAN, {
     bathymetryReady: !!oceanMode.bathymetryReady,
     localBathymetryReady: !!oceanMode.localBathymetryReady,
     rendererReady: !!oceanMode.renderer,
-    sceneReady: !!oceanMode.scene
+    sceneReady: !!oceanMode.scene,
+    scope: oceanSessionScope?.snapshot() || null
   })
 });
 

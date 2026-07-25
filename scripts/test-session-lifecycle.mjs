@@ -147,9 +147,35 @@ function assertPlateau(mode, cycles) {
   for (const [index, cycle] of cycles.entries()) {
     const activeAdapter = cycle.active.coordinator.environments[adapterKey];
     const exitedAdapter = cycle.exited.coordinator.environments[adapterKey];
+    const activeSession = cycle.active.coordinator.activeSession;
+    const exitedSession = cycle.exited.coordinator.activeSession;
     const expectedFrameOwner = mode === 'space' ? 'space.flight-renderer' : 'ocean.mode-renderer';
     assert(activeAdapter.active && activeAdapter.animationActive, `${mode} cycle ${index + 1} did not own an active render loop`);
     assert(!exitedAdapter.active && !exitedAdapter.animationActive, `${mode} cycle ${index + 1} left its render loop active`);
+    assert(
+      activeSession?.destination === adapterKey && activeSession.active,
+      `${mode} cycle ${index + 1} was not owned by the active destination session`
+    );
+    assert(
+      activeSession.scope?.resources?.['animation-frame'] === 1,
+      `${mode} cycle ${index + 1} did not schedule exactly one frame through its destination scope`
+    );
+    assert(
+      activeAdapter.scope?.owner === activeSession.scope?.owner,
+      `${mode} cycle ${index + 1} retained a private renderer scope outside DestinationSession`
+    );
+    assert(
+      exitedSession?.destination === 'EARTH' && exitedSession.active,
+      `${mode} cycle ${index + 1} did not return ownership to an Earth destination session`
+    );
+    assert(
+      !activeAdapter.scope?.disposedReason,
+      `${mode} cycle ${index + 1} ran through an already disposed destination scope`
+    );
+    assert(
+      exitedAdapter.scope == null,
+      `${mode} cycle ${index + 1} retained its destination scope after exit`
+    );
     assert(cycle.active.frameOwnership?.ok, `${mode} cycle ${index + 1} has conflicting frame owners`);
     assert(
       cycle.active.frameOwnership?.active?.includes(expectedFrameOwner),
