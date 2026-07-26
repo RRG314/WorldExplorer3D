@@ -11,11 +11,18 @@ approval to ignore a reproducible defect.
 - The verified 4.0.0 Baltimore production journey can render a large building
   mass across or immediately over the street corridor. This is a systemic
   surface/occupancy failure, not an approved data variation. Release 4.1
-  remains blocked until initial and streamed content use the same canonical
+  remains blocked until all location loads use the same canonical
   surface and occupancy contracts and the global fixtures pass visual review.
 - Passing source counts, runtime counters, or unit tests do not clear a world
   frame with missing roads, road/building overlap, invalid grade separation,
   or similarly broken composition.
+- The fixed Apple Metal structure/mountain subset is mechanically green but
+  not visually approved. The Swiss Alps fixture currently has no mapped road
+  products, starts on a 19.3-degree slope, and shows a terrain opening/seam
+  with unsupported floating geometry. Holland Tunnel traversal has a coherent
+  interior, but its initial portal/urban composition contains overlapping and
+  clipped structure geometry. Golden Gate Bridge is coherent but took 28.8
+  seconds to load in the focused run, above the 20-second release budget.
 
 ## Map Coverage
 
@@ -25,18 +32,19 @@ approval to ignore a reproducible defect.
 
 ## Loading and Performance
 
-- Dense cities, rapid plane travel, and continuous streaming can be demanding on GPU memory and network bandwidth.
+- Dense cities and rapid plane travel can be demanding on GPU memory and network bandwidth.
 - The initial world load intentionally waits for core roads and buildings so play does not begin in an empty scene. Additional distant detail may continue to refine afterward.
-- Version 4.0 uses a detailed initial location/OSM build and a separate Overture-backed continuous-streaming build. Their geometry and detail rules are not yet fully unified, so quality can change after traveling beyond the initial area or crossing world-cell boundaries.
-- Whole-cell streaming and LOD replacement can produce visible vegetation or ground-detail changes while traveling, particularly at vehicle or aircraft speed.
+- LOD changes can produce visible vegetation or ground-detail changes while traveling, particularly at vehicle or aircraft speed.
 - Browser GPU support and memory limits differ significantly, especially on older phones and integrated graphics.
 
 ## Rendering and World Geometry
 
-- Medium rendering quality can produce visibly blocky or stair-stepped directional shadows. The next rendering-foundation release replaces the current single coarse shadow range.
+- The 4.1 candidate replaces medium-quality basic shadow maps with one fitted,
+  texel-stabilized soft-shadow policy. Wider daylight/dusk and geography
+  certification remains open; a failed hardware frame remains release-blocking.
 - Mountain sidewalks and paths can intersect or be partially covered by steep terrain because corridors and terrain do not yet share one composited surface owner.
 - Bridges, viaducts, elevated surfaces, and tunnel approaches depend on incomplete source tags and tile-local feature fragments. Some complex structures can have incorrect grade, clearance, supports, or transitions.
-- Generated or streamed trees, grass, buildings, and water are validated through several different placement paths. Rare overlaps such as trees or buildings in water, floating vegetation, or land-cover over transportation surfaces can remain outside certified benchmark areas.
+- Generated trees, grass, buildings, and water are validated through several different placement paths. Rare overlaps such as trees or buildings in water, floating vegetation, or land-cover over transportation surfaces can remain outside certified benchmark areas.
 - Building facades use a limited material and procedural-window library. Regional typology and material distinctions such as limestone, sandstone, marble, stucco, timber, and metal cladding are not yet represented at the intended quality.
 - Water uses gameplay wave displacement and buoyancy, but does not yet provide the intended unified wave-normal, reflection, refraction, shoreline, and vessel system.
 
@@ -57,8 +65,7 @@ approval to ignore a reproducible defect.
 
 - Real indoor data is uncommon. Buildings without usable indoor mapping receive a footprint-aware generated interior.
 - Generated interiors are traversable and sized from the building footprint, but may be visually sparse when no authoritative indoor geometry exists.
-- Procedural vegetation, inferred buildings, distant aerial context, and deep-space encounters fill data gaps and should not be interpreted as exact observations.
-- Streamed distant buildings use simplified batched massing and coarse collision bounds; they are not exact facade or structural reconstructions.
+- Procedural vegetation, inferred buildings, and deep-space encounters fill data gaps and should not be interpreted as exact observations.
 - Solar-system distances and planetary sizes use documented visual scaling so destinations remain navigable. The experience is educational and exploratory, not an orbital-navigation simulator.
 
 ## Backend Features

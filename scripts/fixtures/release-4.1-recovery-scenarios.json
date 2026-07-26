@@ -6,7 +6,7 @@
   },
   "scenarios": [
     {
-      "id": "baltimore_streamed_road_building_occupancy",
+      "id": "baltimore_road_building_occupancy",
       "category": "surface_occupancy",
       "location": {
         "kind": "preset",
@@ -16,10 +16,9 @@
       },
       "journey": {
         "mode": "walk",
-        "continuousWorld": true,
         "localWaypoints": [
           { "x": 0, "z": 0 },
-          { "x": 9500, "z": 900 }
+          { "x": 1200, "z": 900 }
         ]
       },
       "owner": "WorldSurfaceQuery/SpatialOccupancy",
@@ -27,7 +26,7 @@
         "solid_at_grade_building_never_intersects_at_grade_road_core",
         "road_overlap_requires_explicit_elevated_clearance",
         "pass_through_building_has_no_foundation_or_collider_below_occupied_floor",
-        "initial_and_streamed_content_use_the_same_rule"
+        "every_location_load_uses_the_same_rule"
       ],
       "evidenceCheckpoint": "163f168bb6a6bcd7164eca7610174a6a6cf691db",
       "implementationExceptionAllowed": false
@@ -43,7 +42,6 @@
       },
       "journey": {
         "mode": "drive",
-        "continuousWorld": true,
         "localWaypoints": [
           { "x": 0, "z": 0 }
         ]
@@ -68,7 +66,6 @@
       },
       "journey": {
         "mode": "drive",
-        "continuousWorld": true,
         "localWaypoints": [
           { "x": 0, "z": 0 }
         ]
@@ -84,7 +81,7 @@
       "implementationExceptionAllowed": false
     },
     {
-      "id": "baltimore_repeated_seam_resource_quiescence",
+      "id": "baltimore_repeated_location_resource_stability",
       "category": "runtime_lifecycle",
       "location": {
         "kind": "preset",
@@ -94,20 +91,19 @@
       },
       "journey": {
         "mode": "walk",
-        "continuousWorld": true,
         "cycles": 3,
         "localWaypoints": [
           { "x": 0, "z": 0 },
-          { "x": 9500, "z": 900 },
+          { "x": 1200, "z": 900 },
           { "x": 0, "z": 0 }
         ]
       },
-      "owner": "TileCoordinator/WorldScene",
+      "owner": "WorldLoadTransaction/WorldScene",
       "invariants": [
-        "quiescence_includes_pending_structure_work",
-        "pending_geometry_disposals_reach_zero",
+        "location_reload_commits_atomically",
+        "superseded_location_work_cannot_publish",
         "reachable_scene_resources_plateau_after_warmup",
-        "stale_generation_cannot_publish"
+        "scene_ownership_remains_singular"
       ],
       "evidenceCheckpoint": "163f168bb6a6bcd7164eca7610174a6a6cf691db",
       "implementationExceptionAllowed": false
@@ -123,7 +119,6 @@
       },
       "journey": {
         "mode": "walk",
-        "continuousWorld": true,
         "localWaypoints": [
           { "x": 0, "z": 0 }
         ]

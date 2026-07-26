@@ -232,6 +232,16 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     const lat = finiteNumber(world.lat, null);
     const lon = finiteNumber(world.lon, null);
     const kind = String(world.kind || "earth").toLowerCase();
+    const activeLat = finiteNumber(appCtx.LOC?.lat, null);
+    const activeLon = finiteNumber(appCtx.LOC?.lon, null);
+    const alreadyAtRoomEarthLocation =
+      kind === "earth" &&
+      Number.isFinite(lat) &&
+      Number.isFinite(lon) &&
+      Number.isFinite(activeLat) &&
+      Number.isFinite(activeLon) &&
+      Math.abs(activeLat - lat) <= 1e-7 &&
+      Math.abs(activeLon - lon) <= 1e-7;
 
     if (kind === "earth" && Number.isFinite(lat) && Number.isFinite(lon)) {
       setRoomEarthSelection(room, lat, lon);
@@ -267,6 +277,15 @@ export function createUiRoomRuntime({ appCtx, refs, state, renderers, helpers })
     }
 
     if (!Number.isFinite(lat) || !Number.isFinite(lon) || typeof appCtx.loadRoads !== "function") return;
+
+    if (alreadyAtRoomEarthLocation && appCtx.initialEarthWorldReady === true) {
+      appCtx.markLocationSelectionLoaded?.();
+      if (respawn && typeof appCtx.spawnOnRoad === "function") {
+        appCtx.spawnOnRoad();
+      }
+      clearPendingRoomWorldRetry();
+      return;
+    }
 
     setStatus(`Syncing room world ${room.code} (seed ${roomSeed})...`);
     try {

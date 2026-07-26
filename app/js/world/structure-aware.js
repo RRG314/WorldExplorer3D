@@ -4,7 +4,11 @@ import {
   buildFeatureStations,
   buildFeatureTransitionAnchors,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=21";
+} from "../structure-semantics.js?v=22";
+import {
+  boundsIntersect,
+  polylineBounds
+} from "../structure-semantics/geometry.js?v=1";
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -37,6 +41,19 @@ function worldRenderedTerrainY(x, z) {
 function structureAwareLinearFeatures() {
   if (!Array.isArray(appCtx.linearFeatures)) return [];
   return appCtx.linearFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
+}
+
+function featureBounds(feature, padding = 0) {
+  const bounds = feature?.bounds;
+  if (
+    Number.isFinite(bounds?.minX) &&
+    Number.isFinite(bounds?.maxX) &&
+    Number.isFinite(bounds?.minZ) &&
+    Number.isFinite(bounds?.maxZ)
+  ) {
+    return bounds;
+  }
+  return polylineBounds(feature?.pts || [], padding);
 }
 
 function smoothstep01Local(value) {
@@ -272,13 +289,9 @@ export function applyBuildingContextSemanticsToFeature(feature) {
   if (feature.isStructureConnector === true) feature.isStructureConnector = false;
 }
 
-export function refreshStructureAwareFeatureProfiles(options = {}) {
-  const includeStreaming = options.includeStreaming !== false;
-  const roadFeatures = Array.isArray(appCtx.roads)
-    ? appCtx.roads.filter((feature) => includeStreaming || !feature?._streamChunkKey)
-    : [];
-  const connectorFeatures = structureAwareLinearFeatures()
-    .filter((feature) => includeStreaming || !feature?._streamChunkKey);
+export function refreshStructureAwareFeatureProfiles() {
+  const roadFeatures = Array.isArray(appCtx.roads) ? appCtx.roads : [];
+  const connectorFeatures = structureAwareLinearFeatures();
   const transportFeatures = roadFeatures.concat(connectorFeatures);
 
   for (let i = 0; i < transportFeatures.length; i++) {
@@ -301,9 +314,16 @@ export function refreshStructureAwareFeatureProfiles(options = {}) {
   for (let i = 0; i < structureFeatures.length; i++) {
     const feature = structureFeatures[i];
     if (!feature?.structureSemantics?.gradeSeparated) continue;
+    const bounds = featureBounds(feature, (Number(feature.width) || 4) + 24);
+    const nearbyStructures = structureFeatures.filter((other) =>
+      other === feature || boundsIntersect(bounds, featureBounds(other, (Number(other?.width) || 4) + 18), 14)
+    );
+    const nearbyWaterAreas = (appCtx.waterAreas || []).filter((water) =>
+      boundsIntersect(bounds, featureBounds(water), 8)
+    );
     feature.structureStations = buildFeatureStations(feature, {
-      features: structureFeatures,
-      waterAreas: appCtx.waterAreas
+      features: nearbyStructures,
+      waterAreas: nearbyWaterAreas
     });
   }
 

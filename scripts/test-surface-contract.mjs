@@ -18,7 +18,6 @@ import {
 
 const appCtx = {
   METERS_PER_WORLD_UNIT: 2,
-  getContinuousWorldEnabled: () => false,
   terrainTileCache: new Map([['15/1/1', { loaded: true, elev: new Float32Array(4) }]])
 };
 const GroundHeight = {
@@ -43,13 +42,9 @@ assert.equal(query.driveAt(1, 2).provenance.dataset, 'OSM Shortbread vector tile
 assert.equal(query.driveAt(1, 2).position.y, GroundHeight.driveSurfaceY(1, 2, true));
 assert.equal(query.driveAt(1, 2, { preferRoad: false }).position.y, GroundHeight.terrainY(1, 2));
 
-appCtx.getContinuousWorldEnabled = () => true;
-assert.equal(query.getSourceProfile(), SOURCE_PROFILE.CONTINUOUS_GLOBAL);
-assert.deepEqual(query.getTraversalBounds(), { horizontalRadius: null, originRebase: true });
-
-const tile = createSurfaceTileDescriptor({ z: 3, x: -1, y: 99, profile: SOURCE_PROFILE.CONTINUOUS_GLOBAL });
+const tile = createSurfaceTileDescriptor({ z: 3, x: -1, y: 99, profile: SOURCE_PROFILE.LOCATION_OSM });
 assert.equal(tile.key, '3/7/7');
-assert.equal(tile.profile, SOURCE_PROFILE.CONTINUOUS_GLOBAL);
+assert.equal(tile.profile, SOURCE_PROFILE.LOCATION_OSM);
 
 const sample = createSurfaceSample({ kind: SURFACE_KIND.WATER, y: 4, metersPerWorldUnit: 2 });
 assert.equal(sample.vertical.elevationMeters, 8);
@@ -79,7 +74,7 @@ const elevatedLake = normalizeWaterBody({
   shape: 'area',
   pts: [{ x: -200, z: -200 }, { x: 200, z: -200 }, { x: 200, z: 200 }, { x: -200, z: 200 }],
   surfaceY: 1698.08,
-  geometrySource: 'overture-vector',
+  geometrySource: 'osm-shortbread',
   layer: 'water_polygons'
 });
 assert.equal(elevatedLake.waterKind, 'lake');

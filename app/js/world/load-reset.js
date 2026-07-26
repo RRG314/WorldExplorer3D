@@ -53,10 +53,6 @@ export function resetWorldForReload(options = {}) {
   const resetWorldFurnitureCaches = typeof options.resetWorldFurnitureCaches === 'function' ? options.resetWorldFurnitureCaches : () => {};
 
   appCtx.cancelWorldSurfaceSync?.();
-  if (typeof appCtx.resetEarthStreaming === 'function') {
-    appCtx.resetEarthStreaming('full_world_reload');
-  }
-  appCtx.initialEarthWorldRetired = false;
   appCtx.initialEarthDetailRadius = 0;
 
   appCtx.showLoad(`Loading ${locName}...`);

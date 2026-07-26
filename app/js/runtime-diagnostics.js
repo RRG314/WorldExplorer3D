@@ -160,18 +160,10 @@ function getWorldExplorerRuntimeDiagnostics() {
       : null,
     renderer: rendererSnapshot(),
     browserMemory: browserMemorySnapshot(),
-    streamingResources: appCtx.getStreamingVectorResourceSnapshot?.() || null,
     lastLoad: appCtx.perfStats?.lastLoad || null,
     renderReadiness: appCtx._lastWorldRenderReadiness || null,
     composer: composerSnapshot(),
     quality: appCtx.renderQualityLevel || null,
-    earthStreaming: appCtx.getEarthStreamingSnapshot?.() || null,
-    earthOrigin: {
-      lat: numberOrNull(appCtx.LOC?.lat),
-      lon: numberOrNull(appCtx.LOC?.lon),
-      rebases: numberOrNull(appCtx.earthOriginRebaseCount || 0),
-      initialWorldRetired: !!appCtx.initialEarthWorldRetired
-    },
     terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
     worldCounts: {
       buildings: appCtx.buildings?.length ?? null,

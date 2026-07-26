@@ -1,4 +1,4 @@
-import { createProvenance } from './data-contract.js?v=4';
+import { createProvenance } from './data-contract.js?v=5';
 import { createProviderRegistry } from './provider-registry.js?v=2';
 
 const DEFAULT_ENDPOINT = '/api/geospatial/aircraft';

@@ -1,4 +1,4 @@
-import { createProvenance } from './data-contract.js?v=4';
+import { createProvenance } from './data-contract.js?v=5';
 import { createProviderRegistry } from './provider-registry.js?v=2';
 
 const MARINE_API = 'https://marine-api.open-meteo.com/v1/marine';

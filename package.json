@@ -17,6 +17,7 @@
     "test:module-versions": "node scripts/test-module-version-consistency.mjs",
     "test:release-version": "node scripts/test-release-version.mjs",
     "test:maintainability": "node scripts/test-maintainability-guard.mjs",
+    "test:shadow-policy": "node scripts/test-shadow-policy.mjs",
     "test:app-runtime": "node scripts/test-app-runtime.mjs",
     "test:destination-schedulers": "node scripts/test-destination-schedulers.mjs",
     "test:product-ports": "node scripts/test-product-ports.mjs",
@@ -37,8 +38,6 @@
     "test:domain-boundaries": "node scripts/test-domain-dependency-boundaries.mjs",
     "test:world-load-transaction": "node scripts/test-world-load-transaction.mjs",
     "test:world-load-stage": "node scripts/test-world-load-stage.mjs",
-    "test:world-tile-compiler": "node scripts/test-world-tile-compiler.mjs",
-    "test:tile-coordinator": "node scripts/test-tile-coordinator.mjs",
     "test:navigation-surface-query": "node scripts/test-navigation-surface-query.mjs",
     "test:bridge-guardrails": "node scripts/test-bridge-guardrail-contract.mjs",
     "test:structure-visual-sampling": "node scripts/test-structure-visual-sampling.mjs",
@@ -70,9 +69,6 @@
     "test:hardware-performance": "node scripts/test-hardware-performance.mjs",
     "test:road-spatial-index": "node scripts/test-road-spatial-index.mjs",
     "test:surface-contract": "node scripts/test-surface-contract.mjs",
-    "test:overture-source": "node scripts/test-overture-tile-source.mjs",
-    "test:streaming-source": "node scripts/test-world-tile-compiler.mjs && node scripts/test-streaming-feature-budget.mjs && node scripts/test-render-provenance.mjs",
-    "test:continuous-renderer": "node scripts/test-continuous-renderer.mjs",
     "test:hosting-release-contract": "node scripts/test-hosting-release-contract.mjs",
     "test:hosting-size": "node scripts/test-hosting-size-budget.mjs",
     "test:retention": "node scripts/test-release-retention.mjs",
@@ -124,7 +120,6 @@
     "playwright": "^1.61.0"
   },
   "dependencies": {
-    "pmtiles": "4.4.1",
     "satellite.js": "5.0.0",
     "three": "0.128.0"
   }

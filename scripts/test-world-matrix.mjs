@@ -85,7 +85,7 @@ async function bootstrapRuntime(page, baseUrl) {
     return !!(
       ctx &&
       typeof ctx.loadRoads === 'function' &&
-      typeof ctx.switchEnv === 'function' &&
+      typeof ctx.commitEnvironment === 'function' &&
       ctx.ENV?.EARTH
     );
   }, { timeout: 120000 });
@@ -101,7 +101,7 @@ async function bootstrapRuntime(page, baseUrl) {
         ctx.runtimeReady === true &&
         typeof ctx.loadRoads === 'function' &&
         typeof ctx.setCustomLocation === 'function' &&
-        typeof ctx.switchEnv === 'function' &&
+        typeof ctx.commitEnvironment === 'function' &&
         ctx.ENV?.EARTH
       ) {
         break;
@@ -115,7 +115,9 @@ async function bootstrapRuntime(page, baseUrl) {
     ctx.loadingScreenMode = 'earth';
     ctx.gameStarted = true;
     ctx.paused = false;
-    ctx.switchEnv(ctx.ENV.EARTH);
+    if (!ctx.commitEnvironment(ctx.ENV.EARTH, { source: 'world_matrix_bootstrap' })) {
+      throw new Error('Earth runtime session could not be activated during world matrix bootstrap');
+    }
     document.getElementById('titleScreen')?.classList.add('hidden');
     document.getElementById('globeSelectorScreen')?.classList.remove('show');
     ['hud', 'minimap', 'floatMenuContainer', 'mainMenuBtn', 'controlsTab', 'coords', 'historicBtn'].forEach((id) => {

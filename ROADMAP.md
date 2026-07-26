@@ -4,6 +4,8 @@
 > [`docs/RELEASE_4_1_RECOVERY_PLAN.md`](docs/RELEASE_4_1_RECOVERY_PLAN.md).
 > Its preservation and classification status is recorded in
 > [`docs/RELEASE_4_1_RECOVERY_LEDGER.md`](docs/RELEASE_4_1_RECOVERY_LEDGER.md).
+> Fixed 4.1 ship criteria are recorded in
+> [`docs/RELEASE_4_1_ACCEPTANCE.md`](docs/RELEASE_4_1_ACCEPTANCE.md).
 > This broader roadmap cannot be used to skip a 4.1 phase gate.
 
 Last reviewed: 2026-07-23.
@@ -30,22 +32,18 @@ a promise that every phase will ship on a particular date.
 - `KNOWN_ISSUES.md` records confirmed limitations honestly. It is not a place to
   normalize defects that violate a release gate.
 
-## Architectural Decision: One Earth, One Tile Pipeline
+## Architectural Decision: One Earth, One Location Pipeline
 
 Version 4.0 has three distinct concepts that must remain separate:
 
-1. **Location selection** chooses the initial Earth coordinate and spawn intent.
-2. **World streaming** loads and retires geographic cells around the active
-   player.
+1. **Location selection** chooses the Earth coordinate and spawn intent.
+2. **World loading** atomically assembles the selected local area.
 3. **Multiplayer/MMO authority** synchronizes players and persistent room
    patches within relevant world cells.
 
-These concepts are necessary for a global world. The problem is not their
-existence. The current Earth renderer has both an initial location/OSM build
-path and a continuous Overture-tile build path. They use different geometry,
-batching, vegetation, and detail rules. That duplication creates avoidable
-seams and inconsistent results after the player travels away from the starting
-area.
+The unfinished continuous-world path was removed. Selected-location OSM loading
+is the only Earth renderer and must be consistent for every supported
+coordinate.
 
 The target architecture is:
 
@@ -56,30 +54,23 @@ WorldAddress
 WorldSession
     |
     v
-WorldTileScheduler ---- movement prediction and interest radius
-    |
-    v
-WorldTilePipeline ----- acquire -> normalize -> compose -> validate -> commit
+WorldLoadTransaction -- acquire -> normalize -> compose -> validate -> commit
     |                                            |
     |                                            +-- SurfaceQuery
     |                                            +-- collision/navigation
     v
-Scene cells + MMO room patches + transient actors
+Local scene + MMO room patches + transient actors
 ```
 
-The initial location becomes a scheduling policy:
+Each selected location follows one loading policy:
 
-- prioritize the spawn cell;
-- warm the immediate walking/driving ring;
-- prepare a wider aerial ring when required;
+- prioritize the spawn area;
+- load the walking/driving area within a bounded budget;
 - enter play after the spawn safety contract is ready;
-- continue using the same loaders and builders while the player travels.
-
-It must not create a different kind of Earth that later gets replaced by a
-second renderer.
+- cancel stale work and atomically replace the prior location.
 
 OpenStreetMap is the canonical Earth vector source. OSM Shortbread vector tiles
-provide global streamed coverage; bounded Overpass requests may add OSM tags or
+provide global selected-location coverage; bounded Overpass requests may add OSM tags or
 detail around the active area when the provider is healthy. Both paths must
 produce the same normalized OSM feature contracts and pass through the same
 geometry, surface, provenance, and validation stages.
@@ -98,7 +89,7 @@ when all of the following are documented:
 - benchmark evidence that it does not create geometry or visual inconsistency.
 
 Without that evidence, the Overture runtime path, configuration, tests, and
-source-specific compatibility fields are removed after the OSM streaming path
+source-specific compatibility fields are removed after the OSM location path
 passes parity.
 
 ## Architectural Decision: Multiplayer Remains an Overlay
@@ -206,13 +197,14 @@ After the three foundation changes, run a fresh audit covering:
 
 No deployment occurs until the audit passes.
 
-## Phase 2 — Global Consistency and Streaming Convergence
+## Phase 2 — Global Consistency for Location Loads
+
+For release 4.1, selected-location OSM worlds are the only Earth loading path
+and the primary certification target.
 
 ### 2.1 OSM-only source convergence
 
-Migrate continuous Earth streaming from Overture PMTiles to OSM Shortbread.
-
-- Use one OSM tile acquisition/cache owner for initial warm-up and travel.
+- Use one OSM acquisition/cache owner for every selected-location load.
 - Normalize Shortbread and Overpass data into the same road, corridor,
   structure, building, land-cover, water, and provenance contracts.
 - Preserve stable OSM source identity across tile fragments where the upstream
@@ -285,7 +277,7 @@ grade of the same bridge.
 
 ### 2.4 Spatial exclusion and occupancy
 
-Create one spatial-exclusion service used by initial and streamed content.
+Create one spatial-exclusion service used by every selected-location load.
 
 It prevents:
 

@@ -73,6 +73,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       enabled: gameplayReady,
       update(frame) {
         appCtx.updateCamera(frame.dt);
+        appCtx.updateShadowPolicyFrame?.();
         appCtx.updatePlanetarySky?.();
       }
     },

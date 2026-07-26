@@ -357,7 +357,6 @@ async function exerciseLifecycle(page) {
         reachableGeometries: reachable.geometries,
         reachableMaterials: reachable.materials,
         reachableTextures: reachable.textures,
-        pendingGeometryDisposals: Number(ctx.getStreamingVectorResourceSnapshot?.()?.pendingGeometryDisposals || 0),
         heapBytes: Number(performance.memory?.usedJSHeapSize || 0)
       });
     }
@@ -477,7 +476,6 @@ async function main() {
       finalModeCycle.reachableTextures <= warmModeCycle.reachableTextures,
       'Reachable scene texture count grew after mode warm-up'
     );
-    assert(finalModeCycle.pendingGeometryDisposals <= 192, 'Mode cycle left the geometry disposal queue over budget');
     assert(
       report.modeResourcePlateau.buildingDetailStatus !== 'loading',
       'Mode resource plateau started before deferred world detail settled'

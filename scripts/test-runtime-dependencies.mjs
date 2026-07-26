@@ -11,8 +11,7 @@ const MANIFEST_PATH = path.join(ROOT, 'app', 'js', 'modules', 'manifest.js');
 const VENDOR_INVENTORIES = [
   'three-r128',
   'firebase-12.16.0',
-  'satellite-5.0.0',
-  'pmtiles-4.4.1'
+  'satellite-5.0.0'
 ];
 
 function packageVersion(packageName) {
@@ -138,8 +137,7 @@ const localAdapterChecks = [
   ['app/js/platform/firebase/auth.js', 'vendor/firebase-12.16.0/firebase-auth.js'],
   ['app/js/platform/firebase/firestore.js', 'vendor/firebase-12.16.0/firebase-firestore.js'],
   ['app/js/platform/firebase/analytics.js', 'vendor/firebase-12.16.0/firebase-analytics.js'],
-  ['app/js/live-earth/satellites.js', 'vendor/satellite-5.0.0/satellite.es.js'],
-  ['app/js/world/overture-tile-source.js', 'vendor/pmtiles-4.4.1/index.js']
+  ['app/js/live-earth/satellites.js', 'vendor/satellite-5.0.0/satellite.es.js']
 ];
 for (const [file, requiredReference] of localAdapterChecks) {
   const source = fs.readFileSync(path.join(ROOT, file), 'utf8');
@@ -151,8 +149,7 @@ const moduleExportChecks = [
   ['app/js/platform/firebase/auth.js', ['getAuth', 'signInAnonymously']],
   ['app/js/platform/firebase/firestore.js', ['collection', 'getFirestore', 'serverTimestamp']],
   ['app/js/platform/firebase/analytics.js', ['getAnalytics', 'isSupported']],
-  ['app/vendor/satellite-5.0.0/satellite.es.js', ['propagate', 'twoline2satrec']],
-  ['app/vendor/pmtiles-4.4.1/index.js', ['PMTiles']]
+  ['app/vendor/satellite-5.0.0/satellite.es.js', ['propagate', 'twoline2satrec']]
 ];
 for (const [file, expectedExports] of moduleExportChecks) {
   const module = await import(pathToFileURL(path.join(ROOT, file)));

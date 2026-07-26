@@ -13,7 +13,8 @@ import {
   setSsaoEnabled as engineSetSsaoEnabled,
   setupPostProcessingPipeline as setupEnginePostProcessingPipeline,
   tryEnablePostProcessing as tryEnableEnginePostProcessing
-} from "./engine/quality.js?v=1";
+} from "./engine/quality.js?v=2";
+import { updateShadowAnchor } from "./engine/shadow-policy.js?v=1";
 import {
   createBuildingGroundPatch as createBuildingGroundPatchRuntime,
   getBuildingMaterial as getBuildingMaterialRuntime,
@@ -41,6 +42,7 @@ const engineState = {
   hdrLoadRequested: false,
   carPaintMaterial: null,
   ssaoEnabled: false,
+  shadowPolicy: null,
   grassDiffuse: null,
   grassNormal: null,
   grassRoughness: null,
@@ -217,6 +219,17 @@ function init() {
   return initEngineRuntime(buildEngineModuleContext());
 }
 
+function updateShadowPolicyFrame() {
+  const focus = appCtx.carMesh?.visible
+    ? appCtx.carMesh.position
+    : appCtx.camera?.position;
+  return updateShadowAnchor({
+    sun: appCtx.sun,
+    focus,
+    policy: engineState.shadowPolicy
+  });
+}
+
 syncTextureGlobals();
 
 Object.assign(appCtx, {
@@ -233,6 +246,7 @@ Object.assign(appCtx, {
   setSsaoEnabled,
   setHighQualityEnabled,
   setRenderQualityLevel,
+  updateShadowPolicyFrame,
   tryEnablePostProcessing
 });
 
@@ -249,5 +263,6 @@ export {
   setSsaoEnabled,
   setHighQualityEnabled,
   setRenderQualityLevel,
+  updateShadowPolicyFrame,
   tryEnablePostProcessing
 };

@@ -111,20 +111,6 @@ export async function finalizeLoadedWorld(options = {}) {
     }
   }
   appCtx.hideLoad();
-  if (typeof appCtx.primeAerialContext === 'function' && appCtx.getContinuousWorldEnabled?.() !== true) {
-    loadMetrics.aerialContext = { status: 'warming' };
-    globalThis.setTimeout(async () => {
-      try {
-        const layer = await appCtx.primeAerialContext({ minLoadedTiles: 9, timeoutMs: 12000 });
-        loadMetrics.aerialContext = {
-          status: 'ready',
-          loadedNearCenter: Number(layer?.loadedNearCenter || 0)
-        };
-      } catch (err) {
-        loadMetrics.aerialContext = { status: 'deferred', error: err?.message || String(err) };
-      }
-    }, 0);
-  }
 }
 
 export function createSyntheticFallbackWorld(options = {}) {

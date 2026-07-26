@@ -24,21 +24,16 @@ import {
     getRuntimeProductPorts
 } from './session-coordinator.js?v=2';
 import './real-estate.js?v=55';
-import './ground.js?v=70';
-import './terrain.js?v=150';
-import './world.js?v=263';
-import './earth-streaming.js?v=22';
-import './world/streaming-vector-chunks.js?v=56';
-import './world/load-continuous-world.js?v=13';
-import './world/streaming-aerial-context.js?v=34';
-import './earth-origin.js?v=4';
+import './ground.js?v=71';
+import './terrain.js?v=154';
+import './world.js?v=266';
 import './building-entry.js?v=4';
 import './interiors.js?v=9';
 import './multiplayer/room-world-patches.js?v=1';
 import { init, tryEnablePostProcessing } from './engine.js?v=80';
-import './physics.js?v=87';
+import './physics.js?v=88';
 import './walking.js?v=71';
-import './travel-mode.js?v=12';
+import './travel-mode.js?v=13';
 import { initBoatMode } from './boat-mode.js?v=36';
 import { setupFishingGame } from './fishing-game.js?v=2';
 import './weather.js?v=6';

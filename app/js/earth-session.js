@@ -236,9 +236,6 @@ async function finalizeEarthResume(resolved, isCurrent = () => true, options = {
     markEarthResumePhase('surface_sync_requested');
   }
   markEarthResumePhase('world_lod');
-  appCtx.resumeEarthStreaming?.(1400);
-  appCtx.updateEarthWorldStreaming?.(1);
-  markEarthResumePhase('earth_streaming_ready');
   appCtx.updateWorldLod?.(true);
   markEarthResumePhase('world_lod_ready');
   if (typeof appCtx.refreshBoatAvailability === 'function') {
@@ -378,7 +375,6 @@ export const earthDestinationAdapter = Object.freeze({
     loaded: hasLoadedEarthWorld(),
     roads: Array.isArray(appCtx.roads) ? appCtx.roads.length : 0,
     selection: String(appCtx.selLoc || ''),
-    streamingActive: !!appCtx.earthStreaming?.active,
     worldLoading: !!appCtx.worldLoading
   })
 });

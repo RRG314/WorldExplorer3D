@@ -1,4 +1,4 @@
-import { createRoadNameResolver } from './streaming-road-labels.js';
+import { createRoadNameResolver } from './road-labels.js';
 import Pbf from '../../vendor/vector-tile/pbf-3.2.1.mjs';
 import { VectorTile } from '../../vendor/vector-tile/mapbox-vector-tile-1.3.1.mjs';
 

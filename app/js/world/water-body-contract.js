@@ -167,7 +167,7 @@ function normalizeWaterBody(options = {}) {
     provenance: {
       dataset: options.geometrySource || options.dataset || 'unknown',
       featureId: sourceFeatureId,
-      tileKey: options.tileKey || options._streamChunkKey || null,
+      tileKey: options.tileKey || null,
       layer: options.layer || null
     }
   };

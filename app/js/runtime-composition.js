@@ -4,7 +4,7 @@ import {
   createSharedSceneScheduler,
   earthFrameOwnerDefinition,
   renderLoop
-} from './main.js?v=77';
+} from './main.js?v=78';
 import {
   initOceanModeUI,
   oceanDestinationAdapter,

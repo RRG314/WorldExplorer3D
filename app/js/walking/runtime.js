@@ -97,6 +97,7 @@ function createWalkingRuntimeHelpers({
         mode: "drive",
         angle: targetAngle,
         feetY: wasWalk ? walkerFeetY : finiteOr(car.y, 1.2) - 1.2,
+        preferredRoad: car.road || null,
         source: "drive_mode_switch"
       });
       appCtx.applyResolvedWorldSpawn(resolvedDriveSpawn, {

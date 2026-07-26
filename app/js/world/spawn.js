@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { inferSelectedLocationWaterKind } from "./water-location-hint.js?v=2";
 import { featuredArrivalNear } from "./featured-arrivals.js?v=6";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=21";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=22";
 import { createWorldSpawnSurfaceApi } from "./spawn-surface.js?v=6";
 
 let worldSpawnDeps = {
@@ -125,7 +125,8 @@ function evaluateDriveSpawnCandidate(x, z, options = {}) {
   const actorFeetY = Number.isFinite(desiredFeetY) ? desiredFeetY : terrainY;
   const nearestRoad = !options.skipRoadQuery && typeof worldSpawnDeps.findNearestRoad === "function" ? worldSpawnDeps.findNearestRoad(x, z, {
     y: actorFeetY + 1.2,
-    maxVerticalDelta: 18
+    maxVerticalDelta: 18,
+    preferredRoad: options.preferredRoad || null
   }) : null;
   const road = worldSpawnDeps.isVehicleRoad(nearestRoad?.road) ? nearestRoad.road : null;
   const onRoad = isRoadSurfaceReachable(nearestRoad, {
@@ -565,6 +566,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
   const direct = evaluateDriveSpawnCandidate(x, z, {
     angle,
     feetY: options.feetY,
+    preferredRoad: options.preferredRoad,
     source: options.source || "direct"
   });
   if (direct.valid && (!preferRoad || direct.onRoad)) return direct;

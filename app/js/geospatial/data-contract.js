@@ -113,10 +113,10 @@ const DATA_SOURCES = Object.freeze({
     homepage: 'https://worldexplorer3d.io/',
     description: 'Modeled route context that is not a live ADS-B or AIS observation.'
   }),
-  'osm-overture': Object.freeze({
-    id: 'osm-overture',
-    label: 'OpenStreetMap and Overture Maps',
-    operator: 'Open mapping contributors',
+  osm: Object.freeze({
+    id: 'osm',
+    label: 'OpenStreetMap',
+    operator: 'OpenStreetMap contributors',
     truthType: 'authoritative',
     licenseId: 'ODbL-1.0',
     licenseUrl: 'https://opendatacommons.org/licenses/odbl/1-0/',

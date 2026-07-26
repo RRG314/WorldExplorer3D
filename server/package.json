@@ -18,6 +18,7 @@
     "@colyseus/schema": "^4.0.28",
     "@colyseus/ws-transport": "^0.17.13",
     "@we3d/mmo-contracts": "*",
+    "express": "^5.1.0",
     "firebase-admin": "^14.2.0"
   },
   "devDependencies": {

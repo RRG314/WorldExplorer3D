@@ -100,14 +100,11 @@ export function assertWorldMatrixLocation(spec, result) {
   if (architecturalBuildings > 0) {
     const dimensions = result.buildingDimensions || {};
     const buildingSource = String(result.buildingDetail?.source || '');
-    const authoritativeBuildingSource =
-      buildingSource === 'overture-buildings-pmtiles' ||
-      buildingSource === 'shortbread-vector-buildings';
+    const authoritativeBuildingSource = buildingSource === 'shortbread-vector-buildings';
     assert(
       authoritativeBuildingSource,
       `${spec.id}: buildings did not use an authoritative mapped massing source ${JSON.stringify(result.buildingDetail)}`
     );
-    const overtureBuildings = Number(dimensions.geometrySources?.overture || 0);
     const streamedMappedBuildings = Number(dimensions.geometrySources?.['shortbread-vector'] || 0);
     const inferredFootprints = Number(dimensions.geometrySources?.inferred_road_frontage || 0);
     if (inferredFootprints > 0) {
@@ -125,18 +122,18 @@ export function assertWorldMatrixLocation(spec, result) {
       );
     }
     assert(
-      overtureBuildings > 0 || streamedMappedBuildings > 0 || inferredFootprints > 0,
+      streamedMappedBuildings > 0 || inferredFootprints > 0,
       `${spec.id}: rendered buildings lost authoritative or explicit inferred provenance ${JSON.stringify(dimensions)}`
     );
     assert(
       architecturalBuildings > 0 &&
-        (overtureBuildings + streamedMappedBuildings + inferredFootprints) / architecturalBuildings >= 0.9,
+        (streamedMappedBuildings + inferredFootprints) / architecturalBuildings >= 0.9,
       `${spec.id}: more than 10% of rendered buildings bypassed global or explicit inferred provenance ${JSON.stringify(dimensions.geometrySources)}`
     );
     const sourceDetails = result.buildingDetail?.sourceDetails || {};
-    const coverageIsWideEnough = buildingSource === 'shortbread-vector-buildings'
-      ? Number(sourceDetails.loaded || 0) >= 4 && Number(sourceDetails.zoom || 0) >= 14
-      : Number(sourceDetails.radiusDegrees || 0) >= 0.0135;
+    const coverageIsWideEnough =
+      Number(sourceDetails.loaded || 0) >= 4 &&
+      Number(sourceDetails.zoom || 0) >= 14;
     assert(coverageIsWideEnough, `${spec.id}: building coverage is smaller than the visible-world contract ${JSON.stringify(sourceDetails)}`);
     assert(Number(dimensions.minHeight) >= 0.2, `${spec.id}: building height fell below the usable minimum ${JSON.stringify(dimensions)}`);
     assert(
@@ -158,17 +155,10 @@ export function assertWorldMatrixLocation(spec, result) {
       assert(inferredBuckets >= 6, `${spec.id}: inferred building heights lack neighborhood-scale variation ${JSON.stringify(dimensions)}`);
     }
     if (spec.minimumAuthoritativeBuildingParts) {
-      if (buildingSource === 'overture-buildings-pmtiles') {
-        assert(
-          Number(dimensions.buildingParts || 0) >= spec.minimumAuthoritativeBuildingParts,
-          `${spec.id}: expected at least ${spec.minimumAuthoritativeBuildingParts} authoritative building parts ${JSON.stringify(dimensions)}`
-        );
-      } else {
-        assert(
-          Number(dimensions.metadataMatched || 0) > 0 && Number(sourceDetails.loaded || 0) >= 4,
-          `${spec.id}: mapped building fallback lost its metadata enrichment or visible coverage ${JSON.stringify({ dimensions, sourceDetails })}`
-        );
-      }
+      assert(
+        Number(dimensions.metadataMatched || 0) > 0 && Number(sourceDetails.loaded || 0) >= 4,
+        `${spec.id}: mapped building source lost its metadata enrichment or visible coverage ${JSON.stringify({ dimensions, sourceDetails })}`
+      );
     }
     if (result.counts.buildings >= 1000) {
       assert(

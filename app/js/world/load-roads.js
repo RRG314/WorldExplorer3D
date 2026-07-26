@@ -7,7 +7,7 @@ import {
   finishWorldLoadRuntimeSession,
   recordWorldSourceMetrics
 } from "./load-runtime-session.js?v=11";
-import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=18";
+import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=21";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   const waitForCoverage = appCtx.waitForTerrainCoverageAt;
@@ -62,7 +62,7 @@ export function createWorldRoadLoader(deps = {}) {
     decimateRoadCenterlineByDepth,
     earthSceneSuppressed,
     fetchOverpassJSON,
-    fetchGlobalBuildingData,
+    fetchShortbreadBuildingData,
     fetchBundledBuildingMetadata,
     fetchShortbreadWorldData,
     featureTileKeyForLatLon,
@@ -369,7 +369,7 @@ export function createWorldRoadLoader(deps = {}) {
           hideEarthSceneMeshes();
           break;
         }
-        const nodes = {};
+        let nodes = {};
         data.elements.filter((element) => element.type === 'node').forEach((node) => { nodes[node.id] = node; });
         appCtx._worldLoadNodes = nodes;
         const baselineFullWorld = perfModeNow === 'baseline';
@@ -530,6 +530,7 @@ export function createWorldRoadLoader(deps = {}) {
         if (Array.isArray(data?.elements)) data.elements.length = 0;
         data = null;
         appCtx._worldLoadNodes = null;
+        nodes = null;
 
         if (appCtx.roads.length > 0) {
           scheduleDeferredLandmarkLoad({
@@ -577,11 +578,11 @@ export function createWorldRoadLoader(deps = {}) {
             featureMinPolygonArea: FEATURE_MIN_POLYGON_AREA,
             fetchOverpassJSON,
             fetchPreferredMetadata: () => fetchBundledBuildingMetadata?.({ locationKey: appCtx.selLoc, lat: appCtx.LOC.lat, lon: appCtx.LOC.lon }),
-            fetchPreferredData: () => fetchGlobalBuildingData({
+            fetchPreferredData: () => fetchShortbreadBuildingData({
                 lat: appCtx.LOC.lat,
                 lon: appCtx.LOC.lon,
                 radius: deferredBuildingCacheMeta.featureRadius
-              }, (error) => recordLoadWarning('OSM building detail fallback', error)),
+              }),
             isActiveLoadContext,
             location: { lat: appCtx.LOC.lat, lon: appCtx.LOC.lon },
             limitWaysByTileBudget,

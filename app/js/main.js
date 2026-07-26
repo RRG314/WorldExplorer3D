@@ -232,9 +232,14 @@ function warmNearbyWorldRenderResources(radius = Number.POSITIVE_INFINITY) {
   const actor = appCtx.activeTransportActor?.()?.position || appCtx.car || { x: 0, z: 0 };
   const radiusSq = radius * radius;
   const restored = [];
+  const restoredActors = [];
+  for (const root of [appCtx.carMesh, appCtx.Walk?.state?.characterMesh]) {
+    if (!root) continue;
+    restoredActors.push({ root, visible: root.visible });
+    root.visible = true;
+  }
   const candidates = [...new Set([
     ...(appCtx.buildingMeshes || []),
-    ...(appCtx.aerialContextMeshes || []),
     ...(appCtx.landuseMeshes || []),
     ...(appCtx.roadMeshes || [])
   ])];
@@ -260,6 +265,9 @@ function warmNearbyWorldRenderResources(radius = Number.POSITIVE_INFINITY) {
       mesh.visible = visible;
       mesh.frustumCulled = frustumCulled;
       if (!parent && mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
+    }
+    for (let i = 0; i < restoredActors.length; i += 1) {
+      restoredActors[i].root.visible = restoredActors[i].visible;
     }
   }
   return performance.now() - startedAt;

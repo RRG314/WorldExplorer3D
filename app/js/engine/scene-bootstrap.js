@@ -495,18 +495,7 @@ export function initEngineRuntime(ctx) {
   } catch {
     console.warn('Tone mapping not supported');
   }
-  try {
-    appCtx.renderer.shadowMap.enabled = true;
-    appCtx.renderer.shadowMap.type = state.currentGpuTier === 'low' ? THREE.BasicShadowMap : THREE.PCFSoftShadowMap;
-  } catch {
-    console.warn('Shadows not supported, trying basic');
-    try {
-      appCtx.renderer.shadowMap.enabled = true;
-      appCtx.renderer.shadowMap.type = THREE.BasicShadowMap;
-    } catch {
-      console.warn('Shadows not supported at all');
-    }
-  }
+  if (appCtx.renderer.shadowMap) appCtx.renderer.shadowMap.enabled = false;
 
   document.body.prepend(appCtx.renderer.domElement);
 
@@ -550,19 +539,6 @@ export function initEngineRuntime(ctx) {
 
   appCtx.sun = new THREE.DirectionalLight(0xfff5e1, 1.2);
   appCtx.sun.position.set(100, 150, 50);
-  appCtx.sun.castShadow = true;
-  const shadowRes = state.currentGpuTier === 'high' ? 1024 : state.currentGpuTier === 'mid' ? 512 : 256;
-  appCtx.sun.shadow.mapSize.width = shadowRes;
-  appCtx.sun.shadow.mapSize.height = shadowRes;
-  appCtx.sun.shadow.camera.left = -120;
-  appCtx.sun.shadow.camera.right = 120;
-  appCtx.sun.shadow.camera.top = 120;
-  appCtx.sun.shadow.camera.bottom = -120;
-  appCtx.sun.shadow.camera.near = 0.5;
-  appCtx.sun.shadow.camera.far = 500;
-  appCtx.sun.shadow.bias = -0.0001;
-  appCtx.sun.shadow.normalBias = 0.02;
-  appCtx.sun.shadow.radius = 3;
   appCtx.scene.add(appCtx.sun);
   appCtx.scene.add(appCtx.sun.target);
 

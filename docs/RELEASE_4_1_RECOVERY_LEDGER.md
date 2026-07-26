@@ -41,17 +41,17 @@ The exact manifest is
 | `docs/RELEASE_4_1_RECOVERY_PLAN.md` | preserve | Governing recovery plan |
 | `app/index.html`, `bootstrap.js`, `app-entry.js`, module manifest | reimplement | Phase 1 application kernel and local dependency boot |
 | `camera/clearance.js` | evidence | Preserve stateful-clearance requirements; implement under Phase 5 traveler/camera owner |
-| `earth-origin.js`, `earth-streaming.js` | reimplement | Phase 1 `EarthSession`, Phase 2 `TileCoordinator` |
+| `earth-origin.js`, `earth-streaming.js` | delete | Continuous-world runtime removed; branch history is reference only |
 | `engine.js`, `scene-bootstrap.js`, `quality.js` | reimplement | `WorldScene`, frame scheduler, quality budget adapters |
 | `engine/shadow-manager.js` | evidence | Preserve measured shadow requirements; reimplement under `WorldScene` |
 | `building-facade-materials.js`, facade/foundation/material prototype modules | evidence | Preserve UV/material/foundation findings; reimplement after canonical building semantics |
 | `ground.js`, `terrain.js`, `terrain/**` | reimplement | Phase 3 `WorldSurfaceQuery`; no file-level cherry-pick |
 | `road-render.js`, structure profiles/semantics | evidence | Preserve topology/profile fixtures; canonical compiler owns the replacement |
 | `world/load-*`, `world/streaming-*`, `world.js` | delete | These are the duplicated owners Phase 2 replaces |
-| `world/transport-compiler.js`, `surface-contract.js`, `tile-lifecycle.js` | evidence | Contract ideas only; redesign against the clean owner model |
+| `world/transport-compiler.js`, `tile-lifecycle.js` | delete | Unused continuous-world prototype code removed |
 | `world/spatial-occupancy.js` | evidence | Preserve exact-geometry/index requirements; current elevated-foundation result is rejected |
 | `world/spatial-rebase.js` | evidence | Preserve coordinate/rebase invariants; implement through session/store/scene |
-| `world/vegetation.js`, `streaming-landcover.js`, `furniture.js` | reimplement | Phase 3 occupancy and Phase 4 LOD |
+| `world/vegetation.js`, `furniture.js` | reimplement | Phase 3 occupancy and Phase 4 LOD |
 | bridge, waterway, land-use, inferred-building modules | evidence | Keep fixtures and source semantics; reimplement in compiler/surface owners |
 | building/terrain/world collection and LOD changes | evidence | Resource and retirement requirements move to `WorldScene` |
 | walking, physics, plane, ocean, HUD changes | reimplement | Phase 5 traveler and Phase 6 product adapters |
@@ -96,7 +96,7 @@ The exact manifest is
 
 ### Replace with owner-level contracts
 
-- initial-load-only and streamed-only geometry tests;
+- duplicate location-loader geometry tests;
 - source-specific renderer tests;
 - tests that mutate shared context to simulate unrelated systems;
 - monolithic world-matrix assertions that report success without proving the
@@ -113,14 +113,14 @@ The exact manifest is
 
 ## Regression fixtures captured for recovery
 
-1. Baltimore continuous seam: streamed elevated/pass-through building
-   foundation occupies a rendered road.
+1. Baltimore occupancy: an elevated/pass-through building foundation can
+   occupy a rendered road.
 2. Baltimore road-debug comparison: source geometry may exist while normal
    material presentation makes roads visually unreadable.
 3. Steep urban terrain: roads can be vertically coherent at the actor while
    the composed world remains visually implausible.
-4. Continuous travel: late structure rebuilds can publish resource retirement
-   after an earlier empty-queue observation.
+4. Repeated location loading: late structure work must not publish after a
+   newer world transaction commits.
 5. Software-WebGL multi-canvas captures may be black or materially different;
    they are diagnostics, not production visual approval.
 

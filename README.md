@@ -20,7 +20,6 @@ Highlights:
 - Preset cities, geolocation, coordinate entry, and an interactive globe for choosing locations worldwide.
 - Live Earth views for observed satellites, earthquakes, aircraft, current weather, community street imagery, modeled marine conditions, and NOAA water-level/tide coverage.
 - Walk, drive, drone, plane, boat, underwater, rover, astronaut, and rocket traversal.
-- Optional continuous Earth streaming for longer trips, with quality and distance budgets for ground and aerial play.
 - In-session Earth, Moon, Mars, ocean, and space transitions without a page reload.
 - A navigable solar system with planets, moons, asteroid and Kuiper belts, spacecraft, and inner/full system maps.
 - Deep-space destinations including catalog-backed star systems, nebulae, galaxies, and black-hole encounters.

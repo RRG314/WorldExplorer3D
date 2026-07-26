@@ -9,6 +9,10 @@ import {
   segmentIntersection2D,
   smoothstep01
 } from './structure-semantics/geometry.js?v=1';
+import {
+  createSegmentIndex,
+  querySegmentIndex
+} from './structure-semantics/station-segment-index.js?v=1';
 
 const CONNECTION_CELL_SIZE = 3;
 const CONNECTION_MAX_DISTANCE = 2.6;
@@ -106,13 +110,22 @@ function buildFeatureStations(feature, context = {}) {
     if (semantics.terrainMode === 'elevated' && otherOrder > ownOrder) continue;
     if (semantics.terrainMode === 'subgrade' && otherOrder < ownOrder) continue;
 
+    const otherSegmentIndex = createSegmentIndex(other);
     for (let segA = 0; segA < points.length - 1; segA++) {
       const a1 = points[segA];
       const a2 = points[segA + 1];
       const segLen = Math.hypot(a2.x - a1.x, a2.z - a1.z);
       if (!(segLen > 0.01)) continue;
-      for (let segB = 0; segB < other.pts.length - 1; segB++) {
-        const intersection = segmentIntersection2D(a1, a2, other.pts[segB], other.pts[segB + 1]);
+      const segmentBounds = {
+        minX: Math.min(a1.x, a2.x),
+        maxX: Math.max(a1.x, a2.x),
+        minZ: Math.min(a1.z, a2.z),
+        maxZ: Math.max(a1.z, a2.z)
+      };
+      const candidates = querySegmentIndex(otherSegmentIndex, segmentBounds);
+      for (const otherSegment of candidates) {
+        if (!boundsIntersect(segmentBounds, otherSegment.bounds)) continue;
+        const intersection = segmentIntersection2D(a1, a2, otherSegment.start, otherSegment.end);
         if (!intersection) continue;
         const distance = distances[segA] + segLen * intersection.t;
         let target = defaultTarget;

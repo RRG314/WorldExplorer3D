@@ -294,6 +294,5 @@ export function supplementSparseBuildingData(data, appCtx, options = {}) {
     residentialRoadEvidence: inferred.residentialRoadEvidence
   };
   data._inferredBuildings = summary;
-  if (data._overtureBuildings) data._overtureBuildings.inferredFootprints = summary;
   return summary;
 }

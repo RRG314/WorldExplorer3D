@@ -1,7 +1,6 @@
 const SURFACE_SCHEMA_VERSION = 1;
 
 const SOURCE_PROFILE = Object.freeze({
-  CONTINUOUS_GLOBAL: 'continuous_global',
   LOCATION_OSM: 'location_osm'
 });
 
@@ -21,7 +20,6 @@ const VERTICAL_DATUM = Object.freeze({
 });
 
 const EARTH_TRAVERSAL_BOUNDS = Object.freeze({
-  [SOURCE_PROFILE.CONTINUOUS_GLOBAL]: Object.freeze({ horizontalRadius: null, originRebase: true }),
   [SOURCE_PROFILE.LOCATION_OSM]: Object.freeze({ horizontalRadius: 5000, originRebase: false })
 });
 
@@ -85,10 +83,8 @@ function clamp01(value) {
   return Math.max(0, Math.min(1, finiteOr(value, 0)));
 }
 
-function activeSourceProfile(appCtx) {
-  return appCtx.getContinuousWorldEnabled?.() === true
-    ? SOURCE_PROFILE.CONTINUOUS_GLOBAL
-    : SOURCE_PROFILE.LOCATION_OSM;
+function activeSourceProfile() {
+  return SOURCE_PROFILE.LOCATION_OSM;
 }
 
 function earthTraversalBounds(profile = SOURCE_PROFILE.LOCATION_OSM) {
@@ -111,7 +107,6 @@ function sourceIdentity(feature = null) {
   const tags = feature?.tags || {};
   return String(
     tags._sourceFeatureId ||
-    tags._overtureFeatureId ||
     feature?.sourceFeatureId ||
     feature?.id ||
     ''
@@ -125,11 +120,7 @@ function provenanceFor(feature, options = {}) {
   let confidence = finiteOr(options.confidence, 0.7);
   let fallback = options.fallback === true;
 
-  if (source.includes('overture')) {
-    provider = 'Overture Maps Foundation';
-    dataset = 'Overture Maps';
-    confidence = 0.92;
-  } else if (source.includes('shortbread')) {
+  if (source.includes('shortbread')) {
     provider = 'OpenStreetMap Foundation';
     dataset = 'OSM Shortbread vector tiles';
     confidence = 0.9;

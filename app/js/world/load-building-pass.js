@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=21";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=22";
 import {
   buildingSeedFromIdentity,
   inferFallbackBuildingHeightMeters,
@@ -41,8 +41,6 @@ export function buildBuildingGeometryPass(options = {}) {
     mappedRoof: 0,
     mappedName: 0,
     mappedFacadeColor: 0,
-    overture: 0,
-    overtureParts: 0,
     inferredFootprints: 0
   };
   const useRdtBudgeting = options.useRdtBudgeting === true;
@@ -184,7 +182,6 @@ export function buildBuildingGeometryPass(options = {}) {
   const shouldUseTieredMassing = (buildingType, height, footprintArea, footprintWidth, footprintDepth, denseUrbanContext, lodTier, buildingSemantics, tags = {}) => {
     if (lodTier !== 'near') return false;
     if (buildingSemantics?.partKind && buildingSemantics.partKind !== 'full') return false;
-    if (tags._geometrySource === 'overture') return false;
     const type = String(buildingType || '').toLowerCase();
     if (['industrial', 'warehouse', 'church', 'cathedral', 'stadium', 'school', 'hospital'].includes(type)) return false;
     const minSpan = Math.min(Math.max(0, footprintWidth || 0), Math.max(0, footprintDepth || 0));
@@ -284,6 +281,7 @@ export function buildBuildingGeometryPass(options = {}) {
 
   const lodNearDist = lodThresholds.near;
   const buildingDetailDist = Math.min(lodNearDist, 300);
+  let unbatchedNearBuildings = 0;
   let unbatchedMidBuildings = 0;
   buildingWays.forEach((way) => {
     const compactCoordinates = way?._coordinates;
@@ -383,10 +381,6 @@ export function buildBuildingGeometryPass(options = {}) {
     if (roofShape) loadMetrics.buildingDimensions.mappedRoof += 1;
     if (way.tags.name) loadMetrics.buildingDimensions.mappedName += 1;
     if (mappedFacadeColor) loadMetrics.buildingDimensions.mappedFacadeColor += 1;
-    if (way.tags._geometrySource === 'overture') {
-      loadMetrics.buildingDimensions.overture += 1;
-      if (way.tags['building:part']) loadMetrics.buildingDimensions.overtureParts += 1;
-    }
     if (way.tags._geometrySource === 'inferred_road_frontage') {
       loadMetrics.buildingDimensions.inferredFootprints += 1;
     }
@@ -605,8 +599,12 @@ export function buildBuildingGeometryPass(options = {}) {
       appCtx.buildingMeshes.push(roofDetailMesh);
     }
 
-    if (lodTier === 'near') loadMetrics.lod.near += 1;
-    else loadMetrics.lod.mid += 1;
+    if (lodTier === 'near') {
+      loadMetrics.lod.near += 1;
+      unbatchedNearBuildings += 1;
+    } else {
+      loadMetrics.lod.mid += 1;
+    }
 
     const shouldCreateGroundPatch =
       lodTier === 'near' &&
@@ -656,6 +654,9 @@ export function buildBuildingGeometryPass(options = {}) {
         batchMidLodBuildingMeshes();
         unbatchedMidBuildings = 0;
       }
+    } else if (!appCtx.disableNearBuildingBatching && unbatchedNearBuildings >= 480) {
+      batchNearLodBuildingMeshes();
+      unbatchedNearBuildings = 0;
     }
   });
 
