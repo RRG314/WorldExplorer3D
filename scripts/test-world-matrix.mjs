@@ -497,7 +497,7 @@ async function loadLocation(page, spec) {
       }
     }
     if (
-      customStructureProbe?.applied &&
+      (exerciseModes || customStructureProbe?.applied) &&
       initialSpawn?.valid !== false &&
       typeof ctx.applyResolvedWorldSpawn === 'function'
     ) {
@@ -1056,6 +1056,25 @@ async function main() {
         }
         await page.waitForTimeout(800);
         result.visualDiagnostics = await captureViewport(page, path.join(outputDir, `${spec.id}.png`));
+        if (
+          result.expectedStart !== 'water' &&
+          result.initialSpawn?.mode === 'drive' &&
+          result.visualDiagnostics?.cameraMode === 0
+        ) {
+          const camera = result.visualDiagnostics.camera;
+          const actor = result.landPresentation;
+          const chaseDistance = camera && actor ?
+            Math.hypot(
+              Number(camera.x) - Number(actor.actorX),
+              Number(camera.y) - Number(actor.carY),
+              Number(camera.z) - Number(actor.actorZ)
+            ) :
+            0;
+          assert(
+            chaseDistance >= 2.4,
+            `${spec.id}: chase camera collapsed into the vehicle or nearby geometry (${chaseDistance.toFixed(2)}m)`
+          );
+        }
         if (spec.expectedRoadStructure === 'tunnel') {
           await captureTunnelPortalTraversal(page, spec, result, outputDir);
           assertWorldMatrixLocation(spec, result);

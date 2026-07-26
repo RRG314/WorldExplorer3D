@@ -27,7 +27,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=41";
+} from "./world/spawn.js?v=42";
 import {
   scheduleDeferredStructureRefresh,
   scheduleDeferredWorldLinearFeatureLoad

@@ -518,7 +518,28 @@ function resolveProjectedRoadSpawn(targetX, targetZ, options = {}) {
   const departure = spawnDepartureAssessment(point.x, point.z, angle, 'drive');
   if (!departure.valid) return null;
   if (departure.reverseHeading) evaluated.angle += Math.PI;
-  return evaluated;
+  const baseScore =
+    Number(nearest.dist || 0) +
+    slopePenaltyAt(point.x, point.z) +
+    Math.max(0, (Number(evaluated.slopeDeg) || 0) - 8) * 4.5 +
+    departure.penalty;
+  const enclosurePenalty = spawnEnclosurePenalty(
+    point.x,
+    point.z,
+    evaluated.angle,
+    'drive'
+  );
+  return {
+    ...evaluated,
+    baseScore,
+    enclosurePenalty,
+    score: baseScore + enclosurePenalty,
+    departureClearance: {
+      forwardBlocked: departure.forwardBlocked,
+      reverseBlocked: departure.reverseBlocked,
+      reversed: departure.reverseHeading
+    }
+  };
 }
 
 function fallbackResolvedSpawn(mode = "drive", options = {}) {
@@ -625,12 +646,19 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
       angle,
       maxRadius: options.maxGroundRadius
     }) : null;
-  const roadFallback = projectedRoad || localGroundFallback || searchNearestSafeRoadSpawn(x, z, {
+  const searchedRoad = searchNearestSafeRoadSpawn(x, z, {
     mode: "drive",
     angle,
     feetY: options.feetY,
     maxDistance: options.maxRoadDistance
   });
+  const rankedRoadCandidates = [projectedRoad, searchedRoad].filter(Boolean);
+  rankedRoadCandidates.sort((a, b) => {
+    const aScore = Number.isFinite(a.score) ? a.score : Infinity;
+    const bScore = Number.isFinite(b.score) ? b.score : Infinity;
+    return aScore - bScore;
+  });
+  const roadFallback = localGroundFallback || rankedRoadCandidates[0] || null;
   if (roadFallback) return roadFallback;
   if (direct.valid) return direct;
 

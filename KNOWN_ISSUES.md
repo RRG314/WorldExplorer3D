@@ -16,8 +16,8 @@ approval to ignore a reproducible defect.
 - Passing source counts, runtime counters, or unit tests do not clear a world
   frame with missing roads, road/building overlap, invalid grade separation,
   or similarly broken composition.
-- The fixed Apple Metal structure/mountain subset is mechanically green but
-  not fully approved. The roadless Swiss Alps fixture now starts on its mapped
+- The fixed Apple Metal structure/mountain subset is mechanically green and
+  its current frames have passed stabilization review. The roadless Swiss Alps fixture now starts on its mapped
   OSM footway at an 11.9-degree slope, and the unsupported steep land-cover
   slabs are removed. Snow presentation remains plain and thin distant terrain
   edges can still be visible, but these are tracked fidelity limitations
@@ -27,6 +27,9 @@ approval to ignore a reproducible defect.
   mechanically coherent, while portal materials and architecture remain
   visually basic. Golden Gate Bridge now loads inside the unchanged 20-second
   release budget after bounded spawn candidate validation.
+- Regional building massing, facades, water, boats, snow, and rural terrain
+  remain visibly simplified. These are documented fidelity limits for 4.1,
+  not claims that the later reconstruction and simulation roadmap is complete.
 
 ## Map Coverage
 

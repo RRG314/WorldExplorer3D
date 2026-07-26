@@ -79,12 +79,12 @@ production visual quality by itself.
 | OSM-only selected-location runtime | complete locally |
 | Dense Baltimore cold load | passing at 12.9 s on the reference hardware run |
 | Shadow policy | implemented; first Baltimore hardware frame accepted, wider time/location gate open |
-| Road visibility | Baltimore accepted; fixed geography gate open |
+| Road visibility | representative frames reviewed; final combined fixed-geography rerun open after the last camera/tunnel policy corrections |
 | Surface/occupancy and mountain paths | Swiss Alps structural blocker cleared: mapped OSM footway spawn at 11.9°, four rendered path meshes, and no unsupported steep land-cover slabs; thin distant terrain edges remain a known fidelity limitation |
-| Sustained Baltimore walk/drive | straight and S-turn profiles pass at ~59.9 FPS median; focused camera clearance passes, while bridge/tunnel/mountain geography remains open |
-| Repeated resource stability | open |
-| Retained product journeys | focused destination, title/planetary, plane/interior, and editor/multiplayer journeys pass; account, mobile completion, and final combined candidate remain open |
-| Dependency/security review | open: optional Firestore chain advisory requires resolution or recorded review |
+| Sustained Baltimore walk/drive | straight and S-turn profiles pass at ~59.9 FPS median; fixed camera geography now rejects a collapsed chase view and Monaco retains 10.7 m clearance |
+| Repeated resource stability | passing: three destination cycles retain canvas/frame ownership; five mode cycles retain identical reachable resources and finish at 96.2% of the warm heap median |
+| Retained product journeys | focused destination, title/planetary, plane/interior, editor/multiplayer, account service, and mobile device-layout journeys pass; final combined candidate remains open |
+| Dependency/security review | open: zero critical advisories; five root and seven Functions high findings remain in the Firebase/Google transitive chain and require upgrade validation or recorded review |
 | Version, notes, immutable artifact, preview, rollback | not started until runtime gates pass |
 
 The focused Golden Gate/Holland/Alps hardware subset is not a release approval.

@@ -60,6 +60,7 @@ function tunnelCameraY(targetY, x, z, roadY, semantics) {
 }
 
 function syncTunnelGroundOcclusion(insideTunnel) {
+  appCtx.tunnelWaterOcclusionActive = insideTunnel;
   const ground = appCtx.groundFallbackMesh;
   if (ground?.userData?.isGroundPlane) ground.visible = !insideTunnel;
   for (const mesh of appCtx.landuseMeshes || []) {

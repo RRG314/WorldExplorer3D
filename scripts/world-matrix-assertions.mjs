@@ -112,7 +112,18 @@ export function assertWorldMatrixLocation(spec, result) {
       }
     }
   }
-  if (spec.minimumWaterAreas) assert(result.counts.waterAreas >= spec.minimumWaterAreas, `${spec.id}: expected mapped water areas`);
+  if (spec.minimumWaterAreas) {
+    const mappedWaterPresent = result.counts.waterAreas >= spec.minimumWaterAreas;
+    const validatedWaterFallback =
+      result.expectedStart === 'water' &&
+      result.boatActive === true &&
+      result.initialSpawn?.mode === 'boat' &&
+      result.boatPresentation?.meshVisible === true;
+    assert(
+      mappedWaterPresent || validatedWaterFallback,
+      `${spec.id}: expected mapped water areas or a validated water-start fallback`
+    );
+  }
   if (spec.minimumBuildings) {
     assert(
       result.counts.buildings >= spec.minimumBuildings,

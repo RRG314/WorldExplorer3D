@@ -41,7 +41,7 @@ import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boa
 import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=5";
 import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=2";
 import { createBoatModePolicy } from "./boat-mode/policy.js?v=1";
-import { boatPromptBlockedBySubgradeTravel } from "./boat-mode/prompt-policy.js?v=1";
+import { boatPromptBlockedBySubgradeTravel } from "./boat-mode/prompt-policy.js?v=2";
 
 const BOAT_PROMPT_DISTANCE = 18;
 const BOAT_ENTRY_OFFSET = 9;

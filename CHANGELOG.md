@@ -32,6 +32,12 @@
 - Kept ordinary custom walking arrivals off subgrade tunnel segments and
   at-grade surfaces inside mapped water; tunnel traversal remains available
   through its dedicated entry/interior/exit path.
+- Ranked exact projected-road starts through the same bounded enclosure
+  policy as other road candidates, preventing dense or steep locations from
+  collapsing the chase camera into nearby geometry.
+- Suppressed boat availability whenever the tunnel renderer owns water
+  occlusion, including the brief portal transition where road ownership can
+  move between connected segments.
 - Kept at-grade navigation surfaces owned by the active terrain sampler after streamed terrain replacement, preventing ordinary roads from retaining stale elevations.
 - Made tunnel water suppression persistent across LOD refreshes and restored normal water visibility ownership on exit.
 - Applied active offshore boat visibility ownership to every asynchronously attached terrain tile, preventing late terrain from appearing through open-ocean presentation.
