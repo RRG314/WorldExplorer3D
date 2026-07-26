@@ -47,7 +47,7 @@ import './planetary/moon-sky.js?v=1';
 import './planetary/tracks.js?v=1';
 import './game.js?v=58';
 import './input.js?v=61';
-import './hud.js?v=77';
+import './hud.js?v=78';
 import './map.js?v=60';
 import { composeRuntimeOwnership, renderLoop } from './runtime-composition.js';
 import './memory.js?v=56';
