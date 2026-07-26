@@ -105,7 +105,11 @@ const steps = [
       ].join(',')
     }
   },
-  { name: 'Final hosting artifact parity', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify'] }
+  {
+    name: 'Rebuild final production hosting artifact',
+    cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'build', '--firebase-env', 'production']
+  },
+  { name: 'Final production hosting artifact parity', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify'] }
 ];
 
 for (const step of steps) {
