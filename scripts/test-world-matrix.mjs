@@ -496,6 +496,23 @@ async function loadLocation(page, spec) {
         ) : [];
       }
     }
+    if (
+      customStructureProbe?.applied &&
+      initialSpawn?.valid !== false &&
+      typeof ctx.applyResolvedWorldSpawn === 'function'
+    ) {
+      ctx.setTravelMode?.(initialSpawn.mode || 'drive', {
+        source: 'world_matrix_restore_initial_spawn',
+        emitTutorial: false,
+        force: true
+      });
+      ctx.applyResolvedWorldSpawn(initialSpawn, { mode: initialSpawn.mode || 'drive' });
+      actorX = Number(initialSpawn.x);
+      actorZ = Number(initialSpawn.z);
+      actorFeetY = initialSpawn.mode === 'walk' ?
+        Number(initialSpawn.walkY) - 1.7 :
+        Number(initialSpawn.carY) - 1.2;
+    }
 
     const buildingPresentation = {
       meshCount: 0,

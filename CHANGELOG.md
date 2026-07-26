@@ -29,6 +29,9 @@
 - Bounded expensive spawn collision/surface validation behind a cheap
   geometry shortlist, removing full-world candidate validation from sparse
   origin searches without weakening the existing spawn rules.
+- Kept ordinary custom walking arrivals off subgrade tunnel segments and
+  at-grade surfaces inside mapped water; tunnel traversal remains available
+  through its dedicated entry/interior/exit path.
 - Kept at-grade navigation surfaces owned by the active terrain sampler after streamed terrain replacement, preventing ordinary roads from retaining stale elevations.
 - Made tunnel water suppression persistent across LOD refreshes and restored normal water visibility ownership on exit.
 - Applied active offshore boat visibility ownership to every asynchronously attached terrain tile, preventing late terrain from appearing through open-ocean presentation.

@@ -55,7 +55,15 @@ function evaluateWalkSpawnCandidate(x, z, options = {}) {
   });
   const road = onRoadSurface ? nearestRoad?.road || null : null;
   let surfaceY = onRoadSurface && Number.isFinite(nearestRoad?.y) ? nearestRoad.y : walkBaseY;
-  if (worldSpawnDeps.isInsideWaterArea(x, z) && !onRoadSurface) {
+  const insideMappedWater = worldSpawnDeps.isInsideWaterArea(x, z);
+  const roadTerrainMode = road?.structureSemantics?.terrainMode || "at_grade";
+  if (
+    insideMappedWater &&
+    (
+      !onRoadSurface ||
+      (options.rejectAtGradeWater === true && roadTerrainMode === "at_grade")
+    )
+  ) {
     return { valid: false, reason: "inside_water", terrainY };
   }
   const containingBuilding = worldSpawnDeps.buildingContainingPoint(x, z, 4, {
@@ -353,6 +361,12 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
     for (let r = 0; r < traversableFeatures.length; r++) {
       const feature = traversableFeatures[r];
       if (!Array.isArray(feature?.pts) || feature.pts.length < 2) continue;
+      if (
+        options.excludeSubgrade === true &&
+        feature?.structureSemantics?.terrainMode === "subgrade"
+      ) {
+        continue;
+      }
       const segmentLengths = [];
       let featureLength = 0;
       for (let i = 0; i < feature.pts.length - 1; i++) {
@@ -413,6 +427,7 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
         evaluateWalkSpawnCandidate(raw.candidate.x, raw.candidate.z, {
           angle: raw.angle,
           feetY: options.feetY,
+          rejectAtGradeWater: options.rejectAtGradeWater === true,
           source: "walk_surface_search"
         });
       if (!evaluated.valid) continue;
@@ -576,7 +591,9 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     const surfaceFallback = searchNearestSafeRoadSpawn(x, z, {
       mode: "walk",
       angle,
-      maxDistance: options.maxRoadDistance
+      maxDistance: options.maxRoadDistance,
+      excludeSubgrade: options.excludeSubgrade === true,
+      rejectAtGradeWater: options.rejectAtGradeWater === true
     });
     if (surfaceFallback) return surfaceFallback;
     if (direct.valid) return direct;
@@ -791,12 +808,20 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
   const structureMode = exactRoad?.road?.structureSemantics?.terrainMode || "at_grade";
   const roadHalfWidth = Math.max(2, Number(exactRoad?.road?.width || 0) * 0.5 + 1);
   const structureFeetY = structureMode !== "at_grade" && exactRoad?.dist <= roadHalfWidth && Number.isFinite(exactRoad?.y) ? exactRoad.y : null;
+  const preferCustomWalkSurface =
+    mode === "walk" &&
+    worldSpawnDeps.traversableFeaturesForMode("walk").length > 0;
   return applySpawnTarget(exactRoad?.x || 0, exactRoad?.z || 0, {
     ...options,
     mode,
-    feetY: Number.isFinite(structureFeetY) ? structureFeetY : options.feetY,
+    feetY:
+      structureMode === "elevated" && Number.isFinite(structureFeetY) ?
+        structureFeetY :
+        options.feetY,
     preferRoad: mode === "drive" || Number.isFinite(structureFeetY),
-    preferWalkSurface: preferMappedWalkSurface
+    preferWalkSurface: preferMappedWalkSurface || preferCustomWalkSurface,
+    excludeSubgrade: mode === "walk",
+    rejectAtGradeWater: mode === "walk"
   });
 }
 

@@ -21,11 +21,12 @@ approval to ignore a reproducible defect.
   OSM footway at an 11.9-degree slope, and the unsupported steep land-cover
   slabs are removed. Snow presentation remains plain and thin distant terrain
   edges can still be visible, but these are tracked fidelity limitations
-  rather than the original broken geometry. Holland Tunnel traversal has a
-  coherent interior, but its initial portal/urban composition contains
-  overlapping and clipped structure geometry. Golden Gate Bridge now loads in
-  12.4 seconds on the reference run after bounded spawn candidate validation,
-  inside the unchanged 20-second release budget.
+  rather than the original broken geometry. Holland Tunnel now starts on the
+  nearest safe mapped pedestrian surface instead of inside the subgrade shell
+  or mapped water; its dedicated entry/interior/exit traversal remains
+  mechanically coherent, while portal materials and architecture remain
+  visually basic. Golden Gate Bridge now loads inside the unchanged 20-second
+  release budget after bounded spawn candidate validation.
 
 ## Map Coverage
 

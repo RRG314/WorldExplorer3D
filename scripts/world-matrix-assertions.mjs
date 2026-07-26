@@ -71,6 +71,11 @@ export function assertWorldMatrixLocation(spec, result) {
       );
     }
     if (spec.expectedRoadStructure === 'tunnel' && result.tunnelPortalTraversal) {
+      assert(
+        result.initialSpawn?.source === 'walk_surface_search' &&
+        result.initialSpawn?.terrainMode !== 'subgrade',
+        `${spec.id}: initial arrival remained inside the subgrade tunnel shell ${JSON.stringify(result.initialSpawn)}`
+      );
       const tunnelVisuals = result.structurePresentation?.tunnelVisuals || {};
       assert(tunnelVisuals.tunnelRoads > 0, `${spec.id}: no mapped tunnel roads were registered ${JSON.stringify(tunnelVisuals)}`);
       assert(tunnelVisuals.walls > 0 && tunnelVisuals.roofs > 0 && tunnelVisuals.floors > 0, `${spec.id}: tunnel shell is incomplete ${JSON.stringify(tunnelVisuals)}`);

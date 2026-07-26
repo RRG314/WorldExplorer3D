@@ -90,6 +90,7 @@ production visual quality by itself.
 The focused Golden Gate/Holland/Alps hardware subset is not a release approval.
 Golden Gate is structurally coherent and its isolated cold load now passes at
 12.4 seconds after bounded spawn validation. Holland Tunnel's generated
-interior traversal is coherent, while its
-initial portal/urban frame is visually rejected for overlapping and clipped
-geometry.
+entry/interior/exit traversal is coherent. Its ordinary arrival now selects a
+safe mapped pedestrian surface outside the subgrade shell and mapped water;
+the previous clipped overview was the matrix's structure-probe pose, not the
+product's initial frame.
