@@ -20,6 +20,12 @@
 - Made multiplayer room synchronization idempotent when the room uses the
   already-loaded Earth coordinates, preserving the committed OSM world and
   updating location authority instead of rebuilding identical geometry.
+- Made broad steep natural/agricultural OSM polygons semantic land-cover
+  inputs while retaining DEM + WorldCover as the visible terrain owner;
+  explicit water, parking, and paved surfaces remain mapped geometry.
+- Made roadless land locations start on their mapped pedestrian network when
+  one exists, with fixed-geography coverage for rendered path ownership,
+  endpoint clearance, and walkable slope.
 - Kept at-grade navigation surfaces owned by the active terrain sampler after streamed terrain replacement, preventing ordinary roads from retaining stale elevations.
 - Made tunnel water suppression persistent across LOD refreshes and restored normal water visibility ownership on exit.
 - Applied active offshore boat visibility ownership to every asynchronously attached terrain tile, preventing late terrain from appearing through open-ocean presentation.

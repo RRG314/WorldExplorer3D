@@ -24,9 +24,9 @@ import {
     getRuntimeProductPorts
 } from './session-coordinator.js?v=2';
 import './real-estate.js?v=55';
-import './ground.js?v=71';
+import './ground.js?v=72';
 import './terrain.js?v=154';
-import './world.js?v=268';
+import './world.js?v=269';
 import './building-entry.js?v=4';
 import './interiors.js?v=9';
 import './multiplayer/room-world-patches.js?v=1';

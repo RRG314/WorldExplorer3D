@@ -26,6 +26,11 @@ export function assertWorldMatrixLocation(spec, result) {
       Number(result.initialSpawn?.slopeDeg) <= 22,
       `${spec.id}: sparse mapped path spawn exceeded the walkable slope contract ${JSON.stringify(result.initialSpawn)}`
     );
+    assert(
+      Number(result.counts?.linearFeatures || 0) > 0 &&
+      Number(result.counts?.linearFeatureMeshes || 0) > 0,
+      `${spec.id}: sparse pedestrian network has no rendered path product ${JSON.stringify(result.counts)}`
+    );
   }
   if (spec.expectedTerrainMode) {
     const acceptableTerrainModes = spec.acceptableTerrainModes || [spec.expectedTerrainMode];

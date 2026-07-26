@@ -48,6 +48,8 @@ const DEVELOPED_SURFACES = new Set([
   'industrial', 'retail', 'parking', 'paved'
 ]);
 const surfaceCompositionCache = new Map();
+const STEEP_SEMANTIC_LANDCOVER_GRADE = 0.075;
+const STEEP_SEMANTIC_LANDCOVER_MIN_SPAN = 120;
 
 function surfaceComposition(kind = '', role = 'land-cover') {
   const normalizedKind = String(kind || '').toLowerCase();
@@ -72,6 +74,33 @@ function surfaceComposition(kind = '', role = 'land-cover') {
   });
   surfaceCompositionCache.set(cacheKey, composition);
   return composition;
+}
+
+function mappedLandcoverOwnership(kind = '', options = {}) {
+  const normalizedKind = String(kind || '').toLowerCase();
+  const span = Math.max(0, finiteOr(options.span, 0));
+  const relief = Math.max(0, finiteOr(options.relief, 0));
+  const grade = span > 0 ? relief / span : 0;
+  const explicitGeometry =
+    normalizedKind === 'water' ||
+    normalizedKind === 'parking' ||
+    normalizedKind === 'paved';
+  const broadSemanticLandcover =
+    NATURAL_SURFACES.has(normalizedKind) ||
+    AGRICULTURAL_SURFACES.has(normalizedKind);
+  const semanticOnly =
+    !explicitGeometry &&
+    broadSemanticLandcover &&
+    span >= STEEP_SEMANTIC_LANDCOVER_MIN_SPAN &&
+    grade >= STEEP_SEMANTIC_LANDCOVER_GRADE;
+  return Object.freeze({
+    owner: semanticOnly ? 'terrain_worldcover' : 'mapped_geometry',
+    semanticOnly,
+    reason: semanticOnly ? 'steep_broad_landcover' : explicitGeometry ? 'explicit_surface' : 'bounded_landcover',
+    span,
+    relief,
+    grade
+  });
 }
 
 function finiteOr(value, fallback = 0) {
@@ -354,6 +383,7 @@ export {
   createSurfaceSample,
   createSurfaceTileDescriptor,
   earthTraversalBounds,
+  mappedLandcoverOwnership,
   provenanceFor,
   surfaceComposition
 };

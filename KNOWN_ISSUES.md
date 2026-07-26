@@ -17,13 +17,15 @@ approval to ignore a reproducible defect.
   frame with missing roads, road/building overlap, invalid grade separation,
   or similarly broken composition.
 - The fixed Apple Metal structure/mountain subset is mechanically green but
-  not visually approved. The roadless Swiss Alps fixture now starts on its
-  mapped OSM footway at an 11.9-degree slope instead of arbitrary 19.3-degree
-  terrain, but still shows unsupported/floating mountain presentation
-  geometry. Holland Tunnel traversal has a coherent
-  interior, but its initial portal/urban composition contains overlapping and
-  clipped structure geometry. Golden Gate Bridge is coherent but took 28.8
-  seconds to load in the focused run, above the 20-second release budget.
+  not fully approved. The roadless Swiss Alps fixture now starts on its mapped
+  OSM footway at an 11.9-degree slope, and the unsupported steep land-cover
+  slabs are removed. Snow presentation remains plain and thin distant terrain
+  edges can still be visible, but these are tracked fidelity limitations
+  rather than the original broken geometry. Holland Tunnel traversal has a
+  coherent interior, but its initial portal/urban composition contains
+  overlapping and clipped structure geometry. Golden Gate Bridge is coherent
+  but took 28.8 seconds to load in the focused run, above the 20-second release
+  budget.
 
 ## Map Coverage
 

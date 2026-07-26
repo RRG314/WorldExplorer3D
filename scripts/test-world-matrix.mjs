@@ -725,6 +725,8 @@ async function loadLocation(page, spec) {
       driveSwitchMs: Number(driveSwitchMs.toFixed(1)),
       counts: {
         roads: Array.isArray(ctx.roads) ? ctx.roads.length : 0,
+        linearFeatures: Array.isArray(ctx.linearFeatures) ? ctx.linearFeatures.length : 0,
+        linearFeatureMeshes: Array.isArray(ctx.linearFeatureMeshes) ? ctx.linearFeatureMeshes.length : 0,
         buildings: Array.isArray(ctx.buildings) ? ctx.buildings.filter(Boolean).length : 0,
         buildingMeshes: Array.isArray(ctx.buildingMeshes) ? ctx.buildingMeshes.filter((mesh) => mesh?.isMesh).length : 0,
         landuses: Array.isArray(ctx.landuses) ? ctx.landuses.length : 0,

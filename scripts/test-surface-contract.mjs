@@ -5,6 +5,7 @@ import {
   createSurfaceQuery,
   createSurfaceSample,
   createSurfaceTileDescriptor,
+  mappedLandcoverOwnership,
   provenanceFor,
   surfaceComposition
 } from '../app/js/world/surface-contract.js';
@@ -117,6 +118,14 @@ for (let index = 1; index < surfaceOrder.length; index += 1) {
   assert.ok(surfaceOrder[index].surfaceOffset > surfaceOrder[index - 1].surfaceOffset);
 }
 assert.ok(surfaceComposition('', 'road').layer > surfaceOrder.at(-1).layer);
+
+const steepBarren = mappedLandcoverOwnership('barren', { span: 4058, relief: 680 });
+assert.equal(steepBarren.semanticOnly, true);
+assert.equal(steepBarren.owner, 'terrain_worldcover');
+assert.ok(steepBarren.grade > 0.16);
+assert.equal(mappedLandcoverOwnership('meadow', { span: 180, relief: 8 }).semanticOnly, false);
+assert.equal(mappedLandcoverOwnership('parking', { span: 900, relief: 140 }).semanticOnly, false);
+assert.equal(mappedLandcoverOwnership('water', { span: 900, relief: 140 }).semanticOnly, false);
 
 console.log(JSON.stringify({
   ok: true,

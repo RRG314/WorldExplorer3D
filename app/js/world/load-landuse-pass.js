@@ -1,5 +1,5 @@
 import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=2';
-import { surfaceComposition } from './surface-contract.js?v=8';
+import { mappedLandcoverOwnership, surfaceComposition } from './surface-contract.js?v=9';
 import { normalizeWaterBody } from './water-body-contract.js?v=2';
 import { assessMappedWaterTerrain } from './water-surface-validity.js?v=3';
 
@@ -181,6 +181,9 @@ export function createWorldLandusePass(options = {}) {
     const minElevation = sampledHeights.reduce((best, value) =>
       Number.isFinite(value) ? Math.min(best, value) : best,
     Infinity);
+    const maxElevation = sampledHeights.reduce((best, value) =>
+      Number.isFinite(value) ? Math.max(best, value) : best,
+    -Infinity);
 
     const cleanedHoles = [];
     if (holeRings && holeRings.length > 0) {
@@ -203,6 +206,25 @@ export function createWorldLandusePass(options = {}) {
     const isWater = landuseType === 'water';
     const isExplicitHardscape = landuseType === 'paved' || landuseType === 'parking';
     const isMappedGroundCover = visibleMappedSurfaceTypes.has(landuseType);
+    const span = Math.max(maxX - minX, maxZ - minZ);
+    const landcoverOwnership = mappedLandcoverOwnership(landuseType, {
+      span,
+      relief: Number.isFinite(minElevation) && Number.isFinite(maxElevation) ?
+        maxElevation - minElevation :
+        0
+    });
+    if (landcoverOwnership.semanticOnly) {
+      appCtx.landuses.push({
+        type: landuseType,
+        pts: ring,
+        bounds: { minX, maxX, minZ, maxZ },
+        semanticOnly: true,
+        semanticOnlyReason: landcoverOwnership.reason,
+        presentationOwner: landcoverOwnership.owner,
+        sourceFeatureId: featureMeta.sourceFeatureId || null
+      });
+      return true;
+    }
     const waterVisualProfile = isWater ? resolveWaterSurfaceVisualProfile() : null;
     const composition = surfaceComposition(landuseType, isWater ? 'water' : 'land-cover');
     const centerX = (minX + maxX) * 0.5;

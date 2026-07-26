@@ -172,7 +172,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=7";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=77";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=78";
 import { worldLoadTransactions } from './world/load-transaction.js?v=2';
 import {
   fetchShortbreadBuildingData,

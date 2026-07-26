@@ -80,7 +80,7 @@ production visual quality by itself.
 | Dense Baltimore cold load | passing at 12.9 s on the reference hardware run |
 | Shadow policy | implemented; first Baltimore hardware frame accepted, wider time/location gate open |
 | Road visibility | Baltimore accepted; fixed geography gate open |
-| Surface/occupancy and mountain paths | open: the roadless Swiss Alps fixture now starts on its mapped OSM footway at 11.9° with bounded endpoint clearance; its inspected frame still has unsupported/floating mountain presentation geometry |
+| Surface/occupancy and mountain paths | Swiss Alps structural blocker cleared: mapped OSM footway spawn at 11.9°, four rendered path meshes, and no unsupported steep land-cover slabs; thin distant terrain edges remain a known fidelity limitation |
 | Sustained Baltimore walk/drive | straight and S-turn profiles pass at ~59.9 FPS median; focused camera clearance passes, while bridge/tunnel/mountain geography remains open |
 | Repeated resource stability | open |
 | Retained product journeys | focused destination, title/planetary, plane/interior, and editor/multiplayer journeys pass; account, mobile completion, and final combined candidate remain open |
