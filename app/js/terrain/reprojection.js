@@ -2,7 +2,7 @@ import {
   buildFeatureRibbonEdges,
   isRoadSurfaceReachable,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=21";
+} from "../structure-semantics.js?v=22";
 import { waterSurfaceBaseElevation } from "../world/load-geometry.js?v=19";
 import { reconcileWaterBodySurface } from '../world/water-body-contract.js?v=2';
 
@@ -162,7 +162,7 @@ function createTerrainReprojectionApi(deps = {}) {
     if (Array.isArray(appCtx.buildings)) {
       for (let i = 0; i < appCtx.buildings.length; i++) {
         const building = appCtx.buildings[i];
-        if (!building || building._streamChunkKey) continue;
+        if (!building) continue;
         const sourceId = String(building.sourceBuildingId || '');
         if (!sourceId) continue;
         if (!collidersBySourceId.has(sourceId)) collidersBySourceId.set(sourceId, []);
@@ -171,7 +171,6 @@ function createTerrainReprojectionApi(deps = {}) {
     }
 
     appCtx.buildingMeshes.forEach((mesh) => {
-      if (mesh.userData?.earthStreamingChunk || mesh.userData?.streamChunkKey) return;
       const pts = mesh.userData.buildingFootprint;
       if (!pts || pts.length === 0) return;
 
@@ -224,7 +223,6 @@ function createTerrainReprojectionApi(deps = {}) {
     });
 
     appCtx.landuseMeshes.forEach((mesh) => {
-      if (mesh.userData?.earthStreamingChunk || mesh.userData?.streamChunkKey) return;
       if (mesh.userData?.isWaterwayLine) {
         reprojectWaterwayMeshToTerrain(mesh);
         return;
@@ -270,7 +268,6 @@ function createTerrainReprojectionApi(deps = {}) {
     });
 
     appCtx.linearFeatureMeshes.forEach((mesh) => {
-      if (mesh.userData?.earthStreamingChunk || mesh.userData?.streamChunkKey) return;
       reprojectLinearFeatureMeshToTerrain(mesh);
     });
 

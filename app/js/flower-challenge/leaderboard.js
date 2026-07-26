@@ -108,7 +108,7 @@ function createFlowerChallengeLeaderboardApi(context) {
       }
 
       try {
-        const services = typeof getFirebaseServices === 'function' ? getFirebaseServices() : null;
+        const services = typeof getFirebaseServices === 'function' ? await getFirebaseServices() : null;
         if (!services?.db) throw new Error('Firebase services are unavailable.');
         const firestoreMod = await import(FIREBASE_STORE_MODULE);
         const db = services.db;
@@ -240,7 +240,10 @@ function createFlowerChallengeLeaderboardApi(context) {
     }
   }
 
-  async function refreshFlowerLeaderboard(challengeType = challengeState.leaderboardView || 'flower') {
+  async function refreshFlowerLeaderboard(
+    challengeType = challengeState.leaderboardView || 'flower',
+    options = {}
+  ) {
     const normalizedType = normalizeChallengeType(challengeType);
     challengeState.leaderboardView = normalizedType;
     if (ui.titleFlowerTabBtn) ui.titleFlowerTabBtn.classList.toggle('active', normalizedType === 'flower');
@@ -252,7 +255,10 @@ function createFlowerChallengeLeaderboardApi(context) {
       ui.titleStartBtn.style.display = flowerView ? '' : 'none';
       ui.titleStartBtn.disabled = !flowerView;
     }
-    const entries = await readRemoteLeaderboard(normalizedType) || readLocalLeaderboard(normalizedType);
+    const useRemote = options.remote !== false;
+    const entries = (useRemote ? await readRemoteLeaderboard(normalizedType) : null) ||
+      readLocalLeaderboard(normalizedType);
+    if (!useRemote) challengeState.leaderboardBackend = 'local';
     renderLeaderboard(entries);
 
     if (ui.titleHint) {

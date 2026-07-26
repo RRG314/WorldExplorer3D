@@ -24,7 +24,7 @@ async function bootstrapEarthRuntime(page, baseUrl) {
       if (
         ctx &&
         typeof ctx.loadRoads === 'function' &&
-        typeof ctx.switchEnv === 'function' &&
+        typeof ctx.commitEnvironment === 'function' &&
         ctx.ENV?.EARTH
       ) {
         break;
@@ -39,7 +39,9 @@ async function bootstrapEarthRuntime(page, baseUrl) {
     ctx.loadingScreenMode = 'earth';
     ctx.gameStarted = true;
     ctx.paused = false;
-    ctx.switchEnv(ctx.ENV.EARTH);
+    if (!ctx.commitEnvironment(ctx.ENV.EARTH, { source: 'editor_multiplayer_bootstrap' })) {
+      throw new Error('Earth runtime session could not be activated during editor/multiplayer bootstrap.');
+    }
     document.getElementById('titleScreen')?.classList.add('hidden');
     document.getElementById('globeSelectorScreen')?.classList.remove('show');
     ['hud', 'minimap', 'floatMenuContainer', 'mainMenuBtn', 'controlsTab', 'coords', 'historicBtn'].forEach((id) => {

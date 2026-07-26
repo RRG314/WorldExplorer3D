@@ -9,7 +9,6 @@ const RUNTIME_STATE_NAMES = Object.freeze([
   'dynamicLodScale',
   'initialEarthDetailRadius',
   'initialEarthWorldReady',
-  'initialEarthWorldRetired',
   'navigationRouteDistance',
   'navigationRoutePoints',
   'osmTreeNodes',

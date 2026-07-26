@@ -6,7 +6,17 @@ project code and documentation unless a file says otherwise.
 
 ## Bundled Software
 
-- Three.js is distributed under the MIT License.
+- Three.js 0.128.0 is distributed under the MIT License. The exact runtime
+  files and license are retained under `app/vendor/three-r128/`; their byte
+  sizes and SHA-256 checksums are recorded in that directory's `manifest.json`.
+- Firebase 12.16.0 is distributed under the Apache License 2.0. The locally
+  served browser modules and license are retained under
+  `app/vendor/firebase-12.16.0/`.
+- satellite.js 5.0.0 is distributed under the MIT License. Its locally served
+  browser module and license are retained under `app/vendor/satellite-5.0.0/`.
+- PMTiles 4.4.1 is distributed under the BSD-3-Clause License and uses fflate
+  0.8.3 under the MIT License. Their locally served browser modules and the
+  complete license texts are retained under `app/vendor/pmtiles-4.4.1/`.
 - The Colyseus browser SDK is distributed under the MIT License. Its bundled
   license is retained at `app/vendor/COLYSEUS-SDK-LICENSE.txt`.
 - Pbf 3.2.1 and Mapbox Vector Tile JS 1.3.1 are distributed under BSD-3-Clause

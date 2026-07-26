@@ -22,8 +22,6 @@ function disposeEarthWorldObject(object) {
     child.geometry?.dispose?.();
     if (!child.material) return;
     const sharedMaterial = !!(
-      child.userData?.earthStreamingChunk ||
-      child.userData?.streamChunkKey ||
       child.userData?.sharedRoadMaterial ||
       child.userData?.sharedUrbanSurfaceMaterial
     );

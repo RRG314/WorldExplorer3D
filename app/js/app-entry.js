@@ -11,48 +11,45 @@ import './state.js?v=60';
 import './camera-mode.js?v=1';
 import './pause-state.js?v=1';
 import './location-session.js?v=3';
-import './controls/action-input.js?v=4';
+import {
+    getControlInputSnapshot,
+    updateControlInput
+} from './controls/action-input.js?v=4';
 import './transport/actor-contract.js?v=2';
 import './world/collection-registry.js?v=1';
 import './perf.js?v=57';
 import './env.js?v=57';
-import './session-coordinator.js?v=2';
+import {
+    bindRuntimeProductPort,
+    getRuntimeProductPorts
+} from './session-coordinator.js?v=2';
 import './real-estate.js?v=55';
-import './ground.js?v=70';
-import './terrain.js?v=150';
-import './world.js?v=263';
-import './earth-streaming.js?v=22';
-import './world/streaming-vector-chunks.js?v=56';
-import './world/load-continuous-world.js?v=13';
-import './world/streaming-aerial-context.js?v=34';
-import './earth-origin.js?v=4';
+import './ground.js?v=72';
+import './terrain.js?v=154';
+import './world.js?v=274';
 import './building-entry.js?v=4';
 import './interiors.js?v=9';
 import './multiplayer/room-world-patches.js?v=1';
 import { init, tryEnablePostProcessing } from './engine.js?v=80';
-import './physics.js?v=87';
+import './physics.js?v=88';
 import './walking.js?v=71';
-import './travel-mode.js?v=12';
-import { initBoatMode } from './boat-mode.js?v=36';
+import './travel-mode.js?v=13';
+import { initBoatMode } from './boat-mode.js?v=37';
 import { setupFishingGame } from './fishing-game.js?v=2';
-import './sky.js?v=83';
 import './weather.js?v=6';
 import './live-earth/controller.js?v=21';
 import './solar-system.js?v=72';
-import './space.js?v=94';
 import './planetary/scene-ownership.js?v=11';
 import './planetary/vehicles.js?v=3';
 import './planetary/astronaut.js?v=1';
 import './planetary/sky-orientation.js?v=9';
 import './planetary/moon-sky.js?v=1';
-import './planetary/mars-world.js?v=17';
 import './planetary/tracks.js?v=1';
-import './ocean.js?v=7';
 import './game.js?v=58';
 import './input.js?v=61';
-import './hud.js?v=76';
+import './hud.js?v=78';
 import './map.js?v=60';
-import { renderLoop } from './main.js?v=77';
+import { composeRuntimeOwnership, renderLoop } from './runtime-composition.js';
 import './memory.js?v=56';
 import './blocks.js?v=63';
 import './block-builder/ui.js?v=3';
@@ -67,11 +64,71 @@ let _editorWarmupScheduled = false;
 let _activityDiscoveryWarmupScheduled = false;
 let _analyticsWarmupScheduled = false;
 let _platformServicesRegistered = false;
+let _runtimeProductPortsBound = false;
 const platformServices = createPlatformServiceRegistry({
     onEvent(event) {
         globalThis.dispatchEvent?.(new CustomEvent('we3d:platform-service', { detail: event }));
     }
 });
+const runtimeProductPorts = getRuntimeProductPorts();
+
+function bindRuntimeProductPorts() {
+    if (_runtimeProductPortsBound) return;
+    _runtimeProductPortsBound = true;
+    bindRuntimeProductPort('shell', {
+        publishRuntimeEvent(event) {
+            globalThis.dispatchEvent?.(new CustomEvent('we3d:app-runtime', { detail: event }));
+        },
+        reportRuntimeError(detail) {
+            globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-system-error', { detail }));
+        },
+        setRuntimeReady(ready) {
+            const isReady = ready === true;
+            appCtx.runtimeReady = isReady;
+            globalThis.__WE3D_RUNTIME_READY__ = isReady;
+            const startButton = document.getElementById('startBtn');
+            if (startButton) {
+                startButton.disabled = !isReady;
+                startButton.setAttribute('aria-busy', isReady ? 'false' : 'true');
+            }
+            if (isReady) globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-ready'));
+            return isReady;
+        }
+    });
+    bindRuntimeProductPort('input', {
+        snapshot: getControlInputSnapshot,
+        update: updateControlInput
+    });
+    bindRuntimeProductPort('persistence', {
+        async capture(destination = appCtx.getEnv?.()) {
+            if (destination !== appCtx.ENV?.EARTH) return null;
+            const module = await import('./earth-session.js?v=20');
+            return module.captureEarthWorldSession();
+        },
+        async restore(destination = appCtx.getEnv?.(), options = {}) {
+            if (destination !== appCtx.ENV?.EARTH) return false;
+            const module = await import('./earth-session.js?v=20');
+            return module.resumeEarthWorldSession(options);
+        },
+        snapshot() {
+            return {
+                destination: appCtx.getEnv?.() || null,
+                earthLoaded: Array.isArray(appCtx.roads) && appCtx.roads.length > 0,
+                selection: String(appCtx.selLoc || '')
+            };
+        }
+    });
+    bindRuntimeProductPort('multiplayer', {
+        ensureReady: ensureMultiplayerPlatformReady,
+        snapshot() {
+            return {
+                service: platformServices.snapshot().services
+                    .find((service) => service.id === 'multiplayer') || null,
+                room: platformServices.peek('multiplayer')?.getCurrentRoom?.() || null
+            };
+        }
+    });
+}
 
 function scheduleIdleTask(task, timeout = 1200) {
     if (typeof task !== 'function') return;
@@ -477,8 +534,9 @@ function bootApp() {
         return { tryEnablePostProcessing };
     }
 
-    appCtx.runtimeReady = false;
-    globalThis.__WE3D_RUNTIME_READY__ = false;
+    bindRuntimeProductPorts();
+    composeRuntimeOwnership();
+    runtimeProductPorts.call('shell', 'setRuntimeReady', false);
 
     const runBootStep = (label, action) => {
         console.log(`[boot] step:start:${label}`);
@@ -501,14 +559,7 @@ function bootApp() {
     runBootStep('startMultiplayerAfterAuthReady', () => startMultiplayerAfterAuthReady());
     runBootStep('renderLoop', () => renderLoop());
     runBootStep('markRuntimeReady', () => {
-        appCtx.runtimeReady = true;
-        globalThis.__WE3D_RUNTIME_READY__ = true;
-        const startButton = document.getElementById('startBtn');
-        if (startButton) {
-            startButton.disabled = false;
-            startButton.setAttribute('aria-busy', 'false');
-        }
-        globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-ready'));
+        runtimeProductPorts.call('shell', 'setRuntimeReady', true);
     });
     runBootStep('scheduleAnalyticsWarmup', () => scheduleAnalyticsWarmup(2800));
     _booted = true;

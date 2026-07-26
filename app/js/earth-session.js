@@ -1,6 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 import { currentActorWorldPosition } from "./earth-location.js?v=2";
-import { commitEnvironment, registerEnvironmentLifecycle } from './session-coordinator.js?v=2';
+import { commitEnvironment } from './session-coordinator.js?v=2';
 
 const REUSE_EXISTING_EARTH_WORLD = true;
 
@@ -236,9 +236,6 @@ async function finalizeEarthResume(resolved, isCurrent = () => true, options = {
     markEarthResumePhase('surface_sync_requested');
   }
   markEarthResumePhase('world_lod');
-  appCtx.resumeEarthStreaming?.(1400);
-  appCtx.updateEarthWorldStreaming?.(1);
-  markEarthResumePhase('earth_streaming_ready');
   appCtx.updateWorldLod?.(true);
   markEarthResumePhase('world_lod_ready');
   if (typeof appCtx.refreshBoatAvailability === 'function') {
@@ -370,7 +367,7 @@ export async function resumeEarthWorldSession(options = {}) {
   }
 }
 
-registerEnvironmentLifecycle(appCtx.ENV.EARTH, {
+export const earthDestinationAdapter = Object.freeze({
   exitSync: () => captureEarthWorldSession(),
   snapshot: () => ({
     active: appCtx.getEnv?.() === appCtx.ENV.EARTH,
@@ -378,7 +375,6 @@ registerEnvironmentLifecycle(appCtx.ENV.EARTH, {
     loaded: hasLoadedEarthWorld(),
     roads: Array.isArray(appCtx.roads) ? appCtx.roads.length : 0,
     selection: String(appCtx.selLoc || ''),
-    streamingActive: !!appCtx.earthStreaming?.active,
     worldLoading: !!appCtx.worldLoading
   })
 });

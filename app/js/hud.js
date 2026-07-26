@@ -60,6 +60,8 @@ function tunnelCameraY(targetY, x, z, roadY, semantics) {
 }
 
 function syncTunnelGroundOcclusion(insideTunnel) {
+  const stateChanged = insideTunnel !== tunnelWaterOcclusionActive;
+  appCtx.tunnelWaterOcclusionActive = insideTunnel;
   const ground = appCtx.groundFallbackMesh;
   if (ground?.userData?.isGroundPlane) ground.visible = !insideTunnel;
   for (const mesh of appCtx.landuseMeshes || []) {
@@ -71,6 +73,9 @@ function syncTunnelGroundOcclusion(insideTunnel) {
     appCtx.updateWorldLod?.(true);
   }
   tunnelWaterOcclusionActive = insideTunnel;
+  if (stateChanged && typeof appCtx.refreshBoatAvailability === 'function') {
+    appCtx.refreshBoatAvailability(true);
+  }
   const terrainSide = insideTunnel ? THREE.FrontSide : THREE.DoubleSide;
   for (const mesh of appCtx.terrainGroup?.children || []) {
     const materials = Array.isArray(mesh?.material) ? mesh.material : [mesh?.material];

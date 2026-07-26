@@ -176,6 +176,7 @@ export const WORLD_TEST_LOCATIONS = [
     label: 'Jungfrau Region, Switzerland',
     category: 'alpine_snow_rock_custom',
     expectedStart: 'land',
+    captureMode: 'walk',
     maximumWaterAreaSpan: 50,
     rejectBoatPrompt: true,
     expectedTerrainMode: 'snowRock',
@@ -289,6 +290,7 @@ export const WORLD_TEST_LOCATIONS = [
     category: 'major_bridge_coastal_custom',
     expectedStart: 'land',
     expectedRoadStructure: 'bridge',
+    maximumLoadMs: 20000,
     minimumStructureClearance: 6
   },
   {

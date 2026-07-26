@@ -49,6 +49,7 @@ export async function captureViewport(page, filePath) {
         y: Number(camera.position.y.toFixed(2)),
         z: Number(camera.position.z.toFixed(2))
       } : null,
+      cameraMode: Number(ctx.camMode),
       car: {
         stateY: Number(Number(ctx.car?.y || 0).toFixed(2)),
         meshY: Number(Number(ctx.carMesh?.position?.y || 0).toFixed(2)),

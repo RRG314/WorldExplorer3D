@@ -4,6 +4,8 @@
 
 This is the governing implementation plan for 4.1. `ROADMAP.md` describes the
 longer product direction; this document controls the order of 4.1 work.
+The fixed ship criteria and current pass/fail status are recorded in
+[`RELEASE_4_1_ACCEPTANCE.md`](RELEASE_4_1_ACCEPTANCE.md).
 
 The current worktree is an integration prototype, not a release candidate. No
 deployment or merge is permitted from that state. Work advances through the
@@ -31,9 +33,9 @@ The 4.1 runtime ownership model is:
 AppRuntime
   -> DestinationSession
        -> EarthSession
-            -> TileCoordinator
+            -> WorldLoadTransaction
             -> EarthSourceAdapters
-            -> WorldTileCompiler
+            -> WorldCompiler
             -> WorldStore
             -> WorldSurfaceQuery
             -> WorldScene
@@ -48,11 +50,11 @@ AppRuntime
 1. `AppRuntime` owns application state and destination transitions.
 2. One `DestinationSession` owns one frame scheduler and resource scope.
 3. `EarthSession` owns one generation of Earth loading and travel.
-4. `TileCoordinator` owns initial load and continuous streaming.
-5. `WorldTileCompiler` publishes one immutable canonical tile transaction.
+4. `WorldLoadTransaction` owns one selected-location load and cancellation.
+5. `WorldCompiler` publishes one immutable canonical location transaction.
 6. `WorldSurfaceQuery` is the only authority for terrain, corridors,
    structures, foundations, water, collision, navigation, spawn, and placement.
-7. `SpatialOccupancy` applies the same rules to initial and streamed content.
+7. `SpatialOccupancy` applies the same rules to every selected location.
 8. `WorldScene` alone creates, attaches, retires, and disposes world objects.
 9. `Traveler` owns travel-mode state; controllers query and do not mutate the
    world.
@@ -139,21 +141,29 @@ shared owners and may not add a second implementation.
 
 ## Phase 2 — One Earth tile transaction
 
+### 4.1 sequencing decision
+
+The selected-location OSM experience is the 4.1 release baseline. Its load
+time, frame pacing, roads, terrain, structures, occupancy, camera, and visual
+quality are the only Earth-world certification path. The unfinished
+continuous-world runtime and its settings surface were removed; its preserved
+branch history is reference material only and is not part of release 4.1.
+
 ### Work
 
 1. Approve source authority and provenance for terrain, roads, paths,
    buildings, structures, water, land cover, vegetation, and POIs.
 2. Implement one OSM Shortbread adapter and one terrain adapter.
-3. Use one `TileCoordinator` for cold start and continuous travel.
+3. Use one `WorldLoadTransaction` owner for cold start and location changes.
 4. Compile immutable canonical records in local metres.
 5. Commit render, collision, navigation, labels, and map products atomically.
-6. Implement bounded queues, abort, retry, cache identity, retirement, and
-   disposal in the coordinator.
-7. Delete each losing initial/streamed owner when its replacement passes.
+6. Implement bounded work, abort, retry, cache identity, replacement, and
+   disposal in the transaction owner.
+7. Delete each losing location-load owner when its replacement passes.
 
 ### Exit
 
-- initial load and seam travel use the same compiler;
+- initial load and location changes use the same compiler;
 - feature counts and identities reconcile from source through rendering;
 - OSM is the only ordinary vector authority;
 - active tiles, requests, memory, geometries, textures, and disposal remain
@@ -314,6 +324,9 @@ deployment with explicit approval and immutable-artifact promotion.
 
 ## Immediate next action
 
-Do Phase 0 only. Do not fix the latest road/building screenshot in the current
-prototype. Preserve it as a regression fixture, recover a clean branch, and
-implement the invariant later through the canonical compiler.
+Continue 4.1 stabilization against the fixed acceptance contract. Phase 0 and
+the runtime-kernel replacement are preserved; Continuous World and the live
+Overture/PMTiles ordinary-vector fallback are removed. Complete the
+surface/occupancy, camera, sustained-performance, resource-stability, and
+retained-journey gates before changing release metadata or building the final
+artifact.

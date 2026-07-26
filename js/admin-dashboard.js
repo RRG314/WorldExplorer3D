@@ -1,4 +1,4 @@
-import { hasFirebaseConfig } from './firebase-init.js?v=55';
+import { hasFirebaseConfig } from './firebase-config.js?v=1';
 import { ensureSignedIn, observeAuth, signOutUser } from './auth-ui.js?v=55';
 import { enableAdminTester, getAccountOverview } from './billing.js?v=60';
 import {

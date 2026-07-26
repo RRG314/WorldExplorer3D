@@ -12,6 +12,9 @@ const context = (terrainMode, overrides = {}) => ({
 
 assert.equal(boatPromptBlockedBySubgradeTravel(context('subgrade')), true);
 assert.equal(boatPromptBlockedBySubgradeTravel(context('at_grade')), false);
+assert.equal(boatPromptBlockedBySubgradeTravel(context('at_grade', {
+  tunnelWaterOcclusionActive: true
+})), true);
 assert.equal(boatPromptBlockedBySubgradeTravel(context('subgrade', { droneMode: true })), false);
 assert.equal(boatPromptBlockedBySubgradeTravel(context('subgrade', { boatMode: { active: true } })), false);
 assert.equal(boatPromptBlockedBySubgradeTravel(context('subgrade', { oceanMode: { active: true } })), false);

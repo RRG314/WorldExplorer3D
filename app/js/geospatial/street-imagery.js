@@ -1,4 +1,4 @@
-import { createProvenance, getDataSource, normalizeGeoQuery } from './data-contract.js?v=4';
+import { createProvenance, getDataSource, normalizeGeoQuery } from './data-contract.js?v=5';
 import { createProviderRegistry } from './provider-registry.js?v=2';
 
 const STREET_PROVIDERS = Object.freeze(['panoramax', 'kartaview']);

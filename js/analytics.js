@@ -1,5 +1,6 @@
 import { observeAuth } from './auth-ui.js';
-import { initFirebaseAnalytics, readFirebaseConfig } from './firebase-init.js';
+import { initFirebaseAnalytics } from './firebase-analytics-init.js';
+import { readFirebaseConfig } from './firebase-config.js';
 import {
   sanitizeAnalyticsName,
   sanitizeProductParams,
@@ -112,7 +113,7 @@ async function ensureAnalyticsTools() {
       analyticsTools = null;
       return null;
     }
-    const analyticsMod = await import('https://www.gstatic.com/firebasejs/10.12.5/firebase-analytics.js');
+    const analyticsMod = await import('../app/js/platform/firebase/analytics.js');
     analyticsTools = {
       analytics,
       logEvent: analyticsMod.logEvent,

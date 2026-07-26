@@ -1,4 +1,4 @@
-import { doc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+import { doc, getDoc } from '../app/js/platform/firebase/firestore.js';
 import { hasFirebaseConfig, initFirebase } from './firebase-init.js';
 
 export const LANDING_PAGE_ENTRY_ID = 'landingPage';

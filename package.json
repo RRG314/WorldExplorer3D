@@ -1,6 +1,6 @@
 {
   "name": "worldexplorer3d",
-  "version": "4.0.0",
+  "version": "4.1.0",
   "description": "Browser-based 3D geospatial exploration app using OpenStreetMap-derived data for Earth and destination-mode exploration.",
   "type": "module",
   "main": "three.js",
@@ -16,7 +16,13 @@
     "test:inferred-buildings": "node scripts/test-inferred-building-coverage.mjs",
     "test:module-versions": "node scripts/test-module-version-consistency.mjs",
     "test:release-version": "node scripts/test-release-version.mjs",
+    "test:production-audit": "node scripts/test-reviewed-production-audit.mjs",
     "test:maintainability": "node scripts/test-maintainability-guard.mjs",
+    "test:shadow-policy": "node scripts/test-shadow-policy.mjs",
+    "test:app-runtime": "node scripts/test-app-runtime.mjs",
+    "test:destination-schedulers": "node scripts/test-destination-schedulers.mjs",
+    "test:product-ports": "node scripts/test-product-ports.mjs",
+    "test:runtime-dependencies": "node scripts/test-runtime-dependencies.mjs",
     "test:release-4.1-scenarios": "node scripts/test-release-4.1-scenario-contract.mjs",
     "firebase:config": "node scripts/apply-firebase-config.mjs",
     "firebase:config:production": "node scripts/apply-firebase-config.mjs production",
@@ -64,8 +70,6 @@
     "test:hardware-performance": "node scripts/test-hardware-performance.mjs",
     "test:road-spatial-index": "node scripts/test-road-spatial-index.mjs",
     "test:surface-contract": "node scripts/test-surface-contract.mjs",
-    "test:overture-source": "node scripts/test-overture-tile-source.mjs && node scripts/test-overture-streaming-source.mjs && node scripts/test-streaming-feature-budget.mjs && node scripts/test-render-provenance.mjs",
-    "test:continuous-renderer": "node scripts/test-continuous-renderer.mjs",
     "test:hosting-release-contract": "node scripts/test-hosting-release-contract.mjs",
     "test:hosting-size": "node scripts/test-hosting-size-budget.mjs",
     "test:retention": "node scripts/test-release-retention.mjs",
@@ -113,7 +117,11 @@
   "homepage": "https://worldexplorer3d.io",
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.1",
-    "firebase": "^12.16.0",
+    "firebase": "12.16.0",
     "playwright": "^1.61.0"
+  },
+  "dependencies": {
+    "satellite.js": "5.0.0",
+    "three": "0.128.0"
   }
 }

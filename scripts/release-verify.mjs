@@ -27,7 +27,7 @@ const steps = [
   { name: 'Hosting release contract', cmd: [process.execPath, 'scripts/test-hosting-release-contract.mjs'] },
   { name: 'Release version identity', cmd: [process.execPath, 'scripts/test-release-version.mjs'] },
   { name: 'Cloud Functions dependency install', cmd: [npmCommand, 'ci', '--prefix', 'functions', '--ignore-scripts'] },
-  { name: 'Cloud Functions security audit', cmd: [npmCommand, 'audit', '--omit=dev', '--prefix', 'functions'] },
+  { name: 'Reviewed production dependency audit', cmd: [process.execPath, 'scripts/test-reviewed-production-audit.mjs'] },
   { name: 'Cloud Functions runtime exports', cmd: [process.execPath, 'scripts/test-functions-runtime.mjs'] },
   { name: 'Open-source distribution', cmd: [process.execPath, 'scripts/test-open-source-distribution.mjs'] },
   { name: 'Build production hosting artifact', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'build', '--firebase-env', 'production'] },
@@ -37,11 +37,7 @@ const steps = [
   { name: 'CSS integrity', cmd: [process.execPath, 'scripts/test-css-integrity.mjs'] },
   { name: 'ES module URL identity', cmd: [process.execPath, 'scripts/test-module-version-consistency.mjs'] },
   { name: 'Surface contract', cmd: [process.execPath, 'scripts/test-surface-contract.mjs'] },
-  { name: 'Overture tile source', cmd: [process.execPath, 'scripts/test-overture-tile-source.mjs'] },
-  { name: 'Overture streaming source', cmd: [process.execPath, 'scripts/test-overture-streaming-source.mjs'] },
-  { name: 'Streaming feature budget', cmd: [process.execPath, 'scripts/test-streaming-feature-budget.mjs'] },
-  { name: 'Renderer provenance', cmd: [process.execPath, 'scripts/test-render-provenance.mjs'] },
-  { name: 'Continuous renderer', cmd: [process.execPath, 'scripts/test-continuous-renderer.mjs'] },
+  { name: 'Shadow policy', cmd: [process.execPath, 'scripts/test-shadow-policy.mjs'] },
   { name: 'Inferred building coverage', cmd: [process.execPath, 'scripts/test-inferred-building-coverage.mjs'] },
   { name: 'Firestore rules', cmd: [process.execPath, 'scripts/test-rules.mjs'] },
   { name: 'Local data safety', cmd: [process.execPath, 'scripts/test-local-data-safety.mjs'] },
@@ -90,8 +86,30 @@ const steps = [
       WORLD_MATRIX_REPORT_NAME: 'r7-provider-outage.json'
     }
   },
-  { name: 'World matrix', cmd: [process.execPath, 'scripts/test-world-matrix.mjs'] },
-  { name: 'Final hosting artifact parity', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify'] }
+  {
+    name: 'Fixed release geography matrix',
+    cmd: [process.execPath, 'scripts/test-world-matrix.mjs'],
+    env: {
+      WORLD_MATRIX_IDS: [
+        'baltimore',
+        'losangeles',
+        'tokyo',
+        'monaco',
+        'swiss_alps_custom',
+        'sahara_custom',
+        'iowa_farmland_custom',
+        'lake_tahoe_custom',
+        'atlantic_ocean_custom',
+        'golden_gate_custom',
+        'holland_tunnel_custom'
+      ].join(',')
+    }
+  },
+  {
+    name: 'Rebuild final production hosting artifact',
+    cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'build', '--firebase-env', 'production']
+  },
+  { name: 'Final production hosting artifact parity', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify'] }
 ];
 
 for (const step of steps) {

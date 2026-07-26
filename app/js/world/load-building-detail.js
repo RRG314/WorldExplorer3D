@@ -1,13 +1,13 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { mergeBuildingMetadata } from "./building-metadata.js?v=2";
-import { supplementSparseBuildingData } from "./inferred-building-footprints.js?v=3";
+import { supplementSparseBuildingData } from "./inferred-building-footprints.js?v=4";
 import { fetchBundledLandmarkData } from "./landmark-source.js?v=2";
 import { createLandmarkBuildingOwnership } from "./landmark-building-ownership.js?v=5";
 import { curatedLandmarksNear } from "./landmark-catalog.js?v=8";
 
 function buildingDataPriority(way) {
   const tags = way?.tags || {};
-  let score = tags._geometrySource === 'overture' ? 2 : 0;
+  let score = 0;
   const height = Number.parseFloat(tags.height);
   const levels = Number.parseFloat(tags['building:levels']);
   const mappedHeight = Number.isFinite(height) ? height : Number.isFinite(levels) ? levels * 3.2 : 0;
@@ -89,8 +89,7 @@ export function scheduleDeferredBuildingLoad(options = {}) {
       } finally {
         options.endLoadPhase?.('fetchBuildingFootprints');
       }
-      const authoritativeMassing = data?._overpassSource === 'overture-buildings-pmtiles';
-      if (data && !authoritativeMassing) {
+      if (data) {
         options.startLoadPhase?.('fetchBuildingMetadata');
         let metadata;
         try {
@@ -130,7 +129,7 @@ export function scheduleDeferredBuildingLoad(options = {}) {
         options.recordLoadWarning?.('landmark building ownership', landmarkOwnershipErr);
       }
 
-      const nodes = {};
+      let nodes = {};
       for (const element of data.elements || []) {
         if (element?.type === 'node') nodes[element.id] = element;
       }
@@ -155,8 +154,14 @@ export function scheduleDeferredBuildingLoad(options = {}) {
       });
       options.endLoadPhase?.('prepareBuildingOwnership');
 
-      options.loadMetrics.buildings.requested = requested.length;
-      options.loadMetrics.buildings.selected = buildingWays.length;
+      const requestedCount = requested.length;
+      const selectedCount = buildingWays.length;
+      const source = data._overpassSource || null;
+      const endpoint = data._overpassEndpoint || null;
+      const metadata = data._buildingMetadata || metadataState;
+      const sourceDetails = data._shortbreadTiles || null;
+      options.loadMetrics.buildings.requested = requestedCount;
+      options.loadMetrics.buildings.selected = selectedCount;
       options.buildBuildingGeometryPass({
         buildingGeometryGuards: options.buildingGeometryGuards,
         buildingWays,
@@ -174,6 +179,13 @@ export function scheduleDeferredBuildingLoad(options = {}) {
         endLoadPhase: options.endLoadPhase,
         useRdtBudgeting: options.useRdtBudgeting
       });
+      if (Array.isArray(data.elements)) data.elements.length = 0;
+      buildingNodeMap.clear();
+      if (Array.isArray(buildingCandidates)) buildingCandidates.length = 0;
+      if (Array.isArray(buildingWays)) buildingWays.length = 0;
+      if (requested !== buildingWays && Array.isArray(requested)) requested.length = 0;
+      nodes = null;
+      data = null;
       if (!isActiveLoadContext()) return;
 
       if (options.deferSurfaceSync !== true) {
@@ -183,14 +195,9 @@ export function scheduleDeferredBuildingLoad(options = {}) {
         appCtx.requestWorldSurfaceSync?.({ force: true, source: 'deferred_buildings' });
       }
       options.updateWorldLod?.(true);
-      const source = data._overpassSource || null;
-      const endpoint = data._overpassEndpoint || null;
-      const metadata = data._buildingMetadata || metadataState;
-      const sourceDetails = data._overtureBuildings || data._shortbreadTiles || null;
-      if (Array.isArray(data.elements)) data.elements.length = 0;
       setBuildingDetailState('ready', {
-        requested: requested.length,
-        selected: buildingWays.length,
+        requested: requestedCount,
+        selected: selectedCount,
         meshes: appCtx.buildingMeshes.length,
         durationMs: Math.round(performance.now() - startedAt),
         source,

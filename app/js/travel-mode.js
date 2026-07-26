@@ -132,14 +132,12 @@ function emitTravelModeEvent(mode, source = 'runtime') {
 }
 
 let pendingModeLodRefresh = null;
-let pendingModeStreamingRefresh = null;
 
-function scheduleModeWorldRefresh(mode) {
+function scheduleModeWorldRefresh() {
   if (pendingModeLodRefresh !== null) {
     if (typeof cancelIdleCallback === 'function') cancelIdleCallback(pendingModeLodRefresh);
     else clearTimeout(pendingModeLodRefresh);
   }
-  if (pendingModeStreamingRefresh !== null) clearTimeout(pendingModeStreamingRefresh);
   const run = () => {
     pendingModeLodRefresh = null;
     appCtx.updateWorldLod?.(true);
@@ -147,16 +145,18 @@ function scheduleModeWorldRefresh(mode) {
   pendingModeLodRefresh = typeof requestIdleCallback === 'function'
     ? requestIdleCallback(run, { timeout: 300 })
     : setTimeout(run, 64);
-  pendingModeStreamingRefresh = setTimeout(() => {
-    pendingModeStreamingRefresh = null;
-    appCtx.resumeEarthStreaming?.(600);
-    appCtx.updateEarthWorldStreaming?.(1);
-  }, mode === 'plane' || mode === 'drone' ? 450 : 180);
 }
 
 function setTravelMode(mode, options = {}) {
   const targetMode = mode === 'walk' || mode === 'drone' || mode === 'boat' || mode === 'plane' ? mode : 'drive';
   const currentMode = getCurrentTravelMode();
+  if (
+    targetMode === currentMode &&
+    options.force !== true &&
+    options.refreshSurface !== true
+  ) {
+    return syncTravelModeButtons();
+  }
 
   if (targetMode === 'boat' && appCtx.oceanMode?.active && typeof appCtx.transferSubmarineToBoat === 'function') {
     void appCtx.transferSubmarineToBoat({
@@ -184,11 +184,6 @@ function setTravelMode(mode, options = {}) {
     });
   }
 
-  const settlingAerialTransition = targetMode !== currentMode && (
-    targetMode === 'plane' || targetMode === 'drone' || currentMode === 'plane' || currentMode === 'drone'
-  );
-  if (settlingAerialTransition) appCtx.pauseEarthStreaming?.('travel_mode_transition');
-
   let planeExitState = null;
   if (targetMode !== 'plane' && appCtx.planeMode?.active) {
     planeExitState = appCtx.stopPlaneMode?.({ targetMode }) || null;
@@ -196,7 +191,6 @@ function setTravelMode(mode, options = {}) {
 
   if (targetMode === 'plane') {
     if (appCtx.onMoon || appCtx.onMars || !appCtx.startPlaneMode?.(options)) {
-      if (settlingAerialTransition) appCtx.resumeEarthStreaming?.(600);
       return syncTravelModeButtons();
     }
     setDroneModeActive(false);
@@ -257,7 +251,7 @@ function setTravelMode(mode, options = {}) {
   }
 
   const resolvedMode = syncTravelModeButtons();
-  scheduleModeWorldRefresh(resolvedMode);
+  scheduleModeWorldRefresh();
   if (typeof appCtx.updateControlsModeUI === 'function') {
     appCtx.updateControlsModeUI();
   }

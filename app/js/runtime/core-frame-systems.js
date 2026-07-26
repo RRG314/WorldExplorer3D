@@ -27,7 +27,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       phase: 'input',
       enabled: gameplayReady,
       update() {
-        appCtx.updateControlInput?.();
+        hooks.updateInput?.();
       }
     },
     {
@@ -73,6 +73,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       enabled: gameplayReady,
       update(frame) {
         appCtx.updateCamera(frame.dt);
+        appCtx.updateShadowPolicyFrame?.();
         appCtx.updatePlanetarySky?.();
       }
     },

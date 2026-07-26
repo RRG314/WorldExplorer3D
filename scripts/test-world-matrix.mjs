@@ -85,7 +85,7 @@ async function bootstrapRuntime(page, baseUrl) {
     return !!(
       ctx &&
       typeof ctx.loadRoads === 'function' &&
-      typeof ctx.switchEnv === 'function' &&
+      typeof ctx.commitEnvironment === 'function' &&
       ctx.ENV?.EARTH
     );
   }, { timeout: 120000 });
@@ -101,7 +101,7 @@ async function bootstrapRuntime(page, baseUrl) {
         ctx.runtimeReady === true &&
         typeof ctx.loadRoads === 'function' &&
         typeof ctx.setCustomLocation === 'function' &&
-        typeof ctx.switchEnv === 'function' &&
+        typeof ctx.commitEnvironment === 'function' &&
         ctx.ENV?.EARTH
       ) {
         break;
@@ -115,7 +115,9 @@ async function bootstrapRuntime(page, baseUrl) {
     ctx.loadingScreenMode = 'earth';
     ctx.gameStarted = true;
     ctx.paused = false;
-    ctx.switchEnv(ctx.ENV.EARTH);
+    if (!ctx.commitEnvironment(ctx.ENV.EARTH, { source: 'world_matrix_bootstrap' })) {
+      throw new Error('Earth runtime session could not be activated during world matrix bootstrap');
+    }
     document.getElementById('titleScreen')?.classList.add('hidden');
     document.getElementById('globeSelectorScreen')?.classList.remove('show');
     ['hud', 'minimap', 'floatMenuContainer', 'mainMenuBtn', 'controlsTab', 'coords', 'historicBtn'].forEach((id) => {
@@ -494,6 +496,23 @@ async function loadLocation(page, spec) {
         ) : [];
       }
     }
+    if (
+      (exerciseModes || customStructureProbe?.applied) &&
+      initialSpawn?.valid !== false &&
+      typeof ctx.applyResolvedWorldSpawn === 'function'
+    ) {
+      ctx.setTravelMode?.(initialSpawn.mode || 'drive', {
+        source: 'world_matrix_restore_initial_spawn',
+        emitTutorial: false,
+        force: true
+      });
+      ctx.applyResolvedWorldSpawn(initialSpawn, { mode: initialSpawn.mode || 'drive' });
+      actorX = Number(initialSpawn.x);
+      actorZ = Number(initialSpawn.z);
+      actorFeetY = initialSpawn.mode === 'walk' ?
+        Number(initialSpawn.walkY) - 1.7 :
+        Number(initialSpawn.carY) - 1.2;
+    }
 
     const buildingPresentation = {
       meshCount: 0,
@@ -723,6 +742,8 @@ async function loadLocation(page, spec) {
       driveSwitchMs: Number(driveSwitchMs.toFixed(1)),
       counts: {
         roads: Array.isArray(ctx.roads) ? ctx.roads.length : 0,
+        linearFeatures: Array.isArray(ctx.linearFeatures) ? ctx.linearFeatures.length : 0,
+        linearFeatureMeshes: Array.isArray(ctx.linearFeatureMeshes) ? ctx.linearFeatureMeshes.length : 0,
         buildings: Array.isArray(ctx.buildings) ? ctx.buildings.filter(Boolean).length : 0,
         buildingMeshes: Array.isArray(ctx.buildingMeshes) ? ctx.buildingMeshes.filter((mesh) => mesh?.isMesh).length : 0,
         landuses: Array.isArray(ctx.landuses) ? ctx.landuses.length : 0,
@@ -821,6 +842,8 @@ async function loadLocation(page, spec) {
         valid: initialSpawn.valid !== false,
         mode: initialSpawn.mode || null,
         source: initialSpawn.source || null,
+        surfaceKind: initialSpawn.surfaceKind || null,
+        onWalkSurface: initialSpawn.onWalkSurface === true,
         x: Number.isFinite(initialSpawn.x) ? Number(initialSpawn.x.toFixed(2)) : null,
         z: Number.isFinite(initialSpawn.z) ? Number(initialSpawn.z.toFixed(2)) : null,
         structureKind: initialSpawn.road?.structureSemantics?.structureKind || null,
@@ -1008,7 +1031,7 @@ async function main() {
       report.locations.push(result);
       await fs.writeFile(path.join(outputDir, reportName), JSON.stringify(report, null, 2));
       try {
-        assertWorldMatrixLocation(spec, result);
+        assertWorldMatrixLocation(spec, result, { enforcePerformance: hardwareBrowser });
         if ((spec.minimumBuildings || /urban|city|downtown/.test(String(spec.category || ''))) && !result.worldCover?.status?.ready) {
           assert(Number(result.counts?.roads || 0) > 0, `${spec.id}: mapped city has no explicit road surface`);
         }
@@ -1033,9 +1056,28 @@ async function main() {
         }
         await page.waitForTimeout(800);
         result.visualDiagnostics = await captureViewport(page, path.join(outputDir, `${spec.id}.png`));
+        if (
+          result.expectedStart !== 'water' &&
+          result.initialSpawn?.mode === 'drive' &&
+          result.visualDiagnostics?.cameraMode === 0
+        ) {
+          const camera = result.visualDiagnostics.camera;
+          const actor = result.landPresentation;
+          const chaseDistance = camera && actor ?
+            Math.hypot(
+              Number(camera.x) - Number(actor.actorX),
+              Number(camera.y) - Number(actor.carY),
+              Number(camera.z) - Number(actor.actorZ)
+            ) :
+            0;
+          assert(
+            chaseDistance >= 2.4,
+            `${spec.id}: chase camera collapsed into the vehicle or nearby geometry (${chaseDistance.toFixed(2)}m)`
+          );
+        }
         if (spec.expectedRoadStructure === 'tunnel') {
           await captureTunnelPortalTraversal(page, spec, result, outputDir);
-          assertWorldMatrixLocation(spec, result);
+          assertWorldMatrixLocation(spec, result, { enforcePerformance: hardwareBrowser });
         }
         if (captureDroneViews && result.expectedStart !== 'water') {
           await captureDroneView(page, spec, result, outputDir);

@@ -6,8 +6,7 @@ const DEFAULT_RUNTIME_BUDGETS = Object.freeze({
   textures: 512,
   heapBytes: 1000 * 1024 * 1024,
   loadMs: 60000,
-  renderReadyMs: 9000,
-  pendingGeometryDisposals: 192
+  renderReadyMs: 9000
 });
 
 function finite(value) {
@@ -55,7 +54,6 @@ function diagnoseRuntimeBudgets(snapshot = {}, options = {}) {
   const renderer = snapshot.renderer || {};
   const kernel = snapshot.runtimeKernel || {};
   const memory = snapshot.browserMemory || {};
-  const streaming = snapshot.streamingResources || {};
   const lastLoad = snapshot.lastLoad || null;
   const renderReadiness = snapshot.renderReadiness || null;
   const topOwner = topRuntimeOwner(kernel);
@@ -87,15 +85,6 @@ function diagnoseRuntimeBudgets(snapshot = {}, options = {}) {
   if (heapBytes !== null && heapBytes > budgets.heapBytes) {
     violations.push(createViolation({
       metric: 'heapBytes', owner: 'resource-lifecycle', value: heapBytes, budget: budgets.heapBytes
-    }));
-  }
-  const pendingDisposals = finite(streaming.pendingGeometryDisposals);
-  if (pendingDisposals !== null && pendingDisposals > budgets.pendingGeometryDisposals) {
-    violations.push(createViolation({
-      metric: 'pendingGeometryDisposals',
-      owner: 'earth-streaming',
-      value: pendingDisposals,
-      budget: budgets.pendingGeometryDisposals
     }));
   }
   const loadMs = finite(lastLoad?.loadMs);

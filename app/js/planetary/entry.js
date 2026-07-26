@@ -11,7 +11,6 @@ export function hidePlanetaryReturnControls() {
 export function suspendEarthModesForPlanetaryEntry(targetEnvironment = ENV.EARTH) {
   appCtx.cancelPendingEarthArrival?.();
   exitCurrentEnvironmentSync(targetEnvironment, { source: 'planetary_entry' });
-  appCtx.pauseEarthStreaming?.('planetary_entry');
   if (targetEnvironment !== ENV.EARTH) appCtx.setEarthSceneVisible?.(false);
   hidePlanetaryReturnControls();
   if (appCtx.boatMode?.active && typeof appCtx.stopBoatMode === 'function') {

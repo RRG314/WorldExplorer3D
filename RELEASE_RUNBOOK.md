@@ -21,7 +21,10 @@ npm ci
 npm run release:verify
 ```
 
-The gate builds a production-configured artifact, verifies its hashes before testing, runs the complete acceptance suite, and verifies the same artifact again at the end. Record the `buildId` from `dist/build-manifest.json`.
+The gate builds a production-configured artifact, verifies its hashes before
+testing, runs the complete acceptance suite, then deterministically rebuilds
+and verifies the production artifact after any test-owned staging build.
+Record the final `buildId` from `dist/build-manifest.json`.
 
 The manual GitHub `Full Release Verify` workflow performs the same gate and retains the verified `dist/` artifact for 30 days. Its artifact name is derived from `package.json`.
 

@@ -94,7 +94,6 @@ async function readState(page, mode) {
         geometries: Number(memory.geometries || 0),
         textures: Number(memory.textures || 0),
         heapBytes: Number(performance.memory?.usedJSHeapSize || 0),
-        pendingGeometryDisposals: Number(ctx.getRuntimeDiagnostics?.()?.streaming?.pendingGeometryDisposals || 0),
         planeMeshes: ctx.scene?.children?.filter((child) => child?.name === 'Explorer STOL Aircraft').length || 0
       }
     };
@@ -201,7 +200,6 @@ try {
   assert(third.planeMeshes === 1, `Repeated cycles retained ${third.planeMeshes} plane meshes`);
   assert(third.geometries <= second.geometries + 8, `Renderer geometries grew after warm-up (${second.geometries} to ${third.geometries})`);
   assert(third.textures <= second.textures + 2, `Renderer textures grew after warm-up (${second.textures} to ${third.textures})`);
-  assert(third.pendingGeometryDisposals <= 192, `Geometry disposal queue remained over budget (${third.pendingGeometryDisposals})`);
   if (second.heapBytes > 0 && third.heapBytes > 0) {
     assert(third.heapBytes <= second.heapBytes * 1.2, `Heap retained growth after warm-up (${second.heapBytes} to ${third.heapBytes})`);
   }

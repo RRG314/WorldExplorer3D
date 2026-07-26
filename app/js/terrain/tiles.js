@@ -482,7 +482,7 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
   mesh.userData.terrainTextureRepeats = repeats;
   mesh.userData.renderProvenance = {
     version: 1,
-    profile: appCtx.getContinuousWorldEnabled?.() === true ? 'continuous_global' : 'location_osm',
+    profile: 'location_osm',
     provider: 'AWS Open Data / ESA / mapped vector provider',
     dataset: 'Mapzen Terrarium elevation + semantic surface classification',
     release: '',

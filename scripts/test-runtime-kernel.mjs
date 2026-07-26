@@ -94,7 +94,6 @@ const budgetStatus = diagnoseRuntimeBudgets({
   },
   renderer: { calls: 1200, triangles: 1200000, geometries: 400, textures: 40 },
   browserMemory: { usedBytes: 1200 * 1024 * 1024 },
-  streamingResources: { pendingGeometryDisposals: 240 },
   lastLoad: { loadMs: 72000 },
   renderReadiness: { durationMs: 9500 }
 });
@@ -107,7 +106,6 @@ assert.deepEqual(
     'frameMs:world',
     'calls:world-rendering',
     'heapBytes:resource-lifecycle',
-    'pendingGeometryDisposals:earth-streaming',
     'loadMs:world-loading',
     'renderReadyMs:renderer-readiness'
   ]

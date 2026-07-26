@@ -1,11 +1,13 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=4';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=1';
-import { getFrameOwnershipSnapshot, registerFrameOwner } from './runtime/frame-ownership.js?v=1';
+import { getFrameOwnershipSnapshot } from './runtime/frame-ownership.js?v=1';
 import { createRuntimeKernel } from './runtime/kernel.js?v=1';
+import { getRuntimeProductPorts } from './session-coordinator.js?v=2';
 
 let perfPanelTimer = 0;
 let runtimeSystemsRegistered = false;
+const runtimeProductPorts = getRuntimeProductPorts();
 const OVERLAY_EDGE_MARGIN = 6;
 const OVERLAY_ANCHOR_GAP = 10;
 const DEFAULT_LOADING_BG = '../assets/landing/city.jpg';
@@ -109,13 +111,14 @@ const runtimeKernel = createRuntimeKernel({
   },
   onSystemError: ({ error, system }) => {
     console.error(`[runtime] System failed: ${system.id}`, error);
-    globalThis.dispatchEvent?.(new CustomEvent('we3d:runtime-system-error', {
-      detail: { system, message: error instanceof Error ? error.message : String(error) }
-    }));
+    runtimeProductPorts.tryCall('shell', 'reportRuntimeError', {
+      system,
+      message: error instanceof Error ? error.message : String(error)
+    });
   }
 });
 
-registerFrameOwner({
+const earthFrameOwnerDefinition = Object.freeze({
   id: 'earth.runtime-kernel',
   label: 'Earth runtime kernel',
   kind: 'continuous-renderer',
@@ -137,7 +140,8 @@ function registerRuntimeSystems() {
   const systems = createCoreFrameSystems(appCtx, {
     isActivityCreatorOpen,
     isEditorWorkspaceOpen,
-    positionTopOverlays
+    positionTopOverlays,
+    updateInput: () => runtimeProductPorts.call('input', 'update')
   });
   systems.forEach((system) => runtimeKernel.registerSystem(system));
   runtimeKernel.registerSystem(createDebugPresentationSystem(appCtx));
@@ -168,9 +172,59 @@ function registerRuntimeSystems() {
   });
 }
 
+function createSharedSceneScheduler({ destination }) {
+  let active = false;
+  let releaseVisibilityListener = null;
+
+  function syncVisibility() {
+    if (!active) return false;
+    if (document.hidden) {
+      runtimeKernel.stop(`${destination}:hidden`);
+      return false;
+    }
+    return runtimeKernel.start();
+  }
+
+  return Object.freeze({
+    start() {
+      registerRuntimeSystems();
+      active = true;
+      if (!releaseVisibilityListener) {
+        const onVisibilityChange = () => syncVisibility();
+        document.addEventListener('visibilitychange', onVisibilityChange);
+        releaseVisibilityListener = () => {
+          document.removeEventListener('visibilitychange', onVisibilityChange);
+          releaseVisibilityListener = null;
+        };
+      }
+      return syncVisibility();
+    },
+    stop(reason = 'destination-exit') {
+      active = false;
+      releaseVisibilityListener?.();
+      return runtimeKernel.stop(`${destination}:${reason}`);
+    },
+    snapshot() {
+      return {
+        ...runtimeKernel.snapshot(),
+        active,
+        visibilityBound: releaseVisibilityListener != null
+      };
+    }
+  });
+}
+
 function renderLoop() {
   registerRuntimeSystems();
-  return runtimeKernel.start();
+  const destination = appCtx.getEnv?.();
+  if (
+    destination === appCtx.ENV?.EARTH ||
+    destination === appCtx.ENV?.MOON ||
+    destination === appCtx.ENV?.MARS
+  ) {
+    return runtimeKernel.start();
+  }
+  return true;
 }
 
 function warmNearbyWorldRenderResources(radius = Number.POSITIVE_INFINITY) {
@@ -178,9 +232,14 @@ function warmNearbyWorldRenderResources(radius = Number.POSITIVE_INFINITY) {
   const actor = appCtx.activeTransportActor?.()?.position || appCtx.car || { x: 0, z: 0 };
   const radiusSq = radius * radius;
   const restored = [];
+  const restoredActors = [];
+  for (const root of [appCtx.carMesh, appCtx.Walk?.state?.characterMesh]) {
+    if (!root) continue;
+    restoredActors.push({ root, visible: root.visible });
+    root.visible = true;
+  }
   const candidates = [...new Set([
     ...(appCtx.buildingMeshes || []),
-    ...(appCtx.aerialContextMeshes || []),
     ...(appCtx.landuseMeshes || []),
     ...(appCtx.roadMeshes || [])
   ])];
@@ -206,6 +265,9 @@ function warmNearbyWorldRenderResources(radius = Number.POSITIVE_INFINITY) {
       mesh.visible = visible;
       mesh.frustumCulled = frustumCulled;
       if (!parent && mesh.parent === appCtx.scene) appCtx.scene.remove(mesh);
+    }
+    for (let i = 0; i < restoredActors.length; i += 1) {
+      restoredActors[i].root.visible = restoredActors[i].visible;
     }
   }
   return performance.now() - startedAt;
@@ -329,6 +391,8 @@ Object.assign(appCtx, {
 });
 
 export {
+  createSharedSceneScheduler,
+  earthFrameOwnerDefinition,
   hideLoad,
   positionTopOverlays,
   registerRuntimeSystem,

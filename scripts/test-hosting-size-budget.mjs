@@ -21,7 +21,20 @@ const forbiddenTitleRequests = new Set([
   '/app/assets/textures/moon_lroc_2048.jpg',
   '/app/assets/textures/universe/andromeda-galex-spitzer.jpg',
   '/app/assets/textures/universe/orion-nebula-nasa.jpg',
-  '/app/vendor/colyseus-sdk.js'
+  '/app/vendor/colyseus-sdk.js',
+  '/app/vendor/firebase-12.16.0/firebase-firestore.js',
+  '/app/vendor/three-r128/shaders/CopyShader.js',
+  '/app/vendor/three-r128/shaders/LuminosityHighPassShader.js',
+  '/app/vendor/three-r128/shaders/SSAOShader.js',
+  '/app/vendor/three-r128/shaders/DepthLimitedBlurShader.js',
+  '/app/vendor/three-r128/shaders/SMAAShader.js',
+  '/app/vendor/three-r128/math/SimplexNoise.js',
+  '/app/vendor/three-r128/postprocessing/EffectComposer.js',
+  '/app/vendor/three-r128/postprocessing/RenderPass.js',
+  '/app/vendor/three-r128/postprocessing/ShaderPass.js',
+  '/app/vendor/three-r128/postprocessing/SSAOPass.js',
+  '/app/vendor/three-r128/postprocessing/SMAAPass.js',
+  '/app/vendor/three-r128/postprocessing/UnrealBloomPass.js'
 ]);
 
 function assert(condition, message) {
@@ -104,6 +117,15 @@ try {
   for (const forbidden of forbiddenTitleRequests) {
     assert(!requestedPaths.has(forbidden), `Cold title route eagerly requested destination-only asset ${forbidden}.`);
   }
+
+  await page.evaluate(() => {
+    globalThis.dispatchEvent(new CustomEvent('we3d:game-started'));
+  });
+  await page.waitForFunction(
+    () => typeof globalThis.THREE?.EffectComposer === 'function' &&
+      typeof globalThis.THREE?.SSAOPass === 'function',
+    { timeout: 30000 }
+  );
 
   const byType = {};
   for (const row of uniqueResponses) byType[row.type] = (byType[row.type] || 0) + row.bytes;

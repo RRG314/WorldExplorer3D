@@ -10,7 +10,15 @@ const PRODUCTION_ROOTS = [
 ];
 const OWNERSHIP_REVIEW_LINES = 500;
 const SHARED_CONTEXT_IMPORT_BUDGET = 155;
-const APP_ENTRY_STATIC_IMPORT_BUDGET = 58;
+const APP_ENTRY_STATIC_IMPORT_BUDGET = 54;
+const RUNTIME_DOMAIN_MODULES = new Set([
+  'runtime/app-runtime.js',
+  'runtime/destination-session.js',
+  'runtime/destination-schedulers.js',
+  'runtime/kernel.js',
+  'runtime/lifecycle-scope.js',
+  'runtime/product-ports.js'
+]);
 const WORLD_COLLECTIONS = [
   'roads', 'roadMeshes', 'urbanSurfaceMeshes', 'buildings', 'buildingMeshes',
   'dynamicBuildingColliders', 'landuses', 'surfaceFeatureHints', 'landuseMeshes',
@@ -37,6 +45,21 @@ const SURFACE_CONTRACT_CONSUMERS = new Set([
   'walking/terrain.js',
   'world/spawn-surface.js'
 ]);
+const OWNERSHIP_REGISTRATION_FILES = Object.freeze({
+  registerDestinationScheduler: new Set([
+    'runtime-composition.js',
+    'runtime/destination-schedulers.js'
+  ]),
+  registerEnvironmentLifecycle: new Set([
+    'runtime-composition.js',
+    'session-coordinator.js'
+  ]),
+  registerFrameOwner: new Set([
+    'runtime-composition.js',
+    'runtime/frame-ownership.js',
+    'ui/globe-selector/scene.js'
+  ])
+});
 
 function listJavaScriptFiles(directory) {
   return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
@@ -135,6 +158,22 @@ for (const file of files) {
   }
   if (appRelative === 'app-entry.js') appEntryStaticImports = specifiers.length;
 
+  if (RUNTIME_DOMAIN_MODULES.has(appRelative)) {
+    const forbiddenImport = specifiers.find((specifier) => (
+      /(?:^|\/)shared-context\.js(?:[?#]|$)/.test(specifier) ||
+      /firebase|gstatic|https?:\/\//i.test(specifier)
+    ));
+    if (forbiddenImport) {
+      failures.push(`${relative}: runtime domain imports forbidden adapter ${forbiddenImport}`);
+    }
+    if (specifiers.some((specifier) => /[?#]/.test(specifier))) {
+      failures.push(`${relative}: runtime domain embeds a cache version in an import`);
+    }
+    if (/\b(?:document|window|fetch|XMLHttpRequest|localStorage|sessionStorage)\b/.test(source)) {
+      failures.push(`${relative}: runtime domain accesses a browser or network adapter directly`);
+    }
+  }
+
   if (appRelative !== 'env.js' && /appCtx\.(?:onMoon|onMars)\s*=/.test(source)) {
     failures.push(`${relative}: writes environment surface flags owned by env.js`);
   }
@@ -169,6 +208,15 @@ for (const file of files) {
 
   if (appRelative !== 'location-session.js' && /appCtx\.(?:selLoc|customLoc|customLocTransient)\s*=(?!=)/.test(source)) {
     failures.push(`${relative}: writes location selection instead of using location-session.js`);
+  }
+
+  for (const [registration, allowedFiles] of Object.entries(OWNERSHIP_REGISTRATION_FILES)) {
+    const registrationCall = new RegExp(`\\b${registration}\\s*\\(`);
+    if (registrationCall.test(source) && !allowedFiles.has(appRelative)) {
+      failures.push(
+        `${relative}: calls ${registration}() outside the approved runtime composition owner`
+      );
+    }
   }
 
   const worldCollectionPattern = new RegExp(`appCtx\\.(?:${WORLD_COLLECTIONS.join('|')})\\s*=(?!=)`);

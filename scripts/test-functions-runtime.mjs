@@ -6,8 +6,8 @@ const functionsPackage = require('../functions/package.json');
 const runtimeExports = require('../functions/index.js');
 
 assert.equal(functionsPackage.engines?.node, '22', 'Cloud Functions must use the supported Node.js 22 runtime.');
-assert.match(functionsPackage.dependencies?.['firebase-admin'] || '', /^\^13\./, 'Firebase Admin must remain on the audited namespace-compatible major.');
-assert.match(functionsPackage.dependencies?.['firebase-functions'] || '', /^\^6\./, 'Firebase Functions must remain on the audited Gen 1-compatible major.');
+assert.match(functionsPackage.dependencies?.['firebase-admin'] || '', /^\^14\./, 'Firebase Admin must remain on the audited modular major.');
+assert.match(functionsPackage.dependencies?.['firebase-functions'] || '', /^\^7\./, 'Firebase Functions must remain on the audited Gen 1-compatible major.');
 
 const expectedExports = [
   'createCheckoutSession',

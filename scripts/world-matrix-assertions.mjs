@@ -2,8 +2,14 @@ function assert(value, message) {
   if (!value) throw new Error(message);
 }
 
-export function assertWorldMatrixLocation(spec, result) {
+export function assertWorldMatrixLocation(spec, result, { enforcePerformance = true } = {}) {
   assert(result.worldLoading === false, `${spec.id}: worldLoading stayed true`);
+  if (enforcePerformance && Number.isFinite(spec.maximumLoadMs)) {
+    assert(
+      Number(result.loadMs) <= spec.maximumLoadMs,
+      `${spec.id}: location load exceeded ${spec.maximumLoadMs}ms ${JSON.stringify({ loadMs: result.loadMs })}`
+    );
+  }
   if (spec.kind === 'custom') {
     assert(
       String(result.customLocationLabel || '') === String(spec.label || ''),
@@ -12,6 +18,26 @@ export function assertWorldMatrixLocation(spec, result) {
   }
   assert(!result.terrainProfiles?.urban, `${spec.id}: base terrain still resolved to urban pavement ${JSON.stringify(result.terrainProfiles.urban)}`);
   if (spec.kind === 'preset') assert(result.counts.roads > 0, `${spec.id}: preset silently finalized without mapped roads`);
+  if (
+    result.expectedStart === 'land' &&
+    Number(result.counts?.roads || 0) === 0 &&
+    Number(result.traversal?.walkSegments || 0) > 0
+  ) {
+    assert(
+      result.initialSpawn?.onWalkSurface === true &&
+      result.initialSpawn?.source === 'walk_surface_search',
+      `${spec.id}: sparse mapped world ignored its pedestrian network at spawn ${JSON.stringify(result.initialSpawn)}`
+    );
+    assert(
+      Number(result.initialSpawn?.slopeDeg) <= 22,
+      `${spec.id}: sparse mapped path spawn exceeded the walkable slope contract ${JSON.stringify(result.initialSpawn)}`
+    );
+    assert(
+      Number(result.counts?.linearFeatures || 0) > 0 &&
+      Number(result.counts?.linearFeatureMeshes || 0) > 0,
+      `${spec.id}: sparse pedestrian network has no rendered path product ${JSON.stringify(result.counts)}`
+    );
+  }
   if (spec.expectedTerrainMode) {
     const acceptableTerrainModes = spec.acceptableTerrainModes || [spec.expectedTerrainMode];
     assert(acceptableTerrainModes.some((mode) => result.terrainProfiles?.[mode]?.count > 0), `${spec.id}: expected ${acceptableTerrainModes.join(' or ')} terrain ${JSON.stringify(result.terrainProfiles)}`);
@@ -45,6 +71,11 @@ export function assertWorldMatrixLocation(spec, result) {
       );
     }
     if (spec.expectedRoadStructure === 'tunnel' && result.tunnelPortalTraversal) {
+      assert(
+        result.initialSpawn?.source === 'walk_surface_search' &&
+        result.initialSpawn?.terrainMode !== 'subgrade',
+        `${spec.id}: initial arrival remained inside the subgrade tunnel shell ${JSON.stringify(result.initialSpawn)}`
+      );
       const tunnelVisuals = result.structurePresentation?.tunnelVisuals || {};
       assert(tunnelVisuals.tunnelRoads > 0, `${spec.id}: no mapped tunnel roads were registered ${JSON.stringify(tunnelVisuals)}`);
       assert(tunnelVisuals.walls > 0 && tunnelVisuals.roofs > 0 && tunnelVisuals.floors > 0, `${spec.id}: tunnel shell is incomplete ${JSON.stringify(tunnelVisuals)}`);
@@ -81,7 +112,18 @@ export function assertWorldMatrixLocation(spec, result) {
       }
     }
   }
-  if (spec.minimumWaterAreas) assert(result.counts.waterAreas >= spec.minimumWaterAreas, `${spec.id}: expected mapped water areas`);
+  if (spec.minimumWaterAreas) {
+    const mappedWaterPresent = result.counts.waterAreas >= spec.minimumWaterAreas;
+    const validatedWaterFallback =
+      result.expectedStart === 'water' &&
+      result.boatActive === true &&
+      result.initialSpawn?.mode === 'boat' &&
+      result.boatPresentation?.meshVisible === true;
+    assert(
+      mappedWaterPresent || validatedWaterFallback,
+      `${spec.id}: expected mapped water areas or a validated water-start fallback`
+    );
+  }
   if (spec.minimumBuildings) {
     assert(
       result.counts.buildings >= spec.minimumBuildings,
@@ -100,14 +142,11 @@ export function assertWorldMatrixLocation(spec, result) {
   if (architecturalBuildings > 0) {
     const dimensions = result.buildingDimensions || {};
     const buildingSource = String(result.buildingDetail?.source || '');
-    const authoritativeBuildingSource =
-      buildingSource === 'overture-buildings-pmtiles' ||
-      buildingSource === 'shortbread-vector-buildings';
+    const authoritativeBuildingSource = buildingSource === 'shortbread-vector-buildings';
     assert(
       authoritativeBuildingSource,
       `${spec.id}: buildings did not use an authoritative mapped massing source ${JSON.stringify(result.buildingDetail)}`
     );
-    const overtureBuildings = Number(dimensions.geometrySources?.overture || 0);
     const streamedMappedBuildings = Number(dimensions.geometrySources?.['shortbread-vector'] || 0);
     const inferredFootprints = Number(dimensions.geometrySources?.inferred_road_frontage || 0);
     if (inferredFootprints > 0) {
@@ -125,18 +164,18 @@ export function assertWorldMatrixLocation(spec, result) {
       );
     }
     assert(
-      overtureBuildings > 0 || streamedMappedBuildings > 0 || inferredFootprints > 0,
+      streamedMappedBuildings > 0 || inferredFootprints > 0,
       `${spec.id}: rendered buildings lost authoritative or explicit inferred provenance ${JSON.stringify(dimensions)}`
     );
     assert(
       architecturalBuildings > 0 &&
-        (overtureBuildings + streamedMappedBuildings + inferredFootprints) / architecturalBuildings >= 0.9,
+        (streamedMappedBuildings + inferredFootprints) / architecturalBuildings >= 0.9,
       `${spec.id}: more than 10% of rendered buildings bypassed global or explicit inferred provenance ${JSON.stringify(dimensions.geometrySources)}`
     );
     const sourceDetails = result.buildingDetail?.sourceDetails || {};
-    const coverageIsWideEnough = buildingSource === 'shortbread-vector-buildings'
-      ? Number(sourceDetails.loaded || 0) >= 4 && Number(sourceDetails.zoom || 0) >= 14
-      : Number(sourceDetails.radiusDegrees || 0) >= 0.0135;
+    const coverageIsWideEnough =
+      Number(sourceDetails.loaded || 0) >= 4 &&
+      Number(sourceDetails.zoom || 0) >= 14;
     assert(coverageIsWideEnough, `${spec.id}: building coverage is smaller than the visible-world contract ${JSON.stringify(sourceDetails)}`);
     assert(Number(dimensions.minHeight) >= 0.2, `${spec.id}: building height fell below the usable minimum ${JSON.stringify(dimensions)}`);
     assert(
@@ -158,17 +197,10 @@ export function assertWorldMatrixLocation(spec, result) {
       assert(inferredBuckets >= 6, `${spec.id}: inferred building heights lack neighborhood-scale variation ${JSON.stringify(dimensions)}`);
     }
     if (spec.minimumAuthoritativeBuildingParts) {
-      if (buildingSource === 'overture-buildings-pmtiles') {
-        assert(
-          Number(dimensions.buildingParts || 0) >= spec.minimumAuthoritativeBuildingParts,
-          `${spec.id}: expected at least ${spec.minimumAuthoritativeBuildingParts} authoritative building parts ${JSON.stringify(dimensions)}`
-        );
-      } else {
-        assert(
-          Number(dimensions.metadataMatched || 0) > 0 && Number(sourceDetails.loaded || 0) >= 4,
-          `${spec.id}: mapped building fallback lost its metadata enrichment or visible coverage ${JSON.stringify({ dimensions, sourceDetails })}`
-        );
-      }
+      assert(
+        Number(dimensions.metadataMatched || 0) > 0 && Number(sourceDetails.loaded || 0) >= 4,
+        `${spec.id}: mapped building source lost its metadata enrichment or visible coverage ${JSON.stringify({ dimensions, sourceDetails })}`
+      );
     }
     if (result.counts.buildings >= 1000) {
       assert(

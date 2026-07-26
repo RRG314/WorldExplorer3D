@@ -6,7 +6,13 @@ import { chromium } from 'playwright';
 const rootDir = process.cwd();
 const baseUrl = String(process.env.HARDWARE_PERF_BASE_URL || 'http://127.0.0.1:4260').replace(/\/$/, '');
 const scenarioMs = Math.max(8000, Number(process.env.HARDWARE_PERF_SAMPLE_MS || 10000));
-const outputDir = path.join(rootDir, 'output', 'playwright', 'hardware-performance');
+const routeProfile = String(process.env.HARDWARE_PERF_ROUTE || 'straight').trim().toLowerCase();
+const outputDir = path.join(
+  rootDir,
+  'output',
+  'playwright',
+  routeProfile === 'turning' ? 'hardware-camera-turning' : 'hardware-performance'
+);
 const reportPath = path.join(outputDir, 'production-gameplay-report.json');
 const requestedModes = new Set(String(process.env.HARDWARE_PERF_MODES || 'walk,drive,drone,plane').split(',').map((mode) => mode.trim()).filter(Boolean));
 const planetaryJourneyEnabled = process.env.HARDWARE_PERF_PLANETARY !== '0';
@@ -14,10 +20,10 @@ const cpuProfileEnabled = process.env.HARDWARE_PERF_CPU_PROFILE === '1';
 const heapProfileEnabled = process.env.HARDWARE_PERF_HEAP_PROFILE === '1';
 const heapProfileIncludesLoad = process.env.HARDWARE_PERF_HEAP_PROFILE === 'load';
 const budgets = Object.freeze({
-  loadMs: 60000,
-  medianFps: 45,
-  onePercentLowFps: 20,
-  p99FrameMs: 55,
+  loadMs: 20000,
+  medianFps: 58,
+  onePercentLowFps: 45,
+  p99FrameMs: 33,
   peakFrameMs: 300,
   transitionPeakFrameMs: 250,
   maxFramesOver50Ms: 4,
@@ -404,9 +410,9 @@ async function setMode(page, mode) {
     const reference = ctx.activeTransportActor?.()?.position || { x: ctx.car?.x || 0, z: ctx.car?.z || 0 };
     const terrainY = ctx.SurfaceQuery?.terrainAt?.(reference.x, reference.z)?.position?.y || 0;
     const options = nextMode === 'plane' ? {
-      source: 'hardware_performance', force: true, x: reference.x, z: reference.z,
+      source: 'hardware_performance', x: reference.x, z: reference.z,
       y: terrainY + 140, speed: 28, throttle: 0.72, airborne: true
-    } : { source: 'hardware_performance', force: true, emitTutorial: false };
+    } : { source: 'hardware_performance', emitTutorial: false };
     return ctx.setTravelMode?.(nextMode, options);
   }, mode);
 }
@@ -417,6 +423,7 @@ async function runScenario(page, definition) {
   await setMode(page, definition.mode);
   await page.waitForTimeout(1500);
   const transitionFrames = summarizeFrames(await stopFrameRecorder(page));
+  const transitionLongTasks = await readLastLongTasks(page);
   const before = await runtimeSnapshot(page);
 
   await startFrameRecorder(page);
@@ -433,6 +440,7 @@ async function runScenario(page, definition) {
     elapsed += duration;
   }
   const frames = summarizeFrames(await stopFrameRecorder(page));
+  const longTasks = await readLastLongTasks(page);
   await page.waitForTimeout(250);
   const after = await runtimeSnapshot(page);
   const beforePosition = before.actor?.position || {};
@@ -448,7 +456,9 @@ async function runScenario(page, definition) {
     mode: definition.mode,
     transitionMs: Date.now() - transitionStarted - scenarioMs - 250,
     transitionFrames,
+    transitionLongTasks,
     frames,
+    longTasks,
     movement,
     before,
     after,
@@ -497,20 +507,25 @@ try {
   });
   await page.waitForFunction(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return typeof ctx?.loadRoads === 'function' && typeof ctx?.setTravelMode === 'function';
+    return typeof ctx?.loadRoads === 'function' &&
+      typeof ctx?.setTravelMode === 'function' &&
+      typeof ctx?.commitEnvironment === 'function';
   }, { timeout: 120000 });
 
-  const setup = await page.evaluate(async () => {
+  const setup = await page.evaluate(async (activeRouteProfile) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    const { ENV } = await import('/app/js/env.js?v=57');
     const deadline = performance.now() + 120000;
     while (
-      (typeof ctx.loadRoads !== 'function' || typeof ctx.setTravelMode !== 'function' || typeof ctx.switchEnv !== 'function') &&
+      (typeof ctx.loadRoads !== 'function' ||
+        typeof ctx.setTravelMode !== 'function' ||
+        typeof ctx.commitEnvironment !== 'function') &&
       performance.now() < deadline
     ) {
       await new Promise((resolve) => window.setTimeout(resolve, 100));
     }
-    if (typeof ctx.loadRoads !== 'function' || typeof ctx.setTravelMode !== 'function' || typeof ctx.switchEnv !== 'function') {
+    if (typeof ctx.loadRoads !== 'function' ||
+        typeof ctx.setTravelMode !== 'function' ||
+        typeof ctx.commitEnvironment !== 'function') {
       throw new Error('World runtime did not become ready before the hardware performance timeout.');
     }
     globalThis.__we3dCtx = ctx;
@@ -519,7 +534,8 @@ try {
     ctx.gameStarted = true;
     ctx.paused = false;
     ctx.selLoc = 'baltimore';
-    ctx.switchEnv(ENV.EARTH);
+    ctx.commitEnvironment(ctx.ENV.EARTH, { source: 'hardware_performance_bootstrap' });
+    if (activeRouteProfile === 'turning') ctx.setTimeOfDay?.('day');
     document.getElementById('titleScreen')?.classList.add('hidden');
     document.getElementById('globeSelectorScreen')?.classList.remove('show');
     ['hud', 'minimap', 'floatMenuContainer', 'mainMenuBtn', 'controlsTab', 'coords'].forEach((id) => {
@@ -535,7 +551,7 @@ try {
       worldLoadStage: ctx.lastWorldLoadStage || null,
       mapRoadDraw: ctx.lastMapRoadDrawStats || null
     };
-  });
+  }, routeProfile);
   setup.navigationAndLoadMs = performance.now() - navigationStarted;
   await page.waitForTimeout(2000);
 
@@ -560,18 +576,17 @@ try {
     await cdp.send('Profiler.start');
   }
   const scenarios = [];
+  const groundRoute = routeProfile === 'turning'
+    ? [
+        { share: 0.35, keys: ['ArrowUp'] },
+        { share: 0.15, keys: ['ArrowUp', 'ArrowLeft'] },
+        { share: 0.35, keys: ['ArrowUp'] },
+        { share: 0.15, keys: ['ArrowUp', 'ArrowRight'] }
+      ]
+    : [{ share: 1, keys: ['ArrowUp'] }];
   for (const definition of [
-    { mode: 'walk', phases: [
-      { share: 0.3, keys: ['ArrowUp'] },
-      { share: 0.16, keys: ['ArrowUp', 'ArrowLeft'] },
-      { share: 0.38, keys: ['ArrowUp'] },
-      { share: 0.16, keys: ['ArrowUp', 'ArrowRight'] }
-    ] },
-    { mode: 'drive', phases: [
-      { share: 0.5, keys: ['ArrowUp'] },
-      { share: 0.25, keys: ['ArrowUp', 'ArrowRight'] },
-      { share: 0.25, keys: ['ArrowUp', 'ArrowLeft'] }
-    ] },
+    { mode: 'walk', phases: groundRoute },
+    { mode: 'drive', phases: groundRoute },
     { mode: 'drone', phases: [
       { share: 0.6, keys: ['ArrowUp'] },
       { share: 0.2, keys: ['ArrowUp', 'ArrowLeft'] },
@@ -674,6 +689,7 @@ try {
     generatedAt: new Date().toISOString(),
     baseUrl,
     scenarioMs,
+    routeProfile,
     budgets,
     glInfo,
     setup,

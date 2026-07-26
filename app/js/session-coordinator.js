@@ -1,178 +1,110 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { ENV, getEnv, switchEnv } from './env.js?v=57';
-import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
+import { createAppRuntime } from './runtime/app-runtime.js';
+import { createDestinationScheduler } from './runtime/destination-schedulers.js';
+import { createProductPorts } from './runtime/product-ports.js';
 
-const environmentAdapters = new Map();
-let transitionSequence = 0;
-let activeTransition = null;
+const validEnvironments = new Set(Object.values(ENV));
+const productPorts = createProductPorts();
 
-function validEnvironment(environment) {
-  return Object.values(ENV).includes(environment);
+const runtime = createAppRuntime({
+  getDestination: getEnv,
+  isDestinationValid: (environment) => validEnvironments.has(environment),
+  commitDestination: ({ target }) => getEnv() === target || switchEnv(target),
+  createScheduler: createDestinationScheduler,
+  ports: productPorts,
+  onEvent(event) {
+    productPorts.tryCall('shell', 'publishRuntimeEvent', event);
+  }
+});
+
+function bindRuntimeProductPort(name, adapter) {
+  return productPorts.bind(name, adapter);
 }
 
-function isEnvironmentTransitionCurrent(token) {
-  return !!token && activeTransition === token && token.scope.isActive();
+function getRuntimeProductPorts() {
+  return productPorts;
 }
 
-function finishEnvironmentTransition(token, reason = 'completed') {
-  if (!isEnvironmentTransitionCurrent(token)) return false;
-  token.finishedAt = performance.now();
-  token.finishReason = reason;
-  token.scope.dispose(reason);
-  activeTransition = null;
-  return true;
-}
-
-function cancelEnvironmentTransition(token = activeTransition, reason = 'superseded') {
-  if (!token || !token.scope.isActive()) return false;
-  token.cancelledAt = performance.now();
-  token.cancelReason = reason;
-  token.abortController.abort(reason);
-  token.scope.dispose(reason);
-  if (activeTransition === token) activeTransition = null;
-  return true;
+function withLegacyContext(adapter) {
+  const wrap = (method) => typeof adapter[method] === 'function'
+    ? (context) => adapter[method]({ appCtx, ...context })
+    : undefined;
+  return Object.freeze({
+    enter: wrap('enter'),
+    exit: wrap('exit'),
+    exitSync: wrap('exitSync'),
+    prepare: wrap('prepare'),
+    snapshot: typeof adapter.snapshot === 'function' ? () => adapter.snapshot() : undefined
+  });
 }
 
 function beginEnvironmentTransition(target, options = {}) {
-  if (!validEnvironment(target)) throw new Error(`Unknown environment: ${target}`);
-  if (activeTransition) cancelEnvironmentTransition(activeTransition, 'superseded');
-  const id = ++transitionSequence;
-  const source = String(options.source || 'runtime');
-  const scope = createLifecycleScope(`environment-transition:${id}:${source}`);
-  const abortController = new AbortController();
-  const token = {
-    id,
-    source,
-    from: getEnv(),
-    target,
-    startedAt: performance.now(),
-    committedAt: null,
-    finishedAt: null,
-    finishReason: '',
-    cancelReason: '',
-    abortController,
-    signal: abortController.signal,
-    scope,
-    metadata: options.metadata && typeof options.metadata === 'object' ? { ...options.metadata } : {}
-  };
-  activeTransition = token;
-  return token;
+  return runtime.beginTransition(target, options);
+}
+
+function isEnvironmentTransitionCurrent(token) {
+  return runtime.isTransitionCurrent(token);
+}
+
+function finishEnvironmentTransition(token, reason = 'completed') {
+  return runtime.finishTransition(token, reason);
+}
+
+function cancelEnvironmentTransition(token, reason = 'superseded') {
+  return runtime.cancelTransition(token, reason);
 }
 
 function commitEnvironment(target, options = {}) {
-  if (!validEnvironment(target)) return false;
-  let token = options.token || null;
-  if (token && (!isEnvironmentTransitionCurrent(token) || token.target !== target)) return false;
-  if (!token) {
-    token = activeTransition?.target === target
-      ? activeTransition
-      : beginEnvironmentTransition(target, { source: options.source });
-  }
-
-  const committed = getEnv() === target || switchEnv(target);
-  if (!committed) {
-    cancelEnvironmentTransition(token, 'commit-rejected');
-    return false;
-  }
-  token.committedAt = performance.now();
-  if (options.finish !== false) finishEnvironmentTransition(token);
-  return true;
+  return runtime.commit(target, options);
 }
 
 function registerEnvironmentLifecycle(environment, adapter) {
-  if (!validEnvironment(environment)) throw new Error(`Unknown environment: ${environment}`);
-  if (!adapter || typeof adapter !== 'object') throw new TypeError('Environment lifecycle adapter must be an object.');
-  environmentAdapters.set(environment, adapter);
-  return () => {
-    if (environmentAdapters.get(environment) === adapter) environmentAdapters.delete(environment);
-  };
+  return runtime.registerDestination(environment, withLegacyContext(adapter));
 }
 
 function exitCurrentEnvironmentSync(target, options = {}) {
-  if (!validEnvironment(target)) throw new Error(`Unknown environment: ${target}`);
-  const from = getEnv();
-  if (!from || from === target) return false;
-  const adapter = environmentAdapters.get(from);
-  if (typeof adapter?.exitSync !== 'function') return false;
-  adapter.exitSync({
-    appCtx,
-    from,
-    target,
-    source: String(options.source || 'runtime')
-  });
-  return true;
+  return runtime.exitCurrentSync(target, options);
 }
 
-async function transitionEnvironment(target, options = {}) {
-  const token = beginEnvironmentTransition(target, options);
-  const fromAdapter = environmentAdapters.get(token.from);
-  const targetAdapter = environmentAdapters.get(target);
-  const context = { appCtx, signal: token.signal, scope: token.scope, token };
-  try {
-    if (typeof fromAdapter?.exit === 'function') await fromAdapter.exit(context);
-    else if (typeof fromAdapter?.exitSync === 'function') fromAdapter.exitSync(context);
-    if (!isEnvironmentTransitionCurrent(token)) return false;
-    await targetAdapter?.prepare?.(context);
-    if (!isEnvironmentTransitionCurrent(token)) return false;
-    if (!commitEnvironment(target, { token, finish: false })) return false;
-    await targetAdapter?.enter?.(context);
-    if (!isEnvironmentTransitionCurrent(token)) return false;
-    finishEnvironmentTransition(token);
-    return true;
-  } catch (error) {
-    cancelEnvironmentTransition(token, 'failed');
-    throw error;
-  }
+function transitionEnvironment(target, options = {}) {
+  return runtime.transition(target, options);
 }
 
 function getSessionCoordinatorDebugState() {
-  const environments = {};
-  environmentAdapters.forEach((adapter, environment) => {
-    try {
-      environments[environment] = typeof adapter.snapshot === 'function'
-        ? adapter.snapshot()
-        : { registered: true };
-    } catch (error) {
-      environments[environment] = {
-        registered: true,
-        snapshotError: error instanceof Error ? error.message : String(error)
-      };
-    }
-  });
+  const snapshot = runtime.snapshot();
   return {
-    environment: getEnv(),
-    registeredEnvironments: [...environmentAdapters.keys()],
-    environments,
-    transition: activeTransition ? {
-      id: activeTransition.id,
-      source: activeTransition.source,
-      from: activeTransition.from,
-      target: activeTransition.target,
-      committed: Number.isFinite(activeTransition.committedAt),
-      scope: activeTransition.scope.snapshot()
-    } : null
+    environment: snapshot.destination,
+    registeredEnvironments: snapshot.registeredDestinations,
+    environments: snapshot.destinations,
+    activeSession: snapshot.activeSession,
+    transition: snapshot.transition
   };
 }
 
 Object.assign(appCtx, {
+  bindRuntimeProductPort,
   beginEnvironmentTransition,
   cancelEnvironmentTransition,
   commitEnvironment,
   exitCurrentEnvironmentSync,
   finishEnvironmentTransition,
   getSessionCoordinatorDebugState,
+  getRuntimeProductPortsSnapshot: () => productPorts.snapshot(),
   isEnvironmentTransitionCurrent,
   registerEnvironmentLifecycle,
   transitionEnvironment
 });
 
 export {
+  bindRuntimeProductPort,
   beginEnvironmentTransition,
   cancelEnvironmentTransition,
   commitEnvironment,
   exitCurrentEnvironmentSync,
   finishEnvironmentTransition,
   getSessionCoordinatorDebugState,
+  getRuntimeProductPorts,
   isEnvironmentTransitionCurrent,
   registerEnvironmentLifecycle,
   transitionEnvironment

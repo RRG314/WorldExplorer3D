@@ -1,5 +1,6 @@
 function createLifecycleScope(owner = 'runtime') {
   const records = new Set();
+  const animationFrameRecords = new Map();
   let active = true;
   let disposedReason = '';
 
@@ -42,10 +43,23 @@ function createLifecycleScope(owner = 'runtime') {
     let record = null;
     const handle = globalThis.requestAnimationFrame((timestamp) => {
       release(record);
+      animationFrameRecords.delete(handle);
       if (active) callback(timestamp);
     });
-    record = track('animation-frame', () => globalThis.cancelAnimationFrame?.(handle));
+    record = track('animation-frame', () => {
+      animationFrameRecords.delete(handle);
+      globalThis.cancelAnimationFrame?.(handle);
+    });
+    if (record) animationFrameRecords.set(handle, record);
     return handle;
+  }
+
+  function cancelAnimationFrame(handle) {
+    const record = animationFrameRecords.get(handle);
+    if (!record) return false;
+    record.cancel();
+    release(record);
+    return true;
   }
 
   function idle(callback, timeout = 2000) {
@@ -119,6 +133,7 @@ function createLifecycleScope(owner = 'runtime') {
 
   return Object.freeze({
     animationFrame,
+    cancelAnimationFrame,
     defer,
     dispose,
     guard,

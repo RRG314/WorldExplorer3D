@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=21";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=22";
 import { addBuildingToSpatialIndex, removeBuildingsFromSpatialIndex } from "./building-spatial-index.js?v=7";
 import {
   buildGuardrailEdges,
@@ -108,7 +108,6 @@ export function registerBridgeGuardrails(road, owner = null) {
       colliderDetail: 'full',
       sourceBuildingId: `${road.sourceFeatureId}:guardrail:${pending.startIndex}:${side}`,
       guardrailReason: pending.reason,
-      _streamChunkKey: road._streamChunkKey || null
     };
     colliders.push(collider);
     appCtx.buildings.push(collider);
@@ -189,28 +188,40 @@ export function registerBridgeGuardrails(road, owner = null) {
   return colliders;
 }
 
-function clearRoadGuardrails(road) {
-  const colliders = Array.isArray(road?.guardrailColliders) ? road.guardrailColliders : [];
-  if (colliders.length > 0) {
-    const colliderSet = new Set(colliders);
-    removeBuildingsFromSpatialIndex(colliders);
-    removeArrayItemsInPlace(appCtx.buildings, colliderSet);
-    const owner = road._guardrailOwner;
-    if (owner) {
-      removeArrayItemsInPlace(owner.bridgeGuardrails, colliderSet);
-      removeArrayItemsInPlace(owner.buildings, colliderSet);
-    }
-  }
-  road.guardrailColliders = [];
-  road._guardrailsRegistered = false;
-}
-
 export function refreshBridgeGuardrails(roads = appCtx.roads) {
   if (!Array.isArray(roads)) return 0;
+  const retired = [];
+  const retiredByOwner = new Map();
+  roads.forEach((road) => {
+    const colliders = Array.isArray(road?.guardrailColliders) ? road.guardrailColliders : [];
+    if (colliders.length > 0) {
+      retired.push(...colliders);
+      const owner = road._guardrailOwner;
+      if (owner) {
+        let ownerRetired = retiredByOwner.get(owner);
+        if (!ownerRetired) {
+          ownerRetired = new Set();
+          retiredByOwner.set(owner, ownerRetired);
+        }
+        colliders.forEach((collider) => ownerRetired.add(collider));
+      }
+    }
+    road.guardrailColliders = [];
+    road._guardrailsRegistered = false;
+  });
+  if (retired.length > 0) {
+    const retiredSet = new Set(retired);
+    removeBuildingsFromSpatialIndex(retired);
+    removeArrayItemsInPlace(appCtx.buildings, retiredSet);
+    retiredByOwner.forEach((ownerRetired, owner) => {
+      removeArrayItemsInPlace(owner.bridgeGuardrails, ownerRetired);
+      removeArrayItemsInPlace(owner.buildings, ownerRetired);
+    });
+  }
+
   let count = 0;
   roads.forEach((road) => {
     const owner = road?._guardrailOwner || null;
-    clearRoadGuardrails(road);
     count += registerBridgeGuardrails(road, owner).length;
   });
   return count;

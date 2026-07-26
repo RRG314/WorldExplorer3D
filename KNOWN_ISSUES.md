@@ -6,16 +6,25 @@ The production-quality work required to resolve the architectural limitations
 below is tracked in [ROADMAP.md](ROADMAP.md). A listed limitation is not an
 approval to ignore a reproducible defect.
 
-## 4.1 Release Blockers
+## 4.1 Certification Status
 
-- The verified 4.0.0 Baltimore production journey can render a large building
-  mass across or immediately over the street corridor. This is a systemic
-  surface/occupancy failure, not an approved data variation. Release 4.1
-  remains blocked until initial and streamed content use the same canonical
-  surface and occupancy contracts and the global fixtures pass visual review.
-- Passing source counts, runtime counters, or unit tests do not clear a world
-  frame with missing roads, road/building overlap, invalid grade separation,
-  or similarly broken composition.
+- No unresolved code blocker remains in the fixed 11-class 4.1 geography
+  matrix. The selected-location OSM runtime, road/surface occupancy, sparse
+  path arrival, Golden Gate bridge, Holland Tunnel, camera clearance, and
+  provider-degradation contracts pass.
+- Production preview, promotion, and the rollback drill are operational
+  release actions, not code fixes. They remain pending until deployment is
+  explicitly authorized.
+- Passing counters alone are not sufficient. The release requires the
+  installed-Chrome performance run and inspected hardware frames in addition
+  to deterministic CI.
+- Shinjuku remains an unfeatured diagnostic stress location. It completes
+  through the shared runtime, but the extended software-browser matrix observed
+  a roughly 71-second load. It is not a curated Places entry for 4.1.
+- Regional building massing, facades, water, boats, snow, tunnel architecture,
+  and rural terrain remain visibly simplified. These are documented fidelity
+  limits for 4.1, not claims that later reconstruction and simulation roadmap
+  work is complete.
 
 ## Map Coverage
 
@@ -25,18 +34,23 @@ approval to ignore a reproducible defect.
 
 ## Loading and Performance
 
-- Dense cities, rapid plane travel, and continuous streaming can be demanding on GPU memory and network bandwidth.
+- Dense cities and rapid plane travel can be demanding on GPU memory and network bandwidth.
 - The initial world load intentionally waits for core roads and buildings so play does not begin in an empty scene. Additional distant detail may continue to refine afterward.
-- Version 4.0 uses a detailed initial location/OSM build and a separate Overture-backed continuous-streaming build. Their geometry and detail rules are not yet fully unified, so quality can change after traveling beyond the initial area or crossing world-cell boundaries.
-- Whole-cell streaming and LOD replacement can produce visible vegetation or ground-detail changes while traveling, particularly at vehicle or aircraft speed.
+- LOD changes can produce visible vegetation or ground-detail changes while traveling, particularly at vehicle or aircraft speed.
 - Browser GPU support and memory limits differ significantly, especially on older phones and integrated graphics.
 
 ## Rendering and World Geometry
 
-- Medium rendering quality can produce visibly blocky or stair-stepped directional shadows. The next rendering-foundation release replaces the current single coarse shadow range.
-- Mountain sidewalks and paths can intersect or be partially covered by steep terrain because corridors and terrain do not yet share one composited surface owner.
+- The 4.1 candidate replaces medium-quality basic shadow maps with one fitted,
+  texel-stabilized soft-shadow policy. Certified Apple Metal frames pass; GPU,
+  browser, and source-data combinations outside the release matrix can still
+  expose rendering differences.
+- Mapped mountain paths now use the shared navigation/surface contract and the
+  certified Swiss Alps path is traversable. Incomplete path tagging, extreme
+  DEM relief, and thin distant terrain edges can still reduce fidelity outside
+  the certified matrix.
 - Bridges, viaducts, elevated surfaces, and tunnel approaches depend on incomplete source tags and tile-local feature fragments. Some complex structures can have incorrect grade, clearance, supports, or transitions.
-- Generated or streamed trees, grass, buildings, and water are validated through several different placement paths. Rare overlaps such as trees or buildings in water, floating vegetation, or land-cover over transportation surfaces can remain outside certified benchmark areas.
+- Generated trees, grass, buildings, and water are validated through several different placement paths. Rare overlaps such as trees or buildings in water, floating vegetation, or land-cover over transportation surfaces can remain outside certified benchmark areas.
 - Building facades use a limited material and procedural-window library. Regional typology and material distinctions such as limestone, sandstone, marble, stucco, timber, and metal cladding are not yet represented at the intended quality.
 - Water uses gameplay wave displacement and buoyancy, but does not yet provide the intended unified wave-normal, reflection, refraction, shoreline, and vessel system.
 
@@ -57,8 +71,7 @@ approval to ignore a reproducible defect.
 
 - Real indoor data is uncommon. Buildings without usable indoor mapping receive a footprint-aware generated interior.
 - Generated interiors are traversable and sized from the building footprint, but may be visually sparse when no authoritative indoor geometry exists.
-- Procedural vegetation, inferred buildings, distant aerial context, and deep-space encounters fill data gaps and should not be interpreted as exact observations.
-- Streamed distant buildings use simplified batched massing and coarse collision bounds; they are not exact facade or structural reconstructions.
+- Procedural vegetation, inferred buildings, and deep-space encounters fill data gaps and should not be interpreted as exact observations.
 - Solar-system distances and planetary sizes use documented visual scaling so destinations remain navigable. The experience is educational and exploratory, not an orbital-navigation simulator.
 
 ## Backend Features

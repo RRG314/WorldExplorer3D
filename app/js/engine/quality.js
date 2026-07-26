@@ -1,3 +1,8 @@
+import {
+  applyShadowPolicy,
+  createShadowPolicy
+} from './shadow-policy.js?v=1';
+
 export function createProceduralEnvironmentMap(ctx, pmremGenerator) {
   if (!pmremGenerator) return null;
   try {
@@ -17,11 +22,10 @@ export function createProceduralEnvironmentMap(ctx, pmremGenerator) {
 }
 
 export function getShadowMapResolution(ctx, level) {
-  const normalized = ctx.normalizeRenderQualityLevel(level);
-  if (normalized === ctx.RENDER_QUALITY_LOW) return 0;
-  if (ctx.state.currentGpuTier === 'low') return normalized === ctx.RENDER_QUALITY_HIGH ? 512 : 256;
-  if (ctx.state.currentGpuTier === 'mid') return normalized === ctx.RENDER_QUALITY_HIGH ? 1024 : 512;
-  return normalized === ctx.RENDER_QUALITY_HIGH ? 2048 : 1024;
+  return createShadowPolicy({
+    quality: ctx.normalizeRenderQualityLevel(level),
+    gpuTier: ctx.state.currentGpuTier
+  }).resolution;
 }
 
 export function applyRenderQuality(ctx, level, options = {}) {
@@ -31,19 +35,18 @@ export function applyRenderQuality(ctx, level, options = {}) {
   if (options.persist !== false) ctx.writeStorage(ctx.RENDER_QUALITY_STORAGE_KEY, normalized);
 
   if (ctx.appCtx.renderer) {
-    const enableShadows = normalized !== ctx.RENDER_QUALITY_LOW;
-    ctx.appCtx.renderer.shadowMap.enabled = enableShadows;
-    ctx.appCtx.renderer.shadowMap.type = normalized === ctx.RENDER_QUALITY_HIGH ? THREE.PCFSoftShadowMap : THREE.BasicShadowMap;
     ctx.appCtx.renderer.toneMappingExposure = normalized === ctx.RENDER_QUALITY_HIGH ? 0.95 : normalized === ctx.RENDER_QUALITY_MED ? 0.9 : 0.85;
   }
-  if (ctx.appCtx.sun) {
-    const shadowRes = getShadowMapResolution(ctx, normalized);
-    ctx.appCtx.sun.castShadow = shadowRes > 0;
-    ctx.appCtx.sun.shadow.mapSize.width = shadowRes || 1;
-    ctx.appCtx.sun.shadow.mapSize.height = shadowRes || 1;
-    ctx.appCtx.sun.shadow.radius = normalized === ctx.RENDER_QUALITY_HIGH ? 3 : 1;
-    ctx.appCtx.sun.shadow.needsUpdate = true;
-  }
+  const shadowPolicy = createShadowPolicy({
+    quality: normalized,
+    gpuTier: ctx.state.currentGpuTier
+  });
+  ctx.state.shadowPolicy = applyShadowPolicy({
+    renderer: ctx.appCtx.renderer,
+    sun: ctx.appCtx.sun,
+    three: THREE,
+    policy: shadowPolicy
+  });
   if (normalized === ctx.RENDER_QUALITY_LOW) {
     ctx.appCtx.scene.environment = ctx.state.fallbackEnvMap || null;
   } else if (ctx.state.hdrEnvMap) {

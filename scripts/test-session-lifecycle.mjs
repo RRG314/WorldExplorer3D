@@ -76,6 +76,7 @@ async function readLifecycleState(page, mode) {
       coordinator: ctx.getSessionCoordinatorDebugState?.(),
       diagnosticsLifecycle: ctx.getRuntimeDiagnosticsLifecycleSnapshot?.(),
       frameOwnership: ctx.getFrameOwnershipSnapshot?.(),
+      productPorts: ctx.getRuntimeProductPortsSnapshot?.(),
       canvases: {
         ocean: document.querySelectorAll('#oceanModeCanvas').length,
         space: document.querySelectorAll('#spaceFlightCanvas').length,
@@ -117,6 +118,23 @@ async function waitForHubExit(page, mode) {
   }, mode, 30000, `${mode} return to hub`);
 }
 
+async function setTestDocumentHidden(page, hidden) {
+  await page.evaluate((nextHidden) => {
+    if (!Object.prototype.hasOwnProperty.call(document, '__we3dTestHiddenInstalled')) {
+      Object.defineProperty(document, '__we3dTestHiddenInstalled', {
+        configurable: true,
+        value: true
+      });
+      Object.defineProperty(document, 'hidden', {
+        configurable: true,
+        get: () => globalThis.__WE3D_TEST_DOCUMENT_HIDDEN__ === true
+      });
+    }
+    globalThis.__WE3D_TEST_DOCUMENT_HIDDEN__ = nextHidden === true;
+    document.dispatchEvent(new Event('visibilitychange'));
+  }, hidden);
+}
+
 async function runModeCycles(page, mode, lifecycleEvents) {
   const destination = mode === 'space' ? '#globeSelectorSpaceBtn' : '#globeSelectorOceanBtn';
   const cycles = [];
@@ -126,6 +144,21 @@ async function runModeCycles(page, mode, lifecycleEvents) {
     await page.click(destination);
     await waitForMode(page, mode, previousSpaceSessionId);
     const observed = await readLifecycleState(page, mode);
+    let hidden = null;
+    let resumed = null;
+    if (cycle === 1) {
+      await setTestDocumentHidden(page, true);
+      await pollPageState(page, async (requestedMode) => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        return requestedMode === 'space'
+          ? ctx.spaceFlight?.active && ctx.spaceFlight?.animationId == null
+          : ctx.oceanMode?.active && ctx.oceanMode?.animationId == null;
+      }, mode, 5000, `${mode} hidden-tab suspension`);
+      hidden = await readLifecycleState(page, mode);
+      await setTestDocumentHidden(page, false);
+      await waitForMode(page, mode, previousSpaceSessionId);
+      resumed = await readLifecycleState(page, mode);
+    }
     await page.waitForTimeout(1200);
     const active = await readLifecycleState(page, mode);
     if (cycle === 1 || cycle === 3) {
@@ -134,8 +167,34 @@ async function runModeCycles(page, mode, lifecycleEvents) {
 
     await page.click('#mainMenuBtn');
     await waitForHubExit(page, mode);
-    const exited = await readLifecycleState(page, mode);
-    cycles.push({ observed, active, exited, events: lifecycleEvents.splice(0) });
+    let exited = await readLifecycleState(page, mode);
+    let hiddenEarth = null;
+    let resumedEarth = null;
+    if (cycle === 1) {
+      await setTestDocumentHidden(page, true);
+      await pollPageState(page, async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        return ctx.getSessionCoordinatorDebugState?.().activeSession?.scheduler?.running === false;
+      }, null, 5000, 'shared destination hidden-tab suspension');
+      hiddenEarth = await readLifecycleState(page, mode);
+      await setTestDocumentHidden(page, false);
+      await pollPageState(page, async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        return ctx.getSessionCoordinatorDebugState?.().activeSession?.scheduler?.running === true;
+      }, null, 5000, 'shared destination visibility resume');
+      resumedEarth = await readLifecycleState(page, mode);
+      exited = resumedEarth;
+    }
+    cycles.push({
+      observed,
+      hidden,
+      resumed,
+      active,
+      exited,
+      hiddenEarth,
+      resumedEarth,
+      events: lifecycleEvents.splice(0)
+    });
   }
   return cycles;
 }
@@ -147,17 +206,92 @@ function assertPlateau(mode, cycles) {
   for (const [index, cycle] of cycles.entries()) {
     const activeAdapter = cycle.active.coordinator.environments[adapterKey];
     const exitedAdapter = cycle.exited.coordinator.environments[adapterKey];
+    const activeSession = cycle.active.coordinator.activeSession;
+    const exitedSession = cycle.exited.coordinator.activeSession;
     const expectedFrameOwner = mode === 'space' ? 'space.flight-renderer' : 'ocean.mode-renderer';
     assert(activeAdapter.active && activeAdapter.animationActive, `${mode} cycle ${index + 1} did not own an active render loop`);
     assert(!exitedAdapter.active && !exitedAdapter.animationActive, `${mode} cycle ${index + 1} left its render loop active`);
+    assert(
+      activeSession?.destination === adapterKey && activeSession.active,
+      `${mode} cycle ${index + 1} was not owned by the active destination session`
+    );
+    assert(
+      activeSession.scope?.resources?.['animation-frame'] === 1,
+      `${mode} cycle ${index + 1} did not schedule exactly one frame through its destination scope`
+    );
+    assert(
+      activeAdapter.scope?.owner === activeSession.scope?.owner,
+      `${mode} cycle ${index + 1} retained a private renderer scope outside DestinationSession`
+    );
+    assert(
+      exitedSession?.destination === 'EARTH' && exitedSession.active,
+      `${mode} cycle ${index + 1} did not return ownership to an Earth destination session`
+    );
+    assert(
+      !activeAdapter.scope?.disposedReason,
+      `${mode} cycle ${index + 1} ran through an already disposed destination scope`
+    );
+    assert(
+      exitedAdapter.scope == null,
+      `${mode} cycle ${index + 1} retained its destination scope after exit`
+    );
     assert(cycle.active.frameOwnership?.ok, `${mode} cycle ${index + 1} has conflicting frame owners`);
     assert(
       cycle.active.frameOwnership?.active?.includes(expectedFrameOwner),
       `${mode} cycle ${index + 1} was not registered as the active environment renderer`
     );
+    if (cycle.hidden) {
+      const hiddenAdapter = cycle.hidden.coordinator.environments[adapterKey];
+      const resumedAdapter = cycle.resumed.coordinator.environments[adapterKey];
+      assert(hiddenAdapter.active, `${mode} stopped the destination while the tab was hidden`);
+      assert(!hiddenAdapter.animationActive, `${mode} retained a destination frame while the tab was hidden`);
+      assert(
+        !cycle.hidden.frameOwnership?.scheduled?.includes(expectedFrameOwner),
+        `${mode} retained scheduled frame ownership while the tab was hidden`
+      );
+      assert(
+        !cycle.hidden.coordinator.activeSession.scope?.resources?.['animation-frame'],
+        `${mode} retained an animation-frame resource while the tab was hidden`
+      );
+      assert(
+        resumedAdapter.active && resumedAdapter.animationActive,
+        `${mode} did not resume exactly one destination frame after visibility returned`
+      );
+    }
+    if (cycle.hiddenEarth) {
+      assert(
+        cycle.hiddenEarth.coordinator.activeSession.scheduler?.running === false,
+        `Earth retained its shared destination frame while the tab was hidden after ${mode}`
+      );
+      assert(
+        !cycle.hiddenEarth.frameOwnership?.scheduled?.includes('earth.runtime-kernel'),
+        `Earth retained scheduled frame ownership while the tab was hidden after ${mode}`
+      );
+      assert(
+        cycle.resumedEarth.coordinator.activeSession.scheduler?.running === true,
+        `Earth did not resume its shared destination frame after ${mode}`
+      );
+    }
+    assert(
+      !cycle.active.frameOwnership?.scheduled?.includes('earth.runtime-kernel'),
+      `${mode} cycle ${index + 1} left the shared Earth/Moon/Mars kernel scheduled`
+    );
     assert(
       !cycle.exited.frameOwnership?.active?.includes(expectedFrameOwner),
       `${mode} cycle ${index + 1} retained frame ownership after exit`
+    );
+    assert(
+      cycle.exited.frameOwnership?.active?.includes('earth.runtime-kernel'),
+      `${mode} cycle ${index + 1} did not return frame ownership to the shared scene kernel`
+    );
+    assert(
+      exitedSession.scheduler?.running === true,
+      `${mode} cycle ${index + 1} returned to Earth without starting its session scheduler`
+    );
+    assert(
+      cycle.active.productPorts?.ports?.length === 4 &&
+        cycle.active.productPorts.ports.every((port) => port.bound),
+      `${mode} cycle ${index + 1} did not boot all four runtime product ports`
     );
     assert(
       cycle.active.diagnosticsLifecycle?.resources?.interval === 1 &&

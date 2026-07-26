@@ -15,7 +15,7 @@ import {
   setDoc,
   writeBatch,
   where
-} from 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+} from '../platform/firebase/firestore.js';
 import { ensureGuestSession, getCurrentUser } from '../../../js/auth-ui.js';
 import { initFirebase } from '../../../js/firebase-init.js';
 import {

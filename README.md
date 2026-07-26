@@ -10,9 +10,13 @@ World Explorer 3D is a browser-based geospatial exploration game built around re
 
 **[Launch World Explorer 3D](https://worldexplorer3d.io/app/)**
 
-## Version 4.0
+## Version 4.1
 
-Version 4.0 turns the refactored explorer into an open-source world platform. It adds an authoritative multiplayer foundation, contributor-facing gameplay contracts, stronger persistence and security boundaries, and a release-tested runtime spanning Earth, ocean, Moon, Mars, and space.
+Version 4.1 is a focused stabilization release. It simplifies Earth exploration
+to the selected-location OSM runtime, improves dense-world load and frame
+stability, fixes shared road/path/terrain/camera ownership, removes Continuous
+World and Overture/PMTiles runtime paths, and retains the existing Earth,
+ocean, Moon, Mars, space, account, editor, and multiplayer journeys.
 
 Highlights:
 
@@ -20,7 +24,6 @@ Highlights:
 - Preset cities, geolocation, coordinate entry, and an interactive globe for choosing locations worldwide.
 - Live Earth views for observed satellites, earthquakes, aircraft, current weather, community street imagery, modeled marine conditions, and NOAA water-level/tide coverage.
 - Walk, drive, drone, plane, boat, underwater, rover, astronaut, and rocket traversal.
-- Optional continuous Earth streaming for longer trips, with quality and distance budgets for ground and aerial play.
 - In-session Earth, Moon, Mars, ocean, and space transitions without a page reload.
 - A navigable solar system with planets, moons, asteroid and Kuiper belts, spacecraft, and inner/full system maps.
 - Deep-space destinations including catalog-backed star systems, nebulae, galaxies, and black-hole encounters.

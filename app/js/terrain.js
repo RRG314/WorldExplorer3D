@@ -45,7 +45,7 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   rebuildRoadsWithTerrain
-} from "./terrain/rebuild.js?v=11";
+} from "./terrain/rebuild.js?v=13";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
@@ -199,7 +199,7 @@ const terrainRebuildDeps = {
 };
 
 function scheduleRoadAndBuildingRebuild() {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired) return;
+  if (!appCtx.terrainEnabled || appCtx.onMoon) return;
   appCtx.roadsNeedRebuild = true;
   if (terrain._rebuildTimer) return;
 
@@ -211,7 +211,7 @@ function scheduleRoadAndBuildingRebuild() {
 
   terrain._rebuildTimer = setTimeout(() => {
     terrain._rebuildTimer = null;
-    if (!appCtx.roadsNeedRebuild || appCtx.onMoon || appCtx.initialEarthWorldRetired || !appCtx.terrainEnabled) return;
+    if (!appCtx.roadsNeedRebuild || appCtx.onMoon || !appCtx.terrainEnabled) return;
     if (terrain._rebuildInFlight) {
       scheduleRoadAndBuildingRebuild();
       return;
@@ -231,7 +231,7 @@ function scheduleRoadAndBuildingRebuild() {
 }
 
 function canRunRoadAndBuildingRebuildNow() {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired) return false;
+  if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   let tilesLoaded = 0;
   let tilesTotal = 0;
   appCtx.terrainTileCache.forEach((tile) => {
@@ -242,10 +242,18 @@ function canRunRoadAndBuildingRebuildNow() {
 }
 
 function requestWorldSurfaceSync(options = {}) {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired) return false;
+  if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   appCtx.roadsNeedRebuild = true;
 
   const force = options.force === true;
+  const source = String(options.source || '');
+  const worldTransactionOwnsSurfaceCommit =
+    appCtx.worldLoading === true &&
+    source !== 'world_load_finalize';
+  if (worldTransactionOwnsSurfaceCommit) {
+    return false;
+  }
+
   if (force && terrain._rebuildTimer) {
     clearTimeout(terrain._rebuildTimer);
     terrain._rebuildTimer = null;

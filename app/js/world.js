@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=21";
+} from "./structure-semantics.js?v=22";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -27,7 +27,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=34";
+} from "./world/spawn.js?v=42";
 import {
   scheduleDeferredStructureRefresh,
   scheduleDeferredWorldLinearFeatureLoad
@@ -109,8 +109,8 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=3";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=13";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=25";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=14";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=27";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -171,14 +171,14 @@ import {
   refreshStructureAwareFeatureProfiles,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=5";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=75";
+} from "./world/structure-aware.js?v=7";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=78";
 import { worldLoadTransactions } from './world/load-transaction.js?v=2';
 import {
+  fetchShortbreadBuildingData,
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=13";
-import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=10";
-import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
+import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=2";
 import { scheduleDeferredLandmarkLoad } from "./world/landmark-detail.js?v=28";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================
@@ -232,7 +232,7 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   decimateRoadCenterlineByDepth,
   earthSceneSuppressed,
   fetchOverpassJSON,
-  fetchGlobalBuildingData,
+  fetchShortbreadBuildingData,
   fetchBundledBuildingMetadata,
   fetchShortbreadWorldData,
   featureTileKeyForLatLon,
@@ -285,21 +285,12 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
 });
 
 async function loadRoads(retryPass = 0) {
-  if (retryPass === 0 && appCtx.getContinuousWorldEnabled?.() === true) {
-    if (typeof appCtx.loadContinuousEarthWorld !== 'function') {
-      throw new Error('Continuous Earth loader is not registered.');
-    }
-    return appCtx.loadContinuousEarthWorld();
-  }
   return loadOsmRoads(retryPass);
 }
 
 async function refreshAuthoritativeMapData() {
   if (appCtx.onMoon || appCtx.onMars || appCtx.spaceFlight?.active) {
     throw new Error('OpenStreetMap refresh is available on Earth.');
-  }
-  if (appCtx.getContinuousWorldEnabled?.() === true) {
-    throw new Error('OpenStreetMap refresh is available in Quality Location mode.');
   }
   await invalidateOverpassCaches(appCtx.LOC, ['core', 'buildings', 'building-metadata']);
   return loadRoads();

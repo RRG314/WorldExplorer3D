@@ -2,17 +2,74 @@
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-07-25
+
 ### Fixed
 
+- Replaced split Earth shadow decisions and medium-quality basic shadow maps
+  with one fitted, texel-stabilized soft-shadow policy.
+- Released OSM decode/build working sets before world commit, preventing dense
+  location data from triggering long garbage-collection stalls during early
+  walking and driving.
+- Retired near-detail source building meshes in bounded compiler batches,
+  reducing dense-city peak allocation pressure without reducing mapped
+  buildings or collision coverage.
+- Prewarmed walking and driving render resources behind the loading screen and
+  reused the current road during walk/drive surface resolution, reducing
+  synchronous mode-transition work.
+- Declared the MMO WebSocket transport's Express peer as a direct server
+  runtime dependency.
+- Centralized Cloud Functions initialization on the Firebase Admin 14 modular
+  API so a clean Node 22 install loads every deployed export.
+- Made multiplayer room synchronization idempotent when the room uses the
+  already-loaded Earth coordinates, preserving the committed OSM world and
+  updating location authority instead of rebuilding identical geometry.
+- Made broad steep natural/agricultural OSM polygons semantic land-cover
+  inputs while retaining DEM + WorldCover as the visible terrain owner;
+  explicit water, parking, and paved surfaces remain mapped geometry.
+- Made roadless land locations start on their mapped pedestrian network when
+  one exists, with fixed-geography coverage for rendered path ownership,
+  endpoint clearance, and walkable slope.
+- Bounded expensive spawn collision/surface validation behind a cheap
+  geometry shortlist, removing full-world candidate validation from sparse
+  origin searches without weakening the existing spawn rules.
+- Kept ordinary custom walking arrivals off subgrade tunnel segments and
+  at-grade surfaces inside mapped water; tunnel traversal remains available
+  through its dedicated entry/interior/exit path.
+- Ranked exact projected-road starts through the same bounded enclosure
+  policy as other road candidates, preventing dense or steep locations from
+  collapsing the chase camera into nearby geometry.
+- Suppressed boat availability whenever the tunnel renderer owns water
+  occlusion, including the brief portal transition where road ownership can
+  move between connected segments.
 - Kept at-grade navigation surfaces owned by the active terrain sampler after streamed terrain replacement, preventing ordinary roads from retaining stale elevations.
 - Made tunnel water suppression persistent across LOD refreshes and restored normal water visibility ownership on exit.
 - Applied active offshore boat visibility ownership to every asynchronously attached terrain tile, preventing late terrain from appearing through open-ocean presentation.
 
 ### Verification
 
+- Added a fixed 4.1 acceptance contract with representative geography,
+  hardware frame-pacing, memory, lifecycle, provider-degradation, operations,
+  and human-review gates.
+- Aligned the hardware performance harness with the production runtime entry
+  path and the documented 58 FPS median/45 FPS 1% low budget.
+- Added a deterministic daylight S-turn profile to the installed-Chrome
+  hardware gate so walk/drive camera clearance is exercised during steering
+  without mixing night-light shader preparation into the measurement.
+- Added a direct shadow-policy contract and hardware daylight evidence.
+- Corrected the editor/multiplayer browser journey to enter Earth through the
+  production destination-session owner; the complete editor, room sync,
+  Moon, Space, and Earth-return journey now passes.
 - Made plane/interior lifecycle retention wait for deferred building detail, use precise forced-GC heap measurements across multiple warmed samples, and compare exact reachable scene resources instead of Three.js upload-history counters.
 - Made landscape mobile acceptance assert the Explore menu's actual open state and tutorial-card suppression instead of relying on an unrelated two-second polling window.
 - Added a direct terrain-streaming/boat-suppression contract to the release suite.
+
+### Removed
+
+- Removed Continuous World and its settings, scheduler, origin-rebase,
+  streamed renderers, lifecycle machinery, diagnostics, and obsolete tests.
+- Removed the live Overture/PMTiles building fallback, vendored PMTiles runtime,
+  source-specific release checks, and unreachable Overture rendering metrics.
 
 ## [4.0.0] - 2026-07-22
 

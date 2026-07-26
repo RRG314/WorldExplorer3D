@@ -1,7 +1,6 @@
 const SURFACE_SCHEMA_VERSION = 1;
 
 const SOURCE_PROFILE = Object.freeze({
-  CONTINUOUS_GLOBAL: 'continuous_global',
   LOCATION_OSM: 'location_osm'
 });
 
@@ -21,7 +20,6 @@ const VERTICAL_DATUM = Object.freeze({
 });
 
 const EARTH_TRAVERSAL_BOUNDS = Object.freeze({
-  [SOURCE_PROFILE.CONTINUOUS_GLOBAL]: Object.freeze({ horizontalRadius: null, originRebase: true }),
   [SOURCE_PROFILE.LOCATION_OSM]: Object.freeze({ horizontalRadius: 5000, originRebase: false })
 });
 
@@ -50,6 +48,8 @@ const DEVELOPED_SURFACES = new Set([
   'industrial', 'retail', 'parking', 'paved'
 ]);
 const surfaceCompositionCache = new Map();
+const STEEP_SEMANTIC_LANDCOVER_GRADE = 0.075;
+const STEEP_SEMANTIC_LANDCOVER_MIN_SPAN = 120;
 
 function surfaceComposition(kind = '', role = 'land-cover') {
   const normalizedKind = String(kind || '').toLowerCase();
@@ -76,6 +76,33 @@ function surfaceComposition(kind = '', role = 'land-cover') {
   return composition;
 }
 
+function mappedLandcoverOwnership(kind = '', options = {}) {
+  const normalizedKind = String(kind || '').toLowerCase();
+  const span = Math.max(0, finiteOr(options.span, 0));
+  const relief = Math.max(0, finiteOr(options.relief, 0));
+  const grade = span > 0 ? relief / span : 0;
+  const explicitGeometry =
+    normalizedKind === 'water' ||
+    normalizedKind === 'parking' ||
+    normalizedKind === 'paved';
+  const broadSemanticLandcover =
+    NATURAL_SURFACES.has(normalizedKind) ||
+    AGRICULTURAL_SURFACES.has(normalizedKind);
+  const semanticOnly =
+    !explicitGeometry &&
+    broadSemanticLandcover &&
+    span >= STEEP_SEMANTIC_LANDCOVER_MIN_SPAN &&
+    grade >= STEEP_SEMANTIC_LANDCOVER_GRADE;
+  return Object.freeze({
+    owner: semanticOnly ? 'terrain_worldcover' : 'mapped_geometry',
+    semanticOnly,
+    reason: semanticOnly ? 'steep_broad_landcover' : explicitGeometry ? 'explicit_surface' : 'bounded_landcover',
+    span,
+    relief,
+    grade
+  });
+}
+
 function finiteOr(value, fallback = 0) {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
@@ -85,10 +112,8 @@ function clamp01(value) {
   return Math.max(0, Math.min(1, finiteOr(value, 0)));
 }
 
-function activeSourceProfile(appCtx) {
-  return appCtx.getContinuousWorldEnabled?.() === true
-    ? SOURCE_PROFILE.CONTINUOUS_GLOBAL
-    : SOURCE_PROFILE.LOCATION_OSM;
+function activeSourceProfile() {
+  return SOURCE_PROFILE.LOCATION_OSM;
 }
 
 function earthTraversalBounds(profile = SOURCE_PROFILE.LOCATION_OSM) {
@@ -111,7 +136,6 @@ function sourceIdentity(feature = null) {
   const tags = feature?.tags || {};
   return String(
     tags._sourceFeatureId ||
-    tags._overtureFeatureId ||
     feature?.sourceFeatureId ||
     feature?.id ||
     ''
@@ -125,11 +149,7 @@ function provenanceFor(feature, options = {}) {
   let confidence = finiteOr(options.confidence, 0.7);
   let fallback = options.fallback === true;
 
-  if (source.includes('overture')) {
-    provider = 'Overture Maps Foundation';
-    dataset = 'Overture Maps';
-    confidence = 0.92;
-  } else if (source.includes('shortbread')) {
+  if (source.includes('shortbread')) {
     provider = 'OpenStreetMap Foundation';
     dataset = 'OSM Shortbread vector tiles';
     confidence = 0.9;
@@ -363,6 +383,7 @@ export {
   createSurfaceSample,
   createSurfaceTileDescriptor,
   earthTraversalBounds,
+  mappedLandcoverOwnership,
   provenanceFor,
   surfaceComposition
 };

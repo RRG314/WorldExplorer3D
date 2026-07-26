@@ -3,7 +3,6 @@ import { createFlowerChallengeLeaderboardApi } from "./flower-challenge/leaderbo
 import { createFlowerLeaderboardView } from "./flower-challenge/leaderboard-view.js?v=1";
 import { createFlowerMarkerRuntime } from "./flower-challenge/marker-runtime.js?v=1";
 import { getCurrentUser } from "../../js/auth-ui.js";
-import { initFirebase } from "../../js/firebase-init.js";
 
 const LOCAL_LEADERBOARD_KEY = 'worldExplorer3D.flowerChallenge.localLeaderboard.v1';
 const LOCAL_PAINT_LEADERBOARD_KEY = 'worldExplorer3D.paintTown.localLeaderboard.v1';
@@ -19,7 +18,10 @@ const LEADERBOARD_LIMIT = 10;
 const FLOWER_MIN_DISTANCE = 120;
 const FLOWER_MAX_DISTANCE = 2600;
 
-const FIREBASE_STORE_MODULE = 'https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore.js';
+const FIREBASE_STORE_MODULE = new URL(
+  './platform/firebase/firestore.js',
+  import.meta.url
+).toString();
 
 const challengeState = {
   active: false,
@@ -257,7 +259,10 @@ const leaderboardApi = createFlowerChallengeLeaderboardApi({
     LOCAL_FISHING_LEADERBOARD_KEY,
     LOCAL_PAINT_LEADERBOARD_KEY
   },
-  getFirebaseServices: initFirebase,
+  getFirebaseServices: async () => {
+    const { initFirebase } = await import("../../js/firebase-init.js");
+    return initFirebase();
+  },
   getSignedInUser: getCurrentUser,
   getActiveActorPosition,
   getRuntimeLocationLabel,
@@ -608,7 +613,7 @@ function setupFlowerChallenge() {
 
   challengeUiBound = true;
   setTitlePanelOpen(false);
-  refreshFlowerLeaderboard(challengeState.leaderboardView);
+  refreshFlowerLeaderboard(challengeState.leaderboardView, { remote: false });
 }
 
 function getFlowerChallengeBackendStatus() {
