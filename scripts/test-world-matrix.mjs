@@ -1031,7 +1031,7 @@ async function main() {
       report.locations.push(result);
       await fs.writeFile(path.join(outputDir, reportName), JSON.stringify(report, null, 2));
       try {
-        assertWorldMatrixLocation(spec, result);
+        assertWorldMatrixLocation(spec, result, { enforcePerformance: hardwareBrowser });
         if ((spec.minimumBuildings || /urban|city|downtown/.test(String(spec.category || ''))) && !result.worldCover?.status?.ready) {
           assert(Number(result.counts?.roads || 0) > 0, `${spec.id}: mapped city has no explicit road surface`);
         }
@@ -1077,7 +1077,7 @@ async function main() {
         }
         if (spec.expectedRoadStructure === 'tunnel') {
           await captureTunnelPortalTraversal(page, spec, result, outputDir);
-          assertWorldMatrixLocation(spec, result);
+          assertWorldMatrixLocation(spec, result, { enforcePerformance: hardwareBrowser });
         }
         if (captureDroneViews && result.expectedStart !== 'water') {
           await captureDroneView(page, spec, result, outputDir);

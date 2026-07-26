@@ -6,30 +6,25 @@ The production-quality work required to resolve the architectural limitations
 below is tracked in [ROADMAP.md](ROADMAP.md). A listed limitation is not an
 approval to ignore a reproducible defect.
 
-## 4.1 Release Blockers
+## 4.1 Certification Status
 
-- The verified 4.0.0 Baltimore production journey can render a large building
-  mass across or immediately over the street corridor. This is a systemic
-  surface/occupancy failure, not an approved data variation. Release 4.1
-  remains blocked until all location loads use the same canonical
-  surface and occupancy contracts and the global fixtures pass visual review.
-- Passing source counts, runtime counters, or unit tests do not clear a world
-  frame with missing roads, road/building overlap, invalid grade separation,
-  or similarly broken composition.
-- The fixed Apple Metal structure/mountain subset is mechanically green and
-  its current frames have passed stabilization review. The roadless Swiss Alps fixture now starts on its mapped
-  OSM footway at an 11.9-degree slope, and the unsupported steep land-cover
-  slabs are removed. Snow presentation remains plain and thin distant terrain
-  edges can still be visible, but these are tracked fidelity limitations
-  rather than the original broken geometry. Holland Tunnel now starts on the
-  nearest safe mapped pedestrian surface instead of inside the subgrade shell
-  or mapped water; its dedicated entry/interior/exit traversal remains
-  mechanically coherent, while portal materials and architecture remain
-  visually basic. Golden Gate Bridge now loads inside the unchanged 20-second
-  release budget after bounded spawn candidate validation.
-- Regional building massing, facades, water, boats, snow, and rural terrain
-  remain visibly simplified. These are documented fidelity limits for 4.1,
-  not claims that the later reconstruction and simulation roadmap is complete.
+- No unresolved code blocker remains in the fixed 11-class 4.1 geography
+  matrix. The selected-location OSM runtime, road/surface occupancy, sparse
+  path arrival, Golden Gate bridge, Holland Tunnel, camera clearance, and
+  provider-degradation contracts pass.
+- Production preview, promotion, and the rollback drill are operational
+  release actions, not code fixes. They remain pending until deployment is
+  explicitly authorized.
+- Passing counters alone are not sufficient. The release requires the
+  installed-Chrome performance run and inspected hardware frames in addition
+  to deterministic CI.
+- Shinjuku remains an unfeatured diagnostic stress location. It completes
+  through the shared runtime, but the extended software-browser matrix observed
+  a roughly 71-second load. It is not a curated Places entry for 4.1.
+- Regional building massing, facades, water, boats, snow, tunnel architecture,
+  and rural terrain remain visibly simplified. These are documented fidelity
+  limits for 4.1, not claims that later reconstruction and simulation roadmap
+  work is complete.
 
 ## Map Coverage
 
@@ -47,9 +42,13 @@ approval to ignore a reproducible defect.
 ## Rendering and World Geometry
 
 - The 4.1 candidate replaces medium-quality basic shadow maps with one fitted,
-  texel-stabilized soft-shadow policy. Wider daylight/dusk and geography
-  certification remains open; a failed hardware frame remains release-blocking.
-- Mountain sidewalks and paths can intersect or be partially covered by steep terrain because corridors and terrain do not yet share one composited surface owner.
+  texel-stabilized soft-shadow policy. Certified Apple Metal frames pass; GPU,
+  browser, and source-data combinations outside the release matrix can still
+  expose rendering differences.
+- Mapped mountain paths now use the shared navigation/surface contract and the
+  certified Swiss Alps path is traversable. Incomplete path tagging, extreme
+  DEM relief, and thin distant terrain edges can still reduce fidelity outside
+  the certified matrix.
 - Bridges, viaducts, elevated surfaces, and tunnel approaches depend on incomplete source tags and tile-local feature fragments. Some complex structures can have incorrect grade, clearance, supports, or transitions.
 - Generated trees, grass, buildings, and water are validated through several different placement paths. Rare overlaps such as trees or buildings in water, floating vegetation, or land-cover over transportation surfaces can remain outside certified benchmark areas.
 - Building facades use a limited material and procedural-window library. Regional typology and material distinctions such as limestone, sandstone, marble, stucco, timber, and metal cladding are not yet represented at the intended quality.

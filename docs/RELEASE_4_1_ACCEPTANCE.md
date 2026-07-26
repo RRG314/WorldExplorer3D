@@ -78,17 +78,22 @@ production visual quality by itself.
 | Continuous World removal | complete locally |
 | OSM-only selected-location runtime | complete locally |
 | Dense Baltimore cold load | passing at 12.9 s on the reference hardware run |
-| Shadow policy | implemented; first Baltimore hardware frame accepted, wider time/location gate open |
+| Shadow policy | passing: the single soft-shadow owner, texel stabilization contract, and inspected daylight/low-angle Apple Metal frames are accepted |
 | Road visibility | clean committed 11-class fixed-geography matrix passes and affected frames are accepted for stabilization scope |
 | Surface/occupancy and mountain paths | Swiss Alps structural blocker cleared: mapped OSM footway spawn at 11.9°, four rendered path meshes, and no unsupported steep land-cover slabs; thin distant terrain edges remain a known fidelity limitation |
 | Sustained Baltimore walk/drive | straight and S-turn profiles pass at ~59.9 FPS median; fixed camera geography now rejects a collapsed chase view and Monaco retains 10.7 m clearance |
-| Repeated resource stability | passing: three destination cycles retain canvas/frame ownership; five mode cycles retain identical reachable resources and finish at 96.2% of the warm heap median |
-| Retained product journeys | focused destination, title/planetary, plane/interior, editor/multiplayer, account service, and mobile device-layout journeys pass |
+| Repeated resource stability | passing: three destination cycles retain canvas/frame ownership; five mode cycles retain a stable resource plateau and finish below the warmed heap median |
+| Retained product journeys | release-gate destination, title/planetary, plane/interior, editor/multiplayer, account, Firestore/MMO, and mobile device-layout journeys pass |
 | Dependency/security review | reviewed: zero critical advisories; the Firebase/Google transitive high chain is conditionally accepted with controls in `docs/RELEASE_4_1_SECURITY_REVIEW.md` |
-| Version, notes, immutable artifact, preview, rollback | 4.1.0 identity and release notes prepared; clean artifact, preview, and rollback checks remain open |
+| Provider degradation | passing: Tokyo, Monaco, and Miami Beach complete through the documented fallback with the land-cover provider blocked |
+| Fixed geography CI | passing: the deterministic software-browser matrix covers the same 11 release classes; performance and human visual approval remain owned by installed Chrome |
+| Version, notes, immutable artifact | 4.1.0 identity and notes complete; clean artifact build, parity, size, attribution, and 453/453 hosted-source reachability pass |
+| Preview, promotion, rollback drill | operational release actions remain pending and require explicit deployment authorization |
 
 The clean committed fixed-geography report is
 `output/playwright/world-matrix/4.1-release-candidate-green/report.json`.
+The final deterministic CI report is
+`output/playwright/world-matrix/4.1-release-ci-final/report.json`.
 Golden Gate is structurally coherent and loads inside its 20-second budget.
 Holland Tunnel's generated entry/interior/exit traversal is coherent, its
 ordinary arrival selects a safe mapped pedestrian surface outside the

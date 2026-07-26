@@ -2,9 +2,9 @@ function assert(value, message) {
   if (!value) throw new Error(message);
 }
 
-export function assertWorldMatrixLocation(spec, result) {
+export function assertWorldMatrixLocation(spec, result, { enforcePerformance = true } = {}) {
   assert(result.worldLoading === false, `${spec.id}: worldLoading stayed true`);
-  if (Number.isFinite(spec.maximumLoadMs)) {
+  if (enforcePerformance && Number.isFinite(spec.maximumLoadMs)) {
     assert(
       Number(result.loadMs) <= spec.maximumLoadMs,
       `${spec.id}: location load exceeded ${spec.maximumLoadMs}ms ${JSON.stringify({ loadMs: result.loadMs })}`

@@ -86,7 +86,25 @@ const steps = [
       WORLD_MATRIX_REPORT_NAME: 'r7-provider-outage.json'
     }
   },
-  { name: 'World matrix', cmd: [process.execPath, 'scripts/test-world-matrix.mjs'] },
+  {
+    name: 'Fixed release geography matrix',
+    cmd: [process.execPath, 'scripts/test-world-matrix.mjs'],
+    env: {
+      WORLD_MATRIX_IDS: [
+        'baltimore',
+        'losangeles',
+        'tokyo',
+        'monaco',
+        'swiss_alps_custom',
+        'sahara_custom',
+        'iowa_farmland_custom',
+        'lake_tahoe_custom',
+        'atlantic_ocean_custom',
+        'golden_gate_custom',
+        'holland_tunnel_custom'
+      ].join(',')
+    }
+  },
   { name: 'Final hosting artifact parity', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify'] }
 ];
 
