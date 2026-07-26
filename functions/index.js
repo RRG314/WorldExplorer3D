@@ -1,5 +1,5 @@
 const functions = require('firebase-functions/v1');
-const admin = require('firebase-admin');
+const admin = require('./firebase-admin-runtime');
 const { defineString } = require('firebase-functions/params');
 const { ADMIN_ACTIVITY_COLLECTION, buildAdminDashboardExports } = require('./admin-dashboard');
 const {

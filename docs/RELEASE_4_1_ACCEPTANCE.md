@@ -79,18 +79,18 @@ production visual quality by itself.
 | OSM-only selected-location runtime | complete locally |
 | Dense Baltimore cold load | passing at 12.9 s on the reference hardware run |
 | Shadow policy | implemented; first Baltimore hardware frame accepted, wider time/location gate open |
-| Road visibility | representative frames reviewed; final combined fixed-geography rerun open after the last camera/tunnel policy corrections |
+| Road visibility | clean committed 11-class fixed-geography matrix passes and affected frames are accepted for stabilization scope |
 | Surface/occupancy and mountain paths | Swiss Alps structural blocker cleared: mapped OSM footway spawn at 11.9°, four rendered path meshes, and no unsupported steep land-cover slabs; thin distant terrain edges remain a known fidelity limitation |
 | Sustained Baltimore walk/drive | straight and S-turn profiles pass at ~59.9 FPS median; fixed camera geography now rejects a collapsed chase view and Monaco retains 10.7 m clearance |
 | Repeated resource stability | passing: three destination cycles retain canvas/frame ownership; five mode cycles retain identical reachable resources and finish at 96.2% of the warm heap median |
-| Retained product journeys | focused destination, title/planetary, plane/interior, editor/multiplayer, account service, and mobile device-layout journeys pass; final combined candidate remains open |
-| Dependency/security review | open: zero critical advisories; five root and seven Functions high findings remain in the Firebase/Google transitive chain and require upgrade validation or recorded review |
-| Version, notes, immutable artifact, preview, rollback | not started until runtime gates pass |
+| Retained product journeys | focused destination, title/planetary, plane/interior, editor/multiplayer, account service, and mobile device-layout journeys pass |
+| Dependency/security review | reviewed: zero critical advisories; the Firebase/Google transitive high chain is conditionally accepted with controls in `docs/RELEASE_4_1_SECURITY_REVIEW.md` |
+| Version, notes, immutable artifact, preview, rollback | 4.1.0 identity and release notes prepared; clean artifact, preview, and rollback checks remain open |
 
-The focused Golden Gate/Holland/Alps hardware subset is not a release approval.
-Golden Gate is structurally coherent and its isolated cold load now passes at
-12.4 seconds after bounded spawn validation. Holland Tunnel's generated
-entry/interior/exit traversal is coherent. Its ordinary arrival now selects a
-safe mapped pedestrian surface outside the subgrade shell and mapped water;
-the previous clipped overview was the matrix's structure-probe pose, not the
-product's initial frame.
+The clean committed fixed-geography report is
+`output/playwright/world-matrix/4.1-release-candidate-green/report.json`.
+Golden Gate is structurally coherent and loads inside its 20-second budget.
+Holland Tunnel's generated entry/interior/exit traversal is coherent, its
+ordinary arrival selects a safe mapped pedestrian surface outside the
+subgrade shell and mapped water, and boat availability is suppressed
+immediately while tunnel water occlusion owns the scene.

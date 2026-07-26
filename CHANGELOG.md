@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [4.1.0] - 2026-07-25
+
 ### Fixed
 
 - Replaced split Earth shadow decisions and medium-quality basic shadow maps
@@ -17,6 +19,8 @@
   synchronous mode-transition work.
 - Declared the MMO WebSocket transport's Express peer as a direct server
   runtime dependency.
+- Centralized Cloud Functions initialization on the Firebase Admin 14 modular
+  API so a clean Node 22 install loads every deployed export.
 - Made multiplayer room synchronization idempotent when the room uses the
   already-loaded Earth coordinates, preserving the committed OSM world and
   updating location authority instead of rebuilding identical geometry.
