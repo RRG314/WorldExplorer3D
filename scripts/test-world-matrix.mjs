@@ -823,6 +823,8 @@ async function loadLocation(page, spec) {
         valid: initialSpawn.valid !== false,
         mode: initialSpawn.mode || null,
         source: initialSpawn.source || null,
+        surfaceKind: initialSpawn.surfaceKind || null,
+        onWalkSurface: initialSpawn.onWalkSurface === true,
         x: Number.isFinite(initialSpawn.x) ? Number(initialSpawn.x.toFixed(2)) : null,
         z: Number.isFinite(initialSpawn.z) ? Number(initialSpawn.z.toFixed(2)) : null,
         structureKind: initialSpawn.road?.structureSemantics?.structureKind || null,

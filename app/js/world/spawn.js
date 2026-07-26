@@ -328,6 +328,9 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
       const nextResult = {
         ...evaluated,
         ...spawnMeta,
+        surfaceFeature: feature,
+        surfaceKind: String(feature?.networkKind || feature?.kind || "road").toLowerCase(),
+        onWalkSurface: requestedMode === "walk",
         baseScore,
         score: baseScore
       };
@@ -524,9 +527,12 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
       allowBuildingRoof: options.allowBuildingRoof,
       source: options.source || "direct"
     });
-    if (direct.valid) return direct;
+    if (direct.valid && options.preferWalkSurface !== true) return direct;
 
-    if (options.preferGroundFallback === true || options.preferRoad !== true) {
+    if (
+      options.preferWalkSurface !== true &&
+      (options.preferGroundFallback === true || options.preferRoad !== true)
+    ) {
       const nearbyGround = searchNearestSafeGroundSpawn(x, z, {
         angle,
         maxRadius: options.maxGroundRadius,
@@ -553,6 +559,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
       maxDistance: options.maxRoadDistance
     });
     if (surfaceFallback) return surfaceFallback;
+    if (direct.valid) return direct;
 
     const groundFallback = searchNearestSafeGroundSpawn(x, z, {
       angle,
@@ -732,6 +739,10 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
     source: options.source || "custom_location"
   });
   if (boatSpawn) return boatSpawn;
+  const preferMappedWalkSurface =
+    mode === "walk" &&
+    (!Array.isArray(appCtx.roads) || appCtx.roads.length === 0) &&
+    worldSpawnDeps.traversableFeaturesForMode("walk").length > 0;
   const arrival = featuredArrivalNear(appCtx.LOC);
   if (arrival) {
     const viewpoint = appCtx.geoToWorld(arrival.viewpoint.lat, arrival.viewpoint.lon);
@@ -742,7 +753,8 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
       angle,
       mode,
       preferRoad: false,
-      preferGroundFallback: true,
+      preferGroundFallback: !preferMappedWalkSurface,
+      preferWalkSurface: preferMappedWalkSurface,
       maxGroundRadius: 160,
       maxGroundSlope: 18,
       minLandmarkDistance: 35,
@@ -763,7 +775,8 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
     ...options,
     mode,
     feetY: Number.isFinite(structureFeetY) ? structureFeetY : options.feetY,
-    preferRoad: mode === "drive" || Number.isFinite(structureFeetY)
+    preferRoad: mode === "drive" || Number.isFinite(structureFeetY),
+    preferWalkSurface: preferMappedWalkSurface
   });
 }
 
@@ -771,6 +784,18 @@ function spawnOnRoad(options = {}) {
   const opts = options && typeof options === "object" ? options : {};
 
   if (!appCtx.roads || appCtx.roads.length === 0) {
+    const walkSurfaces = worldSpawnDeps.traversableFeaturesForMode("walk");
+    if (Array.isArray(walkSurfaces) && walkSurfaces.length > 0) {
+      const mappedWalkSpawn = resolveSafeWorldSpawn(0, 0, {
+        mode: "walk",
+        preferWalkSurface: true,
+        maxRoadDistance: 640,
+        source: "sparse_walk_surface"
+      });
+      if (mappedWalkSpawn?.onWalkSurface) {
+        return applyResolvedWorldSpawn(mappedWalkSpawn, { mode: "walk" });
+      }
+    }
     return applySpawnTarget(0, 0, {
       mode: "drive",
       source: "no_roads_fallback"

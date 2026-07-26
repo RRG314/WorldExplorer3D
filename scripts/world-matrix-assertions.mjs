@@ -12,6 +12,21 @@ export function assertWorldMatrixLocation(spec, result) {
   }
   assert(!result.terrainProfiles?.urban, `${spec.id}: base terrain still resolved to urban pavement ${JSON.stringify(result.terrainProfiles.urban)}`);
   if (spec.kind === 'preset') assert(result.counts.roads > 0, `${spec.id}: preset silently finalized without mapped roads`);
+  if (
+    result.expectedStart === 'land' &&
+    Number(result.counts?.roads || 0) === 0 &&
+    Number(result.traversal?.walkSegments || 0) > 0
+  ) {
+    assert(
+      result.initialSpawn?.onWalkSurface === true &&
+      result.initialSpawn?.source === 'walk_surface_search',
+      `${spec.id}: sparse mapped world ignored its pedestrian network at spawn ${JSON.stringify(result.initialSpawn)}`
+    );
+    assert(
+      Number(result.initialSpawn?.slopeDeg) <= 22,
+      `${spec.id}: sparse mapped path spawn exceeded the walkable slope contract ${JSON.stringify(result.initialSpawn)}`
+    );
+  }
   if (spec.expectedTerrainMode) {
     const acceptableTerrainModes = spec.acceptableTerrainModes || [spec.expectedTerrainMode];
     assert(acceptableTerrainModes.some((mode) => result.terrainProfiles?.[mode]?.count > 0), `${spec.id}: expected ${acceptableTerrainModes.join(' or ')} terrain ${JSON.stringify(result.terrainProfiles)}`);

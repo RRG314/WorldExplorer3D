@@ -26,7 +26,7 @@ import {
 import './real-estate.js?v=55';
 import './ground.js?v=71';
 import './terrain.js?v=154';
-import './world.js?v=266';
+import './world.js?v=268';
 import './building-entry.js?v=4';
 import './interiors.js?v=9';
 import './multiplayer/room-world-patches.js?v=1';
