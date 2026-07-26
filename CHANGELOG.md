@@ -26,6 +26,9 @@
 - Made roadless land locations start on their mapped pedestrian network when
   one exists, with fixed-geography coverage for rendered path ownership,
   endpoint clearance, and walkable slope.
+- Bounded expensive spawn collision/surface validation behind a cheap
+  geometry shortlist, removing full-world candidate validation from sparse
+  origin searches without weakening the existing spawn rules.
 - Kept at-grade navigation surfaces owned by the active terrain sampler after streamed terrain replacement, preventing ordinary roads from retaining stale elevations.
 - Made tunnel water suppression persistent across LOD refreshes and restored normal water visibility ownership on exit.
 - Applied active offshore boat visibility ownership to every asynchronously attached terrain tile, preventing late terrain from appearing through open-ocean presentation.

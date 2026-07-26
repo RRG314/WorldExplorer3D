@@ -23,9 +23,9 @@ approval to ignore a reproducible defect.
   edges can still be visible, but these are tracked fidelity limitations
   rather than the original broken geometry. Holland Tunnel traversal has a
   coherent interior, but its initial portal/urban composition contains
-  overlapping and clipped structure geometry. Golden Gate Bridge is coherent
-  but took 28.8 seconds to load in the focused run, above the 20-second release
-  budget.
+  overlapping and clipped structure geometry. Golden Gate Bridge now loads in
+  12.4 seconds on the reference run after bounded spawn candidate validation,
+  inside the unchanged 20-second release budget.
 
 ## Map Coverage
 

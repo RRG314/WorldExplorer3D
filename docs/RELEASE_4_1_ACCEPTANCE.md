@@ -88,7 +88,8 @@ production visual quality by itself.
 | Version, notes, immutable artifact, preview, rollback | not started until runtime gates pass |
 
 The focused Golden Gate/Holland/Alps hardware subset is not a release approval.
-Golden Gate is structurally coherent but exceeded the load budget at 28.8
-seconds. Holland Tunnel's generated interior traversal is coherent, while its
+Golden Gate is structurally coherent and its isolated cold load now passes at
+12.4 seconds after bounded spawn validation. Holland Tunnel's generated
+interior traversal is coherent, while its
 initial portal/urban frame is visually rejected for overlapping and clipped
 geometry.

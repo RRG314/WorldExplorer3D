@@ -323,6 +323,13 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
   for (let pass = 0; pass < limits.length; pass++) {
     const limit = limits[pass];
     const shortlist = [];
+    const rawCandidates = [];
+    const rawCandidateLimit = requestedMode === "drive" ? 64 : 48;
+    const pushRawCandidate = (candidate) => {
+      rawCandidates.push(candidate);
+      rawCandidates.sort((a, b) => a.roughScore - b.roughScore);
+      if (rawCandidates.length > rawCandidateLimit) rawCandidates.length = rawCandidateLimit;
+    };
 
     const pushCandidate = (evaluated, feature, baseScore, spawnMeta = {}) => {
       const nextResult = {
@@ -374,56 +381,69 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
             feature.connectedFeatures[nearestEndpoint].length > 0;
           let angle = Math.atan2(p2.x - p1.x, p2.z - p1.z);
           if (nearestEndpoint === "end" && !endpointConnected) angle += Math.PI;
-          const evaluated = requestedMode === "drive" ?
-            evaluateDriveSpawnCandidate(candidate.x, candidate.z, {
-              angle,
-              feetY: options.feetY,
-              requireRoad: true,
-              source: "road_search"
-            }) :
-            evaluateWalkSpawnCandidate(candidate.x, candidate.z, {
-              angle,
-              feetY: options.feetY,
-              source: "walk_surface_search"
-            });
-          if (!evaluated.valid) continue;
-
-          const departure = spawnDepartureAssessment(
-            candidate.x,
-            candidate.z,
-            evaluated.angle,
-            requestedMode
-          );
-          if (!departure.valid) continue;
-          if (departure.reverseHeading) evaluated.angle += Math.PI;
-
           const endpointPenalty =
             endpointClearance >= 22 ? 0 :
             endpointConnected ? (22 - endpointClearance) * 0.45 :
             45 + (22 - endpointClearance) * 4;
-          const spawnSlopePenalty = Math.max(
-            0,
-            (Number(evaluated.slopeDeg) || 0) - (requestedMode === "drive" ? 8 : 12)
-          ) * (requestedMode === "drive" ? 4.5 : 2.6);
-          const score =
+          pushRawCandidate({
+            angle,
+            candidate,
+            endpointClearance,
+            endpointConnected,
+            feature,
+            roughScore:
             dist +
             spawnSurfacePenalty(feature, requestedMode) +
-            slopePenaltyAt(candidate.x, candidate.z) +
-            spawnSlopePenalty +
-            endpointPenalty +
-            departure.penalty;
-          pushCandidate(evaluated, feature, score, {
-            featureEndpointClearance: endpointClearance,
-            endpointConnected,
-            departureClearance: {
-              forwardBlocked: departure.forwardBlocked,
-              reverseBlocked: departure.reverseBlocked,
-              reversed: departure.reverseHeading
-            }
+            endpointPenalty
           });
         }
         distanceBeforeSegment += segmentLengths[i] || 0;
       }
+    }
+
+    for (let i = 0; i < rawCandidates.length; i++) {
+      const raw = rawCandidates[i];
+      const evaluated = requestedMode === "drive" ?
+        evaluateDriveSpawnCandidate(raw.candidate.x, raw.candidate.z, {
+          angle: raw.angle,
+          feetY: options.feetY,
+          requireRoad: true,
+          source: "road_search"
+        }) :
+        evaluateWalkSpawnCandidate(raw.candidate.x, raw.candidate.z, {
+          angle: raw.angle,
+          feetY: options.feetY,
+          source: "walk_surface_search"
+        });
+      if (!evaluated.valid) continue;
+
+      const departure = spawnDepartureAssessment(
+        raw.candidate.x,
+        raw.candidate.z,
+        evaluated.angle,
+        requestedMode
+      );
+      if (!departure.valid) continue;
+      if (departure.reverseHeading) evaluated.angle += Math.PI;
+
+      const spawnSlopePenalty = Math.max(
+        0,
+        (Number(evaluated.slopeDeg) || 0) - (requestedMode === "drive" ? 8 : 12)
+      ) * (requestedMode === "drive" ? 4.5 : 2.6);
+      const score =
+        raw.roughScore +
+        slopePenaltyAt(raw.candidate.x, raw.candidate.z) +
+        spawnSlopePenalty +
+        departure.penalty;
+      pushCandidate(evaluated, raw.feature, score, {
+        featureEndpointClearance: raw.endpointClearance,
+        endpointConnected: raw.endpointConnected,
+        departureClearance: {
+          forwardBlocked: departure.forwardBlocked,
+          reverseBlocked: departure.reverseBlocked,
+          reversed: departure.reverseHeading
+        }
+      });
     }
 
     if (shortlist.length > 0) {

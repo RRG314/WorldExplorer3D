@@ -4,6 +4,12 @@ function assert(value, message) {
 
 export function assertWorldMatrixLocation(spec, result) {
   assert(result.worldLoading === false, `${spec.id}: worldLoading stayed true`);
+  if (Number.isFinite(spec.maximumLoadMs)) {
+    assert(
+      Number(result.loadMs) <= spec.maximumLoadMs,
+      `${spec.id}: location load exceeded ${spec.maximumLoadMs}ms ${JSON.stringify({ loadMs: result.loadMs })}`
+    );
+  }
   if (spec.kind === 'custom') {
     assert(
       String(result.customLocationLabel || '') === String(spec.label || ''),

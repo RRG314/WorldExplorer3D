@@ -290,6 +290,7 @@ export const WORLD_TEST_LOCATIONS = [
     category: 'major_bridge_coastal_custom',
     expectedStart: 'land',
     expectedRoadStructure: 'bridge',
+    maximumLoadMs: 20000,
     minimumStructureClearance: 6
   },
   {
