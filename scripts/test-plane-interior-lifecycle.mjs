@@ -305,20 +305,54 @@ async function exerciseLifecycle(page) {
     };
     ctx.clearActiveInterior?.({ restorePlayer: true, preserveCache: true });
     const modeCycles = [];
+    let previousReachableResources = null;
     const settleFrames = () => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+    const waitForTerrainMeshPlateau = async () => {
+      const expectedTerrainMeshes = (Math.max(1, Number(ctx.TERRAIN_RING) || 1) * 2 + 1) ** 2;
+      const deadline = performance.now() + 10000;
+      let stableSamples = 0;
+      let previousCount = -1;
+      const observedCounts = [];
+      while (performance.now() < deadline) {
+        const count = (ctx.terrainGroup?.children || [])
+          .filter((mesh) => mesh?.userData?.isTerrainMesh)
+          .length;
+        if (observedCounts.at(-1) !== count) observedCounts.push(count);
+        if (count === expectedTerrainMeshes && count === previousCount) stableSamples += 1;
+        else stableSamples = 0;
+        if (stableSamples >= 3) return count;
+        previousCount = count;
+        await new Promise((resolve) => globalThis.setTimeout(resolve, 120));
+      }
+      throw new Error(
+        `Terrain streaming did not settle at ${expectedTerrainMeshes} meshes ` +
+        `(observed ${observedCounts.join(' -> ') || 'none'})`
+      );
+    };
     const collectReachableResources = () => {
       const geometries = new Set();
       const materials = new Set();
       const textures = new Set();
+      const geometryOwners = new Map();
+      const materialOwners = new Map();
       const collectTexture = (value) => {
         if (value?.isTexture) textures.add(value);
       };
       ctx.scene?.traverse?.((object) => {
-        if (object?.geometry) geometries.add(object.geometry);
+        const owner = String(object?.name || object?.parent?.name || object?.type || 'unnamed');
+        if (object?.geometry) {
+          geometries.add(object.geometry);
+          if (!geometryOwners.has(object.geometry)) {
+            geometryOwners.set(object.geometry, `${owner}:${object.geometry.type || 'Geometry'}`);
+          }
+        }
         const objectMaterials = Array.isArray(object?.material) ? object.material : [object?.material];
         for (const material of objectMaterials) {
           if (!material) continue;
           materials.add(material);
+          if (!materialOwners.has(material)) {
+            materialOwners.set(material, `${owner}:${material.type || 'Material'}`);
+          }
           for (const value of Object.values(material)) collectTexture(value);
           for (const uniform of Object.values(material.uniforms || {})) collectTexture(uniform?.value);
         }
@@ -326,7 +360,9 @@ async function exerciseLifecycle(page) {
       return {
         geometries: geometries.size,
         materials: materials.size,
-        textures: textures.size
+        textures: textures.size,
+        geometryOwners,
+        materialOwners
       };
     };
     for (let cycle = 1; cycle <= 5; cycle += 1) {
@@ -343,9 +379,19 @@ async function exerciseLifecycle(page) {
       ctx.setTravelMode('drive', { source: 'mode_resource_plateau', force: true, emitTutorial: false });
       ctx.setTravelMode('walk', { source: 'mode_resource_plateau', force: true, emitTutorial: false });
       await settleFrames();
+      const terrainMeshCount = await waitForTerrainMeshPlateau();
       globalThis.gc?.();
       await settleFrames();
       const reachable = collectReachableResources();
+      const resourceGrowth = previousReachableResources ? {
+        geometries: [...reachable.geometryOwners]
+          .filter(([geometry]) => !previousReachableResources.geometryOwners.has(geometry))
+          .map(([, owner]) => owner),
+        materials: [...reachable.materialOwners]
+          .filter(([material]) => !previousReachableResources.materialOwners.has(material))
+          .map(([, owner]) => owner)
+      } : { geometries: [], materials: [] };
+      previousReachableResources = reachable;
       modeCycles.push({
         cycle,
         durationMs: performance.now() - startedAt,
@@ -357,6 +403,8 @@ async function exerciseLifecycle(page) {
         reachableGeometries: reachable.geometries,
         reachableMaterials: reachable.materials,
         reachableTextures: reachable.textures,
+        terrainMeshCount,
+        resourceGrowth,
         heapBytes: Number(performance.memory?.usedJSHeapSize || 0)
       });
     }
