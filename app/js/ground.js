@@ -8,6 +8,34 @@ import { createSurfaceQuery } from './world/surface-contract.js?v=6';
 // Single source of truth for y(x,z) used by terrain, roads, and vehicles
 // ============================================================================
 
+function isWalkFeatureSurfaceReachable(feature, options = {}) {
+  const semantics = feature?.structureSemantics || null;
+  const surfaceY = Number(options.surfaceY);
+  const terrainY = Number(options.terrainY);
+  const currentY = Number(options.currentY);
+  if (!Number.isFinite(surfaceY) || !Number.isFinite(terrainY)) return false;
+
+  // An at-grade feature is only valid when its published surface is actually
+  // connected to terrain. Metadata alone cannot authorize a large vertical
+  // jump; stale or pre-terrain feature heights must fall back to terrain.
+  if (!semantics?.gradeSeparated) {
+    return Math.abs(surfaceY - terrainY) <= 1.25;
+  }
+
+  // A new walk session starts on the rendered terrain unless a structure
+  // surface is already at a physical portal/transition. This prevents a
+  // laterally-near tunnel or bridge from capturing an actor on another level.
+  if (!Number.isFinite(currentY)) {
+    return Math.abs(surfaceY - terrainY) <= 0.85;
+  }
+
+  const verticalDelta = Math.abs(surfaceY - currentY);
+  if (verticalDelta <= 1.25) return true;
+
+  const atTerrainTransition = Math.abs(surfaceY - terrainY) <= 0.85;
+  return atTerrainTransition && verticalDelta <= 1.8;
+}
+
 const GroundHeight = {
   // Road surface sits this far above raw terrain (prevents z-fighting)
   ROAD_OFFSET: 0.08,
@@ -275,6 +303,13 @@ const GroundHeight = {
     );
     const preferLinear = !!(
       onLinear &&
+      isWalkFeatureSurfaceReachable(linear?.feature, {
+        currentY,
+        terrainY,
+        surfaceY: Number.isFinite(linear?.pt?.x) && Number.isFinite(linear?.pt?.z)
+          ? sampleFeatureSurfaceY(linear.feature, linear.pt.x, linear.pt.z, linear)
+          : NaN
+      }) &&
       (!roadOnSurface || linear.dist <= (Number.isFinite(nr?.dist) ? nr.dist + 0.15 : Infinity))
     );
 
@@ -475,4 +510,4 @@ const GroundHeight = {
 const SurfaceQuery = createSurfaceQuery(appCtx, GroundHeight);
 Object.assign(appCtx, { GroundHeight, SurfaceQuery });
 
-export { GroundHeight, SurfaceQuery };
+export { GroundHeight, SurfaceQuery, isWalkFeatureSurfaceReachable };

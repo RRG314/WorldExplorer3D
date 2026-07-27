@@ -61,9 +61,14 @@ export function createWorldLoadRuntimeSession(options = {}) {
 
   const phaseStartedAt = Object.create(null);
   const phaseTotals = Object.create(null);
+  let runtimeState = null;
   const startLoadPhase = (name) => {
     if (!name) return;
     phaseStartedAt[name] = performance.now();
+    if (runtimeState) {
+      runtimeState.activePhases = Object.keys(phaseStartedAt);
+      runtimeState.updatedAt = performance.now();
+    }
   };
   const endLoadPhase = (name) => {
     if (!name) return;
@@ -72,6 +77,11 @@ export function createWorldLoadRuntimeSession(options = {}) {
     const dt = performance.now() - startedAt;
     phaseTotals[name] = (phaseTotals[name] || 0) + dt;
     delete phaseStartedAt[name];
+    if (runtimeState) {
+      runtimeState.activePhases = Object.keys(phaseStartedAt);
+      runtimeState.lastCompletedPhase = name;
+      runtimeState.updatedAt = performance.now();
+    }
   };
 
   resetWorldForReload({
@@ -96,6 +106,17 @@ export function createWorldLoadRuntimeSession(options = {}) {
 
   const loadLocation = { lat: appCtx.LOC.lat, lon: appCtx.LOC.lon };
   const loadSequence = appCtx._worldLoadSequence = (appCtx._worldLoadSequence || 0) + 1;
+  runtimeState = appCtx.worldLoadRuntimeState = {
+    sequence: loadSequence,
+    status: 'loading',
+    location: { ...loadLocation, name: locName },
+    retryPass,
+    startedAt: performance.now(),
+    updatedAt: performance.now(),
+    activePhases: [],
+    lastCompletedPhase: '',
+    geometryReady: false
+  };
   const isActiveLoadContext = () =>
     appCtx._worldLoadSequence === loadSequence &&
     sameLocation(appCtx.LOC, loadLocation) &&
@@ -179,6 +200,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
     perfModeNow,
     phaseTotals,
     rdtLoadComplexity,
+    runtimeState,
     startLoadPhase,
     useRdtBudgeting,
     useSyntheticFallbackRoads:
@@ -189,7 +211,7 @@ export function createWorldLoadRuntimeSession(options = {}) {
 }
 
 export function finishWorldLoadRuntimeSession(session = {}) {
-  const { appCtx, finalizePerfLoad, loadMetrics, phaseTotals, loaded = false } = session;
+  const { appCtx, finalizePerfLoad, loadMetrics, phaseTotals, runtimeState, loaded = false } = session;
   if (!appCtx) return;
 
   const loadedRadiusDeg = Number(loadMetrics?.activeRadiusDeg);
@@ -197,7 +219,6 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     ? Math.max(800, Math.round(loadedRadiusDeg * (appCtx.SCALE || 100000) * 0.92))
     : 1050;
 
-  appCtx.worldLoading = false;
   appCtx.initialEarthWorldReady = !!loaded;
   if (typeof appCtx.enforceEnvironmentSceneOwnership === 'function') {
     appCtx.enforceEnvironmentSceneOwnership();
@@ -217,6 +238,16 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     );
   }
   loadMetrics.initialEarthDetailRadius = appCtx.initialEarthDetailRadius;
+  appCtx.reconcileActorsAfterSurfaceRebuild?.();
+  appCtx.worldLoading = false;
+  appCtx.hideLoad?.();
+  if (runtimeState) {
+    runtimeState.status = loaded ? 'ready' : 'failed';
+    runtimeState.updatedAt = performance.now();
+    runtimeState.finishedAt = runtimeState.updatedAt;
+    runtimeState.activePhases = [];
+    runtimeState.geometryReady = !!loaded;
+  }
   finalizePerfLoad(loaded, {
     roadsFinal: appCtx.roads.length,
     roadVertices: Math.round(loadMetrics.roads.vertices || 0),
