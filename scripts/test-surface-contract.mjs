@@ -18,7 +18,12 @@ import {
 import { isWalkFeatureSurfaceReachable } from '../app/js/ground.js';
 import { buildingOccupiesActorHeight } from '../app/js/building-entry.js';
 import { finishWorldLoadRuntimeSession } from '../app/js/world/load-runtime-session.js';
-import { sampleFeatureSurfaceY } from '../app/js/structure-semantics.js';
+import {
+  buildFeatureRibbonEdges,
+  enforceAtGradeRibbonClearance,
+  sampleFeatureSurfaceY
+} from '../app/js/structure-semantics.js';
+import { createLinearFeatureRuntime } from '../app/js/world/load-linear-runtime.js';
 
 const appCtx = {
   METERS_PER_WORLD_UNIT: 2,
@@ -150,6 +155,76 @@ assert.equal(
 );
 assert.deepEqual(projectedPointSamples, [{ x: 5, z: 0 }]);
 
+const steepCrossSlopeTerrain = (x, z) => 20 + x * 0.8 + z * 0.01;
+const steepAtGradeRoad = {
+  pts: [{ x: 0, z: 0 }, { x: 0, z: 20 }],
+  surfaceBias: 0.08,
+  structureSemantics: { terrainMode: 'at_grade' }
+};
+const steepEdges = buildFeatureRibbonEdges(
+  steepAtGradeRoad,
+  steepAtGradeRoad.pts,
+  4,
+  steepCrossSlopeTerrain,
+  { surfaceBias: 0.08 }
+);
+for (const point of [...steepEdges.leftEdge, ...steepEdges.rightEdge]) {
+  assert.ok(
+    point.y >= steepCrossSlopeTerrain(point.x, point.z) + 0.08,
+    `at-grade road edge fell below terrain: ${JSON.stringify(point)}`
+  );
+}
+steepEdges.leftEdge[0].y -= 5;
+assert.equal(
+  enforceAtGradeRibbonClearance(
+    steepAtGradeRoad,
+    steepEdges.leftEdge,
+    steepEdges.rightEdge,
+    steepCrossSlopeTerrain,
+    0.08
+  ),
+  1
+);
+
+const hiddenPathContext = {
+  linearFeatures: [],
+  linearFeatureMeshes: [],
+  scene: { add: () => assert.fail('hidden footways must not publish scene meshes') }
+};
+const hiddenPathRuntime = createLinearFeatureRuntime({
+  appCtx: hiddenPathContext,
+  applyBuildingContextSemanticsToFeature: () => {},
+  classifyLinearFeatureTags: () => ({ kind: 'footway', subtype: 'footway' }),
+  classifyStructureSemantics: () => ({ terrainMode: 'at_grade', gradeSeparated: false }),
+  cloneStructureSemantics: (value) => ({ ...value }),
+  decimatePoints: (points) => points,
+  enableLinearFeatures: true,
+  linearFeatureVisualSpec: () => ({
+    width: 1.8,
+    bias: 0.06,
+    color: 0xffffff,
+    emissive: 0,
+    emissiveIntensity: 0,
+    roughness: 1,
+    metalness: 0,
+    opacity: 1
+  }),
+  polylineBounds: () => null,
+  refreshStructureAwareFeatureProfiles: () => {},
+  sanitizeWorldPathPoints: (points) => points,
+  updateFeatureSurfaceProfile: () => {},
+  worldBaseTerrainY: () => 0
+});
+assert.equal(
+  hiddenPathRuntime.addLinearFeatureRecord(
+    [{ x: 0, z: 0 }, { x: 5, z: 0 }],
+    { highway: 'footway' }
+  ),
+  true
+);
+assert.equal(hiddenPathContext.linearFeatures.length, 1);
+assert.equal(hiddenPathContext.linearFeatureMeshes.length, 0);
+
 const atGradeFootway = {
   structureSemantics: { gradeSeparated: false, terrainMode: 'at_grade' }
 };
@@ -259,5 +334,7 @@ console.log(JSON.stringify({
   surfaceLayers: surfaceOrder.map((entry) => entry.layer),
   gradeSeparatedWalkAttachment: 'vertical-and-transition-aware',
   buildingEntryAttachment: 'vertical-occupancy-aware',
+  atGradeRoadClearance: 'terrain-floor-after-crossfall-and-smoothing',
+  mappedFootwayPresentation: 'navigation-data-only',
   worldLoadCommit: 'reconcile-before-reveal'
 }, null, 2));

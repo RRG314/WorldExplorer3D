@@ -712,7 +712,7 @@ async function main() {
     const networkAndCopyReport = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
       const ctx = mod?.ctx;
-      const semanticsMod = await import('/app/js/structure-semantics.js?v=14');
+      const semanticsMod = await import('/app/js/structure-semantics.js?v=18');
       const classifyStructureSemantics = semanticsMod?.classifyStructureSemantics;
       const walkGraph = ctx?.traversalNetworks?.walk || null;
       const driveGraph = ctx?.traversalNetworks?.drive || null;
@@ -846,10 +846,12 @@ async function main() {
       laneEdgeReasonable: report.laneHitRatePct <= 3.5,
       waterDataPresent: (report.waterAreas + report.waterways + preWaterMetrics.waterAreas + preWaterMetrics.waterways) > 0,
       waterVisible: report.visibleWaterMeshes > 0 || preWaterMetrics.visibleWaterMeshes > 0,
-      linearFeatureGeometryReady:
+      linearFeatureNavigationReady:
         (report.linearFeatures + preWaterMetrics.linearFeatures) > 0 &&
-        report.linearFeatureMeshCount > 0 &&
-        report.solidLinearMaterials === true,
+        report.linearFeatureMeshCount === 0 &&
+        report.walkFeatureRoute?.ok === true &&
+        Number.isFinite(report.walkSurfaceSample?.yDelta) &&
+        Math.abs(report.walkSurfaceSample.yDelta) <= 1,
       spawnResolverAvailable: report.resolveSpawnAvailable === true,
       driveSpawnFallbackSafe: report.buildingInteriorSamples === 0 || report.driveSpawnSafe === report.buildingInteriorSamples,
       walkSpawnFallbackSafe: report.buildingInteriorSamples === 0 || report.walkSpawnSafe === report.buildingInteriorSamples,
@@ -955,11 +957,12 @@ async function main() {
     );
     assert(checks.laneEdgeReasonable, `Lane-edge collision rate too high: ${report.laneHitRatePct}%`);
     assert(
-      checks.linearFeatureGeometryReady,
-      `Mapped path geometry contract is incomplete: ${JSON.stringify({
+      checks.linearFeatureNavigationReady,
+      `Mapped path navigation-without-presentation contract is incomplete: ${JSON.stringify({
         linearFeatures: report.linearFeatures,
         linearFeatureMeshCount: report.linearFeatureMeshCount,
-        solidLinearMaterials: report.solidLinearMaterials
+        walkFeatureRoute: report.walkFeatureRoute,
+        walkSurfaceSample: report.walkSurfaceSample
       })}`
     );
     assert(checks.spawnResolverAvailable, 'Spawn resolver helpers are not exposed on runtime context.');

@@ -14,7 +14,7 @@ import {
   classifyStructureSemantics,
   polylineBounds,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=17";
+} from "../structure-semantics.js?v=18";
 import {
   INITIAL_DETAIL_RADIUS,
   ROAD_SURFACE_OFFSET,

@@ -1,4 +1,4 @@
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=17";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=18";
 
 export function buildSidewalkStripBatch(options = {}) {
   const {

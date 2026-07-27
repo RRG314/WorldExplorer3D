@@ -231,7 +231,9 @@ Work:
 
 1. Render terrain from the compiled ground model with shared edge samples,
    skirts/stitching, stable normals, and bounded near/mid/far meshes.
-2. Render at-grade roads and paths from compiled cross/longitudinal profiles.
+2. Render at-grade roads from compiled cross/longitudinal profiles. Preserve
+   mapped paths for navigation and physical surface semantics without
+   publishing raw path ribbons as world presentation.
 3. Triangulate intersections from graph topology rather than overlapping
    ribbons.
 4. Render bridge decks, approaches, tunnel interiors, and portals from
@@ -257,12 +259,22 @@ Work:
 
 1. Derive building base/foundation from the compiled occupied surface.
 2. Preserve mapped height, levels, material, facade, roof, and structure tags.
-3. Reject ordinary solid building volumes in road cores or water.
-4. Place vegetation/props through the shared occupancy index.
-5. Render water from hydrology records with shoreline and seabed ownership.
-6. Bind spawn, collision, navigation, placement, and all camera modes to
+3. Replace the legacy facade shader, generated window textures, streaming
+   facade materials, and blank-extrusion fallbacks as one owner-level change;
+   delete those losing presentation owners in the same phase.
+4. Resolve brick, sandstone, marble, stone, concrete, glass, and rendered
+   colors from mapped source tags and provenance. Never invent a specific
+   premium material when source data is absent; use one restrained,
+   documented neutral fallback system instead.
+5. Compile exterior massing, building parts, roof forms, wall surfaces, and
+   openings before rendering so exterior detail is geometry-led rather than a
+   facade texture pasted onto generic blocks.
+6. Reject ordinary solid building volumes in road cores or water.
+7. Place vegetation/props through the shared occupancy index.
+8. Render water from hydrology records with shoreline and seabed ownership.
+9. Bind spawn, collision, navigation, placement, and all camera modes to
    `WorldSurfaceQuery`.
-7. Use one stateful obstruction solver per traveler family.
+10. Use one stateful obstruction solver per traveler family.
 
 Exit:
 
@@ -369,7 +381,8 @@ Release exit:
 
 ## 5.0 continuation
 
-4.1 establishes the platform boundary. 5.0 may then add facade systems,
+4.1 establishes the platform boundary. 5.0 may then add advanced facade
+authoring systems,
 advanced water/vessels, spacecraft/orbital gameplay, historical Earth, and
 prehistoric Earth only as compiler products or destination sessions. No 5.0
 feature may reintroduce a second Earth source, surface, scene, traveler, or

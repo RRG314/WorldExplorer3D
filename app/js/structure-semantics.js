@@ -440,10 +440,16 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
     const rightX = point.x - nx * halfWidth;
     const rightZ = point.z - nz * halfWidth;
     const maxCrossfall = Math.max(0.12, Math.min(0.45, halfWidth * 0.08));
-    const clampCrossfall = (terrainY) => centerY + Math.max(
-      -maxCrossfall,
-      Math.min(maxCrossfall, Number(terrainY) + baseTopBias - centerY)
-    );
+    const clampCrossfall = (terrainY) => {
+      const minimumY = Number(terrainY) + baseTopBias;
+      const crossfallY = centerY + Math.max(
+        -maxCrossfall,
+        Math.min(maxCrossfall, minimumY - centerY)
+      );
+      // Crossfall is a comfort/presentation constraint, never permission for
+      // an at-grade surface to pass through the accepted ground.
+      return Number.isFinite(minimumY) ? Math.max(minimumY, crossfallY) : crossfallY;
+    };
     const leftY = atGrade ? clampCrossfall(sampleTerrainY(leftX, leftZ)) : centerY;
     const rightY = atGrade ? clampCrossfall(sampleTerrainY(rightX, rightZ)) : centerY;
     leftEdge.push({
@@ -459,6 +465,34 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
   }
 
   return { leftEdge, rightEdge, centerlineHeights };
+}
+
+function enforceAtGradeRibbonClearance(feature, leftEdge, rightEdge, sampleTerrainY, surfaceBias = null) {
+  if (
+    feature?.structureSemantics?.terrainMode !== 'at_grade' ||
+    typeof sampleTerrainY !== 'function'
+  ) return 0;
+
+  const bias = Number.isFinite(surfaceBias)
+    ? Number(surfaceBias)
+    : Number.isFinite(feature?.surfaceBias)
+      ? Number(feature.surfaceBias)
+      : 0.08;
+  let corrected = 0;
+  [leftEdge, rightEdge].forEach((edge) => {
+    if (!Array.isArray(edge)) return;
+    edge.forEach((point) => {
+      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) return;
+      const terrainY = Number(sampleTerrainY(point.x, point.z));
+      if (!Number.isFinite(terrainY)) return;
+      const minimumY = terrainY + bias;
+      if (!Number.isFinite(point.y) || point.y < minimumY) {
+        point.y = minimumY;
+        corrected += 1;
+      }
+    });
+  });
+  return corrected;
 }
 
 function shouldRenderRoadSkirts(feature) {
@@ -650,6 +684,7 @@ export {
   assignFeatureConnections,
   boundsIntersect,
   buildFeatureRibbonEdges,
+  enforceAtGradeRibbonClearance,
   buildFeatureStations,
   buildFeatureTransitionAnchors,
   classifyStructureSemantics,

@@ -1,4 +1,4 @@
-import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=7";
+import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=9";
 import { createWorldLandusePass } from "./load-landuse-pass.js?v=25";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
@@ -105,7 +105,6 @@ export function createWorldRoadLoader(deps = {}) {
     scheduleDeferredWorldLinearFeatureLoad,
     signedPolygonAreaXZ,
     spawnOnRoad,
-    syncLinearFeatureOverlayVisibility,
     updateFeatureSurfaceProfile,
     updateWorldLod,
     vectorTileRangeForBounds,
@@ -126,7 +125,6 @@ export function createWorldRoadLoader(deps = {}) {
   const linearRuntime = createLinearFeatureRuntime({
     appCtx,
     applyBuildingContextSemanticsToFeature,
-    buildFeatureRibbonEdges,
     classifyLinearFeatureTags,
     classifyStructureSemantics,
     cloneStructureSemantics,
@@ -136,7 +134,6 @@ export function createWorldRoadLoader(deps = {}) {
     polylineBounds,
     refreshStructureAwareFeatureProfiles,
     sanitizeWorldPathPoints,
-    syncLinearFeatureOverlayVisibility,
     updateFeatureSurfaceProfile,
     worldBaseTerrainY
   });
@@ -279,7 +276,7 @@ export function createWorldRoadLoader(deps = {}) {
       if (!waterKind) return null;
       return candidate;
     };
-    const { addLinearFeatureRibbon, buildImmediateLinearFeatureGeometryPass } = linearRuntime;
+    const { addLinearFeatureRecord, buildImmediateLinearFeatureDataPass } = linearRuntime;
     for (const radius of radii) {
       if (loaded) break;
       loadMetrics.activeRadiusDeg = radius;
@@ -333,10 +330,9 @@ export function createWorldRoadLoader(deps = {}) {
             geometryGuards,
             geoToWorld: appCtx.geoToWorld,
             sanitizeWorldPathPoints,
-            addLinearFeatureRibbon,
+            addLinearFeatureRecord,
             startLoadPhase,
             endLoadPhase,
-            syncLinearFeatureOverlayVisibility,
             rebuildStructureVisualMeshes: appCtx.rebuildStructureVisualMeshes,
             invalidateTraversalNetworks,
             buildTraversalNetworks,
@@ -469,7 +465,7 @@ export function createWorldRoadLoader(deps = {}) {
           waterwayWays: normalizedSelection.waterwayWays,
           worldSurfaceProfile
         });
-        buildImmediateLinearFeatureGeometryPass({
+        buildImmediateLinearFeatureDataPass({
           cyclewayWays: normalizedSelection.cyclewayWays,
           endLoadPhase,
           footwayWays: normalizedSelection.footwayWays,

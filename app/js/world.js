@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=17";
+} from "./structure-semantics.js?v=18";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -30,7 +30,7 @@ import {
 import {
   scheduleDeferredStructureRefresh,
   scheduleDeferredWorldLinearFeatureLoad
-} from "./world/linear-features.js?v=2";
+} from "./world/linear-features.js?v=3";
 import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,
@@ -168,7 +168,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=5";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=55";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=57";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=8";
@@ -269,7 +269,6 @@ const { loadRoads: loadOsmRoads, isVehicleRoad, isInsideWaterArea } = createWorl
   scheduleDeferredWorldLinearFeatureLoad,
   signedPolygonAreaXZ,
   spawnOnRoad,
-  syncLinearFeatureOverlayVisibility,
   updateFeatureSurfaceProfile,
   updateWorldLod,
   vectorTileRangeForBounds,

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { buildFeatureRibbonEdges } from '../structure-semantics.js?v=17';
+import { buildFeatureRibbonEdges } from '../structure-semantics.js?v=18';
 import { appendUpwardRibbonGeometry } from '../road-render.js?v=2';
 
 const INITIAL_DETAIL_RADIUS = 1050;

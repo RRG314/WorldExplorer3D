@@ -3,8 +3,9 @@ import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-rende
 import { detectRoadIntersections } from "./intersections.js?v=1";
 import {
   buildFeatureRibbonEdges,
+  enforceAtGradeRibbonClearance,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=17";
+} from "../structure-semantics.js?v=18";
 import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=2";
 
 const ROAD_SURFACE_BIAS = 0.08;
@@ -433,6 +434,13 @@ export function rebuildRoadsWithTerrain(deps = {}) {
         rightEdge[i].y = rightEdge[i].y * 0.52 + (rightEdge[i - 1].y + rightEdge[i + 1].y) * 0.24;
       }
     }
+    enforceAtGradeRibbonClearance(
+      road,
+      leftEdge,
+      rightEdge,
+      roadTerrainSampler,
+      Number.isFinite(road?.surfaceBias) ? road.surfaceBias : ROAD_SURFACE_BIAS
+    );
 
     appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
     appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);

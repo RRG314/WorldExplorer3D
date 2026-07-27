@@ -13,10 +13,9 @@ export function scheduleDeferredWorldLinearFeatureLoad(options = {}) {
     geometryGuards,
     geoToWorld,
     sanitizeWorldPathPoints,
-    addLinearFeatureRibbon,
+    addLinearFeatureRecord,
     startLoadPhase,
     endLoadPhase,
-    syncLinearFeatureOverlayVisibility,
     rebuildStructureVisualMeshes,
     invalidateTraversalNetworks,
     buildTraversalNetworks,
@@ -75,7 +74,7 @@ export function scheduleDeferredWorldLinearFeatureLoad(options = {}) {
         minPerTile: 1
       });
 
-      startLoadPhase('buildLinearFeatureGeometryDeferred');
+      startLoadPhase('buildLinearFeatureDataDeferred');
       try {
         [railwayWays, cyclewayWays, footwayWays].forEach((featureWays) => {
           if (!Array.isArray(featureWays) || featureWays.length === 0) return;
@@ -86,14 +85,13 @@ export function scheduleDeferredWorldLinearFeatureLoad(options = {}) {
               .map((node) => geoToWorld(node.lat, node.lon));
             const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
             if (pts.length < 2) return;
-            addLinearFeatureRibbon(pts, { ...(way.tags || {}), sourceFeatureId: way.id ? String(way.id) : '' });
+            addLinearFeatureRecord(pts, { ...(way.tags || {}), sourceFeatureId: way.id ? String(way.id) : '' });
           });
         });
       } finally {
-        endLoadPhase('buildLinearFeatureGeometryDeferred');
+        endLoadPhase('buildLinearFeatureDataDeferred');
       }
 
-      syncLinearFeatureOverlayVisibility();
       if (typeof rebuildStructureVisualMeshes === 'function') {
         rebuildStructureVisualMeshes();
       }
