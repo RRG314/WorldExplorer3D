@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "type": "GroundSourceAttestationTemplate",
+  "rasters": [
+    {
+      "rasterId": "80894",
+      "sourceRelease": "20260511",
+      "sourceHorizontalFrame": "NAD83_2011",
+      "sourceVerticalDatum": "NAVD88",
+      "sourceGeoidModel": "GEOID18",
+      "verticalAccuracyRmseMeters": 0.1,
+      "metadataUrl": "https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/metadata/MD_4County_D24/MD_4County_2_D24/reports/lidar_mapping_report/Lidar_Mapping_Report_MD_4County_2_D24.pdf",
+      "metadataSha256": "344140322df7653620d80ed35fa58265e908bce934885409c4061f9d9cdba73e"
+    }
+  ]
+}

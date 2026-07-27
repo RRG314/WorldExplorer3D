@@ -73,6 +73,8 @@ Commands:
 The fetch stage records raw USGS 3DEP/NAVD88 evidence only. It never produces
 accepted runtime ground. The compile stage requires a complete normalization
 document bound to the raw file SHA-256 and declaring WGS84_G1674/EGM2008.
+Use scripts/ground-datum-normalizer.py to prepare that document from separately
+verified, raster-specific source attestations.
 `.trim();
 }
 
@@ -165,7 +167,11 @@ async function commandFetchUsgs() {
       key: sample.key,
       latitude: sample.latitude,
       longitude: sample.longitude,
-      elevationMeters: sample.rawElevationMeters
+      elevationMeters: sample.rawElevationMeters,
+      rasterId: sample.rasterId,
+      sourceRelease: sample.sourceRelease,
+      acquisitionStartDate: sample.acquisitionStartDate,
+      acquisitionEndDate: sample.acquisitionEndDate
     }))
   };
   const requestOutput = await writeJson(
