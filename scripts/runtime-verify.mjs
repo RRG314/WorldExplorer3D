@@ -7,6 +7,8 @@ const steps = [
   ['CSS integrity and browser boot', 'scripts/test-css-integrity.mjs'],
   ['ES module URL identity', 'scripts/test-module-version-consistency.mjs'],
   ['Terrain source contract', 'scripts/test-terrain-source-contract.mjs'],
+  ['Ground provider registry', 'scripts/test-ground-provider-registry.mjs'],
+  ['Ground artifact integrity', 'scripts/test-ground-artifact.mjs'],
   ['District compiler contract', 'scripts/test-district-compiler-contract.mjs'],
   ['Surface contract', 'scripts/test-surface-contract.mjs'],
   ['Overture continuous source', 'scripts/test-overture-tile-source.mjs'],

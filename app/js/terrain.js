@@ -14,6 +14,13 @@ import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=1
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=1";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=4";
 import {
+  groundProviderCatalogSnapshot
+} from "./terrain/ground-provider-registry.js?v=1";
+import {
+  compileGroundArtifact,
+  loadGroundArtifact
+} from "./terrain/ground-artifact.js?v=1";
+import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   computeElevationStatsMeters,
@@ -372,8 +379,11 @@ Object.assign(appCtx, {
   elevationMetersAtLatLon,
   elevationWorldYAtWorldXZ,
   ensureTerrainGroup,
+  compileGroundArtifact,
+  getGroundProviderCatalogSnapshot: groundProviderCatalogSnapshot,
   getOrLoadTerrainTile,
   latLonToTileXY,
+  loadGroundArtifact,
   pruneTerrainTileCache,
   reconcileActorsAfterSurfaceRebuild,
   rebuildRoadsWithTerrain: rebuildRoadsWithTerrainRuntime,
