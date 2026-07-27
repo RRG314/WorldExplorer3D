@@ -4,6 +4,7 @@ import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
 import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=6";
 import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=9";
+import { prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=1";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   const waitForCoverage = appCtx.waitForTerrainCoverageAt;
@@ -373,62 +374,35 @@ export function createWorldRoadLoader(deps = {}) {
         }
         const nodes = {};
         data.elements.filter((element) => element.type === 'node').forEach((node) => { nodes[node.id] = node; });
-        appCtx._worldLoadNodes = nodes;
         const baselineFullWorld = perfModeNow === 'baseline';
         startLoadPhase('featureBudgeting');
-        const selection = prepareWorldFeatureSelections({
-          baselineFullWorld,
-          centerLat: appCtx.LOC?.lat,
-          classifyLinearFeatureTags,
-          classifyStructureSemantics,
-          classifyWorldSurfaceProfile,
+        const normalized = prepareSelectedLocationSource({
           data,
-          enableLinearFeatures: ENABLE_LINEAR_FEATURES,
-          isDriveableHighwayTag,
-          limitNodesByTileBudget,
-          limitWaysByTileBudget,
-          linearFeaturePriority,
-          loadMetrics,
-          maxBuildingWays,
-          maxLanduseWays,
-          maxPoiNodes,
-          maxRoadWays,
-          maxTreeNodes: MAX_TREE_NODES,
-          maxTreeRowWays: MAX_TREE_ROW_WAYS,
+          location: appCtx.LOC,
           nodes,
-          poiKeyFromTags,
-          roadTypePriority: deps.roadTypePriority,
-          tileBudgetCfg,
-          useRdtBudgeting
+          prepareSelection: prepareWorldFeatureSelections,
+          selectionOptions: {
+            baselineFullWorld, classifyLinearFeatureTags,
+            classifyStructureSemantics, classifyWorldSurfaceProfile,
+            enableLinearFeatures: ENABLE_LINEAR_FEATURES,
+            isDriveableHighwayTag, limitNodesByTileBudget,
+            limitWaysByTileBudget, linearFeaturePriority, loadMetrics,
+            maxBuildingWays, maxLanduseWays, maxPoiNodes, maxRoadWays,
+            maxTreeNodes: MAX_TREE_NODES, maxTreeRowWays: MAX_TREE_ROW_WAYS,
+            poiKeyFromTags, roadTypePriority: deps.roadTypePriority,
+            tileBudgetCfg, useRdtBudgeting
+          }
         });
+        const selection = normalized.rawSelection;
         endLoadPhase('featureBudgeting');
-        const {
-          roadWays,
-          buildingWays,
-          landuseWays,
-          waterwayWays,
-          railwayWays,
-          footwayWays,
-          cyclewayWays,
-          structureConnectorWays,
-          poiNodes,
-          requestedCounts,
-          worldSurfaceProfile
-        } = selection;
-        if (
-          roadWays.length < requestedCounts.roads ||
-          buildingWays.length < requestedCounts.buildings ||
-          landuseWays.length < requestedCounts.landuse ||
-          poiNodes.length < requestedCounts.pois
-        ) {
-          console.warn(
-            `[WorldLoad] Applied adaptive limits ` +
-            `(roads ${roadWays.length}/${requestedCounts.roads}, ` +
-            `buildings ${buildingWays.length}/${requestedCounts.buildings}, ` +
-            `landuse ${landuseWays.length}/${requestedCounts.landuse}, ` +
-            `pois ${poiNodes.length}/${requestedCounts.pois}).`
-          );
+        const { worldSurfaceProfile } = selection;
+        const normalizedSelection = normalized.selection;
+        appCtx._worldLoadNodes = normalizedSelection.nodes;
+        if (runtimeState) {
+          Object.assign(runtimeState, normalized.diagnostics);
         }
+        loadMetrics.districtSource = normalized.diagnostics.districtSource;
+        if (normalized.budgetWarning) console.warn(normalized.budgetWarning);
         terrainCoverageReady = await waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase);
         buildRoadGeometryPass({
           appendIndexedGeometry,
@@ -440,11 +414,11 @@ export function createWorldRoadLoader(deps = {}) {
           geometryGuards,
           getRoadSubdivisionStep,
           loadMetrics,
-          nodes,
+          nodes: normalizedSelection.nodes,
           perfModeNow,
           polylineBounds,
           rdtDepthForFeatureTile,
-          roadWays,
+          roadWays: normalizedSelection.roadWays,
           sanitizeWorldPathPoints,
           showLoad: appCtx.showLoad,
           startLoadPhase,
@@ -453,14 +427,14 @@ export function createWorldRoadLoader(deps = {}) {
           wayCenterLatLon,
           worldBaseTerrainY
         });
-        if (buildingWays.length > 0) {
+        if (normalizedSelection.buildingWays.length > 0) {
           buildBuildingGeometryPass({
             buildingGeometryGuards,
-            buildingWays,
+            buildingWays: normalizedSelection.buildingWays,
             featureMinPolygonArea: FEATURE_MIN_POLYGON_AREA,
             loadMetrics,
             lodThresholds,
-            nodes,
+            nodes: normalizedSelection.nodes,
             pickBuildingBaseColor,
             rdtLoadComplexity,
             registerBuildingCollision,
@@ -477,22 +451,22 @@ export function createWorldRoadLoader(deps = {}) {
           endLoadPhase,
           featureRadius,
           landuseGeometryGuards,
-          landuseWays,
+          landuseWays: normalizedSelection.landuseWays,
           loadMetrics,
-          nodes,
+          nodes: normalizedSelection.nodes,
           startLoadPhase,
-          waterwayWays,
+          waterwayWays: normalizedSelection.waterwayWays,
           worldSurfaceProfile
         });
         buildImmediateLinearFeatureGeometryPass({
-          cyclewayWays,
+          cyclewayWays: normalizedSelection.cyclewayWays,
           endLoadPhase,
-          footwayWays,
+          footwayWays: normalizedSelection.footwayWays,
           geometryGuards,
-          nodes,
-          railwayWays,
+          nodes: normalizedSelection.nodes,
+          railwayWays: normalizedSelection.railwayWays,
           startLoadPhase,
-          structureConnectorWays,
+          structureConnectorWays: normalizedSelection.structureConnectorWays,
           deferStructureRefresh: true
         });
         scheduleDeferredWorldDetailPasses({
@@ -502,7 +476,7 @@ export function createWorldRoadLoader(deps = {}) {
           lodMidDist,
           lodNearDist,
           poiKeyFromTags,
-          poiNodes,
+          poiNodes: normalizedSelection.poiNodes,
           startLoadPhase,
           updateWorldLod
         });

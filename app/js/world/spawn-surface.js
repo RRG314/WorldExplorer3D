@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=16";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=17";
 
 function createWorldSpawnSurfaceApi(context) {
   const { getDeps } = context;

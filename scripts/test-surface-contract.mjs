@@ -18,6 +18,7 @@ import {
 import { isWalkFeatureSurfaceReachable } from '../app/js/ground.js';
 import { buildingOccupiesActorHeight } from '../app/js/building-entry.js';
 import { finishWorldLoadRuntimeSession } from '../app/js/world/load-runtime-session.js';
+import { sampleFeatureSurfaceY } from '../app/js/structure-semantics.js';
 
 const appCtx = {
   METERS_PER_WORLD_UNIT: 2,
@@ -125,6 +126,29 @@ for (let index = 1; index < surfaceOrder.length; index += 1) {
   assert.ok(surfaceOrder[index].surfaceOffset > surfaceOrder[index - 1].surfaceOffset);
 }
 assert.ok(surfaceComposition('', 'road').layer > surfaceOrder.at(-1).layer);
+
+const projectedPointSamples = [];
+const projectedAtGradeFeature = {
+  pts: [{ x: 0, z: 0 }, { x: 10, z: 0 }],
+  surfaceDistances: new Float32Array([0, 10]),
+  surfaceHeights: new Float32Array([2, 2]),
+  surfaceOffsets: new Float32Array([0, 0]),
+  surfaceBias: 0.08,
+  structureSemantics: { terrainMode: 'at_grade' },
+  surfaceTerrainSampler: (x, z) => {
+    projectedPointSamples.push({ x, z });
+    return x + z;
+  }
+};
+assert.equal(
+  sampleFeatureSurfaceY(projectedAtGradeFeature, 5, 1, {
+    pt: { x: 5, z: 0 },
+    segIndex: 0,
+    t: 0.5
+  }),
+  5.08
+);
+assert.deepEqual(projectedPointSamples, [{ x: 5, z: 0 }]);
 
 const atGradeFootway = {
   structureSemantics: { gradeSeparated: false, terrainMode: 'at_grade' }

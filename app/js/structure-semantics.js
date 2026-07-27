@@ -478,15 +478,34 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
   const heights = feature.surfaceHeights instanceof Float32Array ? feature.surfaceHeights : null;
   if (!distances || !heights || !distances.length || !heights.length) return NaN;
 
-  const p1 = feature.pts[projection.segIndex];
-  const p2 = feature.pts[projection.segIndex + 1];
+  const segIndex = Number(projection.segIndex);
+  if (
+    !Number.isInteger(segIndex) ||
+    segIndex < 0 ||
+    segIndex >= feature.pts.length - 1
+  ) return NaN;
+  const p1 = feature.pts[segIndex];
+  const p2 = feature.pts[segIndex + 1];
+  const projectionT = Number.isFinite(Number(projection.t))
+    ? Math.max(0, Math.min(1, Number(projection.t)))
+    : 0;
   const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
-  const distance = distances[projection.segIndex] + segLen * projection.t;
+  const distance = distances[segIndex] + segLen * projectionT;
   if (
     feature.structureSemantics?.terrainMode === 'at_grade' &&
     typeof feature.surfaceTerrainSampler === 'function'
   ) {
-    const terrainY = Number(feature.surfaceTerrainSampler(projection.x, projection.z));
+    const sampleX = Number.isFinite(Number(projection.x))
+      ? Number(projection.x)
+      : Number.isFinite(Number(projection.pt?.x))
+        ? Number(projection.pt.x)
+        : p1.x + (p2.x - p1.x) * projectionT;
+    const sampleZ = Number.isFinite(Number(projection.z))
+      ? Number(projection.z)
+      : Number.isFinite(Number(projection.pt?.z))
+        ? Number(projection.pt.z)
+        : p1.z + (p2.z - p1.z) * projectionT;
+    const terrainY = Number(feature.surfaceTerrainSampler(sampleX, sampleZ));
     if (Number.isFinite(terrainY)) {
       const offsets = feature.surfaceOffsets instanceof Float32Array ? feature.surfaceOffsets : null;
       const structureOffset = offsets ? Number(sampleProfileAtDistance(distances, offsets, distance)) || 0 : 0;
