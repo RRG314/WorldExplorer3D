@@ -777,6 +777,10 @@ async function main() {
         structureTags: { bridge: 'yes' }, networkKind: 'road', type: 'primary'
       };
       semanticsMod.updateFeatureSurfaceProfile?.(syntheticBridge, (x) => x === 50 ? -80 : 12);
+      const acceptedGroundSnapshot =
+        ctx?.getAcceptedGroundRuntimeSnapshot?.() || null;
+      const inactiveAcceptedGroundSample =
+        ctx?.sampleAcceptedGroundAtWorldXZ?.(0, 0) || null;
 
       return {
         walkGraphNodeCount: Number(walkGraph?.nodeCount || walkGraph?.nodes?.length || 0),
@@ -802,6 +806,14 @@ async function main() {
           }),
         syntheticStructureSemantics,
         syntheticBridgeHeights: Array.from(syntheticBridge.surfaceHeights || []),
+        acceptedGroundRuntimeBoundary: {
+          prepareExposed:
+            typeof ctx?.prepareAcceptedGroundForLocation === 'function',
+          coverageGateExposed:
+            typeof ctx?.verifyAcceptedGroundCoverage === 'function',
+          snapshot: acceptedGroundSnapshot,
+          inactiveSample: inactiveAcceptedGroundSample
+        },
         landingCopyClear:
           /optional/i.test(landingHtml) &&
           /map, core exploration, and traversal modes are free/i.test(landingHtml) &&
@@ -870,6 +882,14 @@ async function main() {
         report.syntheticStructureSemantics?.bridgeFootway?.gradeSeparated === true &&
         report.syntheticStructureSemantics?.tunnelRoad?.terrainMode === 'subgrade' &&
         report.syntheticStructureSemantics?.tunnelRoad?.gradeSeparated === true,
+      acceptedGroundRuntimeReady:
+        report.acceptedGroundRuntimeBoundary?.prepareExposed === true &&
+        report.acceptedGroundRuntimeBoundary?.coverageGateExposed === true &&
+        report.acceptedGroundRuntimeBoundary?.snapshot?.status === 'blocked' &&
+        report.acceptedGroundRuntimeBoundary?.snapshot?.reason ===
+          'no-ground-artifacts-configured' &&
+        report.acceptedGroundRuntimeBoundary?.inactiveSample?.status ===
+          'unavailable',
       bridgeSpansTerrainDepressions:
         report.syntheticBridgeHeights?.length === 3 &&
         Math.min(...report.syntheticBridgeHeights) > 15 &&
@@ -994,6 +1014,7 @@ async function main() {
     assert(checks.waterMaterialsSolid, 'Water meshes are still rendering with transparent materials.');
     assert(checks.vegetationIntegrated, `Vegetation layer did not initialize correctly: ${JSON.stringify({ vegetationFeatures: report.vegetationFeatures, vegetationMeshes: report.vegetationMeshes })}`);
     assert(checks.structureSemanticsStable, `Synthetic structure semantics classification regressed: ${JSON.stringify(report.syntheticStructureSemantics || null)}`);
+    assert(checks.acceptedGroundRuntimeReady, `Accepted-ground runtime boundary is unavailable or unexpectedly active: ${JSON.stringify(report.acceptedGroundRuntimeBoundary || null)}`);
     assert(checks.bridgeSpansTerrainDepressions, `Bridge profile followed underlying terrain: ${JSON.stringify(report.syntheticBridgeHeights || null)}`);
     assert(checks.roadSurfacesDraped, `Road surface skirt policy regressed: ${JSON.stringify(report.roadSurfaceContract || null)}`);
     assert(checks.lazyInteriorIdle, `Interior system is not staying lazy by default: ${JSON.stringify({ buildingEntrySupportExposed: report.buildingEntrySupportExposed, activeInteriorByDefault: report.activeInteriorByDefault, dynamicInteriorCollidersIdle: report.dynamicInteriorCollidersIdle, interiorActionExposed: report.interiorActionExposed, interiorPromptPresent: report.interiorPromptPresent })}`);

@@ -4,7 +4,7 @@ import {
   WEB_MERCATOR_MAX_LATITUDE,
   geographicToXyzTile,
   webMercatorGroundResolutionMeters
-} from './source-contract.js?v=1';
+} from './source-contract.js?v=2';
 
 export const TERRAIN_SAMPLE_SCHEMA_VERSION = 1;
 export const TERRAIN_SAMPLE_STATUSES = Object.freeze([

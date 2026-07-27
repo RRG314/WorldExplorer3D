@@ -3,10 +3,10 @@ import {
   decodeTerrariumRgb,
   geographicToXyzTile,
   xyzTileBounds
-} from "./source-contract.js?v=1";
+} from "./source-contract.js?v=2";
 import {
   adaptTerrariumTileSample
-} from "./provider-adapter.js?v=1";
+} from "./provider-adapter.js?v=2";
 import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,

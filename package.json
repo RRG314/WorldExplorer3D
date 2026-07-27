@@ -6,7 +6,7 @@
   "main": "three.js",
   "scripts": {
     "dev": "node scripts/serve-local-preview.mjs",
-    "test": "npm run test:terrain-source && npm run test:ground-provider && npm run test:ground-artifact && npm run test:ground-artifact-builder && npm run test:ground-datum && npm run test:district-compiler && npm run test:rules && npm run test:runtime && npm run test:osm-smoke",
+    "test": "npm run test:terrain-source && npm run test:ground-provider && npm run test:ground-artifact && npm run test:ground-artifact-builder && npm run test:ground-datum && npm run test:accepted-ground-runtime && npm run test:district-compiler && npm run test:rules && npm run test:runtime && npm run test:osm-smoke",
     "test:rules": "node scripts/test-rules.mjs",
     "test:css": "node scripts/test-css-integrity.mjs",
     "test:inferred-buildings": "node scripts/test-inferred-building-coverage.mjs",
@@ -45,6 +45,7 @@
     "test:ground-artifact": "node scripts/test-ground-artifact.mjs",
     "test:ground-artifact-builder": "node scripts/test-ground-artifact-builder.mjs",
     "test:ground-datum": "node scripts/run-ground-datum-normalizer.mjs self-test",
+    "test:accepted-ground-runtime": "node scripts/test-accepted-ground-runtime.mjs",
     "test:district-compiler": "node scripts/test-district-compiler-contract.mjs",
     "test:overture-source": "node scripts/test-overture-tile-source.mjs && node scripts/test-overture-streaming-source.mjs && node scripts/test-streaming-feature-budget.mjs && node scripts/test-render-provenance.mjs",
     "test:continuous-renderer": "node scripts/test-continuous-renderer.mjs",

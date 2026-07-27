@@ -21,6 +21,9 @@ import {
   loadGroundArtifact
 } from "./terrain/ground-artifact.js?v=2";
 import {
+  createAcceptedGroundRuntime
+} from "./terrain/accepted-ground-runtime.js?v=1";
+import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   computeElevationStatsMeters,
@@ -49,7 +52,7 @@ import {
   waitForTerrainReadyBounds,
   waitForTerrainReadyAt,
   worldToLatLon
-} from "./terrain/tiles.js?v=29";
+} from "./terrain/tiles.js?v=30";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -88,6 +91,19 @@ const terrain = {
   _lastRoadCount: 0,
   _lastTerrainTileCount: 0
 };
+const acceptedGroundRuntime = createAcceptedGroundRuntime({ worldToLatLon });
+const clearAcceptedGroundRuntime = (reason) =>
+  acceptedGroundRuntime.clear(reason);
+const getAcceptedGroundRuntimeSnapshot = () =>
+  acceptedGroundRuntime.snapshot();
+const prepareAcceptedGroundForLocation = (options) =>
+  acceptedGroundRuntime.prepare(options);
+const sampleAcceptedGroundAtLatLon = (latitude, longitude) =>
+  acceptedGroundRuntime.sampleAtLatLon(latitude, longitude);
+const sampleAcceptedGroundAtWorldXZ = (x, z) =>
+  acceptedGroundRuntime.sampleAtWorldXZ(x, z);
+const verifyAcceptedGroundCoverage = (locations) =>
+  acceptedGroundRuntime.verifyCoverage(locations);
 const ROAD_ENDPOINT_EXTENSION_SCALE = 0.5;
 const ROAD_ENDPOINT_EXTENSION_MIN = 0.35;
 const ROAD_ENDPOINT_EXTENSION_MAX = 2.0;
@@ -380,10 +396,13 @@ Object.assign(appCtx, {
   elevationWorldYAtWorldXZ,
   ensureTerrainGroup,
   compileGroundArtifact,
+  clearAcceptedGroundRuntime,
   getGroundProviderCatalogSnapshot: groundProviderCatalogSnapshot,
+  getAcceptedGroundRuntimeSnapshot,
   getOrLoadTerrainTile,
   latLonToTileXY,
   loadGroundArtifact,
+  prepareAcceptedGroundForLocation,
   pruneTerrainTileCache,
   reconcileActorsAfterSurfaceRebuild,
   rebuildRoadsWithTerrain: rebuildRoadsWithTerrainRuntime,
@@ -393,6 +412,8 @@ Object.assign(appCtx, {
   refreshTerrainSurfaceProfiles,
   resetTerrainStreamingState,
   sampleTileElevationMeters,
+  sampleAcceptedGroundAtLatLon,
+  sampleAcceptedGroundAtWorldXZ,
   terrainSourceSampleAtLatLon: (lat, lon) =>
     terrainSourceSampleAtLatLon(lat, lon, terrainTileDeps),
   terrainSourceSampleAtWorldXZ: (x, z) =>
@@ -405,6 +426,7 @@ Object.assign(appCtx, {
   toggleRoadDebugMode,
   updateTerrainAround,
   validateRoadTerrainConformance,
+  verifyAcceptedGroundCoverage,
   waitForTerrainCoverageAt,
   waitForTerrainReadyBounds: (bounds, timeoutMs) => waitForTerrainReadyBounds(bounds, timeoutMs, terrainTileDeps),
   waitForTerrainReadyAt: (x, z, timeoutMs) => waitForTerrainReadyAt(x, z, timeoutMs, terrainTileDeps),
@@ -422,6 +444,7 @@ export {
   cachedTerrainHeight,
   cancelWorldSurfaceSync,
   classifyTerrainVisualProfile,
+  clearAcceptedGroundRuntime,
   clearTerrainHeightCache,
   clearTerrainMeshes,
   decodeTerrariumRGB,
@@ -429,9 +452,11 @@ export {
   elevationMetersAtLatLon,
   elevationWorldYAtWorldXZ,
   ensureTerrainGroup,
+  getAcceptedGroundRuntimeSnapshot,
   getOrLoadTerrainTile,
   latLonToTileXY,
   pruneTerrainTileCache,
+  prepareAcceptedGroundForLocation,
   reconcileActorsAfterSurfaceRebuild,
   rebuildRoadsWithTerrainRuntime as rebuildRoadsWithTerrain,
   requestWorldSurfaceSync,
@@ -440,6 +465,8 @@ export {
   refreshTerrainSurfaceProfiles,
   resetTerrainStreamingState,
   sampleTileElevationMeters,
+  sampleAcceptedGroundAtLatLon,
+  sampleAcceptedGroundAtWorldXZ,
   terrainSourceSampleAtLatLon,
   terrainSourceSampleAtWorldXZ,
   terrainTileCacheSnapshot,
@@ -450,6 +477,7 @@ export {
   toggleRoadDebugMode,
   updateTerrainAround,
   validateRoadTerrainConformance,
+  verifyAcceptedGroundCoverage,
   waitForTerrainCoverageAt,
   waitForTerrainReadyBounds,
   waitForTerrainReadyAt,

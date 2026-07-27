@@ -6,6 +6,7 @@ import {
   createLocalEnuFrame,
   decodeTerrariumRgb,
   geographicToLocalEnu,
+  geographicToWebMercatorMeters,
   geographicToXyzTile,
   localEnuToGeographic,
   normalizeLongitude,
@@ -63,6 +64,15 @@ assert.equal(geographicToXyzTile(0, 540, 8).x, 0);
 assert.equal(geographicToXyzTile(90, 0, 8).y, 0);
 assert.equal(geographicToXyzTile(-90, 0, 8).y, 255);
 assert.equal(clampWebMercatorLatitude(90), WEB_MERCATOR_MAX_LATITUDE);
+
+const mercatorOrigin = geographicToWebMercatorMeters(0, 0);
+assert.equal(mercatorOrigin.eastingMeters, 0);
+assertNear(mercatorOrigin.northingMeters, 0, 1e-9, 'Web Mercator origin northing');
+const mercatorLimit = geographicToWebMercatorMeters(90, 180);
+assert.equal(mercatorLimit.boundedLatitude, WEB_MERCATOR_MAX_LATITUDE);
+assert.equal(mercatorLimit.wrappedLongitude, -180);
+assert.ok(Number.isFinite(mercatorLimit.eastingMeters));
+assert.ok(Number.isFinite(mercatorLimit.northingMeters));
 
 const tileEdgeWest = xyzTileBounds(16383, 10901, 15);
 const tileEdgeEast = xyzTileBounds(16384, 10901, 15);
