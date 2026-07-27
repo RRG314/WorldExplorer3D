@@ -10,6 +10,7 @@ const steps = [
   ['Ground provider registry', 'scripts/test-ground-provider-registry.mjs'],
   ['Ground artifact integrity', 'scripts/test-ground-artifact.mjs'],
   ['Ground artifact builder', 'scripts/test-ground-artifact-builder.mjs'],
+  ['Ground datum normalizer', 'scripts/run-ground-datum-normalizer.mjs', ['self-test']],
   ['District compiler contract', 'scripts/test-district-compiler-contract.mjs'],
   ['Surface contract', 'scripts/test-surface-contract.mjs'],
   ['Overture continuous source', 'scripts/test-overture-tile-source.mjs'],
