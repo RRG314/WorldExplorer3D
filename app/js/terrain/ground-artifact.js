@@ -1,7 +1,7 @@
 import {
   GROUND_ARTIFACT_SCHEMA_VERSION,
   validateGroundArtifactManifest
-} from './ground-provider-registry.js?v=1';
+} from './ground-provider-registry.js?v=2';
 import {
   compileDistrictGroundModel
 } from '../world/compiler/district-ground-model.js?v=1';
