@@ -34,13 +34,15 @@ import {
   latLonToTileXY,
   pruneTerrainTileCache,
   sampleTileElevationMeters,
+  terrainSourceSampleAtLatLon,
+  terrainSourceSampleAtWorldXZ,
   terrainTileCacheSnapshot,
   terrainTileMeshKey,
   tileXYToLatLonBounds,
   waitForTerrainReadyBounds,
   waitForTerrainReadyAt,
   worldToLatLon
-} from "./terrain/tiles.js?v=28";
+} from "./terrain/tiles.js?v=29";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -381,6 +383,10 @@ Object.assign(appCtx, {
   refreshTerrainSurfaceProfiles,
   resetTerrainStreamingState,
   sampleTileElevationMeters,
+  terrainSourceSampleAtLatLon: (lat, lon) =>
+    terrainSourceSampleAtLatLon(lat, lon, terrainTileDeps),
+  terrainSourceSampleAtWorldXZ: (x, z) =>
+    terrainSourceSampleAtWorldXZ(x, z, terrainTileDeps),
   terrainTileCacheSnapshot,
   setWorldSurfaceProfile,
   subdivideRoadPoints,
@@ -424,6 +430,8 @@ export {
   refreshTerrainSurfaceProfiles,
   resetTerrainStreamingState,
   sampleTileElevationMeters,
+  terrainSourceSampleAtLatLon,
+  terrainSourceSampleAtWorldXZ,
   terrainTileCacheSnapshot,
   setWorldSurfaceProfile,
   subdivideRoadPoints,

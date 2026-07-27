@@ -24,6 +24,53 @@ function featureBudgetWarning(selection) {
     `pois ${selected.pois}/${requested.pois || 0}).`;
 }
 
+export function diagnoseDistrictGroundSource(sample = null) {
+  const base = {
+    schemaVersion: DISTRICT_GROUND_MODEL_SCHEMA_VERSION,
+    status: 'blocked'
+  };
+  if (!sample) {
+    return Object.freeze({
+      ...base,
+      reason: 'approved-ground-provider-adapter-required'
+    });
+  }
+  const sampleStatus = String(sample.status || 'failed');
+  const sourceClassification = String(
+    sample.provenance?.runtimeClassification || 'rejected'
+  );
+  if (sampleStatus !== 'available') {
+    return Object.freeze({
+      ...base,
+      reason: `terrain-source-${sampleStatus}`,
+      sourceClassification,
+      sampleStatus
+    });
+  }
+  if (sourceClassification !== 'accepted-ground') {
+    return Object.freeze({
+      ...base,
+      reason: 'terrain-source-not-accepted-ground',
+      sourceClassification,
+      sampleStatus,
+      confidence: Number.isFinite(sample.confidence)
+        ? Number(sample.confidence)
+        : null,
+      verticalDatum: String(sample.provenance?.verticalDatum || 'unknown')
+    });
+  }
+  return Object.freeze({
+    ...base,
+    reason: 'full-district-grid-coverage-required',
+    sourceClassification,
+    sampleStatus,
+    confidence: Number.isFinite(sample.confidence)
+      ? Number(sample.confidence)
+      : null,
+    verticalDatum: String(sample.provenance?.verticalDatum || 'unknown')
+  });
+}
+
 export function adaptSelectedLocationSource(options = {}) {
   const location = options.location || {};
   const selection = options.selection || {};
@@ -97,11 +144,8 @@ export function adaptSelectedLocationSource(options = {}) {
         wayCount: districtSource.reconciliation.wayCount,
         provider: districtSource.provider.name
       }),
-      districtGroundModel: Object.freeze({
-        schemaVersion: DISTRICT_GROUND_MODEL_SCHEMA_VERSION,
-        status: 'blocked',
-        reason: 'approved-ground-provider-adapter-required'
-      })
+      districtGroundModel:
+        diagnoseDistrictGroundSource(options.terrainSourceSample)
     })
   });
 }

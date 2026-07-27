@@ -8,7 +8,8 @@ import {
   sampleDistrictGroundMeters
 } from '../app/js/world/compiler/district-ground-model.js';
 import {
-  adaptSelectedLocationSource
+  adaptSelectedLocationSource,
+  diagnoseDistrictGroundSource
 } from '../app/js/world/compiler/selected-location-source-adapter.js';
 
 const nodes = {
@@ -97,6 +98,39 @@ const adapted = adaptSelectedLocationSource({
 assert.equal(adapted.selection.roadWays[0].sourceId, 'osm:way:20');
 assert.equal(adapted.diagnostics.districtSource.wayCount, 2);
 assert.equal(adapted.diagnostics.districtGroundModel.status, 'blocked');
+assert.equal(
+  diagnoseDistrictGroundSource({
+    status: 'pending',
+    confidence: 0,
+    provenance: {
+      runtimeClassification: 'legacy-ground-fallback-only',
+      verticalDatum: 'mixed'
+    }
+  }).reason,
+  'terrain-source-pending'
+);
+assert.equal(
+  diagnoseDistrictGroundSource({
+    status: 'available',
+    confidence: 0.35,
+    provenance: {
+      runtimeClassification: 'legacy-ground-fallback-only',
+      verticalDatum: 'mixed-source'
+    }
+  }).reason,
+  'terrain-source-not-accepted-ground'
+);
+assert.equal(
+  diagnoseDistrictGroundSource({
+    status: 'available',
+    confidence: 0.98,
+    provenance: {
+      runtimeClassification: 'accepted-ground',
+      verticalDatum: 'NAVD88'
+    }
+  }).reason,
+  'full-district-grid-coverage-required'
+);
 
 const grid = {
   spacingMeters: 30,

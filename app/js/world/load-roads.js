@@ -4,7 +4,10 @@ import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
 import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=6";
 import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=9";
-import { prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=1";
+import {
+  diagnoseDistrictGroundSource,
+  prepareSelectedLocationSource
+} from "./compiler/selected-location-source-adapter.js?v=2";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   const waitForCoverage = appCtx.waitForTerrainCoverageAt;
@@ -404,6 +407,14 @@ export function createWorldRoadLoader(deps = {}) {
         loadMetrics.districtSource = normalized.diagnostics.districtSource;
         if (normalized.budgetWarning) console.warn(normalized.budgetWarning);
         terrainCoverageReady = await waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase);
+        if (runtimeState) {
+          const centerTerrainSource = appCtx.terrainSourceSampleAtLatLon?.(
+            appCtx.LOC.lat,
+            appCtx.LOC.lon
+          ) || null;
+          runtimeState.districtGroundModel =
+            diagnoseDistrictGroundSource(centerTerrainSource);
+        }
         buildRoadGeometryPass({
           appendIndexedGeometry,
           classifyStructureSemantics,
