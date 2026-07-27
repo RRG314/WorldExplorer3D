@@ -412,6 +412,8 @@ function getWorldExplorerRuntimeDiagnostics() {
       initialWorldRetired: !!appCtx.initialEarthWorldRetired
     },
     terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
+    groundProviderCatalog:
+      appCtx.getGroundProviderCatalogSnapshot?.() || null,
     worldCounts: {
       buildings: appCtx.buildings?.length ?? null,
       buildingMeshes: appCtx.buildingMeshes?.length ?? null,
