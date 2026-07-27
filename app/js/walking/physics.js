@@ -46,7 +46,7 @@ function createWalkingPhysicsHelpers({
   function queryBuildings(x, z, radius = 100) {
     if (typeof getNearbyBuildings === "function") {
       const nearby = getNearbyBuildings(x, z, radius);
-      if (nearby && nearby.length > 0) return nearby;
+      if (Array.isArray(nearby)) return nearby;
     }
     if (!getBuildingsArray) return null;
     return getBuildingsArray();
@@ -196,16 +196,13 @@ function createWalkingPhysicsHelpers({
     const gravity = appCtx.onMoon ? -1.62 : appCtx.onMars ? -3.71 : -9.80665;
     const jumpVelocity = appCtx.onMoon ? 3.0 : appCtx.onMars ? 4.0 : 5.0;
 
-    const initialGroundState = resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y, finiteOr);
-    let groundY = initialGroundState.groundY;
-
-    if (state.walker.y === undefined || state.walker.y === 0) {
-      state.walker.y = groundY + 1.7;
-    }
-
     const groundState = resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y, finiteOr);
-    groundY = groundState.groundY;
+    let groundY = groundState.groundY;
+    if (state.walker.y === undefined || state.walker.y === 0) {
+      state.walker.y = groundY + CFG.eyeHeight;
+    }
     let effectiveGroundY = groundState.effectiveGroundY;
+    let finalGroundState = groundState;
     state.walker.onBuilding = groundState.onBuilding;
     state.walker.onGround = Math.abs(state.walker.y - (effectiveGroundY + CFG.eyeHeight)) < 0.3;
 
@@ -317,6 +314,7 @@ function createWalkingPhysicsHelpers({
       state.walker.z = newZ;
 
       const postGroundState = resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y, finiteOr);
+      finalGroundState = postGroundState;
       const targetEyeY = postGroundState.effectiveGroundY + CFG.eyeHeight;
       const snapDownDistance = Math.max(0.3, adjustedSpeed * dt * 0.95 + 0.22);
       const snapUpDistance = CFG.blockStepHeight + 0.12;
@@ -344,10 +342,9 @@ function createWalkingPhysicsHelpers({
     state.walker.vz = (state.walker.z - startZ) / elapsed;
 
     if (state.characterMesh && state.characterMesh.visible) {
-      const meshGroundState = resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y, finiteOr);
       const meshFeetY = state.walker.onGround
-        ? meshGroundState.effectiveGroundY + 0.04
-        : Math.max(state.walker.y - CFG.eyeHeight, meshGroundState.effectiveGroundY + 0.02);
+        ? finalGroundState.effectiveGroundY + 0.04
+        : Math.max(state.walker.y - CFG.eyeHeight, finalGroundState.effectiveGroundY + 0.02);
       state.characterMesh.position.set(state.walker.x, meshFeetY, state.walker.z);
       state.characterMesh.rotation.y = state.walker.angle;
       animateCharacterWalk(state.characterMesh, state.walker.speedMph > 0, dt);

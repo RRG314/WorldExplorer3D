@@ -244,6 +244,7 @@ function projectPointToSegment(x, z, p1, p2) {
 
 export function findNearestTraversalFeature(x, z, options = {}) {
   const mode = options.mode === 'drive' ? 'drive' : 'walk';
+  const excludeRoads = options.excludeRoads === true;
   const graph = traversalGraphForMode(mode);
   const segments = Array.isArray(graph?.segments) ? graph.segments : [];
   const maxDistance = Number.isFinite(options.maxDistance) ?
@@ -253,6 +254,7 @@ export function findNearestTraversalFeature(x, z, options = {}) {
   let best = null;
   for (let i = 0; i < segments.length; i++) {
     const segment = segments[i];
+    if (excludeRoads && traversalFeatureKind(segment.feature) === 'road') continue;
     const projected = projectPointToSegment(x, z, segment.p1, segment.p2);
     if (!Number.isFinite(projected.dist) || projected.dist > maxDistance) continue;
     const weighted = projected.dist * (mode === 'drive' ? 1 : Math.max(0.85, segment.penalty));

@@ -25,7 +25,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       owner: 'engine',
       phase: 'input',
       enabled: () => !!appCtx.gameStarted,
-      update() {
+      fixedUpdate() {
         appCtx.updateControlInput?.();
       }
     },
@@ -34,8 +34,8 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       owner: 'engine',
       phase: 'simulation',
       enabled: () => !!appCtx.gameStarted,
-      update(frame) {
-        appCtx.update(frame.dt);
+      fixedUpdate(frame) {
+        appCtx.update(frame.fixedDelta);
       }
     },
     {

@@ -123,7 +123,7 @@ import {
   pointInPolygon,
   runtimeRoadFeatures,
   teleportToLocation
-} from "./world/navigation.js?v=2";
+} from "./world/navigation.js?v=3";
 import {
   buildTraversalNetworks,
   findNearestTraversalFeature,
@@ -134,7 +134,7 @@ import {
   pickNavigationTargetPoint,
   surfaceDisplayName,
   traversableFeaturesForMode
-} from "./world/traversal.js?v=1";
+} from "./world/traversal.js?v=2";
 import {
   initWorldVegetation,
   MAX_TREE_NODES,

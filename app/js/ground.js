@@ -143,14 +143,14 @@ const GroundHeight = {
   },
 
   // Exact road mesh sample from rendered road geometry. Falls back to null if unavailable.
-  roadMeshY(x, z, currentY = NaN) {
+  roadMeshY(x, z, currentY = NaN, nearestRoadHint = null) {
     const roadSurfaceMeshes = this._getRoadSurfaceMeshes();
     const currentRoad = appCtx.car?.road || null;
-    const nearestRoad = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z, {
+    const nearestRoad = nearestRoadHint || (typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z, {
       y: Number.isFinite(currentY) ? currentY : NaN,
       maxVerticalDelta: 16,
       preferredRoad: currentRoad
-    }) : null;
+    }) : null);
     const roadReachable = isRoadSurfaceReachable(nearestRoad, {
       currentRoad,
       extraVerticalAllowance: 0.5
@@ -255,7 +255,8 @@ const GroundHeight = {
 
     const nearest = appCtx.findNearestTraversalFeature(x, z, {
       mode: 'walk',
-      maxDistance: 16
+      maxDistance: 16,
+      excludeRoads: true
     });
     const feature = nearest?.feature || null;
     const kind = String(feature?.kind || feature?.networkKind || '').toLowerCase();
@@ -347,7 +348,7 @@ const GroundHeight = {
     if (roadOnSurface) {
       const sampleX = Number.isFinite(nr?.pt?.x) ? nr.pt.x : x;
       const sampleZ = Number.isFinite(nr?.pt?.z) ? nr.pt.z : z;
-      const meshY = this.roadMeshY(sampleX, sampleZ, currentY);
+      const meshY = this.roadMeshY(sampleX, sampleZ, currentY, nr);
       const roadY =
         this._shouldUseRoadMeshHeight(nr?.road, meshY, nr?.y) ?
           this._resolveRoadSurfaceY(nr?.road, meshY, nr?.y) :
@@ -391,7 +392,7 @@ const GroundHeight = {
       })) {
         const sampleX = Number.isFinite(nearestRoad?.pt?.x) ? nearestRoad.pt.x : x;
         const sampleZ = Number.isFinite(nearestRoad?.pt?.z) ? nearestRoad.pt.z : z;
-        const meshY = this.roadMeshY(sampleX, sampleZ, currentY);
+        const meshY = this.roadMeshY(sampleX, sampleZ, currentY, nearestRoad);
         if (this._shouldUseRoadMeshHeight(nearestRoad?.road, meshY, nearestRoad?.y)) {
           return {
             y: this._resolveRoadSurfaceY(nearestRoad?.road, meshY, nearestRoad?.y),

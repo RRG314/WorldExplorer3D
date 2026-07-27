@@ -781,6 +781,40 @@ async function main() {
         ctx?.getAcceptedGroundRuntimeSnapshot?.() || null;
       const inactiveAcceptedGroundSample =
         ctx?.sampleAcceptedGroundAtWorldXZ?.(0, 0) || null;
+      const roadParityCandidates = Array.isArray(ctx?.roads)
+        ? ctx.roads.filter((road) => Array.isArray(road?.pts) && road.pts.length >= 2)
+        : [];
+      const roadParityIndexes = roadParityCandidates.length > 0
+        ? [0, 0.25, 0.5, 0.75].map((ratio) =>
+            Math.min(
+              roadParityCandidates.length - 1,
+              Math.floor((roadParityCandidates.length - 1) * ratio)
+            ))
+        : [];
+      const roadIndexParitySamples = roadParityIndexes.map((index) => {
+        const road = roadParityCandidates[index];
+        const p1 = road.pts[0];
+        const p2 = road.pts[1];
+        const x = (p1.x + p2.x) * 0.5 + 1.25;
+        const z = (p1.z + p2.z) * 0.5 - 0.85;
+        const indexed = ctx.findNearestRoad?.(x, z);
+        const indexedSnapshot = {
+          road: indexed?.road || null,
+          dist: Number(indexed?.dist),
+          y: Number(indexed?.y)
+        };
+        const fullScan = ctx.findNearestRoad?.(x, z, {
+          forceFullScan: true
+        });
+        return {
+          sameRoad: indexedSnapshot.road === (fullScan?.road || null),
+          distanceDelta: Math.abs(indexedSnapshot.dist - Number(fullScan?.dist)),
+          heightDelta:
+            Number.isFinite(indexedSnapshot.y) && Number.isFinite(fullScan?.y)
+              ? Math.abs(indexedSnapshot.y - Number(fullScan.y))
+              : 0
+        };
+      });
 
       return {
         walkGraphNodeCount: Number(walkGraph?.nodeCount || walkGraph?.nodes?.length || 0),
@@ -813,6 +847,18 @@ async function main() {
             typeof ctx?.verifyAcceptedGroundCoverage === 'function',
           snapshot: acceptedGroundSnapshot,
           inactiveSample: inactiveAcceptedGroundSample
+        },
+        roadIndexParity: {
+          sampleCount: roadIndexParitySamples.length,
+          allSameRoad: roadIndexParitySamples.every((sample) => sample.sameRoad),
+          maxDistanceDelta: Math.max(
+            0,
+            ...roadIndexParitySamples.map((sample) => sample.distanceDelta)
+          ),
+          maxHeightDelta: Math.max(
+            0,
+            ...roadIndexParitySamples.map((sample) => sample.heightDelta)
+          )
         },
         landingCopyClear:
           /optional/i.test(landingHtml) &&
@@ -890,6 +936,11 @@ async function main() {
           'no-ground-artifacts-configured' &&
         report.acceptedGroundRuntimeBoundary?.inactiveSample?.status ===
           'unavailable',
+      roadSpatialIndexExact:
+        report.roadIndexParity?.sampleCount >= 4 &&
+        report.roadIndexParity?.allSameRoad === true &&
+        report.roadIndexParity?.maxDistanceDelta <= 1e-9 &&
+        report.roadIndexParity?.maxHeightDelta <= 1e-9,
       bridgeSpansTerrainDepressions:
         report.syntheticBridgeHeights?.length === 3 &&
         Math.min(...report.syntheticBridgeHeights) > 15 &&
@@ -1015,6 +1066,7 @@ async function main() {
     assert(checks.vegetationIntegrated, `Vegetation layer did not initialize correctly: ${JSON.stringify({ vegetationFeatures: report.vegetationFeatures, vegetationMeshes: report.vegetationMeshes })}`);
     assert(checks.structureSemanticsStable, `Synthetic structure semantics classification regressed: ${JSON.stringify(report.syntheticStructureSemantics || null)}`);
     assert(checks.acceptedGroundRuntimeReady, `Accepted-ground runtime boundary is unavailable or unexpectedly active: ${JSON.stringify(report.acceptedGroundRuntimeBoundary || null)}`);
+    assert(checks.roadSpatialIndexExact, `Indexed nearest-road results differ from the full scan: ${JSON.stringify(report.roadIndexParity || null)}`);
     assert(checks.bridgeSpansTerrainDepressions, `Bridge profile followed underlying terrain: ${JSON.stringify(report.syntheticBridgeHeights || null)}`);
     assert(checks.roadSurfacesDraped, `Road surface skirt policy regressed: ${JSON.stringify(report.roadSurfaceContract || null)}`);
     assert(checks.lazyInteriorIdle, `Interior system is not staying lazy by default: ${JSON.stringify({ buildingEntrySupportExposed: report.buildingEntrySupportExposed, activeInteriorByDefault: report.activeInteriorByDefault, dynamicInteriorCollidersIdle: report.dynamicInteriorCollidersIdle, interiorActionExposed: report.interiorActionExposed, interiorPromptPresent: report.interiorPromptPresent })}`);

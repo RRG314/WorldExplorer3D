@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { RUNTIME_PHASES, createRuntimeKernel } from '../app/js/runtime/kernel.js';
+import { createCoreFrameSystems } from '../app/js/runtime/core-frame-systems.js';
 
 const calls = [];
 let requestedFrame = null;
@@ -77,9 +78,38 @@ assert.equal(kernel.unregisterSystem('test.disabled'), false);
 assert.equal(kernel.dispose('test-dispose'), true);
 assert.equal(kernel.dispose('test-dispose'), false);
 
+const fixedCalls = [];
+const fixedAppCtx = {
+  gameStarted: true,
+  updateControlInput: () => fixedCalls.push('input'),
+  update: (dt) => fixedCalls.push(`simulation:${dt}`)
+};
+const fixedKernel = createRuntimeKernel({
+  fixedDelta: 0.01,
+  maxDelta: 0.1,
+  maxFixedSteps: 2
+});
+createCoreFrameSystems(fixedAppCtx)
+  .filter((system) => system.id === 'core.input' || system.id === 'core.simulation')
+  .forEach((system) => fixedKernel.registerSystem(system));
+fixedKernel.runFrame(0);
+fixedKernel.runFrame(100);
+assert.deepEqual(fixedCalls, [
+  'input',
+  'simulation:0.01',
+  'input',
+  'simulation:0.01'
+]);
+const fixedSnapshot = fixedKernel.snapshot();
+assert.equal(fixedSnapshot.phases.input[0].updates, 0);
+assert.equal(fixedSnapshot.phases.input[0].fixedUpdates, 2);
+assert.equal(fixedSnapshot.phases.simulation[0].updates, 0);
+assert.equal(fixedSnapshot.phases.simulation[0].fixedUpdates, 2);
+
 console.log(JSON.stringify({
   ok: true,
   phases: RUNTIME_PHASES,
   frameNumber: snapshot.frameNumber,
-  systems: Object.values(snapshot.phases).flat().map((system) => system.id)
+  systems: Object.values(snapshot.phases).flat().map((system) => system.id),
+  fixedSimulationCatchUpLimit: fixedSnapshot.phases.simulation[0].fixedUpdates
 }, null, 2));
