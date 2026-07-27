@@ -2,20 +2,20 @@ export const GROUND_ARTIFACT_SCHEMA_VERSION = 1;
 export const GROUND_TARGET_VERTICAL_DATUM = 'EGM2008';
 
 const PROVIDERS = Object.freeze({
-  'usgs-3dep-10m': Object.freeze({
-    id: 'usgs-3dep-10m',
-    label: 'USGS 3DEP 1/3 arc-second DEM',
+  'usgs-3dep-best-available': Object.freeze({
+    id: 'usgs-3dep-best-available',
+    label: 'USGS 3DEP bare-earth DEM (best available)',
     sourceKind: 'bare-earth-dem',
     sourceClassification: 'accepted-ground',
     nativeVerticalDatum:
       'regional; typically NAVD88 in the conterminous United States',
-    nominalResolutionMeters: 10,
+    nominalResolutionMeters: null,
     coverage: 'United States; artifact coverage manifest required',
     licenseStatus: 'usable-public-government-data',
     runtimeDelivery: 'precompiled-artifact-only',
     priority: 100,
     sourceDocument:
-      'https://data.usgs.gov/datacatalog/data/USGS%3A3a81321b-c153-416f-98b7-cc8e5f0e17c3',
+      'https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer',
     datumDocument:
       'https://www.usgs.gov/faqs/what-projection-horizontal-datum-vertical-datum-and-resolution-a-usgs-digital-elevation-model'
   }),

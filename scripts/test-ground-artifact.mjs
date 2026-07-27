@@ -9,7 +9,7 @@ const artifact = {
   schemaVersion: 1,
   artifactId: 'fixture-ground-baltimore',
   districtId: 'fixture-baltimore',
-  providerId: 'usgs-3dep-10m',
+  providerId: 'usgs-3dep-best-available',
   sourceRelease: 'fixture-2026',
   verticalDatum: 'EGM2008',
   coverage: { south: 39.2, north: 39.4, west: -76.8, east: -76.4 },

@@ -9,6 +9,7 @@ const steps = [
   ['Terrain source contract', 'scripts/test-terrain-source-contract.mjs'],
   ['Ground provider registry', 'scripts/test-ground-provider-registry.mjs'],
   ['Ground artifact integrity', 'scripts/test-ground-artifact.mjs'],
+  ['Ground artifact builder', 'scripts/test-ground-artifact-builder.mjs'],
   ['District compiler contract', 'scripts/test-district-compiler-contract.mjs'],
   ['Surface contract', 'scripts/test-surface-contract.mjs'],
   ['Overture continuous source', 'scripts/test-overture-tile-source.mjs'],

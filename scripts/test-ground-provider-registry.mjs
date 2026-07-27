@@ -16,7 +16,7 @@ function manifest(overrides = {}) {
   return {
     schemaVersion: GROUND_ARTIFACT_SCHEMA_VERSION,
     artifactId: 'fixture-ground',
-    providerId: 'usgs-3dep-10m',
+    providerId: 'usgs-3dep-best-available',
     sourceRelease: 'fixture-2026',
     contentSha256: SHA_A,
     spacingMeters: 10,
@@ -35,7 +35,7 @@ function manifest(overrides = {}) {
 
 assert.equal(groundProviderCatalog().length, 6);
 assert.equal(
-  groundProvider('usgs-3dep-10m').sourceClassification,
+  groundProvider('usgs-3dep-best-available').sourceClassification,
   'accepted-ground'
 );
 assert.equal(
@@ -65,7 +65,7 @@ const acceptedUs = selectGroundArtifact({
   manifests: [manifest()]
 });
 assert.equal(acceptedUs.status, 'accepted');
-assert.equal(acceptedUs.provider.id, 'usgs-3dep-10m');
+assert.equal(acceptedUs.provider.id, 'usgs-3dep-best-available');
 assert.equal(acceptedUs.manifest.verticalDatum, 'EGM2008');
 
 const outsideUs = selectGroundArtifact({
@@ -147,7 +147,7 @@ const higherPriorityWins = selectGroundArtifact({
     manifest()
   ]
 });
-assert.equal(higherPriorityWins.provider.id, 'usgs-3dep-10m');
+assert.equal(higherPriorityWins.provider.id, 'usgs-3dep-best-available');
 
 const antimeridianArtifact = manifest({
   artifactId: 'antimeridian',
