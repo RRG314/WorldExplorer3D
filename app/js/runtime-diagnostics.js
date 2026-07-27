@@ -57,6 +57,23 @@ function surfaceSampleSnapshot(sample) {
   };
 }
 
+function terrainSourceSampleSnapshot(sample) {
+  if (!sample) return null;
+  return {
+    type: String(sample.type || ''),
+    schemaVersion: numberOrNull(sample.schemaVersion),
+    status: String(sample.status || ''),
+    available: sample.available === true,
+    reason: sample.reason == null ? null : String(sample.reason),
+    elevationMeters: numberOrNull(sample.elevationMeters),
+    confidence: numberOrNull(sample.confidence),
+    deliveryResolutionMeters:
+      numberOrNull(sample.deliveryResolutionMeters),
+    tile: sample.tile || null,
+    provenance: sample.provenance || null
+  };
+}
+
 function buildingSnapshot(building) {
   if (!building) return null;
   return {
@@ -174,6 +191,9 @@ function surfaceChainSnapshot(actor = appCtx.activeTransportActor?.() || null) {
   const sourceElevationMeters = Number.isFinite(lat) && Number.isFinite(lon)
     ? safeCall(() => appCtx.elevationMetersAtLatLon?.(lat, lon), null)
     : null;
+  const terrainSourceSample = Number.isFinite(lat) && Number.isFinite(lon)
+    ? safeCall(() => appCtx.terrainSourceSampleAtLatLon?.(lat, lon), null)
+    : null;
   const sourceWorldY = safeCall(() => appCtx.elevationWorldYAtWorldXZ?.(x, z), null);
   const renderedTerrainY = safeCall(() => appCtx.terrainMeshHeightAt?.(x, z), null);
   const terrain = safeCall(() => appCtx.SurfaceQuery?.terrainAt?.(x, z), null);
@@ -209,6 +229,8 @@ function surfaceChainSnapshot(actor = appCtx.activeTransportActor?.() || null) {
       contactKind: String(actor.contact?.kind || "")
     },
     sourceElevationMeters: numberOrNull(sourceElevationMeters),
+    terrainSourceSample:
+      terrainSourceSampleSnapshot(terrainSourceSample),
     sourceWorldY: numberOrNull(sourceWorldY),
     renderedTerrainY: numberOrNull(renderedTerrainY),
     surfaces: {

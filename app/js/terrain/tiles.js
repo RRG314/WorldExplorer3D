@@ -5,6 +5,9 @@ import {
   xyzTileBounds
 } from "./source-contract.js?v=1";
 import {
+  adaptTerrariumTileSample
+} from "./provider-adapter.js?v=1";
+import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
@@ -393,6 +396,35 @@ export function elevationMetersAtLatLon(lat, lon, deps = {}) {
   const u = t.xf - t.x;
   const v = t.yf - t.y;
   return sampleTileElevationMeters(tile, u, v, deps.clampElevationMeters);
+}
+
+export function terrainSourceSampleAtLatLon(lat, lon, deps = {}) {
+  const preflight = adaptTerrariumTileSample({
+    latitude: lat,
+    longitude: lon,
+    zoom: appCtx.TERRAIN_ZOOM,
+    tile: null
+  });
+  if (preflight.status === "outside-coverage") return preflight;
+  const tilePoint = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
+  const tile = getOrLoadTerrainTile(
+    appCtx.TERRAIN_ZOOM,
+    tilePoint.x,
+    tilePoint.y,
+    deps
+  );
+  return adaptTerrariumTileSample({
+    latitude: lat,
+    longitude: lon,
+    zoom: appCtx.TERRAIN_ZOOM,
+    tile,
+    clampElevationMeters: deps.clampElevationMeters
+  });
+}
+
+export function terrainSourceSampleAtWorldXZ(x, z, deps = {}) {
+  const { lat, lon } = worldToLatLon(x, z);
+  return terrainSourceSampleAtLatLon(lat, lon, deps);
 }
 
 export function elevationWorldYAtWorldXZ(x, z, deps = {}) {

@@ -12,6 +12,12 @@ import {
   webMercatorGroundResolutionMeters,
   xyzTileBounds
 } from '../app/js/terrain/source-contract.js';
+import {
+  TERRAIN_SAMPLE_SCHEMA_VERSION,
+  TERRAIN_SAMPLE_STATUSES,
+  adaptTerrariumTileSample,
+  bilinearElevationMeters
+} from '../app/js/terrain/provider-adapter.js';
 
 function assertNear(actual, expected, tolerance, label) {
   assert.ok(
@@ -168,6 +174,110 @@ assert.equal(TERRARIUM_SOURCE_FACTS.runtimeClassification, 'legacy-ground-fallba
 assert.match(TERRARIUM_SOURCE_FACTS.deliveryGrid, /not the native source resolution/);
 assert.match(TERRARIUM_SOURCE_FACTS.failurePolicy, /must not be converted to zero/);
 
+assert.deepEqual(TERRAIN_SAMPLE_STATUSES, [
+  'available',
+  'pending',
+  'failed',
+  'outside-coverage'
+]);
+assert.equal(
+  bilinearElevationMeters(
+    new Float32Array([10, 20, 30, 40]),
+    2,
+    2,
+    0.5,
+    0.5
+  ),
+  25
+);
+assert.equal(
+  bilinearElevationMeters(
+    new Float32Array([10, Number.NaN, 30, 40]),
+    2,
+    2,
+    0.5,
+    0.5
+  ),
+  null
+);
+
+const outsideCoverageSample = adaptTerrariumTileSample({
+  latitude: 86,
+  longitude: 0,
+  zoom: 15,
+  tile: null
+});
+assert.equal(outsideCoverageSample.status, 'outside-coverage');
+assert.equal(outsideCoverageSample.available, false);
+assert.equal(outsideCoverageSample.elevationMeters, null);
+assert.equal(outsideCoverageSample.tile, null);
+
+const pendingSample = adaptTerrariumTileSample({
+  latitude: 39.2904,
+  longitude: -76.6122,
+  zoom: 15,
+  tile: { loading: true, loaded: false, failed: false, attempts: 1 }
+});
+assert.equal(pendingSample.status, 'pending');
+assert.equal(pendingSample.available, false);
+assert.equal(pendingSample.elevationMeters, null);
+assert.equal(pendingSample.reason, 'tile-loading');
+assert.match(pendingSample.tile.key, /^15\/\d+\/\d+$/);
+
+const failedSample = adaptTerrariumTileSample({
+  latitude: 39.2904,
+  longitude: -76.6122,
+  zoom: 15,
+  tile: {
+    loading: false,
+    loaded: false,
+    failed: true,
+    attempts: 3,
+    lastError: 'fixture request failed'
+  }
+});
+assert.equal(failedSample.status, 'failed');
+assert.equal(failedSample.elevationMeters, null);
+assert.equal(failedSample.reason, 'fixture request failed');
+assert.equal(failedSample.attempts, 3);
+
+const availableSample = adaptTerrariumTileSample({
+  latitude: 0,
+  longitude: 0,
+  zoom: 1,
+  tile: {
+    loaded: true,
+    failed: false,
+    attempts: 1,
+    w: 2,
+    h: 2,
+    elev: new Float32Array([12.5, 20, 30, 40])
+  }
+});
+assert.equal(availableSample.schemaVersion, TERRAIN_SAMPLE_SCHEMA_VERSION);
+assert.equal(availableSample.status, 'available');
+assert.equal(availableSample.available, true);
+assert.equal(availableSample.elevationMeters, 12.5);
+assert.equal(availableSample.confidence, 0.35);
+assert.equal(
+  availableSample.provenance.runtimeClassification,
+  'legacy-ground-fallback-only'
+);
+assert.match(
+  availableSample.effectiveSourceResolution,
+  /30 m SRTM/
+);
+assert.ok(availableSample.deliveryResolutionMeters > 0);
+assert.throws(
+  () => adaptTerrariumTileSample({
+    latitude: Number.NaN,
+    longitude: 0,
+    zoom: 15,
+    tile: null
+  }),
+  /latitude must be a finite number/
+);
+
 console.log(JSON.stringify({
   ok: true,
   contract: 'terrain-source',
@@ -181,5 +291,6 @@ console.log(JSON.stringify({
   },
   effectiveSourceResolution:
     TERRARIUM_SOURCE_FACTS.effectiveSourceResolution,
-  sourceClassification: TERRARIUM_SOURCE_FACTS.runtimeClassification
+  sourceClassification: TERRARIUM_SOURCE_FACTS.runtimeClassification,
+  sampleStatuses: TERRAIN_SAMPLE_STATUSES
 }, null, 2));
