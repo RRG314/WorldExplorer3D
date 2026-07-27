@@ -210,6 +210,62 @@ export function createWorldLoadRuntimeSession(options = {}) {
   };
 }
 
+const PUBLICATION_COLLECTIONS = Object.freeze([
+  'roads',
+  'roadMeshes',
+  'buildings',
+  'buildingMeshes',
+  'landuses',
+  'landuseMeshes',
+  'linearFeatures',
+  'linearFeatureMeshes',
+  'pois',
+  'poiMeshes',
+  'historicSites',
+  'historicMarkers',
+  'structureVisualMeshes',
+  'streetFurnitureMeshes',
+  'vegetationFeatures',
+  'vegetationMeshes',
+  'waterAreas',
+  'waterways'
+]);
+
+export function worldPublicationCounts(appCtx = {}) {
+  return Object.freeze(Object.fromEntries(
+    PUBLICATION_COLLECTIONS.map((name) => [
+      name,
+      Array.isArray(appCtx[name]) ? appCtx[name].length : 0
+    ])
+  ));
+}
+
+export function verifyWorldPublicationStable(appCtx = {}, publication = null) {
+  const expected = publication?.counts || null;
+  const actual = worldPublicationCounts(appCtx);
+  if (!expected) {
+    return Object.freeze({
+      stable: false,
+      reason: 'publication-snapshot-missing',
+      changes: Object.freeze([]),
+      actual
+    });
+  }
+  const changes = PUBLICATION_COLLECTIONS
+    .filter((name) => Number(expected[name]) !== Number(actual[name]))
+    .map((name) => Object.freeze({
+      collection: name,
+      expected: Number(expected[name]),
+      actual: Number(actual[name])
+    }));
+  return Object.freeze({
+    stable: changes.length === 0,
+    reason: changes.length === 0 ? null : 'published-world-mutated',
+    changes: Object.freeze(changes),
+    actual
+  });
+}
+
 export function finishWorldLoadRuntimeSession(session = {}) {
   const { appCtx, finalizePerfLoad, loadMetrics, phaseTotals, runtimeState, loaded = false } = session;
   if (!appCtx) return;
@@ -239,6 +295,16 @@ export function finishWorldLoadRuntimeSession(session = {}) {
   }
   loadMetrics.initialEarthDetailRadius = appCtx.initialEarthDetailRadius;
   appCtx.reconcileActorsAfterSurfaceRebuild?.();
+  const publication = Object.freeze({
+    sequence: Number(runtimeState?.sequence || appCtx._worldLoadSequence || 0),
+    location: Object.freeze({
+      lat: Number(appCtx.LOC?.lat),
+      lon: Number(appCtx.LOC?.lon)
+    }),
+    counts: worldPublicationCounts(appCtx),
+    publishedAt: performance.now()
+  });
+  appCtx.worldPublication = publication;
   appCtx.worldLoading = false;
   appCtx.hideLoad?.();
   if (runtimeState) {
@@ -247,6 +313,7 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     runtimeState.finishedAt = runtimeState.updatedAt;
     runtimeState.activePhases = [];
     runtimeState.geometryReady = !!loaded;
+    runtimeState.publication = publication;
   }
   finalizePerfLoad(loaded, {
     roadsFinal: appCtx.roads.length,

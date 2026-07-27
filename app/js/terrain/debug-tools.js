@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { detectRoadIntersections } from "./rebuild.js?v=9";
+import { detectRoadIntersections } from "./rebuild.js?v=10";
 
 let roadDebugMode = false;
 let roadDebugMeshes = [];

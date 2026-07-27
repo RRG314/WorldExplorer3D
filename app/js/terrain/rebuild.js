@@ -245,7 +245,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
   } = constants;
 
   if (!appCtx.terrainEnabled || appCtx.roads.length === 0 || appCtx.onMoon) return;
-  const baseRoads = appCtx.roads.filter((road) => !road?._streamChunkKey);
+  const baseRoads = appCtx.roads;
   if (baseRoads.length === 0) return;
 
   if (typeof disableRoadDebugMode === "function") {
@@ -267,15 +267,10 @@ export function rebuildRoadsWithTerrain(deps = {}) {
   if (typeof clearTerrainHeightCache === "function") clearTerrainHeightCache();
   terrain._lastRoadCount = baseRoads.length;
   if (typeof appCtx.refreshStructureAwareFeatureProfiles === "function") {
-    appCtx.refreshStructureAwareFeatureProfiles({ includeStreaming: false });
+    appCtx.refreshStructureAwareFeatureProfiles();
   }
 
-  const retainedRoadMeshes = [];
   appCtx.roadMeshes.forEach((mesh) => {
-    if (mesh?.userData?.earthStreamingChunk || mesh?.userData?.streamChunkKey) {
-      retainedRoadMeshes.push(mesh);
-      return;
-    }
     mesh.parent?.remove?.(mesh);
     if (mesh.geometry) mesh.geometry.dispose();
     if (mesh.material && !mesh.userData?.sharedRoadMaterial) {
@@ -288,21 +283,16 @@ export function rebuildRoadsWithTerrain(deps = {}) {
       }
     }
   });
-  appCtx.replaceWorldCollection('roadMeshes', retainedRoadMeshes);
+  appCtx.replaceWorldCollection('roadMeshes');
 
-  const retainedUrbanSurfaceMeshes = [];
   appCtx.urbanSurfaceMeshes.forEach((mesh) => {
-    if (mesh?.userData?.earthStreamingChunk || mesh?.userData?.streamChunkKey) {
-      retainedUrbanSurfaceMeshes.push(mesh);
-      return;
-    }
     mesh.parent?.remove?.(mesh);
     if (mesh.geometry) mesh.geometry.dispose();
     if (mesh.material && !mesh.userData?.sharedUrbanSurfaceMaterial && typeof mesh.material.dispose === "function") {
       mesh.material.dispose();
     }
   });
-  appCtx.replaceWorldCollection('urbanSurfaceMeshes', retainedUrbanSurfaceMeshes);
+  appCtx.replaceWorldCollection('urbanSurfaceMeshes');
   appCtx.urbanSurfaceStats = {
     sidewalkBatchCount: 0,
     sidewalkVertices: 0,

@@ -848,6 +848,10 @@ async function main() {
           snapshot: acceptedGroundSnapshot,
           inactiveSample: inactiveAcceptedGroundSample
         },
+        worldPublication:
+          typeof ctx?.verifyWorldPublicationStable === 'function'
+            ? ctx.verifyWorldPublicationStable()
+            : null,
         roadIndexParity: {
           sampleCount: roadIndexParitySamples.length,
           allSameRoad: roadIndexParitySamples.every((sample) => sample.sameRoad),
@@ -941,6 +945,9 @@ async function main() {
         report.roadIndexParity?.allSameRoad === true &&
         report.roadIndexParity?.maxDistanceDelta <= 1e-9 &&
         report.roadIndexParity?.maxHeightDelta <= 1e-9,
+      worldPublicationStable:
+        report.worldPublication?.stable === true &&
+        report.worldPublication?.changes?.length === 0,
       bridgeSpansTerrainDepressions:
         report.syntheticBridgeHeights?.length === 3 &&
         Math.min(...report.syntheticBridgeHeights) > 15 &&

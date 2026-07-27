@@ -12,7 +12,7 @@ import {
 } from "./terrain/context-utils.js?v=1";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=1";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=1";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=4";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=5";
 import {
   groundProviderCatalogSnapshot
 } from "./terrain/ground-provider-registry.js?v=2";
@@ -29,7 +29,7 @@ import {
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=26";
+} from "./terrain/surface-profiles.js?v=27";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -52,12 +52,12 @@ import {
   waitForTerrainReadyBounds,
   waitForTerrainReadyAt,
   worldToLatLon
-} from "./terrain/tiles.js?v=30";
+} from "./terrain/tiles.js?v=31";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
   rebuildRoadsWithTerrain
-} from "./terrain/rebuild.js?v=9";
+} from "./terrain/rebuild.js?v=10";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
@@ -223,7 +223,7 @@ const terrainRebuildDeps = {
 };
 
 function scheduleRoadAndBuildingRebuild() {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired) return;
+  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.worldLoading !== true) return;
   appCtx.roadsNeedRebuild = true;
   if (terrain._rebuildTimer) return;
 
@@ -235,7 +235,7 @@ function scheduleRoadAndBuildingRebuild() {
 
   terrain._rebuildTimer = setTimeout(() => {
     terrain._rebuildTimer = null;
-    if (!appCtx.roadsNeedRebuild || appCtx.onMoon || appCtx.initialEarthWorldRetired || !appCtx.terrainEnabled) return;
+    if (!appCtx.roadsNeedRebuild || appCtx.onMoon || !appCtx.terrainEnabled || appCtx.worldLoading !== true) return;
     if (terrain._rebuildInFlight) {
       scheduleRoadAndBuildingRebuild();
       return;
@@ -255,7 +255,7 @@ function scheduleRoadAndBuildingRebuild() {
 }
 
 function canRunRoadAndBuildingRebuildNow() {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired) return false;
+  if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   let tilesLoaded = 0;
   let tilesTotal = 0;
   appCtx.terrainTileCache.forEach((tile) => {
@@ -266,7 +266,7 @@ function canRunRoadAndBuildingRebuildNow() {
 }
 
 function requestWorldSurfaceSync(options = {}) {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.initialEarthWorldRetired) return false;
+  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.worldLoading !== true) return false;
   appCtx.roadsNeedRebuild = true;
 
   const force = options.force === true;

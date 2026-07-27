@@ -413,65 +413,13 @@ function applyLoadedWorldCoverBaseline(mesh) {
     mesh.userData.worldCoverSurfaceMode = semanticProfile.mode;
     applyTerrainVisualProfile(mesh, semanticProfile, null, { queueWorldCover: false });
   }
-  const continuousMode = appCtx.getContinuousWorldEnabled?.() === true;
-  if (result.texture && continuousMode) {
-    const detailMode =
-      result.dominantClass === 'built' ? 'urban' :
-      result.dominantClass === 'crop' ? 'soil' :
-      result.dominantClass === 'bare' ? (semanticProfile?.mode === 'sand' ? 'sand' : 'rock') :
-      result.dominantClass === 'snow' ? 'snow' :
-      result.dominantClass === 'tree' || result.dominantClass === 'mangrove' ? 'forest' :
-      'grass';
-    const detailTextures = ensureTerrainTextureSet(
-      mesh,
-      Number(mesh.userData.terrainTextureRepeats) || 12,
-      detailMode
-    );
-    material.map = result.texture;
-    material.normalMap = detailTextures?.normalMap || null;
-    material.roughnessMap = detailTextures?.roughnessMap || null;
-    if (material.normalMap) material.normalScale = new THREE.Vector2(0.28, 0.28);
-    material.color.setHex(0xffffff);
-    material.emissiveMap = null;
-    material.emissiveIntensity = 0;
-    material.roughness = 0.96;
-    material.metalness = 0;
-    material.needsUpdate = true;
-    mesh.userData.terrainDetailProvenance = {
-      kind: 'semantic-pbr',
-      source: 'surface-material-registry',
-      mode: detailMode
-    };
-  } else {
-    mesh.userData.terrainDetailProvenance = null;
-  }
-  if (!continuousMode && result.texture) {
+  mesh.userData.terrainDetailProvenance = null;
+  if (result.texture) {
     result.texture.dispose?.();
     result.texture = null;
   }
-  mesh.userData.worldCoverTexture = continuousMode ? result.texture || null : null;
-  if (!continuousMode) appCtx.scheduleWorldCoverVegetationRefresh?.();
+  mesh.userData.worldCoverTexture = null;
   return true;
-}
-
-function applyPendingSemanticSurface(material, mode) {
-  const color = mode === 'snow' ? SNOW_COLOR_HEX :
-    mode === 'snowRock' ? ALPINE_SNOW_COLOR_HEX :
-    mode === 'sand' ? SAND_COLOR_HEX :
-    mode === 'built' || mode === 'urban' ? URBAN_GROUND_HEX :
-    mode === 'soil' ? SOIL_COLOR_HEX :
-    mode === 'rock' ? ROCK_COLOR_HEX :
-    mode === 'forest' ? FOREST_COLOR_HEX :
-    TERRAIN_GRASS_COLOR_HEX;
-  material.map = null;
-  material.normalMap = null;
-  material.roughnessMap = null;
-  material.color.setHex(color);
-  material.emissiveMap = null;
-  material.emissiveIntensity = 0;
-  material.roughness = 0.96;
-  material.metalness = 0;
-  material.needsUpdate = true;
 }
 
 function queueWorldCoverBaseline(mesh, bounds) {
@@ -545,17 +493,6 @@ export function applyTerrainVisualProfile(mesh, profile, repeats = null, options
     repeats :
     Number(mesh.userData.terrainTextureRepeats) || 12;
   mesh.userData.terrainTextureRepeats = textureRepeats;
-
-  const pendingContinuousSemanticSurface =
-    appCtx.getContinuousWorldEnabled?.() === true &&
-    !mesh.userData.worldCoverResult;
-  if (pendingContinuousSemanticSurface) {
-    applyPendingSemanticSurface(mat, nextMode);
-    mesh.userData.terrainVisualProfile = nextProfile;
-    applyGroundFallbackProfile(nextProfile);
-    if (options.queueWorldCover !== false) queueWorldCoverBaseline(mesh, tileBounds);
-    return;
-  }
 
   if (nextMode === "snow" || nextMode === "snowRock") {
     const textures = ensureTerrainTextureSet(mesh, textureRepeats, nextMode);

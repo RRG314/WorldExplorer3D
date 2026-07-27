@@ -10,7 +10,7 @@ import {
   shouldRenderRoadSkirts,
   updateFeatureSurfaceProfile
 } from "../structure-semantics.js?v=18";
-import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=6";
+import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=7";
 
 const ROAD_SURFACE_BIAS = 0.08;
 

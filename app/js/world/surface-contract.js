@@ -1,7 +1,6 @@
 const SURFACE_SCHEMA_VERSION = 1;
 
 const SOURCE_PROFILE = Object.freeze({
-  CONTINUOUS_GLOBAL: 'continuous_global',
   LOCATION_OSM: 'location_osm'
 });
 
@@ -21,7 +20,6 @@ const VERTICAL_DATUM = Object.freeze({
 });
 
 const EARTH_TRAVERSAL_BOUNDS = Object.freeze({
-  [SOURCE_PROFILE.CONTINUOUS_GLOBAL]: Object.freeze({ horizontalRadius: null, originRebase: true }),
   [SOURCE_PROFILE.LOCATION_OSM]: Object.freeze({ horizontalRadius: 5000, originRebase: false })
 });
 
@@ -85,10 +83,8 @@ function clamp01(value) {
   return Math.max(0, Math.min(1, finiteOr(value, 0)));
 }
 
-function activeSourceProfile(appCtx) {
-  return appCtx.getContinuousWorldEnabled?.() === true
-    ? SOURCE_PROFILE.CONTINUOUS_GLOBAL
-    : SOURCE_PROFILE.LOCATION_OSM;
+function activeSourceProfile() {
+  return SOURCE_PROFILE.LOCATION_OSM;
 }
 
 function earthTraversalBounds(profile = SOURCE_PROFILE.LOCATION_OSM) {

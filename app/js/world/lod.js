@@ -128,7 +128,6 @@ export function updateWorldLod(force = false) {
     hideMeshList(appCtx.landuseMeshes);
     hideMeshList(appCtx.poiMeshes);
     hideMeshList(appCtx.streetFurnitureMeshes);
-    hideMeshList(appCtx.aerialContextMeshes);
     if (typeof appCtx.setPerfLiveStat === 'function') {
       appCtx.setPerfLiveStat('lodVisible', { near: 0, mid: 0 });
     }
@@ -169,21 +168,9 @@ export function updateWorldLod(force = false) {
     ? Number(appCtx.terrainMeshHeightAt?.(refX, refZ) ?? appCtx.elevationWorldYAtWorldXZ?.(refX, refZ) ?? 0)
     : 0;
   const aerialAltitude = aerialMode ? Math.max(0, Number(aerialActor?.y) - aerialGroundY) : 0;
-  const aerialHorizon = aerialMode ? Math.min(9000, 5000 + aerialAltitude * 5) : 0;
   const poiMidSq = lodThresholds.mid * lodThresholds.mid;
 
   for (let i = 0; i < appCtx.roadMeshes.length; i += 1) setEarthMeshVisible(appCtx.roadMeshes[i], true);
-  const protectedDetailRadius = Math.max(1700, Number(appCtx.initialEarthDetailRadius) || 0);
-  const aerialNear = Math.max(protectedDetailRadius + 180, 1200 + aerialAltitude * 1.4);
-  const aerialFar = Math.max(7200, aerialHorizon + 2800);
-  const aerialMeshes = Array.isArray(appCtx.aerialContextMeshes) ? appCtx.aerialContextMeshes : [];
-  for (let i = 0; i < aerialMeshes.length; i += 1) {
-    const mesh = aerialMeshes[i];
-    const center = getMeshLodCenter(mesh);
-    const distance = center ? Math.hypot(center.x - refX, center.z - refZ) : Infinity;
-    setEarthMeshVisible(mesh, aerialMode && distance >= aerialNear && distance <= aerialFar);
-  }
-
   let nearVisible = 0;
   let midVisible = 0;
 
@@ -228,9 +215,6 @@ export function updateWorldLod(force = false) {
     } else {
       const batchBoost = isBatch ? Math.min(1300, radius) : Math.min(800, radius);
       visibleDist = lodThresholds.farVisible + batchBoost;
-    }
-    if (aerialMode && mesh.userData?.earthStreamingChunk) {
-      visibleDist = Math.max(visibleDist, aerialHorizon + Math.min(700, radius * 0.35));
     }
     const dx = center.x - refX;
     const dz = center.z - refZ;

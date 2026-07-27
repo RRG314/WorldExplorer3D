@@ -1,6 +1,6 @@
 import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=1';
-import { surfaceComposition } from './surface-contract.js?v=6';
-import { normalizeWaterBody } from './water-body-contract.js?v=2';
+import { surfaceComposition } from './surface-contract.js?v=7';
+import { normalizeWaterBody } from './water-body-contract.js?v=3';
 
 const SOIL_LANDUSE_TYPES = new Set([
   'farmland', 'farmyard', 'orchard', 'vineyard', 'allotments',

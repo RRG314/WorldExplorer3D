@@ -11,7 +11,7 @@ const provenance = createRenderProvenance({
     z: 14,
     x: 4705,
     y: 6244,
-    profile: 'continuous_global',
+    profile: 'location_osm',
     sources: ['overture-base', 'overture-base']
   },
   tileRecord: { source: 'overture-pmtiles', release: '2026-06-17.0' },
@@ -22,7 +22,7 @@ const provenance = createRenderProvenance({
 
 assert.equal(provenance.version, RENDER_PROVENANCE_VERSION);
 assert.equal(provenance.tileKey, '14/4705/6244');
-assert.equal(provenance.profile, 'continuous_global');
+assert.equal(provenance.profile, 'location_osm');
 assert.deepEqual(provenance.sources, ['overture-base']);
 assert(Object.isFrozen(provenance));
 
@@ -33,7 +33,7 @@ assert.equal(mesh.userData.renderProvenance, provenance);
 const streamMesh = { userData: {} };
 attachStreamProvenance(
   streamMesh,
-  { surfaceTile: { z: 14, x: 4705, y: 6244, profile: 'continuous_global' } },
+  { surfaceTile: { z: 14, x: 4705, y: 6244, profile: 'location_osm' } },
   { source: 'overture-pmtiles', release: '2026-06-17.0', z: 14, x: 4705, y: 6244 },
   { layer: 'transportation.segment', role: 'road' }
 );

@@ -7,7 +7,7 @@ import { geometryHasFinitePositions } from "./geometry-batching.js?v=4";
 import {
   fetchShortbreadTile,
   vectorTileRangeForBounds
-} from "./shortbread-source.js?v=8";
+} from "./shortbread-source.js?v=9";
 
 const WATER_VECTOR_TILE_ZOOM = 13;
 const FEATURE_CLIP_RADIUS_SCALE = 1.75;
@@ -256,7 +256,7 @@ export function buildWaterGeometryGuards(baseGuards) {
   };
 }
 
-export { waterSurfaceBaseElevation } from './water-body-contract.js?v=2';
+export { waterSurfaceBaseElevation } from './water-body-contract.js?v=3';
 
 export function resolveWaterSurfaceVisualProfile(bounds = null) {
   const surfaceProfile = classifyWaterSurfaceProfile({

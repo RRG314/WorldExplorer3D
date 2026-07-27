@@ -182,12 +182,7 @@ export function buildWorldOverpassPlan({
   const buildingBounds = formatBounds(location, buildingRadius);
   const buildingMetadataBounds = formatBounds(location, buildingMetadataRadius);
   const poiBounds = formatBounds(location, poiRadius);
-  const linearFeatureRadius = Math.min(featureRadius, Math.max(roadsRadius * 0.6, 0.008));
-  const linearFeatureBounds = formatBounds(location, linearFeatureRadius);
-  const landmarkRadius = Math.min(featureRadius, Math.max(roadsRadius * 0.72, 0.014));
-  const landmarkBounds = formatBounds(location, landmarkRadius);
   const queryTimeoutSeconds = Math.max(8, Math.floor(overpassTimeoutMs / 1000));
-  const linearTimeoutSeconds = Math.max(8, Math.floor(Math.min(overpassTimeoutMs, 18000) / 1000));
 
   return {
     featureRadius,
@@ -200,7 +195,7 @@ export function buildWorldOverpassPlan({
       poiRadius,
       kind: 'core'
     },
-    deferredBuildingCacheMeta: {
+    buildingPublicationCacheMeta: {
       lat: location.lat,
       lon: location.lon,
       roadsRadius,
@@ -208,7 +203,7 @@ export function buildWorldOverpassPlan({
       poiRadius,
       kind: 'buildings'
     },
-    deferredBuildingMetadataCacheMeta: {
+    buildingMetadataCacheMeta: {
       lat: location.lat,
       lon: location.lon,
       roadsRadius,
@@ -216,39 +211,13 @@ export function buildWorldOverpassPlan({
       poiRadius,
       kind: 'building-metadata'
     },
-    deferredBuildingMetadataQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
+    buildingMetadataQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["building"]${buildingMetadataBounds};
             );out tags center qt;`,
-    deferredBuildingQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
+    buildingPublicationQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["building"]${buildingBounds};
                 way["building:part"]${buildingBounds};
             );out body;>;out skel qt;`,
-    deferredLandmarkCacheMeta: {
-      lat: location.lat,
-      lon: location.lon,
-      roadsRadius,
-      featureRadius: landmarkRadius,
-      poiRadius,
-      kind: 'landmarks'
-    },
-    deferredLandmarkQuery: `[out:json][timeout:${linearTimeoutSeconds}];(
-                way["tomb"="pyramid"]${landmarkBounds};
-                way["roof:shape"~"^(pyramidal|pyramid)$"]${landmarkBounds};
-                way["historic"="citywalls"]${landmarkBounds};
-                way["barrier"="city_wall"]${landmarkBounds};
-                way["barrier"="wall"]["historic"]${landmarkBounds};
-            );out body;>;out skel qt;`,
-    deferredLinearFeatureQuery: `[out:json][timeout:${linearTimeoutSeconds}];(
-                way["railway"~"^(rail|light_rail|tram|subway|narrow_gauge)$"]${linearFeatureBounds};
-                way["highway"~"^(cycleway|footway|pedestrian|path|steps)$"]${linearFeatureBounds};
-            );out body;>;out skel qt;`,
-    deferredPoiQuery: `[out:json][timeout:${linearTimeoutSeconds}];(
-                node["amenity"~"school|hospital|police|fire_station|parking|fuel|restaurant|cafe|bank|pharmacy|post_office"]${poiBounds};
-                node["shop"]${poiBounds};
-                node["tourism"]${poiBounds};
-                node["historic"]${poiBounds};
-                node["leisure"~"park|stadium|sports_centre|playground"]${poiBounds};
-            );out body qt;`,
     primaryQuery: `[out:json][timeout:${queryTimeoutSeconds}];(
                 way["highway"~"^(motorway|motorway_link|trunk|trunk_link|primary|primary_link|secondary|secondary_link|tertiary|tertiary_link|residential|unclassified|living_street|service)$"]${roadsBounds};
                 way["highway"~"^(footway|pedestrian|path|corridor|steps)$"]["bridge"]${featureBounds};

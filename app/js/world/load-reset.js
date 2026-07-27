@@ -55,7 +55,6 @@ export function resetWorldForReload(options = {}) {
   if (typeof appCtx.resetEarthStreaming === 'function') {
     appCtx.resetEarthStreaming('full_world_reload');
   }
-  appCtx.initialEarthWorldRetired = false;
   appCtx.initialEarthDetailRadius = 0;
 
   appCtx.showLoad(`Loading ${locName}...`);

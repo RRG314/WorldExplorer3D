@@ -349,7 +349,6 @@ registerEnvironmentLifecycle(appCtx.ENV.EARTH, {
     loaded: hasLoadedEarthWorld(),
     roads: Array.isArray(appCtx.roads) ? appCtx.roads.length : 0,
     selection: String(appCtx.selLoc || ''),
-    streamingActive: !!appCtx.earthStreaming?.active,
     worldLoading: !!appCtx.worldLoading
   })
 });

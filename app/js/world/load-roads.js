@@ -2,8 +2,8 @@ import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=9";
 import { createWorldLandusePass } from "./load-landuse-pass.js?v=25";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
-import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=6";
-import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=9";
+import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=7";
+import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=10";
 import {
   diagnoseDistrictGroundSource,
   prepareSelectedLocationSource
@@ -98,11 +98,8 @@ export function createWorldRoadLoader(deps = {}) {
     sameLocation,
     sanitizeWorldFootprintPoints,
     sanitizeWorldPathPoints,
-    scheduleDeferredWorldDetailPasses,
-    scheduleDeferredLandmarkLoad,
-    scheduleDeferredPoiLoad,
-    scheduleDeferredStructureRefresh,
-    scheduleDeferredWorldLinearFeatureLoad,
+    buildWorldDetailPasses,
+    loadLandmarksForPublication,
     signedPolygonAreaXZ,
     spawnOnRoad,
     updateFeatureSurfaceProfile,
@@ -296,14 +293,10 @@ export function createWorldRoadLoader(deps = {}) {
           maxTotalLoadMs
         });
         const {
-          deferredBuildingCacheMeta,
-          deferredBuildingMetadataCacheMeta,
-          deferredBuildingMetadataQuery,
-          deferredBuildingQuery,
-          deferredLandmarkCacheMeta,
-          deferredLandmarkQuery,
-          deferredLinearFeatureQuery,
-          deferredPoiQuery,
+          buildingPublicationCacheMeta,
+          buildingMetadataCacheMeta,
+          buildingMetadataQuery,
+          buildingPublicationQuery,
           featureRadius,
           loadDeadline,
           overpassCacheMeta,
@@ -311,36 +304,10 @@ export function createWorldRoadLoader(deps = {}) {
         } = overpassPlan;
         const geometryGuards = buildFeatureGeometryGuards(featureRadius);
         const buildingGeometryGuards = buildBuildingGeometryGuards(
-          buildFeatureGeometryGuards(deferredBuildingCacheMeta.featureRadius)
+          buildFeatureGeometryGuards(buildingPublicationCacheMeta.featureRadius)
         );
         const landuseGeometryGuards = buildLanduseGeometryGuards(geometryGuards);
         buildWaterGeometryGuards(geometryGuards);
-        const scheduleDeferredLinearFeatureLoad = () => {
-          scheduleDeferredWorldLinearFeatureLoad({
-            enabled: ENABLE_LINEAR_FEATURES,
-            isActiveLoadContext,
-            overpassTimeoutMs,
-            deferredLinearFeatureQuery,
-            fetchOverpassJSON,
-            classifyLinearFeatureTags,
-            limitWaysByTileBudget,
-            tileBudgetCfg,
-            useRdtBudgeting,
-            linearFeaturePriority,
-            geometryGuards,
-            geoToWorld: appCtx.geoToWorld,
-            sanitizeWorldPathPoints,
-            addLinearFeatureRecord,
-            startLoadPhase,
-            endLoadPhase,
-            rebuildStructureVisualMeshes: appCtx.rebuildStructureVisualMeshes,
-            invalidateTraversalNetworks,
-            buildTraversalNetworks,
-            safeLoadCall,
-            updateWorldLod,
-            recordLoadWarning
-          });
-        };
         startLoadPhase('fetchOverpass');
         let data;
         try {
@@ -474,9 +441,9 @@ export function createWorldRoadLoader(deps = {}) {
           railwayWays: normalizedSelection.railwayWays,
           startLoadPhase,
           structureConnectorWays: normalizedSelection.structureConnectorWays,
-          deferStructureRefresh: true
+          deferStructureRefresh: false
         });
-        scheduleDeferredWorldDetailPasses({
+        buildWorldDetailPasses({
           endLoadPhase,
           isActiveLoadContext,
           loadMetrics,
@@ -485,58 +452,23 @@ export function createWorldRoadLoader(deps = {}) {
           poiKeyFromTags,
           poiNodes: normalizedSelection.poiNodes,
           startLoadPhase,
-          updateWorldLod
         });
 
         if (appCtx.roads.length > 0) {
-          scheduleDeferredLandmarkLoad({
-            cacheMeta: deferredLandmarkCacheMeta,
+          const loadBuildingDetail = () => loadBuildingDetailForPublication({
             featureMinPolygonArea: FEATURE_MIN_POLYGON_AREA,
-            fetchOverpassJSON,
-            geometryGuards: buildingGeometryGuards,
-            isActiveLoadContext,
-            loadMetrics,
-            query: deferredLandmarkQuery,
-            recordLoadWarning,
-            registerBuildingCollision,
-            sanitizeWorldFootprintPoints,
-            timeoutMs: overpassTimeoutMs,
-            updateWorldLod
-          });
-          const schedulePoiDetail = () => scheduleDeferredPoiLoad({
-            query: deferredPoiQuery,
-            isActiveLoadContext,
-            fetchOverpassJSON,
-            timeoutMs: overpassTimeoutMs,
-            poiKeyFromTags,
-            limitNodesByTileBudget,
-            maxPoiNodes,
-            tileBudgetCfg,
-            useRdtBudgeting,
-            buildPoiGeometryPass,
-            lodNearDist,
-            lodMidDist,
-            loadMetrics,
-            startLoadPhase,
-            endLoadPhase,
-            updateWorldLod,
-            recordLoadWarning
-          });
-          const scheduleBuildingDetail = (detailOptions = {}) => scheduleDeferredBuildingLoad({
             baselineFullWorld,
             buildingGeometryGuards,
             buildBuildingGeometryPass,
-            cacheMeta: deferredBuildingCacheMeta,
+            cacheMeta: buildingPublicationCacheMeta,
             deadlineMs: performance.now() + Math.max(12000, overpassTimeoutMs + 2500),
-            delayMs: detailOptions.delayMs,
             endLoadPhase,
-            featureMinPolygonArea: FEATURE_MIN_POLYGON_AREA,
             fetchOverpassJSON,
             fetchPreferredMetadata: () => fetchBundledBuildingMetadata?.({ locationKey: appCtx.selLoc, lat: appCtx.LOC.lat, lon: appCtx.LOC.lon }),
             fetchPreferredData: () => fetchGlobalBuildingData({
                 lat: appCtx.LOC.lat,
                 lon: appCtx.LOC.lon,
-                radius: deferredBuildingCacheMeta.featureRadius
+                radius: buildingPublicationCacheMeta.featureRadius
               }, (error) => recordLoadWarning('Overture building massing fallback', error)),
             isActiveLoadContext,
             location: { lat: appCtx.LOC.lat, lon: appCtx.LOC.lon },
@@ -544,13 +476,12 @@ export function createWorldRoadLoader(deps = {}) {
             loadMetrics,
             lodThresholds,
             maxBuildingWays,
-            metadataCacheMeta: deferredBuildingMetadataCacheMeta,
+            metadataCacheMeta: buildingMetadataCacheMeta,
             metadataDeadlineMs: Infinity,
-            metadataQuery: deferredBuildingMetadataQuery,
+            metadataQuery: buildingMetadataQuery,
             metadataTimeoutMs: 9000,
-            onSettled: schedulePoiDetail,
             pickBuildingBaseColor,
-            query: deferredBuildingQuery,
+            query: buildingPublicationQuery,
             rdtLoadComplexity,
             recordLoadWarning,
             refreshStructureAwareFeatureProfiles,
@@ -563,23 +494,18 @@ export function createWorldRoadLoader(deps = {}) {
             updateWorldLod,
             useRdtBudgeting
           });
-          if (appCtx.buildingMeshes.length > 0) {
-            schedulePoiDetail();
-          } else {
+          if (appCtx.buildingMeshes.length === 0) {
             appCtx.showLoad('Loading buildings and preparing the world...');
-            await scheduleBuildingDetail({ delayMs: 0 });
+            await loadBuildingDetail();
           }
-          await markLoaded('primary');
-          scheduleDeferredLinearFeatureLoad();
-          scheduleDeferredStructureRefresh({
-            roads: appCtx.roads,
+          await loadLandmarksForPublication({
             isActiveLoadContext,
-            startLoadPhase,
-            endLoadPhase,
-            refreshStructureAwareFeatureProfiles,
-            rebuildStructureVisualMeshes: appCtx.rebuildStructureVisualMeshes,
-            recordLoadWarning
+            loadMetrics,
+            recordLoadWarning,
+            registerBuildingCollision,
+            updateWorldLod
           });
+          await markLoaded('primary');
         } else {
           const waterOnlyCandidate = resolveWaterOnlyStartCandidate();
           if (waterOnlyCandidate) {

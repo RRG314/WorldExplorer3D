@@ -99,8 +99,7 @@ export function registerBridgeGuardrails(road, owner = null) {
         levelsSource: 'not_applicable',
         colliderDetail: 'full',
         sourceBuildingId: `${road.sourceFeatureId}:guardrail:${i}:${side}`,
-        guardrailReason: safety.reason,
-        _streamChunkKey: road._streamChunkKey || null
+        guardrailReason: safety.reason
       };
       colliders.push(collider);
       appCtx.buildings.push(collider);

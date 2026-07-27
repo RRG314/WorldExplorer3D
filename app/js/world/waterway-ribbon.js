@@ -5,7 +5,7 @@ import { registerWaterWaveMaterial } from "./render-support.js?v=5";
 import { decimatePoints } from "./world-geometry.js?v=2";
 import { inferWaterRenderContext } from "../water-dynamics.js?v=4";
 import { classifyStructureSemantics } from "../structure-semantics.js?v=18";
-import { normalizeWaterBody } from './water-body-contract.js?v=2';
+import { normalizeWaterBody } from './water-body-contract.js?v=3';
 
 function waterwayWidthFromTags(tags) {
   const explicit = Number.parseFloat(tags?.width);
