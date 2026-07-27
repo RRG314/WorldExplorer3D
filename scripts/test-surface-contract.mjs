@@ -15,6 +15,9 @@ import {
   reconcileWaterBodySurface,
   resolveWaterBodySurfaceY
 } from '../app/js/world/water-body-contract.js';
+import { isWalkFeatureSurfaceReachable } from '../app/js/ground.js';
+import { buildingOccupiesActorHeight } from '../app/js/building-entry.js';
+import { finishWorldLoadRuntimeSession } from '../app/js/world/load-runtime-session.js';
 
 const appCtx = {
   METERS_PER_WORLD_UNIT: 2,
@@ -123,11 +126,114 @@ for (let index = 1; index < surfaceOrder.length; index += 1) {
 }
 assert.ok(surfaceComposition('', 'road').layer > surfaceOrder.at(-1).layer);
 
+const atGradeFootway = {
+  structureSemantics: { gradeSeparated: false, terrainMode: 'at_grade' }
+};
+const tunnelFootway = {
+  structureSemantics: { gradeSeparated: true, terrainMode: 'subgrade' }
+};
+const bridgeFootway = {
+  structureSemantics: { gradeSeparated: true, terrainMode: 'elevated' }
+};
+assert.equal(isWalkFeatureSurfaceReachable(atGradeFootway, {
+  terrainY: 50,
+  surfaceY: 47
+}), false);
+assert.equal(isWalkFeatureSurfaceReachable(atGradeFootway, {
+  terrainY: 50,
+  surfaceY: 50.2
+}), true);
+assert.equal(isWalkFeatureSurfaceReachable(tunnelFootway, {
+  terrainY: 50,
+  surfaceY: 47
+}), false);
+assert.equal(isWalkFeatureSurfaceReachable(tunnelFootway, {
+  currentY: 50,
+  terrainY: 50,
+  surfaceY: 47
+}), false);
+assert.equal(isWalkFeatureSurfaceReachable(tunnelFootway, {
+  currentY: 47.1,
+  terrainY: 50,
+  surfaceY: 47
+}), true);
+assert.equal(isWalkFeatureSurfaceReachable(bridgeFootway, {
+  currentY: 50,
+  terrainY: 50,
+  surfaceY: 55
+}), false);
+assert.equal(isWalkFeatureSurfaceReachable(bridgeFootway, {
+  currentY: 50.4,
+  terrainY: 50,
+  surfaceY: 50.6
+}), true);
+
+const elevatedBuildingPart = {
+  minY: 56.1,
+  maxY: 59.3,
+  height: 3.2,
+  collisionKind: 'elevated_part',
+  allowsPassageBelow: true
+};
+assert.equal(buildingOccupiesActorHeight(elevatedBuildingPart, 49.1, 1.62), false);
+assert.equal(buildingOccupiesActorHeight(elevatedBuildingPart, 56.2, 1.62), true);
+assert.equal(buildingOccupiesActorHeight({ baseY: 48.8, height: 8 }, 49.1, 1.62), true);
+assert.equal(buildingOccupiesActorHeight({ height: 8 }, 49.1, 1.62), true);
+
+const loadCommitEvents = [];
+const loadRuntimeState = {
+  status: 'loading',
+  activePhases: ['terrain'],
+  geometryReady: true
+};
+const loadCommitContext = {
+  SCALE: 100000,
+  worldLoading: true,
+  roads: [],
+  buildingMeshes: [],
+  buildings: [],
+  poiMeshes: [],
+  landuseMeshes: [],
+  linearFeatures: [],
+  linearFeatureMeshes: [],
+  enforceEnvironmentSceneOwnership: () => loadCommitEvents.push('ownership'),
+  setPerfLiveStat: () => {},
+  reconcileActorsAfterSurfaceRebuild: () => {
+    assert.equal(loadCommitContext.worldLoading, true);
+    loadCommitEvents.push('reconcile');
+  },
+  hideLoad: () => {
+    assert.equal(loadCommitContext.worldLoading, false);
+    loadCommitEvents.push('hide');
+  }
+};
+finishWorldLoadRuntimeSession({
+  appCtx: loadCommitContext,
+  finalizePerfLoad: () => loadCommitEvents.push('metrics'),
+  loadMetrics: {
+    activeRadiusDeg: 0.01,
+    lod: { near: 0, mid: 0 },
+    roads: { vertices: 0 },
+    colliders: { full: 0, simplified: 0 }
+  },
+  phaseTotals: {},
+  runtimeState: loadRuntimeState,
+  loaded: true
+});
+assert.deepEqual(loadCommitEvents.slice(0, 3), ['ownership', 'reconcile', 'hide']);
+assert.equal(loadCommitContext.worldLoading, false);
+assert.equal(loadCommitContext.initialEarthWorldReady, true);
+assert.equal(loadRuntimeState.status, 'ready');
+assert.equal(loadRuntimeState.activePhases.length, 0);
+
 console.log(JSON.stringify({
   ok: true,
   profiles: Object.values(SOURCE_PROFILE),
   kinds: Object.values(SURFACE_KIND),
   tileKey: tile.key,
   verticalDatum: sample.vertical.id,
-  surfaceLayers: surfaceOrder.map((entry) => entry.layer)
+  surfaceLayers: surfaceOrder.map((entry) => entry.layer),
+  gradeSeparatedWalkAttachment: 'vertical-and-transition-aware',
+  buildingEntryAttachment: 'vertical-occupancy-aware',
+  worldLoadCommit: 'reconcile-before-reveal'
 }, null, 2));

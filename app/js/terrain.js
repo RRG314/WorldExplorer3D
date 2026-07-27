@@ -40,7 +40,7 @@ import {
   waitForTerrainReadyBounds,
   waitForTerrainReadyAt,
   worldToLatLon
-} from "./terrain/tiles.js?v=27";
+} from "./terrain/tiles.js?v=28";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -373,6 +373,7 @@ Object.assign(appCtx, {
   getOrLoadTerrainTile,
   latLonToTileXY,
   pruneTerrainTileCache,
+  reconcileActorsAfterSurfaceRebuild,
   rebuildRoadsWithTerrain: rebuildRoadsWithTerrainRuntime,
   requestWorldSurfaceSync,
   repositionBuildingsWithTerrain,
@@ -415,6 +416,7 @@ export {
   getOrLoadTerrainTile,
   latLonToTileXY,
   pruneTerrainTileCache,
+  reconcileActorsAfterSurfaceRebuild,
   rebuildRoadsWithTerrainRuntime as rebuildRoadsWithTerrain,
   requestWorldSurfaceSync,
   repositionBuildingsWithTerrain,

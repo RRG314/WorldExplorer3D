@@ -12,6 +12,7 @@ const steps = [
   { name: 'Hosted source reachability', cmd: [process.execPath, 'scripts/audit-hosting-reachability.mjs', '--strict'] },
   { name: 'CSS integrity', cmd: [process.execPath, 'scripts/test-css-integrity.mjs'] },
   { name: 'ES module URL identity', cmd: [process.execPath, 'scripts/test-module-version-consistency.mjs'] },
+  { name: 'Terrain source contract', cmd: [process.execPath, 'scripts/test-terrain-source-contract.mjs'] },
   { name: 'Surface contract', cmd: [process.execPath, 'scripts/test-surface-contract.mjs'] },
   { name: 'Overture tile source', cmd: [process.execPath, 'scripts/test-overture-tile-source.mjs'] },
   { name: 'Overture streaming source', cmd: [process.execPath, 'scripts/test-overture-streaming-source.mjs'] },

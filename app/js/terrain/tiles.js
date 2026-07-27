@@ -1,5 +1,10 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
+  decodeTerrariumRgb,
+  geographicToXyzTile,
+  xyzTileBounds
+} from "./source-contract.js?v=1";
+import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
@@ -122,25 +127,27 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
 }
 
 export function latLonToTileXY(lat, lon, z) {
-  const n = Math.pow(2, z);
-  const xt = (lon + 180) / 360 * n;
-  const yt = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n;
-  return { x: Math.floor(xt), y: Math.floor(yt), xf: xt, yf: yt };
+  const tile = geographicToXyzTile(lat, lon, z);
+  return {
+    x: tile.x,
+    y: tile.y,
+    xf: tile.x + tile.xFraction,
+    yf: tile.y + tile.yFraction
+  };
 }
 
 export function tileXYToLatLonBounds(x, y, z) {
-  const n = Math.pow(2, z);
-  const lonW = x / n * 360 - 180;
-  const lonE = (x + 1) / n * 360 - 180;
-
-  const latN = 180 / Math.PI * Math.atan(Math.sinh(Math.PI * (1 - 2 * (y / n))));
-  const latS = 180 / Math.PI * Math.atan(Math.sinh(Math.PI * (1 - 2 * ((y + 1) / n))));
-
-  return { latN, latS, lonW, lonE };
+  const bounds = xyzTileBounds(x, y, z);
+  return {
+    latN: bounds.north,
+    latS: bounds.south,
+    lonW: bounds.west,
+    lonE: bounds.east
+  };
 }
 
 export function decodeTerrariumRGB(r, g, b) {
-  return r * 256 + g + b / 256 - 32768;
+  return decodeTerrariumRgb(r, g, b);
 }
 
 export function getOrLoadTerrainTile(z, x, y, deps = {}) {

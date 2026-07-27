@@ -29,6 +29,7 @@ export function finalizeLoadedWorld(options = {}) {
   const updateWorldLod = typeof options.updateWorldLod === 'function' ? options.updateWorldLod : null;
   const startLoadPhase = typeof options.startLoadPhase === 'function' ? options.startLoadPhase : () => {};
   const endLoadPhase = typeof options.endLoadPhase === 'function' ? options.endLoadPhase : () => {};
+  const finalizePresentation = options.finalizePresentation !== false;
   const runFinalStep = (label, fn) => {
     startLoadPhase(label);
     try {
@@ -43,7 +44,7 @@ export function finalizeLoadedWorld(options = {}) {
     loadMetrics.recoveryReason = 'env_changed_during_load';
     loadMetrics.partialRecovery = true;
     hideEarthSceneMeshes();
-    appCtx.hideLoad();
+    if (finalizePresentation) appCtx.hideLoad();
     return;
   }
 
@@ -76,7 +77,7 @@ export function finalizeLoadedWorld(options = {}) {
   if (typeof updateWorldLod === 'function') {
     runFinalStep('updateWorldLod', () => updateWorldLod(true));
   }
-  appCtx.hideLoad();
+  if (finalizePresentation) appCtx.hideLoad();
   if (typeof appCtx.refreshAstronomicalSky === 'function') {
     runFinalStep('refreshAstronomicalSky', () => appCtx.refreshAstronomicalSky(true));
   } else if (typeof appCtx.alignStarFieldToLocation === 'function') {
@@ -85,7 +86,7 @@ export function finalizeLoadedWorld(options = {}) {
   if (typeof appCtx.refreshLiveWeather === 'function') {
     runFinalStep('refreshLiveWeather', () => appCtx.refreshLiveWeather(true));
   }
-  if (appCtx.gameStarted) {
+  if (finalizePresentation && appCtx.gameStarted) {
     runFinalStep('startMode', () => appCtx.startMode());
   }
 }

@@ -190,6 +190,19 @@ function isEnterableBuildingCandidate(building) {
   return !building.isInteriorCollider && !building.collisionDisabled;
 }
 
+function buildingOccupiesActorHeight(building, actorBaseY, actorHeight = 1.65, tolerance = 0.45) {
+  if (!building || !Number.isFinite(actorBaseY)) return true;
+  const minY = Number.isFinite(building.minY) ?
+    building.minY :
+    Number.isFinite(building.baseY) ? building.baseY : NaN;
+  const maxY = Number.isFinite(building.maxY) ?
+    building.maxY :
+    Number.isFinite(minY) && Number.isFinite(building.height) ? minY + building.height : NaN;
+  if (!Number.isFinite(minY) || !Number.isFinite(maxY)) return true;
+  const actorTopY = actorBaseY + Math.max(0.5, finiteNumber(actorHeight, 1.65));
+  return !(actorTopY < minY - tolerance || actorBaseY > maxY + tolerance);
+}
+
 function destinationKey(destination) {
   if (!destination || typeof destination !== 'object') return '';
   return String(
@@ -423,6 +436,8 @@ function resolveActiveDestinationBuildingSupport(options = {}) {
 
 function pickNearbyEnterableBuildingSupport(x, z, options = {}) {
   const radius = Math.max(2, finiteNumber(options.radius, DEFAULT_ENTRY_RADIUS));
+  const actorBaseY = finiteNumber(options.actorBaseY, NaN);
+  const actorHeight = Math.max(0.5, finiteNumber(options.actorHeight, 1.65));
   const nearby = typeof appCtx.getNearbyBuildings === 'function' ?
     appCtx.getNearbyBuildings(x, z, radius + 10) :
     (Array.isArray(appCtx.buildings) ? appCtx.buildings : []);
@@ -430,6 +445,7 @@ function pickNearbyEnterableBuildingSupport(x, z, options = {}) {
   let best = null;
   for (let i = 0; i < nearby.length; i++) {
     const building = nearby[i];
+    if (!buildingOccupiesActorHeight(building, actorBaseY, actorHeight)) continue;
     const support = resolveBuildingEntrySupport(building, options);
     if (!support.enterable) continue;
     const footprintHit = distanceToFootprint(x, z, support.building);
@@ -447,7 +463,10 @@ function pickNearbyEnterableBuildingSupport(x, z, options = {}) {
   }
 
   const destinationSupport = resolveActiveDestinationBuildingSupport(options);
-  if (destinationSupport?.enterable) {
+  if (
+    destinationSupport?.enterable &&
+    buildingOccupiesActorHeight(destinationSupport.building, actorBaseY, actorHeight)
+  ) {
     const destinationDist = supportDistanceToActor(x, z, destinationSupport);
     if (Number.isFinite(destinationDist) && destinationDist <= radius + 1.5) {
       const destinationHit = distanceToFootprint(x, z, destinationSupport.building);
@@ -505,6 +524,7 @@ Object.assign(appCtx, {
   buildingKey,
   buildingLabel,
   buildingFootprintPoints,
+  buildingOccupiesActorHeight,
   distanceToFootprint,
   hasFullBuildingFootprint,
   isEnterableBuildingCandidate,
@@ -520,6 +540,7 @@ export {
   buildingKey,
   buildingLabel,
   buildingFootprintPoints,
+  buildingOccupiesActorHeight,
   distanceToFootprint,
   hasFullBuildingFootprint,
   isEnterableBuildingCandidate,

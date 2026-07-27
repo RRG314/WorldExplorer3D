@@ -2,7 +2,7 @@ import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=7";
 import { createWorldLandusePass } from "./load-landuse-pass.js?v=25";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
-import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=5";
+import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=6";
 import { scheduleDeferredBuildingLoad } from "./load-building-detail.js?v=9";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
@@ -186,6 +186,7 @@ export function createWorldRoadLoader(deps = {}) {
       perfModeNow,
       phaseTotals,
       rdtLoadComplexity,
+      runtimeState,
       startLoadPhase,
       useRdtBudgeting,
       useSyntheticFallbackRoads
@@ -217,7 +218,14 @@ export function createWorldRoadLoader(deps = {}) {
         earthSceneSuppressed,
         hideEarthSceneMeshes,
         loadMetrics,
-        markLoaded: () => { loaded = true; },
+        markLoaded: () => {
+          loaded = true;
+          if (runtimeState) {
+            runtimeState.geometryReady = true;
+            runtimeState.updatedAt = performance.now();
+          }
+        },
+        finalizePresentation: false,
         reason,
         spawnOnRoad,
         updateWorldLod,
@@ -669,7 +677,8 @@ export function createWorldRoadLoader(deps = {}) {
       finalizePerfLoad,
       loadMetrics,
       loaded,
-      phaseTotals
+      phaseTotals,
+      runtimeState
     });
   }
 

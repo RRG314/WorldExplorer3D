@@ -1,5 +1,18 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
 
+const runtimeErrors = [];
+function recordRuntimeError(kind, value) {
+  const message = value instanceof Error
+    ? `${value.name}: ${value.message}`
+    : String(value?.message || value || "Unknown runtime error");
+  const entry = { kind, message, at: Date.now() };
+  if (runtimeErrors.some((existing) => existing.kind === kind && existing.message === message)) return;
+  runtimeErrors.push(entry);
+  if (runtimeErrors.length > 12) runtimeErrors.shift();
+}
+globalThis.addEventListener?.("error", (event) => recordRuntimeError("error", event.error || event.message));
+globalThis.addEventListener?.("unhandledrejection", (event) => recordRuntimeError("unhandledrejection", event.reason));
+
 function numberOrNull(value) {
   return Number.isFinite(value) ? Number(value) : null;
 }
@@ -10,6 +23,225 @@ function vectorSnapshot(vector) {
     x: numberOrNull(vector.x),
     y: numberOrNull(vector.y),
     z: numberOrNull(vector.z)
+  };
+}
+
+function safeCall(callback, fallback = null) {
+  try {
+    return callback();
+  } catch {
+    return fallback;
+  }
+}
+
+function surfaceSampleSnapshot(sample) {
+  if (!sample) return null;
+  return {
+    kind: String(sample.kind || ""),
+    y: numberOrNull(sample.position?.y),
+    source: String(sample.provenance?.source || ""),
+    dataset: String(sample.provenance?.dataset || ""),
+    fallback: sample.provenance?.fallback === true,
+    feature: sample.feature
+      ? {
+          id: String(sample.feature.id || sample.feature.sourceFeatureId || ""),
+          kind: String(sample.feature.kind || sample.feature.networkKind || sample.feature.type || ""),
+          name: String(sample.feature.name || sample.feature.tags?.name || ""),
+          terrainMode: String(sample.feature.structureSemantics?.terrainMode || ""),
+          structureKind: String(sample.feature.structureSemantics?.structureKind || ""),
+          verticalOrder: numberOrNull(sample.feature.structureSemantics?.verticalOrder),
+          cutDepth: numberOrNull(sample.feature.structureSemantics?.cutDepth),
+          structureTags: sample.feature.structureTags || null
+        }
+      : null
+  };
+}
+
+function buildingSnapshot(building) {
+  if (!building) return null;
+  return {
+    id: String(building.id || building.sourceFeatureId || ""),
+    name: String(building.name || building.tags?.name || ""),
+    type: String(building.buildingType || building.type || ""),
+    collisionKind: String(building.collisionKind || ""),
+    colliderDetail: String(building.colliderDetail || ""),
+    baseY: numberOrNull(building.baseY),
+    minY: numberOrNull(building.minY),
+    maxY: numberOrNull(building.maxY),
+    height: numberOrNull(building.height),
+    allowsPassageBelow: building.allowsPassageBelow === true,
+    collisionDisabled: building.collisionDisabled === true
+  };
+}
+
+function buildingOccupancySnapshot(x, z, feetY, actorHeight) {
+  const nearby = safeCall(() => appCtx.getNearbyBuildings?.(x, z, 12), []);
+  if (!Array.isArray(nearby)) return null;
+  const containing = nearby.filter((building) => {
+    if (!building) return false;
+    if (x < building.minX || x > building.maxX || z < building.minZ || z > building.maxZ) return false;
+    if (!Array.isArray(building.pts) || building.pts.length < 3) return true;
+    return safeCall(() => appCtx.pointInPolygon?.(x, z, building.pts), false);
+  }).slice(0, 8);
+  const entry = safeCall(() => appCtx.pickNearbyEnterableBuildingSupport?.(x, z, {
+    radius: 8,
+    actorBaseY: feetY,
+    actorHeight
+  }), null);
+  return {
+    nearbyCount: nearby.length,
+    containingFootprints: containing.map((building) => {
+      const minY = Number.isFinite(building?.minY)
+        ? Number(building.minY)
+        : Number(building?.baseY);
+      const maxY = Number.isFinite(building?.maxY)
+        ? Number(building.maxY)
+        : Number.isFinite(minY) ? minY + (Number(building?.height) || 0) : NaN;
+      const topY = Number(feetY) + (Number(actorHeight) || 1.7);
+      return {
+        ...buildingSnapshot(building),
+        actorVerticalOverlap: Number.isFinite(feetY) && Number.isFinite(minY) && Number.isFinite(maxY)
+          ? !(topY < minY - 0.45 || feetY > maxY + 0.45)
+          : null
+      };
+    }),
+    entryCandidate: entry?.support
+      ? {
+          label: String(entry.support.label || ""),
+          distance: numberOrNull(entry.distance),
+          inside: entry.inside === true,
+          building: buildingSnapshot(entry.support.building)
+        }
+      : null
+  };
+}
+
+function actorFeetY(actor) {
+  if (!actor) return null;
+  const offset = {
+    walk: 1.7,
+    drive: 1.2,
+    plane: 0.85,
+    drone: 0.25,
+    boat: 1.1
+  }[actor.mode] ?? 0;
+  const y = Number(actor.position?.y);
+  return Number.isFinite(y) ? y - offset : null;
+}
+
+function terrainNeighborhoodSnapshot(centerX, centerZ) {
+  const offsets = [-40, 0, 40];
+  const samples = [];
+  for (const offsetZ of offsets) {
+    for (const offsetX of offsets) {
+      const x = centerX + offsetX;
+      const z = centerZ + offsetZ;
+      const sourceY = safeCall(() => appCtx.elevationWorldYAtWorldXZ?.(x, z), null);
+      const renderedY = safeCall(() => appCtx.terrainMeshHeightAt?.(x, z), null);
+      samples.push({
+        offsetX,
+        offsetZ,
+        sourceY: numberOrNull(sourceY),
+        renderedY: numberOrNull(renderedY),
+        renderedMinusSource: Number.isFinite(Number(sourceY)) && Number.isFinite(Number(renderedY))
+          ? Number(renderedY) - Number(sourceY)
+          : null
+      });
+    }
+  }
+  const rendered = samples.map((sample) => sample.renderedY).filter(Number.isFinite);
+  const deltas = samples.map((sample) => sample.renderedMinusSource).filter(Number.isFinite);
+  return {
+    radius: 40,
+    samples,
+    renderedRange: rendered.length > 0 ? Math.max(...rendered) - Math.min(...rendered) : null,
+    maxAbsoluteRenderedMinusSource: deltas.length > 0
+      ? Math.max(...deltas.map(Math.abs))
+      : null
+  };
+}
+
+function surfaceChainSnapshot(actor = appCtx.activeTransportActor?.() || null) {
+  if (!actor || ["ocean", "rocket"].includes(actor.mode)) return null;
+  const x = Number(actor.position?.x);
+  const z = Number(actor.position?.z);
+  if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
+
+  const feetY = actorFeetY(actor);
+  const geographic = safeCall(() => appCtx.worldToLatLon?.(x, z), null);
+  const lat = Number(geographic?.lat);
+  const lon = Number(geographic?.lon);
+  const sourceElevationMeters = Number.isFinite(lat) && Number.isFinite(lon)
+    ? safeCall(() => appCtx.elevationMetersAtLatLon?.(lat, lon), null)
+    : null;
+  const sourceWorldY = safeCall(() => appCtx.elevationWorldYAtWorldXZ?.(x, z), null);
+  const renderedTerrainY = safeCall(() => appCtx.terrainMeshHeightAt?.(x, z), null);
+  const terrain = safeCall(() => appCtx.SurfaceQuery?.terrainAt?.(x, z), null);
+  const walk = safeCall(() => appCtx.SurfaceQuery?.walkAt?.(x, z, { currentY: feetY }), null);
+  const drive = safeCall(() => appCtx.SurfaceQuery?.driveAt?.(x, z, {
+    currentY: feetY,
+    preferRoad: true
+  }), null);
+  const collision = safeCall(() => appCtx.checkBuildingCollision?.(
+    x,
+    z,
+    actor.mode === "walk" ? 0.35 : Number(actor.bounds?.radius) || 1,
+    {
+      actorBaseY: feetY,
+      actorHeight: Number(actor.bounds?.height) || 1.7
+    }
+  ), null);
+
+  const renderedY = Number(renderedTerrainY);
+  const walkY = Number(walk?.position?.y);
+  return {
+    coordinateSystem: "local tangent world; +x east, +y up, +z south",
+    world: { x, z },
+    geographic: {
+      lat: numberOrNull(lat),
+      lon: numberOrNull(lon)
+    },
+    actor: {
+      mode: actor.mode,
+      centerY: numberOrNull(actor.position?.y),
+      feetY: numberOrNull(feetY),
+      grounded: actor.contact?.grounded ?? null,
+      contactKind: String(actor.contact?.kind || "")
+    },
+    sourceElevationMeters: numberOrNull(sourceElevationMeters),
+    sourceWorldY: numberOrNull(sourceWorldY),
+    renderedTerrainY: numberOrNull(renderedTerrainY),
+    surfaces: {
+      terrain: surfaceSampleSnapshot(terrain),
+      walk: surfaceSampleSnapshot(walk),
+      drive: surfaceSampleSnapshot(drive)
+    },
+    deltas: {
+      feetMinusRenderedTerrain: Number.isFinite(feetY) && Number.isFinite(renderedY)
+        ? feetY - renderedY
+        : null,
+      feetMinusWalkSurface: Number.isFinite(feetY) && Number.isFinite(walkY)
+        ? feetY - walkY
+        : null,
+      renderedMinusSourceWorld: Number.isFinite(renderedY) && Number.isFinite(Number(sourceWorldY))
+        ? renderedY - Number(sourceWorldY)
+        : null
+    },
+    buildingCollision: collision
+      ? {
+          collision: collision.collision === true,
+          inside: collision.inside === true,
+          penetration: numberOrNull(collision.penetration),
+          building: buildingSnapshot(collision.building)
+        }
+      : null,
+    buildingOccupancy: buildingOccupancySnapshot(
+      x,
+      z,
+      feetY,
+      Number(actor.bounds?.height) || 1.7
+    ),
+    terrainNeighborhood: terrainNeighborhoodSnapshot(x, z)
   };
 }
 
@@ -76,18 +308,22 @@ function composerSnapshot() {
 }
 
 function getWorldExplorerRuntimeDiagnostics() {
+  const activeActor = appCtx.activeTransportActor?.() || null;
   return {
     runtimeKernel: appCtx.getRuntimeKernelSnapshot?.() || null,
+    runtimeErrors: [...runtimeErrors],
     sessionLifecycle: appCtx.getSessionCoordinatorDebugState?.() || null,
     account: appCtx.getAccountSnapshot?.() || null,
     platformServices: appCtx.getPlatformServicesSnapshot?.() || null,
     gameplayPlugins: appCtx.getGameplayRegistrySnapshot?.() || null,
     transportControllers: appCtx.getEarthTransportControllerSnapshot?.() || null,
-    activeActor: appCtx.activeTransportActor?.() || null,
+    activeActor,
+    surfaceChain: surfaceChainSnapshot(activeActor),
     environment: appCtx.getEnv?.() || null,
     gameStarted: !!appCtx.gameStarted,
     paused: !!appCtx.paused,
     worldLoading: !!appCtx.worldLoading,
+    worldLoad: appCtx.worldLoadRuntimeState || null,
     earthResumePending: !!appCtx.earthResumePending,
     worldDetail: appCtx.worldDetailState || null,
     modes: {
@@ -180,6 +416,32 @@ function getWorldExplorerRuntimeDiagnostics() {
 }
 
 globalThis.getWorldExplorerRuntimeDiagnostics = getWorldExplorerRuntimeDiagnostics;
+globalThis.render_game_to_text = () => JSON.stringify({
+  environment: appCtx.getEnv?.() || null,
+  gameStarted: !!appCtx.gameStarted,
+  paused: !!appCtx.paused,
+  worldLoading: !!appCtx.worldLoading,
+  titleVisible: !!document.getElementById("titleScreen") &&
+    !document.getElementById("titleScreen").classList.contains("hidden"),
+  surfaceChain: surfaceChainSnapshot(),
+  terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
+  worldCounts: {
+    buildings: appCtx.buildings?.length ?? null,
+    roads: appCtx.roads?.length ?? null,
+    terrainTiles: appCtx.terrainTileCache?.size ?? null
+  }
+});
+globalThis.advanceTime = (milliseconds = 0) => new Promise((resolve) => {
+  const duration = Math.max(0, Number(milliseconds) || 0);
+  if (duration === 0) {
+    resolve();
+    return;
+  }
+  // The runtime owns a continuously scheduled render loop. One requested
+  // animation frame therefore advances one observable game frame; waiting for
+  // wall-clock duration here double-counts frames in automated clients.
+  globalThis.requestAnimationFrame(() => resolve());
+});
 
 function publishRuntimeDiagnostics() {
   if (!document?.documentElement) return;
