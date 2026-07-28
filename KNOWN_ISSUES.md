@@ -1,18 +1,19 @@
 # Known Issues and Limitations
 
-Last reviewed: 2026-07-20 for version 3.1.0.
+Last reviewed: 2026-07-28 for version 4.1.1.
 
 ## Map Coverage
 
 - Building footprints, heights, roof shapes, indoor details, roads, vegetation, and water depend on available source data. Coverage varies globally.
-- Missing building heights and facade details use bounded visual fallbacks; those fallbacks are not claims about the real structure.
+- Missing building heights, materials, facade details, and roof equipment use bounded visual fallbacks; those fallbacks are not claims about the real structure.
 - New OpenStreetMap edits appear only after upstream services and local caches refresh.
 
 ## Loading and Performance
 
-- Dense cities, rapid plane travel, and continuous streaming can be demanding on GPU memory and network bandwidth.
+- Dense cities, rapid plane travel, detailed facades, and large structure networks can be demanding on GPU memory and network bandwidth.
 - The initial world load intentionally waits for core roads and buildings so play does not begin in an empty scene. Additional distant detail may continue to refine afterward.
 - Browser GPU support and memory limits differ significantly, especially on older phones and integrated graphics.
+- Provider latency can make the same location load at different speeds even when the generated world is unchanged.
 
 ## External Services
 
@@ -39,5 +40,6 @@ Last reviewed: 2026-07-20 for version 3.1.0.
 
 - World Explorer 3D is not turn-by-turn navigation, a marine chart, an aviation trainer, or survey-grade GIS.
 - Ocean and underwater behavior is gameplay-oriented rather than a scientific fluid or bathymetry simulation.
+- Tunnels, bridges, ramps, and stacked roads depend on mapped structure and layer tags. Incomplete source tagging can reduce geometric detail or cause the safer fallback profile to be used.
 
 Please report reproducible problems through [GitHub Issues](https://github.com/RRG314/WorldExplorer3D/issues).

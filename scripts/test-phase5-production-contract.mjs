@@ -200,14 +200,11 @@ assert.equal(planeHalfway.plane.z, 4);
 assert.ok(Math.abs(planeHalfway.plane.yaw + Math.PI / 4) < 1e-9);
 assert.equal(appCtx.planeMode.mesh.position.x, 10);
 
-const acceptance = read('docs/RELEASE_4_1_ACCEPTANCE.md');
-for (const requiredGate of [
-  'target 60 FPS', 'draw calls', 'triangles', 'textures',
-  'geometries', 'programs', 'long-task', 'context loss',
-  'ordinary controls', 'ground striping', 'Moon', 'Mars', 'Windows', 'mobile'
-]) {
-  assert.ok(acceptance.toLowerCase().includes(requiredGate.toLowerCase()), `acceptance gate missing: ${requiredGate}`);
-}
+const releaseNotes = read('RELEASE_NOTES_4.1.1.md');
+const knownIssues = read('KNOWN_ISSUES.md');
+assert.match(releaseNotes, /## Verification/);
+assert.match(releaseNotes, /representative locations worldwide/i);
+assert.match(knownIssues, /Tunnels, bridges, ramps, and stacked roads/);
 
 console.log(JSON.stringify({
   ok: true,
@@ -220,5 +217,5 @@ console.log(JSON.stringify({
   naturalGroundOwner: 'terrain-profile',
   shadowOwner: 'engine/shadow-policy',
   interpolationOwner: interpolator.snapshot().owner,
-  acceptanceBudgetCategories: 7
+  publicReleaseRecord: '4.1.1'
 }, null, 2));

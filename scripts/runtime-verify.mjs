@@ -13,7 +13,7 @@ const steps = [
   ['Ground datum normalizer', 'scripts/run-ground-datum-normalizer.mjs', ['self-test']],
   ['District compiler contract', 'scripts/test-district-compiler-contract.mjs'],
   ['Surface contract', 'scripts/test-surface-contract.mjs'],
-  ['Overture continuous source', 'scripts/test-overture-tile-source.mjs'],
+  ['Overture building fallback source', 'scripts/test-overture-tile-source.mjs'],
   ['Inferred building coverage', 'scripts/test-inferred-building-coverage.mjs'],
   ['Local data safety', 'scripts/test-local-data-safety.mjs'],
   ['Block builder contracts', 'scripts/test-block-builder-contract.mjs']
