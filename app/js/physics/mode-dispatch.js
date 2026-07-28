@@ -6,16 +6,7 @@ let controllerContext = null;
 function updateWalkController(appCtx, dt) {
   appCtx.Walk.update(dt);
 
-  if (appCtx.isRecording && appCtx.customTrack.length > 0) {
-    const lastPoint = appCtx.customTrack[appCtx.customTrack.length - 1];
-    const distance = Math.hypot(
-      appCtx.Walk.state.walker.x - lastPoint.x,
-      appCtx.Walk.state.walker.z - lastPoint.z
-    );
-    if (distance > 5) appCtx.customTrack.push({ x: appCtx.Walk.state.walker.x, z: appCtx.Walk.state.walker.z });
-  } else if (appCtx.isRecording) {
-    appCtx.customTrack.push({ x: appCtx.Walk.state.walker.x, z: appCtx.Walk.state.walker.z });
-  }
+  appCtx.appendTrackPoint?.(appCtx.Walk.state.walker.x, appCtx.Walk.state.walker.z);
 
   appCtx.police.forEach((officer) => {
     const distance = Math.hypot(

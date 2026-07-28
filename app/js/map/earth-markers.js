@@ -344,7 +344,7 @@ function drawNavigation(ctx, isLarge, worldToScreen) {
 }
 
 function drawCustomTrack(ctx, isLarge, worldToScreen) {
-  if (appCtx.mapLayers.customTrack && appCtx.customTrack.length >= 2) {
+  if (isLarge && appCtx.mapLayers.customTrack && appCtx.customTrack.length >= 2) {
     ctx.strokeStyle = appCtx.isRecording ? "#f64" : "#fa0";
     ctx.lineWidth = isLarge ? 5 : 3;
     ctx.beginPath();

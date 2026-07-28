@@ -117,7 +117,9 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
         }
 
         mapTimer += frame.dt;
-        const interval = appCtx.planeMode?.active ? 0.25 : appCtx.droneMode ? 0.16 : 0.1;
+        // Five updates per second keeps the navigation display responsive
+        // without rebuilding every vector layer ten times per second.
+        const interval = appCtx.planeMode?.active ? 0.25 : 0.2;
         if (mapTimer > interval) {
           mapTimer = 0;
           if (!workspaceOpen()) {

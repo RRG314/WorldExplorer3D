@@ -170,12 +170,7 @@ export function createBoatRuntimeDynamics(deps = {}) {
       if (typeof appCtx.updateWorldLod === 'function') appCtx.updateWorldLod(false);
     }
 
-    if (appCtx.isRecording) {
-      const last = appCtx.customTrack[appCtx.customTrack.length - 1];
-      if (!last || Math.hypot(appCtx.boat.x - last.x, appCtx.boat.z - last.z) > 10) {
-        appCtx.customTrack.push({ x: appCtx.boat.x, z: appCtx.boat.z });
-      }
-    }
+    appCtx.appendTrackPoint?.(appCtx.boat.x, appCtx.boat.z);
     return true;
   };
 }

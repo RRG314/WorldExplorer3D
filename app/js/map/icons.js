@@ -3,6 +3,14 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 function drawMapPlayerIcons(ctx, w, h, isLarge, view) {
   const { worldToScreen, mx, my } = view;
   const iconSize = isLarge ? 16 : 8;
+  const actor = appCtx.planeMode?.active
+    ? appCtx.planeMode
+    : appCtx.droneMode
+      ? appCtx.drone
+      : appCtx.Walk?.state?.mode === "walk"
+        ? appCtx.Walk.state.walker
+        : appCtx.car;
+  const actorPos = actor ? worldToScreen(actor.x, actor.z) : { x: mx, y: my };
 
   if (appCtx.droneMode && isLarge) {
     const carPos = worldToScreen(appCtx.car.x, appCtx.car.z);
@@ -25,13 +33,13 @@ function drawMapPlayerIcons(ctx, w, h, isLarge, view) {
   }
 
   if (appCtx.planeMode?.active) {
-    drawPlaneIcon(ctx, mx, my, iconSize, isLarge);
+    drawPlaneIcon(ctx, actorPos.x, actorPos.y, iconSize, isLarge);
   } else if (appCtx.droneMode) {
-    drawDroneIcon(ctx, mx, my, iconSize, isLarge);
+    drawDroneIcon(ctx, actorPos.x, actorPos.y, iconSize, isLarge);
   } else if (appCtx.Walk && appCtx.Walk.state.mode === "walk") {
-    drawWalkerIcon(ctx, mx, my, iconSize, isLarge);
+    drawWalkerIcon(ctx, actorPos.x, actorPos.y, iconSize, isLarge);
   } else {
-    drawCarIcon(ctx, mx, my, iconSize, isLarge);
+    drawCarIcon(ctx, actorPos.x, actorPos.y, iconSize, isLarge);
   }
 }
 

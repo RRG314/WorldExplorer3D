@@ -409,6 +409,8 @@ function getWorldExplorerRuntimeDiagnostics() {
       lon: numberOrNull(appCtx.LOC?.lon)
     },
     terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
+    mapTileCache: appCtx.mapTileCacheSnapshot?.() || null,
+    minimapView: appCtx.getMinimapViewSnapshot?.() || null,
     groundProviderCatalog:
       appCtx.getGroundProviderCatalogSnapshot?.() || null,
     worldCounts: {
@@ -446,6 +448,8 @@ globalThis.render_game_to_text = () => JSON.stringify({
     !document.getElementById("titleScreen").classList.contains("hidden"),
   surfaceChain: surfaceChainSnapshot(),
   terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
+  mapTileCache: appCtx.mapTileCacheSnapshot?.() || null,
+  minimapView: appCtx.getMinimapViewSnapshot?.() || null,
   worldCounts: {
     buildings: appCtx.buildings?.length ?? null,
     roads: appCtx.roads?.length ?? null,
