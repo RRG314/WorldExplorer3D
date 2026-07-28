@@ -8,7 +8,6 @@ function getPlanetarySurfaceMesh() {
 
 function createWalkingTerrainHelpers({ car, state, CFG }) {
   let lastWalkTerrainUpdateAt = 0;
-  let lastWalkTerrainRebuildAt = 0;
   let lastWalkTerrainX = NaN;
   let lastWalkTerrainZ = NaN;
 
@@ -99,19 +98,6 @@ function createWalkingTerrainHelpers({ car, state, CFG }) {
     lastWalkTerrainX = x;
     lastWalkTerrainZ = z;
 
-    if (typeof appCtx.roadsNeedRebuild !== "undefined" && appCtx.roadsNeedRebuild) {
-      const firstRebuild = lastWalkTerrainRebuildAt === 0;
-      const rebuildInterval = firstRebuild ? 500 : 2000;
-      if (t - lastWalkTerrainRebuildAt >= rebuildInterval) {
-        if (typeof appCtx.requestWorldSurfaceSync === "function") {
-          appCtx.requestWorldSurfaceSync({ force: firstRebuild, source: "walk_sync" });
-        } else {
-          if (typeof appCtx.rebuildRoadsWithTerrain === "function") appCtx.rebuildRoadsWithTerrain();
-          if (typeof appCtx.repositionBuildingsWithTerrain === "function") appCtx.repositionBuildingsWithTerrain();
-        }
-        lastWalkTerrainRebuildAt = t;
-      }
-    }
   }
 
   return {

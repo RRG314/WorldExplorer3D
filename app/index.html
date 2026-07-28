@@ -26,8 +26,8 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/block-builder.css?v=2">
 <link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
-<link rel="stylesheet" href="styles/interface-v4.css?v=8">
-<link rel="stylesheet" href="styles/start-hub.css?v=8">
+<link rel="stylesheet" href="styles/interface-v4.css?v=10">
+<link rel="stylesheet" href="styles/start-hub.css?v=10">
 </head>
 <body>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
@@ -251,19 +251,6 @@ Not case sensitive! Try: "Seattle" • "Tokyo" • "Paris, France" • "Austin, 
 <div style="padding:8px 0">
 <div style="margin-bottom:24px">
 <div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
-World Loading
-</div>
-<label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;padding:14px;background:#f8fafc;border-radius:8px;border:2px solid #e2e8f0;transition:all 0.2s" id="continuousWorldToggleLabel">
-<input type="checkbox" id="continuousWorldToggle" style="width:20px;height:20px;margin-top:1px;cursor:pointer">
-<div>
-<div style="font-size:13px;font-weight:600;color:#1e293b">Continuous World</div>
-<div style="font-size:11px;color:#64748b;margin-top:3px;line-height:1.45">Load new map areas during long-distance travel. Leave off for the most complete, stable version of the selected location.</div>
-</div>
-</label>
-<div id="continuousWorldStatus" style="font-size:11px;color:#64748b;margin-top:8px;min-height:16px">Quality Location mode is active.</div>
-</div>
-<div style="margin-bottom:24px">
-<div style="font-family:'Poppins',sans-serif;font-size:15px;font-weight:600;color:#667eea;margin-bottom:12px;display:flex;align-items:center;gap:8px">
 Graphics
 </div>
 <div style="background:#f8fafc;border:2px solid #e2e8f0;border-radius:8px;padding:14px">
@@ -462,7 +449,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <button type="button" data-globe-destination="games"><span>⌖</span>Missions</button>
   <button type="button" data-globe-destination="multiplayer"><span>♙</span>Multiplayer</button>
   <button type="button" data-globe-destination="live-earth"><span>⌁</span>Live Data</button>
-  <button type="button" data-globe-destination="library"><span>▥</span>Library</button>
+  <button type="button" data-globe-destination="library"><span>▥</span>My Places</button>
   <button type="button" data-globe-destination="controls"><span>⌨</span>Quick Start</button>
 </nav>
 <div class="globe-selector-top">
@@ -487,6 +474,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <div class="globe-selector-stat-label">Selected Coordinates</div>
 <div id="globeSelectorLatLon" class="globe-selector-stat-value">No point selected</div>
 <div id="globeSelectorPlace" class="globe-selector-stat-label" style="margin-top:4px">Click the globe to choose a location.</div>
+<button id="globeSaveFavoriteBtn" class="globe-save-favorite" type="button" title="Add selected place to My Places" aria-label="Add selected place to My Places" disabled>☆</button>
 </div>
 <div class="globe-selector-actions">
 <button id="globeSelectorBackBtn" class="globe-selector-action-btn" type="button">Close</button>
@@ -498,7 +486,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 </div>
 <div id="globeSelectorExplorePanel" class="globe-selector-mode-panel active">
 <button id="globeSelectorLocateBtn" class="globe-selector-search-btn globe-selector-locate-btn" type="button">Use My Location</button>
-<div id="globeLocationSearchStatus" style="font-size:11px;min-height:14px;color:#64748b">Uses the same search flow as Custom Location.</div>
+<div id="globeLocationSearchStatus" style="font-size:11px;min-height:14px;color:#64748b">Search for a place or choose one from the globe.</div>
 <div class="globe-selector-field-label">Manual Coordinates</div>
 <div class="globe-selector-row globe-selector-coordinate-row">
 <input id="globeCustomLat" type="number" step="0.0001" placeholder="Latitude">
@@ -506,7 +494,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 </div>
 <div class="globe-selector-city-tabs" role="tablist" aria-label="City lists">
 <button id="globeNearbyTabBtn" class="globe-selector-city-tab active" type="button" data-city-tab="nearby">Nearby</button>
-<button id="globeFavoritesTabBtn" class="globe-selector-city-tab" type="button" data-city-tab="favorites">Favorites</button>
+<button id="globeFavoritesTabBtn" class="globe-selector-city-tab" type="button" data-city-tab="favorites">My Places</button>
 </div>
 <div id="globeCityListHint" class="globe-selector-stat-label">Pick a point to see nearby cities.</div>
 <ul id="globeCityList" class="globe-selector-city-list">
@@ -549,7 +537,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
   <header class="globe-hub-overlay-header">
     <div>
       <span>World Explorer 3D</span>
-      <h2 id="globeHubOverlayTitle">Library</h2>
+      <h2 id="globeHubOverlayTitle">My Places</h2>
     </div>
     <button id="globeHubOverlayCloseBtn" type="button" aria-label="Return to globe">×</button>
   </header>
@@ -1598,5 +1586,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=84"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=294"></script>
+<script type="module" src="js/bootstrap.js?v=320"></script>
 </body></html>

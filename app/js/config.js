@@ -48,8 +48,6 @@ const WORLD_UNITS_PER_METER = 1 / METERS_PER_WORLD_UNIT; // ~0.90
 const terrainTileCache = new Map(); // key: `${z}/${x}/${y}` => {loaded, elev, w, h}
 let terrainGroup = null; // THREE.Group holding terrain meshes
 let terrainEnabled = true; // toggle for terrain system
-let roadsNeedRebuild = true; // rebuild roads after terrain loads
-let lastRoadRebuildCheck = 0; // throttle rebuild checks
 
 // Land use styles for massive visual realism - ground truth rendering
 const LANDUSE_STYLES = {
@@ -130,8 +128,6 @@ exposeMutableGlobal('LOC', () => LOC, (v) => {LOC = v;});
 exposeMutableGlobal('customLoc', () => customLoc, (v) => {customLoc = v;});
 exposeMutableGlobal('terrainGroup', () => terrainGroup, (v) => {terrainGroup = v;});
 exposeMutableGlobal('terrainEnabled', () => terrainEnabled, (v) => {terrainEnabled = v;});
-exposeMutableGlobal('roadsNeedRebuild', () => roadsNeedRebuild, (v) => {roadsNeedRebuild = v;});
-exposeMutableGlobal('lastRoadRebuildCheck', () => lastRoadRebuildCheck, (v) => {lastRoadRebuildCheck = v;});
 
 Object.assign(appCtx, {
   LANDUSE_STYLES,
@@ -165,9 +161,7 @@ export {
   WORLD_UNITS_PER_METER,
   customLoc,
   geoToWorld,
-  lastRoadRebuildCheck,
   locKeys,
-  roadsNeedRebuild,
   terrainEnabled,
   terrainGroup,
   terrainTileCache };

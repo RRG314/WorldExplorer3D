@@ -31,18 +31,13 @@ export function applyRenderQuality(ctx, level, options = {}) {
   if (options.persist !== false) ctx.writeStorage(ctx.RENDER_QUALITY_STORAGE_KEY, normalized);
 
   if (ctx.appCtx.renderer) {
-    const enableShadows = normalized !== ctx.RENDER_QUALITY_LOW;
-    ctx.appCtx.renderer.shadowMap.enabled = enableShadows;
-    ctx.appCtx.renderer.shadowMap.type = normalized === ctx.RENDER_QUALITY_HIGH ? THREE.PCFSoftShadowMap : THREE.BasicShadowMap;
     ctx.appCtx.renderer.toneMappingExposure = normalized === ctx.RENDER_QUALITY_HIGH ? 0.95 : normalized === ctx.RENDER_QUALITY_MED ? 0.9 : 0.85;
   }
   if (ctx.appCtx.sun) {
-    const shadowRes = getShadowMapResolution(ctx, normalized);
-    ctx.appCtx.sun.castShadow = shadowRes > 0;
-    ctx.appCtx.sun.shadow.mapSize.width = shadowRes || 1;
-    ctx.appCtx.sun.shadow.mapSize.height = shadowRes || 1;
-    ctx.appCtx.sun.shadow.radius = normalized === ctx.RENDER_QUALITY_HIGH ? 3 : 1;
-    ctx.appCtx.sun.shadow.needsUpdate = true;
+    applyDirectionalShadowPolicy(ctx.appCtx, {
+      gpuTier: ctx.state.currentGpuTier,
+      quality: normalized
+    });
   }
   if (normalized === ctx.RENDER_QUALITY_LOW) {
     ctx.appCtx.scene.environment = ctx.state.fallbackEnvMap || null;
@@ -181,3 +176,4 @@ export function tryEnablePostProcessing(ctx) {
   }
   return enabled;
 }
+import { applyDirectionalShadowPolicy } from './shadow-policy.js?v=1';

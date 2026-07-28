@@ -423,28 +423,31 @@ function applyPlaneCamera(dt) {
   state.cameraYaw = Math.atan2(Math.sin(state.cameraYaw), Math.cos(state.cameraYaw));
   state.cameraPitch = clamp(state.cameraPitch, -0.5, 0.55);
 
-  const viewYaw = state.yaw + state.cameraYaw;
-  const forwardX = Math.sin(state.yaw) * Math.cos(state.pitch);
-  const forwardZ = Math.cos(state.yaw) * Math.cos(state.pitch);
-  const lookY = state.y + 0.45 + Math.sin(state.pitch) * 10 + Math.sin(state.cameraPitch) * 5;
+  const flightPose = appCtx.presentationPose?.mode === 'plane'
+    ? appCtx.presentationPose.plane
+    : state;
+  const viewYaw = flightPose.yaw + state.cameraYaw;
+  const forwardX = Math.sin(flightPose.yaw) * Math.cos(flightPose.pitch);
+  const forwardZ = Math.cos(flightPose.yaw) * Math.cos(flightPose.pitch);
+  const lookY = flightPose.y + 0.45 + Math.sin(flightPose.pitch) * 10 + Math.sin(state.cameraPitch) * 5;
   state.mesh.visible = appCtx.camMode !== 1;
 
   if (appCtx.camMode === 1) {
-    appCtx.camera.position.set(state.x + forwardX * 0.65, state.y + 0.62, state.z + forwardZ * 0.65);
-    appCtx.camera.lookAt(state.x + forwardX * 18, lookY, state.z + forwardZ * 18);
+    appCtx.camera.position.set(flightPose.x + forwardX * 0.65, flightPose.y + 0.62, flightPose.z + forwardZ * 0.65);
+    appCtx.camera.lookAt(flightPose.x + forwardX * 18, lookY, flightPose.z + forwardZ * 18);
   } else if (appCtx.camMode === 2) {
-    appCtx.camera.position.set(state.x, state.y + 24, state.z - 2);
-    appCtx.camera.lookAt(state.x + forwardX * 5, state.y, state.z + forwardZ * 5);
+    appCtx.camera.position.set(flightPose.x, flightPose.y + 24, flightPose.z - 2);
+    appCtx.camera.lookAt(flightPose.x + forwardX * 5, flightPose.y, flightPose.z + forwardZ * 5);
   } else {
     const distance = 12 + clamp(state.speed / 18, 0, 4);
-    const targetX = state.x - Math.sin(viewYaw) * distance;
-    const targetY = state.y + 4.2 + Math.sin(state.cameraPitch) * 6;
-    const targetZ = state.z - Math.cos(viewYaw) * distance;
+    const targetX = flightPose.x - Math.sin(viewYaw) * distance;
+    const targetY = flightPose.y + 4.2 + Math.sin(state.cameraPitch) * 6;
+    const targetZ = flightPose.z - Math.cos(viewYaw) * distance;
     const blend = 1 - Math.exp(-6.5 * dt);
     appCtx.camera.position.x += (targetX - appCtx.camera.position.x) * blend;
     appCtx.camera.position.y += (targetY - appCtx.camera.position.y) * blend;
     appCtx.camera.position.z += (targetZ - appCtx.camera.position.z) * blend;
-    appCtx.camera.lookAt(state.x + forwardX * 3, state.y + 0.4, state.z + forwardZ * 3);
+    appCtx.camera.lookAt(flightPose.x + forwardX * 3, flightPose.y + 0.4, flightPose.z + forwardZ * 3);
   }
   return true;
 }

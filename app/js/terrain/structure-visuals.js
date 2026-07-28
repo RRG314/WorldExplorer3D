@@ -3,13 +3,13 @@ import {
   polylineBounds,
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=17";
+} from "../structure-semantics.js?v=25";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext
-} from "./structure-visual-meshes.js?v=3";
-import { collectTunnelVisualInstances } from "./structure-tunnel-visuals.js?v=1";
-import { elevatedSegmentSafety } from "../world/bridge-safety.js?v=1";
+} from "./structure-visual-meshes.js?v=6";
+import { collectTunnelVisualInstances } from "./structure-tunnel-visuals.js?v=7";
+import { elevatedSegmentSafety } from "../world/bridge-safety.js?v=2";
 
 function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {
   const featureBounds = feature?.bounds || polylineBounds(feature?.pts || [], (Number(feature?.width) || 4) + padding);
@@ -44,6 +44,9 @@ export function collectStructureVisualInstances({
   const wallInstances = [];
   const roofInstances = [];
   const tunnelLightInstances = [];
+  const tunnelShells = [];
+  const elevatedDeckShells = [];
+  const elevatedBarrierSegments = [];
   const guardrailInstances = [];
   const elevatedFeatures = []
     .concat(Array.isArray(appCtx.roads) ? appCtx.roads : [])
@@ -144,18 +147,12 @@ export function collectStructureVisualInstances({
         !isSkywalk &&
         !clutteredInterchange &&
         total >= 42;
-      const renderRoadSideGirders =
-        renderRoadFullDeckBody &&
-        total >= 140 &&
-        curvatureMetric < 0.12 &&
-        nearbyElevatedCount <= 2;
       const renderRoadSupports =
         !isConnectorLike &&
         !isSkywalk &&
         !clutteredInterchange &&
         total >= 58 &&
         nearbyElevatedCount <= 3;
-      const renderRoadAbutments = renderRoadFullDeckBody;
       const renderCapBeams = isConnectorLike || isSkywalk || renderRoadSupports;
       const width = Math.max(2, Number(feature.width) || 4);
       const deckThickness = isConnectorLike ? 0.72 : Math.max(0.9, Math.min(1.6, width * 0.11));
@@ -197,26 +194,12 @@ export function collectStructureVisualInstances({
           isConnectorLike || isSkywalk ?
             1 :
             Math.max(0.24, 1 - Math.max(0, slopeRatio - 0.01) / 0.065);
-        const renderMinimalRoadDeckBody =
-          !isConnectorLike &&
-          !isSkywalk &&
-          !suppressExteriorVisuals &&
-          !clutteredInterchange &&
-          total >= 24 &&
-          segmentClearance > 0.95 &&
-          (!nearTransitionVisual || segmentClearance > 1.35);
-        const renderDeckBody =
-          (
-            isConnectorLike ||
-            isSkywalk ||
-            renderMinimalRoadDeckBody
-          );
+        const renderDeckBody = isConnectorLike || isSkywalk;
         const renderSideGirders =
           !nearTransitionVisual &&
           (
             isConnectorLike ||
-            isSkywalk ||
-            renderRoadSideGirders
+            isSkywalk
           );
         const deckBodyThickness =
           isConnectorLike || isSkywalk ?
@@ -256,7 +239,7 @@ export function collectStructureVisualInstances({
           total,
           waterAreas: appCtx.waterAreas
         });
-        if (guardrailSafety.protected) {
+        if (guardrailSafety.protected && (isConnectorLike || isSkywalk)) {
           const railOffset = width * 0.5 + 0.28;
           for (const side of [-1, 1]) {
             addBeam(
@@ -292,6 +275,13 @@ export function collectStructureVisualInstances({
               rotationY
             );
           }
+        } else if (guardrailSafety.protected) {
+          elevatedBarrierSegments.push({
+            p1: { x: p1.x, y: startY, z: p1.z },
+            p2: { x: p2.x, y: endY, z: p2.z },
+            halfWidth: width * 0.5 + 0.18,
+            height: 0.72
+          });
         }
 
         const sideOffset = Math.max(0.7, width * 0.34);
@@ -378,6 +368,20 @@ export function collectStructureVisualInstances({
             rotationY,
             segmentQuat
           );
+        }
+      }
+
+      if (!isConnectorLike && !isSkywalk && total >= 12) {
+        const rings = structurePts.map((point) => {
+          const y = sampleFeatureSurfaceY(feature, point.x, point.z);
+          return Number.isFinite(y) ? { x: point.x, y, z: point.z } : null;
+        }).filter(Boolean);
+        if (rings.length >= 2) {
+          elevatedDeckShells.push({
+            rings,
+            width,
+            thickness: Math.max(0.18, Math.min(0.42, width * 0.032))
+          });
         }
       }
 
@@ -535,7 +539,7 @@ export function collectStructureVisualInstances({
           );
         }
       };
-      if (isConnectorLike || renderRoadAbutments) {
+      if (isConnectorLike) {
         addAbutmentAt(Math.min(6, total * 0.12));
         addAbutmentAt(Math.max(0, total - Math.min(6, total * 0.12)));
       }
@@ -548,6 +552,7 @@ export function collectStructureVisualInstances({
       wallInstances.push(...tunnel.walls);
       roofInstances.push(...tunnel.roofs);
       tunnelLightInstances.push(...tunnel.lights);
+      tunnelShells.push(...tunnel.shells);
     }
   }
 
@@ -560,6 +565,9 @@ export function collectStructureVisualInstances({
     wallInstances,
     roofInstances,
     tunnelLightInstances,
+    tunnelShells,
+    elevatedDeckShells,
+    elevatedBarrierSegments,
     guardrailInstances
   };
 }

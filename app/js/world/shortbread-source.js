@@ -1,4 +1,4 @@
-import { createRoadNameResolver } from './streaming-road-labels.js?v=1';
+import { createRoadNameResolver } from './shortbread-road-labels.js?v=1';
 
 const SHORTBREAD_ZOOM = 14;
 const SHORTBREAD_FETCH_TIMEOUT_MS = 8000;

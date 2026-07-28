@@ -6,9 +6,9 @@ import {
   materialBatchKey,
   appendGeometryWithTransform
 } from "./geometry-batching.js?v=4";
-import { restoreFacadeWallMask } from "../engine/building-facade-shader.js?v=1";
 
-const BUILDING_BATCH_CELL_METERS = 420;
+const NEAR_BUILDING_BATCH_CELL_METERS = 360;
+const MID_BUILDING_BATCH_CELL_METERS = 960;
 
 function buildingMeshCenter(mesh) {
   const footprint = mesh?.userData?.buildingFootprint;
@@ -55,8 +55,14 @@ function batchBuildingMeshesByTier(tiers = ['near']) {
         continue;
       }
       const center = buildingMeshCenter(mesh);
-      const cellX = Math.floor(center.x / BUILDING_BATCH_CELL_METERS);
-      const cellZ = Math.floor(center.z / BUILDING_BATCH_CELL_METERS);
+      // Near geometry keeps smaller cells for precise view culling. Mid-LOD
+      // geometry is already a skyline representation, so larger cells remove
+      // thousands of material/cell draw-call fragments in dense cities.
+      const cellSize = tier === 'mid'
+        ? MID_BUILDING_BATCH_CELL_METERS
+        : NEAR_BUILDING_BATCH_CELL_METERS;
+      const cellX = Math.floor(center.x / cellSize);
+      const cellZ = Math.floor(center.z / cellSize);
       const key = `${tier}|${cellX},${cellZ}|${matKey}`;
       if (!groups.has(key)) {
         groups.set(key, {
@@ -109,12 +115,24 @@ function batchBuildingMeshesByTier(tiers = ['near']) {
       }
 
       const material = group.material.clone();
-      restoreFacadeWallMask(material);
+      // THREE.Material.clone() does not preserve custom shader callbacks.
+      // Building batches must keep the single facade owner's wall mask so the
+      // shared atlas never spills across horizontal roof caps.
+      material.onBeforeCompile = group.material.onBeforeCompile;
+      material.customProgramCacheKey = group.material.customProgramCacheKey;
+      material.userData = {
+        ...(material.userData || {}),
+        sharedRuntimeMaterial: false,
+        buildingBatchMaterial: true
+      };
       const mergedMesh = new THREE.Mesh(geometry, material);
       mergedMesh.renderOrder = group.renderOrder;
-      mergedMesh.castShadow = true;
+      // The shadow camera only covers the near field. Rendering every distant
+      // skyline batch into that pass doubles dense-city draw pressure and
+      // creates the broad, unstable building shadow bands seen from aircraft.
+      mergedMesh.castShadow = group.lodTier !== 'mid';
       mergedMesh.receiveShadow = true;
-      mergedMesh.frustumCulled = false;
+      mergedMesh.frustumCulled = true;
 
       let centerX = 0;
       let centerZ = 0;

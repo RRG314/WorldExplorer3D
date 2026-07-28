@@ -1,7 +1,7 @@
 import {
   projectPointToFeature,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=17";
+} from "../structure-semantics.js?v=25";
 
 function createTerrainHeightSamplingApi(deps = {}) {
   const {
@@ -113,7 +113,7 @@ function createTerrainHeightSamplingApi(deps = {}) {
 
       const lateralT = Math.max(0, Math.min(1, projected.dist / Math.max(0.5, influenceRadius)));
       let fade = 1 - (lateralT * lateralT * (3 - 2 * lateralT));
-      const distances = cut.feature?.surfaceDistances;
+      const distances = cut.feature?.transportSurfaceModel?.pathDistances || cut.feature?.surfaceDistances;
       const points = cut.feature?.pts;
       if (distances instanceof Float32Array && Array.isArray(points) && points.length >= 2) {
         const lastIndex = distances.length - 1;

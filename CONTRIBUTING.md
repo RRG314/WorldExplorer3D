@@ -1,6 +1,6 @@
 # Contributing to World Explorer 3D
 
-Last reviewed: 2026-07-15
+Last reviewed: 2026-07-28
 
 Contribution workflow and minimum quality bars for this repository.
 
@@ -12,8 +12,8 @@ Canonical repository:
 
 Preferred branch naming:
 
-- `steven/<feature-or-fix>`
-- `codex/<feature-or-fix>`
+- `feature/<short-description>`
+- `fix/<short-description>`
 
 ## 2. Local Setup
 
@@ -72,13 +72,7 @@ At minimum, review the affected public documents:
 
 ## 6. PR Format
 
-Use this structure:
-
-1. Summary
-2. Problem
-3. Fix
-4. Validation
-5. Risks/follow-ups
+Describe what changed, why it changed, how it was validated, and any remaining compatibility or deployment risk.
 
 Include screenshots for UI changes and logs for backend behavior changes.
 

@@ -67,6 +67,21 @@ export function clampWebMercatorLatitude(latitude) {
   );
 }
 
+export function geographicToWebMercatorMeters(latitude, longitude) {
+  const boundedLatitude = clampWebMercatorLatitude(latitude);
+  const wrappedLongitude = normalizeLongitude(longitude);
+  const latitudeRadians = degreesToRadians(boundedLatitude);
+  return Object.freeze({
+    eastingMeters:
+      WEB_MERCATOR_RADIUS_METERS * degreesToRadians(wrappedLongitude),
+    northingMeters:
+      WEB_MERCATOR_RADIUS_METERS *
+      Math.log(Math.tan(Math.PI / 4 + latitudeRadians / 2)),
+    boundedLatitude,
+    wrappedLongitude
+  });
+}
+
 export function geographicToXyzTile(latitude, longitude, zoom) {
   assertZoom(zoom);
   const boundedLatitude = clampWebMercatorLatitude(latitude);

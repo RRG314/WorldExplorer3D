@@ -33,14 +33,16 @@ function createTerrainMaterialCacheApi(deps = {}) {
     const materials = createRoadSurfaceMaterials({
       asphaltTex: appCtx.asphaltTex,
       asphaltNormal: appCtx.asphaltNormal,
-      asphaltRoughness: appCtx.asphaltRoughness
+      asphaltRoughness: appCtx.asphaltRoughness,
+      includeMarkings: true
     });
 
     terrainState._roadMaterialCacheKey = key;
     terrainState._roadMaterials = {
       roadMat: materials.roadMainMaterial,
       skirtMat: materials.roadSkirtMaterial,
-      capMat: materials.roadCapMaterial
+      capMat: materials.roadCapMaterial,
+      markMat: materials.roadMarkMaterial
     };
     return terrainState._roadMaterials;
   }

@@ -145,10 +145,29 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   gap: 11px;
 }
 .globe-selector-stat {
+  position: relative;
   padding: 14px 12px;
   border-width: 0 0 1px;
   background: transparent;
 }
+.globe-save-favorite {
+  position: absolute;
+  top: 10px;
+  right: 8px;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  color: var(--hub-muted);
+  background: transparent;
+  border: 1px solid var(--hub-line);
+  border-radius: 2px;
+  font: 22px/1 Inter, sans-serif;
+  cursor: pointer;
+}
+.globe-save-favorite.saved { color: #f0a620; }
+.globe-save-favorite:disabled { opacity: 0.35; cursor: default; }
+.globe-selector-stat-value,
+#globeSelectorPlace { padding-right: 38px; }
 .globe-selector-stat-value { margin-top: 7px; font: 700 17px/1.2 Inter, sans-serif; }
 .globe-selector-actions { position: static; display: block; padding: 0; background: transparent; border: 0; }
 #globeSelectorBackBtn { display: none; }
@@ -163,6 +182,17 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-selector-locate-btn { min-height: 36px; }
 .globe-mobile-search { display: none; }
 .globe-selector-city-list { max-height: min(31vh, 250px); }
+.globe-selector-city-section {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 13px 4px 7px;
+  color: var(--hub-text);
+  border-bottom: 1px solid var(--hub-line);
+}
+.globe-selector-city-section strong { font-size: 10px; text-transform: uppercase; }
+.globe-selector-city-section span { color: var(--hub-muted); font-size: 9px; text-align: right; }
 .globe-selector-city-item[style*="background:#eef2ff"] {
   color: var(--hub-text) !important;
   background: #10243a !important;
@@ -324,6 +354,62 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   transform: none;
 }
 .globe-hub-panel-host .tab-content.active { display: block; }
+.globe-hub-panel-host .hub-center-panel.active { display: block; }
+.hub-library-panel {
+  width: min(1100px, 100%);
+  margin: 0 auto;
+}
+.hub-library-panel.active { display: grid; gap: 24px; }
+.hub-library-section { display: grid; gap: 10px; }
+.hub-library-section > header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--hub-line);
+}
+.hub-library-section > header strong { color: var(--hub-text); font-size: 14px; }
+.hub-library-section > header span { color: var(--hub-muted); font-size: 10px; }
+.hub-library-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+.hub-library-grid button {
+  min-width: 0;
+  min-height: 58px;
+  display: grid;
+  gap: 5px;
+  align-content: center;
+  padding: 10px 12px;
+  color: var(--hub-text);
+  text-align: left;
+  background: var(--hub-panel-2);
+  border: 1px solid var(--hub-line);
+  border-radius: 2px;
+  cursor: pointer;
+}
+.hub-library-grid button:hover,
+.hub-library-grid button:focus-visible {
+  background: #10243a;
+  border-color: var(--hub-blue);
+}
+.hub-library-grid button strong {
+  overflow: hidden;
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hub-library-grid button span { color: var(--hub-muted); font-size: 10px; }
+.hub-library-empty {
+  margin: 0;
+  padding: 14px;
+  color: var(--hub-muted);
+  background: var(--hub-panel-2);
+  border: 1px solid var(--hub-line);
+  font-size: 11px;
+}
 .globe-hub-panel-host .launch-switch-row { display: none; }
 .globe-hub-panel-host .loc-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .globe-hub-panel-host .loc,
@@ -478,6 +564,10 @@ body.start-hub-open #flowerChallengePanel {
   .globe-hub-footer-host .title-license { display: none; }
 }
 
+@media (max-width: 620px) {
+  .hub-library-grid { grid-template-columns: 1fr; }
+}
+
 @media (max-width: 520px) {
   body.start-hub-open #appSignInBtn { right: 132px; max-width: 92px; padding: 0 8px; font-size: 8px; }
   .globe-selector-brand { padding-left: 8px; padding-right: 58%; font-size: 8px; }
@@ -486,6 +576,5 @@ body.start-hub-open #flowerChallengePanel {
   .globe-hub-tools button { width: 34px; height: 34px; font-size: 15px; }
   .globe-destination-bar button { gap: 5px; font-size: 7px; }
   .globe-destination-bar button .destination-thumb { width: 34px; height: 34px; flex-basis: 34px; }
-  .globe-app-rail button:nth-child(5) { display: none; }
   .globe-hub-panel-host .loc-grid { grid-template-columns: 1fr; }
 }

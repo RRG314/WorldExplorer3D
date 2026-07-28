@@ -382,7 +382,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   backdrop-filter: blur(8px);
 }
 .hud-box::before { content: 'WORLD EXPLORER'; display: block; margin: 0 0 14px; padding-bottom: 9px; color: var(--wx-muted); border-bottom: 1px solid var(--wx-line-soft); font: 600 9px/1 Orbitron, sans-serif; }
-.hud-box::after { content: 'V3.1.0'; position: absolute; top: 18px; right: 16px; color: var(--wx-blue); font: 600 9px/1 Orbitron, sans-serif; }
+.hud-box::after { content: 'V4.1.1'; position: absolute; top: 18px; right: 16px; color: var(--wx-blue); font: 600 9px/1 Orbitron, sans-serif; }
 #hudToggleBtn { color: var(--wx-text); background: transparent; border: 1px solid var(--wx-line); border-radius: 50%; }
 #speed { color: var(--wx-text); font-family: Orbitron, sans-serif; }
 .hud-label, #weatherMetaLine, #locationLine, .indicators { color: var(--wx-muted); }

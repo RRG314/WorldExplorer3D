@@ -210,10 +210,6 @@ async function finalizeEarthResume(resolved, isCurrent = () => true, options = {
   if (typeof appCtx.updateTerrainAround === 'function' && appCtx.terrainEnabled && !appCtx.onMoon) {
     appCtx.updateTerrainAround(x, z);
   }
-  if (options.syncSurface === true) {
-    markEarthResumePhase('surface_sync');
-    appCtx.requestWorldSurfaceSync?.({ force: true, source: 'earth_reload' });
-  }
   markEarthResumePhase('world_lod');
   appCtx.resumeEarthStreaming?.(1400);
   appCtx.updateEarthWorldStreaming?.(1);
@@ -349,7 +345,6 @@ registerEnvironmentLifecycle(appCtx.ENV.EARTH, {
     loaded: hasLoadedEarthWorld(),
     roads: Array.isArray(appCtx.roads) ? appCtx.roads.length : 0,
     selection: String(appCtx.selLoc || ''),
-    streamingActive: !!appCtx.earthStreaming?.active,
     worldLoading: !!appCtx.worldLoading
   })
 });

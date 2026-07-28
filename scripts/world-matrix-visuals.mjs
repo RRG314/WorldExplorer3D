@@ -83,8 +83,35 @@ export async function captureDroneView(page, spec, result, outputDir) {
       ctx.elevationWorldYAtWorldXZ?.(ctx.drone?.x || 0, ctx.drone?.z || 0) ??
       0
     );
+    let nearbyMaximumY = groundY;
+    for (const offsetX of [-400, -200, 0, 200, 400]) {
+      for (const offsetZ of [-400, -200, 0, 200, 400]) {
+        const sampleY = Number(
+          ctx.SurfaceQuery?.terrainAt?.(
+            Number(ctx.drone?.x || 0) + offsetX,
+            Number(ctx.drone?.z || 0) + offsetZ
+          )?.position?.y
+        );
+        if (Number.isFinite(sampleY)) nearbyMaximumY = Math.max(nearbyMaximumY, sampleY);
+      }
+    }
+    if (typeof THREE !== 'undefined') {
+      const droneX = Number(ctx.drone?.x || 0);
+      const droneZ = Number(ctx.drone?.z || 0);
+      for (const terrainMesh of ctx.terrainGroup?.children || []) {
+        if (!terrainMesh?.isMesh || terrainMesh.visible === false) continue;
+        const bounds = new THREE.Box3().setFromObject(terrainMesh);
+        const distanceX = droneX < bounds.min.x ? bounds.min.x - droneX :
+          droneX > bounds.max.x ? droneX - bounds.max.x : 0;
+        const distanceZ = droneZ < bounds.min.z ? bounds.min.z - droneZ :
+          droneZ > bounds.max.z ? droneZ - bounds.max.z : 0;
+        if (Math.hypot(distanceX, distanceZ) <= 700 && Number.isFinite(bounds.max.y)) {
+          nearbyMaximumY = Math.max(nearbyMaximumY, bounds.max.y);
+        }
+      }
+    }
     if (ctx.drone) {
-      ctx.drone.y = groundY + 80;
+      ctx.drone.y = Math.max(groundY + 80, nearbyMaximumY + 100);
       ctx.drone.pitch = -0.48;
     }
     ctx.updateWorldLod?.(true);
@@ -96,6 +123,7 @@ export async function captureDroneView(page, spec, result, outputDir) {
     const visibleNearMeshes = nearMeshes.filter((mesh) => mesh.visible !== false);
     return {
       altitude: Number((Number(ctx.drone?.y || 0) - groundY).toFixed(1)),
+      nearbyTerrainClearance: Number((Number(ctx.drone?.y || 0) - nearbyMaximumY).toFixed(1)),
       visibleMeshes: meshes.length,
       visibleSources: meshes.reduce((sum, mesh) => sum + sourceCount(mesh), 0),
       totalNearSources: nearMeshes.reduce((sum, mesh) => sum + sourceCount(mesh), 0),

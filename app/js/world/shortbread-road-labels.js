@@ -95,7 +95,9 @@ export function createRoadNameResolver(tileRecord, cleanLine) {
       const label = labels[index];
       if (!label) return;
       let score = Infinity;
-      samples.forEach((point) => { score = Math.min(score, distanceToLineSq(point, label.points)); });
+      samples.forEach((point) => {
+        score = Math.min(score, distanceToLineSq(point, label.points));
+      });
       if (normalizedKind && label.kind && normalizedKind !== label.kind) score += 12 ** 2;
       if (score < bestScore) {
         bestScore = score;

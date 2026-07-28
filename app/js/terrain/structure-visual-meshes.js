@@ -48,6 +48,170 @@ function createStructureVisualMaterial(hex, roughness, metalness) {
   });
 }
 
+function buildTunnelShellMeshForContext(appCtx, shellDescriptors = []) {
+  if (!Array.isArray(shellDescriptors) || shellDescriptors.length === 0 || typeof THREE === "undefined") return null;
+  const positions = [];
+  const indices = [];
+  // A continuous seven-point section gives vertical walls, shoulders, and an
+  // arched crown without fragment seams or exposed box ends on curves.
+  const lateralFactors = [-1, -1, -0.76, 0, 0.76, 1, 1];
+  const heightFactors = [0.02, 0.56, 0.84, 1, 0.84, 0.56, 0.02];
+  for (const shell of shellDescriptors) {
+    const rings = Array.isArray(shell?.rings) ? shell.rings : [];
+    if (rings.length < 2) continue;
+    const baseVertex = positions.length / 3;
+    for (const ring of rings) {
+      const nx = -Number(ring.tangentZ || 0);
+      const nz = Number(ring.tangentX || 0);
+      for (let section = 0; section < lateralFactors.length; section += 1) {
+        const lateral = lateralFactors[section] * shell.halfWidth;
+        positions.push(
+          ring.x + nx * lateral,
+          ring.y + heightFactors[section] * shell.clearance,
+          ring.z + nz * lateral
+        );
+      }
+    }
+    const sectionSize = lateralFactors.length;
+    for (let ringIndex = 0; ringIndex < rings.length - 1; ringIndex += 1) {
+      for (let section = 0; section < sectionSize - 1; section += 1) {
+        const a = baseVertex + ringIndex * sectionSize + section;
+        const b = a + 1;
+        const c = a + sectionSize;
+        const d = c + 1;
+        indices.push(a, c, b, b, c, d);
+      }
+    }
+    for (const approach of shell.approaches || []) {
+      const approachRings = Array.isArray(approach?.rings) ? approach.rings : [];
+      if (approachRings.length < 2) continue;
+      const approachBase = positions.length / 3;
+      for (const ring of approachRings) {
+        const nx = -Number(ring.tangentZ || 0);
+        const nz = Number(ring.tangentX || 0);
+        for (const side of [-1, 1]) {
+          const lateral = side * shell.halfWidth;
+          positions.push(
+            ring.x + nx * lateral,
+            ring.y,
+            ring.z + nz * lateral,
+            ring.x + nx * lateral,
+            ring.terrainY,
+            ring.z + nz * lateral
+          );
+        }
+      }
+      for (let ringIndex = 0; ringIndex < approachRings.length - 1; ringIndex += 1) {
+        for (let sideIndex = 0; sideIndex < 2; sideIndex += 1) {
+          const a = approachBase + ringIndex * 4 + sideIndex * 2;
+          const b = a + 1;
+          const c = a + 4;
+          const d = c + 1;
+          indices.push(a, c, b, b, c, d);
+        }
+      }
+    }
+  }
+  if (positions.length === 0 || indices.length === 0) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const material = createStructureVisualMaterial(0x5d6974, 0.9, 0.04);
+  material.side = THREE.DoubleSide;
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.castShadow = false;
+  mesh.receiveShadow = true;
+  mesh.frustumCulled = false;
+  Object.assign(mesh.userData, {
+    isStructureVisual: true,
+    structureVisualType: "tunnel_shells",
+    tunnelShellOwner: "compiled-tunnel-system"
+  });
+  appCtx.scene.add(mesh);
+  appCtx.structureVisualMeshes.push(mesh);
+  return mesh;
+}
+
+function buildElevatedRoadMeshForContext(appCtx, deckShells = [], barrierSegments = []) {
+  if (typeof THREE === "undefined") return null;
+  const positions = [];
+  const indices = [];
+  for (const shell of deckShells || []) {
+    const rings = Array.isArray(shell?.rings) ? shell.rings : [];
+    if (rings.length < 2) continue;
+    const base = positions.length / 3;
+    for (let index = 0; index < rings.length; index += 1) {
+      const ring = rings[index];
+      const previous = rings[Math.max(0, index - 1)];
+      const next = rings[Math.min(rings.length - 1, index + 1)];
+      const dx = next.x - previous.x;
+      const dz = next.z - previous.z;
+      const length = Math.hypot(dx, dz) || 1;
+      const nx = -dz / length;
+      const nz = dx / length;
+      const halfWidth = shell.width * 0.5 + 0.1;
+      positions.push(
+        ring.x + nx * halfWidth, ring.y - 0.045, ring.z + nz * halfWidth,
+        ring.x - nx * halfWidth, ring.y - 0.045, ring.z - nz * halfWidth,
+        ring.x + nx * halfWidth, ring.y - shell.thickness, ring.z + nz * halfWidth,
+        ring.x - nx * halfWidth, ring.y - shell.thickness, ring.z - nz * halfWidth
+      );
+    }
+    for (let index = 0; index < rings.length - 1; index += 1) {
+      const a = base + index * 4;
+      const b = a + 4;
+      indices.push(
+        a + 2, b + 2, a + 3, a + 3, b + 2, b + 3,
+        a, b, a + 2, a + 2, b, b + 2,
+        a + 1, a + 3, b + 1, a + 3, b + 3, b + 1
+      );
+    }
+  }
+  for (const segment of barrierSegments || []) {
+    const p1 = segment?.p1;
+    const p2 = segment?.p2;
+    if (!p1 || !p2) continue;
+    const dx = p2.x - p1.x;
+    const dz = p2.z - p1.z;
+    const length = Math.hypot(dx, dz);
+    if (!(length > 0.2)) continue;
+    const nx = -dz / length;
+    const nz = dx / length;
+    for (const side of [-1, 1]) {
+      const base = positions.length / 3;
+      const lateral = Number(segment.halfWidth) * side;
+      const height = Number(segment.height) || 0.72;
+      positions.push(
+        p1.x + nx * lateral, p1.y + 0.04, p1.z + nz * lateral,
+        p1.x + nx * lateral, p1.y + height, p1.z + nz * lateral,
+        p2.x + nx * lateral, p2.y + 0.04, p2.z + nz * lateral,
+        p2.x + nx * lateral, p2.y + height, p2.z + nz * lateral
+      );
+      indices.push(base, base + 2, base + 1, base + 1, base + 2, base + 3);
+    }
+  }
+  if (positions.length === 0 || indices.length === 0) return null;
+  const geometry = new THREE.BufferGeometry();
+  geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geometry.setIndex(indices);
+  geometry.computeVertexNormals();
+  const material = createStructureVisualMaterial(0x5c6670, 0.9, 0.05);
+  material.side = THREE.DoubleSide;
+  const mesh = new THREE.Mesh(geometry, material);
+  mesh.castShadow = false;
+  mesh.receiveShadow = true;
+  mesh.frustumCulled = false;
+  Object.assign(mesh.userData, {
+    isStructureVisual: true,
+    structureVisualType: "elevated_road_shells",
+    elevatedRoadOwner: "compiled-transport-surface"
+  });
+  appCtx.scene.add(mesh);
+  appCtx.structureVisualMeshes.push(mesh);
+  return mesh;
+}
+
 export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureVisualInstances, deps = {}) {
   clearStructureVisualMeshesForContext(appCtx);
   if (appCtx.onMoon || !appCtx.scene) return;
@@ -60,6 +224,9 @@ export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureV
     wallInstances,
     roofInstances,
     tunnelLightInstances,
+    tunnelShells,
+    elevatedDeckShells,
+    elevatedBarrierSegments,
     guardrailInstances
   } = collectStructureVisualInstances(deps);
 
@@ -125,6 +292,8 @@ export function rebuildStructureVisualMeshesForContext(appCtx, collectStructureV
     material.emissiveIntensity = 1.8;
     buildStructureVisualMeshForContext(appCtx, tunnelLightInstances, material, { structureVisualType: "tunnel_lights" });
   }
+  buildTunnelShellMeshForContext(appCtx, tunnelShells);
+  buildElevatedRoadMeshForContext(appCtx, elevatedDeckShells, elevatedBarrierSegments);
   if (guardrailInstances.length > 0) {
     buildStructureVisualMeshForContext(
       appCtx,

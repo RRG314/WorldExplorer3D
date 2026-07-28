@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=17";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=25";
 import { addBuildingToSpatialIndex, removeBuildingsFromSpatialIndex } from "./building-spatial-index.js?v=5";
-import { elevatedSegmentSafety, isProtectedRoadFeature } from "./bridge-safety.js?v=1";
+import { elevatedSegmentSafety, isProtectedRoadFeature } from "./bridge-safety.js?v=2";
 
 function removeArrayItemsInPlace(source, removed) {
   if (!Array.isArray(source) || !(removed instanceof Set) || removed.size === 0) return source || [];
@@ -99,8 +99,7 @@ export function registerBridgeGuardrails(road, owner = null) {
         levelsSource: 'not_applicable',
         colliderDetail: 'full',
         sourceBuildingId: `${road.sourceFeatureId}:guardrail:${i}:${side}`,
-        guardrailReason: safety.reason,
-        _streamChunkKey: road._streamChunkKey || null
+        guardrailReason: safety.reason
       };
       colliders.push(collider);
       appCtx.buildings.push(collider);

@@ -51,26 +51,21 @@ function setBuildingDetailState(status, extra = {}) {
   };
 }
 
-export function scheduleDeferredBuildingLoad(options = {}) {
+export async function loadBuildingDetailForPublication(options = {}) {
   const query = String(options.query || '');
   const isActiveLoadContext = typeof options.isActiveLoadContext === 'function' ? options.isActiveLoadContext : () => true;
-  const onSettled = typeof options.onSettled === 'function' ? options.onSettled : () => {};
   const fetchPreferredData = typeof options.fetchPreferredData === 'function' ? options.fetchPreferredData : null;
   if (!fetchPreferredData && (!query || typeof options.fetchOverpassJSON !== 'function')) {
     setBuildingDetailState('skipped');
-    onSettled();
-    return Promise.resolve(appCtx.worldDetailState.buildings);
+    return appCtx.worldDetailState.buildings;
   }
 
   setBuildingDetailState('loading', { requested: 0, selected: 0 });
-  const delayMs = Number.isFinite(options.delayMs) ? Math.max(0, options.delayMs) : 80;
-  return new Promise((resolve) => globalThis.setTimeout(async () => {
-    if (!isActiveLoadContext()) {
-      resolve({ status: 'aborted', updatedAt: Date.now() });
-      return;
-    }
-    const startedAt = performance.now();
-    try {
+  if (!isActiveLoadContext()) {
+    return { status: 'aborted', updatedAt: Date.now() };
+  }
+  const startedAt = performance.now();
+  try {
       let metadataState = { status: 'skipped' };
       let data;
       try {
@@ -142,7 +137,6 @@ export function scheduleDeferredBuildingLoad(options = {}) {
       options.refreshStructureAwareFeatureProfiles?.();
       appCtx.refreshTerrainSurfaceProfiles?.();
       appCtx.clearTerrainHeightCache?.();
-      appCtx.requestWorldSurfaceSync?.({ force: true, source: 'deferred_buildings' });
       options.updateWorldLod?.(true);
       setBuildingDetailState('ready', {
         requested: requested.length,
@@ -155,15 +149,15 @@ export function scheduleDeferredBuildingLoad(options = {}) {
         sourceDetails: data._overtureBuildings || data._shortbreadTiles || null,
         inferredCoverage
       });
-    } catch (err) {
-      options.recordLoadWarning?.('deferred buildings', err);
-      setBuildingDetailState('error', {
-        durationMs: Math.round(performance.now() - startedAt),
-        error: err?.message || String(err)
-      });
-    } finally {
-      if (isActiveLoadContext()) onSettled();
-      resolve(appCtx.worldDetailState?.buildings || { status: 'unknown', updatedAt: Date.now() });
-    }
-  }, delayMs));
+  } catch (err) {
+    options.recordLoadWarning?.('building publication', err);
+    setBuildingDetailState('error', {
+      durationMs: Math.round(performance.now() - startedAt),
+      error: err?.message || String(err)
+    });
+  }
+  return appCtx.worldDetailState?.buildings || {
+    status: 'unknown',
+    updatedAt: Date.now()
+  };
 }

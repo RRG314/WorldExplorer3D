@@ -122,18 +122,29 @@ function selectBuildingCandidates(candidates, budget) {
 
 export function updateWorldLod(force = false) {
   if (appCtx.onMoon || appCtx.travelingToMoon || (typeof appCtx.isEnv === 'function' && appCtx.ENV && !appCtx.isEnv(appCtx.ENV.EARTH))) {
+    appCtx.updateTerrainAerialDetail?.(false, 0);
     hideMeshList(appCtx.roadMeshes);
     hideMeshList(appCtx.urbanSurfaceMeshes);
     hideMeshList(appCtx.buildingMeshes);
     hideMeshList(appCtx.landuseMeshes);
     hideMeshList(appCtx.poiMeshes);
     hideMeshList(appCtx.streetFurnitureMeshes);
-    hideMeshList(appCtx.aerialContextMeshes);
     if (typeof appCtx.setPerfLiveStat === 'function') {
       appCtx.setPerfLiveStat('lodVisible', { near: 0, mid: 0 });
     }
     return;
   }
+
+  const ref = lodReferenceActor();
+  const refX = Number.isFinite(ref?.x) ? ref.x : 0;
+  const refZ = Number.isFinite(ref?.z) ? ref.z : 0;
+  const aerialMode = !!(appCtx.planeMode?.active || appCtx.droneMode);
+  const aerialActor = appCtx.planeMode?.active ? appCtx.planeMode : appCtx.drone;
+  const aerialGroundY = aerialMode
+    ? Number(appCtx.terrainMeshHeightAt?.(refX, refZ) ?? appCtx.elevationWorldYAtWorldXZ?.(refX, refZ) ?? 0)
+    : 0;
+  const aerialAltitude = aerialMode ? Math.max(0, Number(aerialActor?.y) - aerialGroundY) : 0;
+  appCtx.updateTerrainAerialDetail?.(aerialMode, aerialAltitude);
 
   if ((!appCtx.buildingMeshes || appCtx.buildingMeshes.length === 0) &&
       (!appCtx.poiMeshes || appCtx.poiMeshes.length === 0) &&
@@ -141,9 +152,6 @@ export function updateWorldLod(force = false) {
     return;
   }
 
-  const ref = lodReferenceActor();
-  const refX = Number.isFinite(ref?.x) ? ref.x : 0;
-  const refZ = Number.isFinite(ref?.z) ? ref.z : 0;
   const buildingMeshCount = appCtx.buildingMeshes.length;
   const buildingSetChanged = buildingMeshCount !== lastBuildingMeshCount;
 
@@ -163,27 +171,9 @@ export function updateWorldLod(force = false) {
     typeof appCtx.rdtComplexity === 'number' ? appCtx.rdtComplexity : 0;
   const boatLodScale = appCtx.boatMode?.active ? Math.max(0.34, Math.min(1, Number(appCtx.boatMode.detailBias) || 1)) : 1;
   const lodThresholds = runtime.getWorldLodThresholds(depthForLod, mode, dynamicBudgetState.lodScale * boatLodScale);
-  const aerialMode = !!(appCtx.planeMode?.active || appCtx.droneMode);
-  const aerialActor = appCtx.planeMode?.active ? appCtx.planeMode : appCtx.drone;
-  const aerialGroundY = aerialMode
-    ? Number(appCtx.terrainMeshHeightAt?.(refX, refZ) ?? appCtx.elevationWorldYAtWorldXZ?.(refX, refZ) ?? 0)
-    : 0;
-  const aerialAltitude = aerialMode ? Math.max(0, Number(aerialActor?.y) - aerialGroundY) : 0;
-  const aerialHorizon = aerialMode ? Math.min(9000, 5000 + aerialAltitude * 5) : 0;
   const poiMidSq = lodThresholds.mid * lodThresholds.mid;
 
   for (let i = 0; i < appCtx.roadMeshes.length; i += 1) setEarthMeshVisible(appCtx.roadMeshes[i], true);
-  const protectedDetailRadius = Math.max(1700, Number(appCtx.initialEarthDetailRadius) || 0);
-  const aerialNear = Math.max(protectedDetailRadius + 180, 1200 + aerialAltitude * 1.4);
-  const aerialFar = Math.max(7200, aerialHorizon + 2800);
-  const aerialMeshes = Array.isArray(appCtx.aerialContextMeshes) ? appCtx.aerialContextMeshes : [];
-  for (let i = 0; i < aerialMeshes.length; i += 1) {
-    const mesh = aerialMeshes[i];
-    const center = getMeshLodCenter(mesh);
-    const distance = center ? Math.hypot(center.x - refX, center.z - refZ) : Infinity;
-    setEarthMeshVisible(mesh, aerialMode && distance >= aerialNear && distance <= aerialFar);
-  }
-
   let nearVisible = 0;
   let midVisible = 0;
 
@@ -228,9 +218,6 @@ export function updateWorldLod(force = false) {
     } else {
       const batchBoost = isBatch ? Math.min(1300, radius) : Math.min(800, radius);
       visibleDist = lodThresholds.farVisible + batchBoost;
-    }
-    if (aerialMode && mesh.userData?.earthStreamingChunk) {
-      visibleDist = Math.max(visibleDist, aerialHorizon + Math.min(700, radius * 0.35));
     }
     const dx = center.x - refX;
     const dz = center.z - refZ;

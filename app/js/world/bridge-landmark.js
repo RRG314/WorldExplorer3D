@@ -1,4 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
+import { sampleFeatureSurfaceY } from '../structure-semantics.js?v=25';
 import { createBridgeStructuralDetails } from './bridge-landmark-structure.js?v=1';
 
 const BRIDGE_COLOR = 0xbf4e3b;
@@ -152,9 +153,6 @@ function synchronizeNavigableDeck(path) {
     matchedRoads += 1;
   }
 
-  if (matchedRoads > 0) {
-    appCtx.requestWorldSurfaceSync?.({ force: true, source: 'landmark_bridge_deck' });
-  }
   return matchedRoads;
 }
 
@@ -173,9 +171,13 @@ function sampleRoadDeckY(x, z) {
       const pz = start.z + dz * t;
       const distance = Math.hypot(px - x, pz - z);
       if (best && distance >= best.distance) continue;
-      const startY = road.surfaceHeights instanceof Float32Array ? Number(road.surfaceHeights[i]) : NaN;
-      const endY = road.surfaceHeights instanceof Float32Array ? Number(road.surfaceHeights[i + 1]) : NaN;
-      const profileY = Number.isFinite(startY) && Number.isFinite(endY) ? startY + (endY - startY) * t : NaN;
+      const profileY = sampleFeatureSurfaceY(road, px, pz, {
+        x: px,
+        z: pz,
+        dist: distance,
+        segIndex: i,
+        t
+      });
       best = { distance, y: Number.isFinite(profileY) ? profileY : appCtx.elevationWorldYAtWorldXZ(x, z) + 55 };
     }
   }

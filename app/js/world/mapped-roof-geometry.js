@@ -22,16 +22,28 @@ function footprintMetrics(pts) {
   let maxX = -Infinity;
   let minZ = Infinity;
   let maxZ = -Infinity;
-  let centerX = 0;
-  let centerZ = 0;
+  let averageX = 0;
+  let averageZ = 0;
+  let signedAreaTwice = 0;
+  let centroidXTimesArea = 0;
+  let centroidZTimesArea = 0;
   for (const point of pts) {
     minX = Math.min(minX, point.x);
     maxX = Math.max(maxX, point.x);
     minZ = Math.min(minZ, point.z);
     maxZ = Math.max(maxZ, point.z);
-    centerX += point.x;
-    centerZ += point.z;
+    averageX += point.x;
+    averageZ += point.z;
   }
+  for (let index = 0; index < pts.length; index += 1) {
+    const current = pts[index];
+    const next = pts[(index + 1) % pts.length];
+    const cross = current.x * next.z - next.x * current.z;
+    signedAreaTwice += cross;
+    centroidXTimesArea += (current.x + next.x) * cross;
+    centroidZTimesArea += (current.z + next.z) * cross;
+  }
+  const hasStableArea = Math.abs(signedAreaTwice) > 1e-5;
   return {
     minX,
     maxX,
@@ -39,9 +51,40 @@ function footprintMetrics(pts) {
     maxZ,
     width: Math.max(0.1, maxX - minX),
     depth: Math.max(0.1, maxZ - minZ),
-    centerX: centerX / pts.length,
-    centerZ: centerZ / pts.length
+    area: Math.abs(signedAreaTwice) * 0.5,
+    centerX: hasStableArea ? centroidXTimesArea / (3 * signedAreaTwice) : averageX / pts.length,
+    centerZ: hasStableArea ? centroidZTimesArea / (3 * signedAreaTwice) : averageZ / pts.length
   };
+}
+
+function isConvexFootprint(pts) {
+  let winding = 0;
+  for (let index = 0; index < pts.length; index += 1) {
+    const a = pts[index];
+    const b = pts[(index + 1) % pts.length];
+    const c = pts[(index + 2) % pts.length];
+    const cross = (b.x - a.x) * (c.z - b.z) - (b.z - a.z) * (c.x - b.x);
+    if (Math.abs(cross) < 1e-5) continue;
+    const sign = Math.sign(cross);
+    if (winding !== 0 && sign !== winding) return false;
+    winding = sign;
+  }
+  return winding !== 0;
+}
+
+function stableRoofFootprint(shape, pts) {
+  if (!Array.isArray(pts) || pts.length < 3 || pts.length > 32) return false;
+  if (pts.some((point) => !Number.isFinite(point?.x) || !Number.isFinite(point?.z))) return false;
+  const metrics = footprintMetrics(pts);
+  const boundingArea = metrics.width * metrics.depth;
+  const longestSpan = Math.max(metrics.width, metrics.depth);
+  const shortestSpan = Math.min(metrics.width, metrics.depth);
+  if (shortestSpan < 1.2 || longestSpan > 180 || longestSpan / shortestSpan > 10) return false;
+  if (!(metrics.area > 1.5) || metrics.area / boundingArea < 0.28) return false;
+  // Apex and ridge fans are only valid on convex footprints. Concave and
+  // multipart outlines receive a clean flat cap instead of diagonal sails.
+  if (shape !== 'skillion' && !isConvexFootprint(pts)) return false;
+  return true;
 }
 
 function longestEdgeAxis(pts) {
@@ -170,16 +213,17 @@ function domeRoofGeometry(pts, roofHeight) {
 }
 
 function inferredRoofHeight(shape, heightMeters, pts, fullPartRoof) {
-  if (fullPartRoof) return Math.max(0.3, heightMeters);
   const metrics = footprintMetrics(pts);
   const span = Math.min(metrics.width, metrics.depth);
-  const share = shape === 'dome' || shape === 'onion' ? 0.34 : 0.24;
-  return Math.max(0.8, Math.min(heightMeters * 0.38, span * share, 8));
+  const curved = shape === 'dome' || shape === 'onion' || shape === 'round';
+  const share = curved ? 0.34 : fullPartRoof ? 0.3 : 0.24;
+  const maximum = curved ? 12 : 8;
+  return Math.max(0.8, Math.min(heightMeters * 0.38, span * share, maximum));
 }
 
 export function resolveMappedRoof(tags = {}, heightMeters = 0, buildingSemantics = null, pts = []) {
   const shape = String(tags['roof:shape'] || '').trim().toLowerCase();
-  if (!NON_FLAT_ROOF_SHAPES.has(shape) || !Array.isArray(pts) || pts.length < 3) return null;
+  if (!NON_FLAT_ROOF_SHAPES.has(shape) || !stableRoofFootprint(shape, pts)) return null;
   const mappedRoofHeight = numericValue(tags['roof:height']);
   const fullPartRoof = !!tags['building:part'] && Number(buildingSemantics?.baseOffsetMeters || 0) > 0.4;
   const roofHeight = Math.min(

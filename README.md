@@ -1,8 +1,8 @@
 # World Explorer 3D
 
-[![Runtime Verify](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=main)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
-[![Secret Scan](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml/badge.svg?branch=main)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml)
-[![GitHub Pages](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml/badge.svg?branch=main)](https://rrg314.github.io/WorldExplorer3D/)
+[![Runtime Verify](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/runtime-verify.yml)
+[![Secret Scan](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml/badge.svg?branch=stable)](https://github.com/RRG314/WorldExplorer3D/actions/workflows/secret-scan.yml)
+[![GitHub Pages](https://github.com/RRG314/WorldExplorer3D/actions/workflows/deploy-pages-public.yml/badge.svg?branch=stable)](https://rrg314.github.io/WorldExplorer3D/)
 [![Release](https://img.shields.io/github/v/release/RRG314/WorldExplorer3D?sort=semver)](https://github.com/RRG314/WorldExplorer3D/releases/latest)
 [![License: Source Available](https://img.shields.io/badge/license-source--available-lightgrey)](LICENSE)
 
@@ -10,9 +10,9 @@ World Explorer 3D is a browser-based geospatial exploration game built around re
 
 **[Launch World Explorer 3D](https://worldexplorer3d.io/app/)**
 
-## Version 3.1 Release Candidate
+## Version 4.1.1
 
-Version 3.1 completes the ownership-focused runtime work started in 3.0 and adds a consolidated globe-first interface plus provenance-aware operational data tools. It is being verified on a release branch before the live application and GitHub `main` are updated together.
+Version 4.1.1 stabilizes selected-location exploration, removes the unfinished Continuous World runtime, and restores one consistent owner for terrain, roads, structures, movement, and world publication.
 
 Highlights:
 
@@ -20,7 +20,10 @@ Highlights:
 - Preset cities, geolocation, coordinate entry, and an interactive globe for choosing locations worldwide.
 - Live Earth views for observed satellites, earthquakes, aircraft, current weather, community street imagery, modeled marine conditions, and NOAA water-level/tide coverage.
 - Walk, drive, drone, plane, boat, underwater, rover, astronaut, and rocket traversal.
-- Optional continuous Earth streaming for longer trips, with quality and distance budgets for ground and aerial play.
+- Selected-location Earth sessions with atomic loading and explicit cancellation.
+- Structure-aware bridges, elevated roads, ramps, underpasses, and tunnels.
+- Material-aware building facades and improved rooftop geometry with restrained fallbacks when mapped detail is unavailable.
+- Terrain, actor, vehicle, and camera interpolation designed to prevent clipping and visible pose drift.
 - In-session Earth, Moon, Mars, ocean, and space transitions without a page reload.
 - A navigable solar system with planets, moons, asteroid and Kuiper belts, spacecraft, and inner/full system maps.
 - Deep-space destinations including catalog-backed star systems, nebulae, galaxies, and black-hole encounters.
@@ -72,7 +75,7 @@ npm run runtime:verify
 npm run release:verify
 ```
 
-`runtime:verify` is the fast pull-request gate. The full release gate additionally covers Firestore rules, mobile controls, editor/multiplayer surfaces, planetary round trips, world-provider fallbacks, ocean/biome behavior, and the global location matrix.
+`runtime:verify` is the fast pull-request gate. The full release gate additionally covers Firestore rules, mobile controls, editor and multiplayer surfaces, planetary round trips, provider fallbacks, ocean and biome behavior, and a representative global location matrix.
 
 ## Repository Layout
 

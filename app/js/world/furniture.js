@@ -336,19 +336,17 @@ export function generateStreetFurniture() {
 }
 
 export function refreshWorldCoverVegetation() {
-  if (appCtx.getContinuousWorldEnabled?.() !== true) {
-    (appCtx.vegetationMeshes || []).forEach((mesh) => {
-      mesh?.parent?.remove?.(mesh);
-      if (Array.isArray(mesh?.material)) {
-        mesh.material.forEach((material) => {
-          if (material !== matTrunk) material?.dispose?.();
-        });
-      } else if (mesh?.material !== matTrunk) {
-        mesh?.material?.dispose?.();
-      }
-    });
-    appCtx.clearWorldCollections?.(['vegetationMeshes', 'vegetationFeatures']);
-  }
+  (appCtx.vegetationMeshes || []).forEach((mesh) => {
+    mesh?.parent?.remove?.(mesh);
+    if (Array.isArray(mesh?.material)) {
+      mesh.material.forEach((material) => {
+        if (material !== matTrunk) material?.dispose?.();
+      });
+    } else if (mesh?.material !== matTrunk) {
+      mesh?.material?.dispose?.();
+    }
+  });
+  appCtx.clearWorldCollections?.(['vegetationMeshes', 'vegetationFeatures']);
   return buildWorldVegetationInstancing(collectWorldVegetationPlacements(), {
     initFurnitureMaterials,
     initFurnitureGeometries,
@@ -357,7 +355,6 @@ export function refreshWorldCoverVegetation() {
 }
 
 export function scheduleWorldCoverVegetationRefresh() {
-  if (appCtx.getContinuousWorldEnabled?.() === true) return;
   if (worldCoverVegetationTimer) globalThis.clearTimeout(worldCoverVegetationTimer);
   const loadSequence = appCtx._worldLoadSequence;
   worldCoverVegetationTimer = globalThis.setTimeout(() => {

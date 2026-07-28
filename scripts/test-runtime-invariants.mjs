@@ -337,7 +337,7 @@ async function main() {
 
     report = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
-      const structureSemantics = await import('/app/js/structure-semantics.js?v=14');
+      const structureSemantics = await import('/app/js/structure-semantics.js?v=19');
       const ctx = mod?.ctx;
       const roads = Array.isArray(ctx.roads) ? ctx.roads : [];
       const buildings = Array.isArray(ctx.buildings) ? ctx.buildings : [];
@@ -712,7 +712,7 @@ async function main() {
     const networkAndCopyReport = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
       const ctx = mod?.ctx;
-      const semanticsMod = await import('/app/js/structure-semantics.js?v=14');
+      const semanticsMod = await import('/app/js/structure-semantics.js?v=19');
       const classifyStructureSemantics = semanticsMod?.classifyStructureSemantics;
       const walkGraph = ctx?.traversalNetworks?.walk || null;
       const driveGraph = ctx?.traversalNetworks?.drive || null;
@@ -777,6 +777,61 @@ async function main() {
         structureTags: { bridge: 'yes' }, networkKind: 'road', type: 'primary'
       };
       semanticsMod.updateFeatureSurfaceProfile?.(syntheticBridge, (x) => x === 50 ? -80 : 12);
+      const compiledRoads = Array.isArray(ctx?.roads)
+        ? ctx.roads.filter((road) =>
+            road?.transportSurfaceModel?.authority === 'compiled_transport_surface')
+        : [];
+      const transportSurfaceCoverage = {
+        roadCount: Number(ctx?.roads?.length || 0),
+        compiledRoadCount: compiledRoads.length,
+        liveTerrainSamplerCount: compiledRoads.filter((road) =>
+          typeof road?.surfaceTerrainSampler === 'function').length,
+        invalidModelCount: compiledRoads.filter((road) =>
+          !Number.isFinite(road?.transportSurfaceModel?.stats?.minimumY) ||
+          !Number.isFinite(road?.transportSurfaceModel?.stats?.maximumY) ||
+          !Number.isFinite(road?.transportSurfaceModel?.stats?.maximumGrade)
+        ).length,
+        maximumGrade: compiledRoads.reduce((maximum, road) =>
+          Math.max(maximum, Number(road?.transportSurfaceModel?.stats?.maximumGrade) || 0), 0)
+      };
+      const acceptedGroundSnapshot =
+        ctx?.getAcceptedGroundRuntimeSnapshot?.() || null;
+      const inactiveAcceptedGroundSample =
+        ctx?.sampleAcceptedGroundAtWorldXZ?.(0, 0) || null;
+      const roadParityCandidates = Array.isArray(ctx?.roads)
+        ? ctx.roads.filter((road) => Array.isArray(road?.pts) && road.pts.length >= 2)
+        : [];
+      const roadParityIndexes = roadParityCandidates.length > 0
+        ? [0, 0.25, 0.5, 0.75].map((ratio) =>
+            Math.min(
+              roadParityCandidates.length - 1,
+              Math.floor((roadParityCandidates.length - 1) * ratio)
+            ))
+        : [];
+      const roadIndexParitySamples = roadParityIndexes.map((index) => {
+        const road = roadParityCandidates[index];
+        const p1 = road.pts[0];
+        const p2 = road.pts[1];
+        const x = (p1.x + p2.x) * 0.5 + 1.25;
+        const z = (p1.z + p2.z) * 0.5 - 0.85;
+        const indexed = ctx.findNearestRoad?.(x, z);
+        const indexedSnapshot = {
+          road: indexed?.road || null,
+          dist: Number(indexed?.dist),
+          y: Number(indexed?.y)
+        };
+        const fullScan = ctx.findNearestRoad?.(x, z, {
+          forceFullScan: true
+        });
+        return {
+          sameRoad: indexedSnapshot.road === (fullScan?.road || null),
+          distanceDelta: Math.abs(indexedSnapshot.dist - Number(fullScan?.dist)),
+          heightDelta:
+            Number.isFinite(indexedSnapshot.y) && Number.isFinite(fullScan?.y)
+              ? Math.abs(indexedSnapshot.y - Number(fullScan.y))
+              : 0
+        };
+      });
 
       return {
         walkGraphNodeCount: Number(walkGraph?.nodeCount || walkGraph?.nodes?.length || 0),
@@ -802,6 +857,32 @@ async function main() {
           }),
         syntheticStructureSemantics,
         syntheticBridgeHeights: Array.from(syntheticBridge.surfaceHeights || []),
+        transportSurfaceCoverage,
+        transportSurfacePublication: ctx?.transportSurfacePublication || null,
+        acceptedGroundRuntimeBoundary: {
+          prepareExposed:
+            typeof ctx?.prepareAcceptedGroundForLocation === 'function',
+          coverageGateExposed:
+            typeof ctx?.verifyAcceptedGroundCoverage === 'function',
+          snapshot: acceptedGroundSnapshot,
+          inactiveSample: inactiveAcceptedGroundSample
+        },
+        worldPublication:
+          typeof ctx?.verifyWorldPublicationStable === 'function'
+            ? ctx.verifyWorldPublicationStable()
+            : null,
+        roadIndexParity: {
+          sampleCount: roadIndexParitySamples.length,
+          allSameRoad: roadIndexParitySamples.every((sample) => sample.sameRoad),
+          maxDistanceDelta: Math.max(
+            0,
+            ...roadIndexParitySamples.map((sample) => sample.distanceDelta)
+          ),
+          maxHeightDelta: Math.max(
+            0,
+            ...roadIndexParitySamples.map((sample) => sample.heightDelta)
+          )
+        },
         landingCopyClear:
           /optional/i.test(landingHtml) &&
           /map, core exploration, and traversal modes are free/i.test(landingHtml) &&
@@ -846,10 +927,12 @@ async function main() {
       laneEdgeReasonable: report.laneHitRatePct <= 3.5,
       waterDataPresent: (report.waterAreas + report.waterways + preWaterMetrics.waterAreas + preWaterMetrics.waterways) > 0,
       waterVisible: report.visibleWaterMeshes > 0 || preWaterMetrics.visibleWaterMeshes > 0,
-      linearFeatureGeometryReady:
+      linearFeatureNavigationReady:
         (report.linearFeatures + preWaterMetrics.linearFeatures) > 0 &&
-        report.linearFeatureMeshCount > 0 &&
-        report.solidLinearMaterials === true,
+        report.linearFeatureMeshCount === 0 &&
+        report.walkFeatureRoute?.ok === true &&
+        Number.isFinite(report.walkSurfaceSample?.yDelta) &&
+        Math.abs(report.walkSurfaceSample.yDelta) <= 1,
       spawnResolverAvailable: report.resolveSpawnAvailable === true,
       driveSpawnFallbackSafe: report.buildingInteriorSamples === 0 || report.driveSpawnSafe === report.buildingInteriorSamples,
       walkSpawnFallbackSafe: report.buildingInteriorSamples === 0 || report.walkSpawnSafe === report.buildingInteriorSamples,
@@ -868,10 +951,42 @@ async function main() {
         report.syntheticStructureSemantics?.bridgeFootway?.gradeSeparated === true &&
         report.syntheticStructureSemantics?.tunnelRoad?.terrainMode === 'subgrade' &&
         report.syntheticStructureSemantics?.tunnelRoad?.gradeSeparated === true,
+      acceptedGroundRuntimeReady:
+        report.acceptedGroundRuntimeBoundary?.prepareExposed === true &&
+        report.acceptedGroundRuntimeBoundary?.coverageGateExposed === true &&
+        report.acceptedGroundRuntimeBoundary?.snapshot?.status === 'blocked' &&
+        report.acceptedGroundRuntimeBoundary?.snapshot?.reason ===
+          'no-ground-artifacts-configured' &&
+        report.acceptedGroundRuntimeBoundary?.inactiveSample?.status ===
+          'unavailable',
+      roadSpatialIndexExact:
+        report.roadIndexParity?.sampleCount >= 4 &&
+        report.roadIndexParity?.allSameRoad === true &&
+        report.roadIndexParity?.maxDistanceDelta <= 1e-9 &&
+        report.roadIndexParity?.maxHeightDelta <= 1e-9,
+      worldPublicationStable:
+        report.worldPublication?.stable === true &&
+        report.worldPublication?.changes?.length === 0,
       bridgeSpansTerrainDepressions:
-        report.syntheticBridgeHeights?.length === 3 &&
+        report.syntheticBridgeHeights?.length >= 3 &&
         Math.min(...report.syntheticBridgeHeights) > 15 &&
         Math.max(...report.syntheticBridgeHeights) - Math.min(...report.syntheticBridgeHeights) < 0.1,
+      compiledTransportAuthority:
+        report.transportSurfaceCoverage?.roadCount > 0 &&
+        report.transportSurfaceCoverage?.compiledRoadCount === report.transportSurfaceCoverage?.roadCount &&
+        report.transportSurfaceCoverage?.liveTerrainSamplerCount === 0 &&
+        report.transportSurfaceCoverage?.invalidModelCount === 0 &&
+        report.transportSurfaceCoverage?.maximumGrade <= 0.1202 &&
+        report.transportSurfacePublication?.authority === 'compiled_transport_surface' &&
+        report.transportSurfacePublication?.roadCount === report.transportSurfaceCoverage?.roadCount,
+      compiledTransportRendererBudget:
+        report.transportSurfacePublication?.meshCount <= 4 &&
+        report.transportSurfacePublication?.compiledSampleCount <=
+          report.transportSurfacePublication?.roadCount * 120 &&
+        report.transportSurfacePublication?.vertices <=
+          report.transportSurfacePublication?.roadCount * 150 &&
+        report.transportSurfacePublication?.triangles <=
+          report.transportSurfacePublication?.roadCount * 140,
       roadSurfacesDraped:
         report.roadSurfaceContract?.atGradeSkirt === false &&
         report.roadSurfaceContract?.elevatedSkirt === false &&
@@ -955,11 +1070,12 @@ async function main() {
     );
     assert(checks.laneEdgeReasonable, `Lane-edge collision rate too high: ${report.laneHitRatePct}%`);
     assert(
-      checks.linearFeatureGeometryReady,
-      `Mapped path geometry contract is incomplete: ${JSON.stringify({
+      checks.linearFeatureNavigationReady,
+      `Mapped path navigation-without-presentation contract is incomplete: ${JSON.stringify({
         linearFeatures: report.linearFeatures,
         linearFeatureMeshCount: report.linearFeatureMeshCount,
-        solidLinearMaterials: report.solidLinearMaterials
+        walkFeatureRoute: report.walkFeatureRoute,
+        walkSurfaceSample: report.walkSurfaceSample
       })}`
     );
     assert(checks.spawnResolverAvailable, 'Spawn resolver helpers are not exposed on runtime context.');
@@ -991,7 +1107,17 @@ async function main() {
     assert(checks.waterMaterialsSolid, 'Water meshes are still rendering with transparent materials.');
     assert(checks.vegetationIntegrated, `Vegetation layer did not initialize correctly: ${JSON.stringify({ vegetationFeatures: report.vegetationFeatures, vegetationMeshes: report.vegetationMeshes })}`);
     assert(checks.structureSemanticsStable, `Synthetic structure semantics classification regressed: ${JSON.stringify(report.syntheticStructureSemantics || null)}`);
+    assert(checks.acceptedGroundRuntimeReady, `Accepted-ground runtime boundary is unavailable or unexpectedly active: ${JSON.stringify(report.acceptedGroundRuntimeBoundary || null)}`);
+    assert(checks.roadSpatialIndexExact, `Indexed nearest-road results differ from the full scan: ${JSON.stringify(report.roadIndexParity || null)}`);
     assert(checks.bridgeSpansTerrainDepressions, `Bridge profile followed underlying terrain: ${JSON.stringify(report.syntheticBridgeHeights || null)}`);
+    assert(checks.compiledTransportAuthority, `Transport surfaces did not publish from one compiled authority: ${JSON.stringify({
+      coverage: report.transportSurfaceCoverage,
+      publication: report.transportSurfacePublication
+    })}`);
+    assert(
+      checks.compiledTransportRendererBudget,
+      `Compiled transport renderer exceeded its bounded per-road budget: ${JSON.stringify(report.transportSurfacePublication || null)}`
+    );
     assert(checks.roadSurfacesDraped, `Road surface skirt policy regressed: ${JSON.stringify(report.roadSurfaceContract || null)}`);
     assert(checks.lazyInteriorIdle, `Interior system is not staying lazy by default: ${JSON.stringify({ buildingEntrySupportExposed: report.buildingEntrySupportExposed, activeInteriorByDefault: report.activeInteriorByDefault, dynamicInteriorCollidersIdle: report.dynamicInteriorCollidersIdle, interiorActionExposed: report.interiorActionExposed, interiorPromptPresent: report.interiorPromptPresent })}`);
     assert(checks.sampledInteriorEnterable, `Sampled building entry did not produce a usable contained interior shell: ${JSON.stringify(report.enteredInteriorReport || null)}`);

@@ -404,12 +404,9 @@ function getWorldExplorerRuntimeDiagnostics() {
     renderer: rendererSnapshot(),
     composer: composerSnapshot(),
     quality: appCtx.renderQualityLevel || null,
-    earthStreaming: appCtx.getEarthStreamingSnapshot?.() || null,
     earthOrigin: {
       lat: numberOrNull(appCtx.LOC?.lat),
-      lon: numberOrNull(appCtx.LOC?.lon),
-      rebases: numberOrNull(appCtx.earthOriginRebaseCount || 0),
-      initialWorldRetired: !!appCtx.initialEarthWorldRetired
+      lon: numberOrNull(appCtx.LOC?.lon)
     },
     terrainCache: appCtx.terrainTileCacheSnapshot?.() || null,
     groundProviderCatalog:

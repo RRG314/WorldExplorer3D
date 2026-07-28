@@ -6,9 +6,6 @@ export function setupSettingsUi(appCtx) {
   const saveApiKeyBtn = document.getElementById('saveApiKey');
   const realEstateToggle = document.getElementById('realEstateToggle');
   const toggleLabel = document.getElementById('realEstateToggleLabel');
-  const continuousWorldToggle = document.getElementById('continuousWorldToggle');
-  const continuousWorldToggleLabel = document.getElementById('continuousWorldToggleLabel');
-  const continuousWorldStatus = document.getElementById('continuousWorldStatus');
   const renderQualitySelect = document.getElementById('renderQualitySelect');
   const highQualityToggle = document.getElementById('highQualityToggle');
   const ssaoToggle = document.getElementById('ssaoToggle');
@@ -130,42 +127,6 @@ export function setupSettingsUi(appCtx) {
       localStorage.setItem('realEstateEnabled', enabled);
       toggleLabel.style.background = enabled ? '#f0f4ff' : '#f8fafc';
       toggleLabel.style.borderColor = enabled ? '#667eea' : '#e2e8f0';
-    });
-  }
-
-  const syncContinuousWorldUi = () => {
-    const enabled = typeof appCtx.getContinuousWorldEnabled === 'function' ?
-      appCtx.getContinuousWorldEnabled() :
-      !!appCtx.earthStreamingState?.enabled;
-    if (continuousWorldToggle) continuousWorldToggle.checked = enabled;
-    if (continuousWorldToggleLabel) {
-      continuousWorldToggleLabel.style.background = enabled ? '#f0f4ff' : '#f8fafc';
-      continuousWorldToggleLabel.style.borderColor = enabled ? '#667eea' : '#e2e8f0';
-    }
-    if (continuousWorldStatus) {
-      continuousWorldStatus.textContent = enabled ?
-        'Continuous World is active. New map areas load as you travel.' :
-        'Quality Location mode is active.';
-    }
-  };
-  syncContinuousWorldUi();
-  if (continuousWorldToggle) {
-    continuousWorldToggle.addEventListener('change', async () => {
-      const enabled = !!continuousWorldToggle.checked;
-      continuousWorldToggle.disabled = true;
-      if (continuousWorldStatus) {
-        continuousWorldStatus.textContent = enabled ?
-          'Enabling continuous map loading...' :
-          'Restoring the complete selected location...';
-      }
-      try {
-        if (typeof appCtx.setContinuousWorldEnabled === 'function') {
-          await appCtx.setContinuousWorldEnabled(enabled);
-        }
-      } finally {
-        continuousWorldToggle.disabled = false;
-        syncContinuousWorldUi();
-      }
     });
   }
 

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "./structure-semantics.js?v=17";
+import { isRoadSurfaceReachable } from "./structure-semantics.js?v=25";
 import { updateDrone } from "./physics/drone-flight.js?v=4";
 import { updatePlane } from "./plane-mode.js?v=7";
 import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=2";
@@ -641,7 +641,10 @@ function update(dt) {
         carY = appCtx.car.y + diff * lerpRate;
       }
     }
-    if (appCtx.car.onRoad && Number.isFinite(targetY) && carY < targetY - 0.04) {
+    // Suspension smoothing may ease a downward change, but it must never lag
+    // behind a rising selected surface far enough to bury the chassis. This
+    // applies equally to roads and legitimate off-road terrain.
+    if (Number.isFinite(targetY) && carY < targetY - 0.04) {
       carY = targetY - 0.04;
     }
     appCtx.car.y = carY;
@@ -665,14 +668,6 @@ function update(dt) {
 
   if (!isPlanetarySurface() && !appCtx.worldLoading) {
     appCtx.updateTerrainAround(appCtx.car.x, appCtx.car.z);
-
-    const now = performance.now();
-    const rebuildInterval = appCtx.lastRoadRebuildCheck === 0 ? 500 : 2000;
-    if (appCtx.roadsNeedRebuild && now - appCtx.lastRoadRebuildCheck > rebuildInterval) {
-      appCtx.lastRoadRebuildCheck = now;
-      appCtx.rebuildRoadsWithTerrain();
-      appCtx.repositionBuildingsWithTerrain();
-    }
   }
 }
 

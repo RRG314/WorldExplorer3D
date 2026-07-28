@@ -1,8 +1,10 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { curatedLandmarksNear } from './landmark-catalog.js?v=7';
+import { curatedLandmarksNear } from './landmark-catalog.js?v=9';
 import { createMeasuredEiffelTower } from './eiffel-structure.js?v=1';
 import { createMeasuredElizabethTower } from './elizabeth-tower-structure.js?v=1';
 import { createMeasuredKhufuPyramid } from './giza-pyramid-structure.js?v=3';
+import { createMeasuredTenLightStreet } from './ten-light-street-structure.js?v=1';
+import { createMeasuredCommercePlace } from './commerce-place-structure.js?v=1';
 
 function disposeModel(root) {
   root?.traverse?.((object) => {
@@ -97,6 +99,8 @@ async function loadCuratedLandmark(landmark, isActiveLoadContext) {
   if (landmark.builder === 'measured-eiffel-tower') model = createMeasuredEiffelTower();
   else if (landmark.builder === 'measured-elizabeth-tower') model = createMeasuredElizabethTower();
   else if (landmark.builder === 'measured-khufu-pyramid') model = createMeasuredKhufuPyramid();
+  else if (landmark.builder === 'measured-ten-light-street') model = createMeasuredTenLightStreet();
+  else if (landmark.builder === 'measured-commerce-place') model = createMeasuredCommercePlace();
   else model = await loadModel(landmark.modelUrl);
   if (!isActiveLoadContext?.()) {
     disposeModel(model);
@@ -113,7 +117,7 @@ async function loadCuratedLandmark(landmark, isActiveLoadContext) {
     landmarkKind: 'curated_model',
     landmarkName: landmark.name,
     wikidata: landmark.wikidata,
-    source: 'licensed-local-asset'
+    source: landmark.builder?.startsWith('measured-') ? 'measured-procedural-structure' : 'licensed-local-asset'
   };
   const placement = placeAtRealScale(root, landmark);
   addEiffelAntenna(root, placement, landmark);

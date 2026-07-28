@@ -46,6 +46,15 @@ export const WORLD_TEST_LOCATIONS = [
     minimumBuildings: 1000
   },
   {
+    id: 'monaco_sainte_devote_custom',
+    kind: 'custom',
+    lat: 43.7364,
+    lon: 7.4197,
+    label: 'Sainte-Dévote tunnel approaches, Monaco',
+    category: 'mountain_tunnel_elevated_interchange_custom',
+    expectedStart: 'land'
+  },
+  {
     id: 'tokyo_shinjuku_custom',
     kind: 'custom',
     lat: 35.6896,
@@ -277,12 +286,23 @@ export const WORLD_TEST_LOCATIONS = [
   {
     id: 'holland_tunnel_custom',
     kind: 'custom',
-    lat: 40.7272,
-    lon: -74.021,
+    lat: 40.726368,
+    lon: -74.014159,
     label: 'Holland Tunnel',
     category: 'urban_tunnel_custom',
     expectedStart: 'land',
     expectedRoadStructure: 'tunnel'
+  },
+  {
+    id: 'pregerson_interchange_custom',
+    kind: 'custom',
+    lat: 33.928746,
+    lon: -118.280939,
+    label: 'Judge Harry Pregerson Interchange',
+    category: 'multi_level_urban_interchange_custom',
+    expectedStart: 'land',
+    expectedRoadStructure: 'bridge',
+    expectedStackedRoadClearance: 5.4
   },
   {
     id: 'panama_canal_custom',

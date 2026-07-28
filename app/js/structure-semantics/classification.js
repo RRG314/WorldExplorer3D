@@ -110,10 +110,10 @@ function classifyStructureSemantics(tags = {}, options = {}) {
 
   const deckClearance = Math.max(
     explicitBaseOffset,
-    verticalOrder > 0 ? baseClearance + Math.max(0, verticalOrder - 1) * 3.4 : 0
+    verticalOrder > 0 ? baseClearance * verticalOrder : 0
   );
   const cutDepth = Math.max(
-    verticalOrder < 0 ? baseDepth + Math.max(0, Math.abs(verticalOrder) - 1) * 3.2 : 0,
+    verticalOrder < 0 ? baseDepth * Math.abs(verticalOrder) : 0,
     culvert ? 2.4 : 0
   );
 

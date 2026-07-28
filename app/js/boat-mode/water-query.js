@@ -38,7 +38,7 @@ import {
   normalizeWaterBody,
   resolveWaterBodySurfaceY,
   waterKindLabel
-} from '../world/water-body-contract.js?v=2';
+} from '../world/water-body-contract.js?v=3';
 
 let _waterRaycaster = null;
 let _waterRayStart = null;

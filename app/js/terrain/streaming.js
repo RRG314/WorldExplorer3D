@@ -13,7 +13,6 @@ function createTerrainStreamingApi(deps = {}) {
     getOrLoadTerrainTile,
     pruneTerrainTileCache,
     terrainTileCacheSnapshot,
-    requestWorldSurfaceSync,
     clearTerrainHeightCache
   } = deps;
 
@@ -41,9 +40,6 @@ function createTerrainStreamingApi(deps = {}) {
         : typeof terrainTileCacheSnapshot === 'function' ? terrainTileCacheSnapshot() : null;
       if (cacheSnapshot && typeof appCtx.setPerfLiveStat === 'function') {
         appCtx.setPerfLiveStat('terrainCache', cacheSnapshot);
-      }
-      if (appCtx.roads.length > 0 && !appCtx.onMoon) {
-        requestWorldSurfaceSync({ source: "terrain_tiles_streamed" });
       }
     }
   }
@@ -122,7 +118,6 @@ function createTerrainStreamingApi(deps = {}) {
     const centerKey = `${appCtx.TERRAIN_ZOOM}/${t.x}/${t.y}`;
     const activeRing = getDynamicTerrainRing();
     const ringChanged = activeRing !== lastDynamicTerrainRing;
-    const needsRoadRebuild = !!appCtx.roadsNeedRebuild && appCtx.roads.length > 0 && !appCtx.onMoon;
     lastDynamicTerrainRing = activeRing;
     if (typeof appCtx.setPerfLiveStat === "function") appCtx.setPerfLiveStat("terrainRing", activeRing);
 
@@ -130,7 +125,7 @@ function createTerrainStreamingApi(deps = {}) {
       const dx = x - terrainState._lastUpdatePos.x;
       const dz = z - terrainState._lastUpdatePos.z;
       const distMoved = Math.sqrt(dx * dx + dz * dz);
-      if (centerKey === lastTerrainCenterKey && distMoved < 5.0 && !ringChanged && !needsRoadRebuild) return;
+      if (centerKey === lastTerrainCenterKey && distMoved < 5.0 && !ringChanged) return;
     }
 
     const tilesChanged = centerKey !== lastTerrainCenterKey || ringChanged;
@@ -186,8 +181,6 @@ function createTerrainStreamingApi(deps = {}) {
         appCtx.setPerfLiveStat("terrainCache", cacheSnapshot);
         appCtx.setPerfLiveStat("terrainMeshQueue", pendingTerrainMeshes.size);
       }
-    } else if (needsRoadRebuild) {
-      requestWorldSurfaceSync({ source: "terrain_tiles_pending" });
     }
   }
 

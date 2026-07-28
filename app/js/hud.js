@@ -1,5 +1,6 @@
 import { ctx as appCtx } from "./shared-context.js?v=55"; // ============================================================================
 import { updateNightLighting } from "./engine/night-lighting.js?v=6";
+import { updateStableDirectionalShadow } from "./engine/shadow-policy.js?v=1";
 import { clampValue, normalizeHeading, updateBoatCamera } from "./hud/boat-camera.js?v=2";
 // hud.js - HUD updates, camera system, sky positioning
 // ============================================================================
@@ -18,6 +19,80 @@ const OVERHEAD_CAMERA_HEIGHT = 50;
 const OVERHEAD_CAMERA_Z_OFFSET = 15;
 const WALK_ROAD_EDGE_MIN = 6;
 const WALK_ROAD_EDGE_SCALE = 0.75;
+let chaseCameraRaycaster = null;
+let chaseCameraOrigin = null;
+let chaseCameraDirection = null;
+let chaseCameraCollisionFrame = 0;
+let chaseCameraCollisionRatio = 1;
+let chaseCameraCollisionCacheValid = false;
+let chaseCameraCollisionLookX = NaN;
+let chaseCameraCollisionLookZ = NaN;
+
+function resolveChaseCameraStructureCollision(lookX, lookY, lookZ, targetX, targetY, targetZ) {
+  if (typeof THREE === 'undefined') return { x: targetX, y: targetY, z: targetZ, collided: false };
+  const targets = (appCtx.structureVisualMeshes || []).filter((mesh) => {
+    if (!mesh?.visible) return false;
+    const type = String(mesh.userData?.structureVisualType || '');
+    return /^(decks|girders|caps|walls|roofs|portals|tunnel_shells|elevated_road_shells)$/.test(type);
+  });
+  if (targets.length === 0) {
+    chaseCameraCollisionCacheValid = false;
+    return { x: targetX, y: targetY, z: targetZ, collided: false };
+  }
+
+  chaseCameraOrigin ||= new THREE.Vector3();
+  chaseCameraDirection ||= new THREE.Vector3();
+  chaseCameraOrigin.set(lookX, lookY, lookZ);
+  chaseCameraDirection.set(
+    targetX - lookX,
+    targetY - lookY,
+    targetZ - lookZ
+  );
+  const distance = chaseCameraDirection.length();
+  if (!(distance > 1.5)) return { x: targetX, y: targetY, z: targetZ, collided: false };
+  chaseCameraDirection.multiplyScalar(1 / distance);
+  chaseCameraCollisionFrame += 1;
+  const movedSinceProbe = Number.isFinite(chaseCameraCollisionLookX)
+    ? Math.hypot(lookX - chaseCameraCollisionLookX, lookZ - chaseCameraCollisionLookZ)
+    : Infinity;
+  const shouldRaycast =
+    !chaseCameraCollisionCacheValid ||
+    movedSinceProbe > 3 ||
+    chaseCameraCollisionFrame % 8 === 0;
+  if (!shouldRaycast) {
+    return {
+      x: lookX + chaseCameraDirection.x * distance * chaseCameraCollisionRatio,
+      y: lookY + chaseCameraDirection.y * distance * chaseCameraCollisionRatio,
+      z: lookZ + chaseCameraDirection.z * distance * chaseCameraCollisionRatio,
+      collided: chaseCameraCollisionRatio < 0.999
+    };
+  }
+
+  chaseCameraRaycaster ||= new THREE.Raycaster();
+  chaseCameraRaycaster.set(chaseCameraOrigin, chaseCameraDirection);
+  chaseCameraRaycaster.near = 0.65;
+  chaseCameraRaycaster.far = distance;
+  const hit = chaseCameraRaycaster.intersectObjects(targets, false)
+    .find((candidate) => Number(candidate?.distance) > 0.8);
+  chaseCameraRaycaster.near = 0;
+  chaseCameraRaycaster.far = Infinity;
+  chaseCameraCollisionCacheValid = true;
+  chaseCameraCollisionLookX = lookX;
+  chaseCameraCollisionLookZ = lookZ;
+  if (!hit) {
+    chaseCameraCollisionRatio = 1;
+    return { x: targetX, y: targetY, z: targetZ, collided: false };
+  }
+
+  const safeDistance = Math.max(1.15, Number(hit.distance) - 0.45);
+  chaseCameraCollisionRatio = Math.min(1, safeDistance / distance);
+  return {
+    x: lookX + chaseCameraDirection.x * safeDistance,
+    y: lookY + chaseCameraDirection.y * safeDistance,
+    z: lookZ + chaseCameraDirection.z * safeDistance,
+    collided: true
+  };
+}
 
 function locationName() {
   if (appCtx.onMars) return 'Olympus Mons, Mars';
@@ -151,9 +226,7 @@ function updateSkyPositions() {
       );
     }
     if (appCtx.sun) {
-      appCtx.sun.position.set(cameraX + lunarSun.x * 220, cameraY + lunarSun.y * 220, cameraZ + lunarSun.z * 220);
-      appCtx.sun.target?.position.set(cameraX, cameraY, cameraZ);
-      appCtx.sun.target?.updateMatrixWorld();
+      updateStableDirectionalShadow(appCtx, lunarSun, appCtx.camera.position);
     }
     if (appCtx.moonSphere) appCtx.moonSphere.visible = false;
     return;
@@ -177,9 +250,7 @@ function updateSkyPositions() {
       }
     }
     if (appCtx.sun) {
-      appCtx.sun.position.set(cameraX + marsSun.x * 220, cameraY + marsSun.y * 220, cameraZ + marsSun.z * 220);
-      appCtx.sun.target?.position.set(cameraX, cameraY, cameraZ);
-      appCtx.sun.target?.updateMatrixWorld();
+      updateStableDirectionalShadow(appCtx, marsSun, appCtx.camera.position);
     }
     if (appCtx.fillLight) {
       appCtx.fillLight.position.set(cameraX - marsSun.x * 150, cameraY + 70, cameraZ - marsSun.z * 150);
@@ -212,11 +283,7 @@ function updateSkyPositions() {
     const dirX = Number.isFinite(sunDir?.x) ? sunDir.x : 0.52;
     const dirY = Number.isFinite(sunDir?.y) ? sunDir.y : 0.82;
     const dirZ = Number.isFinite(sunDir?.z) ? sunDir.z : 0.22;
-    appCtx.sun.position.set(cameraX + dirX * 220, cameraY + dirY * 220, cameraZ + dirZ * 220);
-    if (appCtx.sun.target) {
-      appCtx.sun.target.position.set(cameraX, cameraY, cameraZ);
-      appCtx.sun.target.updateMatrixWorld();
-    }
+    updateStableDirectionalShadow(appCtx, { x: dirX, y: dirY, z: dirZ }, appCtx.camera.position);
   }
 
   // Moon follows the computed lunar direction and stays centered on the observer.
@@ -271,14 +338,17 @@ function updateCamera(dt = 1 / 60) {
 
   // Drone camera mode
   if (appCtx.droneMode) {
-    appCtx.camera.position.set(appCtx.drone.x, appCtx.drone.y, appCtx.drone.z);
+    const dronePose = appCtx.presentationPose?.mode === 'drone'
+      ? appCtx.presentationPose.drone
+      : appCtx.drone;
+    appCtx.camera.position.set(dronePose.x, dronePose.y, dronePose.z);
 
     // Use Euler angles for proper rotation without gimbal lock
     // Order: YXZ (yaw, pitch, roll)
     appCtx.camera.rotation.order = 'YXZ';
-    appCtx.camera.rotation.y = appCtx.drone.yaw + (Number(appCtx.drone.cameraYawOffset) || 0);
-    appCtx.camera.rotation.x = appCtx.drone.pitch;
-    appCtx.camera.rotation.z = appCtx.drone.roll;
+    appCtx.camera.rotation.y = dronePose.yaw + (Number(dronePose.cameraYawOffset) || 0);
+    appCtx.camera.rotation.x = dronePose.pitch;
+    appCtx.camera.rotation.z = dronePose.roll;
 
     updateCameraLinkedEffects();
 
@@ -296,6 +366,7 @@ function updateCamera(dt = 1 / 60) {
   }
 
   const carLook = appCtx.camera.userData.carLook || { yaw: 0, pitch: 0 };
+  const presentationCar = appCtx.presentationPose?.car || appCtx.car;
   appCtx.camera.userData.carLook = carLook;
   const cameraLookSpeed = 1.8 * clampValue(dt, 1 / 240, 0.05);
   const manualCameraInput = appCtx.keys.KeyW || appCtx.keys.KeyA || appCtx.keys.KeyS || appCtx.keys.KeyD;
@@ -323,8 +394,11 @@ function updateCamera(dt = 1 / 60) {
   const h = insideTunnel ? 2.35 : appCtx.onMars ? 6.5 : CHASE_CAMERA_HEIGHT;
 
   // Get car's actual Y position (follows terrain)
-  const carGroundY = appCtx.carMesh.position.y - CAR_BODY_HEIGHT_FROM_GROUND;
-  const viewAngle = appCtx.car.angle + carLook.yaw + (lb ? Math.PI : 0);
+  const carGroundY = Number(presentationCar?.y ?? appCtx.carMesh.position.y) - CAR_BODY_HEIGHT_FROM_GROUND;
+  const carX = Number(presentationCar?.x ?? appCtx.car.x);
+  const carZ = Number(presentationCar?.z ?? appCtx.car.z);
+  const carAngle = Number(presentationCar?.angle ?? appCtx.car.angle);
+  const viewAngle = carAngle + carLook.yaw + (lb ? Math.PI : 0);
 
   // Show car mesh for non-first-person modes
   if (appCtx.camMode !== 1 && appCtx.carMesh && !appCtx.carMesh.visible) {
@@ -336,16 +410,25 @@ function updateCamera(dt = 1 / 60) {
     const horizontalDistance = d * Math.cos(carLook.pitch * 0.55);
     const ox = -Math.sin(viewAngle) * horizontalDistance;
     const oz = -Math.cos(viewAngle) * horizontalDistance;
-    const targetX = appCtx.car.x + ox;
-    const targetY = carGroundY + h + Math.sin(carLook.pitch) * d * 0.72;
-    const targetZ = appCtx.car.z + oz;
-    const lookX = appCtx.car.x;
+    let targetX = carX + ox;
+    let targetY = carGroundY + h + Math.sin(carLook.pitch) * d * 0.72;
+    let targetZ = carZ + oz;
+    const lookX = carX;
     const lookY = carGroundY + (planetaryChase ? 2.1 : 0.5);
-    const lookZ = appCtx.car.z;
+    const lookZ = carZ;
+    const collisionTarget = planetaryChase
+      ? { x: targetX, y: targetY, z: targetZ, collided: false }
+      : resolveChaseCameraStructureCollision(
+          lookX, lookY, lookZ,
+          targetX, targetY, targetZ
+        );
+    targetX = collisionTarget.x;
+    targetY = collisionTarget.y;
+    targetZ = collisionTarget.z;
 
     // Smooth both camera position and lookAt target together
     // Higher factor = camera stays more rigidly fixed to car
-    const smoothFactor = CHASE_CAMERA_SMOOTH_FACTOR;
+    const smoothFactor = collisionTarget.collided ? 1 : CHASE_CAMERA_SMOOTH_FACTOR;
     appCtx.camera.position.x += (targetX - appCtx.camera.position.x) * smoothFactor;
     appCtx.camera.position.y += (targetY - appCtx.camera.position.y) * smoothFactor;
     appCtx.camera.position.z += (targetZ - appCtx.camera.position.z) * smoothFactor;
@@ -364,20 +447,20 @@ function updateCamera(dt = 1 / 60) {
   } else if (appCtx.camMode === 1) {
     // Hood camera - positioned at front of car looking forward over the hood
     // Move camera forward to the hood area (1.2 units ahead of car center)
-    const fwdX = Math.sin(appCtx.car.angle) * HOOD_FORWARD_OFFSET;
-    const fwdZ = Math.cos(appCtx.car.angle) * HOOD_FORWARD_OFFSET;
-    appCtx.camera.position.set(appCtx.car.x + fwdX, carGroundY + HOOD_CAMERA_HEIGHT, appCtx.car.z + fwdZ);
+    const fwdX = Math.sin(carAngle) * HOOD_FORWARD_OFFSET;
+    const fwdZ = Math.cos(carAngle) * HOOD_FORWARD_OFFSET;
+    appCtx.camera.position.set(carX + fwdX, carGroundY + HOOD_CAMERA_HEIGHT, carZ + fwdZ);
     appCtx.camera.lookAt(
-      appCtx.car.x + Math.sin(viewAngle) * HOOD_LOOK_DISTANCE,
+      carX + Math.sin(viewAngle) * HOOD_LOOK_DISTANCE,
       carGroundY + 1.6 + Math.sin(carLook.pitch) * HOOD_LOOK_DISTANCE,
-      appCtx.car.z + Math.cos(viewAngle) * HOOD_LOOK_DISTANCE
+      carZ + Math.cos(viewAngle) * HOOD_LOOK_DISTANCE
     );
     // Hide car mesh in first-person so you don't see tires/body
     if (appCtx.carMesh) appCtx.carMesh.visible = false;
   } else {
     // Overhead camera - high above car
-    appCtx.camera.position.set(appCtx.car.x, carGroundY + OVERHEAD_CAMERA_HEIGHT, appCtx.car.z + OVERHEAD_CAMERA_Z_OFFSET);
-    appCtx.camera.lookAt(appCtx.car.x, carGroundY, appCtx.car.z);
+    appCtx.camera.position.set(carX, carGroundY + OVERHEAD_CAMERA_HEIGHT, carZ + OVERHEAD_CAMERA_Z_OFFSET);
+    appCtx.camera.lookAt(carX, carGroundY, carZ);
   }
 
   updateBillboardMarkers();

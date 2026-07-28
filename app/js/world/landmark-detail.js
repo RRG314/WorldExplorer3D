@@ -1,7 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { fetchBundledLandmarkData } from "./landmark-source.js?v=2";
-import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=7";
-import { renderCuratedLandmarkModels } from './landmark-models.js?v=12';
+import { renderSuspensionBridgeLandmark } from "./bridge-landmark.js?v=9";
+import { renderCuratedLandmarkModels } from './landmark-models.js?v=13';
 
 const MAX_PYRAMIDS = 48;
 const MAX_WALL_WAYS = 140;
@@ -166,7 +166,7 @@ function reprojectActorOutsideLandmarks(meshes) {
   appCtx.applySpawnTarget(x, z, {
     mode,
     preferRoad: mode === 'drive',
-    source: 'deferred_landmark_clearance'
+    source: 'publication_landmark_clearance'
   });
   return true;
 }
@@ -311,35 +311,26 @@ function renderLandmarks(data, options) {
   };
 }
 
-export function scheduleDeferredLandmarkLoad(options = {}) {
-  const query = String(options.query || '');
-  if (!query || typeof options.fetchOverpassJSON !== 'function') return;
-  globalThis.setTimeout(async () => {
-    if (!options.isActiveLoadContext?.()) return;
-    try {
-      const timeoutMs = Math.max(7000, Math.min(18000, Number(options.timeoutMs) || 14000));
-      const bundledData = await fetchBundledLandmarkData({ lat: appCtx.LOC?.lat, lon: appCtx.LOC?.lon });
-      const data = bundledData || await options.fetchOverpassJSON(
-          query,
-          timeoutMs,
-          performance.now() + timeoutMs + 800,
-          options.cacheMeta || null
-        );
-      if (!options.isActiveLoadContext?.()) return;
-      const metrics = renderLandmarks(data, options);
-      metrics.curatedModels = await renderCuratedLandmarkModels(options);
-      if (!options.isActiveLoadContext?.()) return;
-      metrics.source = data._overpassSource || null;
-      metrics.packId = data._landmarkPackId || null;
-      options.loadMetrics.landmarks = metrics;
-      if (appCtx.perfStats?.lastLoad) appCtx.perfStats.lastLoad.landmarks = metrics;
-      options.updateWorldLod?.(true);
-      console.log(
-        `[WorldLoad] Deferred landmarks ready (${metrics.pyramids} pyramids, ${metrics.walls} walls, ` +
-        `${metrics.suspensionBridge?.towerParts || 0} bridge tower parts).`
-      );
-    } catch (err) {
-      options.recordLoadWarning?.('deferredLandmarks', err);
-    }
-  }, 240);
+export async function loadLandmarksForPublication(options = {}) {
+  if (!options.isActiveLoadContext?.()) return { status: 'aborted' };
+  try {
+    const data = await fetchBundledLandmarkData({
+      lat: appCtx.LOC?.lat,
+      lon: appCtx.LOC?.lon
+    });
+    if (!options.isActiveLoadContext?.()) return { status: 'aborted' };
+    const metrics = data
+      ? renderLandmarks(data, options)
+      : { pyramids: 0, walls: 0, suspensionBridge: null };
+    metrics.curatedModels = await renderCuratedLandmarkModels(options);
+    if (!options.isActiveLoadContext?.()) return { status: 'aborted' };
+    metrics.source = data?._overpassSource || null;
+    metrics.packId = data?._landmarkPackId || null;
+    options.loadMetrics.landmarks = metrics;
+    if (appCtx.perfStats?.lastLoad) appCtx.perfStats.lastLoad.landmarks = metrics;
+    return { status: 'ready', metrics };
+  } catch (err) {
+    options.recordLoadWarning?.('landmark publication', err);
+    return { status: 'error', error: err?.message || String(err) };
+  }
 }

@@ -1,4 +1,4 @@
-import { pointInPolygonXZ } from "../structure-semantics.js?v=17";
+import { pointInPolygonXZ } from "../structure-semantics.js?v=25";
 
 function isProtectedRoadFeature(feature) {
   const semantics = feature?.structureSemantics;

@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
   - name: Documentation index
-    url: https://github.com/RRG314/WorldExplorer3D/blob/main/DOCUMENTATION_INDEX.md
-    about: Start here for docs before opening an issue.
+    url: https://github.com/RRG314/WorldExplorer3D#project-documents
+    about: Review the project documentation before opening an issue.

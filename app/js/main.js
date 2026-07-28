@@ -1,5 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=1';
+import { createCoreFrameSystems } from './runtime/core-frame-systems.js?v=2';
 import { createDebugPresentationSystem } from './runtime/debug-presentation.js?v=1';
 import { createRuntimeKernel } from './runtime/kernel.js?v=1';
 
@@ -97,7 +97,9 @@ function dedicatedRendererActive() {
 const runtimeKernel = createRuntimeKernel({
   fixedDelta: 1 / 60,
   maxDelta: 0.1,
-  maxFixedSteps: 5,
+  // Bound catch-up work so a slow frame cannot recursively create another
+  // slow frame. Excess wall-clock time is intentionally dropped.
+  maxFixedSteps: 2,
   getContext: () => ({
     appCtx,
     environment: appCtx.getEnv?.() || null,

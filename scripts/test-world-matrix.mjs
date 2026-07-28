@@ -18,6 +18,7 @@ const captureDroneViews = process.env.WORLD_MATRIX_CAPTURE_DRONE === '1';
 const forceDaylight = process.env.WORLD_MATRIX_FORCE_DAYLIGHT === '1';
 const requireWorldCover = process.env.WORLD_MATRIX_REQUIRE_WORLDCOVER === '1';
 const blockWorldCover = process.env.WORLD_MATRIX_BLOCK_WORLDCOVER === '1';
+const disableNearBuildingBatching = process.env.WORLD_MATRIX_DISABLE_NEAR_BUILDING_BATCHING === '1';
 const locationDelayMs = Math.max(0, Number(process.env.WORLD_MATRIX_LOCATION_DELAY_MS ?? 1200) || 0);
 const buildingDetailWaitLimitMs = 32000;
 const reportName = /^[a-z0-9._-]+$/i.test(String(process.env.WORLD_MATRIX_REPORT_NAME || '')) ?
@@ -45,14 +46,14 @@ function isTransientNetworkConsoleError(text = '') {
   const msg = String(text || '');
   return (
     /Failed to load resource:\s+the server responded with a status of\s+(400|429|500|502|503|504)/i.test(msg) ||
-    /Failed to load resource:\s+net::ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|BLOCKED_BY_CLIENT|FAILED)/i.test(msg) ||
+    /Failed to load resource:\s+net::ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|NETWORK_CHANGED|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|BLOCKED_BY_CLIENT|FAILED)/i.test(msg) ||
     /blocked by CORS policy/i.test(msg)
   );
 }
 
 function fatalConsoleEntries(consoleErrors, requestFailures, baseUrl) {
   const transientRequests = requestFailures.filter((failure) =>
-    /ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|BLOCKED_BY_CLIENT|FAILED)/i.test(failure.errorText || '')
+    /ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|NETWORK_CHANGED|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|BLOCKED_BY_CLIENT|FAILED)/i.test(failure.errorText || '')
   );
   const transientOnlyExternal = transientRequests.length > 0 && transientRequests.every((failure) =>
     !String(failure.url || '').startsWith(baseUrl)
@@ -174,7 +175,9 @@ async function loadLocation(page, spec) {
     if (locationSpec.kind === 'custom' && typeof ctx.applyCustomLocationSpawn === 'function') {
       initialSpawn = ctx.applyCustomLocationSpawn('walk', {
         emitTutorial: false,
-        preferBoatIfWater: expectedStart === 'water',
+        // Match the production title/globe launch policy. A mapped bridge,
+        // tunnel, or valid dry surface must win over merely nearby water.
+        preferBoatIfWater: true,
         source: expectedStart === 'water' ? 'world_matrix_custom_water' : 'world_matrix_custom_land'
       });
     } else if (typeof ctx.spawnOnRoad === 'function') {
@@ -307,10 +310,32 @@ async function loadLocation(page, spec) {
       if (mesh?.visible !== false) landusePresentation[type].visibleSources += sourceCount;
     }
 
-    const structurePresentation = { roads: {}, waterways: {}, nonNavigableWaterways: 0 };
+    const structurePresentation = {
+      roads: {},
+      waterways: {},
+      nonNavigableWaterways: 0,
+      tunnelModels: {},
+      tunnelShellMeshes: 0,
+      tunnelShellTriangles: 0,
+      terrainCuts: Array.isArray(ctx.structureTerrainCuts) ? ctx.structureTerrainCuts.length : 0
+    };
     for (const road of ctx.roads || []) {
       const kind = String(road?.structureSemantics?.structureKind || 'at_grade');
       structurePresentation.roads[kind] = (structurePresentation.roads[kind] || 0) + 1;
+      if (road?.tunnelSystemModel) {
+        const visualKind = String(road.tunnelSystemModel.visualKind || 'none');
+        structurePresentation.tunnelModels[visualKind] =
+          (structurePresentation.tunnelModels[visualKind] || 0) + 1;
+      }
+    }
+    for (const mesh of ctx.structureVisualMeshes || []) {
+      if (mesh?.userData?.structureVisualType !== 'tunnel_shells') continue;
+      structurePresentation.tunnelShellMeshes += 1;
+      const indexCount = Number(mesh.geometry?.index?.count || 0);
+      const positionCount = Number(mesh.geometry?.attributes?.position?.count || 0);
+      structurePresentation.tunnelShellTriangles += indexCount > 0 ?
+        Math.floor(indexCount / 3) :
+        Math.floor(positionCount / 3);
     }
     for (const waterway of ctx.waterways || []) {
       const kind = String(waterway?.structureSemantics?.structureKind || 'at_grade');
@@ -318,12 +343,121 @@ async function loadLocation(page, spec) {
       if (waterway?.navigable === false) structurePresentation.nonNavigableWaterways += 1;
     }
 
-    let customStructureProbe = null;
-    if (locationSpec.expectedRoadStructure) {
-      const targetRoad = (ctx.roads || []).find((road) =>
-        road?.structureSemantics?.structureKind === locationSpec.expectedRoadStructure &&
-        Array.isArray(road.pts) && road.pts.length >= 2
+    let stackedRoadCrossings = null;
+    if (Number.isFinite(locationSpec.expectedStackedRoadClearance)) {
+      const elevatedRoads = (ctx.roads || []).filter((road) =>
+        road?.structureSemantics?.terrainMode === 'elevated' &&
+        Number.isFinite(road?.structureSemantics?.verticalOrder) &&
+        Array.isArray(road?.pts) &&
+        road.pts.length >= 2
       );
+      let minimumSeparation = Infinity;
+      let worst = null;
+      let count = 0;
+      const segmentCrossing = (a1, a2, b1, b2) => {
+        const adx = a2.x - a1.x;
+        const adz = a2.z - a1.z;
+        const bdx = b2.x - b1.x;
+        const bdz = b2.z - b1.z;
+        const denominator = adx * bdz - adz * bdx;
+        if (Math.abs(denominator) < 1e-8) return null;
+        const dx = b1.x - a1.x;
+        const dz = b1.z - a1.z;
+        const t = (dx * bdz - dz * bdx) / denominator;
+        const u = (dx * adz - dz * adx) / denominator;
+        if (t <= 0.02 || t >= 0.98 || u <= 0.02 || u >= 0.98) return null;
+        return { x: a1.x + adx * t, z: a1.z + adz * t, t, u };
+      };
+
+      for (let aIndex = 0; aIndex < elevatedRoads.length; aIndex += 1) {
+        const lowerCandidate = elevatedRoads[aIndex];
+        for (let bIndex = aIndex + 1; bIndex < elevatedRoads.length; bIndex += 1) {
+          const upperCandidate = elevatedRoads[bIndex];
+          const lowerOrder = Number(lowerCandidate.structureSemantics.verticalOrder);
+          const upperOrder = Number(upperCandidate.structureSemantics.verticalOrder);
+          if (ctx.areRoadsConnected?.(lowerCandidate, upperCandidate)) continue;
+          for (let aSegment = 0; aSegment < lowerCandidate.pts.length - 1; aSegment += 1) {
+            for (let bSegment = 0; bSegment < upperCandidate.pts.length - 1; bSegment += 1) {
+              const crossing = segmentCrossing(
+                lowerCandidate.pts[aSegment],
+                lowerCandidate.pts[aSegment + 1],
+                upperCandidate.pts[bSegment],
+                upperCandidate.pts[bSegment + 1]
+              );
+              if (!crossing) continue;
+              const aY = Number(ctx.sampleFeatureSurfaceY?.(
+                lowerCandidate,
+                crossing.x,
+                crossing.z,
+                { segIndex: aSegment, t: crossing.t }
+              ));
+              const bY = Number(ctx.sampleFeatureSurfaceY?.(
+                upperCandidate,
+                crossing.x,
+                crossing.z,
+                { segIndex: bSegment, t: crossing.u }
+              ));
+              if (!Number.isFinite(aY) || !Number.isFinite(bY)) continue;
+              const separation = Math.abs(aY - bY);
+              count += 1;
+              if (separation < minimumSeparation) {
+                minimumSeparation = separation;
+                worst = {
+                  x: Number(crossing.x.toFixed(2)),
+                  z: Number(crossing.z.toFixed(2)),
+                  separation: Number(separation.toFixed(3)),
+                  orders: [lowerOrder, upperOrder].sort((a, b) => a - b),
+                  featureIds: [
+                    String(lowerCandidate.sourceFeatureId || lowerCandidate.id || ''),
+                    String(upperCandidate.sourceFeatureId || upperCandidate.id || '')
+                  ],
+                  names: [String(lowerCandidate.name || ''), String(upperCandidate.name || '')],
+                  stationTargets: [
+                    (lowerCandidate.structureStations || []).map((station) => Number(station.targetOffset)),
+                    (upperCandidate.structureStations || []).map((station) => Number(station.targetOffset))
+                  ],
+                  stationSources: [
+                    (lowerCandidate.structureStations || []).map((station) => String(station.source || '')),
+                    (upperCandidate.structureStations || []).map((station) => String(station.source || ''))
+                  ],
+                  surfaceRanges: [
+                    [Number(lowerCandidate.structureSurfaceMinY), Number(lowerCandidate.structureSurfaceMaxY)],
+                    [Number(upperCandidate.structureSurfaceMinY), Number(upperCandidate.structureSurfaceMaxY)]
+                  ]
+                };
+              }
+            }
+          }
+        }
+      }
+      stackedRoadCrossings = {
+        count,
+        minimumSeparation: Number.isFinite(minimumSeparation) ? Number(minimumSeparation.toFixed(3)) : null,
+        worst
+      };
+    }
+
+    let customStructureProbe = null;
+    let structureGameplay = null;
+    if (locationSpec.expectedRoadStructure) {
+      const structureLength = (road) => {
+        if (!Array.isArray(road?.pts) || road.pts.length < 2) return 0;
+        let length = 0;
+        for (let index = 0; index < road.pts.length - 1; index += 1) {
+          length += Math.hypot(
+            road.pts[index + 1].x - road.pts[index].x,
+            road.pts[index + 1].z - road.pts[index].z
+          );
+        }
+        return length;
+      };
+      const targetRoad = (ctx.roads || [])
+        .filter((road) =>
+          road?.structureSemantics?.structureKind === locationSpec.expectedRoadStructure &&
+          Array.isArray(road.pts) &&
+          road.pts.length >= 2
+        )
+        .sort((left, right) => structureLength(right) - structureLength(left))[0] || null;
       if (targetRoad) {
         let segmentIndex = 0;
         let segmentLength = -1;
@@ -364,6 +498,81 @@ async function loadLocation(page, spec) {
           actorX = x;
           actorZ = z;
           actorFeetY = surfaceY;
+
+          const frameCount = 480;
+          const startX = Number(ctx.car?.x);
+          const startZ = Number(ctx.car?.z);
+          let onExpectedLayerFrames = 0;
+          let maximumLateralError = 0;
+          let maximumVerticalError = 0;
+          let minimumStructureSeparation = Infinity;
+          const savedKeys = {
+            KeyW: !!ctx.keys?.KeyW,
+            ArrowUp: !!ctx.keys?.ArrowUp,
+            KeyA: !!ctx.keys?.KeyA,
+            ArrowLeft: !!ctx.keys?.ArrowLeft,
+            KeyD: !!ctx.keys?.KeyD,
+            ArrowRight: !!ctx.keys?.ArrowRight
+          };
+
+          if (ctx.keys && typeof ctx.update === 'function') {
+            ctx.keys.KeyW = true;
+            ctx.keys.ArrowUp = true;
+            ctx.keys.KeyA = false;
+            ctx.keys.ArrowLeft = false;
+            ctx.keys.KeyD = false;
+            ctx.keys.ArrowRight = false;
+            for (let frame = 0; frame < frameCount; frame += 1) {
+              ctx.update(1 / 60);
+              const carFeetY = Number(ctx.car?.y) - 1.2;
+              const currentRoad = ctx.findNearestRoad?.(Number(ctx.car?.x), Number(ctx.car?.z), {
+                y: carFeetY,
+                maxVerticalDelta: 8,
+                preferredRoad: targetRoad
+              });
+              const currentSurfaceY = Number(currentRoad?.y);
+              const currentKind = currentRoad?.road?.structureSemantics?.structureKind || null;
+              const sameVerticalGroup =
+                currentRoad?.road?.structureSemantics?.verticalGroup ===
+                targetRoad?.structureSemantics?.verticalGroup;
+              if (currentKind === locationSpec.expectedRoadStructure && sameVerticalGroup) {
+                onExpectedLayerFrames += 1;
+              }
+              if (Number.isFinite(currentRoad?.dist)) {
+                maximumLateralError = Math.max(maximumLateralError, Number(currentRoad.dist));
+              }
+              if (Number.isFinite(currentSurfaceY) && Number.isFinite(carFeetY)) {
+                maximumVerticalError = Math.max(maximumVerticalError, Math.abs(carFeetY - currentSurfaceY));
+                const terrainY = Number(ctx.SurfaceQuery?.terrainAt?.(
+                  Number(ctx.car?.x),
+                  Number(ctx.car?.z)
+                )?.position?.y);
+                if (Number.isFinite(terrainY)) {
+                  const separation = locationSpec.expectedRoadStructure === 'tunnel' ?
+                    terrainY - currentSurfaceY :
+                    currentSurfaceY - terrainY;
+                  minimumStructureSeparation = Math.min(minimumStructureSeparation, separation);
+                }
+              }
+            }
+          }
+
+          const endX = Number(ctx.car?.x);
+          const endZ = Number(ctx.car?.z);
+          structureGameplay = {
+            simulatedSeconds: Number((frameCount / 60).toFixed(1)),
+            frames: frameCount,
+            moved: Number(Math.hypot(endX - startX, endZ - startZ).toFixed(2)),
+            onExpectedLayerPct: Number((onExpectedLayerFrames / frameCount * 100).toFixed(2)),
+            maximumLateralError: Number(maximumLateralError.toFixed(3)),
+            maximumVerticalError: Number(maximumVerticalError.toFixed(3)),
+            minimumStructureSeparation: Number.isFinite(minimumStructureSeparation) ?
+              Number(minimumStructureSeparation.toFixed(3)) :
+              null
+          };
+
+          if (ctx.keys) Object.assign(ctx.keys, savedKeys);
+          ctx.applyResolvedWorldSpawn(probeSpawn, { mode: 'drive' });
         }
         const nearest = typeof ctx.findNearestRoad === 'function' ? ctx.findNearestRoad(x, z, {
           y: surfaceY,
@@ -373,6 +582,7 @@ async function loadLocation(page, spec) {
         customStructureProbe = {
           kind: targetRoad.structureSemantics?.structureKind || null,
           terrainMode: targetRoad.structureSemantics?.terrainMode || null,
+          featureLength: Number(structureLength(targetRoad).toFixed(2)),
           segmentLength: Number(segmentLength.toFixed(2)),
           surfaceY: Number.isFinite(surfaceY) ? Number(surfaceY.toFixed(2)) : null,
           renderedY: Number.isFinite(renderedY) ? Number(renderedY.toFixed(2)) : null,
@@ -398,6 +608,16 @@ async function loadLocation(page, spec) {
       visibleDetailedSourceCount: 0,
       wallFacadeSourceCount: 0,
       visibleWallFacadeSourceCount: 0,
+      facadeAtlasSourceCount: 0,
+      visibleFacadeAtlasSourceCount: 0,
+      roofSourceCount: 0,
+      visibleRoofSourceCount: 0,
+      exteriorOwnedSourceCount: 0,
+      visibleExteriorOwnedSourceCount: 0,
+      provenanceClaimedSourceCount: 0,
+      visibleProvenanceClaimedSourceCount: 0,
+      unownedSamples: [],
+      geometryAnomalySamples: [],
       tiers: {}
     };
     let buildingDimensions = null;
@@ -413,12 +633,89 @@ async function loadLocation(page, spec) {
       const sourceCount = Math.max(1, Number(mesh.userData?.batchCount || 1));
       const tier = String(mesh.userData?.lodTier || 'unknown');
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      if (!mesh.userData?.isBuildingBatch && mesh.geometry) {
+        if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+        const bounds = mesh.geometry.boundingBox;
+        const width = bounds ? bounds.max.x - bounds.min.x : 0;
+        const height = bounds ? bounds.max.y - bounds.min.y : 0;
+        const depth = bounds ? bounds.max.z - bounds.min.z : 0;
+        if (
+          buildingPresentation.geometryAnomalySamples.length < 40 &&
+          (width > 80 || depth > 80 || height > 80 || mesh.userData?.buildingName)
+        ) {
+          const footprint = Array.isArray(mesh.userData?.buildingFootprint) ? mesh.userData.buildingFootprint : [];
+          const footprintCenter = footprint.length > 0 ? footprint.reduce(
+            (sum, point) => ({ x: sum.x + Number(point.x || 0), z: sum.z + Number(point.z || 0) }),
+            { x: 0, z: 0 }
+          ) : null;
+          if (footprintCenter) {
+            footprintCenter.x /= footprint.length;
+            footprintCenter.z /= footprint.length;
+          }
+          buildingPresentation.geometryAnomalySamples.push({
+            sourceBuildingId: mesh.userData?.sourceBuildingId || null,
+            buildingName: mesh.userData?.buildingName || null,
+            buildingType: mesh.userData?.buildingType || null,
+            roofShape: mesh.userData?.roofShape || null,
+            geometrySource: mesh.userData?.geometrySource || null,
+            footprintWidth: Number(mesh.userData?.footprintWidth || 0),
+            footprintDepth: Number(mesh.userData?.footprintDepth || 0),
+            footprintArea: Number(mesh.userData?.footprintArea || 0),
+            heightMeters: Number(mesh.userData?.heightMeters || 0),
+            footprintCenter: footprintCenter ? {
+              x: Number(footprintCenter.x.toFixed(2)),
+              z: Number(footprintCenter.z.toFixed(2))
+            } : null,
+            bounds: {
+              width: Number(width.toFixed(2)),
+              height: Number(height.toFixed(2)),
+              depth: Number(depth.toFixed(2))
+            }
+          });
+        }
+      }
       const hasSurfaceDetail = materials.some((material) => !!material?.map);
       const hasWallFacade = materials.some((material) => material?.userData?.facadeWallsOnly === true);
+      const hasRoofOwner = mesh.userData?.isRoofDetail === true || materials.every((material) => {
+        const key = String(material?.userData?.buildingBatchKey || '');
+        return key.startsWith('mapped-roof:') || key.startsWith('roof-detail:');
+      });
+      const hasExteriorOwner = hasRoofOwner || materials.every((material) =>
+        material?.userData?.buildingExterior === true
+      );
+      const hasFacadeAtlas = !hasRoofOwner && materials.every((material) =>
+        material?.userData?.buildingExterior === true &&
+        material?.userData?.facadeAtlas === true &&
+        material?.userData?.wallOnlyTexture === true &&
+        !!material?.map
+      );
+      const hasProvenanceClaim = materials.every((material) =>
+        material?.userData?.materialClaim === 'mapped' ||
+        material?.userData?.materialClaim === 'neutral-fallback' ||
+        String(material?.userData?.buildingBatchKey || '').startsWith('mapped-roof:') ||
+        String(material?.userData?.buildingBatchKey || '').startsWith('roof-detail:')
+      );
+      if ((!hasExteriorOwner || !hasProvenanceClaim) && buildingPresentation.unownedSamples.length < 12) {
+        buildingPresentation.unownedSamples.push({
+          sourceCount,
+          tier,
+          meshName: String(mesh.name || ''),
+          meshFlags: { ...(mesh.userData || {}) },
+          materials: materials.map((material) => ({
+            name: String(material?.name || ''),
+            type: String(material?.type || ''),
+            userData: { ...(material?.userData || {}) }
+          }))
+        });
+      }
       buildingPresentation.meshCount += 1;
       buildingPresentation.sourceCount += sourceCount;
       if (hasSurfaceDetail) buildingPresentation.detailedSourceCount += sourceCount;
       if (hasWallFacade) buildingPresentation.wallFacadeSourceCount += sourceCount;
+      if (hasFacadeAtlas) buildingPresentation.facadeAtlasSourceCount += sourceCount;
+      if (hasRoofOwner) buildingPresentation.roofSourceCount += sourceCount;
+      if (hasExteriorOwner) buildingPresentation.exteriorOwnedSourceCount += sourceCount;
+      if (hasProvenanceClaim) buildingPresentation.provenanceClaimedSourceCount += sourceCount;
       buildingPresentation.tiers[tier] ||= { meshes: 0, sources: 0, visibleMeshes: 0, visibleSources: 0 };
       buildingPresentation.tiers[tier].meshes += 1;
       buildingPresentation.tiers[tier].sources += sourceCount;
@@ -427,6 +724,10 @@ async function loadLocation(page, spec) {
         buildingPresentation.visibleSourceCount += sourceCount;
         if (hasSurfaceDetail) buildingPresentation.visibleDetailedSourceCount += sourceCount;
         if (hasWallFacade) buildingPresentation.visibleWallFacadeSourceCount += sourceCount;
+        if (hasFacadeAtlas) buildingPresentation.visibleFacadeAtlasSourceCount += sourceCount;
+        if (hasRoofOwner) buildingPresentation.visibleRoofSourceCount += sourceCount;
+        if (hasExteriorOwner) buildingPresentation.visibleExteriorOwnedSourceCount += sourceCount;
+        if (hasProvenanceClaim) buildingPresentation.visibleProvenanceClaimedSourceCount += sourceCount;
         buildingPresentation.tiers[tier].visibleMeshes += 1;
         buildingPresentation.tiers[tier].visibleSources += sourceCount;
       }
@@ -632,6 +933,7 @@ async function loadLocation(page, spec) {
       },
       landusePresentation,
       structurePresentation,
+      stackedRoadCrossings,
       buildingPresentation,
       buildingDimensions,
       landmarkPresentation,
@@ -657,6 +959,7 @@ async function loadLocation(page, spec) {
         endpointConnected: initialSpawn.endpointConnected ?? null
       } : null,
       customStructureProbe,
+      structureGameplay,
       boatActive: !!ctx.boatMode?.active,
       boatPresentation: ctx.boatMode?.active ? {
         meshVisible: !!ctx.boatMode?.mesh?.visible,
@@ -769,6 +1072,12 @@ async function main() {
 
   try {
     await bootstrapRuntime(page, baseUrl);
+    if (disableNearBuildingBatching) {
+      await page.evaluate(async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        ctx.disableNearBuildingBatching = true;
+      });
+    }
 
     for (const spec of testLocations) {
       console.log(`[world-matrix] loading ${spec.id}`);

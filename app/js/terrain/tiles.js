@@ -3,15 +3,16 @@ import {
   decodeTerrariumRgb,
   geographicToXyzTile,
   xyzTileBounds
-} from "./source-contract.js?v=1";
+} from "./source-contract.js?v=2";
 import {
   adaptTerrariumTileSample
-} from "./provider-adapter.js?v=1";
+} from "./provider-adapter.js?v=2";
 import {
   applyTerrainVisualProfile,
   classifyTerrainVisualProfile,
   TERRAIN_GRASS_COLOR_HEX
-} from "./surface-profiles.js?v=26";
+} from "./surface-profiles.js?v=30";
+import { stitchTerrainMeshEdges } from "./seams.js?v=1";
 
 const TERRAIN_TILE_CACHE_LIMIT = 72;
 const TERRAIN_TILE_MAX_ATTEMPTS = 3;
@@ -111,13 +112,18 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
       if (appCtx.terrainGroup && typeof deps.reapplyTerrainMeshHeights === "function") {
         appCtx.terrainGroup.children.forEach((mesh) => {
           const tileInfo = mesh.userData?.terrainTile;
-          if (tileInfo && tileInfo.z === z && tileInfo.tx === x && tileInfo.ty === y) {
+          const suppliesSharedEdge = tileInfo && tileInfo.z === z && (
+            (tileInfo.tx === x && tileInfo.ty === y) ||
+            (tileInfo.tx + 1 === x && tileInfo.ty === y) ||
+            (tileInfo.tx === x && tileInfo.ty + 1 === y) ||
+            (tileInfo.tx + 1 === x && tileInfo.ty + 1 === y)
+          );
+          if (suppliesSharedEdge) {
             deps.reapplyTerrainMeshHeights(mesh);
           }
         });
       }
 
-      deps.scheduleRoadAndBuildingRebuild?.();
       resolveReady(true);
     } catch (error) {
       console.warn("Terrain tile decode failed:", z, x, y, error);
@@ -507,7 +513,9 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
     color: typeof appCtx.grassDiffuse !== "undefined" && appCtx.grassDiffuse ? 0xffffff : TERRAIN_GRASS_COLOR_HEX,
     roughness: 0.95,
     metalness: 0.0,
-    side: THREE.DoubleSide,
+    // Only the physical top face is visible. Rendering the underside places
+    // terrain over the ceiling from inside a subgrade transport structure.
+    side: THREE.FrontSide,
     polygonOffset: true,
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1,
@@ -527,7 +535,7 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
   mesh.userData.terrainTextureRepeats = repeats;
   mesh.userData.renderProvenance = {
     version: 1,
-    profile: appCtx.getContinuousWorldEnabled?.() === true ? 'continuous_global' : 'location_osm',
+    profile: 'location_osm',
     provider: 'AWS Open Data / ESA / mapped vector provider',
     dataset: 'Mapzen Terrarium elevation + semantic surface classification',
     release: '',
@@ -581,6 +589,8 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
   let maxElevation = -Infinity;
   const elevations = [];
   const elevationMetersSamples = [];
+  const segments = Math.max(1, Number(appCtx.TERRAIN_SEGMENTS) || 1);
+  const verticesPerSide = segments + 1;
 
   for (let i = 0; i < pos.count; i++) {
     const wx = pos.getX(i) + mesh.position.x;
@@ -588,7 +598,33 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
     const { lat, lon } = worldToLatLon(wx, wz);
     const u = (lon - bounds.lonW) / lonRange;
     const v = (bounds.latN - lat) / latRange;
-    const meters = sampleTileElevationMeters(tile, u, v, deps.clampElevationMeters);
+    const column = i % verticesPerSide;
+    const row = Math.floor(i / verticesPerSide);
+    const eastEdge = column === segments;
+    const southEdge = row === segments;
+    let sampleSource = tile;
+    let sampleU = u;
+    let sampleV = v;
+    if (eastEdge || southEdge) {
+      const tileCount = 2 ** z;
+      const adjacent = getOrLoadTerrainTile(
+        z,
+        eastEdge ? (tx + 1) % tileCount : tx,
+        Math.min(tileCount - 1, ty + (southEdge ? 1 : 0)),
+        deps
+      );
+      if (adjacent.loaded && adjacent.elev) {
+        sampleSource = adjacent;
+        if (eastEdge) sampleU = 0;
+        if (southEdge) sampleV = 0;
+      }
+    }
+    const meters = sampleTileElevationMeters(
+      sampleSource,
+      sampleU,
+      sampleV,
+      deps.clampElevationMeters
+    );
     elevationMetersSamples.push(meters);
     const baseY = meters * appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION;
     const y = typeof deps.applyStructureTerrainCuts === "function" ? deps.applyStructureTerrainCuts(wx, wz, baseY) : baseY;
@@ -604,6 +640,7 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
 
   pos.needsUpdate = true;
   mesh.geometry.computeVertexNormals();
+  stitchTerrainMeshEdges(appCtx, mesh);
   mesh.userData.pendingTerrainTile = false;
   mesh.visible = true;
 
