@@ -4,7 +4,7 @@ import { resolveWaterSurfaceVisualProfile } from "./load-geometry.js?v=20";
 import { registerWaterWaveMaterial } from "./render-support.js?v=6";
 import { decimatePoints } from "./world-geometry.js?v=3";
 import { inferWaterRenderContext } from "../water-dynamics.js?v=4";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=25";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=28";
 import { normalizeWaterBody } from './water-body-contract.js?v=3';
 
 function waterwayWidthFromTags(tags) {

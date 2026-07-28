@@ -589,8 +589,6 @@ function stopOceanMode(options = {}) {
   const indBrake = document.getElementById('indBrake');
   const indBoost = document.getElementById('indBoost');
   const indDrift = document.getElementById('indDrift');
-  const indOff = document.getElementById('indOff');
-  const offRoadWarn = document.getElementById('offRoadWarn');
   if (speedUnitEl) speedUnitEl.textContent = 'MPH';
   if (limitLabelEl) limitLabelEl.textContent = 'LIMIT';
   if (indBrake) {
@@ -602,12 +600,6 @@ function stopOceanMode(options = {}) {
     indBoost.classList.remove('on');
   }
   if (indDrift) indDrift.textContent = 'DRIFT';
-  if (indOff) {
-    indOff.textContent = 'OFF';
-    indOff.classList.remove('on', 'warn');
-  }
-  if (offRoadWarn) offRoadWarn.classList.remove('active');
-
   if (options.commitEnvironment !== false && appCtx.ENV?.EARTH) {
     commitEnvironment(appCtx.ENV.EARTH, { source: 'ocean_stop' });
   }

@@ -4,22 +4,14 @@ import { detectRoadIntersections } from "./intersections.js?v=1";
 import {
   buildFeatureRibbonEdges,
   enforceAtGradeRibbonClearance,
-  projectPointToFeature,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=25";
-import { compileIntersectionTopologyGeometry } from "./intersection-geometry.js?v=1";
+} from "../structure-semantics.js?v=28";
 import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=3";
 
 const ROAD_SURFACE_BIAS = 0.08;
 
 export { detectRoadIntersections };
-
-function shouldBuildIntersectionCap(intersection) {
-  if (!intersection || !Array.isArray(intersection.roads)) return false;
-  if (intersection.roads.length < 3) return false;
-  return true;
-}
 
 function computeIntersectionCapRadius(intersection) {
   const maxWidth = Number(intersection?.maxWidth || 8);
@@ -35,105 +27,6 @@ function computeIntersectionCapRadius(intersection) {
   const minRadius = maxWidth * 0.22;
   const maxRadius = maxWidth * 0.34;
   return Math.max(minRadius, Math.min(maxRadius, unclamped));
-}
-
-function polylineLengthLocal(points = []) {
-  if (!Array.isArray(points) || points.length < 2) return 0;
-  let total = 0;
-  for (let i = 1; i < points.length; i++) {
-    total += Math.hypot(points[i].x - points[i - 1].x, points[i].z - points[i - 1].z);
-  }
-  return total;
-}
-
-function trimPolylineEndpoints(points = [], startTrim = 0, endTrim = 0) {
-  if (!Array.isArray(points) || points.length < 2) return Array.isArray(points) ? points.slice() : [];
-  const totalLength = polylineLengthLocal(points);
-  if (!(totalLength > 0)) return points.slice();
-
-  const safeStartTrim = Math.max(0, Math.min(Number(startTrim) || 0, totalLength * 0.32));
-  const safeEndTrim = Math.max(0, Math.min(Number(endTrim) || 0, totalLength * 0.32));
-  if (safeStartTrim <= 0 && safeEndTrim <= 0) return points.slice();
-  if (safeStartTrim + safeEndTrim >= totalLength - 2.5) return points.slice();
-
-  let startIndex = 0;
-  let startPoint = { ...points[0] };
-  let remainingStart = safeStartTrim;
-  while (remainingStart > 1e-4 && startIndex < points.length - 1) {
-    const a = points[startIndex];
-    const b = points[startIndex + 1];
-    const segLen = Math.hypot(b.x - a.x, b.z - a.z);
-    if (!(segLen > 1e-4)) {
-      startIndex += 1;
-      startPoint = { ...points[startIndex] };
-      continue;
-    }
-    if (remainingStart >= segLen) {
-      remainingStart -= segLen;
-      startIndex += 1;
-      startPoint = { ...points[startIndex] };
-      continue;
-    }
-    const t = remainingStart / segLen;
-    startPoint = {
-      x: a.x + (b.x - a.x) * t,
-      z: a.z + (b.z - a.z) * t
-    };
-    remainingStart = 0;
-  }
-
-  let endIndex = points.length - 1;
-  let endPoint = { ...points[endIndex] };
-  let remainingEnd = safeEndTrim;
-  while (remainingEnd > 1e-4 && endIndex > 0) {
-    const a = points[endIndex];
-    const b = points[endIndex - 1];
-    const segLen = Math.hypot(a.x - b.x, a.z - b.z);
-    if (!(segLen > 1e-4)) {
-      endIndex -= 1;
-      endPoint = { ...points[endIndex] };
-      continue;
-    }
-    if (remainingEnd >= segLen) {
-      remainingEnd -= segLen;
-      endIndex -= 1;
-      endPoint = { ...points[endIndex] };
-      continue;
-    }
-    const t = remainingEnd / segLen;
-    endPoint = {
-      x: a.x + (b.x - a.x) * t,
-      z: a.z + (b.z - a.z) * t
-    };
-    remainingEnd = 0;
-  }
-
-  if (startIndex >= endIndex && Math.hypot(endPoint.x - startPoint.x, endPoint.z - startPoint.z) < 2.5) {
-    return points.slice();
-  }
-
-  const trimmed = [startPoint];
-  for (let i = startIndex + 1; i < endIndex; i++) trimmed.push(points[i]);
-  trimmed.push(endPoint);
-  return trimmed;
-}
-
-function trimRoadVisualPointsForCaps(points, options = {}) {
-  const {
-    endIntersection = null,
-    halfWidth = 0,
-    startIntersection = null
-  } = options;
-  const trimForIntersection = (intersection) => {
-    if (!shouldBuildIntersectionCap(intersection)) return 0;
-    const radius = computeIntersectionCapRadius(intersection);
-    return Math.max(0, radius - Math.min(Math.max(halfWidth * 0.22, 0.3), 0.85));
-  };
-  return trimPolylineEndpoints(
-    points,
-    trimForIntersection(startIntersection),
-    trimForIntersection(endIntersection)
-  );
 }
 
 function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
@@ -246,7 +139,6 @@ export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5) {
 
 export function publishCompiledTransportMeshes(deps = {}) {
   const {
-    terrain,
     constants = {},
     disableRoadDebugMode,
     clearTerrainHeightCache,
@@ -256,10 +148,7 @@ export function publishCompiledTransportMeshes(deps = {}) {
     expandBoundsLocal,
     pointsBoundsLocal,
     isUrbanLanduseType,
-    isGreenLanduseType,
     roadHasExplicitSidewalkHint,
-    roadConnectedSidewalkContinuity,
-    roadSupportsInferredUrbanSidewalks,
     roadSupportsSidewalks,
     roadBaseSidewalkWidth,
     resolveSidewalkWidth,
@@ -333,8 +222,6 @@ export function publishCompiledTransportMeshes(deps = {}) {
   const roadMainBatchIdx = [];
   const roadSkirtBatchVerts = [];
   const roadSkirtBatchIdx = [];
-  const roadCapBatchVerts = [];
-  const roadCapBatchIdx = [];
   const roadMarkBatchVerts = [];
   const roadMarkBatchIdx = [];
   const sidewalkBatchVerts = [];
@@ -343,7 +230,6 @@ export function publishCompiledTransportMeshes(deps = {}) {
   const sharedRoadMaterials = typeof getSharedRoadMaterials === "function" ? getSharedRoadMaterials() : {};
   const roadMat = sharedRoadMaterials.roadMat;
   const skirtMat = sharedRoadMaterials.skirtMat;
-  const capMat = sharedRoadMaterials.capMat;
   const markMat = sharedRoadMaterials.markMat;
   const urbanSurfaceMaterials = typeof getSharedUrbanSurfaceMaterials === "function" ? getSharedUrbanSurfaceMaterials() : {};
   const sidewalkMat = urbanSurfaceMaterials.sidewalkMat;
@@ -372,14 +258,10 @@ export function publishCompiledTransportMeshes(deps = {}) {
         intersection?.roads?.some((entry) => entry.roadIdx === roadIdx && entry.ptIdx === road.pts.length - 1)
       ) || null
     };
-    const pts =
-      road?.structureSemantics?.terrainMode === "at_grade" && !hasTransitionAnchors ?
-        trimRoadVisualPointsForCaps(basePts, {
-          startIntersection: endpointIntersectionRefs.start,
-          endIntersection: endpointIntersectionRefs.end,
-          halfWidth: hw
-        }) :
-        basePts;
+    // Preserve the source road as one continuous ribbon. A separate
+    // intersection-cap pass previously trimmed these endpoints and filled
+    // junctions with fan polygons, exposing circles and triangle boundaries.
+    const pts = basePts;
     if (!Array.isArray(pts) || pts.length < 2) return;
 
     const verts = [];
@@ -404,17 +286,12 @@ export function publishCompiledTransportMeshes(deps = {}) {
       boundsIntersectLocal(landuse.bounds || pointsBoundsLocal(landuse.pts || []), contextBounds)
     ) : [];
     const nearbyUrbanLanduses = nearbyLanduses.filter((landuse) => isUrbanLanduseType(landuse?.type)).length;
-    const nearbyGreenLanduses = nearbyLanduses.filter((landuse) => isGreenLanduseType(landuse?.type)).length;
     const explicitSidewalkHint = roadHasExplicitSidewalkHint(road);
-    const roadLength = polylineLengthLocal(road.pts);
     const denseUrbanContext =
       nearbyUrbanLanduses >= 2 ||
       buildingCandidates.length >= 12 ||
       (buildingCandidates.length >= 8 && width >= 9) ||
       (nearbyUrbanLanduses >= 1 && buildingCandidates.length >= 5);
-    const ruralGreenContext =
-      nearbyUrbanLanduses === 0 &&
-      (nearbyGreenLanduses > 0 || buildingCandidates.length < 4);
     const shouldBuildSidewalks =
       roadSupportsSidewalks(road) &&
       explicitSidewalkHint;
@@ -527,19 +404,6 @@ export function publishCompiledTransportMeshes(deps = {}) {
     }
   });
 
-  intersections.forEach((intersection) => {
-    if (intersection?.hasGradeSeparatedRoad) return;
-    if (!shouldBuildIntersectionCap(intersection)) return;
-    const capData = compileIntersectionTopologyGeometry(intersection, baseRoads, {
-      computeRadius: computeIntersectionCapRadius,
-      projectPointToFeature,
-      sampleFeatureSurfaceY,
-      sampleGroundY: cachedTerrainHeight,
-      surfaceBias: ROAD_SURFACE_BIAS
-    });
-    appendIndexedGeometry(roadCapBatchVerts, roadCapBatchIdx, capData.verts, capData.indices);
-  });
-
   buildIndexedBatchMesh({
     scene: appCtx.scene,
     targetList: appCtx.roadMeshes,
@@ -557,15 +421,6 @@ export function publishCompiledTransportMeshes(deps = {}) {
     material: skirtMat,
     renderOrder: 1,
     userData: { isRoadBatch: true, isRoadSkirt: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
-  });
-  buildIndexedBatchMesh({
-    scene: appCtx.scene,
-    targetList: appCtx.roadMeshes,
-    verts: roadCapBatchVerts,
-    indices: roadCapBatchIdx,
-    material: capMat,
-    renderOrder: 3,
-    userData: { isRoadBatch: true, isIntersectionCap: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
   });
   buildIndexedBatchMesh({
     scene: appCtx.scene,
@@ -611,20 +466,19 @@ export function publishCompiledTransportMeshes(deps = {}) {
     authority: "compiled_transport_surface",
     roadCount: baseRoads.length,
     meshCount: appCtx.roadMeshes.length,
-    intersectionCount: intersections.filter((intersection) =>
-      !intersection?.hasGradeSeparatedRoad && shouldBuildIntersectionCap(intersection)
+    intersectionCount: 0,
+    topologyIntersectionCount: intersections.filter((intersection) =>
+      !intersection?.hasGradeSeparatedRoad
     ).length,
     compiledSampleCount: baseRoads.reduce((total, road) =>
       total + Number(road?.transportSurfaceModel?.distances?.length || 0), 0),
     vertices:
       roadMainBatchVerts.length / 3 +
       roadSkirtBatchVerts.length / 3 +
-      roadCapBatchVerts.length / 3 +
       roadMarkBatchVerts.length / 3,
     triangles:
       roadMainBatchIdx.length / 3 +
       roadSkirtBatchIdx.length / 3 +
-      roadCapBatchIdx.length / 3 +
       roadMarkBatchIdx.length / 3,
     worldLoadSequence: appCtx._worldLoadSequence || 0
   });

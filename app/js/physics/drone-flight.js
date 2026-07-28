@@ -49,11 +49,20 @@ export function updateDrone(dt) {
   const minAltitude = groundY + 5;
   const maxAltitude = planetary ? groundY + 2000 : groundY + 400;
   appCtx.drone.y = Math.max(minAltitude, Math.min(maxAltitude, appCtx.drone.y));
-  const earthLimit = Number(appCtx.SurfaceQuery?.getTraversalBounds?.().horizontalRadius);
-  const worldLimit = planetary ? 4800 : Number.isFinite(earthLimit) && earthLimit > 0 ? earthLimit : null;
-  if (worldLimit !== null) {
-    appCtx.drone.x = Math.max(-worldLimit, Math.min(worldLimit, appCtx.drone.x));
-    appCtx.drone.z = Math.max(-worldLimit, Math.min(worldLimit, appCtx.drone.z));
+  if (planetary) {
+    const worldLimit = 4800;
+    const distance = Math.hypot(appCtx.drone.x, appCtx.drone.z);
+    if (distance > worldLimit) {
+      const scale = worldLimit / distance;
+      appCtx.drone.x *= scale;
+      appCtx.drone.z *= scale;
+    }
+  } else {
+    const bounded = appCtx.SurfaceQuery?.clampTraversalPoint?.(appCtx.drone.x, appCtx.drone.z, { margin: 12 });
+    if (bounded?.limited) {
+      appCtx.drone.x = bounded.x;
+      appCtx.drone.z = bounded.z;
+    }
   }
   const elapsed = Math.max(0.001, dt);
   appCtx.drone.vx = (appCtx.drone.x - previousX) / elapsed;

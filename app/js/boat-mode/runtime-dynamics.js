@@ -105,8 +105,17 @@ export function createBoatRuntimeDynamics(deps = {}) {
     }
     appCtx.boat.speed = appCtx.boat.forwardSpeed;
 
-    const nextX = appCtx.boat.x + appCtx.boat.vx * dt;
-    const nextZ = appCtx.boat.z + appCtx.boat.vz * dt;
+    let nextX = appCtx.boat.x + appCtx.boat.vx * dt;
+    let nextZ = appCtx.boat.z + appCtx.boat.vz * dt;
+    const bounded = appCtx.SurfaceQuery?.clampTraversalPoint?.(nextX, nextZ, { margin: 8 });
+    if (bounded?.limited) {
+      nextX = bounded.x;
+      nextZ = bounded.z;
+      appCtx.boat.forwardSpeed *= 0.2;
+      appCtx.boat.lateralSpeed *= 0.2;
+      appCtx.boat.vx *= 0.15;
+      appCtx.boat.vz *= 0.15;
+    }
     const currentWater = appCtx.boatMode.currentWater || null;
     const syntheticTraversal = currentWater?.synthetic === true || currentWater?.source?.synthetic === true;
     const nextCandidate = findNearestBoatCandidate(nextX, nextZ, 24, {

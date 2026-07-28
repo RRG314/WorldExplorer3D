@@ -38,7 +38,7 @@ import {
 import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=1";
 import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=1";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";
-import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=5";
+import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=6";
 import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=1";
 import { createBoatModePolicy } from "./boat-mode/policy.js?v=1";
 

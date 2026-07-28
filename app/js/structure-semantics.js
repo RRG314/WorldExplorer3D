@@ -7,7 +7,7 @@ import { classifyStructureSemantics, normalizedTagValue } from './structure-sema
 import {
   assignFeatureConnections,
   assignStructureStackRanks as assignStructureStackRanksByGraph
-} from './structure-semantics/stacking.js?v=1';
+} from './structure-semantics/stacking.js?v=3';
 import {
   boundsIntersect,
   pointInPolygonXZ,
@@ -20,8 +20,43 @@ import {
 
 function assignStructureStackRanks(features = [], sampleTerrainY = null) {
   return assignStructureStackRanksByGraph(features, sampleTerrainY, {
-    areRoadsConnected
+    areRoadsConnected,
+    areRoadsStackContinuous
   });
+}
+
+function areRoadsStackContinuous(a, b) {
+  if (!a || !b || a === b) return a === b;
+  const normalizedName = (feature) => String(feature?.name || '').trim().toLowerCase();
+  const nameA = normalizedName(a);
+  const nameB = normalizedName(b);
+  if (
+    nameA !== nameB ||
+    String(a?.type || '') !== String(b?.type || '')
+  ) return false;
+
+  const endpointVector = (feature, endpoint) => {
+    const points = Array.isArray(feature?.pts) ? feature.pts : [];
+    if (points.length < 2) return null;
+    const from = endpoint === 'start' ? points[0] : points[points.length - 1];
+    const into = endpoint === 'start' ? points[1] : points[points.length - 2];
+    const dx = into.x - from.x;
+    const dz = into.z - from.z;
+    const length = Math.hypot(dx, dz);
+    return length > 1e-6 ? { x: dx / length, z: dz / length } : null;
+  };
+  const sides = ['start', 'end'];
+  for (const side of sides) {
+    const links = Array.isArray(a?.connectedFeatures?.[side]) ? a.connectedFeatures[side] : [];
+    for (const link of links) {
+      if (link?.feature !== b || link.endpoint === 'interior') continue;
+      const aVector = endpointVector(a, side);
+      const bVector = endpointVector(b, link.endpoint);
+      if (!aVector || !bVector) continue;
+      if (aVector.x * bVector.x + aVector.z * bVector.z <= -0.82) return true;
+    }
+  }
+  return false;
 }
 
 function buildFeatureStations(feature, context = {}) {
@@ -151,11 +186,12 @@ function buildFeatureStations(feature, context = {}) {
   return merged;
 }
 
-function featureEndpointSurfaceY(feature, endpointIndex, sampleTerrainY) {
+function featureConnectionSurfaceY(feature, connection, sampleTerrainY) {
   if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2) return NaN;
   const lastIndex = feature.pts.length - 1;
+  const endpointIndex = Number(connection?.endpointIndex || 0);
   const clampedIndex = endpointIndex <= 0 ? 0 : lastIndex;
-  const point = feature.pts[clampedIndex];
+  const point = connection?.point || feature.pts[clampedIndex];
   if (!point) return NaN;
   if (feature.transportSurfaceModel) {
     const total = Number(
@@ -165,7 +201,9 @@ function featureEndpointSurfaceY(feature, endpointIndex, sampleTerrainY) {
     ) || 0;
     const value = sampleTransportSurfaceAtDistance(
       feature.transportSurfaceModel,
-      clampedIndex === 0 ? 0 : total
+      Number.isFinite(connection?.distanceAlong) ?
+        Math.max(0, Math.min(total, Number(connection.distanceAlong))) :
+        clampedIndex === 0 ? 0 : total
     );
     if (Number.isFinite(value)) return value;
   } else if (feature.surfaceHeights instanceof Float32Array && feature.surfaceHeights.length > clampedIndex) {
@@ -227,7 +265,7 @@ function buildFeatureTransitionAnchors(feature, sampleTerrainY) {
       if (!other || other === feature || !Array.isArray(other.pts) || other.pts.length < 2) continue;
       const otherSemantics = other.structureSemantics || null;
       if (!otherSemantics) continue;
-      const otherSurfaceY = featureEndpointSurfaceY(other, linked[j].endpointIndex, sampleTerrainY);
+      const otherSurfaceY = featureConnectionSurfaceY(other, linked[j], sampleTerrainY);
       if (!Number.isFinite(otherSurfaceY)) continue;
       const targetOffset = otherSemantics.gradeSeparated
         ? otherSurfaceY - terrainY - (Number(feature.surfaceBias) || 0.08)
@@ -494,14 +532,18 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
 function areRoadsConnected(a, b) {
   if (!a || !b) return false;
   if (a === b) return true;
-  const starts = Array.isArray(a?.connectedFeatures?.start) ? a.connectedFeatures.start : [];
-  const ends = Array.isArray(a?.connectedFeatures?.end) ? a.connectedFeatures.end : [];
-  for (let i = 0; i < starts.length; i++) {
-    if (starts[i]?.feature === b) return true;
-  }
-  for (let i = 0; i < ends.length; i++) {
-    if (ends[i]?.feature === b) return true;
-  }
+  const hasLink = (source, target) => {
+    const starts = Array.isArray(source?.connectedFeatures?.start) ? source.connectedFeatures.start : [];
+    const ends = Array.isArray(source?.connectedFeatures?.end) ? source.connectedFeatures.end : [];
+    for (let i = 0; i < starts.length; i++) {
+      if (starts[i]?.feature === target) return true;
+    }
+    for (let i = 0; i < ends.length; i++) {
+      if (ends[i]?.feature === target) return true;
+    }
+    return false;
+  };
+  if (hasLink(a, b) || hasLink(b, a)) return true;
   return false;
 }
 

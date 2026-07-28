@@ -41,7 +41,6 @@ function createTerrainMaterialCacheApi(deps = {}) {
     terrainState._roadMaterials = {
       roadMat: materials.roadMainMaterial,
       skirtMat: materials.roadSkirtMaterial,
-      capMat: materials.roadCapMaterial,
       markMat: materials.roadMarkMaterial
     };
     return terrainState._roadMaterials;

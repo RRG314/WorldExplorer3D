@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   clearStructureVisualMeshes,
   rebuildStructureVisualMeshes
-} from "./terrain/structure-visuals.js?v=11";
+} from "./terrain/structure-visuals.js?v=12";
 import {
   boundsIntersectLocal,
   expandBoundsLocal,

@@ -134,7 +134,7 @@ function setStreetAndLocation(roadLabel, locationLabel) {
     }
   }
 
-  if (!normalizedRoad) normalizedRoad = 'Off Road';
+  if (!normalizedRoad) normalizedRoad = 'Exploring';
 
   if (streetEl) streetEl.textContent = clampText(normalizedRoad, 32);
   if (locationEl) {
@@ -488,8 +488,6 @@ function updateHUD() {
     document.getElementById('indBoost').textContent = 'WAKE';
     document.getElementById('indDrift').classList.toggle('on', Math.abs(appCtx.boat.roll) > 0.06 || Math.abs(appCtx.boat.pitch) > 0.05);
     document.getElementById('indDrift').textContent = 'SEA';
-    document.getElementById('indOff').classList.remove('on', 'warn');
-    document.getElementById('offRoadWarn').classList.toggle('active', false);
     updateCoordinatesHud(appCtx.boat.x, appCtx.boat.z, appCtx.boat.angle);
     return;
   }
@@ -512,9 +510,6 @@ function updateHUD() {
     document.getElementById('indBoost').textContent = 'PWR';
     document.getElementById('indDrift').classList.toggle('on', plane.airborne);
     document.getElementById('indDrift').textContent = plane.airborne ? 'AIR' : 'GEAR';
-    document.getElementById('indOff').classList.remove('on', 'warn');
-    document.getElementById('indOff').textContent = `${altitude} M`;
-    document.getElementById('offRoadWarn').classList.remove('active');
     updateCoordinatesHud(plane.x, plane.z, plane.yaw);
     return;
   }
@@ -551,10 +546,6 @@ function updateHUD() {
     document.getElementById('indBoost').classList.remove('on');
     document.getElementById('indDrift').classList.remove('on');
     document.getElementById('indDrift').textContent = 'DRONE';
-    const droneOffIndicator = document.getElementById('indOff');
-    droneOffIndicator.textContent = appCtx.onMars ? '0.38g' : appCtx.onMoon ? '0.17g' : 'OFF';
-    droneOffIndicator.classList.remove('on', 'warn');
-    document.getElementById('offRoadWarn').classList.remove('active');
     updateCoordinatesHud(appCtx.drone.x, appCtx.drone.z, appCtx.drone.yaw);
 
     return;
@@ -588,7 +579,7 @@ function updateHUD() {
     const walkLabel = planetaryWalkLabel || (
       walkSurface && typeof appCtx.surfaceDisplayName === 'function'
         ? appCtx.surfaceDisplayName(walkSurface)
-        : walkSurface?.name || 'Off Road'
+        : walkSurface?.name || 'Terrain'
     );
     setStreetAndLocation(
       activeInterior ?
@@ -603,10 +594,6 @@ function updateHUD() {
     document.getElementById('indBoost').classList.remove('on');
     document.getElementById('indDrift').textContent = running ? 'RUN' : 'WALK';
     document.getElementById('indDrift').classList.toggle('on', running);
-    const walkOffIndicator = document.getElementById('indOff');
-    walkOffIndicator.textContent = appCtx.onMars ? '0.38g' : appCtx.onMoon ? '0.17g' : 'OFF';
-    walkOffIndicator.classList.remove('on', 'warn');
-    document.getElementById('offRoadWarn').classList.remove('active');
 
     // Use WALKER position for coordinates
     updateCoordinatesHud(
@@ -627,7 +614,7 @@ function updateHUD() {
   document.getElementById('speed').classList.toggle('fast', mph > limit || appCtx.car.boost);
   document.getElementById('limit').textContent = limit;
   const planetarySurfaceLabel = appCtx.onMars ? 'Martian Surface' : appCtx.onMoon ? 'Lunar Surface' : null;
-  setStreetAndLocation(planetarySurfaceLabel || appCtx.car.road?.name || 'Off Road', locName);
+  setStreetAndLocation(planetarySurfaceLabel || appCtx.car.road?.name || 'Exploring', locName);
   const bf = document.getElementById('boostFill');
   bf.style.width = appCtx.car.boost ? appCtx.car.boostTime / appCtx.CFG.boostDur * 100 + '%' : appCtx.car.boostReady ? '100%' : '0%';
   bf.classList.toggle('active', appCtx.car.boost);
@@ -637,11 +624,6 @@ function updateHUD() {
   document.getElementById('indDrift').classList.toggle('on', isDrifting);
   if (isDrifting) document.getElementById('indDrift').textContent = 'DRIFT ' + Math.round(Math.abs(appCtx.car.driftAngle) * 180 / Math.PI) + '°';else
   document.getElementById('indDrift').textContent = 'DRIFT';
-  const planetaryDrive = !!(appCtx.onMoon || appCtx.onMars);
-  const offIndicator = document.getElementById('indOff');
-  offIndicator.textContent = appCtx.onMars ? '0.38g' : appCtx.onMoon ? '0.17g' : String(appCtx.car.surfaceDynamics?.label || 'ROAD');
-  offIndicator.classList.remove('on', 'warn');
-  document.getElementById('offRoadWarn').classList.remove('active');
   updateCoordinatesHud(appCtx.car.x, appCtx.car.z, appCtx.car.angle);
 
 }

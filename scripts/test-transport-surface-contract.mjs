@@ -17,8 +17,8 @@ import {
   updateFeatureSurfaceProfile
 } from '../app/js/structure-semantics.js';
 import { detectRoadIntersections } from '../app/js/terrain/intersections.js';
-import { compileIntersectionTopologyGeometry } from '../app/js/terrain/intersection-geometry.js';
 import { roadHeadingAtSegment } from '../app/js/world/spawn-surface.js';
+import { resolveVehicleSurface } from '../app/js/physics/vehicle-surface.js';
 
 const EPSILON = 1e-4;
 const SURFACE_BIAS = 0.08;
@@ -579,35 +579,23 @@ intersectionRoads.forEach((road) => updateFeatureSurfaceProfile(road, () => 10))
 const detectedIntersection = detectRoadIntersections(intersectionRoads)
   .find((intersection) => intersection.roads.length === 4);
 assert.ok(detectedIntersection, 'four-branch graph intersection was not detected');
-const intersectionGeometry = compileIntersectionTopologyGeometry(
-  detectedIntersection,
-  intersectionRoads,
-  {
-    computeRadius: () => 3,
-    projectPointToFeature: (feature, x, z) => {
-      const end = feature.pts[1];
-      const lengthSquared = end.x ** 2 + end.z ** 2;
-      const t = Math.max(0, Math.min(1, (x * end.x + z * end.z) / lengthSquared));
-      const px = end.x * t;
-      const pz = end.z * t;
-      return { x: px, z: pz, dist: Math.hypot(x - px, z - pz), segIndex: 0, t };
-    },
-    sampleFeatureSurfaceY,
-    sampleGroundY: () => 10,
-    surfaceBias: SURFACE_BIAS
-  }
-);
-assert.ok(intersectionGeometry.polygon.length >= 4, 'intersection topology polygon is incomplete');
-assert.ok(intersectionGeometry.area >= 90, 'intersection topology polygon left a central hole');
 assert.equal(
-  intersectionGeometry.indices.length,
-  intersectionGeometry.polygon.length * 3,
-  'intersection topology was not triangulated once'
+  fs.existsSync(path.join(repositoryRoot, 'app', 'js', 'terrain', 'intersection-geometry.js')),
+  false,
+  'separate intersection fill geometry must not compete with continuous road ribbons'
 );
-for (let vertexIndex = 1; vertexIndex < intersectionGeometry.verts.length / 3; vertexIndex += 1) {
-  const y = intersectionGeometry.verts[vertexIndex * 3 + 1];
-  assert.ok(Math.abs(y - 10.08) <= EPSILON, 'intersection render surface diverged from connected road authority');
-}
+const earthRoadProfile = resolveVehicleSurface({
+  onMars: false,
+  onMoon: false,
+  car: { onRoad: true, road: { surfaceTag: 'asphalt' } }
+});
+const earthTerrainProfile = resolveVehicleSurface({
+  onMars: false,
+  onMoon: false,
+  car: { onRoad: false, road: { surfaceTag: 'sand' } }
+});
+assert.equal(earthRoadProfile, earthTerrainProfile, 'Earth handling changed away from mapped road geometry');
+assert.equal(earthRoadProfile.kind, 'asphalt', 'Earth did not retain its neutral driving profile');
 
 const separatedCrossingRoads = [
   {
@@ -684,6 +672,21 @@ assert.equal(
   false,
   'bridge and tunnel primary roads lost their compiled center markings'
 );
+const retiredEarthDrivingTerms = /\b(?:offRoad|offroad|off-road|offMax|offFriction|indOff)\b/i;
+for (const relativePath of [
+  'app/index.html',
+  'app/js/engine.js',
+  'app/js/hud.js',
+  'app/js/physics.js',
+  'app/js/physics/vehicle-surface.js'
+]) {
+  const source = fs.readFileSync(path.join(repositoryRoot, relativePath), 'utf8');
+  assert.equal(
+    retiredEarthDrivingTerms.test(source),
+    false,
+    `${relativePath} restored retired Earth off-road behavior`
+  );
+}
 
 console.log(JSON.stringify({
   ok: true,
@@ -699,6 +702,7 @@ console.log(JSON.stringify({
   parity: 'compiled-render-query-width-aware',
   ownership: {
     compiledPublicationCallers: publicationCallers,
-    forbiddenRuntimeOwners
+    forbiddenRuntimeOwners,
+    earthDrivingProfile: earthRoadProfile.kind
   }
 }, null, 2));

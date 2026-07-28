@@ -343,6 +343,121 @@ async function loadLocation(page, spec) {
       if (waterway?.navigable === false) structurePresentation.nonNavigableWaterways += 1;
     }
 
+    const elevatedTerminalEndpoints = [];
+    const elevatedInteriorConnections = [];
+    const traversalRadius = Number(ctx.worldTraversalRadiusWorld || 0);
+    for (const road of ctx.roads || []) {
+      if (
+        road?.structureSemantics?.terrainMode !== 'elevated' ||
+        !Array.isArray(road?.pts) ||
+        road.pts.length < 2
+      ) continue;
+      for (const endpoint of ['start', 'end']) {
+        const connections = Array.isArray(road.connectedFeatures?.[endpoint]) ?
+          road.connectedFeatures[endpoint] :
+          [];
+        for (const connection of connections) {
+          if (connection?.endpoint !== 'interior') continue;
+          elevatedInteriorConnections.push({
+            sourceFeatureId: String(road.sourceFeatureId || ''),
+            name: String(road.name || road.type || ''),
+            endpoint,
+            targetFeatureId: String(connection.feature?.sourceFeatureId || ''),
+            targetName: String(connection.feature?.name || connection.feature?.type || ''),
+            targetSegmentIndex: Number(connection.segmentIndex),
+            lateralGap: Number((Number(connection.distance) || 0).toFixed(3))
+          });
+        }
+        if (connections.length > 0) continue;
+        const point = endpoint === 'start' ? road.pts[0] : road.pts[road.pts.length - 1];
+        const surfaceY = Number(ctx.sampleFeatureSurfaceY?.(road, point.x, point.z));
+        const terrainY = Number(
+          ctx.baseTerrainHeightAt?.(point.x, point.z) ??
+          ctx.terrainMeshHeightAt?.(point.x, point.z) ??
+          0
+        );
+        const heightAboveTerrain = surfaceY - terrainY;
+        if (!(heightAboveTerrain > 2.5)) continue;
+        let nearestRoadEndpoint = null;
+        let nearestRoadSegment = null;
+        for (const otherRoad of ctx.roads || []) {
+          if (otherRoad === road || !Array.isArray(otherRoad?.pts) || otherRoad.pts.length < 2) continue;
+          for (const otherEndpoint of ['start', 'end']) {
+            const otherPoint = otherEndpoint === 'start' ?
+              otherRoad.pts[0] :
+              otherRoad.pts[otherRoad.pts.length - 1];
+            const distance = Math.hypot(otherPoint.x - point.x, otherPoint.z - point.z);
+            if (!nearestRoadEndpoint || distance < nearestRoadEndpoint.distance) {
+              nearestRoadEndpoint = {
+                distance,
+                sourceFeatureId: String(otherRoad.sourceFeatureId || ''),
+                name: String(otherRoad.name || otherRoad.type || ''),
+                type: String(otherRoad.type || ''),
+                endpoint: otherEndpoint,
+                terrainMode: String(otherRoad.structureSemantics?.terrainMode || '')
+              };
+            }
+          }
+          for (let segmentIndex = 0; segmentIndex < otherRoad.pts.length - 1; segmentIndex += 1) {
+            const a = otherRoad.pts[segmentIndex];
+            const b = otherRoad.pts[segmentIndex + 1];
+            const dx = b.x - a.x;
+            const dz = b.z - a.z;
+            const lengthSq = dx * dx + dz * dz;
+            if (!(lengthSq > 1e-6)) continue;
+            const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.z - a.z) * dz) / lengthSq));
+            const projectedX = a.x + dx * t;
+            const projectedZ = a.z + dz * t;
+            const distance = Math.hypot(projectedX - point.x, projectedZ - point.z);
+            if (!nearestRoadSegment || distance < nearestRoadSegment.distance) {
+              nearestRoadSegment = {
+                distance,
+                sourceFeatureId: String(otherRoad.sourceFeatureId || ''),
+                name: String(otherRoad.name || otherRoad.type || ''),
+                type: String(otherRoad.type || ''),
+                segmentIndex,
+                t,
+                terrainMode: String(otherRoad.structureSemantics?.terrainMode || '')
+              };
+            }
+          }
+        }
+        elevatedTerminalEndpoints.push({
+          sourceFeatureId: String(road.sourceFeatureId || ''),
+          name: String(road.name || road.type || ''),
+          type: String(road.type || ''),
+          endpoint,
+          x: Number(point.x.toFixed(2)),
+          z: Number(point.z.toFixed(2)),
+          distance: Number(Math.hypot(point.x, point.z).toFixed(2)),
+          insideTraversalBoundary: traversalRadius > 0 ?
+            Math.hypot(point.x, point.z) < traversalRadius - 30 :
+            null,
+          surfaceY: Number(surfaceY.toFixed(2)),
+          terrainY: Number(terrainY.toFixed(2)),
+          heightAboveTerrain: Number(heightAboveTerrain.toFixed(2)),
+          layer: String(road.structureTags?.layer || ''),
+          bridge: String(road.structureTags?.bridge || ''),
+          terminalBarrierPresent: (ctx.buildings || []).some((building) =>
+            building?.geometrySource === 'road_terminal_guardrail' &&
+            String(building?.sourceBuildingId || '').startsWith(
+              `${String(road.sourceFeatureId || '')}:guardrail:terminal:${endpoint}`
+            )
+          ),
+          nearestRoadEndpoint: nearestRoadEndpoint ? {
+            ...nearestRoadEndpoint,
+            distance: Number(nearestRoadEndpoint.distance.toFixed(3))
+          } : null,
+          nearestRoadSegment: nearestRoadSegment ? {
+            ...nearestRoadSegment,
+            distance: Number(nearestRoadSegment.distance.toFixed(3)),
+            t: Number(nearestRoadSegment.t.toFixed(3))
+          } : null
+        });
+      }
+    }
+    elevatedTerminalEndpoints.sort((a, b) => a.distance - b.distance);
+
     let stackedRoadCrossings = null;
     if (Number.isFinite(locationSpec.expectedStackedRoadClearance)) {
       const elevatedRoads = (ctx.roads || []).filter((road) =>
@@ -933,6 +1048,8 @@ async function loadLocation(page, spec) {
       },
       landusePresentation,
       structurePresentation,
+      elevatedTerminalEndpoints,
+      elevatedInteriorConnections,
       stackedRoadCrossings,
       buildingPresentation,
       buildingDimensions,

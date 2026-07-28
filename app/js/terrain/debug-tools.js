@@ -43,7 +43,7 @@ export function toggleRoadDebugMode(deps = {}) {
     console.log("🔍 Road Debug Mode ENABLED");
 
     appCtx.roadMeshes.forEach((mesh) => {
-      if (mesh.userData.isRoadSkirt || mesh.userData.isIntersectionCap) return;
+      if (mesh.userData.isRoadSkirt) return;
 
       if (!mesh.userData._originalMaterial) {
         mesh.userData._originalMaterial = mesh.material;
@@ -55,7 +55,7 @@ export function toggleRoadDebugMode(deps = {}) {
     });
 
     appCtx.roadMeshes.forEach((mesh) => {
-      if (mesh.userData.isRoadSkirt || mesh.userData.isIntersectionCap) return;
+      if (mesh.userData.isRoadSkirt) return;
 
       const pos = mesh.geometry.attributes.position;
       if (!pos) return;
@@ -87,7 +87,7 @@ export function toggleRoadDebugMode(deps = {}) {
     });
 
     appCtx.roadMeshes.forEach((mesh) => {
-      if (mesh.userData.isRoadSkirt || mesh.userData.isIntersectionCap) return;
+      if (mesh.userData.isRoadSkirt) return;
 
       const pos = mesh.geometry.attributes.position;
       if (!pos || typeof terrainMeshHeightAt !== "function") return;
@@ -133,7 +133,7 @@ export function validateRoadTerrainConformance(deps = {}) {
   const worstDeltas = [];
 
   appCtx.roadMeshes.forEach((mesh) => {
-    if (mesh.userData.isRoadSkirt || mesh.userData.isIntersectionCap) return;
+    if (mesh.userData.isRoadSkirt) return;
 
     const pos = mesh.geometry.attributes.position;
     if (!pos) return;

@@ -112,6 +112,7 @@ export function resetWorldForReload(options = {}) {
   } else {
     appCtx.worldSurfaceProfile = null;
   }
+  appCtx.worldTraversalRadiusWorld = null;
 
   disposeSceneMeshes(appCtx.linearFeatureMeshes);
   appCtx.clearWorldCollections(['linearFeatureMeshes', 'linearFeatures']);

@@ -60,35 +60,9 @@ function createRoadSurfaceMaterials({
     polygonOffsetUnits: -1
   });
 
-  const roadCapMaterial = asphaltTex ? new THREE.MeshStandardMaterial({
-    map: asphaltTex,
-    normalMap: asphaltNormal || undefined,
-    normalScale: new THREE.Vector2(0.8, 0.8),
-    roughnessMap: asphaltRoughness || undefined,
-    roughness: 0.95,
-    metalness: 0.05,
-    side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
-    depthWrite: true,
-    depthTest: true
-  }) : new THREE.MeshStandardMaterial({
-    color: 0x333333,
-    roughness: 0.95,
-    metalness: 0.05,
-    side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -2,
-    polygonOffsetUnits: -2,
-    depthWrite: true,
-    depthTest: true
-  });
-
   const materials = {
     roadMainMaterial,
-    roadSkirtMaterial,
-    roadCapMaterial
+    roadSkirtMaterial
   };
 
   if (includeMarkings) {

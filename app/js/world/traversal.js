@@ -48,7 +48,7 @@ function walkSurfacePenalty(feature) {
 }
 
 export function surfaceDisplayName(feature) {
-  if (!feature) return 'Off Road';
+  if (!feature) return 'Terrain';
   const explicitName = String(feature.name || '').trim();
   if (explicitName) return explicitName;
 

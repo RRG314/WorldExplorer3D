@@ -84,9 +84,7 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0) {
   const indBrake = document.getElementById('indBrake');
   const indBoost = document.getElementById('indBoost');
   const indDrift = document.getElementById('indDrift');
-  const indOff = document.getElementById('indOff');
   const boostFill = document.getElementById('boostFill');
-  const offRoadWarn = document.getElementById('offRoadWarn');
   const sub = oceanMode.submarine;
 
   const speedKnots = Math.abs(sub.speed) * 1.94;
@@ -134,11 +132,4 @@ export function updateOceanHud(appCtx, oceanMode, nowSeconds = 0) {
     indDrift.textContent = 'SUB';
     indDrift.classList.add('on');
   }
-  if (indOff) {
-    indOff.textContent = 'SONAR';
-    indOff.classList.remove('warn');
-    indOff.classList.toggle('on', speedKnots > 11);
-  }
-  if (offRoadWarn) offRoadWarn.classList.remove('active');
-
 }

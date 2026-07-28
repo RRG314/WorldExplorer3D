@@ -2,10 +2,11 @@ import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   assignFeatureConnections,
   assignStructureStackRanks,
+  areRoadsConnected,
   buildFeatureStations,
   buildFeatureTransitionAnchors,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=25";
+} from "../structure-semantics.js?v=28";
 import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=2";
 
 const runtime = {
@@ -172,7 +173,7 @@ export function refreshStructureAwareFeatureProfiles() {
 
   const structureFeatures = transportFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
   assignFeatureConnections(transportFeatures);
-  assignStructureStackRanks(structureFeatures, worldBaseTerrainY);
+  assignStructureStackRanks(structureFeatures, worldBaseTerrainY, { areRoadsConnected });
 
   for (let i = 0; i < structureFeatures.length; i++) {
     const feature = structureFeatures[i];
@@ -180,6 +181,21 @@ export function refreshStructureAwareFeatureProfiles() {
     feature.structureStations = buildFeatureStations(feature, {
       features: structureFeatures,
       waterAreas: appCtx.waterAreas
+    });
+  }
+
+  // Connection anchors must read surfaces compiled from the current graph and
+  // stack ranks. Reusing the pre-refresh models makes a merge target sample a
+  // stale deck height and leaves visible steps or open-air ramp ends.
+  for (let i = 0; i < transportFeatures.length; i++) {
+    const feature = transportFeatures[i];
+    if (!feature) continue;
+    feature.structureTransitionAnchors = [];
+    const sampleTerrainY = feature?.structureSemantics?.terrainMode === 'at_grade' ?
+      worldRenderedTerrainY :
+      worldBaseTerrainY;
+    updateFeatureSurfaceProfile(feature, sampleTerrainY, {
+      surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
     });
   }
 

@@ -42,7 +42,15 @@ const GroundHeight = {
 
 const query = createSurfaceQuery(appCtx, GroundHeight);
 assert.equal(query.getSourceProfile(), SOURCE_PROFILE.LOCATION_OSM);
-assert.deepEqual(query.getTraversalBounds(), { horizontalRadius: 5000, originRebase: false });
+assert.deepEqual(query.getTraversalBounds(), { horizontalRadius: 2700, originRebase: false });
+appCtx.worldTraversalRadiusWorld = 1800;
+assert.deepEqual(query.getTraversalBounds(), { horizontalRadius: 1800, originRebase: false });
+assert.deepEqual(
+  query.clampTraversalPoint(2000, 0, { margin: 5 }),
+  { x: 1795, z: 0, radius: 1795, distance: 2000, limited: true }
+);
+assert.equal(query.clampTraversalPoint(300, 400).limited, false);
+appCtx.worldTraversalRadiusWorld = null;
 assert.equal(query.terrainAt(1, 2).kind, SURFACE_KIND.TERRAIN);
 assert.equal(query.walkAt(1, 2).kind, SURFACE_KIND.ROAD);
 assert.deepEqual(query.walkAt(1, 2).contact, { x: 1.2, y: 13, z: 2.1 });

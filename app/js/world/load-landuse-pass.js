@@ -1,5 +1,5 @@
 import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=1';
-import { surfaceComposition } from './surface-contract.js?v=7';
+import { surfaceComposition } from './surface-contract.js?v=8';
 import { normalizeWaterBody } from './water-body-contract.js?v=3';
 
 const SOIL_LANDUSE_TYPES = new Set([
@@ -112,6 +112,79 @@ export function createWorldLandusePass(options = {}) {
     'village_green', 'cemetery', 'sand', 'dune', 'barren', 'glacier', 'quarry'
   ]);
   const terrainOwnedLandCoverTypes = new Set(visibleMappedSurfaceTypes);
+
+  function pointInsideRing(x, z, ring) {
+    if (!Array.isArray(ring) || ring.length < 3) return false;
+    let inside = false;
+    for (let index = 0, previous = ring.length - 1; index < ring.length; previous = index++) {
+      const a = ring[index];
+      const b = ring[previous];
+      const crosses = (a.z > z) !== (b.z > z) &&
+        x < (b.x - a.x) * (z - a.z) / ((b.z - a.z) || 1e-9) + a.x;
+      if (crosses) inside = !inside;
+    }
+    return inside;
+  }
+
+  function duplicateWaterAreas(candidate) {
+    if (!candidate?.bounds || !Array.isArray(appCtx.waterAreas)) return [];
+    const duplicates = [];
+    const candidateId = String(candidate.sourceFeatureId || '');
+    const cb = candidate.bounds;
+    const candidateBoundsArea = Math.max(1, (cb.maxX - cb.minX) * (cb.maxZ - cb.minZ));
+    for (const existing of appCtx.waterAreas) {
+      if (existing?.shape !== 'area' || !existing.bounds) continue;
+      const existingId = String(existing.sourceFeatureId || '');
+      if (candidateId && existingId && candidateId === existingId) {
+        duplicates.push(existing);
+        continue;
+      }
+      const eb = existing.bounds;
+      const overlapWidth = Math.max(0, Math.min(cb.maxX, eb.maxX) - Math.max(cb.minX, eb.minX));
+      const overlapDepth = Math.max(0, Math.min(cb.maxZ, eb.maxZ) - Math.max(cb.minZ, eb.minZ));
+      if (overlapWidth <= 0 || overlapDepth <= 0) continue;
+      const existingBoundsArea = Math.max(1, (eb.maxX - eb.minX) * (eb.maxZ - eb.minZ));
+      const overlapRatio = overlapWidth * overlapDepth / Math.min(candidateBoundsArea, existingBoundsArea);
+      const centerDistance = Math.hypot(
+        Number(candidate.centerX || 0) - Number(existing.centerX || 0),
+        Number(candidate.centerZ || 0) - Number(existing.centerZ || 0)
+      );
+      const centerTolerance = Math.max(
+        8,
+        Math.min(cb.maxX - cb.minX, cb.maxZ - cb.minZ, eb.maxX - eb.minX, eb.maxZ - eb.minZ) * 0.18
+      );
+      const heightDelta = Math.abs(Number(candidate.surfaceY || 0) - Number(existing.surfaceY || 0));
+      const contained =
+        pointInsideRing(candidate.centerX, candidate.centerZ, existing.pts) ||
+        pointInsideRing(existing.centerX, existing.centerZ, candidate.pts);
+      if (
+        heightDelta <= 6 &&
+        (
+          (overlapRatio >= 0.88 && centerDistance <= centerTolerance) ||
+          (overlapRatio >= 0.98 && contained)
+        )
+      ) {
+        duplicates.push(existing);
+      }
+    }
+    return duplicates;
+  }
+
+  function removePublishedWaterArea(waterArea) {
+    const meshIndex = appCtx.landuseMeshes.findIndex((mesh) => mesh?.userData?.waterAreaRef === waterArea);
+    if (meshIndex >= 0) {
+      const [mesh] = appCtx.landuseMeshes.splice(meshIndex, 1);
+      mesh.parent?.remove(mesh);
+      mesh.geometry?.dispose?.();
+      if (Array.isArray(mesh.material)) mesh.material.forEach((material) => material?.dispose?.());
+      else mesh.material?.dispose?.();
+    }
+    const waterIndex = appCtx.waterAreas.indexOf(waterArea);
+    if (waterIndex >= 0) appCtx.waterAreas.splice(waterIndex, 1);
+    const landuseIndex = appCtx.landuses.findIndex((landuse) => landuse?.type === 'water' && landuse?.pts === waterArea.pts);
+    if (landuseIndex >= 0) appCtx.landuses.splice(landuseIndex, 1);
+  }
+
   function addLandusePolygon(runtime, pts, landuseType, holeRings = [], guardOptions = null, featureMeta = {}) {
     if (!pts || pts.length < 3) return;
 
@@ -203,6 +276,15 @@ export function createWorldLandusePass(options = {}) {
       datumConfidence: featureMeta.layer === 'ocean' ? 0.98 : 0.82
     }) : null;
     const waterFlattenFactor = isWater ? 0 : 1.0;
+
+    // OSM land-use and Shortbread water layers can describe the same body.
+    // Publish one physical/visual surface instead of two nearly coincident
+    // sheets that flicker, separate with waves, and double draw cost.
+    if (isWater) {
+      const duplicates = duplicateWaterAreas(waterArea);
+      if (duplicates.some((existing) => Number(existing.area || 0) >= Number(waterArea.area || 0) * 0.98)) return;
+      duplicates.forEach(removePublishedWaterArea);
+    }
 
     // Natural ground cover is semantic input to the terrain profile and
     // vegetation compilers, not a second rendered surface. Draping large OSM

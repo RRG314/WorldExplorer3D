@@ -1,5 +1,5 @@
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=9";
-import { createWorldLandusePass } from "./load-landuse-pass.js?v=25";
+import { createWorldLandusePass } from "./load-landuse-pass.js?v=27";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
 import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=7";
@@ -334,6 +334,13 @@ export function createWorldRoadLoader(deps = {}) {
     for (const radius of radii) {
       if (loaded) break;
       loadMetrics.activeRadiusDeg = radius;
+      // Keep every travel controller inside the district that is actually
+      // loaded. The safety inset prevents actors from reaching clipped roads,
+      // terrain edges, or unpopulated map space.
+      appCtx.worldTraversalRadiusWorld = Math.max(
+        900,
+        radius * Number(appCtx.SCALE || 100000) * 0.88
+      );
       try {
         if (performance.now() - loadStartedAt > maxTotalLoadMs) {
           console.warn('[Overpass] Max load budget reached, switching to fallback world.');

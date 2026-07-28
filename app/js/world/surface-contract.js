@@ -20,7 +20,7 @@ const VERTICAL_DATUM = Object.freeze({
 });
 
 const EARTH_TRAVERSAL_BOUNDS = Object.freeze({
-  [SOURCE_PROFILE.LOCATION_OSM]: Object.freeze({ horizontalRadius: 5000, originRebase: false })
+  [SOURCE_PROFILE.LOCATION_OSM]: Object.freeze({ horizontalRadius: 2700, originRebase: false })
 });
 
 const SURFACE_COMPOSITION_LAYER = Object.freeze({
@@ -87,8 +87,12 @@ function activeSourceProfile() {
   return SOURCE_PROFILE.LOCATION_OSM;
 }
 
-function earthTraversalBounds(profile = SOURCE_PROFILE.LOCATION_OSM) {
-  return EARTH_TRAVERSAL_BOUNDS[profile] || EARTH_TRAVERSAL_BOUNDS[SOURCE_PROFILE.LOCATION_OSM];
+function earthTraversalBounds(profile = SOURCE_PROFILE.LOCATION_OSM, appCtx = null) {
+  const configured = EARTH_TRAVERSAL_BOUNDS[profile] || EARTH_TRAVERSAL_BOUNDS[SOURCE_PROFILE.LOCATION_OSM];
+  const runtimeRadius = Number(appCtx?.worldTraversalRadiusWorld);
+  return Number.isFinite(runtimeRadius) && runtimeRadius > 0
+    ? Object.freeze({ ...configured, horizontalRadius: runtimeRadius })
+    : configured;
 }
 
 function normalizedSourceName(feature = null, fallback = '') {
@@ -252,6 +256,26 @@ function createSurfaceQuery(appCtx, GroundHeight) {
   if (!appCtx || !GroundHeight) throw new TypeError('SurfaceQuery requires app context and GroundHeight.');
   const profile = () => activeSourceProfile(appCtx);
   const units = () => Math.max(0.000001, finiteOr(appCtx.METERS_PER_WORLD_UNIT, 1));
+  const traversalBounds = () => earthTraversalBounds(profile(), appCtx);
+
+  function clampTraversalPoint(x, z, options = {}) {
+    const safeX = finiteOr(x, 0);
+    const safeZ = finiteOr(z, 0);
+    const margin = Math.max(0, finiteOr(options.margin, 0));
+    const radius = Math.max(50, finiteOr(traversalBounds().horizontalRadius, 2700) - margin);
+    const distance = Math.hypot(safeX, safeZ);
+    if (distance <= radius || distance <= 1e-6) {
+      return { x: safeX, z: safeZ, radius, distance, limited: false };
+    }
+    const scale = radius / distance;
+    return {
+      x: safeX * scale,
+      z: safeZ * scale,
+      radius,
+      distance,
+      limited: true
+    };
+  }
 
   function terrainAt(x, z) {
     return createSurfaceSample({
@@ -337,10 +361,11 @@ function createSurfaceQuery(appCtx, GroundHeight) {
 
   return Object.freeze({
     at,
+    clampTraversalPoint,
     createTileDescriptor: (options = {}) => createSurfaceTileDescriptor({ ...options, profile: options.profile || profile() }),
     driveAt,
     getSourceProfile: profile,
-    getTraversalBounds: () => earthTraversalBounds(profile()),
+    getTraversalBounds: traversalBounds,
     terrainAt,
     walkAt,
     waterAt

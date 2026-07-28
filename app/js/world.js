@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=25";
+} from "./structure-semantics.js?v=28";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -65,7 +65,7 @@ import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=10";
+} from "./world/load-reset.js?v=11";
 import {
   prepareWorldFeatureSelections
 } from "./world/load-budgeting.js?v=3";
@@ -102,7 +102,7 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=11";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=12";
 import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=27";
 import {
   batchLanduseMeshes,
@@ -162,8 +162,8 @@ import {
   refreshStructureAwareFeatureProfiles,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=12";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=60";
+} from "./world/structure-aware.js?v=14";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=62";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=9";
@@ -347,6 +347,7 @@ initWorldLoadGeometry({
 });
 
 Object.assign(appCtx, {
+  areRoadsConnected,
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
   applySpawnTarget,

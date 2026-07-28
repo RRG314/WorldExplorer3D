@@ -44,6 +44,15 @@ export function assertWorldMatrixLocation(spec, result) {
       })}`
     );
   }
+  const unsafeElevatedTerminals = (result.elevatedTerminalEndpoints || []).filter((endpoint) =>
+    endpoint?.insideTraversalBoundary === true &&
+    endpoint?.terminalBarrierPresent !== true
+  );
+  assert(
+    unsafeElevatedTerminals.length === 0,
+    `${spec.id}: an elevated road ends inside the playable district without a terminal barrier ` +
+    `${JSON.stringify(unsafeElevatedTerminals.slice(0, 4))}`
+  );
   if (spec.minimumWaterAreas) assert(result.counts.waterAreas >= spec.minimumWaterAreas, `${spec.id}: expected mapped water areas`);
   if (spec.minimumBuildings) {
     assert(

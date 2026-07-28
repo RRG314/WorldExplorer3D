@@ -301,8 +301,6 @@ input,textarea{-webkit-user-select:text;user-select:text}
 .ind{color:#cbd5e1;font-weight:500}
 .ind.on{color:#667eea}
 .ind.warn{color:#dc2626}
-#offRoadWarn{position:fixed;inset:0;pointer-events:none;border:4px solid transparent;z-index:50;transition:border-color 0.2s}
-#offRoadWarn.active{border-color:rgba(239,68,68,0.6);animation:pulse 0.5s infinite}
 @keyframes pulse{0%,100%{border-color:rgba(239,68,68,0.6)}50%{border-color:rgba(239,68,68,0.2)}}
 #liveEarthLocalPanel{position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:141;display:none;min-width:min(360px,calc(100vw - 40px));max-width:min(440px,calc(100vw - 28px));background:rgba(255,255,255,0.96);border:1px solid rgba(148,163,184,0.35);border-radius:14px;box-shadow:0 14px 32px rgba(2,6,23,0.18);padding:12px 14px}
 #liveEarthLocalPanel.show{display:block}
