@@ -122,6 +122,7 @@ function selectBuildingCandidates(candidates, budget) {
 
 export function updateWorldLod(force = false) {
   if (appCtx.onMoon || appCtx.travelingToMoon || (typeof appCtx.isEnv === 'function' && appCtx.ENV && !appCtx.isEnv(appCtx.ENV.EARTH))) {
+    appCtx.updateTerrainAerialDetail?.(false, 0);
     hideMeshList(appCtx.roadMeshes);
     hideMeshList(appCtx.urbanSurfaceMeshes);
     hideMeshList(appCtx.buildingMeshes);
@@ -134,15 +135,23 @@ export function updateWorldLod(force = false) {
     return;
   }
 
+  const ref = lodReferenceActor();
+  const refX = Number.isFinite(ref?.x) ? ref.x : 0;
+  const refZ = Number.isFinite(ref?.z) ? ref.z : 0;
+  const aerialMode = !!(appCtx.planeMode?.active || appCtx.droneMode);
+  const aerialActor = appCtx.planeMode?.active ? appCtx.planeMode : appCtx.drone;
+  const aerialGroundY = aerialMode
+    ? Number(appCtx.terrainMeshHeightAt?.(refX, refZ) ?? appCtx.elevationWorldYAtWorldXZ?.(refX, refZ) ?? 0)
+    : 0;
+  const aerialAltitude = aerialMode ? Math.max(0, Number(aerialActor?.y) - aerialGroundY) : 0;
+  appCtx.updateTerrainAerialDetail?.(aerialMode, aerialAltitude);
+
   if ((!appCtx.buildingMeshes || appCtx.buildingMeshes.length === 0) &&
       (!appCtx.poiMeshes || appCtx.poiMeshes.length === 0) &&
       (!appCtx.landuseMeshes || appCtx.landuseMeshes.length === 0)) {
     return;
   }
 
-  const ref = lodReferenceActor();
-  const refX = Number.isFinite(ref?.x) ? ref.x : 0;
-  const refZ = Number.isFinite(ref?.z) ? ref.z : 0;
   const buildingMeshCount = appCtx.buildingMeshes.length;
   const buildingSetChanged = buildingMeshCount !== lastBuildingMeshCount;
 
@@ -162,12 +171,6 @@ export function updateWorldLod(force = false) {
     typeof appCtx.rdtComplexity === 'number' ? appCtx.rdtComplexity : 0;
   const boatLodScale = appCtx.boatMode?.active ? Math.max(0.34, Math.min(1, Number(appCtx.boatMode.detailBias) || 1)) : 1;
   const lodThresholds = runtime.getWorldLodThresholds(depthForLod, mode, dynamicBudgetState.lodScale * boatLodScale);
-  const aerialMode = !!(appCtx.planeMode?.active || appCtx.droneMode);
-  const aerialActor = appCtx.planeMode?.active ? appCtx.planeMode : appCtx.drone;
-  const aerialGroundY = aerialMode
-    ? Number(appCtx.terrainMeshHeightAt?.(refX, refZ) ?? appCtx.elevationWorldYAtWorldXZ?.(refX, refZ) ?? 0)
-    : 0;
-  const aerialAltitude = aerialMode ? Math.max(0, Number(aerialActor?.y) - aerialGroundY) : 0;
   const poiMidSq = lodThresholds.mid * lodThresholds.mid;
 
   for (let i = 0; i < appCtx.roadMeshes.length; i += 1) setEarthMeshVisible(appCtx.roadMeshes[i], true);

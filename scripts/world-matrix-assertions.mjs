@@ -29,6 +29,21 @@ export function assertWorldMatrixLocation(spec, result) {
       );
     }
   }
+  if (Number.isFinite(spec.expectedStackedRoadClearance)) {
+    const crossings = result.stackedRoadCrossings || {};
+    assert(
+      Number(crossings.count || 0) > 0,
+      `${spec.id}: no mapped differently layered road crossing was measured ${JSON.stringify(crossings)}`
+    );
+    assert(
+      Number(crossings.minimumSeparation) >= Number(spec.expectedStackedRoadClearance),
+      `${spec.id}: stacked road decks lack vehicle clearance ${JSON.stringify({
+        measured: crossings.minimumSeparation,
+        required: spec.expectedStackedRoadClearance,
+        worst: crossings.worst
+      })}`
+    );
+  }
   if (spec.minimumWaterAreas) assert(result.counts.waterAreas >= spec.minimumWaterAreas, `${spec.id}: expected mapped water areas`);
   if (spec.minimumBuildings) {
     assert(
@@ -121,10 +136,19 @@ export function assertWorldMatrixLocation(spec, result) {
     const presentation = result.buildingPresentation || {};
     const visibleSources = Number(presentation.visibleSourceCount || 0);
     if (visibleSources >= 30) {
-      const detailedRatio = Number(presentation.visibleDetailedSourceCount || 0) / visibleSources;
-      const wallFacadeRatio = Number(presentation.visibleWallFacadeSourceCount || 0) / visibleSources;
-      assert(detailedRatio >= 0.5, `${spec.id}: most visible buildings lost facade surface detail ${JSON.stringify(presentation)}`);
-      assert(wallFacadeRatio >= 0.5, `${spec.id}: occupied buildings regressed to blank extrusions ${JSON.stringify(presentation)}`);
+      const exteriorOwnerRatio = Number(presentation.visibleExteriorOwnedSourceCount || 0) / visibleSources;
+      const provenanceRatio = Number(presentation.visibleProvenanceClaimedSourceCount || 0) / visibleSources;
+      const visibleBodySources = visibleSources - Number(presentation.visibleRoofSourceCount || 0);
+      assert(exteriorOwnerRatio === 1, `${spec.id}: visible buildings escaped the exterior material owner ${JSON.stringify(presentation)}`);
+      assert(provenanceRatio === 1, `${spec.id}: visible building material claim lacks mapped or neutral provenance ${JSON.stringify(presentation)}`);
+      assert(
+        Number(presentation.visibleFacadeAtlasSourceCount || 0) === visibleBodySources,
+        `${spec.id}: a visible building body lacks its shared facade atlas ${JSON.stringify(presentation)}`
+      );
+      assert(
+        Number(presentation.visibleWallFacadeSourceCount || 0) === 0,
+        `${spec.id}: deleted legacy wall-facade shader returned ${JSON.stringify(presentation)}`
+      );
     }
   }
   if (spec.expectedLandmarkKind) {
@@ -177,6 +201,8 @@ export function assertWorldMatrixLocation(spec, result) {
   }
 
   assert(hasMappedWorld || hasTerrainFallback, `${spec.id}: no mapped world or terrain fallback loaded`);
+  assert(result.boatActive !== true, `${spec.id}: land launch was incorrectly captured by nearby water`);
+  assert(result.initialSpawn?.mode !== 'boat', `${spec.id}: land launch incorrectly selected boat mode ${JSON.stringify(result.initialSpawn)}`);
   assert(result.driveSpawn?.valid !== false, `${spec.id}: invalid drive spawn ${JSON.stringify(result.driveSpawn)}`);
   assert(result.walkSpawn?.valid !== false, `${spec.id}: invalid walk spawn ${JSON.stringify(result.walkSpawn)}`);
   if (spec.expectedRoadStructure) {

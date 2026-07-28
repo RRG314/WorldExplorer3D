@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=19";
+} from "./structure-semantics.js?v=24";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=19";
+} from "./world/spawn.js?v=21";
 import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,
@@ -60,7 +60,7 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=19";
+} from "./world/load-support.js?v=20";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -84,7 +84,7 @@ import {
   waterSurfaceBaseElevation,
   WATER_VECTOR_TILE_ZOOM,
   worldLinePointsFromLonLat
-} from "./world/load-geometry.js?v=16";
+} from "./world/load-geometry.js?v=19";
 import {
   decimateRoadCenterlineByDepth,
   getPerfModeValue,
@@ -102,13 +102,13 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=10";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=20";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=11";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=24";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
   registerWaterWaveMaterial
-} from "./world/render-support.js?v=5";
+} from "./world/render-support.js?v=6";
 import {
   buildingContainingPoint,
   findNearestRoad,
@@ -143,8 +143,8 @@ import {
   sanitizeWorldFootprintPoints,
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
-} from "./world/world-geometry.js?v=2";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=15";
+} from "./world/world-geometry.js?v=3";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=19";
 import {
   resetWorldFurnitureCaches
 } from "./world/furniture.js?v=11";
@@ -162,7 +162,7 @@ import {
   refreshStructureAwareFeatureProfiles,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=7";
+} from "./world/structure-aware.js?v=10";
 import { createWorldRoadLoader } from "./world/load-roads.js?v=59";
 import {
   fetchShortbreadWorldData

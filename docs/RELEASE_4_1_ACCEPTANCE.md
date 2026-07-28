@@ -35,7 +35,7 @@ existing retained journey is broken.
 | Source and runtime ownership | dependency, reachability, lifecycle, and transaction contracts | OSM is the only ordinary Earth vector source; one active destination and one location transaction own publication; stale work cannot commit |
 | World integrity | contract probes plus hardware screenshots | roads are present and legible; ordinary buildings do not occupy road cores or water; actor, camera, paths, bridges, and tunnels agree with the selected surface |
 | Rendering | shadow policy contract plus daylight/dusk hardware captures | medium/high use soft shadows; no obvious block staircase or unstable crawling; no blank, clipped, or wrong-canvas frame is accepted |
-| Performance | installed-Chrome reference-Mac run | dense cold load ≤20 s, dense warm load ≤12 s, median ≥58 FPS, 1% low ≥45 FPS, no sustained sequence above 33 ms |
+| Performance | installed-Chrome reference-Mac gameplay run | ordinary play is visibly smooth and responsive; load time, FPS, frame pacing, draw calls, triangles, and resources are recorded against the candidate and 3.1 reference |
 | Resource stability | three warmed location/destination cycles | zero pending disposal, no canvas/frame-owner growth, and retained heap within 10% of the warm plateau |
 | Product journeys | browser journeys on desktop and mobile layouts | title→Earth, location replacement, walk/drive/drone/plane, water return, Earth↔Moon/Mars/Space, editor, account, and multiplayer compatibility complete without fatal errors |
 | Provider degradation | blocked-provider fixtures | the world either enters through its documented OSM/terrain fallback or reports a recoverable failure; it never switches to a second ordinary-vector renderer |
@@ -69,6 +69,103 @@ buildings, spawn, and camera must consume one validated district ground field.
 A report that proves road presence while the inspected frame shows rooftop
 ridges, artificial ramps, or building/ground disagreement fails.
 
+## Phase 5 production-readiness checklist
+
+Phase 5 is complete only when every applicable row below has machine-readable
+evidence from the exact candidate commit. A location is evidence for a data
+class, never a key for runtime correction. A software browser may verify logic
+and budgets, but it cannot approve a visibly broken frame or substitute for the
+required reference-Mac and Windows GPU checks.
+
+### Architecture and visual correctness
+
+| Area | Pass condition |
+| --- | --- |
+| Building exterior owner | One compiler owns foundations, massing, parts, roof forms, wall surfaces, openings, material provenance, and render batches. Legacy facade shaders, generated window textures, streaming facade materials, and blank-extrusion presentation fallbacks are unreachable and deleted. |
+| Material claims | Brick, sandstone, marble, stone, concrete, metal, glass, and rendered colors are used only when mapped provenance supports them. Unmapped buildings use one restrained neutral palette and never claim a premium material. |
+| Building occupancy | Ordinary solid volumes do not occupy road cores, mapped water, or a different vertical layer. Foundations meet the compiled occupied surface without floating or terrain intrusion. |
+| Terrain geometry | Adjacent tile edges share positions and normals; invalid/missing samples cannot become spikes, folded triangles, visible cracks, or zero-height cliffs. Mountain silhouettes and slope shading remain continuous through LOD changes. |
+| Atmosphere | Sky, fog, haze, clouds, and post-processing show no screen-space stripes, color bands, stale depth bands, or environment leakage at daylight, dusk, night, rain, mountain, ocean, Moon, Mars, or Space. |
+| Shadows | One Earth shadow policy owns type, resolution, bias, normal bias, radius, frustum, update cadence, and quality-tier fallback. Building shadows are stable, soft on balanced/high, free of acne/peter-panning, and do not crawl during ordinary travel. |
+| Camera | One stateful solver per traveler family prevents penetration, flipping, collapsed chase distance, grade-layer capture, and visible frame-to-frame oscillation. |
+| Surface contract | Spawn, collision, navigation, placement, camera, rendering, and traveler height agree on generation, kind, layer, provenance, confidence, and traversal permissions. |
+
+### Runtime and performance evidence
+
+Performance is measured during complete installed-browser gameplay, after the
+location has loaded and initial shader compilation has settled. Frame counters
+support the decision; they do not replace visual and control-response review.
+
+| Profile | Frame pacing | Dense-city renderer ceiling | Resource ceiling |
+| --- | --- | --- | --- |
+| Desktop high | target 60 FPS; no repeated visible hitching during travel | ≤2,000 draw calls; ≤3.5 M triangles | ≤320 textures; ≤2,800 geometries; ≤160 programs |
+| Desktop balanced | target 60 FPS; no repeated visible hitching during travel | ≤1,400 draw calls; ≤2.5 M triangles | ≤256 textures; ≤2,200 geometries; ≤128 programs |
+| Desktop performance | target 60 FPS and materially lighter than balanced | ≤900 draw calls; ≤1.5 M triangles | ≤192 textures; ≤1,600 geometries; ≤96 programs |
+| Mobile balanced | target 30 FPS with usable touch response | ≤700 draw calls; ≤1.1 M triangles | ≤160 textures; ≤1,200 geometries; ≤80 programs |
+
+Additional gates:
+
+- dense cold load ≤20 seconds and dense warm load ≤12 seconds;
+- ordinary cold load ≤12 seconds and ordinary warm load ≤8 seconds;
+- no simulation catch-up above two fixed updates per display frame;
+- input, actor, vehicle, and camera remain visually synchronized;
+- actor/car do not clip below their selected traversal surface;
+- no repeated long-task sequence during ordinary travel;
+- three warmed destination cycles and five mode/environment cycles retain heap
+  within 10% of the warm plateau with no canvas, frame-owner, geometry,
+  texture, listener, timer, or pending-disposal growth;
+- hidden or backgrounded gameplay stops world rendering and resumes without a
+  time-step burst;
+- WebGL context loss is recoverable or produces an explicit recoverable state.
+
+### Product gameplay journeys
+
+Journeys use ordinary controls in the installed browser. They must travel far
+enough to leave the spawn block, exercise the named transitions, and reveal
+stutter, clipping, stale LOD, or controller drift. Exact distance and duration
+quotas are diagnostic tools, not release criteria.
+
+| Journey | Required production scenario |
+| --- | --- |
+| Walk | Leave spawn, turn through multiple blocks, cross an intersection and slope/curb transition, meet a collision, and change camera mode |
+| Drive | Travel a multi-block route with turns, braking/reverse, a smooth ramp, and representative bridge/elevated/tunnel surfaces |
+| Drone | Climb from close terrain to aerial LOD, travel away from spawn, yaw/descend, verify ground striping is absent, and confirm close detail returns |
+| Plane | Take off or enter flight, climb, bank, travel beyond the initial district view, descend, and exit cleanly |
+| Boat/Ocean | Depart a shoreline, sustain water travel, change camera, and return to Earth |
+| Moon/Mars | Move, jump or exercise gravity, change camera, and return to Earth |
+| Space | Enter controlled travel, complete a destination/environment transition, and return cleanly |
+
+Required transition loops:
+
+- title → Earth → replacement Earth location → title;
+- walk → drone → plane → drive → walk;
+- Earth → Ocean → Earth;
+- Earth → Moon → Earth → Mars → Earth → Space → Earth;
+- foreground → hidden/background → foreground during each traveler family;
+- pause → resume and main-menu → resume without duplicate runtime owners;
+- phone portrait → landscape and tablet/desktop layout changes without lost
+  controls, stuck inputs, incorrect pixel ratio, or canvas growth.
+
+### Platform, failure, and release gates
+
+- Reference Mac: installed Chrome hardware run passes visual, sustained-route,
+  frame-time, memory, shadow, and context-loss gates.
+- Windows: Windows Chromium CI passes all deterministic journeys and layout
+  contracts; an installed Chrome or Edge GPU run is required before public
+  promotion.
+- Mobile: iPhone portrait/landscape, Android phone, and tablet emulations pass
+  touch/control/layout/resource budgets; at least one real mobile hardware
+  smoke is required before public promotion.
+- Keyboard, mouse, touch, gamepad mapping, focus loss, resize, fullscreen, and
+  reduced-motion/accessibility behavior remain usable.
+- Blocked terrain, land-cover, weather, imagery, account, analytics, and
+  realtime providers fail recoverably without changing world authority.
+- Zero uncaught errors, unhandled rejections, WebGL errors, duplicate-owner
+  warnings, stale-generation commits, or critical security advisories.
+- Full tests, release verification, immutable artifact verification,
+  attribution, rollback rehearsal, changelog/version identity, and human
+  screenshot approval all bind to the exact candidate commit.
+
 ## Test layers
 
 1. Pure contracts verify deterministic owners, geometry rules, cancellation,
@@ -86,39 +183,38 @@ production visual quality by itself.
 
 ## Current status
 
-The release is blocked at the world-authority boundary. The repository-wide
-audit in
-[`WORLD_RUNTIME_AUTHORITY_AUDIT.md`](WORLD_RUNTIME_AUTHORITY_AUDIT.md) found that
-terrain streaming, initial geometry builders, deferred detail, surface queries,
-and post-load reprojection can describe different generations of one selected
-location. Geographic fixtures are now probes only. No location-level visual
-correction can clear the release until one compiled district ground/surface
-generation owns rendering, traversal, collision, spawn, navigation, and camera
-queries.
+Phase 5 is a local release-candidate build. It is not production-promotable
+until the open hardware and sustained-journey rows below have evidence bound to
+the final commit. Older 4.1.0 reports are historical input, not Phase 5 proof.
 
-| Area | Status |
-| --- | --- |
-| Continuous World removal | complete locally |
-| OSM-only selected-location runtime | complete locally |
-| Dense Baltimore cold load | passing at 12.9 s on the reference hardware run |
-| Shadow policy | passing: the single soft-shadow owner, texel stabilization contract, and inspected daylight/low-angle Apple Metal frames are accepted |
-| Road visibility | clean committed 11-class fixed-geography matrix passes and affected frames are accepted for stabilization scope |
-| Surface/occupancy and mountain paths | Swiss Alps structural blocker cleared: mapped OSM footway spawn at 11.9°, four rendered path meshes, and no unsupported steep land-cover slabs; thin distant terrain edges remain a known fidelity limitation |
-| Sustained Baltimore walk/drive | straight and S-turn profiles pass at ~59.9 FPS median; fixed camera geography now rejects a collapsed chase view and Monaco retains 10.7 m clearance |
-| Repeated resource stability | passing: three destination cycles retain canvas/frame ownership; five mode cycles retain a stable resource plateau and finish below the warmed heap median |
-| Retained product journeys | release-gate destination, title/planetary, plane/interior, editor/multiplayer, account, Firestore/MMO, and mobile device-layout journeys pass |
-| Dependency/security review | reviewed: zero critical advisories; the Firebase/Google transitive high chain is conditionally accepted with controls in `docs/RELEASE_4_1_SECURITY_REVIEW.md` |
-| Provider degradation | passing: Tokyo, Monaco, and Miami Beach complete through the documented fallback with the land-cover provider blocked |
-| Fixed geography CI | passing: the deterministic software-browser matrix covers the same 11 release classes; performance and human visual approval remain owned by installed Chrome |
-| Version, notes, immutable artifact | 4.1.0 identity and notes complete; clean artifact build, parity, size, attribution, and 453/453 hosted-source reachability pass |
-| Preview, promotion, rollback drill | operational release actions remain pending and require explicit deployment authorization |
+| Area | Exact Phase 5 evidence | Status |
+| --- | --- | --- |
+| Continuous World removal | Phase 3 ownership scan across 385 executable sources | pass |
+| Building exterior architecture | legacy shader and fake window/normal/roughness generators deleted; five static facade atlases cover mapped material families and a restrained type-inferred fallback; near geometry retains mapped footprints and mid LOD retains a bounded polygonal silhouette | pass in Baltimore and Paris visual probes |
+| Terrain geometry | Swiss Alps glacier classification, shared-edge positions/normals, and final daylight drone frame | pass for the tested high-relief class; global source accuracy remains bounded by provider quality |
+| Shadow/atmosphere | single shadow owner, stable texel anchor, one cloud draw owner, installed-Chrome daylight/night frames | pass on the reference Mac visual run |
+| Runtime interpolation | fixed-step previous/current actor and car pose contract with teleport rejection | pass |
+| Dense renderer ceiling | installed Chrome at the Los Angeles interchange after the facade/shadow batching correction: 705 calls, 1.97 M triangles, 496 geometries, 157 textures, 33 programs | pass for the balanced count/resource ceiling |
+| Installed-Chrome frame pacing | current cadence varied between 30 and 60 FPS in the controlled selected tab; final settled sample was 30 FPS with clean logs | open for an uninstrumented physical-device approval run; automation cadence is recorded, not promoted as 60 FPS |
+| Earth gameplay journeys | sustained automation: walk 120 s/1.44 km, drive 120 s/6.47 km, drone 120 s/3.39 km, plane 60 s/2.47 km; surface contact and mode exit contracts passed; installed Chrome also exercised walking, driving, drone, and camera reset | pass for candidate automation and installed-browser controls |
+| Planetary/ocean transitions | Earth→Moon→Earth and Earth→Ocean→Earth deterministic journeys pass without console errors | pass for transitions; sustained Moon/Mars/Space durations remain open |
+| Mobile layouts/controls | iPhone portrait, iPhone landscape, and Android portrait deterministic journeys pass | pass for emulation; real mobile hardware smoke remains open |
+| Windows | deterministic Chromium gates are portable, but no Windows GPU evidence is attached | open before public promotion |
+| Security and rules | 45/45 Firestore rules checks pass | pass |
+| Fixed geography | exact-candidate matrix passes Baltimore, Paris, Monaco, Swiss Alps, Sahara, Sydney, Golden Gate, Holland Tunnel, and the Judge Harry Pregerson interchange; the latter verifies 41 real stacked crossings with 5.689 m minimum separation | pass for covered classes |
+| Version/artifact/promotion | local identity is `4.1.1-rc.1`; immutable artifact verification is required below; deployment remains intentionally unauthorized | candidate only; no production promotion |
 
-The clean committed fixed-geography report is
-`output/playwright/world-matrix/4.1-release-candidate-green/report.json`.
-The final deterministic CI report is
-`output/playwright/world-matrix/4.1-release-ci-final/report.json`.
-Golden Gate is structurally coherent and loads inside its 20-second budget.
-Holland Tunnel's generated entry/interior/exit traversal is coherent, its
-ordinary arrival selects a safe mapped pedestrian surface outside the
-subgrade shell and mapped water, and boat availability is suppressed
-immediately while tunnel water occlusion owns the scene.
+Current artifacts:
+
+- `output/playwright/world-matrix/phase5-rc1-representative/report.json`
+- `output/playwright/world-matrix/phase5-rc1-representative/baltimore-drone.png`
+- `output/playwright/world-matrix/phase5-rc1-representative/swiss_alps_custom-drone.png`
+- `output/playwright/world-matrix/phase5-rc1-representative/pregerson_interchange_custom-drone.png`
+- `output/playwright/phase5-sustained-earth/report.json`
+
+The public site remains on the immutable 3.1 production baseline. Phase 5 does
+not authorize a Firebase promotion.
+
+`test-phase5-sustained-earth.mjs` and
+`measure-phase5-performance.mjs` are optional diagnostics. They are not merge
+or release gates and cannot overrule ordinary-control browser gameplay.

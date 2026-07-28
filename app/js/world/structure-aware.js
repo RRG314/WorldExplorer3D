@@ -1,10 +1,11 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   assignFeatureConnections,
+  assignStructureStackRanks,
   buildFeatureStations,
   buildFeatureTransitionAnchors,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=19";
+} from "../structure-semantics.js?v=24";
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -170,6 +171,7 @@ export function refreshStructureAwareFeatureProfiles() {
 
   const structureFeatures = transportFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
   assignFeatureConnections(transportFeatures);
+  assignStructureStackRanks(structureFeatures, worldBaseTerrainY);
 
   for (let i = 0; i < structureFeatures.length; i++) {
     const feature = structureFeatures[i];

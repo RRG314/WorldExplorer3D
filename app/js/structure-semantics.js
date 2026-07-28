@@ -2,8 +2,12 @@ import {
   attachCompiledTransportSurface,
   compileTransportSurfaceModel,
   sampleTransportSurfaceAtDistance
-} from './world/compiler/transport-surface-model.js?v=1';
+} from './world/compiler/transport-surface-model.js?v=2';
 import { classifyStructureSemantics, normalizedTagValue } from './structure-semantics/classification.js?v=1';
+import {
+  assignFeatureConnections,
+  assignStructureStackRanks as assignStructureStackRanksByGraph
+} from './structure-semantics/stacking.js?v=1';
 import {
   boundsIntersect,
   pointInPolygonXZ,
@@ -14,52 +18,9 @@ import {
   smoothstep01
 } from './structure-semantics/geometry.js?v=1';
 
-function connectionEndpointKey(point) {
-  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) return '';
-  return `${Math.round(point.x * 10)},${Math.round(point.z * 10)}`;
-}
-
-function assignFeatureConnections(features = []) {
-  const endpointGroups = new Map();
-  for (let i = 0; i < features.length; i++) {
-    const feature = features[i];
-    const points = Array.isArray(feature?.pts) ? feature.pts : null;
-    if (!points || points.length < 2) continue;
-    feature.connectedFeatures = { start: [], end: [] };
-    const endpoints = [
-      { endpoint: 'start', endpointIndex: 0, point: points[0] },
-      { endpoint: 'end', endpointIndex: points.length - 1, point: points[points.length - 1] }
-    ];
-    for (let e = 0; e < endpoints.length; e++) {
-      const entry = endpoints[e];
-      const key = connectionEndpointKey(entry.point);
-      if (!key) continue;
-      let bucket = endpointGroups.get(key);
-      if (!bucket) {
-        bucket = [];
-        endpointGroups.set(key, bucket);
-      }
-      bucket.push({ feature, ...entry });
-    }
-  }
-
-  endpointGroups.forEach((entries) => {
-    for (let i = 0; i < entries.length; i++) {
-      const entry = entries[i];
-      const target = entry.feature?.connectedFeatures?.[entry.endpoint];
-      if (!Array.isArray(target)) continue;
-      target.length = 0;
-      for (let j = 0; j < entries.length; j++) {
-        const other = entries[j];
-        if (other === entry || other.feature === entry.feature) continue;
-        target.push({
-          feature: other.feature,
-          endpoint: other.endpoint,
-          endpointIndex: other.endpointIndex,
-          point: other.point
-        });
-      }
-    }
+function assignStructureStackRanks(features = [], sampleTerrainY = null) {
+  return assignStructureStackRanksByGraph(features, sampleTerrainY, {
+    areRoadsConnected
   });
 }
 
@@ -74,7 +35,10 @@ function buildFeatureStations(feature, context = {}) {
   const bounds = feature.bounds || polylineBounds(points, (Number(feature.width) || 4) + 24);
   const stations = [];
   const laneWidth = Math.max(1.2, Number(feature.width) || 4);
-  const defaultTarget = semantics.terrainMode === 'subgrade' ? semantics.cutDepth : semantics.deckClearance;
+  const stackOffset = Math.max(0, Number(feature.structureStackOffset) || 0);
+  const defaultTarget = semantics.terrainMode === 'subgrade'
+    ? semantics.cutDepth + stackOffset
+    : semantics.deckClearance + stackOffset;
   const defaultSpan = Math.max(18, laneWidth * 4.5, defaultTarget * 4.2);
 
   const addStation = (distance, targetOffset, span, source = 'crossing') => {
@@ -86,7 +50,6 @@ function buildFeatureStations(feature, context = {}) {
       source
     });
   };
-
   for (let i = 0; i < features.length; i++) {
     const other = features[i];
     if (!other || other === feature || !Array.isArray(other.pts) || other.pts.length < 2) continue;
@@ -107,14 +70,37 @@ function buildFeatureStations(feature, context = {}) {
       for (let segB = 0; segB < other.pts.length - 1; segB++) {
         const intersection = segmentIntersection2D(a1, a2, other.pts[segB], other.pts[segB + 1]);
         if (!intersection) continue;
+        const atFeatureEndpointA =
+          (segA === 0 && intersection.t <= 0.02) ||
+          (segA === points.length - 2 && intersection.t >= 0.98);
+        const atFeatureEndpointB =
+          (segB === 0 && intersection.u <= 0.02) ||
+          (segB === other.pts.length - 2 && intersection.u >= 0.98);
+        if (
+          atFeatureEndpointA &&
+          atFeatureEndpointB &&
+          areRoadsConnected(feature, other)
+        ) {
+          continue;
+        }
         const distance = distances[segA] + segLen * intersection.t;
         let target = defaultTarget;
         if (semantics.terrainMode === 'elevated') {
-          const otherTarget = Number.isFinite(otherSemantics?.deckClearance) ? otherSemantics.deckClearance : 0;
-          target = Math.max(defaultTarget, otherTarget + 2.2);
+          const otherTarget =
+            (Number.isFinite(otherSemantics?.deckClearance) ? otherSemantics.deckClearance : 0) +
+            Math.max(0, Number(other.structureStackOffset) || 0);
+          const crossingClearance = semantics.featureCategory === 'road' ? 5.5 : 4.2;
+          target = otherOrder < ownOrder
+            ? Math.max(defaultTarget, otherTarget + crossingClearance)
+            : defaultTarget;
         } else if (semantics.terrainMode === 'subgrade') {
-          const otherDepth = Number.isFinite(otherSemantics?.cutDepth) ? otherSemantics.cutDepth : 0;
-          target = Math.max(defaultTarget, otherDepth + 1.4);
+          const otherDepth =
+            (Number.isFinite(otherSemantics?.cutDepth) ? otherSemantics.cutDepth : 0) +
+            Math.max(0, Number(other.structureStackOffset) || 0);
+          const crossingClearance = semantics.featureCategory === 'road' ? 4.6 : 3;
+          target = otherOrder > ownOrder
+            ? Math.max(defaultTarget, otherDepth + crossingClearance)
+            : defaultTarget;
         }
         addStation(distance, target, defaultSpan, 'feature_crossing');
       }
@@ -190,7 +176,14 @@ function featureEndpointSurfaceY(feature, endpointIndex, sampleTerrainY) {
   const terrainY = Number(sampleTerrainY(point.x, point.z));
   if (!Number.isFinite(terrainY)) return NaN;
   const surfaceBias = Number.isFinite(feature?.surfaceBias) ? Number(feature.surfaceBias) : 0.08;
-  return terrainY + surfaceBias;
+  const semantics = feature.structureSemantics || null;
+  const structureOffset =
+    semantics?.terrainMode === 'subgrade'
+      ? -Math.max(0, Number(semantics.cutDepth) || 0) - Math.max(0, Number(feature.structureStackOffset) || 0)
+      : semantics?.terrainMode === 'elevated'
+        ? Math.max(0, Number(semantics.deckClearance) || 0) + Math.max(0, Number(feature.structureStackOffset) || 0)
+        : 0;
+  return terrainY + structureOffset + surfaceBias;
 }
 
 function buildFeatureTransitionAnchors(feature, sampleTerrainY) {
@@ -561,11 +554,10 @@ function isRoadSurfaceReachable(nearestRoad, options = {}) {
   const currentRoad = options?.currentRoad || null;
   const sameRoad = !!currentRoad && road === currentRoad;
   const connectedRoad = !!currentRoad && !sameRoad && areRoadsConnected(currentRoad, road);
-  const sameVerticalGroup = !!(
-    currentRoad?.structureSemantics?.verticalGroup &&
-    road?.structureSemantics?.verticalGroup === currentRoad.structureSemantics.verticalGroup
-  );
-  const continuityAccess = sameRoad || connectedRoad || sameVerticalGroup;
+  // A vertical group describes a class of surface, not network connectivity.
+  // Treating every layer-1 bridge as continuous lets unrelated stacked
+  // overpasses capture an actor or vehicle at their planar crossing.
+  const continuityAccess = sameRoad || connectedRoad;
 
   let maxDist = roadSurfaceLateralThreshold(road, options);
   if (sameRoad) maxDist += 0.55;
@@ -590,7 +582,6 @@ function isRoadSurfaceReachable(nearestRoad, options = {}) {
   let maxVertical = roadSurfaceAttachmentThreshold(road, options);
   if (sameRoad) maxVertical += 1.7;
   else if (connectedRoad) maxVertical += 1.15;
-  else if (sameVerticalGroup) maxVertical += 0.45;
   return verticalDelta <= maxVertical;
 }
 
@@ -628,6 +619,7 @@ function featureTraversalKey(feature) {
 }
 
 export {
+  assignStructureStackRanks,
   areRoadsConnected,
   assignFeatureConnections,
   boundsIntersect,

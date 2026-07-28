@@ -248,7 +248,18 @@ export function createSyntheticFallbackWorld(options = {}) {
     const geometry = new THREE.ExtrudeGeometry(shape, { depth: h, bevelEnabled: false });
     geometry.rotateX(-Math.PI / 2);
     const color = [0x8899aa, 0x887766, 0x7788aa, 0x887799][Math.floor(Math.random() * 4)];
-    const material = new THREE.MeshLambertMaterial({ color });
+    const material = typeof appCtx.getBuildingMaterial === 'function'
+      ? appCtx.getBuildingMaterial('yes', idx, color, {
+        lodTier: 'near',
+        heightMeters: h,
+        footprintWidth: w,
+        footprintDepth: d,
+        footprintArea: w * d,
+        denseUrban: false,
+        facadeMaterial: '',
+        facadeColorMapped: false
+      })
+      : new THREE.MeshStandardMaterial({ color, roughness: 0.9, metalness: 0.02 });
     const mesh = new THREE.Mesh(geometry, material);
 
     let avgElevation = 0;

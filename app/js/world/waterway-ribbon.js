@@ -1,10 +1,10 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { clampNumber } from "./budgets.js?v=6";
-import { resolveWaterSurfaceVisualProfile } from "./load-geometry.js?v=16";
-import { registerWaterWaveMaterial } from "./render-support.js?v=5";
-import { decimatePoints } from "./world-geometry.js?v=2";
+import { resolveWaterSurfaceVisualProfile } from "./load-geometry.js?v=19";
+import { registerWaterWaveMaterial } from "./render-support.js?v=6";
+import { decimatePoints } from "./world-geometry.js?v=3";
 import { inferWaterRenderContext } from "../water-dynamics.js?v=4";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=19";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=24";
 import { normalizeWaterBody } from './water-body-contract.js?v=3';
 
 function waterwayWidthFromTags(tags) {

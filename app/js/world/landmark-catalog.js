@@ -45,6 +45,40 @@ const CURATED_LANDMARKS = [
     color: 0xc39b59,
     hideRadiusMeters: 126,
     wikidata: 'Q37200'
+  },
+  {
+    id: 'ten-light-street',
+    name: '10 Light Street',
+    lat: 39.289194,
+    lon: -76.614111,
+    matchRadiusMeters: 4200,
+    builder: 'measured-ten-light-street',
+    preserveMaterials: true,
+    modelHeightMeters: 155.2,
+    totalHeightMeters: 155.2,
+    modelWidthMeters: 48,
+    modelDepthMeters: 37,
+    rotation: { x: 0, y: 0.035, z: 0 },
+    color: 0xb88a68,
+    hideRadiusMeters: 38,
+    wikidata: 'Q2882640'
+  },
+  {
+    id: 'commerce-place-baltimore',
+    name: 'Commerce Place',
+    lat: 39.289352,
+    lon: -76.610606,
+    matchRadiusMeters: 4200,
+    builder: 'measured-commerce-place',
+    preserveMaterials: true,
+    modelHeightMeters: 138.4,
+    totalHeightMeters: 138.4,
+    modelWidthMeters: 48,
+    modelDepthMeters: 36,
+    rotation: { x: 0, y: -0.045, z: 0 },
+    color: 0xcfc4aa,
+    hideRadiusMeters: 48,
+    wikidata: null
   }
 ];
 

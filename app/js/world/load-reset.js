@@ -137,11 +137,6 @@ export function resetWorldForReload(options = {}) {
   appCtx.clearEarthWorldSceneObjects?.();
 
   resetWorldFurnitureCaches();
-  if (typeof appCtx.clearWindowTextureCache === 'function') {
-    appCtx.clearWindowTextureCache();
-  } else {
-    appCtx.windowTextures = {};
-  }
   if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
 
 }

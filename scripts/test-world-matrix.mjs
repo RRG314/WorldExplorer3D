@@ -18,6 +18,7 @@ const captureDroneViews = process.env.WORLD_MATRIX_CAPTURE_DRONE === '1';
 const forceDaylight = process.env.WORLD_MATRIX_FORCE_DAYLIGHT === '1';
 const requireWorldCover = process.env.WORLD_MATRIX_REQUIRE_WORLDCOVER === '1';
 const blockWorldCover = process.env.WORLD_MATRIX_BLOCK_WORLDCOVER === '1';
+const disableNearBuildingBatching = process.env.WORLD_MATRIX_DISABLE_NEAR_BUILDING_BATCHING === '1';
 const locationDelayMs = Math.max(0, Number(process.env.WORLD_MATRIX_LOCATION_DELAY_MS ?? 1200) || 0);
 const buildingDetailWaitLimitMs = 32000;
 const reportName = /^[a-z0-9._-]+$/i.test(String(process.env.WORLD_MATRIX_REPORT_NAME || '')) ?
@@ -45,14 +46,14 @@ function isTransientNetworkConsoleError(text = '') {
   const msg = String(text || '');
   return (
     /Failed to load resource:\s+the server responded with a status of\s+(400|429|500|502|503|504)/i.test(msg) ||
-    /Failed to load resource:\s+net::ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|BLOCKED_BY_CLIENT|FAILED)/i.test(msg) ||
+    /Failed to load resource:\s+net::ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|NETWORK_CHANGED|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|BLOCKED_BY_CLIENT|FAILED)/i.test(msg) ||
     /blocked by CORS policy/i.test(msg)
   );
 }
 
 function fatalConsoleEntries(consoleErrors, requestFailures, baseUrl) {
   const transientRequests = requestFailures.filter((failure) =>
-    /ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|BLOCKED_BY_CLIENT|FAILED)/i.test(failure.errorText || '')
+    /ERR_(CONNECTION_REFUSED|CONNECTION_RESET|CONNECTION_CLOSED|NETWORK_CHANGED|EMPTY_RESPONSE|HTTP2_PROTOCOL_ERROR|ABORTED|BLOCKED_BY_CLIENT|FAILED)/i.test(failure.errorText || '')
   );
   const transientOnlyExternal = transientRequests.length > 0 && transientRequests.every((failure) =>
     !String(failure.url || '').startsWith(baseUrl)
@@ -174,7 +175,9 @@ async function loadLocation(page, spec) {
     if (locationSpec.kind === 'custom' && typeof ctx.applyCustomLocationSpawn === 'function') {
       initialSpawn = ctx.applyCustomLocationSpawn('walk', {
         emitTutorial: false,
-        preferBoatIfWater: expectedStart === 'water',
+        // Match the production title/globe launch policy. A mapped bridge,
+        // tunnel, or valid dry surface must win over merely nearby water.
+        preferBoatIfWater: true,
         source: expectedStart === 'water' ? 'world_matrix_custom_water' : 'world_matrix_custom_land'
       });
     } else if (typeof ctx.spawnOnRoad === 'function') {
@@ -316,6 +319,100 @@ async function loadLocation(page, spec) {
       const kind = String(waterway?.structureSemantics?.structureKind || 'at_grade');
       structurePresentation.waterways[kind] = (structurePresentation.waterways[kind] || 0) + 1;
       if (waterway?.navigable === false) structurePresentation.nonNavigableWaterways += 1;
+    }
+
+    let stackedRoadCrossings = null;
+    if (Number.isFinite(locationSpec.expectedStackedRoadClearance)) {
+      const elevatedRoads = (ctx.roads || []).filter((road) =>
+        road?.structureSemantics?.terrainMode === 'elevated' &&
+        Number.isFinite(road?.structureSemantics?.verticalOrder) &&
+        Array.isArray(road?.pts) &&
+        road.pts.length >= 2
+      );
+      let minimumSeparation = Infinity;
+      let worst = null;
+      let count = 0;
+      const segmentCrossing = (a1, a2, b1, b2) => {
+        const adx = a2.x - a1.x;
+        const adz = a2.z - a1.z;
+        const bdx = b2.x - b1.x;
+        const bdz = b2.z - b1.z;
+        const denominator = adx * bdz - adz * bdx;
+        if (Math.abs(denominator) < 1e-8) return null;
+        const dx = b1.x - a1.x;
+        const dz = b1.z - a1.z;
+        const t = (dx * bdz - dz * bdx) / denominator;
+        const u = (dx * adz - dz * adx) / denominator;
+        if (t <= 0.02 || t >= 0.98 || u <= 0.02 || u >= 0.98) return null;
+        return { x: a1.x + adx * t, z: a1.z + adz * t, t, u };
+      };
+
+      for (let aIndex = 0; aIndex < elevatedRoads.length; aIndex += 1) {
+        const lowerCandidate = elevatedRoads[aIndex];
+        for (let bIndex = aIndex + 1; bIndex < elevatedRoads.length; bIndex += 1) {
+          const upperCandidate = elevatedRoads[bIndex];
+          const lowerOrder = Number(lowerCandidate.structureSemantics.verticalOrder);
+          const upperOrder = Number(upperCandidate.structureSemantics.verticalOrder);
+          if (ctx.areRoadsConnected?.(lowerCandidate, upperCandidate)) continue;
+          for (let aSegment = 0; aSegment < lowerCandidate.pts.length - 1; aSegment += 1) {
+            for (let bSegment = 0; bSegment < upperCandidate.pts.length - 1; bSegment += 1) {
+              const crossing = segmentCrossing(
+                lowerCandidate.pts[aSegment],
+                lowerCandidate.pts[aSegment + 1],
+                upperCandidate.pts[bSegment],
+                upperCandidate.pts[bSegment + 1]
+              );
+              if (!crossing) continue;
+              const aY = Number(ctx.sampleFeatureSurfaceY?.(
+                lowerCandidate,
+                crossing.x,
+                crossing.z,
+                { segIndex: aSegment, t: crossing.t }
+              ));
+              const bY = Number(ctx.sampleFeatureSurfaceY?.(
+                upperCandidate,
+                crossing.x,
+                crossing.z,
+                { segIndex: bSegment, t: crossing.u }
+              ));
+              if (!Number.isFinite(aY) || !Number.isFinite(bY)) continue;
+              const separation = Math.abs(aY - bY);
+              count += 1;
+              if (separation < minimumSeparation) {
+                minimumSeparation = separation;
+                worst = {
+                  x: Number(crossing.x.toFixed(2)),
+                  z: Number(crossing.z.toFixed(2)),
+                  separation: Number(separation.toFixed(3)),
+                  orders: [lowerOrder, upperOrder].sort((a, b) => a - b),
+                  featureIds: [
+                    String(lowerCandidate.sourceFeatureId || lowerCandidate.id || ''),
+                    String(upperCandidate.sourceFeatureId || upperCandidate.id || '')
+                  ],
+                  names: [String(lowerCandidate.name || ''), String(upperCandidate.name || '')],
+                  stationTargets: [
+                    (lowerCandidate.structureStations || []).map((station) => Number(station.targetOffset)),
+                    (upperCandidate.structureStations || []).map((station) => Number(station.targetOffset))
+                  ],
+                  stationSources: [
+                    (lowerCandidate.structureStations || []).map((station) => String(station.source || '')),
+                    (upperCandidate.structureStations || []).map((station) => String(station.source || ''))
+                  ],
+                  surfaceRanges: [
+                    [Number(lowerCandidate.structureSurfaceMinY), Number(lowerCandidate.structureSurfaceMaxY)],
+                    [Number(upperCandidate.structureSurfaceMinY), Number(upperCandidate.structureSurfaceMaxY)]
+                  ]
+                };
+              }
+            }
+          }
+        }
+      }
+      stackedRoadCrossings = {
+        count,
+        minimumSeparation: Number.isFinite(minimumSeparation) ? Number(minimumSeparation.toFixed(3)) : null,
+        worst
+      };
     }
 
     let customStructureProbe = null;
@@ -489,6 +586,16 @@ async function loadLocation(page, spec) {
       visibleDetailedSourceCount: 0,
       wallFacadeSourceCount: 0,
       visibleWallFacadeSourceCount: 0,
+      facadeAtlasSourceCount: 0,
+      visibleFacadeAtlasSourceCount: 0,
+      roofSourceCount: 0,
+      visibleRoofSourceCount: 0,
+      exteriorOwnedSourceCount: 0,
+      visibleExteriorOwnedSourceCount: 0,
+      provenanceClaimedSourceCount: 0,
+      visibleProvenanceClaimedSourceCount: 0,
+      unownedSamples: [],
+      geometryAnomalySamples: [],
       tiers: {}
     };
     let buildingDimensions = null;
@@ -504,12 +611,89 @@ async function loadLocation(page, spec) {
       const sourceCount = Math.max(1, Number(mesh.userData?.batchCount || 1));
       const tier = String(mesh.userData?.lodTier || 'unknown');
       const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+      if (!mesh.userData?.isBuildingBatch && mesh.geometry) {
+        if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+        const bounds = mesh.geometry.boundingBox;
+        const width = bounds ? bounds.max.x - bounds.min.x : 0;
+        const height = bounds ? bounds.max.y - bounds.min.y : 0;
+        const depth = bounds ? bounds.max.z - bounds.min.z : 0;
+        if (
+          buildingPresentation.geometryAnomalySamples.length < 40 &&
+          (width > 80 || depth > 80 || height > 80 || mesh.userData?.buildingName)
+        ) {
+          const footprint = Array.isArray(mesh.userData?.buildingFootprint) ? mesh.userData.buildingFootprint : [];
+          const footprintCenter = footprint.length > 0 ? footprint.reduce(
+            (sum, point) => ({ x: sum.x + Number(point.x || 0), z: sum.z + Number(point.z || 0) }),
+            { x: 0, z: 0 }
+          ) : null;
+          if (footprintCenter) {
+            footprintCenter.x /= footprint.length;
+            footprintCenter.z /= footprint.length;
+          }
+          buildingPresentation.geometryAnomalySamples.push({
+            sourceBuildingId: mesh.userData?.sourceBuildingId || null,
+            buildingName: mesh.userData?.buildingName || null,
+            buildingType: mesh.userData?.buildingType || null,
+            roofShape: mesh.userData?.roofShape || null,
+            geometrySource: mesh.userData?.geometrySource || null,
+            footprintWidth: Number(mesh.userData?.footprintWidth || 0),
+            footprintDepth: Number(mesh.userData?.footprintDepth || 0),
+            footprintArea: Number(mesh.userData?.footprintArea || 0),
+            heightMeters: Number(mesh.userData?.heightMeters || 0),
+            footprintCenter: footprintCenter ? {
+              x: Number(footprintCenter.x.toFixed(2)),
+              z: Number(footprintCenter.z.toFixed(2))
+            } : null,
+            bounds: {
+              width: Number(width.toFixed(2)),
+              height: Number(height.toFixed(2)),
+              depth: Number(depth.toFixed(2))
+            }
+          });
+        }
+      }
       const hasSurfaceDetail = materials.some((material) => !!material?.map);
       const hasWallFacade = materials.some((material) => material?.userData?.facadeWallsOnly === true);
+      const hasRoofOwner = mesh.userData?.isRoofDetail === true || materials.every((material) => {
+        const key = String(material?.userData?.buildingBatchKey || '');
+        return key.startsWith('mapped-roof:') || key.startsWith('roof-detail:');
+      });
+      const hasExteriorOwner = hasRoofOwner || materials.every((material) =>
+        material?.userData?.buildingExterior === true
+      );
+      const hasFacadeAtlas = !hasRoofOwner && materials.every((material) =>
+        material?.userData?.buildingExterior === true &&
+        material?.userData?.facadeAtlas === true &&
+        material?.userData?.wallOnlyTexture === true &&
+        !!material?.map
+      );
+      const hasProvenanceClaim = materials.every((material) =>
+        material?.userData?.materialClaim === 'mapped' ||
+        material?.userData?.materialClaim === 'neutral-fallback' ||
+        String(material?.userData?.buildingBatchKey || '').startsWith('mapped-roof:') ||
+        String(material?.userData?.buildingBatchKey || '').startsWith('roof-detail:')
+      );
+      if ((!hasExteriorOwner || !hasProvenanceClaim) && buildingPresentation.unownedSamples.length < 12) {
+        buildingPresentation.unownedSamples.push({
+          sourceCount,
+          tier,
+          meshName: String(mesh.name || ''),
+          meshFlags: { ...(mesh.userData || {}) },
+          materials: materials.map((material) => ({
+            name: String(material?.name || ''),
+            type: String(material?.type || ''),
+            userData: { ...(material?.userData || {}) }
+          }))
+        });
+      }
       buildingPresentation.meshCount += 1;
       buildingPresentation.sourceCount += sourceCount;
       if (hasSurfaceDetail) buildingPresentation.detailedSourceCount += sourceCount;
       if (hasWallFacade) buildingPresentation.wallFacadeSourceCount += sourceCount;
+      if (hasFacadeAtlas) buildingPresentation.facadeAtlasSourceCount += sourceCount;
+      if (hasRoofOwner) buildingPresentation.roofSourceCount += sourceCount;
+      if (hasExteriorOwner) buildingPresentation.exteriorOwnedSourceCount += sourceCount;
+      if (hasProvenanceClaim) buildingPresentation.provenanceClaimedSourceCount += sourceCount;
       buildingPresentation.tiers[tier] ||= { meshes: 0, sources: 0, visibleMeshes: 0, visibleSources: 0 };
       buildingPresentation.tiers[tier].meshes += 1;
       buildingPresentation.tiers[tier].sources += sourceCount;
@@ -518,6 +702,10 @@ async function loadLocation(page, spec) {
         buildingPresentation.visibleSourceCount += sourceCount;
         if (hasSurfaceDetail) buildingPresentation.visibleDetailedSourceCount += sourceCount;
         if (hasWallFacade) buildingPresentation.visibleWallFacadeSourceCount += sourceCount;
+        if (hasFacadeAtlas) buildingPresentation.visibleFacadeAtlasSourceCount += sourceCount;
+        if (hasRoofOwner) buildingPresentation.visibleRoofSourceCount += sourceCount;
+        if (hasExteriorOwner) buildingPresentation.visibleExteriorOwnedSourceCount += sourceCount;
+        if (hasProvenanceClaim) buildingPresentation.visibleProvenanceClaimedSourceCount += sourceCount;
         buildingPresentation.tiers[tier].visibleMeshes += 1;
         buildingPresentation.tiers[tier].visibleSources += sourceCount;
       }
@@ -723,6 +911,7 @@ async function loadLocation(page, spec) {
       },
       landusePresentation,
       structurePresentation,
+      stackedRoadCrossings,
       buildingPresentation,
       buildingDimensions,
       landmarkPresentation,
@@ -861,6 +1050,12 @@ async function main() {
 
   try {
     await bootstrapRuntime(page, baseUrl);
+    if (disableNearBuildingBatching) {
+      await page.evaluate(async () => {
+        const { ctx } = await import('/app/js/shared-context.js?v=55');
+        ctx.disableNearBuildingBatching = true;
+      });
+    }
 
     for (const spec of testLocations) {
       console.log(`[world-matrix] loading ${spec.id}`);

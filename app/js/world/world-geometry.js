@@ -26,6 +26,47 @@ export function isFiniteWorldPointXZ(point) {
   return !!point && Number.isFinite(point.x) && Number.isFinite(point.z);
 }
 
+function orientationXZ(a, b, c) {
+  const value = (b.x - a.x) * (c.z - a.z) - (b.z - a.z) * (c.x - a.x);
+  if (Math.abs(value) <= 1e-7) return 0;
+  return Math.sign(value);
+}
+
+function pointOnSegmentXZ(point, a, b) {
+  return (
+    point.x >= Math.min(a.x, b.x) - 1e-7 &&
+    point.x <= Math.max(a.x, b.x) + 1e-7 &&
+    point.z >= Math.min(a.z, b.z) - 1e-7 &&
+    point.z <= Math.max(a.z, b.z) + 1e-7
+  );
+}
+
+function segmentsIntersectXZ(a, b, c, d) {
+  const abC = orientationXZ(a, b, c);
+  const abD = orientationXZ(a, b, d);
+  const cdA = orientationXZ(c, d, a);
+  const cdB = orientationXZ(c, d, b);
+  if (abC !== abD && cdA !== cdB) return true;
+  if (abC === 0 && pointOnSegmentXZ(c, a, b)) return true;
+  if (abD === 0 && pointOnSegmentXZ(d, a, b)) return true;
+  if (cdA === 0 && pointOnSegmentXZ(a, c, d)) return true;
+  if (cdB === 0 && pointOnSegmentXZ(b, c, d)) return true;
+  return false;
+}
+
+export function polygonHasSelfIntersectionsXZ(pts) {
+  if (!Array.isArray(pts) || pts.length < 4) return false;
+  for (let first = 0; first < pts.length; first += 1) {
+    const firstNext = (first + 1) % pts.length;
+    for (let second = first + 1; second < pts.length; second += 1) {
+      const secondNext = (second + 1) % pts.length;
+      if (first === second || firstNext === second || secondNext === first) continue;
+      if (segmentsIntersectXZ(pts[first], pts[firstNext], pts[second], pts[secondNext])) return true;
+    }
+  }
+  return false;
+}
+
 export function sanitizeWorldPathPoints(pts, options = {}) {
   if (!Array.isArray(pts) || pts.length < 2) return [];
   const maxDistanceFromOrigin = Number.isFinite(options.maxDistanceFromOrigin) ? Math.max(32, options.maxDistanceFromOrigin) : Infinity;
@@ -106,6 +147,9 @@ export function sanitizeWorldFootprintPoints(pts, minArea = 8, options = {}) {
 
   const area = Math.abs(signedPolygonAreaXZ(cleaned));
   if (area < minArea || area > maxArea) return [];
+  // THREE.ExtrudeGeometry assumes a simple polygon. Reject bow-ties and
+  // overlapping rings here so they cannot become long triangular wall sails.
+  if (polygonHasSelfIntersectionsXZ(cleaned)) return [];
   return cleaned;
 }
 

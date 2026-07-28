@@ -1,5 +1,4 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { clearWindowTextureCache } from "./engine/procedural-textures.js?v=2";
 import {
   applyRenderQuality as applyEngineRenderQuality,
   canUseSsao as engineCanUseSsao,
@@ -19,7 +18,7 @@ import {
   getBuildingMaterial as getBuildingMaterialRuntime,
   initEngineTextures as initEngineTexturesRuntime,
   syncTextureGlobals as syncTextureGlobalsRuntime
-} from "./engine/materials-runtime.js?v=16";
+} from "./engine/materials-runtime.js?v=17";
 import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=8";
 
 const RENDER_QUALITY_LOW = 'low';
@@ -32,8 +31,6 @@ const engineState = {
   asphaltTex: null,
   asphaltNormal: null,
   asphaltRoughness: null,
-  buildingNormalMap: null,
-  buildingRoughnessMap: null,
   currentGpuTier: 'high',
   renderQualityLevel: RENDER_QUALITY_MED,
   hdrEnvMap: null,
@@ -221,7 +218,6 @@ syncTextureGlobals();
 
 Object.assign(appCtx, {
   canUseSsao,
-  clearWindowTextureCache,
   createBuildingGroundPatch,
   getHighQualityEnabled,
   getBuildingMaterial,
@@ -238,7 +234,6 @@ Object.assign(appCtx, {
 
 export {
   canUseSsao,
-  clearWindowTextureCache,
   createBuildingGroundPatch,
   getHighQualityEnabled,
   getBuildingMaterial,

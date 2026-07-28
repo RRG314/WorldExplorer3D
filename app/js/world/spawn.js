@@ -1,8 +1,8 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { inferSelectedLocationWaterKind } from "./water-location-hint.js?v=1";
 import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=19";
-import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=4";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=24";
+import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=5";
 
 let worldSpawnDeps = {
   buildingContainingPoint: () => null,
@@ -603,12 +603,6 @@ function tryAutoEnterBoatAt(worldX, worldZ, options = {}) {
 }
 
 function applyCustomLocationSpawn(mode = "walk", options = {}) {
-  const boatSpawn = tryAutoEnterBoatAt(0, 0, {
-    ...options,
-    mode,
-    source: options.source || "custom_location"
-  });
-  if (boatSpawn) return boatSpawn;
   const arrival = featuredArrivalNear(appCtx.LOC);
   if (arrival) {
     const viewpoint = appCtx.geoToWorld(arrival.viewpoint.lat, arrival.viewpoint.lon);
@@ -626,10 +620,29 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
     if (resolved) resolved.angle = Math.atan2(lookAt.x - resolved.x, lookAt.z - resolved.z);
     return applyResolvedWorldSpawn(resolved, options);
   }
+
   const exactRoad = findGradeSeparatedRoadAt(0, 0);
   const structureMode = exactRoad?.road?.structureSemantics?.terrainMode || "at_grade";
   const roadHalfWidth = Math.max(2, Number(exactRoad?.road?.width || 0) * 0.5 + 1);
   const structureFeetY = structureMode !== "at_grade" && exactRoad?.dist <= roadHalfWidth && Number.isFinite(exactRoad?.y) ? exactRoad.y : null;
+  if (Number.isFinite(structureFeetY)) {
+    return applySpawnTarget(exactRoad.x, exactRoad.z, {
+      ...options,
+      mode,
+      feetY: structureFeetY,
+      preferRoad: true,
+      preserveElevatedSurface: structureMode === "elevated",
+      source: options.source || "custom_structure"
+    });
+  }
+
+  const boatSpawn = tryAutoEnterBoatAt(0, 0, {
+    ...options,
+    mode,
+    source: options.source || "custom_location"
+  });
+  if (boatSpawn) return boatSpawn;
+
   return applySpawnTarget(exactRoad?.x || 0, exactRoad?.z || 0, {
     ...options,
     mode,
@@ -675,7 +688,6 @@ function spawnOnRoad(options = {}) {
     source: "spawn_on_road_fallback"
   });
 }
-
 export {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,

@@ -68,9 +68,13 @@ function normalizeAnchors(feature, semantics, totalDistance) {
   const total = Math.max(0, finiteNumber(totalDistance));
   const defaultOffset =
     semantics?.terrainMode === 'subgrade'
-      ? -Math.max(0, finiteNumber(semantics?.cutDepth))
+      ? -Math.max(0, finiteNumber(semantics?.cutDepth) + finiteNumber(feature?.structureStackOffset))
       : semantics?.terrainMode === 'elevated'
-        ? Math.max(0, finiteNumber(semantics?.deckClearance, semantics?.explicitBaseOffset))
+        ? Math.max(
+            0,
+            finiteNumber(semantics?.deckClearance, semantics?.explicitBaseOffset) +
+              finiteNumber(feature?.structureStackOffset)
+          )
         : 0;
   const anchors = [
     { distance: 0, offset: defaultOffset, priority: 0 },
@@ -304,10 +308,14 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
       distance,
       sampleSmoothAnchors(anchors, distance)
     );
+    // Grade-separated structures have an engineered vertical alignment.
+    // Their endpoint chord and explicit transition/station offsets own that
+    // alignment; sampling terrain here would make every DEM bump appear in a
+    // bridge deck or tunnel floor.
     const referenceY =
-      mode === 'elevated'
-        ? Math.max(approachReference, groundY)
-        : groundY;
+      mode === 'at_grade'
+        ? groundY
+        : approachReference;
     const unconstrainedCenterY = referenceY + offset + surfaceBias;
     const centerY =
       mode === 'elevated' && Number.isFinite(minimumStructureSurfaceY)
@@ -331,6 +339,31 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     rightLowerBounds[index] = atGrade
       ? rightY + surfaceBias
       : Number.NEGATIVE_INFINITY;
+  }
+
+  const hasTransitionAnchors =
+    Array.isArray(feature?.structureTransitionAnchors) &&
+    feature.structureTransitionAnchors.length > 0;
+  if (!hasTransitionAnchors && mode !== 'at_grade') {
+    let structuralShift = 0;
+    for (let index = 0; index < centerInitial.length; index += 1) {
+      const controllingGround = mode === 'elevated'
+        ? Math.max(groundHeights[index], leftGround[index], rightGround[index])
+        : Math.min(groundHeights[index], leftGround[index], rightGround[index]);
+      const requiredSurface = controllingGround + offsets[index] + surfaceBias;
+      if (mode === 'elevated') {
+        structuralShift = Math.max(structuralShift, requiredSurface - centerInitial[index]);
+      } else {
+        structuralShift = Math.min(structuralShift, requiredSurface - centerInitial[index]);
+      }
+    }
+    if (Math.abs(structuralShift) > 1e-6) {
+      for (let index = 0; index < centerInitial.length; index += 1) {
+        centerInitial[index] += structuralShift;
+        leftInitial[index] += structuralShift;
+        rightInitial[index] += structuralShift;
+      }
+    }
   }
 
   const centerHeights = smoothGradeLimitedProfile(

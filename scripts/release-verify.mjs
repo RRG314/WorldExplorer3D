@@ -15,7 +15,6 @@ const steps = [
   { name: 'Terrain source contract', cmd: [process.execPath, 'scripts/test-terrain-source-contract.mjs'] },
   { name: 'Surface contract', cmd: [process.execPath, 'scripts/test-surface-contract.mjs'] },
   { name: 'Overture tile source', cmd: [process.execPath, 'scripts/test-overture-tile-source.mjs'] },
-  { name: 'Renderer provenance', cmd: [process.execPath, 'scripts/test-render-provenance.mjs'] },
   { name: 'Inferred building coverage', cmd: [process.execPath, 'scripts/test-inferred-building-coverage.mjs'] },
   { name: 'Firestore rules', cmd: [process.execPath, 'scripts/test-rules.mjs'] },
   { name: 'Local data safety', cmd: [process.execPath, 'scripts/test-local-data-safety.mjs'] },

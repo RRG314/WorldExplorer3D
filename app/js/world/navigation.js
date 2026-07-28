@@ -356,29 +356,19 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
         Array.isArray(preferredRoad?.connectedFeatures?.start) && preferredRoad.connectedFeatures.start.some((entry) => entry?.feature === road) ||
         Array.isArray(preferredRoad?.connectedFeatures?.end) && preferredRoad.connectedFeatures.end.some((entry) => entry?.feature === road)
       );
-      const sameVerticalGroup =
-        preferredRoad?.structureSemantics?.verticalGroup &&
-        road?.structureSemantics?.verticalGroup === preferredRoad.structureSemantics.verticalGroup;
       if (sameRoad) {
         weightedDist = d + verticalDelta * 0.12;
       } else if (connectedRoad) {
         weightedDist = d + verticalDelta * 0.2;
-      } else if (sameVerticalGroup) {
-        weightedDist = d + verticalDelta * 0.32;
       }
       if (sameRoad) weightedDist -= 3.4;
       else if (connectedRoad) weightedDist -= 2.25;
-      else if (sameVerticalGroup) weightedDist -= 0.7;
       if ((sameRoad || connectedRoad) && (t < 0.08 || t > 0.92)) weightedDist -= 0.55;
     }
     const continuityAccess =
       !!preferredRoad && (
         road === preferredRoad ||
-        runtime.areRoadsConnected(preferredRoad, road) ||
-        (
-          preferredRoad?.structureSemantics?.verticalGroup &&
-          road?.structureSemantics?.verticalGroup === preferredRoad.structureSemantics.verticalGroup
-        )
+        runtime.areRoadsConnected(preferredRoad, road)
       );
     if (semantics?.gradeSeparated && !continuityAccess && Number.isFinite(verticalDelta)) {
       const directLockThreshold = semantics.terrainMode === 'elevated' ? 1.25 : 1.35;

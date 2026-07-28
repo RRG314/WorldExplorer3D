@@ -1,4 +1,9 @@
+import { createRenderInterpolator } from './render-interpolation.js?v=1';
+
 function createCoreFrameSystems(appCtx, hooks = {}) {
+  const renderInterpolator = createRenderInterpolator(appCtx);
+  appCtx.getRenderInterpolationSnapshot = () => renderInterpolator.snapshot();
+  appCtx.resetRenderInterpolation = () => renderInterpolator.reset();
   let hudTimer = 0;
   let mapTimer = 0;
   let lodTimer = 0;
@@ -35,7 +40,9 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       phase: 'simulation',
       enabled: () => !!appCtx.gameStarted,
       fixedUpdate(frame) {
+        renderInterpolator.beginFixedStep();
         appCtx.update(frame.fixedDelta);
+        renderInterpolator.endFixedStep();
       }
     },
     {
@@ -70,6 +77,7 @@ function createCoreFrameSystems(appCtx, hooks = {}) {
       phase: 'camera',
       enabled: () => !!appCtx.gameStarted,
       update(frame) {
+        renderInterpolator.apply(frame.interpolation);
         appCtx.updateCamera(frame.dt);
         appCtx.updatePlanetarySky?.();
       }

@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   clearStructureVisualMeshes,
   rebuildStructureVisualMeshes
-} from "./terrain/structure-visuals.js?v=4";
+} from "./terrain/structure-visuals.js?v=5";
 import {
   boundsIntersectLocal,
   expandBoundsLocal,
@@ -10,9 +10,9 @@ import {
   isUrbanLanduseType,
   pointsBoundsLocal
 } from "./terrain/context-utils.js?v=1";
-import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=2";
+import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=3";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=2";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=5";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=9";
 import {
   groundProviderCatalogSnapshot
 } from "./terrain/ground-provider-registry.js?v=2";
@@ -28,8 +28,9 @@ import {
   classifyTerrainVisualProfile,
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
-  setWorldSurfaceProfile
-} from "./terrain/surface-profiles.js?v=27";
+  setWorldSurfaceProfile,
+  updateTerrainAerialDetail
+} from "./terrain/surface-profiles.js?v=29";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,
@@ -57,7 +58,7 @@ import {
   buildRoadSkirts,
   detectRoadIntersections,
   publishCompiledTransportMeshes
-} from "./terrain/rebuild.js?v=11";
+} from "./terrain/rebuild.js?v=12";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
@@ -318,6 +319,7 @@ Object.assign(appCtx, {
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
+  updateTerrainAerialDetail,
   resetTerrainStreamingState,
   sampleTileElevationMeters,
   sampleAcceptedGroundAtLatLon,
@@ -369,6 +371,7 @@ export {
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
+  updateTerrainAerialDetail,
   resetTerrainStreamingState,
   sampleTileElevationMeters,
   sampleAcceptedGroundAtLatLon,

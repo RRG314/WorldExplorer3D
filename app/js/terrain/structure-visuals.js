@@ -3,13 +3,13 @@ import {
   polylineBounds,
   polylineDistances,
   sampleFeatureSurfaceY
-} from "../structure-semantics.js?v=19";
+} from "../structure-semantics.js?v=24";
 import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext
 } from "./structure-visual-meshes.js?v=3";
-import { collectTunnelVisualInstances } from "./structure-tunnel-visuals.js?v=1";
-import { elevatedSegmentSafety } from "../world/bridge-safety.js?v=1";
+import { collectTunnelVisualInstances } from "./structure-tunnel-visuals.js?v=2";
+import { elevatedSegmentSafety } from "../world/bridge-safety.js?v=2";
 
 function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {
   const featureBounds = feature?.bounds || polylineBounds(feature?.pts || [], (Number(feature?.width) || 4) + padding);

@@ -1,11 +1,11 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=19";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=24";
 import {
   buildingSeedFromIdentity,
   inferFallbackBuildingHeightMeters,
   interpretBuildingSemantics
 } from "../building-semantics.js?v=4";
-import { createMidLodBuildingMesh } from "./load-geometry.js?v=16";
+import { createMidLodBuildingMesh } from "./load-geometry.js?v=19";
 import {
   appendGeometryWithTransform,
   buildMergedGeometry,
@@ -15,11 +15,12 @@ import { createRoofDetailMesh } from "./roof-details.js?v=2";
 import {
   createMappedRoofMesh,
   resolveMappedRoof
-} from "./mapped-roof-geometry.js?v=2";
+} from "./mapped-roof-geometry.js?v=3";
 import {
   batchMidLodBuildingMeshes,
   batchNearLodBuildingMeshes
-} from "./building-batching.js?v=3";
+} from "./building-batching.js?v=4";
+import { curatedLandmarksNear } from "./landmark-catalog.js?v=9";
 
 export function buildBuildingGeometryPass(options = {}) {
   const buildingWays = Array.isArray(options.buildingWays) ? options.buildingWays : [];
@@ -55,6 +56,13 @@ export function buildBuildingGeometryPass(options = {}) {
   const signedPolygonAreaXZ = options.signedPolygonAreaXZ;
   const pickBuildingBaseColor = options.pickBuildingBaseColor;
   const registerBuildingCollision = options.registerBuildingCollision;
+  const curatedLandmarkExclusions = curatedLandmarksNear(appCtx.LOC)
+    .filter((landmark) => Number(landmark.hideRadiusMeters) > 0)
+    .map((landmark) => ({
+      id: landmark.id,
+      radius: Number(landmark.hideRadiusMeters),
+      world: appCtx.geoToWorld(landmark.lat, landmark.lon)
+    }));
 
   showLoad(`Loading buildings... (${buildingWays.length})`);
   startLoadPhase('buildBuildingGeometry');
@@ -310,6 +318,14 @@ export function buildBuildingGeometryPass(options = {}) {
     }
     centerX /= pts.length;
     centerZ /= pts.length;
+    const curatedExclusion = curatedLandmarkExclusions.find((landmark) =>
+      Math.hypot(centerX - landmark.world.x, centerZ - landmark.world.z) <= landmark.radius
+    );
+    if (curatedExclusion) {
+      loadMetrics.curatedLandmarkSuppressedBuildings =
+        Number(loadMetrics.curatedLandmarkSuppressedBuildings || 0) + 1;
+      return;
+    }
     const footprintWidth = Math.max(0, maxFootprintX - minFootprintX);
     const footprintDepth = Math.max(0, maxFootprintZ - minFootprintZ);
     const footprintArea = Math.abs(signedPolygonAreaXZ(pts));
@@ -426,6 +442,7 @@ export function buildBuildingGeometryPass(options = {}) {
         buildingType: bt,
         denseUrban: denseUrbanContext,
         facadeMaterial: way.tags['building:material'] || '',
+        facadeColorMapped: /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(mappedFacadeColor),
         buildingSemantics
       });
     } else {
@@ -464,6 +481,7 @@ export function buildBuildingGeometryPass(options = {}) {
           footprintArea,
           denseUrban: denseUrbanContext,
           facadeMaterial: way.tags['building:material'] || '',
+          facadeColorMapped: /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(mappedFacadeColor),
           structureSemantics,
           buildingSemantics
         }) :

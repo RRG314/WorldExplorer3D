@@ -7,9 +7,9 @@ import {
   projectPointToFeature,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=19";
+} from "../structure-semantics.js?v=24";
 import { compileIntersectionTopologyGeometry } from "./intersection-geometry.js?v=1";
-import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=2";
+import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=3";
 
 const ROAD_SURFACE_BIAS = 0.08;
 

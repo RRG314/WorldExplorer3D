@@ -4,8 +4,6 @@ import {
   createBrickFacadeTexture,
   createBrickNormalMap,
   createBrickRoughnessMap,
-  createBuildingNormalMap,
-  createBuildingRoughnessMap,
   createConcreteFacadeTexture,
   createConcreteNormalMap,
   createConcreteRoughnessMap,
@@ -15,13 +13,9 @@ import {
   createProceduralGrassNormal,
   createProceduralGrassRoughness,
   createProceduralGrassTexture,
-  createRoughnessMap,
-  getWindowTextureCache
+  createRoughnessMap
 } from "./procedural-textures.js?v=2";
-import {
-  getBuildingMaterial,
-  refreshBuildingFacadeMaterials
-} from "./building-facade-materials.js?v=6";
+import { getBuildingMaterial } from "./building-facade-materials.js?v=8";
 
 const EARTH_TEXTURE_ROOT = 'assets/textures/earth';
 
@@ -51,9 +45,6 @@ export function syncTextureGlobals(ctx) {
   appCtx.brickNormal = state.brickNormal;
   appCtx.brickRoughness = state.brickRoughness;
   appCtx.surfaceTextureSets = state.surfaceTextureSets;
-  appCtx.buildingNormalMap = state.buildingNormalMap;
-  appCtx.buildingRoughnessMap = state.buildingRoughnessMap;
-  appCtx.windowTextures = getWindowTextureCache();
 }
 
 function createGroundPatchMaterial(state, type) {
@@ -441,7 +432,6 @@ function initPbrTextures(ctx, maxAniso) {
     tuneSet([state.concreteDiffuse, state.concreteNormal, state.concreteRoughness]);
     state.pbrTexturesLoaded.concrete = true;
     console.log('Concrete textures ready (' + (fromPrimary ? 'bundled CC0 asset' : 'procedural fallback') + ')');
-    refreshBuildingFacadeMaterials(ctx);
   }, () => {
     return {
       diff: createConcreteFacadeTexture(),
@@ -458,7 +448,6 @@ function initPbrTextures(ctx, maxAniso) {
     tuneSet([state.brickDiffuse, state.brickNormal, state.brickRoughness]);
     state.pbrTexturesLoaded.brick = true;
     console.log('Brick textures ready (' + (fromPrimary ? 'bundled CC0 asset' : 'procedural fallback') + ')');
-    refreshBuildingFacadeMaterials(ctx);
   }, () => {
     return {
       diff: createBrickFacadeTexture(),
@@ -488,8 +477,6 @@ export function initEngineTextures(ctx, renderer) {
   state.asphaltTex = createAsphaltTexture();
   state.asphaltNormal = createAsphaltNormal();
   state.asphaltRoughness = createRoughnessMap();
-  state.buildingNormalMap = createBuildingNormalMap();
-  state.buildingRoughnessMap = createBuildingRoughnessMap();
 
   const maxAniso = renderer.capabilities.getMaxAnisotropy();
   const aniso = Math.min(maxAniso, 8);

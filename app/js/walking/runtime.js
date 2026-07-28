@@ -153,37 +153,40 @@ function createWalkingRuntimeHelpers({
       return false;
     }
 
-    const cameraYaw = state.walker.yaw + (Number(state.walker.lookYawOffset) || 0);
+    const walker = appCtx.presentationPose?.mode === 'walk'
+      ? appCtx.presentationPose.walk
+      : state.walker;
+    const cameraYaw = walker.yaw + (Number(walker.lookYawOffset) || 0);
 
     if (state.view === "first") {
-      const y = state.walker.y;
-      camera.position.set(state.walker.x, y, state.walker.z);
+      const y = walker.y;
+      camera.position.set(walker.x, y, walker.z);
 
       const lookDistance = 10;
-      const lookX = state.walker.x + Math.sin(cameraYaw) * Math.cos(state.walker.pitch) * lookDistance;
-      const lookY = y + Math.sin(state.walker.pitch) * lookDistance;
-      const lookZ = state.walker.z + Math.cos(cameraYaw) * Math.cos(state.walker.pitch) * lookDistance;
+      const lookX = walker.x + Math.sin(cameraYaw) * Math.cos(walker.pitch) * lookDistance;
+      const lookY = y + Math.sin(walker.pitch) * lookDistance;
+      const lookZ = walker.z + Math.cos(cameraYaw) * Math.cos(walker.pitch) * lookDistance;
 
       camera.lookAt(lookX, lookY, lookZ);
       return true;
     }
 
     if (state.view === "overhead") {
-      const terrainY = getWalkGroundY(state.walker.x, state.walker.z, 0);
+      const terrainY = getWalkGroundY(walker.x, walker.z, 0);
       const height = 45;
       const offsetBack = 8;
 
       camera.position.set(
-        state.walker.x - Math.sin(cameraYaw) * offsetBack,
+        walker.x - Math.sin(cameraYaw) * offsetBack,
         terrainY + height,
-        state.walker.z - Math.cos(cameraYaw) * offsetBack
+        walker.z - Math.cos(cameraYaw) * offsetBack
       );
 
       const lookAhead = 15;
       camera.lookAt(
-        state.walker.x + Math.sin(cameraYaw) * lookAhead,
+        walker.x + Math.sin(cameraYaw) * lookAhead,
         terrainY,
-        state.walker.z + Math.cos(cameraYaw) * lookAhead
+        walker.z + Math.cos(cameraYaw) * lookAhead
       );
       return true;
     }
@@ -191,13 +194,13 @@ function createWalkingRuntimeHelpers({
     const activeInterior = appCtx.activeInterior || null;
     const interiorFootprint = Array.isArray(activeInterior?.usableFootprint) ? activeInterior.usableFootprint : null;
     const interiorCamera = !!(activeInterior && interiorFootprint && interiorFootprint.length >= 3);
-    const baseY = state.walker.y;
+    const baseY = walker.y;
     const back = interiorCamera ? Math.min(1.05, CFG.thirdPersonDist * 0.24) : CFG.thirdPersonDist;
     const up = interiorCamera ? Math.min(0.78, CFG.thirdPersonHeight * 0.34) : CFG.thirdPersonHeight;
-    const pitchBackScale = Math.max(0.46, Math.cos(state.walker.pitch));
-    const camX = state.walker.x - Math.sin(cameraYaw) * pitchBackScale * back;
-    const camZ = state.walker.z - Math.cos(cameraYaw) * pitchBackScale * back;
-    const camY = baseY + up - Math.sin(state.walker.pitch) * back * 0.42;
+    const pitchBackScale = Math.max(0.46, Math.cos(walker.pitch));
+    const camX = walker.x - Math.sin(cameraYaw) * pitchBackScale * back;
+    const camZ = walker.z - Math.cos(cameraYaw) * pitchBackScale * back;
+    const camY = baseY + up - Math.sin(walker.pitch) * back * 0.42;
 
     let resolvedCamX = camX;
     let resolvedCamZ = camZ;
@@ -210,13 +213,13 @@ function createWalkingRuntimeHelpers({
     camera.position.set(resolvedCamX, camY, resolvedCamZ);
 
     if (state.characterMesh && state.view === "third") {
-      state.characterMesh.visible = state.walker.pitch < 0.98;
+      state.characterMesh.visible = walker.pitch < 0.98;
     }
 
     const lookAhead = interiorCamera ? Math.min(1.45, CFG.thirdPersonLookAhead * 0.24) : CFG.thirdPersonLookAhead;
-    const lookX = state.walker.x + Math.sin(cameraYaw) * Math.cos(state.walker.pitch) * lookAhead;
-    const lookY = baseY - CFG.eyeHeight + 1.2 + Math.sin(state.walker.pitch) * lookAhead * 0.5;
-    const lookZ = state.walker.z + Math.cos(cameraYaw) * Math.cos(state.walker.pitch) * lookAhead;
+    const lookX = walker.x + Math.sin(cameraYaw) * Math.cos(walker.pitch) * lookAhead;
+    const lookY = baseY - CFG.eyeHeight + 1.2 + Math.sin(walker.pitch) * lookAhead * 0.5;
+    const lookZ = walker.z + Math.cos(cameraYaw) * Math.cos(walker.pitch) * lookAhead;
 
     camera.lookAt(lookX, lookY, lookZ);
     return true;

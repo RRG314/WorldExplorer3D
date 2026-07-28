@@ -8,9 +8,11 @@ import {
 } from '../app/js/world/compiler/transport-surface-model.js';
 import {
   assignFeatureConnections,
+  assignStructureStackRanks,
   buildFeatureStations,
   buildFeatureTransitionAnchors,
   buildFeatureRibbonEdges,
+  isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
 } from '../app/js/structure-semantics.js';
@@ -150,6 +152,33 @@ const bridgeModel = compileTransportSurfaceModel(bridge, bridgeGround);
 assert.ok(bridgeModel.stats.minimumY > 17.4, 'bridge deck followed the valley instead of spanning it');
 assert.ok(bridgeModel.stats.maximumY - bridgeModel.stats.minimumY < 0.05, 'level bridge deck became uneven');
 
+const bridgeBumpGround = (x) => 12 + 11 * Math.exp(-((x - 120) ** 2) / 180);
+const bridgeBumpModel = compileTransportSurfaceModel(
+  straightFeature({
+    id: 'bridge-terrain-bump',
+    semantics: {
+      terrainMode: 'elevated',
+      gradeSeparated: true,
+      isBridge: true,
+      deckClearance: 5.5,
+      rampCandidate: false,
+      verticalGroup: 'elevated:1:bridge'
+    }
+  }),
+  bridgeBumpGround
+);
+assert.ok(
+  bridgeBumpModel.stats.maximumY - bridgeBumpModel.stats.minimumY < 0.05,
+  'bridge deck copied a local terrain bump instead of preserving its engineered alignment'
+);
+for (let index = 0; index < bridgeBumpModel.distances.length; index += 1) {
+  assert.ok(
+    bridgeBumpModel.centerHeights[index] + EPSILON >=
+      bridgeBumpGround(bridgeBumpModel.distances[index]) + 5.5 + SURFACE_BIAS,
+    'flat bridge alignment lost required clearance over a terrain bump'
+  );
+}
+
 const approachStart = straightFeature({
   id: 'bridge-approach-start',
   length: 100,
@@ -207,7 +236,7 @@ assert.ok(
 );
 assert.ok(connectedBridgeModel.stats.maximumGrade <= 0.1201, 'connected bridge approach exceeded grade limit');
 
-const tunnelGround = (x) => 104 + Math.sin(x / 35) * 0.8;
+const tunnelGround = (x) => 104 + 2 * Math.exp(-((x - 120) ** 2) / 180);
 const tunnel = straightFeature({
   id: 'tunnel-hill',
   semantics: {
@@ -220,10 +249,14 @@ const tunnel = straightFeature({
   }
 });
 const tunnelModel = compileTransportSurfaceModel(tunnel, tunnelGround);
-for (let index = 0; index < tunnelModel.distances.length; index += 1) {
-  const groundY = tunnelGround(tunnelModel.distances[index]);
-  assert.ok(tunnelModel.centerHeights[index] <= groundY - 4.4, 'tunnel surface escaped its subgrade layer');
-}
+assert.ok(
+  tunnelModel.stats.maximumY - tunnelModel.stats.minimumY < 0.05,
+  'tunnel copied small terrain undulations instead of preserving its engineered alignment'
+);
+assert.ok(
+  tunnelModel.stats.maximumY <= 99.6,
+  'tunnel surface escaped its subgrade layer'
+);
 
 const ramp = straightFeature({
   id: 'smooth-ramp',
@@ -283,6 +316,213 @@ const stackY = stackModels.map((model) => sampleTransportSurfaceAtDistance(model
 assert.ok(stackY[1] - stackY[0] >= 4.5, 'tunnel and at-grade layers collapsed');
 assert.ok(stackY[2] - stackY[1] >= 5.4, 'at-grade and bridge layers collapsed');
 assert.equal(new Set(stackModels.map((model) => model.verticalGroup)).size, 3, 'stack layer identities collided');
+
+const upperStackModel = compileTransportSurfaceModel(straightFeature({
+  id: 'stack-upper-bridge',
+  semantics: {
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    isBridge: true,
+    verticalOrder: 2,
+    deckClearance: 11,
+    verticalGroup: 'elevated:2:bridge'
+  }
+}), stackGround);
+assert.ok(
+  sampleTransportSurfaceAtDistance(upperStackModel, 120) - stackY[2] >= 5.4,
+  'two elevated roadway layers do not preserve vehicle clearance'
+);
+
+const connectedElevatedA = straightFeature({
+  id: 'connected-elevated-a',
+  length: 100,
+  originX: -100,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    isBridge: true,
+    verticalOrder: 1,
+    deckClearance: 5.5,
+    verticalGroup: 'elevated:1:bridge'
+  }
+});
+const connectedElevatedB = straightFeature({
+  id: 'connected-elevated-b',
+  length: 100,
+  originX: 0,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    isBridge: true,
+    verticalOrder: 1,
+    deckClearance: 5.5,
+    verticalGroup: 'elevated:1:bridge'
+  }
+});
+assignFeatureConnections([connectedElevatedA, connectedElevatedB]);
+for (const connected of [connectedElevatedA, connectedElevatedB]) {
+  const stations = buildFeatureStations(connected, {
+    features: [connectedElevatedA, connectedElevatedB],
+    waterAreas: []
+  });
+  assert.equal(
+    stations.some((station) => String(station.source).includes('feature_crossing')),
+    false,
+    'connected elevated road segments were mistaken for a crossing and given an artificial hump'
+  );
+}
+
+const connectedDeckCrossing = {
+  ...straightFeature({
+    id: 'connected-deck-crossing',
+    length: 100,
+    originX: 50,
+    semantics: {
+      featureCategory: 'road',
+      terrainMode: 'elevated',
+      gradeSeparated: true,
+      isBridge: true,
+      verticalOrder: 1,
+      deckClearance: 5.5,
+      verticalGroup: 'elevated:1:bridge'
+    }
+  }),
+  pts: [{ x: 50, z: -50 }, { x: 50, z: 50 }]
+};
+const connectedDeckNetwork = [connectedElevatedA, connectedElevatedB, connectedDeckCrossing];
+assignFeatureConnections(connectedDeckNetwork);
+assignStructureStackRanks(connectedDeckNetwork, () => 10);
+assert.equal(
+  connectedElevatedA.structureStackOffset,
+  connectedElevatedB.structureStackOffset,
+  'source fragments of one connected deck received different stack heights'
+);
+assert.ok(
+  Math.abs(connectedDeckCrossing.structureStackOffset - connectedElevatedB.structureStackOffset) >= 5.5,
+  'an unconnected crossing did not separate from the connected deck'
+);
+for (const connected of [connectedElevatedA, connectedElevatedB]) {
+  connected.structureStations = buildFeatureStations(connected, {
+    features: connectedDeckNetwork,
+    waterAreas: []
+  });
+  buildFeatureTransitionAnchors(connected, () => 10);
+  updateFeatureSurfaceProfile(connected, () => 10);
+}
+const connectedJoinA = sampleTransportSurfaceAtDistance(
+  connectedElevatedA.transportSurfaceModel,
+  connectedElevatedA.transportSurfaceModel.distances.at(-1)
+);
+const connectedJoinB = sampleTransportSurfaceAtDistance(
+  connectedElevatedB.transportSurfaceModel,
+  0
+);
+assert.ok(
+  Math.abs(connectedJoinA - connectedJoinB) <= EPSILON,
+  'connected grade-separated source fragments produced a vertical seam at their shared endpoint'
+);
+
+const sameLayerCrossingA = straightFeature({
+  id: 'same-layer-crossing-a',
+  length: 120,
+  originX: -60,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    isBridge: true,
+    verticalOrder: 1,
+    deckClearance: 5.5,
+    verticalGroup: 'elevated:1:bridge'
+  }
+});
+const sameLayerCrossingB = {
+  ...straightFeature({
+    id: 'same-layer-crossing-b',
+    length: 120,
+    originX: -60,
+    semantics: {
+      featureCategory: 'road',
+      terrainMode: 'elevated',
+      gradeSeparated: true,
+      isBridge: true,
+      verticalOrder: 1,
+      deckClearance: 5.5,
+      verticalGroup: 'elevated:1:bridge'
+    }
+  }),
+  pts: [{ x: 0, z: -60 }, { x: 0, z: 60 }]
+};
+assignFeatureConnections([sameLayerCrossingA, sameLayerCrossingB]);
+assignStructureStackRanks([sameLayerCrossingA, sameLayerCrossingB]);
+const sameLayerStationSets = [sameLayerCrossingA, sameLayerCrossingB].map((crossing) =>
+  buildFeatureStations(crossing, {
+    features: [sameLayerCrossingA, sameLayerCrossingB],
+    waterAreas: []
+  })
+);
+const sameLayerCrossingTargets = sameLayerStationSets
+  .flat()
+  .filter((station) => String(station.source).includes('feature_crossing'))
+  .map((station) => station.targetOffset);
+assert.equal(
+  sameLayerCrossingTargets.length,
+  2,
+  'an ambiguous unconnected same-layer crossing was not assigned consistent district stack ranks'
+);
+assert.ok(
+  Math.max(...sameLayerCrossingTargets) - Math.min(...sameLayerCrossingTargets) >= 5.5,
+  'district stack ranks do not preserve vehicle clearance'
+);
+
+const lowerCrossingRoad = {
+  ...straightFeature({
+    id: 'unrelated-lower-overpass',
+    length: 100,
+    originX: -50,
+    semantics: {
+      terrainMode: 'elevated',
+      gradeSeparated: true,
+      isBridge: true,
+      verticalOrder: 1,
+      deckClearance: 5.5,
+      verticalGroup: 'elevated:1:bridge'
+    }
+  })
+};
+const upperCrossingRoad = {
+  ...straightFeature({
+    id: 'unrelated-upper-overpass',
+    length: 100,
+    originX: -50,
+    originZ: 0,
+    semantics: {
+      terrainMode: 'elevated',
+      gradeSeparated: true,
+      isBridge: true,
+      verticalOrder: 1,
+      deckClearance: 5.5,
+      verticalGroup: 'elevated:1:bridge'
+    }
+  }),
+  pts: [{ x: 0, z: -50 }, { x: 0, z: 50 }]
+};
+updateFeatureSurfaceProfile(lowerCrossingRoad, () => 20);
+updateFeatureSurfaceProfile(upperCrossingRoad, () => 20);
+assert.equal(
+  isRoadSurfaceReachable({
+    road: upperCrossingRoad,
+    dist: 0.2,
+    verticalDelta: 4.8,
+    distanceToTransitionZone: Infinity
+  }, {
+    currentRoad: lowerCrossingRoad
+  }),
+  false,
+  'unconnected overpasses sharing a generic layer label allowed the car to jump decks'
+);
 
 const parityFeature = straightFeature({
   id: 'render-gameplay-parity',

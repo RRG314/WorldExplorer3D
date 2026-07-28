@@ -111,6 +111,7 @@ export function createWorldLandusePass(options = {}) {
     'plant_nursery', 'greenhouse_horticulture', 'recreation_ground',
     'village_green', 'cemetery', 'sand', 'dune', 'barren', 'glacier', 'quarry'
   ]);
+  const terrainOwnedLandCoverTypes = new Set(visibleMappedSurfaceTypes);
   function addLandusePolygon(runtime, pts, landuseType, holeRings = [], guardOptions = null, featureMeta = {}) {
     if (!pts || pts.length < 3) return;
 
@@ -202,6 +203,24 @@ export function createWorldLandusePass(options = {}) {
       datumConfidence: featureMeta.layer === 'ocean' ? 0.98 : 0.82
     }) : null;
     const waterFlattenFactor = isWater ? 0 : 1.0;
+
+    // Natural ground cover is semantic input to the terrain profile and
+    // vegetation compilers, not a second rendered surface. Draping large OSM
+    // polygons over steep relief created long, independently triangulated
+    // sheets that visibly cut through mountain terrain. Keep the mapped
+    // footprint for world rules while the terrain tile remains the sole
+    // natural-ground renderer.
+    if (!isWater && !isExplicitHardscape && terrainOwnedLandCoverTypes.has(landuseType)) {
+      appCtx.landuses.push({
+        type: landuseType,
+        pts: ring,
+        bounds: { minX, maxX, minZ, maxZ },
+        renderOwner: 'terrain-profile',
+        geometryRendered: false
+      });
+      return;
+    }
+
     let geometry;
     if (isWater) {
       const shape = new THREE.Shape();
@@ -356,18 +375,35 @@ export function createWorldLandusePass(options = {}) {
     let lines = 0;
     const geom = geojson.geometry;
     const props = geojson.properties || {};
+    const polygonSurfaceType = String(props.kind || '').toLowerCase() === 'glacier'
+      ? 'glacier'
+      : 'water';
     const waterFeatureMeta = {
       ...featureMeta,
       kindHint: props.kind || props.water || props.class || props.subclass || featureMeta.kindHint || null
     };
 
     if (geom.type === 'Polygon') {
-      if (addWaterPolygonFromVectorCoords(runtime, geom.coordinates, waterFeatureMeta)) polygons++;
+      if (polygonSurfaceType === 'glacier') {
+        const outer = normalizeWorldRingFromLonLat(geom.coordinates?.[0], 1000);
+        if (outer) {
+          cacheSurfaceFeatureHint(outer, 'glacier');
+          addLandusePolygon(runtime, outer, 'glacier', [], null, waterFeatureMeta);
+          polygons++;
+        }
+      } else if (addWaterPolygonFromVectorCoords(runtime, geom.coordinates, waterFeatureMeta)) polygons++;
       return { polygons, lines };
     }
     if (geom.type === 'MultiPolygon') {
       geom.coordinates.forEach((polyCoords) => {
-        if (addWaterPolygonFromVectorCoords(runtime, polyCoords, waterFeatureMeta)) polygons++;
+        if (polygonSurfaceType === 'glacier') {
+          const outer = normalizeWorldRingFromLonLat(polyCoords?.[0], 1000);
+          if (outer) {
+            cacheSurfaceFeatureHint(outer, 'glacier');
+            addLandusePolygon(runtime, outer, 'glacier', [], null, waterFeatureMeta);
+            polygons++;
+          }
+        } else if (addWaterPolygonFromVectorCoords(runtime, polyCoords, waterFeatureMeta)) polygons++;
       });
       return { polygons, lines };
     }

@@ -43,7 +43,7 @@ export function initWorldLoadGeometry(options = {}) {
   }
 }
 
-function fallbackMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8ca0') {
+function fallbackMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8ca0', options = {}) {
   if (!pts || pts.length < 3) return null;
 
   let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
@@ -58,17 +58,41 @@ function fallbackMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8c
   const d = Math.max(4, maxZ - minZ);
   const h = Math.max(3.2, Number.isFinite(height) ? height : 10);
 
-  const geo = new THREE.BoxGeometry(w, h, d);
-  const mat = new THREE.MeshStandardMaterial({
-    color: colorHex,
-    roughness: 0.92,
-    metalness: 0.02
+  const shape = new THREE.Shape();
+  shape.moveTo(minX, -minZ);
+  shape.lineTo(maxX, -minZ);
+  shape.lineTo(maxX, -maxZ);
+  shape.lineTo(minX, -maxZ);
+  shape.closePath();
+  const geo = new THREE.ExtrudeGeometry(shape, {
+    depth: h,
+    bevelEnabled: false,
+    curveSegments: 1,
+    steps: 1
   });
+  geo.rotateX(-Math.PI / 2);
+  const mat = typeof appCtx.getBuildingMaterial === 'function'
+    ? appCtx.getBuildingMaterial(options.buildingType || 'yes', options.buildingSeed || 0, colorHex, {
+      lodTier: 'mid',
+      heightMeters: h,
+      footprintWidth: w,
+      footprintDepth: d,
+      footprintArea: w * d,
+      denseUrban: options.denseUrban === true,
+      facadeMaterial: options.facadeMaterial || '',
+      facadeColorMapped: options.facadeColorMapped === true,
+      buildingSemantics: options.buildingSemantics || null
+    })
+    : new THREE.MeshStandardMaterial({
+      color: colorHex,
+      roughness: 0.92,
+      metalness: 0.02
+    });
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.position.set((minX + maxX) * 0.5, avgElevation + h * 0.5, (minZ + maxZ) * 0.5);
+  mesh.position.y = avgElevation;
   mesh.userData.buildingFootprint = pts;
-  mesh.userData.midLodHalfHeight = h * 0.5;
-  mesh.userData.midLodPositionMode = 'center';
+  mesh.userData.midLodHalfHeight = 0;
+  mesh.userData.midLodPositionMode = 'base';
   mesh.userData.midLodDims = { w, h, d };
   mesh.userData.midLodColor = colorHex;
   mesh.userData.avgElevation = avgElevation;
@@ -100,6 +124,21 @@ function footprintMetrics(pts) {
   };
 }
 
+function midLodRenderFootprint(pts, maximumPoints = 10) {
+  if (!Array.isArray(pts) || pts.length <= maximumPoints) return pts;
+  const simplified = [];
+  const step = pts.length / maximumPoints;
+  for (let i = 0; i < maximumPoints; i++) {
+    const point = pts[Math.floor(i * step)];
+    if (!point) continue;
+    const previous = simplified[simplified.length - 1];
+    if (!previous || previous.x !== point.x || previous.z !== point.z) {
+      simplified.push(point);
+    }
+  }
+  return simplified.length >= 3 ? simplified : pts;
+}
+
 export function createMidLodBuildingMesh(pts, height, avgElevation, options = {}) {
   if (!pts || pts.length < 3) return null;
 
@@ -109,10 +148,14 @@ export function createMidLodBuildingMesh(pts, height, avgElevation, options = {}
   const minimumHeight = options.buildingSemantics?.partKind && options.buildingSemantics.partKind !== 'full' ? 0.2 : 3.2;
   const h = Math.max(minimumHeight, Number.isFinite(height) ? height : 10);
   const metrics = footprintMetrics(pts);
+  // Retain a polygonal skyline silhouette and the full facade material while
+  // bounding distant geometry cost. Collision and near-LOD geometry continue
+  // to use the complete mapped footprint.
+  const renderPts = midLodRenderFootprint(pts);
 
   try {
     const shape = new THREE.Shape();
-    pts.forEach((p, i) => {
+    renderPts.forEach((p, i) => {
       if (i === 0) shape.moveTo(p.x, -p.z);
       else shape.lineTo(p.x, -p.z);
     });
@@ -127,7 +170,7 @@ export function createMidLodBuildingMesh(pts, height, avgElevation, options = {}
     geo.rotateX(-Math.PI / 2);
     if (!geometryHasFinitePositions(geo)) {
       geo.dispose();
-      return fallbackMidLodBuildingMesh(pts, h, avgElevation, colorHex);
+      return fallbackMidLodBuildingMesh(pts, h, avgElevation, colorHex, options);
     }
 
     const mat = typeof appCtx.getBuildingMaterial === 'function'
@@ -139,6 +182,7 @@ export function createMidLodBuildingMesh(pts, height, avgElevation, options = {}
         footprintArea: metrics.area,
         denseUrban: options.denseUrban === true,
         facadeMaterial: options.facadeMaterial || '',
+        facadeColorMapped: options.facadeColorMapped === true,
         buildingSemantics: options.buildingSemantics || null
       })
       : new THREE.MeshStandardMaterial({
@@ -160,12 +204,13 @@ export function createMidLodBuildingMesh(pts, height, avgElevation, options = {}
     mesh.userData.midLodColor = colorHex;
     mesh.userData.avgElevation = avgElevation;
     mesh.userData.lodTier = 'mid';
-    mesh.castShadow = true;
+    // Mid-LOD skyline geometry never occupies the near shadow field.
+    mesh.castShadow = false;
     mesh.receiveShadow = true;
     return mesh;
   } catch (err) {
     console.warn('[WorldLoad] createMidLodBuildingMesh fallback:', err);
-    return fallbackMidLodBuildingMesh(pts, h, avgElevation, colorHex);
+    return fallbackMidLodBuildingMesh(pts, h, avgElevation, colorHex, options);
   }
 }
 
