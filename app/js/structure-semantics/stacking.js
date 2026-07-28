@@ -271,7 +271,7 @@ function assignFeatureConnections(features = []) {
   // pairs as connected makes real ramps look like stacked crossings and lifts
   // the adjoining decks apart.
   const segmentCellSize = 12;
-  const joinTolerance = 0.35;
+  const joinTolerance = 0.6;
   const segmentCells = new Map();
   const cellKey = (x, z) => `${x},${z}`;
   for (const feature of features) {
@@ -327,19 +327,22 @@ function assignFeatureConnections(features = []) {
         1,
         ((point.x - candidate.a.x) * dx + (point.z - candidate.a.z) * dz) / lengthSq
       ));
-      // Endpoint-to-endpoint joins were already handled exactly above. This
-      // pass is specifically for T/merge junctions on the segment interior.
-      if (t <= 0.001 || t >= 0.999) continue;
       const projectedX = candidate.a.x + dx * t;
       const projectedZ = candidate.a.z + dz * t;
       const distance = Math.hypot(projectedX - point.x, projectedZ - point.z);
       if (distance > joinTolerance) continue;
+      const candidateEndpoint =
+        t <= 0.001 ? 'start' :
+        t >= 0.999 ? 'end' :
+        'interior';
+      const candidateEndpointIndex =
+        candidateEndpoint === 'end' ? candidate.segmentIndex + 1 : candidate.segmentIndex;
       const previous = bestByFeature.get(candidate.feature);
       if (!previous || distance < previous.distance) {
         bestByFeature.set(candidate.feature, {
           feature: candidate.feature,
-          endpoint: 'interior',
-          endpointIndex: candidate.segmentIndex,
+          endpoint: candidateEndpoint,
+          endpointIndex: candidateEndpointIndex,
           segmentIndex: candidate.segmentIndex,
           segmentT: t,
           distanceAlong: candidate.distanceBefore + Math.sqrt(lengthSq) * t,

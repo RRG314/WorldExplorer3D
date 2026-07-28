@@ -38,6 +38,7 @@
     "test:editor-multiplayer": "node scripts/test-editor-multiplayer-surfaces.mjs",
     "test:block-builder": "node scripts/test-block-builder-contract.mjs",
     "test:title-planetary": "node scripts/test-title-planetary-launches.mjs",
+    "test:space-flight-controls": "node scripts/test-space-flight-controls.mjs",
     "test:session-lifecycle": "node scripts/test-session-lifecycle.mjs",
     "test:surface-contract": "node scripts/test-surface-contract.mjs",
     "test:terrain-source": "node scripts/test-terrain-source-contract.mjs",

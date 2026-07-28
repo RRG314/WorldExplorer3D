@@ -371,36 +371,6 @@ export function collectStructureVisualInstances({
         }
       }
 
-      if (!isConnectorLike && !isSkywalk) {
-        for (const endpoint of ['start', 'end']) {
-          const links = Array.isArray(feature.connectedFeatures?.[endpoint]) ?
-            feature.connectedFeatures[endpoint] :
-            [];
-          if (links.length > 0) continue;
-          const endpointIndex = endpoint === 'start' ? 0 : structurePts.length - 1;
-          const adjacentIndex = endpoint === 'start' ? 1 : structurePts.length - 2;
-          const point = structurePts[endpointIndex];
-          const adjacent = structurePts[adjacentIndex];
-          const dx = adjacent.x - point.x;
-          const dz = adjacent.z - point.z;
-          const length = Math.hypot(dx, dz);
-          if (!(length > 0.35)) continue;
-          const deckY = sampleFeatureSurfaceY(feature, point.x, point.z);
-          const terrainY = sampleTerrainHeight(point.x, point.z);
-          if (!Number.isFinite(deckY) || deckY - terrainY < 1.05) continue;
-          addBeam(
-            guardrailInstances,
-            point.x,
-            deckY + 0.56,
-            point.z,
-            width + 0.9,
-            1.04,
-            0.22,
-            Math.atan2(dx, dz)
-          );
-        }
-      }
-
       if (!isConnectorLike && !isSkywalk && total >= 12) {
         const rings = structurePts.map((point) => {
           const y = sampleFeatureSurfaceY(feature, point.x, point.z);

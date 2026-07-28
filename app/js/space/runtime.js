@@ -8,6 +8,8 @@ const _sfTempQuat = new THREE.Quaternion();
 const _sfGravityTmp = new THREE.Vector3();
 const _sfGravitySum = new THREE.Vector3();
 const _sfLaunchRadial = new THREE.Vector3();
+const _sfLocalRight = new THREE.Vector3(1, 0, 0);
+const _sfLocalUp = new THREE.Vector3(0, 0, -1);
 
 export function normalizeLandingTargetName(target) {
   const t = String(target || '').trim().toLowerCase();
@@ -326,33 +328,23 @@ export function updateSpaceFlightPhysics() {
   const rocket = appCtx.spaceFlight.rocket;
   const keys = appCtx.spaceFlight.keys;
   const launchAssist = getLaunchAssistState(rocket);
-  const cam = appCtx.spaceFlight.camera;
   const frameScale = appCtx.spaceFlight._frameScale || 1;
 
   if (keys['arrowleft'] || keys['arrowright']) {
-    _sfTempVec.setFromMatrixColumn(cam.matrixWorld, 1).normalize();
     const yawDir = keys['arrowleft'] ? 1 : -1;
-    _sfTempQuat.setFromAxisAngle(_sfTempVec, SPACE_CONSTANTS.TURN_SPEED * yawDir * frameScale);
-    rocket.quaternion.premultiply(_sfTempQuat);
+    _sfTempQuat.setFromAxisAngle(_sfLocalUp, SPACE_CONSTANTS.TURN_SPEED * yawDir * frameScale);
+    // Post-multiply so steering is always expressed in spacecraft-local axes.
+    // Camera axes invert when the chase view crosses a world axis.
+    rocket.quaternion.multiply(_sfTempQuat);
   }
 
   if (keys['arrowup'] || keys['arrowdown']) {
-    _sfTempVec.setFromMatrixColumn(cam.matrixWorld, 0).normalize();
     const pitchDir = keys['arrowup'] ? 1 : -1;
-    _sfTempQuat.setFromAxisAngle(_sfTempVec, SPACE_CONSTANTS.PITCH_SPEED * pitchDir * frameScale);
-    rocket.quaternion.premultiply(_sfTempQuat);
+    _sfTempQuat.setFromAxisAngle(_sfLocalRight, SPACE_CONSTANTS.PITCH_SPEED * pitchDir * frameScale);
+    rocket.quaternion.multiply(_sfTempQuat);
   }
 
   rocket.quaternion.normalize();
-
-  _sfTempVec.set(1, 0, 0).applyQuaternion(rocket.quaternion);
-  const rollError = _sfTempVec.y;
-  if (Math.abs(rollError) > 0.01) {
-    _sfForward.set(0, 1, 0).applyQuaternion(rocket.quaternion);
-    _sfTempQuat.setFromAxisAngle(_sfForward, -rollError * 0.06 * frameScale);
-    rocket.quaternion.premultiply(_sfTempQuat);
-    rocket.quaternion.normalize();
-  }
 
   let isThrusting = false;
   if (keys[' ']) {
@@ -445,7 +437,7 @@ export function updateSpaceFlightCamera() {
   if (appCtx.spaceFlight.overviewMode) {
     if (appCtx.spaceFlight.overviewMode === 'inner') _sfTargetPos.set(0, 5600, 7200);
     else _sfTargetPos.set(0, 52000, 68000);
-    appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, 0.2);
+    appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, 0.08);
     appCtx.spaceFlight.camera.up.set(0, 1, 0);
     appCtx.spaceFlight.camera.lookAt(0, 0, 0);
     return;
@@ -459,12 +451,12 @@ export function updateSpaceFlightCamera() {
   if (launchBody?.position && launchAltitude < 180) {
     _sfLaunchRadial.copy(rocket.position).sub(launchBody.position).normalize();
     _sfTargetPos.copy(rocket.position)
-      .addScaledVector(_sfLaunchRadial, 135)
-      .addScaledVector(_sfTempVec, 58);
+      .addScaledVector(_sfLaunchRadial, 48)
+      .addScaledVector(_sfTempVec, 24);
   } else {
     _sfTargetPos.copy(rocket.position)
-      .addScaledVector(_sfForward, -165)
-      .addScaledVector(_sfTempVec, 62);
+      .addScaledVector(_sfForward, -70)
+      .addScaledVector(_sfTempVec, 25);
   }
 
   appCtx.spaceFlight.camera.position.lerp(_sfTargetPos, 0.1);

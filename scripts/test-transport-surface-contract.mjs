@@ -236,6 +236,39 @@ assert.ok(
 );
 assert.ok(connectedBridgeModel.stats.maximumGrade <= 0.1201, 'connected bridge approach exceeded grade limit');
 
+const openBridge = straightFeature({
+  id: 'open-bridge-transition',
+  length: 180,
+  semantics: {
+    featureCategory: 'road',
+    terrainMode: 'elevated',
+    gradeSeparated: true,
+    isBridge: true,
+    deckClearance: 5.5,
+    verticalGroup: 'elevated:1:bridge'
+  }
+});
+assignFeatureConnections([openBridge]);
+openBridge.structureStations = buildFeatureStations(openBridge, {
+  features: [openBridge],
+  waterAreas: []
+});
+const openBridgeAnchors = buildFeatureTransitionAnchors(openBridge, () => 30);
+assert.deepEqual(
+  openBridgeAnchors.map((anchor) => [anchor.endpoint, anchor.targetOffset, anchor.source]),
+  [
+    ['start', 0, 'open_structure_transition'],
+    ['end', 0, 'open_structure_transition']
+  ],
+  'an incomplete bridge did not receive shared ground transitions at both open ends'
+);
+updateFeatureSurfaceProfile(openBridge, () => 30);
+assert.ok(
+  Math.abs(sampleTransportSurfaceAtDistance(openBridge.transportSurfaceModel, 0) - 30.08) <= 0.02 &&
+  Math.abs(sampleTransportSurfaceAtDistance(openBridge.transportSurfaceModel, 180) - 30.08) <= 0.02,
+  'open bridge endpoints did not return smoothly to the accepted ground surface'
+);
+
 const tunnelGround = (x) => 104 + 2 * Math.exp(-((x - 120) ** 2) / 180);
 const tunnel = straightFeature({
   id: 'tunnel-hill',
@@ -373,6 +406,28 @@ for (const connected of [connectedElevatedA, connectedElevatedB]) {
     'connected elevated road segments were mistaken for a crossing and given an artificial hump'
   );
 }
+
+const nearEndpointFragmentA = {
+  ...connectedElevatedA,
+  sourceFeatureId: 'near-endpoint-a',
+  pts: [{ x: -100, z: 20 }, { x: 0, z: 20 }]
+};
+const nearEndpointFragmentB = {
+  ...connectedElevatedB,
+  sourceFeatureId: 'near-endpoint-b',
+  pts: [{ x: 0.42, z: 20 }, { x: 100, z: 20 }]
+};
+assignFeatureConnections([nearEndpointFragmentA, nearEndpointFragmentB]);
+assert.equal(
+  nearEndpointFragmentA.connectedFeatures.end?.[0]?.feature,
+  nearEndpointFragmentB,
+  'sub-meter vector-tile endpoint drift broke a continuous elevated road'
+);
+assert.equal(
+  nearEndpointFragmentB.connectedFeatures.start?.[0]?.feature,
+  nearEndpointFragmentA,
+  'near-endpoint connection ownership was not reciprocal'
+);
 
 const connectedDeckCrossing = {
   ...straightFeature({

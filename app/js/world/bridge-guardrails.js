@@ -106,57 +106,6 @@ export function registerBridgeGuardrails(road, owner = null) {
       addBuildingToSpatialIndex(collider);
     }
   }
-  for (const endpoint of ['start', 'end']) {
-    const links = Array.isArray(road.connectedFeatures?.[endpoint]) ?
-      road.connectedFeatures[endpoint] :
-      [];
-    if (links.length > 0) continue;
-    const endpointIndex = endpoint === 'start' ? 0 : road.pts.length - 1;
-    const adjacentIndex = endpoint === 'start' ? 1 : road.pts.length - 2;
-    const point = road.pts[endpointIndex];
-    const adjacent = road.pts[adjacentIndex];
-    const dx = adjacent.x - point.x;
-    const dz = adjacent.z - point.z;
-    const length = Math.hypot(dx, dz);
-    if (!(length > 0.35)) continue;
-    const tangentX = dx / length;
-    const tangentZ = dz / length;
-    const crossX = -tangentZ;
-    const crossZ = tangentX;
-    const surfaceY = sampleFeatureSurfaceY(road, point.x, point.z);
-    const terrainY = appCtx.baseTerrainHeightAt?.(point.x, point.z) ??
-      appCtx.terrainMeshHeightAt?.(point.x, point.z) ??
-      0;
-    if (!Number.isFinite(surfaceY) || surfaceY - terrainY < 1.05) continue;
-    const barrierLength = width + 0.9;
-    const pts = barrierFootprint(
-      point.x,
-      point.z,
-      crossX,
-      crossZ,
-      barrierLength,
-      0.28
-    );
-    const collider = {
-      pts,
-      ...colliderBounds(pts),
-      baseY: surfaceY,
-      minY: surfaceY,
-      maxY: surfaceY + 1.25,
-      height: 1.25,
-      buildingType: 'bridge_guardrail',
-      collisionKind: 'barrier',
-      geometrySource: 'road_terminal_guardrail',
-      heightSource: 'infrastructure',
-      levelsSource: 'not_applicable',
-      colliderDetail: 'full',
-      sourceBuildingId: `${road.sourceFeatureId}:guardrail:terminal:${endpoint}`,
-      guardrailReason: 'unconnected_elevated_terminal'
-    };
-    colliders.push(collider);
-    appCtx.buildings.push(collider);
-    addBuildingToSpatialIndex(collider);
-  }
   road._guardrailsRegistered = true;
   road.guardrailColliders = colliders;
   road._guardrailOwner = owner || null;

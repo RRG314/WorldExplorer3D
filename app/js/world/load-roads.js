@@ -334,12 +334,13 @@ export function createWorldRoadLoader(deps = {}) {
     for (const radius of radii) {
       if (loaded) break;
       loadMetrics.activeRadiusDeg = radius;
-      // Keep every travel controller inside the district that is actually
-      // loaded. The safety inset prevents actors from reaching clipped roads,
-      // terrain edges, or unpopulated map space.
+      // Keep travel actors just inside the district that is actually loaded.
+      // This does not change world loading, the visible horizon, map coverage,
+      // atmosphere, or sky; it only keeps controllers off clipped data edges.
+      const loadedRadiusWorld = radius * Number(appCtx.SCALE || 100000);
       appCtx.worldTraversalRadiusWorld = Math.max(
         900,
-        radius * Number(appCtx.SCALE || 100000) * 0.88
+        loadedRadiusWorld - Math.max(45, Math.min(80, loadedRadiusWorld * 0.03))
       );
       try {
         if (performance.now() - loadStartedAt > maxTotalLoadMs) {

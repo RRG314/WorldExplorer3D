@@ -254,7 +254,7 @@ function buildFeatureTransitionAnchors(feature, sampleTerrainY) {
     const endpoint = endpoints[i];
     const point = points[endpoint.index];
     const linked = Array.isArray(connections?.[endpoint.endpoint]) ? connections[endpoint.endpoint] : [];
-    if (!point || linked.length === 0) continue;
+    if (!point) continue;
 
     const terrainY = Number(sampleTerrainY(point.x, point.z));
     if (!Number.isFinite(terrainY)) continue;
@@ -279,6 +279,13 @@ function buildFeatureTransitionAnchors(feature, sampleTerrainY) {
       }
     }
 
+    // An incomplete grade-separated OSM way must return to the accepted
+    // ground surface at its open end. A wall across a bridge or tunnel traps
+    // the player and hides the real topology error. A zero-offset transition
+    // produces the same engineered ramp/portal rule for every location.
+    if (strongestOffset === null && linked.length === 0 && semantics?.gradeSeparated) {
+      strongestOffset = 0;
+    }
     if (strongestOffset === null) continue;
 
     const blendDistance = Math.max(
@@ -296,7 +303,7 @@ function buildFeatureTransitionAnchors(feature, sampleTerrainY) {
       targetOffset: strongestOffset,
       span: blendDistance,
       endpoint: endpoint.endpoint,
-      source: 'connected_feature'
+      source: linked.length > 0 ? 'connected_feature' : 'open_structure_transition'
     });
   }
 
