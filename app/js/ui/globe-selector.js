@@ -1,12 +1,14 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { createGlobeSelectorScene } from './globe-selector/scene.js?v=5';
+import { createGlobeSelectorScene } from './globe-selector/scene.js?v=6';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
-import { getGlobeSelectorElements } from './globe-selector/dom.js?v=1';
+import { getGlobeSelectorElements } from './globe-selector/dom.js?v=2';
+import { CURATED_DESTINATIONS, MAJOR_CITY_DESTINATIONS, fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=1';
+import { bindCityListInteractions, renderLibraryCityItems, renderNearbyCityItems } from './globe-selector/city-list-view.js?v=1';
 import {
   addSelectionToSavedFavorites,
+  addRecentPlace,
   buildFavoriteCities as buildFavoriteCitiesFromData,
   buildNearbyCities as buildNearbyCitiesFromData,
-  cityLocationLabel,
   cityMatchesGlobeSelection,
   clampLatLon,
   fetchReversePayload,
@@ -14,13 +16,14 @@ import {
   getMenuFavoriteCities as getMenuFavoriteCitiesFromLocs,
   latLonToLocalPoint,
   loadSavedFavoriteCities as loadSavedFavoriteCitiesFromStorage,
+  loadRecentPlaces,
   normalizeCityRecord,
   parseReverseAddress,
   persistSavedFavoriteCities as persistSavedFavoriteCitiesToStorage,
   syncLegacyCustomSelection,
   setGlobeSelectorScrollLock,
   toFiniteNumber
-} from "./globe-selector/helpers.js?v=1";
+} from "./globe-selector/helpers.js?v=5";
 
 function createGlobeSelector(options = {}) {
   const {
@@ -28,7 +31,7 @@ function createGlobeSelector(options = {}) {
     mobileSearchBtn, searchStatus, latInput, lonInput, startBtn, backBtn, moonBtn,
     spaceBtn, searchBtn, locateBtn, exploreModeBtn, liveEarthModeBtn, explorePanel,
     liveEarthPanel, liveEarthStatus, liveEarthCategoryChips, liveEarthLayerList,
-    liveEarthDetails, liveEarthRefreshBtn, nearbyTabBtn, favoritesTabBtn,
+    liveEarthDetails, liveEarthRefreshBtn, nearbyTabBtn, favoritesTabBtn, saveFavoriteBtn,
     cityListHint, cityList
   } = getGlobeSelectorElements();
 
@@ -44,20 +47,15 @@ function createGlobeSelector(options = {}) {
     };
   }
 
-  let openState = false;
-  let selected = null;
-  let searchInFlight = false;
-  let coordinateInputsDirty = false;
-  let reverseLookupToken = 0;
+  let openState = false, selected = null, searchInFlight = false;
+  let coordinateInputsDirty = false, reverseLookupToken = 0;
   let activeCityTab = 'nearby';
-  let nearbyCities = [];
-  let liveNearbyCity = null;
-  let favoritePresetList = [];
-  let favoriteSavedList = [];
+  let nearbyCities = [], mappedNearbyCities = [], liveNearbyCity = null;
+  let favoritePresetList = [], favoriteSavedList = [], favoriteRecentList = [];
   let panelMode = 'explore';
   const reverseLookupCache = new Map();
-
-  let savedFavoriteCities = [];
+  let nearbyLookupController = null, nearbyLookupToken = 0;
+  let savedFavoriteCities = [], recentPlaces = [];
 
   const globeScene = createGlobeSelectorScene({
     appCtx,
@@ -69,12 +67,12 @@ function createGlobeSelector(options = {}) {
     getOpenState: () => openState,
     cityMatchesSelection,
     onFavoritePick(city) {
-      setSelection(city.lat, city.lon, { name: city.name, focus: true });
+      setSelection(city.lat, city.lon, { name: city.name, focus: true, arrivalMode: 'walk' });
       if (searchInput) searchInput.value = city.name;
     },
     onGlobePick(next) {
       const fallbackName = `Selected ${next.lat.toFixed(2)}, ${next.lon.toFixed(2)}`;
-      setSelection(next.lat, next.lon, { name: fallbackName });
+      setSelection(next.lat, next.lon, { name: fallbackName, fetchNearby: true });
       reverseLookupPlace(next.lat, next.lon);
       if (searchInput) searchInput.value = fallbackName;
     }
@@ -84,13 +82,17 @@ function createGlobeSelector(options = {}) {
     savedFavoriteCities = addSelectionToSavedFavorites(nextSelection, savedFavoriteCities);
   }
 
-  function cityMatchesSelection(city) {
-    return cityMatchesGlobeSelection(selected, city);
+  function getLibraryPresets() {
+    return [
+      ...CURATED_DESTINATIONS,
+      ...MAJOR_CITY_DESTINATIONS,
+      ...getMenuFavoriteCitiesFromLocs(appCtx.LOCS || {})
+    ];
   }
 
-  function setFavoriteMarkersVisible() {
-    globeScene.setFavoriteMarkersVisible(activeCityTab === 'favorites');
-  }
+  function selectionIsSaved() { return savedFavoriteCities.some((city) => cityMatchesGlobeSelection(selected, city)); }
+  function cityMatchesSelection(city) { return cityMatchesGlobeSelection(selected, city); }
+  function setFavoriteMarkersVisible() { globeScene.setFavoriteMarkersVisible(activeCityTab === 'favorites'); }
 
   function setPanelMode(nextMode = 'explore') {
     panelMode = nextMode === 'live-earth' ? 'live-earth' : 'explore';
@@ -117,7 +119,7 @@ function createGlobeSelector(options = {}) {
 
   function renderFavoriteMarkers() {
     const favorites = buildFavoriteCitiesFromData({
-      menuFavoriteCities: getMenuFavoriteCitiesFromLocs(appCtx.LOCS || {}),
+      menuFavoriteCities: getLibraryPresets(),
       savedFavoriteCities
     });
     globeScene.renderFavoriteMarkers(favorites);
@@ -129,67 +131,31 @@ function createGlobeSelector(options = {}) {
     favoritesTabBtn?.classList.toggle('active', activeCityTab === 'favorites');
     if (cityListHint) {
       cityListHint.textContent = activeCityTab === 'favorites' ?
-      'Favorites list includes preset cities and your saved cities. Saved entries can be deleted.' :
-      'Nearest mapped place plus closest saved custom locations.';
+      'Saved places, recent trips, major cities, and world destinations.' :
+      'Major cities within 100 miles of the selected point, from OpenStreetMap.';
     }
     renderCityList();
     setFavoriteMarkersVisible();
+    if (activeCityTab === 'nearby' && selected) {
+      void refreshNearbyCities(selected.lat, selected.lon);
+    }
   }
 
   function renderCityList() {
     if (!cityList) return;
     if (activeCityTab === 'nearby') {
-      const list = nearbyCities;
-      if (!Array.isArray(list) || list.length === 0) {
-        cityList.innerHTML = '<li class="globe-selector-city-empty">Pick a point on the globe to see nearby cities.</li>';
-        return;
-      }
-      cityList.innerHTML = list.map((city, index) => {
-        const selectedClass = cityMatchesSelection(city) ? ' style="border-color:#667eea;background:#eef2ff"' : '';
-        const isLive = city.source === 'live';
-        const meta = Number.isFinite(city.distanceKm) ?
-          `${isLive ? 'Nearest mapped place • ' : ''}${city.distanceKm.toFixed(0)} km away` :
-          (isLive ? `Nearest mapped place • ${cityLocationLabel(city)}` : cityLocationLabel(city));
-        return `<li class="globe-selector-city-item" data-city-source="nearby" data-city-index="${index}"${selectedClass}><div class="globe-selector-city-item-main"><span class="globe-selector-city-item-name">${city.name}</span><span class="globe-selector-city-item-meta">${meta}</span></div></li>`;
-      }).join('');
+      renderNearbyCityItems(cityList, nearbyCities, cityMatchesSelection);
       return;
     }
 
     const groups = getFavoriteCityGroupsFromData({
-      menuFavoriteCities: getMenuFavoriteCitiesFromLocs(appCtx.LOCS || {}),
+      menuFavoriteCities: getLibraryPresets(),
       savedFavoriteCities
     });
     favoritePresetList = groups.presets;
     favoriteSavedList = groups.saved;
 
-    if (!favoritePresetList.length && !favoriteSavedList.length) {
-      cityList.innerHTML = '<li class="globe-selector-city-empty">No favorite cities yet. Explore a location to save it.</li>';
-      return;
-    }
-
-    const html = [];
-    if (favoritePresetList.length) {
-      html.push('<li class="globe-selector-city-section">Preset Cities</li>');
-      favoritePresetList.forEach((city, index) => {
-        const selectedClass = cityMatchesSelection(city) ? ' style="border-color:#667eea;background:#eef2ff"' : '';
-        html.push(
-          `<li class="globe-selector-city-item" data-city-source="preset" data-city-index="${index}"${selectedClass}><div class="globe-selector-city-item-main"><span class="globe-selector-city-item-name">${city.name}</span><span class="globe-selector-city-item-meta">${cityLocationLabel(city)}</span></div></li>`
-        );
-      });
-    }
-
-    html.push('<li class="globe-selector-city-section">Your Saved Favorites</li>');
-    if (favoriteSavedList.length) {
-      favoriteSavedList.forEach((city, index) => {
-        const selectedClass = cityMatchesSelection(city) ? ' style="border-color:#667eea;background:#eef2ff"' : '';
-        html.push(
-          `<li class="globe-selector-city-item" data-city-source="saved" data-city-index="${index}"${selectedClass}><div class="globe-selector-city-item-main"><span class="globe-selector-city-item-name">${city.name}</span><span class="globe-selector-city-item-meta">${cityLocationLabel(city)}</span></div><button class="globe-selector-city-delete" type="button" data-delete-saved-index="${index}" aria-label="Delete saved favorite ${city.name}">Delete</button></li>`
-        );
-      });
-    } else {
-      html.push('<li class="globe-selector-city-empty">No saved favorites yet. Explore a location to save it.</li>');
-    }
-    cityList.innerHTML = html.join('');
+    renderLibraryCityItems(cityList, favoritePresetList, favoriteSavedList, favoriteRecentList, cityMatchesSelection);
   }
 
   function focusOnSelection(lat, lon) {
@@ -205,6 +171,11 @@ function createGlobeSelector(options = {}) {
       if (latLonReadout) latLonReadout.textContent = 'No point selected';
       if (placeReadout) placeReadout.textContent = 'Click the globe to choose a location.';
       globeScene.setSelectionMarker(null);
+      if (saveFavoriteBtn) {
+        saveFavoriteBtn.disabled = true;
+        saveFavoriteBtn.textContent = '☆';
+        saveFavoriteBtn.classList.remove('saved');
+      }
       nearbyCities = [];
       renderCityList();
       setStartButtonBusy(false);
@@ -220,13 +191,21 @@ function createGlobeSelector(options = {}) {
     if (placeReadout) {
       placeReadout.textContent = selected.name || 'Selected from globe';
     }
+    if (saveFavoriteBtn) {
+      const saved = selectionIsSaved();
+      saveFavoriteBtn.disabled = false;
+      saveFavoriteBtn.textContent = saved ? '★' : '☆';
+      saveFavoriteBtn.classList.toggle('saved', saved);
+      saveFavoriteBtn.title = saved ? 'Remove selected place from favorites' : 'Add selected place to favorites';
+      saveFavoriteBtn.setAttribute('aria-label', saveFavoriteBtn.title);
+    }
     if (latInput) latInput.value = selected.lat.toFixed(6);
     if (lonInput) lonInput.value = selected.lon.toFixed(6);
     coordinateInputsDirty = false;
 
     globeScene.setSelectionMarker(selected);
     nearbyCities = buildNearbyCitiesFromData({
-      savedFavoriteCities,
+      mappedCities: mappedNearbyCities,
       liveNearbyCity,
       lat: selected.lat,
       lon: selected.lon
@@ -257,18 +236,46 @@ function createGlobeSelector(options = {}) {
     const coordsChanged = !selected ||
       Math.abs(selected.lat - clamped.lat) > 0.00001 ||
       Math.abs(selected.lon - clamped.lon) > 0.00001;
-    if (coordsChanged) liveNearbyCity = null;
+    if (coordsChanged) {
+      liveNearbyCity = null;
+      mappedNearbyCities = [];
+    }
     const named = typeof meta.name === 'string' ? meta.name.trim() : '';
     selected = {
       lat: clamped.lat,
       lon: clamped.lon,
       name: named || selected?.name || appCtx.customLoc?.name || 'Custom Location',
       skipAutoFavorite: !!meta.skipAutoFavorite,
-      fromGeolocation: !!meta.fromGeolocation
+      fromGeolocation: !!meta.fromGeolocation,
+      arrivalMode: meta.arrivalMode === 'walk' || meta.arrivalMode === 'boat'
+        ? meta.arrivalMode
+        : coordsChanged ? 'auto' : selected?.arrivalMode || 'auto'
     };
     if (meta.focus) focusOnSelection(selected.lat, selected.lon);
     syncLegacyCustomState(selected);
     renderSelection();
+    if (coordsChanged && meta.fetchNearby === true) {
+      void refreshNearbyCities(selected.lat, selected.lon);
+    }
+  }
+  async function refreshNearbyCities(lat, lon) {
+    const token = ++nearbyLookupToken;
+    nearbyLookupController?.abort();
+    nearbyLookupController = new AbortController();
+    mappedNearbyCities = nearbyMajorCities(lat, lon); nearbyCities = buildNearbyCitiesFromData({ mappedCities: mappedNearbyCities, liveNearbyCity, lat, lon }); renderCityList();
+    if (activeCityTab === 'nearby' && cityListHint) cityListHint.textContent = 'Finding nearby cities and towns…';
+    try {
+      const cities = await fetchNearbyCities(lat, lon, { signal: nearbyLookupController.signal });
+      if (!openState || token !== nearbyLookupToken || !selected) return;
+      if (Math.abs(selected.lat - lat) > 0.00001 || Math.abs(selected.lon - lon) > 0.00001) return;
+      mappedNearbyCities = cities;
+      nearbyCities = buildNearbyCitiesFromData({ mappedCities: mappedNearbyCities, liveNearbyCity, lat, lon });
+      if (activeCityTab === 'nearby' && cityListHint) cityListHint.textContent = 'Nearby cities and towns from OpenStreetMap.';
+      renderCityList();
+    } catch (error) {
+      if (error?.name === 'AbortError' || token !== nearbyLookupToken) return;
+      if (activeCityTab === 'nearby' && cityListHint) cityListHint.textContent = 'Showing the nearest mapped area; live nearby cities are temporarily unavailable.';
+    }
   }
 
   function applySelectionAndResolve(lat, lon, meta = {}) {
@@ -276,7 +283,8 @@ function createGlobeSelector(options = {}) {
       name: meta.name || selected?.name || appCtx.customLoc?.name || 'Custom Location',
       focus: meta.focus !== false,
       skipAutoFavorite: !!meta.skipAutoFavorite,
-      fromGeolocation: !!meta.fromGeolocation
+      fromGeolocation: !!meta.fromGeolocation,
+      fetchNearby: true
     });
     if (Number.isFinite(meta.zoomDistance)) globeScene.setCameraDistance(Number(meta.zoomDistance));
     if (searchInput && typeof meta.searchLabel === 'string' && meta.searchLabel.trim()) {
@@ -368,19 +376,19 @@ function createGlobeSelector(options = {}) {
       if (typeof appCtx.searchLocation === 'function') {
         searchInFlight = true;
         if (searchBtn) searchBtn.disabled = true;
-        await appCtx.searchLocation();
+        const result = await appCtx.searchLocation();
+        if (!result || !Number.isFinite(result.lat) || !Number.isFinite(result.lon)) {
+          throw new Error(legacyStatus?.textContent || 'Location was not found');
+        }
+        setSelection(result.lat, result.lon, {
+          name: result.name || query,
+          focus: true,
+          fetchNearby: true,
+          arrivalMode: result.arrivalMode || 'walk'
+        });
+        reverseLookupPlace(result.lat, result.lon);
       } else {
         throw new Error('Search function unavailable');
-      }
-
-      const foundLat = toFiniteNumber(appCtx.customLoc?.lat ?? document.getElementById('customLat')?.value);
-      const foundLon = toFiniteNumber(appCtx.customLoc?.lon ?? document.getElementById('customLon')?.value);
-      if (foundLat != null && foundLon != null) {
-        setSelection(foundLat, foundLon, {
-          name: appCtx.customLoc?.name || query,
-          focus: true
-        });
-        reverseLookupPlace(foundLat, foundLon);
       }
 
       if (searchStatus) {
@@ -410,7 +418,7 @@ function createGlobeSelector(options = {}) {
       }
       return false;
     }
-    setSelection(lat, lon, { name: 'Manual Coordinates' });
+    setSelection(lat, lon, { name: 'Manual Coordinates', fetchNearby: true });
     coordinateInputsDirty = false;
     reverseLookupPlace(lat, lon);
     return true;
@@ -424,7 +432,8 @@ function createGlobeSelector(options = {}) {
     isOpen: () => openState,
     onStartHere: options.onStartHere,
     prepareSelection(nextSelection) {
-      if (!nextSelection.skipAutoFavorite) saveSelectionAsFavorite(nextSelection);
+      recentPlaces = addRecentPlace(nextSelection, recentPlaces);
+      favoriteRecentList = recentPlaces;
       renderFavoriteMarkers();
       renderCityList();
       syncLegacyCustomState(nextSelection);
@@ -491,33 +500,43 @@ function createGlobeSelector(options = {}) {
     globeScene.ensureSize();
 
     if (searchStatus) {
-      searchStatus.textContent = 'Uses the same search flow as Custom Location.';
+      searchStatus.textContent = 'Search for a place or choose one from the globe.';
       searchStatus.style.color = '#64748b';
     }
     setLocateButtonBusy(false);
     setStartButtonBusy(false);
     savedFavoriteCities = loadSavedFavoriteCitiesFromStorage();
+    recentPlaces = loadRecentPlaces();
+    favoriteRecentList = recentPlaces;
     setCityTab(activeCityTab);
     setPanelMode(panelMode);
 
     const savedLat = toFiniteNumber(appCtx.customLoc?.lat);
     const savedLon = toFiniteNumber(appCtx.customLoc?.lon);
     if (savedLat != null && savedLon != null) {
-      setSelection(savedLat, savedLon, { name: appCtx.customLoc?.name || 'Custom Location', focus: true });
+      setSelection(savedLat, savedLon, {
+        name: appCtx.customLoc?.name || 'Custom Location',
+        focus: true,
+        arrivalMode: appCtx.customLoc?.arrivalMode || 'auto'
+      });
     } else {
       const selectedLoc = String(appCtx.selLoc || '').trim();
       const preset = selectedLoc && selectedLoc !== 'custom' ? appCtx.LOCS?.[selectedLoc] : null;
       const presetLat = toFiniteNumber(preset?.lat);
       const presetLon = toFiniteNumber(preset?.lon);
       if (presetLat != null && presetLon != null) {
-        setSelection(presetLat, presetLon, { name: String(preset?.name || selectedLoc || 'Custom Location'), focus: true });
+        setSelection(presetLat, presetLon, {
+          name: String(preset?.name || selectedLoc || 'Custom Location'),
+          focus: true,
+          arrivalMode: 'walk'
+        });
       } else {
         const fallback = buildFavoriteCitiesFromData({
-          menuFavoriteCities: getMenuFavoriteCitiesFromLocs(appCtx.LOCS || {}),
+          menuFavoriteCities: getLibraryPresets(),
           savedFavoriteCities
         })[0] || null;
         if (fallback) {
-          setSelection(fallback.lat, fallback.lon, { name: fallback.name, focus: true });
+          setSelection(fallback.lat, fallback.lon, { name: fallback.name, focus: true, arrivalMode: 'walk' });
         } else {
           selected = null;
           renderSelection();
@@ -543,6 +562,8 @@ function createGlobeSelector(options = {}) {
     document.body.classList.remove('start-hub-open');
     setGlobeSelectorScrollLock(false);
     reverseLookupToken += 1;
+    nearbyLookupToken += 1;
+    nearbyLookupController?.abort();
     root.classList.remove('show');
     root.setAttribute('aria-hidden', 'true');
     setLocateButtonBusy(false);
@@ -560,12 +581,8 @@ function createGlobeSelector(options = {}) {
     if (typeof options.onBack === 'function') options.onBack();
     close();
   });
-  if (moonBtn) {
-    moonBtn.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onMoonShortcut, 'Moon'));
-  }
-  if (spaceBtn) {
-    spaceBtn.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onSpaceShortcut, 'Space'));
-  }
+  moonBtn?.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onMoonShortcut, 'Moon'));
+  spaceBtn?.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onSpaceShortcut, 'Space'));
   for (const coordinateInput of [latInput, lonInput]) {
     coordinateInput?.addEventListener('input', () => {
       coordinateInputsDirty = true;
@@ -605,61 +622,41 @@ function createGlobeSelector(options = {}) {
       if (typeof options.onUseMyLocation === 'function') options.onUseMyLocation();
     });
   }
-  if (exploreModeBtn) {
-    exploreModeBtn.addEventListener('click', () => setPanelMode('explore'));
-  }
-  if (liveEarthModeBtn) {
-    liveEarthModeBtn.addEventListener('click', () => setPanelMode('live-earth'));
-  }
-  if (nearbyTabBtn) {
-    nearbyTabBtn.addEventListener('click', () => setCityTab('nearby'));
-  }
-  if (favoritesTabBtn) {
-    favoritesTabBtn.addEventListener('click', () => setCityTab('favorites'));
-  }
-  if (cityList) {
-    cityList.addEventListener('click', (event) => {
-      const deleteBtn = event.target instanceof Element ? event.target.closest('[data-delete-saved-index]') : null;
-      if (deleteBtn instanceof HTMLElement) {
-        event.preventDefault();
-        event.stopPropagation();
-        const deleteIndex = Number.parseInt(deleteBtn.dataset.deleteSavedIndex || '', 10);
-        if (!Number.isFinite(deleteIndex) || deleteIndex < 0 || deleteIndex >= favoriteSavedList.length) return;
-        const cityToDelete = favoriteSavedList[deleteIndex];
-        if (!cityToDelete) return;
-        savedFavoriteCities = savedFavoriteCities.filter(
-          (city) => Math.abs(city.lat - cityToDelete.lat) > 0.0005 || Math.abs(city.lon - cityToDelete.lon) > 0.0005
-        );
-        persistSavedFavoriteCitiesToStorage(savedFavoriteCities);
-        renderFavoriteMarkers();
-        renderCityList();
-        if (searchStatus) {
-          searchStatus.textContent = `Removed saved favorite: ${cityToDelete.name}`;
-          searchStatus.style.color = '#64748b';
-        }
-        return;
-      }
-
-      const target = event.target instanceof Element ? event.target.closest('[data-city-source][data-city-index]') : null;
-      if (!(target instanceof HTMLElement)) return;
-      const index = Number.parseInt(target.dataset.cityIndex || '', 10);
-      if (!Number.isFinite(index) || index < 0) return;
-      const source = String(target.dataset.citySource || '');
-      const city = source === 'nearby' ?
-        nearbyCities[index] :
-        source === 'preset' ?
-          favoritePresetList[index] :
-          source === 'saved' ?
-            favoriteSavedList[index] :
-            null;
-      if (!city) return;
-      setSelection(city.lat, city.lon, {
-        name: city.name,
-        focus: true
-      });
+  exploreModeBtn?.addEventListener('click', () => setPanelMode('explore'));
+  liveEarthModeBtn?.addEventListener('click', () => setPanelMode('live-earth'));
+  nearbyTabBtn?.addEventListener('click', () => setCityTab('nearby'));
+  favoritesTabBtn?.addEventListener('click', () => setCityTab('favorites'));
+  saveFavoriteBtn?.addEventListener('click', () => {
+    if (!selected) return;
+    if (selectionIsSaved()) {
+      savedFavoriteCities = savedFavoriteCities.filter((city) => !cityMatchesGlobeSelection(selected, city));
+      persistSavedFavoriteCitiesToStorage(savedFavoriteCities);
+    } else {
+      saveSelectionAsFavorite(selected);
+    }
+    renderSelection();
+    renderFavoriteMarkers();
+  });
+  bindCityListInteractions(cityList, {
+    getLists: () => ({ nearby: nearbyCities, preset: favoritePresetList, saved: favoriteSavedList, recent: favoriteRecentList }),
+    getSavedCities: () => favoriteSavedList,
+    onDelete(cityToDelete) {
+      savedFavoriteCities = savedFavoriteCities.filter((city) => !cityMatchesGlobeSelection(city, cityToDelete));
+      persistSavedFavoriteCitiesToStorage(savedFavoriteCities);
+      renderFavoriteMarkers();
+      renderCityList();
+      if (searchStatus) searchStatus.textContent = `Removed saved favorite: ${cityToDelete.name}`;
+    },
+    onSelect(city) {
+      setSelection(city.lat, city.lon, { name: city.name, focus: true, arrivalMode: 'walk' });
       if (searchInput) searchInput.value = city.name;
-    });
-  }
+    },
+    onActivate(city) {
+      setSelection(city.lat, city.lon, { name: city.name, focus: true, arrivalMode: 'walk' });
+      if (searchInput) searchInput.value = city.name;
+      void triggerStartHere();
+    }
+  });
 
   window.addEventListener('keydown', (event) => {
     if (!openState) return;
@@ -671,12 +668,8 @@ function createGlobeSelector(options = {}) {
 
   return {
     close,
-    getSelection() {
-      return selected ? { ...selected } : null;
-    },
-    isOpen() {
-      return openState;
-    },
+    getSelection() { return selected ? { ...selected } : null; },
+    isOpen() { return openState; },
     open,
     startHere: triggerStartHere,
     applySelectionAndResolve,
@@ -692,5 +685,4 @@ function createGlobeSelector(options = {}) {
 }
 
 Object.assign(appCtx, { createGlobeSelector });
-
 export { createGlobeSelector };

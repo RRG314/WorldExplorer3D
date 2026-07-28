@@ -632,8 +632,22 @@ function aerialTerrainColor(mode) {
   return TERRAIN_GRASS_COLOR_HEX;
 }
 
+function regionalAerialTerrainColor(meshes) {
+  const average = new THREE.Color(0, 0, 0);
+  let count = 0;
+  for (const mesh of meshes) {
+    if (!mesh?.userData?.isTerrainMesh) continue;
+    const profile = mesh.userData.terrainVisualProfile || {};
+    average.add(new THREE.Color(aerialTerrainColor(profile.visualMode || profile.mode)));
+    count += 1;
+  }
+  return count > 0 ? average.multiplyScalar(1 / count) : new THREE.Color(TERRAIN_GRASS_COLOR_HEX);
+}
+
 export function updateTerrainAerialDetail(aerialMode = false, altitudeMeters = 0) {
   const meshes = appCtx.terrainGroup?.children || [];
+  const regionalColor = regionalAerialTerrainColor(meshes);
+  const regionalBlend = Math.max(0.72, Math.min(0.94, 0.72 + Number(altitudeMeters || 0) / 1800));
   for (const mesh of meshes) {
     if (!mesh?.userData?.isTerrainMesh || !mesh.material || Array.isArray(mesh.material)) continue;
     const material = mesh.material;
@@ -655,7 +669,8 @@ export function updateTerrainAerialDetail(aerialMode = false, altitudeMeters = 0
       material.normalMap = null;
       material.roughnessMap = null;
       const profile = mesh.userData.terrainVisualProfile || {};
-      material.color?.setHex?.(aerialTerrainColor(profile.visualMode || profile.mode));
+      const profileColor = new THREE.Color(aerialTerrainColor(profile.visualMode || profile.mode));
+      material.color?.copy?.(profileColor.lerp(regionalColor, regionalBlend));
       if (material.normalScale) material.normalScale.set(0, 0);
       mesh.userData.terrainAerialDetailSuppressed = true;
     } else {

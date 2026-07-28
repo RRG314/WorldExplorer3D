@@ -2,7 +2,7 @@ import { ctx as appCtx } from "./shared-context.js?v=55"; // ===================
 import {
   clearStructureVisualMeshes,
   rebuildStructureVisualMeshes
-} from "./terrain/structure-visuals.js?v=5";
+} from "./terrain/structure-visuals.js?v=11";
 import {
   boundsIntersectLocal,
   expandBoundsLocal,
@@ -30,7 +30,7 @@ import {
   refreshTerrainSurfaceProfiles,
   setWorldSurfaceProfile,
   updateTerrainAerialDetail
-} from "./terrain/surface-profiles.js?v=29";
+} from "./terrain/surface-profiles.js?v=30";
 import {
   applyHeightsToTerrainMesh,
   buildTerrainTileMesh,

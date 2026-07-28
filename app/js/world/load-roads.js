@@ -565,10 +565,13 @@ export function createWorldRoadLoader(deps = {}) {
             await loadBuildingDetail();
           }
           await loadLandmarksForPublication({
+            featureMinPolygonArea: FEATURE_MIN_POLYGON_AREA,
+            geometryGuards: buildingGeometryGuards,
             isActiveLoadContext,
             loadMetrics,
             recordLoadWarning,
             registerBuildingCollision,
+            sanitizeWorldFootprintPoints,
             updateWorldLod
           });
           await markLoaded('primary');

@@ -19,6 +19,80 @@ const OVERHEAD_CAMERA_HEIGHT = 50;
 const OVERHEAD_CAMERA_Z_OFFSET = 15;
 const WALK_ROAD_EDGE_MIN = 6;
 const WALK_ROAD_EDGE_SCALE = 0.75;
+let chaseCameraRaycaster = null;
+let chaseCameraOrigin = null;
+let chaseCameraDirection = null;
+let chaseCameraCollisionFrame = 0;
+let chaseCameraCollisionRatio = 1;
+let chaseCameraCollisionCacheValid = false;
+let chaseCameraCollisionLookX = NaN;
+let chaseCameraCollisionLookZ = NaN;
+
+function resolveChaseCameraStructureCollision(lookX, lookY, lookZ, targetX, targetY, targetZ) {
+  if (typeof THREE === 'undefined') return { x: targetX, y: targetY, z: targetZ, collided: false };
+  const targets = (appCtx.structureVisualMeshes || []).filter((mesh) => {
+    if (!mesh?.visible) return false;
+    const type = String(mesh.userData?.structureVisualType || '');
+    return /^(decks|girders|caps|walls|roofs|portals|tunnel_shells|elevated_road_shells)$/.test(type);
+  });
+  if (targets.length === 0) {
+    chaseCameraCollisionCacheValid = false;
+    return { x: targetX, y: targetY, z: targetZ, collided: false };
+  }
+
+  chaseCameraOrigin ||= new THREE.Vector3();
+  chaseCameraDirection ||= new THREE.Vector3();
+  chaseCameraOrigin.set(lookX, lookY, lookZ);
+  chaseCameraDirection.set(
+    targetX - lookX,
+    targetY - lookY,
+    targetZ - lookZ
+  );
+  const distance = chaseCameraDirection.length();
+  if (!(distance > 1.5)) return { x: targetX, y: targetY, z: targetZ, collided: false };
+  chaseCameraDirection.multiplyScalar(1 / distance);
+  chaseCameraCollisionFrame += 1;
+  const movedSinceProbe = Number.isFinite(chaseCameraCollisionLookX)
+    ? Math.hypot(lookX - chaseCameraCollisionLookX, lookZ - chaseCameraCollisionLookZ)
+    : Infinity;
+  const shouldRaycast =
+    !chaseCameraCollisionCacheValid ||
+    movedSinceProbe > 3 ||
+    chaseCameraCollisionFrame % 8 === 0;
+  if (!shouldRaycast) {
+    return {
+      x: lookX + chaseCameraDirection.x * distance * chaseCameraCollisionRatio,
+      y: lookY + chaseCameraDirection.y * distance * chaseCameraCollisionRatio,
+      z: lookZ + chaseCameraDirection.z * distance * chaseCameraCollisionRatio,
+      collided: chaseCameraCollisionRatio < 0.999
+    };
+  }
+
+  chaseCameraRaycaster ||= new THREE.Raycaster();
+  chaseCameraRaycaster.set(chaseCameraOrigin, chaseCameraDirection);
+  chaseCameraRaycaster.near = 0.65;
+  chaseCameraRaycaster.far = distance;
+  const hit = chaseCameraRaycaster.intersectObjects(targets, false)
+    .find((candidate) => Number(candidate?.distance) > 0.8);
+  chaseCameraRaycaster.near = 0;
+  chaseCameraRaycaster.far = Infinity;
+  chaseCameraCollisionCacheValid = true;
+  chaseCameraCollisionLookX = lookX;
+  chaseCameraCollisionLookZ = lookZ;
+  if (!hit) {
+    chaseCameraCollisionRatio = 1;
+    return { x: targetX, y: targetY, z: targetZ, collided: false };
+  }
+
+  const safeDistance = Math.max(1.15, Number(hit.distance) - 0.45);
+  chaseCameraCollisionRatio = Math.min(1, safeDistance / distance);
+  return {
+    x: lookX + chaseCameraDirection.x * safeDistance,
+    y: lookY + chaseCameraDirection.y * safeDistance,
+    z: lookZ + chaseCameraDirection.z * safeDistance,
+    collided: true
+  };
+}
 
 function locationName() {
   if (appCtx.onMars) return 'Olympus Mons, Mars';
@@ -336,16 +410,25 @@ function updateCamera(dt = 1 / 60) {
     const horizontalDistance = d * Math.cos(carLook.pitch * 0.55);
     const ox = -Math.sin(viewAngle) * horizontalDistance;
     const oz = -Math.cos(viewAngle) * horizontalDistance;
-    const targetX = carX + ox;
-    const targetY = carGroundY + h + Math.sin(carLook.pitch) * d * 0.72;
-    const targetZ = carZ + oz;
+    let targetX = carX + ox;
+    let targetY = carGroundY + h + Math.sin(carLook.pitch) * d * 0.72;
+    let targetZ = carZ + oz;
     const lookX = carX;
     const lookY = carGroundY + (planetaryChase ? 2.1 : 0.5);
     const lookZ = carZ;
+    const collisionTarget = planetaryChase
+      ? { x: targetX, y: targetY, z: targetZ, collided: false }
+      : resolveChaseCameraStructureCollision(
+          lookX, lookY, lookZ,
+          targetX, targetY, targetZ
+        );
+    targetX = collisionTarget.x;
+    targetY = collisionTarget.y;
+    targetZ = collisionTarget.z;
 
     // Smooth both camera position and lookAt target together
     // Higher factor = camera stays more rigidly fixed to car
-    const smoothFactor = CHASE_CAMERA_SMOOTH_FACTOR;
+    const smoothFactor = collisionTarget.collided ? 1 : CHASE_CAMERA_SMOOTH_FACTOR;
     appCtx.camera.position.x += (targetX - appCtx.camera.position.x) * smoothFactor;
     appCtx.camera.position.y += (targetY - appCtx.camera.position.y) * smoothFactor;
     appCtx.camera.position.z += (targetZ - appCtx.camera.position.z) * smoothFactor;

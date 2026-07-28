@@ -169,7 +169,8 @@ for (const point of [...steepEdges.leftEdge, ...steepEdges.rightEdge]) {
     `at-grade road edge fell below terrain: ${JSON.stringify(point)}`
   );
 }
-steepEdges.leftEdge[0].y -= 5;
+steepEdges.leftEdge[0].y =
+  steepCrossSlopeTerrain(steepEdges.leftEdge[0].x, steepEdges.leftEdge[0].z) - 1;
 assert.equal(
   enforceAtGradeRibbonClearance(
     steepAtGradeRoad,

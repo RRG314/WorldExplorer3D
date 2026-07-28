@@ -23,6 +23,51 @@ const MATERIAL_PROFILES = Object.freeze({
   neutral: { color: 0x8d9292, roughness: 0.9, metalness: 0.0 }
 });
 
+const ROOF_PROFILES = Object.freeze({
+  clay_tile: { colorA: 0x5d3d34, colorB: 0x865641, roughness: 0.9, metalness: 0.0, grainScale: 0.54 },
+  slate: { colorA: 0x252c30, colorB: 0x414b50, roughness: 0.88, metalness: 0.02, grainScale: 0.7 },
+  metal: { colorA: 0x4c5a60, colorB: 0x718084, roughness: 0.62, metalness: 0.3, grainScale: 0.34 },
+  concrete: { colorA: 0x555752, colorB: 0x787971, roughness: 0.94, metalness: 0.0, grainScale: 0.42 },
+  membrane: { colorA: 0x444a4a, colorB: 0x676c68, roughness: 0.96, metalness: 0.0, grainScale: 0.36 },
+  gravel: { colorA: 0x504e48, colorB: 0x777268, roughness: 0.98, metalness: 0.0, grainScale: 0.82 }
+});
+
+function roofPresentation(mappedMaterial = '', mappedColor = '', buildingType = '', buildingSeed = 0) {
+  const material = String(mappedMaterial || '').trim().toLowerCase();
+  let key =
+    /clay|terracotta|tile/.test(material) ? 'clay_tile' :
+    /slate|shingle/.test(material) ? 'slate' :
+    /metal|steel|zinc|copper|aluminium|aluminum/.test(material) ? 'metal' :
+    /concrete|cement/.test(material) ? 'concrete' :
+    /gravel|aggregate|stone/.test(material) ? 'gravel' :
+    'membrane';
+  if (!material) {
+    const type = String(buildingType || '').toLowerCase();
+    if (['house', 'residential', 'detached', 'terrace', 'townhouse'].includes(type)) {
+      key = ((Number(buildingSeed) || 0) & 1) === 0 ? 'clay_tile' : 'slate';
+    } else if (['industrial', 'warehouse', 'hangar'].includes(type)) {
+      key = 'metal';
+    } else {
+      key = ((Number(buildingSeed) || 0) & 1) === 0 ? 'membrane' : 'gravel';
+    }
+  }
+  const base = ROOF_PROFILES[key];
+  const colorMapped = /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(String(mappedColor || '').trim());
+  if (!colorMapped) return { key, colorMapped, ...base };
+  const mapped = new THREE.Color(mappedColor);
+  const dark = mapped.clone().multiplyScalar(0.72);
+  const light = mapped.clone().lerp(new THREE.Color(0xffffff), 0.24);
+  return {
+    key: `${key}-mapped-${mapped.getHexString()}`,
+    colorMapped,
+    colorA: dark.getHex(),
+    colorB: light.getHex(),
+    roughness: base.roughness,
+    metalness: base.metalness,
+    grainScale: base.grainScale
+  };
+}
+
 function normalizeMappedMaterial(value = '') {
   const material = String(value || '').trim().toLowerCase();
   if (!material) return null;
@@ -203,28 +248,57 @@ function facadeTexture(appCtx, atlasStyle, facadeStyle, variant = 0) {
   return texture;
 }
 
-function applyWallOnlyFacadeMap(material) {
+function glslColor(hex) {
+  const color = new THREE.Color(hex);
+  return `vec3(${color.r.toFixed(5)}, ${color.g.toFixed(5)}, ${color.b.toFixed(5)})`;
+}
+
+function applyWallOnlyFacadeMap(material, roof) {
+  const roofA = glslColor(roof.colorA);
+  const roofB = glslColor(roof.colorB);
+  const grainScale = Number(roof.grainScale || 0.6).toFixed(4);
   material.onBeforeCompile = (shader) => {
-    shader.vertexShader = `varying float vFacadeWallMask;\n${shader.vertexShader}`;
+    shader.vertexShader = `varying float vFacadeWallMask;\nvarying vec2 vFacadeRoofPosition;\n${shader.vertexShader}`;
     shader.vertexShader = shader.vertexShader.replace(
       '#include <beginnormal_vertex>',
       [
         '#include <beginnormal_vertex>',
-        'vFacadeWallMask = smoothstep(0.18, 0.72, 1.0 - abs(objectNormal.y));'
+        'vFacadeWallMask = smoothstep(0.18, 0.72, 1.0 - abs(objectNormal.y));',
+        'vFacadeRoofPosition = position.xz;'
       ].join('\n')
     );
-    shader.fragmentShader = `varying float vFacadeWallMask;\n${shader.fragmentShader}`;
+    shader.fragmentShader = [
+      'varying float vFacadeWallMask;',
+      'varying vec2 vFacadeRoofPosition;',
+      'float facadeRoofHash(vec2 p) {',
+      '  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);',
+      '}',
+      'float facadeRoofNoise(vec2 p) {',
+      '  vec2 cell = floor(p);',
+      '  vec2 fraction = fract(p);',
+      '  vec2 blend = fraction * fraction * (3.0 - 2.0 * fraction);',
+      '  float a = facadeRoofHash(cell);',
+      '  float b = facadeRoofHash(cell + vec2(1.0, 0.0));',
+      '  float c = facadeRoofHash(cell + vec2(0.0, 1.0));',
+      '  float d = facadeRoofHash(cell + vec2(1.0, 1.0));',
+      '  return mix(mix(a, b, blend.x), mix(c, d, blend.x), blend.y);',
+      '}',
+      shader.fragmentShader
+    ].join('\n');
     shader.fragmentShader = shader.fragmentShader.replace(
         '#include <map_fragment>',
         [
         '#ifdef USE_MAP',
         '  vec4 facadeTexel = mapTexelToLinear(texture2D(map, vUv));',
-        '  diffuseColor *= mix(vec4(1.0), facadeTexel, vFacadeWallMask);',
+        `  float roofGrain = facadeRoofNoise(vFacadeRoofPosition * ${grainScale});`,
+        `  vec3 roofSurface = mix(${roofA}, ${roofB}, 0.18 + roofGrain * 0.64);`,
+        '  diffuseColor.rgb = mix(roofSurface, diffuseColor.rgb * facadeTexel.rgb, vFacadeWallMask);',
+        '  diffuseColor.a *= facadeTexel.a;',
         '#endif'
       ].join('\n')
     );
   };
-  material.customProgramCacheKey = () => 'building-facade-atlas-wall-mask-v1';
+  material.customProgramCacheKey = () => `building-facade-roof-surface-v2:${roof.key}`;
 }
 
 export function getBuildingMaterial(engineContext, buildingType, buildingSeed, baseColorHex, options = {}) {
@@ -236,6 +310,7 @@ export function getBuildingMaterial(engineContext, buildingType, buildingSeed, b
   const color = quantizedColor(mappedColor ? baseColorHex : null, profile.color);
   const lodTier = options.lodTier === 'mid' ? 'mid' : 'near';
   const presentation = facadePresentation(family, buildingType, options, buildingSeed);
+  const roof = roofPresentation(options.roofMaterial, options.roofColor, buildingType, buildingSeed);
   const facadeStyle = presentation.facadeStyle;
   const facadeAtlasStyle = presentation.atlasStyle;
   const facadeVariant = ((Number(buildingSeed) || 0) >>> 0) % 4;
@@ -244,7 +319,7 @@ export function getBuildingMaterial(engineContext, buildingType, buildingSeed, b
     mappedColor ? 0.5 : mappedFamily ? 0.34 : 0.7
   );
   const key = materialPoolKey(
-    `${family}:${facadeAtlasStyle}:${facadeStyle}`,
+    `${family}:${facadeAtlasStyle}:${facadeStyle}:roof-${roof.key}`,
     mappedColor ? tint : new THREE.Color(0xffffff),
     lodTier,
     facadeVariant
@@ -256,9 +331,9 @@ export function getBuildingMaterial(engineContext, buildingType, buildingSeed, b
     color: tint,
     map: facadeTexture(appCtx, facadeAtlasStyle, facadeStyle, facadeVariant),
     roughness: Math.min(1, profile.roughness + (lodTier === 'mid' ? 0.04 : 0)),
-    metalness: profile.metalness
+    metalness: Math.max(profile.metalness, roof.metalness * 0.08)
   });
-  applyWallOnlyFacadeMap(material);
+  applyWallOnlyFacadeMap(material, roof);
   material.name = `building-exterior:${key}`;
   material.userData = {
     buildingBatchKey: `building-exterior:${key}`,
@@ -276,7 +351,13 @@ export function getBuildingMaterial(engineContext, buildingType, buildingSeed, b
     materialSource: mappedFamily ? 'building:material' : 'unmapped',
     facadeSelection: mappedFamily ? 'mapped-material-family' : 'type-inferred-fallback',
     colorClaim: mappedColor ? 'mapped' : 'profile-default',
-    colorSource: mappedColor ? 'building:colour' : 'material-profile'
+    colorSource: mappedColor ? 'building:colour' : 'material-profile',
+    roofSurfaceOwner: 'engine/building-facade-materials',
+    roofSurfaceStyle: roof.key,
+    roofMaterialClaim: options.roofMaterial ? 'mapped' : 'type-inferred-fallback',
+    roofMaterialSource: options.roofMaterial ? 'roof:material' : 'building-type',
+    roofColorClaim: roof.colorMapped ? 'mapped' : 'profile-default',
+    roofColorSource: roof.colorMapped ? 'roof:colour' : 'roof-profile'
   };
   exteriorMaterialPool.set(key, material);
   return material;

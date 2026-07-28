@@ -7,7 +7,7 @@ import {
   projectPointToFeature,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=24";
+} from "../structure-semantics.js?v=25";
 import { compileIntersectionTopologyGeometry } from "./intersection-geometry.js?v=1";
 import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=3";
 

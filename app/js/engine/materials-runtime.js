@@ -15,7 +15,7 @@ import {
   createProceduralGrassTexture,
   createRoughnessMap
 } from "./procedural-textures.js?v=2";
-import { getBuildingMaterial } from "./building-facade-materials.js?v=8";
+import { getBuildingMaterial } from "./building-facade-materials.js?v=10";
 
 const EARTH_TEXTURE_ROOT = 'assets/textures/earth';
 

@@ -80,6 +80,8 @@ function fallbackMidLodBuildingMesh(pts, height, avgElevation, colorHex = '#7f8c
       footprintArea: w * d,
       denseUrban: options.denseUrban === true,
       facadeMaterial: options.facadeMaterial || '',
+      roofMaterial: options.roofMaterial || '',
+      roofColor: options.roofColor || '',
       facadeColorMapped: options.facadeColorMapped === true,
       buildingSemantics: options.buildingSemantics || null
     })
@@ -182,6 +184,8 @@ export function createMidLodBuildingMesh(pts, height, avgElevation, options = {}
         footprintArea: metrics.area,
         denseUrban: options.denseUrban === true,
         facadeMaterial: options.facadeMaterial || '',
+        roofMaterial: options.roofMaterial || '',
+        roofColor: options.roofColor || '',
         facadeColorMapped: options.facadeColorMapped === true,
         buildingSemantics: options.buildingSemantics || null
       })

@@ -5,7 +5,8 @@ import {
   buildFeatureStations,
   buildFeatureTransitionAnchors,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=24";
+} from "../structure-semantics.js?v=25";
+import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=2";
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -203,22 +204,13 @@ export function refreshStructureAwareFeatureProfiles() {
     });
   }
 
+  compileTunnelSystemModels(transportFeatures, worldBaseTerrainY);
   appCtx.refreshBridgeGuardrails?.(roadFeatures);
 
-  if (structureFeatures.length > 0) {
-    appCtx.structureTerrainCuts = structureFeatures
-      .filter((feature) => feature?.structureSemantics?.terrainMode === 'subgrade')
-      .map((feature) => ({
-        feature,
-        pts: feature.pts,
-        width: Math.max(6.2, (Number(feature.width) || 6) + 3.2),
-        clearance: Math.max(3.8, Number(feature?.structureSemantics?.cutDepth) ? 3.35 + Math.min(3.4, Number(feature.structureSemantics.cutDepth) * 0.45) : 3.8),
-        portalLength: Math.max(12, Math.min(34, (Number(feature.width) || 6) * 2.2)),
-        bounds: feature.bounds
-      }));
-  } else {
-    appCtx.structureTerrainCuts = [];
-  }
+  // Terrain remains the terrain roof above a tunnel. Portal placement and the
+  // tunnel interior come from the compiled tunnel model; lowering an entire
+  // corridor creates an open trench and exposes box geometry above ground.
+  appCtx.structureTerrainCuts = [];
 }
 
 export function syncLinearFeatureOverlayVisibility() {

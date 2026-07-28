@@ -1,11 +1,11 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { classifyStructureSemantics } from "../structure-semantics.js?v=24";
+import { classifyStructureSemantics } from "../structure-semantics.js?v=25";
 import {
   buildingSeedFromIdentity,
   inferFallbackBuildingHeightMeters,
   interpretBuildingSemantics
 } from "../building-semantics.js?v=4";
-import { createMidLodBuildingMesh } from "./load-geometry.js?v=19";
+import { createMidLodBuildingMesh } from "./load-geometry.js?v=20";
 import {
   appendGeometryWithTransform,
   buildMergedGeometry,
@@ -84,6 +84,17 @@ export function buildBuildingGeometryPass(options = {}) {
       for (let dz = -r; dz <= r; dz++) roadCoreCells.add(`${cx + dx},${cz + dz}`);
     }
   };
+  const markRoadSegment = (p0, p1, cellSize, radiusCells, markCell) => {
+    if (!p0 || !p1) return;
+    const segLen = Math.hypot(p1.x - p0.x, p1.z - p0.z);
+    const steps = Math.max(1, Math.ceil(segLen / Math.max(1.75, cellSize * 0.5)));
+    for (let step = 0; step <= steps; step += 1) {
+      const t = step / steps;
+      markCell(p0.x + (p1.x - p0.x) * t, p0.z + (p1.z - p0.z) * t, radiusCells);
+    }
+  };
+  const markRoadCoreSegment = (p0, p1, radiusCells) =>
+    markRoadSegment(p0, p1, roadCoreCellSize, radiusCells, markRoadCoreCell);
   const markRoadCorridorCell = (x, z, radiusCells) => {
     const cx = Math.floor(x / roadCorridorCellSize);
     const cz = Math.floor(z / roadCorridorCellSize);
@@ -92,19 +103,8 @@ export function buildBuildingGeometryPass(options = {}) {
       for (let dz = -r; dz <= r; dz++) roadCorridorCells.add(`${cx + dx},${cz + dz}`);
     }
   };
-  const markRoadCorridorSegment = (p0, p1, radiusCells) => {
-    if (!p0 || !p1) return;
-    const segLen = Math.hypot(p1.x - p0.x, p1.z - p0.z);
-    const steps = Math.max(1, Math.ceil(segLen / Math.max(1.75, roadCorridorCellSize * 0.75)));
-    for (let step = 0; step <= steps; step++) {
-      const t = step / steps;
-      markRoadCorridorCell(
-        p0.x + (p1.x - p0.x) * t,
-        p0.z + (p1.z - p0.z) * t,
-        radiusCells
-      );
-    }
-  };
+  const markRoadCorridorSegment = (p0, p1, radiusCells) =>
+    markRoadSegment(p0, p1, roadCorridorCellSize * 1.5, radiusCells, markRoadCorridorCell);
   const pointOnRoadCore = (x, z) => roadCoreCells.has(toRoadCoreCellKey(x, z));
   const pointOnRoadCorridor = (x, z) => roadCorridorCells.has(toRoadCorridorCellKey(x, z));
   const expandFootprintForGroundApron = (pts) => {
@@ -266,6 +266,7 @@ export function buildBuildingGeometryPass(options = {}) {
       markRoadCoreCell(p.x, p.z, roadCoreRadiusCells);
       markRoadCorridorCell(p.x, p.z, corridorRadiusCells);
       if (i < rd.pts.length - 1) {
+        markRoadCoreSegment(p, rd.pts[i + 1], roadCoreRadiusCells);
         markRoadCorridorSegment(p, rd.pts[i + 1], corridorRadiusCells);
       }
     }
@@ -413,22 +414,49 @@ export function buildBuildingGeometryPass(options = {}) {
       roadCoreConflict;
     const colliderDetail = useRdtBudgeting && lodTier !== 'near' && !roadCoreConflict ? 'bbox' : 'full';
 
-    let avgElevation = 0;
-    let minElevation = Infinity;
-    let maxElevation = -Infinity;
-    pts.forEach((p) => {
-      const h = appCtx.elevationWorldYAtWorldXZ(p.x, p.z);
-      avgElevation += h;
-      if (h < minElevation) minElevation = h;
-      if (h > maxElevation) maxElevation = h;
+    const sampleTerrainY = (x, z) => {
+      const meshHeight = typeof appCtx.terrainMeshHeightAt === 'function'
+        ? Number(appCtx.terrainMeshHeightAt(x, z))
+        : NaN;
+      return Number.isFinite(meshHeight) ? meshHeight : Number(appCtx.elevationWorldYAtWorldXZ(x, z));
+    };
+    const terrainSamples = [];
+    let terrainCentroidX = 0, terrainCentroidZ = 0;
+    for (let i = 0; i < pts.length; i++) {
+      const point = pts[i];
+      const next = pts[(i + 1) % pts.length];
+      terrainCentroidX += point.x;
+      terrainCentroidZ += point.z;
+      terrainSamples.push(point);
+      terrainSamples.push({ x: (point.x + next.x) * 0.5, z: (point.z + next.z) * 0.5 });
+    }
+    terrainSamples.push({ x: terrainCentroidX / pts.length, z: terrainCentroidZ / pts.length });
+    const elevationValues = [];
+    let validElevationSamples = 0;
+    terrainSamples.forEach((p) => {
+      const h = sampleTerrainY(p.x, p.z);
+      if (!Number.isFinite(h)) return;
+      elevationValues.push(h);
+      validElevationSamples += 1;
     });
-    avgElevation /= pts.length;
+    elevationValues.sort((a, b) => a - b);
+    const medianElevation = validElevationSamples > 0 ? elevationValues[Math.floor((validElevationSamples - 1) * 0.5)] : 0;
+    const reliefLimit = Math.min(18, Math.max(4, height * 0.65, Math.min(footprintWidth, footprintDepth) * 0.4));
+    const lowSample = validElevationSamples > 0 ? elevationValues[Math.floor((validElevationSamples - 1) * 0.15)] : medianElevation;
+    const highSample = validElevationSamples > 0 ? elevationValues[Math.ceil((validElevationSamples - 1) * 0.85)] : medianElevation;
+    const minElevation = Math.max(lowSample, medianElevation - reliefLimit);
+    const maxElevation = Math.min(highSample, medianElevation + reliefLimit);
+    const avgElevation = elevationValues.length > 0 ? elevationValues.reduce((sum, value) => sum + value, 0) / elevationValues.length : medianElevation;
     const slopeRange = Number.isFinite(minElevation) && Number.isFinite(maxElevation) ? maxElevation - minElevation : 0;
-    const baseElevationRaw = slopeRange >= 0.06 ? minElevation + 0.03 : avgElevation;
+    const terrainFoundationRise = slopeRange >= 0.06 ? Math.min(12, slopeRange) : 0;
+    const baseElevationRaw = terrainFoundationRise > 0 ? maxElevation - terrainFoundationRise + 0.03 : avgElevation;
     const structureBaseOffset = Number.isFinite(buildingSemantics.baseOffsetMeters) ? buildingSemantics.baseOffsetMeters : 0;
     const baseElevation = baseElevationRaw + structureBaseOffset;
+    const collisionBaseElevation = maxElevation + 0.03 + structureBaseOffset;
+    // Bound downhill foundations so cliff outliers cannot create towers.
     const mappedRoof = resolveMappedRoof(way.tags, height, buildingSemantics, pts);
-    const bodyHeight = mappedRoof ? Math.max(0.05, mappedRoof.wallHeight) : height;
+    const bodyHeight = (mappedRoof ? Math.max(0.05, mappedRoof.wallHeight) : height) + terrainFoundationRise;
+    const renderedHeight = height + terrainFoundationRise;
     const fallbackBaseColor = pickBuildingBaseColor(bt, bSeed ^ Math.floor(br2 * 0xffff));
     const baseColor = /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(mappedFacadeColor) ?
       new THREE.Color(mappedFacadeColor).getHex() :
@@ -442,6 +470,8 @@ export function buildBuildingGeometryPass(options = {}) {
         buildingType: bt,
         denseUrban: denseUrbanContext,
         facadeMaterial: way.tags['building:material'] || '',
+        roofMaterial: way.tags['roof:material'] || '',
+        roofColor: way.tags['roof:colour'] || way.tags['roof:color'] || '',
         facadeColorMapped: /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(mappedFacadeColor),
         buildingSemantics
       });
@@ -481,6 +511,8 @@ export function buildBuildingGeometryPass(options = {}) {
           footprintArea,
           denseUrban: denseUrbanContext,
           facadeMaterial: way.tags['building:material'] || '',
+          roofMaterial: way.tags['roof:material'] || '',
+          roofColor: way.tags['roof:colour'] || way.tags['roof:color'] || '',
           facadeColorMapped: /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(mappedFacadeColor),
           structureSemantics,
           buildingSemantics
@@ -514,6 +546,9 @@ export function buildBuildingGeometryPass(options = {}) {
     mesh.userData.buildingSeed = bSeed;
     mesh.userData.heightMeters = height;
     mesh.userData.bodyHeightMeters = bodyHeight;
+    mesh.userData.renderedHeightMeters = renderedHeight;
+    mesh.userData.terrainFoundationRise = terrainFoundationRise;
+    mesh.userData.collisionBaseElevation = collisionBaseElevation;
     mesh.userData.heightSource = buildingSemantics.heightSource;
     mesh.userData.levels = resolvedLevels;
     mesh.userData.levelsSource = levelsSource;
@@ -559,22 +594,28 @@ export function buildBuildingGeometryPass(options = {}) {
       overtureParentBuildingId: way.tags._overtureParentBuildingId || '',
       metadataSourceId: way.tags._buildingMetadataSourceId || '',
       minLevels: Number.isFinite(buildingSemantics.buildingMinLevel) ? buildingSemantics.buildingMinLevel : null,
-      baseY: baseElevation,
+      baseY: collisionBaseElevation,
       buildingSemantics,
       structureSemantics
     });
     if (colliderDetail === 'full') loadMetrics.colliders.full += 1;
     else loadMetrics.colliders.simplified += 1;
     if (colliderRef) {
-      colliderRef.baseY = baseElevation;
-      colliderRef.minY = baseElevation;
-      colliderRef.maxY = baseElevation + height;
+      colliderRef.baseY = collisionBaseElevation;
+      colliderRef.minY = collisionBaseElevation;
+      colliderRef.maxY = collisionBaseElevation + height;
     }
 
     appCtx.scene.add(mesh);
     appCtx.buildingMeshes.push(mesh);
 
-    const mappedRoofMesh = createMappedRoofMesh(pts, baseElevation, mappedRoof?.wallHeight || 0, mappedRoof, way.tags);
+    const mappedRoofMesh = createMappedRoofMesh(
+      pts,
+      baseElevation,
+      (mappedRoof?.wallHeight || 0) + terrainFoundationRise,
+      mappedRoof,
+      way.tags
+    );
     if (mappedRoofMesh) {
       mappedRoofMesh.userData.sourceBuildingId = sourceBuildingId;
       mappedRoofMesh.userData.buildingFootprint = pts;
@@ -585,13 +626,14 @@ export function buildBuildingGeometryPass(options = {}) {
     }
 
     const roofDetailMesh = !mappedRoofMesh && buildingSemantics.shouldCreateRoofDetail ?
-      createRoofDetailMesh(pts, height, baseElevation, bSeed, bt, lodTier) :
+      createRoofDetailMesh(pts, renderedHeight, baseElevation, bSeed, bt, lodTier) :
       null;
     if (roofDetailMesh) {
       roofDetailMesh.userData.isRoofDetail = true;
       roofDetailMesh.userData.sourceBuildingId = sourceBuildingId;
       roofDetailMesh.userData.terrainAvgElevation = avgElevation;
       roofDetailMesh.userData.structureBaseOffset = structureBaseOffset;
+      roofDetailMesh.userData.terrainFoundationRise = terrainFoundationRise;
       roofDetailMesh.userData.buildingSemantics = buildingSemantics;
       roofDetailMesh.userData.structureSemantics = structureSemantics;
       appCtx.scene.add(roofDetailMesh);
@@ -621,7 +663,7 @@ export function buildBuildingGeometryPass(options = {}) {
     if (shouldCreateGroundPatch) {
       const groundPatchesRaw = appCtx.createBuildingGroundPatch(pts, baseElevation, {
         buildingType: bt,
-        heightMeters: height,
+        heightMeters: renderedHeight,
         footprintArea,
         denseUrban: denseUrbanContext && !roadCorridorOverlap,
         roadside: false,

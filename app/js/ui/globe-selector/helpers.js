@@ -1,5 +1,7 @@
 export const FAVORITE_STORAGE_KEY = "worldExplorer3D.globeSelector.savedFavorites";
 export const MAX_SAVED_FAVORITES = 10;
+export const RECENT_STORAGE_KEY = "worldExplorer3D.globeSelector.recentPlaces";
+export const MAX_RECENT_PLACES = 8;
 
 export function toFiniteNumber(value) {
   const n = Number(value);
@@ -27,13 +29,15 @@ export function normalizeCityRecord(raw, source = "menu") {
   if (lat == null || lon == null) return null;
   const clamped = clampLatLon(lat, lon);
   const name = normalizeCityName(raw.name, clamped.lat, clamped.lon, source === "saved" ? "Saved Custom" : "City");
-  const normalizedSource = source === "saved" ? "saved" : source === "live" ? "live" : "menu";
+  const normalizedSource = source === "saved" ? "saved" : source === "live" ? "live" : source === "curated" ? "curated" : "menu";
   return {
     key: String(raw.key || ""),
     name,
     lat: Number(clamped.lat),
     lon: Number(clamped.lon),
     source: normalizedSource,
+    category: String(raw.category || ""),
+    collection: String(raw.collection || ""),
     savedAt: Number(raw.savedAt || 0)
   };
 }
@@ -137,6 +141,37 @@ export function persistSavedFavoriteCities(savedFavoriteCities = []) {
   }
 }
 
+export function loadRecentPlaces() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(RECENT_STORAGE_KEY) || '[]');
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((entry) => normalizeCityRecord(entry, 'saved'))
+      .filter(Boolean)
+      .sort((a, b) => Number(b.savedAt || 0) - Number(a.savedAt || 0))
+      .slice(0, MAX_RECENT_PLACES);
+  } catch {
+    return [];
+  }
+}
+
+export function addRecentPlace(selection, recentPlaces = []) {
+  const normalized = normalizeCityRecord({
+    ...selection,
+    key: `recent-${Date.now()}`,
+    savedAt: Date.now()
+  }, 'saved');
+  if (!normalized) return recentPlaces;
+  const next = [normalized, ...recentPlaces.filter((city) => cityDedupKey(city) !== cityDedupKey(normalized))]
+    .slice(0, MAX_RECENT_PLACES);
+  try {
+    localStorage.setItem(RECENT_STORAGE_KEY, JSON.stringify(next));
+  } catch {
+    // Recents remain available for this session when storage is unavailable.
+  }
+  return next;
+}
+
 export function distanceKmBetween(latA, lonA, latB, lonB) {
   const toRad = Math.PI / 180;
   const dLat = (latB - latA) * toRad;
@@ -150,13 +185,10 @@ export function distanceKmBetween(latA, lonA, latB, lonB) {
   return 6371 * c;
 }
 
-export function buildNearbyCities({ savedFavoriteCities = [], liveNearbyCity = null, lat, lon }) {
-  const savedFavorites = savedFavoriteCities
-    .map((city) => normalizeCityRecord(city, "saved"))
-    .filter(Boolean);
+export function buildNearbyCities({ mappedCities = [], liveNearbyCity = null, lat, lon }) {
   const combined = [];
   if (liveNearbyCity) combined.push(liveNearbyCity);
-  combined.push(...savedFavorites);
+  combined.push(...mappedCities);
   if (!combined.length) return [];
 
   const seen = new Set();
@@ -329,7 +361,8 @@ export function syncLegacyCustomSelection(appCtx, selection) {
   appCtx.setCustomLocation?.({
     lat: selection.lat,
     lon: selection.lon,
-    name: selection.name || appCtx.customLoc?.name || 'Custom Location'
+    name: selection.name || appCtx.customLoc?.name || 'Custom Location',
+    arrivalMode: selection.arrivalMode || 'auto'
   }, { transient: selection.fromGeolocation === true, syncInputs: false });
 }
 

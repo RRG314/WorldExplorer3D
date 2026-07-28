@@ -269,10 +269,6 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
   const centerLowerBounds = new Float64Array(sampleDistances.length);
   const leftGround = new Float32Array(sampleDistances.length);
   const rightGround = new Float32Array(sampleDistances.length);
-  const leftInitial = new Float64Array(sampleDistances.length);
-  const rightInitial = new Float64Array(sampleDistances.length);
-  const leftLowerBounds = new Float64Array(sampleDistances.length);
-  const rightLowerBounds = new Float64Array(sampleDistances.length);
   const mode = semantics?.terrainMode || 'at_grade';
   const minimumStructureSurfaceY = Number(feature.minimumStructureSurfaceY);
 
@@ -312,9 +308,15 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     // Their endpoint chord and explicit transition/station offsets own that
     // alignment; sampling terrain here would make every DEM bump appear in a
     // bridge deck or tunnel floor.
+    // A road is an engineered cross-section, not three independent terrain
+    // samples. Using separate center/left/right DEM profiles folds the asphalt
+    // into visible triangles on side slopes. Lift one level cross-section to
+    // the highest accepted ground sample instead; this is the minimal cut/fill
+    // surface that cannot clip into the rendered terrain.
+    const atGradeReferenceY = Math.max(groundY, leftY, rightY);
     const referenceY =
       mode === 'at_grade'
-        ? groundY
+        ? atGradeReferenceY
         : approachReference;
     const unconstrainedCenterY = referenceY + offset + surfaceBias;
     const centerY =
@@ -329,15 +331,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     offsets[index] = offset;
     centerInitial[index] = centerY;
     centerLowerBounds[index] = atGrade
-      ? groundY + surfaceBias
-      : Number.NEGATIVE_INFINITY;
-    leftInitial[index] = atGrade ? Math.max(centerY, leftY + surfaceBias) : centerY;
-    rightInitial[index] = atGrade ? Math.max(centerY, rightY + surfaceBias) : centerY;
-    leftLowerBounds[index] = atGrade
-      ? leftY + surfaceBias
-      : Number.NEGATIVE_INFINITY;
-    rightLowerBounds[index] = atGrade
-      ? rightY + surfaceBias
+      ? atGradeReferenceY + surfaceBias
       : Number.NEGATIVE_INFINITY;
   }
 
@@ -360,8 +354,6 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     if (Math.abs(structuralShift) > 1e-6) {
       for (let index = 0; index < centerInitial.length; index += 1) {
         centerInitial[index] += structuralShift;
-        leftInitial[index] += structuralShift;
-        rightInitial[index] += structuralShift;
       }
     }
   }
@@ -372,12 +364,11 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     sampleDistances,
     maximumGrade
   );
-  const leftHeights = mode === 'at_grade'
-    ? smoothGradeLimitedProfile(leftInitial, leftLowerBounds, sampleDistances, maximumGrade)
-    : new Float32Array(centerHeights);
-  const rightHeights = mode === 'at_grade'
-    ? smoothGradeLimitedProfile(rightInitial, rightLowerBounds, sampleDistances, maximumGrade)
-    : new Float32Array(centerHeights);
+  // Publish the same accepted profile at both edges. All gameplay, markings,
+  // sidewalks, and visuals then query one planar deck instead of recreating
+  // incompatible lateral terrain folds.
+  const leftHeights = new Float32Array(centerHeights);
+  const rightHeights = new Float32Array(centerHeights);
 
   return Object.freeze({
     schemaVersion: TRANSPORT_SURFACE_SCHEMA_VERSION,

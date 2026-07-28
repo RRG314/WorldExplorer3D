@@ -18,7 +18,7 @@ import {
   getBuildingMaterial as getBuildingMaterialRuntime,
   initEngineTextures as initEngineTexturesRuntime,
   syncTextureGlobals as syncTextureGlobalsRuntime
-} from "./engine/materials-runtime.js?v=17";
+} from "./engine/materials-runtime.js?v=19";
 import { initEngineRuntime } from "./engine/scene-bootstrap.js?v=8";
 
 const RENDER_QUALITY_LOW = 'low';

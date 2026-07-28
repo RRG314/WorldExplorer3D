@@ -46,6 +46,15 @@ export const WORLD_TEST_LOCATIONS = [
     minimumBuildings: 1000
   },
   {
+    id: 'monaco_sainte_devote_custom',
+    kind: 'custom',
+    lat: 43.7364,
+    lon: 7.4197,
+    label: 'Sainte-Dévote tunnel approaches, Monaco',
+    category: 'mountain_tunnel_elevated_interchange_custom',
+    expectedStart: 'land'
+  },
+  {
     id: 'tokyo_shinjuku_custom',
     kind: 'custom',
     lat: 35.6896,

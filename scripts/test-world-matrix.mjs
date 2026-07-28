@@ -310,10 +310,32 @@ async function loadLocation(page, spec) {
       if (mesh?.visible !== false) landusePresentation[type].visibleSources += sourceCount;
     }
 
-    const structurePresentation = { roads: {}, waterways: {}, nonNavigableWaterways: 0 };
+    const structurePresentation = {
+      roads: {},
+      waterways: {},
+      nonNavigableWaterways: 0,
+      tunnelModels: {},
+      tunnelShellMeshes: 0,
+      tunnelShellTriangles: 0,
+      terrainCuts: Array.isArray(ctx.structureTerrainCuts) ? ctx.structureTerrainCuts.length : 0
+    };
     for (const road of ctx.roads || []) {
       const kind = String(road?.structureSemantics?.structureKind || 'at_grade');
       structurePresentation.roads[kind] = (structurePresentation.roads[kind] || 0) + 1;
+      if (road?.tunnelSystemModel) {
+        const visualKind = String(road.tunnelSystemModel.visualKind || 'none');
+        structurePresentation.tunnelModels[visualKind] =
+          (structurePresentation.tunnelModels[visualKind] || 0) + 1;
+      }
+    }
+    for (const mesh of ctx.structureVisualMeshes || []) {
+      if (mesh?.userData?.structureVisualType !== 'tunnel_shells') continue;
+      structurePresentation.tunnelShellMeshes += 1;
+      const indexCount = Number(mesh.geometry?.index?.count || 0);
+      const positionCount = Number(mesh.geometry?.attributes?.position?.count || 0);
+      structurePresentation.tunnelShellTriangles += indexCount > 0 ?
+        Math.floor(indexCount / 3) :
+        Math.floor(positionCount / 3);
     }
     for (const waterway of ctx.waterways || []) {
       const kind = String(waterway?.structureSemantics?.structureKind || 'at_grade');
