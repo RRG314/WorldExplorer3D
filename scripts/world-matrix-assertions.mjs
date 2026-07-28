@@ -179,6 +179,18 @@ export function assertWorldMatrixLocation(spec, result) {
   assert(hasMappedWorld || hasTerrainFallback, `${spec.id}: no mapped world or terrain fallback loaded`);
   assert(result.driveSpawn?.valid !== false, `${spec.id}: invalid drive spawn ${JSON.stringify(result.driveSpawn)}`);
   assert(result.walkSpawn?.valid !== false, `${spec.id}: invalid walk spawn ${JSON.stringify(result.walkSpawn)}`);
+  if (spec.expectedRoadStructure) {
+    const gameplay = result.structureGameplay;
+    assert(gameplay?.frames >= 480, `${spec.id}: structure gameplay was only a short segment ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.simulatedSeconds >= 8, `${spec.id}: structure gameplay duration is insufficient ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.moved >= 40, `${spec.id}: vehicle did not traverse the structure ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.onExpectedLayerPct >= 95, `${spec.id}: vehicle changed grade-separated layers ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.maximumVerticalError <= 0.8, `${spec.id}: vehicle clipped or floated from compiled surface ${JSON.stringify(gameplay)}`);
+    assert(
+      gameplay?.maximumLateralError <= Math.max(3, Number(result.landPresentation?.nearestRoad?.width || 0) * 0.5 + 1),
+      `${spec.id}: vehicle left the compiled transport ribbon ${JSON.stringify(gameplay)}`
+    );
+  }
   if (result.counts.roads > 0) {
     if (Number(result.traversalDiagnostics?.driveEligible || 0) > 0) {
       assert(result.traversal.driveSegments > 0, `${spec.id}: drive traversal graph missing`);

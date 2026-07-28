@@ -3,7 +3,7 @@ import { createWorldLandusePass } from "./load-landuse-pass.js?v=25";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
 import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=7";
-import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=10";
+import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=11";
 import {
   diagnoseDistrictGroundSource,
   prepareSelectedLocationSource
@@ -25,6 +25,63 @@ async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
     endLoadPhase('waitForTerrainCoverage');
   }
 }
+
+function selectedRoadGeographicBounds(roadWays = [], nodes = {}) {
+  let latN = -Infinity;
+  let latS = Infinity;
+  const longitudes = [];
+  for (const way of roadWays) {
+    for (const nodeId of way?.nodes || []) {
+      const node = nodes[nodeId];
+      const lat = Number(node?.lat);
+      const lon = Number(node?.lon);
+      if (!Number.isFinite(lat) || !Number.isFinite(lon)) continue;
+      latN = Math.max(latN, lat);
+      latS = Math.min(latS, lat);
+      longitudes.push(((lon % 360) + 360) % 360);
+    }
+  }
+  if (!Number.isFinite(latN) || !Number.isFinite(latS) || longitudes.length === 0) return null;
+
+  longitudes.sort((left, right) => left - right);
+  let largestGap = -Infinity;
+  let gapIndex = 0;
+  for (let index = 0; index < longitudes.length; index += 1) {
+    const next = index === longitudes.length - 1
+      ? longitudes[0] + 360
+      : longitudes[index + 1];
+    const gap = next - longitudes[index];
+    if (gap > largestGap) {
+      largestGap = gap;
+      gapIndex = index;
+    }
+  }
+  const arcStart = longitudes[(gapIndex + 1) % longitudes.length];
+  const arcEnd = longitudes[gapIndex];
+  const toSignedLongitude = (value) => value > 180 ? value - 360 : value;
+  const padding = 0.00002;
+  return {
+    latN: Math.min(85.05112878, latN + padding),
+    latS: Math.max(-85.05112878, latS - padding),
+    lonW: toSignedLongitude((arcStart - padding + 360) % 360),
+    lonE: toSignedLongitude((arcEnd + padding) % 360)
+  };
+}
+
+async function waitForSelectedRoadTerrain(appCtx, roadWays, nodes, startLoadPhase, endLoadPhase) {
+  if (!appCtx.terrainEnabled || appCtx.onMoon || typeof appCtx.waitForTerrainReadyBounds !== 'function') {
+    return false;
+  }
+  const bounds = selectedRoadGeographicBounds(roadWays, nodes);
+  if (!bounds) return false;
+  startLoadPhase('waitForTransportGround');
+  try {
+    return await appCtx.waitForTerrainReadyBounds(bounds, 8000);
+  } finally {
+    endLoadPhase('waitForTransportGround');
+  }
+}
+
 export function createWorldRoadLoader(deps = {}) {
   const {
     ENABLE_LINEAR_FEATURES = false,
@@ -369,8 +426,17 @@ export function createWorldRoadLoader(deps = {}) {
         }
         loadMetrics.districtSource = normalized.diagnostics.districtSource;
         if (normalized.budgetWarning) console.warn(normalized.budgetWarning);
-        terrainCoverageReady = await waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase);
+        const transportGroundCoverageReady = await waitForSelectedRoadTerrain(
+          appCtx,
+          normalizedSelection.roadWays,
+          normalizedSelection.nodes,
+          startLoadPhase,
+          endLoadPhase
+        );
+        terrainCoverageReady = transportGroundCoverageReady ||
+          await waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase);
         if (runtimeState) {
+          runtimeState.transportGroundCoverageReady = transportGroundCoverageReady;
           const centerTerrainSource = appCtx.terrainSourceSampleAtLatLon?.(
             appCtx.LOC.lat,
             appCtx.LOC.lon

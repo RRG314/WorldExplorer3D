@@ -10,8 +10,8 @@ import {
   isUrbanLanduseType,
   pointsBoundsLocal
 } from "./terrain/context-utils.js?v=1";
-import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=1";
-import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=1";
+import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=2";
+import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=2";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=5";
 import {
   groundProviderCatalogSnapshot
@@ -52,19 +52,19 @@ import {
   waitForTerrainReadyBounds,
   waitForTerrainReadyAt,
   worldToLatLon
-} from "./terrain/tiles.js?v=31";
+} from "./terrain/tiles.js?v=32";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
-  rebuildRoadsWithTerrain
-} from "./terrain/rebuild.js?v=10";
+  publishCompiledTransportMeshes
+} from "./terrain/rebuild.js?v=11";
 import {
   disableRoadDebugMode as disableRoadDebugModeInternal,
   toggleRoadDebugMode as toggleRoadDebugModeInternal,
   validateRoadTerrainConformance as validateRoadTerrainConformanceInternal
 } from "./terrain/debug-tools.js?v=3";
 import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
-import { createTerrainStreamingApi } from "./terrain/streaming.js?v=9";
+import { createTerrainStreamingApi } from "./terrain/streaming.js?v=10";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 // terrain.js - Terrain elevation system (Terrarium tiles)
 // ============================================================================
@@ -75,9 +75,6 @@ import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection
 
 // Namespace for terrain internal state
 const terrain = {
-  _rebuildTimer: null,
-  _rebuildInFlight: false,
-  _lastRoadRebuildAt: 0,
   _raycaster: null,
   _rayOrigin: null,
   _rayDir: null,
@@ -87,8 +84,6 @@ const terrain = {
   _urbanSurfaceMaterials: null,
   // Performance optimization caching
   _lastUpdatePos: { x: 0, z: 0 },
-  _cachedIntersections: null,
-  _lastRoadCount: 0,
   _lastTerrainTileCount: 0
 };
 const acceptedGroundRuntime = createAcceptedGroundRuntime({ worldToLatLon });
@@ -107,8 +102,6 @@ const verifyAcceptedGroundCoverage = (locations) =>
 const ROAD_ENDPOINT_EXTENSION_SCALE = 0.5;
 const ROAD_ENDPOINT_EXTENSION_MIN = 0.35;
 const ROAD_ENDPOINT_EXTENSION_MAX = 2.0;
-const ROAD_REBUILD_DEBOUNCE_MS = 90;
-const ROAD_REBUILD_MIN_INTERVAL_MS = 420;
 const SIDEWALK_INNER_GAP = 0.18;
 const SIDEWALK_MIN_WIDTH = 0.9;
 const SIDEWALK_SEGMENT_MIN_WIDTH = 0.62;
@@ -126,7 +119,6 @@ function clampElevationMeters(meters) {
 
 const terrainTileDeps = {
   clampElevationMeters,
-  scheduleRoadAndBuildingRebuild: () => scheduleRoadAndBuildingRebuild(),
   applyStructureTerrainCuts: (worldX, worldZ, terrainY) => applyStructureTerrainCuts(worldX, worldZ, terrainY),
   computeElevationStatsMeters: (samplesMeters) => computeElevationStatsMeters(samplesMeters),
   reapplyTerrainMeshHeights: (mesh) => applyHeightsToTerrainMesh(mesh, terrainTileDeps),
@@ -185,7 +177,7 @@ const {
   SIDEWALK_SEGMENT_MIN_WIDTH
 });
 
-const terrainRebuildDeps = {
+const transportPublicationDeps = {
   terrain,
   constants: {
     SIDEWALK_INNER_GAP,
@@ -222,84 +214,6 @@ const terrainRebuildDeps = {
   validateRoadTerrainConformance
 };
 
-function scheduleRoadAndBuildingRebuild() {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.worldLoading !== true) return;
-  appCtx.roadsNeedRebuild = true;
-  if (terrain._rebuildTimer) return;
-
-  const now = performance.now();
-  const elapsed = now - terrain._lastRoadRebuildAt;
-  const waitMs = elapsed >= ROAD_REBUILD_MIN_INTERVAL_MS ?
-  ROAD_REBUILD_DEBOUNCE_MS :
-  Math.max(ROAD_REBUILD_DEBOUNCE_MS, ROAD_REBUILD_MIN_INTERVAL_MS - elapsed);
-
-  terrain._rebuildTimer = setTimeout(() => {
-    terrain._rebuildTimer = null;
-    if (!appCtx.roadsNeedRebuild || appCtx.onMoon || !appCtx.terrainEnabled || appCtx.worldLoading !== true) return;
-    if (terrain._rebuildInFlight) {
-      scheduleRoadAndBuildingRebuild();
-      return;
-    }
-
-    terrain._rebuildInFlight = true;
-    try {
-      if (appCtx.roads.length > 0) rebuildRoadsWithTerrain(terrainRebuildDeps);
-      repositionBuildingsWithTerrain();
-      reconcileActorsAfterSurfaceRebuild(appCtx);
-      terrain._lastRoadRebuildAt = performance.now();
-    } finally {
-      terrain._rebuildInFlight = false;
-      if (appCtx.roadsNeedRebuild) scheduleRoadAndBuildingRebuild();
-    }
-  }, waitMs);
-}
-
-function canRunRoadAndBuildingRebuildNow() {
-  if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
-  let tilesLoaded = 0;
-  let tilesTotal = 0;
-  appCtx.terrainTileCache.forEach((tile) => {
-    tilesTotal++;
-    if (tile?.loaded) tilesLoaded++;
-  });
-  return tilesLoaded > 0 && tilesTotal > 0;
-}
-
-function requestWorldSurfaceSync(options = {}) {
-  if (!appCtx.terrainEnabled || appCtx.onMoon || appCtx.worldLoading !== true) return false;
-  appCtx.roadsNeedRebuild = true;
-
-  const force = options.force === true;
-  if (force && terrain._rebuildTimer) {
-    clearTimeout(terrain._rebuildTimer);
-    terrain._rebuildTimer = null;
-  }
-
-  if (!force || terrain._rebuildInFlight || !canRunRoadAndBuildingRebuildNow()) {
-    scheduleRoadAndBuildingRebuild();
-    return false;
-  }
-
-  terrain._rebuildInFlight = true;
-  try {
-    if (appCtx.roads.length > 0) rebuildRoadsWithTerrain(terrainRebuildDeps);
-    repositionBuildingsWithTerrain();
-    reconcileActorsAfterSurfaceRebuild(appCtx);
-    terrain._lastRoadRebuildAt = performance.now();
-    return true;
-  } finally {
-    terrain._rebuildInFlight = false;
-    if (appCtx.roadsNeedRebuild) scheduleRoadAndBuildingRebuild();
-  }
-}
-
-function cancelWorldSurfaceSync() {
-  if (terrain._rebuildTimer) {
-    clearTimeout(terrain._rebuildTimer);
-    terrain._rebuildTimer = null;
-  }
-  appCtx.roadsNeedRebuild = false;
-}
 const {
   resetTerrainStreamingState,
   updateTerrainAround
@@ -317,7 +231,6 @@ const {
   getOrLoadTerrainTile,
   pruneTerrainTileCache,
   terrainTileCacheSnapshot,
-  requestWorldSurfaceSync,
   clearTerrainHeightCache
 });
 
@@ -350,9 +263,6 @@ async function waitForTerrainCoverageAt(x = 0, z = 0, timeoutMs = 5000, minLoade
     ]);
   }
 
-  if (snapshot.loaded > 0) {
-    requestWorldSurfaceSync({ force: true, source: 'initial_terrain_coverage_ready' });
-  }
   return snapshot;
 }
 
@@ -368,8 +278,8 @@ function validateRoadTerrainConformance() {
   return validateRoadTerrainConformanceInternal({ terrainMeshHeightAt, worldToLatLon });
 }
 
-function rebuildRoadsWithTerrainRuntime() {
-  return rebuildRoadsWithTerrain(terrainRebuildDeps);
+function publishCompiledTransportMeshesRuntime() {
+  return publishCompiledTransportMeshes(transportPublicationDeps);
 }
 
 // =====================
@@ -386,7 +296,6 @@ Object.assign(appCtx, {
   buildTerrainTileMesh,
   cachedBaseTerrainHeight,
   cachedTerrainHeight,
-  cancelWorldSurfaceSync,
   classifyTerrainVisualProfile,
   clearTerrainHeightCache,
   clearTerrainMeshes,
@@ -405,8 +314,7 @@ Object.assign(appCtx, {
   prepareAcceptedGroundForLocation,
   pruneTerrainTileCache,
   reconcileActorsAfterSurfaceRebuild,
-  rebuildRoadsWithTerrain: rebuildRoadsWithTerrainRuntime,
-  requestWorldSurfaceSync,
+  publishCompiledTransportMeshes: publishCompiledTransportMeshesRuntime,
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
@@ -442,7 +350,6 @@ export {
   buildTerrainTileMesh,
   cachedBaseTerrainHeight,
   cachedTerrainHeight,
-  cancelWorldSurfaceSync,
   classifyTerrainVisualProfile,
   clearAcceptedGroundRuntime,
   clearTerrainHeightCache,
@@ -458,8 +365,7 @@ export {
   pruneTerrainTileCache,
   prepareAcceptedGroundForLocation,
   reconcileActorsAfterSurfaceRebuild,
-  rebuildRoadsWithTerrainRuntime as rebuildRoadsWithTerrain,
-  requestWorldSurfaceSync,
+  publishCompiledTransportMeshesRuntime as publishCompiledTransportMeshes,
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,

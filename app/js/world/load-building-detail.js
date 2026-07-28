@@ -137,7 +137,6 @@ export async function loadBuildingDetailForPublication(options = {}) {
       options.refreshStructureAwareFeatureProfiles?.();
       appCtx.refreshTerrainSurfaceProfiles?.();
       appCtx.clearTerrainHeightCache?.();
-      appCtx.requestWorldSurfaceSync?.({ force: true, source: 'publication_buildings' });
       options.updateWorldLod?.(true);
       setBuildingDetailState('ready', {
         requested: requested.length,

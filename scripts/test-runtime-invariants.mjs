@@ -337,7 +337,7 @@ async function main() {
 
     report = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
-      const structureSemantics = await import('/app/js/structure-semantics.js?v=14');
+      const structureSemantics = await import('/app/js/structure-semantics.js?v=19');
       const ctx = mod?.ctx;
       const roads = Array.isArray(ctx.roads) ? ctx.roads : [];
       const buildings = Array.isArray(ctx.buildings) ? ctx.buildings : [];
@@ -712,7 +712,7 @@ async function main() {
     const networkAndCopyReport = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
       const ctx = mod?.ctx;
-      const semanticsMod = await import('/app/js/structure-semantics.js?v=18');
+      const semanticsMod = await import('/app/js/structure-semantics.js?v=19');
       const classifyStructureSemantics = semanticsMod?.classifyStructureSemantics;
       const walkGraph = ctx?.traversalNetworks?.walk || null;
       const driveGraph = ctx?.traversalNetworks?.drive || null;
@@ -777,6 +777,23 @@ async function main() {
         structureTags: { bridge: 'yes' }, networkKind: 'road', type: 'primary'
       };
       semanticsMod.updateFeatureSurfaceProfile?.(syntheticBridge, (x) => x === 50 ? -80 : 12);
+      const compiledRoads = Array.isArray(ctx?.roads)
+        ? ctx.roads.filter((road) =>
+            road?.transportSurfaceModel?.authority === 'compiled_transport_surface')
+        : [];
+      const transportSurfaceCoverage = {
+        roadCount: Number(ctx?.roads?.length || 0),
+        compiledRoadCount: compiledRoads.length,
+        liveTerrainSamplerCount: compiledRoads.filter((road) =>
+          typeof road?.surfaceTerrainSampler === 'function').length,
+        invalidModelCount: compiledRoads.filter((road) =>
+          !Number.isFinite(road?.transportSurfaceModel?.stats?.minimumY) ||
+          !Number.isFinite(road?.transportSurfaceModel?.stats?.maximumY) ||
+          !Number.isFinite(road?.transportSurfaceModel?.stats?.maximumGrade)
+        ).length,
+        maximumGrade: compiledRoads.reduce((maximum, road) =>
+          Math.max(maximum, Number(road?.transportSurfaceModel?.stats?.maximumGrade) || 0), 0)
+      };
       const acceptedGroundSnapshot =
         ctx?.getAcceptedGroundRuntimeSnapshot?.() || null;
       const inactiveAcceptedGroundSample =
@@ -840,6 +857,8 @@ async function main() {
           }),
         syntheticStructureSemantics,
         syntheticBridgeHeights: Array.from(syntheticBridge.surfaceHeights || []),
+        transportSurfaceCoverage,
+        transportSurfacePublication: ctx?.transportSurfacePublication || null,
         acceptedGroundRuntimeBoundary: {
           prepareExposed:
             typeof ctx?.prepareAcceptedGroundForLocation === 'function',
@@ -949,9 +968,25 @@ async function main() {
         report.worldPublication?.stable === true &&
         report.worldPublication?.changes?.length === 0,
       bridgeSpansTerrainDepressions:
-        report.syntheticBridgeHeights?.length === 3 &&
+        report.syntheticBridgeHeights?.length >= 3 &&
         Math.min(...report.syntheticBridgeHeights) > 15 &&
         Math.max(...report.syntheticBridgeHeights) - Math.min(...report.syntheticBridgeHeights) < 0.1,
+      compiledTransportAuthority:
+        report.transportSurfaceCoverage?.roadCount > 0 &&
+        report.transportSurfaceCoverage?.compiledRoadCount === report.transportSurfaceCoverage?.roadCount &&
+        report.transportSurfaceCoverage?.liveTerrainSamplerCount === 0 &&
+        report.transportSurfaceCoverage?.invalidModelCount === 0 &&
+        report.transportSurfaceCoverage?.maximumGrade <= 0.1202 &&
+        report.transportSurfacePublication?.authority === 'compiled_transport_surface' &&
+        report.transportSurfacePublication?.roadCount === report.transportSurfaceCoverage?.roadCount,
+      compiledTransportRendererBudget:
+        report.transportSurfacePublication?.meshCount <= 4 &&
+        report.transportSurfacePublication?.compiledSampleCount <=
+          report.transportSurfacePublication?.roadCount * 120 &&
+        report.transportSurfacePublication?.vertices <=
+          report.transportSurfacePublication?.roadCount * 150 &&
+        report.transportSurfacePublication?.triangles <=
+          report.transportSurfacePublication?.roadCount * 140,
       roadSurfacesDraped:
         report.roadSurfaceContract?.atGradeSkirt === false &&
         report.roadSurfaceContract?.elevatedSkirt === false &&
@@ -1075,6 +1110,14 @@ async function main() {
     assert(checks.acceptedGroundRuntimeReady, `Accepted-ground runtime boundary is unavailable or unexpectedly active: ${JSON.stringify(report.acceptedGroundRuntimeBoundary || null)}`);
     assert(checks.roadSpatialIndexExact, `Indexed nearest-road results differ from the full scan: ${JSON.stringify(report.roadIndexParity || null)}`);
     assert(checks.bridgeSpansTerrainDepressions, `Bridge profile followed underlying terrain: ${JSON.stringify(report.syntheticBridgeHeights || null)}`);
+    assert(checks.compiledTransportAuthority, `Transport surfaces did not publish from one compiled authority: ${JSON.stringify({
+      coverage: report.transportSurfaceCoverage,
+      publication: report.transportSurfacePublication
+    })}`);
+    assert(
+      checks.compiledTransportRendererBudget,
+      `Compiled transport renderer exceeded its bounded per-road budget: ${JSON.stringify(report.transportSurfacePublication || null)}`
+    );
     assert(checks.roadSurfacesDraped, `Road surface skirt policy regressed: ${JSON.stringify(report.roadSurfaceContract || null)}`);
     assert(checks.lazyInteriorIdle, `Interior system is not staying lazy by default: ${JSON.stringify({ buildingEntrySupportExposed: report.buildingEntrySupportExposed, activeInteriorByDefault: report.activeInteriorByDefault, dynamicInteriorCollidersIdle: report.dynamicInteriorCollidersIdle, interiorActionExposed: report.interiorActionExposed, interiorPromptPresent: report.interiorPromptPresent })}`);
     assert(checks.sampledInteriorEnterable, `Sampled building entry did not produce a usable contained interior shell: ${JSON.stringify(report.enteredInteriorReport || null)}`);

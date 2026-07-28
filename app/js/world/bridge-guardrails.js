@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=18";
+import { sampleFeatureSurfaceY } from "../structure-semantics.js?v=19";
 import { addBuildingToSpatialIndex, removeBuildingsFromSpatialIndex } from "./building-spatial-index.js?v=5";
 import { elevatedSegmentSafety, isProtectedRoadFeature } from "./bridge-safety.js?v=1";
 

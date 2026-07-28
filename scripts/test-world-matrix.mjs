@@ -319,11 +319,26 @@ async function loadLocation(page, spec) {
     }
 
     let customStructureProbe = null;
+    let structureGameplay = null;
     if (locationSpec.expectedRoadStructure) {
-      const targetRoad = (ctx.roads || []).find((road) =>
-        road?.structureSemantics?.structureKind === locationSpec.expectedRoadStructure &&
-        Array.isArray(road.pts) && road.pts.length >= 2
-      );
+      const structureLength = (road) => {
+        if (!Array.isArray(road?.pts) || road.pts.length < 2) return 0;
+        let length = 0;
+        for (let index = 0; index < road.pts.length - 1; index += 1) {
+          length += Math.hypot(
+            road.pts[index + 1].x - road.pts[index].x,
+            road.pts[index + 1].z - road.pts[index].z
+          );
+        }
+        return length;
+      };
+      const targetRoad = (ctx.roads || [])
+        .filter((road) =>
+          road?.structureSemantics?.structureKind === locationSpec.expectedRoadStructure &&
+          Array.isArray(road.pts) &&
+          road.pts.length >= 2
+        )
+        .sort((left, right) => structureLength(right) - structureLength(left))[0] || null;
       if (targetRoad) {
         let segmentIndex = 0;
         let segmentLength = -1;
@@ -364,6 +379,81 @@ async function loadLocation(page, spec) {
           actorX = x;
           actorZ = z;
           actorFeetY = surfaceY;
+
+          const frameCount = 480;
+          const startX = Number(ctx.car?.x);
+          const startZ = Number(ctx.car?.z);
+          let onExpectedLayerFrames = 0;
+          let maximumLateralError = 0;
+          let maximumVerticalError = 0;
+          let minimumStructureSeparation = Infinity;
+          const savedKeys = {
+            KeyW: !!ctx.keys?.KeyW,
+            ArrowUp: !!ctx.keys?.ArrowUp,
+            KeyA: !!ctx.keys?.KeyA,
+            ArrowLeft: !!ctx.keys?.ArrowLeft,
+            KeyD: !!ctx.keys?.KeyD,
+            ArrowRight: !!ctx.keys?.ArrowRight
+          };
+
+          if (ctx.keys && typeof ctx.update === 'function') {
+            ctx.keys.KeyW = true;
+            ctx.keys.ArrowUp = true;
+            ctx.keys.KeyA = false;
+            ctx.keys.ArrowLeft = false;
+            ctx.keys.KeyD = false;
+            ctx.keys.ArrowRight = false;
+            for (let frame = 0; frame < frameCount; frame += 1) {
+              ctx.update(1 / 60);
+              const carFeetY = Number(ctx.car?.y) - 1.2;
+              const currentRoad = ctx.findNearestRoad?.(Number(ctx.car?.x), Number(ctx.car?.z), {
+                y: carFeetY,
+                maxVerticalDelta: 8,
+                preferredRoad: targetRoad
+              });
+              const currentSurfaceY = Number(currentRoad?.y);
+              const currentKind = currentRoad?.road?.structureSemantics?.structureKind || null;
+              const sameVerticalGroup =
+                currentRoad?.road?.structureSemantics?.verticalGroup ===
+                targetRoad?.structureSemantics?.verticalGroup;
+              if (currentKind === locationSpec.expectedRoadStructure && sameVerticalGroup) {
+                onExpectedLayerFrames += 1;
+              }
+              if (Number.isFinite(currentRoad?.dist)) {
+                maximumLateralError = Math.max(maximumLateralError, Number(currentRoad.dist));
+              }
+              if (Number.isFinite(currentSurfaceY) && Number.isFinite(carFeetY)) {
+                maximumVerticalError = Math.max(maximumVerticalError, Math.abs(carFeetY - currentSurfaceY));
+                const terrainY = Number(ctx.SurfaceQuery?.terrainAt?.(
+                  Number(ctx.car?.x),
+                  Number(ctx.car?.z)
+                )?.position?.y);
+                if (Number.isFinite(terrainY)) {
+                  const separation = locationSpec.expectedRoadStructure === 'tunnel' ?
+                    terrainY - currentSurfaceY :
+                    currentSurfaceY - terrainY;
+                  minimumStructureSeparation = Math.min(minimumStructureSeparation, separation);
+                }
+              }
+            }
+          }
+
+          const endX = Number(ctx.car?.x);
+          const endZ = Number(ctx.car?.z);
+          structureGameplay = {
+            simulatedSeconds: Number((frameCount / 60).toFixed(1)),
+            frames: frameCount,
+            moved: Number(Math.hypot(endX - startX, endZ - startZ).toFixed(2)),
+            onExpectedLayerPct: Number((onExpectedLayerFrames / frameCount * 100).toFixed(2)),
+            maximumLateralError: Number(maximumLateralError.toFixed(3)),
+            maximumVerticalError: Number(maximumVerticalError.toFixed(3)),
+            minimumStructureSeparation: Number.isFinite(minimumStructureSeparation) ?
+              Number(minimumStructureSeparation.toFixed(3)) :
+              null
+          };
+
+          if (ctx.keys) Object.assign(ctx.keys, savedKeys);
+          ctx.applyResolvedWorldSpawn(probeSpawn, { mode: 'drive' });
         }
         const nearest = typeof ctx.findNearestRoad === 'function' ? ctx.findNearestRoad(x, z, {
           y: surfaceY,
@@ -373,6 +463,7 @@ async function loadLocation(page, spec) {
         customStructureProbe = {
           kind: targetRoad.structureSemantics?.structureKind || null,
           terrainMode: targetRoad.structureSemantics?.terrainMode || null,
+          featureLength: Number(structureLength(targetRoad).toFixed(2)),
           segmentLength: Number(segmentLength.toFixed(2)),
           surfaceY: Number.isFinite(surfaceY) ? Number(surfaceY.toFixed(2)) : null,
           renderedY: Number.isFinite(renderedY) ? Number(renderedY.toFixed(2)) : null,
@@ -657,6 +748,7 @@ async function loadLocation(page, spec) {
         endpointConnected: initialSpawn.endpointConnected ?? null
       } : null,
       customStructureProbe,
+      structureGameplay,
       boatActive: !!ctx.boatMode?.active,
       boatPresentation: ctx.boatMode?.active ? {
         meshVisible: !!ctx.boatMode?.mesh?.visible,

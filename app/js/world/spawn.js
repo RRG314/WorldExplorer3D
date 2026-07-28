@@ -1,8 +1,8 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { inferSelectedLocationWaterKind } from "./water-location-hint.js?v=1";
 import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=18";
-import { createWorldSpawnSurfaceApi } from "./spawn-surface.js?v=3";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=19";
+import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=4";
 
 let worldSpawnDeps = {
   buildingContainingPoint: () => null,
@@ -394,16 +394,7 @@ function resolveProjectedRoadSpawn(targetX, targetZ, options = {}) {
   if (!road || !worldSpawnDeps.isVehicleRoad(road) || Number(nearest.dist) > maxDistance) return null;
   const point = { x: Number(nearest.pt?.x), z: Number(nearest.pt?.z) };
   if (!Number.isFinite(point.x) || !Number.isFinite(point.z)) return null;
-  let nearestPointIndex = 0;
-  let nearestPointDistance = Infinity;
-  for (let i = 0; i < road.pts.length; i += 1) {
-    const distance = Math.hypot(point.x - road.pts[i].x, point.z - road.pts[i].z);
-    if (distance < nearestPointDistance) {
-      nearestPointDistance = distance;
-      nearestPointIndex = i;
-    }
-  }
-  const angle = resolveRoadHeading(road, nearestPointIndex, options.angle);
+  const angle = roadHeadingAtSegment(road, nearest.segIndex, options.angle);
   const evaluated = evaluateDriveSpawnCandidate(point.x, point.z, {
     angle,
     feetY: options.feetY,

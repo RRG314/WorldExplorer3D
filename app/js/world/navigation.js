@@ -397,6 +397,8 @@ function evaluateNearestRoadCandidate(road, x, z, targetY, maxVerticalDelta, pre
         dist: d,
         pt: { x: nx, z: nz },
         y: roadY,
+        segIndex: i,
+        t,
         verticalDelta,
         weightedDist,
         distanceAlong,
@@ -415,6 +417,8 @@ export function findNearestRoad(x, z, options = {}) {
   nearRoadResult.y = NaN;
   nearRoadResult.verticalDelta = Infinity;
   nearRoadResult.distanceAlong = NaN;
+  nearRoadResult.segIndex = -1;
+  nearRoadResult.t = NaN;
   nearRoadResult.distanceToEndpoint = Infinity;
   nearRoadResult.distanceToTransitionZone = Infinity;
   const targetY = Number.isFinite(options?.y) ? Number(options.y) : NaN;
@@ -445,6 +449,8 @@ export function findNearestRoad(x, z, options = {}) {
     nearRoadResult.y = hit.y;
     nearRoadResult.verticalDelta = hit.verticalDelta;
     nearRoadResult.distanceAlong = hit.distanceAlong;
+    nearRoadResult.segIndex = hit.segIndex;
+    nearRoadResult.t = hit.t;
     nearRoadResult.distanceToEndpoint = hit.distanceToEndpoint;
     nearRoadResult.distanceToTransitionZone = hit.distanceToTransitionZone;
   };

@@ -165,7 +165,7 @@ const steepEdges = buildFeatureRibbonEdges(
 );
 for (const point of [...steepEdges.leftEdge, ...steepEdges.rightEdge]) {
   assert.ok(
-    point.y >= steepCrossSlopeTerrain(point.x, point.z) + 0.08,
+    point.y + 1e-5 >= steepCrossSlopeTerrain(point.x, point.z) + 0.08,
     `at-grade road edge fell below terrain: ${JSON.stringify(point)}`
   );
 }

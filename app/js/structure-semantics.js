@@ -1,4 +1,8 @@
-import { buildElevatedTerrainReference } from './structure-profile-grade.js';
+import {
+  attachCompiledTransportSurface,
+  compileTransportSurfaceModel,
+  sampleTransportSurfaceAtDistance
+} from './world/compiler/transport-surface-model.js?v=1';
 import { classifyStructureSemantics, normalizedTagValue } from './structure-semantics/classification.js?v=1';
 import {
   boundsIntersect,
@@ -167,7 +171,18 @@ function featureEndpointSurfaceY(feature, endpointIndex, sampleTerrainY) {
   const clampedIndex = endpointIndex <= 0 ? 0 : lastIndex;
   const point = feature.pts[clampedIndex];
   if (!point) return NaN;
-  if (feature.surfaceHeights instanceof Float32Array && feature.surfaceHeights.length > clampedIndex) {
+  if (feature.transportSurfaceModel) {
+    const total = Number(
+      feature.transportSurfaceModel.pathDistances?.[
+        feature.transportSurfaceModel.pathDistances.length - 1
+      ]
+    ) || 0;
+    const value = sampleTransportSurfaceAtDistance(
+      feature.transportSurfaceModel,
+      clampedIndex === 0 ? 0 : total
+    );
+    if (Number.isFinite(value)) return value;
+  } else if (feature.surfaceHeights instanceof Float32Array && feature.surfaceHeights.length > clampedIndex) {
     const value = Number(feature.surfaceHeights[clampedIndex]);
     if (Number.isFinite(value)) return value;
   }
@@ -213,7 +228,7 @@ function buildFeatureTransitionAnchors(feature, sampleTerrainY) {
     const terrainY = Number(sampleTerrainY(point.x, point.z));
     if (!Number.isFinite(terrainY)) continue;
 
-    let strongestOffset = 0;
+    let strongestOffset = null;
     for (let j = 0; j < linked.length; j++) {
       const other = linked[j]?.feature || null;
       if (!other || other === feature || !Array.isArray(other.pts) || other.pts.length < 2) continue;
@@ -221,13 +236,19 @@ function buildFeatureTransitionAnchors(feature, sampleTerrainY) {
       if (!otherSemantics) continue;
       const otherSurfaceY = featureEndpointSurfaceY(other, linked[j].endpointIndex, sampleTerrainY);
       if (!Number.isFinite(otherSurfaceY)) continue;
-      const targetOffset = otherSurfaceY - terrainY;
-      if (Math.abs(targetOffset) < 0.85) continue;
+      const targetOffset = otherSemantics.gradeSeparated
+        ? otherSurfaceY - terrainY - (Number(feature.surfaceBias) || 0.08)
+        : 0;
       if (!semantics?.gradeSeparated && !otherSemantics.gradeSeparated && !other.structureTransitionAnchors?.length) continue;
-      if (Math.abs(targetOffset) > Math.abs(strongestOffset)) strongestOffset = targetOffset;
+      if (
+        strongestOffset === null ||
+        Math.abs(targetOffset) > Math.abs(strongestOffset)
+      ) {
+        strongestOffset = targetOffset;
+      }
     }
 
-    if (Math.abs(strongestOffset) < 0.85) continue;
+    if (strongestOffset === null) continue;
 
     const blendDistance = Math.max(
       rampLike ? 20 : 10,
@@ -252,78 +273,6 @@ function buildFeatureTransitionAnchors(feature, sampleTerrainY) {
   return anchors;
 }
 
-function buildFeatureProfileAnchors(feature, semantics, totalDistance) {
-  const total = Math.max(0, Number(totalDistance) || 0);
-  const endpointBaseOffset =
-    semantics?.terrainMode === 'subgrade' ?
-      -Math.max(0, Number(semantics.cutDepth) || 0) :
-    semantics?.terrainMode === 'elevated' ?
-      Math.max(0, Number(semantics.deckClearance) || Number(semantics.explicitBaseOffset) || 0) :
-      0;
-  const anchors = [
-    { distance: 0, targetOffset: endpointBaseOffset, source: 'endpoint_default' },
-    { distance: total, targetOffset: endpointBaseOffset, source: 'endpoint_default' }
-  ];
-  const transitionAnchors = Array.isArray(feature?.structureTransitionAnchors) ? feature.structureTransitionAnchors : [];
-  for (let i = 0; i < transitionAnchors.length; i++) {
-    const anchor = transitionAnchors[i];
-    const distance = Math.max(0, Math.min(total, Number(anchor?.distance) || 0));
-    const targetOffset = Number(anchor?.targetOffset);
-    if (!Number.isFinite(targetOffset)) continue;
-    anchors.push({
-      distance,
-      targetOffset,
-      source: String(anchor?.source || 'transition')
-    });
-  }
-
-  if (semantics?.gradeSeparated) {
-    const stations = Array.isArray(feature?.structureStations) ? feature.structureStations : [];
-    if (stations.length > 0) {
-      for (let i = 0; i < stations.length; i++) {
-        const station = stations[i];
-        const distance = Math.max(0, Math.min(total, Number(station?.distance) || 0));
-        const magnitude = Number(station?.targetOffset);
-        if (!Number.isFinite(magnitude)) continue;
-        const targetOffset = semantics.terrainMode === 'subgrade' ? -Math.abs(magnitude) : Math.abs(magnitude);
-        anchors.push({
-          distance,
-          targetOffset,
-          source: String(station?.source || 'station')
-        });
-      }
-    } else {
-      const fallbackTarget =
-        semantics.terrainMode === 'subgrade' ?
-          -Math.max(0, Number(semantics.cutDepth) || 0) :
-          Math.max(0, Number(semantics.deckClearance) || Number(semantics.explicitBaseOffset) || 0);
-      if (Math.abs(fallbackTarget) > 0.01 && total > 4) {
-        anchors.push({
-          distance: total * 0.5,
-          targetOffset: fallbackTarget,
-          source: 'fallback_center'
-        });
-      }
-    }
-  }
-
-  anchors.sort((a, b) => a.distance - b.distance);
-  const merged = [];
-  for (let i = 0; i < anchors.length; i++) {
-    const anchor = anchors[i];
-    const previous = merged[merged.length - 1];
-    if (previous && Math.abs(previous.distance - anchor.distance) < 0.25) {
-      if (Math.abs(anchor.targetOffset) > Math.abs(previous.targetOffset)) {
-        previous.targetOffset = anchor.targetOffset;
-        previous.source = anchor.source;
-      }
-    } else {
-      merged.push({ ...anchor });
-    }
-  }
-  return merged;
-}
-
 function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
   if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2 || typeof sampleTerrainY !== 'function') return feature;
 
@@ -331,62 +280,19 @@ function updateFeatureSurfaceProfile(feature, sampleTerrainY, options = {}) {
     featureKind: feature.networkKind || feature.kind || 'road',
     subtype: feature.type || feature.subtype || ''
   });
-  const { distances, total } = polylineDistances(feature.pts);
   const surfaceBias = Number.isFinite(options.surfaceBias) ? options.surfaceBias : Number(feature.surfaceBias) || 0.08;
-  const terrainHeights = feature.pts.map((point) => Number(sampleTerrainY(point.x, point.z)) || 0);
-  const terrainReference = semantics.terrainMode === 'elevated' ?
-    buildElevatedTerrainReference(terrainHeights, distances, total) :
-    terrainHeights;
-  const profileHeights = new Float32Array(feature.pts.length);
-  const profileOffsets = new Float32Array(feature.pts.length);
-  const stations = Array.isArray(feature.structureStations) ? feature.structureStations : [];
-  const anchors = buildFeatureProfileAnchors(feature, semantics, total);
-  const anchorDistances = new Float32Array(anchors.length);
-  const anchorOffsets = new Float32Array(anchors.length);
-  for (let i = 0; i < anchors.length; i++) {
-    anchorDistances[i] = Number(anchors[i].distance) || 0;
-    anchorOffsets[i] = Number(anchors[i].targetOffset) || 0;
-  }
-
-  for (let i = 0; i < feature.pts.length; i++) {
-    let signedOffset = sampleProfileAtDistance(anchorDistances, anchorOffsets, distances[i]);
-    if (!Number.isFinite(signedOffset)) signedOffset = 0;
-    for (let s = 0; s < stations.length; s++) {
-      const station = stations[s];
-      const delta = Math.abs(distances[i] - station.distance);
-      if (delta > station.span) continue;
-      const weight = 1 - smoothstep01(delta / station.span);
-      const contribution = station.targetOffset * weight * (semantics.terrainMode === 'subgrade' ? -1 : 1);
-      if (contribution >= 0) {
-        signedOffset = Math.max(signedOffset, contribution);
-      } else {
-        signedOffset = Math.min(signedOffset, contribution);
-      }
-    }
-
-    // The grade-separated feature owns its ramp or portal transition. Carrying
-    // that offset onto an ordinary road can pull the entire at-grade segment
-    // above or below the terrain between sparse OSM endpoints.
-    if (semantics.terrainMode === 'at_grade') signedOffset = 0;
-
-    let profileY = terrainReference[i] + signedOffset + surfaceBias;
-    const minimumSurfaceY = Number(feature.minimumStructureSurfaceY);
-    if (semantics.terrainMode === 'elevated' && Number.isFinite(minimumSurfaceY)) {
-      profileY = Math.max(profileY, minimumSurfaceY);
-    }
-    profileOffsets[i] = signedOffset;
-    profileHeights[i] = profileY;
-  }
-
   feature.structureSemantics = semantics;
   feature.surfaceBias = surfaceBias;
-  feature.surfaceDistances = distances;
-  feature.surfaceHeights = profileHeights;
-  feature.surfaceOffsets = profileOffsets;
-  feature.surfaceTerrainSampler = semantics.terrainMode === 'at_grade' ? sampleTerrainY : null;
-  feature.structureSurfaceMinY = profileHeights.reduce((best, value) => Math.min(best, value), Infinity);
-  feature.structureSurfaceMaxY = profileHeights.reduce((best, value) => Math.max(best, value), -Infinity);
-  return feature;
+  return attachCompiledTransportSurface(
+    feature,
+    compileTransportSurfaceModel(feature, sampleTerrainY, {
+      surfaceBias,
+      width: Number.isFinite(options.width) ? Number(options.width) : undefined,
+      sampleStep: Number.isFinite(feature.subdivideMaxDist)
+        ? Math.min(2, Math.max(0.5, Number(feature.subdivideMaxDist)))
+        : 2
+    })
+  );
 }
 
 function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, options = {}) {
@@ -396,7 +302,10 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
 
   const baseTopBias = Number.isFinite(options.surfaceBias) ? options.surfaceBias : Number(feature.surfaceBias) || 0.08;
   if (!(feature.surfaceDistances instanceof Float32Array) || !(feature.surfaceHeights instanceof Float32Array)) {
-    updateFeatureSurfaceProfile(feature, sampleTerrainY, { surfaceBias: baseTopBias });
+    updateFeatureSurfaceProfile(feature, sampleTerrainY, {
+      surfaceBias: baseTopBias,
+      width: halfWidth * 2
+    });
   }
 
   const { distances: pointDistances, total } = polylineDistances(points);
@@ -424,15 +333,20 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
     const nz = dx / len;
     const distanceRatio = total > 1e-6 ? pointDistances[i] / total : 0;
     const profileDistance = profileTotal * distanceRatio;
+    const model = feature.transportSurfaceModel || null;
     const atGrade = feature.structureSemantics?.terrainMode === 'at_grade';
     const terrainY = Number(sampleTerrainY(point.x, point.z));
     const surfaceOffset = feature.surfaceOffsets instanceof Float32Array ?
       Number(sampleProfileAtDistance(feature.surfaceDistances, feature.surfaceOffsets, profileDistance)) || 0 :
       0;
     const storedProfileY = Number(sampleProfileAtDistance(feature.surfaceDistances, feature.surfaceHeights, profileDistance));
-    const centerY = atGrade && Number.isFinite(terrainY) ?
-      terrainY + surfaceOffset + baseTopBias :
-      Number.isFinite(storedProfileY) ? storedProfileY : terrainY + baseTopBias;
+    const centerY = model
+      ? sampleTransportSurfaceAtDistance(model, profileDistance, 0)
+      : atGrade && Number.isFinite(terrainY)
+        ? terrainY + surfaceOffset + baseTopBias
+        : Number.isFinite(storedProfileY)
+          ? storedProfileY
+          : terrainY + baseTopBias;
     centerlineHeights.push(centerY);
 
     const leftX = point.x + nx * halfWidth;
@@ -450,8 +364,16 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
       // an at-grade surface to pass through the accepted ground.
       return Number.isFinite(minimumY) ? Math.max(minimumY, crossfallY) : crossfallY;
     };
-    const leftY = atGrade ? clampCrossfall(sampleTerrainY(leftX, leftZ)) : centerY;
-    const rightY = atGrade ? clampCrossfall(sampleTerrainY(rightX, rightZ)) : centerY;
+    const leftY = model
+      ? sampleTransportSurfaceAtDistance(model, profileDistance, halfWidth)
+      : atGrade
+        ? clampCrossfall(sampleTerrainY(leftX, leftZ))
+        : centerY;
+    const rightY = model
+      ? sampleTransportSurfaceAtDistance(model, profileDistance, -halfWidth)
+      : atGrade
+        ? clampCrossfall(sampleTerrainY(rightX, rightZ))
+        : centerY;
     leftEdge.push({
       x: leftX,
       y: Number.isFinite(leftY) ? leftY : centerY,
@@ -486,7 +408,7 @@ function enforceAtGradeRibbonClearance(feature, leftEdge, rightEdge, sampleTerra
       const terrainY = Number(sampleTerrainY(point.x, point.z));
       if (!Number.isFinite(terrainY)) return;
       const minimumY = terrainY + bias;
-      if (!Number.isFinite(point.y) || point.y < minimumY) {
+      if (!Number.isFinite(point.y) || point.y < minimumY - 1e-5) {
         point.y = minimumY;
         corrected += 1;
       }
@@ -508,8 +430,17 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
   if (!feature || !Array.isArray(feature.pts) || feature.pts.length < 2) return NaN;
   const projection = projected || projectPointToFeature(feature, x, z);
   if (!projection) return NaN;
-  const distances = feature.surfaceDistances instanceof Float32Array ? feature.surfaceDistances : null;
-  const heights = feature.surfaceHeights instanceof Float32Array ? feature.surfaceHeights : null;
+  const model = feature.transportSurfaceModel || null;
+  const distances = model?.distances instanceof Float32Array
+    ? model.distances
+    : feature.surfaceDistances instanceof Float32Array
+      ? feature.surfaceDistances
+      : null;
+  const heights = model?.centerHeights instanceof Float32Array
+    ? model.centerHeights
+    : feature.surfaceHeights instanceof Float32Array
+      ? feature.surfaceHeights
+      : null;
   if (!distances || !heights || !distances.length || !heights.length) return NaN;
 
   const segIndex = Number(projection.segIndex);
@@ -524,7 +455,22 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
     ? Math.max(0, Math.min(1, Number(projection.t)))
     : 0;
   const segLen = Math.hypot(p2.x - p1.x, p2.z - p1.z);
-  const distance = distances[segIndex] + segLen * projectionT;
+  const pathDistances = model?.pathDistances instanceof Float32Array
+    ? model.pathDistances
+    : distances;
+  const distance = pathDistances[segIndex] + segLen * projectionT;
+  if (model) {
+    const sampleX = Number.isFinite(Number(projection.x))
+      ? Number(projection.x)
+      : p1.x + (p2.x - p1.x) * projectionT;
+    const sampleZ = Number.isFinite(Number(projection.z))
+      ? Number(projection.z)
+      : p1.z + (p2.z - p1.z) * projectionT;
+    const tangentX = (p2.x - p1.x) / Math.max(1e-6, segLen);
+    const tangentZ = (p2.z - p1.z) / Math.max(1e-6, segLen);
+    const lateralOffset = (x - sampleX) * -tangentZ + (z - sampleZ) * tangentX;
+    return sampleTransportSurfaceAtDistance(model, distance, lateralOffset);
+  }
   if (
     feature.structureSemantics?.terrainMode === 'at_grade' &&
     typeof feature.surfaceTerrainSampler === 'function'
@@ -542,7 +488,9 @@ function sampleFeatureSurfaceY(feature, x, z, projected = null) {
     const terrainY = Number(feature.surfaceTerrainSampler(sampleX, sampleZ));
     if (Number.isFinite(terrainY)) {
       const offsets = feature.surfaceOffsets instanceof Float32Array ? feature.surfaceOffsets : null;
-      const structureOffset = offsets ? Number(sampleProfileAtDistance(distances, offsets, distance)) || 0 : 0;
+      const structureOffset = offsets
+        ? Number(sampleProfileAtDistance(distances, offsets, distance)) || 0
+        : 0;
       const surfaceBias = Number.isFinite(feature.surfaceBias) ? Number(feature.surfaceBias) : 0.08;
       return terrainY + structureOffset + surfaceBias;
     }

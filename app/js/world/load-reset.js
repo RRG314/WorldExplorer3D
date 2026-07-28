@@ -51,7 +51,6 @@ export function resetWorldForReload(options = {}) {
   const clearBuildingSpatialIndex = typeof options.clearBuildingSpatialIndex === 'function' ? options.clearBuildingSpatialIndex : () => {};
   const resetWorldFurnitureCaches = typeof options.resetWorldFurnitureCaches === 'function' ? options.resetWorldFurnitureCaches : () => {};
 
-  appCtx.cancelWorldSurfaceSync?.();
   if (typeof appCtx.resetEarthStreaming === 'function') {
     appCtx.resetEarthStreaming('full_world_reload');
   }
@@ -145,5 +144,4 @@ export function resetWorldForReload(options = {}) {
   }
   if (typeof appCtx.invalidateRoadCache === 'function') appCtx.invalidateRoadCache();
 
-  appCtx.roadsNeedRebuild = true;
 }

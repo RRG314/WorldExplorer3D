@@ -4,8 +4,11 @@ import { detectRoadIntersections } from "./intersections.js?v=1";
 import {
   buildFeatureRibbonEdges,
   enforceAtGradeRibbonClearance,
+  projectPointToFeature,
+  sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=18";
+} from "../structure-semantics.js?v=19";
+import { compileIntersectionTopologyGeometry } from "./intersection-geometry.js?v=1";
 import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=2";
 
 const ROAD_SURFACE_BIAS = 0.08;
@@ -149,6 +152,66 @@ function appendIndexedGeometry(targetVerts, targetIndices, verts, indices) {
   }
 }
 
+function appendRoadCenterMarkings(road, points, targetVerts, targetIndices) {
+  if (
+    (Number(road?.width) || 0) < 8.4 ||
+    !/(motorway|trunk|primary)/.test(String(road?.type || "")) ||
+    !Array.isArray(points) ||
+    points.length < 2
+  ) return;
+
+  const markHalfWidth = 0.15;
+  const dashLength = 6;
+  const patternLength = 12;
+  let distanceBeforeSegment = 0;
+  for (let index = 0; index < points.length - 1; index += 1) {
+    const start = points[index];
+    const end = points[index + 1];
+    const dx = end.x - start.x;
+    const dz = end.z - start.z;
+    const segmentLength = Math.hypot(dx, dz);
+    if (!(segmentLength > 1e-5)) continue;
+    const dirX = dx / segmentLength;
+    const dirZ = dz / segmentLength;
+    const normalX = -dirZ;
+    const normalZ = dirX;
+    let localDistance = 0;
+    while (localDistance < segmentLength) {
+      const globalDistance = distanceBeforeSegment + localDistance;
+      const phase = ((globalDistance % patternLength) + patternLength) % patternLength;
+      const advanceToDash = phase < dashLength ? 0 : patternLength - phase;
+      const dashStart = localDistance + advanceToDash;
+      if (dashStart >= segmentLength) break;
+      const activePhase = (distanceBeforeSegment + dashStart) % patternLength;
+      const availableDash = dashLength - activePhase;
+      const dashEnd = Math.min(segmentLength, dashStart + Math.max(0.01, availableDash));
+      const x1 = start.x + dirX * dashStart;
+      const z1 = start.z + dirZ * dashStart;
+      const x2 = start.x + dirX * dashEnd;
+      const z2 = start.z + dirZ * dashEnd;
+      const y1 = sampleFeatureSurfaceY(road, x1, z1) + 0.012;
+      const y2 = sampleFeatureSurfaceY(road, x2, z2) + 0.012;
+      if (Number.isFinite(y1) && Number.isFinite(y2)) {
+        const baseVertex = targetVerts.length / 3;
+        targetVerts.push(
+          x1 + normalX * markHalfWidth, y1, z1 + normalZ * markHalfWidth,
+          x1 - normalX * markHalfWidth, y1, z1 - normalZ * markHalfWidth,
+          x2 + normalX * markHalfWidth, y2, z2 + normalZ * markHalfWidth,
+          x2 - normalX * markHalfWidth, y2, z2 - normalZ * markHalfWidth
+        );
+        targetIndices.push(
+          baseVertex, baseVertex + 2, baseVertex + 1,
+          baseVertex + 1, baseVertex + 2, baseVertex + 3
+        );
+      }
+      localDistance = Math.max(dashEnd, dashStart + 0.01);
+      const newPhase = (distanceBeforeSegment + localDistance) % patternLength;
+      if (newPhase < dashLength) localDistance += dashLength - newPhase;
+    }
+    distanceBeforeSegment += segmentLength;
+  }
+}
+
 export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5) {
   const verts = [];
   const indices = [];
@@ -181,30 +244,7 @@ export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5) {
   return { verts, indices };
 }
 
-function buildIntersectionCap(x, z, radius, segments = 16, cachedTerrainHeight = null) {
-  const sampleTerrain = typeof cachedTerrainHeight === "function" ? cachedTerrainHeight : () => 0;
-  const verts = [];
-  const indices = [];
-
-  const centerY = sampleTerrain(x, z) + ROAD_SURFACE_BIAS;
-  verts.push(x, centerY, z);
-
-  for (let i = 0; i <= segments; i++) {
-    const angle = i / segments * Math.PI * 2;
-    const px = x + Math.cos(angle) * radius;
-    const pz = z + Math.sin(angle) * radius;
-    const py = sampleTerrain(px, pz) + ROAD_SURFACE_BIAS;
-    verts.push(px, py, pz);
-  }
-
-  for (let i = 0; i < segments; i++) {
-    indices.push(0, i + 1, i + 2);
-  }
-
-  return { verts, indices };
-}
-
-export function rebuildRoadsWithTerrain(deps = {}) {
+export function publishCompiledTransportMeshes(deps = {}) {
   const {
     terrain,
     constants = {},
@@ -252,20 +292,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
     disableRoadDebugMode();
   }
 
-  let tilesLoaded = 0;
-  let tilesTotal = 0;
-  appCtx.terrainTileCache.forEach((tile) => {
-    tilesTotal++;
-    if (tile.loaded) tilesLoaded++;
-  });
-
-  if (tilesLoaded === 0 || tilesTotal === 0) return;
-
-  // Terrain tiles arrive asynchronously. Profiles must sample the newly loaded
-  // elevation data, never the flat placeholder cached during initial loading.
-  const roadCountChanged = baseRoads.length !== terrain?._lastRoadCount;
   if (typeof clearTerrainHeightCache === "function") clearTerrainHeightCache();
-  terrain._lastRoadCount = baseRoads.length;
   if (typeof appCtx.refreshStructureAwareFeatureProfiles === "function") {
     appCtx.refreshStructureAwareFeatureProfiles();
   }
@@ -300,13 +327,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
     skippedBuildingAprons: Number(appCtx.urbanSurfaceStats?.skippedBuildingAprons || 0)
   };
 
-  let intersections;
-  if (roadCountChanged || !terrain?._cachedIntersections) {
-    intersections = detectRoadIntersections(baseRoads);
-    if (terrain) terrain._cachedIntersections = intersections;
-  } else {
-    intersections = terrain._cachedIntersections;
-  }
+  const intersections = detectRoadIntersections(baseRoads);
 
   const roadMainBatchVerts = [];
   const roadMainBatchIdx = [];
@@ -314,6 +335,8 @@ export function rebuildRoadsWithTerrain(deps = {}) {
   const roadSkirtBatchIdx = [];
   const roadCapBatchVerts = [];
   const roadCapBatchIdx = [];
+  const roadMarkBatchVerts = [];
+  const roadMarkBatchIdx = [];
   const sidewalkBatchVerts = [];
   const sidewalkBatchIdx = [];
 
@@ -321,6 +344,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
   const roadMat = sharedRoadMaterials.roadMat;
   const skirtMat = sharedRoadMaterials.skirtMat;
   const capMat = sharedRoadMaterials.capMat;
+  const markMat = sharedRoadMaterials.markMat;
   const urbanSurfaceMaterials = typeof getSharedUrbanSurfaceMaterials === "function" ? getSharedUrbanSurfaceMaterials() : {};
   const sidewalkMat = urbanSurfaceMaterials.sidewalkMat;
 
@@ -410,20 +434,6 @@ export function rebuildRoadsWithTerrain(deps = {}) {
     leftEdge.push(...ribbonEdges.leftEdge);
     rightEdge.push(...ribbonEdges.rightEdge);
 
-    const edgeSmoothPasses =
-      road?.structureSemantics?.terrainMode === "elevated" ?
-        3 :
-        road?.structureSemantics?.terrainMode && road.structureSemantics.terrainMode !== "at_grade" ?
-          2 :
-          hasTransitionAnchors ?
-            2 :
-            1;
-    for (let pass = 0; pass < edgeSmoothPasses; pass++) {
-      for (let i = 1; i < leftEdge.length - 1; i++) {
-        leftEdge[i].y = leftEdge[i].y * 0.52 + (leftEdge[i - 1].y + leftEdge[i + 1].y) * 0.24;
-        rightEdge[i].y = rightEdge[i].y * 0.52 + (rightEdge[i - 1].y + rightEdge[i + 1].y) * 0.24;
-      }
-    }
     enforceAtGradeRibbonClearance(
       road,
       leftEdge,
@@ -434,6 +444,7 @@ export function rebuildRoadsWithTerrain(deps = {}) {
 
     appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
     appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
+    appendRoadCenterMarkings(road, pts, roadMarkBatchVerts, roadMarkBatchIdx);
 
     const terrainMode = road?.structureSemantics?.terrainMode;
     if (shouldRenderRoadSkirts(road)) {
@@ -519,8 +530,13 @@ export function rebuildRoadsWithTerrain(deps = {}) {
   intersections.forEach((intersection) => {
     if (intersection?.hasGradeSeparatedRoad) return;
     if (!shouldBuildIntersectionCap(intersection)) return;
-    const radius = computeIntersectionCapRadius(intersection);
-    const capData = buildIntersectionCap(intersection.x, intersection.z, radius, 24, cachedTerrainHeight);
+    const capData = compileIntersectionTopologyGeometry(intersection, baseRoads, {
+      computeRadius: computeIntersectionCapRadius,
+      projectPointToFeature,
+      sampleFeatureSurfaceY,
+      sampleGroundY: cachedTerrainHeight,
+      surfaceBias: ROAD_SURFACE_BIAS
+    });
     appendIndexedGeometry(roadCapBatchVerts, roadCapBatchIdx, capData.verts, capData.indices);
   });
 
@@ -550,6 +566,16 @@ export function rebuildRoadsWithTerrain(deps = {}) {
     material: capMat,
     renderOrder: 3,
     userData: { isRoadBatch: true, isIntersectionCap: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
+  });
+  buildIndexedBatchMesh({
+    scene: appCtx.scene,
+    targetList: appCtx.roadMeshes,
+    verts: roadMarkBatchVerts,
+    indices: roadMarkBatchIdx,
+    material: markMat,
+    renderOrder: 4,
+    receiveShadow: false,
+    userData: { isRoadBatch: true, isRoadMarking: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
   });
   if (sidewalkBatchVerts.length > 0 && sidewalkBatchIdx.length > 0) {
     const geo = new THREE.BufferGeometry();
@@ -581,5 +607,25 @@ export function rebuildRoadsWithTerrain(deps = {}) {
     polylineCurvatureMetric
   });
 
-  appCtx.roadsNeedRebuild = false;
+  appCtx.transportSurfacePublication = Object.freeze({
+    authority: "compiled_transport_surface",
+    roadCount: baseRoads.length,
+    meshCount: appCtx.roadMeshes.length,
+    intersectionCount: intersections.filter((intersection) =>
+      !intersection?.hasGradeSeparatedRoad && shouldBuildIntersectionCap(intersection)
+    ).length,
+    compiledSampleCount: baseRoads.reduce((total, road) =>
+      total + Number(road?.transportSurfaceModel?.distances?.length || 0), 0),
+    vertices:
+      roadMainBatchVerts.length / 3 +
+      roadSkirtBatchVerts.length / 3 +
+      roadCapBatchVerts.length / 3 +
+      roadMarkBatchVerts.length / 3,
+    triangles:
+      roadMainBatchIdx.length / 3 +
+      roadSkirtBatchIdx.length / 3 +
+      roadCapBatchIdx.length / 3 +
+      roadMarkBatchIdx.length / 3,
+    worldLoadSequence: appCtx._worldLoadSequence || 0
+  });
 }

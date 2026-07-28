@@ -1,5 +1,16 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=18";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=19";
+
+function roadHeadingAtSegment(road, segmentIndex, fallbackAngle = 0) {
+  const points = Array.isArray(road?.pts) ? road.pts : [];
+  if (points.length < 2) return fallbackAngle;
+  const index = Math.max(0, Math.min(points.length - 2, Math.trunc(Number(segmentIndex) || 0)));
+  const start = points[index];
+  const end = points[index + 1];
+  const dx = end.x - start.x;
+  const dz = end.z - start.z;
+  return Math.hypot(dx, dz) > 1e-6 ? Math.atan2(dx, dz) : fallbackAngle;
+}
 
 function createWorldSpawnSurfaceApi(context) {
   const { getDeps } = context;
@@ -130,10 +141,10 @@ function createWorldSpawnSurfaceApi(context) {
   function resolveRoadHeading(road, pointIndex, fallbackAngle = 0) {
     if (!road || !Array.isArray(road.pts) || road.pts.length < 2) return fallbackAngle;
     if (pointIndex < road.pts.length - 1) {
-      return Math.atan2(road.pts[pointIndex + 1].x - road.pts[pointIndex].x, road.pts[pointIndex + 1].z - road.pts[pointIndex].z);
+      return roadHeadingAtSegment(road, pointIndex, fallbackAngle);
     }
     if (pointIndex > 0) {
-      return Math.atan2(road.pts[pointIndex].x - road.pts[pointIndex - 1].x, road.pts[pointIndex].z - road.pts[pointIndex - 1].z);
+      return roadHeadingAtSegment(road, pointIndex - 1, fallbackAngle);
     }
     return fallbackAngle;
   }
@@ -358,4 +369,4 @@ function createWorldSpawnSurfaceApi(context) {
   };
 }
 
-export { createWorldSpawnSurfaceApi };
+export { createWorldSpawnSurfaceApi, roadHeadingAtSegment };

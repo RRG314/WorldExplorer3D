@@ -117,7 +117,6 @@ function startTerrainTileAttempt(tile, z, x, y, deps) {
         });
       }
 
-      deps.scheduleRoadAndBuildingRebuild?.();
       resolveReady(true);
     } catch (error) {
       console.warn("Terrain tile decode failed:", z, x, y, error);
@@ -507,7 +506,9 @@ export function buildTerrainTileMesh(z, tx, ty, deps = {}) {
     color: typeof appCtx.grassDiffuse !== "undefined" && appCtx.grassDiffuse ? 0xffffff : TERRAIN_GRASS_COLOR_HEX,
     roughness: 0.95,
     metalness: 0.0,
-    side: THREE.DoubleSide,
+    // Only the physical top face is visible. Rendering the underside places
+    // terrain over the ceiling from inside a subgrade transport structure.
+    side: THREE.FrontSide,
     polygonOffset: true,
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1,

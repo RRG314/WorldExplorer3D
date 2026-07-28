@@ -6,7 +6,7 @@
   "main": "three.js",
   "scripts": {
     "dev": "node scripts/serve-local-preview.mjs",
-    "test": "npm run test:terrain-source && npm run test:ground-provider && npm run test:ground-artifact && npm run test:ground-artifact-builder && npm run test:ground-datum && npm run test:accepted-ground-runtime && npm run test:district-compiler && npm run test:phase3-ownership && npm run test:rules && npm run test:runtime && npm run test:osm-smoke",
+    "test": "npm run test:terrain-source && npm run test:ground-provider && npm run test:ground-artifact && npm run test:ground-artifact-builder && npm run test:ground-datum && npm run test:accepted-ground-runtime && npm run test:district-compiler && npm run test:phase3-ownership && npm run test:transport-surface && npm run test:rules && npm run test:runtime && npm run test:osm-smoke",
     "test:rules": "node scripts/test-rules.mjs",
     "test:css": "node scripts/test-css-integrity.mjs",
     "test:inferred-buildings": "node scripts/test-inferred-building-coverage.mjs",
@@ -48,6 +48,7 @@
     "test:accepted-ground-runtime": "node scripts/test-accepted-ground-runtime.mjs",
     "test:district-compiler": "node scripts/test-district-compiler-contract.mjs",
     "test:phase3-ownership": "node scripts/test-phase3-ownership.mjs",
+    "test:transport-surface": "node scripts/test-transport-surface-contract.mjs",
     "test:overture-source": "node scripts/test-overture-tile-source.mjs && node scripts/test-render-provenance.mjs",
     "test:retention": "node scripts/test-release-retention.mjs",
     "test:world-matrix": "node scripts/test-world-matrix.mjs",

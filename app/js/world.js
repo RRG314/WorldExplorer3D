@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=18";
+} from "./structure-semantics.js?v=19";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -60,12 +60,12 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=18";
+} from "./world/load-support.js?v=19";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
   resetWorldForReload
-} from "./world/load-reset.js?v=9";
+} from "./world/load-reset.js?v=10";
 import {
   prepareWorldFeatureSelections
 } from "./world/load-budgeting.js?v=3";
@@ -162,14 +162,14 @@ import {
   refreshStructureAwareFeatureProfiles,
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
-} from "./world/structure-aware.js?v=6";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=58";
+} from "./world/structure-aware.js?v=7";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=59";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=9";
 import { fetchGlobalBuildingData } from "./world/overture-building-source.js?v=6";
 import { fetchBundledBuildingMetadata } from "./world/preset-building-metadata.js?v=1";
-import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=23";
+import { loadLandmarksForPublication } from "./world/landmark-detail.js?v=24";
 import { verifyWorldPublicationStable } from "./world/load-runtime-session.js?v=7";
 // world.js - OSM data loading, roads, buildings, landuse, POIs
 // ============================================================================

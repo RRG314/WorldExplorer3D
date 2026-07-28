@@ -2,7 +2,7 @@
 // Import order mirrors legacy runtime dependencies.
 import { getCurrentUser, observeAuth } from '../../js/auth-ui.js';
 import './rdt.js?v=55';
-import './config.js?v=59';
+import './config.js?v=60';
 import { ctx as appCtx } from './shared-context.js?v=55';
 import { createAccountService } from './platform/account-service.js?v=1';
 import { createPlatformServiceRegistry } from './platform/service-registry.js?v=1';
@@ -18,14 +18,14 @@ import './perf.js?v=56';
 import './env.js?v=57';
 import './session-coordinator.js?v=2';
 import './real-estate.js?v=55';
-import './ground.js?v=73';
-import './terrain.js?v=136';
-import './world.js?v=215';
+import './ground.js?v=74';
+import './terrain.js?v=138';
+import './world.js?v=216';
 import './building-entry.js?v=5';
 import './interiors.js?v=9';
 import { init, tryEnablePostProcessing } from './engine.js?v=78';
-import './physics.js?v=78';
-import './walking.js?v=66';
+import './physics.js?v=79';
+import './walking.js?v=67';
 import './travel-mode.js?v=11';
 import { initBoatMode } from './boat-mode.js?v=29';
 import { setupFishingGame } from './fishing-game.js?v=2';

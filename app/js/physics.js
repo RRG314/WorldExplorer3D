@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "./shared-context.js?v=55";
-import { isRoadSurfaceReachable } from "./structure-semantics.js?v=18";
+import { isRoadSurfaceReachable } from "./structure-semantics.js?v=19";
 import { updateDrone } from "./physics/drone-flight.js?v=4";
 import { updatePlane } from "./plane-mode.js?v=7";
 import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=2";
@@ -665,14 +665,6 @@ function update(dt) {
 
   if (!isPlanetarySurface() && !appCtx.worldLoading) {
     appCtx.updateTerrainAround(appCtx.car.x, appCtx.car.z);
-
-    const now = performance.now();
-    const rebuildInterval = appCtx.lastRoadRebuildCheck === 0 ? 500 : 2000;
-    if (appCtx.roadsNeedRebuild && now - appCtx.lastRoadRebuildCheck > rebuildInterval) {
-      appCtx.lastRoadRebuildCheck = now;
-      appCtx.rebuildRoadsWithTerrain();
-      appCtx.repositionBuildingsWithTerrain();
-    }
   }
 }
 
