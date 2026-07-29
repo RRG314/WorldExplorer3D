@@ -361,12 +361,24 @@ export async function fetchShortbreadBuildingData(options = {}) {
   const lat = Number(options.lat);
   const lon = Number(options.lon);
   const { tiles, requestedTiles, bounds } = await fetchTileCoverage(lat, lon, options.radius, SHORTBREAD_ZOOM);
+  const elements = convertTilesToElements(tiles, ['buildings'], bounds);
+  const coverageComplete = tiles.length === requestedTiles;
+  elements.forEach((element) => {
+    if (element?.type === 'way' && element.tags) {
+      element.tags._geometryCoverageComplete = coverageComplete ? 'yes' : 'no';
+    }
+  });
   return {
-    elements: convertTilesToElements(tiles, ['buildings'], bounds),
+    elements,
     _overpassSource: 'shortbread-vector-buildings',
     _overpassEndpoint: tileTemplate(),
     _overpassCacheAgeMs: 0,
-    _shortbreadTiles: { loaded: tiles.length, requested: requestedTiles, zoom: SHORTBREAD_ZOOM }
+    _shortbreadTiles: {
+      loaded: tiles.length,
+      requested: requestedTiles,
+      zoom: SHORTBREAD_ZOOM,
+      coverageComplete
+    }
   };
 }
 

@@ -482,25 +482,10 @@ export function createWorldRoadLoader(deps = {}) {
         });
         // Navigation requires graph identity even when terrain publication is deferred.
         refreshStructureAwareFeatureProfiles();
-        if (normalizedSelection.buildingWays.length > 0) {
-          buildBuildingGeometryPass({
-            buildingGeometryGuards,
-            buildingWays: normalizedSelection.buildingWays,
-            featureMinPolygonArea: FEATURE_MIN_POLYGON_AREA,
-            loadMetrics,
-            lodThresholds,
-            nodes: normalizedSelection.nodes,
-            pickBuildingBaseColor,
-            rdtLoadComplexity,
-            registerBuildingCollision,
-            sanitizeWorldFootprintPoints,
-            showLoad: appCtx.showLoad,
-            signedPolygonAreaXZ,
-            startLoadPhase,
-            endLoadPhase,
-            useRdtBudgeting
-          });
-        }
+        // Building publication is deferred to the Phase 4 authority pass.
+        // Publishing the district-source footprints here and then appending an
+        // Overture/OSM detail pass creates two owners for the same buildings.
+        loadMetrics.buildings.deferredSourceWays = normalizedSelection.buildingWays.length;
         await landusePass.buildLanduseGeometryPass({
           classifyLanduseType,
           endLoadPhase,
@@ -575,10 +560,8 @@ export function createWorldRoadLoader(deps = {}) {
             updateWorldLod,
             useRdtBudgeting
           });
-          if (appCtx.buildingMeshes.length === 0) {
-            appCtx.showLoad('Loading buildings and preparing the world...');
-            await loadBuildingDetail();
-          }
+          appCtx.showLoad('Loading buildings and preparing the world...');
+          await loadBuildingDetail();
           await loadLandmarksForPublication({
             featureMinPolygonArea: FEATURE_MIN_POLYGON_AREA,
             geometryGuards: buildingGeometryGuards,

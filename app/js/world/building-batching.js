@@ -89,6 +89,7 @@ function batchBuildingMeshesByTier(tiers = ['near']) {
       const batch = { positions: [], normals: [], uvs: [], indices: [] };
       const sourceMeshes = [];
       const xzPoints = [];
+      const provenanceByFeatureId = new Map();
 
       for (let i = 0; i < group.meshes.length; i++) {
         const mesh = group.meshes[i];
@@ -99,6 +100,9 @@ function batchBuildingMeshesByTier(tiers = ['near']) {
           continue;
         }
         sourceMeshes.push(mesh);
+        const provenance = mesh.userData?.buildingProvenance;
+        const featureId = provenance?.identity?.featureId;
+        if (featureId) provenanceByFeatureId.set(featureId, provenance);
 
         xzPoints.push(buildingMeshCenter(mesh));
       }
@@ -153,6 +157,7 @@ function batchBuildingMeshesByTier(tiers = ['near']) {
         isBuildingBatch: true,
         isNearBuildingBatch: true,
         batchCount: sourceMeshes.length,
+        buildingProvenanceRecords: Object.freeze([...provenanceByFeatureId.values()]),
         lodCenter: { x: centerX, z: centerZ },
         lodRadius: maxRadius
       };

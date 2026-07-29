@@ -54,6 +54,7 @@ export function createWorldRoadLoaderSupport({
       overtureBuildingId: options.overtureBuildingId || '',
       overtureParentBuildingId: options.overtureParentBuildingId || '',
       metadataSourceId: options.metadataSourceId || '',
+      buildingProvenance: options.buildingProvenance || null,
       minLevels: Number.isFinite(options.minLevels) ? options.minLevels : null,
       baseY,
       minY: baseY,

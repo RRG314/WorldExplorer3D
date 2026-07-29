@@ -39,6 +39,7 @@ import {
   resolveWaterBodySurfaceY,
   waterKindLabel
 } from '../world/water-body-contract.js?v=3';
+import { pointInWaterBody } from '../world/water-surface-registry.js?v=1';
 
 let _waterRaycaster = null;
 let _waterRayStart = null;
@@ -265,12 +266,13 @@ function resolveBoatHeading(candidate, fallbackAngle = 0) {
 
 function getReferencePosition() {
   if (appCtx.boatMode?.active) {
-    return { x: appCtx.boat.x, z: appCtx.boat.z, angle: appCtx.boat.angle, mode: 'boat' };
+    return { x: appCtx.boat.x, y: appCtx.boat.y, z: appCtx.boat.z, angle: appCtx.boat.angle, mode: 'boat' };
   }
   if (appCtx.droneMode) return null;
   if (appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk.state.walker) {
     return {
       x: appCtx.Walk.state.walker.x,
+      y: appCtx.Walk.state.walker.y,
       z: appCtx.Walk.state.walker.z,
       angle: Number.isFinite(appCtx.Walk.state.walker.angle) ? appCtx.Walk.state.walker.angle : appCtx.Walk.state.walker.yaw || 0,
       mode: 'walk'
@@ -278,16 +280,21 @@ function getReferencePosition() {
   }
   return {
     x: Number.isFinite(appCtx.car?.x) ? appCtx.car.x : 0,
+    y: Number.isFinite(appCtx.car?.y) ? appCtx.car.y : 0,
     z: Number.isFinite(appCtx.car?.z) ? appCtx.car.z : 0,
     angle: Number.isFinite(appCtx.car?.angle) ? appCtx.car.angle : 0,
-    mode: 'drive'
+    mode: 'drive',
+    structureTerrainMode:
+      appCtx.car?.onRoad === true ?
+        String(appCtx.car?.road?.structureSemantics?.terrainMode || 'at_grade') :
+        'at_grade'
   };
 }
 
 function buildAreaCandidate(area, x, z) {
   const classification = classifyWaterArea(area);
   if (!classification) return null;
-  const inside = typeof appCtx.pointInPolygon === 'function' && appCtx.pointInPolygon(x, z, area.pts);
+  const inside = pointInWaterBody(area, x, z);
   const nearest = nearestPointOnPolygon(x, z, area.pts);
   if (!nearest) return null;
   const stats = area._boatStats || polygonStats(area.pts);
@@ -345,13 +352,25 @@ function buildWaterwayCandidate(way, x, z) {
 }
 
 function findNearestBoatCandidate(x, z, maxDistance = BOAT_MAX_CANDIDATE_DISTANCE, options = {}) {
+  if (String(options.structureTerrainMode || '') === 'subgrade') return null;
   let best = null;
+  const requireContainment = options.requireContainment !== false;
+  const referenceY = Number(options.referenceY);
+  const maximumVerticalDelta = Math.max(0.5, Number(options.maximumVerticalDelta) || 2.8);
+  const verticallyReachable = (candidate) => {
+    if (!Number.isFinite(referenceY)) return true;
+    const surfaceY = waterSurfaceBaseYAt(x, z, candidate);
+    return Number.isFinite(surfaceY) &&
+      Math.abs(referenceY - surfaceY) <= maximumVerticalDelta;
+  };
   const areas = Array.isArray(appCtx.waterAreas) ? appCtx.waterAreas : [];
   const ways = Array.isArray(appCtx.waterways) ? appCtx.waterways : [];
 
   for (let i = 0; i < areas.length; i++) {
     const candidate = buildAreaCandidate(areas[i], x, z);
     if (!candidate) continue;
+    if (requireContainment && !candidate.inside) continue;
+    if (!verticallyReachable(candidate)) continue;
     if (!candidate.inside && candidate.distanceToWater > candidateMaxDistance(candidate, maxDistance)) continue;
     if (!best || candidateDistanceScore(candidate) < candidateDistanceScore(best)) best = candidate;
   }
@@ -359,6 +378,8 @@ function findNearestBoatCandidate(x, z, maxDistance = BOAT_MAX_CANDIDATE_DISTANC
   for (let i = 0; i < ways.length; i++) {
     const candidate = buildWaterwayCandidate(ways[i], x, z);
     if (!candidate) continue;
+    if (requireContainment && !candidate.inside) continue;
+    if (!verticallyReachable(candidate)) continue;
     if (!candidate.inside && candidate.distanceToWater > candidateMaxDistance(candidate, maxDistance)) continue;
     if (!best || candidateDistanceScore(candidate) < candidateDistanceScore(best)) best = candidate;
   }

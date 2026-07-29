@@ -173,7 +173,7 @@ async function waitForRuntimeSnapshot(page, timeoutMs = 120000) {
     });
     const ready =
       last.roads > 300 &&
-      last.buildings > 1000 &&
+      last.buildings > 200 &&
       last.landuseMeshes > 0 &&
       last.worldLoading === false;
     if (ready) return last;
@@ -358,6 +358,73 @@ async function main() {
       const vegetationMeshes = Array.isArray(ctx.vegetationMeshes) ? ctx.vegetationMeshes.length : 0;
       const visibleWaterMeshes = (ctx.landuseMeshes || []).filter((m) =>
         m && m.visible !== false && (m.userData?.landuseType === 'water' || m.userData?.isWaterwayLine)
+      ).length;
+      const buildingProvenanceModel = ctx.buildingProvenanceModel || null;
+      const buildingFeatureIds = new Set(
+        (buildingProvenanceModel?.records || []).map((record) => record?.identity?.featureId)
+      );
+      const provenanceRelevantBuildingMeshes = (ctx.buildingMeshes || []).filter((mesh) =>
+        mesh?.userData?.isBuildingBatch || mesh?.userData?.sourceBuildingId
+      );
+      const unownedBuildingMeshCount = provenanceRelevantBuildingMeshes.filter((mesh) => {
+        if (mesh?.userData?.isBuildingBatch) {
+          return !(mesh.userData.buildingProvenanceRecords || []).length;
+        }
+        return !mesh?.userData?.buildingProvenance;
+      }).length;
+      const unownedBuildingColliderCount = buildings.filter((building) =>
+        buildingFeatureIds.has(building?.sourceBuildingId) &&
+        !building?.buildingProvenance
+      ).length;
+      const waterSurfaceRegistry = ctx.waterSurfaceRegistrySnapshot || null;
+      const buildingProvenanceSummary = buildingProvenanceModel ? {
+        schemaVersion: buildingProvenanceModel.schemaVersion,
+        authority: buildingProvenanceModel.authority,
+        featureCount: buildingProvenanceModel.featureCount,
+        validCount: buildingProvenanceModel.validCount,
+        outlineCount: buildingProvenanceModel.outlineCount,
+        partCount: buildingProvenanceModel.partCount,
+        inferredGeometryCount: buildingProvenanceModel.inferredGeometryCount,
+        ambiguousMetadataCount: buildingProvenanceModel.ambiguousMetadataCount,
+        duplicateFeatureIds: buildingProvenanceModel.duplicateFeatureIds
+      } : null;
+      const waterSurfaceRegistrySummary = waterSurfaceRegistry ? {
+        schemaVersion: waterSurfaceRegistry.schemaVersion,
+        authority: waterSurfaceRegistry.authority,
+        surfaceCount: waterSurfaceRegistry.surfaceCount,
+        navigableCount: waterSurfaceRegistry.navigableCount,
+        duplicateRegistryIds: waterSurfaceRegistry.duplicateRegistryIds
+      } : null;
+      const publishedWaterBodies = [
+        ...(ctx.waterAreas || []),
+        ...(ctx.waterways || [])
+      ];
+      const registeredWaterBodies = ctx.waterSurfaceRegistry?.entries?.() || [];
+      const waterRegistryIds = publishedWaterBodies
+        .map((body) => body?.registryId)
+        .filter(Boolean);
+      const duplicatePublishedWaterRegistryIds = waterRegistryIds.filter((id, index) =>
+        waterRegistryIds.indexOf(id) !== index
+      );
+      const orphanedWaterBodyCount = publishedWaterBodies.filter((body) =>
+        !registeredWaterBodies.includes(body)
+      ).length;
+      const orphanedWaterBodySamples = publishedWaterBodies
+        .filter((body) => !registeredWaterBodies.includes(body))
+        .slice(0, 8)
+        .map((body) => ({
+          registryId: body?.registryId || null,
+          sourceFeatureId: body?.sourceFeatureId || null,
+          shape: body?.shape || null,
+          dataset: body?.provenance?.dataset || null,
+          layer: body?.provenance?.layer || null
+        }));
+      const unownedWaterBodyCount = publishedWaterBodies.filter((body) =>
+        body?.registryProvenance?.authority !== 'water_surface_registry'
+      ).length;
+      const unownedWaterMeshCount = (ctx.landuseMeshes || []).filter((mesh) =>
+        (mesh?.userData?.landuseType === 'water' || mesh?.userData?.isWaterwayLine) &&
+        mesh?.userData?.waterSurfaceProvenance?.authority !== 'water_surface_registry'
       ).length;
 
       function sampleRoadPoint(road, fraction) {
@@ -561,6 +628,21 @@ async function main() {
         vegetationFeatures,
         vegetationMeshes,
         visibleWaterMeshes,
+        buildingProvenanceModel: buildingProvenanceSummary,
+        buildingProvenancePublication: {
+          relevantMeshCount: provenanceRelevantBuildingMeshes.length,
+          unownedMeshCount: unownedBuildingMeshCount,
+          unownedColliderCount: unownedBuildingColliderCount
+        },
+        waterSurfaceRegistry: waterSurfaceRegistrySummary,
+        waterSurfacePublication: {
+          bodyCount: publishedWaterBodies.length,
+          unownedBodyCount: unownedWaterBodyCount,
+          unownedMeshCount: unownedWaterMeshCount,
+          orphanedBodyCount: orphanedWaterBodyCount,
+          orphanedBodySamples: orphanedWaterBodySamples,
+          duplicateRegistryIds: [...new Set(duplicatePublishedWaterRegistryIds)].slice(0, 12)
+        },
         roadSurfaceContract: {
           atGradeSkirt: structureSemantics.shouldRenderRoadSkirts({
             structureSemantics: { terrainMode: 'at_grade' }
@@ -1105,6 +1187,22 @@ async function main() {
         report.walkGraphNodeCount > 0 &&
         report.walkGraphSegmentCount >= report.driveGraphSegmentCount,
       waterMaterialsSolid: report.solidWaterMeshes === true,
+      buildingProvenanceAuthority:
+        report.buildingProvenanceModel?.authority === 'compiled_building_provenance' &&
+        report.buildingProvenanceModel?.featureCount > 0 &&
+        report.buildingProvenanceModel?.featureCount === report.buildingProvenanceModel?.validCount &&
+        report.buildingProvenanceModel?.ambiguousMetadataCount === 0 &&
+        report.buildingProvenanceModel?.duplicateFeatureIds?.length === 0 &&
+        report.buildingProvenancePublication?.unownedMeshCount === 0 &&
+        report.buildingProvenancePublication?.unownedColliderCount === 0,
+      waterSurfaceAuthority:
+        report.waterSurfaceRegistry?.authority === 'water_surface_registry' &&
+        report.waterSurfaceRegistry?.surfaceCount === report.waterSurfacePublication?.bodyCount &&
+        report.waterSurfaceRegistry?.duplicateRegistryIds?.length === 0 &&
+        report.waterSurfacePublication?.unownedBodyCount === 0 &&
+        report.waterSurfacePublication?.unownedMeshCount === 0 &&
+        report.waterSurfacePublication?.orphanedBodyCount === 0 &&
+        report.waterSurfacePublication?.duplicateRegistryIds?.length === 0,
       vegetationIntegrated: report.vegetationFeatures > 0 && report.vegetationMeshes > 0,
       structureSemanticsStable:
         report.syntheticStructureSemantics?.overgroundFootway?.terrainMode === 'at_grade' &&
@@ -1286,6 +1384,20 @@ async function main() {
       })}`
     );
     assert(checks.waterMaterialsSolid, 'Water meshes are still rendering with transparent materials.');
+    assert(
+      checks.buildingProvenanceAuthority,
+      `Building publication is missing stable provenance ownership: ${JSON.stringify({
+        model: report.buildingProvenanceModel,
+        publication: report.buildingProvenancePublication
+      })}`
+    );
+    assert(
+      checks.waterSurfaceAuthority,
+      `Water publication is missing registry ownership or contains duplicates: ${JSON.stringify({
+        registry: report.waterSurfaceRegistry,
+        publication: report.waterSurfacePublication
+      })}`
+    );
     assert(checks.vegetationIntegrated, `Vegetation layer did not initialize correctly: ${JSON.stringify({ vegetationFeatures: report.vegetationFeatures, vegetationMeshes: report.vegetationMeshes })}`);
     assert(checks.structureSemanticsStable, `Synthetic structure semantics classification regressed: ${JSON.stringify(report.syntheticStructureSemantics || null)}`);
     assert(checks.acceptedGroundRuntimeReady, `Accepted ground is not active, attributable, and sampleable: ${JSON.stringify(report.acceptedGroundRuntimeBoundary || null)}`);

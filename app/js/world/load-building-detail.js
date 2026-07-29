@@ -1,6 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { mergeBuildingMetadata } from "./building-metadata.js?v=1";
 import { supplementSparseBuildingData } from "./inferred-building-footprints.js?v=2";
+import { createBuildingProvenanceSnapshot } from './building-provenance-model.js?v=1';
 
 function buildingDataPriority(way) {
   const tags = way?.tags || {};
@@ -102,8 +103,12 @@ export async function loadBuildingDetailForPublication(options = {}) {
       const requested = (data.elements || []).filter((element) =>
         element?.type === 'way' && (element.tags?.building || element.tags?.['building:part'])
       );
+      const provenancePublicationCap = Math.min(
+        Number(options.maxBuildingWays) || 8000,
+        8000
+      );
       const buildingWays = options.limitWaysByTileBudget(requested, nodes, {
-        globalCap: options.maxBuildingWays,
+        globalCap: provenancePublicationCap,
         basePerTile: options.tileBudgetCfg.buildingsPerTile,
         minPerTile: options.tileBudgetCfg.buildingsMinPerTile,
         tileDegrees: options.tileBudgetCfg.tileDegrees,
@@ -115,6 +120,7 @@ export async function loadBuildingDetailForPublication(options = {}) {
 
       options.loadMetrics.buildings.requested = requested.length;
       options.loadMetrics.buildings.selected = buildingWays.length;
+      options.loadMetrics.buildings.provenancePublicationCap = provenancePublicationCap;
       options.buildBuildingGeometryPass({
         buildingGeometryGuards: options.buildingGeometryGuards,
         buildingWays,
@@ -132,6 +138,9 @@ export async function loadBuildingDetailForPublication(options = {}) {
         endLoadPhase: options.endLoadPhase,
         useRdtBudgeting: options.useRdtBudgeting
       });
+      appCtx.buildingProvenanceModel = createBuildingProvenanceSnapshot(
+        appCtx.buildingProvenanceRecords || []
+      );
       if (!isActiveLoadContext()) return;
 
       options.refreshStructureAwareFeatureProfiles?.();
@@ -142,6 +151,8 @@ export async function loadBuildingDetailForPublication(options = {}) {
         requested: requested.length,
         selected: buildingWays.length,
         meshes: appCtx.buildingMeshes.length,
+        provenanceFeatures: appCtx.buildingProvenanceModel.featureCount,
+        publicationDiagnostics: { ...(options.loadMetrics.buildingPublication || {}) },
         durationMs: Math.round(performance.now() - startedAt),
         source: data._overpassSource || null,
         endpoint: data._overpassEndpoint || null,

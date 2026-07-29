@@ -1,6 +1,6 @@
 # Next Production Release Plan
 
-**Plan status:** implementation underway; Phases 0–3 complete, including hardware-backed named structure journeys and exit evidence
+**Plan status:** implementation underway; Phases 0–4 complete, including provenance-owned building/water publication and real-input boat/tunnel evidence
 **Starting baseline:** `3823aea9333717ab1ea5032fb4ca929900ab8a81`  
 **Release rule:** no production deployment until every phase exit condition and the final production gate pass  
 **Design rule:** locations are evidence fixtures, never locations for patches
@@ -374,6 +374,23 @@ camera clearance, and zero centerline structure collisions.
 **Rollback point:** Phase 3 commit.
 
 **Expected commit boundary:** `feat: enforce building and water provenance ownership`.
+
+**Phase 4 exit checkpoint (2026-07-29):** One immutable building provenance
+model now owns every rendered source feature, batch, roof and collider.
+Overture is authoritative only with complete tile coverage, parent suppression
+waits for complete part assembly, and OSM enrichment requires explicit stable
+identity. Mapped fields and landmarks are protected from generic inference;
+foundations bind to accepted ground without terrain mutation.
+
+Ocean, coast, inland water and waterways now publish through one priority-aware
+water registry with stable part identity, holes, access and navigability.
+Boat discovery requires registry-backed containment and vertical reachability,
+and subgrade transport context blocks tunnel-to-water activation. Pure
+contracts, the Baltimore runtime ownership gate, and accepted-ground journeys
+covering Baltimore, Monaco, Golden Gate, Holland Tunnel and the Dead Sea pass
+on Apple M1 Metal without permission-gated data. The city, slope, coast,
+inland-water, boat and tunnel evidence is recorded in
+`docs/PHASE4_BUILDING_WATER_STATUS.md`.
 
 ## Phase 5 — Unify controller transitions and environment lifecycle
 

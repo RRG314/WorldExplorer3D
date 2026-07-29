@@ -1,3 +1,5 @@
+import { createBuildingProvenanceSnapshot } from './building-provenance-model.js?v=1';
+
 export function createWorldLoadRuntimeSession(options = {}) {
   const {
     appCtx,
@@ -92,6 +94,11 @@ export function createWorldLoadRuntimeSession(options = {}) {
   });
   appCtx.initialEarthWorldReady = false;
   appCtx.worldDetailState = {};
+  appCtx.buildingProvenanceRecords = [];
+  appCtx.buildingProvenanceFeatureIds = new Set();
+  appCtx.buildingProvenanceModel = null;
+  appCtx.waterSurfaceRegistry = null;
+  appCtx.waterSurfaceRegistrySnapshot = null;
 
   if (!locationSelection) {
     appCtx.showLoad('Choose a valid location');
@@ -293,6 +300,11 @@ export function finishWorldLoadRuntimeSession(session = {}) {
     );
   }
   loadMetrics.initialEarthDetailRadius = appCtx.initialEarthDetailRadius;
+  appCtx.buildingProvenanceModel = createBuildingProvenanceSnapshot(
+    appCtx.buildingProvenanceRecords || []
+  );
+  appCtx.waterSurfaceRegistrySnapshot =
+    appCtx.waterSurfaceRegistry?.snapshot?.() || null;
   appCtx.reconcileActorsAfterSurfaceRebuild?.();
   const publication = Object.freeze({
     sequence: Number(runtimeState?.sequence || appCtx._worldLoadSequence || 0),

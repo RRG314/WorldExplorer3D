@@ -244,7 +244,10 @@ function syncBoatPromptState(force = false) {
     updateBoatMenuUi();
     return null;
   }
-  const candidate = findNearestBoatCandidate(ref.x, ref.z);
+  const candidate = findNearestBoatCandidate(ref.x, ref.z, BOAT_MAX_CANDIDATE_DISTANCE, {
+    referenceY: ref.y,
+    structureTerrainMode: ref.structureTerrainMode
+  });
   appCtx.boatMode.candidate = candidate;
   appCtx.boatMode.available = !!candidate;
   if (candidate) {
@@ -301,6 +304,7 @@ function startBoatMode(options = {}) {
   if (appCtx.oceanMode?.active || appCtx.onMoon || appCtx.travelingToMoon) return false;
   const baseRef = getReferencePosition();
   if (!baseRef) return false;
+  if (baseRef.structureTerrainMode === 'subgrade') return false;
   const ref = {
     ...baseRef,
     x: Number.isFinite(options.spawnX) ? options.spawnX : baseRef.x,
@@ -311,7 +315,9 @@ function startBoatMode(options = {}) {
     appCtx.boatMode?.candidate ||
     findNearestBoatCandidate(ref.x, ref.z, BOAT_MAX_CANDIDATE_DISTANCE, {
       allowSynthetic: options.allowSynthetic === true,
-      waterKind: options.waterKind || 'open_ocean'
+      waterKind: options.waterKind || 'open_ocean',
+      referenceY: ref.y,
+      structureTerrainMode: ref.structureTerrainMode
     });
   if (!candidate) return false;
 
