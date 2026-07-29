@@ -381,16 +381,16 @@ export function createWorldRoadLoader(deps = {}) {
         let data;
         try {
           try {
+            data = await fetchOverpassJSON(primaryQuery, overpassTimeoutMs, loadDeadline, overpassCacheMeta);
+          } catch (overpassErr) {
+            recordLoadWarning('lossless OpenStreetMap transport data', overpassErr);
+            appCtx.showLoad('Loading generalized mapped data...');
             data = await fetchShortbreadWorldData({
               lat: appCtx.LOC.lat,
               lon: appCtx.LOC.lon,
               radius: Math.max(radius, featureRadius),
               includeBuildings: false
             });
-          } catch (vectorErr) {
-            recordLoadWarning('vector map data', vectorErr);
-            appCtx.showLoad('Loading alternate mapped data...');
-            data = await fetchOverpassJSON(primaryQuery, overpassTimeoutMs, loadDeadline, overpassCacheMeta);
           }
         } finally {
           endLoadPhase('fetchOverpass');
@@ -480,6 +480,8 @@ export function createWorldRoadLoader(deps = {}) {
           wayCenterLatLon,
           worldBaseTerrainY
         });
+        // Navigation requires graph identity even when terrain publication is deferred.
+        refreshStructureAwareFeatureProfiles();
         if (normalizedSelection.buildingWays.length > 0) {
           buildBuildingGeometryPass({
             buildingGeometryGuards,

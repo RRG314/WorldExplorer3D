@@ -4,13 +4,16 @@ import {
   buildIndexedBatchMesh,
   createRoadSurfaceMaterials
 } from "../road-render.js?v=2";
-import { estimateDriveableRoadWidth } from "./load-style.js?v=3";
 import {
   buildFeatureRibbonEdges,
+  sampleFeatureSurfaceY,
   shouldRenderRoadSkirts,
   updateFeatureSurfaceProfile
 } from "../structure-semantics.js?v=28";
 import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=9";
+import {
+  normalizeTransportSource
+} from "./compiler/transport-source-normalizer.js?v=1";
 
 const ROAD_SURFACE_BIAS = 0.08;
 
@@ -59,7 +62,12 @@ export function buildRoadGeometryPass(options = {}) {
   });
 
   roadWays.forEach((way) => {
-    const rawPts = way.nodes.map((id) => nodes[id]).filter((n) => n).map((n) => appCtx.geoToWorld(n.lat, n.lon));
+    const rawNodeRecords = way.nodes
+      .map((id) => ({ id: String(id), node: nodes[id] }))
+      .filter((entry) => entry.node);
+    const rawPts = rawNodeRecords.map((entry) =>
+      appCtx.geoToWorld(entry.node.lat, entry.node.lon)
+    );
     const pts = sanitizeWorldPathPoints(rawPts, geometryGuards);
     if (pts.length < 2) return;
 
@@ -68,7 +76,22 @@ export function buildRoadGeometryPass(options = {}) {
       featureKind: 'road',
       subtype: type
     });
-    const width = estimateDriveableRoadWidth(way.tags || {});
+    const sourceFeatureId = String(way.tags?._sourceFeatureId || way.sourceId || way.id || '');
+    const transportRecord = normalizeTransportSource({
+      sourceId: sourceFeatureId,
+      id: way.id,
+      type: 'way',
+      providerNamespace: sourceFeatureId.startsWith('shortbread:')
+        ? 'shortbread'
+        : 'osm',
+      completeness: sourceFeatureId.startsWith('shortbread:')
+        ? 'generalized'
+        : 'lossless',
+      geometryProvenance: sourceFeatureId.startsWith('shortbread:')
+        ? 'shortbread-v1'
+        : 'osm-overpass'
+    }, way.tags || {});
+    const width = transportRecord.crossSection.widthMeters;
     const limit = type.includes('motorway') ? 65 : type.includes('trunk') ? 55 : type.includes('primary') ? 40 : type.includes('secondary') ? 35 : 25;
     const name = way.tags?.name || type.charAt(0).toUpperCase() + type.slice(1);
     const centerLatLon = wayCenterLatLon(way, nodes);
@@ -87,27 +110,24 @@ export function buildRoadGeometryPass(options = {}) {
       width,
       limit,
       name,
-      sourceFeatureId: String(way.tags?._sourceFeatureId || way.id || ''),
+      sourceFeatureId: transportRecord.identity,
+      sourceNodeIds: Object.freeze((way.nodes || []).map(String)),
+      sourceTopologyNodes: Object.freeze(rawNodeRecords.map((entry, index) =>
+        Object.freeze({
+          id: entry.id,
+          x: rawPts[index].x,
+          z: rawPts[index].z
+        })
+      )),
+      transportRecord,
       type,
       surfaceTag: String(way.tags?.surface || '').toLowerCase(),
       litTag: String(way.tags?.lit || '').toLowerCase(),
       sidewalkHint: String(way.tags?.sidewalk || '').toLowerCase(),
       networkKind: 'road',
-      walkable: true,
-      driveable: true,
-      structureTags: {
-        bridge: way.tags?.bridge || '',
-        tunnel: way.tags?.tunnel || '',
-        layer: way.tags?.layer || '',
-        level: way.tags?.level || '',
-        placement: way.tags?.placement || '',
-        ramp: way.tags?.ramp || '',
-        covered: way.tags?.covered || '',
-        indoor: way.tags?.indoor || '',
-        location: way.tags?.location || '',
-        min_height: way.tags?.min_height || '',
-        man_made: way.tags?.man_made || ''
-      },
+      walkable: transportRecord.access.pedestrian !== 'prohibited',
+      driveable: transportRecord.safeForDriving,
+      structureTags: transportRecord.rawTags,
       structureSemantics,
       baseStructureSemantics: cloneStructureSemantics(structureSemantics),
       surfaceBias: ROAD_SURFACE_BIAS,
@@ -172,13 +192,20 @@ export function buildRoadGeometryPass(options = {}) {
             const x = p1.x + dx * segDist;
             const z = p1.z + dz * segDist;
             const len = Math.min(dashLen, segLen - segDist);
-            const y = (typeof appCtx.terrainMeshHeightAt === 'function' ? appCtx.terrainMeshHeightAt(x, z) : appCtx.elevationWorldYAtWorldXZ(x, z)) + ROAD_SURFACE_BIAS + 0.01;
+            const endX = x + dx * len;
+            const endZ = z + dz * len;
+            const y = sampleFeatureSurfaceY(roadFeature, x, z) + 0.01;
+            const endY = sampleFeatureSurfaceY(roadFeature, endX, endZ) + 0.01;
+            if (!Number.isFinite(y) || !Number.isFinite(endY)) {
+              segDist += dashLen + gapLen;
+              continue;
+            }
             const vi = markVerts.length / 3;
             markVerts.push(
               x + nx * mw, y, z + nz * mw,
               x - nx * mw, y, z - nz * mw,
-              x + dx * len + nx * mw, y, z + dz * len + nz * mw,
-              x + dx * len - nx * mw, y, z + dz * len - nz * mw
+              endX + nx * mw, endY, endZ + nz * mw,
+              endX - nx * mw, endY, endZ - nz * mw
             );
             markIdx.push(vi, vi + 2, vi + 1, vi + 1, vi + 2, vi + 3);
           }
@@ -219,6 +246,26 @@ export function buildRoadGeometryPass(options = {}) {
     material: roadMarkMaterial,
     renderOrder: 3,
     userData: { isRoadBatch: true, isRoadMarking: true, sharedRoadMaterial: true, worldLoadSequence: appCtx._worldLoadSequence || 0 }
+  });
+
+  appCtx.transportSurfacePublication = Object.freeze({
+    authority: 'compiled_transport_surface',
+    transportGraphId: appCtx.transportNetworkModel?.id || null,
+    roadCount: appCtx.roads.length,
+    meshCount: appCtx.roadMeshes.length,
+    intersectionCount: 0,
+    topologyIntersectionCount: 0,
+    compiledSampleCount: appCtx.roads.reduce((total, road) =>
+      total + Number(road?.transportSurfaceModel?.distances?.length || 0), 0),
+    vertices:
+      roadMainBatchVerts.length / 3 +
+      roadSkirtBatchVerts.length / 3 +
+      roadMarkBatchVerts.length / 3,
+    triangles:
+      roadMainBatchIdx.length / 3 +
+      roadSkirtBatchIdx.length / 3 +
+      roadMarkBatchIdx.length / 3,
+    worldLoadSequence: appCtx._worldLoadSequence || 0
   });
 
   endLoadPhase('buildRoadGeometry');

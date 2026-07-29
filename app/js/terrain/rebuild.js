@@ -3,7 +3,6 @@ import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-rende
 import { detectRoadIntersections } from "./intersections.js?v=1";
 import {
   buildFeatureRibbonEdges,
-  enforceAtGradeRibbonClearance,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
 } from "../structure-semantics.js?v=28";
@@ -56,52 +55,64 @@ function appendRoadCenterMarkings(road, points, targetVerts, targetIndices) {
   const markHalfWidth = 0.15;
   const dashLength = 6;
   const patternLength = 12;
-  let distanceBeforeSegment = 0;
-  for (let index = 0; index < points.length - 1; index += 1) {
-    const start = points[index];
-    const end = points[index + 1];
-    const dx = end.x - start.x;
-    const dz = end.z - start.z;
-    const segmentLength = Math.hypot(dx, dz);
-    if (!(segmentLength > 1e-5)) continue;
-    const dirX = dx / segmentLength;
-    const dirZ = dz / segmentLength;
-    const normalX = -dirZ;
-    const normalZ = dirX;
-    let localDistance = 0;
-    while (localDistance < segmentLength) {
-      const globalDistance = distanceBeforeSegment + localDistance;
-      const phase = ((globalDistance % patternLength) + patternLength) % patternLength;
-      const advanceToDash = phase < dashLength ? 0 : patternLength - phase;
-      const dashStart = localDistance + advanceToDash;
-      if (dashStart >= segmentLength) break;
-      const activePhase = (distanceBeforeSegment + dashStart) % patternLength;
-      const availableDash = dashLength - activePhase;
-      const dashEnd = Math.min(segmentLength, dashStart + Math.max(0.01, availableDash));
-      const x1 = start.x + dirX * dashStart;
-      const z1 = start.z + dirZ * dashStart;
-      const x2 = start.x + dirX * dashEnd;
-      const z2 = start.z + dirZ * dashEnd;
-      const y1 = sampleFeatureSurfaceY(road, x1, z1) + 0.012;
-      const y2 = sampleFeatureSurfaceY(road, x2, z2) + 0.012;
-      if (Number.isFinite(y1) && Number.isFinite(y2)) {
-        const baseVertex = targetVerts.length / 3;
-        targetVerts.push(
-          x1 + normalX * markHalfWidth, y1, z1 + normalZ * markHalfWidth,
-          x1 - normalX * markHalfWidth, y1, z1 - normalZ * markHalfWidth,
-          x2 + normalX * markHalfWidth, y2, z2 + normalZ * markHalfWidth,
-          x2 - normalX * markHalfWidth, y2, z2 - normalZ * markHalfWidth
-        );
-        targetIndices.push(
-          baseVertex, baseVertex + 2, baseVertex + 1,
-          baseVertex + 1, baseVertex + 2, baseVertex + 3
-        );
+  const laneCount = Math.max(1, Number(road?.transportRecord?.crossSection?.lanes) || 1);
+  const corridorOffset = Number(
+    road?.transportRecord?.crossSection?.placement?.centerlineOffsetMeters
+  ) || 0;
+  const markingOffsets = Array.from({ length: Math.max(1, laneCount - 1) }, (_, index) =>
+    laneCount > 1
+      ? -Number(road.width) * 0.5 + Number(road.width) * (index + 1) / laneCount
+      : 0
+  );
+  for (const laneOffset of markingOffsets) {
+    let distanceBeforeSegment = 0;
+    for (let index = 0; index < points.length - 1; index += 1) {
+      const start = points[index];
+      const end = points[index + 1];
+      const dx = end.x - start.x;
+      const dz = end.z - start.z;
+      const segmentLength = Math.hypot(dx, dz);
+      if (!(segmentLength > 1e-5)) continue;
+      const dirX = dx / segmentLength;
+      const dirZ = dz / segmentLength;
+      const normalX = -dirZ;
+      const normalZ = dirX;
+      const lateralOffset = corridorOffset + laneOffset;
+      let localDistance = 0;
+      while (localDistance < segmentLength) {
+        const globalDistance = distanceBeforeSegment + localDistance;
+        const phase = ((globalDistance % patternLength) + patternLength) % patternLength;
+        const advanceToDash = phase < dashLength ? 0 : patternLength - phase;
+        const dashStart = localDistance + advanceToDash;
+        if (dashStart >= segmentLength) break;
+        const activePhase = (distanceBeforeSegment + dashStart) % patternLength;
+        const availableDash = dashLength - activePhase;
+        const dashEnd = Math.min(segmentLength, dashStart + Math.max(0.01, availableDash));
+        const x1 = start.x + dirX * dashStart + normalX * lateralOffset;
+        const z1 = start.z + dirZ * dashStart + normalZ * lateralOffset;
+        const x2 = start.x + dirX * dashEnd + normalX * lateralOffset;
+        const z2 = start.z + dirZ * dashEnd + normalZ * lateralOffset;
+        const y1 = sampleFeatureSurfaceY(road, x1, z1) + 0.012;
+        const y2 = sampleFeatureSurfaceY(road, x2, z2) + 0.012;
+        if (Number.isFinite(y1) && Number.isFinite(y2)) {
+          const baseVertex = targetVerts.length / 3;
+          targetVerts.push(
+            x1 + normalX * markHalfWidth, y1, z1 + normalZ * markHalfWidth,
+            x1 - normalX * markHalfWidth, y1, z1 - normalZ * markHalfWidth,
+            x2 + normalX * markHalfWidth, y2, z2 + normalZ * markHalfWidth,
+            x2 - normalX * markHalfWidth, y2, z2 - normalZ * markHalfWidth
+          );
+          targetIndices.push(
+            baseVertex, baseVertex + 2, baseVertex + 1,
+            baseVertex + 1, baseVertex + 2, baseVertex + 3
+          );
+        }
+        localDistance = Math.max(dashEnd, dashStart + 0.01);
+        const newPhase = (distanceBeforeSegment + localDistance) % patternLength;
+        if (newPhase < dashLength) localDistance += dashLength - newPhase;
       }
-      localDistance = Math.max(dashEnd, dashStart + 0.01);
-      const newPhase = (distanceBeforeSegment + localDistance) % patternLength;
-      if (newPhase < dashLength) localDistance += dashLength - newPhase;
+      distanceBeforeSegment += segmentLength;
     }
-    distanceBeforeSegment += segmentLength;
   }
 }
 
@@ -311,14 +322,6 @@ export function publishCompiledTransportMeshes(deps = {}) {
     leftEdge.push(...ribbonEdges.leftEdge);
     rightEdge.push(...ribbonEdges.rightEdge);
 
-    enforceAtGradeRibbonClearance(
-      road,
-      leftEdge,
-      rightEdge,
-      roadTerrainSampler,
-      Number.isFinite(road?.surfaceBias) ? road.surfaceBias : ROAD_SURFACE_BIAS
-    );
-
     appendUpwardRibbonGeometry(leftEdge, rightEdge, verts, indices);
     appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
     appendRoadCenterMarkings(road, pts, roadMarkBatchVerts, roadMarkBatchIdx);
@@ -464,6 +467,7 @@ export function publishCompiledTransportMeshes(deps = {}) {
 
   appCtx.transportSurfacePublication = Object.freeze({
     authority: "compiled_transport_surface",
+    transportGraphId: appCtx.transportNetworkModel?.id || null,
     roadCount: baseRoads.length,
     meshCount: appCtx.roadMeshes.length,
     intersectionCount: 0,

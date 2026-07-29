@@ -8,6 +8,9 @@ const TRANSPORT_SURFACE_SCHEMA_VERSION = 1;
 const DEFAULT_SURFACE_BIAS = 0.08;
 const DEFAULT_SAMPLE_STEP = 2;
 const DEFAULT_MAX_GRADE = 0.12;
+const DEFAULT_MAX_AT_GRADE_CUT = 4;
+const DEFAULT_MAX_AT_GRADE_FILL = 4;
+const DEFAULT_VERTICAL_FIT_RADIUS = 14;
 
 function finiteNumber(value, fallback = 0) {
   const number = Number(value);
@@ -202,15 +205,82 @@ function smoothGradeLimitedProfile(initialHeights, lowerBounds, distances, maxim
   return new Float32Array(heights);
 }
 
-function profileStats(distances, heights) {
+function smoothSignedCutFillProfile(
+  terrainEnvelope,
+  lowerBounds,
+  upperBounds,
+  distances,
+  maximumGrade,
+  fitRadius
+) {
+  const radius = Math.max(4, finiteNumber(fitRadius, DEFAULT_VERTICAL_FIT_RADIUS));
+  const heights = new Float64Array(terrainEnvelope.length);
+  for (let index = 0; index < terrainEnvelope.length; index += 1) {
+    let weightedSum = 0;
+    let weightTotal = 0;
+    for (let candidate = 0; candidate < terrainEnvelope.length; candidate += 1) {
+      const delta = Math.abs(distances[candidate] - distances[index]);
+      if (delta > radius) continue;
+      const weight = 1 - delta / radius;
+      weightedSum += terrainEnvelope[candidate] * weight;
+      weightTotal += weight;
+    }
+    const target = weightTotal > 0
+      ? weightedSum / weightTotal
+      : terrainEnvelope[index];
+    heights[index] = clamp(target, lowerBounds[index], upperBounds[index]);
+  }
+
+  const grade = Math.max(0.01, finiteNumber(maximumGrade, DEFAULT_MAX_GRADE));
+  for (let pass = 0; pass < 8; pass += 1) {
+    for (let index = 1; index < heights.length; index += 1) {
+      const run = Math.max(1e-6, distances[index] - distances[index - 1]);
+      heights[index] = clamp(
+        heights[index],
+        Math.max(lowerBounds[index], heights[index - 1] - grade * run),
+        Math.min(upperBounds[index], heights[index - 1] + grade * run)
+      );
+    }
+    for (let index = heights.length - 2; index >= 0; index -= 1) {
+      const run = Math.max(1e-6, distances[index + 1] - distances[index]);
+      heights[index] = clamp(
+        heights[index],
+        Math.max(lowerBounds[index], heights[index + 1] - grade * run),
+        Math.min(upperBounds[index], heights[index + 1] + grade * run)
+      );
+    }
+    const next = new Float64Array(heights);
+    for (let index = 1; index < heights.length - 1; index += 1) {
+      next[index] = clamp(
+        heights[index] * 0.45 + (heights[index - 1] + heights[index + 1]) * 0.275,
+        lowerBounds[index],
+        upperBounds[index]
+      );
+    }
+    heights.set(next);
+  }
+  return new Float32Array(heights);
+}
+
+function profileStats(distances, heights, terrainSamples = null, surfaceBias = 0) {
   let minimumY = Infinity;
   let maximumY = -Infinity;
   let maximumGrade = 0;
   let maximumGradeDelta = 0;
+  let maximumCut = 0;
+  let maximumFill = 0;
   let previousGrade = null;
   for (let index = 0; index < heights.length; index += 1) {
     minimumY = Math.min(minimumY, heights[index]);
     maximumY = Math.max(maximumY, heights[index]);
+    if (terrainSamples?.length) {
+      for (const samples of terrainSamples) {
+        if (samples?.length !== heights.length) continue;
+        const cutFill = heights[index] - (samples[index] + surfaceBias);
+        maximumCut = Math.max(maximumCut, -cutFill);
+        maximumFill = Math.max(maximumFill, cutFill);
+      }
+    }
     if (index === 0) continue;
     const run = Math.max(1e-6, distances[index] - distances[index - 1]);
     const grade = (heights[index] - heights[index - 1]) / run;
@@ -224,7 +294,9 @@ function profileStats(distances, heights) {
     minimumY,
     maximumY,
     maximumGrade,
-    maximumGradeDelta
+    maximumGradeDelta,
+    maximumCut,
+    maximumFill
   });
 }
 
@@ -262,15 +334,28 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     ? Number(options.width)
     : finiteNumber(feature.width, 4);
   const halfWidth = Math.max(0.6, compiledWidth * 0.5);
+  const corridorCenterOffset = finiteNumber(
+    feature?.transportRecord?.crossSection?.placement?.centerlineOffsetMeters
+  );
   const anchors = normalizeAnchors(feature, semantics, total);
   const groundHeights = new Float32Array(sampleDistances.length);
   const offsets = new Float32Array(sampleDistances.length);
   const centerInitial = new Float64Array(sampleDistances.length);
   const centerLowerBounds = new Float64Array(sampleDistances.length);
+  const centerUpperBounds = new Float64Array(sampleDistances.length);
+  const terrainEnvelope = new Float32Array(sampleDistances.length);
   const leftGround = new Float32Array(sampleDistances.length);
   const rightGround = new Float32Array(sampleDistances.length);
   const mode = semantics?.terrainMode || 'at_grade';
   const minimumStructureSurfaceY = Number(feature.minimumStructureSurfaceY);
+  const maximumAtGradeCut = Math.max(
+    0,
+    finiteNumber(options.maximumAtGradeCut, DEFAULT_MAX_AT_GRADE_CUT)
+  );
+  const maximumAtGradeFill = Math.max(
+    0,
+    finiteNumber(options.maximumAtGradeFill, DEFAULT_MAX_AT_GRADE_FILL)
+  );
 
   const endpointGroundStart = sampleTerrainOrThrow(sampleTerrainY, points[0].x, points[0].z);
   const endpointGroundEnd = sampleTerrainOrThrow(
@@ -285,16 +370,20 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     const tangent = tangentAtDistance(points, pathDistances, distance);
     const normalX = -tangent.z;
     const normalZ = tangent.x;
-    const groundY = sampleTerrainOrThrow(sampleTerrainY, point.x, point.z);
+    const groundY = sampleTerrainOrThrow(
+      sampleTerrainY,
+      point.x + normalX * corridorCenterOffset,
+      point.z + normalZ * corridorCenterOffset
+    );
     const leftY = sampleTerrainOrThrow(
       sampleTerrainY,
-      point.x + normalX * halfWidth,
-      point.z + normalZ * halfWidth
+      point.x + normalX * (halfWidth + corridorCenterOffset),
+      point.z + normalZ * (halfWidth + corridorCenterOffset)
     );
     const rightY = sampleTerrainOrThrow(
       sampleTerrainY,
-      point.x - normalX * halfWidth,
-      point.z - normalZ * halfWidth
+      point.x + normalX * (-halfWidth + corridorCenterOffset),
+      point.z + normalZ * (-halfWidth + corridorCenterOffset)
     );
     const progress = total > 1e-6 ? distance / total : 0;
     const approachReference = endpointGroundStart + (endpointGroundEnd - endpointGroundStart) * progress;
@@ -313,7 +402,9 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     // into visible triangles on side slopes. Lift one level cross-section to
     // the highest accepted ground sample instead; this is the minimal cut/fill
     // surface that cannot clip into the rendered terrain.
-    const atGradeReferenceY = Math.max(groundY, leftY, rightY);
+    const highestCrossSectionGround = Math.max(groundY, leftY, rightY);
+    const lowestCrossSectionGround = Math.min(groundY, leftY, rightY);
+    const atGradeReferenceY = (groundY + leftY + rightY) / 3;
     const referenceY =
       mode === 'at_grade'
         ? atGradeReferenceY
@@ -330,9 +421,13 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     rightGround[index] = rightY;
     offsets[index] = offset;
     centerInitial[index] = centerY;
+    terrainEnvelope[index] = atGradeReferenceY + surfaceBias;
     centerLowerBounds[index] = atGrade
-      ? atGradeReferenceY + surfaceBias
+      ? highestCrossSectionGround + surfaceBias - maximumAtGradeCut
       : Number.NEGATIVE_INFINITY;
+    centerUpperBounds[index] = atGrade
+      ? lowestCrossSectionGround + surfaceBias + maximumAtGradeFill
+      : Number.POSITIVE_INFINITY;
   }
 
   const hasTransitionAnchors =
@@ -358,12 +453,21 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     }
   }
 
-  const centerHeights = smoothGradeLimitedProfile(
-    centerInitial,
-    centerLowerBounds,
-    sampleDistances,
-    maximumGrade
-  );
+  const centerHeights = mode === 'at_grade'
+    ? smoothSignedCutFillProfile(
+        terrainEnvelope,
+        centerLowerBounds,
+        centerUpperBounds,
+        sampleDistances,
+        maximumGrade,
+        options.verticalFitRadius
+      )
+    : smoothGradeLimitedProfile(
+        centerInitial,
+        centerLowerBounds,
+        sampleDistances,
+        maximumGrade
+      );
   // Publish the same accepted profile at both edges. All gameplay, markings,
   // sidewalks, and visuals then query one planar deck instead of recreating
   // incompatible lateral terrain folds.
@@ -379,6 +483,14 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     width: halfWidth * 2,
     surfaceBias,
     maximumGrade,
+    cutFillPolicy: Object.freeze({
+      signed: mode === 'at_grade',
+      maximumCutMeters: mode === 'at_grade' ? maximumAtGradeCut : 0,
+      maximumFillMeters: mode === 'at_grade' ? maximumAtGradeFill : 0,
+      verticalFitRadiusMeters: mode === 'at_grade'
+        ? finiteNumber(options.verticalFitRadius, DEFAULT_VERTICAL_FIT_RADIUS)
+        : 0
+    }),
     pathDistances,
     distances: sampleDistances,
     groundHeights,
@@ -386,7 +498,12 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     centerHeights,
     leftHeights,
     rightHeights,
-    stats: profileStats(sampleDistances, centerHeights)
+    stats: profileStats(
+      sampleDistances,
+      centerHeights,
+      mode === 'at_grade' ? [groundHeights, leftGround, rightGround] : null,
+      surfaceBias
+    )
   });
 }
 
@@ -420,6 +537,8 @@ function attachCompiledTransportSurface(feature, model) {
 
 export {
   DEFAULT_MAX_GRADE,
+  DEFAULT_MAX_AT_GRADE_CUT,
+  DEFAULT_MAX_AT_GRADE_FILL,
   TRANSPORT_SURFACE_SCHEMA_VERSION,
   attachCompiledTransportSurface,
   compileTransportSurfaceModel,

@@ -172,7 +172,14 @@ export function refreshStructureAwareFeatureProfiles() {
   }
 
   const structureFeatures = transportFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
-  assignFeatureConnections(transportFeatures);
+  appCtx.transportNetworkModel = assignFeatureConnections(transportFeatures);
+  if (appCtx.transportSurfacePublication?.authority === 'compiled_transport_surface') {
+    appCtx.transportSurfacePublication = Object.freeze({
+      ...appCtx.transportSurfacePublication,
+      transportGraphId: appCtx.transportNetworkModel.id,
+      roadCount: roadFeatures.length
+    });
+  }
   assignStructureStackRanks(structureFeatures, worldBaseTerrainY, { areRoadsConnected });
 
   for (let i = 0; i < structureFeatures.length; i++) {

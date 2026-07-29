@@ -4,11 +4,9 @@ import {
   polylineDistances,
   segmentIntersection2D
 } from './geometry.js?v=1';
-
-function connectionEndpointKey(point) {
-  if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) return '';
-  return `${Math.round(point.x * 10)},${Math.round(point.z * 10)}`;
-}
+import {
+  compileTransportNetworkModel
+} from '../world/compiler/transport-network-model.js?v=1';
 
 function structureFeatureStableKey(candidate) {
   const sourceId = String(candidate?.sourceFeatureId || candidate?.id || '').trim();
@@ -228,134 +226,8 @@ function assignStructureStackRanks(features = [], sampleTerrainY = null, options
   return structureFeatures;
 }
 
-function assignFeatureConnections(features = []) {
-  const endpointGroups = new Map();
-  const endpoints = [];
-  for (const feature of features) {
-    const points = Array.isArray(feature?.pts) ? feature.pts : null;
-    if (!points || points.length < 2) continue;
-    feature.connectedFeatures = { start: [], end: [] };
-    const featureEndpoints = [
-      { endpoint: 'start', endpointIndex: 0, point: points[0] },
-      { endpoint: 'end', endpointIndex: points.length - 1, point: points[points.length - 1] }
-    ];
-    for (const entry of featureEndpoints) {
-      const key = connectionEndpointKey(entry.point);
-      if (!key) continue;
-      if (!endpointGroups.has(key)) endpointGroups.set(key, []);
-      const endpointEntry = { feature, ...entry };
-      endpointGroups.get(key).push(endpointEntry);
-      endpoints.push(endpointEntry);
-    }
-  }
-
-  endpointGroups.forEach((entries) => {
-    for (const entry of entries) {
-      const target = entry.feature?.connectedFeatures?.[entry.endpoint];
-      if (!Array.isArray(target)) continue;
-      target.length = 0;
-      for (const other of entries) {
-        if (other === entry || other.feature === entry.feature) continue;
-        target.push({
-          feature: other.feature,
-          endpoint: other.endpoint,
-          endpointIndex: other.endpointIndex,
-          point: other.point
-        });
-      }
-    }
-  });
-
-  // Vector-tile road data commonly represents a merge as the endpoint of one
-  // way touching the interior of another. Treating only endpoint-to-endpoint
-  // pairs as connected makes real ramps look like stacked crossings and lifts
-  // the adjoining decks apart.
-  const segmentCellSize = 12;
-  const joinTolerance = 0.6;
-  const segmentCells = new Map();
-  const cellKey = (x, z) => `${x},${z}`;
-  for (const feature of features) {
-    const points = Array.isArray(feature?.pts) ? feature.pts : null;
-    if (!points || points.length < 2) continue;
-    const profile = polylineDistances(points);
-    for (let segmentIndex = 0; segmentIndex < points.length - 1; segmentIndex += 1) {
-      const a = points[segmentIndex];
-      const b = points[segmentIndex + 1];
-      const minCellX = Math.floor((Math.min(a.x, b.x) - joinTolerance) / segmentCellSize);
-      const maxCellX = Math.floor((Math.max(a.x, b.x) + joinTolerance) / segmentCellSize);
-      const minCellZ = Math.floor((Math.min(a.z, b.z) - joinTolerance) / segmentCellSize);
-      const maxCellZ = Math.floor((Math.max(a.z, b.z) + joinTolerance) / segmentCellSize);
-      const segment = {
-        feature,
-        segmentIndex,
-        a,
-        b,
-        distanceBefore: Number(profile.distances[segmentIndex] || 0)
-      };
-      for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
-        for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ += 1) {
-          const key = cellKey(cellX, cellZ);
-          if (!segmentCells.has(key)) segmentCells.set(key, []);
-          segmentCells.get(key).push(segment);
-        }
-      }
-    }
-  }
-
-  for (const entry of endpoints) {
-    const target = entry.feature?.connectedFeatures?.[entry.endpoint];
-    if (!Array.isArray(target)) continue;
-    const point = entry.point;
-    const candidates = segmentCells.get(cellKey(
-      Math.floor(point.x / segmentCellSize),
-      Math.floor(point.z / segmentCellSize)
-    )) || [];
-    const bestByFeature = new Map();
-    for (const candidate of candidates) {
-      if (candidate.feature === entry.feature) continue;
-      const entrySemantics = entry.feature?.structureSemantics || null;
-      const candidateSemantics = candidate.feature?.structureSemantics || null;
-      if (
-        entrySemantics?.terrainMode !== candidateSemantics?.terrainMode ||
-        Number(entrySemantics?.verticalOrder || 0) !== Number(candidateSemantics?.verticalOrder || 0)
-      ) continue;
-      const dx = candidate.b.x - candidate.a.x;
-      const dz = candidate.b.z - candidate.a.z;
-      const lengthSq = dx * dx + dz * dz;
-      if (!(lengthSq > 1e-8)) continue;
-      const t = Math.max(0, Math.min(
-        1,
-        ((point.x - candidate.a.x) * dx + (point.z - candidate.a.z) * dz) / lengthSq
-      ));
-      const projectedX = candidate.a.x + dx * t;
-      const projectedZ = candidate.a.z + dz * t;
-      const distance = Math.hypot(projectedX - point.x, projectedZ - point.z);
-      if (distance > joinTolerance) continue;
-      const candidateEndpoint =
-        t <= 0.001 ? 'start' :
-        t >= 0.999 ? 'end' :
-        'interior';
-      const candidateEndpointIndex =
-        candidateEndpoint === 'end' ? candidate.segmentIndex + 1 : candidate.segmentIndex;
-      const previous = bestByFeature.get(candidate.feature);
-      if (!previous || distance < previous.distance) {
-        bestByFeature.set(candidate.feature, {
-          feature: candidate.feature,
-          endpoint: candidateEndpoint,
-          endpointIndex: candidateEndpointIndex,
-          segmentIndex: candidate.segmentIndex,
-          segmentT: t,
-          distanceAlong: candidate.distanceBefore + Math.sqrt(lengthSq) * t,
-          point: { x: projectedX, z: projectedZ },
-          distance
-        });
-      }
-    }
-    for (const connection of bestByFeature.values()) {
-      if (target.some((existing) => existing?.feature === connection.feature)) continue;
-      target.push(connection);
-    }
-  }
+function assignFeatureConnections(features = [], options = {}) {
+  return compileTransportNetworkModel(features, options);
 }
 
 export { assignFeatureConnections, assignStructureStackRanks };

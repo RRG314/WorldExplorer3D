@@ -20,7 +20,6 @@ import { buildingOccupiesActorHeight } from '../app/js/building-entry.js';
 import { finishWorldLoadRuntimeSession } from '../app/js/world/load-runtime-session.js';
 import {
   buildFeatureRibbonEdges,
-  enforceAtGradeRibbonClearance,
   sampleFeatureSurfaceY
 } from '../app/js/structure-semantics.js';
 import { createLinearFeatureRuntime } from '../app/js/world/load-linear-runtime.js';
@@ -173,21 +172,22 @@ const steepEdges = buildFeatureRibbonEdges(
 );
 for (const point of [...steepEdges.leftEdge, ...steepEdges.rightEdge]) {
   assert.ok(
-    point.y + 1e-5 >= steepCrossSlopeTerrain(point.x, point.z) + 0.08,
-    `at-grade road edge fell below terrain: ${JSON.stringify(point)}`
+    Number.isFinite(point.y),
+    `at-grade compiled edge unavailable: ${JSON.stringify(point)}`
   );
 }
-steepEdges.leftEdge[0].y =
-  steepCrossSlopeTerrain(steepEdges.leftEdge[0].x, steepEdges.leftEdge[0].z) - 1;
-assert.equal(
-  enforceAtGradeRibbonClearance(
-    steepAtGradeRoad,
-    steepEdges.leftEdge,
-    steepEdges.rightEdge,
-    steepCrossSlopeTerrain,
-    0.08
-  ),
-  1
+assert.ok(
+  steepAtGradeRoad.transportSurfaceModel.stats.maximumCut <=
+    steepAtGradeRoad.transportSurfaceModel.cutFillPolicy.maximumCutMeters + 1e-5
+);
+assert.ok(
+  steepAtGradeRoad.transportSurfaceModel.stats.maximumFill <=
+    steepAtGradeRoad.transportSurfaceModel.cutFillPolicy.maximumFillMeters + 1e-5
+);
+assert.ok(
+  steepAtGradeRoad.transportSurfaceModel.stats.maximumCut > 0 &&
+    steepAtGradeRoad.transportSurfaceModel.stats.maximumFill > 0,
+  'steep cross-slope did not produce signed cut and fill'
 );
 
 const hiddenPathContext = {
@@ -338,7 +338,7 @@ console.log(JSON.stringify({
   surfaceLayers: surfaceOrder.map((entry) => entry.layer),
   gradeSeparatedWalkAttachment: 'vertical-and-transition-aware',
   buildingEntryAttachment: 'vertical-occupancy-aware',
-  atGradeRoadClearance: 'terrain-floor-after-crossfall-and-smoothing',
+  atGradeRoadClearance: 'bounded-signed-cross-section-cut-fill',
   mappedFootwayPresentation: 'navigation-data-only',
   worldLoadCommit: 'reconcile-before-reveal'
 }, null, 2));

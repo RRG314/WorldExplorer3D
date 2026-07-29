@@ -348,27 +348,58 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
 
   const { distances: pointDistances, total } = polylineDistances(points);
   const profileTotal = feature.surfaceDistances?.length ? feature.surfaceDistances[feature.surfaceDistances.length - 1] : total;
+  const corridorCenterOffset = Number(
+    feature?.transportRecord?.crossSection?.placement?.centerlineOffsetMeters
+  ) || 0;
   const leftEdge = [];
   const rightEdge = [];
   const centerlineHeights = [];
   for (let i = 0; i < points.length; i++) {
     const point = points[i];
-    let dx;
-    let dz;
+    let nx;
+    let nz;
+    let joinFactor = 1;
     if (i === 0) {
-      dx = points[1].x - point.x;
-      dz = points[1].z - point.z;
+      const dx = points[1].x - point.x;
+      const dz = points[1].z - point.z;
+      const length = Math.hypot(dx, dz) || 1;
+      nx = -dz / length;
+      nz = dx / length;
     } else if (i === points.length - 1) {
-      dx = point.x - points[i - 1].x;
-      dz = point.z - points[i - 1].z;
+      const dx = point.x - points[i - 1].x;
+      const dz = point.z - points[i - 1].z;
+      const length = Math.hypot(dx, dz) || 1;
+      nx = -dz / length;
+      nz = dx / length;
     } else {
-      dx = points[i + 1].x - points[i - 1].x;
-      dz = points[i + 1].z - points[i - 1].z;
+      const previousDx = point.x - points[i - 1].x;
+      const previousDz = point.z - points[i - 1].z;
+      const nextDx = points[i + 1].x - point.x;
+      const nextDz = points[i + 1].z - point.z;
+      const previousLength = Math.hypot(previousDx, previousDz) || 1;
+      const nextLength = Math.hypot(nextDx, nextDz) || 1;
+      const previousNormalX = -previousDz / previousLength;
+      const previousNormalZ = previousDx / previousLength;
+      const nextNormalX = -nextDz / nextLength;
+      const nextNormalZ = nextDx / nextLength;
+      const miterX = previousNormalX + nextNormalX;
+      const miterZ = previousNormalZ + nextNormalZ;
+      const miterLength = Math.hypot(miterX, miterZ);
+      if (miterLength > 1e-5) {
+        nx = miterX / miterLength;
+        nz = miterZ / miterLength;
+        const denominator = nx * nextNormalX + nz * nextNormalZ;
+        if (Math.abs(denominator) >= 0.25) {
+          joinFactor = Math.max(-2.25, Math.min(2.25, 1 / denominator));
+        } else {
+          nx = nextNormalX;
+          nz = nextNormalZ;
+        }
+      } else {
+        nx = nextNormalX;
+        nz = nextNormalZ;
+      }
     }
-
-    const len = Math.hypot(dx, dz) || 1;
-    const nx = -dz / len;
-    const nz = dx / len;
     const distanceRatio = total > 1e-6 ? pointDistances[i] / total : 0;
     const profileDistance = profileTotal * distanceRatio;
     const model = feature.transportSurfaceModel || null;
@@ -387,10 +418,10 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
           : terrainY + baseTopBias;
     centerlineHeights.push(centerY);
 
-    const leftX = point.x + nx * halfWidth;
-    const leftZ = point.z + nz * halfWidth;
-    const rightX = point.x - nx * halfWidth;
-    const rightZ = point.z - nz * halfWidth;
+    const leftX = point.x + nx * (halfWidth + corridorCenterOffset) * joinFactor;
+    const leftZ = point.z + nz * (halfWidth + corridorCenterOffset) * joinFactor;
+    const rightX = point.x + nx * (-halfWidth + corridorCenterOffset) * joinFactor;
+    const rightZ = point.z + nz * (-halfWidth + corridorCenterOffset) * joinFactor;
     const maxCrossfall = Math.max(0.12, Math.min(0.45, halfWidth * 0.08));
     const clampCrossfall = (terrainY) => {
       const minimumY = Number(terrainY) + baseTopBias;
@@ -425,34 +456,6 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
   }
 
   return { leftEdge, rightEdge, centerlineHeights };
-}
-
-function enforceAtGradeRibbonClearance(feature, leftEdge, rightEdge, sampleTerrainY, surfaceBias = null) {
-  if (
-    feature?.structureSemantics?.terrainMode !== 'at_grade' ||
-    typeof sampleTerrainY !== 'function'
-  ) return 0;
-
-  const bias = Number.isFinite(surfaceBias)
-    ? Number(surfaceBias)
-    : Number.isFinite(feature?.surfaceBias)
-      ? Number(feature.surfaceBias)
-      : 0.08;
-  let corrected = 0;
-  [leftEdge, rightEdge].forEach((edge) => {
-    if (!Array.isArray(edge)) return;
-    edge.forEach((point) => {
-      if (!point || !Number.isFinite(point.x) || !Number.isFinite(point.z)) return;
-      const terrainY = Number(sampleTerrainY(point.x, point.z));
-      if (!Number.isFinite(terrainY)) return;
-      const minimumY = terrainY + bias;
-      if (!Number.isFinite(point.y) || point.y < minimumY - 1e-5) {
-        point.y = minimumY;
-        corrected += 1;
-      }
-    });
-  });
-  return corrected;
 }
 
 function shouldRenderRoadSkirts(feature) {
@@ -673,7 +676,6 @@ export {
   assignFeatureConnections,
   boundsIntersect,
   buildFeatureRibbonEdges,
-  enforceAtGradeRibbonClearance,
   buildFeatureStations,
   buildFeatureTransitionAnchors,
   classifyStructureSemantics,

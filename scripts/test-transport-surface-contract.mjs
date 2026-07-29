@@ -104,21 +104,27 @@ for (const terrain of terrainFamilies) {
   assert.equal(model.schemaVersion, TRANSPORT_SURFACE_SCHEMA_VERSION);
   assert.equal(model.authority, 'compiled_transport_surface');
   assert.ok(model.stats.maximumGrade <= 0.1201, `${terrain.id}: grade limit exceeded`);
+  assert.equal(model.cutFillPolicy.signed, true, `${terrain.id}: signed cut/fill disabled`);
+  assert.ok(
+    model.stats.maximumCut <= model.cutFillPolicy.maximumCutMeters + EPSILON,
+    `${terrain.id}: cut bound exceeded`
+  );
+  assert.ok(
+    model.stats.maximumFill <= model.cutFillPolicy.maximumFillMeters + EPSILON,
+    `${terrain.id}: fill bound exceeded`
+  );
 
-  for (let index = 0; index < model.distances.length; index += 1) {
-    const x = model.distances[index];
-    const centerGround = terrain.sample(x, 0);
-    const leftGround = terrain.sample(x, 5);
-    const rightGround = terrain.sample(x, -5);
-    assert.ok(model.centerHeights[index] + EPSILON >= centerGround + SURFACE_BIAS, `${terrain.id}: center clipped`);
-    assert.ok(model.leftHeights[index] + EPSILON >= leftGround + SURFACE_BIAS, `${terrain.id}: left edge clipped`);
-    assert.ok(model.rightHeights[index] + EPSILON >= rightGround + SURFACE_BIAS, `${terrain.id}: right edge clipped`);
+  if (terrain.id === 'rolling_inland' || terrain.id === 'high_mountain') {
+    assert.ok(model.stats.maximumCut > 0.02, `${terrain.id}: road still only raises terrain`);
+    assert.ok(model.stats.maximumFill > 0.02, `${terrain.id}: road did not fill terrain dips`);
   }
 
   geographyResults.push({
     id: terrain.id,
     samples: model.distances.length,
-    maximumGrade: Number(model.stats.maximumGrade.toFixed(5))
+    maximumGrade: Number(model.stats.maximumGrade.toFixed(5)),
+    maximumCut: Number(model.stats.maximumCut.toFixed(4)),
+    maximumFill: Number(model.stats.maximumFill.toFixed(4))
   });
 }
 
@@ -612,6 +618,36 @@ for (let index = 0; index < parityFeature.pts.length; index += 1) {
   assert.ok(Math.abs(right.y - rightY) <= EPSILON, 'right render/collision surface diverged');
   assert.ok(Number.isFinite(centerY), 'center gameplay surface unavailable');
 }
+
+const rightAngleRoad = {
+  ...straightFeature({
+    id: 'right-angle-miter',
+    length: 40,
+    width: 10,
+    semantics: {
+      terrainMode: 'at_grade',
+      gradeSeparated: false,
+      verticalGroup: 'at_grade:0:at_grade'
+    }
+  }),
+  pts: [{ x: 0, z: 0 }, { x: 20, z: 0 }, { x: 20, z: 20 }]
+};
+updateFeatureSurfaceProfile(rightAngleRoad, () => 10);
+const rightAngleRibbon = buildFeatureRibbonEdges(
+  rightAngleRoad,
+  rightAngleRoad.pts,
+  5,
+  () => 10
+);
+const cornerLeft = rightAngleRibbon.leftEdge[1];
+const cornerRight = rightAngleRibbon.rightEdge[1];
+assert.ok(
+  Math.abs(Math.abs(cornerLeft.z) - 5) <= EPSILON &&
+    Math.abs(Math.abs(cornerLeft.x - 20) - 5) <= EPSILON &&
+    Math.abs(Math.abs(cornerRight.z) - 5) <= EPSILON &&
+    Math.abs(Math.abs(cornerRight.x - 20) - 5) <= EPSILON,
+  'corridor miter failed to preserve width through a right-angle curve'
+);
 
 const intersectionRoad = (id, endX, endZ) => ({
   sourceFeatureId: id,

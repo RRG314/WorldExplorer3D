@@ -1,6 +1,6 @@
 # Next Production Release Plan
 
-**Plan status:** implementation underway; Phase 0 complete and bounded Phase 1 artifact active
+**Plan status:** implementation underway; Phases 0–2 complete, Phase 3 ready to begin
 **Starting baseline:** `3823aea9333717ab1ea5032fb4ca929900ab8a81`  
 **Release rule:** no production deployment until every phase exit condition and the final production gate pass  
 **Design rule:** locations are evidence fixtures, never locations for patches
@@ -252,6 +252,35 @@ commands are in `docs/PHASE1_ACCEPTED_GROUND_HANDOFF.md`.
 **Rollback point:** Phase 1 commit.
 
 **Expected commit boundary:** `feat: make compiled transport the sole road authority`.
+
+**Phase 2 exit checkpoint (2026-07-29):** Phase 2 engineering is complete and
+the Phase 3 entry condition is satisfied. Public OSM/Overpass is the lossless
+primary transport source; public OSM Shortbread is a generalized fallback.
+Normalization preserves stable source identity and 33 raw transport fields,
+including direction, access, lane, placement, structure and vertical-order
+semantics. Generalized grade-separated fragments are explicitly uncertain and
+non-drivable rather than being promoted with invented structure metadata.
+
+One immutable compiled graph now owns sub-meter endpoint joins,
+endpoint-to-interior joins, shared source-node topology, crossing separation,
+direction and connection provenance. The same graph stations and compiled
+surface feed ribbons, markings, collision/surface queries and walk/drive
+navigation. At-grade profiles use bounded signed cross-section cut/fill and
+vertical smoothing; placement-aware bounded-miter corridors replace the former
+independent terrain mutation and unbounded corner behavior.
+
+The complete `npm test` chain passes. The runtime gate passed on two distinct
+public responses, including a 3,522-road/25,362-building run with 13,822 walk
+segments, 12,881 drive segments, exact render/walk/drive surface parity, a
+resolved mapped-footway route and no console errors. Public-source smoke
+coverage loaded Monaco, Svalbard, Antarctica and Dubai desert transport, while
+unsupported Sydney correctly failed closed. The 600-feature compiler test
+completed in 3.3 ms; cached surface and spatial p95 queries were 0.0068 ms and
+0.0341 ms, respectively. Hosting build/verification and strict reachability
+also pass. SwiftShader evidence is functional only and is not claimed as the
+later hardware-eligible release performance gate. Full ownership, source
+policy, evidence and Phase 3 constraints are recorded in
+`docs/PHASE2_COMPILED_TRANSPORT_HANDOFF.md`.
 
 ## Phase 3 — Specialize structures without fragmenting authority
 

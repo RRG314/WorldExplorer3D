@@ -233,6 +233,7 @@ export function buildWorldOverpassPlan({
                 way["place"="square"]${featureBounds};
                 way["surface"~"^(paved|asphalt|concrete|concrete:plates|paving_stones|sett|cobblestone)$"]["area"="yes"]${featureBounds};
                 way["natural"~"^(wood|forest|scrub|grassland|heath|wetland|tree_row|sand|beach|bare_rock|scree|shingle|glacier)$"]${featureBounds};
+                node["natural"="tree"]${featureBounds};
                 way["natural"="water"]${featureBounds};
                 way["water"]${featureBounds};
                 way["waterway"~"^(river|stream|canal|drain|ditch)$"]${featureBounds};
