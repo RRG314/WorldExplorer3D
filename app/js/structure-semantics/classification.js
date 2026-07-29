@@ -80,15 +80,19 @@ function classifyStructureSemantics(tags = {}, options = {}) {
   const placement = normalizedTagValue(tags?.placement);
   const rampTag = normalizedTagValue(tags?.ramp);
   const passage = normalizedTagValue(tags?.passage || tags?.building_passage);
+  const cutting = isTruthyTag(tags?.cutting);
+  const embankment = isTruthyTag(tags?.embankment);
   const layer = parseIntegerTag(tags?.layer, 0);
   const level = parseNumericTag(tags?.level, NaN);
   const minHeight = parseNumericTag(tags?.min_height, NaN);
   const buildingMinLevel = parseNumericTag(tags?.['building:min_level'], NaN);
   const culvert = tunnelTag === 'culvert' || normalizedTagValue(tags?.culvert) === 'yes';
   const isBridge = isTruthyTag(bridgeTag) || manMade === 'bridge';
-  const isTunnel = (isTruthyTag(tunnelTag) && tunnelTag !== 'building_passage') || location === 'underground' || location === 'underwater';
-  const isCovered = isTruthyTag(coveredTag) || tunnelTag === 'building_passage' || passage === 'yes';
-  const isIndoor = !!indoorTag;
+  const buildingPassage = tunnelTag === 'building_passage' || passage === 'yes';
+  const underground = location === 'underground' || location === 'underwater';
+  const isTunnel = (isTruthyTag(tunnelTag) && !buildingPassage) || underground;
+  const isCovered = isTruthyTag(coveredTag) || buildingPassage;
+  const isIndoor = isTruthyTag(indoorTag);
   const isPedestrianConnector = /^(footway|pedestrian|path|corridor|steps)$/.test(highway) || featureCategory === 'connector';
   const rampCandidate =
     rampTag === 'yes' ||
@@ -163,6 +167,10 @@ function classifyStructureSemantics(tags = {}, options = {}) {
     culvert,
     covered: isCovered,
     indoor: isIndoor,
+    buildingPassage,
+    underground,
+    cutting,
+    embankment,
     skywalk,
     placement,
     layer,

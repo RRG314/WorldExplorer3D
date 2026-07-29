@@ -8,7 +8,10 @@ import {
   clearStructureVisualMeshesForContext,
   rebuildStructureVisualMeshesForContext
 } from "./structure-visual-meshes.js?v=6";
-import { collectTunnelVisualInstances } from "./structure-tunnel-visuals.js?v=7";
+import {
+  collectCoveredVisualInstances,
+  collectTunnelVisualInstances
+} from "./structure-tunnel-visuals.js?v=8";
 import { elevatedSegmentSafety } from "../world/bridge-safety.js?v=2";
 
 function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {
@@ -155,7 +158,9 @@ export function collectStructureVisualInstances({
         nearbyElevatedCount <= 3;
       const renderCapBeams = isConnectorLike || isSkywalk || renderRoadSupports;
       const width = Math.max(2, Number(feature.width) || 4);
-      const deckThickness = isConnectorLike ? 0.72 : Math.max(0.9, Math.min(1.6, width * 0.11));
+      const structureSpecification = feature?.transportStructureRef?.specification || {};
+      const deckThickness = Number(structureSpecification.deckThickness) ||
+        (isConnectorLike ? 0.72 : Math.max(0.9, Math.min(1.6, width * 0.11)));
       const girderDepth = isConnectorLike ? Math.max(0.34, deckThickness * 0.65) : Math.max(0.58, deckThickness * 0.72);
       for (let segIndex = 0; segIndex < structurePts.length - 1; segIndex++) {
         const p1 = structurePts[segIndex];
@@ -245,7 +250,7 @@ export function collectStructureVisualInstances({
             addBeam(
               guardrailInstances,
               midX + nx * railOffset * side,
-              deckY + 1.02,
+              deckY + (Number(structureSpecification.barrierHeight) || 1.1) - 0.08,
               midZ + nz * railOffset * side,
               0.14,
               0.16,
@@ -280,7 +285,7 @@ export function collectStructureVisualInstances({
             p1: { x: p1.x, y: startY, z: p1.z },
             p2: { x: p2.x, y: endY, z: p2.z },
             halfWidth: width * 0.5 + 0.18,
-            height: 0.72
+            height: Number(structureSpecification.barrierHeight) || 1.25
           });
         }
 
@@ -385,10 +390,12 @@ export function collectStructureVisualInstances({
         }
       }
 
-      const supportSpacing =
-        isConnectorLike ?
-          Math.max(16, width * 3.6) :
-          Math.max(26, width * 3.8 + nearbyElevatedCount * 5);
+      const supportSpacing = Math.max(
+        Number(structureSpecification.supportSpacing) || 0,
+        isConnectorLike
+          ? Math.max(16, width * 3.6)
+          : Math.max(26, width * 3.8 + nearbyElevatedCount * 5)
+      );
       const skipNear = Math.max(8, width * 0.9);
       const skipDistance = (distance) => {
         if (distance < skipNear || distance > total - skipNear) return true;
@@ -553,6 +560,13 @@ export function collectStructureVisualInstances({
       roofInstances.push(...tunnel.roofs);
       tunnelLightInstances.push(...tunnel.lights);
       tunnelShells.push(...tunnel.shells);
+    } else if (semantics.structureKind === "covered") {
+      const covered = collectCoveredVisualInstances(feature, structurePts, {
+        samplePointAlongPolyline
+      });
+      portalInstances.push(...covered.portals);
+      wallInstances.push(...covered.walls);
+      roofInstances.push(...covered.roofs);
     }
   }
 

@@ -67,6 +67,9 @@ function buildFeatureStations(feature, context = {}) {
   const { distances, total } = polylineDistances(points);
   const features = Array.isArray(context.features) ? context.features : [];
   const waterAreas = Array.isArray(context.waterAreas) ? context.waterAreas : [];
+  const sampleTerrainY = typeof context.sampleTerrainY === 'function'
+    ? context.sampleTerrainY
+    : null;
   const bounds = feature.bounds || polylineBounds(points, (Number(feature.width) || 4) + 24);
   const stations = [];
   const laneWidth = Math.max(1.2, Number(feature.width) || 4);
@@ -75,6 +78,48 @@ function buildFeatureStations(feature, context = {}) {
     ? semantics.cutDepth + stackOffset
     : semantics.deckClearance + stackOffset;
   const defaultSpan = Math.max(18, laneWidth * 4.5, defaultTarget * 4.2);
+  const approachProfileCache = new Map();
+  const approachSurfaceAt = (candidate, segmentIndex, t) => {
+    if (!sampleTerrainY || !Array.isArray(candidate?.pts) || candidate.pts.length < 2) {
+      return NaN;
+    }
+    let profile = approachProfileCache.get(candidate);
+    if (!profile) {
+      const path = polylineDistances(candidate.pts);
+      const first = candidate.pts[0];
+      const last = candidate.pts[candidate.pts.length - 1];
+      profile = {
+        ...path,
+        startY: Number(sampleTerrainY(first.x, first.z)),
+        endY: Number(sampleTerrainY(last.x, last.z))
+      };
+      approachProfileCache.set(candidate, profile);
+    }
+    if (!Number.isFinite(profile.startY) || !Number.isFinite(profile.endY)) return NaN;
+    const start = candidate.pts[segmentIndex];
+    const end = candidate.pts[Math.min(candidate.pts.length - 1, segmentIndex + 1)];
+    const segmentLength = Math.hypot(end.x - start.x, end.z - start.z);
+    const distance = Number(profile.distances[segmentIndex] || 0) +
+      segmentLength * Math.max(0, Math.min(1, Number(t) || 0));
+    const progress = profile.total > 1e-6 ? distance / profile.total : 0;
+    return profile.startY + (profile.endY - profile.startY) * progress;
+  };
+  const compiledSurfaceAt = (candidate, segmentIndex, t) => {
+    const model = candidate?.transportSurfaceModel;
+    if (!model) return NaN;
+    let profile = approachProfileCache.get(candidate);
+    if (!profile) {
+      const path = polylineDistances(candidate.pts);
+      profile = { ...path, startY: NaN, endY: NaN };
+      approachProfileCache.set(candidate, profile);
+    }
+    const start = candidate.pts[segmentIndex];
+    const end = candidate.pts[Math.min(candidate.pts.length - 1, segmentIndex + 1)];
+    const segmentLength = Math.hypot(end.x - start.x, end.z - start.z);
+    const distance = Number(profile.distances[segmentIndex] || 0) +
+      segmentLength * Math.max(0, Math.min(1, Number(t) || 0));
+    return sampleTransportSurfaceAtDistance(model, distance);
+  };
 
   const addStation = (distance, targetOffset, span, source = 'crossing') => {
     if (!Number.isFinite(distance) || !Number.isFinite(targetOffset) || !(span > 0)) return;
@@ -125,17 +170,37 @@ function buildFeatureStations(feature, context = {}) {
             (Number.isFinite(otherSemantics?.deckClearance) ? otherSemantics.deckClearance : 0) +
             Math.max(0, Number(other.structureStackOffset) || 0);
           const crossingClearance = semantics.featureCategory === 'road' ? 5.5 : 4.2;
-          target = otherOrder < ownOrder
-            ? Math.max(defaultTarget, otherTarget + crossingClearance)
-            : defaultTarget;
+          if (otherOrder < ownOrder) {
+            const ownApproachY = approachSurfaceAt(feature, segA, intersection.t);
+            const otherApproachY = approachSurfaceAt(other, segB, intersection.u);
+            const otherSurfaceY = compiledSurfaceAt(other, segB, intersection.u);
+            const worldSpaceTarget =
+              Number.isFinite(ownApproachY) && Number.isFinite(otherSurfaceY)
+                ? otherSurfaceY + crossingClearance - ownApproachY -
+                  (Number(feature.surfaceBias) || 0.08)
+                : Number.isFinite(ownApproachY) && Number.isFinite(otherApproachY)
+                  ? otherApproachY + otherTarget + crossingClearance - ownApproachY
+                : otherTarget + crossingClearance;
+            target = Math.max(defaultTarget, worldSpaceTarget);
+          }
         } else if (semantics.terrainMode === 'subgrade') {
           const otherDepth =
             (Number.isFinite(otherSemantics?.cutDepth) ? otherSemantics.cutDepth : 0) +
             Math.max(0, Number(other.structureStackOffset) || 0);
           const crossingClearance = semantics.featureCategory === 'road' ? 4.6 : 3;
-          target = otherOrder > ownOrder
-            ? Math.max(defaultTarget, otherDepth + crossingClearance)
-            : defaultTarget;
+          if (otherOrder > ownOrder) {
+            const ownApproachY = approachSurfaceAt(feature, segA, intersection.t);
+            const otherApproachY = approachSurfaceAt(other, segB, intersection.u);
+            const otherSurfaceY = compiledSurfaceAt(other, segB, intersection.u);
+            const worldSpaceTarget =
+              Number.isFinite(ownApproachY) && Number.isFinite(otherSurfaceY)
+                ? ownApproachY - otherSurfaceY + crossingClearance +
+                  (Number(feature.surfaceBias) || 0.08)
+                : Number.isFinite(ownApproachY) && Number.isFinite(otherApproachY)
+                  ? ownApproachY - otherApproachY + otherDepth + crossingClearance
+                : otherDepth + crossingClearance;
+            target = Math.max(defaultTarget, worldSpaceTarget);
+          }
         }
         addStation(distance, target, defaultSpan, 'feature_crossing');
       }

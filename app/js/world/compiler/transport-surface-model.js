@@ -424,7 +424,12 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     terrainEnvelope[index] = atGradeReferenceY + surfaceBias;
     centerLowerBounds[index] = atGrade
       ? highestCrossSectionGround + surfaceBias - maximumAtGradeCut
-      : Number.NEGATIVE_INFINITY;
+      : mode === 'elevated'
+        // Crossing stations are structural minimums expressed in world
+        // elevation. Smoothing may lift neighboring samples to satisfy grade,
+        // but it must never average a required vehicle clearance back out.
+        ? centerY
+        : Number.NEGATIVE_INFINITY;
     centerUpperBounds[index] = atGrade
       ? lowestCrossSectionGround + surfaceBias + maximumAtGradeFill
       : Number.POSITIVE_INFINITY;

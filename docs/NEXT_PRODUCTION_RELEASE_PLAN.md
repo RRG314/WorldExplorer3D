@@ -1,6 +1,6 @@
 # Next Production Release Plan
 
-**Plan status:** implementation underway; Phases 0–2 complete, Phase 3 ready to begin
+**Plan status:** implementation underway; Phases 0–3 complete, including hardware-backed named structure journeys and exit evidence
 **Starting baseline:** `3823aea9333717ab1ea5032fb4ca929900ab8a81`  
 **Release rule:** no production deployment until every phase exit condition and the final production gate pass  
 **Design rule:** locations are evidence fixtures, never locations for patches
@@ -283,6 +283,11 @@ policy, evidence and Phase 3 constraints are recorded in
 `docs/PHASE2_COMPILED_TRANSPORT_HANDOFF.md`.
 
 ## Phase 3 — Specialize structures without fragmenting authority
+
+**Completion:** complete on the Phase 3 commit boundary. Named and paired
+real-input journeys pass on Apple M1 Metal with inspected screenshots,
+accepted public ground, physical portal exits, stacked clearance, enclosed
+camera clearance, and zero centerline structure collisions.
 
 **Single objective:** bridges, ramps, overpasses, tunnels, covered roads and building passages are typed products of the Phase 2 transport model.
 

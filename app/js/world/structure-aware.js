@@ -8,6 +8,8 @@ import {
   updateFeatureSurfaceProfile
 } from "../structure-semantics.js?v=28";
 import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=2";
+import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
+import { refreshStructureColliders } from "./structure-colliders.js?v=1";
 
 const runtime = {
   enableLinearFeatures: () => false,
@@ -38,7 +40,10 @@ function worldRenderedTerrainY(x, z) {
 
 function structureAwareLinearFeatures() {
   if (!Array.isArray(appCtx.linearFeatures)) return [];
-  return appCtx.linearFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
+  return appCtx.linearFeatures.filter((feature) =>
+    feature?.structureSemantics?.gradeSeparated ||
+    feature?.structureSemantics?.structureKind === 'covered'
+  );
 }
 
 function featureBuildingContainmentStats(feature) {
@@ -173,6 +178,9 @@ export function refreshStructureAwareFeatureProfiles() {
 
   const structureFeatures = transportFeatures.filter((feature) => feature?.structureSemantics?.gradeSeparated);
   appCtx.transportNetworkModel = assignFeatureConnections(transportFeatures);
+  appCtx.transportStructureModel = compileTransportStructureModel(transportFeatures, {
+    transportGraphId: appCtx.transportNetworkModel.id
+  });
   if (appCtx.transportSurfacePublication?.authority === 'compiled_transport_surface') {
     appCtx.transportSurfacePublication = Object.freeze({
       ...appCtx.transportSurfacePublication,
@@ -187,7 +195,8 @@ export function refreshStructureAwareFeatureProfiles() {
     if (!feature?.structureSemantics?.gradeSeparated) continue;
     feature.structureStations = buildFeatureStations(feature, {
       features: structureFeatures,
-      waterAreas: appCtx.waterAreas
+      waterAreas: appCtx.waterAreas,
+      sampleTerrainY: worldBaseTerrainY
     });
   }
 
@@ -204,6 +213,26 @@ export function refreshStructureAwareFeatureProfiles() {
     updateFeatureSurfaceProfile(feature, sampleTerrainY, {
       surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
     });
+  }
+
+  // Resolve crossing clearances once against the first compiled world-space
+  // surfaces. Nominal layer offsets alone are insufficient when two ramps
+  // have different endpoint-ground chords on sloped terrain.
+  for (let refinement = 0; refinement < 3; refinement += 1) {
+    for (let i = 0; i < structureFeatures.length; i++) {
+      const feature = structureFeatures[i];
+      feature.structureStations = buildFeatureStations(feature, {
+        features: structureFeatures,
+        waterAreas: appCtx.waterAreas,
+        sampleTerrainY: worldBaseTerrainY
+      });
+    }
+    for (let i = 0; i < structureFeatures.length; i++) {
+      const feature = structureFeatures[i];
+      updateFeatureSurfaceProfile(feature, worldBaseTerrainY, {
+        surfaceBias: Number.isFinite(feature.surfaceBias) ? feature.surfaceBias : 0.08
+      });
+    }
   }
 
   for (let i = 0; i < transportFeatures.length; i++) {
@@ -228,6 +257,7 @@ export function refreshStructureAwareFeatureProfiles() {
   }
 
   compileTunnelSystemModels(transportFeatures, worldBaseTerrainY);
+  refreshStructureColliders(appCtx, transportFeatures);
   appCtx.refreshBridgeGuardrails?.(roadFeatures);
 
   // Terrain remains the terrain roof above a tunnel. Portal placement and the

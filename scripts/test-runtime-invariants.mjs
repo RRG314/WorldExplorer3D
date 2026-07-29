@@ -932,6 +932,32 @@ async function main() {
         maximumGrade: compiledRoads.reduce((maximum, road) =>
           Math.max(maximum, Number(road?.transportSurfaceModel?.stats?.maximumGrade) || 0), 0)
       };
+      const transportStructureModel = ctx?.transportStructureModel || null;
+      const transportStructureColliders = Array.isArray(ctx?.transportStructureColliders)
+        ? ctx.transportStructureColliders
+        : [];
+      const transportStructureCoverage = {
+        authority: String(transportStructureModel?.authority || ''),
+        modelId: String(transportStructureModel?.id || ''),
+        transportGraphId: String(transportStructureModel?.transportGraphId || ''),
+        activeTransportGraphId: String(ctx?.transportNetworkModel?.id || ''),
+        featureCount: Number(transportStructureModel?.stats?.featureCount || 0),
+        chainCount: Number(transportStructureModel?.stats?.chainCount || 0),
+        incompleteCount: Number(transportStructureModel?.stats?.incompleteCount || 0),
+        colliderCount: transportStructureColliders.length,
+        invalidColliderCount: transportStructureColliders.filter((collider) =>
+          collider?.geometrySource !== 'compiled_transport_structures' ||
+          collider?.heightSource !== 'compiled_transport_surface' ||
+          !['side_wall', 'ceiling'].includes(collider?.structureColliderKind) ||
+          !Number.isFinite(collider?.minY) ||
+          !Number.isFinite(collider?.maxY) ||
+          !(collider.maxY > collider.minY)
+        ).length,
+        sideWallCount: transportStructureColliders.filter((collider) =>
+          collider?.structureColliderKind === 'side_wall').length,
+        ceilingCount: transportStructureColliders.filter((collider) =>
+          collider?.structureColliderKind === 'ceiling').length
+      };
       const acceptedGroundSnapshot =
         ctx?.getAcceptedGroundRuntimeSnapshot?.() || null;
       const activeAcceptedGroundSample =
@@ -996,6 +1022,7 @@ async function main() {
         syntheticStructureSemantics,
         syntheticBridgeHeights: Array.from(syntheticBridge.surfaceHeights || []),
         transportSurfaceCoverage,
+        transportStructureCoverage,
         transportSurfacePublication: ctx?.transportSurfacePublication || null,
         acceptedGroundRuntimeBoundary: {
           prepareExposed:
@@ -1108,6 +1135,18 @@ async function main() {
         report.transportSurfaceCoverage?.maximumGrade <= 0.1202 &&
         report.transportSurfacePublication?.authority === 'compiled_transport_surface' &&
         report.transportSurfacePublication?.roadCount === report.transportSurfaceCoverage?.roadCount,
+      compiledStructureAuthority:
+        report.transportStructureCoverage?.authority === 'compiled_transport_structures' &&
+        report.transportStructureCoverage?.modelId?.startsWith('transport-structure-model:') &&
+        report.transportStructureCoverage?.transportGraphId ===
+          report.transportStructureCoverage?.activeTransportGraphId &&
+        report.transportStructureCoverage?.featureCount > 0 &&
+        report.transportStructureCoverage?.chainCount > 0,
+      structureCollisionAuthority:
+        report.transportStructureCoverage?.colliderCount > 0 &&
+        report.transportStructureCoverage?.invalidColliderCount === 0 &&
+        report.transportStructureCoverage?.sideWallCount > 0 &&
+        report.transportStructureCoverage?.ceilingCount > 0,
       compiledTransportRendererBudget:
         report.transportSurfacePublication?.meshCount <= 4 &&
         report.transportSurfacePublication?.compiledSampleCount <=
@@ -1256,6 +1295,14 @@ async function main() {
       coverage: report.transportSurfaceCoverage,
       publication: report.transportSurfacePublication
     })}`);
+    assert(
+      checks.compiledStructureAuthority,
+      `Transport structures did not publish from the active compiled graph: ${JSON.stringify(report.transportStructureCoverage || null)}`
+    );
+    assert(
+      checks.structureCollisionAuthority,
+      `Structure collision was missing or did not consume compiled structure/surface authority: ${JSON.stringify(report.transportStructureCoverage || null)}`
+    );
     assert(
       checks.compiledTransportRendererBudget,
       `Compiled transport renderer exceeded its bounded per-road budget: ${JSON.stringify(report.transportSurfacePublication || null)}`

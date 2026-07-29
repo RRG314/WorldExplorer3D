@@ -48,7 +48,9 @@ export function registerBridgeGuardrails(road, owner = null) {
   if (Array.isArray(road.guardrailColliders) && road.guardrailColliders.length > 0) return road.guardrailColliders;
   const colliders = [];
   const width = Math.max(3, Number(road.width) || 5);
-  const offset = width * 0.5 + 0.3;
+  const specification = road?.transportStructureRef?.specification || {};
+  const offset = Number(specification.barrierOffset) || width * 0.5 + 0.3;
+  const barrierHeight = Number(specification.barrierHeight) || 1.25;
   const thickness = 0.24;
   const distances = new Float32Array(road.pts.length);
   for (let i = 1; i < road.pts.length; i += 1) {
@@ -90,8 +92,8 @@ export function registerBridgeGuardrails(road, owner = null) {
         ...colliderBounds(pts),
         baseY: surfaceY,
         minY: surfaceY,
-        maxY: surfaceY + 1.25,
-        height: 1.25,
+        maxY: surfaceY + barrierHeight,
+        height: barrierHeight,
         buildingType: 'bridge_guardrail',
         collisionKind: 'barrier',
         geometrySource: 'road_guardrail',

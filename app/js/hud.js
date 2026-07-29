@@ -388,7 +388,16 @@ function updateCamera(dt = 1 / 60) {
 
   // Normal car camera modes
   const lb = appCtx.keys.KeyV;
-  const insideTunnel = appCtx.car?.road?.structureSemantics?.terrainMode === 'subgrade';
+  const activeRoadSemantics = appCtx.car?.road?.structureSemantics || null;
+  const activeStructureKind = String(
+    appCtx.car?.road?.transportStructureRef?.kind ||
+    activeRoadSemantics?.structureKind ||
+    ''
+  );
+  const insideTunnel =
+    activeRoadSemantics?.terrainMode === 'subgrade' ||
+    activeRoadSemantics?.structureKind === 'covered' ||
+    ['covered', 'indoor_covered', 'building_passage'].includes(activeStructureKind);
   const planetaryChase = !!(appCtx.onMoon || appCtx.onMars);
   const d = insideTunnel ? 6.5 : appCtx.onMars ? 12 : CHASE_CAMERA_DISTANCE;
   const h = insideTunnel ? 2.35 : appCtx.onMars ? 6.5 : CHASE_CAMERA_HEIGHT;
