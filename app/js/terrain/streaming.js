@@ -110,10 +110,18 @@ function createTerrainStreamingApi(deps = {}) {
   function updateTerrainAround(x, z) {
     if (!appCtx.terrainEnabled) return;
     if (![x, z].every(Number.isFinite)) return;
+    const geographic = worldToLatLon(x, z);
+    if (
+      terrainTileDeps?.usesAcceptedGround === true &&
+      terrainTileDeps.sampleAcceptedGroundAtLatLon?.(
+        geographic.lat,
+        geographic.lon
+      )?.status !== 'available'
+    ) return;
 
     ensureTerrainGroup();
 
-    const { lat, lon } = worldToLatLon(x, z);
+    const { lat, lon } = geographic;
     const t = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
     const centerKey = `${appCtx.TERRAIN_ZOOM}/${t.x}/${t.y}`;
     const activeRing = getDynamicTerrainRing();
@@ -155,7 +163,14 @@ function createTerrainStreamingApi(deps = {}) {
             `${appCtx.TERRAIN_ZOOM}/${tx}/${ty}`;
           desiredKeys.add(key);
           if (!existingMeshesByKey.has(key)) {
-            getOrLoadTerrainTile?.(appCtx.TERRAIN_ZOOM, tx, ty, terrainTileDeps);
+            if (terrainTileDeps?.usesAcceptedGround !== true) {
+              getOrLoadTerrainTile?.(
+                appCtx.TERRAIN_ZOOM,
+                tx,
+                ty,
+                terrainTileDeps
+              );
+            }
             missing.push({
               key,
               z: appCtx.TERRAIN_ZOOM,

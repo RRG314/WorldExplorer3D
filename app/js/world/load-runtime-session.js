@@ -140,7 +140,6 @@ export function createWorldLoadRuntimeSession(options = {}) {
   if (appCtx.terrainEnabled && !appCtx.onMoon) {
     if (typeof appCtx.resetTerrainStreamingState === 'function') appCtx.resetTerrainStreamingState();
     if (typeof appCtx.clearTerrainMeshes === 'function') appCtx.clearTerrainMeshes();
-    if (typeof appCtx.updateTerrainAround === 'function') appCtx.updateTerrainAround(0, 0);
   }
 
   appCtx.rdtSeed = appCtx.hashGeoToInt(

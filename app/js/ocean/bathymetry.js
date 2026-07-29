@@ -127,23 +127,8 @@ export function createOceanBathymetryApi({
   }
 
   function sampleTerrainMetersAtLatLon(lat, lon) {
-    if (
-      typeof appCtx.latLonToTileXY === 'function' &&
-      typeof appCtx.getOrLoadTerrainTile === 'function' &&
-      typeof appCtx.sampleTileElevationMeters === 'function' &&
-      Number.isFinite(appCtx.TERRAIN_ZOOM)
-    ) {
-      const t = appCtx.latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
-      const tile = appCtx.getOrLoadTerrainTile(appCtx.TERRAIN_ZOOM, t.x, t.y);
-      if (!tile || !tile.loaded || !tile.elev) return null;
-      const u = t.xf - t.x;
-      const v = t.yf - t.y;
-      const meters = appCtx.sampleTileElevationMeters(tile, u, v);
-      return Number.isFinite(meters) ? meters : null;
-    }
-
     if (typeof appCtx.elevationMetersAtLatLon === 'function') {
-      const meters = Number(appCtx.elevationMetersAtLatLon(lat, lon));
+      const meters = appCtx.elevationMetersAtLatLon(lat, lon);
       return Number.isFinite(meters) ? meters : null;
     }
 
@@ -220,69 +205,15 @@ export function createOceanBathymetryApi({
 
   function primeBathymetryTiles() {
     if (oceanMode.bathymetryPromise) return oceanMode.bathymetryPromise;
-
-    if (
-      typeof appCtx.latLonToTileXY !== 'function' ||
-      typeof appCtx.getOrLoadTerrainTile !== 'function' ||
-      !Number.isFinite(appCtx.TERRAIN_ZOOM)
-    ) {
-      oceanMode.bathymetryReady = oceanMode.localBathymetryReady;
-      oceanMode.bathymetryBlend = 0;
-      return Promise.resolve(oceanMode.localBathymetryReady);
-    }
-
-    const offsets = [-0.12, -0.08, -0.04, 0, 0.04, 0.08, 0.12];
-    const tileKeys = new Set();
-
-    for (let i = 0; i < offsets.length; i++) {
-      for (let j = 0; j < offsets.length; j++) {
-        const lat = oceanMode.launchSite.lat + offsets[i];
-        const lon = oceanMode.launchSite.lon + offsets[j];
-        const t = appCtx.latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);
-        appCtx.getOrLoadTerrainTile(appCtx.TERRAIN_ZOOM, t.x, t.y);
-        tileKeys.add(`${appCtx.TERRAIN_ZOOM}/${t.x}/${t.y}`);
-      }
-    }
-
-    oceanMode.bathymetryTileKeys = Array.from(tileKeys);
-
-    oceanMode.bathymetryPromise = new Promise((resolve) => {
-      const startedAt = performance.now();
-
-      const poll = () => {
-        let loadedCount = 0;
-        let doneCount = 0;
-
-        for (let i = 0; i < oceanMode.bathymetryTileKeys.length; i++) {
-          const key = oceanMode.bathymetryTileKeys[i];
-          const tile = appCtx.terrainTileCache && appCtx.terrainTileCache.get(key);
-          if (!tile) continue;
-          if (tile.loaded) {
-            loadedCount += 1;
-            doneCount += 1;
-          } else if (tile.failed) {
-            doneCount += 1;
-          }
-        }
-
-        const elapsed = performance.now() - startedAt;
-        const complete = doneCount >= oceanMode.bathymetryTileKeys.length;
-        const timedOut = elapsed >= constants.BATHYMETRY_WAIT_MS;
-
-        if (complete || timedOut) {
-          oceanMode.bathymetryReady = oceanMode.localBathymetryReady || loadedCount > 0;
-          oceanMode.bathymetryBlend = oceanMode.bathymetryReady ? 1 : 0;
-          if (oceanMode.bathymetryReady) oceanMode.bathymetryCache.clear();
-          resolve(oceanMode.bathymetryReady);
-          return;
-        }
-
-        setTimeout(poll, 120);
-      };
-
-      poll();
-    });
-
+    const groundActive =
+      appCtx.getAcceptedGroundRuntimeSnapshot?.().status === 'accepted';
+    oceanMode.bathymetryReady =
+      oceanMode.localBathymetryReady || groundActive;
+    oceanMode.bathymetryBlend = oceanMode.bathymetryReady ? 1 : 0;
+    if (oceanMode.bathymetryReady) oceanMode.bathymetryCache.clear();
+    oceanMode.bathymetryPromise = Promise.resolve(
+      oceanMode.bathymetryReady
+    );
     return oceanMode.bathymetryPromise;
   }
 

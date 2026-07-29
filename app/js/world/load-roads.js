@@ -1,13 +1,14 @@
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=9";
-import { createWorldLandusePass } from "./load-landuse-pass.js?v=27";
+import { createWorldLandusePass } from "./load-landuse-pass.js?v=28";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
-import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=7";
+import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=8";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=11";
+import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=1";
 import {
   diagnoseDistrictGroundSource,
   prepareSelectedLocationSource
-} from "./compiler/selected-location-source-adapter.js?v=2";
+} from "./compiler/selected-location-source-adapter.js?v=3";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   const waitForCoverage = appCtx.waitForTerrainCoverageAt;
@@ -246,6 +247,11 @@ export function createWorldRoadLoader(deps = {}) {
       useRdtBudgeting,
       useSyntheticFallbackRoads
     } = session;
+    const acceptedGroundReady = await activateAcceptedGroundForWorldLoad({
+      appCtx, endLoadPhase, finalizePerfLoad, loadMetrics, runtimeState,
+      startLoadPhase
+    });
+    if (!acceptedGroundReady) return;
     const radii = loadProfile.radii.slice();
     const featureRadiusScale = loadProfile.featureRadiusScale;
     const poiRadiusScale = loadProfile.poiRadiusScale;
@@ -445,7 +451,7 @@ export function createWorldRoadLoader(deps = {}) {
           await waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase);
         if (runtimeState) {
           runtimeState.transportGroundCoverageReady = transportGroundCoverageReady;
-          const centerTerrainSource = appCtx.terrainSourceSampleAtLatLon?.(
+          const centerTerrainSource = appCtx.sampleAcceptedGroundAtLatLon?.(
             appCtx.LOC.lat,
             appCtx.LOC.lon
           ) || null;

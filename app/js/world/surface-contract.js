@@ -236,19 +236,21 @@ function surfaceKindFromWalkInfo(info = {}) {
 }
 
 function terrainProvenance(appCtx) {
-  const hasLoadedElevation = [...(appCtx.terrainTileCache?.values?.() || [])].some((tile) => tile?.loaded && tile?.elev);
-  return hasLoadedElevation ? {
-    provider: 'Amazon Web Services Open Data',
-    dataset: 'Mapzen Terrarium elevation tiles',
-    source: 'terrarium',
-    confidence: 0.88,
+  const ground = appCtx.getAcceptedGroundRuntimeSnapshot?.() || null;
+  return ground?.status === 'accepted' ? {
+    provider: ground.providerId,
+    dataset: ground.artifactId,
+    source: 'accepted_ground_artifact',
+    sourceRelease: ground.sourceRelease,
+    verticalDatum: ground.verticalDatum,
+    confidence: 1,
     fallback: false
   } : {
     provider: 'World Explorer 3D',
-    dataset: 'terrain fallback',
-    source: 'terrain_fallback',
-    confidence: 0.35,
-    fallback: true
+    dataset: 'accepted ground unavailable',
+    source: 'accepted_ground_unavailable',
+    confidence: 0,
+    fallback: false
   };
 }
 

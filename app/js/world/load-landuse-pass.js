@@ -1,5 +1,5 @@
 import { buildTerrainConformingPolygonGeometry } from './terrain-conforming-polygon.js?v=1';
-import { surfaceComposition } from './surface-contract.js?v=8';
+import { surfaceComposition } from './surface-contract.js?v=9';
 import { normalizeWaterBody } from './water-body-contract.js?v=3';
 
 const SOIL_LANDUSE_TYPES = new Set([

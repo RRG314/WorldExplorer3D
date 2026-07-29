@@ -35,6 +35,25 @@ export function diagnoseDistrictGroundSource(sample = null) {
       reason: 'approved-ground-provider-adapter-required'
     });
   }
+  if (
+    sample.status === 'available' &&
+    Number.isFinite(Number(sample.groundElevationMeters)) &&
+    String(sample.artifactId || '') &&
+    String(sample.providerId || '') &&
+    String(sample.verticalDatum || '')
+  ) {
+    return Object.freeze({
+      schemaVersion: DISTRICT_GROUND_MODEL_SCHEMA_VERSION,
+      status: 'accepted',
+      reason: null,
+      sourceClassification: 'accepted-ground',
+      sampleStatus: 'available',
+      artifactId: String(sample.artifactId),
+      providerId: String(sample.providerId),
+      sourceRelease: String(sample.sourceRelease || ''),
+      verticalDatum: String(sample.verticalDatum)
+    });
+  }
   const sampleStatus = String(sample.status || 'failed');
   const sourceClassification = String(
     sample.provenance?.runtimeClassification || 'rejected'

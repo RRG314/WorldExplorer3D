@@ -17,7 +17,7 @@ import {
   getSeabedTextureSet as getSeabedTextureSetAsset
 } from "./ocean/scene-textures.js?v=1";
 import { createOceanFishLifeApi } from "./ocean/fish-life.js?v=1";
-import { createOceanBathymetryApi } from "./ocean/bathymetry.js?v=1";
+import { createOceanBathymetryApi } from "./ocean/bathymetry.js?v=2";
 import { updateOceanHud as updateOceanHudView } from "./ocean/hud.js?v=2";
 import {
   commitEnvironment,

@@ -161,6 +161,25 @@ Named fixtures include Baltimore (dense city), Miami Beach (coast), Swiss Alps (
 
 **Expected commit boundary:** `feat: establish accepted ground authority`.
 
+**Implementation checkpoint (2026-07-28):** The accepted-ground activation
+boundary is implemented, but Phase 1 is not yet eligible to exit. World loading
+now resets the previous publication, loads the deployment manifest catalog,
+verifies the selected artifact and its SHA-256 binding, and only then starts
+terrain streaming. The render mesh and public height API sample the active
+accepted artifact; legacy Terrarium sampling remains diagnostic-only. Missing
+samples return unavailable/null, pending terrain stays hidden, and an empty
+catalog produces a visible `no-ground-artifacts-configured` blocked state before
+roads or terrain are published. Browser verification confirmed zero road and
+terrain publication in that state with no page errors.
+
+The catalog is intentionally empty because the repository contains no reviewed
+USGS 3DEP source attestations or licensed FABDEM artifacts. Phase 1 remains
+blocked on building and reviewing real, complete, hash-bound artifacts for the
+worldwide scenario matrix. Terrarium must not be relabeled as accepted ground to
+remove this blocker. After artifacts are supplied, complete the consumer
+allowlist, seam/render-collision parity, worldwide visual review and performance
+budgets before marking Phase 1 complete.
+
 ## Phase 2 — Compile one professional transport surface and graph
 
 **Single objective:** one lossless transport model owns topology, vertical alignment and the products consumed by road rendering, collision and navigation.
