@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { chromium } from 'playwright';
+import { classifyEvidence } from './production-readiness.mjs';
 import { startStaticRootServer } from './test-static-server.mjs';
 
 const rootDir = process.cwd();
@@ -48,6 +49,7 @@ async function main() {
       );
     }, { timeout: 120000 });
 
+    const simulationStartedAt = Date.now();
     report = await page.evaluate(async () => {
       const deadline = performance.now() + 60000;
       let ctx = null;
@@ -391,6 +393,13 @@ async function main() {
         runtime: ctx.getRuntimeKernelSnapshot?.() || null,
         interpolation: ctx.getRenderInterpolationSnapshot?.() || null
       };
+    });
+    report.evidence = classifyEvidence({
+      kind: 'synthetic-direct-state',
+      realInput: false,
+      wallClockSeconds: (Date.now() - simulationStartedAt) / 1000,
+      softwareRenderer: false,
+      visualReviewApproved: false
     });
     lastReport = report;
 

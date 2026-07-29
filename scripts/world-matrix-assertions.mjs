@@ -215,11 +215,13 @@ export function assertWorldMatrixLocation(spec, result) {
   assert(result.walkSpawn?.valid !== false, `${spec.id}: invalid walk spawn ${JSON.stringify(result.walkSpawn)}`);
   if (spec.expectedRoadStructure) {
     const gameplay = result.structureGameplay;
-    assert(gameplay?.frames >= 480, `${spec.id}: structure gameplay was only a short segment ${JSON.stringify(gameplay)}`);
-    assert(gameplay?.simulatedSeconds >= 8, `${spec.id}: structure gameplay duration is insufficient ${JSON.stringify(gameplay)}`);
-    assert(gameplay?.moved >= 40, `${spec.id}: vehicle did not traverse the structure ${JSON.stringify(gameplay)}`);
-    assert(gameplay?.onExpectedLayerPct >= 95, `${spec.id}: vehicle changed grade-separated layers ${JSON.stringify(gameplay)}`);
-    assert(gameplay?.maximumVerticalError <= 0.8, `${spec.id}: vehicle clipped or floated from compiled surface ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.evidence?.kind === 'synthetic-direct-state', `${spec.id}: structure simulation evidence kind is missing ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.evidence?.releaseEligible === false, `${spec.id}: direct-state structure simulation was mislabeled as release evidence`);
+    assert(gameplay?.frames >= 480, `${spec.id}: structure simulation was only a short segment ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.simulatedSeconds >= 8, `${spec.id}: structure simulation duration is insufficient ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.moved >= 40, `${spec.id}: simulated vehicle did not traverse the structure ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.onExpectedLayerPct >= 95, `${spec.id}: simulated vehicle changed grade-separated layers ${JSON.stringify(gameplay)}`);
+    assert(gameplay?.maximumVerticalError <= 0.8, `${spec.id}: simulated vehicle clipped or floated from compiled surface ${JSON.stringify(gameplay)}`);
     assert(
       gameplay?.maximumLateralError <= Math.max(3, Number(result.landPresentation?.nearestRoad?.width || 0) * 0.5 + 1),
       `${spec.id}: vehicle left the compiled transport ribbon ${JSON.stringify(gameplay)}`

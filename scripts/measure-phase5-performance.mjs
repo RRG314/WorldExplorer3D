@@ -6,12 +6,14 @@ import { chromium } from 'playwright';
 const args = {
   url: 'http://127.0.0.1:4192/app/',
   frames: 1800,
+  timeoutMs: 180000,
   out: 'output/playwright/phase5-performance.json'
 };
 for (let index = 2; index < process.argv.length; index += 1) {
   const value = process.argv[index + 1];
   if (process.argv[index] === '--url' && value) args.url = value, index += 1;
   else if (process.argv[index] === '--frames' && value) args.frames = Math.max(120, Number(value) || 1800), index += 1;
+  else if (process.argv[index] === '--timeout-ms' && value) args.timeoutMs = Math.max(30000, Number(value) || 180000), index += 1;
   else if (process.argv[index] === '--out' && value) args.out = value, index += 1;
 }
 
@@ -58,7 +60,7 @@ try {
   });
   await page.waitForTimeout(5000);
 
-  const metrics = await page.evaluate(async (frameTarget) => {
+  const metrics = await page.evaluate(async ({ frameTarget, timeoutMs }) => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const frameTimes = [];
     const rendererMaximum = {
@@ -88,9 +90,17 @@ try {
       programs: Number(ctx.renderer?.info?.programs?.length || 0)
     };
 
-    await new Promise((resolve) => {
+    await new Promise((resolve, reject) => {
       let lastTimestamp = null;
+      let settled = false;
+      const timeoutHandle = window.setTimeout(() => {
+        settled = true;
+        reject(new Error(
+          `Software performance diagnostic did not collect ${frameTarget} frames within ${timeoutMs}ms`
+        ));
+      }, timeoutMs);
       const frame = (timestamp) => {
+        if (settled) return;
         if (lastTimestamp !== null) frameTimes.push(timestamp - lastTimestamp);
         lastTimestamp = timestamp;
         const render = ctx.renderer?.info?.render || {};
@@ -100,7 +110,11 @@ try {
         rendererMaximum.geometries = Math.max(rendererMaximum.geometries, Number(memory.geometries || 0));
         rendererMaximum.textures = Math.max(rendererMaximum.textures, Number(memory.textures || 0));
         rendererMaximum.programs = Math.max(rendererMaximum.programs, Number(ctx.renderer?.info?.programs?.length || 0));
-        if (frameTimes.length >= frameTarget) resolve();
+        if (frameTimes.length >= frameTarget) {
+          settled = true;
+          window.clearTimeout(timeoutHandle);
+          resolve();
+        }
         else requestAnimationFrame(frame);
       };
       requestAnimationFrame(frame);
@@ -152,12 +166,22 @@ try {
         end: Number(performance.memory?.usedJSHeapSize || 0)
       },
       gpu: { ...gpu, softwareRenderer },
-      budgetEligible: !softwareRenderer,
+      budgetEligible: false,
+      releaseEvidence: {
+        kind: 'software-renderer-diagnostic',
+        realInput: false,
+        softwareRenderer: true,
+        visualReviewApproved: false,
+        releaseEligible: false
+      },
       runtime: ctx.getRuntimeKernelSnapshot?.() || null,
       interpolation: ctx.getRenderInterpolationSnapshot?.() || null,
       snapshot: ctx.capturePerfSnapshot?.({ source: 'phase5-performance' }) || null
     };
-  }, args.frames);
+  }, {
+    frameTarget: args.frames,
+    timeoutMs: args.timeoutMs
+  });
 
   const payload = {
     ok: consoleErrors.length === 0,

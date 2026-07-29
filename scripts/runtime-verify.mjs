@@ -1,6 +1,7 @@
 import { spawnSync } from 'node:child_process';
 
 const steps = [
+  ['Production readiness semantics', 'scripts/test-production-readiness-contract.mjs'],
   ['Build hosting artifact', 'scripts/hosting-artifact.mjs', ['build', '--firebase-env', 'staging']],
   ['Hosting artifact parity', 'scripts/hosting-artifact.mjs', ['verify']],
   ['Hosting source reachability', 'scripts/audit-hosting-reachability.mjs', ['--strict']],

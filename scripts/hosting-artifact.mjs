@@ -154,6 +154,10 @@ async function readPackage() {
   return JSON.parse(await fs.readFile(path.join(ROOT, 'package.json'), 'utf8'));
 }
 
+async function packageLockSha256() {
+  return hashFile(path.join(ROOT, 'package-lock.json'));
+}
+
 async function buildArtifact(environment) {
   const sourceFiles = await collectSourceFiles();
   const config = JSON.parse(await fs.readFile(firebaseConfigPath(environment), 'utf8'));
@@ -168,6 +172,7 @@ async function buildArtifact(environment) {
   const fingerprint = await sourceFingerprint(sourceFiles, environment, config);
   const dirty = git(['status', '--porcelain', '--untracked-files=no'], '').length > 0;
   const commitTime = git(['show', '-s', '--format=%cI', 'HEAD'], 'unknown');
+  const dependencyLockSha256 = await packageLockSha256();
   const buildId = `${packageJson.version}+${shortCommit}.${contentHash.slice(0, 16)}.${environment}`;
 
   await fs.writeFile(path.join(OUTPUT_DIR, ASSET_MANIFEST), canonicalJson({ schemaVersion: 1, files }));
@@ -181,6 +186,8 @@ async function buildArtifact(environment) {
     sourceDirty: dirty,
     sourceFingerprint: fingerprint,
     contentHash,
+    dependencyLockSha256,
+    nodeVersion: process.version,
     firebaseEnvironment: environment,
     firebaseProjectId: String(config.projectId || ''),
     fileCount: Object.keys(files).length
@@ -232,12 +239,15 @@ async function verifyArtifact() {
   }
   const contentHash = sha256(canonicalJson(expectedFiles));
   const fingerprint = await sourceFingerprint(sourceFiles, environment, config);
+  const dependencyLockSha256 = await packageLockSha256();
   const commit = git(['rev-parse', 'HEAD'], 'unknown');
   const buildId = `${packageJson.version}+${commit.slice(0, 12)}.${contentHash.slice(0, 16)}.${environment}`;
   if (
     buildManifest.buildId !== buildId ||
     buildManifest.contentHash !== contentHash ||
     buildManifest.sourceFingerprint !== fingerprint ||
+    buildManifest.dependencyLockSha256 !== dependencyLockSha256 ||
+    buildManifest.nodeVersion !== process.version ||
     buildManifest.commit !== commit ||
     buildManifest.firebaseProjectId !== String(config.projectId || '') ||
     buildManifest.fileCount !== expectedNames.length
@@ -251,6 +261,8 @@ async function verifyArtifact() {
     firebaseEnvironment: environment,
     firebaseProjectId: buildManifest.firebaseProjectId,
     sourceDirty: buildManifest.sourceDirty,
+    dependencyLockSha256,
+    nodeVersion: process.version,
     fileCount: expectedNames.length
   };
   console.log(JSON.stringify(result, null, 2));

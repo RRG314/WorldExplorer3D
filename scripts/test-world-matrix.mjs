@@ -3,6 +3,10 @@ import path from 'node:path';
 import { chromium } from 'playwright';
 import { WORLD_TEST_LOCATIONS } from './world-test-locations.mjs';
 import { captureDroneView, captureViewport } from './world-matrix-visuals.mjs';
+import {
+  classifyEvidence,
+  verifyVisualReview
+} from './production-readiness.mjs';
 import { assertWorldMatrixLocation } from './world-matrix-assertions.mjs';
 import { startStaticRootServer } from './test-static-server.mjs';
 
@@ -24,6 +28,7 @@ const buildingDetailWaitLimitMs = 32000;
 const reportName = /^[a-z0-9._-]+$/i.test(String(process.env.WORLD_MATRIX_REPORT_NAME || '')) ?
   String(process.env.WORLD_MATRIX_REPORT_NAME) :
   'report.json';
+const visualReviewFile = String(process.env.WORLD_MATRIX_VISUAL_REVIEW_FILE || '').trim();
 const requestedLocationIds = new Set(
   String(process.env.WORLD_MATRIX_IDS || '')
     .split(',')
@@ -675,6 +680,14 @@ async function loadLocation(page, spec) {
           const endX = Number(ctx.car?.x);
           const endZ = Number(ctx.car?.z);
           structureGameplay = {
+            evidence: {
+              kind: 'synthetic-direct-state',
+              realInput: false,
+              wallClockSeconds: 0,
+              softwareRenderer: false,
+              visualReviewApproved: false,
+              releaseEligible: false
+            },
             simulatedSeconds: Number((frameCount / 60).toFixed(1)),
             frames: frameCount,
             moved: Number(Math.hypot(endX - startX, endZ - startZ).toFixed(2)),
@@ -1241,10 +1254,8 @@ async function main() {
         }
       } catch (err) {
         result.screenshotWarning = String(err?.message || err);
-        if (/drone LOD hid nearby building neighborhoods/.test(result.screenshotWarning)) {
-          result.assertionError = result.screenshotWarning;
-          locationFailures.push(result.screenshotWarning);
-        }
+        result.assertionError = result.screenshotWarning;
+        locationFailures.push(`${spec.id}: screenshot capture failed: ${result.screenshotWarning}`);
       }
       console.log(`[world-matrix] ready ${spec.id} (${result.loadMs}ms, ${result.counts.roads} roads)`);
       if (locationDelayMs > 0) await page.waitForTimeout(locationDelayMs);
@@ -1255,7 +1266,37 @@ async function main() {
     report.requestFailures = requestFailures;
     report.fatalConsoleErrors = fatalConsoleErrors;
     report.locationFailures = locationFailures;
-    report.pass = fatalConsoleErrors.length === 0 && locationFailures.length === 0;
+    report.automatedPass =
+      fatalConsoleErrors.length === 0 &&
+      locationFailures.length === 0;
+    const expectedScreenshots = report.locations.flatMap((result) => {
+      const spec = testLocations.find((candidate) => candidate.id === result.id);
+      const files = [path.join(outputDir, `${result.id}.png`)];
+      if (captureDroneViews && result.expectedStart !== 'water') {
+        files.push(path.join(outputDir, `${result.id}-drone.png`));
+      }
+      if (result.landmarkOverview) {
+        files.push(path.join(outputDir, `${result.id}-landmark.png`));
+      }
+      return spec ? files : [];
+    });
+    report.visualReview = await verifyVisualReview({
+      manifestPath: visualReviewFile ?
+        path.resolve(rootDir, visualReviewFile) :
+        '',
+      outputDir,
+      expectedFiles: expectedScreenshots
+    });
+    report.releaseEvidence = classifyEvidence({
+      kind: 'world-matrix',
+      realInput: false,
+      wallClockSeconds: 0,
+      softwareRenderer: false,
+      visualReviewApproved: report.visualReview.approved
+    });
+    report.pass =
+      report.automatedPass &&
+      report.visualReview.approved;
     await fs.writeFile(path.join(outputDir, reportName), JSON.stringify(report, null, 2));
   } finally {
     await browser.close();

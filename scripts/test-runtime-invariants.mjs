@@ -2,6 +2,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { chromium } from 'playwright';
+import { evaluateRuntimeReadiness } from './production-readiness.mjs';
 import { exercisePlanetaryRoundTrip } from './runtime-planetary-check.mjs';
 import { mkdirp, startServer } from './runtime-test-server.mjs';
 
@@ -796,7 +797,7 @@ async function main() {
       };
       const acceptedGroundSnapshot =
         ctx?.getAcceptedGroundRuntimeSnapshot?.() || null;
-      const inactiveAcceptedGroundSample =
+      const activeAcceptedGroundSample =
         ctx?.sampleAcceptedGroundAtWorldXZ?.(0, 0) || null;
       const roadParityCandidates = Array.isArray(ctx?.roads)
         ? ctx.roads.filter((road) => Array.isArray(road?.pts) && road.pts.length >= 2)
@@ -865,7 +866,7 @@ async function main() {
           coverageGateExposed:
             typeof ctx?.verifyAcceptedGroundCoverage === 'function',
           snapshot: acceptedGroundSnapshot,
-          inactiveSample: inactiveAcceptedGroundSample
+          activeSample: activeAcceptedGroundSample
         },
         worldPublication:
           typeof ctx?.verifyWorldPublicationStable === 'function'
@@ -922,17 +923,14 @@ async function main() {
       report.screenshotWarning = String(error?.message || error);
     }
 
+    const readinessChecks = evaluateRuntimeReadiness(report, preWaterMetrics);
     const checks = {
-      roadCenterDriveable: report.blockedDriveRatePct <= 10,
-      laneEdgeReasonable: report.laneHitRatePct <= 3.5,
+      roadCenterDriveable: readinessChecks.roadCenterDriveable,
+      laneEdgeReasonable: readinessChecks.laneEdgeReasonable,
       waterDataPresent: (report.waterAreas + report.waterways + preWaterMetrics.waterAreas + preWaterMetrics.waterways) > 0,
       waterVisible: report.visibleWaterMeshes > 0 || preWaterMetrics.visibleWaterMeshes > 0,
       linearFeatureNavigationReady:
-        (report.linearFeatures + preWaterMetrics.linearFeatures) > 0 &&
-        report.linearFeatureMeshCount === 0 &&
-        report.walkFeatureRoute?.ok === true &&
-        Number.isFinite(report.walkSurfaceSample?.yDelta) &&
-        Math.abs(report.walkSurfaceSample.yDelta) <= 1,
+        readinessChecks.linearFeatureNavigationReady,
       spawnResolverAvailable: report.resolveSpawnAvailable === true,
       driveSpawnFallbackSafe: report.buildingInteriorSamples === 0 || report.driveSpawnSafe === report.buildingInteriorSamples,
       walkSpawnFallbackSafe: report.buildingInteriorSamples === 0 || report.walkSpawnSafe === report.buildingInteriorSamples,
@@ -952,13 +950,7 @@ async function main() {
         report.syntheticStructureSemantics?.tunnelRoad?.terrainMode === 'subgrade' &&
         report.syntheticStructureSemantics?.tunnelRoad?.gradeSeparated === true,
       acceptedGroundRuntimeReady:
-        report.acceptedGroundRuntimeBoundary?.prepareExposed === true &&
-        report.acceptedGroundRuntimeBoundary?.coverageGateExposed === true &&
-        report.acceptedGroundRuntimeBoundary?.snapshot?.status === 'blocked' &&
-        report.acceptedGroundRuntimeBoundary?.snapshot?.reason ===
-          'no-ground-artifacts-configured' &&
-        report.acceptedGroundRuntimeBoundary?.inactiveSample?.status ===
-          'unavailable',
+        readinessChecks.acceptedGroundRuntimeReady,
       roadSpatialIndexExact:
         report.roadIndexParity?.sampleCount >= 4 &&
         report.roadIndexParity?.allSameRoad === true &&
@@ -1066,14 +1058,27 @@ async function main() {
 
     assert(
       checks.roadCenterDriveable,
-      `Road center driveability degraded: blocked ${report.blockedDriveSamples}/${report.driveSampleCount} (${report.blockedDriveRatePct}%)`
+      `Road readiness lacks representative journeys or is blocked: ${JSON.stringify({
+        checkedSamples: report.checkedSamples,
+        driveSampleCount: report.driveSampleCount,
+        blockedDriveSamples: report.blockedDriveSamples,
+        blockedDriveRatePct: report.blockedDriveRatePct
+      })}`
     );
-    assert(checks.laneEdgeReasonable, `Lane-edge collision rate too high: ${report.laneHitRatePct}%`);
+    assert(
+      checks.laneEdgeReasonable,
+      `Lane-edge evidence is insufficient or collision rate is too high: ${JSON.stringify({
+        checkedSamples: report.checkedSamples,
+        laneHits: report.laneHits,
+        laneHitRatePct: report.laneHitRatePct
+      })}`
+    );
     assert(
       checks.linearFeatureNavigationReady,
-      `Mapped path navigation-without-presentation contract is incomplete: ${JSON.stringify({
+      `Mapped path navigation and visible presentation are incomplete: ${JSON.stringify({
         linearFeatures: report.linearFeatures,
         linearFeatureMeshCount: report.linearFeatureMeshCount,
+        solidLinearMaterials: report.solidLinearMaterials,
         walkFeatureRoute: report.walkFeatureRoute,
         walkSurfaceSample: report.walkSurfaceSample
       })}`
@@ -1107,7 +1112,7 @@ async function main() {
     assert(checks.waterMaterialsSolid, 'Water meshes are still rendering with transparent materials.');
     assert(checks.vegetationIntegrated, `Vegetation layer did not initialize correctly: ${JSON.stringify({ vegetationFeatures: report.vegetationFeatures, vegetationMeshes: report.vegetationMeshes })}`);
     assert(checks.structureSemanticsStable, `Synthetic structure semantics classification regressed: ${JSON.stringify(report.syntheticStructureSemantics || null)}`);
-    assert(checks.acceptedGroundRuntimeReady, `Accepted-ground runtime boundary is unavailable or unexpectedly active: ${JSON.stringify(report.acceptedGroundRuntimeBoundary || null)}`);
+    assert(checks.acceptedGroundRuntimeReady, `Accepted ground is not active, attributable, and sampleable: ${JSON.stringify(report.acceptedGroundRuntimeBoundary || null)}`);
     assert(checks.roadSpatialIndexExact, `Indexed nearest-road results differ from the full scan: ${JSON.stringify(report.roadIndexParity || null)}`);
     assert(checks.bridgeSpansTerrainDepressions, `Bridge profile followed underlying terrain: ${JSON.stringify(report.syntheticBridgeHeights || null)}`);
     assert(checks.compiledTransportAuthority, `Transport surfaces did not publish from one compiled authority: ${JSON.stringify({
@@ -1152,13 +1157,20 @@ async function main() {
 }
 
 main().catch(async (err) => {
-  const fallback = {
-    ok: false,
-    error: err?.message || String(err)
-  };
   try {
     await mkdirp(outputDir);
-    await fs.writeFile(path.join(outputDir, 'report.json'), JSON.stringify(fallback, null, 2));
+    const reportPath = path.join(outputDir, 'report.json');
+    let existing = {};
+    try {
+      existing = JSON.parse(await fs.readFile(reportPath, 'utf8'));
+    } catch {
+      // Startup failures can occur before the first complete report is written.
+    }
+    await fs.writeFile(reportPath, JSON.stringify({
+      ...existing,
+      ok: false,
+      error: err?.message || String(err)
+    }, null, 2));
   } catch {
     // best-effort only
   }

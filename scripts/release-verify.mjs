@@ -3,6 +3,7 @@ import { spawnSync } from 'node:child_process';
 const npmCommand = process.platform === 'win32' ? 'npm.cmd' : 'npm';
 
 const steps = [
+  { name: 'Production readiness semantics', cmd: [process.execPath, 'scripts/test-production-readiness-contract.mjs'] },
   { name: 'Maintainability guard', cmd: [process.execPath, 'scripts/test-maintainability-guard.mjs'] },
   { name: 'Cloud Functions dependency install', cmd: [npmCommand, 'ci', '--prefix', 'functions', '--ignore-scripts'] },
   { name: 'Cloud Functions security audit', cmd: [npmCommand, 'audit', '--omit=dev', '--prefix', 'functions'] },
@@ -27,6 +28,7 @@ const steps = [
   { name: 'Mobile touch controls', cmd: [process.execPath, 'scripts/test-mobile-controls.mjs'] },
   { name: 'Plane and interior lifecycle', cmd: [process.execPath, 'scripts/test-plane-interior-lifecycle.mjs'] },
   { name: 'Environment session lifecycle', cmd: [process.execPath, 'scripts/test-session-lifecycle.mjs'] },
+  { name: 'Real-input sustained drive', cmd: [process.execPath, 'scripts/test-player-input-drive.mjs'] },
   { name: 'Runtime invariants', cmd: [process.execPath, 'scripts/test-runtime-invariants.mjs'] },
   { name: 'Editor and multiplayer transitions', cmd: [process.execPath, 'scripts/test-editor-multiplayer-surfaces.mjs'] },
   { name: 'Block builder contracts', cmd: [process.execPath, 'scripts/test-block-builder-contract.mjs'] },
@@ -42,7 +44,8 @@ const steps = [
       WORLD_MATRIX_REPORT_NAME: 'r7-provider-outage.json'
     }
   },
-  { name: 'World matrix', cmd: [process.execPath, 'scripts/test-world-matrix.mjs'] }
+  { name: 'World matrix', cmd: [process.execPath, 'scripts/test-world-matrix.mjs'] },
+  { name: 'Production evidence gate', cmd: [process.execPath, 'scripts/verify-production-gate.mjs'] }
 ];
 
 for (const step of steps) {

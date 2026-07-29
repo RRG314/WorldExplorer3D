@@ -68,6 +68,8 @@ Named fixtures include Baltimore (dense city), Miami Beach (coast), Swiss Alps (
 
 **Single objective:** establish a reproducible baseline and replace false-positive release assertions before changing production behavior.
 
+**Implementation checkpoint (2026-07-28):** Phase 0 guardrails are implemented on the audit branch. The readiness contract rejects the former one-sample road pass, blocked accepted ground, absent linear-feature presentation, synthetic direct-state “gameplay,” software-renderer performance, unreviewed screenshots and screenshot reviews whose hashes no longer match. A real keyboard-input drive now launches through visible UI instead of forcing hidden controls. The current baseline correctly fails that journey with zero movement and also fails runtime readiness before any production repair begins. This is the intended gate state; Phase 1 must fix ground authority rather than weakening these checks.
+
 **Owned systems:** test harness, evidence schema, release toolchain, artifact manifest prototype.
 
 **Expected files to change:**
