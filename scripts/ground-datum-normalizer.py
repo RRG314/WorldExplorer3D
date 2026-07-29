@@ -88,6 +88,7 @@ def download(url: str, destination: Path) -> None:
 
 
 def prepare_grids(grid_directory: Path) -> dict:
+    grid_directory = grid_directory.resolve()
     grid_directory.mkdir(parents=True, exist_ok=True)
     geoid_path = grid_directory / GEOID18["filename"]
     if not geoid_path.exists():
@@ -198,6 +199,15 @@ def validate_attestations(request: dict, attestations: dict) -> dict[str, dict]:
         accuracy = float(record.get("verticalAccuracyRmseMeters", math.nan))
         if not math.isfinite(accuracy) or accuracy <= 0 or accuracy > 1:
             raise ValueError(f"raster {raster_id} vertical accuracy is invalid")
+        sampling_uncertainty = float(record.get("samplingUncertaintyMeters", 0))
+        if (
+            not math.isfinite(sampling_uncertainty)
+            or sampling_uncertainty < 0
+            or sampling_uncertainty > 0.75
+        ):
+            raise ValueError(
+                f"raster {raster_id} sampling uncertainty is invalid"
+            )
         by_id[raster_id] = record
     return by_id
 
@@ -306,10 +316,13 @@ def operation_pipeline(geoid_path: Path, egm_path: Path) -> str:
     )
 
 
-def uncertainty_95_meters(source_accuracy_rmse_meters: float) -> float:
+def uncertainty_95_meters(
+    source_accuracy_rmse_meters: float,
+    sampling_uncertainty_meters: float = 0,
+) -> float:
     source_sigma = source_accuracy_rmse_meters
     sigma = math.hypot(source_sigma, *NOAA_COMPONENT_STANDARD_UNCERTAINTY_METERS)
-    return sigma * 1.96
+    return math.hypot(sigma * 1.96, sampling_uncertainty_meters)
 
 
 def dataset_sha256() -> str:
@@ -323,6 +336,7 @@ def normalize(
     grid_directory: Path,
     output_path: Path,
 ) -> dict:
+    grid_directory = grid_directory.resolve()
     request = read_json(request_path)
     attestation_document = read_json(attestation_path)
     attestations = validate_attestations(request, attestation_document)
@@ -352,7 +366,8 @@ def normalize(
         if not all(math.isfinite(value) for value in values):
             raise ValueError(f"normalization failed for {sample['key']}")
         uncertainty = uncertainty_95_meters(
-            float(attestations[raster_id]["verticalAccuracyRmseMeters"])
+            float(attestations[raster_id]["verticalAccuracyRmseMeters"]),
+            float(attestations[raster_id].get("samplingUncertaintyMeters", 0)),
         )
         outputs.append(
             {

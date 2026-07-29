@@ -10,6 +10,13 @@ import {
   fetchUsgs3depSamples,
   normalizeGroundSamples
 } from './lib/ground-artifact-builder.mjs';
+import {
+  decodeUncompressedFloat32Tiff
+} from './lib/tiff-f32.mjs';
+
+const USGS_3DEP_EXPORT_URL =
+  'https://elevation.nationalmap.gov/arcgis/rest/services/' +
+  '3DEPElevation/ImageServer/exportImage';
 
 function canonicalJson(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
@@ -65,7 +72,11 @@ Commands:
     --width-m M --height-m M --spacing-m M --output FILE
 
   fetch-usgs
-    --plan FILE --output FILE [--batch-size 500]
+    --plan FILE --output FILE [--batch-size 5] [--concurrency 12]
+
+  fetch-usgs-export
+    --plan FILE --source-template FILE --output FILE
+    [--export-spacing-m 5]
 
   compile
     --raw FILE --normalization FILE --output-dir DIRECTORY
@@ -129,13 +140,31 @@ function assertPlan(plan) {
 async function commandFetchUsgs() {
   const { value: plan } = await readJson(requiredFlag('--plan'));
   assertPlan(plan);
-  const batchSize = numberFlag('--batch-size', 500);
-  const samples = [];
-  for (const part of plan.parts) {
-    for (const batch of chunkGroundPoints(part.points, batchSize)) {
-      samples.push(...await fetchUsgs3depSamples({ points: batch }));
+  const batchSize = numberFlag('--batch-size', 5);
+  const concurrency = Math.max(
+    1,
+    Math.min(12, Math.floor(numberFlag('--concurrency', 12)))
+  );
+  const batches = plan.parts.flatMap((part) =>
+    chunkGroundPoints(part.points, batchSize)
+  );
+  const results = new Array(batches.length);
+  let nextBatch = 0;
+  const worker = async () => {
+    while (nextBatch < batches.length) {
+      const index = nextBatch++;
+      results[index] = await fetchUsgs3depSamples({
+        points: batches[index]
+      });
     }
-  }
+  };
+  await Promise.all(
+    Array.from(
+      { length: Math.min(concurrency, batches.length) },
+      () => worker()
+    )
+  );
+  const samples = results.flat();
   const releases = [...new Set(samples.map((sample) => sample.sourceRelease))]
     .filter(Boolean)
     .sort();
@@ -186,6 +215,205 @@ async function commandFetchUsgs() {
     sourceContentSha256: normalizationRequest.sourceContentSha256,
     sampleCount: samples.length,
     sourceReleases: releases
+  };
+}
+
+function requireSourceTemplate(template) {
+  if (
+    template?.schemaVersion !== 1 ||
+    template?.type !== 'GroundSourceAttestationTemplate' ||
+    !Array.isArray(template.rasters) ||
+    template.rasters.length !== 1
+  ) {
+    throw new Error(
+      'USGS mosaic export requires one reviewed source attestation'
+    );
+  }
+  const source = template.rasters[0];
+  for (const field of [
+    'rasterId',
+    'sourceRelease',
+    'sourceTitle',
+    'acquisitionStartDate',
+    'acquisitionEndDate'
+  ]) {
+    if (!String(source[field] || '')) {
+      throw new Error(`source attestation is missing ${field}`);
+    }
+  }
+  if (!Number.isFinite(Number(source.sourceResolutionMeters))) {
+    throw new Error('source attestation is missing sourceResolutionMeters');
+  }
+  return source;
+}
+
+async function commandFetchUsgsExport() {
+  const [{ value: plan }, { value: sourceTemplate }] = await Promise.all([
+    readJson(requiredFlag('--plan')),
+    readJson(requiredFlag('--source-template'))
+  ]);
+  assertPlan(plan);
+  const source = requireSourceTemplate(sourceTemplate);
+  const exportSpacingMeters = numberFlag('--export-spacing-m', 5);
+  if (!(exportSpacingMeters > 0)) {
+    throw new Error('--export-spacing-m must be positive');
+  }
+  const samples = [];
+  const exports = [];
+  for (const part of plan.parts) {
+    const { grid } = part;
+    const columnStep = grid.spacingMeters / exportSpacingMeters;
+    if (!Number.isInteger(columnStep) || columnStep < 1) {
+      throw new Error(
+        'plan spacing must be an integer multiple of export spacing'
+      );
+    }
+    const width =
+      (grid.maxColumn - grid.minColumn) * columnStep + 1;
+    const height =
+      (grid.maxRow - grid.minRow) * columnStep + 1;
+    const halfSpacing = exportSpacingMeters / 2;
+    const bbox = [
+      grid.minColumn * grid.spacingMeters - halfSpacing,
+      grid.minRow * grid.spacingMeters - halfSpacing,
+      grid.maxColumn * grid.spacingMeters + halfSpacing,
+      grid.maxRow * grid.spacingMeters + halfSpacing
+    ];
+    const parameters = new URLSearchParams({
+      f: 'json',
+      bbox: bbox.join(','),
+      bboxSR: '3857',
+      imageSR: '3857',
+      size: `${width},${height}`,
+      format: 'tiff',
+      pixelType: 'F32',
+      interpolation: 'RSP_NearestNeighbor',
+      adjustAspectRatio: 'false'
+    });
+    const response = await fetch(
+      `${USGS_3DEP_EXPORT_URL}?${parameters}`
+    );
+    if (!response.ok) {
+      throw new Error(
+        `USGS 3DEP export failed with HTTP ${response.status}`
+      );
+    }
+    const exportResult = await response.json();
+    if (
+      !String(exportResult?.href || '').startsWith('https://') ||
+      Number(exportResult?.width) !== width ||
+      Number(exportResult?.height) !== height
+    ) {
+      throw new Error('USGS 3DEP export response is invalid');
+    }
+    const imageResponse = await fetch(exportResult.href);
+    if (!imageResponse.ok) {
+      throw new Error(
+        `USGS 3DEP TIFF failed with HTTP ${imageResponse.status}`
+      );
+    }
+    const imageBytes = new Uint8Array(await imageResponse.arrayBuffer());
+    const decoded = decodeUncompressedFloat32Tiff(imageBytes);
+    if (decoded.width !== width || decoded.height !== height) {
+      throw new Error('USGS 3DEP TIFF dimensions do not match the plan');
+    }
+    const exportContentSha256 = sha256(imageBytes);
+    exports.push({
+      partId: part.id,
+      request: {
+        endpoint: USGS_3DEP_EXPORT_URL,
+        bbox,
+        bboxSR: 3857,
+        imageSR: 3857,
+        width,
+        height,
+        exportSpacingMeters,
+        format: 'tiff',
+        pixelType: 'F32',
+        interpolation: 'RSP_NearestNeighbor'
+      },
+      exportContentSha256
+    });
+    for (const point of part.points) {
+      const columnIndex =
+        (point.column - grid.minColumn) * columnStep;
+      const southRowIndex =
+        (point.row - grid.minRow) * columnStep;
+      const imageRowIndex = height - 1 - southRowIndex;
+      const rawElevationMeters =
+        decoded.values[imageRowIndex * width + columnIndex];
+      if (!Number.isFinite(rawElevationMeters)) {
+        throw new Error(`USGS 3DEP export has no value for ${point.key}`);
+      }
+      samples.push({
+        schemaVersion: 1,
+        key: point.key,
+        column: point.column,
+        row: point.row,
+        latitude: point.latitude,
+        longitude: point.longitude,
+        rawElevationMeters,
+        sourceHorizontalFrame: 'NAD83',
+        sourceVerticalDatum: 'NAVD88',
+        sourceResolutionMeters: Number(source.sourceResolutionMeters),
+        rasterId: String(source.rasterId),
+        sourceProduct: 'USGS_3DEP',
+        sourceTitle: String(source.sourceTitle),
+        sourceRelease: String(source.sourceRelease),
+        acquisitionStartDate: String(source.acquisitionStartDate),
+        acquisitionEndDate: String(source.acquisitionEndDate)
+      });
+    }
+  }
+  const rawDocument = {
+    schemaVersion: 1,
+    type: 'GroundRawSampleSet',
+    status: 'raw-not-runtime-ground',
+    providerId: 'usgs-3dep-best-available',
+    sourceHorizontalFrame: 'NAD83',
+    sourceVerticalDatum: 'NAVD88',
+    targetVerticalDatum: plan.targetVerticalDatum,
+    plan,
+    sampleCount: samples.length,
+    sourceReleases: [String(source.sourceRelease)],
+    sourceExports: exports,
+    samples
+  };
+  const output = await writeJson(requiredFlag('--output'), rawDocument);
+  const rawText = canonicalJson(rawDocument);
+  const normalizationRequest = {
+    schemaVersion: 1,
+    type: 'GroundNormalizationRequest',
+    sourceContentSha256: sha256(rawText),
+    sourceHorizontalFrame: rawDocument.sourceHorizontalFrame,
+    sourceVerticalDatum: rawDocument.sourceVerticalDatum,
+    targetHorizontalFrame: 'WGS84_G1674',
+    targetVerticalDatum: 'EGM2008',
+    sampleCount: samples.length,
+    samples: samples.map((sample) => ({
+      key: sample.key,
+      latitude: sample.latitude,
+      longitude: sample.longitude,
+      elevationMeters: sample.rawElevationMeters,
+      rasterId: sample.rasterId,
+      sourceRelease: sample.sourceRelease,
+      acquisitionStartDate: sample.acquisitionStartDate,
+      acquisitionEndDate: sample.acquisitionEndDate
+    }))
+  };
+  const requestOutput = await writeJson(
+    `${output}.normalization-request.json`,
+    normalizationRequest
+  );
+  return {
+    ok: true,
+    command: 'fetch-usgs-export',
+    output,
+    normalizationRequest: requestOutput,
+    sourceContentSha256: normalizationRequest.sourceContentSha256,
+    sampleCount: samples.length,
+    exportContentSha256: exports.map((entry) =>
+      entry.exportContentSha256)
   };
 }
 
@@ -325,6 +553,9 @@ try {
   let result;
   if (command === 'plan') result = await commandPlan();
   else if (command === 'fetch-usgs') result = await commandFetchUsgs();
+  else if (command === 'fetch-usgs-export') {
+    result = await commandFetchUsgsExport();
+  }
   else if (command === 'compile') result = await commandCompile();
   else {
     console.log(help());

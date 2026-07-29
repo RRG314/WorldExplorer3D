@@ -4,7 +4,10 @@ import {
 } from './district-source.js?v=1';
 import {
   DISTRICT_GROUND_MODEL_SCHEMA_VERSION
-} from './district-ground-model.js?v=1';
+} from './district-ground-model.js?v=2';
+import {
+  filterSelectionToAcceptedGround
+} from './accepted-ground-selection.js?v=1';
 
 function featureBudgetWarning(selection) {
   const requested = selection.requestedCounts || {};
@@ -173,11 +176,26 @@ export function prepareSelectedLocationSource(options = {}) {
   if (typeof options.prepareSelection !== 'function') {
     throw new TypeError('prepareSelection must be a function');
   }
-  const selection = options.prepareSelection({
+  const preparedSelection = options.prepareSelection({
     ...(options.selectionOptions || {}),
     centerLat: options.location?.lat,
     data: options.data,
     nodes: options.nodes
   });
-  return adaptSelectedLocationSource({ ...options, selection });
+  const groundFiltered = filterSelectionToAcceptedGround(
+    preparedSelection,
+    options.nodes,
+    options.sampleGroundAtLatLon
+  );
+  const adapted = adaptSelectedLocationSource({
+    ...options,
+    selection: groundFiltered.selection
+  });
+  return Object.freeze({
+    ...adapted,
+    diagnostics: Object.freeze({
+      ...adapted.diagnostics,
+      acceptedGroundSelection: groundFiltered.diagnostics
+    })
+  });
 }

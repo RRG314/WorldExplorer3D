@@ -282,7 +282,11 @@ function toggleDroneMode(options = {}) {
 function cyclePrimaryTravelMode(options = {}) {
   const currentMode = getCurrentTravelMode();
   const nextMode = currentMode === 'drive' ? 'walk' : currentMode === 'walk' ? 'drone' : currentMode === 'drone' ? 'plane' : 'drive';
-  return setTravelMode(nextMode, options);
+  const resolvedMode = setTravelMode(nextMode, options);
+  if (currentMode === 'drone' && nextMode === 'plane' && resolvedMode === 'drone') {
+    return setTravelMode('drive', options);
+  }
+  return resolvedMode;
 }
 
 function togglePlaneMode(options = {}) {

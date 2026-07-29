@@ -1,4 +1,24 @@
 {
   "schemaVersion": 1,
-  "manifests": []
+  "manifests": [
+    {
+      "schemaVersion": 1,
+      "artifactId": "baltimore-ground",
+      "providerId": "usgs-3dep-best-available",
+      "sourceRelease": "USGS-3DEP:20260511",
+      "contentSha256": "a3b3c9372f4873e77336c4c25e0b4ba28d24fddded59e50cd1b9d9f7100140f0",
+      "spacingMeters": 60,
+      "coverage": {
+        "south": 39.26568195116693,
+        "north": 39.31490556731849,
+        "west": -76.64372105190711,
+        "east": -76.58065931896192
+      },
+      "verticalDatum": "EGM2008",
+      "complete": true,
+      "missingSampleCount": 0,
+      "licenseAttested": true,
+      "url": "./baltimore/ground-artifact.json"
+    }
+  ]
 }

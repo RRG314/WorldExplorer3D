@@ -6,7 +6,7 @@
   "main": "three.js",
   "scripts": {
     "dev": "node scripts/serve-local-preview.mjs",
-    "test": "npm run test:terrain-source && npm run test:ground-provider && npm run test:ground-artifact && npm run test:ground-artifact-builder && npm run test:ground-datum && npm run test:accepted-ground-catalog && npm run test:accepted-ground-runtime && npm run test:accepted-ground-activation && npm run test:ground-authority-consumers && npm run test:district-compiler && npm run test:phase3-ownership && npm run test:transport-surface && npm run test:phase5-production && npm run test:rules && npm run test:runtime && npm run test:osm-smoke",
+    "test": "npm run test:terrain-source && npm run test:ground-provider && npm run test:ground-artifact && npm run test:ground-artifact-builder && npm run test:ground-datum && npm run test:accepted-ground-catalog && npm run test:accepted-ground-runtime && npm run test:accepted-ground-artifacts && npm run test:accepted-ground-selection && npm run test:accepted-ground-activation && npm run test:ground-authority-consumers && npm run test:district-compiler && npm run test:phase3-ownership && npm run test:transport-surface && npm run test:phase5-production && npm run test:rules && npm run test:runtime && npm run test:osm-smoke",
     "test:rules": "node scripts/test-rules.mjs",
     "test:css": "node scripts/test-css-integrity.mjs",
     "test:inferred-buildings": "node scripts/test-inferred-building-coverage.mjs",
@@ -52,6 +52,8 @@
     "test:ground-artifact-builder": "node scripts/test-ground-artifact-builder.mjs",
     "test:ground-datum": "node scripts/run-ground-datum-normalizer.mjs self-test",
     "test:accepted-ground-runtime": "node scripts/test-accepted-ground-runtime.mjs",
+    "test:accepted-ground-artifacts": "node scripts/test-accepted-ground-artifacts.mjs",
+    "test:accepted-ground-selection": "node scripts/test-accepted-ground-selection.mjs",
     "test:accepted-ground-catalog": "node scripts/test-accepted-ground-catalog.mjs",
     "test:accepted-ground-activation": "node scripts/test-accepted-ground-activation.mjs",
     "test:ground-authority-consumers": "node scripts/test-ground-authority-consumers.mjs",

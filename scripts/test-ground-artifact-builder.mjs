@@ -11,6 +11,55 @@ import {
   fetchUsgs3depSamples,
   normalizeGroundSamples
 } from './lib/ground-artifact-builder.mjs';
+import {
+  decodeUncompressedFloat32Tiff
+} from './lib/tiff-f32.mjs';
+
+function float32StripTiff(values, width, height) {
+  const tags = [
+    [256, 4, width],
+    [257, 4, height],
+    [258, 3, 32],
+    [259, 3, 1],
+    [273, 4, 122],
+    [277, 3, 1],
+    [278, 4, height],
+    [279, 4, values.length * 4],
+    [339, 3, 3]
+  ];
+  const bytes = new Uint8Array(122 + values.length * 4);
+  const view = new DataView(bytes.buffer);
+  bytes.set([0x49, 0x49]);
+  view.setUint16(2, 42, true);
+  view.setUint32(4, 8, true);
+  view.setUint16(8, tags.length, true);
+  tags.forEach(([tag, type, value], index) => {
+    const offset = 10 + index * 12;
+    view.setUint16(offset, tag, true);
+    view.setUint16(offset + 2, type, true);
+    view.setUint32(offset + 4, 1, true);
+    if (type === 3) view.setUint16(offset + 8, value, true);
+    else view.setUint32(offset + 8, value, true);
+  });
+  view.setUint32(118, 0, true);
+  values.forEach((value, index) => {
+    view.setFloat32(122 + index * 4, value, true);
+  });
+  return bytes;
+}
+
+const decodedTiff = decodeUncompressedFloat32Tiff(
+  float32StripTiff([1.25, -2.5, 3.75, 4.5], 2, 2)
+);
+assert.equal(decodedTiff.width, 2);
+assert.equal(decodedTiff.height, 2);
+assert.deepEqual([...decodedTiff.values], [1.25, -2.5, 3.75, 4.5]);
+const compressedTiff = float32StripTiff([1, 2, 3, 4], 2, 2);
+new DataView(compressedTiff.buffer).setUint16(54, 5, true);
+assert.throws(
+  () => decodeUncompressedFloat32Tiff(compressedTiff),
+  /must be uncompressed/
+);
 
 const plan = createGroundBuildPlan({
   districtId: 'baltimore-fixture',
@@ -107,6 +156,10 @@ assert.throws(
 assert.deepEqual(
   chunkGroundPoints(plan.parts[0].points, 4).map((chunk) => chunk.length),
   [4, 4, 1]
+);
+assert.throws(
+  () => chunkGroundPoints(plan.parts[0].points, 6),
+  /integer from 1 through 5/
 );
 
 const providerPayload = {
@@ -298,6 +351,7 @@ console.log(JSON.stringify({
   worldPlanningControls: worldControls.length,
   providerDatumVerified: true,
   sourceResolutionRecorded: rawSamples[0].sourceResolutionMeters,
+  float32TiffDecodeVerified: true,
   normalizationFailClosed: true,
   artifactSampleCount: bundle.compiled.model.grid.sampleCount,
   cliCompileVerified: true

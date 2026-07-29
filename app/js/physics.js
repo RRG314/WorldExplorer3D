@@ -4,6 +4,7 @@ import { updateDrone } from "./physics/drone-flight.js?v=5";
 import { updatePlane } from "./plane-mode.js?v=8";
 import { updateVehicleSurface } from "./physics/vehicle-surface.js?v=2";
 import { createBuildingCollisionQuery } from "./physics/building-collision.js?v=1";
+import { resolveVehicleBuildingCollision } from "./physics/building-collision-response.js?v=2";
 import { getEarthTransportControllerSnapshot, updateAlternateTravelMode } from "./physics/mode-dispatch.js?v=2";
 import { updatePlanetaryVehicleHeight } from "./physics/planetary-vehicle.js?v=1";
 // RDT-based adaptive throttling state
@@ -507,86 +508,14 @@ function update(dt) {
   // Building collisions remain enforced without a second terrain-handling mode.
 
   if (!isPlanetarySurface()) {
-    const carFeetY = Number.isFinite(appCtx.car.y) ? appCtx.car.y - 1.2 : NaN;
-    const buildingCheck = checkBuildingCollision(nx, nz, 2.0, {
-      actorBaseY: carFeetY,
-      actorHeight: 1.9
-    });
-    const nearestRoadForCollision = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(nx, nz, {
-      y: Number.isFinite(carFeetY) ? carFeetY + 1.2 : NaN,
-      maxVerticalDelta: 18,
-      preferredRoad: appCtx.car?.road || null
-    }) : null;
-    const roadDist = Number.isFinite(nearestRoadForCollision?.dist) ? nearestRoadForCollision.dist : Infinity;
-    const roadHalfWidth = nearestRoadForCollision?.road?.width ? nearestRoadForCollision.road.width * 0.5 : 0;
-    const onRoadCenter = roadHalfWidth > 0 &&
-    roadDist <= Math.max(2.2, roadHalfWidth - 0.35);
-    const onRoadCore = roadHalfWidth > 0 &&
-    roadDist <= Math.max(1.6, roadHalfWidth - 0.95);
-    const colliderDetail = buildingCheck?.building?.colliderDetail === 'bbox' ? 'bbox' : 'full';
-    const buildingType = String(buildingCheck?.building?.buildingType || '').toLowerCase();
-    const isApproxCollider = colliderDetail !== 'full';
-  const partKind = String(buildingCheck?.building?.buildingPartKind || '').toLowerCase();
-  const roofLikeCollider =
-    buildingType === 'roof' ||
-    buildingType === 'canopy' ||
-    buildingType === 'carport' ||
-    partKind === 'roof' ||
-    partKind === 'balcony' ||
-    partKind === 'canopy' ||
-    buildingCheck?.building?.collisionKind === 'thin_part' ||
-    buildingCheck?.building?.allowsPassageBelow === true;
-    const shallowRoadsideCollision = !!buildingCheck.collision &&
-    onRoadCenter &&
-    !buildingCheck.inside &&
-    Number.isFinite(buildingCheck.penetration) &&
-    buildingCheck.penetration < 1.25;
-    const likelyRoadGhostCollision = !!buildingCheck.collision &&
-    ((onRoadCenter && isApproxCollider) ||
-    (onRoadCore && buildingCheck.inside) ||
-    (onRoadCenter && roofLikeCollider));
-
-    if (buildingCheck.collision && !(shallowRoadsideCollision || likelyRoadGhostCollision)) {
-      if (buildingCheck.inside) {
-        if (buildingCheck.nearestPoint) {
-          const pushDist = 3.0;
-          nx = buildingCheck.nearestPoint.x + buildingCheck.pushX * pushDist;
-          nz = buildingCheck.nearestPoint.z + buildingCheck.pushZ * pushDist;
-
-          appCtx.car.speed = 0;
-          appCtx.car.vFwd = 0;
-          appCtx.car.vLat = 0;
-          appCtx.car.vx = 0;
-          appCtx.car.vz = 0;
-        } else {
-          nx = appCtx.car.x;
-          nz = appCtx.car.z;
-          appCtx.car.speed *= 0.1;
-          appCtx.car.vFwd *= 0.1;
-          appCtx.car.vLat *= 0.1;
-          appCtx.car.vx *= 0.1;
-          appCtx.car.vz *= 0.1;
-        }
-      } else {
-        const pushDist = buildingCheck.penetration + 1.0;
-        nx += buildingCheck.pushX * pushDist;
-        nz += buildingCheck.pushZ * pushDist;
-
-        const hitAngle = Math.atan2(appCtx.car.vz, appCtx.car.vx);
-        const wallAngle = Math.atan2(buildingCheck.pushZ, buildingCheck.pushX);
-        let angleDiff = Math.abs(hitAngle - wallAngle);
-        if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
-
-        const headOnFactor = Math.abs(Math.cos(angleDiff));
-        const speedReduction = 0.1 + (1 - headOnFactor) * 0.3;
-
-        appCtx.car.speed *= speedReduction;
-        appCtx.car.vFwd *= speedReduction;
-        appCtx.car.vLat *= speedReduction;
-        appCtx.car.vx *= speedReduction;
-        appCtx.car.vz *= speedReduction;
-      }
-    }
+    const resolved = resolveVehicleBuildingCollision(
+      appCtx,
+      checkBuildingCollision,
+      nx,
+      nz
+    );
+    nx = resolved.x;
+    nz = resolved.z;
   }
 
   if (typeof appCtx.getBuildVehicleContact === 'function') {

@@ -1,14 +1,11 @@
-import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=9";
+import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=10";
 import { createWorldLandusePass } from "./load-landuse-pass.js?v=28";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
 import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=8";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=11";
 import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=1";
-import {
-  diagnoseDistrictGroundSource,
-  prepareSelectedLocationSource
-} from "./compiler/selected-location-source-adapter.js?v=3";
+import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=5";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   const waitForCoverage = appCtx.waitForTerrainCoverageAt;
@@ -180,6 +177,7 @@ export function createWorldRoadLoader(deps = {}) {
   const linearRuntime = createLinearFeatureRuntime({
     appCtx,
     applyBuildingContextSemanticsToFeature,
+    buildFeatureRibbonEdges,
     classifyLinearFeatureTags,
     classifyStructureSemantics,
     cloneStructureSemantics,
@@ -340,8 +338,8 @@ export function createWorldRoadLoader(deps = {}) {
     for (const radius of radii) {
       if (loaded) break;
       loadMetrics.activeRadiusDeg = radius;
-      // Keep travel actors just inside the district that is actually loaded.
-      // This does not change world loading, the visible horizon, map coverage,
+      // Keep travel actors just inside the district that is actually loaded;
+      // this does not change world loading, the visible horizon, map coverage,
       // atmosphere, or sky; it only keeps controllers off clipped data edges.
       const loadedRadiusWorld = radius * Number(appCtx.SCALE || 100000);
       appCtx.worldTraversalRadiusWorld = Math.max(
@@ -417,6 +415,7 @@ export function createWorldRoadLoader(deps = {}) {
           data,
           location: appCtx.LOC,
           nodes,
+          sampleGroundAtLatLon: appCtx.sampleAcceptedGroundAtLatLon,
           prepareSelection: prepareWorldFeatureSelections,
           selectionOptions: {
             baselineFullWorld, classifyLinearFeatureTags,

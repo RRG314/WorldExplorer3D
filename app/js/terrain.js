@@ -19,10 +19,10 @@ import {
 import {
   compileGroundArtifact,
   loadGroundArtifact
-} from "./terrain/ground-artifact.js?v=2";
+} from "./terrain/ground-artifact.js?v=3";
 import {
   createAcceptedGroundRuntime
-} from "./terrain/accepted-ground-runtime.js?v=1";
+} from "./terrain/accepted-ground-runtime.js?v=2";
 import {
   loadAcceptedGroundCatalog
 } from "./terrain/accepted-ground-catalog.js?v=1";

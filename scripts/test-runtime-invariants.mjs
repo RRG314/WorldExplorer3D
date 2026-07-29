@@ -339,6 +339,7 @@ async function main() {
     report = await page.evaluate(async () => {
       const mod = await import('/app/js/shared-context.js?v=55');
       const structureSemantics = await import('/app/js/structure-semantics.js?v=19');
+      const collisionResponse = await import('/app/js/physics/building-collision-response.js?v=2');
       const ctx = mod?.ctx;
       const roads = Array.isArray(ctx.roads) ? ctx.roads : [];
       const buildings = Array.isArray(ctx.buildings) ? ctx.buildings : [];
@@ -359,8 +360,114 @@ async function main() {
         m && m.visible !== false && (m.userData?.landuseType === 'water' || m.userData?.isWaterwayLine)
       ).length;
 
+      function sampleRoadPoint(road, fraction) {
+        if (!Array.isArray(road?.pts) || road.pts.length < 2) return null;
+        const segmentCount = road.pts.length - 1;
+        const target = Math.max(
+          0,
+          Math.min(segmentCount - 1e-6, fraction * segmentCount)
+        );
+        const index = Math.floor(target);
+        const blend = target - index;
+        const start = road.pts[index];
+        const end = road.pts[index + 1];
+        const dx = end.x - start.x;
+        const dz = end.z - start.z;
+        const length = Math.hypot(dx, dz);
+        if (!Number.isFinite(length) || length < 0.1) return null;
+        return {
+          x: start.x + dx * blend,
+          z: start.z + dz * blend,
+          tangentX: dx / length,
+          tangentZ: dz / length,
+          normalX: -dz / length,
+          normalZ: dx / length
+        };
+      }
+
+      let checkedSamples = 0;
+      let centerHits = 0;
+      let laneHits = 0;
+      const driveCandidates = [];
+      const roadStep = Math.max(1, Math.floor(roads.length / 160));
+      for (
+        let roadIndex = 0;
+        roadIndex < roads.length && checkedSamples < 640;
+        roadIndex += roadStep
+      ) {
+        const road = roads[roadIndex];
+        const halfWidth = Math.max(2, Number(road?.width || 8) * 0.5);
+        for (const fraction of [0.2, 0.5, 0.8]) {
+          const point = sampleRoadPoint(road, fraction);
+          if (!point) continue;
+          checkedSamples += 1;
+          const roadSurface = ctx.SurfaceQuery?.driveAt?.(
+            point.x,
+            point.z,
+            { preferRoad: true }
+          );
+          const actorBaseY = Number(roadSurface?.position?.y);
+          const collisionOptions = {
+            actorBaseY,
+            actorHeight: 1.9
+          };
+          const centerCollision = ctx.checkBuildingCollision?.(
+            point.x,
+            point.z,
+            2,
+            collisionOptions
+          );
+          const centerRoad = ctx.findNearestRoad?.(point.x, point.z, {
+            y: actorBaseY,
+            maxVerticalDelta: 18
+          });
+          const centerBlocked =
+            collisionResponse.isVehicleBuildingCollisionBlocking(
+              centerCollision,
+              centerRoad
+            );
+          if (centerBlocked) centerHits += 1;
+          const laneOffset = Math.max(0.4, halfWidth - 0.8);
+          for (const sign of [-1, 1]) {
+            const laneCollision = ctx.checkBuildingCollision?.(
+              point.x + point.normalX * laneOffset * sign,
+              point.z + point.normalZ * laneOffset * sign,
+              2,
+              collisionOptions
+            );
+            const laneRoad = ctx.findNearestRoad?.(
+              point.x + point.normalX * laneOffset * sign,
+              point.z + point.normalZ * laneOffset * sign,
+              { y: actorBaseY, maxVerticalDelta: 18 }
+            );
+            if (
+              collisionResponse.isVehicleBuildingCollisionBlocking(
+                laneCollision,
+                laneRoad
+              )
+            ) {
+              laneHits += 1;
+            }
+          }
+          if (
+            !centerBlocked &&
+            driveCandidates.length < 24 &&
+            roadIndex % (roadStep * 2) === 0 &&
+            Math.hypot(point.x, point.z) <
+              Number(ctx.worldTraversalRadiusWorld || 2700) - 120
+          ) {
+            driveCandidates.push({
+              x: point.x,
+              z: point.z,
+              heading: Math.atan2(point.tangentX, point.tangentZ)
+            });
+          }
+        }
+      }
+
       const saved = {
         x: Number(ctx.car?.x || 0),
+        y: Number(ctx.car?.y || 0),
         z: Number(ctx.car?.z || 0),
         angle: Number(ctx.car?.angle || 0),
         speed: Number(ctx.car?.speed || 0),
@@ -374,20 +481,50 @@ async function main() {
       };
 
       if (ctx.Walk?.setModeDrive) ctx.Walk.setModeDrive();
-      const startX = Number(ctx.car?.x || 0);
-      const startZ = Number(ctx.car?.z || 0);
-      for (let f = 0; f < 90; f++) {
-        ctx.keys.KeyW = true;
-        ctx.keys.ArrowUp = true;
-        ctx.update?.(1 / 60);
+      const driveOutcomes = [];
+      let blockedDriveSamples = 0;
+      for (const candidate of driveCandidates) {
+        ctx.car.x = candidate.x;
+        ctx.car.z = candidate.z;
+        ctx.car.angle = candidate.heading;
+        ctx.car.speed = 0;
+        ctx.car.vFwd = 0;
+        ctx.car.vLat = 0;
+        ctx.car.vx = 0;
+        ctx.car.vz = 0;
+        ctx.car.yawRate = 0;
+        const surface = ctx.SurfaceQuery?.driveAt?.(
+          candidate.x,
+          candidate.z,
+          { preferRoad: true }
+        );
+        if (Number.isFinite(surface?.position?.y)) {
+          ctx.car.y = surface.position.y + 1.2;
+        }
+        ctx.invalidateRoadCache?.();
+        for (let frame = 0; frame < 150; frame += 1) {
+          ctx.keys.KeyW = true;
+          ctx.keys.ArrowUp = true;
+          ctx.update?.(1 / 60);
+        }
+        ctx.keys.KeyW = false;
+        ctx.keys.ArrowUp = false;
+        const moved = Math.hypot(
+          ctx.car.x - candidate.x,
+          ctx.car.z - candidate.z
+        );
+        const finalSpeed = Number(ctx.car.speed || 0);
+        const blocked = moved < 12;
+        if (blocked) blockedDriveSamples += 1;
+        driveOutcomes.push({
+          moved: Number(moved.toFixed(2)),
+          finalSpeed: Number(finalSpeed.toFixed(2)),
+          blocked
+        });
       }
-      ctx.keys.KeyW = false;
-      ctx.keys.ArrowUp = false;
-      const moved = Math.hypot((ctx.car?.x || 0) - startX, (ctx.car?.z || 0) - startZ);
-      const finalSpeed = Number(ctx.car?.speed || 0);
-      const blocked = moved < 8 || finalSpeed < 8;
 
       ctx.car.x = saved.x;
+      ctx.car.y = saved.y;
       ctx.car.z = saved.z;
       ctx.car.angle = saved.angle;
       ctx.car.speed = saved.speed;
@@ -402,21 +539,21 @@ async function main() {
       return {
         roads: roads.length,
         buildings: buildings.length,
-        checkedSamples: 1,
-        centerHits: 0,
-        laneHits: 0,
-        centerHitRatePct: 0,
-        laneHitRatePct: 0,
-        driveSampleCount: 1,
-        blockedDriveSamples: blocked ? 1 : 0,
-        blockedDriveRatePct: blocked ? 100 : 0,
-        driveOutcomePreview: [
-          {
-            moved: Number(moved.toFixed(2)),
-            finalSpeed: Number(finalSpeed.toFixed(2)),
-            blocked
-          }
-        ],
+        checkedSamples,
+        centerHits,
+        laneHits,
+        centerHitRatePct: Number(
+          (centerHits / Math.max(1, checkedSamples) * 100).toFixed(2)
+        ),
+        laneHitRatePct: Number(
+          (laneHits / Math.max(1, checkedSamples * 2) * 100).toFixed(2)
+        ),
+        driveSampleCount: driveCandidates.length,
+        blockedDriveSamples,
+        blockedDriveRatePct: Number((
+          blockedDriveSamples / Math.max(1, driveCandidates.length) * 100
+        ).toFixed(2)),
+        driveOutcomePreview: driveOutcomes.slice(0, 12),
         waterAreas,
         waterways,
         linearFeatures,

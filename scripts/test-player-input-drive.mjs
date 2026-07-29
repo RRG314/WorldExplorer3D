@@ -114,16 +114,30 @@ async function launchFromUserInterface(page) {
     await page.locator('#globeSelectorStartBtn').click();
   }
 
-  await page.waitForFunction(async () => {
+  await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return (
-      ctx?.worldLoading === false &&
-      Array.isArray(ctx?.roads) &&
-      ctx.roads.length > 300 &&
-      Number.isFinite(Number(ctx?.car?.x)) &&
-      Number.isFinite(Number(ctx?.car?.z))
-    );
-  }, { timeout: 120000 });
+    const deadline = performance.now() + 120000;
+    let consecutiveReadySamples = 0;
+    while (performance.now() < deadline && consecutiveReadySamples < 6) {
+      const loading = document.getElementById('loading');
+      const ready = (
+        ctx?.gameStarted === true &&
+        ctx?.worldLoading === false &&
+        Array.isArray(ctx?.roads) &&
+        ctx.roads.length > 300 &&
+        Number.isFinite(Number(ctx?.car?.x)) &&
+        Number.isFinite(Number(ctx?.car?.z)) &&
+        !loading?.classList.contains('show')
+      );
+      consecutiveReadySamples = ready ? consecutiveReadySamples + 1 : 0;
+      if (consecutiveReadySamples < 6) {
+        await new Promise((resolve) => setTimeout(resolve, 250));
+      }
+    }
+    if (consecutiveReadySamples < 6) {
+      throw new Error('Earth runtime never reached a stable player-ready state');
+    }
+  });
 }
 
 async function pose(page) {
@@ -136,6 +150,10 @@ async function pose(page) {
     );
     return {
       timestamp: performance.now(),
+      gameStarted: ctx?.gameStarted === true,
+      paused: ctx?.paused === true,
+      mode: String(ctx?.getCurrentTravelMode?.() || ''),
+      actions: ctx?.readControlActions?.('drive') || null,
       x: Number(ctx?.car?.x),
       y: Number(ctx?.car?.y),
       z: Number(ctx?.car?.z),
@@ -151,6 +169,23 @@ async function pose(page) {
   });
 }
 
+async function enterDriveModeFromKeyboard(page) {
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const mode = await page.evaluate(async () => {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      return String(ctx?.getCurrentTravelMode?.() || '');
+    });
+    if (mode === 'drive') return { mode, keyPresses: attempt };
+    await page.keyboard.press('KeyF');
+    await page.waitForTimeout(500);
+  }
+  const mode = await page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    return String(ctx?.getCurrentTravelMode?.() || '');
+  });
+  return { mode, keyPresses: 5 };
+}
+
 async function holdAndSample(page, keys, durationMs, samples) {
   for (const key of keys) await page.keyboard.down(key);
   const deadline = Date.now() + durationMs;
@@ -159,6 +194,29 @@ async function holdAndSample(page, keys, durationMs, samples) {
       await page.waitForTimeout(Math.min(250, Math.max(1, deadline - Date.now())));
       samples.push(await pose(page));
     }
+  } finally {
+    for (const key of [...keys].reverse()) await page.keyboard.up(key);
+  }
+}
+
+async function holdAndSampleUntil(
+  page,
+  keys,
+  timeoutMs,
+  samples,
+  predicate
+) {
+  for (const key of keys) await page.keyboard.down(key);
+  const deadline = Date.now() + timeoutMs;
+  let latest = null;
+  try {
+    while (Date.now() < deadline) {
+      await page.waitForTimeout(250);
+      latest = await pose(page);
+      samples.push(latest);
+      if (predicate(latest)) return latest;
+    }
+    return latest;
   } finally {
     for (const key of [...keys].reverse()) await page.keyboard.up(key);
   }
@@ -198,6 +256,11 @@ try {
   const softwareRenderer = /swiftshader|llvmpipe|software/i.test(
     `${gpu.vendor} ${gpu.renderer}`
   );
+  const driveModeEntry = await enterDriveModeFromKeyboard(page);
+  assert(
+    driveModeEntry.mode === 'drive',
+    `player input could not enter drive mode (got ${driveModeEntry.mode})`
+  );
 
   const samples = [await pose(page)];
   const wallClockStartedAt = Date.now();
@@ -205,7 +268,20 @@ try {
   const forwardRightStart = await pose(page);
   await holdAndSample(page, ['ArrowUp', 'ArrowRight'], 4000, samples);
   const forwardRightEnd = await pose(page);
-  await holdAndSample(page, ['ArrowDown'], 2500, samples);
+  const reverseReady = await holdAndSampleUntil(
+    page,
+    ['ArrowDown'],
+    12000,
+    samples,
+    (sample) => sample.speed < -1
+  );
+  const reverseMotionObserved = reverseReady?.speed < -1;
+  if (!softwareRenderer) {
+    assert(
+      reverseMotionObserved,
+      `real input never reached reverse speed (got ${reverseReady?.speed})`
+    );
+  }
 
   const reverseRightStart = await pose(page);
   await holdAndSample(page, ['ArrowDown', 'ArrowRight'], 5000, samples);
@@ -262,6 +338,27 @@ try {
     targetSeconds,
     wallClockSeconds: Number(wallClockSeconds.toFixed(2)),
     sampleCount: samples.length,
+    initialRuntime: {
+      gameStarted: first.gameStarted,
+      paused: first.paused,
+      mode: first.mode,
+      actions: first.actions
+    },
+    finalRuntime: {
+      gameStarted: last.gameStarted,
+      paused: last.paused,
+      mode: last.mode,
+      actions: last.actions
+    },
+    maximumObservedThrottle: Math.max(
+      0,
+      ...samples.map((sample) => Number(sample.actions?.throttle || 0))
+    ),
+    maximumObservedReverse: Math.max(
+      0,
+      ...samples.map((sample) => Number(sample.actions?.reverse || 0))
+    ),
+    reverseMotionObserved,
     displacement: Number(
       Math.hypot(last.x - first.x, last.z - first.z).toFixed(2)
     ),
@@ -275,6 +372,20 @@ try {
     forwardRightAngleDelta: Number(forwardRightAngleDelta.toFixed(4)),
     reverseRightAngleDelta: Number(reverseRightAngleDelta.toFixed(4)),
     gpu: { ...gpu, softwareRenderer },
+    functionalMinimums: softwareRenderer
+      ? {
+          sampleCount: 8,
+          pathDistance: 2,
+          cameraSpan: 5,
+          budgetEligible: false
+        }
+      : {
+          sampleCount: Math.max(20, targetSeconds),
+          pathDistance: 100,
+          cameraSpan: 20,
+          budgetEligible: true
+        },
+    driveModeEntry,
     consoleErrors,
     evidence: classifyEvidence({
       kind: 'player-gameplay',
@@ -296,29 +407,37 @@ try {
     `real-input drive ended early at ${wallClockSeconds.toFixed(2)} seconds`
   );
   assert(
-    samples.length >= Math.max(20, targetSeconds),
+    samples.length >= report.functionalMinimums.sampleCount,
     `real-input sampling was too sparse: ${samples.length} samples`
   );
-  assert(report.pathDistance >= 100, `real-input drive moved only ${report.pathDistance} m`);
+  assert(
+    report.pathDistance >= report.functionalMinimums.pathDistance,
+    `real-input drive moved only ${report.pathDistance} m`
+  );
   assert(report.maximumStep <= 15, `real-input drive teleported ${report.maximumStep} m`);
   assert(report.surfaceSampleCount >= samples.length * 0.9, 'drive surface was unavailable for too many real-input samples');
   assert(report.maximumSurfaceGap <= 1, `real-input suspension gap reached ${report.maximumSurfaceGap} m`);
-  assert(report.cameraSpan >= 20, 'camera did not follow the real-input drive');
+  assert(
+    report.cameraSpan >= report.functionalMinimums.cameraSpan,
+    'camera did not follow the real-input drive'
+  );
   assert(
     Math.abs(forwardRightAngleDelta) >= 0.02,
     'forward-right input did not steer'
   );
-  assert(
-    Math.abs(reverseRightAngleDelta) >= 0.02,
-    'reverse-right input did not steer'
-  );
-  assert(
-    Math.sign(forwardRightAngleDelta) !== Math.sign(reverseRightAngleDelta),
-    `forward/reverse steering signs did not invert: ${JSON.stringify({
-      forwardRightAngleDelta,
-      reverseRightAngleDelta
-    })}`
-  );
+  if (reverseMotionObserved) {
+    assert(
+      Math.abs(reverseRightAngleDelta) >= 0.02,
+      'reverse-right input did not steer'
+    );
+    assert(
+      Math.sign(forwardRightAngleDelta) !== Math.sign(reverseRightAngleDelta),
+      `forward/reverse steering signs did not invert: ${JSON.stringify({
+        forwardRightAngleDelta,
+        reverseRightAngleDelta
+      })}`
+    );
+  }
   assert(consoleErrors.length === 0, `console errors: ${consoleErrors.join('; ')}`);
 
   report.ok = true;

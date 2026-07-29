@@ -4,7 +4,7 @@ import {
 } from './ground-provider-registry.js?v=2';
 import {
   compileDistrictGroundModel
-} from '../world/compiler/district-ground-model.js?v=1';
+} from '../world/compiler/district-ground-model.js?v=2';
 
 function rejection(reason, diagnostics = {}) {
   return Object.freeze({

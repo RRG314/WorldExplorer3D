@@ -255,7 +255,8 @@ async function loadPresetLocation(page, locKey) {
       ok: true,
       selLoc: ctx.selLoc || null,
       worldLoading: !!ctx.worldLoading,
-      roads: Array.isArray(ctx.roads) ? ctx.roads.length : 0
+      roads: Array.isArray(ctx.roads) ? ctx.roads.length : 0,
+      acceptedGround: ctx.getAcceptedGroundRuntimeSnapshot?.() || null
     };
   }, locKey);
 }
@@ -290,7 +291,8 @@ async function loadCustomLocation(page, locationSpec) {
       customLoc: ctx.customLoc || null,
       worldLoading: !!ctx.worldLoading,
       roads: Array.isArray(ctx.roads) ? ctx.roads.length : 0,
-      buildings: Array.isArray(ctx.buildings) ? ctx.buildings.length : 0
+      buildings: Array.isArray(ctx.buildings) ? ctx.buildings.length : 0,
+      acceptedGround: ctx.getAcceptedGroundRuntimeSnapshot?.() || null
     };
   }, locationSpec);
 }
@@ -500,73 +502,10 @@ async function main() {
     assert(monacoLoad.selLoc === 'monaco', `Expected Monaco preset to be active, got ${monacoLoad.selLoc}`);
     await page.waitForTimeout(1800);
 
-    markStage('earth:inspect-monaco-water');
-    const monacoWaterRaw = await page.evaluate(async () => {
-      const mod = await import('/app/js/shared-context.js?v=55');
-      const ctx = mod?.ctx || {};
-      const waterMeshes = Array.isArray(ctx.landuseMeshes) ?
-        ctx.landuseMeshes.filter((mesh) =>
-          mesh && mesh.visible !== false && (mesh.userData?.landuseType === 'water' || mesh.userData?.isWaterwayLine)
-        ) :
-        [];
-
-      let pngDataUrl = null;
-      let firstWaterPreview = null;
-      const firstWater = waterMeshes[0] || null;
-      if (firstWater && globalThis.THREE && ctx.camera && ctx.renderer?.domElement) {
-        const box = new globalThis.THREE.Box3().setFromObject(firstWater);
-        const center = box.getCenter(new globalThis.THREE.Vector3());
-        const size = box.getSize(new globalThis.THREE.Vector3());
-        const camOffsetX = Math.max(18, size.x * 0.2 || 18);
-        const camOffsetZ = Math.max(18, size.z * 0.2 || 18);
-        const camY = center.y + Math.max(14, size.y * 1.25 + 14);
-
-        ctx.camera.position.set(center.x + camOffsetX, camY, center.z + camOffsetZ);
-        ctx.camera.lookAt(center.x, center.y + 0.4, center.z);
-        ctx.camera.updateProjectionMatrix?.();
-        if (typeof ctx.render === 'function') ctx.render();
-        else if (ctx.renderer && ctx.scene && ctx.camera) ctx.renderer.render(ctx.scene, ctx.camera);
-        pngDataUrl = ctx.renderer.domElement.toDataURL('image/png');
-
-        firstWaterPreview = {
-          type: firstWater.userData?.isWaterwayLine ? 'waterway' : firstWater.userData?.landuseType || 'water',
-          center: {
-            x: Number(center.x.toFixed(2)),
-            y: Number(center.y.toFixed(2)),
-            z: Number(center.z.toFixed(2))
-          },
-          size: {
-            x: Number(size.x.toFixed(2)),
-            y: Number(size.y.toFixed(2)),
-            z: Number(size.z.toFixed(2))
-          }
-        };
-      }
-
-      return {
-        preset: ctx.selLoc || null,
-        loc: ctx.LOC || null,
-        roads: Array.isArray(ctx.roads) ? ctx.roads.length : 0,
-        buildings: Array.isArray(ctx.buildings) ? ctx.buildings.length : 0,
-        waterAreas: Array.isArray(ctx.waterAreas) ? ctx.waterAreas.length : 0,
-        waterways: Array.isArray(ctx.waterways) ? ctx.waterways.length : 0,
-        visibleWaterMeshes: waterMeshes.length,
-        firstWaterPreview,
-        pngDataUrl
-      };
-    });
-
-    const monacoWaterImage = path.join(outputDir, 'monaco-water.png');
-    await writePngDataUrl(monacoWaterImage, monacoWaterRaw.pngDataUrl);
-    const { pngDataUrl, ...monacoWater } = monacoWaterRaw;
-
     assert(
-      monacoWater.waterAreas + monacoWater.waterways > 0,
-      `Monaco load returned no water features: ${JSON.stringify(monacoWater)}`
-    );
-    assert(
-      monacoWater.visibleWaterMeshes > 0,
-      `Monaco water loaded but no visible meshes were rendered: ${JSON.stringify(monacoWater)}`
+      monacoLoad.roads === 0 &&
+      monacoLoad.acceptedGround?.status === 'blocked',
+      `Monaco must fail closed without an accepted artifact: ${JSON.stringify(monacoLoad)}`
     );
 
     markStage('earth:load-arctic');
@@ -576,23 +515,11 @@ async function main() {
       label: 'Svalbard Arctic'
     });
     assert(arcticLoad.ok, `Failed to load Arctic custom location: ${arcticLoad.reason || 'unknown error'}`);
-    await page.waitForTimeout(1800);
-    const arcticSurface = await inspectSurfaceModes(page);
-    await page.screenshot({ path: path.join(outputDir, 'arctic-surface.png'), fullPage: true });
     assert(
-      (arcticSurface.terrainModes.snow || 0) + (arcticSurface.terrainModes.snowRock || 0) > 0,
-      `Arctic terrain did not classify as snow: ${JSON.stringify(arcticSurface)}`
+      arcticLoad.roads === 0 &&
+      arcticLoad.acceptedGround?.status === 'blocked',
+      `Arctic load must fail closed without accepted ground: ${JSON.stringify(arcticLoad)}`
     );
-    assert(
-      arcticSurface.worldSurfaceProfile?.waterModeHint === 'ice',
-      `Arctic water profile did not freeze: ${JSON.stringify(arcticSurface.worldSurfaceProfile || {})}`
-    );
-    if (arcticSurface.visibleWaterMeshes > 0) {
-      assert(
-        arcticSurface.frozenWaterMeshes > 0,
-        `Arctic visible water meshes were not rendered as ice: ${JSON.stringify(arcticSurface)}`
-      );
-    }
 
     markStage('earth:load-antarctica');
     const antarcticaLoad = await loadCustomLocation(page, {
@@ -601,16 +528,10 @@ async function main() {
       label: 'Antarctica'
     });
     assert(antarcticaLoad.ok, `Failed to load Antarctica custom location: ${antarcticaLoad.reason || 'unknown error'}`);
-    await page.waitForTimeout(1800);
-    const antarcticaSurface = await inspectSurfaceModes(page);
-    await page.screenshot({ path: path.join(outputDir, 'antarctica-surface.png'), fullPage: true });
     assert(
-      (antarcticaSurface.terrainModes.snow || 0) + (antarcticaSurface.terrainModes.snowRock || 0) > 0,
-      `Antarctica terrain did not classify as snow: ${JSON.stringify(antarcticaSurface)}`
-    );
-    assert(
-      antarcticaSurface.worldSurfaceProfile?.waterModeHint === 'ice',
-      `Antarctica water profile did not freeze: ${JSON.stringify(antarcticaSurface.worldSurfaceProfile || {})}`
+      antarcticaLoad.roads === 0 &&
+      antarcticaLoad.acceptedGround?.status === 'blocked',
+      `Antarctica must fail closed without accepted ground: ${JSON.stringify(antarcticaLoad)}`
     );
 
     markStage('earth:load-desert');
@@ -620,13 +541,18 @@ async function main() {
       label: 'Dubai Desert'
     });
     assert(desertLoad.ok, `Failed to load desert custom location: ${desertLoad.reason || 'unknown error'}`);
-    await page.waitForTimeout(1800);
-    const desertSurface = await inspectSurfaceModes(page);
-    await page.screenshot({ path: path.join(outputDir, 'desert-surface.png'), fullPage: true });
     assert(
-      (desertSurface.terrainModes.sand || 0) > 0 ||
-      desertSurface.worldSurfaceProfile?.terrainModeHint === 'sand',
-      `Desert terrain did not classify as sand: ${JSON.stringify(desertSurface)}`
+      desertLoad.roads === 0 &&
+      desertLoad.acceptedGround?.status === 'blocked',
+      `Desert must fail closed without accepted ground: ${JSON.stringify(desertLoad)}`
+    );
+
+    markStage('earth:restore-baltimore');
+    const baltimoreRestore = await loadPresetLocation(page, 'baltimore');
+    assert(
+      baltimoreRestore.roads > 0 &&
+      baltimoreRestore.acceptedGround?.status === 'accepted',
+      `Baltimore accepted-ground restore failed: ${JSON.stringify(baltimoreRestore)}`
     );
 
     markStage('ocean:start');
@@ -708,26 +634,23 @@ async function main() {
         requests: localFailures.length > 0 ? localFailures : deferredRequests
       });
     }
-    const desertTerrainTileCount = Object.values(desertSurface.terrainModes || {}).reduce((sum, count) => sum + Number(count || 0), 0);
-    const desertSandTiles = Number(desertSurface.terrainModes.sand || 0);
-
     const checks = {
       titleGeolocationPresent: titlePresence.hasTitleGeolocation,
       globeGeolocationPresent: titlePresence.hasGlobeGeolocation,
       oceanLaunchTogglePresent: titlePresence.hasOceanLaunchToggle,
       oceanLaunchWorks: oceanState.oceanActive || oceanState.env === 'OCEAN',
-      monacoWaterPresent: monacoWater.waterAreas + monacoWater.waterways > 0,
-      monacoWaterVisible: monacoWater.visibleWaterMeshes > 0,
-      arcticFrozenSurface:
-        ((arcticSurface.terrainModes.snow || 0) + (arcticSurface.terrainModes.snowRock || 0) > 0) &&
-        arcticSurface.worldSurfaceProfile?.waterModeHint === 'ice',
-      antarcticaFrozenSurface:
-        ((antarcticaSurface.terrainModes.snow || 0) + (antarcticaSurface.terrainModes.snowRock || 0) > 0) &&
-        antarcticaSurface.worldSurfaceProfile?.waterModeHint === 'ice',
-      desertSurfaceSand:
-        desertTerrainTileCount <= 0 ?
-          desertSurface.worldSurfaceProfile?.terrainModeHint === 'sand' :
-          desertSandTiles >= Math.max(4, Math.ceil(desertTerrainTileCount * 0.5)),
+      unsupportedGroundFailsClosed: [
+        monacoLoad,
+        arcticLoad,
+        antarcticaLoad,
+        desertLoad
+      ].every((load) =>
+        load.roads === 0 &&
+        load.acceptedGround?.status === 'blocked'
+      ),
+      acceptedGroundRestores:
+        baltimoreRestore.roads > 0 &&
+        baltimoreRestore.acceptedGround?.status === 'accepted',
       earthLaunchWorks:
         earthStateAfterTitleLaunch.env === 'EARTH' &&
         earthState.env === 'EARTH' &&
@@ -744,14 +667,10 @@ async function main() {
       titlePresence,
       earthStateAfterTitleLaunch,
       monacoLoad,
-      monacoWater,
-      monacoWaterImage,
       arcticLoad,
-      arcticSurface,
       antarcticaLoad,
-      antarcticaSurface,
       desertLoad,
-      desertSurface,
+      baltimoreRestore,
       oceanState,
       earthState,
       consoleErrors,

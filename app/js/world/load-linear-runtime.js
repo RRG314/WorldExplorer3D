@@ -1,7 +1,12 @@
+import {
+  publishLinearFeaturePresentation
+} from './linear-feature-presentation.js?v=1';
+
 export function createLinearFeatureRuntime(options = {}) {
   const {
     appCtx,
     applyBuildingContextSemanticsToFeature,
+    buildFeatureRibbonEdges,
     classifyLinearFeatureTags,
     classifyStructureSemantics,
     cloneStructureSemantics,
@@ -120,6 +125,12 @@ export function createLinearFeatureRuntime(options = {}) {
       });
     });
 
+    publishLinearFeaturePresentation({
+      appCtx,
+      buildFeatureRibbonEdges,
+      features: appCtx.linearFeatures.slice(initialFeatureCount),
+      worldBaseTerrainY
+    });
     if (!deferStructureRefresh) refreshStructureAwareFeatureProfiles();
     if (!deferStructureRefresh && typeof appCtx.rebuildStructureVisualMeshes === 'function') {
       appCtx.rebuildStructureVisualMeshes();

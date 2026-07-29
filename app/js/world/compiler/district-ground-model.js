@@ -207,8 +207,22 @@ export function sampleDistrictGroundMeters(model, eastingMeters, northingMeters)
   assertFinite(eastingMeters, 'easting');
   assertFinite(northingMeters, 'northing');
   const { spacingMeters, minColumn, maxColumn, minRow, maxRow } = model.grid;
-  const columnFloat = eastingMeters / spacingMeters;
-  const rowFloat = northingMeters / spacingMeters;
+  const snapEdge = (value, minimum, maximum) => {
+    const epsilon = 1e-9;
+    if (Math.abs(value - minimum) <= epsilon) return minimum;
+    if (Math.abs(value - maximum) <= epsilon) return maximum;
+    return value;
+  };
+  const columnFloat = snapEdge(
+    eastingMeters / spacingMeters,
+    minColumn,
+    maxColumn
+  );
+  const rowFloat = snapEdge(
+    northingMeters / spacingMeters,
+    minRow,
+    maxRow
+  );
   const column0 = Math.floor(columnFloat);
   const row0 = Math.floor(rowFloat);
   const column1 = Math.min(maxColumn, column0 + 1);

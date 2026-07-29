@@ -218,10 +218,10 @@ export function createGroundBuildPlan(options = {}) {
   });
 }
 
-export function chunkGroundPoints(points, batchSize = 500) {
+export function chunkGroundPoints(points, batchSize = 5) {
   if (!Array.isArray(points)) throw new TypeError('points must be an array');
-  if (!Number.isInteger(batchSize) || batchSize <= 0 || batchSize > 1000) {
-    throw new RangeError('batchSize must be an integer from 1 through 1000');
+  if (!Number.isInteger(batchSize) || batchSize <= 0 || batchSize > 5) {
+    throw new RangeError('batchSize must be an integer from 1 through 5');
   }
   const chunks = [];
   for (let index = 0; index < points.length; index += batchSize) {

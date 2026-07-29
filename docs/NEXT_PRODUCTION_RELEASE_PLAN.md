@@ -1,6 +1,6 @@
 # Next Production Release Plan
 
-**Plan status:** approved architecture sequence; implementation not begun  
+**Plan status:** implementation underway; Phase 0 complete and bounded Phase 1 artifact active
 **Starting baseline:** `3823aea9333717ab1ea5032fb4ca929900ab8a81`  
 **Release rule:** no production deployment until every phase exit condition and the final production gate pass  
 **Design rule:** locations are evidence fixtures, never locations for patches
@@ -68,7 +68,7 @@ Named fixtures include Baltimore (dense city), Miami Beach (coast), Swiss Alps (
 
 **Single objective:** establish a reproducible baseline and replace false-positive release assertions before changing production behavior.
 
-**Implementation checkpoint (2026-07-28):** Phase 0 guardrails are implemented on the audit branch. The readiness contract rejects the former one-sample road pass, blocked accepted ground, absent linear-feature presentation, synthetic direct-state “gameplay,” software-renderer performance, unreviewed screenshots and screenshot reviews whose hashes no longer match. A real keyboard-input drive now launches through visible UI instead of forcing hidden controls. The current baseline correctly fails that journey with zero movement and also fails runtime readiness before any production repair begins. This is the intended gate state; Phase 1 must fix ground authority rather than weakening these checks.
+**Implementation checkpoint (2026-07-28):** Phase 0 guardrails are implemented on the audit branch. The readiness contract rejects the former one-sample road pass, blocked accepted ground, absent linear-feature presentation, synthetic direct-state “gameplay,” software-renderer performance, unreviewed screenshots and screenshot reviews whose hashes no longer match. The real keyboard-input drive launches through visible UI, waits for stable world readiness, reaches drive through the player-facing `F` cycle, and records input, surface, camera and movement telemetry. SwiftShader may satisfy only a reduced functional-motion threshold and always remains `releaseEligible:false`; hardware evidence still requires the full distance, sampling and camera thresholds. The journey also exposed and fixed a mode-cycle trap in which an unavailable plane transition left `F` stuck retrying drone-to-plane instead of continuing to drive.
 
 **Owned systems:** test harness, evidence schema, release toolchain, artifact manifest prototype.
 
@@ -161,24 +161,37 @@ Named fixtures include Baltimore (dense city), Miami Beach (coast), Swiss Alps (
 
 **Expected commit boundary:** `feat: establish accepted ground authority`.
 
-**Implementation checkpoint (2026-07-28):** The accepted-ground activation
-boundary is implemented, but Phase 1 is not yet eligible to exit. World loading
-now resets the previous publication, loads the deployment manifest catalog,
-verifies the selected artifact and its SHA-256 binding, and only then starts
-terrain streaming. The render mesh and public height API sample the active
-accepted artifact; legacy Terrarium sampling remains diagnostic-only. Missing
-samples return unavailable/null, pending terrain stays hidden, and an empty
-catalog produces a visible `no-ground-artifacts-configured` blocked state before
-roads or terrain are published. Browser verification confirmed zero road and
-terrain publication in that state with no page errors.
+**Implementation checkpoint (2026-07-28):** The catalog now contains one real,
+complete Baltimore artifact built from the USGS 3DEP `MD_4County_D24` bare-earth
+DEM mosaic. Its reviewed source attestation binds the official project report,
+NAD83(2011)/NAVD88(GEOID18) source frame, source release, accuracy and hashes.
+The build exports an uncompressed Float32 raster, decodes it deterministically,
+normalizes every sample to WGS84(G1674)/EGM2008 with pinned NOAA datum grids,
+combines source/datum/sampling uncertainty, and compiles 14,042 samples at
+60-meter spacing into a SHA-256-bound 7 km × 7 km artifact.
 
-The catalog is intentionally empty because the repository contains no reviewed
-USGS 3DEP source attestations or licensed FABDEM artifacts. Phase 1 remains
-blocked on building and reviewing real, complete, hash-bound artifacts for the
-worldwide scenario matrix. Terrarium must not be relabeled as accepted ground to
-remove this blocker. After artifacts are supplied, complete the consumer
-allowlist, seam/render-collision parity, worldwide visual review and performance
-budgets before marking Phase 1 complete.
+World loading verifies that artifact before publication. Vector features
+returned outside its accepted coverage are removed before district compilation,
+and the transport coverage gate runs before geometry creation. Unsupported
+locations publish no roads, buildings or terrain and expose
+`no-accepted-ground-artifact-for-location`; returning to Baltimore restores the
+accepted artifact normally. The runtime gate now measures 483 road probes and
+24 representative journeys instead of one fabricated sample. Baltimore passed
+with a 4.17% blocked-journey rate, 1.76% blocking lane-collision rate, exact
+14-sample render/walk/drive surface parity and no console errors. Path
+presentation is published as one accepted-surface batch rather than hundreds of
+independent ribbons. Artifact corruption, edge coverage, outside-coverage,
+Float32 TIFF decoding, accepted-ground selection, datum and unauthorized raw
+consumer checks pass. The physics collision-response seam is isolated and the
+maintainability guard now passes (`physics.js` 650 lines).
+
+Phase 1 is still not eligible to exit worldwide. Monaco, Svalbard, Antarctica,
+Dubai and every other uncataloged location intentionally remain unavailable.
+The proposed FABDEM global source cannot be activated without a reviewed
+production-use license attestation, and direct-surface DEMs still require a
+ground-classification pipeline. Worldwide artifacts, visual review and
+hardware-eligible performance evidence remain release blockers. Terrarium must
+not be relabeled as accepted ground to remove them.
 
 ## Phase 2 — Compile one professional transport surface and graph
 
