@@ -33,7 +33,7 @@ function manifest(overrides = {}) {
   };
 }
 
-assert.equal(groundProviderCatalog().length, 6);
+assert.equal(groundProviderCatalog().length, 7);
 assert.equal(
   groundProvider('usgs-3dep-best-available').sourceClassification,
   'accepted-ground'
@@ -117,6 +117,20 @@ const copernicusValidation =
 assert.ok(
   copernicusValidation.reasons.includes('provider-not-ground-authority')
 );
+const classifiedCopernicus = manifest({
+  artifactId: 'copernicus-classified',
+  providerId: 'copernicus-dem-classified-ground-v1',
+  licenseAttested: true
+});
+assert.ok(
+  validateGroundArtifactManifest(classifiedCopernicus).reasons.includes(
+    'correction-attestation-required'
+  )
+);
+assert.equal(validateGroundArtifactManifest({
+  ...classifiedCopernicus,
+  correctionAttested: true
+}).valid, true);
 
 const wrongDatum = manifest({ verticalDatum: 'NAVD88' });
 assert.ok(
@@ -172,7 +186,7 @@ assert.equal(
 
 const snapshot = groundProviderCatalogSnapshot();
 assert.equal(snapshot.targetVerticalDatum, 'EGM2008');
-assert.equal(snapshot.providerCount, 6);
+assert.equal(snapshot.providerCount, 7);
 assert(Object.isFrozen(snapshot));
 assert(Object.isFrozen(snapshot.providers));
 

@@ -503,9 +503,10 @@ async function main() {
     await page.waitForTimeout(1800);
 
     assert(
-      monacoLoad.roads === 0 &&
-      monacoLoad.acceptedGround?.status === 'blocked',
-      `Monaco must fail closed without an accepted artifact: ${JSON.stringify(monacoLoad)}`
+      monacoLoad.roads > 0 &&
+      monacoLoad.acceptedGround?.status === 'accepted' &&
+      monacoLoad.acceptedGround?.artifactId === 'monaco-ground',
+      `Monaco accepted-ground activation failed: ${JSON.stringify(monacoLoad)}`
     );
 
     markStage('earth:load-arctic');
@@ -516,9 +517,9 @@ async function main() {
     });
     assert(arcticLoad.ok, `Failed to load Arctic custom location: ${arcticLoad.reason || 'unknown error'}`);
     assert(
-      arcticLoad.roads === 0 &&
-      arcticLoad.acceptedGround?.status === 'blocked',
-      `Arctic load must fail closed without accepted ground: ${JSON.stringify(arcticLoad)}`
+      arcticLoad.acceptedGround?.status === 'accepted' &&
+      arcticLoad.acceptedGround?.artifactId === 'svalbard-ground',
+      `Arctic accepted-ground activation failed: ${JSON.stringify(arcticLoad)}`
     );
 
     markStage('earth:load-antarctica');
@@ -529,9 +530,9 @@ async function main() {
     });
     assert(antarcticaLoad.ok, `Failed to load Antarctica custom location: ${antarcticaLoad.reason || 'unknown error'}`);
     assert(
-      antarcticaLoad.roads === 0 &&
-      antarcticaLoad.acceptedGround?.status === 'blocked',
-      `Antarctica must fail closed without accepted ground: ${JSON.stringify(antarcticaLoad)}`
+      antarcticaLoad.acceptedGround?.status === 'accepted' &&
+      antarcticaLoad.acceptedGround?.artifactId === 'antarctica-ground',
+      `Antarctica accepted-ground activation failed: ${JSON.stringify(antarcticaLoad)}`
     );
 
     markStage('earth:load-desert');
@@ -542,9 +543,22 @@ async function main() {
     });
     assert(desertLoad.ok, `Failed to load desert custom location: ${desertLoad.reason || 'unknown error'}`);
     assert(
-      desertLoad.roads === 0 &&
-      desertLoad.acceptedGround?.status === 'blocked',
-      `Desert must fail closed without accepted ground: ${JSON.stringify(desertLoad)}`
+      desertLoad.acceptedGround?.status === 'accepted' &&
+      desertLoad.acceptedGround?.artifactId === 'dubai-desert-ground',
+      `Desert accepted-ground activation failed: ${JSON.stringify(desertLoad)}`
+    );
+
+    markStage('earth:load-unsupported');
+    const unsupportedLoad = await loadCustomLocation(page, {
+      lat: -33.8688,
+      lon: 151.2093,
+      label: 'Unsupported Sydney Control'
+    });
+    assert(
+      unsupportedLoad.ok &&
+      unsupportedLoad.roads === 0 &&
+      unsupportedLoad.acceptedGround?.status === 'blocked',
+      `Uncataloged location must fail closed: ${JSON.stringify(unsupportedLoad)}`
     );
 
     markStage('earth:restore-baltimore');
@@ -639,15 +653,15 @@ async function main() {
       globeGeolocationPresent: titlePresence.hasGlobeGeolocation,
       oceanLaunchTogglePresent: titlePresence.hasOceanLaunchToggle,
       oceanLaunchWorks: oceanState.oceanActive || oceanState.env === 'OCEAN',
-      unsupportedGroundFailsClosed: [
+      worldwideGroundActivates: [
         monacoLoad,
         arcticLoad,
         antarcticaLoad,
         desertLoad
-      ].every((load) =>
-        load.roads === 0 &&
-        load.acceptedGround?.status === 'blocked'
-      ),
+      ].every((load) => load.acceptedGround?.status === 'accepted'),
+      unsupportedGroundFailsClosed:
+        unsupportedLoad.roads === 0 &&
+        unsupportedLoad.acceptedGround?.status === 'blocked',
       acceptedGroundRestores:
         baltimoreRestore.roads > 0 &&
         baltimoreRestore.acceptedGround?.status === 'accepted',
@@ -670,6 +684,7 @@ async function main() {
       arcticLoad,
       antarcticaLoad,
       desertLoad,
+      unsupportedLoad,
       baltimoreRestore,
       oceanState,
       earthState,

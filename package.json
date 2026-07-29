@@ -6,7 +6,7 @@
   "main": "three.js",
   "scripts": {
     "dev": "node scripts/serve-local-preview.mjs",
-    "test": "npm run test:terrain-source && npm run test:ground-provider && npm run test:ground-artifact && npm run test:ground-artifact-builder && npm run test:ground-datum && npm run test:accepted-ground-catalog && npm run test:accepted-ground-runtime && npm run test:accepted-ground-artifacts && npm run test:accepted-ground-selection && npm run test:accepted-ground-activation && npm run test:ground-authority-consumers && npm run test:district-compiler && npm run test:phase3-ownership && npm run test:transport-surface && npm run test:phase5-production && npm run test:rules && npm run test:runtime && npm run test:osm-smoke",
+    "test": "npm run test:terrain-source && npm run test:ground-provider && npm run test:ground-artifact && npm run test:ground-artifact-builder && npm run test:copernicus-ground && npm run test:ground-datum && npm run test:accepted-ground-catalog && npm run test:accepted-ground-runtime && npm run test:accepted-ground-artifacts && npm run test:phase1-worldwide-ground && npm run test:accepted-ground-selection && npm run test:accepted-ground-activation && npm run test:ground-authority-consumers && npm run test:district-compiler && npm run test:phase3-ownership && npm run test:transport-surface && npm run test:phase5-production && npm run test:rules && npm run test:runtime && npm run test:osm-smoke",
     "test:rules": "node scripts/test-rules.mjs",
     "test:css": "node scripts/test-css-integrity.mjs",
     "test:inferred-buildings": "node scripts/test-inferred-building-coverage.mjs",
@@ -20,6 +20,8 @@
     "audit:reachability": "node scripts/audit-hosting-reachability.mjs --strict",
     "audit:terrain-provider": "node scripts/audit-terrain-provider.mjs",
     "ground:artifact": "node scripts/build-ground-artifact.mjs",
+    "ground:catalog": "node scripts/rebuild-ground-catalog.mjs",
+    "ground:worldwide": "node scripts/build-worldwide-ground-artifacts.mjs",
     "ground:datum": "node scripts/run-ground-datum-normalizer.mjs",
     "data:landmarks": "node scripts/update-featured-landmarks.mjs",
     "data:buildings": "node scripts/update-preset-building-metadata.mjs",
@@ -50,9 +52,11 @@
     "test:ground-provider": "node scripts/test-ground-provider-registry.mjs",
     "test:ground-artifact": "node scripts/test-ground-artifact.mjs",
     "test:ground-artifact-builder": "node scripts/test-ground-artifact-builder.mjs",
+    "test:copernicus-ground": "node scripts/test-copernicus-ground-builder.mjs",
     "test:ground-datum": "node scripts/run-ground-datum-normalizer.mjs self-test",
     "test:accepted-ground-runtime": "node scripts/test-accepted-ground-runtime.mjs",
     "test:accepted-ground-artifacts": "node scripts/test-accepted-ground-artifacts.mjs",
+    "test:phase1-worldwide-ground": "node scripts/test-phase1-worldwide-ground.mjs",
     "test:accepted-ground-selection": "node scripts/test-accepted-ground-selection.mjs",
     "test:accepted-ground-catalog": "node scripts/test-accepted-ground-catalog.mjs",
     "test:accepted-ground-activation": "node scripts/test-accepted-ground-activation.mjs",
@@ -100,6 +104,7 @@
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.0",
     "firebase": "^12.9.0",
+    "geotiff": "^3.0.5",
     "playwright": "^1.61.0"
   }
 }

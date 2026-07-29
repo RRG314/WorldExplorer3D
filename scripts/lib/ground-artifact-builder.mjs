@@ -7,7 +7,7 @@ import {
 } from '../../app/js/terrain/source-contract.js';
 import {
   compileGroundArtifact
-} from '../../app/js/terrain/ground-artifact.js?v=1';
+} from '../../app/js/terrain/ground-artifact.js?v=4';
 
 export const USGS_3DEP_SAMPLES_URL =
   'https://elevation.nationalmap.gov/arcgis/rest/services/' +
@@ -387,7 +387,12 @@ export function createGroundArtifactBundle({
   part,
   sourceRelease,
   normalizedSamples,
-  licenseAttested = true
+  licenseAttested = true,
+  providerId = 'usgs-3dep-best-available',
+  correctionAttested = false,
+  sourceEvidence = null,
+  attribution = null,
+  compactArtifact = false
 } = {}) {
   if (!part?.grid || !part?.coverage) {
     throw new TypeError('a ground build plan part is required');
@@ -396,7 +401,7 @@ export function createGroundArtifactBundle({
     schemaVersion: 1,
     artifactId: String(artifactId || part.id),
     districtId: part.id,
-    providerId: 'usgs-3dep-best-available',
+    providerId: String(providerId),
     sourceRelease: String(sourceRelease || ''),
     verticalDatum: 'EGM2008',
     coverage: part.coverage,
@@ -404,7 +409,9 @@ export function createGroundArtifactBundle({
     grid: part.grid,
     samples: normalizedSamples
   };
-  const artifactText = canonicalJson(artifact);
+  const artifactText = compactArtifact
+    ? `${JSON.stringify(artifact)}\n`
+    : canonicalJson(artifact);
   const manifest = {
     schemaVersion: 1,
     artifactId: artifact.artifactId,
@@ -419,7 +426,10 @@ export function createGroundArtifactBundle({
       0,
       part.grid.sampleCount - normalizedSamples.length
     ),
-    licenseAttested
+    licenseAttested,
+    correctionAttested,
+    ...(sourceEvidence ? { sourceEvidence } : {}),
+    ...(attribution ? { attribution } : {})
   };
   const compiled = compileGroundArtifact({ manifest, artifact });
   if (compiled.status !== 'accepted') {

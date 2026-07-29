@@ -13,6 +13,14 @@ import {
 import {
   decodeUncompressedFloat32Tiff
 } from './lib/tiff-f32.mjs';
+import {
+  buildCopernicusGroundSamples,
+  COPERNICUS_DEM_ATTRIBUTION,
+  COPERNICUS_DEM_90_ATTRIBUTION,
+  COPERNICUS_DEM_LICENSE_DOCUMENT,
+  COPERNICUS_DEM_LIABILITY_NOTICE,
+  COPERNICUS_DEM_90_LIABILITY_NOTICE
+} from './lib/copernicus-ground-builder.mjs';
 
 const USGS_3DEP_EXPORT_URL =
   'https://elevation.nationalmap.gov/arcgis/rest/services/' +
@@ -62,6 +70,13 @@ async function writeJson(filePath, value) {
   return absolute;
 }
 
+async function writeText(filePath, text) {
+  const absolute = path.resolve(filePath);
+  await fs.mkdir(path.dirname(absolute), { recursive: true });
+  await fs.writeFile(absolute, text, 'utf8');
+  return absolute;
+}
+
 function help() {
   return `
 WorldExplorer3D accepted-ground artifact builder
@@ -81,11 +96,18 @@ Commands:
   compile
     --raw FILE --normalization FILE --output-dir DIRECTORY
 
+  compile-copernicus
+    --plan FILE --output-dir DIRECTORY
+
 The fetch stage records raw USGS 3DEP/NAVD88 evidence only. It never produces
 accepted runtime ground. The compile stage requires a complete normalization
 document bound to the raw file SHA-256 and declaring WGS84_G1674/EGM2008.
 Use scripts/ground-datum-normalizer.py to prepare that document from separately
 verified, raster-specific source attestations.
+
+The Copernicus command reads only the public unsigned AWS distribution. It
+records source-object hashes, preserves the source DSM samples separately from
+the classified ground product, and never calls a permission-gated view service.
 `.trim();
 }
 
@@ -548,6 +570,75 @@ async function commandCompile() {
   };
 }
 
+async function commandCompileCopernicus() {
+  const { value: plan } = await readJson(requiredFlag('--plan'));
+  assertPlan(plan);
+  const outputDirectory = path.resolve(requiredFlag('--output-dir'));
+  const outputs = [];
+  for (const part of plan.parts) {
+    const built = await buildCopernicusGroundSamples({ part });
+    const artifactId = plan.partCount === 1
+      ? `${plan.districtId}-ground`
+      : `${part.id}-ground`;
+    const bundle = createGroundArtifactBundle({
+      artifactId,
+      part,
+      sourceRelease: built.sourceRelease,
+      normalizedSamples: built.samples,
+      providerId: 'copernicus-dem-classified-ground-v1',
+      licenseAttested: true,
+      correctionAttested: true,
+      sourceEvidence: {
+        sourceClassification: 'digital-surface-model',
+        correctionMethod: built.classification.method,
+        sourceTiles: built.sourceTiles
+      },
+      attribution: {
+        notice: [...new Set(built.sourceTiles.map((tile) =>
+          tile.resolutionMeters === 30
+            ? COPERNICUS_DEM_ATTRIBUTION
+            : COPERNICUS_DEM_90_ATTRIBUTION
+        ))].join(' '),
+        liabilityNotice: [...new Set(built.sourceTiles.map((tile) =>
+          tile.resolutionMeters === 30
+            ? COPERNICUS_DEM_LIABILITY_NOTICE
+            : COPERNICUS_DEM_90_LIABILITY_NOTICE
+        ))].join(' '),
+        licenseDocument: COPERNICUS_DEM_LICENSE_DOCUMENT,
+        modified: true
+      },
+      compactArtifact: true
+    });
+    const partDirectory = plan.partCount === 1
+      ? outputDirectory
+      : path.join(outputDirectory, part.id);
+    const artifactPath = await writeText(
+      path.join(partDirectory, 'ground-artifact.json'),
+      bundle.artifactText
+    );
+    const manifestPath = await writeJson(
+      path.join(partDirectory, 'ground-manifest.json'),
+      bundle.manifest
+    );
+    outputs.push({
+      artifactId,
+      artifactPath,
+      manifestPath,
+      contentSha256: bundle.manifest.contentSha256,
+      sampleCount: bundle.compiled.model.grid.sampleCount,
+      classification: built.classification,
+      sourceTiles: built.sourceTiles
+    });
+  }
+  return {
+    ok: true,
+    command: 'compile-copernicus',
+    providerId: 'copernicus-dem-classified-ground-v1',
+    outputCount: outputs.length,
+    outputs
+  };
+}
+
 const command = process.argv[2] || 'help';
 try {
   let result;
@@ -557,6 +648,9 @@ try {
     result = await commandFetchUsgsExport();
   }
   else if (command === 'compile') result = await commandCompile();
+  else if (command === 'compile-copernicus') {
+    result = await commandCompileCopernicus();
+  }
   else {
     console.log(help());
     process.exit(command === 'help' || command === '--help' ? 0 : 1);

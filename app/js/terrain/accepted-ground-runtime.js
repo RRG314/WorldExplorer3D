@@ -1,9 +1,9 @@
 import {
   selectGroundArtifact
-} from './ground-provider-registry.js?v=2';
+} from './ground-provider-registry.js?v=3';
 import {
   loadGroundArtifact
-} from './ground-artifact.js?v=3';
+} from './ground-artifact.js?v=4';
 import {
   geographicToWebMercatorMeters
 } from './source-contract.js?v=2';

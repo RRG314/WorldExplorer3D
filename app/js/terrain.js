@@ -15,11 +15,11 @@ import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=2";
 import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=9";
 import {
   groundProviderCatalogSnapshot
-} from "./terrain/ground-provider-registry.js?v=2";
+} from "./terrain/ground-provider-registry.js?v=3";
 import {
   compileGroundArtifact,
   loadGroundArtifact
-} from "./terrain/ground-artifact.js?v=3";
+} from "./terrain/ground-artifact.js?v=4";
 import {
   createAcceptedGroundRuntime
 } from "./terrain/accepted-ground-runtime.js?v=2";

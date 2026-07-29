@@ -41,9 +41,24 @@ const PROVIDERS = Object.freeze({
     nativeVerticalDatum: 'EGM2008',
     nominalResolutionMeters: 30,
     coverage: 'worldwide land surface',
-    licenseStatus: 'source-license-and-access-acceptance-required',
+    licenseStatus: 'public-free-use-with-attribution',
     runtimeDelivery: 'precompiled-correction-input-only',
     priority: 0,
+    sourceDocument:
+      'https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM'
+  }),
+  'copernicus-dem-classified-ground-v1': Object.freeze({
+    id: 'copernicus-dem-classified-ground-v1',
+    label: 'Copernicus DEM classified ground V1',
+    sourceKind: 'classified-ground-dem',
+    sourceClassification: 'accepted-ground',
+    nativeVerticalDatum: 'EGM2008',
+    nominalResolutionMeters: null,
+    coverage: 'public Copernicus GLO-30 with GLO-90 fallback',
+    licenseStatus: 'public-free-use-with-attribution',
+    runtimeDelivery: 'precompiled-artifact-only',
+    requiresCorrectionAttestation: true,
+    priority: 70,
     sourceDocument:
       'https://dataspace.copernicus.eu/explore-data/data-collections/copernicus-contributing-missions/collections-description/COP-DEM'
   }),
@@ -189,6 +204,10 @@ export function validateGroundArtifactManifest(manifest = {}) {
   if (provider?.sourceClassification === 'accepted-ground-candidate' &&
       manifest.licenseAttested !== true) {
     reasons.push('license-attestation-required');
+  }
+  if (provider?.requiresCorrectionAttestation === true &&
+      manifest.correctionAttested !== true) {
+    reasons.push('correction-attestation-required');
   }
   if (provider &&
       !['accepted-ground', 'accepted-ground-candidate'].includes(

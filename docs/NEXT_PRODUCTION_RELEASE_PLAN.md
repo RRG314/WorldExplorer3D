@@ -185,13 +185,28 @@ Float32 TIFF decoding, accepted-ground selection, datum and unauthorized raw
 consumer checks pass. The physics collision-response seam is isolated and the
 maintainability guard now passes (`physics.js` 650 lines).
 
-Phase 1 is still not eligible to exit worldwide. Monaco, Svalbard, Antarctica,
-Dubai and every other uncataloged location intentionally remain unavailable.
-The proposed FABDEM global source cannot be activated without a reviewed
-production-use license attestation, and direct-surface DEMs still require a
-ground-classification pipeline. Worldwide artifacts, visual review and
-hardware-eligible performance evidence remain release blockers. Terrarium must
-not be relabeled as accepted ground to remove them.
+**Phase 1 exit checkpoint (2026-07-29):** Phase 1 engineering is complete and
+the Phase 2 entry condition is satisfied. FABDEM remains excluded because its
+production-use rights were not accepted. The public unsigned Copernicus
+GLO-30 distribution now feeds a separate, correction-attested derived-ground
+provider; direct DSM data is never relabeled as ground. The builder preserves
+raw and classified products, hashes every source object, applies a conservative
+slope-adaptive progressive morphological filter, caps classified corrections,
+records uncertainty/provenance, and carries the required attribution and
+liability notice into manifests and application legal surfaces.
+
+Eight global artifacts now add Monaco, Swiss Alps, Svalbard, Antarctica, Dubai
+desert, Dead Sea, Lhasa plateau, and an exact four-source-tile corner to the
+Baltimore artifact. All Phase 1 worldwide categories therefore have active
+coverage. Integrity-before-parse, corruption, complete edges, outside coverage,
+below-sea values, plateau height, four-tile binding, source/ground separation,
+authorized consumers, render/collision sampling parity, and the 0.2 ms cached
+sampling budget pass. Visible browser launches at Monaco, Swiss Alps, Dead Sea,
+and the four-tile corner reached ready state with the expected accepted
+artifact and no runtime errors or visible zero-elevation/source-tile cliff.
+The browser run was software-rendered and is not being misrepresented as the
+later hardware-eligible release performance gate. Full evidence and reproduction
+commands are in `docs/PHASE1_ACCEPTED_GROUND_HANDOFF.md`.
 
 ## Phase 2 — Compile one professional transport surface and graph
 
