@@ -203,6 +203,13 @@ function updateBoatPatchWakeUniforms(profile = null) {
   return true;
 }
 
+function shouldSuppressBoatTerrain(context = appCtx) {
+  return !!(
+    context?.boatMode?.active &&
+    context?.worldLoadRuntimeState?.groundMode === 'open-ocean-surface-only'
+  );
+}
+
 function syncBoatTerrainSuppression() {
   const active = !!appCtx.boatMode?.active;
   const shoreline = Number(appCtx.boatMode?.shorelineDistance || 0);
@@ -215,6 +222,7 @@ function syncBoatTerrainSuppression() {
     active &&
     offshore > 160 &&
     (waterKind === 'open_ocean' || waterKind === 'coastal');
+  const surfaceOnlyOcean = shouldSuppressBoatTerrain(appCtx);
   const clutterRadius = active ?
     farOffshoreWater ? clamp(offshore * 4.5, 1080, 6200) :
     waterKind === 'open_ocean' ? clamp(offshore * 0.92, 160, 460) :
@@ -287,7 +295,7 @@ function syncBoatTerrainSuppression() {
     return landuseType === 'water' || surfaceVariant === 'water' || surfaceVariant === 'ice';
   };
 
-  const suppressFallbackGround = farOffshoreWater;
+  const suppressFallbackGround = farOffshoreWater || surfaceOnlyOcean;
   for (let i = 0; i < groundPlanes.length; i++) {
     const mesh = groundPlanes[i];
     if (!suppressFallbackGround) {
@@ -301,7 +309,12 @@ function syncBoatTerrainSuppression() {
   for (let i = 0; i < terrainMeshes.length; i++) {
     const mesh = terrainMeshes[i];
     if (!mesh) continue;
-    clearSuppression(mesh, true);
+    if (!surfaceOnlyOcean) {
+      clearSuppression(mesh, true);
+      continue;
+    }
+    mesh.userData.boatSuppressed = true;
+    mesh.visible = false;
   }
 
   for (let i = 0; i < landuseMeshes.length; i++) {
@@ -652,6 +665,7 @@ export {
   applyBoatWavePose,
   ensureBoatWaterPatch,
   resetBoatFoamFx,
+  shouldSuppressBoatTerrain,
   syncBoatTerrainSuppression,
   updateBoatFoamFx,
   updateBoatWaterPatch,

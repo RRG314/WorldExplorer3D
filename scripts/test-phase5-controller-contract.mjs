@@ -6,6 +6,7 @@ import {
 } from '../app/js/controls/action-input.js';
 import { createBoatModePolicy } from '../app/js/boat-mode/policy.js';
 import { getReferencePosition } from '../app/js/boat-mode/water-query.js';
+import { shouldSuppressBoatTerrain } from '../app/js/boat-mode/surface-effects.js';
 
 ctx.keys = {};
 ctx.keys.ArrowUp = true;
@@ -59,6 +60,19 @@ assert.equal(boatPolicy.canExitBoatMode('drive', { source: 'boat_prompt_exit' })
 boatPolicyContext.boatMode.shorelineDistance = 500;
 assert.equal(boatPolicy.canExitBoatMode('walk', { source: 'boat_prompt_exit', showNotice: false }), false);
 
+assert.equal(shouldSuppressBoatTerrain({
+  boatMode: { active: true },
+  worldLoadRuntimeState: { groundMode: 'open-ocean-surface-only' }
+}), true);
+assert.equal(shouldSuppressBoatTerrain({
+  boatMode: { active: true },
+  worldLoadRuntimeState: { groundMode: 'accepted-terrain' }
+}), false);
+assert.equal(shouldSuppressBoatTerrain({
+  boatMode: { active: false },
+  worldLoadRuntimeState: { groundMode: 'open-ocean-surface-only' }
+}), false);
+
 ctx.boatMode = { active: false };
 ctx.planeMode = { active: true, airborne: true, x: 3, y: 1, z: 4, yaw: 0.2 };
 ctx.droneMode = false;
@@ -79,6 +93,7 @@ console.log(JSON.stringify({
   staleKeyboardStateCleared: true,
   forwardReverseChannelsIndependent: true,
   boatLocksOffshoreModeSwitches: true,
+  openOceanFallbackTerrainSuppressed: true,
   explicitNearShoreExitStillWorks: true,
   groundedPlaneAndDroneCanFindNearbyBoats: true
 }, null, 2));
