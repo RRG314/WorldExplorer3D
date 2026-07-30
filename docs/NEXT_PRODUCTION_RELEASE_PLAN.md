@@ -1,6 +1,7 @@
 # Next Production Release Plan
 
-**Plan status:** Phase 6 candidate preparation underway; Phases 0–5 complete
+**Plan status:** Phase 6 blocked by failed visual acceptance; affected Phase 1–5
+exit conditions are reopened
 **Starting baseline:** `3823aea9333717ab1ea5032fb4ca929900ab8a81`  
 **Release rule:** no production deployment until every phase exit condition and the final production gate pass  
 **Design rule:** locations are evidence fixtures, never locations for patches
@@ -449,6 +450,12 @@ evidence is recorded in `docs/PHASE5_CONTROLLER_LIFECYCLE_STATUS.md`.
 
 **Single objective:** prove and promote exactly one reproducible artifact, with no new architecture or features.
 
+**Current gate:** blocked. Direct player review found selector handoff failures,
+incorrect water/land arrivals, overlapping ground presentation, visibly
+disconnected or misaligned bridges/tunnels/skywalks, stale Earth sky state and
+minimap drift. These are production-runtime defects, so Phase 6 cannot absorb
+them or proceed to deployment.
+
 **Owned systems:** release evidence, build artifact, deployment manifest, rollback package, changelog/release notes.
 
 **Expected files to change:** version/changelog/release metadata, CI workflow, generated immutable manifest. Test evidence may be attached outside runtime source.
@@ -486,6 +493,38 @@ evidence is recorded in `docs/PHASE5_CONTROLLER_LIFECYCLE_STATUS.md`.
 **Rollback point:** Phase 5 commit plus the previously promoted production artifact.
 
 **Expected commit boundary:** `release: prepare WorldExplorer3D <version> production artifact`.
+
+### Visual-coherence recovery order
+
+The candidate returns to the owning phases in this order. A later owner cannot
+patch around an earlier unresolved surface:
+
+1. Resolve the selected place to one canonical latitude/longitude and preserve
+   that identity through load, spawn, HUD and minimap.
+2. Activate one accepted elevation surface and one ground-presentation owner.
+   Missing presentation is allowed to fail closed; a fallback sheet may not
+   overlay an accepted textured surface.
+3. Compile the OSM water mask and semantic transport graph in the accepted
+   ground coordinate frame.
+4. Compile road grades, cuts, fills, bridges, portals and tunnels against that
+   frozen surface. Incomplete elevated connectors and structures without valid
+   endpoints are suppressed rather than rendered.
+5. Place buildings and other detail after transport exclusions and vertical
+   structure envelopes are known.
+6. Attach actors, cameras and the minimap only after the compiled world is
+   published.
+7. Run named visual journeys before long soaks or release verification:
+   Baltimore harbor, Monaco land arrival, San Francisco terrain, representative
+   bridge/overpass transitions, tunnel portals, disconnected elevated
+   walkways, ground-owner seams, minimap centering and every return-to-Earth
+   path.
+
+OSM is the semantic and topology authority for mapped roads, water, buildings
+and structure tags. It is not an elevation raster or photographic ground
+texture. Production therefore uses OSM plus exactly one accepted DEM/elevation
+authority and one presentation layer. Optional building sources may fill
+coverage only after normalization and deduplication; they never override OSM
+topology or accepted ground.
 
 ## Commit and review discipline
 

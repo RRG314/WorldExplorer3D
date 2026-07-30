@@ -2,7 +2,8 @@
 
 **Target version:** 4.1.2
 
-**Status:** candidate preparation and release verification in progress
+**Status:** blocked — failed direct visual acceptance; no preview or production
+promotion is permitted
 
 **Runtime baseline:** Phase 5 commit `da9de3b`
 
@@ -12,6 +13,12 @@ Phase 6 changes release metadata, evidence gates, artifact identity and
 promotion mechanics only. Production geometry, data compilation, rendering,
 controllers, UI behavior and lifecycle architecture are frozen. Any newly
 discovered runtime defect returns to the phase that owns it.
+
+Direct review on 2026-07-30 found production-code defects in the location
+handoff, ground composition, water presentation, transport structures,
+environment sky reset and minimap follow behavior. The release verifier's
+counter/schema assertions did not prove those player-visible outcomes. The
+candidate has therefore returned to its owning phases and is not deployable.
 
 ## Candidate identity
 
