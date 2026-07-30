@@ -20,6 +20,8 @@ const state = {
   cameraLookTimer: 0,
   contactKind: 'terrain',
   contactBuildingId: '',
+  launchKind: 'ground',
+  launchClearanceY: null,
   lastImpactAt: 0,
   lastImpactSpeed: 0,
   mesh: null,
@@ -149,6 +151,67 @@ function pointInsideBuildingFootprint(x, z, building) {
   return !Array.isArray(building.pts) || building.pts.length < 3 || appCtx.pointInPolygon?.(x, z, building.pts) === true;
 }
 
+function pointToBuildingFootprintDistance(x, z, building) {
+  if (!building) return Infinity;
+  if (pointInsideBuildingFootprint(x, z, building)) return 0;
+  const points = Array.isArray(building.pts) ? building.pts : [];
+  if (points.length < 3) {
+    const nearestX = clamp(x, Number(building.minX), Number(building.maxX));
+    const nearestZ = clamp(z, Number(building.minZ), Number(building.maxZ));
+    return Math.hypot(x - nearestX, z - nearestZ);
+  }
+  let best = Infinity;
+  for (let index = 0; index < points.length; index += 1) {
+    const start = points[index];
+    const end = points[(index + 1) % points.length];
+    const dx = end.x - start.x;
+    const dz = end.z - start.z;
+    const lengthSquared = dx * dx + dz * dz;
+    const t = lengthSquared > 0
+      ? clamp(((x - start.x) * dx + (z - start.z) * dz) / lengthSquared, 0, 1)
+      : 0;
+    best = Math.min(
+      best,
+      Math.hypot(x - (start.x + dx * t), z - (start.z + dz * t))
+    );
+  }
+  return best;
+}
+
+function safePlaneLaunchAboveUrbanGeometry(x, z, groundY) {
+  const aircraftAndCameraRadius = 18;
+  const candidates = appCtx.getNearbyBuildings?.(
+    x,
+    z,
+    aircraftAndCameraRadius + 12
+  ) || appCtx.buildings || [];
+  let highestRoofY = -Infinity;
+  let nearbyBuildingCount = 0;
+  for (let index = 0; index < candidates.length; index += 1) {
+    const building = candidates[index];
+    if (
+      !building ||
+      building.collisionDisabled ||
+      building.allowsPassageBelow === true ||
+      building.collisionKind === 'barrier'
+    ) continue;
+    if (pointToBuildingFootprintDistance(x, z, building) > aircraftAndCameraRadius) continue;
+    const roofY = buildingTopY(building);
+    if (!Number.isFinite(roofY) || roofY <= groundY + 2) continue;
+    highestRoofY = Math.max(highestRoofY, roofY);
+    nearbyBuildingCount += 1;
+  }
+  if (nearbyBuildingCount === 0) {
+    return { required: false, y: groundY + 0.72, nearbyBuildingCount: 0 };
+  }
+  return {
+    required: true,
+    y: highestRoofY + 12,
+    highestRoofY,
+    nearbyBuildingCount
+  };
+}
+
 function buildingRoofSurfaceAt(x, z, terrainY) {
   const gearY = state.y - 0.72;
   const candidates = appCtx.getNearbyBuildings?.(x, z, 8) || appCtx.buildings || [];
@@ -224,12 +287,26 @@ function startPlaneMode(options = {}) {
   if (Number.isFinite(options.y)) state.y = options.y;
   surfaceSample.valid = false;
   const groundY = samplePlaneSurface(0, true);
-  state.y = Number.isFinite(options.y) ? Math.max(groundY + 0.72, options.y) : groundY + 0.72;
+  const hasExplicitY = Number.isFinite(options.y);
+  const safeLaunch = hasExplicitY
+    ? { required: false, y: Math.max(groundY + 0.72, options.y) }
+    : safePlaneLaunchAboveUrbanGeometry(state.x, state.z, groundY);
+  state.y = safeLaunch.y;
   state.pitch = clamp(Number(options.pitch) || 0, -0.35, 0.35);
   state.roll = clamp(Number(options.roll) || 0, -0.65, 0.65);
-  state.speed = clamp(Number(options.speed) || 0, 0, 62);
-  state.throttle = clamp(Number(options.throttle) || 0, 0, 1);
-  state.airborne = options.airborne === true || state.y > groundY + 1.4;
+  state.speed = clamp(
+    safeLaunch.required ? Math.max(20, Number(options.speed) || 0) : Number(options.speed) || 0,
+    0,
+    62
+  );
+  state.throttle = clamp(
+    safeLaunch.required ? Math.max(0.48, Number(options.throttle) || 0) : Number(options.throttle) || 0,
+    0,
+    1
+  );
+  state.airborne = safeLaunch.required || options.airborne === true || state.y > groundY + 1.4;
+  state.launchKind = safeLaunch.required ? 'urban_airborne' : 'ground';
+  state.launchClearanceY = safeLaunch.required ? safeLaunch.y : null;
   state.climbRate = 0;
   state.vx = 0;
   state.vy = 0;
@@ -476,6 +553,8 @@ function getPlaneSnapshot() {
     airborne: state.airborne,
     contactKind: state.contactKind,
     contactBuildingId: state.contactBuildingId,
+    launchKind: state.launchKind,
+    launchClearanceY: state.launchClearanceY,
     lastImpactAt: state.lastImpactAt,
     lastImpactSpeed: state.lastImpactSpeed
   };

@@ -313,6 +313,10 @@ export function createGlobeSelectorScene(options = {}) {
     sceneReady = false;
     if (scene) disposeThreeObjectTree(scene);
     renderer = disposeThreeRenderer(renderer);
+    if (canvas) {
+      canvas.width = 1;
+      canvas.height = 1;
+    }
     scene = null;
     camera = null;
     globeRoot = null;

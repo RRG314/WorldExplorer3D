@@ -170,21 +170,206 @@ async function pose(page) {
   });
 }
 
+async function captureSpawnDiagnostic(page, name) {
+  const diagnostic = await page.evaluate(async (diagnosticName) => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const { getWorldExplorerRuntimeDiagnostics } =
+      await import('/app/js/runtime-diagnostics.js?v=1');
+    const actor = ctx?.activeTransportActor?.() || null;
+    const actorX = Number(actor?.position?.x);
+    const actorZ = Number(actor?.position?.z);
+    const actorY = Number(actor?.position?.y);
+    const actorFeetOffset = {
+      drive: 1.2,
+      walk: 1.7,
+      plane: 0.72,
+      drone: 0.25,
+      boat: 1.1
+    }[actor?.mode] ?? 0;
+    const actorFeetY = actorY - actorFeetOffset;
+    const cameraX = Number(ctx?.camera?.position?.x);
+    const cameraY = Number(ctx?.camera?.position?.y);
+    const cameraZ = Number(ctx?.camera?.position?.z);
+    const actorCollision = ctx?.checkBuildingCollision?.(
+      actorX,
+      actorZ,
+      Number(actor?.bounds?.radius) || 2,
+      {
+        actorBaseY: actorFeetY,
+        actorHeight: Number(actor?.bounds?.height) || 1.9
+      }
+    ) || { collision: false };
+    const cameraBuilding = ctx?.buildingContainingPoint?.(
+      cameraX,
+      cameraZ,
+      0.1,
+      {
+        y: cameraY,
+        actorHeight: 0.2,
+        tolerance: 0.05
+      }
+    ) || null;
+    return {
+      generatedAt: new Date().toISOString(),
+      name: diagnosticName,
+      actor: {
+        mode: String(actor?.mode || ''),
+        x: actorX,
+        y: actorY,
+        z: actorZ,
+        feetY: actorFeetY,
+        collision: actorCollision?.collision === true,
+        inside: actorCollision?.inside === true,
+        buildingSourceId: String(actorCollision?.building?.sourceId || '')
+      },
+      camera: {
+        x: cameraX,
+        y: cameraY,
+        z: cameraZ,
+        insideBuilding: !!cameraBuilding,
+        buildingSourceId: String(cameraBuilding?.sourceId || '')
+      },
+      plane: ctx?.planeMode?.active
+        ? {
+            airborne: ctx.planeMode.airborne === true,
+            launchKind: String(ctx.planeMode.launchKind || ''),
+            launchClearanceY: Number(ctx.planeMode.launchClearanceY)
+          }
+        : null,
+      runtime: getWorldExplorerRuntimeDiagnostics()
+    };
+  }, name);
+  await page.screenshot({
+    path: path.join(outputDir, `${name}.png`),
+    fullPage: false
+  });
+  await fs.writeFile(
+    path.join(outputDir, `${name}.json`),
+    JSON.stringify(diagnostic, null, 2)
+  );
+  return diagnostic;
+}
+
 async function enterDriveModeFromKeyboard(page) {
+  const transitions = [];
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const mode = await page.evaluate(async () => {
       const { ctx } = await import('/app/js/shared-context.js?v=55');
       return String(ctx?.getCurrentTravelMode?.() || '');
     });
-    if (mode === 'drive') return { mode, keyPresses: attempt };
+    if (mode === 'drive') return { mode, keyPresses: attempt, transitions };
     await page.keyboard.press('KeyF');
     await page.waitForTimeout(500);
+    const diagnostic = await captureSpawnDiagnostic(
+      page,
+      `mode-transition-${attempt + 1}`
+    );
+    transitions.push({
+      mode: diagnostic.actor.mode,
+      actorCollision: diagnostic.actor.collision,
+      actorInside: diagnostic.actor.inside,
+      cameraInsideBuilding: diagnostic.camera.insideBuilding,
+      planeAirborne: diagnostic.plane?.airborne ?? null,
+      planeLaunchKind: diagnostic.plane?.launchKind || null
+    });
   }
   const mode = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     return String(ctx?.getCurrentTravelMode?.() || '');
   });
-  return { mode, keyPresses: 5 };
+  return { mode, keyPresses: 5, transitions };
+}
+
+async function prepareBuildingClearDriveRoute(page) {
+  return page.evaluate(async () => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const candidates = [];
+    for (const road of ctx.roads || []) {
+      const vehicleRoad = !!road &&
+        road.driveable !== false &&
+        (!road.networkKind || road.networkKind === 'road');
+      if (!vehicleRoad || !Array.isArray(road.pts)) continue;
+      const roadType = String(road.type || '').toLowerCase();
+      if (/motorway|trunk|service|track/.test(roadType)) continue;
+      for (let index = 0; index < road.pts.length - 1; index += 1) {
+        const start = road.pts[index];
+        const end = road.pts[index + 1];
+        const length = Math.hypot(end.x - start.x, end.z - start.z);
+        if (length < 20) continue;
+        const x = (start.x + end.x) * 0.5;
+        const z = (start.z + end.z) * 0.5;
+        const terrainY = Number(ctx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y);
+        const collision = ctx.checkBuildingCollision?.(x, z, 8, {
+          actorBaseY: terrainY,
+          actorHeight: 2
+        });
+        if (collision?.collision) continue;
+        const angle = Math.atan2(end.x - start.x, end.z - start.z);
+        const score = length + Math.min(20, Number(road.width) || 0) * 3;
+        candidates.push({
+          x,
+          z,
+          angle,
+          score,
+          segmentLength: length,
+          roadId: String(road.id || ''),
+          roadName: String(road.name || '')
+        });
+      }
+    }
+    candidates.sort((left, right) => right.score - left.score);
+    let selected = null;
+    for (const candidate of candidates.slice(0, 240)) {
+      const resolved = ctx.resolveSafeWorldSpawn?.(candidate.x, candidate.z, {
+        mode: 'drive',
+        angle: candidate.angle,
+        preferRoad: true,
+        source: 'player_drive_release_route'
+      });
+      if (!resolved) continue;
+      if (Math.hypot(resolved.x - candidate.x, resolved.z - candidate.z) > 20) continue;
+      const collision = ctx.checkBuildingCollision?.(
+        Number(resolved.x),
+        Number(resolved.z),
+        5,
+        {
+          actorBaseY: Number(resolved.carY) - 1.2,
+          actorHeight: 2
+        }
+      );
+      if (collision?.collision) continue;
+      selected = { candidate, resolved };
+      break;
+    }
+    if (!selected || typeof ctx.applyResolvedWorldSpawn !== 'function') {
+      throw new Error('Building-clear road spawn could not be resolved');
+    }
+    const { candidate: best, resolved } = selected;
+    ctx.applyResolvedWorldSpawn(resolved, {
+      mode: 'drive',
+      syncCar: true,
+      syncWalker: true
+    });
+    const collision = ctx.checkBuildingCollision?.(
+      Number(ctx.car?.x),
+      Number(ctx.car?.z),
+      5,
+      {
+        actorBaseY: Number(ctx.car?.y) - 1.2,
+        actorHeight: 2
+      }
+    );
+    if (collision?.collision) {
+      throw new Error('Resolved release drive route was not building-clear');
+    }
+    return {
+      ...best,
+      resolvedX: Number(resolved.x),
+      resolvedZ: Number(resolved.z),
+      resolvedSource: String(resolved.source || ''),
+      onRoad: resolved.onRoad === true
+    };
+  });
 }
 
 async function holdAndSample(page, keys, durationMs, samples) {
@@ -242,6 +427,7 @@ try {
     timeout: 120000
   });
   await launchFromUserInterface(page);
+  const launchDiagnostic = await captureSpawnDiagnostic(page, 'launch');
   const gpu = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const gl = ctx?.renderer?.getContext?.();
@@ -262,6 +448,27 @@ try {
     driveModeEntry.mode === 'drive',
     `player input could not enter drive mode (got ${driveModeEntry.mode})`
   );
+  assert(
+    driveModeEntry.transitions.every((transition) =>
+      !transition.actorCollision &&
+      !transition.actorInside &&
+      !transition.cameraInsideBuilding
+    ),
+    `travel transition entered building geometry: ${JSON.stringify(driveModeEntry.transitions)}`
+  );
+  const planeTransition = driveModeEntry.transitions.find(
+    (transition) => transition.mode === 'plane'
+  );
+  assert(
+    !planeTransition || (
+      planeTransition.planeAirborne &&
+      planeTransition.planeLaunchKind === 'urban_airborne'
+    ),
+    `dense-city plane entry was not airborne-safe: ${JSON.stringify(planeTransition)}`
+  );
+  const driveEntryDiagnostic = await captureSpawnDiagnostic(page, 'drive-entry');
+  const driveRoute = await prepareBuildingClearDriveRoute(page);
+  const driveRouteDiagnostic = await captureSpawnDiagnostic(page, 'drive-route');
 
   const samples = [await pose(page)];
   const wallClockStartedAt = Date.now();
@@ -387,6 +594,12 @@ try {
           budgetEligible: true
         },
     driveModeEntry,
+    driveRoute,
+    spawnDiagnostics: {
+      launch: launchDiagnostic,
+      driveEntry: driveEntryDiagnostic,
+      driveRoute: driveRouteDiagnostic
+    },
     consoleErrors,
     evidence: classifyEvidence({
       kind: 'player-gameplay',

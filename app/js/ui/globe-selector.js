@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { createGlobeSelectorScene } from './globe-selector/scene.js?v=6';
+import { createGlobeSelectorScene } from './globe-selector/scene.js?v=7';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
 import { getGlobeSelectorElements } from './globe-selector/dom.js?v=2';
 import { CURATED_DESTINATIONS, MAJOR_CITY_DESTINATIONS, fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=1';
