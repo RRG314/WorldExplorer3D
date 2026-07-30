@@ -20,6 +20,8 @@ import { buildingOccupiesActorHeight } from '../app/js/building-entry.js';
 import { finishWorldLoadRuntimeSession } from '../app/js/world/load-runtime-session.js';
 import {
   buildFeatureRibbonEdges,
+  roadSkirtDepth,
+  shouldRenderRoadSkirts,
   sampleFeatureSurfaceY
 } from '../app/js/structure-semantics.js';
 import { createLinearFeatureRuntime } from '../app/js/world/load-linear-runtime.js';
@@ -184,6 +186,21 @@ assert.ok(
   steepAtGradeRoad.transportSurfaceModel.stats.maximumCut <= 1e-5 &&
     steepAtGradeRoad.transportSurfaceModel.stats.maximumFill > 0,
   'at-grade ribbon was not kept above the rendered cross-section'
+);
+assert.equal(
+  shouldRenderRoadSkirts({ structureSemantics: { terrainMode: 'at_grade' } }),
+  false,
+  'ordinary at-grade road unexpectedly gained a retaining skirt'
+);
+assert.equal(
+  shouldRenderRoadSkirts(steepAtGradeRoad),
+  true,
+  'steep at-grade engineered fill did not gain retaining presentation'
+);
+assert.ok(
+  roadSkirtDepth(steepAtGradeRoad) >=
+    steepAtGradeRoad.transportSurfaceModel.stats.maximumFill + 0.59,
+  'retaining skirt does not reach below the compiled fill envelope'
 );
 
 const hiddenPathContext = {

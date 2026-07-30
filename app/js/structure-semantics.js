@@ -1,8 +1,9 @@
 import {
   attachCompiledTransportSurface,
   compileTransportSurfaceModel,
+  roadSkirtDepth,
   sampleTransportSurfaceAtDistance
-} from './world/compiler/transport-surface-model.js?v=4';
+} from './world/compiler/transport-surface-model.js?v=5';
 import { classifyStructureSemantics, normalizedTagValue } from './structure-semantics/classification.js?v=1';
 import {
   assignFeatureConnections,
@@ -524,12 +525,9 @@ function buildFeatureRibbonEdges(feature, points, halfWidth, sampleTerrainY, opt
 }
 
 function shouldRenderRoadSkirts(feature) {
-  const semantics = feature?.structureSemantics || null;
-  if (semantics?.terrainMode === 'elevated') return false;
-  if (semantics?.terrainMode === 'subgrade') return true;
-  // Ordinary roads are draped surfaces. Vertical skirts make them read as
-  // elevated slabs and expose wall textures on normal terrain.
-  return false;
+  // Ordinary draped roads remain skirt-free. Steep engineered fill receives
+  // a retaining face deep enough to meet its rendered terrain envelope.
+  return roadSkirtDepth(feature) > 0;
 }
 
 function sampleFeatureSurfaceY(feature, x, z, projected = null) {
@@ -750,6 +748,7 @@ export {
   polylineBounds,
   polylineDistances,
   projectPointToFeature,
+  roadSkirtDepth,
   roadSurfaceAttachmentThreshold,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts,

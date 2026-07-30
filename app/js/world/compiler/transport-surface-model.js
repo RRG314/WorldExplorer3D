@@ -546,6 +546,17 @@ function attachCompiledTransportSurface(feature, model) {
   return feature;
 }
 
+function roadSkirtDepth(feature) {
+  const semantics = feature?.structureSemantics || null;
+  if (semantics?.terrainMode === 'elevated') return 0;
+  if (semantics?.terrainMode === 'subgrade') return 0.3;
+  const maximumFill = Number(feature?.transportSurfaceModel?.stats?.maximumFill);
+  if (semantics?.terrainMode !== 'at_grade' || !Number.isFinite(maximumFill) || maximumFill <= 2.5) {
+    return 0;
+  }
+  return Math.max(3.6, maximumFill + 0.6);
+}
+
 export {
   DEFAULT_MAX_GRADE,
   DEFAULT_MAX_AT_GRADE_CUT,
@@ -553,5 +564,6 @@ export {
   TRANSPORT_SURFACE_SCHEMA_VERSION,
   attachCompiledTransportSurface,
   compileTransportSurfaceModel,
+  roadSkirtDepth,
   sampleTransportSurfaceAtDistance
 };

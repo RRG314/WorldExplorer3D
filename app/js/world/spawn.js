@@ -1,8 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { inferSelectedLocationWaterKind } from "./water-location-hint.js?v=2";
 import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
-import { isRoadSurfaceReachable } from "../structure-semantics.js?v=28";
+import { isRoadSurfaceReachable } from "../structure-semantics.js?v=30";
 import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=5";
+import { findGradeSeparatedRoad } from "./spawn-structure-search.js?v=1";
 
 let worldSpawnDeps = {
   buildingContainingPoint: () => null,
@@ -202,33 +203,9 @@ function searchNearestSafeDriveGroundSpawn(targetX, targetZ, options = {}) {
 }
 
 function findGradeSeparatedRoadAt(x, z) {
-  let best = null;
-  let nearest = null;
-  for (const road of appCtx.roads || []) {
-    if (road?.structureSemantics?.terrainMode === "at_grade" || !Array.isArray(road?.pts)) continue;
-    for (let i = 0; i < road.pts.length - 1; i++) {
-      const p1 = road.pts[i];
-      const p2 = road.pts[i + 1];
-      const dx = p2.x - p1.x;
-      const dz = p2.z - p1.z;
-      const t = Math.max(0, Math.min(1, ((x - p1.x) * dx + (z - p1.z) * dz) / (dx * dx + dz * dz || 1)));
-      const projectedX = p1.x + dx * t;
-      const projectedZ = p1.z + dz * t;
-      const dist = Math.hypot(x - projectedX, z - projectedZ);
-      if (!nearest || dist < nearest.dist) nearest = { road, dist };
-      const snapDistance = road.structureSemantics?.structureKind === "bridge" ? 42 : 18;
-      if (dist > snapDistance) continue;
-      if (best && dist >= best.dist) continue;
-      const y = worldSpawnDeps.sampleFeatureSurfaceY(road, x, z, { segIndex: i, t });
-      if (Number.isFinite(y)) best = { road, dist, y, x: projectedX, z: projectedZ };
-    }
-  }
-  appCtx._lastCustomStructureProbe = nearest ? {
-    distance: nearest.dist,
-    kind: nearest.road?.structureSemantics?.structureKind || null,
-    width: Number(nearest.road?.width || 0)
-  } : null;
-  return best;
+  const result = findGradeSeparatedRoad(appCtx.roads, worldSpawnDeps.sampleFeatureSurfaceY, x, z);
+  appCtx._lastCustomStructureProbe = result.diagnostic;
+  return result.best;
 }
 
 function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
@@ -277,6 +254,7 @@ function searchNearestSafeRoadSpawn(targetX, targetZ, options = {}) {
     for (let r = 0; r < traversableFeatures.length; r++) {
       const feature = traversableFeatures[r];
       if (!Array.isArray(feature?.pts) || feature.pts.length < 2) continue;
+      if (feature?.structureSemantics?.terrainMode === "subgrade") continue;
       const segmentLengths = [];
       let featureLength = 0;
       for (let i = 0; i < feature.pts.length - 1; i++) {
@@ -392,6 +370,7 @@ function resolveProjectedRoadSpawn(targetX, targetZ, options = {}) {
   });
   const road = nearest?.road;
   if (!road || !worldSpawnDeps.isVehicleRoad(road) || Number(nearest.dist) > maxDistance) return null;
+  if (road?.structureSemantics?.terrainMode === "subgrade") return null;
   const point = { x: Number(nearest.pt?.x), z: Number(nearest.pt?.z) };
   if (!Number.isFinite(point.x) || !Number.isFinite(point.z)) return null;
   const angle = roadHeadingAtSegment(road, nearest.segIndex, options.angle);
@@ -428,6 +407,7 @@ function fallbackResolvedSpawn(mode = "drive", options = {}) {
   };
 }
 
+function isSubgradeArrival(spawn) { return spawn?.road?.structureSemantics?.terrainMode === "subgrade"; }
 function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
   const mode = options.mode === "walk" ? "walk" : "drive";
   const x = finiteNumberOr(targetX, 0);
@@ -443,7 +423,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
       allowBuildingRoof: options.allowBuildingRoof,
       source: options.source || "direct"
     });
-    if (direct.valid) return direct;
+    if (direct.valid && !isSubgradeArrival(direct)) return direct;
 
     const surfaceFallback = searchNearestSafeRoadSpawn(x, z, {
       mode: "walk",
@@ -466,7 +446,7 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     feetY: options.feetY,
     source: options.source || "direct"
   });
-  if (direct.valid && (!preferRoad || direct.onRoad)) return direct;
+  if (direct.valid && !isSubgradeArrival(direct) && (!preferRoad || direct.onRoad)) return direct;
 
   const projectedRoad = resolveProjectedRoadSpawn(x, z, {
     angle,
@@ -484,8 +464,8 @@ function resolveSafeWorldSpawn(targetX, targetZ, options = {}) {
     feetY: options.feetY,
     maxDistance: options.maxRoadDistance
   });
-  if (roadFallback) return roadFallback;
-  if (direct.valid) return direct;
+  if (roadFallback && !isSubgradeArrival(roadFallback)) return roadFallback;
+  if (direct.valid && !isSubgradeArrival(direct)) return direct;
 
   const groundFallback = searchNearestSafeGroundSpawn(x, z, {
     angle,
@@ -624,7 +604,15 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
   const exactRoad = findGradeSeparatedRoadAt(0, 0);
   const structureMode = exactRoad?.road?.structureSemantics?.terrainMode || "at_grade";
   const roadHalfWidth = Math.max(2, Number(exactRoad?.road?.width || 0) * 0.5 + 1);
-  const structureFeetY = structureMode !== "at_grade" && exactRoad?.dist <= roadHalfWidth && Number.isFinite(exactRoad?.y) ? exactRoad.y : null;
+  // A custom location centered on a bridge should preserve the deck. Do not
+  // force ordinary arrivals into a tunnel shell; select a safe nearby surface
+  // and let the player approach the tunnel through its portal.
+  const structureFeetY =
+    structureMode === "elevated" &&
+    exactRoad?.dist <= roadHalfWidth &&
+    Number.isFinite(exactRoad?.y) ?
+      exactRoad.y :
+      null;
   if (Number.isFinite(structureFeetY)) {
     return applySpawnTarget(exactRoad.x, exactRoad.z, {
       ...options,
@@ -634,6 +622,18 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
       preserveElevatedSurface: structureMode === "elevated",
       source: options.source || "custom_structure"
     });
+  }
+
+  if (Array.isArray(appCtx.roads) && appCtx.roads.length > 0) {
+    const landApproach = resolveSafeWorldSpawn(exactRoad?.x || 0, exactRoad?.z || 0, {
+      ...options,
+      mode,
+      preferRoad: mode === "drive",
+      source: options.source || "custom_land_approach"
+    });
+    if (landApproach?.valid && !isSubgradeArrival(landApproach)) {
+      return applyResolvedWorldSpawn(landApproach, options);
+    }
   }
 
   const boatSpawn = tryAutoEnterBoatAt(0, 0, {

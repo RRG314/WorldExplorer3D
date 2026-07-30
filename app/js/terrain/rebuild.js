@@ -3,9 +3,10 @@ import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-rende
 import { detectRoadIntersections } from "./intersections.js?v=1";
 import {
   buildFeatureRibbonEdges,
+  roadSkirtDepth,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts
-} from "../structure-semantics.js?v=28";
+} from "../structure-semantics.js?v=30";
 import { buildSidewalkStripBatch } from "./sidewalk-batching.js?v=3";
 
 const ROAD_SURFACE_BIAS = 0.08;
@@ -116,14 +117,21 @@ function appendRoadCenterMarkings(road, points, targetVerts, targetIndices) {
   }
 }
 
-export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5) {
+export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5, baseHeightAt = null) {
   const verts = [];
   const indices = [];
+  const bottomY = (top) => {
+    const fixedBottom = top.y - skirtDepth;
+    if (typeof baseHeightAt !== 'function') return fixedBottom;
+    const terrainY = Number(baseHeightAt(top.x, top.z));
+    if (!Number.isFinite(terrainY)) return fixedBottom;
+    return Math.max(fixedBottom, Math.min(top.y - 0.15, terrainY - 0.25));
+  };
 
   for (let i = 0; i < leftEdge.length; i++) {
     const top = leftEdge[i];
     verts.push(top.x, top.y, top.z);
-    verts.push(top.x, top.y - skirtDepth, top.z);
+    verts.push(top.x, bottomY(top), top.z);
 
     if (i < leftEdge.length - 1) {
       const vi = i * 2;
@@ -136,7 +144,7 @@ export function buildRoadSkirts(leftEdge, rightEdge, skirtDepth = 1.5) {
     const top = rightEdge[i];
     const baseIdx = leftEdge.length * 2 + i * 2;
     verts.push(top.x, top.y, top.z);
-    verts.push(top.x, top.y - skirtDepth, top.z);
+    verts.push(top.x, bottomY(top), top.z);
 
     if (i < rightEdge.length - 1) {
       const vi = baseIdx;
@@ -326,10 +334,14 @@ export function publishCompiledTransportMeshes(deps = {}) {
     appendIndexedGeometry(roadMainBatchVerts, roadMainBatchIdx, verts, indices);
     appendRoadCenterMarkings(road, pts, roadMarkBatchVerts, roadMarkBatchIdx);
 
-    const terrainMode = road?.structureSemantics?.terrainMode;
     if (shouldRenderRoadSkirts(road)) {
-      const skirtDepth = terrainMode === "subgrade" ? 0.3 : 3.6;
-      const skirtData = buildRoadSkirts(leftEdge, rightEdge, skirtDepth);
+      const skirtDepth = roadSkirtDepth(road);
+      const skirtData = buildRoadSkirts(
+        leftEdge,
+        rightEdge,
+        skirtDepth,
+        road?.structureSemantics?.terrainMode === "at_grade" ? roadTerrainSampler : null
+      );
       if (skirtData.verts.length > 0) {
         appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
       }

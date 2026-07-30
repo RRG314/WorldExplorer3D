@@ -279,16 +279,28 @@ export function assertWorldMatrixLocation(spec, result) {
       if (road.terrainMode === 'at_grade') {
         const terrainMeshY = Number(result.landPresentation?.terrainMeshY);
         if (Number.isFinite(terrainMeshY)) {
+          const profileTerrainDelta = roadSurfaceY - terrainMeshY;
+          const retainingSkirtDepth = Number(road.retainingSkirtDepth);
+          const supportedEngineeredFill =
+            profileTerrainDelta > 2.5 &&
+            Number.isFinite(retainingSkirtDepth) &&
+            retainingSkirtDepth >= profileTerrainDelta + 0.4;
           assert(
-            Math.abs(roadSurfaceY - terrainMeshY) <= 2.5,
+            Math.abs(profileTerrainDelta) <= 2.5 || supportedEngineeredFill,
             `${spec.id}: at-grade road profile detached from current terrain ` +
-            `${JSON.stringify({ roadSurfaceY, terrainMeshY, road })}`
+            `${JSON.stringify({ roadSurfaceY, terrainMeshY, profileTerrainDelta, supportedEngineeredFill, road })}`
           );
           if (Number.isFinite(exactRenderedRoadY)) {
+            const renderedTerrainDelta = exactRenderedRoadY - terrainMeshY;
             assert(
-              Math.abs(exactRenderedRoadY - terrainMeshY) <= 2.5,
+              Math.abs(renderedTerrainDelta) <= 2.5 ||
+                (
+                  renderedTerrainDelta > 2.5 &&
+                  Number.isFinite(retainingSkirtDepth) &&
+                  retainingSkirtDepth >= renderedTerrainDelta + 0.4
+                ),
               `${spec.id}: rendered at-grade road detached from current terrain ` +
-              `${JSON.stringify({ exactRenderedRoadY, terrainMeshY, road })}`
+              `${JSON.stringify({ exactRenderedRoadY, terrainMeshY, renderedTerrainDelta, road })}`
             );
           }
         }

@@ -6,10 +6,11 @@ import {
 } from "../road-render.js?v=2";
 import {
   buildFeatureRibbonEdges,
+  roadSkirtDepth,
   sampleFeatureSurfaceY,
   shouldRenderRoadSkirts,
   updateFeatureSurfaceProfile
-} from "../structure-semantics.js?v=28";
+} from "../structure-semantics.js?v=30";
 import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=9";
 import {
   normalizeTransportSource
@@ -159,8 +160,13 @@ export function buildRoadGeometryPass(options = {}) {
     loadMetrics.roads.vertices += verts.length / 3;
 
     if (typeof appCtx.buildRoadSkirts === 'function' && shouldRenderRoadSkirts(roadFeature)) {
-      const skirtDepth = roadFeature.structureSemantics?.terrainMode === 'subgrade' ? 0.3 : 3.6;
-      const skirtData = appCtx.buildRoadSkirts(leftEdge, rightEdge, skirtDepth);
+      const skirtDepth = roadSkirtDepth(roadFeature);
+      const skirtData = appCtx.buildRoadSkirts(
+        leftEdge,
+        rightEdge,
+        skirtDepth,
+        roadFeature.structureSemantics?.terrainMode === 'at_grade' ? worldBaseTerrainY : null
+      );
       if (skirtData.verts.length > 0) {
         appendIndexedGeometry(roadSkirtBatchVerts, roadSkirtBatchIdx, skirtData.verts, skirtData.indices);
         loadMetrics.roads.vertices += skirtData.verts.length / 3;

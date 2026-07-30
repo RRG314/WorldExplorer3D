@@ -1210,6 +1210,16 @@ async function loadLocation(page, spec) {
           terrainSamplerY: typeof nearestRoad.road.surfaceTerrainSampler === 'function' && nearestRoad.pt ?
             Number(Number(nearestRoad.road.surfaceTerrainSampler(nearestRoad.pt.x, nearestRoad.pt.z)).toFixed(2)) :
             null,
+          maximumFill: Number.isFinite(nearestRoad.road.transportSurfaceModel?.stats?.maximumFill) ?
+            Number(nearestRoad.road.transportSurfaceModel.stats.maximumFill.toFixed(2)) :
+            null,
+          retainingSkirtDepth: (
+            nearestRoad.road.structureSemantics?.terrainMode === 'at_grade' &&
+            Number(nearestRoad.road.transportSurfaceModel?.stats?.maximumFill) > 2.5
+          ) ? Number(Math.max(
+            3.6,
+            Number(nearestRoad.road.transportSurfaceModel.stats.maximumFill) + 0.6
+          ).toFixed(2)) : 0,
           verticalDelta: Number.isFinite(nearestRoad.verticalDelta) ? Number(nearestRoad.verticalDelta.toFixed(2)) : null,
           surfaceY: Number.isFinite(roadProfileY) ? Number(roadProfileY.toFixed(2)) : null,
           surfaceMinY: Number(Number(nearestRoad.road.structureSurfaceMinY || 0).toFixed(2)),

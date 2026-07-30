@@ -16,7 +16,7 @@ import {
   isRoadSurfaceReachable,
   sampleFeatureSurfaceY,
   updateFeatureSurfaceProfile
-} from "./structure-semantics.js?v=28";
+} from "./structure-semantics.js?v=30";
 import {
   applyCustomLocationSpawn,
   applyResolvedWorldSpawn,
@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=22";
+} from "./world/spawn.js?v=26";
 import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,
@@ -102,7 +102,7 @@ import {
   limitWaysByDistance,
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
-import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=12";
+import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=14";
 import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=28";
 import {
   batchLanduseMeshes,

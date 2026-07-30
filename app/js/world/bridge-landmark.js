@@ -1,5 +1,5 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
-import { sampleFeatureSurfaceY } from '../structure-semantics.js?v=28';
+import { sampleFeatureSurfaceY } from '../structure-semantics.js?v=30';
 import { createBridgeStructuralDetails } from './bridge-landmark-structure.js?v=1';
 
 const BRIDGE_COLOR = 0xbf4e3b;
