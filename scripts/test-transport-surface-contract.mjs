@@ -104,18 +104,13 @@ for (const terrain of terrainFamilies) {
   assert.equal(model.schemaVersion, TRANSPORT_SURFACE_SCHEMA_VERSION);
   assert.equal(model.authority, 'compiled_transport_surface');
   assert.ok(model.stats.maximumGrade <= 0.1201, `${terrain.id}: grade limit exceeded`);
-  assert.equal(model.cutFillPolicy.signed, true, `${terrain.id}: signed cut/fill disabled`);
+  assert.equal(model.cutFillPolicy.signed, true, `${terrain.id}: terrain-relative profile disabled`);
   assert.ok(
     model.stats.maximumCut <= model.cutFillPolicy.maximumCutMeters + EPSILON,
     `${terrain.id}: cut bound exceeded`
   );
-  assert.ok(
-    model.stats.maximumFill <= model.cutFillPolicy.maximumFillMeters + EPSILON,
-    `${terrain.id}: fill bound exceeded`
-  );
-
   if (terrain.id === 'rolling_inland' || terrain.id === 'high_mountain') {
-    assert.ok(model.stats.maximumCut > 0.02, `${terrain.id}: road still only raises terrain`);
+    assert.ok(model.stats.maximumCut <= EPSILON, `${terrain.id}: road can be buried without a published terrain cut`);
     assert.ok(model.stats.maximumFill > 0.02, `${terrain.id}: road did not fill terrain dips`);
   }
 

@@ -550,9 +550,9 @@ async function main() {
 
     markStage('earth:load-unsupported');
     const unsupportedLoad = await loadCustomLocation(page, {
-      lat: -33.8688,
-      lon: 151.2093,
-      label: 'Unsupported Sydney Control'
+      lat: 10,
+      lon: 10,
+      label: 'Unsupported Land Control'
     });
     assert(
       unsupportedLoad.ok &&

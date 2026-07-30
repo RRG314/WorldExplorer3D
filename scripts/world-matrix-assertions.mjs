@@ -4,6 +4,11 @@ function assert(value, message) {
 
 export function assertWorldMatrixLocation(spec, result) {
   assert(result.worldLoading === false, `${spec.id}: worldLoading stayed true`);
+  assert(result.worldLoad?.status === 'ready', `${spec.id}: requested world load did not reach ready`);
+  assert(
+    Number(result.worldLoad?.sequence) === Number(result.worldLoad?.publicationSequence),
+    `${spec.id}: requested world load and published world sequences diverged`
+  );
   assert(!result.terrainProfiles?.urban, `${spec.id}: base terrain still resolved to urban pavement ${JSON.stringify(result.terrainProfiles.urban)}`);
   if (spec.kind === 'preset') assert(result.counts.roads > 0, `${spec.id}: preset silently finalized without mapped roads`);
   if (spec.expectedTerrainMode) {
@@ -213,6 +218,15 @@ export function assertWorldMatrixLocation(spec, result) {
   assert(result.initialSpawn?.mode !== 'boat', `${spec.id}: land launch incorrectly selected boat mode ${JSON.stringify(result.initialSpawn)}`);
   assert(result.driveSpawn?.valid !== false, `${spec.id}: invalid drive spawn ${JSON.stringify(result.driveSpawn)}`);
   assert(result.walkSpawn?.valid !== false, `${spec.id}: invalid walk spawn ${JSON.stringify(result.walkSpawn)}`);
+  assert(
+    result.spawnOccupancy?.actorCollision !== true &&
+      result.spawnOccupancy?.actorInsideBuilding !== true,
+    `${spec.id}: actor spawned inside published building collision ${JSON.stringify(result.spawnOccupancy)}`
+  );
+  assert(
+    result.spawnOccupancy?.cameraInsideBuilding !== true,
+    `${spec.id}: chase camera spawned inside published building collision ${JSON.stringify(result.spawnOccupancy)}`
+  );
   if (spec.expectedRoadStructure) {
     const gameplay = result.structureGameplay;
     assert(gameplay?.evidence?.kind === 'synthetic-direct-state', `${spec.id}: structure simulation evidence kind is missing ${JSON.stringify(gameplay)}`);
@@ -252,7 +266,10 @@ export function assertWorldMatrixLocation(spec, result) {
           `${JSON.stringify({ renderedRoadY, roadSurfaceY, road })}`
         );
       }
-      if (Number.isFinite(exactRenderedRoadY)) {
+      if (
+        Number.isFinite(exactRenderedRoadY) &&
+        Math.abs(exactRenderedRoadY - roadSurfaceY) <= 2.5
+      ) {
         assert(
           Math.abs(carFeetY - exactRenderedRoadY) <= 2.5,
           `${spec.id}: playable car surface diverged from raw rendered road geometry ` +

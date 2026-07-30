@@ -1,0 +1,40 @@
+{
+  "schemaVersion": 1,
+  "artifactId": "great_wall_custom-ground",
+  "providerId": "copernicus-dem-classified-ground-v1",
+  "sourceRelease": "COP-DEM-2021:GLO-30",
+  "contentSha256": "98318be90ade13d499c692cc6d0ffc05e253781e68c24f792cf863f1430fe55a",
+  "spacingMeters": 90,
+  "coverage": {
+    "south": 40.40690505392501,
+    "north": 40.45675246371025,
+    "west": 116.53727399895615,
+    "east": 116.60276118316847
+  },
+  "verticalDatum": "EGM2008",
+  "complete": true,
+  "missingSampleCount": 0,
+  "licenseAttested": true,
+  "correctionAttested": true,
+  "sourceEvidence": {
+    "sourceClassification": "digital-surface-model",
+    "correctionMethod": "worldexplorer-pmf-grid-v1",
+    "sourceTiles": [
+      {
+        "tileId": "Copernicus_DSM_COG_10_N40_00_E116_00_DEM",
+        "url": "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N40_00_E116_00_DEM/Copernicus_DSM_COG_10_N40_00_E116_00_DEM.tif",
+        "resolutionMeters": 30,
+        "contentLength": 46764581,
+        "contentSha256": "e1f33db5ab07cb6ee5d3fbba83da030cb4156f8be5e0b2cb84744919fef7527e",
+        "etag": "f864fde13e9923a4b29898a8ffa64089",
+        "lastModified": "Mon, 09 May 2022 14:21:33 GMT"
+      }
+    ]
+  },
+  "attribution": {
+    "notice": "produced using Copernicus WorldDEM-30 © DLR e.V. 2010-2014 and © Airbus Defence and Space GmbH 2014-2018 provided under COPERNICUS by the European Union and ESA; all rights reserved.",
+    "liabilityNotice": "The organisations in charge of the Copernicus programme by law or by delegation do not incur any liability for any use of the Copernicus WorldDEM-30.",
+    "licenseDocument": "https://dataspace.copernicus.eu/sites/default/files/media/files/2025-06/copernicus_contributing_mission_data_access_v2_cop_dem_licenses.pdf",
+    "modified": true
+  }
+}

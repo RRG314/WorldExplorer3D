@@ -181,13 +181,9 @@ assert.ok(
     steepAtGradeRoad.transportSurfaceModel.cutFillPolicy.maximumCutMeters + 1e-5
 );
 assert.ok(
-  steepAtGradeRoad.transportSurfaceModel.stats.maximumFill <=
-    steepAtGradeRoad.transportSurfaceModel.cutFillPolicy.maximumFillMeters + 1e-5
-);
-assert.ok(
-  steepAtGradeRoad.transportSurfaceModel.stats.maximumCut > 0 &&
+  steepAtGradeRoad.transportSurfaceModel.stats.maximumCut <= 1e-5 &&
     steepAtGradeRoad.transportSurfaceModel.stats.maximumFill > 0,
-  'steep cross-slope did not produce signed cut and fill'
+  'at-grade ribbon was not kept above the rendered cross-section'
 );
 
 const hiddenPathContext = {
@@ -338,7 +334,7 @@ console.log(JSON.stringify({
   surfaceLayers: surfaceOrder.map((entry) => entry.layer),
   gradeSeparatedWalkAttachment: 'vertical-and-transition-aware',
   buildingEntryAttachment: 'vertical-occupancy-aware',
-  atGradeRoadClearance: 'bounded-signed-cross-section-cut-fill',
+  atGradeRoadClearance: 'rendered-cross-section-clearance-with-bounded-grade',
   mappedFootwayPresentation: 'navigation-data-only',
   worldLoadCommit: 'reconcile-before-reveal'
 }, null, 2));

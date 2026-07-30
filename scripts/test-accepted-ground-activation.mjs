@@ -84,10 +84,28 @@ assert.equal(diagnosis.status, 'accepted');
 assert.equal(diagnosis.reason, null);
 assert.equal(diagnosis.artifactId, acceptedState.artifactId);
 
+const openOcean = harness({
+  status: 'blocked',
+  reason: 'no-accepted-ground-artifact-for-location'
+});
+openOcean.appCtx.selLoc = 'custom';
+openOcean.appCtx.LOC = {
+  lat: 30,
+  lon: -40,
+  name: 'Atlantic Ocean'
+};
+assert.equal(await openOcean.run(), true);
+assert.equal(openOcean.terrainUpdates(), 0);
+assert.equal(openOcean.finalizations.length, 0);
+assert.equal(openOcean.runtimeState.groundMode, 'open-ocean-surface-only');
+assert.equal(openOcean.runtimeState.acceptedGround.status, 'not-applicable');
+assert.equal(openOcean.runtimeState.acceptedGround.waterKind, 'open_ocean');
+
 console.log(JSON.stringify({
   ok: true,
   contract: 'accepted-ground-activation',
   blocksBeforeTerrainPublication: true,
   acceptedArtifactStartsTerrain: true,
+  openOceanDoesNotFabricateGround: true,
   diagnosticsUseAcceptedArtifact: true
 }, null, 2));

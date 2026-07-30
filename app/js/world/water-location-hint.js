@@ -13,6 +13,10 @@ function inferSelectedLocationWaterKind(appCtx) {
     location.region,
     location.state,
     location.country,
+    appCtx?.customLoc?.name,
+    appCtx?.customLoc?.region,
+    appCtx?.customLoc?.state,
+    appCtx?.customLoc?.country,
     appCtx?.currentLocationName
   ].filter(Boolean).join(' ');
   return WATER_LOCATION_PATTERNS.find((entry) => entry.pattern.test(text))?.kind || null;

@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { inferSelectedLocationWaterKind } from "./water-location-hint.js?v=1";
+import { inferSelectedLocationWaterKind } from "./water-location-hint.js?v=2";
 import { featuredArrivalNear } from "./featured-arrivals.js?v=3";
 import { isRoadSurfaceReachable } from "../structure-semantics.js?v=28";
 import { createWorldSpawnSurfaceApi, roadHeadingAtSegment } from "./spawn-surface.js?v=5";

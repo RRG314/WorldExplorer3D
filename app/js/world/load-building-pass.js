@@ -22,7 +22,7 @@ import {
 } from "./building-batching.js?v=4";
 import { curatedLandmarksNear } from "./landmark-catalog.js?v=9";
 import { compileBuildingProvenance } from './building-provenance-model.js?v=1';
-import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=1';
+import { createBuildingRoadFootprintGuards } from './building-road-footprint.js?v=2';
 
 export function buildBuildingGeometryPass(options = {}) {
   const buildingWays = Array.isArray(options.buildingWays) ? options.buildingWays : [];
@@ -86,6 +86,7 @@ export function buildBuildingGeometryPass(options = {}) {
 
   const {
     expandFootprintForGroundApron,
+    footprintContainsRoadCore,
     isBuildingNearLoadedRoad,
     overlapsRoadCore,
     overlapsRoadCorridor,
@@ -201,7 +202,7 @@ export function buildBuildingGeometryPass(options = {}) {
       return;
     }
     const roadCoreStats = sampleFootprintCoverage(pts, pointOnRoadCore);
-    if (overlapsRoadCore(roadCoreStats)) {
+    if (overlapsRoadCore(roadCoreStats) || footprintContainsRoadCore(pts)) {
       loadMetrics.buildingsSkippedRoadOverlap = (loadMetrics.buildingsSkippedRoadOverlap || 0) + 1;
       loadMetrics.buildingPublication.roadOverlap += 1;
       return;

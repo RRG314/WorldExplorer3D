@@ -84,6 +84,46 @@ export function createBuildingRoadFootprintGuards(options = {}) {
     return { total: samples.length, inside, centroidInside: tester(centroid.x, centroid.z) };
   };
 
+  const pointInFootprint = (x, z, points) => {
+    let inside = false;
+    for (let index = 0, previous = points.length - 1; index < points.length; previous = index++) {
+      const currentPoint = points[index];
+      const previousPoint = points[previous];
+      const crosses = ((currentPoint.z > z) !== (previousPoint.z > z)) &&
+        x < (previousPoint.x - currentPoint.x) * (z - currentPoint.z) /
+          ((previousPoint.z - currentPoint.z) || Number.EPSILON) + currentPoint.x;
+      if (crosses) inside = !inside;
+    }
+    return inside;
+  };
+
+  const footprintContainsRoadCore = (points) => {
+    if (!Array.isArray(points) || points.length < 3 || roadCoreCells.size === 0) return false;
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minZ = Infinity;
+    let maxZ = -Infinity;
+    for (const point of points) {
+      minX = Math.min(minX, point.x);
+      maxX = Math.max(maxX, point.x);
+      minZ = Math.min(minZ, point.z);
+      maxZ = Math.max(maxZ, point.z);
+    }
+    const minCellX = Math.floor(minX / roadCoreCellSize);
+    const maxCellX = Math.floor(maxX / roadCoreCellSize);
+    const minCellZ = Math.floor(minZ / roadCoreCellSize);
+    const maxCellZ = Math.floor(maxZ / roadCoreCellSize);
+    for (let cellX = minCellX; cellX <= maxCellX; cellX++) {
+      for (let cellZ = minCellZ; cellZ <= maxCellZ; cellZ++) {
+        if (!roadCoreCells.has(`${cellX},${cellZ}`)) continue;
+        const centerX = (cellX + 0.5) * roadCoreCellSize;
+        const centerZ = (cellZ + 0.5) * roadCoreCellSize;
+        if (pointInFootprint(centerX, centerZ, points)) return true;
+      }
+    }
+    return false;
+  };
+
   const expandFootprintForGroundApron = (points) => {
     if (!Array.isArray(points) || points.length < 3) return points || [];
     const center = points.reduce(
@@ -125,6 +165,7 @@ export function createBuildingRoadFootprintGuards(options = {}) {
 
   return Object.freeze({
     expandFootprintForGroundApron,
+    footprintContainsRoadCore,
     isBuildingNearLoadedRoad,
     overlapsRoadCore: (stats) => !!stats && stats.total > 0 && stats.inside > 0,
     overlapsRoadCorridor: (stats) => {

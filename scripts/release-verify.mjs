@@ -34,14 +34,6 @@ const steps = [
   },
   { name: 'Plane and interior lifecycle', cmd: [process.execPath, 'scripts/test-plane-interior-lifecycle.mjs'] },
   { name: 'Environment session lifecycle', cmd: [process.execPath, 'scripts/test-session-lifecycle.mjs'] },
-  {
-    name: 'Hardware real-input 10-minute drive',
-    cmd: [process.execPath, 'scripts/test-player-input-drive.mjs'],
-    env: {
-      PLAYER_DRIVE_SECONDS: '600',
-      PLAYER_DRIVE_HEADED: '1'
-    }
-  },
   { name: 'Runtime invariants', cmd: [process.execPath, 'scripts/test-runtime-invariants.mjs'] },
   { name: 'Editor and multiplayer transitions', cmd: [process.execPath, 'scripts/test-editor-multiplayer-surfaces.mjs'] },
   { name: 'Block builder contracts', cmd: [process.execPath, 'scripts/test-block-builder-contract.mjs'] },
@@ -57,7 +49,15 @@ const steps = [
       WORLD_MATRIX_REPORT_NAME: 'r7-provider-outage.json'
     }
   },
-  { name: 'World matrix', cmd: [process.execPath, 'scripts/test-world-matrix.mjs'] }
+  { name: 'World matrix', cmd: [process.execPath, 'scripts/test-world-matrix.mjs'] },
+  {
+    name: 'Hardware real-input 10-minute drive',
+    cmd: [process.execPath, 'scripts/test-player-input-drive.mjs'],
+    env: {
+      PLAYER_DRIVE_SECONDS: '600',
+      PLAYER_DRIVE_HEADED: '1'
+    }
+  }
 ];
 
 for (const step of steps) {

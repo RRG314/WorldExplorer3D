@@ -152,8 +152,44 @@ async function loadLocation(page, spec) {
       ctx.selLoc = String(locationSpec.key);
     }
 
+    const requestedSelection = ctx.resolveLocationSelection?.() || null;
+    if (
+      !requestedSelection ||
+      !Number.isFinite(Number(requestedSelection.lat)) ||
+      !Number.isFinite(Number(requestedSelection.lon))
+    ) {
+      throw new Error(`${locationSpec.id}: requested location did not resolve`);
+    }
+    const sequenceBeforeLoad = Number(ctx._worldLoadSequence || 0);
     await ctx.loadRoads();
     const loadMs = performance.now() - startedAt;
+    const completedLoad = ctx.worldLoadRuntimeState || null;
+    const publication = ctx.worldPublication || null;
+    const coordinateDelta = (left, right) => {
+      const raw = Math.abs(Number(left) - Number(right));
+      return Math.min(raw, Math.abs(raw - 360));
+    };
+    const completedRequestedLocation = !!(
+      completedLoad &&
+      Number(completedLoad.sequence) > sequenceBeforeLoad &&
+      completedLoad.status === 'ready' &&
+      Math.abs(Number(completedLoad.location?.lat) - Number(requestedSelection.lat)) <= 1e-7 &&
+      coordinateDelta(completedLoad.location?.lon, requestedSelection.lon) <= 1e-7 &&
+      Number(publication?.sequence) === Number(completedLoad.sequence) &&
+      Math.abs(Number(publication?.location?.lat) - Number(requestedSelection.lat)) <= 1e-7 &&
+      coordinateDelta(publication?.location?.lon, requestedSelection.lon) <= 1e-7
+    );
+    if (!completedRequestedLocation) {
+      throw new Error(
+        `${locationSpec.id}: load resolved without publishing the requested location ` +
+        JSON.stringify({
+          requested: requestedSelection,
+          sequenceBeforeLoad,
+          completedLoad,
+          publication
+        })
+      );
+    }
     await new Promise((resolve) => window.setTimeout(resolve, 1200));
     const buildingDetailWaitStartedAt = performance.now();
     while (
@@ -594,10 +630,14 @@ async function loadLocation(page, spec) {
         }
         const start = targetRoad.pts[segmentIndex];
         const end = targetRoad.pts[segmentIndex + 1];
-        const x = (start.x + end.x) * 0.5;
-        const z = (start.z + end.z) * 0.5;
-        const angle = Math.atan2(-(end.x - start.x), -(end.z - start.z));
-        const surfaceY = Number(ctx.sampleFeatureSurfaceY?.(targetRoad, x, z, { segIndex: segmentIndex, t: 0.5 }));
+        const probeSegmentT = 0.08;
+        const x = start.x + (end.x - start.x) * probeSegmentT;
+        const z = start.z + (end.z - start.z) * probeSegmentT;
+        const angle = Math.atan2(end.x - start.x, end.z - start.z);
+        const surfaceY = Number(ctx.sampleFeatureSurfaceY?.(targetRoad, x, z, {
+          segIndex: segmentIndex,
+          t: probeSegmentT
+        }));
         const renderedY = Number.isFinite(surfaceY) && ctx.GroundHeight?._raycastMeshY ?
           ctx.GroundHeight._raycastMeshY(ctx.roadMeshes || [], x, z, surfaceY + 2.2, 5) :
           null;
@@ -633,7 +673,8 @@ async function loadLocation(page, spec) {
             KeyA: !!ctx.keys?.KeyA,
             ArrowLeft: !!ctx.keys?.ArrowLeft,
             KeyD: !!ctx.keys?.KeyD,
-            ArrowRight: !!ctx.keys?.ArrowRight
+            ArrowRight: !!ctx.keys?.ArrowRight,
+            Space: !!ctx.keys?.Space
           };
 
           if (ctx.keys && typeof ctx.update === 'function') {
@@ -643,7 +684,16 @@ async function loadLocation(page, spec) {
             ctx.keys.ArrowLeft = false;
             ctx.keys.KeyD = false;
             ctx.keys.ArrowRight = false;
+            ctx.keys.Space = false;
             for (let frame = 0; frame < frameCount; frame += 1) {
+              const distanceFromStart = Math.hypot(
+                Number(ctx.car?.x) - startX,
+                Number(ctx.car?.z) - startZ
+              );
+              const traversedProbeDistance = distanceFromStart >= 45;
+              ctx.keys.KeyW = !traversedProbeDistance;
+              ctx.keys.ArrowUp = !traversedProbeDistance;
+              ctx.keys.Space = traversedProbeDistance;
               ctx.update(1 / 60);
               const carFeetY = Number(ctx.car?.y) - 1.2;
               const currentRoad = ctx.findNearestRoad?.(Number(ctx.car?.x), Number(ctx.car?.z), {
@@ -972,6 +1022,8 @@ async function loadLocation(page, spec) {
     // Keep actor pose and road evidence from the same frame. The nearest-road API
     // reuses one result object, and the diagnostics above can yield while the game
     // continues to reconcile streamed terrain.
+    let finalActorCollision = null;
+    let finalCameraBuilding = null;
     if (expectedStart !== 'water') {
       actorX = Number.isFinite(ctx.car?.x) ? ctx.car.x : Number(ctx.Walk?.state?.walker?.x || 0);
       actorZ = Number.isFinite(ctx.car?.z) ? ctx.car.z : Number(ctx.Walk?.state?.walker?.z || 0);
@@ -996,6 +1048,20 @@ async function loadLocation(page, spec) {
       roadSegments = Array.isArray(nearestRoad?.road?.pts) ? nearestRoad.road.pts.slice(0, -1).map((point, index) =>
         Math.hypot(nearestRoad.road.pts[index + 1].x - point.x, nearestRoad.road.pts[index + 1].z - point.z)
       ) : [];
+      finalActorCollision = ctx.checkBuildingCollision?.(actorX, actorZ, 2, {
+        actorBaseY: actorFeetY,
+        actorHeight: 1.9
+      }) || { collision: false, inside: false };
+      finalCameraBuilding = ctx.buildingContainingPoint?.(
+        Number(ctx.camera?.position?.x),
+        Number(ctx.camera?.position?.z),
+        0.1,
+        {
+          y: Number(ctx.camera?.position?.y),
+          actorHeight: 0.2,
+          tolerance: 0.05
+        }
+      ) || null;
       roadProfileY = Number(nearestRoad?.y);
       exactRenderedRoadY = ctx.GroundHeight?._raycastMeshY ?
         ctx.GroundHeight._raycastMeshY(
@@ -1018,6 +1084,12 @@ async function loadLocation(page, spec) {
       category: locationSpec.category,
       expectedStart,
       loadMs: Number(loadMs.toFixed(1)),
+      worldLoad: {
+        sequence: Number(completedLoad.sequence),
+        status: String(completedLoad.status || ''),
+        location: { ...(completedLoad.location || {}) },
+        publicationSequence: Number(publication.sequence)
+      },
       buildingDetailWaitMs: Number(buildingDetailWaitMs.toFixed(1)),
       landmarkWaitMs: Number(landmarkWaitMs.toFixed(1)),
       baselineWaitMs: Number(baselineWaitMs.toFixed(1)),
@@ -1079,6 +1151,13 @@ async function loadLocation(page, spec) {
         z: Number(actorZ.toFixed(2)),
         currentMode: typeof ctx.getCurrentTravelMode === 'function' ? ctx.getCurrentTravelMode() : (ctx.droneMode ? 'drone' : ctx.Walk?.state?.mode === 'walk' ? 'walk' : 'drive')
       },
+      spawnOccupancy: expectedStart !== 'water' ? {
+        actorCollision: finalActorCollision?.collision === true,
+        actorInsideBuilding: finalActorCollision?.inside === true,
+        actorBuildingSourceId: String(finalActorCollision?.building?.sourceId || ''),
+        cameraInsideBuilding: !!finalCameraBuilding,
+        cameraBuildingSourceId: String(finalCameraBuilding?.sourceId || '')
+      } : null,
       initialSpawn: initialSpawn ? {
         valid: initialSpawn.valid !== false,
         mode: initialSpawn.mode || null,

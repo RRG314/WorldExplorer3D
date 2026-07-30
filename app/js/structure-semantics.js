@@ -2,7 +2,7 @@ import {
   attachCompiledTransportSurface,
   compileTransportSurfaceModel,
   sampleTransportSurfaceAtDistance
-} from './world/compiler/transport-surface-model.js?v=3';
+} from './world/compiler/transport-surface-model.js?v=4';
 import { classifyStructureSemantics, normalizedTagValue } from './structure-semantics/classification.js?v=1';
 import {
   assignFeatureConnections,

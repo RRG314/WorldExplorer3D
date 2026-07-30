@@ -1,3 +1,5 @@
+import { inferSelectedLocationWaterKind } from "./water-location-hint.js?v=2";
+
 export async function activateAcceptedGroundForWorldLoad(options = {}) {
   const {
     appCtx,
@@ -38,6 +40,23 @@ export async function activateAcceptedGroundForWorldLoad(options = {}) {
   }
 
   const reason = String(state?.reason || 'accepted-ground-unavailable');
+  const waterKind = appCtx.selLoc === 'custom'
+    ? inferSelectedLocationWaterKind(appCtx)
+    : null;
+  if (waterKind === 'open_ocean') {
+    const exemption = Object.freeze({
+      status: 'not-applicable',
+      reason: 'open-ocean-has-no-land-ground',
+      waterKind,
+      rejectedGround: state || null
+    });
+    runtimeState.acceptedGround = exemption;
+    runtimeState.groundMode = 'open-ocean-surface-only';
+    loadMetrics.acceptedGround = exemption;
+    appCtx.showLoad('Loading open-ocean surface data...');
+    return true;
+  }
+
   Object.assign(runtimeState, {
     status: 'blocked',
     reason,

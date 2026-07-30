@@ -4,7 +4,7 @@ import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
 import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=8";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=11";
-import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=1";
+import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=3";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=5";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
@@ -662,8 +662,16 @@ export function createWorldRoadLoader(deps = {}) {
       appCtx.stopBoatMode({ targetMode: 'walk' });
     }
     const signature = getWorldLoadSignature();
-    if (activeWorldLoad && activeWorldLoad.signature === signature) {
-      return activeWorldLoad.promise;
+    if (activeWorldLoad) {
+      if (activeWorldLoad.signature === signature) {
+        return activeWorldLoad.promise;
+      }
+      // A different selection must not reset or publish the world while the
+      // current selection is still loading. Wait for that load to settle, then
+      // resolve the latest global selection and either join or start its load.
+      return activeWorldLoad.promise
+        .catch(() => undefined)
+        .then(() => loadRoads(0));
     }
 
     const promise = loadRoadsInternal(0).finally(() => {

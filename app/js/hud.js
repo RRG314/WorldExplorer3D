@@ -30,11 +30,15 @@ let chaseCameraCollisionLookZ = NaN;
 
 function resolveChaseCameraStructureCollision(lookX, lookY, lookZ, targetX, targetY, targetZ) {
   if (typeof THREE === 'undefined') return { x: targetX, y: targetY, z: targetZ, collided: false };
-  const targets = (appCtx.structureVisualMeshes || []).filter((mesh) => {
+  const structureTargets = (appCtx.structureVisualMeshes || []).filter((mesh) => {
     if (!mesh?.visible) return false;
     const type = String(mesh.userData?.structureVisualType || '');
     return /^(decks|girders|caps|walls|roofs|portals|tunnel_shells|elevated_road_shells)$/.test(type);
   });
+  const buildingTargets = (appCtx.buildingMeshes || []).filter((mesh) =>
+    mesh?.visible && mesh?.geometry
+  );
+  const targets = [...structureTargets, ...buildingTargets];
   if (targets.length === 0) {
     chaseCameraCollisionCacheValid = false;
     return { x: targetX, y: targetY, z: targetZ, collided: false };

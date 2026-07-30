@@ -14,6 +14,33 @@ import {
 } from '../app/js/world/water-surface-registry.js';
 import { ctx as appCtx } from '../app/js/shared-context.js?v=55';
 import { findNearestBoatCandidate } from '../app/js/boat-mode/water-query.js';
+import {
+  createBuildingRoadFootprintGuards
+} from '../app/js/world/building-road-footprint.js';
+
+const roadFootprintGuards = createBuildingRoadFootprintGuards({
+  roads: [{
+    pts: [{ x: -5, z: -8 }, { x: 5, z: -8 }],
+    width: 8
+  }]
+});
+const roadEnclosingFootprint = [
+  { x: -50, z: -20 },
+  { x: 50, z: -20 },
+  { x: 50, z: 40 },
+  { x: -50, z: 40 }
+];
+const legacyRoadCoreSamples = roadFootprintGuards.sampleFootprintCoverage(
+  roadEnclosingFootprint,
+  roadFootprintGuards.pointOnRoadCore
+);
+assert.equal(legacyRoadCoreSamples.inside, 0);
+assert.equal(legacyRoadCoreSamples.centroidInside, false);
+assert.equal(
+  roadFootprintGuards.footprintContainsRoadCore(roadEnclosingFootprint),
+  true,
+  'A building enclosing a road core must be rejected even when its boundary and centroid miss the road.'
+);
 
 const mappedBuilding = compileBuildingProvenance({
   building: 'office',
@@ -211,7 +238,8 @@ console.log(JSON.stringify({
     schemaVersion: mappedBuilding.schemaVersion,
     snapshotFeatures: snapshot.featureCount,
     ambiguousMetadataRejected: proximityOnlyFootprint._buildingMetadata.rejectedAmbiguous,
-    partialParentRetained: true
+    partialParentRetained: true,
+    enclosedRoadCoreRejected: true
   },
   water: {
     schemaVersion: higherPriorityLake.waterSchemaVersion,

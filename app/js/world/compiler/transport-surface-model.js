@@ -404,7 +404,7 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     // surface that cannot clip into the rendered terrain.
     const highestCrossSectionGround = Math.max(groundY, leftY, rightY);
     const lowestCrossSectionGround = Math.min(groundY, leftY, rightY);
-    const atGradeReferenceY = (groundY + leftY + rightY) / 3;
+    const atGradeReferenceY = highestCrossSectionGround;
     const referenceY =
       mode === 'at_grade'
         ? atGradeReferenceY
@@ -423,7 +423,10 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
     centerInitial[index] = centerY;
     terrainEnvelope[index] = atGradeReferenceY + surfaceBias;
     centerLowerBounds[index] = atGrade
-      ? highestCrossSectionGround + surfaceBias - maximumAtGradeCut
+      // The current renderer does not publish a matching terrain cut. Until
+      // it does, an at-grade ribbon must stay above the complete rendered
+      // cross-section or the road and its actors can be buried by terrain.
+      ? highestCrossSectionGround + surfaceBias
       : mode === 'elevated'
         // Crossing stations are structural minimums expressed in world
         // elevation. Smoothing may lift neighboring samples to satisfy grade,
@@ -431,7 +434,10 @@ function compileTransportSurfaceModel(feature, sampleTerrainY, options = {}) {
         ? centerY
         : Number.NEGATIVE_INFINITY;
     centerUpperBounds[index] = atGrade
-      ? lowestCrossSectionGround + surfaceBias + maximumAtGradeFill
+      ? Math.max(
+          highestCrossSectionGround + surfaceBias,
+          lowestCrossSectionGround + surfaceBias + maximumAtGradeFill
+        )
       : Number.POSITIVE_INFINITY;
   }
 
