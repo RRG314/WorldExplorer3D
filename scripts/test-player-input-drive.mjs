@@ -349,6 +349,14 @@ async function prepareBuildingClearDriveRoute(page) {
   return page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const candidates = [];
+    const rejections = {
+      unresolved: 0,
+      resolvedAway: 0,
+      initialCollision: 0,
+      unstableSettle: 0,
+      mobility: 0,
+      unstableReset: 0
+    };
     for (const road of ctx.roads || []) {
       const vehicleRoad = !!road &&
         road.driveable !== false &&
@@ -360,7 +368,7 @@ async function prepareBuildingClearDriveRoute(page) {
         const start = road.pts[index];
         const end = road.pts[index + 1];
         const length = Math.hypot(end.x - start.x, end.z - start.z);
-        if (length < 180) continue;
+        if (length < 140) continue;
         const x = (start.x + end.x) * 0.5;
         const z = (start.z + end.z) * 0.5;
         const terrainY = Number(ctx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y);
@@ -391,8 +399,14 @@ async function prepareBuildingClearDriveRoute(page) {
         preferRoad: true,
         source: 'player_drive_release_route'
       });
-      if (!resolved) continue;
-      if (Math.hypot(resolved.x - candidate.x, resolved.z - candidate.z) > 20) continue;
+      if (!resolved) {
+        rejections.unresolved += 1;
+        continue;
+      }
+      if (Math.hypot(resolved.x - candidate.x, resolved.z - candidate.z) > 20) {
+        rejections.resolvedAway += 1;
+        continue;
+      }
       const collision = ctx.checkBuildingCollision?.(
         Number(resolved.x),
         Number(resolved.z),
@@ -402,7 +416,10 @@ async function prepareBuildingClearDriveRoute(page) {
           actorHeight: 2
         }
       );
-      if (collision?.collision) continue;
+      if (collision?.collision) {
+        rejections.initialCollision += 1;
+        continue;
+      }
       ctx.applyResolvedWorldSpawn(resolved, {
         mode: 'drive',
         syncCar: true,
@@ -423,7 +440,10 @@ async function prepareBuildingClearDriveRoute(page) {
           actorHeight: 2
         }
       );
-      if (settledDistance > 5 || settledCollision?.collision) continue;
+      if (settledDistance > 5 || settledCollision?.collision) {
+        rejections.unstableSettle += 1;
+        continue;
+      }
       const probeStartX = Number(ctx.car?.x);
       const probeStartZ = Number(ctx.car?.z);
       ctx.keys.ArrowUp = true;
@@ -451,7 +471,10 @@ async function prepareBuildingClearDriveRoute(page) {
         probeDistance < 40 ||
         probeSpeed < 8 ||
         probeCollision?.collision
-      ) continue;
+      ) {
+        rejections.mobility += 1;
+        continue;
+      }
       ctx.applyResolvedWorldSpawn(resolved, {
         mode: 'drive',
         syncCar: true,
@@ -463,7 +486,10 @@ async function prepareBuildingClearDriveRoute(page) {
         Number(ctx.car?.x) - Number(resolved.x),
         Number(ctx.car?.z) - Number(resolved.z)
       );
-      if (resetDistance > 5) continue;
+      if (resetDistance > 5) {
+        rejections.unstableReset += 1;
+        continue;
+      }
       selected = {
         candidate,
         mobilityProbe: {
@@ -481,7 +507,11 @@ async function prepareBuildingClearDriveRoute(page) {
       break;
     }
     if (!selected || typeof ctx.applyResolvedWorldSpawn !== 'function') {
-      throw new Error('Building-clear road spawn could not be resolved');
+      throw new Error(`Building-clear road spawn could not be resolved: ${JSON.stringify({
+        candidateCount: candidates.length,
+        attempted: Math.min(240, candidates.length),
+        rejections
+      })}`);
     }
     const { candidate: best, mobilityProbe, resolved } = selected;
     const collision = ctx.checkBuildingCollision?.(
@@ -621,13 +651,27 @@ try {
   const maneuverSamples = [await pose(page)];
   const wallClockStartedAt = Date.now();
 
+  const forwardReady = await holdAndSampleUntil(
+    page,
+    ['ArrowUp'],
+    4000,
+    maneuverSamples,
+    (sample) => sample.speed > 5
+  );
+  if (!softwareRenderer) {
+    assert(
+      forwardReady?.speed > 5,
+      `real input never reached forward steering speed (got ${forwardReady?.speed})`
+    );
+  }
   const forwardRightStart = await pose(page);
-  await holdAndSample(page, ['ArrowUp', 'ArrowRight'], 4000, maneuverSamples);
+  await holdAndSample(page, ['ArrowUp', 'ArrowRight'], 1200, maneuverSamples);
   const forwardRightEnd = await pose(page);
+  await resetBuildingClearDriveRoute(page, driveRoute);
   const reverseReady = await holdAndSampleUntil(
     page,
     ['ArrowDown'],
-    12000,
+    6000,
     maneuverSamples,
     (sample) => sample.speed < -1
   );
@@ -640,7 +684,7 @@ try {
   }
 
   const reverseRightStart = await pose(page);
-  await holdAndSample(page, ['ArrowDown', 'ArrowRight'], 5000, maneuverSamples);
+  await holdAndSample(page, ['ArrowDown', 'ArrowRight'], 1200, maneuverSamples);
   const reverseRightEnd = await pose(page);
 
   const soakRoute = await resetBuildingClearDriveRoute(page, driveRoute);
