@@ -424,8 +424,52 @@ async function prepareBuildingClearDriveRoute(page) {
         }
       );
       if (settledDistance > 5 || settledCollision?.collision) continue;
+      const probeStartX = Number(ctx.car?.x);
+      const probeStartZ = Number(ctx.car?.z);
+      ctx.keys.ArrowUp = true;
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 6000));
+      } finally {
+        ctx.keys.ArrowUp = false;
+        ctx.clearControlInputState?.('player-drive-route-probe');
+      }
+      const probeDistance = Math.hypot(
+        Number(ctx.car?.x) - probeStartX,
+        Number(ctx.car?.z) - probeStartZ
+      );
+      const probeSpeed = Math.abs(Number(ctx.car?.speed) || 0);
+      const probeCollision = ctx.checkBuildingCollision?.(
+        Number(ctx.car?.x),
+        Number(ctx.car?.z),
+        2,
+        {
+          actorBaseY: Number(ctx.car?.y) - 1.2,
+          actorHeight: 2
+        }
+      );
+      if (
+        probeDistance < 40 ||
+        probeSpeed < 8 ||
+        probeCollision?.collision
+      ) continue;
+      ctx.applyResolvedWorldSpawn(resolved, {
+        mode: 'drive',
+        syncCar: true,
+        syncWalker: true
+      });
+      ctx.clearControlInputState?.('player-drive-route-probe-reset');
+      await new Promise((resolve) => setTimeout(resolve, 750));
+      const resetDistance = Math.hypot(
+        Number(ctx.car?.x) - Number(resolved.x),
+        Number(ctx.car?.z) - Number(resolved.z)
+      );
+      if (resetDistance > 5) continue;
       selected = {
         candidate,
+        mobilityProbe: {
+          distance: probeDistance,
+          speed: probeSpeed
+        },
         resolved: {
           ...resolved,
           x: Number(ctx.car?.x),
@@ -439,7 +483,7 @@ async function prepareBuildingClearDriveRoute(page) {
     if (!selected || typeof ctx.applyResolvedWorldSpawn !== 'function') {
       throw new Error('Building-clear road spawn could not be resolved');
     }
-    const { candidate: best, resolved } = selected;
+    const { candidate: best, mobilityProbe, resolved } = selected;
     const collision = ctx.checkBuildingCollision?.(
       Number(ctx.car?.x),
       Number(ctx.car?.z),
@@ -457,7 +501,11 @@ async function prepareBuildingClearDriveRoute(page) {
       resolvedX: Number(resolved.x),
       resolvedZ: Number(resolved.z),
       resolvedSource: String(resolved.source || ''),
-      onRoad: resolved.onRoad === true
+      onRoad: resolved.onRoad === true,
+      mobilityProbe: {
+        distance: Number(mobilityProbe.distance.toFixed(2)),
+        speed: Number(mobilityProbe.speed.toFixed(2))
+      }
     };
   });
 }
