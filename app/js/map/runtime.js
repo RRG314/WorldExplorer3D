@@ -10,7 +10,7 @@ import {
   resetMinimapView,
   resolveMapView,
   worldToScreenLarge
-} from "./tiles.js?v=2";
+} from "./tiles.js?v=3";
 
 const mctx = document.getElementById("minimap").getContext("2d");
 const largeMapCtx = document.getElementById("largeMapCanvas").getContext("2d");

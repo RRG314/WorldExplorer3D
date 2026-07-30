@@ -89,6 +89,11 @@ const _moonDir = new THREE.Vector3(-0.4, 0.8, -0.2).normalize();
 const _fillDir = new THREE.Vector3(-0.3, 0.6, -0.7).normalize();
 let _lastAppliedSkySignature = "";
 let _lastStarOpacitySignature = "";
+
+export function invalidateSkyVisualCache() {
+  _lastAppliedSkySignature = "";
+  _lastStarOpacitySignature = "";
+}
 let _lastMoonPhaseSignature = "";
 
 function buildSkyCacheKey(lat, lon, timestamp) {

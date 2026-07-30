@@ -3,10 +3,11 @@ import { captureEarthWorldSession, resumeEarthWorldSession } from "./earth-sessi
 import {
   cycleTimeOfDay as cycleSkyTimeOfDay,
   getAstronomicalSkySnapshot,
+  invalidateSkyVisualCache,
   inspectAstronomicalSkyState,
   refreshAstronomicalSky as refreshAstronomicalSkyState,
   setTimeOfDay as setSkyTimeOfDay
-} from "./sky/astronomical-state.js?v=1";
+} from "./sky/astronomical-state.js?v=2";
 import {
   alignStarFieldToLocation,
   checkMoonClick as checkMoonSelection,
@@ -452,6 +453,7 @@ Object.assign(appCtx, {
   hideReturnToEarthButton,
   highlightConstellation,
   inspectAstronomicalSkyState,
+  invalidateSkyVisualCache,
   getAstronomicalSkySnapshot,
   positionCarOnMoon,
   refreshAstronomicalSky,
@@ -479,6 +481,7 @@ export {
   hideReturnToEarthButton,
   highlightConstellation,
   inspectAstronomicalSkyState,
+  invalidateSkyVisualCache,
   getAstronomicalSkySnapshot,
   positionCarOnMoon,
   refreshAstronomicalSky,

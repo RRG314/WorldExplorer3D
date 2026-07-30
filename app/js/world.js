@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=26";
+} from "./world/spawn.js?v=27";
 import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,

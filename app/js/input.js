@@ -410,6 +410,19 @@ async function searchLocation() {
 
       // Debug log removed
     } // Debug log removed
+
+    // The title screen only needs the side effects above, while the globe
+    // selector needs the resolved location as an explicit handoff. Returning
+    // the canonical result keeps both entry points on the same geocoder
+    // contract instead of making the overlay infer success from status text.
+    return {
+      lat,
+      lon,
+      name: locationName,
+      country,
+      displayName: result.display_name || query,
+      arrivalMode: 'walk'
+    };
   } catch (e) {
     console.error('=== SEARCH LOCATION DEBUG END - ERROR ===');
     console.error('Search error:', e);

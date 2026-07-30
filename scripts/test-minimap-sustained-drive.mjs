@@ -223,11 +223,11 @@ try {
   assert(samples.every((sample) => sample.trackPoints === 0 && sample.recording === false), 'Normal driving recorded a route');
   assert(result.recordedPoints <= 4096, `Recorded route exceeded its bound (${result.recordedPoints} points)`);
   assert(result.geometriesAfterRecording === result.geometriesBeforeRecording, 'Track recording allocated 3D geometry');
-  const deadZoneOffset = Math.hypot(
+  const centeredActorOffset = Math.hypot(
     Number(result.deadZoneView?.actorX) - Number(result.deadZoneView?.centerX),
     Number(result.deadZoneView?.actorY) - Number(result.deadZoneView?.centerY)
   );
-  assert(deadZoneOffset >= 35 && deadZoneOffset <= 44, `Minimap dead zone was not retained (${deadZoneOffset.toFixed(1)}px)`);
+  assert(centeredActorOffset <= 0.5, `Minimap actor was not centered (${centeredActorOffset.toFixed(1)}px)`);
   assert(result.lateP95 <= Math.max(50, result.earlyP95 * 1.8), `Late frame pacing regressed (${result.earlyP95.toFixed(1)}ms -> ${result.lateP95.toFixed(1)}ms)`);
   console.log(JSON.stringify(report, null, 2));
 } finally {

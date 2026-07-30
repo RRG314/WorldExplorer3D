@@ -1,5 +1,5 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { getMapReferencePosition } from "./tiles.js?v=2";
+import { getMapReferencePosition } from "./tiles.js?v=3";
 
 function drawEarthMarkerLayers(ctx, w, h, isLarge, view) {
   const { worldToScreen, latLonToScreen, mx, my } = view;

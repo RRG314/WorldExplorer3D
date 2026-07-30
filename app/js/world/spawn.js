@@ -624,7 +624,8 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
     });
   }
 
-  if (Array.isArray(appCtx.roads) && appCtx.roads.length > 0) {
+  const inferredWaterKind = inferSelectedLocationWaterKind(appCtx);
+  if (!inferredWaterKind && Array.isArray(appCtx.roads) && appCtx.roads.length > 0) {
     const landApproach = resolveSafeWorldSpawn(exactRoad?.x || 0, exactRoad?.z || 0, {
       ...options,
       mode,
@@ -642,7 +643,6 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
     source: options.source || "custom_location"
   });
   if (boatSpawn) return boatSpawn;
-
   return applySpawnTarget(exactRoad?.x || 0, exactRoad?.z || 0, {
     ...options,
     mode,

@@ -8,7 +8,6 @@ function latLonToTile(lat, lon, zoom) {
 }
 
 const MAP_TILE_CACHE_LIMIT = 96;
-const MINIMAP_DEAD_ZONE_PX = 42;
 const tileCache = new Map();
 const tileCacheLifetime = {
   hits: 0,
@@ -28,13 +27,6 @@ function tileCoordinates(lat, lon, zoom) {
     x: (lon + 180) / 360 * n,
     y: (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n
   };
-}
-
-function tileCoordinatesToLatLon(x, y, zoom) {
-  const n = Math.pow(2, zoom);
-  const lon = x / n * 360 - 180;
-  const lat = Math.atan(Math.sinh(Math.PI * (1 - 2 * y / n))) * 180 / Math.PI;
-  return { lat, lon };
 }
 
 function touchTile(key, tile) {
@@ -105,29 +97,10 @@ function worldToLatLon(worldX, worldZ) {
 function resolveMinimapCenter(actorRef, zoom) {
   const actor = worldToLatLon(actorRef.x, actorRef.z);
   const locationKey = mapLocationKey();
-  if (!minimapCenter || minimapCenter.locationKey !== locationKey || minimapCenter.zoom !== zoom) {
-    minimapCenter = { ...actor, locationKey, zoom };
-    return minimapCenter;
-  }
-
-  const centerTile = tileCoordinates(minimapCenter.lat, minimapCenter.lon, zoom);
-  const actorTile = tileCoordinates(actor.lat, actor.lon, zoom);
-  const dx = (actorTile.x - centerTile.x) * 256;
-  const dy = (actorTile.y - centerTile.y) * 256;
-  const distance = Math.hypot(dx, dy);
-
-  // Keep the map stable during ordinary movement. Recenter only enough to
-  // retain the active actor inside the dead zone.
-  if (distance > MINIMAP_DEAD_ZONE_PX) {
-    const retainedRatio = MINIMAP_DEAD_ZONE_PX / distance;
-    const nextX = actorTile.x - (actorTile.x - centerTile.x) * retainedRatio;
-    const nextY = actorTile.y - (actorTile.y - centerTile.y) * retainedRatio;
-    minimapCenter = {
-      ...tileCoordinatesToLatLon(nextX, nextY, zoom),
-      locationKey,
-      zoom
-    };
-  }
+  // The minimap is an actor-follow view. Keeping a dead zone made the vehicle
+  // visibly drift away from the center and contradicted the map interaction
+  // contract. The large map remains independently actor-centered below.
+  minimapCenter = { ...actor, locationKey, zoom };
   return minimapCenter;
 }
 

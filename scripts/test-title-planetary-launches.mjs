@@ -44,6 +44,27 @@ function assertPlanetaryStarStyle(state, body, label) {
   assert(stars.faintRoundSprite, `${label} lost the round background-star sprite`);
 }
 
+function assertEarthStarStyle(state, label) {
+  const stars = state.starVisuals || {};
+  const expectedOpacity = Number(stars.skyStarsOpacity || 0);
+  assert(stars.observerBody === 'earth', `${label} retained the ${stars.observerBody || 'unknown'} observer orientation`);
+  assert(
+    stars.fieldVisible === (expectedOpacity > 0.015),
+    `${label} star visibility did not match Earth's astronomical state`
+  );
+  if (expectedOpacity <= 0.015) return;
+  const expectedBrightOpacity = Number(stars.brightBaseOpacity || 0) * expectedOpacity;
+  const expectedFaintOpacity = Number(stars.faintBaseOpacity || 0) * expectedOpacity;
+  assert(
+    Math.abs(Number(stars.brightOpacity || 0) - expectedBrightOpacity) <= 0.01,
+    `${label} retained planetary bright-star opacity`
+  );
+  assert(
+    Math.abs(Number(stars.faintOpacity || 0) - expectedFaintOpacity) <= 0.01,
+    `${label} retained planetary faint-star opacity`
+  );
+}
+
 function assertMarsSceneOwned(state, label) {
   const scene = state.sceneOwnership || {};
   assert(state.env === 'MARS' && state.onMars, `${label} did not retain Mars runtime ownership`);
@@ -107,11 +128,17 @@ async function readState(page) {
       spaceCatalog: globalThis.getWorldExplorerRuntimeDiagnostics?.().spaceCatalog || null,
       starVisuals: {
         observerBody: ctx.starField?.userData?.observerBody || '',
+        fieldVisible: !!ctx.starField?.visible,
+        skyStarsOpacity: Number(ctx.skyState?.starsOpacity || 0),
         brightVisible: !!brightStars?.visible,
+        brightOpacity: Number(brightStars?.material?.opacity || 0),
+        brightBaseOpacity: Number(brightStars?.userData?.baseOpacity || 0),
         brightSize: Number(brightStars?.material?.size || 0),
         brightVertexColors: brightStars?.material?.vertexColors,
         brightRoundSprite: !!brightStars?.material?.map,
         faintVisible: !!faintStars?.visible,
+        faintOpacity: Number(faintStars?.material?.opacity || 0),
+        faintBaseOpacity: Number(faintStars?.userData?.baseOpacity || 0),
         faintSize: Number(faintStars?.material?.size || 0),
         faintRoundSprite: !!faintStars?.material?.map
       },
@@ -247,6 +274,7 @@ async function runScenario(browser, baseUrl, scenario) {
       await settleVisualFrame(page);
       await page.screenshot({ path: path.join(outputDir, 'moon-return-earth.png'), fullPage: false });
       assert(earthReturn.roads > 0, 'Moon return did not initialize the selected Earth world');
+      assertEarthStarStyle(earthReturn, 'Moon return to Earth');
       assert(mainFrameNavigations === 1, 'Moon return reloaded the page instead of restoring Earth in place');
       assert(!earthReturn.fatal, 'Moon return showed a fatal renderer error');
 
@@ -346,6 +374,7 @@ async function runScenario(browser, baseUrl, scenario) {
       const earthAfterMarsReturn = await waitForEarthReturn(page);
       assert(earthAfterMarsReturn.sceneOwnership.earthVisible, 'Return to Earth did not restore Earth scene ownership');
       assert(!earthAfterMarsReturn.sceneOwnership.marsSurfaceVisible, 'Return to Earth left the Mars surface visible');
+      assertEarthStarStyle(earthAfterMarsReturn, 'Mars return to Earth');
       await waitForEarthVisual(page);
       await page.screenshot({ path: path.join(outputDir, 'mars-return-earth.png'), fullPage: false });
       state.marsAfterCancelledReturn = marsAfterCancelledReturn;
