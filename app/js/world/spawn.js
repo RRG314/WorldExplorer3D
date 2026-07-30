@@ -551,8 +551,12 @@ function tryAutoEnterBoatAt(worldX, worldZ, options = {}) {
   if (!options?.preferBoatIfWater || typeof appCtx.enterBoatAtWorldPoint !== "function") return null;
   const entryMode = options.mode === "walk" ? "walk" : "drive";
   const inferredWaterKind = inferSelectedLocationWaterKind(appCtx);
+  const requestedBoatArrival = appCtx.customLoc?.arrivalMode === "boat";
+  const openOceanSurfaceOnly =
+    appCtx.worldLoadRuntimeState?.groundMode === "open-ocean-surface-only";
   const allowSynthetic = !!(
     options.allowSyntheticWater ||
+    (requestedBoatArrival && openOceanSurfaceOnly) ||
     (
       inferredWaterKind &&
       appCtx.selLoc === "custom" &&
@@ -625,7 +629,8 @@ function applyCustomLocationSpawn(mode = "walk", options = {}) {
   }
 
   const inferredWaterKind = inferSelectedLocationWaterKind(appCtx);
-  if (!inferredWaterKind && Array.isArray(appCtx.roads) && appCtx.roads.length > 0) {
+  const requestedBoatArrival = appCtx.customLoc?.arrivalMode === "boat";
+  if (!inferredWaterKind && !requestedBoatArrival && Array.isArray(appCtx.roads) && appCtx.roads.length > 0) {
     const landApproach = resolveSafeWorldSpawn(exactRoad?.x || 0, exactRoad?.z || 0, {
       ...options,
       mode,

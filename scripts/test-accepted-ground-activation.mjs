@@ -3,6 +3,8 @@ import { activateAcceptedGroundForWorldLoad } from
   '../app/js/world/accepted-ground-activation.js';
 import { diagnoseDistrictGroundSource } from
   '../app/js/world/compiler/selected-location-source-adapter.js';
+import { setCustomLocation } from '../app/js/location-session.js';
+import { ctx as sharedCtx } from '../app/js/shared-context.js?v=55';
 
 function harness(groundState) {
   const messages = [];
@@ -101,11 +103,40 @@ assert.equal(openOcean.runtimeState.groundMode, 'open-ocean-surface-only');
 assert.equal(openOcean.runtimeState.acceptedGround.status, 'not-applicable');
 assert.equal(openOcean.runtimeState.acceptedGround.waterKind, 'open_ocean');
 
+assert.equal(setCustomLocation({
+  lat: 30,
+  lon: -40,
+  name: 'Manual Coordinates',
+  arrivalMode: 'boat'
+}, { syncInputs: false }), true);
+assert.equal(sharedCtx.customLoc.arrivalMode, 'boat');
+
+const explicitBoat = harness({
+  status: 'blocked',
+  reason: 'no-accepted-ground-artifact-for-location'
+});
+explicitBoat.appCtx.selLoc = 'custom';
+explicitBoat.appCtx.LOC = {
+  lat: 30,
+  lon: -40,
+  name: 'Manual Coordinates'
+};
+explicitBoat.appCtx.customLoc = {
+  lat: 30,
+  lon: -40,
+  name: 'Manual Coordinates',
+  arrivalMode: 'boat'
+};
+assert.equal(await explicitBoat.run(), true);
+assert.equal(explicitBoat.runtimeState.groundMode, 'open-ocean-surface-only');
+assert.equal(explicitBoat.runtimeState.acceptedGround.requestedBoatArrival, true);
+
 console.log(JSON.stringify({
   ok: true,
   contract: 'accepted-ground-activation',
   blocksBeforeTerrainPublication: true,
   acceptedArtifactStartsTerrain: true,
   openOceanDoesNotFabricateGround: true,
+  explicitBoatArrivalSurvivesNormalization: true,
   diagnosticsUseAcceptedArtifact: true
 }, null, 2));

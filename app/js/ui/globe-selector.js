@@ -29,7 +29,7 @@ function createGlobeSelector(options = {}) {
   const {
     root, stage, canvas, latLonReadout, placeReadout, searchInput, mobileSearchInput,
     mobileSearchBtn, searchStatus, latInput, lonInput, startBtn, backBtn, moonBtn,
-    spaceBtn, searchBtn, locateBtn, exploreModeBtn, liveEarthModeBtn, explorePanel,
+    spaceBtn, oceanBtn, searchBtn, locateBtn, exploreModeBtn, liveEarthModeBtn, explorePanel,
     liveEarthPanel, liveEarthStatus, liveEarthCategoryChips, liveEarthLayerList,
     liveEarthDetails, liveEarthRefreshBtn, nearbyTabBtn, favoritesTabBtn, saveFavoriteBtn,
     cityListHint, cityList
@@ -441,6 +441,7 @@ function createGlobeSelector(options = {}) {
     setShortcutButtonsBusy(isBusy) {
       if (moonBtn) moonBtn.disabled = isBusy;
       if (spaceBtn) spaceBtn.disabled = isBusy;
+      if (oceanBtn) oceanBtn.disabled = isBusy;
     },
     setStartButtonBusy,
     setStatus(message, color) {
@@ -452,6 +453,24 @@ function createGlobeSelector(options = {}) {
 
   function triggerStartHere() {
     return launchCoordinator.startHere();
+  }
+
+  function startSelectedOcean() {
+    if (coordinateInputsDirty && !applySelectionFromInputs()) {
+      return Promise.resolve(false);
+    }
+    if (!selected) {
+      if (searchStatus) {
+        searchStatus.textContent = 'Choose an ocean point on the globe first.';
+        searchStatus.style.color = '#dc2626';
+      }
+      return Promise.resolve(false);
+    }
+    setSelection(selected.lat, selected.lon, {
+      name: selected.name,
+      arrivalMode: 'boat'
+    });
+    return triggerStartHere();
   }
 
   function bindLiveEarthBridge() {
@@ -583,6 +602,7 @@ function createGlobeSelector(options = {}) {
   });
   moonBtn?.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onMoonShortcut, 'Moon'));
   spaceBtn?.addEventListener('click', () => void launchCoordinator.startEnvironment(options.onSpaceShortcut, 'Space'));
+  oceanBtn?.addEventListener('click', () => void startSelectedOcean());
   for (const coordinateInput of [latInput, lonInput]) {
     coordinateInput?.addEventListener('input', () => {
       coordinateInputsDirty = true;

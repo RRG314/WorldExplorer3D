@@ -43,11 +43,15 @@ export async function activateAcceptedGroundForWorldLoad(options = {}) {
   const waterKind = appCtx.selLoc === 'custom'
     ? inferSelectedLocationWaterKind(appCtx)
     : null;
-  if (waterKind === 'open_ocean') {
+  const requestedBoatArrival =
+    appCtx.selLoc === 'custom' &&
+    appCtx.customLoc?.arrivalMode === 'boat';
+  if (waterKind === 'open_ocean' || requestedBoatArrival) {
     const exemption = Object.freeze({
       status: 'not-applicable',
       reason: 'open-ocean-has-no-land-ground',
-      waterKind,
+      waterKind: waterKind || 'open_ocean',
+      requestedBoatArrival,
       rejectedGround: state || null
     });
     runtimeState.acceptedGround = exemption;

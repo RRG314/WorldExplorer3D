@@ -1,5 +1,5 @@
 import { ctx as appCtx } from './shared-context.js?v=55';
-import { ENV, getEnv, switchEnv } from './env.js?v=57';
+import { ENV, getEnv, switchEnv } from './env.js?v=58';
 import { createLifecycleScope, getLifecycleRegistrySnapshot } from './runtime/lifecycle-scope.js?v=2';
 
 const environmentAdapters = new Map();

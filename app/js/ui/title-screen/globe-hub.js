@@ -277,11 +277,6 @@ function setupGlobeHub({
     globeSelector.close();
     onLaunchMode('mars');
   });
-  document.getElementById('globeSelectorOceanBtn')?.addEventListener('click', () => {
-    globeSelector.close();
-    onLaunchMode('ocean');
-  });
-
   return { closePanel, openPanel };
 }
 

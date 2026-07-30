@@ -26,7 +26,7 @@ import {
   spawnOnRoad,
   terrainYAtWorld,
   tryAutoEnterBoatAt
-} from "./world/spawn.js?v=27";
+} from "./world/spawn.js?v=28";
 import {
   buildWorldOverpassPlan,
   fetchOverpassJSON,
@@ -163,7 +163,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=14";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=70";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=71";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=9";

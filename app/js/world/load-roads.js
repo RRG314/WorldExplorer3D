@@ -4,7 +4,7 @@ import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=6";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=14";
 import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=8";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=12";
-import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=3";
+import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=4";
 import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=5";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
