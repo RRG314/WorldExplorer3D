@@ -15,6 +15,7 @@ function setDroneModeActive(active) {
 
 function syncTravelModeButtons() {
   const activeMode = getCurrentTravelMode();
+  const boatLocked = activeMode === 'boat';
   const drivingBtn = document.getElementById('fDriving');
   const walkingBtn = document.getElementById('fWalk');
   const droneBtn = document.getElementById('fDrone');
@@ -25,6 +26,19 @@ function syncTravelModeButtons() {
   if (droneBtn) droneBtn.classList.toggle('on', activeMode === 'drone');
   if (planeBtn) planeBtn.classList.toggle('on', activeMode === 'plane');
   if (boatBtn) boatBtn.classList.toggle('on', activeMode === 'boat');
+  [
+    drivingBtn,
+    walkingBtn,
+    droneBtn,
+    planeBtn,
+    document.getElementById('fOceanMode'),
+    document.getElementById('fEarthMode'),
+    document.getElementById('fSpaceDirect'),
+    document.getElementById('fSpaceRocket'),
+    document.getElementById('fSpaceMars')
+  ].forEach((button) => {
+    if (button) button.style.display = boatLocked ? 'none' : '';
+  });
   return activeMode;
 }
 
@@ -189,7 +203,10 @@ function setTravelMode(mode, options = {}) {
   }
 
   if (targetMode !== 'boat' && appCtx.boatMode?.active && typeof appCtx.stopBoatMode === 'function') {
-    if (typeof appCtx.canExitBoatMode === 'function' && !appCtx.canExitBoatMode(targetMode, { showNotice: true })) {
+    if (typeof appCtx.canExitBoatMode === 'function' && !appCtx.canExitBoatMode(targetMode, {
+      showNotice: true,
+      source: options.source || 'runtime_switch'
+    })) {
       const resolvedMode = syncTravelModeButtons();
       if (typeof appCtx.updateControlsModeUI === 'function') {
         appCtx.updateControlsModeUI();

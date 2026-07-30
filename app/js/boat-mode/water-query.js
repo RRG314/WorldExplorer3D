@@ -268,7 +268,34 @@ function getReferencePosition() {
   if (appCtx.boatMode?.active) {
     return { x: appCtx.boat.x, y: appCtx.boat.y, z: appCtx.boat.z, angle: appCtx.boat.angle, mode: 'boat' };
   }
-  if (appCtx.droneMode) return null;
+  if (appCtx.planeMode?.active) {
+    if (appCtx.planeMode.airborne) return null;
+    return {
+      x: appCtx.planeMode.x,
+      y: appCtx.planeMode.y,
+      z: appCtx.planeMode.z,
+      angle: Number.isFinite(appCtx.planeMode.yaw) ? appCtx.planeMode.yaw : 0,
+      mode: 'plane'
+    };
+  }
+  if (appCtx.droneMode) {
+    const x = Number(appCtx.drone?.x);
+    const y = Number(appCtx.drone?.y);
+    const z = Number(appCtx.drone?.z);
+    if (![x, y, z].every(Number.isFinite)) return null;
+    const sampledGroundY = appCtx.SurfaceQuery?.walkAt?.(x, z)?.position?.y;
+    const groundY = Number.isFinite(sampledGroundY)
+      ? sampledGroundY
+      : appCtx.terrainMeshHeightAt?.(x, z);
+    if (!Number.isFinite(groundY) || y - groundY > 4) return null;
+    return {
+      x,
+      y,
+      z,
+      angle: Number.isFinite(appCtx.drone.yaw) ? appCtx.drone.yaw : 0,
+      mode: 'drone'
+    };
+  }
   if (appCtx.Walk?.state?.mode === 'walk' && appCtx.Walk.state.walker) {
     return {
       x: appCtx.Walk.state.walker.x,

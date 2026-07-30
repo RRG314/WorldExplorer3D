@@ -60,7 +60,7 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=20";
+} from "./world/load-support.js?v=21";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -134,7 +134,7 @@ import {
   initWorldVegetation,
   MAX_TREE_NODES,
   MAX_TREE_ROW_WAYS
-} from "./world/vegetation.js?v=6";
+} from "./world/vegetation.js?v=7";
 import {
   appendIndexedGeometry,
   decimatePoints,
@@ -147,7 +147,7 @@ import {
 import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=19";
 import {
   resetWorldFurnitureCaches
-} from "./world/furniture.js?v=11";
+} from "./world/furniture.js?v=12";
 import {
   addBuildingToSpatialIndex,
   clearBuildingSpatialIndex,
@@ -163,7 +163,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=14";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=71";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=72";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=9";

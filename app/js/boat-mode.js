@@ -25,7 +25,7 @@ import {
   syncWaterMeshCache,
   waterKindLabel,
   waterSurfaceYAt
-} from "./boat-mode/water-query.js?v=14";
+} from "./boat-mode/water-query.js?v=15";
 import {
   applyBoatWavePose,
   ensureBoatWaterPatch,
@@ -34,13 +34,13 @@ import {
   updateBoatFoamFx,
   updateBoatWaterPatch,
   updateWaterWaveVisuals
-} from "./boat-mode/surface-effects.js?v=9";
+} from "./boat-mode/surface-effects.js?v=10";
 import { createBoatModeMesh } from "./boat-mode/boat-model.js?v=1";
 import { createBoatPromptUi } from "./boat-mode/prompt-ui.js?v=1";
 import { clamp, normalizeAngle, shortestAngleDelta, stepBoatSpring } from "./boat-mode/dynamics.js?v=1";
 import { createBoatRuntimeDynamics } from "./boat-mode/runtime-dynamics.js?v=6";
 import { createBoatOceanTransferApi } from "./boat-mode/ocean-transfer.js?v=1";
-import { createBoatModePolicy } from "./boat-mode/policy.js?v=1";
+import { createBoatModePolicy } from "./boat-mode/policy.js?v=2";
 
 const BOAT_PROMPT_DISTANCE = 18;
 const BOAT_ENTRY_OFFSET = 9;
@@ -229,7 +229,7 @@ function syncBoatPromptState(force = false) {
     return appCtx.boatMode.currentWater || null;
   }
 
-  if (appCtx.droneMode || appCtx.activeInterior || !appCtx.isEnv?.(appCtx.ENV.EARTH)) {
+  if (appCtx.activeInterior || !appCtx.isEnv?.(appCtx.ENV.EARTH)) {
     appCtx.boatMode.available = false;
     appCtx.boatMode.candidate = null;
     _boatPromptSignature = '';
