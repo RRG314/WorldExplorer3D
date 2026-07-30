@@ -104,8 +104,8 @@ export async function loadBuildingDetailForPublication(options = {}) {
         element?.type === 'way' && (element.tags?.building || element.tags?.['building:part'])
       );
       const provenancePublicationCap = Math.min(
-        Number(options.maxBuildingWays) || 8000,
-        8000
+        Number(options.maxBuildingWays) || 12000,
+        12000
       );
       const buildingWays = options.limitWaysByTileBudget(requested, nodes, {
         globalCap: provenancePublicationCap,
