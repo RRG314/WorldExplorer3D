@@ -205,10 +205,30 @@ async function resetBuildingClearDriveRoute(page, route) {
       syncCar: true,
       syncWalker: true
     });
+    ctx.clearControlInputState?.('player-drive-route-reset');
+    await new Promise((resolve) => setTimeout(resolve, 750));
+    const settledDistance = Math.hypot(
+      Number(ctx.car?.x) - Number(resolved.x),
+      Number(ctx.car?.z) - Number(resolved.z)
+    );
+    const settledCollision = ctx.checkBuildingCollision?.(
+      Number(ctx.car?.x),
+      Number(ctx.car?.z),
+      5,
+      {
+        actorBaseY: Number(ctx.car?.y) - 1.2,
+        actorHeight: 2
+      }
+    );
+    if (settledDistance > 5 || settledCollision?.collision) {
+      throw new Error(
+        `Release drive route reset was unstable (${settledDistance.toFixed(2)} m)`
+      );
+    }
     return {
-      x: Number(resolved.x),
-      z: Number(resolved.z),
-      angle: Number(resolved.angle),
+      x: Number(ctx.car?.x),
+      z: Number(ctx.car?.z),
+      angle: Number(ctx.car?.angle),
       source: String(resolved.source || ''),
       onRoad: resolved.onRoad === true
     };
@@ -383,18 +403,43 @@ async function prepareBuildingClearDriveRoute(page) {
         }
       );
       if (collision?.collision) continue;
-      selected = { candidate, resolved };
+      ctx.applyResolvedWorldSpawn(resolved, {
+        mode: 'drive',
+        syncCar: true,
+        syncWalker: true
+      });
+      ctx.clearControlInputState?.('player-drive-route-candidate');
+      await new Promise((resolve) => setTimeout(resolve, 750));
+      const settledDistance = Math.hypot(
+        Number(ctx.car?.x) - Number(resolved.x),
+        Number(ctx.car?.z) - Number(resolved.z)
+      );
+      const settledCollision = ctx.checkBuildingCollision?.(
+        Number(ctx.car?.x),
+        Number(ctx.car?.z),
+        5,
+        {
+          actorBaseY: Number(ctx.car?.y) - 1.2,
+          actorHeight: 2
+        }
+      );
+      if (settledDistance > 5 || settledCollision?.collision) continue;
+      selected = {
+        candidate,
+        resolved: {
+          ...resolved,
+          x: Number(ctx.car?.x),
+          z: Number(ctx.car?.z),
+          angle: Number(ctx.car?.angle),
+          carY: Number(ctx.car?.y)
+        }
+      };
       break;
     }
     if (!selected || typeof ctx.applyResolvedWorldSpawn !== 'function') {
       throw new Error('Building-clear road spawn could not be resolved');
     }
     const { candidate: best, resolved } = selected;
-    ctx.applyResolvedWorldSpawn(resolved, {
-      mode: 'drive',
-      syncCar: true,
-      syncWalker: true
-    });
     const collision = ctx.checkBuildingCollision?.(
       Number(ctx.car?.x),
       Number(ctx.car?.z),
@@ -514,6 +559,16 @@ try {
   const driveEntryDiagnostic = await captureSpawnDiagnostic(page, 'drive-entry');
   const driveRoute = await prepareBuildingClearDriveRoute(page);
   const driveRouteDiagnostic = await captureSpawnDiagnostic(page, 'drive-route');
+  assert(
+    Math.hypot(
+      driveRouteDiagnostic.actor.x - driveRoute.resolvedX,
+      driveRouteDiagnostic.actor.z - driveRoute.resolvedZ
+    ) <= 5,
+    `drive route drifted before input: ${JSON.stringify({
+      route: driveRoute,
+      actor: driveRouteDiagnostic.actor
+    })}`
+  );
 
   const maneuverSamples = [await pose(page)];
   const wallClockStartedAt = Date.now();
