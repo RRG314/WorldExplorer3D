@@ -200,7 +200,7 @@ assert.equal(planeHalfway.plane.z, 4);
 assert.ok(Math.abs(planeHalfway.plane.yaw + Math.PI / 4) < 1e-9);
 assert.equal(appCtx.planeMode.mesh.position.x, 10);
 
-const releaseNotes = read('RELEASE_NOTES_4.1.1.md');
+const releaseNotes = read('RELEASE_NOTES_4.1.2.md');
 const knownIssues = read('KNOWN_ISSUES.md');
 assert.match(releaseNotes, /## Verification/);
 assert.match(releaseNotes, /representative locations worldwide/i);
@@ -217,5 +217,5 @@ console.log(JSON.stringify({
   naturalGroundOwner: 'terrain-profile',
   shadowOwner: 'engine/shadow-policy',
   interpolationOwner: interpolator.snapshot().owner,
-  publicReleaseRecord: '4.1.1'
+  publicReleaseRecord: '4.1.2'
 }, null, 2));

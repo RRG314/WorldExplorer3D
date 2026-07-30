@@ -10,9 +10,12 @@ World Explorer 3D is a browser-based geospatial exploration game built around re
 
 **[Launch World Explorer 3D](https://worldexplorer3d.io/app/)**
 
-## Version 4.1.1
+## Version 4.1.2
 
-Version 4.1.1 stabilizes selected-location exploration, removes the unfinished Continuous World runtime, and restores one consistent owner for terrain, roads, structures, movement, and world publication.
+Version 4.1.2 completes the production-architecture release train: accepted
+ground, compiled transport and structures, provenance-owned buildings and
+water, deterministic controllers, and environment lifecycle cleanup now have
+one tested owner apiece.
 
 Highlights:
 

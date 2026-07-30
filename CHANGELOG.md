@@ -2,6 +2,39 @@
 
 Notable user-facing changes are recorded here. Git history and GitHub releases contain the complete change record.
 
+## [4.1.2] - 2026-07-30
+
+### Added
+
+- Integrity-checked accepted-ground artifacts for the documented worldwide
+  release scenarios, with explicit datum, provenance, coverage, uncertainty,
+  and fail-closed loading.
+- One provenance-preserving OSM transport graph and surface shared by road
+  rendering, collision, navigation, bridges, tunnels, ramps, and stacked
+  structures.
+- Building and water authority registries that retain source identity,
+  mapped/inferred status, foundation datum, navigability, and publication
+  ownership.
+- Controller p95 diagnostics, lifecycle owner/resource diagnostics, sustained
+  journey evidence, and ten-cycle space/ocean stress coverage.
+
+### Changed
+
+- Reworked walk, drive, drone, plane, boat, and space transitions to clear
+  stale input while preserving valid accepted-surface pose.
+- Rebuilt space camera/control math around explicit local axes and normalized
+  quaternion interpolation.
+- Made the generated hosting manifest bind the exact commit, dependency lock,
+  source-release manifests, asset manifest, content hash, Firebase environment,
+  and immutable deployment target.
+
+### Fixed
+
+- Eliminated missing-elevation-as-zero publication, duplicate road/building/
+  water ownership, proximity-only boat selection, tunnel/bridge authority
+  divergence, slow walk presentation-mesh raycasts, and leaked environment
+  renderer/animation sessions.
+
 ## [4.1.1] - 2026-07-28
 
 ### Added

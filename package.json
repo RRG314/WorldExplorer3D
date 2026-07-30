@@ -1,6 +1,6 @@
 {
   "name": "worldexplorer3d",
-  "version": "4.1.1",
+  "version": "4.1.2",
   "description": "Browser-based 3D geospatial exploration app using OpenStreetMap-derived data for Earth and destination-mode exploration.",
   "type": "module",
   "main": "three.js",
@@ -31,6 +31,7 @@
     "test:player-drive-input": "node scripts/test-player-input-drive.mjs",
     "test:production-candidate": "npm run test:production-readiness && npm run test:player-drive-input && npm run test:runtime && npm run test:world-matrix",
     "test:production-gate": "node scripts/verify-production-gate.mjs",
+    "test:release-candidate": "node scripts/test-release-candidate.mjs",
     "test:runtime-kernel": "node scripts/test-runtime-kernel.mjs",
     "test:transport-controllers": "node scripts/test-transport-controller-registry.mjs",
     "test:platform-services": "node scripts/test-platform-service-registry.mjs",
@@ -84,6 +85,8 @@
     "runtime:verify": "node scripts/runtime-verify.mjs",
     "diag:phase5-software-perf": "node scripts/measure-phase5-performance.mjs",
     "release:verify": "node scripts/release-verify.mjs",
+    "release:finalize": "node scripts/release-finalize.mjs",
+    "release:prepare-visual-review": "node scripts/prepare-world-matrix-review.mjs",
     "preview:deploy": "node scripts/firebase-hosting-preview.mjs",
     "preview:promote": "node scripts/firebase-hosting-promote.mjs"
   },

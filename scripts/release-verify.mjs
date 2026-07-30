@@ -10,6 +10,7 @@ const steps = [
   { name: 'Cloud Functions runtime exports', cmd: [process.execPath, 'scripts/test-functions-runtime.mjs'] },
   { name: 'Build production hosting artifact', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'build', '--firebase-env', 'production'] },
   { name: 'Hosting artifact parity', cmd: [process.execPath, 'scripts/hosting-artifact.mjs', 'verify'] },
+  { name: 'Immutable release candidate identity', cmd: [process.execPath, 'scripts/test-release-candidate.mjs'] },
   { name: 'Hosted source reachability', cmd: [process.execPath, 'scripts/audit-hosting-reachability.mjs', '--strict'] },
   { name: 'CSS integrity', cmd: [process.execPath, 'scripts/test-css-integrity.mjs'] },
   { name: 'ES module URL identity', cmd: [process.execPath, 'scripts/test-module-version-consistency.mjs'] },
@@ -25,10 +26,22 @@ const steps = [
   { name: 'Account service', cmd: [process.execPath, 'scripts/test-account-service.mjs'] },
   { name: 'Gameplay plugin registry', cmd: [process.execPath, 'scripts/test-gameplay-plugin-registry.mjs'] },
   { name: 'Geospatial data fabric', cmd: [process.execPath, 'scripts/test-geospatial-data-fabric.mjs'] },
-  { name: 'Mobile touch controls', cmd: [process.execPath, 'scripts/test-mobile-controls.mjs'] },
+  { name: 'Mobile Chromium touch controls', cmd: [process.execPath, 'scripts/test-mobile-controls.mjs'] },
+  {
+    name: 'Mobile WebKit touch controls',
+    cmd: [process.execPath, 'scripts/test-mobile-controls.mjs'],
+    env: { MOBILE_BROWSER: 'webkit' }
+  },
   { name: 'Plane and interior lifecycle', cmd: [process.execPath, 'scripts/test-plane-interior-lifecycle.mjs'] },
   { name: 'Environment session lifecycle', cmd: [process.execPath, 'scripts/test-session-lifecycle.mjs'] },
-  { name: 'Real-input sustained drive', cmd: [process.execPath, 'scripts/test-player-input-drive.mjs'] },
+  {
+    name: 'Hardware real-input 10-minute drive',
+    cmd: [process.execPath, 'scripts/test-player-input-drive.mjs'],
+    env: {
+      PLAYER_DRIVE_SECONDS: '600',
+      PLAYER_DRIVE_HEADED: '1'
+    }
+  },
   { name: 'Runtime invariants', cmd: [process.execPath, 'scripts/test-runtime-invariants.mjs'] },
   { name: 'Editor and multiplayer transitions', cmd: [process.execPath, 'scripts/test-editor-multiplayer-surfaces.mjs'] },
   { name: 'Block builder contracts', cmd: [process.execPath, 'scripts/test-block-builder-contract.mjs'] },
@@ -44,8 +57,7 @@ const steps = [
       WORLD_MATRIX_REPORT_NAME: 'r7-provider-outage.json'
     }
   },
-  { name: 'World matrix', cmd: [process.execPath, 'scripts/test-world-matrix.mjs'] },
-  { name: 'Production evidence gate', cmd: [process.execPath, 'scripts/verify-production-gate.mjs'] }
+  { name: 'World matrix', cmd: [process.execPath, 'scripts/test-world-matrix.mjs'] }
 ];
 
 for (const step of steps) {
@@ -61,4 +73,8 @@ for (const step of steps) {
   }
 }
 
-console.log('\n[release-verify] All checks passed.');
+console.log(
+  '\n[release-verify] Automated candidate checks passed. ' +
+  'Review the generated world-matrix screenshots, prepare a hash-bound review, ' +
+  'then run npm run release:finalize.'
+);

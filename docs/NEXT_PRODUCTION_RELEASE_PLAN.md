@@ -1,6 +1,6 @@
 # Next Production Release Plan
 
-**Plan status:** implementation underway; Phases 0–4 complete, including provenance-owned building/water publication and real-input boat/tunnel evidence
+**Plan status:** Phase 6 candidate preparation underway; Phases 0–5 complete
 **Starting baseline:** `3823aea9333717ab1ea5032fb4ca929900ab8a81`  
 **Release rule:** no production deployment until every phase exit condition and the final production gate pass  
 **Design rule:** locations are evidence fixtures, never locations for patches
@@ -435,6 +435,15 @@ inland-water, boat and tunnel evidence is recorded in
 **Rollback point:** Phase 4 commit.
 
 **Expected commit boundary:** `feat: make controller and renderer lifecycles deterministic`.
+
+**Phase 5 exit checkpoint (2026-07-30):** Controller ownership, stale-input
+clearing, accepted-surface attachment and transition state are deterministic.
+The sustained Baltimore run completed 120 simulated seconds each for walk,
+drive and drone plus 60 seconds for plane with walk p95 at 0.4 ms and no
+controller conflict or failure. Space and ocean each completed ten launch/exit
+cycles with one active renderer/RAF lease and no owner growth. Space local-axis,
+quaternion-camera, planetary round-trip and real-keyboard structure transition
+evidence is recorded in `docs/PHASE5_CONTROLLER_LIFECYCLE_STATUS.md`.
 
 ## Phase 6 — Production candidate and immutable promotion
 

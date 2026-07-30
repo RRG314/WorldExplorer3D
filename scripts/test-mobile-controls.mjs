@@ -1,12 +1,15 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
-import { chromium } from 'playwright';
+import { chromium, webkit } from 'playwright';
 import { startStaticRootServer } from './test-static-server.mjs';
 
 const rootDir = process.cwd();
 const outputDir = path.join(rootDir, 'output', 'playwright', 'mobile-controls');
 const host = '127.0.0.1';
 const ports = [4230, 4231, 4232, 4233];
+const browserName = process.env.MOBILE_BROWSER === 'webkit' ? 'webkit' : 'chromium';
+const browserType = browserName === 'webkit' ? webkit : chromium;
+const headed = process.env.MOBILE_HEADED === '1';
 
 const devices = {
   iphone: {
@@ -212,7 +215,7 @@ async function main() {
   const hostedBaseUrl = String(process.env.TEST_BASE_URL || '').replace(/\/$/, '');
   const server = hostedBaseUrl ? null : await startStaticRootServer({ rootDir, host, candidatePorts: ports });
   const baseUrl = hostedBaseUrl || `http://${host}:${server.port}`;
-  const browser = await chromium.launch({ headless: true });
+  const browser = await browserType.launch({ headless: !headed });
   const errors = [];
   try {
     console.log('[mobile-controls] iPhone title touch');
@@ -222,22 +225,24 @@ async function main() {
     await assertTitleTouch(iphonePage, baseUrl);
     await iphone.close();
 
-    console.log('[mobile-controls] Android Earth bootstrap and mode controls');
-    const android = await browser.newContext(contextOptions(devices.android));
-    const androidPage = await android.newPage();
-    androidPage.on('pageerror', (error) => errors.push(`android: ${error.message}`));
-    await bootstrapEarth(androidPage, baseUrl);
-    await androidPage.screenshot({ path: path.join(outputDir, 'android-bootstrap.png') });
-    await assertDockHitTargets(androidPage);
-    await switchMode(androidPage, '#fDriving', 'drive');
-    await switchMode(androidPage, '#fDrone', 'drone');
-    await switchMode(androidPage, '#fPlane', 'plane');
-    await switchMode(androidPage, '#fWalk', 'walk');
-    await assertDockMenus(androidPage);
-    await assertHeldMovement(androidPage);
-    await androidPage.screenshot({ path: path.join(outputDir, 'android-portrait.png') });
-    await assertMainMenuReturn(androidPage);
-    await android.close();
+    const runtimeDevice = browserName === 'webkit' ? devices.iphone : devices.android;
+    const runtimeLabel = browserName === 'webkit' ? 'iPhone WebKit' : 'Android Chromium';
+    console.log(`[mobile-controls] ${runtimeLabel} Earth bootstrap and mode controls`);
+    const runtime = await browser.newContext(contextOptions(runtimeDevice));
+    const runtimePage = await runtime.newPage();
+    runtimePage.on('pageerror', (error) => errors.push(`${runtimeLabel}: ${error.message}`));
+    await bootstrapEarth(runtimePage, baseUrl);
+    await runtimePage.screenshot({ path: path.join(outputDir, `${browserName}-bootstrap.png`) });
+    await assertDockHitTargets(runtimePage);
+    await switchMode(runtimePage, '#fDriving', 'drive');
+    await switchMode(runtimePage, '#fDrone', 'drone');
+    await switchMode(runtimePage, '#fPlane', 'plane');
+    await switchMode(runtimePage, '#fWalk', 'walk');
+    await assertDockMenus(runtimePage);
+    await assertHeldMovement(runtimePage);
+    await runtimePage.screenshot({ path: path.join(outputDir, `${browserName}-portrait.png`) });
+    await assertMainMenuReturn(runtimePage);
+    await runtime.close();
 
     console.log('[mobile-controls] iPhone landscape Earth bootstrap');
     await assertLandscapeShell(browser, baseUrl);
@@ -246,7 +251,13 @@ async function main() {
     await server?.close();
   }
   assert(errors.length === 0, `Mobile page errors: ${errors.join(' | ')}`);
-  console.log(JSON.stringify({ ok: true, devices: ['iPhone portrait', 'Android portrait', 'iPhone landscape'] }, null, 2));
+  console.log(JSON.stringify({
+    ok: true,
+    browser: browserName,
+    devices: browserName === 'webkit'
+      ? ['iPhone WebKit portrait', 'iPhone WebKit landscape']
+      : ['iPhone emulation portrait', 'Android Chromium portrait', 'iPhone emulation landscape']
+  }, null, 2));
 }
 
 main().catch((error) => {

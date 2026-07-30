@@ -61,7 +61,8 @@ const checks = {
   realInputDrivePassed:
     playerDrive.ok === true &&
     playerDrive.evidence?.realInput === true &&
-    Number(playerDrive.wallClockSeconds) >= 60,
+    Number(playerDrive.wallClockSeconds) >= 600 &&
+    playerDrive.gpu?.softwareRenderer === false,
   worldMatrixAutomatedPassed: worldMatrix.automatedPass === true,
   screenshotsPresent: screenshots.length > 0,
   visualReviewApproved: visualReview.approved === true

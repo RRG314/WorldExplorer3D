@@ -15,6 +15,7 @@ const outputDir = path.join(
 const reportPath = path.join(outputDir, 'report.json');
 const requestedSeconds = Number(process.env.PLAYER_DRIVE_SECONDS || 60);
 const targetSeconds = Math.max(20, requestedSeconds);
+const headed = process.env.PLAYER_DRIVE_HEADED === '1';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -224,7 +225,7 @@ async function holdAndSampleUntil(
 
 await fs.mkdir(outputDir, { recursive: true });
 const server = await startPreviewServer();
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({ headless: !headed });
 const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
 const consoleErrors = [];
 page.on('pageerror', (error) => consoleErrors.push(String(error?.message || error)));
