@@ -38,7 +38,7 @@ function formatAcceleration(value) {
   return `time acceleration ×${value.toExponential(1)}`;
 }
 
-export function initSpaceFlightUI(attemptLanding) {
+export function initSpaceFlightUI(attemptLanding, lifecycleScope = null) {
   console.log("Initializing Space Flight UI...");
 
   appCtx.spaceFlight.velocity = new THREE.Vector3();
@@ -76,13 +76,16 @@ export function initSpaceFlightUI(attemptLanding) {
   document.body.appendChild(hud);
   appCtx.spaceFlight.hud = hud;
 
-  setupSpaceFlightControls(attemptLanding);
+  setupSpaceFlightControls(attemptLanding, lifecycleScope);
 }
 
-function setupSpaceFlightControls(attemptLanding) {
-  document.getElementById('sfLandBtn').addEventListener('click', attemptLanding);
+function setupSpaceFlightControls(attemptLanding, lifecycleScope = null) {
+  const listen = lifecycleScope?.listen?.bind(lifecycleScope) || ((target, eventName, listener, options) => {
+    target.addEventListener(eventName, listener, options);
+  });
+  listen(document.getElementById('sfLandBtn'), 'click', attemptLanding);
 
-  document.addEventListener('keydown', (e) => {
+  listen(document, 'keydown', (e) => {
     if (appCtx.spaceFlight.active) {
       appCtx.spaceFlight.keys[e.key.toLowerCase()] = true;
       if ([' ', 'shift', 'arrowup', 'arrowdown', 'arrowleft', 'arrowright'].includes(e.key.toLowerCase())) {
@@ -91,13 +94,13 @@ function setupSpaceFlightControls(attemptLanding) {
     }
   });
 
-  document.addEventListener('keyup', (e) => {
+  listen(document, 'keyup', (e) => {
     if (appCtx.spaceFlight.active) {
       appCtx.spaceFlight.keys[e.key.toLowerCase()] = false;
     }
   });
 
-  window.addEventListener('resize', () => {
+  listen(window, 'resize', () => {
     if (appCtx.spaceFlight.active && appCtx.spaceFlight.camera && appCtx.spaceFlight.renderer) {
       appCtx.spaceFlight.camera.aspect = window.innerWidth / window.innerHeight;
       appCtx.spaceFlight.camera.updateProjectionMatrix();

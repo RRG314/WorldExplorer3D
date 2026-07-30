@@ -27,6 +27,7 @@ function createWalkingRuntimeHelpers({
     }
 
     state.mode = "walk";
+    state.walker._resolvedGroundState = null;
     state.walker.lookYawOffset = 0;
     let appliedSafeWalkSpawn = options.preserveResolvedSpawn === true;
     if (!appliedSafeWalkSpawn && typeof appCtx.resolveSafeWorldSpawn === "function" && typeof appCtx.applyResolvedWorldSpawn === "function") {
@@ -86,6 +87,7 @@ function createWalkingRuntimeHelpers({
 
     const wasWalk = state.mode === "walk";
     state.mode = "drive";
+    state.walker._resolvedGroundState = null;
     let resolvedDriveSpawn = null;
     if (typeof appCtx.resolveSafeWorldSpawn === "function" && typeof appCtx.applyResolvedWorldSpawn === "function") {
       const targetX = wasWalk ? finiteOr(state.walker.x, car.x) : finiteOr(car.x, state.walker.x);

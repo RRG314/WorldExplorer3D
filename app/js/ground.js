@@ -53,6 +53,7 @@ const GroundHeight = {
   _roadRayStart: null,
   _roadRayDir: null,
   _walkFeatureCache: null,
+  _walkRoadCache: null,
   _roadSurfaceMeshes: null,
   _roadSurfaceMeshSource: null,
   _roadSurfaceMeshCount: 0,
@@ -269,7 +270,34 @@ const GroundHeight = {
     return nearest;
   },
 
-  walkSurfaceInfo(x, z, currentY = NaN) {
+  _nearestWalkRoad(x, z, currentY = NaN) {
+    const cachedRoad = this._walkRoadCache?.road || null;
+    if (cachedRoad) {
+      const projection = this._projectPointToFeature(cachedRoad, x, z);
+      const reuseRadius = Math.max(5, (Number(cachedRoad.width) || 7) * 0.5 + 2.5);
+      if (projection && projection.dist <= reuseRadius) {
+        return {
+          road: cachedRoad,
+          dist: projection.dist,
+          pt: projection.pt,
+          segIndex: projection.segIndex,
+          t: projection.t,
+          y: sampleFeatureSurfaceY(cachedRoad, projection.pt.x, projection.pt.z, projection),
+          verticalDelta: Number.isFinite(currentY)
+            ? Math.abs(sampleFeatureSurfaceY(cachedRoad, projection.pt.x, projection.pt.z, projection) - currentY)
+            : 0
+        };
+      }
+    }
+    const nearest = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z, {
+      y: Number.isFinite(currentY) ? currentY : NaN,
+      maxVerticalDelta: 14
+    }) : null;
+    this._walkRoadCache = nearest?.road ? { road: nearest.road } : null;
+    return nearest;
+  },
+
+  walkSurfaceInfo(x, z, currentY = NaN, options = {}) {
     const interiorSurface = typeof appCtx.sampleInteriorWalkSurface === 'function' ?
       appCtx.sampleInteriorWalkSurface(x, z) :
       null;
@@ -284,17 +312,11 @@ const GroundHeight = {
     }
 
     const terrainY = this.terrainY(x, z);
-    const nr = typeof appCtx.findNearestRoad === 'function' ? appCtx.findNearestRoad(x, z, {
-      y: Number.isFinite(currentY) ? currentY : NaN,
-      maxVerticalDelta: 14
-    }) : null;
+    const nr = this._nearestWalkRoad(x, z, currentY);
     const roadOnSurface = isRoadSurfaceReachable(nr, {
       currentRoad: appCtx.car?.road || null,
       extraLateralPadding: -0.1
     });
-    const urbanSurfaceY = this.urbanSurfaceMeshY(x, z);
-    const onUrbanSurface = Number.isFinite(urbanSurfaceY) && urbanSurfaceY > terrainY + 0.12;
-
     const linear = this._nearestLinearWalkFeature(x, z);
     const featureWidth = Number(linear?.feature?.width) || 0;
     const onLinear = !!(
@@ -335,20 +357,12 @@ const GroundHeight = {
       };
     }
 
-    if (onUrbanSurface) {
-      return {
-        y: urbanSurfaceY + 0.02,
-        source: 'urban_surface',
-        feature: null,
-        dist: 0,
-        pt: { x, z }
-      };
-    }
-
     if (roadOnSurface) {
       const sampleX = Number.isFinite(nr?.pt?.x) ? nr.pt.x : x;
       const sampleZ = Number.isFinite(nr?.pt?.z) ? nr.pt.z : z;
-      const meshY = this.roadMeshY(sampleX, sampleZ, currentY, nr);
+      const meshY = options.sampleRenderedMesh === false
+        ? Number(nr?.y)
+        : this.roadMeshY(sampleX, sampleZ, currentY, nr);
       const roadY =
         this._shouldUseRoadMeshHeight(nr?.road, meshY, nr?.y) ?
           this._resolveRoadSurfaceY(nr?.road, meshY, nr?.y) :
@@ -360,6 +374,20 @@ const GroundHeight = {
         feature: nr.road,
         dist: nr.dist,
         pt: nr.pt ? { x: nr.pt.x, z: nr.pt.z } : null
+      };
+    }
+
+    // Developed fill is below mapped pedestrian/transportation surfaces in
+    // the composition contract. Raycast it only after those authoritative
+    // candidates have been rejected.
+    const urbanSurfaceY = this.urbanSurfaceMeshY(x, z);
+    if (Number.isFinite(urbanSurfaceY) && urbanSurfaceY > terrainY + 0.12) {
+      return {
+        y: urbanSurfaceY + 0.02,
+        source: 'urban_surface',
+        feature: null,
+        dist: 0,
+        pt: { x, z }
       };
     }
 
@@ -503,6 +531,7 @@ const GroundHeight = {
   // -------------------------------------------------------------------------
   invalidate() {
     this._walkFeatureCache = null;
+    this._walkRoadCache = null;
     this._roadSurfaceMeshes = null;
     this._roadSurfaceMeshSource = null;
     this._roadSurfaceMeshCount = 0;

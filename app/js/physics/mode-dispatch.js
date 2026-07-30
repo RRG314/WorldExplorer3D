@@ -5,7 +5,10 @@ let controllerContext = null;
 
 function updateWalkController(appCtx, dt) {
   appCtx.Walk.update(dt);
+}
 
+function updateWalkAuxiliaries(appCtx, dt) {
+  appCtx.Walk.syncTerrain?.(false);
   appCtx.appendTrackPoint?.(appCtx.Walk.state.walker.x, appCtx.Walk.state.walker.z);
 
   appCtx.police.forEach((officer) => {
@@ -47,8 +50,6 @@ function createEarthTransportControllers(appCtx, options = {}) {
     isActive: () => !!appCtx.boatMode?.active,
     update(dt) {
       appCtx.updateBoatMode?.(dt);
-      appCtx.updateFishingGame?.(dt);
-      appCtx.updateMode?.(dt);
     }
   });
   registry.registerController({
@@ -57,8 +58,6 @@ function createEarthTransportControllers(appCtx, options = {}) {
     isActive: () => !!appCtx.planeMode?.active,
     update(dt) {
       updatePlane(dt);
-      appCtx.updateMode?.(dt);
-      appCtx.updateInteriorInteraction?.();
     }
   });
   registry.registerController({
@@ -67,11 +66,6 @@ function createEarthTransportControllers(appCtx, options = {}) {
     isActive: () => !!appCtx.droneMode,
     update(dt) {
       updateDrone(dt);
-      appCtx.updateMode?.(dt);
-      appCtx.updateInteriorInteraction?.();
-      if (!isPlanetarySurface() && !appCtx.worldLoading) {
-        appCtx.updateTerrainAround(appCtx.drone.x, appCtx.drone.z);
-      }
     }
   });
   registry.registerController({
@@ -95,7 +89,26 @@ function updateAlternateTravelMode(appCtx, dt, options = {}) {
   if (!appCtx.boatMode?.active && (appCtx.fishingGame?.open || appCtx.fishingGame?.active)) {
     appCtx.updateFishingGame?.(dt);
   }
-  return ensureControllerRegistry(appCtx, options).update(dt, { appCtx });
+  const registry = ensureControllerRegistry(appCtx, options);
+  const updated = registry.update(dt, { appCtx });
+  if (!updated) return false;
+  const activeId = registry.snapshot({ appCtx }).activeId;
+  if (activeId === 'walk') {
+    updateWalkAuxiliaries(appCtx, dt);
+  } else if (activeId === 'boat') {
+    appCtx.updateFishingGame?.(dt);
+    appCtx.updateMode?.(dt);
+  } else if (activeId === 'plane') {
+    appCtx.updateMode?.(dt);
+    appCtx.updateInteriorInteraction?.();
+  } else if (activeId === 'drone') {
+    appCtx.updateMode?.(dt);
+    appCtx.updateInteriorInteraction?.();
+    if (!options.isPlanetarySurface?.() && !appCtx.worldLoading) {
+      appCtx.updateTerrainAround(appCtx.drone.x, appCtx.drone.z);
+    }
+  }
+  return true;
 }
 
 function getEarthTransportControllerSnapshot(appCtx, options = {}) {

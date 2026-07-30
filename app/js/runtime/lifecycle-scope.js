@@ -1,4 +1,8 @@
+const activeScopes = new Map();
+let scopeSequence = 0;
+
 function createLifecycleScope(owner = 'runtime') {
+  const id = ++scopeSequence;
   const records = new Set();
   let active = true;
   let disposedReason = '';
@@ -84,6 +88,7 @@ function createLifecycleScope(owner = 'runtime') {
         console.warn(`[lifecycle:${owner}] ${record.type} cleanup failed`, error);
       }
     }
+    activeScopes.delete(id);
     return true;
   }
 
@@ -92,6 +97,7 @@ function createLifecycleScope(owner = 'runtime') {
     for (const record of records) counts[record.type] = (counts[record.type] || 0) + 1;
     return {
       owner,
+      id,
       active,
       disposedReason,
       resourceCount: records.size,
@@ -99,7 +105,7 @@ function createLifecycleScope(owner = 'runtime') {
     };
   }
 
-  return Object.freeze({
+  const scope = Object.freeze({
     animationFrame,
     defer,
     dispose,
@@ -111,6 +117,30 @@ function createLifecycleScope(owner = 'runtime') {
     snapshot,
     timeout
   });
+  activeScopes.set(id, scope);
+  return scope;
 }
 
-export { createLifecycleScope };
+function getLifecycleRegistrySnapshot() {
+  const scopes = [...activeScopes.values()].map((scope) => scope.snapshot());
+  const owners = {};
+  const resources = {};
+  for (const scope of scopes) {
+    const owner = owners[scope.owner] || { scopes: 0, resources: 0 };
+    owner.scopes += 1;
+    owner.resources += scope.resourceCount;
+    owners[scope.owner] = owner;
+    for (const [type, count] of Object.entries(scope.resources)) {
+      resources[type] = (resources[type] || 0) + count;
+    }
+  }
+  return {
+    activeScopeCount: scopes.length,
+    resourceCount: scopes.reduce((total, scope) => total + scope.resourceCount, 0),
+    owners,
+    resources,
+    scopes
+  };
+}
+
+export { createLifecycleScope, getLifecycleRegistrySnapshot };

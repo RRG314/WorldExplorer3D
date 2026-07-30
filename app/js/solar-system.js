@@ -344,6 +344,30 @@ function initSolarSystem(spaceScene) {
   }, spaceScene);
 }
 
+function resetSolarSystemRuntime() {
+  if (appCtx.spaceFlight?.canvas) {
+    appCtx.spaceFlight.canvas.removeEventListener('click', onSolarSystemClick);
+  }
+  Object.assign(solarSystem, {
+    group: null,
+    sunMesh: null,
+    planetMeshes: [],
+    moonMeshes: [],
+    orbitLines: [],
+    asteroidBelt: null,
+    kuiperBelt: null,
+    asteroidMeshes: [],
+    spacecraftMeshes: [],
+    galaxyMeshes: [],
+    orbitMarkers: [],
+    selectedPlanet: null,
+    raycaster: null,
+    mouse: null,
+    _earthVisualPos: null,
+    initialized: false
+  });
+}
+
 // ---------------------------------------------------------------------------
 // UPDATE MOON POSITIONS
 // ---------------------------------------------------------------------------
@@ -591,6 +615,7 @@ Object.assign(appCtx, {
   getMoonScenePosition,
   hideSolarSystemUI,
   initSolarSystem,
+  resetSolarSystemRuntime,
   setSolarSystemCenter,
   setSolarSystemFrameVisibility,
   showSolarSystemUI,
@@ -605,6 +630,7 @@ export {
   getMoonScenePosition,
   hideSolarSystemUI,
   initSolarSystem,
+  resetSolarSystemRuntime,
   setSolarSystemCenter,
   setSolarSystemFrameVisibility,
   showSolarSystemUI,

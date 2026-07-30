@@ -292,7 +292,7 @@ function createSurfaceQuery(appCtx, GroundHeight) {
   }
 
   function walkAt(x, z, options = {}) {
-    const info = GroundHeight.walkSurfaceInfo(x, z, options.currentY);
+    const info = GroundHeight.walkSurfaceInfo(x, z, options.currentY, options);
     const kind = surfaceKindFromWalkInfo(info);
     return createSurfaceSample({
       x,

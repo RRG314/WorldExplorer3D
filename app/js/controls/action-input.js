@@ -6,6 +6,11 @@ const inputState = {
   previousButtons: [],
   updatedAt: 0
 };
+const HELD_CONTROL_CODES = Object.freeze([
+  'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
+  'Space', 'ShiftLeft', 'ShiftRight', 'ControlLeft', 'ControlRight',
+  'KeyW', 'KeyA', 'KeyS', 'KeyD', 'KeyR', 'KeyX', 'KeyZ'
+]);
 
 function clamp(value, min = -1, max = 1) {
   return Math.max(min, Math.min(max, Number(value) || 0));
@@ -135,6 +140,17 @@ function updateControlInput() {
   return true;
 }
 
+function clearControlInputState(reason = 'runtime') {
+  const keys = appCtx.keys || {};
+  HELD_CONTROL_CODES.forEach((code) => {
+    keys[code] = false;
+  });
+  inputState.gamepad = null;
+  inputState.previousButtons = [];
+  inputState.updatedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
+  return String(reason || 'runtime');
+}
+
 function getControlInputSnapshot(mode = appCtx.getCurrentTravelMode?.() || 'drive') {
   return {
     device: inputState.gamepad ? 'gamepad' : 'keyboard_touch',
@@ -146,8 +162,9 @@ function getControlInputSnapshot(mode = appCtx.getCurrentTravelMode?.() || 'driv
 
 Object.assign(appCtx, {
   getControlInputSnapshot,
+  clearControlInputState,
   readControlActions,
   updateControlInput
 });
 
-export { getControlInputSnapshot, readControlActions, updateControlInput };
+export { clearControlInputState, getControlInputSnapshot, readControlActions, updateControlInput };

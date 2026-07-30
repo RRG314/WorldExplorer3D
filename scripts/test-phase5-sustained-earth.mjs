@@ -8,6 +8,7 @@ const rootDir = process.cwd();
 const outputDir = path.join(rootDir, 'output', 'playwright', 'phase5-sustained-earth');
 const reportPath = path.join(outputDir, 'report.json');
 let lastReport = null;
+const profileOnly = process.env.PHASE5_PROFILE_ONLY === '1';
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -20,7 +21,9 @@ async function main() {
     host: '127.0.0.1',
     candidatePorts: [4173, 4174, 4175, 4176, 4177]
   });
-  const browser = await chromium.launch({ headless: true });
+  const browser = await chromium.launch({
+    headless: process.env.PHASE5_HEADED !== '1'
+  });
   const page = await browser.newPage({ viewport: { width: 1440, height: 960 } });
   const consoleErrors = [];
   page.on('pageerror', (error) => consoleErrors.push(String(error?.message || error)));
@@ -50,7 +53,7 @@ async function main() {
     }, { timeout: 120000 });
 
     const simulationStartedAt = Date.now();
-    report = await page.evaluate(async () => {
+    report = await page.evaluate(async ({ profileOnly }) => {
       const deadline = performance.now() + 60000;
       let ctx = null;
       while (performance.now() < deadline) {
@@ -65,13 +68,18 @@ async function main() {
         await new Promise((resolve) => window.setTimeout(resolve, 200));
       }
       if (!ctx?.ENV?.EARTH) throw new Error('Earth runtime unavailable during sustained test bootstrap');
-      ctx.selLoc = 'baltimore';
+      ctx.customLoc = { lat: 39.2904, lon: -76.6122, name: 'Baltimore' };
+      ctx.customLocTransient = false;
+      ctx.selLoc = 'custom';
       ctx.gameMode = 'free';
+      ctx.loadingScreenMode = 'earth';
       ctx.gameStarted = true;
       ctx.paused = false;
       ctx.switchEnv(ctx.ENV.EARTH);
       document.getElementById('titleScreen')?.classList.add('hidden');
       await ctx.loadRoads();
+      ctx.phase5WalkProfileEnabled = profileOnly;
+      ctx.phase5WalkProfile = null;
 
       const roadLength = (road) => {
         let distance = 0;
@@ -123,35 +131,54 @@ async function main() {
       function chooseRoute(minimumDistance) {
         const direct = roadCandidates.find((candidate) => candidate.length >= minimumDistance);
         if (direct) return { points: direct.points, distance: direct.length, source: 'bounded-single-road' };
-        const start = roadCandidates[0]?.points?.[0];
-        if (!start) return null;
-        const endpointCandidates = roadCandidates
-          .flatMap((candidate) => [candidate.points[0], candidate.points[candidate.points.length - 1]])
-          .sort((a, b) =>
-            Math.hypot(b.x - start.x, b.z - start.z) -
-            Math.hypot(a.x - start.x, a.z - start.z)
-          )
-          .slice(0, 24);
+        const driveGraph = ctx.traversalNetworks?.drive;
+        const graphNodes = (driveGraph?.nodes || [])
+          .map((point, index) => ({
+            ...point,
+            nodeId: index,
+            degree: driveGraph.adjacency?.[index]?.length || 0
+          }))
+          .filter((point) => point.degree > 0 && Math.hypot(point.x, point.z) <= routeRadius);
+        const startCandidates = [...graphNodes]
+          .sort((left, right) => right.degree - left.degree)
+          .slice(0, 48);
+        if (!startCandidates.length) return null;
         let best = null;
-        for (const endpoint of endpointCandidates) {
-          const route = ctx.findTraversalRoute?.(start.x, start.z, endpoint.x, endpoint.z, {
-            mode: 'drive',
-            maxAnchorDistance: 80
-          });
-          const staysInsideBoundary = route?.points?.every((point) =>
-            Math.hypot(point.x, point.z) <= routeRadius
-          );
-          if (
-            route?.points?.length >= 2 &&
-            staysInsideBoundary &&
-            Number(route.distance) > Number(best?.distance || 0)
-          ) {
+        for (const start of startCandidates.slice(0, 16)) {
+          const parent = new Int32Array(driveGraph.nodes.length);
+          parent.fill(-1);
+          const distance = new Float64Array(driveGraph.nodes.length);
+          distance.fill(-1);
+          const stack = [start.nodeId];
+          distance[start.nodeId] = 0;
+          let farthestId = start.nodeId;
+          while (stack.length > 0) {
+            const nodeId = stack.pop();
+            for (const edge of driveGraph.adjacency[nodeId] || []) {
+              if (distance[edge.to] >= 0) continue;
+              const point = driveGraph.nodes[edge.to];
+              if (!point || Math.hypot(point.x, point.z) > routeRadius) continue;
+              parent[edge.to] = nodeId;
+              distance[edge.to] = distance[nodeId] + Number(edge.weight || 0);
+              if (distance[edge.to] > distance[farthestId]) farthestId = edge.to;
+              stack.push(edge.to);
+            }
+          }
+          const nodeIds = [];
+          for (let cursor = farthestId; cursor >= 0; cursor = parent[cursor]) {
+            nodeIds.push(cursor);
+            if (cursor === start.nodeId) break;
+          }
+          nodeIds.reverse();
+          const points = sanitizeRoutePoints(nodeIds.map((nodeId) => driveGraph.nodes[nodeId]));
+          if (points.length >= 2 && distance[farthestId] > Number(best?.distance || 0)) {
             best = {
-              points: sanitizeRoutePoints(route.points),
-              distance: Number(route.distance),
-              source: 'drive-graph'
+              points,
+              distance: Number(distance[farthestId]),
+              source: 'compiled-drive-graph'
             };
           }
+          if (Number(best?.distance || 0) >= minimumDistance) return best;
         }
         return best;
       }
@@ -372,11 +399,18 @@ async function main() {
 
       const walkRoute = chooseRoute(650);
       const driveRoute = chooseRoute(2400);
-      if (!walkRoute || !driveRoute) throw new Error('Unable to resolve sustained Baltimore routes');
-      const walk = runRoadJourney('walk', walkRoute, 7200);
-      const drive = runRoadJourney('drive', driveRoute, 7200);
-      const drone = runDroneJourney(7200);
-      const plane = runPlaneJourney(3600);
+      if (!walkRoute || !driveRoute) {
+        throw new Error(`Unable to resolve sustained Baltimore routes (${JSON.stringify({
+          roads: ctx.roads?.length || 0,
+          roadCandidates: roadCandidates.length,
+          traversal: ctx.traversalNetworks?.drive?.segmentCount || 0,
+          acceptedGround: ctx.getAcceptedGroundDiagnostics?.() || null
+        })})`);
+      }
+      const walk = runRoadJourney('walk', walkRoute, profileOnly ? 360 : 7200);
+      const drive = runRoadJourney('drive', driveRoute, profileOnly ? 360 : 7200);
+      const drone = runDroneJourney(profileOnly ? 360 : 7200);
+      const plane = runPlaneJourney(profileOnly ? 360 : 3600);
       return {
         generatedAt: new Date().toISOString(),
         location: 'Baltimore',
@@ -390,10 +424,12 @@ async function main() {
         drive,
         drone,
         plane,
+        controllers: ctx.getEarthTransportControllerSnapshot?.() || null,
+        walkProfile: ctx.phase5WalkProfile || null,
         runtime: ctx.getRuntimeKernelSnapshot?.() || null,
         interpolation: ctx.getRenderInterpolationSnapshot?.() || null
       };
-    });
+    }, { profileOnly });
     report.evidence = classifyEvidence({
       kind: 'synthetic-direct-state',
       realInput: false,
@@ -406,6 +442,10 @@ async function main() {
     report.consoleErrors = consoleErrors;
     await page.screenshot({ path: path.join(outputDir, 'final.png') });
     await fs.writeFile(reportPath, JSON.stringify(report, null, 2));
+    if (profileOnly) {
+      console.log(JSON.stringify({ ok: true, profileOnly: true, ...report }, null, 2));
+      return;
+    }
 
     assert(report.walk.simulatedSeconds >= 120, 'walking duration below 120 seconds');
     assert(report.walk.pathDistance >= 500, `walking path too short: ${report.walk.pathDistance} m`);
@@ -443,6 +483,14 @@ async function main() {
     assert(report.plane.maximumAbsoluteRoll >= 0.08, 'plane did not bank');
     assert(report.plane.cameraChanged, 'plane camera did not change');
     assert(report.plane.exitedCleanly, 'plane did not exit cleanly to the ground traveler');
+    for (const controller of report.controllers?.controllers || []) {
+      if (controller.updates > 0) {
+        assert(
+          controller.updateDurationP95Ms <= 0.5,
+          `${controller.id} controller p95 ${controller.updateDurationP95Ms} ms exceeded 0.5 ms`
+        );
+      }
+    }
     assert(report.world.publication?.stable === true, 'world publication changed during sustained travel');
     assert(consoleErrors.length === 0, `console errors: ${consoleErrors.join('; ')}`);
 

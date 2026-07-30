@@ -12,7 +12,7 @@ function assert(condition, message) {
 }
 
 function isTransientNetworkError(message = '') {
-  return /net::ERR_(ABORTED|HTTP2_PROTOCOL_ERROR)|Failed to load resource:.*\b(429|500|502|503|504)\b/i.test(message);
+  return /net::ERR_(ABORTED|CONNECTION_REFUSED|HTTP2_PROTOCOL_ERROR)|Failed to load resource:.*\b(429|500|502|503|504)\b/i.test(message);
 }
 
 async function waitForRuntime(page) {
@@ -118,7 +118,7 @@ async function waitForHubExit(page, mode) {
 async function runModeCycles(page, mode, lifecycleEvents) {
   const destination = mode === 'space' ? '#globeSelectorSpaceBtn' : '#globeSelectorOceanBtn';
   const cycles = [];
-  for (let cycle = 1; cycle <= 3; cycle++) {
+  for (let cycle = 1; cycle <= 10; cycle++) {
     const beforeLaunch = await readLifecycleState(page, mode);
     const previousSpaceSessionId = Number(beforeLaunch.coordinator.environments.SPACE_FLIGHT?.sessionId || 0);
     await page.click(destination);
@@ -126,7 +126,7 @@ async function runModeCycles(page, mode, lifecycleEvents) {
     const observed = await readLifecycleState(page, mode);
     await page.waitForTimeout(1200);
     const active = await readLifecycleState(page, mode);
-    if (cycle === 1 || cycle === 3) {
+    if (cycle === 1 || cycle === 10) {
       await page.screenshot({ path: path.join(outputDir, `${mode}-cycle-${cycle}.png`), fullPage: false });
     }
 
@@ -140,7 +140,7 @@ async function runModeCycles(page, mode, lifecycleEvents) {
 
 function assertPlateau(mode, cycles) {
   const second = cycles[1];
-  const third = cycles[2];
+  const finalCycle = cycles.at(-1);
   const adapterKey = mode === 'space' ? 'SPACE_FLIGHT' : 'OCEAN';
   for (const [index, cycle] of cycles.entries()) {
     const activeAdapter = cycle.active.coordinator.environments[adapterKey];
@@ -149,18 +149,27 @@ function assertPlateau(mode, cycles) {
     assert(!exitedAdapter.active && !exitedAdapter.animationActive, `${mode} cycle ${index + 1} left its render loop active`);
     assert(cycle.exited.coordinator.transition === null, `${mode} cycle ${index + 1} left a transition token active`);
     assert(cycle.exited.canvases[mode] === 1, `${mode} cycle ${index + 1} duplicated its canvas`);
-    if (mode === 'ocean') {
-      assert(!exitedAdapter.rendererReady && !exitedAdapter.sceneReady, `ocean cycle ${index + 1} retained renderer resources`);
-    }
+    assert(!exitedAdapter.rendererReady, `${mode} cycle ${index + 1} retained renderer resources`);
+    if (mode === 'ocean') assert(!exitedAdapter.sceneReady, `ocean cycle ${index + 1} retained scene resources`);
+    const expectedSessionOwner = mode === 'space' ? 'space-flight-session' : 'ocean-session';
+    assert(cycle.active.coordinator.lifecycle.owners[expectedSessionOwner]?.scopes === 1, `${mode} cycle ${index + 1} did not have one session owner`);
+    assert(cycle.active.coordinator.lifecycle.resources.renderer === 1, `${mode} cycle ${index + 1} did not lease one renderer`);
+    assert(cycle.active.coordinator.lifecycle.resources['animation-frame'] === 1, `${mode} cycle ${index + 1} did not lease one RAF`);
+    assert(!cycle.exited.coordinator.lifecycle.owners[expectedSessionOwner], `${mode} cycle ${index + 1} retained its session owner`);
+    assert(!cycle.exited.coordinator.lifecycle.resources.renderer, `${mode} cycle ${index + 1} retained a renderer lease`);
+    assert(!cycle.exited.coordinator.lifecycle.resources['animation-frame'], `${mode} cycle ${index + 1} retained a RAF lease`);
   }
-  assert(third.active.scene.objects === second.active.scene.objects, `${mode} scene object count changed after warm-up`);
-  assert(third.active.scene.geometries === second.active.scene.geometries, `${mode} scene geometry count changed after warm-up`);
-  assert(third.active.scene.materials === second.active.scene.materials, `${mode} scene material count changed after warm-up`);
-  assert(third.active.scene.textures === second.active.scene.textures, `${mode} scene texture count changed after warm-up`);
-  if (mode === 'space') {
-    assert(third.active.scene.resourceSignature === second.active.scene.resourceSignature, 'space persistent scene resources were replaced after warm-up');
-  }
-  assert(third.exited.canvases.total === second.exited.canvases.total, `${mode} DOM canvas count grew after warm-up`);
+  assert(finalCycle.active.scene.objects === second.active.scene.objects, `${mode} scene object count changed after warm-up`);
+  assert(finalCycle.active.scene.geometries === second.active.scene.geometries, `${mode} scene geometry count changed after warm-up`);
+  assert(finalCycle.active.scene.materials === second.active.scene.materials, `${mode} scene material count changed after warm-up`);
+  assert(finalCycle.active.scene.textures === second.active.scene.textures, `${mode} scene texture count changed after warm-up`);
+  assert(finalCycle.exited.canvases.total === second.exited.canvases.total, `${mode} DOM canvas count grew after warm-up`);
+  assert(finalCycle.exited.coordinator.lifecycle.activeScopeCount === second.exited.coordinator.lifecycle.activeScopeCount, `${mode} lifecycle owner count grew after warm-up`);
+  assert(finalCycle.exited.coordinator.lifecycle.resourceCount === second.exited.coordinator.lifecycle.resourceCount, `${mode} lifecycle resource count grew after warm-up`);
+  assert(
+    JSON.stringify(finalCycle.exited.coordinator.lifecycle.resources) === JSON.stringify(second.exited.coordinator.lifecycle.resources),
+    `${mode} lifecycle resource types changed after warm-up`
+  );
 }
 
 await mkdirp(outputDir);

@@ -386,6 +386,14 @@ async function diagnoseCameraRay(page) {
       distance + 1
     );
     return raycaster.intersectObjects(ctx.scene.children, true)
+      .filter((hit) => {
+        let owner = hit.object;
+        while (owner) {
+          if (owner.visible === false) return false;
+          owner = owner.parent;
+        }
+        return true;
+      })
       .slice(0, 12)
       .map((hit) => {
         const ancestors = [];

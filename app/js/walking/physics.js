@@ -46,7 +46,22 @@ function createWalkingPhysicsHelpers({
   function queryBuildings(x, z, radius = 100) {
     if (typeof getNearbyBuildings === "function") {
       const nearby = getNearbyBuildings(x, z, radius);
-      if (Array.isArray(nearby)) return nearby;
+      if (Array.isArray(nearby)) {
+        return nearby.filter((building) => {
+          if (
+            !Number.isFinite(building?.minX) ||
+            !Number.isFinite(building?.maxX) ||
+            !Number.isFinite(building?.minZ) ||
+            !Number.isFinite(building?.maxZ)
+          ) return true;
+          return !(
+            x < building.minX - radius ||
+            x > building.maxX + radius ||
+            z < building.minZ - radius ||
+            z > building.maxZ + radius
+          );
+        });
+      }
     }
     if (!getBuildingsArray) return null;
     return getBuildingsArray();
@@ -177,7 +192,10 @@ function createWalkingPhysicsHelpers({
   }
 
   function updateWalkPhysics(dt, finiteOr) {
-    syncWalkTerrain(false);
+    const profileEnabled = appCtx.phase5WalkProfileEnabled === true;
+    const profileStartedAt = profileEnabled ? performance.now() : 0;
+    let profileAfterCollision = profileStartedAt;
+    let profileAfterFinalSurface = profileStartedAt;
     const startX = finiteOr(state.walker.x, 0);
     const startZ = finiteOr(state.walker.z, 0);
     const actions = appCtx.readControlActions?.('walk') || {};
@@ -196,7 +214,9 @@ function createWalkingPhysicsHelpers({
     const gravity = appCtx.onMoon ? -1.62 : appCtx.onMars ? -3.71 : -9.80665;
     const jumpVelocity = appCtx.onMoon ? 3.0 : appCtx.onMars ? 4.0 : 5.0;
 
-    const groundState = resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y, finiteOr);
+    const groundState = state.walker._resolvedGroundState ||
+      resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y, finiteOr);
+    const profileAfterInitialSurface = profileEnabled ? performance.now() : 0;
     let groundY = groundState.groundY;
     if (state.walker.y === undefined || state.walker.y === 0) {
       state.walker.y = groundY + CFG.eyeHeight;
@@ -316,11 +336,14 @@ function createWalkingPhysicsHelpers({
           }
         }
       }
+      profileAfterCollision = profileEnabled ? performance.now() : 0;
 
       state.walker.x = newX;
       state.walker.z = newZ;
 
       const postGroundState = resolveWalkGroundState(state.walker.x, state.walker.z, state.walker.y, finiteOr);
+      state.walker._resolvedGroundState = postGroundState;
+      profileAfterFinalSurface = profileEnabled ? performance.now() : 0;
       finalGroundState = postGroundState;
       const targetEyeY = postGroundState.effectiveGroundY + CFG.eyeHeight;
       const snapDownDistance = Math.max(0.3, adjustedSpeed * dt * 0.95 + 0.22);
@@ -357,7 +380,23 @@ function createWalkingPhysicsHelpers({
       animateCharacterWalk(state.characterMesh, state.walker.speedMph > 0, dt);
     }
 
-    syncWalkTerrain(false);
+    if (profileEnabled) {
+      const profile = appCtx.phase5WalkProfile || {
+        samples: 0,
+        initialSurfaceMs: 0,
+        collisionMs: 0,
+        finalSurfaceMs: 0,
+        presentationMs: 0
+      };
+      const now = performance.now();
+      profile.samples += 1;
+      profile.initialSurfaceMs += profileAfterInitialSurface - profileStartedAt;
+      profile.collisionMs += Math.max(0, profileAfterCollision - profileAfterInitialSurface);
+      profile.finalSurfaceMs += Math.max(0, profileAfterFinalSurface - profileAfterCollision);
+      profile.presentationMs += Math.max(0, now - profileAfterFinalSurface);
+      appCtx.phase5WalkProfile = profile;
+    }
+
   }
 
   return {

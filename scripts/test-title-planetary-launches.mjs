@@ -284,16 +284,16 @@ async function runScenario(browser, baseUrl, scenario) {
       await waitForExpectedState(page, spaceScenario);
       const repeatedSpace = await requireStableExpectedState(page, spaceScenario);
       assertCompleteSpaceCatalog(repeatedSpace, 'Repeated Space launch');
-      const reuse = await page.evaluate(async () => {
+      const replacement = await page.evaluate(async () => {
         const { ctx } = await import('/app/js/shared-context.js?v=55');
         return {
           renderer: ctx.spaceFlight?.renderer === globalThis.__titlePlanetarySpaceRenderer,
           scene: ctx.spaceFlight?.scene === globalThis.__titlePlanetarySpaceScene
         };
       });
-      assert(reuse.renderer, 'Repeated Space launch recreated the renderer');
-      assert(reuse.scene, 'Repeated Space launch discarded the complete space scene');
-      repeatedSpace.reuse = reuse;
+      assert(!replacement.renderer, 'Repeated Space launch retained the exited renderer');
+      assert(!replacement.scene, 'Repeated Space launch retained the exited scene');
+      repeatedSpace.replacement = replacement;
       spaceAfterMars.repeatedSpace = repeatedSpace;
       marsAfterMoon.spaceAfterMars = spaceAfterMars;
       earthReturn.marsAfterMoon = marsAfterMoon;

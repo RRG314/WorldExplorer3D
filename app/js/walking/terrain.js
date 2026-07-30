@@ -65,7 +65,10 @@ function createWalkingTerrainHelpers({ car, state, CFG }) {
 
     if (appCtx.SurfaceQuery) {
       const walkerFeetY = Number.isFinite(state.walker?.y) ? state.walker.y - CFG.eyeHeight : NaN;
-      const surfaceY = appCtx.SurfaceQuery.walkAt(x, z, { currentY: walkerFeetY }).position.y;
+      const surfaceY = appCtx.SurfaceQuery.walkAt(x, z, {
+        currentY: walkerFeetY,
+        sampleRenderedMesh: false
+      }).position.y;
       if (Number.isFinite(surfaceY)) return surfaceY;
     }
     return finiteOr(fallbackY, 0);

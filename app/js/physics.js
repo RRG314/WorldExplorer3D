@@ -583,7 +583,7 @@ function update(dt) {
       if (Number.isFinite(buildSurfaceY)) surfaceY = Math.max(surfaceY, buildSurfaceY);
     }
 
-    const targetY = surfaceY + 1.2;
+    const targetY = surfaceY + 1.21;
     const speedAbs = Math.abs(appCtx.car.speed || 0);
     if (appCtx.car.y === undefined || appCtx.car.y === 0) {
       carY = targetY;
@@ -600,8 +600,8 @@ function update(dt) {
     }
     // Suspension smoothing may ease a downward change, but it must never lag
     // behind a rising selected surface far enough to bury the chassis.
-    if (Number.isFinite(targetY) && carY < targetY - 0.04) {
-      carY = targetY - 0.04;
+    if (Number.isFinite(targetY) && carY < targetY) {
+      carY = targetY;
     }
     appCtx.car.y = carY;
     appCtx.car.vy = 0;

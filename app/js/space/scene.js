@@ -1,7 +1,8 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import {
   createAuxiliaryRenderer,
-  disposeThreeObjectTree
+  disposeThreeObjectTree,
+  disposeThreeRenderer
 } from "../engine/webgl-lifecycle.js?v=1";
 import { SPACE_CONSTANTS } from "./constants.js?v=1";
 import { PLANETARY_BODIES, configureColorTexture } from "../planetary/catalog.js?v=1";
@@ -325,12 +326,13 @@ export function resetSpaceFlightForMars() {
 }
 
 export function destroySpaceFlightScene() {
+  appCtx.resetSolarSystemRuntime?.();
   if (appCtx.spaceFlight.scene) {
     disposeThreeObjectTree(appCtx.spaceFlight.scene);
   }
-  appCtx.spaceFlight.renderer?.renderLists?.dispose?.();
   appCtx.spaceFlight.renderer?.info?.reset?.();
   appCtx.spaceFlight.renderer?.clear?.();
+  appCtx.spaceFlight.renderer = disposeThreeRenderer(appCtx.spaceFlight.renderer);
   appCtx.spaceFlight.scene = null;
   appCtx.spaceFlight.camera = null;
   appCtx.spaceFlight.rocket = null;

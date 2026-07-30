@@ -131,6 +131,23 @@ function emitTravelModeEvent(mode, source = 'runtime') {
   }
 }
 
+function clearControllerLocalState(targetMode) {
+  appCtx.clearControlInputState?.('travel-mode-transition');
+  if (targetMode === 'drive' && appCtx.car) {
+    appCtx.car.steerSm = 0;
+    appCtx.car.throttleSm = 0;
+    appCtx.car.yawRate = 0;
+    appCtx.car.vLat = 0;
+    appCtx.car.rearSlip = 0;
+    appCtx.car.isDrifting = false;
+    appCtx.car._driftHoldTimer = 0;
+  }
+  if (targetMode !== 'drone' && appCtx.drone) {
+    appCtx.drone.roll = 0;
+    appCtx.drone.cameraYawOffset = 0;
+  }
+}
+
 let pendingModeLodRefresh = null;
 let pendingModeStreamingRefresh = null;
 
@@ -157,6 +174,7 @@ function scheduleModeWorldRefresh(mode) {
 function setTravelMode(mode, options = {}) {
   const targetMode = mode === 'walk' || mode === 'drone' || mode === 'boat' || mode === 'plane' ? mode : 'drive';
   const currentMode = getCurrentTravelMode();
+  if (targetMode !== currentMode) clearControllerLocalState(targetMode);
 
   if (targetMode === 'boat' && appCtx.oceanMode?.active && typeof appCtx.transferSubmarineToBoat === 'function') {
     void appCtx.transferSubmarineToBoat({

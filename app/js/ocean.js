@@ -24,6 +24,7 @@ import {
   exitCurrentEnvironmentSync,
   registerEnvironmentLifecycle
 } from './session-coordinator.js?v=2';
+import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 
 const OCEAN_SITE = Object.freeze({
   name: 'Coral Shelf Reserve',
@@ -98,6 +99,8 @@ Object.assign(oceanMode, {
   }
 });
 appCtx.oceanMode = oceanMode;
+const oceanModuleScope = createLifecycleScope('ocean-module');
+let oceanSessionScope = null;
 
 const _tmpVecA = new THREE.Vector3();
 const _tmpVecB = new THREE.Vector3();
@@ -487,7 +490,7 @@ function updateSubmarine(dt) {
 
 function animateOceanMode(nowMs = 0) {
   if (!oceanMode.active) return;
-  oceanMode.animationId = requestAnimationFrame(animateOceanMode);
+  oceanMode.animationId = oceanSessionScope?.animationFrame(animateOceanMode) ?? null;
 
   if (!oceanMode.lastFrameMs) oceanMode.lastFrameMs = nowMs;
   const dt = Math.min(0.05, Math.max(0.001, (nowMs - oceanMode.lastFrameMs) / 1000));
@@ -518,11 +521,14 @@ function startOceanMode(options = {}) {
   try {
     if (appCtx.ENV?.OCEAN) exitCurrentEnvironmentSync(appCtx.ENV.OCEAN, { source: 'ocean_start' });
     if (appCtx.ENV?.OCEAN) commitEnvironment(appCtx.ENV.OCEAN, { source: 'ocean_start' });
+    oceanSessionScope?.dispose('ocean-session-replaced');
+    oceanSessionScope = createLifecycleScope('ocean-session');
 
     if (options.launchSite) {
       resetOceanLaunchSite(options.launchSite);
     }
     if (!oceanMode.scene || !oceanMode.renderer || !oceanMode.camera) createOceanScene();
+    oceanSessionScope.defer(() => destroyOceanScene(), 'renderer');
     resetSubmarineAtLaunch(options.submarinePose || null);
     rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
 
@@ -533,7 +539,7 @@ function startOceanMode(options = {}) {
     oceanMode.active = true;
     oceanMode.lastFrameMs = 0;
     oceanMode.weatherRefreshTimer = 0;
-    oceanMode.animationId = requestAnimationFrame(animateOceanMode);
+    oceanMode.animationId = oceanSessionScope.animationFrame(animateOceanMode);
     if (typeof appCtx.refreshAstronomicalSky === 'function') {
       appCtx.refreshAstronomicalSky(true);
     }
@@ -545,20 +551,22 @@ function startOceanMode(options = {}) {
     if (typeof appCtx.refreshBoatAvailability === 'function') appCtx.refreshBoatAvailability(true);
     updateOceanHud(performance.now() * 0.001);
 
-    primeLocalBathymetryGrid().then((ready) => {
+    primeLocalBathymetryGrid().then(oceanSessionScope.guard((ready) => {
       if (!ready || !oceanMode.scene) return;
       rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
-    });
+    }));
 
-    primeBathymetryTiles().then((ready) => {
+    primeBathymetryTiles().then(oceanSessionScope.guard((ready) => {
       if (!ready || !oceanMode.scene) return;
       rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
-    });
+    }));
 
     return true;
   } catch (error) {
     console.error('[OceanMode] start failed', error);
     oceanMode.active = false;
+    oceanSessionScope?.dispose('ocean-start-failed');
+    oceanSessionScope = null;
     if (oceanMode.animationId) {
       cancelAnimationFrame(oceanMode.animationId);
       oceanMode.animationId = null;
@@ -575,6 +583,8 @@ function startOceanMode(options = {}) {
 function stopOceanMode(options = {}) {
   const wasActive = !!oceanMode.active;
   oceanMode.active = false;
+  oceanSessionScope?.dispose('ocean-exit');
+  oceanSessionScope = null;
   if (oceanMode.animationId) {
     cancelAnimationFrame(oceanMode.animationId);
     oceanMode.animationId = null;
@@ -605,7 +615,7 @@ function stopOceanMode(options = {}) {
   }
   if (typeof appCtx.updateControlsModeUI === 'function') appCtx.updateControlsModeUI();
   if (typeof appCtx.refreshBoatAvailability === 'function') appCtx.refreshBoatAvailability(true);
-  destroyOceanScene();
+  if (oceanMode.scene || oceanMode.renderer) destroyOceanScene();
   return wasActive;
 }
 
@@ -617,7 +627,8 @@ registerEnvironmentLifecycle(appCtx.ENV.OCEAN, {
     bathymetryReady: !!oceanMode.bathymetryReady,
     localBathymetryReady: !!oceanMode.localBathymetryReady,
     rendererReady: !!oceanMode.renderer,
-    sceneReady: !!oceanMode.scene
+    sceneReady: !!oceanMode.scene,
+    scope: oceanSessionScope?.snapshot() || null
   })
 });
 
@@ -640,7 +651,7 @@ function initOceanModeUI() {
   const legacyHud = document.getElementById('oceanModeHUD');
   if (legacyHud && legacyHud.parentElement) legacyHud.parentElement.removeChild(legacyHud);
 
-  window.addEventListener('resize', () => {
+  oceanModuleScope.listen(window, 'resize', () => {
     if (!oceanMode.renderer || !oceanMode.camera) return;
     oceanMode.camera.aspect = window.innerWidth / window.innerHeight;
     oceanMode.camera.updateProjectionMatrix();
@@ -683,7 +694,7 @@ if (typeof globalThis !== 'undefined') {
 }
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initOceanModeUI);
+  oceanModuleScope.listen(document, 'DOMContentLoaded', initOceanModeUI, { once: true });
 } else {
   initOceanModeUI();
 }

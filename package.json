@@ -6,7 +6,7 @@
   "main": "three.js",
   "scripts": {
     "dev": "node scripts/serve-local-preview.mjs",
-    "test": "npm run test:terrain-source && npm run test:ground-provider && npm run test:ground-artifact && npm run test:ground-artifact-builder && npm run test:copernicus-ground && npm run test:ground-datum && npm run test:accepted-ground-catalog && npm run test:accepted-ground-runtime && npm run test:accepted-ground-artifacts && npm run test:phase1-worldwide-ground && npm run test:phase3-ground-fixtures && npm run test:accepted-ground-selection && npm run test:accepted-ground-activation && npm run test:ground-authority-consumers && npm run test:district-compiler && npm run test:phase3-ownership && npm run test:phase2-transport && npm run test:phase3-structures && npm run test:phase4-provenance && npm run test:transport-surface && npm run test:phase5-production && npm run test:rules && npm run test:runtime && npm run test:osm-smoke",
+    "test": "npm run test:terrain-source && npm run test:ground-provider && npm run test:ground-artifact && npm run test:ground-artifact-builder && npm run test:copernicus-ground && npm run test:ground-datum && npm run test:accepted-ground-catalog && npm run test:accepted-ground-runtime && npm run test:accepted-ground-artifacts && npm run test:phase1-worldwide-ground && npm run test:phase3-ground-fixtures && npm run test:accepted-ground-selection && npm run test:accepted-ground-activation && npm run test:ground-authority-consumers && npm run test:district-compiler && npm run test:phase3-ownership && npm run test:phase2-transport && npm run test:phase3-structures && npm run test:phase4-provenance && npm run test:transport-surface && npm run test:phase5-controls && npm run test:phase5-production && npm run test:rules && npm run test:runtime && npm run test:osm-smoke",
     "test:rules": "node scripts/test-rules.mjs",
     "test:css": "node scripts/test-css-integrity.mjs",
     "test:inferred-buildings": "node scripts/test-inferred-building-coverage.mjs",
@@ -72,6 +72,7 @@
     "test:transport-surface": "node scripts/test-transport-surface-contract.mjs",
     "test:tunnel-system": "node scripts/test-tunnel-system-model.mjs",
     "test:phase5-production": "node scripts/test-phase5-production-contract.mjs",
+    "test:phase5-controls": "node scripts/test-phase5-controller-contract.mjs",
     "test:phase5-aerial-transition": "node scripts/test-phase5-aerial-transition.mjs",
     "diag:phase5-sustained": "node scripts/test-phase5-sustained-earth.mjs",
     "diag:minimap-sustained-drive": "node scripts/test-minimap-sustained-drive.mjs",

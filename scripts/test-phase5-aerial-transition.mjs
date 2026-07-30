@@ -39,9 +39,9 @@ try {
     ctx.gameStarted = true;
     ctx.paused = false;
     ctx.switchEnv(ctx.ENV.EARTH);
-    ctx.customLoc = { lat: 23.4162, lon: 25.6628, name: 'Sahara transition probe' };
+    ctx.customLoc = null;
     ctx.customLocTransient = false;
-    ctx.selLoc = 'custom';
+    ctx.selLoc = 'baltimore';
     document.getElementById('titleScreen')?.classList.add('hidden');
     await ctx.loadRoads();
 

@@ -28,14 +28,20 @@ try {
     waitUntil: 'domcontentloaded',
     timeout: 120000
   });
-  await page.waitForFunction(async () => {
-    const { ctx } = await import('/app/js/shared-context.js?v=55');
-    return typeof ctx?.startSpaceFlightToMoon === 'function';
-  }, { timeout: 120000 });
+  await page.evaluate(async () => {
+    const deadline = performance.now() + 120000;
+    while (performance.now() < deadline) {
+      const { ctx } = await import('/app/js/shared-context.js?v=55');
+      if (typeof ctx?.startSpaceFlightToMoon === 'function') return;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    throw new Error('Space runtime initialization timed out.');
+  });
 
   const report = await page.evaluate(async () => {
     const { ctx } = await import('/app/js/shared-context.js?v=55');
     const runtime = await import('/app/js/space/runtime.js?v=9');
+    if (!ctx.getEnv?.()) ctx.commitEnvironment?.(ctx.ENV.EARTH, { source: 'space-control-test' });
     if (!ctx.startSpaceFlightToMoon()) throw new Error('Space flight did not start');
     await new Promise((resolve) => setTimeout(resolve, 800));
 

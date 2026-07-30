@@ -2,10 +2,10 @@ import { ctx as appCtx } from "./shared-context.js?v=55";
 import { getPrimaryWorldCanvas } from "./engine/webgl-lifecycle.js?v=1";
 import { captureEarthWorldSession } from "./earth-session.js?v=17";
 import { suspendEarthModesForPlanetaryEntry } from "./planetary/entry.js?v=9";
-import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=9";
-import { createSpaceFlightScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=15";
+import { animateSpaceFlight as animateSpaceFlightRuntime, attemptLanding as attemptLandingRuntime, configureSpaceRuntimeDependencies, forceSpaceFlightLanding as forceSpaceFlightLandingRuntime, setSpaceFlightLandingTarget as setSpaceFlightLandingTargetRuntime } from "./space/runtime.js?v=10";
+import { createSpaceFlightScene, destroySpaceFlightScene, resetSpaceFlightForEarth, resetSpaceFlightForMars, resetSpaceFlightForMoon } from "./space/scene.js?v=16";
 import { hideGameUI, initSpaceFlightUI, showFlightMessage, showGameUI, updateSpaceFlightHUD } from "./space/ui.js?v=4";
-import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=1';
+import { createLifecycleScope } from './runtime/lifecycle-scope.js?v=2';
 import {
   beginEnvironmentTransition,
   commitEnvironment,
@@ -50,6 +50,7 @@ appCtx.spaceFlight = {
 };
 
 let spaceSessionScope = null;
+const spaceModuleScope = createLifecycleScope('space-module');
 
 function beginSpaceFlightSession() {
   spaceSessionScope?.dispose('space-session-replaced');
@@ -64,13 +65,31 @@ function isCurrentSpaceFlightSession(sessionId, destination = '') {
   return !destination || appCtx.spaceFlight.destination === destination;
 }
 
+function leaseSpaceFlightResources() {
+  if (!spaceSessionScope?.isActive() || !appCtx.spaceFlight.renderer) return false;
+  spaceSessionScope.defer(() => destroySpaceFlightScene(), 'renderer');
+  return true;
+}
+
+function requestSessionFrame(callback) {
+  return spaceSessionScope?.animationFrame(callback) ?? null;
+}
+
 const landingDeps = {
+  get THREE() {
+    return globalThis.THREE;
+  },
   completeLanding,
+  requestFrame: requestSessionFrame,
   showFlightMessage
 };
 
 const animationDeps = {
+  get THREE() {
+    return globalThis.THREE;
+  },
   completeLanding,
+  requestFrame: requestSessionFrame,
   updateSpaceFlightHUD
 };
 
@@ -107,6 +126,7 @@ function startSpaceFlightToMoon() {
   hideGameUI();
 
   if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.renderer || !appCtx.spaceFlight.camera) createSpaceFlightScene();
+  leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForMoon();
 
@@ -154,6 +174,7 @@ function startSpaceFlightToEarth() {
 
   hideGameUI();
   if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.renderer || !appCtx.spaceFlight.camera) createSpaceFlightScene();
+  leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForEarth();
   animateSpaceFlight();
@@ -200,6 +221,7 @@ function startSpaceFlightToMars() {
   hideGameUI();
 
   if (!appCtx.spaceFlight.scene || !appCtx.spaceFlight.renderer || !appCtx.spaceFlight.camera) createSpaceFlightScene();
+  leaseSpaceFlightResources();
   appCtx.returnUniverseToSolImmediate?.();
   resetSpaceFlightForMars();
   animateSpaceFlight();
@@ -303,10 +325,11 @@ registerEnvironmentLifecycle(appCtx.ENV.SPACE_FLIGHT, {
 
 function initSpaceFlightWhenReady() {
   if (typeof THREE !== 'undefined') {
+    configureSpaceRuntimeDependencies({ THREE: globalThis.THREE });
     console.log("Space Flight module loaded!");
-    initSpaceFlightUI(attemptLanding);
+    initSpaceFlightUI(attemptLanding, spaceModuleScope);
   } else {
-    setTimeout(initSpaceFlightWhenReady, 100);
+    spaceModuleScope.timeout(initSpaceFlightWhenReady, 100);
   }
 }
 
@@ -332,7 +355,7 @@ export {
 };
 
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initSpaceFlightWhenReady);
+  spaceModuleScope.listen(document, 'DOMContentLoaded', initSpaceFlightWhenReady, { once: true });
 } else {
   initSpaceFlightWhenReady();
 }

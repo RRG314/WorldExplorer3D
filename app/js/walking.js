@@ -110,6 +110,9 @@ function createWalkingModule(opts) {
     applyCameraIfWalking() {
       return updateWalkCamera();
     },
+    syncTerrain(force = false) {
+      return syncWalkTerrain(force);
+    },
     getMapRefPosition
   };
 }
