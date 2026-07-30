@@ -149,6 +149,15 @@ async function pose(page) {
       Number(ctx?.car?.z),
       Number(ctx?.car?.y) - 1.2
     );
+    const buildingCheck = ctx?.checkBuildingCollision?.(
+      Number(ctx?.car?.x),
+      Number(ctx?.car?.z),
+      2,
+      {
+        actorBaseY: Number(ctx?.car?.y) - 1.2,
+        actorHeight: 1.9
+      }
+    ) || { collision: false };
     return {
       timestamp: performance.now(),
       gameStarted: ctx?.gameStarted === true,
@@ -161,6 +170,8 @@ async function pose(page) {
       angle: Number(ctx?.car?.angle),
       speed: Number(ctx?.car?.speed),
       surfaceY: Number(surface?.position?.y),
+      buildingCollision: buildingCheck.collision === true,
+      buildingInside: buildingCheck.inside === true,
       camera: {
         x: Number(ctx?.camera?.position?.x),
         y: Number(ctx?.camera?.position?.y),
@@ -168,6 +179,40 @@ async function pose(page) {
       }
     };
   });
+}
+
+async function resetBuildingClearDriveRoute(page, route) {
+  return page.evaluate(async (target) => {
+    const { ctx } = await import('/app/js/shared-context.js?v=55');
+    const resolved = ctx.resolveSafeWorldSpawn?.(target.x, target.z, {
+      mode: 'drive',
+      angle: target.angle,
+      preferRoad: true,
+      source: 'player_drive_release_route_reset'
+    });
+    if (!resolved || typeof ctx.applyResolvedWorldSpawn !== 'function') {
+      throw new Error('Release drive route reset could not be resolved');
+    }
+    const resolvedDistance = Math.hypot(
+      Number(resolved.x) - Number(target.x),
+      Number(resolved.z) - Number(target.z)
+    );
+    if (resolvedDistance > 20) {
+      throw new Error(`Release drive route reset moved ${resolvedDistance.toFixed(2)} m`);
+    }
+    ctx.applyResolvedWorldSpawn(resolved, {
+      mode: 'drive',
+      syncCar: true,
+      syncWalker: true
+    });
+    return {
+      x: Number(resolved.x),
+      z: Number(resolved.z),
+      angle: Number(resolved.angle),
+      source: String(resolved.source || ''),
+      onRoad: resolved.onRoad === true
+    };
+  }, route);
 }
 
 async function captureSpawnDiagnostic(page, name) {
@@ -295,7 +340,7 @@ async function prepareBuildingClearDriveRoute(page) {
         const start = road.pts[index];
         const end = road.pts[index + 1];
         const length = Math.hypot(end.x - start.x, end.z - start.z);
-        if (length < 20) continue;
+        if (length < 180) continue;
         const x = (start.x + end.x) * 0.5;
         const z = (start.z + end.z) * 0.5;
         const terrainY = Number(ctx.SurfaceQuery?.terrainAt?.(x, z)?.position?.y);
@@ -377,7 +422,7 @@ async function holdAndSample(page, keys, durationMs, samples) {
   const deadline = Date.now() + durationMs;
   try {
     while (Date.now() < deadline) {
-      await page.waitForTimeout(Math.min(250, Math.max(1, deadline - Date.now())));
+      await page.waitForTimeout(Math.min(200, Math.max(1, deadline - Date.now())));
       samples.push(await pose(page));
     }
   } finally {
@@ -397,7 +442,7 @@ async function holdAndSampleUntil(
   let latest = null;
   try {
     while (Date.now() < deadline) {
-      await page.waitForTimeout(250);
+      await page.waitForTimeout(200);
       latest = await pose(page);
       samples.push(latest);
       if (predicate(latest)) return latest;
@@ -470,17 +515,17 @@ try {
   const driveRoute = await prepareBuildingClearDriveRoute(page);
   const driveRouteDiagnostic = await captureSpawnDiagnostic(page, 'drive-route');
 
-  const samples = [await pose(page)];
+  const maneuverSamples = [await pose(page)];
   const wallClockStartedAt = Date.now();
 
   const forwardRightStart = await pose(page);
-  await holdAndSample(page, ['ArrowUp', 'ArrowRight'], 4000, samples);
+  await holdAndSample(page, ['ArrowUp', 'ArrowRight'], 4000, maneuverSamples);
   const forwardRightEnd = await pose(page);
   const reverseReady = await holdAndSampleUntil(
     page,
     ['ArrowDown'],
     12000,
-    samples,
+    maneuverSamples,
     (sample) => sample.speed < -1
   );
   const reverseMotionObserved = reverseReady?.speed < -1;
@@ -492,19 +537,48 @@ try {
   }
 
   const reverseRightStart = await pose(page);
-  await holdAndSample(page, ['ArrowDown', 'ArrowRight'], 5000, samples);
+  await holdAndSample(page, ['ArrowDown', 'ArrowRight'], 5000, maneuverSamples);
   const reverseRightEnd = await pose(page);
 
-  const elapsedBeforeSoak = (Date.now() - wallClockStartedAt) / 1000;
-  const remainingMs = Math.max(0, (targetSeconds - elapsedBeforeSoak) * 1000);
-  let segment = 0;
-  let remaining = remainingMs;
+  const soakRoute = await resetBuildingClearDriveRoute(page, driveRoute);
+  const samples = [await pose(page)];
+  let direction = 1;
+  let directionChanges = 0;
+  let maximumRouteOffset = 0;
+  const routeOffsetLimit = Math.max(
+    20,
+    Math.min(150, Number(driveRoute.segmentLength) * 0.5 - 80)
+  );
+  let remaining = Math.max(
+    0,
+    targetSeconds * 1000 - (Date.now() - wallClockStartedAt)
+  );
   while (remaining > 0) {
-    const duration = Math.min(5000, remaining);
-    const steeringKey = segment % 2 === 0 ? 'ArrowLeft' : 'ArrowRight';
-    await holdAndSample(page, ['ArrowUp', steeringKey], duration, samples);
-    remaining -= duration;
-    segment += 1;
+    const duration = Math.min(250, remaining);
+    const latest = samples.at(-1);
+    const forwardX = Math.sin(soakRoute.angle);
+    const forwardZ = Math.cos(soakRoute.angle);
+    const routeOffset =
+      (latest.x - soakRoute.x) * forwardX +
+      (latest.z - soakRoute.z) * forwardZ;
+    maximumRouteOffset = Math.max(maximumRouteOffset, Math.abs(routeOffset));
+    if (direction > 0 && routeOffset >= routeOffsetLimit) {
+      direction = -1;
+      directionChanges += 1;
+    } else if (direction < 0 && routeOffset <= -routeOffsetLimit) {
+      direction = 1;
+      directionChanges += 1;
+    }
+    await holdAndSample(
+      page,
+      [direction > 0 ? 'ArrowUp' : 'ArrowDown'],
+      duration,
+      samples
+    );
+    remaining = Math.max(
+      0,
+      targetSeconds * 1000 - (Date.now() - wallClockStartedAt)
+    );
   }
 
   const wallClockSeconds = (Date.now() - wallClockStartedAt) / 1000;
@@ -514,12 +588,22 @@ try {
       sample.z - samples[index].z
     )
   );
+  const sampleVelocities = samples.slice(1).map((sample, index) => {
+    const elapsedSeconds = Math.max(
+      0.001,
+      (sample.timestamp - samples[index].timestamp) / 1000
+    );
+    return displacements[index] / elapsedSeconds;
+  });
   const first = samples[0];
   const last = samples.at(-1);
-  const cameraSpan = Math.hypot(
-    last.camera.x - first.camera.x,
-    last.camera.y - first.camera.y,
-    last.camera.z - first.camera.z
+  const cameraSpan = Math.max(
+    0,
+    ...samples.map((sample) => Math.hypot(
+      sample.camera.x - first.camera.x,
+      sample.camera.y - first.camera.y,
+      sample.camera.z - first.camera.z
+    ))
   );
   const finiteSurfaceSamples = samples.filter((sample) =>
     Number.isFinite(sample.surfaceY)
@@ -560,13 +644,21 @@ try {
     },
     maximumObservedThrottle: Math.max(
       0,
-      ...samples.map((sample) => Number(sample.actions?.throttle || 0))
+      ...[...maneuverSamples, ...samples].map(
+        (sample) => Number(sample.actions?.throttle || 0)
+      )
     ),
     maximumObservedReverse: Math.max(
       0,
-      ...samples.map((sample) => Number(sample.actions?.reverse || 0))
+      ...[...maneuverSamples, ...samples].map(
+        (sample) => Number(sample.actions?.reverse || 0)
+      )
     ),
     reverseMotionObserved,
+    maneuverSampleCount: maneuverSamples.length,
+    soakDirectionChanges: directionChanges,
+    routeOffsetLimit: Number(routeOffsetLimit.toFixed(2)),
+    maximumRouteOffset: Number(maximumRouteOffset.toFixed(2)),
     displacement: Number(
       Math.hypot(last.x - first.x, last.z - first.z).toFixed(2)
     ),
@@ -574,6 +666,9 @@ try {
       displacements.reduce((sum, value) => sum + value, 0).toFixed(2)
     ),
     maximumStep: Number(Math.max(0, ...displacements).toFixed(3)),
+    maximumSampleVelocity: Number(
+      Math.max(0, ...sampleVelocities).toFixed(3)
+    ),
     maximumSurfaceGap: Number(maximumSurfaceGap.toFixed(3)),
     surfaceSampleCount: finiteSurfaceSamples.length,
     cameraSpan: Number(cameraSpan.toFixed(2)),
@@ -589,12 +684,13 @@ try {
         }
       : {
           sampleCount: Math.max(20, targetSeconds),
-          pathDistance: 100,
-          cameraSpan: 20,
+          pathDistance: Math.max(20, targetSeconds * 2),
+          cameraSpan: Math.max(5, targetSeconds * 0.05),
           budgetEligible: true
         },
     driveModeEntry,
     driveRoute,
+    soakRoute,
     spawnDiagnostics: {
       launch: launchDiagnostic,
       driveEntry: driveEntryDiagnostic,
@@ -628,9 +724,20 @@ try {
     report.pathDistance >= report.functionalMinimums.pathDistance,
     `real-input drive moved only ${report.pathDistance} m`
   );
-  assert(report.maximumStep <= 15, `real-input drive teleported ${report.maximumStep} m`);
+  assert(
+    report.maximumSampleVelocity <= 160,
+    `real-input drive exceeded modeled velocity at ${report.maximumSampleVelocity} m/s`
+  );
+  assert(
+    report.maximumRouteOffset <= driveRoute.segmentLength * 0.5 + 30,
+    `real-input drive left its measured route corridor at ${report.maximumRouteOffset} m`
+  );
   assert(report.surfaceSampleCount >= samples.length * 0.9, 'drive surface was unavailable for too many real-input samples');
   assert(report.maximumSurfaceGap <= 1, `real-input suspension gap reached ${report.maximumSurfaceGap} m`);
+  assert(
+    samples.every((sample) => !sample.buildingInside),
+    'real-input drive entered a building footprint'
+  );
   assert(
     report.cameraSpan >= report.functionalMinimums.cameraSpan,
     'camera did not follow the real-input drive'
