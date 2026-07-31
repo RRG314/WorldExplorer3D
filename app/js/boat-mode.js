@@ -25,7 +25,7 @@ import {
   syncWaterMeshCache,
   waterKindLabel,
   waterSurfaceYAt
-} from "./boat-mode/water-query.js?v=15";
+} from "./boat-mode/water-query.js?v=16";
 import {
   applyBoatWavePose,
   ensureBoatWaterPatch,

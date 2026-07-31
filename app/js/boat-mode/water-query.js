@@ -33,13 +33,13 @@ import {
   resolveBoatSpawnPoint,
   segmentDistanceInfo,
   shortestAngleDelta
-} from './water-geometry.js?v=2';
+} from './water-geometry.js?v=3';
 import {
   normalizeWaterBody,
   resolveWaterBodySurfaceY,
   waterKindLabel
 } from '../world/water-body-contract.js?v=3';
-import { pointInWaterBody } from '../world/water-surface-registry.js?v=1';
+import { pointInWaterBody } from '../world/water-surface-registry.js?v=2';
 
 let _waterRaycaster = null;
 let _waterRayStart = null;

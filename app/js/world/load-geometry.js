@@ -219,7 +219,29 @@ export function createMidLodBuildingMesh(pts, height, avgElevation, options = {}
 }
 
 export async function fetchVectorTileWater(z, x, y) {
-  return fetchShortbreadTile(z, x, y);
+  try {
+    return await fetchShortbreadTile(z, x, y);
+  } catch (detailError) {
+    if (!(z > 0)) throw detailError;
+    // Shortbread water exists at lower zooms. If a detailed public tile is
+    // temporarily unavailable, retain complete OSM hydrology with its parent
+    // tile instead of publishing a world where terrain wins by omission.
+    const parentZ = z - 1;
+    const parentX = Math.floor(x / 2);
+    const parentY = Math.floor(y / 2);
+    try {
+      const parent = await fetchShortbreadTile(parentZ, parentX, parentY);
+      parent.hydrologyFallback = {
+        requested: `${z}/${x}/${y}`,
+        resolved: `${parentZ}/${parentX}/${parentY}`,
+        reason: detailError?.message || String(detailError)
+      };
+      return parent;
+    } catch (parentError) {
+      parentError.cause = detailError;
+      throw parentError;
+    }
+  }
 }
 
 export function normalizeWorldRingFromLonLat(coords, maxPoints = 900, guardOptions = null) {

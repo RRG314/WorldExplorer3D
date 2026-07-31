@@ -79,6 +79,12 @@ function surfacesDuplicate(a, b) {
   const bId = String(b.sourceFeatureId || '');
   if (aId && bId && aId === bId) return true;
   if (a.shape === WATER_BODY_SHAPE.WATERWAY) return false;
+  const areaA = Math.max(1, Number(a.area) || Number(polygonMetrics(a.pts || []).area) || 0);
+  const areaB = Math.max(1, Number(b.area) || Number(polygonMetrics(b.pts || []).area) || 0);
+  const comparableAreaRatio = Math.min(areaA, areaB) / Math.max(areaA, areaB);
+  // A small basin, dock, or pond may sit wholly inside a harbor polygon. That
+  // containment is not evidence that both records describe the same surface.
+  if (comparableAreaRatio < 0.72) return false;
   const overlap = boundsOverlapRatio(a, b);
   if (overlap < 0.88) return false;
   const heightDelta = Math.abs(Number(a.surfaceY || 0) - Number(b.surfaceY || 0));

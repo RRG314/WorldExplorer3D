@@ -56,6 +56,9 @@ export function finalizeLoadedWorld(options = {}) {
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.updateTerrainAround === 'function') {
     runFinalStep('updateTerrainAround', () => appCtx.updateTerrainAround(0, 0));
   }
+  if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.applyWaterTerrainMask === 'function') {
+    runFinalStep('applyWaterTerrainMask', () => appCtx.applyWaterTerrainMask());
+  }
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.publishCompiledTransportMeshes === 'function') {
     runFinalStep('publishCompiledTransportMeshes', () => appCtx.publishCompiledTransportMeshes());
   }

@@ -12,7 +12,7 @@ import {
 } from "./terrain/context-utils.js?v=1";
 import { createTerrainHeightSamplingApi } from "./terrain/height-sampling.js?v=4";
 import { createTerrainMaterialCacheApi } from "./terrain/material-cache.js?v=2";
-import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=9";
+import { createTerrainReprojectionApi } from "./terrain/reprojection.js?v=10";
 import {
   groundProviderCatalogSnapshot
 } from "./terrain/ground-provider-registry.js?v=3";
@@ -52,7 +52,7 @@ import {
   terrainTileMeshKey,
   tileXYToLatLonBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=33";
+} from "./terrain/tiles.js?v=34";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -66,6 +66,7 @@ import {
 import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
 import { createTerrainStreamingApi } from "./terrain/streaming.js?v=11";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
+import { pointInWaterBody } from "./world/water-surface-registry.js?v=2";
 // terrain.js - Accepted-ground artifact and terrain presentation system
 // ============================================================================
 
@@ -160,15 +161,76 @@ function elevationWorldYAtWorldXZ(x, z) {
     appCtx.TERRAIN_Y_EXAGGERATION;
 }
 
+function createWaterTerrainContext(tileBounds = null) {
+  const areas = Array.isArray(appCtx.waterAreas) ? appCtx.waterAreas : [];
+  if (!tileBounds || typeof appCtx.geoToWorld !== 'function') return areas;
+  const northWest = appCtx.geoToWorld(tileBounds.latN, tileBounds.lonW);
+  const southEast = appCtx.geoToWorld(tileBounds.latS, tileBounds.lonE);
+  const minX = Math.min(northWest.x, southEast.x);
+  const maxX = Math.max(northWest.x, southEast.x);
+  const minZ = Math.min(northWest.z, southEast.z);
+  const maxZ = Math.max(northWest.z, southEast.z);
+  return areas.filter((area) => {
+    const bounds = area?.bounds;
+    return !bounds || (
+      bounds.maxX >= minX && bounds.minX <= maxX &&
+      bounds.maxZ >= minZ && bounds.minZ <= maxZ
+    );
+  });
+}
+
+function resolveWaterTerrainY(x, z, terrainY, candidates = null) {
+  if (!Number.isFinite(terrainY)) return terrainY;
+  const areas = Array.isArray(candidates)
+    ? candidates
+    : Array.isArray(appCtx.waterAreas) ? appCtx.waterAreas : [];
+  let resolvedY = terrainY;
+  for (let i = 0; i < areas.length; i += 1) {
+    const area = areas[i];
+    const bounds = area?.bounds;
+    if (bounds && (
+      x < bounds.minX || x > bounds.maxX ||
+      z < bounds.minZ || z > bounds.maxZ
+    )) continue;
+    if (!Number.isFinite(Number(area?.surfaceY))) continue;
+    if (!pointInWaterBody(area, x, z)) continue;
+    // Accepted elevation rasters often report positive shoreline/DSM values
+    // across harbors. OSM hydrology owns these footprints, so keep the terrain
+    // bed below the registered flat water datum instead of rendering grass
+    // through the water surface.
+    resolvedY = Math.min(resolvedY, Number(area.surfaceY) - 0.45);
+  }
+  return resolvedY;
+}
+
 const terrainTileDeps = {
   clampElevationMeters,
   sampleAcceptedGroundAtLatLon,
   usesAcceptedGround: true,
   applyStructureTerrainCuts: (worldX, worldZ, terrainY) => applyStructureTerrainCuts(worldX, worldZ, terrainY),
+  createWaterTerrainContext,
+  resolveWaterTerrainY,
   computeElevationStatsMeters: (samplesMeters) => computeElevationStatsMeters(samplesMeters),
   reapplyTerrainMeshHeights: (mesh) => applyHeightsToTerrainMesh(mesh, terrainTileDeps),
   applyHeightsToTerrainMesh: (mesh) => applyHeightsToTerrainMesh(mesh, terrainTileDeps)
 };
+
+function applyWaterTerrainMask() {
+  const meshes = (appCtx.terrainGroup?.children || []).filter((mesh) => mesh?.userData?.isTerrainMesh);
+  let maskedVertices = 0;
+  for (const mesh of meshes) {
+    applyHeightsToTerrainMesh(mesh, terrainTileDeps);
+    maskedVertices += Number(mesh.userData?.waterMaskedVertices || 0);
+  }
+  clearTerrainHeightCache();
+  const stats = {
+    terrainMeshes: meshes.length,
+    waterAreas: Number(appCtx.waterAreas?.length || 0),
+    maskedVertices
+  };
+  appCtx.waterTerrainMaskStats = stats;
+  return stats;
+}
 
 const {
   applyStructureTerrainCuts,
@@ -362,6 +424,7 @@ function publishCompiledTransportMeshesRuntime() {
 Object.assign(appCtx, {
   applyTerrainVisualProfile,
   applyHeightsToTerrainMesh,
+  applyWaterTerrainMask,
   baseTerrainHeightAt: cachedBaseTerrainHeight,
   buildRoadSkirts,
   clearStructureVisualMeshes,
@@ -417,6 +480,7 @@ Object.assign(appCtx, {
 export {
   applyTerrainVisualProfile,
   applyHeightsToTerrainMesh,
+  applyWaterTerrainMask,
   baseTerrainHeightAt,
   buildRoadSkirts,
   clearStructureVisualMeshes,

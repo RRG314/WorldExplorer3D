@@ -1,7 +1,7 @@
 import { ctx as appCtx } from '../shared-context.js?v=55';
 import { clamp } from './dynamics.js?v=1';
 import { normalizeWaterKind, waterKindLabel } from '../world/water-body-contract.js?v=3';
-import { pointInWaterBody } from '../world/water-surface-registry.js?v=1';
+import { pointInWaterBody } from '../world/water-surface-registry.js?v=2';
 
 const BOAT_ENTRY_OFFSET = 9;
 const BOAT_MAX_CANDIDATE_DISTANCE = 58;

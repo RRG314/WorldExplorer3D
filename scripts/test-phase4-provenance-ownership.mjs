@@ -207,6 +207,35 @@ assert.equal(registry.snapshot().surfaceCount, 1);
 assert.deepEqual(registry.snapshot().duplicateRegistryIds, []);
 assert.equal(registry.snapshot().records[0].authority, 'water_surface_registry');
 
+const nestedRegistry = createWaterSurfaceRegistry();
+const harbor = normalizeWaterBody({
+  shape: 'area',
+  pts: square(-1000, -1000, 1000, 1000),
+  sourceFeatureId: 'shortbread:harbor',
+  geometrySource: 'osm-shortbread',
+  layer: 'water_polygons',
+  kindHint: 'harbor',
+  surfaceY: 0
+});
+const nestedBasin = normalizeWaterBody({
+  shape: 'area',
+  pts: square(-20, -20, 20, 20),
+  sourceFeatureId: 'osm:nested-basin',
+  geometrySource: 'osm-overpass',
+  layer: 'landuse',
+  kindHint: 'basin',
+  surfaceY: 0
+});
+assert.equal(nestedRegistry.register(harbor).accepted, true);
+const nestedRegistration = nestedRegistry.register(nestedBasin);
+assert.equal(nestedRegistration.accepted, true);
+assert.equal(nestedRegistration.replacements.length, 0);
+assert.equal(
+  nestedRegistry.snapshot().surfaceCount,
+  2,
+  'A small nested water feature must not replace its containing harbor polygon.'
+);
+
 appCtx.waterAreas = [higherPriorityLake, privateLake];
 appCtx.waterways = [];
 appCtx.boatMode = { waterKind: null };
@@ -246,6 +275,7 @@ console.log(JSON.stringify({
     surfaceCount: registry.snapshot().surfaceCount,
     holeContainment: true,
     privateRejected: true,
+    nestedWaterRetained: true,
     proximityRejected: true,
     submergedTunnelRejected: true,
     containedBoatEligible: true

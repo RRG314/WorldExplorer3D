@@ -51,7 +51,7 @@ import {
 import {
   initWorldLod,
   updateWorldLod
-} from "./world/lod.js?v=13";
+} from "./world/lod.js?v=15";
 import {
   buildPoiGeometryPass,
   buildStreetFurniturePass,
@@ -60,7 +60,7 @@ import {
   finalizeLoadedWorld,
   recordWorldLoadWarning,
   safeWorldLoadCall
-} from "./world/load-support.js?v=21";
+} from "./world/load-support.js?v=22";
 import {
   earthSceneSuppressed,
   hideEarthSceneMeshes,
@@ -84,7 +84,7 @@ import {
   waterSurfaceBaseElevation,
   WATER_VECTOR_TILE_ZOOM,
   worldLinePointsFromLonLat
-} from "./world/load-geometry.js?v=20";
+} from "./world/load-geometry.js?v=21";
 import {
   decimateRoadCenterlineByDepth,
   getPerfModeValue,
@@ -103,7 +103,7 @@ import {
   nodeDistanceSq
 } from "./world/load-selection.js?v=1";
 import { buildRoadGeometryPass } from "./world/load-road-pass.js?v=14";
-import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=28";
+import { buildBuildingGeometryPass } from "./world/load-building-pass.js?v=29";
 import {
   batchLanduseMeshes,
   initWorldRenderSupport,
@@ -144,7 +144,7 @@ import {
   sanitizeWorldPathPoints,
   signedPolygonAreaXZ
 } from "./world/world-geometry.js?v=3";
-import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=19";
+import { addWaterwayRibbon } from "./world/waterway-ribbon.js?v=21";
 import {
   resetWorldFurnitureCaches
 } from "./world/furniture.js?v=12";
@@ -163,7 +163,7 @@ import {
   syncLinearFeatureOverlayVisibility,
   worldBaseTerrainY
 } from "./world/structure-aware.js?v=14";
-import { createWorldRoadLoader } from "./world/load-roads.js?v=72";
+import { createWorldRoadLoader } from "./world/load-roads.js?v=73";
 import {
   fetchShortbreadWorldData
 } from "./world/shortbread-source.js?v=9";
