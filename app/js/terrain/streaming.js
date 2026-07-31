@@ -13,7 +13,9 @@ function createTerrainStreamingApi(deps = {}) {
     getOrLoadTerrainTile,
     pruneTerrainTileCache,
     terrainTileCacheSnapshot,
-    clearTerrainHeightCache
+    clearTerrainHeightCache,
+    resetFarTerrainClipmap,
+    updateFarTerrainClipmap
   } = deps;
 
   let lastTerrainCenterKey = null;
@@ -80,6 +82,7 @@ function createTerrainStreamingApi(deps = {}) {
     terrainState._lastUpdatePos.z = 0;
     terrainState._cachedIntersections = null;
     terrainState._lastRoadCount = 0;
+    resetFarTerrainClipmap?.();
     clearTerrainHeightCache();
   }
 
@@ -196,6 +199,14 @@ function createTerrainStreamingApi(deps = {}) {
         appCtx.setPerfLiveStat("terrainCache", cacheSnapshot);
         appCtx.setPerfLiveStat("terrainMeshQueue", pendingTerrainMeshes.size);
       }
+      updateFarTerrainClipmap?.({
+        z: appCtx.TERRAIN_ZOOM,
+        centerX: t.x,
+        centerY: t.y,
+        ring: activeRing,
+        actorX: x,
+        actorZ: z
+      });
     }
   }
 

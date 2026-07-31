@@ -112,7 +112,6 @@ export function createWorldLandusePass(options = {}) {
     'plant_nursery', 'greenhouse_horticulture', 'recreation_ground',
     'village_green', 'cemetery', 'sand', 'dune', 'barren', 'glacier', 'quarry'
   ]);
-  const terrainOwnedLandCoverTypes = new Set(visibleMappedSurfaceTypes);
   const ensureWaterSurfaceRegistry = () => appCtx.waterSurfaceRegistry ||
     (appCtx.waterSurfaceRegistry = createWaterSurfaceRegistry());
 
@@ -235,23 +234,6 @@ export function createWorldLandusePass(options = {}) {
       const registration = ensureWaterSurfaceRegistry().register(waterArea);
       if (!registration.accepted) return;
       registration.replacements.forEach(removePublishedWaterArea);
-    }
-
-    // Natural ground cover is semantic input to the terrain profile and
-    // vegetation compilers, not a second rendered surface. Draping large OSM
-    // polygons over steep relief created long, independently triangulated
-    // sheets that visibly cut through mountain terrain. Keep the mapped
-    // footprint for world rules while the terrain tile remains the sole
-    // natural-ground renderer.
-    if (!isWater && !isExplicitHardscape && terrainOwnedLandCoverTypes.has(landuseType)) {
-      appCtx.landuses.push({
-        type: landuseType,
-        pts: ring,
-        bounds: { minX, maxX, minZ, maxZ },
-        renderOwner: 'terrain-profile',
-        geometryRendered: false
-      });
-      return;
     }
 
     let geometry;

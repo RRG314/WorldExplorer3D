@@ -310,6 +310,11 @@ async function waitForTerrainTileReady(z, x, y, deadline, deps) {
   return false;
 }
 
+export async function waitForTerrainTileReadyAtZoom(z, x, y, timeoutMs = 6000, deps = {}) {
+  const timeout = Math.max(0, Number(timeoutMs) || 0);
+  return waitForTerrainTileReady(z, x, y, terrainNow() + timeout, deps);
+}
+
 export async function waitForTerrainReadyAt(x, z, timeoutMs = 3000, deps = {}) {
   const { lat, lon } = worldToLatLon(x, z);
   const tilePoint = latLonToTileXY(lat, lon, appCtx.TERRAIN_ZOOM);

@@ -307,6 +307,7 @@ function applyWeatherPresentation() {
 
   const weatherCloudFactor = clamp01((Number(profile.cloudCover) || 0) / 100);
   const weatherFogBlend = clamp01((profile.haze - 0.9) / 1.4);
+  const fogWeatherActive = state?.category === 'fog' || appCtx.weatherMode === 'fog';
   const precipitationBoost = state?.category === 'rain' || state?.category === 'storm' || state?.category === 'snow' ? 0.12 : 0;
   const skyVisual = skyState.visual;
 
@@ -333,7 +334,9 @@ function applyWeatherPresentation() {
   }
   if (appCtx.scene?.fog?.isFogExp2) {
     appCtx.scene.fog.color.setHex(mixColorHex(skyVisual.fogColor, WEATHER_FOG_COLOR, weatherFogBlend));
-    appCtx.scene.fog.density = skyVisual.fogDensity * Math.max(0.85, profile.haze + precipitationBoost + weatherCloudFactor * 0.08);
+    appCtx.scene.fog.density = fogWeatherActive
+      ? skyVisual.fogDensity * Math.max(0.85, profile.haze)
+      : 0;
   }
   if (appCtx.scene?.background?.isColor) {
     const skyBlend = Math.max(weatherCloudFactor * 0.56, weatherFogBlend * 0.76, precipitationBoost * 2.1);

@@ -7,7 +7,7 @@ import {
   inspectAstronomicalSkyState,
   refreshAstronomicalSky as refreshAstronomicalSkyState,
   setTimeOfDay as setSkyTimeOfDay
-} from "./sky/astronomical-state.js?v=2";
+} from "./sky/astronomical-state.js?v=3";
 import {
   alignStarFieldToLocation,
   checkMoonClick as checkMoonSelection,
@@ -216,7 +216,7 @@ function arriveAtMoon() {
 
   // IMMEDIATELY set black background and hide car to prevent earth ground flash
   appCtx.scene.background = new THREE.Color(0x000000);
-  appCtx.scene.fog = new THREE.FogExp2(0x000000, 0.00005);
+  appCtx.scene.fog = new THREE.FogExp2(0x000000, 0);
   if (appCtx.renderer) appCtx.renderer.toneMappingExposure = 1.05;
   appCtx.setLunarEarthVisible?.(true);
   appCtx.setPlanetarySky?.('moon');

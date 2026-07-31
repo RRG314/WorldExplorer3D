@@ -367,9 +367,8 @@ function applySkyVisualState(config, state) {
 
   if (appCtx.scene.fog?.isFogExp2) {
     appCtx.scene.fog.color.setHex(config.fogColor);
-    appCtx.scene.fog.density = config.fogDensity;
   } else {
-    appCtx.scene.fog = new THREE.FogExp2(config.fogColor, config.fogDensity);
+    appCtx.scene.fog = new THREE.FogExp2(config.fogColor, 0);
   }
 
   if (appCtx.renderer) {
