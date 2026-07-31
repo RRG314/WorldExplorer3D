@@ -329,6 +329,27 @@ function composerSnapshot() {
   };
 }
 
+function worldCompositionSnapshot() {
+  const result = {
+    aerialReplacementMeshes: 0,
+    mappedTerrainMeshes: 0,
+    suppressedTerrainMeshes: 0,
+    terrainMeshes: 0
+  };
+  appCtx.scene?.traverse?.((object) => {
+    if (object?.userData?.aerialSurfaceContext) result.aerialReplacementMeshes += 1;
+    if (!object?.userData?.isTerrainMesh) return;
+    result.terrainMeshes += 1;
+    if (object.material && !Array.isArray(object.material) && object.material.map) {
+      result.mappedTerrainMeshes += 1;
+    }
+    if (object.userData.terrainAerialDetailSuppressed === true) {
+      result.suppressedTerrainMeshes += 1;
+    }
+  });
+  return result;
+}
+
 function getWorldExplorerRuntimeDiagnostics() {
   const activeActor = appCtx.activeTransportActor?.() || null;
   return {
@@ -403,6 +424,7 @@ function getWorldExplorerRuntimeDiagnostics() {
       : null,
     renderer: rendererSnapshot(),
     composer: composerSnapshot(),
+    worldComposition: worldCompositionSnapshot(),
     quality: appCtx.renderQualityLevel || null,
     earthOrigin: {
       lat: numberOrNull(appCtx.LOC?.lat),
@@ -434,7 +456,15 @@ function getWorldExplorerRuntimeDiagnostics() {
             .filter((mesh) => mesh?.userData?.structureVisualType === 'guardrails')
             .reduce((sum, mesh) => sum + (Number(mesh?.count) || 0), 0)
         : null
-    }
+    },
+    groundFallback: appCtx.groundFallbackMesh
+      ? {
+          exists: true,
+          attached: !!appCtx.groundFallbackMesh.parent,
+          visible: appCtx.groundFallbackMesh.visible !== false,
+          loadingPlaceholder: appCtx.groundFallbackMesh.userData?.isLoadingPlaceholder === true
+        }
+      : { exists: false, attached: false, visible: false, loadingPlaceholder: false }
   };
 }
 

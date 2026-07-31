@@ -230,6 +230,7 @@ export function createWorldRoadLoader(deps = {}) {
       sameLocation
     });
     if (session.aborted) return;
+    appCtx.showGroundFallbackPlaceholder?.();
     const {
       endLoadPhase,
       finalizePerfLoad,

@@ -98,6 +98,18 @@ const finalizerSource = await fs.readFile(
   path.join(root, 'app/js/world/load-support.js'),
   'utf8'
 );
+const sceneBootstrapSource = await fs.readFile(
+  path.join(root, 'app/js/engine/scene-bootstrap.js'),
+  'utf8'
+);
+const loadRoadsSource = await fs.readFile(
+  path.join(root, 'app/js/world/load-roads.js'),
+  'utf8'
+);
+const runtimeDiagnosticsSource = await fs.readFile(
+  path.join(root, 'app/js/runtime-diagnostics.js'),
+  'utf8'
+);
 const markIndex = finalizerSource.lastIndexOf(
   'markLoaded();',
   finalizerSource.indexOf('export function createSyntheticFallbackWorld')
@@ -110,6 +122,41 @@ for (const requiredStep of [
   const stepIndex = finalizerSource.indexOf(requiredStep);
   assert(stepIndex >= 0 && stepIndex < markIndex, `${requiredStep} must complete before publication`);
 }
+
+const fallbackRetirementIndex = finalizerSource.indexOf(
+  "runFinalStep('retireGroundFallbackPlaceholder'"
+);
+const traversalIndex = finalizerSource.indexOf("runFinalStep('buildTraversalNetworks'");
+assert(fallbackRetirementIndex >= 0, 'world finalization must retire the loading-only ground placeholder');
+assert(
+  fallbackRetirementIndex < traversalIndex,
+  'ground placeholder must retire before traversal and presentation are published'
+);
+assert.match(
+  sceneBootstrapSource,
+  /ground\.userData\.isLoadingPlaceholder = true;/,
+  'fallback ground must be identified as a loading-only placeholder'
+);
+assert.match(
+  sceneBootstrapSource,
+  /mesh\.userData\.pendingTerrainTile === false/,
+  'fallback ground must remain until a real terrain tile is ready'
+);
+assert.match(
+  sceneBootstrapSource,
+  /ground\.parent\?\.remove\?\.\(ground\);/,
+  'retiring fallback ground must detach it instead of leaving an overlapping hidden owner in the Earth root'
+);
+assert.match(
+  loadRoadsSource,
+  /appCtx\.showGroundFallbackPlaceholder\?\.\(\);/,
+  'each world load must restore the loading placeholder before asynchronous terrain work'
+);
+assert.match(
+  runtimeDiagnosticsSource,
+  /groundFallback: appCtx\.groundFallbackMesh/,
+  'runtime diagnostics must expose fallback attachment and visibility for visual acceptance checks'
+);
 
 console.log(JSON.stringify({
   ok: true,

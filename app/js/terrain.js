@@ -31,8 +31,7 @@ import {
   classifyTerrainVisualProfile,
   computeElevationStatsMeters,
   refreshTerrainSurfaceProfiles,
-  setWorldSurfaceProfile,
-  updateTerrainAerialDetail
+  setWorldSurfaceProfile
 } from "./terrain/surface-profiles.js?v=30";
 import {
   applyHeightsToTerrainMesh,
@@ -454,7 +453,6 @@ Object.assign(appCtx, {
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
-  updateTerrainAerialDetail,
   resetTerrainStreamingState,
   sampleAcceptedGroundAtLatLon,
   sampleAcceptedGroundAtWorldXZ,
@@ -507,7 +505,6 @@ export {
   repositionBuildingsWithTerrain,
   rebuildStructureVisualMeshes,
   refreshTerrainSurfaceProfiles,
-  updateTerrainAerialDetail,
   resetTerrainStreamingState,
   sampleAcceptedGroundAtLatLon,
   sampleAcceptedGroundAtWorldXZ,

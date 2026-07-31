@@ -65,6 +65,9 @@ export function finalizeLoadedWorld(options = {}) {
   if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.refreshTerrainSurfaceProfiles === 'function') {
     runFinalStep('refreshTerrainSurfaceProfiles', () => appCtx.refreshTerrainSurfaceProfiles());
   }
+  if (appCtx.terrainEnabled && !appCtx.onMoon && typeof appCtx.retireGroundFallbackPlaceholder === 'function') {
+    runFinalStep('retireGroundFallbackPlaceholder', () => appCtx.retireGroundFallbackPlaceholder());
+  }
   runFinalStep('buildTraversalNetworks', () => buildTraversalNetworks());
   runFinalStep('spawnOnRoad', () => spawnOnRoad());
   if (typeof appCtx.refreshMemoryMarkersForCurrentLocation === 'function') {

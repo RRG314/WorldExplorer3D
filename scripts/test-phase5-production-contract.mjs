@@ -79,11 +79,14 @@ assert.match(batchingSource, /material\.customProgramCacheKey = group\.material\
 const terrainProfilesSource = read('app/js/terrain/surface-profiles.js');
 assert.match(terrainProfilesSource, /LinearMipmapLinearFilter/);
 assert.match(terrainProfilesSource, /anisotropy\s*=\s*Math\.max\(1,\s*Math\.min\(8/);
-assert.match(terrainProfilesSource, /export function updateTerrainAerialDetail/);
-assert.match(terrainProfilesSource, /alreadySuppressed \? 105 : 145/);
-assert.match(terrainProfilesSource, /terrainSurfaceDetailState/);
-assert.match(terrainProfilesSource, /material\.map = state\.map \|\| null/);
-assert.match(read('app/js/world/lod.js'), /updateTerrainAerialDetail\?\.\(aerialMode, aerialAltitude\)/);
+assert.doesNotMatch(terrainProfilesSource, /updateTerrainAerialDetail|terrainAerialDetailSuppressed|terrainSurfaceDetailState/);
+assert.equal(
+  fs.existsSync(path.join(root, 'app/js/world/aerial-surface-context.js')),
+  false,
+  'aerial mode must not own a regional replacement ground plane'
+);
+const worldLodSource = read('app/js/world/lod.js');
+assert.doesNotMatch(worldLodSource, /aerial-surface-context|syncAerialSurfaceContext|syncAerialFog/);
 
 const landmarkCatalogSource = read('app/js/world/landmark-catalog.js');
 for (const landmark of [
@@ -212,7 +215,7 @@ console.log(JSON.stringify({
   facadeOwner: 'engine/building-facade-materials',
   facadeAtlases: facadeAssets.length,
   facadeAssetBytes,
-  aerialTerrainDetail: 'hysteretic-map-suppression',
+  aerialTerrainDetail: 'same-materials-as-ground',
   measuredBaltimoreLandmarks: 2,
   naturalGroundOwner: 'terrain-profile',
   shadowOwner: 'engine/shadow-policy',

@@ -1,5 +1,4 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { syncAerialSurfaceContext } from "./aerial-surface-context.js?v=2";
 
 const runtime = {
   getPerfModeValue: () => 'full',
@@ -11,19 +10,6 @@ let lastLodRefX = 0;
 let lastLodRefZ = 0;
 let lastLodReady = false;
 let lastBuildingMeshCount = -1;
-let savedGroundFog = null;
-
-function syncAerialFog(aerialMode) {
-  if (!appCtx.scene) return;
-  if (aerialMode) {
-    if (appCtx.scene.fog) savedGroundFog = appCtx.scene.fog;
-    appCtx.scene.fog = null;
-  } else if (!appCtx.scene.fog && savedGroundFog) {
-    appCtx.scene.fog = savedGroundFog;
-    savedGroundFog = null;
-  }
-}
-
 export function initWorldLod(deps = {}) {
   if (typeof deps.getPerfModeValue === 'function') runtime.getPerfModeValue = deps.getPerfModeValue;
   if (typeof deps.getRuntimeDynamicBudget === 'function') runtime.getRuntimeDynamicBudget = deps.getRuntimeDynamicBudget;
@@ -135,7 +121,6 @@ function selectBuildingCandidates(candidates, budget) {
 
 export function updateWorldLod(force = false) {
   if (appCtx.onMoon || appCtx.travelingToMoon || (typeof appCtx.isEnv === 'function' && appCtx.ENV && !appCtx.isEnv(appCtx.ENV.EARTH))) {
-    appCtx.updateTerrainAerialDetail?.(false, 0);
     hideMeshList(appCtx.roadMeshes);
     hideMeshList(appCtx.urbanSurfaceMeshes);
     hideMeshList(appCtx.buildingMeshes);
@@ -151,15 +136,6 @@ export function updateWorldLod(force = false) {
   const ref = lodReferenceActor();
   const refX = Number.isFinite(ref?.x) ? ref.x : 0;
   const refZ = Number.isFinite(ref?.z) ? ref.z : 0;
-  const aerialMode = !!(appCtx.planeMode?.active || appCtx.droneMode);
-  syncAerialFog(aerialMode);
-  const aerialActor = appCtx.planeMode?.active ? appCtx.planeMode : appCtx.drone;
-  const aerialGroundY = aerialMode
-    ? Number(appCtx.terrainMeshHeightAt?.(refX, refZ) ?? appCtx.elevationWorldYAtWorldXZ?.(refX, refZ) ?? 0)
-    : 0;
-  const aerialAltitude = aerialMode ? Math.max(0, Number(aerialActor?.y) - aerialGroundY) : 0;
-  appCtx.updateTerrainAerialDetail?.(aerialMode, aerialAltitude);
-  appCtx.aerialSurfaceContextState = syncAerialSurfaceContext(aerialMode, aerialAltitude);
 
   if ((!appCtx.buildingMeshes || appCtx.buildingMeshes.length === 0) &&
       (!appCtx.poiMeshes || appCtx.poiMeshes.length === 0) &&
