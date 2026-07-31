@@ -65,7 +65,7 @@ import {
 } from "./terrain/debug-tools.js?v=3";
 import { createTerrainSidewalkApi } from "./terrain/sidewalk-helpers.js?v=1";
 import { createTerrainStreamingApi } from "./terrain/streaming.js?v=11";
-import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=2";
+import { createFarFieldTerrainApi } from "./terrain/far-field.js?v=3";
 import { reconcileActorsAfterSurfaceRebuild } from "./terrain/actor-reprojection.js?v=2";
 import { pointInWaterBody } from "./world/water-surface-registry.js?v=2";
 // terrain.js - Accepted-ground artifact and terrain presentation system

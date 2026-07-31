@@ -333,6 +333,7 @@ function worldCompositionSnapshot() {
   const result = {
     aerialReplacementMeshes: 0,
     farTerrainClipmaps: 0,
+    farMappedContexts: 0,
     mappedTerrainMeshes: 0,
     suppressedTerrainMeshes: 0,
     terrainMeshes: 0
@@ -340,6 +341,7 @@ function worldCompositionSnapshot() {
   appCtx.scene?.traverse?.((object) => {
     if (object?.userData?.aerialSurfaceContext) result.aerialReplacementMeshes += 1;
     if (object?.userData?.isFarTerrainClipmap) result.farTerrainClipmaps += 1;
+    if (object?.userData?.isFarMappedContext) result.farMappedContexts += 1;
     if (!object?.userData?.isTerrainMesh) return;
     result.terrainMeshes += 1;
     if (object.material && !Array.isArray(object.material) && object.material.map) {

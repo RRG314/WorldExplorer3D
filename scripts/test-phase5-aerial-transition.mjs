@@ -21,6 +21,8 @@ const farFieldSource = read('app/js/terrain/far-field.js');
 const {
   FAR_FIELD_OUTER_DISTANCE_METERS,
   FAR_FIELD_SOURCE_ZOOM_OFFSET,
+  FAR_CONTEXT_MAX_BUILDINGS,
+  FAR_CONTEXT_ZOOM,
   buildClipmapAxis,
   cellInsideHole
 } = await import('../app/js/terrain/far-field.js');
@@ -53,6 +55,8 @@ assert.match(streamingSource, /z: appCtx\.TERRAIN_ZOOM/);
 assert.doesNotMatch(streamingSource, /childTiles|terrainLeafPlan|terrainSegmentsForZoom/);
 assert.equal(FAR_FIELD_SOURCE_ZOOM_OFFSET, 3);
 assert.equal(FAR_FIELD_OUTER_DISTANCE_METERS, 15000);
+assert.equal(FAR_CONTEXT_ZOOM, 13);
+assert.equal(FAR_CONTEXT_MAX_BUILDINGS, 10000);
 const axis = buildClipmapAxis(-100, -20, 30, 100, 15);
 assert.equal(axis[0], -100);
 assert.equal(axis.at(-1), 100);
@@ -62,12 +66,15 @@ assert.ok(axis.every((value, index) => index === 0 || value > axis[index - 1]), 
 assert.equal(cellInsideHole(0, 0, { minX: -20, maxX: 30, minZ: -10, maxZ: 10 }), true);
 assert.equal(cellInsideHole(31, 0, { minX: -20, maxX: 30, minZ: -10, maxZ: 10 }), false);
 assert.match(farFieldSource, /Mapzen Terrarium elevation-derived landscape/);
-assert.match(farFieldSource, /deterministic-elevation-derived/);
+assert.match(farFieldSource, /mapped-landuse-with-elevation-fallback/);
+assert.match(farFieldSource, /openstreetmap-shortbread/);
+assert.match(farFieldSource, /isFarMappedContext/);
 assert.doesNotMatch(farFieldSource, /loadWorldCoverBaseline/);
 assert.match(farFieldSource, /const isWater = sourceMeters <= 0\.75/);
 assert.match(farFieldSource, /if \(isWater\) meters = 0/);
 assert.match(farFieldSource, /isFarTerrainClipmap/);
 assert.match(diagnosticsSource, /farTerrainClipmap/);
+assert.match(diagnosticsSource, /farMappedContexts/);
 
 console.log(JSON.stringify({
   ok: true,

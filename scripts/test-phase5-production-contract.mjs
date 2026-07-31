@@ -106,8 +106,10 @@ assert.match(buildingLoadSource, /hideRadiusMeters/);
 assert.match(buildingLoadSource, /curatedLandmarkSuppressedBuildings/);
 
 const landuseSource = read('app/js/world/load-landuse-pass.js');
-assert.match(landuseSource, /renderOwner:\s*'terrain-profile'/);
-assert.match(landuseSource, /geometryRendered:\s*false/);
+assert.match(landuseSource, /buildTerrainConformingPolygonGeometry/);
+assert.match(landuseSource, /const isMappedGroundCover = visibleMappedSurfaceTypes\.has\(landuseType\)/);
+assert.match(landuseSource, /mesh\.userData\.alwaysVisible = isWater \|\| isExplicitHardscape \|\| isMappedGroundCover/);
+assert.doesNotMatch(landuseSource, /geometryRendered:\s*false/);
 assert.match(landuseSource, /props\.kind[\s\S]*'glacier'/);
 
 const shadowSource = read('app/js/engine/shadow-policy.js');
@@ -217,7 +219,7 @@ console.log(JSON.stringify({
   facadeAssetBytes,
   aerialTerrainDetail: 'same-materials-as-ground',
   measuredBaltimoreLandmarks: 2,
-  naturalGroundOwner: 'terrain-profile',
+  naturalGroundOwner: 'terrain-with-conforming-osm-landcover',
   shadowOwner: 'engine/shadow-policy',
   interpolationOwner: interpolator.snapshot().owner,
   publicReleaseRecord: '4.1.2'
