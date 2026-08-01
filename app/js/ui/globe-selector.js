@@ -1,9 +1,9 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
-import { createGlobeSelectorScene } from './globe-selector/scene.js?v=12';
+import { createGlobeSelectorScene } from './globe-selector/scene.js?v=14';
 import { createGlobeSelectorLaunch } from './globe-selector/launch.js?v=2';
 import { getGlobeSelectorElements } from './globe-selector/dom.js?v=2';
-import { fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=1';
-import { bindCityListInteractions, renderNearbyCityItems, renderPresetCityItems } from './globe-selector/city-list-view.js?v=3';
+import { fetchNearbyCities, nearbyMajorCities } from './globe-selector/catalog.js?v=2';
+import { bindCityListInteractions, renderNearbyCityItems, renderPresetCityItems } from './globe-selector/city-list-view.js?v=4';
 import {
   addSelectionToSavedFavorites,
   addRecentPlace,
@@ -20,10 +20,11 @@ import {
   normalizeCityRecord,
   parseReverseAddress,
   persistSavedFavoriteCities as persistSavedFavoriteCitiesToStorage,
+  resolveCoordinateWaterKind,
   syncLegacyCustomSelection,
   setGlobeSelectorScrollLock,
   toFiniteNumber
-} from "./globe-selector/helpers.js?v=5";
+} from "./globe-selector/helpers.js?v=6";
 
 function createGlobeSelector(options = {}) {
   const {
@@ -48,6 +49,7 @@ function createGlobeSelector(options = {}) {
   }
 
   let openState = false, selected = null, searchInFlight = false;
+  let selectionResolvePromise = Promise.resolve();
   let coordinateInputsDirty = false, reverseLookupToken = 0;
   let activeCityTab = 'nearby';
   let nearbyCities = [], mappedNearbyCities = [], liveNearbyCity = null;
@@ -78,7 +80,7 @@ function createGlobeSelector(options = {}) {
     onGlobePick(next, interaction = {}) {
       const fallbackName = `Selected ${next.lat.toFixed(2)}, ${next.lon.toFixed(2)}`;
       setSelection(next.lat, next.lon, { name: fallbackName, fetchNearby: true });
-      reverseLookupPlace(next.lat, next.lon);
+      beginReverseLookup(next.lat, next.lon);
       if (searchInput) searchInput.value = fallbackName;
       if (interaction.activate === true) void triggerStartHere();
     }
@@ -239,6 +241,7 @@ function createGlobeSelector(options = {}) {
     if (coordsChanged) {
       liveNearbyCity = null;
       mappedNearbyCities = [];
+      selectionResolvePromise = Promise.resolve();
     }
     const named = typeof meta.name === 'string' ? meta.name.trim() : '';
     selected = {
@@ -290,7 +293,13 @@ function createGlobeSelector(options = {}) {
     if (searchInput && typeof meta.searchLabel === 'string' && meta.searchLabel.trim()) {
       searchInput.value = meta.searchLabel.trim();
     }
-    if (selected) reverseLookupPlace(selected.lat, selected.lon);
+    if (selected) beginReverseLookup(selected.lat, selected.lon);
+  }
+
+  function beginReverseLookup(lat, lon) {
+    const lookup = reverseLookupPlace(lat, lon);
+    selectionResolvePromise = Promise.resolve(lookup).catch(() => null);
+    return selectionResolvePromise;
   }
 
   async function reverseLookupPlace(lat, lon) {
@@ -300,6 +309,10 @@ function createGlobeSelector(options = {}) {
     if (cached && selected && Math.abs(selected.lat - lat) <= 0.00001 && Math.abs(selected.lon - lon) <= 0.00001) {
       selected.name = cached.display;
       selected.locationDetails = cached.details || null;
+      if (cached.waterKind) {
+        selected.arrivalMode = 'boat';
+        selected.waterKind = cached.waterKind;
+      }
       liveNearbyCity = normalizeCityRecord({
         key: 'live-nearby',
         name: cached.queryLabel || cached.display,
@@ -316,6 +329,14 @@ function createGlobeSelector(options = {}) {
       if (Math.abs(selected.lat - lat) > 0.00001 || Math.abs(selected.lon - lon) > 0.00001) return;
 
       const parsed = parseReverseAddress(payload);
+      parsed.waterKind = parsed.waterKind || await resolveCoordinateWaterKind(lat, lon, payload);
+      if (parsed.waterKind) {
+        parsed.details = { ...(parsed.details || {}), waterKind: parsed.waterKind };
+        parsed.display ||= `Open Ocean ${lat.toFixed(2)}, ${lon.toFixed(2)}`;
+        parsed.queryLabel ||= 'Open Ocean';
+      }
+      if (!openState || requestToken !== reverseLookupToken || !selected) return;
+      if (Math.abs(selected.lat - lat) > 0.00001 || Math.abs(selected.lon - lon) > 0.00001) return;
       if (parsed.display) {
         reverseLookupCache.set(cacheKey, parsed);
         const payloadLat = toFiniteNumber(payload?.lat ?? payload?.latitude);
@@ -329,6 +350,10 @@ function createGlobeSelector(options = {}) {
         if (liveCandidate) liveNearbyCity = liveCandidate;
         selected.name = parsed.display;
         selected.locationDetails = parsed.details;
+        if (parsed.waterKind) {
+          selected.arrivalMode = 'boat';
+          selected.waterKind = parsed.waterKind;
+        }
         syncLegacyCustomState(selected);
         renderSelection();
         if (searchInput && !searchInput.value.trim()) searchInput.value = parsed.queryLabel || parsed.display;
@@ -386,7 +411,7 @@ function createGlobeSelector(options = {}) {
           fetchNearby: true,
           arrivalMode: result.arrivalMode || 'walk'
         });
-        reverseLookupPlace(result.lat, result.lon);
+        beginReverseLookup(result.lat, result.lon);
       } else {
         throw new Error('Search function unavailable');
       }
@@ -420,7 +445,7 @@ function createGlobeSelector(options = {}) {
     }
     setSelection(lat, lon, { name: 'Manual Coordinates', fetchNearby: true });
     coordinateInputsDirty = false;
-    reverseLookupPlace(lat, lon);
+    beginReverseLookup(lat, lon);
     return true;
   }
 
@@ -451,7 +476,9 @@ function createGlobeSelector(options = {}) {
     }
   });
 
-  function triggerStartHere() {
+  async function triggerStartHere() {
+    if (coordinateInputsDirty && !applySelectionFromInputs()) return false;
+    await selectionResolvePromise;
     return launchCoordinator.startHere();
   }
 
@@ -574,7 +601,7 @@ function createGlobeSelector(options = {}) {
 
     if (searchInput) searchInput.value = appCtx.customLoc?.name || '';
     if (mobileSearchInput) mobileSearchInput.value = searchInput?.value || appCtx.customLoc?.name || '';
-    if (selected) reverseLookupPlace(selected.lat, selected.lon);
+    if (selected) beginReverseLookup(selected.lat, selected.lon);
 
     if (appCtx.liveEarth && typeof appCtx.liveEarth.onSelectorOpen === 'function') {
       appCtx.liveEarth.onSelectorOpen();

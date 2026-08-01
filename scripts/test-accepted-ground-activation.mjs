@@ -42,21 +42,20 @@ function harness(groundState) {
   };
 }
 
-const blocked = harness({
+const worldwideFallback = harness({
   status: 'blocked',
   reason: 'no-ground-artifacts-configured'
 });
-assert.equal(await blocked.run(), false);
-assert.equal(blocked.appCtx.worldLoading, false);
-assert.equal(blocked.appCtx.initialEarthWorldReady, false);
-assert.equal(blocked.runtimeState.status, 'blocked');
-assert.equal(blocked.terrainUpdates(), 0);
-assert.equal(blocked.finalizations.length, 1);
-assert.match(
-  blocked.messages.at(-1).message,
-  /accepted ground data is unavailable/
-);
-assert.deepEqual(blocked.phases, [
+assert.equal(await worldwideFallback.run(), true);
+assert.equal(worldwideFallback.appCtx.worldLoading, true);
+assert.equal(worldwideFallback.appCtx.initialEarthWorldReady, true);
+assert.equal(worldwideFallback.runtimeState.groundMode, 'worldwide-terrain-fallback');
+assert.equal(worldwideFallback.runtimeState.acceptedGround.status, 'fallback');
+assert.equal(worldwideFallback.runtimeState.acceptedGround.providerId, 'mapzen-terrarium');
+assert.equal(worldwideFallback.terrainUpdates(), 1);
+assert.equal(worldwideFallback.finalizations.length, 0);
+assert.match(worldwideFallback.messages.at(-1).message, /worldwide terrain and OpenStreetMap/);
+assert.deepEqual(worldwideFallback.phases, [
   'start:prepareAcceptedGround',
   'end:prepareAcceptedGround'
 ]);
@@ -134,7 +133,7 @@ assert.equal(explicitBoat.runtimeState.acceptedGround.requestedBoatArrival, true
 console.log(JSON.stringify({
   ok: true,
   contract: 'accepted-ground-activation',
-  blocksBeforeTerrainPublication: true,
+  worldwideLandFallbackStarts: true,
   acceptedArtifactStartsTerrain: true,
   openOceanDoesNotFabricateGround: true,
   explicitBoatArrivalSurvivesNormalization: true,

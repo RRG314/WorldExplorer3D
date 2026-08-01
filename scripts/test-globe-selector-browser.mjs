@@ -48,6 +48,52 @@ async function stubTitleLaunch() {
 }
 
 await openSelector();
+assert.equal(await page.locator('.globe-system-bar').count(), 0, 'legacy live status strip should be removed');
+const destinationButtons = page.locator('.globe-destination-bar button');
+assert.equal(await destinationButtons.count(), 5);
+assert.deepEqual(await destinationButtons.allTextContents(), ['', '', '', '', '']);
+const destinationChrome = await page.evaluate(() => ({
+  barBorderTop: getComputedStyle(document.querySelector('.globe-destination-bar')).borderTopWidth,
+  buttonBorders: [...document.querySelectorAll('.globe-destination-bar button')].map((button) => ({
+    right: getComputedStyle(button).borderRightWidth,
+    bottom: getComputedStyle(button).borderBottomWidth
+  }))
+}));
+assert.equal(destinationChrome.barBorderTop, '0px');
+assert(destinationChrome.buttonBorders.every(({ right, bottom }) => right === '0px' && bottom === '0px'));
+
+const themeButton = page.locator('#globeHubThemeBtn');
+assert.equal(await page.evaluate(() => document.documentElement.dataset.hubTheme), 'night');
+await page.screenshot({ path: path.join(outputDir, 'selector-night-clean.png'), fullPage: true });
+await themeButton.click();
+assert.equal(await page.evaluate(() => document.documentElement.dataset.hubTheme), 'day');
+assert.equal(await themeButton.getAttribute('aria-pressed'), 'true');
+const daySurfaceColors = await page.evaluate(() => {
+  const color = (selector) => getComputedStyle(document.querySelector(selector)).backgroundColor;
+  return {
+    screen: color('#globeSelectorScreen'),
+    shell: color('.globe-selector-shell'),
+    side: color('.globe-selector-side'),
+    destinationBar: color('.globe-destination-bar'),
+    search: color('.globe-hub-search')
+  };
+});
+assert(Object.values(daySurfaceColors).every((value) => !/rgb\((?:[0-2]?\d|3[0-9]),\s*(?:[0-2]?\d|3[0-9]),\s*(?:[0-2]?\d|3[0-9])\)/.test(value)), `day surfaces remained dark: ${JSON.stringify(daySurfaceColors)}`);
+await page.screenshot({ path: path.join(outputDir, 'selector-day-clean.png'), fullPage: true });
+await page.getByRole('button', { name: 'My Places' }).click();
+await page.waitForSelector('#globeHubOverlay:not([hidden])');
+const dayOverlayColors = await page.evaluate(() => ({
+  overlay: getComputedStyle(document.querySelector('#globeHubOverlay')).backgroundColor,
+  header: getComputedStyle(document.querySelector('.globe-hub-overlay-header')).backgroundColor,
+  card: getComputedStyle(document.querySelector('.hub-library-grid button')).backgroundColor,
+  footer: getComputedStyle(document.querySelector('.globe-hub-footer-host .title-footer')).backgroundColor
+}));
+assert(Object.values(dayOverlayColors).every((value) => !value.startsWith('rgb(0,') && !value.startsWith('rgb(3,') && !value.startsWith('rgb(5,') && !value.startsWith('rgb(7,')), `day overlay remained dark: ${JSON.stringify(dayOverlayColors)}`);
+await page.screenshot({ path: path.join(outputDir, 'selector-day-my-places.png'), fullPage: true });
+await page.locator('#globeHubOverlayCloseBtn').click();
+await themeButton.click();
+assert.equal(await page.evaluate(() => document.documentElement.dataset.hubTheme), 'night');
+
 await page.getByRole('button', { name: 'Featured Cities' }).click();
 const featuredNames = await page.locator('#globeCityList .globe-selector-city-item-name').allTextContents();
 assert.deepEqual(featuredNames, [
@@ -70,7 +116,7 @@ for (let index = 0; index < 14; index += 1) {
   await page.waitForTimeout(80);
 }
 await page.waitForTimeout(2500);
-await page.screenshot({ path: path.join(outputDir, 'close-globe-detail.png'), fullPage: true });
+await page.screenshot({ path: path.join(outputDir, 'close-globe-original-imagery.png'), fullPage: true });
 
 await stubTitleLaunch();
 await page.getByRole('button', { name: 'Explore underwater at the selected coordinates' }).click();
@@ -79,6 +125,29 @@ const oceanLaunch = (await page.evaluate(() => window.__selectorLaunchCapture))[
 assertCoordinate(oceanLaunch.customLoc.lat, 35.6762, 'ocean latitude');
 assertCoordinate(oceanLaunch.customLoc.lon, 139.6503, 'ocean longitude');
 assert.equal(oceanLaunch.loadingScreenMode, 'ocean');
+
+await page.route('https://nominatim.openstreetmap.org/reverse?*', (route) => route.fulfill({
+  status: 200,
+  contentType: 'application/json',
+  body: JSON.stringify({ error: 'Unable to geocode' })
+}));
+await page.route('https://wms.gebco.net/mapserv?*', (route) => route.fulfill({
+  status: 200,
+  contentType: 'text/plain',
+  body: "GetFeatureInfo results:\nvalue_list = '-4300'"
+}));
+await openSelector();
+await page.locator('#globeCustomLat').fill('0');
+await page.locator('#globeCustomLon').fill('-140');
+await stubTitleLaunch();
+await page.getByRole('button', { name: 'Explore', exact: true }).click();
+await page.waitForFunction(() => window.__selectorLaunchCapture?.length === 1, null, { timeout: 20000 });
+const surfaceOceanLaunch = (await page.evaluate(() => window.__selectorLaunchCapture))[0];
+assertCoordinate(surfaceOceanLaunch.customLoc.lat, 0, 'surface-ocean latitude');
+assertCoordinate(surfaceOceanLaunch.customLoc.lon, -140, 'surface-ocean longitude');
+assert.equal(surfaceOceanLaunch.customLoc.arrivalMode, 'boat');
+await page.unroute('https://nominatim.openstreetmap.org/reverse?*');
+await page.unroute('https://wms.gebco.net/mapserv?*');
 
 await openSelector();
 await page.getByRole('button', { name: 'Featured Cities' }).click();
@@ -132,11 +201,15 @@ console.log(JSON.stringify({
   featuredCities: featuredNames.length,
   tokyoCoordinates: [35.6762, 139.6503],
   oceanCoordinates: [oceanLaunch.customLoc.lat, oceanLaunch.customLoc.lon],
+  surfaceOceanArrival: surfaceOceanLaunch.customLoc.arrivalMode,
   doubleClickCoordinates: [doubleClickLaunch.customLoc.lat, doubleClickLaunch.customLoc.lon],
   geolocationCoordinates: [geolocationLaunch.customLoc.lat, geolocationLaunch.customLoc.lon],
   screenshots: [
+    'output/playwright/globe-selector/selector-night-clean.png',
+    'output/playwright/globe-selector/selector-day-clean.png',
+    'output/playwright/globe-selector/selector-day-my-places.png',
     'output/playwright/globe-selector/featured-cities.png',
-    'output/playwright/globe-selector/close-globe-detail.png',
+    'output/playwright/globe-selector/close-globe-original-imagery.png',
     'output/playwright/globe-selector/pacific-global-bathymetry.png'
   ]
 }, null, 2));

@@ -1,11 +1,11 @@
 import {
   CURATED_DESTINATIONS,
   MAJOR_CITY_DESTINATIONS
-} from '../globe-selector/catalog.js?v=1';
+} from '../globe-selector/catalog.js?v=2';
 import {
   loadRecentPlaces,
   loadSavedFavoriteCities
-} from '../globe-selector/helpers.js?v=5';
+} from '../globe-selector/helpers.js?v=6';
 
 const HUB_PANELS = {
   games: { tab: 'games', title: 'Missions & Games' },
@@ -30,9 +30,11 @@ function setupHubTheme() {
 
   const apply = () => {
     document.documentElement.dataset.hubTheme = mode;
-    button.textContent = mode === 'day' ? '☼' : '◒';
-    button.title = `Appearance: ${mode[0].toUpperCase()}${mode.slice(1)}`;
-    button.setAttribute('aria-label', `${button.title}. Activate to change.`);
+    const nextMode = mode === 'day' ? 'dark' : 'light';
+    button.textContent = mode === 'day' ? '◒' : '☼';
+    button.title = `Switch to ${nextMode} appearance`;
+    button.setAttribute('aria-label', button.title);
+    button.setAttribute('aria-pressed', mode === 'day' ? 'true' : 'false');
   };
 
   button.addEventListener('click', () => {

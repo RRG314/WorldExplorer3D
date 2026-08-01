@@ -51,8 +51,10 @@ import {
   terrainTileMeshKey,
   tileXYToLatLonBounds,
   waitForTerrainTileReadyAtZoom,
+  waitForTerrainReadyAt as waitForTerrainTileReadyAt,
+  waitForTerrainReadyBounds as waitForTerrainTileReadyBounds,
   worldToLatLon
-} from "./terrain/tiles.js?v=34";
+} from "./terrain/tiles.js?v=35";
 import {
   buildRoadSkirts,
   detectRoadIntersections,
@@ -144,6 +146,12 @@ function clampElevationMeters(meters) {
 }
 
 function elevationMetersAtLatLon(latitude, longitude) {
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'worldwide-terrain-fallback') {
+    const sample = terrainSourceSampleAtLatLon(latitude, longitude, terrainTileDeps);
+    return sample.status === 'available' && Number.isFinite(Number(sample.elevationMeters))
+      ? clampElevationMeters(Number(sample.elevationMeters))
+      : null;
+  }
   const sample = acceptedGroundRuntime.sampleAtLatLon(latitude, longitude);
   return sample.status === 'available' &&
     Number.isFinite(Number(sample.groundElevationMeters))
@@ -152,6 +160,13 @@ function elevationMetersAtLatLon(latitude, longitude) {
 }
 
 function elevationWorldYAtWorldXZ(x, z) {
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'worldwide-terrain-fallback') {
+    const sample = terrainSourceSampleAtWorldXZ(x, z, terrainTileDeps);
+    return sample.status === 'available' && Number.isFinite(Number(sample.elevationMeters))
+      ? clampElevationMeters(Number(sample.elevationMeters)) *
+        appCtx.WORLD_UNITS_PER_METER * appCtx.TERRAIN_Y_EXAGGERATION
+      : null;
+  }
   const sample = acceptedGroundRuntime.sampleAtWorldXZ(x, z);
   if (
     sample.status !== 'available' ||
@@ -207,7 +222,8 @@ function resolveWaterTerrainY(x, z, terrainY, candidates = null) {
 const terrainTileDeps = {
   clampElevationMeters,
   sampleAcceptedGroundAtLatLon,
-  usesAcceptedGround: true,
+  usesAcceptedGround: () =>
+    appCtx.worldLoadRuntimeState?.groundMode !== 'worldwide-terrain-fallback',
   applyStructureTerrainCuts: (worldX, worldZ, terrainY) => applyStructureTerrainCuts(worldX, worldZ, terrainY),
   createWaterTerrainContext,
   resolveWaterTerrainY,
@@ -358,14 +374,16 @@ const {
 async function waitForTerrainCoverageAt(x = 0, z = 0, timeoutMs = 5000, minLoadedRatio = 0.72) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return { ready: false, loaded: 0, total: 0 };
   if (![x, z].every(Number.isFinite)) return { ready: false, loaded: 0, total: 0 };
-  const acceptedSample = sampleAcceptedGroundAtWorldXZ(x, z);
-  if (acceptedSample.status !== 'available') {
-    return {
-      ready: false,
-      loaded: 0,
-      total: 1,
-      reason: acceptedSample.reason || 'accepted-ground-unavailable'
-    };
+  if (terrainTileDeps.usesAcceptedGround()) {
+    const acceptedSample = sampleAcceptedGroundAtWorldXZ(x, z);
+    if (acceptedSample.status !== 'available') {
+      return {
+        ready: false,
+        loaded: 0,
+        total: 1,
+        reason: acceptedSample.reason || 'accepted-ground-unavailable'
+      };
+    }
   }
   updateTerrainAround(x, z);
 
@@ -395,10 +413,16 @@ async function waitForTerrainCoverageAt(x = 0, z = 0, timeoutMs = 5000, minLoade
 }
 
 async function waitForAcceptedGroundReadyAt(x, z) {
+  if (!terrainTileDeps.usesAcceptedGround()) {
+    return waitForTerrainTileReadyAt(x, z, 3000, terrainTileDeps);
+  }
   return sampleAcceptedGroundAtWorldXZ(x, z).status === 'available';
 }
 
 async function waitForAcceptedGroundReadyBounds(bounds) {
+  if (!terrainTileDeps.usesAcceptedGround()) {
+    return waitForTerrainTileReadyBounds(bounds, 8000, terrainTileDeps);
+  }
   const south = Number(bounds?.latS);
   const north = Number(bounds?.latN);
   const west = Number(bounds?.lonW);

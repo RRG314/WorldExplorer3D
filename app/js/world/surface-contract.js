@@ -237,7 +237,7 @@ function surfaceKindFromWalkInfo(info = {}) {
 
 function terrainProvenance(appCtx) {
   const ground = appCtx.getAcceptedGroundRuntimeSnapshot?.() || null;
-  return ground?.status === 'accepted' ? {
+  if (ground?.status === 'accepted') return {
     provider: ground.providerId,
     dataset: ground.artifactId,
     source: 'accepted_ground_artifact',
@@ -245,7 +245,18 @@ function terrainProvenance(appCtx) {
     verticalDatum: ground.verticalDatum,
     confidence: 1,
     fallback: false
-  } : {
+  };
+  if (appCtx.worldLoadRuntimeState?.groundMode === 'worldwide-terrain-fallback') {
+    return {
+      provider: 'mapzen-terrarium',
+      dataset: 'Mapzen Terrain Tiles',
+      source: 'worldwide_terrain_fallback',
+      verticalDatum: 'mixed-source',
+      confidence: 0.35,
+      fallback: true
+    };
+  }
+  return {
     provider: 'World Explorer 3D',
     dataset: 'accepted ground unavailable',
     source: 'accepted_ground_unavailable',

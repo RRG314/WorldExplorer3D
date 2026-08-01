@@ -247,6 +247,7 @@ function createFarFieldTerrainApi(deps = {}) {
     latLonToTileXY,
     sampleAcceptedGroundAtLatLon,
     sampleTileElevationMeters,
+    terrainTileDeps,
     tileXYToLatLonBounds,
     waitForTerrainTileReadyAtZoom,
     worldToLatLon
@@ -325,6 +326,8 @@ function createFarFieldTerrainApi(deps = {}) {
   }
 
   function normalizationOffset(innerBounds, zoom, loadedTiles) {
+    if (typeof terrainTileDeps?.usesAcceptedGround === 'function' &&
+        !terrainTileDeps.usesAcceptedGround()) return 0;
     const offsets = [];
     for (const fx of [0.15, 0.5, 0.85]) {
       for (const fz of [0.15, 0.5, 0.85]) {
@@ -570,7 +573,9 @@ function createFarFieldTerrainApi(deps = {}) {
       layer: 'terrain',
       role: 'far-field-terrain',
       sources: ['mapzen-terrarium', 'openstreetmap-shortbread'],
-      fallback: false
+      fallback: offsetMeters === 0 &&
+        typeof terrainTileDeps?.usesAcceptedGround === 'function' &&
+        !terrainTileDeps.usesAcceptedGround()
     };
 
     removeCurrentMesh();

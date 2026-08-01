@@ -8,6 +8,28 @@
   --hub-muted: #a5b2bd;
   --hub-blue: #2d7dff;
   --hub-green: #4ade80;
+  --hub-input: #03090e;
+  --hub-hover: #10243a;
+  --hub-active: #163b66;
+  --hub-overlay: #050c12;
+  --hub-bar: #03090e;
+}
+
+html[data-hub-theme="day"] {
+  --hub-bg: #e9eff4;
+  --hub-panel: #f4f7fa;
+  --hub-panel-2: #ffffff;
+  --hub-line: rgba(52, 70, 86, 0.24);
+  --hub-line-strong: rgba(52, 70, 86, 0.42);
+  --hub-text: #14202a;
+  --hub-muted: #586976;
+  --hub-blue: #155fc4;
+  --hub-green: #087d3e;
+  --hub-input: #ffffff;
+  --hub-hover: #e3edf8;
+  --hub-active: #cfe2f8;
+  --hub-overlay: #eef3f7;
+  --hub-bar: #f7fafc;
 }
 
 /* The globe hub owns the complete pre-game experience. */
@@ -19,7 +41,7 @@ body.start-hub-open #appSignInBtn {
   position: fixed;
   z-index: 10004;
   top: 16px;
-  right: 210px;
+  right: 258px;
   left: auto !important;
   width: auto;
   height: 40px;
@@ -35,10 +57,42 @@ body.start-hub-open #appSignInBtn {
 body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 
 #globeSelectorScreen { color: var(--hub-text); background: var(--hub-bg); }
+#globeSelectorScreen {
+  --wx-bg: var(--hub-bg);
+  --wx-panel: color-mix(in srgb, var(--hub-panel) 94%, transparent);
+  --wx-panel-solid: var(--hub-panel);
+  --wx-panel-soft: var(--hub-panel-2);
+  --wx-line: var(--hub-line-strong);
+  --wx-line-soft: var(--hub-line);
+  --wx-text: var(--hub-text);
+  --wx-muted: var(--hub-muted);
+  --wx-blue: var(--hub-blue);
+  --wx-green: var(--hub-green);
+}
 #globeSelectorScreen .globe-selector-shell {
   grid-template-columns: 160px minmax(0, 1fr) 332px;
-  grid-template-rows: 76px minmax(0, 1fr) 110px 58px;
+  grid-template-rows: 76px minmax(0, 1fr) 110px;
 }
+.globe-selector-brand,
+.globe-selector-top,
+.globe-app-rail,
+.globe-destination-bar { background: var(--hub-bar); }
+.globe-selector-side { background: var(--hub-panel); }
+.globe-selector-stat,
+.globe-selector-live-details,
+.globe-selector-live-layer,
+.globe-selector-city-item { background: var(--hub-panel-2); }
+.globe-selector-field-label,
+.globe-selector-live-loading,
+.globe-selector-city-empty { color: var(--hub-muted); }
+.globe-selector-row input,
+.globe-mobile-search input { color: var(--hub-text); background: var(--hub-input); border-color: var(--hub-line); }
+.globe-selector-mode-tab,
+.globe-selector-city-tab,
+#globeSelectorBackBtn { color: var(--hub-muted); background: var(--hub-panel-2); border-color: var(--hub-line); }
+.globe-selector-mode-tab.active,
+.globe-selector-city-tab.active { color: var(--hub-text); background: var(--hub-active); border-color: var(--hub-blue); }
+#globeLocationSearchStatus { color: var(--hub-muted) !important; }
 .globe-selector-brand {
   gap: 5px;
   padding: 0 8px;
@@ -72,7 +126,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   grid-template-columns: 38px minmax(0, 1fr) auto;
   align-items: center;
   color: var(--hub-muted);
-  background: #03090e;
+  background: var(--hub-input);
   border: 1px solid var(--hub-line-strong);
 }
 .globe-hub-search > span { text-align: center; font: 24px/1 Inter, sans-serif; }
@@ -91,7 +145,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   height: 100%;
   padding: 0 18px;
   color: var(--hub-text);
-  background: #152331;
+  background: var(--hub-panel-2);
   border: 0;
   border-left: 1px solid var(--hub-line);
   border-radius: 0;
@@ -99,7 +153,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   text-transform: uppercase;
   cursor: pointer;
 }
-.globe-hub-search button:hover { background: #1d3650; }
+.globe-hub-search button:hover { background: var(--hub-hover); }
 .globe-hub-tools {
   display: flex;
   justify-content: flex-end;
@@ -118,7 +172,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   font: 600 18px/1 Inter, sans-serif;
   cursor: pointer;
 }
-.globe-hub-tools button:hover { color: #fff; background: #102238; border-color: var(--hub-blue); }
+.globe-hub-tools button:hover { color: var(--hub-text); background: var(--hub-hover); border-color: var(--hub-blue); }
 
 .globe-app-rail button { letter-spacing: 0; }
 .globe-app-rail button span { font-size: 23px; }
@@ -195,7 +249,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-selector-city-section span { color: var(--hub-muted); font-size: 9px; text-align: right; }
 .globe-selector-city-item[style*="background:#eef2ff"] {
   color: var(--hub-text) !important;
-  background: #10243a !important;
+  background: var(--hub-active) !important;
   border-color: var(--hub-blue) !important;
 }
 .globe-selector-live-chip,
@@ -203,11 +257,11 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-selector-live-refresh,
 .globe-selector-live-action-btn {
   color: var(--hub-text);
-  background: #102033;
+  background: var(--hub-panel-2);
   border-color: var(--hub-line);
 }
 .globe-selector-live-chip.active,
-.globe-selector-live-filter.active { color: #fff; background: #164378; border-color: var(--hub-blue); }
+.globe-selector-live-filter.active { color: var(--hub-text); background: var(--hub-active); border-color: var(--hub-blue); }
 .globe-selector-live-detail-card,
 .globe-selector-live-list-item {
   color: var(--hub-text);
@@ -245,7 +299,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   border: 1px solid var(--hub-line);
   border-radius: 6px;
   color: var(--hub-text);
-  background: #0b1721;
+  background: var(--hub-panel-2);
   text-align: left;
   cursor: pointer;
 }
@@ -266,19 +320,20 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 
 .globe-destination-bar { padding: 0 18px; }
 .globe-destination-bar button {
-  gap: 7px;
+  gap: 0;
+  padding: 0;
   letter-spacing: 0;
   overflow: hidden;
 }
 .globe-destination-bar button .destination-thumb {
-  width: 46px;
-  height: 46px;
-  flex: 0 0 46px;
+  width: 58px;
+  height: 58px;
+  flex: 0 0 58px;
   display: block;
   background-position: center;
   background-repeat: no-repeat;
   background-size: cover;
-  border: 1px solid rgba(255,255,255,0.24);
+  border: 2px solid transparent;
   border-radius: 50%;
   box-shadow: 0 0 18px rgba(45,125,255,0.12);
 }
@@ -286,28 +341,32 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .destination-thumb.moon { background-image: url('../assets/textures/moon_lroc_2048.jpg'); background-position: 38% 50%; }
 .destination-thumb.mars { background-image: url('../assets/textures/mars_viking_4096.jpg'); background-position: 42% 50%; }
 .globe-destination-bar button .destination-thumb.space {
-  width: 60px;
-  border-radius: 3px;
+  width: 76px;
+  border-radius: 8px;
   background-image: url('../assets/textures/universe/andromeda-galex-spitzer.jpg');
   background-size: contain;
 }
 .destination-thumb.ocean { background-image: url('../../assets/screenshots/ocean-mode-great-barrier-reef.png'); background-position: 40% 58%; }
 .globe-destination-bar button:hover .destination-thumb,
-.globe-destination-bar button.active .destination-thumb { border-color: #d8ebff; box-shadow: 0 0 20px rgba(45,125,255,0.35); }
-
-.globe-system-bar span { letter-spacing: 0; }
+.globe-destination-bar button.active .destination-thumb {
+  border-color: var(--hub-blue);
+  box-shadow: 0 0 22px color-mix(in srgb, var(--hub-blue) 42%, transparent);
+  transform: translateY(-2px) scale(1.04);
+}
+.globe-destination-bar button:hover,
+.globe-destination-bar button.active { background: transparent; }
 
 /* Existing working start panels are hosted here instead of on another page. */
 .globe-hub-overlay {
   z-index: 20;
   grid-column: 2 / 4;
-  grid-row: 2 / 5;
+  grid-row: 2 / 4;
   min-width: 0;
   min-height: 0;
   display: grid;
   grid-template-rows: 72px minmax(0, 1fr) auto;
   color: var(--hub-text);
-  background: #050c12;
+  background: var(--hub-overlay);
   border-left: 1px solid var(--hub-line);
 }
 .globe-hub-overlay[hidden] { display: none; }
@@ -316,7 +375,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   align-items: center;
   justify-content: space-between;
   padding: 0 22px;
-  background: #071018;
+  background: var(--hub-panel);
   border-bottom: 1px solid var(--hub-line);
 }
 .globe-hub-overlay-header span {
@@ -392,7 +451,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 }
 .hub-library-grid button:hover,
 .hub-library-grid button:focus-visible {
-  background: #10243a;
+  background: var(--hub-hover);
   border-color: var(--hub-blue);
 }
 .hub-library-grid button strong {
@@ -425,10 +484,10 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 .globe-hub-panel-host .loc:hover,
 .globe-hub-panel-host .loc.sel,
 .globe-hub-panel-host .mode:hover,
-.globe-hub-panel-host .mode.sel { border-color: var(--hub-blue); background: #10243a; }
+.globe-hub-panel-host .mode.sel { border-color: var(--hub-blue); background: var(--hub-hover); }
 .globe-hub-panel-host .title-use-location-btn { color: #fff; background: var(--hub-blue); box-shadow: none; }
 .globe-hub-panel-host input,
-.globe-hub-panel-host select { color: var(--hub-text); background: #03090e; border-color: var(--hub-line); }
+.globe-hub-panel-host select { color: var(--hub-text); background: var(--hub-input); border-color: var(--hub-line); }
 #tab-settings [style*="background"] {
   color: var(--hub-text) !important;
   background: var(--hub-panel-2) !important;
@@ -443,8 +502,8 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
 #tab-settings [style*="color:#475569"],
 #tab-settings [style*="color: #475569"] { color: var(--hub-muted) !important; }
 #tab-settings input,
-#tab-settings select { color: var(--hub-text) !important; background: #03090e !important; border-color: var(--hub-line) !important; }
-#tab-multiplayer .mpRoomEmpty { color: var(--hub-muted); background: #08131c; border-color: var(--hub-line); }
+#tab-settings select { color: var(--hub-text) !important; background: var(--hub-input) !important; border-color: var(--hub-line) !important; }
+#tab-multiplayer .mpRoomEmpty { color: var(--hub-muted); background: var(--hub-panel-2); border-color: var(--hub-line); }
 #tab-multiplayer .mp-btn.warn { color: #fff; background: var(--hub-blue); }
 .globe-hub-footer-host .title-footer {
   position: static;
@@ -455,7 +514,7 @@ body.start-hub-open #authFloatPanel { z-index: 10006; top: 64px; }
   align-items: center;
   gap: 14px;
   padding: 8px 18px;
-  background: #03090e;
+  background: var(--hub-bar);
   border-top: 1px solid var(--hub-line);
 }
 .globe-hub-footer-host .title-share-row {
@@ -485,7 +544,7 @@ body.start-hub-open #flowerChallengePanel {
 
 @media (max-width: 900px) {
   .globe-selector-street-list { grid-template-columns: 1fr; }
-  body.start-hub-open #appSignInBtn { top: 12px; right: 148px; height: 36px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  body.start-hub-open #appSignInBtn { top: 12px; right: 190px; height: 36px; max-width: 110px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   #globeSelectorScreen .globe-selector-shell {
     grid-template-columns: 1fr;
     grid-template-rows: 62px minmax(250px, 43vh) minmax(230px, 1fr) 86px 68px;
@@ -526,7 +585,7 @@ body.start-hub-open #flowerChallengePanel {
     height: 40px;
     padding: 0 10px;
     color: var(--hub-text);
-    background: #03090e;
+    background: var(--hub-input);
     border: 1px solid var(--hub-line);
     border-right: 0;
     border-radius: 0;
@@ -544,7 +603,6 @@ body.start-hub-open #flowerChallengePanel {
   .globe-selector-city-list { max-height: 150px; }
   .globe-destination-bar { grid-column: 1; grid-row: 4; padding: 0; }
   .globe-destination-bar button .destination-thumb { width: 38px; height: 38px; flex-basis: 38px; }
-  .globe-system-bar { display: none; }
   .globe-selector-side:has(#globeSelectorLiveEarthPanel.active)::before,
   .globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-mobile-search,
   .globe-selector-side:has(#globeSelectorLiveEarthPanel.active) .globe-selector-stat,
@@ -569,12 +627,12 @@ body.start-hub-open #flowerChallengePanel {
 }
 
 @media (max-width: 520px) {
-  body.start-hub-open #appSignInBtn { right: 132px; max-width: 92px; padding: 0 8px; font-size: 8px; }
+  body.start-hub-open #appSignInBtn { right: 172px; max-width: 92px; padding: 0 8px; font-size: 8px; }
   .globe-selector-brand { padding-left: 8px; padding-right: 58%; font-size: 8px; }
   .globe-selector-top { padding-left: 48%; padding-right: 6px; }
   .globe-hub-tools { gap: 4px; }
   .globe-hub-tools button { width: 34px; height: 34px; font-size: 15px; }
-  .globe-destination-bar button { gap: 5px; font-size: 7px; }
+  .globe-destination-bar button { gap: 0; font-size: 0; }
   .globe-destination-bar button .destination-thumb { width: 34px; height: 34px; flex-basis: 34px; }
   .globe-hub-panel-host .loc-grid { grid-template-columns: 1fr; }
 }

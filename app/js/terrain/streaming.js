@@ -114,8 +114,11 @@ function createTerrainStreamingApi(deps = {}) {
     if (!appCtx.terrainEnabled) return;
     if (![x, z].every(Number.isFinite)) return;
     const geographic = worldToLatLon(x, z);
+    const usesAcceptedGround = typeof terrainTileDeps?.usesAcceptedGround === 'function'
+      ? terrainTileDeps.usesAcceptedGround()
+      : terrainTileDeps?.usesAcceptedGround === true;
     if (
-      terrainTileDeps?.usesAcceptedGround === true &&
+      usesAcceptedGround &&
       terrainTileDeps.sampleAcceptedGroundAtLatLon?.(
         geographic.lat,
         geographic.lon
@@ -166,7 +169,7 @@ function createTerrainStreamingApi(deps = {}) {
             `${appCtx.TERRAIN_ZOOM}/${tx}/${ty}`;
           desiredKeys.add(key);
           if (!existingMeshesByKey.has(key)) {
-            if (terrainTileDeps?.usesAcceptedGround !== true) {
+            if (!usesAcceptedGround) {
               getOrLoadTerrainTile?.(
                 appCtx.TERRAIN_ZOOM,
                 tx,

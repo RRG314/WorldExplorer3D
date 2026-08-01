@@ -35,6 +35,7 @@ export async function activateAcceptedGroundForWorldLoad(options = {}) {
   loadMetrics.acceptedGround = state;
   if (state?.status === 'accepted') {
     runtimeState.acceptedGround = state;
+    runtimeState.groundMode = 'accepted-ground';
     appCtx.updateTerrainAround?.(0, 0);
     return true;
   }
@@ -61,20 +62,18 @@ export async function activateAcceptedGroundForWorldLoad(options = {}) {
     return true;
   }
 
-  Object.assign(runtimeState, {
-    status: 'blocked',
-    reason,
-    acceptedGround: state || null,
-    updatedAt: performance.now(),
-    finishedAt: performance.now(),
-    activePhases: []
+  const fallback = Object.freeze({
+    status: 'fallback',
+    reason: 'worldwide-terrain-fallback',
+    sourceClassification: 'worldwide-terrain-fallback',
+    providerId: 'mapzen-terrarium',
+    dataset: 'Mapzen Terrain Tiles',
+    rejectedGround: state || null
   });
-  appCtx.worldLoading = false;
-  appCtx.initialEarthWorldReady = false;
-  finalizePerfLoad(false, { reason, acceptedGround: state || null });
-  appCtx.showLoad(
-    `This location cannot open safely: accepted ground data is unavailable (${reason}).`,
-    { hideSpinner: true, bold: true }
-  );
-  return false;
+  runtimeState.acceptedGround = fallback;
+  runtimeState.groundMode = 'worldwide-terrain-fallback';
+  loadMetrics.acceptedGround = fallback;
+  appCtx.showLoad('Loading worldwide terrain and OpenStreetMap data...');
+  appCtx.updateTerrainAround?.(0, 0);
+  return true;
 }

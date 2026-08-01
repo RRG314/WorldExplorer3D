@@ -27,7 +27,7 @@ function featureBudgetWarning(selection) {
     `pois ${selected.pois}/${requested.pois || 0}).`;
 }
 
-export function diagnoseDistrictGroundSource(sample = null) {
+export function diagnoseDistrictGroundSource(sample = null, options = {}) {
   const base = {
     schemaVersion: DISTRICT_GROUND_MODEL_SCHEMA_VERSION,
     status: 'blocked'
@@ -61,6 +61,23 @@ export function diagnoseDistrictGroundSource(sample = null) {
   const sourceClassification = String(
     sample.provenance?.runtimeClassification || 'rejected'
   );
+  if (
+    options.allowWorldwideTerrainFallback === true &&
+    sampleStatus === 'available' &&
+    Number.isFinite(Number(sample.elevationMeters)) &&
+    sourceClassification === 'legacy-ground-fallback-only'
+  ) {
+    return Object.freeze({
+      schemaVersion: DISTRICT_GROUND_MODEL_SCHEMA_VERSION,
+      status: 'fallback',
+      reason: 'worldwide-terrain-fallback',
+      sourceClassification: 'worldwide-terrain-fallback',
+      sampleStatus,
+      providerId: 'mapzen-terrarium',
+      confidence: Number.isFinite(sample.confidence) ? Number(sample.confidence) : null,
+      verticalDatum: String(sample.provenance?.verticalDatum || 'mixed-source')
+    });
+  }
   if (sampleStatus !== 'available') {
     return Object.freeze({
       ...base,
@@ -167,7 +184,7 @@ export function adaptSelectedLocationSource(options = {}) {
         provider: districtSource.provider.name
       }),
       districtGroundModel:
-        diagnoseDistrictGroundSource(options.terrainSourceSample)
+        diagnoseDistrictGroundSource(options.terrainSourceSample, options)
     })
   });
 }
@@ -182,11 +199,23 @@ export function prepareSelectedLocationSource(options = {}) {
     data: options.data,
     nodes: options.nodes
   });
-  const groundFiltered = filterSelectionToAcceptedGround(
-    preparedSelection,
-    options.nodes,
-    options.sampleGroundAtLatLon
-  );
+  const groundFiltered = options.allowWorldwideTerrainFallback === true
+    ? Object.freeze({
+        selection: preparedSelection,
+        diagnostics: Object.freeze({
+          status: 'fallback',
+          reason: 'worldwide-terrain-fallback',
+          acceptedNodeCount: 0,
+          rejectedNodeCount: 0,
+          rejectedWayCount: 0,
+          rejectedPointFeatureCount: 0
+        })
+      })
+    : filterSelectionToAcceptedGround(
+        preparedSelection,
+        options.nodes,
+        options.sampleGroundAtLatLon
+      );
   const adapted = adaptSelectedLocationSource({
     ...options,
     selection: groundFiltered.selection

@@ -1,11 +1,11 @@
 import { createLinearFeatureRuntime } from "./load-linear-runtime.js?v=10";
-import { createWorldLandusePass } from "./load-landuse-pass.js?v=30";
+import { createWorldLandusePass } from "./load-landuse-pass.js?v=31";
 import { createWorldRoadLoaderSupport } from "./load-roads-support.js?v=7";
 import { findNearestBoatCandidate, isPointInsideWaterFootprint } from "../boat-mode/water-query.js?v=16";
 import { createWorldLoadRuntimeSession, finishWorldLoadRuntimeSession } from "./load-runtime-session.js?v=8";
 import { loadBuildingDetailForPublication } from "./load-building-detail.js?v=12";
-import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=4";
-import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=5";
+import { activateAcceptedGroundForWorldLoad } from "./accepted-ground-activation.js?v=5";
+import { diagnoseDistrictGroundSource, prepareSelectedLocationSource } from "./compiler/selected-location-source-adapter.js?v=6";
 async function waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase) {
   if (!appCtx.terrainEnabled || appCtx.onMoon) return false;
   const waitForCoverage = appCtx.waitForTerrainCoverageAt;
@@ -413,6 +413,8 @@ export function createWorldRoadLoader(deps = {}) {
         const baselineFullWorld = perfModeNow === 'baseline';
         startLoadPhase('featureBudgeting');
         const normalized = prepareSelectedLocationSource({
+          allowWorldwideTerrainFallback:
+            runtimeState?.groundMode === 'worldwide-terrain-fallback',
           data,
           location: appCtx.LOC,
           nodes,
@@ -451,12 +453,15 @@ export function createWorldRoadLoader(deps = {}) {
           await waitForInitialTerrain(appCtx, startLoadPhase, endLoadPhase);
         if (runtimeState) {
           runtimeState.transportGroundCoverageReady = transportGroundCoverageReady;
-          const centerTerrainSource = appCtx.sampleAcceptedGroundAtLatLon?.(
-            appCtx.LOC.lat,
-            appCtx.LOC.lon
-          ) || null;
+          const worldwideFallback =
+            runtimeState.groundMode === 'worldwide-terrain-fallback';
+          const centerTerrainSource = worldwideFallback
+            ? appCtx.terrainSourceSampleAtLatLon?.(appCtx.LOC.lat, appCtx.LOC.lon) || null
+            : appCtx.sampleAcceptedGroundAtLatLon?.(appCtx.LOC.lat, appCtx.LOC.lon) || null;
           runtimeState.districtGroundModel =
-            diagnoseDistrictGroundSource(centerTerrainSource);
+            diagnoseDistrictGroundSource(centerTerrainSource, {
+              allowWorldwideTerrainFallback: worldwideFallback
+            });
         }
         buildRoadGeometryPass({
           appendIndexedGeometry,

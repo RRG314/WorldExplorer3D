@@ -567,8 +567,11 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
   if (!info) return;
 
   const { z, tx, ty, bounds } = info;
+  const usesAcceptedGround = typeof deps.usesAcceptedGround === 'function'
+    ? deps.usesAcceptedGround()
+    : deps.usesAcceptedGround !== false;
   const acceptedSampler =
-    typeof deps.sampleAcceptedGroundAtLatLon === 'function'
+    usesAcceptedGround && typeof deps.sampleAcceptedGroundAtLatLon === 'function'
       ? deps.sampleAcceptedGroundAtLatLon
       : null;
   const tile = acceptedSampler ? null : getOrLoadTerrainTile(z, tx, ty, deps);
@@ -630,6 +633,21 @@ export function applyHeightsToTerrainMesh(mesh, deps = {}) {
         };
       }
     } else {
+      if (i === 0) {
+        mesh.userData.renderProvenance = {
+          version: 1,
+          profile: 'worldwide-terrain-fallback',
+          provider: 'mapzen-terrarium',
+          dataset: 'Mapzen Terrain Tiles',
+          release: '',
+          verticalDatum: 'mixed-source',
+          tileKey: mesh.userData.terrainTileKey,
+          layer: 'terrain',
+          role: 'terrain',
+          sources: ['mapzen-terrarium'],
+          fallback: true
+        };
+      }
       const u = (lon - bounds.lonW) / lonRange;
       const v = (bounds.latN - lat) / latRange;
       const column = i % verticesPerSide;

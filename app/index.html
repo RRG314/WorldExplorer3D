@@ -26,8 +26,8 @@ if (location.protocol === 'file:') document.documentElement.classList.add('unsup
 <link rel="stylesheet" href="styles/block-builder.css?v=2">
 <link rel="stylesheet" href="styles/universe.css?v=5">
 <link rel="stylesheet" href="styles/fishing-game.css?v=2">
-<link rel="stylesheet" href="styles/interface-v4.css?v=10">
-<link rel="stylesheet" href="styles/start-hub.css?v=10">
+<link rel="stylesheet" href="styles/interface-v4.css?v=11">
+<link rel="stylesheet" href="styles/start-hub.css?v=11">
 </head>
 <body>
 <div id="fileLaunchError" role="alert"><div><strong>World Explorer needs a local web server.</strong><code>npm run dev</code></div></div>
@@ -460,6 +460,7 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 </div>
 <div class="globe-hub-tools" aria-label="Account and application tools">
 <button id="globeHubShareBtn" type="button" title="Share World Explorer" aria-label="Share World Explorer">↗</button>
+<button id="globeHubThemeBtn" type="button" title="Switch to light appearance" aria-label="Switch to light appearance" aria-pressed="false">☼</button>
 <button type="button" data-globe-destination="settings" title="Settings" aria-label="Open settings">⚙</button>
 <button type="button" data-globe-destination="controls" title="Controls" aria-label="Open controls">?</button>
 <button id="globeHubFullscreenBtn" type="button" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
@@ -519,19 +520,11 @@ Three.js (MIT) · OpenStreetMap data © OpenStreetMap contributors (ODbL) · Str
 <div class="globe-selector-hint">Drag to rotate · Scroll to zoom · Tap/Click to pick</div>
 </div>
 <div class="globe-destination-bar" aria-label="World destinations">
-  <button id="globeSelectorEarthBtn" class="active" type="button"><span class="destination-thumb earth" aria-hidden="true"></span>Earth</button>
-  <button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Go to Moon" aria-label="Launch Moon"><span class="destination-thumb moon" aria-hidden="true"></span>Moon</button>
-  <button id="globeSelectorMarsBtn" type="button" title="Go to Mars"><span class="destination-thumb mars" aria-hidden="true"></span>Mars</button>
-  <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Go to Space" aria-label="Launch Space"><span class="destination-thumb space" aria-hidden="true"></span>Space</button>
-  <button id="globeSelectorOceanBtn" type="button" title="Explore underwater at the selected coordinates" aria-label="Explore underwater at the selected coordinates"><span class="destination-thumb ocean" aria-hidden="true"></span>Ocean</button>
-</div>
-<div class="globe-system-bar" aria-label="Data status">
-  <span><b>Satellites</b><em>Observed</em></span>
-  <span><b>Aircraft</b><em>OpenSky</em></span>
-  <span><b>Marine traffic</b><em>Reference</em></span>
-  <span><b>Weather</b><em>Current</em></span>
-  <span><b>USGS earthquakes</b><em>Live data</em></span>
-  <span><b>OSM data</b><em>Up to date</em></span>
+  <button id="globeSelectorEarthBtn" class="active" type="button" title="Explore Earth" aria-label="Explore Earth"><span class="destination-thumb earth" aria-hidden="true"></span></button>
+  <button id="globeSelectorMoonBtn" class="globe-selector-shortcut" type="button" title="Explore the Moon" aria-label="Explore the Moon"><span class="destination-thumb moon" aria-hidden="true"></span></button>
+  <button id="globeSelectorMarsBtn" type="button" title="Explore Mars" aria-label="Explore Mars"><span class="destination-thumb mars" aria-hidden="true"></span></button>
+  <button id="globeSelectorSpaceBtn" class="globe-selector-shortcut" type="button" title="Explore space" aria-label="Explore space"><span class="destination-thumb space" aria-hidden="true"></span></button>
+  <button id="globeSelectorOceanBtn" type="button" title="Explore underwater at the selected coordinates" aria-label="Explore underwater at the selected coordinates"><span class="destination-thumb ocean" aria-hidden="true"></span></button>
 </div>
 <section id="globeHubOverlay" class="globe-hub-overlay" hidden aria-hidden="true">
   <header class="globe-hub-overlay-header">
@@ -1585,5 +1578,5 @@ Explore the area
 <!-- Real Estate System -->
 <script type="module" src="js/app-shell-fragments.js?v=84"></script>
 <script type="module" src="js/app-auth-shell.js?v=86"></script>
-<script type="module" src="js/bootstrap.js?v=346"></script>
+<script type="module" src="js/bootstrap.js?v=349"></script>
 </body></html>

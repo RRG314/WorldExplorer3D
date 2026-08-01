@@ -2,8 +2,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { LOCS } from '../app/js/config.js';
 import { createGlobeSelectorLaunch } from '../app/js/ui/globe-selector/launch.js';
-import { detailZoomForDistance, patchRadiusForZoom } from '../app/js/ui/globe-selector/detail-tiles.js';
-import { getMenuFavoriteCities } from '../app/js/ui/globe-selector/helpers.js';
+import { getMenuFavoriteCities, parseReverseAddress } from '../app/js/ui/globe-selector/helpers.js';
 
 const expectedV3Cities = {
   baltimore: [39.2904, -76.6122],
@@ -53,14 +52,8 @@ assert.deepEqual(receivedSelection, {
   name: LOCS.tokyo.name
 });
 
-assert.equal(detailZoomForDistance(2.8), 0);
-assert.equal(detailZoomForDistance(1.6), 4);
-assert.equal(detailZoomForDistance(1.3), 6);
-assert.equal(detailZoomForDistance(1.15), 8);
-assert.equal(detailZoomForDistance(1.05), 9);
-assert.equal(patchRadiusForZoom(4), 1);
-assert.equal(patchRadiusForZoom(8), 2);
-assert.equal(patchRadiusForZoom(9), 2);
+assert.equal(parseReverseAddress({ type: 'sea', display_name: 'North Atlantic Ocean' }).waterKind, 'open_ocean');
+assert.equal(parseReverseAddress({ address: { lake: 'Lake Erie' } }).waterKind, 'lake');
 
 const selectorSource = fs.readFileSync(new URL('../app/js/ui/globe-selector.js', import.meta.url), 'utf8');
 const sceneSource = fs.readFileSync(new URL('../app/js/ui/globe-selector/scene.js', import.meta.url), 'utf8');
@@ -69,12 +62,17 @@ assert.match(selectorSource, /onOceanShortcut\(\{ \.\.\.selected \}\)/);
 assert.match(sceneSource, /addEventListener\('dblclick'/);
 assert.match(titleSource, /await globeSelector\?\.startHere\?\.\(\)/);
 assert.match(titleSource, /startOceanMode\(\{\s*launchSite:/);
+assert.match(selectorSource, /await selectionResolvePromise/);
+assert.match(sceneSource, /earth_atmos_2048\.jpg/);
+assert.doesNotMatch(sceneSource, /createGlobeDetailTiles|detailTiles|World_Imagery/);
+assert.equal(fs.existsSync(new URL('../app/js/ui/globe-selector/detail-tiles.js', import.meta.url)), false);
 
 console.log(JSON.stringify({
   ok: true,
   featuredCities: Object.keys(expectedV3Cities).length,
   coordinateAuthority: 'selected-coordinates-through-launch',
   globeActivation: 'double-click',
-  globeDetailZooms: [4, 6, 8, 9],
+  globeDetailZooms: 'smooth-camera-on-original-globe',
+  globeImagery: 'original-earth-texture-only',
   oceanLaunch: 'selected-coordinate-launch-site'
 }, null, 2));

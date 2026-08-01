@@ -224,7 +224,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   padding: 0;
   gap: 0;
   grid-template-columns: 136px minmax(0, 1fr) 332px;
-  grid-template-rows: 72px minmax(0, 1fr) 104px 58px;
+  grid-template-rows: 72px minmax(0, 1fr) 104px;
   color: var(--wx-text);
   background: var(--wx-bg);
   border: 0;
@@ -256,7 +256,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .globe-selector-subtitle { color: var(--wx-muted); text-align: left; }
 .globe-app-rail {
   grid-column: 1;
-  grid-row: 2 / 5;
+  grid-row: 2 / 4;
   display: flex;
   flex-direction: column;
   background: #03090e;
@@ -332,7 +332,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
   background: rgba(3, 9, 14, 0.98);
-  border-top: 1px solid var(--wx-line-soft);
+  border-top: 0;
 }
 .globe-destination-bar button {
   display: flex;
@@ -343,27 +343,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   color: var(--wx-muted);
   background: transparent;
   border: 0;
-  border-right: 1px solid var(--wx-line-soft);
-  border-bottom: 4px solid transparent;
+  border: 0;
   border-radius: 0;
   font: 600 11px/1 Orbitron, sans-serif;
   text-transform: uppercase;
   cursor: pointer;
 }
 .globe-destination-bar button span { font-size: 28px; line-height: 1; }
-.globe-destination-bar button:hover, .globe-destination-bar button.active { color: var(--wx-text); border-bottom-color: var(--wx-blue); background: rgba(45, 125, 255, 0.08); }
+.globe-destination-bar button:hover, .globe-destination-bar button.active { color: var(--wx-text); background: rgba(45, 125, 255, 0.08); }
 .globe-selector-shortcut { position: static; width: auto; height: auto; box-shadow: none; }
-.globe-system-bar {
-  grid-column: 2 / 4;
-  grid-row: 4;
-  display: grid;
-  grid-template-columns: repeat(6, minmax(0, 1fr));
-  background: #03090e;
-  border-top: 1px solid var(--wx-line-soft);
-}
-.globe-system-bar span { min-width: 0; display: flex; flex-direction: column; justify-content: center; padding: 0 14px; border-right: 1px solid var(--wx-line-soft); text-transform: uppercase; }
-.globe-system-bar b { overflow: hidden; color: var(--wx-muted); font: 500 9px/1.2 Orbitron, sans-serif; text-overflow: ellipsis; white-space: nowrap; }
-.globe-system-bar em { margin-top: 5px; color: var(--wx-green); font: normal 600 10px/1 Orbitron, sans-serif; }
 
 /* Runtime desktop HUD */
 #hud { top: 0; left: 0; }
@@ -527,8 +515,6 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
   .globe-destination-bar button { font-size: 8px; }
   .globe-destination-bar button span { font-size: 21px; }
   .globe-selector-side { order: 3; flex: 0 0 auto; padding: 12px 12px 82px; overflow: visible; border-top: 1px solid var(--wx-line-soft); border-left: 0; }
-  .globe-system-bar { display: none; }
-
   #hud { top: 0; left: 0; right: 0; }
   .hud-box {
     width: 100%;
