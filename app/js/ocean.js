@@ -17,7 +17,7 @@ import {
   getSeabedTextureSet as getSeabedTextureSetAsset
 } from "./ocean/scene-textures.js?v=1";
 import { createOceanFishLifeApi } from "./ocean/fish-life.js?v=1";
-import { createOceanBathymetryApi } from "./ocean/bathymetry.js?v=2";
+import { createOceanBathymetryApi } from "./ocean/bathymetry.js?v=3";
 import { updateOceanHud as updateOceanHudView } from "./ocean/hud.js?v=2";
 import {
   commitEnvironment,
@@ -86,6 +86,9 @@ Object.assign(oceanMode, {
   localBathymetryGrid: null,
   localBathymetryReady: false,
   localBathymetryPromise: null,
+  globalBathymetryGrid: null,
+  globalBathymetryReady: false,
+  globalBathymetryPromise: null,
   weatherRefreshTimer: 0,
   submarine: {
     mesh: null,
@@ -363,6 +366,9 @@ function resetOceanLaunchSite(site = null) {
   oceanMode.bathymetryCache.clear();
   oceanMode.bathymetryTileKeys = [];
   oceanMode.bathymetryPromise = null;
+  oceanMode.globalBathymetryGrid = null;
+  oceanMode.globalBathymetryReady = false;
+  oceanMode.globalBathymetryPromise = null;
   oceanMode.bathymetryReady = false;
   oceanMode.bathymetryBlend = 0;
   return true;
@@ -517,7 +523,19 @@ function animateOceanMode(nowMs = 0) {
 }
 
 function startOceanMode(options = {}) {
-  if (oceanMode.active) return true;
+  if (oceanMode.active) {
+    if (options.launchSite && resetOceanLaunchSite(options.launchSite)) {
+      resetSubmarineAtLaunch(options.submarinePose || null);
+      rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
+      void primeBathymetryTiles().then((ready) => {
+        if (ready && oceanMode.active && oceanMode.scene) {
+          rebuildOceanTerrainLayers(oceanMode.scene, oceanMode.renderer);
+        }
+      });
+      updateOceanHud(performance.now() * 0.001);
+    }
+    return true;
+  }
   try {
     if (appCtx.ENV?.OCEAN) exitCurrentEnvironmentSync(appCtx.ENV.OCEAN, { source: 'ocean_start' });
     if (appCtx.ENV?.OCEAN) commitEnvironment(appCtx.ENV.OCEAN, { source: 'ocean_start' });

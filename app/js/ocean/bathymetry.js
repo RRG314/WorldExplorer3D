@@ -4,6 +4,9 @@ export function createOceanBathymetryApi({
   bathymetryGridUrl,
   constants
 }) {
+  const GEBCO_GRID_SIZE = 5;
+  const GEBCO_GRID_EXTENT = 900;
+  const GEBCO_WMS = 'https://wms.gebco.net/mapserv';
   function clamp01(v) {
     return Math.max(0, Math.min(1, v));
   }
@@ -126,6 +129,88 @@ export function createOceanBathymetryApi({
     return lerp(h0, h1, fy);
   }
 
+  async function fetchGebcoElevationMeters(lat, lon) {
+    const halfSpan = 0.01;
+    const params = new URLSearchParams({
+      SERVICE: 'WMS',
+      VERSION: '1.1.1',
+      REQUEST: 'GetFeatureInfo',
+      LAYERS: 'GEBCO_LATEST_2',
+      QUERY_LAYERS: 'GEBCO_LATEST_2',
+      STYLES: '',
+      SRS: 'EPSG:4326',
+      BBOX: `${lon - halfSpan},${lat - halfSpan},${lon + halfSpan},${lat + halfSpan}`,
+      WIDTH: '64',
+      HEIGHT: '64',
+      FORMAT: 'image/png',
+      INFO_FORMAT: 'text/plain',
+      X: '32',
+      Y: '32'
+    });
+    const response = await fetch(`${GEBCO_WMS}?${params.toString()}`, { cache: 'force-cache' });
+    if (!response.ok) throw new Error(`GEBCO WMS HTTP ${response.status}`);
+    const payload = await response.text();
+    const match = payload.match(/value_list\s*=\s*'(-?\d+(?:\.\d+)?)/i);
+    const elevation = match ? Number(match[1]) : NaN;
+    return Number.isFinite(elevation) ? elevation : null;
+  }
+
+  async function primeGlobalBathymetryGrid() {
+    if (oceanMode.globalBathymetryPromise) return oceanMode.globalBathymetryPromise;
+    const launchSignature = `${Number(oceanMode.launchSite?.lat).toFixed(6)},${Number(oceanMode.launchSite?.lon).toFixed(6)}`;
+    oceanMode.globalBathymetryPromise = (async () => {
+      const samples = [];
+      for (let row = 0; row < GEBCO_GRID_SIZE; row += 1) {
+        const z = -GEBCO_GRID_EXTENT + row / (GEBCO_GRID_SIZE - 1) * GEBCO_GRID_EXTENT * 2;
+        for (let column = 0; column < GEBCO_GRID_SIZE; column += 1) {
+          const x = -GEBCO_GRID_EXTENT + column / (GEBCO_GRID_SIZE - 1) * GEBCO_GRID_EXTENT * 2;
+          const geo = oceanWorldToLatLon(x, z);
+          samples.push(fetchGebcoElevationMeters(geo.lat, geo.lon).catch(() => null));
+        }
+      }
+      const values = await Promise.all(samples);
+      const validCount = values.filter(Number.isFinite).length;
+      const currentSignature = `${Number(oceanMode.launchSite?.lat).toFixed(6)},${Number(oceanMode.launchSite?.lon).toFixed(6)}`;
+      if (currentSignature !== launchSignature || validCount < Math.ceil(values.length * 0.6)) return false;
+      oceanMode.globalBathymetryGrid = {
+        size: GEBCO_GRID_SIZE,
+        extent: GEBCO_GRID_EXTENT,
+        values,
+        dataset: 'GEBCO_2024 Grid',
+        source: GEBCO_WMS
+      };
+      oceanMode.globalBathymetryReady = true;
+      oceanMode.bathymetryCache.clear();
+      return true;
+    })().catch((error) => {
+      console.warn('[OceanMode] Global GEBCO bathymetry unavailable; retaining local/procedural seabed.', error);
+      oceanMode.globalBathymetryGrid = null;
+      oceanMode.globalBathymetryReady = false;
+      return false;
+    });
+    return oceanMode.globalBathymetryPromise;
+  }
+
+  function sampleGlobalBathymetryMeters(x, z) {
+    const grid = oceanMode.globalBathymetryGrid;
+    if (!grid || !Array.isArray(grid.values) || grid.size < 2) return null;
+    const gridX = clamp01((x + grid.extent) / (grid.extent * 2)) * (grid.size - 1);
+    const gridY = clamp01((z + grid.extent) / (grid.extent * 2)) * (grid.size - 1);
+    const x0 = Math.floor(gridX);
+    const y0 = Math.floor(gridY);
+    const x1 = Math.min(grid.size - 1, x0 + 1);
+    const y1 = Math.min(grid.size - 1, y0 + 1);
+    const valueAt = (row, column) => Number(grid.values[row * grid.size + column]);
+    const h00 = valueAt(y0, x0);
+    const h10 = valueAt(y0, x1);
+    const h01 = valueAt(y1, x0);
+    const h11 = valueAt(y1, x1);
+    if (![h00, h10, h01, h11].every(Number.isFinite)) return null;
+    const top = lerp(h00, h10, gridX - x0);
+    const bottom = lerp(h01, h11, gridX - x0);
+    return lerp(top, bottom, gridY - y0);
+  }
+
   function sampleTerrainMetersAtLatLon(lat, lon) {
     if (typeof appCtx.elevationMetersAtLatLon === 'function') {
       const meters = appCtx.elevationMetersAtLatLon(lat, lon);
@@ -162,7 +247,12 @@ export function createOceanBathymetryApi({
 
     const { lat, lon } = oceanWorldToLatLon(x, z);
     const localMeters = sampleLocalBathymetryMeters(lat, lon);
-    const meters = Number.isFinite(localMeters) ? localMeters : sampleTerrainMetersAtLatLon(lat, lon);
+    const globalMeters = sampleGlobalBathymetryMeters(x, z);
+    const meters = Number.isFinite(localMeters)
+      ? localMeters
+      : Number.isFinite(globalMeters)
+        ? globalMeters
+        : sampleTerrainMetersAtLatLon(lat, lon);
     const mapped = mapBathymetryMetersToWorldY(meters);
     const sampled = Number.isFinite(mapped) ? mapped : null;
     oceanMode.bathymetryCache.set(key, sampled);
@@ -205,15 +295,13 @@ export function createOceanBathymetryApi({
 
   function primeBathymetryTiles() {
     if (oceanMode.bathymetryPromise) return oceanMode.bathymetryPromise;
-    const groundActive =
-      appCtx.getAcceptedGroundRuntimeSnapshot?.().status === 'accepted';
-    oceanMode.bathymetryReady =
-      oceanMode.localBathymetryReady || groundActive;
-    oceanMode.bathymetryBlend = oceanMode.bathymetryReady ? 1 : 0;
-    if (oceanMode.bathymetryReady) oceanMode.bathymetryCache.clear();
-    oceanMode.bathymetryPromise = Promise.resolve(
-      oceanMode.bathymetryReady
-    );
+    oceanMode.bathymetryPromise = primeGlobalBathymetryGrid().then((globalReady) => {
+      const groundActive = appCtx.getAcceptedGroundRuntimeSnapshot?.().status === 'accepted';
+      oceanMode.bathymetryReady = oceanMode.localBathymetryReady || globalReady || groundActive;
+      oceanMode.bathymetryBlend = oceanMode.bathymetryReady ? 1 : 0;
+      if (oceanMode.bathymetryReady) oceanMode.bathymetryCache.clear();
+      return oceanMode.bathymetryReady;
+    });
     return oceanMode.bathymetryPromise;
   }
 
@@ -222,6 +310,7 @@ export function createOceanBathymetryApi({
     expApproachFactor,
     lerp,
     primeBathymetryTiles,
+    primeGlobalBathymetryGrid,
     primeLocalBathymetryGrid,
     sampleSeabedHeight,
     smoothstep,

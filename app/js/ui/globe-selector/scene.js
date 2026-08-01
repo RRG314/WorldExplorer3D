@@ -4,6 +4,7 @@ import {
   disposeThreeRenderer
 } from '../../engine/webgl-lifecycle.js?v=1';
 import { latLonToLocalPoint, localPointToLatLon } from './helpers.js?v=5';
+import { createGlobeDetailTiles } from './detail-tiles.js?v=3';
 
 export function createGlobeSelectorScene(options = {}) {
   const {
@@ -16,6 +17,7 @@ export function createGlobeSelectorScene(options = {}) {
     getOpenState,
     cityMatchesSelection,
     onFavoritePick,
+    onFavoriteActivate,
     onGlobePick
   } = options;
 
@@ -33,6 +35,7 @@ export function createGlobeSelectorScene(options = {}) {
   let menuFavoriteMaterial = null;
   let savedFavoriteMaterial = null;
   let favoriteMarkerNodes = [];
+  let detailTiles = null;
   let cameraDistance = 2.8;
   let pointerActive = false;
   let pointerDragDistance = 0;
@@ -43,11 +46,11 @@ export function createGlobeSelectorScene(options = {}) {
   let dragLastY = 0;
   let eventsBound = false;
 
-  const minDistance = 1.08;
+  const minDistance = 1.025;
   const maxDistance = 4.4;
 
   function getMarkerScale() {
-    return Math.max(0.34, Math.min(1, cameraDistance / 2.8));
+    return Math.max(0.055, Math.min(1, (cameraDistance - 1) * 0.56));
   }
 
   function applyMarkerScales() {
@@ -132,6 +135,7 @@ export function createGlobeSelectorScene(options = {}) {
   }
 
   function setSelectionMarker(selected) {
+    detailTiles?.setSelection(selected);
     if (!markerMesh) return;
     if (!selected) {
       markerMesh.visible = false;
@@ -147,6 +151,7 @@ export function createGlobeSelectorScene(options = {}) {
   function setCameraDistance(nextDistance) {
     if (!Number.isFinite(nextDistance)) return;
     cameraDistance = Math.max(minDistance, Math.min(maxDistance, Number(nextDistance)));
+    detailTiles?.setCameraDistance(cameraDistance);
     if (camera) {
       camera.position.z = cameraDistance;
       camera.updateProjectionMatrix();
@@ -154,7 +159,7 @@ export function createGlobeSelectorScene(options = {}) {
     }
   }
 
-  function handlePick(clientX, clientY) {
+  function handlePick(clientX, clientY, activate = false) {
     if (!renderer || !camera || !raycaster || !earthMesh) return;
     const rect = canvas.getBoundingClientRect();
     if (!rect.width || !rect.height) return;
@@ -167,7 +172,8 @@ export function createGlobeSelectorScene(options = {}) {
       const markerHit = raycaster.intersectObjects(favoriteMarkerNodes.map((entry) => entry.mesh), false)?.[0];
       const favoriteCity = markerHit?.object?.userData?.favoriteCity;
       if (favoriteCity) {
-        onFavoritePick(favoriteCity);
+        if (activate) onFavoriteActivate?.(favoriteCity);
+        else onFavoritePick(favoriteCity);
         return;
       }
     }
@@ -176,7 +182,7 @@ export function createGlobeSelectorScene(options = {}) {
     if (!hit) return;
     const localPoint = hit.point.clone();
     earthMesh.worldToLocal(localPoint);
-    onGlobePick(localPointToLatLon(localPoint));
+    onGlobePick(localPointToLatLon(localPoint), { activate });
   }
 
   function bindEvents() {
@@ -219,6 +225,10 @@ export function createGlobeSelectorScene(options = {}) {
       setCameraDistance(cameraDistance + Math.sign(event.deltaY || 0) * 0.16);
       renderFrame();
     }, { passive: false });
+    canvas.addEventListener('dblclick', (event) => {
+      event.preventDefault();
+      handlePick(event.clientX, event.clientY, true);
+    });
     window.addEventListener('resize', ensureSize);
   }
 
@@ -269,10 +279,13 @@ export function createGlobeSelectorScene(options = {}) {
     });
     earthMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 64, 48), earthMaterial);
     globeRoot.add(earthMesh);
+    detailTiles = createGlobeDetailTiles({ THREE, globeRoot, onInvalidate: renderFrame });
+    detailTiles.setCameraDistance(cameraDistance);
     markerMesh = new THREE.Mesh(
       new THREE.SphereGeometry(0.018, 14, 12),
-      new THREE.MeshBasicMaterial({ color: 0xff3b30 })
+      new THREE.MeshBasicMaterial({ color: 0xff3b30, depthTest: false })
     );
+    markerMesh.renderOrder = 4;
     markerMesh.visible = false;
     globeRoot.add(markerMesh);
     favoriteMarkerGroup = new THREE.Group();
@@ -311,6 +324,7 @@ export function createGlobeSelectorScene(options = {}) {
     pointerActive = false;
     favoriteMarkerNodes = [];
     sceneReady = false;
+    detailTiles?.destroy?.();
     if (scene) disposeThreeObjectTree(scene);
     renderer = disposeThreeRenderer(renderer);
     if (canvas) {
@@ -327,6 +341,7 @@ export function createGlobeSelectorScene(options = {}) {
     favoriteMarkerGeometry = null;
     menuFavoriteMaterial = null;
     savedFavoriteMaterial = null;
+    detailTiles = null;
   }
 
   return {

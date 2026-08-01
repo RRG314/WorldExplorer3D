@@ -41,7 +41,7 @@ import './planetary/sky-orientation.js?v=10';
 import './planetary/moon-sky.js?v=1';
 import './planetary/mars-world.js?v=17';
 import './planetary/tracks.js?v=1';
-import './ocean.js?v=5';
+import './ocean.js?v=7';
 import './game.js?v=58';
 import './input.js?v=60';
 import './hud.js?v=73';
@@ -51,7 +51,7 @@ import './memory.js?v=55';
 import './blocks.js?v=60';
 import './block-builder/ui.js?v=2';
 import './flower-challenge.js?v=56';
-import { setupUI } from './ui.js?v=104';
+import { setupUI } from './ui.js?v=110';
 
 let _booted = false;
 let _lastObservedAuthUser = null;
