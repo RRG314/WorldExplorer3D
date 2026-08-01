@@ -43,6 +43,11 @@ assert.ok(tunnelModel.shellStart >= 14 && tunnelModel.shellStart <= 22);
 assert.ok(tunnelModel.shellEnd >= 78 && tunnelModel.shellEnd <= 86);
 assert.equal(tunnelModel.portalStart, tunnelModel.shellStart);
 assert.equal(tunnelModel.portalEnd, tunnelModel.shellEnd);
+assert.equal(tunnelModel.version, 3);
+assert.equal(tunnelModel.portalZones.length, 2);
+assert.ok(tunnelModel.portalZones.every((zone) => zone.transitionLength <= 11));
+assert.ok(tunnelModel.portalZones[0].approachStart > 0, 'entrance transition must be local to the cover boundary');
+assert.ok(tunnelModel.portalZones[1].approachEnd < 100, 'exit transition must be local to the cover boundary');
 
 const shortUnderpass = tunnelFeature(0, 32, 'Short Underpass');
 const underpassModel = compileTunnelSystemModel(shortUnderpass, () => 0);
@@ -84,7 +89,8 @@ console.log(JSON.stringify({
   ok: true,
   portalModel: {
     start: Number(tunnelModel.shellStart.toFixed(2)),
-    end: Number(tunnelModel.shellEnd.toFixed(2))
+    end: Number(tunnelModel.shellEnd.toFixed(2)),
+    transitionZones: tunnelModel.portalZones.length
   },
   shortUnderpass: underpassModel.visualKind,
   continuousChain: true,

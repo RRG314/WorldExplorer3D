@@ -12,6 +12,8 @@ import {
   updateFeatureSurfaceProfile
 } from "../structure-semantics.js?v=30";
 import { registerBridgeGuardrails } from "./bridge-guardrails.js?v=9";
+import { detectRoadIntersections } from "../terrain/intersections.js?v=1";
+import { appendRoadJunctionGeometry } from "../terrain/road-junctions.js?v=1";
 import {
   normalizeTransportSource
 } from "./compiler/transport-source-normalizer.js?v=1";
@@ -226,6 +228,14 @@ export function buildRoadGeometryPass(options = {}) {
     }
   });
 
+  const intersections = detectRoadIntersections(appCtx.roads);
+  const junctionStats = appendRoadJunctionGeometry({
+    intersections,
+    roads: appCtx.roads,
+    verts: roadMainBatchVerts,
+    indices: roadMainBatchIdx
+  });
+
   buildIndexedBatchMesh({
     scene: appCtx.scene,
     targetList: appCtx.roadMeshes,
@@ -259,8 +269,10 @@ export function buildRoadGeometryPass(options = {}) {
     transportGraphId: appCtx.transportNetworkModel?.id || null,
     roadCount: appCtx.roads.length,
     meshCount: appCtx.roadMeshes.length,
-    intersectionCount: 0,
-    topologyIntersectionCount: 0,
+    intersectionCount: junctionStats.count,
+    topologyIntersectionCount: intersections.filter((intersection) =>
+      !intersection?.hasGradeSeparatedRoad
+    ).length,
     compiledSampleCount: appCtx.roads.reduce((total, road) =>
       total + Number(road?.transportSurfaceModel?.distances?.length || 0), 0),
     vertices:

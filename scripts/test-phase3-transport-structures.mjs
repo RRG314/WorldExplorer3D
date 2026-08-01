@@ -164,6 +164,7 @@ assert.equal(underpassModel.visualKind, 'underpass');
 assert.equal(underpassModel.shellRanges.length, 1);
 assert.ok(underpassModel.shellStart < 50 && underpassModel.shellEnd > 50);
 assert.equal(underpassModel.portalDistances.length, 2);
+assert.equal(underpassModel.portalZones.length, 2);
 
 const tunnelColliders = compileStructureColliderDescriptors([underpass]);
 const tunnelWalls = tunnelColliders.filter((collider) => collider.structureColliderKind === 'side_wall');

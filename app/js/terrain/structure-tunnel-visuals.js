@@ -174,21 +174,16 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
       .filter(Boolean);
     if (rings.length < 2) continue;
     const approaches = [];
-    if (model.visualKind === 'tunnel' && rangeIndex === 0 && range.start > 1.2) {
-      const approach = distancesWithin(0, range.start)
+    const portalZones = Array.isArray(model.portalZones) ? model.portalZones : [];
+    for (const zone of portalZones) {
+      const belongsToRange =
+        Math.abs(Number(zone.distance) - Number(range.start)) < 0.2 ||
+        Math.abs(Number(zone.distance) - Number(range.end)) < 0.2;
+      if (!belongsToRange || !(zone.approachEnd - zone.approachStart > 0.5)) continue;
+      const approach = distancesWithin(zone.approachStart, zone.approachEnd)
         .map((distance) => pointRing(distance, true))
         .filter(Boolean);
-      if (approach.length >= 2) approaches.push({ rings: approach });
-    }
-    if (
-      model.visualKind === 'tunnel' &&
-      rangeIndex === shellRanges.length - 1 &&
-      total - range.end > 1.2
-    ) {
-      const approach = distancesWithin(range.end, total)
-        .map((distance) => pointRing(distance, true))
-        .filter(Boolean);
-      if (approach.length >= 2) approaches.push({ rings: approach });
+      if (approach.length >= 2) approaches.push({ rings: approach, endpoint: zone.endpoint });
     }
     shells.push({
       rings,
@@ -216,9 +211,10 @@ export function collectTunnelVisualInstances(feature, structurePts, total, deps 
     const rotationY = Math.atan2(point.tangentX, point.tangentZ);
     const pillarWidth = Math.max(0.75, width * 0.16);
     const sideOffset = interiorHalfWidth + pillarWidth * 0.5;
-    portals.push(beam(point.x + nx * sideOffset, roadY + openingHeight * 0.5, point.z + nz * sideOffset, pillarWidth, openingHeight, Math.max(1.2, width * 0.55), rotationY));
-    portals.push(beam(point.x - nx * sideOffset, roadY + openingHeight * 0.5, point.z - nz * sideOffset, pillarWidth, openingHeight, Math.max(1.2, width * 0.55), rotationY));
-    portals.push(beam(point.x, roadY + openingHeight + 0.3, point.z, width + pillarWidth * 2.2, 0.6, Math.max(0.9, width * 0.34), rotationY));
+    const portalDepth = Math.max(1.1, Math.min(2.4, width * 0.22));
+    portals.push(beam(point.x + nx * sideOffset, roadY + openingHeight * 0.5, point.z + nz * sideOffset, pillarWidth, openingHeight, portalDepth, rotationY));
+    portals.push(beam(point.x - nx * sideOffset, roadY + openingHeight * 0.5, point.z - nz * sideOffset, pillarWidth, openingHeight, portalDepth, rotationY));
+    portals.push(beam(point.x, roadY + openingHeight + 0.3, point.z, width + pillarWidth * 2.2, 0.6, portalDepth, rotationY));
   }
   return { portals, walls, roofs, lights, shells };
 }

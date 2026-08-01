@@ -7,7 +7,7 @@ import {
   buildFeatureTransitionAnchors,
   updateFeatureSurfaceProfile
 } from "../structure-semantics.js?v=30";
-import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=2";
+import { compileTunnelSystemModels } from "./compiler/tunnel-system-model.js?v=3";
 import { compileTransportStructureModel } from "./compiler/transport-structure-model.js?v=1";
 import { refreshStructureColliders } from "./structure-colliders.js?v=1";
 

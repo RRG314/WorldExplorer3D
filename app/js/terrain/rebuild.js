@@ -1,6 +1,7 @@
 import { ctx as appCtx } from "../shared-context.js?v=55";
 import { appendUpwardRibbonGeometry, buildIndexedBatchMesh } from "../road-render.js?v=2";
 import { detectRoadIntersections } from "./intersections.js?v=1";
+import { appendRoadJunctionGeometry } from "./road-junctions.js?v=1";
 import {
   buildFeatureRibbonEdges,
   roadSkirtDepth,
@@ -419,6 +420,13 @@ export function publishCompiledTransportMeshes(deps = {}) {
     }
   });
 
+  const junctionStats = appendRoadJunctionGeometry({
+    intersections,
+    roads: baseRoads,
+    verts: roadMainBatchVerts,
+    indices: roadMainBatchIdx
+  });
+
   buildIndexedBatchMesh({
     scene: appCtx.scene,
     targetList: appCtx.roadMeshes,
@@ -482,7 +490,7 @@ export function publishCompiledTransportMeshes(deps = {}) {
     transportGraphId: appCtx.transportNetworkModel?.id || null,
     roadCount: baseRoads.length,
     meshCount: appCtx.roadMeshes.length,
-    intersectionCount: 0,
+    intersectionCount: junctionStats.count,
     topologyIntersectionCount: intersections.filter((intersection) =>
       !intersection?.hasGradeSeparatedRoad
     ).length,

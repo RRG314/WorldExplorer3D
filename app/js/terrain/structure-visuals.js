@@ -11,7 +11,7 @@ import {
 import {
   collectCoveredVisualInstances,
   collectTunnelVisualInstances
-} from "./structure-tunnel-visuals.js?v=8";
+} from "./structure-tunnel-visuals.js?v=9";
 import { elevatedSegmentSafety } from "../world/bridge-safety.js?v=2";
 
 function countNearbyElevatedFeatures(feature, elevatedFeatures, boundsIntersect, padding = 28) {

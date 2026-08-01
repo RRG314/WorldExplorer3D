@@ -108,6 +108,38 @@ function crossingShellRanges(feature, features, pathDistances, total) {
   return merged;
 }
 
+function compilePortalZones(shellRanges, total, width, portalDistances = []) {
+  const portalSet = new Set(
+    portalDistances.filter(Number.isFinite).map((distance) => Number(distance).toFixed(4))
+  );
+  const transitionLength = Math.max(4.5, Math.min(11, Number(width) * 1.05));
+  const shellInset = Math.max(1.1, Math.min(2.4, Number(width) * 0.18));
+  const zones = [];
+  for (const range of shellRanges || []) {
+    if (portalSet.has(Number(range.start).toFixed(4))) {
+      zones.push(Object.freeze({
+        distance: range.start,
+        endpoint: 'start',
+        approachStart: Math.max(0, range.start - transitionLength),
+        approachEnd: range.start,
+        shellInsetEnd: Math.min(range.end, range.start + shellInset),
+        transitionLength
+      }));
+    }
+    if (portalSet.has(Number(range.end).toFixed(4))) {
+      zones.push(Object.freeze({
+        distance: range.end,
+        endpoint: 'end',
+        approachStart: range.end,
+        approachEnd: Math.min(total, range.end + transitionLength),
+        shellInsetStart: Math.max(range.start, range.end - shellInset),
+        transitionLength
+      }));
+    }
+  }
+  return Object.freeze(zones);
+}
+
 export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) {
   if (!compatibleTunnelFeature(feature) || typeof sampleTerrainY !== 'function') return null;
   const profile = feature.transportSurfaceModel;
@@ -153,8 +185,11 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
       total
     );
     if (shellRanges.length > 0) {
+      const portalDistances = Object.freeze(
+        shellRanges.flatMap((range) => [range.start, range.end])
+      );
       return {
-        version: 2,
+        version: 3,
         visualKind: 'underpass',
         total,
         clearance,
@@ -162,21 +197,21 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
         shellRanges,
         shellStart: shellRanges[0].start,
         shellEnd: shellRanges[shellRanges.length - 1].end,
-        portalDistances: Object.freeze(
-          shellRanges.flatMap((range) => [range.start, range.end])
-        ),
+        portalDistances,
+        portalZones: compilePortalZones(shellRanges, total, width, portalDistances),
         portalStart: shellRanges[0].start,
         portalEnd: shellRanges[shellRanges.length - 1].end
       };
     }
     return {
-      version: 2,
+      version: 3,
       visualKind: 'underpass',
       total,
       clearance,
       roofThickness,
       shellRanges: [],
       portalDistances: [],
+      portalZones: Object.freeze([]),
       shellStart: null,
       shellEnd: null,
       portalStart: null,
@@ -196,13 +231,14 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
   }
   if (!(shellEnd - shellStart > 1.2)) {
     return {
-      version: 2,
+      version: 3,
       visualKind: 'underpass',
       total,
       clearance,
       roofThickness,
       shellRanges: [],
       portalDistances: [],
+      portalZones: Object.freeze([]),
       shellStart: null,
       shellEnd: null,
       portalStart: null,
@@ -213,7 +249,7 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
   const portalStart = !continuesAtStart && (shellStart > 1 || linkedSurfaceAt(feature, 'start')) ? shellStart : null;
   const portalEnd = !continuesAtEnd && (shellEnd < total - 1 || linkedSurfaceAt(feature, 'end')) ? shellEnd : null;
   return {
-    version: 2,
+    version: 3,
     visualKind: 'tunnel',
     total,
     clearance,
@@ -224,6 +260,12 @@ export function compileTunnelSystemModel(feature, sampleTerrainY, options = {}) 
     // A portal belongs at a real surface/tunnel boundary. Dataset clipping in
     // the middle of a tunnel has no connected surface way and gets no fake arch.
     portalDistances: Object.freeze([portalStart, portalEnd].filter(Number.isFinite)),
+    portalZones: compilePortalZones(
+      [{ start: shellStart, end: shellEnd }],
+      total,
+      width,
+      [portalStart, portalEnd].filter(Number.isFinite)
+    ),
     portalStart,
     portalEnd
   };
@@ -234,3 +276,5 @@ export function compileTunnelSystemModels(features = [], sampleTerrainY) {
     feature.tunnelSystemModel = compileTunnelSystemModel(feature, sampleTerrainY, { features });
   }
 }
+
+export { compilePortalZones };
