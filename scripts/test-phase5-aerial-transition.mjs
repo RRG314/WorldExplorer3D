@@ -49,6 +49,16 @@ assert.doesNotMatch(
   /scene\.fog\s*=\s*null|syncAerialFog|savedGroundFog/,
   'travel-mode changes must not replace the Earth fog model'
 );
+assert.match(
+  lodSource,
+  /const aerialMode = !!\(appCtx\.planeMode\?\.active \|\| appCtx\.droneMode\);/,
+  'the shared LOD pass must resolve aerial state before applying building hysteresis'
+);
+assert.match(
+  lodSource,
+  /if \(alwaysVisible\) \{\s*setEarthMeshVisible\(mesh, true\);\s*continue;/,
+  'persistent mapped land-use and water must survive every traversal mode'
+);
 assert.match(diagnosticsSource, /aerialReplacementMeshes/);
 assert.match(diagnosticsSource, /suppressedTerrainMeshes/);
 assert.match(streamingSource, /for \(let dx = -activeRing; dx <= activeRing; dx\+\+\)/);
@@ -83,6 +93,73 @@ assert.match(farFieldSource, /if \(isWater\) meters = 0/);
 assert.match(farFieldSource, /isFarTerrainClipmap/);
 assert.match(diagnosticsSource, /farTerrainClipmap/);
 assert.match(diagnosticsSource, /farMappedContexts/);
+
+const { ctx } = await import('../app/js/shared-context.js?v=55');
+const { initWorldLod, updateWorldLod } = await import('../app/js/world/lod.js?v=16');
+const scene = {
+  add(mesh) {
+    mesh.parent = this;
+    mesh.visible = true;
+  },
+  remove(mesh) {
+    if (mesh.parent === this) mesh.parent = null;
+  }
+};
+const building = {
+  visible: true,
+  parent: scene,
+  userData: { lodCenter: { x: 20, z: 20 }, lodTier: 'near' }
+};
+const persistentGrass = {
+  visible: false,
+  parent: null,
+  userData: { alwaysVisible: true, landuseType: 'grass' }
+};
+const persistentWater = {
+  visible: false,
+  parent: null,
+  userData: { alwaysVisible: true, landuseType: 'water' }
+};
+Object.assign(ctx, {
+  scene,
+  onMoon: false,
+  travelingToMoon: false,
+  isEnv: null,
+  ENV: null,
+  planeMode: { active: false },
+  droneMode: false,
+  car: { x: 0, z: 0 },
+  drone: { x: 0, z: 0 },
+  boatMode: { active: false },
+  roadMeshes: [],
+  urbanSurfaceMeshes: [],
+  buildingMeshes: [building],
+  landuseMeshes: [persistentGrass, persistentWater],
+  poiMeshes: [],
+  streetFurnitureMeshes: [],
+  linearFeatureMeshes: [],
+  landUseVisible: true,
+  poiMode: false,
+  renderQualityLevel: 'med',
+  camMode: 0,
+  setPerfLiveStat: () => {}
+});
+initWorldLod({
+  getPerfModeValue: () => 'full',
+  getRuntimeDynamicBudget: () => ({ lodScale: 1, budgetScale: 1 }),
+  getWorldLodThresholds: () => ({ mid: 900, farVisible: 1600 })
+});
+updateWorldLod(true);
+assert.equal(persistentGrass.parent, scene, 'driving LOD must restore persistent mapped grass');
+assert.equal(persistentWater.parent, scene, 'driving LOD must restore persistent mapped water');
+ctx.droneMode = true;
+persistentGrass.visible = false;
+persistentGrass.parent = null;
+persistentWater.visible = false;
+persistentWater.parent = null;
+updateWorldLod(true);
+assert.equal(persistentGrass.parent, scene, 'drone LOD must restore persistent mapped grass');
+assert.equal(persistentWater.parent, scene, 'drone LOD must restore persistent mapped water');
 
 console.log(JSON.stringify({
   ok: true,

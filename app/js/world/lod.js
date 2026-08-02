@@ -163,6 +163,10 @@ export function updateWorldLod(force = false) {
   const boatLodScale = appCtx.boatMode?.active ? Math.max(0.34, Math.min(1, Number(appCtx.boatMode.detailBias) || 1)) : 1;
   const lodThresholds = runtime.getWorldLodThresholds(depthForLod, mode, dynamicBudgetState.lodScale * boatLodScale);
   const poiMidSq = lodThresholds.mid * lodThresholds.mid;
+  // One shared visibility pass owns driving, drone, and plane traversal. Keep
+  // the aerial state local to this update so building hysteresis cannot abort
+  // before persistent mapped ground and water surfaces are restored.
+  const aerialMode = !!(appCtx.planeMode?.active || appCtx.droneMode);
 
   for (let i = 0; i < appCtx.roadMeshes.length; i += 1) setEarthMeshVisible(appCtx.roadMeshes[i], true);
   let nearVisible = 0;
